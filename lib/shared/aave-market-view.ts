@@ -13,6 +13,8 @@
 import type { AaveMarketReserve } from "@/lib/api/fetch-aave-market-overview";
 import type { ServerRead } from "@/lib/shared/server-head-read";
 import { assetClass, ASSET_CLASS_TITLE, type AssetClass } from "@/lib/aave-v4/asset-class";
+import type { AaveMarketKey } from "@/lib/shared/aave-market-configs";
+import { aaveFamilyTerms, familyRate } from "@/lib/aave-family/terms";
 
 export interface MarketReserveRow extends AaveMarketReserve {
   cls: AssetClass;
@@ -25,6 +27,10 @@ export interface MarketReserveRow extends AaveMarketReserve {
   borrowCapState: CapState;
   /** Every way this reserve is closed to new business; empty when open. */
   closed: ClosedRoute[];
+  /** The two rates in the family's form (lib/aave-family/terms.ts): the
+   *  stored rate on Aave V3 and Seamless, the APY on SparkLend. */
+  supplyRate: number;
+  borrowRate: number;
 }
 
 // ── Caps ─────────────────────────────────────────────────────────────────────
@@ -169,6 +175,7 @@ export function buildAaveMarketView(
     capAutomator?: string;
   },
 ): AaveMarketView {
+  const terms = aaveFamilyTerms(identity.protocol as AaveMarketKey);
   const rows: MarketReserveRow[] = reserves.map((r) => {
     const cls = assetClass(r.symbol);
     const supplyCapState = capSide(r, "supply");
@@ -182,6 +189,8 @@ export function buildAaveMarketView(
       supplyCapState,
       borrowCapState,
       closed: closedRoutes(r, supplyCapState, borrowCapState),
+      supplyRate: familyRate(terms, r.supplyApr),
+      borrowRate: familyRate(terms, r.borrowApr),
     };
   });
 

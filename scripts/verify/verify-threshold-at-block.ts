@@ -655,7 +655,7 @@ test("aave: a listing, an LTV-only set and a block that ends where it began draw
   // Block 25,037,701 sets one reserve 75 % → 0.01 % → 75 % twice.
   assert.ok(!all.some((c) => c.block === 25_037_701), "the round trip");
   // An account in no e-mode sees no category change.
-  assert.ok(!all.some((c) => c.name.startsWith("E-mode")));
+  assert.ok(!all.some((c) => c.name.startsWith("E-Mode")));
 });
 
 test("aave: the v3.2 upgrade's re-emitted memberships and a membership change", () => {
@@ -696,7 +696,7 @@ test("aave: the v3.2 upgrade's re-emitted memberships and a membership change", 
   };
   const out = aaveConfigChanges(synth, held, [sw]).filter((c) => c.block === last.block + 10);
   assert.equal(out.length, 1);
-  assert.equal(out[0].name, "WETH threshold in e-mode “ETH correlated”");
+  assert.equal(out[0].name, "WETH threshold in E-Mode “ETH correlated”");
   assert.ok(out[0].moves);
   const reserveLt = [...core.logs].reverse().find((l) => l.kind === "collateral" && l.asset === weth) as { lt: number };
   assert.equal(out[0].to, factorPct(reserveLt.lt / 1e4));
@@ -757,7 +757,7 @@ test("aave on Base: a category change and a switch in one block are ordered by t
   const change = { block: 200, transactionIndex: 8, logIndex: 0 };
   assert.deepEqual(
     names(log(change), sw(5, 40)),
-    ["E-mode “ETH correlated” liquidation threshold 93 % → 95 %"],
+    ["E-Mode “ETH correlated” liquidation threshold 93 % → 95 %"],
     "the switch's transaction came first",
   );
   // The answer before transactionIndex: the change's tx-local 0 against the switch's block-wide 40.

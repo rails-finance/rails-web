@@ -56,7 +56,8 @@ import { borrowRoomShows, deficitShows, type MarketReserveRow } from "@/lib/shar
 import type { AaveMarketVocab } from "@/lib/shared/aave-market-provenance";
 import type { Loadable, ProductHead, ProductSection, RateCurveModel, Missing } from "@/lib/shared/product/model";
 import type { SectionMenuLink } from "@/components/shared/section-menu";
-import { contractLinks, sentenceName, RATE_TIP, readAtOf, vocabOf } from "@/lib/aave-family/product";
+import { contractLinks, sentenceName, rateTip, readAtOf, vocabOf } from "@/lib/aave-family/product";
+import { aaveFamilyTerms, familyRate, type AaveFamilyTerms } from "@/lib/aave-family/terms";
 
 const NOTE = "text-[13px] text-rb-500";
 const RAY = 1e27;
@@ -99,7 +100,9 @@ function restartWords(h: ReserveHistory): string {
 }
 
 /** One line per reason the loaded days have no utilisation (the route's `why`). */
-function gapLines(h: ReserveHistory, label: string, symbol: string): string[] {
+function gapLines(h: ReserveHistory, label: string, symbol: string, t: AaveFamilyTerms): string[] {
+  const U = t.utilization;
+  const u = t.utilizationText;
   const pts = h.points;
   const out: string[] = [];
   const count = (why: string) => pts.filter((p) => p.why === why).length;
@@ -110,22 +113,22 @@ function gapLines(h: ReserveHistory, label: string, symbol: string): string[] {
     const restart = next && next.closeBlock >= h.reserveFactor.heldFrom;
     out.push(
       next
-        ? `Utilisation before ${formatDate(next.date)} isn't held for ${label} yet: ${restart ? `the reserve factor history starts at ${restartWords(h)}` : "the reserve factor isn't held for those days"}.`
-        : `Utilisation isn't held for ${label} yet: the reserve factor history starts at ${restartWords(h)}, and no ${symbol} change has come since.`,
+        ? `${U} before ${formatDate(next.date)} isn't held for ${label} yet: ${restart ? `the reserve factor history starts at ${restartWords(h)}` : "the reserve factor isn't held for those days"}.`
+        : `${U} isn't held for ${label} yet: the reserve factor history starts at ${restartWords(h)}, and no ${symbol} change has come since.`,
     );
   }
-  if (count("gho")) out.push("GHO has no supply side, so its utilisation isn't drawn.");
+  if (count("gho")) out.push(`GHO has no supply side, so its ${u} isn't drawn.`);
   const stable = pts.find((p) => p.why === "stable-debt");
   if (stable)
     out.push(
-      `Utilisation from ${formatDate(stable.date)} isn't drawn: stable debt may be outstanding, and the rate identity holds only without it.`,
+      `${U} from ${formatDate(stable.date)} isn't drawn: stable debt may be outstanding, and the rate identity holds only without it.`,
     );
   const zero = count("borrow-rate-zero");
-  if (zero) out.push(`${days(zero)} no utilisation: the borrow rate was 0.`);
+  if (zero) out.push(`${days(zero)} no ${u}: the borrow rate was 0.`);
   const moved = count("rf-changed-between-snapshots");
-  if (moved) out.push(`${days(moved)} no utilisation: the reserve factor changed between the stored snapshots.`);
+  if (moved) out.push(`${days(moved)} no ${u}: the reserve factor changed between the stored snapshots.`);
   const full = count("reserve-factor-full");
-  if (full) out.push(`${days(full)} no utilisation: the reserve factor was 100%.`);
+  if (full) out.push(`${days(full)} no ${u}: the reserve factor was 100%.`);
   return out;
 }
 
@@ -149,6 +152,17 @@ function curveOf(r: MarketReserveRow, vocab: AaveMarketVocab): RateCurveModel | 
     },
     symbol: r.symbol,
     receipt: vocab.reserveCurveProv(r.symbol, { ...rc, strategy: r.rateStrategy }),
+    kinkLabel: vocab.terms.kinkText,
+    utilizationWord: vocab.terms.utilizationText,
+    ...(vocab.terms.rateForm === "apy"
+      ? {
+          form: {
+            of: (rate: number) => familyRate(vocab.terms, rate),
+            borrow: vocab.terms.borrowRate,
+            supply: vocab.terms.supplyRate,
+          },
+        }
+      : {}),
   };
 }
 
@@ -161,6 +175,7 @@ function ReserveExplainer({ r, label, vocab }: { r: MarketReserveRow; label: str
   const ltv = r.bps?.ltv ?? Math.round((r.ltv ?? 0) * 1e4);
   const lt = r.bps?.lt ?? Math.round((r.lt ?? 0) * 1e4);
   const c = r.borrowCapState;
+  const t = vocab.terms;
   return (
     <>
       <ExplainGroup title="This reserve">
@@ -209,21 +224,22 @@ function ReserveExplainer({ r, label, vocab }: { r: MarketReserveRow; label: str
       <ExplainGroup title="Rates">
         {r.supplied > 0 && (
           <ExplainBullet>
-            Suppliers earn <Fig bold>{ratePercentText(r.supplyApr)}</Fig> a year, as an APR.
+            Suppliers earn <Fig bold>{ratePercentText(r.supplyRate)}</Fig> a year, as an {t.rateUnit}.
           </ExplainBullet>
         )}
         {r.borrowed > 0 && (
           <ExplainBullet>
-            Borrowers pay <Fig bold>{ratePercentText(r.borrowApr)}</Fig> a year, as an APR.
+            Borrowers pay <Fig bold>{ratePercentText(r.borrowRate)}</Fig> a year, as an {t.rateUnit}.
           </ExplainBullet>
         )}
         {u != null && (
           <ExplainBullet>
-            Utilisation <Fig bold>{pct(u)}</Fig> is the share of the supply on loan.
+            {t.utilization} <Fig bold>{pct(u)}</Fig> is the share of the supply on loan.
           </ExplainBullet>
         )}
         <ExplainBullet>
-          The supply rate is the borrow rate times utilisation, less the {pct(r.reserveFactor)} reserve factor.
+          The supply rate is the borrow rate times {t.utilizationText}, less the {pct(r.reserveFactor)} reserve factor.
+          {t.rateForm === "apy" && " Each APY is its rate compounded every second for a year."}
         </ExplainBullet>
       </ExplainGroup>
       <ExplainGroup title="Collateral">
@@ -243,6 +259,7 @@ function ReserveExplainer({ r, label, vocab }: { r: MarketReserveRow; label: str
 }
 
 function reserveMarkdown(m: AaveMarketConfig, r: MarketReserveRow, block: number): string {
+  const t = aaveFamilyTerms(m.key);
   const usd = (t: number) => (r.priceUsd != null ? fmtUsd(t * r.priceUsd).display : `${formatCompact(t)} ${r.symbol}`);
   return [
     `# ${r.symbol}, a reserve of ${m.marketLabel}`,
@@ -250,9 +267,9 @@ function reserveMarkdown(m: AaveMarketConfig, r: MarketReserveRow, block: number
     `- Supplied: ${usd(r.supplied)}`,
     `- Borrowed: ${usd(r.borrowed)}`,
     `- Available: ${usd(r.virtualBalance ?? Math.max(0, r.supplied - r.borrowed))}`,
-    `- Supply rate: ${ratePercentText(r.supplyApr)} APR`,
-    `- Borrow rate: ${ratePercentText(r.borrowApr)} APR`,
-    ...(r.utilization != null && r.supplied > 0 ? [`- Utilisation: ${pct(r.utilization)}`] : []),
+    `- ${t.supplyRate}: ${ratePercentText(r.supplyRate)}${t.rateForm === "apr" ? " APR" : ""}`,
+    `- ${t.borrowRate}: ${ratePercentText(r.borrowRate)}${t.rateForm === "apr" ? " APR" : ""}`,
+    ...(r.utilization != null && r.supplied > 0 ? [`- ${t.utilization}: ${pct(r.utilization)}`] : []),
     "",
     `Read from the ${chainMeta(m.chainId).name} chain at block ${block.toLocaleString("en-US")}.`,
   ].join("\n");
@@ -334,19 +351,19 @@ function reserveHead(
       },
       {
         slot: "rateIn",
-        label: "Supply rate",
-        tip: RATE_TIP.supply,
+        label: vocab.terms.supplyRate,
+        tip: rateTip(vocab.terms).supply,
         value: <span data-vital="supply-rate">{z.supplyRate}</span>,
       },
       {
         slot: "rateOut",
-        label: "Borrow rate",
-        tip: RATE_TIP.borrow,
+        label: vocab.terms.borrowRate,
+        tip: rateTip(vocab.terms).borrow,
         value: <span data-vital="borrow-rate">{z.borrowRate}</span>,
       },
       {
         slot: "usage",
-        label: "Utilisation",
+        label: vocab.terms.utilization,
         tip: "Borrowed ÷ supplied, both traced on this page.",
         value: (
           <span data-prov-exempt="" data-vital="utilisation">
@@ -457,8 +474,9 @@ function changeItems(
   symbol: string,
   chainId: ChainId,
   configurator: string,
+  em: string,
 ): ConfigChangeItem[] {
-  const explained = reserveChangesExplained(changes, { symbol, compact: compactFigure });
+  const explained = reserveChangesExplained(changes, { symbol, compact: compactFigure, emode: em });
   const name = chainMeta(chainId).explorerName;
   return changes.map(({ row, words }, i) => ({
     ...explained[i],
@@ -524,7 +542,7 @@ function indexedSections(
         Couldn&apos;t read the {what}. Reload to retry.
       </p>
     );
-  const gaps = h ? gapLines(h, m.marketLabel, r.symbol) : [];
+  const gaps = h ? gapLines(h, m.marketLabel, r.symbol, aaveFamilyTerms(m.key)) : [];
   const history: ProductSection = {
     scope: "reserve-history",
     anatomy: "M3.4",
@@ -550,6 +568,7 @@ function indexedSections(
           <ReserveHistoryChart
             h={h}
             symbol={r.symbol}
+            terms={aaveFamilyTerms(m.key)}
             changes={changes}
             range={x.range}
             onRange={x.onRange}
@@ -597,8 +616,8 @@ function indexedSections(
       cr.state === "ok" && changes ? (
         <ConfigChangeTimeline
           family={`${m.key}-config`}
-          items={changeItems(changes, r.symbol, chainId, cr.data.configurator)}
-          held={heldLine(cr.data, dateOf)}
+          items={changeItems(changes, r.symbol, chainId, cr.data.configurator, aaveFamilyTerms(m.key).emode)}
+          held={heldLine(cr.data, dateOf, aaveFamilyTerms(m.key).emode)}
           automatorNote={m.key === "spark"}
           pageSize={CHANGES_SHOWN}
         />
@@ -689,7 +708,7 @@ export function AaveReservePage({ marketKey, asset }: { marketKey: AaveMarketKey
   const cr = reads.changes;
   const r = view?.rows.find((x) => x.address === asset.toLowerCase()) ?? null;
   const changes = useMemo(
-    () => (cr.state === "ok" && r ? reserveChanges(cr.data, r.symbol) : null),
+    () => (cr.state === "ok" && r ? reserveChanges(cr.data, r.symbol, aaveFamilyTerms(m.key).emode) : null),
     [cr, r?.symbol], // eslint-disable-line react-hooks/exhaustive-deps
   );
   // "Supplied by vaults": Aave's vault roster is on Ethereum and wraps Core.

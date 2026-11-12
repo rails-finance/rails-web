@@ -25,7 +25,7 @@ import {
   Collateral,
   collateralRank,
   CompositionBar,
-  HEADER_TIP,
+  headerTip,
   pct,
   ReserveDetails,
   reserveFigures,
@@ -62,6 +62,7 @@ import type {
   SectionTools,
 } from "@/lib/shared/product/model";
 import type { SectionMenuLink } from "@/components/shared/section-menu";
+import { aaveFamilyTerms, type AaveFamilyTerms } from "@/lib/aave-family/terms";
 
 export const AAVE_TERMS: ProductTerms = {
   market: { one: "market", many: "markets" },
@@ -69,11 +70,17 @@ export const AAVE_TERMS: ProductTerms = {
   position: { one: "position", many: "positions" },
 };
 
-/** The rate tips: the basis goes here, the label stays the house's. */
-export const RATE_TIP = {
-  supply: "What suppliers earn a year, as an APR (simple, not compounded)",
-  borrow: "The variable rate borrowers pay a year, as an APR (simple, not compounded)",
-} as const;
+/** The rate tips: the basis goes here, the label is the family's. */
+export const rateTip = (t: AaveFamilyTerms) =>
+  t.rateForm === "apy"
+    ? {
+        supply: "What suppliers earn a year, with interest compounding each second",
+        borrow: "What the variable rate costs borrowers a year, with interest compounding each second",
+      }
+    : {
+        supply: "What suppliers earn a year, as an APR (simple, not compounded)",
+        borrow: "The variable rate borrowers pay a year, as an APR (simple, not compounded)",
+      };
 
 /** The vocabulary for a market's read. */
 export function vocabOf(m: AaveMarketConfig, read: AaveMarketRead): AaveMarketVocab | null {
@@ -132,7 +139,7 @@ const hasListingOf = (m: AaveMarketConfig) => !EXPLORERS_WITHOUT_LISTING.has(m.k
 // ── The head ─────────────────────────────────────────────────────────────────
 
 /** The market head's (i): what the market is, its size and use, how it works. */
-function MarketExplainer({ view }: { view: AaveMarketView }) {
+function MarketExplainer({ view, terms }: { view: AaveMarketView; terms: AaveFamilyTerms }) {
   const supplied = fmtUsd(view.suppliedUsd).display;
   const borrowed = fmtUsd(view.borrowedUsd).display;
   const closed = view.rows.filter((r) => r.closed.length > 0).length;
@@ -147,7 +154,8 @@ function MarketExplainer({ view }: { view: AaveMarketView }) {
         </ExplainBullet>
         {view.suppliedUsd > 0 && (
           <ExplainBullet>
-            Utilisation <Fig bold>{pct(view.borrowedUsd / view.suppliedUsd)}</Fig> is the share of the supply on loan.
+            {terms.utilization} <Fig bold>{pct(view.borrowedUsd / view.suppliedUsd)}</Fig> is the share of the supply on
+            loan.
           </ExplainBullet>
         )}
         {closed > 0 && (
@@ -158,8 +166,12 @@ function MarketExplainer({ view }: { view: AaveMarketView }) {
         )}
       </ExplainGroup>
       <ExplainGroup title="How it works">
-        <ExplainBullet>Suppliers earn each reserve&rsquo;s supply rate; borrowers pay its borrow rate.</ExplainBullet>
-        <ExplainBullet>A reserve&rsquo;s rates rise with its utilisation, steeply past its kink.</ExplainBullet>
+        <ExplainBullet>
+          Suppliers earn each reserve&rsquo;s {terms.supplyRateText}; borrowers pay its {terms.borrowRateText}.
+        </ExplainBullet>
+        <ExplainBullet>
+          A reserve&rsquo;s rates rise with its {terms.utilizationText}, steeply past its {terms.kinkText}.
+        </ExplainBullet>
         <ExplainBullet>A wallet borrows against all it supplies here, under one health factor.</ExplainBullet>
       </ExplainGroup>
     </>
@@ -167,6 +179,7 @@ function MarketExplainer({ view }: { view: AaveMarketView }) {
 }
 
 function marketMarkdown(m: AaveMarketConfig, view: AaveMarketView): string {
+  const terms = aaveFamilyTerms(m.key);
   const lines = [
     `# ${view.label}`,
     "",
@@ -175,7 +188,7 @@ function marketMarkdown(m: AaveMarketConfig, view: AaveMarketView): string {
     `- Reserves: ${view.reserveCount}`,
     `- Supplied: ${fmtUsd(view.suppliedUsd).display}`,
     `- Borrowed: ${fmtUsd(view.borrowedUsd).display}`,
-    ...(view.suppliedUsd > 0 ? [`- Utilisation: ${pct(view.borrowedUsd / view.suppliedUsd)}`] : []),
+    ...(view.suppliedUsd > 0 ? [`- ${terms.utilization}: ${pct(view.borrowedUsd / view.suppliedUsd)}`] : []),
     ...(view.composition.length
       ? [`- Supply mix: ${view.composition.map((c) => `${c.label} ${c.pct}%`).join(", ")}`]
       : []),
@@ -312,7 +325,7 @@ function marketHead(m: AaveMarketConfig, read: AaveMarketRead, view: AaveMarketV
         ? [
             {
               slot: "usage" as const,
-              label: "Utilisation",
+              label: aaveFamilyTerms(m.key).utilization,
               // A ratio of the two receipted figures beside it: exempt from the
               // coverage tripwire, like the per-row utilisation.
               value: <span data-prov-exempt="">{pct(usage)}</span>,
@@ -331,7 +344,7 @@ function marketHead(m: AaveMarketConfig, read: AaveMarketRead, view: AaveMarketV
     entries,
     readAt: readAtOf(m, read, `Every figure in ${view.label}`),
     tools,
-    explainer: { body: <MarketExplainer view={view} />, label: "market explanation" },
+    explainer: { body: <MarketExplainer view={view} terms={aaveFamilyTerms(m.key)} />, label: "market explanation" },
     bandHooks: { "data-market-panel": view.protocol },
   };
 }
@@ -417,10 +430,18 @@ function reserveRows(m: AaveMarketConfig, view: AaveMarketView, vocab: AaveMarke
             z.available
           ),
         },
-        supplyRate: { sort: r.supplyApr, title: `Supply rate: ${RATE_TIP.supply.toLowerCase()}`, node: z.supplyRate },
-        borrowRate: { sort: r.borrowApr, title: `Borrow rate: ${RATE_TIP.borrow.toLowerCase()}`, node: z.borrowRate },
+        supplyRate: {
+          sort: r.supplyRate,
+          title: `${vocab.terms.supplyRate}: ${rateTip(vocab.terms).supply.toLowerCase()}`,
+          node: z.supplyRate,
+        },
+        borrowRate: {
+          sort: r.borrowRate,
+          title: `${vocab.terms.borrowRate}: ${rateTip(vocab.terms).borrow.toLowerCase()}`,
+          node: z.borrowRate,
+        },
         collateral: { sort: collateralRank(r), node: <Collateral r={r} vocab={vocab} /> },
-        util: { sort: r.utilization ?? -1, node: <UtilBar r={r} /> },
+        util: { sort: r.utilization ?? -1, node: <UtilBar r={r} terms={vocab.terms} /> },
       },
     };
   });
@@ -428,6 +449,8 @@ function reserveRows(m: AaveMarketConfig, view: AaveMarketView, vocab: AaveMarke
 
 function reservesTable(m: AaveMarketConfig, read: AaveMarketRead, view: AaveMarketView): ReserveTableModel {
   const vocab = vocabOf(m, read)!;
+  const terms = vocab.terms;
+  const HEADER_TIP = headerTip(terms);
   const scope = `reserves-${m.key}`;
   return {
     scope,
@@ -436,7 +459,7 @@ function reservesTable(m: AaveMarketConfig, read: AaveMarketRead, view: AaveMark
       <>
         Every reserve on the Pool, filter by class, sort any column. Rates, caps and risk parameters are the
         configuration the Pool enforces; USD is the market&apos;s oracle price. A cap shows beside its dollar value once
-        90% of it is in use. The bar is utilisation, and its tick is the rate model&apos;s kink. A row opens its
+        90% of it is in use. The bar is {terms.utilizationText}, and its tick is the {terms.kinkText}. A row opens its
         reserve&apos;s page; Details opens its parameters in place.
       </>
     ),
@@ -457,7 +480,7 @@ function reservesTable(m: AaveMarketConfig, read: AaveMarketRead, view: AaveMark
       },
       {
         key: "supplyRate",
-        label: "Supply rate",
+        label: terms.supplyRate,
         align: "right",
         className: RATE,
         tip: HEADER_TIP.supplyRate,
@@ -465,7 +488,7 @@ function reservesTable(m: AaveMarketConfig, read: AaveMarketRead, view: AaveMark
       },
       {
         key: "borrowRate",
-        label: "Borrow rate",
+        label: terms.borrowRate,
         align: "right",
         className: RATE,
         tip: HEADER_TIP.borrowRate,
@@ -481,7 +504,7 @@ function reservesTable(m: AaveMarketConfig, read: AaveMarketRead, view: AaveMark
       },
       {
         key: "util",
-        label: "Utilisation",
+        label: terms.utilization,
         className: "lg:w-[180px] lg:min-w-[112px]",
         wide: true,
         tip: HEADER_TIP.util,

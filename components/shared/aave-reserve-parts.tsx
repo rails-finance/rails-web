@@ -33,6 +33,7 @@ import { type AssetClass, ASSET_CLASS_COLOR } from "@/lib/aave-v4/asset-class";
 import { capShows, type AaveMarketView, type CapState, type MarketReserveRow } from "@/lib/shared/aave-market-view";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import type { AaveMarketVocab } from "@/lib/shared/aave-market-provenance";
+import type { AaveFamilyTerms } from "@/lib/aave-family/terms";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { ratePercentText } from "@/lib/shared/rate-percent";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
@@ -211,8 +212,11 @@ export function Collateral({ r, vocab }: { r: MarketReserveRow; vocab: AaveMarke
   if (ltvBps === 0) {
     if (em.lendsLtv)
       return (
-        <span className="text-rb-500" title="Collateral only for a wallet in one of its eMode categories (Details)">
-          <Prov info={vocab.reserveEModeLtProv(r.symbol, em.cats)}>eMode only</Prov>
+        <span
+          className="text-rb-500"
+          title={`Collateral only for a wallet in one of its ${vocab.terms.emode} categories (Details)`}
+        >
+          <Prov info={vocab.reserveEModeLtProv(r.symbol, em.cats)}>{vocab.terms.emode} only</Prov>
         </span>
       );
     return (
@@ -233,13 +237,13 @@ export function Collateral({ r, vocab }: { r: MarketReserveRow; vocab: AaveMarke
 /** The utilisation bar with the kink tick. Utilisation is borrowed ÷ supplied,
  *  both traced in the same row, so its percentage is exempt from the coverage
  *  tripwire. */
-export function UtilBar({ r }: { r: MarketReserveRow }) {
+export function UtilBar({ r, terms }: { r: MarketReserveRow; terms: AaveFamilyTerms }) {
   const ticks: RatioBarTick[] = [];
   if (r.kink != null)
     ticks.push({
       f: r.kink,
       kind: "neutral",
-      title: `Rate model kink · the utilisation this reserve's curve turns at (${fracText(r.kink)}%)`,
+      title: `${terms.kink} · the ${terms.utilizationText} this reserve's curve turns at (${fracText(r.kink)}%)`,
     });
   const u = r.utilization != null && r.borrowed > 0 ? r.utilization : null;
   return (
@@ -250,7 +254,7 @@ export function UtilBar({ r }: { r: MarketReserveRow }) {
       <span
         className="w-9 shrink-0 text-right tabular-nums text-[12px] text-foreground/80"
         data-prov-exempt=""
-        title="Utilisation: borrowed ÷ supplied, both traced in this row"
+        title={`${terms.utilization}: borrowed ÷ supplied, both traced in this row`}
       >
         {u != null ? pct(u) : "—"}
       </span>
@@ -326,12 +330,12 @@ export function reserveFigures({ r, vocab, assetHref }: RowProps) {
     );
   const supplyRate =
     r.supplied > 0 ? (
-      <Prov info={vocab.reserveRateProv("supply", r.symbol)}>{ratePercentText(r.supplyApr)}</Prov>
+      <Prov info={vocab.reserveRateProv("supply", r.symbol, r.supplyApr)}>{ratePercentText(r.supplyRate)}</Prov>
     ) : (
       <span className="text-rb-500">—</span>
     );
   const borrowRate = hasBorrow ? (
-    <Prov info={vocab.reserveRateProv("borrow", r.symbol)}>{ratePercentText(r.borrowApr)}</Prov>
+    <Prov info={vocab.reserveRateProv("borrow", r.symbol, r.borrowApr)}>{ratePercentText(r.borrowRate)}</Prov>
   ) : (
     <span className="text-rb-500">—</span>
   );
@@ -554,7 +558,7 @@ export function ReserveParameters({
         )}
         {r.kink != null && r.rateStrategy && (
           <DetailLine
-            term="Kink"
+            term={vocab.terms.kink}
             title={`The share of the reserve's ${r.symbol} lent out at which the borrow rate starts to climb steeply.`}
           >
             <Prov
@@ -571,7 +575,7 @@ export function ReserveParameters({
       </dl>
       {em.cats.length > 0 && (
         <div className="mt-3 border-t border-rb-200 pt-2 dark:border-rb-700" data-reserve-emode="">
-          <p className="mb-1.5 text-[11px] text-rb-500">eMode categories (LTV / LT)</p>
+          <p className="mb-1.5 text-[11px] text-rb-500">{vocab.terms.emode} categories (LTV / LT)</p>
           <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 text-[12px]">
             {em.cats.map((c) => (
               <div key={c.label} className="contents">
@@ -655,16 +659,22 @@ export function ReserveDetails({
   );
 }
 
-/** What a column header stands for, in its tip. */
-export const HEADER_TIP: Record<string, string> = {
+/** What a column header stands for, in its tip, in the family's terms. */
+export const headerTip = (t: AaveFamilyTerms): Record<string, string> => ({
   available:
     "Available: the underlying the Pool holds for this reserve, what suppliers can withdraw and borrowers can still take (supplied less borrowed on a Pool before v3.3)",
   collateral:
     "Collateral: loan-to-value / liquidation threshold, the most a wallet can borrow against this reserve and the ratio past which a position holding it can be liquidated",
-  supplyRate: "Supply rate: what suppliers earn a year, as an APR",
-  borrowRate: "Borrow rate: the variable rate borrowers pay a year, as an APR",
-  util: "Utilisation: the share of the reserve's supply that is on loan; the tick is the rate model's kink",
-};
+  supplyRate:
+    t.rateForm === "apy"
+      ? `${t.supplyRate}: what suppliers earn a year, with interest compounding each second`
+      : `${t.supplyRate}: what suppliers earn a year, as an APR`,
+  borrowRate:
+    t.rateForm === "apy"
+      ? `${t.borrowRate}: what the variable rate costs borrowers a year, with interest compounding each second`
+      : `${t.borrowRate}: the variable rate borrowers pay a year, as an APR`,
+  util: `${t.utilization}: the share of the reserve's supply that is on loan; the tick is the ${t.kinkText}`,
+});
 
 /** A reserve's collateral standing as one sortable number: loan-to-value,
  *  then liquidation threshold. */

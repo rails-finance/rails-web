@@ -12,7 +12,7 @@
 //   2. The page names the reserve and stays inside the viewport's width.
 //   3. Vitals match the route: Supplied, Borrowed, Available (the virtual
 //      balance where the Pool has one, else supplied − borrowed, GHO included),
-//      Supply rate, Borrow rate, Utilisation; where the supply cap is one token
+//      Supply rate, Borrow rate, Utilization (Supply APY, Borrow APY on SparkLend); where the supply cap is one token
 //      and the borrow cap real (GHO on Core), the borrow capacity line under
 //      Available is cap − borrowed.
 //   4. The deficit line shows exactly when the route's deficit is at least
@@ -218,8 +218,11 @@ for (const f of process.env.V4_ONLY ? [] : FIXTURES) {
       );
     } else check(`${tag} 3g no borrow capacity line (supply side open)`, got.capacity == null, norm(got.capacity));
   }
+  // SparkLend states each rate as an APY: the Pool's rate compounded each
+  // second for a year (lib/aave-family/apy.ts, restated; ui-jobs 611).
+  const inForm = (apr) => (API_MARKET[f.api] === "spark" ? Math.expm1(31_536_000 * Math.log1p(apr / 31_536_000)) : apr);
   const rateOk = (text, apr) => {
-    const p = apr * 100;
+    const p = inForm(apr) * 100;
     if (p === 0) return /0\.00%/.test(text);
     if (p < 0.0001) return /<0\.0001%/.test(text);
     // Two decimals from 0.01%, one significant digit below (lib/shared/rate-percent.ts).
@@ -240,7 +243,7 @@ for (const f of process.env.V4_ONLY ? [] : FIXTURES) {
     );
   if (r.utilization != null && r.supplied > 0)
     check(
-      `${tag} 3f Utilisation`,
+      `${tag} 3f Utilization`,
       Math.abs(pctOf(got.util) - Math.round(r.utilization * 100)) <= 1,
       `${norm(got.util)} vs ${(r.utilization * 100).toFixed(1)}%`,
     );
