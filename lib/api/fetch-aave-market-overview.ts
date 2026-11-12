@@ -125,6 +125,8 @@ export interface AaveMarketOverviewResponse {
   stored?: StoredHeadRead;
   /** True when the RPC read failed — reserves is empty, show a retry state. */
   chainStale: boolean;
+  /** With `chainStale`: the read was refused at the daily read ceiling (lib/shared/read-ceiling.ts). */
+  readCeiling?: boolean;
   /** SparkLend's CapAutomator, when the market has one. */
   capAutomator?: string;
   reserves: AaveMarketReserve[];

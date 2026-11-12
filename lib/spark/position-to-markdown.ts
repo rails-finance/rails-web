@@ -12,6 +12,7 @@
 // agrees with the card number-for-number.
 
 import { formatDate } from "@/lib/date";
+import { aprToApy } from "@/lib/aave-family/apy";
 import { NOT_LOADED_CELL, unreadToken } from "@/lib/shared/decimals-unread";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isSparkEvent } from "@/lib/shared/types/event-shape";
@@ -223,13 +224,13 @@ export function sparkPositionToMarkdown(args: SparkPositionMarkdownArgs): string
   }
   if (captions?.borrowRate) {
     lines.push(
-      `- **Borrow rate:** ${num(captions.borrowRate.pct, 2)}% APR${captions.borrowRate.avg ? " (debt-USD-weighted average across the borrowed reserves)" : ""}`,
+      `- **Borrow APY:** ${num(captions.borrowRate.pct, 2)}%${captions.borrowRate.avg ? " (debt-USD-weighted average across the borrowed reserves)" : ""}`,
     );
   }
   if (chain && !chain.chainStale) {
     lines.push(...aaveLtvLines(chain));
     if (chain.availableBorrowsUsd > 0) {
-      lines.push(`- **Available to borrow:** ${usd(chain.availableBorrowsUsd)} more before the LTV cap`);
+      lines.push(`- **Available to borrow:** ${usd(chain.availableBorrowsUsd)} more before the Max LTV`);
     }
   }
   lines.push("");
@@ -238,12 +239,12 @@ export function sparkPositionToMarkdown(args: SparkPositionMarkdownArgs): string
   if (chain && !chain.chainStale && chain.reserves.some((r) => r.supplyApr != null || r.borrowApr != null)) {
     lines.push(`## Reserve rates (at block ${chain.blockNumber})`);
     lines.push("");
-    lines.push("| Asset | Supply APR | Variable borrow APR | Utilization | Reserve factor |");
-    lines.push("|-------|------------|---------------------|-------------|----------------|");
+    lines.push("| Asset | Supply APY | Borrow APY | Utilization | Reserve factor |");
+    lines.push("|-------|------------|------------|-------------|----------------|");
     for (const r of chain.reserves) {
       const pct = (v?: number) => (v != null ? num(v * 100, 2) + "%" : "—");
       lines.push(
-        `| ${r.symbol} | ${pct(r.supplyApr)} | ${pct(r.borrowApr)} | ${pct(r.utilization)} | ${pct(r.reserveFactor)} |`,
+        `| ${r.symbol} | ${pct(aprToApy(r.supplyApr) ?? undefined)} | ${pct(aprToApy(r.borrowApr) ?? undefined)} | ${pct(r.utilization)} | ${pct(r.reserveFactor)} |`,
       );
     }
     lines.push("");
@@ -317,7 +318,7 @@ function marketNotesLine(notes: MarketNote[]): string | null {
   if (notes.length === 0) return null;
   if (notes.length === 1) return `- **Market notes:** 1 — ${marketNoteHeadline(notes[0])} (see below)`;
   return (
-    `- **Market notes:** ${notes.length} — stretches where one reserve's own supply or borrow rate moved between ` +
+    `- **Market notes:** ${notes.length} — stretches where one reserve's own supply or borrow APY moved between ` +
     `two of this position's own touches, and the live readings since its newest one (see below)`
   );
 }
@@ -332,7 +333,7 @@ function marketNotesSection(notes: MarketNote[]): string[] {
     "Each note is a receipted fact about ONE reserve this position holds, on ONE side of it, observed between two " +
       "of the position's own touches and stated between them — or between its newest touch and the chain head for " +
       "a live note. A V3-family account is one cross-collateralised account holding several reserves at once, and " +
-      "each reserve carries a supply rate the account earns and a variable borrow rate it pays, so a note is per " +
+      "each reserve carries a supply APY the account earns and a borrow APY it pays, so a note is per " +
       "reserve and per side rather than per position. A note is not an event: this snapshot's totals leave it out, " +
       "and the timeline table below reads as it would without any of them. The rate is on " +
       "neither of the position's rows — it is the reserve's own ReserveDataUpdated, and the two ends are found by " +
@@ -341,7 +342,8 @@ function marketNotesSection(notes: MarketNote[]): string[] {
       "before the position's next touch and NOT inside that touch's own transaction, so a move the position " +
       "itself caused there is never stated as the market's. A live note's later end is the Pool's getReserveData " +
       "read at the head. The interest figures hold the earlier touch's own balance fixed and move only the rate, " +
-      "so they are what that balance came to be worth at each rate.",
+      "so they are what that balance came to be worth at each rate. Each rate is stated as an APY, the Pool's " +
+      "rate compounded each second for a year.",
   );
   out.push("");
   for (const n of notes) {

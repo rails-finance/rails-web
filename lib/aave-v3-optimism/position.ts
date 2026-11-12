@@ -9,7 +9,7 @@
 //   10^8 (rails-ops decision 0047).
 // - Health factor: getUserAccountData's, over 1e18; none where the account owes nothing.
 // - Room to borrow: getUserAccountData's availableBorrowsBase over 10^8.
-// - Liquidation threshold: the wallet's eMode category's where the category
+// - Liquidation threshold: the wallet's E-Mode category's where the category
 //   counts the reserve, else the reserve's own (configuration bits 16-31).
 // - 30-day interest: a scaled balance is fixed between the account's own
 //   actions and grows into tokens through the index, so with the same scaled
@@ -49,7 +49,7 @@ export interface OpReserveFigures {
   price: number | null;
   suppliedUsd: number | null;
   debtUsd: number | null;
-  /** A fraction; the eMode category's where it counts this reserve. */
+  /** A fraction; the E-Mode category's where it counts this reserve. */
   liquidationThreshold: number | null;
   ltSource: "emode" | "reserve";
   supplyApr: number;
@@ -132,7 +132,7 @@ export function opPosition(r: OpPositionRead): OpPositionFigures {
     wallet: r.wallet,
     healthFactor: borrowed.length === 0 || !Number.isFinite(hf) || hf > HF_NONE ? null : hf,
     roomToBorrowUsd: Number(r.account.availableBorrowsBase) / 1e8,
-    emode: r.emode ? { id: r.emode.id, label: r.emode.label ?? `eMode ${r.emode.id}` } : null,
+    emode: r.emode ? { id: r.emode.id, label: r.emode.label ?? `E-Mode ${r.emode.id}` } : null,
     reserves,
     supplied,
     borrowed,

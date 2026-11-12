@@ -11,6 +11,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { HistoryTitleRow } from "@/components/shared/history-tag";
+import { UnansweredLine } from "@/components/shared/unanswered-line";
 import { PairDoorCards } from "@/components/start/pair-door";
 import { InFocusSymbol, StartOutOfFocus } from "@/components/start/start-focus";
 import { fetchUniswapPair } from "@/lib/api/fetch-uniswap";
@@ -79,7 +80,9 @@ export async function UniswapPairPage({
           <PairDoorCards base={spec.base} quote={spec.quote} cards={cards} protocol={protocol} v4={version === "v4"} />
         </InFocusSymbol>
       ) : (
-        <p className="text-sm text-rb-500">{PAIR_DOOR.unanswered}</p>
+        <UnansweredLine ceiling={answer.kind === "ceiling"} className="text-sm text-rb-500">
+          {PAIR_DOOR.unanswered}
+        </UnansweredLine>
       )}
     </div>
   );

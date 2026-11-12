@@ -660,9 +660,17 @@ export function pwnCardSlots({
   // running loan carries no tag.
   const status: PositionCardStatus | null = unclaimed ? { word: "Defaulted · unclaimed", tone: "danger" } : null;
   const heads: PositionCardHead[] = [
-    { id: "principal", label: "Principal", labelTip: principalTip, value: principalFigure, sub: principalSub },
+    {
+      id: "principal",
+      label: "Principal",
+      labelTip: principalTip,
+      tier: "amount",
+      value: principalFigure,
+      sub: principalSub,
+    },
     {
       id: "repay",
+      tier: "amount",
       // Past the deadline the contract refuses a repayment, so the sum is what
       // the loan owed when it lapsed, never a figure to repay.
       label: unclaimed || cost?.shape === "accruing" ? "Owed at deadline" : "Repay",

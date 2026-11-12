@@ -10,6 +10,7 @@ import { notFound } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { HistoryTitleRow } from "@/components/shared/history-tag";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { UnansweredLine } from "@/components/shared/unanswered-line";
 import { FluidBasePositionCard } from "@/components/protocol/fluid-base/fluid-base-position-card";
 import { fetchFluidBasePosition } from "@/lib/api/fetch-fluid-base";
 import { fluidBasePosition } from "@/lib/fluid-base/position";
@@ -27,13 +28,17 @@ export async function FluidBasePositionPage({ id }: { id: string }) {
   if (answer.kind === "not-found") notFound();
   const session = "fluid-base";
   const home = protocolForSession(session)!.href;
-  if (answer.kind === "error")
+  if (answer.kind === "error" || answer.kind === "ceiling")
     return (
       <div className="py-8">
         <DetailTopRow session={session} fallbackHref={home} showStamp={false} />
-        <p className="mt-6 text-sm text-rb-500" data-position-unanswered="">
+        <UnansweredLine
+          ceiling={answer.kind === "ceiling"}
+          className="mt-6 text-sm text-rb-500"
+          data-position-unanswered=""
+        >
           {POSITION_PAGE.unanswered}
-        </p>
+        </UnansweredLine>
       </div>
     );
   const r = answer.data;

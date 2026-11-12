@@ -19,7 +19,7 @@ const row = (block, kind, fields) => ({
 });
 // Newest first, as reserveChanges gives them; the words as it writes them.
 const changes = [
-  { row: row(9, "asset-category", { from: 0, to: 1 }), words: "eMode category none → ETH correlated (1)" },
+  { row: row(9, "asset-category", { from: 0, to: 1 }), words: "E-Mode category none → ETH correlated (1)" },
   { row: row(8, "borrowing", { enabled: false }), words: "Borrowing off" },
   { row: row(7, "frozen", { frozen: true }), words: "Frozen" },
   { row: row(6, "reserve-factor", { old: "1000", new: "1500" }), words: "Reserve factor 10% → 15%" },
@@ -35,7 +35,7 @@ const out = reserveChangesExplained(changes, { symbol: "USDC", compact: compactF
 const head = (i) => [out[i].headline, out[i].figure ?? ""].join("|");
 
 test("the head names what moved, with the figure", () => {
-  assert.equal(head(0), "eMode category none → ETH correlated (1)|");
+  assert.equal(head(0), "E-Mode category none → ETH correlated (1)|");
   assert.equal(head(1), "Borrowing turned off|");
   assert.equal(head(2), "Frozen|");
   assert.equal(head(3), "Reserve factor raised|10% → 15%");
@@ -48,7 +48,7 @@ test("the head names what moved, with the figure", () => {
 test("the bullets say what the setting does and what the change means", () => {
   assert.equal(
     out[0].bullets[1],
-    "Borrowers who choose eMode category 1 count USDC at the category's LTV and liquidation threshold, and can borrow it there.",
+    "Borrowers who choose E-Mode category 1 count USDC at the category's LTV and liquidation threshold, and can borrow it there.",
   );
   assert.deepEqual(out[3].bullets, [
     "The reserve factor is the share of borrowers' interest that goes to the Aave treasury.",
@@ -64,30 +64,33 @@ test("the bullets say what the setting does and what the change means", () => {
   ]);
 });
 
-// The eMode kinds, newest first; category 47 is labelled by its category row.
+// The E-Mode kinds, newest first; category 47 is labelled by its category row.
 const CAT = "PT-srUSDe Stablecoins (47)";
 const tx = (b) => `0x${b.toString(16)}`;
 const emode = [
-  { row: row(29, "emode-isolation", { categoryId: 47, isolated: true }), words: `eMode ${CAT} isolated: on` },
+  { row: row(29, "emode-isolation", { categoryId: 47, isolated: true }), words: `E-Mode ${CAT} isolated: on` },
   {
     row: row(29, "category", { categoryId: 47, ltv: 9000, lt: 9200, bonus: 10403, label: "PT-srUSDe Stablecoins" }),
-    words: `eMode ${CAT}: liquidation bonus 4.08% → 4.03%`,
+    words: `E-Mode ${CAT}: liquidation bonus 4.08% → 4.03%`,
   },
-  { row: row(28, "emode-ltvzero", { categoryId: 47, ltvzero: true }), words: `LTV zero in eMode ${CAT}: on` },
-  { row: row(27, "emode-borrowable", { categoryId: 47, borrowable: false }), words: `Borrowable in eMode ${CAT}: off` },
-  { row: row(26, "emode-borrowable", { categoryId: 47, borrowable: true }), words: `Borrowable in eMode ${CAT}: on` },
-  { row: row(25, "emode-collateral", { categoryId: 47, collateral: true }), words: `Collateral in eMode ${CAT}: on` },
-  { row: row(24, "asset-category", { from: 0, to: 47 }), words: `eMode category none → ${CAT}` },
-  { row: row(23, "emode-isolation", { categoryId: 47, isolated: true }), words: `eMode ${CAT} isolated: on` },
+  { row: row(28, "emode-ltvzero", { categoryId: 47, ltvzero: true }), words: `LTV zero in E-Mode ${CAT}: on` },
+  {
+    row: row(27, "emode-borrowable", { categoryId: 47, borrowable: false }),
+    words: `Borrowable in E-Mode ${CAT}: off`,
+  },
+  { row: row(26, "emode-borrowable", { categoryId: 47, borrowable: true }), words: `Borrowable in E-Mode ${CAT}: on` },
+  { row: row(25, "emode-collateral", { categoryId: 47, collateral: true }), words: `Collateral in E-Mode ${CAT}: on` },
+  { row: row(24, "asset-category", { from: 0, to: 47 }), words: `E-Mode category none → ${CAT}` },
+  { row: row(23, "emode-isolation", { categoryId: 47, isolated: true }), words: `E-Mode ${CAT} isolated: on` },
   {
     row: row(23, "category", { categoryId: 47, ltv: 9000, lt: 9200, bonus: 10408, label: "PT-srUSDe Stablecoins" }),
-    words: `eMode ${CAT} set: LTV 90%, LT 92%, liquidation bonus 4.08%`,
+    words: `E-Mode ${CAT} set: LTV 90%, LT 92%, liquidation bonus 4.08%`,
   },
 ];
 assert.equal(emode[0].row.txHash, tx(29));
 const ex = reserveChangesExplained(emode, { symbol: "USDC", compact: compactFigure });
 const EMODE_WHAT =
-  "An eMode category is a set of assets with its LTV, liquidation threshold and liquidation bonus; a borrower who chooses the category borrows on those terms.";
+  "An E-Mode category is a set of assets with its LTV, liquidation threshold and liquidation bonus; a borrower who chooses the category borrows on those terms.";
 
 test("a category's first terms, then a move of one of them", () => {
   assert.deepEqual(ex[8].bullets, [
@@ -99,15 +102,15 @@ test("a category's first terms, then a move of one of them", () => {
   assert.deepEqual(ex[1].bullets, [
     `A liquidator of a position in ${CAT} takes 4.03% extra of the category's collateral over the debt repaid.`,
   ]);
-  assert.equal(ex[1].headline, `eMode ${CAT}: liquidation bonus 4.08% → 4.03%`);
+  assert.equal(ex[1].headline, `E-Mode ${CAT}: liquidation bonus 4.08% → 4.03%`);
 });
 
 test("isolation: first written, then restated with the category's terms", () => {
-  assert.equal(ex[7].headline, `eMode ${CAT} isolated: on`);
+  assert.equal(ex[7].headline, `E-Mode ${CAT} isolated: on`);
   assert.deepEqual(ex[7].bullets, [
     `${CAT} is isolated: for its borrowers, only the category's collateral supports borrowing.`,
   ]);
-  assert.equal(ex[0].headline, `eMode ${CAT} isolated: on, restated`);
+  assert.equal(ex[0].headline, `E-Mode ${CAT} isolated: on, restated`);
   assert.equal(
     ex[0].bullets[0],
     "Each update to a category's terms writes its isolation again, in the same transaction.",
@@ -139,16 +142,16 @@ test("LTV zero in a category", () => {
 
 test("isolation off: first written, and turned off", () => {
   const rows = [
-    { row: row(42, "emode-isolation", { categoryId: 44, isolated: false }), words: "eMode category 44 isolated: off" },
-    { row: row(41, "emode-isolation", { categoryId: 44, isolated: true }), words: "eMode category 44 isolated: on" },
-    { row: row(40, "emode-isolation", { categoryId: 45, isolated: false }), words: "eMode category 45 isolated: off" },
+    { row: row(42, "emode-isolation", { categoryId: 44, isolated: false }), words: "E-Mode category 44 isolated: off" },
+    { row: row(41, "emode-isolation", { categoryId: 44, isolated: true }), words: "E-Mode category 44 isolated: on" },
+    { row: row(40, "emode-isolation", { categoryId: 45, isolated: false }), words: "E-Mode category 45 isolated: off" },
   ];
   const got = reserveChangesExplained(rows, { symbol: "USDC", compact: compactFigure });
   assert.deepEqual(got[0].bullets, [
-    "eMode category 44 is no longer isolated: its borrowers count collateral outside the category at its reserve's LTV again.",
+    "E-Mode category 44 is no longer isolated: its borrowers count collateral outside the category at its reserve's LTV again.",
   ]);
   assert.deepEqual(got[2].bullets, [
-    "A borrower in eMode category 45 counts collateral outside the category at its reserve's LTV.",
+    "A borrower in E-Mode category 45 counts collateral outside the category at its reserve's LTV.",
   ]);
 });
 

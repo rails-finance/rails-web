@@ -98,6 +98,9 @@ export function aaveConfigChanges(
   log: AaveConfigLogAnswer | null,
   held: ReadonlyMap<string, { asset: string; symbol: string }>,
   emode: readonly AaveFamilyEmodeSwitch[],
+  /** The family's spelling of the mode: "E-Mode" on Aave V3 and Seamless,
+   *  "E-mode" on SparkLend (lib/aave-family/terms.ts). */
+  em = "E-Mode",
 ): AaveConfigChange[] {
   if (!log || !Array.isArray(log.logs)) return [];
   const switches = [...emode].sort((a, b) => logOrder(switchAt(a), switchAt(b)));
@@ -113,7 +116,7 @@ export function aaveConfigChanges(
     cat > 0 && member(asset, cat) ? (cats.get(cat)?.lt ?? 0) : (reserveLt.get(asset) ?? 0);
   const catName = (id: number) => {
     const label = cats.get(id)?.label;
-    return label ? `e-mode “${label}”` : `e-mode category ${id}`;
+    return label ? `${em} “${label}”` : `${em} category ${id}`;
   };
   // Base and Seamless answer from the Base Sieve as a whole; a mainnet row carries its own mark.
   const viaOf = (l: At) =>
@@ -157,7 +160,7 @@ export function aaveConfigChanges(
       const h = held.get(asset);
       if (before == null || before === l.lt || !h) continue;
       const inCat = user > 0 && member(asset, user);
-      const summary = `${h.symbol}'s liquidation threshold (reserve ${short(asset)}), set to ${pct(l.lt)} by the PoolConfigurator's CollateralConfigurationChanged at block ${blockWords}. Before it, ${pct(before)}. It counts from that block for every account holding ${h.symbol} as collateral outside an e-mode category that covers it.${
+      const summary = `${h.symbol}'s liquidation threshold (reserve ${short(asset)}), set to ${pct(l.lt)} by the PoolConfigurator's CollateralConfigurationChanged at block ${blockWords}. Before it, ${pct(before)}. It counts from that block for every account holding ${h.symbol} as collateral outside an ${em} category that covers it.${
         inCat
           ? ` This account was in ${catName(user)}, whose ${pct(cats.get(user)?.lt ?? 0)} applies to ${h.symbol}, so the change does not move its line.`
           : ""
@@ -174,7 +177,7 @@ export function aaveConfigChanges(
       const name = catName(l.categoryId);
       push(
         l,
-        `${name[0].toUpperCase()}${name.slice(1)} liquidation threshold`,
+        `${name} liquidation threshold`,
         before.lt,
         l.lt,
         assets.map(([, h]) => h.asset),

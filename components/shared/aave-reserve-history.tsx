@@ -26,6 +26,7 @@ import { Prov } from "@/components/shared/provenance";
 import { lwTickLabel, useLwColors, useLwLib } from "@/components/shared/lw-chart-kit";
 import { formatDate } from "@/lib/date";
 import { ratePercentText } from "@/lib/shared/rate-percent";
+import { familyRate, type AaveFamilyTerms } from "@/lib/aave-family/terms";
 import { historyRateProv, historyUtilisationProv } from "@/lib/shared/aave-reserve-reads-provenance";
 import type { ReserveChange } from "@/lib/shared/aave-reserve-config-words";
 import type { HistoryPoint, ReserveHistory } from "@/lib/api/fetch-aave-reserve-reads";
@@ -72,9 +73,12 @@ export function ReserveHistoryChart({
   range,
   onRange,
   loadingAll,
+  terms,
 }: {
   h: ReserveHistory;
   symbol: string;
+  /** The family's words and rate form (lib/aave-family/terms.ts). */
+  terms: AaveFamilyTerms;
   /** The config log in words, newest first; the marked kinds are drawn. */
   changes: ReserveChange[] | null;
   range: HistoryRange;
@@ -195,8 +199,8 @@ export function ReserveHistoryChart({
         const v = f(p);
         return v == null ? { time: dayTime(p.date) } : { time: dayTime(p.date), value: v };
       });
-    borrow.setData(rows((p) => p.borrowApr * 100));
-    supply.setData(rows((p) => p.supplyApr * 100));
+    borrow.setData(rows((p) => familyRate(terms, p.borrowApr) * 100));
+    supply.setData(rows((p) => familyRate(terms, p.supplyApr) * 100));
     util.setData(rows((p) => (p.utilisation == null ? null : p.utilisation * 100)));
     const last = dayTime(points[points.length - 1].date);
     const span = range === "90D" ? 90 * DAY_S : range === "1Y" ? 365 * DAY_S : null;
@@ -206,7 +210,7 @@ export function ReserveHistoryChart({
         from: Math.max(dayTime(points[0].date), last - span) as UTCTimestamp,
         to: last,
       });
-  }, [points, range, lib]);
+  }, [points, range, lib, terms]);
 
   const at = cursor != null && cursor >= 0 && cursor < points.length ? cursor : points.length - 1;
   const p = points[at];
@@ -260,25 +264,25 @@ export function ReserveHistoryChart({
             {cursor == null && <span>latest</span>}
             <span className="inline-flex items-center gap-1.5">
               <Swatch />
-              Borrow rate
-              <Prov info={historyRateProv("borrow", symbol, p, h)}>
+              {terms.borrowRate}
+              <Prov info={historyRateProv("borrow", symbol, p, h, terms.rateForm)}>
                 <span className="text-foreground" data-history-borrow="">
-                  {ratePercentText(p.borrowApr)}
+                  {ratePercentText(familyRate(terms, p.borrowApr))}
                 </span>
               </Prov>
             </span>
             <span className="inline-flex items-center gap-1.5">
               <Swatch dashed />
-              Supply rate
-              <Prov info={historyRateProv("supply", symbol, p, h)}>
+              {terms.supplyRate}
+              <Prov info={historyRateProv("supply", symbol, p, h, terms.rateForm)}>
                 <span className="text-foreground" data-history-supply="">
-                  {ratePercentText(p.supplyApr)}
+                  {ratePercentText(familyRate(terms, p.supplyApr))}
                 </span>
               </Prov>
             </span>
             <span className="inline-flex items-center gap-1.5">
               <Swatch />
-              Utilisation (lower pane)
+              {terms.utilization} (lower pane)
               {p.utilisation != null ? (
                 <Prov info={historyUtilisationProv(symbol, p, h)}>
                   <span className="text-foreground" data-history-utilisation="">

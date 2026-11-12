@@ -31,7 +31,7 @@
 //      carries a field-max cap (no pill) and an automator maximum.
 //   7. Seamless: every row carries the frozen tag.
 //   8. A reserve with LTV 0 and no eMode loan-to-value reads "Not collateral"
-//      in its Collateral cell; one with an eMode loan-to-value reads "eMode
+//      in its Collateral cell; one with an eMode loan-to-value reads "E-Mode
 //      only"; one with an LTV reads "LTV% / LT%".
 //   9. No non-zero rate reads 0.00% (each page).
 //  11. /ethereum/aave-v3/markets is the overview of Core, Prime and EtherFi:
@@ -237,7 +237,7 @@ for (const p of PAGES) {
     } else check("core 8a an LTV-0 reserve with no eMode LTV exists", false);
     if (emodeLtv) {
       const t = await collText(emodeLtv.address);
-      check(`core 8b ${emodeLtv.symbol} (LTV 0, eMode LTV) reads "eMode only"`, t === "eMode only", t);
+      check(`core 8b ${emodeLtv.symbol} (LTV 0, eMode LTV) reads "E-Mode only"`, t === "E-Mode only", t);
     } else check("core 8b an LTV-0 reserve with an eMode LTV exists", false);
     if (lends) {
       const t = await collText(lends.address);

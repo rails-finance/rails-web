@@ -11,6 +11,7 @@ import { notFound } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { HistoryTitleRow } from "@/components/shared/history-tag";
+import { UnansweredLine } from "@/components/shared/unanswered-line";
 import { ROW, isWallet } from "@/components/protocol/uniswap/uniswap-wallet-positions";
 import { fetchFluidBasePositions } from "@/lib/api/fetch-fluid-base";
 import { FRONT_DOOR } from "@/lib/fluid-base/words";
@@ -40,7 +41,9 @@ export async function FluidBaseWalletPositions({ wallet: raw }: { wallet: string
         </HistoryTitleRow>
       </header>
       {answer.kind !== "ok" ? (
-        <p className="text-sm text-rb-500">{FRONT_DOOR.unanswered}</p>
+        <UnansweredLine ceiling={answer.kind === "ceiling"} className="text-sm text-rb-500">
+          {FRONT_DOOR.unanswered}
+        </UnansweredLine>
       ) : all.length === 0 ? (
         <p className="text-sm text-rb-500" data-fluid-base-none="">
           {FRONT_DOOR.none}

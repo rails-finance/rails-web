@@ -13,6 +13,7 @@ import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { HistoryTitleRow } from "@/components/shared/history-tag";
 import { Prov } from "@/components/shared/provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { UnansweredLine } from "@/components/shared/unanswered-line";
 import { AaveV4ArcReceipts } from "@/components/protocol/aave-v4-arc/aave-v4-arc-receipts";
 import { ROW } from "@/components/protocol/uniswap/uniswap-wallet-positions";
 import { fetchAaveV4ArcWallet } from "@/lib/api/fetch-aave-v4-arc";
@@ -47,7 +48,9 @@ export async function AaveV4ArcWallet({ wallet: raw }: { wallet: string }) {
         </HistoryTitleRow>
       </header>
       {answer.kind !== "ok" ? (
-        <p className="text-sm text-rb-500">{FRONT_DOOR.unanswered}</p>
+        <UnansweredLine ceiling={answer.kind === "ceiling"} className="text-sm text-rb-500">
+          {FRONT_DOOR.unanswered}
+        </UnansweredLine>
       ) : spokes.length === 0 ? (
         <p className="text-sm text-rb-500" data-aave-v4-arc-none="">
           {FRONT_DOOR.none}

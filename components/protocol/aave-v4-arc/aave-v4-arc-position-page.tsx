@@ -10,6 +10,7 @@ import { notFound } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { HistoryTitleRow } from "@/components/shared/history-tag";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { UnansweredLine } from "@/components/shared/unanswered-line";
 import { AaveV4ArcPositionCard } from "@/components/protocol/aave-v4-arc/aave-v4-arc-position-card";
 import { fetchAaveV4ArcPosition } from "@/lib/api/fetch-aave-v4-arc";
 import { ARC_SESSION, arcSpokeBySlug, isArcWallet } from "@/lib/aave-v4-arc/types";
@@ -38,13 +39,17 @@ export async function AaveV4ArcPositionPage({ spoke: slug, wallet: raw }: { spok
       tools={false}
     />
   );
-  if (answer.kind === "error")
+  if (answer.kind === "error" || answer.kind === "ceiling")
     return (
       <div className="py-8">
         {head}
-        <p className="mt-6 text-sm text-rb-500" data-position-unanswered="">
+        <UnansweredLine
+          ceiling={answer.kind === "ceiling"}
+          className="mt-6 text-sm text-rb-500"
+          data-position-unanswered=""
+        >
           {POSITION_PAGE.unanswered}
-        </p>
+        </UnansweredLine>
       </div>
     );
   const r = answer.data;

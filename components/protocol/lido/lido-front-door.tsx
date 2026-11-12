@@ -8,6 +8,7 @@ import Link from "next/link";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { FrontDoorSearch } from "@/components/shared/front-door-search";
 import { HistoryLine } from "@/components/shared/history-tag";
+import { UnansweredLine } from "@/components/shared/unanswered-line";
 import { Prov } from "@/components/shared/provenance";
 import { HeadingTip } from "@/components/shared/tip-label";
 import { ProvSection, SectionHeading, SectionMenu } from "@/components/shared/section-menu";
@@ -90,7 +91,7 @@ function Totals({ r }: { r: LidoProtocolRead }) {
   );
 }
 
-export function LidoFrontDoor({ r }: { r: LidoProtocolRead | null }) {
+export function LidoFrontDoor({ r, readCeiling = false }: { r: LidoProtocolRead | null; readCeiling?: boolean }) {
   const tagged = historyOf(ID) != null;
   return (
     <div
@@ -110,7 +111,13 @@ export function LidoFrontDoor({ r }: { r: LidoProtocolRead | null }) {
         <FrontDoorSearch href={(wallet) => `${ROUTE}/${wallet}`} />
       </div>
       <p className="mt-6 max-w-xl text-center text-sm text-rb-500">{FRONT_DOOR.line}</p>
-      {r ? <Totals r={r} /> : <p className="mt-10 text-sm text-rb-500">{FRONT_DOOR.unanswered}</p>}
+      {r ? (
+        <Totals r={r} />
+      ) : (
+        <UnansweredLine ceiling={readCeiling} className="mt-10 text-sm text-rb-500">
+          {FRONT_DOOR.unanswered}
+        </UnansweredLine>
+      )}
       <nav aria-label="Explorer sections" className="mt-6 flex justify-center">
         <Link href={`${ROUTE}/info`} className={NAV_PILL}>
           About {LABEL} on Rails

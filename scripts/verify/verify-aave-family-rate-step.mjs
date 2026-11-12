@@ -292,6 +292,10 @@ function indexRates(requests, answer) {
 }
 
 const rateOf = (side, p) => (side === "supply" ? p.liquidityRate : p.variableBorrowRate);
+/** SparkLend's notes state each rate as an APY, the Pool's rate compounded
+ *  each second for a year (lib/aave-family/apy.ts, restated; ui-jobs 611).
+ *  Which stretches are noted stays the stored rate's move. */
+const shownRate = (proto, r) => (proto === "spark" ? Math.expm1(31_536_000 * Math.log1p(r / 31_536_000)) : r);
 const round4 = (n) => Number(n.toFixed(4));
 
 /** The historical notes, in the fixture's own shape. */
@@ -617,7 +621,9 @@ for (const p of PAGES) {
   );
   // No family draws a live note whose move rounds to 0.00 points (rails-ops
   // market-notes §9), so those sides are expected off the page.
-  const drawn = above.filter((n) => Math.abs(n.liveRate - n.fromRate) >= 0.005);
+  const drawn = above.filter(
+    (n) => Math.abs(shownRate(p.proto, n.liveRate / 100) - shownRate(p.proto, n.fromRate / 100)) * 100 >= 0.005,
+  );
   data.expected = { historical: got, since, above: drawn, below, through };
 }
 
@@ -735,10 +741,10 @@ for (const p of PAGES) {
     if (await derivation.count()) await derivation.first().click();
     await page.waitForTimeout(150);
     const text = (await row.textContent()).replace(/\s+/g, " ");
-    if (!text.includes(ratePct(w.fromRate / 100)))
-      headDiffs.push(`${id} lacks the pinned ${ratePct(w.fromRate / 100)}`);
+    if (!text.includes(ratePct(shownRate(p.proto, w.fromRate / 100))))
+      headDiffs.push(`${id} lacks the pinned ${ratePct(shownRate(p.proto, w.fromRate / 100))}`);
     const r = (data.overlay.reserves ?? []).find((x) => x.symbol === w.reserve);
-    const liveNow = r ? (w.side === "supply" ? r.supplyApr : r.borrowApr) * 100 : null;
+    const liveNow = r ? shownRate(p.proto, w.side === "supply" ? r.supplyApr : r.borrowApr) * 100 : null;
     const shown = [...text.matchAll(/(\d{1,3}(?:,\d{3})*\.\d{2})%/g)].map((m) => Number(m[1].replace(/,/g, "")));
     if (liveNow == null || !shown.some((v) => Math.abs(v - liveNow) <= 0.05)) {
       headDiffs.push(`${id} shows ${shown.join("/")}, overlay re-read says ${liveNow?.toFixed(4)}`);

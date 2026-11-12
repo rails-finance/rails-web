@@ -10,6 +10,7 @@
 // The shapes are the upstream's. Client only: the bearer token stays in the route.
 
 import { useEffect, useState } from "react";
+import { isReadCeiling } from "@/lib/shared/read-ceiling";
 export type { V4ConfigLog } from "@/lib/aave-v4/config-words";
 
 /** The head read of one spoke reserve: decimal strings at one block. */
@@ -107,7 +108,8 @@ export interface V4History {
 
 export type V4Read<T> =
   | { state: "loading" }
-  | { state: "error"; message: string }
+  /** `ceiling`: refused at the daily read ceiling (lib/shared/read-ceiling.ts). */
+  | { state: "error"; message: string; ceiling?: boolean }
   /** The spoke lists the token from more than one hub and none was named. */
   | { state: "hub-required"; hubs: string[] }
   | { state: "not-listed" }
@@ -132,7 +134,8 @@ export async function getV4Read<T>(
     const body = (await res.json().catch(() => null)) as (T & { code?: string; hubs?: string[] }) | null;
     if (res.status === 400 && body?.code === "hub_required") return { state: "hub-required", hubs: body.hubs ?? [] };
     if (res.status === 404) return { state: "not-listed" };
-    if (!res.ok || !body) return { state: "error", message: `The read answered ${res.status}.` };
+    if (!res.ok || !body)
+      return { state: "error", message: `The read answered ${res.status}.`, ceiling: isReadCeiling(res.status, body) };
     return { state: "ok", data: body };
   } catch {
     return { state: "error", message: "The read did not answer: reload to retry." };

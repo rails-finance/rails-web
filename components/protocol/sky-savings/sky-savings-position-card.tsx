@@ -32,6 +32,7 @@ const worthHead = (p: SkyPosition, asOf: SkyAsOf): PositionCardHead => {
   return {
     id: "worth",
     label: "Worth",
+    tier: "amount",
     labelTip:
       "What the sUSDS held redeems for in USDS at the page's block: the share count times the share price, rounded down as the contract rounds it.",
     value:
@@ -48,13 +49,14 @@ const earnedHead = (p: SkyPosition, asOf: SkyAsOf): PositionCardHead => {
   const label = "Interest earned";
   const labelTip =
     "What the position is worth now, plus every USDS amount that left it, less every USDS amount that came in.";
-  if (!p.earned) return { id: "earned", label, labelTip, value: null };
+  if (!p.earned) return { id: "earned", label, labelTip, tier: "amount", value: null };
   const yearly = skyYearlyEarnings(p, asOf);
   const e = units(p.earned.raw);
   return {
     id: "earned",
     label,
     labelTip,
+    tier: "amount",
     value: (
       <span title={`${withRealMinus(exact(p.earned.raw))} ${USDS.symbol}`}>
         <Prov info={earnedProv(asOf.block, p.earned.raw, p.value?.raw ?? "0", p.usdsIn.raw, p.usdsOut.raw)}>

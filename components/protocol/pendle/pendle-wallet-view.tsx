@@ -50,6 +50,7 @@ function ListingCard({ p, w }: { p: PendlePosition; w: PendleWalletPositions }) 
       {
         id: "value",
         label: "Value",
+        tier: "amount",
         value:
           p.value.asset.total == null ? null : (
             <Prov

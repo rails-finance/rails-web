@@ -41,7 +41,7 @@ export function readContracts(r: OpPositionRead) {
     {
       name: "Aave UiPoolDataProvider",
       address: r.uiPoolDataProvider,
-      reads: "the account's scaled balances, collateral switches and eMode category at both blocks",
+      reads: "the account's scaled balances, collateral switches and E-Mode category at both blocks",
     },
     { name: "Aave V3 Optimism IAaveOracle", address: r.oracle, reads: "each reserve's USD price at the head" },
   ];
@@ -115,7 +115,7 @@ export function opReserveProv(key: OpReserveFigure, c: OpReceiptContext, x: OpRe
         contract: poolC(r),
         summary:
           x.ltSource === "emode"
-            ? `${x.symbol} liquidation threshold. The share of its value that counts toward the health factor, from the ${c.p.emode?.label ?? "eMode"} category this account is in, read at ${at(r.head)}.`
+            ? `${x.symbol} liquidation threshold. The share of its value that counts toward the health factor, from the ${c.p.emode?.label ?? "E-Mode"} category this account is in, read at ${at(r.head)}.`
             : `${x.symbol} liquidation threshold. The share of its value that counts toward the health factor, from the reserve's configuration, read at ${at(r.head)}.`,
         via:
           x.ltSource === "emode"

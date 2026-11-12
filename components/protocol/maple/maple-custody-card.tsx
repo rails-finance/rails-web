@@ -156,6 +156,7 @@ export function MapleCustodyCard({
       // one pool's shares, so a cluster would only repeat it.
       id: "held-in-custody",
       label: "Held in custody",
+      tier: "amount",
       value: live.length > 0 ? <CustodyLines holdings={live} /> : null,
     },
     {

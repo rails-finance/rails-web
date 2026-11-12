@@ -162,6 +162,7 @@ function slots(r: EulerPositionRead): PositionCardSlots {
         id: "collateral-value",
         label: CARD_WORDS.collateralValue,
         labelTip: CARD_WORDS.collateralValueTip,
+        tier: "amount",
         value:
           p.collateralValue === null || inUnit(p.collateralValue, p.unit) === null ? null : (
             <Prov info={cardProv("collateralValue", c)}>{inUnit(p.collateralValue, p.unit)}</Prov>

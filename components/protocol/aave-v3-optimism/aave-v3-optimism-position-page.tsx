@@ -10,6 +10,7 @@ import { notFound } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { HistoryTitleRow } from "@/components/shared/history-tag";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { UnansweredLine } from "@/components/shared/unanswered-line";
 import { AaveV3OptimismPositionCard } from "@/components/protocol/aave-v3-optimism/aave-v3-optimism-position-card";
 import { fetchAaveV3OptimismPosition } from "@/lib/api/fetch-aave-v3-optimism";
 import { isOpWallet, OP_ROUTE, OP_SESSION } from "@/lib/aave-v3-optimism/types";
@@ -35,13 +36,17 @@ export async function AaveV3OptimismPositionPage({ wallet: raw }: { wallet: stri
       tools={false}
     />
   );
-  if (answer.kind === "error")
+  if (answer.kind === "error" || answer.kind === "ceiling")
     return (
       <div className="py-8">
         {head}
-        <p className="mt-6 text-sm text-rb-500" data-position-unanswered="">
+        <UnansweredLine
+          ceiling={answer.kind === "ceiling"}
+          className="mt-6 text-sm text-rb-500"
+          data-position-unanswered=""
+        >
           {POSITION_PAGE.unanswered}
-        </p>
+        </UnansweredLine>
       </div>
     );
   const r = answer.data;

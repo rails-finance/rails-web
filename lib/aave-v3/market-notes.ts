@@ -55,6 +55,7 @@
 // which restates the rule rather than importing it.
 
 import { unreadToken } from "@/lib/shared/decimals-unread";
+import { aprToApy } from "@/lib/aave-family/apy";
 import type { AaveV3ChainReserve } from "@/lib/api/fetch-aave-v3-position";
 import {
   ratePointKey,
@@ -350,8 +351,19 @@ export const noteScope = (opts: Pick<AaveFamilyNoteOptions, "protocol" | "market
  *  balance yet and keeps the figures. */
 const statesHolding = (opts: AaveFamilyNoteOptions): boolean => opts.protocol !== "aave-v3";
 
-const rateOf = (side: RateSide, point: { liquidityRate: number; variableBorrowRate: number }): number =>
+/** A side's rate at one end, in the family's form: SparkLend states an APY,
+ *  the Pool's rate compounded each second for a year (ui-jobs 611). */
+const inForm = (opts: AaveFamilyNoteOptions, rate: number): number =>
+  opts.protocol === "spark" ? (aprToApy(rate) ?? rate) : rate;
+
+const poolRateOf = (side: RateSide, point: { liquidityRate: number; variableBorrowRate: number }): number =>
   side === "supply" ? point.liquidityRate : point.variableBorrowRate;
+
+const rateOf = (
+  side: RateSide,
+  point: { liquidityRate: number; variableBorrowRate: number },
+  opts: AaveFamilyNoteOptions,
+): number => inForm(opts, poolRateOf(side, point));
 
 /** One end of a note that IS one of the position's own touches. */
 function touchPoint(touch: AaveFamilyTouch, value: number): MarketNotePoint {
@@ -421,11 +433,14 @@ export function aaveFamilyRateStepNotesFor(
     const a = lookup.after.get(ratePointKey(s.from.block, s.from.logIndex));
     const b = lookup.before.get(ratePointKey(s.to.block, s.to.logIndex));
     if (!a || !b) continue;
-    const rateA = rateOf(s.side, a);
-    const rateB = rateOf(s.side, b);
+    const rateA = rateOf(s.side, a, opts);
+    const rateB = rateOf(s.side, b, opts);
     if (!Number.isFinite(rateA) || !Number.isFinite(rateB)) continue;
     const deltaPp = (rateB - rateA) * 100;
-    if (Math.abs(deltaPp) < RATE_STEP_MIN_PP) continue;
+    // Which stretches are stated is the stored rate's move, whatever form the
+    // note states it in, so SparkLend's APY notes are the stretches its rate
+    // notes were.
+    if (Math.abs((poolRateOf(s.side, b) - poolRateOf(s.side, a)) * 100) < RATE_STEP_MIN_PP) continue;
 
     const symbol = symbolFor(s.reserve, rates, opts, s.from);
     out.push({
@@ -440,6 +455,7 @@ export function aaveFamilyRateStepNotesFor(
       from: touchPoint(s.from, rateA),
       to: touchPoint(s.to, rateB),
       deltaPp,
+      ...(opts.protocol === "spark" ? { poolRate: { from: poolRateOf(s.side, a), to: poolRateOf(s.side, b) } } : {}),
       // The reserve emits a ReserveDataUpdated on every action that touches
       // it, so there is no count of resets to state — only the two logs.
       setsBetween: null,
@@ -495,12 +511,13 @@ export function liveAaveFamilyRateStepNotes(
 
   for (const r of live.reserves) {
     const reserve = r.address.toLowerCase();
-    const sides: { side: RateSide; rate: number | undefined }[] = [
-      { side: "supply", rate: isPositiveRaw(r.supplyBalanceRaw) ? r.supplyApr : undefined },
-      { side: "borrow", rate: isPositiveRaw(r.debtBalanceRaw) ? r.borrowApr : undefined },
+    const sides: { side: RateSide; poolRate: number | undefined }[] = [
+      { side: "supply", poolRate: isPositiveRaw(r.supplyBalanceRaw) ? r.supplyApr : undefined },
+      { side: "borrow", poolRate: isPositiveRaw(r.debtBalanceRaw) ? r.borrowApr : undefined },
     ];
-    for (const { side, rate } of sides) {
-      if (rate == null || !Number.isFinite(rate)) continue;
+    for (const { side, poolRate } of sides) {
+      if (poolRate == null || !Number.isFinite(poolRate)) continue;
+      const rate = inForm(opts, poolRate);
       if (side === "borrow" && stable.has(reserve)) continue;
 
       // The newest touch at which this side was held. Not simply the newest
@@ -519,11 +536,11 @@ export function liveAaveFamilyRateStepNotes(
       if (!from) continue;
       const a = rates.get(reserve)?.after.get(ratePointKey(from.block, from.logIndex));
       if (!a) continue;
-      const rateA = rateOf(side, a);
+      const rateA = rateOf(side, a, opts);
       if (!Number.isFinite(rateA)) continue;
       // A side with no rate to speak of at either end — a reserve nobody
       // borrows, whose supply rate is 0.0000% now and was then.
-      if (Math.max(rateA, rate) < AAVE_RATE_STEP_LIVE_FLOOR) continue;
+      if (Math.max(poolRateOf(side, a), poolRate) < AAVE_RATE_STEP_LIVE_FLOOR) continue;
 
       const symbol = symbolFor(reserve, rates, opts, from);
       const to: MarketNotePoint = {
@@ -547,6 +564,7 @@ export function liveAaveFamilyRateStepNotes(
         from: touchPoint(from, rateA),
         to,
         deltaPp: (rate - rateA) * 100,
+        ...(opts.protocol === "spark" ? { poolRate: { from: poolRateOf(side, a), to: poolRate } } : {}),
         setsBetween: null,
         observed: { from: observedLog(a), to: null },
         ...(amount > 0 && statesHolding(opts)

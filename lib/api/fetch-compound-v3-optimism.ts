@@ -41,8 +41,9 @@ const STALE: CompoundV3MarketsResponse = {
   chainStale: true,
 };
 
-/** GET /api/at-block/compound-v3-optimism/markets, in the markets reader's shape; a stale stub where it failed. */
+/** GET /api/at-block/compound-v3-optimism/markets, in the markets reader's shape; a stale stub where it failed,
+ *  marked `readCeiling` where the daily read ceiling refused it. */
 export async function fetchCompoundV3OptimismMarkets(): Promise<CompoundV3MarketsResponse> {
   const a = await readAtBlock<CompoundV3MarketsResponse>(`/api/at-block/${WHO}/markets`, 30, WHO);
-  return a.kind === "ok" ? a.data : STALE;
+  return a.kind === "ok" ? a.data : a.kind === "ceiling" ? { ...STALE, readCeiling: true } : STALE;
 }

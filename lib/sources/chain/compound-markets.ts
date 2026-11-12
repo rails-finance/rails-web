@@ -196,6 +196,8 @@ export interface CompoundV3MarketsResponse {
   };
   /** True when the chain read failed and we returned an empty roster. */
   chainStale: boolean;
+  /** The read was refused at the daily read ceiling (lib/shared/read-ceiling.ts). */
+  readCeiling?: boolean;
 }
 
 function empty(): CompoundV3MarketsResponse {

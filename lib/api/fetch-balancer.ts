@@ -8,11 +8,12 @@ import "server-only";
 //
 // A route refuses with 503 `index_unavailable` or `index_behind` when the
 // index cannot serve the read; the answer carries the code so the page can
-// say which.
+// say which. The daily read ceiling's 503 answers `ceiling` (lib/shared/read-ceiling.ts).
 //
 // SERVER-ONLY: reads RAILS_API_URL and the bearer token.
 
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
+import { isReadCeiling } from "@/lib/shared/read-ceiling";
 import { fetchIndexCoverage } from "@/lib/api/fetch-index";
 import type { UniAnswer } from "@/lib/api/fetch-uniswap";
 import type { BalIndexRefusal, BalPositionRead, BalPositionsRead } from "@/lib/balancer/types";
@@ -31,6 +32,7 @@ async function readBalancer<T>(path: string): Promise<BalAnswer<T>> {
       const body = (await res.json().catch(() => null)) as { error?: string } | null;
       const code = REFUSALS.find((c) => c === body?.error);
       if (code) return { kind: "refused", code };
+      if (isReadCeiling(503, body)) return { kind: "ceiling" };
     }
     if (!res.ok) {
       console.error(`balancer: ${path} answered ${res.status}`);

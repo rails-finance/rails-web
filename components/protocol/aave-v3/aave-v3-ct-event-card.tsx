@@ -347,7 +347,7 @@ export function AaveV3CtEventCard({
         }
       : {
           none: feeOf
-            ? "A liquidation fee's row states the fee; the account's ledgers are on the liquidation's card."
+            ? "A liquidation protocol fee's row states the fee; the account's ledgers are on the liquidation's card."
             : "No position read for this row: the sheet states the row's balances.",
         },
     notes: body.notes,

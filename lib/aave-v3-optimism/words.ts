@@ -67,7 +67,7 @@ export const CARD_WORDS = {
     unread: "not read",
   } as Record<Exclude<OpInterest["state"], "ok">, string>,
   unpriced: "no dollar price",
-  emode: (label: string) => `eMode: ${label}`,
+  emode: (label: string) => `E-Mode: ${label}`,
   foot: "Dollar values use Aave's oracle at the same block.",
 };
 
@@ -85,7 +85,7 @@ export function cardExplainer(p: OpPositionFigures): { title: string; bullets: s
           : "It borrows nothing.",
         ...(p.emode
           ? [
-              `It is in the ${p.emode.label} eMode category, which lends higher thresholds to the assets it counts and limits borrowing to the assets it allows.`,
+              `It is in the ${p.emode.label} E-Mode category, which lends higher thresholds to the assets it counts and limits borrowing to the assets it allows.`,
             ]
           : []),
       ],
