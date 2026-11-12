@@ -50,7 +50,7 @@ export default async function VaultComparePage({
         </p>
       </header>
       {notFound.length > 0 && (
-        <p className="mb-4 text-sm text-rb-500" data-compare-not-found={notFound.join(",")}>
+        <p className="mb-4 break-all text-sm text-rb-500" data-compare-not-found={notFound.join(",")}>
           {COMPARE_PAGE.notFound(notFound)}
         </p>
       )}
