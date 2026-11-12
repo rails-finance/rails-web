@@ -135,15 +135,16 @@ import { chromium } from "playwright";
 import { BASE as HOST_BASE, bypassHeaders, hostFetch } from "./lib/host.mjs";
 
 const BASE = (process.env.BASE_URL ?? HOST_BASE).replace(/\/$/, "");
-/** Morpho's view (step 6): the card's LTV, its LLTV in the "Share of the
- *  LLTV line" row, today's level the price its "Liquidates on a drop of"
- *  names; days between events dotted. */
+/** Morpho's view (step 6): the card's LTV, its LLTV in the LTV headline's
+ *  tip (`lineFromHeadTip`, TO-DO-position-card 341), today's level the price
+ *  its "Liquidates on a drop of" names; days between events dotted. */
 const MORPHO_RATIO = {
   label: "LTV",
   liquidates: "above",
   head: "ltv",
-  lineRow: "lltv-share",
-  linePattern: /LLTV (\d+(?:\.\d+)?)%/,
+  lineRow: "ltv",
+  lineFromHeadTip: true,
+  linePattern: /LLTV,? (\d+(?:\.\d+)?)%/,
   dropRow: "liquidation-drop",
   held: true,
   help: ["the market oracle's price", "fixed when the market was created", "drawn dotted"],
@@ -1439,10 +1440,21 @@ async function checkRatio(page, tag, pg) {
       end.block === "" && !end.none && pct(end.text) === pct(head),
       `chart ${end.text}, card ${head}`,
     );
-    const lineCard = await page.$eval(`[data-panel-row="${r.lineRow}"] dd`, (d) => d.textContent ?? "").catch(() => "");
+    const lineCard = r.lineFromHeadTip
+      ? await (async () => {
+          try {
+            await page.locator(`[data-card-head="${r.lineRow}"] [data-heading-tip]`).first().click({ timeout: 3000 });
+            const text = await page.locator('[role="tooltip"]').first().textContent({ timeout: 3000 });
+            await page.keyboard.press("Escape");
+            return text ?? "";
+          } catch {
+            return "";
+          }
+        })()
+      : await page.$eval(`[data-panel-row="${r.lineRow}"] dd`, (d) => d.textContent ?? "").catch(() => "");
     const cardLine = r.linePattern ? Number(lineCard.match(r.linePattern)?.[1] ?? NaN) : pct(lineCard);
     check(
-      `${tag}: today's line is the card's ${r.lineRow.replace(/-/g, " ")}`,
+      `${tag}: today's line is the card's ${r.lineRow.replace(/-/g, " ")}${r.lineFromHeadTip ? " tip" : ""}`,
       end.line != null && Math.abs(end.line * 100 - cardLine) < 0.05,
       `chart ${end.line}, card ${lineCard}`,
     );

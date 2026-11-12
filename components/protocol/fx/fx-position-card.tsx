@@ -46,7 +46,6 @@ import {
   impliedDebtProv,
   socializedDebtProv,
   lifetimeCollateralDriftProv,
-  anchorPriceProv,
   poolLineProv,
   triggerPriceProv,
   oracleLegAtProv,
@@ -82,7 +81,6 @@ import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import type { FxPositionSummary } from "@/lib/sources/api/fx-positions";
 import { summariseFxDrift, type FxDriftResult } from "@/lib/sources/api/fx-drift";
 import { AmountText } from "@/components/shared/amount-text";
-import { BlockRef } from "@/components/shared/block-ref";
 import { FxMenuRows } from "./fx-menu-rows";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { serverReadAt } from "@/lib/shared/server-head-read";
@@ -343,10 +341,12 @@ function debtReconciliationRows(v: FxPositionView, rows?: FxRebalanceRows): Posi
   ];
 }
 
-/** Under the debt ratio: the anchor price it is read at, the min price the
- *  pool's lines are judged at (both read at the settled block), the lines, and
- *  the min price at which this position reaches each. Panel rows, in two
- *  groups: the prices the ratio is read at, then the tick and the lines. */
+/** Under the debt ratio: the ratio at the min price the pool's lines are
+ *  judged at (read at the settled block), the lines, and the min price at
+ *  which this position reaches each. Panel rows, in two groups: the ratio at
+ *  the min price, then redemption and the lines. The anchor price is the
+ *  Explanation's and the tick a line at the card's foot (TO-DO-position-card
+ *  341). */
 function ratioRows(
   v: FxPositionView,
   terms: FxPoolTerms | null,
@@ -359,27 +359,7 @@ function ratioRows(
   const pctLine = (r: number) => `${(r * 100).toFixed(1).replace(/\.0$/, "")}%`;
   const fall = (p: number, from: number) => `−${((1 - p / from) * 100).toFixed(1)}%`;
   const minRatio = px ? debts / (colls * px.min) : null;
-  const prices: PositionPanelRow[] = [
-    {
-      id: "anchor-price",
-      label: "Anchor price",
-      value: (
-        <>
-          <Prov info={px ? oracleLegAtProv("anchor", sym, px.block) : anchorPriceProv(sym, v.settled.block)}>
-            <PanelFigure>{formatLiquidationPrice(anchor)}</PanelFigure>
-          </Prov>{" "}
-          per {sym}
-          {v.settled.block != null ? (
-            <>
-              {" "}
-              · settled @ <BlockRef block={v.settled.block} />
-            </>
-          ) : null}
-        </>
-      ),
-      tip: `The oracle's anchor price in USD per ${sym}, read at the settled block. The debt ratio divides by it, so the debt over the collateral's value at this price is the ratio.`,
-    },
-  ];
+  const prices: PositionPanelRow[] = [];
   if (px && minRatio != null)
     prices.push({
       id: "ratio-at-min",
@@ -399,53 +379,19 @@ function ratioRows(
     });
 
   const lines: PositionPanelRow[] = [];
-  if (px?.tick != null) {
+  if (px?.tick != null && terms) {
     lines.push({
-      id: "tick",
-      label: "Tick",
-      value: (
+      id: "redemption",
+      label: "Redemption",
+      value: terms.redeemAllowed ? (
+        "open now"
+      ) : (
         <>
-          <Prov info={positionTickProv(sym, px.block)} value={String(px.tick)}>
-            <PanelFigure>#{px.tick}</PanelFigure>
-          </Prov>{" "}
-          ·{" "}
-          <Link href={`/ethereum/fx/pools/${v.pool}?tick=${px.tick}#tick-${v.pool}-${px.tick}`} className={INLINE_LINK}>
-            find it on the pool page
-          </Link>
+          <PanelFigure>closed now</PanelFigure> (opens only while fxUSD trades below its peg)
         </>
       ),
-      tip: "The tick the position's debt sits in, read from the pool at the settled block. Ticks group positions by debt-to-collateral ratio; rebalances and redemptions work one tick at a time.",
+      tip: "Whether the pool lets fxUSD be redeemed for collateral now. Redemption takes from the highest-ratio ticks first.",
     });
-    if (terms) {
-      lines.push({
-        id: "redemption",
-        label: "Redemption",
-        value: terms.redeemAllowed ? (
-          "open now"
-        ) : (
-          <>
-            <PanelFigure>closed now</PanelFigure> (opens only while fxUSD trades below its peg)
-          </>
-        ),
-        tip: "Whether the pool lets fxUSD be redeemed for collateral now. Redemption takes from the highest-ratio ticks first.",
-      });
-      if (px.ticksAbove != null)
-        lines.push({
-          id: "ticks-above",
-          label: "Debt ticks above",
-          value:
-            px.ticksAbove === 0 ? (
-              <>
-                <PanelFigure>none</PanelFigure>, this position&apos;s tick is the top one
-              </>
-            ) : (
-              <Prov info={ticksAboveProv(px.block)} value={String(px.ticksAbove)}>
-                {px.ticksAbove}
-              </Prov>
-            ),
-          tip: "How many debt ticks sit above this position's tick. A redemption starts at the top tick and walks down, so these come before it.",
-        });
-    }
   }
   if (terms) {
     lines.push(
@@ -548,6 +494,44 @@ function ratioRows(
  *  last stretch ends at the same settled sweep the collateral figure comes
  *  from). Present once the intervals have arrived; while a long history is
  *  still being read, the row says how much of the life it covers. */
+/** The position's tick and the debt ticks above it, at the card's foot
+ *  (TO-DO-position-card 341). */
+function FxTickLine({
+  v,
+  tick,
+  ticksAbove,
+  block,
+}: {
+  v: FxPositionView;
+  tick: number;
+  ticksAbove: number | null;
+  block: number;
+}) {
+  return (
+    <p className="text-xs text-rb-500 tabular-nums">
+      Tick{" "}
+      <Prov info={positionTickProv(v.normalizedSymbol, block)} value={String(tick)}>
+        #{tick}
+      </Prov>{" "}
+      ·{" "}
+      <Link href={`/ethereum/fx/pools/${v.pool}?tick=${tick}#tick-${v.pool}-${tick}`} className={INLINE_LINK}>
+        find it on the pool page
+      </Link>
+      {ticksAbove == null ? null : ticksAbove === 0 ? (
+        <>. No debt tick sits above it: a redemption starts here.</>
+      ) : (
+        <>
+          .{" "}
+          <Prov info={ticksAboveProv(block)} value={String(ticksAbove)}>
+            {ticksAbove.toLocaleString("en-US")}
+          </Prov>{" "}
+          debt {ticksAbove === 1 ? "tick sits" : "ticks sit"} above it, which a redemption reaches first.
+        </>
+      )}
+    </p>
+  );
+}
+
 function collateralDriftRow(
   v: FxPositionView,
   drift: FxDriftResult,
@@ -835,6 +819,10 @@ export function useFxCardSlots({
 
   if (!detail) return { ...common, heads, surface: "listing", menu: null, tag, outcome };
 
+  const tickLine =
+    !closed && px?.tick != null ? (
+      <FxTickLine v={v} tick={px.tick} ticksAbove={px.ticksAbove} block={px.block} />
+    ) : null;
   const detailCommon = {
     ...common,
     heads,
@@ -859,9 +847,13 @@ export function useFxCardSlots({
       ),
       exports: exports ?? null,
     },
-    foot: bodyExtra ? (
-      <div className="mt-3 border-t border-rb-300/40 pt-3 dark:border-rb-700/40">{bodyExtra}</div>
-    ) : undefined,
+    foot:
+      bodyExtra || tickLine ? (
+        <div className="mt-3 border-t border-rb-300/40 pt-3 dark:border-rb-700/40">
+          {tickLine}
+          {bodyExtra}
+        </div>
+      ) : undefined,
   };
   if (outcome) return { ...detailCommon, outcome, panel: [[...(driftRow ? [driftRow] : []), ...debtRows], []] };
 

@@ -258,14 +258,14 @@ const p484 = await openAndRead("/ethereum/fx/wbtc-484");
 check("484: no page errors", p484.errors.length === 0, p484.errors.slice(0, 2).join(" | "));
 {
   // The card's collateral (full figure, then USD) against the Explanation's
-  // anchor price; the card's Anchor price row names the settled block.
+  // anchor price.
   const m = p484.text.match(/\n([\d.]+) WBTC\n\$([\d,.]+)\n/);
   const a = p484.text.match(/At the oracle’s anchor price, \$([\d,]+) per WBTC/);
   const usd = m ? Number(m[2].replace(/,/g, "")) : NaN;
   const anchor = a ? Number(a[1].replace(/,/g, "")) : NaN;
   check(
     "484: the collateral's USD is at the settled block's anchor price, the ratio's price",
-    m != null && a != null && near(usd / anchor, Number(m[1]), 0.001) && /per WBTC · settled @/.test(p484.text),
+    m != null && a != null && near(usd / anchor, Number(m[1]), 0.001),
     `${m?.[2]} ÷ ${a?.[1]} vs ${m?.[1]}`,
   );
 }
@@ -400,7 +400,7 @@ check(
   /both in this block/.test(p243.text) && /included above/.test(p243.text),
 );
 check("243 r3: dust after liquidation 1", /dust left/.test(p243.text), p243.figs.join(","));
-check("243 r3: the card names the position's tick", /\n#\d+ · find it on the pool page/.test(p243.text));
+check("243 r3: the card names the position's tick", /Tick #\d+ · find it on the pool page/.test(p243.text));
 // The head is words (decision 0045): a tick's or the pool's totals are in the
 // Explanation, none on the row.
 check(
@@ -482,7 +482,7 @@ check(
 {
   // wsteth-243's tick as its card states it today; a rebalance of the tick
   // moves the position to another one.
-  const tick243 = p243.text.match(/\n#(\d+) · find it on the pool page/)?.[1];
+  const tick243 = p243.text.match(/Tick #(\d+) · find it on the pool page/)?.[1];
   check("pools r3: wsteth-243's card names its tick", tick243 != null);
   const pg = await browser.newPage({ viewport: { width: 1280, height: 1000 } });
   await pg.goto(BASE + `/ethereum/fx/pools/wsteth?tick=${tick243}`, { waitUntil: "networkidle", timeout: 120000 });

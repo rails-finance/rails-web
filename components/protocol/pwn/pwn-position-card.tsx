@@ -66,6 +66,7 @@ import type { PwnAsset } from "@/lib/sources/api/pwn-positions";
 import type { PwnBundleAsset } from "@/lib/api/fetch-pwn-bundle";
 import { PwnMenuRows } from "./pwn-menu-rows";
 import { PanelFigure } from "@/components/shared/position-card-panel";
+import type { PanelRowBreakdown } from "@/components/shared/stat-breakdown";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export interface PwnPositionView {
@@ -169,10 +170,11 @@ function AssetValue({ asset, prov, iconSize }: { asset: PwnAsset; prov?: Provena
   return prov ? <Prov info={prov}>{inner}</Prov> : inner;
 }
 
-/** The bundle's contents grouped by contract, one panel row each: an ERC20 reads
- *  "1,000 USDT", a single NFT "#3599", several of one contract "4×". The values
- *  carry the Token Bundler read's receipt. */
-function bundleRows(assets: PwnBundleAsset[], bundleId: string, atBlock?: number | null): PositionPanelRow[] {
+/** The bundle's contents grouped by contract, one line each: an ERC20 reads
+ *  "1,000 USDT", a single NFT "#3599", several of one contract "4×". They open
+ *  from the Collateral stat as its breakdown (C19; TO-DO-position-card 341),
+ *  each figure with the Token Bundler read's receipt. */
+function bundleBreakdown(assets: PwnBundleAsset[], bundleId: string, atBlock?: number | null): PanelRowBreakdown {
   const byContract = new Map<string, PwnBundleAsset[]>();
   for (const a of assets) {
     const list = byContract.get(a.address) ?? [];
@@ -180,39 +182,40 @@ function bundleRows(assets: PwnBundleAsset[], bundleId: string, atBlock?: number
     byContract.set(a.address, list);
   }
   const prov = positionBundleContentsProv(bundleId, atBlock);
-  const tip =
-    "One of the assets wrapped inside the bundled collateral, read from the Token Bundler's tokensInBundle view at the block the loan opened.";
-  const rows: PositionPanelRow[] = [];
+  const lines: { key: string; symbol: string; address: string; value: string; erc20: boolean }[] = [];
   for (const list of byContract.values()) {
     const first = list[0];
-    const make = (key: string, value: string, asset?: PositionPanelRow["asset"]): PositionPanelRow => ({
-      id: `bundle-${first.address}-${key}`,
-      label: `${first.symbol} in the bundle`,
-      tip,
-      value: (
-        <Prov info={prov}>
-          <RevealTip tip={first.address}>{value}</RevealTip>
-        </Prov>
-      ),
-      asset,
-    });
-    if (first.category === "ERC20") {
-      list.forEach((a, i) =>
-        rows.push(
-          make(String(i), formatCompact(a.amount), {
-            symbol: a.symbol,
-            address: a.address,
-            figure: `${formatExact(a.amount)} ${a.symbol}`,
-          }),
-        ),
-      );
-    } else if (list.length === 1 && first.amount <= 1) {
-      rows.push(make("0", first.tokenId != null ? `#${shortTokenId(first.tokenId)}` : "1"));
-    } else {
-      rows.push(make("0", `${list.reduce((n, a) => n + Math.max(1, a.amount), 0)}×`));
-    }
+    const line = (key: string, value: string, erc20 = false) =>
+      lines.push({ key: `${first.address}-${key}`, symbol: first.symbol, address: first.address, value, erc20 });
+    if (first.category === "ERC20") list.forEach((a, i) => line(String(i), formatCompact(a.amount), true));
+    else if (list.length === 1 && first.amount <= 1)
+      line("0", first.tokenId != null ? `#${shortTokenId(first.tokenId)}` : "1");
+    else line("0", `${list.reduce((n, a) => n + Math.max(1, a.amount), 0)}×`);
   }
-  return rows;
+  return {
+    assets: [...byContract.values()].map((l) => ({ symbol: l[0].symbol, address: l[0].address })),
+    panel: (
+      <span className="flex flex-col gap-1 text-sm font-semibold tabular-nums text-foreground" data-pwn-bundle="">
+        {lines.map((l) => (
+          <span key={l.key} data-bundle-row={l.key}>
+            <Prov info={prov}>
+              <RevealTip tip={l.address}>
+                {l.erc20 ? (
+                  <TokenFigure symbol={l.symbol} address={l.address}>
+                    {l.value}
+                  </TokenFigure>
+                ) : (
+                  <>
+                    {l.symbol} {l.value}
+                  </>
+                )}
+              </RevealTip>
+            </Prov>
+          </span>
+        ))}
+      </span>
+    ),
+  };
 }
 
 /** The closed card's collateral note, under its figure: what the bundle
@@ -703,18 +706,17 @@ export function pwnCardSlots({
 
   const left: PositionPanelRow[] = [];
   if (v.collateral && collateralFigure) {
+    const c = v.collateral;
+    // A bundle's contents open from the Collateral stat (TO-DO-position-card 341).
+    const bundled = v.bundleContents && v.bundleContents.length > 0 && c.tokenId != null;
     left.push({
       id: "collateral",
       label: CARD_VOCAB.collateral,
       tip: "What the borrower locked for this loan, from the loan's terms as created. The protocol holds it until the loan ends.",
-      value: (
-        <AssetValue asset={v.collateral} prov={positionCollateralProv(v.collateral.symbol, v.version)} iconSize={16} />
-      ),
+      value: <AssetValue asset={c} prov={positionCollateralProv(c.symbol, v.version)} iconSize={16} />,
+      breakdown: bundled ? bundleBreakdown(v.bundleContents!, c.tokenId!, v.createdBlock) : undefined,
     });
-    const c = v.collateral;
-    if (v.bundleContents && v.bundleContents.length > 0 && c.tokenId != null) {
-      left.push(...bundleRows(v.bundleContents, c.tokenId, v.createdBlock));
-    } else if ((c.category === "ERC721" || c.category === "ERC1155") && !c.named) {
+    if (!bundled && (c.category === "ERC721" || c.category === "ERC1155") && !c.named) {
       left.push({
         id: "collateral-kind",
         label: "Collateral kind",

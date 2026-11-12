@@ -38,20 +38,6 @@ const marketNote = (c?: MorphoChainCoords): string => (c?.marketLabel ? ` in the
 const marketInputs = (c?: MorphoChainCoords) =>
   c?.marketId ? [{ label: "market", value: c.marketId, kind: "chain" as const, note: "Morpho market id" }] : [];
 
-/** The market's liquidation LTV — a governance-enabled params constant. */
-export const lltvProv = (c?: MorphoChainCoords, readBy?: ServerRead | null): Provenance =>
-  stampServerRead(
-    {
-      kind: "chain",
-      pclass: "state",
-      summary: `The market's liquidation loan-to-value${marketNote(c)} — the lltv field of the immutable market params tuple (its keccak IS the market id), governance-enabled at market creation. Debt above lltv × collateral value is liquidatable; there is no separate borrow threshold.`,
-      contract: blueOf(c),
-      via: `${LANE} · Morpho.idToMarketParams(id).lltv @ head`,
-      inputs: marketInputs(c),
-    },
-    readBy,
-  );
-
 /** A capacity / LTV aggregate — products and ratios of same-head chain reads. */
 export const capacityProv = (
   label: string,

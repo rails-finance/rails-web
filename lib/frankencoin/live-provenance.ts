@@ -119,3 +119,12 @@ export function liveTermProv(
     readBy,
   );
 }
+
+/** The length of each of a challenge's two phases, as the Explanation states it. */
+export const liveChallengePeriodProv = (position?: string, readBy?: ServerRead | null): Provenance =>
+  liveTermProv(
+    "challengePeriod()",
+    "Challenge phases — the length of each of a challenge's two phases: the position's challengePeriod() at the latest block, in seconds.",
+    position,
+    readBy,
+  );

@@ -783,8 +783,10 @@ function DetailMenu({
 // only where its figure exists), so no static count or tuple type can see the
 // number a card reaches; the shell counts what it is handed. Outside
 // production an over-cap card warns once in the console and carries
-// `data-card-over-cap`; it renders as it is, since which value goes is
-// Miles's call (warn-level until he rules on the cards over today).
+// `data-card-over-cap`; it renders as it is. `npm run check:card-caps`
+// (scripts/check-card-caps.mjs) fails on a family's slot builder that can
+// reach past the caps unless scripts/card-caps-over.txt lists it, pending
+// that protocol's review.
 const warnedOverCap = new Set<string>();
 function overCap(slots: PositionCardSlots): string | null {
   if (process.env.NODE_ENV === "production") return null;

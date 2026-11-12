@@ -418,6 +418,30 @@ export function useAaveV4SpokeCardSlots({
   const oneSupply = single(supplyLegs, spoke.supplyingSymbols);
   const oneColl = single(collLegs, spoke.supplyBreakdown.collateralSymbols);
   const oneDebt = single(debtLegs, spoke.borrowingSymbols);
+  // Supplies not enabled as collateral: they cannot be seized and do not move
+  // the health factor. The on-chain figure (supply − collateral, both priced)
+  // where it stands, else the DefiLlama one, on a line under the Collateral
+  // headline (TO-DO-position-card 341).
+  const nonCollUsd = spoke.supplyBreakdown.nonCollateralUsd;
+  const onchainNonColl = onc && onc.supply != null && onc.collateral != null ? onc.supply - onc.collateral : null;
+  const nonCollSub: ReactNode =
+    !supplyOnly && nonCollUsd > 0
+      ? (() => {
+          const v = fmtUsd(onchainNonColl ?? nonCollUsd);
+          return (
+            <span data-collateral-sub="not-collateral">
+              +
+              <RevealTip tip={v.title}>
+                <Prov info={onchainNonColl != null ? usdProvOnchain("Supplied, not collateral") : NONCOLL_USD_PROV}>
+                  {v.display}
+                </Prov>
+              </RevealTip>{" "}
+              supplied, not collateral
+            </span>
+          );
+        })()
+      : undefined;
+
   const heads: PositionCardHead[] = supplyOnly
     ? [
         {
@@ -455,6 +479,7 @@ export function useAaveV4SpokeCardSlots({
           // lives in the health factor.
           id: "collateral",
           label: CARD_VOCAB.collateral,
+          sub: nonCollSub,
           ...(oneColl
             ? oneAssetHead(
                 oneColl,
@@ -542,30 +567,6 @@ export function useAaveV4SpokeCardSlots({
         }
       : null;
 
-  // Supplies not enabled as collateral: they cannot be seized and do not move
-  // the health factor. The on-chain figure (supply − collateral, both priced)
-  // where it stands, else the DefiLlama one.
-  const nonCollUsd = spoke.supplyBreakdown.nonCollateralUsd;
-  const onchainNonColl = onc && onc.supply != null && onc.collateral != null ? onc.supply - onc.collateral : null;
-  const nonCollRow: PositionPanelRow | null =
-    !supplyOnly && nonCollUsd > 0
-      ? (() => {
-          const v = fmtUsd(onchainNonColl ?? nonCollUsd);
-          return {
-            id: "not-collateral",
-            label: "Supplied, not collateral",
-            tip: "Supplies the position has not enabled as collateral, in dollars. They cannot be seized and do not count toward the health factor.",
-            value: (
-              <RevealTip tip={v.title}>
-                <Prov info={onchainNonColl != null ? usdProvOnchain("Supplied, not collateral") : NONCOLL_USD_PROV}>
-                  {v.display}
-                </Prov>
-              </RevealTip>
-            ),
-          };
-        })()
-      : null;
-
   // The liquidation threshold the health factor weighs the collateral at: one
   // asset's, or the dollar-weighted blend of several.
   const ltPct = spoke.blendedLt != null && spoke.blendedLt > 0 ? Math.round(spoke.blendedLt * 100) : null;
@@ -590,7 +591,12 @@ export function useAaveV4SpokeCardSlots({
       ? {
           id: "borrow-rate",
           label: ratePrefix ? `${ratePrefix}borrow rate` : "Borrow rate",
-          tip: "The latest borrow rate recorded on this spoke for the borrowed asset, from its most recent rate event.",
+          // The position's risk premium stands in the tip (TO-DO-position-card 341).
+          tip: `The latest borrow rate recorded on this spoke for the borrowed asset, from its most recent rate event.${
+            riskPremium && riskPremium > 0
+              ? ` Aave V4 prices risk per position: the collateral held here carries a risk premium of ${(riskPremium * 100).toFixed(2)}% on top of the hub's base borrow rate.`
+              : ""
+          }`,
           value: <Prov info={BORROW_RATE_PROV}>{rate.toFixed(2)}%</Prov>,
         }
       : null;
@@ -610,16 +616,6 @@ export function useAaveV4SpokeCardSlots({
           ),
         }
       : null;
-  const premiumRow: PositionPanelRow | null =
-    riskPremium && riskPremium > 0
-      ? {
-          id: "risk-premium",
-          label: "Risk premium",
-          tip: "Aave V4 prices risk per position: the collateral held here carries a premium on top of the hub's base borrow rate.",
-          value: `${(riskPremium * 100).toFixed(2)}%`,
-        }
-      : null;
-
   return {
     surface: "detail",
     status: null,
@@ -631,8 +627,8 @@ export function useAaveV4SpokeCardSlots({
     menu,
     foot,
     panel: [
-      present([unpricedRow, nonCollRow, interestRow(spoke, "supply"), ltRow]),
-      present([interestRow(spoke, "debt"), rateRow, costRow, premiumRow, supplyOnly ? null : liquidationRow(spoke)]),
+      present([unpricedRow, interestRow(spoke, "supply"), ltRow]),
+      present([interestRow(spoke, "debt"), rateRow, costRow, supplyOnly ? null : liquidationRow(spoke)]),
     ],
   };
 }

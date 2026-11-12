@@ -18,8 +18,9 @@
 // position that survived a challenge stays an open card, its tally in the
 // panel (named as challenges, never "liquidations"), and a running challenge
 // is the notice above the headlines. There is NO health headline and no
-// invented health factor: the declared price, the challenges, the expiry and
-// the cooldown carry the risk, as panel rows.
+// invented health factor: the declared price, the challenges and the expiry
+// carry the risk, as panel rows; the challenge phases and a running cooldown
+// are the Explanation's (TO-DO-position-card 341).
 //
 // The card view builds from EITHER lane: `viewFromSummary` (the index row,
 // the latest MintingUpdate absolutes) or `viewFromChain` (the live overlay,
@@ -50,13 +51,12 @@ import { Prov } from "@/components/shared/provenance";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import { latestAbsoluteProv, peakAbsoluteProv, lifetimeFlowProv } from "@/lib/frankencoin/event-provenance";
 import type { FrankencoinLifetimeDebt } from "@/lib/frankencoin/flows";
-import { fmtZchf, phaseText } from "@/lib/frankencoin/figures";
+import { fmtZchf } from "@/lib/frankencoin/figures";
 import {
   liveMintedProv,
   liveCollateralProv,
   liveLiqPriceProv,
   liveInterestProv,
-  liveTermProv,
 } from "@/lib/frankencoin/live-provenance";
 import { ppmToPct, shortAddress } from "@/lib/frankencoin/asset-catalog";
 import { frankencoinPositionModal } from "@/lib/frankencoin/event-templates";
@@ -64,7 +64,7 @@ import type { Provenance } from "@/components/shared/provenance";
 import type { FrankencoinPositionSummary, FrankencoinPositionStatus } from "@/lib/sources/api/frankencoin-positions";
 import type { FrankencoinChainResponse } from "@/lib/api/fetch-frankencoin-position";
 import { AmountText } from "@/components/shared/amount-text";
-import { formatDate, formatDayMonth } from "@/lib/date";
+import { formatDate } from "@/lib/date";
 import { PanelFigure } from "@/components/shared/position-card-panel";
 import { serverReadOf, stampServerRead, type ServerRead } from "@/lib/shared/server-head-read";
 
@@ -332,8 +332,7 @@ export interface FrankencoinPositionCardProps {
   ending?: FrankencoinEnding | null;
   /** The debt's lifetime totals, for a closed card's lifetime line. */
   lifetimeDebt?: FrankencoinLifetimeDebt | null;
-  /** The page's live read of the position contract: the running challenge,
-   *  the phase length and the minting cooldown. */
+  /** The page's live read of the position contract: the running challenge. */
   live?: FrankencoinChainResponse | null;
   /** The challenge tally from the index, or null while it has not landed. */
   challengeTally?: number | null;
@@ -592,28 +591,6 @@ export function useFrankencoinCardSlots({
       tip: "How many times anyone has challenged the position's declared price, from its indexed history.",
     });
   }
-  if (live?.challengePeriod != null && live.challengePeriod > 0) {
-    left.push({
-      id: "challenge-phases",
-      label: "Challenge phases",
-      value: (
-        <>
-          <Prov
-            info={liveTermProv(
-              "challengePeriod()",
-              "Challenge phases — the length of each of a challenge's two phases: the position's challengePeriod() at the latest block, in seconds.",
-              v.position,
-              v.readBy,
-            )}
-          >
-            <PanelFigure>{phaseText(live.challengePeriod)}</PanelFigure>
-          </Prov>{" "}
-          each
-        </>
-      ),
-      tip: "The length of each of a challenge's two phases, from the position's challengePeriod() at the latest block.",
-    });
-  }
   if (v.annualInterestPPM != null) {
     right.push({
       id: "interest",
@@ -666,21 +643,6 @@ export function useFrankencoinCardSlots({
         </>
       ),
       tip: "When the position expires, from its expiration() at the latest block. It is fixed for the life of the position.",
-    });
-  }
-  const cooling = live?.cooldownActive && live.cooldownUntil != null;
-  if (live && (cooling || !live.mintingDisabledForGood)) {
-    right.push({
-      id: "cooldown",
-      label: "Minting cooldown",
-      value: cooling ? (
-        <>
-          until <PanelFigure>{formatDayMonth(live.cooldownUntil as number)}</PanelFigure>
-        </>
-      ) : (
-        "None"
-      ),
-      tip: "Minting and withdrawals pause for a cooldown after the owner raises the declared price, read from the position at the latest block.",
     });
   }
   return { ...detailCommon, outcome: undefined, panel: [left, right] };
