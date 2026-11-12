@@ -78,6 +78,9 @@ export function shown(p: Pick<PoolPosition, "price" | "priceThen" | "range" | "b
       low: p.range.low,
       high: p.range.high,
       unit: `${p.quote.symbol} per ${p.base.symbol}`,
+      /** The token priced, and the token it is priced in. */
+      of: p.base.symbol,
+      in: p.quote.symbol,
       side: p.side,
     };
   return {
@@ -86,6 +89,8 @@ export function shown(p: Pick<PoolPosition, "price" | "priceThen" | "range" | "b
     low: 1 / p.range.high,
     high: 1 / p.range.low,
     unit: `${p.base.symbol} per ${p.quote.symbol}`,
+    of: p.quote.symbol,
+    in: p.base.symbol,
     side: p.side === "below" ? ("above" as const) : p.side === "above" ? ("below" as const) : p.side,
   };
 }
@@ -150,37 +155,67 @@ const REMOVE = new Set<HookFlag>(["beforeRemoveLiquidity", "afterRemoveLiquidity
 
 // ── Door 1: the page ───────────────────────────────────────────────────────
 
+/** A protocol's own word for the same figure (decision 0065): Uniswap's docs collect fees, PancakeSwap's
+ *  claim them and call them trading fees. The terms are in each protocol's Terms table in rails-ops
+ *  `reference/official-docs/`. */
+export const TERMS: Record<UniProtocol, { uncollected: string; earned: string; collected: string }> = {
+  uniswap: { uncollected: "Uncollected fees", earned: "Swap fees", collected: "collected" },
+  pancakeswap: { uncollected: "Unclaimed fees", earned: "Trading fees", collected: "claimed" },
+};
+
 export const POSITION_PAGE = {
   title: (p: PoolPosition) =>
     `${p.base.symbol}/${p.quote.symbol} · ${versionLabel(p.version, p.protocol)} · position ${positionNumber(p.id)}`,
+  /** The pool's identity: its fee tier (a dynamic fee moves, so its figure is in the readout), the chain
+   *  and the hook. */
   sub: (p: PoolPosition) =>
-    `Fee ${feeLabel(p)} · ${chainName(p)}${p.hooks ? ` · hook ${short(p.hooks)}` : ""}${p.staked ? " · staked in PancakeSwap's farm" : ""}`,
+    `${p.dynamicFee ? "Dynamic fee" : `Fee ${feeText(p.fee)}`} · ${chainName(p)}${p.hooks ? ` · hook ${short(p.hooks)}` : ""}`,
   notFound: (v: UniswapVersion, id: string, protocol: UniProtocol = "uniswap") =>
     `${versionLabel(v, protocol)} has no position ${positionNumber(id)}.`,
   unanswered: "The read of this position did not answer. Try again in a minute.",
 };
 
+/** A position with no liquidity: the card says Closed and the readout drops its rows. */
+export const isClosed = (p: Pick<PoolPosition, "liquidity">): boolean => BigInt(p.liquidity) === BigInt(0);
+
+/** The token a position out of range holds, or null where it holds both. */
+const onlyHolds = (p: Pick<PoolPosition, "holds" | "base" | "quote">): string | null =>
+  p.holds.base === 0 ? p.quote.symbol : p.holds.quote === 0 ? p.base.symbol : null;
+
 export const CARD_WORDS = {
   heading: "Position summary",
-  holds: "Holds now",
-  worth: "Worth now",
-  uncollected: "Fees not yet collected",
-  opened: "Opened",
+  holds: "Tokens",
+  worth: "Value",
+  uncollected: (pr: UniProtocol) => TERMS[pr].uncollected,
   holdsTip: "The two tokens the position's liquidity holds at the pool's price now.",
   worthTip: (q: string) => `Both tokens valued in ${q} at the pool's price now.`,
-  uncollectedTip: "Fees the position has earned and the owner has not collected yet.",
+  uncollectedTip: (pr: UniProtocol) => `Fees the position has earned and the owner has not ${TERMS[pr].collected} yet.`,
   /** A staked PancakeSwap position: MasterChefV3's recorded staker collects its fees. */
-  uncollectedTipStaked: (staker: string) =>
-    `Fees the position has earned and its staker, ${short(staker)}, has not collected yet.`,
-  openedTip: "The day the position took its first deposit.",
-  cake: "CAKE not yet harvested",
-  cakeTip: "CAKE PancakeSwap's farm has paid this staked position that the staker has not harvested yet.",
-  foot: (q: string) => `In ${q}, at the pool's own price. Rails prices nothing in dollars here.`,
-  rangeLabel: "The range against the price",
-  fullRange: "Full range: the position is in range at every price.",
+  uncollectedTipStaked: (staker: string, pr: UniProtocol = "pancakeswap") =>
+    `Fees the position has earned and its staker, ${short(staker)}, has not ${TERMS[pr].collected} yet.`,
+  cake: "Pending CAKE",
+  cakeTip: "CAKE rewards PancakeSwap's farm has paid this staked position that the staker has not harvested yet.",
+  /** PancakeSwap: whether the position is staked in the farm, beside its number. */
+  staked: "Staked",
+  unstaked: "Not staked",
+  closed: "Closed",
+  closedTip: "The position holds no liquidity now.",
+  outOfRange: "Out of range",
+  outOfRangeTip: "The pool's price is outside the position's range.",
+  rangeLabel: "Range",
+  fullRange: "Full range",
   rangeText: (low: number, high: number) => `Range ${num(low)} to ${num(high)}`,
   priceText: (price: number, unit: string) => `Price ${num(price)} ${unit}`,
 };
+
+/** The card's status word: Closed with no liquidity, Out of range outside it, none while in range. */
+export function cardStatus(
+  p: Pick<PoolPosition, "liquidity" | "inRange" | "range">,
+): { word: string; tip: string } | null {
+  if (isClosed(p)) return { word: CARD_WORDS.closed, tip: CARD_WORDS.closedTip };
+  if (!p.inRange && !p.range.full) return { word: CARD_WORDS.outOfRange, tip: CARD_WORDS.outOfRangeTip };
+  return null;
+}
 
 /** A bullet's parts: plain text, or a figure the card also shows (drawn bold). */
 export type Seg = string | { fig: string };
@@ -189,266 +224,460 @@ export interface ExplainGroupWords {
   bullets: Seg[][];
 }
 
-/** The card's (i): the status lead is the first group's first bullet (charter §4). */
+/** The range against the price: where the price sits, and what that means out of range. */
+export function rangeBullets(
+  p: Pick<PoolPosition, "range" | "inRange" | "holds" | "base" | "quote" | "price" | "priceThen" | "side">,
+  earns: string,
+): Seg[][] {
+  if (p.range.full) return [["The position is full range, so it is in range at every price."]];
+  const s = shown(p);
+  const out: Seg[][] = [
+    ["The position's range runs from ", { fig: num(s.low) }, " to ", { fig: num(s.high) }, ` ${s.unit}.`],
+    ["The pool's price is ", { fig: num(s.price) }, p.inRange ? ", inside the range." : `, ${s.side} the range.`],
+  ];
+  if (!p.inRange) out.push([`It holds only ${onlyHolds(p) ?? "one token"} and ${earns} while the price is outside.`]);
+  out.push(["The two amounts follow the price: as it moves, the position trades one token for the other."]);
+  return out;
+}
+
+/** The card's (i) (rails-ops standards/prose-limits-and-zones.md 3.3: Holdings, Risk, History). */
 export function cardExplainer(p: PoolPosition): ExplainGroupWords[] {
   const Q = p.quote.symbol;
   const B = p.base.symbol;
-  const s = shown(p);
-  const position: Seg[][] = [
-    ["This position is worth ", { fig: `${num(p.valueNow)} ${Q}` }, " at the pool's price."],
-    [
-      "The position holds ",
-      { fig: `${num(p.holds.base)} ${B}` },
-      " and ",
-      { fig: `${num(p.holds.quote)} ${Q}` },
-      " now.",
-    ],
-    ["Fees not yet collected come to ", { fig: `${num(p.uncollected)} ${Q}` }, "."],
-  ];
+  const closed = isClosed(p);
+  const holdings: Seg[][] = closed
+    ? [["This position holds no liquidity now."]]
+    : [
+        ["This position is worth ", { fig: `${num(p.valueNow)} ${Q}` }, " at the pool's price."],
+        ["It holds ", { fig: `${num(p.holds.base)} ${B}` }, " and ", { fig: `${num(p.holds.quote)} ${Q}` }, " now."],
+      ];
+  if (!closed || p.uncollected > 0)
+    holdings.push([`${TERMS[p.protocol].uncollected} come to `, { fig: `${num(p.uncollected)} ${Q}` }, "."]);
   if (p.staked)
-    position.push([
+    holdings.push([
       "The position is staked in PancakeSwap's farm, with ",
       { fig: `${num(p.staked.pendingCake)} ${p.staked.cake.symbol}` },
       " not yet harvested.",
     ]);
-  if (p.opened) position.push(["The position opened on ", { fig: day(p.opened.time) }, "."]);
-  position.push(
-    p.range.full
-      ? ["The position is full range, so it is in range at every price."]
-      : [
-          "The position's range runs from ",
-          { fig: num(s.low) },
-          " to ",
-          { fig: num(s.high) },
-          ` ${s.unit}; the price is `,
-          { fig: num(s.price) },
-          ".",
-        ],
-  );
+  else if (p.staked === null) holdings.push(["Not staked in PancakeSwap's farm, so it earns no CAKE."]);
+  const history: Seg[][] = p.opened ? [["The position was minted on ", { fig: day(p.opened.time) }, "."]] : [];
   return [
-    { title: "This position", bullets: position },
+    { title: "Holdings", bullets: holdings },
+    { title: "Risk", bullets: closed ? [] : rangeBullets(p, "earns no fees") },
+    { title: "History", bullets: history },
+  ].filter((g) => g.bullets.length > 0);
+}
+
+// ── Door 1: the readout, a then / now table (components/shared/then-now-table.tsx) ──
+
+/** A row's key: what its receipt traces (lib/uniswap/provenance.ts `lineProv`). */
+export type RowKey =
+  | `token:${0 | 1}`
+  | "days"
+  | "earned"
+  | "against"
+  | "withEarned"
+  | "deposits"
+  | "share"
+  | "penalty"
+  | "withdrawals"
+  | "subscriber"
+  | "minted"
+  | "price"
+  | "move"
+  | `balance:${0 | 1}`
+  | "balances"
+  | "fullRange"
+  | "fullRangeReward"
+  | "lpFee"
+  | "swapFee"
+  | "protocolFee";
+
+export interface PoolRow {
+  key: RowKey;
+  /** Whose figure it is: the receipt's side. */
+  part: "yours" | "pool";
+  label: string;
+  /** The figure at the past block; null where the row has none. */
+  then: string | null;
+  now: string;
+  /** A fact with no past side by nature (a change, a setting): its past cell stays blank. */
+  single?: true;
+  /** One line under the label, up to eight words, lower case: why a figure moved or a cell is empty. */
+  note?: string;
+}
+export interface PoolTable {
+  /** The past column's date; null where the pool had no state 30 days back. */
+  then: string | null;
+  groups: { title: string; rows: PoolRow[] }[];
+}
+
+export const READOUT = {
+  /** The section's heading: the window where the pool has a past read, the present where it has none. */
+  title: (t: Pick<PoolTable, "then">) => (t.then ? "Last 30 days" : "Pool now"),
+  now: "Now",
+  position: "This position",
+  pool: "The pool",
+  explainerLabel: "explanation of this table",
+};
+
+/** Why a 30-day figure is empty, in a few words under its row. */
+export const WINDOW_NOTE = {
+  minted: "minted inside the 30 days",
+  changed: "liquidity changed inside the 30 days",
+  /** A position minted inside the window, with its opening day: when its first figure lands. */
+  firstOn: (ts: number) => `first figure on ${day(ts)}`,
+};
+
+/** The two token rows of a position or a pool: a past amount and a present one. */
+export function tokenRows(
+  part: "yours" | "pool",
+  b: string,
+  q: string,
+  now: { base: number; quote: number },
+  then: { base: number; quote: number } | null,
+  note?: string,
+): PoolRow[] {
+  return [
     {
-      title: "How it counts",
-      bullets: [
-        [`Every figure is in ${Q}, priced by the pool.`],
-        ["The two amounts follow the price: as it moves, the position trades one token for the other."],
-      ],
+      key: part === "yours" ? "token:0" : "balance:0",
+      part,
+      label: b,
+      then: then ? num(then.base) : null,
+      now: num(now.base),
+      ...(note ? { note } : {}),
+    },
+    {
+      key: part === "yours" ? "token:1" : "balance:1",
+      part,
+      label: q,
+      then: then ? num(then.quote) : null,
+      now: num(now.quote),
     },
   ];
 }
 
-// ── Door 1: the readout ────────────────────────────────────────────────────
-
-export type LineKey = "range" | "fees" | "cake" | "against" | "size" | "withdrawals" | "steward";
-
-export interface ReadoutLine {
-  key: LineKey;
-  label: string;
-  /** The holder's figure, first; null where there is none. */
-  yours: string | null;
-  /** The pool's figure, after. */
-  pool: string | null;
+/** The price rows: the pool's price at both blocks, and its change. */
+export function priceRows(
+  p: Pick<PoolPosition, "price" | "priceThen" | "range" | "base" | "quote" | "side">,
+): PoolRow[] {
+  const s = shown(p);
+  return [
+    {
+      key: "price",
+      part: "pool",
+      label: `${s.of} price`,
+      then: s.then !== null ? `${num(s.then)} ${s.in}` : null,
+      now: `${num(s.price)} ${s.in}`,
+    },
+    ...(s.then !== null
+      ? [
+          {
+            key: "move",
+            part: "pool",
+            label: "Price change",
+            then: null,
+            now: pct(s.price / s.then - 1, 1),
+            single: true,
+          } as PoolRow,
+        ]
+      : []),
+  ];
 }
 
-export const READOUT = {
-  title: "How the position and its pool are doing",
-  sub: "Measured from the chain over the last 30 days. Rails does not forecast, rate or recommend.",
-  explainerLabel: "explanation of these lines",
-};
+/** The share of the liquidity in range that earns: "0.12%", "under 0.01%", "0%" out of range. */
+export const shareText = (inRange: boolean, x: number): string =>
+  !inRange ? "0%" : x >= 0.0001 ? share(x, 2) : "under 0.01%";
 
-/** The six lines in drawing order: Range leads when the position is out of range. */
-export function readoutLines(p: PoolPosition): ReadoutLine[] {
+/** The days-in-range row, where the daily reads cover the position. */
+export function daysRow(d: { inRange: number; read: number } | null, since: string | null): PoolRow[] {
+  return d && d.read > 0
+    ? [
+        {
+          key: "days",
+          part: "yours",
+          label: "Days in range",
+          then: null,
+          now: `${d.inRange} of ${d.read}`,
+          single: true,
+          note: since ? `one read a day since ${since}` : "one read a day",
+        },
+      ]
+    : [];
+}
+
+/** The protocol's cut as a figure, with its note: "1/4" of the LPs' fee, "0.05%" added to a swap. */
+export function cutCell(c: ProtocolCut): { now: string; note?: string } {
+  if (c.version === "pancake-v3") {
+    if (!c.s0 && !c.s1) return { now: "None" };
+    return {
+      now: c.s0 === c.s1 ? bps(c.s0) : `${bps(c.s0)} or ${bps(c.s1)}`,
+      note: "of the swap fee, from LPs' share",
+    };
+  }
+  if (c.version === "v3") {
+    if (!c.d0 && !c.d1) return { now: "None" };
+    const f = (d: number) => (d ? `1/${d}` : "0");
+    return { now: c.d0 === c.d1 ? f(c.d0) : `${f(c.d0)} or ${f(c.d1)}`, note: "of the swap fee, from LPs' share" };
+  }
+  if (!c.p0 && !c.p1) return { now: "None" };
+  return { now: c.p0 === c.p1 ? pips(c.p0) : `${pips(c.p0)} or ${pips(c.p1)}`, note: "added to each swap's fee" };
+}
+
+/** The readout as a table: the position's rows, then the pool's. */
+export function readoutTable(p: PoolPosition): PoolTable {
   const B = p.base.symbol;
   const Q = p.quote.symbol;
-  const s = shown(p);
   const opened = p.openedInWindow && p.opened ? p.opened.time : null;
-
-  // Range
-  const onlyHolds = p.holds.base === 0 ? Q : p.holds.quote === 0 ? B : null;
-  const now = p.range.full
-    ? "In range at every price: the position is full range."
-    : p.inRange
-      ? `In range: the price, ${num(s.price)} ${s.unit}, sits inside ${num(s.low)} to ${num(s.high)}.`
-      : `Out of range, ${s.side} it: the price is ${num(s.price)} ${s.unit}, the range ${num(s.low)} to ${num(s.high)}. It holds only ${onlyHolds ?? "one token"} and earns no fees while the price is outside.`;
   // Without the chain's history (Base) a position opened inside the window has no opening day, and
   // the daily reads before it opened are not its own.
   const newInWindow = !opened && p.openedInWindow;
-  const dir = p.daysInRange;
-  const days =
-    dir && dir.read > 0 && !newInWindow
-      ? opened
-        ? `In range on ${dir.inRange} of ${dir.read} daily reads since it opened on ${day(opened)}.`
-        : `In range on ${dir.inRange} of the last ${dir.read} days, read once a day.`
-      : null;
-  const range: ReadoutLine = {
-    key: "range",
-    label: "Range",
-    yours: [now, days].filter(Boolean).join(" "),
-    pool:
-      s.then !== null
-        ? `The price moved ${pct(s.price / s.then - 1, 1)} in 30 days, from ${num(s.then)} to ${num(s.price)} ${s.unit}.`
-        : null,
-  };
-
-  // Fees
-  const feesYours = opened
-    ? `Opened on ${day(opened)}, inside the window: its first 30-day figure is on ${day(opened + 30 * 86400)}.`
+  const why = opened
+    ? WINDOW_NOTE.firstOn(opened + 30 * 86400)
     : newInWindow
-      ? "It did not exist 30 days ago, so Rails states no 30-day fees yet."
+      ? WINDOW_NOTE.minted
       : p.liquidityChanged
-        ? "Its liquidity changed inside the window, so Rails does not state its 30-day fees yet."
-        : p.fees30d !== null
-          ? `Earned ${num(p.fees30d)} ${Q} in fees in the last 30 days.`
-          : null;
-  const uncollected = p.uncollected > 0 ? `Not yet collected: ${num(p.uncollected)} ${Q}.` : null;
-  const fees: ReadoutLine = {
-    key: "fees",
-    label: "Fees",
-    yours: [feesYours, uncollected].filter(Boolean).join(" ") || null,
-    pool:
-      p.pool30d.fullRangeFees !== null
-        ? `A full-range position in this pool earned ${share(p.pool30d.fullRangeFees)} of its value in fees in 30 days.`
-        : "The pool is younger than 30 days.",
+        ? WINDOW_NOTE.changed
+        : undefined;
+  const earned: PoolRow = {
+    key: "earned",
+    part: "yours",
+    label: TERMS[p.protocol].earned,
+    then: null,
+    now: p.fees30d !== null ? `${num(p.fees30d)} ${Q}` : "—",
+    single: true,
+    ...(p.fees30d === null && why ? { note: why } : {}),
   };
-
-  // Against holding
-  const ahYours = opened
-    ? "Opened inside the window."
-    : newInWindow
-      ? "It did not exist 30 days ago."
-      : p.liquidityChanged
-        ? "Its liquidity changed inside the window, so Rails does not state this yet."
-        : p.againstHolding !== null && p.againstHoldingWithFees !== null
-          ? `${pct(p.againstHolding)} against holding the tokens it held on ${day(p.then.time)}, both valued at today's price; ${pct(p.againstHoldingWithFees)} with the fees it earned.`
-          : null;
+  const against: PoolRow[] =
+    p.againstHolding !== null && p.againstHoldingWithFees !== null
+      ? [
+          {
+            key: "against",
+            part: "yours",
+            label: "Against holding",
+            then: null,
+            now: pct(p.againstHolding),
+            single: true,
+          },
+          {
+            key: "withEarned",
+            part: "yours",
+            label: "With fees",
+            then: null,
+            now: pct(p.againstHoldingWithFees),
+            single: true,
+          },
+        ]
+      : [];
   const sd = p.sinceDeposit;
-  const against: ReadoutLine = {
-    key: "against",
-    label: "Against holding",
-    yours: ahYours,
-    pool: sd
-      ? `Since its first deposit on ${p.opened ? day(p.opened.time) : "–"}: ${num(sd.deposited.base)} ${B} and ${num(sd.deposited.quote)} ${Q} put in, ${num(sd.holdValue)} ${Q} if held. The position, its unpaid fees and all it has paid out come to ${num(sd.nowWithEverything)} ${Q}: ${pct(sd.nowWithEverything / sd.holdValue - 1)}.`
-      : p.version === "v4"
-        ? "Since its first deposit: Rails does not read a V4 position's own deposits yet."
-        : !p.historyRead
-          ? `Since its first deposit: Rails does not read a position's deposits on ${chainName(p)} yet.`
-          : null,
-  };
-
-  // Size
-  const b = p.pool30d.balances;
-  const b30 = p.pool30d.balancesThen;
-  const size: ReadoutLine = {
-    key: "size",
-    label: "Size",
-    yours: p.inRange
-      ? `${p.shareOfActive >= 0.0001 ? share(p.shareOfActive, 2) : "Under 0.01%"} of the liquidity in range now.`
-      : "None of the liquidity in range now: the position is out of range.",
-    pool: b
-      ? `The pool holds ${num(b.base)} ${B} and ${num(b.quote)} ${Q}${b30 ? `; 30 days ago ${num(b30.base)} ${B} and ${num(b30.quote)} ${Q}` : ""}.`
-      : "Rails does not read a V4 pool's balances yet: V4 keeps every pool in one contract.",
-  };
-
-  // Withdrawals
+  const deposits: PoolRow[] = sd
+    ? [
+        {
+          key: "deposits",
+          part: "yours",
+          label: "Against deposits",
+          then: null,
+          now: pct(sd.nowWithEverything / sd.holdValue - 1),
+          single: true,
+          note: "fees and payouts counted, since first deposit",
+        },
+      ]
+    : p.version === "v4" || !p.historyRead
+      ? [
+          {
+            key: "deposits",
+            part: "yours",
+            label: "Against deposits",
+            then: null,
+            now: "—",
+            single: true,
+            note: p.version === "v4" ? "deposits not read for V4" : `deposits not read on ${chainName(p)}`,
+          },
+        ]
+      : [];
   const removes = p.hookPermissions.some((f) => REMOVE.has(f));
-  const withdrawals: ReadoutLine = {
+  const withdrawals: PoolRow = {
     key: "withdrawals",
+    part: "yours",
     label: "Withdrawals",
-    yours: p.staked
-      ? "Can be withdrawn at any block by the staker, through PancakeSwap's farm, which holds the position. The pool has no pause and no hook."
-      : !p.hooks
-        ? "Can be withdrawn at any block. The pool has no pause and no hook."
-        : removes
-          ? `The pool's hook ${short(p.hooks)} runs on every withdrawal and can block it or take from it.`
-          : `Can be withdrawn at any block. The pool's hook ${short(p.hooks)} runs on ${list(hookActions(p.hookPermissions))}, and has no permission on withdrawals.`,
-    pool: p.hasSubscriber ? "A subscriber contract is notified of the position's changes." : null,
+    then: null,
+    now: p.hooks && removes ? "Via hook" : "Open",
+    single: true,
+    ...(p.staked
+      ? { note: "by the staker, through the farm" }
+      : p.hooks
+        ? { note: removes ? "the hook runs on each withdrawal" : "the hook has no withdrawal permission" }
+        : {}),
   };
+  const closed = isClosed(p);
+  const position: PoolRow[] = [
+    ...tokenRows(
+      "yours",
+      B,
+      Q,
+      p.holds,
+      p.holdsThen,
+      // Said once: the fees row carries the same reason where it has it.
+      p.holdsThen === null && p.priceThen !== null && why !== WINDOW_NOTE.minted ? WINDOW_NOTE.minted : undefined,
+    ),
+    ...daysRow(newInWindow || closed ? null : p.daysInRange, opened ? day(opened) : null),
+    earned,
+    ...against,
+    ...deposits,
+  ];
+  // An open position's present: its share of the liquidity that earns, and how it comes out.
+  const open: PoolRow[] = closed
+    ? []
+    : [
+        {
+          key: "share",
+          part: "yours",
+          label: "Active liquidity share",
+          then: null,
+          now: shareText(p.inRange, p.shareOfActive),
+          single: true,
+          ...(p.inRange ? {} : { note: "out of range" }),
+        },
+        withdrawals,
+        ...(p.hasSubscriber
+          ? [{ key: "subscriber", part: "yours", label: "Subscriber", then: null, now: "Yes", single: true } as PoolRow]
+          : []),
+      ];
+  const minted: PoolRow[] = p.opened
+    ? [{ key: "minted", part: "yours", label: "Minted", then: null, now: day(p.opened.time), single: true }]
+    : [];
 
-  // Steward
-  const steward: ReadoutLine = {
-    key: "steward",
-    label: "Steward",
-    yours: null,
-    pool: `${
-      p.dynamicFee && p.hooks
-        ? `The hook ${short(p.hooks)} sets this pool's fee, ${p.lpFeePct.toLocaleString("en-US", { maximumFractionDigits: 4 })}% now.`
-        : `Nobody can change this pool's ${feeLabel(p)} fee.`
-    } ${cutSentence(p.protocolCut)}`,
-  };
-
-  // CAKE: PancakeSwap's farm, staked or not.
-  const cakeLine: ReadoutLine[] =
-    p.staked === undefined
-      ? []
+  const b = p.pool30d.balances;
+  const cut = cutCell(p.protocolCut);
+  const pool: PoolRow[] = [
+    ...priceRows(p),
+    ...(b
+      ? tokenRows("pool", B, Q, b, p.pool30d.balancesThen)
       : [
           {
-            key: "cake",
-            label: "CAKE",
-            yours: p.staked
-              ? `Staked in PancakeSwap's farm: ${num(p.staked.pendingCake)} ${p.staked.cake.symbol} not yet harvested.`
-              : "Not staked in PancakeSwap's farm, so it earns no CAKE.",
-            pool: p.staked
-              ? "A staked position keeps earning the pool's swap fees, and earns CAKE while it is in range."
-              : null,
-          },
-        ];
-
-  return p.inRange || p.range.full
-    ? [size, fees, ...cakeLine, range, withdrawals, against, steward]
-    : [range, size, fees, ...cakeLine, withdrawals, against, steward];
+            key: "balances",
+            part: "pool",
+            label: "Balances",
+            then: null,
+            now: "—",
+            single: true,
+            note: "one contract holds every V4 pool",
+          } as PoolRow,
+        ]),
+    {
+      key: "fullRange",
+      part: "pool",
+      label: "Full range fees",
+      then: null,
+      now: p.pool30d.fullRangeFees !== null ? share(p.pool30d.fullRangeFees) : "—",
+      single: true,
+      ...(p.pool30d.fullRangeFees === null ? { note: "pool under 30 days old" } : {}),
+    },
+    ...(p.dynamicFee && p.hooks
+      ? [
+          {
+            key: "lpFee",
+            part: "pool",
+            label: "LP fee",
+            then: null,
+            now: `${p.lpFeePct.toLocaleString("en-US", { maximumFractionDigits: 4 })}%`,
+            single: true,
+            note: "set by its hook",
+          } as PoolRow,
+        ]
+      : []),
+    {
+      key: "protocolFee",
+      part: "pool",
+      label: "Protocol fee",
+      then: null,
+      now: cut.now,
+      single: true,
+      ...(cut.note ? { note: cut.note } : {}),
+    },
+  ];
+  // A position with no liquidity at either block has no rows: the section is the pool's alone.
+  const held = !isClosed(p) || (p.holdsThen !== null && (p.holdsThen.base > 0 || p.holdsThen.quote > 0));
+  return {
+    then: p.priceThen !== null ? day(p.then.time) : null,
+    groups: [
+      ...(held ? [{ title: READOUT.position, rows: [...position, ...open, ...minted] }] : []),
+      { title: READOUT.pool, rows: pool },
+    ],
+  };
 }
 
-/** The readout's (i): one group per line, in the lines' order (charter §4, "Product panes follow
- *  the band"). Each bullet says what its line's figure means and stands alone; what the line
- *  already states on the face is not repeated, so the pane fits one phone screen at 390px. */
-export function readoutExplainer(p: PoolPosition, order: readonly LineKey[]): ExplainGroupWords[] {
-  const groups: Record<LineKey, ExplainGroupWords> = {
-    range: {
-      title: "Range",
-      bullets: [["A position earns fees only while the pool's price sits inside its range."]],
+/** The readout's (i): how the columns compare, then what the position's rows and the pool's mean. */
+export function readoutExplainer(p: PoolPosition): ExplainGroupWords[] {
+  const Q = p.quote.symbol;
+  const opened = p.openedInWindow && p.opened ? p.opened.time : null;
+  const newInWindow = !opened && p.openedInWindow;
+  const sd = p.sinceDeposit;
+  const removes = p.hookPermissions.some((f) => REMOVE.has(f));
+  const position: Seg[][] = [
+    ["Each swap pays the pool's fee to the liquidity in range at that moment."],
+    ...(opened
+      ? [[`Minted on ${day(opened)}, inside the window: its first 30-day figure is on ${day(opened + 30 * 86400)}.`]]
+      : newInWindow
+        ? [["It did not exist 30 days ago, so it has no 30-day figure yet."]]
+        : p.liquidityChanged
+          ? [["Its liquidity changed inside the window, so it has no 30-day figure yet."]]
+          : []),
+    ["Against holding compares the position now with keeping the tokens it held 30 days ago, both at today's price."],
+    ...(sd
+      ? [
+          [
+            `Since its first deposit${p.opened ? ` on ${day(p.opened.time)}` : ""}, what went in comes to `,
+            { fig: `${num(sd.holdValue)} ${Q}` },
+            " if held.",
+          ],
+          [
+            "The position, its unpaid fees and all it has paid out come to ",
+            { fig: `${num(sd.nowWithEverything)} ${Q}` },
+            ".",
+          ],
+        ]
+      : []),
+    ["The position's share is of the liquidity in range now, the part that earns fees."],
+    p.staked
+      ? ["PancakeSwap's farm holds a staked position, and only its staker can withdraw it, at any block."]
+      : !p.hooks
+        ? ["The pool has no pause and no hook, so nothing can stop or charge a withdrawal."]
+        : removes
+          ? [`The pool's hook ${short(p.hooks)} runs on every withdrawal and can block it or take from it.`]
+          : [
+              `The pool's hook ${short(p.hooks)} runs on ${list(hookActions(p.hookPermissions))}, and has no permission on withdrawals.`,
+            ],
+    ...(p.staked ? [["The pool has no pause and no hook, so nothing can stop or charge a withdrawal."]] : []),
+    ...(p.hasSubscriber ? [["A subscriber contract is notified of the position's changes."]] : []),
+    ...(p.staked
+      ? [["A staked position keeps earning the pool's swap fees, and earns CAKE while it is in range."]]
+      : []),
+  ];
+  const pool: Seg[][] = [
+    ["Full range fees: what a full-range position in this pool earned in fees in 30 days, as a share of its value."],
+    ["A donation to the pool counts as a fee in the pool's figure."],
+    p.dynamicFee && p.hooks
+      ? [`The hook ${short(p.hooks)} sets this pool's fee, and can change it at any swap.`]
+      : [`Nobody can change this pool's ${feeLabel(p)} fee.`],
+    [
+      cutSentence(p.protocolCut),
+      p.protocol === "pancakeswap"
+        ? " The owner of PancakeSwap's factory sets the protocol fee."
+        : " Uniswap's governance sets the protocol fee.",
+    ],
+  ];
+  return [
+    {
+      title: "How it compares",
+      bullets:
+        p.priceThen !== null
+          ? [["The first column is a block 30 days back, on the date shown."], ["Now is the block this page read."]]
+          : [["The pool is younger than 30 days, so the table shows now only."]],
     },
-    fees: {
-      title: "Fees",
-      bullets: [
-        ["Each swap pays the pool's fee to the liquidity in range at that moment."],
-        ["A donation to the pool counts as a fee in the pool's figure."],
-      ],
-    },
-    cake: {
-      title: "CAKE",
-      bullets: [
-        [
-          "A position staked in PancakeSwap's farm earns CAKE on top of its swap fees; the staker harvests the CAKE and collects the fees through the farm.",
-        ],
-      ],
-    },
-    against: {
-      title: "Against holding",
-      bullets: [["Against holding compares the position now with keeping the tokens it held 30 days ago."]],
-    },
-    size: {
-      title: "Size",
-      bullets: [["The position's share is of the liquidity in range now, the part that earns fees."]],
-    },
-    withdrawals: {
-      title: "Withdrawals",
-      bullets: p.hooks
-        ? [["A hook is a contract the pool calls on each action it has permission for."]]
-        : [["A pool with no hook has no step that can stop or charge a withdrawal."]],
-    },
-    steward: {
-      title: "Steward",
-      bullets: [
-        [
-          p.protocol === "pancakeswap"
-            ? "The owner of PancakeSwap's factory sets the protocol fee."
-            : "Uniswap's governance sets the protocol fee.",
-        ],
-        ...(p.dynamicFee ? [["A dynamic fee is set by the pool's hook and can change at any swap."]] : []),
-      ],
-    },
-  };
-  return order.map((k) => groups[k]);
+    { title: READOUT.position, bullets: isClosed(p) && !p.holdsThen ? [] : position },
+    { title: READOUT.pool, bullets: pool },
+  ].filter((g) => g.bullets.length > 0);
 }
 
 // ── Door 1: the front door and a wallet's positions ────────────────────────

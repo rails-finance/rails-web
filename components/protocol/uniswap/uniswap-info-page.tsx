@@ -151,6 +151,7 @@ function howItWorks(version: UniswapVersion, d: UniDeployment): readonly [ReactN
       {d.protocolName} runs no dollar price feed, so Rails states no dollar figure here
       {d.masterChef ? "; CAKE is stated in CAKE" : ""}.
     </>,
+    <>Rails does not forecast, rate or recommend.</>,
   ];
 }
 

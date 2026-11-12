@@ -8,7 +8,7 @@ import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import { uniDeployment, type UniDeployment } from "@/lib/uniswap/deployments";
 import type { PoolPosition } from "@/lib/uniswap/position";
 import { dayGridPhrase, type UniPositionRead } from "@/lib/uniswap/types";
-import type { LineKey } from "@/lib/uniswap/words";
+import { TERMS, type RowKey } from "@/lib/uniswap/words";
 
 /** The contracts a deployment's receipts name (lib/uniswap/deployments.ts). */
 function uniContracts(d: UniDeployment) {
@@ -80,7 +80,7 @@ export function cardProv(
         kind: "derived",
         pclass: "state",
         source: head,
-        summary: `Holds now — the two amounts the position's liquidity ${r.liquidity} holds between ticks ${r.tickLower} and ${r.tickUpper} at the pool's square-root price at ${at(r.head)}.`,
+        summary: `Tokens — the two amounts the position's liquidity ${r.liquidity} holds between ticks ${r.tickLower} and ${r.tickUpper} at the pool's square-root price at ${at(r.head)}.`,
         contract: positionContract(c),
         via: via(c, `block ${n(r.head.block)}`),
         formula: "Uniswap's amounts for liquidity L over [√Pa, √Pb] at √P",
@@ -97,7 +97,7 @@ export function cardProv(
         kind: "derived",
         pclass: "state",
         source: head,
-        summary: `Worth now — the position's two amounts valued in ${Q} at the pool's price at ${at(r.head)}: ${fig(p.valueNow)} ${Q}.`,
+        summary: `Value — the position's two amounts valued in ${Q} at the pool's price at ${at(r.head)}: ${fig(p.valueNow)} ${Q}.`,
         contract: poolContract(c),
         via: via(c, `block ${n(r.head.block)}`),
         formula: "base amount × price + quote amount",
@@ -112,7 +112,7 @@ export function cardProv(
         kind: "derived",
         pclass: "state",
         source: head,
-        summary: `Fees not yet collected — the fees owed on record plus the liquidity times the growth of fees inside the range since the position last settled, at ${at(r.head)}, valued in ${Q} at the pool's price.`,
+        summary: `${TERMS[p.protocol].uncollected} — the fees owed on record plus the liquidity times the growth of fees inside the range since the position last settled, at ${at(r.head)}, valued in ${Q} at the pool's price.`,
         contract: positionContract(c),
         via: via(c, `block ${n(r.head.block)}`),
         formula: "tokensOwed + L × (feeGrowthInside − feeGrowthInsideLast) ÷ 2^128, per token",
@@ -137,8 +137,8 @@ export function cardProv(
         source: { block: r.opened?.block ?? r.head.block },
         summary:
           p.version === "v3"
-            ? `Opened — the position's first IncreaseLiquidity log on the NonfungiblePositionManager, filtered by token id ${p.id}, is at ${r.opened ? at(r.opened) : "no block"}.`
-            : `Opened — the PositionManager's Transfer log from the zero address for token id ${p.id}, its mint, is at ${r.opened ? at(r.opened) : "no block"}.`,
+            ? `Minted — the position's first IncreaseLiquidity log on the NonfungiblePositionManager, filtered by token id ${p.id}, is at ${r.opened ? at(r.opened) : "no block"}.`
+            : `Minted — the PositionManager's Transfer log from the zero address for token id ${p.id}, its mint, is at ${r.opened ? at(r.opened) : "no block"}.`,
         contract: positionContract(c),
         via: "rails-server · getLogs by token id",
       };
@@ -149,7 +149,7 @@ export function cardProv(
         pclass: "state",
         source: head,
         summary: st
-          ? `CAKE not yet harvested — MasterChefV3's pendingCake(${p.id}) at ${at(r.head)}, ${r.staked?.pendingCake ?? "0"} in CAKE's ${st.cake.decimals} decimals: ${fig(st.pendingCake)} ${st.cake.symbol}. The farm holds the position for its staker ${st.user}.`
+          ? `Pending CAKE — MasterChefV3's pendingCake(${p.id}) at ${at(r.head)}, ${r.staked?.pendingCake ?? "0"} in CAKE's ${st.cake.decimals} decimals: ${fig(st.pendingCake)} ${st.cake.symbol}. The farm holds the position for its staker ${st.user}.`
           : `Not staked — ownerOf(${p.id}) on the NonfungiblePositionManager at ${at(r.head)} is ${r.owner}, not MasterChefV3, so the farm pays it no CAKE.`,
         contract: st ? farmContract(c) : positionContract(c),
         via: via(c, `block ${n(r.head.block)}`),
@@ -180,8 +180,68 @@ export function cardProv(
   }
 }
 
-/** One readout line's two parts; null where the part states no read. */
-export function lineProv(key: LineKey, part: "yours" | "pool", c: UniReceiptContext): Provenance | null {
+/** A readout row's receipt; null where the row states no read. */
+export function lineProv(key: RowKey, c: UniReceiptContext): Provenance | null {
+  switch (key) {
+    case "token:0":
+    case "token:1":
+      return holdsProv(c);
+    case "days":
+      return partProv("range", "yours", c);
+    case "earned":
+      return c.p.fees30d === null ? null : partProv("fees", "yours", c);
+    case "against":
+    case "withEarned":
+      return partProv("against", "yours", c);
+    case "deposits":
+      return partProv("against", "pool", c);
+    case "share":
+      return partProv("size", "yours", c);
+    case "withdrawals":
+      return partProv("withdrawals", "yours", c);
+    case "subscriber":
+      return partProv("withdrawals", "pool", c);
+    case "minted":
+      return c.p.opened ? cardProv("opened", c) : null;
+    case "price":
+    case "move":
+      return c.r.past ? partProv("range", "pool", c) : cardProv("price", c);
+    case "balance:0":
+    case "balance:1":
+    case "balances":
+      return partProv("size", "pool", c);
+    case "fullRange":
+      return partProv("fees", "pool", c);
+    case "lpFee":
+    case "protocolFee":
+      return partProv("steward", "pool", c);
+    default:
+      return null;
+  }
+}
+
+/** The position's two amounts now and at the past block, each its liquidity at that block's price. */
+function holdsProv(c: UniReceiptContext): Provenance {
+  const { p, r } = c;
+  const now = cardProv("holds", c);
+  const past = r.past;
+  if (!past || past.positionLiquidity === null || !p.holdsThen) return now;
+  return {
+    ...now,
+    summary: `Tokens — the two amounts the position's liquidity holds between ticks ${r.tickLower} and ${r.tickUpper}: ${r.liquidity} at the pool's square-root price at ${at(r.head)}, and ${past.positionLiquidity} at the square-root price at ${at(r.then)}.`,
+    via: via(c, `blocks ${n(r.then.block)} and ${n(r.head.block)}`),
+    inputs: [
+      ...(now.inputs ?? []),
+      chain(`${positionCall(c)} · liquidity · ${at(r.then)}`, past.positionLiquidity),
+      chain(`sqrtPriceX96 · ${at(r.then)}`, past.sqrtPriceX96),
+      derived(`${p.base.symbol} then`, fig(p.holdsThen.base)),
+      derived(`${p.quote.symbol} then`, fig(p.holdsThen.quote)),
+    ],
+  };
+}
+
+/** One part of the readout's facts; null where it states no read. */
+function partProv(key: string, part: "yours" | "pool", c: UniReceiptContext): Provenance | null {
   const { p, r } = c;
   const head = { block: r.head.block };
   const Q = p.quote.symbol;
@@ -205,7 +265,7 @@ export function lineProv(key: LineKey, part: "yours" | "pool", c: UniReceiptCont
         kind: "derived",
         pclass: "state",
         source: head,
-        summary: `Price move — the pool's square-root price at ${at(r.then)} and at ${at(r.head)}, squared and scaled by the tokens' decimals.`,
+        summary: `Price change — the pool's square-root price at ${at(r.then)} and at ${at(r.head)}, squared and scaled by the tokens' decimals.`,
         contract: poolContract(c),
         via: via(c, `blocks ${n(r.then.block)} and ${n(r.head.block)}`),
         formula: "price now ÷ price then − 1",
@@ -220,7 +280,7 @@ export function lineProv(key: LineKey, part: "yours" | "pool", c: UniReceiptCont
         kind: "derived",
         pclass: "state",
         source: head,
-        summary: `Fees, 30 days — the position's liquidity ${r.liquidity}, the same at both blocks, times the growth of fees inside its range between ${both(c)}, valued in ${Q} at the pool's price now.`,
+        summary: `Swap fees — the position's liquidity ${r.liquidity}, the same at both blocks, times the growth of fees inside its range between ${both(c)}, valued in ${Q} at the pool's price now.`,
         contract: poolContract(c),
         via: via(c, `blocks ${n(r.then.block)} and ${n(r.head.block)}`),
         formula: "L × (feeGrowthInside now − feeGrowthInside then) ÷ 2^128, per token",
@@ -242,7 +302,7 @@ export function lineProv(key: LineKey, part: "yours" | "pool", c: UniReceiptCont
         kind: "derived",
         pclass: "state",
         source: head,
-        summary: `Full-range fees — the growth of the pool's global fee counters between ${both(c)}, as a share of a full-range position's value at the price now. A donation to the pool raises these counters as a fee does.`,
+        summary: `Full range fees — the growth of the pool's global fee counters between ${both(c)}, as a share of a full-range position's value at the price now. A donation to the pool raises these counters as a fee does.`,
         contract: poolContract(c),
         via: via(c, `blocks ${n(r.then.block)} and ${n(r.head.block)}`),
         formula: "(Δg0 × P + Δg1) ÷ (2 × √P), with g in units of 2^128",
@@ -272,19 +332,6 @@ export function lineProv(key: LineKey, part: "yours" | "pool", c: UniReceiptCont
           derived(`fees, 30 days, ${Q}`, fig(p.fees30d ?? 0)),
         ],
       };
-    case "cake:yours":
-      return cardProv("cake", c);
-    case "cake:pool":
-      if (!p.staked) return null;
-      return {
-        kind: "derived",
-        pclass: "state",
-        source: head,
-        summary: `A staked position — ownerOf(${p.id}) at ${at(r.head)} is MasterChefV3, which records the staker in userPositionInfos. The farm keeps the position in the pool, so its fee growth runs as before, and pays CAKE by the reward growth inside the range of the pool's farm.`,
-        contract: farmContract(c),
-        via: via(c, `block ${n(r.head.block)}`),
-        inputs: [chain(`ownerOf(${p.id})`, r.owner), chain(`userPositionInfos(${p.id}) · pid`, p.staked.pid)],
-      };
     case "against:pool": {
       const sd = p.sinceDeposit;
       if (!sd) return null;
@@ -292,7 +339,7 @@ export function lineProv(key: LineKey, part: "yours" | "pool", c: UniReceiptCont
         kind: "derived",
         pclass: "emitted",
         source: head,
-        summary: `Since the first deposit — ${sd.events.increase} IncreaseLiquidity, ${sd.events.decrease} DecreaseLiquidity and ${sd.events.collect} Collect logs on the NonfungiblePositionManager for token id ${p.id}, up to ${at(r.head)}. What was put in is valued at the pool's price now; Collect pays out withdrawn tokens and fees together.`,
+        summary: `Against deposits — ${sd.events.increase} IncreaseLiquidity, ${sd.events.decrease} DecreaseLiquidity and ${sd.events.collect} Collect logs on the NonfungiblePositionManager for token id ${p.id}, up to ${at(r.head)}. What was put in is valued at the pool's price now; Collect pays out withdrawn tokens and fees together.`,
         contract: positionContract(c),
         via: "rails-server · getLogs by token id",
         formula: "(worth now + uncollected + every Collect) ÷ deposits valued now − 1",
@@ -310,7 +357,7 @@ export function lineProv(key: LineKey, part: "yours" | "pool", c: UniReceiptCont
         kind: "derived",
         pclass: "state",
         source: head,
-        summary: `Share in range — the position's liquidity over the pool's liquidity in range at ${at(r.head)}.`,
+        summary: `Active liquidity share — the position's liquidity over the pool's liquidity in range at ${at(r.head)}.`,
         contract: poolContract(c),
         via: via(c, `block ${n(r.head.block)}`),
         formula: "L ÷ pool liquidity",
