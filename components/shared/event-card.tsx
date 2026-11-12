@@ -748,14 +748,14 @@ function EventCardView(props: EventCardProps) {
       phoneMark ? (
         <>
           <span aria-hidden className="min-w-0">
-            {kind} &middot;
+            {kind} <span data-caption-sep="">&middot;</span>
           </span>
           {phoneMark}
         </>
       ) : (
         <>
-          {kind} &middot;{" "}
-          <span className="whitespace-nowrap">
+          {kind} <span data-caption-sep="">&middot;</span>{" "}
+          <span className="whitespace-nowrap" data-caption-tail="">
             {capDate && <span className="text-foreground">{capDate}</span>}
             {capDate ? " " : ""}
             {formatTimestamp(captionCtx.ts)}
@@ -794,6 +794,26 @@ function EventCardView(props: EventCardProps) {
   useLayoutEffect(() => {
     const drawn = document.getElementById(legsId) != null;
     if (drawn !== legsDrawn) setLegsDrawn(drawn);
+  });
+  // A caption whose date (`data-caption-tail`, or the day's mark) drops to a
+  // second line leaves no "·" at the end of the first: the separator
+  // (`data-caption-sep`) is hidden in place, keeping its width, so hiding it
+  // cannot pull the date back up (ui-jobs 620).
+  const captionRef = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    const el = captionRef.current;
+    if (!el) return;
+    const sync = () => {
+      const sep = el.querySelector<HTMLElement>("[data-caption-sep]");
+      const tail = el.querySelector<HTMLElement>("[data-caption-tail], [data-flow-day-mark-phone]");
+      if (!sep || !tail) return;
+      const broken = tail.getBoundingClientRect().top > sep.getBoundingClientRect().bottom - 1;
+      sep.style.visibility = broken ? "hidden" : "";
+    };
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(el);
+    return () => ro.disconnect();
   });
   const nameProps = label
     ? { "aria-label": label }
@@ -870,6 +890,7 @@ function EventCardView(props: EventCardProps) {
               day's mark the line breaks before the mark, whose 36px button
               reaches past the 20px line. */}
           <span
+            ref={captionRef}
             aria-hidden={phoneMark ? undefined : true}
             className={`${phoneMark ? "flex flex-wrap items-center justify-center gap-x-1" : "block"} max-w-full px-2 text-center text-xs leading-5 ${showDetail ? "text-foreground" : "text-rb-500"}`}
             style={{ backgroundColor: "var(--background)" }}
