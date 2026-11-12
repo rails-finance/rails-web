@@ -523,13 +523,21 @@ html.dark {
 }
 
 /* The read-more cue (ui-jobs 384): the dotted underline under a label, figure
-   or mark that opens a tooltip. One strength for the whole site: change
-   --tip-underline-alpha to re-tune every cue at once. `tip-underline` is the
-   text form; --tip-underline-color is the same ink for a border-bottom cue
-   under an icon. Set to 0% (ui-jobs 602, Miles 12 Nov 2026): an experiment
-   reading the text without the cue; 30% brings it back everywhere. */
+   or mark that opens a tooltip. It shows on hover, on keyboard focus and while
+   the tip is open, and is absent at rest (ui-jobs 602, Miles 12 Nov 2026). One
+   strength for the whole site: --tip-underline-alpha. The hover scope sets
+   --tip-underline-color; `tip-underline` is the text form, and a border-bottom
+   cue under an icon takes the same var. Set in the scope as an unresolved
+   value, currentColor is the cue's own colour. */
 :root {
-  --tip-underline-alpha: 0%;
+  --tip-underline-alpha: 30%;
+  --tip-underline-color: transparent;
+}
+.tip-underline:hover,
+.cursor-help:hover,
+[data-reveal-tip]:hover,
+[data-reveal-tip]:focus-visible,
+[data-reveal-tip][aria-expanded="true"] {
   --tip-underline-color: color-mix(in srgb, currentColor var(--tip-underline-alpha), transparent);
 }
 @utility tip-underline {
