@@ -16,7 +16,6 @@ import { cardProv, readContracts, stakedProv, type BalReceiptContext } from "@/l
 import type { BalPositionRead } from "@/lib/balancer/types";
 import { chainMeta, type ChainId } from "@/lib/shared/chains";
 import { balChain } from "@/lib/balancer/chains";
-import { explorerHref } from "@/lib/shared/protocols";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { CARD_WORDS, cardExplainer, rateText } from "@/lib/balancer/words";
 import { day, num, share, short } from "@/lib/uniswap/words";
@@ -135,10 +134,7 @@ function slots(r: BalPositionRead): PositionCardSlots {
             </ExplainGroup>
           ))}
           <p className="mt-3 text-sm">
-            <Link
-              href={`${explorerHref(r.chainId as ChainId, balChain(r.chainId).session)}/info`}
-              className={INLINE_LINK}
-            >
+            <Link href={`${balChain(r.chainId).home}/info`} className={INLINE_LINK}>
               {CARD_WORDS.infoLink}
             </Link>
           </p>

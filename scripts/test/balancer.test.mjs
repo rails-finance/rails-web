@@ -231,3 +231,18 @@ test("the readout names all the pool's shares, and its (i) the past block per ch
   const staked = [{ gauge: "0x62A66eB9aBf7a788F48D0ce7C0C065df9e09dA19", balance: read().balance }];
   assert.match(readoutLines(balPosition(read({ staked })))[0].pool, / on \d+ \w+ 2026\.$/);
 });
+
+test("each chain's pages live under the URL slug balancer-v3, not the roster session", async () => {
+  const { BAL_CHAINS, balChain } = await import("../../lib/balancer/chains.ts");
+  assert.equal(BAL_CHAINS[1].home, "/ethereum/balancer-v3");
+  assert.equal(BAL_CHAINS[42161].home, "/arbitrum/balancer-v3");
+  assert.equal(`${balChain(42161).home}/info`, "/arbitrum/balancer-v3/info");
+  assert.ok(!BAL_CHAINS[42161].home.includes(BAL_CHAINS[42161].session));
+});
+
+test("the readout's (i) says the share of pool moves with other holders and what the swap fee does", () => {
+  const [compare, wallet, pool] = readoutExplainer(42161);
+  assert.match(compare.bullets.join(" "), /staked shares, its figures show now only/);
+  assert.match(wallet.bullets.join(" "), /rises when other holders withdraw/);
+  assert.match(pool.bullets.join(" "), /charged on each swap/);
+});

@@ -16,7 +16,6 @@ import {
 } from "@/components/shared/protocol-info-page";
 import { BALANCER_VAULT } from "@/lib/balancer/types";
 import { BAL_CHAINS, type BalChainId } from "@/lib/balancer/chains";
-import { explorerHref } from "@/lib/shared/protocols";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 const DOCS = { label: "Balancer V3 documentation", href: "https://docs.balancer.fi" };
@@ -95,7 +94,7 @@ const views = (chainId: BalChainId): readonly [InfoView, ...InfoView[]] => [
       <>
         <p>
           Enter a wallet address or ENS name on the{" "}
-          <Link href={explorerHref(chainId, BAL_CHAINS[chainId].session)} className={INLINE_LINK}>
+          <Link href={BAL_CHAINS[chainId].home} className={INLINE_LINK}>
             front door
           </Link>{" "}
           to see the Balancer V3 pools that wallet holds a share of on {BAL_CHAINS[chainId].name}.

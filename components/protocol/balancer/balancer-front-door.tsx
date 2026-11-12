@@ -11,7 +11,6 @@ import { PoolFrontDoor } from "@/components/protocol/uniswap/uniswap-front-door"
 import { BAL_CHAINS, type BalChainId } from "@/lib/balancer/chains";
 import { countProv } from "@/lib/balancer/provenance";
 import { COUNT_WORDS, FRONT_DOOR, LABEL } from "@/lib/balancer/words";
-import { explorerHref } from "@/lib/shared/protocols";
 
 const SCOPE = "balancer-count";
 
@@ -57,7 +56,7 @@ export function BalancerFrontDoor({ chainId, count }: { chainId: BalChainId; cou
       id={c.session}
       label={LABEL}
       line={FRONT_DOOR.line(c.name)}
-      route={explorerHref(chainId, c.session)}
+      route={c.home}
       below={<Count chainId={chainId} count={count} />}
     />
   );

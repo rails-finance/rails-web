@@ -25,7 +25,8 @@ export const FRONT_DOOR = {
   unanswered: "The read of this wallet's pools did not answer. Try again in a minute.",
   rowShare: (s: number) => `${share(s)} of the pool`,
   /** A row's gauge stake, part of the row's share: the gauge holds these shares for the wallet. */
-  rowStaked: (s: number) => `Of which staked in a gauge: ${share(s)}`,
+  rowStakedLabel: "Of which staked in a gauge",
+  rowStaked: (s: number) => `${FRONT_DOOR.rowStakedLabel}: ${share(s)}`,
   stakedTip: "Pool shares this wallet staked in the pool's gauge. The gauge holds them and pays rewards on them.",
 };
 
@@ -68,7 +69,7 @@ export const CARD_WORDS = {
     "The wallet's part of each token the pool holds: the pool's balance of it times the wallet's share of the pool. Withdrawing pays out about these amounts.",
   rate: "Value per share, 30 days",
   rateTip:
-    "How much the pool's value per share changed over the last 30 days. It is the same for every share, and grows with the swap fees the pool keeps and its tokens' yield.",
+    "How much the pool's value per share changed over the last 30 days. It is the same for every share, and grows from the swap fees the pool keeps and its tokens' yield.",
   /** The share's split where some shares are staked. */
   split: (held: number, staked: number) => `${num(held)} in the wallet, ${num(staked)} staked in a gauge`,
   /** First added, where the wallet holds or stakes shares but added none itself: the value, and the line under it. */
@@ -204,7 +205,7 @@ export function cardExplainer(p: BalPosition): ExplainGroupWords[] {
     p.rateChange == null
       ? []
       : [
-          `Value per share ${rose(p.rateChange)} over 30 days, with the swap fees the pool keeps and its tokens' yield.`,
+          `Value per share ${rose(p.rateChange)} over 30 days, from the swap fees the pool keeps and its tokens' yield.`,
           "It is the pool's figure, the same for every share.",
           p.windowWithheld && held
             ? "Staked shares are read now only, so this wallet's holding 30 days back is not shown."
@@ -239,14 +240,14 @@ export function readoutExplainer(chainId: number): ExplainGroupWords[] {
         chainId === 42161
           ? "Each line sets the block read now against the block at UTC midnight 30 days back, on the date shown."
           : "Each line sets the block read now against a block 30 to 31 days back, on the date shown.",
-        "The wallet's figure comes first, then the pool's.",
+        "The wallet's figure comes first, then the pool's. Where the wallet has staked shares, its figures show now only.",
       ],
     },
     {
       title: "The wallet",
       bullets: [
         "Pool shares: the wallet's count, then all the shares of the pool, whoever holds them.",
-        "Share of pool: the wallet's shares over all the shares.",
+        "Share of pool: the wallet's shares over all the shares. It rises when other holders withdraw and falls when they add, with the wallet's count unchanged.",
         "A token line: Your part is what the share would pay out of the pool's balance, not what was deposited.",
       ],
     },
@@ -254,6 +255,7 @@ export function readoutExplainer(chainId: number): ExplainGroupWords[] {
       title: "The pool",
       bullets: [
         "Value per share: what one share claims of the pool's tokens, counted at their rates.",
+        "Swap fee: charged on each swap. The part the pool keeps raises value per share.",
         "Pool: Trading means swaps, adds and removes are open. Paused stops all three.",
         "In recovery mode, holders can withdraw their tokens in proportion.",
       ],
