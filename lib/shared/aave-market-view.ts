@@ -31,6 +31,9 @@ export interface MarketReserveRow extends AaveMarketReserve {
    *  stored rate on Aave V3 and Seamless, the APY on SparkLend. */
   supplyRate: number;
   borrowRate: number;
+  /** On the docs' deprecated-as-collateral list, with a loan-to-value of 0 on
+   *  the chain (AaveMarketConfig.deprecatedCollateral). */
+  deprecated: boolean;
 }
 
 // ── Caps ─────────────────────────────────────────────────────────────────────
@@ -173,6 +176,8 @@ export function buildAaveMarketView(
     pool: string;
     oracle: string;
     capAutomator?: string;
+    /** Lowercased addresses the docs list as deprecated as collateral. */
+    deprecated?: readonly string[];
   },
 ): AaveMarketView {
   const terms = aaveFamilyTerms(identity.protocol as AaveMarketKey);
@@ -191,6 +196,7 @@ export function buildAaveMarketView(
       closed: closedRoutes(r, supplyCapState, borrowCapState),
       supplyRate: familyRate(terms, r.supplyApr),
       borrowRate: familyRate(terms, r.borrowApr),
+      deprecated: (identity.deprecated ?? []).includes(r.address.toLowerCase()) && (r.bps?.ltv ?? 1) === 0,
     };
   });
 

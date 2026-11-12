@@ -120,6 +120,15 @@ export function StateTags({ r, vocab }: { r: MarketReserveRow; vocab: AaveMarket
           <Prov info={vocab.flagProv("paused", r.symbol)}>paused</Prov>
         </span>
       )}
+      {r.deprecated && (
+        <span className={TAG} title="Deprecated as collateral: LTV set to 0" data-reserve-deprecated="">
+          {vocab.deprecatedProv(r.symbol) ? (
+            <Prov info={vocab.deprecatedProv(r.symbol)!}>deprecated</Prov>
+          ) : (
+            "deprecated"
+          )}
+        </span>
+      )}
       {r.debtCeiling != null && (
         <span className={TAG} title={`Isolation mode: debt ceiling $${r.debtCeiling.toLocaleString("en-US")}`}>
           <Prov info={vocab.isolatedProv(r.symbol, r.debtCeiling)}>isolated</Prov>

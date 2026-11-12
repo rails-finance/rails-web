@@ -57,6 +57,12 @@ export interface AaveMarketConfig {
   assetHref?: (symbol: string, side: "supply" | "borrow") => string;
   /** Off-site pages the market head's ⋮ carries besides the Pool and oracle. */
   offsite?: { item: string; title: string; subtitle: string; href: string }[];
+  /** Reserves the protocol's docs list as deprecated as collateral, held as
+   *  data with the page and the day it was read: the chain cannot tell them
+   *  apart (a reserve with a loan-to-value of 0 and a threshold above 0 is
+   *  also one the docs call borrow-only, DAI at 0.01%, or a frozen one). The
+   *  tag draws only where the chain also reads a loan-to-value of 0. */
+  deprecatedCollateral?: { assets: readonly string[]; words: string; source: string; read: string };
 }
 
 const ETHEREUM_AAVE_V3: Record<AaveV3MarketKey, AaveMarketConfig> = {
@@ -181,6 +187,19 @@ export const SPARK_MARKET: AaveMarketConfig = {
   purpose:
     "The single SparkLend market: an Aave-V3-architecture Pool governed by Sky, centred on stablecoin liquidity against WETH, wstETH, weETH, WBTC and cbBTC collateral.",
   modal: "spark",
+  // docs.spark.finance, Overview of Markets: "Deprecated as collateral: sDAI,
+  // sUSDS, LBTC … LTV set to 0, so they no longer add borrowing power."
+  deprecatedCollateral: {
+    assets: [
+      "0x83f20f44975d03b1b09e64809b757c47f942beea", // sDAI
+      "0xa3931d71877c0e7a3148cb7eb4463524fec27fbd", // sUSDS
+      "0x8236a87084f8b84306f72007f36f2618a5634494", // LBTC
+    ],
+    words: "Deprecated as collateral: LTV set to 0, so they no longer add borrowing power.",
+    source:
+      "https://docs.spark.finance/products/sparklend/guides/overview-of-markets#active-deprecated-and-frozen-markets",
+    read: "12 Nov 2026",
+  },
   assetHref: (symbol, side) =>
     `/ethereum/spark?${side === "supply" ? "supply" : "borrow"}=${encodeURIComponent(symbol)}`,
 };

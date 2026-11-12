@@ -30,6 +30,7 @@
 // stored read and why; `readBy: null` (the web read the chain) names the block
 // alone. A caller that passes no `readBy` keeps "@ head".
 
+import { aaveMarketConfig } from "@/lib/shared/aave-market-configs";
 import type { Provenance } from "@/components/shared/provenance";
 import { stampHeadRead, type ServerRead } from "@/lib/shared/server-head-read";
 import { aaveFamilyTerms, type AaveFamilyTerms } from "@/lib/aave-family/terms";
@@ -104,6 +105,9 @@ export interface AaveMarketVocab {
   flagProv: (flag: "frozen" | "paused", symbol: string) => Provenance;
   /** A loan-to-value of 0 on a reserve that still carries a threshold. */
   ltvZeroProv: (symbol: string) => Provenance;
+  /** A reserve the protocol's docs list as deprecated as collateral, where the
+   *  chain reads its loan-to-value as 0 (SparkLend). Null on a market with no list. */
+  deprecatedProv: (symbol: string) => Provenance | null;
   /** Isolation mode (a debt ceiling) and siloed borrowing. */
   isolatedProv: (symbol: string, ceilingUsd: number) => Provenance;
   siloedProv: (symbol: string) => Provenance;
@@ -515,6 +519,23 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
       contract: poolContract(coords),
       via: `${cfg.lane} · Pool.getConfiguration · bits 0-15 (ltv) = 0, bits 16-31 (liquidationThreshold) > 0; eMode category loan-to-values @ head`,
     }),
+    deprecatedProv: (symbol) => {
+      const dep = aaveMarketConfig(cfg.protocol).deprecatedCollateral;
+      if (!dep) return null;
+      return {
+        kind: "offchain",
+        pclass: "offchain",
+        source: { block: coords.blockNumber },
+        summary: `${symbol} deprecated. The protocol's docs list it as "${dep.words}" (read ${dep.read}). The chain agrees on the loan-to-value: the reserve's configuration${atBlock(coords)} holds an LTV of 0. The chain alone cannot mark a reserve deprecated: a loan-to-value of 0 with a threshold above 0 is also a borrow-only reserve or a frozen one.`,
+        contract: poolContract(coords),
+        via: `${dep.source} · Pool.getConfiguration · bits 0-15 (ltv) = 0 @ head`,
+        verify: { kind: "link", href: dep.source, text: `The docs' Overview of Markets, read ${dep.read}` },
+        inputs: [
+          { label: "docs", value: dep.source, kind: "offchain", pclass: "offchain", note: `read ${dep.read}` },
+          { label: "ltv", value: "0", kind: "chain", pclass: "state", note: "Pool.getConfiguration bits 0-15" },
+        ],
+      };
+    },
     isolatedProv: (symbol, ceilingUsd) => ({
       kind: "chain",
       pclass: "state",
