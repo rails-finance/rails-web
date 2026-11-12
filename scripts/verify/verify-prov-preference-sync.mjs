@@ -127,6 +127,51 @@ check(
   JSON.stringify(s),
 );
 
+// Off the switch's routes (ui-jobs 625): with the choice saved on, the row
+// reads "Not on this page", is disabled and shows off, nothing is pickable,
+// and a press keeps the saved choice.
+const OFF_LIST = "/assets";
+await page.evaluate((k) => localStorage.setItem(k, "1"), KEY);
+await page.goto(`${BASE}${OFF_LIST}`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.waitForTimeout(3000);
+let row = null;
+for (let i = 0; i < 4 && row == null; i++) {
+  await page.locator(H20).click();
+  row = await page.waitForSelector(SWITCH, { timeout: 3000 }).catch(() => null);
+}
+const read = row
+  ? {
+      state: await row.getAttribute("data-profile-menu-prov"),
+      disabled: await row.getAttribute("aria-disabled"),
+      checked: await row.getAttribute("aria-checked"),
+      note:
+        (await page
+          .locator("[data-profile-menu-prov-unavailable]")
+          .textContent()
+          .catch(() => null)) ?? null,
+    }
+  : null;
+if (row) await row.click().catch(() => {});
+await page.waitForTimeout(400);
+const after = {
+  saved: await page.evaluate((k) => localStorage.getItem(k) === "1", KEY),
+  picks: await page.locator("[data-prov-pickable]").count(),
+  exit: await page.locator(EXIT).count(),
+};
+await closeMenu();
+check(
+  `${OFF_LIST}: the switch reads "Not on this page", disabled and off; a press keeps the saved choice; nothing is pickable`,
+  !!read &&
+    read.state === "unavailable" &&
+    read.disabled === "true" &&
+    read.checked === "false" &&
+    /not on this page/i.test(read.note ?? "") &&
+    after.saved &&
+    after.picks === 0 &&
+    after.exit === 0,
+  JSON.stringify({ read, after }),
+);
+
 await browser.close();
 console.log(`\n${checked - failures}/${checked} checks pass`);
 process.exit(failures || checked === 0 ? 1 : 0);
