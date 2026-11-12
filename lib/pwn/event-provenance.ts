@@ -393,6 +393,29 @@ export const positionInterestProv = (sym: string, version?: string | null): Prov
   ],
 });
 
+/** The accruing loan's yearly rate, a field of the loan's terms. */
+export const positionAprProv = (version?: string | null): Provenance => ({
+  kind: "chain",
+  summary:
+    "Accruing rate — the yearly rate the principal accrues at, from the loan's on-chain terms as created (accruingInterestAPR, two decimals: 6000 is 60.00%). Fixed for the life of the loan.",
+  contract: simpleLoanFor(version),
+  via: `${PWN_VIA} · LOANCreated log · terms.accruingInterestAPR`,
+});
+
+/** The fixed interest as a rate over the struck term, and that rate a year. */
+export const positionFixedRateProv = (sym: string, version?: string | null): Provenance => ({
+  kind: "chain-derived",
+  summary: `Interest rate (${sym}) — the fixed interest as a share of the principal over the term the parties struck (creation to the original deadline), and that share scaled to 365 days without compounding. Every input is a field of the loan's on-chain terms or its creation block.`,
+  contract: simpleLoanFor(version),
+  via: `(terms.loanRepayAmount − ${creditField(version)}) ÷ ${creditField(version)}`,
+  formula: "fixed interest ÷ principal; × 365 ÷ term days for the year",
+  inputs: [
+    { label: "fixed interest", kind: "chain-derived" as const, note: "repay − principal" },
+    { label: "principal", kind: "chain" as const, note: "the terms' credit amount" },
+    { label: "term", kind: "chain" as const, note: "creation block to the terms' original deadline" },
+  ],
+});
+
 /** A deadline an extension set. v1.1 logs only the new expiration
  *  (LOANExpirationDateExtended); the one it replaced is the loan's previous
  *  extension, else the expiration its terms struck. v1.2+ logs both
