@@ -128,7 +128,14 @@ for (const f of FIXTURES) {
       order: lineEls.map((el) => el.getAttribute("data-pool-line")),
       lines,
       bar: document.querySelector("[data-range-bar]")?.getAttribute("data-range-bar") ?? null,
-      sub: t(document.querySelector("[data-uniswap-position]")?.nextElementSibling),
+      // The title sits in a HistoryTitleRow (567), so climb to the header's own child, then read its next sibling.
+      sub: (() => {
+        const h2 = document.querySelector("[data-uniswap-position]");
+        const header = h2?.closest("header");
+        let n = h2;
+        while (n && header && n.parentElement !== header) n = n.parentElement;
+        return t(n?.nextElementSibling);
+      })(),
       chip: t(document.querySelector("[data-latest-prices] button")),
       worth: t(worthHead),
       holds: t(holdsHead),
