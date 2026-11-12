@@ -436,7 +436,7 @@ const SPECS: ProtocolSpec[] = [
     brand: 50,
     tags: ["CDP", "Yield"],
     desc: "Self-repaying loans against yield-bearing vault tokens: each position's debt and collateral, dated by block, and the redemptions that moved them",
-    subPages: [{ segment: "lines", label: "Lines overview", tab: "Lines" }],
+    subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
   },
   {
     // Alchemix V3's BASE line — alUSDb. Its own Alchemist, its own Transmuter,
@@ -453,8 +453,8 @@ const SPECS: ProtocolSpec[] = [
     slug: "alchemix",
     protocolKey: "alchemix",
     tags: ["CDP", "Yield"],
-    desc: "Alchemix V3 on Base: every position on the alUSDb line, its debt and collateral rebuilt from its events and dated by block",
-    subPages: [{ segment: "lines", label: "Lines overview", tab: "Lines" }],
+    desc: "Alchemix V3 on Base: every position on the alUSDb market, its debt and collateral rebuilt from its events and dated by block",
+    subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
   },
   {
     id: "asymmetry",

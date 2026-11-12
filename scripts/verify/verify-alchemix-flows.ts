@@ -22,9 +22,9 @@
 // repay's shares are not a collateral leg; every day's printed lines add to
 // the printed total; each event card's sum is exact and its token lines add to
 // the reading; the live stop meets the live read; the share price line is the
-// readings' and today the card's; the collateralisation view is the readings'
-// ratio against the lower bound read at each picked event, today the card's,
-// and the share price's level today is the card's.
+// readings' and today the card's; the LTV view is the readings' LTV against
+// the liquidation threshold (one over the lower bound read at each picked
+// event), today the card's, and the share price's level today is the card's.
 //
 //   npx tsx --test scripts/verify/verify-alchemix-flows.ts
 import { test } from "node:test";
@@ -42,12 +42,8 @@ import {
   alchemixFocusEvents,
   type AlchemixFlowOptions,
 } from "@/lib/alchemix/flows";
-import {
-  alchemixBoundRead,
-  alchemixHealthFinish,
-  alchemixHealthSource,
-  alchemixRatioPrint,
-} from "@/lib/alchemix/flows-health";
+import { alchemixBoundRead, alchemixHealthFinish, alchemixHealthSource } from "@/lib/alchemix/flows-health";
+import { ltvPrint } from "@/lib/alchemix/ltv";
 import { buildFlowModel, stateAt, type FlowTimeline } from "@/lib/shared/flows-timeline";
 import { sideSumRows } from "@/lib/shared/flows-sum";
 import { eventCum, eventSideSum, eventTokenSum } from "@/lib/shared/flow-focus";
@@ -140,7 +136,7 @@ function withHealth(f: Fixture): FlowTimeline {
   const hv = healthView(t, reads, {
     liveHf: coll > 0 ? coll / b : null,
     liveLevels: coll > 0 ? { [ALCHEMIX_MYT_KEY]: ((sharePrice(f) * b) / coll) * rp.grain } : null,
-    liveLine: b,
+    liveLine: 1 / b,
     source: alchemixHealthSource(f.chainId, f.underlyingSymbol, f.mytSymbol),
   });
   assert.ok(hv, `${f.name}: a health view`);
@@ -387,18 +383,19 @@ for (const name of NAMES) {
 }
 
 for (const name of NAMES) {
-  test(`${name}: the collateralisation against the lower bound read at each picked event`, () => {
+  test(`${name}: the LTV against the liquidation threshold read at each picked event`, () => {
     const f = fx(name);
     const t = withHealth(f);
     const h = t.health!;
     const b = bound(f);
-    assert.equal(h.asset.symbol, "Collateralisation");
+    assert.equal(h.asset.symbol, "LTV");
     assert.equal(h.unit, "ratio");
-    assert.equal(h.liquidates, "below");
+    assert.equal(h.liquidates, "above");
     assert.ok(/in force at the day's last event/.test(h.level!.summary), "the line's words name the read");
     assert.ok(/in force at each event/.test(h.help!));
-    for (const p of h.level!.points) assert.equal(p[1], b, `${name}: the line is the bound read`);
-    // Each day's point is shares × share price ÷ debt from the reading in force.
+    for (const p of h.level!.points)
+      assert.ok(near(p[1], 1 / b, 1e-12), `${name}: the line is one over the bound read`);
+    // Each day's point is debt ÷ (shares × share price) from the reading in force.
     const rp = replay(f);
     const m = buildFlowModel(t)!;
     const startDay = m.start / 86_400_000;
@@ -410,7 +407,7 @@ for (const name of NAMES) {
       const r = [...rp.replayed].reverse().find((x) => x.ev.ts < end)!;
       const price = [...rp.rows].reverse().find((x) => x.ts < end && x.reading?.sharePrice != null)!.reading!
         .sharePrice!;
-      assert.ok(near(v, (r.shares * price) / r.debt, 1e-9), `${name} ${day - startDay}: ${v}`);
+      assert.ok(near(v, r.debt / (r.shares * price), 1e-9), `${name} ${day - startDay}: ${v}`);
       checked++;
     }
     assert.ok(checked > 0);
@@ -418,8 +415,8 @@ for (const name of NAMES) {
       const last = h.points.at(-1)!;
       const card = Number(f.live.collateralizationRaw) / WAD;
       assert.equal(last[0], today);
-      assert.ok(near(last[1], card, 1e-12), `${name}: today the card's collateralisation`);
-      assert.equal(h.print!(last[1]), alchemixRatioPrint(card));
+      assert.ok(near(last[1], 1 / card, 1e-12), `${name}: today the card's LTV`);
+      assert.equal(h.print!(last[1]), ltvPrint(1 / card));
       // The share price's level today: the card's share price less its drop.
       const lv = t.shareLine!.series.level!.points.at(-1)!;
       assert.equal(lv[0], today);
@@ -431,8 +428,9 @@ for (const name of NAMES) {
   });
 }
 
-test("the card's ratio print: one place under 1,000 %, whole above", () => {
-  assert.equal(alchemixRatioPrint(1.1104), "111.0%");
-  assert.equal(alchemixRatioPrint(12.345), "1,235%");
-  assert.equal(alchemixRatioPrint(150), ">10k%");
+test("the card's LTV print: one place, and a dust debt below it", () => {
+  assert.equal(ltvPrint(0.9), "90.0%");
+  assert.equal(ltvPrint(1 / 1.1104), "90.1%");
+  assert.equal(ltvPrint(0.0004), "<0.1%");
+  assert.equal(ltvPrint(1.05), "105.0%");
 });

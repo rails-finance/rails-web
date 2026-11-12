@@ -95,7 +95,7 @@ const ACTIVITY_ONLY: SortOption[] = [{ value: "recent", label: RECENT_ACTIVITY_L
 const WITH_LINE: SortOption[] = [
   { value: "recent", label: RECENT_ACTIVITY_LABEL },
   { value: "debt", label: "Debt" },
-  { value: "collateral", label: "Collateral" },
+  { value: "collateral", label: "Deposit" },
   { value: "tokenId", label: "Position id" },
 ];
 
@@ -144,8 +144,8 @@ export function alchemixListDimensions(chainId: ChainId): SerializableDimension<
   return [
     {
       id: "line",
-      label: "Line",
-      group: "Line",
+      label: "Market",
+      group: "Market",
       cardinality: "multi",
       param: "line",
       options: lineOptions,

@@ -5,12 +5,12 @@ export default function TransmuterPositionNotFound() {
   return (
     <RouteNotFound
       session="alchemix"
-      heading="No Transmuter position under this line and id"
+      heading="No Transmuter position under this market and id"
       backHref="/ethereum/alchemix/transmuter"
       backLabel="Browse Transmuter positions on Ethereum"
     >
-      A Transmuter position is keyed by its line and its id. The line names which synthetic on which chain holds it, the
-      alUSD and alETH lines here, and an id that exists on one line is a different position on another.
+      A Transmuter position is keyed by its market and its id. The market names which synthetic on which chain holds it,
+      the alUSD and alETH markets here, and an id that exists on one market is a different position on another.
     </RouteNotFound>
   );
 }

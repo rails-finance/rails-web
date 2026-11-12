@@ -17,7 +17,7 @@ export function generateMetadata(): Metadata {
     title: "Explore Alchemix V2 positions",
     canonicalPath: v2ListingPath(ALCHEMIX_ETHEREUM),
     description:
-      "Every Alchemix V2 account on the alUSD and alETH lines, closed when V2 was wound down on 2 April 2026: the debt and collateral each held at that block, and the V3 position the wallet holds now.",
+      "Every Alchemix V2 account on the alUSD and alETH markets, closed when V2 was wound down on 2 April 2026: the debt and collateral each held at that block, and the V3 position the wallet holds now.",
   });
 }
 

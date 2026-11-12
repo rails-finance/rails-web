@@ -864,7 +864,7 @@ const SYSTEM = [
   {
     // lib/alchemix/lines-page-data.ts: each position type's coverage rows.
     id: "alchemix-lines",
-    match: re(`/(ethereum|base)/alchemix/lines`),
+    match: re(`/(ethereum|base)/alchemix/markets`),
     routes: ([, chain]) =>
       captureUrls(() => {
         const d = chain === "base" ? ALCHEMIX_BASE : ALCHEMIX_ETHEREUM;

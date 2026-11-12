@@ -2,7 +2,7 @@
 
 // The Alchemist position card's Explanation pane: this position's figures,
 // explained. What is true of every position (what the vault does, what the
-// synthetic is, how the Transmuter sets debt aside, liquidation, how to read an
+// synthetic is, how the Transmuter earmarks debt, liquidation, how to read an
 // event card, the NFT) is the card's "?" (`alchemixPositionContent`).
 //
 // Colour points back to the card (rails-ops standards/detail-page-anatomy.md,
@@ -20,21 +20,12 @@ import type { SelfLiquidationSplit } from "@/lib/alchemix/self-liquidation";
 import { formatDate } from "@/lib/date";
 import { formatSharePrice } from "@/components/protocol/alchemix/alchemix-position-card";
 import { formatCompactTitled } from "@/lib/shared/format-compact";
+import { ltvPct } from "@/lib/alchemix/ltv";
 
 const compact = (n: number) => formatCompactTitled(n).display;
 /** A signed figure that keeps its sign and size however small: a lifetime net
  *  of a few millionths reads as that, never as "−0.00". */
 const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${formatNumber(Math.abs(n))}`;
-
-/** A 1e18-scaled ratio as the position card draws it: one decimal below
- *  1,000%, whole numbers above it, and ">10k%" past that. */
-export function ratioPct(raw: string): string {
-  const pct = Number(raw) / 1e16;
-  if (pct >= 10000) return ">10k%";
-  return pct < 1000
-    ? `${pct.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
-    : `${Math.round(pct).toLocaleString("en-US")}%`;
-}
 
 /** A share-price fall as the card draws it: one decimal, two under 1%. */
 export function fallPct(fall: number): string {
@@ -75,7 +66,7 @@ export interface AlchemixPositionExplanationProps {
   net?: AlchemixRedemptionNetView | null;
   /** The MYT's address on the chain's explorer. */
   vaultHref?: string | null;
-  /** The share-price fall to the liquidation line, 0 to 1; null with no debt. */
+  /** The share-price fall to the liquidation threshold, 0 to 1; null with no debt. */
   fall?: number | null;
   /** The debt this position's own events leave, and what the redemptions cleared of it, where the two differ. */
   debtFromEvents?: ReactNode;
@@ -122,7 +113,7 @@ function closeItems(close: AlchemixCloseFacts, sym: string, mytSymbol: string): 
           <span className="tabular-nums">
             {shares(s.feeRaw)} {mytSymbol}
           </span>{" "}
-          on the part set aside for repayment
+          on the earmarked debt, the part set aside to be repaid by redemptions
         </>
       ) : null}
       {s.returnedRaw != null && s.returnedRaw > BigInt(0) ? (
@@ -194,7 +185,7 @@ function explanationParts({
     <>the {mytSymbol} vault</>
   );
 
-  // What clearing the whole set-aside would take at this reading's share
+  // What clearing all the earmarked debt would take at this reading's share
   // price: shares worth the debt, and the line's fee on top of them.
   const earmarked = live.earmarked && live.earmarked.formatted > 0 ? live.earmarked : null;
   const takeShares = earmarked && sharePrice ? earmarked.formatted / sharePrice : null;
@@ -231,23 +222,23 @@ function explanationParts({
     ) : null,
   ];
 
-  // Risk: the distance to liquidation, the line's liquidations, and the debt set aside.
+  // Risk: the distance to liquidation, the line's liquidations, and the earmarked debt.
   const risk: ReactNode[] = [
     fall != null && live.debt && health ? (
       fall > 0 ? (
         <>
-          A fall of <H>{fallPct(fall)}</H> in the vault&rsquo;s share price would take the collateral ratio from{" "}
-          {health.collateralizationRaw != null ? <H>{ratioPct(health.collateralizationRaw)}</H> : "where it is"} to the
-          liquidation ratio of <H>{ratioPct(health.collateralizationLowerBoundRaw)}</H>.
+          A fall of <H>{fallPct(fall)}</H> in the vault&rsquo;s share price would take the LTV from{" "}
+          {health.collateralizationRaw != null ? <H>{ltvPct(health.collateralizationRaw)}</H> : "where it is"} to the
+          liquidation threshold of <H>{ltvPct(health.collateralizationLowerBoundRaw)}</H>.
         </>
       ) : (
-        <>This position is at or below its liquidation ratio, so anyone can liquidate it.</>
+        <>This position is at or above its liquidation threshold, so anyone can liquidate it.</>
       )
     ) : null,
     lineLiquidations && live.debt && live.debt.formatted > 0 ? (
       lineLiquidations.count > 0 ? (
         <>
-          The {sym} line has had{" "}
+          The {sym} market has had{" "}
           <Prov info={lineLiquidations.prov} value={String(lineLiquidations.count)}>
             {lineLiquidations.count} {lineLiquidations.count === 1 ? "liquidation" : "liquidations"}
           </Prov>
@@ -258,7 +249,7 @@ function explanationParts({
           <Prov info={lineLiquidations.prov} value="0">
             No position
           </Prov>{" "}
-          on the {sym} line has been liquidated so far.
+          on the {sym} market has been liquidated so far.
         </>
       )
     ) : null,
@@ -267,8 +258,8 @@ function explanationParts({
         <H>
           {compact(earmarked.formatted)} {sym}
         </H>{" "}
-        of the debt is set aside for repayment. A redemption clears it, and so does a repayment in vault shares or a
-        close.
+        of the debt is earmarked: set aside to be repaid by redemptions. A redemption clears it, and so does a repayment
+        in vault shares or a close.
       </>
     ) : null,
     earmarked && takeShares != null ? (
@@ -277,7 +268,7 @@ function explanationParts({
         {takeFee != null && feeBps != null ? (
           <>
             , plus {takeFee.toLocaleString("en-US", { maximumFractionDigits: takeFee < 0.01 ? 6 : 2 })} {mytSymbol} for
-            the line&rsquo;s {(feeBps / 100).toLocaleString("en-US")}% redemption fee
+            the market&rsquo;s {(feeBps / 100).toLocaleString("en-US")}% redemption fee
           </>
         ) : null}
         .
@@ -320,7 +311,7 @@ function explanationParts({
     ) : null,
     redemptions.cleared > 0 && net && netN != null && net.prov && fee ? (
       <>
-        The line&rsquo;s {(fee.bps / 100).toLocaleString("en-US")}% redemption fee is{" "}
+        The market&rsquo;s {(fee.bps / 100).toLocaleString("en-US")}% redemption fee is{" "}
         {signed(-Number(fee.valueRaw) / 1e18)} {net.underlyingSymbol} of that net (
         <AmountText value={Number(fee.sharesRaw) / 1e18} /> {mytSymbol}).
       </>
@@ -333,7 +324,7 @@ function explanationParts({
     rest != null &&
     Math.abs(rest) >= Math.abs(Number(fee.valueRaw) / 1e18) * 0.01 ? (
       <>
-        The other {signed(rest)} {net.underlyingSymbol} is how the Alchemist charges a position: at the line&rsquo;s
+        The other {signed(rest)} {net.underlyingSymbol} is how the Alchemist charges a position: at the market&rsquo;s
         average shares per unit of debt across every redemption since the position&rsquo;s last event, while the share
         price moved between them.
       </>

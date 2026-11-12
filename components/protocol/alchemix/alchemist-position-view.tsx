@@ -38,7 +38,7 @@
 //    alone: a V2 debt and this position's debt are one obligation at two
 //    points in time (rails-ops reference/alchemix-v2-frozen-record.md).
 //
-// THE CARD BODY IS FIGURES AND LABELLED ROWS. Deposited and Debt are the
+// THE CARD BODY IS FIGURES AND LABELLED ROWS. Deposit and Debt are the
 // headlines, the rest are the panel's rows (rails-ops TO-DO-position-card
 // 322, 323). This position's figures, explained, are the Explanation pane
 // (alchemix-position-explanation.tsx); what is true of every position is its
@@ -111,24 +111,24 @@ import {
   AlchemixPositionExplanation,
   fallPct,
   hasAlchemixPositionExplanation,
-  ratioPct,
   type AlchemixCloseFacts,
   type AlchemixPositionExplanationProps,
   type AlchemixRedemptionTotals,
 } from "@/components/protocol/alchemix/alchemix-position-explanation";
 import { selfLiquidationSplit } from "@/lib/alchemix/self-liquidation";
+import { ltvOfCollateralization, ltvPct, ltvPrint } from "@/lib/alchemix/ltv";
 import { formatDate } from "@/lib/date";
 import { ALCHEMIX_LIFETIME_FLOWS, alchemixPositionContent } from "@/lib/alchemix/learn-more";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import {
   clearedRunProv,
   redemptionCountProv,
-  collateralisationProv,
   eventsAloneDebtProv,
   lineLiquidationsProv,
   lineRatioProv,
   liquidationDistanceProv,
   liveFigureProv,
+  ltvProv,
   redemptionNetTotalProv,
   sharePriceProv,
   underlyingProv,
@@ -150,10 +150,11 @@ import { PanelFigure } from "@/components/shared/position-card-panel";
 
 const block = (n: number) => n.toLocaleString("en-US");
 
-/** The panel's health rows: collateralisation at the reading's block, the
- *  line's two ratios, and how far the share price would need to fall. A
- *  closed position has no band to sit in, so it keeps "No debt" alone; an open
- *  one with no debt keeps the minimum, which bounds what it can mint. */
+/** The panel's health rows: the LTV at the reading's block, the line's Max
+ *  LTV and liquidation threshold, and how far the share price would need to
+ *  fall. A closed position has no band to sit in, so it keeps the LTV's "—"
+ *  alone; an open one with no debt keeps the Max LTV, which bounds what it can
+ *  mint. */
 function healthRows(
   health: AlchemixHealth,
   debtRaw: string | null,
@@ -162,45 +163,44 @@ function healthRows(
 ): PositionPanelRow[] {
   const b = health.asOfBlock;
   const fall = shareFallToLiquidation(health.collateralizationRaw, health.collateralizationLowerBoundRaw);
+  const ltv = ltvOfCollateralization(health.collateralizationRaw);
   const rows: PositionPanelRow[] = [
     {
-      id: "collateralisation",
-      label: "Collateral ratio",
+      id: "ltv",
+      label: "LTV",
       value:
-        health.collateralizationRaw != null && health.collateralValueRaw != null && debtRaw != null ? (
-          <Prov
-            info={collateralisationProv(health.collateralValueRaw, debtRaw, b, coords)}
-            value={String(Number(health.collateralizationRaw) / 1e16)}
-          >
-            {ratioPct(health.collateralizationRaw)}
+        ltv != null && health.collateralValueRaw != null && debtRaw != null ? (
+          <Prov info={ltvProv(health.collateralValueRaw, debtRaw, b, coords)} value={String(ltv * 100)}>
+            {ltvPrint(ltv)}
           </Prov>
         ) : (
-          <span className="text-rb-500">No debt</span>
+          <span className="text-rb-500">—</span>
         ),
-      tip: "The collateral, counted in the asset underneath, over the debt, both read from the Alchemist at the reading's block.",
+      sub: ltv == null ? "no debt" : undefined,
+      tip: "Loan-to-value: the debt as a share of the collateral's value, both counted in the asset underneath and read from the Alchemist at the reading's block.",
     },
   ];
   if (closed) return rows;
   rows.push(
     {
-      id: "minimum",
-      label: "Minimum ratio",
+      id: "max-ltv",
+      label: "Max LTV",
       value: (
         <Prov info={lineRatioProv("minimumCollateralization", health.minimumCollateralizationRaw, b, coords)}>
-          {ratioPct(health.minimumCollateralizationRaw)}
+          {ltvPct(health.minimumCollateralizationRaw)}
         </Prov>
       ),
-      tip: "A mint or a withdrawal must leave the position above this collateral ratio: the Alchemist's minimumCollateralization at the reading's block.",
+      tip: "The borrowing cap: a mint or a withdrawal must leave the position below this LTV. One over the Alchemist's minimumCollateralization at the reading's block.",
     },
     {
-      id: "liquidation-line",
-      label: "Liquidation ratio",
+      id: "liquidation-threshold",
+      label: "Liquidation threshold",
       value: (
         <Prov info={lineRatioProv("collateralizationLowerBound", health.collateralizationLowerBoundRaw, b, coords)}>
-          {ratioPct(health.collateralizationLowerBoundRaw)}
+          {ltvPct(health.collateralizationLowerBoundRaw)}
         </Prov>
       ),
-      tip: "The liquidation line: at or below this collateral ratio anyone may liquidate the position. The Alchemist's collateralizationLowerBound at the reading's block.",
+      tip: "At or above this LTV anyone may liquidate the position. One over the Alchemist's collateralizationLowerBound at the reading's block.",
     },
   );
   if (fall != null && health.collateralizationRaw != null) {
@@ -224,7 +224,7 @@ function healthRows(
         ) : (
           "0%"
         ),
-      tip: "How far the vault's share price would need to fall to take the position to the liquidation line. Debt and collateral are counted in one asset, so the ratio moves with the share price alone.",
+      tip: "How far the vault's share price would need to fall to take the position's LTV to the liquidation threshold. Debt and collateral are counted in one asset, so the LTV moves with the share price alone.",
     });
   }
   return rows;
@@ -349,7 +349,7 @@ export function AlchemistPositionView({
   const beforeByBlock = useMemo(() => readingsBefore(alchemistEvents), [alchemistEvents]);
   // Every reading in block order, for a custody card's figures in force.
   const readingList = useMemo(() => readingsInOrder(alchemistEvents), [alchemistEvents]);
-  // The blocks holding a line-scope row, where set-aside's move is not one card's.
+  // The blocks holding a line-scope row, where earmarked debt's move is not one card's.
   const lineBlocks = useMemo(() => lineEventBlocks(alchemistEvents), [alchemistEvents]);
   // A transfer sharing its transaction with another leg is drawn inside that
   // card, so the timeline counts the card and not the transfer.
@@ -441,8 +441,8 @@ export function AlchemistPositionView({
     () => (v2Events.length > 0 ? [...drawnEvents, ...v2Events] : drawnEvents),
     [drawnEvents, v2Events],
   );
-  // The line's two ratios as the position card states them, for the event
-  // cards' collateralisation.
+  // The line's two getters as the position card reads them, for the event
+  // cards' Max LTV and liquidation threshold.
   const lineRatios = useMemo<AlchemixLineRatios | null>(() => {
     const h = live?.health;
     return h
@@ -723,12 +723,12 @@ export function AlchemistPositionView({
       }
     : null;
 
-  // The card's slots (rails-ops TO-DO-position-card 322, 323): Deposited and
-  // Debt as the headlines, both from the current reading; the health rows, set
-  // aside for repayment, the share price and the debt rows in the panel.
+  // The card's slots (rails-ops TO-DO-position-card 322, 323): Deposit and
+  // Debt as the headlines, both from the current reading; the health rows,
+  // earmarked debt and the share price in the panel.
   const collProv = live
     ? {
-        shares: liveFigureProv("Collateral", mytSymbol, live.collateral.raw, live.asOfBlock, coords),
+        shares: liveFigureProv("Deposit", mytSymbol, live.collateral.raw, live.asOfBlock, coords),
         underlying: live.collateral.underlying
           ? underlyingProv(
               live.collateral.underlying.symbol ?? "the asset underneath",
@@ -764,7 +764,7 @@ export function AlchemistPositionView({
         },
       ]
     : [
-        { id: "deposited", label: "Collateral", value: null, pending: pendingHeads },
+        { id: "deposited", label: "Deposit", value: null, pending: pendingHeads },
         { id: "debt", label: "Debt", value: null, pending: pendingHeads },
       ];
   const u = live?.collateral.underlying ?? null;
@@ -776,15 +776,15 @@ export function AlchemistPositionView({
   const holdingRows: PositionPanelRow[] = live
     ? [
         {
-          id: "set-aside",
-          label: "Debt set aside",
+          id: "earmarked",
+          label: "Earmarked debt",
           value: live.earmarked ? (
             <span className="tabular-nums">
               <PanelFigure>
                 {alchemixAmountFigure(
                   live.earmarked,
                   sym,
-                  liveFigureProv("Debt set aside", sym, live.earmarked.raw, live.asOfBlock, coords),
+                  liveFigureProv("Earmarked debt", sym, live.earmarked.raw, live.asOfBlock, coords),
                 )}
               </PanelFigure>{" "}
               {sym}
@@ -792,7 +792,7 @@ export function AlchemistPositionView({
           ) : (
             NOT_SETTLED
           ),
-          tip: "The part of the debt the Alchemist has set aside to be repaid from the Transmuter, read at the reading's block. It grows block by block.",
+          tip: "Earmarked: the part of the debt the Alchemist has set aside to be repaid by the Transmuter's redemptions, read at the reading's block. It grows block by block.",
         },
         ...(sharePrice != null && u
           ? [
@@ -981,7 +981,7 @@ export function AlchemistPositionView({
                                 This position closed
                                 {endedWindow.endedAt != null ? (
                                   <> on {formatDate(endedWindow.endedAt)}</>
-                                ) : null} (block {block(endedWindow.endedAtBlock)}). Nothing on the line can change it
+                                ) : null} (block {block(endedWindow.endedAtBlock)}). Nothing on the market can change it
                                 after that, so the timeline ends there.
                               </p>
                             ) : null}
