@@ -16,7 +16,7 @@ import { fluidBasePosition } from "@/lib/fluid-base/position";
 import { isFluidBaseId } from "@/lib/fluid-base/types";
 import { POSITION_PAGE } from "@/lib/fluid-base/words";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
-import { explorerHref } from "@/lib/shared/protocols";
+import { protocolForSession } from "@/lib/shared/protocols";
 
 /** One read per request: the metadata and the page share it. */
 export const loadFluidBasePosition = cache((id: string) => fetchFluidBasePosition(id));
@@ -26,7 +26,7 @@ export async function FluidBasePositionPage({ id }: { id: string }) {
   const answer = await loadFluidBasePosition(id);
   if (answer.kind === "not-found") notFound();
   const session = "fluid-base";
-  const home = explorerHref(8453, session);
+  const home = protocolForSession(session)!.href;
   if (answer.kind === "error")
     return (
       <div className="py-8">

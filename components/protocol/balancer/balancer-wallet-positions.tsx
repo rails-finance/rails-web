@@ -15,13 +15,12 @@ import { fetchBalancerPositions } from "@/lib/api/fetch-balancer";
 import { FRONT_DOOR, REFUSED } from "@/lib/balancer/words";
 import { BAL_CHAINS, type BalChainId } from "@/lib/balancer/chains";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
-import { explorerHref } from "@/lib/shared/protocols";
 
 export async function BalancerWalletPositions({ chainId, wallet: raw }: { chainId: BalChainId; wallet: string }) {
   if (!isWallet(raw)) notFound();
   const wallet = raw.toLowerCase();
   const session = BAL_CHAINS[chainId].session;
-  const home = explorerHref(chainId, session);
+  const home = BAL_CHAINS[chainId].home;
   const answer = await fetchBalancerPositions(chainId, wallet);
   return (
     <div className="min-h-screen">

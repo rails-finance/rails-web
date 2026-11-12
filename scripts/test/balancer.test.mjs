@@ -193,3 +193,17 @@ test("each chain names itself on the front door and in a receipt's grid", async 
   assert.equal(balChain(1).session, "balancer-v3");
   assert.equal(balChain(42161).session, "balancer-v3-arbitrum");
 });
+
+test("each chain's explorer path is the URL slug's, with a page behind it", async () => {
+  const { BAL_CHAINS } = await import("../../lib/balancer/chains.ts");
+  // The Arbitrum roster session is "balancer-v3-arbitrum"; its pages live under the slug.
+  assert.equal(BAL_CHAINS[42161].home, "/arbitrum/balancer-v3");
+  assert.equal(BAL_CHAINS[1].home, "/ethereum/balancer-v3");
+  const { existsSync } = await import("node:fs");
+  for (const c of Object.values(BAL_CHAINS)) {
+    const dir = new URL(`../../app/(app)${c.home}/`, import.meta.url);
+    assert.ok(existsSync(new URL("page.tsx", dir)), `${c.home} has a front door`);
+    assert.ok(existsSync(new URL("info/page.tsx", dir)), `${c.home}/info exists`);
+    assert.ok(existsSync(new URL("position/[pool]/[wallet]/page.tsx", dir)), `${c.home}/position exists`);
+  }
+});

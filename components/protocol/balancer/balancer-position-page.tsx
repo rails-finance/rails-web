@@ -21,7 +21,6 @@ import { balPosition } from "@/lib/balancer/position";
 import { BAL_CHAINS, type BalChainId } from "@/lib/balancer/chains";
 import { POSITION_PAGE, REFUSED } from "@/lib/balancer/words";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
-import { explorerHref } from "@/lib/shared/protocols";
 
 /** One read per request: the metadata and the page share it. */
 export const loadBalancerPosition = cache((chainId: BalChainId, pool: string, wallet: string) =>
@@ -43,7 +42,7 @@ export async function BalancerPositionPage({
   if (answer.kind === "not-found") notFound();
   const chain = BAL_CHAINS[chainId];
   const session = chain.session;
-  const home = explorerHref(chainId, session);
+  const home = chain.home;
   if (answer.kind === "error" || answer.kind === "refused")
     return (
       <div className="py-8">
