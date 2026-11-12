@@ -380,9 +380,9 @@ const SPECS: ProtocolSpec[] = [
     label: "Aerodrome",
     chainId: 8453,
     slug: "aerodrome",
-    // Hue 264, Aerodrome's blue #0433FF in oklch (the mark's second stripe, from
+    // Hue 256.5 (427's spread, between wallet-view hues), from Aerodrome's blue #0433FF (264) in oklch (the mark's second stripe, from
     // the favicon in aerodrome-finance/agents on GitHub).
-    brand: 264,
+    brand: 256.5,
     tags: ["Liquidity"],
     desc: "Concentrated liquidity on Base, staked or not: a position's range, fees or AERO and pool over the last 30 days",
     positionListing: false,
@@ -552,9 +552,9 @@ const SPECS: ProtocolSpec[] = [
     label: "Velodrome",
     chainId: 10,
     slug: "velodrome",
-    // Hue 30, Velodrome's red #FF1100 in oklch (the mark's outer band, from
+    // Hue 31.5 (427's spread), from Velodrome's red #FF1100 (30) in oklch (the mark's outer band, from
     // the favicon on velodrome.finance).
-    brand: 30,
+    brand: 31.5,
     tags: ["Liquidity"],
     desc: "Concentrated liquidity on Optimism, staked or not: a position's range, fees or VELO and pool over the last 30 days",
     positionListing: false,
@@ -609,8 +609,8 @@ const SPECS: ProtocolSpec[] = [
     chainId: 8453,
     slug: "euler-v2",
     protocolKey: "euler-v2",
-    // DRAFT: hue 160, read off the green of Euler's app; Miles to confirm.
-    brand: 160,
+    // DRAFT: hue 166.5 (427's spread), near the green of Euler's app (160); Miles to confirm.
+    brand: 166.5,
     tags: ["Lend", "Borrow"],
     desc: "Euler's vaults on Base: a wallet's 256 accounts, each loan with its collateral and health, and each deposit over the last 30 days",
     positionListing: false,
@@ -694,8 +694,8 @@ const SPECS: ProtocolSpec[] = [
     label: "Lido",
     chainId: 1,
     slug: "lido",
-    // Hue 240, a draft read off Lido's blue mark (public/icons/protocols/lido.png).
-    brand: 240,
+    // Hue 241.5 (427's spread), a draft read off Lido's blue mark (public/icons/protocols/lido.png).
+    brand: 241.5,
     tags: ["Staking"],
     desc: "Staked ether on Ethereum: a wallet's stETH and wstETH in ETH, its change over the last 30 days, and its withdrawal requests",
     positionListing: false,
@@ -852,8 +852,8 @@ const SPECS: ProtocolSpec[] = [
     label: "PancakeSwap V3",
     chainId: 8453,
     slug: "pancakeswap-v3",
-    // Hue 57, the bunny's #D1884F in oklch (pancakeswap/pancake-developer, docs/public/logo.svg).
-    brand: 57,
+    // Hue 61.5 (427's spread), from the bunny's #D1884F (57) in oklch (pancakeswap/pancake-developer, docs/public/logo.svg).
+    brand: 61.5,
     tags: ["Liquidity"],
     desc: "PancakeSwap V3 on Base, staked in its farm or not: a position's range, fees, CAKE and pool over the last 30 days",
     positionListing: false,
@@ -933,7 +933,7 @@ const SPECS: ProtocolSpec[] = [
     label: "Polaris",
     chainId: 11155111,
     slug: "polaris",
-    brand: 220,
+    brand: 211.5,
     tags: ["CDP", "Stablecoin"],
     desc: "Polaris on the Sepolia testnet: USDp and GOLDp minted against pETH, every position from the market's events, liquidations absorbed by stability pools",
     subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
@@ -1018,9 +1018,9 @@ const SPECS: ProtocolSpec[] = [
     label: "Uniswap V3",
     chainId: 1,
     slug: "uniswap-v3",
-    // DRAFT: hue 4, read off Uniswap's pink #FF007A in oklch, the space this
+    // DRAFT: hue 1.5 (427's spread), from Uniswap's pink #FF007A (4) in oklch, the space this
     // field takes (its HSL hue is 331).
-    brand: 4,
+    brand: 1.5,
     tags: ["Liquidity"],
     desc: "Concentrated liquidity on Ethereum: a position's range, fees and pool over the last 30 days, read from the pool at two blocks",
     positionListing: false,
@@ -1033,7 +1033,7 @@ const SPECS: ProtocolSpec[] = [
     label: "Uniswap V4",
     chainId: 1,
     slug: "uniswap-v4",
-    brand: 4,
+    brand: 1.5,
     tags: ["Liquidity"],
     desc: "Uniswap's singleton pools on Ethereum, hooks included: a position's range, fees and pool over the last 30 days",
     positionListing: false,
