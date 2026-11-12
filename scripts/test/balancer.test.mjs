@@ -123,7 +123,7 @@ test("the readout: shares, share, one line per token, value per share, the pool"
     ["shares", "share", "token:0", "token:1", "rate", "status"],
   );
   assert.equal(lines[2].label, "waEthWETH");
-  assert.equal(lines[5].pool, "Swap fee 0.04%. Trading.");
+  assert.equal(lines[5].pool, "Swap fee 0.04%. Open for trading: swaps, adds and removes.");
   const recovery = readoutLines(balPosition(read({ recoveryMode: true })));
   assert.match(recovery[5].pool, /recovery mode/);
   for (const l of lines) for (const s of [l.yours, l.pool]) if (s) assert.doesNotMatch(s, /, not |honest|fold/i);
@@ -141,6 +141,8 @@ test("a wallet row and the words that say what the search misses", () => {
   });
   assert.equal(w.symbol, "waEthWETH-rETH");
   assert.equal(FRONT_DOOR.rowShare(w.share), "0.907% of the pool");
+  assert.equal(FRONT_DOOR.rowShare(0.000001), "under 0.001% of the pool");
+  assert.equal(FRONT_DOOR.rowShare(0), "0.000% of the pool");
   assert.equal(w.staked, null);
   assert.equal(
     FRONT_DOOR.found("Ethereum"),

@@ -21,7 +21,8 @@ import type { BalPositionsRead } from "@/lib/balancer/types";
 import { chainMeta, type ChainId } from "@/lib/shared/chains";
 import { balChain } from "@/lib/balancer/chains";
 import { FRONT_DOOR } from "@/lib/balancer/words";
-import { share, short } from "@/lib/uniswap/words";
+import { short } from "@/lib/uniswap/words";
+import { share } from "@/lib/balancer/words";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 const SCOPE = "balancer-wallet";

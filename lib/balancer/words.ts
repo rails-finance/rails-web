@@ -8,7 +8,10 @@
 
 import { rateTokens, type BalMove, type BalPosition } from "./position";
 import type { BalIndexRefusal } from "./types";
-import { day, num, pct, share } from "../uniswap/words";
+import { day, num, pct, share as plainShare } from "../uniswap/words";
+
+/** A share, unsigned; one above zero that would print as 0.000% reads "under 0.001%". */
+export const share = (x: number): string => (x > 0 && plainShare(x) === "0.000%" ? "under 0.001%" : plainShare(x));
 
 export const LABEL = "Balancer V3";
 
@@ -67,7 +70,7 @@ export const CARD_WORDS = {
   holds: "Holds now",
   holdsTip:
     "The wallet's part of each token the pool holds: the pool's balance of it times the wallet's share of the pool. Withdrawing pays out about these amounts.",
-  rate: "Value per share, 30 days",
+  rate: "Pool value per share, 30 days",
   rateTip:
     "How much the pool's value per share changed over the last 30 days. It is the same for every share, and grows from the swap fees the pool keeps and its tokens' yield.",
   /** The share's split where some shares are staked. */
@@ -157,9 +160,11 @@ export function readoutLines(p: BalPosition): BalLine[] {
       yours: null,
       pool: [
         p.feePct == null ? null : `Swap fee ${num(p.feePct)}%.`,
-        p.paused ? "Paused: no swaps, adds or removes." : null,
-        p.recoveryMode ? "In recovery mode: holders can withdraw their tokens in proportion." : null,
-        !p.paused && !p.recoveryMode ? "Trading." : null,
+        p.paused ? "This pool is paused: no swaps, adds or removes." : null,
+        p.recoveryMode
+          ? `${p.paused ? "It is" : "This pool is"} in recovery mode: holders can withdraw their tokens in proportion.`
+          : null,
+        !p.paused && !p.recoveryMode ? "Open for trading: swaps, adds and removes." : null,
       ]
         .filter(Boolean)
         .join(" "),
@@ -256,7 +261,7 @@ export function readoutExplainer(chainId: number): ExplainGroupWords[] {
       bullets: [
         "Value per share: what one share claims of the pool's tokens, counted at their rates.",
         "Swap fee: charged on each swap. The part the pool keeps raises value per share.",
-        "Pool: Trading means swaps, adds and removes are open. Paused stops all three.",
+        "Pool: Open for trading means swaps, adds and removes all work. Paused stops all three.",
         "In recovery mode, holders can withdraw their tokens in proportion.",
       ],
     },

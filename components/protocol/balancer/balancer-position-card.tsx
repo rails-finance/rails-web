@@ -18,7 +18,8 @@ import { chainMeta, type ChainId } from "@/lib/shared/chains";
 import { balChain } from "@/lib/balancer/chains";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { CARD_WORDS, cardExplainer, rateText } from "@/lib/balancer/words";
-import { day, num, share, short } from "@/lib/uniswap/words";
+import { day, num, short } from "@/lib/uniswap/words";
+import { share } from "@/lib/balancer/words";
 
 /** Every figure's read stamp on a Balancer page. */
 export function BalancerReadStamp({ c, what }: { c: BalReceiptContext; what: string }) {
