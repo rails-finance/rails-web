@@ -125,6 +125,13 @@ export interface PositionCardHead {
   /** An icon after the label. The closed card's peaks carry their asset here
    *  (Liquity V2's closed face); an open headline puts it in `assets`. */
   labelIcon?: ReactNode;
+  /** Which size the figure takes (decision 0066; ui-jobs 604): an `amount` the
+   *  position holds (collateral, debt, total assets) at the headline size, a
+   *  `measure` of it (a ratio, a rate, a price, a count) a step down on the
+   *  same baseline. Unset, a head with assets, a USD line or a breakdown is an
+   *  amount and any other a measure. A card with no amount draws every head at
+   *  the headline size. */
+  tier?: "amount" | "measure";
   /** The large figure, drawn in the card's figure type. The family keeps its
    *  `Prov`, `FadeNumber` and `HighlightableValue` inside it. `null` draws a
    *  dash. */
@@ -487,11 +494,22 @@ function ListingPill({ status }: { status: PositionCardStatus | null }) {
   );
 }
 
+/** A head's resolved tier (`PositionCardHead.tier`). */
+const tierOf = (h: PositionCardHead): "amount" | "measure" =>
+  h.tier ?? (h.assets != null || h.usd !== undefined || h.breakdown != null ? "amount" : "measure");
+
+/** A measure's figure: a step under the headline size, in a line box of the
+ *  headline's height and dropped to its baseline. */
+const MEASURE_TYPE = "!text-lg lg:!text-xl !font-semibold h-8 lg:h-9 flex items-end lg:pb-px";
+
 function HeadBody({
   head,
   toggle,
+  measure = false,
 }: {
   head: PositionCardHead;
+  /** Drawn a step down (`MEASURE_TYPE`). */
+  measure?: boolean;
   /** The breakdown's button, where the side has one on a detail card. */
   toggle?: {
     open: boolean;
@@ -540,7 +558,7 @@ function HeadBody({
       ) : head.value == null ? (
         <StatDash />
       ) : (
-        <StatValue>
+        <StatValue className={measure ? MEASURE_TYPE : undefined}>
           {trigger ? (
             trigger
           ) : head.assets ? (
@@ -598,6 +616,8 @@ function OpenGrid({ heads, detail }: { heads: PositionCardHead[]; detail: boolea
   };
   const exact = formatUsdValue;
   const title = openHead ? (openHead.total ? `${openHead.label} ${exact(openHead.total.usd)}` : openHead.label) : "";
+  // Tiers apply only where the card holds an amount to stand over its measures.
+  const tiered = heads.some((h) => tierOf(h) === "amount");
   return (
     <>
       <div className={OPEN_GRID} data-anatomy="C10">
@@ -611,7 +631,7 @@ function OpenGrid({ heads, detail }: { heads: PositionCardHead[]; detail: boolea
             headerIcon={h.labelIcon}
             explain={detail}
           >
-            <HeadBody head={h} toggle={toggleOf(h)} />
+            <HeadBody head={h} toggle={toggleOf(h)} measure={tiered && tierOf(h) === "measure"} />
           </PositionCardRow>
         ))}
       </div>
@@ -967,7 +987,8 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
         (closed ? (
           <PositionCardPanel columns={panel} />
         ) : (
-          <div data-nosnippet="">
+          // A hairline between the headlines and the stats (decision 0066 point 5).
+          <div className="mt-6 border-t border-rb-500/50" data-nosnippet="" data-card-rule="">
             <PositionCardPanel columns={panel} />
           </div>
         ))}

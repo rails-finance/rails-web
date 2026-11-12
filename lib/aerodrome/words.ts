@@ -27,6 +27,7 @@ import {
   type PoolRow,
   type PoolTable,
   type Seg,
+  loss,
 } from "../uniswap/words";
 import type { AeroPosition, PoolAside } from "./position";
 import { AERODROME, type SlipstreamSite } from "./sites";
@@ -61,13 +62,6 @@ export const POSITION_PAGE = {
   sub: (p: AeroPosition) => `${DEPLOYMENT_LABEL[p.deployment]} · tick spacing ${p.tickSpacing} · ${p.site.chainName}`,
   unanswered: "The read of this position did not answer. Try again in a minute.",
 };
-
-/** The line under a position and a wallet's positions where the site says it is not indexed yet
- *  (sites.ts `saysNotIndexed`); null where it does not. */
-export const notIndexed = (site: SlipstreamSite, what: "position" | "wallet"): string | null =>
-  !site.saysNotIndexed
-    ? null
-    : `Not indexed yet on ${site.chainName}: ${what === "position" ? "this position's history arrives" : "a listing of positions and their history arrive"} when Rails indexes ${site.label} there.`;
 
 /** The card's words on a site: AERO on Base, VELO on Optimism. */
 export const cardWords = (site: SlipstreamSite) => {
@@ -284,9 +278,9 @@ export function readoutTable(p: AeroPosition): PoolTable {
           {
             key: "against",
             part: "yours",
-            label: "Against holding",
+            label: "Impermanent loss",
             then: null,
-            now: pct(p.againstHolding),
+            now: loss(p.againstHolding),
             single: true,
           },
           ...(p.againstHoldingWithEarnings !== null
@@ -296,7 +290,7 @@ export function readoutTable(p: AeroPosition): PoolTable {
                   part: "yours",
                   label: p.staked ? `With ${R}` : "With fees",
                   then: null,
-                  now: pct(p.againstHoldingWithEarnings),
+                  now: loss(p.againstHoldingWithEarnings),
                   single: true,
                 } as PoolRow,
               ]
@@ -430,7 +424,10 @@ export function readoutExplainer(p: AeroPosition): ExplainGroupWords[] {
         : "Each swap pays the pool's fee to the unstaked liquidity in range at that moment.",
     ],
     ...(wt ? [[wt]] : []),
-    ["Against holding compares the position now with keeping the tokens it held 30 days ago, both at today's price."],
+    [
+      "Impermanent loss is how much less the position is worth now than the tokens it held 30 days ago, both at today's price.",
+      "The row under it takes the 30-day earnings off that loss. Below zero, they outweighed it.",
+    ],
     [
       p.staked
         ? `The position's share is of the staked liquidity in range now, which splits the gauge's ${R}.`
