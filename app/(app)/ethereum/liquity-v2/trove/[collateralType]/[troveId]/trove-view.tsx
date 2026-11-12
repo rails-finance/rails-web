@@ -365,6 +365,7 @@ export default function TroveView({
     open: flowOpen,
     price: flowPrice,
     liveState,
+    shutdownAt: shutdown?.at ?? null,
   });
   // The branch's redemptions per day over the life, the protocol activity
   // chart under the events (lib/liquity-v2/redemption-pace.ts): to today, or

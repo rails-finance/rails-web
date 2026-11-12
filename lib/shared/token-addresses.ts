@@ -25,6 +25,10 @@ export const TOKEN_ADDRESSES: Record<string, string> = {
   // symbol tier; this entry is the CDN fallback behind it.
   alETH: "0x0100546f2cd4c9d97f798ffc9755e47865ff7ee6",
   ankrETH: "0xe95a203b1a91a908f9b9ce46459d101078c2c3cb",
+  // apxUSD's own address, read from the chain as the yieldToken() of its
+  // Pendle PTs (pt-underlying.ts). A summed folder leg draws by symbol alone,
+  // and this entry is what reaches its local PNG (public/icons/tokens).
+  apxUSD: "0x98a878b1cd98131b271883b390f68d2c90674665",
   AURA: "0xc0c293ce456ff0ed870add98a0828dd4d2903dbf",
   BAL: "0xba100000625a3754423978a60c9317c58a424e3d",
   BOLD: "0x6440f144b7e50d6a8439336510312d2f54beb01d",

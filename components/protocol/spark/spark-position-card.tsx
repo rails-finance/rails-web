@@ -388,6 +388,44 @@ export interface SparkPositionCardProps {
   exports?: PositionCardExports | null;
 }
 
+/** A closed card's panel: the peaks of reserves that never backed borrowing. */
+function closedPanel(peakOthers: SparkReserveAmount[]): PositionPanelColumns | undefined {
+  if (peakOthers.length === 0) return undefined;
+  return [
+    [
+      {
+        id: "peak-not-collateral",
+        label: "Supplied, not collateral",
+        tip: PEAK_NOT_COLLATERAL_TIP,
+        value: (
+          <span data-spark-not-collateral="">
+            {peakOthers.length > 1 ? (
+              // A count of the peaks the overlay lists, each with its receipt.
+              <span data-prov-exempt="">{peakOthers.length} assets</span>
+            ) : (
+              <PeakLines reserves={peakOthers} side="supply" iconSize={16} />
+            )}
+          </span>
+        ),
+        // Many assets: their count opens the peaks, so the cell holds one
+        // line. The peaks carry no USD (PeakLines).
+        breakdown:
+          peakOthers.length > 1
+            ? {
+                assets: loadedMarks(peakOthers),
+                panel: (
+                  <span className="text-sm font-semibold tabular-nums text-foreground" data-spark-peak-breakdown="">
+                    <PeakLines reserves={peakOthers} side="supply" iconSize={16} />
+                  </span>
+                ),
+              }
+            : undefined,
+      },
+    ],
+    [],
+  ];
+}
+
 /** SparkLend's slots for the shared position card. */
 export function useSparkCardSlots({
   v,
@@ -441,15 +479,12 @@ export function useSparkCardSlots({
   let heads: PositionCardHead[];
   let outcome: PositionCardOutcome | undefined;
   let notice: ReactNode;
-  // A closed card's panel: the peaks of reserves that never backed borrowing.
-  let closedPanel: PositionPanelColumns | undefined;
   if (ended) {
     // The wallet holds no open reserves, so the headline is what each asset
     // held at its height. Where the peaks are read, a side the account never
     // held reads "None": no supply backed borrowing (the switches read), or
     // nothing was borrowed.
     const peakColl = v.peakSupplies.filter((r) => !isOther(r));
-    const peakOthers = v.peakSupplies.filter(isOther);
     const peaksRead = v.peakSupplies.length + v.peakBorrows.length > 0;
     heads = [
       {
@@ -473,41 +508,6 @@ export function useSparkCardSlots({
           ) : null,
       },
     ];
-    if (peakOthers.length > 0) {
-      closedPanel = [
-        [
-          {
-            id: "peak-not-collateral",
-            label: "Supplied, not collateral",
-            tip: PEAK_NOT_COLLATERAL_TIP,
-            value: (
-              <span data-spark-not-collateral="">
-                {peakOthers.length > 1 ? (
-                  // A count of the peaks the overlay lists, each with its receipt.
-                  <span data-prov-exempt="">{peakOthers.length} assets</span>
-                ) : (
-                  <PeakLines reserves={peakOthers} side="supply" iconSize={16} />
-                )}
-              </span>
-            ),
-            // Many assets: their count opens the peaks, so the cell holds one
-            // line. The peaks carry no USD (PeakLines).
-            breakdown:
-              peakOthers.length > 1
-                ? {
-                    assets: loadedMarks(peakOthers),
-                    panel: (
-                      <span className="text-sm font-semibold tabular-nums text-foreground" data-spark-peak-breakdown="">
-                        <PeakLines reserves={peakOthers} side="supply" iconSize={16} />
-                      </span>
-                    ),
-                  }
-                : undefined,
-          },
-        ],
-        [],
-      ];
-    }
     outcome = {
       word: v.status === "liquidated" ? "Liquidated" : "Closed",
       dates: [{ at: v.status === "liquidated" && outcomeAt != null ? outcomeAt : v.lastActivityAt }],
@@ -624,7 +624,7 @@ export function useSparkCardSlots({
     learnMore: ended ? sparkPositionModal(v.status) : sparkPositionModal(v.status, v.borrows.length > 0),
     menu: { leading: () => <SparkMenuRows wallet={v.wallet} />, exports: exports ?? null },
   };
-  if (outcome) return { ...detailCommon, outcome, panel: closedPanel };
+  if (outcome) return { ...detailCommon, outcome, panel: closedPanel(v.peakSupplies.filter(isOther)) };
 
   // ── Each side's reserve rows, and the panel: the supply side's values on
   //    the left, the debt's and its risk on the right. A side whose total is

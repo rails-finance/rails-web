@@ -1,12 +1,4 @@
 # Position-card slot builders over the caps (4 headlines, 6 stats; decision 0040),
 # each waiting on its protocol's review (TO-DO-position-card 341). Written by
 # `node scripts/check-card-caps.mjs --write`; the counts are the most the source can reach.
-components/protocol/aave-v3-optimism/aave-v3-optimism-position-card.tsx#slots headlines=4 stats=unbounded
-components/protocol/aave-v3/aave-v3-position-card.tsx#useAaveV3CardSlots headlines=3 stats=7
-components/protocol/aave-v4-arc/aave-v4-arc-position-card.tsx#slots headlines=4 stats=unbounded
-components/protocol/aave-v4/aave-v4-spoke-card.tsx#useAaveV4SpokeCardSlots headlines=3 stats=7
-components/protocol/compound-v3-optimism/compound-v3-optimism-position-card.tsx#slots headlines=3 stats=unbounded
-components/protocol/fx/fx-position-card.tsx#useFxCardSlots headlines=3 stats=9
-components/protocol/llamalend/llamalend-position-card.tsx#useLlamalendCardSlots headlines=3 stats=8
-components/protocol/moonwell/moonwell-position-card.tsx#useMoonwellCardSlots headlines=3 stats=unbounded
-components/protocol/spark/spark-position-card.tsx#useSparkCardSlots headlines=3 stats=7
+

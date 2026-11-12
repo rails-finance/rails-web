@@ -10,6 +10,7 @@ import {
   useEffect,
   useContext,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   type ReactElement,
@@ -739,16 +740,19 @@ function EventCardView(props: EventCardProps) {
     (captionCtx ? (
       phoneMark ? (
         <>
-          <span aria-hidden className="min-w-0 truncate">
-            {kind} &middot;
+          <span aria-hidden className="min-w-0">
+            {kind} <span data-caption-sep="">&middot;</span>
           </span>
           {phoneMark}
         </>
       ) : (
         <>
-          {kind} &middot; {capDate && <span className="text-foreground">{capDate}</span>}
-          {capDate ? " " : ""}
-          {formatTimestamp(captionCtx.ts)}
+          {kind} <span data-caption-sep="">&middot;</span>{" "}
+          <span className="whitespace-nowrap" data-caption-tail="">
+            {capDate && <span className="text-foreground">{capDate}</span>}
+            {capDate ? " " : ""}
+            {formatTimestamp(captionCtx.ts)}
+          </span>
         </>
       )
     ) : null);
@@ -776,7 +780,37 @@ function EventCardView(props: EventCardProps) {
     () => ({ legsId: inTimeline ? legsId : undefined, target: rowTarget, byOwner: actedByOwner }),
     [inTimeline, legsId, rowTarget, actedByOwner],
   );
-  const nameProps = label ? { "aria-label": label } : { "aria-labelledby": `${labelId} ${legsId}` };
+  // A row whose column states no legs (an icon-only node) draws no legs
+  // element, and a name pointing at it ends in an empty slot: it names
+  // itself by the caption alone (ui-jobs 620).
+  const [legsDrawn, setLegsDrawn] = useState(true);
+  useLayoutEffect(() => {
+    const drawn = document.getElementById(legsId) != null;
+    if (drawn !== legsDrawn) setLegsDrawn(drawn);
+  });
+  // A caption whose date (`data-caption-tail`, or the day's mark) drops to a
+  // second line leaves no "·" at the end of the first: the separator
+  // (`data-caption-sep`) is hidden in place, keeping its width, so hiding it
+  // cannot pull the date back up (ui-jobs 620).
+  const captionRef = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    const el = captionRef.current;
+    if (!el) return;
+    const sync = () => {
+      const sep = el.querySelector<HTMLElement>("[data-caption-sep]");
+      const tail = el.querySelector<HTMLElement>("[data-caption-tail], [data-flow-day-mark-phone]");
+      if (!sep || !tail) return;
+      const broken = tail.getBoundingClientRect().top > sep.getBoundingClientRect().bottom - 1;
+      sep.style.visibility = broken ? "hidden" : "";
+    };
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(el);
+    return () => ro.disconnect();
+  });
+  const nameProps = label
+    ? { "aria-label": label }
+    : { "aria-labelledby": legsDrawn ? `${labelId} ${legsId}` : labelId };
   const panelId = `${domId}-card`;
 
   /* ── Content tiers ──────────────────────────────────────────────── */
@@ -844,11 +878,14 @@ function EventCardView(props: EventCardProps) {
         // Under 640px: the caption centred on the spine, the ⋮ at the row's
         // right edge.
         <div className="relative flex justify-center px-7 pb-2.5 pt-1.5 sm:hidden" data-spine-caption="">
-          {/* With the day's mark the kind truncates alone: the mark's 36px
-              button reaches past the 20px line, and a clipped box takes no taps. */}
+          {/* The caption wraps rather than clips: the date and time hold
+              together and move to a second line whole (ui-jobs 620). With the
+              day's mark the line breaks before the mark, whose 36px button
+              reaches past the 20px line. */}
           <span
+            ref={captionRef}
             aria-hidden={phoneMark ? undefined : true}
-            className={`${phoneMark ? "flex items-center gap-1" : "block truncate"} max-w-full px-2 text-xs leading-5 ${showDetail ? "text-foreground" : "text-rb-500"}`}
+            className={`${phoneMark ? "flex flex-wrap items-center justify-center gap-x-1" : "block"} max-w-full px-2 text-center text-xs leading-5 ${showDetail ? "text-foreground" : "text-rb-500"}`}
             style={{ backgroundColor: "var(--background)" }}
           >
             {captionText}

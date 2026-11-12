@@ -2,14 +2,25 @@
 
 // A Compound V3 account on Optimism (rails-ops ui-jobs 578), on the shared position
 // card: Collateral, Lent or Debt, and Borrowing limit used as headlines, the
-// labels the other chains' Compound V3 card uses; each collateral asset in the
-// left column with its amount, dollars and factors, and the base balance with its
-// rate and 30-day interest, then the borrower's room, absorb line and drop, in the
-// right. Every figure is read when the page opens; the read stamp names the blocks.
+// labels the other chains' Compound V3 card uses; the stats are the base balance
+// with its rate and 30-day interest, then the borrower's room, absorb line and
+// drop, and COMP to claim; under them the collateral table (ui-jobs 622), one row
+// per asset with its amount, dollars and factors. Every figure is read when the
+// page opens; the read stamp names the blocks.
 
 import { Prov } from "@/components/shared/provenance";
 import { PositionCard, type PositionCardSlots, type PositionPanelRow } from "@/components/shared/position-card";
 import { PanelFigure } from "@/components/shared/position-card-panel";
+import {
+  DataTable,
+  DataTableAmount,
+  DataTableBody,
+  DataTableCell,
+  DataTableHead,
+  DataTableHeader,
+  DataTableRow,
+} from "@/components/shared/data-table/data-table";
+import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups";
 import { PoolReadStamp } from "@/components/protocol/uniswap/uniswap-readout";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
@@ -25,28 +36,56 @@ import {
 import type { OpcPositionRead } from "@/lib/compound-v3-optimism/types";
 import { amount, CARD_WORDS, cardExplainer, pctText, usd } from "@/lib/compound-v3-optimism/words";
 
-/** One collateral asset: amount · dollars, then its borrow and liquidate factors. */
-export function collateralRow(c: OpcReceiptContext, x: OpcCollateralFigures): PositionPanelRow {
-  return {
-    id: `collateral-${x.symbol}`,
-    label: CARD_WORDS.collateralRow(x.symbol),
-    asset: { symbol: x.symbol, address: x.asset },
-    value: (
-      <span data-figure={`collateral-${x.symbol}`}>
-        <Prov info={opcCollateralProv("amount", c, x)}>{amount(x.amount, x.symbol)}</Prov>
-        <span className="text-rb-500">
-          {" · "}
-          {x.usd == null ? CARD_WORDS.unpriced : <Prov info={opcCollateralProv("usd", c, x)}>{usd(x.usd)}</Prov>}
+const NUM = "whitespace-nowrap tabular-nums text-[13px]";
+const COLS = CARD_WORDS.columns;
+
+/** One collateral asset: the amount over its dollars, then its borrow and liquidate factors. */
+function CollateralRow({ c, x }: { c: OpcReceiptContext; x: OpcCollateralFigures }) {
+  return (
+    <DataTableRow data-reserve-row={`collateral-${x.symbol}`}>
+      <DataTableCell rowHeader>
+        <span className="flex items-center gap-2">
+          <TokenChipIcon symbol={x.symbol} address={x.asset} size={20} filterable={false} />
+          <span className="min-w-0 text-[13px] font-medium text-foreground">{CARD_WORDS.collateralRow(x.symbol)}</span>
         </span>
-        <span className="mt-0.5 block text-xs text-rb-500">
-          {CARD_WORDS.factorsLabel}{" "}
-          <Prov info={opcCollateralProv("factors", c, x)}>
-            {pctText(x.borrowFactor, 0)} / {pctText(x.liquidateFactor, 0)}
-          </Prov>
+      </DataTableCell>
+      <DataTableCell align="right" className={NUM} label={COLS.amount}>
+        <span data-figure={`collateral-${x.symbol}`}>
+          <DataTableAmount
+            amount={<Prov info={opcCollateralProv("amount", c, x)}>{amount(x.amount, x.symbol)}</Prov>}
+            value={
+              x.usd == null ? CARD_WORDS.unpriced : <Prov info={opcCollateralProv("usd", c, x)}>{usd(x.usd)}</Prov>
+            }
+          />
         </span>
-      </span>
-    ),
-  };
+      </DataTableCell>
+      <DataTableCell align="right" className={NUM} label={COLS.factors}>
+        <Prov info={opcCollateralProv("factors", c, x)}>
+          {pctText(x.borrowFactor, 0)} / {pctText(x.liquidateFactor, 0)}
+        </Prov>
+      </DataTableCell>
+    </DataTableRow>
+  );
+}
+
+/** The account's collateral under the headlines (ui-jobs 622): the house table, one row per asset. */
+function CollateralTable({ c }: { c: OpcReceiptContext }) {
+  const p = c.p!;
+  if (!p.collateral.length) return null;
+  return (
+    <DataTable label={CARD_WORDS.collateral} stacked anatomy="C21" className="mt-4" data-reserves-table="">
+      <DataTableHead>
+        <DataTableHeader label={COLS.asset} />
+        <DataTableHeader label={COLS.amount} align="right" />
+        <DataTableHeader label={COLS.factors} align="right" />
+      </DataTableHead>
+      <DataTableBody>
+        {p.collateral.map((x) => (
+          <CollateralRow key={x.asset} c={c} x={x} />
+        ))}
+      </DataTableBody>
+    </DataTable>
+  );
 }
 
 function baseRow(c: OpcReceiptContext): PositionPanelRow | null {
@@ -222,8 +261,9 @@ function slots(r: OpcPositionRead): PositionCardSlots {
       ),
     },
     learnMore: null,
+    band: <CollateralTable c={c} />,
     foot: <p className="mt-3 text-xs text-rb-500">{CARD_WORDS.foot(p.quoteUnit === "ETH")}</p>,
-    panel: [p.collateral.map((x) => collateralRow(c, x)), right],
+    panel: [[], right],
   };
 }
 

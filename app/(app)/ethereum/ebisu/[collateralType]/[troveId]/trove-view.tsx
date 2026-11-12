@@ -418,6 +418,7 @@ export default function EbisuTroveDetail({
     surplusClaimed: surplus?.claimed != null,
     fork: flowFork,
     pace: flowPace,
+    shutdownAt: shutdown?.at ?? null,
   });
 
   // The top row's price dropdown: the branch's own oracle
@@ -586,6 +587,8 @@ export default function EbisuTroveDetail({
                   name: "Ebisu",
                   debtSymbol: DEBT_SYMBOL,
                   docsLinks: [...EBISU_DOCS.trove, ...EBISU_DOCS.redemption],
+
+                  shutdown,
                 };
                 return (
                   <LifetimeFlowsPanel
@@ -600,6 +603,7 @@ export default function EbisuTroveDetail({
                           unpriced={unpricedEvents(flows.events)}
                           lives={troveLives(flows.events)}
                           zombie={chain?.status === "zombie"}
+                          shutDown={shutdown != null}
                         />
                       </div>
                     }

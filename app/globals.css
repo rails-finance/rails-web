@@ -657,16 +657,22 @@ body {
     .spine-seg > .spine-content {
       display: contents;
     }
+    /* The caption lies over the cell's 36px foot (spine-column.tsx,
+       `max-sm:min-h-9`), one line of it exactly: in the row under the cell,
+       pulled up by that height. A caption that wraps to a second line grows
+       the row by that line, below the node, and the list's line runs on
+       behind it (ui-jobs 620). */
     .spine-seg > .spine-content > .spine-t1 {
-      grid-row: 1;
+      grid-row: 2;
       grid-column: 1;
-      align-self: end;
+      align-self: start;
+      margin-top: -2.25rem;
       position: relative;
       z-index: 30;
       pointer-events: none;
     }
     .spine-seg > .spine-content > .spine-body {
-      grid-row: 2;
+      grid-row: 3;
       grid-column: 1;
     }
     .spine-num,

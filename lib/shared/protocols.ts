@@ -592,7 +592,9 @@ const SPECS: ProtocolSpec[] = [
     slug: "ebisu",
     brand: 9,
     tags: ["CDP"],
-    desc: "A Liquity V2 fork minting ebUSD across five collateral branches: each Trove's collateral and debt read from events",
+    // The shutdown's date is the catalog's record (lib/ebisu/asset-catalog.ts,
+    // EBISU_SHUTDOWN; ui-jobs 608, 612).
+    desc: "A Liquity V2 fork that minted ebUSD across five collateral branches, shut down on 20 Aug 2026: each Trove's collateral and debt read from events",
     subPages: [{ segment: "branches", label: "Branches", tab: "Branches" }],
   },
   {

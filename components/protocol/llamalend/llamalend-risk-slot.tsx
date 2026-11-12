@@ -5,14 +5,14 @@
 // figure here is inspectable:
 //
 //   • the third headline: the protocol's own health; below 0 anyone may
-//     liquidate, and a Liquidatable panel row says so in CRITICAL red (the
-//     line is the protocol's);
+//     liquidate, and the line under it says so in CRITICAL red (the line is
+//     the protocol's);
 //   • the panel's rows: what the AMM holds converted from the collateral (a
 //     zero is worth stating: it is a positive claim about the chain, and this
-//     explorer's signature figure), the soft-liquidation multiple (how far the
-//     price stands above the onset), the collateral the AMM has sold net and
-//     any lost to soft-liquidation, and the band figures: where the price
-//     stands against the position's bands, the bands' range, the oracle price.
+//     explorer's signature figure), the collateral the AMM has sold net or
+//     lost to soft-liquidation, and the band figures: where the price stands
+//     against the position's bands (its tip carries the soft-liquidation
+//     multiple), the bands' range, the oracle price.
 //
 // The figures carry no risk colour (feedback-no-opinionated-color). The band
 // state is words: "Converting now" and "Fully converted" are the protocol's
@@ -60,18 +60,25 @@ export function LlamalendHealth({ chain }: { chain: LlamalendChainResponse }) {
   );
 }
 
-/** Under Health: near 0 the figure alone reads as small, so one plain line
+/** Under Health: below 0 the line says anyone may liquidate it now, in
+ *  CRITICAL red; near 0 the figure alone reads as small, so one plain line
  *  says how close liquidation is. */
 export function llamalendHealthSub(chain: LlamalendChainResponse): ReactNode {
   if (!llamalendHasRisk(chain) || chain.healthFull == null) return undefined;
+  if (chain.healthFull < 0)
+    return (
+      <span data-llamalend-liquidatable="" className="inline-flex items-center gap-1 font-semibold text-red-500">
+        <Icon name="triangle" size={12} />
+        health below 0: anyone may liquidate it now
+      </span>
+    );
   if (chain.healthFull > 0 && chain.healthFull < HEALTH_NEAR_ZERO)
     return <span className="text-tone-caution">close to 0; below 0 anyone may liquidate it</span>;
   return undefined;
 }
 
-/** The panel's rows from the live read: the converted amount, the
- *  soft-liquidation multiple, what the AMM sold and lost on the left; the
- *  liquidatable flag and the band figures on the right. */
+/** The panel's rows from the live read: the converted amount and what the
+ *  AMM sold or lost on the left; the band figures on the right. */
 export function llamalendRiskRows(
   chain: LlamalendChainResponse,
   {
@@ -143,17 +150,6 @@ export function llamalendRiskRows(
     tip: `The ${chain.borrowedSymbol} the AMM holds for this position from collateral it has sold, read from the Controller and checked against the AMM's figure; 0 means no soft-liquidation.`,
   });
 
-  if (chain.health != null)
-    left.push({
-      id: "price-over-onset",
-      label: "Price over onset",
-      value: (
-        <Prov info={stampServerRead(llamalendHealthProv(chain.amm), serverReadOf(chain))}>
-          {chain.health.toFixed(3)}×
-        </Prov>
-      ),
-      tip: "The collateral's oracle price over the price where this position's band begins: 1.0 at the band's top, below 1.0 inside or beneath the bands. Both prices are read from the AMM at the latest block.",
-    });
   if (sold != null && sold > 0)
     left.push({
       id: "sold-net",
@@ -166,7 +162,9 @@ export function llamalendRiskRows(
       asset: { symbol: chain.collateralSymbol, figure: `${formatExact(sold)} ${chain.collateralSymbol}` },
       tip: `${chain.collateralSymbol} the AMM has sold from this position and not bought back: everything deposited, less everything withdrawn, less what the position holds now.`,
     });
-  if (lost != null && lost > 0)
+  // Lost is stated only with nothing converted, sold only with something
+  // converted (lib/llamalend/economics.ts): one of the two at most.
+  else if (lost != null && lost > 0)
     left.push({
       id: "lost-to-soft-liquidation",
       label: "Lost to soft-liquidation",
@@ -177,19 +175,6 @@ export function llamalendRiskRows(
       ),
       asset: { symbol: chain.collateralSymbol, figure: `${formatExact(lost)} ${chain.collateralSymbol}` },
       tip: `${chain.collateralSymbol} the AMM sold while the price sat in this position's bands and did not buy back, with nothing converted at the latest block and nothing liquidated: deposited, less withdrawn, less held now.`,
-    });
-
-  if (chain.healthFull != null && chain.healthFull < 0)
-    right.push({
-      id: "liquidatable",
-      label: "Liquidatable",
-      value: (
-        <span data-llamalend-liquidatable="" className="inline-flex items-center gap-1 font-semibold text-red-500">
-          <Icon name="triangle" size={12} />
-          health below 0: anyone may liquidate it now
-        </span>
-      ),
-      tip: "The Controller reads this position's health below 0, so anyone may liquidate it now, whatever the AMM has converted.",
     });
 
   const { pUp, pDown, priceOracle: price } = chain;
@@ -215,7 +200,23 @@ export function llamalendRiskRows(
           from soft-liquidation
         </>
       ),
-      tip: "Where the oracle price stands against this position's bands: above them (the fall left before conversion begins), inside them (the AMM is converting collateral) or below them (all of it converted).",
+      tip: (
+        <>
+          Where the oracle price stands against this position&apos;s bands: above them (the fall left before conversion
+          begins), inside them (the AMM is converting collateral) or below them (all of it converted).
+          {chain.health != null && (
+            <>
+              {" "}
+              The collateral&apos;s oracle price is{" "}
+              <Prov info={stampServerRead(llamalendHealthProv(chain.amm), serverReadOf(chain))}>
+                {chain.health.toFixed(3)}×
+              </Prov>{" "}
+              the price where this position&apos;s band begins: 1.0 at the band&apos;s top, below 1.0 inside or beneath
+              the bands. Both prices are read from the AMM at the latest block.
+            </>
+          )}
+        </>
+      ),
     });
     right.push({
       id: "bands",

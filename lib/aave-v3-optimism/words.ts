@@ -53,14 +53,11 @@ export const CARD_WORDS = {
   debtRow: (sym: string) => `${sym} borrowed`,
   collateralFlag: "collateral",
   notCollateral: "not collateral",
-  thresholdLabel: "threshold",
-  supplyRateLabel: "Supply rate",
-  rateLabel: "Borrow rate",
-  rateTip:
-    "The reserve's variable rate, a year, as an APR. The 30-day line is the interest added over the last 30 days.",
+  reserves: "Reserves",
+  columns: { asset: "Asset", amount: "Amount", threshold: "Threshold", rate: "Rate", interest: "Interest, 30 days" },
+  rateTip: "The reserve's variable rate, a year, as an APR.",
   interestTip:
     "Interest over 30 days: what the reserve's rate added to this balance since the UTC midnight 30 days back, from the balances at the two dates.",
-  interest30: "Interest, 30 days:",
   withheld: {
     opened: "opened inside the window",
     changed: "changed inside the window",

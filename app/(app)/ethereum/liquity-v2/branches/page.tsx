@@ -21,6 +21,7 @@ import {
 import { ProvSource } from "@/components/shared/provenance";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { loadLiquityForkBranchesFromChain } from "@/lib/sources/chain/liquity-fork-branches";
+import { branchesPageTitle } from "@/lib/liquity-fork/shutdown";
 import type { LiquityForkConfig, LiquityForkBranchConfig } from "@/lib/sources/chain/liquity-fork-position";
 import { LIQUITY_V2_BRANCHES, DEBT_SYMBOL } from "@/lib/liquity/asset-catalog";
 import { branchScopeKeys } from "@/lib/shared/asset-family";
@@ -56,7 +57,7 @@ export default async function LiquityV2BranchesPage() {
       <div className="py-8">
         <SubPageHeader
           protocol={PROTOCOL}
-          title="Branches & how redemption reaches them"
+          title={branchesPageTitle(data.branches)}
           stamp={<LiquityForkBranchesStamp data={data} />}
         />
 

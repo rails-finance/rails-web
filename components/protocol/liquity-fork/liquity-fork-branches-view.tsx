@@ -54,7 +54,8 @@ import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
 import { INLINE_LINK, INPLACE_TEXT } from "@/lib/shared/ui-grammar";
 import { liquityFamilyTerms } from "@/lib/liquity/ltv";
-import { shutdownDateProv, shutdownDay } from "@/lib/shared/liquity-family-shutdown";
+import { shutdownDateProv, shutdownDay, withdrawalDateProv } from "@/lib/shared/liquity-family-shutdown";
+import { allBranchesShutDown } from "@/lib/liquity-fork/shutdown";
 
 const ratePct = (x: number) => `${x.toFixed(2)}%`;
 const ratio = (x: number) => `${(x * 100).toFixed(1)}%`;
@@ -262,7 +263,7 @@ function BranchCard({
                 </Prov>
               )
             ) : (
-              <span className="text-rb-500">no queued troves</span>
+              <span className="text-rb-500">{shut ? "none" : "no queued troves"}</span>
             )}
             {branch.avgRatePct != null && !branch.queueCapped && (
               <span className="ml-1 text-rb-500">
@@ -355,6 +356,59 @@ function BranchCard({
   );
 }
 
+/** The Redemption section when every branch is shut down (ui-jobs 612): the
+ *  state, in the section's two paragraphs. The dates come from the branches'
+ *  shutdown state (the catalog's record, else the live read), each with its
+ *  receipt; the pools' emptying from the record's withdrawal and this read's
+ *  branch collateral. */
+function ShutDownRedemption({
+  data,
+  protocolName,
+  learnMore,
+}: {
+  data: LiquityForkBranchesResponse;
+  protocolName: string;
+  learnMore: LiquityForkLearnMoreParams;
+}) {
+  const branchWord = learnMore.terms.branch;
+  const states = data.branches.map((b) => ({ sym: b.symbol, s: b.shutdown! }));
+  const day = (at: number) => shutdownDay(at);
+  const one = <T,>(xs: T[]) => (xs.length > 0 && xs.every((x) => x === xs[0]) ? xs[0] : null);
+  const shutDay = one(states.map((x) => day(x.s.at)));
+  const first = states[0];
+  const recs = states.map((x) => x.s.record);
+  const withdrawals = recs.map((r) => r?.withdrawal ?? null);
+  const withdrawDay = withdrawals.every((w) => w != null) ? one(withdrawals.map((w) => day(w!.at))) : null;
+  const by = one(recs.map((r) => r?.by ?? null));
+  const poolsEmpty = data.branches.every((b) => b.branchColl != null && b.branchColl < 1e-12);
+  return (
+    <>
+      <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-redemption-shutdown="">
+        Every {branchWord} of {protocolName} has been shut down
+        {shutDay ? (
+          <>
+            {" "}
+            since <Prov info={shutdownDateProv(data.protocol, first.sym, first.s)}>{shutDay}</Prov>
+          </>
+        ) : null}
+        , and standard redemptions of {learnMore.stablecoin} no longer reach any of them.
+      </p>
+      <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500">
+        {withdrawDay && by && first.s.record ? (
+          <>
+            A shutdown redemption could take a {branchWord}&rsquo;s collateral from the shutdown until the {by} withdrew
+            the pools&rsquo; collateral on{" "}
+            <Prov info={withdrawalDateProv(data.protocol, first.sym, first.s.record)!}>{withdrawDay}</Prov>
+            {poolsEmpty ? <>; the pools now hold none.</> : "."}
+          </>
+        ) : (
+          <>Shutdown redemptions remain open on them.</>
+        )}
+      </p>
+    </>
+  );
+}
+
 export interface LiquityForkBranchesViewProps {
   data: LiquityForkBranchesResponse;
   /** Display name ("Ebisu" | "Asymmetry"). */
@@ -402,7 +456,11 @@ export function LiquityForkBranchesView({
   // card rightly says "no queued troves", and a link beside that saying
   // "cbBTC18 queue →" would open an empty listing. The link excludes zombies,
   // so its availability has to be decided on the same set it will show.
-  const queued = shown.filter((b) => b.listedCount > 0);
+  // A shut-down branch takes no standard redemption, so it has no queue to
+  // link (ui-jobs 612).
+  const queued = shown.filter((b) => b.listedCount > 0 && !b.shutdown);
+  const allShut = allBranchesShutDown(data.branches);
+  const someShut = !allShut && data.branches.some((b) => b.shutdown);
 
   if (data.chainStale) {
     return (
@@ -418,64 +476,79 @@ export function LiquityForkBranchesView({
 
   return (
     <ProvReceiptsScope registry={registry}>
-      <section>
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 className="text-sm font-semibold text-foreground">Branches</h2>
-          {emptyCount > 0 && withTroves.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowEmpty((v) => !v)}
-              className={`text-[11px] font-semibold ${INPLACE_TEXT}`}
-            >
-              {showEmpty ? "Hide" : "Show"} {emptyCount} branch{emptyCount === 1 ? "" : "es"} with no queued troves
-            </button>
-          )}
-        </div>
-        <ScopeNote scoped={scoped} noun={["branch", "branches"]} className="mt-1" />
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3" {...scoped.listProps}>
-          {shown.map((b) => (
-            <BranchCard key={b.key} branch={b} data={data} hrefBase={basePath} wiring={wiring} />
-          ))}
-        </div>
-      </section>
-
-      <section className="mt-8">
-        <div className="flex items-center gap-2">
-          <h2 className="text-sm font-semibold text-foreground">Redemption</h2>
-          <LearnMore content={liquityForkRedemptionContent(learnMore)} inline />
-        </div>
-        <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500">
-          Anyone holding {learnMore.stablecoin} can redeem it against {protocolName} at $1 face value. A redemption
-          routes across the branches by how much of each is unbacked, then sweeps the branch it lands on from the LOWEST
-          user-set interest rate up, so a borrower&rsquo;s rate is also their place in this queue. Being redeemed
-          isn&rsquo;t a penalty: the trove gives up collateral and sheds the same value of debt, and its{" "}
-          {learnMore.terms.ltv ? "LTV falls" : `${learnMore.terms.ratioText} rises`}.
-        </p>
-        <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500">
-          A branch&rsquo;s queue is its troves in rate order, which is the listing sorted that way. One link per branch
-          below. Two things that order leaves out: a Trove redeemed below the minimum debt drops out of the sorted list,
-          and the branch&rsquo;s most recent one with debt left is redeemed ahead of everything in it, whatever rate it
-          carries, so those sit under the listing&rsquo;s {learnMore.terms.dormant} status rather than in these links;
-          and how much is redeemed before any one trove is stated on that trove&rsquo;s own page.
-        </p>
-        {queued.length > 0 ? (
-          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
-            {queued.map((b) => (
-              <Link key={b.key} href={queueHref(basePath, b.symbol, wiring)} className={`text-[13px] ${INLINE_LINK}`}>
-                {b.symbol} queue <span aria-hidden>→</span>
-              </Link>
+      <div data-anatomy="M6">
+        <section>
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className="text-sm font-semibold text-foreground">Branches</h2>
+            {emptyCount > 0 && withTroves.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowEmpty((v) => !v)}
+                className={`text-[11px] font-semibold ${INPLACE_TEXT}`}
+              >
+                {showEmpty ? "Hide" : "Show"} {emptyCount} branch{emptyCount === 1 ? "" : "es"} with{" "}
+                {allShut ? "no Trove in debt" : "no queued troves"}
+              </button>
+            )}
+          </div>
+          <ScopeNote scoped={scoped} noun={["branch", "branches"]} className="mt-1" />
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3" {...scoped.listProps}>
+            {shown.map((b) => (
+              <BranchCard key={b.key} branch={b} data={data} hrefBase={basePath} wiring={wiring} />
             ))}
           </div>
-        ) : (
-          <p className="mt-3 text-[13px] text-rb-500">
-            {scoped.on && !scoped.peek && scoped.rows.length < scoped.total
-              ? "No branch in your focus holds a trove to redeem against."
-              : "No branch currently holds a trove to redeem against."}
-          </p>
-        )}
-      </section>
+        </section>
 
-      <ProvenanceInfoTabs className="mt-6" />
+        <section className="mt-8">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-foreground">Redemption</h2>
+            <LearnMore content={liquityForkRedemptionContent(learnMore)} inline />
+          </div>
+          {allShut ? (
+            <ShutDownRedemption data={data} protocolName={protocolName} learnMore={learnMore} />
+          ) : (
+            <>
+              <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500">
+                Anyone holding {learnMore.stablecoin} can redeem it against {protocolName} at $1 face value. A
+                redemption routes across the {someShut ? "branches not shut down" : "branches"} by how much of each is
+                unbacked, then sweeps the branch it lands on from the LOWEST user-set interest rate up, so a
+                borrower&rsquo;s rate is also their place in this queue. Being redeemed isn&rsquo;t a penalty: the trove
+                gives up collateral and sheds the same value of debt, and its{" "}
+                {learnMore.terms.ltv ? "LTV falls" : `${learnMore.terms.ratioText} rises`}.
+              </p>
+              <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500">
+                A branch&rsquo;s queue is its troves in rate order, which is the listing sorted that way. One link per
+                branch below. Two things that order leaves out: a Trove redeemed below the minimum debt drops out of the
+                sorted list, and the branch&rsquo;s most recent one with debt left is redeemed ahead of everything in
+                it, whatever rate it carries, so those sit under the listing&rsquo;s {learnMore.terms.dormant} status
+                rather than in these links; and how much is redeemed before any one trove is stated on that
+                trove&rsquo;s own page.
+              </p>
+              {queued.length > 0 ? (
+                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
+                  {queued.map((b) => (
+                    <Link
+                      key={b.key}
+                      href={queueHref(basePath, b.symbol, wiring)}
+                      className={`text-[13px] ${INLINE_LINK}`}
+                    >
+                      {b.symbol} queue <span aria-hidden>→</span>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-3 text-[13px] text-rb-500">
+                  {scoped.on && !scoped.peek && scoped.rows.length < scoped.total
+                    ? "No branch in your focus holds a trove to redeem against."
+                    : "No branch currently holds a trove to redeem against."}
+                </p>
+              )}
+            </>
+          )}
+        </section>
+
+        <ProvenanceInfoTabs className="mt-6" />
+      </div>
     </ProvReceiptsScope>
   );
 }

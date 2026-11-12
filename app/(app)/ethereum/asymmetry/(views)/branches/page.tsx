@@ -14,6 +14,7 @@ import {
 } from "@/components/protocol/liquity-fork/liquity-fork-branches-view";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { loadLiquityForkBranchesFromChain } from "@/lib/sources/chain/liquity-fork-branches";
+import { branchesPageTitle } from "@/lib/liquity-fork/shutdown";
 import type { LiquityForkConfig } from "@/lib/sources/chain/liquity-fork-position";
 import { ASYMMETRY_BRANCHES, DEBT_ADDRESS, DEBT_SYMBOL } from "@/lib/asymmetry/asset-catalog";
 import { protocolForHref } from "@/lib/shared/protocols";
@@ -41,7 +42,7 @@ export default async function AsymmetryBranchesPage() {
       <div className="py-8">
         <SubPageHeader
           protocol={PROTOCOL}
-          title="Branches & how redemption reaches them"
+          title={branchesPageTitle(data.branches)}
           stamp={<LiquityForkBranchesStamp data={data} />}
         />
 

@@ -341,42 +341,32 @@ function debtReconciliationRows(v: FxPositionView, rows?: FxRebalanceRows): Posi
   ];
 }
 
-/** Under the debt ratio: the ratio at the min price the pool's lines are
- *  judged at (read at the settled block), the lines, and the min price at
- *  which this position reaches each. Panel rows, in two groups: the ratio at
- *  the min price, then redemption and the lines. The anchor price is the
- *  Explanation's and the tick a line at the card's foot (TO-DO-position-card
- *  341). */
+const pctLine = (r: number) => `${(r * 100).toFixed(1).replace(/\.0$/, "")}%`;
+
+/** The debt ratio at the oracle's min price, the price the pool judges its
+ *  lines at (read at the settled block); null without the price read. */
+function minPriceRatio(v: FxPositionView, px: { min: number } | null): number | null {
+  const { colls, debts } = v.settled;
+  if (!px || colls == null || debts == null || colls <= 0 || px.min <= 0) return null;
+  return debts / (colls * px.min);
+}
+
+/** Under the debt ratio: redemption and the min price at which this position
+ *  reaches each of the pool's lines, each line stated in its stat's tip. The
+ *  ratio at the min price is the Debt ratio headline's tip, the anchor price
+ *  the Explanation's and the tick a line at the card's foot
+ *  (TO-DO-position-card 341). */
 function ratioRows(
   v: FxPositionView,
   terms: FxPoolTerms | null,
   px: { anchor: number; min: number; block: number; tick?: number | null; ticksAbove?: number | null } | null,
-): [PositionPanelRow[], PositionPanelRow[]] {
+): PositionPanelRow[] {
   const { colls, debts, debtRatio } = v.settled;
-  if (colls == null || debts == null || debtRatio == null || colls <= 0 || debtRatio <= 0) return [[], []];
+  if (colls == null || debts == null || debtRatio == null || colls <= 0 || debtRatio <= 0) return [];
   const anchor = px?.anchor ?? debts / (colls * debtRatio);
   const sym = v.normalizedSymbol;
-  const pctLine = (r: number) => `${(r * 100).toFixed(1).replace(/\.0$/, "")}%`;
   const fall = (p: number, from: number) => `−${((1 - p / from) * 100).toFixed(1)}%`;
-  const minRatio = px ? debts / (colls * px.min) : null;
-  const prices: PositionPanelRow[] = [];
-  if (px && minRatio != null)
-    prices.push({
-      id: "ratio-at-min",
-      label: "Ratio at the min price",
-      value: (
-        <>
-          <Prov info={minRatioProv(px.block)}>
-            <PanelFigure>{(minRatio * 100).toFixed(1)}%</PanelFigure>
-          </Prov>{" "}
-          at{" "}
-          <Prov info={oracleLegAtProv("min", sym, px.block)}>
-            <PanelFigure>{formatLiquidationPrice(px.min)}</PanelFigure>
-          </Prov>
-        </>
-      ),
-      tip: "The debt ratio judged at the oracle's min price, the price the pool's lines are judged at. It sits at or above the ratio at the anchor price.",
-    });
+  const minRatio = minPriceRatio(v, px);
 
   const lines: PositionPanelRow[] = [];
   if (px?.tick != null && terms) {
@@ -394,39 +384,40 @@ function ratioRows(
     });
   }
   if (terms) {
-    lines.push(
-      {
-        id: "rebalance-line",
-        label: "Rebalances from",
-        value: (
-          <Prov info={poolLineProv("rebalance", terms.block, serverReadAt(terms.head, terms.block))}>
-            {pctLine(terms.rebalanceRatio)}
-          </Prov>
-        ),
-        tip: "The pool's rebalance line: from this debt ratio a keeper can rebalance the position's tick, read from the pool.",
-      },
-      {
-        id: "liquidation-line",
-        label: "Liquidates from",
-        value: (
-          <Prov info={poolLineProv("liquidate", terms.block, serverReadAt(terms.head, terms.block))}>
-            {pctLine(terms.liquidateRatio)}
-          </Prov>
-        ),
-        tip: "The pool's liquidation line: from this debt ratio a keeper can liquidate the position, read from the pool.",
-      },
+    // The pool's two lines, each read from the pool with its receipt.
+    const lineFigure = (which: "rebalance" | "liquidate") => (
+      <Prov info={poolLineProv(which, terms.block, serverReadAt(terms.head, terms.block))}>
+        {pctLine(which === "rebalance" ? terms.rebalanceRatio : terms.liquidateRatio)}
+      </Prov>
     );
     const basis = px && minRatio != null ? "min" : "anchor";
-    const reachTip = (what: string) =>
-      `The ${basis} price at which this position's debt ratio reaches the ${what} line, with the fall from today's. It holds collateral and debt where they are now; funding keeps taking collateral, which raises this price slowly.`;
+    const keeper = {
+      rebalance: "from which a keeper can rebalance the position's tick",
+      liquidation: "from which a keeper can liquidate the position",
+    };
+    const reachTip = (what: "rebalance" | "liquidation", withLiquidation = false): ReactNode => (
+      <>
+        The {basis} price at which this position&apos;s debt ratio reaches the pool&apos;s{" "}
+        {lineFigure(what === "rebalance" ? "rebalance" : "liquidate")} {what} line, {keeper[what]}, with the fall from
+        today&apos;s.
+        {withLiquidation && (
+          <>
+            {" "}
+            Its liquidation line is {lineFigure("liquidate")}, {keeper.liquidation}.
+          </>
+        )}{" "}
+        It holds collateral and debt where they are now; funding keeps taking collateral, which raises this price
+        slowly.
+      </>
+    );
+    const pastLine = (): PositionPanelRow => ({
+      id: "rebalance-at",
+      label: "Rebalances at",
+      value: <>at or past the {lineFigure("rebalance")} rebalance line now</>,
+      tip: reachTip("rebalance", true),
+    });
     if (px && minRatio != null) {
-      if (minRatio >= terms.rebalanceRatio)
-        lines.push({
-          id: "rebalance-at",
-          label: "Rebalances at",
-          value: "at or past the rebalance line now",
-          tip: reachTip("rebalance"),
-        });
+      if (minRatio >= terms.rebalanceRatio) lines.push(pastLine());
       else {
         const rb = debts / (colls * terms.rebalanceRatio);
         const lq = debts / (colls * terms.liquidateRatio);
@@ -460,12 +451,7 @@ function ratioRows(
         );
       }
     } else if (debtRatio >= terms.rebalanceRatio) {
-      lines.push({
-        id: "rebalance-at",
-        label: "Rebalances at",
-        value: "at or past the rebalance line now",
-        tip: reachTip("rebalance"),
-      });
+      lines.push(pastLine());
     } else {
       const at = anchor * (debtRatio / terms.rebalanceRatio);
       lines.push({
@@ -479,11 +465,11 @@ function ratioRows(
             anchor price ({fall(at, anchor)})
           </>
         ),
-        tip: reachTip("rebalance"),
+        tip: reachTip("rebalance", true),
       });
     }
   }
-  return [prices, lines];
+  return lines;
 }
 
 /** THE COLLATERAL-SIDE RECONCILIATION: funding is charged on collateral (the
@@ -768,6 +754,7 @@ export function useFxCardSlots({
   const driftRow = detail && drift ? collateralDriftRow(v, drift, rebalanceRows, inTxFunding) : null;
   const debtRows = detail ? debtReconciliationRows(v, rebalanceRows) : [];
 
+  const minRatio = minPriceRatio(v, px);
   let heads: PositionCardHead[];
   let outcome: PositionCardOutcome | undefined;
   if (closed) {
@@ -805,8 +792,22 @@ export function useFxCardSlots({
       {
         id: "debt-ratio",
         label: "Debt ratio",
-        labelTip:
-          "The position's debt divided by its collateral's value at the oracle's anchor price, read from the pool in the same settled sweep.",
+        labelTip: (
+          <>
+            The position&apos;s debt divided by its collateral&apos;s value at the oracle&apos;s anchor price, read from
+            the pool in the same settled sweep.
+            {px && minRatio != null && (
+              <>
+                {" "}
+                The pool judges its lines at the oracle&apos;s min price,{" "}
+                <Prov info={oracleLegAtProv("min", v.normalizedSymbol, px.block)}>
+                  {formatLiquidationPrice(px.min)}
+                </Prov>
+                , where the ratio is <Prov info={minRatioProv(px.block)}>{(minRatio * 100).toFixed(1)}%</Prov>.
+              </>
+            )}
+          </>
+        ),
         // getPositionDebtRatio, 0–1 scaled to a percentage: the pool's own
         // risk figure.
         value:
@@ -857,11 +858,10 @@ export function useFxCardSlots({
   };
   if (outcome) return { ...detailCommon, outcome, panel: [[...(driftRow ? [driftRow] : []), ...debtRows], []] };
 
-  const [prices, lines] = ratioRows(v, terms, px);
   return {
     ...detailCommon,
     outcome: undefined,
-    panel: [[...(driftRow ? [driftRow] : []), ...debtRows, ...prices], lines],
+    panel: [[...(driftRow ? [driftRow] : []), ...debtRows], ratioRows(v, terms, px)],
   };
 }
 

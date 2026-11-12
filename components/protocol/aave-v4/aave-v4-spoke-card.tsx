@@ -85,8 +85,8 @@ const borrowInterestProv = () => interestSinceZeroProv("Borrow interest inside t
  * total when every contributing asset is oracle-priced, traced as read from
  * the chain; otherwise the DefiLlama figure, which sums only the assets a price
  * covers and is marked partial when one is missing (RULE: Rails never invents a
- * price, lib/aave-v4/unpriced.ts). The panel's "Not in the totals" row names
- * what is missing.
+ * price, lib/aave-v4/unpriced.ts). The figure's "(partial)" tip and its
+ * receipt (`partialSumProv`) name what is missing.
  */
 function HeadlineUsd({
   defillamaUsd,
@@ -549,24 +549,6 @@ export function useAaveV4SpokeCardSlots({
   const present = (rows: (PositionPanelRow | null)[]): PositionPanelRow[] =>
     rows.filter((r): r is PositionPanelRow => r != null);
 
-  // What a fallback total leaves out. The on-chain totals are whole or
-  // absent, so the row stands only when a head shows the fallback figure.
-  const fallbackShown = supplyOnly ? onc?.supply == null : onc?.collateral == null || onc?.debt == null;
-  const unpricedRow: PositionPanelRow | null =
-    fallbackShown && spoke.unpricedSymbols.length > 0
-      ? {
-          id: "unpriced",
-          label: "Not in the totals",
-          tip: "Assets held here that no price source covers. The dollar figures above leave them out and are marked partial.",
-          value: (
-            <span className="inline-flex flex-wrap items-center gap-x-1.5">
-              <InlineAssetCluster assets={spoke.unpricedSymbols.map(symbolOnly)} size={16} overlap={4} max={6} />
-              no price source
-            </span>
-          ),
-        }
-      : null;
-
   // The liquidation threshold the health factor weighs the collateral at: one
   // asset's, or the dollar-weighted blend of several.
   const ltPct = spoke.blendedLt != null && spoke.blendedLt > 0 ? Math.round(spoke.blendedLt * 100) : null;
@@ -627,7 +609,7 @@ export function useAaveV4SpokeCardSlots({
     menu,
     foot,
     panel: [
-      present([unpricedRow, interestRow(spoke, "supply"), ltRow]),
+      present([interestRow(spoke, "supply"), ltRow]),
       present([interestRow(spoke, "debt"), rateRow, costRow, supplyOnly ? null : liquidationRow(spoke)]),
     ],
   };

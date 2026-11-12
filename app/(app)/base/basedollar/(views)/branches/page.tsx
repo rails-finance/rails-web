@@ -15,6 +15,7 @@ import {
 } from "@/components/protocol/liquity-fork/liquity-fork-branches-view";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { loadLiquityForkBranchesFromChain } from "@/lib/sources/chain/liquity-fork-branches";
+import { branchesPageTitle } from "@/lib/liquity-fork/shutdown";
 import type { LiquityForkConfig } from "@/lib/sources/chain/liquity-fork-position";
 import { BASEDOLLAR_BRANCHES, DEBT_ADDRESS, DEBT_SYMBOL } from "@/lib/basedollar/asset-catalog";
 import { BASE_CHAIN_ID } from "@/lib/shared/chains";
@@ -53,7 +54,7 @@ export default async function BasedollarBranchesPage() {
       <div className="py-8">
         <SubPageHeader
           protocol={PROTOCOL}
-          title="Branches & how redemption reaches them"
+          title={branchesPageTitle(data.branches)}
           stamp={<LiquityForkBranchesStamp data={data} />}
         />
 

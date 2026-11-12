@@ -422,6 +422,7 @@ export default function BasedollarTroveDetail({
     surplusClaimed: surplus?.claimed != null,
     fork: flowFork,
     pace: flowPace,
+    shutdownAt: shutdown?.at ?? null,
   });
 
   // The top row's price dropdown: the branch's own oracle
@@ -590,6 +591,8 @@ export default function BasedollarTroveDetail({
                   name: "Base Dollar",
                   debtSymbol: DEBT_SYMBOL,
                   docsLinks: [{ label: "Basedollar", url: "https://basedollar.money" }],
+
+                  shutdown,
                 };
                 return (
                   <LifetimeFlowsPanel
@@ -604,6 +607,7 @@ export default function BasedollarTroveDetail({
                           unpriced={unpricedEvents(flows.events)}
                           lives={troveLives(flows.events)}
                           zombie={chain?.status === "zombie"}
+                          shutDown={shutdown != null}
                         />
                       </div>
                     }

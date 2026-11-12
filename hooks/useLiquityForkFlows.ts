@@ -47,6 +47,8 @@ export interface LiquityForkFlowsInput {
   /** The branch's redemptions per day, the protocol activity chart under the
    *  events (lib/liquity-v2/redemption-pace.ts); null draws none. */
   pace?: PaceSource | null;
+  /** Unix seconds the branch shut down (ui-jobs 612); null while it is live. */
+  shutdownAt?: number | null;
 }
 
 export function useLiquityForkFlows(p: LiquityForkFlowsInput): {
@@ -92,6 +94,7 @@ export function useLiquityForkFlows(p: LiquityForkFlowsInput): {
       debtSymbol: p.debtSymbol,
       surplusClaimed: p.surplusClaimed,
       now,
+      shutdownAt: p.shutdownAt ?? null,
       ...(p.fork ? { priceView: { collateralType: p.collSymbol, fork: p.fork } } : {}),
       live: p.open
         ? {
@@ -109,7 +112,7 @@ export function useLiquityForkFlows(p: LiquityForkFlowsInput): {
           }
         : null,
     });
-  }, [events, p.collSymbol, p.debtSymbol, p.surplusClaimed, now, p.open, livePrice, chain, p.fork]);
+  }, [events, p.collSymbol, p.debtSymbol, p.surplusClaimed, now, p.open, livePrice, chain, p.fork, p.shutdownAt]);
   // The minimum's steps, marked on the events row (ruling 10).
   const changes = useMemo(() => (p.fork ? forkMcrChanges(p.fork) : []), [p.fork]);
   const changed = useMemo(() => withChanges(baseTimeline, changes), [baseTimeline, changes]);
