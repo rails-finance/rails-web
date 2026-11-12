@@ -72,7 +72,8 @@ export function ProvInspectorToggle({
   const label = armed ? "Exit the provenance inspector" : "Provenance inspector: click any value to trace it";
   const onClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     const opener = variant === "dock" ? e.currentTarget : (openerRef?.current ?? null);
-    provInspector.setArmed(!armed, null, opener);
+    if (armed) putDownInspector();
+    else provInspector.setArmed(true, null, opener);
     onPick?.();
   };
   if (variant === "menu") {
@@ -110,6 +111,16 @@ export function ProvInspectorToggle({
       {armed && <span className="prov-inspect-hint">click any value · esc exits</span>}
     </button>
   );
+}
+
+/** Put the inspector down from a control the reader pressed (the exit
+ *  button, Escape's second rung, the toggle, the profile menu's switch): one
+ *  state, so the standing preference (decision 0062) goes off with it and the
+ *  profile switch reads off at once (ui-jobs 624). Leaving a page disarms with
+ *  `setArmed(false)` alone and keeps the preference. */
+export function putDownInspector() {
+  provInspector.setArmed(false);
+  setProvPreference(false);
 }
 
 /** Arm the inspector on one section (ui-jobs 284): the position card
@@ -211,7 +222,7 @@ export function ProvInspectorLayer() {
       if (e.key !== "Escape") return;
       if (provInspector.getPin()) provInspector.unpin();
       else {
-        provInspector.setArmed(false);
+        putDownInspector();
         provInspector.restoreFocus();
       }
     };
@@ -255,7 +266,7 @@ export function ProvInspectorLayer() {
                 className="prov-inspect-exit"
                 data-anatomy="H7.4"
                 onClick={() => {
-                  provInspector.setArmed(false);
+                  putDownInspector();
                   provInspector.restoreFocus();
                 }}
               >
