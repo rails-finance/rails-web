@@ -620,7 +620,7 @@ export function alchemixFlowTimeline(rp: AlchemixFlowReplay, o: AlchemixFlowOpti
       ? { shareLine: { asset: MYT, series: shareLine, unitLabel: u, name: "Share price", digits: 6 } }
       : {}),
     today: open ? today : endDay,
-    labels: { collateral: "Collateral", debt: "Debt" },
+    labels: { collateral: "Deposited", debt: "Debt" },
     words: alchemixFlowWords(o),
     ...(o.mytAddress ? { addresses: { [o.mytSymbol]: o.mytAddress } } : {}),
   };

@@ -134,7 +134,7 @@ export function depositedHead(
   prov?: { shares?: Provenance; underlying?: Provenance; usd?: Provenance },
   block?: ReactNode,
 ): PositionCardHead {
-  const head = { id: "deposited", label: "Collateral" };
+  const head = { id: "deposited", label: "Deposited" };
   if (!c) return { ...head, value: NOT_SETTLED };
   const myt = c.mytSymbol ?? fallbackMytSymbol;
   const u = c.underlying;
