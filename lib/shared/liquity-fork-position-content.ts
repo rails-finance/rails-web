@@ -12,6 +12,7 @@
 import type { LearnMoreContent, LearnMoreLink } from "@/components/shared/learn-more-modal";
 import { forkLiquidationReserve } from "@/lib/shared/liquity-fork-ops";
 import { fmtLtv, liquityFamilyTerms } from "@/lib/liquity/ltv";
+import { liquityShutdownConcept } from "@/lib/shared/learn-more-content";
 
 export interface LiquityForkPositionContentParams {
   /** Display name ("Ebisu" | "Asymmetry" | "Base Dollar"). */
@@ -125,6 +126,7 @@ export function liquityForkPositionContent(opts: LiquityForkPositionContentParam
       bold: "Branch scoping",
       text: `each collateral type is its own ${t.branch === "branch" ? "branch" : `${t.branch} (a branch)`} with its own oracle, ${t.limitText} and redemption queue, so one branch's stress does not liquidate another's Troves.`,
     },
+    liquityShutdownConcept(t, "position"),
     {
       bold: "Trove NFT",
       text: "ownership of a Trove is an ERC-721 NFT. One address can hold many Troves, each a separate position.",

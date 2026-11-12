@@ -122,6 +122,10 @@ export interface LiquityFamilyTerms {
   branch: string;
   /** The branch ratio below which borrowing is restricted, as a label. */
   ccr: string;
+  /** The collateral bonus a shutdown redemption pays the redeemer ("2%"),
+   *  where the deployment's docs or chain state it; absent, the modal names
+   *  a bonus without its figure. */
+  shutdownBonus?: string;
 }
 
 const LIQUITY_V2_TERMS: LiquityFamilyTerms = {
@@ -141,6 +145,8 @@ const LIQUITY_V2_TERMS: LiquityFamilyTerms = {
   liquidationPrice: "Liquidates at",
   branch: "branch",
   ccr: "Critical Collateral Ratio (CCR)",
+  // docs.liquity.org, "What is Shutdown Mode?": "a 2% collateral bonus".
+  shutdownBonus: "2%",
 };
 
 export const LIQUITY_FAMILY_TERMS: Record<LiquityFamilyTermsId, LiquityFamilyTerms> = {
@@ -158,6 +164,8 @@ export const LIQUITY_FAMILY_TERMS: Record<LiquityFamilyTermsId, LiquityFamilyTer
     upfrontFee: "7-day interest fee",
     upfrontFeeText: "7-day interest fee",
     branch: "borrow market",
+    // The docs name no shutdown; the bonus is unread.
+    shutdownBonus: undefined,
   },
   // ebisu.gitbook.io: the "Collateralization Ratio (CR)", read collateral over
   // debt in all but one formula, against the "Minimum Collateral Ratio
@@ -181,6 +189,9 @@ export const LIQUITY_FAMILY_TERMS: Record<LiquityFamilyTermsId, LiquityFamilyTer
     liquidationPrice: "Liquidation price",
     branch: "branch",
     ccr: "Critical ratio",
+    // The docs name no shutdown. The sUSDe Trove's urgent redemption of
+    // 7 Oct 2026 paid the redeemer 2% (rails-ops TO-DO-ui-jobs 608).
+    shutdownBonus: "2%",
   },
 };
 
