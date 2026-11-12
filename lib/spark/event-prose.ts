@@ -15,6 +15,7 @@
 // keeps to the row's figures. Figures the card's cells, notes and price row show
 // stay on the card unless the sentence says what they mean.
 
+import { rayRateToApy } from "@/lib/aave-family/apy";
 import type { SparkContext } from "@/lib/shared/types/event-shape";
 import type { EventProseCore } from "@/lib/shared/event-prose/types";
 import { externalActor } from "@/lib/shared/external-actor";
@@ -226,7 +227,8 @@ export function sparkEventProse(input: SparkProseInput): SparkEventProse {
     case "spark.borrow": {
       sp.say("borrow.what", { amount: "amount" });
       delegated("delegated.borrow");
-      const rate = ctx.borrowRate ? Number(ctx.borrowRate) / 1e27 : null;
+      // SparkLend states the rate as an APY (ui-jobs 611).
+      const rate = ctx.borrowRate ? rayRateToApy(ctx.borrowRate) : null;
       if (rate != null && rate > 0) {
         v.rate = rate;
         sp.say("borrow.rate");

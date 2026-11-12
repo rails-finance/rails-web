@@ -23,6 +23,8 @@
 // TroveManagers here are the same ones lib/liquity/event-provenance.ts:127-129
 // seeds the event pipeline with.
 
+import type { BranchShutdownRecord, ShutdownRead } from "@/lib/liquity-fork/shutdown";
+
 export interface LiquityV2Branch {
   /** Lowercase branch key (weth | wsteth | reth) — matches the TROVE_MANAGER
    *  keys in lib/liquity/event-provenance.ts and the collateral facet lower-cased. */
@@ -39,6 +41,11 @@ export interface LiquityV2Branch {
   /** The branch's TroveManager — emits the trove events and answers
    *  getLatestTroveData / getEntireBranch{Debt,Coll}. */
   troveManager: string;
+  /** Where the branch answers its shutdown (ui-jobs 612): `TroveManager.shutdownTime()`,
+   *  0 while live. Every branch answered 0 on 12 Nov 2026. */
+  shutdownRead: ShutdownRead;
+  /** The branch's shutdown as recorded, where it is recorded (decision 0054 ruling 2). */
+  shutdownRecord?: BranchShutdownRecord;
   /** The branch's BorrowerOperations — where MCR / CCR / SCR / BCR are read
    *  from (BO getters), chain-verified against TroveManager.CCR() as a cross-check. */
   borrowerOperations: string;
@@ -65,6 +72,11 @@ export const LIQUITY_V2_BRANCHES: Record<string, LiquityV2Branch> = {
     decimals: 18,
     collateralAddr: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
     troveManager: "0x7bcb64b2c9206a5b699ed43363f6f98d4776cf5a",
+    shutdownRead: {
+      contract: "TroveManager",
+      address: "0x7bcb64b2c9206a5b699ed43363f6f98d4776cf5a",
+      call: "shutdownTime",
+    },
     borrowerOperations: "0x372abd1810eaf23cb9d941bbe7596dfb2c46bc65",
     priceFeed: "0xcc5f8102eb670c89a4a3c567c13851260303c24f",
     sortedTroves: "0xa25269e41bd072513849f2e64ad221e84f3063f4",
@@ -79,6 +91,11 @@ export const LIQUITY_V2_BRANCHES: Record<string, LiquityV2Branch> = {
     decimals: 18,
     collateralAddr: "0x7f39c581f595b53c5cb19bd0b3f8da6c935e2ca0",
     troveManager: "0xa2895d6a3bf110561dfe4b71ca539d84e1928b22",
+    shutdownRead: {
+      contract: "TroveManager",
+      address: "0xa2895d6a3bf110561dfe4b71ca539d84e1928b22",
+      call: "shutdownTime",
+    },
     borrowerOperations: "0xa741a32f9dcfe6adba088fd0f97e90742d7d5da3",
     priceFeed: "0xe7aa2ba9e086a379d3beb224098bc634a46e314e",
     sortedTroves: "0x84eb85a8c25049255614f0536bea8f31682e86f1",
@@ -93,6 +110,11 @@ export const LIQUITY_V2_BRANCHES: Record<string, LiquityV2Branch> = {
     decimals: 18,
     collateralAddr: "0xae78736cd615f374d3085123a210448e74fc6393",
     troveManager: "0xb2b2abeb5c357a234363ff5d180912d319e3e19e",
+    shutdownRead: {
+      contract: "TroveManager",
+      address: "0xb2b2abeb5c357a234363ff5d180912d319e3e19e",
+      call: "shutdownTime",
+    },
     borrowerOperations: "0xe8119fc02953b27a1b48d2573855738485a17329",
     priceFeed: "0x34f1e9c7dcc279ec70d3c4488eb2d80fba8b7b2b",
     sortedTroves: "0x14d8d8011df2b396ed2bbc4959bb73250324f386",

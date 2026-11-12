@@ -113,7 +113,7 @@ function SystemCard({ data, readBy }: { data: LiquityV1SystemChainResponse; read
   // crossing it is not itself a liquidation.
   const ccrFill = data.tcr != null ? Math.min(1, data.tcr / data.ccr) : null;
   const ticks: RatioBarTick[] =
-    data.tcr != null ? [{ f: 1, kind: "neutral", title: `CCR ${ratio(data.ccr)}: recovery mode line` }] : [];
+    data.tcr != null ? [{ f: 1, kind: "neutral", title: `Recovery Mode below ${ratio(data.ccr)}` }] : [];
 
   return (
     <div className="rounded-xl bg-raised px-4 py-3.5">
@@ -183,7 +183,7 @@ function SystemCard({ data, readBy }: { data: LiquityV1SystemChainResponse; read
                 {ratio(data.tcr)}
               </Prov>
             </span>
-            <span>CCR {ratio(data.ccr)}: recovery mode</span>
+            <span>Recovery Mode below {ratio(data.ccr)}</span>
           </div>
         </>
       )}
@@ -248,7 +248,7 @@ function RatesCard({ data, readBy }: { data: LiquityV1SystemChainResponse; readB
       <div className="text-xs font-semibold text-foreground">Rates &amp; fees</div>
 
       <div className="mt-3 grid grid-cols-3 gap-x-4 gap-y-2">
-        <Stat label="Base rate">
+        <Stat label="baseRate">
           <Prov info={stampServerRead(baseRateProv(), readBy)} value={formatExact(data.baseRate)}>
             {feePct(data.baseRate)}
           </Prov>
@@ -279,7 +279,7 @@ function RatesCard({ data, readBy }: { data: LiquityV1SystemChainResponse; readB
 
       <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
         Liquity V1 charges <span className="text-foreground">no interest</span> and has no per-Trove rate. These three
-        figures are the protocol&rsquo;s entire rate surface, and they are shared by every borrower: one base rate that
+        figures are the protocol&rsquo;s entire rate surface, and they are shared by every borrower: one baseRate that
         redemptions push up and time decays back down, and the two one-time fees that derive from it. Liquity V2 and its
         forks replaced this with a rate each borrower sets, which is also what orders their redemption queues. Here,
         nothing about the queue below is chosen.
@@ -317,7 +317,7 @@ function QueueCard({ data, readBy }: { data: LiquityV1SystemChainResponse; readB
             <AmountText value={data.queueDebtTotal} format="compact" /> {DEBT_SYMBOL}
           </Prov>
         </Stat>
-        <Stat label="Front of the queue">
+        <Stat label="First in line">
           {front?.icr != null ? (
             <Prov info={stampServerRead(queueIcrProv(), readBy)} value={formatExact(front.icr)}>
               {ratio(front.icr)}

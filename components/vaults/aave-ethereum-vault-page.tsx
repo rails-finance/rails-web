@@ -490,7 +490,7 @@ export function AaveEthereumVaultPage({
       {
         id: "reserve",
         label: "Reserve",
-        tip: "The Aave V3 reserve this token stands behind, and whether Umbrella reports a slashable deficit on it.",
+        tip: "The Aave V3 reserve this token stands behind, and whether Umbrella reports a slashable deficit on it: one the stake can be slashed for, when part of the stake is taken to cover a shortfall.",
         sub:
           u.reserveSlashable == null ? (
             "deficit not read"

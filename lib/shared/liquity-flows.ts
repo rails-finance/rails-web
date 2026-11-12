@@ -44,7 +44,7 @@ import {
 } from "@/lib/utils/liquidation-utils";
 import { compareWithinBlock } from "@/lib/shared/event-order";
 import { forkMcrAt, type ForkMcrStep } from "@/lib/shared/liquity-fork-ops";
-import { fmtMaxLtv, ltvLiquidationPriceSummary } from "@/lib/liquity/ltv";
+import { fmtLtv, fmtMaxLtv, liquityFamilyTerms, ltvLiquidationPriceSummary } from "@/lib/liquity/ltv";
 
 /** Liquity V2's year (Constants.sol `ONE_YEAR = 365 days`); its forks share it. */
 const ONE_YEAR_S = 31_536_000;
@@ -636,9 +636,14 @@ const dayOf = (ts: number) =>
 /** A fork's minimum through the life in words: each listed step, then today's. */
 function forkMcrWords(f: LiquityForkLevel): string {
   const steps = [...(f.mcrBefore ?? [])].sort((a, b) => a.untilBlock - b.untilBlock);
-  return [...steps.map((st) => `${pctOf(st.mcr)} until ${dayOf(st.untilTimestamp)}`), `${pctOf(f.mcr)} since`].join(
-    ", ",
-  );
+  const lim = forkLimitOf(f);
+  return [...steps.map((st) => `${lim(st.mcr)} until ${dayOf(st.untilTimestamp)}`), `${lim(f.mcr)} since`].join(", ");
+}
+
+/** A fork's limit as its docs state it (decision 0065): the Max LTV, 1 ÷ the
+ *  MCR, or the MCR itself. */
+function forkLimitOf(f: LiquityForkLevel): (mcr: number) => string {
+  return liquityFamilyTerms(f.name).ltv ? (m) => fmtLtv(100 / m, 2) : pctOf;
 }
 
 /** A fork's level in the receipt: the minimum in force each day, and what
@@ -647,18 +652,26 @@ function forkLevelWords(
   f: LiquityForkLevel,
   symbol: string,
 ): Pick<PriceLevel, "formula" | "summary" | "formulaBefore"> {
+  const t = liquityFamilyTerms(f.name);
+  const lim = forkLimitOf(f);
+  // The limit's short name in a sentence: "minimum", "MCR" or "Max LTV".
+  const word = t.limitShort;
   const steps = [...(f.mcrBefore ?? [])].sort((a, b) => a.untilBlock - b.untilBlock);
   const formula = (m: number) =>
-    `${LIQUIDATION_PRICE_FORMULA.replace("MCR", pctOf(m))} after each event, with interest accruing between`;
+    t.ltv
+      ? `debt ÷ (collateral × ${lim(m)}) after each event, with interest accruing between`
+      : `${LIQUIDATION_PRICE_FORMULA.replace("MCR", pctOf(m))} after each event, with interest accruing between`;
   const history =
     steps.length > 0
-      ? `${f.name}'s governance moved this branch's minimum (${forkMcrWords(f)}, each change read from the branch manager's log); each day is drawn against the minimum in force at its end.`
+      ? `${f.name}'s governance moved this branch's ${word} (${forkMcrWords(f)}, each change read from the branch manager's log); each day is drawn against the ${word} in force at its end.`
       : f.stepsRead
-        ? `No branch manager log has moved this branch's ${pctOf(f.mcr)} minimum.`
-        : `Today's ${pctOf(f.mcr)} minimum is held across the life: no earlier value is listed for this branch.`;
+        ? `No branch manager log has moved this branch's ${lim(f.mcr)} ${word}.`
+        : `Today's ${lim(f.mcr)} ${word} is held across the life: no earlier value is listed for this branch.`;
   return {
     formula: formula(f.mcr),
-    summary: `Liquidation price. The ${symbol} price at which the Trove's collateral ratio reaches the ${f.name} branch's minimum; its debt × the minimum ÷ its collateral. Below that price the Trove can be liquidated. ${history}`,
+    summary: t.ltv
+      ? `Liquidation price. The ${symbol} price at which the Trove's LTV reaches the ${f.name} branch's Max LTV; its debt ÷ (its collateral × the Max LTV). Below that price the Trove can be liquidated. ${history}`
+      : `Liquidation price. The ${symbol} price at which the Trove's ${t.ratioText} reaches the ${f.name} branch's ${word}; its debt × the ${word} ÷ its collateral. Below that price the Trove can be liquidated. ${history}`,
     ...(steps.length > 0
       ? {
           formulaBefore: steps.map((st) => ({
@@ -672,16 +685,20 @@ function forkLevelWords(
 
 /** A fork's sentence in the charts' how-to-read. */
 function forkLevelHelp(f: LiquityForkLevel): string {
+  const t = liquityFamilyTerms(f.name);
+  const lim = forkLimitOf(f);
+  const word = t.limitShort;
   const at =
     (f.mcrBefore?.length ?? 0) > 0
-      ? `at the minimum in force each day (${forkMcrWords(f)})`
+      ? `at the ${word} in force each day (${forkMcrWords(f)})`
       : f.stepsRead
-        ? `at the branch's ${pctOf(f.mcr)} minimum, which no governance log has moved`
-        : `at today's ${pctOf(f.mcr)} minimum, held across the life`;
+        ? `at the branch's ${lim(f.mcr)} ${t.ltv ? word : t.limitText}, which no governance log has moved`
+        : `at today's ${lim(f.mcr)} ${word}, held across the life`;
   const priced = f.pricedRows
     ? ` The branch PriceFeed's price is recorded on the Trove's ${f.pricedRows} alone, and today's is read live; between them the last one is carried.`
     : "";
-  return `on the same days; the red line is where the Trove liquidates, its debt × the minimum ÷ its collateral after each event, ${at}.${priced}`;
+  const how = t.ltv ? "its debt ÷ (its collateral × the Max LTV)" : `its debt × the ${word} ÷ its collateral`;
+  return `on the same days; the red line is where the Trove liquidates, ${how} after each event, ${at}.${priced}`;
 }
 
 /** Liquity V2's price view marks for the collateral: each row's price on

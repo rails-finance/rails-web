@@ -2,15 +2,24 @@
 // rails-ops reference/asset-key-map.md, "The spread"). Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import {
-  fmtSignedSpread,
-  fmtSpread,
-  gapSince,
-  inForce,
-  lineSpreads,
-  roundDeviations,
-  SPREAD_LIMIT,
-} from "../../lib/shared/asset-spread.ts";
+import { register } from "node:module";
+
+// asset-spread imports ./block-rate by extensionless specifier, as the app does.
+const hooks = `
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+export async function resolve(specifier, context, next) {
+  if (specifier.startsWith(".") && !/\\.[cm]?[jt]sx?$/.test(specifier) && context.parentURL) {
+    const url = new URL(specifier + ".ts", context.parentURL).href;
+    if (existsSync(fileURLToPath(url))) return { url, shortCircuit: true };
+  }
+  return next(specifier, context);
+}`;
+register(`data:text/javascript,${encodeURIComponent(hooks)}`);
+
+const { fmtSignedSpread, fmtSpread, gapSince, inForce, lineSpreads, roundDeviations, SPREAD_LIMIT } = await import(
+  "../../lib/shared/asset-spread.ts"
+);
 
 const main = {
   key: "main",
@@ -34,7 +43,26 @@ test("a day compares two lines only where their reads are within ten minutes", (
   assert.deepEqual([...s.byDay.keys()], [100, 102], "196 blocks on Ethereum is 39 minutes: day 101 is left out");
   assert.equal(s.passes, false);
   const [b] = lineSpreads(main, [near], 8453);
-  assert.ok(b.byDay.has(101), "on Base the window is 300 blocks");
+  assert.ok(b.byDay.has(101), "on Base before Denim the window is 300 blocks");
+  // Past Denim (block 53,556,127) a Base block is 0.2 s: 3,000 blocks is ten minutes.
+  const D = 53_556_127;
+  const late = (k, off) => ({
+    key: k,
+    points: [
+      [200, 1.0, D + 10_000],
+      [201, 0.97, D + 20_000 + off],
+    ],
+  });
+  const [m] = lineSpreads(late("main", 0), [late("far", 2_900)], 8453);
+  assert.ok(m.byDay.has(201), "2,900 blocks past Denim is 580 s");
+  const [f] = lineSpreads(late("main", 0), [late("far", 3_100)], 8453);
+  assert.ok(!f.byDay.has(201), "3,100 blocks past Denim is 620 s");
+  // A span across the upgrade counts each side at its rate: 200 blocks at 2 s and 1,000 at 0.2 s is 600 s.
+  const across = (b) => ({ key: "x", points: [[300, 1, b]] });
+  const [x] = lineSpreads(across(D - 200), [across(D + 1_000)], 8453);
+  assert.ok(x.byDay.has(300));
+  const [y] = lineSpreads(across(D - 201), [across(D + 1_000)], 8453);
+  assert.ok(!y.byDay.has(300));
 });
 
 test("a fixed price compares whatever block it was read at, and names its gap", () => {

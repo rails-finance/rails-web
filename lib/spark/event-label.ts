@@ -12,7 +12,7 @@ export const TRANSFER_LABEL = { transfer_in: "Transfer in", transfer_out: "Trans
  *  a transfer says its verb; any other row says its action label. `feeOf` is
  *  the liquidation a fee transfer belongs to. */
 export function sparkRowLabel(ctx: SparkContext, actionLabel: string, feeOf?: SparkContext): string {
-  if (feeOf) return "Liquidation fee";
+  if (feeOf) return "Liquidation protocol fee";
   if (isGatewayWithdrawal(ctx)) return "Withdraw";
   if (ctx.eventType === "transfer_out" || ctx.eventType === "transfer_in") return TRANSFER_LABEL[ctx.eventType];
   return actionLabel;

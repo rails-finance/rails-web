@@ -20,7 +20,7 @@
 //
 // ui-jobs 302: on the event card header (T1) the chevron comes last in the left
 // cluster, after the verb, the amounts and icons that show and any rate pill;
-// an asset icon hides with its amount while Timeline values is on (≥640 px);
+// an asset icon hides with its amount (≥640 px);
 // the chevron appears 0.5 s after the pointer enters the header and hides at
 // once on leave, keyboard focus shows it at once, the position card's rows keep
 // the instant reveal.
@@ -61,19 +61,13 @@ function check(name, ok, detail = "") {
 
 const browser = await chromium.launch();
 
-async function open(width, path, { touch = false, store = null, valuesOff = false } = {}) {
+async function open(width, path, { touch = false, store = null } = {}) {
   const ctx = await browser.newContext({
     viewport: { width, height: 1000 },
     hasTouch: touch,
     isMobile: touch,
     extraHTTPHeaders: bypassHeaders(),
   });
-  if (valuesOff)
-    await ctx.addInitScript(() => {
-      try {
-        localStorage.setItem("timeline-display-v3", JSON.stringify({ showTimelineValues: false }));
-      } catch {}
-    });
   if (store)
     await ctx.addInitScript(
       ([k, v]) => {
@@ -736,7 +730,7 @@ const SHEET_WORDS_SUBJECTS = [
     risk: ["Health factor", "Collateral can fall"],
     limits: ["LTV", "Still borrowable"],
     params: ["Max LTV", "Liquidation threshold"],
-    optional: ["eMode"],
+    optional: ["E-Mode"],
   },
   {
     name: "Aave V3 0xc593…5948 Repay with collateral",
@@ -745,7 +739,7 @@ const SHEET_WORDS_SUBJECTS = [
     risk: ["Health factor", "Collateral can fall"],
     limits: ["LTV", "Still borrowable"],
     params: ["Max LTV", "Liquidation threshold"],
-    optional: ["eMode"],
+    optional: ["E-Mode"],
   },
   // The families that moved to the sheet (ui-jobs 330), one subject each, the
   // fixtures verify-event-share.mjs holds. `carried`: the sides whose carry
@@ -806,9 +800,10 @@ const SHEET_WORDS_SUBJECTS = [
     name: "Ebisu",
     path: "/ethereum/ebisu/WBTC/75911241408635389930317354588378809432274724767733080584082611717827843647638",
     id: "0x8496531fb5d25fc73d0d2df3695176b44d86f057871e9b89a5de224f16590a18-0",
-    risk: ["Collateral ratio", "Liquidates at"],
+    // Ebisu's docs' terms (decision 0065); "Critical ratio" is Rails's.
+    risk: ["Collateralization ratio", "Liquidation price"],
     limits: ["Interest rate"],
-    params: ["Minimum ratio", "Critical ratio"],
+    params: ["Minimum Collateral Ratio", "Critical ratio"],
     optional: [],
     // The escrow states its amount alone on the WBTC branch: no WETH price.
     note: /^0\.0375 WETH held in escrow$/,

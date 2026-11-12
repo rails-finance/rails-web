@@ -77,12 +77,16 @@ const count = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString(
 
 /** The line's words for the wallet's positions, in the wallet view's words
  *  (W1: "2 positions · 1 open · 1 closed"; Miles, 6 Nov 2026), the chains
- *  named only when there are more than one. Null when there is nothing. */
-export function walletLineText(positions: WalletCountsPosition[]): string | null {
+ *  named only when there are more than one, after the scope: "On Rails:" when
+ *  the page's position is among those counted, "Also on Rails:" when it is
+ *  not (a Read on visit page; Miles 12 Nov 2026, ui-jobs 613). Null when there
+ *  is nothing. */
+export function walletLineText(positions: WalletCountsPosition[], pageCounted: boolean): string | null {
   const n = positions.length;
   if (n === 0) return null;
   const chains = new Set(positions.map((p) => p.chain)).size;
   const open = positions.filter((p) => p.status === "open").length;
   const where = chains > 1 ? ` on ${chains} chains` : "";
-  return `${count(n, "position")}${where} · ${open.toLocaleString("en-US")} open · ${(n - open).toLocaleString("en-US")} closed`;
+  const scope = pageCounted ? "On Rails" : "Also on Rails";
+  return `${scope}: ${count(n, "position")}${where} · ${open.toLocaleString("en-US")} open · ${(n - open).toLocaleString("en-US")} closed`;
 }

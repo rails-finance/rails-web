@@ -37,6 +37,7 @@ import { Prov, type Provenance } from "@/components/shared/provenance";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { formatUnitsExact } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
+import { blockSpanSeconds, secondsPerBlock } from "@/lib/shared/block-rate";
 import type { TransmuterMaturityEstimate } from "@/lib/alchemix/transmuter-provenance";
 import { alchemixMarketWord } from "@/lib/alchemix/naming";
 import type { AlchemixAmount, AlchemixTransmuterPositionSummary } from "@/types/api/alchemix";
@@ -54,10 +55,6 @@ const block = (n: number) => n.toLocaleString("en-US");
 
 /** The synthetic and every vault share are 18 decimals on every line. */
 const WAD_DECIMALS = 18;
-
-/** Seconds per block, for the estimate beside a block count and nowhere else:
- *  twelve-second slots on Ethereum, two seconds on Base. */
-const SECONDS_PER_BLOCK: Record<number, number> = { 1: 12, 8453: 2 };
 
 export type TransmuterState = "maturing" | "matured" | "claimed";
 
@@ -90,18 +87,17 @@ function amountFigure(a: AlchemixAmount, symbol: string, prov?: Provenance): Rea
   );
 }
 
-/** "about 3 days", from a block count at the chain's block time. */
-export function aboutDuration(blocks: number, chainId: number): string | null {
-  const spb = SECONDS_PER_BLOCK[chainId];
-  if (!spb) return null;
-  const hours = (blocks * spb) / 3600;
+/** "about 3 days", from a span in seconds. */
+export function aboutDuration(seconds: number): string {
+  const hours = seconds / 3600;
   if (hours < 1) return "under an hour";
   if (hours < 48) return `about ${Math.round(hours)} hours`;
   return `about ${Math.round(hours / 24)} days`;
 }
 
 /** The date a maturing position is estimated to mature, from the blocks still
- *  to go at the chain's block time, counted from `nowMs`. Null once matured or
+ *  to go at the chain's block time in each era (lib/shared/block-rate.ts; Base's
+ *  0.2 s from Denim, ui-jobs 615), counted from `nowMs`. Null once matured or
  *  claimed, on a chain with no block time here, or before the browser's clock
  *  has arrived (`nowMs` null): a server render and a browser an hour apart
  *  would otherwise draw two dates. */
@@ -110,7 +106,7 @@ export function transmuterMaturityEstimate(
   nowMs: number | null,
 ): TransmuterMaturityEstimate | null {
   const m = p.maturity;
-  const spb = SECONDS_PER_BLOCK[p.chainId];
+  const spb = m.referenceBlock == null ? null : secondsPerBlock(p.chainId, m.referenceBlock);
   if (
     nowMs == null ||
     p.status === "claimed" ||
@@ -122,12 +118,14 @@ export function transmuterMaturityEstimate(
     return null;
   }
   const fromMs = nowMs;
+  const seconds = Math.round(blockSpanSeconds(p.chainId, m.referenceBlock, m.referenceBlock + m.blocksRemaining) ?? 0);
   return {
     referenceBlock: m.referenceBlock,
     blocksRemaining: m.blocksRemaining,
     secondsPerBlock: spb,
+    seconds,
     fromMs,
-    atMs: fromMs + m.blocksRemaining * spb * 1000,
+    atMs: fromMs + seconds * 1000,
   };
 }
 
@@ -152,7 +150,7 @@ export function transmuterHeads(
   let title: string | undefined;
   let note: ReactNode = null;
   if (estimate) {
-    const about = aboutDuration(estimate.blocksRemaining, p.chainId);
+    const about = aboutDuration(estimate.seconds);
     figure = (
       <span className="inline-flex items-center gap-1.5 whitespace-nowrap tabular-nums max-sm:text-lg">
         <Clock className="size-4 shrink-0 text-rb-500" aria-hidden />≈ {formatDate(new Date(estimate.atMs))}
@@ -161,11 +159,11 @@ export function transmuterHeads(
     title =
       `Estimated: block ${block(m.maturationBlock)} is ${block(estimate.blocksRemaining)} blocks past block ` +
       `${block(estimate.referenceBlock)}, the block the market is indexed to. At ${estimate.secondsPerBlock} seconds a block ` +
-      `that is ${about ?? `${block(estimate.blocksRemaining * estimate.secondsPerBlock)} seconds`} from now.`;
+      `that is ${about} from now.`;
     note = (
       <>
         <BlockRef block={m.maturationBlock} size={12} />
-        {about ? ` · ${about}` : ""}
+        {` · ${about}`}
       </>
     );
   } else if (p.status !== "claimed" && m.referenceBlock != null && m.matured) {

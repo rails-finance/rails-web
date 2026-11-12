@@ -102,7 +102,8 @@
 // of the sUSDS price, today the card's, no level, the how-to-read naming chi.
 // The forks and Polaris (step 6, `level`, `checkLevelView`): Ebisu WBTC 3876
 // (liquidated) and weETH 1065 (closed), whose level steps by the two minimums'
-// ratio on 4 Jan 2026, Ebisu stcUSD 6774 and Basedollar cbETH 6846 (open:
+// ratio on 4 Jan 2026, Ebisu stcUSD 6774 (open on a shut-down branch: the card
+// states no "Liquidates at", ui-jobs 612) and Basedollar cbETH 6846 (open:
 // today's level the card's "Liquidates at"), Asymmetry ysyBOLD 4577, scrvUSD 2145
 // and Basedollar wstETH 1150 (closed: the level ends that day), Polaris USDp
 // 2420 and GOLDp 18 (open: today's level the card's price × 115 % ÷ its ratio),
@@ -226,7 +227,7 @@ const PAGES = [
     health: true,
     changes: {
       day: 20348,
-      name: "E-mode “PT-USDe USDe Nov 2025” liquidation threshold",
+      name: "E-Mode “PT-USDe USDe Nov 2025” liquidation threshold",
       from: "91.50 %",
       to: "92 %",
       block: 23382225,
@@ -860,7 +861,7 @@ const PAGES = [
     ...forkPace("ebisu", "weETH", "ebUSD", "last"),
     path: "/ethereum/ebisu/weeth/106525219326064530299176858413070691994107358379893271777150080609961810096862",
     lwOnly: true,
-    changes: { day: 20457, name: "Minimum ratio", from: "128 %", to: "120 %", block: 24160712 },
+    changes: { day: 20457, name: "Minimum Collateral Ratio", from: "128 %", to: "120 %", block: 24160712 },
     level: {
       asset: "weETH",
       endDay: 20624,
@@ -873,7 +874,11 @@ const PAGES = [
     ...forkPace("ebisu", "stcUSD", "ebUSD", "today"),
     path: "/ethereum/ebisu/stcusd/6774201543947923016744174294482881587816035374101342731108014726689376691497",
     lwOnly: true,
-    level: { asset: "stcUSD", card: "liquidates-at", help: ["115% minimum, which no governance log has moved"] },
+    level: {
+      asset: "stcUSD",
+      card: "liquidates-at",
+      help: ["115% Minimum Collateral Ratio (MCR), which no governance log has moved"],
+    },
   },
   {
     // Closed on 8 Nov 2026 00:10 UTC (day 20765): no "Liquidates at" since.
@@ -881,14 +886,14 @@ const PAGES = [
     ...forkPace("asymmetry", "scrvUSD", "USDaf", "last"),
     path: "/ethereum/asymmetry/scrvusd/21455407195608252231693499135014282170032223495298941722085434215551435526302",
     lwOnly: true,
-    level: { asset: "scrvUSD", endDay: 20765, help: ["today's 110% minimum, held across the life"] },
+    level: { asset: "scrvUSD", endDay: 20765, help: ["today's 90.91% Max LTV, held across the life"] },
   },
   {
     id: "asymmetry ysybold 4577 (closed)",
     ...forkPace("asymmetry", "ysyBOLD", "USDaf", "last"),
     path: "/ethereum/asymmetry/ysybold/45771828629529054463940548704077640517998892185928814218152521258795699925919",
     lwOnly: true,
-    level: { asset: "ysyBOLD", endDay: 20392, help: ["today's", "minimum, held across the life"] },
+    level: { asset: "ysyBOLD", endDay: 20392, help: ["today's", "Max LTV, held across the life"] },
   },
   {
     id: "basedollar cbeth 6846",
@@ -2363,7 +2368,15 @@ async function checkLevelView(page, tag, pg) {
   check(`${tag}: the level is drawn`, pts.length > 0, `${pts.length} days`);
   if (pts.length === 0) return;
   const days = pts.map((p) => p[0]);
-  if (want.card === "liquidates-at") {
+  // A Trove on a shut-down branch (ui-jobs 612: Ebisu since 20 Aug 2026) is
+  // open with no liquidation to state: its card draws no "Liquidates at".
+  const shutDown = await page
+    .$eval("[data-card-status]", (e) => e.getAttribute("data-card-status") === "shut down")
+    .catch(() => false);
+  if (want.card === "liquidates-at" && shutDown) {
+    const rows = await page.$$('[data-panel-row="liquidates-at"]');
+    check(`${tag}: a shut-down branch's card states no "Liquidates at"`, rows.length === 0, `${rows.length} rows`);
+  } else if (want.card === "liquidates-at") {
     const card = await page.$eval('[data-panel-row="liquidates-at"] dd', (d) => d.textContent ?? "").catch(() => "");
     const m = card.replace(/,/g, "").match(/\$(\d+(?:\.(\d+))?)(K?)/);
     const k = m?.[3] ? 1000 : 1;

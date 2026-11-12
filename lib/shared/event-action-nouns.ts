@@ -61,7 +61,7 @@ const COMMON: Record<string, string> = {
   supply_with_collateral: "supplies",
   // Aave and Spark.
   bad_debt_written_off: "write-offs",
-  liquidation_fee: "liquidation fees",
+  liquidation_fee: "liquidation protocol fees",
   emode: "e-mode changes",
   // Maker keys are the row labels (`getEventActionKey`).
   grab: "liquidations",

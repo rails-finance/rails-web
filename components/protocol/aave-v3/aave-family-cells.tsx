@@ -19,6 +19,7 @@
 // Aave V3 on Ethereum and Base, Seamless's switch rows and SparkLend share it:
 // SparkLend runs Aave V3's account arithmetic.
 
+import { aaveFamilyTermsOfPool } from "@/lib/aave-family/terms";
 import { useMemo, type ReactNode } from "react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { AmountText, ExactTip } from "@/components/shared/amount-text";
@@ -987,7 +988,7 @@ export function aaveV3RiskCells(
           {
             key: "emode",
             kind: "stat" as const,
-            label: "eMode",
+            label: aaveFamilyTermsOfPool(coords.pool).emode,
             changed: !!emode && emode.before !== emode.after,
             value: emode
               ? {
@@ -1003,9 +1004,9 @@ export function aaveV3RiskCells(
   ];
   const missing =
     sources.settings == null && sources.market == null
-      ? "Collateral on/off, eMode, prices and reserve settings at this block aren’t available, so USD and the account figures are not shown."
+      ? `Collateral on/off, ${aaveFamilyTermsOfPool(coords.pool).emode}, prices and reserve settings at this block aren’t available, so USD and the account figures are not shown.`
       : sources.settings == null
-        ? "Collateral on/off and eMode at this block aren’t available, so the account figures are not shown."
+        ? `Collateral on/off and ${aaveFamilyTermsOfPool(coords.pool).emode} at this block aren’t available, so the account figures are not shown.`
         : sources.market == null
           ? "Prices and reserve settings at this block aren’t available, so USD and the account figures are not shown."
           : null;

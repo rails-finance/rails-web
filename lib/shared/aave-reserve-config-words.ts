@@ -46,7 +46,12 @@ function thresholdWords(prev: Record<string, number> | undefined, next: Record<s
 const cap1 = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** Every row in words, newest first. */
-export function reserveChanges(log: ReserveConfigLog, symbol: string): ReserveChange[] {
+export function reserveChanges(
+  log: ReserveConfigLog,
+  symbol: string,
+  /** The family's spelling of the mode (lib/aave-family/terms.ts). */
+  em = "E-Mode",
+): ReserveChange[] {
   const labels = new Map<number, string>();
   for (const r of log.logs) if (r.kind === "category" && r.label) labels.set(Number(r.categoryId), String(r.label));
   const cat = (id: unknown) => {
@@ -100,25 +105,25 @@ export function reserveChanges(log: ReserveConfigLog, symbol: string): ReserveCh
         words = on(r.enabled) ? "Borrowing on" : "Borrowing off";
         break;
       case "asset-category":
-        words = r.from === r.to ? `eMode category ${cat(r.to)}` : `eMode category ${cat(r.from)} → ${cat(r.to)}`;
+        words = r.from === r.to ? `${em} category ${cat(r.to)}` : `${em} category ${cat(r.from)} → ${cat(r.to)}`;
         break;
       case "emode-collateral":
-        words = `Collateral in eMode ${cat(r.categoryId)}: ${on(r.collateral) ? "on" : "off"}`;
+        words = `Collateral in ${em} ${cat(r.categoryId)}: ${on(r.collateral) ? "on" : "off"}`;
         break;
       case "emode-borrowable":
-        words = `Borrowable in eMode ${cat(r.categoryId)}: ${on(r.borrowable) ? "on" : "off"}`;
+        words = `Borrowable in ${em} ${cat(r.categoryId)}: ${on(r.borrowable) ? "on" : "off"}`;
         break;
       case "emode-ltvzero":
-        words = `LTV zero in eMode ${cat(r.categoryId)}: ${on(r.ltvzero) ? "on" : "off"}`;
+        words = `LTV zero in ${em} ${cat(r.categoryId)}: ${on(r.ltvzero) ? "on" : "off"}`;
         break;
       case "emode-isolation":
-        words = `eMode ${cat(r.categoryId)} isolated: ${on(r.isolated) ? "on" : "off"}`;
+        words = `${em} ${cat(r.categoryId)} isolated: ${on(r.isolated) ? "on" : "off"}`;
         break;
       case "category": {
         const id = n("categoryId");
         const next = { ltv: n("ltv"), lt: n("lt"), bonus: n("bonus") };
         const prev = lastCategory.get(id);
-        words = `eMode ${cat(id)}${prev ? "" : " set"}: ${thresholdWords(prev, next)}`;
+        words = `${em} ${cat(id)}${prev ? "" : " set"}: ${thresholdWords(prev, next)}`;
         lastCategory.set(id, next);
         break;
       }
@@ -130,7 +135,8 @@ export function reserveChanges(log: ReserveConfigLog, symbol: string): ReserveCh
   return out.reverse();
 }
 
-/** The groups the held line names, each with the kinds it stands for. */
+/** The groups the held line names, each with the kinds it stands for; "eMode"
+ *  is replaced by the family's spelling. */
 const HELD_GROUPS: [string, string[]][] = [
   ["cap", ["supply-cap", "borrow-cap"]],
   ["reserve factor", ["reserve-factor"]],
@@ -147,9 +153,10 @@ const listWords = (xs: string[]) => (xs.length < 2 ? xs.join("") : `${xs.slice(0
  *  from 1 Nov 2026; collateral and eMode changes from the Pool's start." The
  *  earliest first block is the Pool's start; `dateOf` names a later one's day
  *  where it can. */
-export function heldLine(log: ReserveConfigLog, dateOf: (block: number) => string | null): string {
+export function heldLine(log: ReserveConfigLog, dateOf: (block: number) => string | null, em = "E-Mode"): string {
   const byFrom = new Map<number, string[]>();
-  for (const [group, kinds] of HELD_GROUPS) {
+  for (const [g, kinds] of HELD_GROUPS) {
+    const group = g === "eMode" ? em : g;
     const froms = kinds.map((k) => log.held[k]?.heldFrom).filter((b): b is number => b != null);
     if (!froms.length) continue;
     const from = Math.max(...froms);

@@ -744,7 +744,7 @@ export function useAaveV3CardSlots({
       ? {
           id: "borrow-room",
           label: "Room to borrow",
-          tip: "How much more the account can borrow, in dollars, before it reaches its loan-to-value limit, as the Pool gives it at the latest block.",
+          tip: "How much more the account can borrow, in dollars, before it reaches its Max LTV, as the Pool gives it at the latest block.",
           value: (
             <Prov info={accountDataProv("Available to borrow", "availableBorrowsBase", chainPool, v.readBy)}>
               {formatCompactUsd(chain.availableBorrowsUsd)}
@@ -797,8 +797,8 @@ export function useAaveV3CardSlots({
     emode && chainPool
       ? {
           id: "emode",
-          label: "eMode",
-          tip: "The efficiency-mode category the account has chosen: a reserve in it is borrowed against at the category's loan-to-value and liquidation threshold, as the Pool gives them at the latest block.",
+          label: "E-Mode",
+          tip: "The Efficiency Mode (E-Mode) category the account has chosen: a reserve in it is borrowed against at the category's loan-to-value and liquidation threshold, as the Pool gives them at the latest block.",
           value: <Prov info={userEmodeProv(emode.label, chainPool)}>{emode.label}</Prov>,
         }
       : null;

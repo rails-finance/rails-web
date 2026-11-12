@@ -64,7 +64,8 @@ export const EBISU_SORT_OPTIONS: SortOption[] = [
 // MIN_DEBT that the chain still reads Active (ui-jobs 420).
 const STATUS_OPTIONS: FilterOptionDef[] = [
   { value: "open", label: "Open" },
-  { value: "zombie", label: "Dormant" },
+  // Ebisu's docs call it a zombie position (decision 0065).
+  { value: "zombie", label: "Zombie" },
   { value: "closed", label: "Closed" },
   { value: "liquidated", label: "Liquidated" },
 ];

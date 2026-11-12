@@ -1,36 +1,25 @@
 #!/usr/bin/env node
-// On a served timeline the folders are the standard: the toggle is gone, and a
-// stored preference opens nothing.
+// On a served timeline the folders are the standard: a page the server answered
+// in folders opens none of them, and a folder's events are read when the reader
+// opens that folder.
 // ----------------------------------------------------------------------------
-// Subject: steps 1 and 2 of rails-ops decision 0021. On a page the server
-// answered in folders (Aave V3, SparkLend, Moonwell Base) the eye menu does not
-// offer "Collapse like events", a stored `collapseRuns: false` opens no folder,
-// and a folder's events are read when the reader opens that folder. A page that
-// groups in the browser keeps the toggle, and so does `?folders=0`, which is
-// flat and therefore groups in the browser.
-//
-// Repointed 2026-10-23 (ui-jobs 432): the Display menu is read once its
-// "Transaction hashes" row stands ("Timeline values" left with the spine's
-// values switch); S4 and C1 are dropped, since 326 (web `81662167`) took the
-// "Collapse like events" toggle off every family and nothing offers it now.
+// Subject: steps 1 and 2 of rails-ops decision 0021 (Aave V3, SparkLend,
+// Moonwell Base). 326 (web `81662167`) retired the "Collapse like events"
+// toggle, so S1 (the menu does not offer it), S4 and C1 (the toggle stays on
+// other pages) are gone, and S2 reads the default page.
 //
 // ── THE CHECKS, per served family ──────────────────────────────────────────
 //   S0  the default page draws folders (the fixture is still served — a guard;
 //       every other check on the family waits on it)
-//   S1  the default page's eye menu has no "Collapse like events"
 //   S5  no folder header names a lone standout member (decision 0019, rule 6,
 //       amended 2026-09-25: the header states the sums only, never
 //       "including one …")
-//   S2  with `timeline-display-v3` = {"collapseRuns":false} stored before load:
-//       zero `/timeline/folder` reads through load and settle, and no folder
-//       drawn open
+//   S2  the default page: zero `/timeline/folder` reads through load and
+//       settle, and no folder drawn open
 //   S3  opening one folder by click makes exactly one folder read and draws
 //       that folder's first window of members: min(count, GROUP_MEMBER_BATCH =
 //       50), the rest paged on scroll (decision 0039 rule 5, web 55e1919e), with
 //       the frame stating the whole count in `data-group-members`
-//   S4  the same wallet with `?folders=0` still offers the toggle
-// and once:
-//   C1  a client-grouped family page still offers the toggle
 // and a list with folders is never empty (rails-ops TO-DO-ui-jobs §13):
 //   E1  SparkLend 0xb137…ece5, every event inside a folder: folder rows drawn,
 //       no empty label
@@ -47,9 +36,8 @@
 //       which also drew the "view" row at the bottom; a cut hides nothing
 //       older, so it draws none
 //
-// Absence is only ever asserted after a positive signal: the menu is read once
-// one of its other items is visible, and "no folder read" is counted once the
-// folder rows are drawn and the page has sat still for SETTLE_MS.
+// Absence is only ever asserted after a positive signal: "no folder read" is
+// counted once the folder rows are drawn and the page has sat still for SETTLE_MS.
 //
 // ── PROVED IT CAN FAIL, 2026-09-13, BASE=http://localhost:3000 ─────────────
 // Green: 16 checks (S0–S4 on three families, C1). Each break applied ALONE to
@@ -75,10 +63,6 @@
 //  (d) both ends read `sortedEvents` only (`newestLoadedAt = newestLooseAt`,
 //      `oldestLoadedAt = oldestLooseAt`) — FAIL E4 "28 folder row(s), 0 tip
 //      row(s), 1 pulsing dot(s), 0 view row(s)"; E1 E2 E3 E4a pass (4/5).
-//
-// 🔑 The menu title-cases its labels. The first draft compared the label
-// exactly, and S1 passed on a page that did offer the toggle; the comparison
-// is case-insensitive, and (a) is what shows it now reads the menu.
 //
 //   BASE=http://localhost:3000 node scripts/verify/verify-served-folders-standard.mjs
 //   ONLY=spark,client …   run a subset (fixture ids)
@@ -152,7 +136,6 @@ const EMPTY_LABELS = [
   "No events to show",
 ];
 
-const TOGGLE = "Collapse like events";
 const FOLDER_READ = /\/timeline\/folder\?/;
 // A folder is a group frame since ui-jobs 250 (lib/group-rows.mjs): its
 // closed header is named by its label, and its ⋮ opens the members.
@@ -170,15 +153,8 @@ function check(name, cond, detail = "") {
 const browser = await chromium.launch();
 
 /** A page with its folder reads counted from the first request. */
-async function openPage(path, { stored } = {}) {
+async function openPage(path) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 1400 }, extraHTTPHeaders: bypassHeaders() });
-  if (stored) {
-    await ctx.addInitScript((value) => {
-      try {
-        localStorage.setItem("timeline-display-v3", value);
-      } catch {}
-    }, JSON.stringify(stored));
-  }
   const page = await ctx.newPage();
   const reads = [];
   page.on("request", (r) => {
@@ -215,61 +191,11 @@ async function folderRows(page) {
     .catch(() => 0);
 }
 
-/** The eye menu's item labels, read once one of its always-present items is
- *  visible. Retries the trigger: a click before hydration is lost. Returns
- *  null when the menu never opened — a crash of the check, not an absence. */
-async function menuLabels(page) {
-  // The position card has a Display menu of its own; the timeline's is the one
-  // sharing an ancestor with the count line, nearest first.
-  const tagged = await page.evaluate(() => {
-    const COUNT = /^(Showing )?[\d,]+( rows)?( of (at least )?[\d,]+)? (events?|listed)/;
-    const span = [...document.querySelectorAll("span.tabular-nums")].find((el) =>
-      COUNT.test((el.textContent || "").trim()),
-    );
-    for (let node = span?.parentElement; node; node = node.parentElement) {
-      const button = node.querySelector('button[aria-label="Display"][aria-haspopup="listbox"]');
-      if (button) {
-        button.setAttribute("data-verify-timeline-display", "");
-        return true;
-      }
-    }
-    return false;
-  });
-  if (!tagged) return null;
-  const trigger = page.locator("button[data-verify-timeline-display]");
-  const anchor = page.getByRole("button", { name: /^Transaction hashes$/i }).first();
-  for (let attempt = 0; attempt < 8; attempt++) {
-    await trigger.click().catch(() => {});
-    const open = await anchor
-      .waitFor({ state: "visible", timeout: 2500 })
-      .then(() => true)
-      .catch(() => false);
-    if (open) {
-      const labels = await page
-        .getByRole("button")
-        .evaluateAll((els) => els.map((e) => (e.textContent || "").trim()).filter(Boolean));
-      await page.keyboard.press("Escape");
-      return labels;
-    }
-    await page.waitForTimeout(700);
-  }
-  return null;
-}
-
-async function offersToggle(page, id, name, want) {
-  const labels = await menuLabels(page);
-  if (!labels) return check(id(name), false, "the eye menu never opened");
-  // The menu title-cases its labels ("Collapse Like Events"), so compare
-  // without case — an exact match would report every page as lacking it.
-  const has = labels.some((l) => l.toLowerCase() === TOGGLE.toLowerCase());
-  return check(id(name), has === want, `menu ${has ? "offers" : "does not offer"} "${TOGGLE}"`);
-}
-
 async function runServed(f) {
   const id = (s) => `${s} [${f.id}]`;
   console.log(`\n── ${f.id} ${f.path}`);
 
-  // ── S0, S1, S3 — the default page ──────────────────────────────────────
+  // ── S0, S3, S5 — the default page ──────────────────────────────────────
   {
     const { ctx, page, reads, errors } = await openPage(f.path);
     const line = await countLine(page);
@@ -280,8 +206,6 @@ async function runServed(f) {
       await ctx.close();
       return;
     }
-    await offersToggle(page, id, "S1 the eye menu does not offer the toggle", false);
-
     // S5 — rule 6's retired naming: no header reads "including one …".
     const bodyText = await page.evaluate(() => document.body.innerText);
     check(
@@ -333,23 +257,20 @@ async function runServed(f) {
     await ctx.close();
   }
 
-  // ── S2 — the stored preference opens nothing ───────────────────────────
+  // ── S2 — the default page opens nothing ───────────────────────────
   {
-    const { ctx, page, reads } = await openPage(f.path, { stored: { collapseRuns: false } });
+    const { ctx, page, reads } = await openPage(f.path);
     const line = await countLine(page);
     const folders = line ? await folderRows(page) : 0;
     if (folders > 0) await page.waitForTimeout(SETTLE_MS);
     const open = await page.locator(OPEN_GROUP).count();
     check(
-      id("S2 a stored collapseRuns:false makes no folder read and opens no folder"),
+      id("S2 the default page makes no folder read and opens no folder"),
       folders > 0 && reads.length === 0 && open === 0,
       `${folders} folder row(s), ${reads.length} folder read(s), ${open} drawn open`,
     );
     await ctx.close();
   }
-
-  // S4 dropped: it read "Collapse like events" in the `?folders=0` page's
-  // Display menu, a toggle 326 (web `81662167`) removed from every family.
 }
 
 /** E1–E3: folder rows drawn, and — only once they are — no empty wording. */
@@ -416,8 +337,6 @@ try {
     await runNeverEmpty(e3, 'E3 a filter that hides every loose event leaves the folders, not "filtered out"');
   if (!ONLY || ONLY.has(e4.id))
     await runNeverEmpty(e4, "E4a a past-day cut on an all-folder answer draws its events, not the empty label");
-  // C1 dropped: it read "Collapse like events" in a client-grouped page's
-  // Display menu, a toggle 326 (web `81662167`) removed from every family.
 } finally {
   await browser.close();
 }

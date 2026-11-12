@@ -309,14 +309,14 @@ export interface MorphoBaseVaultTimelineResult {
 }
 
 /** A tail older than this many blocks below `finalized` is refreshed after the
- *  request that used it. Base runs at two seconds a block, so 300,000 blocks is
- *  about a week — the same cadence chain 1's 50,000 buys there. Not a
- *  correctness figure: the gate runs either way, and this only decides how much
- *  head a later request has to sweep. */
+ *  request that used it. The bound is the head a later request sweeps, so it
+ *  stays in blocks: 300,000 was about a week at Base's two seconds and is about
+ *  17 hours since Denim (block 53,556,127, 5 Nov 2026; ui-jobs 615), a store
+ *  write that often. Not a correctness figure: the gate runs either way. */
 export const BASE_TAIL_REFRESH_BLOCKS = 300_000;
 /** …and so is a head that came back with more rows than this. */
 export const BASE_TAIL_REFRESH_ROWS = 200;
-/** Ethereum's: twelve seconds a block, so 50,000 blocks is the same week. */
+/** Ethereum's: twelve seconds a block, so 50,000 blocks is about a week. */
 const ETHEREUM_TAIL_REFRESH_BLOCKS = 50_000;
 
 /** How long a chunked build waits before asking again for a block that would

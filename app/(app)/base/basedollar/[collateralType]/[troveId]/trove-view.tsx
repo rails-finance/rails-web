@@ -97,6 +97,9 @@ import { forkLiveVocab, forkReadBy } from "@/lib/shared/liquity-fork-live-proven
 import { atBlockPriceProv } from "@/lib/basedollar/event-provenance";
 import { resolveBranch as resolveForkBranch } from "@/lib/basedollar/asset-catalog";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { useBranchShutdown } from "@/hooks/useBranchShutdown";
+import { ShutdownBullet } from "@/components/protocol/liquity-family/shutdown-bullet";
+import { ProseExplainer } from "@/lib/shared/explainer-prose";
 
 // Redemption touches collapse into one expandable run row — the V2 trove
 // treatment via ChainTruthTimeline's runs seam; the spec is shared across the
@@ -383,6 +386,8 @@ export default function BasedollarTroveDetail({
   }, [collateralType, troveId]);
 
   const liveRisk = chain != null && view?.status === "open";
+  // The branch's shutdown (ui-jobs 612): the catalog's record at once, the live read confirming it.
+  const shutdown = useBranchShutdown("basedollar", collateralType, view?.status === "open");
 
   // Lifetime flows: the Trove's whole history replayed (lib/shared/liquity-flows.ts).
   // A windowed or folder-served page reads the flat history once for it.
@@ -471,6 +476,7 @@ export default function BasedollarTroveDetail({
   const terminalPane =
     view && view.status !== "open" ? (
       <LiquityForkClosedExplanation
+        protocol="basedollar"
         status={view.status}
         collateralSymbol={view.collateralType}
         debtSymbol={DEBT_SYMBOL}
@@ -497,6 +503,7 @@ export default function BasedollarTroveDetail({
         debtSymbol: DEBT_SYMBOL,
         view,
         chain,
+        shutdown,
         events: basedollarEvents,
         csvFilename: `basedollar-${collateralType}-${troveId.slice(0, 10)}-activity.csv`,
         // A grouped page's `events` hold only the ungrouped rows, so its
@@ -542,6 +549,7 @@ export default function BasedollarTroveDetail({
                 surplus={surplus}
                 viewHref={tl.viewHref}
                 live={liveRisk ? chain : undefined}
+                shutdown={shutdown}
                 // The live read's rows in the panel, inside the card's receipts scope.
                 panel={liveRisk ? liquityForkPanelColumns(chain) : undefined}
                 exports={exports}
@@ -553,6 +561,22 @@ export default function BasedollarTroveDetail({
                       chain={chain}
                       isBatched={view?.isBatched ?? false}
                       redist={redistTally}
+                      shutdown={shutdown}
+                    />
+                  ) : shutdown ? (
+                    // Before the live read lands, the record's bullet over the Trove's indexed figures.
+                    <ProseExplainer
+                      items={[
+                        <ShutdownBullet
+                          key="shutdown"
+                          protocol="basedollar"
+                          state={shutdown}
+                          symbol={view.collateralType}
+                          debtSymbol={DEBT_SYMBOL}
+                          coll={view.collateral}
+                          debt={view.debt}
+                        />,
+                      ]}
                     />
                   ) : undefined)
                 }

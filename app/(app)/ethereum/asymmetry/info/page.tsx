@@ -5,6 +5,7 @@
 
 import Link from "next/link";
 import { GlossaryLink, ProtocolInfoPage, type InfoTerm, type InfoView } from "@/components/shared/protocol-info-page";
+import { ASYMMETRY_DOCS_AND_CHAIN } from "@/lib/asymmetry/docs-and-chain";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
@@ -47,21 +48,21 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
     ],
   },
   {
-    term: "Batch manager",
+    term: "Delegate",
     definition:
-      "A batch manager is a third party to whom a borrower delegates the interest rate. The manager sets the rate for every Trove in its batch and may charge a fee for this service.",
+      "A delegate is a third party manager to whom a borrower delegates the interest rate. The delegate sets the rate for every Trove in its batch and may charge a fee for this service.",
     sources: [{ label: "Choosing a rate", href: `${RATES}#how-do-i-decide-on-the-right-rate-for-me` }],
   },
   {
-    term: "Collateral ratio",
+    term: "LTV",
     definition:
-      "The collateral ratio is the value of a Trove's collateral divided by its USDaf debt. Each branch sets a minimum, and a Trove below it can be liquidated.",
+      "LTV, loan-to-value, is a Trove's USDaf debt divided by the value of its collateral. Each borrow market sets a Max LTV, and a Trove above it can be liquidated.",
     sources: [{ label: "How liquidations work", href: `${DOCS}/liquidations#how-do-liquidations-work` }],
   },
   {
     term: "Liquidation",
     definition:
-      "A liquidation closes a Trove whose collateral ratio has fallen below its branch's minimum. The Stability Pool, a pool of USDaf deposits, absorbs the debt, and the borrower can claim the collateral left after a penalty of usually 5%. Whoever starts it receives a gas compensation.",
+      "A liquidation closes a Trove whose LTV has risen above its borrow market's Max LTV. The Stability Pool, a pool of USDaf deposits, absorbs the debt, and the borrower can claim the collateral left after a penalty of usually 5%. Whoever starts it receives a gas compensation.",
     sources: [
       { label: "How liquidations work", href: `${DOCS}/liquidations#how-do-liquidations-work` },
       { label: "Compensation", href: `${DOCS}/liquidations#how-am-i-compensated-for-liquidating-a-trove` },
@@ -82,12 +83,12 @@ const views: readonly [InfoView, ...InfoView[]] = [
       <ul className={UL}>
         <li>Each row is one Trove.</li>
         <li>
-          A row shows the Trove&apos;s collateral, its USDaf debt, its collateral ratio, its dollar value, its interest
-          rate and its status.
+          A row shows the Trove&apos;s collateral, its USDaf debt, its LTV, its dollar value, its interest rate and its
+          status.
         </li>
         <li>
-          The owner sets the interest rate, or the batch manager sets it when the owner has delegated it. A status is
-          Open, Dormant, Closed or Liquidated.
+          The owner sets the interest rate, or the delegate sets it when the owner has delegated it. A status is Open,
+          Dormant, Closed or Liquidated.
         </li>
       </ul>
     ),
@@ -130,21 +131,21 @@ export default function InfoPage() {
           address. The borrower locks collateral, an asset that backs the loan, and borrows USDaf against it.
         </>,
         <>
-          Each collateral type is a branch with its own Troves and its own redemption queue, because a redemption starts
-          with the lowest interest rates in each collateral market. The borrower sets the{" "}
+          Each collateral type is a borrow market, a branch on these pages, with its own Troves and its own redemption
+          queue, because a redemption starts with the lowest interest rates in each borrow market. The borrower sets the{" "}
           <GlossaryLink term="Interest rate">interest rate</GlossaryLink>. A higher rate protects the owner, because a{" "}
           <GlossaryLink term="Redemption">redemption</GlossaryLink> repays the debt of the lowest-rate Troves first and
           takes their collateral at one dollar per USDaf, possibly below the price the owner wants.
         </>,
         <>
-          A borrower can hand the rate to a <GlossaryLink term="Batch manager">batch manager</GlossaryLink>, who moves
-          it for many Troves at once.
+          A borrower can hand the rate to a <GlossaryLink term="Delegate">delegate</GlossaryLink>, who moves it for many
+          Troves at once.
         </>,
         <>
           A redemption that cuts a Trove&apos;s debt below the 2,000 USDaf minimum makes it{" "}
           <GlossaryLink term="Dormant Trove">dormant</GlossaryLink>. A Trove whose{" "}
-          <GlossaryLink term="Collateral ratio">collateral ratio</GlossaryLink> falls below its branch&apos;s minimum
-          can be <GlossaryLink term="Liquidation">liquidated</GlossaryLink>.
+          <GlossaryLink term="LTV">LTV</GlossaryLink> rises above its borrow market&apos;s Max LTV can be{" "}
+          <GlossaryLink term="Liquidation">liquidated</GlossaryLink>.
         </>,
         <>
           Opening a Trove also sets aside a <GlossaryLink term="Liquidation reserve">liquidation reserve</GlossaryLink>{" "}
@@ -153,6 +154,7 @@ export default function InfoPage() {
       ]}
       views={views}
       search="You can search by Trove id, collateral or owner address. The listing filters by Status, Collateral, Debt (USDaf), Collateral (USD) and Transactions, and sorts by Recent activity, Collateral, Debt (USDaf) or Interest rate."
+      docsAndChain={ASYMMETRY_DOCS_AND_CHAIN}
       docs={{ label: "Asymmetry documentation", href: "https://docs.asymmetry.finance" }}
     />
   );

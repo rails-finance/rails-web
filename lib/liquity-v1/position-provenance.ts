@@ -364,7 +364,7 @@ export function baseRateProv(): Provenance {
     pclass: "state",
     verify: STATE_VERIFY,
     summary:
-      "The base rate — TroveManager.baseRate at the latest block. Liquity V1 has no per-Trove interest rate: this single protocol-wide value is what both fees derive from. Redeeming raises it (in proportion to how much of the supply was redeemed) and time decays it back toward zero, so it reads as a measure of recent redemption pressure rather than a price anyone sets.",
+      "The baseRate — TroveManager.baseRate at the latest block. Liquity V1 has no per-Trove interest rate: this single protocol-wide value is what both fees derive from. Redeeming raises it (in proportion to how much of the supply was redeemed) and time decays it back toward zero, so it reads as a measure of recent redemption pressure rather than a price anyone sets.",
     contract: TROVE_MANAGER,
     via: `${SYSTEM_VIA} · TroveManager.baseRate @ head · ÷10^18`,
   };
@@ -376,7 +376,7 @@ export function systemFeeRateProv(what: string, call: string): Provenance {
     kind: "chain",
     pclass: "state",
     verify: STATE_VERIFY,
-    summary: `${what} — TroveManager.${call} at the latest block: the contract's own current rate (the shared base rate with time decay applied). A one-time fee, not an ongoing interest rate — V1 charges no interest.`,
+    summary: `${what} — TroveManager.${call} at the latest block: the contract's own current rate (the shared baseRate with time decay applied). A one-time fee, not an ongoing interest rate — V1 charges no interest.`,
     contract: TROVE_MANAGER,
     via: `${SYSTEM_VIA} · TroveManager.${call} @ head · ÷10^18`,
   };

@@ -12,7 +12,8 @@
 import type { ForkTroveTail } from "@/lib/shared/liquity-fork-trove-page-data";
 import type { AsymmetryTroveSummary } from "@/lib/sources/api/asymmetry-troves";
 import { DEBT_SYMBOL, shortId } from "@/lib/asymmetry/asset-catalog";
-import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
+import { CARD_VOCAB } from "@/lib/shared/card-vocab";
+import { LTV_LABEL, ltvPct } from "@/lib/liquity/ltv";
 import { formatNumber, formatPrice } from "@/lib/utils/format";
 import type { PositionCardModel } from "@/lib/share/position-card";
 
@@ -40,9 +41,9 @@ export function asymmetryShareCardModel(
     // percent — the card's `viewFromForkSummary` scales it ×100 before it
     // ever reaches a column, and this mapper does the same rather than
     // reading the raw field as if it already were one.
-    if (trove.collateralRatio != null && trove.collateralRatio > 0) {
-      stats.push({ label: ratioLabel("cdp"), value: `${(trove.collateralRatio * 100).toFixed(1)}%` });
-    }
+    // Asymmetry's docs state the ratio as LTV, debt ÷ collateral (decision 0065).
+    const ltv = ltvPct(trove.collateralRatio != null ? trove.collateralRatio * 100 : null);
+    if (ltv != null) stats.push({ label: LTV_LABEL, value: `${ltv.toFixed(1)}%` });
   } else {
     // Closed/liquidated troves hold nothing current — state the
     // highest-recorded figures over the trove's life instead, the same peak

@@ -33,7 +33,7 @@ export const revalidate = 600;
 export const metadata = {
   title: "Liquity V1 system",
   description:
-    "Liquity V1's system state and redemption queue: total collateral ratio, the Stability Pool, and the base rate.",
+    "Liquity V1's system state and redemption queue: total collateral ratio, the Stability Pool, and the baseRate.",
 };
 
 const PROTOCOL = protocolForHref("/ethereum/liquity-v1")!;

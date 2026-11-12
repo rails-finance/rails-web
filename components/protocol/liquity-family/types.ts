@@ -100,6 +100,10 @@ export interface LiquityTroveLive {
   /** The contract's own status word when the lane has one ("active" |
    *  "zombie" | …); "zombie" overrides the view's index-derived flag. */
   status: string;
+  /** The branch's entire collateral (TroveManager.getEntireBranchColl), where
+   *  the lane reads it (the forks'): a shut-down branch's pool can hold less
+   *  than the Trove records (ui-jobs 607, 612). */
+  branchColl?: number | null;
 }
 
 /** A liquidated Trove's collateral surplus, read at the head

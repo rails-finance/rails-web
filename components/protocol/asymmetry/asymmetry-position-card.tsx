@@ -13,6 +13,7 @@ import {
   liveFromForkChain,
 } from "@/components/protocol/liquity-family/liquity-position-card";
 import type { LiquityTroveSurplus, LiquityTroveView } from "@/components/protocol/liquity-family/types";
+import type { BranchShutdownState } from "@/lib/liquity-fork/shutdown";
 import type { PositionCardExports, PositionPanelColumns } from "@/components/shared/position-card";
 import type { LiquityForkTroveChainResponse } from "@/lib/api/fetch-liquity-fork-position";
 import type { AsymmetryTroveSummary } from "@/lib/sources/api/asymmetry-troves";
@@ -29,6 +30,7 @@ export function AsymmetryPositionCard({
   surplus,
   panel,
   exports,
+  shutdown,
 }: {
   v: AsymmetryTroveView;
   /** The Trove page's render (receipts, panel, (i)); the listing omits it. */
@@ -48,6 +50,8 @@ export function AsymmetryPositionCard({
   panel?: PositionPanelColumns;
   /** The card ⋮'s export shapes (`liquityForkExports`). */
   exports?: PositionCardExports | null;
+  /** The branch's shutdown (ui-jobs 612): the page's `useBranchShutdown`. */
+  shutdown?: BranchShutdownState | null;
 }) {
   return (
     <LiquityPositionCard
@@ -61,6 +65,7 @@ export function AsymmetryPositionCard({
       surplus={surplus}
       panel={panel}
       exports={exports}
+      shutdown={shutdown}
     />
   );
 }

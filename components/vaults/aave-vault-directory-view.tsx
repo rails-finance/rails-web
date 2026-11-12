@@ -145,8 +145,8 @@ function AaveRosterDrawer({ counts, block }: { counts: { stataCount: number; sta
         grow with a stored yield index, and withdrawals are clamped to the GHO the contract holds. A static aToken wraps
         exactly one Aave V3 aToken, so its shares are a non-rebasing claim on a supply position and its share price is
         the reserve&rsquo;s accrued index. An Umbrella stake token is staked against one reserve&rsquo;s deficit:
-        Umbrella can slash it, which lowers every holder&rsquo;s share price at once, and redemption runs through a
-        cooldown and a window after it.
+        Umbrella can slash it, taking part of the stake to cover the deficit, which lowers every holder&rsquo;s share
+        price at once, and redemption runs through a cooldown and a window after it.
       </p>
       <h3 className="text-[13px] font-semibold text-foreground">What this page is</h3>
       <p>

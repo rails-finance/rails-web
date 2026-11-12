@@ -8,6 +8,7 @@
 import { notFound } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { HistoryTitleRow } from "@/components/shared/history-tag";
+import { UnansweredLine } from "@/components/shared/unanswered-line";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { isWallet } from "@/components/protocol/uniswap/uniswap-wallet-positions";
 import { BalancerWalletList } from "@/components/protocol/balancer/balancer-wallet-list";
@@ -39,9 +40,12 @@ export async function BalancerWalletPositions({ chainId, wallet: raw }: { chainI
           </HistoryTitleRow>
         </header>
         {answer.kind !== "ok" ? (
-          <p className="text-sm text-rb-500" data-balancer-unanswered={answer.kind === "refused" ? answer.code : ""}>
+          <UnansweredLine
+            ceiling={answer.kind === "ceiling"}
+            data-balancer-unanswered={answer.kind === "refused" ? answer.code : ""}
+          >
             {answer.kind === "refused" ? REFUSED[answer.code] : FRONT_DOOR.unanswered}
-          </p>
+          </UnansweredLine>
         ) : (
           <BalancerWalletList r={answer.data} home={home} />
         )}

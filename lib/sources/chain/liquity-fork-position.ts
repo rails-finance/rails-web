@@ -27,6 +27,7 @@ import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { serverLiquityForkTrove } from "@/lib/sources/api/liquity-fork-head";
 import { settleTrove, troveStub, type TroveDataRead } from "./liquity-fork-settle";
+import type { BranchShutdownRecord, ShutdownRead } from "@/lib/liquity-fork/shutdown";
 
 export interface LiquityForkBranchConfig {
   key: string;
@@ -38,6 +39,10 @@ export interface LiquityForkBranchConfig {
   mcr: number;
   ccr: number;
   scr: number;
+  /** Where the branch answers its shutdown (lib/sources/chain/liquity-fork-shutdown.ts). */
+  shutdownRead?: ShutdownRead;
+  /** The branch's shutdown as its catalog records it (decision 0054 ruling 2). */
+  shutdownRecord?: BranchShutdownRecord;
 }
 
 export interface LiquityForkConfig {

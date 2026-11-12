@@ -7,6 +7,7 @@
 // LiquityForkBranchesView holds the presentation — Asymmetry renders the same
 // component off its own roster.
 
+import { LIQUITY_FAMILY_TERMS } from "@/lib/liquity/ltv";
 import { branchScopeKeys } from "@/lib/shared/asset-family";
 import {
   LiquityForkBranchesView,
@@ -52,6 +53,7 @@ export default async function EbisuBranchesPage() {
           protocolName="Ebisu"
           basePath="/ethereum/ebisu"
           learnMore={{
+            terms: LIQUITY_FAMILY_TERMS.ebisu,
             protocolName: "Ebisu",
             stablecoin: DEBT_SYMBOL,
             // The one live-verified Ebisu link (docs.ebisu.money doesn't

@@ -11,6 +11,7 @@ import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { HistoryTitleRow } from "@/components/shared/history-tag";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { AimGate } from "@/components/shared/aim-gate";
+import { UnansweredLine } from "@/components/shared/unanswered-line";
 import { EulerPositionCard } from "@/components/protocol/euler/euler-position-card";
 import { EulerVaultSection } from "@/components/protocol/euler/euler-vault-section";
 import { isWallet } from "@/components/protocol/uniswap/uniswap-wallet-positions";
@@ -39,13 +40,17 @@ export async function EulerPositionPage({
   const home = explorerHref(chain, "euler-v2");
   const answer = await loadEulerPosition(chain, account, vault);
   if (answer.kind === "not-found") notFound();
-  if (answer.kind === "error")
+  if (answer.kind === "error" || answer.kind === "ceiling")
     return (
       <div className="py-8">
         <DetailTopRow session={session} fallbackHref={home} showStamp={false} />
-        <p className="mt-6 text-sm text-rb-500" data-position-unanswered="">
+        <UnansweredLine
+          ceiling={answer.kind === "ceiling"}
+          className="mt-6 text-sm text-rb-500"
+          data-position-unanswered=""
+        >
           {POSITION_PAGE.unanswered}
-        </p>
+        </UnansweredLine>
       </div>
     );
   const r = answer.data;

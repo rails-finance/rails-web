@@ -63,7 +63,10 @@ export function transmuterEmittedProv(
 export interface TransmuterMaturityEstimate {
   referenceBlock: number;
   blocksRemaining: number;
+  /** The chain's seconds per block at the indexed block. */
   secondsPerBlock: number;
+  /** The blocks to go, in seconds, each era at its rate (lib/shared/block-rate.ts). */
+  seconds: number;
   /** Unix milliseconds the count starts from: the time the page was read. */
   fromMs: number;
   /** Unix milliseconds of the estimated maturity. */
@@ -99,7 +102,7 @@ export function transmuterMaturityProv(
   };
   if (!estimate) return block;
   const e = estimate;
-  const seconds = e.blocksRemaining * e.secondsPerBlock;
+  const seconds = e.seconds;
   return {
     ...block,
     summary:

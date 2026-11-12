@@ -812,11 +812,12 @@ export function useFxCardSlots({
       {
         id: "collateral",
         label: CARD_VOCAB.collateral,
+        tier: "amount",
         value: collateralValue,
         usd: collateralUsd(v, px, listingPx),
       },
       // fxUSD is not pinned to a dollar, so the debt carries no USD line.
-      { id: "debt", label: CARD_VOCAB.debt, value: debtValue },
+      { id: "debt", label: CARD_VOCAB.debt, tier: "amount", value: debtValue },
       {
         id: "debt-ratio",
         label: "Debt ratio",

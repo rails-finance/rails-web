@@ -5,6 +5,7 @@
 
 import Link from "next/link";
 import { GlossaryLink, ProtocolInfoPage } from "@/components/shared/protocol-info-page";
+import { SPARK_DOCS_AND_CHAIN } from "@/lib/spark/docs-and-chain";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { sparkGlossary } from "@/lib/spark/event-templates";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
@@ -81,7 +82,7 @@ export default function InfoPage() {
           heading: "Market page",
           body: (
             <p>
-              The market page lists every asset in the Pool with its size, its supply and borrow rates and its risk
+              The market page lists every asset in the Pool with its size, its supply and borrow APYs and its risk
               settings, read live.{" "}
               <Link href="/ethereum/spark/markets" className={INLINE_LINK}>
                 See the SparkLend market
@@ -91,6 +92,7 @@ export default function InfoPage() {
           ),
         },
       ]}
+      docsAndChain={SPARK_DOCS_AND_CHAIN}
       docs={{ label: "SparkLend documentation", href: "https://docs.spark.finance/products/sparklend" }}
     />
   );
