@@ -496,7 +496,8 @@ export function useMorphoCardSlots({
     ) : hasDebt ? (
       <Prov info={positionBorrowedProv(v.loanSymbol, v.atBlock, coords)}>{loanFigure(v.borrowed)}</Prov>
     ) : null;
-    heads = [collateral, { id: "debt", label: CARD_VOCAB.debt, value: debtValue }];
+    // An amount with no icon or USD line on the detail card: named (decision 0066 point 2).
+    heads = [collateral, { id: "debt", label: CARD_VOCAB.debt, value: debtValue, tier: "amount" }];
 
     // The LTV headline, from the page's live read: debt over the collateral's
     // value at the market's oracle. A listing reads no market (decision 0018).
