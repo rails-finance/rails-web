@@ -109,6 +109,9 @@ export interface PositionCardStatus {
   /** The tag's read-more: a "?" after the tag on a detail card, drawn as a
    *  panel row's is. */
   tip?: string;
+  /** A sub-code the tag also carries where the state has its own key row
+   *  (rails-ops reference/app-anatomy.md): "C6.1", a shut-down Trove. */
+  anatomy?: string;
 }
 
 /** One headline figure. */
@@ -458,7 +461,7 @@ function StatusTag({ status }: { status: PositionCardStatus }) {
     <span className="inline-flex items-center">
       <span
         className={`rounded-xs px-1.5 py-0.5 text-[11px] font-semibold ${POSITION_TAG_TONE[status.tone]}`}
-        data-anatomy="C6"
+        data-anatomy={status.anatomy ? `C6 ${status.anatomy}` : "C6"}
       >
         {status.word}
       </span>
@@ -487,7 +490,7 @@ function ListingPill({ status }: { status: PositionCardStatus | null }) {
   return (
     <span
       className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${status ? POSITION_TAG_TONE[status.tone] : OPEN_PILL}`}
-      data-anatomy="C6"
+      data-anatomy={status?.anatomy ? `C6 ${status.anatomy}` : "C6"}
     >
       {status ? status.word.toUpperCase() : "OPEN"}
     </span>

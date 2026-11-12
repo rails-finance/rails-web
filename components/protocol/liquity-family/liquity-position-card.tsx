@@ -696,7 +696,7 @@ export function useLiquityCardSlots({
       : v.status === "closed"
         ? { word: "Closed", tone: "muted" }
         : shut
-          ? { word: "Shut down", tone: "caution" }
+          ? { word: "Shut down", tone: "caution", anatomy: "C6.1" }
           : zombie
             ? { word: terms.dormant, tone: "muted" }
             : null;
@@ -991,7 +991,7 @@ export function useLiquityCardSlots({
       <span data-liq-none="no-debt">None</span>
     ) : null;
   // Each heading's read-more (decision 0038), in the branch's symbols.
-  const tips = troveCardTips(ct, cfg.debtSymbol, terms);
+  const tips = troveCardTips(ct, cfg.debtSymbol, terms, shut != null);
   const HEAD_TIP = tips.heads;
   const ROW_TIP = tips.rows;
   const tipRow = (r: PositionPanelRow): PositionPanelRow =>

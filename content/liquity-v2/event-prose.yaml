@@ -747,6 +747,19 @@ trove_words:
     The {coll_symbol} price at which the Trove's {ratio_text} meets the branch's {limit_text}: the debt times the {limit_short}, divided by the collateral.
   card_tip_liquidates_at_ltv: |-
     The {coll_symbol} price at which the Trove's LTV reaches the branch's Max LTV: the debt divided by the collateral times the Max LTV.
+  # An open Trove on a shut-down branch (ui-jobs 612): the heads that stay,
+  # in the state they are in. Interest stopped at the shutdown; whether the
+  # Trove can be liquidated has not been read.
+  card_tip_collateral_shutdown: |-
+    The {coll_symbol} the Trove records against its debt.
+  card_tip_debt_shutdown: |-
+    The {debt_symbol} the Trove records as owed. Interest stopped accruing when its branch shut down.
+  card_tip_cr_shutdown: |-
+    The {ratio_text} (CR): the collateral's dollar value divided by the debt.
+  card_tip_ltv_shutdown: |-
+    The debt divided by the collateral's dollar value.
+  card_tip_rate_shutdown: |-
+    The annual rate the Trove carried when its branch shut down. Interest stopped accruing then.
   # ── The Trove listing: its heading, noun and search box ──
   listing_title: |-
     Liquity V2 Troves

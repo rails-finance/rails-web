@@ -14,6 +14,9 @@ export interface LiquityFlowsNoteProps {
   zombie: boolean;
   /** The collateral between events is at the branch's daily price. */
   daily?: boolean;
+  /** The branch shut down (ui-jobs 612): interest stopped then, and the Trove
+   *  takes no new debt. */
+  shutDown?: boolean;
 }
 
 export function LiquityFlowsNote({
@@ -23,6 +26,7 @@ export function LiquityFlowsNote({
   lives,
   zombie,
   daily = false,
+  shutDown = false,
 }: LiquityFlowsNoteProps): ReactNode {
   return (
     <div className="space-y-2" data-liquity-flows-note="" data-anatomy="F14">
@@ -36,10 +40,10 @@ export function LiquityFlowsNote({
         The debt side adds up to what the Trove owes, in {debtSymbol} at its $1 face: borrowed, plus the interest, the
         upfront fees, the batch management fees and the debt redistributed from liquidated Troves, less what was repaid,
         redeemed and liquidated. Each event records the debt after it, so the interest to that event is exact; on a
-        batch member it is split into interest and the batch&apos;s fee by their two rates. Interest since the last
-        event is the last line: the interest the Trove&apos;s rate has built on its recorded debt since then (at
-        today&apos;s stop, the Trove&apos;s own current figure, with any redistribution and batch fee not yet recorded
-        on their own lines).
+        batch member it is split into interest and the batch&apos;s fee by their two rates.{" "}
+        {shutDown
+          ? "Interest since the last event is the last line: the interest the Trove's rate built on its recorded debt until its branch shut down, when interest stopped."
+          : "Interest since the last event is the last line: the interest the Trove's rate has built on its recorded debt since then (at today's stop, the Trove's own current figure, with any redistribution and batch fee not yet recorded on their own lines)."}
       </p>
       <p>
         {daily
@@ -54,8 +58,9 @@ export function LiquityFlowsNote({
         The bars and the sums cover every life of this Trove: a closed life&apos;s flows stay in the bars and the line
         reads zero while the Trove is closed
         {lives > 1 ? ` (it has had ${lives} lives)` : ""}. A dormant Trove, redeemed below the minimum debt, still holds
-        its collateral and owes its debt, so both stay solid on the bars until its owner closes it or brings it back
-        above the minimum{zombie ? "; this Trove is dormant now" : ""}.
+        its collateral and owes its debt, so both stay solid on the bars
+        {shutDown ? "" : " until its owner closes it or brings it back above the minimum"}
+        {zombie ? "; this Trove is dormant now" : ""}.
       </p>
     </div>
   );
