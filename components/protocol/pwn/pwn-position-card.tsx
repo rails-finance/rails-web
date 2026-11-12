@@ -40,6 +40,8 @@ import {
   bookPastDueProv,
   positionInterestProv,
   positionAccruedProv,
+  positionAprProv,
+  positionFixedRateProv,
   extendedDeadlineProv,
 } from "@/lib/pwn/event-provenance";
 import { formatExact } from "@/lib/utils/format";
@@ -390,7 +392,11 @@ function costRows(v: PwnPositionView, cost: PwnLoanCost): PositionPanelRow[] {
         id: "rate",
         label: "Rate",
         tip: "The fixed interest as a rate over the term the parties struck, worked out from the principal and the repay total.",
-        value: <RateText text={interestRateText(cost.rate)} />,
+        value: (
+          <Prov info={positionFixedRateProv(sym, v.version)}>
+            <RateText text={interestRateText(cost.rate)} />
+          </Prov>
+        ),
       });
     return rows;
   }
@@ -421,7 +427,11 @@ function costRows(v: PwnPositionView, cost: PwnLoanCost): PositionPanelRow[] {
       id: "rate",
       label: "Accrues",
       tip: "The yearly rate in the loan's terms, read from the PWN contract at creation.",
-      value: <RateText text={aprText(a.apr)} />,
+      value: (
+        <Prov info={positionAprProv(v.version)}>
+          <RateText text={aprText(a.apr)} />
+        </Prov>
+      ),
     },
   ];
 }

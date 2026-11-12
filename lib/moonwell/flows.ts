@@ -91,10 +91,12 @@ function liquidationRoles(
 }
 
 /** The page's rows as the replay reads them, oldest first. `mtokenOf` maps a
- *  market key to its mToken address (lowercased). */
+ *  market key to its mToken address (lowercased); `underlyingOf` to its
+ *  underlying token's, where the page knows it. */
 export function moonwellFlowRows(
   events: readonly BaseActivityEvent[],
   mtokenOf: (market: string) => string,
+  underlyingOf: (market: string) => string | null,
 ): CTokenFlowRow[] {
   const rows = sortByLog(events.filter(isMoonwellEvent));
   const roles = liquidationRoles(rows, mtokenOf);
@@ -129,6 +131,7 @@ export function moonwellFlowRows(
       kind,
       market: c.market,
       symbol: c.marketSymbol,
+      underlying: underlyingOf(c.market),
       supplyBefore: supply ? num(c.supplyBefore) : null,
       supplyAfter: supply ? num(c.supplyAfter) : null,
       debtBefore: debt ? num(c.debtBefore) : null,

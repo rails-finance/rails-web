@@ -137,6 +137,27 @@ export function llamalendHealthProv(amm?: string): Provenance {
   };
 }
 
+/** The fall left before soft-liquidation begins: (price_oracle − pUp) ÷
+ *  price_oracle, from the same two same-block reads as the band ratio. */
+export function llamalendBandDistanceProv(amm?: string): Provenance {
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    verify: recompute(
+      "Re-run the AMM's price_oracle and p_oracle_up(n1) eth_calls, then take 1 − pUp ÷ price_oracle; only that step is arithmetic.",
+    ),
+    summary:
+      "Fall to soft-liquidation — how far the collateral's oracle price can fall before it reaches this position's top band and the AMM begins converting collateral: 1 − pUp ÷ price_oracle, two prices in the same unit at the same block, rounded to a whole percent.",
+    contract: ammOf(amm),
+    via: `${LANE_VIA} · 1 − derived pUp ÷ price_oracle (same block)`,
+    formula: "1 − pUp ÷ price_oracle",
+    inputs: [
+      { label: "price_oracle", kind: "chain", pclass: "oracle", note: "the AMM's own price @ head" },
+      { label: "pUp", kind: "chain-derived", pclass: "state", note: "exact band math over A, base_price, n1" },
+    ],
+  };
+}
+
 /** The Controller's own health(user, true) at head. */
 export function llamalendHealthFullProv(controller?: string, raw?: string | null): Provenance {
   return {

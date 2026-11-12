@@ -123,6 +123,7 @@ export function compoundV2FlowRows(
       kind: KIND[c.eventType],
       market: c.market,
       symbol: c.marketSymbol,
+      underlying: m?.underlying ?? null,
       supplyBefore: supply ? num(c.supplyBefore) : null,
       supplyAfter: supply ? num(c.supplyAfter) : null,
       debtBefore: supply ? null : num(c.debtBefore),

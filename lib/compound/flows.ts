@@ -805,6 +805,8 @@ export function compoundFlowTimeline(events: CompoundFlowEvent[], o: CompoundFlo
       debt: "Debt",
     },
     words: compoundFlowWords(o.baseSymbol, roles, o.dailyPrices ? "store" : "carried"),
+    // Each token's address by symbol, for the icons.
+    addresses: Object.fromEntries(events.map((e) => [e.symbol, e.token])),
   };
 }
 

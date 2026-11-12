@@ -2,6 +2,7 @@
 
 import { useContext } from "react";
 import { QuietTipsContext } from "@/components/shared/reveal-tip";
+import type { AssetMark } from "@/lib/shared/asset-mark";
 import { TokenChipIcon } from "./token-chip-icon";
 
 // Compact inline icon cluster for "value + icons" rows on position cards.
@@ -10,9 +11,11 @@ import { TokenChipIcon } from "./token-chip-icon";
 // Past `max` symbols the stack caps and a trailing "+N" chip carries the rest —
 // at seven uncapped icons the glyphs occlude into an unreadable band, so the
 // cap keeps the cluster scannable on every card that renders it.
+// Each asset comes with its address (AssetMark), so a cluster icon resolves
+// through the same chain as the timeline's and the breakdown's.
 
 export interface InlineAssetClusterProps {
-  symbols: string[];
+  assets: AssetMark[];
   size?: number;
   overlap?: number;
   /** Cap on rendered icons; the remainder collapses into a "+N" chip whose
@@ -20,22 +23,22 @@ export interface InlineAssetClusterProps {
   max?: number;
 }
 
-export function InlineAssetCluster({ symbols, size = 28, overlap = 9, max = 3 }: InlineAssetClusterProps) {
+export function InlineAssetCluster({ assets, size = 28, overlap = 9, max = 3 }: InlineAssetClusterProps) {
   // Inside the breakdown button the title falls quiet with the figure's tips.
   const quiet = useContext(QuietTipsContext);
-  if (symbols.length === 0) return null;
-  const overflows = symbols.length > max;
-  const visible = overflows ? symbols.slice(0, max) : symbols;
-  const hidden = overflows ? symbols.slice(max) : [];
+  if (assets.length === 0) return null;
+  const overflows = assets.length > max;
+  const visible = overflows ? assets.slice(0, max) : assets;
+  const hidden = overflows ? assets.slice(max) : [];
   return (
     <span className="inline-flex items-center">
-      {visible.map((sym, i) => (
+      {visible.map((a, i) => (
         <span
-          key={`${sym}-${i}`}
+          key={`${a.symbol}-${i}`}
           className="relative inline-flex items-center justify-center rounded-full bg-raised p-0.5"
           style={{ marginLeft: i > 0 ? -overlap : 0, zIndex: visible.length - i }}
         >
-          <TokenChipIcon symbol={sym} size={size} filterable={false} />
+          <TokenChipIcon symbol={a.symbol} address={a.address ?? undefined} size={size} filterable={false} />
         </span>
       ))}
       {hidden.length > 0 && (
@@ -45,7 +48,7 @@ export function InlineAssetCluster({ symbols, size = 28, overlap = 9, max = 3 }:
         // live on the surfaces that trace them.
         <span
           data-prov-exempt=""
-          title={quiet ? undefined : hidden.join(", ")}
+          title={quiet ? undefined : hidden.map((a) => a.symbol).join(", ")}
           className="relative inline-flex items-center justify-center rounded-full bg-raised text-[10px] font-semibold tabular-nums text-rb-500"
           style={{ marginLeft: -overlap, zIndex: 0, width: size + 4, height: size + 4 }}
         >

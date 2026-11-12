@@ -15,13 +15,13 @@ import { ROW, isWallet } from "@/components/protocol/uniswap/uniswap-wallet-posi
 import { fetchFluidBasePositions } from "@/lib/api/fetch-fluid-base";
 import { FRONT_DOOR } from "@/lib/fluid-base/words";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
-import { explorerHref } from "@/lib/shared/protocols";
+import { protocolForSession } from "@/lib/shared/protocols";
 
 export async function FluidBaseWalletPositions({ wallet: raw }: { wallet: string }) {
   if (!isWallet(raw)) notFound();
   const wallet = raw.toLowerCase();
   const session = "fluid-base";
-  const home = explorerHref(8453, session);
+  const home = protocolForSession(session)!.href;
   const answer = await fetchFluidBasePositions(wallet);
   const all = answer.kind === "ok" ? answer.data.positions : [];
   return (

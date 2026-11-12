@@ -1,12 +1,15 @@
-// The Lifetime flows panel's loading shape (rails-ops TO-DO-ui-jobs §266):
-// the scrubber's parts at the heights the settled panel takes (a position with
-// a line, both sides), so nothing moves when the history lands. Phone (below
-// sm) and desktop each take their own heights: the headlines, the two bars and
-// their axis, the line with its marks and ends, the playback controls and, on
-// a phone, the "Show to" button's own row. The panel's header and its (i) row
-// are real while it loads. Heights measured 5 Oct 2026 on the Liquity V2 trove
-// at 390, 430 and 1280: 415px phone, 332px desktop between the header and the
-// (i) row.
+// The Lifetime flows panel's loading shape (rails-ops TO-DO-ui-jobs §266, 337):
+// the combined body's parts at the heights the settled body takes, so nothing
+// moves when the history lands. Top to bottom: the bars (the old-price line,
+// then each side's headline over its bar: one side for a savings position,
+// two where there is debt), the events heading with its charts button, the
+// value and price chart where the charts are shown, then the events' pips and
+// the cursor's date with the steps. Phone (below sm) and desktop take their
+// own heights, and a touch screen its taller controls. Measured 12 Nov 2026,
+// desktop and phone: 236 and 250 px with one side (Maple), 318 and 332 px with
+// two (Aave V3, Liquity V2); with the charts shown, 536 and 590 px, 618 and
+// 672 px. A protocol activity chart under the events (Liquity V2) is not
+// reserved.
 //
 // Over it, the waiting cue (ui-jobs 333): after 1.2 s an activity bar and the
 // scale of the read ("Loading 44,898 events…" where the timeline has stated
@@ -74,54 +77,69 @@ export function LifetimeFlowsWaiting({ count, line }: { count: LifeCount | null;
   );
 }
 
-export function LifetimeFlowsSkeleton({ compact = false }: { compact?: boolean }) {
-  if (compact)
-    // Collapsed: the headlines over their bars, the toggle, the events pill
-    // and the steps.
-    return (
-      <div className="mt-2 animate-pulse" aria-hidden data-flows-skeleton="compact">
-        <div className="mb-2 flex h-[53px] flex-wrap items-start gap-x-6 sm:h-7 sm:items-center">
-          <div className={`${BLOCK} h-7 w-32`} />
-          <div className={`${BLOCK} h-7 w-28`} />
-        </div>
-        <div className={`${BLOCK} h-10 sm:h-11`} />
-        <div className={`${BLOCK} mt-3 h-10 sm:h-11`} />
-        <div className="mt-3 flex justify-center">
-          <div className={`${BLOCK} size-8 rounded-full`} />
-        </div>
-        {/* The events pill, the cursor's date and the steps. */}
-        <div className="mt-2 h-4" />
-        <div className={`${BLOCK} mt-1.5 h-11 rounded-full sm:h-[38px]`} />
-        <div className="mt-6 flex justify-end">
-          <div className={`${BLOCK} h-11 w-[184px] sm:h-8`} />
-        </div>
-      </div>
-    );
+/** What the settled body will draw, where the page knows before the history
+ *  lands: how many sides the bars take, and whether a switch row (Maple's
+ *  pools) stands over them. */
+export interface FlowsSkeletonShape {
+  sides?: 1 | 2;
+  switchRow?: boolean;
+}
+
+export function LifetimeFlowsSkeleton({
+  compact = false,
+  sides = 2,
+  switchRow = false,
+  viewToggle = true,
+}: FlowsSkeletonShape & {
+  compact?: boolean;
+  /** The charts' button beside the events heading; a page with no toggle
+   *  keeps the heading on one row. */
+  viewToggle?: boolean;
+}) {
   return (
-    <div className="mt-2 animate-pulse" aria-hidden data-flows-skeleton="">
-      {/* Headlines, and the date at the row's right end (it wraps under them
-          on a phone). */}
-      <div className="mb-2 flex h-[53px] flex-wrap items-start gap-x-6 sm:h-7 sm:items-center">
-        <div className={`${BLOCK} h-7 w-32`} />
-        <div className={`${BLOCK} h-7 w-28`} />
-        <div className={`${BLOCK} ml-auto h-4 w-12 max-sm:mt-2`} />
+    <div className="mt-2 animate-pulse" aria-hidden data-flows-skeleton={compact ? "compact" : ""}>
+      {switchRow && <div className={`${BLOCK} mb-3 h-8 w-36`} />}
+      {/* The old-price line, then each side's headline over its bar. */}
+      <div className="h-5" />
+      {Array.from({ length: sides }, (_, i) => (
+        <div key={i} className={i > 0 ? "mt-4" : undefined}>
+          <div className="mb-1.5 flex h-7 items-center">
+            <div className={`${BLOCK} h-6 w-32`} />
+          </div>
+          <div className={`${BLOCK} h-8`} />
+        </div>
+      ))}
+      {/* The events heading and its charts button: the button wraps under
+          the heading on a phone while the charts are shown. */}
+      <div
+        className={`mt-6 flex items-start justify-between gap-3 ${
+          !compact && viewToggle
+            ? "h-[72px] sm:h-8 pointer-coarse:h-24 sm:pointer-coarse:h-11"
+            : "h-8 pointer-coarse:h-11"
+        }`}
+      >
+        <div className="flex h-8 items-center gap-3 pointer-coarse:h-11">
+          <div className={`${BLOCK} h-4 w-14`} />
+          {compact && viewToggle && <div className={`${BLOCK} h-8 w-36 pointer-coarse:h-11`} />}
+        </div>
+        <div className={`${BLOCK} size-7 rounded-full`} />
       </div>
-      {/* The held and owed bars on their axis. */}
-      <div className={`${BLOCK} h-10 sm:h-11`} />
-      <div className={`${BLOCK} mt-3 h-10 sm:h-11`} />
-      <div className="mt-1 h-4" />
-      {/* The line, its marks and its two ends. */}
-      <div className={`${BLOCK} mt-4 h-20 opacity-60`} />
-      <div className="h-[26px] sm:h-5" />
-      <div className="flex h-4 justify-between px-2">
-        <div className={`${BLOCK} h-3 w-14`} />
-        <div className={`${BLOCK} h-3 w-10`} />
-      </div>
-      {/* The playback controls, and the "Show to" button: its own row on a
-          phone, the controls' right end from sm. */}
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-        <div className={`${BLOCK} h-11 w-[220px] sm:h-9 sm:w-[184px]`} />
-        <div className={`${BLOCK} h-11 w-full sm:h-9 sm:w-40`} />
+      <div className="mt-3">
+        {/* The value and price chart: its range buttons, then the chart. */}
+        {!compact && (
+          <>
+            <div className="mb-1.5 flex h-5 gap-1 pointer-coarse:h-9">
+              <div className={`${BLOCK} h-5 w-24 pointer-coarse:h-9`} />
+            </div>
+            <div className={`${BLOCK} h-[250px] opacity-60`} />
+            <div className="h-6" />
+          </>
+        )}
+        {/* The events' pips, then the cursor's date with the steps. */}
+        <div className={compact ? "mt-2" : undefined}>
+          <div className={`${BLOCK} h-11 sm:h-[38px]`} />
+          <div className={`${BLOCK} mt-2 h-11 sm:h-9`} />
+        </div>
       </div>
     </div>
   );

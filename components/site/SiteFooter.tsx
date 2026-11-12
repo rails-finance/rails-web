@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { LwNotice } from "@/components/shared/lw-attribution";
 import { Activity, DraftingCompass, FileText, Home, Info, LayoutGrid, Signpost } from "lucide-react";
@@ -10,9 +9,10 @@ import { DonateModal } from "@/components/site/DonateModal";
 import { FeedbackCluster } from "@/components/shared/feedback-cluster";
 import { LiquityModal } from "@/components/site/LiquityModal";
 import { PhoneBeta } from "@/components/nav/phone-beta";
+import { useIsHome } from "@/hooks/useIsHome";
 
 export function SiteFooter() {
-  const home = usePathname() === "/";
+  const home = useIsHome();
   const [donateOpen, setDonateOpen] = useState(false);
   const [liquityOpen, setLiquityOpen] = useState(false);
   // Footer rail links are deliberately dumb — they land on the protocol's
