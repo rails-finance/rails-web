@@ -123,6 +123,7 @@ import {
 } from "@/components/protocol/liquity-fork/liquity-fork-state-stats";
 import { getForkBatchManagerName } from "@/lib/shared/fork-batch-managers";
 import { AmountText } from "@/components/shared/amount-text";
+import { familyRatioPct, fmtLtv, type LiquityFamilyTerms } from "@/lib/liquity/ltv";
 
 const shortAddress = (a: string): string => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
@@ -190,7 +191,7 @@ export interface LiquityForkExplainerProvs {
 }
 
 /** The fork blanks the copy reads — the display name and the minted stablecoin. */
-export type LiquityForkCopy = Pick<LiquityForkLearnMoreParams, "protocolName" | "stablecoin" | "minDebt">;
+export type LiquityForkCopy = Pick<LiquityForkLearnMoreParams, "protocolName" | "stablecoin" | "minDebt" | "terms">;
 
 // A debt leg reads as cleared at or below a cent (the 18-decimal stable's
 // display dust); collateral clears at an exact zero (the 8-decimal branches make
@@ -244,7 +245,7 @@ export function liquityForkEventSlots(
   // A redemption states its ratio in its own clauses, step by step where
   // interest was booked on the same touch.
   const ratio =
-    ctx.eventType === "redeemCollateral" && Number(ctx.debtAfter) > DEBT_EPS ? null : ratioClause(ctx, coords, b);
+    ctx.eventType === "redeemCollateral" && Number(ctx.debtAfter) > DEBT_EPS ? null : ratioClause(ctx, coords, fork, b);
   return ratio ? { ...withRedist, meansNow: [...(withRedist.meansNow ?? []), ratio] } : withRedist;
 }
 
@@ -363,11 +364,15 @@ function redistClauses(
 function ratioClause(
   ctx: LiquityForkEventContext,
   coords: LiquityForkCoords,
+  fork: LiquityForkCopy,
   b: LiquityForkExplainerProvs,
 ): ClauseInput {
   if (!b.collRatioProv || ctx.eventType === "liquidate") return null;
   const f = liquityForkStateFigures(ctx);
   if (f.price == null || f.crAfter == null) return null;
+  // The ratio in the deployment's terms (decision 0065).
+  const t = fork.terms;
+  const rd = (cr: number) => familyRatioPct(t, cr) as number;
   const emitted = ctx.priceAtBlock?.source === "redemption-event-price";
   const priceFig = (
     <Fig
@@ -380,21 +385,21 @@ function ratioClause(
   const after = (
     <Fig
       info={b.collRatioProv(coords, { coll: ctx.collAfter, debt: ctx.debtAfter, priceUsd: f.price, which: "after" })}
-      value={forkCrText(f.crAfter)}
+      value={forkCrText(rd(f.crAfter))}
     >
-      {forkCrText(f.crAfter)}
+      {forkCrText(rd(f.crAfter))}
     </Fig>
   );
-  const moved = f.crBefore != null && Math.abs(f.crBefore - f.crAfter) >= 0.005;
+  const moved = f.crBefore != null && Math.abs(rd(f.crBefore) - rd(f.crAfter)) >= 0.005;
   return clause(
     moved ? (
       <>
-        At the branch&rsquo;s {ctx.collateralSymbol} price of {priceFig} for this block, the collateral ratio went from{" "}
-        {forkCrText(f.crBefore!)} to {after}.
+        At the branch&rsquo;s {ctx.collateralSymbol} price of {priceFig} for this block, the {t.ratioText} went from{" "}
+        {forkCrText(rd(f.crBefore!))} to {after}.
       </>
     ) : (
       <>
-        At the branch&rsquo;s {ctx.collateralSymbol} price of {priceFig} for this block, the collateral ratio stands at{" "}
+        At the branch&rsquo;s {ctx.collateralSymbol} price of {priceFig} for this block, the {t.ratioText} stands at{" "}
         {after}.
       </>
     ),
@@ -410,6 +415,11 @@ function eventSlots(
   const coll = ctx.collateralSymbol;
   const debt = fork.stablecoin;
   const et = ctx.eventType;
+  // The deployment's documented terms (decision 0065).
+  const t = fork.terms;
+  const rd = (cr: number) => familyRatioPct(t, cr) as number;
+  // The fee drawing debt adds: its name, and its size where the name does not say.
+  const weekFee = !/^7-day/.test(t.upfrontFeeText);
   // The collateral the act moved, apart from any redistribution landing on the
   // same touch (that is its own clause, redistClauses).
   const collDelta = forkCollMove(ctx);
@@ -518,7 +528,7 @@ function eventSlots(
       ctx.operation?.accruedIncludesBatchFees ? (
         <>
           {interestFig()} of interest and batch fees built up since the Trove was last touched is now part of its debt.
-          Batch fees are the batch manager&rsquo;s annual fee on the batch&rsquo;s debt, and any fee the batch paid for
+          Batch fees are the {t.delegate}&rsquo;s annual fee on the batch&rsquo;s debt, and any fee the batch paid for
           changing its rate early.
         </>
       ) : (
@@ -567,7 +577,10 @@ function eventSlots(
           Opened the Trove with {collDeltaFig()} of collateral and borrowed {debtDeltaFig()}
           {rate ? (
             batched ? (
-              <> at its batch manager&rsquo;s {rate} rate</>
+              <>
+                {" "}
+                at its {t.delegate}&rsquo;s {rate} rate
+              </>
             ) : (
               <> at a self-chosen {rate} annual rate</>
             )
@@ -581,19 +594,32 @@ function eventSlots(
       // on trust. Without the decomposition the original worded clause stands.
       const feeNote = hasFee
         ? clause(
-            <>
-              {fork.protocolName} added its one-time borrowing fee of {feeFig()} to the debt, about a week of the
-              branch&rsquo;s average interest.
-            </>,
+            weekFee ? (
+              <>
+                {fork.protocolName} added its {t.upfrontFeeText} of {feeFig()} to the debt, about a week of the
+                branch&rsquo;s average interest.
+              </>
+            ) : (
+              <>
+                {fork.protocolName} added a {t.upfrontFeeText} of {feeFig()} to the debt.
+              </>
+            ),
           )
         : clause(
-            <>The debt also carries a one-time borrowing fee, about 7 days of the branch&rsquo;s average interest.</>,
+            weekFee ? (
+              <>
+                The debt also carries {indefiniteArticle(t.upfrontFeeText).toLowerCase()} {t.upfrontFeeText}, about 7
+                days of the branch&rsquo;s average interest.
+              </>
+            ) : (
+              <>The debt also carries a {t.upfrontFeeText}.</>
+            ),
           );
       const meansNow: ClauseInput[] = batched
         ? [
             clause(
               <>
-                The batch manager sets one rate for every Trove in its batch and manages its place in the redemption
+                The {t.delegate} sets one rate for every Trove in its batch and manages its place in the redemption
                 queue.
               </>,
             ),
@@ -664,15 +690,26 @@ function eventSlots(
         debtMoved && debtMove > 0
           ? hasFee
             ? clause(
-                <>
-                  The new debt also carries a one-time borrowing fee of {feeFig()}, about a week of the branch&rsquo;s
-                  average interest, added to what the Trove owes.
-                </>,
+                weekFee ? (
+                  <>
+                    The new debt also carries {indefiniteArticle(t.upfrontFeeText).toLowerCase()} {t.upfrontFeeText} of{" "}
+                    {feeFig()}, about a week of the branch&rsquo;s average interest, added to what the Trove owes.
+                  </>
+                ) : (
+                  <>
+                    The new debt also carries a {t.upfrontFeeText} of {feeFig()}, added to what the Trove owes.
+                  </>
+                ),
               )
             : clause(
-                <>
-                  The new debt carries a one-time borrowing fee, about 7 days of the branch&rsquo;s average interest.
-                </>,
+                weekFee ? (
+                  <>
+                    The new debt carries {indefiniteArticle(t.upfrontFeeText).toLowerCase()} {t.upfrontFeeText}, about 7
+                    days of the branch&rsquo;s average interest.
+                  </>
+                ) : (
+                  <>The new debt carries a {t.upfrontFeeText}.</>
+                ),
               )
           : null,
         // The interest that built up while the Trove sat untouched: its own
@@ -687,7 +724,7 @@ function eventSlots(
       const rateNode = rate ?? <>a new value</>;
       const happened = ctx.isBatched ? (
         <>
-          Changed the Trove&rsquo;s annual interest rate to {rateNode}, set by its batch manager rather than by the
+          Changed the Trove&rsquo;s annual interest rate to {rateNode}, set by its {t.delegate} rather than by the
           owner.
         </>
       ) : (
@@ -733,15 +770,22 @@ function eventSlots(
       const rate = rateFig();
       const happened = (
         <>
-          Delegated the Trove&rsquo;s interest rate to a batch manager
-          {rate ? <>, now on the manager&rsquo;s {rate} rate</> : null}.
+          Delegated the Trove&rsquo;s interest rate to a {t.delegate}
+          {rate ? (
+            <>
+              , now on the {t.delegate}&rsquo;s {rate} rate
+            </>
+          ) : null}
+          .
         </>
       );
       return {
         happened: [clause(happened)],
         meansNow: [
           clause(
-            <>The manager sets one rate for every Trove in its batch and manages its place in the redemption queue.</>,
+            <>
+              The {t.delegate} sets one rate for every Trove in its batch and manages its place in the redemption queue.
+            </>,
           ),
           clause(
             <>
@@ -821,15 +865,27 @@ function eventSlots(
     case "liquidate": {
       // The minimum in force at this block: governance can have moved it since.
       const mcrText = ctx.mcrAtEvent != null ? `${Math.round(ctx.mcrAtEvent * 1000) / 10}%` : null;
+      // In LTV terms the limit is the Max LTV, 1 ÷ that minimum.
+      const mcrMaxLtv = ctx.mcrAtEvent != null ? fmtLtv(100 / ctx.mcrAtEvent, 2) : null;
       // The collateral taken is the Trove's whole collateral less the surplus
       // that came back to the owner, which is its own figure below.
       const surplusN = ctx.liquidation ? Number(ctx.liquidation.collSurplus) : 0;
       const taken = Math.abs(collDelta) - (surplusN > 0 ? surplusN : 0);
       const happened = (
         <>
-          The Trove&rsquo;s collateral ratio fell below the branch&rsquo;s minimum
-          {mcrText ? <> of {mcrText} at the time</> : null} at the branch&rsquo;s own price, so anyone could liquidate
-          it: {debtDeltaFig()} of debt was cleared and its {collDeltaFig()} of collateral left the Trove
+          {t.ltv ? (
+            <>
+              The Trove&rsquo;s LTV rose above the branch&rsquo;s Max LTV
+              {mcrMaxLtv ? <> of {mcrMaxLtv} at the time</> : null}
+            </>
+          ) : (
+            <>
+              The Trove&rsquo;s {t.ratioText} fell below the branch&rsquo;s {t.limitText}
+              {mcrText ? <> of {mcrText} at the time</> : null}
+            </>
+          )}{" "}
+          at the branch&rsquo;s own price, so anyone could liquidate it: {debtDeltaFig()} of debt was cleared and its{" "}
+          {collDeltaFig()} of collateral left the Trove
           {surplusN > 0 ? (
             <>
               , of which {forkCollAmount(taken)} {coll} was taken and the rest came back to the owner as surplus
@@ -843,7 +899,7 @@ function eventSlots(
         liquidationRoute(ctx, coords, debt, b),
       ];
       const meansNow: ClauseInput[] = [
-        liquidationValued(ctx, coords, coll, debt, b),
+        liquidationValued(ctx, coords, coll, debt, b, t),
         ...liquidationSurplus(ctx, coords, coll, b),
       ];
       return { happened: [clause(happened)], changed, meansNow };
@@ -860,8 +916,8 @@ function eventSlots(
       const becameZombie = minDebt != null && !wasZombie && preDebt >= minDebt && hasDebtAfter && debtAfter < minDebt;
       const why = wasZombie ? (
         <>
-          already dormant, its debt under the {formatNumber(minDebt!)} {debt} minimum, so out of the rate queue and
-          reached as the branch&rsquo;s most recent dormant Trove
+          already {t.dormantText}, its debt under the {formatNumber(minDebt!)} {debt} minimum, so out of the rate queue
+          and reached as the branch&rsquo;s most recent {t.dormantNoun}
         </>
       ) : (
         <>among the branch&rsquo;s lowest interest rates at the time</>
@@ -888,7 +944,7 @@ function eventSlots(
         redFeeFig() != null
           ? clause(
               <>
-                The redeemer paid a fee of {redFeeFig()}
+                The redeemer paid a redemption fee of {redFeeFig()}
                 {feePct != null ? <> ({feePct.toFixed(2)}% of the collateral redeemed from this Trove)</> : null}, and
                 the Trove kept it as collateral.
               </>,
@@ -941,17 +997,19 @@ function eventSlots(
                 {fmtNum(ctx.debtBefore)} → {forkAmount(debtBeforeN + accruedN)} {debt}
                 {cr0 != null && cr1 != null ? (
                   <>
-                    , collateral ratio {forkCrText(cr0)} → {forkCrText(cr1)}
+                    , {t.ratioText} {forkCrText(rd(cr0))} → {forkCrText(rd(cr1))}
                   </>
                 ) : null}
                 ), then the redemption cancelled {forkAmount(ownCleared)} {debt} ({forkAmount(debtBeforeN + accruedN)} →{" "}
                 {fmtNum(ctx.debtAfter)} {debt}
                 {cr1 != null && cr2 != null ? (
-                  forkCrText(cr1) === forkCrText(cr2) ? (
-                    <>, collateral ratio stays at {forkCrText(cr2)}</>
+                  forkCrText(rd(cr1)) === forkCrText(rd(cr2)) ? (
+                    <>
+                      , {t.ratioText} stays at {forkCrText(rd(cr2))}
+                    </>
                   ) : (
                     <>
-                      , collateral ratio {forkCrText(cr1)} → {forkCrText(cr2)}
+                      , {t.ratioText} {forkCrText(rd(cr1))} → {forkCrText(rd(cr2))}
                     </>
                   )
                 ) : null}
@@ -969,8 +1027,8 @@ function eventSlots(
           changed: [
             clause(
               <>
-                That cleared the Trove&rsquo;s debt entirely; it now holds only {collAfterFig()} of collateral and is
-                dormant, out of the rate queue.
+                That cleared the Trove&rsquo;s debt entirely; it now holds only {collAfterFig()} of collateral and is{" "}
+                {t.dormantText}, out of the rate queue.
               </>,
             ),
             ...redemptionContext,
@@ -994,14 +1052,17 @@ function eventSlots(
       const redFrom = accruedN > DEBT_EPS ? cr1 : cr0;
       // Read at the precision shown, so the sentence never contradicts the
       // two figures beside it.
+      // In the deployment's terms: a redemption raises a collateral ratio and
+      // lowers an LTV.
       const ratioMove =
         redFrom != null && cr2 != null
-          ? forkCrText(cr2) === forkCrText(redFrom)
+          ? forkCrText(rd(cr2)) === forkCrText(rd(redFrom))
             ? "kept"
-            : cr2 > redFrom
+            : rd(cr2) > rd(redFrom)
               ? "raised"
               : "lowered"
           : null;
+      const easing = t.ltv ? "lowered" : "raised";
       return {
         happened: [clause(happened)],
         changed: [
@@ -1016,8 +1077,8 @@ function eventSlots(
             ? clause(
                 <>
                   This redemption left the debt under the branch&rsquo;s {formatNumber(minDebt!)} {debt} minimum, so the
-                  Trove is now dormant, out of the rate queue. As the branch&rsquo;s most recent dormant Trove, it is
-                  the first Trove the next redemption reaches.
+                  Trove is now {t.dormantText}, out of the rate queue. As the branch&rsquo;s most recent {t.dormantNoun}
+                  , it is the first Trove the next redemption reaches.
                 </>,
               )
             : null,
@@ -1027,18 +1088,18 @@ function eventSlots(
             ratioMove != null ? (
               <>
                 Redemption swaps debt for collateral at the branch&rsquo;s price, and the Trove keeps the fee
-                {ratioMove === "raised" ? (
+                {ratioMove === easing ? (
                   <>
-                    , so this one raised the collateral ratio from {forkCrText(redFrom!)} to {forkCrText(cr2!)}
+                    , so this one {easing} the {t.ratioText} from {forkCrText(rd(redFrom!))} to {forkCrText(rd(cr2!))}
                   </>
                 ) : ratioMove === "kept" ? (
                   <>
-                    , so a redemption raises the collateral ratio; this one moved it by less than 0.01% (
-                    {forkCrText(cr2!)})
+                    , so a redemption {t.ltv ? "lowers" : "raises"} the {t.ratioText}; this one moved it by less than
+                    0.01% ({forkCrText(rd(cr2!))})
                   </>
                 ) : (
                   <>
-                    : this one took the collateral ratio from {forkCrText(redFrom!)} to {forkCrText(cr2!)}
+                    : this one took the {t.ratioText} from {forkCrText(rd(redFrom!))} to {forkCrText(rd(cr2!))}
                   </>
                 )}
                 .
@@ -1046,7 +1107,7 @@ function eventSlots(
             ) : (
               <>
                 Redemption swaps debt for collateral at the branch&rsquo;s price, and the Trove keeps the fee, so a
-                redemption on its own raises the collateral ratio.
+                redemption on its own {t.ltv ? "lowers" : "raises"} the {t.ratioText}.
               </>
             ),
           ),
@@ -1061,7 +1122,7 @@ function eventSlots(
               ? clause(
                   <>
                     A redemption that leaves a Trove under the branch&rsquo;s {formatNumber(minDebt)} {debt} minimum
-                    debt makes it dormant, out of the rate-ordered queue.
+                    debt makes it {t.dormantText}, out of the rate-ordered queue.
                   </>,
                 )
               : null,
@@ -1074,7 +1135,7 @@ function eventSlots(
       const br = ctx.batchRate;
       const manager = ctx.batchManager
         ? (getForkBatchManagerName(ctx.batchManager) ?? shortAddress(ctx.batchManager))
-        : "The batch manager";
+        : `The ${t.delegate}`;
       const f = liquityForkStateFigures(ctx);
       const rateNow =
         f.rate != null ? (
@@ -1085,13 +1146,13 @@ function eventSlots(
       const happened =
         ctx.eventType === "lowerBatchManagerAnnualFee" && br ? (
           <>
-            {manager}, the Trove&rsquo;s batch manager, lowered the batch&rsquo;s annual management fee
+            {manager}, the Trove&rsquo;s {t.delegate}, lowered the batch&rsquo;s annual management fee
             {br.managementFeeBefore != null ? <> from {forkRateText(Number(br.managementFeeBefore))}</> : null} to{" "}
             {forkRateText(Number(br.managementFee))}.
           </>
         ) : (
           <>
-            {manager}, the Trove&rsquo;s batch manager, changed the batch&rsquo;s annual interest rate
+            {manager}, the Trove&rsquo;s {t.delegate}, changed the batch&rsquo;s annual interest rate
             {f.rateBefore != null ? <> from {forkRateText(f.rateBefore)}</> : null}
             {rateNow ? <> to {rateNow}</> : null}.
           </>
@@ -1100,16 +1161,16 @@ function eventSlots(
       // sentence above.
       const ownerIdle =
         ctx.eventType === "lowerBatchManagerAnnualFee" && br ? null : (
-          <>The owner did not act: every Trove in the batch pays the rate its manager sets.</>
+          <>The owner did not act: every Trove in the batch pays the rate its {t.delegate} sets.</>
         );
       const troveFee = br?.troveFee != null ? Number(br.troveFee) : 0;
       const changed: ClauseInput[] = [
         br && troveFee > 0 && b.batchFeeShareProv
           ? clause(
               <>
-                The change came inside the cooldown after the manager&rsquo;s previous change, so {fork.protocolName}{" "}
-                added a premature-adjustment fee of {fmtNum(br.batchFee)} {debt} to the batch&rsquo;s debt. This Trove
-                carries{" "}
+                The change came inside the cooldown after the {t.delegate}&rsquo;s previous change, so{" "}
+                {fork.protocolName} added a premature-adjustment fee of {fmtNum(br.batchFee)} {debt} to the
+                batch&rsquo;s debt. This Trove carries{" "}
                 <Fig
                   info={b.batchFeeShareProv(coords, {
                     fee: br.troveFee,
@@ -1137,7 +1198,7 @@ function eventSlots(
                 >
                   <AmountText value={f.costPerYear} /> {debt}
                 </Fig>
-                , before the manager&rsquo;s management fee.
+                , before the {t.delegate}&rsquo;s management fee.
               </>,
             )
           : null,
@@ -1187,12 +1248,14 @@ function liquidationValued(
   coll: string,
   debt: string,
   b: LiquityForkExplainerProvs,
+  t: LiquityFamilyTerms,
 ): ClauseInput {
   const v = liquidationValues(ctx);
   if (!v) return null;
   const { price, seizedUsd, clearedUsd, cleared } = v;
   // The forensics block's third cell: the collateral ratio at liquidation.
-  const premiumPct = forkCrText((seizedUsd / clearedUsd) * 100);
+  // In LTV terms (decision 0065) it is the debt over the collateral.
+  const premiumPct = forkCrText(t.ltv ? (clearedUsd / seizedUsd) * 100 : (seizedUsd / clearedUsd) * 100);
   const priceFig = (
     <Fig info={b.atBlockPriceProv(coords, price)} value={formatPrice(price)} symbol={coll}>
       {formatPrice(price)}
@@ -1230,7 +1293,8 @@ function liquidationValued(
   return clause(
     <>
       At the branch&rsquo;s price at the time ({priceFig} per {coll}) the Trove&rsquo;s collateral was worth {seizedFig}{" "}
-      against {clearedFig} of debt counted at $1 face: a collateral ratio of {premiumFig} at liquidation.
+      against {clearedFig} of debt counted at $1 face: {t.ltv ? "an LTV" : `a ${t.ratioText}`} of {premiumFig} at
+      liquidation.
     </>,
   );
 }

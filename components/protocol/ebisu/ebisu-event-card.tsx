@@ -4,6 +4,7 @@
 // (components/protocol/liquity-fork/liquity-fork-event-card.tsx) with this
 // deployment's words, stable and provenance vocabulary.
 
+import { LIQUITY_FAMILY_TERMS } from "@/lib/liquity/ltv";
 import type { BaseActivityEvent, EbisuContext } from "@/lib/shared/types/event-shape";
 import {
   LiquityForkEventCard,
@@ -16,6 +17,7 @@ import { DEBT_SYMBOL, EBISU_DOCS, MIN_DEBT, resolveBranch } from "@/lib/ebisu/as
 // question-level docs links per card topic (EBISU_DOCS — read and verified
 // against ebisu.gitbook.io/ebisu-money, 2026-09-28, Miles's OK).
 export const EBISU_FORK = {
+  terms: LIQUITY_FAMILY_TERMS.ebisu,
   protocolName: "Ebisu",
   stablecoin: DEBT_SYMBOL,
   minDebt: MIN_DEBT,

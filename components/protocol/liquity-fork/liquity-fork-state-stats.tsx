@@ -37,6 +37,7 @@ import { forkAmount, forkCollAmount, forkDebtMove, forkRedistArrival } from "@/l
 import { AmountText } from "@/components/shared/amount-text";
 import { faceUsdProv } from "@/lib/shared/flows-timeline-provenance";
 import { formatCompact } from "@/lib/shared/format-compact";
+import { familyRatioPct, type LiquityFamilyTerms } from "@/lib/liquity/ltv";
 
 /** The fork vocabulary's builders the cells read (lib/<fork>/event-provenance.ts). */
 export interface LiquityForkStateProvs {
@@ -195,6 +196,7 @@ export function liquityForkStateStats(
   coords: LiquityForkCoords,
   debtSymbol: string,
   p: LiquityForkStateProvs,
+  terms: LiquityFamilyTerms,
 ): ChainTruthStat[] {
   const f = liquityForkStateFigures(ctx);
   const stats: ChainTruthStat[] = [];
@@ -448,26 +450,31 @@ export function liquityForkStateStats(
   });
 
   if (f.crAfter != null && f.price != null) {
-    const moved = f.crBefore != null && Math.abs(f.crBefore - f.crAfter) >= 0.005;
+    // The ratio in the deployment's terms (decision 0065): LTV is 10000 ÷ the
+    // collateral ratio, each side converted before the change is taken.
+    const disp = (cr: number) => familyRatioPct(terms, cr) as number;
+    const after = disp(f.crAfter);
+    const before = f.crBefore != null ? disp(f.crBefore) : undefined;
+    const moved = before != null && Math.abs(before - after) >= 0.005;
     stats.push({
-      label: "Collateral ratio",
-      value: forkCrText(f.crAfter),
-      display: forkCrText(f.crAfter),
+      label: terms.ratio,
+      value: forkCrText(after),
+      display: forkCrText(after),
       symbol: "",
       prov: p.collRatioProv(coords, { coll: ctx.collAfter, debt: ctx.debtAfter, priceUsd: f.price, which: "after" }),
-      changed: moved || f.crBefore == null,
+      changed: moved || before == null,
       ...(moved
         ? {
             transition: pctTransition(
-              f.crBefore!,
-              f.crAfter,
+              before!,
+              after,
               p.collRatioProv(coords, {
                 coll: ctx.collBefore,
                 debt: ctx.debtBefore,
                 priceUsd: f.price,
                 which: "before",
               }),
-              "Collateral ratio",
+              terms.ratio,
             ),
           }
         : {}),

@@ -66,8 +66,10 @@ const V2_BATCHED =
 // AUTHORSHIP, not phrasing — each regex accepts any wording that credits the
 // right party and still goes red if the parties swap.
 const BORROWER = /the (?:rate the )?borrower chooses(?: it)?/;
+// The forks name the party in their docs' word (decision 0065): Ebisu's and
+// Asymmetry's "delegate", where the copy said "batch manager".
 const DELEGATE =
-  /(?:interest-)?batch manager (?:sets it on the owner|rather than by the owner)|set by its batch manager/;
+  /(?:interest-)?(?:batch manager|delegate) (?:sets it on the owner|rather than by the owner)|set by its (?:batch manager|delegate)/;
 
 let failures = 0;
 const assert = (cond, msg) => {
@@ -256,7 +258,7 @@ console.log("§4 fork fallback modal copy (module level — no live page reaches
   const body = fn.slice(0, fn.indexOf("\n}\n"));
   assert(!body.includes("each borrower chooses their own annual rate"), "fallback no longer asserts sole authorship");
   assert(
-    body.includes("set by the borrower, or by the interest-batch manager the borrower delegates to"),
+    body.includes("set by the borrower, or by the ${p.terms.delegate} the borrower delegates to"),
     "fallback names both rate-authorship routes",
   );
 }

@@ -5,6 +5,7 @@
 
 import { flowChange, pctWords, type FlowChange } from "@/lib/shared/flows-changes";
 import type { LiquityForkLevel } from "@/lib/shared/liquity-flows";
+import { liquityFamilyTerms } from "@/lib/liquity/ltv";
 
 const ratio = (m: number) => pctWords(Math.round(m * 1e4) / 100, 0);
 
@@ -16,7 +17,8 @@ export function forkMcrChanges(fork: LiquityForkLevel): FlowChange[] {
       ts: s.untilTimestamp,
       block: s.untilBlock,
       ...(s.setBy ? { txHash: s.setBy.txHash } : {}),
-      name: "Minimum ratio",
+      // The limit as the deployment's docs name it (decision 0065).
+      name: liquityFamilyTerms(fork.name).limit,
       from: ratio(s.mcr),
       to: ratio(to),
       prov: {

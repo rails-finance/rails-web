@@ -33,6 +33,7 @@ import { forkAmount, forkCollAmount, forkLiquidationReserve } from "@/lib/shared
 import type { LiquityForkTroveChainResponse } from "@/lib/api/fetch-liquity-fork-position";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { AmountText } from "@/components/shared/amount-text";
+import { fmtLtv, liquityFamilyTerms } from "@/lib/liquity/ltv";
 
 /** Past-tense narration for a closed or liquidated fork Trove — the card's own
  *  terminal figures (the recorded peaks), with the ending mechanism derived
@@ -41,6 +42,7 @@ import { AmountText } from "@/components/shared/amount-text";
  *  V2-family Trove — it leaves a zombie), and every liquidated life ends with
  *  the liquidation that seized it. */
 export function LiquityForkClosedExplanation({
+  protocol,
   status,
   collateralSymbol,
   debtSymbol,
@@ -51,6 +53,8 @@ export function LiquityForkClosedExplanation({
   surplus,
   redist,
 }: {
+  /** The deployment, whose docs' terms the bullets take. */
+  protocol: string;
   status: "closed" | "liquidated";
   collateralSymbol: string;
   debtSymbol: string;
@@ -76,6 +80,7 @@ export function LiquityForkClosedExplanation({
   surplus?: LiquityTroveSurplus | null;
 }) {
   const liquidated = status === "liquidated";
+  const terms = liquityFamilyTerms(protocol);
 
   const lead = liquidated ? (
     <>
@@ -108,7 +113,10 @@ export function LiquityForkClosedExplanation({
         ) : (
           <>The liquidation seized the Trove&rsquo;s remaining collateral and cleared its remaining debt, </>
         )}
-        the branch liquidates a Trove whose collateral ratio falls below its minimum, in one whole-Trove seizure.
+        {terms.ltv
+          ? `the branch liquidates a Trove whose LTV rises above its ${terms.limitText}`
+          : `the branch liquidates a Trove whose ${terms.ratioText} falls below its ${terms.limitText}`}
+        , in one whole-Trove seizure.
       </span>,
     );
     if (surplus) bullets.push(<SurplusBullet key="surplus" surplus={surplus} symbol={collateralSymbol} />);
@@ -195,6 +203,7 @@ export function LiquityForkPositionExplanation({
 }) {
   if (chain.chainStale || (chain.status !== "active" && chain.status !== "zombie")) return null;
   const debtSymbol = FORK_DEBT_SYMBOL[chain.protocol] ?? "debt";
+  const terms = liquityFamilyTerms(chain.protocol);
   const reserve = forkLiquidationReserve(chain.protocol);
   // The card's receipts, one per figure (the shared fork vocabulary).
   const vocab = forkLiveVocab(chain.protocol, forkReadBy(chain));
@@ -265,16 +274,16 @@ export function LiquityForkPositionExplanation({
           <Prov info={rateProv}>
             <H>{chain.annualInterestRatePct.toFixed(2)}%</H>
           </Prov>{" "}
-          annual rate: the rate its interest-batch manager sets for every member.
+          annual rate: the rate its {terms.delegate} sets for every member.
           {chain.accruedBatchManagementFee > 0 && (
             <>
               {" "}
-              Another <AmountText value={chain.accruedBatchManagementFee} /> {debtSymbol} is the manager&rsquo;s
-              management fee built up over the same time, also part of the debt.
+              Another <AmountText value={chain.accruedBatchManagementFee} /> {debtSymbol} is the {terms.delegate}
+              &rsquo;s management fee built up over the same time, also part of the debt.
             </>
           )}
           {chain.status !== "zombie" && (
-            <> The manager&rsquo;s rate also sets the batch&rsquo;s place in the redemption queue.</>
+            <> The {terms.delegate}&rsquo;s rate also sets the batch&rsquo;s place in the redemption queue.</>
           )}
         </span>
       ) : (
@@ -304,14 +313,25 @@ export function LiquityForkPositionExplanation({
 
   if (hasDebt && chain.icr != null) {
     bullets.push(
-      <span key="icr">
-        Collateral ratio{" "}
-        <Prov info={vocab.contractIcrProv(sym)}>
-          <H>{(chain.icr * 100).toFixed(1)}%</H>
-        </Prov>
-        , against the branch&rsquo;s <H>{(chain.mcr * 100).toFixed(0)}%</H> minimum. Below it, anyone can liquidate the
-        Trove.
-      </span>,
+      terms.ltv ? (
+        <span key="icr">
+          LTV{" "}
+          <Prov info={vocab.contractIcrProv(sym)}>
+            <H>{(100 / chain.icr).toFixed(1)}%</H>
+          </Prov>
+          , against the branch&rsquo;s <H>{fmtLtv(100 / chain.mcr, 2)}</H> Max LTV. Above it, anyone can liquidate the
+          Trove.
+        </span>
+      ) : (
+        <span key="icr">
+          {terms.ratio}{" "}
+          <Prov info={vocab.contractIcrProv(sym)}>
+            <H>{(chain.icr * 100).toFixed(1)}%</H>
+          </Prov>
+          , against the branch&rsquo;s <H>{(chain.mcr * 100).toFixed(0)}%</H> {terms.limitText}. Below it, anyone can
+          liquidate the Trove.
+        </span>
+      ),
     );
     if (dropPct != null && chain.liqPriceUsd != null) {
       bullets.push(
@@ -335,7 +355,8 @@ export function LiquityForkPositionExplanation({
             <H>
               <AmountText value={headroom} format="compact" />
             </H>{" "}
-            {debtSymbol} more could be borrowed before the Trove reaches the {(chain.mcr * 100).toFixed(0)}% minimum.
+            {debtSymbol} more could be borrowed before the Trove reaches the{" "}
+            {terms.ltv ? fmtLtv(100 / chain.mcr, 2) : `${(chain.mcr * 100).toFixed(0)}%`} {terms.limitText}.
           </span>,
         );
       }
@@ -348,16 +369,16 @@ export function LiquityForkPositionExplanation({
     bullets.push(
       hasDebt ? (
         <span key="zombie">
-          A partial redemption left this Trove below the branch&rsquo;s minimum debt, which makes it <H>dormant</H>: out
-          of the rate-ordered redemption queue.{" "}
+          A partial redemption left this Trove below the branch&rsquo;s minimum debt, which makes it{" "}
+          <H>{terms.dormantText}</H>: out of the rate-ordered redemption queue.{" "}
           {chain.redeemedFirst ? (
             <>
-              The TroveManager holds it as the branch&rsquo;s last dormant Trove (lastZombieTroveId), so the next
+              The TroveManager holds it as the branch&rsquo;s last {terms.dormantNoun} (lastZombieTroveId), so the next
               redemption on the branch takes it first.
             </>
           ) : (
             <>
-              A redemption reaches only the dormant Trove the TroveManager holds as lastZombieTroveId, and that is
+              A redemption reaches only the {terms.dormantNoun} the TroveManager holds as lastZombieTroveId, and that is
               another Trove, so no redemption reaches this one.
             </>
           )}{" "}
@@ -367,8 +388,9 @@ export function LiquityForkPositionExplanation({
         </span>
       ) : (
         <span key="zombie">
-          Redemption cancelled all of its debt, which leaves it <H>dormant</H>: outside the redemption queue. With no
-          debt, a redemption cannot reach it and there is nothing to liquidate. Closing the Trove returns the{" "}
+          Redemption cancelled all of its debt, which leaves it <H>{terms.dormantText}</H>: outside the redemption
+          queue. With no debt, a redemption cannot reach it and there is nothing to liquidate. Closing the Trove returns
+          the{" "}
           <H>
             <AmountText value={chain.entireColl} /> {chain.symbol}
           </H>
@@ -397,13 +419,30 @@ export function LiquityForkPositionExplanation({
 
   if (chain.branchTcr != null) {
     bullets.push(
-      <span key="branch">
-        The {chain.symbol} branch as a whole is <H>{(chain.branchTcr * 100).toFixed(0)}%</H> collateralised
-        {chain.branchTcr < chain.ccr ? (
-          <> : below its {(chain.ccr * 100).toFixed(0)}% critical ratio, so new borrowing is paused until it recovers</>
-        ) : null}
-        .
-      </span>,
+      terms.ltv ? (
+        // The docs name the branch ratios TCR and CCR (decision 0065).
+        <span key="branch">
+          The {chain.symbol} branch&rsquo;s Total Collateral Ratio (TCR) is <H>{(chain.branchTcr * 100).toFixed(0)}%</H>
+          {chain.branchTcr < chain.ccr ? (
+            <>
+              : below its {(chain.ccr * 100).toFixed(0)}% Critical Collateral Ratio (CCR), so new borrowing is paused
+              until it recovers
+            </>
+          ) : null}
+          .
+        </span>
+      ) : (
+        <span key="branch">
+          The {chain.symbol} branch as a whole is <H>{(chain.branchTcr * 100).toFixed(0)}%</H> collateralised
+          {chain.branchTcr < chain.ccr ? (
+            <>
+              {" "}
+              : below its {(chain.ccr * 100).toFixed(0)}% critical ratio, so new borrowing is paused until it recovers
+            </>
+          ) : null}
+          .
+        </span>
+      ),
     );
   } else if (chain.branchDebt != null && chain.branchDebt < 1) {
     // A wound-down branch keeps dust in its aggregate interest bookkeeping, so
@@ -411,8 +450,8 @@ export function LiquityForkPositionExplanation({
     // state one; the fact worth stating is the emptiness itself.
     bullets.push(
       <span key="branch">
-        The {chain.symbol} branch as a whole carries no {debtSymbol} debt at present, so it has no branch-level
-        collateral ratio to state.
+        The {chain.symbol} branch as a whole carries no {debtSymbol} debt at present, so it has no{" "}
+        {terms.ltv ? "TCR" : "branch-level collateral ratio"} to state.
       </span>,
     );
   }

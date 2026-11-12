@@ -216,17 +216,18 @@ export function protectsLine(f: ProtectsFact): ProtectsLine {
       if (f.timelock === 0)
         return {
           label: "Timelock",
-          headline: "New markets, higher caps and removals take effect at once",
+          headline: "Adding a market, raising a cap and removing a market take effect at once",
           sentence: pending.join(" "),
           gap: null,
         };
       return {
         label: "Timelock",
-        headline: `New markets, higher caps, removals and a shorter timelock wait ${days(f.timelock)}`,
+        headline: `Adding a market, raising a cap, removing a market that still holds deposits, shortening the timelock and replacing the guardian each wait ${days(f.timelock)}`,
         sentence: [
           f.guardian
-            ? `The guardian, ${shortHex(f.guardian)}, can cancel them while they wait, as can the owner, ${shortHex(f.owner)}.`
-            : `No guardian is set; the owner, ${shortHex(f.owner)}, can cancel them while they wait.`,
+            ? `The guardian, ${shortHex(f.guardian)}, or the owner, ${shortHex(f.owner)}, can cancel any of them during the wait.`
+            : `No guardian is set; the owner, ${shortHex(f.owner)}, can cancel any of them during the wait.`,
+          "Lowering a cap and moving money between markets take effect at once.",
           ...pending,
         ].join(" "),
         gap: null,
@@ -235,34 +236,42 @@ export function protectsLine(f: ProtectsFact): ProtectsLine {
     case "yearn-v3":
       return {
         label: "Profit release",
-        headline: f.unlock === 0 ? "Profit is released at once" : `Profit is released over ${days(f.unlock)}`,
+        headline:
+          f.unlock === 0
+            ? "Profit reaches the share price at once"
+            : `Profit reaches the share price over ${days(f.unlock)}`,
         sentence:
           f.roleManager === ZERO
-            ? "No role manager is set; the vault applies role holders' changes at once."
-            : `The role manager, ${shortHex(f.roleManager)}, hands out every role; the vault applies role holders' changes at once.`,
+            ? "No role manager is set, and role holders' changes take effect at once."
+            : `The role manager, ${shortHex(f.roleManager)}, assigns every role, and role holders' changes take effect at once.`,
         gap: "Whether a role holder works behind a timelock of its own is not read.",
       };
     case "aave-gov": {
-      const guardian = `Aave's guardian, ${shortHex(f.gov.guardian)}, can cancel a change while it waits.`;
+      const guardian = `Aave's guardian, ${shortHex(f.gov.guardian)}, can cancel a change during the wait.`;
       return {
         label: "Governance",
-        headline: `A ${dayAdj(f.gov.votingDuration)} vote, then a ${dayAdj(f.gov.delay)} wait`,
+        headline: `Changes need a ${dayAdj(f.gov.votingDuration)} Aave vote, then wait ${days(f.gov.delay)}`,
         sentence:
           f.subject === "stata"
-            ? `Aave governance changes the wrapper and the pool it lends into. ${guardian}`
+            ? `Aave governance can change this wrapper and the pool it lends into. ${guardian}`
             : f.govAdmin
               ? `Aave governance holds sGHO's admin role. ${guardian}`
               : `Rails could not trace who holds sGHO's admin role. ${guardian}`,
-        gap: f.subject === "sgho" ? "Which addresses hold its yield manager role is not read." : null,
+        gap:
+          f.subject === "sgho"
+            ? "Which addresses hold its yield manager role is not read."
+            : "Roles that act without a vote, such as the emergency admin's pause, are not read.",
       };
     }
     case "umbrella":
       return {
         label: "Cooldown",
-        headline: `A ${dayAdj(f.cooldown)} cooldown, then ${days(f.window)} to unstake`,
+        headline: `Withdrawing takes a ${dayAdj(f.cooldown)} cooldown, then a ${dayAdj(f.window)} window to unstake`,
         sentence:
-          `Umbrella, ${shortHex(f.umbrella)}, can slash the stake when the Aave reserve it covers runs a deficit; ` +
-          (f.govAdmin ? `Aave governance controls Umbrella ${govWait(f.gov)}.` : "who controls Umbrella was not read."),
+          `Umbrella, ${shortHex(f.umbrella)}, can slash the stake: take part of it to cover a shortfall in the Aave reserve it backs.` +
+          (f.govAdmin
+            ? `Aave governance can change Umbrella ${govWait(f.gov)}.`
+            : "Who can change Umbrella was not read."),
         gap: null,
       };
     case "maple": {
@@ -277,7 +286,7 @@ export function protectsLine(f: ProtectsFact): ProtectsLine {
             ? `The pool delegate, ${shortHex(f.delegate)}, runs the pool's lending; `
             : "The pool delegate runs the pool's lending; ") +
           `Maple's security admin, ${shortHex(f.securityAdmin)}, can upgrade without the wait.`,
-        gap: "The deployed managers' versions are not matched to Maple's source on GitHub.",
+        gap: "Rails has not matched the deployed managers' versions to Maple's published source.",
       };
     }
   }
@@ -291,7 +300,7 @@ export function underneathLine(f: UnderneathFact): ProtectsLine {
         label: "Morpho Blue",
         headline: deployedText("Morpho Blue", f.deploy),
         sentence: fixed
-          ? `Its code cannot be changed. Its owner, ${shortHex(f.owner)}, can switch on new rate models and loan-to-value levels and set a market's fee, at once.`
+          ? `Its code cannot be changed, and neither can a market's rules once it exists. Its owner, ${shortHex(f.owner)}, can allow new rate models and liquidation loan-to-value levels for new markets, and set a market's fee, at once.`
           : "Rails found a proxy slot or a delegate call in its code.",
         gap: null,
       };

@@ -464,6 +464,7 @@ export default function AsymmetryTroveDetail({
   const terminalPane =
     view && view.status !== "open" ? (
       <LiquityForkClosedExplanation
+        protocol="asymmetry"
         status={view.status}
         collateralSymbol={view.collateralType}
         debtSymbol={DEBT_SYMBOL}

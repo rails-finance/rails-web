@@ -729,8 +729,10 @@ trove_words:
     The {coll_symbol} the Trove holds, its dollar value at the branch's {coll_symbol} price beneath. It backs the debt, and a liquidation or a redemption takes from it.
   card_tip_debt: |-
     The {debt_symbol} the Trove owes, including the interest accrued since its last event. Repaying it in full closes the Trove.
+  # A collateral-ratio deployment's tips (Ebisu), in its docs' terms
+  # (LiquityFamilyTerms, decision 0065).
   card_tip_cr: |-
-    The collateral's dollar value divided by the debt. Below the {coll_symbol} branch's minimum ratio the Trove can be liquidated.
+    The {ratio_text} (CR): the collateral's dollar value divided by the debt. Below the {coll_symbol} branch's {limit_text} the Trove can be liquidated.
   card_tip_ltv: |-
     The debt divided by the collateral's dollar value. Above the {coll_symbol} branch's Max LTV the Trove can be liquidated.
   card_tip_rate: |-
@@ -742,7 +744,7 @@ trove_words:
   card_tip_costs: |-
     A year's interest at today's rate: the debt times the annual interest rate. It moves with the rate and the debt.
   card_tip_liquidates_at: |-
-    The {coll_symbol} price at which the Trove's collateral ratio meets the branch's minimum: the debt times the minimum ratio, divided by the collateral.
+    The {coll_symbol} price at which the Trove's {ratio_text} meets the branch's {limit_text}: the debt times the {limit_short}, divided by the collateral.
   card_tip_liquidates_at_ltv: |-
     The {coll_symbol} price at which the Trove's LTV reaches the branch's Max LTV: the debt divided by the collateral times the Max LTV.
   # ── The Trove listing: its heading, noun and search box ──
