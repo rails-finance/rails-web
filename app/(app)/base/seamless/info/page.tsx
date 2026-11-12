@@ -33,7 +33,7 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "Supplied",
     definition:
-      "Supplied assets are the assets a wallet has deposited into the Pool to earn interest. The wallet can withdraw them again, with their interest.",
+      "Supplied assets are the assets a wallet has supplied to the Pool to earn interest. The wallet can withdraw them again, with their interest.",
     sources: [{ label: "Supply", href: DOCS + "/overview#supply" }],
   },
   {
