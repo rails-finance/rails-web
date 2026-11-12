@@ -26,7 +26,10 @@
     "llamalend": ["docs.curve.finance"],
     "polaris": ["docs.polaris.finance"],
     "yearn": ["docs.yearn.fi"],
-    "basedollar": ["docs.liquity.org"]
+    "basedollar": ["docs.liquity.org"],
+    "uniswap-v3": ["developers.uniswap.org"],
+    "uniswap-v4": ["developers.uniswap.org"],
+    "aerodrome": ["aerodrome.finance"]
   },
   "notDocumentation": ["github.com", "www.youtube.com", "youtube.com", "app.aave.com", "governance.aave.com"]
 }
