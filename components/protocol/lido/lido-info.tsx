@@ -154,7 +154,7 @@ export function LidoInfo() {
           section&apos;s ⋮ traces its figures to the chain.
         </>
       }
-      notCovered="stVaults, Lido on other chains, node operators and the LDO token aren't covered here."
+      notCovered="stVaults (Lido V3's separate vaults, where a staker chooses its own node operator), Lido on other chains, node operators and the LDO token aren't covered here."
       glossary={glossary}
       howItWorks={howItWorks}
       reads={reads}

@@ -174,12 +174,8 @@ export interface ExplainGroupWords {
   bullets: string[];
 }
 
-/** How a stake's shares split between its legs: "all as wstETH", "300 as stETH and 101.2 as wstETH". */
-function legs(s: LidoStake): string {
-  if (s.now.wsteth === 0) return "all as stETH";
-  if (s.now.stethShares === 0) return "all as wstETH";
-  return `${num(s.now.stethShares)} as stETH and ${num(s.now.wsteth)} as wstETH`;
-}
+/** A stake held in one leg: "all as stETH", "all as wstETH". */
+const leg = (s: LidoStake): string => (s.now.wsteth === 0 ? "all as stETH" : "all as wstETH");
 
 /** The card's (i): this wallet's stake first, then one line of the general lesson. */
 export function cardExplainer(s: LidoStake): ExplainGroupWords[] {
@@ -189,7 +185,9 @@ export function cardExplainer(s: LidoStake): ExplainGroupWords[] {
       ? "This wallet holds no stETH or wstETH now."
       : dust
         ? `This wallet holds a remainder under 0.0001 shares, worth ${s.now.eth < 1e-4 ? "under 0.0001" : num(s.now.eth)} ETH.${s.now.stethShares > 0 ? " Sending a whole stETH balance can leave a wei or two behind." : ""}`
-        : `This wallet holds ${num(s.now.shares)} shares, ${legs(s)}; at ${rateText(s.now.rate)} a share they are worth ${num(s.now.eth)} ETH.`;
+        : s.now.wsteth > 0 && s.now.stethShares > 0
+          ? `This wallet holds ${num(s.now.shares)} shares at ${rateText(s.now.rate)} a share: its ${num(s.now.stethEth)} stETH and ${num(s.now.wsteth)} wstETH (worth ${num(s.now.wstethEth)} ETH) make the ${num(s.now.eth)} ETH stake.`
+          : `This wallet holds ${num(s.now.shares)} shares, ${leg(s)}; at ${rateText(s.now.rate)} a share they are worth ${num(s.now.eth)} ETH.`;
   return [
     {
       title: "This stake",
@@ -218,14 +216,33 @@ function queued(s: LidoStake): string[] {
   return [];
 }
 
+/** Why the share rate moved over the window, by the sign of its change; none where it did not move. */
+export function rateCause(growth: number): string | null {
+  if (growth > 0) return "The share rate rose because oracle reports added the validators' rewards, after Lido's fee.";
+  if (growth < 0) return "The share rate fell because an oracle report recorded a loss, such as slashing or penalties.";
+  return null;
+}
+
+/** What a stated Earned figure is; none where Earned states no figure or no change. */
+export function earnedMeaning(s: LidoStake): string | null {
+  if (s.windowState !== "ok" || s.earned === null || s.earned === 0 || s.then.shares === 0) return null;
+  return s.earned > 0
+    ? "Earned is the rise in the shares' worth in ETH as oracle reports added the validators' rewards, after Lido's fee, to the share rate. Nothing was paid out: it stays in the stake until the stETH or wstETH is sold or withdrawn. It is in ETH, so ETH's dollar price is outside it."
+    : "Earned is the fall in the shares' worth in ETH at the share rate. It is in ETH, so ETH's dollar price is outside it.";
+}
+
 /** The readout's (i). */
 export function readoutExplainer(s: LidoStake): ExplainGroupWords[] {
+  const why = rateCause(s.rateGrowth);
+  const earned = earnedMeaning(s);
   return [
     {
       title: "The lines",
       bullets: [
         "Each line compares the block when the page was read with a block 30 days earlier.",
+        ...(why ? [why] : []),
         "Earned is stated only where the wallet held the same shares at both blocks: those shares times the change in the share rate since.",
+        ...(earned ? [earned] : []),
         ...(s.cause && s.cause.fit !== "all"
           ? ["Wrapping stETH into wstETH, or back, leaves the share count unchanged, so it is not among these moves."]
           : []),
@@ -262,6 +279,7 @@ const DOCS_TOKENS = "https://docs.lido.fi/guides/lido-tokens-integration-guide";
 const DOCS_QUEUE = "https://docs.lido.fi/contracts/withdrawal-queue-erc721";
 const DOCS_LIDO = "https://docs.lido.fi/contracts/lido";
 const DOCS_ORACLE = "https://docs.lido.fi/contracts/accounting-oracle";
+const ETH_SLASHING = "https://ethereum.org/en/developers/docs/consensus-mechanisms/pos/rewards-and-penalties/";
 
 /** The stake card's "?" (T4): how Lido staking works, the same on every wallet. */
 export const LIDO_LEARN_MORE: LearnMoreContent = {
@@ -272,10 +290,11 @@ export const LIDO_LEARN_MORE: LearnMoreContent = {
   details: [
     {
       bold: "Shares and the share rate",
-      text: "The share rate is the ETH one share is worth: all the ether Lido accounts for over all shares. Lido's oracle is a committee of members run by node operators the Lido DAO selects; once more than half agree, it reports the validators' balances on chain, normally once a day, and the rate moves at each report. It normally rises; slashing or penalties can lower it, and Lido's docs say daily reports have never been negative.",
+      text: "The share rate is the ETH one share is worth: all the ether Lido accounts for over all shares. Lido's oracle is a committee of members run by node operators the Lido DAO selects; once more than half agree, it reports the validators' balances on chain, normally once a day, and the rate moves at each report. It normally rises; slashing (Ethereum removing a validator that proposed or attested dishonestly, with a loss of its staked ether) or penalties can lower it, and Lido's docs say daily reports have never been negative.",
       sources: [
         { label: "accounting oracle", url: DOCS_ORACLE },
         { label: "oracle report", url: DOCS_LIDO },
+        { label: "slashing", url: ETH_SLASHING },
       ],
     },
     {
@@ -291,6 +310,11 @@ export const LIDO_LEARN_MORE: LearnMoreContent = {
       bold: "Lido's fee",
       text: "Lido keeps a percentage of the staking rewards as its protocol fee, set by the Lido DAO, so the share rate moves on the rewards after the fee.",
       sources: [{ label: "fees", url: DOCS_TOKENS }],
+    },
+    {
+      bold: "Leaving on a market",
+      text: "stETH and wstETH also trade on markets, such as Curve's stETH/ETH pool, where their price can differ from the share rate, so the withdrawal queue above is one way to leave.",
+      sources: [{ label: "liquidity venues", url: DOCS_TOKENS }],
     },
   ],
   stepsHeading: "Leaving through the withdrawal queue:",

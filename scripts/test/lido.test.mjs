@@ -25,8 +25,18 @@ register(`data:text/javascript,${encodeURIComponent(hooks)}`);
 const { gainOn, growth, lidoStake, lidoTotals, requestRow, shareCause, units } = await import(
   "../../lib/lido/stake.ts"
 );
-const { cardExplainer, readoutExplainer, readoutLines, requestsExplainer, REQUESTS, rateText, signed, WINDOW_WORDS } =
-  await import("../../lib/lido/words.ts");
+const {
+  cardExplainer,
+  earnedMeaning,
+  rateCause,
+  readoutExplainer,
+  readoutLines,
+  requestsExplainer,
+  REQUESTS,
+  rateText,
+  signed,
+  WINDOW_WORDS,
+} = await import("../../lib/lido/words.ts");
 
 const RATE_NOW = "1248899063481582992";
 const RATE_THEN = "1246088839423097632";
@@ -143,7 +153,48 @@ test("the window's three states: Earned where the shares match, the reason on th
     assert.match(line.text, /^Not stated: /);
     assert.equal(line.withheld, state);
   }
-  assert.equal(readoutExplainer(ok)[0].bullets.length, 2);
+  // Compare, why the rate rose, when Earned is stated, what it is.
+  assert.equal(readoutExplainer(ok)[0].bullets.length, 4);
+  assert.match(earnedMeaning(ok), /^Earned is the rise in the shares' worth in ETH .*Nothing was paid out/);
+  assert.equal(earnedMeaning(lidoStake(read({ windowState: "changed" }))), null);
+});
+
+test("why the share rate moved, by the sign of its change", () => {
+  assert.equal(
+    rateCause(0.00232),
+    "The share rate rose because oracle reports added the validators' rewards, after Lido's fee.",
+  );
+  assert.equal(
+    rateCause(-0.001),
+    "The share rate fell because an oracle report recorded a loss, such as slashing or penalties.",
+  );
+  assert.equal(rateCause(0), null);
+  const fell = lidoStake(read({ ...SAME, past: { ...SAME.past, rate: "1250000000000000000" } }));
+  assert.ok(fell.earned < 0);
+  const bullets = readoutExplainer(fell)[0].bullets;
+  assert.ok(bullets.includes(rateCause(-1)));
+  assert.match(earnedMeaning(fell), /^Earned is the fall/);
+});
+
+test("both legs above zero: the card's (i) says how they make the stake", () => {
+  // Wallet 0x176f…a132 on 11 Nov 2026: almost all stETH, a little wstETH.
+  const s = lidoStake(
+    read({
+      ...SAME,
+      now: {
+        stethShares: "191688866583702288850044",
+        wstethBalance: "49598208393891739",
+        rate: "1248978826478474065",
+        stethBalance: "239415335634701266825532",
+        wstethEth: "61947112115237706",
+        totalEth: "239415397581813382063239",
+      },
+    }),
+  );
+  assert.equal(
+    cardExplainer(s)[0].bullets[0],
+    "This wallet holds 191,689 shares at 1.248979 ETH a share: its 239,415 stETH and 0.0496 wstETH (worth 0.06195 ETH) make the 239,415 ETH stake.",
+  );
 });
 
 test("the readout: shares, rate, earned; no shares then says so", () => {
