@@ -15,7 +15,8 @@
 // aToken / variableDebtToken `balanceOf` at the indexed head. The headlines are
 // each side's oracle-USD total with the reserves' icons beside it; the panel
 // holds one row per reserve, the borrow rate, the interest inside each side,
-// the room to borrow, the liquidation read and the eMode category. A LISTING
+// the room to borrow and the liquidation read; the eMode category sits on the
+// identity line beside the market badge. A LISTING
 // card carries no health factor (rails-ops decision 0018): a listing exists to
 // find a position, and risk is read live on the position page — whose Pool
 // getUserAccountData read is the only HF this card ever shows.
@@ -792,16 +793,20 @@ export function useAaveV3CardSlots({
             }
           : null;
 
+  // The E-Mode category the account has chosen, on the identity line beside
+  // the market badge (as the Aave V3 Optimism card draws it).
   const emode = chain?.emode ?? null;
-  const emodeRow: PositionPanelRow | null =
-    emode && chainPool
-      ? {
-          id: "emode",
-          label: "E-Mode",
-          tip: "The Efficiency Mode (E-Mode) category the account has chosen: a reserve in it is borrowed against at the category's loan-to-value and liquidation threshold, as the Pool gives them at the latest block.",
-          value: <Prov info={userEmodeProv(emode.label, chainPool)}>{emode.label}</Prov>,
-        }
-      : null;
+  const emodeIdentity =
+    emode && chainPool ? (
+      <span className="flex items-center gap-2">
+        {marketBadge}
+        <span className="text-xs font-semibold text-rb-500" data-emode={emode.id}>
+          E-Mode: <Prov info={userEmodeProv(emode.label, chainPool)}>{emode.label}</Prov>
+        </span>
+      </span>
+    ) : (
+      identity
+    );
 
   // The supplies that back no borrowing: many and priced, their total and
   // icons open the breakdown (C19); otherwise each line under the total.
@@ -875,15 +880,13 @@ export function useAaveV3CardSlots({
   );
   return {
     ...common,
+    identity: emodeIdentity,
     heads: withRows,
     surface: "detail",
     explainer,
     learnMore,
     menu: menuSlot,
-    panel: [
-      present([interestRow("supply"), notCollRow, emodeRow]),
-      present([rateRow, interestRow("debt"), roomRow, liqRow]),
-    ],
+    panel: [present([interestRow("supply"), notCollRow]), present([rateRow, interestRow("debt"), roomRow, liqRow])],
   };
 }
 

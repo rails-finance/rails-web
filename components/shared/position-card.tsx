@@ -116,8 +116,9 @@ export interface PositionCardHead {
   /** The headline's name: its React key and `data-card-head`. */
   id: string;
   label: string;
-  /** What the label means, on hover or tap (a dotted underline). */
-  labelTip?: string;
+  /** What the label means, on hover or tap (a dotted underline). A detail
+   *  card's tip can carry receipts (a node); a listing keeps a string one. */
+  labelTip?: ReactNode;
   /** Keep `labelTip` on a listing card, where tips are otherwise quiet: a
    *  headline whose label needs its meaning in the row (Polaris's estimated
    *  ratio). */
@@ -423,7 +424,7 @@ function PositionCardRow({
   /** The headline's name (`data-card-head`). */
   head: string;
   label: string;
-  labelTip?: string;
+  labelTip?: ReactNode;
   headerIcon?: ReactNode;
   /** A "?" read-more after the label (the Outcome's `tip`). */
   help?: string;
@@ -441,7 +442,7 @@ function PositionCardRow({
         ) : (
           // A listing passes a labelTip only where the head keeps it.
           <QuietTipsContext.Provider value={false}>
-            <TipLabel text={label} tip={labelTip} />
+            <TipLabel text={label} tip={typeof labelTip === "string" ? labelTip : undefined} />
           </QuietTipsContext.Provider>
         )}
         {headerIcon}

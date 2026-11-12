@@ -34,10 +34,10 @@ import {
 } from "@/components/shared/position-card";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
-import type { AssetBreakdown } from "@/components/shared/asset-donut";
+import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { formatUnitsExact, formatUsdValue } from "@/lib/utils/format";
-import { Prov, type Provenance } from "@/components/shared/provenance";
+import { Prov } from "@/components/shared/provenance";
 import { useMoonwellDeployment } from "@/lib/moonwell/deployment-context";
 import { moonwellPositionModal } from "@/lib/moonwell/event-templates";
 import type { MoonwellCardCaptions } from "@/lib/moonwell/economics";
@@ -156,16 +156,10 @@ const NOT_COLLATERAL_TIP =
   "Supplied and earning the supply rate, but not entered as collateral (the Comptroller's market membership, read now), so it backs no borrowing. A liquidation can still seize it.";
 const FACTOR_TIP =
   "The share of each entered market's value that counts toward the borrow limit, as the Comptroller sets it now.";
-const DUST_TIP =
-  "Balances worth under a cent at the oracle price, usually the last units a withdrawal or repayment left behind. Open to see them.";
-
 /** Whether a line's market is entered as collateral; true where membership
  *  is unknown, so nothing is split without a read behind it. */
 const isEntered = (v: MoonwellPositionView, address: string) =>
   !v.entered || v.entered.some((e) => e.underlying === address.toLowerCase());
-
-/** A line's share of its side, as the panel states it. */
-const shareText = (share: number) => (share > 0 && share < 0.01 ? "under 1%" : `${Math.round(share * 100)}%`);
 
 /** The stacked per-market amounts of a side with no complete USD total. */
 function AmountStack({ children }: { children: ReactNode }) {
@@ -215,64 +209,6 @@ function UsdFigure({
     </Prov>
   );
   return form === "cents" ? figure : <TitleTip title={formatUsdValue(usd)}>{figure}</TitleTip>;
-}
-
-/** A line's share of its side: its oracle USD over the side's, both from the
- *  receipt `usd` names, so the share carries that read as its input. */
-function shareProv(usd: Provenance, line: string, side: string): Provenance {
-  return {
-    kind: "chain-derived",
-    pclass: usd.pclass,
-    summary: `Share of ${side} — ${line} in USD over the sum of ${side} in USD, each a balance times the price the Comptroller's oracle reads, rounded to a whole percent.`,
-    contract: usd.contract,
-    via: `${usd.via ?? "chain balance × Comptroller oracle getUnderlyingPrice"} · line USD ÷ side USD`,
-    formula: "line USD ÷ Σ side USD",
-    inputs: [
-      { label: "line USD", kind: "chain-derived", pclass: "oracle", note: "balance × oracle price" },
-      { label: "side USD", kind: "chain-derived", pclass: "oracle", note: `Σ balance × oracle price over ${side}` },
-    ],
-  };
-}
-
-/** A panel row's value for one market line: the amount, then its USD and its
- *  share of the side (`side` names it in the share's receipt). */
-function LineValue({
-  amount,
-  usd,
-  share,
-  usdWhat,
-  side,
-  marketBy,
-}: {
-  amount: ReactNode;
-  usd: number | null;
-  share: number | null;
-  usdWhat: string;
-  side: string;
-  marketBy?: ServerRead;
-}) {
-  const dep = useMoonwellDeployment();
-  return (
-    <>
-      {amount}
-      {usd != null && (
-        <>
-          {" · "}
-          <Prov info={stampServerRead(dep.card.usd(usdWhat), marketBy)}>
-            <PanelFigure>{formatUsdValue(usd)}</PanelFigure>
-          </Prov>
-          {share != null && (
-            <>
-              {" · "}
-              <Prov info={stampServerRead(shareProv(dep.card.usd(usdWhat), usdWhat, side), marketBy)}>
-                <PanelFigure>{shareText(share)}</PanelFigure>
-              </Prov>
-            </>
-          )}
-        </>
-      )}
-    </>
-  );
 }
 
 /** "84% · 88%", each with its market's icon: the entered markets the card
@@ -570,43 +506,6 @@ export function useMoonwellCardSlots({
   };
   if (outcome) return { ...detailCommon, outcome };
 
-  const supplyRow = (r: MoonwellSupplyAmount, kind: "collateral" | "other", total: number | null): PositionPanelRow => {
-    const usd = lineUsd(v, r.address, supplyAmount(r));
-    const exact = r.current != null ? formatUnitsExact(r.mTokensRaw, 8) : String(r.principal);
-    const basis =
-      r.current != null
-        ? "its mToken balance times the market's exchange rate, interest included"
-        : "the deposits replayed, less the withdrawals";
-    return {
-      id: `${kind}-${r.address}`,
-      label: kind === "collateral" ? `${r.symbol} collateral` : `${r.symbol} supplied, not collateral`,
-      tip:
-        kind === "collateral"
-          ? `The ${r.symbol} this account supplies as collateral: ${basis}, with its oracle value and its share of the collateral.`
-          : NOT_COLLATERAL_TIP,
-      value: (
-        <LineValue
-          amount={
-            <TokenFigure symbol={r.symbol} address={r.address}>
-              <Prov info={supplyProv(r)}>
-                <ExactSpan exact={exact} symbol={r.current != null ? mSymbolOf(r) : r.symbol}>
-                  {formatCompact(supplyAmount(r))}
-                </ExactSpan>
-              </Prov>
-            </TokenFigure>
-          }
-          usd={usd}
-          share={usd != null && total ? usd / total : null}
-          usdWhat={`${r.symbol} supplied`}
-          side={kind === "collateral" ? "the collateral" : "the supplies not entered as collateral"}
-          marketBy={marketBy}
-        />
-      ),
-    };
-  };
-  const dustRow = (id: string, control: ReactNode): PositionPanelRow[] =>
-    control ? [{ id, label: "Dust reserves", tip: DUST_TIP, value: control }] : [];
-
   const collateralFactors = factorsRow(
     v,
     vc.supplies.map((r) => r.address),
@@ -622,11 +521,16 @@ export function useMoonwellCardSlots({
         <UsdFigure usd={usd} what={what} form="whole" marketBy={marketBy} />
       </span>
     ) : undefined;
-  const collBreakdown: AssetBreakdown = {
-    assets: collDust.lines.map((r) => {
+  // A side of supplies as a breakdown: each line's amount and dollars, the
+  // dust behind the toggle.
+  const supplyBreakdown = (
+    kind: "collateral" | "other",
+    { lines, control }: { lines: MoonwellSupplyAmount[]; control: ReactNode },
+  ): AssetBreakdown => ({
+    assets: lines.map((r) => {
       const usd = lineUsd(v, r.address, supplyAmount(r));
       return {
-        id: `collateral-${r.address}`,
+        id: `${kind}-${r.address}`,
         symbol: r.symbol,
         address: r.address,
         usd,
@@ -643,12 +547,80 @@ export function useMoonwellCardSlots({
         usdText: usdCell(usd, `${r.symbol} supplied`),
       };
     }),
-    dust: collDust.control ?? undefined,
-  };
+    dust: control ?? undefined,
+  });
+  const collBreakdown = supplyBreakdown("collateral", collDust);
+  // The supplies not entered as collateral: many and priced, their total and
+  // icons open the breakdown (C19), as Aave V3's and Spark's do; otherwise
+  // each line under the total.
+  const notCollTotal =
+    otherUsd != null
+      ? { usd: otherUsd, info: stampServerRead(dep.card.usd("Supplied, not collateral"), marketBy) }
+      : null;
+  const othersByValue = [...vo.supplies].sort((a, b) => (supplyLineUsd(v)(b) ?? -1) - (supplyLineUsd(v)(a) ?? -1));
+  const notCollRow: PositionPanelRow | null =
+    vo.supplies.length === 0
+      ? null
+      : vo.supplies.length > 1 && notCollTotal
+        ? {
+            id: "not-collateral",
+            label: "Supplied, not collateral",
+            tip: NOT_COLLATERAL_TIP,
+            value: (
+              <UsdFigure usd={notCollTotal.usd} what="Supplied, not collateral" form="compact" marketBy={marketBy} />
+            ),
+            breakdown: {
+              assets: splitDust(vo.supplies, supplyLineUsd(v)).shown.map((r) => ({
+                symbol: r.symbol,
+                address: r.address,
+              })),
+              total: notCollTotal,
+              panel: (
+                <AssetBreakdownPanel
+                  id="moonwell-not-collateral-breakdown"
+                  name="Supplied, not collateral"
+                  side="collateral"
+                  breakdown={supplyBreakdown("other", otherDust)}
+                />
+              ),
+            },
+          }
+        : {
+            id: "not-collateral",
+            label: "Supplied, not collateral",
+            tip: NOT_COLLATERAL_TIP,
+            value: (
+              <span className="flex flex-col gap-0.5">
+                {notCollTotal && (
+                  <PanelFigure>
+                    <UsdFigure
+                      usd={notCollTotal.usd}
+                      what="Supplied, not collateral"
+                      form="compact"
+                      marketBy={marketBy}
+                    />
+                  </PanelFigure>
+                )}
+                {othersByValue.map((r) => (
+                  <span key={r.address}>
+                    <TokenFigure symbol={r.symbol} address={r.address}>
+                      <Prov info={supplyProv(r)}>
+                        <ExactSpan
+                          exact={r.current != null ? formatUnitsExact(r.mTokensRaw, 8) : String(r.principal)}
+                          symbol={r.current != null ? mSymbolOf(r) : r.symbol}
+                        >
+                          {formatCompact(supplyAmount(r))}
+                        </ExactSpan>
+                      </Prov>
+                    </TokenFigure>
+                  </span>
+                ))}
+              </span>
+            ),
+          };
   const left: PositionPanelRow[] = [
     ...(collateralFactors ? [collateralFactors] : []),
-    ...otherDust.lines.map((r) => supplyRow(r, "other", otherUsd)),
-    ...dustRow("dust-not-collateral", otherDust.control),
+    ...(notCollRow ? [notCollRow] : []),
   ];
   const rate = captions?.borrowRate;
   const debtBreakdown: AssetBreakdown = {

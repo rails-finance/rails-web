@@ -56,6 +56,7 @@ import { START_CTA } from "@/lib/shared/ui-grammar";
 import type { ChainId } from "@/lib/shared/chains";
 import type { SavedLink, WalletSession } from "@/lib/shared/sessions";
 import { setProvPreference, useProvPreference } from "@/lib/shared/prov-preference";
+import { putDownInspector } from "@/components/shared/prov-inspector";
 import { menuEntries } from "@/lib/shared/sessions";
 import { RevealTip } from "@/components/shared/reveal-tip";
 
@@ -257,7 +258,7 @@ function ProvInspectorSwitch({ onDone }: { onDone: () => void }) {
             type="button"
             role="menuitemcheckbox"
             aria-checked={on}
-            onClick={() => setProvPreference(!on)}
+            onClick={() => (on ? putDownInspector() : setProvPreference(true))}
             className="min-w-0 truncate text-left outline-none after:absolute after:inset-0 after:rounded-lg after:content-['']"
             data-profile-menu-prov={on ? "on" : "off"}
           >
