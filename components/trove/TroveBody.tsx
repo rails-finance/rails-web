@@ -23,6 +23,7 @@ import type { PositionCardExports } from "@/components/shared/position-card";
 import type { LiquityTroveSurplus } from "@/components/protocol/liquity-family/types";
 import { troveWords } from "@/lib/liquity/event-templates";
 import { TroveSummaryStack } from "@/components/trove/TroveSummaryStack";
+import type { BranchShutdownState } from "@/lib/liquity-fork/shutdown";
 import { LifetimeFlowsPanel, type FlowsRead } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import {
@@ -132,6 +133,8 @@ export interface TroveBodyProps {
   redeemedFirst?: boolean | null;
   debtInFrontLoading: boolean;
   surplus?: LiquityTroveSurplus | null;
+  /** The branch's shutdown (ui-jobs 612); none on the home page. */
+  shutdown?: BranchShutdownState | null;
   /** The card ⋮'s export shapes; null draws the ⋮ with the identity rows and
    *  the provenance row only. */
   exports: PositionCardExports | null;
@@ -180,6 +183,7 @@ export function TroveBody({
   redeemedFirst,
   debtInFrontLoading,
   surplus,
+  shutdown,
   exports,
   loadingMessage,
   topRow,
@@ -256,6 +260,7 @@ export function TroveBody({
           debtInFrontLoading={debtInFrontLoading}
           viewHref={tl.viewHref}
           surplus={surplus}
+          shutdown={shutdown}
           exports={exports}
           loadingStatus={{ message: loadingMessage, snapshotDate: lastEventTs ?? undefined }}
         />

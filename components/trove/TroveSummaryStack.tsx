@@ -12,6 +12,7 @@ import { useTroveExplanationItems } from "@/components/trove/use-trove-explanati
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
 import { ProseExplainer } from "@/lib/shared/explainer-prose";
 import { formatDate } from "@/lib/date";
+import type { BranchShutdownState } from "@/lib/liquity-fork/shutdown";
 import type { LiquityTroveSurplus } from "@/components/protocol/liquity-family/types";
 
 /**
@@ -35,6 +36,7 @@ export function TroveSummaryStack({
   viewHref,
   surplus,
   exports,
+  shutdown,
 }: {
   trove: TroveSummary;
   liveState?: TroveStateData;
@@ -59,6 +61,8 @@ export function TroveSummaryStack({
   /** The card ⋮'s export shapes (TO-DO-position-card 270). The home hero
    *  passes none and draws no ⋮. */
   exports?: PositionCardExports | null;
+  /** The branch's shutdown (ui-jobs 612); absent on the home hero. */
+  shutdown?: BranchShutdownState | null;
 }) {
   // The close's debt before it ran, from the page's replayed events (the
   // last one is the close); the home hero has no provider and keeps null.
@@ -79,6 +83,7 @@ export function TroveSummaryStack({
     redeemedFirst,
     surplus,
     debtAtClose,
+    shutdown,
   });
 
   const view = viewFromTroveSummary(trove, prices);
@@ -148,6 +153,7 @@ export function TroveSummaryStack({
       panel={panel}
       exports={exports}
       foot={foot}
+      shutdown={shutdown}
     />
   );
 }

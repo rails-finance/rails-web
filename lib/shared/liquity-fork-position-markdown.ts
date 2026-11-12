@@ -9,6 +9,8 @@
 // the data already in scope on the detail page — no fetching.
 
 import { fmtLtv, liquityFamilyTerms } from "@/lib/liquity/ltv";
+import type { BranchShutdownState } from "@/lib/liquity-fork/shutdown";
+import { shutdownDay } from "@/lib/shared/liquity-family-shutdown";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { LiquityForkTroveChainResponse } from "@/lib/api/fetch-liquity-fork-position";
 import { num, amt, usd, fmtUtc, txCell } from "@/lib/shared/position-markdown";
@@ -66,6 +68,9 @@ export interface LiquityForkTroveMarkdownArgs {
   /** When the snapshot was taken (copy time) — passed in so the serializer
    *  stays pure. */
   generatedAt: Date;
+  /** The branch's shutdown (ui-jobs 612): stated under Status, and the lines on
+   *  liquidation, the queue and the branch ratio go. */
+  shutdown?: BranchShutdownState | null;
 }
 
 const pct = (f: number, d = 1) => `${num(f * 100, d)}%`;
@@ -74,6 +79,7 @@ export function liquityForkTroveToMarkdown(args: LiquityForkTroveMarkdownArgs): 
   const { protocolLabel, debtSymbol, view, chain, events, generatedAt } = args;
   const live = chain && !chain.chainStale ? chain : null;
   const coll = view.collateralType;
+  const shut = view.status === "open" ? (args.shutdown ?? null) : null;
   const lines: string[] = [];
   // The deployment's documented terms (decision 0065).
   const t = liquityFamilyTerms(protocolLabel);
@@ -91,7 +97,23 @@ export function liquityForkTroveToMarkdown(args: LiquityForkTroveMarkdownArgs): 
   );
   lines.push("");
   lines.push(`- **Trove:** ${view.id} (${coll} branch)`);
-  lines.push(`- **Status:** ${view.status[0].toUpperCase() + view.status.slice(1)}`);
+  if (shut) {
+    const rec = shut.record;
+    lines.push(
+      `- **Status:** Shut down on ${shutdownDay(shut.at)}` +
+        (rec
+          ? ` by the ${t.branch}'s ${rec.by} (transaction ${rec.shutdown.tx}, block ${rec.shutdown.block.toLocaleString("en-US")})`
+          : ""),
+    );
+    if (rec?.withdrawal)
+      lines.push(
+        `- **Pool:** the ${rec.by} withdrew the pool's collateral on ${shutdownDay(rec.withdrawal.at)} (transaction ${rec.withdrawal.tx}, block ${rec.withdrawal.block.toLocaleString("en-US")})` +
+          (rec.withdrawal.amount ? `: ${rec.withdrawal.amount} ${coll}` : ""),
+      );
+    if (rec?.reverts?.length) lines.push(`- **Owner operations:** ${rec.reverts.join(", ")} revert`);
+    if (shut.disagree)
+      lines.push(`- **Live read:** the branch's contracts now answer that it is live, against this record`);
+  } else lines.push(`- **Status:** ${view.status[0].toUpperCase() + view.status.slice(1)}`);
   if (view.isBatched) lines.push(`- **Interest batch:** managed by a ${t.delegate} (debt derived from batch shares)`);
   lines.push("");
 
@@ -126,7 +148,8 @@ export function liquityForkTroveToMarkdown(args: LiquityForkTroveMarkdownArgs): 
     lines.push(`## Position`);
     lines.push("");
     if (live) {
-      const collUsd = live.priceUsd != null ? ` (${usd(live.entireColl * live.priceUsd)})` : "";
+      const collUsd =
+        live.priceUsd != null && !shut?.record?.withdrawal ? ` (${usd(live.entireColl * live.priceUsd)})` : "";
       lines.push(
         `- **Collateral:** ${amt(live.entireColl)} ${coll}${collUsd} (live entire collateral, pending redistribution included)`,
       );
@@ -148,30 +171,34 @@ export function liquityForkTroveToMarkdown(args: LiquityForkTroveMarkdownArgs): 
         `- **Interest rate:** ${num(live.annualInterestRatePct, 2)}% annual ${
           view.isBatched
             ? `(the batch's current rate, set by its ${t.delegate} for every member)`
-            : "(user-set, adjustable any time)"
+            : shut
+              ? "(user-set)"
+              : "(user-set, adjustable any time)"
         }`,
       );
       lines.push("");
-      lines.push(`## Live risk (at block ${live.blockNumber})`);
+      lines.push(shut ? `## Live read (at block ${live.blockNumber})` : `## Live risk (at block ${live.blockNumber})`);
       lines.push("");
       if (live.priceUsd != null)
         lines.push(
           `- **${coll} price:** ${usd(live.priceUsd)}, the branch's PriceFeed${live.priceStale ? " (lastGoodPrice; the live fetch failed on this read; it lags between user operations)" : " (fetchPrice simulated at head)"}`,
         );
-      if (live.icr != null)
+      if (live.icr != null && !shut)
         lines.push(
           t.ltv
             ? `- **LTV:** ${num(100 / live.icr, 1)}% (1 ÷ the TroveManager's getCurrentICR) vs the branch's Max LTV ${fmtLtv(100 / live.mcr, 2)} (1 ÷ its ${pct(live.mcr, 0)} MCR)`
             : `- **${t.ratio}:** ${pct(live.icr)} (the TroveManager's getCurrentICR) vs the branch's ${t.limitText} ${pct(live.mcr, 0)}`,
         );
-      if (live.liqPriceUsd != null)
+      if (live.liqPriceUsd != null && !shut)
         lines.push(
           `- **Liquidation price:** ${usd(live.liqPriceUsd)} per ${coll} (${t.ltv ? "entire debt ÷ (entire collateral × Max LTV)" : "entire debt × MCR ÷ entire collateral"})` +
             (live.priceUsd != null && live.priceUsd > live.liqPriceUsd
               ? `, ${num((1 - live.liqPriceUsd / live.priceUsd) * 100, 0)}% below the current price`
               : ""),
         );
-      if (live.status === "zombie") {
+      if (shut) {
+        // No queued redemption and no branch ratio on a shut-down branch.
+      } else if (live.status === "zombie") {
         lines.push(
           live.redeemedFirst
             ? `- **Redemption queue:** ${t.dormant === "Zombie" ? "Zombie" : `${t.dormant} (Zombie in the contracts)`}: a partial redemption left the Trove below the minimum debt; it is the branch's lastZombieTroveId, which the next redemption on this branch takes first`
@@ -184,7 +211,10 @@ export function liquityForkTroveToMarkdown(args: LiquityForkTroveMarkdownArgs): 
           `- **Redemption queue (this branch):** ${amt(live.debtInFront)} ${debtSymbol} of debt is redeemed before this one (${live.trovesAhead ?? 0} trove${(live.trovesAhead ?? 0) === 1 ? "" : "s"}): the branch's last ${t.dormantNoun} (lastZombieTroveId) when it has debt, then the same or lower interest rates; redemptions take it at $1 face`,
         );
       }
-      if (live.branchTcr != null)
+      if (shut) {
+        // The branch's figures: the pool beside the Trove's own.
+        if (live.branchColl != null) lines.push(`- **Pool now:** holds ${amt(live.branchColl)} ${coll}`);
+      } else if (live.branchTcr != null)
         lines.push(
           t.ltv
             ? `- **Branch:** Total Collateral Ratio (TCR) ${pct(live.branchTcr, 0)} (${amt(live.branchDebt ?? 0)} ${debtSymbol} total debt); new borrowing gates below the ${pct(live.ccr, 0)} Critical Collateral Ratio (CCR), shutdown possible below ${pct(live.scr, 0)}`

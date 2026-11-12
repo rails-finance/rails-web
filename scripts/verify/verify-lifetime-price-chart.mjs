@@ -102,7 +102,8 @@
 // of the sUSDS price, today the card's, no level, the how-to-read naming chi.
 // The forks and Polaris (step 6, `level`, `checkLevelView`): Ebisu WBTC 3876
 // (liquidated) and weETH 1065 (closed), whose level steps by the two minimums'
-// ratio on 4 Jan 2026, Ebisu stcUSD 6774 and Basedollar cbETH 6846 (open:
+// ratio on 4 Jan 2026, Ebisu stcUSD 6774 (open on a shut-down branch: the card
+// states no "Liquidates at", ui-jobs 612) and Basedollar cbETH 6846 (open:
 // today's level the card's "Liquidates at"), Asymmetry ysyBOLD 4577, scrvUSD 2145
 // and Basedollar wstETH 1150 (closed: the level ends that day), Polaris USDp
 // 2420 and GOLDp 18 (open: today's level the card's price × 115 % ÷ its ratio),
@@ -2367,7 +2368,15 @@ async function checkLevelView(page, tag, pg) {
   check(`${tag}: the level is drawn`, pts.length > 0, `${pts.length} days`);
   if (pts.length === 0) return;
   const days = pts.map((p) => p[0]);
-  if (want.card === "liquidates-at") {
+  // A Trove on a shut-down branch (ui-jobs 612: Ebisu since 20 Aug 2026) is
+  // open with no liquidation to state: its card draws no "Liquidates at".
+  const shutDown = await page
+    .$eval("[data-card-status]", (e) => e.getAttribute("data-card-status") === "shut down")
+    .catch(() => false);
+  if (want.card === "liquidates-at" && shutDown) {
+    const rows = await page.$$('[data-panel-row="liquidates-at"]');
+    check(`${tag}: a shut-down branch's card states no "Liquidates at"`, rows.length === 0, `${rows.length} rows`);
+  } else if (want.card === "liquidates-at") {
     const card = await page.$eval('[data-panel-row="liquidates-at"] dd', (d) => d.textContent ?? "").catch(() => "");
     const m = card.replace(/,/g, "").match(/\$(\d+(?:\.(\d+))?)(K?)/);
     const k = m?.[3] ? 1000 : 1;

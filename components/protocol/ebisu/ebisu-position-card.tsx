@@ -13,6 +13,7 @@ import {
   liveFromForkChain,
 } from "@/components/protocol/liquity-family/liquity-position-card";
 import type { LiquityTroveSurplus, LiquityTroveView } from "@/components/protocol/liquity-family/types";
+import type { BranchShutdownState } from "@/lib/liquity-fork/shutdown";
 import type { PositionCardExports, PositionPanelColumns } from "@/components/shared/position-card";
 import type { LiquityForkTroveChainResponse } from "@/lib/api/fetch-liquity-fork-position";
 import type { EbisuTroveSummary } from "@/lib/sources/api/ebisu-troves";
@@ -29,6 +30,7 @@ export function EbisuPositionCard({
   surplus,
   panel,
   exports,
+  shutdown,
 }: {
   v: EbisuTroveView;
   /** The Trove page's render (receipts, panel, (i)); the listing omits it. */
@@ -48,6 +50,8 @@ export function EbisuPositionCard({
   panel?: PositionPanelColumns;
   /** The card ⋮'s export shapes (`liquityForkExports`). */
   exports?: PositionCardExports | null;
+  /** The branch's shutdown (ui-jobs 612): the page's `useBranchShutdown`. */
+  shutdown?: BranchShutdownState | null;
 }) {
   return (
     <LiquityPositionCard
@@ -61,6 +65,7 @@ export function EbisuPositionCard({
       surplus={surplus}
       panel={panel}
       exports={exports}
+      shutdown={shutdown}
     />
   );
 }
