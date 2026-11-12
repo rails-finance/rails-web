@@ -8,7 +8,12 @@
 // layout's strip covers this route.
 
 import Link from "next/link";
-import { ProtocolInfoPage, type InfoReads, type InfoView } from "@/components/shared/protocol-info-page";
+import {
+  ProtocolInfoPage,
+  type InfoReads,
+  type InfoView,
+  GUIDE_NO_LEARN_MORE,
+} from "@/components/shared/protocol-info-page";
 import { MORPHO_INFO_SHARED } from "@/components/protocol/morpho/morpho-info";
 import { MORPHO_OPTIMISM } from "@/lib/morpho-at-block/types";
 import { OPTIMISM_CHAIN_ID } from "@/lib/shared/chains";
@@ -106,6 +111,7 @@ const reads: InfoReads = {
 export default function InfoPage() {
   return (
     <ProtocolInfoPage
+      guide={GUIDE_NO_LEARN_MORE}
       session="morpho-optimism"
       tracks={
         <>

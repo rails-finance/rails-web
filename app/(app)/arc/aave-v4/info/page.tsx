@@ -7,7 +7,13 @@
 // layout's strip covers this route.
 
 import Link from "next/link";
-import { GlossaryLink, ProtocolInfoPage, type InfoReads, type InfoView } from "@/components/shared/protocol-info-page";
+import {
+  GlossaryLink,
+  ProtocolInfoPage,
+  type InfoReads,
+  type InfoView,
+  GUIDE_NO_LEARN_MORE,
+} from "@/components/shared/protocol-info-page";
 import { aaveV4Glossary } from "@/lib/aave-v4/event-templates";
 import { AAVE_V4_ARC_CONTRACTS } from "@/lib/aave-v4-arc/types";
 import { infoMetadata } from "@/lib/shared/page-metadata";
@@ -109,6 +115,7 @@ const reads: InfoReads = {
 export default function InfoPage() {
   return (
     <ProtocolInfoPage
+      guide={GUIDE_NO_LEARN_MORE}
       session="aave-v4-arc"
       tracks={
         <>
