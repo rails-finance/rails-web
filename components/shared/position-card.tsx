@@ -125,7 +125,7 @@ export interface PositionCardHead {
   /** An icon after the label. The closed card's peaks carry their asset here
    *  (Liquity V2's closed face); an open headline puts it in `assets`. */
   labelIcon?: ReactNode;
-  /** Which size the figure takes (ui-jobs 604, a prototype): an `amount` the
+  /** Which size the figure takes (decision 0066; ui-jobs 604): an `amount` the
    *  position holds (collateral, debt, total assets) at the headline size, a
    *  `measure` of it (a ratio, a rate, a price, a count) a step down on the
    *  same baseline. Unset, a head with assets, a USD line or a breakdown is an
@@ -987,7 +987,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
         (closed ? (
           <PositionCardPanel columns={panel} />
         ) : (
-          // A hairline between the headlines and the stats (ui-jobs 604).
+          // A hairline between the headlines and the stats (decision 0066 point 5).
           <div className="mt-6 border-t border-rb-500/50" data-nosnippet="" data-card-rule="">
             <PositionCardPanel columns={panel} />
           </div>

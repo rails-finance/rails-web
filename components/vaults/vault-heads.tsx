@@ -236,7 +236,7 @@ export function vaultHeads({
       id: "total-assets",
       label: "Total assets",
       // The vault's figures carry their asset inside the value (InAsset), so
-      // the tiers are named (ui-jobs 604).
+      // the tiers are named (decision 0066 point 2).
       tier: "amount",
       labelTip: detail ? VAULT_HEAD_TIPS.totalAssets : undefined,
       value: v.totalAssets ? (
