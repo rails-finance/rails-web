@@ -87,12 +87,14 @@ export function useReportPositionRead(read: PositionRead | null | undefined): vo
   }, [report, kind, block, at]);
 }
 
-/** The stamp, muted, in the card's heading row. */
+/** The stamp, muted, in the card's heading row: drawn only for a stored read,
+ *  to say the latest read failed. Otherwise H6 beside it states the read's age,
+ *  block and time (Miles, 12 Nov 2026; ui-jobs 602). */
 export function PositionReadStamp() {
   const store = useContext(PositionReadContext);
   const chainId = useChainId();
   const read = store?.read;
-  if (!read) return null;
+  if (!read || read.kind !== "stored") return null;
   const { lead, tail } = positionReadWords(read);
   return (
     <span

@@ -10,18 +10,22 @@
 // off the block timestamp; the head only re-pulls on focus / reload.
 // Fail-soft: renders nothing when the chain head is unavailable.
 //
-// Two readings, switched by a press on the stamp: the age ("3 min", behind
-// the block-and-clock icon) or the block number ("11,932,361", behind the
-// cube). The choice holds across pages for this browser. The copy-for-LLM exports carry the block
+// Three readings, stepped by a press on the stamp: the age ("3 min", behind
+// the block-and-clock icon), the block number ("11,932,361", behind the
+// cube) or the block's time ("12 Nov 10:52 UTC", behind the calendar-clock;
+// ui-jobs 602). The choice holds across pages for this browser
+// (lib/shared/recency-reading.ts). The copy-for-LLM exports carry the block
 // number from the page's own data (lib/<proto>/position-to-markdown.ts).
 // The age carries no "ago": the block-and-clock glyph says it, and the
 // accessible name keeps the full words (ui-jobs 429).
 
 import { useEffect, useState } from "react";
-import { Box } from "lucide-react";
+import { Box, CalendarClock } from "lucide-react";
 import { BlockClockIcon } from "@/components/icons/block-clock-icon";
 import { useChainHead } from "@/hooks/useChainHead";
 import { CTRL_GHOST, CTRL_OFF } from "@/lib/shared/ui-grammar";
+import { nextReading, stampTime, storedReading, storeReading, type Reading } from "@/lib/shared/recency-reading";
+import { readTimeText } from "@/lib/shared/position-read";
 
 // Compact age for the 11px stamp: "< 1 min" / "5 min" / "3 hr" / "2 d".
 // Deliberately NOT lib/date's formatDuration — that is shared by 35 call sites
@@ -35,17 +39,6 @@ function formatCompactAge(elapsedMs: number): string {
   const hr = Math.floor(min / 60);
   if (hr < 24) return `${hr} hr`;
   return `${Math.floor(hr / 24)} d`;
-}
-
-type Reading = "age" | "block";
-const READING_KEY = "rails.recency-reading";
-
-function storedReading(): Reading {
-  try {
-    return localStorage.getItem(READING_KEY) === "block" ? "block" : "age";
-  } catch {
-    return "age";
-  }
 }
 
 /** `compact` drops the cube below sm, for the detail pages' top row, which
@@ -63,19 +56,18 @@ export function RecencyStamp({ className, compact = false }: { className?: strin
   const [reading, setReading] = useState<Reading>("age");
   useEffect(() => setReading(storedReading()), []);
   const toggle = () => {
-    const next = reading === "age" ? "block" : "age";
+    const next = nextReading(reading, () => true);
     setReading(next);
-    try {
-      localStorage.setItem(READING_KEY, next);
-    } catch {}
+    storeReading(next);
   };
 
   if (!head) return null;
   const age = formatCompactAge(Date.now() - head.blockTimestamp * 1000);
   const block = head.blockNumber.toLocaleString("en-US");
 
-  const showAge = reading === "age";
-  const Icon = showAge ? BlockClockIcon : Box;
+  const Icon = reading === "age" ? BlockClockIcon : reading === "block" ? Box : CalendarClock;
+  const text = reading === "age" ? age : reading === "block" ? block : stampTime(head.blockTimestamp);
+  const nextName = { age: "block number", block: "time", time: "age" }[reading];
 
   return (
     <button
@@ -86,13 +78,13 @@ export function RecencyStamp({ className, compact = false }: { className?: strin
       // (provenance-receipts-grammar.md, the coverage tripwire's `data-prov-exempt`).
       data-prov-exempt
       onClick={toggle}
-      aria-label={`${head.source === "index" ? `Indexed to block ${block}, minted ${age} ago` : `Chain head minted ${age} ago, block ${block}`}. Press to show the ${showAge ? "block number" : "age"}.`}
+      aria-label={`${head.source === "index" ? `Indexed to block ${block}, minted ${age} ago` : `Chain head minted ${age} ago, block ${block}`}, ${readTimeText(head.blockTimestamp)}. Press to show the ${nextName}.`}
       // The control grammar: the stamp reads as pressable. Same height and
       // radius as the price trigger beside it, one type size down.
       className={className ?? `${CTRL_GHOST} ${CTRL_OFF} h-7 gap-1.5 rounded-md px-1.5 text-[11px] tabular-nums`}
     >
       <Icon size={12} aria-hidden className={compact ? "hidden sm:block" : undefined} />
-      <span aria-hidden>{showAge ? age : block}</span>
+      <span aria-hidden>{text}</span>
     </button>
   );
 }
