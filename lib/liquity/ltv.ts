@@ -161,7 +161,9 @@ const FORK_TERMS: LiquityFamilyTerms = {
 
 export const LIQUITY_FAMILY_TERMS: Record<LiquityFamilyTermsId, LiquityFamilyTerms> = {
   "liquity-v2": LIQUITY_V2_TERMS,
-  basedollar: FORK_TERMS,
+  // Basedollar's docs host does not answer; by the standing ruling it rests
+  // on Liquity V2's docs (reference/official-docs/basedollar.md).
+  basedollar: LIQUITY_V2_TERMS,
   // docs.asymmetry.finance: LTV and the maximum LTV, a "third party manager"
   // or delegate, the "liquidation reserve", the "borrow market", TCR and CCR.
   // The docs deny an upfront fee and charge "a fee corresponding to 7 days of

@@ -7,7 +7,7 @@
 // here: the protocol name, the BD stablecoin, the backend table prefix, and
 // the branch → TroveManager mapping.
 
-import { gasEscrowReceipt, type LiquityGasEscrow } from "@/lib/shared/liquity-gas-escrow";
+import { gasEscrowReceipt, LIQUIDATION_RESERVE_TERMS, type LiquityGasEscrow } from "@/lib/shared/liquity-gas-escrow";
 import { makeLiquityForkVocabulary, type LiquityForkCoords, type DeltaOps } from "@/lib/shared/liquity-fork-provenance";
 import { resolveBranch, BASEDOLLAR_BRANCHES } from "./asset-catalog";
 import { BASEDOLLAR_PRICE_GRADES } from "./price-feeds";
@@ -67,7 +67,7 @@ export const {
   },
 });
 
-/** The gas compensation escrow: the WETH every Basedollar Trove sends to its
+/** The liquidation reserve: the WETH every Basedollar Trove sends to its
  *  branch's GasPool at its open, returned at the close and paid to the
  *  liquidator (the fork's ETH_GAS_COMPENSATION, an internal constant with no
  *  getter). Established from the deployed contracts' transfers: an open's WETH Transfer of 0.001 to the branch's GasPool and the close's back, on the WETH branch (open 0xd727b7e3…, close 0x4281a03a…), the rETH branch (open 0x0ce424b3…, close 0x56c80ba5…) and the wstETH branch (open 0x1a933e2e…), read on Base 18 Oct 2026. Basedollar does not use Liquity V2's 0.0375. */
@@ -78,6 +78,8 @@ export const BASEDOLLAR_GAS_ESCROW: LiquityGasEscrow = {
   address: "0x4200000000000000000000000000000000000006",
   source: "ETH_GAS_COMPENSATION, as the GasPool's WETH Transfers carry it",
   label: "0.001 WETH",
+  // Liquity V2's docs' name, on which Basedollar rests (decision 0065).
+  terms: { ...LIQUIDATION_RESERVE_TERMS, ratio: "LTV" },
 };
 
 /** The escrow's receipt at an event. */
