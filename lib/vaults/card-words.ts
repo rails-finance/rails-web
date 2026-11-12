@@ -21,8 +21,7 @@ const YIELD_CONCEPT = {
 export const STEWARD_TIP = {
   curator: "The address that chooses which markets the vault lends to, and their caps.",
   owner: "The vault names no curator, so its owner chooses the markets and their caps.",
-  umbrella:
-    "The stake token's owner: the one address that can slash it, taking part of the stake to cover a shortfall.",
+  umbrella: "The stake token's owner: the one address that can slash it.",
   roleManager: "The address that hands out every role over the vault, from adding a strategy to shutting it down.",
 } as const;
 
