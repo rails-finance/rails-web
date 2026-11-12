@@ -4,7 +4,8 @@
 // the grid of tiles, Miles, 10 Nov 2026): the holder finder (V4), the vault
 // card (V2), then the grid (components/vaults/vault-tiles.tsx): the last 30
 // days (V5); where the assets are (V3) | who holds it; what protects it (V9) |
-// the protocol underneath (V10), streamed by the route; configuration and
+// the protocol underneath (V10), streamed by the route; the steward's record
+// (V14); configuration and
 // addresses; the colour note at the foot. One block's read of the vault and
 // of Morpho Blue (lib/sources/chain/morpho-base-vault.ts), the fee and the
 // guardian at the same block (lib/vaults/config-read.ts); Holders and Who
@@ -27,6 +28,8 @@ import { VaultIlliquidMarkets } from "@/components/vaults/vault-illiquid";
 import { vaultHeads } from "@/components/vaults/vault-heads";
 import { ColourNote, RULE, Tile, VAULT_CARD_TILE, VAULT_GRID } from "@/components/vaults/vault-tiles";
 import { HOLDERS_SCOPE, VaultWhoHolds } from "@/components/vaults/vault-who-holds";
+import { VaultStewardRecord } from "@/components/vaults/vault-steward-record";
+import type { StewardRecordRead } from "@/lib/vaults/steward-record";
 import { VaultConfiguration } from "@/components/vaults/vault-config";
 import { metaMorphoConfigTile } from "@/components/vaults/vault-config-columns";
 import type { VaultStripSeries } from "@/lib/vaults/yield-read";
@@ -149,6 +152,7 @@ export function MorphoBaseVaultPage({
   factory,
   config,
   holders,
+  stewardRecord,
 }: {
   /** "What protects it" and "The protocol underneath" (V9, V10), streamed by the route. */
   protects: ReactNode;
@@ -165,6 +169,8 @@ export function MorphoBaseVaultPage({
   config: VaultConfig;
   /** Who holds it: the census's largest holders; null where it did not answer. */
   holders: VaultHolders | null;
+  /** The vaults this steward runs now, from the /vaults directory; null where it did not answer. */
+  stewardRecord: StewardRecordRead;
 }) {
   const registry = useReceiptRegistry();
   const { vault, legs, chainId } = data;
@@ -630,6 +636,10 @@ export function MorphoBaseVaultPage({
             <i aria-hidden className={`pointer-events-none absolute inset-y-5 left-1/2 hidden w-px lg:block ${RULE}`} />
             {protects}
           </div>
+        </Tile>
+
+        <Tile id="steward-record" wide>
+          <VaultStewardRecord record={stewardRecord} role={steward.role} />
         </Tile>
 
         <Tile id="configuration" wide last>

@@ -6,7 +6,8 @@
 // PoolManager, its two LoanManagers and its withdrawal queue
 // (lib/sources/chain/maple-pool-state.ts). The daily store keeps no Maple
 // series, so there is no Yield figure and no "last 30 days" (V5). The Steward
-// is the pool delegate.
+// is the pool delegate; the pool delegate's record (V14) closes the page,
+// after what protects it and the protocol underneath.
 
 import { ProvReceiptsScope, Prov, useReceiptRegistry, type Provenance } from "@/components/shared/provenance";
 import { readStampProv, SectionReadStamp } from "@/components/shared/read-stamp";
@@ -16,6 +17,8 @@ import { NotLoaded } from "@/components/shared/not-loaded";
 import { CreatedBullet, VaultCard, type VaultMenuLink } from "@/components/vaults/vault-card";
 import { VaultAssets, type VaultAssetRow } from "@/components/vaults/vault-assets";
 import { VaultFinder } from "@/components/vaults/vault-finder";
+import { VaultStewardRecord } from "@/components/vaults/vault-steward-record";
+import type { StewardRecordRead } from "@/lib/vaults/steward-record";
 import { StatAmount } from "@/components/vaults/stat-amount";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { assetText, pctText, sharePriceText, shareText, shortAddress } from "@/lib/shared/vault-amount-text";
@@ -53,12 +56,15 @@ const eth = (kind: "address" | "block", v: string | number) => explorerUrl(MAINN
 
 export function MaplePoolPage({
   protects,
+  stewardRecord,
   pool: p,
   state: s,
   readAt,
 }: {
   /** "What protects it" and "The protocol underneath" (V9, V10), streamed by the route. */
   protects?: React.ReactNode;
+  /** The vaults the pool delegate runs now, from the /vaults directory; null where it did not answer. */
+  stewardRecord: StewardRecordRead;
   pool: MaplePool;
   state: MaplePoolState;
   readAt: string;
@@ -473,6 +479,7 @@ export function MaplePoolPage({
         }}
       />
       {protects}
+      <VaultStewardRecord record={stewardRecord} role="poolDelegate" />
     </ProvReceiptsScope>
   );
 }
