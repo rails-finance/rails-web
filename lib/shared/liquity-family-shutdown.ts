@@ -82,6 +82,8 @@ export function shutdownDateProv(protocol: string, symbol: string, s: BranchShut
   } else {
     summary = `Shutdown date — ${call} on the ${symbol} branch returns ${live?.raw} (${utc(s.at)}) at block ${blockOf(live?.source.block ?? 0)}. A branch's shutdown is permanent.`;
   }
+  // The liquidation price is dropped in the shut-down state (ui-jobs 612); the receipt says why.
+  summary += ` Whether a Trove on the ${symbol} branch can still be liquidated has not been read from the chain, so no liquidation price is shown.`;
   return {
     kind: "chain",
     pclass: live?.shutDown ? "state" : "emitted",

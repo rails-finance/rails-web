@@ -124,7 +124,7 @@ function BranchCard({
   // A shut-down branch (ui-jobs 612): the status word and its date, with the receipt.
   const shut = branch.shutdown ?? null;
   const shutLine = shut ? (
-    <div className="mt-1 text-[11px] tabular-nums text-rb-500" data-branch-shutdown="">
+    <div className="mt-1 text-[11px] tabular-nums text-rb-500" data-branch-shutdown="" data-anatomy="M6.1">
       <span className="font-semibold text-caution-700 dark:text-caution-400">Shut down</span>{" "}
       <Prov info={shutdownDateProv(data.protocol, sym, shut)}>{shutdownDay(shut.at)}</Prov>
       {shut.disagree && <span className="ml-1 text-rb-400">· the chain now reads live</span>}
