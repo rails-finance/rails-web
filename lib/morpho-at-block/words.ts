@@ -16,9 +16,10 @@ const num = (x: number) =>
     maximumSignificantDigits: x < 1 ? 4 : undefined,
   });
 
-/** "cirBTC / USDC", or the loan token alone on a market with no collateral. */
+/** "USDC / cirBTC", the loan asset first as the docs write a market, or the
+ *  loan asset alone on a market with no collateral. */
 export const pairName = (f: Pick<MorphoAtBlockFigures, "collateralToken" | "loan">) =>
-  f.collateralToken ? `${f.collateralToken.symbol} / ${f.loan.symbol}` : `${f.loan.symbol}, no collateral`;
+  f.collateralToken ? `${f.loan.symbol} / ${f.collateralToken.symbol}` : `${f.loan.symbol}, no collateral`;
 
 export const amount = (x: number, unit: string) => `${num(x)} ${unit}`;
 export const usd = (x: number) =>
@@ -26,7 +27,7 @@ export const usd = (x: number) =>
 export const pctText = (x: number, digits = 2) => `${(x * 100).toFixed(digits)}%`;
 
 export const frontDoorWords = ({ chain }: Dep) => ({
-  line: `A wallet's Morpho Blue positions on ${chain}, each with its collateral, debt and LTV against the market's line, in dollars where ${chain} has a price feed for the loan token, and its interest over the last 30 days.`,
+  line: `A wallet's Morpho Blue positions on ${chain}, each with its collateral, debt and LTV against the market's LLTV, in dollars where ${chain} has a price feed for the loan asset, and its interest over the last 30 days.`,
   links: { markets: "Markets" },
   heading: "Morpho Blue positions",
   none: `This address holds no Morpho Blue position on ${chain}.`,
@@ -66,15 +67,16 @@ export const CARD_WORDS = {
   ltv: "LTV",
   ltvTip: "Debt divided by the collateral's value at the market's oracle price. The market liquidates at its LLTV.",
   ltvLine: (lltv: number) => `of ${pctText(lltv, 1)} LLTV`,
-  borrowRate: "Borrow rate",
+  borrowRate: "Borrow APY",
   borrowRateTip:
-    "The market's borrow rate from its rate model, a year, simple. It follows how much of the market is lent out.",
-  supplyRate: "Supply rate",
-  supplyRateTip: "The borrow rate times the share lent out, less the market's fee: what supply earns, a year, simple.",
+    "The market's borrow rate from its rate model, compounded over a year. It follows how much of the market is lent out.",
+  supplyRate: "Supply APY",
+  supplyRateTip:
+    "The borrow rate times the share lent out, less the market's fee, compounded over a year: what supply earns.",
   room: "Room to borrow",
   roomTip: "How much more the position can borrow before its LTV reaches the market's LLTV.",
   drop: "Liquidates on a drop of",
-  dropTip: "How far the collateral's price, in the loan token, can fall before the LTV reaches the LLTV.",
+  dropTip: "How far the collateral's price, in the loan asset, can fall before the LTV reaches the LLTV.",
   interest30: { earned: "Earned, 30 days", owed: "Interest, 30 days" },
   interestTip: "What the market's rate added over the last 30 days, from the market's totals at the two dates.",
   withheld: {
@@ -120,7 +122,7 @@ export const MARKET_LIST_WORDS = {
     ];
     return parts.length ? `Not listed here: ${parts.join(" and ")}. Each keeps its own page.` : null;
   },
-  idle: "The idle market names no loan token, collateral, oracle or rate model, so nothing can be borrowed from it.",
+  idle: "The idle market names no loan asset, collateral, oracle or rate model, so nothing can be borrowed from it.",
   /** An idle market that lends a token (Optimism's USDC one). */
   idleLends: (loan: string) =>
     `The idle ${loan} market names no collateral, oracle or rate model, so nothing can be borrowed from it.`,
@@ -134,7 +136,7 @@ export const MARKET_LIST_WORDS = {
     "never-funded": "This market isn't listed on the markets page: nothing has ever been supplied to it.",
   } as Record<"test-token" | "never-funded", string>,
   idlePage:
-    "This is the idle market: it names no loan token, collateral, oracle or rate model, so nothing can be supplied or borrowed in it.",
+    "This is the idle market: it names no loan asset, collateral, oracle or rate model, so nothing can be supplied or borrowed in it.",
   idleLendsPage: (loan: string) =>
     `This is an idle ${loan} market: it names no collateral, oracle or rate model, so ${loan} supplied here earns nothing and nothing can be borrowed.`,
 };

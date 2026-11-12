@@ -32,7 +32,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const name = g?.loanNamed ? g.loanSymbol : `${token.slice(0, 6)}…${token.slice(-4)}`;
   return {
     title: `${name} markets · Morpho Blue`,
-    description: `Every Morpho Blue market that lends ${name}: its collateral, LLTV, size, rates and utilisation.`,
+    description: `Every Morpho Blue market that lends ${name}: its collateral, LLTV, size, rates and utilization.`,
     alternates: { canonical: `/ethereum/morpho/markets/${token}` },
   };
 }

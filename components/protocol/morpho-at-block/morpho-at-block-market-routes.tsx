@@ -95,7 +95,7 @@ export async function morphoAtBlockLoanTokenMetadata(dep: Dep, loanToken: string
   const name = g?.loanNamed ? g.loanSymbol : `${token.slice(0, 6)}…${token.slice(-4)}`;
   return {
     title: `${name} markets · Morpho Blue on ${dep.chain}`,
-    description: `Every Morpho Blue market on ${dep.chain} that lends ${name}: its collateral, LLTV, size, rates and utilisation.`,
+    description: `Every Morpho Blue market on ${dep.chain} that lends ${name}: its collateral, LLTV, size, rates and utilization.`,
     alternates: { canonical: `${dep.route}/markets/${token}` },
     robots: { index: false },
   };
@@ -138,7 +138,7 @@ export async function morphoAtBlockMarketMetadata(dep: Dep, loanToken: string, m
       ? "Idle market"
       : m.isIdle
         ? `${m.loanSymbol} idle market`
-        : `${m.collateralSymbol ?? "no collateral"} / ${m.loanSymbol}`;
+        : `${m.loanSymbol} / ${m.collateralSymbol ?? "no collateral"}`;
   return {
     title: `${pair} · Morpho Blue on ${dep.chain}`,
     description: `One Morpho Blue market on ${dep.chain}, ${pair}: what it holds, what it pays and charges, its rate curve, its oracle price and its terms.`,

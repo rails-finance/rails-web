@@ -901,7 +901,8 @@ const SHEET_WORDS_SUBJECTS = [
     path: "/base/morpho/0xd13de0ab683e6b1eef10532759d9717b65d8a8bd/0x9103c3b4e834476c9a62ea009ba2c884ee42e94e6e314a26f04d312434191836",
     id: "0x17675f8d57fdd518d7cc8c8f607588887495778d8f00f00883920b29f7e2ff78:3",
     risk: ["LTV (liquidation at 86.0%)", "Collateral can fall"],
-    limits: ["Still borrowable", "Borrow rate"],
+    // Morpho's docs' word for the rate (ui-jobs 628).
+    limits: ["Still borrowable", "Borrow APY"],
     params: ["LLTV", "Oracle price"],
     optional: [],
     carried: 1,

@@ -49,7 +49,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
     body: (
       <p>
         The position page shows the collateral, the debt or the supply, each in dollars where Optimism has a price for
-        the loan token, the LTV against the market&apos;s LLTV, the borrow or supply rate, the room left to borrow, the
+        the loan asset, the LTV against the market&apos;s LLTV, the borrow or supply rate, the room left to borrow, the
         price drop that would liquidate it, and the interest over the last 30 days.
       </p>
     ),
@@ -63,7 +63,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
           markets overview
         </Link>{" "}
         groups every market Morpho Blue has created on Optimism by the token it lends, with each group&apos;s supply,
-        borrowing and utilisation in that token. Each market opens its own page: its rates and rate curve, its
+        borrowing and utilization in that token. Each market opens its own page: its rates and rate curve, its
         oracle&apos;s price and its terms.
       </p>
     ),
@@ -82,20 +82,20 @@ const reads: InfoReads = {
     {
       name: "AdaptiveCurveIRM",
       address: MORPHO_OPTIMISM.contracts.adaptiveCurveIrm,
-      reads: "each market's borrow rate and its rate at target, the rate the curve sets at 90% utilisation.",
+      reads: "each market's borrow rate and its rate at target, the rate the curve sets at 90% utilization.",
     },
     {
       name: "Each market's oracle",
-      reads: "the price of one unit of collateral in the loan token, and the price feeds it names.",
+      reads: "the price of one unit of collateral in the loan asset, and the price feeds it names.",
     },
     {
       name: "Chainlink USDC / USD, ETH / USD and USDT / USD",
-      reads: "the loan token's dollar price, for markets that lend USDC, WETH or USDT.",
+      reads: "the loan asset's dollar price, for markets that lend USDC, WETH or USDT.",
     },
     {
       name: "Aave V3 Optimism oracle",
       address: MORPHO_OPTIMISM.aaveOracle!.address,
-      reads: "the dollar price of a loan token with no Chainlink feed in Aave's address book, where Aave V3 lists it.",
+      reads: "the dollar price of a loan asset with no Chainlink feed in Aave's address book, where Aave V3 lists it.",
     },
   ],
   how: "Rails's server reads Morpho Blue's log of created markets once and keeps it, then reads only the blocks since. It reads these contracts at the latest block when you open a page, and a position and its market again at the UTC midnight 30 days back. A past block's answers are stored once that block is final, so a later visit reads only the newest block again.",
@@ -130,7 +130,7 @@ export default function InfoPage() {
         MORPHO_INFO_SHARED.whatItIs,
         MORPHO_INFO_SHARED.isolatedMarkets,
         MORPHO_INFO_SHARED.liquidation,
-        "Each market's oracle prices its collateral in its loan token, and Morpho Blue states no dollar value. Rails gives a dollar figure at the loan token's Chainlink feed on Optimism, or at Aave V3's oracle there for a token with no feed, so a USDC debt reads in dollars.",
+        "Each market's oracle prices its collateral in its loan asset, and Morpho Blue states no dollar value. Rails gives a dollar figure at the loan asset's Chainlink feed on Optimism, or at Aave V3's oracle there for a token with no feed, so a USDC debt reads in dollars.",
       ]}
       reads={reads}
       views={views}
