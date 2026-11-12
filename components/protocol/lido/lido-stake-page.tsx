@@ -12,6 +12,7 @@ import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { HistoryTitleRow } from "@/components/shared/history-tag";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { AimGate } from "@/components/shared/aim-gate";
+import { UnansweredLine } from "@/components/shared/unanswered-line";
 import { assetKey } from "@/lib/shared/asset-family";
 import { isWallet } from "@/components/protocol/uniswap/uniswap-wallet-positions";
 import { LidoStakeCard } from "@/components/protocol/lido/lido-stake-card";
@@ -36,9 +37,13 @@ export async function LidoStakePage({ wallet: raw }: { wallet: string }) {
     return (
       <div className="py-8">
         <DetailTopRow session={session} fallbackHref={home} showStamp={false} />
-        <p className="mt-6 text-sm text-rb-500" data-position-unanswered="">
+        <UnansweredLine
+          ceiling={answer.kind === "ceiling"}
+          className="mt-6 text-sm text-rb-500"
+          data-position-unanswered=""
+        >
           {STAKE_PAGE.unanswered}
-        </p>
+        </UnansweredLine>
       </div>
     );
   const r = answer.data;

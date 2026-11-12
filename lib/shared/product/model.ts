@@ -48,8 +48,12 @@ export interface Missing {
 export const isMissing = (x: unknown): x is Missing =>
   typeof x === "object" && x != null && "missing" in x && typeof (x as Missing).missing === "string";
 
-/** A read that is still out, failed, or answered. */
-export type Loadable<T> = { state: "loading" } | { state: "error"; message: string } | { state: "ok"; data: T };
+/** A read that is still out, failed, or answered. `ceiling`: refused at the daily read ceiling
+ *  (lib/shared/read-ceiling.ts), drawn as the ceiling's line. */
+export type Loadable<T> =
+  | { state: "loading" }
+  | { state: "error"; message: string; ceiling?: boolean }
+  | { state: "ok"; data: T };
 
 /** The read behind a section's figures: `SectionReadStamp`'s props. */
 export interface ReadAt {

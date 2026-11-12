@@ -26,6 +26,7 @@ import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared
 import { ProvSection, SectionHeading } from "@/components/shared/section-menu";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
+import { UnansweredLine } from "@/components/shared/unanswered-line";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import type { ProtocolEntry } from "@/lib/shared/protocols";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
@@ -292,7 +293,15 @@ export function ProductLoading({ height }: { height?: number }) {
 }
 
 /** A read that failed, in a product page's body. */
-export function ProductFailed({ what, message }: { what: string; message: string }) {
+export function ProductFailed({ what, message, ceiling }: { what: string; message: string; ceiling?: boolean }) {
+  if (ceiling)
+    return (
+      <div className="py-12 text-center text-rb-500">
+        <UnansweredLine ceiling className="text-sm">
+          {message}
+        </UnansweredLine>
+      </div>
+    );
   return (
     <div className="py-12 text-center text-rb-500">
       <p className="mb-1">Couldn&apos;t read {what} from chain.</p>
@@ -316,7 +325,7 @@ export function MarketBody({
   headOnly?: boolean;
 }) {
   if (market.state === "loading") return headOnly ? <SkeletonBlock height={260} /> : <ProductLoading />;
-  if (market.state === "error") return <ProductFailed what={what} message={market.message} />;
+  if (market.state === "error") return <ProductFailed what={what} message={market.message} ceiling={market.ceiling} />;
   return (
     <>
       <ProductHeadSection head={market.data.head} titled={headOnly} />

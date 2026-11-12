@@ -520,7 +520,12 @@ function reservesTable(m: AaveMarketConfig, read: AaveMarketRead, view: AaveMark
 export function aaveMarketModel(m: AaveMarketConfig, read: AaveMarketRead, overview: boolean): Loadable<MarketModel> {
   const { data, loading, error, view } = read;
   if (loading && !data) return { state: "loading" };
-  if (error || !view) return { state: "error", message: error ?? "The RPC read failed: reload to retry." };
+  if (error || !view)
+    return {
+      state: "error",
+      message: error ?? "The RPC read failed: reload to retry.",
+      ceiling: !error && data?.readCeiling,
+    };
   return {
     state: "ok",
     data: { head: marketHead(m, read, view, overview), reserves: reservesTable(m, read, view) },

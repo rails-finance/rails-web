@@ -791,9 +791,12 @@ export function MorphoMarketPage({
   note,
   listing,
   positions,
+  readCeiling = false,
 }: {
   /** Null where the read failed. */
   data: MorphoMarketViewData | null;
+  /** The read was refused at the daily read ceiling (lib/shared/read-ceiling.ts). */
+  readCeiling?: boolean;
   chainId: ChainId;
   /** The pair's name from the roster, for the header when the read failed. */
   pair: string;
@@ -820,7 +823,7 @@ export function MorphoMarketPage({
           sections: sectionsOf(x),
         },
       }
-    : { state: "error", message: FAILED };
+    : { state: "error", message: FAILED, ceiling: readCeiling };
   const holders: ProductSection | null = x
     ? {
         scope: "market-holders",

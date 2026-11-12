@@ -46,6 +46,7 @@ import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { AimGate } from "@/components/shared/aim-gate";
 import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
+import { UnansweredLine } from "@/components/shared/unanswered-line";
 import { assetKey } from "@/lib/shared/asset-family";
 import { AssetUnit } from "@/components/shared/asset-unit";
 import { TokenPairIcons } from "@/components/shared/token-pair-icons";
@@ -869,6 +870,8 @@ type RosterProps = {
   /** The explainer's words after the count of markets holding no supply; "has never been supplied"
    *  where absent ("is empty now" on Arc and Optimism, ui-jobs 578). */
   unfundedWords?: UnfundedWords;
+  /** The read was refused at the daily read ceiling (lib/shared/read-ceiling.ts). */
+  readCeiling?: boolean;
 };
 
 /** The roster reads `?all=1` from the URL; the static render, before the
@@ -893,6 +896,7 @@ function RosterView({
   note,
   unfundedLabel = "never funded",
   unfundedWords = NEVER_SUPPLIED,
+  readCeiling = false,
 }: RosterProps & { all: boolean }) {
   const root = `/${chainMeta(chainId).slug}/morpho`;
   const pathname = usePathname();
@@ -1014,7 +1018,9 @@ function RosterView({
       <div className="py-8">
         <SubPageHeader protocol={protocolForHref(root)!} title="Markets" />
         {data.chainStale ? (
-          <p className={NOTE}>The market roster could not be read from the chain. Reload to try again.</p>
+          <UnansweredLine ceiling={readCeiling} className={NOTE}>
+            The market roster could not be read from the chain. Reload to try again.
+          </UnansweredLine>
         ) : (
           <>
             <ProductHeadSection head={head} titled={false} />

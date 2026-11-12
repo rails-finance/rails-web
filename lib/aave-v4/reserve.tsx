@@ -720,7 +720,11 @@ export function AaveV4ReservePage({
   else if (head.state === "loading") reserve = { state: "loading" };
   else if (head.state === "not-listed") reserve = { state: "ok", data: null };
   else if (head.state !== "ok")
-    reserve = { state: "error", message: head.state === "error" ? head.message : "The head read failed." };
+    reserve = {
+      state: "error",
+      message: head.state === "error" ? head.message : "The head read failed.",
+      ceiling: head.state === "error" && head.ceiling,
+    };
   else {
     const f = settleHead(head.data);
     const names = namesOf(sp, line);

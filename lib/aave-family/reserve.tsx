@@ -718,7 +718,11 @@ export function AaveReservePage({ marketKey, asset }: { marketKey: AaveMarketKey
   let reserve: Loadable<ReservePageData | null>;
   if (loading && !data) reserve = { state: "loading" };
   else if (error || !view || !vocab)
-    reserve = { state: "error", message: error ?? "The RPC read failed: reload to retry." };
+    reserve = {
+      state: "error",
+      message: error ?? "The RPC read failed: reload to retry.",
+      ceiling: !error && data?.readCeiling,
+    };
   else if (!r) reserve = { state: "ok", data: null };
   else {
     const z = reserveFigures({ r, vocab });

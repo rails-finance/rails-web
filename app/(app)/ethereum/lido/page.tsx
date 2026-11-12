@@ -19,7 +19,7 @@ export default async function Page() {
   const answer = await fetchLidoProtocol();
   return (
     <>
-      <LidoFrontDoor r={answer.kind === "ok" ? answer.data : null} />
+      <LidoFrontDoor r={answer.kind === "ok" ? answer.data : null} readCeiling={answer.kind === "ceiling"} />
       <ProvInspectorLayer />
     </>
   );

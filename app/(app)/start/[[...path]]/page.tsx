@@ -23,6 +23,7 @@ import { ASSET_DOOR, HEALTH_DISCLAIMER } from "@/lib/vaults/health-words";
 import { PairDoorCards } from "@/components/start/pair-door";
 import { InFocusSymbol, StartOutOfFocus } from "@/components/start/start-focus";
 import { fetchUniswapPair } from "@/lib/api/fetch-uniswap";
+import { UnansweredLine } from "@/components/shared/unanswered-line";
 import { PAIRS, PAIR_TOKENS, pairCards, type PairKey } from "@/lib/uniswap/pairs";
 import { PAIR_DOOR } from "@/lib/uniswap/words";
 import {
@@ -379,7 +380,7 @@ async function PairStep({ pair, pairsBase }: { pair: PairKey; pairsBase: string 
           <PairDoorCards base={base} quote={quote} cards={pairCards(answer.data, pair)} />
         </InFocusSymbol>
       ) : (
-        <p className="text-sm text-rb-500">{PAIR_DOOR.unanswered}</p>
+        <UnansweredLine ceiling={answer.kind === "ceiling"}>{PAIR_DOOR.unanswered}</UnansweredLine>
       )}
     </div>
   );

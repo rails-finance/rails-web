@@ -13,6 +13,7 @@ import { ArrowRight } from "lucide-react";
 import { notFound } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { HistoryTitleRow } from "@/components/shared/history-tag";
+import { UnansweredLine } from "@/components/shared/unanswered-line";
 import { fetchUniswapPositions } from "@/lib/api/fetch-uniswap";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { uniExplorer, type UniChainId, type UniProtocol } from "@/lib/uniswap/deployments";
@@ -73,7 +74,9 @@ export async function UniswapWalletPositions({
         </HistoryTitleRow>
       </header>
       {answer.kind !== "ok" ? (
-        <p className="text-sm text-rb-500">{FRONT_DOOR.unanswered}</p>
+        <UnansweredLine ceiling={answer.kind === "ceiling"} className="text-sm text-rb-500">
+          {FRONT_DOOR.unanswered}
+        </UnansweredLine>
       ) : mine.length === 0 ? (
         <p className="text-sm text-rb-500" data-uniswap-none="">
           {FRONT_DOOR.none(version, protocol)}

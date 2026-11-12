@@ -27,6 +27,7 @@ import { PricesProvider, usePrices, useRequestPrices } from "@/lib/shared/prices
 import { listSymbols, NO_PRICE_HINT } from "@/lib/aave-v4/unpriced";
 import { fetchAaveV4Hubs } from "@/lib/api/fetch-aave-v4-hubs";
 import { useV4Heads, type V4Read, type V4ReserveHead } from "@/lib/api/fetch-aave-v4-reserve";
+import { isReadCeiling, READ_CEILING_CODE } from "@/lib/shared/read-ceiling";
 import { AAVE_V4_ARC_API_ROOT, AAVE_V4_BASE_API_ROOT, AAVE_V4_ORACLE_ROUTE } from "@/lib/aave-v4/deployment-routes";
 import type { ArcMarketsRead } from "@/lib/aave-v4-arc/types";
 import { aaveV4Modal, aaveV4PositionModal } from "@/lib/aave-v4/event-templates";
@@ -122,6 +123,9 @@ export const protocolOf = (d: V4Deployment) => {
 
 // ── The stored read ──────────────────────────────────────────────────────────
 
+/** Arc's markets read refused at the daily read ceiling (lib/shared/read-ceiling.ts). */
+const CEILING = new Error(READ_CEILING_CODE);
+
 /** The deployment's stored lines: `/api/aave-v4/hubs` or `/api/aave-v4-base/reserves`. */
 export function useV4Stored(d: V4Deployment): Loadable<V4Stored> {
   const [out, setOut] = useState<Loadable<V4Stored>>({ state: "loading" });
@@ -134,12 +138,26 @@ export function useV4Stored(d: V4Deployment): Loadable<V4Stored> {
             .then(storedFromBase)
         : d.chain === "arc"
           ? fetch(`${AAVE_V4_ARC_API_ROOT}/markets`, { cache: "no-store" })
-              .then((r) => (r.ok ? (r.json() as Promise<ArcMarketsRead>) : Promise.reject(new Error(`${r.status}`))))
+              .then(async (r) =>
+                r.ok
+                  ? (r.json() as Promise<ArcMarketsRead>)
+                  : Promise.reject(
+                      isReadCeiling(r.status, await r.json().catch(() => null)) ? CEILING : new Error(`${r.status}`),
+                    ),
+              )
               .then(storedFromArc)
           : fetchAaveV4Hubs().then(storedFromHubs);
     read
       .then((s) => live && setOut({ state: "ok", data: s }))
-      .catch((e) => live && setOut({ state: "error", message: e instanceof Error ? e.message : "The read failed." }));
+      .catch(
+        (e) =>
+          live &&
+          setOut({
+            state: "error",
+            message: e instanceof Error ? e.message : "The read failed.",
+            ceiling: e === CEILING,
+          }),
+      );
     return () => {
       live = false;
     };
@@ -390,7 +408,8 @@ function RosterBody({ d }: { d: V4Deployment }) {
   const roster = useMemo(() => (s && book ? rosterOf(s, book) : []), [s, book]);
   const byKey = new Map(roster.map((r) => [r.sp.slug, r]));
   const useMarket = (k: string): Loadable<MarketModel> => {
-    if (stored.state !== "ok") return stored.state === "loading" ? stored : { state: "error", message: stored.message };
+    if (stored.state !== "ok")
+      return stored.state === "loading" ? stored : { state: "error", message: stored.message, ceiling: stored.ceiling };
     const r = byKey.get(k);
     if (!r) return { state: "loading" };
     return { state: "ok", data: { head: rosterHead(stored.data, r), reserves: EMPTY_TABLE } };
@@ -953,7 +972,11 @@ export function useSpokeRows(sp: V4Spoke | null, book: V4PriceBook | null, d?: V
   if (!sp) return { state: "loading" };
   if (!heads || !book) return { state: "loading" };
   if (heads.every((h) => h.state !== "ok"))
-    return { state: "error", message: "The head read failed for every reserve: reload to retry." };
+    return {
+      state: "error",
+      message: "The head read failed for every reserve: reload to retry.",
+      ceiling: heads.some((h) => h.state === "error" && h.ceiling),
+    };
   return {
     state: "ok",
     data: sp.lines.map((l, i) => {

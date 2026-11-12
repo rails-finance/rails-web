@@ -23,6 +23,7 @@ import { uniExplorer, type UniChainId, type UniProtocol } from "@/lib/uniswap/de
 import { poolPosition } from "@/lib/uniswap/position";
 import { cardProv } from "@/lib/uniswap/provenance";
 import type { Provenance } from "@/components/shared/provenance";
+import { UnansweredLine } from "@/components/shared/unanswered-line";
 import type { UniToken, UniswapVersion } from "@/lib/uniswap/types";
 import { POSITION_PAGE, num } from "@/lib/uniswap/words";
 
@@ -101,13 +102,17 @@ export async function UniswapPositionPage({
   const x = uniExplorer(protocol, chainId, version);
   const session = x.id as SessionProtocol;
   const home = x.route;
-  if (answer.kind === "error")
+  if (answer.kind === "error" || answer.kind === "ceiling")
     return (
       <div className="py-8">
         <DetailTopRow session={session} fallbackHref={home} showStamp={false} />
-        <p className="mt-6 text-sm text-rb-500" data-position-unanswered="">
+        <UnansweredLine
+          ceiling={answer.kind === "ceiling"}
+          className="mt-6 text-sm text-rb-500"
+          data-position-unanswered=""
+        >
           {POSITION_PAGE.unanswered}
-        </p>
+        </UnansweredLine>
       </div>
     );
   const r = answer.data;
