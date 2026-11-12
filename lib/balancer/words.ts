@@ -17,33 +17,32 @@ export const LABEL = "Balancer V3";
 
 export const FRONT_DOOR = {
   line: (chain: string) =>
-    `Balancer V3 pools hold tokens that traders swap against, and liquidity providers own shares of each pool. Look up a wallet to see its pool shares on ${chain}.`,
-  heading: "Balancer V3 pool shares",
+    `Balancer V3 pools hold tokens that traders swap against, and liquidity providers hold Balancer Pool Tokens (BPT), their shares of a pool. Look up a wallet to see its BPT on ${chain}.`,
+  heading: "Balancer V3 BPT",
   none: "Rails found no Balancer V3 pool this wallet holds a share of.",
   /** How the pools were found, said on every wallet page. */
   found: (chain: string) =>
-    `Pools are found from every transfer of pool shares to or from this wallet since Balancer V3 launched on ${chain}.`,
+    `Pools are found from every transfer of BPT to or from this wallet since Balancer V3 launched on ${chain}.`,
   truncated: (checked: number, held: number) =>
-    `This wallet has held shares of more pools than Rails reads at once: Rails checked the ${checked} it touched most recently and shows at most ${held}.`,
+    `This wallet has held BPT of more pools than Rails reads at once: Rails checked the ${checked} it touched most recently and shows at most ${held}.`,
   unanswered: "The read of this wallet's pools did not answer. Try again in a minute.",
   rowShare: (s: number) => `${share(s)} of the pool`,
-  /** A row's gauge stake, part of the row's share: the gauge holds these shares for the wallet. */
+  /** A row's gauge stake, part of the row's share: the gauge holds this BPT for the wallet. */
   rowStakedLabel: "Of which staked in a gauge",
   rowStaked: (s: number) => `${FRONT_DOOR.rowStakedLabel}: ${share(s)}`,
-  stakedTip: "Pool shares this wallet staked in the pool's gauge. The gauge holds them and pays rewards on them.",
+  stakedTip: "BPT this wallet staked in the pool's gauge. The gauge holds it for the wallet.",
 };
 
 /** The index's count on the front door (rails-ops decision 0063). */
 export const COUNT_WORDS = {
   title: "Recorded by Rails",
-  positions: "Pool-share holdings",
+  positions: "BPT holdings",
   positionsTip:
-    "Each holding is one address's shares in one pool. The address is a wallet or a contract, such as a gauge or a router that holds pool shares.",
+    "Each holding is one address's BPT in one pool. The address is a wallet or a contract, such as a gauge or a router that holds BPT.",
   holders: "Holders",
-  holdersTip: "The addresses that hold shares of at least one pool, wallets and contracts both.",
-  line: (chain: string) =>
-    `Every pool share held on ${chain} now, from Rails's record of Balancer V3 since it launched.`,
-  unanswered: "Rails's count of pool shares did not answer. Try again in a minute.",
+  holdersTip: "The addresses that hold BPT of at least one pool, wallets and contracts both.",
+  line: (chain: string) => `Every BPT holding on ${chain} now, from Rails's record of Balancer V3 since it launched.`,
+  unanswered: "Rails's count of BPT holdings did not answer. Try again in a minute.",
 };
 
 /** A page's words when the index cannot serve its read. */
@@ -61,27 +60,28 @@ export const POSITION_PAGE = {
 };
 
 export const CARD_WORDS = {
-  heading: "Pool share summary",
+  heading: "BPT summary",
   share: "Share of pool",
-  shareTip: "The wallet's pool shares, in the wallet and staked in a gauge, as a part of all the pool's shares.",
+  shareTip:
+    "The wallet's BPT (Balancer Pool Tokens, its shares of the pool), in the wallet and staked in a gauge, as a part of the BPT total supply.",
   holds: "Tokens",
   holdsTip:
     "The wallet's part of each token the pool holds: the pool's balance of it times the wallet's share of the pool. Withdrawing pays out about these amounts.",
-  rate: "Share value",
+  rate: "BPT rate",
   rateSub: "over 30 days",
   rateYoung: "pool under 30 days old",
   rateUnread: "not read",
   rateTip:
-    "How much the pool's value per share changed over the last 30 days. It is the same for every share, and grows from the swap fees the pool keeps and its tokens' yield.",
+    "How much the BPT rate, the pool's value per BPT, changed over the last 30 days. It is the same for every BPT, and grows from the swap fees the pool keeps and its tokens' yield.",
   /** The share's split where some shares are staked. */
   split: (held: number, staked: number) => `${num(held)} in the wallet, ${num(staked)} staked in a gauge`,
   /** Under an empty First added: the wallet holds or stakes shares it added none of, or has no move on record. */
-  byTransferSub: "shares came by transfer",
+  byTransferSub: "BPT came by transfer",
   noMoves: "no adds or removes found",
   closed: "Closed",
   added: "First added",
   addedTip: "When this wallet first added liquidity to this pool.",
-  none: "This wallet holds no shares of this pool now.",
+  none: "This wallet holds no BPT of this pool now.",
   /** After the add and remove counts: the latest move's day. */
   last: (m: BalMove) => `last ${day(m.time)}`,
   /** The link at the foot of the card's (i) pane. */
@@ -113,6 +113,8 @@ export interface BalRow {
   now: string;
   /** A fact with no past side by nature (a change, a setting): its past cell stays blank. */
   single?: true;
+  /** One line under the label, up to eight words. */
+  note?: string;
 }
 export interface BalTable {
   /** The past column's date; null for a pool younger than the window. */
@@ -127,7 +129,14 @@ export function readoutTable(p: BalPosition): BalTable {
   // wallet's rows show the present alone; the pool's rows keep the window.
   const w = p.windowWithheld ? null : t;
   const wallet: BalRow[] = [
-    { key: "shares", part: "yours", label: "Pool shares", then: w ? num(w.shares) : null, now: num(p.now.shares) },
+    {
+      key: "shares",
+      part: "yours",
+      label: "BPT",
+      then: w ? num(w.shares) : null,
+      now: num(p.now.shares),
+      ...(p.windowWithheld ? { note: "staked BPT read now only" } : {}),
+    },
     { key: "share", part: "yours", label: "Share of pool", then: w ? share(w.share) : null, now: share(p.now.share) },
     ...p.tokens.map(
       (tok, i): BalRow => ({
@@ -141,7 +150,7 @@ export function readoutTable(p: BalPosition): BalTable {
   ];
   const status = [p.paused ? "Paused" : null, p.recoveryMode ? "Recovery mode" : null].filter(Boolean).join(" · ");
   const pool: BalRow[] = [
-    { key: "shares", part: "pool", label: "All pool shares", then: t ? num(t.supply) : null, now: num(p.now.supply) },
+    { key: "shares", part: "pool", label: "BPT total supply", then: t ? num(t.supply) : null, now: num(p.now.supply) },
     ...p.tokens.map(
       (tok, i): BalRow => ({
         key: `token:${i}`,
@@ -151,7 +160,7 @@ export function readoutTable(p: BalPosition): BalTable {
         now: num(p.now.pool[i]),
       }),
     ),
-    { key: "rate", part: "pool", label: "Value per share", then: null, now: rateText(p), single: true },
+    { key: "rate", part: "pool", label: "BPT rate", then: null, now: rateText(p), single: true },
     ...(p.feePct == null
       ? []
       : [
@@ -193,8 +202,8 @@ export function cardExplainer(p: BalPosition): ExplainGroupWords[] {
   const yielding = rateTokens(p);
   const holdings = [
     held
-      ? `This wallet holds ${num(p.now.shares)} pool shares, ${share(p.now.share)} of the pool.`
-      : "This wallet holds no shares of this pool now.",
+      ? `This wallet holds ${num(p.now.shares)} BPT, ${share(p.now.share)} of the pool.`
+      : "This wallet holds no BPT of this pool now.",
     held &&
       // A paused pool outside recovery mode pays nothing out until it reopens.
       `${p.paused && !p.recoveryMode ? "Its share comes to" : "It could withdraw"} about ${
@@ -211,14 +220,14 @@ export function cardExplainer(p: BalPosition): ExplainGroupWords[] {
     p.rateChange == null
       ? []
       : [
-          `Value per share ${rose(p.rateChange)} over 30 days, from the swap fees the pool keeps and its tokens' yield.`,
-          "It is the pool's figure, the same for every share.",
+          `The BPT rate ${rose(p.rateChange)} over 30 days, from the swap fees the pool keeps and its tokens' yield.`,
+          "It is the pool's figure, the same for every BPT.",
           p.windowWithheld && held
-            ? "Staked shares are read now only, so this wallet has no figure from 30 days back."
+            ? "Staked BPT is read now only, so this wallet has no figure from 30 days back."
             : t && t.shares < p.now.shares
               ? t.shares === 0
-                ? `This wallet held none on ${day(t.at.time)}, so the change was measured before its current shares were added.`
-                : `This wallet held ${num(t.shares)} shares on ${day(t.at.time)}; those ${p.firstAdd ? "added" : "received"} since had only part of the window.`
+                ? `This wallet held none on ${day(t.at.time)}, so the change was measured before its current BPT was added.`
+                : `This wallet held ${num(t.shares)} BPT on ${day(t.at.time)}; the BPT ${p.firstAdd ? "added" : "received"} since had only part of the window.`
               : null,
         ];
   const limit = "Amounts are in the pool's tokens, so a gain or loss in dollars is outside this page.";
@@ -248,25 +257,25 @@ export function readoutExplainer(chainId: number): ExplainGroupWords[] {
           ? "The first column is the block at UTC midnight 30 days back, on the date shown."
           : "The first column is a block 30 to 31 days back, on the date shown.",
         "Now is the block this page read.",
-        "A wallet with staked shares has figures for now only.",
+        "A wallet with staked BPT has figures for now only.",
       ],
     },
     {
       title: READOUT.wallet,
       bullets: [
-        "Pool shares: the wallet's count, in the wallet and staked.",
-        "Share of pool: the wallet's shares over all the pool's shares. It rises when other holders withdraw and falls when they add.",
+        "BPT: Balancer Pool Tokens, the wallet's shares of the pool, in the wallet and staked.",
+        "Share of pool: the wallet's BPT over the BPT total supply. It rises when other liquidity providers withdraw and falls when they add.",
         "A token row: what the share would pay out of the pool's balance today.",
       ],
     },
     {
       title: READOUT.pool,
       bullets: [
-        "All pool shares: every share of the pool, whoever holds it.",
+        "BPT total supply: all the pool's BPT, whoever holds it.",
         "A token row: the pool's balance of that token.",
-        "Value per share: what one share claims of the pool's tokens, counted at their rates.",
-        "Swap fee: charged on each swap. The part the pool keeps raises value per share.",
-        "Status: Open means swaps, adds and removes all work. Paused stops all three. Recovery mode lets holders withdraw in proportion.",
+        "BPT rate: what one BPT claims of the pool's tokens, counted at their rates.",
+        "Swap fee: charged on each swap. The part the pool keeps raises the BPT rate.",
+        "Status: Open means swaps, adds and removes all work. Paused stops all three. Recovery mode lets liquidity providers withdraw in proportion.",
       ],
     },
   ];

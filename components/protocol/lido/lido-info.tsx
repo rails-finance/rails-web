@@ -73,6 +73,7 @@ const howItWorks: readonly [ReactNode, ...ReactNode[]] = [
     finalized, the ETH can be claimed.
   </>,
   <>Every figure is in ETH at Lido&apos;s share rate. Rails states no dollar figure here.</>,
+  <>Rails does not forecast, rate or recommend.</>,
 ];
 
 const views: readonly [InfoView, ...InfoView[]] = [
