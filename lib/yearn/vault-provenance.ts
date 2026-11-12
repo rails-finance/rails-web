@@ -151,16 +151,6 @@ const yearnVaultShutdownProv_ = (c: YearnVaultCoords): Provenance => ({
   via: `${LANE} · VaultV3.isShutdown() @ the pinned block`,
 });
 
-/** How many catalogued vaults in one asset hold something at the block. */
-const yearnAssetGroupCountProv_ = (c: YearnVaultCoords, count: number): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  summary: `${count === 1 ? "One vault" : `${n(count)} vaults`} denominated in ${asset(c)} with a non-zero \`totalAssets()\`${atBlock(c)} — a count over this page's reads, one per catalogued vault whose immutable \`asset()\` is ${asset(c)}. Vaults in this asset that read zero are counted in the trailing group and are never dropped.`,
-  via: `${LANE} · count of catalogued vaults with asset() = ${asset(c)} and totalAssets() > 0 @ the pinned block`,
-  formula: `count of catalogued vaults where asset() = ${asset(c)} and totalAssets() > 0`,
-});
-
 /** How many catalogued vaults hold nothing at the block — a reading, one per
  *  vault, and never the vaults whose call went unanswered. */
 const yearnEmptyCountProv_ = (c: YearnVaultCoords, count: number, catalogSize: number): Provenance => ({
@@ -296,7 +286,6 @@ export const yearnVaultTotalAssetsProv = withServerRead(yearnVaultTotalAssetsPro
 export const yearnVaultSharePriceProv = withServerRead(yearnVaultSharePriceProv_);
 export const yearnVaultEndorsedProv = withServerRead(yearnVaultEndorsedProv_);
 export const yearnVaultShutdownProv = withServerRead(yearnVaultShutdownProv_);
-export const yearnAssetGroupCountProv = withServerRead(yearnAssetGroupCountProv_);
 export const yearnEmptyCountProv = withServerRead(yearnEmptyCountProv_);
 export const yearnEndorsedCountProv = withServerRead(yearnEndorsedCountProv_);
 export const yearnVaultTotalSupplyProv = withServerRead(yearnVaultTotalSupplyProv_);

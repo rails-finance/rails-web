@@ -15,7 +15,6 @@
 import Link from "next/link";
 import { ProvSection, SectionMenu } from "@/components/shared/section-menu";
 import { ROSTER_SCOPE, VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
-import { VaultIndexTable, useVaultIndexSort } from "@/components/vaults/vault-index-table";
 import { CompareBar } from "@/components/vaults/compare-selection";
 import { isoSeconds, RosterBlock, RosterReadStamp } from "@/components/vaults/roster-read-stamp";
 import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
@@ -114,7 +113,6 @@ export function VaultIndexView({
     : [];
   // `?network=` and `?protocol=` (written by the roster, which keeps its
   // facets in the URL here) choose those facets on arrival, as `?asset=` does.
-  const indexSort = useVaultIndexSort(initialSearch ?? "");
   const arrival = new URLSearchParams(initialSearch ?? "");
   const chosen = (id: string, known: string[]) =>
     (arrival.get(id) ?? "")
@@ -190,7 +188,7 @@ export function VaultIndexView({
           <VaultRoster
             initialSearch={initialSearch}
             vaults={scoped.rows}
-            yields={yields}
+            yieldOf={(v) => yields[vaultIndexKey(v)]}
             chainId={MAINNET_CHAIN_ID as ChainId}
             blockNumber={0}
             chainStale={rosters.every((r) => r.chainStale)}
@@ -203,20 +201,7 @@ export function VaultIndexView({
             holdersHrefOf={vaultIndexHoldersHref}
             receiptsOf={receiptsOf}
             hooksOf={hooksOf}
-            mobileSort={indexSort.mobileSort}
-            table={(rows, part) => (
-              <VaultIndexTable
-                rows={rows}
-                part={part}
-                initialSearch={initialSearch ?? ""}
-                yieldOf={(v) => yields[vaultIndexKey(v)]}
-                receiptsOf={receiptsOf}
-                leadOf={(v) => LEAD_IDS[vaultIndexRosterKeyOf(v)] ?? null}
-                hrefOf={vaultIndexHref}
-                holdersHrefOf={vaultIndexHoldersHref}
-                hooksOf={hooksOf}
-              />
-            )}
+            leadOf={(v) => LEAD_IDS[vaultIndexRosterKeyOf(v)] ?? null}
             head={{
               census: null,
               censusFigure: "index-census",
