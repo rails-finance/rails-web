@@ -268,7 +268,7 @@ export function protectsLine(f: ProtectsFact): ProtectsLine {
         label: "Cooldown",
         headline: `Withdrawing takes a ${dayAdj(f.cooldown)} cooldown, then a ${dayAdj(f.window)} window to unstake`,
         sentence:
-          `Umbrella, ${shortHex(f.umbrella)}, can take part of the stake to cover a shortfall in the Aave reserve it backs. ` +
+          `Umbrella, ${shortHex(f.umbrella)}, can slash the stake: take part of it to cover a shortfall in the Aave reserve it backs.` +
           (f.govAdmin
             ? `Aave governance can change Umbrella ${govWait(f.gov)}.`
             : "Who can change Umbrella was not read."),
