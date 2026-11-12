@@ -16,6 +16,7 @@ import {
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { loadLiquityForkBranchesFromChain } from "@/lib/sources/chain/liquity-fork-branches";
 import { branchesPageTitle } from "@/lib/liquity-fork/shutdown";
+import { shutdownDay } from "@/lib/shared/liquity-family-shutdown";
 import type { LiquityForkConfig } from "@/lib/sources/chain/liquity-fork-position";
 import { EBISU_BRANCHES, DEBT_ADDRESS, DEBT_SYMBOL } from "@/lib/ebisu/asset-catalog";
 import { protocolForHref } from "@/lib/shared/protocols";
@@ -24,10 +25,16 @@ import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/pro
 
 export const dynamic = "force-dynamic";
 
+// The shutdown's date from the catalog's record (ui-jobs 612).
+const SHUT_ON = EBISU_BRANCHES.weeth.shutdownRecord
+  ? shutdownDay(EBISU_BRANCHES.weeth.shutdownRecord.shutdown.at)
+  : null;
+
 export const metadata = {
   title: "Ebisu branches",
-  description:
-    "Ebisu's five collateral branches and the order redemption reaches them: each branch with its own oracle, minimum collateral ratio and terms.",
+  description: SHUT_ON
+    ? `Ebisu's five collateral branches, shut down on ${SHUT_ON}: each branch with its own oracle, minimum collateral ratio and terms.`
+    : "Ebisu's five collateral branches and the order redemption reaches them: each branch with its own oracle, minimum collateral ratio and terms.",
 };
 
 const CFG: LiquityForkConfig = { protocol: "ebisu", debtSymbol: DEBT_SYMBOL, branches: EBISU_BRANCHES };
