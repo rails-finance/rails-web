@@ -217,9 +217,14 @@ export function settleTrove(
     // a ratio in the quintillions — the branches lane's rule applies here
     // too: gate on the QUEUE, not on debt > 0 (a failed walk falls back to
     // a whole-token floor). An empty branch has no ratio to state.
+    // A branch total below this one Trove's collateral cannot be the
+    // branch's collateral (Ebisu's pools were emptied while its Troves kept
+    // their recorded collateral, ui-jobs 607): no ratio is stated over it.
     branchTcr:
       branchDebt != null &&
       branchColl != null &&
+      r.branchCollRaw != null &&
+      r.branchCollRaw >= data.entireColl &&
       priceUsd != null &&
       (queueLen != null ? queueLen > 0 && branchDebt > 0 : branchDebt >= 1)
         ? (branchColl * priceUsd) / branchDebt
