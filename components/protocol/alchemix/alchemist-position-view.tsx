@@ -50,7 +50,7 @@
 // `PositionCard`, drawn from the slots this view builds, with no frame, type
 // scale or palette of the family's.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
@@ -165,7 +165,7 @@ function healthRows(
   const rows: PositionPanelRow[] = [
     {
       id: "collateralisation",
-      label: "Collateralisation",
+      label: "Collateral ratio",
       value:
         health.collateralizationRaw != null && health.collateralValueRaw != null && debtRaw != null ? (
           <Prov
@@ -184,29 +184,29 @@ function healthRows(
   rows.push(
     {
       id: "minimum",
-      label: "Minimum",
+      label: "Minimum ratio",
       value: (
         <Prov info={lineRatioProv("minimumCollateralization", health.minimumCollateralizationRaw, b, coords)}>
           {ratioPct(health.minimumCollateralizationRaw)}
         </Prov>
       ),
-      tip: "A mint or a withdrawal must leave the position above this collateralisation: the Alchemist's minimumCollateralization at the reading's block.",
+      tip: "A mint or a withdrawal must leave the position above this collateral ratio: the Alchemist's minimumCollateralization at the reading's block.",
     },
     {
       id: "liquidation-line",
-      label: "Liquidates at",
+      label: "Liquidation ratio",
       value: (
         <Prov info={lineRatioProv("collateralizationLowerBound", health.collateralizationLowerBoundRaw, b, coords)}>
           {ratioPct(health.collateralizationLowerBoundRaw)}
         </Prov>
       ),
-      tip: "The liquidation line: at or below this collateralisation anyone may liquidate the position. The Alchemist's collateralizationLowerBound at the reading's block.",
+      tip: "The liquidation line: at or below this collateral ratio anyone may liquidate the position. The Alchemist's collateralizationLowerBound at the reading's block.",
     },
   );
   if (fall != null && health.collateralizationRaw != null) {
     rows.push({
       id: "liquidates-on-drop",
-      label: "Liquidates on a share-price drop of",
+      label: "Drop to liquidation",
       value:
         fall > 0 ? (
           <Prov
@@ -222,22 +222,9 @@ function healthRows(
             {fallPct(fall)}
           </Prov>
         ) : (
-          "At or below the line"
+          "0%"
         ),
       tip: "How far the vault's share price would need to fall to take the position to the liquidation line. Debt and collateral are counted in one asset, so the ratio moves with the share price alone.",
-    });
-  }
-  // Said only while it is true; a count above zero is in the Explanation pane.
-  if (health.lineLiquidations?.count === 0) {
-    rows.push({
-      id: "line-liquidations",
-      label: "Liquidations on this line",
-      value: (
-        <Prov info={lineLiquidationsProv(0, health.lineLiquidations.throughBlock, coords)} value="0">
-          None yet
-        </Prov>
-      ),
-      tip: "Every Liquidated and BatchLiquidated log on this line, to the block it is indexed to.",
     });
   }
   return rows;
@@ -648,62 +635,29 @@ export function AlchemistPositionView({
     return { read, asOfBlock: live.asOfBlock, clearedAccounts };
   })();
 
-  // The panel's debt rows: the events-only debt, and what the redemptions
-  // cleared, each said only where it is true.
-  const debtRows: PositionPanelRow[] =
-    eventsAlone && dlb
-      ? [
-          {
-            id: "events-alone",
-            label: "Debt from events alone",
-            value: (
-              <span className="tabular-nums">
-                <Prov
-                  info={eventsAloneDebtProv(sym, dlb.debtRaw, dlb.reducedToBlock, dlb.validToBlock, coords)}
-                  value={String(Number(dlb.debtRaw) / 1e18)}
-                  symbol={sym}
-                >
-                  <PanelFigure>{formatCompactTitled(Number(dlb.debtRaw) / 1e18).display}</PanelFigure>
-                </Prov>{" "}
-                {sym}
-              </span>
-            ),
-            tip: "The debt summed from this position's events. A redemption clears debt with no event of the position's to show it, so this sum can sit above the debt read now.",
-          },
-          ...(eventsAlone.clearedAccounts
-            ? [
-                {
-                  id: "cleared-by-redemptions",
-                  label: "Cleared by redemptions",
-                  value: (
-                    <span className="tabular-nums">
-                      <Prov
-                        info={clearedRunProv(
-                          sym,
-                          redemptionTotals.clearedRaw,
-                          redemptionTotals.count,
-                          redemptionTotals.stated,
-                          "every redemption on this timeline",
-                          coords,
-                        )}
-                        value={String(redemptionTotals.cleared)}
-                        symbol={sym}
-                      >
-                        <PanelFigure>{formatCompactTitled(redemptionTotals.cleared).display}</PanelFigure>
-                      </Prov>{" "}
-                      {sym} by{" "}
-                      <Prov info={redemptionCountProv(redemptionTotals.count, coords)}>
-                        <PanelFigure>{redemptionTotals.count}</PanelFigure>
-                      </Prov>{" "}
-                      {redemptionTotals.count === 1 ? "redemption" : "redemptions"}
-                    </span>
-                  ),
-                  tip: "What the redemptions on this timeline cleared from this position, summed. It accounts for the gap between the debt read now and the debt from events alone.",
-                },
-              ]
-            : []),
-        ]
-      : [];
+  // The events-only debt and what the redemptions cleared, for the pane's
+  // History: each said only where it is true.
+  const debtFromEvents: ReactNode =
+    eventsAlone && dlb ? (
+      <>
+        This position&rsquo;s own events leave{" "}
+        <Prov
+          info={eventsAloneDebtProv(sym, dlb.debtRaw, dlb.reducedToBlock, dlb.validToBlock, coords)}
+          value={String(Number(dlb.debtRaw) / 1e18)}
+          symbol={sym}
+        >
+          <span className="tabular-nums">
+            {formatCompactTitled(Number(dlb.debtRaw) / 1e18).display} {sym}
+          </span>
+        </Prov>{" "}
+        of debt.
+        {eventsAlone.clearedAccounts ? (
+          <> Redemptions cleared the rest.</>
+        ) : (
+          <> A redemption clears debt with no event of the position&rsquo;s, so this sum sits above the debt now.</>
+        )}
+      </>
+    ) : null;
   // Whether the collateral column states the dollar figure (collateralUsdText).
   const usdOnCard =
     live != null && collateralUsdText(live.collateral.underlying ?? null, live.collateral.usd ?? null) != null;
@@ -748,20 +702,19 @@ export function AlchemistPositionView({
         vaultHref: live.collateral.mytAddress
           ? explorerUrl(chainId as ChainId, "address", live.collateral.mytAddress)
           : null,
-        clearedOnCard: Boolean(eventsAlone && dlb && eventsAlone.clearedAccounts),
+        debtFromEvents,
         usdOnCard,
         feeBps: lineProtocolFeeBps(chainId, lineKey),
-        lineLiquidations:
-          live.health?.lineLiquidations && live.health.lineLiquidations.count > 0
-            ? {
-                ...live.health.lineLiquidations,
-                prov: lineLiquidationsProv(
-                  live.health.lineLiquidations.count,
-                  live.health.lineLiquidations.throughBlock,
-                  coords,
-                ),
-              }
-            : null,
+        lineLiquidations: live.health?.lineLiquidations
+          ? {
+              ...live.health.lineLiquidations,
+              prov: lineLiquidationsProv(
+                live.health.lineLiquidations.count,
+                live.health.lineLiquidations.throughBlock,
+                coords,
+              ),
+            }
+          : null,
         v2: v2History && v2History.links.length > 0 ? { names: v2Names, joined: v2History.joined } : null,
         fall: live.health
           ? shareFallToLiquidation(live.health.collateralizationRaw, live.health.collateralizationLowerBoundRaw)
@@ -811,7 +764,7 @@ export function AlchemistPositionView({
         },
       ]
     : [
-        { id: "deposited", label: "Deposited", value: null, pending: pendingHeads },
+        { id: "deposited", label: "Collateral", value: null, pending: pendingHeads },
         { id: "debt", label: "Debt", value: null, pending: pendingHeads },
       ];
   const u = live?.collateral.underlying ?? null;
@@ -824,14 +777,14 @@ export function AlchemistPositionView({
     ? [
         {
           id: "set-aside",
-          label: "Set aside for repayment",
+          label: "Debt set aside",
           value: live.earmarked ? (
             <span className="tabular-nums">
               <PanelFigure>
                 {alchemixAmountFigure(
                   live.earmarked,
                   sym,
-                  liveFigureProv("Set aside for repayment", sym, live.earmarked.raw, live.asOfBlock, coords),
+                  liveFigureProv("Debt set aside", sym, live.earmarked.raw, live.asOfBlock, coords),
                 )}
               </PanelFigure>{" "}
               {sym}
@@ -861,16 +814,14 @@ export function AlchemistPositionView({
                     symbol={u.symbol ?? undefined}
                   >
                     <span className="tabular-nums">
-                      <PanelFigure>1</PanelFigure> {mytSymbol} ={" "}
                       <PanelFigure>{formatSharePrice(sharePrice, u.decimals)}</PanelFigure> {u.symbol ?? "underlying"}
                     </span>
                   </Prov>
                 ),
-                tip: "What one vault share is worth in the asset underneath, read from the vault. It moves as the vault earns or loses.",
+                tip: `What one ${mytSymbol} vault share is worth in the asset underneath, read from the vault. It moves as the vault earns or loses.`,
               },
             ]
           : []),
-        ...debtRows,
       ]
     : [];
   const cardSlots: PositionCardSlots = {
@@ -880,28 +831,19 @@ export function AlchemistPositionView({
       <AlchemixIdentity name={alchemixPositionName(sym, tokenId)} chain={position.chainName ?? `chain ${chainId}`} />
     ),
     heads,
-    notice: (
-      <div className="mb-3 space-y-1.5">
-        <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-          <span className={`${OVERLAY_HEADING} text-rb-500`}>Now</span>
-          {live ? (
-            // data-prov-exempt: the block the reading was taken at, a
-            // coordinate linked to the explorer.
-            <span className="text-[11px] tabular-nums text-rb-500" data-prov-exempt="">
-              one reading at <BlockRef block={live.asOfBlock} chainId={chainId as ChainId} linkClassName="link-muted" />
-            </span>
+    notice:
+      position.refusedReason || (!live && !livePending) ? (
+        <div className="mb-3 space-y-1.5">
+          {position.refusedReason ? (
+            <p className="text-xs leading-relaxed text-rb-500">{position.refusedReason}</p>
           ) : null}
-        </span>
-        {position.refusedReason ? (
-          <p className="text-xs leading-relaxed text-rb-500">{position.refusedReason}</p>
-        ) : null}
-        {!live && !livePending ? (
-          <p className="text-sm text-rb-500">
-            The current figures did not come back. Reload the page to read them again.
-          </p>
-        ) : null}
-      </div>
-    ),
+          {!live && !livePending ? (
+            <p className="text-sm text-rb-500">
+              The current figures did not come back. Reload the page to read them again.
+            </p>
+          ) : null}
+        </div>
+      ) : undefined,
     counters: null,
     explainer: {
       body:
@@ -1028,12 +970,8 @@ export function AlchemistPositionView({
                       countTooltip="Counts logs: a transaction that moved more than one thing (an opening, a deposit with a mint, a close) is one card holding each of its logs."
                       countDetail={countDetail}
                       notice={
-                        (lineScopedNote && redemptionRowDrawn) || endedWindow ? (
+                        endedWindow ? (
                           <div className="space-y-1">
-                            {lineScopedNote && redemptionRowDrawn ? (
-                              // The route's own sentence about line rows, rendered as given.
-                              <p className="px-1 text-[11px] leading-relaxed text-rb-500">{lineScopedNote}</p>
-                            ) : null}
                             {/* Why a closed position's timeline stops carrying the line's
                     events while the line goes on having them. Open positions
                     get nothing: their window ends at the frontier, so the

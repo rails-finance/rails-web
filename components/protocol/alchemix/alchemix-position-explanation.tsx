@@ -10,7 +10,7 @@
 // written in the card's format; one stated only here is muted.
 
 import type { ReactNode } from "react";
-import { ProseExplainer, H } from "@/lib/shared/explainer-prose";
+import { ProseExplainer, H, type ExplainerItem } from "@/lib/shared/explainer-prose";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import type { RedemptionNetTotal } from "@/lib/alchemix/redemption-net";
 import { formatNumber } from "@/lib/utils/format";
@@ -77,14 +77,13 @@ export interface AlchemixPositionExplanationProps {
   vaultHref?: string | null;
   /** The share-price fall to the liquidation line, 0 to 1; null with no debt. */
   fall?: number | null;
-  /** The card's Debt subline states the debt the redemptions cleared. */
-  clearedOnCard?: boolean;
+  /** The debt this position's own events leave, and what the redemptions cleared of it, where the two differ. */
+  debtFromEvents?: ReactNode;
   /** The card's Collateral subline states the dollar value. */
   usdOnCard?: boolean;
   /** The line's redemption fee, in basis points of the shares a redemption takes. */
   feeBps?: number | null;
-  /** The line's liquidation count with its receipt, where it is above zero
-   *  (at zero the card says so). */
+  /** The line's liquidation count with its receipt. */
   lineLiquidations?: { count: number; throughBlock: number | null; prov: Provenance } | null;
   /** The holder's V2 account(s), linked, and whether their rows are on the timeline. */
   v2?: { names: ReactNode; joined: boolean } | null;
@@ -155,13 +154,13 @@ function explanationParts({
   net = null,
   vaultHref = null,
   fall = null,
-  clearedOnCard = false,
+  debtFromEvents = null,
   usdOnCard = false,
   feeBps = null,
   lineLiquidations = null,
   v2 = null,
   close = null,
-}: AlchemixPositionExplanationProps): { lead: ReactNode; items: ReactNode[] } | null {
+}: AlchemixPositionExplanationProps): { lead: ReactNode; items: ExplainerItem[] } | null {
   if (!live) return null;
   const sym = syntheticSymbol;
   const under = live.collateral.underlying;
@@ -183,7 +182,7 @@ function explanationParts({
         <H>
           {compact(live.debt.formatted)} {sym}
         </H>{" "}
-        of debt:
+        of debt.
       </>
     ) : null;
 
@@ -201,93 +200,99 @@ function explanationParts({
   const takeShares = earmarked && sharePrice ? earmarked.formatted / sharePrice : null;
   const takeFee = takeShares != null && feeBps != null ? (takeShares * feeBps) / 10000 : null;
 
-  const items: ReactNode[] = [
-    // The collateral: share count, vault, share price, value.
+  const fee = net?.total.fee && net.total.restRaw != null ? net.total.fee : null;
+  const rest = fee && net?.total.restRaw != null ? Number(net.total.restRaw) / 1e18 : null;
+  const one = redemptions.count === 1;
+
+  // Holdings: the collateral as shares, and its worth.
+  const holdings: ReactNode[] = [
     hasCollateral ? (
       <>
         The collateral is{" "}
         <H>
           {compact(live.collateral.formatted)} {mytSymbol}
         </H>
-        , shares in {vault}.
-        {priceText && under ? (
+        , shares in {vault}
+        {priceText ? (
           <>
             {" "}
-            At a share price of <H>{priceText}</H> they are worth{" "}
-            <H>
-              {compact(under.formatted)} {underSym}
-            </H>
-            {live.collateral.usd ? (
-              <>
-                , or {usdOnCard ? <H>${compact(live.collateral.usd.usd)}</H> : <>${compact(live.collateral.usd.usd)}</>}{" "}
-                at {underSym}&rsquo;s $
-                {live.collateral.usd.pricePerUnit.toLocaleString("en-US", { maximumFractionDigits: 4 })}
-              </>
-            ) : null}
-            .
+            worth <H>{priceText}</H> each
           </>
         ) : null}
+        .
       </>
     ) : null,
-    // The share-price fall to the liquidation line.
+    hasCollateral && under && live.collateral.usd ? (
+      <>
+        At {underSym}&rsquo;s ${live.collateral.usd.pricePerUnit.toLocaleString("en-US", { maximumFractionDigits: 2 })}{" "}
+        the collateral is worth{" "}
+        {usdOnCard ? <H>${compact(live.collateral.usd.usd)}</H> : <>${compact(live.collateral.usd.usd)}</>}.
+      </>
+    ) : null,
+  ];
+
+  // Risk: the distance to liquidation, the line's liquidations, and the debt set aside.
+  const risk: ReactNode[] = [
     fall != null && live.debt && health ? (
       fall > 0 ? (
         <>
-          A fall of <H>{fallPct(fall)}</H> in the vault&rsquo;s share price would take collateralisation from{" "}
+          A fall of <H>{fallPct(fall)}</H> in the vault&rsquo;s share price would take the collateral ratio from{" "}
           {health.collateralizationRaw != null ? <H>{ratioPct(health.collateralizationRaw)}</H> : "where it is"} to the
-          liquidation line at <H>{ratioPct(health.collateralizationLowerBoundRaw)}</H>.
-          {lineLiquidations && lineLiquidations.count > 0 ? (
-            <>
-              {" "}
-              The {sym} line has had{" "}
-              <Prov info={lineLiquidations.prov} value={String(lineLiquidations.count)}>
-                {lineLiquidations.count} {lineLiquidations.count === 1 ? "liquidation" : "liquidations"}
-              </Prov>
-              .
-            </>
-          ) : null}
+          liquidation ratio of <H>{ratioPct(health.collateralizationLowerBoundRaw)}</H>.
         </>
       ) : (
-        <>This position is at or below its liquidation line, so anyone can liquidate it.</>
+        <>This position is at or below its liquidation ratio, so anyone can liquidate it.</>
       )
     ) : null,
-    // The set-aside amount and what clearing it takes.
+    lineLiquidations && live.debt && live.debt.formatted > 0 ? (
+      lineLiquidations.count > 0 ? (
+        <>
+          The {sym} line has had{" "}
+          <Prov info={lineLiquidations.prov} value={String(lineLiquidations.count)}>
+            {lineLiquidations.count} {lineLiquidations.count === 1 ? "liquidation" : "liquidations"}
+          </Prov>
+          .
+        </>
+      ) : (
+        <>
+          <Prov info={lineLiquidations.prov} value="0">
+            No position
+          </Prov>{" "}
+          on the {sym} line has been liquidated so far.
+        </>
+      )
+    ) : null,
     earmarked ? (
       <>
         <H>
           {compact(earmarked.formatted)} {sym}
         </H>{" "}
-        of the debt is set aside for repayment.
-        {takeShares != null ? (
-          <>
-            {" "}
-            A line redemption clears it, and so does the holder repaying with vault shares or closing the position. At
-            this share price clearing all of it takes {compact(takeShares)} {mytSymbol} from the collateral
-            {takeFee != null && feeBps != null ? (
-              <>
-                , plus {takeFee.toLocaleString("en-US", { maximumFractionDigits: takeFee < 0.01 ? 6 : 2 })} {mytSymbol}{" "}
-                for the line&rsquo;s {(feeBps / 100).toLocaleString("en-US")}% redemption fee
-              </>
-            ) : null}
-            .
-          </>
-        ) : null}
+        of the debt is set aside for repayment. A redemption clears it, and so does a repayment in vault shares or a
+        close.
       </>
     ) : null,
-    // The lifetime redemption totals, and the net with the fee's part.
+    earmarked && takeShares != null ? (
+      <>
+        Clearing all of it at this share price takes {compact(takeShares)} {mytSymbol} of collateral
+        {takeFee != null && feeBps != null ? (
+          <>
+            , plus {takeFee.toLocaleString("en-US", { maximumFractionDigits: takeFee < 0.01 ? 6 : 2 })} {mytSymbol} for
+            the line&rsquo;s {(feeBps / 100).toLocaleString("en-US")}% redemption fee
+          </>
+        ) : null}
+        .
+      </>
+    ) : null,
+  ];
+
+  // History: the close, the debt the events leave, the redemptions and their net, the V2 account.
+  const history: ReactNode[] = [
+    ...(close ? closeItems(close, sym, mytSymbol) : []),
+    debtFromEvents,
     redemptions.stated > 0 && redemptions.cleared > 0 ? (
       <>
-        Across the {redemptions.count} line redemptions on the timeline below, the line cleared{" "}
-        {clearedOnCard ? (
-          <H>
-            {compact(redemptions.cleared)} {sym}
-          </H>
-        ) : (
-          <>
-            <AmountText value={redemptions.cleared} /> {sym}
-          </>
-        )}{" "}
-        of this position&rsquo;s debt
+        The {redemptions.count} {one ? "redemption" : "redemptions"} on the timeline cleared{" "}
+        <AmountText value={redemptions.cleared} /> {sym} of this position&rsquo;s debt
         {redemptions.taken != null ? (
           <>
             {" "}
@@ -295,57 +300,61 @@ function explanationParts({
           </>
         ) : null}
         .
-        {net && netN != null && net.prov ? (
-          <>
-            {" "}
-            Valued in {net.underlyingSymbol} at each redemption&rsquo;s block, with one {sym} counted as one{" "}
-            {net.underlyingSymbol}, that is a net of{" "}
-            <Prov info={net.prov} value={String(netN)} symbol={net.underlyingSymbol}>
-              <span className="tabular-nums">
-                {signed(netN)} {net.underlyingSymbol}
-              </span>
-            </Prov>{" "}
-            for the holder: the debt cleared less the value of the collateral taken.
-            {net.total.fee && net.total.restRaw != null ? (
-              <>
-                {" "}
-                The line&rsquo;s {(net.total.fee.bps / 100).toLocaleString("en-US")}% redemption fee, paid to
-                Alchemix&rsquo;s fee receiver, is {signed(-Number(net.total.fee.valueRaw) / 1e18)}{" "}
-                {net.underlyingSymbol} of it (<AmountText value={Number(net.total.fee.sharesRaw) / 1e18} /> {mytSymbol}
-                ).
-                {Math.abs(Number(net.total.restRaw) / 1e18) >=
-                Math.abs(Number(net.total.fee.valueRaw) / 1e18) * 0.01 ? (
-                  <>
-                    {" "}
-                    The other {signed(Number(net.total.restRaw) / 1e18)} {net.underlyingSymbol} is how the Alchemist
-                    charges a position: at the line&rsquo;s average shares per unit of debt across every redemption
-                    since the position&rsquo;s last event, while the share price moved between them.
-                  </>
-                ) : null}
-              </>
-            ) : null}{" "}
-            Each redemption&rsquo;s own net is in its card&rsquo;s detail.
-          </>
-        ) : net && net.total.missingPrice > 0 ? (
-          <>
-            {" "}
-            {net.total.missingPrice} of those redemptions {net.total.missingPrice === 1 ? "has" : "have"} no share price
-            read at {net.total.missingPrice === 1 ? "its" : "their"} block, so no net for the holder is given.
-          </>
-        ) : null}
+      </>
+    ) : null,
+    redemptions.stated > 0 && redemptions.cleared > 0 && net && netN != null && net.prov ? (
+      <>
+        Net for the holder:{" "}
+        <Prov info={net.prov} value={String(netN)} symbol={net.underlyingSymbol}>
+          <span className="tabular-nums">
+            {signed(netN)} {net.underlyingSymbol}
+          </span>
+        </Prov>
+        , the debt cleared less the collateral taken, valued in {net.underlyingSymbol} at each redemption&rsquo;s block.
+      </>
+    ) : redemptions.stated > 0 && redemptions.cleared > 0 && net && net.total.missingPrice > 0 ? (
+      <>
+        {net.total.missingPrice} of those redemptions {net.total.missingPrice === 1 ? "has" : "have"} no share price
+        read at {net.total.missingPrice === 1 ? "its" : "their"} block, so no net for the holder is given.
+      </>
+    ) : null,
+    redemptions.cleared > 0 && net && netN != null && net.prov && fee ? (
+      <>
+        The line&rsquo;s {(fee.bps / 100).toLocaleString("en-US")}% redemption fee is{" "}
+        {signed(-Number(fee.valueRaw) / 1e18)} {net.underlyingSymbol} of that net (
+        <AmountText value={Number(fee.sharesRaw) / 1e18} /> {mytSymbol}).
+      </>
+    ) : null,
+    redemptions.cleared > 0 &&
+    net &&
+    netN != null &&
+    net.prov &&
+    fee &&
+    rest != null &&
+    Math.abs(rest) >= Math.abs(Number(fee.valueRaw) / 1e18) * 0.01 ? (
+      <>
+        The other {signed(rest)} {net.underlyingSymbol} is how the Alchemist charges a position: at the line&rsquo;s
+        average shares per unit of debt across every redemption since the position&rsquo;s last event, while the share
+        price moved between them.
       </>
     ) : null,
     v2 ? (
       <>
         {v2.names} is this holder&rsquo;s account from before Alchemix V3, closed on 2 April 2026.
         {v2.joined
-          ? " Its events are on the timeline below, marked V2, and the figures on this page are V3's alone."
+          ? " Its events are on the timeline, marked V2. This page's figures are V3's alone."
           : " Its events are on its own page."}
       </>
     ) : null,
-  ].filter(Boolean);
+  ];
 
-  if (close) items.unshift(...closeItems(close, sym, mytSymbol));
+  const grouped = (group: string, nodes: ReactNode[]): ExplainerItem[] =>
+    nodes.filter((n) => n != null && n !== false).map((node) => ({ group, node }));
+  const items: ExplainerItem[] = [
+    ...grouped("Holdings", holdings),
+    ...grouped("Risk", risk),
+    ...grouped("History", history),
+  ];
   return lead || items.length > 0 ? { lead, items } : null;
 }
 
