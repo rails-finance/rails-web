@@ -462,7 +462,7 @@ const SPECS: ProtocolSpec[] = [
     label: "Asymmetry",
     chainId: 1,
     slug: "asymmetry",
-    brand: 240,
+    brand: 222, // 427 spread: the blue six 14° apart (Asymmetry 222, Fluid 236, Yearn 250, Morpho 264, Liquity 278, Moonwell 292)
     tags: ["CDP"],
     desc: "A Liquity V2 fork minting USDaf across seven collateral branches: each Trove's collateral and debt read from events",
     subPages: [{ segment: "branches", label: "Branches", tab: "Branches" }],
@@ -637,7 +637,7 @@ const SPECS: ProtocolSpec[] = [
     label: "Fluid",
     chainId: 1,
     slug: "fluid",
-    brand: 260,
+    brand: 236, // 427 spread (Fluid #3F75FF, the lightest of the blues, toward azure)
     tags: ["Lend", "Borrow", "CDP"],
     desc: "Fluid vault positions as NFTs: deposits and borrows from the chain, and each liquidation's effect on every position it touched",
     subPages: [{ segment: "vaults", label: "Vaults overview", tab: "Vaults" }],
@@ -709,7 +709,7 @@ const SPECS: ProtocolSpec[] = [
     label: "Liquity V1",
     chainId: 1,
     slug: "liquity-v1",
-    brand: 270,
+    brand: 278, // 427 spread (Liquity #1542CD, the deepest, toward violet)
     tags: ["Borrow"],
     desc: "The original interest-free Trove: ETH collateral and exact LUSD debt emitted per event",
     subPages: [{ segment: "system", label: "System overview", tab: "System" }],
@@ -720,7 +720,7 @@ const SPECS: ProtocolSpec[] = [
     label: "Liquity V2",
     chainId: 1,
     slug: "liquity-v2",
-    brand: 270,
+    brand: 278, // 427 spread
     tags: ["Borrow"],
     desc: "Borrow the BOLD stablecoin with user-set interest rates",
     subPages: [{ segment: "branches", label: "Branches", tab: "Branches" }],
@@ -764,7 +764,7 @@ const SPECS: ProtocolSpec[] = [
     label: "Moonwell",
     chainId: 1,
     slug: "moonwell",
-    brand: 250,
+    brand: 292, // 427 spread
     tags: ["Lend", "Borrow"],
     desc: "A Compound v2 fork newly on Ethereum: exact mToken balances replayed from events, debt from emitted balances",
     subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
@@ -1130,7 +1130,7 @@ const SPECS: ProtocolSpec[] = [
     label: "Yearn V3",
     chainId: 1,
     slug: "yearn",
-    brand: 260,
+    brand: 250, // 427 spread
     tags: ["Vaults", "Yield"],
     desc: "Every vault the V3 factories made, endorsed or not, each one's totals, share price and endorsement read from chain at one block",
     // No position listing, for the reason Aave's vault layer has none: a
