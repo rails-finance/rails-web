@@ -20,9 +20,8 @@ import { finderProv, gaugeContracts, stakedProv, walletShareProv } from "@/lib/b
 import type { BalPositionsRead } from "@/lib/balancer/types";
 import { chainMeta, type ChainId } from "@/lib/shared/chains";
 import { balChain } from "@/lib/balancer/chains";
-import { FRONT_DOOR } from "@/lib/balancer/words";
+import { FRONT_DOOR, share } from "@/lib/balancer/words";
 import { short } from "@/lib/uniswap/words";
-import { share } from "@/lib/balancer/words";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 const SCOPE = "balancer-wallet";
