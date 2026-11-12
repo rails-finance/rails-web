@@ -6,7 +6,7 @@
 // on Lightweight Charts (components/shared/lw-chart-kit.tsx). One pane, the APY solid in the
 // foreground (color-grammar §1); a readout above follows the cursor, the latest
 // day otherwise, with its receipt. 90D and 1Y narrow the loaded year; All asks
-// the route for the asset's whole history. Utilisation is not held for past
+// the route for the asset's whole history. Utilization is not held for past
 // days, so the page says so under the chart.
 
 import { useEffect, useRef, useState } from "react";

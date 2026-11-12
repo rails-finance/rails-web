@@ -269,7 +269,7 @@ function spokeLinks(d: V4Deployment, sp: V4Spoke, roster: boolean): SectionMenuL
           href: spokeHref(d, sp.slug),
           internal: true,
         }
-      : { item: "markets", title: "Markets", subtitle: "Every Aave V4 spoke", href: marketsHref(d), internal: true },
+      : { item: "markets", title: "Spokes", subtitle: "Every Aave V4 spoke", href: marketsHref(d), internal: true },
     ...positionsLink(d, sp),
     { item: "hubs", title: "Hubs", subtitle: "The liquidity this spoke draws", href: hubsHref(d), internal: true },
   ];
@@ -422,7 +422,7 @@ function RosterBody({ d }: { d: V4Deployment }) {
     <MarketRoster
       header={{
         protocol: protocolOf(d),
-        title: "Markets",
+        title: "Spokes",
         learnMore: aaveV4Modal(d.chain === "arc" ? "arc_hub" : "hubs"),
       }}
       markets={markets}
@@ -610,7 +610,7 @@ function rowOf(d: V4Deployment, sp: V4Spoke, x: V4Row, c: StoredCoords): Reserve
       },
       available: {
         sort: f ? f.available * (usd ?? 0) : -1,
-        title: "The hub's liquidity, capped by what the draw cap leaves this spoke",
+        title: "The hub's liquidity, capped by what the borrow cap leaves this spoke",
         node: amounts.available ? (
           <DataTableAmount {...amounts.available} />
         ) : f && avail && borrowable !== false ? (
@@ -646,7 +646,7 @@ function rowOf(d: V4Deployment, sp: V4Spoke, x: V4Row, c: StoredCoords): Reserve
       },
       creditUsed: {
         sort: f?.creditUsed ?? -1,
-        title: "What the spoke owes the hub ÷ the draw cap the hub set for it",
+        title: "What the spoke owes the hub ÷ the borrow cap the hub set for it",
         node:
           f && f.creditUsed != null ? (
             <Prov info={creditUsedProv(f, names)}>{pctText(Math.round(f.creditUsed * 1000) / 1000)}</Prov>
@@ -718,7 +718,7 @@ function reservesTable(d: V4Deployment, sp: V4Spoke, rows: V4Row[], c: StoredCoo
         label: "Available",
         align: "right",
         className: NUM,
-        tip: "Available: the hub's liquidity, capped by the draw cap less what this spoke owes",
+        tip: "Available: the hub's liquidity, capped by the borrow cap less what this spoke owes",
         hooks: { "data-available": "" },
       },
       {
@@ -739,10 +739,10 @@ function reservesTable(d: V4Deployment, sp: V4Spoke, rows: V4Row[], c: StoredCoo
       },
       {
         key: "collateral",
-        label: "Collateral",
+        label: "Collateral factor",
         align: "right",
         className: RATE,
-        tip: "Collateral: the collateral factor, the share of the asset's value the spoke counts toward a borrow",
+        tip: "Collateral factor: the share of the asset's value the spoke counts toward a borrow",
         hooks: { "data-collateral": "" },
       },
       {
@@ -750,7 +750,7 @@ function reservesTable(d: V4Deployment, sp: V4Spoke, rows: V4Row[], c: StoredCoo
         label: "Credit used",
         align: "right",
         className: RATE,
-        tip: "Credit used: what this spoke owes the hub ÷ the draw cap the hub set for it",
+        tip: "Credit used: what this spoke owes the hub ÷ the borrow cap the hub set for it",
         hooks: { "data-credit-used": "" },
       },
     ],
@@ -807,9 +807,8 @@ function LiquidationLine({ f, spoke }: { f: V4ReserveFigures; spoke: string }) {
     <p className="mt-2 text-[12px] text-rb-500" data-spoke-liquidation="">
       <Prov info={liquidationConfigProv(f, spoke)}>
         <span>
-          Liquidation restores a health factor of {l.targetHealthFactor.toFixed(2)}; the bonus starts at{" "}
-          {pctText(l.bonusFactor)} of its maximum and reaches it at a health factor of{" "}
-          {l.healthFactorForMaxBonus.toFixed(2)}.
+          Target health factor {l.targetHealthFactor.toFixed(2)}; the bonus starts at {pctText(l.bonusFactor)} of its
+          maximum and reaches it at the max-bonus threshold, a health factor of {l.healthFactorForMaxBonus.toFixed(2)}.
         </span>
       </Prov>
     </p>
@@ -944,7 +943,7 @@ function spokeHead(d: V4Deployment, s: V4Stored, sp: V4Spoke, rows: V4Row[]): Pr
             </ExplainBullet>
             <ExplainBullet>
               {sp.name} draws from the {andList(sp.hubs.map((h) => V4_HUB_LABEL[h]))}{" "}
-              {sp.hubs.length === 1 ? "hub" : "hubs"}, each over a credit line: an add cap and a draw cap per asset.
+              {sp.hubs.length === 1 ? "hub" : "hubs"}, each over a credit line: a supply cap and a borrow cap per asset.
             </ExplainBullet>
           </ExplainGroup>
           <ExplainGroup title="How it works">

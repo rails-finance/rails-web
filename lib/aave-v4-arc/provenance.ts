@@ -115,7 +115,7 @@ export function arcReserveProv(key: ArcReserveFigure, c: ArcReceiptContext, x: A
       };
     case "borrow-rate":
       return {
-        kind: "chain",
+        kind: "chain-derived",
         pclass: "state",
         source: head,
         contract: hubC,
@@ -123,7 +123,7 @@ export function arcReserveProv(key: ArcReserveFigure, c: ArcReceiptContext, x: A
         via: `${via(`block ${n(r.head.block)}`)} · hub getAssetDrawnRate(${raw.assetId}) ÷ 10^27, compounded`,
         formula: APY_FORMULA,
         inputs: [
-          chain("getAssetDrawnRate", raw.drawnRate ?? "—", "a ray"),
+          chain("getAssetDrawnRate", raw.drawnRate ?? "—", "a ray: ÷ 10^27 is the rate a year"),
           chain("riskPremium", c.r.account.riskPremium, "basis points of drawn debt, getUserAccountData"),
         ],
       };
@@ -181,7 +181,7 @@ export function arcCardProv(key: ArcCardFigure, c: ArcReceiptContext): Provenanc
             .filter((x) => x.isCollateral)
             .map((x) => ({ x, v: (x.suppliedUsd ?? 0) * (x.collateralFactor ?? 0), a: x.supplied }))
         : p.supplied.map((x) => ({ x, v: x.suppliedUsd, a: x.supplied }));
-  const name = key === "debt-total" ? "Debt" : key === "borrow-limit" ? "Borrow limit" : "Supplied";
+  const name = key === "debt-total" ? "Debt" : key === "borrow-limit" ? "Maximum borrowing power" : "Supplied";
   const words =
     key === "debt-total"
       ? "Each borrowed asset's amount owed at the spoke oracle's price, added up"

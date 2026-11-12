@@ -2,7 +2,7 @@
 // (rails-ops decision 0065; ui-jobs 611). Each family takes its docs' term in
 // its docs' spelling; Seamless, whose docs host is gone, takes Aave V3's
 // (0065 point 10). The terms tables are
-// rails-ops reference/official-docs/{aave-v3,spark,seamless}.md.
+// rails-ops reference/official-docs/{aave-v3,spark,seamless,aave-v4}.md.
 //
 // Pure, with one type import, so a unit test can read it.
 
@@ -114,9 +114,9 @@ export function aaveFamilyTerms(
 
 /** A reserve's rate (the Pool's stored rate as a fraction a year) in the
  *  family's form: unchanged as an APR, compounded as an APY. */
-export function familyRate(t: AaveFamilyTerms, apr: number): number;
-export function familyRate(t: AaveFamilyTerms, apr: number | null | undefined): number | null;
-export function familyRate(t: AaveFamilyTerms, apr: number | null | undefined): number | null {
+export function familyRate(t: Pick<AaveFamilyTerms, "rateForm">, apr: number): number;
+export function familyRate(t: Pick<AaveFamilyTerms, "rateForm">, apr: number | null | undefined): number | null;
+export function familyRate(t: Pick<AaveFamilyTerms, "rateForm">, apr: number | null | undefined): number | null {
   if (apr == null) return null;
   return t.rateForm === "apy" ? (aprToApy(apr) ?? apr) : apr;
 }

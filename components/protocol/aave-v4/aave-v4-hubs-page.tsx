@@ -3,7 +3,7 @@
 // Aave V4 Hubs (/<chain>/aave-v4/hubs, ui-jobs 548): the money side of V4.
 // Bespoke, on the house table (components/shared/data-table/):
 //   - one panel per hub in the vitals band's shape (ProductHeadSection): Assets,
-//     Supplied, Borrowed, Utilisation, Positions, the spokes it lends to, and
+//     Supplied, Borrowed, Utilization, Positions, the spokes it lends to, and
 //     under it the hub's assets: Asset · Supplied · Borrowed · Liquidity ·
 //     Utilization · Borrow APY · Supply APY · Liquidity fee, each row unfolding
 //     its credit lines (Spoke · Supply cap · Supplied · Borrow cap · Borrowed · Credit
@@ -137,7 +137,7 @@ function hubHead(s: V4Stored, h: V4Hub, prices: Prices): ProductHead {
       ? [
           {
             slot: "usage" as const,
-            label: "Utilisation",
+            label: "Utilization",
             tip: "Borrowed ÷ supplied in USD: the two figures beside it",
             value: <span data-prov-exempt="">{pct1(borrowed / supplied)}</span>,
           },
@@ -188,7 +188,7 @@ function hubHead(s: V4Stored, h: V4Hub, prices: Prices): ProductHead {
     readAt: readAtOf(s, `Every figure on the ${h.label} hub`),
     tools: {
       links: [
-        { item: "markets", title: "Markets", subtitle: "Every Aave V4 spoke", href: marketsHref(s.d), internal: true },
+        { item: "markets", title: "Spokes", subtitle: "Every Aave V4 spoke", href: marketsHref(s.d), internal: true },
       ],
       exports: {
         csv: {
@@ -259,10 +259,10 @@ function CreditLines({ s, a, prices }: { s: V4Stored; a: V4HubAsset; prices: Pri
     >
       <DataTableHead>
         <DataTableHeader label="Spoke" />
-        <DataTableHeader label="Add cap" align="right" />
+        <DataTableHeader label="Supply cap" align="right" />
         <DataTableHeader label="Supplied" align="right" />
-        <DataTableHeader label="Draw cap" align="right" />
-        <DataTableHeader label="Drawn" align="right" />
+        <DataTableHeader label="Borrow cap" align="right" />
+        <DataTableHeader label="Borrowed" align="right" />
         <DataTableHeader label="Credit used" align="right" />
         <DataTableHeader label="Status" align="right" />
       </DataTableHead>
@@ -377,7 +377,7 @@ function AssetRow({ s, h, a, prices }: { s: V4Stored; h: V4Hub; a: V4HubAsset; p
         {cell(amount("liquidity", a.liquidity), COLS[2])}
         {cell(
           a.utilisation != null ? (
-            <Prov info={storedRatioProv("utilisation", scope, c)}>{pct1(a.utilisation)}</Prov>
+            <Prov info={storedRatioProv("utilization", scope, c)}>{pct1(a.utilisation)}</Prov>
           ) : (
             none
           ),
@@ -470,7 +470,7 @@ function Matrix({ s }: { s: V4Stored }) {
         style={{
           backgroundColor: `color-mix(in srgb, var(--foreground) ${used == null ? 4 : Math.round(6 + used * 34)}%, transparent)`,
         }}
-        title={`${l.symbol}: ${used == null ? "no draw cap" : `${pct1(used)} of the draw cap used`}`}
+        title={`${l.symbol}: ${used == null ? "no borrow cap" : `${pct1(used)} of the borrow cap used`}`}
         data-matrix-line={`${l.hub}:${l.spokeKey}:${l.symbol}`}
       >
         {l.symbol}
@@ -548,7 +548,7 @@ function HubsBody({ d }: { d: V4Deployment }) {
                   links: [
                     {
                       item: "markets",
-                      title: "Markets",
+                      title: "Spokes",
                       subtitle: "Every Aave V4 spoke",
                       href: marketsHref(d),
                       internal: true,
@@ -559,7 +559,7 @@ function HubsBody({ d }: { d: V4Deployment }) {
             }
           >
             <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-rb-500">
-              Hubs across, spokes down: each chip is a credit line, shaded by the share of its draw cap the spoke has
+              Hubs across, spokes down: each chip is a credit line, shaded by the share of its borrow cap the spoke has
               used. A chip opens its reserve page.
             </p>
           </SectionHeading>

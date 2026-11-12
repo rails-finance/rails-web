@@ -57,12 +57,12 @@ const views: readonly [InfoView, ...InfoView[]] = [
     ),
   },
   {
-    heading: "Markets, reserves and hubs",
+    heading: "Spokes, reserves and hubs",
     body: (
       <ul className={UL}>
         <li>
           <Link href={`${ROUTE}/markets`} className={INLINE_LINK}>
-            Markets
+            Spokes
           </Link>{" "}
           lists the three spokes with what each has supplied and borrowed; each opens its reserves, and each reserve its
           page, with the spoke&apos;s terms beside the hub&apos;s figures for that asset.

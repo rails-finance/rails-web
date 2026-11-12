@@ -370,7 +370,7 @@ export function aaveV4EconomicsContent(
   const details: LearnMoreContent["details"] = [
     {
       bold: "Collateral tower",
-      text: `what was deposited${has.supplyInterest ? " plus the interest it earned" : ""}, set against what left: withdrawals${has.liquidations ? " and collateral seized in liquidations" : ""}. What remains is the collateral held today.`,
+      text: `what was supplied${has.supplyInterest ? " plus the interest it earned" : ""}, set against what left: withdrawals${has.liquidations ? " and collateral seized in liquidations" : ""}. What remains is the collateral held today.`,
     },
     {
       bold: "Debt tower",

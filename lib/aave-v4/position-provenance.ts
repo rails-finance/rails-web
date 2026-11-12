@@ -380,7 +380,7 @@ export function deltaProv(detail?: EventProvDetail): Provenance {
  *  ray-scaled) on every UpdateAsset accrual; the index attaches the newest
  *  rate at or before this event's block, per reserve. So supply/withdraw
  *  events show the true held-debt rate too, not just the moved asset's. */
-export function heldDebtRateProv(detail?: EventProvDetail): Provenance {
+export function heldDebtRateProv(detail?: EventProvDetail, apr?: number | null): Provenance {
   const asset = detail?.asset ? ` (${detail.asset})` : "";
   const inputs: ProvInput[] = [
     {
@@ -401,7 +401,7 @@ export function heldDebtRateProv(detail?: EventProvDetail): Provenance {
       note: "rate read at or before this block",
     });
   return {
-    kind: "chain",
+    kind: "chain-derived",
     pclass: "emitted",
     summary: `Borrow APY on the held debt${asset} — the variable rate the hub set for this asset the last time it accrued interest at or before this event's block, ${COMPOUNDED}. The hub writes the rate as a ray, so dividing by 10^27 gives the rate a year, where 10^27 is 100%.`,
     contract: { name: "Aave V4 hub" },
@@ -431,7 +431,7 @@ export function healthFactorProv(basis: "calc" | "chain" = "chain"): Provenance 
   if (basis === "calc")
     return calcProv(
       "Health factor, over the same balances and prices as the collateral and debt shown beside it (the spoke's getUserAccountData works it out the same way)",
-      { formula: "Σ(collateral × price × liquidation threshold) ÷ Σ(debt × price)" },
+      { formula: "Σ(collateral × price × collateral factor) ÷ Σ(debt × price)" },
     );
   return {
     kind: "chain",
@@ -453,7 +453,7 @@ export function healthFactorProv(basis: "calc" | "chain" = "chain"): Provenance 
 export function calcProv(what: string, opts?: { formula?: string; inputs?: ProvInput[] }): Provenance {
   return {
     kind: "derived",
-    summary: `${what} — worked out in the browser from the position's collateral and debt, each asset weighted by the liquidation threshold the spoke reports for it, and valued at the price Aave's oracle answers.`,
+    summary: `${what} — worked out in the browser from the position's collateral and debt, each asset weighted by the collateral factor the spoke reports for it, and valued at the price Aave's oracle answers.`,
     via: "calculateAaveV4Position · the spoke's thresholds · Aave's oracle price",
     formula: opts?.formula,
     inputs: [
@@ -468,16 +468,16 @@ export function calcProv(what: string, opts?: { formula?: string; inputs?: ProvI
 // formulas and method names — and this vocabulary file is where that register
 // lives (the Explanation surfaces are charter-swept and register-gated; a
 // receipt embedded there would have to water its basis down).
-/** The blended liquidation threshold — the risk strip's pivot figure. A
+/** The blended collateral factor — the risk strip's pivot figure. A
  *  bespoke summary rather than the calcProv template: the receipt must say
  *  what the WEIGHTING means, which the generic calculation boilerplate
  *  doesn't. */
 export const BLENDED_LT_PROV: Provenance = {
   kind: "derived",
   summary:
-    "The position's blended liquidation threshold — each collateral-enabled asset's threshold weighted by its dollar share of the basket, so a mixed basket reads as one figure; with one collateral asset it is that asset's threshold. The balances are the spoke's read, each threshold is what the spoke reports for that asset, and the dollar legs use the price Aave's oracle answers.",
-  via: "Σ(collateral $ × threshold) ÷ Σ(collateral $) · spoke balances · Aave's oracle price",
-  formula: "Σ(collateral USD × LT) ÷ Σ(collateral USD)",
+    "The position's collateral factor — each collateral-enabled asset's collateral factor weighted by its dollar share of the basket, so a mixed basket reads as one figure; with one collateral asset it is that asset's factor. The balances are the spoke's read, each factor is what the spoke reports for that asset, and the dollar legs use the price Aave's oracle answers.",
+  via: "Σ(collateral $ × collateral factor) ÷ Σ(collateral $) · spoke balances · Aave's oracle price",
+  formula: "Σ(collateral USD × collateral factor) ÷ Σ(collateral USD)",
   inputs: [
     {
       label: "collateral",
@@ -486,10 +486,10 @@ export const BLENDED_LT_PROV: Provenance = {
       note: "per-asset balances, collateral-enabled only (spoke read)",
     },
     {
-      label: "liquidation threshold",
+      label: "collateral factor",
       kind: "chain",
       pclass: "state",
-      note: "the threshold the spoke reports per asset",
+      note: "the collateral factor the spoke reports per asset",
     },
     { label: "asset price", kind: "chain", pclass: "oracle", note: "Aave's oracle (getReservePrice)" },
   ],
@@ -517,7 +517,7 @@ export function interestProv(what: string): Provenance {
     via: "the spoke's balance − the amounts the position's events put in · Aave's oracle price",
     inputs: [
       { label: "current balance", kind: "chain", pclass: "state", note: "spoke-position read" },
-      { label: "deposits", kind: "chain", pclass: "indexed", note: "the Supply/Repay amounts the logs recorded" },
+      { label: "supplies", kind: "chain", pclass: "indexed", note: "the Supply/Repay amounts the logs recorded" },
       { label: "price", kind: "chain", pclass: "oracle", note: "Aave's oracle (getReservePrice)" },
     ],
   };
@@ -739,7 +739,7 @@ export const PEAK_DEBT_PROV = accumProv("The peak debt this position has carried
 export const LIQ_PRICE_PROV: Provenance = {
   kind: "derived",
   summary:
-    "Liquidation price for this collateral — the price at which the position becomes liquidatable. Derived from the current off-chain market price and the health factor.",
+    "Liquidation price for this collateral — the price at which the health factor reaches 1; below it the position can be liquidated. Derived from the current off-chain market price and the health factor.",
   via: "current price ÷ health factor",
   formula: "currentPrice ÷ HF",
 };
@@ -749,7 +749,7 @@ export const LIQ_PRICE_PROV: Provenance = {
 export function liqRatioProv(collSymbol: string, debtSymbol: string): Provenance {
   return {
     kind: "derived",
-    summary: `The ${collSymbol} price, in ${debtSymbol}, at which the position becomes liquidatable. The debt moves with the collateral, so the price between the two is the one that matters.`,
+    summary: `Liquidation price. The ${collSymbol} price, in ${debtSymbol}, at which the health factor reaches 1; below it the position can be liquidated. The debt moves with the collateral, so the price between the two is the one that matters.`,
     via: "collateral price ÷ debt price ÷ health factor",
     formula: "(collateralPrice ÷ debtPrice) ÷ HF",
   };
@@ -757,8 +757,8 @@ export function liqRatioProv(collSymbol: string, debtSymbol: string): Provenance
 
 // The explanation's interest bullet reads the position's lifetime interest
 // (interestPnl), a figure the card does not print; these are its receipts.
-export const SUPPLY_INTEREST_PROV = interestProv("Accrued supply interest");
-export const BORROW_INTEREST_PROV = interestProv("Accrued borrow interest");
+export const SUPPLY_INTEREST_PROV = interestProv("Earned interest on the supplies");
+export const BORROW_INTEREST_PROV = interestProv("Accrued interest on the debt");
 
 /** GPv2Settlement, whose Trade log settles a CoW position swap's order. */
 export const GPV2_SETTLEMENT = "0x9008d19f58aabd9ed0d60971565aa8510560ab41";

@@ -129,6 +129,9 @@ export interface PriceEvent {
  *  null for a live read]), the line ending where the position did. */
 export interface PriceLevel {
   points: PricePoint[];
+  /** The level's name on its mark where the family's docs name it (Aave V4's
+   *  "Liquidation price"); unset, "Liquidates at" or "Liquidates below". */
+  label?: string;
   /** The caption's formula in words. */
   formula: string;
   /** The level's receipt: what it is and how it moves. */

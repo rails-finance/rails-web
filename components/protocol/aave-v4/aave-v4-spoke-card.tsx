@@ -78,8 +78,8 @@ import { v4Apy } from "@/lib/aave-v4/rates";
 export type { AaveSpokeCardInfo };
 
 // The interest figures are added since each balance last started from zero.
-const supplyInterestProv = () => interestSinceZeroProv("Supply interest inside the collateral");
-const borrowInterestProv = () => interestSinceZeroProv("Borrow interest inside the debt");
+const supplyInterestProv = () => interestSinceZeroProv("Earned interest inside the collateral");
+const borrowInterestProv = () => interestSinceZeroProv("Accrued interest inside the debt");
 
 /**
  * A headline USD figure (collateral, debt, supplied). The on-chain-oracle
@@ -194,8 +194,8 @@ function interestRow(spoke: AaveSpokeCardInfo, side: "supply" | "debt"): Positio
   return side === "supply"
     ? {
         id: "supply-interest",
-        label: "Supply interest",
-        tip: "The supply interest inside the collateral, in dollars: what the supplied balance holds beyond its deposits and withdrawals since it last started from zero.",
+        label: "Earned interest",
+        tip: "The interest the supplied balance has earned, in dollars: what it holds beyond its supplies and withdrawals since it last started from zero.",
         value: (
           <span>
             <Prov info={supplyInterestProv()}>
@@ -207,8 +207,8 @@ function interestRow(spoke: AaveSpokeCardInfo, side: "supply" | "debt"): Positio
       }
     : {
         id: "borrow-interest",
-        label: "Borrow interest",
-        tip: "The borrow interest inside the debt, in dollars: what the debt holds beyond its draws and repayments since it last started from zero.",
+        label: "Accrued interest",
+        tip: "The interest the debt has accrued, in dollars: what it holds beyond its borrows and repayments since it last started from zero.",
         value: (
           <span>
             <Prov info={borrowInterestProv()}>
@@ -246,8 +246,8 @@ function liquidationRow(spoke: AaveSpokeCardInfo): PositionPanelRow | null {
     const debt = aaveV4DisplaySymbol(a.symbol);
     return {
       id: "liquidates-at",
-      label: "Liquidates at",
-      tip: `The ${coll} price, in ${debt}, at which the health factor reaches 1 and the position can be liquidated. The debt moves with the collateral, so the price between the two is the one that matters.`,
+      label: "Liquidation price",
+      tip: `The ${coll} price, in ${debt}, at which the health factor reaches 1; below it the position can be liquidated. The debt moves with the collateral, so the price between the two is the one that matters.`,
       value: (
         <span className="inline-flex items-center gap-1">
           <TokenChipIcon symbol={buf.single.symbol} size={14} filterable={false} />
@@ -263,8 +263,8 @@ function liquidationRow(spoke: AaveSpokeCardInfo): PositionPanelRow | null {
   if (buf.single)
     return {
       id: "liquidates-at",
-      label: "Liquidates at",
-      tip: `The ${aaveV4DisplaySymbol(buf.single.symbol)} price at which the health factor reaches 1 and the position can be liquidated: its market price divided by the health factor.`,
+      label: "Liquidation price",
+      tip: `The ${aaveV4DisplaySymbol(buf.single.symbol)} price at which the health factor reaches 1, below which the position can be liquidated: its market price divided by the health factor.`,
       value: (
         <span className="inline-flex items-center gap-1">
           <TokenChipIcon symbol={buf.single.symbol} size={14} filterable={false} />
@@ -275,7 +275,7 @@ function liquidationRow(spoke: AaveSpokeCardInfo): PositionPanelRow | null {
   return {
     id: "liquidation-drop",
     label: "Liquidates on a drop of",
-    tip: "How far the dollar value of all the collateral can fall, the debt standing still, before the health factor reaches 1 and the position can be liquidated: 1 − 1 ÷ health factor.",
+    tip: "How far the dollar value of all the collateral can fall, the debt standing still, before the health factor reaches 1, below which the position can be liquidated: 1 − 1 ÷ health factor.",
     value: <Prov info={LIQ_DROP_PROV}>{buf.dropPct.toFixed(0)}%</Prov>,
   };
 }
@@ -550,7 +550,7 @@ export function useAaveV4SpokeCardSlots({
   const present = (rows: (PositionPanelRow | null)[]): PositionPanelRow[] =>
     rows.filter((r): r is PositionPanelRow => r != null);
 
-  // The liquidation threshold the health factor weighs the collateral at: one
+  // The collateral factor the health factor weighs the collateral at: one
   // asset's, or the dollar-weighted blend of several.
   const ltPct = spoke.blendedLt != null && spoke.blendedLt > 0 ? Math.round(spoke.blendedLt * 100) : null;
   const blended = spoke.supplyBreakdown.collateralSymbols.length > 1;
@@ -558,10 +558,10 @@ export function useAaveV4SpokeCardSlots({
     !supplyOnly && ltPct != null
       ? {
           id: "liquidation-threshold",
-          label: blended ? "Blended liquidation threshold" : "Liquidation threshold",
+          label: blended ? "Blended collateral factor" : "Collateral factor",
           tip: blended
-            ? "Each collateral asset's liquidation threshold weighted by its dollar share, as the spoke reports them: the part of the collateral's value the health factor counts."
-            : "The collateral's liquidation threshold, as the spoke reports it: the part of its value the health factor counts.",
+            ? "Each collateral asset's collateral factor weighted by its dollar share, as the spoke reports them: the part of the collateral's value the health factor counts."
+            : "The collateral factor the spoke reports for the collateral: the part of its value the health factor counts.",
           value: <Prov info={BLENDED_LT_PROV}>{ltPct}%</Prov>,
         }
       : null;

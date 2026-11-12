@@ -60,7 +60,7 @@ import {
   headValueProv,
   holderAmountProv,
   supplyRateProv,
-  utilisationProv,
+  utilizationProv,
   v4ConfigChangeProv,
 } from "@/lib/aave-v4/market-provenance";
 import { v4HeldLine, v4ReserveChanges } from "@/lib/aave-v4/config-words";
@@ -281,7 +281,7 @@ function reserveHead(d: V4Deployment, sp: V4Spoke, l: V4Line, f: V4ReserveFigure
         slot: "sizeFree",
         label: "Available",
         side,
-        tip: "The hub's liquidity, capped by the draw cap less what this spoke owes",
+        tip: "The hub's liquidity, capped by the borrow cap less what this spoke owes",
         value: (
           <span data-vital="available">
             <Prov info={availableProv(f, names)}>{avail.display}</Prov>
@@ -328,13 +328,13 @@ function reserveHead(d: V4Deployment, sp: V4Spoke, l: V4Line, f: V4ReserveFigure
       },
       {
         slot: "usage",
-        label: "Utilisation",
+        label: "Utilization",
         side,
-        tip: "Drawn ÷ (drawn + liquidity) on the hub",
+        tip: "Borrowed ÷ (borrowed + liquidity) on the hub: how much of the asset's liquidity is borrowed",
         value: (
           <span data-vital="utilisation">
             {f.utilisation != null ? (
-              <Prov info={utilisationProv(f, names)}>{pctText(Math.round(f.utilisation * 1000) / 1000)}</Prov>
+              <Prov info={utilizationProv(f, names)}>{pctText(Math.round(f.utilisation * 1000) / 1000)}</Prov>
             ) : (
               "—"
             )}

@@ -219,10 +219,10 @@ function HubTerms({ f, names }: { f: V4ReserveFigures; names: V4Names }) {
     headParamProv(f, "hub", `${names.symbol} ${what}`, call, meaning, names);
   return (
     <>
-      <Line term="Add cap" title="The most the hub takes in from this spoke">
+      <Line term="Supply cap" title="The most the hub takes in from this spoke">
         <Prov
           info={p(
-            "add cap",
+            "supply cap",
             "getSpokeConfig(assetId, spoke).addCap",
             "the most the hub takes in from this spoke, whole tokens",
           )}
@@ -230,9 +230,9 @@ function HubTerms({ f, names }: { f: V4ReserveFigures; names: V4Names }) {
           {capText(f.addCap, names.symbol)}
         </Prov>
       </Line>
-      <Line term="Draw cap" title="The most this spoke can draw from the hub">
+      <Line term="Borrow cap" title="The most this spoke can draw from the hub">
         <Prov
-          info={p("draw cap", "getSpokeConfig(assetId, spoke).drawCap", "the most this spoke can draw, whole tokens")}
+          info={p("borrow cap", "getSpokeConfig(assetId, spoke).drawCap", "the most this spoke can draw, whole tokens")}
         >
           {capText(f.drawCap, names.symbol)}
         </Prov>
@@ -263,7 +263,7 @@ function HubTerms({ f, names }: { f: V4ReserveFigures; names: V4Names }) {
         <Line term="Optimal usage ratio" title="The utilization at which the borrow rate starts to climb steeply">
           <Prov
             info={p(
-              "optimal usage",
+              "optimal usage ratio",
               "strategy getInterestRateData(assetId).optimalUsageRatio",
               "where the rate curve turns",
             )}

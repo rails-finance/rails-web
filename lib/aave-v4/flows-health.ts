@@ -16,6 +16,7 @@
 //
 // Pure.
 
+import { AAVE_V4_TERMS } from "@/lib/aave-family/terms";
 import type { AaveHealthSource } from "@/lib/aave-v3/flows-health";
 import type { FactorRead, HealthLine } from "@/lib/shared/flows-health";
 import type { AaveV4SpokePositionChainResponse } from "@/lib/api/fetch-aave-v4-spoke-position";
@@ -73,5 +74,8 @@ export const AAVE_V4_HEALTH_SOURCE: AaveHealthSource = {
     of: aaveV4Levels,
     formula:
       "the price at which the health factor reaches 1, every other balance and price held at the day's; with one collateral, its price ÷ the health factor",
+    label: AAVE_V4_TERMS.liquidationPrice,
+    summary:
+      "Liquidation price. The asset's price at which the health factor reaches 1, with every other balance and price as they stood on the day and the collateral factors the spoke held at the day's last event. Below it the position can be liquidated.",
   },
 };

@@ -38,7 +38,7 @@ export const FRONT_DOOR = {
     ]
       .filter(Boolean)
       .join(" · "),
-  links: { markets: "Markets", hubs: "Hubs" },
+  links: { markets: "Spokes", hubs: "Hubs" },
 };
 
 export const POSITION_PAGE = {
@@ -58,7 +58,7 @@ export const CARD_WORDS = {
   healthTip:
     "Collateral counted at each asset's collateral factor, divided by debt, both at the spoke's oracle. Below 1 the account can be liquidated.",
   noDebt: "no debt",
-  borrowLimit: "Borrow limit",
+  borrowLimit: "Maximum borrowing power",
   borrowLimitTip:
     "Collateral counted at each asset's collateral factor: the debt at which the health factor reaches 1.",
   supplyRow: (sym: string) => `${sym} supplied`,

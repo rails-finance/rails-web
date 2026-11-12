@@ -180,8 +180,8 @@ function openHeadlines(args: AaveV4SpokeMarkdownArgs): string[] {
   // "Collateral" = full deposit).
   let collLine = `- **Collateral:** ${usd(card.totalSupplyUsd)} supplied`;
   if (card.weightedCollateralUsd > 0) {
-    collLine += ` (${usd(card.weightedCollateralUsd)} backs the loan after the liquidation-threshold haircut`;
-    collLine += card.blendedLt != null ? `, ~${num(card.blendedLt * 100, 0)}% blended LT)` : ")";
+    collLine += ` (${usd(card.weightedCollateralUsd)} counts at the collateral factor`;
+    collLine += card.blendedLt != null ? `, ~${num(card.blendedLt * 100, 0)}% blended)` : ")";
   }
   out.push(collLine);
   if (card.supplyingSymbols.length) {
@@ -221,7 +221,7 @@ function openHeadlines(args: AaveV4SpokeMarkdownArgs): string[] {
   const pnl = card.interestPnl;
   if (pnl?.hasData) {
     const verb = pnl.netUsd >= 0 ? "earned" : "paid";
-    econ.push(`- **Net interest carry:** ${usd(Math.abs(pnl.netUsd))} ${verb} (supply interest − borrow interest)`);
+    econ.push(`- **Net interest carry:** ${usd(Math.abs(pnl.netUsd))} ${verb} (earned interest − accrued interest)`);
     for (const a of pnl.assets) {
       if (a.supplyInterest > 0) {
         econ.push(`  - ${a.symbol}: +${amt(a.supplyInterest)} earned (${usd(a.supplyInterestUsd)})`);
