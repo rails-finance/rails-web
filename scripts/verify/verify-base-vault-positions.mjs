@@ -1096,7 +1096,10 @@ else
 // The shape vocabulary is restated here rather than imported: a check that read
 // its option list off the thing under test could not catch a shape being
 // dropped from the facet, and a dropped shape is rows that no selection can
-// reach. Σ over it must be the chain total exactly.
+// reach. Its source is the census classifier (rails-server
+// census-vault-positions.ts, `DeepClassify` and the adapter shape), less
+// `vault-self`, which the census leaves out of participants. Σ over it must be
+// the unfiltered total (the census header's participants) exactly.
 const SHAPES = [
   "eoa",
   "delegated-account",
@@ -1107,10 +1110,13 @@ const SHAPES = [
   "contract",
   "aave-vault",
   "metamorpho-vault",
+  "vault-v2",
+  "yearn-v3-vault",
+  "vault-v2-adapter",
 ];
 let shapeSum = 0;
 for (const s of SHAPES) shapeSum += (await readRoute(`chain=${CHAIN}&shape=${s}&limit=1&overlay=0`)).pagination.total;
-check("L3b Σ over the shape facet == the chain total", shapeSum === chainTotal, `${shapeSum} vs ${chainTotal}`);
+check("L3b Σ over the shape facet == the unfiltered total", shapeSum === chainTotal, `${shapeSum} vs ${chainTotal}`);
 
 const vaultSum = censusRows.reduce((s, c) => s + c.participants, 0);
 check(
