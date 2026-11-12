@@ -76,7 +76,7 @@ export const CARD_WORDS = {
   past: "past it",
   reached: "reached",
   collateralRow: (sym: string) => `${sym} collateral`,
-  factorsLabel: "borrow / liquidate",
+  columns: { asset: "Asset", amount: "Amount", factors: "Borrow / liquidate factors" },
   baseRow: (sym: string, lend: boolean) => `${sym} ${lend ? "lent" : "borrowed"}`,
   supplyRateLabel: "Supply rate",
   borrowRateLabel: "Borrow rate",

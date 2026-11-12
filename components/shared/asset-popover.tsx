@@ -31,6 +31,7 @@ import { QuietTipsContext } from "@/components/shared/reveal-tip";
 import { createPortal } from "react-dom";
 import { MobileSheet } from "@/components/shared/mobile-sheet";
 import { provInspector } from "@/components/shared/provenance";
+import { tipYieldsToTrace } from "@/lib/shared/tip-yields";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { useChainId } from "@/lib/shared/chain-context";
@@ -119,8 +120,8 @@ export function AssetPopover({
         data-prov-hidden=""
         className={`inline-flex cursor-pointer items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 ${className ?? ""}`}
         onClick={(e) => {
-          // While the inspector is armed the click traces the figure.
-          if (provInspector.getArmed()) return;
+          // Inside a figure the inspector can pick, the click traces it.
+          if (tipYieldsToTrace(triggerRef.current, provInspector.getArmed())) return;
           e.preventDefault();
           e.stopPropagation();
           setOpen((o) => !o);

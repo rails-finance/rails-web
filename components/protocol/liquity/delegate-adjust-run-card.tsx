@@ -435,7 +435,14 @@ export function DelegateAdjustRunCard({
             <>
               {troveWords("run_adjusted")}
               <CountChip count={count} />{" "}
-              {troveNodes("run_phone_caption", { range: <span className="text-foreground">{range}</span> })}
+              {troveNodes("run_phone_caption", {
+                sep: <span data-caption-sep="">&middot;</span>,
+                range: (
+                  <span className="whitespace-nowrap text-foreground" data-caption-tail="">
+                    {range}
+                  </span>
+                ),
+              })}
             </>
           }
           spokenCaption={troveWords("run_spoken", { range: spokenRange })}

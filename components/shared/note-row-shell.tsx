@@ -114,7 +114,7 @@ export function NoteRowShell({
                 // on the page's ground — the words, a dot, the date, the chevron.
                 <div className="flex min-h-14 flex-wrap items-center gap-1.5 pb-3 pl-5 pr-5 pt-4 max-sm:min-h-0 max-sm:justify-center max-sm:px-7 max-sm:pb-2.5 max-sm:pt-1.5 sm:pr-[52px]">
                   <span
-                    className="inline-flex min-w-0 max-w-full items-center gap-1.5 text-xs leading-5 max-sm:px-2 sm:contents"
+                    className="inline-flex min-w-0 max-w-full items-center gap-1.5 text-xs leading-5 max-sm:flex-wrap max-sm:justify-center max-sm:px-2 sm:contents"
                     style={{ backgroundColor: "var(--background)" }}
                     data-note-caption=""
                   >
@@ -122,7 +122,10 @@ export function NoteRowShell({
                     <span className="inline-flex items-center self-center max-sm:order-last" data-evt-head-chev="">
                       <DiscChevron isOpen={open} />
                     </span>
-                    {meta}
+                    {/* The date stays whole: under 640px the caption wraps
+                        and the date drops to the next line in one piece
+                        (ui-jobs 620). */}
+                    <span className="contents max-sm:inline-flex max-sm:shrink-0 max-sm:whitespace-nowrap">{meta}</span>
                   </span>
                 </div>
               ) : (

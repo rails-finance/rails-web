@@ -808,7 +808,7 @@ trove_words:
   run_adjusted: |-
     Adjusted
   run_phone_caption: |-
-    · {range}
+    {sep} {range}
   run_spoken: |-
     Adjusted, {range}
   run_count_one: |-

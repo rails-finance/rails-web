@@ -59,6 +59,17 @@ const wholeText = (pg) =>
     return `${document.body.innerText}\n${body.textContent}`;
   });
 
+/** The Band state stat's tip, opened from its heading: it carries the
+ *  soft-liquidation multiple ("1.128×"). */
+async function bandStateTip(page) {
+  await page.click('[data-panel-row="band-state"] [data-heading-tip]').catch(() => {});
+  const text = await page
+    .waitForSelector('[role="tooltip"]', { timeout: 10000 })
+    .then((el) => el.textContent())
+    .catch(() => "");
+  await page.keyboard.press("Escape").catch(() => {});
+  return { text, test: /[\d.,]+×[\s\S]{0,60}the price where this position/.test(text ?? "") };
+}
 async function openAllAndRead(pg) {
   for (const b of await pg.$$('button[aria-expanded="false"]')) {
     try {
@@ -471,9 +482,9 @@ try {
     // here — the caption follows "Converting now" and a word boundary between
     // "w" and "4" does not exist. A negative lookbehind on a digit says what is
     // actually meant: this count, not the tail of a longer number.
-    // The onset multiple is the panel's "Price over onset" row (ui-jobs 322).
-    new RegExp(`(?<!\\d)${sl.bands} bands:`).test(body) &&
-      /Price over onset(Price over onset, explain)?\s*[\d.,]+×/.test(body),
+    // The onset multiple is in the Band state stat's tip (TO-DO-position-card
+    // 341): open it and read the multiple there.
+    new RegExp(`(?<!\\d)${sl.bands} bands:`).test(body) && (await bandStateTip(page)).test,
   );
   check(
     "detail: REAL timeline events render (borrow rows)",
@@ -514,18 +525,18 @@ try {
     });
     await openPositionCards(page);
     await page.waitForSelector("[data-llamalend-liquidatable]", { timeout: 120000 }).catch(() => {});
-    // A detail card names Liquidatable in its panel, in the critical red, and
-    // states the chain read's health.
+    // A detail card says it under its Health headline, in the critical red,
+    // and states the chain read's health.
     const row = await page
       .$eval("[data-llamalend-liquidatable]", (el) => ({ text: el.textContent, cls: el.className }))
       .catch(() => null);
     body = await page.textContent("body");
     check(
-      `detail: liquidatable card's panel names Liquidatable on the critical red, at ${healthText}`,
+      `detail: liquidatable card's Health line says anyone may liquidate it, on the critical red, at ${healthText}`,
       /anyone may liquidate it now/.test(row?.text ?? "") &&
         /text-red-500/.test(row?.cls ?? "") &&
         body.includes(healthText),
-      row ? row.text : "no Liquidatable row",
+      row ? row.text : "no liquidatable line under Health",
     );
     check(
       "detail: the card's explanation leads with the liquidatable line, not soft-liquidation",
