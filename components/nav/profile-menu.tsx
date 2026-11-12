@@ -56,7 +56,7 @@ import { START_CTA } from "@/lib/shared/ui-grammar";
 import type { ChainId } from "@/lib/shared/chains";
 import type { SavedLink, WalletSession } from "@/lib/shared/sessions";
 import { setProvPreference, useProvPreference } from "@/lib/shared/prov-preference";
-import { putDownInspector } from "@/components/shared/prov-inspector";
+import { ProvInspectorExit, putDownInspector } from "@/components/shared/prov-inspector";
 import { menuEntries } from "@/lib/shared/sessions";
 import { RevealTip } from "@/components/shared/reveal-tip";
 
@@ -452,6 +452,9 @@ export function ProfileMenu() {
 
   return (
     <>
+      {/* While the inspector is armed, its way out stands left of the control
+          (ui-jobs 624.2). */}
+      <ProvInspectorExit onExit={() => trigger.current?.focus()} />
       <button
         ref={trigger}
         type="button"

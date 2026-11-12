@@ -1,5 +1,5 @@
 // The provenance inspector's one state (rails-ops TO-DO-ui-jobs 624): the
-// profile menu's switch (H20.1), the halo's "Exit inspector" (H7.4), Escape
+// profile menu's switch (H20.1), "Exit inspector" beside the profile control (H7.4), Escape
 // and the inspector read and write one state. Putting the inspector down from
 // any of them turns the saved choice off, and the switch reads off at once;
 // the switch turned on arms the page at once, and turned off disarms it.
@@ -12,7 +12,7 @@ const PATH = "/ethereum/aave-v3/0x8008316e61985599dc62d69716bab3ebe643c0a8?marke
 const KEY = "rails-prov-inspector";
 const H20 = '[data-anatomy="H20"]:visible';
 const SWITCH = "[data-profile-menu-prov]";
-const EXIT = ".prov-inspect-exit";
+const EXIT = ".prov-inspect-exit:visible";
 
 let checked = 0;
 let failures = 0;
@@ -71,9 +71,28 @@ check(
 );
 
 // Exit inspector puts it down, saved choice included.
-check("the halo carries Exit inspector", Boolean(await page.$(EXIT)));
+// "Exit inspector" stands beside the visible profile control (ui-jobs 624.2):
+// its right edge within 16px left of H20's left, the two on one line.
+const nextTo = await (async () => {
+  const e = await page
+    .locator(EXIT)
+    .first()
+    .boundingBox()
+    .catch(() => null);
+  const h = await page
+    .locator(H20)
+    .first()
+    .boundingBox()
+    .catch(() => null);
+  if (!e || !h) return { e, h };
+  const gap = h.x - (e.x + e.width);
+  const midDy = Math.abs(e.y + e.height / 2 - (h.y + h.height / 2));
+  return { ok: gap >= 0 && gap <= 16 && midDy <= 6, gap, midDy };
+})();
+check("Exit inspector stands beside the profile control", Boolean(nextTo.ok), JSON.stringify(nextTo));
 await page
   .locator(EXIT)
+  .first()
   .click({ timeout: 5000 })
   .catch(() => {});
 await page.waitForTimeout(400);

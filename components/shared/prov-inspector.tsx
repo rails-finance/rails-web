@@ -41,7 +41,6 @@ import {
   type ProvInspectorPin,
   type ProvReceiptEntry,
 } from "./provenance";
-import { usePriceStripActive } from "@/components/shared/price-strip";
 import { useParams, usePathname } from "next/navigation";
 import { setProvPreference, useProvPreference } from "@/lib/shared/prov-preference";
 import { provPreferenceAllows } from "@/lib/shared/prov-preference-routes";
@@ -193,8 +192,9 @@ const SCOPE_WORDS = {
 };
 
 /** Mount once per page (beside the timeline, outside any card). Renders
- *  nothing at rest; owns the page-wide halo, the close control, the Escape
- *  ladder, and the pinned popover. */
+ *  nothing at rest; owns the page-wide halo, the Escape
+ *  ladder, and the pinned popover. "Exit inspector" stands beside the profile
+ *  control (<ProvInspectorExit>). */
 export function ProvInspectorLayer() {
   const armed = useSyncExternalStore(provInspector.subscribe, provInspector.getArmed, () => false);
   const scoped = useSyncExternalStore(
@@ -210,11 +210,6 @@ export function ProvInspectorLayer() {
   const pathname = usePathname();
   const params = useParams();
   const allowed = provPreferenceAllows(pathname, params);
-  // Where the way out lives. A page with the dock still has the toggle in
-  // sight, so the halo adds nothing; a page whose toggle is a row of a menu
-  // that has since closed has no visible control at all, so the halo carries
-  // its own.
-  const dock = usePriceStripActive();
   // Escape, in rungs: an open popover closes first; a second press disarms.
   useEffect(() => {
     if (!armed) return;
@@ -254,44 +249,55 @@ export function ProvInspectorLayer() {
       {!scoped &&
         !quiet &&
         createPortal(<div className="prov-inspect-halo" aria-hidden data-prov-chrome="" />, document.body)}
-      {/* The halo's own way out, where nothing else on the page offers one;
-          armed by hand with the preference off, "Keep this on" beside it
-          (decision 0062 point 7). */}
-      {(!dock || (!quiet && !preference)) &&
+      {/* Armed by hand with the preference off, "Keep this on" (decision
+          0062 point 7). The way out is beside the profile control
+          (<ProvInspectorExit>). */}
+      {!quiet &&
+        !preference &&
         createPortal(
           <div className="prov-inspect-chips" data-prov-chrome="">
-            {!dock && (
-              <button
-                type="button"
-                className="prov-inspect-exit"
-                data-anatomy="H7.4"
-                onClick={() => {
-                  putDownInspector();
-                  provInspector.restoreFocus();
-                }}
-              >
-                <X aria-hidden />
-                <span>Exit inspector</span>
-              </button>
-            )}
-            {!quiet && !preference && (
-              <button
-                type="button"
-                className="prov-inspect-keep"
-                data-anatomy="H7.5"
-                data-prov-keep-on=""
-                title={KEEP_ON_TITLE}
-                onClick={() => setProvPreference(true)}
-              >
-                {KEEP_ON_LABEL}
-              </button>
-            )}
+            <button
+              type="button"
+              className="prov-inspect-keep"
+              data-anatomy="H7.5"
+              data-prov-keep-on=""
+              title={KEEP_ON_TITLE}
+              onClick={() => setProvPreference(true)}
+            >
+              {KEEP_ON_LABEL}
+            </button>
           </div>,
           document.body,
         )}
       {/* Keyed per pick: a fresh mount per figure resets expansion + position. */}
       {pin && <InspectorPopover key={`${pin.key}:${pin.tick}`} pin={pin} />}
     </>
+  );
+}
+
+/** "Exit inspector" (ui-jobs 624.2): beside the profile control (H20), in the
+ *  site header, the column's corner or the position bar, while the inspector
+ *  is armed. Puts it down with the saved preference; `onExit` takes focus
+ *  where the button stood. */
+export function ProvInspectorExit({ onExit }: { onExit?: () => void }) {
+  const armed = useSyncExternalStore(provInspector.subscribe, provInspector.getArmed, () => false);
+  if (!armed) return null;
+  return (
+    <button
+      type="button"
+      className="prov-inspect-exit"
+      data-anatomy="H7.4"
+      aria-label="Exit inspector"
+      onClick={() => {
+        putDownInspector();
+        onExit?.();
+      }}
+    >
+      <X aria-hidden />
+      <span>
+        Exit<span className="max-sm:hidden"> inspector</span>
+      </span>
+    </button>
   );
 }
 

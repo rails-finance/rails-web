@@ -2049,11 +2049,8 @@ label[for] {
     background: rgba(196, 205, 217, 0.08);
   }
 }
-/* the armed halo's own way out, on a page whose toggle is behind a menu that
-   has closed. Sits over the halo and under the popover (z 60), and at
-   the LEFT end of the bottom edge: the right end is where the dock sits on the
-   pages that still have one, and where a card's end flank lands — a pick that
-   hit this chip instead would put the tool down rather than trace a value. */
+/* "Keep this on" (decision 0062 point 7), at the left end of the bottom edge,
+   over the halo and under the popover. */
 .prov-inspect-chips {
   position: fixed;
   z-index: var(--z-inspect-exit);
@@ -2063,6 +2060,7 @@ label[for] {
   align-items: center;
   gap: 10px;
 }
+/* "Exit inspector", beside the profile control (H20; ui-jobs 624.2) */
 .prov-inspect-exit {
   display: inline-flex;
   align-items: center;
@@ -2072,10 +2070,11 @@ label[for] {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
+  flex: none;
   color: rgb(13 148 136); /* teal-600 */
   background: rgb(238 249 246);
   border: 1px solid rgb(13 148 136 / 0.35);
-  box-shadow: 0 6px 20px rgb(13 148 136 / 0.18);
 }
 .prov-inspect-exit svg {
   width: 14px;
@@ -2088,7 +2087,6 @@ label[for] {
   color: rgb(45 212 191); /* teal-400 */
   background: rgb(15 40 37);
   border-color: rgb(45 212 191 / 0.35);
-  box-shadow: 0 6px 20px rgb(0 0 0 / 0.45);
 }
 .dark .prov-inspect-exit:hover {
   background: rgb(45 212 191 / 0.16);
