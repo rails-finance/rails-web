@@ -1271,7 +1271,10 @@ function aaveFamilyRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody 
 
   const stats: NoteStat[] = [
     {
-      label: `${isSupply ? "Supply" : "Borrow"} rate (% per year)`,
+      label:
+        note.protocol === "spark"
+          ? `${isSupply ? "Supply" : "Borrow"} APY (%)`
+          : `${isSupply ? "Supply" : "Borrow"} rate (% per year)`,
       transition: {
         before: { text: f.fromRate, prov: aaveFamilyRateStepProv(note, "rate"), exact: String(note.from.value) },
         after: { text: f.toRate, prov: aaveFamilyRateStepProv(note, "rate"), exact: String(note.to.value) },

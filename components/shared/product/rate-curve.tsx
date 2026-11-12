@@ -20,6 +20,7 @@ const H = 240;
 const RATE_CAP = 1;
 const wholePercent = (v: number) => `${Math.round(v * 100).toLocaleString("en-US")}%`;
 const PAD = { l: 44, r: 12, t: 12, b: 28 };
+const lowerFirst = (t: string) => t.charAt(0).toLowerCase() + t.slice(1);
 
 /** The borrow rate at utilisation `u` on the two-slope curve. */
 export function borrowRateAt(
@@ -65,10 +66,16 @@ export function RateCurve({ curve }: { curve: RateCurveModel | Missing }) {
     );
   const c = curve;
   const rf = c.reserveFactor;
-  const supplyAt = (u: number) => borrowRateAt(u, c) * u * (1 + (c.premium ?? 0)) * (1 - rf);
+  const form = c.form?.of ?? ((rate: number) => rate);
+  const utilWord = c.utilizationWord ?? "utilisation";
+  const utilised = utilWord === "utilization" ? "utilized" : "utilised";
+  const supplyAt = (u: number) => form(borrowRateAt(u, c) * u * (1 + (c.premium ?? 0)) * (1 - rf));
+  const borrowAt = (u: number) => form(borrowRateAt(u, c));
+  const nowBorrow = form(c.now.borrow);
+  const nowSupply = form(c.now.supply);
   const u = c.now.utilisation != null ? Math.min(1, c.now.utilisation) : null;
-  const peak = borrowRateAt(1, c);
-  const top = Math.max(Math.min(peak, RATE_CAP), c.now.borrow, 0.0001);
+  const peak = borrowAt(1);
+  const top = Math.max(Math.min(peak, RATE_CAP), nowBorrow, 0.0001);
   const ticks = rateAxis(top);
   const yMax = ticks[ticks.length - 1];
   // Off the chart only where the axis stops short of the peak: a point now
@@ -86,7 +93,7 @@ export function RateCurve({ curve }: { curve: RateCurveModel | Missing }) {
       const uu = i / N;
       return `${i === 0 ? "M" : "L"}${x(uu).toFixed(1)},${y(f(uu)).toFixed(1)}`;
     }).join(" ");
-  const borrowPath = line((uu) => borrowRateAt(uu, c));
+  const borrowPath = line(borrowAt);
   const supplyPath = line(supplyAt);
   const axisText = "fill-rb-500 text-[11px]";
   const clipId = `rate-curve-plot-${c.symbol.replace(/[^A-Za-z0-9]/g, "")}`;
@@ -99,7 +106,7 @@ export function RateCurve({ curve }: { curve: RateCurveModel | Missing }) {
             width={W}
             height={H}
             role="img"
-            aria-label={`${c.symbol} borrow and supply rate against utilisation${c.noKink ? "" : `; ${c.kinkLabel ?? "kink"} at ${Math.round(c.optimal * 100)}%`}${u != null ? `, now at ${Math.round(u * 100)}%` : ""}`}
+            aria-label={`${c.symbol} ${c.form ? `${lowerFirst(c.form.borrow)} and ${lowerFirst(c.form.supply)}` : "borrow and supply rate"} against ${utilWord}${c.noKink ? "" : `; ${c.kinkLabel ?? "kink"} at ${Math.round(c.optimal * 100)}%`}${u != null ? `, now at ${Math.round(u * 100)}%` : ""}`}
             className="block text-foreground"
           >
             {ticks.map((t) => (
@@ -160,10 +167,10 @@ export function RateCurve({ curve }: { curve: RateCurveModel | Missing }) {
                   className="stroke-foreground/30"
                   data-now-line=""
                 />
-                <circle cx={x(u)} cy={y(c.now.borrow)} r={4} className="fill-current" data-now-borrow="" />
+                <circle cx={x(u)} cy={y(nowBorrow)} r={4} className="fill-current" data-now-borrow="" />
                 <circle
                   cx={x(u)}
-                  cy={y(c.now.supply)}
+                  cy={y(nowSupply)}
                   r={4}
                   className="fill-background stroke-rb-500"
                   strokeWidth={2}
@@ -179,28 +186,28 @@ export function RateCurve({ curve }: { curve: RateCurveModel | Missing }) {
           <svg width="18" height="6" aria-hidden className="text-foreground">
             <line x1="0" x2="18" y1="3" y2="3" strokeWidth="2" className="stroke-current" />
           </svg>
-          Borrow rate
+          {c.form?.borrow ?? "Borrow rate"}
         </span>
         <span className="inline-flex items-center gap-1.5">
           <svg width="18" height="6" aria-hidden>
             <line x1="0" x2="18" y1="3" y2="3" strokeWidth="1.5" strokeDasharray="5 3" className="stroke-rb-500" />
           </svg>
-          Supply rate
+          {c.form?.supply ?? "Supply rate"}
         </span>
         {offScale && (
           <span data-curve-offscale="">
-            The borrow rate leaves the chart above {wholePercent(yMax)} and reaches {wholePercent(peak)} at 100%
-            utilised.
+            The {c.form ? lowerFirst(c.form.borrow) : "borrow rate"} leaves the chart above {wholePercent(yMax)} and
+            reaches {wholePercent(peak)} at 100% {utilised}.
           </span>
         )}
         <Prov info={c.receipt}>
           {u != null ? (
             <span data-now-caption="">
-              Now: {Math.round(u * 100)}% utilised, borrow {ratePercentText(c.now.borrow)}, supply{" "}
-              {ratePercentText(c.now.supply)}
+              Now: {Math.round(u * 100)}% {utilised}, borrow {ratePercentText(nowBorrow)}, supply{" "}
+              {ratePercentText(nowSupply)}
             </span>
           ) : (
-            <span>No utilisation: nothing is supplied to this reserve.</span>
+            <span>No {utilWord}: nothing is supplied to this reserve.</span>
           )}
         </Prov>
       </figcaption>

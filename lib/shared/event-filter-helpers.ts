@@ -316,7 +316,7 @@ const SPARK_OP_LABELS: Record<string, string> = {
   borrow: "Borrow",
   repay: "Repay",
   liquidation: "Liquidated",
-  liquidation_fee: "Liquidation fee",
+  liquidation_fee: "Liquidation protocol fee",
   transfer_in: "Transfer in",
   transfer_out: "Transfer out",
   emode: "E-mode",

@@ -1,4 +1,5 @@
 import type { LearnMoreContent, LearnMoreLink } from "@/components/shared/learn-more-modal";
+import { aaveFamilyTerms } from "@/lib/aave-family/terms";
 import { SEAMLESS_DOCS_URL } from "@/lib/aave-v3/protocol-name";
 import { FAQ_URLS, AAVE_FAQ_URLS } from "@/lib/shared/faq-urls";
 import { fmtMaxLtv, type LiquityFamilyTerms } from "@/lib/liquity/ltv";
@@ -1545,10 +1546,11 @@ export function emodeSwitchContent(protocol: "aave" | "spark" | "seamless"): Lea
       : protocol === "seamless"
         ? { label: "Seamless documentation", url: SEAMLESS_DOCS_URL }
         : { label: "Aave V3 overview: Efficiency Mode", url: "https://aave.com/docs/aave-v3/overview" };
+  // Each family's spelling (lib/aave-family/terms.ts; ui-jobs 611).
+  const t = aaveFamilyTerms(protocol === "aave" ? "aave-v3" : protocol);
   return {
-    title: "How e-mode works",
-    intro:
-      "E-mode is a setting on the whole account. Choosing a category lets collateral in that category count at the category's limits in place of each asset's own.",
+    title: `How ${t.emode} works`,
+    intro: `${t.emodeLong} (${t.emode}) is a setting on the whole account. Choosing a category lets collateral in that category count at the category's limits in place of each asset's own.`,
     detailsHeading: "Key concepts:",
     details: [
       {
@@ -1564,7 +1566,7 @@ export function emodeSwitchContent(protocol: "aave" | "spark" | "seamless"): Lea
         text: "moves with the switch although nothing is supplied or borrowed, because the same collateral now counts at other limits.",
       },
       {
-        bold: "Borrowing in e-mode",
+        bold: `Borrowing in ${t.emode}`,
         text: "an account in a category may borrow only assets in that category.",
       },
     ],

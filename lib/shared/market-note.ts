@@ -317,7 +317,7 @@ export function noteT1Words(note: MarketNote): RateNoteWords | null {
     note.protocol === "makerdao"
       ? RATE_NOTE_T1.makerdao
       : note.protocol === "aave-v3" || note.protocol === "spark"
-        ? `${note.marketSymbol} ${note.side === "supply" ? RATE_NOTE_T1.supply : RATE_NOTE_T1.borrow}`
+        ? `${note.marketSymbol} ${note.protocol === "spark" ? aaveFamilyRateNoun(note) : note.side === "supply" ? RATE_NOTE_T1.supply : RATE_NOTE_T1.borrow}`
         : RATE_NOTE_T1.polaris;
   return {
     increased: `${noun} ${RATE_NOTE_T1.increased}`,
@@ -630,6 +630,11 @@ export interface RateStepNote extends MarketNoteBase {
    *  AND its side. No verdict and no colour rides on it — the side is the
    *  fact. Absent on Polaris and MakerDAO, where the market has one rate. */
   side?: "supply" | "borrow";
+  /** The Pool's stored rate (a fraction a year) at each end, where the note
+   *  states the rate in another form: SparkLend's notes state an APY, the
+   *  rate compounded each second for a year (ui-jobs 611), and the receipt
+   *  derives it from these. Absent where `from.value` is the stored rate. */
+  poolRate?: { from: number; to: number };
   /** How many PrimaryRateSet logs fired between the two observed logs
    *  (`to.ordinal − from.ordinal`) — null when either end's log is not
    *  observed (the backend join has not reached this row, or a pure-selector
@@ -1169,7 +1174,17 @@ const isAaveFamily = (note: RateStepNote): boolean => note.protocol === "aave-v3
 /** "borrow rate" / "supply rate" — the quantity the note states, which on a
  *  V3-family reserve is only half the answer without the side. */
 export const aaveFamilyRateNoun = (note: RateStepNote): string =>
-  note.side === "supply" ? "supply rate" : "borrow rate";
+  note.protocol === "spark"
+    ? note.side === "supply"
+      ? "supply APY"
+      : "borrow APY"
+    : note.side === "supply"
+      ? "supply rate"
+      : "borrow rate";
+
+/** " per year" after a rate; nothing after an APY, which is a year's yield
+ *  by its name (SparkLend's notes, ui-jobs 611). */
+const aaveFamilyPerYear = (note: RateStepNote): string => (note.protocol === "spark" ? "" : " per year");
 
 /** The Pool in prose — "Aave V3 Core", "Spark" — falling back to the chip's
  *  own symbol so a note built without one still reads. */
@@ -1251,12 +1266,12 @@ export function marketNoteSentence(note: MarketNote): string {
     if (note.live) {
       return (
         `Since this position's ${aaveFamilyEndLabel(note.from)} at block ${f.fromBlock} ${quantity} has moved ` +
-        `${f.fromRate} → ${f.toRate} per year, ${moveWord(note.deltaPp)} ${f.deltaMagnitude}, at the latest block ` +
+        `${f.fromRate} → ${f.toRate}${aaveFamilyPerYear(note)}, ${moveWord(note.deltaPp)} ${f.deltaMagnitude}, at the latest block ` +
         `${f.toBlock}.${aaveFamilyInterestClause(note, f, true)}`
       );
     }
     return (
-      `${quantity[0].toUpperCase()}${quantity.slice(1)} moved ${f.fromRate} → ${f.toRate} per year, ` +
+      `${quantity[0].toUpperCase()}${quantity.slice(1)} moved ${f.fromRate} → ${f.toRate}${aaveFamilyPerYear(note)}, ` +
       `${moveWord(note.deltaPp)} ${f.deltaMagnitude}, between this position's ${aaveFamilyEndLabel(note.from)} at ` +
       `block ${f.fromBlock} and its ${aaveFamilyEndLabel(note.to)} at block ${f.toBlock}.` +
       `${aaveFamilyInterestClause(note, f, false)}`
@@ -1315,8 +1330,8 @@ export function marketNoteHeadline(note: MarketNote): string {
   if (isAaveFamily(note)) {
     const quantity = `the ${note.marketSymbol} ${aaveFamilyRateNoun(note)} on ${aaveFamilyMarketName(note)}`;
     return note.live
-      ? `${quantity} is ${f.toRate} per year at the latest block ${f.toBlock}, ${f.delta} since block ${f.fromBlock}`
-      : `${quantity} was ${f.toRate} per year by this position's ${aaveFamilyEndLabel(note.to)} at block ${f.toBlock}, ${f.delta} from ${f.fromRate} at block ${f.fromBlock}`;
+      ? `${quantity} is ${f.toRate}${aaveFamilyPerYear(note)} at the latest block ${f.toBlock}, ${f.delta} since block ${f.fromBlock}`
+      : `${quantity} was ${f.toRate}${aaveFamilyPerYear(note)} by this position's ${aaveFamilyEndLabel(note.to)} at block ${f.toBlock}, ${f.delta} from ${f.fromRate} at block ${f.fromBlock}`;
   }
   return note.live
     ? `the ${note.marketSymbol} market's primary rate is ${f.toRate} per year at the latest block ${f.toBlock}, ${f.delta} since block ${f.fromBlock}`
@@ -1344,8 +1359,8 @@ export function marketNoteRowAnnotation(note: MarketNote): string {
   if (isAaveFamily(note)) {
     const quantity = `the ${note.marketSymbol} ${aaveFamilyRateNoun(note)}`;
     return note.live
-      ? `market note: ${quantity} is ${f.toRate} per year at the latest block ${f.toBlock}, ${f.delta} since block ${f.fromBlock}`
-      : `market note: ${quantity} was ${f.toRate} per year by block ${f.toBlock}, ${f.delta}`;
+      ? `market note: ${quantity} is ${f.toRate}${aaveFamilyPerYear(note)} at the latest block ${f.toBlock}, ${f.delta} since block ${f.fromBlock}`
+      : `market note: ${quantity} was ${f.toRate}${aaveFamilyPerYear(note)} by block ${f.toBlock}, ${f.delta}`;
   }
   return note.live
     ? `market note: the ${note.marketSymbol} market's primary rate is ${f.toRate} per year at the latest block ${f.toBlock}, ${f.delta} since block ${f.fromBlock}`

@@ -337,6 +337,14 @@ export interface RateCurveModel {
   premium?: number;
   /** Where the reserve sits now; utilisation null where nothing is supplied. */
   now: { utilisation: number | null; borrow: number; supply: number };
+  /** The rates' form on the chart where the protocol states another than its
+   *  stored rate (SparkLend's APY): applied to every point and to `now`'s two
+   *  rates, which stay the stored rates, with the legend's names. Absent: the
+   *  stored rate, "Borrow rate" and "Supply rate". */
+  form?: { of: (rate: number) => number; borrow: string; supply: string };
+  /** The protocol's spelling of utilisation on the chart ("utilization" on
+   *  the Aave family). "utilisation" where absent. */
+  utilizationWord?: string;
   symbol: string;
   /** The curve's receipt: the strategy, its reads, the formula. */
   receipt: Provenance;

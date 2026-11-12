@@ -21,13 +21,11 @@ export function aaveLtvLines(chain: AaveLtvRead): string[] {
   const lines: string[] = [];
   if (chain.totalCollateralUsd > 0) {
     lines.push(
-      `- **Loan-to-value:** ${pct(chain.totalDebtUsd / chain.totalCollateralUsd)} (debt over collateral); liquidation at ${pct(chain.avgLiquidationThreshold)}`,
+      `- **LTV:** ${pct(chain.totalDebtUsd / chain.totalCollateralUsd)} (debt over collateral); liquidation at ${pct(chain.avgLiquidationThreshold)}`,
     );
   }
   lines.push(
-    chain.ltv > 0
-      ? `- **Maximum loan-to-value:** ${pct(chain.ltv)}`
-      : "- **Maximum loan-to-value:** 0%, so the account can borrow no more",
+    chain.ltv > 0 ? `- **Max LTV:** ${pct(chain.ltv)}` : "- **Max LTV:** 0%, so the account can borrow no more",
   );
   return lines;
 }

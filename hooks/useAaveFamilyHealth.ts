@@ -14,6 +14,7 @@
 // index answers only a transaction with the account's event, so a change's
 // read there takes the at-block route ("chain:<market>", rails-server's store).
 
+import { aaveFamilyTerms } from "@/lib/aave-family/terms";
 import { useEffect, useMemo, useState } from "react";
 import type { FlowTimeline } from "@/lib/shared/flows-timeline";
 import { AAVE_V3_LEVELS, aaveV3ThresholdRead, type AaveHealthSource } from "@/lib/aave-v3/flows-health";
@@ -140,7 +141,10 @@ export function useAaveFamilyHealth(t: FlowTimeline | null, p: AaveFamilyHealthI
   const { log, unavailable: changesUnavailable } = useConfigLog(configMarket);
   const held = useMemo(() => heldCollateral(t), [t]);
   const changes = useMemo(
-    () => (configMarket && log && emode ? changesInLife(aaveConfigChanges(log, held, emode), t) : []),
+    () =>
+      configMarket && log && emode
+        ? changesInLife(aaveConfigChanges(log, held, emode, aaveFamilyTerms(configMarket).emode), t)
+        : [],
     [configMarket, log, emode, held, t],
   );
   const also = useMemo<ChangePick[]>(
