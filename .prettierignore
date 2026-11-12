@@ -54,5 +54,3 @@ public/workbox-*.js
 lib/shared/types/event-shape.ts
 # Verifier fixtures are written by scripts/verify/build-*-fixture.ts; a reformat is undone on the next build.
 scripts/verify/fixtures/*.json
-# The S1 stopgap fixtures (lib/api/fetch-morpho-market-liquidations.ts): a dump, one line per file.
-data/s1-fixtures/*.json
