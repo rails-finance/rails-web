@@ -1,7 +1,7 @@
 // focus: the explorer's explainer; the shell's gate stands over the explorer
 // About this explorer — Fluid on Ethereum, drawn on the typed template
 // (rails-ops standards/info-page-template.md). Every link is Fluid's official
-// documentation at docs.fluid.io. The glossary sits in this file: Fluid keeps no
+// documentation: docs.fluid.io and its guides at fluid.guides.instadapp.io. The glossary sits in this file: Fluid keeps no
 // content/fluid/event-prose.yaml.
 
 import Link from "next/link";
@@ -24,6 +24,7 @@ const POSITIONS = `${DOCS}/integrate/vault-user-positions.html`;
 const HEALTH = `${POSITIONS}#health-factors-collateral-factor-liquidation-threshold-penalty-etc`;
 const SMART = `${POSITIONS}#smart-debt-smart-col-amounts`;
 const LIQUIDATION = `${DOCS}/integrate/liquidation-swaps.html#fluid-liquidation-swaps`;
+const TERMS = "https://fluid.guides.instadapp.io/vault-protocol/protocol-details";
 
 const UL = "list-disc space-y-1 pl-5";
 
@@ -52,23 +53,35 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "Smart vault",
     definition:
-      "A smart vault holds its collateral, its debt or both as shares of a DEX pool. A DEX is a decentralised exchange, and its pool is the liquidity that traders swap against. Pool shares earn trading fees.",
+      "A smart vault holds its collateral, its debt or both as shares of a DEX pool. A DEX is a decentralised exchange, and its pool is the liquidity that traders swap against. DEX shares earn trading fees.",
     sources: [
       { label: "Contracts overview", href: `${DOCS}/#core` },
       { label: "Smart debt and smart collateral amounts", href: SMART },
     ],
   },
   {
+    term: "Collateral factor",
+    definition:
+      "The collateral factor is the share of the collateral's value that can be borrowed against. The vault refuses to lend beyond it.",
+    sources: [
+      { label: "Health factors: Collateral factor, Liquidation threshold, penalty etc.", href: HEALTH },
+      { label: "Protocol Details", href: TERMS },
+    ],
+  },
+  {
     term: "Borrow limit",
     definition:
-      "The borrow limit is the most a position may borrow, as a share of its collateral's value. The vault refuses to lend beyond it.",
-    sources: [{ label: "Vault configuration", href: HEALTH }],
+      "The borrow limit is the most a vault can borrow from the Liquidity Layer. Above it, no position in the vault can borrow more.",
+    sources: [{ label: "Protocol Details", href: TERMS }],
   },
   {
     term: "Liquidation threshold",
     definition:
       "The liquidation threshold is the debt-to-collateral share at which liquidation can start. A position with debt above it can be liquidated.",
-    sources: [{ label: "Vault configuration", href: HEALTH }],
+    sources: [
+      { label: "Health factors: Collateral factor, Liquidation threshold, penalty etc.", href: HEALTH },
+      { label: "Protocol Details", href: TERMS },
+    ],
   },
   {
     term: "Liquidation",
@@ -77,10 +90,13 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
     sources: [{ label: "Fluid liquidation swaps", href: LIQUIDATION }],
   },
   {
-    term: "Maximum liquidation limit",
+    term: "Liquidation max limit",
     definition:
-      "The maximum liquidation limit is a share of collateral value above the liquidation threshold. A position with debt above it can have all of its debt liquidated.",
-    sources: [{ label: "Vault configuration", href: HEALTH }],
+      "The liquidation max limit is a share of collateral value above the liquidation threshold. Above it, 100% of a position gets liquidated.",
+    sources: [
+      { label: "Health factors: Collateral factor, Liquidation threshold, penalty etc.", href: HEALTH },
+      { label: "Protocol Details", href: TERMS },
+    ],
   },
 ];
 
@@ -144,7 +160,7 @@ const reads: InfoReads = {
   how: "The vaults page reads the VaultResolver at each load, and a vault's page at most every ten minutes, through Rails's server where it answers. Position histories come from Rails's server store of Fluid's events, and the vaults page's count of open positions from its index of Fluid positions.",
   notes: [
     "The VaultResolver's read of the whole list fails as a unit when one vault's read fails, so Rails reads each vault on its own; a vault whose read fails is left out, and the vaults page says how many.",
-    "On a smart side the vault's own rate is only the DEX pool's fee and reward share, so its pages state no rate there. Fluid's Liquidity layer, which sets the rates of token sides, is outside this explorer.",
+    "On a smart side the vault's own rate is only the DEX pool's fee and reward share, so its pages state no rate there. Fluid's Liquidity Layer, which sets the rates of token sides, is outside this explorer.",
   ],
 };
 
@@ -174,16 +190,14 @@ export default function InfoPage() {
         <>
           The vault&apos;s <GlossaryLink term="Oracle">oracle</GlossaryLink> prices the collateral. Some vaults are{" "}
           <GlossaryLink term="Smart vault">smart vaults</GlossaryLink>: a side, collateral or debt, is held as shares of
-          a DEX pool, an exchange&apos;s liquidity pool. Amounts on that side are then counted in pool shares, not
-          tokens.
+          a DEX pool, an exchange&apos;s liquidity pool. Amounts on that side are then counted in DEX shares.
         </>,
         <>
           Each vault sets three limits, each a share of the collateral&apos;s value. The{" "}
-          <GlossaryLink term="Borrow limit">borrow limit</GlossaryLink> is the most a position may borrow. The{" "}
+          <GlossaryLink term="Collateral factor">collateral factor</GlossaryLink> is the most a position may borrow. The{" "}
           <GlossaryLink term="Liquidation threshold">liquidation threshold</GlossaryLink> is higher: debt above it can
-          be liquidated. Above the{" "}
-          <GlossaryLink term="Maximum liquidation limit">maximum liquidation limit</GlossaryLink>, all of the debt could
-          be liquidated.
+          be liquidated. Above the <GlossaryLink term="Liquidation max limit">liquidation max limit</GlossaryLink>, 100%
+          of the position gets liquidated.
         </>,
         <>
           To <GlossaryLink term="Liquidation">liquidate</GlossaryLink> a position, anyone repays part of its debt and

@@ -145,7 +145,7 @@ const WORDS = {
   seized: "Seized",
   cleared: "Debt cleared",
   absorbed: "Absorbed",
-  ratio: "Position ratio",
+  ratio: "Debt to collateral ratio",
   fall: "Collateral can fall",
   fall_caption: (debt: string) => `Before liquidation, with the collateral priced in ${debt}.`,
   borrowable: "Still borrowable",
@@ -182,18 +182,18 @@ const TIPS = {
   ratio: (col: string, debt: string) =>
     `The debt as a share of the collateral's value after this event, the ${col} priced in ${debt} by the vault's oracle at this block.`,
   fall: (col: string, debt: string) =>
-    `How far the ${col} price in ${debt} can fall before the position ratio reaches the vault's liquidation threshold: one less the ratio over the threshold.`,
+    `How far the ${col} price in ${debt} can fall before the debt to collateral ratio reaches the vault's liquidation threshold: one less the ratio over the threshold.`,
   borrowable: (debt: string) =>
     `What the position could still borrow, in ${debt}: the collateral's value at this block's oracle price times the vault's collateral factor, less the debt.`,
   rate: "The vault's yearly borrow rate at this event's block, which floats with how much of the vault is borrowed.",
   factor:
     "The share of the collateral's value the vault lends against, from the vault's configuration as the page reads it at the latest block.",
   threshold:
-    "The position ratio above which the vault can liquidate the position, from the vault's configuration as the page reads it at the latest block.",
+    "The debt to collateral ratio above which the vault can liquidate the position, from the vault's configuration as the page reads it at the latest block.",
   penaltyAtBlock:
-    "The bonus the vault hands a liquidator, as a share of the debt cleared, read from the vault at this block.",
+    "The vault's liquidation penalty: what a liquidated position pays in collateral beyond the debt cleared, as a share of that debt, read from the vault at this block.",
   penaltyHead:
-    "The bonus the vault hands a liquidator, as a share of the debt cleared, from the vault's configuration as the page reads it at the latest block.",
+    "The vault's liquidation penalty: what a liquidated position pays in collateral beyond the debt cleared, as a share of that debt, from the vault's configuration as the page reads it at the latest block.",
 };
 
 type Side = "collateral" | "debt";
@@ -476,7 +476,7 @@ export function fluidSheet({
       ratio != null && prevRatio != null
         ? {
             text: changeText(ratio - prevRatio, pts),
-            info: sinceProv("The position ratio's change, in percentage points"),
+            info: sinceProv("The debt to collateral ratio's change, in percentage points"),
           }
         : null,
   };
@@ -490,11 +490,11 @@ export function fluidSheet({
       ? {
           kind: "chain-derived",
           pclass: "state",
-          summary: `Collateral can fall. How far the ${colSym} price in ${debtSym} can fall before the position ratio after this event reaches the vault's liquidation threshold; one less the ratio over the threshold. The threshold is the vault's configuration as the page reads it at the latest block.`,
+          summary: `Collateral can fall. How far the ${colSym} price in ${debtSym} can fall before the debt to collateral ratio after this event reaches the vault's liquidation threshold; one less the ratio over the threshold. The threshold is the vault's configuration as the page reads it at the latest block.`,
           formula: "1 − ratio ÷ liquidation threshold",
           inputs: [
             {
-              label: "position ratio",
+              label: "debt to collateral ratio",
               value: pct2(ratio),
               kind: "chain-derived",
               pclass: "state",

@@ -110,7 +110,7 @@ export function fxFlowsContent(): LearnMoreContent {
       },
       {
         bold: "Rebalances and redemptions",
-        text: "a keeper repays part of the debt of every position in a tick past the rebalance line and takes collateral plus a bonus; a redemption takes collateral for fxUSD from the riskiest ticks. The position's owner does not act.",
+        text: "a keeper repays part of the debt of every position in a tick past the rebalance line and takes collateral plus a bounty; a redemption takes collateral for fxUSD from the riskiest ticks. The position's owner does not act.",
       },
       {
         bold: "Bad debt",

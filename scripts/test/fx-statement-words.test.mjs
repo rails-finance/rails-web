@@ -60,3 +60,40 @@ test("the rule names the docs' condition, the rate and the off state once", () =
   assert.match(W.FX_FUNDING_RULE, /0% otherwise\.$/);
   assert.ok(W.FX_FUNDING_RULE.split(/\s+/).length <= 25);
 });
+
+// ui-jobs 638: the owner's rebalance cost, split into the pool's bounty over
+// the debt and the rest. wsteth-1950 (8 Nov 2026): $60.255 over 2,410.205
+// fxUSD at 2.5% reconciles; wbtc-915: $46.53 over 1,331.692 fxUSD, of which
+// the bounty is $33.29 and the min price's move inside the blocks the rest.
+const usd = (n) => `$${Math.round(n).toLocaleString("en-US")}`;
+
+test("a rebalance cost that is the bounty says so", () => {
+  const s = W.fxBountyWords({ paid: 60.255, bounty: 2410.2047 * 0.025, bountyRatio: 0.025, redemptions: false }, usd);
+  assert.equal(s, "That difference is the pool's 2.5% bounty over the debt repaid, which the owner paid the keepers.");
+});
+
+test("a rebalance cost above the bounty names the rest", () => {
+  const s = W.fxBountyWords({ paid: 46.53, bounty: 1331.692 * 0.025, bountyRatio: 0.025, redemptions: false }, usd);
+  assert.match(
+    s,
+    /^The pool's 2\.5% bounty over the debt repaid comes to \$33, which the owner paid the keepers\. The other \$13 comes from the price: each rebalance ran at the pool's price in its block/,
+  );
+  assert.doesNotMatch(s, /of the collateral taken/);
+});
+
+test("no bounty sentence without the bounty read", () => {
+  assert.equal(W.fxBountyWords({ paid: 10, bounty: null, bountyRatio: null, redemptions: false }, usd), null);
+});
+
+test("the docs' names", () => {
+  assert.equal(W.FX_WORDS.ltv, "LTV");
+  assert.equal(W.FX_WORDS.rebalanceLine, "Rebalance line");
+  assert.equal(
+    W.fxPoolPurpose("wstETH", "stETH"),
+    "Positions on stETH: each locks wstETH and borrows fxUSD against it.",
+  );
+  assert.equal(
+    W.fxCollateralUnitTip("wstETH", "stETH"),
+    "The wstETH deposited, counted in stETH at the pool's wstETH to stETH rate.",
+  );
+});

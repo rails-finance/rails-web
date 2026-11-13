@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Fluid vaults",
   description:
-    "Every Fluid vault: its collateral and debt, rates, positions and its ladder of three rungs, where borrowing stops, liquidation starts and the vault absorbs a position.",
+    "Every Fluid vault: its collateral and debt, rates, positions and its ladder of three rungs: the collateral factor, the liquidation threshold and the liquidation max limit.",
 };
 
 export default async function FluidVaultsPage() {

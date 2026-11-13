@@ -34,16 +34,16 @@ export const POSITION_PAGE = {
 
 export const CARD_WORDS = {
   heading: "Position summary",
-  ratio: "Position ratio",
+  ratio: "Debt to collateral ratio",
   ratioTip:
     "Debt divided by collateral at the vault oracle's liquidate price, the figure Fluid's liquidation engine compares with the vault's risk lines.",
   borrowRate: "Borrow rate",
   borrowRateTip: "The vault's current borrow rate, annual. It floats with how heavily the vault is used.",
-  room: "Room to the borrow limit",
+  room: "Room to borrow",
   roomTip:
-    "How much more debt the position can take before it reaches the vault's borrow limit (its collateral factor), where Fluid stops lending.",
-  threshold: "Liquidates above",
-  thresholdTip: "The ratio above which Fluid can liquidate the position: the vault's liquidation threshold.",
+    "How much more debt the position can take before it reaches the vault's collateral factor, where Fluid stops lending.",
+  threshold: "Liquidation threshold",
+  thresholdTip: "The ratio above which Fluid can liquidate the position.",
   interestCol: "Interest earned, 30 days",
   interestDebt: "Interest owed, 30 days",
   interestTip:

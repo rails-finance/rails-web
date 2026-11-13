@@ -18,7 +18,7 @@ export const revalidate = 600;
 export const metadata = {
   title: "f(x) pools",
   description:
-    "f(x) V2's two pools on Ethereum, wstETH and WBTC: their collateral, fxUSD debt, funding rate, debt ratio and the lines their keepers act from.",
+    "f(x) V2's two pools on Ethereum, wstETH and WBTC: their collateral, fxUSD debt, funding rate, LTV and the lines their keepers act from.",
 };
 
 export default async function FxPoolsRoute() {

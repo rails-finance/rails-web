@@ -94,7 +94,7 @@ export const FX_SORT_OPTIONS: SortOption[] = [
   { value: "lastActivity", label: RECENT_ACTIVITY_LABEL },
   { value: "collateral", label: "Collateral (settled)" },
   { value: "debt", label: "Debt (fxUSD)" },
-  { value: "debtRatio", label: "Debt ratio" },
+  { value: "debtRatio", label: "LTV" },
   { value: "events", label: "Event count" },
   { value: "created", label: "Created" },
 ];

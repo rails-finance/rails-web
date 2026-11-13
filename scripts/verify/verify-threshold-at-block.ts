@@ -941,7 +941,7 @@ test("fx: a change between two events steps the line on its day and draws its ma
   const [first, last] = fxLife(p);
   const inLife = changesByDay(fxRatioChanges(log, "wstETH"), first, last).flatMap((d) => d.changes);
   assert.equal(inLife.length, 1, "one marker inside the life");
-  assert.equal(`${inLife[0].name} ${inLife[0].from} → ${inLife[0].to}`, "Liquidation ratio 95 % → 90 %");
+  assert.equal(`${inLife[0].name} ${inLife[0].from} → ${inLife[0].to}`, "Liquidation line 95 % → 90 %");
   assert.equal(inLife[0].day, Math.floor(gap.ts / DAY_S));
   assert.ok(inLife[0].prov.summary.includes("UpdateLiquidateRatios"));
   // The event reads as the chain would give them under this log.

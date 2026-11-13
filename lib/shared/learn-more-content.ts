@@ -696,7 +696,7 @@ const FX_DOC_URL = "https://fxprotocol.gitbook.io/fx-docs";
 export function fxOperateContent(kind: "open" | "reopen" | "adjust" | "close"): LearnMoreContent {
   const intro =
     kind === "open" || kind === "reopen"
-      ? "Opening a position deposits collateral into one of f(x)'s pools (wstETH or WBTC) and mints fxUSD debt against it, creating a leveraged long held as an ERC-721 position NFT."
+      ? "Opening a position deposits collateral into one of f(x)'s pools (wstETH or WBTC) and mints fxUSD debt against it, as a position held as an ERC-721 NFT."
       : kind === "close"
         ? "Closing repays the position's remaining fxUSD debt and withdraws its collateral, emptying the position. The final repay amount settles whatever the debt really was at that block, including every socialized adjustment accrued since the last touch."
         : "Adjusting moves a position's collateral and/or fxUSD debt in one operation: deposits, withdrawals, borrows and repays are one call to the pool manager with a signed amount for each side.";
@@ -741,12 +741,12 @@ export function fxLiquidationContent(expenseRatio?: number | null): LearnMoreCon
   return {
     title: "How liquidations & rebalances work",
     intro:
-      "f(x) positions sit in ticks: buckets of positions with nearly the same debt ratio. When a tick's debt ratio reaches the pool's rebalance line, a keeper can rebalance it; when it reaches the higher liquidation line, a keeper can liquidate. The pool judges both at the oracle's min price, which is at or below the anchor price the rows' ratios are read at. Keepers are any address that calls the manager; they are paid by the bonus. Since March 2025 a liquidation runs from the pool's top tick down, and the manager logs one event for the whole run; a rebalance can target one tick or run the same way.",
+      "f(x) positions sit in ticks: buckets of positions with nearly the same LTV. When a tick's LTV reaches the pool's rebalance line, a keeper can rebalance it; when it reaches the higher liquidation line, a keeper can liquidate. The pool judges both at the oracle's min price, which is at or below the anchor price the rows' ratios are read at. Keepers are any address that calls the manager; they are paid by the bounty. Since March 2025 a liquidation runs from the pool's top tick down, and the manager logs one event for the whole run; a rebalance can target one tick or run the same way.",
     extraParagraphs: [
-      "A rebalance repays part of the tick's fxUSD debt and takes collateral worth that debt plus the rebalance bonus, bringing the tick back to the rebalance line. Every position in the tick loses collateral and debt in proportion and stays open. The position has no event of its own for it; the timeline places the rebalance on its history and reads the position before and after.",
-      "A liquidation repays the position's debt and takes collateral worth it plus the liquidation bonus. Collateral beyond that stays in the position for the owner. When the collateral cannot cover the debt and the bonus, the liquidator takes all of it, and the debt it did not cover is added to every other position in the pool through the pool's debt index.",
-      `Of each bonus the protocol keeps a share${expenseRatio != null ? `, ${Math.round(expenseRatio * 100)}% at the latest read` : ""}, so the collateral the keeper receives is less than what the position lost. The owner keeps the fxUSD they borrowed.`,
-      "A redemption is the third way a position changes without its owner: anyone may pay fxUSD into the manager for collateral at the oracle's max price, taken from the highest-ratio ticks first, at most 20% of a tick per pass. Today the manager opens it only while fxUSD trades below its peg; six redemptions have run, all on the wstETH pool in March 2025.",
+      "A rebalance repays part of the tick's fxUSD debt and takes collateral worth that debt plus the rebalance bounty, bringing the tick back to the rebalance line. Every position in the tick loses collateral and debt in proportion and stays open. The position has no event of its own for it; the timeline places the rebalance on its history and reads the position before and after.",
+      "A liquidation repays the position's debt and takes collateral worth it plus the liquidation bounty. Collateral beyond that stays in the position for the owner. When the collateral cannot cover the debt and the bounty, the liquidator takes all of it, and the debt it did not cover is added to every other position in the pool through the pool's debt index.",
+      `Of each bounty the protocol keeps a share${expenseRatio != null ? `, ${Math.round(expenseRatio * 100)}% at the latest read` : ""}, so the collateral the keeper receives is less than what the position lost. The owner keeps the fxUSD they borrowed.`,
+      "A redemption is the third way a position changes without its owner: anyone may pay fxUSD into the manager for collateral at the oracle's max price, taken from the highest-ratio ticks first, at most 20% of each position's debt at a time. Today the manager opens it only while fxUSD trades below its peg; six redemptions have run, all on the wstETH pool in March 2025.",
     ],
     links: [{ label: "f(x) docs", url: FX_DOC_URL }],
   };
@@ -769,12 +769,12 @@ export function fxEventFallbackContent(): LearnMoreContent {
   return {
     title: "How f(x) positions work",
     intro:
-      "f(x) V2 splits yield-bearing collateral into fxUSD (a stablecoin) and leveraged long positions. A position mints fxUSD against wstETH or WBTC. By f(x)'s docs, it pays funding at Aave's USDC borrow rate while the Stability Pool is short of USDC.",
+      "f(x) V2 lends fxUSD (a stablecoin) against wstETH or WBTC. A position mints fxUSD against its collateral; the docs call a leveraged one an xPOSITION and a plain loan fxMINT. By f(x)'s docs, a position pays funding at Aave's USDC borrow rate while the Stability Pool is short of USDC.",
     detailsHeading: "Key concepts:",
     details: [
       {
         bold: "The tick tree",
-        text: "positions are grouped by debt ratio into ticks; protocol-level rebalances and redemptions operate on whole ticks at once, socializing the adjustment across every position inside.",
+        text: "positions are grouped by LTV into ticks; protocol-level rebalances and redemptions operate on whole ticks at once, socializing the adjustment across every position inside.",
       },
       {
         bold: "Settled state",
@@ -806,6 +806,7 @@ const MORPHO_DOC_URLS = {
 // settlement views, and these explainers say why that is trustworthy.
 
 const FLUID_DOC_URL = "https://docs.fluid.io";
+const FLUID_GUIDES_TERMS_URL = "https://fluid.guides.instadapp.io/vault-protocol/protocol-details";
 
 export function fluidOperateContent(kind: "deposit" | "borrow" | "composite"): LearnMoreContent {
   const intro =
@@ -830,7 +831,7 @@ export function fluidOperateContent(kind: "deposit" | "borrow" | "composite"): L
       },
       {
         bold: "Signed deltas, one event",
-        text: "LogOperate(user, nftId, colAmt, debtAmt, to) is the only action event: positive amounts deposit/borrow, negative amounts withdraw/repay; either leg can be zero.",
+        text: "the vault's LogOperate(user, nftId, colAmt, debtAmt, to) is the only action event: positive amounts deposit/borrow, negative amounts withdraw/repay; either leg can be zero. The LogOperate in Fluid's docs is the Liquidity Layer's event, which has a different signature.",
       },
       {
         bold: "Interest accrues between events",
@@ -845,7 +846,7 @@ export function fluidLiquidationContent(absorbed: boolean): LearnMoreContent {
   return {
     title: absorbed ? "How absorption works" : "How Fluid liquidations work",
     intro: absorbed
-      ? "When a position sinks past the vault's maximum liquidation limit, the vault takes over its remaining debt and collateral, leaving the position empty. No event of the position's own records it."
+      ? "When a position passes the vault's liquidation max limit, 100% of it gets liquidated: the protocol absorbs its collateral and settles its debt, leaving the position empty. No event of the position's own records it."
       : "When a position's debt grows too large against its collateral, a liquidator repays part of the debt and takes collateral worth a little more in return. Fluid does this for a whole price band of positions at once, so the on-chain event names no single position.",
     detailsHeading: "Key concepts:",
     details: [
@@ -859,10 +860,13 @@ export function fluidLiquidationContent(absorbed: boolean): LearnMoreContent {
       },
       {
         bold: "Partial by design",
-        text: "a swept position usually keeps most of its collateral and debt. Fluid liquidates only enough to restore the band's health, so 'liquidated' rarely means emptied. A fully liquidated position is flagged explicitly.",
+        text: "a swept position usually keeps most of its collateral and debt. Fluid liquidates only what brings the band back to its liquidation threshold, so 'liquidated' rarely means emptied. A fully liquidated position is flagged explicitly.",
       },
     ],
-    links: [{ label: "Fluid docs", url: FLUID_DOC_URL }],
+    links: [
+      { label: "Fluid docs", url: FLUID_DOC_URL },
+      { label: "Fluid guides: Protocol Details", url: FLUID_GUIDES_TERMS_URL },
+    ],
   };
 }
 

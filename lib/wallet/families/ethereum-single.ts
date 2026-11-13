@@ -307,7 +307,10 @@ export const fluid: FamilyModule = {
       return {
         ...p,
         buffer: 1 - live.ratio / live.liquidationThreshold,
-        riskFigure: { value: `${pct(live.ratio)} ratio`, label: `liquidates above ${pct(live.liquidationThreshold)}` },
+        riskFigure: {
+          value: `${pct(live.ratio)} ratio`,
+          label: `liquidation threshold ${pct(live.liquidationThreshold)}`,
+        },
         liquidatable: live.ratio > live.liquidationThreshold,
         debtRate: live.borrowRatePct != null ? live.borrowRatePct / 100 : undefined,
         headRead: "read",
