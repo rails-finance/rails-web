@@ -19,7 +19,7 @@
 // every request and the browser context — see lib/host.mjs.
 
 import { chromium } from "playwright";
-import { armInspector, openInspectorHome } from "./lib/prov-inspector.mjs";
+import { armInspector } from "./lib/prov-inspector.mjs";
 import { BASE, bypassHeaders, hostFetch } from "./lib/host.mjs";
 
 const fails = [];
@@ -66,7 +66,6 @@ await page.goto(BASE + path, { waitUntil: "domcontentloaded", timeout: 180000 })
 // The live read has landed when a receipt's via line names the call
 // (`TroveManager.getLatestTroveData(): …`); before it, the card shows the logged
 // snapshot, whose receipts carry no raw here and owe no sentence.
-await openInspectorHome(page);
 
 /** Arm, then pick pickables until one's popover head names `label`. Returns the
  *  popover's text and its scaling sentence, or null. */

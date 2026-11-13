@@ -1,20 +1,17 @@
-// Every traced value on a product page is reachable from a section ⋮
-// (rails-ops TO-DO-ui-jobs 549/550, proposal §3 and §4).
+// Every traced value on a product page sits in a section and is reachable
+// from the inspector (rails-ops TO-DO-ui-jobs 549/550, proposal §3 and §4).
 // ---------------------------------------------------------------------------
-// The page-wide inspector toggle (H12's crosshair) is gone from these pages,
-// so a value's one route to its receipt is the "Inspect provenance" row of the
-// ⋮ on the section it sits in. For each page this asserts:
+// The inspector is armed in one place, the profile menu's switch (ui-jobs
+// 625); a section's ⋮ no longer arms it. For each page this asserts:
 //
-//   a  the page mounts no page-wide toggle (`button.prov-inspect-toggle`
-//      outside a menu);
 //   b  every scoped <Prov> (`.prov-locate-box`) sits inside a
 //      `[data-prov-scope]` section, and there is at least one;
-//   c  every such section holds a ⋮ whose menu carries
-//      `[data-prov-scope-toggle="<its scope>"]` reading "Inspect provenance";
-//   d  arming from that row rings that section alone (`[data-prov-lit]` on it
-//      and nowhere else), its values are pickable and no value outside it is;
+//   d  armed from the switch, every such section's values are pickable;
 //   e  on the Morpho rosters, the default view lists only the markets a vault
 //      lends into and `?all=1` every row (R1.1.3); Arbitrum lists every row.
+//
+// Checks a (no page-wide toggle) and c (each section's ⋮ carries Inspect
+// provenance) are retired with the controls they read (ui-jobs 625).
 //
 // Pages: the Morpho Base case-study vault, a Morpho Ethereum vault, the three
 // Aave vault families, a Yearn vault, the four family rosters, and the Aave
@@ -33,6 +30,7 @@
 
 import { chromium } from "playwright";
 import { BASE, bypassHeaders } from "./lib/host.mjs";
+import { armInspector } from "./lib/prov-inspector.mjs";
 
 const USDC_CORE = "/ethereum/aave-v3/markets/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
 const MORPHO_BASE_MARKET =
@@ -209,11 +207,6 @@ function check(name, ok, detail = "") {
   return ok;
 }
 
-/** A section's ⋮ triggers: a `SectionMenu`'s, the position card's (C17), or
- *  an event card's (its own scope, as on Pendle's market page). */
-const MENU_TRIGGERS =
-  "[data-section-menu] button[aria-haspopup], [data-card-menu] > button[aria-haspopup], [data-event-head-menu] button[aria-haspopup]";
-
 const browser = await chromium.launch();
 
 for (const path of PAGES) {
@@ -244,10 +237,6 @@ for (const path of PAGES) {
       "the section is not on the page",
     );
 
-  // a — no page-wide toggle.
-  const toggles = await page.locator("button.prov-inspect-toggle:not(.prov-inspect-toggle-menu)").count();
-  if (!only) check(`${tag} a: no page-wide inspect toggle`, toggles === 0, `${toggles} on the page`);
-
   // b — every traced value sits in a section scope.
   const tally = await page.evaluate(() => {
     const boxes = [...document.querySelectorAll(".prov-locate-box")];
@@ -268,48 +257,21 @@ for (const path of PAGES) {
         : `${tally.total} values in ${tally.scopes.join(", ")}`,
     );
 
-  for (const scope of only ?? tally.scopes) {
-    const section = page.locator(`[data-prov-scope="${scope}"]`).first();
-    const trigger = section.locator(MENU_TRIGGERS).first();
-    const row = page.locator(`[data-prov-scope-toggle="${scope}"]`).first();
-    // c — the section's ⋮ carries its Inspect provenance row.
-    let rowText = "";
-    if ((await trigger.count()) > 0) {
-      for (let i = 0; i < 4 && !(await row.isVisible().catch(() => false)); i++) {
-        await trigger.scrollIntoViewIfNeeded().catch(() => {});
-        await trigger.click().catch(() => {});
-        await page.waitForTimeout(500);
-      }
-      rowText = ((await row.textContent().catch(() => "")) ?? "").replace(/\s+/g, " ").trim();
+  // d — armed from the switch, every section's values are pickable.
+  const armed = await armInspector(page);
+  const picks = await page.evaluate(() => {
+    const by = {};
+    for (const p of document.querySelectorAll("[data-prov-pickable]")) {
+      const s = p.closest("[data-prov-scope]")?.getAttribute("data-prov-scope");
+      if (s) by[s] = (by[s] ?? 0) + 1;
     }
-    if (
-      !check(
-        `${tag} c: "${scope}" has a ⋮ with Inspect provenance on it`,
-        /Inspect provenance/.test(rowText),
-        rowText || ((await trigger.count()) ? "the ⋮ opened no row for this scope" : "no ⋮ in the section"),
-      )
-    )
-      continue;
-
-    // d — arming rings this section alone.
-    await row.click();
-    await page.waitForTimeout(600);
-    const armed = await page.evaluate((s) => {
-      const lit = [...document.querySelectorAll("[data-prov-lit]")].map((e) => e.getAttribute("data-prov-scope"));
-      const picks = [...document.querySelectorAll("[data-prov-pickable]")];
-      const inside = picks.filter((p) => p.closest("[data-prov-scope]")?.getAttribute("data-prov-scope") === s).length;
-      return { lit, inside, outside: picks.length - inside, halo: !!document.querySelector(".prov-inspect-halo") };
-    }, scope);
-    check(
-      `${tag} d: arming "${scope}" rings it alone and marks only its values`,
-      armed.lit.length === 1 && armed.lit[0] === scope && armed.inside > 0 && armed.outside === 0 && !armed.halo,
-      JSON.stringify(armed),
-    );
-    // Put the mode down: the first Escape closes any popover, the second disarms.
-    await page.keyboard.press("Escape");
-    await page.keyboard.press("Escape");
-    await page.waitForTimeout(300);
-  }
+    return by;
+  });
+  for (const scope of only ?? tally.scopes)
+    check(`${tag} d: armed, "${scope}" has pickable values`, armed && (picks[scope] ?? 0) > 0, JSON.stringify(picks));
+  // Put the mode down (and the saved choice), so the next page loads unarmed.
+  if (armed) await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
 
   check(`${tag}: no page error`, errors.length === 0, errors.slice(0, 2).join(" | "));
   if (MORPHO_ROSTERS[path]) await morphoRosterView(page, path, tag);

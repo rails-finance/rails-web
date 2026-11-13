@@ -56,7 +56,7 @@ export async function AaveV4ArcWallet({ wallet: raw }: { wallet: string }) {
           {FRONT_DOOR.none}
         </p>
       ) : (
-        <AaveV4ArcReceipts scopeId="aave-v4-arc-wallet">
+        <AaveV4ArcReceipts>
           <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {spokes.map((s) => (
               <li key={s.key}>

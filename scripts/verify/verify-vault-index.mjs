@@ -44,6 +44,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { checkRosterView, presetKeeps, readRosterRows } from "./lib/vault-roster-view.mjs";
+import { armInspector } from "./lib/prov-inspector.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BASE = process.env.BASE ?? "http://localhost:3033";
@@ -392,8 +393,12 @@ for (const k of KEYS) {
     .locator("[data-vault-index] .prov-locate-box, [data-vault-index] [data-prov-covered]")
     .count();
   check("9a the index's rows carry receipts", receipts > 0, `${receipts} receipt spans`);
-  const tools = await page.locator("button.prov-inspect-toggle, [data-prov-tripwire]").count();
-  check("9b the page offers the provenance inspector", tools > 0, `${tools} inspector controls`);
+  // The profile menu's switch arms the page (ui-jobs 625); put down again
+  // after, so the checks below read the page unarmed.
+  const armed = await armInspector(page);
+  const picks = await page.locator("[data-vault-index] [data-prov-pickable]").count();
+  check("9b the profile menu's switch arms the index's rows", armed && picks > 0, `${picks} pickable values`);
+  if (armed) await page.keyboard.press("Escape");
 }
 
 // ── 9c: no figure reads unitless (decision 0028 point 8) ────────────────────

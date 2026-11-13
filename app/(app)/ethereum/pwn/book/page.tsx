@@ -23,8 +23,7 @@ import { PwnBookView, PwnBookStamp } from "@/components/protocol/pwn/pwn-book-vi
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { loadPwnLoanBook } from "@/lib/pwn/loan-book";
 import { protocolForHref } from "@/lib/shared/protocols";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +48,6 @@ export default async function PwnBookPage() {
         <div data-skel-section="page-table">
           <PwnBookView book={book} />
         </div>
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
         <ProvInspectorLayer />
       </div>
     </div>

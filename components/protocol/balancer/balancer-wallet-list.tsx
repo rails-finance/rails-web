@@ -3,7 +3,7 @@
 // A wallet's Balancer V3 pools (U6; rails-ops ui-jobs 569): one row per
 // pool the wallet holds a share of, its share with its receipt, each opening the
 // pool-share page, and under it any shares staked in the pool's gauge. One
-// receipts scope its ⋮ arms; the read stamp's receipt names the search that
+// receipts scope; the read stamp's receipt names the search that
 // found the pools: Rails's index of the Vault's transfers, then the chain's logs. Under Focus (ui-jobs 557) a row stays when one
 // of its pool's tokens is in focus.
 
@@ -11,7 +11,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Prov } from "@/components/shared/provenance";
 import { HeadingTip } from "@/components/shared/tip-label";
-import { ProvSection, SectionHeading, SectionMenu } from "@/components/shared/section-menu";
+import { ProvSection, SectionHeading } from "@/components/shared/section-menu";
 import { SectionReadStamp, readStampProv } from "@/components/shared/read-stamp";
 import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
 import { assetKey } from "@/lib/shared/asset-family";
@@ -70,7 +70,6 @@ export function BalancerWalletList({ r, home }: { r: BalPositionsRead; home: str
             }}
           />
         }
-        menu={<SectionMenu scope={SCOPE} title={title} />}
       >
         <p className="text-xs text-rb-500" data-anatomy="U6.1" data-balancer-found="">
           {FRONT_DOOR.found(balChain(r.chainId).name)}

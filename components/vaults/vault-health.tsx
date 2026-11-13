@@ -6,7 +6,7 @@
 // each a label, the measured figure with its window and one sentence, the
 // figure traced to its reads (lib/vaults/health-provenance.ts). No colour
 // carries a verdict. A line Rails does not read for the family says so,
-// muted. The section is one receipts scope its ⋮ arms (decision 0059).
+// muted. The section is one receipts scope (decision 0059).
 
 import { Prov } from "@/components/shared/provenance";
 import { ProvSection, SectionHeading, SectionMenu, type SectionMenuLink } from "@/components/shared/section-menu";
@@ -19,7 +19,7 @@ import type { Health } from "@/lib/vaults/health";
 import { HEALTH_DISCLAIMER, HEALTH_EXPLAINER, HEALTH_TITLE, type HealthLine } from "@/lib/vaults/health-words";
 import { healthLineProv, type HealthReceiptVault } from "@/lib/vaults/health-provenance";
 
-/** The section's scope: its ⋮ arms the inspector on it alone. */
+/** The section's name (`data-prov-scope`). */
 export const HEALTH_SCOPE = "vault-health";
 
 /** The lines as Markdown, for the ⋮'s Copy. */

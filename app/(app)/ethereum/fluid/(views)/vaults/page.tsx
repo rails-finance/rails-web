@@ -27,7 +27,7 @@ export default async function FluidVaultsPage() {
   return (
     <>
       <FluidRosterPage data={data} open={open} />
-      {/* Each section arms the inspector from its ⋮; no page-wide toggle. */}
+      {/* The inspector, armed from the profile menu's switch. */}
       <ProvInspectorLayer />
     </>
   );

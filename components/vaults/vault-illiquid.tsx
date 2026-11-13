@@ -28,7 +28,7 @@ const marketProv = (
   summary:
     what === "utilisation"
       ? `Borrowed — the ${marketName(m)} market's totalBorrowAssets over its totalSupplyAssets, as Morpho Blue last settled it, read at block ${n(il.block)}.`
-      : `Borrow rate — Rails's figure: the AdaptiveCurveIRM's curve at the market's utilisation over its rate at target, a year, simple. The rate at target is the stored rateAtTarget adapted over the time since the market last settled, to block ${n(il.block)}; it is at the IRM's maximum, 200% a year, so at full utilisation the rate is the ceiling, 800% a year.`,
+      : `Borrow rate — Rails's figure: the AdaptiveCurveIRM's curve at the market's utilisation over its rate at target, a year, before compounding. The rate at target is the stored rateAtTarget adapted over the time since the market last settled, to block ${n(il.block)}; it is at the IRM's maximum, 200% a year, so at full utilisation the rate is the ceiling, 800% a year.`,
   contract: { name: `Morpho Blue market ${m.id.slice(0, 10)}…` },
   via:
     what === "utilisation"

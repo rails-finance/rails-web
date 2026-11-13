@@ -114,7 +114,7 @@ export function ReservePage({
         </header>
         {body}
       </div>
-      {/* Each section arms the inspector from its ⋮; the layer draws it. */}
+      {/* The inspector, armed from the profile menu's switch. */}
       <ProvInspectorLayer />
     </div>
   );

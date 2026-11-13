@@ -7,7 +7,7 @@
 // wallet heading's address, then the event's place, time, block and
 // transaction), and at its foot the Learn more link reading the modal's title
 // (ui-jobs 380). The column stands inside the protocol's bar (C20). The card's
-// top right holds the event's ⋮ (View in timeline, Inspect provenance, Copy
+// top right holds the event's ⋮ (View in timeline, Copy
 // transaction hash, Copy link, the explorer, View as Markdown, Copy for LLM,
 // ui-jobs 535); the previous
 // and next arrows sit under the card (`EventPageControls`, `EventPageSteps`;
@@ -276,17 +276,15 @@ function EventPageSentence({ sentence, beside }: { sentence: ReactNode; beside?:
 
 /** The card's top right on the event page: the event's ⋮ (`EventCardMenu`),
  *  View in timeline its top row (the position's timeline with the event
- *  focused, the `?at=` landing), then Inspect provenance on `provScope`, the
- *  card's receipts scope (ui-jobs 284), Copy transaction hash and the page's
+ *  focused, the `?at=` landing), then Copy transaction hash and the page's
  *  rows (ui-jobs 535). */
-export function EventPageControls({ page, provScope }: { page: EventPageShell; provScope: string }) {
+export function EventPageControls({ page }: { page: EventPageShell }) {
   const shareHref = useEventShareHref();
   return (
     <span className="flex items-center" data-event-head-menu="">
       <EventCardMenu
         shareHref={shareHref}
         timelineHref={page.contract.timelineHref}
-        provScope={{ id: provScope, hint: W.provenance_hint }}
         txHash={page.contract.txHash}
         pageRows={(close) => <EventPageRows c={page.contract} close={close} />}
       />

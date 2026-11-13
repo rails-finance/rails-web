@@ -203,7 +203,7 @@ async function probeEcho(page) {
   await page.waitForTimeout(2000);
 
   if (!(await armInspector(page))) {
-    bad("no provenance-inspector toggle on the page — cannot test the echo");
+    bad("the profile menu's switch does not arm this page — cannot test the echo");
     return;
   }
   await page.waitForTimeout(400);
@@ -224,7 +224,7 @@ async function probeEcho(page) {
     // between picks would toggle it OFF on alternate rounds (which is what
     // produced phantom empty results the first time this ran) — so just check
     // the armed state and only re-arm when it has actually dropped, which is
-    // what armInspector does: it reads the halo before it clicks anything.
+    // what armInspector does: it reads the armed state before it clicks anything.
     await armInspector(page);
     await flank.click();
     await page.waitForTimeout(400);

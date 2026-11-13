@@ -2,11 +2,10 @@
 
 // The event card's ⋮ (rails-ops TO-DO-ui-jobs 281, 308, 535), at the T1 row's
 // right end (ui-jobs 295), the same on every family. On a timeline: Open event
-// page, Inspect provenance (armed on this card, `provScope`), Copy transaction
-// hash, inside a group Group {n} events, and Hide the row's type of event, the
-// Types of event filter's untick; a closed group's row holds Show {n} grouped
-// events. On the event page it stands at the card's top right: View in
-// timeline (`timelineHref`), Inspect provenance, Copy transaction hash, then
+// page, Copy transaction hash, inside a group Group {n} events, and Hide the
+// row's type of event, the Types of event filter's untick; a closed group's
+// row holds Show {n} grouped events. On the event page it stands at the
+// card's top right: View in timeline (`timelineHref`), Copy transaction hash, then
 // the page's rows (`pageRows`: copy link, the explorer, the Markdown and Copy
 // for LLM; `components/shared/event-page-aside.tsx`, which reuses
 // `useMenuCopied` and `eventMarkdownHref` from here). The explorer link is the
@@ -89,10 +88,8 @@ export function hideTypeWords(label: string, suffix?: ReactNode): { title: React
 export function EventCardMenu({
   shareHref,
   groupShow,
-  provScope,
   txHash,
   timelineHref,
-  onInspect,
   pageRows,
 }: {
   /** A closed group's row: its one item, "Show 48 grouped events", the only
@@ -101,14 +98,10 @@ export function EventCardMenu({
   /** The event page's path (`useEventShareHref`); null outside a timeline,
    *  where the page row is left out. */
   shareHref: string | null;
-  /** Inspect provenance, armed on this card: the event's receipts scope. */
-  provScope?: { id: string; hint: string };
   /** The event's transaction, for Copy transaction hash. */
   txHash?: string | null;
   /** The event page's View in timeline, its top row. */
   timelineHref?: string;
-  /** Called as Inspect provenance arms the card: a timeline card opens. */
-  onInspect?: () => void;
   /** The event page's rows, under Copy transaction hash. */
   pageRows?: (close: () => void) => ReactNode;
 }) {
@@ -133,15 +126,8 @@ export function EventCardMenu({
     );
 
   return (
-    <ToolsMenu
-      variant="event"
-      label={WORDS.menu}
-      heading={WORDS.heading}
-      provScope={provScope}
-      scopeInline
-      onScopeArm={onInspect}
-    >
-      {(close, scopeRow) =>
+    <ToolsMenu variant="event" label={WORDS.menu} heading={WORDS.heading}>
+      {(close) =>
         groupShow ? (
           <>
             <ToolsMenuItem
@@ -181,7 +167,6 @@ export function EventCardMenu({
                 onClick={close}
               />
             )}
-            {scopeRow}
             {txHash && (
               <ToolsMenuItem
                 item="copy-hash"

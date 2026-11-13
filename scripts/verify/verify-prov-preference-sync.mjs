@@ -1,5 +1,5 @@
 // The provenance inspector's one state (rails-ops TO-DO-ui-jobs 624): the
-// profile menu's switch (H20.1), the halo's "Exit inspector" (H7.4), Escape
+// profile menu's switch (H20.1), "Exit inspector" beside the profile control (H7.4), Escape
 // and the inspector read and write one state. Putting the inspector down from
 // any of them turns the saved choice off, and the switch reads off at once;
 // the switch turned on arms the page at once, and turned off disarms it.
@@ -12,7 +12,7 @@ const PATH = "/ethereum/aave-v3/0x8008316e61985599dc62d69716bab3ebe643c0a8?marke
 const KEY = "rails-prov-inspector";
 const H20 = '[data-anatomy="H20"]:visible';
 const SWITCH = "[data-profile-menu-prov]";
-const EXIT = ".prov-inspect-exit";
+const EXIT = ".prov-inspect-exit:visible";
 
 let checked = 0;
 let failures = 0;
@@ -71,9 +71,28 @@ check(
 );
 
 // Exit inspector puts it down, saved choice included.
-check("the halo carries Exit inspector", Boolean(await page.$(EXIT)));
+// "Exit inspector" stands beside the visible profile control (ui-jobs 624.2):
+// its right edge within 16px left of H20's left, the two on one line.
+const nextTo = await (async () => {
+  const e = await page
+    .locator(EXIT)
+    .first()
+    .boundingBox()
+    .catch(() => null);
+  const h = await page
+    .locator(H20)
+    .first()
+    .boundingBox()
+    .catch(() => null);
+  if (!e || !h) return { e, h };
+  const gap = h.x - (e.x + e.width);
+  const midDy = Math.abs(e.y + e.height / 2 - (h.y + h.height / 2));
+  return { ok: gap >= 0 && gap <= 16 && midDy <= 6, gap, midDy };
+})();
+check("Exit inspector stands beside the profile control", Boolean(nextTo.ok), JSON.stringify(nextTo));
 await page
   .locator(EXIT)
+  .first()
   .click({ timeout: 5000 })
   .catch(() => {});
 await page.waitForTimeout(400);
@@ -106,6 +125,51 @@ check(
   "Escape: disarmed, the saved choice off, the switch reads off",
   !s.armed && !s.saved && s.sw === "off",
   JSON.stringify(s),
+);
+
+// Off the switch's routes (ui-jobs 625): with the choice saved on, the row
+// reads "Not on this page", is disabled and shows off, nothing is pickable,
+// and a press keeps the saved choice.
+const OFF_LIST = "/assets";
+await page.evaluate((k) => localStorage.setItem(k, "1"), KEY);
+await page.goto(`${BASE}${OFF_LIST}`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.waitForTimeout(3000);
+let row = null;
+for (let i = 0; i < 4 && row == null; i++) {
+  await page.locator(H20).click();
+  row = await page.waitForSelector(SWITCH, { timeout: 3000 }).catch(() => null);
+}
+const read = row
+  ? {
+      state: await row.getAttribute("data-profile-menu-prov"),
+      disabled: await row.getAttribute("aria-disabled"),
+      checked: await row.getAttribute("aria-checked"),
+      note:
+        (await page
+          .locator("[data-profile-menu-prov-unavailable]")
+          .textContent()
+          .catch(() => null)) ?? null,
+    }
+  : null;
+if (row) await row.click().catch(() => {});
+await page.waitForTimeout(400);
+const after = {
+  saved: await page.evaluate((k) => localStorage.getItem(k) === "1", KEY),
+  picks: await page.locator("[data-prov-pickable]").count(),
+  exit: await page.locator(EXIT).count(),
+};
+await closeMenu();
+check(
+  `${OFF_LIST}: the switch reads "Not on this page", disabled and off; a press keeps the saved choice; nothing is pickable`,
+  !!read &&
+    read.state === "unavailable" &&
+    read.disabled === "true" &&
+    read.checked === "false" &&
+    /not on this page/i.test(read.note ?? "") &&
+    after.saved &&
+    after.picks === 0 &&
+    after.exit === 0,
+  JSON.stringify({ read, after }),
 );
 
 await browser.close();

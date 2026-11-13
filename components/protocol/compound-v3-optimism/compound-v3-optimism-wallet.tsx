@@ -59,7 +59,7 @@ export async function CompoundV3OptimismWallet({ wallet: raw }: { wallet: string
           {WALLET_PAGE.empty}
         </p>
       ) : (
-        <CompoundV3OptimismReceipts scopeId="compound-v3-optimism-wallet">
+        <CompoundV3OptimismReceipts>
           <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {held.map(({ a, f }) => {
               const c: OpcReceiptContext = { a, f, head: answer.data.head, ethUsd: answer.data.ethUsd };

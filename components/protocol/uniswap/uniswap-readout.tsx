@@ -5,7 +5,7 @@
 // back and the block read now, the position's rows first, then the pool's,
 // each figure traced to its reads (lib/uniswap/provenance.ts). Every word is
 // lib/uniswap/words.ts's; no colour carries a verdict. The section is one
-// receipts scope its ⋮ arms (decision 0059).
+// receipts scope (decision 0059).
 
 import type { Provenance } from "@/components/shared/provenance";
 import { ProvSection, SectionHeading, SectionMenu } from "@/components/shared/section-menu";
