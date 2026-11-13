@@ -6,8 +6,10 @@
 // Rails? Start here" to /start (ui-jobs 509); then four groups, Focus,
 // Listings, Wallets and Positions, each under a heading that links to its tab
 // on /bookmarks (a cog at the group's right on hover or keyboard focus; on a
-// touch screen see HEADING_TOUCH); last, Advanced, holding the provenance
-// inspector switch (decision 0062; ui-jobs 571).
+// touch screen see HEADING_TOUCH); with anything saved, starred or not, a
+// Bookmarks row to /bookmarks (Miles, 13 Nov 2026; ui-jobs 652); last,
+// Advanced, holding the provenance inspector switch (decision 0062; ui-jobs
+// 571).
 //
 // Stars alone decide what each group lists (ui-jobs 652): Focus lists the
 // views starred on /bookmarks?tab=focus and, while it is unstarred, the view
@@ -39,7 +41,18 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
-import { Check, ChevronDown, CircleHelp, Crosshair, Monitor, Moon, Settings, Signpost, Sun } from "lucide-react";
+import {
+  Bookmark,
+  Check,
+  ChevronDown,
+  CircleHelp,
+  Crosshair,
+  Monitor,
+  Moon,
+  Settings,
+  Signpost,
+  Sun,
+} from "lucide-react";
 import { useTheme } from "next-themes";
 
 import { Facehash } from "@/components/shared/facehash";
@@ -612,6 +625,21 @@ export function ProfileMenu() {
                 </div>
               )}
               {linkGroup(linkGroups[1])}
+              {/* The way to /bookmarks whatever is starred (ui-jobs 652). */}
+              {anything && (
+                <div className={GROUP}>
+                  <Link
+                    href={BOOKMARKS_PATH}
+                    role="menuitem"
+                    onClick={done}
+                    className={ITEM}
+                    data-profile-menu-bookmarks=""
+                  >
+                    <Bookmark className="size-4 shrink-0 text-rb-500" fill="currentColor" aria-hidden="true" />
+                    <span className="font-medium">Bookmarks</span>
+                  </Link>
+                </div>
+              )}
               <div role="group" aria-labelledby={`${menuId}-advanced`} className={GROUP}>
                 <p id={`${menuId}-advanced`} className={`${LABEL} flex min-h-8 items-center`}>
                   Advanced
