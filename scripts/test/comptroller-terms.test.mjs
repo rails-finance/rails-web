@@ -36,3 +36,10 @@ test("Moonwell's liquidation modal states no 7% / 3% split the chain does not sh
   assert.doesNotMatch(mw, /7% for the liquidator/);
   assert.match(mw, /1\.10× the repaid debt/);
 });
+
+test("the markets CSV keeps the stored rate under supply_apr and borrow_apr", () => {
+  const src = read("lib/comptroller/product.tsx");
+  assert.match(src, /"supply_apr",\s*"borrow_apr"/);
+  assert.doesNotMatch(src, /supply_apy|borrow_apy/);
+  assert.match(src, /storedYear\(x, m, "supply"\)/);
+});

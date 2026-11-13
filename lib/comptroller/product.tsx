@@ -42,7 +42,7 @@ import { MOONWELL_BASE_BORROW_FREEZE_DATE } from "@/lib/moonwell-base/borrow-fre
 import { COMPTROLLER_FAMILIES, vocabFamily, type ComptrollerFamily } from "@/lib/comptroller/families";
 import type { ComptrollerMarket, ComptrollerRead } from "@/lib/comptroller/markets";
 import { curveConstants, modelUtilisation } from "@/lib/comptroller/rate-model";
-import { apyOfYear, yearOfApy } from "@/lib/comptroller/apy";
+import { MOONWELL_SECONDS_PER_YEAR, apyOfYear, yearOfApy } from "@/lib/comptroller/apy";
 import {
   cmAmountProv,
   cmAvailableProv,
@@ -460,6 +460,17 @@ const csvCell = (v: string | number | null | undefined) => {
   return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
 };
 
+/** The CSV's rate: the stored per-period rate as a simple year, as Morpho and
+ *  Aave V4 export it (Compound V2 on 2,628,000 blocks, Moonwell on 31,536,000
+ *  seconds); the page carries the APY. */
+function storedYear(x: Ctx, m: ComptrollerMarket, side: "supply" | "borrow"): number | null {
+  const raw = side === "supply" ? m.supplyRatePerPeriodRaw : m.borrowRatePerPeriodRaw;
+  const periods = x.f.rateYear?.periods ?? MOONWELL_SECONDS_PER_YEAR;
+  if (raw) return (Number(raw) / 1e18) * periods;
+  const apy = side === "supply" ? m.supplyApr : m.borrowApr;
+  return apy != null ? yearOfApy(apy, x.f.apy.steps) : null;
+}
+
 function marketsCsv(x: Ctx): string {
   const head = [
     "market",
@@ -471,8 +482,8 @@ function marketsCsv(x: Ctx): string {
     "borrowed",
     "available",
     "reserves",
-    "supply_apy",
-    "borrow_apy",
+    "supply_apr",
+    "borrow_apr",
     "collateral_factor",
     "reserve_factor",
     "utilization",
@@ -492,8 +503,8 @@ function marketsCsv(x: Ctx): string {
       m.borrowed,
       m.cash,
       m.reserves,
-      m.supplyApr,
-      m.borrowApr,
+      storedYear(x, m, "supply"),
+      storedYear(x, m, "borrow"),
       m.collateralFactor ?? 0,
       m.reserveFactor,
       utilisationOf(m),
