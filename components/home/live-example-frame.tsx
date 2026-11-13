@@ -204,7 +204,7 @@ function PhoneButton() {
   return (
     <div className="flex justify-center px-4 sm:hidden" data-live-button="">
       <Link href={LIVE_EXAMPLE_TROVE_PATH} className={PHONE_BUTTON}>
-        View a live position <span>→</span>
+        View a live position
       </Link>
     </div>
   );
@@ -362,7 +362,7 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
               <span
                 className={`${PILL_CTA.replace("transition-colors ", "")} absolute bottom-5 left-1/2 -translate-x-1/2 translate-y-1 opacity-0 transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0 group-hover:border-blue-500 dark:group-hover:border-blue-500`}
               >
-                View a live position <span>→</span>
+                View a live position
               </span>
             </Link>
           </div>
@@ -371,7 +371,7 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
             pill never shows there: the home CTA pill, right-aligned. */}
           <div className="relative mt-4 flex justify-end [@media(hover:hover)]:hidden">
             <Link href={LIVE_EXAMPLE_TROVE_PATH} className={PILL_CTA}>
-              View a live position <span>→</span>
+              View a live position
             </Link>
           </div>
         </div>

@@ -137,7 +137,7 @@ export default function ArchitecturePage() {
           rel="noopener"
           className="underline hover:text-pink-500 transition-colors"
         >
-          View on GitHub →
+          View on GitHub
         </a>
       </p>
     </div>

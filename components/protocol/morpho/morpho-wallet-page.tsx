@@ -233,17 +233,20 @@ export function MorphoWalletView({
                 {!sweptClean && timeline.positions.length > 0 && (
                   <p className="text-sm text-rb-500">{w.notWholeWallet}</p>
                 )}
-                {!sweptClean &&
-                  rows.map(({ pos }) => (
-                    <Link
-                      key={pos.marketId}
-                      href={d.positionHref(wallet, pos.marketId)}
-                      className={`text-xs font-semibold ${FOOT_LINK}`}
-                      prefetch={false}
-                    >
-                      {pos.marketLabel}
-                    </Link>
-                  ))}
+                {!sweptClean && rows.length > 0 && (
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                    {rows.map(({ pos }) => (
+                      <Link
+                        key={pos.marketId}
+                        href={d.positionHref(wallet, pos.marketId)}
+                        className={`text-xs font-semibold ${FOOT_LINK}`}
+                        prefetch={false}
+                      >
+                        {pos.marketLabel}
+                      </Link>
+                    ))}
+                  </div>
+                )}
                 {unswept.length > 0 && (
                   <p className="text-sm text-rb-500">
                     {w.unswept(unswept.length === 1 ? "One market" : `${unswept.length} markets`)}
