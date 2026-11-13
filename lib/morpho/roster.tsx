@@ -211,7 +211,7 @@ function CeilingTag({ m, c }: { m: MorphoRosterRow; c: MorphoMarketCoords }) {
 }
 
 const CEILING_TIP =
-  "Fully lent out, the rate model at its maximum: and suppliers may not be able to withdraw until borrowers repay.";
+  "Fully lent out, with the rate model at its maximum; suppliers may not be able to withdraw until borrowers repay.";
 
 const list = (xs: string[]) => (xs.length <= 1 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
 
