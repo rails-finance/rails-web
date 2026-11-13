@@ -316,8 +316,8 @@ export function liquityLifetimeFlowsContent(opts: { isBatched?: boolean } = {}):
       {
         bold: "Carrying cost",
         text: opts.isBatched
-          ? "the interest plus the delegate's management fee that accrue to the debt each day and year."
-          : "the interest that accrues to the debt each day and year at the trove's chosen rate.",
+          ? "the interest plus the delegate's management fee that accrue to the debt each day and year; it stops if the branch shuts down."
+          : "the interest that accrues to the debt each day and year at the trove's chosen rate; it stops if the branch shuts down.",
       },
       {
         bold: "Upfront Borrowing Fee",

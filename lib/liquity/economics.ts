@@ -279,6 +279,13 @@ export interface LiquityEconomicsResult {
   economics: TroveEconomicsType & { _meta: TroveMeta };
 }
 
+/** The clock a Trove's interest accrues to: `now`, or the branch's shutdown
+ *  where that came first (ui-jobs 626; liquity-flows.ts caps the replay the
+ *  same way). */
+export function liquityAccrualNow(now: number, shutdownAt: number | null | undefined): number {
+  return shutdownAt != null ? Math.min(now, shutdownAt) : now;
+}
+
 export function computeLiquityEconomics(
   events: MinimalEvent[],
   opts: {

@@ -923,6 +923,8 @@ trove_words:
     This trove holds {coll} of collateral against {debt} of debt:
   debt_breakdown: |-
     The debt includes {interest} of interest accrued since the last event
+  debt_breakdown_shutdown: |-
+    The debt includes {interest} of interest accrued until the branch shut down on {date}
   debt_breakdown_fee: |-
     and {fee} of delegate fees
   coll_worth: |-

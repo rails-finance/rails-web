@@ -177,8 +177,11 @@ export function liquityRedemptionOutcome(
 export interface LiquityFlowsExplanationProps {
   economics: TroveEconomicsType;
   meta: TroveMeta;
-  /** The clock the debt owed today accrues to. */
+  /** The clock the debt owed today accrues to: the branch's shutdown on a
+   *  shut-down branch (liquityAccrualNow). */
   now: number;
+  /** The branch shut down (ui-jobs 626): the interest sentences say it stopped. */
+  shutDown?: boolean;
   currentPrice?: number;
   surplusClaimed?: boolean;
   /** Events whose row carries no price of their own. */
@@ -197,6 +200,7 @@ export function LiquityFlowsExplanation({
   economics,
   meta,
   now,
+  shutDown = false,
   currentPrice,
   surplusClaimed = false,
   unpriced,
@@ -273,7 +277,10 @@ export function LiquityFlowsExplanation({
             ? `Between events, ${coll} takes the branch's price at each day's close`
             : `Between events, ${coll} keeps its latest event's price`}
         </ExplainBullet>
-        <ExplainBullet>Debt is {debt} at $1, plus interest at the Trove's rate</ExplainBullet>
+        <ExplainBullet>
+          Debt is {debt} at $1, plus interest at the Trove&apos;s rate
+          {shutDown ? "; this Trove's interest stopped when its branch shut down" : ""}
+        </ExplainBullet>
         {meta.isInBatch && <ExplainBullet>Its interest splits into interest and the batch fee by rate</ExplainBullet>}
         {lives > 1 && (
           <ExplainBullet>
@@ -295,7 +302,8 @@ export function LiquityFlowsExplanation({
         </p>
         <p>
           The debt side adds up to what the Trove owes: borrowed, plus interest, fees and redistributed debt, less what
-          was repaid, redeemed and liquidated. Its last line is the interest since the last event.
+          was repaid, redeemed and liquidated. Its last line is the interest since the last event
+          {shutDown ? ", up to the branch's shutdown" : ""}.
         </p>
         {f.feesReceivedColl > 0 && (
           <p>Redemptions left {tok(f.feesReceivedColl, coll, 4)} with the Trove as fees; neither net counts them.</p>

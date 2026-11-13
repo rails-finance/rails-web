@@ -3,37 +3,12 @@
 // (MCR 120%), and stays a sentence on a branch Rails does not know.
 // Run: npm test
 //
-// The loader imports through `@/` and reads a `.yaml` file, so this file
-// registers the resolver scripts/lib/strip-types.mjs gives the scripts.
+// The loader imports through `@/` and reads a `.yaml` file (scripts/lib/app-resolver.mjs).
 import test from "node:test";
 import assert from "node:assert/strict";
-import { register } from "node:module";
+import { registerAppResolver } from "../lib/app-resolver.mjs";
 
-const ROOT = new URL("../../", import.meta.url).href;
-const hooks = `
-import { existsSync, readFileSync } from "node:fs";
-import { createRequire } from "node:module";
-const ROOT = ${JSON.stringify(ROOT)};
-const EXT = [".ts", "/index.ts", ".mjs", ".js"];
-export async function resolve(spec, ctx, next) {
-  let s = spec;
-  if (s.startsWith("@/")) s = new URL(s.slice(2), ROOT).href;
-  if (s.startsWith(".") || s.startsWith("file:")) {
-    const base = s.startsWith("file:") ? s : new URL(s, ctx.parentURL).href;
-    if (!/\\.(ts|tsx|mjs|js|yaml|json)$/.test(base))
-      for (const e of EXT) if (existsSync(new URL(base + e))) return next(base + e, ctx);
-    return next(base, ctx);
-  }
-  return next(spec, ctx);
-}
-export async function load(url, ctx, next) {
-  if (url.startsWith("file:") && url.endsWith(".yaml")) {
-    const { toModule } = createRequire(ROOT)("./scripts/yaml-loader.cjs");
-    return { format: "module", source: toModule(readFileSync(new URL(url), "utf8")), shortCircuit: true };
-  }
-  return next(url, ctx);
-}`;
-register(`data:text/javascript,${encodeURIComponent(hooks)}`);
+registerAppResolver();
 
 const { L5 } = await import("../../lib/liquity/event-templates.ts");
 

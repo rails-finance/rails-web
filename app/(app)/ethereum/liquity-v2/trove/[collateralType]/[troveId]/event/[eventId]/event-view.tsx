@@ -18,6 +18,7 @@ import { FlowFocusContext } from "@/components/shared/flow-focus-context";
 import { useTroveFlows } from "@/components/trove/TroveBody";
 import { liquityDailyBranch, useLiquityDailyPrices } from "@/hooks/useLiquityDailyPrices";
 import { useLiquityCollSurplus } from "@/hooks/useLiquityCollSurplus";
+import { useBranchShutdown } from "@/hooks/useBranchShutdown";
 import { useWalletContext } from "@/components/nav/wallet-context";
 import { eventPagePlace, troveHolder } from "@/lib/liquity/event-page";
 import { liquityV2Explorer } from "@/lib/liquity/explorer";
@@ -108,6 +109,9 @@ export default function EventView({
   const daily = useLiquityDailyPrices(liquityDailyBranch(collSymbol));
   const surplusClaimed = surplus?.claimed != null;
   const open = trove?.status === "open";
+  // The branch's shutdown, as the trove page reads it (ui-jobs 612, 626): the
+  // replay's interest stops there.
+  const shutdown = useBranchShutdown("liquity-v2", collateralType, open);
   const { flowFocus } = useTroveFlows({
     flowEvents,
     collSymbol,
@@ -118,6 +122,7 @@ export default function EventView({
     open,
     price: currentPrice,
     liveState: undefined,
+    shutdownAt: shutdown?.at ?? null,
   });
   const troveMeta = useMemo(() => ({ owner: owner ?? null, total }), [owner, total]);
 

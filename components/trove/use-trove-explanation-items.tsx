@@ -29,6 +29,7 @@ import { troveNodes } from "@/lib/liquity/trove-nodes";
 import { SurplusBullet } from "@/components/protocol/liquity-family/surplus-bullet";
 import { ShutdownBullet } from "@/components/protocol/liquity-family/shutdown-bullet";
 import type { BranchShutdownState } from "@/lib/liquity-fork/shutdown";
+import { shutdownDay } from "@/lib/shared/liquity-family-shutdown";
 import { formatCompact } from "@/lib/shared/format-compact";
 
 // V2 TroveManager per branch — the contract the chain values are read from.
@@ -390,18 +391,19 @@ function buildOpenItems({
     via: troveWords("prov_mgmt_rate_via"),
   };
   if (displayAccruedInterest !== undefined) {
+    const interestNode = (
+      <Prov info={accruedProv}>
+        <HighlightableValue type="interest" state="after" value={displayAccruedInterest}>
+          {formatPrice(displayAccruedInterest)} BOLD
+        </HighlightableValue>
+      </Prov>
+    );
     add(
       "holdings",
       <span key="debt-breakdown" className="text-rb-500">
-        {troveNodes("debt_breakdown", {
-          interest: (
-            <Prov info={accruedProv}>
-              <HighlightableValue type="interest" state="after" value={displayAccruedInterest}>
-                {formatPrice(displayAccruedInterest)} BOLD
-              </HighlightableValue>
-            </Prov>
-          ),
-        })}
+        {shut
+          ? troveNodes("debt_breakdown_shutdown", { interest: interestNode, date: shutdownDay(shut.at) })
+          : troveNodes("debt_breakdown", { interest: interestNode })}
         {trove.batch.isMember && displayManagementFee !== undefined && displayManagementFee > 0 && (
           <span>
             {" "}
