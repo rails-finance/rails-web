@@ -229,7 +229,7 @@ function vaultsCsv(rows: FluidVaultRow[]): string {
     "liquidation_threshold",
     "liquidation_max_limit",
     "used",
-    "positions_opened",
+    "positions",
     "oracle",
   ];
   return [
