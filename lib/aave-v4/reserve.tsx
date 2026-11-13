@@ -13,7 +13,8 @@
 //   M3.4 the hub asset's daily borrow APY; M3.6 the spoke's and the hub's
 //        configuration changes, newest first (lib/aave-v4/config-words.ts);
 //   M3.7 beside M3.8, the largest suppliers and borrowers of this spoke reserve,
-//        each holder's share of the spoke's side.
+//        each holder's share of the spoke's side (each full width where a side
+//        has no rows).
 // What the store doesn't hold on a chain (Base: history and changes; Arc: those
 // and the holders) is one tile with one line (`notIndexedSection`).
 // Drawn on the tile layout (ui-jobs 675): no panel fills, hairlines between.
@@ -136,7 +137,13 @@ function ReserveExplainer({ f, names }: { f: V4ReserveFigures; names: V4Names })
           <Fig bold>{usd(f.hubBorrowed)}</Fig>.
         </ExplainBullet>
         <ExplainBullet>
-          <Fig bold>{usd(f.available)}</Fig> is available for this spoke to draw now.
+          {f.borrowable === false ? (
+            <>{names.symbol} isn&apos;t borrowable on this spoke.</>
+          ) : (
+            <>
+              <Fig bold>{usd(f.available)}</Fig> is available for this spoke to draw now.
+            </>
+          )}
         </ExplainBullet>
       </ExplainGroup>
       <ExplainGroup title="Rates">
@@ -177,7 +184,7 @@ function reserveMarkdown(d: V4Deployment, f: V4ReserveFigures, names: V4Names): 
     "",
     `- Supplied (this spoke): ${usd(f.spokeSupplied)} of ${usd(f.hubSupplied)} on ${names.hub}`,
     `- Borrowed (this spoke): ${usd(f.spokeBorrowed)} of ${usd(f.hubBorrowed)} on ${names.hub}`,
-    `- Available (this spoke): ${f.borrowable === false ? "–, not borrowable on this spoke" : usd(f.available)}`,
+    `- Available (this spoke): ${f.borrowable === false ? `–, ${names.symbol} isn't borrowable on this spoke` : usd(f.available)}`,
     ...(f.supplyApr != null ? [`- Supply APY (hub): ${v4ApyText(f.supplyApr)}`] : []),
     ...(f.drawnApr != null ? [`- Borrow APY (hub): ${v4ApyText(f.drawnApr)}, ${PREMIUM_LINE}`] : []),
     ...(f.utilisation != null ? [`- Utilization (hub): ${pctText(f.utilisation)}`] : []),
@@ -463,6 +470,8 @@ function indexedSections(
     hd.state === "ok"
       ? (["suppliers", "borrowers"] as const).map((side) => {
           const rows = hd.data[side];
+          // Side by side only when both sides have rows; else each runs full width.
+          const paired = hd.data.suppliers.length > 0 && hd.data.borrowers.length > 0;
           const amountLabel = side === "suppliers" ? "Supplied" : "Borrowed";
           // The share's denominator is the side the table ranks, on this spoke:
           // its supplied assets, or what it owes (drawn plus premium) for borrowers.
@@ -475,7 +484,7 @@ function indexedSections(
             scope: `reserve-${side}`,
             anatomy: side === "suppliers" ? "M3.7" : "M3.8",
             title: `Largest ${side}`,
-            pair: side === "suppliers" ? ("left" as const) : ("right" as const),
+            pair: !paired ? undefined : side === "suppliers" ? ("left" as const) : ("right" as const),
             tools: {
               links: [
                 {
