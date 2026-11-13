@@ -155,7 +155,10 @@ export function PendleWalletView({
           {open.length > 0 && (
             <section className="space-y-3" aria-label="Open positions" data-pendle-open="">
               <h2 className={`${SECTION_HEADING} ${CARD_INSET_START}`}>
-                Open positions <span className="tabular-nums text-rb-500">{open.length}</span>
+                Open positions{" "}
+                <span className="tabular-nums text-rb-500" data-prov-exempt="">
+                  {open.length}
+                </span>
               </h2>
               {open.map((p) => (
                 <ListingCard key={p.tokens.market.address} p={p} w={data!} />
@@ -165,7 +168,10 @@ export function PendleWalletView({
           {closed.length > 0 && (
             <section className="space-y-3" aria-label="Closed positions" data-pendle-closed="">
               <h2 className={`${SECTION_HEADING} ${CARD_INSET_START}`}>
-                Closed <span className="tabular-nums text-rb-500">{closed.length}</span>
+                Closed{" "}
+                <span className="tabular-nums text-rb-500" data-prov-exempt="">
+                  {closed.length}
+                </span>
               </h2>
               {closed.map((p) => (
                 <ListingCard key={p.tokens.market.address} p={p} w={data!} />

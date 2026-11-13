@@ -20,6 +20,7 @@ import { WalletHeading } from "@/components/shared/wallet-heading";
 import { PROFILE_CLEARANCE } from "@/lib/shared/ui-grammar";
 import { WalletMenu } from "@/components/shared/wallet-menu";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { WalletLookup } from "@/components/shared/wallet-lookup";
 import { StartHereLine } from "@/components/start/start-here-line";
 import { WalletPositionCard, atRisk, protocolId } from "@/components/wallet/wallet-position-card";
@@ -530,6 +531,9 @@ export function WalletView({
           </p>
         )}
       </div>
+      {/* The page's one inspector layer: the switch arms this route
+          (lib/shared/prov-preference-routes.ts). */}
+      <ProvInspectorLayer />
     </ProvReceiptsScope>
   );
 }

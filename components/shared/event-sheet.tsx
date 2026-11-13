@@ -420,19 +420,24 @@ function SidePanel({ s, breakdown, col }: { s: SheetSide; breakdown: boolean; co
             {s.assets?.map((r) => (
               <Row key={r.key} r={r} tone="plain" col={col} />
             ))}
+            {/* The repaid row's 0.00 and $0 are drawn by the sheet for every
+                asset the side holds none of, not read for this one: exempt
+                from the coverage tripwire as a status, as a count is. */}
             {(s.repaid?.length ?? 0) > 0 && (
-              <Row
-                r={{
-                  key: "repaid",
-                  label: WORDS.repaid(s.repaid!.length),
-                  note: s.repaid!.join(", "),
-                  amount: { text: "0.00" },
-                  usd: { text: "$0" },
-                  tip: s.repaidTip,
-                }}
-                tone="muted"
-                col={col}
-              />
+              <div className="contents" data-prov-exempt="">
+                <Row
+                  r={{
+                    key: "repaid",
+                    label: WORDS.repaid(s.repaid!.length),
+                    note: s.repaid!.join(", "),
+                    amount: { text: "0.00" },
+                    usd: { text: "$0" },
+                    tip: s.repaidTip,
+                  }}
+                  tone="muted"
+                  col={col}
+                />
+              </div>
             )}
           </div>
         )}
