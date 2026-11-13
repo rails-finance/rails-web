@@ -1,6 +1,7 @@
 // The provenance inspector's one state (rails-ops TO-DO-ui-jobs 624): the
-// profile menu's switch (H20.1), "Exit inspector" beside the profile control (H7.4), Escape
-// and the inspector read and write one state. Putting the inspector down from
+// profile menu's switch "Inspector" (H20.1), Escape and the inspector read
+// and write one state; the indicator beside the profile control (H7.4) shows
+// it and turns nothing off (ui-jobs 651). Putting the inspector down from
 // any of them turns the saved choice off, and the switch reads off at once;
 // the switch turned on arms the page at once, and turned off disarms it.
 // Read on an Aave V3 position (a route the preference arms, no dock).
@@ -12,7 +13,7 @@ const PATH = "/ethereum/aave-v3/0x8008316e61985599dc62d69716bab3ebe643c0a8?marke
 const KEY = "rails-prov-inspector";
 const H20 = '[data-anatomy="H20"]:visible';
 const SWITCH = "[data-profile-menu-prov]";
-const EXIT = ".prov-inspect-exit:visible";
+const INDICATOR = "[data-prov-inspect-on]:visible";
 
 let checked = 0;
 let failures = 0;
@@ -70,12 +71,11 @@ check(
   JSON.stringify(s),
 );
 
-// Exit inspector puts it down, saved choice included.
-// "Exit inspector" stands beside the visible profile control (ui-jobs 624.2):
-// its right edge within 16px left of H20's left, the two on one line.
+// The indicator stands beside the visible profile control (ui-jobs 624.2,
+// 651): its right edge within 16px left of H20's left, the two on one line.
 const nextTo = await (async () => {
   const e = await page
-    .locator(EXIT)
+    .locator(INDICATOR)
     .first()
     .boundingBox()
     .catch(() => null);
@@ -89,18 +89,26 @@ const nextTo = await (async () => {
   const midDy = Math.abs(e.y + e.height / 2 - (h.y + h.height / 2));
   return { ok: gap >= 0 && gap <= 16 && midDy <= 6, gap, midDy };
 })();
-check("Exit inspector stands beside the profile control", Boolean(nextTo.ok), JSON.stringify(nextTo));
+check("the inspector indicator stands beside the profile control", Boolean(nextTo.ok), JSON.stringify(nextTo));
+// A press on the indicator changes nothing.
 await page
-  .locator(EXIT)
+  .locator(INDICATOR)
   .first()
   .click({ timeout: 5000 })
   .catch(() => {});
 await page.waitForTimeout(400);
 s = await state();
+check("a press on the indicator: still armed, saved, reads on", s.armed && s.saved && s.sw === "on", JSON.stringify(s));
+
+// The switch turned off puts it down, saved choice included, and the
+// indicator leaves the header.
+await pressSwitch();
+s = await state();
+const gone = (await page.locator(INDICATOR).count()) === 0;
 check(
-  "Exit inspector: disarmed, the saved choice off, the switch reads off",
-  !s.armed && !s.saved && s.sw === "off",
-  JSON.stringify(s),
+  "switch off: disarmed, the saved choice off, reads off, no indicator",
+  !s.armed && !s.saved && s.sw === "off" && gone,
+  JSON.stringify({ ...s, gone }),
 );
 
 // The switch turned on arms the page at once; off disarms it.
@@ -127,9 +135,10 @@ check(
   JSON.stringify(s),
 );
 
-// Off the switch's routes (ui-jobs 625): with the choice saved on, the row
-// reads "Not on this page", is disabled and shows off, nothing is pickable,
-// and a press keeps the saved choice.
+// Off the switch's routes (ui-jobs 625, 651): with the choice saved on, the
+// row is disabled and shows off, its hidden note reads "Nothing to inspect on
+// this page", nothing is pickable, a press keeps the saved choice, and the
+// header draws no inspector indicator.
 const OFF_LIST = "/assets";
 await page.evaluate((k) => localStorage.setItem(k, "1"), KEY);
 await page.goto(`${BASE}${OFF_LIST}`, { waitUntil: "domcontentloaded", timeout: 180000 });
@@ -156,22 +165,21 @@ await page.waitForTimeout(400);
 const after = {
   saved: await page.evaluate((k) => localStorage.getItem(k) === "1", KEY),
   picks: await page.locator("[data-prov-pickable]").count(),
-  exit: await page.locator(EXIT).count(),
+  indicator: await page.locator(INDICATOR).count(),
 };
 await closeMenu();
 check(
-  `${OFF_LIST}: the switch reads "Not on this page", disabled and off; a press keeps the saved choice; nothing is pickable`,
+  `${OFF_LIST}: the switch is disabled and off with its note; a press keeps the saved choice; nothing is pickable; no inspector indicator`,
   !!read &&
     read.state === "unavailable" &&
     read.disabled === "true" &&
     read.checked === "false" &&
-    /not on this page/i.test(read.note ?? "") &&
+    /nothing to inspect on this page/i.test(read.note ?? "") &&
     after.saved &&
     after.picks === 0 &&
-    after.exit === 0,
+    after.indicator === 0,
   JSON.stringify({ read, after }),
 );
-
 await browser.close();
 console.log(`\n${checked - failures}/${checked} checks pass`);
 process.exit(failures || checked === 0 ? 1 : 0);

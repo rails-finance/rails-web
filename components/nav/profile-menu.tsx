@@ -8,8 +8,7 @@
 // on /saved-views (a cog at the group's right on hover or keyboard focus; on a
 // touch screen see HEADING_TOUCH); with anything saved, starred or not, a
 // "Saved views" row to /saved-views (Miles, 13 Nov 2026; ui-jobs 652); last,
-// Advanced, holding the provenance inspector switch (decision 0062; ui-jobs
-// 571).
+// Advanced, holding the switch "Inspector" (decision 0062; ui-jobs 571, 651).
 //
 // Stars alone decide what each group lists (ui-jobs 652): Focus lists the
 // views starred on /saved-views?tab=focus and, while it is unstarred, the view
@@ -70,10 +69,9 @@ import { START_CTA } from "@/lib/shared/ui-grammar";
 import type { ChainId } from "@/lib/shared/chains";
 import type { SavedLink, WalletSession } from "@/lib/shared/sessions";
 import { setProvPreference, useProvPreference } from "@/lib/shared/prov-preference";
+import { ProvInspectorIndicator, putDownInspector } from "@/components/shared/prov-inspector";
 import { provPreferenceAllows } from "@/lib/shared/prov-preference-routes";
-import { ProvInspectorExit, putDownInspector } from "@/components/shared/prov-inspector";
 import { menuEntries } from "@/lib/shared/sessions";
-import { RevealTip } from "@/components/shared/reveal-tip";
 import { SAVED_NAME, SAVED_PATH } from "@/components/shared/bookmarks-name";
 
 /** The control's and the menu's accessible name: what the menu holds as a whole. */
@@ -244,100 +242,74 @@ function ThemeSwitch() {
 
 const PROV_ABOUT_PATH = "/about/provenance";
 const ITEMS = '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]';
-const PROV_HELP =
-  "Underlines each figure that has a receipt: click one to see the contract call, the block and the maths behind it. Switched on here, it stays on across the pages that support it.";
 
-/** The provenance inspector's one switch (decision 0062; ui-jobs 571, 625):
- *  arms the inspector on arrival on every page that has passed the coverage
- *  gate (lib/shared/prov-preference-routes.ts). Off by default.
+/** The inspector's one switch, "Inspector" (decision 0062; ui-jobs 571, 625,
+ *  651): arms the inspector on arrival on every page that has passed the
+ *  coverage gate (lib/shared/prov-preference-routes.ts). Off by default.
  *
- *  The row is one switch; its "?" opens the house tooltip (RevealTip) and is
- *  a sibling of the switch, standing over the switch's stretched hit area
- *  (`after:inset-0`), so a press on it explains and never toggles (ui-jobs 602).
+ *  One line, the height of the other rows. Its "?" is a link to
+ *  /about/provenance that closes the menu; it is a sibling of the switch,
+ *  standing over the switch's stretched hit area (`after:inset-0`), so a press
+ *  on it navigates and never toggles (ui-jobs 602, 603, 651).
  *
- *  On a page off the list the switch reads "Not on this page", is disabled and
- *  shows off; the saved choice is kept and arms the next page that supports
- *  it (ui-jobs 625). */
+ *  On a page off the list the switch is disabled, dimmed and shows off; a
+ *  visually hidden note gives screen readers the reason. On a listed page it
+ *  stays enabled whether or not values have mounted. The saved choice is kept
+ *  and arms the next listed page (ui-jobs 625, 651). */
 function ProvInspectorSwitch({ onDone }: { onDone: () => void }) {
   const saved = useProvPreference();
   const allowed = provPreferenceAllows(usePathname(), useParams());
   const on = saved && allowed;
+  const descId = useId();
   const noteId = useId();
   return (
     <div
-      // ITEM's row, its ring answering the switch's hover and focus.
-      // Disabled, no hover ring and no pointer; the focus ring stays.
+      // ITEM's row with no hover ring: on hover the label turns teal, the
+      // switch's on colour (ui-jobs 651). The focus ring answers the
+      // keyboard. Disabled, no teal and no pointer.
       className={`relative flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-[15px] text-foreground has-[[role=menuitemcheckbox]:focus-visible]:ring-[1.5px] has-[[role=menuitemcheckbox]:focus-visible]:ring-blue-500 ${
-        allowed
-          ? "cursor-pointer has-[[role=menuitemcheckbox]:hover]:ring-1 has-[[role=menuitemcheckbox]:hover]:ring-blue-500"
-          : ""
+        allowed ? "cursor-pointer" : ""
       }`}
       data-anatomy="H20.1"
     >
       <Crosshair className="size-5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
-      {/* The label over its subtitle line, a title over a text-xs line.
-          Neither span is positioned, so the switch's hit area and the tip's
-          bubble still stand on the row. */}
-      <span className="flex min-w-0 flex-col py-1.5">
-        <span className="flex min-w-0 items-center gap-3">
-          <button
-            type="button"
-            role="menuitemcheckbox"
-            aria-checked={on}
-            aria-disabled={allowed ? undefined : true}
-            aria-describedby={allowed ? undefined : noteId}
-            onClick={() => {
-              if (!allowed) return;
-              if (on) putDownInspector();
-              else setProvPreference(true);
-            }}
-            className={`min-w-0 truncate text-left outline-none after:absolute after:inset-0 after:rounded-lg after:content-[''] ${
-              allowed ? "" : "cursor-default text-rb-500"
-            }`}
-            data-profile-menu-prov={allowed ? (on ? "on" : "off") : "unavailable"}
-          >
-            Provenance inspector
-          </button>
-          <RevealTip
-            // `!static`: the bubble stands on the row (the menu clips a bubble
-            // anchored at the "?"), opening up from the row's left edge.
-            className="-ml-1.5 !static"
-            wrap
-            tip={<span className="block w-64 font-normal leading-snug">{PROV_HELP}</span>}
-          >
-            <button
-              type="button"
-              aria-label="About the provenance inspector"
-              className="relative z-10 inline-flex rounded-full p-0.5 text-rb-400 hover:text-foreground focus-visible:outline-2 focus-visible:outline-blue-500"
-              data-profile-menu-prov-help=""
-            >
-              <CircleHelp className="size-3.5" aria-hidden="true" />
-            </button>
-          </RevealTip>
-        </span>
-        {/* The page half of the "?" (ui-jobs 603): a link to /about/provenance,
-            standing over the switch's stretched hit area as the "?" does, so a
-            press on it navigates and never toggles. */}
-        <span className="flex items-center gap-1 self-start text-xs leading-5 text-rb-500">
-          {!allowed && (
-            <>
-              <span id={noteId} data-profile-menu-prov-unavailable="">
-                Not on this page
-              </span>
-              <span aria-hidden="true">·</span>
-            </>
-          )}
-          <Link
-            href={PROV_ABOUT_PATH}
-            role="menuitem"
-            onClick={onDone}
-            className="relative z-10 whitespace-nowrap rounded-sm outline-none hover:text-blue-600 focus-visible:text-blue-600 focus-visible:ring-[1.5px] focus-visible:ring-blue-500 dark:hover:text-[var(--text-link)] dark:focus-visible:text-[var(--text-link)]"
-            data-profile-menu-prov-about=""
-          >
-            How it works
-          </Link>
-        </span>
+      <button
+        type="button"
+        role="menuitemcheckbox"
+        aria-checked={on}
+        aria-disabled={allowed ? undefined : true}
+        aria-describedby={allowed ? descId : `${descId} ${noteId}`}
+        onClick={() => {
+          if (!allowed) return;
+          if (on) putDownInspector();
+          else setProvPreference(true);
+        }}
+        className={`min-w-0 truncate text-left outline-none after:absolute after:inset-0 after:rounded-lg after:content-[''] ${
+          allowed ? "transition-colors hover:text-teal-600 dark:hover:text-teal-400" : "cursor-default text-rb-500"
+        }`}
+        data-profile-menu-prov={allowed ? (on ? "on" : "off") : "unavailable"}
+      >
+        Inspector
+      </button>
+      <span id={descId} className="sr-only">
+        Shows where each figure comes from.
       </span>
+      {!allowed && (
+        <span id={noteId} className="sr-only" data-profile-menu-prov-unavailable="">
+          Nothing to inspect on this page.
+        </span>
+      )}
+      <Link
+        href={PROV_ABOUT_PATH}
+        role="menuitem"
+        aria-label="About the inspector"
+        onClick={onDone}
+        className="relative z-10 -ml-1.5 inline-flex rounded-full p-0.5 text-rb-400 outline-none hover:text-foreground focus-visible:text-foreground focus-visible:ring-[1.5px] focus-visible:ring-blue-500"
+        data-profile-menu-prov-help=""
+        data-profile-menu-prov-about=""
+      >
+        <CircleHelp className="size-3.5" aria-hidden="true" />
+      </Link>
       <span
         className={`pointer-events-none relative ml-auto inline-flex h-5 w-9 shrink-0 rounded-full transition-colors ${
           on ? "bg-teal-500" : "bg-rb-300 dark:bg-rb-700"
@@ -497,9 +469,10 @@ export function ProfileMenu() {
 
   return (
     <>
-      {/* While the inspector is armed, its way out stands left of the control
-          (ui-jobs 624.2). */}
-      <ProvInspectorExit onExit={() => trigger.current?.focus()} />
+      {/* While the inspector is armed on a page with a traced value, the
+          inspector indicator stands left of the control (ui-jobs 624.2,
+          651). */}
+      <ProvInspectorIndicator />
       <button
         ref={trigger}
         type="button"
