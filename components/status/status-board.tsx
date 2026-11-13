@@ -48,6 +48,7 @@ import {
   pipelineNewestBlockTime,
   pipelineState,
   visitState,
+  visitTooFew,
   writerState,
   VISIT_FAIL_LATE,
   VISIT_FAIL_STALLED,
@@ -199,8 +200,12 @@ const pct = (x: number) => `${Math.round(x * 100)}%`;
 function visitLine(v: VisitReads | null | undefined): string {
   if (!v?.lastHourVisits) return "No page visit in the last hour.";
   const failed = v.failedShare != null ? `, ${pct(v.failedShare)} of reads failed` : "";
-  const p95 = v.p95Ms != null ? `, 95% answered within ${n(Math.round(v.p95Ms))} ms` : "";
-  return `${n(v.lastHourVisits)} visits in the last hour${failed}${p95}.`;
+  const p95 = v.p95Ms != null && v.answered !== 0 ? `, 95% answered within ${n(Math.round(v.p95Ms))} ms` : "";
+  const visits = v.lastHourVisits === 1 ? "1 visit" : `${n(v.lastHourVisits)} visits`;
+  const few = visitTooFew(v)
+    ? ` Too few to judge: none answered, and it takes ${VISIT_FAIL_MIN} failed reads to show late.`
+    : "";
+  return `${visits} in the last hour${failed}${p95}.${few}`;
 }
 
 const shortAddress = (a: string) => (a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a);
@@ -312,7 +317,7 @@ function cellView(c: StatusCell, now: number, allowance: Allowance | null): Cell
   const lastVisit = v?.lastVisitAt ? Date.parse(v.lastVisitAt) / 1000 : null;
   return {
     hb,
-    status: STATUS_WORDS[hb],
+    status: visitTooFew(v) ? "Too few reads" : STATUS_WORDS[hb],
     index: "On visit",
     indexRank: -1,
     last: lastVisit,
@@ -924,7 +929,7 @@ export function StatusBoard({ source, view }: { source: StatusSource; view: Stat
                       ? `Stalled: past 3 times its schedule, or ${pct(VISIT_FAIL_STALLED)} failing`
                       : h === "paused"
                         ? "Paused: held for the daily allowance"
-                        : "Not measured: no write time or visit"}
+                        : "Not measured: no write time or visit, or too few visit reads to judge"}
               </span>
             ))}
           </div>
