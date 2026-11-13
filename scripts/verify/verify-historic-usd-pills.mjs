@@ -17,7 +17,7 @@
 // Run against a dev server:  BASE=http://localhost:3021 node scripts/verify/verify-historic-usd-pills.mjs
 
 import { chromium } from "playwright";
-import { armScope } from "./lib/prov-inspector.mjs";
+import { receiptIn } from "./lib/prov-inspector.mjs";
 import { showCardTab } from "./lib/card-tabs.mjs";
 
 import { BASE, hostFetch, bypassHeaders } from "./lib/host.mjs";
@@ -262,39 +262,12 @@ async function positionStateSettled(proto, card) {
   );
 }
 
-/** Read the receipt behind a card value matching `valueText`. The inspector
- *  arms from a card's ⋮ on the event's page (scoped arming, ui-jobs 284), so
- *  the receipt is read there: the event's page, its card's "Inspect
- *  provenance", the card's scoped <Prov> span whose text matches the value,
- *  the popover's text. Returns null if no pickable value matched. */
+/** Read the receipt behind a card value matching `valueText`, on the timeline
+ *  where the card stands open: the inspector is armed from the profile menu's
+ *  switch (ui-jobs 625), which does not arm event pages. Returns null if no
+ *  pickable value matched. */
 async function openReceiptFor(proto, wallet, card, valueText) {
-  const id = await card.getAttribute("data-event-id");
-  if (!id) return null;
-  const page = await browser.newPage({ extraHTTPHeaders: bypassHeaders() });
-  try {
-    await page.goto(`${BASE}/ethereum/${proto}/${wallet}/event/${encodeURIComponent(id)}`, {
-      waitUntil: "domcontentloaded",
-      timeout: 240000,
-    });
-    const evCard = page.locator(`[data-event-id="${id}"]`).first();
-    await evCard
-      .locator('[data-sheet] [data-sheet-row="total"]', { hasText: "$" })
-      .first()
-      .waitFor({ timeout: 120000 })
-      .catch(() => {});
-    if (!(await armScope(page, id, { menu: evCard.locator("[data-event-menu]").first() }))) return null;
-    const target = evCard.locator("span.prov-locate-box").filter({ hasText: valueText }).first();
-    if ((await target.count()) === 0) return null;
-    await target.scrollIntoViewIfNeeded();
-    await target.click();
-    const pop = page.locator(".prov-inspect-pop");
-    await pop.waitFor({ state: "visible", timeout: 10000 });
-    return await pop.innerText();
-  } catch {
-    return null;
-  } finally {
-    await page.close();
-  }
+  return receiptIn(card, valueText);
 }
 
 // ── Runner ──────────────────────────────────────────────────────────────

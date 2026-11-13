@@ -4,11 +4,11 @@
 // request the wallet owns (U9.1), the newest first, with its stETH at request,
 // when it was made, and whether it waits, is ready to claim (with the ETH it
 // pays) or was claimed, each state word explaining itself on hover or press;
-// the (i) says what the requests mean for the wallet. One receipts scope its ⋮ arms; the read stamp's
+// the (i) says what the requests mean for the wallet. One receipts scope; the read stamp's
 // receipt names the ids the queue holds for the wallet.
 
 import { Prov } from "@/components/shared/provenance";
-import { ProvSection, SectionHeading, SectionMenu } from "@/components/shared/section-menu";
+import { ProvSection, SectionHeading } from "@/components/shared/section-menu";
 import { SectionReadStamp, readStampProv } from "@/components/shared/read-stamp";
 import { lidoStake } from "@/lib/lido/stake";
 import { readContracts, requestProv, requestsFinderProv } from "@/lib/lido/provenance";
@@ -55,7 +55,6 @@ export function LidoRequests({ r }: { r: LidoStakeRead }) {
             }}
           />
         }
-        menu={<SectionMenu scope={SCOPE} title={REQUESTS.title} />}
       />
       {s.requests.length === 0 ? (
         <p className="mt-3 text-sm text-rb-500" data-lido-requests-none="">

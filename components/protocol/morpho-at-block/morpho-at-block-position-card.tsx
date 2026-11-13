@@ -8,6 +8,7 @@
 // interest, the room to borrow and the drop that liquidates. Every figure is
 // read when the page opens; the read stamp names the blocks.
 
+import { morphoApy } from "@/lib/morpho/terms";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCard, type PositionCardSlots, type PositionPanelRow } from "@/components/shared/position-card";
 import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups";
@@ -192,7 +193,7 @@ function slots(r: MorphoAtBlockPositionRead, dep: MorphoAtBlockDeployment): Posi
             labelTip: CARD_WORDS.borrowRateTip,
             value:
               f.borrowApr != null ? (
-                <Prov info={morphoAtBlockProv("borrow-rate", c)}>{pctText(f.borrowApr)}</Prov>
+                <Prov info={morphoAtBlockProv("borrow-rate", c)}>{pctText(morphoApy(f.borrowApr))}</Prov>
               ) : null,
           }
         : {
@@ -201,7 +202,7 @@ function slots(r: MorphoAtBlockPositionRead, dep: MorphoAtBlockDeployment): Posi
             labelTip: CARD_WORDS.supplyRateTip,
             value:
               f.supplyApr != null ? (
-                <Prov info={morphoAtBlockProv("supply-rate", c)}>{pctText(f.supplyApr)}</Prov>
+                <Prov info={morphoAtBlockProv("supply-rate", c)}>{pctText(morphoApy(f.supplyApr))}</Prov>
               ) : null,
           },
     ],

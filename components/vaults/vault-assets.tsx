@@ -14,8 +14,8 @@
 // text. Amount carries the asset's mark (`AssetUnit`). A venue opens Rails's
 // page for it where there is one (a Morpho market, an Aave reserve, a Yearn or
 // MetaMorpho vault), else it is text; its contract and ids are the venue's receipt. The
-// section's ⋮ carries the Rails pages for the whole table, the exports and
-// "Inspect provenance" on this section alone (components/shared/section-menu.tsx).
+// section's ⋮ carries the Rails pages for the whole table and the exports
+// (components/shared/section-menu.tsx).
 // Below sm each row is a card (D6): the venue across, Amount and Share two-up
 // under their names.
 
@@ -85,7 +85,7 @@ export interface VaultAssetRow {
   hooks?: Record<string, string>;
 }
 
-/** The section's scope: its ⋮ arms the inspector on it alone. */
+/** The section's name (`data-prov-scope`). */
 export const ASSETS_SCOPE = "vault-assets";
 
 /** Where the assets are as a segment bar (V3.1), on the vault-page grid: the
@@ -207,7 +207,7 @@ export function VaultAssets({
   /** The "Share of this vault" header's read-more: what divides what. */
   shareTip: string;
   learnMore: LearnMoreContent;
-  /** The section ⋮'s rows above Inspect provenance. */
+  /** The section ⋮'s rows. */
   menu: { links?: SectionMenuLink[]; exports?: SectionMenuExports };
   /** Draw the first `limit` rows; the band draws every row either way. */
   limit?: number;

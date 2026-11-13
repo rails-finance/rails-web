@@ -128,8 +128,8 @@ export function VaultDirectoryView({
                 infoHref={`${metaMorphoVaultRosterHref(chainId)}/info`}
                 docs={{
                   title: "Morpho's documentation",
-                  subtitle: "docs.morpho.org: Vaults",
-                  href: "https://docs.morpho.org/learn/concepts/vault/",
+                  subtitle: "docs.morpho.org: Vaults V1 roles",
+                  href: "https://docs.morpho.org/curate/concepts/roles/#morpho-vaults-v1-roles",
                 }}
               />
             ),

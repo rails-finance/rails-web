@@ -5,8 +5,20 @@
 
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 
-const MORPHO_VAULT_DOCS = { label: "docs.morpho.org: Vaults", url: "https://docs.morpho.org/learn/concepts/vault/" };
-const MORPHO_MARKET_DOCS = { label: "docs.morpho.org: Markets", url: "https://docs.morpho.org/learn/concepts/market/" };
+// The cards describe MetaMorpho (Vaults V1) vaults: the docs' V1 sections,
+// not /learn/concepts/vault/, which answers with the Vault V2 page (ui-jobs 628).
+const MORPHO_VAULT_DOCS = {
+  label: "docs.morpho.org: Vaults V1 roles",
+  url: "https://docs.morpho.org/curate/concepts/roles/#morpho-vaults-v1-roles",
+};
+const MORPHO_VAULT_QUEUE_DOCS = {
+  label: "docs.morpho.org: Vaults V1 liquidity",
+  url: "https://docs.morpho.org/curate/concepts/liquidity/#curation-in-morpho-vaults-v1-legacy",
+};
+const MORPHO_MARKET_DOCS = {
+  label: "docs.morpho.org: Variable Rate Market",
+  url: "https://docs.morpho.org/learn/concepts/blue/#what-is-a-variable-rate-market",
+};
 const AAVE_DOCS = {
   sgho: { label: "aave.com: Savings GHO", url: "https://aave.com/docs/ecosystem/gho/sgho" },
   stata: { label: "aave.com: Static aTokens", url: "https://aave.com/docs/aave-v3/smart-contracts/tokenization" },
@@ -67,7 +79,7 @@ export const morphoVaultAssetsContent = (): LearnMoreContent => ({
     { bold: "Share of this vault", text: "a market's amount over the sum across the queue." },
     { bold: "The band", text: "a market holding 2% or more draws on its own; the rest share the last segment." },
   ],
-  links: [MORPHO_MARKET_DOCS],
+  links: [MORPHO_VAULT_QUEUE_DOCS, MORPHO_MARKET_DOCS],
 });
 
 export function aaveVaultCardContent(family: "sgho" | "stata" | "umbrella-stake"): LearnMoreContent {
@@ -278,7 +290,7 @@ export function suppliedByContent(family: "morpho" | "aave"): LearnMoreContent {
             text: "a market can sit in a queue with nothing supplied: the curator may supply it later.",
           },
         ],
-        links: [MORPHO_VAULT_DOCS],
+        links: [MORPHO_VAULT_QUEUE_DOCS],
       }
     : {
         title: "Vaults over this reserve",

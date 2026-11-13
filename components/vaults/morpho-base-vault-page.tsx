@@ -336,8 +336,8 @@ export function MorphoBaseVaultPage({
     {
       item: "docs",
       title: "Morpho's documentation",
-      subtitle: "docs.morpho.org: Vaults",
-      href: "https://docs.morpho.org/learn/concepts/vault/",
+      subtitle: "docs.morpho.org: Vaults V1 roles",
+      href: "https://docs.morpho.org/curate/concepts/roles/#morpho-vaults-v1-roles",
     },
   ];
 
@@ -418,7 +418,7 @@ export function MorphoBaseVaultPage({
           contract: { name: "Morpho Blue", address: vault.morpho },
           ids: [
             { label: "market id", value: leg.id },
-            { label: "loan token", value: leg.loanToken },
+            { label: "loan asset", value: leg.loanToken },
           ],
         },
         coords.readBy,

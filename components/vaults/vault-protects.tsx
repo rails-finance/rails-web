@@ -5,7 +5,7 @@
 // read fact as the headline (traced to its calls), one sentence and, muted,
 // what Rails did not read. Words lib/vaults/protects-words.ts, receipts
 // lib/vaults/protects-provenance.ts. No colour carries a verdict. Each
-// section is one receipts scope its ⋮ arms (decision 0059); the first one's
+// section is one receipts scope (decision 0059); the first one's
 // explanation carries the page's disclaimer.
 
 import { Prov, type Provenance } from "@/components/shared/provenance";

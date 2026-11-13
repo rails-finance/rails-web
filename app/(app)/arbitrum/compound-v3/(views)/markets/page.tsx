@@ -20,7 +20,7 @@ export default async function CompoundArbitrumMarketsRoute() {
   return (
     <>
       <CompoundMarketsOverview data={data} chain="arbitrum" />
-      {/* Each section arms the inspector from its ⋮; no page-wide toggle. */}
+      {/* The inspector, armed from the profile menu's switch. */}
       <ProvInspectorLayer />
     </>
   );

@@ -11,7 +11,7 @@ import { HistoryLine } from "@/components/shared/history-tag";
 import { UnansweredLine } from "@/components/shared/unanswered-line";
 import { Prov } from "@/components/shared/provenance";
 import { HeadingTip } from "@/components/shared/tip-label";
-import { ProvSection, SectionHeading, SectionMenu } from "@/components/shared/section-menu";
+import { ProvSection, SectionHeading } from "@/components/shared/section-menu";
 import { PoolReadStamp } from "@/components/protocol/uniswap/uniswap-readout";
 import { NAV_PILL } from "@/lib/shared/ui-grammar";
 import { historyOf } from "@/lib/shared/protocols";
@@ -68,7 +68,6 @@ function Totals({ r }: { r: LidoProtocolRead }) {
             ]}
           />
         }
-        menu={<SectionMenu scope={SCOPE} title={FRONT_DOOR.totalsTitle} />}
       />
       <dl className="mt-2 grid grid-cols-2 gap-3 rounded-xl border border-rb-200 px-4 py-3 dark:border-rb-500/30">
         {cells.map((c) => (

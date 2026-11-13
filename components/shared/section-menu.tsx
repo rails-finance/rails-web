@@ -1,29 +1,26 @@
 "use client";
 
-// The section ⋮ and the section it arms (rails-ops ui-jobs 549/550, proposal
-// §3): every section of a product page that draws a figure carries a ⋮ at the
-// right of its heading row, and is one receipts scope, so the ⋮'s "Inspect
-// provenance" arms that section alone and rings it.
+// The section ⋮ and its section (rails-ops ui-jobs 549/550, proposal §3): a
+// section of a product page that draws a figure is one receipts scope, and
+// carries a ⋮ at the right of its heading row where it has rows to offer.
 // ----------------------------------------------------------------------------
 // The rows, in this order, each group drawn only where it has rows:
 //   1. Rails pages for the section's object (`--text-link`)
 //   2. off-site pages: the contract on the chain's explorer, the protocol's
 //      app, its docs (`--text-external`, pink)
 //   3. exports: Copy, View as Markdown, Download CSV
-//   4. a divider, then Inspect provenance (provenance teal), which ToolsMenu
-//      draws from `provScope`.
-// `SectionMenuRows` is groups 1 to 3 alone, for a ⋮ another shell draws (the
-// position card's, through `menu.leading`).
+// A ⋮ with no rows draws nothing: the inspector is armed from the profile
+// menu (H20.1; ui-jobs 625). `SectionMenuRows` is the groups alone, for a ⋮
+// another shell draws (the position card's, through `menu.leading`).
 //
-// `ProvSection` is the section: one `ProvReceiptsScope` under a stable
-// `scopeId`, its root stamped `data-prov-scope` and, while armed on it alone,
-// `data-prov-lit` (the ring, app/globals.css).
+// `ProvSection` is the section: one `ProvReceiptsScope`, its root stamped
+// `data-prov-scope` with the section's name.
 
 import { useState, type ReactNode } from "react";
 import { Copy, Download, ExternalLink, FileText, ArrowRight, ToggleLeft, ToggleRight } from "lucide-react";
 import { Icon } from "@/components/icons/icon";
 import { ToolsMenu, ToolsMenuItem } from "@/components/shared/tools-menu";
-import { ProvReceiptsScope, useProvScopeLit, useReceiptRegistry } from "@/components/shared/provenance";
+import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 
 /** A row that opens a page: a Rails page (`internal`) or one off-site. */
 export interface SectionMenuLink {
@@ -72,7 +69,7 @@ function download(text: string, filename: string) {
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
-/** Groups 1 to 3 of the ⋮: Rails pages, off-site pages, exports, a divider
+/** The groups of the ⋮: Rails pages, off-site pages, exports, a divider
  *  between groups that both have rows. */
 export function SectionMenuRows({
   close,
@@ -195,37 +192,36 @@ export function SectionMenuRows({
   );
 }
 
-/** A section's ⋮: its rows, then Inspect provenance armed on `scope`. */
+/** A section's ⋮: its rows; none, no ⋮. */
 export function SectionMenu({
   scope,
   title,
-  hint = "Click a value in this section to trace it",
   links,
   exports,
   views,
 }: {
-  /** The `scopeId` of the `ProvSection` this ⋮ arms. */
+  /** The name of the `ProvSection` this ⋮ belongs to (`data-section-menu`). */
   scope: string;
   /** The section's heading: the menu's accessible name and its sheet's heading. */
   title: string;
-  hint?: string;
   links?: SectionMenuLink[];
   exports?: SectionMenuExports;
   views?: SectionMenuView[];
 }) {
   const rows =
     (links?.length ?? 0) > 0 || (views?.length ?? 0) > 0 || exports?.markdown != null || exports?.csv != null;
+  if (!rows) return null;
   return (
     <div className="-my-1 -mr-1 flex shrink-0" data-anatomy="K1" data-section-menu={scope}>
-      <ToolsMenu variant="panel" label={`${title} menu`} heading={title} provScope={{ id: scope, hint }}>
-        {rows ? (close) => <SectionMenuRows close={close} links={links} exports={exports} views={views} /> : undefined}
+      <ToolsMenu variant="panel" label={`${title} menu`} heading={title}>
+        {(close) => <SectionMenuRows close={close} links={links} exports={exports} views={views} />}
       </ToolsMenu>
     </div>
   );
 }
 
-/** A section that its ⋮ arms alone: one receipts scope under `scope`, its
- *  root stamped `data-prov-scope` and ringed while armed on it. */
+/** A section: one receipts scope, its root stamped `data-prov-scope` with
+ *  the section's name. */
 export function ProvSection({
   scope,
   as: Tag = "section",
@@ -239,21 +235,13 @@ export function ProvSection({
   children: ReactNode;
 } & Record<`data-${string}`, string | undefined>) {
   const registry = useReceiptRegistry();
-  const lit = useProvScopeLit(scope);
   // The scope sits inside the root, so its dev coverage bookends never stand
   // between the section and its siblings.
   return (
-    // 8px of room on every side, taken back by the margins, so the ring
-    // stands off the content without moving it.
-    <Tag
-      className={`-mx-2 -mt-2 rounded-xl p-2 ${className ?? ""}`}
-      data-prov-scope={scope}
-      data-prov-lit={lit ? "" : undefined}
-      {...data}
-    >
-      <ProvReceiptsScope registry={registry} scopeId={scope}>
-        {children}
-      </ProvReceiptsScope>
+    // 8px of room on every side, taken back by the margins: where the retired
+    // armed ring stood (ui-jobs 625), kept so the sections keep their spacing.
+    <Tag className={`-mx-2 -mt-2 rounded-xl p-2 ${className ?? ""}`} data-prov-scope={scope} {...data}>
+      <ProvReceiptsScope registry={registry}>{children}</ProvReceiptsScope>
     </Tag>
   );
 }

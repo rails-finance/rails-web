@@ -48,7 +48,6 @@ export interface UserPreferences {
   ratioMode: RatioMode; // Display collateral health as Collateral Ratio (CR) or Loan-to-Value (LTV)
   gasUnit: GasUnit; // The unit an event card's gas figure reads in
   hideClosedPositions: boolean; // Hide closed/liquidated positions from selectors and the protocol nav
-  priceStripMinimized: boolean; // Collapse the floating price strip to a small icon
   liquityV2: LiquityV2Preferences; // Per-branch risk thresholds
   aaveV4: AaveV4Preferences; // Global headroom preference for the price runway
 }
@@ -82,7 +81,6 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   ratioMode: "cr",
   gasUnit: "usd",
   hideClosedPositions: false,
-  priceStripMinimized: false,
   liquityV2: DEFAULT_LIQUITY_V2_PREFERENCES,
   aaveV4: DEFAULT_AAVE_V4_PREFERENCES,
 };

@@ -58,6 +58,7 @@ import {
   type MorphoHealthMove,
 } from "@/lib/morpho/use-market-at-block";
 import { MORPHO_WORDS, PROSE } from "@/lib/morpho/event-templates";
+import { morphoApy } from "@/lib/morpho/terms";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import type { GroupLane } from "@/components/shared/group-sheet";
 
@@ -117,7 +118,7 @@ const fallProv = (
 const borrowableProv = (collSym: string, loanSym: string, m: MorphoHealthMove): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
-  summary: `The ${loanSym} the position could still borrow after this event. Its ${collSym} collateral valued at the market oracle's price at the end of block ${m.priceBlock}, times the market's LLTV, less its debt. Morpho Blue has one line per market, so the LLTV is the borrow cap.`,
+  summary: `The ${loanSym} the position could still borrow after this event. Its ${collSym} collateral valued at the market oracle's price at the end of block ${m.priceBlock}, times the market's LLTV, less its debt. A Morpho Blue market has one LLTV, which caps borrowing as well as setting liquidation.`,
   formula: "collateral × price × LLTV − debt",
   inputs: [
     { label: "collateral", value: `${m.collAfter} ${collSym}`, kind: "chain", note: "row, after the event" },
@@ -132,7 +133,7 @@ const lltvAtBlockProv = (coords: MorphoCoords, lltv: number): Provenance => ({
   kind: "chain",
   pclass: "state",
   summary:
-    "LLTV. The market's liquidation loan-to-value, the lltv field of its immutable params (Morpho.idToMarketParams), fixed when the market was created. Debt above LLTV × the collateral's value is liquidatable; there is no separate borrow threshold.",
+    "LLTV. The lltv field of the market's immutable params (Morpho.idToMarketParams), fixed when the market was created. Debt above LLTV × the collateral's value is liquidatable; there is no separate borrow threshold.",
   via: "Morpho.idToMarketParams(id).lltv · 1e18-scaled",
   inputs: [
     { label: "lltv", value: String(lltv), kind: "chain", note: "market params" },
@@ -367,9 +368,9 @@ export function morphoSheet({ ctx, coords, flows, label, read, move }: MorphoShe
     value:
       read.status === "ok" && apr != null
         ? {
-            text: `${(apr * 100).toFixed(2)}% APR`,
+            text: `${(morphoApy(apr) * 100).toFixed(2)}%`,
             info: morphoBorrowRateAtBlockProv(coords, read.at.block, apr),
-            value: String(apr),
+            value: String(morphoApy(apr)),
           }
         : { none: MORPHO_WORDS.sheet_no_read },
   });

@@ -3,8 +3,8 @@
 // "The vault" (J2): the whole vault under an Euler V2 holding, read at the
 // same two blocks as the card. One line each (J2.1) for supplied, borrowed,
 // utilization, the share price over the window, the borrow APY now with the
-// debts' growth over the window, and the oracle's price, each with its receipt. The section is one receipts scope its
-// ⋮ arms (decision 0059).
+// debts' growth over the window, and the oracle's price, each with its receipt.
+// The section is one receipts scope (decision 0059).
 
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { ProvSection, SectionHeading, SectionMenu } from "@/components/shared/section-menu";

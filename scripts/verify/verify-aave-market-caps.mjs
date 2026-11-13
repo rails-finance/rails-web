@@ -49,7 +49,7 @@
 //   BASE=http://localhost:3000 node scripts/verify/verify-aave-market-caps.mjs
 
 import { chromium } from "playwright";
-import { armScope } from "./lib/prov-inspector.mjs";
+import { armInspector } from "./lib/prov-inspector.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const NAV = { waitUntil: "domcontentloaded", timeout: 300000 };
@@ -271,9 +271,8 @@ for (const p of PAGES) {
         ? /Pool\.getVirtualUnderlyingBalance\(asset\) at block \d+/
         : /supplied − borrowed; this Pool has no virtual balance/i;
     let text = "";
-    // The reserves section's ⋮ arms it (no page-wide toggle, ui-jobs 549/550).
-    const scope = await wide.locator("[data-reserves-section]").first().getAttribute("data-prov-scope");
-    if (scope && (await armScope(wide, scope, { menu: `[data-section-menu="${scope}"]` }).catch(() => false))) {
+    // Armed from the profile menu's switch (ui-jobs 625).
+    if (await armInspector(wide).catch(() => false)) {
       await wide
         .locator("tr[data-reserve-row]")
         .first()
@@ -288,6 +287,8 @@ for (const p of PAGES) {
           .innerText()
           .catch(() => ""),
       );
+      // The receipt, then the inspector: the page is left unarmed.
+      await wide.keyboard.press("Escape");
       await wide.keyboard.press("Escape");
     }
     check(`${p.name} 10b ${first?.symbol} Available receipt names its formula`, want.test(text), text.slice(0, 140));

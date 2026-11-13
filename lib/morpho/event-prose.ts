@@ -21,6 +21,7 @@ import type { MorphoContext } from "@/lib/shared/types/event-shape";
 import type { EventProseCore } from "@/lib/shared/event-prose/types";
 import { morphoHealthMove, morphoLiquidationPrice, type MorphoAtBlock } from "@/lib/morpho/use-market-at-block";
 import { isPendlePt } from "@/lib/morpho/pendle-pt";
+import { morphoApy } from "@/lib/morpho/terms";
 import { morphoEventKey, morphoEventModal, PROSE, type MorphoL5Key } from "@/lib/morpho/event-templates";
 
 /** The receipt a figure echoes on the card. */
@@ -201,19 +202,19 @@ export function morphoEventProse(input: MorphoProseInput): MorphoEventProse {
     sp.say(hfAfter > hfBefore ? "liq.safer" : "liq.less_safe");
   };
 
-  // A move of the borrow rate within the block, else since the previous event.
+  // A move of the Borrow APY within the block, else since the previous event.
   const rates = () => {
     if (!read || read.status !== "ok") return;
     const prevEventApr = prevEventRead?.status === "ok" ? prevEventRead.at.borrowApr : null;
     const before = read.prev.borrowApr;
     const after = read.at.borrowApr;
     if (before != null && after != null && Math.abs(after - before) > RATE_STEP) {
-      v.rate_before = before;
-      v.rate_after = after;
+      v.rate_before = morphoApy(before);
+      v.rate_after = morphoApy(after);
       sp.say("rate.block");
     } else if (prevEventApr != null && before != null && Math.abs(before - prevEventApr) > RATE_STEP) {
-      v.rate_before = prevEventApr;
-      v.rate_after = before;
+      v.rate_before = morphoApy(prevEventApr);
+      v.rate_after = morphoApy(before);
       sp.say("rate.drift");
     }
   };
@@ -222,7 +223,7 @@ export function morphoEventProse(input: MorphoProseInput): MorphoEventProse {
     case "morpho.borrow": {
       if (variant === "first") sp.say("borrow.what_first", echo);
       else sp.say("borrow.what", echo);
-      if (third) sp.say("actor.authorised");
+      if (third) sp.say("actor.authorized");
       risk();
       rates();
       break;
@@ -250,7 +251,7 @@ export function morphoEventProse(input: MorphoProseInput): MorphoEventProse {
     case "morpho.withdraw_collateral": {
       if (variant === "emptied") sp.say("withdraw.what_closed", echo);
       else sp.say("withdraw.what", echo);
-      if (third) sp.say("actor.authorised");
+      if (third) sp.say("actor.authorized");
       if (variant === "emptied" && earlierInTx?.includes("repay")) sp.say("withdraw.same_tx");
       risk();
       break;
@@ -289,7 +290,7 @@ export function morphoEventProse(input: MorphoProseInput): MorphoEventProse {
     }
     case "morpho.withdraw": {
       sp.say("lend.withdraw", echo);
-      if (third) sp.say("actor.authorised");
+      if (third) sp.say("actor.authorized");
       // The running supplied figure reads below zero once withdrawals have
       // returned more than was supplied; the excess is interest earned.
       const supplied = ctx.suppliedAfter != null ? Number(ctx.suppliedAfter) : NaN;

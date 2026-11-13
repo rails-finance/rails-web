@@ -1,7 +1,7 @@
 "use client";
 
 // The accounts of J3: one block per account (J3.2), its holdings on rows that
-// open their pages, each amount with its receipt. One receipts scope its ⋮ arms.
+// open their pages, each amount with its receipt. One receipts scope.
 
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";

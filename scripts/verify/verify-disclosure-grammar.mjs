@@ -243,20 +243,17 @@ const headerLayout = (card) =>
     flowsGap != null && flowsGap >= 0 && flowsGap <= 8,
     `${flowsGap}px`,
   );
-  const flowsMenu = await f1
-    .evaluate((row) => {
-      const menu = row.querySelector("[data-panel-menu]");
-      if (!menu) return null;
-      return {
-        rightGap: Math.round(row.getBoundingClientRect().right - menu.getBoundingClientRect().right),
-        help: !!row.querySelector('[data-anatomy="F16"]'),
-      };
-    })
+  // The panel's ⋮ held only Inspect provenance and left with it (ui-jobs 625).
+  const flowsHead = await f1
+    .evaluate((row) => ({
+      menu: !!row.querySelector("[data-panel-menu]"),
+      help: !!row.querySelector('[data-anatomy="F16"]'),
+    }))
     .catch(() => null);
   check(
-    "2b. the Lifetime flows ⋮ stands at the header's right end, no ? in the header",
-    !!flowsMenu && flowsMenu.rightGap <= 6 && !flowsMenu.help,
-    JSON.stringify(flowsMenu),
+    "2b. the Lifetime flows header draws no ⋮ and no ?",
+    !!flowsHead && !flowsHead.menu && !flowsHead.help,
+    JSON.stringify(flowsHead),
   );
   // A press before hydration is lost: pressed until the modal shows.
   const howTo = page.locator('[data-flow-help="F16"] button').first();
@@ -428,15 +425,14 @@ const headerLayout = (card) =>
     .locator('[data-event-menu] [role="menu"] [data-menu-item]')
     .evaluateAll((els) => els.map((e) => e.getAttribute("data-menu-item")))
     .catch(() => []);
-  // ui-jobs 535: Open event page, Inspect provenance, Copy transaction hash,
-  // then Hide the row's type of event.
+  // ui-jobs 535, 625: Open event page, Copy transaction hash, then Hide the
+  // row's type of event.
   const after = items.slice(1);
-  const order = ["show-provenance", "copy-hash", "hide-group", "hide-type"];
+  const order = ["copy-hash", "hide-group", "hide-type"];
   check(
-    "4b. a press on it opens the menu: Open event page, Inspect provenance, Copy transaction hash, then Hide the row's type of event where the timeline has more than one",
+    "4b. a press on it opens the menu: Open event page, Copy transaction hash, then Hide the row's type of event where the timeline has more than one",
     items[0] === "view-page" &&
-      items[1] === "show-provenance" &&
-      items[2] === "copy-hash" &&
+      items[1] === "copy-hash" &&
       after.every((i) => order.includes(i)) &&
       after.every((i, k) => k === 0 || order.indexOf(after[k - 1]) < order.indexOf(i)),
     JSON.stringify(items),
@@ -902,7 +898,8 @@ const SHEET_WORDS_SUBJECTS = [
     path: "/base/morpho/0xd13de0ab683e6b1eef10532759d9717b65d8a8bd/0x9103c3b4e834476c9a62ea009ba2c884ee42e94e6e314a26f04d312434191836",
     id: "0x17675f8d57fdd518d7cc8c8f607588887495778d8f00f00883920b29f7e2ff78:3",
     risk: ["LTV (liquidation at 86.0%)", "Collateral can fall"],
-    limits: ["Still borrowable", "Borrow rate"],
+    // Morpho's docs' word for the rate (ui-jobs 628).
+    limits: ["Still borrowable", "Borrow APY"],
     params: ["LLTV", "Oracle price"],
     optional: [],
     carried: 1,

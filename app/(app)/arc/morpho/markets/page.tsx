@@ -12,7 +12,7 @@ export const metadata = listingMetadata({
   title: "Morpho Blue on Arc · Markets",
   canonicalPath: "/arc/morpho/markets",
   description:
-    "Every Morpho Blue market on Arc, grouped by the token it lends: its collateral, LLTV, size, rates and utilisation, read from the chain.",
+    "Every Morpho Blue market on Arc, grouped by the token it lends: its collateral, LLTV, size, rates and utilization, read from the chain.",
 });
 
 export default function MorphoArcMarketsPage() {

@@ -4,7 +4,7 @@
 // or reserve page that lists the vaults on Rails's rosters holding a position
 // there, each row opening the vault's page. A section of its own (K1): the
 // heading, the read stamp (K2), the "?" and the ⋮ (the roster's page, Copy,
-// View as Markdown, Download CSV, Inspect provenance), one line, then one
+// View as Markdown, Download CSV), one line, then one
 // house table (D1, D4, D6): Vault (name over its kind) · Steward (short
 // address over its role) · Amount (in the market's asset, with its receipt).
 // It takes plain data (lib/vaults/supplied-by.ts), so a server page and a
@@ -31,7 +31,7 @@ import { assetText, shortAddress } from "@/lib/shared/vault-amount-text";
 import { serverReadAt, stampServerRead } from "@/lib/shared/server-head-read";
 import type { SuppliedByRead, SuppliedByRow } from "@/lib/vaults/supplied-by";
 
-/** The section's scope: its ⋮ arms the inspector on it alone. */
+/** The section's name (`data-prov-scope`). */
 export const SUPPLIED_BY_SCOPE = "supplied-by-vaults";
 
 const n = (v: number) => v.toLocaleString("en-US");

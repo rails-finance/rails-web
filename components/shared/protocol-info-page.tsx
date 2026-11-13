@@ -23,7 +23,7 @@ import { shortAddress } from "@/lib/shared/asset-roster";
 import { InfoHistoryLine } from "@/components/shared/history-tag";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-import { ProvSection, SectionHeading, SectionMenu } from "@/components/shared/section-menu";
+import { ProvSection, SectionHeading } from "@/components/shared/section-menu";
 
 /** Slot I6, the pointer line, where an explorer passes no `guide`: true of a
  *  page whose cards carry all four controls (label tip, (i), ?, ⋮). */
@@ -157,16 +157,13 @@ const DOCS_AND_CHAIN_SCOPE = "docs-and-chain";
 
 /** The docs-and-chain section, after the glossary whose terms it qualifies.
  *  Drawn only where an explorer passes at least one entry. One receipts
- *  scope, armed by its ⋮; the page's one inspector layer rides with it,
- *  since no other part of an info page draws a receipt. */
+ *  scope; the page's one inspector layer rides with it, since no other part
+ *  of an info page draws a receipt. */
 function InfoDocsAndChainSection({ items }: { items: readonly InfoDocsAndChain[] }) {
   return (
     <div className="mt-5">
       <ProvSection scope={DOCS_AND_CHAIN_SCOPE} data-anatomy="I9" data-info-docs-chain="">
-        <SectionHeading
-          title={DOCS_AND_CHAIN_HEADING}
-          menu={<SectionMenu scope={DOCS_AND_CHAIN_SCOPE} title={DOCS_AND_CHAIN_HEADING} />}
-        />
+        <SectionHeading title={DOCS_AND_CHAIN_HEADING} />
         <ul className={UL}>
           {items.map((d) => (
             <li key={d.claim} data-info-docs-chain-item="">
