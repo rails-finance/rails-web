@@ -594,9 +594,17 @@ function Row({ m, block, at }: { m: PendleRosterEntry; block: number; at: number
         "apy",
         "Implied APY",
         emptyOf(m) ? (
-          <span className="font-normal text-rb-500" data-pendle-empty="">
-            — <span className="text-[11px]">{PENDLE_WORDS.noLiquidity}</span>
-          </span>
+          <RevealTip
+            tip={PENDLE_WORDS.noLiquidityTip}
+            label={`${PENDLE_WORDS.noLiquidity}: ${PENDLE_WORDS.noLiquidityTip}`}
+            focusable
+            wrap
+            className="focus-ring rounded-sm"
+          >
+            <span className="font-normal text-rb-500" data-pendle-empty="">
+              — <span className="tip-underline text-[11px]">{PENDLE_WORDS.noLiquidity}</span>
+            </span>
+          </RevealTip>
         ) : m.impliedApy == null ? null : (
           <Prov info={impliedApyProv(t.market.address, block, null)} value={m.impliedApy.toFixed(6)}>
             {apyText(m.impliedApy)}

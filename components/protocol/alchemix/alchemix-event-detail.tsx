@@ -49,6 +49,7 @@ import {
 import { redemptionNet } from "@/lib/alchemix/redemption-net";
 import { lineProtocolFeeStep } from "@/lib/alchemix/lines";
 import { selfLiquidationSplit } from "@/lib/alchemix/self-liquidation";
+import { feeListed } from "@/lib/alchemix/protocol-fee";
 import {
   closeFromReadingProv,
   selfLiquidationRestProv,
@@ -126,8 +127,9 @@ function legStats(
         changed: credit != null,
         prov: resolvedAtCaptureProv("debt credit", sym, credit, coords),
       });
+      // A logged zero (Base at 0 bps) is no fee: the card states none either.
       const fee = ctx.resolvedAtCapture?.collateralFee ?? null;
-      if (fee != null) {
+      if (fee != null && feeListed(fee)) {
         stats.push({
           label: "Fee taken in shares",
           value: formatExact(scaled(fee) ?? 0),

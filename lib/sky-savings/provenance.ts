@@ -28,6 +28,16 @@ const scaling18 = (raw: string, from: "log" | "call" = "call") => ({
 
 // ── the position, at the sealed block ───────────────────────────────────────
 
+/** The page's block: the level-1 head's figure. */
+export const pageBlockProv = (block: number): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  summary: `Block — every figure on this page is read at block ${n(block)}, the newest block Rails had read when the page loaded.`,
+  contract: SUSDS_CONTRACT,
+  via: LEDGER,
+  source: { block },
+});
+
 export const sharesHeldProv = (holder: string, block: number, raw: string): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",

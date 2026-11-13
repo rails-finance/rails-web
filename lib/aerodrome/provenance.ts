@@ -10,6 +10,7 @@ import type { AeroPosition, AeroPriceRoute } from "@/lib/aerodrome/position";
 import { AERODROME, type SlipstreamSite } from "@/lib/aerodrome/sites";
 import type { AeroPositionRead } from "@/lib/aerodrome/types";
 import type { RowKey } from "@/lib/uniswap/words";
+import { priceDecimalsInputs } from "@/lib/uniswap/provenance";
 
 const n = (v: number) => v.toLocaleString("en-US");
 const date = (t: number) => new Date(t * 1000).toISOString().slice(0, 10);
@@ -93,7 +94,7 @@ export function cardProv(
         contract: poolC(c),
         via: headVia(c),
         formula: "(sqrtPriceX96 ÷ 2^96)² × 10^(decimals0 − decimals1)",
-        inputs: [chain("slot0() · sqrtPriceX96", r.now.sqrtPriceX96)],
+        inputs: [chain("slot0() · sqrtPriceX96", r.now.sqrtPriceX96), ...priceDecimalsInputs(r.token0, r.token1)],
       };
     case "holds":
       return {

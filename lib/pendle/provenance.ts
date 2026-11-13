@@ -185,6 +185,18 @@ export function rewardProv(
   };
 }
 
+/** The wallet page's block: the level-1 head's figure. */
+export function pageBlockProv(block: number): Provenance {
+  return {
+    kind: "chain",
+    pclass: "state",
+    summary: `Block — every figure on this page is read at block ${n(block)}, the newest block Rails had read when the page loaded.`,
+    contract: ROUTER_STATIC,
+    via: "RouterStatic reads · at this block",
+    source: { block },
+  };
+}
+
 /** The LP's share of the pool's PT and SY. */
 export function lpSplitProv(block: number): Provenance {
   return {

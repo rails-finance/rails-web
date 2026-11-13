@@ -29,7 +29,7 @@ import {
   maturityWords,
   shortAddress,
 } from "@/lib/pendle/format";
-import { entryApyProv, impliedApyProv, maturityProv, valueProv } from "@/lib/pendle/provenance";
+import { entryApyProv, impliedApyProv, maturityProv, pageBlockProv, valueProv } from "@/lib/pendle/provenance";
 import { PENDLE_WORDS } from "@/lib/pendle/words";
 import { pendleWalletHref } from "@/lib/pendle/routes";
 import type { PendlePosition, PendleWalletPositions } from "@/lib/pendle/types";
@@ -147,7 +147,10 @@ export function PendleWalletView({
         {failure && <PendleReadNotice failure={failure} />}
         {data && (
           <p className="text-xs text-rb-500" data-pendle-asof={data.block}>
-            Pendle · Ethereum · every figure at <BlockRef block={data.block} chainId={PENDLE_CHAIN_ID} />
+            Pendle · Ethereum · block{" "}
+            <Prov info={pageBlockProv(data.block)} value={String(data.block)}>
+              <BlockRef block={data.block} chainId={PENDLE_CHAIN_ID} />
+            </Prov>
           </p>
         )}
         {data && data.positions.length === 0 && (

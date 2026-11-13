@@ -187,10 +187,10 @@ export function CowWalletView({
     summary && summary.trades > 0 && summary.firstTimestamp != null ? (
       <div className="space-y-2 text-sm leading-relaxed">
         <p>
-          This wallet has settled {n(summary.trades)} {summary.trades === 1 ? "trade" : "trades"} through{" "}
-          {COW_TERMS.name} on Ethereum since {formatDate(summary.firstTimestamp)}, in {n(tokens?.tokens.length ?? 0)}{" "}
-          tokens. Each is a Trade log of the settlement contract naming this wallet as the order&rsquo;s owner.{" "}
-          {COW_FILLS_SENTENCE}
+          Since {formatDate(summary.firstTimestamp)}, {n(summary.trades)} {summary.trades === 1 ? "trade" : "trades"}{" "}
+          through {COW_TERMS.name} on Ethereum {summary.trades === 1 ? "has" : "have"} named this wallet as the
+          order&rsquo;s owner, in {n(tokens?.tokens.length ?? 0)} tokens. Each is a Trade log of the settlement
+          contract. {COW_FILLS_SENTENCE}
         </p>
         {/* Read on chain: an Eth-flow sale's Trade log names the Eth-flow
             contract as owner (rails-ops reference/official-docs/cow.md). */}

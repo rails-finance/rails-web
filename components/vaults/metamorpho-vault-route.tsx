@@ -7,9 +7,10 @@
 // vault and of Blue, the fee and the guardian at the same block
 // (lib/vaults/config-read.ts); Holders and Who holds it are the census's
 // (lib/vaults/holders-read.ts), Yield the daily store's, the steward's record
-// the /vaults directory's (lib/vaults/steward-record.ts). What protects it,
-// The protocol underneath and the record's bad-debt episodes stream behind
-// their own Suspense.
+// the /vaults directory's (lib/vaults/steward-record.ts) with its runs from
+// rails-server's roles route (lib/vaults/steward-runs-read.ts). What protects it,
+// The protocol underneath, the record's runs and its bad-debt episodes stream
+// behind their own Suspense.
 //
 // THE PAGE LINKS TO THE FILTERED LISTING, IT DOES NOT LIST. The Holders
 // headline links to the position listing filtered to this address. What ONE
@@ -50,6 +51,7 @@ import { FocusSourceGate } from "@/components/shared/aim-gate";
 import { readVaultConfig } from "@/lib/vaults/config-read";
 import { loadVaultHolders } from "@/lib/vaults/holders-read";
 import { loadStewardRecord } from "@/lib/vaults/steward-record";
+import { loadStewardRuns } from "@/lib/vaults/steward-runs-read";
 
 export type MetaMorphoVaultParams = {
   params: Promise<{ vault: string }>;
@@ -106,12 +108,16 @@ export async function MetaMorphoVaultRoute({
   const holderParam = firstParam((await searchParams).holder);
   if (holderParam && holderParam.trim()) redirect(metaMorphoVaultHref(chainId, address, holderParam.trim()));
 
+  // The steward's runs stream: the record's Since cells and ran-before list wait on this
+  // promise behind their own Suspense, so the page's first byte does not wait on the roles reads.
+  const stewardRecordRead = loadStewardRecord(chainId, address, null);
+  const stewardRuns = stewardRecordRead.then(loadStewardRuns).catch(() => null);
   const [data, census, series, holders, stewardRecord] = await Promise.all([
     load(chainId, address, undefined),
     loadVaultCensusRow(chainId, address),
     loadVaultPageSeries(chainId, address),
     loadVaultHolders(chainId, address, "morpho"),
-    loadStewardRecord(chainId, address, null),
+    stewardRecordRead,
   ]);
   const [assetScales, config] = data.chainStale
     ? [{}, null]
@@ -143,6 +149,7 @@ export async function MetaMorphoVaultRoute({
               config={config}
               holders={holders}
               stewardRecord={stewardRecord}
+              stewardRuns={stewardRuns}
               badDebt={
                 <Suspense fallback={null}>
                   <VaultBadDebtSection chainId={chainId} vault={address} />
@@ -154,6 +161,18 @@ export async function MetaMorphoVaultRoute({
                     subject={{ chainId, address, kind: "metamorpho" }}
                     vaultName={data.vault.name || shortAddr(address)}
                     look="paragraph"
+                    changes={{
+                      chainId,
+                      vault: { address, name: data.vault.name || shortAddr(address) },
+                      asset: { symbol: data.vault.asset.symbol, decimals: data.vault.asset.decimals },
+                      markets: data.legs.map((l) => ({
+                        id: l.id,
+                        collateralSymbol: l.collateralSymbol,
+                        isIdle: l.isIdle,
+                        lltv: l.lltv,
+                      })),
+                      asOf: { block: data.blockNumber, time: data.head?.blockTime ?? null },
+                    }}
                   />
                 </Suspense>
               }
