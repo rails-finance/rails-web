@@ -277,7 +277,11 @@ export default function TroveView({
     liquidationTx: lastLiquidation?.txHash,
   });
   // The branch's shutdown (ui-jobs 612), read live: no V2 branch records one.
-  const shutdown = useBranchShutdown("liquity-v2", collateralType, troveData?.status === "open");
+  // The branch's state names an urgent redemption on any Trove, open or not
+  // (ui-jobs 619); the card and the accrual clock take it on an open Trove
+  // only, as a closed Trove keeps its recorded state and accrues nothing.
+  const branchShutdown = useBranchShutdown("liquity-v2", collateralType, troveData != null);
+  const shutdown = troveData?.status === "open" ? branchShutdown : null;
 
   // The claim that paid the surplus out, as its own row (the index has none).
   const claimEvent = useMemo(
@@ -410,8 +414,12 @@ export default function TroveView({
 
   // What an event's Copy for LLM header names about the trove.
   const troveMeta = useMemo(
-    () => ({ owner: effectiveOwner ?? null, total: totalEvents ?? liquityEvents.length }),
-    [effectiveOwner, totalEvents, liquityEvents.length],
+    () => ({
+      owner: effectiveOwner ?? null,
+      total: totalEvents ?? liquityEvents.length,
+      shutdownAt: branchShutdown?.at ?? null,
+    }),
+    [effectiveOwner, totalEvents, liquityEvents.length, branchShutdown?.at],
   );
 
   if (loading) {

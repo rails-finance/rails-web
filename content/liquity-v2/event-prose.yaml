@@ -114,7 +114,7 @@ placeholders:
   mcr:
     rounding: pct_whole
     means: |-
-      the branch's minimum collateral ratio (110% for WETH)
+      the open branch's minimum collateral ratio
   min_debt:
     rounding: count
     means: |-
@@ -150,7 +150,7 @@ placeholders:
   max_ltv:
     rounding: ratio
     means: |-
-      the branch's Max LTV, 1 ÷ its minimum collateral ratio (90.91% for WETH)
+      the open branch's Max LTV, 1 ÷ its minimum collateral ratio
   liq_price_before:
     rounding: usd
     means: |-
@@ -715,6 +715,8 @@ group_words:
 L5_words:
   coll_type_unknown: |-
     this collateral
+  max_ltv_unknown: |-
+    set per branch
   delegate_named: |-
     the {delegate_name} delegate
   delegate_unnamed: |-
@@ -921,6 +923,10 @@ trove_words:
     This trove holds {coll} of collateral against {debt} of debt:
   debt_breakdown: |-
     The debt includes {interest} of interest accrued since the last event
+  debt_breakdown_shutdown: |-
+    The debt includes {interest} of interest accrued until the branch shut down on {date}
+  debt_breakdown_stopped: |-
+    Interest stopped when the branch shut down on {date}
   debt_breakdown_fee: |-
     and {fee} of delegate fees
   coll_worth: |-
@@ -1504,6 +1510,19 @@ templates:
           variant at_event, a zombie with debt left
         text: |-
           It can be closed by repaying the debt and withdrawing the collateral, or restored by borrowing above the minimum.
+      # On a shut-down branch (the urgent path, redemptionPath) closing remains and borrowing does not:
+      # rails-ops reference/official-docs/liquity-v2.md row 26 ("closing, surplus claims and shutdown
+      # redemptions remain").
+      redeem.zombie_zero_close:
+        when: |-
+          variant at_event, a zombie with no debt left, on a shut-down branch
+        text: |-
+          It can be closed by withdrawing the collateral.
+      redeem.zombie_low_close:
+        when: |-
+          variant at_event, a zombie with debt left, on a shut-down branch
+        text: |-
+          It can be closed by repaying the debt and withdrawing the collateral.
     order:
       - redeem.no_detail
       - redeem.what
@@ -1515,15 +1534,25 @@ templates:
       - redeem.zombie_zero_next
       - redeem.zombie_low
       - redeem.zombie_low_next
+      - redeem.zombie_zero_close
+      - redeem.zombie_low_close
       - same_block
     groups:
       happened: [redeem.no_detail, redeem.what, redeem.why_batch, redeem.why_owner, same_block]
       adds_up: [redeem.result, redeem.result_no_fee]
-      leaves: [redeem.zombie_zero, redeem.zombie_zero_next, redeem.zombie_low, redeem.zombie_low_next]
+      leaves:
+        [
+          redeem.zombie_zero,
+          redeem.zombie_zero_next,
+          redeem.zombie_low,
+          redeem.zombie_low_next,
+          redeem.zombie_zero_close,
+          redeem.zombie_low_close,
+        ]
     alternates:
       - [redeem.result, redeem.result_no_fee]
       - [redeem.why_batch, redeem.why_owner, redeem.zombie_zero, redeem.zombie_low]
-      - [redeem.zombie_zero_next, redeem.zombie_low_next]
+      - [redeem.zombie_zero_next, redeem.zombie_low_next, redeem.zombie_zero_close, redeem.zombie_low_close]
 
   - id: liquity2.delegation.join
     title: |-
@@ -2011,7 +2040,8 @@ templates:
 #                          Liquity's FAQ (FAQ_URLS)
 # The interest-rate modal has `intro_delegated` and, on its first detail,
 # `text_delegated`: what it says when a delegate sets the trove's rate.
-# The liquidation modal's intro reads {max_ltv} and {coll_type}.
+# The adjust modal's second paragraph and the liquidation modal's intro read
+# {max_ltv} and {coll_type}: the open branch's figure and its collateral.
 # Each concept that states a mechanism rests on a row of rails-ops
 # reference/official-docs/liquity-v2.md, and its link is that row's page.
 L5:
@@ -2022,7 +2052,7 @@ L5:
       An adjustment changes a trove without closing it. The owner can add or withdraw collateral, borrow more BOLD, or repay some of the debt.
     extraParagraphs:
       - |-
-        Adding collateral or repaying makes the trove safer. Withdrawing collateral or borrowing more brings it closer to liquidation. An adjustment must keep the LTV under the branch's Max LTV (90.91% for WETH), or it is rejected.
+        Adding collateral or repaying makes the trove safer. Withdrawing collateral or borrowing more brings it closer to liquidation. An adjustment must keep the LTV under the branch's Max LTV ({max_ltv} for {coll_type}), or it is rejected.
       - |-
         Adjusting doesn't change the interest rate, which is a separate action. The rate matters because it decides how early the trove is redeemed against.
     detailsHeading: |-

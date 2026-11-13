@@ -24,6 +24,7 @@
 // a list's chip) it is "Change focus".
 
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { otherLayerOpen } from "@/components/shared/use-escape-close";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CHAINS } from "@/lib/shared/chains";
@@ -107,6 +108,12 @@ export function AssetScopeStrip() {
       )}
     </>
   );
+}
+
+/** The Focus panel's body in the page's flow, for a new view (/saved-views'
+ *  New view; Miles 13 Nov 2026): saved by Done, closed by Cancel or Escape. */
+export function FocusViewEditor({ className, onClose }: { className?: string; onClose: () => void }) {
+  return <AssetScopePanel mode="new" inline className={className} onClose={onClose} />;
 }
 
 /** The link's params as one string: a new link is a new dialog. */
@@ -728,17 +735,27 @@ const keyOf = (p: Pick<AssetPick, "chain" | "token">) => optionKey({ chain: p.ch
  * in "new" mode nothing is saved until the draft holds something, and then it
  * is a new view, put in use; in "link" mode a link's proposal, saved only by
  * "Use this view".
+ *
+ * `inline`: drawn in the page's flow in place of the modal (/saved-views'
+ * New view, Miles 13 Nov 2026): a new view saved by Done alone, put in use;
+ * Cancel and Escape close it with nothing saved. It has no "Add from all
+ * assets", which edits the view in use on /assets, not this draft.
  */
 function AssetScopePanel({
   mode: initial,
   view,
   proposal,
+  inline = false,
+  className = "",
   onClose,
 }: {
   mode: PanelMode;
   /** The saved view "edit" opens on; the view in use when absent. */
   view?: string;
   proposal?: FocusProposal;
+  inline?: boolean;
+  /** The inline panel's frame. */
+  className?: string;
   onClose: () => void;
 }) {
   const scope = useAssetScope();
@@ -756,6 +773,7 @@ function AssetScopePanel({
         : { assets: [], chains: [] },
   );
   const [name, setName] = useState<string>((mode === "link" ? proposal?.name : target?.name) ?? "");
+  const frame = useRef<HTMLElement>(null);
   const linkMode = mode === "link";
 
   // A link's proposal closed without a choice is "Not now".
@@ -767,7 +785,7 @@ function AssetScopePanel({
     : onClose;
 
   useEffect(() => {
-    if (isPhone) return;
+    if (isPhone || inline) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !e.defaultPrevented) close();
     };
@@ -775,10 +793,26 @@ function AssetScopePanel({
     return () => document.removeEventListener("keydown", onKey);
   });
 
+  // Inline, Escape is the editor's only while focus is inside it or no other
+  // layer (a menu, a dialog, a listbox) stands open over the page; a press it
+  // takes is marked handled.
+  useEffect(() => {
+    if (!inline) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      const inside = !!frame.current?.contains(document.activeElement);
+      if (!inside && otherLayerOpen()) return;
+      e.preventDefault();
+      onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [inline, onClose]);
+
   const commit = (next: Focus) => {
     const f = { assets: next.assets.map(withRecord), chains: next.chains };
     setDraft(f);
-    if (linkMode) return;
+    if (linkMode || inline) return;
     const holds = f.assets.length > 0 || f.chains.length > 0;
     if (viewId && scope.views.some((v) => v.id === viewId)) {
       focusViews.edit(viewId, f);
@@ -869,7 +903,7 @@ function AssetScopePanel({
         chainName={chainName}
         anatomy={undefined}
       />
-      {!linkMode && (
+      {!linkMode && !inline && (
         <Link
           href={manageHref()}
           onClick={onClose}
@@ -933,19 +967,43 @@ function AssetScopePanel({
             </button>
           </>
         ) : (
-          <button
-            type="button"
-            onClick={onClose}
-            className={`ml-auto rounded-md bg-rb-100 px-3 py-1 text-xs font-semibold text-foreground hover:bg-rb-200 dark:bg-rb-800 dark:hover:bg-rb-700 ${TAP}`}
-          >
-            Done
-          </button>
+          <>
+            {inline && (
+              <button
+                type="button"
+                onClick={onClose}
+                className={`ml-auto ${RESET_LINK} ${TAP}`}
+                data-focus-view-editor-cancel=""
+              >
+                Cancel
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                if (inline && holds) focusViews.add(draft, name.trim() || undefined);
+                onClose();
+              }}
+              data-focus-view-editor-done={inline ? "" : undefined}
+              className={`${inline ? "" : "ml-auto"} rounded-md bg-rb-100 px-3 py-1 text-xs font-semibold text-foreground hover:bg-rb-200 dark:bg-rb-800 dark:hover:bg-rb-700 ${TAP}`}
+            >
+              Done
+            </button>
+          </>
         )}
       </div>
     </div>
   );
 
   const title = linkMode ? "Focus from a link" : !viewId ? "New focus view" : PANEL_TITLE;
+
+  if (inline)
+    return (
+      <section ref={frame} aria-label={title} className={className} data-focus-view-editor="">
+        <h3 className={`px-4 py-3 ${OVERLAY_HEADING}`}>{title}</h3>
+        {body}
+      </section>
+    );
 
   if (isPhone)
     return (

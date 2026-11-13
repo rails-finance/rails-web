@@ -172,6 +172,25 @@ export function AssetChooser({
     return () => document.removeEventListener("pointerdown", down);
   }, [open, isPhone]);
 
+  // Escape closes the open list first, wherever focus stands in it or on the
+  // page's body (a press on a row leaves focus nowhere in WebKit), before any
+  // layer under it hears the press (the inline focus view editor; ui-jobs 670).
+  // Capture phase, marked handled; a press inside another open layer is that
+  // layer's.
+  useEffect(() => {
+    if (!open) return;
+    const esc = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      const at = document.activeElement;
+      const ours = !at || at === document.body || !!ref.current?.contains(at);
+      if (!ours) return;
+      e.preventDefault();
+      close();
+    };
+    window.addEventListener("keydown", esc, true);
+    return () => window.removeEventListener("keydown", esc, true);
+  });
+
   // The highlighted row stays in view as the arrows move it.
   useEffect(() => {
     if (!open) return;
@@ -329,6 +348,8 @@ export function AssetChooser({
           data-option-index={i}
           data-asset-option={key}
           onClick={() => toggle(key)}
+          // Focus stays in the search field, so the keys keep working.
+          onMouseDown={(e) => e.preventDefault()}
           onPointerMove={() => setActive(i)}
           className={`overlay-item !gap-2 !py-1.5 ${i === active ? "overlay-item-active" : ""}`}
         >
