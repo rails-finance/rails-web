@@ -107,6 +107,9 @@ export function cardExplainer(p: AeroPosition): ExplainGroupWords[] {
     holdings.push(["The wallet that staked it can claim ", { fig: `${num(p.aero.claimable)} ${R}` }, " now."]);
   else if (p.uncollected !== null && (!closed || p.uncollected > 0))
     holdings.push(["Uncollected fees come to ", { fig: `${num(p.uncollected)} ${Q}` }, "."]);
+  // "while it is in range" is the read, for both states: on Velodrome #2064266 (staked, in range on 0 of
+  // 30 daily reads) the pool's reward and fee growth inside the range were unchanged across the 30 days,
+  // and grew on the in-range #131184 (rails-ops reference/official-docs/velodrome.md, 13 Nov 2026).
   holdings.push(
     p.staked
       ? [`A staked position is held by the pool's gauge, which pays it ${R} while it is in range.`]

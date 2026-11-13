@@ -27,11 +27,13 @@ const DOCS = VELODROME.docs;
 const UL = "list-disc space-y-1 pl-5";
 
 const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
+  // Velodrome's docs never use the word (rails-ops reference/official-docs/velodrome.md); the name is
+  // the contracts' (velodrome-finance/slipstream, lib/aerodrome/sites.ts), so this entry cites no docs page.
   {
     term: "Slipstream",
     definition:
-      "Slipstream is Velodrome's design for pools where each provider's liquidity sits between two prices. Two Slipstream deployments are live on Optimism, each with its own position manager.",
-    sources: [DOCS],
+      "Slipstream is the name in Velodrome's contracts for pools where each provider's liquidity sits between two prices. Two Slipstream deployments are live on Optimism, each with its own position manager.",
+    sources: [],
   },
   {
     term: "Position",

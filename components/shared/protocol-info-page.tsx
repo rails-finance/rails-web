@@ -43,8 +43,9 @@ export interface InfoTerm {
   term: string;
   /** One or two sentences, plain English, the practical figure before the formula. */
   definition: string;
-  /** The protocol's official docs or FAQ, at least one. */
-  sources: readonly [InfoDocLink, ...InfoDocLink[]];
+  /** The protocol's official docs or FAQ that state the definition. Empty where no docs page does
+   *  (the name is the contracts' alone); the term then carries no "Docs:" line. */
+  sources: readonly InfoDocLink[];
 }
 
 export interface InfoView {
@@ -320,7 +321,13 @@ export function ProtocolInfoPage({
               <dt className="inline font-semibold text-foreground">{t.term}</dt>
               <dd className="inline">
                 {": "}
-                {t.definition} <span className="text-rb-400">Docs:</span>{" "}
+                {t.definition}
+                {t.sources.length > 0 && (
+                  <>
+                    {" "}
+                    <span className="text-rb-400">Docs:</span>{" "}
+                  </>
+                )}
                 {t.sources.map((l, i) => (
                   <span key={l.href}>
                     {i > 0 && ", "}
