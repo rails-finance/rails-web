@@ -61,9 +61,9 @@ export function morphoPositionToMarkdown(args: MorphoPositionMarkdownArgs): stri
   lines.push("");
   lines.push(
     `> Point-in-time snapshot generated ${fmtUtc(generatedAt.getTime() / 1000)}. ` +
-      `All values are in the market's OWN units — the loan asset (${loan}) — because a Morpho oracle ` +
-      `quotes collateral in loan-asset terms, never USD; no dollar figure is asserted anywhere. ` +
-      `Balances are the position's own contract slots; the health arithmetic replicates Morpho's ` +
+      `All values are in the market's loan asset (${loan}), because a Morpho oracle ` +
+      `quotes collateral in loan-asset terms; no dollar figure is stated. ` +
+      `Balances are the position's contract slots; the health arithmetic replicates Morpho's ` +
       `internal _isHealthy (the contract exposes no public verdict getter). ` +
       `Everything drifts as the market and position change. Not financial advice.`,
   );
@@ -115,7 +115,7 @@ export function morphoPositionToMarkdown(args: MorphoPositionMarkdownArgs): stri
       if (chain.healthFactor != null) {
         lines.push(
           `- **Health factor:** ${num(chain.healthFactor, 2)} (collateral value × LLTV ÷ debt; liquidatable below 1.0)` +
-            (chain.healthy != null ? ` — _isHealthy replica says ${chain.healthy ? "healthy" : "NOT healthy"}` : ""),
+            (chain.healthy != null ? ` — _isHealthy replica says ${chain.healthy ? "healthy" : "not healthy"}` : ""),
         );
       }
       if (chain.oraclePrice > 0 && scaled) {
