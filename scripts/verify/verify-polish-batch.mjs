@@ -440,7 +440,7 @@ check(
 await phone.close();
 
 // Saved wallets in the reader's order (ui-jobs 504): a list stored before the
-// order is shown newest first; a move on /bookmarks persists, and the profile
+// order is shown newest first; a move on /saved-views persists, and the profile
 // menu lists them in that order.
 {
   const W = [
@@ -460,7 +460,7 @@ await phone.close();
     if (!localStorage.getItem("rails-bookmarks")) localStorage.setItem("rails-bookmarks", JSON.stringify(rows));
   }, held);
   const bp = await ctx.newPage();
-  await bp.goto(`${BASE}/bookmarks?tab=wallets`, { waitUntil: "networkidle" });
+  await bp.goto(`${BASE}/saved-views?tab=wallets`, { waitUntil: "networkidle" });
   await bp.waitForSelector("[data-bookmark-row]");
   const order = () =>
     bp.locator("[data-bookmark-open]").evaluateAll((as) => as.map((a) => a.getAttribute("href").split("/").pop()));
@@ -514,7 +514,7 @@ await phone.close();
 // `rails-saved` with a kind per entry, started from the wallet-only
 // `rails-bookmarks`, which keeps its old shape for builds from before. A
 // wallet such a build adds there joins the list and the views stay; the
-// profile menu groups Focus, Listings, Wallets, Positions in that order (ui-jobs 582), and /bookmarks
+// profile menu groups Focus, Listings, Wallets, Positions in that order (ui-jobs 582), and /saved-views
 // has the same three tabs, each row opening its saved page. A listing's ⋮
 // (N1.7) saves the view under its URL.
 {
@@ -594,7 +594,7 @@ await phone.close();
     groups.join(),
   );
   await sp.keyboard.press("Escape");
-  await sp.goto(`${BASE}/bookmarks?tab=views`, { waitUntil: "networkidle" });
+  await sp.goto(`${BASE}/saved-views?tab=views`, { waitUntil: "networkidle" });
   await sp.waitForSelector('[data-bookmark-row="view"]');
   const tabs = await sp
     .locator("[data-saved-tab]")
@@ -603,7 +603,7 @@ await phone.close();
     );
   const viewHref = await sp.locator('[data-bookmark-row="view"] a').first().getAttribute("href");
   check(
-    "SV /bookmarks tabs Overview, Focus views, Listings, Wallets, Positions; the old ?tab=views opens Listings with the view opening its URL",
+    "SV /saved-views tabs Overview, Focus views, Listings, Wallets, Positions; the old ?tab=views opens Listings with the view opening its URL",
     tabs.join() === "overview,focus,listings*,wallets,positions" && viewHref === VIEW,
     JSON.stringify({ tabs, viewHref }),
   );

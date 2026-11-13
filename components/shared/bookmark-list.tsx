@@ -1,7 +1,7 @@
 "use client";
 
 // The bookmarks list and its backup controls, drawn by the bookmarks page
-// (/bookmarks, rails-ops ui-jobs 480), and `useBookmarks`, which the profile
+// (/saved-views, rails-ops ui-jobs 480), and `useBookmarks`, which the profile
 // control (H20) reads for its face and its menu. The list lives in this
 // origin's localStorage under `rails-bookmarks` (lib/shared/sessions.ts), in
 // the reader's order: with `reorder`, rows move by drag and drop (from sm) and
@@ -473,7 +473,8 @@ function RenameField({
 const NAME_CELL = "sm:w-full sm:max-w-0 sm:min-w-[200px]";
 const MENU_CELL = "dt-row-menu w-px whitespace-nowrap";
 
-/** A saved entry's star (ui-jobs 586, 652): the starred entries of a kind,
+/** A saved entry's star (ui-jobs 586, 652), filled in the foreground colour
+ *  when starred and a muted outline when not: the starred entries of a kind,
  *  focus views included, are the ones the profile menu shows. */
 function StarToggle({ on, label, onToggle }: { on: boolean; label: string; onToggle: () => void }) {
   return (
@@ -488,9 +489,7 @@ function StarToggle({ on, label, onToggle }: { on: boolean; label: string; onTog
       aria-label={on ? `Unstar ${label}` : `Star ${label}`}
       title={on ? "Starred: shown in the profile menu" : "Star to show in the profile menu"}
       className={`-my-2 inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors sm:size-7 ${
-        on
-          ? "text-amber-500 hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-300"
-          : "text-rb-400 hover:text-amber-500 dark:text-rb-600 dark:hover:text-amber-400"
+        on ? "text-foreground" : "text-rb-400 hover:text-foreground dark:text-rb-600 dark:hover:text-foreground"
       }`}
       data-bookmark-star={on ? "on" : "off"}
       data-anatomy="B2.3"

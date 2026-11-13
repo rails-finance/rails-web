@@ -211,7 +211,7 @@ const MIGRATED_KEY = "rails-bookmarks-migrated";
 /** Set once `STORAGE_KEY`'s array order is the reader's order (ui-jobs 504).
  *  Before it the array was unordered and the list showed newest first, so
  *  the migration writes the rows in that order, which the reader then
- *  rearranges on /bookmarks. The array keeps its shape, so a build from
+ *  rearranges on /saved-views. The array keeps its shape, so a build from
  *  before reads the same rows. */
 const ORDERED_KEY = "rails-bookmarks-ordered";
 /** The suffix every pre-431 explorer list's key ends in. */
@@ -414,7 +414,7 @@ export function seedMenuStars<T extends SavedEntry>(rows: T[], eligible: (r: T) 
   const seen: Record<SavedKind, number> = { wallet: 0, position: 0, view: 0 };
   return rows.map((r) => {
     const kind = kindOf(r);
-    if (isWallet(r) && !r.pinned) return r;
+    if (isWallet(r) && r.pinned === false) return r;
     if (!eligible(r) || starred.has(kind) || seen[kind] >= SEED_STARS) return r;
     seen[kind] += 1;
     return { ...r, starred: true };
@@ -468,7 +468,7 @@ function saveSessions(sessions: SavedEntry[]): void {
 }
 
 /** The bookmarked wallets, in the reader's order: a new bookmark goes first,
- *  and /bookmarks moves them (`moveSaved`). */
+ *  and /saved-views moves them (`moveSaved`). */
 export function loadBookmarks(): WalletSession[] {
   return loadSessions()
     .filter(isWallet)

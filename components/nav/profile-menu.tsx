@@ -5,19 +5,19 @@
 // Top down: the theme as a three-way segment; with nothing saved, "New to
 // Rails? Start here" to /start (ui-jobs 509); then four groups, Focus,
 // Listings, Wallets and Positions, each under a heading that links to its tab
-// on /bookmarks (a cog at the group's right on hover or keyboard focus; on a
+// on /saved-views (a cog at the group's right on hover or keyboard focus; on a
 // touch screen see HEADING_TOUCH); with anything saved, starred or not, a
-// Bookmarks row to /bookmarks (Miles, 13 Nov 2026; ui-jobs 652); last,
+// "Saved views" row to /saved-views (Miles, 13 Nov 2026; ui-jobs 652); last,
 // Advanced, holding the provenance inspector switch (decision 0062; ui-jobs
 // 571).
 //
 // Stars alone decide what each group lists (ui-jobs 652): Focus lists the
-// views starred on /bookmarks?tab=focus and, while it is unstarred, the view
+// views starred on /saved-views?tab=focus and, while it is unstarred, the view
 // in use, so Focus can always be turned off here; then Off
 // (lib/shared/asset-scope.ts `menuViews`). Listings, Wallets and Positions
-// list the items starred on /bookmarks (lib/shared/sessions.ts
+// list the items starred on /saved-views (lib/shared/sessions.ts
 // `menuEntries`). Any other group with nothing starred is not drawn; its
-// heading is the way to its tab on /bookmarks. Long names fade at the line's
+// heading is the way to its tab on /saved-views. Long names fade at the line's
 // end (`FADE`); rows read nothing, showing what the browser holds.
 //
 // From md a dropdown under the control, right edges aligned, dropping in with
@@ -74,8 +74,8 @@ import { provPreferenceAllows } from "@/lib/shared/prov-preference-routes";
 import { ProvInspectorExit, putDownInspector } from "@/components/shared/prov-inspector";
 import { menuEntries } from "@/lib/shared/sessions";
 import { RevealTip } from "@/components/shared/reveal-tip";
+import { SAVED_NAME, SAVED_PATH } from "@/components/shared/bookmarks-name";
 
-const BOOKMARKS_PATH = "/bookmarks";
 /** The control's and the menu's accessible name: what the menu holds as a whole. */
 const MENU_NAME = "Saved and settings";
 /** The guided way in (G, /start), reached from this menu (ui-jobs 509). */
@@ -105,7 +105,7 @@ const HEADING_TOUCH = TOUCH_HEADINGS.cog;
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
-/** A group's heading: a link to its tab on /bookmarks, blue with the cog at
+/** A group's heading: a link to its tab on /saved-views, blue with the cog at
  *  the group's right on hover or keyboard focus. */
 function GroupHeading({
   id,
@@ -123,7 +123,7 @@ function GroupHeading({
   return (
     <Link
       id={id}
-      href={`${BOOKMARKS_PATH}?tab=${tab}`}
+      href={`${SAVED_PATH}?tab=${tab}`}
       role="menuitem"
       onClick={onDone}
       className={`group/head flex min-h-8 items-center justify-between rounded-lg text-rb-500 outline-none transition-colors hover:text-blue-600 focus-visible:text-blue-600 dark:hover:text-[var(--text-link)] dark:focus-visible:text-[var(--text-link)] ${LABEL} ${HEADING_TOUCH.head}`}
@@ -625,18 +625,18 @@ export function ProfileMenu() {
                 </div>
               )}
               {linkGroup(linkGroups[1])}
-              {/* The way to /bookmarks whatever is starred (ui-jobs 652). */}
+              {/* The way to /saved-views whatever is starred (ui-jobs 652). */}
               {anything && (
                 <div className={GROUP}>
                   <Link
-                    href={BOOKMARKS_PATH}
+                    href={SAVED_PATH}
                     role="menuitem"
                     onClick={done}
                     className={ITEM}
                     data-profile-menu-bookmarks=""
                   >
                     <Bookmark className="size-4 shrink-0 text-rb-500" fill="currentColor" aria-hidden="true" />
-                    <span className="font-medium">Bookmarks</span>
+                    <span className="font-medium">{SAVED_NAME}</span>
                   </Link>
                 </div>
               )}

@@ -280,7 +280,7 @@ function writeSaved(next: FocusViews) {
 
 const saved = () => snapshot().saved;
 
-/** The saved views' edits, for the profile menu, the panel and /bookmarks. */
+/** The saved views' edits, for the profile menu, the panel and /saved-views. */
 export const focusViews = {
   use: (id: string | null) => writeSaved(setActive(saved(), id)),
   rename: (id: string, name: string) => writeSaved(renameView(saved(), id, name)),

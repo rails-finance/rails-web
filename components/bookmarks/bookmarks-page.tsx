@@ -160,9 +160,10 @@ export function BookmarksPage() {
       <div className={`flex min-h-[38px] items-center ${PROFILE_CLEARANCE}`} data-anatomy="H7" data-back-row="">
         <DetailBackButton fallbackHref="/" />
       </div>
-      {/* One header row: the heading (B1) and the tabs (B4); on a phone the
-          tabs are one row under it that scrolls sideways (Miles, 10 Nov 2026). */}
-      <div className="mb-6 mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6">
+      {/* The heading (B1), and under it the tabs (B4) on a row of their own at
+          every width (Miles, 13 Nov 2026; ui-jobs 652); on a phone the row
+          scrolls sideways. */}
+      <div className="mb-6 mt-6 flex flex-col gap-3">
         <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground" data-anatomy="B1">
           {/* The saved-state glyph the wallet menu draws (ui-jobs 493, 494). */}
           <Bookmark className="size-6 shrink-0" fill="currentColor" aria-hidden="true" />
