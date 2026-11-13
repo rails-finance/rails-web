@@ -126,7 +126,7 @@ export function resolvedAtCaptureProv(
     via: `${ALCHEMIX_VIA} · ${debt ? "debt_credit" : "collateral_fee"}${raw ? `: ${raw}` : ""}`,
     formula: debt
       ? "min(the offered amount converted to debt at this block, the position's debt, the market's total debt)"
-      : "the protocol fee leg of the same transaction's share transfer",
+      : "the redemption fee leg of the same transaction's share transfer",
     verify: {
       kind: "recompute",
       text: "To check: add up the transfers in this transaction.",
@@ -706,7 +706,7 @@ export function redemptionNetProv(
   return {
     kind: "chain-derived",
     pclass: "state",
-    summary: `Net for this position — the ${syntheticSymbol} debt cleared, valued at 1 ${underlyingSymbol} each as the protocol counts it, less the ${mytSymbol} taken, valued at the share price read at the redemption's block. The shares taken include the market's redemption fee${n.fee ? ` (${n.fee.bps / 100}%, ${fmtUnits(n.fee.sharesRaw, 18)} ${mytSymbol})` : ""}`,
+    summary: `Net for this position — the ${syntheticSymbol} debt cleared, valued at 1 ${underlyingSymbol} each as the protocol counts it, less the ${mytSymbol} taken, valued at the share price read at the redemption's block${n.fee && n.fee.bps > 0 ? `. The shares taken include the market's redemption fee (${n.fee.bps / 100}%, ${fmtUnits(n.fee.sharesRaw, 18)} ${mytSymbol})` : ""}`,
     contract: alchemistContract(coords),
     via: `getCDP(${coords.tokenId}) at blocks ${n.fromBlock} and ${n.atBlock}, and the ${mytSymbol} share price at block ${n.atBlock}`,
     formula:
@@ -752,7 +752,7 @@ export function redemptionFeeProv(
   return {
     kind: "chain-derived",
     pclass: "state",
-    summary: `Redemption fee — the market's ${fee.bps / 100}% protocol fee, charged on every redemption in ${mytSymbol} on top of the shares the Transmuter gets, and paid to Alchemix's fee receiver. It is the main part of the net`,
+    summary: `Redemption fee — the market's ${fee.bps / 100}% fee, charged on every redemption in ${mytSymbol} on top of the shares the Transmuter gets, and paid to Alchemix's protocol fee receiver. It is the main part of the net`,
     contract: alchemistContract(coords),
     via: `protocolFee() = ${fee.bps} bps · getCDP(${coords.tokenId}) at blocks ${n.fromBlock} and ${n.atBlock} · the ${mytSymbol} share price at block ${n.atBlock}`,
     formula:
@@ -763,11 +763,16 @@ export function redemptionFeeProv(
         : ""),
     verify: {
       kind: "recompute",
-      text: `In the redemption's transaction, the ${mytSymbol} sent to the fee receiver is ${fee.bps / 100}% of the ${mytSymbol} sent to the Transmuter`,
+      text: `In the redemption's transaction, the ${mytSymbol} sent to the protocol fee receiver is ${fee.bps / 100}% of the ${mytSymbol} sent to the Transmuter`,
     },
     source: { block: n.atBlock },
     inputs: coordInputs(coords, [
-      { label: "protocolFee", value: String(fee.bps), kind: "chain", note: "basis points, read from the Alchemist" },
+      {
+        label: "protocolFee",
+        value: String(fee.bps),
+        kind: "chain",
+        note: fee.read ? `basis points at this block: ${fee.read}` : "basis points, read from the Alchemist",
+      },
       {
         label: "collateral taken",
         value: n.takenRaw,
@@ -784,7 +789,7 @@ export function redemptionNetTotalProv(
   counted: number,
   underlyingSymbol: string,
   coords: AlchemixCoords,
-  fee: { bps: number; valueRaw: string } | null = null,
+  fee: { bps: number | null; valueRaw: string } | null = null,
 ): Provenance {
   return {
     kind: "chain-derived",
@@ -792,7 +797,7 @@ export function redemptionNetTotalProv(
     summary: `Net for this position across its redemptions, in ${underlyingSymbol} — the sum of each redemption's net`,
     contract: alchemistContract(coords),
     via: `getCDP(${coords.tokenId}) either side of each redemption, and the share price at each redemption's block`,
-    formula: `Σ (debt cleared × 1 − shares taken × share price) over ${counted} redemption${counted === 1 ? "" : "s"} = ${fmtUnits(netRaw, 18)} ${underlyingSymbol}${fee ? `, of which the ${fee.bps / 100}% redemption fee is −${fmtUnits(fee.valueRaw, 18)} ${underlyingSymbol}` : ""}`,
+    formula: `Σ (debt cleared × 1 − shares taken × share price) over ${counted} redemption${counted === 1 ? "" : "s"} = ${fmtUnits(netRaw, 18)} ${underlyingSymbol}${fee && fee.valueRaw !== "0" ? `, of which the ${fee.bps != null ? `${fee.bps / 100}% ` : ""}redemption fee${fee.bps == null ? " at each redemption's rate" : ""} is −${fmtUnits(fee.valueRaw, 18)} ${underlyingSymbol}` : ""}`,
     verify: { kind: "rollup", text: "It rolls up the redemptions on the timeline; each carries a receipt." },
     inputs: coordInputs(coords, [{ label: "redemptions summed", value: String(counted), kind: "chain" }]),
   };

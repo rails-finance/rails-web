@@ -1,5 +1,11 @@
 import { isAddress } from "viem";
-import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import {
+  ARBITRUM_CHAIN_ID,
+  BASE_CHAIN_ID,
+  MAINNET_CHAIN_ID,
+  OPTIMISM_CHAIN_ID,
+  type ChainId,
+} from "@/lib/shared/chains";
 import { barOwnerOf, RELAY_BAR, ZEROX_BAR } from "@/lib/shared/bar-owners";
 
 /**
@@ -69,6 +75,11 @@ import { barOwnerOf, RELAY_BAR, ZEROX_BAR } from "@/lib/shared/bar-owners";
  *     `_deposit(msg.sender, …)`, which deposits into the pool for the router
  *     and transfers the shares to that caller, so a transfer from a router
  *     is the receiving wallet's own deposit.
+ *   • Alchemix's Routers: each address is the one Alchemix's docs list as
+ *     "Router" for its market on that chain (docs.alchemix.fi/dev/contracts/
+ *     ethereum, /base, /optimism, /arbitrum, read 2026-11-13), and the docs'
+ *     contract page names the contract `AlchemistRouter`. Not yet read on the
+ *     explorers (rails-ops reference/official-docs/alchemix.md, ui-jobs 646).
  *   • The lending pools (Etherscan `Morpho`, `FluidLiquidityProxy`,
  *     2026-10-02) hold their markets' collateral and loans for every user at
  *     once, so they are busy open Maple holders that are nobody's position.
@@ -458,6 +469,13 @@ const syrupRouter = (poolSymbol: string, asset: string): ProtocolContract => ({
   contractName: "SyrupRouter",
   protocolIcon: "maple",
   role: `Maple’s SyrupRouter for ${poolSymbol}, which deposits a wallet’s ${asset} into the pool and passes the shares to that wallet in the same transaction`,
+});
+const alchemixRouter = (market: string): ProtocolContract => ({
+  name: "Alchemix Router",
+  kind: "router",
+  contractName: "AlchemistRouter",
+  protocolIcon: "alchemix",
+  role: `Alchemix’s Router for the ${market} market, which runs a holder’s deposit, borrow, repay, withdraw or Transmuter claim steps in one transaction`,
 });
 const MORPHO_BLUE: ProtocolContract = {
   name: "Morpho Blue",
@@ -1262,6 +1280,8 @@ const ENTRIES: [ChainId, string, KnownInfrastructure][] = [
   [MAINNET_CHAIN_ID, "0xf007476bb27430795138c511f18f821e8d1e5ee2", syrupRouter("syrupUSDT", "USDT")],
   [MAINNET_CHAIN_ID, "0xbbbbbbbbbb9cc5e90e3b3af64bdaf62c37eeffcb", MORPHO_BLUE],
   [MAINNET_CHAIN_ID, "0x52aa899454998be5b000ad077a46bbe360f4e497", FLUID_LIQUIDITY],
+  [MAINNET_CHAIN_ID, "0xdb852896a23c7e2519b75aea692cacf834d086ab", alchemixRouter("alETH")],
+  [MAINNET_CHAIN_ID, "0x6733aa6b2a622e43e8ff61945e8fbe5f1b6b00fd", alchemixRouter("alUSD")],
   // ── Ethereum, batch 1 (item 430) ──
   [MAINNET_CHAIN_ID, "0x89c6340b1a1f4b25d36cd8b063d49045caf3f818", LIFI_PERMIT2_PROXY],
   [MAINNET_CHAIN_ID, "0x6307119078556fc8ad77781dfc67df20d75fb4f9", LIFI_PERMIT2_PROXY],
@@ -1668,8 +1688,14 @@ const ENTRIES: [ChainId, string, KnownInfrastructure][] = [
   [BASE_CHAIN_ID, "0x79474223aedd0339780bacce75abda0be84dcbf9", PANCAKE_V2_PAIR],
   [BASE_CHAIN_ID, "0x13b312fa5153088f71ef14b55953f72f7c0b25ea", LEVERAGED_POSITION],
   [BASE_CHAIN_ID, "0xbdb49d8852e91c262dcd9ee6ace91828c0b2583a", DZAP_ZAP],
+  [BASE_CHAIN_ID, "0x720d1f945279a6d82eedcc9b7f85767279ea2f96", alchemixRouter("alUSDb")],
   // ── Arbitrum ──
   [ARBITRUM_CHAIN_ID, "0x5283beced7adf6d003225c13896e536f2d4264ff", WETH_GATEWAY],
+  [ARBITRUM_CHAIN_ID, "0xc774f30484818f06a261a89a1d66367e6bbe3e5a", alchemixRouter("alETH")],
+  [ARBITRUM_CHAIN_ID, "0x3c0546587d27354635a4972390a7b96f962d8bbd", alchemixRouter("alUSD")],
+  // ── Optimism ──
+  [OPTIMISM_CHAIN_ID, "0xc774f30484818f06a261a89a1d66367e6bbe3e5a", alchemixRouter("alETH")],
+  [OPTIMISM_CHAIN_ID, "0x3c0546587d27354635a4972390a7b96f962d8bbd", alchemixRouter("alUSD")],
   // ── Arbitrum, batch 2 (item 430) ──
   [ARBITRUM_CHAIN_ID, "0xba1333333333a1ba1108e8412f11850a5c319ba9", BALANCER_V3_VAULT],
   [ARBITRUM_CHAIN_ID, "0xb92fe925dc43a0ecde6c8b1a2709c170ec4fff4f", RELAY_ROUTER_V3],

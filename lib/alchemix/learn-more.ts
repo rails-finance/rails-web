@@ -10,6 +10,7 @@
 // A figure about one position belongs at T2 or T3, never here.
 
 import type { LearnMoreContent, LearnMoreLink } from "@/components/shared/learn-more-modal";
+import { ALCHEMIX_V2_DOCS } from "@/lib/alchemix/transmuter-words";
 
 const DOCS = "https://docs.alchemix.fi";
 
@@ -46,6 +47,8 @@ export const ALCHEMIX_DOCS = {
   v3Migration: { label: "The V2 to V3 migration", url: `${DOCS}/user/v3-migration` },
   contractsEthereum: { label: "Contract addresses on Ethereum", url: `${DOCS}/dev/contracts/ethereum` },
   contractsBase: { label: "Contract addresses on Base", url: `${DOCS}/dev/contracts/base` },
+  fixedYield: { label: "Fixed Yield (the app's Transmuter page)", url: `${DOCS}/user/tutorials/redeem-alassets` },
+  v2Alchemist: { label: "Alchemix V2: the Alchemist", url: `${ALCHEMIX_V2_DOCS}/alchemix-ecosystem/alchemist` },
 } satisfies Record<string, LearnMoreLink>;
 
 // ── The shared core ─────────────────────────────────────────────────────────
@@ -59,7 +62,7 @@ const CORE_COLLATERAL = {
 
 const CORE_EARMARKED = {
   bold: "Earmarked debt",
-  text: "set aside to be repaid by redemptions: the part of the debt the Transmuter has claimed as its depositors' deposits matured. It grows block by block. A redemption clears it, and so does the holder repaying with vault shares (the earmarked part is paid first, with the market's protocol fee) or closing the position with its collateral.",
+  text: "set aside to be repaid by redemptions: the part of the debt the Transmuter has claimed as its depositors' deposits matured. It grows block by block. A redemption clears it, and so does the holder repaying with vault shares (the earmarked part is paid first, with the market's redemption fee) or closing the position with its collateral.",
 };
 
 const CORE_LTV = {
@@ -142,7 +145,7 @@ export const ALCHEMIX_BURN_REPAY: LearnMoreContent = {
     CORE_EARMARKED,
     {
       bold: "Repay",
-      text: "pays the debt with vault shares. Each share counts at its value in the asset underneath at that block, one synthetic per unit, and the market keeps a protocol fee in shares on the part that pays off earmarked debt (0.25% on Ethereum, 0.1% on Base).",
+      text: `pays the debt with vault shares. Each share counts at its value in the asset underneath at that block, one synthetic per unit, and the market keeps its redemption fee, where one is charged, in shares on the part that pays off earmarked debt.`,
     },
   ],
   links: [ALCHEMIX_DOCS.repay, ALCHEMIX_DOCS.borrowerFee, ALCHEMIX_DOCS.transmuterFlow],
@@ -169,7 +172,7 @@ export const ALCHEMIX_SELF_LIQUIDATE: LearnMoreContent = {
     },
     {
       bold: "The fee",
-      text: "is the market's protocol fee on those earmarked shares (0.25% on Ethereum, 0.1% on Base), paid to Alchemix's fee receiver. The rest of the debt is paid without a fee, and no liquidator fee applies.",
+      text: `is the market's redemption fee, where one is charged, on those earmarked shares, paid to Alchemix's protocol fee receiver. The rest of the debt is paid without a fee.`,
     },
     {
       bold: "Shares used",
@@ -193,21 +196,21 @@ export const ALCHEMIX_HOW_IT_WORKS: LearnMoreContent = {
     "Every Alchemix market has two halves. The Alchemist holds borrowers' positions: vault shares in, a synthetic token such as alUSD out. The Transmuter takes that synthetic back from anyone who holds it and, over time, turns it into the vault shares borrowers put up. The second half is what repays the first.",
   stepsHeading: "How a redemption happens",
   steps: [
-    "Someone holding alUSD deposits it in the market's Transmuter, where it matures over a period measured in blocks.",
-    "As those deposits mature, the Alchemist earmarks a matching amount of debt across every open position on the market, in proportion to what each position owes: it sets that debt aside to be repaid by redemptions. That is each position's Earmarked debt figure, and it grows block by block.",
-    "When a depositor claims, the Transmuter redeems: every open position's earmarked debt is cleared by the same ratio, and the Alchemist takes collateral for it. Vault shares worth one unit of the asset underneath (USDC, or WETH on alETH) for each unit of debt cleared go to the Transmuter, and the market's redemption fee, 0.25% on top of those shares on Ethereum and 0.1% on Base, goes to Alchemix's fee receiver.",
-    "The Transmuter pays the depositor in those vault shares (mixUSDC on the alUSD market) for the part of the deposit that has matured, and hands back the rest as alUSD.",
+    "Someone holding alUSD deposits it in the market's Transmuter, where it vests over a term measured in blocks.",
+    "As those deposits vest, the Alchemist earmarks a matching amount of debt across every open position on the market, in proportion to each position's unearmarked debt. That is each position's Earmarked debt figure, and it grows block by block.",
+    `When a depositor claims, the Transmuter redeems: every open position's earmarked debt is cleared by the same ratio, and the Alchemist takes collateral for it. Vault shares worth one unit of the asset underneath (USDC, or WETH on alETH) for each unit of debt cleared go to the Transmuter, and the market's redemption fee, where one is charged, on top of those shares goes to Alchemix's protocol fee receiver.`,
+    "The Transmuter pays the depositor in those vault shares (mixUSDC on the alUSD market) for the part of the deposit that has vested, one unit of the asset underneath for each alUSD, and returns the rest as alUSD.",
   ],
   // The depositor's side, which a borrower reading a redemption also needs: a
   // claim can come before maturity, and what that costs.
   extraParagraphs: [
-    "A deposit converts a little every block, in equal parts from the block it is made to its maturity block. The depositor can claim at any time. A claim before maturity converts only the part whose blocks have passed, hands the rest back as alUSD and keeps an early exit fee on that rest (1% on every early claim so far). So claiming early gives up converting the rest and pays the fee; to convert it, the depositor deposits it again and waits a new full term.",
+    "A deposit vests a little every block, in equal parts from the block it is made to its maturity block. The depositor can claim at any time. A claim before maturity pays out only the part whose blocks have passed, returns the rest as alUSD and charges an early exit fee on that rest. To vest the rest, the depositor deposits it again and waits a new full term.",
   ],
   detailsHeading: "What it means for a borrower",
   details: [
     {
       bold: "The loan is repaid over time without the holder acting.",
-      text: "Each redemption lowers the debt by what it clears and the collateral by that much plus the redemption fee, so the position's collateral less its debt falls by about the fee each time. Each redemption card states the difference for that position as its net and the fee inside it.",
+      text: `Each redemption lowers the debt by what it clears and the collateral by that much plus the market's redemption fee, where one is charged, so the position's collateral less its debt falls by about that fee each time. Each redemption card states the difference for that position as its net and the fee inside it.`,
     },
     {
       bold: "The vault's share price decides what is left over.",
@@ -259,7 +262,7 @@ export const ALCHEMIX_LINE_WIDE: LearnMoreContent = {
   details: [
     {
       bold: "Redemption",
-      text: "clears every open position's earmarked debt on the market at once, by one ratio, and takes shares from each one's collateral: shares worth the debt cleared for the Transmuter, and the market's redemption fee on top for Alchemix's fee receiver.",
+      text: `clears every open position's earmarked debt on the market at once, by one ratio, and takes shares from each one's collateral: shares worth the debt cleared for the Transmuter, and the market's redemption fee, where one is charged, on top for Alchemix's protocol fee receiver.`,
     },
     {
       bold: "Batch liquidation",
@@ -305,7 +308,7 @@ export function alchemixPositionContent(status: string, infoHref: string): Learn
       },
       {
         bold: "Earmarked debt",
-        text: "set aside to be repaid by redemptions: the part of the debt the market's Transmuter has claimed. Holders of the synthetic deposit it in the Transmuter, and as those deposits mature the Alchemist earmarks a matching amount of debt across every open position on the market, in proportion to what each owes. The figure grows block by block, so a reading holds at its block. A redemption clears earmarked debt and takes vault shares worth it from the collateral, plus the market's redemption fee. The holder can also clear it: a repay with vault shares pays the earmarked part first, with the same fee, and closing the position with its collateral pays all of it. The explorer's Info page, linked below, walks through the whole cycle.",
+        text: `set aside to be repaid by redemptions: the part of the debt the market's Transmuter has claimed. Holders of the synthetic deposit it in the Transmuter, and as those deposits vest the Alchemist earmarks a matching amount of debt across every open position on the market, in proportion to each position's unearmarked debt. The figure grows block by block, so a reading holds at its block. A redemption clears earmarked debt and takes vault shares worth it from the collateral, plus the market's redemption fee, where one is charged. The holder can also clear it: a repay with vault shares pays the earmarked part first, with the same fee, and closing the position with its collateral pays all of it. The explorer's Info page, linked below, walks through the whole cycle.`,
       },
       {
         bold: "LTV",
@@ -361,7 +364,7 @@ export const ALCHEMIX_LIFETIME_FLOWS: LearnMoreContent = {
     },
     {
       bold: "Repays",
-      text: "the shares a repay pays with come from the caller's wallet, so they are not drawn; only the protocol fee on the earmarked part leaves the collateral.",
+      text: "the shares a repay pays with come from the caller's wallet, so they are not drawn; only the redemption fee on the earmarked part leaves the collateral.",
     },
     {
       bold: "LTV",
@@ -379,7 +382,7 @@ export const ALCHEMIX_LIFETIME_FLOWS: LearnMoreContent = {
 export const ALCHEMIX_V2: LearnMoreContent = {
   title: "Alchemix V2 events",
   intro:
-    "Alchemix V2 is the version that ran before V3. It closed on 2 April 2026. Where a V2 account was carried into a V3 position, the V3 position's page shows the V2 events for context and adds no V2 figure to its own: they are one obligation at two points in time.",
+    "Alchemix V2 is the version that ran before V3. Its positions were migrated to V3 in April 2026. Where a V2 account was carried into a V3 position, the V3 position's page shows the V2 events for context and adds no V2 figure to its own: they are one obligation at two points in time.",
   detailsHeading: "What a V2 event records",
   details: [
     {
@@ -392,21 +395,21 @@ export const ALCHEMIX_V2: LearnMoreContent = {
     },
     {
       bold: "A V2 Liquidate",
-      text: "is the account holder repaying their own debt by selling their own collateral shares. Nobody else is involved.",
+      text: "is what Alchemix's V2 docs call a self-liquidation: it uses the account's collateral to repay its debt. Only the holder could start one; by those docs, \"A user's collateral will never be liquidated unless they do it themselves\".",
     },
     {
       bold: "The account's figures",
-      text: "were read once, when V2 closed, and not at each event.",
+      text: "are the migration's snapshot, read once from the paused contracts.",
     },
   ],
-  links: [ALCHEMIX_DOCS.v3Migration],
+  links: [ALCHEMIX_DOCS.v3Migration, ALCHEMIX_DOCS.v2Alchemist],
 };
 
 /** The "?" on a Transmuter position's event. */
 export const ALCHEMIX_TRANSMUTER: LearnMoreContent = {
   title: "How the Transmuter works",
   intro:
-    "The Transmuter takes an alAsset and converts it into vault shares over a fixed term. A deposit opens a position, held as an NFT, that converts a little every block until it matures.",
+    "The Transmuter takes an alAsset and pays it out in vault shares over a fixed term, the Transmutation Time. A deposit opens a position, held as an NFT, that vests a little every block until it matures.",
   detailsHeading: "Key concepts:",
   details: [
     {
@@ -415,16 +418,16 @@ export const ALCHEMIX_TRANSMUTER: LearnMoreContent = {
     },
     {
       bold: "Maturity",
-      text: "the block by which the whole deposit has converted. Before it, only the part of the term that has passed has converted.",
+      text: "the block by which the whole deposit has vested. Before it, only the part of the term that has passed has vested.",
     },
     {
       bold: "Claim",
-      text: "ends the position and burns its NFT. It pays out the converted part in vault shares and hands back the alAsset still to convert.",
+      text: "ends the position and burns its NFT. It pays out the vested part in vault shares, one unit of the asset underneath for each alAsset vested, and returns the alAsset not yet vested.",
     },
     {
       bold: "Early exit fee",
-      text: "a claim before maturity gives up part of the alAsset still to convert, which the Transmuter keeps.",
+      text: "a claim before maturity pays a share of the alAsset not yet vested as a fee, which goes to Alchemix's protocol fee receiver. Alchemix's docs also call it the Early Transmutation Fee and the early exit penalty, and the app shows it as the Early Claim Penalty.",
     },
   ],
-  links: [ALCHEMIX_DOCS.transmuter],
+  links: [ALCHEMIX_DOCS.transmuter, ALCHEMIX_DOCS.fixedYield],
 };

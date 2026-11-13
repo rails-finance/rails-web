@@ -24,6 +24,7 @@
 
 import type { ChainId } from "@/lib/shared/chains";
 import type { SessionProtocol } from "@/lib/shared/sessions";
+import { protocolFeeAt, type ProtocolFeeStep } from "@/lib/alchemix/protocol-fee";
 
 export interface AlchemixLine {
   /** The key the API takes in a path or a `line=` filter. */
@@ -33,12 +34,6 @@ export interface AlchemixLine {
   /** How the line is named on a surface ("alUSD"), which is not the same string
    *  as the synthetic's symbol on every line. */
   displayName: string;
-  /** The Alchemist's `protocolFee`, in basis points, read from chain
-   *  2026-09-25 and again 2026-09-27 (rails-ops decisions/0032): charged in
-   *  vault shares on a repay's earmarked part, and on every redemption on top
-   *  of the shares the Transmuter gets. Stated on the repay and redemption
-   *  cards. */
-  protocolFeeBps: number;
   /** The line's vault share (MYT) and the asset it holds, by symbol, for the
    *  prose that names a line's pair. The addresses come from the API. */
   myt: string;
@@ -47,9 +42,9 @@ export interface AlchemixLine {
 
 /** Every line, chain first. The order is the display order. */
 const LINES: AlchemixLine[] = [
-  { key: "eth-alusd", chainId: 1, displayName: "alUSD", protocolFeeBps: 25, myt: "mixUSDC", underlying: "USDC" },
-  { key: "eth-aleth", chainId: 1, displayName: "alETH", protocolFeeBps: 25, myt: "mixWETH", underlying: "WETH" },
-  { key: "base-alusdb", chainId: 8453, displayName: "alUSDb", protocolFeeBps: 10, myt: "mixUSDC", underlying: "USDC" },
+  { key: "eth-alusd", chainId: 1, displayName: "alUSD", myt: "mixUSDC", underlying: "USDC" },
+  { key: "eth-aleth", chainId: 1, displayName: "alETH", myt: "mixWETH", underlying: "WETH" },
+  { key: "base-alusdb", chainId: 8453, displayName: "alUSDb", myt: "mixUSDC", underlying: "USDC" },
 ];
 
 /** One explorer — a chain, its route, its session key, and the lines it lists.
@@ -97,13 +92,13 @@ export function transmuterPositionPath(deployment: AlchemixDeployment, lineKey: 
 // `<explorer>/v2/<line>/<account>`: the position is a wallet account, so the
 // account is the second half of the key where a V3 position has a token id.
 
-const V2_LINES: Omit<AlchemixLine, "protocolFeeBps" | "myt" | "underlying">[] = [
+const V2_LINES: Omit<AlchemixLine, "myt" | "underlying">[] = [
   { key: "eth-alusd-v2", chainId: 1, displayName: "alUSD" },
   { key: "eth-aleth-v2", chainId: 1, displayName: "alETH" },
 ];
 
 /** The V2 lines on one chain: both on Ethereum, none anywhere else. */
-export function v2LinesForChain(chainId: ChainId): Omit<AlchemixLine, "protocolFeeBps" | "myt" | "underlying">[] {
+export function v2LinesForChain(chainId: ChainId): Omit<AlchemixLine, "myt" | "underlying">[] {
   return V2_LINES.filter((l) => l.chainId === chainId);
 }
 
@@ -132,10 +127,10 @@ export function linesForChain(chainId: ChainId): AlchemixLine[] {
   return LINES.filter((l) => l.chainId === chainId);
 }
 
-/** The line's protocol fee in basis points, or null for a key this catalog
- *  does not hold. */
-export function lineProtocolFeeBps(chainId: number, key: string): number | null {
-  return LINES.find((l) => l.chainId === chainId && l.key === key)?.protocolFeeBps ?? null;
+/** The line's protocol fee step in force at `block` (lib/alchemix/protocol-fee.ts):
+ *  its basis points (null where unread) and what they rest on. */
+export function lineProtocolFeeStep(chainId: number, key: string, block: number): ProtocolFeeStep | null {
+  return protocolFeeAt(chainId, key, block);
 }
 
 /** Is this line key one of the lines on this chain? The validity gate for a

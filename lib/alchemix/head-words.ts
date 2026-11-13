@@ -7,6 +7,7 @@
 // title where the card has no teaser).
 
 import type { AlchemixV2Context, AlchemixV3Context } from "@/lib/shared/types/event-shape";
+import { TRANSMUTER_WORDS } from "@/lib/alchemix/transmuter-words";
 
 export const ALCHEMIX_HEAD_WORDS = {
   sep: "·",
@@ -29,8 +30,8 @@ export const ALCHEMIX_HEAD_WORDS = {
   redeemed: "Redeemed",
   batchLiquidated: "Batch liquidated",
   feeShortfall: "Fee shortfall paid",
-  /** The Transmuter. */
-  staked: "Staked",
+  /** The Transmuter: the docs' "deposit" (ui-jobs 646, call 1). */
+  staked: TRANSMUTER_WORDS.deposited,
   claimed: "Claimed",
   poked: "Poked",
   /** V2: the holder's own Liquidate sells their collateral to repay. */
