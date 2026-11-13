@@ -211,9 +211,9 @@ check(
 );
 
 // ---------------------------------------------------------------------------
-console.log("\nRates — blocksPerYear is NOT one constant across the roster");
+console.log("\nRate models — blocksPerYear() differs across the roster; rates print on 2,628,000 blocks");
 check(
-  "the roster disagrees on blocksPerYear — a single hardcoded constant would be wrong somewhere",
+  "the rate models disagree on blocksPerYear()",
   bpySeen.size > 1,
   [...bpySeen].map((n) => n.toLocaleString()).join(" and "),
 );
@@ -221,10 +221,10 @@ const cethIrm = (await read(CETH, CTOKEN_ABI, "interestRateModel")).v;
 const cdaiIrm = (await read(CDAI, CTOKEN_ABI, "interestRateModel")).v;
 const cethBpy = Number((await read(cethIrm, IRM_ABI, "blocksPerYear")).v);
 const cdaiBpy = Number((await read(cdaiIrm, IRM_ABI, "blocksPerYear")).v);
-check("cETH's model annualizes on 2,628,000 blocks", cethBpy === 2_628_000, String(cethBpy));
-check("cDAI's model annualizes on 2,102,400 blocks", cdaiBpy === 2_102_400, String(cdaiBpy));
+check("cETH's model sets its per-block curve on 2,628,000 blocks", cethBpy === 2_628_000, String(cethBpy));
+check("cDAI's model sets its per-block curve on 2,102,400 blocks", cdaiBpy === 2_102_400, String(cdaiBpy));
 check(
-  "so annualizing cETH on cDAI's constant would misstate the biggest market by ~25%",
+  "the two constants differ by a quarter, so neither model's constant can be the printed year for both",
   Math.abs(cethBpy / cdaiBpy - 1.25) < 0.001,
   `${((cethBpy / cdaiBpy - 1) * 100).toFixed(1)}% off`,
 );

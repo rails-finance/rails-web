@@ -24,7 +24,7 @@ import { COMPOUND_V2_HEAD_WORDS } from "@/lib/compound-v2/event-templates";
 
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { compoundV2EventProse, type CompoundV2Event } from "@/lib/compound-v2/event-prose";
+import { compoundV2EventProse, seizeLegs, type CompoundV2Event } from "@/lib/compound-v2/event-prose";
 import { compoundV2HeadSpec, compoundV2T1Caption } from "./compound-v2-event-header";
 import { useCompoundV2Cells } from "./compound-v2-event-detail";
 import { useCompoundV2Sheet } from "./compound-v2-event-sheet";
@@ -240,7 +240,10 @@ export function CompoundV2EventCard({ event, isLast, eventNumber, siblings }: Co
       body: <CompoundV2EventExplainer ctx={ctx} event={event} externalBy={extBy ?? undefined} siblings={sibs} />,
       first:
         prose.L4.length > 0 ? (
-          <CompoundV2ExplainerTeaser prose={prose} echo={(key) => compoundV2EchoFor(key, ctx, coords)} />
+          <CompoundV2ExplainerTeaser
+            prose={prose}
+            echo={(key) => compoundV2EchoFor(key, ctx, coords, seizeLegs({ siblings: sibs, self: event }))}
+          />
         ) : undefined,
       grouped: isGroupedExplanation(prose),
     },

@@ -11,7 +11,12 @@ import { COMPOUND_V2_ADDRESSES } from "@/lib/compound-v2/asset-catalog";
 import { MOONWELL_ADDRESSES } from "@/lib/moonwell/asset-catalog";
 import { MOONWELL_BASE_COMPTROLLER } from "@/lib/moonwell-base/asset-catalog";
 import { BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
-import type { ComptrollerVocabFamily } from "@/lib/comptroller/markets-provenance";
+import type { ComptrollerRateYear, ComptrollerVocabFamily } from "@/lib/comptroller/markets-provenance";
+import {
+  COMPOUND_V2_BLOCKS_PER_YEAR,
+  COMPOUND_V2_YEAR_DOCS,
+  COMPOUND_V2_YEAR_SOURCE,
+} from "@/lib/compound-v2/rate-year";
 
 export type ComptrollerFamilyKey = "compound-v2" | "moonwell" | "moonwell-base";
 
@@ -28,6 +33,10 @@ export interface ComptrollerFamily {
   /** The market token's noun. */
   token: "cToken" | "mToken";
   period: "block" | "second";
+  /** The year rates are printed over where it is a fixed count (Compound V2's
+   *  2,628,000 blocks, lib/compound-v2/rate-year.ts); null where they run on the
+   *  rate model's constant (Moonwell's timestampsPerYear()). */
+  rateYear: ComptrollerRateYear | null;
   oracleName: string;
   /** The Comptroller keeps supply caps (Moonwell); Compound V2 keeps borrow caps alone. */
   supplyCaps: boolean;
@@ -46,6 +55,7 @@ export const COMPTROLLER_FAMILIES: Record<ComptrollerFamilyKey, ComptrollerFamil
     oracle: "0x8CF42B08AD13761345531b839487aA4d113955d9",
     token: "cToken",
     period: "block",
+    rateYear: { periods: COMPOUND_V2_BLOCKS_PER_YEAR, source: COMPOUND_V2_YEAR_SOURCE, href: COMPOUND_V2_YEAR_DOCS },
     oracleName: "Price oracle",
     supplyCaps: false,
     listingFilter: "symbol",
@@ -60,6 +70,7 @@ export const COMPTROLLER_FAMILIES: Record<ComptrollerFamilyKey, ComptrollerFamil
     oracle: MOONWELL_ADDRESSES.ORACLE,
     token: "mToken",
     period: "second",
+    rateYear: null,
     oracleName: "Chainlink oracle",
     supplyCaps: true,
     listingFilter: "symbol",
@@ -74,6 +85,7 @@ export const COMPTROLLER_FAMILIES: Record<ComptrollerFamilyKey, ComptrollerFamil
     oracle: "0xEC942bE8A8114bFD0396A5052c36027f2cA6a9d0",
     token: "mToken",
     period: "second",
+    rateYear: null,
     oracleName: "Chainlink oracle",
     supplyCaps: true,
     listingFilter: "market",
@@ -89,6 +101,7 @@ export function vocabFamily(f: ComptrollerFamily): ComptrollerVocabFamily {
     comptroller: f.comptroller,
     token: f.token,
     period: f.period,
+    rateYear: f.rateYear,
     oracleName: f.oracleName,
     lane: `${f.name} markets`,
   };

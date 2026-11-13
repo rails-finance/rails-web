@@ -109,8 +109,8 @@ export interface CompoundV2PositionView {
   /** Markets whose price is a stored constant with NO feed (the oracle's own
    *  getConfig says so) — the flag every USD surface must carry. */
   priceFixedByMarket?: Record<string, boolean>;
-  /** Annualized per-block rates per market key (from the same multicall). */
-  ratesByMarket?: Record<string, { borrowApr: number | null; supplyApr: number | null }>;
+  /** Per-block rates × 2,628,000 blocks per market key (from the same multicall). */
+  ratesByMarket?: CompoundV2PositionSummary["ratesByMarket"];
   /** The block the exchange rates, prices and rates above were read at and
    *  who answered (`CompoundV2PositionSummary.marketRead`). */
   marketRead?: CompoundV2PositionSummary["marketRead"];
@@ -596,13 +596,13 @@ export function useCompoundV2CardSlots({
           id: "borrow-rate",
           label: rate.avg ? "Average borrow rate" : "Borrow rate",
           value: (
-            <Prov info={stampServerRead(rate.avg ? avgBorrowRateProv() : borrowRateProv(rate.symbol), marketBy)}>
+            <Prov info={stampServerRead(rate.avg ? avgBorrowRateProv() : borrowRateProv(rate.symbol, rate), marketBy)}>
               {rate.pct.toFixed(2)}%
             </Prov>
           ),
           tip: rate.avg
             ? "The borrowed markets' current variable rates, averaged by each debt's dollar value at Compound's oracle prices."
-            : `The ${rate.symbol ?? "market"} market's current variable borrow rate: its borrowRatePerBlock, read from the chain and annualised on the market's interest rate model.`,
+            : `The ${rate.symbol ?? "market"} market's current variable borrow rate: its borrowRatePerBlock, read from the chain, times the 2,628,000 blocks in a year of 12-second blocks.`,
         },
       ]
     : [];

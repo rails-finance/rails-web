@@ -108,8 +108,17 @@ export interface CompoundV2PositionSummary {
    *  (true = frozen — cSAI's constant is $14.4263). Keyed by market key;
    *  present only for priced markets. */
   priceFixedByMarket: Record<string, boolean>;
-  /** Annualized per-block rates per market key (null members when unread). */
-  ratesByMarket: Record<string, { borrowApr: number | null; supplyApr: number | null }>;
+  /** Per-block rates × 2,628,000 blocks per market key (null members when unread). */
+  ratesByMarket: Record<
+    string,
+    {
+      borrowApr: number | null;
+      supplyApr: number | null;
+      /** The per-block borrow rate as read, and the model's blocksPerYear(), for the receipt. */
+      borrowRatePerBlockRaw?: string | null;
+      blocksPerYear?: number | null;
+    }
+  >;
   /** The block the market state above (exchange rates, prices, rates) was
    *  read at and who answered; absent when it was not read. */
   marketRead?: CompoundV2MarketRead;
@@ -178,7 +187,12 @@ export async function buildCompoundV2PositionRows(raw: RawCompoundV2WalletRow[])
       priceByMarket[key] = s.priceUsd;
       priceFixedByMarket[key] = !s.priceHasFeed;
     }
-    ratesByMarket[key] = { borrowApr: s.borrowApr, supplyApr: s.supplyApr };
+    ratesByMarket[key] = {
+      borrowApr: s.borrowApr,
+      supplyApr: s.supplyApr,
+      borrowRatePerBlockRaw: s.borrowRatePerBlockRaw,
+      blocksPerYear: s.blocksPerYear,
+    };
   }
 
   return raw.map((w) => {

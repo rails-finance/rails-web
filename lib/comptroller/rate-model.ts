@@ -5,13 +5,17 @@
 // Three shapes run on the two rosters:
 //   • JumpRateModel (V2 and Moonwell's): base + multiplier × U up to the kink,
 //     then the jump multiplier × (U − kink) on top. Its terms are stored per
-//     block (Compound V2) or per second (Moonwell) and annualised on the
-//     model's blocksPerYear() or timestampsPerYear().
+//     block (Compound V2) or per second (Moonwell) and annualised on the year
+//     the family's rates are printed over: 2,628,000 blocks for Compound V2
+//     (lib/compound-v2/rate-year.ts), the model's timestampsPerYear() for
+//     Moonwell.
 //   • A flat model (Moonwell Base): a jump-rate model with kink, multiplier and
 //     jump all zero, so the rate is the base rate at every utilisation.
 //   • WhitePaperInterestRateModel, the first V2 model (five legacy markets):
 //     baseRate() and multiplier() stored a year, no kink, and a utilisation of
-//     borrows ÷ (cash + borrows) that leaves reserves out.
+//     borrows ÷ (cash + borrows) that leaves reserves out. The contract divides
+//     them by its blocksPerYear() to get the per-block rate, so on another year
+//     they scale by that year ÷ the model's.
 // Utilisation in the other two is borrows ÷ (cash + borrows − reserves).
 //
 // Pure: imported by the server loaders and the client adapter.
@@ -54,16 +58,24 @@ export function jumpRateModel(
   return { shape: "jump", base: a(raw.base), multiplier: a(raw.multiplier), jump, kink, reservesInUtil: true };
 }
 
-/** The white-paper model's terms, stored a year (1e18 mantissas). */
-export function whitePaperModel(raw: {
-  baseRate: bigint | null;
-  multiplier: bigint | null;
-}): ComptrollerRateModel | null {
+/** The white-paper model's terms, stored a year on the model's
+ *  `blocksPerYear()` (1e18 mantissas). With `year`, each term is read per block
+ *  (÷ the model's year) and annualised on `year.periods`; null without the
+ *  model's year to divide by. */
+export function whitePaperModel(
+  raw: {
+    baseRate: bigint | null;
+    multiplier: bigint | null;
+  },
+  year?: { periods: number; modelPeriods: number | null },
+): ComptrollerRateModel | null {
   if (raw.baseRate == null || raw.multiplier == null) return null;
+  if (year && year.modelPeriods == null) return null;
+  const scale = year && year.modelPeriods != null ? year.periods / year.modelPeriods : 1;
   return {
     shape: "linear",
-    base: Number(raw.baseRate) / E18,
-    multiplier: Number(raw.multiplier) / E18,
+    base: (Number(raw.baseRate) / E18) * scale,
+    multiplier: (Number(raw.multiplier) / E18) * scale,
     jump: null,
     kink: null,
     reservesInUtil: false,

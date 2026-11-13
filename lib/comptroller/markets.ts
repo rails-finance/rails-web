@@ -51,6 +51,11 @@ export interface ComptrollerMarket {
   /** A year, as fractions. */
   supplyApr: number | null;
   borrowApr: number | null;
+  /** The per-period rates as read and the model's periods-a-year constant,
+   *  for the receipts where the family prints a fixed year (Compound V2); null elsewhere. */
+  supplyRatePerPeriodRaw: string | null;
+  borrowRatePerPeriodRaw: string | null;
+  modelPeriodsPerYear: number | null;
   reserveFactor: number | null;
   irm: string | null;
   rateModel: ComptrollerRateModel | null;
@@ -119,6 +124,9 @@ export function fromCompoundV2(data: CompoundV2MarketsResponse): ComptrollerRead
           borrowPaused: m.borrowPaused ?? false,
           supplyApr: m.supplyApr != null ? m.supplyApr / 100 : null,
           borrowApr: m.borrowApr != null ? m.borrowApr / 100 : null,
+          supplyRatePerPeriodRaw: m.supplyRatePerBlockRaw ?? null,
+          borrowRatePerPeriodRaw: m.borrowRatePerBlockRaw ?? null,
+          modelPeriodsPerYear: m.blocksPerYear ?? null,
           reserveFactor: m.reserveFactor,
           irm: m.interestRateModel,
           rateModel: m.rateModel ?? null,
@@ -162,6 +170,9 @@ export function fromMoonwell(data: MoonwellMarketsResponse, family: "moonwell" |
         borrowPaused: m.borrowPaused,
         supplyApr: m.supplyApr != null ? m.supplyApr / 100 : null,
         borrowApr: m.borrowApr != null ? m.borrowApr / 100 : null,
+        supplyRatePerPeriodRaw: null,
+        borrowRatePerPeriodRaw: null,
+        modelPeriodsPerYear: null,
         reserveFactor: m.reserveFactor,
         irm: m.interestRateModel,
         rateModel: m.rateModel ?? null,

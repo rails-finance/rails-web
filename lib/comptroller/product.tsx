@@ -260,13 +260,27 @@ function figuresOf(x: Ctx, m: ComptrollerMarket) {
   );
   const supplyRate =
     m.supplyApr != null && m.supplied > 0 ? (
-      <Prov info={cmRateProv(x.v, c, "supply")}>{ratePercentText(m.supplyApr)}</Prov>
+      <Prov
+        info={cmRateProv(x.v, c, "supply", {
+          perPeriodRaw: m.supplyRatePerPeriodRaw,
+          modelPeriodsPerYear: m.modelPeriodsPerYear,
+        })}
+      >
+        {ratePercentText(m.supplyApr)}
+      </Prov>
     ) : (
       DASH
     );
   const borrowRate =
     m.borrowApr != null && m.borrowed > 0 ? (
-      <Prov info={cmRateProv(x.v, c, "borrow")}>{ratePercentText(m.borrowApr)}</Prov>
+      <Prov
+        info={cmRateProv(x.v, c, "borrow", {
+          perPeriodRaw: m.borrowRatePerPeriodRaw,
+          modelPeriodsPerYear: m.modelPeriodsPerYear,
+        })}
+      >
+        {ratePercentText(m.borrowApr)}
+      </Prov>
     ) : (
       DASH
     );
@@ -1312,22 +1326,23 @@ function RateTerms({ x, m }: { x: Ctx; m: ComptrollerMarket }) {
   if (!model) return null;
   const c = coordsOf(x, m);
   const wp = !model.reservesInUtil;
+  const read = { modelPeriodsPerYear: m.modelPeriodsPerYear };
   const year = (v: number) => `${ratePercentText(v)} a year`;
   return (
     <dl className="mt-4 grid max-w-md grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-[13px]" data-rate-terms="">
       <Term term="Base rate" title="The borrow rate at zero utilisation">
-        <Prov info={cmRateTermProv(x.v, c, "base", wp)}>{year(model.base)}</Prov>
+        <Prov info={cmRateTermProv(x.v, c, "base", wp, read)}>{year(model.base)}</Prov>
       </Term>
       <Term term="Multiplier" title="How much the borrow rate climbs per unit of utilisation, up to the kink">
-        <Prov info={cmRateTermProv(x.v, c, "multiplier", wp)}>{year(model.multiplier)}</Prov>
+        <Prov info={cmRateTermProv(x.v, c, "multiplier", wp, read)}>{year(model.multiplier)}</Prov>
       </Term>
       {model.kink != null ? (
         <>
           <Term term="Kink" title="The utilisation where the borrow rate turns steeper">
-            <Prov info={cmRateTermProv(x.v, c, "kink", wp)}>{pct(model.kink)}</Prov>
+            <Prov info={cmRateTermProv(x.v, c, "kink", wp, read)}>{pct(model.kink)}</Prov>
           </Term>
           <Term term="Jump multiplier" title="How much the borrow rate climbs per unit of utilisation past the kink">
-            <Prov info={cmRateTermProv(x.v, c, "jump", wp)}>{year(model.jump ?? 0)}</Prov>
+            <Prov info={cmRateTermProv(x.v, c, "jump", wp, read)}>{year(model.jump ?? 0)}</Prov>
           </Term>
         </>
       ) : (
