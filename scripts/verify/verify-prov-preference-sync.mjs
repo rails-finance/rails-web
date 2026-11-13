@@ -135,50 +135,32 @@ check(
   JSON.stringify(s),
 );
 
-// Off the switch's routes (ui-jobs 625, 651): with the choice saved on, the
-// row is disabled and shows off, its hidden note reads "Nothing to inspect on
-// this page", nothing is pickable, a press keeps the saved choice, and the
-// header draws no inspector indicator.
+// Off the switch's routes (ui-jobs 625, 651; Miles 13 Nov 2026): the switch
+// reads the saved choice and toggles it there as anywhere, nothing is
+// pickable, and the header draws no inspector indicator.
 const OFF_LIST = "/assets";
 await page.evaluate((k) => localStorage.setItem(k, "1"), KEY);
 await page.goto(`${BASE}${OFF_LIST}`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.waitForTimeout(3000);
-let row = null;
-for (let i = 0; i < 4 && row == null; i++) {
-  await page.locator(H20).click();
-  row = await page.waitForSelector(SWITCH, { timeout: 3000 }).catch(() => null);
-}
-const read = row
-  ? {
-      state: await row.getAttribute("data-profile-menu-prov"),
-      disabled: await row.getAttribute("aria-disabled"),
-      checked: await row.getAttribute("aria-checked"),
-      note:
-        (await page
-          .locator("[data-profile-menu-prov-unavailable]")
-          .textContent()
-          .catch(() => null)) ?? null,
-    }
-  : null;
-if (row) await row.click().catch(() => {});
-await page.waitForTimeout(400);
-const after = {
-  saved: await page.evaluate((k) => localStorage.getItem(k) === "1", KEY),
-  picks: await page.locator("[data-prov-pickable]").count(),
+const offList = async () => ({
+  ...(await state()),
   indicator: await page.locator(INDICATOR).count(),
-};
-await closeMenu();
+});
+let o = await offList();
 check(
-  `${OFF_LIST}: the switch is disabled and off with its note; a press keeps the saved choice; nothing is pickable; no inspector indicator`,
-  !!read &&
-    read.state === "unavailable" &&
-    read.disabled === "true" &&
-    read.checked === "false" &&
-    /nothing to inspect on this page/i.test(read.note ?? "") &&
-    after.saved &&
-    after.picks === 0 &&
-    after.indicator === 0,
-  JSON.stringify({ read, after }),
+  `${OFF_LIST}: saved on, the switch reads on; nothing is pickable; no inspector indicator`,
+  o.saved && o.sw === "on" && !o.armed && o.indicator === 0,
+  JSON.stringify(o),
+);
+await pressSwitch();
+o = await offList();
+check(`${OFF_LIST}: a press turns it off`, !o.saved && o.sw === "off" && !o.armed, JSON.stringify(o));
+await pressSwitch();
+o = await offList();
+check(
+  `${OFF_LIST}: a second press turns it on; still nothing pickable, no indicator`,
+  o.saved && o.sw === "on" && !o.armed && o.indicator === 0,
+  JSON.stringify(o),
 );
 await browser.close();
 console.log(`\n${checked - failures}/${checked} checks pass`);

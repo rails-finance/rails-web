@@ -178,8 +178,8 @@ export default function ProvenancePage() {
             the latest read failed.&rdquo; Its figures stand at that block.
           </li>
           <li>
-            While the inspector is on, a figure with no underline has no receipt. The profile menu&rsquo;s switch turns
-            the inspector on only on pages Rails has checked for such figures.
+            While the inspector is on, a figure with no underline has no receipt. The inspector works only on pages
+            Rails has checked for such figures; elsewhere the switch keeps its setting for the next one.
           </li>
         </ul>
       </Section>

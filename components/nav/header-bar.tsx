@@ -34,8 +34,8 @@ export function HeaderBar() {
             every page but home, whose hero carries them.
             Right: H20, with the inspector indicator (H7.4) left of it
             while the inspector is armed on a page with a traced value
-            (ui-jobs 651); the theme switch and the way into /start being
-            in its menu. Below md the beta pill is in the footer
+            (ui-jobs 651); the way into /start is in its menu, the theme
+            switch at the wallet panel's foot. Below md the beta pill is in the footer
             (components/nav/phone-beta.tsx). */}
         <div className="justify-self-start">
           <SearchLauncher placement="header" />

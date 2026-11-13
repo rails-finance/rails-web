@@ -13,7 +13,8 @@
 // From md it starts at the brand rail's right edge, so the rail stays in view
 // and the two read as one piece of chrome, on every page (the site's too,
 // ui-jobs 498); below md (no rail) it starts at the viewport's edge and takes
-// the full width there.
+// the full width there, with the theme switch at its foot (the rail carries
+// it from md; Miles 13 Nov 2026).
 // A scrim dims the page behind it (no blur, Miles 5 Nov 2026) and closes it on
 // a press; the page's animations hold still under it
 // (`html[data-wallet-panel-open]`, globals.css). Escape closes it;
@@ -32,6 +33,7 @@ import {
   SidebarToggleGlyph,
   TOGGLE_SEARCH_EVENT,
 } from "@/components/shared/front-door-search";
+import { ThemeSwitch } from "@/components/nav/theme-switch";
 
 let open = false;
 /** Where the focus lands as the panel opens: the field, or the chooser. */
@@ -101,7 +103,10 @@ const SPRING_IN =
 const BLEED = 24;
 const EASE_OUT = `${OUT_MS}ms cubic-bezier(0.4, 0, 1, 1)`;
 
-const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+/** What Tab reaches: a radio group's unchosen options (`tabindex="-1"`) are
+ *  left out, so the trap's ends are the ones Tab lands on. */
+const FOCUSABLE =
+  'a[href]:not([tabindex="-1"]), button:not([disabled]):not([tabindex="-1"]), input:not([disabled]):not([tabindex="-1"]), [tabindex]:not([tabindex="-1"])';
 
 export function WalletPanel() {
   const isOpen = useWalletPanelOpen();
@@ -252,6 +257,15 @@ export function WalletPanel() {
             (H15.2) opens over it while the reader types. */}
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4">
           <ExplorerChooser key={isOpen ? "open" : "shut"} onNavigate={close} />
+        </div>
+
+        {/* Below md, at the foot: the theme switch (Miles 13 Nov 2026); from
+            md it stands at the rail's foot. */}
+        <div
+          className="shrink-0 border-t border-rb-200 px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden dark:border-rb-700"
+          data-wallet-panel-theme=""
+        >
+          <ThemeSwitch placement="panel" />
         </div>
       </div>
     </div>,
