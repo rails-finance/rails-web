@@ -620,25 +620,30 @@ export function pipelineState(e: StatusEntry, now: Secs): Heartbeat {
   const stateOf = (ws: StatusWriter[]) => ws.map((w) => writerState(w, now, e)).filter((h) => h !== "none");
   const main = stateOf(scheduled.filter((w) => w.name !== CENSUS_WRITER));
   const census = stateOf(scheduled.filter((w) => w.name === CENSUS_WRITER));
-  const moved = isoSecs(e.live?.checkpoint?.updatedAt);
-  const index = main.length ? worst(main) : moved != null ? heartbeatAge(moved, now) : null;
-  if (index != null) return worst([index, ...census.filter((h) => h !== "paused")]);
+  if (hasOwnIndex(e, now)) {
+    const index = main.length ? worst(main) : heartbeatAge(isoSecs(e.live?.checkpoint?.updatedAt), now);
+    return worst([index, ...census.filter((h) => h !== "paused")]);
+  }
   if (census.length) return worst(census);
   return heartbeatAge(isoSecs(e.backfill?.heartbeatAt), now);
 }
 
 /** Whether a row has an index of its own beside any census: another
- *  scheduled writer, or a lane checkpoint. */
-export function hasOwnIndex(e: StatusEntry): boolean {
+ *  scheduled writer with a state (one that has never run has none), or a
+ *  lane checkpoint. */
+export function hasOwnIndex(e: StatusEntry, now: Secs): boolean {
   const ws = e.live?.writers ?? [];
-  return ws.some((w) => w.name !== CENSUS_WRITER && w.expectEverySec) || isoSecs(e.live?.checkpoint?.updatedAt) != null;
+  return (
+    ws.some((w) => w.name !== CENSUS_WRITER && w.expectEverySec && writerState(w, now, e) !== "none") ||
+    isoSecs(e.live?.checkpoint?.updatedAt) != null
+  );
 }
 
 /** A pipeline's heartbeat: the backfill's wall time, else the newest write any
  *  writer stamped, leaving out a census on a row with its own index. Null when
  *  none stamps a wall time. */
-export function pipelineHeartbeat(e: StatusEntry): Secs | null {
-  const own = hasOwnIndex(e);
+export function pipelineHeartbeat(e: StatusEntry, now: Secs): Secs | null {
+  const own = hasOwnIndex(e, now);
   const writers = (e.live?.writers ?? []).filter((w) => !own || w.name !== CENSUS_WRITER);
   const times = [e.backfill?.heartbeatAt, ...writers.map((w) => w.lastWriteAt)]
     .map(isoSecs)

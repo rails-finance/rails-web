@@ -66,6 +66,7 @@ import {
   CENSUS_WRITER,
   CENSUS_LABEL,
   censusScopeOf,
+  hasOwnIndex,
   type StatusWriter,
   censusDue,
   withCensusRuns,
@@ -255,8 +256,9 @@ function censusLine(r: CensusRunStatus, lastWriteAt: string | null, subject = "T
  *  known) and the row line's label ("Next run in 4 h 52 min (14:12 UTC)").
  *  Null otherwise. */
 function censusDueWords(e: StatusEntry, now: number): { status: string; label: string } | null {
-  // Of the held censuses, the one due first. A row reads held only when a
-  // census is its sole index, so the label needs no census name.
+  // Of the held censuses, the one due first, on a row whose sole index is a
+  // census; a row held by its own index never takes a census's words.
+  if (hasOwnIndex(e, now)) return null;
   const held = censusWriters(e)
     .map((w) => ({ w, due: writerState(w, now, e) === "paused" ? censusDue(w) : null }))
     .filter((x): x is { w: StatusWriter; due: { at: number; after: boolean } } => x.due != null)
@@ -290,7 +292,7 @@ function censusLines(e: StatusEntry): string[] {
 }
 
 function pipelineLine(e: StatusEntry, now: number): string {
-  const t = pipelineHeartbeat(e);
+  const t = pipelineHeartbeat(e, now);
   const census = censusLines(e).join(" ");
   const due = pipelineState(e, now) === "paused" ? censusDueWords(e, now) : null;
   const label = due?.label ?? HEARTBEAT_WORDS[pipelineState(e, now)];
@@ -340,7 +342,7 @@ function cellView(c: StatusCell, now: number, allowance: Allowance | null, asOf:
       status: (hb === "paused" && censusDueWords(c.entry, now)?.status) || STATUS_WORDS[hb],
       index: partial ? "Partial" : "Full",
       indexRank: partial ? 50 : 100,
-      last: pipelineHeartbeat(c.entry),
+      last: pipelineHeartbeat(c.entry, now),
       lane,
       title: pipelineLine(c.entry, now),
     };

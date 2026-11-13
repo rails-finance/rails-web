@@ -337,7 +337,7 @@ test("a held census does not take a row with its own index; a late one raises it
   assert.equal(pipelineState(row([held], null), now), "paused");
 });
 
-import { pipelineHeartbeat } from "../../lib/shared/index-progress.ts";
+import { pipelineHeartbeat, hasOwnIndex } from "../../lib/shared/index-progress.ts";
 
 test("a row with its own index takes its last write from the index, not a census", () => {
   const stale = {
@@ -354,8 +354,30 @@ test("a row with its own index takes its last write from the index, not a census
     backfill: null,
     live: { lane: "x", checkpoint: null, head: null, writers: [stale, census] },
   };
-  assert.equal(pipelineHeartbeat(e), now - 5 * 3600);
+  assert.equal(pipelineHeartbeat(e, now), now - 5 * 3600);
   assert.equal(pipelineState(e, now), "stalled");
   const alone = { ...e, protocol: "yearn", live: { ...e.live, writers: [census] } };
-  assert.equal(pipelineHeartbeat(alone), now - 600);
+  assert.equal(pipelineHeartbeat(alone, now), now - 600);
+});
+
+test("a never-run writer is no index of its own: a held census still holds the row", () => {
+  const never = {
+    name: "base-lending-copy",
+    kind: "copy-worker",
+    lastWriteAt: null,
+    lastRunAt: null,
+    expectEverySec: 600,
+    newest: null,
+  };
+  const held = { ...censusWriter(2 * 3600), censusRun: censusRun() };
+  const e = {
+    protocol: "morpho",
+    chain: 8453,
+    backfill: null,
+    live: { lane: "x", checkpoint: null, head: null, writers: [never, held] },
+  };
+  assert.equal(writerState(never, now, e), "none");
+  assert.equal(hasOwnIndex(e, now), false);
+  assert.equal(pipelineState(e, now), "paused");
+  assert.equal(pipelineHeartbeat(e, now), now - 40 * 3600);
 });
