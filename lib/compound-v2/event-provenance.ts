@@ -690,6 +690,7 @@ const docsDailyInput: ProvInput = {
   value: `${COMPOUND_V2_BLOCKS_PER_DAY.toLocaleString("en-US")}, ${COMPOUND_V2_DAYS_PER_YEAR}`,
   kind: "offchain",
   pclass: "offchain",
+  definition: true,
   note: "Compound's docs' APY formula: 12-second blocks, compounded daily",
   verify: {
     kind: "link",

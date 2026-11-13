@@ -21,6 +21,8 @@ export interface EulerReceiptContext {
 
 const chain = (label: string, value: string): ProvInput => ({ label, value, kind: "chain", pclass: "state" });
 const derived = (label: string, value: string): ProvInput => ({ label, value, kind: "derived" });
+/** A constant the protocol defines: no class (lib/shared/prov-class.ts). */
+const defined = (label: string, value: string): ProvInput => ({ ...derived(label, value), definition: true });
 const via = (blocks: string) => `rails-server · eth_call @ ${blocks}`;
 const headVia = (r: { head: BlockRef }) => via(`block ${n(r.head.block)}`);
 const bothVia = (r: EulerPositionRead) => via(`blocks ${n(r.then.block)} and ${n(r.head.block)}`);
@@ -309,7 +311,7 @@ export function vaultProv(key: VaultLineKey | WindowGrowthKey, c: EulerReceiptCo
         formula: SPY_APY_FORMULA,
         inputs: [
           chain(`interestRate() @ ${n(r.head.block)}, per second, scaled by 10^27`, v.interestRate),
-          derived("Seconds in a year: 365.2425 × 86,400, an average Gregorian year in Euler's docs", "31,556,952"),
+          defined("Seconds in a year: 365.2425 × 86,400, an average Gregorian year in Euler's docs", "31,556,952"),
         ],
       };
     case "borrowWindow":

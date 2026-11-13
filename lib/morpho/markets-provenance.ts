@@ -275,6 +275,7 @@ export const morphoBorrowRateProv = (coords: MorphoMarketCoords, yearly?: number
       kind: "derived",
       pclass: "state",
       value: "31,536,000",
+      definition: true,
       note: "the docs' year",
     },
     ...(yearly != null

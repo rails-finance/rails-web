@@ -37,7 +37,7 @@ test("an identical entry signs the same, so re-registering it is a no-op", () =>
   assert.equal(entrySig(entry("state")), entrySig(entry("state")));
 });
 
-test("the value's own class, a definition marker and a scaling raw count too", () => {
+test("the value's class, a definition marker and a scaling raw count too", () => {
   const base = entry("state");
   const sig = entrySig(base);
   assert.notEqual(sig, entrySig({ ...base, info: { ...base.info, pclass: "oracle" } }));

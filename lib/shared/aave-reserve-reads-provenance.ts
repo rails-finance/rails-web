@@ -59,7 +59,7 @@ export function historyRateProv(
           pclass: "emitted",
           note: `ray, ${powerOfTen(27)} = 100% a year`,
         },
-        { label: "seconds a year", value: "31,536,000", kind: "chain-derived", note: "365 days" },
+        { label: "seconds a year", value: "31,536,000", kind: "chain-derived", definition: true, note: "365 days" },
       ],
     };
   return {

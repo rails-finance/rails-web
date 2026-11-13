@@ -68,7 +68,7 @@ export function borrowApyProv(symbol: string | undefined, apr: number | null | u
         pclass: "state",
         note: "currentVariableBorrowRate ÷ 10^27, a year",
       },
-      { label: "seconds a year", value: "31,536,000", kind: "chain-derived", note: "365 days" },
+      { label: "seconds a year", value: "31,536,000", kind: "chain-derived", definition: true, note: "365 days" },
     ],
   };
 }
