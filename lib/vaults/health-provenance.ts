@@ -8,6 +8,7 @@ import { formatDate } from "@/lib/date";
 import { formatUnitsExact } from "@/lib/utils/format";
 import type { Health, HealthKey, Span, StewardRole } from "@/lib/vaults/health";
 import { yearlyOf } from "@/lib/vaults/health";
+import { withScaleNote } from "@/lib/vaults/asset-scale-words";
 import type { VaultYieldRead } from "@/lib/vaults/yield";
 
 const n = (v: number) => v.toLocaleString("en-US");
@@ -21,6 +22,9 @@ export interface HealthReceiptVault {
   decimals: number;
   priceKey: string;
   assetsKey: string;
+  /** Where the asset's decimals disagree (ui-jobs 664): the sentence a receipt
+   *  adds after an amount it prints in the asset at the stated scale. */
+  scaleNote?: string;
 }
 
 const ROLE_CALL: Record<StewardRole, string> = {
@@ -48,6 +52,23 @@ const spanInputs = (v: HealthReceiptVault, label: string, s: Span): ProvInput[] 
   readInput(`${label} to`, v, s.to),
 ];
 
+/** Does the line's receipt print an amount in the asset? Their percentages
+ *  stand at either scale; the amounts beside them do not. */
+function printsAmounts(b: Health[HealthKey]): boolean {
+  switch (b.kind) {
+    case "size":
+    case "yield":
+    case "falls":
+      return true;
+    case "lost-only":
+      return b.lostAssets != null;
+    case "withdrawals":
+      return b.holder != null || b.exit?.kind === "idle" || b.exit?.kind === "queue";
+    default:
+      return false;
+  }
+}
+
 /** The receipt of one line; null where the line states no read. */
 export function healthLineProv(
   key: HealthKey,
@@ -55,6 +76,11 @@ export function healthLineProv(
   v: HealthReceiptVault,
   chainBlock: number,
 ): Provenance | null {
+  const p = lineProv(key, health, v, chainBlock);
+  return p && v.scaleNote && printsAmounts(health[key]) ? withScaleNote(p, v.scaleNote) : p;
+}
+
+function lineProv(key: HealthKey, health: Health, v: HealthReceiptVault, chainBlock: number): Provenance | null {
   const contract = { name: v.name, address: v.address };
   const b = health[key];
   switch (b.kind) {
