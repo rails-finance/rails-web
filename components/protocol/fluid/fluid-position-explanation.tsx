@@ -115,7 +115,7 @@ function FluidClosedPositionExplanation({
     list.push(
       <>
         Liquidation sweeps hit it <H>{v.liquidationCount}</H> time{v.liquidationCount === 1 ? "" : "s"} : a Fluid
-        liquidation is partial by design, clearing just enough each pass to restore the position&rsquo;s health
+        liquidation takes only what brings the position back to its liquidation threshold
         {v.fullyLiquidated ? (
           <>, until the final sweep emptied it entirely.</>
         ) : (
@@ -355,8 +355,8 @@ export function FluidPositionExplanation({
       list.push(
         <>
           {colSym} can fall about <H>{dropPct}%</H> against {debtSym} (to <AmountText value={live.liqPriceDebtPerCol} />{" "}
-          {debtSym}) before liquidation begins. A Fluid liquidation is partial by design: it clears just enough to make
-          the position healthy again.
+          {debtSym}) before liquidation begins. A Fluid liquidation takes only what brings the position back to its
+          liquidation threshold.
         </>,
       );
     }

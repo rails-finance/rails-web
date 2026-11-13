@@ -106,7 +106,7 @@ export function fluidPositionToMarkdown(args: FluidPositionMarkdownArgs): string
             ? ` — ${num((1 - live.liqPriceDebtPerCol / live.oraclePriceLiquidateDebtPerCol) * 100, 0)}% below the current oracle price`
             : "";
         lines.push(
-          `- **Liquidation price:** ${amt(live.liqPriceDebtPerCol)} ${debtSym} per ${colSym} (borrow ÷ (supply × threshold))${drop}. Fluid liquidations are partial by design — a sweep clears only enough to restore the swept tick's health`,
+          `- **Liquidation price:** ${amt(live.liqPriceDebtPerCol)} ${debtSym} per ${colSym} (borrow ÷ (supply × threshold))${drop}. A Fluid liquidation takes only what brings a position back to its liquidation threshold`,
         );
       }
       const rates: string[] = [];
@@ -203,10 +203,9 @@ function forensicsSection(events: BaseActivityEvent[], colSym: string, debtSym: 
     out.push("");
     out.push(
       `_The realized premium is derived from the two legs alone and never from the vault penalty beside it, so the ` +
-        `two are an independent check. The penalty is a FLOOR the engine guarantees, not a target: across Fluid's ` +
-        `whole history a real-sized sweep meets or exceeds its vault's constant essentially always, and reproduces ` +
-        `it exactly in the large majority — so a figure above the constant means that sweep cleared the tick on ` +
-        `better terms than the minimum. On a seizure small enough that the ` +
+        `two are an independent check. Across Fluid's liquidation history a real-sized sweep meets or exceeds its ` +
+        `vault's penalty almost always, and matches it in most; a figure above the penalty is the sweep clearing ` +
+        `the tick on better terms. On a seizure small enough that the ` +
         `tick-settled legs quantize, the ratio is dominated by that rounding and can land either side._`,
     );
   }

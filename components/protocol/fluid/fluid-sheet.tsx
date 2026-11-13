@@ -191,9 +191,9 @@ const TIPS = {
   threshold:
     "The debt to collateral ratio above which the vault can liquidate the position, from the vault's configuration as the page reads it at the latest block.",
   penaltyAtBlock:
-    "The bonus the vault hands a liquidator, as a share of the debt cleared, read from the vault at this block.",
+    "The vault's liquidation penalty: what a liquidated position pays in collateral beyond the debt cleared, as a share of that debt, read from the vault at this block.",
   penaltyHead:
-    "The bonus the vault hands a liquidator, as a share of the debt cleared, from the vault's configuration as the page reads it at the latest block.",
+    "The vault's liquidation penalty: what a liquidated position pays in collateral beyond the debt cleared, as a share of that debt, from the vault's configuration as the page reads it at the latest block.",
 };
 
 type Side = "collateral" | "debt";

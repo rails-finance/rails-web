@@ -110,7 +110,7 @@ const CONFIG_GLOSS: Record<FluidConfigField, string> = {
   collateralFactor: "the ratio a position can borrow up to",
   liquidationThreshold: "the ratio at which a position becomes liquidatable",
   liquidationMaxLimit: "the liquidation max limit, the ratio above which 100% of a position gets liquidated",
-  liquidationPenalty: "the premium floor the engine guarantees a liquidator",
+  liquidationPenalty: "the liquidation penalty a liquidated position pays beyond the debt cleared",
 };
 
 /** A vault's governance-set risk rung — one of the config block's 1e4-scaled

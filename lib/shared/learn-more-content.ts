@@ -831,7 +831,7 @@ export function fluidOperateContent(kind: "deposit" | "borrow" | "composite"): L
       },
       {
         bold: "Signed deltas, one event",
-        text: "LogOperate(user, nftId, colAmt, debtAmt, to) is the only action event: positive amounts deposit/borrow, negative amounts withdraw/repay; either leg can be zero.",
+        text: "the vault's LogOperate(user, nftId, colAmt, debtAmt, to) is the only action event: positive amounts deposit/borrow, negative amounts withdraw/repay; either leg can be zero. The LogOperate in Fluid's docs is the Liquidity Layer's event, which has a different signature.",
       },
       {
         bold: "Interest accrues between events",
@@ -860,7 +860,7 @@ export function fluidLiquidationContent(absorbed: boolean): LearnMoreContent {
       },
       {
         bold: "Partial by design",
-        text: "a swept position usually keeps most of its collateral and debt. Fluid liquidates only enough to restore the band's health, so 'liquidated' rarely means emptied. A fully liquidated position is flagged explicitly.",
+        text: "a swept position usually keeps most of its collateral and debt. Fluid liquidates only what brings the band back to its liquidation threshold, so 'liquidated' rarely means emptied. A fully liquidated position is flagged explicitly.",
       },
     ],
     links: [
