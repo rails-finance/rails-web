@@ -205,6 +205,23 @@ export function disclosureChevron(open: boolean): string {
   }`;
 }
 
+/**
+ * A standalone link at a card's foot ("Open 2 listings", "Assets", "See a
+ * sample wallet"; Miles 13 Nov 2026, first on /saved-views): link blue at
+ * rest whether it opens another page or changes this one's URL, its words
+ * underlined on hover, and a trailing → that shows only on hover and keyboard
+ * focus, and always on a touch screen (`hover: none`), as `disclosureChevron`
+ * does. The arrow hides by opacity, so the words never shift; no fade under
+ * reduced motion. At least 44px tall below sm. The link carries FOOT_LINK,
+ * its words FOOT_WORDS, and the arrow, `aria-hidden`, FOOT_ARROW:
+ *   <a className={FOOT_LINK}><span className={FOOT_WORDS}>Assets</span><span className={FOOT_ARROW} aria-hidden="true">→</span></a>
+ */
+export const FOOT_LINK =
+  "group/foot inline-flex min-h-11 items-center rounded-sm text-blue-600 focus-ring sm:min-h-0 dark:text-[var(--text-link)]";
+export const FOOT_WORDS = "underline-offset-2 group-hover/foot:underline";
+export const FOOT_ARROW =
+  "ml-1 opacity-0 transition-opacity motion-reduce:transition-none group-hover/foot:opacity-100 group-focus-visible/foot:opacity-100 [@media(hover:none)]:opacity-100";
+
 /** A position page's section heading in sentence case: "Lifetime flows". */
 export const SECTION_HEADING = "text-xs font-bold";
 

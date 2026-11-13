@@ -10,7 +10,7 @@
 // row's ⋮ (D7).
 
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
-import { GripVertical, Star, Upload } from "lucide-react";
+import { Check, GripVertical, Star, Upload } from "lucide-react";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { INPLACE_TEXT, NAV_BUTTON, POSITION_TAG_TONE } from "@/lib/shared/ui-grammar";
 
@@ -193,8 +193,11 @@ function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`;
 }
 
+/** Export and Import on the page's background (the Backup section has no
+ *  card; Miles 13 Nov 2026): a resting tile, NAV_BUTTON's ground, so they
+ *  read as buttons there. */
 const BACKUP_BUTTON =
-  "cursor-pointer rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-rb-500 transition-colors hover:bg-rb-200 hover:text-foreground focus-ring dark:hover:bg-rb-800";
+  "cursor-pointer rounded-lg bg-rb-100 px-2.5 py-1.5 text-[11px] font-semibold text-rb-500 transition-colors hover:bg-rb-200 hover:text-foreground focus-ring dark:bg-rb-800 dark:hover:bg-rb-700";
 
 /** Export to file and Import from file, with the line that reports what
  *  either did. The file is a JSON backup of every saved item (version 3, one
@@ -474,7 +477,8 @@ const NAME_CELL = "sm:w-full sm:max-w-0 sm:min-w-[200px]";
 const MENU_CELL = "dt-row-menu w-px whitespace-nowrap";
 
 /** A saved entry's star (ui-jobs 586, 652), filled in the foreground colour
- *  when starred and a muted outline when not: the starred entries of a kind,
+ *  when starred and a muted outline when not (rb-400 / rb-500; dark's
+ *  outline rb-500, Miles 13 Nov 2026): the starred entries of a kind,
  *  focus views included, are the ones the profile menu shows. */
 function StarToggle({ on, label, onToggle }: { on: boolean; label: string; onToggle: () => void }) {
   return (
@@ -489,7 +493,7 @@ function StarToggle({ on, label, onToggle }: { on: boolean; label: string; onTog
       aria-label={on ? `Unstar ${label}` : `Star ${label}`}
       title={on ? "Starred: shown in the profile menu" : "Star to show in the profile menu"}
       className={`-my-2 inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors sm:size-7 ${
-        on ? "text-foreground" : "text-rb-400 hover:text-foreground dark:text-rb-600 dark:hover:text-foreground"
+        on ? "text-foreground" : "text-rb-400 hover:text-foreground dark:text-rb-500 dark:hover:text-foreground"
       }`}
       data-bookmark-star={on ? "on" : "off"}
       data-anatomy="B2.3"
@@ -786,6 +790,20 @@ export function FocusViewList({
 
 const UNDO_MS = 8000;
 
+/** Use and In use: a small teal button on a soft teal fill, "New view"'s
+ *  shape at the row's text size (Miles 13 Nov 2026): using a view changes
+ *  the scope in place, so teal. Below sm an invisible band takes the press to
+ *  44px tall. */
+const USE_BUTTON =
+  "relative cursor-pointer items-center gap-1 rounded-md bg-teal-600/10 px-2 py-0.5 text-xs font-semibold text-teal-700 transition-colors hover:bg-teal-600/20 dark:bg-teal-400/10 dark:text-teal-400 dark:hover:bg-teal-400/20 max-sm:before:absolute max-sm:before:inset-x-0 max-sm:before:-inset-y-3 max-sm:before:content-['']";
+/** "In use" with its tick. */
+const IN_USE = (
+  <>
+    <Check className="size-3.5 shrink-0" strokeWidth={2.5} aria-hidden="true" />
+    In use
+  </>
+);
+
 /** A focus view (B2.2): not a link, so the plain hover block. Its name, the
  *  assets and chains it holds, Use or In use, and the ⋮. */
 function FocusViewRow({
@@ -809,19 +827,28 @@ function FocusViewRow({
 
   const use = inUse ? (
     phone ? (
-      <span className="text-xs font-semibold text-foreground" data-focus-view-in-use="">
-        In use
+      <span className={`inline-flex ${USE_BUTTON}`} data-focus-view-in-use="">
+        {IN_USE}
       </span>
     ) : (
+      // "In use" and "Turn off" share one cell, so the button keeps its width
+      // as the label swaps on hover and keyboard focus.
       <button
         type="button"
         onClick={() => focusViews.use(null)}
         aria-label={`${label} is in use. Turn off`}
-        className="group/use min-w-12 cursor-pointer text-left text-xs font-semibold text-foreground"
+        className={`group/use inline-grid ${USE_BUTTON}`}
         data-focus-view-in-use=""
       >
-        <span className="group-hover/use:hidden group-focus-visible/use:hidden">In use</span>
-        <span className={`hidden group-hover/use:inline group-focus-visible/use:inline ${INPLACE_TEXT}`}>Turn off</span>
+        <span className="inline-flex items-center gap-1 [grid-area:1/1] group-hover/use:invisible group-focus-visible/use:invisible">
+          {IN_USE}
+        </span>
+        <span
+          className="invisible justify-self-center [grid-area:1/1] group-hover/use:visible group-focus-visible/use:visible"
+          data-focus-view-turn-off=""
+        >
+          Turn off
+        </span>
       </button>
     )
   ) : (
@@ -829,7 +856,7 @@ function FocusViewRow({
       type="button"
       onClick={() => focusViews.use(view.id)}
       aria-label={`Use ${label}`}
-      className={`cursor-pointer text-xs font-semibold ${INPLACE_TEXT} min-h-11 min-w-11 text-left sm:min-h-0 sm:min-w-0`}
+      className={`inline-flex ${USE_BUTTON}`}
       data-focus-view-use={view.id}
     >
       Use
@@ -924,7 +951,8 @@ function FocusViewRow({
 }
 
 /** A view's chains as one toggle per launched chain (Miles, 10 Nov 2026):
- *  in focus in text ink, the rest dimmed; a press adds or drops the chain, as
+ *  in focus in text ink, the rest dimmed (rb-500 in dark, so a mark that is
+ *  off still reads; Miles 13 Nov 2026); a press adds or drops the chain, as
  *  the panel's Chains part does. None pressed is every chain. A view of
  *  chains alone keeps its last chain, since an emptied view is removed. */
 function ViewChainToggles({ view }: { view: FocusView }) {
@@ -951,7 +979,7 @@ function ViewChainToggles({ view }: { view: FocusView }) {
             onClick={() => toggle(id)}
             title={last ? `${name} is this view's only part` : on ? `Drop ${name}` : `Add ${name}`}
             className={`inline-flex size-11 items-center justify-center rounded-md transition-colors sm:size-7 ${
-              on ? "text-foreground" : "text-rb-400/80 hover:text-rb-500 dark:text-rb-600 dark:hover:text-rb-400"
+              on ? "text-foreground" : "text-rb-400/80 hover:text-rb-500 dark:text-rb-500 dark:hover:text-rb-400"
             } ${last ? "cursor-default" : "cursor-pointer hover:bg-rb-200/60 dark:hover:bg-rb-800"}`}
             data-focus-view-chain={id}
           >
