@@ -41,7 +41,7 @@ export const AERODROME_DOCS_AND_CHAIN: readonly InfoDocsAndChain[] = [
         prov: factoryProv("gauge caps", AERODROME.nfpm.caps!, AERODROME.factory.caps!),
       },
       {
-        words: "the gauges v3 position manager's returns the gauges v3 CLFactory",
+        words: "the gauges v3 position manager's factory() returns the gauges v3 CLFactory",
         prov: factoryProv("gauges v3", AERODROME.nfpm.gv3!, AERODROME.factory.gv3!),
       },
     ],

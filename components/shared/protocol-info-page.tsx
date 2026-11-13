@@ -224,8 +224,8 @@ const DOCS_AND_CHAIN_SCOPE = "docs-and-chain";
 
 /** The docs-and-chain section, after the glossary whose terms it qualifies.
  *  Drawn only where an explorer passes at least one entry. One receipts
- *  scope; the page's one inspector layer rides with it, since no other part
- *  of an info page draws a receipt. */
+ *  scope, and its inspector layer rides with it. A page that passes no
+ *  docsAndChain may mount a receipt and a layer of its own. */
 function InfoDocsAndChainSection({ items }: { items: readonly InfoDocsAndChain[] }) {
   return (
     <div className="mt-5">
