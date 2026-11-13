@@ -303,10 +303,12 @@ export function vaultHeads({
             </InAsset>
           </span>
         ) : null,
-      ...(v.standing.includes("lost-assets")
-        ? { sub: <LostAssetsCaution vault={v} receipts={receipts} detail={detail} /> }
-        : v.assetScale
-          ? { sub: <ScaleWithheld v={v} detail={detail} /> }
+      // The scale first: a vault with both never prints the caution's amounts
+      // at a scale that is off (ui-jobs 664).
+      ...(v.assetScale
+        ? { sub: <ScaleWithheld v={v} detail={detail} /> }
+        : v.standing.includes("lost-assets")
+          ? { sub: <LostAssetsCaution vault={v} receipts={receipts} detail={detail} /> }
           : {}),
     },
     {

@@ -418,7 +418,7 @@ export function YearnVaultPage({
     stats: [
       ["Shares issued", y.totalSupply ? shareText(y.totalSupply, y.shareDecimals ?? ad) : "not read"],
       ["Idle", y.totalIdle ? `${assetText(y.totalIdle, ad)} ${unit}` : "not read"],
-      ["Deployed", y.totalDebt ? `${assetText(y.totalDebt, ad)} ${unit}` : "not read"],
+      ["Debt", y.totalDebt ? `${assetText(y.totalDebt, ad)} ${unit}` : "not read"],
       ["Profit unlock", y.profitMaxUnlockTime != null ? spanWords(y.profitMaxUnlockTime) : "not read"],
       ["Steward (role manager)", y.roleManager ?? "not read"],
       ["Accountant", y.accountant ?? "none set"],

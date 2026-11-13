@@ -66,7 +66,7 @@ export async function MetaMorphoVaultsInfo({ chainId }: { chainId: MetaMorphoCha
           Morpho&rsquo;s docs
         </a>{" "}
         name Morpho Vault V2 the primary vault surface and say &ldquo;Morpho Vaults V1 are now legacy&rdquo;; this
-        section lists MetaMorpho (V1) vaults only, and no Vault V2.
+        section lists MetaMorpho (V1) vaults only.
       </p>
       <p data-intro-blocks>
         Three blocks, and this section never reduces them to one. The census block the listing states is when membership

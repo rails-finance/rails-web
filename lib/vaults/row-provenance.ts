@@ -86,7 +86,7 @@ export const vaultAssetGrowthProv = (v: VaultSummary, y: Measured): Provenance =
   kind: "derived",
   pclass: "state",
   source: { block: y.to.block },
-  summary: `The wrapped ${v.asset.symbol}'s share price — its \`convertToAssets\` of one whole share, stored once a day in the daily price store, went from ${formatUnitsExact(y.from.raw, v.asset.decimals)} at block ${n(y.from.block)} to ${formatUnitsExact(y.to.raw, v.asset.decimals)} at block ${n(y.to.block)}, in the token ${v.asset.symbol} wraps. This vault holds ${v.asset.symbol}, so the share price of this vault, in ${v.asset.symbol}, does not show that growth; the two are stated apart and never added.`,
+  summary: `The wrapped ${v.asset.symbol}'s share price — its \`convertToAssets\` of one whole share, stored once a day in the daily price store, went from ${formatUnitsExact(y.from.raw, v.asset.decimals)} at block ${n(y.from.block)} to ${formatUnitsExact(y.to.raw, v.asset.decimals)} at block ${n(y.to.block)}, in the token ${v.asset.symbol} wraps. This vault's share price, in ${v.asset.symbol}, does not show that growth; the two are stated apart and never added.`,
   contract: { name: v.asset.symbol, address: v.asset.address },
   via: "daily price store · convertToAssets(10 ** decimals) once per UTC day @ the day's last block",
   formula: "p1 / p0 − 1",

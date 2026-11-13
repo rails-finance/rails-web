@@ -377,14 +377,14 @@ function RowNotes({
         <p className="mt-1 max-w-3xl text-[12px] leading-relaxed text-rb-500" data-figure="row-asset-leg">
           {event.assets && withheld ? (
             <span data-asset-scale-withheld="">
-              The vault stated the other leg in the ERC-4626{" "}
-              <code>{event.kind === "deposit" ? "Deposit" : "Withdraw"}</code> event of this same transaction;{" "}
+              The vault stated{" "}
               <Prov
                 info={withScaleNote(prov.assets(coords, event.kind === "deposit" ? "deposit" : "withdrawal"), withheld)}
               >
-                its amount
+                the other leg
               </Prov>{" "}
-              is not shown. {withheld}
+              in the ERC-4626 <code>{event.kind === "deposit" ? "Deposit" : "Withdraw"}</code> event of this same
+              transaction. {withheld}
             </span>
           ) : event.assets ? (
             <>

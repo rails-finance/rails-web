@@ -170,7 +170,10 @@ function SeriesTile({
         <p className="mt-1 text-[13px] text-foreground" data-strip-sentence="">
           <Prov info={stripChangeProv(tile, v, series.key, w)}>{changeSentence(tile, v, w, jump)}</Prov>
         </p>
-        <Sparkline points={w.points} label={`${label}, one read a day over the last ${w.days} days`} />
+        <Sparkline
+          points={w.points}
+          label={`${label}, one read a day over the ${w.days} days to ${dayText(w.to.day)}`}
+        />
       </Tile>
     );
   }

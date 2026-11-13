@@ -37,12 +37,7 @@ export function assetScaleSentence(symbol: string, s: AssetScale): string {
  *  "—". The figure read at the stated decimals is a power of ten off, so none
  *  is printed. */
 export function assetScaleAbsentTip(symbol: string, s: AssetScale): string {
-  const k = Math.abs(s.implied - s.stated);
-  const times = TIMES[k] ?? `10^${k}`;
-  return (
-    `${symbol} states ${s.stated} decimals, but converts to ${s.wraps.symbol} at ${s.implied}. ` +
-    `Read at ${s.stated}, an amount in ${symbol} comes out ${times} times too ${s.implied > s.stated ? "large" : "small"}, so none is shown.`
-  );
+  return `${assetScaleReceiptNote(symbol, s)} None is shown.`;
 }
 
 /** The one sentence a receipt adds where it shows an amount in the asset at
@@ -50,7 +45,7 @@ export function assetScaleAbsentTip(symbol: string, s: AssetScale): string {
 export function assetScaleReceiptNote(symbol: string, s: AssetScale): string {
   const k = Math.abs(s.implied - s.stated);
   const times = TIMES[k] ?? `10^${k}`;
-  return `${symbol} states ${s.stated} decimals but converts to ${s.wraps.symbol} at ${s.implied}, so an amount in ${symbol} here, read at ${s.stated}, is ${times} times too ${s.implied > s.stated ? "large" : "small"}.`;
+  return `${symbol} states ${s.stated} decimals but converts to ${s.wraps.symbol} at ${s.implied}, so an amount in ${symbol} read at ${s.stated} comes out ${times} times too ${s.implied > s.stated ? "large" : "small"}.`;
 }
 
 /** A receipt with that sentence after its summary; unchanged without one. */

@@ -581,10 +581,11 @@ for (let i = 1; i < funded.length; i++) {
   const [a, b] = [funded[i - 1], funded[i]];
   comparablePairs++;
   const t = a.token.localeCompare(b.token, "en-US", { sensitivity: "base" });
-  if (t > 0 || (t === 0 && BigInt(b.held) > BigInt(a.held))) disorder++;
+  // Total assets sorts by the figure the column shows (ui-jobs 664).
+  if (t > 0 || (t === 0 && BigInt(b.raw) > BigInt(a.raw))) disorder++;
 }
 check(
-  "3c under ?sort=assets the rows run by token A to Z, the most held first inside each token",
+  "3c under ?sort=assets the rows run by token A to Z, the largest total assets first inside each token",
   disorder === 0,
   `${disorder} out-of-order pairs across ${comparablePairs} pairs over ${tokens.length} tokens`,
 );

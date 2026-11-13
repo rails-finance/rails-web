@@ -266,7 +266,7 @@ export function AaveEthereumVaultPage({
     );
     exportStats.push(
       [`${unit} the contract holds`, s.assetHeld ? assetText(s.assetHeld, ad) : "not read"],
-      ["Deposit cap", s.supplyCap ? assetText(s.supplyCap, ad) : "not read"],
+      ["Supply cap", s.supplyCap ? assetText(s.supplyCap, ad) : "not read"],
       ["Remaining capacity", s.remainingCapacity ? assetText(s.remainingCapacity, ad) : "not read"],
       ["Target rate (basis points)", s.targetRateBps != null ? String(s.targetRateBps) : "not read"],
       ["Index last updated", s.lastUpdate != null ? utcInstant(s.lastUpdate) : "not read"],

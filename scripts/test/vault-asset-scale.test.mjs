@@ -33,7 +33,7 @@ test("the implied decimals: a trillion apart is marked, a wrapper that agrees is
 test("the withheld amount's tip says why, once, in plain words", () => {
   assert.equal(
     assetScaleAbsentTip("wUSDL", WUSDL),
-    "wUSDL states 6 decimals, but converts to USDG at 18. Read at 6, an amount in wUSDL comes out a trillion times too large, so none is shown.",
+    "wUSDL states 6 decimals but converts to USDG at 18, so an amount in wUSDL read at 6 comes out a trillion times too large. None is shown.",
   );
   assert.equal(assetScaleSentence("wUSDL", WUSDL), assetScaleAbsentTip("wUSDL", WUSDL));
 });
@@ -42,7 +42,7 @@ test("a receipt keeps its read and adds the one sentence", () => {
   const note = assetScaleReceiptNote("wUSDL", WUSDL);
   assert.equal(
     note,
-    "wUSDL states 6 decimals but converts to USDG at 18, so an amount in wUSDL here, read at 6, is a trillion times too large.",
+    "wUSDL states 6 decimals but converts to USDG at 18, so an amount in wUSDL read at 6 comes out a trillion times too large.",
   );
   const p = { kind: "chain", summary: "Total assets — `totalAssets()` at block 1." };
   assert.equal(withScaleNote(p, note).summary, `${p.summary} ${note}`);
