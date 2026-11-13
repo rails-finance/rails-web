@@ -53,7 +53,7 @@ function ExplorerRow({
       data-switcher-explorer=""
       aria-current={isActive ? "page" : undefined}
       onClick={isActive ? undefined : onNavigate}
-      className={`flex min-w-0 items-center gap-2.5 rounded-lg border border-transparent px-2 py-3 text-sm transition-colors focus-ring ${
+      className={`flex min-w-0 items-center gap-2.5 rounded-lg border border-transparent px-[7px] py-[11px] text-sm transition-colors focus-ring ${
         isActive ? ROW_CURRENT : ROW_REST
       }`}
     >
