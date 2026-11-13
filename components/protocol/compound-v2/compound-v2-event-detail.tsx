@@ -138,8 +138,8 @@ function buildCompoundV2LiqForensics(
       numeraire,
     }),
     premiumReference: {
-      label: "Incentive at block",
-      value: `+${(incPct * 100).toFixed(2)}%`,
+      label: "Liquidation incentive",
+      value: `${(1 + incPct).toFixed(2)}×`,
       prov: liqIncentiveRefProv(coords),
     },
     pricePills: [

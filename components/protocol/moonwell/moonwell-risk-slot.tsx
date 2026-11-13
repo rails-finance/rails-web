@@ -1,29 +1,31 @@
 "use client";
 
 // The Moonwell position card's risk figures from the page's live Comptroller
-// read (rails-ops TO-DO-position-card 322), as slots of the shared card:
+// read (rails-ops TO-DO-position-card 322; ui-jobs 632), as slots of the
+// shared card, in Moonwell's docs' words ("Credit and Liquidations"):
 //
-//   • the Health factor headline (CF-weighted capacity ÷ debt value; 1.0 is the
-//     shortfall line, proven exact against getAccountLiquidity by
-//     scripts/verify-moonwell-chain.mjs). Moonwell has ONE collateral factor
-//     per market, so the borrow limit and the liquidation line coincide;
-//   • the panel's rows: the drop the collateral basket can take (1 − 1/HF), the
-//     debt against the liquidation line, and the Comptroller's "room to
-//     borrow" figure.
+//   • the Credit remaining headline: the credit limit less the debt, over the
+//     credit limit, the docs' percentage ("[$600 − $100] ÷ $600 = 83.3%"). The
+//     credit limit is the collateral-factor-weighted capacity, proven exact
+//     against getAccountLiquidity by scripts/verify-moonwell-chain.mjs;
+//   • the panel's rows: the credit limit and the credit remaining in dollars
+//     (the Comptroller's account liquidity, or its shortfall below zero). The
+//     drop the collateral basket can take before liquidation is the headline's
+//     share, so the panel does not repeat it.
 //
 // The verdict in words is the Explanation's.
 
 import { serverReadOf } from "@/lib/shared/server-head-read";
 import { Prov } from "@/components/shared/provenance";
 import type { PositionCardHead, PositionPanelRow } from "@/components/shared/position-card";
-import { capacityShare } from "@/lib/shared/capacity-share";
 import { formatCompactUsd } from "@/lib/shared/format-compact";
+import { creditRemainingShare, creditRemainingText } from "@/lib/moonwell/credit-remaining";
 import { moonwellCapacityProv, comptrollerVerdictProv, type MoonwellLane } from "@/lib/moonwell/position-provenance";
 import { useMoonwellDeployment } from "@/lib/moonwell/deployment-context";
 import type { MoonwellChainResponse } from "@/lib/api/fetch-moonwell-position";
 
-const HF_TIP =
-  "Collateral capacity (each entered market counted up to its collateral factor) over the debt. At 1.0 the account can be liquidated.";
+const CREDIT_REMAINING_TIP =
+  "The share of the credit limit still unborrowed: the credit limit less the debt, over the credit limit. The credit limit is each entered market's supply counted up to its collateral factor. At 0% the account can be liquidated.";
 
 /** Which Comptroller, through which route, every receipt here names. */
 function useLane(): MoonwellLane {
@@ -31,108 +33,75 @@ function useLane(): MoonwellLane {
   return { comptroller: dep.comptroller, positionRoute: dep.positionRoute };
 }
 
-function HealthValue({ hf, chain }: { hf: number; chain: MoonwellChainResponse }) {
-  const lane = useLane();
-  return (
-    <Prov info={moonwellCapacityProv("Health factor", "CF-weighted capacity ÷ debt value", lane, serverReadOf(chain))}>
-      {hf >= 100 ? "∞" : hf.toFixed(2)}
-    </Prov>
-  );
-}
-
-/** 1 − 1 ÷ HF is 1 − debt ÷ capacity: the same two reads as the share. */
-function DropValue({ hf, chain }: { hf: number; chain: MoonwellChainResponse }) {
+function CreditShareValue({ share, chain }: { share: number; chain: MoonwellChainResponse }) {
   const lane = useLane();
   return (
     <Prov
       info={moonwellCapacityProv(
-        "Drop to liquidation",
-        "1 − debt value ÷ CF-weighted capacity",
+        "Credit remaining",
+        "(credit limit − debt value) ÷ credit limit",
         lane,
         serverReadOf(chain),
       )}
     >
-      {Math.round((1 - 1 / hf) * 100)}%
+      {creditRemainingText(share)}
     </Prov>
   );
 }
 
-function ShareValue({ chain }: { chain: MoonwellChainResponse }) {
+function LimitValue({ chain }: { chain: MoonwellChainResponse }) {
   const lane = useLane();
-  const share = capacityShare(chain.debtValueUsd, chain.collateralCapacityUsd);
   return (
     <Prov
       info={moonwellCapacityProv(
-        "Debt share of the capacity line",
-        "debt value ÷ CF-weighted capacity",
+        "Credit limit",
+        "Σ entered supply × price × collateral factor",
         lane,
         serverReadOf(chain),
       )}
     >
-      {share.text}
+      {formatCompactUsd(chain.collateralCapacityUsd)}
     </Prov>
   );
 }
 
-function RoomValue({ chain }: { chain: MoonwellChainResponse }) {
+function RemainingValue({ chain }: { chain: MoonwellChainResponse }) {
   const lane = useLane();
+  const short = chain.shortfallUsd > 0;
   return (
-    <Prov info={comptrollerVerdictProv("Account liquidity", lane, serverReadOf(chain))}>
-      {formatCompactUsd(chain.liquidityUsd)}
+    <Prov info={comptrollerVerdictProv("Credit remaining", lane, serverReadOf(chain))}>
+      {short ? `−${formatCompactUsd(chain.shortfallUsd)}` : formatCompactUsd(chain.liquidityUsd)}
     </Prov>
   );
 }
 
-/** Whether the read states a health factor: debt and capacity both stand. */
-const hasHealth = (chain: MoonwellChainResponse) =>
-  chain.healthFactor != null && chain.healthFactor > 0 && chain.debtValueUsd > 0 && chain.collateralCapacityUsd > 0;
-
-/** The Health factor headline for an account with debt; null without debt.
- *  Pending while the read is out, a dash when the read states none. */
-export function moonwellHealthHead(chain: MoonwellChainResponse | null, hasDebt: boolean): PositionCardHead | null {
+/** The Credit remaining headline for an account with debt; null without debt.
+ *  Pending while the read is out, a dash where the credit limit is zero. */
+export function moonwellCreditHead(chain: MoonwellChainResponse | null, hasDebt: boolean): PositionCardHead | null {
   if (!hasDebt) return null;
-  const base = { id: "health-factor", label: "Health factor", labelTip: HF_TIP };
+  const base = { id: "credit-remaining", label: "Credit remaining", labelTip: CREDIT_REMAINING_TIP };
   if (!chain) return { ...base, value: null, pending: true };
-  if (!hasHealth(chain)) return { ...base, value: null };
-  return { ...base, value: <HealthValue hf={chain.healthFactor as number} chain={chain} /> };
+  const share = chain.debtValueUsd > 0 ? creditRemainingShare(chain.collateralCapacityUsd, chain.debtValueUsd) : null;
+  if (share == null) return { ...base, value: null };
+  return { ...base, value: <CreditShareValue share={share} chain={chain} /> };
 }
 
-/** The panel rows the read adds on the debt side: room to borrow, the drop to
- *  liquidation and the debt against the liquidation line. */
+/** The panel rows the read adds on the debt side: the credit limit and the
+ *  credit remaining in dollars. */
 export function moonwellRiskRows(chain: MoonwellChainResponse | null): PositionPanelRow[] {
-  if (!chain) return [];
-  const rows: PositionPanelRow[] = [];
-  if (chain.debtValueUsd > 0 && chain.collateralCapacityUsd > 0) {
-    rows.push({
-      id: "room-to-borrow",
-      label: "Room to borrow",
-      tip: "How much more the Comptroller lets this account borrow before its collateral capacity is used up: the account liquidity it reports, read now.",
-      value: <RoomValue chain={chain} />,
-    });
-  }
-  if (!hasHealth(chain)) {
-    // Debt against no capacity at all (the collateral seized or its factor
-    // set to zero) still states where it stands: capacityShare reads the
-    // division past its ceiling as "over 1,000×".
-    if (chain.debtValueUsd > 0 && chain.collateralCapacityUsd === 0) rows.push(liquidationLineRow(chain));
-    return rows;
-  }
-  const hf = chain.healthFactor as number;
-  if (hf > 1) {
-    rows.push({
-      id: "liquidation-drop",
-      label: "Liquidates on a drop of",
-      tip: "How far the value of the collateral basket can fall, all together, before the account reaches the liquidation line: 1 − 1 ÷ the health factor.",
-      value: <DropValue hf={hf} chain={chain} />,
-    });
-  }
-  rows.push(liquidationLineRow(chain));
-  return rows;
+  if (!chain || !(chain.debtValueUsd > 0)) return [];
+  return [
+    {
+      id: "credit-limit",
+      label: "Credit limit",
+      tip: "The most the account can borrow: each entered market's supply in dollars times its collateral factor, added up.",
+      value: <LimitValue chain={chain} />,
+    },
+    {
+      id: "credit-remaining-usd",
+      label: "Credit remaining",
+      tip: "How many more dollars the account can borrow: the credit limit less the debt, as the Comptroller's account liquidity states it. Below zero it is the shortfall, and the account can be liquidated.",
+      value: <RemainingValue chain={chain} />,
+    },
+  ];
 }
-
-const liquidationLineRow = (chain: MoonwellChainResponse): PositionPanelRow => ({
-  id: "liquidation-line",
-  label: "Debt against the liquidation line",
-  tip: "The debt value as a share of the capacity line, the collateral counted up to each market's collateral factor. At 100% the account can be liquidated.",
-  value: <ShareValue chain={chain} />,
-});

@@ -180,7 +180,11 @@ function ladderTicks(v: FluidVaultRow): RatioBarTick[] {
       title: `Liquidation starts at ${pctText(v.liquidationThreshold)}`,
     });
   if (v.liquidationMaxLimit != null)
-    ticks.push({ f: v.liquidationMaxLimit, kind: "neutral", title: `Absorbed from ${pctText(v.liquidationMaxLimit)}` });
+    ticks.push({
+      f: v.liquidationMaxLimit,
+      kind: "neutral",
+      title: `Liquidation max limit ${pctText(v.liquidationMaxLimit)}`,
+    });
   return ticks;
 }
 
@@ -197,7 +201,7 @@ function Ladder({ v, c }: { v: FluidVaultRow; c: FluidVaultCoords }) {
           <Prov info={fluidVaultConfigProv("liquidationThreshold", c)}>{pctText(v.liquidationThreshold)}</Prov>
         </span>
         <span>
-          absorb <Prov info={fluidVaultConfigProv("liquidationMaxLimit", c)}>{pctText(v.liquidationMaxLimit)}</Prov>
+          max limit <Prov info={fluidVaultConfigProv("liquidationMaxLimit", c)}>{pctText(v.liquidationMaxLimit)}</Prov>
         </span>
         {v.aggregateRatio != null && (
           <span>
@@ -318,7 +322,7 @@ function RosterExplainer({
           sub={
             <ExplainSub>
               <Fig>{s.configured}</Fig> are configured: <Fig>{s.tokenPair}</Fig> plain token pairs and{" "}
-              <Fig>{s.smart}</Fig> that hold DEX pool shares on a leg.
+              <Fig>{s.smart}</Fig> that hold DEX shares on a leg.
             </ExplainSub>
           }
         >
@@ -495,7 +499,7 @@ export function FluidRosterPage({ data, open }: { data: FluidVaultsChainResponse
           t={{
             scope: "vaults-table",
             title: "Vaults by type",
-            line: "Each vault is one borrow market: one collateral, one debt token. Grouped by which legs hold DEX pool shares; each opens its page.",
+            line: "Each vault is one borrow market: one collateral, one debt token. Grouped by which legs hold DEX shares; each opens its page.",
             anatomy: "R1.1",
             nameLabel: "Vault",
             columns: [
@@ -506,7 +510,7 @@ export function FluidRosterPage({ data, open }: { data: FluidVaultsChainResponse
               {
                 key: "ladder",
                 label: "Ladder",
-                tip: "Borrowing stops, liquidation starts and the vault absorbs, each a share of collateral value; the fill is the vault's debt over its collateral",
+                tip: "Collateral factor, liquidation threshold and liquidation max limit, each a share of collateral value; the fill is the vault's debt over its collateral",
                 className: "min-w-[220px] text-foreground",
                 wide: true,
               },
@@ -594,7 +598,7 @@ function VaultExplainer({ x }: { x: Ctx }) {
               : v.isSmartCol
                 ? "collateral is held as"
                 : "debt is held as"}{" "}
-            DEX pool shares, shown as the tokens they hold.
+            DEX shares, shown as the tokens they hold.
           </ExplainBullet>
         )}
         <ExplainBullet>
@@ -635,14 +639,16 @@ function VaultExplainer({ x }: { x: Ctx }) {
           {v.totalPositions === 1 ? "position has" : "positions have"} been opened in this vault, open or closed.
         </ExplainBullet>
         <ExplainBullet>
-          A position may borrow up to <Fig bold>{pctText(v.collateralFactor)}</Fig> of its collateral&apos;s value.
+          The collateral factor is <Fig bold>{pctText(v.collateralFactor)}</Fig>: a position may borrow up to that share
+          of its collateral&apos;s value.
         </ExplainBullet>
         <ExplainBullet>
-          Liquidation starts at <Fig bold>{pctText(v.liquidationThreshold)}</Fig>; a liquidator takes collateral at a{" "}
-          <Fig>{pctText(v.liquidationPenalty, 1)}</Fig> discount.
+          Liquidation starts at the liquidation threshold, <Fig bold>{pctText(v.liquidationThreshold)}</Fig>; a
+          liquidator takes collateral at a <Fig>{pctText(v.liquidationPenalty, 1)}</Fig> discount.
         </ExplainBullet>
         <ExplainBullet>
-          Past <Fig bold>{pctText(v.liquidationMaxLimit)}</Fig> the vault absorbs the position onto its own book.
+          Past the liquidation max limit, <Fig bold>{pctText(v.liquidationMaxLimit)}</Fig>, 100% of a position gets
+          liquidated.
         </ExplainBullet>
       </ExplainGroup>
     </>
@@ -663,9 +669,9 @@ function vaultMarkdown(x: Ctx): string {
     ...(v.borrowRatePct != null ? [`- Borrow rate: ${ratePercentText(v.borrowRatePct / 100)} APR`] : []),
     ...(v.aggregateRatio != null ? [`- Used: ${pctText(v.aggregateRatio, 1)}`] : []),
     `- Positions opened, open or closed: ${v.totalPositions}`,
-    `- Borrow to: ${pctText(v.collateralFactor)}`,
-    `- Liquidate from: ${pctText(v.liquidationThreshold)}`,
-    `- Absorb from: ${pctText(v.liquidationMaxLimit)}`,
+    `- Collateral factor: ${pctText(v.collateralFactor)}`,
+    `- Liquidation threshold: ${pctText(v.liquidationThreshold)}`,
+    `- Liquidation max limit: ${pctText(v.liquidationMaxLimit)}`,
     `- Vault: ${v.vault}`,
     "",
     `Read from Ethereum at block ${x.d.blockNumber.toLocaleString("en-US")}.`,
@@ -785,7 +791,7 @@ function headOf(x: Ctx): ProductHead {
       kind: "ladder",
       vaultType: {
         label: "Type",
-        tip: "Which legs hold DEX pool shares",
+        tip: "Which legs hold DEX shares",
         value: (
           <span data-prov-exempt="">
             {x.type.code}, {x.type.name.toLowerCase()}
@@ -794,18 +800,18 @@ function headOf(x: Ctx): ProductHead {
         hooks: { "data-fluid-type": x.type.code },
       },
       borrowTo: {
-        label: "Borrow to",
+        label: "Collateral factor",
         tip: "The most a position may borrow, as a share of its collateral's value",
         value: <Prov info={fluidVaultConfigProv("collateralFactor", c)}>{pctText(v.collateralFactor)}</Prov>,
       },
       liquidateFrom: {
-        label: "Liquidate from",
+        label: "Liquidation threshold",
         tip: "Where liquidation starts",
         value: <Prov info={fluidVaultConfigProv("liquidationThreshold", c)}>{pctText(v.liquidationThreshold)}</Prov>,
       },
       absorbFrom: {
-        label: "Absorb from",
-        tip: "Past this the vault takes the position onto its own book",
+        label: "Liquidation max limit",
+        tip: "Past this, 100% of a position gets liquidated",
         value: <Prov info={fluidVaultConfigProv("liquidationMaxLimit", c)}>{pctText(v.liquidationMaxLimit)}</Prov>,
       },
     },
@@ -891,13 +897,13 @@ function Parameters({ x }: { x: Ctx }) {
             "no oracle"
           )}
         </Term>
-        <Term term="Borrow to" title="The most a position may borrow, as a share of its collateral's value">
+        <Term term="Collateral factor" title="The most a position may borrow, as a share of its collateral's value">
           <Prov info={fluidVaultConfigProv("collateralFactor", c)}>{pctText(v.collateralFactor)}</Prov>
         </Term>
-        <Term term="Liquidate from" title="Where liquidation starts">
+        <Term term="Liquidation threshold" title="Where liquidation starts">
           <Prov info={fluidVaultConfigProv("liquidationThreshold", c)}>{pctText(v.liquidationThreshold)}</Prov>
         </Term>
-        <Term term="Absorb from" title="Past this the vault takes the position onto its own book">
+        <Term term="Liquidation max limit" title="Past this, 100% of a position gets liquidated">
           <Prov info={fluidVaultConfigProv("liquidationMaxLimit", c)}>{pctText(v.liquidationMaxLimit)}</Prov>
         </Term>
         <Term term="Liquidation penalty" title="The discount a liquidator takes collateral at">
@@ -927,8 +933,8 @@ function sectionsOf(x: Ctx): ProductSection[] {
         <RateCurve
           curve={{
             missing: v.isSmartDebt
-              ? "This vault's debt is DEX pool shares, whose cost is the pool's trading fees, so it has no rate curve."
-              : `Fluid's Liquidity layer sets this rate for every vault that borrows ${debtOf(v)}. Rails reads the vault's rate alone, so it draws no curve.`,
+              ? "This vault's debt is DEX shares, whose cost is the pool's trading fees, so it has no rate curve."
+              : `Fluid's Liquidity Layer sets this rate for every vault that borrows ${debtOf(v)}. Rails reads the vault's rate alone, so it draws no curve.`,
           }}
         />
       ),

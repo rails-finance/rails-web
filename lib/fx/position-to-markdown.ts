@@ -171,13 +171,13 @@ export function fxPositionToMarkdown(args: FxPositionMarkdownArgs): string {
         lines.push(
           settled.debts > 0
             ? `- **Debt:** ${amt(settled.debts)} fxUSD`
-            : `- **Debt:** none — collateral-only; no debt ratio, no liquidation surface`,
+            : `- **Debt:** none — collateral-only; no LTV, no liquidation surface`,
         );
       }
     }
     if (!empty && settled.debtRatio != null && (settled.debts ?? 0) > 0) {
       lines.push(
-        `- **Debt ratio:** ${num(settled.debtRatio * 100, 1)}% — the pool's OWN \`getPositionDebtRatio\`, the same math its ` +
+        `- **LTV:** ${num(settled.debtRatio * 100, 1)}% — the pool's OWN \`getPositionDebtRatio\`, the same math its ` +
           `liquidation path runs. It is judged at the oracle's ANCHOR price, a different leg from the MIN price the USD ` +
           `figure above uses, so the two are not two views of one number.`,
       );

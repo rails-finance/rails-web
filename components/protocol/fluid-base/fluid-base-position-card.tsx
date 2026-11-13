@@ -129,7 +129,7 @@ function slots(r: FluidBasePositionRead): PositionCardSlots {
       value: (
         <>
           <Prov info={fluidBaseProv("room", c)}>{amount(p.borrowRoom, p.debtUnit)}</Prov> to the{" "}
-          <Prov info={fluidBaseProv("collateral-factor", c)}>{pct(p.collateralFactor)}</Prov> limit
+          <Prov info={fluidBaseProv("collateral-factor", c)}>{pct(p.collateralFactor)}</Prov> collateral factor
         </>
       ),
     });

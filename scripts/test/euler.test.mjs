@@ -24,8 +24,8 @@ register(`data:text/javascript,${encodeURIComponent(hooks)}`);
 const { eulerPosition, eulerWindow, liquidatable, scaled, unitShow, walletRows } = await import(
   "../../lib/euler/position.ts"
 );
-const { growthToApy, spyToApy, EULER_YEAR_SECONDS } = await import("../../lib/euler/apy.ts");
-const { healthText } = await import("../../lib/euler/words.ts");
+const { spyToApy, EULER_YEAR_SECONDS } = await import("../../lib/euler/apy.ts");
+const { growthText, healthText } = await import("../../lib/euler/words.ts");
 
 const USDC = { address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", symbol: "USDC", decimals: 6 };
 const AERO = { address: "0x3f5bF3EdAc59d650D8fDf9657a71F2f904A3a4Ee", symbol: "AERO", decimals: 18 };
@@ -131,7 +131,6 @@ test("a loan: debt, its value, collateral, health and the window's interest", ()
   close(p.window.days, days);
   const g = 1030853138883472077081401640 / 1022156470651751066595445631 - 1;
   close(p.window.indexGrowth, g, 1e-9);
-  close(p.window.borrowApy, (1 + g) ** (365.2425 / days) - 1, 1e-9);
   // Opened: no debt at the past block, so no 30-day figure.
   assert.equal(p.windowState, "opened");
   assert.equal(p.interest, null);
@@ -166,7 +165,6 @@ test("a deposit: what the shares redeem for, and the share price's change on the
   close(p.windowValue, 0.012907 * 0.99974633);
   const g = 1022350 / 1015828 - 1;
   close(p.window.shareGrowth, g);
-  close(p.window.supplyApy, (1 + g) ** (365.2425 / p.window.days) - 1);
   assert.equal(p.health, null);
   assert.equal(p.collateralValue, null);
 });
@@ -175,9 +173,9 @@ test("a vault younger than the window: no earned or interest figure", () => {
   const p = eulerPosition({ ...loan, past: null });
   assert.equal(p.interest, null);
   assert.equal(p.earned, null);
-  assert.equal(p.window.borrowApy, null);
+  assert.equal(p.window.indexGrowth, null);
   assert.equal(p.windowState, "opened");
-  assert.equal(eulerWindow({ ...loan, past: null }).supplyApy, null);
+  assert.equal(eulerWindow({ ...loan, past: null }).shareGrowth, null);
 });
 
 test("a loan matched at both reads: the debt now less the debt then", () => {
@@ -318,12 +316,10 @@ test("borrow APY: the per-second rate compounded over 365.2425 days, as Euler's 
   assert.equal(spyToApy(BigInt(0)), 0);
 });
 
-test("a window's growth compounded to a year", () => {
-  close(growthToApy(0.01, 365.2425), 0.01, 1e-12);
-  close(growthToApy(0.01, 30), 1.01 ** (365.2425 / 30) - 1, 1e-12);
-  assert.equal(growthToApy(0, 30), 0);
-  assert.equal(growthToApy(null, 30), null);
-  assert.equal(growthToApy(0.01, 0), null);
+test("a window's growth, stated as the growth over its days", () => {
+  assert.equal(growthText(0.0081, 30), "+0.81% over 30.0 days");
+  assert.equal(growthText(-0.002, 29.96), "−0.2% over 30.0 days");
+  assert.equal(growthText(0, 30), "+0% over 30.0 days");
 });
 
 test("health: two decimals, three within 0.01 of 1, and never a rounded 1 for a value that is not 1", () => {

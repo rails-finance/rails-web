@@ -37,9 +37,9 @@ export const COMPOUND_BASE_PAGE: CompoundPageDeployment = {
     reading:
       "Reading this wallet’s whole history from the Comets’ logs — the sweep runs from the earliest market’s first block, so it takes a moment.",
     unavailable:
-      "The history endpoint isn't answering, so the timeline and the lifetime economics are unavailable. The position above is read live from the Comet and is unaffected.",
+      "The history endpoint isn't answering, so the timeline and the lifetime economics are unavailable. The account above is read live from the Comet and is unaffected.",
     failed:
-      "The history sweep failed. Reload to try again — the position above is read live from the Comet and is unaffected.",
+      "The history sweep failed. Reload to try again — the account above is read live from the Comet and is unaffected.",
     emptyNotWhole: "No events to show — the sweep could not read this wallet's history.",
     heldNoEvent: (index) =>
       index

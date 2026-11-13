@@ -51,12 +51,20 @@ import {
   writerState,
   VISIT_FAIL_LATE,
   VISIT_FAIL_STALLED,
+  VISIT_FAIL_MIN,
   type VisitReads,
   type Heartbeat,
   type IndexProgress,
   type IndexProgressEntry,
   type IndexStatus,
   type Allowance,
+  type HeadMiss,
+  type CensusRunStatus,
+  CENSUS_STUCK_STOPS,
+  censusDue,
+  withCensusRuns,
+  liveMiss,
+  withHeadMisses,
   counterChains,
   type GatewayCounter,
   type FillHold,
@@ -151,9 +159,22 @@ function allowanceLine(a: Allowance, gateways: readonly GatewayCounter[]): strin
   return `${providerWords(a.host)}'s daily allowance${covers}: ${mb(a.remaining)} of ${mb(a.allowanceToday)} left${reserve}${reset}. The full-history fill and reads on visit draw on it.${others}`;
 }
 
+/** Why the fill's last plan wrote no sample on this chain. */
+function missLine(m: HeadMiss): string {
+  const plan = `The fill's last plan, at ${hhmm(m.at)}, wrote no sample`;
+  return m.reason === "gateway-refused"
+    ? `refused by the gateway${m.until ? ` until ${hhmm(m.until)}` : ""}. ${plan}.`
+    : `${plan.charAt(0).toLowerCase()}${plan.slice(1)}: its read of the finalized block failed.`;
+}
+
 function heartbeatLine(e: IndexProgressEntry, now: number, allowance: Allowance | null = null): string {
-  const held = heldLine(e.held, allowance);
   const t = heartbeatTime(e);
+  const miss = liveMiss(e, now);
+  if (miss) {
+    const last = t != null ? ` It last wrote at ${utcTime(t)}, ${ageWords(now - t)} ago.` : "";
+    return `${HEARTBEAT_WORDS[fillState(e, now)]}: ${missLine(miss)}${last}`;
+  }
+  const held = heldLine(e.held, allowance);
   if (t == null) return "The fill has not reported this index yet.";
   const state = fillState(e, now);
   const words = HEARTBEAT_WORDS[state];
@@ -182,10 +203,60 @@ function visitLine(v: VisitReads | null | undefined): string {
   return `${n(v.lastHourVisits)} visits in the last hour${failed}${p95}.`;
 }
 
+const shortAddress = (a: string) => (a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a);
+
+/** How a census's latest run ended, where it stopped or failed; null when it
+ *  completed. The stop's time is left out where it is the last write's. */
+function censusLine(r: CensusRunStatus, lastWriteAt: string | null): string | null {
+  const endedAt = Date.parse(r.endedAt) / 1000;
+  const write = lastWriteAt ? Date.parse(lastWriteAt) / 1000 : null;
+  const ended = write != null && Math.abs(endedAt - write) < 60 ? "" : ` at ${utcTime(endedAt)}`;
+  const stuck =
+    r.stuckStopsInARow >= CENSUS_STUCK_STOPS
+      ? ` It has stopped in the same vault ${r.stuckStopsInARow} runs in a row with nothing written.`
+      : "";
+  switch (r.outcome) {
+    case "completed":
+      return null;
+    case "stopped-share": {
+      const left =
+        r.remainingMb != null && r.floorMb != null
+          ? `: ${n(r.remainingMb)} MB left, under its ${n(r.floorMb)} MB reserve`
+          : "";
+      const reset = r.resetsAt ? ` The gateway resets at ${hhmm(r.resetsAt)}.` : "";
+      const row = r.shareStopsInARow > 1 ? ` (${r.shareStopsInARow} in a row)` : "";
+      return `The census stopped at its share of the free gateway${ended}${row}${left}.${reset}${stuck}`;
+    }
+    case "stopped-deadline": {
+      const at = r.stoppedAtVault ? ` in vault ${shortAddress(r.stoppedAtVault)}` : "";
+      return `The census stopped at its time limit${at}${ended}.${stuck}`;
+    }
+    case "failed":
+      return `The census failed${ended} (${errorKind(r.error) ?? "Error"}).`;
+  }
+}
+
+/** A census held until its next run: the status column's words ("In 4 h 52
+ *  min", "Due now"; "After 14:06 UTC" while only the gateway's reset is
+ *  known) and the row line's label ("Next run in 4 h 52 min (14:12 UTC)").
+ *  Null otherwise. */
+function censusDueWords(e: StatusEntry, now: number): { status: string; label: string } | null {
+  const w = e.live?.writers.find((x) => x.censusRun);
+  const due = w && writerState(w, now, e) === "paused" ? censusDue(w) : null;
+  if (!due) return null;
+  const slot = hhmm(new Date(due.at * 1000).toISOString());
+  if (due.after) return { status: `After ${slot}`, label: `Next run after ${slot}` };
+  if (due.at - now < 60) return { status: "Due now", label: `Next run due now (${slot})` };
+  const left = ageWords(due.at - now);
+  return { status: `In ${left}`, label: `Next run in ${left} (${slot})` };
+}
+
 function pipelineLine(e: StatusEntry, now: number): string {
   const t = pipelineHeartbeat(e);
-  if (t != null)
-    return `${HEARTBEAT_WORDS[pipelineState(e, now)]}: last write at ${utcTime(t)}, ${ageWords(now - t)} ago.`;
+  const census = e.live?.writers.map((w) => w.censusRun && censusLine(w.censusRun, w.lastWriteAt)).find(Boolean);
+  const due = pipelineState(e, now) === "paused" ? censusDueWords(e, now) : null;
+  const label = due?.label ?? HEARTBEAT_WORDS[pipelineState(e, now)];
+  if (t != null) return `${label}: last write at ${utcTime(t)}, ${ageWords(now - t)} ago.${census ? ` ${census}` : ""}`;
   const b = pipelineNewestBlockTime(e);
   return b != null ? `No write time stored. The newest row is from a block of ${utcTime(b)}.` : "No write time stored.";
 }
@@ -214,7 +285,7 @@ function cellView(c: StatusCell, now: number, allowance: Allowance | null): Cell
     const stall = fillStall(c.fill);
     return {
       hb,
-      status: stall && hb === "late" && !c.fill.held ? "Not gaining" : STATUS_WORDS[hb],
+      status: stall && hb === "late" && !c.fill.held && !liveMiss(c.fill, now) ? "Not gaining" : STATUS_WORDS[hb],
       index: percentWords(c.fill),
       indexRank: c.fill.atHead ? 100 : (c.fill.percent ?? 0),
       last: heartbeatTime(c.fill),
@@ -228,7 +299,7 @@ function cellView(c: StatusCell, now: number, allowance: Allowance | null): Cell
     const partial = Boolean(rosterFor(c.key, c.chain)?.history);
     return {
       hb,
-      status: STATUS_WORDS[hb],
+      status: (hb === "paused" && censusDueWords(c.entry, now)?.status) || STATUS_WORDS[hb],
       index: partial ? "Partial" : "Full",
       indexRank: partial ? 50 : 100,
       last: pipelineHeartbeat(c.entry),
@@ -586,6 +657,9 @@ function PipelineDetail({ e, now }: { e: StatusEntry; now: number }) {
                   {w.lastWriteAt ? `Last write ${utcTime(Date.parse(w.lastWriteAt) / 1000)}` : "No write time stored"}
                   {w.newest && ` · newest row at block ${n(w.newest.block)}`}
                 </div>
+                {w.censusRun && censusLine(w.censusRun, w.lastWriteAt) && (
+                  <div className="mt-0.5 text-rb-500">{censusLine(w.censusRun, w.lastWriteAt)}</div>
+                )}
               </li>
             ))}
           </ul>
@@ -773,7 +847,9 @@ export function StatusBoard({ source, view }: { source: StatusSource; view: Stat
   }, [router]);
 
   const cells =
-    source.route === "status" ? cellsFromStatus(source.data, protocolLabel) : cellsFromProgress(source.data);
+    source.route === "status"
+      ? cellsFromStatus(withCensusRuns(withHeadMisses(source.data)), protocolLabel)
+      : cellsFromProgress(withHeadMisses(source.data));
   const atHead = (protocol: string, ch: number) =>
     cells.some((c) => c.protocol === protocol && c.chain === ch && c.fill?.atHead === true);
   const next = nextItems(atHead);
@@ -843,7 +919,7 @@ export function StatusBoard({ source, view }: { source: StatusSource; view: Stat
                 {h === "fresh"
                   ? "Arriving: on schedule"
                   : h === "late"
-                    ? `Late: past 1.5 times its schedule, or ${pct(VISIT_FAIL_LATE)} of visit reads failing`
+                    ? `Late: past 1.5 times its schedule, or ${pct(VISIT_FAIL_LATE)} of visit reads failing (${VISIT_FAIL_MIN} at least)`
                     : h === "stalled"
                       ? `Stalled: past 3 times its schedule, or ${pct(VISIT_FAIL_STALLED)} failing`
                       : h === "paused"

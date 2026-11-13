@@ -29,6 +29,7 @@ import {
   COMPOUND_V2_YEAR_DOCS,
   COMPOUND_V2_YEAR_SOURCE,
 } from "@/lib/compound-v2/rate-year";
+import { COMPOUND_V2_APY_FORMULA, COMPOUND_V2_BLOCKS_PER_DAY, COMPOUND_V2_DAYS_PER_YEAR } from "@/lib/comptroller/apy";
 
 // Custody, not origin — the via line's leading segment only (the embedded
 // receipt renderer drops it; provenance-receipts-grammar §3). Summaries state
@@ -683,55 +684,69 @@ const modelYearSentence = (bpy: number | null | undefined): string =>
     ? `The market's rate model answers \`blocksPerYear()\` ${bpy.toLocaleString("en-US")}: the constant it uses to set its per-block curve from its yearly terms.`
     : "The market's rate model answers `blocksPerYear()`: the constant it uses to set its per-block curve from its yearly terms.";
 
-/** The year's input on a Compound V2 rate receipt: 2,628,000 blocks. */
-const blocksAYearInput: ProvInput = {
-  label: "blocks a year",
-  value: COMPOUND_V2_BLOCKS_PER_YEAR.toLocaleString("en-US"),
+/** The compounding input on a Compound V2 APY receipt: the docs' 7,200 blocks a day over 365 days. */
+const docsDailyInput: ProvInput = {
+  label: "blocks a day, days a year",
+  value: `${COMPOUND_V2_BLOCKS_PER_DAY.toLocaleString("en-US")}, ${COMPOUND_V2_DAYS_PER_YEAR}`,
   kind: "offchain",
   pclass: "offchain",
-  note: COMPOUND_V2_YEAR_SOURCE,
-  verify: { kind: "link", href: COMPOUND_V2_YEAR_DOCS, text: "Compound's docs: 12 seconds per block" },
+  note: "Compound's docs' APY formula: 12-second blocks, compounded daily",
+  verify: {
+    kind: "link",
+    href: COMPOUND_V2_YEAR_DOCS,
+    text: "Compound's docs: Calculating the APY Using Rate Per Block",
+  },
 };
 
-/** The live per-block borrow rate on one market × 2,628,000 blocks
- *  (lib/compound-v2/rate-year.ts). */
+/** The live per-block borrow rate on one market as an APY, by Compound's docs'
+ *  formula (lib/comptroller/apy.ts). */
 export const borrowRateProv = (
   sym?: string,
   read?: { perBlockRaw?: string | null; modelBlocksPerYear?: number | null },
-): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  verify: {
-    kind: "recompute",
-    text: "To check: ask any Ethereum node for the cToken's borrowRatePerBlock() and multiply it by 2,628,000.",
-  },
-  summary: `The current variable borrow rate${sym ? ` on the ${sym} market` : ""} — the cToken's \`borrowRatePerBlock\` read at head, divided by 1e18 and multiplied by 2,628,000 blocks a year, as a simple APR. Interest accrues once a block, and 2,628,000 is a year of ${COMPOUND_V2_YEAR_SOURCE}. ${modelYearSentence(read?.modelBlocksPerYear)}`,
-  contract: { name: "cToken", address: "" },
-  via: "cToken borrowRatePerBlock (eth_call at head) × 2,628,000",
-  formula: "per-block rate ÷ 1e18 × 2,628,000",
-  inputs: [
-    {
-      label: "per-block rate",
-      ...(read?.perBlockRaw ? { value: BigInt(read.perBlockRaw).toLocaleString("en-US") } : {}),
-      kind: "chain",
-      pclass: "state",
-      note: "borrowRatePerBlock at head, a 1e18 mantissa",
+): Provenance => {
+  const simple =
+    read?.perBlockRaw != null
+      ? ` As a simple rate on ${COMPOUND_V2_BLOCKS_PER_YEAR.toLocaleString("en-US")} blocks a year (${COMPOUND_V2_YEAR_SOURCE}) it is ${((Number(read.perBlockRaw) / 1e18) * COMPOUND_V2_BLOCKS_PER_YEAR * 100).toFixed(2)}%.`
+      : "";
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    verify: {
+      kind: "recompute",
+      text: `To check: ask any Ethereum node for the cToken's borrowRatePerBlock() and compute ${COMPOUND_V2_APY_FORMULA}.`,
     },
-    blocksAYearInput,
-  ],
-});
+    summary: `The current variable borrow APY${sym ? ` on the ${sym} market` : ""} — the cToken's \`borrowRatePerBlock\` read at head, by Compound's docs' APY formula: ${COMPOUND_V2_APY_FORMULA}, 7,200 blocks a day compounded daily.${simple} ${modelYearSentence(read?.modelBlocksPerYear)}`,
+    contract: { name: "cToken", address: "" },
+    via: "cToken borrowRatePerBlock (eth_call at head) → APY",
+    formula: COMPOUND_V2_APY_FORMULA,
+    inputs: [
+      {
+        label: "per-block rate",
+        ...(read?.perBlockRaw ? { value: BigInt(read.perBlockRaw).toLocaleString("en-US") } : {}),
+        kind: "chain",
+        pclass: "state",
+        note: "borrowRatePerBlock at head, a 1e18 mantissa",
+      },
+      docsDailyInput,
+    ],
+  };
+};
 
-/** Debt-USD-weighted average borrow rate across several borrowed markets. */
+/** Debt-USD-weighted average borrow APY across several borrowed markets. */
 export const avgBorrowRateProv = (): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
-  summary:
-    "Debt-weighted average of the markets' current borrow rates — averaged across the markets this position borrows: each market's borrowRatePerBlock times 2,628,000 blocks a year (12-second blocks, as Compound's docs count a year), weighted by that debt's USD value at Compound's oracle price. All legs are chain reads at head.",
+  summary: `Debt-weighted average of the markets' current borrow APYs — averaged across the markets this position borrows: each market's borrowRatePerBlock as an APY by Compound's docs' formula (${COMPOUND_V2_APY_FORMULA}), weighted by that debt's USD value at Compound's oracle price. All legs are chain reads at head.`,
   contract: { name: "cToken", address: "" },
-  via: "Σ (rate × debt USD) ÷ Σ debt USD, per borrowed market",
-  formula: "Σ (rate × weight) ÷ Σ weight",
+  via: "Σ (APY × debt USD) ÷ Σ debt USD, per borrowed market",
+  formula: "Σ (APY × weight) ÷ Σ weight",
   inputs: [
-    { label: "rate", kind: "chain", pclass: "state", note: "borrowRatePerBlock per market × 2,628,000" },
+    {
+      label: "APY",
+      kind: "chain-derived",
+      pclass: "state",
+      note: "borrowRatePerBlock per market, by the docs' formula",
+    },
     { label: "weight", kind: "chain-derived", pclass: "oracle", note: "debt × oracle getUnderlyingPrice" },
   ],
 });

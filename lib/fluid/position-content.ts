@@ -31,7 +31,7 @@ export function fluidPositionContent(opts: {
         },
         {
           bold: "Liquidation sweeps a band, not a position",
-          text: "Fluid liquidates price-band 'ticks' — one sweep can touch many positions at once, and it usually takes only enough to restore the band's health, so 'liquidated' rarely means emptied outright.",
+          text: "Fluid liquidates price-band 'ticks' — one sweep can touch many positions at once, and it takes only what brings the band back to its liquidation threshold, so 'liquidated' rarely means emptied outright.",
         },
         {
           bold: "Highest recorded",
@@ -57,7 +57,7 @@ export function fluidPositionContent(opts: {
     opts.hasDebt
       ? {
           bold: "Liquidation sweeps a band",
-          text: "Fluid liquidates price-band 'ticks', not individual positions — a sweep clears enough of every position in the affected band to restore its health, so a swept position usually keeps most of what it held.",
+          text: "Fluid liquidates price-band 'ticks', not individual positions — a sweep clears enough of every position in the affected band to bring it back to its liquidation threshold, so a swept position usually keeps most of what it held.",
         }
       : {
           bold: "Collateral only",

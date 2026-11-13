@@ -306,9 +306,9 @@ export function computeFluidEconomics(
     collateralListLabel: view.settled || live ? "Collateral · current" : undefined,
     debtListLabel: view.settled || live ? "Debt · current" : undefined,
     interestNote: live
-      ? "Current figures are read live from the vault — every liquidation and all interest accrued so far is included. The lifetime flows add up the position's own transactions; the interest the vault added between them is stated beside them. Fluid uses no dollar prices: each side is shown in its own token, and the vault's oracle prices the pair in the debt token."
+      ? "Current figures are read live from the vault — every liquidation and all interest accrued so far is included. The lifetime flows add up the position's own transactions; the interest the vault added between them is stated beside them. Each side is shown in its own token, and the vault's oracle prices the pair in the debt token."
       : view.settled
-        ? "Current figures are the vault's own totals as of the stamped time, liquidations and accrued interest included. The lifetime flows add up the position's own transactions; the interest the vault added between them is stated beside them. Fluid uses no dollar prices: each side is shown in its own token."
-        : "Figures add up the position's own transactions, including liquidations. Interest that builds up between events isn't counted, so totals can run slightly behind the vault's own books. Fluid uses no dollar prices: each side is shown in its own token.",
+        ? "Current figures are the vault's own totals as of the stamped time, liquidations and accrued interest included. The lifetime flows add up the position's own transactions; the interest the vault added between them is stated beside them. Each side is shown in its own token, and the vault's oracle prices the pair in the debt token."
+        : "Figures add up the position's own transactions, including liquidations. Interest that builds up between events isn't counted, so totals can run slightly behind the vault's own books. Each side is shown in its own token, and the vault's oracle prices the pair in the debt token.",
   };
 }

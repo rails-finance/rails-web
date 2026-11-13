@@ -81,8 +81,8 @@ export function MoonwellInfoPage({ deployment }: { deployment: MoonwellInfoDeplo
         </>,
         <>
           The <GlossaryLink term="Comptroller">Comptroller</GlossaryLink> counts all of a wallet&apos;s collateral
-          against all of its debt. One <GlossaryLink term="Health factor">health factor</GlossaryLink> then scores the
-          whole account.
+          against all of its debt. Its <GlossaryLink term="Credit remaining">credit remaining</GlossaryLink>, what it
+          may still borrow, measures the whole account.
         </>,
         <>
           Dollar values use the prices of an <GlossaryLink term="Oracle">oracle</GlossaryLink>. The Comptroller uses the
@@ -116,7 +116,7 @@ export function MoonwellInfoPage({ deployment }: { deployment: MoonwellInfoDeplo
           body: (
             <ul className={UL}>
               <li>
-                The top card shows what the wallet supplied, what it owes and its health factor, read live from the
+                The top card shows what the wallet supplied, what it owes and its credit remaining, read live from the
                 chain, not from the account's history.
               </li>
               <li>The timeline lists the account&apos;s events, newest first.</li>

@@ -49,7 +49,7 @@ export const capacityProv = (
     {
       kind: "chain-derived",
       pclass: "state",
-      summary: `${label}${marketNote(c)} — arithmetic over the position's own slots, the market's own oracle price and the lltv, all read at the same head. In loan-asset units (the oracle's numeraire); no USD anywhere.`,
+      summary: `${label}${marketNote(c)} — arithmetic over the position's slots, the market's oracle price and the lltv, all read at the same head. In loan-asset units (the oracle's numeraire), with no USD figure.`,
       contract: blueOf(c),
       via: `${LANE} · ${formula}`,
       formula,
@@ -102,7 +102,7 @@ export const morphoHealthFactorProv = (
 
 const ORACLE = (address: string) => ({ name: "Market oracle", address });
 
-/** The market's own oracle price at the read block. */
+/** The market's oracle price at the read block. */
 export const oraclePriceProv = (
   p: {
     collSym: string;
@@ -118,10 +118,10 @@ export const oraclePriceProv = (
 ): Provenance => ({
   kind: "chain",
   pclass: "oracle",
-  summary: `The market's oracle price${marketNote(c)} — 1 whole ${p.collSym} in ${p.loanSym}, from price() on the market's own oracle (fixed in its immutable params) at block ${p.block.toLocaleString("en-US")}, scaled by 1e(36 + loan decimals − collateral decimals). ${
+  summary: `The market's oracle price${marketNote(c)} — 1 whole ${p.collSym} in ${p.loanSym}, from price() on the market's oracle (fixed in its immutable params) at block ${p.block.toLocaleString("en-US")}, scaled by 1e(36 + loan decimals − collateral decimals). ${
     p.surface === "market"
-      ? "It is the price Morpho's own health test applies to every position in this market."
-      : "It is the price Morpho's own health test uses, and every value, capacity and health figure on this card rests on it."
+      ? "It is the price Morpho's health test applies to every position in this market."
+      : "It is the price Morpho's health test uses, and every value, capacity and health figure on this card rests on it."
   }`,
   contract: ORACLE(p.oracle),
   via: `${p.lane} · IOracle.price() @ block ${p.block}`,

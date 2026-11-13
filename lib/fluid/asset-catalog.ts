@@ -42,7 +42,7 @@ export function vaultKindLabel(vaultType: number): string {
     case "smart-debt":
       return "Smart debt";
     case "smart":
-      return "Smart collateral + debt";
+      return "Smart collateral and debt";
     default:
       return "Standard pair";
   }

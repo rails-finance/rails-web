@@ -93,7 +93,7 @@ const comets = [
 test("the Base strip counts Comet positions and states dollars at each Comet's feed", () => {
   const s = compoundBaseHolderStrip(head, comets);
   const leg = (id) => s.legs.find((l) => l.id === id);
-  assert.equal(s.countsLine, "This wallet holds 3 Comet positions, all open.");
+  assert.equal(s.countsLine, "This wallet holds 3 Comet accounts, all open.");
   assert.equal(leg("collateral").value, "$6,000.00");
   assert.equal(leg("collateral").footnote.text, "cUSDCv3 $6,000.00");
   assert.equal(leg("debt").value, "$1,000.00");

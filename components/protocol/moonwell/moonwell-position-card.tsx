@@ -16,7 +16,7 @@
 // the replayed deposit principal; debt is the emitted accountBorrows at the
 // last borrow/repay event, UPGRADED to the live borrowBalanceStored on the
 // detail page when its chain lane lands (each borrow row's `live` flag names
-// the basis). The Health factor headline and the panel's risk rows ride the
+// the basis). The Credit remaining headline and the panel's risk rows ride the
 // detail page's live Comptroller read — the listing card still asserts no
 // health column (the listing snapshot carries none).
 
@@ -54,7 +54,7 @@ import { ExactSpan } from "@/components/shared/amount-text";
 import type { LiquidationStory } from "@/lib/shared/ctoken-liquidation-story";
 import { splitDust, useDustLines } from "@/components/shared/dust-reserves";
 import type { MoonwellChainResponse } from "@/lib/api/fetch-moonwell-position";
-import { moonwellHealthHead, moonwellRiskRows } from "./moonwell-risk-slot";
+import { moonwellCreditHead, moonwellRiskRows } from "./moonwell-risk-slot";
 import { moonwellCollateralFactorProv, type MoonwellLane } from "@/lib/moonwell/position-provenance";
 import { MoonwellMenuRows } from "./moonwell-menu-rows";
 import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
@@ -260,7 +260,7 @@ export interface MoonwellPositionCardProps {
   v: MoonwellPositionView;
   /** `detail` on the position page (receipts, panel, (i)); `listing` in a row. */
   surface: "detail" | "listing";
-  /** The page's live Comptroller read: the Health factor headline and the
+  /** The page's live Comptroller read: the Credit remaining headline and the
    *  panel's risk rows. Null while it is out; the listing passes none. */
   chain?: MoonwellChainResponse | null;
   /** Whether the row carries highest-recorded amounts (the index's replay and
@@ -481,11 +481,11 @@ export function useMoonwellCardSlots({
           ) : null,
       };
     }
-    // The health factor rides the detail page's live Comptroller read; the
-    // listing snapshot carries none, so a listing card asserts no health
+    // Credit remaining rides the detail page's live Comptroller read; the
+    // listing snapshot carries none, so a listing card asserts no risk
     // column (never dashed, never staled).
-    const health = detail ? moonwellHealthHead(chain, v.borrows.length > 0) : null;
-    if (health) heads.push(health);
+    const credit = detail ? moonwellCreditHead(chain, v.borrows.length > 0) : null;
+    if (credit) heads.push(credit);
   }
 
   if (!detail) return { ...common, surface: "listing", menu: null, heads, outcome };
@@ -648,10 +648,10 @@ export function useMoonwellCardSlots({
       ? [
           {
             id: "borrow-rate",
-            label: rate.avg ? "Average borrow rate" : "Borrow rate",
+            label: rate.avg ? "Average borrow APY" : "Borrow APY",
             tip: rate.avg
-              ? "The live variable borrow rate of each borrowed market, annualised from its per-timestamp rate and weighted by the debt in each."
-              : `The live variable borrow rate on the ${rate.symbol} market, annualised from its per-timestamp rate.`,
+              ? "The live variable borrow APY of each borrowed market, compounded every second from its per-second rate and weighted by the debt in each."
+              : `The live variable borrow APY on the ${rate.symbol} market, compounded every second from its per-second rate.`,
             value: <BorrowRateValue rate={rate} marketBy={marketBy} />,
           },
         ]

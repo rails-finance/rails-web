@@ -23,7 +23,7 @@
 // whatever the seized collateral was credited beyond it. Collateral rows state
 // the asset's balance after them.
 //
-// Values: each flow at Comet's oracle price at its block, as the server
+// Values: each flow at Comet's price feed at its block, as the server
 // stores it for every event block (/api/compound/prices-at, rails-server mig
 // 372), a block not stored yet read from the archive
 // (/api/chain/compound/prices-at-block); an absorb row carries its `usdValue`
@@ -118,7 +118,7 @@ export interface CompoundFlowEvent {
   collAfter: number | null;
   /** An absorb row's oracle value in dollars (its event's usdValue). */
   usdValue: number | null;
-  /** Comet's oracle price per token address at the block, where read. */
+  /** Comet's price feed per token address at the block, where read. */
   prices: Record<string, number> | null;
   /** Another account acted: a transfer received, or a sender and funder
    *  both other than the owner (the card's `externalActor` verdict). */
@@ -403,7 +403,7 @@ export const twoSided = (r: CompoundRoles) => r.collateral || r.debt;
 export function compoundFlowBuckets(roles: CompoundRoles, filled: Set<string>): FlowBucket[] {
   const mixed = roles.collateral && roles.supply;
   const all: FlowBucket[] = [
-    { key: CV3.collIn, label: "Collateral deposited", event: "Supply collateral", side: "collateral", dir: "in" },
+    { key: CV3.collIn, label: "Collateral supplied", event: "Supply collateral", side: "collateral", dir: "in" },
     {
       key: CV3.received,
       label: "Received by transfer",
@@ -509,7 +509,7 @@ export interface CompoundLive {
   base: number;
   /** Each collateral asset held now, by token address. */
   coll: Record<string, number>;
-  /** Comet's oracle price now, USD per token, by token address. */
+  /** Comet's price feed now, USD per token, by token address. */
   prices: Record<string, number>;
   /** The market's rates now, fractions a year. */
   supplyApr?: number | null;
@@ -802,7 +802,7 @@ export function compoundFlowTimeline(events: CompoundFlowEvent[], o: CompoundFlo
     today: open ? today : endDay,
     labels: {
       collateral: twoSided(roles) ? (roles.supply ? "Collateral and supply" : "Collateral") : "Supplied",
-      debt: "Debt",
+      debt: "Borrow balance",
     },
     words: compoundFlowWords(o.baseSymbol, roles, o.dailyPrices ? "store" : "carried"),
     // Each token's address by symbol, for the icons.
@@ -819,7 +819,7 @@ export function compoundFlowWords(
   // The price a balance is held at between events: the daily store's for the
   // day, or without it the latest event's.
   const heldAt =
-    between === "store" ? "at Comet's oracle price at the end of the day" : "at the oracle price of the latest event";
+    between === "store" ? "at Comet's price feed at the end of the day" : "at the price feed of the latest event";
   const two = twoSided(roles);
   const collRest = two
     ? roles.supply
@@ -828,27 +828,27 @@ export function compoundFlowWords(
     : "Market move and interest since the last event";
   const collNote = two
     ? roles.supply
-      ? `the change in each asset's oracle price since its flows, and the interest the lent ${baseSymbol} earned since the last event`
-      : "the change in each asset's oracle price since its flows"
-    : `the interest the ${baseSymbol} earned at the market's rate since the position's last event, and the change in its oracle price since each flow`;
+      ? `the change in each asset's price feed since its flows, and the interest the lent ${baseSymbol} earned since the last event`
+      : "the change in each asset's price feed since its flows"
+    : `the interest the ${baseSymbol} earned at the market's rate since the position's last event, and the change in its price feed since each flow`;
   const supplyBasis = `the ${baseSymbol} lent after the last event by then, grown at the rate the market paid until its next event (after the last, its supply rate now), ${heldAt}`;
   const collBasis =
     between === "store"
-      ? "each asset held after the last event by then, at Comet's oracle price at the end of the day"
-      : "each asset held after the last event by then, at Comet's oracle price of the latest event that priced it";
+      ? "each asset held after the last event by then, at Comet's price feed at the end of the day"
+      : "each asset held after the last event by then, at Comet's price feed of the latest event that priced it";
   return {
-    held: two ? "Still deposited" : "Still supplied",
+    held: "Still supplied",
     restBySide: {
       collateral: collRest,
       ...(two ? { debt: "Market move and interest since the last event" } : {}),
     },
     restNote: {
       collateral: collNote,
-      debt: `the interest built up on the ${baseSymbol} owed at the market's rate since the position's last event, and the change in its oracle price since each flow`,
+      debt: `the interest built up on the ${baseSymbol} owed at the market's rate since the position's last event, and the change in its price feed since each flow`,
     },
     basis: {
-      collateral: "Each flow is valued at Comet's oracle price at its block.",
-      debt: "Each flow is valued at Comet's oracle price at its block.",
+      collateral: "Each flow is valued at Comet's price feed at its block.",
+      debt: "Each flow is valued at Comet's price feed at its block.",
     },
     heldBasis: {
       collateral: two ? (roles.supply ? `${collBasis}; with it, ${supplyBasis}.` : `${collBasis}.`) : `${supplyBasis}.`,
@@ -856,12 +856,12 @@ export function compoundFlowWords(
     },
     linePrices: two
       ? between === "store"
-        ? `in USD, with each asset at Comet's oracle price at the end of the day and the ${baseSymbol} balance grown at the market's rate since the last event`
-        : `in USD, with each asset at Comet's oracle price of its latest priced event and the ${baseSymbol} balance grown at the market's rate since the last event`
+        ? `in USD, with each asset at Comet's price feed at the end of the day and the ${baseSymbol} balance grown at the market's rate since the last event`
+        : `in USD, with each asset at Comet's price feed of its latest priced event and the ${baseSymbol} balance grown at the market's rate since the last event`
       : `in USD, with the ${baseSymbol} supplied grown at the market's rate since the last event, ${heldAt}`,
     moment: {
       noPrice: {
-        collateral: "No oracle price is recorded for this day, so the collateral is stated in tokens.",
+        collateral: "No price-feed price is recorded for this day, so the collateral is stated in tokens.",
       },
       notes: [],
     },

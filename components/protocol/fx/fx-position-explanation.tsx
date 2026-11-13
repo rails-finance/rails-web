@@ -27,6 +27,7 @@ import { useFxPoolTerms, useFxPricesAt } from "@/lib/fx/use-event-state";
 import { formatNumber } from "@/lib/utils/format";
 import type { FxNoTxParts } from "@/lib/fx/no-tx-parts";
 import { FX_LIQUIDATION_RULE } from "@/lib/fx/row-figures";
+import { fxBountyWords } from "@/lib/fx/statement-words";
 
 /** "5,568.943 fxUSD by rebalances, 355.055 by redemptions and …": each part
  *  of the debt the pool moved, where it is there. */
@@ -223,8 +224,8 @@ export function FxPositionExplanation({
     }
     bullets.push(
       <span key="dashes">
-        Collateral, debt and the debt ratio show dashes until the pool&rsquo;s figure arrives. f(x) moves every position
-        with pool-wide funding charged on its collateral, tick rebalances and write-offs that leave no event of the
+        Collateral, debt and the LTV show dashes until the pool&rsquo;s figure arrives. f(x) moves every position with
+        pool-wide funding charged on its collateral, tick rebalances and write-offs that leave no event of the
         position&rsquo;s own, so only the pool&rsquo;s figure can say what it holds now.
       </span>,
     );
@@ -293,8 +294,8 @@ export function FxPositionExplanation({
       const line = (r: number) => `${(r * 100).toFixed(1).replace(/\.0$/, "")}%`;
       bullets.push(
         <span key="ratio">
-          The pool puts the debt ratio at <H>{(ratio * 100).toFixed(1)}%</H>: the debt as a share of the
-          collateral&rsquo;s value at the anchor price, {formatUsd(anchorAt)} per {v.normalizedSymbol}.
+          The pool puts the LTV at <H>{(ratio * 100).toFixed(1)}%</H>: the debt as a share of the collateral&rsquo;s
+          value at the anchor price, {formatUsd(anchorAt)} per {v.normalizedSymbol}.
           {px ? (
             <>
               {" "}
@@ -316,16 +317,16 @@ export function FxPositionExplanation({
             {((1 - p88 / px.min) * 100).toFixed(1)}% below now, and {line(terms.liquidateRatio)} at{" "}
             <H>{formatUsd(p95)}</H>, {((1 - p95 / px.min) * 100).toFixed(1)}% below; funding keeps taking collateral,
             which moves both prices up slowly. A rebalance takes part of the collateral and leaves the position open; a
-            liquidation repays the debt and takes collateral worth it plus the bonus.
+            liquidation repays the debt and takes collateral worth it plus the bounty.
           </span>,
         );
       }
       if (terms) {
         bullets.push(
           <span key="exit">
-            Collateral can be withdrawn while the debt ratio afterwards stays at or under {line(terms.maxBorrowRatio)}{" "}
-            at the min price; past that, debt has to be repaid first. Closing repays the whole debt in fxUSD and returns
-            all the collateral.
+            Collateral can be withdrawn while the LTV afterwards stays at or under {line(terms.maxBorrowRatio)} at the
+            min price; past that, debt has to be repaid first. Closing repays the whole debt in fxUSD and returns all
+            the collateral.
           </span>,
         );
       }
@@ -344,7 +345,7 @@ export function FxPositionExplanation({
     if (!hasDebt && colls != null) {
       bullets.push(
         <span key="no-debt">
-          With no fxUSD debt there is no debt ratio, and nothing here can be rebalanced or liquidated.
+          With no fxUSD debt there is no LTV, and nothing here can be rebalanced or liquidated.
         </span>,
       );
     }
@@ -409,19 +410,22 @@ export function FxPositionExplanation({
   if (bonus && bonus.debt > 0.0005) {
     const who = parts?.redemptions && parts.redemptions.debt > 0.0005 ? "Rebalances and redemptions" : "Rebalances";
     const paid = bonus.collUsd - bonus.debt;
+    const bountyWords = fxBountyWords(
+      {
+        paid,
+        bounty: bonus.bounty,
+        bountyRatio: bonus.bountyRatio,
+        redemptions: who !== "Rebalances",
+      },
+      formatUsd,
+    );
     bullets.push(
-      <span key="bonus">
+      <span key="bounty">
         {who} took {formatNumber(bonus.coll)} {v.normalizedSymbol} of collateral for <AmountText value={bonus.debt} />{" "}
-        fxUSD of debt. At the oracle&rsquo;s min price at the block before each, the price a rebalance is paid at, that
-        collateral was worth {formatUsd(bonus.collUsd)}: {formatUsd(Math.abs(paid))} {paid >= 0 ? "more" : "less"} than
-        the debt it cleared, which the pool counts at $1 per fxUSD.
-        {paid > 0 ? (
-          <>
-            {" "}
-            That difference is the bonus the owner paid the keepers, {((paid / bonus.collUsd) * 100).toFixed(1)}% of the
-            collateral taken.
-          </>
-        ) : null}
+        fxUSD of debt. At the oracle&rsquo;s min price at the block before each, that collateral was worth{" "}
+        {formatUsd(bonus.collUsd)}: {formatUsd(Math.abs(paid))} {paid >= 0 ? "more" : "less"} than the debt it cleared,
+        which the pool counts at $1 per fxUSD.
+        {bountyWords ? <> {bountyWords.replace(/'/g, "’")}</> : null}
       </span>,
     );
   }

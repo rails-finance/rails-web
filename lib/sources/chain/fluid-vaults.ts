@@ -130,7 +130,7 @@ export interface FluidVaultRow {
   collateralFactor: number | null;
   liquidationThreshold: number | null;
   liquidationMaxLimit: number | null;
-  /** The premium floor the engine guarantees a liquidator (0.01 = 1%). */
+  /** The liquidation penalty: what a liquidated position pays beyond the debt cleared (0.01 = 1%). */
   liquidationPenalty: number | null;
   withdrawalGap: number | null;
 

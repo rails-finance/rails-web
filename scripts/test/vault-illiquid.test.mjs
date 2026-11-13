@@ -73,7 +73,7 @@ test("a market at full utilisation and the maximum rate, holding most of the vau
   assert.equal(il.withdrawable, "10");
   assert.equal(
     illiquidSentence(il),
-    "The RLP market holds 99% of the vault, 100% borrowed at the rate ceiling (800% a year).",
+    "The RLP market holds 99% of the vault, 100% borrowed at the rate ceiling (800% a year, before compounding).",
   );
 });
 
@@ -103,7 +103,7 @@ test("several markets read as one sentence, the utilisation floored", () => {
   ]);
   assert.equal(
     illiquidSentence(il),
-    "The USR, wstUSR and RLP markets hold 100% of the vault, 99.9% to 100% borrowed at the rate ceiling (800% a year).",
+    "The USR, wstUSR and RLP markets hold 100% of the vault, 99.9% to 100% borrowed at the rate ceiling (800% a year, before compounding).",
   );
   assert.equal(il.withdrawable, "1");
 });

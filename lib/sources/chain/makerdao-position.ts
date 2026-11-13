@@ -105,6 +105,10 @@ export interface MakerVaultState {
    *  ilk's live per-second rate compounded to a year. Null if the Jug read
    *  failed. */
   stabilityFeeApr: number | null;
+  /** The same per-second rate as a simple yearly rate: ((Jug.base + duty) /
+   *  RAY − 1) × seconds per year, uncompounded. The wallet page's debt tile
+   *  averages this form across protocols. Null if the Jug read failed. */
+  stabilityFeeSimple: number | null;
   /** The ilk's minimum vault debt (`dust`, RAD → DAI). RAD (1e45), NOT ray —
    *  the scale the verify script caught. */
   dustDai: number | null;
@@ -240,6 +244,7 @@ export async function loadMakerVaultStateFromChain(
   // compounding it over a year gives the APR the card captions.
   const perSecond = Number(jugBase + duty) / 1e27;
   const stabilityFeeApr = perSecond >= 1 ? Math.pow(perSecond, SECONDS_PER_YEAR) - 1 : null;
+  const stabilityFeeSimple = perSecond >= 1 ? (Number(jugBase + duty - RAY) / 1e27) * SECONDS_PER_YEAR : null;
   const ilk = bytes32ToStr(ilkB);
   const [priceCap, auction, lockstake] = await Promise.all([
     isLseIlk(ilk) ? readPriceCap(client, spotIlk[0], head.number) : Promise.resolve(null),
@@ -272,6 +277,7 @@ export async function loadMakerVaultStateFromChain(
     // debtDai × mat ÷ ink.
     liquidationPriceUsd: matRatio != null && inkNum > 0 && debtDai > 0 ? (debtDai * matRatio) / inkNum : null,
     stabilityFeeApr,
+    stabilityFeeSimple,
     // dust / line are RAD (1e45) — NOT ray (the verify script caught this).
     dustDai: Number(dust) / 1e45,
     lineDai: Number(line) / 1e45,

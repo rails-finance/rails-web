@@ -109,9 +109,8 @@ type FluidConfigField = "collateralFactor" | "liquidationThreshold" | "liquidati
 const CONFIG_GLOSS: Record<FluidConfigField, string> = {
   collateralFactor: "the ratio a position can borrow up to",
   liquidationThreshold: "the ratio at which a position becomes liquidatable",
-  liquidationMaxLimit:
-    "the ratio past which the vault stops selling to liquidators and absorbs the position onto its own book (why an absorbed liquidation pays no bonus)",
-  liquidationPenalty: "the premium floor the engine guarantees a liquidator",
+  liquidationMaxLimit: "the liquidation max limit, the ratio above which 100% of a position gets liquidated",
+  liquidationPenalty: "the liquidation penalty a liquidated position pays beyond the debt cleared",
 };
 
 /** A vault's governance-set risk rung — one of the config block's 1e4-scaled
@@ -147,9 +146,7 @@ const fluidOraclePriceProv_ = (coords: FluidVaultCoords): Provenance => ({
  *  figure is DEX pool SHARES (a quantity, not a token). */
 const fluidVaultSizeProv_ = (side: "supply" | "borrow", smartLeg: boolean, coords: FluidVaultCoords): Provenance => {
   const field = side === "supply" ? "totalSupplyVault" : "totalBorrowVault";
-  const unit = smartLeg
-    ? "DEX pool shares — the leg holds shares of a Fluid DEX pool, a quantity, not a token"
-    : "the leg's own token units";
+  const unit = smartLeg ? "DEX shares — the leg holds shares of a Fluid DEX pool" : "the leg's own token units";
   return {
     kind: "chain",
     pclass: "state",
@@ -204,7 +201,7 @@ const fluidVaultRateProv_ = (side: "supply" | "borrow", coords: FluidVaultCoords
     pclass: "state",
     source: { block: coords.blockNumber },
     verify: recompute(`exchangePricesAndRates.${field}`, coords),
-    summary: `The vault's current ${side} rate, annual${atBlock(coords)} — the resolver's own rates block (\`exchangePricesAndRates.${field}\`, a 1e2-precision percent): the liquidity-layer rate with the vault's reward or fee magnifier applied. Rates float with utilisation; this is the rate at this block, not a projection.`,
+    summary: `The vault's current ${side} rate, annual${atBlock(coords)} — the resolver's own rates block (\`exchangePricesAndRates.${field}\`, a 1e2-precision percent): the Liquidity Layer rate with the vault's reward or fee magnifier applied. Rates float with utilization; this is the rate at this block, not a projection.`,
     contract: vaultContract(coords),
     via: `${LANE} · VaultResolver.getAllVaultsAddresses() → getVaultEntireData(vault) · exchangePricesAndRates.${field} @ head`,
   };
@@ -264,7 +261,7 @@ const fluidBorrowableProv_ = (coords: FluidVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: coords.blockNumber },
   verify: recompute("limitsAndAvailability.borrowable", coords),
-  summary: `Available to borrow — the resolver's \`limitsAndAvailability.borrowable\`${atBlock(coords)}, in ${coords.debtSym ?? "the debt token"}: the least of the vault's borrow limit at the Liquidity layer and the Liquidity layer's free balance of the token.`,
+  summary: `Available to borrow — the resolver's \`limitsAndAvailability.borrowable\`${atBlock(coords)}, in ${coords.debtSym ?? "the debt token"}: the least of the vault's borrow limit at the Liquidity Layer and the Liquidity Layer's free balance of the token.`,
   contract: VAULT_RESOLVER_CONTRACT,
   via: `${LANE} · getVaultEntireData(vault) · limitsAndAvailability.borrowable @ head`,
 });

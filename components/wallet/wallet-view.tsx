@@ -14,7 +14,8 @@
 
 import { IndexNotice } from "@/components/shared/index-notice";
 import Link from "next/link";
-import { Suspense, use } from "react";
+import { Suspense, use, type ReactNode } from "react";
+import { TipLabel } from "@/components/shared/tip-label";
 import { DetailBackButton } from "@/components/shared/detail-back-row";
 import { WalletHeading } from "@/components/shared/wallet-heading";
 import { PROFILE_CLEARANCE } from "@/lib/shared/ui-grammar";
@@ -52,6 +53,11 @@ import { walletPositionAssetKeys } from "@/lib/wallet/aim-assets";
 const TILE = "rounded-2xl border border-rb-300/40 bg-raised px-5 py-4 dark:border-rb-700/40";
 const H2 = "text-sm font-semibold uppercase tracking-wide text-foreground/80";
 
+/** The Debt tile's rate: each family hands its stored simple yearly rate
+ *  (WalletPosition.debtRate), so the average is in one form. */
+const RATE_TIP =
+  "The borrow rates of the positions with debt, each as a simple yearly rate (the protocol's per-second or yearly rate, uncompounded), averaged by debt. Each protocol's page states its rate in its documented form.";
+
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
@@ -74,7 +80,7 @@ function byRisk(a: WalletPosition, b: WalletPosition): number {
   return (b.collateralUsd ?? -1) - (a.collateralUsd ?? -1);
 }
 
-function Tile({ label, value, sub, anatomy }: { label: string; value: string; sub?: string; anatomy: string }) {
+function Tile({ label, value, sub, anatomy }: { label: string; value: string; sub?: ReactNode; anatomy: string }) {
   return (
     <div className={TILE} data-wallet-tile={anatomy}>
       <div className="text-xs font-semibold uppercase tracking-wide text-rb-500">{label}</div>
@@ -115,13 +121,14 @@ function Tiles({ open, ranked, filtered }: { open: WalletPosition[]; ranked: Wal
           label="Debt"
           value={withDebt.length ? formatCompactUsd(debt) : "—"}
           sub={
-            owing.length === 0
-              ? "no debt"
-              : rate == null
-                ? undefined
-                : rated.length === owing.length
-                  ? `weighted rate ${pct(rate)}`
-                  : `weighted rate ${pct(rate)} on ${rated.length} of ${owing.length} with debt`
+            owing.length === 0 ? (
+              "no debt"
+            ) : rate == null ? undefined : (
+              <>
+                <TipLabel text="simple yearly rate" tip={RATE_TIP} /> {pct(rate)}
+                {rated.length < owing.length && ` on ${rated.length} of ${owing.length} with debt`}
+              </>
+            )
           }
         />
         <Tile

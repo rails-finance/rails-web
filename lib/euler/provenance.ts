@@ -5,9 +5,9 @@
 
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import type { EulerPosition, EulerWalletRow } from "@/lib/euler/position";
-import { GROWTH_APY_FORMULA, SPY_APY_FORMULA } from "@/lib/euler/apy";
+import { SPY_APY_FORMULA } from "@/lib/euler/apy";
 import type { BlockRef, EulerPositionRead, EulerWalletRead } from "@/lib/euler/types";
-import { healthText, rate } from "@/lib/euler/words";
+import { growthText, healthText, rate } from "@/lib/euler/words";
 
 const n = (v: number) => v.toLocaleString("en-US");
 const date = (t: number) => new Date(t * 1000).toISOString().slice(0, 10);
@@ -43,7 +43,7 @@ function priceInputs(c: EulerReceiptContext): ProvInput[] {
       `oracle ${v.oracle} · getQuote(10^${v.asset.decimals}, ${v.asset.symbol}, unit ${v.unit.address})`,
       v.assetPrice,
     ),
-    derived(`${v.asset.symbol} in ${unitName(c)}`, fig(c.p.price ?? 0)),
+    derived(`price of one ${v.asset.symbol} in ${unitName(c)}`, fig(c.p.price ?? 0)),
   ];
 }
 
@@ -73,10 +73,10 @@ export function cardProv(key: CardKey, c: EulerReceiptContext): Provenance {
         via: headVia(r),
         formula:
           p.suppliedValue !== null
-            ? "convertToAssets(balanceOf(account)); × the oracle's price of one asset"
+            ? "convertToAssets(balanceOf(account)) × price"
             : "convertToAssets(balanceOf(account))",
         inputs: [
-          chain(`balanceOf(${r.account})`, v.shares),
+          chain(`balanceOf(account ${r.account})`, v.shares),
           chain("convertToAssets(shares)", v.assets),
           ...priceInputs(c),
         ],
@@ -92,12 +92,12 @@ export function cardProv(key: CardKey, c: EulerReceiptContext): Provenance {
             : `Earned in 30 days — the same ${v.shares} shares at ${at(r.then)} and ${at(r.head)}, and what they redeem for at each: ${fig(p.earned)} ${A}${p.windowValue !== null ? `, worth ${fig(p.windowValue)} in ${unitName(c)} at the head's price` : ""}.`,
         contract: vaultC(c),
         via: bothVia(r),
-        formula: "convertToAssets(shares) now − convertToAssets(shares) then, where balanceOf matches at both blocks",
+        formula: "convertToAssets(shares) now − convertToAssets(shares) then; balanceOf now = balanceOf then",
         inputs: [
-          chain(`balanceOf(${r.account}) @ ${n(r.head.block)}`, v.shares),
-          chain(`balanceOf(${r.account}) @ ${n(r.then.block)}`, r.past?.shares ?? "–"),
-          chain(`convertToAssets(shares) @ ${n(r.head.block)}`, v.assets),
-          chain(`convertToAssets(shares) @ ${n(r.then.block)}`, r.past?.assets ?? "–"),
+          chain(`balanceOf(account ${r.account}) now @ ${n(r.head.block)}`, v.shares),
+          chain(`balanceOf(account ${r.account}) then @ ${n(r.then.block)}`, r.past?.shares ?? "–"),
+          chain(`convertToAssets(shares) now @ ${n(r.head.block)}`, v.assets),
+          chain(`convertToAssets(shares) then @ ${n(r.then.block)}`, r.past?.assets ?? "–"),
           ...(p.windowValue !== null ? priceInputs(c) : []),
         ],
       };
@@ -106,7 +106,7 @@ export function cardProv(key: CardKey, c: EulerReceiptContext): Provenance {
         kind: "chain",
         pclass: "state",
         source: head,
-        summary: `Collateral — the account's enabled collaterals and controllers in the connector at ${at(r.head)}, and each controller's liquidation LTV for this vault${p.collateralFor.length ? `: collateral for ${p.collateralFor.map((x) => x.vaultSymbol).join(", ")}` : ": not collateral for any loan"}.`,
+        summary: `Used as collateral — the account's enabled collaterals and controllers in the connector at ${at(r.head)}, and each controller's liquidation LTV for this vault${p.collateralFor.length ? `: collateral for ${p.collateralFor.map((x) => x.vaultSymbol).join(", ")}` : ": not collateral for any loan"}.`,
         contract: evcC(r),
         via: headVia(r),
         inputs: [
@@ -122,20 +122,23 @@ export function cardProv(key: CardKey, c: EulerReceiptContext): Provenance {
         summary: `Borrowed — what this account owes the ${v.symbol} vault at ${at(r.head)}: ${fig(p.borrowed)} ${A}${p.borrowedValue !== null ? `, worth ${fig(p.borrowedValue)} in ${unitName(c)} at the vault oracle's price` : ""}.`,
         contract: vaultC(c),
         via: headVia(r),
-        formula: p.borrowedValue !== null ? "debtOf(account); × the oracle's price of one asset" : "debtOf(account)",
-        inputs: [chain(`debtOf(${r.account})`, v.debt), ...priceInputs(c)],
+        formula: p.borrowedValue !== null ? "debtOf(account) × price" : "debtOf(account)",
+        inputs: [chain(`debtOf(account ${r.account})`, v.debt), ...priceInputs(c)],
       };
     case "collateralValue":
       return {
         kind: "derived",
         pclass: "state",
         source: head,
-        summary: `Collateral — each collateral vault's shares on this account priced by this vault's oracle at ${at(r.head)}, added up: ${p.collateralValue === null ? "not priced" : `${fig(p.collateralValue)} in ${unitName(c)}`}.`,
+        summary: `Collateral value — each collateral vault's shares on this account priced by this vault's oracle at ${at(r.head)}, added up: ${p.collateralValue === null ? "not priced" : `${fig(p.collateralValue)} in ${unitName(c)}`}.`,
         contract: oracleC(c),
         via: headVia(r),
         formula: "Σ getQuote(shares, collateral vault, unit)",
         inputs: (r.borrow?.collaterals ?? []).map((x) =>
-          chain(`getQuote(${x.shares}, ${x.vaultSymbol} ${x.vault}, unit)`, x.value ?? "no answer"),
+          chain(
+            `getQuote(shares ${x.shares}, collateral vault ${x.vaultSymbol} ${x.vault}, unit)`,
+            x.value ?? "no answer",
+          ),
         ),
       };
     case "health":
@@ -143,7 +146,7 @@ export function cardProv(key: CardKey, c: EulerReceiptContext): Provenance {
         kind: "derived",
         pclass: "state",
         source: head,
-        summary: `Health — the collateral's value at liquidation LTVs over the debt's value, as the ${v.symbol} vault states them at ${at(r.head)}: ${p.health === null ? "–" : `${healthText(p.health)}, ${p.liquidatable ? "at or below 1, so the loan can be liquidated" : "above 1"}`}.`,
+        summary: `Health score — the collateral's value at liquidation LTVs over the debt's value, as the ${v.symbol} vault states them at ${at(r.head)}: ${p.health === null ? "–" : `${healthText(p.health)}, ${p.liquidatable ? "at or below 1, so the loan can be liquidated" : "above 1"}`}.`,
         contract: vaultC(c),
         via: headVia(r),
         formula: "collateralValue ÷ liabilityValue",
@@ -166,15 +169,16 @@ export function cardProv(key: CardKey, c: EulerReceiptContext): Provenance {
         summary:
           p.interest === null
             ? `Interest in 30 days — the debt was borrowed or repaid between ${at(r.then)} and ${at(r.head)}, so no figure is stated.`
-            : `Interest in 30 days — the debt at ${at(r.head)} less the debt at ${at(r.then)}, with nothing borrowed or repaid between them (the debt then grown by the vault's interest index matches the debt now): ${fig(p.interest)} ${A}${p.windowValue !== null ? `, worth ${fig(p.windowValue)} in ${unitName(c)} at the head's price` : ""}.`,
+            : `Interest in 30 days — the debt at ${at(r.head)} less the debt at ${at(r.then)}, with nothing borrowed or repaid between them (the debt then grown by the vault's interest index matches the debt now to a millionth): ${fig(p.interest)} ${A}${p.windowValue !== null ? `, worth ${fig(p.windowValue)} in ${unitName(c)} at the head's price` : ""}.`,
         contract: vaultC(c),
         via: bothVia(r),
-        formula: "debtOf now − debtOf then, where debtOf then × index_now ÷ index_then = debtOf now to a millionth",
+        formula:
+          "debtOf now − debtOf then; debtOf then × interestAccumulator now ÷ interestAccumulator then = debtOf now",
         inputs: [
-          chain(`debtOf(${r.account}) @ ${n(r.head.block)}`, v.debt),
-          chain(`debtOf(${r.account}) @ ${n(r.then.block)}`, r.past?.debt ?? "–"),
-          chain(`interestAccumulator() @ ${n(r.head.block)}`, v.interestAccumulator),
-          chain(`interestAccumulator() @ ${n(r.then.block)}`, r.past?.interestAccumulator ?? "–"),
+          chain(`debtOf(account ${r.account}) now @ ${n(r.head.block)}`, v.debt),
+          chain(`debtOf(account ${r.account}) then @ ${n(r.then.block)}`, r.past?.debt ?? "–"),
+          chain(`interestAccumulator() now @ ${n(r.head.block)}`, v.interestAccumulator),
+          chain(`interestAccumulator() then @ ${n(r.then.block)}`, r.past?.interestAccumulator ?? "–"),
           ...(p.windowValue !== null ? priceInputs(c) : []),
         ],
       };
@@ -192,7 +196,11 @@ export function cardProv(key: CardKey, c: EulerReceiptContext): Provenance {
 }
 
 /** A collateral row on a loan's card. */
-export function collateralProv(i: number, part: "amount" | "value" | "ltv", c: EulerReceiptContext): Provenance {
+export function collateralProv(
+  i: number,
+  part: "amount" | "value" | "ltvBorrow" | "ltv",
+  c: EulerReceiptContext,
+): Provenance {
   const x = c.r.borrow!.collaterals[i];
   const head = { block: c.r.head.block };
   if (part === "amount")
@@ -204,7 +212,7 @@ export function collateralProv(i: number, part: "amount" | "value" | "ltv", c: E
       contract: { name: `Euler vault ${x.vaultSymbol}`, address: x.vault },
       via: headVia(c.r),
       formula: "convertToAssets(balanceOf(account))",
-      inputs: [chain(`balanceOf(${c.r.account})`, x.shares), chain("convertToAssets(shares)", x.assets)],
+      inputs: [chain(`balanceOf(account ${c.r.account})`, x.shares), chain("convertToAssets(shares)", x.assets)],
     };
   if (part === "value")
     return {
@@ -216,25 +224,31 @@ export function collateralProv(i: number, part: "amount" | "value" | "ltv", c: E
       via: headVia(c.r),
       inputs: [chain(`getQuote(${x.shares}, ${x.vault}, ${c.r.vault.unit.address})`, x.value ?? "no answer")],
     };
+  if (part === "ltvBorrow")
+    return {
+      kind: "chain",
+      pclass: "state",
+      source: head,
+      summary: `${x.vaultSymbol} borrow LTV — the share of this collateral's value the ${c.r.vault.symbol} vault counts toward new borrowing, at ${at(c.r.head)}: ${rate(x.ltvBorrow / 10_000)}.`,
+      contract: vaultC(c),
+      via: headVia(c.r),
+      inputs: [chain(`LTVBorrow(${x.vault}), in hundredths of a percent`, String(x.ltvBorrow))],
+    };
   return {
     kind: "chain",
     pclass: "state",
     source: head,
-    summary: `${x.vaultSymbol} liquidation LTV — the share of this collateral's value the ${c.r.vault.symbol} vault counts before a loan can be liquidated, at ${at(c.r.head)}.`,
+    summary: `${x.vaultSymbol} liquidation LTV — the share of this collateral's value the ${c.r.vault.symbol} vault counts before a loan can be liquidated, at ${at(c.r.head)}: ${rate(x.ltvLiquidation / 10_000)}.`,
     contract: vaultC(c),
     via: headVia(c.r),
-    inputs: [
-      chain(`LTVLiquidation(${x.vault})`, String(x.ltvLiquidation)),
-      chain(`LTVBorrow(${x.vault})`, String(x.ltvBorrow)),
-    ],
+    inputs: [chain(`LTVLiquidation(${x.vault}), in hundredths of a percent`, String(x.ltvLiquidation))],
   };
 }
 
 export type VaultLineKey = "supplied" | "borrowed" | "utilisation" | "shareGrowth" | "borrowApy" | "price";
-/** The receipts of the 30-day APYs: the vault line's borrow figure, and the card's lines under the 30-day figures. */
-export type WindowApyKey = "borrowApyWindow" | "supplyApyWindow";
-const days = (r: EulerPositionRead) => ((r.head.time - r.then.time) / 86_400).toFixed(4);
-export function vaultProv(key: VaultLineKey | WindowApyKey, c: EulerReceiptContext): Provenance {
+/** The receipts of the 30-day growths: the vault line's borrow figure, and the card's lines under the 30-day figures. */
+export type WindowGrowthKey = "borrowWindow" | "supplyWindow";
+export function vaultProv(key: VaultLineKey | WindowGrowthKey, c: EulerReceiptContext): Provenance {
   const { p, r } = c;
   const v = r.vault;
   const head = { block: r.head.block };
@@ -264,7 +278,7 @@ export function vaultProv(key: VaultLineKey | WindowApyKey, c: EulerReceiptConte
         kind: "derived",
         pclass: "state",
         source: head,
-        summary: `Utilisation — borrowed over supplied at ${at(r.head)}.`,
+        summary: `Utilization — borrowed over supplied at ${at(r.head)}.`,
         contract: vaultC(c),
         via: headVia(r),
         formula: "totalBorrows ÷ totalAssets",
@@ -278,10 +292,10 @@ export function vaultProv(key: VaultLineKey | WindowApyKey, c: EulerReceiptConte
         summary: `Share price — the asset one whole share redeems for, at ${at(r.then)} and ${at(r.head)}.`,
         contract: vaultC(c),
         via: bothVia(r),
-        formula: "sharePrice_now ÷ sharePrice_then − 1",
+        formula: "convertToAssets now ÷ convertToAssets then − 1",
         inputs: [
-          chain(`convertToAssets(10^${v.decimals}) @ ${n(r.head.block)}`, v.sharePrice),
-          chain(`convertToAssets(10^${v.decimals}) @ ${n(r.then.block)}`, r.past?.sharePrice ?? "–"),
+          chain(`convertToAssets(10^${v.decimals}) now @ ${n(r.head.block)}`, v.sharePrice),
+          chain(`convertToAssets(10^${v.decimals}) then @ ${n(r.then.block)}`, r.past?.sharePrice ?? "–"),
         ],
       };
     case "borrowApy":
@@ -298,34 +312,32 @@ export function vaultProv(key: VaultLineKey | WindowApyKey, c: EulerReceiptConte
           derived("Seconds in a year: 365.2425 × 86,400, an average Gregorian year in Euler's docs", "31,556,952"),
         ],
       };
-    case "borrowApyWindow":
+    case "borrowWindow":
       return {
         kind: "derived",
         pclass: "state",
         source: head,
-        summary: `Borrow APY over the 30 days — the ${v.symbol} vault's interest index at ${at(r.then)} and ${at(r.head)}, its growth between them compounded to a year: ${p.window.borrowApy === null ? "–" : rate(p.window.borrowApy)}.`,
+        summary: `Debt growth over the 30 days — the ${v.symbol} vault's interest index at ${at(r.then)} and ${at(r.head)}, and its growth between them: ${p.window.indexGrowth === null ? "–" : growthText(p.window.indexGrowth, p.window.days)}. A debt held through the window grew by the same share.`,
         contract: vaultC(c),
         via: bothVia(r),
-        formula: GROWTH_APY_FORMULA("interestAccumulator"),
+        formula: "interestAccumulator now ÷ interestAccumulator then − 1",
         inputs: [
           chain(`interestAccumulator() now @ ${n(r.head.block)}`, v.interestAccumulator),
           chain(`interestAccumulator() then @ ${n(r.then.block)}`, r.past?.interestAccumulator ?? "–"),
-          derived("Days between the blocks", days(r)),
         ],
       };
-    case "supplyApyWindow":
+    case "supplyWindow":
       return {
         kind: "derived",
         pclass: "state",
         source: head,
-        summary: `APY over the 30 days — the ${v.symbol} vault's share price at ${at(r.then)} and ${at(r.head)}, its growth between them compounded to a year: ${p.window.supplyApy === null ? "–" : rate(p.window.supplyApy)}.`,
+        summary: `Share price growth over the 30 days — what one whole ${v.symbol} share redeems for at ${at(r.then)} and ${at(r.head)}, and its growth between them: ${p.window.shareGrowth === null ? "–" : growthText(p.window.shareGrowth, p.window.days)}.`,
         contract: vaultC(c),
         via: bothVia(r),
-        formula: GROWTH_APY_FORMULA("convertToAssets"),
+        formula: "convertToAssets now ÷ convertToAssets then − 1",
         inputs: [
           chain(`convertToAssets(10^${v.decimals}) now @ ${n(r.head.block)}`, v.sharePrice),
           chain(`convertToAssets(10^${v.decimals}) then @ ${n(r.then.block)}`, r.past?.sharePrice ?? "–"),
-          derived("Days between the blocks", days(r)),
         ],
       };
     case "price":
@@ -374,7 +386,10 @@ export function walletRowProv(row: EulerWalletRow, w: EulerWalletRead): Provenan
     via: headVia(w),
     formula: row.kind === "loan" ? "debtOf(account)" : "convertToAssets(balanceOf(account))",
     inputs: [
-      chain(row.kind === "loan" ? `debtOf(${row.account})` : `convertToAssets(balanceOf(${row.account}))`, row.raw),
+      chain(
+        row.kind === "loan" ? `debtOf(account ${row.account})` : `convertToAssets(balanceOf(account ${row.account}))`,
+        row.raw,
+      ),
     ],
   };
 }

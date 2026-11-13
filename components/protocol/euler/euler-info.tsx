@@ -55,9 +55,14 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
     sources: [DOCS],
   },
   {
+    term: "Borrow LTV",
+    definition: "The share of a collateral's value a vault counts toward new borrowing.",
+    sources: [DOCS],
+  },
+  {
     term: "Liquidation LTV",
     definition:
-      "The share of a collateral's value a vault counts toward a loan before it can be liquidated. A loan's health is the collateral counted this way over the debt.",
+      "The share of a collateral's value a vault counts toward a loan before it can be liquidated. A loan's health score is the collateral counted this way over the debt.",
     sources: [DOCS],
   },
 ];
@@ -121,9 +126,9 @@ function views(chain: EulerChainId): readonly [InfoView, ...InfoView[]] {
       body: (
         <p>
           A deposit&apos;s page shows what its shares redeem for, what the share price added over the last 30 days, and
-          the loan it backs. A loan&apos;s page shows the debt, the collateral&apos;s value, the loan&apos;s health and
-          the interest over the last 30 days, with each collateral on a row. Under the card, the vault&apos;s totals,
-          its utilisation and rates, and its oracle&apos;s price.
+          the loan it backs. A loan&apos;s page shows the debt, the collateral&apos;s value, the loan&apos;s health
+          score and the interest over the last 30 days, with each collateral on a row. Under the card, the vault&apos;s
+          totals, its utilization and rates, and its oracle&apos;s price.
         </p>
       ),
     },
@@ -147,7 +152,7 @@ function reads(chain: EulerChainId): InfoReads {
     {
       name: "Each vault",
       reads:
-        "an account's shares and debt, what shares redeem for, its interest index and rate, its totals, its unit of account and oracle, and its liquidation LTV for each collateral; and the wallet's shares on account 0, for every vault.",
+        "an account's shares and debt, what shares redeem for, its interest index and rate, its totals, its unit of account and oracle, and its borrow and liquidation LTVs for each collateral; and the wallet's shares on account 0, for every vault.",
     },
     {
       name: "Each oracle router",
@@ -176,10 +181,10 @@ export function EulerInfoPage({ chain }: { chain: EulerChainId }) {
       tracks={
         <>
           The Rails Euler V2 explorer shows a wallet&apos;s Euler accounts on {CHAIN_NAME[chain]}: each loan with its
-          collateral and health, and each deposit, with what the vault paid or charged over the last 30 days.
+          collateral and health score, and each deposit, with what the vault paid or charged over the last 30 days.
         </>
       }
-      notCovered="Euler Earn, EulerSwap and Euler's rewards aren't covered here."
+      notCovered="EulerEarn, EulerSwap and Euler's rewards aren't covered here."
       glossary={glossary}
       howItWorks={howItWorks}
       reads={reads(chain)}

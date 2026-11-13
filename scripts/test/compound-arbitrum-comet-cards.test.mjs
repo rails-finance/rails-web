@@ -130,11 +130,11 @@ test("the reader drops a malformed element and refuses a non-array", () => {
 test("the footer's words", () => {
   assert.equal(
     cometFooterLead({ cards: 3, wallets: 1 }, 412),
-    "Indexed 3 Comet positions across 1 wallet, of 412 wallets with an open position, counted on the chain",
+    "Indexed 3 Comet accounts across 1 wallet, of 412 wallets with an open account, counted on the chain",
   );
-  assert.equal(cometFooterLead({ cards: 1, wallets: 1 }, null), "Indexed 1 Comet position across 1 wallet");
+  assert.equal(cometFooterLead({ cards: 1, wallets: 1 }, null), "Indexed 1 Comet account across 1 wallet");
   assert.equal(
     cometFooterLead({ cards: 1200, wallets: 1050 }, 2400),
-    "Indexed 1,200 Comet positions across 1,050 wallets, of 2,400 wallets with an open position, counted on the chain",
+    "Indexed 1,200 Comet accounts across 1,050 wallets, of 2,400 wallets with an open account, counted on the chain",
   );
 });

@@ -25,7 +25,8 @@ test("the rate model's 2,102,400 is not the year a rate is printed over", () => 
   // On the model's constant the same read is 19.23%, the figure the page printed before.
   assert.equal(pct2((Number(CDAI_PER_BLOCK) / 1e18) * 2_102_400), "19.23");
   assert.notEqual(pct2(compoundV2AnnualRate(CDAI_PER_BLOCK)), "19.23");
-  // None of the three loaders multiplies a rate by the model's blocksPerYear.
+  // None of the three loaders multiplies a rate by the model's blocksPerYear;
+  // each states the docs' APY (lib/comptroller/apy.ts, ui-jobs 631).
   for (const f of [
     "lib/sources/chain/compound-v2-markets.ts",
     "lib/sources/chain/compound-v2-market-state.ts",
@@ -33,7 +34,7 @@ test("the rate model's 2,102,400 is not the year a rate is printed over", () => 
   ]) {
     const src = fs.readFileSync(new URL(`../../${f}`, import.meta.url), "utf8");
     assert.doesNotMatch(src, /\*\s*blocksPerYear\b/, `${f} annualises on the model's blocksPerYear`);
-    assert.match(src, /compoundV2AnnualRate/, `${f} does not use the printed year`);
+    assert.match(src, /compoundV2Apy/, `${f} does not state the docs' APY`);
   }
 });
 

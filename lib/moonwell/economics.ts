@@ -213,7 +213,7 @@ export interface MoonwellCardCaptions {
   supplyInterestUsd: number | null;
   /** USD of accrued borrow interest included in the debt figure. */
   debtInterestUsd: number | null;
-  /** Current variable borrow APR (%). `avg` when debt-USD-weighted across
+  /** Current variable borrow APY (%). `avg` when debt-USD-weighted across
    *  several borrowed markets; `symbol` names the market when single. */
   borrowRate: { pct: number; avg: boolean; symbol?: string } | null;
 }

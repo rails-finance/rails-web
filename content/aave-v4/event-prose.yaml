@@ -1287,7 +1287,8 @@ L5:
       - bold: |-
           How much one call takes
         text: |-
-          enough debt to bring the health factor back to the spoke's target, or all of it when under $1,000 would remain.
+          enough debt to bring the health factor back to the spoke's target; a debt or collateral remainder under $1,000 is taken whole, past the target.
+        sources: [{ label: "Liquidations", doc: OVERVIEW_LIQUIDATIONS }]
       - bold: |-
           One pair
         text: |-
@@ -1333,7 +1334,7 @@ L5:
       - bold: |-
           Hub and spoke
         text: |-
-          hubs hold the pooled tokens; each spoke is a separate market with a separate health factor.
+          hubs hold the pooled tokens; spokes lend them out, and a position's health factor covers one spoke.
     links:
       - label: |-
           Aave V4 positions

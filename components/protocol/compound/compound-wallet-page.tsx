@@ -982,13 +982,13 @@ export function CompoundWalletView({
               <div className="space-y-10">
                 {!pinnedRoute && onlyMarket == null && (
                   <p className="text-[11px] text-rb-500">
-                    This wallet has a position in{" "}
+                    This wallet has an account in{" "}
                     <span className="text-foreground">
                       {sections.length} of {d.words.chainPossessive}{" "}
                       {data?.marketsScanned ?? d.deployment.markets.length}
                     </span>{" "}
                     Compound markets; the others hold nothing for it. Each market is separate: nothing is
-                    cross-collateralised between them, so there is no combined health factor here and no total. The
+                    cross-collateralised between them, so there is no combined liquidation point here and no total. The
                     markets do not all price in the same unit.
                   </p>
                 )}

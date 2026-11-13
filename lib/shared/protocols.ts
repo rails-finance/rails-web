@@ -682,7 +682,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "fx",
     brand: 54,
     tags: ["Leverage", "CDP"],
-    desc: "Leveraged f(x) positions on wstETH and WBTC: every event from the chain, current state from the pools, and shared funding costs split per position",
+    desc: "f(x) positions on wstETH and WBTC: every event from the chain, current state from the pools, and shared funding costs split per position",
     subPages: [{ segment: "pools", label: "Pools overview", tab: "Pools" }],
   },
   {
