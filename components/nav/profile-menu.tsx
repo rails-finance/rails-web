@@ -56,7 +56,7 @@ import { START_CTA } from "@/lib/shared/ui-grammar";
 import type { ChainId } from "@/lib/shared/chains";
 import type { SavedLink, WalletSession } from "@/lib/shared/sessions";
 import { setProvPreference, useProvPreference } from "@/lib/shared/prov-preference";
-import { ProvInspectorMenu, putDownInspector } from "@/components/shared/prov-inspector";
+import { ProvInspectorIndicator, putDownInspector } from "@/components/shared/prov-inspector";
 import { provPreferenceAllows } from "@/lib/shared/prov-preference-routes";
 import { menuEntries } from "@/lib/shared/sessions";
 
@@ -251,12 +251,11 @@ function ProvInspectorSwitch({ onDone }: { onDone: () => void }) {
   const noteId = useId();
   return (
     <div
-      // ITEM's row, its ring answering the switch's hover and focus.
-      // Disabled, no hover ring and no pointer; the focus ring stays.
+      // ITEM's row with no hover ring: on hover the label turns teal, the
+      // switch's on colour (ui-jobs 651). The focus ring answers the
+      // keyboard. Disabled, no teal and no pointer.
       className={`relative flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-[15px] text-foreground has-[[role=menuitemcheckbox]:focus-visible]:ring-[1.5px] has-[[role=menuitemcheckbox]:focus-visible]:ring-blue-500 ${
-        allowed
-          ? "cursor-pointer has-[[role=menuitemcheckbox]:hover]:ring-1 has-[[role=menuitemcheckbox]:hover]:ring-blue-500"
-          : ""
+        allowed ? "cursor-pointer" : ""
       }`}
       data-anatomy="H20.1"
     >
@@ -273,7 +272,7 @@ function ProvInspectorSwitch({ onDone }: { onDone: () => void }) {
           else setProvPreference(true);
         }}
         className={`min-w-0 truncate text-left outline-none after:absolute after:inset-0 after:rounded-lg after:content-[''] ${
-          allowed ? "" : "cursor-default text-rb-500"
+          allowed ? "transition-colors hover:text-teal-600 dark:hover:text-teal-400" : "cursor-default text-rb-500"
         }`}
         data-profile-menu-prov={allowed ? (on ? "on" : "off") : "unavailable"}
       >
@@ -456,9 +455,10 @@ export function ProfileMenu() {
 
   return (
     <>
-      {/* While the inspector is armed on a page with a traced value, its
-          menu stands left of the control (ui-jobs 624.2, 651). */}
-      <ProvInspectorMenu onExit={() => trigger.current?.focus()} />
+      {/* While the inspector is armed on a page with a traced value, the
+          inspector indicator stands left of the control (ui-jobs 624.2,
+          651). */}
+      <ProvInspectorIndicator />
       <button
         ref={trigger}
         type="button"

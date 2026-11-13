@@ -80,8 +80,8 @@ export default function ProvenancePage() {
             strokeWidth={1.75}
             aria-hidden="true"
           />{" "}
-          stands beside the profile menu on any page with something to inspect; it opens a menu to turn the inspector
-          off or read about it.
+          stands beside the profile menu on any page with something to inspect; hover over it for a reminder of what to
+          do. The same switch turns the inspector off.
         </p>
       </Section>
 

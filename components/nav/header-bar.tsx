@@ -32,7 +32,7 @@ export function HeaderBar() {
             ui-jobs 514); the panel's top row draws its open glyph in the same
             place, closing it. Centre: the Rails mark and name, a link home, on
             every page but home, whose hero carries them.
-            Right: H20, with the inspector's menu (H7.4) left of it
+            Right: H20, with the inspector indicator (H7.4) left of it
             while the inspector is armed on a page with a traced value
             (ui-jobs 651); the theme switch and the way into /start being
             in its menu. Below md the beta pill is in the footer

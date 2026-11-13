@@ -4,11 +4,11 @@
 // ----------------------------------------------------------------------------
 // Armed in one place, the profile menu's switch "Inspector" (H20.1, decision
 // 0062; ui-jobs 625, 651): while it is on, the layer arms each page view on
-// arrival, on the routes in lib/shared/prov-preference-routes.ts. Three ways
-// put it down, all through `putDownInspector`, which turns the switch off too:
-// the switch, "Turn off inspector" in the header's inspector menu beside the
-// profile control (<ProvInspectorMenu>, H7.4), and Escape's second press. The
-// header menu is drawn only on a page with a traced value to inspect.
+// arrival, on the routes in lib/shared/prov-preference-routes.ts. Two ways
+// put it down, both through `putDownInspector`, which turns the switch off too:
+// the switch and Escape's second press. While it is armed on a page with a
+// traced value, the header shows the inspector indicator beside the profile
+// control (<ProvInspectorIndicator>, H7.4), which turns nothing off.
 //
 // - <ProvInspectorLayer> — armed, every scoped <Prov> on the page is a click
 //   target with a light dotted underline (the coverage map). A pick anchors
@@ -25,10 +25,9 @@
 // `standards/provenance-receipts-grammar.md` §1). The per-card receipts panel
 // it once sat beside was retired for it in web `161d0cd` (2026-07-22).
 
-import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
-import Link from "next/link";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, Crosshair, X } from "lucide-react";
+import { Crosshair, X } from "lucide-react";
 import {
   CLASS_CSS,
   CLASS_META,
@@ -49,8 +48,8 @@ import { useParams, usePathname } from "next/navigation";
 import { setProvPreference, useProvPreference } from "@/lib/shared/prov-preference";
 import { provPreferenceAllows } from "@/lib/shared/prov-preference-routes";
 
-/** Put the inspector down from a control the reader pressed (the exit
- *  button, Escape's second rung, the profile menu's switch): one state, so
+/** Put the inspector down from a control the reader pressed (Escape's
+ *  second rung, the profile menu's switch): one state, so
  *  the saved preference (decision 0062) goes off with it and the switch reads
  *  off at once (ui-jobs 624). Leaving a page disarms with `setArmed(false)`
  *  alone and keeps the preference. */
@@ -89,7 +88,7 @@ export function ProvInspectorLayer() {
   useEffect(() => () => provInspector.setArmed(false), []);
   // The preference arms each page view on arrival, on the routes that pass
   // the coverage gate; turned off, the inspector goes down. Values that mount
-  // later are pickable as they land; the header menu waits for the first
+  // later are pickable as they land; the header indicator waits for the first
   // (ui-jobs 651).
   useEffect(() => {
     provInspector.setArmed(preference && allowed);
@@ -99,162 +98,43 @@ export function ProvInspectorLayer() {
   return pin ? <InspectorPopover key={`${pin.key}:${pin.tick}`} pin={pin} /> : null;
 }
 
-const MENU_ITEMS = '[role="menuitem"]';
+const INSPECTOR_TIP = "Click a figure to see where it comes from.";
 
-/** The header's inspector menu, H7.4 (ui-jobs 624.2, redrawn in 651): beside
- *  the profile control (H20), drawn only while the inspector is armed and the
- *  page has at least one traced value mounted (`provTraced`); otherwise
- *  nothing. A teal crosshair with a chevron opens a small dropdown (H7.4.1)
- *  on the profile menu's pattern: placed in page coordinates under the
- *  button, right edges aligned; Escape, a press outside, Tab and a
- *  navigation close it, Escape returning focus to the button; the arrow
- *  keys, Home and End move through its items. It holds one line on what the
- *  inspector does, "Turn off inspector" (`putDownInspector`; `onExit` then
- *  takes focus, the button having gone) and "About the inspector". */
-export function ProvInspectorMenu({ onExit }: { onExit?: () => void }) {
+/** The header's inspector indicator, H7.4 (ui-jobs 624.2, redrawn in 651):
+ *  beside the profile control (H20), the teal crosshair, drawn only while the
+ *  inspector is armed and the page has at least one traced value mounted
+ *  (`provTraced`); otherwise nothing. It says the inspector is on and does
+ *  nothing on a press: the profile menu's switch (H20.1) is the one way to
+ *  turn it off. Focusable, with a tip on hover and keyboard focus in the house
+ *  tooltip's look (RevealTip opens on a press, so this draws its own). */
+export function ProvInspectorIndicator() {
   const armed = useSyncExternalStore(provInspector.subscribe, provInspector.getArmed, () => false);
   const traced = useSyncExternalStore(provTraced.subscribe, provTraced.getAny, () => false);
-  const pathname = usePathname();
-  const [open, setOpen] = useState(false);
-  const [place, setPlace] = useState<{ top: number; right: number } | null>(null);
-  const button = useRef<HTMLButtonElement>(null);
-  const menu = useRef<HTMLDivElement>(null);
-  const menuId = useId();
-  const shown = armed && traced;
-
-  // A navigation closes it; so does the button leaving.
-  useEffect(() => setOpen(false), [pathname, shown]);
-
-  useLayoutEffect(() => {
-    if (!open) return;
-    const measure = () => {
-      const r = button.current?.getBoundingClientRect();
-      if (!r) return;
-      setPlace({ top: r.bottom + 8 + window.scrollY, right: document.documentElement.clientWidth - r.right });
-    };
-    measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const first = requestAnimationFrame(() => menu.current?.querySelector<HTMLElement>(MENU_ITEMS)?.focus());
-    const onPointer = (e: PointerEvent) => {
-      const t = e.target as Node;
-      if (!menu.current?.contains(t) && !button.current?.contains(t)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        setOpen(false);
-        button.current?.focus();
-        return;
-      }
-      if (!menu.current) return;
-      const items = Array.from(menu.current.querySelectorAll<HTMLElement>(MENU_ITEMS));
-      const at = items.indexOf(document.activeElement as HTMLElement);
-      const go = (i: number) => items[(i + items.length) % items.length]?.focus();
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        go(at + 1);
-      } else if (e.key === "ArrowUp") {
-        e.preventDefault();
-        go(at - 1);
-      } else if (e.key === "Home") {
-        e.preventDefault();
-        go(0);
-      } else if (e.key === "End") {
-        e.preventDefault();
-        go(items.length - 1);
-      } else if (e.key === "Tab") {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("pointerdown", onPointer);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      cancelAnimationFrame(first);
-      document.removeEventListener("pointerdown", onPointer);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  if (!shown) return null;
+  if (!armed || !traced) return null;
   return (
-    <>
-      <button
-        ref={button}
-        type="button"
-        className="prov-inspect-trigger"
-        data-anatomy="H7.4"
-        data-prov-inspect-menu=""
-        aria-label="Inspector"
-        title="Inspector"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={open ? menuId : undefined}
-        onClick={() => setOpen((v) => !v)}
-        onKeyDown={(e) => {
-          if (e.key === "ArrowDown" && !open) {
-            e.preventDefault();
-            setOpen(true);
-          }
-        }}
+    <span
+      tabIndex={0}
+      className="prov-inspect-on group"
+      data-anatomy="H7.4"
+      data-prov-inspect-on=""
+      aria-label={`Inspector on. ${INSPECTOR_TIP}`}
+    >
+      <Crosshair className="prov-inspect-on-icon" strokeWidth={1.75} aria-hidden="true" />
+      <span
+        aria-hidden="true"
+        data-prov-inspect-tip=""
+        className="pointer-events-none invisible absolute right-0 top-full z-[var(--z-dropdown)] mt-2.5 w-max max-w-[min(20rem,calc(100vw-1.5rem))] whitespace-normal rounded-2xl border p-3 text-xs font-medium text-foreground opacity-0 shadow-lg transition-opacity duration-100 group-hover:visible group-hover:opacity-100 group-focus-visible:visible group-focus-visible:opacity-100"
+        style={{ background: "var(--rb-tooltip-bg)", borderColor: "var(--rb-tooltip-border)" }}
       >
-        <Crosshair className="prov-inspect-trigger-icon" strokeWidth={1.75} aria-hidden="true" />
-        <ChevronDown
-          className={`prov-inspect-trigger-chevron${open ? " rotate-180" : ""}`}
-          strokeWidth={2}
-          aria-hidden="true"
+        {INSPECTOR_TIP}
+        <span
+          className="absolute bottom-full right-3 -mb-[5px] size-2.5 rotate-45 border-l border-t"
+          style={{ background: "var(--rb-tooltip-bg)", borderColor: "var(--rb-tooltip-border)" }}
         />
-      </button>
-      {open &&
-        place &&
-        createPortal(
-          <div
-            ref={menu}
-            id={menuId}
-            role="menu"
-            aria-label="Inspector"
-            data-prov-inspect-dropdown=""
-            data-anatomy="H7.4.1"
-            className="profile-drop absolute z-[var(--z-popover)] w-64 max-w-[calc(100vw-32px)] rounded-xl border border-rb-200 bg-background p-2 shadow-xl dark:border-rb-800 dark:bg-rb-900"
-            style={{ top: place.top, right: Math.max(16, place.right) }}
-          >
-            <p className="px-3 pb-1 pt-1.5 text-xs leading-5 text-rb-500">Click a figure to see where it comes from.</p>
-            <button
-              type="button"
-              role="menuitem"
-              className={DROP_ITEM}
-              data-prov-inspect-off=""
-              onClick={() => {
-                setOpen(false);
-                putDownInspector();
-                onExit?.();
-              }}
-            >
-              Turn off inspector
-            </button>
-            <Link
-              href="/about/provenance"
-              role="menuitem"
-              className={DROP_ITEM}
-              data-prov-inspect-about=""
-              onClick={() => setOpen(false)}
-            >
-              About the inspector
-            </Link>
-          </div>,
-          document.body,
-        )}
-    </>
+      </span>
+    </span>
   );
 }
-
-/** A row, as the profile menu's: 44px, a blue rounded outline on hover and keyboard focus. */
-const DROP_ITEM =
-  "flex min-h-11 w-full cursor-pointer items-center rounded-lg px-3 text-left text-[15px] text-foreground outline-none transition-shadow hover:ring-1 hover:ring-blue-500 focus-visible:ring-[1.5px] focus-visible:ring-blue-500";
 
 const POP_WIDTH = 400;
 

@@ -1976,43 +1976,30 @@ label[for] {
 .dark [data-prov-inspect] {
   text-decoration-color: rgb(45 212 191 / 0.28); /* teal-400 */
 }
-/* The header's inspector menu button, beside the profile control (H7.4;
-   ui-jobs 624.2, an icon from 651): the menu row's crosshair in teal with a
-   chevron, opening its dropdown (H7.4.1). */
-.prov-inspect-trigger {
+/* The header's inspector indicator, beside the profile control (H7.4;
+   ui-jobs 624.2, 651): the menu row's crosshair in teal; its tip opens on
+   hover and keyboard focus (prov-inspector.tsx `ProvInspectorIndicator`). */
+.prov-inspect-on {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  justify-content: center;
+  width: 36px;
   height: 38px;
-  padding: 0 4px 0 9px;
   border-radius: 8px;
-  cursor: pointer;
   flex: none;
   color: rgb(13 148 136); /* teal-600 */
-  transition: background-color 150ms;
 }
-.prov-inspect-trigger:hover,
-.prov-inspect-trigger[aria-expanded="true"] {
-  background: rgb(13 148 136 / 0.12);
-}
-.prov-inspect-trigger:focus-visible {
+.prov-inspect-on:focus-visible {
   outline: 2px solid rgb(59 130 246); /* blue-500 */
   outline-offset: 0;
 }
-.dark .prov-inspect-trigger {
+.dark .prov-inspect-on {
   color: rgb(45 212 191); /* teal-400 */
 }
-.dark .prov-inspect-trigger:hover,
-.dark .prov-inspect-trigger[aria-expanded="true"] {
-  background: rgb(45 212 191 / 0.14);
-}
-.prov-inspect-trigger-icon {
+.prov-inspect-on-icon {
   width: 20px;
   height: 20px;
-}
-.prov-inspect-trigger-chevron {
-  width: 14px;
-  height: 14px;
 }
 /* the popover — the receipt pinned AT the value; a bottom sheet under 640px.
    Teal-washed ground ties it to the tool's colorway (halo, dotted targets,

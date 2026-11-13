@@ -8,7 +8,7 @@
 // and the infra list's "rails-api answers 502 read_failed for three at-block
 // routes". On a route off the list nothing can be inspected: the switch is
 // dimmed (components/nav/profile-menu.tsx) and the header draws no inspector
-// menu (ui-jobs 651).
+// indicator (ui-jobs 651).
 //
 // Entries are App Router templates without route groups. A `[param]` segment
 // matches only where the route served that param (`useParams()`), so a static
