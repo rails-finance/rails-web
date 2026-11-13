@@ -554,7 +554,7 @@ function PipelineDetail({ e, now }: { e: StatusEntry; now: number }) {
               <li key={w.name} className="border-l-2 border-rb-200 pl-3 text-xs dark:border-rb-700">
                 <span className="font-semibold text-foreground">{w.name}</span>
                 <span
-                  className={`ml-1.5 inline-block h-1.5 w-1.5 rounded-full align-middle ${DOT[writerState(w, now)]}`}
+                  className={`ml-1.5 inline-block h-1.5 w-1.5 rounded-full align-middle ${DOT[writerState(w, now, e)]}`}
                 />
                 <span className="text-rb-500"> · {WRITER_KIND[w.kind] ?? w.kind}</span>
                 <span className="text-rb-500">

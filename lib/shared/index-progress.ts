@@ -96,7 +96,12 @@ const isoSecs = (iso: string | null | undefined): Secs | null => {
 /** The time of the index's last heartbeat: the wall time of the fill's last
  *  sample where the server sends it, else the finalized head the fill last
  *  planned against. Null when the fill has not planned it yet. */
-export const heartbeatTime = (e: IndexProgressEntry): Secs | null => isoSecs(e.heartbeatAt) ?? e.head?.time ?? null;
+/** The fields a fill's state reads: a progress entry, or a status entry's backfill. */
+export type FillReading = Pick<IndexProgressEntry, "heartbeatAt" | "head" | "percent" | "pace" | "held"> & {
+  atHead: boolean | null;
+};
+
+export const heartbeatTime = (e: FillReading): Secs | null => isoSecs(e.heartbeatAt) ?? e.head?.time ?? null;
 
 /** Whether `heartbeatTime` is a wall time (true) or a block's time. */
 export const heartbeatIsWallTime = (e: IndexProgressEntry): boolean => isoSecs(e.heartbeatAt) != null;
@@ -107,14 +112,14 @@ export function heartbeatAge(t: Secs | null, now: Secs): Heartbeat {
   return age > HEARTBEAT_STALLED ? "stalled" : age > HEARTBEAT_LATE ? "late" : "fresh";
 }
 
-export const heartbeatState = (e: IndexProgressEntry, now: Secs): Heartbeat => heartbeatAge(heartbeatTime(e), now);
+export const heartbeatState = (e: FillReading, now: Secs): Heartbeat => heartbeatAge(heartbeatTime(e), now);
 
 /** Whether a fill is moving. The fill writes its sample every hour even
  *  while it holds an index, so a fresh heartbeat alone does not mean blocks
  *  are being read. "not-gaining": no blocks read over the pace window (an
  *  hour or more of samples); "behind": read to within rounding of the head,
  *  then fell more than 30 min of blocks behind it. Null when neither holds. */
-export function fillStall(e: IndexProgressEntry): "not-gaining" | "behind" | null {
+export function fillStall(e: FillReading): "not-gaining" | "behind" | null {
   if (e.atHead) return null;
   if (e.percent != null && e.percent >= 99.95) return "behind";
   if (e.pace && e.pace.blocksPerHour === 0) return "not-gaining";
@@ -125,7 +130,7 @@ export function fillStall(e: IndexProgressEntry): "not-gaining" | "behind" | nul
  *  is not moving. A hold shows only while the heartbeat is fresh: the server
  *  restores holds from storage, so a hold alone does not show the loop is
  *  running, and a late or stalled heartbeat wins over it. */
-export function fillState(e: IndexProgressEntry, now: Secs): Heartbeat {
+export function fillState(e: FillReading, now: Secs): Heartbeat {
   const hb = heartbeatState(e, now);
   if (hb === "late" || hb === "stalled") return hb;
   // Held on purpose: the allowance, or the fill's switch. A check runs in
@@ -350,7 +355,14 @@ export function visitState(v: VisitReads | null | undefined): Heartbeat {
 
 /** A writer's state against its schedule: late past 1.5 times its cadence,
  *  stalled past 3 times. */
-export function writerState(w: StatusWriter, now: Secs): Heartbeat {
+/** rails-server explorer-pipelines' name for the at-block fill's writer. */
+export const AT_BLOCK_FILL_WRITER = "at-block-fill";
+
+export function writerState(w: StatusWriter, now: Secs, e?: StatusEntry): Heartbeat {
+  // The at-block fill's writer stamps the fill's sample (lastWriteAt is the
+  // backfill's heartbeatAt), so it reads as the fill does: paused while held,
+  // late past the fill's limit rather than its plan interval.
+  if (w.name === AT_BLOCK_FILL_WRITER && e?.backfill) return fillState(e.backfill, now);
   // Its last poll where the writer records one (a quiet protocol writes no
   // rows), else its newest write.
   const ran = isoSecs(w.lastRunAt);
@@ -372,7 +384,7 @@ const RANK: Record<Heartbeat, number> = { none: 0, fresh: 1, paused: 2, late: 3,
 export function pipelineState(e: StatusEntry, now: Secs): Heartbeat {
   const states = (e.live?.writers ?? [])
     .filter((w) => w.expectEverySec)
-    .map((w) => writerState(w, now))
+    .map((w) => writerState(w, now, e))
     .filter((h) => h !== "none");
   if (states.length) return states.reduce((a, b) => (RANK[b] > RANK[a] ? b : a));
   const moved = isoSecs(e.live?.checkpoint?.updatedAt);
