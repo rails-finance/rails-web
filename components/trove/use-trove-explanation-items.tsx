@@ -363,14 +363,20 @@ function buildOpenItems({
   });
   const priceProv = collateralPriceInfo(coll_type);
 
+  // The live getLatestTroveData read is State; the index's snapshot, Indexed
+  // (as the card's collateral leaf, liquityTroveFaceProv). Both figures come
+  // from the live read today.
+  const accruedClass = isLive ? ("state" as const) : ("indexed" as const);
   const accruedProv: Provenance = {
     kind: "chain",
+    pclass: accruedClass,
     summary: troveWords("prov_accrued"),
     contract: tmContract,
     via: stateOriginVia(isLive, troveWords("field_accrued_interest")),
   };
   const mgmtFeeProv: Provenance = {
     kind: "chain",
+    pclass: accruedClass,
     summary: troveWords("prov_mgmt_fee"),
     contract: tmContract,
     via: stateOriginVia(isLive, troveWords("field_accrued_fee")),
