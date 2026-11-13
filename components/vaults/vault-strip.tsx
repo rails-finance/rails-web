@@ -8,8 +8,8 @@
 // (reference/lifetime-price-chart.md ruling 3: one observation a day, a gap
 // where the store has no row, nothing interpolated). No absolute figure: the
 // number is the card's. The two reads' blocks, the grain and the store are
-// each sentence's receipt; the section's ⋮ downloads the days as CSV and arms
-// the inspector on the section alone (components/shared/section-menu.tsx).
+// each sentence's receipt; the section's ⋮ downloads the days as CSV
+// (components/shared/section-menu.tsx).
 
 import { Prov } from "@/components/shared/provenance";
 import { ProvSection, SectionHeading, SectionMenu } from "@/components/shared/section-menu";
@@ -194,7 +194,7 @@ function SeriesTile({
   );
 }
 
-/** The section's scope: its ⋮ arms the inspector on it alone. */
+/** The section's name (`data-prov-scope`). */
 export const STRIP_SCOPE = "vault-strip";
 
 const pointsOf = (w: SeriesWindow): readonly VaultYieldRead[] => ("points" in w ? w.points : []);

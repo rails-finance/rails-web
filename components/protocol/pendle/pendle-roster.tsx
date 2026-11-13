@@ -2,8 +2,8 @@
 
 // The Pendle market roster's table section (R1.2, under the roster's R0 head,
 // lib/pendle/product.tsx): one row per market the router record names, read
-// at one block, in its own receipts scope with its ⋮ (Download CSV, Inspect
-// provenance) on the house table (components/shared/data-table).
+// at one block, in its own receipts scope with its ⋮ (Download CSV) on the
+// house table (components/shared/data-table).
 // ----------------------------------------------------------------------------
 // D1 one-line rows (`rowHeight="one"`); D2 sortable headers, the sort in `?sort=` and `?dir=`, each
 // written only off its default (maturity, soonest first); D3 the market pinned

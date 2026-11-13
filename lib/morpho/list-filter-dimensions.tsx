@@ -79,7 +79,7 @@ const MORPHO_TX_TOP = 5000;
  *  borrowed in one position (USDC's largest is 164,575,288), 21 Oct 2026. */
 const MORPHO_DEBT_TOP = 250_000_000;
 
-const MORPHO_SIZE_NOTE = "Debt in the market's loan token; pick a loan token to compare like with like.";
+const MORPHO_SIZE_NOTE = "Debt in the market's loan asset; pick a loan asset to compare like with like.";
 
 export interface MorphoListFilters extends BaseListFilters {
   status: string[];
@@ -241,7 +241,7 @@ export function morphoListDimensions(
       getColl: () => [],
       setColl: (f) => f,
       sides: ["debt"],
-      debtUnit: "loan token",
+      debtUnit: "loan asset",
       top: MORPHO_DEBT_TOP,
       panelNote: MORPHO_SIZE_NOTE,
     }),

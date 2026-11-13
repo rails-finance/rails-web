@@ -1136,7 +1136,7 @@ function AaveV4SpokeTowerBlock({
                 <p className="leading-relaxed">
                   These figures add up every event on this spoke. What left the position (withdrawals, repayments,
                   liquidations) is valued at its price when it left, and what is still held at the latest block&apos;s
-                  price. Deposited and Borrowed are set so each side balances, so a price change while a token was held
+                  price. Supplied and Borrowed are set so each side balances, so a price change while a token was held
                   shows in them.
                   {totals.unpricedSymbols.length > 0 && (
                     <>
@@ -1149,7 +1149,7 @@ function AaveV4SpokeTowerBlock({
                 <div className="flex items-start gap-2 leading-relaxed">
                   <span className="select-none text-rb-500">•</span>
                   <span>
-                    {fig(totals.depositedUsd)} of collateral deposited over the position&apos;s life
+                    {fig(totals.depositedUsd)} of collateral supplied over the position&apos;s life
                     {totals.supplyInterestUsd > 0.01 && <> and {fig(totals.supplyInterestUsd)} earned in interest</>}
                     {totals.withdrawnUsd > 0.01 && <>, then {fig(totals.withdrawnUsd)} withdrawn</>}
                     {totals.liquidatedCollUsd > 0.01 && (

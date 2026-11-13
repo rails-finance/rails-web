@@ -99,10 +99,10 @@ test("the head names what moved, with the figure", () => {
   assert.equal(head(24723024, "price-source"), "Price source set|");
   assert.equal(head(24723145, "credit-line"), "Credit line off|");
   assert.equal(head(25552732, "credit-line"), "Credit line on, caps raised|1.25M → 15M USDC");
-  assert.equal(head(25876677, "credit-line"), "Add cap raised|15M → 18M USDC");
+  assert.equal(head(25876677, "credit-line"), "Supply cap raised|15M → 18M USDC");
   assert.equal(head(26301157, "reserve-config"), "Frozen|");
   assert.equal(head(26305337, "dynamic-added"), "Collateral factor lowered|78% → 0%");
-  assert.equal(head(26337526, "credit-line"), "Draw cap raised|15M → 40M USDC");
+  assert.equal(head(26337526, "credit-line"), "Borrow cap raised|15M → 40M USDC");
   assert.equal(head(26337526, "rate-curve"), "Rate curve changed|");
   assert.equal(head(24722784, "rate-curve"), "Rate curve set|");
 });
@@ -124,8 +124,8 @@ test("each row is read against the row before it of its kind", () => {
 
 test("the bullets say what the setting does and what the change means", () => {
   assert.deepEqual(at1(26337526, "credit-line").bullets, [
-    "The draw cap is the most USDC borrowers on Main can owe the Core hub, in total.",
-    "Raising the draw cap by 25M, to 40M USDC, adds that much room for borrowing on Main.",
+    "The borrow cap is the most USDC borrowers on Main can owe the Core hub, in total.",
+    "Raising the borrow cap by 25M, to 40M USDC, adds that much room for borrowing on Main.",
   ]);
   assert.ok(at1(26337526, "rate-curve").bullets.includes("At 92% usage the rate is now 5%, from 4%."));
   assert.deepEqual(at1(26305337, "dynamic-added").bullets, [
@@ -156,7 +156,7 @@ test("a first reserve-config row states its values, then what collateral risk do
     "Main lends USDC: borrowing is on.",
     "USDC's collateral risk on Main is 0%.",
     "A liquidator may take seized USDC as USDC supplied on Main, earning interest, in place of the tokens.",
-    "Collateral risk sets the premium a borrower pays on top of the drawn rate when USDC backs the loan.",
+    "Collateral risk sets the premium a borrower pays on top of the borrow rate when USDC backs the loan.",
   ]);
 });
 

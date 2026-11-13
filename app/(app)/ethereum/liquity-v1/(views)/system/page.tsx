@@ -17,8 +17,7 @@ import { LiquityV1SystemView, LiquityV1SystemStamp } from "@/components/protocol
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { loadLiquityV1SystemFromChain } from "@/lib/sources/chain/liquity-v1-system";
 import { protocolForHref } from "@/lib/shared/protocols";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { AimGate } from "@/components/shared/aim-gate";
 import { assetKey } from "@/lib/shared/asset-family";
 import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
@@ -67,7 +66,6 @@ export default async function LiquityV1SystemPage() {
 
         <AimGate keys={FOCUS_KEYS} chain={1} what="Liquity V1's system">
           <LiquityV1SystemView data={data} />
-          <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
         </AimGate>
         <ProvInspectorLayer />
       </div>

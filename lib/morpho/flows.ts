@@ -91,11 +91,11 @@ export function morphoFlowBuckets(roles: MorphoRoles): FlowBucket[] {
   const out: FlowBucket[] = [];
   if (roles.borrower)
     out.push(
-      { key: MO.collIn, label: "Collateral deposited", event: "Deposit", side: "collateral", dir: "in" },
+      { key: MO.collIn, label: "Collateral supplied", event: "Supply collateral", side: "collateral", dir: "in" },
       {
         key: MO.collOut,
         label: "Collateral withdrawn",
-        event: "Withdraw",
+        event: "Withdraw collateral",
         side: "collateral",
         dir: "out",
       },
@@ -133,7 +133,7 @@ export function morphoFlowBuckets(roles: MorphoRoles): FlowBucket[] {
       },
       {
         key: MO.supplyLoss,
-        label: "Bad debt realised",
+        label: "Bad debt realized",
         event: "",
         side: "collateral",
         dir: "out",
@@ -158,8 +158,8 @@ export function morphoFlowBuckets(roles: MorphoRoles): FlowBucket[] {
       },
       {
         key: MO.badDebt,
-        label: "Bad debt written off",
-        event: "Debt written off",
+        label: "Bad debt",
+        event: "Bad debt",
         side: "debt",
         dir: "out",
         tone: "liquidation",
@@ -643,7 +643,7 @@ export function morphoFlowWords(
   const supplyBasis = `the ${loanSymbol} supplied after the last event by then, grown at the rate the market paid until its next event (after the last, its supply rate now).`;
   const collBasis = `the ${collSymbol} held after the last event by then, at the market oracle's price of the latest event that priced it, in ${loanSymbol}.`;
   return {
-    held: roles.borrower ? "Still deposited" : "Still supplied",
+    held: "Still supplied",
     restBySide: {
       collateral: collRest,
       ...(roles.borrower ? { debt: "Interest since the last event" } : {}),
@@ -654,9 +654,9 @@ export function morphoFlowWords(
     },
     basis: {
       collateral: roles.borrower
-        ? `Every figure is in ${loanSymbol}, the market's loan token; each ${collSymbol} flow is converted at the market oracle's price at its block.`
-        : `Every figure is in ${loanSymbol}, the market's loan token.`,
-      debt: `Every figure is in ${loanSymbol}, the market's loan token.`,
+        ? `Every figure is in ${loanSymbol}, the market's loan asset; each ${collSymbol} flow is converted at the market oracle's price at its block.`
+        : `Every figure is in ${loanSymbol}, the market's loan asset.`,
+      debt: `Every figure is in ${loanSymbol}, the market's loan asset.`,
     },
     heldBasis: {
       collateral: roles.borrower ? (roles.lender ? `${collBasis} With it, ${supplyBasis}` : collBasis) : supplyBasis,

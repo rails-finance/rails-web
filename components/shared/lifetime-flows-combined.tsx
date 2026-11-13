@@ -1551,13 +1551,19 @@ function PriceFigures({
  *  muted in history, naming the level on a press. */
 function LevelMark({ s, isLive, warn }: { s: FlowPriceSeries; isLive: boolean; warn?: string }) {
   const verb = warn ?? "Liquidates";
-  const words = s.health ? `${verb} ${s.liquidates === "above" ? "above" : "below"}` : `${verb} at`;
+  // A family's docs' name for the level (Aave V4's "Liquidation price").
+  const named = !warn && !s.health ? s.level?.label : undefined;
+  const words = s.health ? `${verb} ${s.liquidates === "above" ? "above" : "below"}` : (named ?? `${verb} at`);
   const tone = warn ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400";
   return (
     <RevealTip
       tip={
         <span className="block w-56 max-w-[calc(100vw-48px)] whitespace-normal leading-snug">
-          {s.health ? `${words} this ${viewWord(s.asset.symbol)}.` : `${words} this price.`}
+          {s.health
+            ? `${words} this ${viewWord(s.asset.symbol)}.`
+            : named
+              ? `${named}: the health factor reaches 1 at this price.`
+              : `${words} this price.`}
         </span>
       }
       label={`${words}, explain`}

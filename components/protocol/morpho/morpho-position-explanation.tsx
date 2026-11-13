@@ -12,6 +12,7 @@
 // Every figure is a value shown on the cards around the pane, in the loan
 // token (the market oracle's numeraire); Morpho has no USD.
 
+import { lifBonusText, lifText, morphoApy } from "@/lib/morpho/terms";
 import type { ReactNode } from "react";
 import type { MorphoChainPositionResponse } from "@/lib/api/fetch-morpho-position";
 import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
@@ -178,7 +179,11 @@ export function MorphoPositionExplanation({
 
   if (hasDebt)
     bullets.push(
-      bulletOf("risk", "penalty", positionNodes("penalty", { penalty: `${((chain.lif - 1) * 100).toFixed(2)}%` })),
+      bulletOf(
+        "risk",
+        "penalty",
+        positionNodes("penalty", { lif: lifText(chain.lif), penalty: lifBonusText(chain.lif) }),
+      ),
     );
 
   if (hasDebt && chain.borrowApr > 0)
@@ -187,8 +192,8 @@ export function MorphoPositionExplanation({
         "rate",
         "rate",
         positionNodes("rate", {
-          apr: `${(chain.borrowApr * 100).toFixed(2)}%`,
-          cost: <AmountText value={chain.currentDebt * chain.borrowApr} />,
+          apr: `${(morphoApy(chain.borrowApr) * 100).toFixed(2)}%`,
+          cost: <AmountText value={chain.currentDebt * morphoApy(chain.borrowApr)} />,
           loan_symbol: loan,
         }),
       ),
@@ -211,7 +216,7 @@ export function MorphoPositionExplanation({
     );
 
   // Who has been operating the position. It sits beside the counts: a position
-  // run by an authorised account reads as alarming until the reader is told
+  // run by an authorized account reads as alarming until the reader is told
   // the owner granted it (the card's "?" says how). The denominator comes
   // from operatorLead, which compares events with the transactions beside it.
   const ext = externalActivity;

@@ -18,7 +18,6 @@ import { RecencyStamp } from "@/components/shared/recency-stamp";
 import { LatestPrices, type LatestPriceAsset, type PricesAt } from "@/components/shared/latest-prices";
 import { usePublishTodayPrices } from "@/components/shared/price-basis";
 import { usePublishPositionCardStrip } from "@/components/shared/position-card-strip";
-import { ToolsMenu } from "@/components/shared/tools-menu";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { PositionWalletHeading, type PositionOwner } from "@/components/shared/wallet-heading";
 import { usePublishHeadingWallet } from "@/components/shared/event-page-aside";
@@ -218,13 +217,8 @@ export function DetailTopRow({
             </>
           )}
         </div>
-        {/* Tools is part of the row, not of the export menu that usually fills
-            it: a caller renders its shapes only once the view has loaded
-            (`{view && <ExportMenu …/>}`), and the provenance inspector has to
-            be reachable before then and on a view that never resolves — which
-            is what the dock used to guarantee. A bare menu carries the
-            inspector alone until the shapes arrive. */}
-        {!owner && !eventPage && (children || <ToolsMenu />)}
+        {/* The page's Tools menu, once the caller has export shapes to give. */}
+        {!owner && !eventPage && children}
       </div>
       {owner && (
         <div className="mt-6">

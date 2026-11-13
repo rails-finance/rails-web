@@ -8,7 +8,7 @@
 
 import { chromium } from "playwright";
 import { BASE, bypassHeaders } from "./lib/host.mjs";
-import { HALO, armInspector } from "./lib/prov-inspector.mjs";
+import { ARMED, armInspector } from "./lib/prov-inspector.mjs";
 
 const PAGES = [
   {
@@ -74,7 +74,7 @@ for (const { tag, path } of PAGES) {
   await page.waitForSelector("[data-reveal-tip]", { timeout: 120000 }).catch(() => {});
   await page.waitForTimeout(2500);
   const armed = await armInspector(page);
-  check(`${tag}: the inspector arms`, armed && Boolean(await page.$(HALO)));
+  check(`${tag}: the inspector arms`, armed && Boolean(await page.$(ARMED)));
   await page.waitForTimeout(500);
   const s = await stamp(page);
   check(

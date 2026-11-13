@@ -64,8 +64,9 @@ const POSITION_PAGE: InfoView = {
     <ul className={UL}>
       <li>
         The top card shows the position&apos;s collateral, debt and health factor, read from the spoke now. It also
-        shows the interest so far, which the borrower owes and the supplier earns, and the borrow rate, which is the
-        yearly rate on the debt. The liquidation price is the asset price at which the position becomes liquidatable.
+        shows the interest so far, earned on the supply and accrued on the debt, and the borrow APY, which is the yearly
+        cost of the debt with interest compounded. The liquidation price is the asset price at which the health factor
+        reaches 1; below it the position can be liquidated.
       </li>
       <li>A chart traces the collateral and the debt over the position&apos;s life.</li>
       <li>The timeline lists each event on the spoke, newest first.</li>
@@ -176,8 +177,9 @@ export function AaveV4InfoPage({ deployment }: { deployment: "ethereum" | "base"
           body: (
             <p>
               The hub comparison shows each hub&apos;s supply, borrowing, mix of assets and spokes. It then gives one
-              table of every asset in every hub, with the amount supplied, the amount borrowed, the rates and the
-              utilisation, which is the share of the supplied amount that is borrowed. Use this link to open it:{" "}
+              table of every asset in every hub, with the amount supplied, the amount borrowed, the supply and borrow
+              APY and the utilization, which is the share of an asset&apos;s liquidity that is borrowed. Use this link
+              to open it:{" "}
               <Link href="/ethereum/aave-v4/hubs" className={INLINE_LINK}>
                 the hub comparison page
               </Link>

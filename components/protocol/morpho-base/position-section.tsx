@@ -54,6 +54,7 @@ import { isMorphoEvent } from "@/lib/shared/types/event-shape";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { CARD_VOCAB, notRecordedNote } from "@/lib/shared/card-vocab";
 import { marketLabel } from "@/lib/morpho/asset-catalog";
+import { morphoApy, MORPHO_TERMS } from "@/lib/morpho/terms";
 import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import { FlowFocusContext } from "@/components/shared/flow-focus-context";
@@ -324,7 +325,7 @@ export function MorphoBasePositionSection({
         )}
 
         {/* Lifetime flows: the bars and the line over the position's replay
-          (lib/morpho/flows.ts), in the loan token, in place of the tower
+          (lib/morpho/flows.ts), in the loan asset, in place of the tower
             (TO-DO-ui-jobs 206). */}
         {!onEventPage && flowsOn && (
           <LifetimeFlowsPanel
@@ -451,9 +452,9 @@ export function MorphoLenderOpenCard({
             [
               {
                 id: "supply-rate",
-                label: "Supply rate",
-                value: `${lenderPct(p.supplyApr)} APR`,
-                tip: "The rate the market's lenders earn now, read live from the market: its borrow rate times the share of supply lent out, less the market's fee.",
+                label: MORPHO_TERMS.supplyRate,
+                value: lenderPct(morphoApy(p.supplyApr)),
+                tip: "What the market's lenders earn now, read live from the market: its borrow rate times utilization, less the market's fee, compounded over a year.",
               },
             ],
             [],

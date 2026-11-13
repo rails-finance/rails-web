@@ -105,8 +105,8 @@ export const MORPHO_EVENT_LABEL: Record<MorphoEventType, string> = {
   withdraw: "Withdraw",
   borrow: "Borrow",
   repay: "Repay",
-  supply_collateral: "Add Collateral",
-  withdraw_collateral: "Remove Collateral",
+  supply_collateral: "Supply Collateral",
+  withdraw_collateral: "Withdraw Collateral",
   liquidation: "Liquidated",
 };
 

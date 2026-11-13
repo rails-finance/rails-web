@@ -13,7 +13,7 @@
 // dust in; only the lines, the icon stack and its "+N" leave it out.
 
 import { useState, type ReactNode } from "react";
-import { POSITION_CARD_SCOPE, useProvArmedFor } from "@/components/shared/provenance";
+import { useProvArmed } from "@/components/shared/provenance";
 
 /** Under this many dollars a priced line is dust. */
 export const DUST_USD = 0.01;
@@ -34,12 +34,11 @@ export function splitDust<T>(
 }
 
 /** Whether dust lines are showing: the reader's toggle, or the provenance
- *  inspector armed on the page or on the position card (every caller is a
- *  position card side), which opens them so an armed click can reach a dust
+ *  inspector armed, which opens them so an armed click can reach a dust
  *  figure (the same rule `useReserveDisclosure` follows). */
 export function useDustOpen(): { open: boolean; toggle: () => void } {
   const [open, setOpen] = useState(false);
-  const armed = useProvArmedFor(POSITION_CARD_SCOPE);
+  const armed = useProvArmed();
   return { open: open || armed, toggle: () => setOpen((o) => !o) };
 }
 

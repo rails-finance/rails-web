@@ -54,4 +54,9 @@ test("the allow-list reads", () => {
   assert.ok(!provPreferenceAllows("/vaults/compare", {}));
   assert.ok(!provPreferenceAllows("/ethereum/aave/vaults/info", {}));
   assert.ok(!provPreferenceAllows(null, {}));
+  // Every page that mounts the inspector layer is listed (ui-jobs 625): an
+  // event page, an info page, an Optimism market.
+  assert.ok(provPreferenceAllows("/ethereum/aave-v3/0xabc/event/0x1_2", { wallet: "0xabc", eventId: "0x1_2" }));
+  assert.ok(provPreferenceAllows("/ethereum/spark/info", {}));
+  assert.ok(provPreferenceAllows("/optimism/aave-v3/markets", {}));
 });

@@ -6,11 +6,7 @@
 import type { ReactNode } from "react";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 
-export function AaveV4ArcReceipts({ scopeId, children }: { scopeId: string; children: ReactNode }) {
+export function AaveV4ArcReceipts({ children }: { children: ReactNode }) {
   const registry = useReceiptRegistry();
-  return (
-    <ProvReceiptsScope registry={registry} scopeId={scopeId}>
-      {children}
-    </ProvReceiptsScope>
-  );
+  return <ProvReceiptsScope registry={registry}>{children}</ProvReceiptsScope>;
 }

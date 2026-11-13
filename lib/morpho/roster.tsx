@@ -68,6 +68,7 @@ import { protocolForHref } from "@/lib/shared/protocols";
 import { morphoBlueContract } from "@/lib/morpho/asset-catalog";
 import { morphoLoanTokenHref, morphoMarketHref } from "@/lib/morpho/market-routes";
 import { amount, pctText } from "@/lib/morpho/markets-format";
+import { LLTV_TIP, morphoApy, MORPHO_TERMS } from "@/lib/morpho/terms";
 import {
   morphoBorrowRateProv,
   morphoFamilyTotalProv,
@@ -147,17 +148,29 @@ const COLUMNS: { key: Exclude<SortKey, "collateral">; label: string; tip?: strin
   {
     key: "lltv",
     label: "LLTV",
-    tip: "The most a borrower may owe against the collateral's value, and the liquidation line",
+    tip: LLTV_TIP,
   },
   {
     key: "supplied",
     label: "Supplied",
-    tip: "What suppliers have put in, as the market last settled, in the loan token",
+    tip: "What suppliers have put in, as the market last settled, in the loan asset",
   },
-  { key: "supplyRate", label: "Supply rate", tip: "What suppliers earn a year, as an APR" },
-  { key: "borrowRate", label: "Borrow rate", tip: "What borrowers pay a year, as an APR" },
-  { key: "utilisation", label: "Utilisation", tip: "Borrowed ÷ supplied" },
+  { key: "supplyRate", label: MORPHO_TERMS.supplyRate, tip: "What suppliers earn a year, compounded" },
+  { key: "borrowRate", label: MORPHO_TERMS.borrowRate, tip: "What borrowers pay a year, compounded" },
+  { key: "utilisation", label: MORPHO_TERMS.utilization, tip: "Borrowed ÷ supplied" },
 ];
+
+/** A row's Supply APY receipt, with the figures it is derived from. */
+const supplyRateProvOf = (
+  c: MorphoMarketCoords,
+  m: Pick<MorphoMarketRow, "borrowApr" | "utilization" | "fee" | "supplyApr">,
+) =>
+  morphoSupplyRateProv(c, {
+    borrowYearly: m.borrowApr,
+    utilization: m.utilization,
+    fee: m.fee,
+    supplyYearly: m.supplyApr,
+  });
 
 const collateralName = (m: MorphoMarketRow) =>
   m.isIdle ? "Idle" : (m.collateralSymbol ?? shortAddr(m.collateralToken));
@@ -312,30 +325,30 @@ function MarketRow({
           ) : (
             <span
               className="text-rb-500"
-              title="The loan token's decimals cannot be trusted, so its sizes are not stated"
+              title="The loan asset's decimals cannot be trusted, so its sizes are not stated"
             >
               not stated
             </span>
           )}
         </DataTableCell>
-        <DataTableCell label="Supply rate" align="right" className={NUM}>
+        <DataTableCell label={MORPHO_TERMS.supplyRate} align="right" className={NUM}>
           {m.supplyApr != null ? (
-            <Prov info={morphoSupplyRateProv(c)}>{ratePercentText(m.supplyApr)}</Prov>
+            <Prov info={supplyRateProvOf(c, m)}>{ratePercentText(morphoApy(m.supplyApr))}</Prov>
           ) : (
             <span className="text-rb-500">none</span>
           )}
         </DataTableCell>
-        <DataTableCell label="Borrow rate" align="right" className={NUM}>
+        <DataTableCell label={MORPHO_TERMS.borrowRate} align="right" className={NUM}>
           <span className="inline-flex items-center gap-1.5">
             <CeilingTag m={m} c={c} />
             {m.borrowApr != null ? (
-              <Prov info={morphoBorrowRateProv(c)}>{ratePercentText(m.borrowApr)}</Prov>
+              <Prov info={morphoBorrowRateProv(c, m.borrowApr)}>{ratePercentText(morphoApy(m.borrowApr))}</Prov>
             ) : (
               <span className="text-rb-500">none</span>
             )}
           </span>
         </DataTableCell>
-        <DataTableCell label="Utilisation" align="right" className={NUM}>
+        <DataTableCell label={MORPHO_TERMS.utilization} align="right" className={NUM}>
           {m.utilization != null ? (
             <Prov info={morphoUtilizationProv(c)}>{pctText(m.utilization)}</Prov>
           ) : (
@@ -441,24 +454,24 @@ function PairRow({ p, r, open, onToggle }: { p: Pair; r: Read; open: boolean; on
                 <span className="text-rb-500">not stated</span>
               )}
             </DataTableCell>
-            <DataTableCell label="Supply rate" align="right" className={NUM}>
+            <DataTableCell label={MORPHO_TERMS.supplyRate} align="right" className={NUM}>
               {top.supplyApr != null ? (
-                <Prov info={morphoSupplyRateProv(c)}>{ratePercentText(top.supplyApr)}</Prov>
+                <Prov info={supplyRateProvOf(c, top)}>{ratePercentText(morphoApy(top.supplyApr))}</Prov>
               ) : (
                 <span className="text-rb-500">none</span>
               )}
             </DataTableCell>
-            <DataTableCell label="Borrow rate" align="right" className={NUM}>
+            <DataTableCell label={MORPHO_TERMS.borrowRate} align="right" className={NUM}>
               <span className="inline-flex items-center gap-1.5">
                 <CeilingTag m={top} c={c} />
                 {top.borrowApr != null ? (
-                  <Prov info={morphoBorrowRateProv(c)}>{ratePercentText(top.borrowApr)}</Prov>
+                  <Prov info={morphoBorrowRateProv(c, top.borrowApr)}>{ratePercentText(morphoApy(top.borrowApr))}</Prov>
                 ) : (
                   <span className="text-rb-500">none</span>
                 )}
               </span>
             </DataTableCell>
-            <DataTableCell label="Utilisation" align="right" className={NUM}>
+            <DataTableCell label={MORPHO_TERMS.utilization} align="right" className={NUM}>
               {top.utilization != null ? (
                 <Prov info={morphoUtilizationProv(c)}>{pctText(top.utilization)}</Prov>
               ) : (
@@ -742,7 +755,7 @@ function Group({
                   <span className="text-foreground">
                     <Prov info={morphoGroupUtilizationProv(c, over)}>{pctText(util, 0)}</Prov>
                   </span>{" "}
-                  utilised
+                  utilized
                 </>
               )}
             </>
@@ -833,7 +846,7 @@ function RosterExplainer({ d, unfunded }: { d: MorphoRosterData; unfunded: Unfun
       </ExplainGroup>
       <ExplainGroup title="Reading the table">
         <ExplainBullet>
-          A market measures in its loan token, so the table groups by loan token and totals only within one. Totals in
+          A market measures in its loan asset, so the table groups by loan asset and totals only within one. Totals in
           different tokens do not compare.
         </ExplainBullet>
         {d.vaults === "read" && (
@@ -844,7 +857,7 @@ function RosterExplainer({ d, unfunded }: { d: MorphoRosterData; unfunded: Unfun
           </ExplainBullet>
         )}
         <ExplainBullet>
-          Each loan token&apos;s page lists every market: the ones that carry the book, markets that repeat one pair,
+          Each loan asset&apos;s page lists every market: the ones that carry the book, markets that repeat one pair,
           the small ones and the never funded.
         </ExplainBullet>
         <ExplainBullet>
@@ -975,7 +988,7 @@ function RosterView({
       subtitle: "The contract that holds every market",
       href: explorerUrl(chainId, "address", blue.address),
     },
-    { item: "docs", title: "Morpho's docs", subtitle: "Markets", href: `${DOCS}/learn/concepts/market/` },
+    { item: "docs", title: "Morpho's docs", subtitle: "Markets", href: `${DOCS}/learn/concepts/blue/` },
   ];
   const head: ProductHead = {
     scope: "markets-head",
@@ -995,7 +1008,7 @@ function RosterView({
       },
       {
         slot: "population",
-        label: "Loan tokens",
+        label: "Loan assets",
         tip: "Distinct tokens lent across the markets",
         value: <span data-prov-exempt="">{s.loanTokens.toLocaleString("en-US")}</span>,
       },
@@ -1034,11 +1047,11 @@ function RosterView({
               data-skel-section="page-table"
             >
               <SectionHeading
-                title="Markets by loan token"
+                title="Markets by loan asset"
                 menu={
                   <ToolsFor
                     scope="markets-table"
-                    title="Markets by loan token"
+                    title="Markets by loan asset"
                     tools={{
                       views:
                         filter === "none"
@@ -1058,7 +1071,7 @@ function RosterView({
                         csv: {
                           filename: `morpho-${chainMeta(chainId).slug}-markets.csv`,
                           build: () => marketsCsv(shownRows),
-                          subtitle: "The markets listed under every loan token",
+                          subtitle: "The markets listed under every loan asset",
                         },
                       },
                     }}
@@ -1067,8 +1080,8 @@ function RosterView({
               >
                 <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-rb-500">
                   {filter === "lent" && !focusing
-                    ? "Loan tokens with the most markets a vault lends into first. Open one for its markets."
-                    : "Loan tokens with the most funded markets first. Open one for its markets."}
+                    ? "Loan assets with the most markets a vault lends into first. Open one for its markets."
+                    : "Loan assets with the most funded markets first. Open one for its markets."}
                 </p>
                 {filter === "none" && (
                   <p className="mt-0.5 max-w-2xl text-[12px] text-rb-500" data-morpho-view-line="">
@@ -1104,7 +1117,7 @@ function RosterView({
               )}
               {data.unfundedTokens > 0 && (
                 <p className="mt-3 text-[12px] text-rb-500" data-prov-exempt="">
-                  {data.unfundedTokens.toLocaleString("en-US")} more loan tokens have markets that have never held
+                  {data.unfundedTokens.toLocaleString("en-US")} more loan assets have markets that have never held
                   supply.
                 </p>
               )}
@@ -1218,7 +1231,7 @@ function FamilyBlock({
         <MarketsTable
           rows={f.markets}
           r={r}
-          label={`${coll} / ${g.loanSymbol} markets at ${pctText(f.lltv)}`}
+          label={`${g.loanSymbol} / ${coll} markets at ${pctText(f.lltv)}`}
           sort={sort}
           onSort={onSort}
         />
@@ -1314,7 +1327,7 @@ function LoanTokenBody({ g, block, fromLogs, chainId }: LoanTokenProps) {
       },
       {
         slot: "usage",
-        label: "Utilisation",
+        label: "Utilization",
         tip: "Borrowed ÷ supplied across these markets",
         value:
           util != null ? (
@@ -1345,14 +1358,14 @@ function LoanTokenBody({ g, block, fromLogs, chainId }: LoanTokenProps) {
         {
           item: "markets",
           title: "All markets",
-          subtitle: "Every loan token on this chain",
+          subtitle: "Every loan asset on this chain",
           href: `${root}/markets`,
           internal: true,
         },
         {
           item: "token",
           title: `${g.loanSymbol} on ${explorer}`,
-          subtitle: "The loan token",
+          subtitle: "The loan asset",
           href: explorerUrl(chainId, "address", g.loanToken),
         },
       ],
