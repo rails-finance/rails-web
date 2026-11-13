@@ -45,6 +45,11 @@ import { UNDERLYING_LABEL_TIP, underlyingProtocol } from "@/lib/pendle/underlyin
 import type { PendlePosition, PendleTimelineRow, PendleToken } from "@/lib/pendle/types";
 import { pendleMarketHref } from "@/lib/pendle/routes";
 
+/** Whether the wallet holds PT at the block (getUserPYInfo's ptBalance). */
+export function heldPt(p: PendlePosition): boolean {
+  return p.balances.pt != null && p.balances.pt !== "0";
+}
+
 /** Whether the wallet holds nothing in the market at the block. */
 export function positionClosed(p: PendlePosition): boolean {
   const zero = (v: string | null) => v == null || v === "0";
@@ -114,6 +119,9 @@ export function PendlePositionCard({
 
   const total = p.value.asset.total;
   const entry = p.apy.entry;
+  // A fixed rate is the yield of holding PT (rails-ops ui-jobs 654): none is
+  // shown where the wallet holds no PT at the block.
+  const holdsPt = heldPt(p);
   const heads: PositionCardHead[] = [
     {
       id: "value",
@@ -129,13 +137,14 @@ export function PendlePositionCard({
       labelTip:
         "The fixed rate this wallet's PT buys locked in: each buy's PT against the asset paid and the time left to maturity, weighted by the PT bought.",
       value:
-        entry.ptWeighted == null ? null : (
+        entry.ptWeighted == null || !holdsPt ? null : (
           <Prov info={entryApyProv(entry.buys, entry.unpriced)} value={entry.ptWeighted.toFixed(6)}>
             {apyText(entry.ptWeighted)}
           </Prov>
         ),
-      sub:
-        entry.buys === 0
+      sub: !holdsPt
+        ? "no PT held"
+        : entry.buys === 0
           ? "no PT bought through a router"
           : `${entry.buys} PT ${entry.buys === 1 ? "buy" : "buys"}${entry.unpriced ? `, ${entry.unpriced} unpriced` : ""}`,
     },
@@ -208,6 +217,8 @@ export function PendlePositionCard({
     ...p.rewards.lp.map((r) => ({ ...r, side: "LP" as const })),
   ];
 
+  // "Up to one" and "swaps closed": the chain reads behind them are cited in
+  // lib/pendle/product.tsx above TIP.
   const left: PositionPanelRow[] = [
     legRow(
       "pt",
@@ -217,8 +228,8 @@ export function PendlePositionCard({
       p.value.asset.pt,
       "PT",
       expired
-        ? `Each PT now redeems for one ${asset}.`
-        : `Each PT redeems for one ${asset} at maturity; before then it trades below that, which is the fixed yield.`,
+        ? `Each PT now redeems for up to one ${asset}.`
+        : `Each PT redeems for up to one ${asset} at maturity; before then it trades below that, which is the fixed yield.`,
     ),
     legRow(
       "yt",
@@ -312,8 +323,8 @@ export function PendlePositionCard({
       </p>
       {expired ? (
         <p>
-          The market has matured: each PT redeems for one {asset}, YT is worth nothing and keeps any interest it had not
-          claimed, swaps are closed, and LP can still be removed.
+          The market has matured: each PT redeems for up to one {asset}, YT is worth nothing and keeps any interest it
+          had not claimed, swaps are closed, and LP can still be removed.
         </p>
       ) : (
         <p>
@@ -330,7 +341,7 @@ export function PendlePositionCard({
             : "no mark, because neither the oracle nor RouterStatic answered"}
         , in SY, then in {asset} at the SY&rsquo;s exchange rate.
       </p>
-      {entry.buys > 0 && entry.ptWeighted != null && (
+      {entry.buys > 0 && entry.ptWeighted != null && holdsPt && (
         <p>
           This wallet bought {amountText(entry.ptBought, t.pt.decimals)} PT through Pendle&rsquo;s routers for{" "}
           {amountText(entry.assetPaid, dec)} {asset}, a fixed {apyText(entry.ptWeighted)} a year to maturity
@@ -394,7 +405,7 @@ export function PendlePositionCard({
           ? {
               word: "Matured",
               tone: "muted",
-              tip: `PT redeems for one ${asset}; YT is worth nothing; LP can be removed.`,
+              tip: `PT redeems for up to one ${asset}; YT is worth nothing; LP can be removed.`,
             }
           : null,
         identity,

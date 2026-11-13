@@ -68,12 +68,20 @@ const ROOT = "/ethereum/pendle";
 const DOCS = "https://docs.pendle.finance";
 const n = (v: number) => v.toLocaleString("en-US");
 
+// "Up to one": a PT redeems for one unit of the accounting asset (Pendle's docs,
+// PT) unless the SY's exchange rate sits under the watermark the YT stored, when
+// it redeems for less (Negative Yield; Yield Tokenization: pyIndexCurrent =
+// max(SY.exchangeRate(), pyIndexStored)). Read 13 Nov 2026 at block 26,405,972:
+// both rates equal or the exchange rate above on apyUSD-5NOV2026 and
+// stETH-30DEC2027 (rails-ops reference/official-docs/pendle.md). "No longer
+// trades": RouterStatic.swapExactSyForPtStatic on the matured apyUSD-5NOV2026
+// market reverts with MarketExpired() at that block.
 const TIP = {
   markets: "Every market Pendle's routers have named",
   active: "Markets before their maturity, of all markets",
-  matured: "Markets past their maturity, where each PT redeems for one unit of its asset",
+  matured: "Markets past their maturity, where each PT redeems for up to one unit of its asset",
   tvl: "The pool's SY plus its PT at the PT's price, in the market's asset",
-  apy: "The fixed rate a PT bought now earns a year to maturity, as an APY",
+  apy: "Pendle's docs: the market consensus of the future APY of an asset, from the ratio of the YT price to the PT price",
   pt: "What one PT is worth in the market's asset; it reaches one at maturity",
   yt: "What one YT is worth in the market's asset; it collects the yield until maturity",
   lp: "What one LP is worth in the market's asset: a share of the pool's PT and SY",
@@ -91,7 +99,7 @@ const docs: SectionMenuLink = {
   item: "docs",
   title: "Pendle's docs",
   subtitle: "Markets, PT and YT",
-  href: `${DOCS}/ProtocolMechanics/YieldTokenization/PT`,
+  href: `${DOCS}/pendle-v2/ProtocolMechanics/YieldTokenization/PT`,
 };
 
 /** The stamp's receipt: rails-server's read at the chain's finalized block. */
@@ -129,8 +137,8 @@ function RosterExplainer({ total, active, matured }: { total: number; active: nu
           <Fig bold>{n(active)}</Fig> markets are active: their PT trades below one unit of the asset until maturity.
         </ExplainBullet>
         <ExplainBullet>
-          <Fig bold>{n(matured)}</Fig> markets have matured: each PT redeems for one unit of the asset, and the pool no
-          longer trades.
+          <Fig bold>{n(matured)}</Fig> markets have matured: each PT redeems for up to one unit of the asset, and the
+          pool no longer trades.
         </ExplainBullet>
       </ExplainGroup>
       <ExplainGroup title="Reading the table">
@@ -174,7 +182,7 @@ export function PendleRosterPage({
     scope: "markets-head",
     title: "Pendle on Ethereum",
     purpose:
-      "Each market splits a yield-bearing token into PT, which redeems for one unit of its asset at maturity, and YT, which collects the yield until then.",
+      "Each market splits a yield-bearing token into PT, which redeems for up to one unit of its asset at maturity, and YT, which collects the yield until then.",
     figures: [
       { slot: "roster", label: "Markets", tip: TIP.markets, value: count("all", total, "markets") },
       { slot: "usage", label: "Active", tip: TIP.active, value: count("active", active, "active") },
@@ -329,7 +337,7 @@ function MarketExplainer({ x }: { x: Ctx }) {
           )}
           <ExplainBullet>The implied APY ends at maturity, so the market prices no fixed rate.</ExplainBullet>
           <ExplainBullet>
-            One PT redeems for <Fig bold>1 {a}</Fig>.
+            One PT redeems for up to <Fig bold>1 {a}</Fig>.
           </ExplainBullet>
         </ExplainGroup>
         {tokens}
@@ -349,7 +357,8 @@ function MarketExplainer({ x }: { x: Ctx }) {
         )}
         {x.apy != null && (
           <ExplainBullet>
-            A PT bought now earns <Fig bold>{apyText(x.apy)}</Fig> a year to maturity, the implied APY.
+            The implied APY is <Fig bold>{apyText(x.apy)}</Fig>: by Pendle&rsquo;s docs, the market&rsquo;s consensus of
+            the future APY of {yieldToken}.
           </ExplainBullet>
         )}
         {x.pt != null && (
@@ -358,7 +367,7 @@ function MarketExplainer({ x }: { x: Ctx }) {
             <Fig bold>
               {priceText(x.pt)} {a}
             </Fig>{" "}
-            and redeems for one {a} at maturity.
+            and redeems for up to one {a} at maturity.
           </ExplainBullet>
         )}
         <ExplainBullet>
@@ -453,7 +462,7 @@ function headOf(x: Ctx): ProductHead {
         )}
         <UnderlyingLabel p={m} />
         <span>
-          Splits {symbolOf(t.yieldToken)} into PT and YT; PT redeems for one {a} at maturity
+          Splits {symbolOf(t.yieldToken)} into PT and YT; PT redeems for up to one {a} at maturity
         </span>
       </div>
     ),

@@ -20,7 +20,7 @@ import {
 
 export const metadata = infoMetadata("pendle");
 
-const DOCS = "https://docs.pendle.finance/ProtocolMechanics";
+const DOCS = "https://docs.pendle.finance/pendle-v2/ProtocolMechanics";
 
 const GLOSSARY: readonly [InfoTerm, ...InfoTerm[]] = [
   {
@@ -32,7 +32,7 @@ const GLOSSARY: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "PT",
     definition:
-      "The principal token: a claim on one unit of the market's asset at maturity. Before maturity it trades below that, and the discount is the fixed yield a buyer locks in.",
+      "The principal token: a claim on up to one unit of the market's asset at maturity. Before maturity it trades below that, and the discount is the fixed yield a buyer locks in.",
     sources: [{ label: "PT", href: `${DOCS}/YieldTokenization/PT` }],
   },
   {
@@ -45,19 +45,19 @@ const GLOSSARY: readonly [InfoTerm, ...InfoTerm[]] = [
     term: "LP",
     definition:
       "A share of a market's pool, which holds PT and SY and earns the pool's swap fees and rewards. It can be removed before and after maturity.",
-    sources: [{ label: "AMM", href: `${DOCS}/LiquidityEngines/AMM` }],
+    sources: [{ label: "AMM", href: `${DOCS}/LiquidityEngines/AMM#liquidity-providers-lp` }],
   },
   {
     term: "Implied APY",
     definition:
-      "The fixed rate the market prices PT at: the yearly return of buying PT now and holding it to maturity.",
-    sources: [{ label: "Market APY", href: `${DOCS}/PendleMarketAPYCalculation` }],
+      "By Pendle's docs, the market consensus of the future APY of an asset, from the ratio of the YT price to the PT price.",
+    sources: [{ label: "APY Calculation", href: `${DOCS}/PendleMarketAPYCalculation#impliedapy` }],
   },
   {
     term: "Maturity",
     definition:
-      "The date a market ends. After it, each PT redeems for one unit of the asset, YT is worth nothing, and the pool stops trading.",
-    sources: [{ label: "Minting", href: `${DOCS}/YieldTokenization/Minting` }],
+      "The date a market ends. After it, each PT redeems for up to one unit of the asset, YT is worth nothing, and the pool stops trading.",
+    sources: [{ label: "Glossary", href: `${DOCS}/Glossary#maturity` }],
   },
 ];
 
@@ -113,7 +113,7 @@ export default function PendleInfoPage() {
       glossary={GLOSSARY}
       reads={reads}
       howItWorks={[
-        "A Pendle market splits a yield-bearing token into PT, which redeems for one unit of the asset at maturity, and YT, which collects the yield until then.",
+        "A Pendle market splits a yield-bearing token into PT, which redeems for up to one unit of the asset at maturity, and YT, which collects the yield until then.",
         "Each market's pool trades PT against SY, and the price of PT gives the market's implied APY.",
         "Rails values PT, YT and LP at Pendle's oracle, a 15-minute average, where the market's oracle is ready, and at RouterStatic's spot rate where it is not, then in the asset at the SY's exchange rate.",
         "The protocol behind each yield token is a Rails label: the chain does not name it.",

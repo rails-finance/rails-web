@@ -110,7 +110,7 @@ export function valueProv(
     return {
       kind: "derived",
       pclass: "state",
-      summary: `PT value. The market has expired, so each PT redeems for one ${asset}.`,
+      summary: `PT value. The market has expired; Rails values each PT at one ${asset}, the most it redeems for by Pendle's docs.`,
       formula: "PT balance × 1",
       source: { block },
       verify: callCheck("market.isExpired()", block),
@@ -394,7 +394,7 @@ export function priceProv(
       pclass: "state",
       summary:
         leg === "PT"
-          ? `PT price. The market has matured, so each PT redeems for one ${asset}.`
+          ? `PT price. The market has matured; Rails prices each PT at one ${asset}, the most it redeems for by Pendle's docs.`
           : "YT price. The market has matured, so YT is worth nothing.",
       formula: leg === "PT" ? "1" : "0",
       source: { block },
