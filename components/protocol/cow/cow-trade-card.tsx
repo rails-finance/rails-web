@@ -33,6 +33,7 @@ import {
   tradeAmountProv,
   type CowTokenLabel,
 } from "@/lib/cow/trade";
+import { COW_TERMS, cowFeeSentence } from "@/lib/cow/terms";
 
 /** A token's icon that opens its panel (AssetPopover): the contract, and the
  *  asset page's row and link where Rails has a page for it. */
@@ -208,12 +209,13 @@ export function CowTradeCard({
     },
     caption: "Trade",
     cells,
-    ledgers: { none: "A trade holds no balance in CoW." },
+    ledgers: { none: `A trade holds no balance in ${COW_TERMS.name}.` },
     explainer: {
       body: (
         <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed">
           <li>
-            This wallet&rsquo;s order sold {soldWords} and bought {boughtWords} through CoW&rsquo;s settlement contract.
+            This wallet&rsquo;s order sold {soldWords} and bought {boughtWords} through {COW_TERMS.name}&rsquo;s
+            settlement contract.
           </li>
           {price && (
             <li>
@@ -221,14 +223,10 @@ export function CowTradeCard({
               {fee ? ", on the sold amount less the fee" : ""}.
             </li>
           )}
-          {fee && (
-            <li>
-              The settlement kept {amountText(fee, sell)} {tokenText(sell)} of the sold amount as its fee.
-            </li>
-          )}
+          {fee && <li>{cowFeeSentence(`${amountText(fee, sell)} ${tokenText(sell)}`)}</li>}
           <li>
-            By CoW&rsquo;s docs, its fees are part of the trade&rsquo;s execution, so Sold and Bought are amounts after
-            fees: the order received less, or paid more, than it would have without them.
+            By {COW_TERMS.name}&rsquo;s docs, its fees are part of the trade&rsquo;s execution, so Sold and Bought are
+            amounts after fees: the order received less, or paid more, than it would have without them.
           </li>
           <li>
             A solver sent the settlement transaction

@@ -986,7 +986,8 @@ const SPECS: ProtocolSpec[] = [
     // position listing. Launched 4 Nov 2026 (Miles).
     id: "cow",
     session: "cow",
-    label: "CoW",
+    // The docs' name (docs.cow.fi; rails-ops ui-jobs 657, C11).
+    label: "CoW Protocol",
     chainId: 1,
     slug: "cow",
     // Hue 309 (427's spread), from CoW's brand purple #490072 (307) (its kit pairs it with

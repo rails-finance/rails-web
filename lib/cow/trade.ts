@@ -9,10 +9,11 @@ import { explorerUrl } from "@/lib/shared/chains";
 import { formatNumber, shiftDecimal } from "@/lib/utils/format";
 import type { CowTrade } from "@/lib/cow/types";
 import { executedRatio, soldLessFee } from "@/lib/cow/price";
+import { COW_TERMS } from "@/lib/cow/terms";
 
 export const COW_CHAIN_ID = 1 as const;
 export const GPV2_SETTLEMENT = "0x9008d19f58aabd9ed0d60971565aa8510560ab41";
-const SETTLEMENT = { name: "GPv2Settlement (CoW)", address: GPV2_SETTLEMENT };
+const SETTLEMENT = { name: `GPv2Settlement (${COW_TERMS.name})`, address: GPV2_SETTLEMENT };
 
 /** A token as the page names it: the symbol token_meta holds, else none. */
 export interface CowTokenLabel {
@@ -73,11 +74,10 @@ const scaling = (raw: string, tok: CowTokenLabel) =>
 const FIELD = { sell: "sellAmount", buy: "buyAmount", fee: "feeAmount" } as const;
 const WORDS = {
   sell: (s: string) =>
-    `Sold — the ${s} this wallet's order sent to the CoW settlement contract in this trade, as the contract recorded it in its Trade log.`,
+    `Sold — the ${s} this wallet's order sent to the ${COW_TERMS.name} settlement contract in this trade, as the contract recorded it in its Trade log.`,
   buy: (s: string) =>
     `Bought — the ${s} the settlement contract paid out for this wallet's order in this trade, as its Trade log recorded it.`,
-  fee: (s: string) =>
-    `Fee — the ${s} the settlement contract kept from the sold amount for this trade, as its Trade log recorded it.`,
+  fee: (s: string) => `Fee — the trade's fee amount, paid in the sold token (${s}), as its Trade log recorded it.`,
 };
 
 /** A Trade log field's receipt. */
@@ -109,7 +109,7 @@ export function executedPriceProv(
   return {
     kind: "derived",
     pclass: "emitted",
-    summary: `Executed price — what one ${tokenText(price.base)} cost in ${tokenText(price.quote)} in this trade: the ${perSell ? `amount bought divided by the ${soldSide}` : `${soldSide} divided by the amount bought`}, each scaled by its token's decimals.${fee ? " CoW's docs state the execution price after deducting fees from the amount sold, and the Trade log's sold amount includes the fee." : ""}`,
+    summary: `Executed price — what one ${tokenText(price.base)} cost in ${tokenText(price.quote)} in this trade: the ${perSell ? `amount bought divided by the ${soldSide}` : `${soldSide} divided by the amount bought`}, each scaled by its token's decimals.${fee ? ` ${COW_TERMS.name}'s docs state the execution price after deducting fees from the amount sold, and the Trade log's sold amount includes the fee.` : ""}`,
     formula: perSell ? `bought ÷ ${soldTerm}` : `${soldTerm} ÷ bought`,
     inputs: [
       {
@@ -164,6 +164,18 @@ export function settlementBlockProv(t: CowTrade): Provenance {
   };
 }
 
+/** The page head's block: the checkpoint every figure on the page is read at. */
+export function checkpointProv(asOf: { block: number }): Provenance {
+  return {
+    kind: "chain-derived",
+    pclass: "indexed",
+    summary: `Block — every figure on this page is read at block ${asOf.block.toLocaleString("en-US")}, the newest block Rails had read when the page loaded.`,
+    contract: SETTLEMENT,
+    via: "Trade logs · read to this block",
+    source: { block: asOf.block },
+  };
+}
+
 /** The settlement's other trades, in words. */
 export function settlementWords(t: CowTrade): string {
   const others = t.settlementTrades - 1;
@@ -179,7 +191,7 @@ export function walletCountProv(asOf: { block: number }, what: string, value: nu
   return {
     kind: "chain-derived",
     pclass: "indexed",
-    summary: `${what} — counted over every Trade log of CoW's settlement contract whose owner is this wallet, through block ${asOf.block.toLocaleString("en-US")}: ${value.toLocaleString("en-US")}.`,
+    summary: `${what} — counted over every Trade log of ${COW_TERMS.name}'s settlement contract whose owner is this wallet, through block ${asOf.block.toLocaleString("en-US")}: ${value.toLocaleString("en-US")}.`,
     contract: SETTLEMENT,
     via: "Trade logs · owner = this wallet",
     source: { block: asOf.block },
