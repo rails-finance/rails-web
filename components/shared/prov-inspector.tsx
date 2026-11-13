@@ -73,11 +73,13 @@ export function ProvInspectorLayer() {
   const allowed = provPreferenceAllows(pathname, params);
   // Escape, in rungs: an open popover closes first; a second press disarms.
   // An Escape that closes an open menu or modal (the profile menu, a ⋮) is
-  // theirs, so it never turns the switch off.
+  // theirs, so it never turns the switch off. A menu that heard it first has
+  // closed by the time this runs (the switch turned on with the profile menu
+  // open), so its `preventDefault` counts as the menu's claim (ui-jobs 651).
   useEffect(() => {
     if (!armed) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
+      if (e.key !== "Escape" || e.defaultPrevented) return;
       if (provInspector.getPin()) provInspector.unpin();
       else if (!document.querySelector(OPEN_OVERLAY)) putDownInspector();
     };
