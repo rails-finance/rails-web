@@ -58,14 +58,14 @@ export function makeListedMorphoReceipts(id: ListedMorphoReceiptsArgs): ListedMo
     `read by Rails at the block the row names, after the account's most recent event; the position page reads it live · served by GET ${id.positionsRoute}`;
   const slotVerify = (block: number) => ({
     kind: "recompute" as const,
-    text: `Re-run the Morpho.position eth_call at block ${block} against an archive node; the slot answers this figure`,
+    text: `To check: ask any archive node for Morpho.position at block ${block}; the slot answers this figure.`,
   });
   return {
     collateral: (sym, block) => ({
       kind: "chain",
       pclass: "state",
       verify: slotVerify(block),
-      summary: `Collateral (${sym}) the position holds at block ${block} — the singleton's own \`position(id, user).collateral\` slot, read at that block by Rails, after the account's most recent event; the position page reads it live. Exact: collateral does not accrue, so the slot is the whole answer.`,
+      summary: `Collateral (${sym}) the position holds at block ${block} — the singleton's \`position(id, user).collateral\` slot, read at that block by Rails, after the account's most recent event; the position page reads it live. Exact: collateral does not accrue, so the slot is the whole answer.`,
       contract,
       via: `${custody} · position(id, user).collateral at the row's block`,
     }),
@@ -74,9 +74,9 @@ export function makeListedMorphoReceipts(id: ListedMorphoReceiptsArgs): ListedMo
       pclass: "state",
       verify: {
         kind: "recompute",
-        text: `Re-run Morpho.position and Morpho.market at block ${block} and convert the borrow shares with toAssetsUp; the figure reproduces`,
+        text: `To check: ask any archive node for Morpho.position and Morpho.market at block ${block} and convert the borrow shares with toAssetsUp; the figure reproduces.`,
       },
-      summary: `Debt (${sym}) the position owes at block ${block}, interest included — the position's borrow-shares slot converted to assets through the market's own totals, both read at that block by Rails, after the account's most recent event, rounded up as the contract rounds against a borrower (toAssetsUp). Interest the market had settled by that block is in it; interest accrued since is not; the position page reads it live.`,
+      summary: `Debt (${sym}) the position owes at block ${block}, interest included — the position's borrow-shares slot converted to assets through the market's totals, both read at that block by Rails, after the account's most recent event, rounded up as the contract rounds against a borrower (toAssetsUp). Interest the market had settled by that block is in it; interest accrued since is not; the position page reads it live.`,
       contract,
       via: `${custody} · borrowShares → assets (toAssetsUp) over market(id) totals at the row's block`,
       formula: "shares × (totalBorrowAssets + 1) ÷ (totalBorrowShares + 1e6), rounded up",
@@ -107,7 +107,7 @@ export function makeListedMorphoReceipts(id: ListedMorphoReceiptsArgs): ListedMo
     collateralValue: (collSym, loanSym, block) => ({
       kind: "chain-derived",
       pclass: "oracle",
-      summary: `The collateral (${collSym}) valued in ${loanSym} at block ${block} — the slot's collateral multiplied by the market's OWN oracle price (IOracle.price(), fixed in the market's immutable params), the oracle asked at that block by the same read that took the slot. This is the figure Morpho's own solvency test prices the collateral at; no USD is asserted anywhere.`,
+      summary: `The collateral (${collSym}) valued in ${loanSym} at block ${block} — the slot's collateral multiplied by the market's oracle price (IOracle.price(), fixed in the market's immutable params), the oracle asked at that block by the same read that took the slot. Morpho's solvency test prices the collateral at this figure. No USD figure is stated.`,
       contract,
       via: `${custody} · collateral × oracle price ÷ 1e36 at the row's block`,
       formula: "collateral × price ÷ 1e36",
@@ -124,7 +124,7 @@ export function makeListedMorphoReceipts(id: ListedMorphoReceiptsArgs): ListedMo
     notRecorded: (what) => ({
       kind: "chain-derived",
       pclass: "state",
-      summary: `${what} is not recorded here — a listing row is a read of the position's slots at one block with no history behind it, so its highest recorded amounts and its principal are unknown on this row; the wallet page reads the whole history from the singleton's own logs and states them.`,
+      summary: `${what} is not recorded here — a listing row is a read of the position's slots at one block with no history behind it, so its highest recorded amounts and its principal are unknown on this row; the wallet page reads the whole history from the singleton's logs and states them.`,
       contract,
       via: custody,
     }),

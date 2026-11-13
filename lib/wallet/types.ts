@@ -105,8 +105,11 @@ export interface WalletPosition {
   /** The family's own verdict that the position can be liquidated now
    *  (Compound's isLiquidatable, a health factor under 1). */
   liquidatable?: boolean;
-  /** The debt's annual rate as a fraction, where the read states it: the
-   *  Debt tile weights it by `debtUsd`. */
+  /** The debt's simple yearly rate as a fraction, where the family has one, so
+   *  the Debt tile weights one form by `debtUsd`. A yearly rate the protocol
+   *  stores is handed as stored; a per-second rate is handed times the seconds
+   *  in a year (MakerDAO: (base + duty − 1) × seconds per year). Never
+   *  compounded. */
   debtRate?: number;
   /** Collateral in dollars for the dust floor of the risk sort (open point
    *  5), where only a rank can be had: Morpho's collateral valued in a dollar

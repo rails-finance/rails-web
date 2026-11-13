@@ -242,7 +242,7 @@ export const makerdao: FamilyModule = {
               }
             : undefined,
         liquidatable: cr != null && st.matRatio != null ? cr < st.matRatio : undefined,
-        debtRate: st.debtDai > 0 ? (st.stabilityFeeApr ?? undefined) : undefined,
+        debtRate: st.debtDai > 0 ? (st.stabilityFeeSimple ?? undefined) : undefined,
         headRead: "read",
         readAtBlock: st.atBlock,
         readAt: st.blockTimestamp,
