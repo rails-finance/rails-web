@@ -427,7 +427,7 @@ const sheet = await mHomePage.evaluate(() => {
     groups: [...(m?.querySelectorAll("[data-profile-menu-group]") ?? [])]
       .map((h) => `${h.getAttribute("data-profile-menu-group")}:${h.getAttribute("aria-expanded")}`)
       .join(","),
-    themes: m?.querySelectorAll("[data-theme-option]").length ?? -1,
+    themes: m?.querySelectorAll("[data-theme-switch]").length ?? -1,
     items: [...(m?.querySelectorAll('[role="menuitem"]') ?? [])]
       .slice(0, 3)
       .map((a) => a.getAttribute("href"))

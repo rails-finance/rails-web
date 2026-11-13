@@ -46,7 +46,7 @@ export function ThemeSwitch({ placement }: { placement: Placement }) {
     <button
       type="button"
       aria-label={name}
-      title={now ? `Theme: ${now.label} (press for ${next.label})` : undefined}
+      title={now ? name : undefined}
       onClick={() => now && setTheme(next.value)}
       className={`flex cursor-pointer items-center rounded-lg text-rb-500 transition-colors hover:text-foreground focus-ring ${CHROME_HOVER} ${
         rail ? "size-8 justify-center" : "min-h-10 gap-2 px-2 text-sm"
