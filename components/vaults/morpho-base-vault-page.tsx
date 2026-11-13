@@ -30,6 +30,7 @@ import { ColourNote, RULE, Tile, VAULT_CARD_TILE, VAULT_GRID } from "@/component
 import { HOLDERS_SCOPE, VaultWhoHolds } from "@/components/vaults/vault-who-holds";
 import { VaultStewardRecord } from "@/components/vaults/vault-steward-record";
 import type { StewardRecordRead } from "@/lib/vaults/steward-record";
+import type { StewardRunsRead } from "@/lib/vaults/steward-runs-read";
 import { VaultConfiguration } from "@/components/vaults/vault-config";
 import { metaMorphoConfigTile } from "@/components/vaults/vault-config-columns";
 import type { VaultStripSeries } from "@/lib/vaults/yield-read";
@@ -159,6 +160,7 @@ export function MorphoBaseVaultPage({
   config,
   holders,
   stewardRecord,
+  stewardRuns,
   badDebt,
 }: {
   /** "What protects it" and "The protocol underneath" (V9, V10), streamed by the route. */
@@ -178,6 +180,9 @@ export function MorphoBaseVaultPage({
   holders: VaultHolders | null;
   /** The vaults this steward runs now, from the /vaults directory; null where it did not answer. */
   stewardRecord: StewardRecordRead;
+  /** The steward's runs from rails-server's roles route (V14.2, V14.3), streamed: the record draws them
+   *  behind Suspense as they arrive; resolving to null, none is shown. */
+  stewardRuns?: Promise<StewardRunsRead | null>;
   /** The bad-debt episodes in the steward's vaults (V14.1), streamed by the route. */
   badDebt?: ReactNode;
 }) {
@@ -684,7 +689,7 @@ export function MorphoBaseVaultPage({
         </Tile>
 
         <Tile id="steward-record" wide>
-          <VaultStewardRecord record={stewardRecord} role={steward.role} badDebt={badDebt} />
+          <VaultStewardRecord record={stewardRecord} role={steward.role} runs={stewardRuns} badDebt={badDebt} />
         </Tile>
 
         <Tile id="configuration" wide last>
