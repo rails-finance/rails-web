@@ -125,6 +125,14 @@ const capText = (cap: number | null, symbol: string) =>
 function SpokeTerms({ f, line, names }: { f: V4ReserveFigures; line: V4Line; names: V4Names }) {
   const p = (what: string, call: string, meaning: string, side: "spoke" | "oracle" = "spoke") =>
     headParamProv(f, side, `${names.symbol} ${what}`, call, meaning, names);
+  // Coinbase's registry pause on a stock's price (Base), under the price rows.
+  const registry =
+    line.base?.registryPaused != null ? (
+      <span className="block text-[11px] text-rb-500" data-prov-exempt="" data-price-registry="">
+        {line.base.registryPaused ? "price paused by Coinbase" : "price live at Coinbase"}
+      </span>
+    ) : null;
+  const published = line.base?.feedUpdatedAt != null;
   return (
     <>
       <Line term="Oracle price" title="The price the spoke's oracle gives this asset, in USD">
@@ -137,12 +145,14 @@ function SpokeTerms({ f, line, names }: { f: V4ReserveFigures; line: V4Line; nam
         ) : (
           <span data-prov-exempt="">not read</span>
         )}
+        {!published && registry}
       </Line>
       {line.base?.feedUpdatedAt != null && (
         <Line term="Price published" title="When the feed behind the oracle last published">
           <span data-prov-exempt="" title={ageClauseText(line.base.feedUpdatedAt, line.base.readTs, line.base.block)}>
             {publishedText(line.base.feedUpdatedAt, line.base.readTs)}
           </span>
+          {registry}
         </Line>
       )}
       <Line term="Collateral factor" title="The share of the asset's value the spoke counts toward a borrow">
@@ -198,15 +208,10 @@ function SpokeTerms({ f, line, names }: { f: V4ReserveFigures; line: V4Line; nam
         </Prov>
       </Line>
       {line.base && (
-        <Line term="Paused" title="The spoke's pause, then Coinbase's registry pause on the stock's price">
+        <Line term="Paused" title="Whether the spoke has paused the reserve">
           <Prov info={p("paused", "getReserveConfig(reserveId).paused", "whether the spoke has paused the reserve")}>
             {f.paused ? "by the spoke" : "no"}
           </Prov>
-          {line.base.registryPaused != null && (
-            <span className="block text-[11px] text-rb-500" data-prov-exempt="">
-              {line.base.registryPaused ? "price paused by Coinbase" : "price live at Coinbase"}
-            </span>
-          )}
         </Line>
       )}
     </>
