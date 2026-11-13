@@ -30,6 +30,9 @@ export function healthText(h: number): string {
   }
   return h.toFixed(9);
 }
+/** A change over the window: "+0.81% over 30.0 days". */
+export const growthText = (g: number, days: number): string =>
+  `${g >= 0 ? "+" : "−"}${rate(Math.abs(g))} over ${days.toFixed(1)} days`;
 /** "0x96c1…07ae". */
 export const short = (a: string): string => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
@@ -47,7 +50,7 @@ export const accountName = (i: number | null): string =>
 
 export const FRONT_DOOR = {
   line: (chain: EulerChainId) =>
-    `A wallet's Euler V2 accounts on ${CHAIN_NAME[chain]}: each loan with its collateral and health, and each deposit over the last 30 days.`,
+    `A wallet's Euler V2 accounts on ${CHAIN_NAME[chain]}: each loan with its collateral and health score, and each deposit over the last 30 days.`,
   heading: "Euler V2 accounts",
   narrowing: "Deposits not used as collateral are read on account 0.",
   none: "This wallet has no Euler V2 loan or collateral on any of its 256 accounts, and no deposit on account 0.",
@@ -72,34 +75,35 @@ export const CARD_WORDS = {
   earned: "Earned in 30 days",
   earnedTip:
     "What the deposit gained over the last 30 days: what its shares redeem for now less what they redeemed for then.",
-  earnedApy: (x: number) => `${rate(x)} APY`,
+  earnedGrowth: (g: number, days: number) => growthText(g, days),
   earnedOpened: "Opened inside the 30 days, so Rails does not state its earnings yet.",
   earnedChanged: "Its shares changed inside the 30 days, so Rails does not state its earnings yet.",
   /** The card cell where no 30-day figure is stated; the (i) says why. */
   windowOpenedShort: "Opened inside the 30 days",
   windowChangedShort: "Changed inside the 30 days",
-  collateralFor: "Collateral",
+  collateralFor: "Used as collateral",
   collateralForTip: "Whether a loan on this account counts this deposit as collateral.",
   backs: (list: { vaultSymbol: string }[]) => `For ${list.map((c) => c.vaultSymbol).join(", ")}`,
   backsNone: "Not used",
   enabledNoLoan: "Enabled, no loan",
   borrowed: "Borrowed",
   borrowedTip: "What this account owes the vault now, interest included.",
-  collateralValue: "Collateral",
+  collateralValue: "Collateral value",
   collateralValueTip: "The account's collateral, priced by this vault's oracle.",
-  health: "Health",
+  health: "Health score",
   healthTip:
     "The collateral's value at each vault's liquidation LTV, over the debt's value. At 1.00 or below the loan can be liquidated.",
   healthSub: "liquidation at 1.00 or below",
   interest: "Interest in 30 days",
   interestTip: "What the debt grew by over the last 30 days: the debt now less the debt then.",
-  interestApy: (x: number) => `${rate(x)} APY`,
+  interestGrowth: (g: number, days: number) => growthText(g, days),
   interestOpened: "Opened inside the 30 days, so Rails does not state its interest yet.",
   interestChanged: "Its debt changed inside the 30 days, so Rails does not state its interest yet.",
   unpriced: "no price",
   band: "Collateral on this account",
   bandAmount: "Amount",
   bandValue: "Value",
+  bandBorrowLtv: "Borrow LTV",
   bandLtv: "Liquidation LTV",
   bandTruncated: "The account enables more than 10 collateral vaults; the first 10 are shown.",
   foot: (p: EulerPosition) =>
@@ -149,7 +153,7 @@ export function cardExplainer(p: EulerPosition): ExplainGroupWords[] {
           ` to the ${p.vaultSymbol} vault. The vault is the account's controller: it decides whether the account may withdraw or move its collateral.`,
         ],
         [
-          "Health is ",
+          "The health score is ",
           { fig: p.health === null ? "–" : healthText(p.health) },
           ". It is the collateral's value at each vault's liquidation LTV over the debt's value, both priced by this vault's oracle.",
         ],
@@ -183,7 +187,9 @@ export function cardExplainer(p: EulerPosition): ExplainGroupWords[] {
       [
         "Rails reads two blocks ",
         { fig: `${p.window.days.toFixed(1)} days` },
-        " apart. The APY is the vault's growth between them, compounded over a year of 365.2425 days.",
+        p.kind === "loan"
+          ? " apart. The percentage under the interest is how much the vault's debts grew between them."
+          : " apart. The percentage under the earnings is how much the vault's share price grew between them.",
       ],
     ],
   });
@@ -196,15 +202,14 @@ export const VAULT_SECTION = {
   explainerLabel: "vault explanation",
   supplied: "Supplied",
   borrowed: "Borrowed",
-  utilisation: "Utilisation",
+  utilisation: "Utilization",
   shareGrowth: "Share price",
   borrowApy: "Borrow APY",
   price: "Oracle price",
   none: "–",
-  shareGrowthText: (g: number, days: number) =>
-    `${g >= 0 ? "+" : "−"}${rate(Math.abs(g))} over ${days.toFixed(1)} days`,
+  shareGrowthText: (g: number, days: number) => growthText(g, days),
   borrowApyNow: (now: number) => `${rate(now)} now`,
-  borrowApyWindow: (apy: number) => `${rate(apy)} averaged over the 30 days`,
+  borrowApyWindow: (g: number, days: number) => `debts grew ${growthText(g, days)}`,
   priceText: (p: EulerPosition) => inUnit(p.price, p.unit) ?? "not priced",
 };
 
@@ -215,10 +220,10 @@ export function vaultExplainer(p: EulerPosition): ExplainGroupWords[] {
       bullets: [
         ["Supplied is everything depositors' shares redeem for; borrowed is what borrowers owe, interest included."],
         [
-          "Utilisation is borrowed over supplied. On most rate models the borrow rate rises with it, and depositors earn what borrowers pay, less the vault's fee.",
+          "Utilization is borrowed over supplied. Many utilization-based rate models raise the borrow rate as utilization rises. Depositors earn what borrowers pay, less the vault's fee.",
         ],
         [
-          "Borrow APY compounds the vault's per-second rate over a year. The 30-day figure compounds the vault's interest growth over the window the same way.",
+          "Borrow APY compounds the vault's per-second rate over a year of 365.2425 days. The 30-day figure is how much the vault's debts grew over the window.",
         ],
         [
           "The vault prices assets in its unit of account through its oracle router. ",

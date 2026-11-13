@@ -2,8 +2,8 @@
 
 // "The vault" (J2): the whole vault under an Euler V2 holding, read at the
 // same two blocks as the card. One line each (J2.1) for supplied, borrowed,
-// utilisation, the share price over the window, the borrow APY now and over
-// the window, and the oracle's price, each with its receipt. The section is one receipts scope its
+// utilization, the share price over the window, the borrow APY now with the
+// debts' growth over the window, and the oracle's price, each with its receipt. The section is one receipts scope its
 // ⋮ arms (decision 0059).
 
 import { Prov, type Provenance } from "@/components/shared/provenance";
@@ -13,7 +13,7 @@ import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups"
 import { Segs } from "@/components/protocol/uniswap/uniswap-readout";
 import { EulerReadStamp } from "@/components/protocol/euler/euler-position-card";
 import { eulerPosition } from "@/lib/euler/position";
-import { vaultProv, type VaultLineKey, type WindowApyKey } from "@/lib/euler/provenance";
+import { vaultProv, type VaultLineKey, type WindowGrowthKey } from "@/lib/euler/provenance";
 import type { EulerPositionRead } from "@/lib/euler/types";
 import { VAULT_SECTION, num, rate, vaultExplainer } from "@/lib/euler/words";
 
@@ -23,12 +23,12 @@ export function EulerVaultSection({ r }: { r: EulerPositionRead }) {
   const p = eulerPosition(r);
   const c = { p, r };
   const A = p.asset.symbol;
-  // A line is one figure with its receipt, or several joined by ", " (the borrow APY now and over the window).
+  // A line is one figure with its receipt, or several joined by ", " (the borrow APY now, the debts' growth over the window).
   const all: {
     key: VaultLineKey;
     label: string;
     text: string | null;
-    parts?: { key: VaultLineKey | WindowApyKey; text: string }[];
+    parts?: { key: VaultLineKey | WindowGrowthKey; text: string }[];
   }[] = [
     { key: "supplied", label: VAULT_SECTION.supplied, text: `${num(p.totalSupplied)} ${A}` },
     { key: "borrowed", label: VAULT_SECTION.borrowed, text: `${num(p.totalBorrowed)} ${A}` },
@@ -39,11 +39,16 @@ export function EulerVaultSection({ r }: { r: EulerPositionRead }) {
       text: p.window.shareGrowth === null ? null : VAULT_SECTION.shareGrowthText(p.window.shareGrowth, p.window.days),
     },
     (() => {
-      const parts: { key: VaultLineKey | WindowApyKey; text: string }[] = [
+      const parts: { key: VaultLineKey | WindowGrowthKey; text: string }[] = [
         { key: "borrowApy", text: VAULT_SECTION.borrowApyNow(p.borrowApyNow) },
-        ...(p.window.borrowApy === null
+        ...(p.window.indexGrowth === null
           ? []
-          : [{ key: "borrowApyWindow" as const, text: VAULT_SECTION.borrowApyWindow(p.window.borrowApy) }]),
+          : [
+              {
+                key: "borrowWindow" as const,
+                text: VAULT_SECTION.borrowApyWindow(p.window.indexGrowth, p.window.days),
+              },
+            ]),
       ];
       return {
         key: "borrowApy" as const,
@@ -62,7 +67,7 @@ export function EulerVaultSection({ r }: { r: EulerPositionRead }) {
       "",
       ...lines.map((l) => `- **${l.label}**: ${l.text ?? VAULT_SECTION.none}`),
     ].join("\n");
-  const info = (k: VaultLineKey | WindowApyKey): Provenance => vaultProv(k, c);
+  const info = (k: VaultLineKey | WindowGrowthKey): Provenance => vaultProv(k, c);
   return (
     <ProvSection scope={SCOPE} data-anatomy="J2" data-euler-vault={p.vault}>
       <SectionHeading
