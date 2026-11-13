@@ -1,7 +1,7 @@
 "use client";
 
 // The bookmarks list and its backup controls, drawn by the bookmarks page
-// (/bookmarks, rails-ops ui-jobs 480), and `useBookmarks`, which the profile
+// (/saved-views, rails-ops ui-jobs 480), and `useBookmarks`, which the profile
 // control (H20) reads for its face and its menu. The list lives in this
 // origin's localStorage under `rails-bookmarks` (lib/shared/sessions.ts), in
 // the reader's order: with `reorder`, rows move by drag and drop (from sm) and
@@ -10,7 +10,7 @@
 // row's ⋮ (D7).
 
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
-import { GripVertical, Star, Upload } from "lucide-react";
+import { Check, Download, GripVertical, Star, Upload } from "lucide-react";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { INPLACE_TEXT, NAV_BUTTON, POSITION_TAG_TONE } from "@/lib/shared/ui-grammar";
 
@@ -40,13 +40,13 @@ import {
   exportBookmarks,
   importBookmarks,
   loadBookmarks,
-  MENU_STARS,
   moveSaved,
   removeBookmark,
   removeSaved,
   renameSaved,
   renameSession,
   SESSIONS_CHANGED_EVENT,
+  STARS_SEEDED_FROM,
   toggleStar,
   type SavedKind,
   type SavedLink,
@@ -129,7 +129,6 @@ export function BookmarkList({
 }) {
   const moveOf = useRowDrag("wallet");
   if (bookmarks.length === 0) return <>{empty}</>;
-  const full = bookmarks.filter((b) => b.starred).length >= MENU_STARS;
   return (
     <DataTable caption="Saved wallets" stacked rowHeight="one" tableClassName="text-sm" data-bookmark-list="">
       <DataTableHead>
@@ -144,7 +143,6 @@ export function BookmarkList({
             key={s.key}
             session={s}
             summary={summary}
-            full={full}
             move={reorder ? moveOf(i, bookmarks.length, s.addresses[0]) : undefined}
           />
         ))}
@@ -167,7 +165,6 @@ export function SavedLinkList({
 }) {
   const moveOf = useRowDrag(kind);
   if (links.length === 0) return <>{empty}</>;
-  const full = links.filter((l) => l.starred).length >= MENU_STARS;
   return (
     <DataTable
       caption={kind === "position" ? "Saved positions" : "Saved listings"}
@@ -185,7 +182,7 @@ export function SavedLinkList({
       </DataTableHead>
       <DataTableBody>
         {links.map((l, i) => (
-          <SavedLinkRow key={l.key} link={l} full={full} move={moveOf(i, links.length, l.key)} />
+          <SavedLinkRow key={l.key} link={l} move={moveOf(i, links.length, l.key)} />
         ))}
       </DataTableBody>
     </DataTable>
@@ -196,8 +193,12 @@ function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`;
 }
 
+/** Export and Import on the page's background (the Backup section has no
+ *  card; Miles 13 Nov 2026): a resting tile, NAV_BUTTON's ground, so they
+ *  read as buttons there, each with its icon (a download, an upload) where
+ *  the section heading's icon was. */
 const BACKUP_BUTTON =
-  "cursor-pointer rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-rb-500 transition-colors hover:bg-rb-200 hover:text-foreground focus-ring dark:hover:bg-rb-800";
+  "inline-flex items-center gap-1.5 cursor-pointer rounded-lg bg-rb-100 px-2.5 py-1.5 text-[11px] font-semibold text-rb-500 transition-colors hover:bg-rb-200 hover:text-foreground focus-ring dark:bg-rb-800 dark:hover:bg-rb-700";
 
 /** Export to file and Import from file, with the line that reports what
  *  either did. The file is a JSON backup of every saved item (version 3, one
@@ -217,7 +218,7 @@ export function BookmarkBackup({ className = "", empty = false }: { className?: 
     const backup = { ...exportBookmarks(), ...(views.length ? { focusViews: views } : {}) };
     const count = backup.bookmarks.length;
     if (count + views.length === 0) {
-      setNotice("No saved items to export yet.");
+      setNotice("No saved views to export yet.");
       return;
     }
     const name = bookmarksBackupFilename();
@@ -237,11 +238,15 @@ export function BookmarkBackup({ className = "", empty = false }: { className?: 
     try {
       const text = await file.text();
       const result = importBookmarks(text);
-      let fileViews: unknown;
+      let held: { focusViews?: unknown; version?: unknown } = {};
       try {
-        fileViews = (JSON.parse(text) as { focusViews?: unknown }).focusViews;
+        held = JSON.parse(text);
       } catch {}
-      const v = fileViews === undefined ? null : focusViews.importList(fileViews);
+      // A file from before ui-jobs 652 carries no stars: its views start starred.
+      const v =
+        held.focusViews === undefined
+          ? null
+          : focusViews.importList(held.focusViews, Number(held.version) < STARS_SEEDED_FROM);
       const parts = [
         result.read ? `${plural(result.read, "saved item")}, ${result.added} new` : "",
         v && v.read ? `${plural(v.read, "focus view")}, ${v.added} new` : "",
@@ -256,12 +261,13 @@ export function BookmarkBackup({ className = "", empty = false }: { className?: 
     <div className={className} data-bookmark-backup="">
       {empty && (
         <p className="text-sm text-rb-500">
-          Saved items in another browser? Export them there, then import the file here.
+          Saved views in another browser? Export them there, then import the file here.
         </p>
       )}
       <div className={`flex flex-wrap items-center gap-2 ${empty ? "mt-3" : ""}`}>
         {!empty && (
           <button type="button" onClick={handleExport} className={BACKUP_BUTTON}>
+            <Download className="size-3.5 shrink-0" aria-hidden="true" />
             Export to file
           </button>
         )}
@@ -271,7 +277,7 @@ export function BookmarkBackup({ className = "", empty = false }: { className?: 
           className={empty ? NAV_BUTTON : BACKUP_BUTTON}
           data-bookmark-import-button=""
         >
-          {empty && <Upload className="size-4 shrink-0" aria-hidden="true" />}
+          <Upload className={`${empty ? "size-4" : "size-3.5"} shrink-0`} aria-hidden="true" />
           Import from file
         </button>
         <input
@@ -472,49 +478,26 @@ function RenameField({
 const NAME_CELL = "sm:w-full sm:max-w-0 sm:min-w-[200px]";
 const MENU_CELL = "dt-row-menu w-px whitespace-nowrap";
 
-/** A saved entry's star (ui-jobs 586): starred entries are the ones the
- *  profile menu shows, up to `MENU_STARS` of a kind; with that many starred,
- *  the other rows' stars are off. */
-function StarToggle({
-  kind,
-  id,
-  on,
-  full,
-  label,
-}: {
-  kind: SavedKind;
-  id: string;
-  on: boolean;
-  full: boolean;
-  label: string;
-}) {
-  const off = full && !on;
+/** A saved entry's star (ui-jobs 586, 652), filled in the foreground colour
+ *  when starred and a muted outline when not (rb-400 / rb-500; dark's
+ *  outline rb-500, Miles 13 Nov 2026): the starred entries of a kind,
+ *  focus views included, are the ones the profile menu shows. */
+function StarToggle({ on, label, onToggle }: { on: boolean; label: string; onToggle: () => void }) {
   return (
     <button
       type="button"
       aria-pressed={on}
-      disabled={off}
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        toggleStar(kind, id);
+        onToggle();
       }}
       aria-label={on ? `Unstar ${label}` : `Star ${label}`}
-      title={
-        off
-          ? "Five starred. Unstar one to star this."
-          : on
-            ? "Starred: shown in the profile menu"
-            : "Star to show in the profile menu"
-      }
-      className={`-my-2 inline-flex size-11 shrink-0 items-center justify-center rounded-md transition-colors sm:size-7 ${
-        on
-          ? "text-amber-500 hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-300"
-          : off
-            ? "cursor-not-allowed text-rb-300 dark:text-rb-600"
-            : "cursor-pointer text-rb-400 hover:text-amber-500 dark:text-rb-600 dark:hover:text-amber-400"
+      title={on ? "Shown in the profile menu" : "Show in the profile menu"}
+      className={`-my-2 inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors sm:size-7 ${
+        on ? "text-foreground" : "text-rb-400 hover:text-foreground dark:text-rb-500 dark:hover:text-foreground"
       }`}
-      data-bookmark-star={on ? "on" : off ? "full" : "off"}
+      data-bookmark-star={on ? "on" : "off"}
       data-anatomy="B2.3"
     >
       <Star className="size-4" fill={on ? "currentColor" : "none"} aria-hidden="true" />
@@ -529,17 +512,7 @@ function shortAddress(a: string): string {
 
 /** A saved wallet (D4): the facehash and name open its page; its positions,
  *  its address and the ⋮ follow. */
-function BookmarkRow({
-  session,
-  summary,
-  full,
-  move,
-}: {
-  session: WalletSession;
-  summary?: boolean;
-  full: boolean;
-  move?: RowMove;
-}) {
+function BookmarkRow({ session, summary, move }: { session: WalletSession; summary?: boolean; move?: RowMove }) {
   const [editing, setEditing] = useState(false);
   const [copied, copy] = useCopy();
 
@@ -567,7 +540,7 @@ function BookmarkRow({
       <DataTableCell rowHeader valign="middle" className="sm:w-[38%] sm:max-w-0 sm:min-w-[200px]">
         <span className="flex min-w-0 items-center gap-2">
           {move && <Grip />}
-          <StarToggle kind="wallet" id={primary} on={!!session.starred} full={full} label={label} />
+          <StarToggle on={!!session.starred} label={label} onToggle={() => toggleStar("wallet", primary)} />
           {editing ? (
             <span className="flex min-w-0 flex-1 items-center gap-3">
               {avatar}
@@ -644,7 +617,7 @@ const KIND_NOUN = { position: "position", view: "listing" } as const;
 
 /** A saved position or listing (D4): the explorer's mark and the name open
  *  the page; its explorer, chain, a closed position's tag and the ⋮ follow. */
-function SavedLinkRow({ link, full, move }: { link: SavedLink; full: boolean; move: RowMove }) {
+function SavedLinkRow({ link, move }: { link: SavedLink; move: RowMove }) {
   const [editing, setEditing] = useState(false);
   const [copied, copy] = useCopy();
   const label = link.customName || link.name;
@@ -668,7 +641,7 @@ function SavedLinkRow({ link, full, move }: { link: SavedLink; full: boolean; mo
       <DataTableCell rowHeader valign="middle" className={NAME_CELL}>
         <span className="flex min-w-0 items-center gap-2">
           <Grip />
-          <StarToggle kind={link.kind} id={link.key} on={!!link.starred} full={full} label={label} />
+          <StarToggle on={!!link.starred} label={label} onToggle={() => toggleStar(link.kind, link.key)} />
           {editing ? (
             <span className="flex min-w-0 flex-1 items-center gap-3">
               {glyph}
@@ -750,13 +723,10 @@ function SavedLinkRow({ link, full, move }: { link: SavedLink; full: boolean; mo
 export function FocusViewList({
   views,
   active,
-  menu,
   empty,
 }: {
   views: FocusView[];
   active: string | null;
-  /** The view the profile menu offers (ui-jobs 582). */
-  menu: string | null;
   empty: ReactNode;
 }) {
   const moveOf = useRowDrag("view", focusViews.move);
@@ -809,7 +779,6 @@ export function FocusViewList({
               key={v.id}
               view={v}
               inUse={v.id === active}
-              inMenu={v.id === menu}
               phone={isPhone}
               onRemove={() => remove(v.id)}
               move={moveOf(i, views.length, v.id)}
@@ -823,19 +792,31 @@ export function FocusViewList({
 
 const UNDO_MS = 8000;
 
+/** Use and In use: a small teal button on a soft teal fill, "New view"'s
+ *  shape at the row's text size (Miles 13 Nov 2026): using a view changes
+ *  the scope in place, so teal. Below sm an invisible band takes the press to
+ *  44px tall. */
+const USE_BUTTON =
+  "relative cursor-pointer items-center gap-1 rounded-md bg-teal-600/10 px-2 py-0.5 text-xs font-semibold text-teal-700 transition-colors hover:bg-teal-600/20 dark:bg-teal-400/10 dark:text-teal-400 dark:hover:bg-teal-400/20 max-sm:before:absolute max-sm:before:inset-x-0 max-sm:before:-inset-y-3 max-sm:before:content-['']";
+/** "In use" with its tick. */
+const IN_USE = (
+  <>
+    <Check className="size-3.5 shrink-0" strokeWidth={2.5} aria-hidden="true" />
+    In use
+  </>
+);
+
 /** A focus view (B2.2): not a link, so the plain hover block. Its name, the
  *  assets and chains it holds, Use or In use, and the ⋮. */
 function FocusViewRow({
   view,
   inUse,
-  inMenu,
   phone,
   onRemove,
   move,
 }: {
   view: FocusView;
   inUse: boolean;
-  inMenu: boolean;
   phone: boolean;
   onRemove: () => void;
   move: RowMove;
@@ -848,19 +829,28 @@ function FocusViewRow({
 
   const use = inUse ? (
     phone ? (
-      <span className="text-xs font-semibold text-foreground" data-focus-view-in-use="">
-        In use
+      <span className={`inline-flex ${USE_BUTTON}`} data-focus-view-in-use="">
+        {IN_USE}
       </span>
     ) : (
+      // "In use" and "Turn off" share one cell, so the button keeps its width
+      // as the label swaps on hover and keyboard focus.
       <button
         type="button"
         onClick={() => focusViews.use(null)}
         aria-label={`${label} is in use. Turn off`}
-        className="group/use min-w-12 cursor-pointer text-left text-xs font-semibold text-foreground"
+        className={`group/use inline-grid ${USE_BUTTON}`}
         data-focus-view-in-use=""
       >
-        <span className="group-hover/use:hidden group-focus-visible/use:hidden">In use</span>
-        <span className={`hidden group-hover/use:inline group-focus-visible/use:inline ${INPLACE_TEXT}`}>Turn off</span>
+        <span className="inline-flex items-center gap-1 [grid-area:1/1] group-hover/use:invisible group-focus-visible/use:invisible">
+          {IN_USE}
+        </span>
+        <span
+          className="invisible justify-self-center [grid-area:1/1] group-hover/use:visible group-focus-visible/use:visible"
+          data-focus-view-turn-off=""
+        >
+          Turn off
+        </span>
       </button>
     )
   ) : (
@@ -868,7 +858,7 @@ function FocusViewRow({
       type="button"
       onClick={() => focusViews.use(view.id)}
       aria-label={`Use ${label}`}
-      className={`cursor-pointer text-xs font-semibold ${INPLACE_TEXT} min-h-11 min-w-11 text-left sm:min-h-0 sm:min-w-0`}
+      className={`inline-flex ${USE_BUTTON}`}
       data-focus-view-use={view.id}
     >
       Use
@@ -892,18 +882,6 @@ function FocusViewRow({
           },
         ]
       : []),
-    // The profile menu offers one view (ui-jobs 582): this one, or this
-    // press to make it the one.
-    ...(inMenu
-      ? []
-      : [
-          {
-            key: "show-in-menu",
-            label: "Show in menu",
-            onSelect: () => focusViews.showInMenu(view.id),
-            hooks: { "data-focus-view-menu": "show-in-menu" },
-          },
-        ]),
     ...moveItems(move, (to) => focusViews.move(view.id, to), true),
     {
       key: "copy",
@@ -932,6 +910,7 @@ function FocusViewRow({
       <DataTableCell rowHeader valign="middle" className="sm:w-[34%] sm:max-w-0 sm:min-w-[200px]">
         <span className="flex min-w-0 items-center gap-2">
           <Grip />
+          <StarToggle on={!!view.starred} label={label} onToggle={() => focusViews.toggleStar(view.id)} />
           {editing ? (
             <RenameField
               label="Focus view name"
@@ -945,14 +924,7 @@ function FocusViewRow({
               onCancel={() => setEditing(false)}
             />
           ) : (
-            <>
-              <span className="truncate text-sm font-bold text-foreground">{label}</span>
-              {inMenu && (
-                <span className="shrink-0 text-xs text-rb-500" data-focus-view-in-menu="">
-                  In menu
-                </span>
-              )}
-            </>
+            <span className="truncate text-sm font-bold text-foreground">{label}</span>
           )}
         </span>
       </DataTableCell>
@@ -981,7 +953,8 @@ function FocusViewRow({
 }
 
 /** A view's chains as one toggle per launched chain (Miles, 10 Nov 2026):
- *  in focus in text ink, the rest dimmed; a press adds or drops the chain, as
+ *  in focus in text ink, the rest dimmed (rb-500 in dark, so a mark that is
+ *  off still reads; Miles 13 Nov 2026); a press adds or drops the chain, as
  *  the panel's Chains part does. None pressed is every chain. A view of
  *  chains alone keeps its last chain, since an emptied view is removed. */
 function ViewChainToggles({ view }: { view: FocusView }) {
@@ -1008,7 +981,7 @@ function ViewChainToggles({ view }: { view: FocusView }) {
             onClick={() => toggle(id)}
             title={last ? `${name} is this view's only part` : on ? `Drop ${name}` : `Add ${name}`}
             className={`inline-flex size-11 items-center justify-center rounded-md transition-colors sm:size-7 ${
-              on ? "text-foreground" : "text-rb-400/80 hover:text-rb-500 dark:text-rb-600 dark:hover:text-rb-400"
+              on ? "text-foreground" : "text-rb-400/80 hover:text-rb-500 dark:text-rb-500 dark:hover:text-rb-400"
             } ${last ? "cursor-default" : "cursor-pointer hover:bg-rb-200/60 dark:hover:bg-rb-800"}`}
             data-focus-view-chain={id}
           >

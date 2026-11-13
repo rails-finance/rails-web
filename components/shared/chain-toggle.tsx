@@ -26,7 +26,7 @@ import { useHydrated } from "@/hooks/useHydrated";
 
 /** The segmented control's row and segment, exported so another switch (the
  *  Alchemix position-type tabs, the Maple pool switch) wears the same control.
- *  The theme switch's style (profile-menu.tsx; Miles, 6 Nov 2026): no track,
+ *  The theme switch's style as it stood in the profile menu (Miles, 6 Nov 2026): no track,
  *  rounded-md segments, the chosen one holding the soft fill the others show on
  *  hover. In dark the fill is rb-600 (hover rb-700), a step lighter than the
  *  page canvas (CTRL_ON's rb-800 is darker than it); tints of white or black

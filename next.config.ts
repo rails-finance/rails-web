@@ -286,6 +286,13 @@ const nextConfig: NextConfig = {
         destination: "/",
         permanent: true,
       },
+      // The saved items page moved from /bookmarks (ui-jobs 652); a `?tab=`
+      // query rides along.
+      {
+        source: "/bookmarks",
+        destination: "/saved-views",
+        permanent: true,
+      },
       // Status is one page per chain, as coverage is; the bare path opens
       // Ethereum's (rails-ops ui-jobs 583).
       {

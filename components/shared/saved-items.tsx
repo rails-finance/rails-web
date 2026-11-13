@@ -3,7 +3,7 @@
 // Saving a position (C17's "Save position", ui-jobs 530) and a listing view
 // (N1.7, the listing's ⋮, ui-jobs 521) into the one saved-items list
 // (lib/shared/sessions.ts), and `useSavedLinks`, which the profile menu (H20)
-// and /bookmarks read. The rows are the wallet menu's "Save wallet" row with
+// and /saved-views read. The rows are the wallet menu's "Save wallet" row with
 // the same filled bookmark once saved.
 
 import { useEffect, useState } from "react";

@@ -21,6 +21,11 @@
  *  there (`reconcileLegacyWallets`). That build reads and writes the wallets
  *  it knows and never sees the positions and views, so it cannot drop them.
  *
+ *  Stars decide the profile menu (ui-jobs 652): each kind shows its starred
+ *  entries, every one, in the reader's order, and nothing else. A new entry
+ *  of any kind starts starred; unstarring takes it out of the menu. A list
+ *  from before 652 has its stars seeded once per browser (`seedMenuStars`).
+ *
  *  `SessionProtocol` names an explorer for the props that still take one (the
  *  page's session, a listing's filter); it no longer scopes a bookmark. */
 
@@ -165,7 +170,7 @@ export interface WalletSession {
   preset?: boolean;
   /** User-provided display name, overrides ENS / short address. */
   customName?: string;
-  /** Starred on /bookmarks: shown in the profile menu (ui-jobs 586). */
+  /** Shown in the profile menu (ui-jobs 586, 652). */
   starred?: boolean;
 }
 
@@ -185,7 +190,7 @@ export interface SavedLink {
   /** A closed position's status tag at the last read of its card. */
   ended?: { word: string; tone: string };
   savedAt: number;
-  /** Starred on /bookmarks: shown in the profile menu (ui-jobs 586). */
+  /** Shown in the profile menu (ui-jobs 586, 652). */
   starred?: boolean;
 }
 
@@ -206,11 +211,15 @@ const MIGRATED_KEY = "rails-bookmarks-migrated";
 /** Set once `STORAGE_KEY`'s array order is the reader's order (ui-jobs 504).
  *  Before it the array was unordered and the list showed newest first, so
  *  the migration writes the rows in that order, which the reader then
- *  rearranges on /bookmarks. The array keeps its shape, so a build from
+ *  rearranges on /saved-views. The array keeps its shape, so a build from
  *  before reads the same rows. */
 const ORDERED_KEY = "rails-bookmarks-ordered";
 /** The suffix every pre-431 explorer list's key ends in. */
 const LEGACY_SUFFIX = "-sessions";
+/** Set once the list's stars have been seeded (ui-jobs 652, `seedMenuStars`). */
+const STARS_KEY = "rails-saved-stars-652";
+/** How many of a kind the seeding stars: what the menu showed before 652. */
+const SEED_STARS = 5;
 
 /** A wallet row, by the fields every build agrees on. Extra fields pass:
  *  this is a shape check, not a schema. */
@@ -374,7 +383,11 @@ function reconcileLegacyWallets(): void {
       const addr = primaryOf(row);
       const at = all.findIndex((r) => isWallet(r) && primaryOf(r) === addr);
       if (at < 0) {
-        added.push(mergeRows([], [row]).rows[0]);
+        // A new bookmark starts starred (ui-jobs 652); before the stars are
+        // seeded it waits for the seeding, which would otherwise read its
+        // star as the reader's and skip the wallets.
+        const seeded = localStorage.getItem(STARS_KEY) !== null;
+        added.push({ ...mergeRows([], [row]).rows[0], ...(seeded ? { starred: true } : {}) });
         changed = true;
         continue;
       }
@@ -393,12 +406,44 @@ function reconcileLegacyWallets(): void {
   }
 }
 
+/** The stars a list from before ui-jobs 652 is given: each kind with none
+ *  starred has its first `SEED_STARS` starred, which is what the menu showed
+ *  of it. A kind with a star keeps its stars as they are. A wallet row that
+ *  is not a bookmark (`pinned: false`, from the pre-521 list) was never in
+ *  the menu, so it is neither counted nor starred; nor is a row `eligible`
+ *  turns down. Pure. */
+export function seedMenuStars<T extends SavedEntry>(rows: T[], eligible: (r: T) => boolean = () => true): T[] {
+  const starred = new Set(rows.filter((r) => r.starred).map(kindOf));
+  const seen: Record<SavedKind, number> = { wallet: 0, position: 0, view: 0 };
+  return rows.map((r) => {
+    const kind = kindOf(r);
+    if (isWallet(r) && r.pinned === false) return r;
+    if (!eligible(r) || starred.has(kind) || seen[kind] >= SEED_STARS) return r;
+    seen[kind] += 1;
+    return { ...r, starred: true };
+  });
+}
+
+/** Seed the stars once per browser (STARS_KEY), so no menu empties when the
+ *  first-five fallback goes (ui-jobs 652). */
+function migrateMenuStars(): void {
+  try {
+    if (localStorage.getItem(STARS_KEY)) return;
+    const rows = readAll();
+    if (rows.length > 0) writeAll(seedMenuStars(rows));
+    localStorage.setItem(STARS_KEY, "1");
+  } catch {
+    /* storage blocked: nothing to seed */
+  }
+}
+
 function loadSessions(): SavedEntry[] {
   if (typeof window === "undefined") return [];
   migrateScopedBookmarks();
   migrateToReaderOrder();
   seedSavedList();
   reconcileLegacyWallets();
+  migrateMenuStars();
   return readAll();
 }
 
@@ -426,7 +471,7 @@ function saveSessions(sessions: SavedEntry[]): void {
 }
 
 /** The bookmarked wallets, in the reader's order: a new bookmark goes first,
- *  and /bookmarks moves them (`moveSaved`). */
+ *  and /saved-views moves them (`moveSaved`). */
 export function loadBookmarks(): WalletSession[] {
   return loadSessions()
     .filter(isWallet)
@@ -474,44 +519,20 @@ export function renameSession(key: string, customName: string): void {
   renameSaved("wallet", key, customName);
 }
 
-/** The profile menu shows at most this many of each kind (ui-jobs 586). */
-export const MENU_STARS = 5;
-
-/** What the profile menu shows of one kind: the starred entries, or with
- *  none starred the first `MENU_STARS`, in the reader's order. */
+/** What the profile menu shows of one kind (ui-jobs 652): the starred
+ *  entries, in the reader's order. Pure. */
 export function menuEntries<T extends SavedEntry>(rows: T[]): T[] {
-  const starred = rows.filter((r) => r.starred);
-  return (starred.length ? starred : rows).slice(0, MENU_STARS);
+  return rows.filter((r) => r.starred);
 }
 
-/** Keep at most `MENU_STARS` stars per kind, the first in the reader's
- *  order (an import can bring more). */
-function capStars(rows: SavedEntry[]): SavedEntry[] {
-  const seen: Record<SavedKind, number> = { wallet: 0, position: 0, view: 0 };
-  return rows.map((r) => {
-    if (!r.starred) return r;
-    const kind = kindOf(r);
-    seen[kind] += 1;
-    if (seen[kind] <= MENU_STARS) return r;
-    const { starred: _starred, ...rest } = r;
-    void _starred;
-    return rest as SavedEntry;
-  });
-}
-
-/** Star or unstar an entry; a star past `MENU_STARS` of its kind is refused.
- *  Returns whether the entry is starred after the press. */
+/** Star or unstar an entry. Returns whether it is starred after the press. */
 export function toggleStar(kind: SavedKind, id: string): boolean {
   const want = idFor(kind, id);
   const sessions = loadSessions();
   const target = sessions.find((s) => kindOf(s) === kind && idOf(s) === want);
   if (!target) return false;
-  if (target.starred) {
-    delete target.starred;
-  } else {
-    if (sessions.filter((s) => kindOf(s) === kind && s.starred).length >= MENU_STARS) return false;
-    target.starred = true;
-  }
+  if (target.starred) delete target.starred;
+  else target.starred = true;
   saveSessions(sessions);
   return !!target.starred;
 }
@@ -553,6 +574,7 @@ export function toggleBookmark(address: string, ensName: string | null): boolean
       lastVisited: now,
       bookmarkedAt: now,
       pinned: true,
+      starred: true,
     });
   }
   saveSessions(sessions.filter((s) => !isWallet(s) || s.pinned));
@@ -570,7 +592,7 @@ export function findSavedLink(kind: "position" | "view", key: string): SavedLink
 }
 
 /** Save a position or view, or remove it when it is saved. A new entry goes
- *  first in its kind. Returns the resulting state. */
+ *  first in its kind, starred (ui-jobs 652). Returns the resulting state. */
 export function toggleSavedLink(entry: Omit<SavedLink, "savedAt">): boolean {
   const sessions = loadSessions();
   if (sessions.some((r) => r.kind === entry.kind && r.key === entry.key)) {
@@ -578,7 +600,7 @@ export function toggleSavedLink(entry: Omit<SavedLink, "savedAt">): boolean {
     return false;
   }
   const first = sessions.findIndex((r) => r.kind === entry.kind);
-  sessions.splice(first < 0 ? sessions.length : first, 0, { ...entry, savedAt: Date.now() });
+  sessions.splice(first < 0 ? sessions.length : first, 0, { ...entry, savedAt: Date.now(), starred: true });
   saveSessions(sessions);
   return true;
 }
@@ -602,11 +624,15 @@ export function updateSavedEnded(key: string, ended: SavedLink["ended"]): void {
 // reading build has no name for travels through untouched, so a row
 // round-tripped by an older build keeps it.
 
-/** 3 since 521: `bookmarks` holds every kind, each row carrying its kind.
- *  Version 2 files carried wallets only, version 1 files an object of
- *  per-explorer lists, and import still reads both. A build that reads
- *  version 2 takes the wallets from a version 3 file and skips the rest. */
-export const BOOKMARKS_BACKUP_VERSION = 3;
+/** 4 since ui-jobs 652: a row's star is the whole of what puts it in the
+ *  menu, so a file of version 3 or below has its stars seeded on import
+ *  (`STARS_SEEDED_FROM`). 3 since 521: `bookmarks` holds every kind, each row
+ *  carrying its kind. Version 2 files carried wallets only, version 1 files
+ *  an object of per-explorer lists, and import still reads both. A build that
+ *  reads version 2 takes the wallets from a later file and skips the rest. */
+export const BOOKMARKS_BACKUP_VERSION = 4;
+/** The first backup version whose stars are read as they stand (ui-jobs 652). */
+export const STARS_SEEDED_FROM = 4;
 
 export interface BookmarksBackup {
   version: number;
@@ -660,13 +686,21 @@ export function importBookmarks(source: string): BookmarksImportResult {
     : typeof backup.bookmarks === "object" && backup.bookmarks !== null
       ? Object.values(backup.bookmarks)
       : [];
-  const rowsIn = lists.flatMap((rows) => (Array.isArray(rows) ? rows : []));
+  const held = loadSessions();
+  // A file from before ui-jobs 652 is read with its stars seeded, as this
+  // browser's list was, on the rows new to this browser only: a star the
+  // file does not carry never lands on a row held here.
+  const heldIds = new Set(held.map((r) => `${kindOf(r)} ${idOf(r)}`));
+  const listed = lists
+    .flatMap((rows) => (Array.isArray(rows) ? rows : []))
+    .filter((r): r is SavedEntry => isSessionRow(r) || isLinkRow(r));
+  const rowsIn =
+    backup.version < STARS_SEEDED_FROM ? seedMenuStars(listed, (r) => !heldIds.has(`${kindOf(r)} ${idOf(r)}`)) : listed;
   const wallets = rowsIn.filter(isSessionRow);
   const links = rowsIn.filter(isLinkRow);
   const hasViews = Array.isArray((parsed as { focusViews?: unknown }).focusViews);
   if (wallets.length + links.length === 0 && !hasViews) throw new Error("That backup carries nothing saved.");
 
-  const held = loadSessions();
   const heldWallets = held.filter(isWallet);
   const { rows: merged, added: walletsAdded } = mergeRows(heldWallets, wallets);
   // The rows held keep the reader's order; the rows the file adds go first in
@@ -683,7 +717,7 @@ export function importBookmarks(source: string): BookmarksImportResult {
     if (prev) {
       // The file's name fills a name the reader has not given here.
       if (!prev.customName && r.customName) prev.customName = r.customName;
-      // A star the file carries fills one not given here (capped below).
+      // A star the file carries fills one not given here.
       if (!prev.starred && r.starred) prev.starred = true;
     } else if (!newLinks.has(linkId(r))) {
       newLinks.set(linkId(r), { ...r, savedAt: typeof r.savedAt === "number" ? r.savedAt : Date.now() });
@@ -706,7 +740,7 @@ export function importBookmarks(source: string): BookmarksImportResult {
 
   const read = new Set(wallets.map(primaryOf)).size + new Set(links.map(linkId)).size;
   try {
-    writeAll(capStars(rows));
+    writeAll(rows);
   } catch {
     throw new Error("This browser wouldn't let the items be saved. Check that site data is allowed.");
   }

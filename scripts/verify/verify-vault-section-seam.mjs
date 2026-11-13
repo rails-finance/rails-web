@@ -46,7 +46,7 @@
 //       with a body over 10 KB. `twitter:image` likewise.
 //   S4  BOOKMARKS. Bookmarks are one list per browser, keyed by address
 //       (rails-ops TO-DO-ui-jobs 431). The wallet menu's bookmark row writes the
-//       holder into `rails-bookmarks` (S4a/b); the bookmarks page (/bookmarks)
+//       holder into `rails-bookmarks` (S4a/b); the bookmarks page (/saved-views)
 //       lists a row opening `/wallet/<holder>` (S4c). A per-explorer list from before 431 (`<explorer>-sessions`) is
 //       merged into the one list on the first read, keeping its custom name,
 //       and the old key is left in place (S4d). The vault listing filtered to
@@ -551,12 +551,12 @@ for (const f of fixtures) {
 const KEY = "rails-bookmarks";
 const MIGRATED = "rails-bookmarks-migrated";
 
-/** Open the bookmarks page (/bookmarks, B2; the wallet panel stopped drawing
+/** Open the bookmarks page (/saved-views, B2; the wallet panel stopped drawing
  *  a list on 4 Nov 2026, ui-jobs 480) and read its rows: each row's link to
  *  the wallet view (`data-bookmark-open`, not the protocol links under the
  *  name) and its label. */
 async function bookmarkRows(page) {
-  await page.goto(`${BASE_URL}/bookmarks?tab=wallets`, { waitUntil: "networkidle", timeout: 180_000 });
+  await page.goto(`${BASE_URL}/saved-views?tab=wallets`, { waitUntil: "networkidle", timeout: 180_000 });
   await page.waitForSelector("[data-bookmark-open]", { timeout: 15_000 }).catch(() => {});
   return page.evaluate(() =>
     [...document.querySelectorAll("[data-bookmark-open]")].map((a) => ({

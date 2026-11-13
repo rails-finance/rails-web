@@ -11,6 +11,11 @@
 // filters by it until "Use this view" saves it, or switches to a saved view
 // holding the same focus, so a link opened twice is one view.
 //
+// A view takes a star as the saved items do (ui-jobs 652): the profile menu's
+// Focus group lists the starred views, in the reader's order, and Off. The
+// view in use is listed too while it is unstarred, so Focus can always be
+// turned off from the menu. A new view starts starred. A store from before 652 is seeded once (`seedViewStars`).
+//
 // Pure: type imports only (scripts/test/focus-views.test.mjs runs it directly).
 
 import type { AssetPick, Focus } from "@/lib/shared/asset-preference";
@@ -25,6 +30,8 @@ export interface FocusView {
   assets: AssetPick[];
   chains: number[];
   savedAt: number;
+  /** Listed in the profile menu (ui-jobs 652). */
+  starred?: boolean;
 }
 
 export interface FocusViews {
@@ -60,6 +67,7 @@ function isView(v: unknown): v is FocusView {
   return (
     typeof r.id === "string" &&
     (r.name === undefined || typeof r.name === "string") &&
+    (r.starred === undefined || typeof r.starred === "boolean") &&
     Array.isArray(r.assets) &&
     r.assets.every(isPick) &&
     Array.isArray(r.chains) &&
@@ -94,6 +102,7 @@ export function cleanView(v: unknown, chainOk: (id: number) => boolean = () => t
     assets,
     chains,
     savedAt: typeof v.savedAt === "number" ? v.savedAt : 0,
+    ...(v.starred ? { starred: true } : {}),
   };
 }
 
@@ -167,7 +176,14 @@ export function adoptFocus(s: FocusViews, f: Focus, name: string | undefined, id
       views: s.views.map((v) => (v.id === same.id && !v.name && label ? { ...v, name: label } : v)),
       active: same.id,
     };
-  const view: FocusView = { id, ...(label ? { name: label } : {}), assets: f.assets, chains: f.chains, savedAt: at };
+  const view: FocusView = {
+    id,
+    ...(label ? { name: label } : {}),
+    assets: f.assets,
+    chains: f.chains,
+    savedAt: at,
+    starred: true,
+  };
   return { views: [view, ...s.views], active: id };
 }
 
@@ -186,8 +202,8 @@ export function editView(s: FocusViews, id: string, f: Focus): FocusViews {
   return { ...s, views: s.views.map((v) => (v.id === id ? { ...v, assets: f.assets, chains: f.chains } : v)) };
 }
 
-/** A new view holding `f`, first in the list (or at `index`), put in use. A
- *  focus holding nothing makes no view. */
+/** A new view holding `f`, first in the list (or at `index`), put in use and
+ *  starred. A focus holding nothing makes no view. */
 export function addView(
   s: FocusViews,
   f: Focus,
@@ -198,7 +214,14 @@ export function addView(
 ): FocusViews {
   if (!focusOn(f)) return s;
   const label = name?.trim().slice(0, MAX_NAME) || undefined;
-  const view: FocusView = { id, ...(label ? { name: label } : {}), assets: f.assets, chains: f.chains, savedAt: at };
+  const view: FocusView = {
+    id,
+    ...(label ? { name: label } : {}),
+    assets: f.assets,
+    chains: f.chains,
+    savedAt: at,
+    starred: true,
+  };
   const views = [...s.views];
   views.splice(Math.max(0, Math.min(views.length, index)), 0, view);
   return { views, active: id };
@@ -243,14 +266,17 @@ export interface ViewsMerge {
 }
 
 /** An import: each view the file carries that no saved view holds the same
- *  focus as goes after the reader's views, in the file's order; one already
- *  saved gives it the file's name when it has none. The view in use stays. */
+ *  focus as goes after the reader's views, in the file's order, with the
+ *  file's star; one already saved gives it the file's name when it has none.
+ *  With `starAll` (a file from before ui-jobs 652, which carries no stars) a
+ *  view the import adds starts starred. The view in use stays. */
 export function mergeViews(
   s: FocusViews,
   incoming: unknown,
   newId: () => string,
   at: number,
   chainOk?: (id: number) => boolean,
+  starAll = false,
 ): ViewsMerge {
   const list = Array.isArray(incoming)
     ? incoming
@@ -278,6 +304,7 @@ export function mergeViews(
       assets: v.assets,
       chains: v.chains,
       savedAt: v.savedAt || at,
+      ...(starAll || v.starred ? { starred: true } : {}),
     });
     added++;
   }
@@ -292,4 +319,31 @@ export function moveView(s: FocusViews, id: string, to: number): FocusViews {
   const [v] = views.splice(from, 1);
   views.splice(Math.max(0, Math.min(views.length, to)), 0, v);
   return { ...s, views };
+}
+
+/** Star or unstar a view. */
+export function toggleViewStar(s: FocusViews, id: string): FocusViews {
+  return {
+    ...s,
+    views: s.views.map((v) => {
+      if (v.id !== id) return v;
+      if (!v.starred) return { ...v, starred: true };
+      const { starred: _old, ...rest } = v;
+      void _old;
+      return rest;
+    }),
+  };
+}
+
+/** The views the profile menu lists (ui-jobs 652): the starred and the view
+ *  in use, in the reader's order. */
+export const menuViews = (s: FocusViews): FocusView[] => s.views.filter((v) => v.starred || v.id === s.active);
+
+/** The stars a store from before ui-jobs 652 is given: with no view starred,
+ *  the view the menu offered is starred (the one chosen for it, `menuId`, else
+ *  the view in use, else the first). A store with a star is left as it is. */
+export function seedViewStars(s: FocusViews, menuId: string | null): FocusViews {
+  if (!s.views.length || s.views.some((v) => v.starred)) return s;
+  const pick = s.views.find((v) => v.id === menuId) ?? activeView(s) ?? s.views[0];
+  return { ...s, views: s.views.map((v) => (v.id === pick.id ? { ...v, starred: true } : v)) };
 }

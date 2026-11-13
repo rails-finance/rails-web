@@ -4,17 +4,27 @@
 // profile menu's switch (H20.1, `[data-profile-menu-prov]`, reading "on" or
 // "off"), which saves the choice in localStorage (`rails-prov-inspector`) and
 // arms the page at once, on the routes in lib/shared/prov-preference-routes.ts.
-// While armed, "Exit inspector" (`.prov-inspect-exit`) stands beside the
-// profile control, so its presence is the armed state.
+// While the inspector is armed on a page with a traced value, its indicator
+// (`[data-prov-inspect-on]`, H7.4) stands beside the profile control, so its
+// presence is the armed state (ui-jobs 651).
 //
 //   import { ARMED, armInspector } from "./lib/prov-inspector.mjs";
 //
 // `armInspector` leaves the tool ARMED and says so, and is idempotent. False on
 // a route the switch does not arm, which is a finding, not a flake.
 
-export const ARMED = ".prov-inspect-exit";
+export const ARMED = "[data-prov-inspect-on]";
 const H20 = '[data-anatomy="H20"]:visible';
 const SWITCH = "[data-profile-menu-prov]";
+
+/** With the profile menu open, open its Advanced group where it is closed (it
+ *  starts closed; Miles 13 Nov 2026), so the switch is drawn. */
+export async function openAdvanced(page) {
+  const head = await page
+    .waitForSelector('[data-profile-menu-group-toggle="advanced"]', { timeout: 4_000 })
+    .catch(() => null);
+  if (head && (await head.getAttribute("aria-expanded")) === "false") await head.click().catch(() => {});
+}
 
 /** Turn the profile menu's switch on (where it reads off) and wait for the
  *  page to arm. The menu is closed from its control: Escape would also be the
@@ -29,6 +39,7 @@ export async function armInspector(page) {
       .first()
       .click({ timeout: 10_000 })
       .catch(() => {});
+    await openAdvanced(page);
     const sw = await page.waitForSelector(SWITCH, { timeout: 4_000 }).catch(() => null);
     if (!sw) continue;
     if ((await sw.getAttribute("data-profile-menu-prov")) === "off") await sw.click().catch(() => {});
