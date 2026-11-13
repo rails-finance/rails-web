@@ -134,7 +134,7 @@ export function liquityForkPositionContent(opts: LiquityForkPositionContentParam
   details.push(
     {
       bold: "Redemption exposure",
-      text: `any ${debtSymbol} holder can redeem it against the system at $1 face value, sweeping each branch's queue from the lowest user-set interest rate upward, ${t.ltv ? "not the highest LTV" : `not the lowest ${t.ratioText}`}. A redeemed Trove gives up collateral worth the debt it sheds: it deleverages, but its net value is preserved.`,
+      text: `any ${debtSymbol} holder can redeem it against the system at $1 face value, sweeping each branch's queue from the lowest user-set interest rate upward. A redeemed Trove gives up collateral worth the debt it sheds: it deleverages, but its net value is preserved.`,
     },
     {
       bold: "Branch scoping",
