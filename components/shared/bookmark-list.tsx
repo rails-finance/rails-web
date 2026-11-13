@@ -40,13 +40,13 @@ import {
   exportBookmarks,
   importBookmarks,
   loadBookmarks,
-  MENU_STARS,
   moveSaved,
   removeBookmark,
   removeSaved,
   renameSaved,
   renameSession,
   SESSIONS_CHANGED_EVENT,
+  STARS_SEEDED_FROM,
   toggleStar,
   type SavedKind,
   type SavedLink,
@@ -129,7 +129,6 @@ export function BookmarkList({
 }) {
   const moveOf = useRowDrag("wallet");
   if (bookmarks.length === 0) return <>{empty}</>;
-  const full = bookmarks.filter((b) => b.starred).length >= MENU_STARS;
   return (
     <DataTable caption="Saved wallets" stacked rowHeight="one" tableClassName="text-sm" data-bookmark-list="">
       <DataTableHead>
@@ -144,7 +143,6 @@ export function BookmarkList({
             key={s.key}
             session={s}
             summary={summary}
-            full={full}
             move={reorder ? moveOf(i, bookmarks.length, s.addresses[0]) : undefined}
           />
         ))}
@@ -167,7 +165,6 @@ export function SavedLinkList({
 }) {
   const moveOf = useRowDrag(kind);
   if (links.length === 0) return <>{empty}</>;
-  const full = links.filter((l) => l.starred).length >= MENU_STARS;
   return (
     <DataTable
       caption={kind === "position" ? "Saved positions" : "Saved listings"}
@@ -185,7 +182,7 @@ export function SavedLinkList({
       </DataTableHead>
       <DataTableBody>
         {links.map((l, i) => (
-          <SavedLinkRow key={l.key} link={l} full={full} move={moveOf(i, links.length, l.key)} />
+          <SavedLinkRow key={l.key} link={l} move={moveOf(i, links.length, l.key)} />
         ))}
       </DataTableBody>
     </DataTable>
@@ -237,11 +234,15 @@ export function BookmarkBackup({ className = "", empty = false }: { className?: 
     try {
       const text = await file.text();
       const result = importBookmarks(text);
-      let fileViews: unknown;
+      let held: { focusViews?: unknown; version?: unknown } = {};
       try {
-        fileViews = (JSON.parse(text) as { focusViews?: unknown }).focusViews;
+        held = JSON.parse(text);
       } catch {}
-      const v = fileViews === undefined ? null : focusViews.importList(fileViews);
+      // A file from before ui-jobs 652 carries no stars: its views start starred.
+      const v =
+        held.focusViews === undefined
+          ? null
+          : focusViews.importList(held.focusViews, Number(held.version) < STARS_SEEDED_FROM);
       const parts = [
         result.read ? `${plural(result.read, "saved item")}, ${result.added} new` : "",
         v && v.read ? `${plural(v.read, "focus view")}, ${v.added} new` : "",
@@ -472,49 +473,26 @@ function RenameField({
 const NAME_CELL = "sm:w-full sm:max-w-0 sm:min-w-[200px]";
 const MENU_CELL = "dt-row-menu w-px whitespace-nowrap";
 
-/** A saved entry's star (ui-jobs 586): starred entries are the ones the
- *  profile menu shows, up to `MENU_STARS` of a kind; with that many starred,
- *  the other rows' stars are off. */
-function StarToggle({
-  kind,
-  id,
-  on,
-  full,
-  label,
-}: {
-  kind: SavedKind;
-  id: string;
-  on: boolean;
-  full: boolean;
-  label: string;
-}) {
-  const off = full && !on;
+/** A saved entry's star (ui-jobs 586, 652): the starred entries of a kind,
+ *  focus views included, are the ones the profile menu shows, every one. */
+function StarToggle({ on, label, onToggle }: { on: boolean; label: string; onToggle: () => void }) {
   return (
     <button
       type="button"
       aria-pressed={on}
-      disabled={off}
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        toggleStar(kind, id);
+        onToggle();
       }}
       aria-label={on ? `Unstar ${label}` : `Star ${label}`}
-      title={
-        off
-          ? "Five starred. Unstar one to star this."
-          : on
-            ? "Starred: shown in the profile menu"
-            : "Star to show in the profile menu"
-      }
-      className={`-my-2 inline-flex size-11 shrink-0 items-center justify-center rounded-md transition-colors sm:size-7 ${
+      title={on ? "Starred: shown in the profile menu" : "Star to show in the profile menu"}
+      className={`-my-2 inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors sm:size-7 ${
         on
           ? "text-amber-500 hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-300"
-          : off
-            ? "cursor-not-allowed text-rb-300 dark:text-rb-600"
-            : "cursor-pointer text-rb-400 hover:text-amber-500 dark:text-rb-600 dark:hover:text-amber-400"
+          : "text-rb-400 hover:text-amber-500 dark:text-rb-600 dark:hover:text-amber-400"
       }`}
-      data-bookmark-star={on ? "on" : off ? "full" : "off"}
+      data-bookmark-star={on ? "on" : "off"}
       data-anatomy="B2.3"
     >
       <Star className="size-4" fill={on ? "currentColor" : "none"} aria-hidden="true" />
@@ -529,17 +507,7 @@ function shortAddress(a: string): string {
 
 /** A saved wallet (D4): the facehash and name open its page; its positions,
  *  its address and the ⋮ follow. */
-function BookmarkRow({
-  session,
-  summary,
-  full,
-  move,
-}: {
-  session: WalletSession;
-  summary?: boolean;
-  full: boolean;
-  move?: RowMove;
-}) {
+function BookmarkRow({ session, summary, move }: { session: WalletSession; summary?: boolean; move?: RowMove }) {
   const [editing, setEditing] = useState(false);
   const [copied, copy] = useCopy();
 
@@ -567,7 +535,7 @@ function BookmarkRow({
       <DataTableCell rowHeader valign="middle" className="sm:w-[38%] sm:max-w-0 sm:min-w-[200px]">
         <span className="flex min-w-0 items-center gap-2">
           {move && <Grip />}
-          <StarToggle kind="wallet" id={primary} on={!!session.starred} full={full} label={label} />
+          <StarToggle on={!!session.starred} label={label} onToggle={() => toggleStar("wallet", primary)} />
           {editing ? (
             <span className="flex min-w-0 flex-1 items-center gap-3">
               {avatar}
@@ -644,7 +612,7 @@ const KIND_NOUN = { position: "position", view: "listing" } as const;
 
 /** A saved position or listing (D4): the explorer's mark and the name open
  *  the page; its explorer, chain, a closed position's tag and the ⋮ follow. */
-function SavedLinkRow({ link, full, move }: { link: SavedLink; full: boolean; move: RowMove }) {
+function SavedLinkRow({ link, move }: { link: SavedLink; move: RowMove }) {
   const [editing, setEditing] = useState(false);
   const [copied, copy] = useCopy();
   const label = link.customName || link.name;
@@ -668,7 +636,7 @@ function SavedLinkRow({ link, full, move }: { link: SavedLink; full: boolean; mo
       <DataTableCell rowHeader valign="middle" className={NAME_CELL}>
         <span className="flex min-w-0 items-center gap-2">
           <Grip />
-          <StarToggle kind={link.kind} id={link.key} on={!!link.starred} full={full} label={label} />
+          <StarToggle on={!!link.starred} label={label} onToggle={() => toggleStar(link.kind, link.key)} />
           {editing ? (
             <span className="flex min-w-0 flex-1 items-center gap-3">
               {glyph}
@@ -750,13 +718,10 @@ function SavedLinkRow({ link, full, move }: { link: SavedLink; full: boolean; mo
 export function FocusViewList({
   views,
   active,
-  menu,
   empty,
 }: {
   views: FocusView[];
   active: string | null;
-  /** The view the profile menu offers (ui-jobs 582). */
-  menu: string | null;
   empty: ReactNode;
 }) {
   const moveOf = useRowDrag("view", focusViews.move);
@@ -809,7 +774,6 @@ export function FocusViewList({
               key={v.id}
               view={v}
               inUse={v.id === active}
-              inMenu={v.id === menu}
               phone={isPhone}
               onRemove={() => remove(v.id)}
               move={moveOf(i, views.length, v.id)}
@@ -828,14 +792,12 @@ const UNDO_MS = 8000;
 function FocusViewRow({
   view,
   inUse,
-  inMenu,
   phone,
   onRemove,
   move,
 }: {
   view: FocusView;
   inUse: boolean;
-  inMenu: boolean;
   phone: boolean;
   onRemove: () => void;
   move: RowMove;
@@ -892,18 +854,6 @@ function FocusViewRow({
           },
         ]
       : []),
-    // The profile menu offers one view (ui-jobs 582): this one, or this
-    // press to make it the one.
-    ...(inMenu
-      ? []
-      : [
-          {
-            key: "show-in-menu",
-            label: "Show in menu",
-            onSelect: () => focusViews.showInMenu(view.id),
-            hooks: { "data-focus-view-menu": "show-in-menu" },
-          },
-        ]),
     ...moveItems(move, (to) => focusViews.move(view.id, to), true),
     {
       key: "copy",
@@ -932,6 +882,7 @@ function FocusViewRow({
       <DataTableCell rowHeader valign="middle" className="sm:w-[34%] sm:max-w-0 sm:min-w-[200px]">
         <span className="flex min-w-0 items-center gap-2">
           <Grip />
+          <StarToggle on={!!view.starred} label={label} onToggle={() => focusViews.toggleStar(view.id)} />
           {editing ? (
             <RenameField
               label="Focus view name"
@@ -945,14 +896,7 @@ function FocusViewRow({
               onCancel={() => setEditing(false)}
             />
           ) : (
-            <>
-              <span className="truncate text-sm font-bold text-foreground">{label}</span>
-              {inMenu && (
-                <span className="shrink-0 text-xs text-rb-500" data-focus-view-in-menu="">
-                  In menu
-                </span>
-              )}
-            </>
+            <span className="truncate text-sm font-bold text-foreground">{label}</span>
           )}
         </span>
       </DataTableCell>

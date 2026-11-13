@@ -15,8 +15,11 @@ import type { FamilyPick } from "@/lib/shared/asset-family";
 
 /** The saved focus views and the one in use (lib/shared/focus-views.ts). */
 export const FOCUS_VIEWS_KEY = "rails-focus-views";
-/** The one saved view the profile menu (H20) offers, by id (ui-jobs 582). */
+/** The one saved view the profile menu (H20) offered, by id (ui-jobs 582).
+ *  Read once since ui-jobs 652, to seed the views' stars (FOCUS_STARS_KEY). */
 export const FOCUS_MENU_KEY = "rails-focus-menu-view";
+/** Set once the saved views' stars have been seeded (ui-jobs 652). */
+export const FOCUS_STARS_KEY = "rails-focus-stars-652";
 export const ASSETS_PARAM = "assets";
 export const CHAINS_PARAM = "chains";
 

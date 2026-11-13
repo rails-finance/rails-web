@@ -84,10 +84,10 @@ export function BookmarksPage() {
   };
 
   const ready = bookmarks && positions && views && scope.ready;
-  /** Over the Listings, Wallets and Positions tables (ui-jobs 586). */
+  /** Over every kind's table, focus views included (ui-jobs 586, 652). */
   const starNote = (
     <p className="mb-3 text-sm text-rb-500" data-star-note="">
-      Starred items appear in the profile menu, up to five.
+      Starred items appear in the profile menu.
     </p>
   );
   const counts: Record<Tab, number> = {
@@ -328,15 +328,10 @@ export function BookmarksPage() {
           )}
           {tab === "focus" && (
             <>
-              {scope.views.length > 0 && (
-                <p className="mb-3 text-sm text-rb-500" data-focus-menu-note="">
-                  The profile menu offers one focus view. Choose it here with Show in menu.
-                </p>
-              )}
+              {scope.views.length > 0 && starNote}
               <FocusViewList
                 views={scope.views}
                 active={scope.active?.id ?? null}
-                menu={scope.menuView?.id ?? null}
                 empty={
                   <div data-anatomy="B3">
                     <p className="font-semibold text-foreground">No focus views yet.</p>

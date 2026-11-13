@@ -31,6 +31,7 @@ import {
   ASSETS_PARAM,
   CHAINS_PARAM,
   FOCUS_MENU_KEY,
+  FOCUS_STARS_KEY,
   FOCUS_VIEWS_KEY,
   formatAssetsParam,
   formatChainsParam,
@@ -52,6 +53,7 @@ import {
   editActive,
   editView,
   focusOn,
+  menuViews,
   moveView,
   NO_VIEWS,
   pickKeys,
@@ -59,7 +61,9 @@ import {
   removeView,
   renameView,
   restoreView,
+  seedViewStars,
   setActive,
+  toggleViewStar,
   VIEW_PARAM,
   type FocusView,
   type FocusViews,
@@ -147,10 +151,8 @@ interface Snapshot {
   stored: Focus;
   /** What a link proposes; null when the URL names nothing Rails knows. */
   link: FocusProposal | null;
-  /** The view chosen for the profile menu, by id; null when none is chosen. */
-  menu: string | null;
 }
-const EMPTY: Snapshot = { saved: NO_VIEWS, stored: NO_FOCUS, link: null, menu: null };
+const EMPTY: Snapshot = { saved: NO_VIEWS, stored: NO_FOCUS, link: null };
 let cache: { raw: string; snap: Snapshot } = { raw: "", snap: EMPTY };
 
 const newId = () => `v${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -168,25 +170,42 @@ function sweepOldStores() {
   } catch {}
 }
 
+/** Seed the saved views' stars once per browser (ui-jobs 652): with none
+ *  starred, the view the menu offered (`seedViewStars`). */
+let seeded = false;
+function seedStars() {
+  if (seeded) return;
+  seeded = true;
+  try {
+    if (localStorage.getItem(FOCUS_STARS_KEY)) return;
+    const held = localStorage.getItem(FOCUS_VIEWS_KEY);
+    if (held) {
+      const before = readViews(JSON.parse(held), knownChain);
+      const after = seedViewStars(before, localStorage.getItem(FOCUS_MENU_KEY));
+      if (after !== before) localStorage.setItem(FOCUS_VIEWS_KEY, JSON.stringify(after));
+    }
+    localStorage.setItem(FOCUS_STARS_KEY, "1");
+  } catch {}
+}
+
 function readRaw(): string {
   sweepOldStores();
+  seedStars();
   let held = "";
-  let menu = "";
   try {
     held = localStorage.getItem(FOCUS_VIEWS_KEY) ?? "";
-    menu = localStorage.getItem(FOCUS_MENU_KEY) ?? "";
   } catch {}
   const sp = new URLSearchParams(window.location.search);
   const a = sp.get(ASSETS_PARAM);
   const c = sp.get(CHAINS_PARAM);
   const n = sp.get(VIEW_PARAM);
-  return [held, a ?? "\u0001", c ?? "\u0001", n ?? "", menu].join("\u0000");
+  return [held, a ?? "\u0001", c ?? "\u0001", n ?? ""].join("\u0000");
 }
 
 function snapshot(): Snapshot {
   const raw = readRaw();
   if (raw === cache.raw) return cache.snap;
-  const [s, a, c, n, m] = raw.split("\u0000");
+  const [s, a, c, n] = raw.split("\u0000");
   let saved: FocusViews = NO_VIEWS;
   try {
     saved = readViews(s ? JSON.parse(s) : null, knownChain);
@@ -200,7 +219,7 @@ function snapshot(): Snapshot {
   const chains = c === "\u0001" ? [] : (parseChainsParam(c, CHAIN_SLUGS) ?? []);
   const focus = { assets, chains };
   const link = focusOn(focus) ? { focus, name: n.trim().slice(0, 60) || null } : null;
-  cache = { raw, snap: { saved, stored: activeFocus(saved), link, menu: m || null } };
+  cache = { raw, snap: { saved, stored: activeFocus(saved), link } };
   return cache.snap;
 }
 
@@ -288,13 +307,9 @@ export const focusViews = {
   },
   /** An edit to one view; emptied, it is removed. */
   edit: (id: string, f: Focus) => writeSaved(editView(saved(), id, f)),
-  /** The view the profile menu offers (ui-jobs 582): one at a time. */
-  showInMenu(id: string) {
-    try {
-      localStorage.setItem(FOCUS_MENU_KEY, id);
-    } catch {}
-    window.dispatchEvent(new Event(CHANGE));
-  },
+  /** Star or unstar a view: the starred are the ones the profile menu lists
+   *  (ui-jobs 652). */
+  toggleStar: (id: string) => writeSaved(toggleViewStar(saved(), id)),
   /** The saved views for a backup file. */
   list: (): FocusView[] => saved().views,
   /** A saved view by id, or the view in use; read from the store, so it is
@@ -304,9 +319,10 @@ export const focusViews = {
     const want = id ?? s.active;
     return s.views.find((v) => v.id === want) ?? null;
   },
-  /** A backup file's views merged in; the view in use stays. */
-  importList(incoming: unknown): { read: number; added: number } {
-    const { state, read, added } = mergeViews(saved(), incoming, newId, Date.now(), knownChain);
+  /** A backup file's views merged in; the view in use stays. `starAll`: the
+   *  file is from before ui-jobs 652, and the views it adds start starred. */
+  importList(incoming: unknown, starAll = false): { read: number; added: number } {
+    const { state, read, added } = mergeViews(saved(), incoming, newId, Date.now(), knownChain, starAll);
     if (read) writeSaved(state);
     return { read, added };
   },
@@ -345,9 +361,9 @@ export interface AssetScope {
   /** The saved views, in the reader's order, and the one in use. */
   views: FocusView[];
   active: FocusView | null;
-  /** The one view the profile menu offers: the one chosen on /bookmarks, else
-   *  the view in use, else the first saved (ui-jobs 582). */
-  menuView: FocusView | null;
+  /** The views the profile menu lists: the starred, in the reader's order
+   *  (ui-jobs 652). */
+  menuViews: FocusView[];
   /** The asset keys the picks reach on the focused chains; null when no asset is picked. */
   keys: Set<string> | null;
   /** A chain passes chain focus. */
@@ -421,7 +437,7 @@ export function useAssetScope(): AssetScope {
     link: ready ? snap.link : null,
     views,
     active,
-    menuView: views.find((v) => v.id === snap.menu) ?? active ?? views[0] ?? null,
+    menuViews: ready ? menuViews(snap.saved) : NO_VIEWS.views,
     keys,
     chainOk,
     matches,

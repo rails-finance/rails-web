@@ -9,12 +9,12 @@
 // touch screen see HEADING_TOUCH); last, Advanced, holding the provenance
 // inspector switch (decision 0062; ui-jobs 571).
 //
-// Focus offers one saved view, the one chosen on /bookmarks?tab=focus (else
-// the view in use, else the first saved; lib/shared/asset-scope.ts
-// `menuView`), and Off. Listings, Wallets and Positions each list the items
-// starred on /bookmarks, up to five, or with none starred the first five, in
-// the reader's order (ui-jobs 586; lib/shared/sessions.ts `menuEntries`). A
-// group is drawn only when it holds something. Long names fade at the line's
+// Stars alone decide what each group lists (ui-jobs 652): Focus lists the
+// views starred on /bookmarks?tab=focus, then Off (lib/shared/asset-scope.ts
+// `menuViews`); Listings, Wallets and Positions list the items starred on
+// /bookmarks (lib/shared/sessions.ts `menuEntries`). Every starred item shows,
+// in the reader's order. A group with nothing starred is not drawn; its
+// heading is the way to its tab on /bookmarks. Long names fade at the line's
 // end (`FADE`); rows read nothing, showing what the browser holds.
 //
 // From md a dropdown under the control, right edges aligned, dropping in with
@@ -364,14 +364,16 @@ export function ProfileMenu() {
   useEffect(() => setMounted(true), []);
 
   const face = bookmarks == null ? null : (bookmarks[0]?.addresses[0] ?? SAMPLE_WALLET);
-  // The starred of each kind, or the first five (ui-jobs 586).
+  // The starred of each kind, every one (ui-jobs 652).
   const rows = menuEntries(bookmarks ?? []);
   const listings = menuEntries(views ?? []);
   const held = menuEntries(positions ?? []);
   const focusOn = scope.ready && scope.on;
-  const menuView = scope.menuView;
-  /** Anything saved, focus views included, takes "Start here" out of the menu. */
-  const anything = rows.length > 0 || listings.length > 0 || held.length > 0 || (scope.ready && scope.views.length > 0);
+  const starredViews = scope.menuViews;
+  /** Anything saved, starred or not, focus views included, takes "Start here"
+   *  out of the menu. */
+  const anything =
+    !!bookmarks?.length || !!views?.length || !!positions?.length || (scope.ready && scope.views.length > 0);
   const focusLabel = scope.active?.name || focusShort(scope.picks, scope.chains);
 
   const close = useCallback((refocus = true) => {
@@ -560,27 +562,29 @@ export function ProfileMenu() {
                   <Signpost className="ml-auto size-4 shrink-0" aria-hidden="true" />
                 </Link>
               )}
-              {/* Focus: the one view chosen for this menu and Off (ui-jobs
-                  582); the others are on /bookmarks?tab=focus. */}
-              {menuView && (
+              {/* Focus: the starred views and Off (ui-jobs 652). */}
+              {starredViews.length > 0 && (
                 <div role="group" aria-labelledby={`${menuId}-focus`} className={GROUP} data-profile-menu-focus="">
                   <GroupHeading id={`${menuId}-focus`} group="focus" tab="focus" label="Focus" onDone={done} />
-                  <div className="mt-1" data-profile-menu-focus-views={scope.views.length}>
+                  <div className="mt-1" data-profile-menu-focus-views={starredViews.length}>
                     <>
-                      <button
-                        type="button"
-                        role="menuitemradio"
-                        aria-checked={scope.active?.id === menuView.id}
-                        onClick={() => focusViews.use(menuView.id)}
-                        className={ITEM}
-                        data-profile-menu-focus-view={menuView.id}
-                      >
-                        <RadioMark on={scope.active?.id === menuView.id} />
-                        <span className="flex min-w-0 flex-1 items-center">
-                          <ViewIcons picks={menuView.assets} chains={menuView.chains} />
-                          <span className={`${FADE} ml-1 font-medium`}>{viewName(menuView)}</span>
-                        </span>
-                      </button>
+                      {starredViews.map((v) => (
+                        <button
+                          key={v.id}
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={scope.active?.id === v.id}
+                          onClick={() => focusViews.use(v.id)}
+                          className={ITEM}
+                          data-profile-menu-focus-view={v.id}
+                        >
+                          <RadioMark on={scope.active?.id === v.id} />
+                          <span className="flex min-w-0 flex-1 items-center">
+                            <ViewIcons picks={v.assets} chains={v.chains} />
+                            <span className={`${FADE} ml-1 font-medium`}>{viewName(v)}</span>
+                          </span>
+                        </button>
+                      ))}
                       <button
                         type="button"
                         role="menuitemradio"
