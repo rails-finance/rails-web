@@ -177,7 +177,7 @@ function reserveMarkdown(d: V4Deployment, f: V4ReserveFigures, names: V4Names): 
     "",
     `- Supplied (this spoke): ${usd(f.spokeSupplied)} of ${usd(f.hubSupplied)} on ${names.hub}`,
     `- Borrowed (this spoke): ${usd(f.spokeBorrowed)} of ${usd(f.hubBorrowed)} on ${names.hub}`,
-    `- Available (this spoke): ${usd(f.available)}`,
+    `- Available (this spoke): ${f.borrowable === false ? "–, not borrowable on this spoke" : usd(f.available)}`,
     ...(f.supplyApr != null ? [`- Supply APY (hub): ${v4ApyText(f.supplyApr)}`] : []),
     ...(f.drawnApr != null ? [`- Borrow APY (hub): ${v4ApyText(f.drawnApr)}, ${PREMIUM_LINE}`] : []),
     ...(f.utilisation != null ? [`- Utilization (hub): ${pctText(f.utilisation)}`] : []),
@@ -291,7 +291,13 @@ function reserveHead(d: V4Deployment, sp: V4Spoke, l: V4Line, f: V4ReserveFigure
         tip: "The hub's liquidity, capped by the borrow cap less what this spoke owes",
         value: (
           <span data-vital="available">
-            <Prov info={availableProv(f, names)}>{avail.display}</Prov>
+            {f.borrowable === false ? (
+              <span title="Not borrowable on this spoke" data-prov-exempt="" data-available-closed="">
+                –
+              </span>
+            ) : (
+              <Prov info={availableProv(f, names)}>{avail.display}</Prov>
+            )}
             {deficit && (
               <span className={SUB} data-reserve-deficit="">
                 deficit {amountText(f.hubDeficit, f.price, names.symbol).display}
@@ -518,6 +524,7 @@ function indexedSections(
                             amount,
                             total,
                             totalWhat,
+                            block: f.block,
                           })}
                         >
                           {sharePct(amount / total)}
@@ -769,7 +776,7 @@ export function AaveV4ReservePage({
     const notIndexed = notIndexedSection(d);
     // Not borrowable here and drawn nowhere on the hub: no rate is paid, so the
     // curve is one line, and it and Parameters each run full width.
-    const noCurve = f.borrowable === false && f.hubDrawn === 0;
+    const noCurve = f.borrowable === false && f.raw.hub.owedDrawn != null && f.hubDrawn === 0;
     const { history: historySection, holders: holderSections } = indexedSections(d, sp, line, names, f, {
       history,
       kept,

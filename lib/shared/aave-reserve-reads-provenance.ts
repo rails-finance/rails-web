@@ -121,8 +121,7 @@ export function holderAmountProv(
 }
 
 /** A holder's share of the reserve's side (M3.7, M3.8): the ranked amount over
- *  the side's total from the page's head read. The two are read at different
- *  times, so a share is as of the ranking's refresh. */
+ *  the side's total from the page's head read, which is read later. */
 export function holderShareProv(o: {
   symbol: string;
   side: "supplied" | "borrowed";
@@ -131,15 +130,24 @@ export function holderShareProv(o: {
   total: number;
   /** The total's name, as the receipt states it: "the aToken's totalSupply()". */
   totalWhat: string;
+  /** The head read's block, where the total was read. */
+  block: number | null;
 }): Provenance {
   const n = (v: number) => v.toLocaleString("en-US", { maximumFractionDigits: 6 });
   return {
     kind: "derived",
-    summary: `${o.wallet.slice(0, 6)}…${o.wallet.slice(-4)}'s ${o.symbol} ${o.side}, over every ${o.symbol} ${o.side} on the reserve (${o.totalWhat}). The amount is from the ranking's last refresh and the total from the page's read, so the share is as close as the two reads are in time.`,
+    summary: `${o.wallet.slice(0, 6)}…${o.wallet.slice(-4)}'s ${o.symbol} ${o.side}, over every ${o.symbol} ${o.side} on the reserve (${o.totalWhat}). The amount is from the ranking's last refresh, the total from the page's read. The two reads differ in time, so the share is approximate.`,
     formula: `amount ÷ total ${o.side}`,
+    ...(o.block ? { source: { block: o.block } } : {}),
     inputs: [
       { label: "amount", value: `${n(o.amount)} ${o.symbol}`, kind: "derived", pclass: "indexed" },
-      { label: `total ${o.side}`, value: `${n(o.total)} ${o.symbol}`, kind: "chain", note: o.totalWhat },
+      {
+        label: `total ${o.side}`,
+        value: `${n(o.total)} ${o.symbol}`,
+        kind: "chain",
+        pclass: "state",
+        note: o.totalWhat,
+      },
     ],
   };
 }

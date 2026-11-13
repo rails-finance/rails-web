@@ -505,6 +505,7 @@ function indexedSections(
   changes: ReturnType<typeof reserveChanges> | null,
   parameters: ProductSection,
   deficit: ProductSection | null,
+  headBlock: number | null,
 ): ProductSection[] {
   const chainId: ChainId = m.chainId;
   const { history: hr, changes: cr, holders: hd } = x.reads;
@@ -681,6 +682,7 @@ function indexedSections(
                             amount,
                             total,
                             totalWhat,
+                            block: headBlock,
                           })}
                         >
                           {pctText(amount / total)}
@@ -827,6 +829,7 @@ export function AaveReservePage({ marketKey, asset }: { marketKey: AaveMarketKey
             changes,
             parameters,
             deficitSection(m, r, indexed, vocab, read.data?.blockNumber ?? null),
+            read.data?.blockNumber ?? null,
           ),
         ],
       },

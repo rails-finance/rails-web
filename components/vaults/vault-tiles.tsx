@@ -1,5 +1,5 @@
 // The vault pages' tile grid (anatomy V13): the shared grid
-// (components/shared/tile-grid.tsx) with the vault sections' own resets. The
+// (components/shared/tile-grid.tsx) with the vault sections' resets. The
 // last 30 days loses its frame round each chart, with a hairline between them
 // from sm; the donuts take the page's ground.
 

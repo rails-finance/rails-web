@@ -1,6 +1,6 @@
 // A grid of tiles with hairline dividers and no outer border or panel fills
 // (Miles, 10 Nov 2026; anatomy V13): one column, two from lg. Each tile draws
-// its own hairlines: under it, inset 20px from its ends from sm and full width
+// its hairlines: under it, inset 20px from its ends from sm and full width
 // below sm; a pair's two lines meet into one unbroken line from lg; the left
 // tile of a pair draws a vertical line at its right edge, stopping 20px short
 // of each end. The last tile draws none.
