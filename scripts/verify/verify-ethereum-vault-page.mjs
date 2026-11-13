@@ -881,8 +881,8 @@ const sghoOwn = await client.multicall({
 });
 const [ownRate, ownCap, ownMaxDeposit, ownIndex, ownRatePerSec, ownLastUpdate, ownGhoHeld] = sghoOwn;
 check(
-  "3a the sGHO page states this script's own targetRate(), in the basis points the contract stores",
-  sghoPage.mechanic === "sgho" && sghoPage.targetRate === Number(ownRate).toLocaleString("en-US"),
+  "3a the sGHO page states this script's own targetRate() as a percentage (450 basis points is 4.50%)",
+  sghoPage.mechanic === "sgho" && sghoPage.targetRate === `${(Number(ownRate) / 100).toFixed(2)}%`,
   `page "${sghoPage.targetRate}" vs own ${ownRate}`,
 );
 check(

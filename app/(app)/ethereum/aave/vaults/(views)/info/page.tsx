@@ -34,6 +34,8 @@ export const metadata = listingMetadata({
 
 const n = (v: number) => v.toLocaleString("en-US");
 
+const AAVE_TOKENIZATION_DOCS = "https://aave.com/docs/aave-v3/smart-contracts/tokenization";
+
 /** The census header alone — one row per catalogued vault, no live overlay and
  *  one position row, because nothing on this page is about a position. An
  *  unanswered census is an empty header, and the paragraphs that rest on it
@@ -93,6 +95,15 @@ export default async function EthereumVaultsInfoPage() {
         Nothing here sums them: the census line counts positions and Value · USD is per row, so no total is rendered
         anywhere in this section. Each static aToken&rsquo;s page names the stake token that holds it and the share it
         holds, and each stake token&rsquo;s page names the wrapper its assets sit in.
+      </p>
+      {/* ui-jobs 664, VA7: the docs' word for the page's "Static aToken". */}
+      <p data-intro-glossary>
+        A static aToken is what{" "}
+        <a href={AAVE_TOKENIZATION_DOCS} target="_blank" rel="noopener" className="link-external">
+          Aave&rsquo;s docs
+        </a>{" "}
+        call a StataToken: &ldquo;ERC-4626 compliant tokens that wrap Aave&rsquo;s aTokens to provide a non-rebasing
+        yield accrual mechanism&rdquo;.
       </p>
       {empty.length > 0 && (
         <p data-intro-empty>

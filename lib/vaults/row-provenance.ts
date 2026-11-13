@@ -77,3 +77,32 @@ export const vaultWithdrawableProv = (v: VaultSummary, il: VaultIlliquid): Prove
     why: `${v.asset.symbol} has ${v.asset.decimals} decimals`,
   },
 });
+
+/** The wrapped asset's own share-price change beside an Umbrella stake's
+ *  Yield (decision 0047 as amended, ui-jobs 664): the asset's two stored
+ *  `convertToAssets` reads, never added into the stake's figure. */
+export const vaultAssetGrowthProv = (v: VaultSummary, y: Measured): Provenance => ({
+  kind: "derived",
+  pclass: "state",
+  source: { block: y.to.block },
+  summary: `The wrapped ${v.asset.symbol}'s share price — its \`convertToAssets\` of one whole share, stored once a day in the daily price store, went from ${formatUnitsExact(y.from.raw, v.asset.decimals)} at block ${n(y.from.block)} to ${formatUnitsExact(y.to.raw, v.asset.decimals)} at block ${n(y.to.block)}, in the token ${v.asset.symbol} wraps. This vault holds ${v.asset.symbol}, so the share price of this vault, in ${v.asset.symbol}, does not show that growth; the two are stated apart and never added.`,
+  contract: { name: v.asset.symbol, address: v.asset.address },
+  via: "daily price store · convertToAssets(10 ** decimals) once per UTC day @ the day's last block",
+  formula: "p1 / p0 − 1",
+  inputs: [
+    {
+      label: `p0 · block ${n(y.from.block)}`,
+      value: formatUnitsExact(y.from.raw, v.asset.decimals),
+      kind: "chain",
+      pclass: "state",
+      note: `${v.asset.symbol}'s convertToAssets of one whole share, stored for that day`,
+    },
+    {
+      label: `p1 · block ${n(y.to.block)}`,
+      value: formatUnitsExact(y.to.raw, v.asset.decimals),
+      kind: "chain",
+      pclass: "state",
+      note: "the latest stored day",
+    },
+  ],
+});

@@ -18,9 +18,14 @@ import { formatUnitsExact } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
 import { assetText, sharePriceText } from "@/lib/shared/vault-amount-text";
 import type { VaultStanding, VaultSummary } from "@/lib/vaults/summary";
-import type { VaultFamily } from "@/lib/vaults/families";
+import { VAULT_FAMILIES, type VaultFamily } from "@/lib/vaults/families";
 import { changeText, jumpTail, measuredYield, yieldText, type VaultYield } from "@/lib/vaults/yield";
-import { vaultHoldersProv, vaultWithdrawableProv, vaultYieldProv } from "@/lib/vaults/row-provenance";
+import {
+  vaultAssetGrowthProv,
+  vaultHoldersProv,
+  vaultWithdrawableProv,
+  vaultYieldProv,
+} from "@/lib/vaults/row-provenance";
 import { illiquidSentence, type VaultIlliquid } from "@/lib/vaults/illiquid";
 import { heldAssetsRaw } from "@/lib/vaults/lost-assets";
 import { assetScaleAbsentTip, assetScaleSentence } from "@/lib/vaults/asset-scale-words";
@@ -63,7 +68,10 @@ export const VAULT_PILL =
   "rounded-sm bg-rb-300 px-1.5 py-0.5 text-[11px] text-foreground/80 dark:bg-rb-700 dark:text-foreground/60";
 
 export const YIELD_LABEL_TIP =
-  "Rails's figure: the share price's growth over 30 days from the daily store, annualised simply. Net of the fees the vault takes inside the share; rewards paid outside the share are not in it.";
+  "The share price's growth over 30 days from the daily store, annualised simply. Net of the fees the vault takes inside the share; rewards paid outside the share are not in it.";
+
+/** A tip with the family's documented word after it (ui-jobs 664). */
+const withDocsWord = (tip: string, word: string | undefined) => (word ? `${tip} ${word}` : tip);
 
 /** The card's read-mores for the four headlines (decision 0038). */
 export const VAULT_HEAD_TIPS = {
@@ -202,6 +210,23 @@ export function LostAssetsCaution({
   );
 }
 
+/** "; the wrapped waEthUSDC's share price +0.35% over the same days": an
+ *  Umbrella stake's asset grows inside its own share, which the stake's share
+ *  price cannot show (decision 0047 as amended, ui-jobs 664). Stated beside
+ *  the Yield subline, never added into the figure. */
+function AssetGrowth({ v, y }: { v: VaultSummary; y: MeasuredYield }) {
+  const a = v.assetYield;
+  if (!VAULT_FAMILIES[v.family].assetGrows || !a || !("yearly" in a)) return null;
+  const same = a.from.day === y.from.day && a.to.day === y.to.day;
+  return (
+    <span data-asset-growth={a.change}>
+      {`; the wrapped ${v.asset.symbol}'s share price `}
+      <Prov info={vaultAssetGrowthProv(v, a)}>{changeText(a.change)}</Prov>
+      {same ? " over the same days" : ` over the ${a.days} days to ${formatDate(new Date(a.to.day * 86_400_000))}`}
+    </span>
+  );
+}
+
 /** "decimals disagree" under a "—" where the vault's asset states decimals
  *  its conversion does not work at (ui-jobs 664): the reason on a press on
  *  the card, in a title on the row. */
@@ -288,7 +313,9 @@ export function vaultHeads({
       id: "share-price",
       label: "Share price",
       tier: "measure",
-      labelTip: detail ? VAULT_HEAD_TIPS.sharePrice : undefined,
+      labelTip: detail
+        ? withDocsWord(VAULT_HEAD_TIPS.sharePrice, VAULT_FAMILIES[v.family].sharePriceDocsWord)
+        : undefined,
       value:
         v.sharePrice && !v.assetScale ? (
           <span
@@ -311,11 +338,12 @@ export function vaultHeads({
   // no figure and a subline saying why; a vault under the dust floor is too
   // small to measure (ui-jobs 542). The interpretation tip goes with the label.
   const yieldFigure = measuredYield(storeYield, v.totalAssets?.raw);
+  const docsWord = VAULT_FAMILIES[v.family].yieldDocsWord;
   if (yieldFigure && "yearly" in yieldFigure) {
     heads.push({
       id: "yield",
       label: "Yield",
-      labelTip: detail ? VAULT_HEAD_TIPS.yield : YIELD_LABEL_TIP,
+      labelTip: withDocsWord(detail ? VAULT_HEAD_TIPS.yield : YIELD_LABEL_TIP, docsWord),
       labelTipOnListing: true,
       value: (
         <span
@@ -339,6 +367,7 @@ export function vaultHeads({
             : {})}
         >
           {yieldSublineText(yieldFigure)}
+          <AssetGrowth v={v} y={yieldFigure} />
           {v.illiquid && <IlliquidCaution vault={v} il={v.illiquid} detail={detail} />}
         </span>
       ),
@@ -347,7 +376,7 @@ export function vaultHeads({
     heads.push({
       id: "yield",
       label: "Yield",
-      labelTip: detail ? VAULT_HEAD_TIPS.yield : undefined,
+      labelTip: detail ? withDocsWord(VAULT_HEAD_TIPS.yield, docsWord) : undefined,
       value: (
         <span className="text-[15px] font-normal text-rb-500" data-cell="yield" data-yield-none="too-small">
           too small to measure
@@ -365,7 +394,7 @@ export function vaultHeads({
     heads.push({
       id: "yield",
       label: "Yield",
-      labelTip: detail ? VAULT_HEAD_TIPS.yield : undefined,
+      labelTip: detail ? withDocsWord(VAULT_HEAD_TIPS.yield, docsWord) : undefined,
       value: null,
       sub: (
         <span data-yield-none={none}>

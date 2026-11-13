@@ -337,7 +337,9 @@ export function VaultIndexTable({
         </p>
       )}
       <DataTable
-        caption={`${part === "funded" ? "Vaults" : "Vaults that hold nothing"}; total assets and share price are in each vault’s asset`}
+        // The asset's mark beside every amount says which asset it is in
+        // (ui-jobs 664, VA12: the reading contract's remedy 1).
+        caption={part === "funded" ? "Vaults" : "Vaults that hold nothing"}
         tableClassName="min-w-[940px] text-sm"
         stacked
         rowHeight="one"
