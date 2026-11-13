@@ -116,6 +116,16 @@ test("withdrawals: a pause leads; Yearn's idle part; Umbrella's cooldown; unread
   assert.equal(p.withdrawals.headline, "Withdrawals are paused");
   const y = lines({ family: "yearn-v3", exit: { kind: "idle", block: 1, idle: "250", total: "1000" } });
   assert.equal(y.withdrawals.headline, "25% of the vault's assets idle at the last read");
+  const yh = lines({
+    family: "yearn-v3",
+    exit: { kind: "idle", block: 1, idle: "0", total: "1000" },
+    holder: { block: 1, claim: "100000000", maxWithdraw: "100000000" },
+  });
+  assert.equal(yh.withdrawals.headline, "All of this position could be withdrawn at the last read");
+  assert.equal(
+    yh.withdrawals.sentence,
+    "0% of the vault's assets idle at the last read. All of them were lent to its strategies, which pay a withdrawal as far as they can free the asset. The figure for this position is the vault's maxWithdraw, which counts what its strategies can free through the withdrawal queue.",
+  );
   const u = lines({
     family: "umbrella-stake",
     exit: { kind: "cooldown", block: 1, cooldownSeconds: 20 * 86_400, windowSeconds: 2 * 86_400 },

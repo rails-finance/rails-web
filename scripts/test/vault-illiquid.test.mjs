@@ -77,6 +77,17 @@ test("a market at full utilisation and the maximum rate, holding most of the vau
   );
 });
 
+test("a rate under the ceiling prints the market's rate and names the ceiling", () => {
+  const il = caught(8453, 100, T, [
+    idle(10n),
+    leg({ vaultAssets: 990n, supplyAssets: 1000n, borrowAssets: 999n, settledUtilisation: 0.999 }),
+  ]);
+  assert.equal(
+    illiquidSentence(il),
+    "The RLP market holds 99% of the vault, 99.9% borrowed at 794% a year, before compounding (the ceiling is 800%).",
+  );
+});
+
 test("under 10% of the vault is not caught", () => {
   assert.equal(caught(8453, 1, T, [idle(950n), leg({ vaultAssets: 50n })]), null);
 });

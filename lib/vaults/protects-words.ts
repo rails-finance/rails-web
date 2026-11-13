@@ -241,9 +241,10 @@ export function protectsLine(f: ProtectsFact): ProtectsLine {
             ? "Profit reaches the share price at once"
             : `Profit reaches the share price over ${days(f.unlock)}`,
         sentence:
-          f.roleManager === ZERO
-            ? "No role manager is set, and role holders' changes take effect at once."
-            : `The role manager, ${shortHex(f.roleManager)}, assigns every role, and role holders' changes take effect at once.`,
+          (f.roleManager === ZERO
+            ? "No role manager is set."
+            : `The role manager, ${shortHex(f.roleManager)}, assigns every role.`) +
+          " Yearn's contract reference lists no delay on any role holder's change; Rails has not read the vault's source.",
         gap: "Whether a role holder works behind a timelock of its own is not read.",
       };
     case "aave-gov": {
