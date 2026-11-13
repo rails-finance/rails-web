@@ -9,7 +9,7 @@
 // the head, the rate curve, the parameters, and history and holders as
 // missing, since rails-server keeps those for the Aave family alone).
 //
-// Surface rules (decision 0059): house labels with APR in the rate tips; the
+// Surface rules (decision 0059): the docs' APY labels on the rates; the
 // read time in the head's stamp with the block and contracts in its receipt;
 // the Comptroller, oracle and rate model off-site in the ⋮; a market token's
 // address in its asset cell's receipt. A state every market shares (borrowing
@@ -42,6 +42,7 @@ import { MOONWELL_BASE_BORROW_FREEZE_DATE } from "@/lib/moonwell-base/borrow-fre
 import { COMPTROLLER_FAMILIES, vocabFamily, type ComptrollerFamily } from "@/lib/comptroller/families";
 import type { ComptrollerMarket, ComptrollerRead } from "@/lib/comptroller/markets";
 import { curveConstants, modelUtilisation } from "@/lib/comptroller/rate-model";
+import { apyOfYear, yearOfApy } from "@/lib/comptroller/apy";
 import {
   cmAmountProv,
   cmAvailableProv,
@@ -79,14 +80,13 @@ import type { ReservePageData } from "@/components/shared/product/reserve-page";
 
 // ── Words ────────────────────────────────────────────────────────────────────
 
-const RATE_TIP = {
-  supply: "What suppliers earn a year, as an APR (simple, not compounded)",
-  borrow: "What borrowers pay a year, as an APR (simple, not compounded)",
-} as const;
+/** The rate columns' tips: an APY, compounded the family's way. */
+const rateTip = (f: ComptrollerFamily, side: "supply" | "borrow") =>
+  `What ${side === "supply" ? "suppliers earn" : "borrowers pay"} a year as an APY, ${f.apy.compounding}`;
 
 const TIP = {
   available: "The token the market holds now: what can be withdrawn or borrowed",
-  collateral: "The collateral factor: the share of a supply's value that counts toward borrowing",
+  collateral: "The share of a supply's value that counts toward borrowing",
   util: "Borrowed ÷ (cash + borrowed − reserves), the quotient the rate model prices from",
 } as const;
 
@@ -108,7 +108,7 @@ const LEARN_MORE: Record<ComptrollerFamily["token"], (f: ComptrollerFamily) => L
       },
       {
         bold: "Rate model",
-        text: "the contract that sets the borrow rate from utilisation. Most turn steeper at a kink.",
+        text: "the contract that sets the borrow rate from utilization. Most turn steeper at a kink.",
       },
     ],
     links: [{ label: f.docs.label, url: f.docs.href }],
@@ -129,7 +129,7 @@ const LEARN_MORE: Record<ComptrollerFamily["token"], (f: ComptrollerFamily) => L
       },
       {
         bold: "Rate model",
-        text: "the contract that sets the borrow rate from utilisation. It turns steeper at a kink.",
+        text: "the contract that sets the borrow rate from utilization. It turns steeper at a kink.",
       },
     ],
     links: [{ label: f.docs.label, url: f.docs.href }],
@@ -139,16 +139,16 @@ const LEARN_MORE: Record<ComptrollerFamily["token"], (f: ComptrollerFamily) => L
 const CURVE_HELP: LearnMoreContent = {
   title: "How the rate curve works",
   intro:
-    "Each market names a rate model. The model sets the borrow rate from the market's utilisation, the share of its money on loan.",
+    "Each market names a rate model. The model sets the borrow rate from the market's utilization, the share of its money on loan.",
   detailsHeading: "The model's terms:",
   details: [
-    { bold: "Base rate", text: "the borrow rate at zero utilisation." },
-    { bold: "Multiplier", text: "how much the rate climbs for each unit of utilisation, up to the kink." },
-    { bold: "Kink", text: "the utilisation where the rate turns steeper." },
+    { bold: "Base rate", text: "the borrow rate at zero utilization." },
+    { bold: "Multiplier", text: "how much the rate climbs for each unit of utilization, up to the kink." },
+    { bold: "Kink", text: "the utilization where the rate turns steeper." },
     { bold: "Jump multiplier", text: "how much it climbs for each unit past the kink." },
   ],
   extraParagraphs: [
-    "Suppliers earn the borrow rate times utilisation, less the reserve factor. A model with no kink climbs in a straight line.",
+    "Suppliers earn the borrow rate times utilization, less the reserve factor. A model with no kink climbs in a straight line.",
   ],
 };
 
@@ -285,7 +285,7 @@ function figuresOf(x: Ctx, m: ComptrollerMarket) {
       DASH
     );
   const u = utilisationOf(m);
-  const utilisation =
+  const utilization =
     u != null && m.rateModel ? (
       <Prov info={cmUtilisationProv(x.v, c, m.rateModel)}>{pct(u, 0)}</Prov>
     ) : u != null ? (
@@ -337,7 +337,7 @@ function figuresOf(x: Ctx, m: ComptrollerMarket) {
     borrowed: pair(m.borrowed, cmValueProv(x.v, c, "borrowed"), "borrow"),
     available: pair(m.cash, cmAvailableProv(x.v, c, true), null),
   };
-  return { supplied, borrowed, available, amounts, supplyRate, borrowRate, utilisation, price, u };
+  return { supplied, borrowed, available, amounts, supplyRate, borrowRate, utilization, price, u };
 }
 
 /** The Collateral cell: the collateral factor, or "Not collateral" at zero. */
@@ -415,7 +415,11 @@ function Tags({ x, m }: { x: Ctx; m: ComptrollerMarket }) {
         </span>
       )}
       {(mint || borrow) && (
-        <span className={TAG} title="The pause guardian has stopped new business here" data-market-paused="">
+        <span
+          className={TAG}
+          title={mint && borrow ? x.f.pause.both : mint ? x.f.pause.supply : x.f.pause.borrow}
+          data-market-paused=""
+        >
           <Prov info={cmPauseProv(x.v, c, mint ? "supply" : "borrow", true)}>
             {mint && borrow ? "paused" : mint ? "supply paused" : "borrow paused"}
           </Prov>
@@ -425,7 +429,7 @@ function Tags({ x, m }: { x: Ctx; m: ComptrollerMarket }) {
   );
 }
 
-/** The utilisation bar with the kink tick; the share beside it carries its receipt. */
+/** The utilization bar with the kink tick; the share beside it carries its receipt. */
 function UtilBar({ m, value }: { m: ComptrollerMarket; value: ReactNode }) {
   const u = utilisationOf(m);
   const kink = m.rateModel?.kink ?? null;
@@ -435,7 +439,7 @@ function UtilBar({ m, value }: { m: ComptrollerMarket; value: ReactNode }) {
           {
             f: kink,
             kind: "neutral",
-            title: `Rate model kink · the utilisation this market's curve turns at (${pct(kink, 0)})`,
+            title: `Rate model kink · the utilization this market's curve turns at (${pct(kink, 0)})`,
           },
         ]
       : [];
@@ -467,11 +471,11 @@ function marketsCsv(x: Ctx): string {
     "borrowed",
     "available",
     "reserves",
-    "supply_apr",
-    "borrow_apr",
+    "supply_apy",
+    "borrow_apy",
     "collateral_factor",
     "reserve_factor",
-    "utilisation",
+    "utilization",
     "supply_cap",
     "borrow_cap",
     "supply_paused",
@@ -516,16 +520,16 @@ function marketsMarkdown(x: Ctx): string {
     `- Markets listed: ${x.read.markets.length}`,
     `- Supplied: ${usdText(t.supplied)}`,
     `- Borrowed: ${usdText(t.borrowed)}`,
-    `- Utilisation: ${pct(t.u)}`,
+    `- Utilization: ${pct(t.u)}`,
     "",
-    "| Asset | Market | Supplied | Borrowed | Available | Supply rate | Borrow rate | Collateral | Utilisation |",
+    "| Asset | Market | Supplied | Borrowed | Available | Supply APY | Borrow APY | Collateral factor | Utilization |",
     "|---|---|---|---|---|---|---|---|---|",
     ...x.read.markets.map(
       (m) =>
         `| ${m.symbol} | ${m.marketSymbol} | ${sizeText(m, m.supplied)} | ${sizeText(m, m.borrowed)} | ${sizeText(m, m.cash)} | ${m.supplyApr != null ? ratePercentText(m.supplyApr) : "—"} | ${m.borrowApr != null ? ratePercentText(m.borrowApr) : "—"} | ${m.collateralFactor != null ? pct(m.collateralFactor) : "Not collateral"} | ${pct(utilisationOf(m), 0)} |`,
     ),
     "",
-    `Read from ${chain} at block ${x.read.blockNumber.toLocaleString("en-US")}. Rates are APRs.`,
+    `Read from ${chain} at block ${x.read.blockNumber.toLocaleString("en-US")}. Rates are APYs, ${x.f.apy.compounding}.`,
   ].join("\n");
 }
 
@@ -580,7 +584,7 @@ function MarketsExplainer({ x }: { x: Ctx }) {
         </ExplainBullet>
         {t.u != null && (
           <ExplainBullet>
-            Utilisation <Fig bold>{pct(t.u)}</Fig> is the share of the supply on loan.
+            Utilization <Fig bold>{pct(t.u)}</Fig> is the share of the supply on loan.
           </ExplainBullet>
         )}
         {k.fixedPrice > 0 && (
@@ -597,7 +601,7 @@ function MarketsExplainer({ x }: { x: Ctx }) {
           </ExplainBullet>
         ) : (
           <ExplainBullet>
-            A market&rsquo;s borrow rate rises with its utilisation, and suppliers earn it less the reserve factor.
+            A market&rsquo;s borrow rate rises with its utilization, and suppliers earn it less the reserve factor.
           </ExplainBullet>
         )}
       </ExplainGroup>
@@ -649,7 +653,7 @@ function MarketsExplainer({ x }: { x: Ctx }) {
                   )}
                 </>
               )}
-              . Repaying, withdrawing and liquidating still run.
+              . Repaying and withdrawing still run.
             </ExplainBullet>
           )}
           {k.closedToSupply > 0 && (
@@ -700,20 +704,10 @@ function HeadNotes({ x }: { x: Ctx }) {
       {note("fixed-price", k.fixedPrice, "with a fixed price", "Markets priced at a number governance stored")}
       {note("deprecated", k.deprecated, "deprecated", `Deprecated: ${DEPRECATED_CONSEQUENCE}`)}
       {k.mintPaused > 0 && k.mintPaused === k.borrowPaused
-        ? note(
-            "paused",
-            k.mintPaused,
-            "paused to new supply and borrowing",
-            "The pause guardian has stopped new business",
-          )
+        ? note("paused", k.mintPaused, "paused to new supply and borrowing", x.f.pause.both)
         : [
-            note("supply-paused", k.mintPaused, "paused to new supply", "The pause guardian has stopped new supply"),
-            note(
-              "borrow-paused",
-              k.borrowPaused,
-              "paused to new borrowing",
-              "The pause guardian has stopped new borrowing",
-            ),
+            note("supply-paused", k.mintPaused, "paused to new supply", x.f.pause.supply),
+            note("borrow-paused", k.borrowPaused, "paused to new borrowing", x.f.pause.borrow),
           ]}
       {note(
         "closed-to-supply",
@@ -847,7 +841,7 @@ function marketHead(x: Ctx): ProductHead {
       },
       {
         slot: "usage",
-        label: "Utilisation",
+        label: "Utilization",
         // A ratio of the two traced figures beside it.
         value: <span data-prov-exempt="">{pct(t.u)}</span>,
         tip: "Borrowed ÷ supplied, both in USD at the oracle's prices: the two figures beside it in this band.",
@@ -919,16 +913,16 @@ function marketRow(x: Ctx, m: ComptrollerMarket): ReserveRowModel {
       },
       supplyRate: {
         sort: m.supplyApr ?? -1,
-        title: `Supply rate: ${RATE_TIP.supply.toLowerCase()}`,
+        title: `Supply APY: ${rateTip(x.f, "supply").toLowerCase()}`,
         node: z.supplyRate,
       },
       borrowRate: {
         sort: m.borrowApr ?? -1,
-        title: `Borrow rate: ${RATE_TIP.borrow.toLowerCase()}`,
+        title: `Borrow APY: ${rateTip(x.f, "borrow").toLowerCase()}`,
         node: z.borrowRate,
       },
       collateral: { sort: m.collateralFactor ?? 0, node: <Collateral x={x} m={m} /> },
-      util: { sort: z.u ?? -1, node: <UtilBar m={m} value={z.utilisation} /> },
+      util: { sort: z.u ?? -1, node: <UtilBar m={m} value={z.utilization} /> },
     },
   };
 }
@@ -942,7 +936,7 @@ function marketsTable(x: Ctx): ReserveTableModel {
     line: (
       <>
         Every market the Comptroller lists; sort any column. USD is the oracle&rsquo;s price. A cap shows beside its
-        dollar value once 90% of it is in use. The bar is utilisation, and its tick is the rate model&rsquo;s kink. A
+        dollar value once 90% of it is in use. The bar is utilization, and its tick is the rate model&rsquo;s kink. A
         row opens its market&rsquo;s page.
       </>
     ),
@@ -963,29 +957,29 @@ function marketsTable(x: Ctx): ReserveTableModel {
       },
       {
         key: "supplyRate",
-        label: "Supply rate",
+        label: "Supply APY",
         align: R,
         className: RATE,
-        tip: RATE_TIP.supply,
+        tip: rateTip(f, "supply"),
         hooks: { "data-rate": "supply" },
       },
       {
         key: "borrowRate",
-        label: "Borrow rate",
+        label: "Borrow APY",
         align: R,
         className: RATE,
-        tip: RATE_TIP.borrow,
+        tip: rateTip(f, "borrow"),
         hooks: { "data-rate": "borrow" },
       },
       {
         key: "collateral",
-        label: "Collateral",
+        label: "Collateral factor",
         align: R,
         className: RATE,
         tip: TIP.collateral,
         hooks: { "data-collateral": "" },
       },
-      { key: "util", label: "Utilisation", className: "lg:w-[180px] lg:min-w-[112px]", wide: true, tip: TIP.util },
+      { key: "util", label: "Utilization", className: "lg:w-[180px] lg:min-w-[112px]", wide: true, tip: TIP.util },
     ],
     rows: x.read.markets.map((m) => marketRow(x, m)),
     defaultSort: { key: "supplied", dir: "desc" },
@@ -1090,30 +1084,30 @@ function MarketExplainer({ x, m }: { x: Ctx; m: ComptrollerMarket }) {
                 <ExplainSub>
                   {m.reserveFactor >= 0.9999
                     ? "The market keeps all of the borrowers' interest as reserves, so suppliers earn nothing."
-                    : `The supply rate is the borrow rate times utilisation, less the ${pct(m.reserveFactor, 0)} reserve factor.`}
+                    : `The supply rate is the borrow rate times utilization, less the ${pct(m.reserveFactor, 0)} reserve factor.`}
                 </ExplainSub>
               )
             }
           >
-            Suppliers earn <Fig bold>{ratePercentText(m.supplyApr)}</Fig> a year, as an APR.
+            Suppliers earn <Fig bold>{ratePercentText(m.supplyApr)}</Fig> a year, as an APY {x.f.apy.compounding}.
           </ExplainBullet>
         ) : (
           m.reserveFactor != null && (
             <ExplainBullet>
               {m.reserveFactor >= 0.9999
                 ? "The market keeps all of the borrowers' interest as reserves, so suppliers earn nothing."
-                : `The supply rate is the borrow rate times utilisation, less the ${pct(m.reserveFactor, 0)} reserve factor.`}
+                : `The supply rate is the borrow rate times utilization, less the ${pct(m.reserveFactor, 0)} reserve factor.`}
             </ExplainBullet>
           )
         )}
         {m.borrowApr != null && m.borrowed > 0 && (
           <ExplainBullet>
-            Borrowers pay <Fig bold>{ratePercentText(m.borrowApr)}</Fig> a year, as an APR.
+            Borrowers pay <Fig bold>{ratePercentText(m.borrowApr)}</Fig> a year, as an APY {x.f.apy.compounding}.
           </ExplainBullet>
         )}
         {u != null && (
           <ExplainBullet>
-            Utilisation <Fig bold>{pct(u, 0)}</Fig> is the share of the supply on loan.
+            Utilization <Fig bold>{pct(u, 0)}</Fig> is the share of the supply on loan.
             {u > 1 ? " It passes 100% when the reserves are larger than the cash left." : ""}
           </ExplainBullet>
         )}
@@ -1133,7 +1127,7 @@ function MarketExplainer({ x, m }: { x: Ctx; m: ComptrollerMarket }) {
               : m.mintPaused
                 ? "Supplying is"
                 : "Borrowing is"}{" "}
-            paused here; repaying, withdrawing and liquidating still run.
+            paused here; repaying and withdrawing still run.
           </ExplainBullet>
         )}
         {supplyCap.state === "closed" && (
@@ -1159,9 +1153,9 @@ function marketMarkdown(x: Ctx, m: ComptrollerMarket): string {
     `- Supplied: ${sizeText(m, m.supplied)}`,
     `- Borrowed: ${sizeText(m, m.borrowed)}`,
     `- Available: ${sizeText(m, m.cash)}`,
-    ...(m.supplyApr != null ? [`- Supply rate: ${ratePercentText(m.supplyApr)} APR`] : []),
-    ...(m.borrowApr != null ? [`- Borrow rate: ${ratePercentText(m.borrowApr)} APR`] : []),
-    ...(u != null ? [`- Utilisation: ${pct(u, 0)}`] : []),
+    ...(m.supplyApr != null ? [`- Supply APY: ${ratePercentText(m.supplyApr)}, ${x.f.apy.compounding}`] : []),
+    ...(m.borrowApr != null ? [`- Borrow APY: ${ratePercentText(m.borrowApr)}, ${x.f.apy.compounding}`] : []),
+    ...(u != null ? [`- Utilization: ${pct(u, 0)}`] : []),
     `- Collateral factor: ${m.collateralFactor != null ? pct(m.collateralFactor) : "0% (not collateral)"}`,
     ...(m.reserveFactor != null ? [`- Reserve factor: ${pct(m.reserveFactor)}`] : []),
     "",
@@ -1260,21 +1254,21 @@ function reserveHead(x: Ctx, m: ComptrollerMarket): ProductHead {
       },
       {
         slot: "rateIn",
-        label: "Supply rate",
-        tip: RATE_TIP.supply,
+        label: "Supply APY",
+        tip: rateTip(f, "supply"),
         value: <span data-vital="supply-rate">{u.supplyRate}</span>,
       },
       {
         slot: "rateOut",
-        label: "Borrow rate",
-        tip: RATE_TIP.borrow,
+        label: "Borrow APY",
+        tip: rateTip(f, "borrow"),
         value: <span data-vital="borrow-rate">{u.borrowRate}</span>,
       },
       {
         slot: "usage",
-        label: "Utilisation",
+        label: "Utilization",
         tip: TIP.util,
-        value: <span data-vital="utilisation">{u.utilisation}</span>,
+        value: <span data-vital="utilisation">{u.utilization}</span>,
       },
     ],
     entries: [entry("supply", m.supplied), entry("borrow", m.borrowed)].filter((e): e is EntryLink => e != null),
@@ -1295,14 +1289,19 @@ function curveOf(x: Ctx, m: ComptrollerMarket): RateCurveModel | Missing {
   const model = m.rateModel;
   if (!model) return { missing: "The rate model's terms could not be read." };
   const k = curveConstants(model);
+  // The model's terms are simple rates a year; the chart draws them, and the
+  // point now, as the family's APY.
+  const steps = x.f.apy.steps;
   return {
     ...k,
     reserveFactor: m.reserveFactor ?? 0,
     now: {
       utilisation: m.supplied > 0 ? modelUtilisation(model, m.cash, m.borrowed, m.reserves) : null,
-      borrow: m.borrowApr ?? 0,
-      supply: m.supplyApr ?? 0,
+      borrow: yearOfApy(m.borrowApr ?? 0, steps),
+      supply: yearOfApy(m.supplyApr ?? 0, steps),
     },
+    form: { of: (rate: number) => apyOfYear(rate, steps), borrow: "Borrow APY", supply: "Supply APY" },
+    utilizationWord: "utilization",
     symbol: m.symbol,
     receipt: cmCurveProv(x.v, coordsOf(x, m), model),
   };
@@ -1330,18 +1329,18 @@ function RateTerms({ x, m }: { x: Ctx; m: ComptrollerMarket }) {
   const year = (v: number) => `${ratePercentText(v)} a year`;
   return (
     <dl className="mt-4 grid max-w-md grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-[13px]" data-rate-terms="">
-      <Term term="Base rate" title="The borrow rate at zero utilisation">
+      <Term term="Base rate" title="The borrow rate at zero utilization">
         <Prov info={cmRateTermProv(x.v, c, "base", wp, read)}>{year(model.base)}</Prov>
       </Term>
-      <Term term="Multiplier" title="How much the borrow rate climbs per unit of utilisation, up to the kink">
+      <Term term="Multiplier" title="How much the borrow rate climbs per unit of utilization, up to the kink">
         <Prov info={cmRateTermProv(x.v, c, "multiplier", wp, read)}>{year(model.multiplier)}</Prov>
       </Term>
       {model.kink != null ? (
         <>
-          <Term term="Kink" title="The utilisation where the borrow rate turns steeper">
+          <Term term="Kink" title="The utilization where the borrow rate turns steeper">
             <Prov info={cmRateTermProv(x.v, c, "kink", wp, read)}>{pct(model.kink)}</Prov>
           </Term>
-          <Term term="Jump multiplier" title="How much the borrow rate climbs per unit of utilisation past the kink">
+          <Term term="Jump multiplier" title="How much the borrow rate climbs per unit of utilization past the kink">
             <Prov info={cmRateTermProv(x.v, c, "jump", wp, read)}>{year(model.jump ?? 0)}</Prov>
           </Term>
         </>
@@ -1400,10 +1399,10 @@ function Parameters({ x, m, price }: { x: Ctx; m: ComptrollerMarket; price: Reac
       <Term term="Borrow cap" title="The share of the borrow cap in use, and the cap">
         <CapLine x={x} m={m} side="borrow" />
       </Term>
-      <Term term="Supplying" title="Whether the pause guardian has stopped new supply">
+      <Term term="Supplying" title="Whether new supply is open or paused">
         <Prov info={cmPauseProv(x.v, c, "supply", m.mintPaused)}>{m.mintPaused ? "paused" : "open"}</Prov>
       </Term>
-      <Term term="Borrowing" title="Whether the pause guardian has stopped new borrowing">
+      <Term term="Borrowing" title="Whether new borrowing is open or paused">
         <Prov info={cmPauseProv(x.v, c, "borrow", m.borrowPaused)}>{m.borrowPaused ? "paused" : "open"}</Prov>
       </Term>
       {m.deprecatedSince && (

@@ -68,7 +68,7 @@ const LANES = [
   { api: "aave-v3-base", line: "Health factor", debt: aaveDebt, path: (r) => `/base/aave-v3/${r.wallet}` },
   { api: "seamless", line: "Health factor", debt: aaveDebt, path: (r) => `/base/seamless/${r.wallet}` },
   // The opened card's risk headline and the line under it (ui-jobs 209).
-  { api: "moonwell-base", line: "Health factor", debt: borrowsDebt, path: (r) => `/base/moonwell/${r.wallet}` },
+  { api: "moonwell-base", line: "Credit remaining", debt: borrowsDebt, path: (r) => `/base/moonwell/${r.wallet}` },
   {
     api: "compound-base",
     line: "Borrowing limit used",

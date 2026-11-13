@@ -2,16 +2,19 @@
 // The borrow-capacity readout past its own ceiling — a stated multiple, not
 // a fourteen-digit percentage.
 // ----------------------------------------------------------------------------
-// The Moonwell position card's stat "Debt against the liquidation line"
-// (C18, `data-panel-row="liquidation-line"`) states where the debt stands
-// against the liquidation line: "61.2%". When the collateral
+// The Moonwell position card's headline "Credit remaining" (C10,
+// `data-card-head="credit-remaining"`, ui-jobs 632) states the share of the
+// credit limit still unborrowed, Moonwell's docs' form: "10.2%". Until ui-jobs
+// 632 the card stated the complement, "Debt against the liquidation line"
+// (C18), with the same floor. When the collateral
 // left is dust against the debt — the 2026-08-27 MAMO exploiter holds $9.3M of
 // debt against a capacity line worth under a cent — that share printed as
 // "19070621780048.1% of the liquidation line" (and the Explanation sentence
 // "The debt stands at 19070621780048.1% of the liquidation line"). Since
 // 2026-09-03 `capacityShare` (lib/shared/capacity-share.ts) stops the
-// percentage at 1,000× and states the floor instead: "over 1,000×". The
-// receipt behind the figure is the same division.
+// percentage at 1,000× and states the floor instead; the credit remaining
+// headline states it as "below −99,900%" (debt over 1,000× the credit limit).
+// The receipt behind the figure is the same division.
 //
 // Fixture: the exploiter wallet (the ratio is ~1.9e11 today and only grows
 // as interest accrues on a debt nothing backs) is a permanent chain fact —
@@ -29,8 +32,8 @@
 // Checks:
 //   0. Precondition — EXPLOITER's debt ÷ capacity is above the ceiling; the
 //      queried CONTROL's sits between 0 and the ceiling.
-//   1. EXPLOITER page — the card's "Debt against the liquidation line" stat
-//      reads "over 1,000×".
+//   1. EXPLOITER page — the card's "Credit remaining" headline reads
+//      "below −99,900%".
 //   2. EXPLOITER page — no seven-digit-plus percentage anywhere in the
 //      document (the Explanation stays mounted while hidden, so this
 //      covers its sentence too).
@@ -52,12 +55,12 @@ const STRIP_TIMEOUT_MS = 240000;
 const CEILING = 1000;
 
 const EXPLOITER = "0x719eae70d4a83f35bf82a2740699f5db84be919d";
-// The value of the card's "Debt against the liquidation line" stat (C18). It
-// read as a line under Health factor in the headlines (C10) until the stats
-// grid took it; the heading-row strip read "Borrow capacity: …" until 2 Oct 2026.
-const STAT = '[data-anatomy="C18"] [data-panel-row="liquidation-line"] dd';
-const FLOOR_TEXT = "over 1,000×";
-const SHARE_RE = /^\d+\.\d%$/;
+// The card's "Credit remaining" headline (C10), label and value. Until ui-jobs
+// 632 the stat was "Debt against the liquidation line" (C18); the heading-row
+// strip read "Borrow capacity: …" until 2 Oct 2026.
+const STAT = '[data-card-head="credit-remaining"]';
+const FLOOR_TEXT = "below −99,900%";
+const SHARE_RE = /−?\d+\.\d%$/;
 const GIANT_PCT_RE = /\d{7,}\.\d%/;
 
 let failures = 0;

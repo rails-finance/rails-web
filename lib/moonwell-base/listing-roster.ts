@@ -11,7 +11,7 @@
 // named block, and the proxy makes no chain call of its own.
 
 import type { MoonwellListingMarket, MoonwellListingRoster } from "@/lib/sources/api/moonwell-positions";
-import { annualizePerTimestamp } from "@/lib/sources/chain/moonwell-market-state";
+import { perTimestampApy } from "@/lib/sources/chain/moonwell-market-state";
 import { MTOKEN_DECIMALS } from "@/lib/moonwell/asset-catalog";
 
 /** One market's state as the rails route ships it beside the rows. */
@@ -47,7 +47,7 @@ function ratio(raw: string | null, exp: number): number | null {
 function apr(raw: string | null): number | null {
   if (raw == null || raw === "") return null;
   try {
-    return annualizePerTimestamp(raw.split(".")[0]);
+    return perTimestampApy(raw.split(".")[0]);
   } catch {
     return null;
   }

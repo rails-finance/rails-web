@@ -395,11 +395,11 @@ if (pricedLiq) {
       `${text} vs ${(premium * 100).toFixed(3)}%`,
     );
   } else check(`liquidation #${n}: premium value renders`, false);
-  const incentive = card.getByText(/Incentive at block/).first();
+  // The docs' multiplier form, "Liquidation incentive 1.10×" (ui-jobs 632).
+  const incentive = card.getByText(/Liquidation incentive/).first();
   check(
-    `liquidation #${n}: incentive reference reads +${((d.incentiveAtBlock - 1) * 100).toFixed(2)}%`,
-    (await incentive.count()) > 0 &&
-      (await incentive.innerText()).includes(`+${((d.incentiveAtBlock - 1) * 100).toFixed(2)}%`),
+    `liquidation #${n}: incentive reference reads ${d.incentiveAtBlock.toFixed(2)}×`,
+    (await incentive.count()) > 0 && (await incentive.innerText()).includes(`${d.incentiveAtBlock.toFixed(2)}×`),
   );
   const pills = card.locator('[data-price-row] [title*="oracle at block"]');
   check(
