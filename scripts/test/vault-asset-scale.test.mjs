@@ -35,7 +35,7 @@ test("the withheld amount's tip says why, once, in plain words", () => {
     assetScaleAbsentTip("wUSDL", WUSDL),
     "wUSDL states 6 decimals, but converts to USDG at 18. Read at 6, an amount in wUSDL comes out a trillion times too large, so none is shown.",
   );
-  assert.match(assetScaleSentence("wUSDL", WUSDL), /a trillion times too large\.$/);
+  assert.equal(assetScaleSentence("wUSDL", WUSDL), assetScaleAbsentTip("wUSDL", WUSDL));
 });
 
 test("a receipt keeps its read and adds the one sentence", () => {

@@ -26,14 +26,10 @@ export function impliedDecimals(stated: number, wrapsDecimals: number, per1e18: 
 
 const TIMES: Record<number, string> = { 3: "a thousand", 6: "a million", 9: "a billion", 12: "a trillion" };
 
-/** The pill's sentence. */
+/** The pill's sentence: the same words as the tip under a withheld figure,
+ *  since the page prints no amount in the asset. */
 export function assetScaleSentence(symbol: string, s: AssetScale): string {
-  const k = Math.abs(s.implied - s.stated);
-  const times = TIMES[k] ?? `10^${k}`;
-  return (
-    `${symbol} states ${s.stated} decimals, but converts to ${s.wraps.symbol} at ${s.implied}. ` +
-    `Amounts in ${symbol} here are read at ${s.stated}, so they read ${times} times too ${s.implied > s.stated ? "large" : "small"}.`
-  );
+  return assetScaleAbsentTip(symbol, s);
 }
 
 /** Why an amount in the asset is not shown (ui-jobs 664): the tip on "decimals
