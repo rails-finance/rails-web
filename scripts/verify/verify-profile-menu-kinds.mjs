@@ -341,6 +341,21 @@ for (const c of CASES) {
     JSON.stringify(kept),
   );
 
+  // An asset and a chain that do not meet: the row says so under its assets,
+  // in the Focus panel's words.
+  await page.locator(`${EDITOR} [data-focus-view-editor-cancel]`).click();
+  await page.locator(`${EDITOR} [data-asset-chooser-add]`).click();
+  await page.locator('[data-asset-top][data-asset-top^="1:"]', { hasText: "BOLD" }).first().click();
+  await page.keyboard.press("Escape");
+  await chain(8453).click();
+  await page.waitForSelector(`${EDITOR} [data-focus-chain-miss]`, { timeout: 20000 }).catch(() => {});
+  const miss = await page.locator(`${EDITOR} [data-focus-chain-miss] li`).allTextContents();
+  check(
+    "B2.2: BOLD on Base shows the miss line under the new row",
+    miss.includes("Rails knows no BOLD on Base"),
+    JSON.stringify(miss),
+  );
+
   // "Add from all assets": not in the row; still in the panel a row's Edit opens.
   check(
     "B2.2: the new row has no Add from all assets",

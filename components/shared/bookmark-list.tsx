@@ -30,7 +30,14 @@ import {
 } from "@/components/shared/data-table/data-table";
 
 import { walletHref } from "@/components/shared/front-door-search";
-import { chainName, FOCUS_OPTIONS, focusName, ViewIcons, viewName } from "@/components/shared/asset-scope-strip";
+import {
+  chainName,
+  FOCUS_OPTIONS,
+  focusName,
+  useFocusMisses,
+  ViewIcons,
+  viewName,
+} from "@/components/shared/asset-scope-strip";
 import { AssetChooser, optionKey } from "@/components/shared/asset-chooser";
 import { otherLayerOpen } from "@/components/shared/use-escape-close";
 import { ChainGlyph } from "@/components/icons/chain-glyphs";
@@ -1050,6 +1057,7 @@ function NewFocusRow({ at, start }: { at: number; start: number }) {
   const input = useRef<HTMLInputElement>(null);
   const holds = assets.length > 0 || chains.length > 0;
   const dirty = holds || name.trim() !== "";
+  const judged = useFocusMisses({ assets, chains });
   const reset = () => {
     setAssets([]);
     setChains([]);
@@ -1128,6 +1136,18 @@ function NewFocusRow({ at, start }: { at: number; start: number }) {
           countNoun={null}
           chainName={chainName}
         />
+        {/* Where the focus holds nothing on a chain, and where Rails cannot
+            say, as the Focus panel's Chains part lists them; under the assets,
+            the row's wide cell at every width. */}
+        {judged && judged.misses.length > 0 && (
+          <ul className="mt-2 text-[11px] leading-snug text-foreground" data-focus-chain-miss={judged.misses.length}>
+            {judged.misses.map((m) => (
+              <li key={m.text} data-miss-kind={m.kind}>
+                {m.text}
+              </li>
+            ))}
+          </ul>
+        )}
       </DataTableCell>
       <DataTableCell label="Chains" valign="middle" className="whitespace-nowrap">
         <ChainMarks chains={chains} label="Chains in the new focus" onChange={setChains} hook="data-focus-chain" />

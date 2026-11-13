@@ -174,7 +174,8 @@ export function AssetChooser({
 
   // Escape closes the open list first, wherever focus stands in it or on the
   // page's body (a press on a row leaves focus nowhere in WebKit), before any
-  // layer under it hears the press (the inline focus view editor; ui-jobs 670).
+  // layer under it hears the press (the new-focus row on /saved-views; ui-jobs
+  // 670, 672).
   // Capture phase, marked handled; a press inside another open layer is that
   // layer's.
   useEffect(() => {

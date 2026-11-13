@@ -142,7 +142,7 @@ export function focusName(picks: AssetPick[], chains: number[]): string {
   const names = [...new Set(picks.map(symbolOf))];
   const a = names.length > 3 ? `${names.slice(0, 3).join(", ")} +${names.length - 3}` : andList(names);
   const c = andList(chains.map(chainNameOf));
-  return a && c ? `${a} on ${c}` : a || c || "New view";
+  return a && c ? `${a} on ${c}` : a || c || "New focus";
 }
 
 /** A saved view's name: its own, else what it holds. */
