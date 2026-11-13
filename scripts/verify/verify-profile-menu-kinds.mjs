@@ -16,6 +16,9 @@
 // Escape that closes the profile menu opened over the row leaves the draft
 // alone. The row has no "Add from all assets" (it edits the view in use on
 // /assets); the panel a row's Edit opens keeps it.
+//
+// B4: a card's foot link opens its tab with a new history entry, so Back
+// returns to the Overview (color-grammar §4c); the tab row replaces it.
 
 import { chromium } from "playwright";
 import { BASE, bypassHeaders } from "./lib/host.mjs";
@@ -357,6 +360,37 @@ for (const c of CASES) {
   await page.locator('[data-saved-tab="overview"]').click();
   const foot = await page.locator('[data-saved-card="focus"] [data-saved-card-open]').textContent();
   check("B4: with one focus saved, the card's foot link reads Open 1 saved", foot.trim() === "Open 1 saved", foot);
+  await ctx.close();
+}
+
+// --- B4: a card's foot link adds a history entry -------------------------
+
+{
+  const { ctx, page } = await fresh(SEED);
+  for (const [kind, sel] of [
+    ["listings", '[data-saved-card="listings"] [data-saved-card-open]'],
+    ["focus", "[data-saved-card-new]"],
+  ]) {
+    await page.goto(`${BASE}/saved-views`, { waitUntil: "networkidle", timeout: 180000 });
+    await page.waitForSelector(sel);
+    await page.waitForTimeout(500);
+    await page.locator(sel).click();
+    await page.waitForSelector(`[data-saved-tab="${kind}"][aria-selected="true"]`, { timeout: 30000 }).catch(() => {});
+    const there = new URL(page.url()).searchParams.get("tab");
+    await page.goBack();
+    await page.waitForSelector('[data-saved-tab="overview"][aria-selected="true"]', { timeout: 30000 }).catch(() => {});
+    const back = await page.evaluate(() => ({
+      tab: new URL(location.href).searchParams.get("tab"),
+      path: location.pathname,
+      overview: document.querySelector('[data-saved-tab="overview"]')?.getAttribute("aria-selected"),
+      cards: !!document.querySelector("[data-saved-overview]"),
+    }));
+    check(
+      `B4: ${kind}'s card link opens its tab, and Back returns to the Overview`,
+      there === kind && back.path === "/saved-views" && back.tab === null && back.overview === "true" && back.cards,
+      JSON.stringify({ there, ...back }),
+    );
+  }
   await ctx.close();
 }
 

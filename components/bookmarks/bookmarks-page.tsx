@@ -76,23 +76,33 @@ export function BookmarksPage() {
       requestAnimationFrame(() => document.getElementById("saved-backup")?.scrollIntoView({ block: "start" }));
   }, []);
   // A link to `?tab=` can change the tab while this page stays mounted
-  // (ui-jobs 582): read it again when the address changes.
-  useEffect(() => {
+  // (ui-jobs 582): read it again when the address changes, on a render and
+  // on Back or Forward, which need not render this page.
+  const follow = () => {
     const t = tabFromUrl();
     if (t !== urlTab.current) {
       urlTab.current = t;
       setTab(t);
       setStartNew(0);
     }
-  });
-  const choose = (t: Tab) => {
+  };
+  useEffect(follow);
+  useEffect(() => {
+    window.addEventListener("popstate", follow);
+    return () => window.removeEventListener("popstate", follow);
+  }, []);
+  /** Opens a tab. The tab row's presses replace the history entry (a control
+   *  that changes what this page shows); a card's foot link adds one (`push`),
+   *  so Back returns to the Overview (color-grammar §4c). */
+  const choose = (t: Tab, push = false) => {
     urlTab.current = t;
     setTab(t);
     setStartNew(0);
     const url = new URL(window.location.href);
     if (t === "overview") url.searchParams.delete("tab");
     else url.searchParams.set("tab", t);
-    window.history.replaceState(window.history.state, "", url);
+    if (push) window.history.pushState(window.history.state, "", url);
+    else window.history.replaceState(window.history.state, "", url);
     window.scrollTo({ top: 0 });
   };
 
@@ -134,7 +144,7 @@ export function BookmarksPage() {
         {counts[kind] > 0 ? (
           <button
             type="button"
-            onClick={() => choose(kind)}
+            onClick={() => choose(kind, true)}
             className={`${FOOT_LINK} cursor-pointer font-semibold`}
             data-saved-card-open={kind}
           >
@@ -144,7 +154,7 @@ export function BookmarksPage() {
           <button
             type="button"
             onClick={() => {
-              choose("focus");
+              choose("focus", true);
               setStartNew((n) => n + 1);
             }}
             className={`${FOOT_LINK} cursor-pointer font-semibold`}
