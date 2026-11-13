@@ -15,6 +15,7 @@ import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubb
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { RiskFigure, RiskFooterStrip } from "@/components/shared/risk-footer-strip";
 import { BlockRef } from "@/components/shared/block-ref";
 import { CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
@@ -33,7 +34,7 @@ import { skySavingsExplorer } from "@/lib/sky-savings/explorer";
 import { skyFlowTimeline, skyLifetimeTotals } from "@/lib/sky-savings/flows";
 import { skyFlowsExplanation } from "@/lib/sky-savings/flows-explanation";
 import { skyFlowsContent } from "@/lib/sky-savings/learn-more";
-import { chiProv, psmPriceProv, rateChangeFromProv, rateChangeProv } from "@/lib/sky-savings/provenance";
+import { chiProv, pageBlockProv, psmPriceProv, rateChangeFromProv, rateChangeProv } from "@/lib/sky-savings/provenance";
 import { SKY_T1 } from "@/lib/sky-savings/event-label";
 import type { SkyAsOf, SkyFlowDay, SkyGate, SkyPosition, SkyRateChange, SkyRates } from "@/lib/sky-savings/types";
 
@@ -65,6 +66,8 @@ export default function SkySavingsPositionView({
   // The event route draws the sub-nav and the event's card in page mode with
   // the shared column; the summary, the price strip and Lifetime flows stay off it.
   const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
+  // The head's Block receipt (ui-jobs 660, the CoW head's shape).
+  const registry = useReceiptRegistry();
   const skyEvents = useMemo(() => events.filter(isSkySavingsEvent) as SkySavingsEvent[], [events]);
   const tl = useTimelineEvents(skyEvents, {
     storageKey: `sky-savings-${position.holder}`,
@@ -204,10 +207,14 @@ export default function SkySavingsPositionView({
       />
 
       {!onEventPage && (
-        <p className="text-xs text-rb-500" data-sky-asof={asOf.block}>
-          Sky Savings · sUSDS on Ethereum · every figure at <BlockRef block={asOf.block} chainId={SKY_CHAIN_ID} />, the
-          newest block when the page loaded
-        </p>
+        <ProvReceiptsScope registry={registry}>
+          <p className="text-xs text-rb-500" data-sky-asof={asOf.block}>
+            Sky Savings · sUSDS on Ethereum · block{" "}
+            <Prov info={pageBlockProv(asOf.block)} value={String(asOf.block)}>
+              <BlockRef block={asOf.block} chainId={SKY_CHAIN_ID} />
+            </Prov>
+          </p>
+        </ProvReceiptsScope>
       )}
 
       {!onEventPage && (

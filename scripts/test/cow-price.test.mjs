@@ -51,8 +51,26 @@ test("no price without decimals, or with a fee not below the sold amount", () =>
 });
 
 test("a fee not below the sold amount has its own reason, not the decimals'", () => {
-  assert.equal(executedPriceNone({ sellAmount: "100", feeAmount: "100" }, 6, 6), "no amount sold after the fee");
-  assert.equal(executedPriceNone({ sellAmount: "100", feeAmount: "120" }, 6, 6), "no amount sold after the fee");
-  assert.equal(executedPriceNone({ sellAmount: "100", feeAmount: "20" }, 6, 6), null);
-  assert.equal(executedPriceNone({ sellAmount: "100", feeAmount: "100" }, null, 6), null);
+  assert.equal(
+    executedPriceNone({ sellAmount: "100", buyAmount: "5", feeAmount: "100" }, 6, 6),
+    "no amount sold after the fee",
+  );
+  assert.equal(
+    executedPriceNone({ sellAmount: "100", buyAmount: "5", feeAmount: "120" }, 6, 6),
+    "no amount sold after the fee",
+  );
+  assert.equal(executedPriceNone({ sellAmount: "100", buyAmount: "5", feeAmount: "20" }, 6, 6), null);
+  assert.equal(executedPriceNone({ sellAmount: "100", buyAmount: "5", feeAmount: "100" }, null, 6), null);
+});
+
+test("a bought amount of zero has its own reason, not the decimals'", () => {
+  assert.equal(executedRatio("100", "0", "20", 6, 6), null);
+  assert.equal(executedPriceNone({ sellAmount: "100", buyAmount: "0", feeAmount: "20" }, 6, 6), "no amount bought");
+  // A sold amount that scales to zero at its decimals reads as nothing sold after the fee.
+  assert.equal(executedRatio("1", "5", "0", 400, 6), null);
+  assert.equal(
+    executedPriceNone({ sellAmount: "1", buyAmount: "5", feeAmount: "0" }, 400, 6),
+    "no amount sold after the fee",
+  );
+  assert.equal(executedPriceNone({ sellAmount: "100", buyAmount: "0", feeAmount: "20" }, null, 6), null);
 });

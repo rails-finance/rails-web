@@ -14,6 +14,8 @@ export const COW_TERMS = {
    *  explanation). Other families' party chips keep the shared entry in
    *  `lib/shared/known-infrastructure.ts`. */
   settlement: "CoW Protocol's settlement contract",
+  /** Its on-chain name, beside the word on the receipt's contract leaf. */
+  settlementContract: "GPv2Settlement",
   /** The Eth-flow contract (C6), in the docs' spelling. */
   ethFlow: "Eth-flow contract",
 } as const;
