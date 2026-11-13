@@ -287,7 +287,10 @@ const FIXTURES = [
   {
     label: "case study / plain transfers, both directions",
     vault: CASE_STUDY,
-    holder: "0xe228c34252bd874c489c2a99e03476162d74db02",
+    // Repinned 2026-11-13 (ui-jobs 642): 0xe228…db02 withdrew to nothing. This
+    // address's 17 rows are plain transfers, 8 in (LI.FI's diamond among the
+    // senders) and 9 out, and it holds a dust balance now.
+    holder: "0xcb15649d7b7a1eb01fb1acd14809de6cf82aa1a0",
     // The transfer branch's fixture: this address never deposited or withdrew,
     // so a reader that only knows mints and burns draws it as nothing at all,
     // and every one of its rows takes the "no asset leg was emitted" branch.
