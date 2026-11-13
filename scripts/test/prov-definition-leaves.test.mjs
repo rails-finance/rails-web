@@ -110,3 +110,11 @@ test("SparkLend: the Borrow and Supply APY receipts' heads drop Oracle, the year
     "reserve history APY (hand-built copy)",
   );
 });
+
+test("Morpho: the market Borrow APY's year loses its dot; the head stays State", async () => {
+  const M = await import("../../lib/morpho/markets-provenance.ts");
+  const c = { chainId: 1, blockNumber: 24_000_000, marketId: "0x64d6", loanSymbol: "USDC" };
+  // The leaf was classed State like the rate it compounds, so the head does not move.
+  heads(M.morphoBorrowRateProv(c, 0.0498), "seconds per year", ["state"], ["state"], "market Borrow APY");
+  heads(M.morphoBorrowRateProv(c, null), "seconds per year", ["state"], ["state"], "market Borrow APY, unread");
+});
