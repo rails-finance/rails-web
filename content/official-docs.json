@@ -31,7 +31,8 @@
     "uniswap-v4": ["developers.uniswap.org"],
     "aerodrome": ["aerodrome.finance"],
     "velodrome": ["velodrome.finance"],
-    "euler-v2": ["docs.euler.finance"]
+    "euler-v2": ["docs.euler.finance"],
+    "cow": ["docs.cow.fi"]
   },
   "notDocumentation": ["github.com", "www.youtube.com", "youtube.com", "app.aave.com", "governance.aave.com"]
 }

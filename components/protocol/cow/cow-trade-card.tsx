@@ -2,7 +2,7 @@
 
 // One CoW trade on the shared event-card shell (components/shared/event-card.tsx):
 // T1 the trade in words, the spine's token rows (sold into the settlement,
-// bought back to the wallet) with the amounts on their flanks; every token
+// bought for the order; the Trade log names no receiver) with the amounts on their flanks; every token
 // icon on the card opens the asset's panel (AssetPopover); T2 Sold, Bought, the
 // executed price, the fee where the log carries one, the settlement
 // transaction and its block; T3 the trade in words. No USD: phase 1 reads no
@@ -126,7 +126,7 @@ export function CowTradeCard({
       key: "price",
       label: "Executed price",
       changed: false,
-      inputs: ["sold", "bought"],
+      inputs: fee ? ["sold", "fee", "bought"] : ["sold", "bought"],
       figure: "cow-price",
       value: price
         ? { after: { text: price.text, info: executedPriceProv(trade, sell, buy, price), value: price.value } }
@@ -213,11 +213,12 @@ export function CowTradeCard({
       body: (
         <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed">
           <li>
-            This wallet sold {soldWords} and bought {boughtWords} through CoW&rsquo;s settlement contract.
+            This wallet&rsquo;s order sold {soldWords} and bought {boughtWords} through CoW&rsquo;s settlement contract.
           </li>
           {price && (
             <li>
-              One {tokenText(price.base)} cost {price.text.split(" = ")[1]} in this trade.
+              One {tokenText(price.base)} cost {price.text.split(" = ")[1]} in this trade
+              {fee ? ", on the sold amount less the fee" : ""}.
             </li>
           )}
           {fee && (
@@ -225,6 +226,10 @@ export function CowTradeCard({
               The settlement kept {amountText(fee, sell)} {tokenText(sell)} of the sold amount as its fee.
             </li>
           )}
+          <li>
+            By CoW&rsquo;s docs, its fees are part of the trade&rsquo;s execution, so Sold and Bought are amounts after
+            fees: the order received less, or paid more, than it would have without them.
+          </li>
           <li>
             A solver sent the settlement transaction
             {others > 0

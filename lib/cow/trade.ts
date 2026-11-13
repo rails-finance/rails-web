@@ -8,6 +8,7 @@ import type { Provenance } from "@/components/shared/provenance";
 import { explorerUrl } from "@/lib/shared/chains";
 import { formatNumber, shiftDecimal } from "@/lib/utils/format";
 import type { CowTrade } from "@/lib/cow/types";
+import { executedRatio, soldLessFee } from "@/lib/cow/price";
 
 export const COW_CHAIN_ID = 1 as const;
 export const GPV2_SETTLEMENT = "0x9008d19f58aabd9ed0d60971565aa8510560ab41";
@@ -43,17 +44,16 @@ export function amountText(raw: string, t: CowTokenLabel): string {
   return n == null ? `${raw} (raw)` : formatNumber(n);
 }
 
-/** The executed price, stated per unit of the dearer token: "1 WETH = 2,320.4 USDT". */
+/** The executed price, stated per unit of the dearer token: "1 WETH = 2,320.4 USDT".
+ *  The sold side is the log's sellAmount less its feeAmount (`lib/cow/price.ts`). */
 export function executedPrice(
   trade: CowTrade,
   sell: CowTokenLabel,
   buy: CowTokenLabel,
 ): { text: string; value: string; base: CowTokenLabel; quote: CowTokenLabel } | null {
-  const s = amountNumber(trade.sellAmount, sell.decimals);
-  const b = amountNumber(trade.buyAmount, buy.decimals);
-  if (s == null || b == null || s === 0 || b === 0) return null;
-  const perSell = b / s;
-  const [base, quote, ratio] = perSell >= 1 ? [sell, buy, perSell] : [buy, sell, s / b];
+  const r = executedRatio(trade.sellAmount, trade.buyAmount, trade.feeAmount, sell.decimals, buy.decimals);
+  if (r == null) return null;
+  const [base, quote, ratio] = r.perSell >= 1 ? [sell, buy, r.perSell] : [buy, sell, r.perBuy];
   // exponent-safe: the receipt key, never drawn
   const value = ratio.toPrecision(8);
   return { text: `1 ${tokenText(base)} = ${formatNumber(ratio)} ${tokenText(quote)}`, value, base, quote };
@@ -103,11 +103,14 @@ export function executedPriceProv(
   price: NonNullable<ReturnType<typeof executedPrice>>,
 ): Provenance {
   const perSell = price.base.address === sell.address;
+  const fee = t.feeAmount !== "0";
+  const soldSide = fee ? "amount sold less the fee" : "amount sold";
+  const soldTerm = fee ? "(sold − fee)" : "sold";
   return {
     kind: "derived",
     pclass: "emitted",
-    summary: `Executed price — what one ${tokenText(price.base)} cost in ${tokenText(price.quote)} in this trade: the ${perSell ? "amount bought divided by the amount sold" : "amount sold divided by the amount bought"}, each scaled by its token's decimals.`,
-    formula: perSell ? "bought ÷ sold" : "sold ÷ bought",
+    summary: `Executed price — what one ${tokenText(price.base)} cost in ${tokenText(price.quote)} in this trade: the ${perSell ? `amount bought divided by the ${soldSide}` : `${soldSide} divided by the amount bought`}, each scaled by its token's decimals.${fee ? " CoW's docs state the execution price after deducting fees from the amount sold, and the Trade log's sold amount includes the fee." : ""}`,
+    formula: perSell ? `bought ÷ ${soldTerm}` : `${soldTerm} ÷ bought`,
     inputs: [
       {
         label: `sold (${tokenText(sell)}, ${sell.decimals ?? "?"} decimals)`,
@@ -115,6 +118,22 @@ export function executedPriceProv(
         kind: "chain",
         pclass: "emitted",
       },
+      ...(fee
+        ? [
+            {
+              label: `fee (${tokenText(sell)}, ${sell.decimals ?? "?"} decimals)`,
+              value: t.feeAmount,
+              kind: "chain" as const,
+              pclass: "emitted" as const,
+            },
+            {
+              label: `sold − fee (${tokenText(sell)})`,
+              value: soldLessFee(t.sellAmount, t.feeAmount) ?? "0",
+              kind: "derived" as const,
+              pclass: "emitted" as const,
+            },
+          ]
+        : []),
       {
         label: `bought (${tokenText(buy)}, ${buy.decimals ?? "?"} decimals)`,
         value: t.buyAmount,
@@ -126,7 +145,9 @@ export function executedPriceProv(
     source: coords(t),
     verify: {
       kind: "recompute",
-      text: "To check: divide the two amounts of this trade's Trade log, each by its token's decimals.",
+      text: fee
+        ? "To check: subtract the fee from the sold amount of this trade's Trade log, then divide the two amounts, each by its token's decimals."
+        : "To check: divide the two amounts of this trade's Trade log, each by its token's decimals.",
     },
   };
 }

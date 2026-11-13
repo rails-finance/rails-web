@@ -190,6 +190,8 @@ export function CowWalletView({
           Ethereum since {formatDate(summary.firstTimestamp)}, in {n(tokens?.tokens.length ?? 0)} tokens. Each is a
           Trade log of the settlement contract naming this wallet as the order&rsquo;s owner.
         </p>
+        {/* Read on chain: an Eth-flow sale's Trade log names the Eth-flow
+            contract as owner (rails-ops reference/official-docs/cow.md). */}
         <p>
           ETH sold through CoW&rsquo;s EthFlow contract is recorded under that contract, so those sales are not counted
           here.
