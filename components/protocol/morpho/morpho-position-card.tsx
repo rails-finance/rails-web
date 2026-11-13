@@ -52,7 +52,7 @@ import {
   morphoYearlyCostProv,
 } from "@/lib/morpho/event-provenance";
 import { capacityProv, morphoHealthFactorProv, type MorphoChainCoords } from "@/lib/morpho/position-provenance";
-import { morphoApy, MORPHO_TERMS } from "@/lib/morpho/terms";
+import { HEALTH_FACTOR_TIP, morphoApy, MORPHO_TERMS } from "@/lib/morpho/terms";
 import { formatNumber, formatExact } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
 import { CARD_VOCAB, notRecordedNote } from "@/lib/shared/card-vocab";
@@ -512,8 +512,7 @@ export function useMorphoCardSlots({
       heads.push({
         id: "health-factor",
         label: MORPHO_TERMS.healthFactor,
-        labelTip:
-          "The collateral's value at the market's oracle times the LLTV, over the debt. Above 1 the position is healthy; below 1 it can be liquidated.",
+        labelTip: HEALTH_FACTOR_TIP,
         pending: live === null,
         value:
           ltvUsable && hf != null ? (

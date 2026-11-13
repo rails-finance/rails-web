@@ -71,6 +71,10 @@ export const MORPHO_TERMS = {
   loanAssets: "Loan assets",
 } as const;
 
+/** The health factor's tip, on every Morpho card that heads with it. */
+export const HEALTH_FACTOR_TIP =
+  "The collateral's value at the market's oracle times the LLTV, over the debt. Above 1 the position is healthy; below 1 it can be liquidated.";
+
 /** The LLTV's tip, the one place the term is spelled out. */
 export const LLTV_TIP =
   "Liquidation Loan-To-Value: the most a position may owe against its collateral's value at the market's oracle, fixed when the market was created. Past it the position can be liquidated.";

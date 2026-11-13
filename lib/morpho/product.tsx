@@ -94,7 +94,7 @@ const CURVE_HELP: LearnMoreContent = {
     },
   ],
   extraParagraphs: [
-    "Suppliers earn the borrow rate times utilization, less the market's fee. The chart and the page state each rate as an APY, compounded over a year.",
+    "Suppliers earn the borrow rate times utilization, less the market's fee. The chart and the page state the borrow and supply rates as an APY, compounded over a year.",
   ],
   links: [{ label: "Morpho docs: interest rate models", url: `${DOCS}/learn/concepts/irm/` }],
 };
@@ -579,7 +579,10 @@ function CurveTerms({ x }: { x: Ctx }) {
   if (!k || !x.d.rateAtTarget) return null;
   return (
     <dl className="mt-4 grid max-w-md grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-[13px]" data-rate-terms="">
-      <Term term="Rate at target" title="The borrow rate a year at the target utilization, as the model holds it now">
+      <Term
+        term="Rate at target"
+        title="The borrow rate at the target utilization, as the model holds it now: a year, before compounding"
+      >
         <Prov
           info={morphoRateAtTargetProv(x.c, {
             stored: x.d.rateAtTarget,
