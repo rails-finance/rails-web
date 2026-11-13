@@ -214,7 +214,7 @@ export function MorphoMarketPositionView({
     out.push({
       symbol: loanSymbol,
       address: pos?.loanToken ?? live?.loanToken,
-      label: `${loanSymbol}, the market's loan token`,
+      label: `${loanSymbol}, the market's loan asset`,
     });
     return out;
   }, [pos, live, liveClean, market, d.routes.wallet, d.chainId]);
@@ -252,7 +252,7 @@ export function MorphoMarketPositionView({
             price,
           ),
         },
-        { symbol: loanSymbol, address: pos.loanToken, label: `${loanSymbol}, the market's loan token` },
+        { symbol: loanSymbol, address: pos.loanToken, label: `${loanSymbol}, the market's loan asset` },
       ];
     });
   }, [closed, pos, exportEvents, market, d.chainId, captureSource]);

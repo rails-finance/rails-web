@@ -19,6 +19,7 @@ import {
   type BlockRef,
 } from "@/lib/morpho-at-block/types";
 import { pairName } from "@/lib/morpho-at-block/words";
+import { MORPHO_APY_FORMULA } from "@/lib/morpho/terms";
 
 const n = (v: number) => v.toLocaleString("en-US");
 const date = (t: number) => new Date(t * 1000).toISOString().slice(0, 10);
@@ -84,9 +85,9 @@ export function readContracts(r: MorphoAtBlockPositionRead, f: MorphoAtBlockFigu
       ? [{ name: "Adaptive Curve IRM", address: r.market.irm, reads: "the market's borrow rate at both blocks" }]
       : []),
     ...(f.collateralToken
-      ? [{ name: `${pairName(f)} oracle`, address: r.market.oracle, reads: "the collateral's price in the loan token" }]
+      ? [{ name: `${pairName(f)} oracle`, address: r.market.oracle, reads: "the collateral's price in the loan asset" }]
       : []),
-    ...(f.usd ? [{ ...usdContract(f.usd, dep), reads: "the loan token's USD price" }] : []),
+    ...(f.usd ? [{ ...usdContract(f.usd, dep), reads: "the loan asset's USD price" }] : []),
   ];
 }
 
@@ -248,22 +249,22 @@ export function morphoAtBlockProv(key: MorphoAtBlockFigure, c: MorphoAtBlockRece
     case "borrow-rate":
     case "supply-rate":
       return {
-        kind: key === "borrow-rate" ? "chain" : "chain-derived",
+        kind: "chain-derived",
         pclass: "state",
         source,
         contract: { name: "Adaptive Curve IRM", address: m.irm },
         summary:
           key === "borrow-rate"
-            ? `Borrow rate. The market rate model's borrowRateView on the market as stored, per second, times a year, at ${at(head)}.`
-            : `Supply rate. The borrow rate times the share of supply lent out, less the market's fee, at ${at(head)}.`,
+            ? `Borrow APY. The market rate model's borrowRateView on the market as stored, per second, compounded over a year as Morpho's docs state it, at ${at(head)}.`
+            : `Supply APY. The per-second borrow rate times utilization, less the market's fee, compounded over a year as Morpho's docs state it, at ${at(head)}.`,
         via: `${v} · IRM borrowRateView`,
         formula:
-          key === "borrow-rate" ? "borrowRateView × 31,536,000 ÷ 10^18" : "borrow rate × utilisation × (1 − fee)",
+          key === "borrow-rate" ? MORPHO_APY_FORMULA : "e^(borrowRateView × utilization × (1 − fee) × 31,536,000) − 1",
         inputs: [
           chain("borrowRateView", m.borrowRate ?? "—", "per second, WAD"),
           ...(key === "supply-rate"
             ? [
-                derivedIn("utilisation", f.utilization == null ? "—" : `${(f.utilization * 100).toFixed(2)}%`),
+                derivedIn("utilization", f.utilization == null ? "—" : `${(f.utilization * 100).toFixed(2)}%`),
                 chain("market · fee", s?.fee ?? "—", "WAD"),
               ]
             : []),

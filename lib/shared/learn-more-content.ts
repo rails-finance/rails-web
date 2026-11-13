@@ -370,7 +370,7 @@ export function aaveV4EconomicsContent(
   const details: LearnMoreContent["details"] = [
     {
       bold: "Collateral tower",
-      text: `what was deposited${has.supplyInterest ? " plus the interest it earned" : ""}, set against what left: withdrawals${has.liquidations ? " and collateral seized in liquidations" : ""}. What remains is the collateral held today.`,
+      text: `what was supplied${has.supplyInterest ? " plus the interest it earned" : ""}, set against what left: withdrawals${has.liquidations ? " and collateral seized in liquidations" : ""}. What remains is the collateral held today.`,
     },
     {
       bold: "Debt tower",
@@ -1528,7 +1528,12 @@ const VAULT_EVENT_LINKS: Record<VaultPositionFamily | "yearn", LearnMoreLink[]> 
   sgho: [{ label: "Savings GHO (sGHO)", url: "https://aave.com/docs/ecosystem/gho/sgho" }],
   stata: [{ label: "Static aTokens", url: "https://aave.com/docs/aave-v3/smart-contracts/tokenization" }],
   "umbrella-stake": [{ label: "Umbrella", url: "https://aave.com/docs/aave-v3/umbrella" }],
-  morpho: [{ label: "Morpho vaults", url: "https://docs.morpho.org/learn/concepts/vault/" }],
+  morpho: [
+    {
+      label: "Morpho Vaults V1 yield",
+      url: "https://docs.morpho.org/curate/concepts/yield/#yield-in-morpho-vaults-v1-legacy",
+    },
+  ],
   yearn: [{ label: "Yearn documentation", url: "https://docs.yearn.fi/getting-started/intro" }],
   "yearn-v3": [{ label: "Yearn documentation", url: "https://docs.yearn.fi/getting-started/intro" }],
 };

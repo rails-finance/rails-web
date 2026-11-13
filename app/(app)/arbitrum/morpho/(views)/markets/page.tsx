@@ -16,7 +16,7 @@ export const metadata = listingMetadata({
   title: "Morpho Blue on Arbitrum · Markets",
   canonicalPath: "/arbitrum/morpho/markets",
   description:
-    "Every Morpho Blue market censused on Arbitrum, grouped by the token it lends: its collateral, LLTV, size, rates and utilisation, read from the chain.",
+    "Every Morpho Blue market censused on Arbitrum, grouped by the token it lends: its collateral, LLTV, size, rates and utilization, read from the chain.",
 });
 
 export default async function MorphoArbitrumMarketsPage() {

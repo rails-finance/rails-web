@@ -51,7 +51,7 @@ placeholders:
   loan_symbol:
     rounding: text
     means: |-
-      the market's loan token
+      the market's loan asset
   coll_symbol:
     rounding: text
     means: |-
@@ -59,7 +59,7 @@ placeholders:
   repaid:
     rounding: morpho_amount
     means: |-
-      the loan token a liquidator repaid
+      the loan asset a liquidator repaid
   seized:
     rounding: morpho_amount
     means: |-
@@ -67,7 +67,7 @@ placeholders:
   seized_value:
     rounding: morpho_amount
     means: |-
-      the seized collateral valued in the loan token at the price the liquidation ran at
+      the seized collateral valued in the loan asset at the price the liquidation ran at
   cleared_value:
     rounding: morpho_amount
     means: |-
@@ -83,7 +83,7 @@ placeholders:
   fall_before:
     rounding: fall_pct
     means: |-
-      how far the collateral's price could fall, in the loan token, before the event until the position reached liquidation
+      how far the collateral's price could fall, in the loan asset, before the event until the position reached liquidation
   fall_after:
     rounding: fall_pct
     means: |-
@@ -91,11 +91,11 @@ placeholders:
   rate_before:
     rounding: ratio_frac
     means: |-
-      the market's borrow rate at the end of the block before, or at the previous event
+      the market's Borrow APY at the end of the block before, or at the previous event
   rate_after:
     rounding: ratio_frac
     means: |-
-      the market's borrow rate at the end of this block, or going into this event
+      the market's Borrow APY at the end of this block, or going into this event
   event_type:
     rounding: text
     means: |-
@@ -108,11 +108,11 @@ placeholders:
   debt:
     rounding: morpho_amount
     means: |-
-      the loan token the position owes now, interest included
+      the loan asset the position owes now, interest included
   coll_value:
     rounding: morpho_amount
     means: |-
-      that collateral at the market oracle's price, in the loan token
+      that collateral at the market oracle's price, in the loan asset
   hf:
     rounding: units2
     means: |-
@@ -120,23 +120,27 @@ placeholders:
   drop:
     rounding: fall_pct
     means: |-
-      how far the collateral's price can fall, in the loan token, before the position reaches liquidation
+      how far the collateral's price can fall, in the loan asset, before the position reaches liquidation
   capacity:
     rounding: morpho_amount
     means: |-
-      the loan token the position could still borrow at the oracle's price, up to the LLTV
+      the loan asset the position could still borrow at the oracle's price, up to the LLTV
   penalty:
-    rounding: ratio_frac
+    rounding: text
     means: |-
-      how much more collateral value than debt repaid a liquidator takes: the market's incentive
+      the bonus a liquidator takes in collateral value over the debt it repays, the factor less 1 (4.38% bonus)
+  lif:
+    rounding: text
+    means: |-
+      the market's Liquidation Incentive Factor at four places (1.0438)
   apr:
     rounding: ratio_frac
     means: |-
-      the market's borrow rate now
+      the market's Borrow APY now
   cost:
     rounding: morpho_amount
     means: |-
-      that rate on the position's debt for a year
+      that APY on the position's debt for a year
   lead:
     rounding: text
     means: |-
@@ -205,7 +209,7 @@ words:
   t1_repaid: |-
     Repaid
   t1_added_coll: |-
-    Added collateral
+    Supplied collateral
   t1_withdrew_coll: |-
     Withdrew collateral
   t1_liquidated: |-
@@ -249,7 +253,7 @@ words:
   sheet_borrowable: |-
     Still borrowable
   sheet_rate: |-
-    Borrow rate
+    Borrow APY
   sheet_lltv: |-
     LLTV
   sheet_oracle: |-
@@ -266,7 +270,7 @@ words:
     Not loaded
   # The sheet's read-more, one per row: what the figure is and where it is read.
   tip_coll_event: |-
-    The {symbol} this event added to or took from the collateral, as Morpho Blue's log states it.
+    The {symbol} this event supplied to or withdrew from the collateral, as Morpho Blue's log states it.
   tip_coll_seized: |-
     The {symbol} the liquidator seized from the collateral, the Liquidate log's seizedAssets.
   tip_coll_before: |-
@@ -282,7 +286,7 @@ words:
   tip_debt_event: |-
     The debt this event added or cleared: the debt after less the debt before, both at the market's totals.
   tip_debt_cleared: |-
-    The debt this liquidation cleared, any bad debt the market wrote off included.
+    The debt this liquidation cleared, any bad debt the market realized included.
   tip_debt_total: |-
     The {symbol} owed after this event: the borrow shares at the market's totals at this block, interest included.
   tip_borrowed_event: |-
@@ -314,11 +318,11 @@ words:
   tip_borrowable: |-
     What the position can still borrow at the oracle's price: the collateral's value times the LLTV, less the debt.
   tip_rate: |-
-    The market's borrow rate at the end of this event's block, from its interest rate model; it moves with the share of the market's supply lent out.
+    The market's Borrow APY at the end of this event's block: its interest rate model's per-second rate, compounded over a year. It moves with utilization.
   tip_lltv: |-
-    The market's liquidation loan-to-value, fixed when the market was created: the most the position can borrow, and the line past which it can be liquidated.
+    Liquidation Loan-To-Value, fixed when the market was created: the most the position can borrow, and the LTV past which it can be liquidated.
   tip_oracle: |-
-    The market oracle's {symbol} price in the loan token going into this event (on a liquidation, the price it ran at): the price the Risk and Limits figures are valued at.
+    The market oracle's {symbol} price in the loan asset going into this event (on a liquidation, the price it ran at): the price the Risk and Limits figures are valued at.
 
 # ── The position card's explanation (zone Z1): an unheaded lead, then bullets
 # under Holdings, Risk, Rate and History when two of them hold two or more
@@ -352,9 +356,9 @@ position_words:
   capacity_idle: |-
     This collateral could back about {capacity} {loan_symbol} of borrowing at the oracle price.
   penalty: |-
-    A liquidator would seize collateral worth {penalty} more than the debt it repays.
+    The market's Liquidation Incentive Factor is {lif}: a liquidator takes a {penalty} in collateral over the debt it repays.
   rate: |-
-    The market's borrow rate is {apr} APR, about {cost} {loan_symbol} a year on this debt.
+    The market's Borrow APY is {apr}, about {cost} {loan_symbol} a year on this debt.
   counts: |-
     The owner made {tx_count} {tx_word}, and the timeline lists {event_count} {event_word} from them.
   counts_tx: |-
@@ -395,20 +399,20 @@ position_words:
   seizures_closed: |-
     Liquidators seized collateral {seizures}; the owner then closed the position.
   bad_debt: |-
-    {bad_debt} {loan_symbol} of the debt had no collateral left and was written off against the market's lenders.
+    {bad_debt} {loan_symbol} of the debt had no collateral left, a loss realized by the market's lenders.
 
 # ── Sentences more than one template says ──
 shared_sentences:
-  actor.authorised:
+  actor.authorized:
     when: |-
       another account ran a borrow or a collateral withdrawal for the owner
     text: |-
-      Another account ran this for the owner, with the owner's authorisation.
+      Another account ran this for the owner, with the owner's authorization.
   actor.open:
     when: |-
-      another account added collateral or repaid for the owner
+      another account supplied collateral or repaid for the owner
     text: |-
-      Another account ran this for the owner; adding to a position needs no permission.
+      Another account ran this for the owner; supplying collateral or repaying needs no permission.
   liq.safer:
     when: |-
       the event raised the price fall the position can take
@@ -441,14 +445,14 @@ shared_sentences:
       With no debt, none of the collateral can be seized.
   rate.block:
     when: |-
-      the market's borrow rate moved by more than a point within the block
+      the market's Borrow APY moved by more than a point within the block
     text: |-
-      The market's borrow rate moved from {rate_before} to {rate_after} during this block.
+      The market's Borrow APY moved from {rate_before} to {rate_after} during this block.
   rate.drift:
     when: |-
-      the market's borrow rate moved by more than a point between the previous event and this block
+      the market's Borrow APY moved by more than a point between the previous event and this block
     text: |-
-      With no action by this position, the market's rate moved from {rate_before} to {rate_after} since the previous event.
+      With no action by this position, the market's Borrow APY moved from {rate_before} to {rate_after} since the previous event.
 
 # ── Templates: one per kind of event ──
 #   id          the template's id
@@ -489,7 +493,7 @@ templates:
     order:
       - borrow.what
       - borrow.what_first
-      - actor.authorised
+      - actor.authorized
       - liq.safer
       - liq.less_safe
       - liq.after
@@ -498,7 +502,7 @@ templates:
       - rate.block
       - rate.drift
     groups:
-      happened: [borrow.what, borrow.what_first, actor.authorised]
+      happened: [borrow.what, borrow.what_first, actor.authorized]
       leaves: [liq.safer, liq.less_safe, liq.after, liq.below, liq.dust, rate.block, rate.drift]
     alternates:
       - [borrow.what, borrow.what_first]
@@ -570,7 +574,7 @@ templates:
 
   - id: morpho.supply_collateral
     title: |-
-      Add collateral
+      Supply collateral
     when: |-
       supply_collateral
     L5: supply_collateral
@@ -584,12 +588,12 @@ templates:
         when: |-
           more
         text: |-
-          Added {amount} {coll_symbol} of collateral to the position.
+          Supplied {amount} {coll_symbol} of collateral to the position.
       collateral.what_first:
         when: |-
           first
         text: |-
-          Added {amount} {coll_symbol} of collateral, the position's first.
+          Supplied {amount} {coll_symbol} of collateral, the position's first.
     order:
       - collateral.what
       - collateral.what_first
@@ -607,7 +611,7 @@ templates:
 
   - id: morpho.withdraw_collateral
     title: |-
-      Remove collateral
+      Withdraw collateral
     when: |-
       withdraw_collateral
     L5: withdraw_collateral
@@ -635,7 +639,7 @@ templates:
     order:
       - withdraw.what
       - withdraw.what_closed
-      - actor.authorised
+      - actor.authorized
       - withdraw.same_tx
       - liq.less_safe
       - liq.safer
@@ -643,7 +647,7 @@ templates:
       - liq.dust
       - liq.none
     groups:
-      happened: [withdraw.what, withdraw.what_closed, actor.authorised]
+      happened: [withdraw.what, withdraw.what_closed, actor.authorized]
       adds_up: [withdraw.same_tx]
       leaves: [liq.less_safe, liq.safer, liq.below, liq.dust, liq.none]
     alternates:
@@ -760,10 +764,10 @@ templates:
           Withdrawals have now returned more {loan_symbol} than was ever supplied; the difference is interest earned.
     order:
       - lend.withdraw
-      - actor.authorised
+      - actor.authorized
       - lend.interest
     groups:
-      happened: [lend.withdraw, actor.authorised]
+      happened: [lend.withdraw, actor.authorized]
       leaves: [lend.interest]
 
   - id: morpho.unloaded
@@ -811,17 +815,17 @@ doc_urls:
   MARKET: |-
     https://docs.morpho.org/learn/concepts/blue/#what-is-a-variable-rate-market
   LLTV: |-
-    https://docs.morpho.org/developers/borrow/concepts/ltv/#liquidation-loan-to-value-lltv
+    https://docs.morpho.org/developers/blue/concepts/ltv/#liquidation-loan-to-value-lltv
   HEALTH_FACTOR: |-
-    https://docs.morpho.org/developers/borrow/concepts/ltv/#health-factor
+    https://docs.morpho.org/developers/blue/concepts/ltv/#health-factor
   COLLATERAL: |-
-    https://docs.morpho.org/developers/borrow/concepts/ltv/#collateral
+    https://docs.morpho.org/developers/blue/concepts/ltv/#collateral
   SHARES: |-
-    https://docs.morpho.org/developers/borrow/concepts/market-mechanics/#assets-vs-shares-the-core-mechanic
+    https://docs.morpho.org/developers/blue/concepts/market-mechanics/#assets-vs-shares-the-core-mechanic
   FUNCTIONS: |-
-    https://docs.morpho.org/developers/borrow/concepts/market-mechanics/#core-functions--their-dual-nature
+    https://docs.morpho.org/developers/blue/concepts/market-mechanics/#core-functions--their-dual-nature
   COLLATERAL_HEALTH: |-
-    https://docs.morpho.org/developers/borrow/concepts/market-mechanics/#collateral-and-health
+    https://docs.morpho.org/developers/blue/concepts/market-mechanics/#collateral-and-health
   LIQUIDATION_INCENTIVE: |-
     https://docs.morpho.org/learn/concepts/liquidation/#liquidation-incentive-factor-lif
   LIQUIDATION_FEATURES: |-
@@ -829,7 +833,7 @@ doc_urls:
   LIQUIDATION_PRICE: |-
     https://docs.morpho.org/learn/concepts/liquidation/#at-what-price-are-liquidations-done
   BAD_DEBT: |-
-    https://docs.morpho.org/developers/borrow/concepts/liquidation/#bad-debt
+    https://docs.morpho.org/developers/blue/concepts/liquidation/#bad-debt
   RATE_MODEL: |-
     https://docs.morpho.org/learn/concepts/irm/#the-adaptivecurveirm
   ORACLE: |-
@@ -854,9 +858,9 @@ doc_urls:
 L5:
   supply_collateral:
     title: |-
-      How adding collateral works
+      How supplying collateral works
     intro: |-
-      Adding collateral deposits one asset into one Morpho market, where it backs borrowing of that market's loan asset.
+      Supplying collateral deposits one asset into one Morpho market, where it backs borrowing of that market's loan asset.
     detailsHeading: |-
       Key concepts:
     details:
@@ -873,9 +877,9 @@ L5:
         text: |-
           it measures a position's distance from liquidation: above 1 is healthy, and more collateral raises it.
       - bold: |-
-          Anyone can add
+          Anyone can supply
         text: |-
-          adding collateral for another address needs no permission from it.
+          supplying collateral for another address needs no permission from it.
       - bold: |-
           Pendle principal token
         only: pt
@@ -895,9 +899,9 @@ L5:
 
   withdraw_collateral:
     title: |-
-      How removing collateral works
+      How withdrawing collateral works
     intro: |-
-      Removing collateral takes some or all of it out of the market. With no debt, any amount can leave; with debt open, only while the position stays healthy afterwards.
+      Withdrawing collateral takes some or all of it out of the market. With no debt, any amount can leave; with debt open, only while the position stays healthy afterwards.
     detailsHeading: |-
       Key concepts:
     details:
@@ -908,11 +912,11 @@ L5:
       - bold: |-
           Liquidation comes closer
         text: |-
-          less collateral means a higher LTV and a lower health factor, so a smaller fall in the collateral's price reaches the line.
+          less collateral means a higher LTV and a lower health factor, so a smaller fall in the collateral's price reaches the LLTV.
       - bold: |-
-          The owner or an authorised account
+          The owner or an authorized account
         text: |-
-          only the owner, or an account the owner has authorised on chain, can withdraw collateral.
+          only the owner, or an account the owner has authorized on chain, can withdraw collateral.
     links:
       - label: |-
           Collateral, LTV & Health
@@ -928,14 +932,14 @@ L5:
     title: |-
       How borrowing works
     intro: |-
-      Borrowing draws the market's loan asset against the collateral in the same market, up to the market's liquidation LTV (LLTV).
+      Borrowing draws the market's loan asset against the collateral in the same market, up to the market's LLTV.
     detailsHeading: |-
       Key concepts:
     details:
       - bold: |-
-          One line
+          The LLTV
         text: |-
-          a position can borrow up to the LLTV, and becomes liquidatable once its LTV passes it.
+          a position can borrow up to it, and becomes liquidatable once its LTV passes it.
       - bold: |-
           Debt as shares
         text: |-
@@ -943,18 +947,18 @@ L5:
       - bold: |-
           The rate
         text: |-
-          the rate model sets the borrow rate from utilization, the share of supplied assets lent out, aiming at 90%; other users' activity moves it too.
+          the rate model sets the borrow rate from utilization, the share of supplied assets lent out, aiming at 90%; the Borrow APY compounds it.
       - bold: |-
           No borrowing fee
         text: |-
           the cost of a borrow is its interest; the contract charges nothing to open it.
       - bold: |-
-          The owner or an authorised account
+          The owner or an authorized account
         text: |-
-          only the owner, or an account the owner has authorised on chain, can borrow against the position.
+          only the owner, or an account the owner has authorized on chain, can borrow against the position.
     links:
       - label: |-
-          Liquidation LTV
+          LLTV
         doc: LLTV
       - label: |-
           Assets and shares
@@ -1010,13 +1014,13 @@ L5:
       Key concepts:
     details:
       - bold: |-
-          The incentive
+          Liquidation Incentive Factor
         text: |-
-          the collateral seized is the debt repaid times the market's incentive factor, which grows with the LLTV up to 15%: 4.38% extra at 86%.
+          the collateral value seized is the debt repaid times this factor, set by the LLTV and at most 1.15: 1.0438 at 86%, a 4.38% bonus.
       - bold: |-
           All of it to the liquidator
         text: |-
-          Morpho takes no fee, and to the borrower the incentive is the collateral given up beyond the debt cleared.
+          Morpho takes no fee, and to the borrower the bonus is the collateral given up beyond the debt cleared.
       - bold: |-
           Up to the whole debt
         text: |-
@@ -1031,7 +1035,7 @@ L5:
           if the collateral runs out before the debt is covered, the unpaid rest is bad debt, a loss for this market's lenders.
     links:
       - label: |-
-          Liquidation incentive factor
+          Liquidation Incentive Factor
         doc: LIQUIDATION_INCENTIVE
       - label: |-
           Key features of liquidation
@@ -1047,7 +1051,7 @@ L5:
     title: |-
       How Morpho Blue works
     intro: |-
-      Morpho Blue is a lending contract holding many isolated markets. Each pairs one loan asset with one collateral asset under a fixed liquidation LTV, an oracle and a rate model.
+      Morpho Blue is a lending contract holding many isolated markets. Each pairs one loan asset with one collateral asset under a fixed LLTV, an oracle and a rate model.
     detailsHeading: |-
       Key concepts:
     details:
@@ -1084,9 +1088,9 @@ L5:
       Key concepts:
     details:
       - bold: |-
-          One line
+          The LLTV
         text: |-
-          the LLTV is both the borrow limit and the liquidation line: a position can borrow up to it and is liquidatable past it.
+          a position can borrow up to it, and becomes liquidatable once its LTV passes it.
       - bold: |-
           The market's oracle
         text: |-
@@ -1100,7 +1104,7 @@ L5:
       - bold: |-
           Acting for the owner
         text: |-
-          anyone can add collateral or repay for a position, but borrowing or withdrawing needs the owner's on-chain authorisation.
+          anyone can supply collateral or repay for a position, but borrowing or withdrawing needs the owner's on-chain authorization.
       - bold: |-
           Pendle principal token
         only: pt
@@ -1112,7 +1116,7 @@ L5:
           Variable rate market
         doc: MARKET
       - label: |-
-          Liquidation LTV
+          LLTV
         doc: LLTV
       - label: |-
           The market's oracle
@@ -1144,9 +1148,9 @@ L5:
         text: |-
           a wallet's position in a market is one timeline, so a new deposit or draw by the same wallet in this market reopens it.
       - bold: |-
-          One line
+          The LLTV
         text: |-
-          the LLTV is both the borrow limit and the liquidation line for the market.
+          a position in this market could borrow up to it, and became liquidatable once its LTV passed it.
       - bold: |-
           Pendle principal token
         only: pt
@@ -1158,7 +1162,7 @@ L5:
           Variable rate market
         doc: MARKET
       - label: |-
-          Liquidation LTV
+          LLTV
         doc: LLTV
 
   position_liquidated:
@@ -1193,7 +1197,7 @@ L5:
         sources: [{ label: "Pendle docs: Principal Token", doc: PENDLE_PT }]
     links:
       - label: |-
-          Liquidation incentive factor
+          Liquidation Incentive Factor
         doc: LIQUIDATION_INCENTIVE
       - label: |-
           Bad debt

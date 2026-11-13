@@ -64,7 +64,7 @@ const WORDS = {
   listed: "Listed",
   listing: (n: N) => [
     `${n.spoke} began offering ${n.symbol}: its suppliers and borrowers use the ${n.hub} hub's ${n.symbol}.`,
-    `${n.spoke} sets the terms its ${n.symbol} suppliers and borrowers meet: the price, the collateral terms and whether ${n.symbol} can be borrowed.`,
+    `${n.spoke} sets the terms its ${n.symbol} suppliers and borrowers meet: the price, the Dynamic Risk Configuration and whether ${n.symbol} can be borrowed.`,
   ],
 
   lineSet: "Credit line set",
@@ -74,8 +74,8 @@ const WORDS = {
   lineResumed: "Credit line resumed",
   lineRestated: "Credit line restated",
   caps: (d: Dir | "changed") => `Caps ${d}`,
-  addCap: (d: Dir | "set" | "removed") => `Add cap ${d}`,
-  drawCap: (d: Dir | "set" | "removed") => `Draw cap ${d}`,
+  addCap: (d: Dir | "set" | "removed") => `Supply cap ${d}`,
+  drawCap: (d: Dir | "set" | "removed") => `Borrow cap ${d}`,
   threshold: "Risk premium threshold changed",
   lineWhat: (n: N) =>
     `The credit line sets how much ${n.symbol} ${n.spoke} can supply to and borrow from the ${n.hub} hub.`,
@@ -89,15 +89,15 @@ const WORDS = {
   haltStops: (n: N) =>
     `A halted line stops ${n.spoke}'s ${n.symbol} supplies, withdrawals, borrows and repayments through the ${n.hub} hub.`,
   addWhat: (n: N) =>
-    `The add cap is the most ${n.symbol} suppliers on ${n.spoke} can put into the ${n.hub} hub, in total.`,
+    `The supply cap is the most ${n.symbol} suppliers on ${n.spoke} can put into the ${n.hub} hub, in total.`,
   drawWhat: (n: N) =>
-    `The draw cap is the most ${n.symbol} borrowers on ${n.spoke} can owe the ${n.hub} hub, in total.`,
+    `The borrow cap is the most ${n.symbol} borrowers on ${n.spoke} can owe the ${n.hub} hub, in total.`,
   addRaised: (n: N, by: string, to: string) =>
-    `Raising the add cap by ${by}, to ${to}, adds that much room for supply on ${n.spoke}.`,
+    `Raising the supply cap by ${by}, to ${to}, adds that much room for supply on ${n.spoke}.`,
   addLowered: (n: N, to: string) => `New supply on ${n.spoke} now stops once the total reaches ${to}.`,
   addOpen: (n: N) => `Suppliers on ${n.spoke} can now add any amount.`,
   drawRaised: (n: N, by: string, to: string) =>
-    `Raising the draw cap by ${by}, to ${to}, adds that much room for borrowing on ${n.spoke}.`,
+    `Raising the borrow cap by ${by}, to ${to}, adds that much room for borrowing on ${n.spoke}.`,
   drawLowered: (n: N, to: string) => `New borrowing on ${n.spoke} now stops once the total owed reaches ${to}.`,
   drawOpen: (n: N) => `Borrowers on ${n.spoke} can now borrow any amount the hub holds.`,
   capsRaised: (n: N, by: string) =>
@@ -131,7 +131,7 @@ const WORDS = {
     `A liquidator may take seized ${n.symbol} as ${n.symbol} supplied on ${n.spoke}, earning interest, in place of the tokens.`,
   sharesOffWhat: (n: N) => `A liquidator takes seized ${n.symbol} as tokens only.`,
   riskWhat: (n: N) =>
-    `Collateral risk sets the premium a borrower pays on top of the drawn rate when ${n.symbol} backs the loan.`,
+    `Collateral risk sets the premium a borrower pays on top of the borrow rate when ${n.symbol} backs the loan.`,
   riskUp: (n: N) => `Borrowers who post ${n.symbol} as collateral on ${n.spoke} now pay a higher premium.`,
   riskDown: (n: N) => `Borrowers who post ${n.symbol} as collateral on ${n.spoke} now pay a lower premium.`,
   reserveLends: (n: N) => `${n.spoke} lends ${n.symbol}: borrowing is on.`,
@@ -147,9 +147,9 @@ const WORDS = {
   priceFollowsFirst: (n: N) => `Every ${n.symbol} collateral and debt value on ${n.spoke} follows this feed.`,
   priceSame: (n: N) => `${n.spoke} named the same feed again.`,
 
-  termsSet: "Collateral terms set",
-  termsSame: "New collateral terms, same values",
-  termsRewritten: "Collateral terms rewritten",
+  termsSet: "Dynamic Risk Configuration set",
+  termsSame: "New Dynamic Risk Configuration, same values",
+  termsRewritten: "Dynamic Risk Configuration rewritten",
   cf: (d: Dir) => `Collateral factor ${d}`,
   bonus: (d: Dir) => `Max liquidation bonus ${d}`,
   liqFee: (d: Dir) => `Liquidation fee ${d}`,

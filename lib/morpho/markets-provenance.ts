@@ -10,10 +10,10 @@
 //   • state   — a field of market(id) at the block (totalSupply/BorrowAssets), or
 //     the lltv the singleton returns via idToMarketParams. Third-party verifiable:
 //     re-run the eth_call at the block against any node.
-//   • derived — a ratio (utilisation = borrow ÷ supply) or a Σ over such reads (a
+//   • derived — a ratio (utilization = borrow ÷ supply) or a Σ over such reads (a
 //     loan-token group total), chain-derived and no further than its weakest leg.
 // There is NO oracle class here, on purpose: Morpho states no USD anywhere, and
-// sizes and utilisation need no price — so this whole surface never asks one.
+// sizes and utilization need no price — so this whole surface never asks one.
 //
 // TWO Morpho-specific truths every builder must respect:
 //   1. NO ACCRUAL IN VIEW. Blue accrues interest only when a market is TOUCHED,
@@ -37,6 +37,7 @@
 
 import type { Provenance } from "@/components/shared/provenance";
 import { morphoBlueContract } from "@/lib/morpho/asset-catalog";
+import { MORPHO_APY_FORMULA, morphoApy, morphoRatePerSecondRaw } from "@/lib/morpho/terms";
 import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 
 const LANE = "live Morpho Blue reads (/morpho/markets)";
@@ -110,7 +111,7 @@ export const morphoLltvProv = (coords: MorphoMarketCoords): Provenance => ({
     kind: "recompute",
     text: "The market id is keccak256(abi.encode(params)); recompute the hash from these params — or call idToMarketParams(id) on the singleton — to confirm this lltv defines the market.",
   },
-  summary: `Loan-to-value — the market's ONE risk number${atBlock(coords)}: the borrow limit and the liquidation line at once, with the liquidation incentive derived from it rather than set. Fixed at creation and immutable, because the market id IS keccak256(abi.encode(params)) — enumerated from the CreateMarket log the roster was censused from, and re-checkable via idToMarketParams(id) at any block.`,
+  summary: `LLTV — the market's one risk parameter${atBlock(coords)}: the most a position may borrow against its collateral's value, and the LTV past which it can be liquidated, with the Liquidation Incentive Factor derived from it rather than set. Fixed at creation and immutable, because the market id IS keccak256(abi.encode(params)) — enumerated from the CreateMarket log the roster was censused from, and re-checkable via idToMarketParams(id) at any block.`,
   contract: blueContract(coords),
   via: `${LANE} · market params (id == keccak(params)) · idToMarketParams(id)`,
 });
@@ -127,7 +128,7 @@ export const morphoMarketSizeProv = (side: "supplied" | "borrowed", coords: Morp
     pclass: "state",
     source: { block: coords.blockNumber },
     verify: recompute("Morpho.market(id)", coords),
-    summary: `${coords.loanSymbol ?? "Loan-token"} ${side} — the market's \`${field}\` from \`market(id)\`${atBlock(coords)}, scaled by the loan token's decimals. STORED state, not projected: Blue accrues interest only when a market is touched, so this is the balance the contract last settled at its \`lastUpdate\`, read straight — never smoothed forward to now.`,
+    summary: `${coords.loanSymbol ?? "Loan-token"} ${side} — the market's \`${field}\` from \`market(id)\`${atBlock(coords)}, scaled by the loan asset's decimals. STORED state, not projected: Blue accrues interest only when a market is touched, so this is the balance the contract last settled at its \`lastUpdate\`, read straight — never smoothed forward to now.`,
     contract: blueContract(coords),
     via: `${LANE} · Morpho.market(id).${field} ${stateAt(coords)}`,
   };
@@ -146,9 +147,9 @@ export const morphoLoanTokenSupplyProv = (coords: MorphoMarketCoords): Provenanc
   pclass: "state",
   source: { block: coords.blockNumber },
   verify: recompute("ERC20.totalSupply()", coords),
-  summary: `${coords.loanSymbol ?? "The loan token"}'s own total supply — \`totalSupply()\` on the token contract${atBlock(coords)}, scaled by its decimals. Not a Morpho figure at all: it is how much of the asset exists, shown so the group's stored book can be compared against it. Blue credits accrued interest to \`totalSupplyAssets\` with no transfer behind it, so a book standing above this line is bookkeeping the asset never backed.`,
+  summary: `${coords.loanSymbol ?? "The loan asset"}'s own total supply — \`totalSupply()\` on the token contract${atBlock(coords)}, scaled by its decimals. Not a Morpho figure at all: it is how much of the asset exists, shown so the group's stored book can be compared against it. Blue credits accrued interest to \`totalSupplyAssets\` with no transfer behind it, so a book standing above this line is bookkeeping the asset never backed.`,
   contract: {
-    name: coords.loanSymbol ? `${coords.loanSymbol} token` : "Loan token",
+    name: coords.loanSymbol ? `${coords.loanSymbol} token` : "Loan asset",
     address: coords.loanToken ?? undefined,
   },
   via: `${LANE} · ERC20.totalSupply() ${readAt(coords)}`,
@@ -168,7 +169,7 @@ export const morphoGroupTotalProv = (
     kind: "chain-derived",
     pclass: "state",
     source: { block: coords.blockNumber },
-    summary: `${coords.loanSymbol ?? "Loan-token"} ${side}, group total — Σ over ${lentOnly != null ? `the ${lentOnly} ${coords.loanSymbol ?? "loan-token"} markets a vault on Rails's roster lends into (a market in the vault's withdraw queue, read from the vault)` : "this loan token's markets"} of each market's stored \`${field}\`${atBlock(coords)}. A sum is legitimate ONLY inside one token: every market here measures in ${coords.loanSymbol ?? "the same loan token"}, so the total is a real quantity — groups are never summed across each other, whose units don't compare.`,
+    summary: `${coords.loanSymbol ?? "Loan-token"} ${side}, group total — Σ over ${lentOnly != null ? `the ${lentOnly} ${coords.loanSymbol ?? "loan-token"} markets a vault on Rails's roster lends into (a market in the vault's withdraw queue, read from the vault)` : "this loan asset's markets"} of each market's stored \`${field}\`${atBlock(coords)}. A sum is legitimate ONLY inside one token: every market here measures in ${coords.loanSymbol ?? "the same loan asset"}, so the total is a real quantity — groups are never summed across each other, whose units don't compare.`,
     contract: blueContract(coords),
     via: `${LANE} · Σ Morpho.market(id).${field} over the ${coords.loanSymbol ?? "loan-token"} markets ${stateAt(coords)}`,
     formula: `Σ ${field}`,
@@ -191,7 +192,7 @@ export const morphoMarketLiquidityProv = (coords: MorphoMarketCoords): Provenanc
   kind: "chain-derived",
   pclass: "state",
   source: { block: coords.blockNumber },
-  summary: `${coords.loanSymbol ?? "Loan-token"} still borrowable — \`totalSupplyAssets\` − \`totalBorrowAssets\` from \`market(id)\`${atBlock(coords)}, scaled by the loan token's decimals: what suppliers have put in and borrowers have not taken out. Both are the balance the contract last settled, so the difference is too; Blue lets a borrow draw it down to zero and no further.`,
+  summary: `Market liquidity, ${coords.loanSymbol ?? "the loan asset"} still borrowable — \`totalSupplyAssets\` − \`totalBorrowAssets\` from \`market(id)\`${atBlock(coords)}, scaled by the loan asset's decimals: what suppliers have put in and borrowers have not taken out. Both are the balance the contract last settled, so the difference is too; Blue lets a borrow draw it down to zero and no further.`,
   contract: blueContract(coords),
   via: `${LANE} · Morpho.market(id): totalSupplyAssets − totalBorrowAssets ${stateAt(coords)}`,
   formula: "totalSupplyAssets − totalBorrowAssets",
@@ -215,13 +216,13 @@ export const morphoLastUpdateProv = (coords: MorphoMarketCoords): Provenance => 
 
 // ── the aggregate ratio Blue keeps ───────────────────────────────────────────
 
-/** Utilisation — the one market-wide ratio Blue holds: borrow ÷ supply of the loan
+/** Utilization — the one market-wide ratio Blue holds: borrow ÷ supply of the loan
  *  token, raw amounts so decimals cancel. Needs no oracle; NOT a loan-to-value. */
 export const morphoUtilizationProv = (coords: MorphoMarketCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: coords.blockNumber },
-  summary: `Utilisation — the one aggregate ratio Blue keeps${atBlock(coords)}: \`totalBorrowAssets\` ÷ \`totalSupplyAssets\` from \`market(id)\`, raw loan-token amounts so their decimals cancel. It needs no oracle — which is why this whole surface never asks one — and it is NOT a loan-to-value, because Blue records collateral per position and never totals it.`,
+  summary: `Utilization — the one aggregate ratio Blue keeps${atBlock(coords)}: \`totalBorrowAssets\` ÷ \`totalSupplyAssets\` from \`market(id)\`, raw loan-asset amounts so their decimals cancel. It needs no oracle — which is why this whole surface never asks one — and it is NOT a loan-to-value, because Blue records collateral per position and never totals it.`,
   contract: blueContract(coords),
   via: `${LANE} · Morpho.market(id): totalBorrowAssets ÷ totalSupplyAssets ${stateAt(coords)}`,
   formula: "totalBorrowAssets ÷ totalSupplyAssets",
@@ -233,61 +234,104 @@ export const morphoUtilizationProv = (coords: MorphoMarketCoords): Provenance =>
 
 // ── the live rate: from the market's own IRM ─────────────────────────────────
 
-/** The market's live borrow APR — its OWN IRM asked with the market as stored
- *  (borrowRateView, exactly as _accrueInterest calls it), annualised from the
- *  per-second rate. The one FRESH figure on this surface. */
-export const morphoBorrowRateProv = (coords: MorphoMarketCoords): Provenance => ({
+/** The rate a year the market's IRM gives, as its raw per-second rate and the
+ *  APY compounded from it, where the row carries the figure. */
+const rawRateInput = (yearly: number | null | undefined, coords: MorphoMarketCoords) =>
+  yearly != null
+    ? [
+        {
+          label: "borrowRateView",
+          kind: "chain" as const,
+          pclass: "state" as const,
+          value: morphoRatePerSecondRaw(yearly),
+          note: `IRM per-second borrow rate, WAD, market as stored ${readAt(coords)}`,
+        },
+      ]
+    : [
+        {
+          label: "borrowRateView",
+          kind: "chain" as const,
+          pclass: "state" as const,
+          note: `IRM per-second borrow rate, WAD, market as stored ${readAt(coords)}`,
+        },
+      ];
+
+/** The market's live Borrow APY — its OWN IRM asked with the market as stored
+ *  (borrowRateView, exactly as _accrueInterest calls it), compounded over a
+ *  year as Morpho's docs state it. The one FRESH figure on this surface. */
+export const morphoBorrowRateProv = (coords: MorphoMarketCoords, yearly?: number | null): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: coords.blockNumber },
   verify: recompute("IRM.borrowRateView", coords),
-  summary: `Borrow APR — the market's OWN interest-rate model asked with the market as stored${atBlock(coords)}: \`borrowRateView(params, market)\`, exactly as \`_accrueInterest\` calls it, annualised from the contract's per-second rate (× 31,536,000). A market naming no IRM is not asked, and states no rate rather than a zero it never reported.`,
+  summary: `Borrow APY — the market's OWN interest-rate model asked with the market as stored${atBlock(coords)}: \`borrowRateView(params, market)\`, exactly as \`_accrueInterest\` calls it, the rate Morpho Blue charges over the time since the market's last update. Morpho's docs compound that per-second rate over a year: e^(rate × 31,536,000) − 1. A market naming no IRM is not asked, and states no rate rather than a zero it never reported.`,
   contract: irmContract(coords),
-  via: `${LANE} · IRM.borrowRateView(params, market) × seconds/year ${readAt(coords)}`,
-  formula: "borrowRateView × seconds per year",
+  via: `${LANE} · IRM.borrowRateView(params, market) · ${MORPHO_APY_FORMULA} ${readAt(coords)}`,
+  formula: MORPHO_APY_FORMULA,
   inputs: [
-    {
-      label: "borrowRateView",
-      kind: "chain",
-      pclass: "state",
-      note: `IRM per-second borrow rate, market as stored ${readAt(coords)}`,
-    },
+    ...rawRateInput(yearly, coords),
     {
       label: "seconds per year",
       kind: "derived",
       pclass: "state",
       value: "31,536,000",
-      note: "annualisation constant",
+      note: "the docs' year",
     },
+    ...(yearly != null
+      ? [
+          {
+            label: "Borrow APY",
+            kind: "chain-derived" as const,
+            pclass: "state" as const,
+            value: `${(morphoApy(yearly) * 100).toFixed(2)}%`,
+            note: "the figure on the page",
+          },
+        ]
+      : []),
   ],
 });
 
-/** The market's supply APR — what lenders earn, derived (never a separate slot):
- *  the same live borrow APR the IRM reports, times utilisation, net of the
- *  protocol fee. The one arithmetic step over two chain reads and a governance
- *  parameter, matching exactly what the position lane's marketRateProv states. */
-export const morphoSupplyRateProv = (coords: MorphoMarketCoords): Provenance => ({
+/** The market's Supply APY — what lenders earn, derived (never a separate
+ *  slot): the docs' supply rate, the borrow rate per second times utilization
+ *  times (1 − fee), compounded over a year. */
+export const morphoSupplyRateProv = (
+  coords: MorphoMarketCoords,
+  r?: { borrowYearly: number | null; utilization: number | null; fee: number; supplyYearly: number | null },
+): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: coords.blockNumber },
-  summary: `Supply APR — what lenders in this market earn${atBlock(coords)}: the market's own borrow APR (\`IRM.borrowRateView\`), times utilisation, net of the protocol fee. Blue keeps no separate supply-rate slot — this is the same arithmetic \`_accrueInterest\` performs to split interest between the protocol fee and suppliers.`,
+  summary: `Supply APY — what lenders in this market earn${atBlock(coords)}. Morpho's docs take the per-second borrow rate (\`IRM.borrowRateView\`), times utilization, times (1 − fee), and compound that over a year: e^(supply rate × 31,536,000) − 1. Blue keeps no separate supply-rate slot; this is the split \`_accrueInterest\` makes between the protocol fee and suppliers.`,
   contract: irmContract(coords),
-  via: `${LANE} · borrow APR × utilisation × (1 − fee) ${readAt(coords)}`,
-  formula: "borrow APR × utilisation × (1 − fee)",
+  via: `${LANE} · borrowRateView × utilization × (1 − fee) · ${MORPHO_APY_FORMULA} ${readAt(coords)}`,
+  formula: "e^(borrowRateView × utilization × (1 − fee) × 31,536,000) − 1",
   inputs: [
+    ...rawRateInput(r?.borrowYearly, coords),
     {
-      label: "borrow APR",
+      label: "utilization",
       kind: "chain-derived",
       pclass: "state",
-      note: `IRM.borrowRateView annualised ${readAt(coords)}`,
-    },
-    {
-      label: "utilisation",
-      kind: "chain-derived",
-      pclass: "state",
+      ...(r?.utilization != null ? { value: `${(r.utilization * 100).toFixed(4)}%` } : {}),
       note: `totalBorrowAssets ÷ totalSupplyAssets ${stateAt(coords)}`,
     },
-    { label: "fee", kind: "chain", pclass: "state", note: `market(id).fee ${stateAt(coords)}` },
+    {
+      label: "fee",
+      kind: "chain",
+      pclass: "state",
+      ...(r ? { value: `${(r.fee * 100).toFixed(2)}%` } : {}),
+      note: `market(id).fee ${stateAt(coords)}`,
+    },
+    ...(r?.supplyYearly != null
+      ? [
+          {
+            label: "Supply APY",
+            kind: "chain-derived" as const,
+            pclass: "state" as const,
+            value: `${(morphoApy(r.supplyYearly) * 100).toFixed(2)}%`,
+            note: "the figure on the page",
+          },
+        ]
+      : []),
   ],
 });
 
@@ -306,14 +350,14 @@ export const morphoFeeProv = (coords: MorphoMarketCoords): Provenance => ({
 
 // ── the overview's group-level ratio and the family's book ───────────────────
 
-/** A loan-token group's utilisation — Σ borrowed ÷ Σ supplied over that token's
+/** A loan-token group's utilization — Σ borrowed ÷ Σ supplied over that token's
  *  markets, raw amounts so decimals cancel. The per-market ratio, taken over
  *  the whole group; still no oracle, still not a loan-to-value. */
 export const morphoGroupUtilizationProv = (coords: MorphoMarketCoords, lentOnly?: number): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: coords.blockNumber },
-  summary: `${coords.loanSymbol ?? "Loan-token"} utilisation, group — Σ \`totalBorrowAssets\` ÷ Σ \`totalSupplyAssets\` over ${lentOnly != null ? `the ${lentOnly} markets a vault on Rails's roster lends into` : "this loan token's markets"}${atBlock(coords)}, raw amounts in one token so their decimals cancel. The same ratio each market states, taken over the whole group; it needs no oracle and is NOT a loan-to-value, because Blue never totals collateral.`,
+  summary: `${coords.loanSymbol ?? "Loan-token"} utilization, group — Σ \`totalBorrowAssets\` ÷ Σ \`totalSupplyAssets\` over ${lentOnly != null ? `the ${lentOnly} markets a vault on Rails's roster lends into` : "this loan asset's markets"}${atBlock(coords)}, raw amounts in one token so their decimals cancel. The same ratio each market states, taken over the whole group; it needs no oracle and is NOT a loan-to-value, because Blue never totals collateral.`,
   contract: blueContract(coords),
   via: `${LANE} · Σ Morpho.market(id).totalBorrowAssets ÷ Σ totalSupplyAssets over the ${coords.loanSymbol ?? "loan-token"} markets ${stateAt(coords)}`,
   formula: "Σ totalBorrowAssets ÷ Σ totalSupplyAssets",
@@ -348,7 +392,7 @@ export const morphoFamilyTotalProv = (
     source: { block: coords.blockNumber },
     summary: `${coords.loanSymbol ?? "Loan-token"} ${side}, family total — Σ over the ${count} ${coords.collateralSymbol ?? "same-collateral"} markets of each market's stored \`${field}\`${atBlock(coords)}. These markets share one collateral and one loan-to-value and differ only by oracle, so the sum is one token and a real quantity — STORED state, never projected: Blue credits interest to a market's book only when it is touched.`,
     contract: blueContract(coords),
-    via: `${LANE} · Σ Morpho.market(id).${field} over the ${count}-market ${coords.collateralSymbol ?? ""}/${coords.loanSymbol ?? ""} family ${stateAt(coords)}`,
+    via: `${LANE} · Σ Morpho.market(id).${field} over the ${count}-market ${coords.loanSymbol ?? ""} / ${coords.collateralSymbol ?? ""} family ${stateAt(coords)}`,
     formula: `Σ ${field}`,
     inputs: [
       {
@@ -374,7 +418,7 @@ export const morphoPairTotalProv = (
     kind: "chain-derived",
     pclass: "state",
     source: { block: coords.blockNumber },
-    summary: `${coords.loanSymbol ?? "Loan-token"} ${side}, over the ${count} ${coords.collateralSymbol ?? ""} / ${coords.loanSymbol ?? ""} markets at one LLTV — Σ of each market's stored \`${field}\`${atBlock(coords)}. They differ only in their oracle or rate model, and all measure in ${coords.loanSymbol ?? "one loan token"}. The rates and utilisation on this row are the largest market's.`,
+    summary: `${coords.loanSymbol ?? "Loan-token"} ${side}, over the ${count} ${coords.loanSymbol ?? ""} / ${coords.collateralSymbol ?? ""} markets at one LLTV — Σ of each market's stored \`${field}\`${atBlock(coords)}. They differ only in their oracle or rate model, and all measure in ${coords.loanSymbol ?? "one loan asset"}. The rates and utilization on this row are the largest market's.`,
     contract: blueContract(coords),
     via: `${LANE} · Σ Morpho.market(id).${field} over the ${count} markets ${stateAt(coords)}`,
     formula: `Σ ${field}`,
@@ -405,7 +449,7 @@ export const morphoPriceSourceProv = (
   verify: recompute("BASE_FEED_1() … QUOTE_FEED_2() on the oracle, then description() on each feed", coords),
   summary:
     p.feeds.length > 0
-      ? `Price source — the feeds this market's oracle names, each by its own \`description()\`${atBlock(coords)}. The market shares its loan token, collateral and LLTV with the others in its row; its oracle is its own. Where two markets' feeds read alike, the page numbers them by size.`
+      ? `Price source — the feeds this market's oracle names, each by its own \`description()\`${atBlock(coords)}. The market shares its loan asset, collateral and LLTV with the others in its row; its oracle is its own. Where two markets' feeds read alike, the page numbers them by size.`
       : `Price source — this market's oracle names no feed Rails can read${atBlock(coords)}, so the page calls it a separate price source, numbered by size where the pair has several. Its oracle is its own.`,
   contract: { name: "Market oracle", address: p.oracle ?? undefined },
   via: `${LANE} · oracle.BASE_FEED_1/2(), QUOTE_FEED_1/2() · feed.description() ${readAt(coords)}`,
@@ -431,10 +475,10 @@ export const morphoRateCeilingProv = (
   pclass: "state",
   source: { block: coords.blockNumber },
   verify: recompute("AdaptiveCurveIrm.rateAtTarget(id)", coords),
-  summary: `Rate ceiling — the market is ${(t.utilisation * 100).toFixed(2)}% borrowed on the AdaptiveCurveIRM, and its rate at target, the stored \`rateAtTarget(id)\` moved over the ${t.elapsed.toLocaleString("en-US")} seconds since the market last settled, is at the IRM's maximum of 200% a year${atBlock(coords)}. At full utilisation the borrow rate is then four times that, 800% a year. The vault pages' "Markets at the rate ceiling" uses the same test.`,
+  summary: `Rate ceiling — the market is ${(t.utilisation * 100).toFixed(2)}% borrowed on the AdaptiveCurveIRM, and its rate at target, the stored \`rateAtTarget(id)\` moved over the ${t.elapsed.toLocaleString("en-US")} seconds since the market last settled, is at the IRM's maximum of 200% a year${atBlock(coords)}. At full utilization the borrow rate is then four times that, 800% a year. The vault pages' "Markets at the rate ceiling" uses the same test.`,
   contract: irmContract(coords),
   via: `${LANE} · AdaptiveCurveIrm.rateAtTarget(id) ${readAt(coords)} · adapted to the block`,
-  formula: "utilisation ≥ 99.9% and rateAtTarget × e^(speed × err × elapsed) ≥ 200% a year",
+  formula: "utilization ≥ 99.9% and rateAtTarget × e^(speed × err × elapsed) ≥ 200% a year",
   inputs: [
     { label: "rateAtTarget", kind: "chain", pclass: "state", value: t.stored, note: "per second, WAD, as stored" },
     {
@@ -460,7 +504,7 @@ export const morphoRateAtTargetProv = (
   pclass: "state",
   source: { block: coords.blockNumber },
   verify: recompute("AdaptiveCurveIrm.rateAtTarget(id)", coords),
-  summary: `Rate at target — the borrow rate the market's AdaptiveCurveIRM sets at 90% utilisation${atBlock(coords)}. \`rateAtTarget(id)\` stores it as of the market's last update; the IRM moves it continuously, up while utilisation is above 90% and down below it, at a speed of 50 a year times the distance from the target. This is the stored value moved over the ${t.elapsed.toLocaleString("en-US")} seconds since that update at the settled utilisation of ${(t.settledUtilisation * 100).toFixed(2)}%, kept between 0.1% and 200% a year, then annualised (× 31,536,000).`,
+  summary: `Rate at target — the borrow rate the market's AdaptiveCurveIRM sets at 90% utilization${atBlock(coords)}. \`rateAtTarget(id)\` stores it as of the market's last update; the IRM moves it continuously, up while utilization is above 90% and down below it, at a speed of 50 a year times the distance from the target. This is the stored value moved over the ${t.elapsed.toLocaleString("en-US")} seconds since that update at the settled utilization of ${(t.settledUtilisation * 100).toFixed(2)}%, kept between 0.1% and 200% a year, then annualised (× 31,536,000).`,
   contract: irmContract(coords),
   via: `${LANE} · AdaptiveCurveIrm.rateAtTarget(id) ${readAt(coords)} · adapted to the block`,
   formula: "rateAtTarget × e^(speed × err × elapsed) × seconds per year",
@@ -482,7 +526,7 @@ export const morphoCurveProv = (coords: MorphoMarketCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: coords.blockNumber },
-  summary: `The AdaptiveCurveIRM's curve${atBlock(coords)}. The borrow rate is the rate at target times a factor that runs from ¼ at 0% utilisation to 1 at the 90% target and 4 at 100% (curve steepness 4), straight between those points. The supply rate is the borrow rate times utilisation, less the market's fee. The point marked is the market's settled utilisation on the curve at this block; the borrow rate on the page head is \`borrowRateView\`, the IRM's average over the time since the last update, so the two agree on a market touched recently.`,
+  summary: `The AdaptiveCurveIRM's curve${atBlock(coords)}. The borrow rate is the rate at target times a factor that runs from ¼ at 0% utilization to 1 at the 90% target and 4 at 100% (curve steepness 4), straight between those points. The supply rate is the borrow rate times utilization, less the market's fee. The point marked is the market's settled utilization on the curve at this block; the borrow rate on the page head is \`borrowRateView\`, the IRM's average over the time since the last update, so the two agree on a market touched recently.`,
   contract: irmContract(coords),
   via: `${LANE} · AdaptiveCurveIrm curve over rateAtTarget(id) ${readAt(coords)}`,
   formula: "borrow(u) = rateAtTarget × (u ≤ 90% ? ¼ + ¾·u/90% : 1 + 3·(u − 90%)/10%)",
@@ -493,10 +537,10 @@ export const morphoLiquidationIncentiveProv = (coords: MorphoMarketCoords): Prov
   kind: "derived",
   pclass: "state",
   source: { block: coords.blockNumber },
-  summary: `Liquidation incentive — what a liquidator receives in collateral per unit of debt repaid, as a multiple of the debt. Morpho Blue does not store it: it follows from the market's lltv, min(1.15, 1 ÷ (1 − 0.3 × (1 − lltv))), so it is as fixed as the lltv.`,
+  summary: `Liquidation Incentive Factor — the collateral value a liquidator receives per unit of debt repaid; the factor less 1 is the liquidator's bonus. Morpho Blue does not store it: it follows from the market's lltv, min(1.15, 1 ÷ (0.3 × lltv + 0.7)), so it is as fixed as the lltv.`,
   contract: blueContract(coords),
-  via: `${LANE} · min(1.15, 1 / (1 − 0.3 × (1 − lltv)))`,
-  formula: "min(1.15, 1 / (1 − 0.3 × (1 − lltv)))",
+  via: `${LANE} · min(1.15, 1 ÷ (0.3 × lltv + 0.7))`,
+  formula: "min(1.15, 1 ÷ (0.3 × lltv + 0.7))",
 });
 
 /** A market row's identity, on its collateral's name: the market id and the
@@ -512,12 +556,12 @@ export const morphoMarketIdentityProv = (
     kind: "recompute",
     text: "The market id is keccak256(abi.encode(params)); recompute it from these five, or call idToMarketParams(id) on Morpho Blue.",
   },
-  summary: `The ${coords.collateralSymbol ?? "idle"} / ${coords.loanSymbol ?? "loan-token"} market. Its id is the hash of its loan token, collateral token, oracle, rate model and LLTV, fixed at creation. Enumerated from the CreateMarket log the roster was censused from.`,
+  summary: `The ${coords.loanSymbol ?? "loan asset"} / ${coords.collateralSymbol ?? "idle"} market. Its id is the hash of its loan asset, collateral token, oracle, rate model and LLTV, fixed at creation. Enumerated from the CreateMarket log the roster was censused from.`,
   contract: blueContract(coords),
   via: `${LANE} · CreateMarket(id, params) · idToMarketParams(id)`,
   inputs: [
     { label: "market id", value: coords.marketId ?? "", kind: "chain", note: "keccak256 of the five parameters" },
-    { label: "loan token", value: coords.loanToken ?? "", kind: "chain" },
+    { label: "loan asset", value: coords.loanToken ?? "", kind: "chain" },
     { label: "collateral token", value: p.collateralToken, kind: "chain" },
     { label: "oracle", value: p.oracle ?? "none", kind: "chain" },
     { label: "rate model", value: p.irm ?? "none", kind: "chain" },

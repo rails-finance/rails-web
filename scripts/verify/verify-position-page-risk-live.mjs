@@ -15,7 +15,8 @@
 //      drop of N%" where several do or the protocol states a fall (Moonwell,
 //      Morpho Blue, Compound V3; decision 0042 point 3);
 //   3  the strip names its line — "Health factor" on the Aave family and Spark,
-//      "Borrow capacity" on Moonwell and Morpho Blue, "Borrowing limit" on
+//      "Borrow capacity" on Moonwell, "Health factor" on Morpho Blue
+//      (ui-jobs 628), "Borrowing limit" on
 //      Compound V3 (web 6e63b8e);
 //   4  the page carries no "could not be read" / "unavailable" wording, and the
 //      browser logged no page error while drawing it. A React hydration
@@ -77,7 +78,8 @@ const LANES = [
   },
   {
     api: "morpho-base",
-    line: "of the LLTV",
+    // The card's risk head, as Morpho's docs name it (ui-jobs 628).
+    line: "Health factor",
     debt: (r) => Number(r.borrowed?.amount ?? 0),
     path: (r) => `/base/morpho/${r.owner}/${r.marketId}`,
   },

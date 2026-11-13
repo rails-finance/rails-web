@@ -18,7 +18,7 @@ import { stampServerRead, type ServerRead } from "@/lib/shared/server-head-read"
 import type { Provenance } from "@/components/shared/provenance";
 import { MORPHO_ADDRESSES, morphoBlueContract } from "./asset-catalog";
 import { publishedText } from "./oracle-age";
-import { formatUnitsExact } from "@/lib/utils/format";
+import { formatExact, formatUnitsExact } from "@/lib/utils/format";
 import type { MorphoOracleFeed } from "@/lib/api/fetch-morpho-position";
 
 const MORPHO = { name: "Morpho Blue", address: MORPHO_ADDRESSES.MORPHO_BLUE };
@@ -49,11 +49,53 @@ export const capacityProv = (
     {
       kind: "chain-derived",
       pclass: "state",
-      summary: `${label}${marketNote(c)} — arithmetic over the position's own slots, the market's own oracle price and the lltv, all read at the same head. In loan-token units (the oracle's numeraire); no USD anywhere.`,
+      summary: `${label}${marketNote(c)} — arithmetic over the position's own slots, the market's own oracle price and the lltv, all read at the same head. In loan-asset units (the oracle's numeraire); no USD anywhere.`,
       contract: blueOf(c),
       via: `${LANE} · ${formula}`,
       formula,
       inputs: marketInputs(c),
+    },
+    readBy,
+  );
+
+/** The health factor as the docs define it (docs.morpho.org, "Collateral,
+ *  LTV & Health"): the collateral's value at the market's oracle times the
+ *  LLTV, over the debt. Below 1 the position can be liquidated. */
+export const morphoHealthFactorProv = (
+  v: { collateralValue: number; lltv: number; debt: number; healthFactor: number; loanSymbol: string },
+  c?: MorphoChainCoords,
+  readBy?: ServerRead | null,
+): Provenance =>
+  stampServerRead(
+    {
+      kind: "chain-derived",
+      pclass: "state",
+      summary: `Health factor${marketNote(c)}. The collateral's value at the market's oracle times the LLTV, over the debt, all read at the same head. Above 1 the position is healthy; below 1 it can be liquidated.`,
+      contract: blueOf(c),
+      via: `${LANE} · collateral value × LLTV ÷ debt`,
+      formula: "collateral value × LLTV ÷ debt",
+      inputs: [
+        {
+          label: "collateral value",
+          value: `${formatExact(v.collateralValue)} ${v.loanSymbol}`,
+          kind: "chain-derived",
+          note: "collateral × oracle price",
+        },
+        { label: "LLTV", value: String(v.lltv), kind: "chain", note: "market params" },
+        {
+          label: "debt",
+          value: `${formatExact(v.debt)} ${v.loanSymbol}`,
+          kind: "chain-derived",
+          note: "borrow shares at the market's totals",
+        },
+        {
+          label: "health factor",
+          value: v.healthFactor.toFixed(4),
+          kind: "chain-derived",
+          note: "the figure on the card",
+        },
+        ...marketInputs(c),
+      ],
     },
     readBy,
   );

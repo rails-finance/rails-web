@@ -5,10 +5,10 @@
 // mapped into the shared A3 shell (components/shared/product/reserve-page.tsx).
 //   head (M3.1, M3.2): the symbol, its state tags, "A reserve of the <spoke>
 //        spoke, drawn from the <hub> hub"; the band Supplied and Borrowed (this
-//        spoke, the hub's total under each), Available, Supply rate, Borrow rate
-//        and Utilisation (the hub), each figure naming its side;
+//        spoke, the hub's total under each), Available, Supply APY, Borrow APY
+//        and Utilization (the hub), each figure naming its side;
 //   M3.3 the rate curve, the hub strategy's constants and the premium;
-//   M3.4 the hub asset's daily drawn rate; M3.5 the spoke's and the hub's
+//   M3.4 the hub asset's daily borrow APY; M3.5 the spoke's and the hub's
 //        parameters; M3.6 the spoke's and the hub's configuration changes, newest
 //        first (lib/aave-v4/config-words.ts; one line on Base, not indexed there);
 //   M3.7, M3.8 the largest suppliers and borrowers of this spoke reserve.
@@ -60,7 +60,7 @@ import {
   headValueProv,
   holderAmountProv,
   supplyRateProv,
-  utilisationProv,
+  utilizationProv,
   v4ConfigChangeProv,
 } from "@/lib/aave-v4/market-provenance";
 import { v4HeldLine, v4ReserveChanges } from "@/lib/aave-v4/config-words";
@@ -78,7 +78,7 @@ import {
 import { headQuery, headRead, namesOf, PREMIUM_LINE, protocolOf, RATE_TIP, useV4Stored } from "@/lib/aave-v4/product";
 import { chainMeta, explorerUrl } from "@/lib/shared/chains";
 import { formatCompactTitled } from "@/lib/shared/format-compact";
-import { ratePercentText } from "@/lib/shared/rate-percent";
+import { V4_RATE, v4Apy, v4ApyText } from "@/lib/aave-v4/rates";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import type { Loadable, ProductHead, ProductSection, RateCurveModel, Missing } from "@/lib/shared/product/model";
 import type { SectionMenuLink } from "@/components/shared/section-menu";
@@ -110,6 +110,9 @@ function curveOf(f: V4ReserveFigures, names: V4Names): RateCurveModel | Missing 
     now: { utilisation: f.utilisation, borrow: f.drawnApr, supply: f.supplyApr ?? 0 },
     symbol: names.symbol,
     receipt: curveProv(f, names),
+    kinkLabel: V4_RATE.kinkText,
+    utilizationWord: V4_RATE.utilizationText,
+    form: { of: (rate: number) => v4Apy(rate), borrow: V4_RATE.borrowRate, supply: V4_RATE.supplyRate },
   };
 }
 
@@ -133,13 +136,13 @@ function ReserveExplainer({ f, names }: { f: V4ReserveFigures; names: V4Names })
       <ExplainGroup title="Rates">
         {f.supplyApr != null && (
           <ExplainBullet>
-            Suppliers earn <Fig bold>{ratePercentText(f.supplyApr)}</Fig> a year: the drawn interest and the premium,
-            less the {f.liquidityFee != null ? pctText(f.liquidityFee) : ""} liquidity fee.
+            Suppliers earn a supply APY of <Fig bold>{v4ApyText(f.supplyApr)}</Fig>: the borrow interest and the
+            premium, less the {f.liquidityFee != null ? pctText(f.liquidityFee) : ""} liquidity fee.
           </ExplainBullet>
         )}
         {f.drawnApr != null && (
           <ExplainBullet>
-            Borrowers pay the drawn rate, <Fig bold>{ratePercentText(f.drawnApr)}</Fig> a year, {PREMIUM_LINE}.
+            Borrowers pay a borrow APY of <Fig bold>{v4ApyText(f.drawnApr)}</Fig>, {PREMIUM_LINE}.
           </ExplainBullet>
         )}
       </ExplainGroup>
@@ -169,9 +172,9 @@ function reserveMarkdown(d: V4Deployment, f: V4ReserveFigures, names: V4Names): 
     `- Supplied (this spoke): ${usd(f.spokeSupplied)} of ${usd(f.hubSupplied)} on ${names.hub}`,
     `- Borrowed (this spoke): ${usd(f.spokeBorrowed)} of ${usd(f.hubBorrowed)} on ${names.hub}`,
     `- Available (hub): ${usd(f.available)}`,
-    ...(f.supplyApr != null ? [`- Supply rate (hub): ${ratePercentText(f.supplyApr)} APR`] : []),
-    ...(f.drawnApr != null ? [`- Borrow rate (hub): ${ratePercentText(f.drawnApr)} APR, ${PREMIUM_LINE}`] : []),
-    ...(f.utilisation != null ? [`- Utilisation (hub): ${pctText(f.utilisation)}`] : []),
+    ...(f.supplyApr != null ? [`- Supply APY (hub): ${v4ApyText(f.supplyApr)}`] : []),
+    ...(f.drawnApr != null ? [`- Borrow APY (hub): ${v4ApyText(f.drawnApr)}, ${PREMIUM_LINE}`] : []),
+    ...(f.utilisation != null ? [`- Utilization (hub): ${pctText(f.utilisation)}`] : []),
     "",
     `Read from the ${chainMeta(d.chainId).name} chain at block ${f.block.toLocaleString("en-US")}.`,
   ].join("\n");
@@ -278,7 +281,7 @@ function reserveHead(d: V4Deployment, sp: V4Spoke, l: V4Line, f: V4ReserveFigure
         slot: "sizeFree",
         label: "Available",
         side,
-        tip: "The hub's liquidity, capped by the draw cap less what this spoke owes",
+        tip: "The hub's liquidity, capped by the borrow cap less what this spoke owes",
         value: (
           <span data-vital="available">
             <Prov info={availableProv(f, names)}>{avail.display}</Prov>
@@ -292,18 +295,18 @@ function reserveHead(d: V4Deployment, sp: V4Spoke, l: V4Line, f: V4ReserveFigure
       },
       {
         slot: "rateIn",
-        label: "Supply rate",
+        label: "Supply APY",
         side,
         tip: RATE_TIP.supply,
         value: (
           <span data-vital="supply-rate">
-            {f.supplyApr != null ? <Prov info={supplyRateProv(f, names)}>{ratePercentText(f.supplyApr)}</Prov> : "—"}
+            {f.supplyApr != null ? <Prov info={supplyRateProv(f, names)}>{v4ApyText(f.supplyApr)}</Prov> : "—"}
           </span>
         ),
       },
       {
         slot: "rateOut",
-        label: "Borrow rate",
+        label: "Borrow APY",
         side,
         tip: RATE_TIP.borrow,
         value: (
@@ -314,7 +317,7 @@ function reserveHead(d: V4Deployment, sp: V4Spoke, l: V4Line, f: V4ReserveFigure
               </span>
             ) : (
               <>
-                {f.drawnApr != null ? <Prov info={drawnRateProv(f, names)}>{ratePercentText(f.drawnApr)}</Prov> : "—"}
+                {f.drawnApr != null ? <Prov info={drawnRateProv(f, names)}>{v4ApyText(f.drawnApr)}</Prov> : "—"}
                 <span className={SUB} data-prov-exempt="">
                   {PREMIUM_LINE}
                 </span>
@@ -325,13 +328,13 @@ function reserveHead(d: V4Deployment, sp: V4Spoke, l: V4Line, f: V4ReserveFigure
       },
       {
         slot: "usage",
-        label: "Utilisation",
+        label: "Utilization",
         side,
-        tip: "Drawn ÷ (drawn + liquidity) on the hub",
+        tip: "Borrowed ÷ (borrowed + liquidity) on the hub: how much of the asset's liquidity is borrowed",
         value: (
           <span data-vital="utilisation">
             {f.utilisation != null ? (
-              <Prov info={utilisationProv(f, names)}>{pctText(Math.round(f.utilisation * 1000) / 1000)}</Prov>
+              <Prov info={utilizationProv(f, names)}>{pctText(Math.round(f.utilisation * 1000) / 1000)}</Prov>
             ) : (
               "—"
             )}
@@ -414,7 +417,7 @@ function indexedSections(
                   ["date", "close_block", "update_block", "drawn_apr"],
                   h.points.map((p) => [p.date, p.closeBlock, p.update.block, p.drawnApr]),
                 ),
-              subtitle: "Each day's closing drawn rate",
+              subtitle: "Each day's closing drawn rate, as stored",
             },
           }
         : undefined,
@@ -435,7 +438,7 @@ function indexedSections(
             loadingAll={x.history.state === "loading"}
           />
           <p className="mt-2 text-[12px] text-rb-500" data-history-gap-note="">
-            The {names.hub} hub&apos;s drawn rate, every spoke drawing {names.symbol} from it alike. Utilisation is not
+            The {names.hub} hub&apos;s borrow APY, every spoke drawing {names.symbol} from it alike. Utilization is not
             held for past days.
           </p>
         </div>
