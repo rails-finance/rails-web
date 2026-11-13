@@ -343,7 +343,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
               pclass: "state",
               note: `${field} ÷ 10^27, a year`,
             },
-            { label: "seconds a year", value: "31,536,000", kind: "chain-derived", note: "365 days" },
+            { label: "seconds a year", value: "31,536,000", kind: "chain-derived", definition: true, note: "365 days" },
           ],
         };
       return {

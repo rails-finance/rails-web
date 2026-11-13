@@ -80,3 +80,33 @@ test("Aave V4: each borrow APY receipt's head drops Oracle, the year being the h
     "reserve page Borrow APY",
   );
 });
+
+test("SparkLend: the Borrow and Supply APY receipts' heads drop Oracle, the year being the Pool's", async () => {
+  const S = await import("../../lib/spark/position-provenance.ts");
+  const V = await import("../../lib/shared/aave-market-provenance.ts");
+  const Y = "seconds a year";
+  heads(S.borrowApyProv("USDS", 0.05), Y, ["state", "oracle"], ["state"], "position Borrow APY");
+  heads(S.borrowApyProv(undefined, null), Y, ["state", "oracle"], ["state"], "position Borrow APY, rate unread");
+  const spark = V.aaveMarketVocab("spark", { blockNumber: 24_000_000 });
+  for (const side of ["borrow", "supply"])
+    heads(spark.reserveRateProv(side, "USDS", 0.05), Y, ["state", "oracle"], ["state"], `market ${side} APY`);
+  // Aave V3 and Seamless state the stored rate as an APR: no year leaf, unchanged.
+  for (const fam of ["aave-v3", "seamless"]) {
+    const p = V.aaveMarketVocab(fam, { blockNumber: 24_000_000 }).reserveRateProv("borrow", "USDC", 0.05);
+    assert.equal(p.inputs, undefined, `${fam}: APR receipt has no leaves`);
+  }
+  // lib/shared/aave-reserve-reads-provenance.ts imports a value from a .tsx, which
+  // the runner cannot load: its APY history receipt's two leaves, copied by hand.
+  heads(
+    {
+      inputs: [
+        { label: "variableBorrowRate", kind: "chain", pclass: "emitted" },
+        { label: Y, value: "31,536,000", kind: "chain-derived", definition: true },
+      ],
+    },
+    Y,
+    ["emitted", "oracle"],
+    ["emitted"],
+    "reserve history APY (hand-built copy)",
+  );
+});
