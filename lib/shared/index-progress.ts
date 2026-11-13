@@ -261,6 +261,10 @@ export interface StatusWriter {
   /** Web-side: the census writer's latest run (the answer's `censusRuns`,
    *  set by `withCensusRuns`). */
   censusRun?: CensusRunStatus | null;
+  /** A census writer's family (metamorpho, vault-v2, aave, yearn-v3), where
+   *  one entry carries several censuses; censusFamilies on some answers. */
+  censusScope?: string | null;
+  censusFamilies?: string[] | null;
 }
 
 /** A vault census's latest run, per chain and family. A run stops by design
@@ -289,8 +293,25 @@ export interface CensusRunStatus {
 
 /** rails-server explorer-pipelines' name for the vault census writer. */
 export const CENSUS_WRITER = "vault-census";
-/** A census family by the status entry it writes for. */
+/** A census family by the status entry it writes for, for an answer whose
+ *  census writers carry no censusScope. */
 const CENSUS_FAMILY: Record<string, string> = { "aave-vaults": "aave", yearn: "yearn-v3" };
+/** Each census family's name on the board. */
+export const CENSUS_LABEL: Record<string, string> = {
+  metamorpho: "MetaMorpho census",
+  "vault-v2": "Vault V2 census",
+  aave: "Aave census",
+  "yearn-v3": "Yearn V3 census",
+};
+
+/** The census family a writer stands for: its censusScope, else its one
+ *  censusFamilies entry the board names, else the family of the entry it
+ *  writes for. */
+export function censusScopeOf(w: StatusWriter, protocol: string): string | null {
+  if (w.name !== CENSUS_WRITER) return null;
+  const named = w.censusFamilies?.find((f) => f in CENSUS_LABEL);
+  return w.censusScope ?? named ?? CENSUS_FAMILY[protocol] ?? null;
+}
 /** Stops in the same vault with nothing written that read as an alarm (the
  *  census wrapper's exit 3). */
 export const CENSUS_STUCK_STOPS = 3;
@@ -329,14 +350,24 @@ export function withCensusRuns(s: IndexStatus): IndexStatus {
   return {
     ...s,
     entries: s.entries.map((e) => {
-      const family = CENSUS_FAMILY[e.protocol];
-      if (!family || !e.live?.writers.some((w) => w.name === CENSUS_WRITER)) return e;
-      const run = runs.find((r) => r.chain === e.chain && r.family === family) ?? null;
+      if (!e.live?.writers.some((w) => w.name === CENSUS_WRITER)) return e;
+      const runOf = (w: StatusWriter) => {
+        const scope = censusScopeOf(w, e.protocol);
+        const fams = w.censusFamilies ?? [];
+        // censusFamilies may name the run's family or its sub-families.
+        const named = (r: CensusRunStatus) => fams.includes(r.family) || r.families.some((f) => fams.includes(f));
+        return (
+          runs.find(
+            (r) =>
+              r.chain === e.chain && (w.censusScope ? r.family === scope : fams.length ? named(r) : r.family === scope),
+          ) ?? null
+        );
+      };
       return {
         ...e,
         live: {
           ...e.live,
-          writers: e.live.writers.map((w) => (w.name === CENSUS_WRITER ? { ...w, censusRun: run } : w)),
+          writers: e.live.writers.map((w) => (w.name === CENSUS_WRITER ? { ...w, censusRun: runOf(w) } : w)),
         },
       };
     }),
@@ -461,7 +492,9 @@ export function errorKind(e: string | null): string | null {
   if (!e) return null;
   if (/whitelist|allowlist|forbidden|unauthori[sz]ed|\b40[13]\b|refus/i.test(e)) return "Upstream refused";
   if (/time(d)? ?out/i.test(e)) return "Timeout";
-  return "Error";
+  // A JavaScript error's class name carries no host or address.
+  const cls = /^([A-Z][A-Za-z]*Error)\b/.exec(e)?.[1];
+  return cls ?? "Error";
 }
 
 /** One cell of the status table, from either route. */

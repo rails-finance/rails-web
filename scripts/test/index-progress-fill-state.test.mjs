@@ -268,3 +268,57 @@ test("visit window starts at the previous clock hour of the snapshot", () => {
   assert.equal(visitWindowStart(h(14, 0, 0)), h(13));
   assert.equal(visitWindowStart(h(14, 0, 30)), h(13));
 });
+
+// Two censuses on one entry: each writer takes its own run, by censusScope,
+// else by censusFamilies, else by the entry's family.
+import { censusScopeOf } from "../../lib/shared/index-progress.ts";
+
+test("each Morpho census writer takes its own run", () => {
+  const mm = censusRun({ family: "metamorpho", families: ["metamorpho-v1"], outcome: "completed" });
+  const v2 = censusRun({ family: "vault-v2", families: ["morpho-v2"], outcome: "failed", error: "RangeError: x" });
+  const base = censusRun({ chain: 8453, family: "vault-v2", families: ["morpho-v2"], outcome: "completed" });
+  const s = withCensusRuns({
+    asOf: at(0),
+    entries: [
+      {
+        protocol: "morpho",
+        chain: 1,
+        backfill: null,
+        live: {
+          lane: "x",
+          checkpoint: null,
+          head: null,
+          writers: [
+            { name: "morpho-processor", kind: "processor", lastWriteAt: at(60), newest: null },
+            { ...censusWriter(3600), censusScope: "metamorpho" },
+            { ...censusWriter(3600, false), censusFamilies: ["morpho-v2"] },
+          ],
+        },
+      },
+    ],
+    censusRuns: [mm, base, v2],
+  });
+  const [, a, b] = s.entries[0].live.writers;
+  assert.equal(a.censusRun.family, "metamorpho");
+  assert.equal(b.censusRun, v2);
+  assert.equal(censusScopeOf(a, "morpho"), "metamorpho");
+  assert.equal(writerState(b, now, s.entries[0]), "late");
+});
+
+test("an answer without censusScope still matches by the entry's family", () => {
+  const s = censusStatus(censusRun());
+  assert.equal(s.entries[0].live.writers[0].censusRun.family, "aave");
+  assert.equal(censusScopeOf(s.entries[0].live.writers[0], "aave-vaults"), "aave");
+});
+
+import { errorKind } from "../../lib/shared/index-progress.ts";
+
+test("an error shows its class name, never its text", () => {
+  assert.equal(
+    errorKind("RangeError: Maximum call stack size exceeded\n    at main (/app/src/x.ts:1:1)"),
+    "RangeError",
+  );
+  assert.equal(errorKind("Error: connect ECONNREFUSED 10.0.0.1:5432"), "Upstream refused");
+  assert.equal(errorKind("fetch failed to 10.0.0.1"), "Error");
+  assert.equal(errorKind("socket timed out"), "Timeout");
+});
