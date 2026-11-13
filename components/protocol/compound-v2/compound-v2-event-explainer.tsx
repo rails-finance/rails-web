@@ -12,7 +12,7 @@ import { ProseExplainer } from "@/lib/shared/explainer-prose";
 import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
 import { ProseSentenceText, type ProseEcho } from "@/components/shared/prose-sentence-text";
 import { formatNumber } from "@/lib/utils/format";
-import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
+import { COMPOUND_V2_MARKET_BY_KEY, compoundV2SeizeShareOf } from "@/lib/compound-v2/asset-catalog";
 import {
   assetsDeltaProv,
   cTokensDeltaProv,
@@ -25,6 +25,7 @@ import {
 import {
   compoundV2EventProse,
   compoundV2ExplanationRuns,
+  seizeLegs,
   type CompoundV2EchoKey,
   type CompoundV2Event,
   type CompoundV2EventProse,
@@ -57,6 +58,7 @@ export function compoundV2EchoFor(
   key: CompoundV2EchoKey,
   ctx: CompoundV2Context,
   coords: CompoundV2Coords,
+  legs?: readonly string[],
 ): ProseEcho | null {
   const sym = ctx.marketSymbol;
   const cSym = COMPOUND_V2_MARKET_BY_KEY[ctx.market]?.cSymbol ?? `c${sym}`;
@@ -93,7 +95,7 @@ export function compoundV2EchoFor(
         case "seize_in":
         case "seize_burn":
           return {
-            info: seizeLegProv(cSym, ctx.eventType, coords, raw),
+            info: seizeLegProv(cSym, ctx.eventType, coords, raw, compoundV2SeizeShareOf(ctx, legs)),
             value: signed(ctx.cTokensDelta),
             symbol: cSym,
           };
@@ -112,7 +114,7 @@ export function compoundV2EchoFor(
       const collateralCSymbol = collateral?.cSymbol ?? (ctx.collateralSymbol ? `c${ctx.collateralSymbol}` : "");
       return ctx.seizeTokens != null && collateralCSymbol
         ? {
-            info: seizeTokensProv(collateralCSymbol, coords, ctx.raw?.seizeTokens),
+            info: seizeTokensProv(collateralCSymbol, coords, ctx.raw?.seizeTokens, compoundV2SeizeShareOf(ctx, legs)),
             value: formatNumber(Number(ctx.seizeTokens)),
             symbol: collateralCSymbol,
           }
@@ -145,7 +147,8 @@ export function CompoundV2EventExplainer({ ctx, event, externalBy, siblings }: C
     blockNumber: event.blockNumber,
   });
   const coords = compoundV2EchoCoords(ctx, event);
-  const echo = (key: CompoundV2EchoKey) => compoundV2EchoFor(key, ctx, coords);
+  const legs = seizeLegs({ siblings: siblings ?? [event], self: event });
+  const echo = (key: CompoundV2EchoKey) => compoundV2EchoFor(key, ctx, coords, legs);
   const sentence = (s: CompoundV2EventProse["L4"][number]) => (
     <ProseSentenceText key={s.sentence_id} s={s} echo={echo} />
   );

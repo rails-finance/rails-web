@@ -13,7 +13,7 @@ const at = (u, c) =>
     : c.base + c.slope1 + (c.slope2 * (u - c.optimal)) / (1 - c.optimal);
 
 test("Compound V2 cUSDC's jump-rate model: 5% to the 80% kink, then 109% a year", () => {
-  // 0xD8EC56013EA119E7181d231E5048f90fBbe753c0, per block, 2,102,400 blocks a year.
+  // 0xD8EC56013EA119E7181d231E5048f90fBbe753c0, per block, on the model's 2,102,400 blocks a year.
   const m = jumpRateModel(
     { base: 0n, multiplier: 23782343987n, jump: 518455098934n, kink: 800000000000000000n },
     2_102_400,

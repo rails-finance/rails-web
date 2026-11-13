@@ -981,6 +981,12 @@ L5:
           The protocol's share
         text: |-
           most markets keep 2.8% of the seized cTokens for the protocol, and a few take none.
+        text_share: |-
+          this collateral market keeps 2.8% of the seized cTokens for the protocol.
+        text_no_share: |-
+          this collateral market takes no protocol share, so the liquidator receives every seized cToken.
+        text_none_taken: |-
+          no protocol share was taken from this seizure, so the liquidator received every seized cToken.
       - bold: |-
           Deprecated markets
         text: |-
@@ -1014,6 +1020,8 @@ L5:
           the seized total is the liquidator's part plus the protocol's 2.8% share, so the liquidator's part alone understates the loss.
         text_no_share: |-
           this market takes no protocol share, so the liquidator receives every seized cToken.
+        text_none_taken: |-
+          no protocol share was taken from this seizure, so the liquidator received every seized cToken.
       - bold: |-
           Receipt tokens move
         text: |-
