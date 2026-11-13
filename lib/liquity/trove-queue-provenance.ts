@@ -16,13 +16,16 @@
 
 import type { Provenance } from "@/components/shared/provenance";
 
-const DIF_VIA = "MultiTroveGetter.getDebtPerInterestRateAscending() at the latest block";
+// State: a view at the latest block, which Rails's backend calls. One via
+// segment, since an embedded receipt drops a leading custody segment.
+const DIF_VIA = "MultiTroveGetter.getDebtPerInterestRateAscending() at the latest block, read by Rails's backend";
 
 /** Receipt for the debt-in-front figure — the branch debt redeemed before
  *  this trove is touched. */
 export function troveDebtInFrontProv(collateralType: string): Provenance {
   return {
     kind: "chain-derived",
+    pclass: "state",
     summary: `Debt in front — the combined BOLD debt, interest included, of the other ${collateralType} troves that pay this trove's interest rate or less, and of the branch's last dormant Trove (lastZombieTroveId) when it has debt. A redemption takes that dormant Trove first, then the lowest-rate troves, so it works through this debt on its way to this trove.`,
     formula: "Σ entireDebt of same-branch troves at rate ≤ this trove's + lastZombieTroveId's entireDebt",
     contract: { name: "MultiTroveGetter" },
@@ -35,6 +38,7 @@ export function troveDebtInFrontProv(collateralType: string): Provenance {
 export function troveTrovesAheadProv(collateralType: string): Provenance {
   return {
     kind: "chain-derived",
+    pclass: "state",
     summary: `Troves ahead — the number of other ${collateralType} troves that pay this trove's interest rate or less, and the branch's last dormant Trove when it has debt. A redemption reaches them first.`,
     formula: "count of same-branch troves at rate ≤ this trove's, + 1 for lastZombieTroveId with debt",
     contract: { name: "MultiTroveGetter" },
@@ -48,14 +52,20 @@ export function troveTrovesAheadProv(collateralType: string): Provenance {
 export function troveQueueShareProv(collateralType: string): Provenance {
   return {
     kind: "chain-derived",
+    pclass: "state",
     summary:
       "Share of the branch's debt redeemed before this trove — the debt in front divided by the branch's entire debt. The larger the share, the more BOLD must be redeemed before a redemption reaches this trove.",
     formula: "debt in front ÷ branch debt",
     contract: { name: "MultiTroveGetter" },
     via: `${DIF_VIA} and TroveManager.getEntireBranchDebt()`,
     inputs: [
-      { label: "debt in front", kind: "chain-derived", note: "Σ same-branch debt at rate ≤ this trove's" },
-      { label: "branch debt", kind: "chain", note: `getEntireBranchDebt · ${collateralType} branch` },
+      {
+        label: "debt in front",
+        kind: "chain-derived",
+        pclass: "state",
+        note: "Σ same-branch debt at rate ≤ this trove's",
+      },
+      { label: "branch debt", kind: "chain", pclass: "state", note: `getEntireBranchDebt · ${collateralType} branch` },
     ],
   };
 }
