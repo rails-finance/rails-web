@@ -53,6 +53,9 @@ export interface IndexProgressEntry {
   heartbeatAt?: string | null;
   /** Why the fill is holding this index, where it is. */
   held?: FillHold | null;
+  /** Web-side: why the fill's last heartbeat wrote no sample on this chain
+   *  (the answer's `headMisses`, set by `withHeadMisses`). */
+  headMiss?: HeadMiss | null;
 }
 
 /** A fill's hold on an index: the free gateway's allowance under the floor
@@ -88,15 +91,45 @@ export function counterChains(
   const shared: number[] = [];
   const own: number[] = [];
   for (const g of gateways) {
+    // A gateway with no reading yet says nothing about its counter.
     const t = isoSecs(g.resetsAt);
-    (at != null && t != null && Math.abs(t - at) < 60 ? shared : own).push(g.chain);
+    if (t == null) continue;
+    (at != null && Math.abs(t - at) < 60 ? shared : own).push(g.chain);
   }
   return { shared, own };
+}
+
+/** A chain the fill's last heartbeat could not sample: the gateway refused
+ *  its finalized-block read (`until` the host's reset), or the read failed.
+ *  Held in the api's memory and replaced at each heartbeat. */
+export interface HeadMiss {
+  chain: number;
+  reason: "gateway-refused" | "read-failed";
+  until: string | null;
+  at: string;
+  error?: string;
 }
 
 export interface IndexProgress {
   asOf: string;
   indexes: IndexProgressEntry[];
+  /** Absent from an api that predates it. */
+  headMisses?: HeadMiss[];
+}
+
+const missOn = (misses: HeadMiss[] | undefined, chain: number) => misses?.find((m) => m.chain === chain) ?? null;
+
+/** Each fill index with its chain's head miss, where the answer has one. */
+export function withHeadMisses<T extends IndexProgress | IndexStatus>(s: T): T {
+  const misses = s.headMisses;
+  if (!misses?.length) return s;
+  if ("indexes" in s) return { ...s, indexes: s.indexes.map((e) => ({ ...e, headMiss: missOn(misses, e.chain) })) };
+  return {
+    ...s,
+    entries: s.entries.map((e) =>
+      e.backfill?.pipeline === "fill" ? { ...e, backfill: { ...e.backfill, headMiss: missOn(misses, e.chain) } } : e,
+    ),
+  };
 }
 
 /** The fill plans each index every 10 min and writes its sample
@@ -115,7 +148,10 @@ const isoSecs = (iso: string | null | undefined): Secs | null => {
 };
 
 /** The fields a fill's state reads: a progress entry, or a status entry's backfill. */
-export type FillReading = Pick<IndexProgressEntry, "heartbeatAt" | "head" | "percent" | "pace" | "held"> & {
+export type FillReading = Pick<
+  IndexProgressEntry,
+  "heartbeatAt" | "head" | "percent" | "pace" | "held" | "headMiss"
+> & {
   atHead: boolean | null;
 };
 
@@ -148,12 +184,24 @@ export function fillStall(e: FillReading): "not-gaining" | "behind" | null {
   return null;
 }
 
+/** The fill's head miss on this chain while it is current: recorded within
+ *  HEARTBEAT_LATE, so a miss an api stopped replacing does not stand. */
+export function liveMiss(e: FillReading, now: Secs): HeadMiss | null {
+  const at = isoSecs(e.headMiss?.at);
+  return e.headMiss && at != null && now - at <= HEARTBEAT_LATE ? e.headMiss : null;
+}
+
 /** A fill's state: its heartbeat's age, and never better than late while it
  *  is not moving. A hold shows only while the heartbeat is fresh: the server
  *  restores holds from storage, so a hold alone does not show the loop is
  *  running, and a late or stalled heartbeat wins over it. */
 export function fillState(e: FillReading, now: Secs): Heartbeat {
   const hb = heartbeatState(e, now);
+  // A miss the last heartbeat recorded shows the loop ran and why it wrote no
+  // sample: a gateway's refusal is a pause until its reset; a failed read is
+  // late, or stalled once the samples are three hours old.
+  const miss = liveMiss(e, now);
+  if (miss) return miss.reason === "gateway-refused" ? "paused" : hb === "stalled" ? "stalled" : "late";
   if (hb === "late" || hb === "stalled") return hb;
   // Held on purpose: the allowance, or the fill's switch. A check runs in
   // seconds and reads as the heartbeat; an error or a failed job is late.
@@ -247,6 +295,8 @@ export interface IndexStatus {
   gateways?: GatewayCounter[];
   allowance?: Allowance | null;
   prices?: PricesSection;
+  /** Absent from an api that predates it. */
+  headMisses?: HeadMiss[];
 }
 
 // ── Prices: the oracle lane's feeds and rates, and the price fillers ───────
@@ -365,20 +415,25 @@ export function cellsFromStatus(s: IndexStatus, name: (key: string, chain: numbe
   });
 }
 
-/** Visit reads: amber from a 10% failure share in the last hour, red from 50%;
- *  none with no visit in the hour. */
+/** Visit reads: amber from a 10% failure share in the last hour, red from
+ *  50%, each only from 2 failed reads; none with no visit in the hour. */
 export const VISIT_FAIL_LATE = 0.1;
 export const VISIT_FAIL_STALLED = 0.5;
+/** Fewer failed reads than this in the hour leave visit reads green. */
+export const VISIT_FAIL_MIN = 2;
 
 export function visitState(v: VisitReads | null | undefined): Heartbeat {
   if (!v || !v.lastHourVisits || v.failedShare == null) return "none";
+  // One failure in a quiet hour is a blip, whatever share of the hour it is.
+  if (Math.round(v.failedShare * v.lastHourVisits) < VISIT_FAIL_MIN) return "fresh";
   return v.failedShare >= VISIT_FAIL_STALLED ? "stalled" : v.failedShare >= VISIT_FAIL_LATE ? "late" : "fresh";
 }
 
-/** A writer's state against its schedule: late past 1.5 times its cadence,
- *  stalled past 3 times. */
 /** rails-server explorer-pipelines' name for the at-block fill's writer. */
 export const AT_BLOCK_FILL_WRITER = "at-block-fill";
+
+/** A writer's state against its schedule: late past 1.5 times its cadence,
+ *  stalled past 3 times. */
 
 export function writerState(w: StatusWriter, now: Secs, e?: StatusEntry): Heartbeat {
   // The at-block fill's writer stamps the fill's sample (lastWriteAt is the

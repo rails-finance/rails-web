@@ -525,8 +525,8 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
                       surface="detail"
                       viewHref={tl.viewHref}
                       captions={captions ?? undefined}
-                      // The Health factor, the room left to borrow and the distance
-                      // to liquidation come from the Comptroller read.
+                      // Credit remaining and the credit limit come from the
+                      // Comptroller read.
                       chain={data}
                       exports={exports}
                       // The Explanation is layman prose about those same face

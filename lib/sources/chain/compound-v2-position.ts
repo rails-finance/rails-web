@@ -13,8 +13,8 @@
 // labeled a REPLICA everywhere it renders — unlike Moonwell's, it has not been
 // proven exact against the Comptroller's truncation order.
 //
-// Rates are per BLOCK (original V2), annualised on 2,628,000 blocks
-// (lib/compound-v2/rate-year.ts). Each market's model's blocksPerYear() is
+// Rates are per BLOCK (original V2), as APYs by the docs' formula
+// (lib/comptroller/apy.ts). Each market's model's blocksPerYear() is
 // still read: the constant the model sets its per-block curve with.
 //
 // SERVER-ONLY.
@@ -22,7 +22,7 @@
 import { parseAbi, getAddress, type ContractFunctionParameters, type PublicClient } from "viem";
 import { alchemyClient } from "./rpc";
 import { COMPOUND_V2_MARKETS, COMPOUND_V2_ADDRESSES, CTOKEN_DECIMALS } from "@/lib/compound-v2/asset-catalog";
-import { compoundV2AnnualRate } from "@/lib/compound-v2/rate-year";
+import { compoundV2Apy } from "@/lib/comptroller/apy";
 import type { CompoundV2ChainMarket, CompoundV2ChainResponse } from "@/lib/api/fetch-compound-v2-position";
 import { withServerHead } from "@/lib/sources/api/lender-position-head";
 
@@ -203,7 +203,7 @@ export async function loadCompoundV2PositionFromChain(
       const blocksPerYear = bpyRaw != null && bpyRaw > ZERO ? Number(bpyRaw) : null;
       const apr = (r: Res | undefined): number | null => {
         const v = ok<bigint>(r);
-        return v != null ? compoundV2AnnualRate(v) : null;
+        return v != null ? compoundV2Apy(v) : null;
       };
 
       if (priceUsd != null) {

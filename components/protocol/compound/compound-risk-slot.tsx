@@ -28,7 +28,11 @@ import type { CompoundMarketChainResponse } from "@/lib/api/fetch-compound-posit
 import { PanelFigure } from "@/components/shared/position-card-panel";
 
 const LIMIT_TIP =
-  "The debt as a share of the borrowing limit, which each collateral's borrow factor sets. The account is absorbed at a higher line, set by the liquidate factors.";
+  "The borrow balance as a share of the account's borrowing capacity, which each collateral's Borrow CF (borrow collateral factor) sets. The account becomes liquidatable at a higher level, set by the Liquidation CFs (liquidation collateral factors).";
+
+/** The level is Rails's coinage: Compound's docs name no line or point. */
+const POINT_TIP =
+  "Liquidation point is Rails's name; Compound's docs name no such level. It is the borrow balance at which the account becomes liquidatable: each collateral's value at the Comet's price feed times its Liquidation CF (liquidation collateral factor), in base tokens.";
 
 const coordsOf = (chain: CompoundMarketChainResponse): CompoundCoords => ({
   comet: chain.comet,
@@ -50,7 +54,7 @@ export function compoundRiskSlots(
   head: PositionCardHead;
   rows: PositionPanelRow[];
 } {
-  const base = { id: "borrowing-limit-used", label: "Borrowing limit used", labelTip: LIMIT_TIP };
+  const base = { id: "borrowing-limit-used", label: "Borrowing capacity used", labelTip: LIMIT_TIP };
   if (!chain) return { head: { ...base, value: null, pending: true }, rows: [] };
   if (chain.debtValue <= 0 || chain.borrowCapacity <= 0 || chain.liquidationCapacity <= 0)
     return { head: { ...base, value: null }, rows: [] };
@@ -65,7 +69,7 @@ export function compoundRiskSlots(
     {
       id: "room-to-borrow",
       label: "Room to borrow",
-      tip: "How much more of the base the account can borrow before it reaches its borrowing limit, from the Comet's collateral balances, prices and borrow factors.",
+      tip: "How much more of the base the account can borrow before it reaches its borrowing capacity, from the Comet's collateral balances, price feeds and Borrow CFs.",
       value: (
         <Prov
           value={formatExact(headroom)}
@@ -83,8 +87,8 @@ export function compoundRiskSlots(
     },
     {
       id: "absorbed-at",
-      label: "Absorbed at",
-      tip: "The debt at which the protocol can absorb the account: each collateral's value at the Comet's price times its liquidate factor, in base tokens.",
+      label: "Liquidation point",
+      tip: POINT_TIP,
       value: (
         <>
           <TokenFigure
@@ -95,8 +99,8 @@ export function compoundRiskSlots(
             <Prov
               value={formatExact(toBase(chain, chain.liquidationCapacity))}
               info={capacityProv(
-                "Liquidation line",
-                "Σ collateral × price × liquidate factor ÷ base price",
+                "Liquidation point",
+                "Σ collateral × price × Liquidation CF ÷ base price",
                 coords,
                 readBy,
               )}
@@ -104,19 +108,19 @@ export function compoundRiskSlots(
               <AmountText value={toBase(chain, chain.liquidationCapacity)} format="compact" />
             </Prov>
           </TokenFigure>{" "}
-          of debt
+          of borrow balance
         </>
       ),
     },
     {
       id: "absorb-line-reached",
-      label: "Absorb line reached",
-      tip: "The debt as a share of the absorb line. The Comet's isLiquidatable says whether the account is past it.",
+      label: "Liquidation point reached",
+      tip: "The borrow balance as a share of the liquidation point, Rails's name for the level. The Comet's isLiquidatable says whether the account is liquidatable.",
       value: (
         <>
           <Prov
             info={capacityProv(
-              "Debt share of the liquidation line",
+              "Borrow balance share of the liquidation point",
               "debt value ÷ liquidation capacity",
               coords,
               readBy,
@@ -124,8 +128,8 @@ export function compoundRiskSlots(
           >
             <PanelFigure>{line.text}</PanelFigure>
           </Prov>{" "}
-          <Prov info={contractVerdictProv("Liquidation line", "isLiquidatable", coords, readBy)}>
-            {line.beyond ? "past it" : "reached"}
+          <Prov info={contractVerdictProv("Liquidation point", "isLiquidatable", coords, readBy)}>
+            {line.beyond ? "liquidatable" : "reached"}
           </Prov>
         </>
       ),
@@ -135,10 +139,10 @@ export function compoundRiskSlots(
     rows.push({
       id: "liquidates-on-drop",
       label: "Liquidates on a drop of",
-      tip: "How far the collateral's value can fall, every asset together, before the debt reaches the absorb line.",
+      tip: "How far the collateral's value can fall, every asset together, before the borrow balance reaches the liquidation point.",
       value: (
         <Prov
-          info={capacityProv("Drop to the liquidation line", "1 − debt value ÷ liquidation capacity", coords, readBy)}
+          info={capacityProv("Drop to the liquidation point", "1 − debt value ÷ liquidation capacity", coords, readBy)}
         >
           {dropPct}%
         </Prov>
@@ -148,7 +152,9 @@ export function compoundRiskSlots(
     head: {
       ...base,
       value: (
-        <Prov info={capacityProv("Share of the borrowing limit used", "debt value ÷ borrow capacity", coords, readBy)}>
+        <Prov
+          info={capacityProv("Share of the borrowing capacity used", "debt value ÷ borrow capacity", coords, readBy)}
+        >
           {used.text}
         </Prov>
       ),

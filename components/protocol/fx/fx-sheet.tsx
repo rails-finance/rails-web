@@ -60,11 +60,11 @@ const TIPS = {
   collFunding:
     "The collateral the pool took as funding at the start of this transaction, the pool's balance after less the balance before.",
   collRebalance:
-    "The collateral a keeper took from the position's tick, the pool's balance before less the balance after, bonus included.",
+    "The collateral a keeper took from the position's tick, the pool's balance before less the balance after, bounty included.",
   collRedemption:
     "The collateral given up to a redeemer from the position's tick, the pool's balance before less the balance after.",
   collLiquidation:
-    "The collateral a keeper took from the position, the pool's balance before less the balance after, bonus included.",
+    "The collateral a keeper took from the position, the pool's balance before less the balance after, bounty included.",
   collTotal: "The collateral held after this event, and its dollars at the oracle's price at this block.",
   collLast: "The collateral the position held after its previous event, in dollars at the oracle's price then.",
   collMoved:
@@ -84,13 +84,13 @@ const TIPS = {
     "The debt the liquidation cleared, the pool's debt before less after, including any the pool wrote off onto other positions.",
   debtTotal: "The debt after this event, from the pool at this block, counting one fxUSD as one dollar.",
   ratio:
-    "The position's debt over the value of its collateral, from the pool's debt ratio at this block. The higher it is, the closer the position is to a rebalance.",
+    "The position's debt over the value of its collateral, from the pool's LTV at this block. The higher it is, the closer the position is to a rebalance.",
   priceToTick:
     "The collateral price at which this position's tick reaches the pool's rebalance line, holding its collateral and debt where they are after this event.",
   drift:
     "The debt the pool moved since the previous event: the debt just before this event less the debt at the previous one.",
-  rebalanceRatio: "The debt ratio from which a keeper may rebalance a tick, read from the pool at this block.",
-  liquidationRatio: "The debt ratio from which a keeper may liquidate a position, read from the pool at this block.",
+  rebalanceRatio: "The LTV from which a keeper may rebalance a tick, read from the pool at this block.",
+  liquidationRatio: "The LTV from which a keeper may liquidate a position, read from the pool at this block.",
 };
 
 const UNREAD = "Not read on this page";
@@ -532,7 +532,7 @@ export function useFxSheet({
       ? prevDebt / (prevColl * rebLine)
       : null;
   const risk: SheetStat[] = [
-    { key: "debt-ratio", label: "Debt ratio", value: ratioValue, tip: TIPS.ratio },
+    { key: "debt-ratio", label: "LTV", value: ratioValue, tip: TIPS.ratio },
     {
       key: "price-to-tick",
       label: "Price to tick",
@@ -593,8 +593,8 @@ export function useFxSheet({
     tip,
   });
   const params: SheetStat[] = [
-    lineRow("rebalance-ratio", "Rebalance ratio", "rebalance", rebLine, TIPS.rebalanceRatio),
-    lineRow("liquidation-ratio", "Liquidation ratio", "liquidate", liqLine, TIPS.liquidationRatio),
+    lineRow("rebalance-ratio", "Rebalance line", "rebalance", rebLine, TIPS.rebalanceRatio),
+    lineRow("liquidation-ratio", "Liquidation line", "liquidate", liqLine, TIPS.liquidationRatio),
   ];
 
   const panels: SheetPanel[] = [

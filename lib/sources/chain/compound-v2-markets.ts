@@ -69,7 +69,8 @@ import {
   isCEth,
 } from "@/lib/compound-v2/asset-catalog";
 import { jumpRateModel, whitePaperModel, type ComptrollerRateModel } from "@/lib/comptroller/rate-model";
-import { COMPOUND_V2_BLOCKS_PER_YEAR, compoundV2AnnualRate } from "@/lib/compound-v2/rate-year";
+import { COMPOUND_V2_BLOCKS_PER_YEAR } from "@/lib/compound-v2/rate-year";
+import { compoundV2Apy } from "@/lib/comptroller/apy";
 
 const ZERO = BigInt(0);
 
@@ -184,8 +185,8 @@ export interface CompoundV2MarketRow {
   collateralDisabled: boolean;
   isListed: boolean;
 
-  /** Annual percent (5.2 = 5.2%): the per-BLOCK rate × 2,628,000 blocks
-   *  (lib/compound-v2/rate-year.ts). Null when the rate call fails. */
+  /** APY in percent (5.2 = 5.2%): the per-BLOCK rate by the docs' formula
+   *  (lib/comptroller/apy.ts). Null when the rate call fails. */
   supplyApr: number | null;
   borrowApr: number | null;
   /** The per-block rates as read (1e18 mantissas), for the receipts. */
@@ -478,7 +479,7 @@ async function readMarkets(client: PublicClient): Promise<CompoundV2MarketsRespo
     const blocksPerYear = bpyRaw != null && bpyRaw > ZERO ? Number(bpyRaw) : null;
     const apr = (r: Res | undefined): number | null => {
       const v = ok<bigint>(r);
-      return v != null ? compoundV2AnnualRate(v) * 100 : null;
+      return v != null ? compoundV2Apy(v) * 100 : null;
     };
     const rawOf = (r: Res | undefined): string | null => ok<bigint>(r)?.toString() ?? null;
 

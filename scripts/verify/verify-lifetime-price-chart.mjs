@@ -155,7 +155,7 @@ const MORPHO_RATIO = {
  *  the "Rebalances at" tip), today's levels those two stats; days between
  *  events dotted. */
 const FX_RATIO = {
-  label: "Debt ratio",
+  label: "LTV",
   liquidates: "above",
   head: "debt-ratio",
   lineRow: "liquidation-at",

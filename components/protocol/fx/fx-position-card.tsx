@@ -84,6 +84,7 @@ import { AmountText } from "@/components/shared/amount-text";
 import { FxMenuRows } from "./fx-menu-rows";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { serverReadAt } from "@/lib/shared/server-head-read";
+import { fxCollateralUnitTip } from "@/lib/fx/statement-words";
 
 const DUST = 1e-9;
 
@@ -397,7 +398,7 @@ function ratioRows(
     };
     const reachTip = (what: "rebalance" | "liquidation", withLiquidation = false): ReactNode => (
       <>
-        The {basis} price at which this position&apos;s debt ratio reaches the pool&apos;s{" "}
+        The {basis} price at which this position&apos;s LTV reaches the pool&apos;s{" "}
         {lineFigure(what === "rebalance" ? "rebalance" : "liquidate")} {what} line, {keeper[what]}, with the fall from
         today&apos;s.
         {withLiquidation && (
@@ -783,6 +784,9 @@ export function useFxCardSlots({
       {
         id: "collateral",
         label: CARD_VOCAB.collateral,
+        ...(v.poolSymbol !== v.normalizedSymbol
+          ? { labelTip: fxCollateralUnitTip(v.poolSymbol, v.normalizedSymbol) }
+          : {}),
         tier: "amount",
         value: collateralValue,
         usd: collateralUsd(v, px, listingPx),
@@ -791,7 +795,7 @@ export function useFxCardSlots({
       { id: "debt", label: CARD_VOCAB.debt, tier: "amount", value: debtValue },
       {
         id: "debt-ratio",
-        label: "Debt ratio",
+        label: "LTV",
         labelTip: (
           <>
             The position&apos;s debt divided by its collateral&apos;s value at the oracle&apos;s anchor price, read from

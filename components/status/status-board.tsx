@@ -51,12 +51,16 @@ import {
   writerState,
   VISIT_FAIL_LATE,
   VISIT_FAIL_STALLED,
+  VISIT_FAIL_MIN,
   type VisitReads,
   type Heartbeat,
   type IndexProgress,
   type IndexProgressEntry,
   type IndexStatus,
   type Allowance,
+  type HeadMiss,
+  liveMiss,
+  withHeadMisses,
   counterChains,
   type GatewayCounter,
   type FillHold,
@@ -151,9 +155,22 @@ function allowanceLine(a: Allowance, gateways: readonly GatewayCounter[]): strin
   return `${providerWords(a.host)}'s daily allowance${covers}: ${mb(a.remaining)} of ${mb(a.allowanceToday)} left${reserve}${reset}. The full-history fill and reads on visit draw on it.${others}`;
 }
 
+/** Why the fill's last plan wrote no sample on this chain. */
+function missLine(m: HeadMiss): string {
+  const plan = `The fill's last plan, at ${hhmm(m.at)}, wrote no sample`;
+  return m.reason === "gateway-refused"
+    ? `refused by the gateway${m.until ? ` until ${hhmm(m.until)}` : ""}. ${plan}.`
+    : `${plan.charAt(0).toLowerCase()}${plan.slice(1)}: its read of the finalized block failed.`;
+}
+
 function heartbeatLine(e: IndexProgressEntry, now: number, allowance: Allowance | null = null): string {
-  const held = heldLine(e.held, allowance);
   const t = heartbeatTime(e);
+  const miss = liveMiss(e, now);
+  if (miss) {
+    const last = t != null ? ` It last wrote at ${utcTime(t)}, ${ageWords(now - t)} ago.` : "";
+    return `${HEARTBEAT_WORDS[fillState(e, now)]}: ${missLine(miss)}${last}`;
+  }
+  const held = heldLine(e.held, allowance);
   if (t == null) return "The fill has not reported this index yet.";
   const state = fillState(e, now);
   const words = HEARTBEAT_WORDS[state];
@@ -214,7 +231,7 @@ function cellView(c: StatusCell, now: number, allowance: Allowance | null): Cell
     const stall = fillStall(c.fill);
     return {
       hb,
-      status: stall && hb === "late" && !c.fill.held ? "Not gaining" : STATUS_WORDS[hb],
+      status: stall && hb === "late" && !c.fill.held && !liveMiss(c.fill, now) ? "Not gaining" : STATUS_WORDS[hb],
       index: percentWords(c.fill),
       indexRank: c.fill.atHead ? 100 : (c.fill.percent ?? 0),
       last: heartbeatTime(c.fill),
@@ -773,7 +790,9 @@ export function StatusBoard({ source, view }: { source: StatusSource; view: Stat
   }, [router]);
 
   const cells =
-    source.route === "status" ? cellsFromStatus(source.data, protocolLabel) : cellsFromProgress(source.data);
+    source.route === "status"
+      ? cellsFromStatus(withHeadMisses(source.data), protocolLabel)
+      : cellsFromProgress(withHeadMisses(source.data));
   const atHead = (protocol: string, ch: number) =>
     cells.some((c) => c.protocol === protocol && c.chain === ch && c.fill?.atHead === true);
   const next = nextItems(atHead);
@@ -843,7 +862,7 @@ export function StatusBoard({ source, view }: { source: StatusSource; view: Stat
                 {h === "fresh"
                   ? "Arriving: on schedule"
                   : h === "late"
-                    ? `Late: past 1.5 times its schedule, or ${pct(VISIT_FAIL_LATE)} of visit reads failing`
+                    ? `Late: past 1.5 times its schedule, or ${pct(VISIT_FAIL_LATE)} of visit reads failing (${VISIT_FAIL_MIN} at least)`
                     : h === "stalled"
                       ? `Stalled: past 3 times its schedule, or ${pct(VISIT_FAIL_STALLED)} failing`
                       : h === "paused"

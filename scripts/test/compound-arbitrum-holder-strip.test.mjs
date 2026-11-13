@@ -107,7 +107,7 @@ const comets = [
 
 test("the counts line names Comet positions by status", () => {
   const s = compoundArbitrumHolderStrip(head, comets);
-  assert.equal(s.countsLine, "This wallet holds 4 Comet positions, 3 open and 1 closed.");
+  assert.equal(s.countsLine, "This wallet holds 4 Comet accounts, 3 open and 1 closed.");
   assert.deepEqual(s.counts, { open: 3, closed: 1, liquidated: 0 });
   assert.equal(s.truncated, false);
 });
@@ -137,7 +137,7 @@ test("liquidatable is said only when a Comet is", () => {
     { ...comets[1], chain: hot },
     comets[2],
   ]);
-  assert.equal(s.countsLine, "This wallet holds 3 Comet positions, all open. 1 of the open ones is liquidatable.");
+  assert.equal(s.countsLine, "This wallet holds 3 Comet accounts, all open. 1 of the open ones is liquidatable.");
   assert.doesNotMatch(compoundArbitrumHolderStrip(head, comets).countsLine, /liquidatable/);
 });
 
@@ -154,7 +154,7 @@ test("no Comet read: the history's count and a note, no legs", () => {
     null,
     comets.map((c) => ({ ...c, chain: null, status: "closed" })),
   );
-  assert.equal(s.countsLine, "The history names 4 Comet positions for this wallet.");
+  assert.equal(s.countsLine, "The history names 4 Comet accounts for this wallet.");
   assert.deepEqual(s.legs, []);
   assert.match(s.note, /did not answer/);
 });

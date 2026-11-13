@@ -1778,7 +1778,7 @@ export const VIEW_NOTES: Record<string, string> = {
   "compound-v2":
     "Every listed market's utilisation against its rate-model kink, with USD from the oracle the Comptroller reads.",
   compound:
-    "Each Comet's utilisation against its kink, rates at current utilisation, and reserves against targetReserves.",
+    "Each Comet's utilization against its kink, rates at current utilization, and reserves against targetReserves.",
   moonwell:
     "The four markets against their caps: cap, collateral factor and utilisation stated as three separate axes.",
   "moonwell-base":

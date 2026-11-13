@@ -88,6 +88,62 @@ test("gateways resetting with the allowance share its counter; the rest count al
     g(8453, "2026-11-13T14:06:09.022Z"),
     g(42161, "2026-11-13T14:06:09.022Z"),
     g(11155111, "2026-11-13T14:06:09.022Z"),
+    g(4663, null),
   ]);
   assert.deepEqual(r, { shared: [1, 8453, 42161, 11155111], own: [10, 5042] });
+});
+
+// headMisses: a refusal at the last heartbeat is a pause until the reset; a
+// failed read is late; a miss no heartbeat replaced does not stand.
+import { withHeadMisses } from "../../lib/shared/index-progress.ts";
+
+const refused = (ago) => ({ chain: 1, reason: "gateway-refused", until: "2026-11-13T14:06:09.022Z", at: at(ago) });
+
+test("a refused chain reads paused though its samples are hours old", () => {
+  const p = withHeadMisses({
+    asOf: at(0),
+    indexes: [{ ...entry(HEARTBEAT_STALLED + 60, null), chain: 1 }],
+    headMisses: [refused(5 * 60)],
+  });
+  assert.equal(fillState(p.indexes[0], now), "paused");
+});
+
+test("a failed read is late, and stalled once the samples are three hours old", () => {
+  const miss = { chain: 1, reason: "read-failed", until: null, at: at(60) };
+  assert.equal(fillState({ ...entry(20 * 60, hold), headMiss: miss }, now), "late");
+  assert.equal(fillState({ ...entry(HEARTBEAT_STALLED + 60, null), headMiss: miss }, now), "stalled");
+});
+
+test("a miss older than the late limit no longer stands", () => {
+  assert.equal(
+    fillState({ ...entry(HEARTBEAT_STALLED + 60, hold), headMiss: refused(HEARTBEAT_LATE + 60) }, now),
+    "stalled",
+  );
+});
+
+test("an answer without headMisses is unchanged; a status answer marks fill backfills only", () => {
+  const p = { asOf: at(0), indexes: [entry(60, null)] };
+  assert.equal(withHeadMisses(p), p);
+  const s = withHeadMisses({
+    asOf: at(0),
+    entries: [
+      { protocol: "cow", chain: 1, backfill: { pipeline: "fill" }, live: null },
+      { protocol: "makerdao", chain: 1, backfill: { pipeline: "makerdao-backfill" }, live: null },
+      { protocol: "cow", chain: 8453, backfill: { pipeline: "fill" }, live: null },
+    ],
+    headMisses: [refused(60)],
+  });
+  assert.equal(s.entries[0].backfill.headMiss.reason, "gateway-refused");
+  assert.equal(s.entries[1].backfill.headMiss, undefined);
+  assert.equal(s.entries[2].backfill.headMiss, null);
+});
+
+// Visit reads: one failure in a quiet hour stays green.
+import { visitState } from "../../lib/shared/index-progress.ts";
+
+test("one failed read of seven stays fresh; two of seven are late; four of seven stalled", () => {
+  assert.equal(visitState({ lastHourVisits: 7, failedShare: 1 / 7 }), "fresh");
+  assert.equal(visitState({ lastHourVisits: 7, failedShare: 2 / 7 }), "late");
+  assert.equal(visitState({ lastHourVisits: 7, failedShare: 4 / 7 }), "stalled");
+  assert.equal(visitState({ lastHourVisits: 1, failedShare: 1 }), "fresh");
 });

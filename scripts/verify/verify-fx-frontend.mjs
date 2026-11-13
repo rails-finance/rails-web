@@ -118,7 +118,7 @@ const rate = W(st137.reads[String(liq.blockNumber)].rate);
 const lost = W(st137.reads[String(liq.blockNumber - 1)].colls) - W(st137.reads[String(liq.blockNumber)].colls);
 const sent = Number(liq.context.data.liqColls) * rate;
 const kept = lost - sent;
-// The keeper's bonus is at most 4% of what it took; the protocol keeps 10% of it.
+// The keeper's bounty is at most 4% of what it took; the protocol keeps 10% of it.
 check(
   "0.1268 wstETH to the liquidator plus the protocol's share is the 0.1518 stETH the position lost",
   near(lost, 0.151773, 0.000001) && near(sent, 0.15119, 0.00001) && kept > 0 && kept <= lost * 0.04 * 0.1 * 1.01,
@@ -384,8 +384,8 @@ check(
   ),
 );
 check(
-  "243 r3: the bonus the owner paid (chain: $6,070.49 − 5,923.998 = $146.49, 2.41%)",
-  /Rebalances and redemptions took 3\.06\d stETH of collateral for 5,923\.99\d fxUSD of debt[\s\S]{0,200}worth \$6,070: \$146 more[\s\S]{0,160}2\.4% of the collateral taken/.test(
+  "243 r3: what the owner paid (chain: $6,070.49 − 5,923.998 = $146.49), the 2.5% bounty over the rebalanced debt named apart",
+  /Rebalances and redemptions took 3\.06\d stETH of collateral for 5,923\.99\d fxUSD of debt[\s\S]{0,200}worth \$6,070: \$146 more[\s\S]{0,160}The pool’s 2\.5% bounty over the debt repaid comes to \$\d+/.test(
     p243.text,
   ),
 );
@@ -450,7 +450,7 @@ check("137: no page errors", p137.errors.length === 0, p137.errors.slice(0, 2).j
 check(
   "137: the liquidation says wstETH to the keeper, its stETH worth and the protocol's share",
   /received 0\.127 wstETH \(0\.151 stETH at this block’s rate\)/.test(p137.text) &&
-    /The protocol kept 0\.000583 stETH, its 10% share of the liquidation bonus/.test(p137.text),
+    /The protocol kept 0\.000583 stETH, its 10% share of the liquidation bounty/.test(p137.text),
 );
 check("137: the unpaid 1.234 fxUSD is named", /did not cover the last 1\.234 fxUSD of debt/.test(p137.text));
 check("137: the reopened row says so", /Reopened position/.test(p137.text) && /Loan 2 of 2/.test(p137.text));

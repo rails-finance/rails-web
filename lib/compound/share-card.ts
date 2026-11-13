@@ -120,9 +120,12 @@ export function compoundShareCardModel(
     if (eff.side === "borrow") {
       const debtUsd = assetUsd(position.priceByAddress, position.base.address, Math.abs(eff.amount));
       if (debtUsd != null) {
-        stats.push({ label: CARD_VOCAB.debt, value: formatUsd(debtUsd) });
+        stats.push({ label: "Borrow balance", value: formatUsd(debtUsd) });
       } else {
-        stats.push({ label: CARD_VOCAB.debt, value: `${formatCompact(Math.abs(eff.amount))} ${position.base.symbol}` });
+        stats.push({
+          label: "Borrow balance",
+          value: `${formatCompact(Math.abs(eff.amount))} ${position.base.symbol}`,
+        });
       }
     }
   } else {
@@ -143,7 +146,7 @@ export function compoundShareCardModel(
     }
     if (position.peak.borrowedBase > 0) {
       stats.push({
-        label: CARD_VOCAB.peakDebt,
+        label: "Highest recorded borrow balance",
         value: `${formatCompact(position.peak.borrowedBase)} ${position.base.symbol}`,
       });
     }
