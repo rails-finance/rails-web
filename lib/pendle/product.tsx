@@ -84,7 +84,7 @@ const TIP = {
   active: "Markets before their maturity, of all markets",
   matured: "Markets past their maturity, where each PT redeems for up to one unit of its asset",
   tvl: "The pool's SY plus its PT at the PT's price, in the market's asset",
-  empty: "The pool holds under 0.000001 SY. Its stored rate is the last trade's.",
+  empty: W.noLiquidityTip,
   apy: "Pendle's docs: the market consensus of the future APY of an asset, from the ratio of the YT price to the PT price",
   pt: "What one PT is worth in the market's asset; it reaches one at maturity",
   yt: "What one YT is worth in the market's asset; it collects the yield until maturity",
