@@ -19,7 +19,7 @@
 //     has no vault roster, so every row shows there.
 //   • Markets in one group with one collateral and one LLTV share one row
 //     that opens in place (R1.1.1), each market saying what sets it apart; a
-//     market at the rate ceiling carries the tag (R1.1.2).
+//     market fully borrowed with the rate model at its maximum carries the tag (R1.1.2).
 //   • The loan-token page (/markets/<loanToken>): the token's head, the same
 //     table for its markets that carry the book, then the markets that repeat
 //     one pair, the small ones and the never funded.
@@ -192,7 +192,7 @@ function sortValue(m: MorphoMarketRow, k: SortKey): number | string {
   }
 }
 
-/** "rate ceiling" beside a borrow rate (R1.1.2): the vault pages' illiquid
+/** "rate model at maximum" beside a borrow rate (R1.1.2): the vault pages' illiquid
  *  test on the market alone (lib/vaults/illiquid.ts `atRateCeiling`). */
 function CeilingTag({ m, c }: { m: MorphoRosterRow; c: MorphoMarketCoords }) {
   if (!m.ceiling) return null;
@@ -203,13 +203,15 @@ function CeilingTag({ m, c }: { m: MorphoRosterRow; c: MorphoMarketCoords }) {
       data-anatomy="R1.1.2"
       data-morpho-ceiling={m.id}
     >
-      <Prov info={morphoRateCeilingProv(c, { ...m.ceiling, utilisation: m.utilization ?? 1 })}>rate ceiling</Prov>
+      <Prov info={morphoRateCeilingProv(c, { ...m.ceiling, utilisation: m.utilization ?? 1 })}>
+        rate model at maximum
+      </Prov>
     </span>
   );
 }
 
 const CEILING_TIP =
-  "Fully lent out: the rate has climbed to the model's maximum, and suppliers may not be able to withdraw until borrowers repay.";
+  "Fully lent out, with the rate model at its maximum; suppliers may not be able to withdraw until borrowers repay.";
 
 const list = (xs: string[]) => (xs.length <= 1 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
 
