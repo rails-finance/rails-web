@@ -123,9 +123,7 @@ export function DataTable({
   /** Where the cards give way to the table: `lg` for a table too wide for a
    *  tablet (`.dt-stack-lg`). The row heights then start at lg. */
   stackBelow?: "sm" | "lg";
-  /** With `stacked`: each card a list row, its other
-   *  cells on one line under the row header, unlabelled on screen
-   *  (`.dt-compact`). The caller sets `--dt-indent` to its name's start. */
+  /** With `stacked`: each card a list row, its other cells on one line under the row header (`.dt-compact`). */
   compact?: boolean;
   /** From sm every row is one fixed height, each cell middle-aligned, the
    *  caller keeping its content inside it (a long name truncates): `one`

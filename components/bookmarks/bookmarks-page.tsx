@@ -58,7 +58,8 @@ const Term = ({ children }: { children: ReactNode }) => (
 
 /** The tab row (B4). Below sm the five tabs are wider than a phone, so the
  *  row scrolls sideways: a cut edge fades out, and the chosen tab is
- *  scrolled into view when it changes and once the counts draw (ui-jobs 677). */
+ *  scrolled clear of the fades when it changes and once the counts draw, a
+ *  tab taking keyboard focus likewise (ui-jobs 677). */
 function TabRow({ tab, ready, children }: { tab: Tab; ready: boolean; children: ReactNode }) {
   const row = useRef<HTMLDivElement>(null);
   const [cut, setCut] = useState({ start: false, end: false });
@@ -69,19 +70,20 @@ function TabRow({ tab, ready, children }: { tab: Tab; ready: boolean; children: 
     const end = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
     setCut((c) => (c.start === start && c.end === end ? c : { start, end }));
   };
-  useEffect(() => {
+  /** Scrolls the row alone so `t` and its focus ring sit clear of the
+   *  32px fades. */
+  const reveal = (t: HTMLElement | null | undefined) => {
     const el = row.current;
-    const chosen = el?.querySelector<HTMLElement>(`[data-saved-tab="${tab}"]`);
-    if (el && chosen && el.scrollWidth > el.clientWidth) {
-      // The tab whole inside the fades, scrolling the row alone.
-      const pad = 32;
-      const left = chosen.getBoundingClientRect().left - el.getBoundingClientRect().left + el.scrollLeft;
-      const right = left + chosen.offsetWidth;
+    if (el && t && el.scrollWidth > el.clientWidth) {
+      const pad = 40;
+      const left = t.getBoundingClientRect().left - el.getBoundingClientRect().left + el.scrollLeft;
+      const right = left + t.offsetWidth;
       if (left - pad < el.scrollLeft) el.scrollLeft = Math.max(0, left - pad);
       else if (right + pad > el.scrollLeft + el.clientWidth) el.scrollLeft = right + pad - el.clientWidth;
     }
     measure();
-  }, [tab, ready]);
+  };
+  useEffect(() => reveal(row.current?.querySelector<HTMLElement>(`[data-saved-tab="${tab}"]`)), [tab, ready]);
   useEffect(() => {
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
@@ -94,7 +96,10 @@ function TabRow({ tab, ready, children }: { tab: Tab; ready: boolean; children: 
     <div
       ref={row}
       onScroll={measure}
-      className="-mx-4 flex items-center gap-4 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:gap-x-8 sm:overflow-visible sm:px-0"
+      onFocus={(e) =>
+        reveal(e.target instanceof HTMLElement ? e.target.closest<HTMLElement>("[data-saved-tab]") : null)
+      }
+      className="-mx-4 flex items-center gap-4 scroll-px-8 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:gap-x-8 sm:overflow-visible sm:px-0"
       style={cut.start || cut.end ? { maskImage: `linear-gradient(to right, ${fade.join(", ")})` } : undefined}
       role="tablist"
       aria-label="Saved views"

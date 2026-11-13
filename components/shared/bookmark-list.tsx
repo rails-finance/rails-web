@@ -508,6 +508,9 @@ const MARK_INDENT = "[--dt-indent:60px]";
 /** Below sm the star's 44px press reaches into the gutter, its glyph on the
  *  column's edge, and the next item 8px after the glyph. */
 const STAR_EDGE = "max-sm:-ml-3.5 max-sm:-mr-2.5";
+/** A part of a compact row's second line named to a screen reader, as its
+ *  column's header names it in the table. */
+const SrName = ({ children }: { children: ReactNode }) => <span className="sr-only">{children}: </span>;
 /** A compact row's second line below sm: small and muted. */
 const PHONE_LINE = "flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-rb-500";
 const MENU_CELL = "dt-row-menu w-px whitespace-nowrap";
@@ -609,13 +612,19 @@ function BookmarkRow({ session, summary, move }: { session: WalletSession; summa
       </DataTableCell>
       {phone ? (
         // One line under the name: the protocols, and the address where a
-        // name stands in its place.
+        // name stands in its place, each named to a screen reader.
         (summary || label !== shortAddress(primary)) && (
-          <DataTableCell label="Positions" valign="middle">
+          <DataTableCell valign="middle">
             <span className={PHONE_LINE}>
-              {summary && <BookmarkSummary address={primary} />}
+              {summary && (
+                <span className="contents">
+                  <SrName>Positions</SrName>
+                  <BookmarkSummary address={primary} />
+                </span>
+              )}
               {label !== shortAddress(primary) && (
                 <span className="font-mono" title={primary}>
+                  <SrName>Address</SrName>
                   {shortAddress(primary)}
                 </span>
               )}
@@ -724,14 +733,33 @@ function SavedLinkRow({ link, move }: { link: SavedLink; move: RowMove }) {
         </span>
       </DataTableCell>
       {/* Below sm one line under the name: explorer · chain, and a closed
-          position's tag. */}
+          position's tag, each named to a screen reader. */}
       {phone && (link.protocol || link.chain || link.ended) && (
-        <DataTableCell label="Explorer" valign="middle">
+        <DataTableCell valign="middle">
           <span className={PHONE_LINE}>
             {(link.protocol || link.chain) && (
-              <span className="truncate">{[link.protocol?.name, link.chain?.name].filter(Boolean).join(" · ")}</span>
+              <span className="truncate">
+                {link.protocol && (
+                  <>
+                    <SrName>Explorer</SrName>
+                    {link.protocol.name}
+                  </>
+                )}
+                {link.protocol && link.chain && <span aria-hidden="true"> · </span>}
+                {link.chain && (
+                  <>
+                    <SrName>Chain</SrName>
+                    {link.chain.name}
+                  </>
+                )}
+              </span>
             )}
-            {link.kind === "position" && link.ended && <SavedEndedTag ended={link.ended} />}
+            {link.kind === "position" && link.ended && (
+              <span>
+                <SrName>Status</SrName>
+                <SavedEndedTag ended={link.ended} />
+              </span>
+            )}
           </span>
         </DataTableCell>
       )}
