@@ -187,7 +187,7 @@ export function faceUsdProv(symbol: string, amount: string, which: "before" | "a
     formula: "debt × $1",
     inputs: [
       { label: "debt", value: `${amount} ${symbol}`, kind: "chain", note: which },
-      { label: "face", value: "$1", kind: "derived", note: `${symbol} redeems at $1` },
+      { label: "face", value: "$1", kind: "derived", definition: true, note: `${symbol} redeems at $1` },
     ],
   };
 }

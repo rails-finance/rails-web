@@ -286,7 +286,7 @@ export function debtUsdProv(debt: number): Provenance {
         pclass: "state",
         note: "getEntireDebtAndColl @ head",
       },
-      { label: "face", value: "$1", kind: "derived", note: "LUSD redeems at $1" },
+      { label: "face", value: "$1", kind: "derived", definition: true, note: "LUSD redeems at $1" },
     ],
   };
 }

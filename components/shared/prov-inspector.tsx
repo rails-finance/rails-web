@@ -31,7 +31,6 @@ import { Crosshair, X } from "lucide-react";
 import {
   CLASS_CSS,
   CLASS_META,
-  CLASS_RANK,
   classifyValue,
   entryKey,
   LadderModal,
@@ -40,10 +39,10 @@ import {
   provTraced,
   ProvReceipt,
   receiptLabel,
-  resolveClass,
   type ProvInspectorPin,
   type ProvReceiptEntry,
 } from "./provenance";
+import { involvedClasses } from "@/lib/shared/prov-class";
 import { useParams, usePathname } from "next/navigation";
 import { setProvPreference, useProvPreference } from "@/lib/shared/prov-preference";
 import { provPreferenceAllows } from "@/lib/shared/prov-preference-routes";
@@ -238,8 +237,7 @@ export function ReceiptCard({
   // nearest the chain first.
   const involved = (() => {
     if (!isComputed) return [vcls];
-    const cls = [...new Set(leaves.map((l) => resolveClass(l.kind, l.pclass)))];
-    cls.sort((a, b) => CLASS_RANK[a] - CLASS_RANK[b]);
+    const cls = involvedClasses(leaves);
     return cls.length > 0 ? cls : [vcls];
   })();
   const involvedTitle =

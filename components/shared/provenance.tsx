@@ -41,6 +41,9 @@ import { ProvCoverageBounds } from "./prov-coverage-tripwire";
 import { formatExact } from "@/lib/utils/format";
 import { BlockRef } from "@/components/shared/block-ref";
 import { untracedInputs } from "@/lib/shared/prov-untraced";
+import { CLASS_RANK, resolveClass, weakestClass } from "@/lib/shared/prov-class";
+
+export { CLASS_RANK, resolveClass };
 
 // Dev gates the coverage tripwire (scope bookends + the <Prov> coverage stamp);
 // Next inlines NODE_ENV, so the prod bundle carries neither.
@@ -80,6 +83,10 @@ export interface ProvInput {
   verify?: ProvVerify;
   /** The contract this leaf was read from — surfaces in the leaf's detail rows. */
   contract?: { name: string; address?: string };
+  /** A constant the protocol defines (a stablecoin's $1 face), not a read: the
+   *  leaf carries no class dot and the value's class skips it
+   *  (lib/shared/prov-class.ts). */
+  definition?: true;
 }
 export interface Provenance {
   kind: ProvKind;
@@ -455,38 +462,16 @@ export const CLASS_CSS: Record<ProvClass, string> = {
   offchain: "prov-cls-offchain",
 };
 
-/** Map a 4-kind gate value to a distance class when the vocabulary hasn't named
- *  one precisely. Best-effort — a vocabulary overrides it with `pclass` (e.g. a
- *  slot read is `chain` but `state`, an oracle price is `chain-derived` but the
- *  `oracle` class). The gate itself is unchanged; this only drives the display. */
-export function resolveClass(kind: ProvKind, pclass?: ProvClass): ProvClass {
-  if (pclass) return pclass;
-  switch (kind) {
-    case "chain":
-      return "emitted";
-    case "chain-derived":
-      return "oracle";
-    case "derived":
-      return "indexed";
-    case "offchain":
-      return "offchain";
-  }
-}
-
 /** The value's display class + computed flag — shared by the receipt pane and
  *  the receipts-panel rows. A vocabulary-stated `pclass` wins. Otherwise a
  *  COMPUTED value (formula over inputs) inherits the furthest class among its
  *  actual inputs — the weakest link — so a ratio whose price input is an oracle
  *  read doesn't badge as if it WERE an oracle read. Plain reads fall back to
  *  the kind map. */
-export const CLASS_RANK: Record<ProvClass, number> = { emitted: 0, state: 1, oracle: 2, indexed: 3, offchain: 4 };
 export function classifyValue(info: Provenance): { vcls: ProvClass; isComputed: boolean; leaves: ProvInput[] } {
   const leaves = (info.inputs ?? []).filter((i) => !["block", "tx"].includes(i.label.toLowerCase()));
   const isComputed = Boolean(info.formula && leaves.length > 0);
-  const weakest = leaves.reduce<ProvClass | null>((acc, l) => {
-    const c = resolveClass(l.kind, l.pclass);
-    return !acc || CLASS_RANK[c] > CLASS_RANK[acc] ? c : acc;
-  }, null);
+  const weakest = weakestClass(leaves);
   const vcls = info.pclass ?? (isComputed && weakest ? weakest : resolveClass(info.kind));
   return { vcls, isComputed, leaves };
 }
@@ -917,7 +902,11 @@ export function ProvReceipt({
                 const cls = resolveClass(inp.kind, inp.pclass);
                 return (
                   <Fragment key={i}>
-                    <span className={`prov-row-dot ${CLASS_CSS[cls]}`} title={CLASS_META[cls]} />
+                    {inp.definition ? (
+                      <span aria-hidden />
+                    ) : (
+                      <span className={`prov-row-dot ${CLASS_CSS[cls]}`} title={CLASS_META[cls]} />
+                    )}
                     <span className="prov-row-label">{inp.label}</span>
                     <span className="prov-row-cell">
                       {inp.value && <span className="prov-row-value">{inp.value}</span>}

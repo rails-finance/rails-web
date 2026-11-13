@@ -380,15 +380,17 @@ function makeForkCardOps(protocol: ForkProtocol, deps: ForkCardDeps): LiquityFam
 
 /** The debt's dollar value at its $1 face: each family stablecoin is
  *  redeemable for $1 of collateral, and the card states no market price for
- *  it (ui-jobs 270: USD under every asset figure, the stablecoin's included). */
-function debtUsdProv(symbol: string, debt: number): Provenance {
+ *  it (ui-jobs 270: USD under every asset figure, the stablecoin's included).
+ *  The debt leaf takes the class of the debt the card shows (the live read, or
+ *  the indexed snapshot); the face is a definition and carries none. */
+function debtUsdProv(symbol: string, debt: number, debtRead: Provenance): Provenance {
   return {
     kind: "derived",
     summary: `Debt value in USD. The ${symbol} debt at its $1 face: the protocol redeems ${symbol} for $1 of collateral.`,
     formula: "debt × $1",
     inputs: [
-      { label: "debt", value: `${formatPrice(debt)} ${symbol}`, kind: "chain", pclass: "state" },
-      { label: "face", value: "$1", kind: "derived", note: `${symbol} redeems at $1` },
+      { label: "debt", value: `${formatPrice(debt)} ${symbol}`, kind: debtRead.kind, pclass: debtRead.pclass },
+      { label: "face", value: "$1", kind: "derived", definition: true, note: `${symbol} redeems at $1` },
     ],
   };
 }
@@ -864,7 +866,7 @@ export function useLiquityCardSlots({
         assets: debtIcon(debt, lv?.entireDebtRaw),
         usd:
           debt > 0 ? (
-            <Prov info={debtUsdProv(cfg.debtSymbol, debt)}>
+            <Prov info={debtUsdProv(cfg.debtSymbol, debt, fp.debt)}>
               <span className="font-bold text-green-400">{formatUsdValue(debt)}</span>
             </Prov>
           ) : null,
