@@ -97,11 +97,22 @@ check(railLauncher === 1, `the brand rail carries the sidebar toggle (${railLaun
 const railHome = await rail.locator('a[href="/"][data-rail-home]').count();
 check(railHome === 1, `the rail's mark links home (${railHome})`);
 // The theme switch stands at the rail's foot from md (Miles 13 Nov 2026):
-// Light, Dark and Auto as one radio group, over the beta pill.
-const railTheme = await rail
-  .locator('[role="radiogroup"][data-theme-switch="rail"] [role="radio"]')
-  .evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")).join(","));
-check(railTheme === "Light,Dark,Auto", `the brand rail carries the theme switch at its foot (${railTheme})`);
+// one button over the beta pill that steps Light → Dark → Auto → Light.
+const railSwitch = rail.locator('button[data-theme-switch="rail"]');
+const railTheme = [];
+for (let i = 0; i < 4; i++) {
+  railTheme.push(await railSwitch.getAttribute("data-theme-current"));
+  await railSwitch.dispatchEvent("click");
+  await page.waitForTimeout(150);
+}
+const railCycle = railTheme.join(",");
+check(
+  (await railSwitch.count()) === 1 &&
+    ["light,dark,system,light", "dark,system,light,dark", "system,light,dark,system"].includes(railCycle),
+  `the brand rail carries one theme button at its foot, stepping Light → Dark → Auto (${railCycle})`,
+);
+// Leave the theme as the run found it: three more presses go round once.
+for (let i = 0; i < 3; i++) await railSwitch.dispatchEvent("click");
 // The grid glyph (497) went with ui-jobs 503: the chooser is in the wallet panel.
 const railGrid = await rail.locator("button[data-chooser-trigger]").count();
 check(railGrid === 0, `the brand rail carries no grid glyph, ui-jobs 503 (${railGrid})`);
@@ -366,12 +377,12 @@ const panelTheme = await mHomePage.evaluate(() => {
   const g = document.querySelector('[data-theme-switch="panel"]');
   const r = g?.getBoundingClientRect();
   return {
-    options: [...(g?.querySelectorAll('[role="radio"]') ?? [])].map((b) => b.textContent.trim()).join(","),
+    label: g?.textContent.trim() ?? "",
     atFoot: !!p && !!r && r.height > 0 && Math.round(p.bottom - r.bottom) <= 24,
   };
 });
 check(
-  panelTheme.options === "Light,Dark,Auto" && panelTheme.atFoot,
+  /^Theme: (Light|Dark|Auto)$/.test(panelTheme.label) && panelTheme.atFoot,
   `home @390: the wallet panel carries the theme switch at its foot (${JSON.stringify(panelTheme)})`,
 );
 const panelRow = await mHomePage.evaluate(() => {
