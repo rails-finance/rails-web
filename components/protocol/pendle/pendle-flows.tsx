@@ -9,8 +9,9 @@
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { SECTION_HEADING, CARD_INSET_START } from "@/lib/shared/ui-grammar";
-import { amountText, assetDecimals, assetSymbol, exact, marketName, symbolOf } from "@/lib/pendle/format";
+import { amountText, assetDecimals, assetSymbol, exact, symbolOf } from "@/lib/pendle/format";
 import { flowProv } from "@/lib/pendle/provenance";
+import { lpName } from "@/lib/pendle/words";
 import type { PendlePosition, PendleToken, PendleTokenMeta, PendleTotals } from "@/lib/pendle/types";
 
 function Cell({ raw, decimals, what, events }: { raw: string; decimals: number | null; what: string; events: number }) {
@@ -25,7 +26,7 @@ export function PendleFlows({ p, meta }: { p: PendlePosition; meta: Record<strin
   const registry = useReceiptRegistry();
   const t = p.tokens;
   const f = p.flows;
-  const lp: PendleToken = { ...t.market, symbol: `LP ${marketName(t)}` };
+  const lp: PendleToken = { ...t.market, symbol: lpName(t) };
   const legs: { key: string; label: string; tok: PendleToken; v: PendleTotals }[] = [
     { key: "pt", label: "PT", tok: t.pt, v: f.pt },
     { key: "yt", label: "YT", tok: t.yt, v: f.yt },

@@ -157,6 +157,13 @@ export const FAMILY_ROWS: FamilyRow[] = [
   row(k1("0x9cf12ccd6020b6888e4d4c4e4c7aca33c1eb91f8"), k1(YSYBOLD), "debt", "USDaf"),
 ];
 
+/** A Pendle LP's stored symbol, `LP-<market>`, is a `?assets=` key (a link
+ *  symbol takes no space); Rails shows it as "LP <market>" (rails-ops ui-jobs
+ *  654, P9). Every other symbol shows as stored. */
+const LP_SYMBOLS = new Set(FAMILY_ROWS.filter((r) => r.kind === "lp").map((r) => r.symbol));
+export const familyDisplaySymbol = (symbol: string): string =>
+  LP_SYMBOLS.has(symbol) ? `LP ${symbol.slice(3)}` : symbol;
+
 /** Every symbol the seed table names, by key. */
 export const FAMILY_SYMBOLS: Record<string, string> = (() => {
   const out: Record<string, string> = {};

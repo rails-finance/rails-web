@@ -80,6 +80,7 @@ export async function AerodromePositionPage({
                 quote: p.quote,
                 valueNow: p.valueNow,
                 price: p.price,
+                closed: BigInt(r.liquidity) === BigInt(0),
                 worthInfo: cardProv("worth", { p, r }),
                 priceInfo: cardProv("price", { p, r }),
               })}

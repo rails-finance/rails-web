@@ -16,6 +16,7 @@ import { rowAssetKeys } from "@/lib/shared/focus-row-keys";
 import { SECTION_HEADING, CARD_INSET_START } from "@/lib/shared/ui-grammar";
 import { PendleReadNotice } from "@/components/protocol/pendle/pendle-read-notice";
 import { UnderlyingLabel, positionClosed } from "@/components/protocol/pendle/pendle-position-card";
+import { ptHolding } from "@/lib/pendle/rules";
 import {
   PENDLE_CHAIN_ID,
   amountText,
@@ -29,6 +30,7 @@ import {
   shortAddress,
 } from "@/lib/pendle/format";
 import { entryApyProv, impliedApyProv, maturityProv, valueProv } from "@/lib/pendle/provenance";
+import { PENDLE_WORDS } from "@/lib/pendle/words";
 import { pendleWalletHref } from "@/lib/pendle/routes";
 import type { PendlePosition, PendleWalletPositions } from "@/lib/pendle/types";
 import type { PendleReadFailure } from "@/lib/sources/api/pendle";
@@ -64,13 +66,14 @@ function ListingCard({ p, w }: { p: PendlePosition; w: PendleWalletPositions }) 
       },
       {
         id: "entry-apy",
-        label: "Fixed APY at entry",
+        label: PENDLE_WORDS.effectiveFixedApy,
         value:
-          p.apy.entry.ptWeighted == null ? null : (
+          p.apy.entry.ptWeighted == null || ptHolding(p) !== "held" ? null : (
             <Prov info={entryApyProv(p.apy.entry.buys, p.apy.entry.unpriced)} value={p.apy.entry.ptWeighted.toFixed(6)}>
               {apyText(p.apy.entry.ptWeighted)}
             </Prov>
           ),
+        sub: ptHolding(p) === "none" ? PENDLE_WORDS.noPtHeld : undefined,
       },
       {
         id: "implied-apy",

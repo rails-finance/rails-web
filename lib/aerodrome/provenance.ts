@@ -473,7 +473,7 @@ function partProv(key: string, part: "yours" | "pool", c: AeroReceiptContext): P
         pclass: "state",
         source: head,
         summary: s
-          ? `Unstaking — the gauge's withdraw(${p.id}) takes no permission beyond the depositor's and pays out the ${p.site.reward.symbol} to claim; ${p.aero?.penalty ? `penaltyRate() is ${s.penaltyBps} bps and minStakeTimes(pool) ${s.minStakeSeconds} s, so before depositTimestamp + ${s.minStakeSeconds} s that share of the ${p.site.reward.symbol} goes to the minter` : s.penaltyBps != null ? `penaltyRate() is ${s.penaltyBps} bps, which applies only within minStakeTimes(pool), ${s.minStakeSeconds} s, of the deposit, now past` : "this gauge has no early-unstake penalty"}. The Slipstream pool's burn and collect take no permission.`
+          ? `Unstaking — the gauge's withdraw(${p.id}) takes no permission beyond the depositor's and pays out the ${p.site.reward.symbol} to claim; ${p.aero?.penalty ? `penaltyRate() is ${s.penaltyBps} bps and minStakeTimes(pool) ${s.minStakeSeconds} s, so before depositTimestamp + ${s.minStakeSeconds} s that share of the ${p.site.reward.symbol} goes to the minter` : s.penaltyBps != null ? `penaltyRate() is ${s.penaltyBps} bps, which applies only within minStakeTimes(pool), ${s.minStakeSeconds} s, of the deposit, now past` : "the gauge factory's penaltyRate() did not answer, so Rails reads no early-unstake penalty for this gauge"}. The Slipstream pool's burn and collect take no permission.`
           : "No gate — a Slipstream pool has no pause and no hook; its burn and collect take no permission.",
         contract: s ? gaugeC(c) : poolC(c),
         via: headVia(c),
@@ -510,11 +510,16 @@ function partProv(key: string, part: "yours" | "pool", c: AeroReceiptContext): P
 /** What the section's read stamp lists as read. */
 export function readContracts(c: AeroReceiptContext) {
   const { p, r } = c;
+  // rails-server looks for the depositor only on Base: the gauge's Deposit and ClaimRewards logs and the
+  // position manager's Transfer logs near the stake, then stakedContains(candidate, id) on each candidate,
+  // then earned(depositor, id). The answer names only the depositor found, so these calls are listed
+  // only then, when they were surely made.
+  const found = r.staked?.depositor != null;
   return [
     {
       name: "Slipstream NonfungiblePositionManager",
       address: r.nfpm,
-      reads: "positions(id), ownerOf(id)",
+      reads: found ? "positions(id), ownerOf(id), Transfer logs to the gauge" : "positions(id), ownerOf(id)",
     },
     {
       name: `Slipstream pool ${p.base.symbol}/${p.quote.symbol}`,
@@ -527,7 +532,12 @@ export function readContracts(c: AeroReceiptContext) {
           {
             name: "Slipstream gauge",
             address: r.staked.gauge,
-            reads: "earned(depositor, id), rewards(id), rewardGrowthInside(id), stakedContains(depositor, id)",
+            reads: [
+              "rewards(id), rewardGrowthInside(id), depositTimestamp(id), lastUpdateTime(id), gaugeFactory()",
+              ...(found
+                ? ["Deposit and ClaimRewards logs", "stakedContains(candidate, id)", "earned(depositor, id)"]
+                : []),
+            ].join(", "),
           },
         ]
       : []),

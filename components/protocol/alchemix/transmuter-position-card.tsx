@@ -17,8 +17,8 @@
 // in the receipt. A matured or claimed one keeps the block: the data carries no
 // timestamp for the block it matured at.
 //
-// THE CLAIM IS TWO AMOUNTS IN TWO UNITS: the converted part, paid out in vault
-// shares, and the rest of the stake handed back as the synthetic. Neither is
+// THE CLAIM IS TWO AMOUNTS IN TWO UNITS: the vested part, paid out in vault
+// shares, and the rest of the deposit returned as the synthetic. Neither is
 // drawn in the other's unit. A claimed position is a closed card: its stake and
 // maturity as heads, Claimed as the outcome, what was paid out beside it.
 
@@ -42,6 +42,9 @@ import type { TransmuterMaturityEstimate } from "@/lib/alchemix/transmuter-prove
 import { alchemixMarketWord } from "@/lib/alchemix/naming";
 import type { AlchemixAmount, AlchemixTransmuterPositionSummary } from "@/types/api/alchemix";
 import { transmuterEarlyClaim } from "@/lib/alchemix/transmuter-early-claim";
+import { TRANSMUTER_WORDS as TW } from "@/lib/alchemix/transmuter-words";
+import { getKnownInfrastructure } from "@/lib/shared/known-infrastructure";
+import type { ChainId } from "@/lib/shared/chains";
 import { AmountText } from "@/components/shared/amount-text";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { BlockRef } from "@/components/shared/block-ref";
@@ -66,7 +69,7 @@ export function transmuterState(p: AlchemixTransmuterPositionSummary): Transmute
 /** The tag: Claimed, the one end state. A maturing or matured position is
  *  live, and the Matures at headline says which. */
 export function transmuterStatus(p: AlchemixTransmuterPositionSummary): PositionCardStatus | null {
-  return p.status === "claimed" ? { word: "Claimed", tone: "muted" } : null;
+  return p.status === "claimed" ? { word: TW.claimed, tone: "muted" } : null;
 }
 
 /** An amount from a log: the headline form, the exact figure on hover, inside
@@ -176,14 +179,14 @@ export function transmuterHeads(
   return [
     {
       id: "deposited",
-      label: "Deposited",
+      label: TW.deposited,
       value: amountFigure(p.staked, p.staked.symbol, prov.staked),
       assets: alchemixChip(p.staked.symbol),
       sub: listing ? <BlockRef block={m.startBlock} size={12} /> : undefined,
     },
     {
       id: "matures-at",
-      label: "Matures at",
+      label: TW.maturesAt,
       value: <span title={title}>{prov.maturity ? <Prov info={prov.maturity}>{figure}</Prov> : figure}</span>,
       sub: note ? <span className="tabular-nums">{note}</span> : undefined,
     },
@@ -200,17 +203,17 @@ export function transmuterPanel(
     [
       {
         id: "staked-at",
-        label: "Deposited at",
+        label: TW.depositedAt,
         value: <BlockRef block={p.maturity.startBlock} />,
-        tip: "The block the stake was made at, from the Transmuter's PositionCreated log.",
+        tip: "The block the deposit was made at.",
       },
       ...(estimate
         ? [
             {
               id: "maturity-block",
-              label: "Maturity block",
+              label: TW.maturityBlock,
               value: <BlockRef block={p.maturity.maturationBlock} />,
-              tip: "The block the stake finishes converting at, settled from the conversion time in force when the position was created. The date above is an estimate from it at the chain's block time.",
+              tip: "The block the deposit finishes vesting at. The date above estimates it at the chain's block time.",
             },
           ]
         : []),
@@ -218,9 +221,9 @@ export function transmuterPanel(
     [
       {
         id: "claimed",
-        label: "Claimed",
+        label: TW.claimed,
         value: <span className="text-rb-500">Not yet</span>,
-        tip: "A claim pays out the converted part of the stake in vault shares and burns the position. None has been made.",
+        tip: "A claim pays out the vested part of the deposit in vault shares and burns the position's NFT. None has been made.",
       },
     ],
   ];
@@ -246,11 +249,11 @@ export function transmuterOutcome(
           {amountFigure(c.unclaimed, c.unclaimed.symbol, prov.returned)}
           <TokenChipIcon symbol={c.unclaimed.symbol} size={14} filterable={false} />
         </span>{" "}
-        handed back unconverted
+        {TW.returnedUnvested}
       </div>
     ) : null;
   return {
-    word: "Claimed",
+    word: TW.claimed,
     dates: at != null ? [{ at }] : undefined,
     footnote: (
       <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
@@ -259,7 +262,7 @@ export function transmuterOutcome(
       </div>
     ),
     extra: {
-      label: "Paid out",
+      label: TW.paidOut,
       value: (
         <div className="mt-2">
           <span className="inline-flex items-center gap-1.5 text-lg font-bold text-foreground/80">
@@ -279,6 +282,13 @@ export function transmuterOutcome(
   };
 }
 
+/** "Claimed by", naming the claimer where the address registry knows it
+ *  (Alchemix's Router, from the docs' contract pages). */
+export function transmuterClaimedByPrefix(p: AlchemixTransmuterPositionSummary, lead: string = TW.claimedBy): string {
+  const known = getKnownInfrastructure(p.claim?.claimer, p.chainId as ChainId);
+  return known ? `${lead} ${known.name}` : lead;
+}
+
 export function transmuterListingSlots(
   p: AlchemixTransmuterPositionSummary,
   session: SessionProtocol,
@@ -294,7 +304,7 @@ export function transmuterListingSlots(
         chain={p.chainName ?? `chain ${p.chainId}`}
         wallet={holder}
         session={session}
-        prefix={p.owner ? undefined : "claimed by"}
+        prefix={p.owner ? undefined : transmuterClaimedByPrefix(p, "claimed by")}
       />
     ),
     heads: transmuterHeads(p, estimate, {}, true),

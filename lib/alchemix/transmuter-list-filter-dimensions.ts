@@ -27,6 +27,7 @@ import type {
 } from "@/lib/sources/api/alchemix-transmuter-backend";
 import { parseListingSearch } from "@/lib/shared/listing-search";
 import { sizeBounds, sizeDimensions } from "@/lib/shared/size-dimensions";
+import { TRANSMUTER_WORDS as TW } from "@/lib/alchemix/transmuter-words";
 
 export const TRANSMUTER_ITEMS_PER_PAGE = 20;
 
@@ -50,9 +51,9 @@ export const TRANSMUTER_LIST_DEFAULTS: TransmuterListFilters = {
 };
 
 const STATUS_OPTIONS: FilterOptionDef[] = [
-  { value: "maturing", label: "Maturing" },
-  { value: "matured", label: "Matured, not claimed" },
-  { value: "claimed", label: "Claimed" },
+  { value: "maturing", label: TW.statusVesting },
+  { value: "matured", label: TW.statusMatured },
+  { value: "claimed", label: TW.claimed },
 ];
 
 const ANY_LINE: SortOption[] = [
@@ -60,7 +61,7 @@ const ANY_LINE: SortOption[] = [
   { value: "created", label: "Created" },
   { value: "nftId", label: "Position id" },
 ];
-const ONE_LINE: SortOption[] = [...ANY_LINE, { value: "amount", label: "Amount deposited" }];
+const ONE_LINE: SortOption[] = [...ANY_LINE, { value: "amount", label: TW.amountDeposited }];
 
 export function transmuterSortOptions(f: TransmuterListFilters): SortOption[] {
   return f.line.length === 1 ? ONE_LINE : ANY_LINE;
@@ -94,7 +95,7 @@ export function transmuterListDimensions(chainId: ChainId): SerializableDimensio
       getColl: (f) => f.coll,
       setColl: (f, coll) => ({ ...f, coll }),
       sides: ["coll"],
-      collLabel: "Staked",
+      collLabel: TW.deposited,
       panelNote: TRANSMUTER_SIZE_NOTE,
     }),
   ];

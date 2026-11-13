@@ -7,13 +7,13 @@
 //     (Markets, Active, Matured), then the markets table with its toolbar
 //     (R1.2, components/protocol/pendle/pendle-roster.tsx).
 //   • A market's page (R2, /ethereum/pendle/markets/<market>): the head on the
-//     vitals band (TVL, Implied APY, PT price, Maturity; YT, LP and SY in the
+//     vitals band (Liquidity, Implied APY, PT price, Maturity; YT, LP and SY in the
 //     `tokens` structure), how the market is built (M2), its pool (M2.1), then
 //     its router events (P3), each section with its own ⋮.
 //
-// Pendle's words stay where the measure is Pendle's: Implied APY, PT price, YT,
-// LP, SY, Maturity. The size is "TVL": the pool's SY and PT valued in the
-// asset, which no one has lent, so the house's "Supplied" would misname it.
+// Pendle's words stay where the measure is Pendle's: Implied APY, PT price, YT
+// price, LP price, SY exchange rate, Maturity. The size is the docs' "Liquidity"
+// (lib/pendle/words.ts; ui-jobs 654).
 // Every read is rails-server's at the chain's finalized block; the addresses
 // sit in receipts and the ⋮s.
 
@@ -25,6 +25,7 @@ import { readStampProv, type ReadContract } from "@/components/shared/read-stamp
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { AssetUnit } from "@/components/shared/asset-unit";
 import { MarketPage } from "@/components/shared/product/market-page";
+import { RevealTip } from "@/components/shared/reveal-tip";
 import { ProductHeadSection } from "@/components/shared/product/product-head";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { PositionReadProvider } from "@/components/shared/position-read";
@@ -59,6 +60,8 @@ import {
   syRateProv,
   tvlProv,
 } from "@/lib/pendle/provenance";
+import { LP_SYMBOL_NOTE, PENDLE_WORDS as W, marketTitleWithAsset } from "@/lib/pendle/words";
+import { emptyPool } from "@/lib/pendle/rules";
 import type { PendleMarketPage, PendleRoster, PendleTokenMeta } from "@/lib/pendle/types";
 import type { Loadable, MarketModel, ProductHead, ProductSection } from "@/lib/shared/product/model";
 
@@ -68,16 +71,25 @@ const ROOT = "/ethereum/pendle";
 const DOCS = "https://docs.pendle.finance";
 const n = (v: number) => v.toLocaleString("en-US");
 
+// "Up to one": a PT redeems for one unit of the accounting asset (Pendle's docs,
+// PT) unless the SY's exchange rate sits under the watermark the YT stored, when
+// it redeems for less (Negative Yield; Yield Tokenization: pyIndexCurrent =
+// max(SY.exchangeRate(), pyIndexStored)). Read 13 Nov 2026 at block 26,405,972:
+// both rates equal or the exchange rate above on apyUSD-5NOV2026 and
+// stETH-30DEC2027 (rails-ops reference/official-docs/pendle.md). "No longer
+// trades": RouterStatic.swapExactSyForPtStatic on the matured apyUSD-5NOV2026
+// market reverts with MarketExpired() at that block.
 const TIP = {
   markets: "Every market Pendle's routers have named",
   active: "Markets before their maturity, of all markets",
-  matured: "Markets past their maturity, where each PT redeems for one unit of its asset",
+  matured: "Markets past their maturity, where each PT redeems for up to one unit of its asset",
   tvl: "The pool's SY plus its PT at the PT's price, in the market's asset",
-  apy: "The fixed rate a PT bought now earns a year to maturity, as an APY",
+  empty: "The pool holds under 0.000001 SY. Its stored rate is the last trade's.",
+  apy: "Pendle's docs: the market consensus of the future APY of an asset, from the ratio of the YT price to the PT price",
   pt: "What one PT is worth in the market's asset; it reaches one at maturity",
   yt: "What one YT is worth in the market's asset; it collects the yield until maturity",
-  lp: "What one LP is worth in the market's asset: a share of the pool's PT and SY",
-  sy: "What one SY is worth in the market's asset: Pendle's wrapper of the yield-bearing token",
+  lp: `What one LP is worth in the market's asset: a share of the pool's PT and SY. ${LP_SYMBOL_NOTE}`,
+  sy: "The SY's exchange rate: what one SY is worth in the market's asset. SY is Pendle's wrapper of the yield-bearing token",
 };
 
 const about: SectionMenuLink = {
@@ -91,7 +103,7 @@ const docs: SectionMenuLink = {
   item: "docs",
   title: "Pendle's docs",
   subtitle: "Markets, PT and YT",
-  href: `${DOCS}/ProtocolMechanics/YieldTokenization/PT`,
+  href: `${DOCS}/pendle-v2/ProtocolMechanics/YieldTokenization/PT`,
 };
 
 /** The stamp's receipt: rails-server's read at the chain's finalized block. */
@@ -129,14 +141,14 @@ function RosterExplainer({ total, active, matured }: { total: number; active: nu
           <Fig bold>{n(active)}</Fig> markets are active: their PT trades below one unit of the asset until maturity.
         </ExplainBullet>
         <ExplainBullet>
-          <Fig bold>{n(matured)}</Fig> markets have matured: each PT redeems for one unit of the asset, and the pool no
-          longer trades.
+          <Fig bold>{n(matured)}</Fig> markets have matured: each PT redeems for up to one unit of the asset, and the
+          pool no longer trades.
         </ExplainBullet>
       </ExplainGroup>
       <ExplainGroup title="Reading the table">
         <ExplainBullet>The table opens on the active markets; its Maturity filter shows the rest.</ExplainBullet>
         <ExplainBullet>
-          TVL and PT price are in each market&rsquo;s asset, so they compare only between markets of one asset.
+          Liquidity and PT price are in each market&rsquo;s asset, so they compare only between markets of one asset.
         </ExplainBullet>
       </ExplainGroup>
     </>
@@ -174,7 +186,7 @@ export function PendleRosterPage({
     scope: "markets-head",
     title: "Pendle on Ethereum",
     purpose:
-      "Each market splits a yield-bearing token into PT, which redeems for one unit of its asset at maturity, and YT, which collects the yield until then.",
+      "Each market splits a yield-bearing token into PT, which redeems for up to one unit of its asset at maturity, and YT, which collects the yield until then.",
     figures: [
       { slot: "roster", label: "Markets", tip: TIP.markets, value: count("all", total, "markets") },
       { slot: "usage", label: "Active", tip: TIP.active, value: count("active", active, "active") },
@@ -244,6 +256,8 @@ interface Ctx {
   lp: number | null;
   sy: number | null;
   spot: boolean;
+  /** An empty pool (lib/pendle/rules.ts): no implied APY shown. */
+  empty: boolean;
 }
 
 function ctxOf(m: PendleMarketPage): Ctx {
@@ -264,6 +278,7 @@ function ctxOf(m: PendleMarketPage): Ctx {
     lp: unitRate(marks.lpToAsset, t.market.decimals, dec),
     sy: unitRate(marks.syToAsset, t.sy.decimals, dec),
     spot: !expired && marks.source === "routerstatic-spot",
+    empty: emptyPool(live.expired, live.tvl, t.sy.decimals),
   };
 }
 
@@ -329,7 +344,7 @@ function MarketExplainer({ x }: { x: Ctx }) {
           )}
           <ExplainBullet>The implied APY ends at maturity, so the market prices no fixed rate.</ExplainBullet>
           <ExplainBullet>
-            One PT redeems for <Fig bold>1 {a}</Fig>.
+            One PT redeems for up to <Fig bold>1 {a}</Fig>.
           </ExplainBullet>
         </ExplainGroup>
         {tokens}
@@ -347,9 +362,11 @@ function MarketExplainer({ x }: { x: Ctx }) {
             of PT and SY.
           </ExplainBullet>
         )}
-        {x.apy != null && (
+        {x.empty && <ExplainBullet>The pool is empty, so it prices no implied APY.</ExplainBullet>}
+        {x.apy != null && !x.empty && (
           <ExplainBullet>
-            A PT bought now earns <Fig bold>{apyText(x.apy)}</Fig> a year to maturity, the implied APY.
+            The implied APY is <Fig bold>{apyText(x.apy)}</Fig>: by Pendle&rsquo;s docs, the market&rsquo;s consensus of
+            the future APY of {yieldToken}.
           </ExplainBullet>
         )}
         {x.pt != null && (
@@ -358,7 +375,7 @@ function MarketExplainer({ x }: { x: Ctx }) {
             <Fig bold>
               {priceText(x.pt)} {a}
             </Fig>{" "}
-            and redeems for one {a} at maturity.
+            and redeems for up to one {a} at maturity.
           </ExplainBullet>
         )}
         <ExplainBullet>
@@ -383,14 +400,14 @@ function marketMarkdown(x: Ctx): string {
   return [
     `# ${marketName(t)}, a Pendle market on Ethereum`,
     "",
-    ...(x.tvl != null ? [`- TVL: ${x.tvl} ${a}`] : []),
-    `- Implied APY: ${x.apy == null ? "none" : apyText(x.apy)}`,
+    ...(x.tvl != null ? [`- Liquidity: ${x.tvl} ${a}`] : []),
+    `- Implied APY: ${x.apy == null || x.empty ? "none" : apyText(x.apy)}`,
     ...(x.pt != null ? [`- PT price: ${priceText(x.pt)} ${a}`] : []),
     ...(x.yt != null ? [`- YT price: ${priceText(x.yt)} ${a}`] : []),
     ...(x.lp != null ? [`- LP price: ${priceText(x.lp)} ${a}`] : []),
-    ...(x.sy != null ? [`- SY price: ${priceText(x.sy)} ${a}`] : []),
+    ...(x.sy != null ? [`- SY exchange rate: ${priceText(x.sy)} ${a}`] : []),
     `- Maturity: ${maturityDate(t.expiry)}${x.expired ? " (matured)" : ""}`,
-    `- Wrapped token: ${symbolOf(t.yieldToken)} ${t.yieldToken.address}`,
+    `- Yield-bearing token: ${symbolOf(t.yieldToken)} ${t.yieldToken.address}`,
     `- SY ${t.sy.address}, PT ${t.pt.address}, YT ${t.yt.address}, market (LP) ${t.market.address}`,
     "",
     `Read from Ethereum at block ${n(x.m.block)}.`,
@@ -437,7 +454,7 @@ function headOf(x: Ctx): ProductHead {
   ];
   return {
     scope: "market-head",
-    title: marketName(t),
+    title: marketTitleWithAsset(marketName(t), a),
     subtitle: (
       <div
         className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-rb-500"
@@ -453,14 +470,14 @@ function headOf(x: Ctx): ProductHead {
         )}
         <UnderlyingLabel p={m} />
         <span>
-          Splits {symbolOf(t.yieldToken)} into PT and YT; PT redeems for one {a} at maturity
+          Splits {symbolOf(t.yieldToken)} into PT and YT; PT redeems for up to one {a} at maturity
         </span>
       </div>
     ),
     figures: [
       {
         slot: "sizeIn",
-        label: "TVL",
+        label: W.liquidity,
         tip: TIP.tvl,
         value: (
           <span data-vital="tvl">
@@ -486,7 +503,14 @@ function headOf(x: Ctx): ProductHead {
         tip: TIP.apy,
         value: (
           <span data-vital="implied-apy">
-            {x.apy == null ? (
+            {x.empty ? (
+              <RevealTip tip={TIP.empty} label={`${W.noLiquidity}: ${TIP.empty}`} focusable wrap>
+                <span className="text-rb-500">—</span>{" "}
+                <span className="tip-underline text-[11px] font-normal text-rb-500" data-pendle-empty="">
+                  {W.noLiquidity}
+                </span>
+              </RevealTip>
+            ) : x.apy == null ? (
               <span className="text-rb-500">{x.expired ? "matured" : "none"}</span>
             ) : (
               <Prov
@@ -515,10 +539,10 @@ function headOf(x: Ctx): ProductHead {
     ],
     structure: {
       kind: "tokens",
-      yt: { label: "YT", tip: TIP.yt, value: price("YT", x.yt), hooks: { "data-pendle-price": "yt" } },
-      lp: { label: "LP", tip: TIP.lp, value: price("LP", x.lp), hooks: { "data-pendle-price": "lp" } },
+      yt: { label: W.ytPrice, tip: TIP.yt, value: price("YT", x.yt), hooks: { "data-pendle-price": "yt" } },
+      lp: { label: W.lpPrice, tip: TIP.lp, value: price("LP", x.lp), hooks: { "data-pendle-price": "lp" } },
       sy: {
-        label: "SY",
+        label: W.syRate,
         tip: TIP.sy,
         hooks: { "data-pendle-price": "sy" },
         value:
@@ -624,7 +648,7 @@ function sectionsOf(x: Ctx): ProductSection[] {
       hooks: { "data-pendle-strip": "" },
       tools: {
         links: [
-          token("yield-token", symbolOf(t.yieldToken), "The wrapped token", t.yieldToken.address),
+          token("yield-token", symbolOf(t.yieldToken), "The yield-bearing token", t.yieldToken.address),
           token("sy", symbolOf(t.sy), "The SY", t.sy.address),
           token("pt", symbolOf(t.pt), "The PT", t.pt.address),
           token("yt", symbolOf(t.yt), "The YT", t.yt.address),
@@ -666,7 +690,7 @@ export function PendleMarketProductPage({
   const market: Loadable<MarketModel> = { state: "ok", data: { head: headOf(x), sections: sectionsOf(x) } };
   return (
     <MarketPage
-      header={{ protocol: protocolForHref(ROOT)!, title: marketName(m.tokens) }}
+      header={{ protocol: protocolForHref(ROOT)!, title: marketTitleWithAsset(marketName(m.tokens), x.asset) }}
       market={market}
       what={`the ${marketName(m.tokens)} market`}
       hooks={{ "data-pendle-market-page": m.tokens.market.address }}

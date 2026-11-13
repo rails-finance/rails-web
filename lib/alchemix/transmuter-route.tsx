@@ -23,7 +23,7 @@ import { transmuterState } from "@/components/protocol/alchemix/transmuter-posit
 import { RouteNotFound } from "@/components/shared/route-not-found";
 import { isLineOnChain, transmuterPositionPath, type AlchemixDeployment } from "@/lib/alchemix/lines";
 import { alchemixMarketWord } from "@/lib/alchemix/naming";
-import { loadTransmuterPosition } from "@/lib/alchemix/transmuter-page-data";
+import { loadTransmuterClaimValue, loadTransmuterPosition } from "@/lib/alchemix/transmuter-page-data";
 import { ALCHEMIX_TOKEN_ID } from "@/lib/sources/api/alchemix-position-backend";
 
 export interface TransmuterPositionParams {
@@ -74,13 +74,19 @@ export async function TransmuterPositionPage({
       </RouteNotFound>
     );
   }
+  const claimValue = await loadTransmuterClaimValue(deployment.chainId, read.position);
   return (
     <PositionReadProvider
       focus={{ source: transmuterFocusSource(deployment, read.position) }}
       key={`${lineKey}:${nftId}`}
       read={indexRead}
     >
-      <TransmuterPositionView key={`${lineKey}:${nftId}`} deployment={deployment} position={read.position} />
+      <TransmuterPositionView
+        key={`${lineKey}:${nftId}`}
+        deployment={deployment}
+        position={read.position}
+        claimValue={claimValue}
+      />
     </PositionReadProvider>
   );
 }

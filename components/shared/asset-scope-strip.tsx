@@ -40,7 +40,7 @@ import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { ChainGlyph, segmentClass } from "@/components/shared/chain-toggle";
 import { launchedChains } from "@/lib/shared/protocols";
 import type { ChainId } from "@/lib/shared/chains";
-import { builtOnSymbols, FAMILY_ROWS, familyOf } from "@/lib/shared/asset-family";
+import { builtOnSymbols, FAMILY_ROWS, familyDisplaySymbol, familyOf } from "@/lib/shared/asset-family";
 import type { Focus } from "@/lib/shared/asset-preference";
 import {
   chainNameOf,
@@ -52,7 +52,7 @@ import {
   SCOPE_CHAINS,
   SCOPE_TOKENS,
   scopeLink,
-  scopeSymbolOf,
+  scopeLabelOf,
   useAssetScope,
   withRecord,
   type AssetPick,
@@ -62,14 +62,14 @@ import { OVERLAY_HEADING, PAGE_LINK, PAGE_SCRIM, RESET_LINK } from "@/lib/shared
 
 const chainName = (c: number) => SCOPE_CHAINS[c] ?? chainNameOf(c);
 const symbolOf = (p: Pick<AssetPick, "chain" | "token">) =>
-  scopeSymbolOf(p.chain, p.token) ?? `${p.token.slice(0, 6)}…${p.token.slice(-4)}`;
+  scopeLabelOf(p.chain, p.token) ?? `${p.token.slice(0, 6)}…${p.token.slice(-4)}`;
 
 // Ordered by how much is built on each (BOLD, ETH and BTC first), the
 // count not drawn.
 const OPTIONS: AssetChooserOption[] = SCOPE_TOKENS.map((t) => ({
   address: t.token,
   chain: t.chain,
-  symbol: t.symbol,
+  symbol: familyDisplaySymbol(t.symbol),
   count: familyOf([{ chain: t.chain, token: t.token, builtOn: true }]).size,
 }));
 
@@ -163,7 +163,7 @@ export function ViewIcons({ picks, chains }: { picks: AssetPick[]; chains: numbe
 /** "with sBOLD, yBOLD and 3 more": what one pick adds, short. */
 function addsLine(p: AssetPick): string | null {
   if (!p.builtOn) return null;
-  const adds = examplesOf([p], 99);
+  const adds = examplesOf([p], 99).map(familyDisplaySymbol);
   if (!adds.length) return null;
   return adds.length > 2 ? `with ${adds.slice(0, 2).join(", ")} and ${adds.length - 2} more` : `with ${andList(adds)}`;
 }
@@ -602,7 +602,7 @@ function PickRow({
   onChange: (p: AssetPick) => void;
   onRemove: () => void;
 }) {
-  const adds = useMemo(() => builtOnSymbols(pick), [pick]);
+  const adds = useMemo(() => builtOnSymbols(pick).map(familyDisplaySymbol), [pick]);
   const sym = symbolOf(pick);
   return (
     <li className="flex items-center gap-2 py-1.5" data-asset-scope-pick={`${pick.chain}:${pick.token}`}>

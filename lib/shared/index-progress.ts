@@ -335,10 +335,12 @@ export function withCensusRuns(s: IndexStatus): IndexStatus {
   };
 }
 
-/** The last hour of reads made when a page opens (the tier-request tally). */
+/** Reads made when a page opens, this UTC clock hour and the one before
+ *  (the tier-request tally); lastHourVisits counts that window. */
 export interface VisitReads {
   gateway: string;
   lastHourVisits?: number;
+  answered?: number;
   failedShare?: number | null;
   byCause?: Record<string, number>;
   p95Ms?: number | null;
@@ -500,15 +502,29 @@ export function cellsFromStatus(s: IndexStatus, name: (key: string, chain: numbe
   });
 }
 
-/** Visit reads: amber from a 10% failure share in the last hour, red from
+/** Visit reads: amber from a 10% failure share since the previous clock hour, red from
  *  50%, each only from 2 failed reads; none with no visit in the hour. */
 export const VISIT_FAIL_LATE = 0.1;
 export const VISIT_FAIL_STALLED = 0.5;
-/** Fewer failed reads than this in the hour leave visit reads green. */
+/** Fewer failed reads than this in the window are too few to judge: green when
+ *  a read answered, not measured when none did. */
 export const VISIT_FAIL_MIN = 2;
 
+/** Start (unix s) of the visit tally's window for a snapshot taken at asOf:
+ *  the previous UTC clock hour, as the server counts it. */
+export function visitWindowStart(asOf: number): number {
+  return (Math.floor(asOf / 3600) - 1) * 3600;
+}
+
+/** Visit reads too few to judge: under VISIT_FAIL_MIN failures, none answered. */
+export function visitTooFew(v: VisitReads | null | undefined): boolean {
+  if (!v?.lastHourVisits || v.failedShare == null) return false;
+  const failed = Math.round(v.failedShare * v.lastHourVisits);
+  return failed < VISIT_FAIL_MIN && (v.answered ?? v.lastHourVisits - failed) === 0;
+}
+
 export function visitState(v: VisitReads | null | undefined): Heartbeat {
-  if (!v || !v.lastHourVisits || v.failedShare == null) return "none";
+  if (!v || !v.lastHourVisits || v.failedShare == null || visitTooFew(v)) return "none";
   // One failure in a quiet hour is a blip, whatever share of the hour it is.
   if (Math.round(v.failedShare * v.lastHourVisits) < VISIT_FAIL_MIN) return "fresh";
   return v.failedShare >= VISIT_FAIL_STALLED ? "stalled" : v.failedShare >= VISIT_FAIL_LATE ? "late" : "fresh";

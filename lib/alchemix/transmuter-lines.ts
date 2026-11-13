@@ -6,6 +6,7 @@
 import type { AlchemixV3Context, BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { formatUnitsExact } from "@/lib/utils/format";
 import type { TransmuterEarlyClaim } from "@/lib/alchemix/transmuter-early-claim";
+import { TRANSMUTER_POKE_SENTENCE } from "@/lib/alchemix/transmuter-words";
 
 export type TransmuterEvent = BaseActivityEvent & { context: { protocol: "alchemix-v3"; data: AlchemixV3Context } };
 
@@ -21,8 +22,10 @@ export function claimShareSymbol(claim: TransmuterEvent, mytSymbol: string): str
 const plain = (raw: string) => (Number(raw) / 1e18).toLocaleString("en-US", { maximumFractionDigits: 2 });
 const pct = (share: number) => `${(share * 100).toLocaleString("en-US", { maximumFractionDigits: 1 })}%`;
 
-/** The sentence a claim before maturity owes its reader: what converted, what
- *  came back, what the fee took, and why only part converted. */
+/** The sentence a claim before maturity owes its reader: what vested, what
+ *  was returned, what the fee took, and why only part vested (TR "Each deposit
+ *  vests linearly"; RT "the unvested share is returned as alAssets minus the
+ *  early exit fee"). */
 export function earlyClaimSentence(
   e: TransmuterEarlyClaim,
   syn: string,
@@ -31,9 +34,9 @@ export function earlyClaimSentence(
   withWhy = true,
 ): string {
   return (
-    `This claim came ${e.blocksEarly.toLocaleString("en-US")} blocks before maturity, when ${pct(e.termPassed)} of the blocks from the stake to its maturity had passed. ` +
-    `${withWhy ? "A stake converts a little every block until it matures, so " : "So "}${plain(e.convertedRaw)} ${syn} had converted and was paid out as ${plain(paidOutRaw)} ${share}. ` +
-    `Of the ${plain(e.unconvertedRaw)} ${syn} still to convert, ${plain(e.returnedRaw)} came back as ${syn} and the Transmuter kept ${plain(e.exitFeeRaw)} ${syn}, ${pct(e.exitFeeShare)}, as its early exit fee.`
+    `This claim came ${e.blocksEarly.toLocaleString("en-US")} blocks before maturity, when ${pct(e.termPassed)} of the blocks from the deposit to its maturity had passed. ` +
+    `${withWhy ? "A deposit vests a little every block until it matures, so " : "So "}${plain(e.convertedRaw)} ${syn} had vested and was paid out as ${plain(paidOutRaw)} ${share}. ` +
+    `Of the ${plain(e.unconvertedRaw)} ${syn} not yet vested, ${plain(e.returnedRaw)} was returned as ${syn} and ${plain(e.exitFeeRaw)} ${syn}, ${pct(e.exitFeeShare)}, was charged as the early exit fee.`
   );
 }
 
@@ -56,7 +59,7 @@ export function transmuterExplainerLines(
     switch (d.eventType) {
       case "transmuter_position_created":
         out.push(
-          `${amount("amount_staked")} ${d.syntheticSymbol} went into the Transmuter to be converted at maturity, opening this position.`,
+          `${amount("amount_staked")} ${d.syntheticSymbol} was deposited in the Transmuter, opening this position. It vests a little every block until maturity.`,
         );
         break;
       case "transmuter_position_claimed":
@@ -67,11 +70,11 @@ export function transmuterExplainerLines(
           break;
         }
         out.push(
-          `The claim paid out ${amount("amount_claimed")} ${claimShareSymbol(leg, mytSymbol)} for the part of the stake that had converted, and handed back ${amount("amount_unclaimed")} ${d.syntheticSymbol} that had not.`,
+          `The claim paid out ${amount("amount_claimed")} ${claimShareSymbol(leg, mytSymbol)} for the part of the deposit that had vested, and returned ${amount("amount_unclaimed")} ${d.syntheticSymbol} that had not.`,
         );
         break;
       case "transmuter_position_poked":
-        out.push("The position was poked. A poke updates the Transmuter's accounting and moves no tokens.");
+        out.push(TRANSMUTER_POKE_SENTENCE);
         break;
       case "transfer": {
         const t = d.transfer;

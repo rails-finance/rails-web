@@ -26,6 +26,7 @@
     "check:prose-limits": "node scripts/check-prose-limits.mjs",
     "check:anatomy": "node scripts/anatomy-shots.mjs --check",
     "check:card-caps": "node scripts/check-card-caps.mjs",
+    "check:docs-links": "node scripts/check-docs-links.mjs",
     "verify:preflight": "node scripts/verify/preflight.mjs",
     "verify:ts": "tsx --import ./scripts/verify/lib/server-only-hook.mjs --test",
     "og": "tsx scripts/generate-og.mjs",

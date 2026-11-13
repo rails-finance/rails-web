@@ -29,6 +29,7 @@ import {
   type Seg,
   loss,
 } from "../uniswap/words";
+import { quoteIsToken0 } from "../uniswap/position";
 import type { AeroPosition, PoolAside } from "./position";
 import { AERODROME, type SlipstreamSite } from "./sites";
 import type { AeroPositionsRead, SlipstreamDeployment } from "./types";
@@ -84,7 +85,7 @@ export const cardWords = (site: SlipstreamSite) => {
     ownerNone: site.namesDepositor ? "no wallet found" : `not named on ${site.chainName}`,
     rangeLabel: "Range",
     stakedBadge: "Staked",
-    unstakedBadge: "Not staked",
+    unstakedBadge: "Unstaked",
   };
 };
 
@@ -107,6 +108,9 @@ export function cardExplainer(p: AeroPosition): ExplainGroupWords[] {
     holdings.push(["The wallet that staked it can claim ", { fig: `${num(p.aero.claimable)} ${R}` }, " now."]);
   else if (p.uncollected !== null && (!closed || p.uncollected > 0))
     holdings.push(["Uncollected fees come to ", { fig: `${num(p.uncollected)} ${Q}` }, "."]);
+  // "while it is in range" is the read, for both states: on Velodrome #2064266 (staked, in range on 0 of
+  // 30 daily reads) the pool's reward and fee growth inside the range were unchanged across the 30 days,
+  // and grew on the in-range #131184 (rails-ops reference/official-docs/velodrome.md, 13 Nov 2026).
   holdings.push(
     p.staked
       ? [`A staked position is held by the pool's gauge, which pays it ${R} while it is in range.`]
@@ -417,6 +421,7 @@ export function readoutExplainer(p: AeroPosition): ExplainGroupWords[] {
   const P = p.site.label;
   const closed = BigInt(p.liquidity) === BigInt(0);
   const wt = windowText(p);
+  const held = !closed || (p.holdsThen !== null && (p.holdsThen.base > 0 || p.holdsThen.quote > 0));
   const position: Seg[][] = [
     [
       p.staked
@@ -424,23 +429,42 @@ export function readoutExplainer(p: AeroPosition): ExplainGroupWords[] {
         : "Each swap pays the pool's fee to the unstaked liquidity in range at that moment.",
     ],
     ...(wt ? [[wt]] : []),
-    [
-      "Impermanent loss is how much less the position is worth now than the tokens it held 30 days ago, both at today's price.",
-      "The row under it takes the 30-day earnings off that loss. Below zero, they outweighed it.",
-    ],
-    [
-      p.staked
-        ? `The position's share is of the staked liquidity in range now, which splits the gauge's ${R}.`
-        : "The position's share is of the unstaked liquidity in range now, which splits the swap fees.",
-    ],
-    ...(p.aero?.penalty ? [[penaltyText(p.aero.penalty, R)]] : []),
-    p.staked
-      ? ["The gauge holds a staked position until the wallet that staked it takes it back, at any block."]
-      : ["A Slipstream pool has no pause and no step that can stop or charge a withdrawal."],
+    // Each bullet explains a row readoutTable draws, and only when it draws it.
+    ...(p.againstHolding !== null
+      ? [
+          [
+            "Impermanent loss is how much less the position is worth now than the tokens it held 30 days ago, both at today's price.",
+            ...(p.againstHoldingWithEarnings !== null
+              ? ["The row under it takes the 30-day earnings off that loss. Below zero, they outweighed it."]
+              : []),
+          ],
+        ]
+      : []),
+    ...(closed
+      ? []
+      : [
+          [
+            p.staked
+              ? `The position's share is of the staked liquidity in range now, which splits the gauge's ${R}.`
+              : "The position's share is of the unstaked liquidity in range now, which splits the swap fees.",
+          ],
+          ...(p.aero?.penalty ? [[penaltyText(p.aero.penalty, R)]] : []),
+          p.staked
+            ? ["The gauge holds a staked position until the wallet that staked it takes it back, at any block."]
+            : ["A Slipstream pool has no pause and no step that can stop or charge a withdrawal."],
+        ]),
   ];
   const pool: Seg[][] = [
     ...poolEarnText(p).map((t): Seg[] => [t]),
-    ...(p.staked ? [] : [["Protocol fee: the share of an unstaked position's fees the pool's voters take."]]),
+    ...(p.staked
+      ? []
+      : [
+          [
+            p.fees.unstaked > 0
+              ? "Protocol fee: the share of an unstaked position's fees the pool's voters take."
+              : "Protocol fee: the pool's unstaked fee reads 0 at the block this page read.",
+          ],
+        ]),
     [
       p.staked
         ? `${P} sets the swap fee through a fee module on the pool's factory, and can change it from swap to swap.`
@@ -458,7 +482,7 @@ export function readoutExplainer(p: AeroPosition): ExplainGroupWords[] {
             ]
           : [["The pool is younger than 30 days, so the table shows now only."]],
     },
-    { title: READOUT.position, bullets: closed && !p.holdsThen ? [] : position },
+    { title: READOUT.position, bullets: held ? position : [] },
     { title: READOUT.pool, bullets: pool },
   ].filter((g) => g.bullets.length > 0);
 }
@@ -472,8 +496,11 @@ export const frontDoorWords = (site: SlipstreamSite) => ({
   none: `This address holds no ${site.label} Slipstream position with liquidity in it.`,
   truncated: "This wallet holds more than 200 positions on one deployment; Rails read the newest 200.",
   unanswered: "The read of this wallet's positions did not answer. Try again in a minute.",
-  row: (p: AeroPositionsRead["positions"][number]) =>
-    `${positionNumber(p.id)} · ${p.token0.symbol}/${p.token1.symbol} · tick spacing ${p.tickSpacing}`,
+  /** The pair in the position page's order, base/quote (aeroPosition). */
+  row: (p: AeroPositionsRead["positions"][number]) => {
+    const [base, quote] = quoteIsToken0(p.token0, p.token1) ? [p.token1, p.token0] : [p.token0, p.token1];
+    return `${positionNumber(p.id)} · ${base.symbol}/${quote.symbol} · tick spacing ${p.tickSpacing}`;
+  },
   staked: "Staked",
-  unstaked: "Not staked",
+  unstaked: "Unstaked",
 });

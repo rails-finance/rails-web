@@ -44,6 +44,8 @@ import {
 import { UNDERLYING_LABEL_TIP, underlyingProtocol } from "@/lib/pendle/underlying";
 import type { PendlePosition, PendleTimelineRow, PendleToken } from "@/lib/pendle/types";
 import { pendleMarketHref } from "@/lib/pendle/routes";
+import { ptHolding } from "@/lib/pendle/rules";
+import { LP_SYMBOL_NOTE, PENDLE_WORDS as W, lpName } from "@/lib/pendle/words";
 
 /** Whether the wallet holds nothing in the market at the block. */
 export function positionClosed(p: PendlePosition): boolean {
@@ -103,7 +105,7 @@ export function PendlePositionCard({
   const asset = assetSymbol(t);
   const expired = p.maturity.expired === true;
   const closed = positionClosed(p);
-  const lpToken: PendleToken = { ...t.market, symbol: `LP ${marketName(t)}` };
+  const lpToken: PendleToken = { ...t.market, symbol: lpName(t) };
 
   const assetFig = (raw: string | null, prov: Parameters<typeof Prov>[0]["info"]) =>
     raw == null ? null : (
@@ -114,35 +116,42 @@ export function PendlePositionCard({
 
   const total = p.value.asset.total;
   const entry = p.apy.entry;
+  // A fixed rate is the yield of holding PT (rails-ops ui-jobs 654): none is
+  // shown where the wallet holds no PT at the block.
+  const holding = ptHolding(p);
+  const holdsPt = holding === "held";
   const heads: PositionCardHead[] = [
     {
       id: "value",
       label: "Value",
-      labelTip: `The PT, YT and LP legs and the unclaimed interest at their marks, in ${asset}.`,
+      labelTip: `The PT, YT and LP legs and the unclaimed yield at their marks, in ${asset}.`,
       value: assetFig(total, valueProv("total", t, block, p.maturity.expired)),
       assets: <TokenIcon tok={t.asset} figure={total ? `${amountText(total, dec)} ${asset}` : undefined} />,
       sub: `in ${asset}`,
     },
     {
       id: "entry-apy",
-      label: "Fixed APY at entry",
-      labelTip:
-        "The fixed rate this wallet's PT buys locked in: each buy's PT against the asset paid and the time left to maturity, weighted by the PT bought.",
+      label: W.effectiveFixedApy,
+      labelTip: W.effectiveFixedApyTip,
       value:
-        entry.ptWeighted == null ? null : (
+        entry.ptWeighted == null || !holdsPt ? null : (
           <Prov info={entryApyProv(entry.buys, entry.unpriced)} value={entry.ptWeighted.toFixed(6)}>
             {apyText(entry.ptWeighted)}
           </Prov>
         ),
       sub:
-        entry.buys === 0
-          ? "no PT bought through a router"
-          : `${entry.buys} PT ${entry.buys === 1 ? "buy" : "buys"}${entry.unpriced ? `, ${entry.unpriced} unpriced` : ""}`,
+        holding === "none"
+          ? W.noPtHeld
+          : holding === "unread"
+            ? undefined
+            : entry.buys === 0
+              ? "no PT bought through a router"
+              : `${entry.buys === 1 ? "1 PT buy" : `weighted over ${entry.buys} PT buys`}${entry.unpriced ? `, ${entry.unpriced} unpriced` : ""}`,
     },
     {
       id: "implied-apy",
       label: "Implied APY now",
-      labelTip: "The fixed rate the market prices PT at, at this block. It ends at maturity.",
+      labelTip: "Pendle's docs: the market consensus of the future APY of an asset. It ends at maturity.",
       value:
         p.apy.current == null ? (
           expired ? (
@@ -208,6 +217,8 @@ export function PendlePositionCard({
     ...p.rewards.lp.map((r) => ({ ...r, side: "LP" as const })),
   ];
 
+  // "Up to one" and "swaps closed": the chain reads behind them are cited in
+  // lib/pendle/product.tsx above TIP.
   const left: PositionPanelRow[] = [
     legRow(
       "pt",
@@ -217,8 +228,8 @@ export function PendlePositionCard({
       p.value.asset.pt,
       "PT",
       expired
-        ? `Each PT now redeems for one ${asset}.`
-        : `Each PT redeems for one ${asset} at maturity; before then it trades below that, which is the fixed yield.`,
+        ? `Each PT now redeems for up to one ${asset}.`
+        : `Each PT redeems for up to one ${asset} at maturity; before then it trades below that, which is the fixed yield.`,
     ),
     legRow(
       "yt",
@@ -228,8 +239,8 @@ export function PendlePositionCard({
       p.value.asset.yt,
       "YT",
       expired
-        ? "YT is worth nothing after maturity; its unclaimed interest stays claimable."
-        : "YT earns the yield token's yield until maturity, then is worth nothing.",
+        ? "YT is worth nothing after maturity; its unclaimed yield stays claimable."
+        : "YT earns the yield-bearing token's yield until maturity, then is worth nothing.",
     ),
     legRow(
       "lp",
@@ -239,8 +250,8 @@ export function PendlePositionCard({
       p.value.asset.lp,
       "LP",
       expired
-        ? "The pool's swaps closed at maturity; LP can still be removed."
-        : "A share of the market's pool of PT and SY.",
+        ? `The pool's swaps closed at maturity; LP can still be removed. ${LP_SYMBOL_NOTE}`
+        : `A share of the market's pool of PT and SY. ${LP_SYMBOL_NOTE}`,
     ),
   ];
   const right: PositionPanelRow[] = [];
@@ -261,7 +272,7 @@ export function PendlePositionCard({
     });
   right.push({
     id: "interest",
-    label: "Unclaimed interest",
+    label: W.unclaimedYield,
     value:
       p.ytInterest.asset == null ? (
         "–"
@@ -271,7 +282,7 @@ export function PendlePositionCard({
           {asset}
         </span>
       ),
-    tip: "The yield this wallet's YT has earned and not yet claimed.",
+    tip: "The yield this wallet's YT has earned and not yet claimed, after Pendle's 5% fee on YT yield.",
   });
   right.push({
     id: "rewards",
@@ -312,13 +323,13 @@ export function PendlePositionCard({
       </p>
       {expired ? (
         <p>
-          The market has matured: each PT redeems for one {asset}, YT is worth nothing and keeps any interest it had not
-          claimed, swaps are closed, and LP can still be removed.
+          The market has matured: each PT redeems for up to one {asset}, YT is worth nothing and keeps any unclaimed
+          yield, swaps are closed, and LP can still be removed.
         </p>
       ) : (
         <p>
           Before maturity PT trades below one {asset}; the gap is the fixed yield a buyer locks in. YT collects the
-          yield until maturity. LP earns the pool&rsquo;s fees and rewards.
+          yield until maturity. {W.lpEarns}
         </p>
       )}
       <p>
@@ -330,10 +341,10 @@ export function PendlePositionCard({
             : "no mark, because neither the oracle nor RouterStatic answered"}
         , in SY, then in {asset} at the SY&rsquo;s exchange rate.
       </p>
-      {entry.buys > 0 && entry.ptWeighted != null && (
+      {entry.buys > 0 && entry.ptWeighted != null && holdsPt && (
         <p>
           This wallet bought {amountText(entry.ptBought, t.pt.decimals)} PT through Pendle&rsquo;s routers for{" "}
-          {amountText(entry.assetPaid, dec)} {asset}, a fixed {apyText(entry.ptWeighted)} a year to maturity
+          {amountText(entry.assetPaid, dec)} {asset}, an Effective Fixed APY of {apyText(entry.ptWeighted)}
           {p.apy.current != null ? `; the market prices PT at ${apyText(p.apy.current)} now` : ""}.
         </p>
       )}
@@ -380,7 +391,7 @@ export function PendlePositionCard({
             ...(first ? [{ label: "First router event", at: first.timestamp }] : []),
             ...(last ? [{ label: "Last router event", at: last.timestamp }] : []),
           ],
-          tip: "This wallet holds no PT, YT or LP in the market and has no interest or rewards to claim at this block.",
+          tip: "This wallet holds no PT, YT or LP in the market and has no yield or rewards to claim at this block.",
         },
         counters,
         heading: "position explanation",
@@ -394,7 +405,7 @@ export function PendlePositionCard({
           ? {
               word: "Matured",
               tone: "muted",
-              tip: `PT redeems for one ${asset}; YT is worth nothing; LP can be removed.`,
+              tip: `PT redeems for up to one ${asset}; YT is worth nothing; LP can be removed.`,
             }
           : null,
         identity,

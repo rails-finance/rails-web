@@ -86,7 +86,7 @@ export function transmuterMaturityProv(
     kind: "chain-derived",
     pclass: "indexed",
     summary:
-      "Maturity block — the start block plus the timeToTransmute in force when the stake was made, counted in blocks",
+      "Maturity block — the start block plus the timeToTransmute in force when the deposit was made, counted in blocks",
     contract: transmuterContract(coords),
     via: `${TRANSMUTER_VIA} · start block + timeToTransmute at that block`,
     formula: `${startBlock} + ${maturationBlock - startBlock} = ${maturationBlock}`,
@@ -106,7 +106,7 @@ export function transmuterMaturityProv(
   return {
     ...block,
     summary:
-      "Estimated maturity date — the maturity block (the start block plus the timeToTransmute in force when the stake was made) less the block the market is indexed to, at the chain's block time, counted from when this page was read",
+      "Estimated maturity date — the maturity block (the start block plus the timeToTransmute in force when the deposit was made) less the block the market is indexed to, at the chain's block time, counted from when this page was read",
     via: `${block.via} · (maturity block − indexed block) × seconds per block`,
     formula: `${block.formula}; (${maturationBlock} − ${e.referenceBlock}) × ${e.secondsPerBlock} s = ${seconds} s after ${new Date(e.fromMs).toISOString()} ≈ ${new Date(e.atMs).toISOString().slice(0, 10)}`,
     inputs: [
@@ -144,11 +144,11 @@ export function transmuterConvertedProv(
   return {
     kind: "chain-derived",
     pclass: "indexed",
-    summary: `${symbol} converted — the stake less what the claim handed back, both from the Transmuter's logs`,
+    summary: `${symbol} vested — the deposit less what the claim returned, both from the Transmuter's logs`,
     contract: transmuterContract(coords),
     via: `${TRANSMUTER_VIA} · amount_staked − amount_unclaimed`,
     formula: `${stakedRaw} − ${unclaimedRaw}`,
-    verify: { kind: "rollup", text: "It rolls up the stake and the claim on this page" },
+    verify: { kind: "rollup", text: "It rolls up the deposit and the claim on this page" },
     inputs: inputs(coords, [
       { label: "amount_staked", value: stakedRaw, kind: "chain", note: "PositionCreated" },
       { label: "amount_unclaimed", value: unclaimedRaw, kind: "chain", note: "PositionClaimed" },
@@ -170,19 +170,19 @@ export function transmuterEarlyClaimProv(
   const unconvertedFormula = `${e.stakedRaw} × (${e.maturationBlock} − ${e.claimBlock}) ÷ (${e.maturationBlock} − ${e.startBlock}) = ${e.stakedRaw} × ${e.blocksEarly} ÷ ${term} = ${e.unconvertedRaw}`;
   const spec = {
     converted: {
-      summary: `${symbol} converted — the stake less the part whose blocks had not yet passed at the claim`,
-      via: "amount_staked − unconverted",
+      summary: `${symbol} vested — the deposit less the part whose blocks had not yet passed at the claim`,
+      via: "amount_staked − unvested",
       formula: `${unconvertedFormula}; ${e.stakedRaw} − ${e.unconvertedRaw} = ${e.convertedRaw}`,
     },
     unconverted: {
-      summary: `${symbol} not yet converted — the stake converts in equal parts every block from its start to maturity, so this is the share of its term still to run at the claim`,
+      summary: `${symbol} not yet vested — the deposit vests in equal parts every block from its start to maturity, so this is the share of its term still to run at the claim`,
       via: "amount_staked × blocks left ÷ term",
       formula: unconvertedFormula,
     },
     "exit-fee": {
-      summary: `${symbol} kept as the early exit fee — the unconverted part less what the claim handed back`,
-      via: "unconverted − amount_unclaimed",
-      formula: `${unconvertedFormula}; ${e.unconvertedRaw} − ${e.returnedRaw} = ${e.exitFeeRaw} (${(e.exitFeeShare * 100).toFixed(4)}% of the unconverted part)`,
+      summary: `${symbol} charged as the early exit fee — the unvested part less what the claim returned`,
+      via: "unvested − amount_unclaimed",
+      formula: `${unconvertedFormula}; ${e.unconvertedRaw} − ${e.returnedRaw} = ${e.exitFeeRaw} (${(e.exitFeeShare * 100).toFixed(4)}% of the unvested part)`,
     },
   }[part];
   return {
@@ -192,7 +192,7 @@ export function transmuterEarlyClaimProv(
     contract: transmuterContract(coords),
     via: `${TRANSMUTER_VIA} · ${spec.via}`,
     formula: spec.formula,
-    verify: { kind: "rollup", text: "It rolls up the stake, its maturity and the claim on this page" },
+    verify: { kind: "rollup", text: "It rolls up the deposit, its maturity and the claim on this page" },
     inputs: inputs(coords, [
       { label: "amount_staked", value: e.stakedRaw, kind: "chain", note: "PositionCreated" },
       { label: "start block", value: String(e.startBlock), kind: "chain", note: "PositionCreated" },

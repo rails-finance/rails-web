@@ -47,7 +47,7 @@ import {
   type AlchemixUnderlyingUnit,
 } from "@/lib/alchemix/readings-before";
 import { redemptionNet } from "@/lib/alchemix/redemption-net";
-import { lineProtocolFeeBps } from "@/lib/alchemix/lines";
+import { lineProtocolFeeStep } from "@/lib/alchemix/lines";
 import { selfLiquidationSplit } from "@/lib/alchemix/self-liquidation";
 import {
   closeFromReadingProv,
@@ -139,7 +139,7 @@ function legStats(
     }
     case "force_repay":
       stat("Paid off earmarked debt", "credit_to_yield", mytSymbol);
-      stat("Protocol fee", "protocol_fee_total", mytSymbol);
+      stat("Redemption fee", "protocol_fee_total", mytSymbol);
       stat("Requested", "amount", sym);
       break;
     case "self_liquidated": {
@@ -222,7 +222,8 @@ function legStats(
         }
         // The net for the holder, in the underlying: Liquity's redemption
         // P/L, over the same two readings (lib/alchemix/redemption-net).
-        const net = redemptionNet(leg, before, unit?.decimals ?? null, lineProtocolFeeBps(ctx.chainId, ctx.lineKey));
+        const feeStep = lineProtocolFeeStep(ctx.chainId, ctx.lineKey, leg.blockNumber);
+        const net = redemptionNet(leg, before, unit?.decimals ?? null, feeStep?.bps ?? null, feeStep?.read ?? null);
         if (net?.status === "stated" && unit) {
           const n = Number(net.netRaw) / WAD;
           const sign = n > 0 ? "+" : n < 0 ? "−" : "";
@@ -256,7 +257,7 @@ function legStats(
           }
           // The line's redemption fee, inside the shares taken: the main part
           // of the net (lib/alchemix/redemption-net).
-          if (net.fee) {
+          if (net.fee && net.fee.bps > 0) {
             stats.push({
               label: `${(net.fee.bps / 100).toLocaleString("en-US")}% redemption fee`,
               value: formatExact(scaled(net.fee.sharesRaw) ?? 0),

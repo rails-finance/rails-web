@@ -134,6 +134,7 @@ export function DetailTopRow({
   showStamp = true,
   assets = [],
   priceReason,
+  pricesSubject,
   closed = false,
   closing,
   owner,
@@ -146,6 +147,9 @@ export function DetailTopRow({
   showStamp?: boolean;
   assets?: LatestPriceAsset[];
   priceReason?: string;
+  /** What the Prices control prices, from the family's terms; "position"
+   *  where none is given. */
+  pricesSubject?: string;
   /** The position is closed. Today's prices say nothing about it, so the
    *  dropdown shows `closing` in their place, or is left out when the family
    *  has no price at the closing block. */
@@ -175,13 +179,14 @@ export function DetailTopRow({
   usePublishTodayPrices(assets);
   const prices = (bare: boolean) =>
     eventPage ? null : !closed ? (
-      <LatestPrices assets={assets} reason={priceReason} bare={bare} />
+      <LatestPrices assets={assets} reason={priceReason} bare={bare} subject={pricesSubject} />
     ) : (
       closingPriced && (
         <LatestPrices
           assets={closing.assets}
           reason={priceReason}
           bare={bare}
+          subject={pricesSubject}
           at={{ block: closing.block, timestamp: closing.timestamp }}
         />
       )

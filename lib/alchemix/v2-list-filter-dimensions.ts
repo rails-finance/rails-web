@@ -22,6 +22,7 @@ import type { AlchemixV2Sort, FetchAlchemixV2PositionsParams } from "@/lib/sourc
 import { parseListingSearch } from "@/lib/shared/listing-search";
 import { sizeBounds, sizeDimensions } from "@/lib/shared/size-dimensions";
 import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
+import { V2_WORDS } from "@/lib/alchemix/transmuter-words";
 
 export const V2_ITEMS_PER_PAGE = 20;
 
@@ -30,7 +31,7 @@ export const V2_ITEMS_PER_PAGE = 20;
 const V2_TX_TOP = 1000;
 
 const V2_SIZE_NOTE =
-  "Debt as the frozen record values it at the price book; the collateral is not drawn (the DAO swept it).";
+  "Debt as the migration snapshot values it at the price book; the collateral is not drawn (it moved to the v3 admin Safe).";
 
 export interface V2ListFilters extends BaseListFilters {
   line: string[];
@@ -62,7 +63,7 @@ const ANY_LINE: SortOption[] = [
   { value: "created", label: "First activity" },
   { value: "events", label: "Events" },
 ];
-const ONE_LINE: SortOption[] = [...ANY_LINE, { value: "debt", label: "Debt at close" }];
+const ONE_LINE: SortOption[] = [...ANY_LINE, { value: "debt", label: V2_WORDS.debtSnapshot }];
 
 export function v2SortOptions(f: V2ListFilters): SortOption[] {
   return f.line.length === 1 ? ONE_LINE : ANY_LINE;
@@ -82,8 +83,8 @@ export function v2ListDimensions(chainId: ChainId): SerializableDimension<V2List
     },
     {
       id: "status",
-      label: "At close",
-      group: "At close",
+      label: V2_WORDS.snapshotGroup,
+      group: V2_WORDS.snapshotGroup,
       cardinality: "multi",
       param: "status",
       options: STATUS_OPTIONS,

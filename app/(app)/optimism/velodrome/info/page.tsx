@@ -20,18 +20,45 @@ import { VELODROME } from "@/lib/aerodrome/sites";
 import { DEPLOYMENT_LABEL } from "@/lib/aerodrome/words";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { Prov, type Provenance } from "@/components/shared/provenance";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { ProvSection } from "@/components/shared/section-menu";
 
 export const metadata = infoMetadata("velodrome");
 
 const DOCS = VELODROME.docs;
 const UL = "list-disc space-y-1 pl-5";
+const UPGRADE = "https://velodrome.finance/docs/upgrade";
+const REWARD_GAUGE = "0xded023B976de3bbe6aEA56678564e992113f8Ea1";
+
+/** The one gauge read for the reward token after the upgrade (13 Nov 2026, ui-jobs 647). */
+const REWARD_TOKEN_READ: Provenance = {
+  kind: "chain",
+  pclass: "state",
+  source: { block: 159_483_363 },
+  contract: { name: "Slipstream gauge, wstETH/USDC", address: REWARD_GAUGE },
+  summary: `Reward token — the Voter's gauges(0xEE1baC98527a9fDd57fcCf967817215B083cE1F0) is this gauge, and its rewardToken() is ${VELODROME.reward.address}, VELO, at Optimism block 159,483,363.`,
+  via: "Voter.gauges(pool), gauge.rewardToken() @ block 159,483,363, read 13 Nov 2026",
+  verify: {
+    kind: "recompute",
+    text: `To check: ask any Optimism archive node for rewardToken() on ${REWARD_GAUGE} at block 159,483,363.`,
+  },
+};
 
 const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
+  // Velodrome's docs never use the word (rails-ops reference/official-docs/velodrome.md), so the
+  // term cites the contract that names it: name() on the initial position manager, read 13 Nov 2026.
   {
     term: "Slipstream",
     definition:
-      "Slipstream is Velodrome's design for pools where each provider's liquidity sits between two prices. Two Slipstream deployments are live on Optimism, each with its own position manager.",
-    sources: [DOCS],
+      "Slipstream is the name in Velodrome's contracts for pools where each provider's liquidity sits between two prices. Two Slipstream deployments are live on Optimism, each with a position manager.",
+    sources: [
+      {
+        kind: "contract",
+        address: VELODROME.nfpm.initial!,
+        carries: 'NonfungiblePositionManager, name() "Slipstream Position NFT v1.2" at block 159,483,363',
+      },
+    ],
   },
   {
     term: "Position",
@@ -41,7 +68,8 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
   },
   {
     term: "VELO",
-    definition: "VELO is Velodrome's token. Gauges pay it to staked positions.",
+    definition:
+      "VELO is Velodrome's token. Gauges pay it to staked positions, which Velodrome's docs call VELO emissions.",
     sources: [DOCS],
   },
   {
@@ -71,9 +99,22 @@ const howItWorks: readonly [ReactNode, ...ReactNode[]] = [
     <GlossaryLink term="VELO">VELO</GlossaryLink> at the rate the gauge pays.
   </>,
   <>
-    Each week VELO holders who lock their VELO vote on how much VELO each pool&apos;s gauge pays out. Those voters
-    receive the pool&apos;s trading fees from staked liquidity and a share from unstaked liquidity.
+    Each week veVELO holders vote on how much VELO each pool&apos;s gauge pays out. Those voters receive the pool&apos;s
+    trading fees from staked liquidity and a share from unstaked liquidity.
   </>,
+  // The read: rails-ops reference/official-docs/velodrome.md, "Read on chain, no disagreement". The docs
+  // say "opens"; Rails reports it in the past. The block is in the receipt.
+  <ProvSection key="upgrade" scope="velodrome-upgrade" as="div" className="contents">
+    Velodrome&apos;s{" "}
+    <a href={UPGRADE} className={INLINE_LINK} target="_blank" rel="noopener">
+      upgrade guide
+    </a>{" "}
+    says the upgrade to Aero opened on 22 October, 00:00 UTC, and that liquid VELO converts to AERO at 0.044.{" "}
+    <Prov info={REWARD_TOKEN_READ}>
+      The wstETH/USDC pool&apos;s gauge, the one gauge checked, still names VELO as its reward token.
+    </Prov>
+    <ProvInspectorLayer />
+  </ProvSection>,
   <>
     Every figure is in the pool&apos;s quote token, the one it prices the other in, at the pool&apos;s price. VELO is
     valued through Velodrome&apos;s own VELO pools, and Rails states no dollar figure here.
@@ -145,7 +186,8 @@ const contracts: InfoReadContract[] = [
   },
   {
     name: "Each gauge factory",
-    reads: "the share of the VELO to claim that unstaking early gives up, and the pool's minimum time staked.",
+    reads:
+      "the share of the VELO to claim that unstaking early gives up, and the pool's minimum time staked. Where it does not answer, no penalty is shown.",
   },
   { name: "VELO/USDC pool", address: VELODROME.rewardPools.usdc, reads: "its reserves, to price VELO in USDC." },
   { name: "VELO/WETH pool", address: VELODROME.rewardPools.weth, reads: "its reserves, to price VELO in WETH." },

@@ -145,7 +145,14 @@ test("one failed read of seven stays fresh; two of seven are late; four of seven
   assert.equal(visitState({ lastHourVisits: 7, failedShare: 1 / 7 }), "fresh");
   assert.equal(visitState({ lastHourVisits: 7, failedShare: 2 / 7 }), "late");
   assert.equal(visitState({ lastHourVisits: 7, failedShare: 4 / 7 }), "stalled");
-  assert.equal(visitState({ lastHourVisits: 1, failedShare: 1 }), "fresh");
+});
+
+test("one visit that failed is too few to judge: not measured, not green", () => {
+  assert.equal(visitState({ lastHourVisits: 1, failedShare: 1 }), "none");
+  assert.equal(visitState({ lastHourVisits: 2, failedShare: 0.5 }), "fresh");
+  assert.equal(visitState({ lastHourVisits: 2, failedShare: 1 }), "stalled");
+  assert.equal(visitState({ lastHourVisits: 1, answered: 0, failedShare: 1 }), "none");
+  assert.equal(visitState({ lastHourVisits: 1, answered: 1, failedShare: 0 }), "fresh");
 });
 
 // censusRuns: a census that stops at its share or deadline is held while the
@@ -238,4 +245,14 @@ test("an answer without censusRuns leaves the census writer as it was", () => {
   const s = censusStatus(null);
   assert.equal(s.entries[0].live.writers[0].censusRun, undefined);
   assert.equal(writerState(s.entries[0].live.writers[0], now, s.entries[0]), "fresh");
+});
+
+// The visit window follows the snapshot's asOf across the hour boundary.
+import { visitWindowStart } from "../../lib/shared/index-progress.ts";
+
+test("visit window starts at the previous clock hour of the snapshot", () => {
+  const h = (hh, mm = 0, ss = 0) => Date.UTC(2026, 10, 13, hh, mm, ss) / 1000;
+  assert.equal(visitWindowStart(h(13, 59, 59)), h(12));
+  assert.equal(visitWindowStart(h(14, 0, 0)), h(13));
+  assert.equal(visitWindowStart(h(14, 0, 30)), h(13));
 });

@@ -42,6 +42,7 @@
 // than the card draws) and `alchemixBetweenReadingsClauses` (what earmarked debt
 // and the share price did between the reading before and this block).
 
+import { feeCharged } from "@/lib/alchemix/protocol-fee";
 import type {
   AlchemixStateAtBlockFromReading,
   AlchemixV3Context,
@@ -236,7 +237,8 @@ export interface AlchemixClauseOptions {
    *  the reading before it less the reading at it (lib/alchemix/readings-before).
    *  Null where the two readings are not in hand. */
   collateralTakenRaw?: string | null;
-  /** The line's protocol fee in basis points, for the repay fee's rate. */
+  /** The line's protocol fee in basis points at this block, for the repay
+   *  fee's rate (lib/alchemix/protocol-fee.ts). */
   protocolFeeBps?: number | null;
   /** A redemption's net for this position (lib/alchemix/redemption-net), and
    *  the underlying it is in. */
@@ -341,19 +343,20 @@ export function alchemixEventClauses(
           ),
         );
       }
-      if (ctx.resolvedAtCapture?.collateralFee) {
+      // A fee of "0" (a market at 0 bps) states nothing, as force_repay does.
+      const collateralFee = ctx.resolvedAtCapture?.collateralFee;
+      if (collateralFee != null && feeCharged(collateralFee)) {
         out.push(
           clause(
             protocolFeeBps != null ? (
               <>
-                A protocol fee of {shown(ctx.resolvedAtCapture.collateralFee, myt)} left the collateral for
-                Alchemix&rsquo;s fee receiver: {(protocolFeeBps / 100).toLocaleString("en-US")}% of the shares that paid
-                off earmarked debt.
+                A redemption fee of {shown(collateralFee, myt)} left the collateral for Alchemix&rsquo;s protocol fee
+                receiver: {(protocolFeeBps / 100).toLocaleString("en-US")}% of the shares that paid off earmarked debt.
               </>
             ) : (
               <>
-                A protocol fee of {shown(ctx.resolvedAtCapture.collateralFee, myt)} left the collateral for
-                Alchemix&rsquo;s fee receiver, charged on the shares that paid off earmarked debt.
+                A redemption fee of {shown(collateralFee, myt)} left the collateral for Alchemix&rsquo;s protocol fee
+                receiver, charged on the shares that paid off earmarked debt.
               </>
             ),
           ),
@@ -376,11 +379,11 @@ export function alchemixEventClauses(
         out.push(
           clause(
             <>
-              Alchemix took a protocol fee of {shown(raw.protocol_fee_total, myt)} from the collateral
+              Alchemix took a redemption fee of {shown(raw.protocol_fee_total, myt)} from the collateral
               {protocolFeeBps != null ? (
                 <>, {(protocolFeeBps / 100).toLocaleString("en-US")}% of those shares,</>
               ) : null}{" "}
-              and paid it to its fee receiver.
+              and paid it to its protocol fee receiver.
             </>,
           ),
         );
@@ -420,12 +423,9 @@ export function alchemixEventClauses(
       out.push(
         clause(
           split && split.feeRaw > BigInt(0) ? (
-            <>That protocol fee is the only charge for closing this way: a close with collateral pays no liquidator.</>
+            <>That redemption fee is the only charge for this close.</>
           ) : (
-            <>
-              No fee was charged: the protocol fee applies only to earmarked debt, and a close with collateral pays no
-              liquidator.
-            </>
+            <>No fee was charged on this close.</>
           ),
         ),
       );
@@ -642,15 +642,15 @@ export function alchemixEventClauses(
             ),
           );
           const net = opts.redemptionNet;
-          const fee = net && net.status === "stated" ? net.fee : null;
+          const fee = net && net.status === "stated" && net.fee && net.fee.bps > 0 ? net.fee : null;
           const pct = fee ? `${(fee.bps / 100).toLocaleString("en-US")}%` : null;
           out.push(
             clause(
               fee ? (
                 <>
                   {shown(fee.sharesRaw, myt)} of those are the market&rsquo;s {pct} redemption fee, which the Alchemist
-                  charges on every redemption on top of the shares the Transmuter gets and pays to Alchemix&rsquo;s fee
-                  receiver. The rest went to the Transmuter, which pays its stakers in them.
+                  charges on every redemption on top of the shares the Transmuter gets and pays to Alchemix&rsquo;s
+                  protocol fee receiver. The rest went to the Transmuter, which pays its stakers in them.
                 </>
               ) : (
                 <>Those {myt} went to the Transmuter, which pays its stakers in them.</>
@@ -698,8 +698,8 @@ export function alchemixEventClauses(
             clause(
               <>
                 Here it cleared {shown(cleared.amountRaw, sym)} of earmarked debt, measured from this position&rsquo;s
-                readings either side of it, and took {myt} from the collateral for it, including the market&rsquo;s
-                redemption fee.
+                readings either side of it, and took {myt} from the collateral for it
+                {protocolFeeBps ? <>, including the market&rsquo;s redemption fee.</> : <>.</>}
               </>,
             ),
           );

@@ -1,9 +1,11 @@
 // A Transmuter claim that landed before maturity, split into its parts.
 // ----------------------------------------------------------------------------
-// A stake converts in equal parts every block from its start block to its
-// maturity block. A claim before maturity pays out the converted part in vault
-// shares; of the part that had not converted, the Transmuter keeps its early
-// exit fee and hands the rest back as the synthetic. `PositionClaimed` emits
+// A deposit vests in equal parts every block from its start block to its
+// maturity block. A claim before maturity pays out the vested part in vault
+// shares; of the part not yet vested, the early exit fee is charged (on
+// eth-alusd 103 it went to the DAO multisig the docs list as protocol fee
+// receiver: rails-ops reference/official-docs/alchemix.md, chain read 2) and
+// the rest is returned as the synthetic. `PositionClaimed` emits
 // only the payout and the part handed back, so the two other figures here are
 // arithmetic over logged values:
 //

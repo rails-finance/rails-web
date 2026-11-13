@@ -72,6 +72,8 @@ import {
   units,
 } from "@/lib/pendle/format";
 import { impliedApyProv, markProv, maturityProv, tvlProv, underlyingProv, valueProv } from "@/lib/pendle/provenance";
+import { PENDLE_WORDS } from "@/lib/pendle/words";
+import { emptyPool } from "@/lib/pendle/rules";
 import { UNDERLYING_LABEL_TIP, underlyingProtocol } from "@/lib/pendle/underlying";
 import { pendleMarketHref, pendleWalletHref } from "@/lib/pendle/routes";
 import type { PendleRoster, PendleRosterEntry } from "@/lib/pendle/types";
@@ -93,7 +95,7 @@ interface Column {
 const COLUMNS: readonly Column[] = [
   { key: "market", label: "Market", first: "asc", numeric: false },
   { key: "apy", label: "Implied APY", first: "desc", numeric: true },
-  { key: "tvl", label: "TVL", first: "desc", numeric: true },
+  { key: "tvl", label: PENDLE_WORDS.liquidity, first: "desc", numeric: true },
   { key: "pt", label: "PT price", first: "desc", numeric: true },
   { key: "maturity", label: "Maturity", first: "asc", numeric: true },
 ];
@@ -101,8 +103,8 @@ const DEFAULT_SORT: SortKey = "maturity";
 
 /** How a column sorts, where that is not plain from its figure. */
 const SORT_NOTE: Partial<Record<SortKey, string>> = {
-  apy: "The fixed rate the market prices PT at, at this block. Sorts by that rate; a matured market has none and sorts last.",
-  tvl: "The pool's SY and its PT at the PT's rate, in the market's asset. Sorts by asset, then by TVL within each asset.",
+  apy: "Pendle's docs: the market consensus of the future APY of an asset. Sorts by that rate; a matured market or an empty pool has none and sorts last.",
+  tvl: "The pool's SY and its PT at the PT's rate, in the market's asset. Sorts by asset, then by liquidity within each asset.",
   pt: "What one PT is worth in the market's asset. Sorts by asset, then by price within each asset.",
   maturity: "Sorts by the expiry date, soonest first.",
 };
@@ -110,6 +112,8 @@ const SORT_NOTE: Partial<Record<SortKey, string>> = {
 const nameOf = (m: PendleRosterEntry) => marketName(m.tokens);
 const assetOf = (m: PendleRosterEntry) => assetSymbol(m.tokens);
 const tvlOf = (m: PendleRosterEntry) => units(m.tvl?.asset, assetDecimals(m.tokens));
+/** An empty pool (lib/pendle/rules.ts): its stored rate is not shown. */
+const emptyOf = (m: PendleRosterEntry) => emptyPool(m.expired, m.tvl, m.tokens.sy.decimals);
 
 /** The PT's price in the asset: ptToSy × SY.exchangeRate(), both 1e18-scaled. */
 function ptToAsset(m: PendleRosterEntry): string | null {
@@ -121,7 +125,7 @@ function ptToAsset(m: PendleRosterEntry): string | null {
 function figureOf(key: SortKey, m: PendleRosterEntry): number | null {
   switch (key) {
     case "apy":
-      return m.impliedApy;
+      return emptyOf(m) ? null : m.impliedApy;
     case "tvl":
       return tvlOf(m);
     case "pt":
@@ -247,7 +251,8 @@ function rosterCsv(markets: PendleRosterEntry[]): string {
       t.market.address,
       underlyingOf(m),
       assetOf(m),
-      m.impliedApy == null ? "" : m.impliedApy.toFixed(6),
+      // The table's figure: blank where it shows none (matured, unread, an empty pool).
+      figureOf("apy", m)?.toFixed(6) ?? "",
       exact(m.tvl?.asset, assetDecimals(t)) ?? "",
       ptToAsset(m) == null ? "" : String(rate(ptToAsset(m))),
       new Date(t.expiry * 1000).toISOString().slice(0, 10),
@@ -446,7 +451,8 @@ export function PendleRosterTable({
         }
       >
         <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-rb-500">
-          Each row opens its market&rsquo;s page. Underlying is a Rails label for the protocol behind each yield token.
+          Each row opens its market&rsquo;s page. Underlying is a Rails label for the protocol behind each yield-bearing
+          token.
         </p>
       </SectionHeading>
       <div className="mt-3">
@@ -490,7 +496,7 @@ export function PendleRosterTable({
           )
         ) : (
           <DataTable
-            caption="Pendle markets on Ethereum; TVL and PT price are in each market's asset"
+            caption="Pendle markets on Ethereum; liquidity and PT price are in each market's asset"
             tableClassName="min-w-[720px] text-sm"
             stacked
             rowHeight="one"
@@ -587,7 +593,11 @@ function Row({ m, block, at }: { m: PendleRosterEntry; block: number; at: number
       {cell(
         "apy",
         "Implied APY",
-        m.impliedApy == null ? null : (
+        emptyOf(m) ? (
+          <span className="font-normal text-rb-500" data-pendle-empty="">
+            — <span className="text-[11px]">{PENDLE_WORDS.noLiquidity}</span>
+          </span>
+        ) : m.impliedApy == null ? null : (
           <Prov info={impliedApyProv(t.market.address, block, null)} value={m.impliedApy.toFixed(6)}>
             {apyText(m.impliedApy)}
           </Prov>
@@ -595,7 +605,7 @@ function Row({ m, block, at }: { m: PendleRosterEntry; block: number; at: number
       )}
       {cell(
         "tvl",
-        "TVL",
+        PENDLE_WORDS.liquidity,
         m.tvl?.asset == null || tvl == null ? null : (
           <InAsset m={m}>
             <Prov info={tvlProv(t.market.address, block)} value={exact(m.tvl.asset, dec) ?? m.tvl.asset} symbol={asset}>

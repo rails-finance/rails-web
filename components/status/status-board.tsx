@@ -48,6 +48,8 @@ import {
   pipelineNewestBlockTime,
   pipelineState,
   visitState,
+  visitTooFew,
+  visitWindowStart,
   writerState,
   VISIT_FAIL_LATE,
   VISIT_FAIL_STALLED,
@@ -196,11 +198,19 @@ const CAUSE_WORDS: Record<string, string> = {
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 
-function visitLine(v: VisitReads | null | undefined): string {
-  if (!v?.lastHourVisits) return "No page visit in the last hour.";
+/** The visit tally's window starts at the previous clock hour (UTC). */
+const visitSince = (asOf: number) => `since ${hhmm(new Date(visitWindowStart(asOf) * 1000).toISOString())}`;
+
+/** asOf is the snapshot's time: the counts' window follows it, not the clock. */
+function visitLine(v: VisitReads | null | undefined, asOf: number): string {
+  if (!v?.lastHourVisits) return `No page visit ${visitSince(asOf)}.`;
   const failed = v.failedShare != null ? `, ${pct(v.failedShare)} of reads failed` : "";
-  const p95 = v.p95Ms != null ? `, 95% answered within ${n(Math.round(v.p95Ms))} ms` : "";
-  return `${n(v.lastHourVisits)} visits in the last hour${failed}${p95}.`;
+  const p95 = v.p95Ms != null && v.answered !== 0 ? `, 95% answered within ${n(Math.round(v.p95Ms))} ms` : "";
+  const visits = v.lastHourVisits === 1 ? "1 visit" : `${n(v.lastHourVisits)} visits`;
+  const few = visitTooFew(v)
+    ? ` Too few to judge: none answered, and it takes ${VISIT_FAIL_MIN} failed reads to show late.`
+    : "";
+  return `${visits} ${visitSince(asOf)}${failed}${p95}.${few}`;
 }
 
 const shortAddress = (a: string) => (a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a);
@@ -277,7 +287,7 @@ interface CellView {
   title: string;
 }
 
-function cellView(c: StatusCell, now: number, allowance: Allowance | null): CellView {
+function cellView(c: StatusCell, now: number, allowance: Allowance | null, asOf: number): CellView {
   const live = c.entry?.live;
   const lane = live ? laneWords(live.lane, live.visitReads?.gateway) : c.fill ? "The full-history fill" : "–";
   if (c.fill) {
@@ -312,12 +322,12 @@ function cellView(c: StatusCell, now: number, allowance: Allowance | null): Cell
   const lastVisit = v?.lastVisitAt ? Date.parse(v.lastVisitAt) / 1000 : null;
   return {
     hb,
-    status: STATUS_WORDS[hb],
+    status: visitTooFew(v) ? "Too few reads" : STATUS_WORDS[hb],
     index: "On visit",
     indexRank: -1,
     last: lastVisit,
     lane,
-    title: `No index yet; reads when a page opens. ${visitLine(v)}`,
+    title: `No index yet; reads when a page opens. ${visitLine(v, asOf)}`,
   };
 }
 
@@ -548,7 +558,7 @@ const laneWords = (lane: string, gateway?: string | null) =>
         : lane;
 
 /** A chain's detail for an index kept by Sieve or a processor, or not started. */
-function PipelineDetail({ e, now }: { e: StatusEntry; now: number }) {
+function PipelineDetail({ e, now, asOf }: { e: StatusEntry; now: number; asOf: number }) {
   const b = e.backfill;
   const live = e.live;
   const hb = b ? pipelineState(e, now) : visitState(live?.visitReads);
@@ -557,7 +567,7 @@ function PipelineDetail({ e, now }: { e: StatusEntry; now: number }) {
       <p className="text-xs text-rb-500">
         {b
           ? pipelineLine(e, now)
-          : `No index yet. Its pages read the chain when they open. ${visitLine(live?.visitReads)}`}
+          : `No index yet. Its pages read the chain when they open. ${visitLine(live?.visitReads, asOf)}`}
       </p>
       <dl className="mt-3 flex flex-col gap-y-1.5 text-sm">
         {b && (
@@ -615,10 +625,10 @@ function PipelineDetail({ e, now }: { e: StatusEntry; now: number }) {
         )}
         {live?.visitReads?.lastHourVisits != null && (
           <Figure
-            name="Last hour"
+            name="Visit reads"
             value={
               <>
-                {visitLine(live.visitReads)}
+                {visitLine(live.visitReads, asOf)}
                 {live.visitReads.byCause && Object.keys(live.visitReads.byCause).length > 0 && (
                   <span className="text-rb-500">
                     {" "}
@@ -632,7 +642,7 @@ function PipelineDetail({ e, now }: { e: StatusEntry; now: number }) {
                 )}
               </>
             }
-            source="visit tally, hourly"
+            source="visit tally, this clock hour and the last"
           />
         )}
       </dl>
@@ -693,7 +703,7 @@ interface Line {
   view: CellView;
 }
 
-function Row({ line, now, allowance }: { line: Line; now: number; allowance: Allowance | null }) {
+function Row({ line, now, asOf, allowance }: { line: Line; now: number; asOf: number; allowance: Allowance | null }) {
   const [open, setOpen] = useState(false);
   const { cell: c, view: v } = line;
   return (
@@ -735,7 +745,7 @@ function Row({ line, now, allowance }: { line: Line; now: number; allowance: All
               {c.fill ? (
                 <ChainDetail e={c.fill} now={now} allowance={allowance} />
               ) : c.entry ? (
-                <PipelineDetail e={c.entry} now={now} />
+                <PipelineDetail e={c.entry} now={now} asOf={asOf} />
               ) : null}
             </div>
           </DataTableCell>
@@ -867,7 +877,7 @@ export function StatusBoard({ source, view }: { source: StatusSource; view: Stat
     .map((c) => {
       const entry = rosterFor(c.key, c.chain);
       const name = entry?.label ?? (c.fill ? c.fill.label.split(" · ")[0] : c.key);
-      return { cell: c, name, markId: entry?.id ?? c.key, view: cellView(c, now, allowance) };
+      return { cell: c, name, markId: entry?.id ?? c.key, view: cellView(c, now, allowance, asOf) };
     });
   const byName = (a: Line, b: Line) => a.name.localeCompare(b.name, "en-US");
   const cmp: Record<SortKey, (a: Line, b: Line) => number> = {
@@ -924,7 +934,7 @@ export function StatusBoard({ source, view }: { source: StatusSource; view: Stat
                       ? `Stalled: past 3 times its schedule, or ${pct(VISIT_FAIL_STALLED)} failing`
                       : h === "paused"
                         ? "Paused: held for the daily allowance"
-                        : "Not measured: no write time or visit"}
+                        : "Not measured: no write time or visit, or too few visit reads to judge"}
               </span>
             ))}
           </div>
@@ -948,7 +958,7 @@ export function StatusBoard({ source, view }: { source: StatusSource; view: Stat
             </DataTableHead>
             <DataTableBody>
               {lines.map((l) => (
-                <Row key={`${l.cell.key}-${l.cell.chain}`} line={l} now={now} allowance={allowance} />
+                <Row key={`${l.cell.key}-${l.cell.chain}`} line={l} now={now} asOf={asOf} allowance={allowance} />
               ))}
             </DataTableBody>
           </DataTable>

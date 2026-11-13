@@ -28,7 +28,7 @@ import {
   chainNameOf,
   effectivePicks,
   openFocusPanel,
-  scopeSymbolOf,
+  scopeLabelOf,
   useAssetScope,
   type AssetPick,
 } from "@/lib/shared/asset-scope";
@@ -38,7 +38,7 @@ import { INPLACE_TEXT } from "@/lib/shared/ui-grammar";
 
 /** "BOLD +4": the first chosen symbol and how many more. */
 export function aimShort(picks: AssetPick[]): string {
-  const names = [...new Set(picks.map((p) => scopeSymbolOf(p.chain, p.token) ?? `${p.token.slice(0, 6)}…`))];
+  const names = [...new Set(picks.map((p) => scopeLabelOf(p.chain, p.token) ?? `${p.token.slice(0, 6)}…`))];
   return `${names[0] ?? ""}${names.length > 1 ? ` +${names.length - 1}` : ""}`;
 }
 

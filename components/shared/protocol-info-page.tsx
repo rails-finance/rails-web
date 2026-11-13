@@ -39,12 +39,30 @@ export interface InfoDocLink {
   href: string;
 }
 
+/** A contract that names a term the docs never use (rails-ops standards/info-page-template.md,
+ *  glossary): its address on the explorer's chain, and the function, event or contract name
+ *  carrying the word, as read. */
+export interface InfoContractSource {
+  kind: "contract";
+  address: string;
+  /** Defaults to the explorer's chain. */
+  chainId?: ChainId;
+  /** What carries the word: `name() is "Slipstream Position NFT v1.2" at block 159,483,363`. */
+  carries: string;
+}
+
+/** A term's source: a docs page (after "Docs:") or a contract (after "Contract:"). */
+export type InfoTermSource = InfoDocLink | InfoContractSource;
+
+const isContractSource = (s: InfoTermSource): s is InfoContractSource => "kind" in s && s.kind === "contract";
+
 export interface InfoTerm {
   term: string;
   /** One or two sentences, plain English, the practical figure before the formula. */
   definition: string;
-  /** The protocol's official docs or FAQ, at least one. */
-  sources: readonly [InfoDocLink, ...InfoDocLink[]];
+  /** The protocol's official docs or FAQ, or for a term the docs never use the contract that
+   *  names it: at least one, by this type and scripts/test/info-glossary-sources.test.mjs. */
+  sources: readonly [InfoTermSource, ...InfoTermSource[]];
 }
 
 export interface InfoView {
@@ -76,6 +94,55 @@ export interface InfoReads {
 }
 
 export const READS_HEADING = "How Rails reads it";
+
+/** A glossary term's sources: docs links after a muted "Docs:", contracts after a muted "Contract:",
+ *  each address linked to the chain's explorer as slot 2a links it. */
+function TermSources({ sources, chainId }: { sources: readonly InfoTermSource[]; chainId: ChainId }) {
+  const docs = sources.filter((s): s is InfoDocLink => !isContractSource(s));
+  const contracts = sources.filter(isContractSource);
+  return (
+    <>
+      {docs.length > 0 && (
+        <>
+          {" "}
+          <span className="text-rb-400">Docs:</span>{" "}
+          {docs.map((l, i) => (
+            <span key={l.href}>
+              {i > 0 && ", "}
+              <a href={l.href} className={INLINE_LINK} target="_blank" rel="noopener">
+                {l.label}
+              </a>
+            </span>
+          ))}
+        </>
+      )}
+      {contracts.length > 0 && (
+        <>
+          {" "}
+          <span className="text-rb-400">Contract:</span>{" "}
+          {contracts.map((c, i) => {
+            const chain = c.chainId ?? chainId;
+            return (
+              <span key={c.address} data-info-term-contract="">
+                {i > 0 && ", "}
+                <a
+                  href={explorerUrl(chain, "address", c.address)}
+                  target="_blank"
+                  rel="noopener"
+                  className="link-external font-mono text-[12px]"
+                  title={`${c.address} on ${CHAINS[chain].explorerName}`}
+                >
+                  {shortAddress(c.address)}
+                </a>
+                , {c.carries}
+              </span>
+            );
+          })}
+        </>
+      )}
+    </>
+  );
+}
 
 /** Slot 2a: one row per contract, its address linked off-site (pink), then the
  *  line on the read and any notes. */
@@ -157,8 +224,8 @@ const DOCS_AND_CHAIN_SCOPE = "docs-and-chain";
 
 /** The docs-and-chain section, after the glossary whose terms it qualifies.
  *  Drawn only where an explorer passes at least one entry. One receipts
- *  scope; the page's one inspector layer rides with it, since no other part
- *  of an info page draws a receipt. */
+ *  scope, and its inspector layer rides with it. A page that passes no
+ *  docsAndChain may mount a receipt and a layer of its own. */
 function InfoDocsAndChainSection({ items }: { items: readonly InfoDocsAndChain[] }) {
   return (
     <div className="mt-5">
@@ -320,15 +387,8 @@ export function ProtocolInfoPage({
               <dt className="inline font-semibold text-foreground">{t.term}</dt>
               <dd className="inline">
                 {": "}
-                {t.definition} <span className="text-rb-400">Docs:</span>{" "}
-                {t.sources.map((l, i) => (
-                  <span key={l.href}>
-                    {i > 0 && ", "}
-                    <a href={l.href} className={INLINE_LINK} target="_blank" rel="noopener">
-                      {l.label}
-                    </a>
-                  </span>
-                ))}
+                {t.definition}
+                <TermSources sources={t.sources} chainId={chainId} />
               </dd>
             </div>
           ))}
