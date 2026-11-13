@@ -73,7 +73,7 @@ import { measuredYield, yieldText, type VaultYield } from "@/lib/vaults/yield";
 import { illiquidSentence } from "@/lib/vaults/illiquid";
 import { vaultHoldersProv, vaultYieldProv } from "@/lib/vaults/row-provenance";
 import { heldAssetsRaw, lostAssetsSentence } from "@/lib/vaults/lost-assets";
-import { assetScaleSentence } from "@/lib/vaults/asset-scale-words";
+import { assetScaleAbsentTip, assetScaleSentence } from "@/lib/vaults/asset-scale-words";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { sharePriceText } from "@/lib/shared/vault-amount-text";
 import { useCompareSelection } from "@/components/vaults/compare-selection";
@@ -110,7 +110,7 @@ const STEWARD_ROLE: Record<NonNullable<VaultSummary["steward"]>["role"], string>
 
 /** How an amount in the vault's asset sorts: by token, then inside it. */
 const SORT_NOTE: Partial<Record<SortKey, string>> = {
-  assets: "Sorts by token, then by what the vault holds within each token: total assets less lost assets.",
+  assets: "Sorts by token, then by total assets within each token.",
   price: "Sorts by token, then by share price within each token.",
 };
 
@@ -137,13 +137,15 @@ function pillTitle(st: VaultStanding, v: VaultSummary): string {
   return STANDING_WORD[st];
 }
 
-/** The key's figure; null sorts last both ways. */
+/** The key's figure; null sorts last both ways. Total assets sorts by the
+ *  figure the column shows (ui-jobs 664). A vault whose asset's decimals
+ *  disagree shows no amount in it, and sorts as none. */
 function figureOf(key: SortKey, v: VaultSummary, y: VaultYield | undefined): number | null {
   switch (key) {
     case "assets":
-      return v.totalAssets ? heldOf(v, v.totalAssets.raw) : null;
+      return v.assetScale ? null : (v.totalAssets?.value ?? null);
     case "price":
-      return v.sharePrice?.value ?? null;
+      return v.assetScale ? null : (v.sharePrice?.value ?? null);
     case "yield":
       return y && "yearly" in y ? y.yearly : null;
     case "holders":
@@ -369,10 +371,14 @@ export function VaultIndexTable({
             const receipts = receiptsOf(v);
             const heads = vaultHeads({ vault: v, yieldFigure: yf, holdersHref: null, receipts });
             const head = (id: string) => heads.find((h) => h.id === id);
-            const name = v.name ?? v.catalogName ?? v.symbol;
+            const name = vaultDisplayName(v);
             const raw = v.totalAssets?.raw ?? "";
             const c = v.census;
             const holdersHref = holdersHrefOf(v);
+            // An asset whose decimals disagree: no amount in it, the reason
+            // read to a screen reader; the row's pill carries it in a title
+            // (ui-jobs 664).
+            const withheld = v.assetScale ? assetScaleAbsentTip(v.asset.symbol, v.assetScale) : undefined;
             // `none`: what stands for an absent figure, for a screen reader
             // (the Yield slot's reason, with its `data-yield-none`).
             const cell = (id: string, label: string, value: ReactNode, none: ReactNode = "no figure") => (
@@ -507,16 +513,17 @@ export function VaultIndexTable({
                   {cell(
                     "total-assets",
                     "Total assets",
-                    v.totalAssets && (
+                    v.totalAssets && !v.assetScale && (
                       <InAsset v={v} data-cell="total-assets">
                         {traced(receipts.totalAssets, formatCompact(v.totalAssets.value))}
                       </InAsset>
                     ),
+                    withheld,
                   )}
                   {cell(
                     "share-price",
                     "Share price",
-                    v.sharePrice && (
+                    v.sharePrice && !v.assetScale && (
                       <InAsset v={v} data-cell="share-price">
                         {/* Past a million, compact (its full text in the
                           title), so one vault's figure cannot widen the column. */}
@@ -532,6 +539,7 @@ export function VaultIndexTable({
                         )}
                       </InAsset>
                     ),
+                    withheld,
                   )}
                   {cell(
                     "yield",

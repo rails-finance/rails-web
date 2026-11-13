@@ -23,7 +23,8 @@ import { changeText, jumpTail, measuredYield, yieldText, type VaultYield } from 
 import { vaultHoldersProv, vaultWithdrawableProv, vaultYieldProv } from "@/lib/vaults/row-provenance";
 import { illiquidSentence, type VaultIlliquid } from "@/lib/vaults/illiquid";
 import { heldAssetsRaw } from "@/lib/vaults/lost-assets";
-import { assetScaleSentence } from "@/lib/vaults/asset-scale-words";
+import { assetScaleAbsentTip, assetScaleSentence } from "@/lib/vaults/asset-scale-words";
+import { HeadingTip } from "@/components/shared/tip-label";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -201,15 +202,28 @@ export function LostAssetsCaution({
   );
 }
 
+/** "decimals disagree" under a "—" where the vault's asset states decimals
+ *  its conversion does not work at (ui-jobs 664): the reason on a press on
+ *  the card, in a title on the row. */
+function ScaleWithheld({ v, detail }: { v: VaultSummary; detail: boolean }) {
+  if (!v.assetScale) return null;
+  const tip = assetScaleAbsentTip(v.asset.symbol, v.assetScale);
+  return (
+    <span data-asset-scale={v.assetScale.implied}>
+      {detail ? <HeadingTip text="decimals disagree" tip={tip} /> : <span title={tip}>decimals disagree</span>}
+    </span>
+  );
+}
+
 /** The four headlines. `detail`: the card, which prints the print rules' full
  *  figures and gives every label its read-more; else the row's compact form. */
 type MeasuredYield = Extract<VaultYield, { yearly: number }>;
 
-/** The Yield subline's words: "share price +0.42% over the last 30 days",
- *  and the one-off move where there is one. The two reads' blocks are the
- *  figure's receipt. */
+/** The Yield subline's words: "share price +0.42% over the 30 days to 12 Nov
+ *  2026" (the latest stored day, decision 0047 point 2), and the one-off move
+ *  where there is one. The two reads' blocks are the figure's receipt. */
 export const yieldSublineText = (y: MeasuredYield): string =>
-  `share price ${changeText(y.change)} over the last ${y.days} days${
+  `share price ${changeText(y.change)} over the ${y.days} days to ${formatDate(new Date(y.to.day * 86_400_000))}${
     y.jump ? jumpTail(y.jump, (d) => formatDate(new Date(d * 86_400_000))) : ""
   }`;
 
@@ -239,40 +253,35 @@ export function vaultHeads({
       // the tiers are named (decision 0066 point 2).
       tier: "amount",
       labelTip: detail ? VAULT_HEAD_TIPS.totalAssets : undefined,
-      value: v.totalAssets ? (
-        <span
-          data-cell="total-assets"
-          {...(detail ? { "data-figure": "total-assets", "data-raw": v.totalAssets.raw } : {})}
-        >
-          <InAsset v={v} exact={formatUnitsExact(v.totalAssets.raw, v.asset.decimals)}>
-            {detail ? (
-              // A phone's half-width column cannot hold nine digits and cents
-              // at headline size: it reads the compact form, the full figure
-              // from sm up, which carries the receipt.
-              <>
-                <span className="sm:hidden" data-prov-exempt="">
-                  {formatCompact(v.totalAssets.value)}
-                </span>
-                <span className="hidden sm:inline" data-figure-value="">
-                  {withProv(receipts.totalAssets, assetText(v.totalAssets, v.asset.decimals))}
-                </span>
-              </>
-            ) : (
-              withProv(receipts.totalAssets, formatCompact(v.totalAssets.value))
-            )}
-          </InAsset>
-        </span>
-      ) : null,
+      value:
+        v.totalAssets && !v.assetScale ? (
+          <span
+            data-cell="total-assets"
+            {...(detail ? { "data-figure": "total-assets", "data-raw": v.totalAssets.raw } : {})}
+          >
+            <InAsset v={v} exact={formatUnitsExact(v.totalAssets.raw, v.asset.decimals)}>
+              {detail ? (
+                // A phone's half-width column cannot hold nine digits and cents
+                // at headline size: it reads the compact form, the full figure
+                // from sm up, which carries the receipt.
+                <>
+                  <span className="sm:hidden" data-prov-exempt="">
+                    {formatCompact(v.totalAssets.value)}
+                  </span>
+                  <span className="hidden sm:inline" data-figure-value="">
+                    {withProv(receipts.totalAssets, assetText(v.totalAssets, v.asset.decimals))}
+                  </span>
+                </>
+              ) : (
+                withProv(receipts.totalAssets, formatCompact(v.totalAssets.value))
+              )}
+            </InAsset>
+          </span>
+        ) : null,
       ...(v.standing.includes("lost-assets")
         ? { sub: <LostAssetsCaution vault={v} receipts={receipts} detail={detail} /> }
         : v.assetScale
-          ? {
-              sub: (
-                <span className="text-xs text-rb-500" data-asset-scale={v.assetScale.implied}>
-                  {assetScaleSentence(v.asset.symbol, v.assetScale)}
-                </span>
-              ),
-            }
+          ? { sub: <ScaleWithheld v={v} detail={detail} /> }
           : {}),
     },
     {
@@ -280,18 +289,20 @@ export function vaultHeads({
       label: "Share price",
       tier: "measure",
       labelTip: detail ? VAULT_HEAD_TIPS.sharePrice : undefined,
-      value: v.sharePrice ? (
-        <span
-          data-cell="share-price"
-          {...(detail ? { "data-figure": "share-price", "data-raw": v.sharePrice.raw } : {})}
-        >
-          <InAsset v={v} exact={formatUnitsExact(v.sharePrice.raw, v.asset.decimals)}>
-            <span data-figure-value="">
-              {withProv(receipts.sharePrice, sharePriceText(v.sharePrice, v.asset.decimals))}
-            </span>
-          </InAsset>
-        </span>
-      ) : null,
+      value:
+        v.sharePrice && !v.assetScale ? (
+          <span
+            data-cell="share-price"
+            {...(detail ? { "data-figure": "share-price", "data-raw": v.sharePrice.raw } : {})}
+          >
+            <InAsset v={v} exact={formatUnitsExact(v.sharePrice.raw, v.asset.decimals)}>
+              <span data-figure-value="">
+                {withProv(receipts.sharePrice, sharePriceText(v.sharePrice, v.asset.decimals))}
+              </span>
+            </InAsset>
+          </span>
+        ) : null,
+      ...(v.assetScale ? { sub: <ScaleWithheld v={v} detail={detail} /> } : {}),
     },
   ];
 

@@ -795,7 +795,7 @@ export function fxEventFallbackContent(): LearnMoreContent {
 const MORPHO_DOC_URLS = {
   OVERVIEW: "https://docs.morpho.org/",
   MARKET: "https://docs.morpho.org/learn/concepts/market/",
-  VAULT: "https://docs.morpho.org/learn/concepts/vault/",
+  VAULT: "https://docs.morpho.org/curate/concepts/roles/#morpho-vaults-v1-roles",
 } as const;
 
 // ── Fluid (Instadapp) ─────────────────────────────────────────────────────────

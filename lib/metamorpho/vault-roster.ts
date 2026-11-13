@@ -68,10 +68,12 @@ const baked = (
   censusBlock: number,
 ): MetaMorphoVaultRoster => ({
   chainId,
-  vaults,
+  // A name is shown trimmed: one vault's `name()` starts with a space (" Usual
+  // Boosted USDC") and would sort ahead of every other (ui-jobs 664).
+  vaults: vaults.map((v) => ({ ...v, name: v.name.trim() })),
   censusBlock,
   source: "baked",
-  byAddress: new Map(vaults.map((v) => [v.address, v])),
+  byAddress: new Map(vaults.map((v) => [v.address, { ...v, name: v.name.trim() }])),
 });
 
 const BAKED: Record<MetaMorphoChainId, MetaMorphoVaultRoster> = {
@@ -102,7 +104,7 @@ export const loadMetaMorphoVaultRoster = cache(async (chainId: MetaMorphoChainId
       address: v.address,
       factory: v.factoryVersion,
       createdBlock: v.createdBlock,
-      name: v.name ?? "",
+      name: (v.name ?? "").trim(),
       symbol: v.symbol ?? "",
       asset: v.asset,
     });

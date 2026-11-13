@@ -97,12 +97,14 @@ type Measured = Extract<SeriesWindow, { from: VaultYieldRead }>;
 
 /** The tile's sentence for a measured window. */
 function changeSentence(tile: StripTile, v: VaultSummary, w: Measured, jump?: VaultYieldJump) {
-  const tail = ` over the last ${w.days} days`;
+  // The window ends on the latest stored day, which can be a day behind the
+  // card's read: the tile names that day (ui-jobs 664).
+  const tail = ` over the ${w.days} days to ${dayText(w.to.day)}`;
   if (w.change != null) {
     return `${changeText(w.change)}${tail}${jump ? jumpTail(jump, dayText) : ""}`;
   }
   // A window that starts at zero has no percentage; the move is stated.
-  if (BigInt(w.to.raw) === BigInt(0)) return `0 throughout the last ${w.days} days`;
+  if (BigInt(w.to.raw) === BigInt(0)) return `0 throughout the ${w.days} days to ${dayText(w.to.day)}`;
   const to =
     tile === "holders"
       ? n(Number(w.to.raw))

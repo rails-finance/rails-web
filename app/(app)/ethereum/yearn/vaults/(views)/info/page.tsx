@@ -40,7 +40,7 @@ export default async function YearnVaultsInfoPage() {
       <p data-intro-membership>
         A Yearn V3 vault takes deposits of one token and issues shares for them. It keeps some of that token idle for
         withdrawals and lends the rest to strategies, each of which puts the token to work somewhere and reports what it
-        owes back. What a share is worth is the vault&rsquo;s answer: total assets divided by shares, which is what the
+        owes back. What a share is worth is the vault&rsquo;s answer to <code>convertToAssets</code>, which is what the
         Share price column on the roster shows, in the vault&rsquo;s asset.
       </p>
       <p data-intro-roster>
@@ -75,7 +75,7 @@ export default async function YearnVaultsInfoPage() {
       <p data-intro-scope>
         Yearn V2 is a separate registry with different vault code and is absent from this page. One address&rsquo;s
         holding in a vault, and the history behind it, opens from the vault&rsquo;s page: enter the address under
-        &ldquo;Find an address in this vault&rdquo;. There is no census of Yearn holders, so no count of them is stated.
+        &ldquo;Find an address in this vault&rdquo;.
       </p>
     </VaultsInfoPage>
   );

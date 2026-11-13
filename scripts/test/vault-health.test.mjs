@@ -77,7 +77,7 @@ test("size: the change in 30 days, then the two totals", () => {
   ];
   const l = lines({ assets });
   assert.equal(l.size.headline, "−3.2% in 30 days");
-  assert.equal(l.size.sentence, "Held 401.1 USDC at the last read, 414.5 on day 20370.");
+  assert.equal(l.size.sentence, "Held 401.1 USDC on day 20400, 414.5 on day 20370.");
   const fresh = lines({ assets: [{ ...assets[0], raw: "0" }, assets[1]] });
   assert.equal(fresh.size.headline, "From nothing in 30 days");
 });

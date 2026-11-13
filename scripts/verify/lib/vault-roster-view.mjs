@@ -51,11 +51,11 @@ export async function readRosterRows(page, scope) {
 const outOfOrder = (list, ok) => list.slice(1).filter((b, i) => !ok(list[i], b)).length;
 
 /** The table's order (ui-jobs 538): under Holders, counted rows first, most
- *  open holders first; under Total assets, by token, the larger held figure
- *  first inside one token (ui-jobs 543). */
+ *  open holders first; under Total assets, by token, the larger total assets
+ *  first inside one token (ui-jobs 664). */
 const tableHoldersOk = (a, b) => (a.live == null ? b.live == null : b.live == null || a.live >= b.live);
 const tokenCmp = (a, b) => a.token.localeCompare(b.token, "en-US", { sensitivity: "base" });
-const tableAssetsOk = (a, b) => tokenCmp(a, b) < 0 || (tokenCmp(a, b) === 0 && (a.held ?? a.raw) >= (b.held ?? b.raw));
+const tableAssetsOk = (a, b) => tokenCmp(a, b) < 0 || (tokenCmp(a, b) === 0 && a.raw >= b.raw);
 
 /**
  * The default view against `?show=all`, the preset's chip and its removal, and
@@ -141,17 +141,13 @@ export async function checkRosterView({ page, base, route, scope, check, tag }) 
     const rows = (await readRosterRows(page, scope)).filter((r) => r.group === "funded");
     const bad = outOfOrder(rows, tableAssetsOk);
     check(
-      `${tag}h ?sort=assets: by token, the most held first inside each token`,
+      `${tag}h ?sort=assets: by token, the largest total assets first inside each token`,
       bad === 0,
       `${bad} rows out of order`,
     );
     // The rule is the header's tip, read with the sort button (no line above the table).
     for (const [key, word, rule] of [
-      [
-        "assets",
-        "total assets",
-        "Sorts by token, then by what the vault holds within each token: total assets less lost assets.",
-      ],
+      ["assets", "total assets", "Sorts by token, then by total assets within each token."],
       ["price", "share price", "Sorts by token, then by share price within each token."],
     ]) {
       const th = page.locator(`${scope} [data-vault-table='funded'] th[data-sort-key='${key}']`);

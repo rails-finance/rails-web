@@ -23,7 +23,7 @@
 //      own read at the stated block, wei-exact
 //   3  grouping: every funded row sits in the group of its catalogued asset;
 //      the group set == the distinct assets of funded vaults; inside every
-//      group the held totals (totalAssets less lostAssets, ui-jobs 543) are
+//      group the total assets (the figure the column shows, ui-jobs 664) are
 //      non-increasing
 //   4  funded + empty + unread == catalog size, and unread == 0
 //   5  the empty group is collapsed at rest, expands to exactly the stated N
@@ -355,8 +355,8 @@ check(
 
 // ── 3: the table and its order ──────────────────────────────────────────────
 // 2026-11-12 (ui-jobs 605): one flat table, no group per asset; the Asset
-// facet narrows by asset. Read under `?sort=assets`: by token A to Z, the most
-// held first inside each token.
+// facet narrows by asset. Read under `?sort=assets`: by token A to Z, the largest
+// total assets first inside each token.
 const funded = rows.filter((r) => r.group === "funded");
 const wrongAsset = funded.filter((r) => CATALOG_BY_ADDRESS.get(r.address)?.asset !== r.asset);
 check(
@@ -374,13 +374,13 @@ check(
 const tokens = [...new Set(funded.map((r) => r.token))];
 let disorder = 0;
 for (let i = 1; i < funded.length; i++) {
-  // Total assets ranks by what the vault holds, total assets less lost assets (ui-jobs 543).
+  // Total assets ranks by the figure the column shows (ui-jobs 664).
   const [a, b] = [funded[i - 1], funded[i]];
   const t = a.token.localeCompare(b.token, "en-US", { sensitivity: "base" });
-  if (t > 0 || (t === 0 && BigInt(b.held || b.raw) > BigInt(a.held || a.raw))) disorder++;
+  if (t > 0 || (t === 0 && BigInt(b.raw) > BigInt(a.raw))) disorder++;
 }
 check(
-  "3c under ?sort=assets the rows run by token A to Z, the most held first inside each token",
+  "3c under ?sort=assets the rows run by token A to Z, the largest total assets first inside each token",
   disorder === 0,
   `${disorder} out-of-order pairs over ${tokens.length} tokens`,
 );

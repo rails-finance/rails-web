@@ -24,6 +24,7 @@ import { NotLoaded } from "@/components/shared/not-loaded";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { ExplainBullet, ExplainGroup, Fig } from "@/components/shared/explain-groups";
 import { VaultVenueMark } from "@/components/vaults/vault-venue-mark";
+import { HeadingTip } from "@/components/shared/tip-label";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { formatUnitsExact } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
@@ -87,6 +88,10 @@ export interface VaultHoldingPlainCardProps {
   /** The family's own bullets for the (i). */
   extra?: ReactNode;
   learnMore: LearnMoreContent;
+  /** Why no amount in the asset is printed (its decimals disagree, ui-jobs
+   *  664): each amount stands as "—" with "decimals disagree" under it, and
+   *  this is its tip. */
+  withheld?: string;
 }
 
 /** The words a card prints where nothing is stated. */
@@ -409,11 +414,17 @@ function plainSlots(p: VaultHoldingPlainCardProps): PositionCardSlots {
   const fraction =
     p.totalSupply && BigInt(p.totalSupply.raw) > ZERO ? Number(p.shares.raw) / Number(p.totalSupply.raw) : null;
 
+  const withheldSub = p.withheld ? (
+    <span data-asset-scale-withheld="">
+      <HeadingTip text="decimals disagree" tip={p.withheld} />
+    </span>
+  ) : null;
+
   const worthNow: PositionCardHead = {
     id: "worth-now",
     label: "Worth now",
     labelTip: `What this address's shares are worth in ${c.assetSymbol} at this read, by the vault's own conversion.`,
-    value: (
+    value: p.withheld ? null : (
       <span data-figure="holder-claim">
         {p.claim ? (
           <Prov info={holdingClaimProv(c, "Worth now")}>
@@ -430,7 +441,9 @@ function plainSlots(p: VaultHoldingPlainCardProps): PositionCardSlots {
         )}
       </span>
     ),
-    sub: !open ? (
+    sub: withheldSub ? (
+      withheldSub
+    ) : !open ? (
       <span data-holder-empty={p.never ? "never" : "closed"}>
         {p.never ? "This address has never held this vault's shares." : "It holds none of this vault's shares now."}
       </span>
@@ -450,23 +463,24 @@ function plainSlots(p: VaultHoldingPlainCardProps): PositionCardSlots {
       dir === "in"
         ? `Every amount of ${c.assetSymbol} this address put into the vault. Shares received from another address count at their worth the day they arrived.`
         : `Every amount of ${c.assetSymbol} this address took out of the vault. Shares sent to another address count at their worth the day they left.`,
-    value: (
+    value: p.withheld ? null : (
       <Suspense fallback={<Pending />}>
         <SideValue history={p.history} coords={c} assetAddress={p.assetAddress} dir={dir} />
       </Suspense>
     ),
+    ...(withheldSub ? { sub: withheldSub } : {}),
   });
 
   const profit: PositionCardHead = {
     id: "profit",
     label: "Profit or loss",
     labelTip: `Worth now plus what was taken out, minus what was put in, in ${c.assetSymbol}. The percentage is of what was put in. ${capital(p.rewards)} are left out.`,
-    value: (
+    value: p.withheld ? null : (
       <Suspense fallback={<Pending />}>
         <ProfitValue history={p.history} coords={c} assetAddress={p.assetAddress} />
       </Suspense>
     ),
-    sub: (
+    sub: withheldSub ?? (
       <Suspense fallback={null}>
         <ProfitSub history={p.history} coords={c} />
       </Suspense>
@@ -483,18 +497,21 @@ function plainSlots(p: VaultHoldingPlainCardProps): PositionCardSlots {
     menu: { leading: () => <MenuRows href={p.holdingHref} />, exports: null },
     explainer: {
       // A holding that never was has nothing to explain past its one sentence.
-      body: p.never ? null : (
+      body: p.never ? null : p.withheld ? (
+        <p data-asset-scale-withheld="">{p.withheld}</p>
+      ) : (
         <Suspense fallback={null}>
           <Explanation p={p} fraction={fraction} />
         </Suspense>
       ),
     },
     learnMore: p.learnMore,
-    band: p.never ? undefined : (
-      <Suspense fallback={null}>
-        <WorthBand history={p.history} coords={c} />
-      </Suspense>
-    ),
+    band:
+      p.never || p.withheld ? undefined : (
+        <Suspense fallback={null}>
+          <WorthBand history={p.history} coords={c} />
+        </Suspense>
+      ),
     // A stake token's own cooldown, plain: when this holder's shares can leave.
     foot:
       open && p.cooldown ? (

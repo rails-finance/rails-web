@@ -311,7 +311,11 @@ export function maplePoolSummary(
 
 /** The name a row prints: the live `name()`, else the catalogue's snapshot,
  *  else the share symbol, else null (the row then prints the address). */
-export const vaultDisplayName = (v: VaultSummary): string | null => v.name ?? v.catalogName ?? v.symbol;
+const trimmed = (s: string | null) => s?.trim() || null;
+
+/** The name a surface shows and sorts by, trimmed (ui-jobs 664). */
+export const vaultDisplayName = (v: VaultSummary): string | null =>
+  trimmed(v.name) ?? trimmed(v.catalogName) ?? trimmed(v.symbol);
 
 // ── The vault pages' reads (V2) ─────────────────────────────────────────────
 // Each vault page reads its vault at one block with its own loader; these turn

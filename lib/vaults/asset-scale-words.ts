@@ -35,3 +35,16 @@ export function assetScaleSentence(symbol: string, s: AssetScale): string {
     `Amounts in ${symbol} here are read at ${s.stated}, so they read ${times} times too ${s.implied > s.stated ? "large" : "small"}.`
   );
 }
+
+/** Why an amount in the asset is not shown (ui-jobs 664): the tip on "decimals
+ *  disagree" where a headline, a share price or a holder's amount stands as
+ *  "—". The figure read at the stated decimals is a power of ten off, so none
+ *  is printed. */
+export function assetScaleAbsentTip(symbol: string, s: AssetScale): string {
+  const k = Math.abs(s.implied - s.stated);
+  const times = TIMES[k] ?? `10^${k}`;
+  return (
+    `${symbol} states ${s.stated} decimals, but converts to ${s.wraps.symbol} at ${s.implied}. ` +
+    `Read at ${s.stated}, an amount in ${symbol} comes out ${times} times too ${s.implied > s.stated ? "large" : "small"}, so none is shown.`
+  );
+}

@@ -458,7 +458,8 @@ export function MorphoBaseVaultPage({
   const c = v.census;
   const heads: PositionCardHead[] = vaultHeads({ vault: v, yieldFigure, holdersHref, receipts, detail: true }).map(
     (h) => {
-      if (h.id === "total-assets" && v.totalAssets)
+      // An asset whose decimals disagree keeps vaultHeads's "—" (ui-jobs 664).
+      if (h.id === "total-assets" && v.totalAssets && !v.assetScale)
         return {
           ...h,
           value: (
@@ -474,7 +475,7 @@ export function MorphoBaseVaultPage({
             </span>
           ),
         };
-      if (h.id === "share-price" && v.sharePrice)
+      if (h.id === "share-price" && v.sharePrice && !v.assetScale)
         return {
           ...h,
           value: (

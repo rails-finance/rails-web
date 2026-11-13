@@ -62,8 +62,7 @@ export default async function EthereumVaultsInfoPage() {
         equalling <code>totalSupply()</code> wei-exact at the census block the listing states. A sweep that came back
         short cannot pass that check, so a silent partial answer becomes a refused load and the previous census stands.
         Transfers, first seen, last activity and what the holding address is all come from that sweep, at that block.
-        The one priced figure on a card, Value · USD, is the census&rsquo;s too and is explained below; there is no rate
-        and no yield anywhere in this section.
+        The one priced figure on a card, Value · USD, is the census&rsquo;s too and is explained below.
       </p>
       <p data-intro-sort>
         The listing rests on value. Each card&rsquo;s Value · USD is the census&rsquo;s figure at the census block: the

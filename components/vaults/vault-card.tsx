@@ -33,7 +33,7 @@ import { Icon } from "@/components/icons/icon";
 import { SectionMenuRows, type SectionMenuLink } from "@/components/shared/section-menu";
 import { VaultLead, VaultPills, vaultHeads, type VaultRowReceipts } from "@/components/vaults/vault-heads";
 import { shortAddress } from "@/lib/shared/vault-amount-text";
-import type { VaultSummary } from "@/lib/vaults/summary";
+import { vaultDisplayName, type VaultSummary } from "@/lib/vaults/summary";
 import { yieldText, type VaultYield } from "@/lib/vaults/yield";
 import { ExplainBullet, Fig } from "@/components/shared/explain-groups";
 import { useBlockTime } from "@/components/shared/read-stamp";
@@ -122,7 +122,7 @@ export function VaultCard({
     filename: `${v.symbol ?? v.address}-vault-${v.readAt.block}.csv`,
     build: () => vaultCardCsv(v, yieldFigure, exports),
   };
-  const name = v.name ?? v.catalogName ?? v.symbol ?? shortAddress(v.address);
+  const name = vaultDisplayName(v) ?? shortAddress(v.address);
   if (process.env.NODE_ENV !== "production" && stats.length > POSITION_CARD_MAX_STATS)
     console.warn(`[vault-card] ${stats.length} stats: the card holds at most ${POSITION_CARD_MAX_STATS}`);
 
