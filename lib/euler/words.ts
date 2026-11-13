@@ -20,6 +20,16 @@ export function num(x: number, sig = 4): string {
 }
 /** "4.1%". */
 export const rate = (x: number): string => `${(x * 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}%`;
+/** Health to two decimals, or within 0.01 of 1 to three, with a further digit while the rounded
+ *  figure would read 1 for a value that is not 1, so a rounded "1.00" cannot hide the side of the line. */
+export function healthText(h: number): string {
+  if (h < 0.99 || h > 1.01) return h.toFixed(2);
+  for (let d = 3; d < 9; d++) {
+    const s = h.toFixed(d);
+    if (h === 1 || Number(s) !== 1) return s;
+  }
+  return h.toFixed(9);
+}
 /** "0x96c1…07ae". */
 export const short = (a: string): string => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
@@ -62,7 +72,7 @@ export const CARD_WORDS = {
   earned: "Earned in 30 days",
   earnedTip:
     "What the deposit gained over the last 30 days: what its shares redeem for now less what they redeemed for then.",
-  earnedYear: (x: number) => `${rate(x)} a year`,
+  earnedApy: (x: number) => `${rate(x)} APY`,
   earnedOpened: "Opened inside the 30 days, so Rails does not state its earnings yet.",
   earnedChanged: "Its shares changed inside the 30 days, so Rails does not state its earnings yet.",
   /** The card cell where no 30-day figure is stated; the (i) says why. */
@@ -79,11 +89,11 @@ export const CARD_WORDS = {
   collateralValueTip: "The account's collateral, priced by this vault's oracle.",
   health: "Health",
   healthTip:
-    "The collateral's value at each vault's liquidation LTV, over the debt's value. Below 1.00 the loan can be liquidated.",
-  healthSub: "liquidation below 1.00",
+    "The collateral's value at each vault's liquidation LTV, over the debt's value. At 1.00 or below the loan can be liquidated.",
+  healthSub: "liquidation at 1.00 or below",
   interest: "Interest in 30 days",
   interestTip: "What the debt grew by over the last 30 days: the debt now less the debt then.",
-  interestYear: (x: number) => `${rate(x)} a year`,
+  interestApy: (x: number) => `${rate(x)} APY`,
   interestOpened: "Opened inside the 30 days, so Rails does not state its interest yet.",
   interestChanged: "Its debt changed inside the 30 days, so Rails does not state its interest yet.",
   unpriced: "no price",
@@ -140,7 +150,7 @@ export function cardExplainer(p: EulerPosition): ExplainGroupWords[] {
         ],
         [
           "Health is ",
-          { fig: p.health === null ? "–" : p.health.toFixed(2) },
+          { fig: p.health === null ? "–" : healthText(p.health) },
           ". It is the collateral's value at each vault's liquidation LTV over the debt's value, both priced by this vault's oracle.",
         ],
       ],
@@ -173,7 +183,7 @@ export function cardExplainer(p: EulerPosition): ExplainGroupWords[] {
       [
         "Rails reads two blocks ",
         { fig: `${p.window.days.toFixed(1)} days` },
-        " apart. The yearly rate is the vault's growth between them times 365 over those days.",
+        " apart. The APY is the vault's growth between them, compounded over a year of 365.2425 days.",
       ],
     ],
   });
@@ -188,13 +198,13 @@ export const VAULT_SECTION = {
   borrowed: "Borrowed",
   utilisation: "Utilisation",
   shareGrowth: "Share price",
-  borrowRate: "Borrow rate",
+  borrowApy: "Borrow APY",
   price: "Oracle price",
   none: "–",
   shareGrowthText: (g: number, days: number) =>
     `${g >= 0 ? "+" : "−"}${rate(Math.abs(g))} over ${days.toFixed(1)} days`,
-  borrowRateText: (now: number, year: number | null) =>
-    year === null ? `${rate(now)} a year now` : `${rate(now)} a year now, ${rate(year)} over the 30 days`,
+  borrowApyNow: (now: number) => `${rate(now)} now`,
+  borrowApyWindow: (apy: number) => `${rate(apy)} averaged over the 30 days`,
   priceText: (p: EulerPosition) => inUnit(p.price, p.unit) ?? "not priced",
 };
 
@@ -205,7 +215,10 @@ export function vaultExplainer(p: EulerPosition): ExplainGroupWords[] {
       bullets: [
         ["Supplied is everything depositors' shares redeem for; borrowed is what borrowers owe, interest included."],
         [
-          "Utilisation is borrowed over supplied. The borrow rate rises with it, and depositors earn what borrowers pay, less the vault's fee.",
+          "Utilisation is borrowed over supplied. On most rate models the borrow rate rises with it, and depositors earn what borrowers pay, less the vault's fee.",
+        ],
+        [
+          "Borrow APY compounds the vault's per-second rate over a year. The 30-day figure compounds the vault's interest growth over the window the same way.",
         ],
         [
           "The vault prices assets in its unit of account through its oracle router. ",

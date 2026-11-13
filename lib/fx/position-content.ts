@@ -12,6 +12,7 @@ import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import type { FxPoolTerms } from "@/lib/sources/chain/fx-terms";
 import { formatNumber } from "@/lib/utils/format";
 import { fxScheduleFull } from "@/lib/fx/row-figures";
+import { fxBonusClause } from "@/lib/fx/statement-words";
 
 const FX_DOC_URL = "https://fxprotocol.gitbook.io/fx-docs";
 
@@ -28,7 +29,7 @@ function mechanics(pool: string, t: FxPoolTerms | null): { bold: string; text: s
     {
       bold: "Who acts",
       text: t
-        ? `rebalances and liquidations are run by keepers: any address may call them, and the bonus pays them (${pct(t.rebalanceBonus)} of the collateral taken on a rebalance, ${pct(t.liquidateBonus)} on a liquidation). The protocol keeps ${pct(t.expenseRatio)} of each bonus.`
+        ? `rebalances and liquidations are run by keepers: any address may call them, and the bonus pays them (${fxBonusClause(t.rebalanceBonus, t.liquidateBonus)}). The protocol keeps ${pct(t.expenseRatio)} of each bonus.`
         : "rebalances and liquidations are run by keepers: any address may call them, and a bonus in collateral pays them. The protocol keeps a share of each bonus.",
     },
     {

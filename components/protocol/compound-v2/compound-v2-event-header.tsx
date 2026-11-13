@@ -29,7 +29,7 @@ import {
   externalActorProv,
   type CompoundV2Coords,
 } from "@/lib/compound-v2/event-provenance";
-import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
+import { COMPOUND_V2_MARKET_BY_KEY, compoundV2SeizeShareOf } from "@/lib/compound-v2/asset-catalog";
 
 export interface CompoundV2EventHeaderProps {
   actionLabel: string;
@@ -106,7 +106,7 @@ export function compoundV2HeadSpec({
         value: -seized,
         symbol: collCSym,
         address: soleFlowAddress(flows, collCSym),
-        prov: seizeTokensProv(collCSym, coords, ctx.raw?.seizeTokens),
+        prov: seizeTokensProv(collCSym, coords, ctx.raw?.seizeTokens, compoundV2SeizeShareOf(ctx)),
         // A cToken count, named so it does not read as the underlying.
         suffix: collCSym,
       });
@@ -120,7 +120,7 @@ export function compoundV2HeadSpec({
         value: d,
         symbol: cSym,
         address: soleFlowAddress(flows, cSym),
-        prov: seizeLegProv(cSym, ctx.eventType, coords, ctx.raw?.cTokens),
+        prov: seizeLegProv(cSym, ctx.eventType, coords, ctx.raw?.cTokens, compoundV2SeizeShareOf(ctx)),
         suffix: cSym,
       });
   } else {
@@ -131,7 +131,7 @@ export function compoundV2HeadSpec({
       ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out" || ctx.eventType === "seize_in";
     const raw = isCTokenLane ? ctx.raw?.cTokens : ctx.raw?.amount;
     const d = Number((isCTokenLane ? ctx.cTokensDelta : ctx.assetsDelta) ?? "0") || 0;
-    const prov = movedDeltaProv(ctx.eventType, ctx.marketSymbol, cSym, coords, raw);
+    const prov = movedDeltaProv(ctx.eventType, ctx.marketSymbol, cSym, coords, raw, compoundV2SeizeShareOf(ctx));
     const shown = isCTokenLane ? cSym : ctx.marketSymbol;
     if (d !== 0 && prov)
       deltas.push({
@@ -167,13 +167,13 @@ export function compoundV2HeadSpec({
           ? {
               prefix: "seized by",
               address: ctx.counterparty,
-              prov: seizeLegProv(cSym, "seize_out", coords, ctx.raw?.cTokens),
+              prov: seizeLegProv(cSym, "seize_out", coords, ctx.raw?.cTokens, compoundV2SeizeShareOf(ctx)),
             }
           : ctx.eventType === "seize_in" && ctx.counterparty
             ? {
                 prefix: "seized from",
                 address: ctx.counterparty,
-                prov: seizeLegProv(cSym, "seize_in", coords, ctx.raw?.cTokens),
+                prov: seizeLegProv(cSym, "seize_in", coords, ctx.raw?.cTokens, compoundV2SeizeShareOf(ctx)),
               }
             : ctx.eventType === "liquidation" && ctx.liquidator
               ? {

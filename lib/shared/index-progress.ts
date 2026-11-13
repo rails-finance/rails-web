@@ -72,15 +72,39 @@ export interface Allowance {
   seenAt: string | null;
 }
 
+/** One gateway's counter as the server last saw it. */
+export interface GatewayCounter extends Allowance {
+  chain: number;
+}
+
+/** Which chains share the allowance's counter and which count on their own.
+ *  Each counter runs a 24 h window, so chains with the same reset time
+ *  (within a minute) draw on one counter. */
+export function counterChains(
+  allowance: Allowance,
+  gateways: readonly GatewayCounter[],
+): { shared: number[]; own: number[] } {
+  const at = isoSecs(allowance.resetsAt);
+  const shared: number[] = [];
+  const own: number[] = [];
+  for (const g of gateways) {
+    const t = isoSecs(g.resetsAt);
+    (at != null && t != null && Math.abs(t - at) < 60 ? shared : own).push(g.chain);
+  }
+  return { shared, own };
+}
+
 export interface IndexProgress {
   asOf: string;
   indexes: IndexProgressEntry[];
 }
 
-/** The fill plans each index every 10 min against the chain's finalized
- *  block, which trails the wall clock by up to about half an hour on the
- *  rollups. Past an hour the heartbeat is late; past three it has stalled. */
-export const HEARTBEAT_LATE = 60 * 60;
+/** The fill writes each index's sample (pidx_progress.sampled_at) about once
+ *  an hour, late in the hour, held or not: on production the gap between
+ *  samples ran 51 to 62 min over 12–13 Nov 2026. Late sits at 1.5 times that
+ *  hour so a fill does not turn amber before each sample; past three hours it
+ *  has stalled. */
+export const HEARTBEAT_LATE = 90 * 60;
 export const HEARTBEAT_STALLED = 3 * 60 * 60;
 
 export type Heartbeat = "fresh" | "late" | "stalled" | "paused" | "none";
@@ -94,7 +118,12 @@ const isoSecs = (iso: string | null | undefined): Secs | null => {
 /** The time of the index's last heartbeat: the wall time of the fill's last
  *  sample where the server sends it, else the finalized head the fill last
  *  planned against. Null when the fill has not planned it yet. */
-export const heartbeatTime = (e: IndexProgressEntry): Secs | null => isoSecs(e.heartbeatAt) ?? e.head?.time ?? null;
+/** The fields a fill's state reads: a progress entry, or a status entry's backfill. */
+export type FillReading = Pick<IndexProgressEntry, "heartbeatAt" | "head" | "percent" | "pace" | "held"> & {
+  atHead: boolean | null;
+};
+
+export const heartbeatTime = (e: FillReading): Secs | null => isoSecs(e.heartbeatAt) ?? e.head?.time ?? null;
 
 /** Whether `heartbeatTime` is a wall time (true) or a block's time. */
 export const heartbeatIsWallTime = (e: IndexProgressEntry): boolean => isoSecs(e.heartbeatAt) != null;
@@ -105,14 +134,14 @@ export function heartbeatAge(t: Secs | null, now: Secs): Heartbeat {
   return age > HEARTBEAT_STALLED ? "stalled" : age > HEARTBEAT_LATE ? "late" : "fresh";
 }
 
-export const heartbeatState = (e: IndexProgressEntry, now: Secs): Heartbeat => heartbeatAge(heartbeatTime(e), now);
+export const heartbeatState = (e: FillReading, now: Secs): Heartbeat => heartbeatAge(heartbeatTime(e), now);
 
-/** Whether a fill is moving. The fill writes its sample every 10 min even
+/** Whether a fill is moving. The fill writes its sample every hour even
  *  while it holds an index, so a fresh heartbeat alone does not mean blocks
  *  are being read. "not-gaining": no blocks read over the pace window (an
  *  hour or more of samples); "behind": read to within rounding of the head,
  *  then fell more than 30 min of blocks behind it. Null when neither holds. */
-export function fillStall(e: IndexProgressEntry): "not-gaining" | "behind" | null {
+export function fillStall(e: FillReading): "not-gaining" | "behind" | null {
   if (e.atHead) return null;
   if (e.percent != null && e.percent >= 99.95) return "behind";
   if (e.pace && e.pace.blocksPerHour === 0) return "not-gaining";
@@ -120,15 +149,18 @@ export function fillStall(e: IndexProgressEntry): "not-gaining" | "behind" | nul
 }
 
 /** A fill's state: its heartbeat's age, and never better than late while it
- *  is not moving. */
-export function fillState(e: IndexProgressEntry, now: Secs): Heartbeat {
+ *  is not moving. A hold shows only while the heartbeat is fresh: the server
+ *  restores holds from storage, so a hold alone does not show the loop is
+ *  running, and a late or stalled heartbeat wins over it. */
+export function fillState(e: FillReading, now: Secs): Heartbeat {
+  const hb = heartbeatState(e, now);
+  if (hb === "late" || hb === "stalled") return hb;
   // Held on purpose: the allowance, or the fill's switch. A check runs in
   // seconds and reads as the heartbeat; an error or a failed job is late.
   const r = e.held?.reason;
   if (r === "egress-floor" || r === "paused") return "paused";
   if (r === "fill-error" || r === "job-failed") return "late";
-  const hb = heartbeatState(e, now);
-  return fillStall(e) && (hb === "fresh" || hb === "none") ? "late" : hb;
+  return fillStall(e) ? "late" : hb;
 }
 
 /** "4 min", "2 h 10 min", "3 days": the age of a time, for a heartbeat. */
@@ -212,7 +244,7 @@ export interface IndexStatus {
   asOf: string;
   entries: StatusEntry[];
   lanes?: { lane: string; chain: number; checkpoint: StatusLive["checkpoint"]; unreachable?: { error: string } }[];
-  gateways?: unknown[];
+  gateways?: GatewayCounter[];
   allowance?: Allowance | null;
   prices?: PricesSection;
 }
@@ -345,7 +377,14 @@ export function visitState(v: VisitReads | null | undefined): Heartbeat {
 
 /** A writer's state against its schedule: late past 1.5 times its cadence,
  *  stalled past 3 times. */
-export function writerState(w: StatusWriter, now: Secs): Heartbeat {
+/** rails-server explorer-pipelines' name for the at-block fill's writer. */
+export const AT_BLOCK_FILL_WRITER = "at-block-fill";
+
+export function writerState(w: StatusWriter, now: Secs, e?: StatusEntry): Heartbeat {
+  // The at-block fill's writer stamps the fill's sample (lastWriteAt is the
+  // backfill's heartbeatAt), so it reads as the fill does: paused while held,
+  // late past the fill's limit rather than its plan interval.
+  if (w.name === AT_BLOCK_FILL_WRITER && e?.backfill) return fillState(e.backfill, now);
   // Its last poll where the writer records one (a quiet protocol writes no
   // rows), else its newest write.
   const ran = isoSecs(w.lastRunAt);
@@ -367,7 +406,7 @@ const RANK: Record<Heartbeat, number> = { none: 0, fresh: 1, paused: 2, late: 3,
 export function pipelineState(e: StatusEntry, now: Secs): Heartbeat {
   const states = (e.live?.writers ?? [])
     .filter((w) => w.expectEverySec)
-    .map((w) => writerState(w, now))
+    .map((w) => writerState(w, now, e))
     .filter((h) => h !== "none");
   if (states.length) return states.reduce((a, b) => (RANK[b] > RANK[a] ? b : a));
   const moved = isoSecs(e.live?.checkpoint?.updatedAt);

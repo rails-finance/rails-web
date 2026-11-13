@@ -21,6 +21,7 @@
 
 import type { Provenance, ProvInput, ProvVerify } from "@/components/shared/provenance";
 import { FX_ADDRESSES } from "./asset-catalog";
+import { fxAnchorBasis, fxAnchorSentence, type FxAnchorSource } from "./statement-words";
 
 /** The route every figure on this page arrives through. */
 const SYSTEM_VIA = "GET /api/chain/fx/pools";
@@ -153,12 +154,13 @@ export const oracleLegProv = (
   address: string,
   oracleAddr: string,
   normalizedSym: string,
+  anchor: FxAnchorSource,
 ): Provenance => ({
   kind: "chain",
   pclass: "oracle",
   summary:
     leg === "anchor"
-      ? `The oracle's ANCHOR leg — USD per NORMALIZED unit (${normalizedSym}, 1e18), read from the ${label}'s own price oracle at the pinned block. The anchor is the oracle's Chainlink reading; the min and max legs are the lowest and highest of it and the on-chain spot prices, each falling back to the anchor when a spot price strays too far from it. The leg a POSITION's stated debt ratio is judged at (chain-verified: getPositionDebtRatio == debts × 1e36 ÷ (colls × anchor), BigInt-exact). Not the leg this page's tick ratios use — ticks are judged the way the engines judge them, at the min leg.`
+      ? `The oracle's ANCHOR leg — USD per NORMALIZED unit (${normalizedSym}, 1e18), read from the ${label}'s own price oracle at the pinned block. ${fxAnchorSentence(anchor)} ${fxAnchorBasis(anchor)} The min and max legs are the lowest and highest of the anchor and the on-chain spot prices, each falling back to the anchor when a spot price strays too far from it. The leg a POSITION's stated debt ratio is judged at (chain-verified: getPositionDebtRatio == debts × 1e36 ÷ (colls × anchor), BigInt-exact). Not the leg this page's tick ratios use — ticks are judged the way the engines judge them, at the min leg.`
       : leg === "min"
         ? `The oracle's MIN leg — the lowest of its price sources, USD per NORMALIZED unit (${normalizedSym}). The leg the protocol's own rebalance and liquidation sweeps judge a TICK at (its getLiquidatePrice getter returns exactly this leg), which is why every tick ratio on this page uses it and says so.`
         : `The oracle's MAX leg — the highest of its price sources, USD per NORMALIZED unit (${normalizedSym}). The leg redemption prices collateral at (getRedeemPrice returns exactly this leg): a redeemer surrenders fxUSD and receives collateral valued at the max, the leg least favorable to them.`,

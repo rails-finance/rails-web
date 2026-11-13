@@ -13,9 +13,8 @@
 //     Comptroller's oracle USD price (and whether a live FEED stands behind
 //     it — three markets are priced by a stored constant nothing updates),
 //     the live collateral factor (null when zero: DISABLED as collateral,
-//     not a 0% parameter), and per-block rates annualized on EACH MARKET'S
-//     OWN interest rate model's blocksPerYear() — the roster does not agree
-//     on one constant (cETH's model says 2,628,000; the rest 2,102,400),
+//     not a 0% parameter), and per-block rates annualised on 2,628,000
+//     blocks (lib/compound-v2/rate-year.ts),
 //   • `entered` — Comptroller.getAssetsIn membership. Supplying alone does
 //     NOT enter a market, so an un-entered supply backs nothing,
 //   • liquidity / shortfall — the CONTRACT's own account verdict
@@ -64,11 +63,11 @@ export interface CompoundV2ChainMarket {
   collateralDisabled: boolean;
   /** getAssetsIn membership — false means this supply backs NOTHING. */
   entered: boolean;
-  /** Annualized simple rates (fraction) from the per-BLOCK getters × this
-   *  market's own model's blocksPerYear. Null when either read fails. */
+  /** Annualised simple rates (fraction): the per-BLOCK getters × 2,628,000
+   *  blocks (lib/compound-v2/rate-year.ts). Null when the read fails. */
   supplyApr: number | null;
   borrowApr: number | null;
-  /** The model's own annualization constant — NOT one value across the roster. */
+  /** The model's `blocksPerYear()`, the constant it sets its per-block curve with. */
   blocksPerYear: number | null;
 }
 

@@ -76,8 +76,8 @@ const howItWorks: readonly [ReactNode, ...ReactNode[]] = [
   <>
     The controller values the collateral and the debt in its{" "}
     <GlossaryLink term="Unit of account">unit of account</GlossaryLink>. When the collateral counted at each
-    vault&apos;s <GlossaryLink term="Liquidation LTV">liquidation LTV</GlossaryLink> falls below the debt, the loan can
-    be liquidated.
+    vault&apos;s <GlossaryLink term="Liquidation LTV">liquidation LTV</GlossaryLink> reaches or falls below the debt,
+    the loan can be liquidated.
   </>,
   EULER_DOLLARS ? (
     <>Rails shows dollars where a vault&apos;s unit of account is US dollars, and the unit&apos;s token otherwise.</>

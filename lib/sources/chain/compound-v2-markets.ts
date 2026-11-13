@@ -31,13 +31,11 @@
 //     convention, so a whole token's USD is price / 1e(36 − ud).
 //   • rates are per BLOCK on Compound V2 proper (borrowRatePerBlock), NOT per
 //     timestamp — the opposite of Moonwell, which kept its Base/Moonbeam
-//     per-second convention. Annualized on EACH MARKET'S OWN interest rate
-//     model's `blocksPerYear()`, read from that model, because the roster does
-//     not agree on one: cETH's model says 2,628,000 (12s blocks) while every
-//     other market's still says 2,102,400 (the pre-Merge 15s assumption). One
-//     hardcoded constant would misstate the protocol's largest market — $43M of
-//     ETH — by 25%. The constant is the model's own, so the annualization is
-//     the protocol's arithmetic rather than a wall-clock estimate of ours.
+//     per-second convention. Annualised on 2,628,000 blocks, the year of
+//     12-second blocks Compound's docs count (lib/compound-v2/rate-year.ts).
+//     Each model's `blocksPerYear()` is still read: 2,628,000 on cETH's,
+//     2,102,400 on the rest. It is the constant the model sets its per-block
+//     curve with, and the receipts name it as that.
 //
 // Two structural facts the roster actually contains, stated rather than smoothed:
 //   • 8 of 20 markets have collateralFactor == 0. That is not a risk parameter
@@ -71,6 +69,7 @@ import {
   isCEth,
 } from "@/lib/compound-v2/asset-catalog";
 import { jumpRateModel, whitePaperModel, type ComptrollerRateModel } from "@/lib/comptroller/rate-model";
+import { COMPOUND_V2_BLOCKS_PER_YEAR, compoundV2AnnualRate } from "@/lib/compound-v2/rate-year";
 
 const ZERO = BigInt(0);
 
@@ -185,22 +184,24 @@ export interface CompoundV2MarketRow {
   collateralDisabled: boolean;
   isListed: boolean;
 
-  /** Annual percent (5.2 = 5.2%), from the protocol's own per-BLOCK rates on
-   *  THIS market's model's own blocks-per-year constant. Null when the rate
-   *  call fails. */
+  /** Annual percent (5.2 = 5.2%): the per-BLOCK rate × 2,628,000 blocks
+   *  (lib/compound-v2/rate-year.ts). Null when the rate call fails. */
   supplyApr: number | null;
   borrowApr: number | null;
+  /** The per-block rates as read (1e18 mantissas), for the receipts. */
+  supplyRatePerBlockRaw: string | null;
+  borrowRatePerBlockRaw: string | null;
   reserveFactor: number | null;
 
   /** This market's interest rate model, and the two things read from it. */
   interestRateModel: string | null;
-  /** The blocks/year the model annualizes with — 2,628,000 on cETH's model,
-   *  2,102,400 on the rest. Not one constant across the roster. */
+  /** The model's `blocksPerYear()`, the constant it sets its per-block curve
+   *  with: 2,628,000 on cETH's model, 2,102,400 on the rest. */
   blocksPerYear: number | null;
   /** The utilisation the rate curve turns at, as a fraction (0.8 = 80%). Null
    *  on the five oldest markets, whose WhitePaper model has no kink at all. */
   kink: number | null;
-  /** The model's terms as annual fractions; null where the model answers neither shape. */
+  /** The model's terms as annual fractions on 2,628,000 blocks; null where the model answers neither shape. */
   rateModel: ComptrollerRateModel | null;
 
   /** The Comptroller's borrow cap in the underlying; null at 0 (uncapped). Compound V2 has no supply cap. */
@@ -469,17 +470,17 @@ async function readMarkets(client: PublicClient): Promise<CompoundV2MarketsRespo
     const collateralDisabled = cfMantissa != null && cfMantissa === ZERO;
     const collateralFactor = cfMantissa != null && cfMantissa > ZERO ? Number(cfMantissa) / 1e18 : null;
 
-    // Annualize on THIS market's model's own constant. Without a readable
-    // model there is no constant to annualize with, so the rate is null; a
-    // guess of 2,102,400 would misstate cETH by 25%.
+    // Annualise on the docs' 2,628,000 blocks; the model's blocksPerYear()
+    // is kept for the receipts and the white-paper terms.
     const irm = (k: (typeof IRM_CALLS)[number]) => ok<bigint>(irmRes[i * IRM_CALLS.length + IRM_CALLS.indexOf(k)]);
     const kinkRaw = irm("kink");
     const bpyRaw = irm("blocksPerYear");
     const blocksPerYear = bpyRaw != null && bpyRaw > ZERO ? Number(bpyRaw) : null;
     const apr = (r: Res | undefined): number | null => {
       const v = ok<bigint>(r);
-      return v != null && blocksPerYear != null ? (Number(v) / 1e18) * blocksPerYear * 100 : null;
+      return v != null ? compoundV2AnnualRate(v) * 100 : null;
     };
+    const rawOf = (r: Res | undefined): string | null => ok<bigint>(r)?.toString() ?? null;
 
     return {
       cToken,
@@ -508,6 +509,8 @@ async function readMarkets(client: PublicClient): Promise<CompoundV2MarketsRespo
 
       supplyApr: apr(results[base + 7]),
       borrowApr: apr(results[base + 6]),
+      supplyRatePerBlockRaw: rawOf(results[base + 7]),
+      borrowRatePerBlockRaw: rawOf(results[base + 6]),
       reserveFactor: (() => {
         const v = ok<bigint>(results[base + 8]);
         return v != null ? Number(v) / 1e18 : null;
@@ -524,8 +527,12 @@ async function readMarkets(client: PublicClient): Promise<CompoundV2MarketsRespo
             jump: irm("jumpMultiplierPerBlock"),
             kink: kinkRaw,
           },
-          blocksPerYear,
-        ) ?? whitePaperModel({ baseRate: irm("baseRate"), multiplier: irm("multiplier") }),
+          COMPOUND_V2_BLOCKS_PER_YEAR,
+        ) ??
+        whitePaperModel(
+          { baseRate: irm("baseRate"), multiplier: irm("multiplier") },
+          { periods: COMPOUND_V2_BLOCKS_PER_YEAR, modelPeriods: blocksPerYear },
+        ),
 
       borrowCap: (() => {
         const v = ok<bigint>(results[base + 11]);

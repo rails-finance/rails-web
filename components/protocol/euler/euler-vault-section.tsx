@@ -2,8 +2,8 @@
 
 // "The vault" (J2): the whole vault under an Euler V2 holding, read at the
 // same two blocks as the card. One line each (J2.1) for supplied, borrowed,
-// utilisation, the share price over the window, the borrow rate and the
-// oracle's price, each with its receipt. The section is one receipts scope (decision 0059).
+// utilisation, the share price over the window, the borrow APY now and over
+// the window, and the oracle's price, each with its receipt. The section is one receipts scope (decision 0059).
 
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { ProvSection, SectionHeading, SectionMenu } from "@/components/shared/section-menu";
@@ -12,7 +12,7 @@ import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups"
 import { Segs } from "@/components/protocol/uniswap/uniswap-readout";
 import { EulerReadStamp } from "@/components/protocol/euler/euler-position-card";
 import { eulerPosition } from "@/lib/euler/position";
-import { vaultProv, type VaultLineKey } from "@/lib/euler/provenance";
+import { vaultProv, type VaultLineKey, type WindowApyKey } from "@/lib/euler/provenance";
 import type { EulerPositionRead } from "@/lib/euler/types";
 import { VAULT_SECTION, num, rate, vaultExplainer } from "@/lib/euler/words";
 
@@ -22,7 +22,13 @@ export function EulerVaultSection({ r }: { r: EulerPositionRead }) {
   const p = eulerPosition(r);
   const c = { p, r };
   const A = p.asset.symbol;
-  const all: { key: VaultLineKey; label: string; text: string | null }[] = [
+  // A line is one figure with its receipt, or several joined by ", " (the borrow APY now and over the window).
+  const all: {
+    key: VaultLineKey;
+    label: string;
+    text: string | null;
+    parts?: { key: VaultLineKey | WindowApyKey; text: string }[];
+  }[] = [
     { key: "supplied", label: VAULT_SECTION.supplied, text: `${num(p.totalSupplied)} ${A}` },
     { key: "borrowed", label: VAULT_SECTION.borrowed, text: `${num(p.totalBorrowed)} ${A}` },
     { key: "utilisation", label: VAULT_SECTION.utilisation, text: p.utilisation === null ? null : rate(p.utilisation) },
@@ -31,11 +37,20 @@ export function EulerVaultSection({ r }: { r: EulerPositionRead }) {
       label: VAULT_SECTION.shareGrowth,
       text: p.window.shareGrowth === null ? null : VAULT_SECTION.shareGrowthText(p.window.shareGrowth, p.window.days),
     },
-    {
-      key: "borrowRate",
-      label: VAULT_SECTION.borrowRate,
-      text: VAULT_SECTION.borrowRateText(p.borrowRateNow, p.window.borrowRateYear),
-    },
+    (() => {
+      const parts: { key: VaultLineKey | WindowApyKey; text: string }[] = [
+        { key: "borrowApy", text: VAULT_SECTION.borrowApyNow(p.borrowApyNow) },
+        ...(p.window.borrowApy === null
+          ? []
+          : [{ key: "borrowApyWindow" as const, text: VAULT_SECTION.borrowApyWindow(p.window.borrowApy) }]),
+      ];
+      return {
+        key: "borrowApy" as const,
+        label: VAULT_SECTION.borrowApy,
+        text: parts.map((x) => x.text).join(", "),
+        parts,
+      };
+    })(),
     { key: "price", label: VAULT_SECTION.price, text: `1 ${A} = ${VAULT_SECTION.priceText(p)}` },
   ];
   // EULER_DOLLARS off: the oracle price line goes with the other dollar lines.
@@ -46,7 +61,7 @@ export function EulerVaultSection({ r }: { r: EulerPositionRead }) {
       "",
       ...lines.map((l) => `- **${l.label}**: ${l.text ?? VAULT_SECTION.none}`),
     ].join("\n");
-  const info = (k: VaultLineKey): Provenance => vaultProv(k, c);
+  const info = (k: VaultLineKey | WindowApyKey): Provenance => vaultProv(k, c);
   return (
     <ProvSection scope={SCOPE} data-anatomy="J2" data-euler-vault={p.vault}>
       <SectionHeading
@@ -69,6 +84,13 @@ export function EulerVaultSection({ r }: { r: EulerPositionRead }) {
               <p className="text-[13px] leading-snug text-foreground">
                 {l.text === null ? (
                   <span className="text-rb-500">{VAULT_SECTION.none}</span>
+                ) : l.parts ? (
+                  l.parts.map((x, i) => (
+                    <span key={x.key}>
+                      {i > 0 && ", "}
+                      <Prov info={info(x.key)}>{x.text}</Prov>
+                    </span>
+                  ))
                 ) : (
                   <Prov info={info(l.key)}>{l.text}</Prov>
                 )}
