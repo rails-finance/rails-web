@@ -57,6 +57,8 @@ export const V2_WORDS = {
   nowOnV3: "Now on V3",
   /** Call 10: CE "v3 admin Safe (Alchemist and Transmuter admin, MYT owner)". */
   safe: "v3 admin Safe",
+  /** The holder's own Liquidate: the legacy docs' term (ui-jobs 653). */
+  selfLiquidation: "Self-liquidation",
 } as const;
 
 /** The legacy (V2) docs: v2-docs.alchemix.fi, linked from docs.alchemix.fi as
