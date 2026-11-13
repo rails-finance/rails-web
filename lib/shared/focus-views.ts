@@ -12,8 +12,9 @@
 // holding the same focus, so a link opened twice is one view.
 //
 // A view takes a star as the saved items do (ui-jobs 652): the profile menu's
-// Focus group lists the starred views, in the reader's order, and Off. A new
-// view starts starred. A store from before 652 is seeded once (`seedViewStars`).
+// Focus group lists the starred views, in the reader's order, and Off. The
+// view in use is listed too while it is unstarred, so Focus can always be
+// turned off from the menu. A new view starts starred. A store from before 652 is seeded once (`seedViewStars`).
 //
 // Pure: type imports only (scripts/test/focus-views.test.mjs runs it directly).
 
@@ -334,9 +335,9 @@ export function toggleViewStar(s: FocusViews, id: string): FocusViews {
   };
 }
 
-/** The views the profile menu lists (ui-jobs 652): the starred, in the
- *  reader's order. */
-export const menuViews = (s: FocusViews): FocusView[] => s.views.filter((v) => v.starred);
+/** The views the profile menu lists (ui-jobs 652): the starred and the view
+ *  in use, in the reader's order. */
+export const menuViews = (s: FocusViews): FocusView[] => s.views.filter((v) => v.starred || v.id === s.active);
 
 /** The stars a store from before ui-jobs 652 is given: with no view starred,
  *  the view the menu offered is starred (the one chosen for it, `menuId`, else

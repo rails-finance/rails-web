@@ -10,11 +10,13 @@
 // inspector switch (decision 0062; ui-jobs 571).
 //
 // Stars alone decide what each group lists (ui-jobs 652): Focus lists the
-// views starred on /bookmarks?tab=focus, then Off (lib/shared/asset-scope.ts
-// `menuViews`); Listings, Wallets and Positions list the items starred on
-// /bookmarks (lib/shared/sessions.ts `menuEntries`). Every starred item shows,
-// in the reader's order. A group with nothing starred is not drawn; its
-// heading is the way to its tab on /bookmarks. Long names fade at the line's
+// views starred on /bookmarks?tab=focus and, while it is unstarred, the view
+// in use, so Focus can always be turned off here; then Off
+// (lib/shared/asset-scope.ts `menuViews`). Listings, Wallets and Positions
+// list the items starred on /bookmarks (lib/shared/sessions.ts
+// `menuEntries`). Every starred item shows, in the reader's order. Any other
+// group with nothing starred is not drawn; its heading is the way to its tab
+// on /bookmarks. Long names fade at the line's
 // end (`FADE`); rows read nothing, showing what the browser holds.
 //
 // From md a dropdown under the control, right edges aligned, dropping in with
@@ -369,7 +371,7 @@ export function ProfileMenu() {
   const listings = menuEntries(views ?? []);
   const held = menuEntries(positions ?? []);
   const focusOn = scope.ready && scope.on;
-  const starredViews = scope.menuViews;
+  const menuViews = scope.menuViews;
   /** Anything saved, starred or not, focus views included, takes "Start here"
    *  out of the menu. */
   const anything =
@@ -562,13 +564,13 @@ export function ProfileMenu() {
                   <Signpost className="ml-auto size-4 shrink-0" aria-hidden="true" />
                 </Link>
               )}
-              {/* Focus: the starred views and Off (ui-jobs 652). */}
-              {starredViews.length > 0 && (
+              {/* Focus: the starred views, the view in use, and Off (ui-jobs 652). */}
+              {menuViews.length > 0 && (
                 <div role="group" aria-labelledby={`${menuId}-focus`} className={GROUP} data-profile-menu-focus="">
                   <GroupHeading id={`${menuId}-focus`} group="focus" tab="focus" label="Focus" onDone={done} />
-                  <div className="mt-1" data-profile-menu-focus-views={starredViews.length}>
+                  <div className="mt-1" data-profile-menu-focus-views={menuViews.length}>
                     <>
-                      {starredViews.map((v) => (
+                      {menuViews.map((v) => (
                         <button
                           key={v.id}
                           type="button"

@@ -361,8 +361,8 @@ export interface AssetScope {
   /** The saved views, in the reader's order, and the one in use. */
   views: FocusView[];
   active: FocusView | null;
-  /** The views the profile menu lists: the starred, in the reader's order
-   *  (ui-jobs 652). */
+  /** The views the profile menu lists: the starred and the view in use, in
+   *  the reader's order (ui-jobs 652). */
   menuViews: FocusView[];
   /** The asset keys the picks reach on the focused chains; null when no asset is picked. */
   keys: Set<string> | null;

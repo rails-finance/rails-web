@@ -139,14 +139,33 @@ test("a new focus view starts starred; a star toggles and survives a read", () =
     menuViews(s).map((v) => v.id),
     ["b", "a"],
   );
-  s = toggleViewStar(s, "b");
+  s = { ...toggleViewStar(s, "b"), active: null };
   assert.deepEqual(
     menuViews(readViews(JSON.parse(JSON.stringify(s)))).map((v) => v.id),
     ["a"],
   );
 });
 
+test("the view in use is listed while it is unstarred, so Focus can be turned off", () => {
+  let s = addView(NO_VIEWS, { assets: [WETH], chains: [] }, undefined, "a", 1);
+  s = addView(s, { assets: [BOLD], chains: [] }, undefined, "b", 2, 1);
+  s = { ...toggleViewStar(toggleViewStar(s, "a"), "b"), active: null };
+  assert.deepEqual(menuViews(s), []);
+  s = { ...s, active: "b" };
+  assert.deepEqual(
+    menuViews(s).map((v) => v.id),
+    ["b"],
+  );
+  // Starred, it lists once; with Focus off, an unstarred view goes.
+  assert.deepEqual(
+    menuViews(toggleViewStar(s, "b")).map((v) => v.id),
+    ["b"],
+  );
+  assert.deepEqual(menuViews({ ...s, active: null }), []);
+});
+
 test("a store from before 652 stars the view the menu offered", () => {
+  const starredIds = (s) => s.views.filter((v) => v.starred).map((v) => v.id);
   const views = {
     views: [
       { id: "a", assets: [WETH], chains: [], savedAt: 1 },
@@ -155,18 +174,9 @@ test("a store from before 652 stars the view the menu offered", () => {
     ],
     active: "c",
   };
-  assert.deepEqual(
-    menuViews(seedViewStars(views, "b")).map((v) => v.id),
-    ["b"],
-  );
-  assert.deepEqual(
-    menuViews(seedViewStars(views, null)).map((v) => v.id),
-    ["c"],
-  );
-  assert.deepEqual(
-    menuViews(seedViewStars({ ...views, active: null }, "gone")).map((v) => v.id),
-    ["a"],
-  );
+  assert.deepEqual(starredIds(seedViewStars(views, "b")), ["b"]);
+  assert.deepEqual(starredIds(seedViewStars(views, null)), ["c"]);
+  assert.deepEqual(starredIds(seedViewStars({ ...views, active: null }, "gone")), ["a"]);
   const starred = { ...views, views: views.views.map((v) => (v.id === "a" ? { ...v, starred: true } : v)) };
   assert.equal(seedViewStars(starred, "b"), starred);
 });
