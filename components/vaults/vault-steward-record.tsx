@@ -225,7 +225,12 @@ function StewardRow({
   const held = v.totalAssets;
   const heldProv: Provenance | undefined = receipts.totalAssets;
   return (
-    <DataTableRow href={href} data-steward-vault={stewardVaultKey(v)} data-steward-current={isCurrent ? "" : undefined}>
+    <DataTableRow
+      href={href}
+      data-steward-vault={stewardVaultKey(v)}
+      data-steward-token={tokenOf(v)}
+      data-steward-current={isCurrent ? "" : undefined}
+    >
       <DataTableLeadCell
         plain
         protocol={leadOf(v)}
