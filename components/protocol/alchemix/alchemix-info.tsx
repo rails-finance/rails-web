@@ -12,6 +12,7 @@ import {
 } from "@/components/shared/protocol-info-page";
 import { transmuterListingPath, v2LinesForChain, v2ListingPath, type AlchemixDeployment } from "@/lib/alchemix/lines";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { ALCHEMIX_BASE_DOCS_AND_CHAIN } from "@/lib/alchemix/docs-and-chain";
 
 const DOCS = "https://docs.alchemix.fi";
 
@@ -24,6 +25,7 @@ const D = {
   alUSDb: { label: "alUSDb on Base", href: `${DOCS}/user/concepts/alAssets#alusdb-on-base` },
   transmuter: { label: "The Transmuter", href: `${DOCS}/user/concepts/transmuter#how-transmutations-flow` },
   selfRepaying: { label: "Self-repaying loans", href: `${DOCS}/user/concepts/self-repaying-loans` },
+  faq: { label: "FAQ", href: `${DOCS}/user/faq` },
   liquidation: { label: "Liquidations", href: `${DOCS}/user/concepts/liquidations#what-can-trigger-liquidation` },
 } satisfies Record<string, InfoDocLink>;
 
@@ -57,14 +59,14 @@ export function AlchemixInfoPage({ deployment }: { deployment: AlchemixDeploymen
     {
       term: "Transmuter",
       definition:
-        "The Transmuter is the contract where any holder of the synthetic can deposit that token to exchange it for MYT. A deposit converts a little every block, the chain's unit of time, until its term ends.",
+        "The Transmuter is the contract where any holder of the synthetic can deposit that token to exchange it for MYT. A deposit vests a little every block, the chain's unit of time, until its term ends. The Alchemix app calls these deposits Fixed Yield positions.",
       sources: [D.transmuter],
     },
     {
       term: "Earmarked debt",
       definition:
-        "Earmarked debt is set aside to be repaid by redemptions: the part of the debt that converting Transmuter deposits have repaid, shared across every open loan in proportion to what each owes.",
-      sources: [D.transmuter, D.repays],
+        "Earmarked debt is set aside to be repaid by redemptions: as Transmuter deposits vest, a matching amount of debt is earmarked across every open loan in proportion to each loan's unearmarked debt.",
+      sources: [D.transmuter, D.faq],
     },
     {
       term: "Redemption",
@@ -108,14 +110,14 @@ export function AlchemixInfoPage({ deployment }: { deployment: AlchemixDeploymen
           <Link href={transmuterListingPath(deployment)} className={INLINE_LINK}>
             the Transmuter
           </Link>
-          , where deposits convert into collateral and repay those loans
+          , where deposits vest and are paid out in collateral, which repays those loans
           {hasV2 && (
             <>
               , and the{" "}
               <Link href={v2ListingPath(deployment)} className={INLINE_LINK}>
-                closed V2 accounts
+                V2 accounts
               </Link>
-              , which are kept as a final record
+              , each as the snapshot taken when V2 was migrated to V3
             </>
           )}
           .
@@ -123,6 +125,7 @@ export function AlchemixInfoPage({ deployment }: { deployment: AlchemixDeploymen
       }
       notCovered="Alchemix on other chains isn't covered here."
       glossary={glossary}
+      docsAndChain={deployment.chainId === 8453 ? ALCHEMIX_BASE_DOCS_AND_CHAIN : undefined}
       howItWorks={[
         <>
           <GlossaryLink term="Market">A market</GlossaryLink> pairs a synthetic token with its collateral, the asset
@@ -132,10 +135,10 @@ export function AlchemixInfoPage({ deployment }: { deployment: AlchemixDeploymen
           exchange it for collateral.
         </>,
         <>
-          As deposits convert, the matching debt is <GlossaryLink term="Earmarked debt">earmarked</GlossaryLink> across
-          every open loan, so each borrower shares the repayment in proportion to what they owe. When a depositor
-          claims, a <GlossaryLink term="Redemption">redemption</GlossaryLink> swaps the depositor's tokens for
-          collateral taken from the loans, which repays debt on all of them.
+          As deposits vest, the matching debt is <GlossaryLink term="Earmarked debt">earmarked</GlossaryLink> across
+          every open loan, so each borrower shares the repayment in proportion to the debt not yet earmarked on their
+          loan. When a depositor claims, a <GlossaryLink term="Redemption">redemption</GlossaryLink> swaps the
+          depositor's tokens for collateral taken from the loans, which repays debt on all of them.
         </>,
         <>
           A loan has three parts, shown here on the {example.displayName} market:
@@ -175,16 +178,16 @@ export function AlchemixInfoPage({ deployment }: { deployment: AlchemixDeploymen
                   Transmuter positions
                 </Link>{" "}
                 list the deposits that repay the loans. Each deposit has one row, with its amount, the block at which it
-                finishes converting (its term ends) and what its claim paid. Claiming earlier pays out only the part
-                converted so far, returns the unconverted tokens and charges an early exit fee.
+                finishes vesting (its term ends) and what its claim paid. Claiming earlier pays out only the part vested
+                so far, returns the unvested tokens and charges an early exit fee.
               </li>
               {hasV2 && (
                 <li>
                   <Link href={v2ListingPath(deployment)} className={INLINE_LINK}>
                     V2 positions
                   </Link>{" "}
-                  are accounts on Alchemix V2, which closed on 2 April 2026 when its loans moved to V3. Each account
-                  shows its final figures.
+                  are accounts on Alchemix V2, whose positions were migrated to V3 in April 2026. Each account shows its
+                  figures in the migration snapshot.
                 </li>
               )}
             </ul>

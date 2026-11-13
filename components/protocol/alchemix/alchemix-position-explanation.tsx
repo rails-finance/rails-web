@@ -331,7 +331,7 @@ function explanationParts({
     ) : null,
     v2 ? (
       <>
-        {v2.names} is this holder&rsquo;s account from before Alchemix V3, closed on 2 April 2026.
+        {v2.names} is this holder&rsquo;s account from before Alchemix V3, migrated to V3 in April 2026.
         {v2.joined
           ? " Its events are on the timeline, marked V2. This page's figures are V3's alone."
           : " Its events are on its own page."}

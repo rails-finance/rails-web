@@ -27,20 +27,23 @@ import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { ChainTruthTimeline, type TimelineRunSpec } from "@/components/shared/chain-truth-timeline";
 import { PositionCard, type PositionCardSlots } from "@/components/shared/position-card";
 import { TimelineActivityHeader, CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
-import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
+import { Prov, ProvReceiptsScope, useReceiptRegistry, type Provenance } from "@/components/shared/provenance";
+import { formatUnitsExact } from "@/lib/utils/format";
+import type { TransmuterClaimValue } from "@/lib/sources/chain/alchemix-claim-value";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { useWalletContext } from "@/components/nav/wallet-context";
 import { isTransmuterEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { alchemixPositionName } from "@/lib/alchemix/naming";
 import { alchemixExplorer } from "@/lib/alchemix/explorer";
-import { transmuterPositionPath, type AlchemixDeployment } from "@/lib/alchemix/lines";
+import { linesForChain, transmuterPositionPath, type AlchemixDeployment } from "@/lib/alchemix/lines";
 import type { AlchemixCoords } from "@/lib/alchemix/event-provenance";
 import { transmuterEmittedProv, transmuterMaturityProv } from "@/lib/alchemix/transmuter-provenance";
 import { computeTransmuterEconomics } from "@/lib/alchemix/transmuter-economics";
 import { transmuterEarlyClaim } from "@/lib/alchemix/transmuter-early-claim";
 import { logIndexOf, splitRidingTransfers, withRiders } from "@/lib/alchemix/riding-transfers";
 import {
+  transmuterClaimedByPrefix,
   transmuterHeads,
   transmuterMaturityEstimate,
   transmuterOutcome,
@@ -58,12 +61,42 @@ import {
 } from "@/components/protocol/alchemix/transmuter-event-card";
 import type { AlchemixTransmuterPositionData } from "@/types/api/alchemix";
 
+/** The asset under each line's vault, at its decimals. */
+const UNDERLYING_DECIMALS: Record<string, number> = { USDC: 6, WETH: 18 };
+
+const fmt2 = (exact: string) => Number(exact).toLocaleString("en-US", { maximumFractionDigits: 2 });
+
+function claimValueProv(
+  v: TransmuterClaimValue,
+  mytSymbol: string,
+  underlying: string,
+  decimals: number,
+  chainId: number,
+): Provenance {
+  return {
+    kind: "chain",
+    pclass: "state",
+    source: { block: v.block },
+    contract: { name: `${mytSymbol} vault`, address: v.vault },
+    summary: `${underlying} the payout was worth — the ${mytSymbol} vault's convertToAssets of the ${mytSymbol} the claim paid out, at the claim's block`,
+    via: `convertToAssets(${v.sharesRaw}) @ block ${v.block}: ${v.assetsRaw}`,
+    verify: {
+      kind: "recompute",
+      text: `To check: ask any ${chainId === 1 ? "Ethereum" : "Base"} archive node for convertToAssets(${v.sharesRaw}) on ${v.vault} at block ${v.block}.`,
+    },
+    scaling: { raw: v.assetsRaw, from: "call", places: decimals, why: `${underlying} carries ${decimals} decimals` },
+  };
+}
+
 export function TransmuterPositionView({
   deployment,
   position,
+  claimValue = null,
 }: {
   deployment: AlchemixDeployment;
   position: AlchemixTransmuterPositionData<BaseActivityEvent>;
+  /** The payout's convertToAssets at the claim's block, read on the server. */
+  claimValue?: TransmuterClaimValue | null;
 }) {
   const registry = useReceiptRegistry();
   // The event route (rails-ops TO-DO-ui-jobs 236): the sub-nav and the event's
@@ -163,14 +196,43 @@ export function TransmuterPositionView({
         ? transmuterEmittedProv("amount_unclaimed", p.claim.unclaimed.symbol, p.claim.unclaimed.raw, claimCoords)
         : undefined,
   };
+  // What the payout was worth (call 6): Alchemix's docs pay one unit of the
+  // asset underneath for each alAsset vested, and the claim block's
+  // convertToAssets shows what the shares paid out came to.
+  const underlying = linesForChain(deployment.chainId).find((l) => l.key === p.lineKey)?.underlying ?? null;
+  const underlyingDecimals = underlying ? UNDERLYING_DECIMALS[underlying] : undefined;
+  const vestedRaw =
+    p.claim?.unclaimed != null
+      ? (early?.convertedRaw ??
+        (BigInt(p.staked.raw.split(".")[0]) - BigInt(p.claim.unclaimed.raw.split(".")[0])).toString())
+      : null;
+  const payoutValue =
+    claimValue && underlying && underlyingDecimals != null && p.claim?.claimed && vestedRaw ? (
+      <p>
+        The claim paid out {fmt2(formatUnitsExact(claimValue.sharesRaw, 18))} {mytSymbol}, worth{" "}
+        <Prov
+          info={claimValueProv(claimValue, mytSymbol, underlying, underlyingDecimals, deployment.chainId)}
+          value={formatUnitsExact(claimValue.assetsRaw, underlyingDecimals)}
+          symbol={underlying}
+        >
+          {fmt2(formatUnitsExact(claimValue.assetsRaw, underlyingDecimals))} {underlying}
+        </Prov>{" "}
+        at block {p.claim.blockNumber.toLocaleString("en-US")}, for {fmt2(formatUnitsExact(vestedRaw, 18))}{" "}
+        {p.syntheticSymbol} vested. Alchemix&rsquo;s docs describe a claim as paying one unit of the asset underneath
+        for each alAsset vested.
+      </p>
+    ) : null;
   const explanation = (
     <div className="space-y-2">
       <p>
-        A Transmuter position locks {p.syntheticSymbol} until a maturity counted in blocks, converting a little every
-        block, and a claim pays out the converted part in {mytSymbol}. The holder can claim before maturity: the claim
-        then hands back the part not yet converted as {p.syntheticSymbol}, less an early exit fee, so claiming early
-        gives up converting that part and pays the fee on it. Every figure here is one of the Transmuter&rsquo;s events,
-        replayed, or arithmetic over them; none is read from the contract at a block.
+        A Transmuter position holds {p.syntheticSymbol} until a maturity counted in blocks, vesting a little every
+        block, and a claim pays out the vested part in {mytSymbol}. The holder can claim before maturity: the claim then
+        returns the part not yet vested as {p.syntheticSymbol}, less an early exit fee, so claiming early gives up
+        vesting that part and pays the fee on it. Every figure here is one of the Transmuter&rsquo;s events, replayed,
+        or arithmetic over them
+        {payoutValue
+          ? ", except the payout's value below, read from the vault at the claim's block."
+          : "; none is read from the contract at a block."}
       </p>
       {early && p.claim?.claimed ? (
         <p>
@@ -178,10 +240,11 @@ export function TransmuterPositionView({
           below carries the arithmetic.
         </p>
       ) : null}
+      {payoutValue}
       {p.owner ? (
         <p>
           The position is a token that can be sold until it is claimed, so the address above is who holds it now and
-          need not be who staked.
+          need not be who deposited.
         </p>
       ) : null}
     </div>
@@ -226,7 +289,11 @@ export function TransmuterPositionView({
         <DetailTopRow
           session={deployment.session}
           wallet={holder}
-          owner={{ wallet: holder, prefix: p.owner ? undefined : <span>Claimed by</span> }}
+          owner={{
+            wallet: holder,
+            chain: deployment.chainId,
+            prefix: p.owner ? undefined : <span>{transmuterClaimedByPrefix(p)}</span>,
+          }}
           closed={p.status === "claimed"}
           // The card's ⋮ carries the menu; an event page draws no Tools.
           tools={false}
