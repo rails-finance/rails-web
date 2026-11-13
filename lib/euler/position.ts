@@ -15,14 +15,15 @@
 // or repaid; its interest is the debt now less the debt then. A holding that
 // was zero at the past block was opened inside the window, and any other
 // difference changed it: neither states a figure. The yearly rates are the
-// vault's, annualised simply over the days between the reads.
+// vault's, as APYs (lib/euler/apy.ts): the rate now compounded each second, and
+// the window's growth compounded to a year.
 //
 // Pure: imports nothing through `@/`, so scripts/test can load it.
 
+import { growthToApy, spyToApy } from "./apy";
 import { EULER_DOLLARS, type EulerPositionRead, type EulerWalletRead, type Token } from "./types";
 
 const DAY = 86_400;
-const YEAR_SECONDS = 365 * DAY;
 /** Euler's interest rate and accumulator are scaled by 10^27. */
 const RAY = BigInt(10) ** BigInt(27);
 
@@ -52,11 +53,12 @@ export interface EulerWindow {
   days: number;
   /** Share price growth over the window, as a fraction; null where the vault had no price then. */
   shareGrowth: number | null;
-  /** That growth annualised simply. */
-  supplyRateYear: number | null;
+  /** That growth compounded to a year, as an APY. */
+  supplyApy: number | null;
   /** Interest index growth over the window, as a fraction. */
   indexGrowth: number | null;
-  borrowRateYear: number | null;
+  /** That growth compounded to a year, as an APY. */
+  borrowApy: number | null;
 }
 
 export interface EulerPosition {
@@ -86,7 +88,8 @@ export interface EulerPosition {
   interest: number | null;
   /** That figure in the unit of account at the head's price; null where unpriced or not stated. */
   windowValue: number | null;
-  borrowRateNow: number;
+  /** The vault's borrow APY at the head, from its per-second rate. */
+  borrowApyNow: number;
   utilisation: number | null;
   totalSupplied: number;
   totalBorrowed: number;
@@ -101,6 +104,8 @@ export interface EulerPosition {
   }[];
   /** The collateral's value at liquidation LTVs over the debt's; null without a loan. */
   health: number | null;
+  /** The loan can be liquidated: on the raw values, collateral at liquidation LTVs not greater than the debt. */
+  liquidatable: boolean | null;
   /** The collateral's value, in the unit, as the controller's oracle prices it. */
   collateralValue: number | null;
   collateralFor: { vault: string; vaultSymbol: string }[];
@@ -143,10 +148,15 @@ export function eulerWindow(r: EulerPositionRead): EulerWindow {
   return {
     days,
     shareGrowth,
-    supplyRateYear: shareGrowth === null || days <= 0 ? null : (shareGrowth * 365) / days,
+    supplyApy: growthToApy(shareGrowth, days),
     indexGrowth,
-    borrowRateYear: indexGrowth === null || days <= 0 ? null : (indexGrowth * 365) / days,
+    borrowApy: growthToApy(indexGrowth, days),
   };
+}
+
+/** Euler's boundary on the raw values: liquidation when the collateral at liquidation LTVs is not greater than the debt. */
+export function liquidatable(liq: { collateralValue: string; liabilityValue: string }): boolean {
+  return BigInt(liq.collateralValue) <= BigInt(liq.liabilityValue);
 }
 
 export function eulerPosition(r: EulerPositionRead): EulerPosition {
@@ -178,7 +188,7 @@ export function eulerPosition(r: EulerPositionRead): EulerPosition {
   const liq = r.borrow?.liquidation;
   const health =
     liq && BigInt(liq.liabilityValue) > BigInt(0)
-      ? Number((BigInt(liq.collateralValue) * BigInt(10) ** BigInt(6)) / BigInt(liq.liabilityValue)) / 1e6
+      ? Number((BigInt(liq.collateralValue) * BigInt(10) ** BigInt(12)) / BigInt(liq.liabilityValue)) / 1e12
       : null;
   const values = collaterals.map((c) => c.value);
   return {
@@ -201,13 +211,14 @@ export function eulerPosition(r: EulerPositionRead): EulerPosition {
     earned,
     interest,
     windowValue: windowFig === null || price === null ? null : windowFig * price,
-    borrowRateNow: scaled((BigInt(v.interestRate) * BigInt(YEAR_SECONDS) * BigInt(10) ** BigInt(9)) / RAY, 9),
+    borrowApyNow: spyToApy(v.interestRate),
     utilisation:
       totalAssets > BigInt(0) ? Number((BigInt(v.totalBorrows) * BigInt(10) ** BigInt(9)) / totalAssets) / 1e9 : null,
     totalSupplied: scaled(v.totalAssets, dec),
     totalBorrowed: scaled(v.totalBorrows, dec),
     collaterals,
     health,
+    liquidatable: liq && BigInt(liq.liabilityValue) > BigInt(0) ? liquidatable(liq) : null,
     collateralValue: r.borrow
       ? values.some((x) => x === null)
         ? null
