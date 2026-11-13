@@ -33,8 +33,11 @@ import { soleFlowAddress } from "@/lib/shared/format-event";
 import { formatUsdValue } from "@/lib/utils/format";
 import {
   liquityForkExplainerTeaser,
+  type LiquityForkEventFacts,
   type LiquityForkExplainerProvs,
 } from "@/lib/shared/liquity-fork-explainer-clauses";
+import { redemptionPath } from "@/lib/liquity-fork/shutdown";
+import { recordedShutdown } from "@/lib/shared/liquity-family-shutdown";
 import type { LiquityForkCoords } from "@/lib/shared/liquity-fork-provenance";
 import type { LiquityForkLearnMoreParams } from "@/lib/shared/learn-more-content";
 import {
@@ -357,7 +360,12 @@ export function LiquityForkEventCard({ event, isLast, eventNumber, fork }: Liqui
     terms,
   });
 
-  const buildTeaser = () => liquityForkExplainerTeaser(ctx, coords, fork.words, provs);
+  // A redemption on a shut-down branch is the urgent path (redemptionPath);
+  // the branch's shutdown is the catalog's record, no read of its own.
+  const facts: LiquityForkEventFacts = {
+    redemption: redemptionPath(event.timestamp, recordedShutdown(fork.family, ctx.collateralSymbol)?.shutdown.at),
+  };
+  const buildTeaser = () => liquityForkExplainerTeaser(ctx, coords, fork.words, provs, facts);
   const teaser = buildTeaser();
   const slots: EventCardSlots = {
     event: {
@@ -400,6 +408,7 @@ export function LiquityForkEventCard({ event, isLast, eventNumber, fork }: Liqui
           txHash={event.txHash}
           blockNumber={event.blockNumber}
           skipLead
+          facts={facts}
         />
       ),
       first: teaser ? (
@@ -417,7 +426,7 @@ export function LiquityForkEventCard({ event, isLast, eventNumber, fork }: Liqui
         />
       ) : undefined,
     },
-    learnMore: <LearnMore inline content={liquityForkLearnMoreContent(ctx, fork.words)} />,
+    learnMore: <LearnMore inline content={liquityForkLearnMoreContent(ctx, fork.words, facts)} />,
   };
   return <EventCard slots={slots} avatar={null} />;
 }

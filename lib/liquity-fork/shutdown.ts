@@ -105,3 +105,17 @@ export function allBranchesShutDown(branches: readonly { shutdown?: BranchShutdo
 export function branchesPageTitle(branches: readonly { shutdown?: BranchShutdownState | null }[]): string {
   return allBranchesShutDown(branches) ? "Branches" : "Branches & how redemption reaches them";
 }
+
+/** Which redemption reached a Trove. Once a branch is shut down, standard
+ *  redemptions skip it and only `urgentRedemption` reaches its Troves (the
+ *  Liquity V2 contracts, which the forks share), so a redemption at or after
+ *  the branch's shutdown time is the urgent path. Seen on chain in Ebisu's
+ *  sUSDe redemption of 7 Oct 2026, tx 0xf9bcc83e…3f94 (block 26,139,958):
+ *  both fees 0 and the collateral at 1.02 × par (rails-ops
+ *  reference/official-docs/ebisu.md, "Chain reads"). The index labels both
+ *  paths `redeemCollateral`, so the time is what tells them apart; an
+ *  unknown shutdown reads as ordinary. `at` and `shutdownAt` are unix seconds. */
+export type RedemptionPath = "ordinary" | "urgent";
+export function redemptionPath(at: number, shutdownAt: number | null | undefined): RedemptionPath {
+  return shutdownAt != null && at >= shutdownAt ? "urgent" : "ordinary";
+}

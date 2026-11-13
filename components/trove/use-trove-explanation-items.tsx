@@ -29,6 +29,8 @@ import { troveNodes } from "@/lib/liquity/trove-nodes";
 import { SurplusBullet } from "@/components/protocol/liquity-family/surplus-bullet";
 import { ShutdownBullet } from "@/components/protocol/liquity-family/shutdown-bullet";
 import type { BranchShutdownState } from "@/lib/liquity-fork/shutdown";
+import { shutdownDay } from "@/lib/shared/liquity-family-shutdown";
+import { liquityDebtBreakdownForm } from "@/lib/liquity/economics";
 import { formatCompact } from "@/lib/shared/format-compact";
 
 // V2 TroveManager per branch — the contract the chain values are read from.
@@ -362,14 +364,20 @@ function buildOpenItems({
   });
   const priceProv = collateralPriceInfo(coll_type);
 
+  // The live getLatestTroveData read is State; the index's snapshot, Indexed
+  // (as the card's collateral leaf, liquityTroveFaceProv). Both figures come
+  // from the live read today.
+  const accruedClass = isLive ? ("state" as const) : ("indexed" as const);
   const accruedProv: Provenance = {
     kind: "chain",
+    pclass: accruedClass,
     summary: troveWords("prov_accrued"),
     contract: tmContract,
     via: stateOriginVia(isLive, troveWords("field_accrued_interest")),
   };
   const mgmtFeeProv: Provenance = {
     kind: "chain",
+    pclass: accruedClass,
     summary: troveWords("prov_mgmt_fee"),
     contract: tmContract,
     via: stateOriginVia(isLive, troveWords("field_accrued_fee")),
@@ -390,18 +398,22 @@ function buildOpenItems({
     via: troveWords("prov_mgmt_rate_via"),
   };
   if (displayAccruedInterest !== undefined) {
+    const breakdown = liquityDebtBreakdownForm(shut?.at, trove.activity.lastActivityAt);
+    const interestNode = (
+      <Prov info={accruedProv}>
+        <HighlightableValue type="interest" state="after" value={displayAccruedInterest}>
+          {formatPrice(displayAccruedInterest)} BOLD
+        </HighlightableValue>
+      </Prov>
+    );
     add(
       "holdings",
       <span key="debt-breakdown" className="text-rb-500">
-        {troveNodes("debt_breakdown", {
-          interest: (
-            <Prov info={accruedProv}>
-              <HighlightableValue type="interest" state="after" value={displayAccruedInterest}>
-                {formatPrice(displayAccruedInterest)} BOLD
-              </HighlightableValue>
-            </Prov>
-          ),
-        })}
+        {breakdown === "stopped" && shut
+          ? troveNodes("debt_breakdown_stopped", { date: shutdownDay(shut.at) })
+          : breakdown === "shutdown" && shut
+            ? troveNodes("debt_breakdown_shutdown", { interest: interestNode, date: shutdownDay(shut.at) })
+            : troveNodes("debt_breakdown", { interest: interestNode })}
         {trove.batch.isMember && displayManagementFee !== undefined && displayManagementFee > 0 && (
           <span>
             {" "}

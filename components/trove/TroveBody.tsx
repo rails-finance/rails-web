@@ -39,7 +39,7 @@ import {
   type FlowFocusValue,
 } from "@/components/shared/flow-focus-context";
 import { troveLives } from "@/lib/shared/liquity-flows-explanation";
-import { computeLiquityEconomics } from "@/lib/liquity/economics";
+import { computeLiquityEconomics, liquityAccrualNow } from "@/lib/liquity/economics";
 import { LiquityFlowsExplanation } from "@/lib/liquity/economics-explanation";
 import { liquityLifetimeFlowsContent } from "@/lib/shared/learn-more-content";
 import { CollSurplusClaimCard } from "@/components/protocol/liquity-family/coll-surplus-claim-card";
@@ -255,11 +255,14 @@ export function TroveBody({
     [chronoIndex, chrono],
   );
 
+  // One clock for the debt, interest and cost figures: a shut-down branch's
+  // accrual stops at the shutdown (ui-jobs 626).
+  const accrualNow = liquityAccrualNow(now, shutdown?.at);
   const economics = computeLiquityEconomics(economicsEvents, {
     currentPrice,
     collateralType: trove.collateralType,
     surplusClaimed,
-    now,
+    now: accrualNow,
   });
 
   return (
@@ -294,7 +297,8 @@ export function TroveBody({
               <LiquityFlowsExplanation
                 economics={economics.economics}
                 meta={economics.economics._meta}
-                now={now}
+                now={accrualNow}
+                shutDown={shutdown != null}
                 currentPrice={currentPrice}
                 surplusClaimed={surplusClaimed}
                 unpriced={unpricedEvents(flowEvents)}

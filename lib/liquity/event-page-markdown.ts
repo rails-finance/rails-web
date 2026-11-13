@@ -18,6 +18,7 @@ import { liquityEventDecimals, liquityEventLedger } from "@/lib/liquity/event-le
 import { liquityEventProse } from "@/lib/liquity/event-prose";
 import { liquityEventMarkdown } from "@/lib/liquity/event-markdown";
 import type { DayObs } from "@/lib/shared/price-series";
+import { recordedShutdown } from "@/lib/shared/liquity-family-shutdown";
 
 export interface EventPageMarkdownInput {
   collateralType: string;
@@ -57,12 +58,17 @@ export function liquityEventPageMarkdown(input: EventPageMarkdownInput): string 
   const debtSymbol = events[0]?.context.data.assetType || "BOLD";
   const currentPrice = prices?.[collSymbol.toLowerCase() as keyof OraclePricesData];
   const flowEvents = liquityV2FlowEvents(events);
+  // The branch's shutdown as its catalog records it (the client adds the live
+  // read): the prose takes it on any Trove, the replay's accrual on an open
+  // one, as event-view.tsx does. None recorded for Liquity V2 today.
+  const shutdownAt = recordedShutdown("liquity-v2", collateralType)?.shutdown.at ?? null;
   const timeline = liquityFlowTimeline(flowEvents, {
     collSymbol,
     debtSymbol,
     surplusClaimed: surplus?.claimed != null,
     now: input.now,
     dailyColl: input.dailyColl,
+    shutdownAt: trove.status === "open" ? shutdownAt : null,
     live: trove.status === "open" ? { price: currentPrice ?? null } : null,
   });
   const model = timeline ? buildFlowModel(timeline) : null;
@@ -83,6 +89,7 @@ export function liquityEventPageMarkdown(input: EventPageMarkdownInput): string 
     collDecimals: model ? liquityEventDecimals(model, focusEvents, event.id, "collateral") : null,
     debtDecimals: model ? liquityEventDecimals(model, focusEvents, event.id, "debt") : null,
     surplusClaimedAt: claim ? claim.timestamp : undefined,
+    shutdownAt,
   });
   const ledgers = model
     ? {

@@ -33,7 +33,13 @@
 //      adds the rest, to the n "Show all n" states: `data-bad-debt-small` rows under 0.01%,
 //      and any row with no share of the vault. Every episode's vault is a row of the record.
 //      A fixture with no bad-debt liquidation shows the "No liquidation" line and no rows.
-// Maple fixture: V14 headed "The pool delegate's record", no V14.1.
+//   7. V14.2: the page's vault's row carries its run's start (`data-steward-since`, a block),
+//      and every MetaMorpho row that carries one has a positive block.
+//   8. V14.3: `data-steward-before-count` equals the ran-before rows after its "Show all"
+//      (no V14.3 where it is 0); no ran-before vault is a row of the vaults run now; each
+//      row's first block is at or before its last; the rows go latest end first; a linked
+//      row links its /vaults href.
+// Maple fixture: V14 headed "The pool delegate's record", no V14.1, no V14.2 or V14.3.
 //
 // Chain reads: V14 reads none. V14.1 makes one Multicall3 eth_call per liquidation block,
 // plus one withdraw-queue read per chain; both are cached, so a second run reads nothing new.
@@ -115,6 +121,7 @@ const rowsOf = (page) =>
       raw: r.querySelector('[data-cell="steward-held"]')?.getAttribute("data-raw") ?? null,
       href: r.querySelector("a[href]")?.getAttribute("href") ?? null,
       current: r.hasAttribute("data-steward-current"),
+      since: r.querySelector("[data-steward-since]")?.getAttribute("data-steward-since") ?? null,
       text: r.textContent,
     })),
   );
@@ -125,6 +132,16 @@ const episodesOf = (page) =>
       key: e.getAttribute("data-bad-debt-episode"),
       vault: e.getAttribute("data-bad-debt-vault").toLowerCase(),
       ppm: e.hasAttribute("data-bad-debt-of-vault") ? Number(e.getAttribute("data-bad-debt-of-vault")) : null,
+    })),
+  );
+/** The ran-before rows, in order. */
+const beforeRowsOf = (page) =>
+  page.evaluate(() =>
+    [...document.querySelectorAll('[data-anatomy="V14.3"] [data-steward-before-vault]')].map((r) => ({
+      key: r.getAttribute("data-steward-before-vault").toLowerCase(),
+      from: Number(r.getAttribute("data-steward-before-from")),
+      until: Number(r.getAttribute("data-steward-before-until")),
+      href: r.querySelector("a[href]")?.getAttribute("href") ?? null,
     })),
   );
 const ids = (rows) => rows.map((r) => r.key).join(",");
@@ -211,6 +228,39 @@ for (const f of FIXTURES) {
       offLink: offLink.map((r) => `${r.href} / ${index[r.key]}`),
       linked,
     }),
+  );
+
+  // V14.2: since when it runs each vault.
+  const sinceRows = rows.filter((r) => r.since != null);
+  check(
+    `${f.tag}: V14.2 dates this vault's run, and every since block is positive`,
+    current[0]?.since != null && sinceRows.every((r) => Number(r.since) > 0),
+    JSON.stringify({ self: current[0]?.since, dated: sinceRows.length, rows: rows.length }),
+  );
+
+  // V14.3: the vaults it ran before.
+  const beforeCount = Number(
+    (await page.getAttribute('[data-anatomy="V14"] [data-steward-before-count]', "data-steward-before-count")) ?? NaN,
+  );
+  const beforeAll = page.locator('[data-anatomy="V14.3"] [data-steward-before-show-all]');
+  if (await beforeAll.count()) await beforeAll.first().click();
+  await page.waitForTimeout(400);
+  const ran = await beforeRowsOf(page);
+  const runNow = new Set(rows.map((r) => r.key));
+  const hasV143 = (await page.locator('[data-anatomy="V14.3"]').count()) > 0;
+  check(
+    `${f.tag}: V14.3 lists data-steward-before-count vaults, none run now, each span in order, latest end first`,
+    ran.length === beforeCount &&
+      hasV143 === beforeCount > 0 &&
+      ran.every((r) => !runNow.has(r.key) && r.from > 0 && r.from <= r.until) &&
+      ran.every((r, i) => i === 0 || ran[i - 1].until >= r.until),
+    JSON.stringify({ beforeCount, rows: ran.length, hasV143 }),
+  );
+  const offBefore = ran.filter((r) => r.href != null && index[r.key] !== r.href);
+  check(
+    `${f.tag}: a linked ran-before row links its /vaults href`,
+    offBefore.length === 0,
+    offBefore.map((r) => `${r.href} / ${index[r.key]}`).join(","),
   );
 
   // V14.1, branching on what the page states.
@@ -309,11 +359,12 @@ if (maplePath) {
       rows: s?.querySelectorAll("[data-steward-vault]").length ?? 0,
       only: !!s?.querySelector("[data-steward-only]"),
       v141: !!document.querySelector('[data-anatomy="V14.1"]'),
+      runs: !!s?.querySelector('[data-steward-since], [data-steward-before-count], [data-anatomy="V14.3"]'),
     };
   });
   check(
-    `maple ${maplePath.split("/").pop().slice(0, 10)}: the pool delegate's record, no V14.1`,
-    m.heading === "The pool delegate’s record" && (m.rows > 0 || m.only) && !m.v141,
+    `maple ${maplePath.split("/").pop().slice(0, 10)}: the pool delegate's record, no V14.1, no runs`,
+    m.heading === "The pool delegate’s record" && (m.rows > 0 || m.only) && !m.v141 && !m.runs,
     JSON.stringify(m),
   );
   await page.close();
