@@ -236,18 +236,19 @@ function censusLine(r: CensusRunStatus, lastWriteAt: string | null): string | nu
   }
 }
 
-/** A census held until its next run: the status word ("Next run in 4 h 52
- *  min", "Next run due now"; "Next run after 14:06 UTC" while only the
- *  gateway's reset is known) and the line's label, which names the slot.
+/** A census held until its next run: the status column's words ("In 4 h 52
+ *  min", "Due now"; "After 14:06 UTC" while only the gateway's reset is
+ *  known) and the row line's label ("Next run in 4 h 52 min (14:12 UTC)").
  *  Null otherwise. */
 function censusDueWords(e: StatusEntry, now: number): { status: string; label: string } | null {
   const w = e.live?.writers.find((x) => x.censusRun);
   const due = w && writerState(w, now, e) === "paused" ? censusDue(w) : null;
   if (!due) return null;
   const slot = hhmm(new Date(due.at * 1000).toISOString());
-  if (due.after) return { status: `Next run after ${slot}`, label: `Next run after ${slot}` };
-  const status = due.at - now < 60 ? "Next run due now" : `Next run in ${ageWords(due.at - now)}`;
-  return { status, label: `${status} (${slot})` };
+  if (due.after) return { status: `After ${slot}`, label: `Next run after ${slot}` };
+  if (due.at - now < 60) return { status: "Due now", label: `Next run due now (${slot})` };
+  const left = ageWords(due.at - now);
+  return { status: `In ${left}`, label: `Next run in ${left} (${slot})` };
 }
 
 function pipelineLine(e: StatusEntry, now: number): string {
