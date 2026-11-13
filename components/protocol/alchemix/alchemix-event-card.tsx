@@ -55,7 +55,8 @@ import {
   useReadingBefore,
 } from "@/lib/alchemix/readings-before";
 import { redemptionNet } from "@/lib/alchemix/redemption-net";
-import { lineProtocolFeeBps } from "@/lib/alchemix/lines";
+import { lineProtocolFeeStep } from "@/lib/alchemix/lines";
+import { unreadFee } from "@/lib/alchemix/protocol-fee";
 
 const WAD = 1e18;
 
@@ -140,15 +141,20 @@ export function AlchemixEventCard({
   const unit = useAlchemixUnderlying();
   const lineEventInBlock = useLineEventInBlock(lead.blockNumber);
   const isRedemption = lead.context.data.eventType === "redemption";
-  const feeBps = lineProtocolFeeBps(lead.context.data.chainId, lead.context.data.lineKey);
+  // The fee in force at this card's block (lib/alchemix/protocol-fee.ts).
+  const feeStep = lineProtocolFeeStep(lead.context.data.chainId, lead.context.data.lineKey, lead.blockNumber);
+  const feeBps = feeStep?.bps ?? null;
   const prose: AlchemixCardProse = {
     underlyingDecimals,
     mytSymbol,
     protocolFeeBps: feeBps,
+    protocolFeeUnread: unreadFee(feeStep),
     collateralTakenRaw: isRedemption ? collateralTakenRaw(lead, before) : null,
     readingBefore: before,
     lineEventInBlock,
-    redemptionNet: isRedemption ? redemptionNet(lead, before, unit?.decimals ?? null, feeBps) : null,
+    redemptionNet: isRedemption
+      ? redemptionNet(lead, before, unit?.decimals ?? null, feeBps, feeStep?.read ?? null)
+      : null,
     underlyingSymbol: unit?.symbol ?? null,
   };
 

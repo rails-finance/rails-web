@@ -39,7 +39,37 @@ const shortTermProv: Provenance = {
   },
 };
 
+const BASE_ALCHEMIST = { name: "Alchemist V3", address: "0xeb380d86eed275c9f2ed77745ab1b2ccf364bf7a" };
+
+const feeProv = (block: number, bps: number): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  source: { block },
+  contract: BASE_ALCHEMIST,
+  summary: `The Base Alchemist's protocolFee — ${bps} basis points at block ${block.toLocaleString("en-US")}, read 13 Nov 2026. It was 10 at block 52,992,079 and 0 at blocks 53,638,119, 54,284,159 and 56,868,319, so the change lies between 52,992,080 and 53,638,119.`,
+  via: `protocolFee() @ block ${block.toLocaleString("en-US")}`,
+  verify: {
+    kind: "recompute",
+    text: `To check: ask any Base archive node for protocolFee() on ${BASE_ALCHEMIST.address} at block ${block.toLocaleString("en-US")}.`,
+  },
+});
+
 export const ALCHEMIX_BASE_DOCS_AND_CHAIN: readonly InfoDocsAndChain[] = [
+  {
+    claim:
+      "The docs give the Base borrower redemption fee as 0.00% on the fees page and 0.10% in the FAQ. The Alchemist charges 0 now; it charged 10 basis points until a block between 52,992,080 and 53,638,119.",
+    docs: {
+      quotes: [
+        { words: "0.00% on Base", href: `${DOCS}/user/concepts/fees#borrower-redemption-fee` },
+        { words: "Borrower Redemption Fee: 0.25% (0.10% on Base)", href: `${DOCS}/user/faq` },
+      ],
+      read: "13 Nov 2026",
+    },
+    chain: [
+      { words: "protocolFee is 0 at block 56,868,319", prov: feeProv(56_868_319, 0) },
+      { words: "10 at block 52,992,079", prov: feeProv(52_992_079, 10) },
+    ],
+  },
   {
     claim:
       "The docs give the Base Transmuter a four-week term. Positions 131 to 161 were opened under a term of 1,209,600 blocks, which for position 160 ran 3 days 3 hours; positions from 162 on carry a term of 12,096,000 blocks.",

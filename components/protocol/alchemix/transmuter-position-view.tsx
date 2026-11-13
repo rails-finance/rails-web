@@ -29,6 +29,7 @@ import { PositionCard, type PositionCardSlots } from "@/components/shared/positi
 import { TimelineActivityHeader, CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
 import { Prov, ProvReceiptsScope, useReceiptRegistry, type Provenance } from "@/components/shared/provenance";
 import { formatUnitsExact } from "@/lib/utils/format";
+import { claimPayoutParts } from "@/lib/alchemix/claim-payout";
 import type { TransmuterClaimValue } from "@/lib/sources/chain/alchemix-claim-value";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
@@ -63,8 +64,6 @@ import type { AlchemixTransmuterPositionData } from "@/types/api/alchemix";
 
 /** The asset under each line's vault, at its decimals. */
 const UNDERLYING_DECIMALS: Record<string, number> = { USDC: 6, WETH: 18 };
-
-const fmt2 = (exact: string) => Number(exact).toLocaleString("en-US", { maximumFractionDigits: 2 });
 
 function claimValueProv(
   v: TransmuterClaimValue,
@@ -206,22 +205,39 @@ export function TransmuterPositionView({
       ? (early?.convertedRaw ??
         (BigInt(p.staked.raw.split(".")[0]) - BigInt(p.claim.unclaimed.raw.split(".")[0])).toString())
       : null;
-  const payoutValue =
-    claimValue && underlying && underlyingDecimals != null && p.claim?.claimed && vestedRaw ? (
-      <p>
-        The claim paid out {fmt2(formatUnitsExact(claimValue.sharesRaw, 18))} {mytSymbol}, worth{" "}
-        <Prov
-          info={claimValueProv(claimValue, mytSymbol, underlying, underlyingDecimals, deployment.chainId)}
-          value={formatUnitsExact(claimValue.assetsRaw, underlyingDecimals)}
-          symbol={underlying}
-        >
-          {fmt2(formatUnitsExact(claimValue.assetsRaw, underlyingDecimals))} {underlying}
-        </Prov>{" "}
-        at block {p.claim.blockNumber.toLocaleString("en-US")}, for {fmt2(formatUnitsExact(vestedRaw, 18))}{" "}
-        {p.syntheticSymbol} vested. Alchemix&rsquo;s docs describe a claim as paying one unit of the asset underneath
-        for each alAsset vested.
-      </p>
-    ) : null;
+  const valued = claimValue != null && underlying != null && underlyingDecimals != null;
+  const parts =
+    p.claim?.claimed && vestedRaw
+      ? claimPayoutParts({
+          sharesRaw: p.claim.claimed.raw,
+          mytSymbol,
+          vestedRaw,
+          synthetic: p.syntheticSymbol,
+          block: p.claim.blockNumber,
+          value: valued ? { assetsRaw: claimValue.assetsRaw, symbol: underlying, decimals: underlyingDecimals } : null,
+        })
+      : null;
+  // Without the read the sentence states the share count alone
+  // (decisions/0054, ruling 2).
+  const payoutValue = parts ? (
+    <p data-claim-payout={parts.worth ? "valued" : "shares"}>
+      {parts.paid}
+      {parts.worth && valued ? (
+        <>
+          , worth{" "}
+          <Prov
+            info={claimValueProv(claimValue, mytSymbol, underlying, underlyingDecimals, deployment.chainId)}
+            value={formatUnitsExact(claimValue.assetsRaw, underlyingDecimals)}
+            symbol={underlying}
+          >
+            {parts.worth}
+          </Prov>
+        </>
+      ) : null}
+      {parts.rest} Alchemix&rsquo;s docs describe a claim as paying one unit of the asset underneath for each alAsset
+      vested.
+    </p>
+  ) : null;
   const explanation = (
     <div className="space-y-2">
       <p>
@@ -230,7 +246,7 @@ export function TransmuterPositionView({
         returns the part not yet vested as {p.syntheticSymbol}, less an early exit fee, so claiming early gives up
         vesting that part and pays the fee on it. Every figure here is one of the Transmuter&rsquo;s events, replayed,
         or arithmetic over them
-        {payoutValue
+        {parts?.worth
           ? ", except the payout's value below, read from the vault at the claim's block."
           : "; none is read from the contract at a block."}
       </p>

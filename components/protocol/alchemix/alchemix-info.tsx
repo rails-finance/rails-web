@@ -13,6 +13,12 @@ import {
 import { transmuterListingPath, v2LinesForChain, v2ListingPath, type AlchemixDeployment } from "@/lib/alchemix/lines";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { ALCHEMIX_BASE_DOCS_AND_CHAIN } from "@/lib/alchemix/docs-and-chain";
+import {
+  BASE_FEE_FIRST_ZERO,
+  BASE_FEE_HEAD_READ,
+  BASE_FEE_LAST_TEN,
+  protocolFeeNow,
+} from "@/lib/alchemix/protocol-fee";
 
 const DOCS = "https://docs.alchemix.fi";
 
@@ -42,7 +48,12 @@ export function AlchemixInfoPage({ deployment }: { deployment: AlchemixDeploymen
   const lineNames = and(lines.map((l) => l.displayName));
   const chain = deployment.chainId === 1 ? "Ethereum" : "Base";
   const example = lines[0];
-  const feePct = `${(lines[0].protocolFeeBps / 100).toString()}%`;
+  // The fee now (lib/alchemix/protocol-fee.ts): the last step read.
+  const feeNow = protocolFeeNow(deployment.chainId, lines[0].key)?.bps ?? null;
+  const feeSentence =
+    feeNow != null && feeNow > 0
+      ? `Each redemption also charges a protocol fee of ${(feeNow / 100).toString()}% of the collateral that pays off the debt, taken from the borrowers' collateral and sent to Alchemix's fee receiver.`
+      : `The Alchemist can charge a protocol fee on the collateral each redemption takes, sent to Alchemix's fee receiver. On ${chain} it is 0%, read at block ${BASE_FEE_HEAD_READ.toLocaleString("en-US")}; it was 0.1% until a block between ${(BASE_FEE_LAST_TEN + 1).toLocaleString("en-US")} and ${BASE_FEE_FIRST_ZERO.toLocaleString("en-US")}.`;
   const alusdb = lines.some((l) => l.key === "base-alusdb");
   const vaults = and([...new Set(lines.map((l) => `${l.myt} holds ${l.underlying}`))]);
   const synthKinds = lines.some((l) => l.underlying === "WETH")
@@ -159,7 +170,7 @@ export function AlchemixInfoPage({ deployment }: { deployment: AlchemixDeploymen
           </ul>
         </>,
         "The loan charges no interest. Its debt changes only when the holder borrows more or repays, or when a redemption clears part of it.",
-        `Each redemption also charges a protocol fee of ${feePct} of the collateral that pays off the debt, taken from the borrowers' collateral and sent to Alchemix's fee receiver.`,
+        feeSentence,
       ]}
       views={[
         {

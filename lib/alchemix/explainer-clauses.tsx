@@ -236,8 +236,11 @@ export interface AlchemixClauseOptions {
    *  the reading before it less the reading at it (lib/alchemix/readings-before).
    *  Null where the two readings are not in hand. */
   collateralTakenRaw?: string | null;
-  /** The line's protocol fee in basis points, for the repay fee's rate. */
+  /** The line's protocol fee in basis points at this block, for the repay
+   *  fee's rate (lib/alchemix/protocol-fee.ts). */
   protocolFeeBps?: number | null;
+  /** The sentence for a block whose fee is unread, else null. */
+  protocolFeeUnread?: string | null;
   /** A redemption's net for this position (lib/alchemix/redemption-net), and
    *  the underlying it is in. */
   redemptionNet?: RedemptionNet | null;
@@ -653,7 +656,10 @@ export function alchemixEventClauses(
                   receiver. The rest went to the Transmuter, which pays its stakers in them.
                 </>
               ) : (
-                <>Those {myt} went to the Transmuter, which pays its stakers in them.</>
+                <>
+                  Those {myt} went to the Transmuter, which pays its stakers in them.
+                  {opts.protocolFeeUnread ? ` ${opts.protocolFeeUnread}` : null}
+                </>
               ),
             ),
           );
@@ -698,8 +704,12 @@ export function alchemixEventClauses(
             clause(
               <>
                 Here it cleared {shown(cleared.amountRaw, sym)} of earmarked debt, measured from this position&rsquo;s
-                readings either side of it, and took {myt} from the collateral for it, including the market&rsquo;s
-                redemption fee.
+                readings either side of it, and took {myt} from the collateral for it
+                {opts.protocolFeeUnread ? (
+                  <>. {opts.protocolFeeUnread}</>
+                ) : (
+                  <>, including the market&rsquo;s redemption fee.</>
+                )}
               </>,
             ),
           );

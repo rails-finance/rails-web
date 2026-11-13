@@ -17,9 +17,10 @@ import { alchemixExplainerTeaser } from "@/lib/alchemix/card-clauses";
 import { transmuterExplainerLines, type TransmuterEvent } from "@/lib/alchemix/transmuter-lines";
 import { movedAmount, v2Sentence, type AlchemixV2Event } from "@/lib/alchemix/v2-lines";
 import type { TransmuterEarlyClaim } from "@/lib/alchemix/transmuter-early-claim";
-import { lineProtocolFeeBps } from "@/lib/alchemix/lines";
+import { lineProtocolFeeStep } from "@/lib/alchemix/lines";
 import { firstSentenceText } from "@/lib/alchemix/sentence-text";
 import { alchemixEventHeading } from "@/lib/alchemix/event-label";
+import { unreadFee } from "@/lib/alchemix/protocol-fee";
 
 /** What the page knows beyond the rows: the line's share ticker and its
  *  underlying's decimals (the Alchemist), the claim's split (the Transmuter). */
@@ -56,7 +57,8 @@ export function alchemixEventSentence(
   const teaser = alchemixExplainerTeaser(legs, siblings.length > 0 ? siblings : [event], {
     underlyingDecimals: page.underlyingDecimals ?? null,
     mytSymbol: page.mytSymbol ?? "shares",
-    protocolFeeBps: lineProtocolFeeBps(ctx.chainId, ctx.lineKey),
+    protocolFeeBps: lineProtocolFeeStep(ctx.chainId, ctx.lineKey, event.blockNumber)?.bps ?? null,
+    protocolFeeUnread: unreadFee(lineProtocolFeeStep(ctx.chainId, ctx.lineKey, event.blockNumber)),
     collateralTakenRaw: null,
     redemptionNet: null,
     underlyingSymbol: null,

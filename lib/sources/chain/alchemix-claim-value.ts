@@ -2,15 +2,25 @@
 // the shares paid out, at the claim's block (rails-ops
 // reference/official-docs/alchemix.md, chain read 1, ui-jobs 646). Alchemix's
 // docs say a claim pays "1 asset-worth of MYT ... for every 1 alAsset that has
-// vested"; this read is what lets the page state the payout's value beside the
-// share count.
+// vested"; this read lets the page state the payout's value beside the share
+// count.
 //
-// One eth_call at a past block, whose answer cannot change, so it is kept in
-// process for the life of the server. A read that fails or runs late answers
-// null and the page states the share count alone.
+// STORED FIRST (decisions/0054, ruling 2). The page renders from the indexed
+// position, which carries the share count; this read only tops it up. The
+// answer at a past block cannot change, so it goes into Next's data cache with
+// no revalidation (`unstable_cache`, `revalidate: false`, as
+// lib/vaults/asset-scale.ts caches its reads): one eth_call per claim, ever,
+// per deployment. A read that fails, runs late or is refused throws inside the
+// cached function, so nothing is kept, and answers null here: the pane then
+// states the share count alone (lib/alchemix/claim-payout.ts).
+//
+// ALCHEMIX_CLAIM_VALUE_FAIL=1 forces that null path outside production, for
+// checking the fallback on a dev server; production ignores it.
 //
 // SERVER-ONLY.
 
+import "server-only";
+import { unstable_cache } from "next/cache";
 import { parseAbi } from "viem";
 import { chainClient } from "@/lib/sources/chain/rpc";
 import type { ChainId } from "@/lib/shared/chains";
@@ -25,7 +35,26 @@ export interface TransmuterClaimValue {
   assetsRaw: string;
 }
 
-const kept = new Map<string, TransmuterClaimValue>();
+async function readOnce(
+  chainId: ChainId,
+  vault: string,
+  sharesRaw: string,
+  block: number,
+): Promise<TransmuterClaimValue> {
+  const assets = await Promise.race([
+    chainClient(chainId).readContract({
+      address: vault as `0x${string}`,
+      abi: ABI,
+      functionName: "convertToAssets",
+      args: [BigInt(sharesRaw)],
+      blockNumber: BigInt(block),
+    }),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timed out")), TIMEOUT_MS)),
+  ]);
+  return { vault, block, sharesRaw, assetsRaw: assets.toString() };
+}
+
+const readKept = unstable_cache(readOnce, ["alchemix-claim-value"], { revalidate: false });
 
 export async function readTransmuterClaimValue(
   chainId: ChainId,
@@ -33,24 +62,9 @@ export async function readTransmuterClaimValue(
   sharesRaw: string,
   block: number,
 ): Promise<TransmuterClaimValue | null> {
-  const key = `${chainId}:${vault.toLowerCase()}:${sharesRaw}:${block}`;
-  const hit = kept.get(key);
-  if (hit) return hit;
+  if (process.env.NODE_ENV !== "production" && process.env.ALCHEMIX_CLAIM_VALUE_FAIL === "1") return null;
   try {
-    const assets = await Promise.race([
-      chainClient(chainId).readContract({
-        address: vault as `0x${string}`,
-        abi: ABI,
-        functionName: "convertToAssets",
-        args: [BigInt(sharesRaw)],
-        blockNumber: BigInt(block),
-      }),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), TIMEOUT_MS)),
-    ]);
-    if (assets == null) return null;
-    const value = { vault: vault.toLowerCase(), block, sharesRaw, assetsRaw: assets.toString() };
-    kept.set(key, value);
-    return value;
+    return await readKept(chainId, vault.toLowerCase(), sharesRaw, block);
   } catch (err) {
     console.error("alchemix transmuter: the claim's convertToAssets did not land", err);
     return null;

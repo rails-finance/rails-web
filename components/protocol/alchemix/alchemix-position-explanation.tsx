@@ -189,7 +189,7 @@ function explanationParts({
   // price: shares worth the debt, and the line's fee on top of them.
   const earmarked = live.earmarked && live.earmarked.formatted > 0 ? live.earmarked : null;
   const takeShares = earmarked && sharePrice ? earmarked.formatted / sharePrice : null;
-  const takeFee = takeShares != null && feeBps != null ? (takeShares * feeBps) / 10000 : null;
+  const takeFee = takeShares != null && feeBps ? (takeShares * feeBps) / 10000 : null;
 
   const fee = net?.total.fee && net.total.restRaw != null ? net.total.fee : null;
   const rest = fee && net?.total.restRaw != null ? Number(net.total.restRaw) / 1e18 : null;

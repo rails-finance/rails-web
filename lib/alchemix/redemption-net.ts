@@ -15,7 +15,7 @@
 //
 // WHAT THE NET IS MADE OF. Each redemption the Alchemist sends the Transmuter
 // shares worth the debt cleared, and sends its fee receiver `protocolFee` bps
-// on top of those shares (25 on Ethereum, 10 on Base; a MYT Transfer to
+// on top of those shares (the fee at the redemption's block, lib/alchemix/protocol-fee.ts; a MYT Transfer to
 // protocolFeeReceiver in every redemption transaction, measured at exactly
 // 0.25% of the Transmuter's transfer). A position is debited its part of both:
 // its redeemed debt × (line shares out ÷ line debt redeemed) since its own last
@@ -44,7 +44,7 @@ export type RedemptionNet =
       netRaw: string;
       /** The line's redemption fee inside the shares taken. Null where the
        *  line's fee rate is not known. */
-      fee: { bps: number; sharesRaw: string; valueRaw: string } | null;
+      fee: { bps: number; sharesRaw: string; valueRaw: string; read: string | null } | null;
       /** netRaw + the fee's value: what the net is besides the fee. Null with
        *  no fee figure. */
       restRaw: string | null;
@@ -60,6 +60,8 @@ export function redemptionNet(
   before: AlchemixReading | null,
   underlyingDecimals: number | null,
   protocolFeeBps: number | null = null,
+  /** What the fee figure rests on (lib/alchemix/protocol-fee.ts), for its receipt. */
+  feeRead: string | null = null,
 ): RedemptionNet | null {
   const ctx = event.context.data;
   const cleared = ctx.debtClearedFromReadings;
@@ -73,12 +75,12 @@ export function redemptionNet(
   }
   const takenValue = (BigInt(taken) * BigInt(price) * TEN ** BigInt(18 - underlyingDecimals)) / WAD;
   const net = BigInt(cleared.amountRaw) - takenValue;
-  let fee: { bps: number; sharesRaw: string; valueRaw: string } | null = null;
+  let fee: { bps: number; sharesRaw: string; valueRaw: string; read: string | null } | null = null;
   let rest: bigint | null = null;
   if (protocolFeeBps != null && protocolFeeBps > 0) {
     const feeShares = (BigInt(taken) * BigInt(protocolFeeBps)) / BigInt(10000 + protocolFeeBps);
     const feeValue = (feeShares * BigInt(price) * TEN ** BigInt(18 - underlyingDecimals)) / WAD;
-    fee = { bps: protocolFeeBps, sharesRaw: feeShares.toString(), valueRaw: feeValue.toString() };
+    fee = { bps: protocolFeeBps, sharesRaw: feeShares.toString(), valueRaw: feeValue.toString(), read: feeRead };
     rest = net + feeValue;
   }
   return {

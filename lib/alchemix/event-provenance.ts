@@ -767,7 +767,12 @@ export function redemptionFeeProv(
     },
     source: { block: n.atBlock },
     inputs: coordInputs(coords, [
-      { label: "protocolFee", value: String(fee.bps), kind: "chain", note: "basis points, read from the Alchemist" },
+      {
+        label: "protocolFee",
+        value: String(fee.bps),
+        kind: "chain",
+        note: fee.read ? `basis points at this block: ${fee.read}` : "basis points, read from the Alchemist",
+      },
       {
         label: "collateral taken",
         value: n.takenRaw,

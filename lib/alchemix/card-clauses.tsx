@@ -31,6 +31,8 @@ export interface AlchemixCardProse {
   underlyingDecimals: number | null;
   mytSymbol: string;
   protocolFeeBps: number | null;
+  /** The sentence for a block whose fee is unread (lib/alchemix/protocol-fee.ts). */
+  protocolFeeUnread?: string | null;
   collateralTakenRaw: string | null;
   redemptionNet: RedemptionNet | null;
   underlyingSymbol: string | null;
@@ -66,6 +68,7 @@ export function alchemixCardClauses(
         underlyingDecimals: prose.underlyingDecimals,
         mytSymbol: prose.mytSymbol,
         protocolFeeBps: prose.protocolFeeBps,
+        protocolFeeUnread: prose.protocolFeeUnread ?? null,
         collateralTakenRaw: prose.collateralTakenRaw,
         redemptionNet: prose.redemptionNet,
         underlyingSymbol: prose.underlyingSymbol,

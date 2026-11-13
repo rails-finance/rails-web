@@ -11,6 +11,7 @@
 
 import type { LearnMoreContent, LearnMoreLink } from "@/components/shared/learn-more-modal";
 import { ALCHEMIX_V2_DOCS } from "@/lib/alchemix/transmuter-words";
+import { PROTOCOL_FEE_WORDS } from "@/lib/alchemix/protocol-fee";
 
 const DOCS = "https://docs.alchemix.fi";
 
@@ -145,7 +146,7 @@ export const ALCHEMIX_BURN_REPAY: LearnMoreContent = {
     CORE_EARMARKED,
     {
       bold: "Repay",
-      text: "pays the debt with vault shares. Each share counts at its value in the asset underneath at that block, one synthetic per unit, and the market keeps a protocol fee in shares on the part that pays off earmarked debt (0.25% on Ethereum, 0.1% on Base).",
+      text: `pays the debt with vault shares. Each share counts at its value in the asset underneath at that block, one synthetic per unit, and the market keeps a protocol fee in shares on the part that pays off earmarked debt (${PROTOCOL_FEE_WORDS}).`,
     },
   ],
   links: [ALCHEMIX_DOCS.repay, ALCHEMIX_DOCS.borrowerFee, ALCHEMIX_DOCS.transmuterFlow],
@@ -172,7 +173,7 @@ export const ALCHEMIX_SELF_LIQUIDATE: LearnMoreContent = {
     },
     {
       bold: "The fee",
-      text: "is the market's protocol fee on those earmarked shares (0.25% on Ethereum, 0.1% on Base), paid to Alchemix's fee receiver. The rest of the debt is paid without a fee, and no liquidator fee applies.",
+      text: `is the market's protocol fee on those earmarked shares (${PROTOCOL_FEE_WORDS}), paid to Alchemix's fee receiver. The rest of the debt is paid without a fee, and no liquidator fee applies.`,
     },
     {
       bold: "Shares used",
@@ -198,7 +199,7 @@ export const ALCHEMIX_HOW_IT_WORKS: LearnMoreContent = {
   steps: [
     "Someone holding alUSD deposits it in the market's Transmuter, where it vests over a term measured in blocks.",
     "As those deposits vest, the Alchemist earmarks a matching amount of debt across every open position on the market, in proportion to each position's unearmarked debt: it sets that debt aside to be repaid by redemptions. That is each position's Earmarked debt figure, and it grows block by block.",
-    "When a depositor claims, the Transmuter redeems: every open position's earmarked debt is cleared by the same ratio, and the Alchemist takes collateral for it. Vault shares worth one unit of the asset underneath (USDC, or WETH on alETH) for each unit of debt cleared go to the Transmuter, and the market's redemption fee, 0.25% on top of those shares on Ethereum and 0.1% on Base, goes to Alchemix's fee receiver.",
+    `When a depositor claims, the Transmuter redeems: every open position's earmarked debt is cleared by the same ratio, and the Alchemist takes collateral for it. Vault shares worth one unit of the asset underneath (USDC, or WETH on alETH) for each unit of debt cleared go to the Transmuter, and the market's redemption fee on top of those shares (${PROTOCOL_FEE_WORDS}) goes to Alchemix's fee receiver.`,
     "The Transmuter pays the depositor in those vault shares (mixUSDC on the alUSD market) for the part of the deposit that has vested, one unit of the asset underneath for each alUSD, and returns the rest as alUSD.",
   ],
   // The depositor's side, which a borrower reading a redemption also needs: a

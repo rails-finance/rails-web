@@ -76,7 +76,8 @@ import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAlchemistEvent, isAlchemixV2Event } from "@/lib/shared/types/event-shape";
 import { AlchemixV2EventCard, type AlchemixV2Event } from "@/components/protocol/alchemix/v2-event-card";
-import { lineProtocolFeeBps, v2PositionPath, v3PositionPath } from "@/lib/alchemix/lines";
+import { lineProtocolFeeStep, v2PositionPath, v3PositionPath } from "@/lib/alchemix/lines";
+import { protocolFeeNow } from "@/lib/alchemix/protocol-fee";
 import { AlchemixEventCard } from "@/components/protocol/alchemix/alchemix-event-card";
 import {
   AlchemixIdentity,
@@ -416,7 +417,8 @@ export function AlchemistPositionView({
               e,
               beforeByBlock.get(e.blockNumber) ?? null,
               underlyingUnit?.decimals ?? null,
-              lineProtocolFeeBps(chainId, lineKey),
+              lineProtocolFeeStep(chainId, lineKey, e.blockNumber)?.bps ?? null,
+              lineProtocolFeeStep(chainId, lineKey, e.blockNumber)?.read ?? null,
             ),
           ),
       ),
@@ -704,7 +706,8 @@ export function AlchemistPositionView({
           : null,
         debtFromEvents,
         usdOnCard,
-        feeBps: lineProtocolFeeBps(chainId, lineKey),
+        // The fee now, for what clearing the earmarked debt would take.
+        feeBps: protocolFeeNow(chainId, lineKey)?.bps ?? null,
         lineLiquidations: live.health?.lineLiquidations
           ? {
               ...live.health.lineLiquidations,
