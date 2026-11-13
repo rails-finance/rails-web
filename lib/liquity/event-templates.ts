@@ -87,6 +87,10 @@ export function troveWords(id: string, values: Record<string, string | number> =
  *  knows a close with no debt left. */
 export interface L5Options {
   collateralType?: string;
+  /** A redemption on a shut-down branch (redemptionPath): the redemption
+   *  modal keeps its intro and links, without the fee kept by the trove and
+   *  the rate queue, which hold only for a standard redemption. */
+  urgentPath?: boolean;
   delegated?: boolean;
   delegateName?: string;
   zeroDebt?: boolean;
@@ -103,6 +107,12 @@ function modal(key: L5Key, o: L5Options = {}): LearnMoreContent {
       max_ltv: fmtMaxLtv(o.collateralType ?? "WETH") ?? "",
       coll_type: o.collateralType ?? FILE.L5_words.coll_type_unknown,
     };
+  } else if (key === "redemption" && o.urgentPath) {
+    const c = PROSE.modal(d, form, values);
+    delete c.extraParagraphs;
+    delete c.detailsHeading;
+    delete c.details;
+    return c;
   } else if (key === "adjust") {
     values = {
       max_ltv: fmtMaxLtv(o.collateralType) ?? FILE.L5_words.max_ltv_unknown,

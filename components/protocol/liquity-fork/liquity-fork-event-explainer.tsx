@@ -27,6 +27,7 @@ import { useCollFigures } from "@/components/shared/event-ledger-context";
 import {
   liquityForkEventSlots,
   type LiquityForkEventContext,
+  type LiquityForkEventFacts,
   type LiquityForkExplainerProvs,
 } from "@/lib/shared/liquity-fork-explainer-clauses";
 
@@ -42,6 +43,8 @@ export interface LiquityForkEventExplainerProps {
   blockNumber?: number;
   /** The card shows the lead sentence as the teaser; render only the rest here. */
   skipLead?: boolean;
+  /** What the row alone does not carry: which redemption path reached the Trove. */
+  facts?: LiquityForkEventFacts;
 }
 
 /** Mechanic modal content for this event — never-empty floor: every event type
@@ -51,6 +54,7 @@ export interface LiquityForkEventExplainerProps {
 export function liquityForkLearnMoreContent(
   ctx: LiquityForkEventContext,
   fork: LiquityForkLearnMoreParams,
+  facts: LiquityForkEventFacts = {},
 ): LearnMoreContent {
   switch (ctx.eventType) {
     case "openTrove":
@@ -64,7 +68,7 @@ export function liquityForkLearnMoreContent(
     case "adjustTroveInterestRate":
       return liquityForkRateContent(fork);
     case "redeemCollateral":
-      return liquityForkRedemptionContent(fork);
+      return liquityForkRedemptionContent(fork, facts.redemption === "urgent");
     case "liquidate":
       return liquityForkLiquidationContent(fork);
     case "openTroveAndJoinBatch":
@@ -85,6 +89,7 @@ export function LiquityForkEventExplainer({
   txHash,
   blockNumber,
   skipLead,
+  facts,
 }: LiquityForkEventExplainerProps) {
   const coords: LiquityForkCoords = {
     txHash,
@@ -93,7 +98,7 @@ export function LiquityForkEventExplainer({
     isBatched: ctx.isBatched,
   };
   const figures = useCollFigures();
-  const clauses = figures(() => eventClauses(liquityForkEventSlots(ctx, coords, fork, builders)));
+  const clauses = figures(() => eventClauses(liquityForkEventSlots(ctx, coords, fork, builders, facts)));
   const items = composeBullets(skipLead ? splitLead(clauses).rest : clauses);
 
   return <ProseExplainer items={items} />;

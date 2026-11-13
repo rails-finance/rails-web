@@ -1161,7 +1161,23 @@ export function liquityForkRateContent(p: LiquityForkLearnMoreParams): LearnMore
   };
 }
 
-export function liquityForkRedemptionContent(p: LiquityForkLearnMoreParams): LearnMoreContent {
+/** `urgent`: the modal as an urgent-path event shows it (a redemption on a
+ *  shut-down branch, lib/liquity-fork/shutdown.ts `redemptionPath`): the rate
+ *  queue's routing, the value-for-value step and the dormant queue go. */
+export function liquityForkRedemptionContent(p: LiquityForkLearnMoreParams, urgent = false): LearnMoreContent {
+  if (urgent)
+    return {
+      title: "How redemptions work",
+      intro: `Any ${p.stablecoin} holder can redeem it against the system at $1 face value, the peg mechanism.`,
+      stepsHeading: "What happens to a redeemed Trove:",
+      steps: [
+        "It gives up collateral at the branch oracle price for the debt cancelled.",
+        p.terms.ltv ? "Its LTV FALLS as a result." : `Its ${p.terms.ratioText} RISES as a result.`,
+      ],
+      detailsHeading: "Key concepts:",
+      details: [liquityShutdownConcept(p.terms, "redemption")],
+      links: forkLinks(p, "redemption"),
+    };
   return {
     title: "How redemptions work",
     intro: `Any ${p.stablecoin} holder can redeem it against the system at $1 face value, the peg mechanism. Redemptions are routed across branches by their unbacked portions and, within a branch, sweep the LOWEST user-set interest rates first (${p.terms.ltv ? "not the highest LTV" : `not the lowest ${p.terms.ratioText}`}, the V1 difference).`,

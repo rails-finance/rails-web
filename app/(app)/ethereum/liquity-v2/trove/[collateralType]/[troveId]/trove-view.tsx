@@ -410,8 +410,12 @@ export default function TroveView({
 
   // What an event's Copy for LLM header names about the trove.
   const troveMeta = useMemo(
-    () => ({ owner: effectiveOwner ?? null, total: totalEvents ?? liquityEvents.length }),
-    [effectiveOwner, totalEvents, liquityEvents.length],
+    () => ({
+      owner: effectiveOwner ?? null,
+      total: totalEvents ?? liquityEvents.length,
+      shutdownAt: shutdown?.at ?? null,
+    }),
+    [effectiveOwner, totalEvents, liquityEvents.length, shutdown?.at],
   );
 
   if (loading) {

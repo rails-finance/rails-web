@@ -29,3 +29,13 @@ test("the adjust modal stays a sentence without a known branch", () => {
 test("the liquidation modal reads the same figure", () => {
   assert.match(L5.liquidation({ collateralType: "rETH" }).intro, /Max LTV of 83\.33% for rETH/);
 });
+
+test("the redemption modal on the urgent path drops the fee kept and the rate queue", () => {
+  const ordinary = L5.redemption({ collateralType: "WETH" });
+  assert.ok(ordinary.extraParagraphs.some((p) => /fee stays in the trove/.test(p)));
+  const urgent = L5.redemption({ collateralType: "WETH", urgentPath: true });
+  const text = JSON.stringify(urgent);
+  assert.doesNotMatch(text, /stays in the trove|lowest first|redemption queue/);
+  assert.equal(urgent.title, ordinary.title);
+  assert.equal(urgent.intro, ordinary.intro);
+});

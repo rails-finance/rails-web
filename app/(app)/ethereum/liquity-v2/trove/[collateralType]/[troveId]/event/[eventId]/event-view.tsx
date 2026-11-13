@@ -124,7 +124,10 @@ export default function EventView({
     liveState: undefined,
     shutdownAt: shutdown?.at ?? null,
   });
-  const troveMeta = useMemo(() => ({ owner: owner ?? null, total }), [owner, total]);
+  const troveMeta = useMemo(
+    () => ({ owner: owner ?? null, total, shutdownAt: shutdown?.at ?? null }),
+    [owner, total, shutdown?.at],
+  );
 
   if (!trove || !events) {
     return (
