@@ -139,7 +139,7 @@ export const externalActorProv = (
   kind: "chain-derived",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `This ${args.eventType.replace(/_/g, " ")} was executed by a third party. The position owner neither signed the transaction nor made the Morpho call. The transaction sender and the event's caller param (msg.sender, authorized for the position) are both chain facts${atBlock(coords)}; each is compared against the owner. Bundler-routed flows keep the owner as signer and contract-owned positions keep the owner as caller — this event has the owner as neither.`,
+  summary: `This ${args.eventType.replace(/_/g, " ")} was executed by a third party. The position owner neither signed the transaction nor made the Morpho call. The transaction sender and the event's caller param (msg.sender, authorized for the position) are both chain facts${atBlock(coords)}; each is compared against the owner. Bundler-routed flows keep the owner as signer and contract-owned positions keep the owner as caller.`,
   contract: blueOf(coords),
   via: `${captureVia(coords)} · tx envelope from + ${MORPHO_LOG[args.eventType] ?? args.eventType} caller param vs owner`,
   inputs: eventInputs(coords, [
@@ -174,7 +174,7 @@ export const collateralAfterProv = (sym: string, coords: MorphoCoords): Provenan
 export const borrowedAfterProv = (sym: string, coords: MorphoCoords): Provenance => ({
   kind: "chain",
   pclass: "indexed",
-  summary: `Net borrowed principal (${sym}) after this event — the position's running loan-asset principal, replayed from its on-chain events (draws add; repayments and the debt a liquidation clears — bad debt included — subtract) in log order up to this block${atBlock(coords)}. Principal only: interest accrued since each draw is excluded (current debt with interest needs the market index — a derived layer).`,
+  summary: `Net borrowed principal (${sym}) after this event — the position's running loan-asset principal, replayed from its on-chain events (draws add; repayments and the debt a liquidation clears — bad debt included — subtract) in log order up to this block${atBlock(coords)}. Principal only: interest accrued since each draw is excluded.`,
   contract: blueOf(coords),
   via: `${captureVia(coords)} · Σ ±assets across Borrow/Repay/Liquidate logs · in on-chain order`,
   inputs: eventInputs(coords),
@@ -197,7 +197,7 @@ export const debtAfterProv = (sym: string, coords: MorphoCoords): Provenance => 
 export const debtBeforeProv = (sym: string, coords: MorphoCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `${sym} the position owed just before this event. Its borrow shares before the event priced at the market's totals just before it. It includes the interest accrued since the previous row.`,
+  summary: `${sym} the position owed just before this event. It includes the interest accrued since the previous row.`,
   contract: blueOf(coords),
   via: "borrow shares before × market totals before this event",
   formula: "after − change",
@@ -279,7 +279,7 @@ export const supplyAfterProv = (sym: string, coords: MorphoCoords): Provenance =
 export const supplyBeforeProv = (sym: string, coords: MorphoCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `${sym} the position's supply stood at just before this event. Its supply shares before the event priced at the market's totals just before it. It includes the interest earned since the previous row.`,
+  summary: `${sym} the position's supply stood at just before this event. It includes the interest earned since the previous row.`,
   contract: blueOf(coords),
   via: "supply shares before × market totals before this event",
   formula: "after − change",
@@ -480,7 +480,7 @@ export const atBlockOraclePriceProv = (
         ? `To check: ask any archive node for the market oracle's price() at block ${coords.blockNumber} (the oracle address is in the market's immutable params).`
         : "To check: ask any archive node for the market oracle's price().",
   },
-  summary: `${collSym} priced in ${loanSym} at this event's block — the market's oracle (IOracle.price(), fixed in the market's immutable params at creation), ${coords.source === "sweep" ? "asked for its answer at that block" : "read at the block and captured into the index"}. Morpho's LLTV test and liquidation-incentive math acted on this figure. Morpho prices in the loan asset by design; no USD figure is stated.`,
+  summary: `${collSym} priced in ${loanSym} at this event's block — the market's oracle (IOracle.price(), fixed in the market's immutable params at creation), ${coords.source === "sweep" ? "asked for its answer at that block" : "read at the block and captured into the index"}. Morpho's LLTV test and liquidation-incentive math acted on this figure. No USD figure is stated.`,
   contract: blueOf(coords),
   via: "market oracle · price() eth_call at the event's block · 1e36-scaled, decimals-adjusted",
   inputs: [
@@ -515,7 +515,7 @@ export const liqClearedValueProv = (loanSym: string, coords: MorphoCoords, vals:
   kind: "chain",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `The ${loanSym} debt this liquidation cleared — the Liquidate log's repaid assets plus any bad debt the market socialized in the same event, as emitted. It is in the market's loan asset, so no price is applied to this leg.`,
+  summary: `The ${loanSym} debt this liquidation cleared — the Liquidate log's repaid assets plus any bad debt the market socialized in the same event, as emitted. No price is applied to this leg.`,
   contract: blueOf(coords),
   via: `${captureVia(coords)} · Liquidate log · repaidAssets + badDebtAssets`,
   inputs: [
@@ -534,7 +534,7 @@ export const liqPremiumProv = (
   pclass: "oracle",
   formula: "seized ÷ cleared − 1",
   verify: txVerify(coords),
-  summary: `The premium realized on this liquidation — seized collateral value (at the market oracle's price this block, in ${loanSym}) over the loan cleared, minus one. This reproduces the market's Liquidation Incentive Factor as realized by the liquidator; when the event also socialized bad debt, the cleared leg includes it, and the figure can fall below the incentive (or negative — the seizure no longer covered the debt).`,
+  summary: `The premium realized on this liquidation — seized collateral value (at the market oracle's price this block, in ${loanSym}) over the loan cleared, minus one. This reproduces the market's Liquidation Incentive Factor as realized by the liquidator; when the event also socialized bad debt, the cleared leg includes it and the figure can fall below the incentive or go negative.`,
   contract: blueOf(coords),
   via: "seized ÷ cleared − 1 · both legs in the market's loan asset",
   inputs: [

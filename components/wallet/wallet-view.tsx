@@ -55,7 +55,7 @@ const H2 = "text-sm font-semibold uppercase tracking-wide text-foreground/80";
 /** The Debt tile's rate: each family hands its stored simple yearly rate
  *  (WalletPosition.debtRate), so the average is in one form. */
 const RATE_TIP =
-  "The borrow rates of the positions with debt, each as a simple yearly rate (the protocol's per-second or yearly rate, uncompounded), averaged by debt. Each protocol's page states its rate in that protocol's documented form.";
+  "The borrow rates of the positions with debt, each as a simple yearly rate (the protocol's per-second or yearly rate, uncompounded), averaged by debt. Each protocol's page states its rate in its documented form.";
 
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
