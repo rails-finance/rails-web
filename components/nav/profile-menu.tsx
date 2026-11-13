@@ -46,7 +46,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type 
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bookmark, Check, ChevronDown, CircleHelp, Crosshair, Signpost } from "lucide-react";
+import { Check, ChevronDown, CircleHelp, Crosshair, Signpost } from "lucide-react";
 
 import { Facehash } from "@/components/shared/facehash";
 import { FocusAvatar } from "@/components/shared/focus-avatar";
@@ -79,13 +79,11 @@ const GROUP = "mt-6";
 /** A row: 44px tall, a blue rounded outline on hover and keyboard focus. */
 const ITEM =
   "flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-left text-[15px] text-foreground outline-none transition-shadow hover:ring-1 hover:ring-blue-500 focus-visible:ring-[1.5px] focus-visible:ring-blue-500";
-/** The Saved views row: ITEM's size, a link's hover in place of the ring, its
- *  text and icon turning link blue; keyboard focus adds the ring (Miles 13
- *  Nov 2026). */
+/** The Saved views row: ITEM's size, its words alone on the rows' content
+ *  edge, a link's hover in place of the ring, the words turning link blue;
+ *  keyboard focus adds the ring (Miles 13 Nov 2026). */
 const SAVED_ROW =
-  "group/saved flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-left text-[15px] text-foreground outline-none transition-colors hover:text-blue-600 focus-visible:text-blue-600 focus-visible:ring-[1.5px] focus-visible:ring-blue-500 dark:hover:text-[var(--text-link)] dark:focus-visible:text-[var(--text-link)]";
-const SAVED_ICON =
-  "size-4 shrink-0 text-rb-500 transition-colors group-hover/saved:text-blue-600 group-focus-visible/saved:text-blue-600 dark:group-hover/saved:text-[var(--text-link)] dark:group-focus-visible/saved:text-[var(--text-link)]";
+  "flex min-h-11 w-full cursor-pointer items-center rounded-lg px-3 text-left text-[15px] font-medium text-foreground outline-none transition-colors hover:text-blue-600 focus-visible:text-blue-600 focus-visible:ring-[1.5px] focus-visible:ring-blue-500 dark:hover:text-[var(--text-link)] dark:focus-visible:text-[var(--text-link)]";
 /** A long name fades at the line's end, with no ellipsis. */
 const FADE =
   "min-w-0 flex-1 overflow-hidden whitespace-nowrap [mask-image:linear-gradient(to_right,#000_calc(100%-2rem),transparent)]";
@@ -559,8 +557,7 @@ export function ProfileMenu() {
                 className={SAVED_ROW}
                 data-profile-menu-bookmarks=""
               >
-                <Bookmark className={SAVED_ICON} fill="currentColor" aria-hidden="true" />
-                <span className="font-medium">{SAVED_NAME}</span>
+                {SAVED_NAME}
               </Link>
               {/* With nothing saved, the way in (ui-jobs 509). */}
               {!anything && (

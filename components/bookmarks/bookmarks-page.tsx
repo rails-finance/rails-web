@@ -12,7 +12,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Bookmark, Focus, HardDriveDownload, Layers, ListFilter, Plus, Signpost, Wallet } from "lucide-react";
+import { Focus, HardDriveDownload, Layers, ListFilter, Plus, Signpost, Wallet } from "lucide-react";
 import { DetailBackButton } from "@/components/shared/detail-back-row";
 import {
   BookmarkBackup,
@@ -164,9 +164,8 @@ export function BookmarksPage() {
           every width (Miles, 13 Nov 2026; ui-jobs 652); on a phone the row
           scrolls sideways. */}
       <div className="mb-6 mt-6 flex flex-col gap-3">
-        <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground" data-anatomy="B1">
-          {/* The saved-state glyph the wallet menu draws (ui-jobs 493, 494). */}
-          <Bookmark className="size-6 shrink-0" fill="currentColor" aria-hidden="true" />
+        {/* The page's name alone, no glyph before it (Miles 13 Nov 2026). */}
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground" data-anatomy="B1">
           {SAVED_NAME}
         </h1>
         <div
