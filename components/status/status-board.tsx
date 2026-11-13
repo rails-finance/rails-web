@@ -255,19 +255,19 @@ function censusLine(r: CensusRunStatus, lastWriteAt: string | null, subject = "T
  *  known) and the row line's label ("Next run in 4 h 52 min (14:12 UTC)").
  *  Null otherwise. */
 function censusDueWords(e: StatusEntry, now: number): { status: string; label: string } | null {
-  // Of the held censuses, the one due first; named where the row has several.
+  // Of the held censuses, the one due first. A row reads held only when a
+  // census is its sole index, so the label needs no census name.
   const held = censusWriters(e)
     .map((w) => ({ w, due: writerState(w, now, e) === "paused" ? censusDue(w) : null }))
     .filter((x): x is { w: StatusWriter; due: { at: number; after: boolean } } => x.due != null)
     .sort((a, b) => a.due.at - b.due.at);
   if (!held.length) return null;
-  const { w, due } = held[0];
-  const next = censusWriters(e).length > 1 ? `Next ${censusLabel(w, e)}` : "Next run";
+  const { due } = held[0];
   const slot = hhmm(new Date(due.at * 1000).toISOString());
-  if (due.after) return { status: `After ${slot}`, label: `${next} after ${slot}` };
-  if (due.at - now < 60) return { status: "Due now", label: `${next} due now (${slot})` };
+  if (due.after) return { status: `After ${slot}`, label: `Next run after ${slot}` };
+  if (due.at - now < 60) return { status: "Due now", label: `Next run due now (${slot})` };
   const left = ageWords(due.at - now);
-  return { status: `In ${left}`, label: `${next} in ${left} (${slot})` };
+  return { status: `In ${left}`, label: `Next run in ${left} (${slot})` };
 }
 
 const censusWriters = (e: StatusEntry) => (e.live?.writers ?? []).filter((w) => w.name === CENSUS_WRITER);

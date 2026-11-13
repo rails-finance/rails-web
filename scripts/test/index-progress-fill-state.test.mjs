@@ -274,7 +274,7 @@ test("visit window starts at the previous clock hour of the snapshot", () => {
 import { censusScopeOf } from "../../lib/shared/index-progress.ts";
 
 test("each Morpho census writer takes its own run", () => {
-  const mm = censusRun({ family: "metamorpho", families: ["metamorpho-v1"], outcome: "completed" });
+  const mm = censusRun({ family: "metamorpho", families: ["morpho"], outcome: "completed" });
   const v2 = censusRun({ family: "vault-v2", families: ["morpho-v2"], outcome: "failed", error: "RangeError: x" });
   const base = censusRun({ chain: 8453, family: "vault-v2", families: ["morpho-v2"], outcome: "completed" });
   const s = withCensusRuns({
@@ -335,4 +335,27 @@ test("a held census does not take a row with its own index; a late one raises it
   assert.equal(pipelineState(row([held]), now), "fresh");
   assert.equal(pipelineState(row([held, failed]), now), "late");
   assert.equal(pipelineState(row([held], null), now), "paused");
+});
+
+import { pipelineHeartbeat } from "../../lib/shared/index-progress.ts";
+
+test("a row with its own index takes its last write from the index, not a census", () => {
+  const stale = {
+    name: "base-lending-copy",
+    kind: "copy-worker",
+    lastWriteAt: at(5 * 3600),
+    expectEverySec: 600,
+    newest: null,
+  };
+  const census = { ...censusWriter(600), lastWriteAt: at(600) };
+  const e = {
+    protocol: "morpho",
+    chain: 8453,
+    backfill: null,
+    live: { lane: "x", checkpoint: null, head: null, writers: [stale, census] },
+  };
+  assert.equal(pipelineHeartbeat(e), now - 5 * 3600);
+  assert.equal(pipelineState(e, now), "stalled");
+  const alone = { ...e, protocol: "yearn", live: { ...e.live, writers: [census] } };
+  assert.equal(pipelineHeartbeat(alone), now - 600);
 });

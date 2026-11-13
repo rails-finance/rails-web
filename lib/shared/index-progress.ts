@@ -627,10 +627,20 @@ export function pipelineState(e: StatusEntry, now: Secs): Heartbeat {
   return heartbeatAge(isoSecs(e.backfill?.heartbeatAt), now);
 }
 
+/** Whether a row has an index of its own beside any census: another
+ *  scheduled writer, or a lane checkpoint. */
+export function hasOwnIndex(e: StatusEntry): boolean {
+  const ws = e.live?.writers ?? [];
+  return ws.some((w) => w.name !== CENSUS_WRITER && w.expectEverySec) || isoSecs(e.live?.checkpoint?.updatedAt) != null;
+}
+
 /** A pipeline's heartbeat: the backfill's wall time, else the newest write any
- *  writer stamped. Null when none stamps a wall time. */
+ *  writer stamped, leaving out a census on a row with its own index. Null when
+ *  none stamps a wall time. */
 export function pipelineHeartbeat(e: StatusEntry): Secs | null {
-  const times = [e.backfill?.heartbeatAt, ...(e.live?.writers ?? []).map((w) => w.lastWriteAt)]
+  const own = hasOwnIndex(e);
+  const writers = (e.live?.writers ?? []).filter((w) => !own || w.name !== CENSUS_WRITER);
+  const times = [e.backfill?.heartbeatAt, ...writers.map((w) => w.lastWriteAt)]
     .map(isoSecs)
     .filter((t): t is Secs => t != null);
   return times.length ? Math.max(...times) : null;
