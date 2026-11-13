@@ -150,7 +150,7 @@ test("one failed read of seven stays fresh; two of seven are late; four of seven
 
 // censusRuns: a census that stops at its share or deadline is held while the
 // run is recent; three stuck stops are an alarm; a failed run is late.
-import { withCensusRuns } from "../../lib/shared/index-progress.ts";
+import { withCensusRuns, censusDue } from "../../lib/shared/index-progress.ts";
 
 const censusRun = (over) => ({
   chain: 1,
@@ -198,9 +198,28 @@ test("a census stopped at its share is paused while the run is recent", () => {
   assert.equal(writerState(s.entries[0].live.writers[0], now, s.entries[0]), "paused");
 });
 
-test("a census stop older than the late line reads by the schedule", () => {
-  const s = censusStatus(censusRun({ endedAt: at(40 * 3600) }), censusWriter(40 * 3600));
+test("a census past its due time and the grace with no newer run is late", () => {
+  const s = censusStatus(censusRun({ resetsAt: at(3 * 3600) }));
   assert.equal(writerState(s.entries[0].live.writers[0], now, s.entries[0]), "late");
+});
+
+test("the next run comes from nextRunAt, else after the reset, else a schedule after the run", () => {
+  const w = (run, ranAgo = 2 * 3600) => ({ ...censusWriter(ranAgo), censusRun: run });
+  assert.deepEqual(censusDue(w(censusRun({ nextRunAt: "2026-11-13T14:12:00.000Z" }))), {
+    at: Date.parse("2026-11-13T14:12:00Z") / 1000,
+    after: false,
+  });
+  // nextRunAt has moved to tomorrow's slot; the due time is the first slot after the stop.
+  assert.deepEqual(
+    censusDue(w(censusRun({ endedAt: "2026-11-12T14:40:00.000Z", nextRunAt: "2026-11-14T14:12:00.000Z" }))),
+    { at: Date.parse("2026-11-13T14:12:00Z") / 1000, after: false },
+  );
+  assert.deepEqual(censusDue(w(censusRun())), { at: Date.parse("2026-11-13T14:06:09.022Z") / 1000, after: true });
+  assert.deepEqual(censusDue(w(censusRun({ outcome: "stopped-deadline", resetsAt: null }))), {
+    at: now - 2 * 3600 + 86400,
+    after: false,
+  });
+  assert.equal(censusDue(w(censusRun({ outcome: "completed" }))), null);
 });
 
 test("three stops in the same vault are stalled; a failed run is late", () => {
