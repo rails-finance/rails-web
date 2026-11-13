@@ -74,7 +74,7 @@ import type { LiquityV1SystemChainResponse } from "@/lib/api/fetch-liquity-v1-sy
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
-import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { INLINE_LINK, FOOT_ARROW, FOOT_LINK, FOOT_WORDS } from "@/lib/shared/ui-grammar";
 
 const ratio = (x: number) => `${(x * 100).toFixed(1)}%`;
 
@@ -351,8 +351,11 @@ function QueueCard({ data, readBy }: { data: LiquityV1SystemChainResponse; readB
           The sorted list didn&rsquo;t answer on this read, so the queue is withheld rather than estimated.
         </p>
       ) : (
-        <Link href={QUEUE_HREF} className={`mt-3 inline-block text-[13px] ${INLINE_LINK}`}>
-          Open the queue in the listing <span aria-hidden>&rarr;</span>
+        <Link href={QUEUE_HREF} className={`mt-3 text-[13px] ${FOOT_LINK}`}>
+          <span className={FOOT_WORDS}>Open the queue in the listing</span>
+          <span className={FOOT_ARROW} aria-hidden="true">
+            →
+          </span>
         </Link>
       )}
     </div>

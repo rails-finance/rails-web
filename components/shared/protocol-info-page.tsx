@@ -18,7 +18,7 @@ import type { SessionProtocol } from "@/lib/shared/sessions";
 import { RailHeader } from "@/components/shared/rail-header";
 import { protocolForSession } from "@/lib/shared/protocols";
 import { CHAINS, explorerUrl, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
-import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { FOOT_ARROW, FOOT_LINK, FOOT_WORDS, INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { shortAddress } from "@/lib/shared/asset-roster";
 import { InfoHistoryLine } from "@/components/shared/history-tag";
 import { Prov, type Provenance } from "@/components/shared/provenance";
@@ -306,8 +306,11 @@ export function ProtocolInfoShell({ session, children }: { session: SessionProto
           audit reader wants that register); the intro above carries any
           reader-facing consequence in plain words instead. */}
       <p className="mt-4 text-sm text-rb-500" data-anatomy="I3">
-        <Link href={`/coverage/${CHAINS[chainId].slug}`} className={INLINE_LINK}>
-          See what Rails covers on each {CHAINS[chainId].name} explorer
+        <Link href={`/coverage/${CHAINS[chainId].slug}`} className={FOOT_LINK}>
+          <span className={FOOT_WORDS}>See what Rails covers on each {CHAINS[chainId].name} explorer</span>
+          <span className={FOOT_ARROW} aria-hidden="true">
+            →
+          </span>
         </Link>
       </p>
     </div>
@@ -415,8 +418,11 @@ export function ProtocolInfoPage({
       </div>
       <p className="mt-4 text-sm text-rb-500" data-anatomy="I3">
         {notCovered && <span className="block">{notCovered}</span>}
-        <Link href={`/coverage/${CHAINS[chainId].slug}`} className={INLINE_LINK}>
-          See what Rails covers on each {CHAINS[chainId].name} explorer
+        <Link href={`/coverage/${CHAINS[chainId].slug}`} className={FOOT_LINK}>
+          <span className={FOOT_WORDS}>See what Rails covers on each {CHAINS[chainId].name} explorer</span>
+          <span className={FOOT_ARROW} aria-hidden="true">
+            →
+          </span>
         </Link>
       </p>
       <p className="mt-2 text-sm text-rb-500" data-anatomy="I7">

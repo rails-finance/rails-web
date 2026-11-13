@@ -43,7 +43,7 @@ import { morphoListedViewFromLive, morphoViewFromSweep } from "@/lib/morpho/swep
 import { morphoHasCollateralRaw, morphoHasDebt } from "@/lib/morpho/position-legs";
 import { explorerUrl } from "@/lib/shared/chains";
 import { CaptureSourceProvider } from "@/lib/shared/capture-source";
-import { PAGE_LINK } from "@/lib/shared/ui-grammar";
+import { PAGE_LINK, FOOT_ARROW, FOOT_LINK, FOOT_WORDS } from "@/lib/shared/ui-grammar";
 import { StoreFirstRead, SweepInFlight } from "@/components/shared/sweep-in-flight";
 
 /** The receipts a hub row's LIVE card cites — the same head read of the
@@ -238,10 +238,13 @@ export function MorphoWalletView({
                     <Link
                       key={pos.marketId}
                       href={d.positionHref(wallet, pos.marketId)}
-                      className={PAGE_LINK}
+                      className={`text-xs font-semibold ${FOOT_LINK}`}
                       prefetch={false}
                     >
-                      {pos.marketLabel} <span aria-hidden>→</span>
+                      <span className={FOOT_WORDS}>{pos.marketLabel}</span>
+                      <span className={FOOT_ARROW} aria-hidden="true">
+                        →
+                      </span>
                     </Link>
                   ))}
                 {unswept.length > 0 && (

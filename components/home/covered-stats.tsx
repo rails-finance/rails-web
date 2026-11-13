@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FOOT_ARROW, FOOT_LINK, FOOT_WORDS } from "@/lib/shared/ui-grammar";
 import type { CoveredPositions } from "@/lib/home/covered-positions";
 import type { HomeStats } from "@/lib/home/home-stats";
 import { formatValueHeld, spokenValueHeld, type ValueHeld } from "@/lib/home/value-held";
@@ -141,12 +142,11 @@ const LABEL = "font-sans font-light tracking-tight text-rb-500 text-lg sm:text-x
 /** Under the sentence: the way to how the figures are counted, in the link blue. */
 function FiguresLink() {
   return (
-    <Link
-      href="/about/figures"
-      className="mt-4 text-sm font-medium text-blue-600 underline-offset-4 hover:underline dark:text-[var(--text-link)]"
-      data-anatomy="S3.3"
-    >
-      How these are counted <span>→</span>
+    <Link href="/about/figures" className={`mt-4 text-sm font-medium ${FOOT_LINK}`} data-anatomy="S3.3">
+      <span className={FOOT_WORDS}>How these are counted</span>
+      <span className={FOOT_ARROW} aria-hidden="true">
+        →
+      </span>
     </Link>
   );
 }

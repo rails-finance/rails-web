@@ -30,7 +30,7 @@ import { MAPLE_POOLS } from "@/lib/maple/asset-catalog";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import Link from "next/link";
-import { PAGE_LINK } from "@/lib/shared/ui-grammar";
+import { FOOT_ARROW, FOOT_LINK, FOOT_WORDS } from "@/lib/shared/ui-grammar";
 import { VAULT_INDEX_HREF } from "@/lib/vaults/routes";
 
 // ISR, ten minutes. This is a protocol aggregate, not a wallet's page: the
@@ -64,8 +64,16 @@ export default async function MaplePoolsPage() {
 
         {/* The pools are rows on the cross-protocol vault index (ui-jobs 39). */}
         <p className="-mt-3 mb-4 text-[13px]">
-          <Link href={VAULT_INDEX_HREF} className={PAGE_LINK} prefetch={false} data-link="vault-index">
-            All vaults <span aria-hidden>→</span>
+          <Link
+            href={VAULT_INDEX_HREF}
+            className={`text-xs font-semibold ${FOOT_LINK}`}
+            prefetch={false}
+            data-link="vault-index"
+          >
+            <span className={FOOT_WORDS}>All vaults</span>
+            <span className={FOOT_ARROW} aria-hidden="true">
+              →
+            </span>
           </Link>
         </p>
         <div data-skel-section="page-table">

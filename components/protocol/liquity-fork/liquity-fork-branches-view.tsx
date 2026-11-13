@@ -52,7 +52,7 @@ import { explorerUrl } from "@/lib/shared/chains";
 import type { LiquityForkBranchesResponse, LiquityForkBranchState } from "@/lib/api/fetch-liquity-fork-branches";
 import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
-import { INLINE_LINK, INPLACE_TEXT } from "@/lib/shared/ui-grammar";
+import { INPLACE_TEXT, FOOT_ARROW, FOOT_LINK, FOOT_WORDS } from "@/lib/shared/ui-grammar";
 import { liquityFamilyTerms } from "@/lib/liquity/ltv";
 import { shutdownDateProv, shutdownDay, withdrawalDateProv } from "@/lib/shared/liquity-family-shutdown";
 import { allBranchesShutDown } from "@/lib/liquity-fork/shutdown";
@@ -530,9 +530,12 @@ export function LiquityForkBranchesView({
                     <Link
                       key={b.key}
                       href={queueHref(basePath, b.symbol, wiring)}
-                      className={`text-[13px] ${INLINE_LINK}`}
+                      className={`text-[13px] ${FOOT_LINK}`}
                     >
-                      {b.symbol} queue <span aria-hidden>→</span>
+                      <span className={FOOT_WORDS}>{b.symbol} queue</span>
+                      <span className={FOOT_ARROW} aria-hidden="true">
+                        →
+                      </span>
                     </Link>
                   ))}
                 </div>

@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { LwNotice } from "@/components/shared/lw-attribution";
 import { Activity, DraftingCompass, FileText, Home, Info, LayoutGrid, ReceiptText, Signpost } from "lucide-react";
-import { INPLACE_TEXT } from "@/lib/shared/ui-grammar";
+import { INPLACE_TEXT, NAV_LINK } from "@/lib/shared/ui-grammar";
 import { DonateModal } from "@/components/site/DonateModal";
 import { FeedbackCluster } from "@/components/shared/feedback-cluster";
 import { LiquityModal } from "@/components/site/LiquityModal";
@@ -107,10 +107,7 @@ export function SiteFooter() {
               <h4 className="text-sm font-semibold text-foreground mb-3">Learn about Rails</h4>
               <ul className="space-y-2">
                 <li>
-                  <Link
-                    href="/"
-                    className="flex items-center gap-2 text-rb-500 hover:text-blue-600 dark:hover:text-[var(--text-link)] text-sm transition-colors duration-150"
-                  >
+                  <Link href="/" className={`flex items-center gap-2 text-sm duration-150 ${NAV_LINK}`}>
                     <Home className="w-4 h-4 shrink-0" aria-hidden="true" />
                     <span>Home</span>
                   </Link>
@@ -118,7 +115,7 @@ export function SiteFooter() {
                 <li>
                   <Link
                     href="/start"
-                    className="flex items-center gap-2 text-rb-500 hover:text-blue-600 dark:hover:text-[var(--text-link)] text-sm transition-colors duration-150"
+                    className={`flex items-center gap-2 text-sm duration-150 ${NAV_LINK}`}
                     data-footer-start=""
                   >
                     <Signpost className="w-4 h-4 shrink-0" aria-hidden="true" />
@@ -126,10 +123,7 @@ export function SiteFooter() {
                   </Link>
                 </li>
                 <li>
-                  <Link
-                    href="/about"
-                    className="flex items-center gap-2 text-rb-500 hover:text-blue-600 dark:hover:text-[var(--text-link)] text-sm transition-colors duration-150"
-                  >
+                  <Link href="/about" className={`flex items-center gap-2 text-sm duration-150 ${NAV_LINK}`}>
                     <Info className="w-4 h-4 shrink-0" aria-hidden="true" />
                     <span>About</span>
                   </Link>
@@ -137,7 +131,7 @@ export function SiteFooter() {
                 <li>
                   <Link
                     href="/coverage/ethereum"
-                    className="flex items-center gap-2 text-rb-500 hover:text-blue-600 dark:hover:text-[var(--text-link)] text-sm transition-colors duration-150"
+                    className={`flex items-center gap-2 text-sm duration-150 ${NAV_LINK}`}
                   >
                     <LayoutGrid className="w-4 h-4 shrink-0" aria-hidden="true" />
                     <span>Coverage</span>
@@ -146,35 +140,26 @@ export function SiteFooter() {
                 <li>
                   <Link
                     href="/about/architecture"
-                    className="flex items-center gap-2 text-rb-500 hover:text-blue-600 dark:hover:text-[var(--text-link)] text-sm transition-colors duration-150"
+                    className={`flex items-center gap-2 text-sm duration-150 ${NAV_LINK}`}
                   >
                     <DraftingCompass className="w-4 h-4 shrink-0" aria-hidden="true" />
                     <span>Architecture</span>
                   </Link>
                 </li>
                 <li>
-                  <Link
-                    href="/about/provenance"
-                    className="flex items-center gap-2 text-rb-500 hover:text-blue-600 dark:hover:text-[var(--text-link)] text-sm transition-colors duration-150"
-                  >
+                  <Link href="/about/provenance" className={`flex items-center gap-2 text-sm duration-150 ${NAV_LINK}`}>
                     <ReceiptText className="w-4 h-4 shrink-0" aria-hidden="true" />
                     <span>Receipts</span>
                   </Link>
                 </li>
                 <li>
-                  <Link
-                    href="/pulse"
-                    className="flex items-center gap-2 text-rb-500 hover:text-blue-600 dark:hover:text-[var(--text-link)] text-sm transition-colors duration-150"
-                  >
+                  <Link href="/pulse" className={`flex items-center gap-2 text-sm duration-150 ${NAV_LINK}`}>
                     <Activity className="w-4 h-4 shrink-0" aria-hidden="true" />
                     <span>Pulse</span>
                   </Link>
                 </li>
                 <li>
-                  <Link
-                    href="/blog"
-                    className="flex items-center gap-2 text-rb-500 hover:text-blue-600 dark:hover:text-[var(--text-link)] text-sm transition-colors duration-150"
-                  >
+                  <Link href="/blog" className={`flex items-center gap-2 text-sm duration-150 ${NAV_LINK}`}>
                     <FileText className="w-4 h-4 shrink-0" aria-hidden="true" />
                     <span>Blog</span>
                   </Link>

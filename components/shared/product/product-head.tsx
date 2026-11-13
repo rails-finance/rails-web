@@ -15,7 +15,7 @@ import { LearnMore } from "@/components/shared/learn-more-modal";
 import { SectionReadStamp } from "@/components/shared/read-stamp";
 import { ProvSection, SectionHeading, SectionMenu } from "@/components/shared/section-menu";
 import { SectionExplainer } from "@/components/shared/section-explainer";
-import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { FOOT_ARROW, FOOT_LINK, FOOT_WORDS } from "@/lib/shared/ui-grammar";
 import type {
   CollateralTerms,
   EntryLink,
@@ -46,20 +46,17 @@ export function ToolsFor({ scope, title, tools }: { scope: string; title: string
   return <SectionMenu scope={scope} title={title} links={tools.links} exports={tools.exports} views={tools.views} />;
 }
 
-/** The links at the foot of a head, "View … →". */
+/** The links at the foot of a head, "View …", each a FOOT_LINK. */
 export function EntryLinks({ entries }: { entries: EntryLink[] }) {
   if (entries.length === 0) return null;
   return (
-    <div className="mt-auto flex flex-col gap-1 pt-3" data-anatomy="R6">
+    <div className="mt-auto flex flex-col items-start gap-1 pt-3" data-anatomy="R6">
       {entries.map((e) => (
-        <Link
-          key={e.href + e.label}
-          href={e.href}
-          className={`inline-flex items-center gap-1 text-[13px] font-medium ${INLINE_LINK}`}
-          {...e.hooks}
-        >
-          {e.label}
-          <span aria-hidden>→</span>
+        <Link key={e.href + e.label} href={e.href} className={`text-[13px] font-medium ${FOOT_LINK}`} {...e.hooks}>
+          <span className={FOOT_WORDS}>{e.label}</span>
+          <span className={FOOT_ARROW} aria-hidden="true">
+            →
+          </span>
         </Link>
       ))}
     </div>

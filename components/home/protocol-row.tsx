@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { FOOT_ARROW, FOOT_LINK, FOOT_WORDS } from "@/lib/shared/ui-grammar";
 
 import { protocolIconSrc } from "@/lib/shared/protocols";
 import { chainExplorers } from "@/lib/shared/explorer-rank";
@@ -215,10 +216,13 @@ export function ProtocolRow() {
             )}
             <Link
               href={`/coverage/${CHAINS[shownChain].slug}`}
-              className="ml-auto shrink-0 rounded-sm px-2 py-1 text-sm font-medium text-blue-600 underline-offset-4 hover:underline focus-ring dark:text-[var(--text-link)]"
+              className={`ml-auto shrink-0 text-sm font-medium ${FOOT_LINK}`}
               data-home-coverage=""
             >
-              See detailed coverage <span>→</span>
+              <span className={FOOT_WORDS}>See detailed coverage</span>
+              <span className={FOOT_ARROW} aria-hidden="true">
+                →
+              </span>
             </Link>
           </div>
         </>
