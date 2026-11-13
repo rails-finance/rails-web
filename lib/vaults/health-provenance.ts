@@ -52,15 +52,22 @@ const spanInputs = (v: HealthReceiptVault, label: string, s: Span): ProvInput[] 
   readInput(`${label} to`, v, s.to),
 ];
 
-/** The lines whose receipt prints an amount in the asset. A yield or a fall is
- *  a ratio of two reads at one scale, so its percentage stands either way. */
-const PRINTS_AMOUNTS: ReadonlySet<Health[HealthKey]["kind"]> = new Set([
-  "size",
-  "yield",
-  "falls",
-  "lost-only",
-  "withdrawals",
-]);
+/** Does the line's receipt print an amount in the asset? Their percentages
+ *  stand at either scale; the amounts beside them do not. */
+function printsAmounts(b: Health[HealthKey]): boolean {
+  switch (b.kind) {
+    case "size":
+    case "yield":
+    case "falls":
+      return true;
+    case "lost-only":
+      return b.lostAssets != null;
+    case "withdrawals":
+      return b.holder != null || b.exit?.kind === "idle" || b.exit?.kind === "queue";
+    default:
+      return false;
+  }
+}
 
 /** The receipt of one line; null where the line states no read. */
 export function healthLineProv(
@@ -70,7 +77,7 @@ export function healthLineProv(
   chainBlock: number,
 ): Provenance | null {
   const p = lineProv(key, health, v, chainBlock);
-  return p && v.scaleNote && PRINTS_AMOUNTS.has(health[key].kind) ? withScaleNote(p, v.scaleNote) : p;
+  return p && v.scaleNote && printsAmounts(health[key]) ? withScaleNote(p, v.scaleNote) : p;
 }
 
 function lineProv(key: HealthKey, health: Health, v: HealthReceiptVault, chainBlock: number): Provenance | null {
