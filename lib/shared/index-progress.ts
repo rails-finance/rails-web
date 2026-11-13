@@ -510,6 +510,12 @@ export const VISIT_FAIL_STALLED = 0.5;
  *  a read answered, not measured when none did. */
 export const VISIT_FAIL_MIN = 2;
 
+/** Start (unix s) of the visit tally's window for a snapshot taken at asOf:
+ *  the previous UTC clock hour, as the server counts it. */
+export function visitWindowStart(asOf: number): number {
+  return (Math.floor(asOf / 3600) - 1) * 3600;
+}
+
 /** Visit reads too few to judge: under VISIT_FAIL_MIN failures, none answered. */
 export function visitTooFew(v: VisitReads | null | undefined): boolean {
   if (!v?.lastHourVisits || v.failedShare == null) return false;
