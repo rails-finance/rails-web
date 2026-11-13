@@ -4,8 +4,7 @@
 // now table (rails-ops standards/reading-contract.md §3) of the wallet's shares
 // and what they earned, then Lido's share rate, each figure traced to its reads
 // (lib/lido/provenance.ts). Why the shares changed, and why Earned states no
-// figure, are in the section's (i). The section is one receipts scope its ⋮
-// arms (decision 0059).
+// figure, are in the section's (i). The section is one receipts scope (decision 0059).
 
 import { ProvSection, SectionHeading, SectionMenu } from "@/components/shared/section-menu";
 import { SectionExplainer } from "@/components/shared/section-explainer";

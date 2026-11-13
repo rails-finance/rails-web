@@ -48,7 +48,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
     body: (
       <p>
         The position page shows the collateral, the debt or the supply, each in dollars where Arc has a price feed for
-        the loan token, the LTV against the market&apos;s LLTV, the borrow or supply rate, the room left to borrow, the
+        the loan asset, the LTV against the market&apos;s LLTV, the borrow or supply rate, the room left to borrow, the
         price drop that would liquidate it, and the interest over the last 30 days.
       </p>
     ),
@@ -62,7 +62,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
           markets overview
         </Link>{" "}
         groups every market Morpho Blue has created on Arc by the token it lends, with each group&apos;s supply,
-        borrowing and utilisation in that token. Each market opens its own page: its rates and rate curve, its
+        borrowing and utilization in that token. Each market opens its own page: its rates and rate curve, its
         oracle&apos;s price and its terms.
       </p>
     ),
@@ -81,22 +81,22 @@ const reads: InfoReads = {
     {
       name: "AdaptiveCurveIRM",
       address: MORPHO_ARC.contracts.adaptiveCurveIrm,
-      reads: "each market's borrow rate and its rate at target, the rate the curve sets at 90% utilisation.",
+      reads: "each market's borrow rate and its rate at target, the rate the curve sets at 90% utilization.",
     },
     {
       name: "Each market's oracle",
-      reads: "the price of one unit of collateral in the loan token, and the price feeds it names.",
+      reads: "the price of one unit of collateral in the loan asset, and the price feeds it names.",
     },
     {
       name: "Chainlink USDC / USD and EURC / USD",
-      reads: "the loan token's dollar price, for markets that lend USDC or EURC.",
+      reads: "the loan asset's dollar price, for markets that lend USDC or EURC.",
     },
   ],
   how: "Rails's server reads Morpho Blue's log of created markets once and keeps it, then reads only the blocks since. It reads these contracts at the block current when you open a page, and a position and its market again at the UTC midnight 30 days back. A past block's answers are stored once that block is final, so a later visit reads only the newest block again.",
   notes: [
     "Positions are read for the wallet you enter, across every market, so there is no listing of every position and no history until Rails indexes Morpho Blue on Arc.",
     "Interest over 30 days is stated only where the position's shares are the same at both reads; a position opened or changed inside the window says so instead.",
-    "Markets that lend MXNB, wARS or GBPA, and a test market lending a mock token, have no dollar figures: Aave's address book lists no Chainlink feed on Arc for those tokens, so their figures stay in the loan token.",
+    "Markets that lend MXNB, wARS or GBPA, and a test market lending a mock token, have no dollar figures: Aave's address book lists no Chainlink feed on Arc for those tokens, so their figures stay in the loan asset.",
     "The addresses are those on Morpho's addresses page, each checked on chain; the price feeds are those Aave's address book lists for Arc (ChainlinkArc.sol).",
   ],
 };
@@ -123,7 +123,7 @@ export default function InfoPage() {
         MORPHO_INFO_SHARED.whatItIs,
         MORPHO_INFO_SHARED.isolatedMarkets,
         MORPHO_INFO_SHARED.liquidation,
-        "Each market's oracle prices its collateral in its loan token, and Morpho Blue states no dollar value. Rails gives a dollar figure where Arc has a Chainlink feed for the loan token, so a USDC debt reads in dollars. On Arc, USDC is also the chain's gas token.",
+        "Each market's oracle prices its collateral in its loan asset, and Morpho Blue states no dollar value. Rails gives a dollar figure where Arc has a Chainlink feed for the loan asset, so a USDC debt reads in dollars. On Arc, USDC is also the chain's gas token.",
       ]}
       reads={reads}
       views={views}

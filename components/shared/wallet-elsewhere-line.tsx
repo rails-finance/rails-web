@@ -8,14 +8,18 @@
 // counts every position Rails holds for the address, in the wallet view's
 // words (W1), so the two read alike (Miles, 6 Nov 2026), and names that scope:
 // "On Rails:" where the page's position is counted, "Also on Rails:" where it
-// is not (ui-jobs 613).
+// is not (ui-jobs 613), and names the protocols it counts (ui-jobs 639).
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { rowIsPage, walletLineText, type WalletCounts } from "@/lib/wallet/summary-counts";
+import { protocolForPathname } from "@/lib/shared/protocols";
+import { rowIsPage, walletLineText, type WalletCounts, type WalletCountsPosition } from "@/lib/wallet/summary-counts";
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
+
+/** A counted position's protocol, from its page. */
+const nameOf = (p: WalletCountsPosition) => protocolForPathname(p.href.split("?")[0])?.label;
 
 // One read per address per page load; the route keeps its answer 60 s.
 const reads = new Map<string, Promise<WalletCounts | null>>();
@@ -49,7 +53,7 @@ export function WalletElsewhereLine({ wallet }: { wallet: string }) {
       const matched = rest.length < c.positions.length;
       // Nothing else to open: the page's position is the wallet's only one.
       if (rest.length === 0) return;
-      const text = walletLineText(c.positions, matched);
+      const text = walletLineText(c.positions, matched, nameOf);
       setLine(text ? { text, matched } : null);
     });
     return () => {

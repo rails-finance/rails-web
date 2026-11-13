@@ -22,12 +22,12 @@ const receipt = (what: string, block: number): Provenance => ({
   source: { block },
   verify: {
     kind: "recompute",
-    text: `To check: ask any Arbitrum archive node for Morpho.position, Morpho.market and the market oracle's price() at block ${block}, then AaveOracle.getAssetPrice(loan token) at the same block.`,
+    text: `To check: ask any Arbitrum archive node for Morpho.position, Morpho.market and the market oracle's price() at block ${block}, then AaveOracle.getAssetPrice(loan asset) at the same block.`,
   },
-  summary: `${what} in dollars. Each held market's figure in its loan token, read from the singleton at block ${block}, times the loan token's price on the Aave V3 Arbitrum oracle at that block, summed over the markets that oracle prices. Morpho Blue states no dollar price.`,
+  summary: `${what} in dollars. Each held market's figure in its loan asset, read from the singleton at block ${block}, times the loan asset's price on the Aave V3 Arbitrum oracle at that block, summed over the markets that oracle prices. Morpho Blue states no dollar price.`,
   contract: { name: "Aave V3 IAaveOracle (Arbitrum)", address: AAVE_V3_ARBITRUM_ORACLE },
-  via: "GET /api/chain/morpho-arbitrum/wallet · figure × AaveOracle.getAssetPrice(loan token) ÷ 1e8",
-  formula: "Σ market figure × loan token price",
+  via: "GET /api/chain/morpho-arbitrum/wallet · figure × AaveOracle.getAssetPrice(loan asset) ÷ 1e8",
+  formula: "Σ market figure × loan asset price",
 });
 
 export function MorphoArbitrumUsdLine({ data, market }: { data: MorphoWalletChainResponse | null; market?: string }) {
@@ -41,7 +41,7 @@ export function MorphoArbitrumUsdLine({ data, market }: { data: MorphoWalletChai
     return (
       <p className="text-[12px] text-rb-500" data-anatomy="H13.1" data-morpho-arbitrum-usd="unpriced">
         No dollar figure: the Aave V3 Arbitrum oracle does not price{" "}
-        {market ? "this market's loan token" : "the loan tokens these markets lend"}.
+        {market ? "this market's loan asset" : "the loan assets these markets lend"}.
       </p>
     );
   const parts: { label: string; value: number; what: string }[] = [
@@ -64,7 +64,7 @@ export function MorphoArbitrumUsdLine({ data, market }: { data: MorphoWalletChai
         ))}{" "}
         at block {block.toLocaleString("en-US")}, in dollars at the Aave V3 Arbitrum oracle&rsquo;s price
         {unpriced > 0 &&
-          `; ${unpriced === 1 ? "one market" : `${unpriced} markets`} in a loan token that oracle does not price ${unpriced === 1 ? "is" : "are"} left out`}
+          `; ${unpriced === 1 ? "one market" : `${unpriced} markets`} in a loan asset that oracle does not price ${unpriced === 1 ? "is" : "are"} left out`}
         .
       </p>
     </ProvReceiptsScope>

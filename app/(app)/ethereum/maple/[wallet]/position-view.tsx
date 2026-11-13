@@ -72,7 +72,6 @@ import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { maplePoolOf } from "@/lib/maple/asset-catalog";
 import { poolExitRateProv } from "@/lib/maple/event-provenance";
-import { ToolsMenu } from "@/components/shared/tools-menu";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import type { MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
@@ -538,8 +537,6 @@ export default function MaplePositionView({
       <div className="py-8 space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <DetailBackButton session="maple" wallet={wallet} />
-          {/* The card's ⋮ carries Inspect provenance once the card draws. */}
-          {!(custody != null && custody.length > 0) && <ToolsMenu />}
         </div>
         <ContractIdentityCard
           kicker="Bridge infrastructure"

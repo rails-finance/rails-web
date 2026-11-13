@@ -16,7 +16,7 @@
 
 import { useState, type ReactNode } from "react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { ProvSection, SectionHeading, SectionMenu } from "@/components/shared/section-menu";
+import { ProvSection, SectionHeading } from "@/components/shared/section-menu";
 import { AssetUnit } from "@/components/shared/asset-unit";
 import {
   DataTable,
@@ -105,11 +105,7 @@ export function VaultStewardRecord({
 }) {
   const [all, setAll] = useState(false);
   const title = TITLE[record?.steward.role ?? role];
-  const head = (sub: ReactNode) => (
-    <SectionHeading title={title} menu={<SectionMenu scope={STEWARD_RECORD_SCOPE} title={title} />}>
-      {sub}
-    </SectionHeading>
-  );
+  const head = (sub: ReactNode) => <SectionHeading title={title}>{sub}</SectionHeading>;
 
   if (!record || record.vaults.length === 0)
     return (

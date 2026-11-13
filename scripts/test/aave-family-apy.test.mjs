@@ -50,3 +50,12 @@ test("zero stays zero and nonsense reads null", () => {
 test("an APY is never below its rate", () => {
   for (const r of [0.001, 0.02, 0.07, 0.4]) assert.ok(aprToApy(r) >= r);
 });
+
+// Aave V4 (ui-jobs 627): the Core hub's WETH drawn rate at block 26,401,778
+// (getAssetDrawnRate, read 12 Nov 2026), 2.15% stored, states a 2.18% borrow APY.
+test("Aave V4's drawn rate compounds the same way: Core WETH at block 26,401,778", () => {
+  const ray = "21536617015515426407969040";
+  const apy = rayRateToApy(ray);
+  assert.ok(Math.abs(apy - referenceApy(BigInt(ray))) < 1e-9);
+  assert.equal((apy * 100).toFixed(2), "2.18");
+});

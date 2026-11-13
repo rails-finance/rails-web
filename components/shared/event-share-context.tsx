@@ -25,8 +25,7 @@ export function useEventShareHref(): string | null {
 }
 
 /** The event's id, read back from its share path (`…/event/<encoded id>`):
- *  the name of the event card's receipts scope (ui-jobs 284), so the card's
- *  ⋮ and the Liquity V2 event page's actions row arm that event alone. */
+ *  the event card's `data-prov-scope`. */
 export function eventIdFromShareHref(href: string | null): string | null {
   if (!href) return null;
   const m = /\/event\/([^/?#]+)/.exec(href);

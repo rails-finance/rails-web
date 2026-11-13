@@ -25,7 +25,7 @@
 import type { ReactNode } from "react";
 import { ChainGlyph } from "@/components/icons/chain-glyphs";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { ProvSection, SectionMenu } from "@/components/shared/section-menu";
+import { ProvSection } from "@/components/shared/section-menu";
 import { readStampProv, SectionReadStamp, type ReadContract } from "@/components/shared/read-stamp";
 import { CopyFact } from "@/components/shared/event-page-aside";
 import { HeadingTip } from "@/components/shared/tip-label";
@@ -245,7 +245,6 @@ export function VaultConfiguration({
           readBy={readBy}
           info={(at) => readStampProv({ chainId, block, at, readBy, what: stampWhat, contracts: stampContracts })}
         />
-        <SectionMenu scope={SCOPE} title="Configuration and addresses" />
       </div>
       <div
         className={`grid grid-cols-1 gap-y-6 ${COLS[shown.length] ?? COLS[3]} lg:[&>div+div]:border-l lg:[&>div+div]:border-rb-200 lg:[&>div+div]:pl-8 lg:[&>div:not(:last-child)]:pr-8 dark:lg:[&>div+div]:border-rb-500/30`}

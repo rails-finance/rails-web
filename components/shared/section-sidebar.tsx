@@ -66,7 +66,7 @@ import { barSubjectOf, type BarSubject } from "@/lib/shared/known-infrastructure
 import { notTheirs, type TxEntry } from "@/lib/shared/tx-entry";
 import { fetchAddressKind } from "@/lib/api/fetch-address-kind";
 import type { ChainId } from "@/lib/shared/chains";
-import { Prov, ProvReceiptsScope, provInspector, useReceiptRegistry } from "@/components/shared/provenance";
+import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { barSubjectProv, type BarAccountKind } from "@/lib/shared/bar-provenance";
 
 type Declared = TimelineEntryDeclaration & { wallet: string };
@@ -152,9 +152,6 @@ interface Stretch {
   subject: BarSubject;
   /** The row at the stretch's head: its receipt sits on the mark. */
   headId: string;
-  /** The head row's receipts scope (its card's `data-prov-scope`), so arming
-   *  that row's inspector reaches the bar's receipt too. */
-  headScope?: string;
 }
 
 /** The subject stretches over the timeline's bar and the "not yours" marks,
@@ -204,7 +201,6 @@ function SubjectStretches({
             bottom: r.bottom - origin,
             subject,
             headId: id,
-            headScope: el.querySelector<HTMLElement>("[data-prov-scope]")?.dataset.provScope,
           });
       }
       tops.sort((a, b) => a - b);
@@ -224,8 +220,7 @@ function SubjectStretches({
             p.top === joined[i].top &&
             p.bottom === joined[i].bottom &&
             p.subject === joined[i].subject &&
-            p.headId === joined[i].headId &&
-            p.headScope === joined[i].headScope,
+            p.headId === joined[i].headId,
         )
           ? prev
           : joined,
@@ -320,27 +315,18 @@ function SubjectStretches({
             : null;
         if (!info) return null;
         return (
-          <ProvReceiptsScope key={`r:${s.headId}`} registry={registry} scopeId={s.headScope ?? s.headId} bounds={false}>
-            {/* The mark opens its receipt as a head chip does: it arms the
-                row's scope and pins the receipt at the mark. */}
-            <button
-              type="button"
-              className="absolute left-3 hidden h-4 w-4 cursor-pointer rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] md:block"
+          <ProvReceiptsScope key={`r:${s.headId}`} registry={registry} bounds={false}>
+            {/* The mark carries its receipt, picked while the inspector is
+                armed. */}
+            <span
+              className="absolute left-3 hidden h-4 w-4 rounded-sm md:block"
               style={{ top: s.top + 12 }}
               data-bar-receipt={s.subject.name}
-              aria-label={`Where this transaction was sent: ${s.subject.name}`}
-              onClick={(e) => {
-                const scope = s.headScope ?? s.headId;
-                const el = e.currentTarget;
-                provInspector.setArmed(true, scope);
-                const entry = registry.getEntries().find((x) => !x.echo && x.el && el.contains(x.el));
-                if (entry?.el) provInspector.pin(entry, registry, entry.el);
-              }}
             >
               <Prov info={info} value={s.subject.name} className="block h-4 w-4">
                 <span className="sr-only">{s.subject.name}</span>
               </Prov>
-            </button>
+            </span>
           </ProvReceiptsScope>
         );
       })}

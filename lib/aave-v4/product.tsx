@@ -85,7 +85,7 @@ import {
   type V4Names,
 } from "@/components/protocol/aave-v4/aave-v4-market-parts";
 import { protocolForHref } from "@/lib/shared/protocols";
-import { ratePercentText } from "@/lib/shared/rate-percent";
+import { v4ApyText } from "@/lib/aave-v4/rates";
 import { formatCompact, formatCompactTitled } from "@/lib/shared/format-compact";
 import { DataTableAmount } from "@/components/shared/data-table/data-table";
 import { AssetUnit } from "@/components/shared/asset-unit";
@@ -109,8 +109,10 @@ export const V4_TERMS = {
 } as const;
 
 export const RATE_TIP = {
-  supply: "What suppliers earn a year, as an APR: the drawn rate and the premium borrowers pay, less the hub's fee",
-  borrow: "The hub's drawn rate a year, as an APR; each borrower pays a premium by collateral risk on top",
+  supply:
+    "What suppliers earn in a year, compounded: the borrow rate and the premium borrowers pay, less the hub's fee",
+  borrow:
+    "What borrowing costs in a year at the hub's rate, compounded; each borrower pays a premium by collateral risk on top",
 } as const;
 
 export const PREMIUM_LINE = "plus a premium by collateral risk";
@@ -267,7 +269,7 @@ function spokeLinks(d: V4Deployment, sp: V4Spoke, roster: boolean): SectionMenuL
           href: spokeHref(d, sp.slug),
           internal: true,
         }
-      : { item: "markets", title: "Markets", subtitle: "Every Aave V4 spoke", href: marketsHref(d), internal: true },
+      : { item: "markets", title: "Spokes", subtitle: "Every Aave V4 spoke", href: marketsHref(d), internal: true },
     ...positionsLink(d, sp),
     { item: "hubs", title: "Hubs", subtitle: "The liquidity this spoke draws", href: hubsHref(d), internal: true },
   ];
@@ -420,7 +422,7 @@ function RosterBody({ d }: { d: V4Deployment }) {
     <MarketRoster
       header={{
         protocol: protocolOf(d),
-        title: "Markets",
+        title: "Spokes",
         learnMore: aaveV4Modal(d.chain === "arc" ? "arc_hub" : "hubs"),
       }}
       markets={markets}
@@ -608,7 +610,7 @@ function rowOf(d: V4Deployment, sp: V4Spoke, x: V4Row, c: StoredCoords): Reserve
       },
       available: {
         sort: f ? f.available * (usd ?? 0) : -1,
-        title: "The hub's liquidity, capped by what the draw cap leaves this spoke",
+        title: "The hub's liquidity, capped by what the borrow cap leaves this spoke",
         node: amounts.available ? (
           <DataTableAmount {...amounts.available} />
         ) : f && avail && borrowable !== false ? (
@@ -621,16 +623,15 @@ function rowOf(d: V4Deployment, sp: V4Spoke, x: V4Row, c: StoredCoords): Reserve
       },
       supplyRate: {
         sort: f?.supplyApr ?? -1,
-        title: `Supply rate: ${RATE_TIP.supply.toLowerCase()}`,
-        node:
-          f && f.supplyApr != null ? <Prov info={supplyRateProv(f, names)}>{ratePercentText(f.supplyApr)}</Prov> : dash,
+        title: `Supply APY: ${RATE_TIP.supply.toLowerCase()}`,
+        node: f && f.supplyApr != null ? <Prov info={supplyRateProv(f, names)}>{v4ApyText(f.supplyApr)}</Prov> : dash,
       },
       borrowRate: {
         sort: f?.drawnApr ?? -1,
-        title: `Borrow rate: ${RATE_TIP.borrow.toLowerCase()}`,
+        title: `Borrow APY: ${RATE_TIP.borrow.toLowerCase()}`,
         node:
           f && f.drawnApr != null && borrowable !== false ? (
-            <Prov info={drawnRateProv(f, names)}>{ratePercentText(f.drawnApr)}</Prov>
+            <Prov info={drawnRateProv(f, names)}>{v4ApyText(f.drawnApr)}</Prov>
           ) : (
             dash
           ),
@@ -645,7 +646,7 @@ function rowOf(d: V4Deployment, sp: V4Spoke, x: V4Row, c: StoredCoords): Reserve
       },
       creditUsed: {
         sort: f?.creditUsed ?? -1,
-        title: "What the spoke owes the hub ÷ the draw cap the hub set for it",
+        title: "What the spoke owes the hub ÷ the borrow cap the hub set for it",
         node:
           f && f.creditUsed != null ? (
             <Prov info={creditUsedProv(f, names)}>{pctText(Math.round(f.creditUsed * 1000) / 1000)}</Prov>
@@ -701,7 +702,7 @@ function reservesTable(d: V4Deployment, sp: V4Spoke, rows: V4Row[], c: StoredCoo
       <>
         Every reserve on the spoke, one row per token and the hub it is drawn from; filter by class, sort any column.
         Supplied and Borrowed are this spoke&apos;s, valued at the spoke oracle&apos;s price; Available and the rates
-        are the hub&apos;s. Borrowers pay the borrow rate {PREMIUM_LINE}. A row opens its reserve&apos;s page; Details
+        are the hub&apos;s. Borrowers pay the borrow APY {PREMIUM_LINE}. A row opens its reserve&apos;s page; Details
         opens its parameters in place.
       </>
     ),
@@ -717,31 +718,31 @@ function reservesTable(d: V4Deployment, sp: V4Spoke, rows: V4Row[], c: StoredCoo
         label: "Available",
         align: "right",
         className: NUM,
-        tip: "Available: the hub's liquidity, capped by the draw cap less what this spoke owes",
+        tip: "Available: the hub's liquidity, capped by the borrow cap less what this spoke owes",
         hooks: { "data-available": "" },
       },
       {
         key: "supplyRate",
-        label: "Supply rate",
+        label: "Supply APY",
         align: "right",
         className: RATE,
-        tip: `Supply rate: ${RATE_TIP.supply.toLowerCase()}`,
+        tip: `Supply APY: ${RATE_TIP.supply.toLowerCase()}`,
         hooks: { "data-rate": "supply" },
       },
       {
         key: "borrowRate",
-        label: "Borrow rate",
+        label: "Borrow APY",
         align: "right",
         className: RATE,
-        tip: `Borrow rate: ${RATE_TIP.borrow.toLowerCase()}`,
+        tip: `Borrow APY: ${RATE_TIP.borrow.toLowerCase()}`,
         hooks: { "data-rate": "borrow" },
       },
       {
         key: "collateral",
-        label: "Collateral",
+        label: "Collateral factor",
         align: "right",
         className: RATE,
-        tip: "Collateral: the collateral factor, the share of the asset's value the spoke counts toward a borrow",
+        tip: "Collateral factor: the share of the asset's value the spoke counts toward a borrow",
         hooks: { "data-collateral": "" },
       },
       {
@@ -749,7 +750,7 @@ function reservesTable(d: V4Deployment, sp: V4Spoke, rows: V4Row[], c: StoredCoo
         label: "Credit used",
         align: "right",
         className: RATE,
-        tip: "Credit used: what this spoke owes the hub ÷ the draw cap the hub set for it",
+        tip: "Credit used: what this spoke owes the hub ÷ the borrow cap the hub set for it",
         hooks: { "data-credit-used": "" },
       },
     ],
@@ -806,9 +807,8 @@ function LiquidationLine({ f, spoke }: { f: V4ReserveFigures; spoke: string }) {
     <p className="mt-2 text-[12px] text-rb-500" data-spoke-liquidation="">
       <Prov info={liquidationConfigProv(f, spoke)}>
         <span>
-          Liquidation restores a health factor of {l.targetHealthFactor.toFixed(2)}; the bonus starts at{" "}
-          {pctText(l.bonusFactor)} of its maximum and reaches it at a health factor of{" "}
-          {l.healthFactorForMaxBonus.toFixed(2)}.
+          Target health factor {l.targetHealthFactor.toFixed(2)}; the bonus starts at {pctText(l.bonusFactor)} of its
+          maximum and reaches it at the max-bonus threshold, a health factor of {l.healthFactorForMaxBonus.toFixed(2)}.
         </span>
       </Prov>
     </p>
@@ -818,7 +818,7 @@ function LiquidationLine({ f, spoke }: { f: V4ReserveFigures; spoke: string }) {
 function spokeMarkdown(sp: V4Spoke, rows: V4Row[], block: number, d?: V4Deployment): string {
   const lines = rows.map(({ line: l, f, price }) => {
     const a = (n: number) => amountText(n, price?.usd ?? null, l.symbol).display;
-    return `- ${l.symbol} (${V4_HUB_LABEL[l.hub]}): supplied ${a(f?.spokeSupplied ?? l.supplied)}, borrowed ${a(f?.spokeBorrowed ?? l.borrowed)}${f?.supplyApr != null ? `, supply rate ${ratePercentText(f.supplyApr)}` : ""}${f?.drawnApr != null ? `, borrow rate ${ratePercentText(f.drawnApr)}` : ""}`;
+    return `- ${l.symbol} (${V4_HUB_LABEL[l.hub]}): supplied ${a(f?.spokeSupplied ?? l.supplied)}, borrowed ${a(f?.spokeBorrowed ?? l.borrowed)}${f?.supplyApr != null ? `, supply APY ${v4ApyText(f.supplyApr)}` : ""}${f?.drawnApr != null ? `, borrow APY ${v4ApyText(f.drawnApr)}` : ""}`;
   });
   return [
     `# ${sp.name}, an Aave V4 spoke`,
@@ -943,17 +943,17 @@ function spokeHead(d: V4Deployment, s: V4Stored, sp: V4Spoke, rows: V4Row[]): Pr
             </ExplainBullet>
             <ExplainBullet>
               {sp.name} draws from the {andList(sp.hubs.map((h) => V4_HUB_LABEL[h]))}{" "}
-              {sp.hubs.length === 1 ? "hub" : "hubs"}, each over a credit line: an add cap and a draw cap per asset.
+              {sp.hubs.length === 1 ? "hub" : "hubs"}, each over a credit line: a supply cap and a borrow cap per asset.
             </ExplainBullet>
           </ExplainGroup>
           <ExplainGroup title="How it works">
-            <ExplainBullet>The hub holds the money for each asset and sets its drawn rate.</ExplainBullet>
+            <ExplainBullet>The hub holds the money for each asset and sets its borrow rate.</ExplainBullet>
             <ExplainBullet>
               The spoke sets the terms: collateral factor, liquidation bonus and fee, and the collateral risk that sets
               a borrower&apos;s premium.
             </ExplainBullet>
             <ExplainBullet>
-              Suppliers earn the drawn rate and the premium, less the hub&apos;s liquidity fee.
+              Suppliers earn the borrow rate and the premium, less the hub&apos;s liquidity fee.
             </ExplainBullet>
           </ExplainGroup>
         </>

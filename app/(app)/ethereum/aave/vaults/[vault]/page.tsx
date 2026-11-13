@@ -136,7 +136,7 @@ export default async function AaveEthereumVaultRoute({ params, searchParams }: P
             />
           )}
 
-          {/* Each section arms the inspector from its ⋮; no page-wide toggle. */}
+          {/* The inspector, armed from the profile menu's switch. */}
           <ProvInspectorLayer />
         </div>
       </div>

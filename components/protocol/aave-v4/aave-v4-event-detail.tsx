@@ -1,5 +1,6 @@
 "use client";
 
+import { v4Apy } from "@/lib/aave-v4/rates";
 import type { EventCellSpec } from "@/components/shared/event-cells";
 import type { EventPriceChip } from "@/components/shared/event-price-row";
 import type { AaveV4Context, AaveV4PriceSource } from "@/lib/shared/types/protocols/aave-v4";
@@ -75,7 +76,7 @@ function pricePillTitle(symbol: string, source: AaveV4PriceSource, block?: numbe
     : `${aaveV4DisplaySymbol(symbol)} price at this event's block${block != null ? ` ${block.toLocaleString("en-US")}` : ""} (${sourceLabel})`;
 }
 
-/** A single held-debt asset's borrow rate — `4.35% [icon] USDC`. Mirrors the
+/** A single held-debt asset's borrow APY — `4.35% [icon] USDC`. Mirrors the
  *  Debt card's `PositionRow` grammar so a multi-debt position reads its rates
  *  the same way it reads its balances: one labelled row per asset. */
 function BorrowRateRow({ symbol, apr, coord }: { symbol: string; apr: string; coord: EventProvDetail }) {
@@ -83,8 +84,11 @@ function BorrowRateRow({ symbol, apr, coord }: { symbol: string; apr: string; co
   return (
     <span className="inline-flex items-center gap-1.5 text-sm">
       <span className="font-semibold">
-        <Prov info={heldDebtRateProv({ ...coord, asset: symbol })} icon={<TokenChipIcon symbol={symbol} size={16} />}>
-          {(parseFloat(apr) * 100).toFixed(2)}%
+        <Prov
+          info={heldDebtRateProv({ ...coord, asset: symbol }, parseFloat(apr))}
+          icon={<TokenChipIcon symbol={symbol} size={16} />}
+        >
+          {(v4Apy(parseFloat(apr)) * 100).toFixed(2)}%
         </Prov>
       </span>
       {showTickerLabels && <span className="text-xs">{aaveV4DisplaySymbol(symbol)}</span>}
@@ -592,7 +596,7 @@ export function useAaveV4Cells({
     cells.push({
       kind: "stat",
       key: "borrow-rate",
-      label: debtRates.length > 1 ? "Borrow Rates" : "Borrow Rate",
+      label: "Borrow APY",
       // Moved where this asset's rate differs, at the two places shown, from
       // the one the previous event on the spoke recorded.
       changed: thisRate != null && previousRate != null && pctOf(parseFloat(thisRate.apr)) !== pctOf(previousRate),

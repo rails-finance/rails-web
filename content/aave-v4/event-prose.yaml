@@ -65,11 +65,11 @@ placeholders:
   rate_then:
     rounding: ratio_frac
     means: |-
-      The asset's borrow rate the previous event recorded, a year.
+      The asset's borrow APY the previous event recorded.
   rate_now:
     rounding: ratio_frac
     means: |-
-      The asset's borrow rate at this event, a year.
+      The asset's borrow APY at this event.
   life_interest:
     rounding: spoke_amount
     means: |-
@@ -146,11 +146,11 @@ placeholders:
   earned_usd:
     rounding: usd
     means: |-
-      The supply interest earned, at today's prices.
+      The interest the supply earned, at today's prices.
   paid_usd:
     rounding: usd
     means: |-
-      The borrow interest accrued, at today's prices.
+      The interest the debt accrued, at today's prices.
   hf:
     rounding: hf
     means: |-
@@ -182,11 +182,11 @@ placeholders:
   rate:
     rounding: pct_plain
     means: |-
-      The latest borrow rate recorded on the spoke.
+      The latest borrow APY recorded on the spoke.
   rate_symbol:
     rounding: text
     means: |-
-      The asset the latest borrow rate is for.
+      The asset the latest borrow APY is for.
   yearly:
     rounding: spoke_amount
     means: |-
@@ -350,11 +350,11 @@ words:
     Disabled as collateral
   # A position swap's head, by kind; a leverage is not called a swap.
   t1_collateral_swap: |-
-    Swapped collateral
+    Swapped supply
   t1_debt_swap: |-
-    Swapped debt
+    Swapped borrow
   t1_repay_with_collateral: |-
-    Repaid with collateral
+    Repaid with supply
   t1_leverage: |-
     Borrowed and supplied
   t1_leg_seized: |-
@@ -415,13 +415,13 @@ position_words:
   capacity: |-
     About {capacity} more could be borrowed before the health factor reaches 1.
   rate: |-
-    The latest borrow rate recorded here is {rate}, about {yearly} a year on the debt as it stands.
+    The latest borrow APY recorded here is {rate}, about {yearly} a year on the debt as it stands.
   rate_plain: |-
-    The latest borrow rate recorded here is {rate}.
+    The latest borrow APY recorded here is {rate}.
   rate_sym: |-
-    The latest {rate_symbol} borrow rate recorded here is {rate}.
+    The latest {rate_symbol} borrow APY recorded here is {rate}.
   rate_sym_yearly: |-
-    The latest {rate_symbol} borrow rate recorded here is {rate}, about {yearly} a year on the debt.
+    The latest {rate_symbol} borrow APY recorded here is {rate}, about {yearly} a year on the debt.
   peaks_both: |-
     At their highest, the supply reached {peak_supply} and the debt {peak_debt}.
   peaks_supply: |-
@@ -535,9 +535,9 @@ shared_sentences:
       Nothing is supplied or owed on this spoke now: the position is closed.
   rate.moved:
     when: |-
-      the asset's borrow rate moved by half or more since the previous event
+      the asset's borrow APY moved by half or more since the previous event
     text: |-
-      The {symbol} borrow rate moved from {rate_then} at the previous event to {rate_now}.
+      The {symbol} borrow APY moved from {rate_then} at the previous event to {rate_now}.
 
 templates:
   - id: aave4.supply
@@ -946,11 +946,11 @@ templates:
     L5: swap_supply
     variants:
       collateral_swap: |-
-        a collateral swap
+        a supply swap
       debt_swap: |-
-        a debt swap
+        a borrow swap
       repay_with_collateral: |-
-        a repay with collateral
+        a repay with supply
       leverage: |-
         a borrow whose proceeds were supplied
     sentences:
@@ -1090,14 +1090,14 @@ L5:
     title: |-
       How supplying works
     intro: |-
-      Supplying deposits an asset into a spoke's reserve, where it earns interest. Enabled as collateral, it backs borrowing on that spoke.
+      Supplying puts an asset into a spoke's reserve, where it earns interest. Enabled as collateral, it backs borrowing on that spoke.
     detailsHeading: |-
       Key concepts:
     details:
       - bold: |-
           Supplied balance
         text: |-
-          the deposit is held as reserve shares that grow with interest, and it can be withdrawn at any time.
+          the supply is held as reserve shares that grow with interest, and it can be withdrawn at any time.
       - bold: |-
           Collateral on or off
         text: |-
@@ -1258,9 +1258,9 @@ L5:
         text: |-
           collateral backs only borrows on the same spoke; positions on other spokes do not touch its health factor.
       - bold: |-
-          Collateral factors
+          Dynamic Risk Configuration
         text: |-
-          disabling collateral updates the collateral factors the position holds, and enabling updates that asset's.
+          the collateral factors, max bonuses and fees the position holds; disabling collateral updates them all, and enabling updates that asset's.
     links:
       - label: |-
           Collateral status
@@ -1269,7 +1269,7 @@ L5:
           Spoke isolation
         doc: SPOKE_ISOLATION
       - label: |-
-          Collateral factors held
+          Dynamic Risk Configuration
         doc: DYNAMIC_CONFIG
 
   liquidation:
@@ -1376,9 +1376,9 @@ L5:
 
   swap_borrow:
     title: |-
-      How swapping debt works
+      How swapping a borrow works
     intro: |-
-      Swapping debt borrows a new asset, sells it through a CoW Protocol order and repays the old debt with what it bought, in one transaction.
+      Swapping a borrow borrows a new asset and sells it through a CoW Protocol order to repay the old debt, in one transaction.
     detailsHeading: |-
       Key concepts:
     details:
@@ -1396,7 +1396,7 @@ L5:
           Aave's Giver position manager repays for the owner and the Taker position manager borrows, under the owner's approval.
     links:
       - label: |-
-          Swapping debt on Aave V4
+          Swapping a borrow on Aave V4
         doc: SWAP_BORROW
       - label: |-
           Position managers
@@ -1495,7 +1495,7 @@ L5:
     intro_usdg_paxg: |-
       USDG PAXG takes PAXG, Paxos Gold, as collateral and lends USDG, all on the Global Dollar hub.
     intro_mag7: |-
-      Mag7 is Aave V4's one market on Base. Coinbase tokenized stocks are its collateral, and USDC from the Equities hub is the one asset it lends.
+      Mag7 is Aave V4's one spoke on Base. Coinbase tokenized stocks are its collateral, and USDC from the Equities hub is the one asset it lends.
     detailsHeading: |-
       Key concepts:
     details:
@@ -1506,7 +1506,7 @@ L5:
       - bold: |-
           Collateral factor
         text: |-
-          each collateral counts at a share of its value set by the spoke; the event cards' collateral ratio times this factor is the health factor.
+          each collateral counts at a share of its value set by the spoke, and the counted collateral is what backs the debt.
       - bold: |-
           Health factor
         text: |-
@@ -1560,7 +1560,7 @@ L5:
           Risk premium
         doc: RISK_PREMIUM
       - label: |-
-          Collateral factors held
+          Dynamic Risk Configuration
         doc: DYNAMIC_CONFIG
 
   # The Ethereum hubs page's "?".
@@ -1568,7 +1568,7 @@ L5:
     title: |-
       How hubs and spokes work
     intro: |-
-      Aave V4 splits lending into hubs, the shared pools that hold supplied assets and set rates, and spokes, the markets people use. A spoke draws from a hub over a credit line.
+      Aave V4 splits lending into hubs, the shared pools that hold supplied assets and set rates, and spokes, where positions live. A spoke borrows from a hub over a credit line and supplies to it over a debit line.
     detailsHeading: |-
       Key concepts:
     details:
@@ -1579,13 +1579,13 @@ L5:
       - bold: |-
           Spoke
         text: |-
-          a market drawing from one hub or more; Bluechip keeps its collateral in Prime and borrows from Prime and Core.
+          where positions live, drawing from one hub or more; Bluechip keeps its collateral in Prime and borrows from Prime and Core.
       - bold: |-
-          Credit line and utilisation
+          Credit line and utilization
         text: |-
-          the cap a hub grants a spoke to draw an asset; utilisation is how much of that line is drawn.
+          the cap a hub grants a spoke to borrow an asset; utilization is how much of an asset's liquidity is borrowed.
       - bold: |-
-          Liquidation threshold (LT)
+          Collateral factor
         text: |-
           the share of an asset's value that counts as collateral on a spoke, shown as a range where spokes set it differently.
     links:
@@ -1614,15 +1614,15 @@ L5:
       - bold: |-
           Liquidity hub
         text: |-
-          the pool that holds supplied assets, backs borrowing and sets each asset's drawn rate.
+          the pool that holds supplied assets, backs borrowing and sets each asset's borrow rate.
       - bold: |-
           Spoke
         text: |-
-          a market drawing from the hub, with its own collateral factors, liquidation settings and oracle.
+          where positions live, drawing from the hub, with its own collateral factors, liquidation settings and oracle.
       - bold: |-
-          Credit line and utilisation
+          Credit line and utilization
         text: |-
-          the cap the hub grants a spoke to draw an asset; utilisation is how much of the hub's asset is drawn.
+          the cap the hub grants a spoke to borrow an asset; utilization is how much of the hub's asset is borrowed.
       - bold: |-
           Collateral factor
         text: |-
@@ -1691,12 +1691,12 @@ glossary:
   - bold: |-
       Spoke
     text: |-
-      A spoke is a market where positions live. It sets which assets count as collateral, how liquidation works and which prices apply, and it draws its liquidity from one hub or more.
+      A spoke is where positions live. It sets which assets count as collateral, how liquidation works and which prices apply, and it draws its liquidity from one hub or more.
     sources: [{ label: "Spokes", doc: SPOKES }]
   - bold: |-
       Credit line
     text: |-
-      A credit line is the limit a hub sets on how much of an asset one spoke may borrow from it.
+      A credit line is the limit a hub sets on how much of an asset one spoke may borrow from it; the debit line is the limit on how much the spoke may supply to it.
     sources: [{ label: "Liquidity hubs", doc: HUBS }, { label: "Caps per hub and spoke", doc: HUB_SPOKE_CONFIGS }]
   - bold: |-
       Collateral
@@ -1706,7 +1706,7 @@ glossary:
   - bold: |-
       Collateral factor
     text: |-
-      The collateral factor is the share of a collateral asset's value that counts toward the debt it can carry, and each spoke sets it for every asset. The position card calls it the liquidation threshold, which is the same figure under another name.
+      The collateral factor is the share of a collateral asset's value that counts toward the debt it can carry, and each spoke sets it for every asset.
     sources: [{ label: "Health factor", doc: HF }, { label: "Reserve settings", doc: RESERVE_DATA }]
   - bold: |-
       Health factor
