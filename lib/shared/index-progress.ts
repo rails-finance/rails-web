@@ -250,6 +250,59 @@ export interface StatusWriter {
   lastRunAt?: string | null;
   lastRunOk?: boolean | null;
   lastRunError?: string | null;
+  /** Web-side: the census writer's latest run (the answer's `censusRuns`,
+   *  set by `withCensusRuns`). */
+  censusRun?: CensusRunStatus | null;
+}
+
+/** A vault census's latest run, per chain and family. A run stops by design
+ *  at its keyless gateway share or its deadline, writing no rows. */
+export interface CensusRunStatus {
+  chain: number;
+  family: string;
+  families: string[];
+  outcome: "completed" | "stopped-share" | "stopped-deadline" | "failed";
+  startedAt: string;
+  endedAt: string;
+  vaultsWritten: number | null;
+  chunksSaved: number | null;
+  stoppedAtVault: string | null;
+  gateway: string | null;
+  remainingMb: number | null;
+  floorMb: number | null;
+  resetsAt: string | null;
+  error: string | null;
+  shareStopsInARow: number;
+  stuckStopsInARow: number;
+}
+
+/** rails-server explorer-pipelines' name for the vault census writer. */
+export const CENSUS_WRITER = "vault-census";
+/** A census family by the status entry it writes for. */
+const CENSUS_FAMILY: Record<string, string> = { "aave-vaults": "aave", yearn: "yearn-v3" };
+/** Stops in the same vault with nothing written that read as an alarm (the
+ *  census wrapper's exit 3). */
+export const CENSUS_STUCK_STOPS = 3;
+
+/** Each census writer with its latest run, where the answer has one. */
+export function withCensusRuns(s: IndexStatus): IndexStatus {
+  const runs = s.censusRuns;
+  if (!runs?.length) return s;
+  return {
+    ...s,
+    entries: s.entries.map((e) => {
+      const family = CENSUS_FAMILY[e.protocol];
+      if (!family || !e.live?.writers.some((w) => w.name === CENSUS_WRITER)) return e;
+      const run = runs.find((r) => r.chain === e.chain && r.family === family) ?? null;
+      return {
+        ...e,
+        live: {
+          ...e.live,
+          writers: e.live.writers.map((w) => (w.name === CENSUS_WRITER ? { ...w, censusRun: run } : w)),
+        },
+      };
+    }),
+  };
 }
 
 /** The last hour of reads made when a page opens (the tier-request tally). */
@@ -297,6 +350,8 @@ export interface IndexStatus {
   prices?: PricesSection;
   /** Absent from an api that predates it. */
   headMisses?: HeadMiss[];
+  /** Absent from an api that predates it. */
+  censusRuns?: CensusRunStatus[];
 }
 
 // ── Prices: the oracle lane's feeds and rates, and the price fillers ───────
@@ -447,6 +502,15 @@ export function writerState(w: StatusWriter, now: Secs, e?: StatusEntry): Heartb
   const every = w.expectEverySec;
   // An event-driven writer has no schedule to be late against.
   if (t == null || !every) return "none";
+  // A census stops by design at its gateway share or its deadline: held
+  // while that run is within the writer's late line, an alarm once it has
+  // stopped in the same vault with nothing written CENSUS_STUCK_STOPS times.
+  const run = w.censusRun;
+  if (run) {
+    if (run.stuckStopsInARow >= CENSUS_STUCK_STOPS) return "stalled";
+    const ended = isoSecs(run.endedAt);
+    if (run.outcome.startsWith("stopped-") && ended != null && now - ended <= 1.5 * every) return "paused";
+  }
   if (ran != null && w.lastRunOk === false) return "late";
   const age = now - t;
   return age > 3 * every ? "stalled" : age > 1.5 * every ? "late" : "fresh";

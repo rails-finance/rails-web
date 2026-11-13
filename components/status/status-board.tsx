@@ -59,6 +59,9 @@ import {
   type IndexStatus,
   type Allowance,
   type HeadMiss,
+  type CensusRunStatus,
+  CENSUS_STUCK_STOPS,
+  withCensusRuns,
   liveMiss,
   withHeadMisses,
   counterChains,
@@ -199,10 +202,41 @@ function visitLine(v: VisitReads | null | undefined): string {
   return `${n(v.lastHourVisits)} visits in the last hour${failed}${p95}.`;
 }
 
+const shortAddress = (a: string) => (a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a);
+
+/** How a census's latest run ended, where it stopped or failed; null when it completed. */
+function censusLine(r: CensusRunStatus): string | null {
+  const ended = utcTime(Date.parse(r.endedAt) / 1000);
+  const stuck =
+    r.stuckStopsInARow >= CENSUS_STUCK_STOPS
+      ? ` It has stopped in the same vault ${r.stuckStopsInARow} runs in a row with nothing written.`
+      : "";
+  switch (r.outcome) {
+    case "completed":
+      return null;
+    case "stopped-share": {
+      const left =
+        r.remainingMb != null && r.floorMb != null
+          ? `: ${n(r.remainingMb)} MB left, under its ${n(r.floorMb)} MB floor`
+          : "";
+      const reset = r.resetsAt ? ` The gateway resets at ${hhmm(r.resetsAt)}.` : "";
+      const row = r.shareStopsInARow > 1 ? ` (${r.shareStopsInARow} in a row)` : "";
+      return `The census stopped at its share of the free gateway at ${ended}${row}${left}.${reset}${stuck}`;
+    }
+    case "stopped-deadline": {
+      const at = r.stoppedAtVault ? ` in vault ${shortAddress(r.stoppedAtVault)}` : "";
+      return `The census stopped at its time limit${at} at ${ended}.${stuck}`;
+    }
+    case "failed":
+      return `The census failed at ${ended} (${errorKind(r.error) ?? "Error"}).`;
+  }
+}
+
 function pipelineLine(e: StatusEntry, now: number): string {
   const t = pipelineHeartbeat(e);
+  const census = e.live?.writers.map((w) => w.censusRun && censusLine(w.censusRun)).find(Boolean);
   if (t != null)
-    return `${HEARTBEAT_WORDS[pipelineState(e, now)]}: last write at ${utcTime(t)}, ${ageWords(now - t)} ago.`;
+    return `${HEARTBEAT_WORDS[pipelineState(e, now)]}: last write at ${utcTime(t)}, ${ageWords(now - t)} ago.${census ? ` ${census}` : ""}`;
   const b = pipelineNewestBlockTime(e);
   return b != null ? `No write time stored. The newest row is from a block of ${utcTime(b)}.` : "No write time stored.";
 }
@@ -603,6 +637,9 @@ function PipelineDetail({ e, now }: { e: StatusEntry; now: number }) {
                   {w.lastWriteAt ? `Last write ${utcTime(Date.parse(w.lastWriteAt) / 1000)}` : "No write time stored"}
                   {w.newest && ` · newest row at block ${n(w.newest.block)}`}
                 </div>
+                {w.censusRun && censusLine(w.censusRun) && (
+                  <div className="mt-0.5 text-rb-500">{censusLine(w.censusRun)}</div>
+                )}
               </li>
             ))}
           </ul>
@@ -791,7 +828,7 @@ export function StatusBoard({ source, view }: { source: StatusSource; view: Stat
 
   const cells =
     source.route === "status"
-      ? cellsFromStatus(withHeadMisses(source.data), protocolLabel)
+      ? cellsFromStatus(withCensusRuns(withHeadMisses(source.data)), protocolLabel)
       : cellsFromProgress(withHeadMisses(source.data));
   const atHead = (protocol: string, ch: number) =>
     cells.some((c) => c.protocol === protocol && c.chain === ch && c.fill?.atHead === true);
