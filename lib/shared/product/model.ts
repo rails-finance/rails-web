@@ -359,6 +359,9 @@ export interface ProductSection {
   body: ReactNode;
   /** Draw the body on a raised panel. */
   raised?: boolean | "narrow";
+  /** On the tile layout (`ReservePage` `layout="tiles"`), this section and the
+   *  next side by side from lg: "left" on the first, "right" on the second. */
+  pair?: "left" | "right";
   hooks?: Hooks;
 }
 

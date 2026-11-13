@@ -19,7 +19,8 @@ import { ExplainBullet, ExplainGroup, Fig } from "@/components/shared/explain-gr
 import { PanelFigure, type PositionPanelRow } from "@/components/shared/position-card-panel";
 import { VaultCard, YieldBullets, type VaultMenuLink } from "@/components/vaults/vault-card";
 import { ALLOCATION_SCOPE, allocationBar, VaultAssets, type VaultAssetRow } from "@/components/vaults/vault-assets";
-import { ColourNote, RULE, Tile, VAULT_CARD_TILE, VAULT_GRID } from "@/components/vaults/vault-tiles";
+import { RULE, Tile } from "@/components/shared/tile-grid";
+import { ColourNote, VAULT_CARD_TILE, VAULT_GRID } from "@/components/vaults/vault-tiles";
 import { HOLDERS_SCOPE, VaultWhoHolds } from "@/components/vaults/vault-who-holds";
 import { VaultConfiguration } from "@/components/vaults/vault-config";
 import { aaveConfigTile } from "@/components/vaults/vault-config-columns";

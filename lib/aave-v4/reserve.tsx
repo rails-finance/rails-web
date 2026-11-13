@@ -7,11 +7,13 @@
 //        spoke, drawn from the <hub> hub"; the band Supplied and Borrowed (this
 //        spoke, the hub's total under each), Available, Supply APY, Borrow APY
 //        and Utilization (the hub), each figure naming its side;
-//   M3.3 the rate curve, the hub strategy's constants and the premium;
-//   M3.4 the hub asset's daily borrow APY; M3.5 the spoke's and the hub's
-//        parameters; M3.6 the spoke's and the hub's configuration changes, newest
-//        first (lib/aave-v4/config-words.ts; one line on Base, not indexed there);
-//   M3.7, M3.8 the largest suppliers and borrowers of this spoke reserve.
+//   M3.3 the rate curve, the hub strategy's constants and the premium, beside
+//        M3.5 the spoke's and the hub's parameters;
+//   M3.4 the hub asset's daily borrow APY; M3.6 the spoke's and the hub's
+//        configuration changes, newest first (lib/aave-v4/config-words.ts; one
+//        line on Base, not indexed there);
+//   M3.7 beside M3.8, the largest suppliers and borrowers of this spoke reserve.
+// Drawn on the tile layout (ui-jobs 675): no panel fills, hairlines between.
 // The head is one read (`/api/at-block/aave-v4/reserve`); a token the spoke lists
 // from two hubs needs `?hub=`, and without it the page asks which.
 
@@ -428,7 +430,7 @@ function indexedSections(
           Not indexed yet on {chainMeta(d.chainId).name}.
         </p>
       ) : h && h.points.length > 0 ? (
-        <div className="rounded-lg bg-raised p-4">
+        <div>
           <AaveV4DrawnRateHistory
             h={h}
             symbol={names.symbol}
@@ -471,6 +473,7 @@ function indexedSections(
             scope: `reserve-${side}`,
             anatomy: side === "suppliers" ? "M3.7" : "M3.8",
             title: `Largest ${side}`,
+            pair: side === "suppliers" ? ("left" as const) : ("right" as const),
             tools: {
               links: [
                 {
@@ -752,7 +755,7 @@ export function AaveV4ReservePage({
             scope: "reserve-curve",
             anatomy: "M3.3",
             title: "Rate curve",
-            raised: true,
+            pair: "left",
             tools: {
               links: [
                 {
@@ -766,12 +769,11 @@ export function AaveV4ReservePage({
             },
             body: <RateCurve curve={curveOf(f, names)} />,
           },
-          historySection,
           {
             scope: "reserve-parameters",
             anatomy: "M3.5",
             title: "Parameters",
-            raised: "narrow",
+            pair: "right",
             learnMore: v4ParametersLearnMore(names, {
               published: line.base?.feedUpdatedAt != null,
               paused: Boolean(line.base),
@@ -810,6 +812,7 @@ export function AaveV4ReservePage({
             },
             body: <V4Parameters f={f} line={line} names={names} />,
           },
+          historySection,
           changesSection(d, sp, f, names, configLog, kept),
           ...holderSections,
         ],
@@ -830,6 +833,7 @@ export function AaveV4ReservePage({
           : `No Aave V4 spoke ${slug} here.`,
         link: { label: sp ? `All ${sp.name} reserves` : "All spokes", href: back },
       }}
+      layout="tiles"
       hooks={{ "data-reserve-page": addr, "data-market": sp?.key ?? slug, "data-reserve-hub": line?.hub ?? "" }}
     />
   );
