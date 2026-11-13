@@ -44,6 +44,7 @@ import { protocolForHref } from "@/lib/shared/protocols";
 import { fxEventFallbackContent } from "@/lib/shared/learn-more-content";
 import { serverReadAt, stampServerRead, type ServerRead } from "@/lib/shared/server-head-read";
 import { FX_ADDRESSES, FX_POOL_KEYS, FX_POOLS, isFxPoolKey, type FxPoolKey } from "@/lib/fx/asset-catalog";
+import { FX_FUNDING_RULE, fxAnchorSentence, fxFundingNow, fxFundingTip } from "@/lib/fx/statement-words";
 import type { FxPoolSystem, FxSystemChainResponse, FxTickRow } from "@/lib/sources/chain/fx-system";
 import {
   capacityProv,
@@ -166,7 +167,7 @@ function structureOf(c: Ctx): TicksStructure {
   const { p, label } = c;
   const leg = (which: "min" | "anchor" | "max", value: number) => (
     <Prov
-      info={stamp(c, oracleLegProv(which, label, p.address, p.oracle, p.normalizedSymbol))}
+      info={stamp(c, oracleLegProv(which, label, p.address, p.oracle, p.normalizedSymbol, FX_POOLS[p.key].anchor))}
       value={formatExact(value)}
     >
       ${formatNumber(value)}
@@ -214,6 +215,7 @@ function structureOf(c: Ctx): TicksStructure {
 /** The head's (i): a first draft to the charter, polished by /newcomer-review. */
 function PoolExplainer({ p }: { p: FxPoolSystem }) {
   const ratio = debtRatioOf(p);
+  const funding = fxFundingNow(p.fundingRatioAnnual);
   return (
     <>
       <ExplainGroup title="This pool">
@@ -228,8 +230,9 @@ function PoolExplainer({ p }: { p: FxPoolSystem }) {
           Each position locks {p.tokenSymbol} and borrows fxUSD against it, a leveraged long on {p.normalizedSymbol}.
         </ExplainBullet>
         <ExplainBullet>
-          The funding rate is <Fig bold>{pctOf(p.fundingRatioAnnual, 2)}</Fig> a year, charged on every position&rsquo;s
-          collateral; it follows Aave&rsquo;s borrow rate.
+          {funding.before}
+          <Fig bold>{funding.figure}</Fig>
+          {funding.after} {FX_FUNDING_RULE}
         </ExplainBullet>
         {ratio != null && (
           <ExplainBullet>
@@ -382,7 +385,7 @@ function head(c: Ctx, overview: boolean): ProductHead {
       {
         slot: "rateOut",
         label: "Funding rate",
-        tip: "A yearly charge on every position's collateral, as an APR; it follows Aave's borrow rate",
+        tip: fxFundingTip(p.fundingRatioAnnual),
         value: (
           <Prov info={stamp(c, fundingRateProv(label, p.address))} value={formatExact(p.fundingRatioAnnual * 100)}>
             {pctOf(p.fundingRatioAnnual, 2)}
@@ -446,7 +449,7 @@ function head(c: Ctx, overview: boolean): ProductHead {
 
 const ORACLE_HELP = (p: FxPoolSystem): LearnMoreContent => ({
   title: "The pool's three prices",
-  intro: `The pool's oracle gives three prices for ${p.normalizedSymbol}, each for a different job. The anchor is a price feed's reading; the min and max are the lowest and highest of it and the prices on trading venues, and each falls back to the anchor when a venue's price strays too far.`,
+  intro: `The pool's oracle gives three prices for ${p.normalizedSymbol}, each for a different job. ${fxAnchorSentence(FX_POOLS[p.key].anchor)}`,
   detailsHeading: "Which price does what:",
   details: [
     {
@@ -457,6 +460,7 @@ const ORACLE_HELP = (p: FxPoolSystem): LearnMoreContent => ({
     { bold: "Max price", text: "a redeemer's collateral is priced at it, the price least in the redeemer's favour." },
   ],
   extraParagraphs: [
+    "The min and max are the lowest and highest of the anchor and the prices on trading venues; each falls back to the anchor when a venue's price strays too far.",
     `Prices are in USD per ${p.normalizedSymbol}. ${p.tokenSymbol === p.normalizedSymbol ? "" : `The pool counts ${p.tokenSymbol} at its rate to ${p.normalizedSymbol}.`}`.trim(),
   ],
   links: [{ label: "f(x) docs", url: DOCS }],

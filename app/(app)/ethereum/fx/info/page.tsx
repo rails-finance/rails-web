@@ -6,7 +6,8 @@
 
 import Link from "next/link";
 import { GlossaryLink, ProtocolInfoPage, type InfoReads, type InfoTerm } from "@/components/shared/protocol-info-page";
-import { FX_ADDRESSES } from "@/lib/fx/asset-catalog";
+import { FX_ADDRESSES, FX_POOL_KEYS, FX_POOLS } from "@/lib/fx/asset-catalog";
+import { FX_FUNDING_RULE, fxPoolAnchorSentence } from "@/lib/fx/statement-words";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
@@ -94,8 +95,7 @@ const GLOSSARY: readonly [InfoTerm, ...InfoTerm[]] = [
   },
   {
     term: "Funding",
-    definition:
-      "A yearly charge on collateral. It is taken continuously, so no transaction records it. The funding rate that Rails reads from each pool follows Aave's USDC borrow rate, and the docs say Funding Level I applies under peg conditions.",
+    definition: `A yearly charge on every position's collateral. It is taken continuously, so no transaction records it. ${FX_FUNDING_RULE}`,
     sources: [{ label: "Fees", href: `${DOCS}/f-x-protocol-mechanisms/fees` }],
   },
 ];
@@ -117,8 +117,7 @@ const reads: InfoReads = {
     },
     {
       name: "Each pool's price oracle",
-      reads:
-        "three prices for the pool's collateral. The anchor is a Chainlink price feed's reading; the min and max are the lowest and highest of it and the prices on trading venues, each falling back to the anchor when a venue's price strays too far. The pool judges borrowing, rebalancing and liquidation at the min price, a position's debt ratio at the anchor, and redemption at the max.",
+      reads: `three prices for the pool's collateral. ${FX_POOL_KEYS.map((k) => fxPoolAnchorSentence(FX_POOLS[k].tokenSymbol, FX_POOLS[k].anchor)).join(" ")} The min and max are the lowest and highest of the anchor and the prices on trading venues, each falling back to the anchor when a venue's price strays too far. The pool judges borrowing, rebalancing and liquidation at the min price, a position's debt ratio at the anchor, and redemption at the max.`,
     },
     {
       name: "Each pool's configuration",

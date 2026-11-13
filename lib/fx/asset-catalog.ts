@@ -15,6 +15,8 @@
 //     × 1e10 → the same quantity in 18 dp).
 // Debt is fxUSD 1e18 everywhere.
 
+import type { FxAnchorSource } from "./statement-words";
+
 export type FxPoolKey = "wsteth" | "wbtc";
 
 export interface FxPoolMeta {
@@ -29,6 +31,9 @@ export interface FxPoolMeta {
   normalizedSymbol: string;
   /** Deploy block (RegisterPool on the PoolManager). */
   fromBlock: number;
+  /** How the pool's oracle forms its anchor price (rails-ops
+   *  reference/official-docs/fx.md, "Docs and chain disagree" 2). */
+  anchor: FxAnchorSource;
 }
 
 export const FX_ADDRESSES = {
@@ -58,6 +63,15 @@ export const FX_POOLS: Record<FxPoolKey, FxPoolMeta> = {
     tokenDecimals: 18,
     normalizedSymbol: "stETH",
     fromBlock: 21529397,
+    anchor: {
+      words: "a Curve stETH/ETH moving average multiplied by Chainlink's ETH/USD price",
+      basis: {
+        kind: "chain",
+        block: 26403000,
+        check:
+          "the anchor divided by Chainlink's ETH/USD price (0x5f4e…8419) was 0.999901574952714, the price_oracle() of Curve's stETH/ETH pool (0x21E2…843a).",
+      },
+    },
   },
   wbtc: {
     key: "wbtc",
@@ -67,6 +81,10 @@ export const FX_POOLS: Record<FxPoolKey, FxPoolMeta> = {
     tokenDecimals: 8,
     normalizedSymbol: "WBTC",
     fromBlock: 22081079,
+    anchor: {
+      words: "Chainlink's WBTC/BTC and BTC/USD prices multiplied",
+      basis: { kind: "docs", page: "Risk management, Oracle, WBTC" },
+    },
   },
 };
 

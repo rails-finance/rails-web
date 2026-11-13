@@ -723,7 +723,7 @@ export function fxOperateContent(kind: "open" | "reopen" | "adjust" | "close"): 
       },
       {
         bold: "Funding costs",
-        text: "leverage is financed through Aave: the pool passes Aave's borrow rate through as a continuous funding charge on collateral, with no per-position event. It simply shows up in the settled reading.",
+        text: "charged on every position's collateral with no event, at Aave's USDC borrow rate while the Stability Pool is short of USDC (f(x)'s docs), 0% otherwise.",
       },
       {
         bold: "Two unit systems",
@@ -769,7 +769,7 @@ export function fxEventFallbackContent(): LearnMoreContent {
   return {
     title: "How f(x) positions work",
     intro:
-      "f(x) V2 splits yield-bearing collateral into fxUSD (a stable token) and leveraged long positions. A position deposits wstETH or WBTC, mints fxUSD against it, and pays a funding rate that follows Aave's borrow rate.",
+      "f(x) V2 splits yield-bearing collateral into fxUSD (a stable token) and leveraged long positions. A position mints fxUSD against wstETH or WBTC and pays funding at Aave's USDC borrow rate while the Stability Pool is short of USDC.",
     detailsHeading: "Key concepts:",
     details: [
       {
