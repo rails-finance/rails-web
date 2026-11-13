@@ -2123,7 +2123,7 @@ L5:
     title: |-
       How liquidations work
     intro: |-
-      A trove can be liquidated once its LTV rises above the Max LTV of {max_ltv} for {coll_type}. Anyone can trigger the liquidation.
+      A trove can be liquidated once its LTV rises above the branch's Max LTV ({max_ltv} for {coll_type}). Anyone can trigger the liquidation.
     detailsHeading: |-
       Key concepts:
     details:

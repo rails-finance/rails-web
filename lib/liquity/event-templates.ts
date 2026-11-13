@@ -103,9 +103,10 @@ function modal(key: L5Key, o: L5Options = {}): LearnMoreContent {
   const form = [...(delegated ? ["delegated"] : []), ...(o.zeroDebt ? ["zero_debt"] : [])];
   let values: Record<string, string> = {};
   if (key === "liquidation") {
-    // The Max LTV is 1 ÷ the branch's MCR (lib/liquity/ltv.ts).
+    // The Max LTV is 1 ÷ the branch's MCR (lib/liquity/ltv.ts); on a branch
+    // Rails does not know, the adjust modal's fallback.
     values = {
-      max_ltv: fmtMaxLtv(o.collateralType ?? "WETH") ?? "",
+      max_ltv: fmtMaxLtv(o.collateralType) ?? FILE.L5_words.max_ltv_unknown,
       coll_type: o.collateralType ?? FILE.L5_words.coll_type_unknown,
     };
   } else if (key === "redemption" && o.urgentPath) {

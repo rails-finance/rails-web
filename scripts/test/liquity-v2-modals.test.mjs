@@ -27,7 +27,14 @@ test("the adjust modal stays a sentence without a known branch", () => {
 });
 
 test("the liquidation modal reads the same figure", () => {
-  assert.match(L5.liquidation({ collateralType: "rETH" }).intro, /Max LTV of 83\.33% for rETH/);
+  assert.match(L5.liquidation({ collateralType: "rETH" }).intro, /Max LTV \(83\.33% for rETH\)/);
+  assert.match(L5.liquidation({ collateralType: "WETH" }).intro, /Max LTV \(90\.91% for WETH\)/);
+});
+
+test("the liquidation modal takes the adjust modal's fallback without a known branch", () => {
+  const s = L5.liquidation({}).intro;
+  assert.doesNotMatch(s, /[{}]|\d+\.\d+%/);
+  assert.match(s, /Max LTV \(set per branch for this collateral\)/);
 });
 
 test("the redemption modal on the urgent path drops the fee kept and the rate queue", () => {
