@@ -610,15 +610,20 @@ const RANK: Record<Heartbeat, number> = { none: 0, fresh: 1, paused: 2, late: 3,
 /** A pipeline's state: the worst of its scheduled writers. A writer that
  *  runs on events (no `expectEverySec`) only shows how long the protocol has
  *  been quiet, so with none scheduled the lane's checkpoint decides (Sieve
- *  moving means data is arriving), else the backfill's heartbeat. */
+ *  moving means data is arriving), else the backfill's heartbeat. A census
+ *  on a row with its own index (another scheduled writer, or a lane
+ *  checkpoint) raises the row when late or stalled, but its hold does not
+ *  take the row's state. */
 export function pipelineState(e: StatusEntry, now: Secs): Heartbeat {
-  const states = (e.live?.writers ?? [])
-    .filter((w) => w.expectEverySec)
-    .map((w) => writerState(w, now, e))
-    .filter((h) => h !== "none");
-  if (states.length) return states.reduce((a, b) => (RANK[b] > RANK[a] ? b : a));
+  const worst = (hs: Heartbeat[]) => hs.reduce((a, b) => (RANK[b] > RANK[a] ? b : a), "none" as Heartbeat);
+  const scheduled = (e.live?.writers ?? []).filter((w) => w.expectEverySec);
+  const stateOf = (ws: StatusWriter[]) => ws.map((w) => writerState(w, now, e)).filter((h) => h !== "none");
+  const main = stateOf(scheduled.filter((w) => w.name !== CENSUS_WRITER));
+  const census = stateOf(scheduled.filter((w) => w.name === CENSUS_WRITER));
   const moved = isoSecs(e.live?.checkpoint?.updatedAt);
-  if (moved != null) return heartbeatAge(moved, now);
+  const index = main.length ? worst(main) : moved != null ? heartbeatAge(moved, now) : null;
+  if (index != null) return worst([index, ...census.filter((h) => h !== "paused")]);
+  if (census.length) return worst(census);
   return heartbeatAge(isoSecs(e.backfill?.heartbeatAt), now);
 }
 

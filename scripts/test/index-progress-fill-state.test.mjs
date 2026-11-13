@@ -322,3 +322,17 @@ test("an error shows its class name, never its text", () => {
   assert.equal(errorKind("fetch failed to 10.0.0.1"), "Error");
   assert.equal(errorKind("socket timed out"), "Timeout");
 });
+
+test("a held census does not take a row with its own index; a late one raises it", () => {
+  const held = { ...censusWriter(2 * 3600), censusRun: censusRun() };
+  const failed = { ...censusWriter(2 * 3600, false), censusRun: censusRun({ outcome: "failed", error: "RangeError" }) };
+  const row = (writers, checkpoint = { block: 1, time: null, updatedAt: at(60) }) => ({
+    protocol: "morpho",
+    chain: 1,
+    backfill: null,
+    live: { lane: "sieve", checkpoint, head: null, writers },
+  });
+  assert.equal(pipelineState(row([held]), now), "fresh");
+  assert.equal(pipelineState(row([held, failed]), now), "late");
+  assert.equal(pipelineState(row([held], null), now), "paused");
+});
