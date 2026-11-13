@@ -307,7 +307,7 @@ export const morphoVaultAllocationCollectedProv = (
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
-  summary: `${count.toLocaleString("en-US")} markets drawn as one segment${atBlock(c)} — the smallest of this address's slices at this block, added together in the loan token's own raw units. A band the width of this panel cannot draw them legibly apart, so they are collected; the collection is always the smallest, never the largest, and the panel below this row lists every one of them separately with its own figure. Each was read the same way as every other segment: the vault's supply in the market from Morpho Blue's own rows, then this address's proportional share of it. The markets collected here are ${legs.map((l) => (l.isIdle ? "the idle market" : (l.collateralSymbol ?? l.marketId.slice(0, 10)))).join(", ")}.`,
+  summary: `${count.toLocaleString("en-US")} markets drawn as one segment${atBlock(c)} — the smallest of this address's slices at this block, added together in the loan asset's own raw units. A band the width of this panel cannot draw them legibly apart, so they are collected; the collection is always the smallest, never the largest, and the panel below this row lists every one of them separately with its own figure. Each was read the same way as every other segment: the vault's supply in the market from Morpho Blue's own rows, then this address's proportional share of it. The markets collected here are ${legs.map((l) => (l.isIdle ? "the idle market" : (l.collateralSymbol ?? l.marketId.slice(0, 10)))).join(", ")}.`,
   contract: vaultContract(c),
   via: `${laneOf(c)} · Σ of the collected legs, each read @ this row's own block`,
   formula: "Σ attributed over the collected legs",

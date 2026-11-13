@@ -20,6 +20,7 @@ import type { EventProseCore } from "@/lib/shared/event-prose/types";
 import type { EventProvDetail } from "@/lib/aave-v4/position-provenance";
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import { borrowRatesByDebt } from "@/lib/aave-v4/borrow-rate";
+import { v4Apy } from "@/lib/aave-v4/rates";
 import { AT_LINE_HF } from "@/lib/aave-v4/format";
 import { getSpokeMeta } from "@/lib/aave-v4/spoke-meta";
 import { debtHubsOf, HUB_TIER_LABEL } from "@/components/protocol/aave-v4/aave-v4-spoke-constants";
@@ -243,14 +244,15 @@ export function aaveV4EventProse(input: AaveV4ProseInput): AaveV4EventProse {
     else if (a < CLOSE_HF) sp.say("hf.close");
   };
 
-  // The asset's borrow rate, where it moved by half or more since the previous event.
+  // The asset's borrow APY, where its rate moved by half or more since the previous event.
   const rateLine = () => {
     const now = num(borrowRatesByDebt(ctx).find((r) => r.symbol === ctx.reserveSymbol)?.apr);
     if (now == null || previousRate == null || previousRate <= 0) return;
     const ratio = now / previousRate;
     if (Math.abs(now - previousRate) < 0.005 || (ratio < 1.5 && ratio > 1 / 1.5)) return;
-    v.rate_then = previousRate;
-    v.rate_now = now;
+    // Chosen on the stored rate's move, stated as the APY (lib/aave-v4/rates.ts).
+    v.rate_then = v4Apy(previousRate);
+    v.rate_now = v4Apy(now);
     sp.say("rate.moved");
   };
 

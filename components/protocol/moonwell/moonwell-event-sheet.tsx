@@ -12,8 +12,8 @@
 // rest of the change in the side's dollars), the total before this
 // transaction, each market the transaction moved, and the total after. With
 // the breakdown on, the Debt side lists every market owed and the ones repaid.
-// Risk (health factor, how far the collateral can fall) and Limits (borrowing
-// limit used, still borrowable, each collateral factor) need the Comptroller
+// Risk (how far the collateral can fall) and Limits (credit limit, credit
+// remaining, each collateral factor) need the Comptroller
 // at the event's block, which the page does not read: their rows stand with
 // their labels and tips, unread.
 
@@ -428,12 +428,12 @@ export function useMoonwellSheet({
   // Risk and Limits: the Comptroller at the event's block, which the page
   // does not read.
   const unread = { none: MOONWELL_WORDS.sheet_unread };
+  // Moonwell's docs state the credit limit and credit remaining (ui-jobs 632).
   const risk: SheetStat[] = [
-    { key: "health-factor", label: MOONWELL_WORDS.sheet_health, tip: MOONWELL_WORDS.tip_health, value: unread },
     { key: "collateral-can-fall", label: MOONWELL_WORDS.sheet_fall, tip: MOONWELL_WORDS.tip_fall, value: unread },
   ];
   const limits: SheetStat[] = [
-    { key: "limit-used", label: MOONWELL_WORDS.sheet_limit_used, tip: MOONWELL_WORDS.tip_limit_used, value: unread },
+    { key: "credit-limit", label: MOONWELL_WORDS.sheet_limit, tip: MOONWELL_WORDS.tip_limit, value: unread },
     { key: "borrowable", label: MOONWELL_WORDS.sheet_borrowable, tip: MOONWELL_WORDS.tip_borrowable, value: unread },
   ];
   const params: SheetStat[] = state.balances.collateral

@@ -66,14 +66,12 @@ export interface ReadAt {
   receipt: (at: number | null) => Provenance;
 }
 
-/** A section ⋮'s rows above Inspect provenance. */
+/** A section ⋮'s rows; none, no ⋮. */
 export interface SectionTools {
   links?: SectionMenuLink[];
   exports?: SectionMenuExports;
   /** Switch rows that change what the section shows, first in the ⋮. */
   views?: SectionMenuView[];
-  /** The armed hint: "Click a value in this section to trace it". */
-  hint?: string;
 }
 
 /** A link at the foot of a head: "View Aave V3 Core reserves →", the
@@ -190,7 +188,7 @@ export interface HeadExplainer {
 /** The head of an A1 panel, an A2 page or an A3 page: the heading row, an
  *  optional subtitle, the vitals band and its (i). */
 export interface ProductHead {
-  /** The section's receipts scope; its ⋮ arms it alone. */
+  /** The section's name (`data-prov-scope`). */
   scope: string;
   /** The heading: a market's name; the ⋮'s name. On A3 the page's h1 is the
    *  heading and this names the ⋮. */

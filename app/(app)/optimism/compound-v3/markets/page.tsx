@@ -15,7 +15,7 @@ export const metadata = listingMetadata({
   title: "Compound V3 on Optimism · Markets",
   canonicalPath: "/optimism/compound-v3/markets",
   description:
-    "The 3 Compound V3 markets on Optimism, read from the Comets when the page opens: each one's size, rates, utilisation, reserves and collateral.",
+    "The 3 Compound V3 markets on Optimism, read from the Comets when the page opens: each one's size, rates, utilization, reserves and collateral.",
 });
 
 export default async function Page() {
@@ -23,7 +23,7 @@ export default async function Page() {
   return (
     <>
       <CompoundMarketsOverview data={data} chain="optimism" />
-      {/* Each section arms the inspector from its ⋮; no page-wide toggle. */}
+      {/* The inspector, armed from the profile menu's switch. */}
       <ProvInspectorLayer />
     </>
   );

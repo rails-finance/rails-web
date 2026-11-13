@@ -13,7 +13,7 @@
 // the browser context — see lib/host.mjs.
 
 import { chromium } from "playwright";
-import { armInspector, HALO } from "./lib/prov-inspector.mjs";
+import { ARMED, armInspector } from "./lib/prov-inspector.mjs";
 import { BASE, bypassHeaders } from "./lib/host.mjs";
 
 const PATH = "/ethereum/liquity-v2/branches";
@@ -31,9 +31,8 @@ await page.goto(BASE + PATH, { waitUntil: "domcontentloaded", timeout: 180000 })
 await armInspector(page);
 const pop = page.locator(".prov-inspect-pop");
 const ladder = page.locator('[role="dialog"][aria-label="Distance ladder"]');
-// The armed halo is the mode's state, and it outlives the menu the toggle
-// now sits in — so it, not the toggle's aria-pressed, is what to read.
-const armed = async () => (await page.locator(HALO).count()) > 0;
+// "Exit inspector" beside the profile control stands while armed: the mode's state.
+const armed = async () => (await page.locator(ARMED).count()) > 0;
 
 // Pick the first value that opens a popover.
 const picks = page.locator("[data-prov-pickable]");

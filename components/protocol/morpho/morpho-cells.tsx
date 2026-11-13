@@ -63,6 +63,7 @@ import { formatNumber } from "@/lib/utils/format";
 
 import { useMorphoLedgerCells } from "./morpho-ledger";
 import { morphoSheet } from "./morpho-sheet";
+import { lifText, morphoApy, MORPHO_TERMS } from "@/lib/morpho/terms";
 
 const fmt = (human: string): string => formatNumber(Number(human));
 /** A running balance the answer did not carry is stated, never filled in. */
@@ -140,8 +141,8 @@ function buildMorphoLiqForensics(
     ...(used.lif != null && read.status === "ok"
       ? {
           premiumReference: {
-            label: "Market incentive",
-            value: `+${((used.lif - 1) * 100).toFixed(2)}%`,
+            label: MORPHO_TERMS.lif,
+            value: lifText(used.lif),
             prov: morphoLifProv(coords, read.lltv, used.lif),
           },
         }
@@ -428,11 +429,11 @@ export function useMorphoOpened(
       riskCells.push({
         kind: "stat",
         key: "rate",
-        label: "Market borrow rate",
+        label: MORPHO_TERMS.borrowRate,
         changed: false,
         value: {
           after: {
-            text: `${(apr * 100).toFixed(2)}% APR`,
+            text: `${(morphoApy(apr) * 100).toFixed(2)}%`,
             info: morphoBorrowRateAtBlockProv(coords, read.at.block, apr),
           },
         },

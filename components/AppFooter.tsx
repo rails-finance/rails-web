@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { usePriceStripActive } from "@/components/shared/price-strip";
 import { FeedbackCluster } from "@/components/shared/feedback-cluster";
 import { LwNotice } from "@/components/shared/lw-attribution";
 import { PhoneBeta } from "@/components/nav/phone-beta";
@@ -14,17 +13,13 @@ import { PhoneBeta } from "@/components/nav/phone-beta";
  *  with support from Liquity" credit has been retired from this surface — it
  *  lives on the marketing site footer (see SiteFooter) where the messaging
  *  context fits — and so has the Coverage link: the depth matrix is reached
- *  from the explorer's own info page, not the legal row.
- *
- *  When a detail page mounts the fixed bottom PriceStrip, the footer pads its
- *  bottom so its content clears the strip instead of sitting behind it. */
+ *  from the explorer's own info page, not the legal row. */
 export function AppFooter() {
-  const priceStripActive = usePriceStripActive();
   return (
     <footer className="mt-32" data-anatomy="H8">
       {/* The hairline spans the text's width, in the muted text tone at half strength. */}
       <div className="max-w-7xl mx-auto px-4">
-        <div className={`border-t border-rb-500/50 pt-6 ${priceStripActive ? "pb-20" : "pb-6"}`}>
+        <div className="border-t border-rb-500/50 pt-6 pb-6">
           <div className="flex flex-col md:flex-row justify-between items-center md:items-start gap-6 md:gap-4">
             <div className="flex flex-col md:flex-row items-center gap-4">
               <div className="flex items-center gap-2">

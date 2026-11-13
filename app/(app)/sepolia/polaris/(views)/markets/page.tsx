@@ -13,8 +13,7 @@ import { loadPolarisMarketsFromChain } from "@/lib/sources/chain/polaris-positio
 import { loadPolarisBook } from "@/lib/sources/api/polaris-book";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { POLARIS_BASE_PATH } from "@/lib/polaris/routes";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 
 // Read live on every request: the stamp says "chain snapshot · block N", and
 // that is only true of a page rendered for the visitor looking at it. The cost
@@ -48,7 +47,6 @@ export default async function PolarisMarketsPage() {
         <div data-skel-section="page-table">
           <PolarisMarketsView chain={chain} book={book} />
         </div>
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
         <ProvInspectorLayer />
       </div>
     </div>

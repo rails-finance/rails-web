@@ -11,7 +11,7 @@
 // sorts; below lg a select and a direction button drive the same sort.
 //
 // Each row is a bounds-free receipts scope inside the section's, so the
-// inspector pins a row's receipts to it and the section's ⋮ still arms them.
+// inspector pins a row's receipts to it.
 
 import { useMemo, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";

@@ -116,14 +116,14 @@ const TERMS: Field[] = [
 ];
 const LIQUIDATION: Field[] = [
   ["targetHealthFactor", "Target health factor", wad],
-  ["healthFactorForMaxBonus", "Health factor for the max bonus", wad],
+  ["healthFactorForMaxBonus", "Max-bonus threshold", wad],
   ["liquidationBonusFactor", "Bonus factor", bps],
 ];
 const CURVE: Field[] = [
-  ["optimalUsageRatio", "Optimal usage", bps],
+  ["optimalUsageRatio", "Optimal usage ratio", bps],
   ["baseDrawnRate", "Base rate", bps],
-  ["rateGrowthBeforeOptimal", "Growth before optimal", bps],
-  ["rateGrowthAfterOptimal", "Growth after optimal", bps],
+  ["rateGrowthBeforeOptimal", "Slope below optimal", bps],
+  ["rateGrowthAfterOptimal", "Slope above optimal", bps],
 ];
 
 /** Who a position's collateral terms follow when a new set is added: a
@@ -196,8 +196,8 @@ function assetConfigWords(prev: V4ConfigRow | undefined, r: V4ConfigRow): string
 
 function creditLineWords(prev: V4ConfigRow | undefined, r: V4ConfigRow, symbol: string): string {
   const caps = against(prev, r, [
-    ["addCap", "Add cap", capShow(symbol), capMove(symbol)],
-    ["drawCap", "Draw cap", capShow(symbol), capMove(symbol)],
+    ["addCap", "Supply cap", capShow(symbol), capMove(symbol)],
+    ["drawCap", "Borrow cap", capShow(symbol), capMove(symbol)],
     ["riskPremiumThreshold", "Risk premium threshold", threshold],
   ]);
   if (!prev)
@@ -307,7 +307,7 @@ const HELD_GROUPS: [string, string[]][] = [
   ["listing", ["reserve-added"]],
   ["flag and collateral risk", ["reserve-config"]],
   ["price source", ["price-source"]],
-  ["collateral terms", ["dynamic-added", "dynamic-updated"]],
+  ["Dynamic Risk Configuration", ["dynamic-added", "dynamic-updated"]],
   ["liquidation settings", ["liquidation-config"]],
   ["liquidity fee and strategy", ["asset-config"]],
   ["credit line", ["credit-line"]],

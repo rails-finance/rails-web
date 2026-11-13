@@ -284,7 +284,7 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Lend", "Borrow"],
     desc: "Multi-spoke lending with unified liquidity across asset classes",
     subPages: [
-      { segment: "markets", label: "Markets", tab: "Markets" },
+      { segment: "markets", label: "Spokes", tab: "Spokes" },
       { segment: "hubs", label: "Hubs", tab: "Hubs" },
     ],
   },
@@ -303,7 +303,7 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Lend", "Borrow"],
     desc: "Aave V4 on Base: the Equities hub's Mag7 spoke, where Coinbase tokenized stocks back USDC loans, each stock price stated with when it was published",
     subPages: [
-      { segment: "markets", label: "Markets", tab: "Markets" },
+      { segment: "markets", label: "Spokes", tab: "Spokes" },
       { segment: "hubs", label: "Hubs", tab: "Hubs" },
     ],
   },
@@ -312,7 +312,7 @@ const SPECS: ProtocolSpec[] = [
     // lending spokes (Main, Forex, USDC Maple), read from the chain when a
     // page opens. A front door taking a wallet, its spoke accounts at
     // `<route>/<wallet>`, each opening `<route>/spoke/<spoke>/<wallet>`; the
-    // Markets and Hubs pages are Ethereum's and Base's, fed by rails-server's
+    // Spokes and Hubs pages are Ethereum's and Base's, fed by rails-server's
     // /api/at-block/aave-v4-arc routes. Unlaunched while Miles reads it.
     id: "aave-v4-arc",
     session: "aave-v4-arc",
@@ -326,7 +326,7 @@ const SPECS: ProtocolSpec[] = [
     history: "none",
     unlaunched: true,
     subPages: [
-      { segment: "markets", label: "Markets", tab: "Markets" },
+      { segment: "markets", label: "Spokes", tab: "Spokes" },
       { segment: "hubs", label: "Hubs", tab: "Hubs" },
     ],
   },

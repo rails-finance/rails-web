@@ -91,7 +91,7 @@ export const COMPOUND_LIST_DEFAULTS: CompoundListFilters = {
 // one-entry constant.
 export const COMPOUND_SORT_OPTIONS: SortOption[] = [
   { value: "recent", label: RECENT_ACTIVITY_LABEL },
-  { value: "debt", label: "Debt" },
+  { value: "debt", label: "Borrow balance" },
   { value: "coll", label: "Collateral" },
 ];
 

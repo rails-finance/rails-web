@@ -937,7 +937,7 @@ export default function AaveV3PositionDetail({
                   ) : null
                 }
               />
-              {/* The inspector's layer: armed from the card's ⋮, every
+              {/* The inspector's layer: armed from the profile menu's switch, every
               traced value on the page becomes a click target and its receipt
               pins into a popover at the value (prototype: this page). */}
               <ProvInspectorLayer />

@@ -21,6 +21,7 @@
 
 import { parseAbi, getAddress, type ContractFunctionParameters, type PublicClient } from "viem";
 import { chainClient } from "./rpc";
+import { moonwellApy } from "@/lib/comptroller/apy";
 import { resolveMoonwellRoster } from "./moonwell-roster";
 import { MOONWELL_DEPLOYMENT, MTOKEN_DECIMALS, type MoonwellDeployment } from "@/lib/moonwell/asset-catalog";
 import type { MoonwellChainMarket, MoonwellChainResponse } from "@/lib/api/fetch-moonwell-position";
@@ -44,7 +45,6 @@ const MTOKEN_ABI = parseAbi([
 const ORACLE_ABI = parseAbi(["function getUnderlyingPrice(address mToken) view returns (uint256)"]);
 
 const FACTOR = 1e18;
-const SECONDS_PER_YEAR = 31_536_000;
 const ZERO = BigInt(0);
 
 function stub(wallet: string): MoonwellChainResponse {
@@ -193,8 +193,8 @@ export async function loadMoonwellPositionFromChain(
         priceUsd,
         collateralFactor,
         entered: isEntered,
-        supplyApr: supplyRate != null ? (Number(supplyRate) / FACTOR) * SECONDS_PER_YEAR : null,
-        borrowApr: borrowRate != null ? (Number(borrowRate) / FACTOR) * SECONDS_PER_YEAR : null,
+        supplyApr: supplyRate != null ? moonwellApy(supplyRate) : null,
+        borrowApr: borrowRate != null ? moonwellApy(borrowRate) : null,
       });
     });
 

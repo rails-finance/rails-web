@@ -133,10 +133,10 @@ const plural = (n: number, one: string, many: string) => `${n.toLocaleString("en
 /** The footer's opening words over per-Comet cards, up to "counted on the
  *  chain" (with a census) or the source clause (without). */
 export function cometFooterLead(fig: { cards: number; wallets: number }, censusOpen: number | null): string {
-  const lead = `Indexed ${plural(fig.cards, "Comet position", "Comet positions")} across ${plural(fig.wallets, "wallet", "wallets")}`;
+  const lead = `Indexed ${plural(fig.cards, "Comet account", "Comet accounts")} across ${plural(fig.wallets, "wallet", "wallets")}`;
   return censusOpen == null
     ? lead
-    : `${lead}, of ${plural(censusOpen, "wallet", "wallets")} with an open position, counted on the chain`;
+    : `${lead}, of ${plural(censusOpen, "wallet", "wallets")} with an open account, counted on the chain`;
 }
 
 /** The listing's collateral facet: its URL param, which /start's Borrowing

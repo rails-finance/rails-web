@@ -32,8 +32,6 @@ roundings:
     whole dollars ($4,490)
   pct_plain: |-
     a fraction as a percent, up to two places (0.078 → 7.8%)
-  hf: |-
-    a health factor as the card prints it (1.0848, 2.60, >100)
   count: |-
     a whole number, grouped (1,204)
   date: |-
@@ -86,10 +84,10 @@ placeholders:
     means: |-
       the event's type as the index names it
   # The position card's figures, drawn by the card with their receipts.
-  hf:
-    rounding: hf
+  credit:
+    rounding: pct_plain
     means: |-
-      the account's health factor now
+      the account's credit remaining now, as a share of its credit limit
   supplied_usd:
     rounding: usd
     means: |-
@@ -113,15 +111,11 @@ placeholders:
   liquidity_usd:
     rounding: usd
     means: |-
-      the borrowing power the account has not used
-  drop:
-    rounding: pct_plain
-    means: |-
-      how far the collateral basket can fall before liquidation
+      the account's credit remaining in dollars, the room left to borrow
   rate:
     rounding: pct_plain
     means: |-
-      the variable borrow rate a year
+      the variable borrow APY, compounded every second
   liq_count:
     rounding: count
     means: |-
@@ -198,14 +192,12 @@ words:
     on this account's timeline
   # T2's balance sheet (ui-jobs 330): the Risk and Limits rows, the parameter
   # rows and the words for a figure the page does not hold.
-  sheet_health: |-
-    Health factor
   sheet_fall: |-
     Collateral can fall
-  sheet_limit_used: |-
-    Borrowing limit used
+  sheet_limit: |-
+    Credit limit
   sheet_borrowable: |-
-    Still borrowable
+    Credit remaining
   sheet_collateral_factor: |-
     {symbol} collateral factor
   sheet_unread: |-
@@ -245,14 +237,12 @@ words:
     The assets this account once borrowed and owes none of after this event.
   tip_debt_total: |-
     The debt's total in dollars after this transaction: each market's accountBorrows at Moonwell's latest oracle price by this event. Where the side holds one market, its amount stands beside the dollars.
-  tip_health: |-
-    The Comptroller's health factor after this event: each entered market's collateral times its collateral factor, over the debt; at 1 or below the account can be liquidated.
   tip_fall: |-
-    How far the collateral's total value can fall, the debt's value held, before the health factor reaches 1: one less one over the health factor.
-  tip_limit_used: |-
-    The debt as a share of the borrowing limit, each entered market's collateral times its collateral factor; Moonwell liquidates at 100%.
+    How far the collateral's total value can fall, the debt's value held, before credit remaining reaches zero: the credit remaining as a share of the credit limit.
+  tip_limit: |-
+    The most the account could borrow after this event: each entered market's collateral in dollars times its collateral factor, added up.
   tip_borrowable: |-
-    What the account could still borrow in dollars after this event: the borrowing limit less the debt, as the Comptroller's getAccountLiquidity states it.
+    What the account could still borrow in dollars after this event: the credit limit less the debt, as the Comptroller's getAccountLiquidity states it. At zero the account can be liquidated.
   tip_collateral_factor: |-
     The share of the {symbol} supplied that counts toward the borrowing limit, set by governance in the Comptroller's markets() for the market.
   # The timeline head (rails-ops decision 0045, TO-DO-ui-jobs 367): the kind
@@ -290,8 +280,8 @@ words:
 
 # ── The position card's explanation (zone Z1): an unheaded lead, then bullets
 # under Holdings, Risk, Rate and History when two of them hold two or more
-# bullets. Risk holds at most four: the shortfall or the unused borrowing power,
-# and the fall to liquidation. The health factor stands in the lead. A closed
+# bullets. Risk holds the shortfall or the credit remaining in dollars; the
+# credit remaining share stands in the lead (ui-jobs 632). A closed
 # account carries the lead and History.
 # Read by positionWords / positionNodes (lib/moonwell/event-templates.ts). ──
 position_words:
@@ -307,7 +297,7 @@ position_words:
   lead_shortfall: |-
     The Comptroller reports a shortfall, so the account can be liquidated now:
   lead_debt: |-
-    The account borrows against its supplied collateral, held at a {hf} health factor:
+    The account borrows against its supplied collateral, with {credit} of its credit limit remaining:
   lead_debt_unread: |-
     The account borrows against its supplied collateral:
   lead_supply: |-
@@ -327,13 +317,11 @@ position_words:
   shortfall: |-
     The shortfall is {shortfall_usd}, the debt the collateral no longer covers.
   capacity: |-
-    {liquidity_usd} of borrowing power is still unused.
-  drop: |-
-    The collateral basket can fall about {drop} before the account is liquidatable.
+    Credit remaining is {liquidity_usd}, what the account can still borrow.
   rate: |-
-    The debt accrues at a {rate} borrow rate.
+    The debt accrues at a {rate} borrow APY.
   rate_avg: |-
-    The debts accrue at a {rate} average borrow rate.
+    The debts accrue at a {rate} average borrow APY.
   liquidated: |-
     It has been liquidated {liq_count} {time_word} and remains open.
   operators: |-
@@ -701,7 +689,7 @@ L5:
       - bold: |-
           Liquidity
         text: |-
-          a withdrawal needs that much of the asset unborrowed in the market; when utilisation is high it waits for repayments or new supply.
+          a withdrawal needs that much of the asset unborrowed in the market; when utilization is high it waits for repayments or new supply.
       - bold: |-
           Effect on credit
         text: |-
@@ -784,7 +772,7 @@ L5:
       A Moonwell account becomes liquidatable when its credit remaining reaches zero: the debt is no longer covered by the collateral-factor-weighted supply. Anyone, in practice automated bots, can then liquidate it.
     extraParagraphs:
       - |-
-        A liquidator repays part of one debt, at most the close factor of 50%, and seizes mTokens worth the repaid debt plus a 10% incentive. The incentive is 7% for the liquidator and 3% for the market's reserves.
+        A liquidator repays part of one debt, at most the close factor of 50%. It seizes mTokens worth 1.10× the repaid debt, 10% extra: the liquidation incentive. The market keeps a share of the seized mTokens for its reserves, and the liquidator receives the rest.
       - |-
         A liquidation is partial and repeatable: each one repays at most half of one debt, nudging the account back toward solvency.
     links:
@@ -884,9 +872,9 @@ L5:
         text: |-
           the credit limit, each entered market's supply times its collateral factor, less the debt; a negative figure is a shortfall, and anyone can liquidate.
       - bold: |-
-          Health factor
+          Credit remaining
         text: |-
-          the credit limit divided by the debt; at 1 the shortfall begins.
+          the credit limit less the debt, in dollars and as a share of the limit; at zero the shortfall begins.
       - bold: |-
           Entering a market
         text: |-
@@ -1010,14 +998,14 @@ glossary:
       Collateral is the supplied assets a wallet has switched on to back its borrowing. A supply that is not switched on still earns interest but backs no borrowing. The collateral factor is the share of an asset's value that counts toward borrowing.
     sources: [{ label: "How to borrow", doc: BORROW_HOW }, { label: "Collateral factor", doc: COLLATERAL_FACTOR }]
   - bold: |-
-      Health factor
+      Credit remaining
     text: |-
-      The health factor scores how safe an account is. It is the credit limit, the most the account may borrow, divided by what it owes. Below 1 the account owes more than its credit limit allows, so it can be liquidated.
-    sources: [{ label: "Credit limit", doc: CREDIT_LIMIT }]
+      Credit remaining is how much more an account may borrow: its credit limit, each entered supply times its collateral factor, less what it owes, in dollars or as a share of the limit. At zero the account can be liquidated.
+    sources: [{ label: "Credit remaining", doc: CREDIT_REMAINING }]
   - bold: |-
       Liquidation
     text: |-
-      A liquidation happens when an account's health factor falls below 1. A liquidator repays part of the debt and receives some of the account's collateral as a bonus, which the borrower bears.
+      A liquidation happens when an account's credit remaining falls below zero. A liquidator repays part of the debt and receives some of the account's collateral as a bonus, which the borrower bears.
     sources:
       [
         { label: "Avoiding liquidation", doc: AVOID_LIQUIDATION },

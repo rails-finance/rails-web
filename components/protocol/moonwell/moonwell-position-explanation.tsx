@@ -21,6 +21,7 @@ import { formatDate } from "@/lib/date";
 import { AmountText } from "@/components/shared/amount-text";
 import { MOONWELL_WORDS, positionWords } from "@/lib/moonwell/event-templates";
 import { positionNodes } from "@/lib/moonwell/position-nodes";
+import { creditRemainingShare, creditRemainingText } from "@/lib/moonwell/credit-remaining";
 import { arrangeByHeading } from "@/lib/shared/event-prose/nodes";
 
 const GROUPS = ["holdings", "risk", "rate", "history"] as const;
@@ -71,8 +72,8 @@ export function MoonwellPositionExplanation({
   const unentered = supplied.filter((m) => !m.entered);
   const borrowed = chain.markets.filter((m) => m.borrowUnderlying > 0);
   const hasDebt = borrowed.length > 0;
-  const hf = chain.healthFactor;
-  const dropPct = hf != null && hf > 1 ? Math.round((1 - 1 / hf) * 100) : null;
+  // Credit remaining as Moonwell's docs state it: (limit − debt) ÷ limit.
+  const credit = creditRemainingShare(chain.collateralCapacityUsd, chain.debtValueUsd);
 
   const bullets: Bullet[] = [];
   const add = (group: Group, key: string, node: ReactNode) =>
@@ -121,7 +122,6 @@ export function MoonwellPositionExplanation({
         ? positionNodes("shortfall", { shortfall_usd: <H>{formatUsd(chain.shortfallUsd)}</H> })
         : positionNodes("capacity", { liquidity_usd: <H>{formatUsd(chain.liquidityUsd)}</H> }),
     );
-    if (dropPct != null && dropPct > 0) add("risk", "drop", positionNodes("drop", { drop: <H>{dropPct}%</H> }));
     if (captions?.borrowRate)
       add(
         "rate",
@@ -167,8 +167,8 @@ export function MoonwellPositionExplanation({
   const lead = hasDebt
     ? chain.shortfallUsd > 0
       ? positionNodes("lead_shortfall")
-      : hf != null
-        ? positionNodes("lead_debt", { hf: <H>{hf >= 100 ? "∞" : hf.toFixed(2)}</H> })
+      : credit != null
+        ? positionNodes("lead_debt", { credit: <H>{creditRemainingText(credit)}</H> })
         : positionNodes("lead_debt_unread")
     : entered.length > 0
       ? positionNodes("lead_supply")

@@ -37,7 +37,7 @@ import { CHROME_HOVER, CHROME_HOVER_ON } from "@/components/nav/chrome-hover";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
 import { Check, ChevronDown, CircleHelp, Crosshair, Monitor, Moon, Settings, Signpost, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 
@@ -56,7 +56,8 @@ import { START_CTA } from "@/lib/shared/ui-grammar";
 import type { ChainId } from "@/lib/shared/chains";
 import type { SavedLink, WalletSession } from "@/lib/shared/sessions";
 import { setProvPreference, useProvPreference } from "@/lib/shared/prov-preference";
-import { putDownInspector } from "@/components/shared/prov-inspector";
+import { provPreferenceAllows } from "@/lib/shared/prov-preference-routes";
+import { ProvInspectorExit, putDownInspector } from "@/components/shared/prov-inspector";
 import { menuEntries } from "@/lib/shared/sessions";
 import { RevealTip } from "@/components/shared/reveal-tip";
 
@@ -232,35 +233,54 @@ const ITEMS = '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbo
 const PROV_HELP =
   "Underlines each figure that has a receipt: click one to see the contract call, the block and the maths behind it. Switched on here, it stays on across the pages that support it.";
 
-/** The standing provenance inspector (decision 0062; ui-jobs 571): arms the
- *  inspector on arrival on every page that has passed the coverage gate
- *  (lib/shared/prov-preference-routes.ts). Off by default.
+/** The provenance inspector's one switch (decision 0062; ui-jobs 571, 625):
+ *  arms the inspector on arrival on every page that has passed the coverage
+ *  gate (lib/shared/prov-preference-routes.ts). Off by default.
  *
  *  The row is one switch; its "?" opens the house tooltip (RevealTip) and is
  *  a sibling of the switch, standing over the switch's stretched hit area
- *  (`after:inset-0`), so a press on it explains and never toggles (ui-jobs 602). */
+ *  (`after:inset-0`), so a press on it explains and never toggles (ui-jobs 602).
+ *
+ *  On a page off the list the switch reads "Not on this page", is disabled and
+ *  shows off; the saved choice is kept and arms the next page that supports
+ *  it (ui-jobs 625). */
 function ProvInspectorSwitch({ onDone }: { onDone: () => void }) {
-  const on = useProvPreference();
+  const saved = useProvPreference();
+  const allowed = provPreferenceAllows(usePathname(), useParams());
+  const on = saved && allowed;
+  const noteId = useId();
   return (
     <div
       // ITEM's row, its ring answering the switch's hover and focus.
-      className="relative flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-[15px] text-foreground has-[[role=menuitemcheckbox]:hover]:ring-1 has-[[role=menuitemcheckbox]:hover]:ring-blue-500 has-[[role=menuitemcheckbox]:focus-visible]:ring-[1.5px] has-[[role=menuitemcheckbox]:focus-visible]:ring-blue-500"
+      // Disabled, no hover ring and no pointer; the focus ring stays.
+      className={`relative flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-[15px] text-foreground has-[[role=menuitemcheckbox]:focus-visible]:ring-[1.5px] has-[[role=menuitemcheckbox]:focus-visible]:ring-blue-500 ${
+        allowed
+          ? "cursor-pointer has-[[role=menuitemcheckbox]:hover]:ring-1 has-[[role=menuitemcheckbox]:hover]:ring-blue-500"
+          : ""
+      }`}
       data-anatomy="H20.1"
     >
       <Crosshair className="size-5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
-      {/* The label over its subtitle line, as the Tools menu's inspector row
-          draws a title over a text-xs line (ProvInspectorToggle). Neither span
-          is positioned, so the switch's hit area and the tip's bubble still
-          stand on the row. */}
+      {/* The label over its subtitle line, a title over a text-xs line.
+          Neither span is positioned, so the switch's hit area and the tip's
+          bubble still stand on the row. */}
       <span className="flex min-w-0 flex-col py-1.5">
         <span className="flex min-w-0 items-center gap-3">
           <button
             type="button"
             role="menuitemcheckbox"
             aria-checked={on}
-            onClick={() => (on ? putDownInspector() : setProvPreference(true))}
-            className="min-w-0 truncate text-left outline-none after:absolute after:inset-0 after:rounded-lg after:content-['']"
-            data-profile-menu-prov={on ? "on" : "off"}
+            aria-disabled={allowed ? undefined : true}
+            aria-describedby={allowed ? undefined : noteId}
+            onClick={() => {
+              if (!allowed) return;
+              if (on) putDownInspector();
+              else setProvPreference(true);
+            }}
+            className={`min-w-0 truncate text-left outline-none after:absolute after:inset-0 after:rounded-lg after:content-[''] ${
+              allowed ? "" : "cursor-default text-rb-500"
+            }`}
+            data-profile-menu-prov={allowed ? (on ? "on" : "off") : "unavailable"}
           >
             Provenance inspector
           </button>
@@ -284,20 +304,30 @@ function ProvInspectorSwitch({ onDone }: { onDone: () => void }) {
         {/* The page half of the "?" (ui-jobs 603): a link to /about/provenance,
             standing over the switch's stretched hit area as the "?" does, so a
             press on it navigates and never toggles. */}
-        <Link
-          href={PROV_ABOUT_PATH}
-          role="menuitem"
-          onClick={onDone}
-          className="relative z-10 self-start whitespace-nowrap rounded-sm text-xs leading-5 text-rb-500 outline-none hover:text-blue-600 focus-visible:text-blue-600 focus-visible:ring-[1.5px] focus-visible:ring-blue-500 dark:hover:text-[var(--text-link)] dark:focus-visible:text-[var(--text-link)]"
-          data-profile-menu-prov-about=""
-        >
-          How it works
-        </Link>
+        <span className="flex items-center gap-1 self-start text-xs leading-5 text-rb-500">
+          {!allowed && (
+            <>
+              <span id={noteId} data-profile-menu-prov-unavailable="">
+                Not on this page
+              </span>
+              <span aria-hidden="true">·</span>
+            </>
+          )}
+          <Link
+            href={PROV_ABOUT_PATH}
+            role="menuitem"
+            onClick={onDone}
+            className="relative z-10 whitespace-nowrap rounded-sm outline-none hover:text-blue-600 focus-visible:text-blue-600 focus-visible:ring-[1.5px] focus-visible:ring-blue-500 dark:hover:text-[var(--text-link)] dark:focus-visible:text-[var(--text-link)]"
+            data-profile-menu-prov-about=""
+          >
+            How it works
+          </Link>
+        </span>
       </span>
       <span
         className={`pointer-events-none relative ml-auto inline-flex h-5 w-9 shrink-0 rounded-full transition-colors ${
           on ? "bg-teal-500" : "bg-rb-300 dark:bg-rb-700"
-        }`}
+        } ${allowed ? "" : "opacity-50"}`}
         aria-hidden="true"
       >
         <span
@@ -452,6 +482,9 @@ export function ProfileMenu() {
 
   return (
     <>
+      {/* While the inspector is armed, its way out stands left of the control
+          (ui-jobs 624.2). */}
+      <ProvInspectorExit onExit={() => trigger.current?.focus()} />
       <button
         ref={trigger}
         type="button"

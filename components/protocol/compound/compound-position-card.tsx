@@ -291,7 +291,7 @@ function CompoundMenuRows({ pagePath }: { pagePath: string }) {
   return (
     <ToolsMenuItem
       icon={copied ? <Icon name="check" size={16} /> : <Link2 size={16} className="-rotate-45" />}
-      title="Link to this position"
+      title="Link to this account"
       subtitle={copied ? "Copied" : "Copy the page's address"}
       onClick={() => {
         void navigator.clipboard.writeText(`${window.location.origin}${pagePath}`).then(() => {
@@ -303,9 +303,14 @@ function CompoundMenuRows({ pagePath }: { pagePath: string }) {
   );
 }
 
+/** The heads in Compound's docs' words (rails-ops reference/official-docs/compound.md). */
+const SUPPLIED = "Supplied";
+const BORROW_BALANCE = "Borrow balance";
+const PEAK_BORROW_BALANCE = "Highest recorded borrow balance";
+
 /** What the card's count counts, beside the timeline's event count. */
 const COUNT_TIP =
-  "Every transaction on this position except absorbs, which another account sends. The timeline counts events, and one transaction can write two or more: an absorb writes one for each seized asset and one for the debt, and one transaction can add collateral and borrow.";
+  "Every transaction on this account except liquidations, which another account sends through absorb. The timeline counts events, and one transaction can write two or more: an absorb writes one for each seized asset and one for the debt, and one transaction can supply collateral and borrow.";
 
 /** What a Compound V3 page or listing hands the card. */
 export interface CompoundPositionCardProps {
@@ -433,7 +438,7 @@ export function useCompoundCardSlots({
     if (!supplyOnly && lentLine) {
       supplyLines.push(
         <div key="lent-caption" className="mt-1 text-xs font-normal text-rb-500">
-          Highest lent {v.base.symbol} (earns interest)
+          Highest supplied {v.base.symbol} (earns interest)
         </div>,
         lentLine,
       );
@@ -449,7 +454,7 @@ export function useCompoundCardSlots({
     if (!peaks || v.peak.borrowedBase > 0)
       heads.push({
         id: "peak-debt",
-        label: CARD_VOCAB.peakDebt,
+        label: PEAK_BORROW_BALANCE,
         value: peaks ? (
           <TracedAmount
             info={peakBaseProv(v.base.symbol, "borrow", { ...peakCoords, asset: v.base.address })}
@@ -494,7 +499,7 @@ export function useCompoundCardSlots({
     // asserted).
     const supplyHead: PositionCardHead = {
       id: "collateral",
-      label: lending ? "Lent" : CARD_VOCAB.collateral,
+      label: lending ? SUPPLIED : CARD_VOCAB.collateral,
       value:
         legs.length === 0 ? null : supplyUsd != null ? (
           <UsdFigure usd={supplyUsd} info={compoundUsdProvOnchain(lending ? "Lent base" : "Collateral", coords)} />
@@ -556,7 +561,7 @@ export function useCompoundCardSlots({
     const borrowing = eff.side === "borrow";
     const debtHead: PositionCardHead = {
       id: "debt",
-      label: CARD_VOCAB.debt,
+      label: BORROW_BALANCE,
       value: borrowing ? (
         <Prov info={baseProv(v, eff, "borrow", vocab, lane)}>
           <AssetAmount value={Math.abs(eff.amount)} symbol={v.base.symbol} address={v.base.address} exact={baseExact} />
@@ -611,14 +616,14 @@ export function useCompoundCardSlots({
       }),
       dust: dustControl ?? undefined,
     };
-    // Panel, right: the borrower's room and the absorb line, then the block
-    // the live balance was read at (interest accrues every block).
+    // Panel, right: the borrower's room and the liquidation point, then the block
+    // the live balance was read at (interest accrues every second).
     const right: PositionPanelRow[] = [...(risk?.rows ?? [])];
     if (eff.isChain && v.current?.block)
       right.push({
         id: "read-at-block",
         label: "Read at block",
-        tip: "The block the Comet's balance was read at. Interest accrues every block, so the balance moves between loads.",
+        tip: "The block the Comet's balance was read at. Interest accrues every second, by the block's timestamp, so the balance moves between loads.",
         // The read's coordinate, the block every figure above was read at:
         // exempt like the strip's block chip (receipts grammar, tripwire).
         value: <span data-prov-exempt="">{v.current.block.toLocaleString("en-US")}</span>,
@@ -630,10 +635,10 @@ export function useCompoundCardSlots({
   // The headlines' read-mores on a detail card.
   const HEAD_TIP = {
     collateral: `The collateral supplied to the ${v.base.symbol} market, in dollars at its price feeds. Collateral earns no interest and backs borrowing of ${v.base.symbol}.`,
-    debt: `The ${v.base.symbol} borrowed from the market, including the interest accrued at its borrow rate.`,
+    debt: `The ${v.base.symbol} borrowed from the market, including the interest accrued at its Borrow APR.`,
   };
   const tipped = (h: PositionCardHead): PositionCardHead =>
-    h.labelTip || !(h.label === CARD_VOCAB.collateral || h.label === CARD_VOCAB.debt)
+    h.labelTip || !(h.label === CARD_VOCAB.collateral || h.label === BORROW_BALANCE)
       ? h
       : { ...h, labelTip: h.id === "debt" ? HEAD_TIP.debt : HEAD_TIP.collateral };
   const common = { status, heads: detail ? heads.map(tipped) : heads, identity, counters, outcome };

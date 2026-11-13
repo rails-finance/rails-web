@@ -32,7 +32,7 @@ export function compoundMarketsMetadata(chain: CompoundDeploymentKey): Metadata 
   return listingMetadata({
     title: `Compound V3 on ${NAME[chain]} · Markets`,
     canonicalPath: `/${chain}/compound-v3/markets`,
-    description: `The ${n} Compound V3 markets on ${NAME[chain]}, read live: each one's size, rates, utilisation, reserves and collateral.`,
+    description: `The ${n} Compound V3 markets Rails reads on ${NAME[chain]}, read live: each one's size, rates, utilization, reserves and collateral.`,
   });
 }
 
@@ -42,6 +42,6 @@ export function cometMetadata(chain: CompoundDeploymentKey, key: string): Metada
   return listingMetadata({
     title: `Compound V3 ${m.label} on ${NAME[chain]}`,
     canonicalPath: `/${chain}/compound-v3/markets/${key}`,
-    description: `Compound V3's ${m.baseSymbol} market on ${NAME[chain]}, read live: its supply and borrow rates, utilisation against the kink, reserves against their target, minimum borrow and every collateral asset's terms.`,
+    description: `Compound V3's ${m.baseSymbol} market on ${NAME[chain]}, read live: its supply and borrow rates, utilization against the kink, reserves against their target, minimum borrow and every collateral asset's terms.`,
   });
 }

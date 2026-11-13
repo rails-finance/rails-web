@@ -13,8 +13,8 @@
 // transaction, each market the transaction moved, and the total after. With
 // the breakdown on, the Debt side lists every market owed and the ones repaid.
 // The replay states a transaction whole, so a liquidation and its seize legs
-// draw one sheet. Risk (health factor, how far the collateral can fall) and
-// Limits (borrowing limit used, still borrowable, each collateral factor) need
+// draw one sheet. Risk (how far the collateral can fall) and
+// Limits (borrow limit used, account liquidity, each collateral factor) need
 // the Comptroller at the event's block, which the page does not read: their
 // rows stand with their labels and tips, unread. The cToken figures (the
 // cToken balance, a liquidation's seized cTokens) leave the body; the
@@ -471,10 +471,8 @@ export function useCompoundV2Sheet({
   // Risk and Limits: the Comptroller at the event's block, which the page
   // does not read.
   const unread = { none: W.sheet_unread };
-  const risk: SheetStat[] = [
-    { key: "health-factor", label: W.sheet_health, tip: W.tip_health, value: unread },
-    { key: "collateral-can-fall", label: W.sheet_fall, tip: W.tip_fall, value: unread },
-  ];
+  // Compound's docs name no ratio for the account: no health factor row (ui-jobs 631).
+  const risk: SheetStat[] = [{ key: "collateral-can-fall", label: W.sheet_fall, tip: W.tip_fall, value: unread }];
   const limits: SheetStat[] = [
     { key: "limit-used", label: W.sheet_limit_used, tip: W.tip_limit_used, value: unread },
     { key: "borrowable", label: W.sheet_borrowable, tip: W.tip_borrowable, value: unread },

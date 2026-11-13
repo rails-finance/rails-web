@@ -11,7 +11,13 @@ import { COMPOUND_V2_ADDRESSES } from "@/lib/compound-v2/asset-catalog";
 import { MOONWELL_ADDRESSES } from "@/lib/moonwell/asset-catalog";
 import { MOONWELL_BASE_COMPTROLLER } from "@/lib/moonwell-base/asset-catalog";
 import { BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
-import type { ComptrollerRateYear, ComptrollerVocabFamily } from "@/lib/comptroller/markets-provenance";
+import type { ComptrollerApy, ComptrollerRateYear, ComptrollerVocabFamily } from "@/lib/comptroller/markets-provenance";
+import {
+  COMPOUND_V2_APY_FORMULA,
+  COMPOUND_V2_DAYS_PER_YEAR,
+  MOONWELL_APY_FORMULA,
+  MOONWELL_SECONDS_PER_YEAR,
+} from "@/lib/comptroller/apy";
 import {
   COMPOUND_V2_BLOCKS_PER_YEAR,
   COMPOUND_V2_YEAR_DOCS,
@@ -37,6 +43,10 @@ export interface ComptrollerFamily {
    *  2,628,000 blocks, lib/compound-v2/rate-year.ts); null where they run on the
    *  rate model's constant (Moonwell's timestampsPerYear()). */
   rateYear: ComptrollerRateYear | null;
+  /** The APY's form (lib/comptroller/apy.ts). */
+  apy: ComptrollerApy;
+  /** The words a family's pause takes: its tag tips and the parameter rows. */
+  pause: ComptrollerPauseWords;
   oracleName: string;
   /** The Comptroller keeps supply caps (Moonwell); Compound V2 keeps borrow caps alone. */
   supplyCaps: boolean;
@@ -44,6 +54,42 @@ export interface ComptrollerFamily {
   listingFilter: "symbol" | "market";
   docs: { label: string; href: string };
 }
+
+/** A pause in the docs' words: Compound V2's Pause Guardian, Moonwell's Mint and Borrow Guardians. */
+export interface ComptrollerPauseWords {
+  both: string;
+  supply: string;
+  borrow: string;
+}
+
+const COMPOUND_V2_APY: ComptrollerApy = {
+  steps: COMPOUND_V2_DAYS_PER_YEAR,
+  formula: COMPOUND_V2_APY_FORMULA,
+  source: "Compound's docs' APY formula: 7,200 blocks a day, compounded daily over 365 days",
+  href: COMPOUND_V2_YEAR_DOCS,
+  compounding: "compounded daily, as Compound's docs compute it",
+};
+
+const MOONWELL_APY: ComptrollerApy = {
+  steps: MOONWELL_SECONDS_PER_YEAR,
+  formula: MOONWELL_APY_FORMULA,
+  source:
+    "compounded every second of a 365-day year. Moonwell's docs say interest accrues per second and give no APY formula, so the form is Rails's",
+  href: null,
+  compounding: "compounded every second",
+};
+
+const COMPOUND_V2_PAUSE: ComptrollerPauseWords = {
+  both: "The Pause Guardian has stopped new supply and borrowing here",
+  supply: "The Pause Guardian has stopped new supply here",
+  borrow: "The Pause Guardian has stopped new borrowing here",
+};
+
+const MOONWELL_PAUSE: ComptrollerPauseWords = {
+  both: "New supply and borrowing are paused here: the pauses Moonwell's docs give the Mint and Borrow Guardians",
+  supply: "New supply is paused here: the pause Moonwell's docs give the Mint Guardian",
+  borrow: "New borrowing is paused here: the pause Moonwell's docs give the Borrow Guardian",
+};
 
 export const COMPTROLLER_FAMILIES: Record<ComptrollerFamilyKey, ComptrollerFamily> = {
   "compound-v2": {
@@ -56,6 +102,8 @@ export const COMPTROLLER_FAMILIES: Record<ComptrollerFamilyKey, ComptrollerFamil
     token: "cToken",
     period: "block",
     rateYear: { periods: COMPOUND_V2_BLOCKS_PER_YEAR, source: COMPOUND_V2_YEAR_SOURCE, href: COMPOUND_V2_YEAR_DOCS },
+    apy: COMPOUND_V2_APY,
+    pause: COMPOUND_V2_PAUSE,
     oracleName: "Price oracle",
     supplyCaps: false,
     listingFilter: "symbol",
@@ -71,6 +119,8 @@ export const COMPTROLLER_FAMILIES: Record<ComptrollerFamilyKey, ComptrollerFamil
     token: "mToken",
     period: "second",
     rateYear: null,
+    apy: MOONWELL_APY,
+    pause: MOONWELL_PAUSE,
     oracleName: "Chainlink oracle",
     supplyCaps: true,
     listingFilter: "symbol",
@@ -86,6 +136,8 @@ export const COMPTROLLER_FAMILIES: Record<ComptrollerFamilyKey, ComptrollerFamil
     token: "mToken",
     period: "second",
     rateYear: null,
+    apy: MOONWELL_APY,
+    pause: MOONWELL_PAUSE,
     oracleName: "Chainlink oracle",
     supplyCaps: true,
     listingFilter: "market",
@@ -102,6 +154,7 @@ export function vocabFamily(f: ComptrollerFamily): ComptrollerVocabFamily {
     token: f.token,
     period: f.period,
     rateYear: f.rateYear,
+    apy: f.apy,
     oracleName: f.oracleName,
     lane: `${f.name} markets`,
   };

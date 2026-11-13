@@ -867,7 +867,6 @@ async function readListingDom(qs = "") {
     : "";
   const roster = await page.locator("[data-roster-drawer]").count();
   const introOnFace = await page.locator("[data-intro-drawer]").count();
-  const inspector = await page.locator("button.prov-inspect-toggle").count();
   const body = bodyText;
   // The rail this page wears. Since rails-ops decision 0028 the vault layer is
   // a view of the Morpho Blue Base explorer, so the row is that explorer's
@@ -885,7 +884,7 @@ async function readListingDom(qs = "") {
   );
   const sectionMark = await page.locator("[data-vaults-identity]").count();
   await page.close();
-  return { status, cards, body, stance, identity, sectionMark, roster, introOnFace, inspector };
+  return { status, cards, body, stance, identity, sectionMark, roster, introOnFace };
 }
 
 /** The vault layer's about page — /base/morpho/vaults/info.
@@ -1707,14 +1706,14 @@ check(
 );
 await railPage.close();
 
-// The face is the figures it read and nothing else. All three of these were on
-// it before the chrome moved — the "How this listing is built" drawer, the
-// roster drawer, and the provenance inspector's toggle — and each is asserted
-// ABSENT by the selector it actually rendered under.
+// The face is the figures it read and nothing else. Both of these were on
+// it before the chrome moved — the "How this listing is built" drawer and the
+// roster drawer (the inspector toggle that was a third left the app in
+// ui-jobs 625) — and each is asserted ABSENT by the selector it actually rendered under.
 check(
-  "L14d the listing face carries no intro drawer, no roster drawer and no provenance inspector",
-  dom.introOnFace === 0 && dom.roster === 0 && dom.inspector === 0,
-  `[data-intro-drawer] ${dom.introOnFace}, [data-roster-drawer] ${dom.roster}, button.prov-inspect-toggle ${dom.inspector}`,
+  "L14d the listing face carries no intro drawer and no roster drawer",
+  dom.introOnFace === 0 && dom.roster === 0,
+  `[data-intro-drawer] ${dom.introOnFace}, [data-roster-drawer] ${dom.roster}`,
 );
 
 // ⚠️ THE THREE-BLOCKS PARAGRAPH NAMES NO BLOCK OF ITS OWN. In the drawer it

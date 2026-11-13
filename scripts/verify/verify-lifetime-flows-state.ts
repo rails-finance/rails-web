@@ -2527,7 +2527,7 @@ test("Comet and Comptroller sources: factors keyed as the timelines key them; to
   const { ctokenCardLines, ctokenTodayRead } = await import("@/lib/shared/ctoken-health");
   const { basketLevels, cardLevels } = await import("@/lib/shared/flows-health");
   const read = cometFactorRead({ block: 7, factors: { "0xAB": { liquidate: 0.9 } } }, 86_400 * 20_000 + 1);
-  assert.deepEqual(read, { day: 20_000, block: 7, lt: { "base-supply": 0, "coll:0xab": 0.9 } });
+  assert.deepEqual(read, { day: 20_000, block: 7, lt: { "base-supply": 0, "coll:0xab": 0.9 }, line: 1 });
 
   // A Comet quoting in ETH: today's level is the read's share of its price,
   // at the chart's (dollar) price.

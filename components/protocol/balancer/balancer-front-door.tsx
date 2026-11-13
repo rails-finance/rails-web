@@ -6,7 +6,7 @@
 
 import { Prov } from "@/components/shared/provenance";
 import { HeadingTip } from "@/components/shared/tip-label";
-import { ProvSection, SectionHeading, SectionMenu } from "@/components/shared/section-menu";
+import { ProvSection, SectionHeading } from "@/components/shared/section-menu";
 import { PoolFrontDoor } from "@/components/protocol/uniswap/uniswap-front-door";
 import { BAL_CHAINS, type BalChainId } from "@/lib/balancer/chains";
 import { countProv } from "@/lib/balancer/provenance";
@@ -31,7 +31,7 @@ function Count({ chainId, count }: { chainId: BalChainId; count: BalCount }) {
   ] as const;
   return (
     <ProvSection scope={SCOPE} className="mt-10 w-full max-w-xl" data-anatomy="U11" data-balancer-count="">
-      <SectionHeading title={COUNT_WORDS.title} menu={<SectionMenu scope={SCOPE} title={COUNT_WORDS.title} />} />
+      <SectionHeading title={COUNT_WORDS.title} />
       <dl className="mt-2 grid grid-cols-2 gap-3 rounded-xl border border-rb-200 px-4 py-3 dark:border-rb-500/30">
         {cells.map((x) => (
           <div key={x.key} data-balancer-count-cell={x.key}>

@@ -64,6 +64,7 @@
 //   BASE=http://localhost:3000 node scripts/verify/verify-vault-compare.mjs
 
 import { chromium } from "playwright";
+import { armInspector } from "./lib/prov-inspector.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const NAV = { waitUntil: "domcontentloaded", timeout: 300000 };
@@ -169,7 +170,10 @@ let vaultsInspector = 0;
   const page = await ctx.newPage();
   await page.goto(`${BASE}/vaults`, NAV);
   await page.locator("[data-vault-row]").first().waitFor({ timeout: WAIT });
-  vaultsInspector = await page.locator("button.prov-inspect-toggle, [data-prov-tripwire]").count();
+  // The profile menu's switch arms /vaults (ui-jobs 625); put down again at
+  // once, so the picks below are row presses.
+  vaultsInspector = (await armInspector(page)) ? 1 : 0;
+  if (vaultsInspector) await page.keyboard.press("Escape");
   for (const f of [...Object.values(FIXTURES), FIFTH]) {
     const k = keyOf(f);
     const row = page.locator(`[data-vault-row="${f.address}"][data-chain="${f.chainId}"]`).first();
@@ -321,16 +325,27 @@ let vaultsInspector = 0;
       marks:
         root?.querySelectorAll(".prov-locate-box, [data-prov-covered], [data-prov-pickable], [data-prov-inspect]")
           .length ?? -1,
-      tools: document.querySelectorAll("button.prov-inspect-toggle, [data-prov-tripwire]").length,
     };
   });
   check("2e the page is E1 and data-prov-exempt", prov.anatomy === "E1" && prov.exempt.length > 0, prov.exempt);
   check("2f no receipt marks on the page's figures", prov.marks === 0, `${prov.marks} marks`);
-  check(
-    "2g no inspector control (the /vaults control has one)",
-    prov.tools === 0 && vaultsInspector > 0,
-    `compare ${prov.tools}, /vaults ${vaultsInspector}`,
-  );
+  {
+    // The switch on, the compare page does not arm (no route of the switch).
+    const p = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    await p.goto(compareUrl(ALL), NAV);
+    await p.evaluate(() => localStorage.setItem("rails-prov-inspector", "1"));
+    await p.reload(NAV);
+    await p.locator("[data-compare-columns]").waitFor({ timeout: WAIT });
+    await p.waitForTimeout(1500);
+    const armedHere =
+      (await p.locator(".prov-inspect-exit").count()) + (await p.locator("[data-prov-pickable]").count());
+    await p.close();
+    check(
+      "2g the switch on, the page does not arm (the switch arms /vaults)",
+      armedHere === 0 && vaultsInspector > 0,
+      `compare ${armedHere}, /vaults ${vaultsInspector}`,
+    );
+  }
 
   // ── 3. Sort by ──
   const sortNote = page.locator("[data-compare-sort-note]");

@@ -1845,7 +1845,7 @@ await verifySheet("liquity-v2");
  *  and the body Copy for LLM puts on the clipboard; an unknown id answers 404.
  *  The event page's one menu, the ⋮ at the card's top right (the design rounds
  *  of 6 Nov 2026), holds Copy link, the explorer, View as Markdown (a new tab,
- *  at the route) and Copy for LLM, then Inspect provenance; a copy row
+ *  at the route) and Copy for LLM; a copy row
  *  confirms in place. The View in timeline tile beside it is the one way to
  *  the timeline; the page draws no T1 and so no number pill. The facts table
  *  has the Time row and the Transaction row with its copy. Neither the card's nor the page's
@@ -1879,23 +1879,16 @@ async function verifyLiquityMarkdown(subject) {
   const fake = await fetch(`${BASE}${positionPath}/event/${encodeURIComponent(FAKE_ID)}.md`);
   check(`${name}: an unknown event's Markdown answers 404`, fake.status === 404, String(fake.status));
 
-  // The event's ⋮ at the card's top right: View in timeline, Inspect
-  // provenance, Copy transaction hash, then the page's rows (ui-jobs 535).
+  // The event's ⋮ at the card's top right: View in timeline, Copy
+  // transaction hash, then the page's rows (ui-jobs 535). Inspect provenance
+  // left it in ui-jobs 625.
   const TRIGGER = "[data-event-page-card] [data-event-head-menu] [data-event-menu] > button";
   const MENU = '[data-event-menu] [role="menu"]';
   const COPY_LLM = `${MENU} [data-menu-item="copy-for-llm"]`;
   const COPY_LINK_BTN = `${MENU} [data-menu-item="copy-link"]`;
   const VIEW_MD = `${MENU} [data-menu-item="view-markdown"]`;
   const COPY_HASH = '[data-event-page-facts] [data-copy-fact="transaction"]';
-  const WANT = [
-    "view-timeline",
-    "show-provenance",
-    "copy-hash",
-    "copy-link",
-    "view-explorer",
-    "view-markdown",
-    "copy-for-llm",
-  ];
+  const WANT = ["view-timeline", "copy-hash", "copy-link", "view-explorer", "view-markdown", "copy-for-llm"];
   const TX_ID = /^(0x[0-9a-f]{64})/i.exec(decodedId)?.[1]?.toLowerCase() ?? null;
   {
     const { ctx, page, errors } = await open(1280, link);
@@ -1921,8 +1914,6 @@ async function verifyLiquityMarkdown(subject) {
       JSON.stringify(items) === JSON.stringify(WANT),
       JSON.stringify(items),
     );
-    const provRow = await page.locator(`${MENU} [data-prov-scope-toggle]`).count();
-    check(`${name} event page: the ⋮ holds Inspect provenance`, provRow === 1, `${provRow} found`);
     const timelineLinks = await page.locator("[data-event-id] a[href*='?at=']").count();
     check(`${name} event page: one timeline link`, timelineLinks === 1, `${timelineLinks} found`);
     const timelineHref = await page.locator(IN_TIMELINE).first().getAttribute("href");

@@ -7,7 +7,7 @@
 // and figures that opens into its markets as indented child rows, the first
 // group open on arrival. A row's first cell holds the pair's marks, its name
 // (the row's one link, carrying its receipt) and a muted line under it. Each row is a bounds-free receipts scope inside
-// the section's, so the section's ⋮ arms every value in it.
+// the section's, so every value in it is the section's.
 
 import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";

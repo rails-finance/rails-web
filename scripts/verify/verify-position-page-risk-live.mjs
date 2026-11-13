@@ -15,7 +15,8 @@
 //      drop of N%" where several do or the protocol states a fall (Moonwell,
 //      Morpho Blue, Compound V3; decision 0042 point 3);
 //   3  the strip names its line — "Health factor" on the Aave family and Spark,
-//      "Borrow capacity" on Moonwell and Morpho Blue, "Borrowing limit" on
+//      "Borrow capacity" on Moonwell, "Health factor" on Morpho Blue
+//      (ui-jobs 628), "Borrowing limit" on
 //      Compound V3 (web 6e63b8e);
 //   4  the page carries no "could not be read" / "unavailable" wording, and the
 //      browser logged no page error while drawing it. A React hydration
@@ -68,16 +69,26 @@ const LANES = [
   { api: "aave-v3-base", line: "Health factor", debt: aaveDebt, path: (r) => `/base/aave-v3/${r.wallet}` },
   { api: "seamless", line: "Health factor", debt: aaveDebt, path: (r) => `/base/seamless/${r.wallet}` },
   // The opened card's risk headline and the line under it (ui-jobs 209).
-  { api: "moonwell-base", line: "Health factor", debt: borrowsDebt, path: (r) => `/base/moonwell/${r.wallet}` },
+  // Moonwell's card states its runway as the docs' Credit remaining share, the
+  // same figure as a drop to liquidation (ui-jobs 632): no separate drop row.
+  {
+    api: "moonwell-base",
+    line: "Credit remaining",
+    runway: /Credit remaining[^$\d−]{0,60}?(?:−?\d+\.\d%|below −[\d,]+%)/,
+    debt: borrowsDebt,
+    path: (r) => `/base/moonwell/${r.wallet}`,
+  },
   {
     api: "compound-base",
-    line: "Borrowing limit used",
+    // The card's risk head in Compound's docs' word (ui-jobs 629).
+    line: "Borrowing capacity used",
     debt: (r) => Math.max(0, -Number(r.base?.amount ?? 0)),
     path: (r) => `/base/compound-v3/${r.market}/${r.account}`,
   },
   {
     api: "morpho-base",
-    line: "of the LLTV",
+    // The card's risk head, as Morpho's docs name it (ui-jobs 628).
+    line: "Health factor",
     debt: (r) => Number(r.borrowed?.amount ?? 0),
     path: (r) => `/base/morpho/${r.owner}/${r.marketId}`,
   },
@@ -156,12 +167,14 @@ for (const lane of LANES) {
   // The runway lands with the live read, which on a busy machine comes after
   // the idle (aave-v3 0x26a5…e95 on 26 Oct 2026): wait up to 30 s for it.
   await page
-    .waitForFunction((src) => new RegExp(src).test(document.body.innerText), RUNWAY.source, { timeout: 30000 })
+    .waitForFunction((src) => new RegExp(src).test(document.body.innerText), (lane.runway ?? RUNWAY).source, {
+      timeout: 30000,
+    })
     .catch(() => {});
   const text = (await page.evaluate(() => document.body.innerText)) ?? "";
 
   // A figure, not the words alone: "Liquidates at" also sits in read-mores.
-  const hit = RUNWAY.exec(text);
+  const hit = (lane.runway ?? RUNWAY).exec(text);
   const at = hit ? hit.index : -1;
   const window = at >= 0 ? text.slice(Math.max(0, at - 120), at + hit[0].length).replace(/\s+/g, " ") : "";
   check(

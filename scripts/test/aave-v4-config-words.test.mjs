@@ -112,15 +112,15 @@ test("newest first, one entry a row", () => {
 
 test("the first row of a kind states its values, later rows what moved", () => {
   assert.deepEqual(words(24720899, "liquidation-config"), [
-    "Target health factor 1.00, health factor for the max bonus 0.00, bonus factor 0%",
+    "Target health factor 1.00, max-bonus threshold 0.00, bonus factor 0%",
   ]);
   assert.deepEqual(words(24723022, "liquidation-config"), [
-    "Target health factor 1.00 → 1.24, health factor for the max bonus 0.00 → 0.90, bonus factor 0% → 90%",
+    "Target health factor 1.00 → 1.24, max-bonus threshold 0.00 → 0.90, bonus factor 0% → 90%",
   ]);
   assert.deepEqual(words(24722784, "rate-curve"), [
-    "Optimal usage 92%, base rate 0%, growth before optimal 4%, growth after optimal 20%",
+    "Optimal usage ratio 92%, base rate 0%, slope below optimal 4%, slope above optimal 20%",
   ]);
-  assert.deepEqual(words(26302505, "rate-curve"), ["Growth before optimal 4% → 5%, growth after optimal 20% → 4.5%"]);
+  assert.deepEqual(words(26302505, "rate-curve"), ["Slope below optimal 4% → 5%, slope above optimal 20% → 4.5%"]);
   assert.deepEqual(words(24722784, "asset-config"), [
     "Liquidity fee 0% → 10%",
     "Liquidity fee 0%, rate strategy set, fee receiver set",
@@ -129,15 +129,15 @@ test("the first row of a kind states its values, later rows what moved", () => {
 
 test("credit line: caps in tokens, no cap at 2^40 − 1, the line's switches", () => {
   assert.deepEqual(words(24723022, "credit-line"), [
-    "Add cap 1,250,000 USDC, draw cap 1,250,000 USDC, risk premium threshold 0%, line on",
+    "Supply cap 1,250,000 USDC, borrow cap 1,250,000 USDC, risk premium threshold 0%, line on",
   ]);
   assert.deepEqual(words(24723145, "credit-line"), ["Line off"]);
   assert.deepEqual(words(24770654, "credit-line"), ["Line on"]);
   assert.deepEqual(words(25876677, "credit-line"), [
-    "Add cap 1,250,000 → 18,000,000 USDC, draw cap 1,250,000 → 15,000,000 USDC",
+    "Supply cap 1,250,000 → 18,000,000 USDC, borrow cap 1,250,000 → 15,000,000 USDC",
   ]);
   assert.deepEqual(words(26283034, "credit-line"), [
-    "Add cap 18,000,000 USDC → no cap, draw cap 15,000,000 → 36,000,000 USDC",
+    "Supply cap 18,000,000 USDC → no cap, borrow cap 15,000,000 → 36,000,000 USDC",
   ]);
 });
 

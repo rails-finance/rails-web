@@ -19,7 +19,6 @@ export const EVENT_PAGE_WORDS = {
   copy_llm: "Copy for LLM",
   copy_llm_hint: "This event as Markdown for an AI assistant",
   copied: "Copied",
-  provenance_hint: "Click a value on this event to trace it",
   explanation: "Explanation",
   figures: "Figures",
   event: "Event",

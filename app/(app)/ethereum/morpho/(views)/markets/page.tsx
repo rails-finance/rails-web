@@ -16,7 +16,7 @@ export const revalidate = 600;
 export const metadata = {
   title: "Morpho Blue markets",
   description:
-    "Every Morpho Blue market on Ethereum, grouped by the token it lends: its collateral, LLTV, size, rates and utilisation.",
+    "Every Morpho Blue market on Ethereum, grouped by the token it lends: its collateral, LLTV, size, rates and utilization.",
 };
 
 export default async function MorphoMarketsPage() {

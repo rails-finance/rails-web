@@ -58,6 +58,7 @@ import {
   type MorphoMarketCoords,
 } from "@/lib/morpho/markets-provenance";
 import type { MorphoMarketViewData } from "@/lib/morpho/markets-shape";
+import { lifBonusText, lifText, LLTV_TIP, morphoApy, morphoPair, MORPHO_TERMS } from "@/lib/morpho/terms";
 import type { Loadable, MarketModel, Missing, ProductSection, RateCurveModel } from "@/lib/shared/product/model";
 
 // ── Words ────────────────────────────────────────────────────────────────────
@@ -66,31 +67,35 @@ const DOCS = "https://docs.morpho.org";
 const NOTE = "text-[13px] text-rb-500";
 
 const RATE_TIP = {
-  supply: "What suppliers earn a year, as an APR: the borrow rate times utilisation, less the market's fee",
-  borrow: "What borrowers pay a year, as an APR, from the market's rate model",
+  supply:
+    "What suppliers earn a year, compounded: the borrow rate times utilization, less the market's fee, compounded over a year",
+  borrow: "What borrowers pay a year, compounded: the market's rate model's borrow rate compounded over a year",
 };
 const TIP = {
-  available: "Supplied less borrowed: what suppliers can withdraw or borrowers take now",
-  util: "Borrowed ÷ supplied, both in the loan token",
+  available:
+    "Loan assets available in the market now: supplied less borrowed, what suppliers can withdraw or borrowers take",
+  util: "Borrowed ÷ supplied, both in the loan asset",
 };
 
 const CURVE_HELP: LearnMoreContent = {
   title: "How the rate curve works",
   intro:
-    "Most Morpho markets use the AdaptiveCurveIRM. It sets the borrow rate from the market's utilisation, the share of its supply on loan, and moves the whole curve over time to pull utilisation towards its target of 90%.",
+    "The AdaptiveCurveIRM is the only interest rate model Morpho's governance has approved; a market names it or, as an idle market, none. It sets the borrow rate from the market's utilization, the share of its supply on loan, and moves the whole curve over time to pull utilization towards its target of 90%.",
   detailsHeading: "The model's terms:",
   details: [
-    { bold: "Rate at target", text: "the borrow rate at 90% utilisation." },
+    { bold: "Rate at target", text: "the borrow rate at 90% utilization." },
     {
       bold: "Steepness",
       text: "the curve runs from a quarter of the rate at target with nothing borrowed to four times it with everything borrowed.",
     },
     {
       bold: "Adapting",
-      text: "while utilisation is above 90% the rate at target rises, and below it the rate falls; the further from 90%, the faster.",
+      text: "while utilization is above 90% the rate at target rises, and below it the rate falls; the further from 90%, the faster.",
     },
   ],
-  extraParagraphs: ["Suppliers earn the borrow rate times utilisation, less the market's fee."],
+  extraParagraphs: [
+    "Suppliers earn the borrow rate times utilization, less the market's fee. The chart and the page state the borrow and supply rates as an APY, compounded over a year.",
+  ],
   links: [{ label: "Morpho docs: interest rate models", url: `${DOCS}/learn/concepts/irm/` }],
 };
 
@@ -130,11 +135,20 @@ function ctxOf(d: MorphoMarketViewData, chainId: ChainId): Ctx {
       loanToken: m.loanToken,
     },
     coll,
-    pair: namesNoToken(m) ? "Idle market" : m.isIdle ? `${m.loanSymbol} idle market` : `${coll} / ${m.loanSymbol}`,
+    pair: namesNoToken(m) ? "Idle market" : m.isIdle ? `${m.loanSymbol} idle market` : morphoPair(m.loanSymbol, coll),
     explorer: chainMeta(chainId).explorerName,
     chainName: chainMeta(chainId).name,
   };
 }
+
+/** The Supply APY's receipt, with the figures it is derived from. */
+const supplyProv = (x: Ctx): Provenance =>
+  morphoSupplyRateProv(x.c, {
+    borrowYearly: x.d.market.borrowApr,
+    utilization: x.d.market.utilization,
+    fee: x.d.market.fee,
+    supplyYearly: x.d.market.supplyApr,
+  });
 
 /** The market id rides the LLTV's receipt: the id is the hash of the parameters. */
 function lltvProv(x: Ctx): Provenance {
@@ -164,8 +178,8 @@ function Size({ x, side }: { x: Ctx; side: "supplied" | "borrowed" | "available"
   // An idle market that names no loan token (Arc's first market) holds nothing to size.
   if (namesNoToken(m))
     return (
-      <span className="text-rb-500" title="This market names no loan token, collateral, oracle or rate model.">
-        no loan token
+      <span className="text-rb-500" title="This market names no loan asset, collateral, oracle or rate model.">
+        no loan asset
       </span>
     );
   if (!m.amountsTrusted)
@@ -174,7 +188,7 @@ function Size({ x, side }: { x: Ctx; side: "supplied" | "borrowed" | "available"
         className="text-rb-500"
         title={
           m.loanDecimalsUnread
-            ? "The chain did not answer for the loan token's decimals. The sizes show once it does."
+            ? "The chain did not answer for the loan asset's decimals. The sizes show once it does."
             : `${m.loanSymbol} misreports its own decimals, so its balances cannot be stated.`
         }
       >
@@ -208,7 +222,7 @@ function MarketExplainer({ x }: { x: Ctx }) {
     return (
       <ExplainGroup title="This market">
         <ExplainBullet>
-          This idle market names no loan token, collateral, oracle or rate model, so nothing can be supplied to it or
+          This idle market names no loan asset, collateral, oracle or rate model, so nothing can be supplied to it or
           borrowed from it.
         </ExplainBullet>
       </ExplainGroup>
@@ -260,7 +274,7 @@ function MarketExplainer({ x }: { x: Ctx }) {
       <ExplainGroup title="Rates">
         {m.borrowApr != null && (
           <ExplainBullet>
-            Suppliers earn <Fig bold>{ratePercentText(m.supplyApr ?? 0)}</Fig> a year, as an APR.
+            Suppliers earn a Supply APY of <Fig bold>{ratePercentText(morphoApy(m.supplyApr ?? 0))}</Fig>.
           </ExplainBullet>
         )}
         {m.borrowApr != null && (
@@ -268,18 +282,18 @@ function MarketExplainer({ x }: { x: Ctx }) {
             sub={
               k && (
                 <ExplainSub>
-                  The rate model aims for 90% utilisation. Above it the rates climb steeply and rise further every day;
-                  below it they ease. At 90% the borrow rate is <Fig bold>{ratePercentText(k.rat)}</Fig> now.
+                  The rate model aims for 90% utilization. Above it the rates climb steeply and rise further every day;
+                  below it they ease. At 90% the borrow rate is <Fig bold>{ratePercentText(k.rat)}</Fig> a year now.
                 </ExplainSub>
               )
             }
           >
-            Borrowers pay <Fig bold>{ratePercentText(m.borrowApr)}</Fig> a year, as an APR.
+            Borrowers pay a Borrow APY of <Fig bold>{ratePercentText(morphoApy(m.borrowApr))}</Fig>.
           </ExplainBullet>
         )}
         {m.borrowApr != null && (
           <ExplainBullet>
-            Utilisation <Fig bold>{pctText(m.utilization)}</Fig> is the share of the supply on loan. The supply rate is
+            Utilization <Fig bold>{pctText(m.utilization)}</Fig> is the share of the supply on loan. The supply rate is
             the borrow rate times it
             {m.fee > 0 ? (
               <>
@@ -293,11 +307,11 @@ function MarketExplainer({ x }: { x: Ctx }) {
       <ExplainGroup title="Collateral and liquidation">
         <ExplainBullet>
           A borrower may owe up to <Fig bold>{pctText(m.lltv)}</Fig> of their collateral&apos;s value at the
-          oracle&apos;s price. Past that, anyone can repay the debt and take collateral worth{" "}
-          <Fig bold>{pctText((m.liquidationIncentive ?? 1) - 1)}</Fig> more.
+          oracle&apos;s price, the LLTV. Past it, anyone can repay the debt and take collateral with a{" "}
+          <Fig bold>{lifBonusText(m.liquidationIncentive ?? 1)}</Fig>.
         </ExplainBullet>
         <ExplainBullet>
-          The market keeps its LLTV and incentive for its whole life, as set when it was created.
+          The market keeps its LLTV and its Liquidation Incentive Factor for its whole life, as set when it was created.
         </ExplainBullet>
       </ExplainGroup>
     </>
@@ -309,17 +323,20 @@ function MarketExplainer({ x }: { x: Ctx }) {
 function marketMarkdown(x: Ctx): string {
   const m = x.d.market;
   const sz = (n: number) =>
-    namesNoToken(m) ? "no loan token" : m.amountsTrusted ? `${amount(n)} ${m.loanSymbol}` : "not stated";
+    namesNoToken(m) ? "no loan asset" : m.amountsTrusted ? `${amount(n)} ${m.loanSymbol}` : "not stated";
   return [
     `# ${x.pair}, a Morpho Blue market on ${x.chainName}`,
     "",
     `- Supplied: ${sz(m.totalSupply)}`,
     `- Borrowed: ${sz(m.totalBorrow)}`,
-    `- Available: ${sz(m.totalSupply - m.totalBorrow)}`,
-    ...(m.supplyApr != null ? [`- Supply rate: ${ratePercentText(m.supplyApr)} APR`] : []),
-    ...(m.borrowApr != null ? [`- Borrow rate: ${ratePercentText(m.borrowApr)} APR`] : []),
-    ...(m.utilization != null ? [`- Utilisation: ${pctText(m.utilization)}`] : []),
+    `- ${MORPHO_TERMS.marketLiquidity}: ${sz(m.totalSupply - m.totalBorrow)}`,
+    ...(m.supplyApr != null ? [`- ${MORPHO_TERMS.supplyRate}: ${ratePercentText(morphoApy(m.supplyApr))}`] : []),
+    ...(m.borrowApr != null ? [`- ${MORPHO_TERMS.borrowRate}: ${ratePercentText(morphoApy(m.borrowApr))}`] : []),
+    ...(m.utilization != null ? [`- ${MORPHO_TERMS.utilization}: ${pctText(m.utilization)}`] : []),
     `- LLTV: ${pctText(m.lltv)}`,
+    ...(m.liquidationIncentive != null
+      ? [`- ${MORPHO_TERMS.lif}: ${lifText(m.liquidationIncentive)} (${lifBonusText(m.liquidationIncentive)})`]
+      : []),
     `- Fee: ${pctText(m.fee, 0)}`,
     `- Market id: ${m.id}`,
     "",
@@ -360,7 +377,7 @@ function headOf(x: Ctx, positions: { href: string; label: string } | null): Mark
       subtitle: "The contract that holds every market",
       href: explorerUrl(x.chainId, "address", blue.address),
     },
-    { item: "docs", title: "Morpho's docs", subtitle: "Markets", href: `${DOCS}/learn/concepts/market/` },
+    { item: "docs", title: "Morpho's docs", subtitle: "Markets", href: `${DOCS}/learn/concepts/blue/` },
   ];
   const contracts = [
     {
@@ -387,7 +404,7 @@ function headOf(x: Ctx, positions: { href: string; label: string } | null): Mark
     subtitle: (
       <p className="mt-1 text-[13px] text-rb-500" data-morpho-market-line="">
         {namesNoToken(m) ? (
-          <>No loan token, collateral, oracle or rate model</>
+          <>No loan asset, collateral, oracle or rate model</>
         ) : m.isIdle ? (
           <>An idle {m.loanSymbol} market</>
         ) : (
@@ -431,7 +448,7 @@ function headOf(x: Ctx, positions: { href: string; label: string } | null): Mark
       },
       {
         slot: "sizeFree",
-        label: "Available",
+        label: MORPHO_TERMS.marketLiquidity,
         tip: TIP.available,
         value: (
           <span data-vital="available">
@@ -441,12 +458,12 @@ function headOf(x: Ctx, positions: { href: string; label: string } | null): Mark
       },
       {
         slot: "rateIn",
-        label: "Supply rate",
+        label: MORPHO_TERMS.supplyRate,
         tip: RATE_TIP.supply,
         value: (
           <span data-vital="supply-rate">
             {m.supplyApr != null ? (
-              <Prov info={morphoSupplyRateProv(x.c)}>{ratePercentText(m.supplyApr)}</Prov>
+              <Prov info={supplyProv(x)}>{ratePercentText(morphoApy(m.supplyApr))}</Prov>
             ) : (
               noRate(m)
             )}
@@ -455,12 +472,12 @@ function headOf(x: Ctx, positions: { href: string; label: string } | null): Mark
       },
       {
         slot: "rateOut",
-        label: "Borrow rate",
+        label: MORPHO_TERMS.borrowRate,
         tip: RATE_TIP.borrow,
         value: (
           <span data-vital="borrow-rate">
             {m.borrowApr != null ? (
-              <Prov info={morphoBorrowRateProv(x.c)}>{ratePercentText(m.borrowApr)}</Prov>
+              <Prov info={morphoBorrowRateProv(x.c, m.borrowApr)}>{ratePercentText(morphoApy(m.borrowApr))}</Prov>
             ) : (
               noRate(m)
             )}
@@ -469,7 +486,7 @@ function headOf(x: Ctx, positions: { href: string; label: string } | null): Mark
       },
       {
         slot: "usage",
-        label: "Utilisation",
+        label: MORPHO_TERMS.utilization,
         tip: TIP.util,
         value: (
           <span data-vital="utilisation">
@@ -532,7 +549,9 @@ function curveOf(x: Ctx): RateCurveModel | Missing {
   const borrow = adaptiveBorrowRate(k.rat, k.u);
   return {
     ...adaptiveCurveTerms(k.rat),
-    kinkLabel: "target",
+    kinkLabel: MORPHO_TERMS.target,
+    utilizationWord: MORPHO_TERMS.utilizationText,
+    form: { of: (rate: number) => morphoApy(rate), borrow: MORPHO_TERMS.borrowRate, supply: MORPHO_TERMS.supplyRate },
     reserveFactor: m.fee,
     now: {
       utilisation: m.utilization,
@@ -560,7 +579,10 @@ function CurveTerms({ x }: { x: Ctx }) {
   if (!k || !x.d.rateAtTarget) return null;
   return (
     <dl className="mt-4 grid max-w-md grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-[13px]" data-rate-terms="">
-      <Term term="Rate at target" title="The borrow rate at the target utilisation, as the model holds it now">
+      <Term
+        term="Rate at target"
+        title="The borrow rate at the target utilization, as the model holds it now: a year, before compounding"
+      >
         <Prov
           info={morphoRateAtTargetProv(x.c, {
             stored: x.d.rateAtTarget,
@@ -571,18 +593,18 @@ function CurveTerms({ x }: { x: Ctx }) {
           {ratePercentText(k.rat)} a year
         </Prov>
       </Term>
-      <Term term="Target utilisation" title="The utilisation the model steers the market towards">
+      <Term term={MORPHO_TERMS.targetUtilization} title="The utilization the model steers the market towards">
         <span data-prov-exempt="">{pctText(TARGET_UTILISATION, 0)}</span>
       </Term>
       <Term
         term="Steepness"
-        title="The borrow rate at 100% utilisation over the rate at target; at 0% it is the inverse"
+        title="The borrow rate at 100% utilization over the rate at target; at 0% it is the inverse"
       >
         <span data-prov-exempt="">{CURVE_STEEPNESS}×</span>
       </Term>
       <Term
         term="Adapts"
-        title="How fast the rate at target moves: at 100% utilisation it doubles in this time, and at 0% it halves"
+        title="How fast the rate at target moves: at 100% utilization it doubles in this time, and at 0% it halves"
       >
         <span data-prov-exempt="">doubles in {DOUBLING_DAYS_AT_FULL.toFixed(1)} days at 100%</span>
       </Term>
@@ -600,7 +622,7 @@ function OraclePrice({ x }: { x: Ctx }) {
     oracleFeeds: x.d.oracleFeeds,
     timestamp: x.d.timestamp,
   });
-  const coords = { marketId: m.id, marketLabel: `${m.loanSymbol} / ${x.coll}` };
+  const coords = { marketId: m.id, marketLabel: morphoPair(m.loanSymbol, x.coll) };
   return (
     <div className="text-[13px] text-rb-500" data-morpho-oracle-price="">
       <p className="tabular-nums">
@@ -659,17 +681,18 @@ function Parameters({ x }: { x: Ctx }) {
   const m = x.d.market;
   return (
     <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-[13px]" data-reserve-parameters="">
-      <Term term="Loan token">{namesNoToken(m) ? "none" : m.loanSymbol}</Term>
+      <Term term={MORPHO_TERMS.loanAsset}>{namesNoToken(m) ? "none" : m.loanSymbol}</Term>
       <Term term="Collateral">{m.isIdle ? "none" : x.coll}</Term>
-      <Term term="LLTV" title="The most a borrower may owe against the collateral's value, and the liquidation line">
+      <Term term="LLTV" title={LLTV_TIP}>
         {m.isIdle ? "none" : <Prov info={lltvProv(x)}>{pctText(m.lltv)}</Prov>}
       </Term>
       {m.liquidationIncentive != null && (
         <Term
-          term="Liquidation incentive"
-          title="What a liquidator receives above the debt repaid, in collateral; set by the LLTV"
+          term={MORPHO_TERMS.lif}
+          title="The collateral value a liquidator receives per unit of debt repaid; set by the LLTV. Less 1, it is the liquidator's bonus"
         >
-          <Prov info={morphoLiquidationIncentiveProv(x.c)}>{pctText(m.liquidationIncentive - 1)}</Prov>
+          <Prov info={morphoLiquidationIncentiveProv(x.c)}>{lifText(m.liquidationIncentive)}</Prov>
+          <span className="block text-rb-500">{lifBonusText(m.liquidationIncentive)}</span>
         </Term>
       )}
       <Term term="Fee" title="The share of borrowers' interest the protocol keeps; suppliers earn the rest">
@@ -734,7 +757,7 @@ function sectionsOf(x: Ctx): ProductSection[] {
         links: [
           ...(namesNoToken(m)
             ? []
-            : [link("loan-token", `${m.loanSymbol} on ${x.explorer}`, "The loan token", m.loanToken)]),
+            : [link("loan-token", `${m.loanSymbol} on ${x.explorer}`, "The loan asset", m.loanToken)]),
           ...(m.isIdle
             ? []
             : [link("collateral", `${x.coll} on ${x.explorer}`, "The collateral token", m.collateralToken)]),

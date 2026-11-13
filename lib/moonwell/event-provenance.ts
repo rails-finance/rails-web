@@ -33,6 +33,7 @@ import type { Provenance, ProvInput, ProvVerify } from "@/components/shared/prov
 import type { CaptureSource } from "@/lib/shared/capture-source";
 import { explorerUrl, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { MOONWELL_ADDRESSES } from "./asset-catalog";
+import { MOONWELL_APY_FORMULA } from "@/lib/comptroller/apy";
 
 // Custody, not origin — the via line's leading segment only (the embedded
 // receipt renderer drops it; provenance-receipts-grammar §3). Summaries state
@@ -453,32 +454,38 @@ export const moonwellUsdProvOnchain = (what: string): Provenance => ({
   ],
 });
 
-/** The live per-timestamp borrow rate on one market, annualized. */
+/** The live per-second borrow rate on one market as an APY, compounded every
+ *  second (lib/comptroller/apy.ts). */
 export const borrowRateProv = (sym?: string): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   verify: {
     kind: "recompute",
-    text: "Re-run the mToken.borrowRatePerTimestamp eth_call and multiply by 31,536,000 (seconds per year)",
+    text: `Re-run the mToken.borrowRatePerTimestamp eth_call and compute ${MOONWELL_APY_FORMULA}`,
   },
-  summary: `The current variable borrow rate${sym ? ` on the ${sym} market` : ""} — the mToken's \`borrowRatePerTimestamp\` read at head, annualized (× seconds per year). Moonwell accrues per timestamp (its Base/Moonbeam convention), so the per-second rate is the contract's own unit; the annualization is simple multiplication, not compounding.`,
+  summary: `The current variable borrow APY${sym ? ` on the ${sym} market` : ""} — the mToken's \`borrowRatePerTimestamp\` read at head, compounded every second of a 365-day year: ${MOONWELL_APY_FORMULA}. Moonwell's docs say interest accrues per second and give no APY formula, so compounding every second is Rails's form.`,
   contract: { name: "mToken", address: "" },
-  via: "mToken borrowRatePerTimestamp (eth_call at head) × 31,536,000",
-  formula: "per-second rate × seconds per year",
+  via: "mToken borrowRatePerTimestamp (eth_call at head) → APY",
+  formula: MOONWELL_APY_FORMULA,
   inputs: [{ label: "per-second rate", kind: "chain", pclass: "state", note: "borrowRatePerTimestamp at head" }],
 });
 
-/** Debt-USD-weighted average borrow rate across several borrowed markets. */
+/** Debt-USD-weighted average borrow APY across several borrowed markets. */
 export const avgBorrowRateProv = (): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   summary:
-    "Debt-weighted average of the markets' current borrow rates — averaged across the markets this position borrows: each market's borrowRatePerTimestamp (annualized) weighted by that debt's USD value at Moonwell's own oracle price. All legs are chain reads at head.",
+    "Debt-weighted average of the markets' current borrow APYs — averaged across the markets this position borrows: each market's borrowRatePerTimestamp compounded every second of a 365-day year, weighted by that debt's USD value at Moonwell's own oracle price. All legs are chain reads at head.",
   contract: { name: "mToken", address: "" },
-  via: "Σ (rate × debt USD) ÷ Σ debt USD, per borrowed market",
-  formula: "Σ (rate × weight) ÷ Σ weight",
+  via: "Σ (APY × debt USD) ÷ Σ debt USD, per borrowed market",
+  formula: "Σ (APY × weight) ÷ Σ weight",
   inputs: [
-    { label: "rate", kind: "chain", pclass: "state", note: "borrowRatePerTimestamp per market, annualized" },
+    {
+      label: "APY",
+      kind: "chain-derived",
+      pclass: "state",
+      note: "borrowRatePerTimestamp per market, compounded every second",
+    },
     { label: "weight", kind: "chain-derived", pclass: "oracle", note: "debt × oracle getUnderlyingPrice" },
   ],
 });
