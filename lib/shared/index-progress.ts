@@ -100,11 +100,9 @@ export interface IndexProgress {
 }
 
 /** The fill plans each index every 10 min and writes its sample
- *  (pidx_progress.sampled_at) when the plan's finalized-block reads answer.
- *  While the gateways refuse them, a plan crawls through retries and the
- *  samples came about hourly: gaps of 51 to 62 min over 12–13 Nov 2026. Late
- *  sits at 1.5 times that hour so a held fill does not turn amber before each
- *  sample; past three hours it has stalled. */
+ *  (pidx_progress.sampled_at) at each plan, but none while the gateways refuse
+ *  its finalized-block reads. Past 90 min the heartbeat is late, which leaves
+ *  room for a plan slowed by retries; past three hours it has stalled. */
 export const HEARTBEAT_LATE = 90 * 60;
 export const HEARTBEAT_STALLED = 3 * 60 * 60;
 
