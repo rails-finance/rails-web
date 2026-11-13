@@ -103,8 +103,8 @@ const SPRING_IN =
 const BLEED = 24;
 const EASE_OUT = `${OUT_MS}ms cubic-bezier(0.4, 0, 1, 1)`;
 
-/** What Tab reaches: a radio group's unchosen options (`tabindex="-1"`) are
- *  left out, so the trap's ends are the ones Tab lands on. */
+/** What Tab reaches: anything with `tabindex="-1"` is left out, so the trap's
+ *  ends are the ones Tab lands on. */
 const FOCUSABLE =
   'a[href]:not([tabindex="-1"]), button:not([disabled]):not([tabindex="-1"]), input:not([disabled]):not([tabindex="-1"]), [tabindex]:not([tabindex="-1"])';
 

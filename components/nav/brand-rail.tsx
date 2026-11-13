@@ -9,8 +9,8 @@
 // the rail does what the toggle does, the cursor an arrow pointing the way the
 // panel will move (e-resize to open, w-resize to close; Miles, 6 Nov 2026):
 // a pointer convenience, the toggle stays the keyboard's control. Over the
-// pill the theme switch, its three options stacked (Miles 13 Nov 2026,
-// components/nav/theme-switch.tsx).
+// pill the theme switch, one button that steps Light, Dark and Auto (Miles 13
+// Nov 2026, components/nav/theme-switch.tsx).
 //
 // IT IS A SURFACE, NOT A MARGIN (68): `bg-raised` is the same tone the cards
 // and panels take, so the strip reads as chrome the page sits beside rather
