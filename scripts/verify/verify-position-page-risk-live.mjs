@@ -69,7 +69,15 @@ const LANES = [
   { api: "aave-v3-base", line: "Health factor", debt: aaveDebt, path: (r) => `/base/aave-v3/${r.wallet}` },
   { api: "seamless", line: "Health factor", debt: aaveDebt, path: (r) => `/base/seamless/${r.wallet}` },
   // The opened card's risk headline and the line under it (ui-jobs 209).
-  { api: "moonwell-base", line: "Credit remaining", debt: borrowsDebt, path: (r) => `/base/moonwell/${r.wallet}` },
+  // Moonwell's card states its runway as the docs' Credit remaining share, the
+  // same figure as a drop to liquidation (ui-jobs 632): no separate drop row.
+  {
+    api: "moonwell-base",
+    line: "Credit remaining",
+    runway: /Credit remaining[^$\d−]{0,60}?(?:−?\d+\.\d%|below −[\d,]+%)/,
+    debt: borrowsDebt,
+    path: (r) => `/base/moonwell/${r.wallet}`,
+  },
   {
     api: "compound-base",
     line: "Borrowing limit used",
@@ -158,12 +166,14 @@ for (const lane of LANES) {
   // The runway lands with the live read, which on a busy machine comes after
   // the idle (aave-v3 0x26a5…e95 on 26 Oct 2026): wait up to 30 s for it.
   await page
-    .waitForFunction((src) => new RegExp(src).test(document.body.innerText), RUNWAY.source, { timeout: 30000 })
+    .waitForFunction((src) => new RegExp(src).test(document.body.innerText), (lane.runway ?? RUNWAY).source, {
+      timeout: 30000,
+    })
     .catch(() => {});
   const text = (await page.evaluate(() => document.body.innerText)) ?? "";
 
   // A figure, not the words alone: "Liquidates at" also sits in read-mores.
-  const hit = RUNWAY.exec(text);
+  const hit = (lane.runway ?? RUNWAY).exec(text);
   const at = hit ? hit.index : -1;
   const window = at >= 0 ? text.slice(Math.max(0, at - 120), at + hit[0].length).replace(/\s+/g, " ") : "";
   check(
