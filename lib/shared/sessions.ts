@@ -405,13 +405,17 @@ function reconcileLegacyWallets(): void {
 
 /** The stars a list from before ui-jobs 652 is given: each kind with none
  *  starred has its first `SEED_STARS` starred, which is what the menu showed
- *  of it. A kind with a star keeps its stars as they are. Pure. */
-export function seedMenuStars<T extends SavedEntry>(rows: T[]): T[] {
+ *  of it. A kind with a star keeps its stars as they are. A wallet row that
+ *  is not a bookmark (`pinned: false`, from the pre-521 list) was never in
+ *  the menu, so it is neither counted nor starred; nor is a row `eligible`
+ *  turns down. Pure. */
+export function seedMenuStars<T extends SavedEntry>(rows: T[], eligible: (r: T) => boolean = () => true): T[] {
   const starred = new Set(rows.filter((r) => r.starred).map(kindOf));
   const seen: Record<SavedKind, number> = { wallet: 0, position: 0, view: 0 };
   return rows.map((r) => {
     const kind = kindOf(r);
-    if (starred.has(kind) || seen[kind] >= SEED_STARS) return r;
+    if (isWallet(r) && !r.pinned) return r;
+    if (!eligible(r) || starred.has(kind) || seen[kind] >= SEED_STARS) return r;
     seen[kind] += 1;
     return { ...r, starred: true };
   });
@@ -513,7 +517,7 @@ export function renameSession(key: string, customName: string): void {
 }
 
 /** What the profile menu shows of one kind (ui-jobs 652): the starred
- *  entries, every one, in the reader's order. Pure. */
+ *  entries, in the reader's order. Pure. */
 export function menuEntries<T extends SavedEntry>(rows: T[]): T[] {
   return rows.filter((r) => r.starred);
 }
@@ -679,18 +683,21 @@ export function importBookmarks(source: string): BookmarksImportResult {
     : typeof backup.bookmarks === "object" && backup.bookmarks !== null
       ? Object.values(backup.bookmarks)
       : [];
+  const held = loadSessions();
   // A file from before ui-jobs 652 is read with its stars seeded, as this
-  // browser's list was: its menu as its owner saw it.
+  // browser's list was, on the rows new to this browser only: a star the
+  // file does not carry never lands on a row held here.
+  const heldIds = new Set(held.map((r) => `${kindOf(r)} ${idOf(r)}`));
   const listed = lists
     .flatMap((rows) => (Array.isArray(rows) ? rows : []))
     .filter((r): r is SavedEntry => isSessionRow(r) || isLinkRow(r));
-  const rowsIn = backup.version < STARS_SEEDED_FROM ? seedMenuStars(listed) : listed;
+  const rowsIn =
+    backup.version < STARS_SEEDED_FROM ? seedMenuStars(listed, (r) => !heldIds.has(`${kindOf(r)} ${idOf(r)}`)) : listed;
   const wallets = rowsIn.filter(isSessionRow);
   const links = rowsIn.filter(isLinkRow);
   const hasViews = Array.isArray((parsed as { focusViews?: unknown }).focusViews);
   if (wallets.length + links.length === 0 && !hasViews) throw new Error("That backup carries nothing saved.");
 
-  const held = loadSessions();
   const heldWallets = held.filter(isWallet);
   const { rows: merged, added: walletsAdded } = mergeRows(heldWallets, wallets);
   // The rows held keep the reader's order; the rows the file adds go first in

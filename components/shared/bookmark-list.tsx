@@ -474,7 +474,7 @@ const NAME_CELL = "sm:w-full sm:max-w-0 sm:min-w-[200px]";
 const MENU_CELL = "dt-row-menu w-px whitespace-nowrap";
 
 /** A saved entry's star (ui-jobs 586, 652): the starred entries of a kind,
- *  focus views included, are the ones the profile menu shows, every one. */
+ *  focus views included, are the ones the profile menu shows. */
 function StarToggle({ on, label, onToggle }: { on: boolean; label: string; onToggle: () => void }) {
   return (
     <button

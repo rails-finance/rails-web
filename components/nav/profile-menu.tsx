@@ -14,9 +14,8 @@
 // in use, so Focus can always be turned off here; then Off
 // (lib/shared/asset-scope.ts `menuViews`). Listings, Wallets and Positions
 // list the items starred on /bookmarks (lib/shared/sessions.ts
-// `menuEntries`). Every starred item shows, in the reader's order. Any other
-// group with nothing starred is not drawn; its heading is the way to its tab
-// on /bookmarks. Long names fade at the line's
+// `menuEntries`). Any other group with nothing starred is not drawn; its
+// heading is the way to its tab on /bookmarks. Long names fade at the line's
 // end (`FADE`); rows read nothing, showing what the browser holds.
 //
 // From md a dropdown under the control, right edges aligned, dropping in with
@@ -366,7 +365,6 @@ export function ProfileMenu() {
   useEffect(() => setMounted(true), []);
 
   const face = bookmarks == null ? null : (bookmarks[0]?.addresses[0] ?? SAMPLE_WALLET);
-  // The starred of each kind, every one (ui-jobs 652).
   const rows = menuEntries(bookmarks ?? []);
   const listings = menuEntries(views ?? []);
   const held = menuEntries(positions ?? []);

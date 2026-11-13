@@ -132,6 +132,34 @@ test("an import from before 652 is read with its stars seeded; a current file's 
 const BOLD = { chain: 1, token: "0x6440f144b7e50d6a8439336510312d2f54beb01d", builtOn: true };
 const WETH = { chain: 1, token: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2", builtOn: true };
 
+test("seeding skips a wallet row that is not a bookmark (pinned: false)", () => {
+  const rows = [wallet(1, { pinned: false }), ...Array.from({ length: 6 }, (_, i) => wallet(i + 2))];
+  assert.deepEqual(
+    seedMenuStars(rows).map((r) => !!r.starred),
+    [false, true, true, true, true, true, false],
+  );
+});
+
+test("an import from before 652 seeds only the rows new to this browser", () => {
+  browser({
+    "rails-saved": JSON.stringify([link("position", 1), wallet(1)]),
+    "rails-saved-stars-652": "1",
+  });
+  // The reader keeps position 1 and wallet 1 unstarred here.
+  const old = {
+    version: 3,
+    exportedAt: "",
+    bookmarks: [link("position", 1), link("position", 2), wallet(1, { kind: undefined }), wallet(2)],
+  };
+  importBookmarks(JSON.stringify(old));
+  const positions = loadSavedLinks("position");
+  assert.equal(positions.find((r) => r.key === "/p/1").starred, undefined);
+  assert.equal(positions.find((r) => r.key === "/p/2").starred, true);
+  const wallets = loadBookmarks();
+  assert.equal(wallets.find((r) => r.key === addr(1)).starred, undefined);
+  assert.equal(wallets.find((r) => r.key === addr(2)).starred, true);
+});
+
 test("a new focus view starts starred; a star toggles and survives a read", () => {
   let s = addView(NO_VIEWS, { assets: [WETH], chains: [] }, undefined, "a", 1);
   s = adoptFocus(s, { assets: [BOLD], chains: [] }, "B", "b", 2);
