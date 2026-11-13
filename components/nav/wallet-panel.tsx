@@ -264,6 +264,7 @@ export function WalletPanel() {
         <div
           className="shrink-0 border-t border-rb-200 px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden dark:border-rb-700"
           data-wallet-panel-theme=""
+          data-anatomy="H16.2"
         >
           <ThemeSwitch placement="panel" />
         </div>

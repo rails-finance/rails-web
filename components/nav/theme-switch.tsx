@@ -58,6 +58,7 @@ export function ThemeSwitch({ placement }: { placement: Placement }) {
       onKeyDown={onKey}
       className={rail ? "flex flex-col items-center gap-1" : "flex gap-1"}
       data-theme-switch={placement}
+      data-anatomy={rail ? "H1.1" : undefined}
     >
       {THEMES.map(({ value, label, Icon }, i) => {
         const on = chosen === value;
