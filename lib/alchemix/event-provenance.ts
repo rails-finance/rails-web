@@ -763,7 +763,7 @@ export function redemptionFeeProv(
         : ""),
     verify: {
       kind: "recompute",
-      text: `In the redemption's transaction, the ${mytSymbol} sent to the fee receiver is ${fee.bps / 100}% of the ${mytSymbol} sent to the Transmuter`,
+      text: `In the redemption's transaction, the ${mytSymbol} sent to the protocol fee receiver is ${fee.bps / 100}% of the ${mytSymbol} sent to the Transmuter`,
     },
     source: { block: n.atBlock },
     inputs: coordInputs(coords, [

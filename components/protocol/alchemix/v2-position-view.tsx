@@ -176,7 +176,7 @@ export function AlchemixV2PositionView({
           </>
         ) : null}
         {p.v3Successors.length > 0
-          ? ". By Alchemix's docs, the Alchemix multisig then recreated each position in V3 from the snapshot, and the V3 position this wallet holds is what this one became. The two are one obligation at two points in time, so no figure here is added to a V3 one."
+          ? ". By Alchemix's docs, the Alchemix multisig then recreated each position in V3 from the snapshot. The V3 position this wallet holds is the same obligation at a later point, so no figure here is added to a V3 one."
           : ". By Alchemix's docs, the Alchemix multisig then recreated each position in V3 from the snapshot."}
       </p>
       {economics ? (

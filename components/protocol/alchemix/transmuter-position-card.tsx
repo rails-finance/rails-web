@@ -205,7 +205,7 @@ export function transmuterPanel(
         id: "staked-at",
         label: TW.depositedAt,
         value: <BlockRef block={p.maturity.startBlock} />,
-        tip: "The block the deposit was made at, from the Transmuter's PositionCreated log.",
+        tip: "The block the deposit was made at.",
       },
       ...(estimate
         ? [
@@ -213,7 +213,7 @@ export function transmuterPanel(
               id: "maturity-block",
               label: TW.maturityBlock,
               value: <BlockRef block={p.maturity.maturationBlock} />,
-              tip: "The block the deposit finishes vesting at, settled from the Transmutation Time in force when the position was created. The date above is an estimate from it at the chain's block time.",
+              tip: "The block the deposit finishes vesting at. The date above estimates it at the chain's block time.",
             },
           ]
         : []),

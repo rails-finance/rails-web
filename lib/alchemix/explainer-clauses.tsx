@@ -42,6 +42,7 @@
 // than the card draws) and `alchemixBetweenReadingsClauses` (what earmarked debt
 // and the share price did between the reading before and this block).
 
+import { feeCharged } from "@/lib/alchemix/protocol-fee";
 import type {
   AlchemixStateAtBlockFromReading,
   AlchemixV3Context,
@@ -342,19 +343,20 @@ export function alchemixEventClauses(
           ),
         );
       }
-      if (ctx.resolvedAtCapture?.collateralFee) {
+      // A fee of "0" (a market at 0 bps) states nothing, as force_repay does.
+      const collateralFee = ctx.resolvedAtCapture?.collateralFee;
+      if (collateralFee != null && feeCharged(collateralFee)) {
         out.push(
           clause(
             protocolFeeBps != null ? (
               <>
-                A redemption fee of {shown(ctx.resolvedAtCapture.collateralFee, myt)} left the collateral for
-                Alchemix&rsquo;s protocol fee receiver: {(protocolFeeBps / 100).toLocaleString("en-US")}% of the shares
-                that paid off earmarked debt.
+                A redemption fee of {shown(collateralFee, myt)} left the collateral for Alchemix&rsquo;s protocol fee
+                receiver: {(protocolFeeBps / 100).toLocaleString("en-US")}% of the shares that paid off earmarked debt.
               </>
             ) : (
               <>
-                A redemption fee of {shown(ctx.resolvedAtCapture.collateralFee, myt)} left the collateral for
-                Alchemix&rsquo;s protocol fee receiver, charged on the shares that paid off earmarked debt.
+                A redemption fee of {shown(collateralFee, myt)} left the collateral for Alchemix&rsquo;s protocol fee
+                receiver, charged on the shares that paid off earmarked debt.
               </>
             ),
           ),
@@ -421,14 +423,9 @@ export function alchemixEventClauses(
       out.push(
         clause(
           split && split.feeRaw > BigInt(0) ? (
-            <>
-              That redemption fee is the only charge for closing this way: a close with collateral pays no liquidator.
-            </>
+            <>That redemption fee is the only charge for this close.</>
           ) : (
-            <>
-              No fee was charged: the redemption fee applies only to earmarked debt, and a close with collateral pays no
-              liquidator.
-            </>
+            <>No fee was charged on this close.</>
           ),
         ),
       );
@@ -652,8 +649,8 @@ export function alchemixEventClauses(
               fee ? (
                 <>
                   {shown(fee.sharesRaw, myt)} of those are the market&rsquo;s {pct} redemption fee, which the Alchemist
-                  charges on every redemption on top of the shares the Transmuter gets and pays to Alchemix&rsquo;s fee
-                  receiver. The rest went to the Transmuter, which pays its stakers in them.
+                  charges on every redemption on top of the shares the Transmuter gets and pays to Alchemix&rsquo;s
+                  protocol fee receiver. The rest went to the Transmuter, which pays its stakers in them.
                 </>
               ) : (
                 <>Those {myt} went to the Transmuter, which pays its stakers in them.</>

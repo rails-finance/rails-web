@@ -53,7 +53,7 @@ export function AlchemixInfoPage({ deployment }: { deployment: AlchemixDeploymen
     ? null
     : feeBefore && feeNow.fromDate
       ? `The Alchemist can charge a redemption fee on the collateral each redemption takes, sent to Alchemix's protocol fee receiver. On ${chain} it is ${pct(feeNow.bps)}; it was ${pct(feeBefore.bps)} until ${feeNow.fromDate}.`
-      : `Each redemption also charges the redemption fee, ${pct(feeNow.bps)} of the collateral that pays off the debt, taken from the borrowers' collateral and sent to Alchemix's protocol fee receiver.`;
+      : `Each redemption charges the redemption fee, ${pct(feeNow.bps)} of the collateral that pays off the debt, sent to Alchemix's protocol fee receiver.`;
   const alusdb = lines.some((l) => l.key === "base-alusdb");
   const vaults = and([...new Set(lines.map((l) => `${l.myt} holds ${l.underlying}`))]);
   const synthKinds = lines.some((l) => l.underlying === "WETH")

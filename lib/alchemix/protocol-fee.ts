@@ -85,18 +85,8 @@ export function protocolFeeSteps(chainId: number, key: string): readonly Protoco
   return SCHEDULES[`${chainId}:${key}`] ?? [];
 }
 
-const pct = (bps: number) => `${(bps / 100).toString()}%`;
-
-/** A line's fee now and, where it changed, what it was until the change:
- *  "0% on Base, where it was 0.1% until 5 Nov 2026". */
-export function protocolFeeHistoryWords(chainId: number, key: string, where?: string): string {
-  const steps = protocolFeeSteps(chainId, key);
-  const now = steps[steps.length - 1];
-  const prev = steps[steps.length - 2];
-  if (!now) return "";
-  const head = `${pct(now.bps)}${where ? ` on ${where}` : ""}`;
-  return prev && now.fromDate ? `${head}, where it was ${pct(prev.bps)} until ${now.fromDate}` : head;
+/** Whether a logged fee amount states a fee: a raw integer above zero. A
+ *  market at 0 bps logs "0", which a card states as nothing. */
+export function feeCharged(raw: string | null | undefined): boolean {
+  return raw != null && /^\d+$/.test(raw) && BigInt(raw) > BigInt(0);
 }
-
-/** The fee as the modals state it, true of every line. */
-export const PROTOCOL_FEE_WORDS = `${protocolFeeHistoryWords(1, "eth-alusd", "Ethereum")}, and ${protocolFeeHistoryWords(8453, "base-alusdb", "Base")}`;

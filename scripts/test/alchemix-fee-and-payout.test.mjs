@@ -3,7 +3,7 @@
 // Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { BASE_FEE_CHANGE_BLOCK, protocolFeeAt, protocolFeeNow } from "../../lib/alchemix/protocol-fee.ts";
+import { BASE_FEE_CHANGE_BLOCK, feeCharged, protocolFeeAt, protocolFeeNow } from "../../lib/alchemix/protocol-fee.ts";
 import { claimPayoutParts } from "../../lib/alchemix/claim-payout.ts";
 import { sumRedemptionNets } from "../../lib/alchemix/redemption-net-sum.ts";
 
@@ -86,4 +86,11 @@ test("redemptions all at 0 bps carry a known fee of zero; an unknown fee drops t
   const unknown = sumRedemptionNets([{ ...stated(56_535_333, 0, "-1", "0", "0"), fee: null, restRaw: null }]);
   assert.equal(unknown.fee, null);
   assert.equal(unknown.netRaw, "-1");
+});
+
+test('a repay\'s logged fee of "0" (Base at 0 bps) states no fee; a positive one does', () => {
+  assert.equal(feeCharged("0"), false);
+  assert.equal(feeCharged(null), false);
+  assert.equal(feeCharged(undefined), false);
+  assert.equal(feeCharged("2500000000000000"), true);
 });
