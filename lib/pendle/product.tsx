@@ -689,7 +689,7 @@ export function PendleMarketProductPage({
   const market: Loadable<MarketModel> = { state: "ok", data: { head: headOf(x), sections: sectionsOf(x) } };
   return (
     <MarketPage
-      header={{ protocol: protocolForHref(ROOT)!, title: marketName(m.tokens) }}
+      header={{ protocol: protocolForHref(ROOT)!, title: marketTitleWithAsset(marketName(m.tokens), x.asset) }}
       market={market}
       what={`the ${marketName(m.tokens)} market`}
       hooks={{ "data-pendle-market-page": m.tokens.market.address }}
