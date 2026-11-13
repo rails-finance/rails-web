@@ -381,3 +381,14 @@ test("a never-run writer is no index of its own: a held census still holds the r
   assert.equal(pipelineState(e, now), "paused");
   assert.equal(pipelineHeartbeat(e, now), now - 40 * 3600);
 });
+
+test("a failed census whose last write is three schedules old reads stalled", () => {
+  const failed = (wroteAgo) => ({
+    ...censusWriter(3 * 3600, false),
+    lastWriteAt: at(wroteAgo),
+    censusRun: censusRun({ outcome: "failed", error: "RangeError: x" }),
+  });
+  assert.equal(writerState(failed(4 * 86400), now), "stalled");
+  assert.equal(writerState(failed(2 * 86400), now), "late");
+  assert.equal(writerState({ ...failed(4 * 86400), name: "morpho-processor", censusRun: undefined }, now), "late");
+});

@@ -600,9 +600,14 @@ export function writerState(w: StatusWriter, now: Secs, e?: StatusEntry): Heartb
     const due = censusDue(w);
     if (due) return now <= due.at + CENSUS_DUE_GRACE ? "paused" : now - due.at > 3 * every ? "stalled" : "late";
   }
-  if (ran != null && w.lastRunOk === false) return "late";
-  const age = now - t;
-  return age > 3 * every ? "stalled" : age > 1.5 * every ? "late" : "fresh";
+  const ageState = (at: Secs) => (now - at > 3 * every ? "stalled" : now - at > 1.5 * every ? "late" : "fresh");
+  if (ran != null && w.lastRunOk === false) {
+    // A census writes on every run that completes, so after a failed run its
+    // last write's age stands: stalled once three schedules old.
+    const wrote = isoSecs(w.lastWriteAt);
+    return w.name === CENSUS_WRITER && wrote != null && ageState(wrote) === "stalled" ? "stalled" : "late";
+  }
+  return ageState(t);
 }
 
 const RANK: Record<Heartbeat, number> = { none: 0, fresh: 1, paused: 2, late: 3, stalled: 4 };
