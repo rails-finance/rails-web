@@ -137,3 +137,13 @@ test("an answer without headMisses is unchanged; a status answer marks fill back
   assert.equal(s.entries[1].backfill.headMiss, undefined);
   assert.equal(s.entries[2].backfill.headMiss, null);
 });
+
+// Visit reads: one failure in a quiet hour stays green.
+import { visitState } from "../../lib/shared/index-progress.ts";
+
+test("one failed read of seven stays fresh; two of seven are late; four of seven stalled", () => {
+  assert.equal(visitState({ lastHourVisits: 7, failedShare: 1 / 7 }), "fresh");
+  assert.equal(visitState({ lastHourVisits: 7, failedShare: 2 / 7 }), "late");
+  assert.equal(visitState({ lastHourVisits: 7, failedShare: 4 / 7 }), "stalled");
+  assert.equal(visitState({ lastHourVisits: 1, failedShare: 1 }), "fresh");
+});

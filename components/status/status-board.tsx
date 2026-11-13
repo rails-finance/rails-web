@@ -51,6 +51,7 @@ import {
   writerState,
   VISIT_FAIL_LATE,
   VISIT_FAIL_STALLED,
+  VISIT_FAIL_MIN,
   type VisitReads,
   type Heartbeat,
   type IndexProgress,
@@ -861,7 +862,7 @@ export function StatusBoard({ source, view }: { source: StatusSource; view: Stat
                 {h === "fresh"
                   ? "Arriving: on schedule"
                   : h === "late"
-                    ? `Late: past 1.5 times its schedule, or ${pct(VISIT_FAIL_LATE)} of visit reads failing`
+                    ? `Late: past 1.5 times its schedule, or ${pct(VISIT_FAIL_LATE)} of visit reads failing (${VISIT_FAIL_MIN} at least)`
                     : h === "stalled"
                       ? `Stalled: past 3 times its schedule, or ${pct(VISIT_FAIL_STALLED)} failing`
                       : h === "paused"

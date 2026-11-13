@@ -415,20 +415,25 @@ export function cellsFromStatus(s: IndexStatus, name: (key: string, chain: numbe
   });
 }
 
-/** Visit reads: amber from a 10% failure share in the last hour, red from 50%;
- *  none with no visit in the hour. */
+/** Visit reads: amber from a 10% failure share in the last hour, red from
+ *  50%, each only from 2 failed reads; none with no visit in the hour. */
 export const VISIT_FAIL_LATE = 0.1;
 export const VISIT_FAIL_STALLED = 0.5;
+/** Fewer failed reads than this in the hour leave visit reads green. */
+export const VISIT_FAIL_MIN = 2;
 
 export function visitState(v: VisitReads | null | undefined): Heartbeat {
   if (!v || !v.lastHourVisits || v.failedShare == null) return "none";
+  // One failure in a quiet hour is a blip, whatever share of the hour it is.
+  if (Math.round(v.failedShare * v.lastHourVisits) < VISIT_FAIL_MIN) return "fresh";
   return v.failedShare >= VISIT_FAIL_STALLED ? "stalled" : v.failedShare >= VISIT_FAIL_LATE ? "late" : "fresh";
 }
 
-/** A writer's state against its schedule: late past 1.5 times its cadence,
- *  stalled past 3 times. */
 /** rails-server explorer-pipelines' name for the at-block fill's writer. */
 export const AT_BLOCK_FILL_WRITER = "at-block-fill";
+
+/** A writer's state against its schedule: late past 1.5 times its cadence,
+ *  stalled past 3 times. */
 
 export function writerState(w: StatusWriter, now: Secs, e?: StatusEntry): Heartbeat {
   // The at-block fill's writer stamps the fill's sample (lastWriteAt is the
