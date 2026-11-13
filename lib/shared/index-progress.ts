@@ -533,14 +533,15 @@ export function writerState(w: StatusWriter, now: Secs, e?: StatusEntry): Heartb
   // An event-driven writer has no schedule to be late against.
   if (t == null || !every) return "none";
   // A census stops by design at its gateway share or its deadline: held
-  // until its next run is due (with CENSUS_DUE_GRACE), late after; an alarm
+  // until its next run is due (with CENSUS_DUE_GRACE), late after, stalled
+  // three schedules past it; an alarm
   // once it has stopped in the same vault with nothing written
   // CENSUS_STUCK_STOPS times.
   const run = w.censusRun;
   if (run) {
     if (run.stuckStopsInARow >= CENSUS_STUCK_STOPS) return "stalled";
     const due = censusDue(w);
-    if (due) return now <= due.at + CENSUS_DUE_GRACE ? "paused" : "late";
+    if (due) return now <= due.at + CENSUS_DUE_GRACE ? "paused" : now - due.at > 3 * every ? "stalled" : "late";
   }
   if (ran != null && w.lastRunOk === false) return "late";
   const age = now - t;

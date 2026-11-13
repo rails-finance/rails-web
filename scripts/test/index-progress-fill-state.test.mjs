@@ -203,6 +203,11 @@ test("a census past its due time and the grace with no newer run is late", () =>
   assert.equal(writerState(s.entries[0].live.writers[0], now, s.entries[0]), "late");
 });
 
+test("a census whose run never came reads stalled three schedules past its due time", () => {
+  const s = censusStatus(censusRun({ resetsAt: at(3 * 86400 + 60) }));
+  assert.equal(writerState(s.entries[0].live.writers[0], now, s.entries[0]), "stalled");
+});
+
 test("the next run comes from nextRunAt, else after the reset, else a schedule after the run", () => {
   const w = (run, ranAgo = 2 * 3600) => ({ ...censusWriter(ranAgo), censusRun: run });
   assert.deepEqual(censusDue(w(censusRun({ nextRunAt: "2026-11-13T14:12:00.000Z" }))), {

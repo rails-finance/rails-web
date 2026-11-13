@@ -221,7 +221,7 @@ function censusLine(r: CensusRunStatus, lastWriteAt: string | null): string | nu
     case "stopped-share": {
       const left =
         r.remainingMb != null && r.floorMb != null
-          ? `: ${n(r.remainingMb)} MB left, under its ${n(r.floorMb)} MB floor`
+          ? `: ${n(r.remainingMb)} MB left, under its ${n(r.floorMb)} MB reserve`
           : "";
       const reset = r.resetsAt ? ` The gateway resets at ${hhmm(r.resetsAt)}.` : "";
       const row = r.shareStopsInARow > 1 ? ` (${r.shareStopsInARow} in a row)` : "";
