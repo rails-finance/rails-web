@@ -80,8 +80,8 @@ export default function ProvenancePage() {
             strokeWidth={1.75}
             aria-hidden="true"
           />{" "}
-          with a small x stands beside the profile menu, and a click on it turns the inspector off. On a page with
-          nothing to inspect the crosshair is grey and struck through, and a click turns the inspector off the same way.
+          stands beside the profile menu on any page with something to inspect; it opens a menu to turn the inspector
+          off or read about it.
         </p>
       </Section>
 

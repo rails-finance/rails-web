@@ -31,7 +31,7 @@ await page.goto(BASE + PATH, { waitUntil: "domcontentloaded", timeout: 180000 })
 await armInspector(page);
 const pop = page.locator(".prov-inspect-pop");
 const ladder = page.locator('[role="dialog"][aria-label="Distance ladder"]');
-// The active inspector button beside the profile control stands while armed: the mode's state.
+// The inspector's menu button beside the profile control stands while armed: the mode's state.
 const armed = async () => (await page.locator(ARMED).count()) > 0;
 
 // Pick the first value that opens a popover.

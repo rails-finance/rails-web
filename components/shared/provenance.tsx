@@ -343,28 +343,17 @@ export class ProvInspectorStore {
 export const provInspector = new ProvInspectorStore();
 
 /** How many scoped <Prov> values are mounted on the page, across every
- *  surface's registry, and the path that settled with none: what tells the
- *  inspector's controls whether the page has anything to inspect (ui-jobs
- *  651; prov-inspector.tsx `useInspectable`). Emits only when the page goes
- *  from none to some or back, or settles, so a listing's churn re-renders
- *  nothing. A value that mounts clears the settled path. */
+ *  surface's registry: the header's inspector menu (H7.4) is drawn only while
+ *  there is at least one (ui-jobs 651). Emits only when the page goes from
+ *  none to some or back, so a listing's churn re-renders nothing. */
 export class ProvTracedStore {
   private count = 0;
-  private settled: string | null = null;
   private listeners = new Set<() => void>();
   add = () => {
-    if (++this.count !== 1) return;
-    this.settled = null;
-    this.emit();
+    if (++this.count === 1) this.emit();
   };
   remove = () => {
     if (--this.count === 0) this.emit();
-  };
-  /** The page at `path` has settled with nothing traced. */
-  settle = (path: string) => {
-    if (this.count > 0 || this.settled === path) return;
-    this.settled = path;
-    this.emit();
   };
   subscribe = (fn: () => void) => {
     this.listeners.add(fn);
@@ -373,7 +362,6 @@ export class ProvTracedStore {
     };
   };
   getAny = () => this.count > 0;
-  getSettled = () => this.settled;
   private emit() {
     this.listeners.forEach((fn) => fn());
   }

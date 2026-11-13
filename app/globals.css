@@ -1976,82 +1976,43 @@ label[for] {
 .dark [data-prov-inspect] {
   text-decoration-color: rgb(45 212 191 / 0.28); /* teal-400 */
 }
-/* The header's inspector button, beside the profile control (H7.4; ui-jobs
-   624.2, an icon from 651): the menu row's crosshair, teal with an x badge
-   while active, grey and struck through while paused (nothing to inspect). */
-.prov-inspect-exit {
+/* The header's inspector menu button, beside the profile control (H7.4;
+   ui-jobs 624.2, an icon from 651): the menu row's crosshair in teal with a
+   chevron, opening its dropdown (H7.4.1). */
+.prov-inspect-trigger {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
+  gap: 2px;
+  height: 38px;
+  padding: 0 4px 0 9px;
   border-radius: 8px;
   cursor: pointer;
   flex: none;
   color: rgb(13 148 136); /* teal-600 */
   transition: background-color 150ms;
 }
-.prov-inspect-exit:hover {
+.prov-inspect-trigger:hover,
+.prov-inspect-trigger[aria-expanded="true"] {
   background: rgb(13 148 136 / 0.12);
 }
-.prov-inspect-exit:focus-visible {
+.prov-inspect-trigger:focus-visible {
   outline: 2px solid rgb(59 130 246); /* blue-500 */
   outline-offset: 0;
 }
-.dark .prov-inspect-exit {
+.dark .prov-inspect-trigger {
   color: rgb(45 212 191); /* teal-400 */
 }
-.dark .prov-inspect-exit:hover {
+.dark .prov-inspect-trigger:hover,
+.dark .prov-inspect-trigger[aria-expanded="true"] {
   background: rgb(45 212 191 / 0.14);
 }
-.prov-inspect-exit[data-prov-inspect-exit="paused"] {
-  color: var(--color-rb-500);
-}
-.dark .prov-inspect-exit[data-prov-inspect-exit="paused"] {
-  color: var(--color-rb-400);
-}
-/* paused takes the chrome's neutral tile on hover (chrome-hover.ts) */
-.prov-inspect-exit[data-prov-inspect-exit="paused"]:hover {
-  background: color-mix(in srgb, var(--color-rb-200) 70%, transparent);
-}
-.dark .prov-inspect-exit[data-prov-inspect-exit="paused"]:hover {
-  background: color-mix(in srgb, var(--color-rb-700) 70%, transparent);
-}
-.prov-inspect-exit-icon {
-  position: relative;
-  display: inline-flex;
-}
-.prov-inspect-exit-icon > svg {
+.prov-inspect-trigger-icon {
   width: 20px;
   height: 20px;
 }
-.prov-inspect-exit-badge {
-  position: absolute;
-  top: -4px;
-  right: -5px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 12px;
-  height: 12px;
-  border-radius: 9999px;
-  background: rgb(20 184 166); /* teal-500, the switch's on colour */
-  color: white;
-  box-shadow: 0 0 0 1.5px var(--background);
-}
-.prov-inspect-exit-badge svg {
-  width: 8px;
-  height: 8px;
-}
-.prov-inspect-exit-slash {
-  position: absolute;
-  inset: 0;
-  width: 20px;
-  height: 20px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.75;
-  stroke-linecap: round;
+.prov-inspect-trigger-chevron {
+  width: 14px;
+  height: 14px;
 }
 /* the popover — the receipt pinned AT the value; a bottom sheet under 640px.
    Teal-washed ground ties it to the tool's colorway (halo, dotted targets,

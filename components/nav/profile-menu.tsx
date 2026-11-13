@@ -37,7 +37,7 @@ import { CHROME_HOVER, CHROME_HOVER_ON } from "@/components/nav/chrome-hover";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
 import { Check, ChevronDown, CircleHelp, Crosshair, Monitor, Moon, Settings, Signpost, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 
@@ -56,7 +56,8 @@ import { START_CTA } from "@/lib/shared/ui-grammar";
 import type { ChainId } from "@/lib/shared/chains";
 import type { SavedLink, WalletSession } from "@/lib/shared/sessions";
 import { setProvPreference, useProvPreference } from "@/lib/shared/prov-preference";
-import { ProvInspectorExit, putDownInspector, useInspectable } from "@/components/shared/prov-inspector";
+import { ProvInspectorMenu, putDownInspector } from "@/components/shared/prov-inspector";
+import { provPreferenceAllows } from "@/lib/shared/prov-preference-routes";
 import { menuEntries } from "@/lib/shared/sessions";
 
 const BOOKMARKS_PATH = "/bookmarks";
@@ -238,14 +239,13 @@ const ITEMS = '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbo
  *  standing over the switch's stretched hit area (`after:inset-0`), so a press
  *  on it navigates and never toggles (ui-jobs 602, 603, 651).
  *
- *  On a page with nothing to inspect (`useInspectable`: off the route list,
- *  or listed with no traced value once settled) the switch is disabled, dimmed
- *  and shows off; a visually hidden note gives screen readers the reason. The
- *  saved choice is kept and arms the next page that has something to inspect
- *  (ui-jobs 625, 651). */
+ *  On a page off the list the switch is disabled, dimmed and shows off; a
+ *  visually hidden note gives screen readers the reason. On a listed page it
+ *  stays enabled whether or not values have mounted. The saved choice is kept
+ *  and arms the next listed page (ui-jobs 625, 651). */
 function ProvInspectorSwitch({ onDone }: { onDone: () => void }) {
   const saved = useProvPreference();
-  const allowed = useInspectable();
+  const allowed = provPreferenceAllows(usePathname(), useParams());
   const on = saved && allowed;
   const descId = useId();
   const noteId = useId();
@@ -456,10 +456,9 @@ export function ProfileMenu() {
 
   return (
     <>
-      {/* While the switch is on, the inspector's header button stands left of
-          the control: active or paused, a press turns it off (ui-jobs 624.2,
-          651). */}
-      <ProvInspectorExit onExit={() => trigger.current?.focus()} />
+      {/* While the inspector is armed on a page with a traced value, its
+          menu stands left of the control (ui-jobs 624.2, 651). */}
+      <ProvInspectorMenu onExit={() => trigger.current?.focus()} />
       <button
         ref={trigger}
         type="button"

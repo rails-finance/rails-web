@@ -1,5 +1,5 @@
 // The provenance inspector's one state (rails-ops TO-DO-ui-jobs 624): the
-// profile menu's switch "Inspector" (H20.1), the inspector's button beside the profile control (H7.4), Escape
+// profile menu's switch "Inspector" (H20.1), "Turn off inspector" in the inspector's menu beside the profile control (H7.4), Escape
 // and the inspector read and write one state. Putting the inspector down from
 // any of them turns the saved choice off, and the switch reads off at once;
 // the switch turned on arms the page at once, and turned off disarms it.
@@ -12,8 +12,8 @@ const PATH = "/ethereum/aave-v3/0x8008316e61985599dc62d69716bab3ebe643c0a8?marke
 const KEY = "rails-prov-inspector";
 const H20 = '[data-anatomy="H20"]:visible';
 const SWITCH = "[data-profile-menu-prov]";
-const EXIT = '.prov-inspect-exit[data-prov-inspect-exit="active"]:visible';
-const PAUSED = '.prov-inspect-exit[data-prov-inspect-exit="paused"]:visible';
+const MENU = "[data-prov-inspect-menu]:visible";
+const OFF = "[data-prov-inspect-off]";
 
 let checked = 0;
 let failures = 0;
@@ -71,12 +71,13 @@ check(
   JSON.stringify(s),
 );
 
-// The active button ("Exit inspector") puts it down, saved choice included.
-// It stands beside the visible profile control (ui-jobs 624.2, 651):
+// "Turn off inspector" in the inspector's menu puts it down, saved choice
+// included. The menu button stands beside the visible profile control
+// (ui-jobs 624.2, 651):
 // its right edge within 16px left of H20's left, the two on one line.
 const nextTo = await (async () => {
   const e = await page
-    .locator(EXIT)
+    .locator(MENU)
     .first()
     .boundingBox()
     .catch(() => null);
@@ -90,16 +91,20 @@ const nextTo = await (async () => {
   const midDy = Math.abs(e.y + e.height / 2 - (h.y + h.height / 2));
   return { ok: gap >= 0 && gap <= 16 && midDy <= 6, gap, midDy };
 })();
-check("Exit inspector stands beside the profile control", Boolean(nextTo.ok), JSON.stringify(nextTo));
+check("the inspector's menu stands beside the profile control", Boolean(nextTo.ok), JSON.stringify(nextTo));
 await page
-  .locator(EXIT)
+  .locator(MENU)
   .first()
+  .click({ timeout: 5000 })
+  .catch(() => {});
+await page
+  .locator(OFF)
   .click({ timeout: 5000 })
   .catch(() => {});
 await page.waitForTimeout(400);
 s = await state();
 check(
-  "Exit inspector: disarmed, the saved choice off, the switch reads off",
+  "Turn off inspector: disarmed, the saved choice off, the switch reads off",
   !s.armed && !s.saved && s.sw === "off",
   JSON.stringify(s),
 );
@@ -130,8 +135,8 @@ check(
 
 // Off the switch's routes (ui-jobs 625, 651): with the choice saved on, the
 // row is disabled and shows off, its hidden note reads "Nothing to inspect on
-// this page", nothing is pickable, and a press keeps the saved choice. The
-// header shows the paused button, and a press on it turns the choice off.
+// this page", nothing is pickable, a press keeps the saved choice, and the
+// header draws no inspector menu.
 const OFF_LIST = "/assets";
 await page.evaluate((k) => localStorage.setItem(k, "1"), KEY);
 await page.goto(`${BASE}${OFF_LIST}`, { waitUntil: "domcontentloaded", timeout: 180000 });
@@ -158,12 +163,11 @@ await page.waitForTimeout(400);
 const after = {
   saved: await page.evaluate((k) => localStorage.getItem(k) === "1", KEY),
   picks: await page.locator("[data-prov-pickable]").count(),
-  exit: await page.locator(EXIT).count(),
-  paused: await page.locator(PAUSED).count(),
+  menu: await page.locator(MENU).count(),
 };
 await closeMenu();
 check(
-  `${OFF_LIST}: the switch is disabled and off with its note; a press keeps the saved choice; nothing is pickable; the header shows paused`,
+  `${OFF_LIST}: the switch is disabled and off with its note; a press keeps the saved choice; nothing is pickable; no inspector menu`,
   !!read &&
     read.state === "unavailable" &&
     read.disabled === "true" &&
@@ -171,26 +175,9 @@ check(
     /nothing to inspect on this page/i.test(read.note ?? "") &&
     after.saved &&
     after.picks === 0 &&
-    after.exit === 0 &&
-    after.paused === 1,
+    after.menu === 0,
   JSON.stringify({ read, after }),
 );
-await page
-  .locator(PAUSED)
-  .first()
-  .click({ timeout: 5000 })
-  .catch(() => {});
-await page.waitForTimeout(400);
-const putDown = {
-  saved: await page.evaluate((k) => localStorage.getItem(k) === "1", KEY),
-  paused: await page.locator(PAUSED).count(),
-};
-check(
-  `${OFF_LIST}: the paused button turns the saved choice off and leaves the header`,
-  !putDown.saved && putDown.paused === 0,
-  JSON.stringify(putDown),
-);
-
 await browser.close();
 console.log(`\n${checked - failures}/${checked} checks pass`);
 process.exit(failures || checked === 0 ? 1 : 0);

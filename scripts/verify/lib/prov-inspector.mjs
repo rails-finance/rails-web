@@ -4,17 +4,16 @@
 // profile menu's switch (H20.1, `[data-profile-menu-prov]`, reading "on" or
 // "off"), which saves the choice in localStorage (`rails-prov-inspector`) and
 // arms the page at once, on the routes in lib/shared/prov-preference-routes.ts.
-// While the switch is on, the inspector's header button (`.prov-inspect-exit`,
-// H7.4) stands beside the profile control: `data-prov-inspect-exit="active"`
-// on a page with something to inspect, "paused" on one with nothing (ui-jobs
-// 651). The active button's presence is the armed state.
+// While the inspector is armed on a page with a traced value, its menu button
+// (`[data-prov-inspect-menu]`, H7.4) stands beside the profile control, so its
+// presence is the armed state (ui-jobs 651).
 //
 //   import { ARMED, armInspector } from "./lib/prov-inspector.mjs";
 //
 // `armInspector` leaves the tool ARMED and says so, and is idempotent. False on
 // a route the switch does not arm, which is a finding, not a flake.
 
-export const ARMED = '.prov-inspect-exit[data-prov-inspect-exit="active"]';
+export const ARMED = "[data-prov-inspect-menu]";
 const H20 = '[data-anatomy="H20"]:visible';
 const SWITCH = "[data-profile-menu-prov]";
 

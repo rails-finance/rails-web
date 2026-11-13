@@ -15,7 +15,7 @@
 // hang. The page-level provenance inspector (prov-inspector.tsx) is THE
 // receipt surface now, so the same claims are asserted against it:
 //
-//   1. The profile menu's switch arms the page (the active ".prov-inspect-exit" stands
+//   1. The profile menu's switch arms the page (the menu button "[data-prov-inspect-menu]" stands
 //      beside the profile control; ui-jobs 625) — the page participates in
 //      the provenance surface. Armed alone does not prove receipts exist, so:
 //   2. Arming stamps ≥1 pickable value ([data-prov-pickable]) — the page's
