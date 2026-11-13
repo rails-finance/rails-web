@@ -77,10 +77,12 @@ export interface IndexProgress {
   indexes: IndexProgressEntry[];
 }
 
-/** The fill plans each index every 10 min against the chain's finalized
- *  block, which trails the wall clock by up to about half an hour on the
- *  rollups. Past an hour the heartbeat is late; past three it has stalled. */
-export const HEARTBEAT_LATE = 60 * 60;
+/** The fill writes each index's sample (pidx_progress.sampled_at) about once
+ *  an hour, late in the hour, held or not: on production the gap between
+ *  samples ran 51 to 62 min over 12–13 Nov 2026. Late sits at 1.5 times that
+ *  hour so a fill does not turn amber before each sample; past three hours it
+ *  has stalled. */
+export const HEARTBEAT_LATE = 90 * 60;
 export const HEARTBEAT_STALLED = 3 * 60 * 60;
 
 export type Heartbeat = "fresh" | "late" | "stalled" | "paused" | "none";
@@ -107,7 +109,7 @@ export function heartbeatAge(t: Secs | null, now: Secs): Heartbeat {
 
 export const heartbeatState = (e: IndexProgressEntry, now: Secs): Heartbeat => heartbeatAge(heartbeatTime(e), now);
 
-/** Whether a fill is moving. The fill writes its sample every 10 min even
+/** Whether a fill is moving. The fill writes its sample every hour even
  *  while it holds an index, so a fresh heartbeat alone does not mean blocks
  *  are being read. "not-gaining": no blocks read over the pace window (an
  *  hour or more of samples); "behind": read to within rounding of the head,
