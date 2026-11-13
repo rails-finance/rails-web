@@ -41,9 +41,9 @@ import { ProvCoverageBounds } from "./prov-coverage-tripwire";
 import { formatExact } from "@/lib/utils/format";
 import { BlockRef } from "@/components/shared/block-ref";
 import { untracedInputs } from "@/lib/shared/prov-untraced";
-import { CLASS_RANK, resolveClass, weakestClass } from "@/lib/shared/prov-class";
+import { resolveClass, weakestClass } from "@/lib/shared/prov-class";
 
-export { CLASS_RANK, resolveClass };
+export { resolveClass };
 
 // Dev gates the coverage tripwire (scope bookends + the <Prov> coverage stamp);
 // Next inlines NODE_ENV, so the prod bundle carries neither.
