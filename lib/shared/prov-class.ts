@@ -1,9 +1,10 @@
 // A receipt's distance classes (components/shared/provenance.tsx): a leaf's
 // class, the weakest link a computed value takes, and the classes the
 // inspector's head lists ("Computed from: …"). A leaf marked `definition` is a
-// constant the protocol defines (a stablecoin's $1 face), not a read, so it
-// carries no class and neither rule counts it (ui-jobs 669). Pure, so a unit
-// test runs the same rule.
+// constant the protocol defines (a stablecoin's $1 face, the year a rate
+// formula compounds over), not a read, so it carries no class and neither rule
+// counts it (ui-jobs 669, 671). Pure, so a unit test runs the
+// same rule.
 
 import type { ProvClass, ProvInput, ProvKind } from "@/components/shared/provenance";
 

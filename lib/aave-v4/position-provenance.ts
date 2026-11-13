@@ -390,7 +390,7 @@ export function heldDebtRateProv(detail?: EventProvDetail, apr?: number | null):
       pclass: "emitted",
       note: "the hub's UpdateAsset drawnRate ÷ 10^27, a year",
     },
-    { label: "seconds a year", value: "31,536,000", kind: "chain-derived", note: "365 days" },
+    { label: "seconds a year", value: "31,536,000", kind: "chain-derived", definition: true, note: "365 days" },
   ];
   if (detail?.asset) inputs.push({ label: "reserve", value: detail.asset, kind: "chain" });
   if (detail?.blockNumber != null)
@@ -691,7 +691,7 @@ export const BORROW_RATE_PROV: Provenance = {
   formula: `most recent on-chain drawn rate → ${APY_FORMULA}`,
   inputs: [
     { label: "drawn rate", kind: "chain", pclass: "emitted", note: "the hub's UpdateAsset drawnRate ÷ 10^27, a year" },
-    { label: "seconds a year", value: "31,536,000", kind: "chain-derived", note: "365 days" },
+    { label: "seconds a year", value: "31,536,000", kind: "chain-derived", definition: true, note: "365 days" },
   ],
 };
 

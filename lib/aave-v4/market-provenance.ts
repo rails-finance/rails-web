@@ -326,7 +326,7 @@ export function storedRateProv(
           pclass: lineClass(c),
           note: "the hub's drawnRate ÷ 10^27, a year",
         },
-        { label: "seconds a year", value: "31,536,000", kind: "chain-derived", note: "365 days" },
+        { label: "seconds a year", value: "31,536,000", kind: "chain-derived", definition: true, note: "365 days" },
       ],
     };
   if (what === "liquidity fee")
@@ -668,7 +668,7 @@ export function drawnRateProv(f: V4ReserveFigures, o: { symbol: string; hub: str
           ? `getAssetDrawnRate ${f.raw.hub.drawnRateRay} ÷ 10^27, a year`
           : "getAssetDrawnRate ÷ 10^27, a year",
       },
-      { label: "seconds a year", value: "31,536,000", kind: "chain-derived", note: "365 days" },
+      { label: "seconds a year", value: "31,536,000", kind: "chain-derived", definition: true, note: "365 days" },
     ],
   };
 }
@@ -820,7 +820,7 @@ export function historyRateProv(
     formula: APY_FORMULA,
     inputs: [
       { label: "drawn rate", value: rateFraction(p.drawnApr), kind: "chain", pclass: "indexed", note: "a year" },
-      { label: "seconds a year", value: "31,536,000", kind: "chain-derived", note: "365 days" },
+      { label: "seconds a year", value: "31,536,000", kind: "chain-derived", definition: true, note: "365 days" },
     ],
   };
 }
