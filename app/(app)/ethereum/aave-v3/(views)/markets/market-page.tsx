@@ -23,7 +23,7 @@ export function AaveV3MarketPage({ market }: { market?: string }) {
   return (
     <>
       {market ? <AaveMarketPage market={ethereumAaveV3Market(market)} /> : <AaveMarketsOverview markets={OVERVIEW} />}
-      {/* Each section arms the inspector from its ⋮; no page-wide toggle. */}
+      {/* The inspector, armed from the profile menu's switch. */}
       <ProvInspectorLayer />
     </>
   );

@@ -9,11 +9,11 @@
 // symbol, across chains), Network and Protocol, with the rosters' search.
 // Each roster was read at its block and the read-at line names each one.
 // No USD and no cross-asset total. The rows open receipts at their roster's
-// block, through each family's builders (lib/vaults/row-receipts.ts), and the
-// ⋮ arms the inspector on them (decision 0062 point 5; ui-jobs 571).
+// block, through each family's builders (lib/vaults/row-receipts.ts), picked
+// while the inspector is armed (decision 0062 point 5; ui-jobs 571, 625).
 
 import Link from "next/link";
-import { ProvSection, SectionMenu } from "@/components/shared/section-menu";
+import { ProvSection } from "@/components/shared/section-menu";
 import { ROSTER_SCOPE, VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
 import { CompareBar } from "@/components/vaults/compare-selection";
 import { isoSeconds, RosterBlock, RosterReadStamp } from "@/components/vaults/roster-read-stamp";
@@ -210,7 +210,6 @@ export function VaultIndexView({
               indexHref: null,
               readAt,
               drawer,
-              menu: <SectionMenu scope={ROSTER_SCOPE} title="Vaults" hint="Click a value on this table to trace it" />,
             }}
           />
         </div>

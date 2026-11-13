@@ -43,16 +43,7 @@ export function ReadStamp({ readAt }: { readAt: ReadAt | null }) {
 
 /** A section's ⋮ from its tools. */
 export function ToolsFor({ scope, title, tools }: { scope: string; title: string; tools: SectionTools }) {
-  return (
-    <SectionMenu
-      scope={scope}
-      title={title}
-      hint={tools.hint}
-      links={tools.links}
-      exports={tools.exports}
-      views={tools.views}
-    />
-  );
+  return <SectionMenu scope={scope} title={title} links={tools.links} exports={tools.exports} views={tools.views} />;
 }
 
 /** The links at the foot of a head, "View … →". */

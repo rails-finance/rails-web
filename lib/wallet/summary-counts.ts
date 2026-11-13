@@ -75,18 +75,50 @@ export function rowIsPage(href: string, pathname: string, search: string): boole
 
 const count = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 
+/** At most this many protocols are named; past it the line counts them. */
+const NAMED_MAX = 3;
+
+const listed = (names: string[]) =>
+  names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+
 /** The line's words for the wallet's positions, in the wallet view's words
  *  (W1: "2 positions · 1 open · 1 closed"; Miles, 6 Nov 2026), the chains
  *  named only when there are more than one, after the scope: "On Rails:" when
  *  the page's position is among those counted, "Also on Rails:" when it is
- *  not (a Read on visit page; Miles 12 Nov 2026, ui-jobs 613). Null when there
- *  is nothing. */
-export function walletLineText(positions: WalletCountsPosition[], pageCounted: boolean): string | null {
+ *  not (a Read on visit page; Miles 12 Nov 2026, ui-jobs 613). The protocols
+ *  counted are named, most positions first, so a reader on a page whose
+ *  family is not counted does not take the count for it (Miles 13 Nov 2026,
+ *  ui-jobs 639): "Also on Rails: 1 Aave V3 position · closed", "3 positions
+ *  in Aave V3 and Liquity V2 · 1 open · 2 closed", past three "in 4
+ *  protocols". `nameOf` gives a position's protocol name; where it has none
+ *  for some position the line names none. Null when there is nothing. */
+export function walletLineText(
+  positions: WalletCountsPosition[],
+  pageCounted: boolean,
+  nameOf: (p: WalletCountsPosition) => string | undefined = () => undefined,
+): string | null {
   const n = positions.length;
   if (n === 0) return null;
   const chains = new Set(positions.map((p) => p.chain)).size;
   const open = positions.filter((p) => p.status === "open").length;
   const where = chains > 1 ? ` on ${chains} chains` : "";
   const scope = pageCounted ? "On Rails" : "Also on Rails";
-  return `${scope}: ${count(n, "position")}${where} · ${open.toLocaleString("en-US")} open · ${(n - open).toLocaleString("en-US")} closed`;
+  const tally = new Map<string, number>();
+  for (const p of positions) {
+    const name = nameOf(p);
+    if (!name) {
+      tally.clear();
+      break;
+    }
+    tally.set(name, (tally.get(name) ?? 0) + 1);
+  }
+  const names = [...tally.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([k]) => k);
+  const states = ` · ${open.toLocaleString("en-US")} open · ${(n - open).toLocaleString("en-US")} closed`;
+  if (names.length === 1) {
+    if (n === 1) return `${scope}: 1 ${names[0]} position · ${open === 1 ? "open" : "closed"}`;
+    return `${scope}: ${count(n, `${names[0]} position`)}${where}${states}`;
+  }
+  const within =
+    names.length === 0 ? "" : names.length <= NAMED_MAX ? ` in ${listed(names)}` : ` in ${names.length} protocols`;
+  return `${scope}: ${count(n, "position")}${within}${where}${states}`;
 }

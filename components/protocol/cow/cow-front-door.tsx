@@ -6,8 +6,7 @@
 
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { FrontDoorSearch } from "@/components/shared/front-door-search";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 
 export function CowFrontDoor() {
   return (
@@ -28,7 +27,6 @@ export function CowFrontDoor() {
           A wallet&rsquo;s trades through CoW on Ethereum, each read from the settlement contract&rsquo;s Trade log.
         </p>
       </div>
-      <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
       <ProvInspectorLayer />
     </>
   );

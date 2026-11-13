@@ -35,7 +35,7 @@ import { eventIdFromShareHref, useEventShareHref } from "@/components/shared/eve
 import { CardTabStrip } from "@/components/shared/info-disclosure";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { isCardOpen, setCardOpen } from "@/lib/shared/card-open-store";
-import { ProvReceiptsScope, useProvScopeLit, useReceiptRegistry } from "@/components/shared/provenance";
+import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { useUnreadTokens } from "@/components/shared/unread-tokens-context";
 import type { UnreadToken } from "@/lib/shared/types/event-shape";
 import { EventCaptionContext, SpineRowContext, isPhoneViewport, useSpineView } from "@/components/shared/mobile-spine";
@@ -537,10 +537,9 @@ function EventCardView(props: EventCardProps) {
   // page-level inspector reads it to pin receipts at the values (the per-card
   // provenance tab retired in its favour).
   const registry = useReceiptRegistry();
-  // The scope's name for scoped arming (ui-jobs 284): the event's id, read from
-  // its share path; a card outside a timeline falls back to the card's key.
+  // The card's name on `data-prov-scope`: the event's id, read from its share
+  // path; a card outside a timeline falls back to the card's key.
   const scopeId = eventIdFromShareHref(shareHref) ?? cardId;
-  const lit = useProvScopeLit(scopeId);
   // The opened timeline card's tab (ui-jobs 370): each card keeps its own,
   // opening on the Display preference's default and reset to it when the
   // preference changes.
@@ -698,8 +697,7 @@ function EventCardView(props: EventCardProps) {
   const numberNode = rowNum ? <PlainNumber number={rowNum.number} last={rowNum.last} /> : null;
   // The event menu (⋮) at the right end of the T1 row, at both widths: after
   // the header on desktop, at the caption's right on a phone. Every event row
-  // carries Inspect provenance, armed on this card's receipts scope, and Copy
-  // transaction hash (ui-jobs 535). A press on it stays with the menu (Escape
+  // carries Copy transaction hash (ui-jobs 535). A press on it stays with the menu (Escape
   // still reaches the menu's document listener). On the event page the ⋮
   // stands at the card's top right (`EventPageControls`).
   const headMenu =
@@ -715,12 +713,7 @@ function EventCardView(props: EventCardProps) {
         <EventCardMenu
           shareHref={groupMenu ? null : shareHref}
           groupShow={groupMenu}
-          provScope={groupMenu ? undefined : { id: scopeId, hint: EVENT_PAGE_WORDS.provenance_hint }}
           txHash={groupMenu ? null : txHash}
-          onInspect={() => {
-            if (hasFigures) setOpenTab("figures");
-            if (!showDetail && hasDetail) toggleDetail();
-          }}
         />
       </span>
     ) : null;
@@ -969,7 +962,7 @@ function EventCardView(props: EventCardProps) {
   const card = (
     <SpineLegsContext.Provider value={spineLegs}>
       <PriceBasisProvider>
-        <ProvReceiptsScope registry={registry} scopeId={scopeId}>
+        <ProvReceiptsScope registry={registry}>
           {/* data-skel-section feeds the skeleton memory layer (skeleton-size-recorder):
           the first event card stands for the spine's row height. One DOM at
           both widths (`.spine-row` in app/globals.css): from 640px the spine
@@ -980,7 +973,6 @@ function EventCardView(props: EventCardProps) {
             ref={rowRef}
             data-skel-section="detail-event"
             data-prov-scope={scopeId}
-            data-prov-lit={lit ? "" : undefined}
             className={`${
               pageMode
                 ? "flex w-full flex-col gap-4 md:flex-row md:items-stretch"
@@ -1040,7 +1032,7 @@ function EventCardView(props: EventCardProps) {
                     <div className="relative" data-event-page-card="">
                       {body}
                       <div className="absolute right-3 top-3 flex h-7 items-center">
-                        <EventPageControls page={page} provScope={scopeId} />
+                        <EventPageControls page={page} />
                       </div>
                     </div>
                     <div className="mt-auto pb-2">

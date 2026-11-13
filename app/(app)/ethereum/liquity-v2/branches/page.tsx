@@ -28,8 +28,7 @@ import { branchScopeKeys } from "@/lib/shared/asset-family";
 import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
 import { listingMetadata } from "@/lib/shared/page-metadata";
 import { protocolForHref } from "@/lib/shared/protocols";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 
 export const dynamic = "force-dynamic";
 
@@ -81,7 +80,6 @@ export default async function LiquityV2BranchesPage() {
             />
           </ProvSource>
         </div>
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
         <ProvInspectorLayer />
       </div>
     </div>

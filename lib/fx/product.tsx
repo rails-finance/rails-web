@@ -936,7 +936,8 @@ function Capacity({ c }: { c: Ctx }) {
 function sections(c: Ctx, s: TicksStructure): ProductSection[] {
   const { p } = c;
   const scope = (k: string) => `pool-${p.key}-${k}`;
-  const inspect: SectionTools = {};
+  // No rows: these sections draw no ⋮.
+  const noTools: SectionTools = {};
   return [
     {
       scope: scope("prices"),
@@ -963,7 +964,7 @@ function sections(c: Ctx, s: TicksStructure): ProductSection[] {
       title: "The tick ladder",
       learnMore: null,
       raised: true,
-      tools: inspect,
+      tools: noTools,
       body: <LadderStrip c={c} />,
     },
     {
@@ -971,7 +972,7 @@ function sections(c: Ctx, s: TicksStructure): ProductSection[] {
       anatomy: "X3",
       title: "Every debt share accounted for",
       raised: "narrow",
-      tools: inspect,
+      tools: noTools,
       body: <Reconcile c={c} />,
     },
     {
@@ -979,7 +980,7 @@ function sections(c: Ctx, s: TicksStructure): ProductSection[] {
       anatomy: "X4",
       title: "Funding and fees",
       raised: true,
-      tools: inspect,
+      tools: noTools,
       body: <Funding c={c} />,
     },
     {

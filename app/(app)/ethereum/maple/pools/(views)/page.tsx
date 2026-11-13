@@ -71,7 +71,7 @@ export default async function MaplePoolsPage() {
         <div data-skel-section="page-table">
           <MaplePoolsView pools={pools} />
         </div>
-        {/* Each pool card arms the inspector from its ⋮; no page-wide toggle. */}
+        {/* The inspector, armed from the profile menu's switch. */}
         <ProvInspectorLayer />
       </div>
     </div>

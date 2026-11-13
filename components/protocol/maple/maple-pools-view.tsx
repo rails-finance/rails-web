@@ -26,7 +26,7 @@
 // Values stay in the muted foreground tone (no opinionated color). Each pool
 // card is its own section (decision 0059): the pool's name opens its page
 // (/ethereum/maple/pools/<pool>), the read stamp states the time of the read
-// and the ⋮ arms the inspector on that card alone.
+// and the ⋮ opens its pages.
 
 import { RatioBar, type RatioBarTick, pct } from "@/components/shared/ratio-bar";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
