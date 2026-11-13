@@ -30,8 +30,9 @@
 //   6. V14.1 sits in V14 and answered with at-block reads. The rows at 0.01% of the vault
 //      or more name `data-bad-debt-large` distinct liquidations; the rows before "Show all"
 //      are the first LIMIT of them, or the "None" line where there are none. "Show all"
-//      adds the rest: `data-bad-debt-small` rows under 0.01%, and any row with no share of
-//      the vault, counted apart. Every episode's vault is a row of the record.
+//      adds the rest, to the n "Show all n" states: `data-bad-debt-small` rows under 0.01%,
+//      and any row with no share of the vault. Every episode's vault is a row of the record.
+//      A fixture with no bad-debt liquidation shows the "No liquidation" line and no rows.
 // Maple fixture: V14 headed "The pool delegate's record", no V14.1.
 //
 // Chain reads: V14 reads none. V14.1 makes one Multicall3 eth_call per liquidation block,
@@ -224,8 +225,23 @@ for (const f of FIXTURES) {
       none: !!s?.querySelector("[data-bad-debt-none]"),
       small: Number(attr("[data-bad-debt-small]", "data-bad-debt-small") ?? 0),
       reads: Number(s?.getAttribute("data-bad-debt-reads") ?? 0),
+      rows: s?.querySelectorAll("[data-bad-debt-episode]").length ?? 0,
+      noLiquidation: /^No liquidation left bad debt/.test(
+        s?.querySelector("[data-bad-debt-count]")?.textContent.trim() ?? "",
+      ),
     };
   });
+  // No episode at all (the curator left the markets that had bad debt): the "No
+  // liquidation" line, no rows, and nothing further to check on this fixture.
+  if (bd.present && !bd.unread && bd.count === 0) {
+    check(
+      `${f.tag}: no bad-debt liquidation: the No liquidation line and no rows`,
+      bd.noLiquidation && bd.rows === 0 && bd.large == null && !bd.none,
+      JSON.stringify(bd),
+    );
+    await page.close();
+    continue;
+  }
   check(
     `${f.tag}: V14.1 sits in V14 and answered with at-block reads`,
     bd.present && !bd.unread && bd.count > 0 && bd.reads > 0,
@@ -233,6 +249,10 @@ for (const f of FIXTURES) {
   );
   const shown = await episodesOf(page);
   const bdAll = page.locator('[data-anatomy="V14.1"] [data-bad-debt-show-all]');
+  // "Show all n": the n it states, or the rows already shown where there is no button.
+  const statedAll = (await bdAll.count())
+    ? Number((await bdAll.first().textContent()).replace(/[^0-9]/g, ""))
+    : shown.length;
   if (await bdAll.count()) await bdAll.first().click();
   await page.waitForTimeout(400);
   const all = await episodesOf(page);
@@ -257,9 +277,7 @@ for (const f of FIXTURES) {
   }
   check(
     `${f.tag}: Show all adds the rest: data-bad-debt-small under 0.01%, rows with no share counted apart`,
-    shown.length === Math.min(largeRows.length, LIMIT) &&
-      smallRows.length === bd.small &&
-      all.length === largeRows.length + smallRows.length + noShare.length,
+    shown.length === Math.min(largeRows.length, LIMIT) && smallRows.length === bd.small && all.length === statedAll,
     JSON.stringify({
       shown: shown.length,
       all: all.length,
@@ -267,6 +285,7 @@ for (const f of FIXTURES) {
       small: smallRows.length,
       stated: bd.small,
       noShare: noShare.length,
+      statedAll,
     }),
   );
   const keys = new Set(rows.map((r) => r.key));
