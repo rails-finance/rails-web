@@ -127,14 +127,15 @@ export function fxBountyWords(i: FxBountyInput, usd: (n: number) => string): str
   const rest = i.paid - i.bounty;
   if (Math.abs(rest) < 0.5) return `That difference is ${named}, which the owner paid the keepers.`;
   const head = named.charAt(0).toUpperCase() + named.slice(1);
-  const runs = "the pool pays a rebalance at its min price when it runs";
+  const ran =
+    "each rebalance ran at the pool's price in its block, and Rails values the collateral at the min price a block earlier";
   const tail = i.redemptions
     ? rest > 0
-      ? `The other ${usd(rest)} comes from the redemptions, which pay no bounty, and from the min price moving between the block before and each rebalance: ${runs}.`
-      : `The difference is ${usd(-rest)} less than that: the redemptions pay no bounty, and the min price moves between the block before and each rebalance, while ${runs}.`
+      ? `The other ${usd(rest)} comes from the redemptions, which pay no bounty, and from the price: ${ran}.`
+      : `The difference is ${usd(-rest)} less than that: the redemptions pay no bounty, and ${ran}.`
     : rest > 0
-      ? `The other ${usd(rest)} comes from the min price moving between the block before and each rebalance: ${runs}.`
-      : `The difference is ${usd(-rest)} less than that because the min price moved between the block before and each rebalance: ${runs}.`;
+      ? `The other ${usd(rest)} comes from the price: ${ran}.`
+      : `The difference is ${usd(-rest)} less than that because of the price: ${ran}.`;
   return `${head} comes to ${usd(i.bounty)}, which the owner paid the keepers. ${tail}`;
 }
 

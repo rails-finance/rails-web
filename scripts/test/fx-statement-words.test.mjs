@@ -76,7 +76,7 @@ test("a rebalance cost above the bounty names the rest", () => {
   const s = W.fxBountyWords({ paid: 46.53, bounty: 1331.692 * 0.025, bountyRatio: 0.025, redemptions: false }, usd);
   assert.match(
     s,
-    /^The pool's 2\.5% bounty over the debt repaid comes to \$33, which the owner paid the keepers\. The other \$13 comes from the min price moving/,
+    /^The pool's 2\.5% bounty over the debt repaid comes to \$33, which the owner paid the keepers\. The other \$13 comes from the price: each rebalance ran at the pool's price in its block/,
   );
   assert.doesNotMatch(s, /of the collateral taken/);
 });
