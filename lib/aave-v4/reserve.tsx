@@ -153,7 +153,7 @@ function ReserveExplainer({ f, names }: { f: V4ReserveFigures; names: V4Names })
             premium, less the {f.liquidityFee != null ? pctText(f.liquidityFee) : ""} liquidity fee.
           </ExplainBullet>
         )}
-        {f.drawnApr != null && (
+        {f.drawnApr != null && f.borrowable !== false && (
           <ExplainBullet>
             Borrowers pay a borrow APY of <Fig bold>{v4ApyText(f.drawnApr)}</Fig>, {PREMIUM_LINE}.
           </ExplainBullet>
@@ -186,7 +186,11 @@ function reserveMarkdown(d: V4Deployment, f: V4ReserveFigures, names: V4Names): 
     `- Borrowed (this spoke): ${usd(f.spokeBorrowed)} of ${usd(f.hubBorrowed)} on ${names.hub}`,
     `- Available (this spoke): ${f.borrowable === false ? `–, ${names.symbol} isn't borrowable on this spoke` : usd(f.available)}`,
     ...(f.supplyApr != null ? [`- Supply APY (hub): ${v4ApyText(f.supplyApr)}`] : []),
-    ...(f.drawnApr != null ? [`- Borrow APY (hub): ${v4ApyText(f.drawnApr)}, ${PREMIUM_LINE}`] : []),
+    ...(f.borrowable === false
+      ? ["- Borrow APY: not borrowable here"]
+      : f.drawnApr != null
+        ? [`- Borrow APY (hub): ${v4ApyText(f.drawnApr)}, ${PREMIUM_LINE}`]
+        : []),
     ...(f.utilisation != null ? [`- Utilization (hub): ${pctText(f.utilisation)}`] : []),
     "",
     `Read from the ${chainMeta(d.chainId).name} chain at block ${f.block.toLocaleString("en-US")}.`,
