@@ -335,7 +335,8 @@ export function withCensusRuns(s: IndexStatus): IndexStatus {
   };
 }
 
-/** The last hour of reads made when a page opens (the tier-request tally). */
+/** Reads made when a page opens, this UTC clock hour and the one before
+ *  (the tier-request tally); lastHourVisits counts that window. */
 export interface VisitReads {
   gateway: string;
   lastHourVisits?: number;
@@ -501,11 +502,11 @@ export function cellsFromStatus(s: IndexStatus, name: (key: string, chain: numbe
   });
 }
 
-/** Visit reads: amber from a 10% failure share in the last hour, red from
+/** Visit reads: amber from a 10% failure share since the previous clock hour, red from
  *  50%, each only from 2 failed reads; none with no visit in the hour. */
 export const VISIT_FAIL_LATE = 0.1;
 export const VISIT_FAIL_STALLED = 0.5;
-/** Fewer failed reads than this in the hour are too few to judge: green when
+/** Fewer failed reads than this in the window are too few to judge: green when
  *  a read answered, not measured when none did. */
 export const VISIT_FAIL_MIN = 2;
 

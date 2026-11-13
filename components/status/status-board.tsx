@@ -197,15 +197,18 @@ const CAUSE_WORDS: Record<string, string> = {
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 
-function visitLine(v: VisitReads | null | undefined): string {
-  if (!v?.lastHourVisits) return "No page visit in the last hour.";
+/** The visit tally's window starts at the previous clock hour (UTC). */
+const visitSince = (now: number) => `since ${hhmm(new Date((Math.floor(now / 3600) - 1) * 3600 * 1000).toISOString())}`;
+
+function visitLine(v: VisitReads | null | undefined, now: number): string {
+  if (!v?.lastHourVisits) return `No page visit ${visitSince(now)}.`;
   const failed = v.failedShare != null ? `, ${pct(v.failedShare)} of reads failed` : "";
   const p95 = v.p95Ms != null && v.answered !== 0 ? `, 95% answered within ${n(Math.round(v.p95Ms))} ms` : "";
   const visits = v.lastHourVisits === 1 ? "1 visit" : `${n(v.lastHourVisits)} visits`;
   const few = visitTooFew(v)
     ? ` Too few to judge: none answered, and it takes ${VISIT_FAIL_MIN} failed reads to show late.`
     : "";
-  return `${visits} in the last hour${failed}${p95}.${few}`;
+  return `${visits} ${visitSince(now)}${failed}${p95}.${few}`;
 }
 
 const shortAddress = (a: string) => (a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a);
@@ -322,7 +325,7 @@ function cellView(c: StatusCell, now: number, allowance: Allowance | null): Cell
     indexRank: -1,
     last: lastVisit,
     lane,
-    title: `No index yet; reads when a page opens. ${visitLine(v)}`,
+    title: `No index yet; reads when a page opens. ${visitLine(v, now)}`,
   };
 }
 
@@ -562,7 +565,7 @@ function PipelineDetail({ e, now }: { e: StatusEntry; now: number }) {
       <p className="text-xs text-rb-500">
         {b
           ? pipelineLine(e, now)
-          : `No index yet. Its pages read the chain when they open. ${visitLine(live?.visitReads)}`}
+          : `No index yet. Its pages read the chain when they open. ${visitLine(live?.visitReads, now)}`}
       </p>
       <dl className="mt-3 flex flex-col gap-y-1.5 text-sm">
         {b && (
@@ -620,10 +623,10 @@ function PipelineDetail({ e, now }: { e: StatusEntry; now: number }) {
         )}
         {live?.visitReads?.lastHourVisits != null && (
           <Figure
-            name="Last hour"
+            name="Visit reads"
             value={
               <>
-                {visitLine(live.visitReads)}
+                {visitLine(live.visitReads, now)}
                 {live.visitReads.byCause && Object.keys(live.visitReads.byCause).length > 0 && (
                   <span className="text-rb-500">
                     {" "}
@@ -637,7 +640,7 @@ function PipelineDetail({ e, now }: { e: StatusEntry; now: number }) {
                 )}
               </>
             }
-            source="visit tally, hourly"
+            source="visit tally, this clock hour and the last"
           />
         )}
       </dl>
