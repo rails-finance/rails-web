@@ -381,6 +381,8 @@ export function VaultIndexTable({
             // read to a screen reader; the row's pill carries it in a title
             // (ui-jobs 664).
             const withheld = v.assetScale ? assetScaleAbsentTip(v.asset.symbol, v.assetScale) : undefined;
+            const shownAssets = v.assetScale ? null : v.totalAssets;
+            const shownPrice = v.assetScale ? null : v.sharePrice;
             // `none`: what stands for an absent figure, for a screen reader
             // (the Yield slot's reason, with its `data-yield-none`).
             const cell = (id: string, label: string, value: ReactNode, none: ReactNode = "no figure") => (
@@ -515,9 +517,9 @@ export function VaultIndexTable({
                   {cell(
                     "total-assets",
                     "Total assets",
-                    v.totalAssets && !v.assetScale && (
+                    shownAssets && (
                       <InAsset v={v} data-cell="total-assets">
-                        {traced(receipts.totalAssets, formatCompact(v.totalAssets.value))}
+                        {traced(receipts.totalAssets, formatCompact(shownAssets.value))}
                       </InAsset>
                     ),
                     withheld,
@@ -525,18 +527,18 @@ export function VaultIndexTable({
                   {cell(
                     "share-price",
                     "Share price",
-                    v.sharePrice && !v.assetScale && (
+                    shownPrice && (
                       <InAsset v={v} data-cell="share-price">
                         {/* Past a million, compact (its full text in the
                           title), so one vault's figure cannot widen the column. */}
                         {traced(
                           receipts.sharePrice,
-                          v.sharePrice.value >= 1e6 ? (
-                            <span title={sharePriceText(v.sharePrice, v.asset.decimals)}>
-                              {formatCompact(v.sharePrice.value)}
+                          shownPrice.value >= 1e6 ? (
+                            <span title={sharePriceText(shownPrice, v.asset.decimals)}>
+                              {formatCompact(shownPrice.value)}
                             </span>
                           ) : (
-                            sharePriceText(v.sharePrice, v.asset.decimals)
+                            sharePriceText(shownPrice, v.asset.decimals)
                           ),
                         )}
                       </InAsset>
