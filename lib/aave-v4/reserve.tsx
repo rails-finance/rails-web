@@ -173,7 +173,7 @@ function reserveMarkdown(d: V4Deployment, f: V4ReserveFigures, names: V4Names): 
     "",
     `- Supplied (this spoke): ${usd(f.spokeSupplied)} of ${usd(f.hubSupplied)} on ${names.hub}`,
     `- Borrowed (this spoke): ${usd(f.spokeBorrowed)} of ${usd(f.hubBorrowed)} on ${names.hub}`,
-    `- Available (hub): ${usd(f.available)}`,
+    `- Available (this spoke): ${usd(f.available)}`,
     ...(f.supplyApr != null ? [`- Supply APY (hub): ${v4ApyText(f.supplyApr)}`] : []),
     ...(f.drawnApr != null ? [`- Borrow APY (hub): ${v4ApyText(f.drawnApr)}, ${PREMIUM_LINE}`] : []),
     ...(f.utilisation != null ? [`- Utilization (hub): ${pctText(f.utilisation)}`] : []),
@@ -282,7 +282,8 @@ function reserveHead(d: V4Deployment, sp: V4Spoke, l: V4Line, f: V4ReserveFigure
       {
         slot: "sizeFree",
         label: "Available",
-        side,
+        // What this spoke can draw: the hub's liquidity under the spoke's borrow cap.
+        side: "This spoke",
         tip: "The hub's liquidity, capped by the borrow cap less what this spoke owes",
         value: (
           <span data-vital="available">
