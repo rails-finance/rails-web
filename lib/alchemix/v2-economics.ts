@@ -98,8 +98,8 @@ export function computeAlchemixV2Economics(
       symbol: sym,
       amount: scaled(liquidated.raw, SYNTHETIC_DECIMALS),
       usd: null,
-      prov: v2SummedProv("Repaid from collateral", sym, liquidated.count, coords),
-      flowLabel: "Repaid from collateral",
+      prov: v2SummedProv(V2_WORDS.selfLiquidation, sym, liquidated.count, coords),
+      flowLabel: V2_WORDS.selfLiquidation,
     });
   }
 

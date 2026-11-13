@@ -9,9 +9,12 @@
 // Overview (Miles, 10 Nov 2026): a card per kind that can be saved, saying
 // how to save one and opening its list, and under the cards the Backup
 // section on the page's background (Miles 13 Nov 2026), with export and
-// import (`?tab=backup` opens the Overview at it).
+// import (`?tab=backup` opens the Overview at it). New view opens the Focus
+// panel's editor in the page's flow on the Focus views tab, under the table or
+// its empty state (Miles 13 Nov 2026); a row's Edit keeps the panel.
+// Leaving the Focus views tab closes it.
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Bookmark, Plus, Signpost } from "lucide-react";
 import { DetailBackButton } from "@/components/shared/detail-back-row";
@@ -22,7 +25,8 @@ import {
   SavedLinkList,
   useBookmarks,
 } from "@/components/shared/bookmark-list";
-import { focusViews, useAssetScope } from "@/lib/shared/asset-scope";
+import { useAssetScope } from "@/lib/shared/asset-scope";
+import { FocusViewEditor } from "@/components/shared/asset-scope-strip";
 import { useSavedLinks } from "@/components/shared/saved-items";
 import { SAVED_NAME } from "@/components/shared/bookmarks-name";
 import { walletHref } from "@/components/shared/front-door-search";
@@ -53,7 +57,8 @@ const Term = ({ children }: { children: ReactNode }) => (
   <span className="font-semibold text-foreground">{children}</span>
 );
 
-const CARD = "flex flex-col rounded-2xl border border-rb-300/40 bg-raised p-5 dark:border-rb-700/40";
+const CARD_FRAME = "flex flex-col rounded-2xl border border-rb-300/40 bg-raised dark:border-rb-700/40";
+const CARD = `${CARD_FRAME} p-5`;
 
 const NEW_VIEW =
   "inline-flex min-h-11 items-center gap-1.5 rounded-md bg-teal-600/10 px-3 py-1.5 text-sm font-semibold text-teal-700 transition-colors hover:bg-teal-600/20 sm:min-h-0 dark:bg-teal-400/10 dark:text-teal-400 dark:hover:bg-teal-400/20";
@@ -64,8 +69,21 @@ export function BookmarksPage() {
   const views = useSavedLinks("view");
   const scope = useAssetScope();
   const [tab, setTab] = useState<Tab>("overview");
+  /** New view's editor, open in the Focus views tab. */
+  const [creating, setCreating] = useState(false);
+  // It opens with its name field focused and in view.
   useEffect(() => {
-    setTab(tabFromUrl());
+    if (!creating) return;
+    const input = document.querySelector<HTMLInputElement>("[data-focus-view-editor] input");
+    input?.focus({ preventScroll: true });
+    input?.closest("[data-focus-view-editor]")?.scrollIntoView({ block: "nearest" });
+  }, [creating]);
+  /** The tab last read from the address: a change of it, not a render that
+   *  has yet to catch up, is what closes the editor. */
+  const urlTab = useRef<Tab | null>(null);
+  useEffect(() => {
+    urlTab.current = tabFromUrl();
+    setTab(urlTab.current);
     if (new URLSearchParams(window.location.search).get("tab") === "backup")
       requestAnimationFrame(() => document.getElementById("saved-backup")?.scrollIntoView({ block: "start" }));
   }, []);
@@ -73,10 +91,16 @@ export function BookmarksPage() {
   // (ui-jobs 582): read it again when the address changes.
   useEffect(() => {
     const t = tabFromUrl();
-    if (t !== tab) setTab(t);
+    if (t !== urlTab.current) {
+      urlTab.current = t;
+      setTab(t);
+      setCreating(false);
+    }
   });
   const choose = (t: Tab) => {
+    urlTab.current = t;
     setTab(t);
+    setCreating(false);
     const url = new URL(window.location.href);
     if (t === "overview") url.searchParams.delete("tab");
     else url.searchParams.set("tab", t);
@@ -112,8 +136,8 @@ export function BookmarksPage() {
     <button
       type="button"
       onClick={() => {
-        choose("focus");
-        focusViews.create();
+        if (tab !== "focus") choose("focus");
+        setCreating(true);
       }}
       className={NEW_VIEW}
       data-focus-view-new=""
@@ -339,7 +363,11 @@ export function BookmarksPage() {
                   </div>
                 }
               />
-              <div className="mt-4 flex justify-end">{newView}</div>
+              {creating ? (
+                <FocusViewEditor className={`${CARD_FRAME} mt-4 max-w-[26rem]`} onClose={() => setCreating(false)} />
+              ) : (
+                <div className="mt-4 flex justify-end">{newView}</div>
+              )}
             </>
           )}
         </div>
