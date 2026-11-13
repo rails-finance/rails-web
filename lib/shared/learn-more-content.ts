@@ -769,7 +769,7 @@ export function fxEventFallbackContent(): LearnMoreContent {
   return {
     title: "How f(x) positions work",
     intro:
-      "f(x) V2 splits yield-bearing collateral into fxUSD (a stable token) and leveraged long positions. A position mints fxUSD against wstETH or WBTC and pays funding at Aave's USDC borrow rate while the Stability Pool is short of USDC.",
+      "f(x) V2 splits yield-bearing collateral into fxUSD (a stablecoin) and leveraged long positions. A position mints fxUSD against wstETH or WBTC. By f(x)'s docs, it pays funding at Aave's USDC borrow rate while the Stability Pool is short of USDC.",
     detailsHeading: "Key concepts:",
     details: [
       {

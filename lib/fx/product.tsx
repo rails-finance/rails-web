@@ -216,6 +216,8 @@ function structureOf(c: Ctx): TicksStructure {
 function PoolExplainer({ p }: { p: FxPoolSystem }) {
   const ratio = debtRatioOf(p);
   const funding = fxFundingNow(p.fundingRatioAnnual);
+  // The pane's bullets are set with typographic apostrophes.
+  const curly = (t: string) => t.replace(/'/g, "’");
   return (
     <>
       <ExplainGroup title="This pool">
@@ -230,9 +232,9 @@ function PoolExplainer({ p }: { p: FxPoolSystem }) {
           Each position locks {p.tokenSymbol} and borrows fxUSD against it, a leveraged long on {p.normalizedSymbol}.
         </ExplainBullet>
         <ExplainBullet>
-          {funding.before}
+          {curly(funding.before)}
           <Fig bold>{funding.figure}</Fig>
-          {funding.after} {FX_FUNDING_RULE}
+          {funding.after} {curly(FX_FUNDING_RULE)}
         </ExplainBullet>
         {ratio != null && (
           <ExplainBullet>
