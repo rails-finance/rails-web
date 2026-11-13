@@ -391,8 +391,9 @@ check(!/beta/i.test(mHeaderBeta), "home @390: the header carries no beta pill");
 const mFooterBeta = await mHomePage.locator("footer [data-phone-beta]").isVisible();
 check(mFooterBeta, "home @390: the beta pill is in the footer");
 // The profile control's menu (ui-jobs 504, 582, 586; Miles 13 Nov 2026,
-// mockup): a menu button; two sections, Saved views (its header a link with
-// no toggle; with nothing saved, Start here under its hairline) and Advanced
+// mockup): a menu button; with nothing saved, Start here first, then two
+// sections, Saved views (its header a link with no toggle, the empty line
+// under its hairline) and Advanced
 // (closed until opened, the inspector switch inside), no other group and no
 // theme switch; a full-width sheet at the foot of the screen (ui-jobs 507)
 // below md; Escape closes it and returns focus.
@@ -416,9 +417,13 @@ const sheet = await mHomePage.evaluate(() => {
       .map((h) => `${h.getAttribute("data-profile-menu-group")}:${h.getAttribute("aria-expanded")}`)
       .join(","),
     themes: m?.querySelectorAll("[data-theme-option]").length ?? -1,
-    first: m?.querySelector('[role="menuitem"]')?.getAttribute("href") ?? null,
+    items: [...(m?.querySelectorAll('[role="menuitem"]') ?? [])]
+      .slice(0, 3)
+      .map((a) => a.getAttribute("href"))
+      .join(","),
+    empty: !!m?.querySelector('[data-profile-menu-section="saved"] [data-profile-menu-empty]'),
     shut: !m?.querySelector("[data-profile-menu-prov]"),
-    start: !!m?.querySelector('[data-profile-menu-section="saved"] a[data-profile-menu-start][href="/start"]'),
+    start: !!m?.querySelector(':scope > a[data-profile-menu-start][href="/start"]'),
     scrim: !!document.querySelector("[data-profile-menu-scrim]"),
   };
 });
@@ -433,8 +438,9 @@ check(
     sheet.start &&
     sheet.scrim &&
     sheet.themes === 0 &&
-    sheet.first === "/saved-views",
-  `home @390: H20 opens a full-width sheet at the screen's foot over a dim: the sections Saved views (first, no toggle, Start here inside) and Advanced (closed), no other group, no theme switch (${JSON.stringify(sheet)})`,
+    sheet.empty &&
+    sheet.items === "/start,/saved-views,/saved-views",
+  `home @390: H20 opens a full-width sheet at the screen's foot over a dim: Start here first, then the sections Saved views (no toggle, the empty line and its learn more) and Advanced (closed), no other group, no theme switch (${JSON.stringify(sheet)})`,
 );
 // Advanced opens on a press and shows the inspector switch.
 await mHomePage.locator('[data-profile-menu-group-toggle="advanced"]').click();

@@ -5,13 +5,17 @@
 // mockup of 13 Nov 2026). The menu has no heading of its own. Each section
 // opens with a header in `MENU_SECTION_HEAD` (lib/shared/ui-grammar.ts):
 //
+// First, with nothing saved, "New to Rails? Start here" to /start (ui-jobs
+// 509), over the sections (Miles 13 Nov 2026).
+//
 // 1. "Saved views", with its bookmark, a link to /saved-views whatever is
 //    saved (ui-jobs 652), link blue on hover; it never collapses. An inset
-//    hairline under it, then: with nothing saved, "New to Rails? Start here"
-//    to /start (ui-jobs 509); then one item per saved kind, Focus views,
-//    Listings, Wallets and Positions, in the explorer tabs' type (H5) with
-//    the number saved in a count badge, each a link to its tab on
-//    /saved-views (Miles 13 Nov 2026). Under each, its starred entries.
+//    hairline under it, then, with nothing to list, the line "Your saved
+//    views will display here, learn more" (`data-profile-menu-empty`); else
+//    one item per saved kind, Focus views, Listings, Wallets and Positions,
+//    in the explorer tabs' type (H5) with the number saved in a count
+//    badge, each a link to its tab on /saved-views (Miles 13 Nov 2026).
+//    Under each, its starred entries.
 // 2. A hairline across the whole panel, then "Advanced", a toggle holding the
 //    switch "Inspector" (decision 0062; ui-jobs 571, 651).
 //
@@ -47,8 +51,8 @@
 // scrolls with the page as one piece with the control (ui-jobs 602) (H2 below md, the column's corner from md;
 // components/nav/rail-shell.tsx). Escape, a press outside and a lookup close
 // it, and focus returns to the control; the arrow keys, Home and End move
-// through its items in order (Saved views, Start here, each kind and its
-// rows, Advanced, the switch), Advanced's rows left out while it is closed; on
+// through its items in order (Start here, Saved views, learn more or each
+// kind and its rows, Advanced, the switch), Advanced's rows left out while it is closed; on
 // Advanced ArrowRight opens it and ArrowLeft closes it.
 
 import { CHROME_HOVER, CHROME_HOVER_ON } from "@/components/nav/chrome-hover";
@@ -69,7 +73,14 @@ import { walletHref } from "@/components/shared/front-door-search";
 import { SAMPLE_WALLET } from "@/lib/shared/sample-wallet";
 import { focusViews, useAssetScope } from "@/lib/shared/asset-scope";
 import { focusShort } from "@/components/shared/aim-gate";
-import { COUNT_BADGE, DISCLOSURE_HEAD, MENU_SECTION_HEAD, START_CTA, disclosureChevron } from "@/lib/shared/ui-grammar";
+import {
+  COUNT_BADGE,
+  DISCLOSURE_HEAD,
+  INLINE_LINK,
+  MENU_SECTION_HEAD,
+  START_CTA,
+  disclosureChevron,
+} from "@/lib/shared/ui-grammar";
 import { TAB_BASE } from "@/components/shared/rail-header";
 import type { ChainId } from "@/lib/shared/chains";
 import type { SavedLink, WalletSession } from "@/lib/shared/sessions";
@@ -520,6 +531,8 @@ export function ProfileMenu() {
     wallets: bookmarks?.length ?? 0,
     positions: positions?.length ?? 0,
   };
+  /** Whether Saved views lists anything: a kind drawn, or the view in use. */
+  const listed = menuViews.length + listings.length + rows.length + held.length > 0;
   const linkKind = (kind: "listings" | "positions", label: string, list: SavedLink[]) =>
     list.length > 0 && (
       <KindGroup menuId={menuId} kind={kind} label={label} count={counts[kind]} onDone={done}>
@@ -597,6 +610,20 @@ export function ProfileMenu() {
               // itself (ui-jobs 586).
               style={place.phone ? undefined : { top: place.top, right: place.right, maxHeight: place.room }}
             >
+              {/* With nothing saved, the way in, first in the menu (ui-jobs 509;
+                  Miles 13 Nov 2026). */}
+              {!anything && (
+                <Link
+                  href={START_PATH}
+                  role="menuitem"
+                  onClick={done}
+                  className={`mb-3 flex w-full ${START_CTA}`}
+                  data-profile-menu-start=""
+                >
+                  New to Rails? Start here
+                  <Signpost className="ml-auto size-4 shrink-0" aria-hidden="true" />
+                </Link>
+              )}
               {/* The first section, Saved views: its header is the way to
                   /saved-views, whatever is saved, and never collapses (Miles
                   13 Nov 2026, mockup; ui-jobs 652). */}
@@ -615,18 +642,19 @@ export function ProfileMenu() {
                 {/* Inset: the hairline stays inside the panel's padding. */}
                 <div aria-hidden="true" className={`mt-1 ${HAIRLINE}`} data-profile-menu-rule="inset" />
                 <div data-profile-menu-saved-body="">
-                  {/* With nothing saved, the way in (ui-jobs 509). */}
-                  {!anything && (
-                    <Link
-                      href={START_PATH}
-                      role="menuitem"
-                      onClick={done}
-                      className={`mt-3 flex w-full ${START_CTA}`}
-                      data-profile-menu-start=""
-                    >
-                      New to Rails? Start here
-                      <Signpost className="ml-auto size-4 shrink-0" aria-hidden="true" />
-                    </Link>
+                  {/* Nothing to list: one line saying what will (Miles 13 Nov 2026). */}
+                  {!listed && (
+                    <p className="mt-3 px-3 text-xs text-rb-500" data-profile-menu-empty="">
+                      Your saved views will display here,{" "}
+                      <Link
+                        href={SAVED_PATH}
+                        role="menuitem"
+                        onClick={done}
+                        className={`${INLINE_LINK} whitespace-nowrap rounded-sm outline-none focus-visible:ring-[1.5px] focus-visible:ring-blue-500`}
+                      >
+                        learn more
+                      </Link>
+                    </p>
                   )}
                   {/* Focus views: the starred views, the view in use, and Off (ui-jobs 652). */}
                   {menuViews.length > 0 && (

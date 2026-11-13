@@ -4,7 +4,9 @@
 // H20: under Saved views, each kind holding something starred is a link to
 // its /saved-views tab in the explorer tabs' type, with every item of the
 // kind saved counted in a pill and its starred entries under it; a kind with
-// nothing starred is not drawn, and no kind is a toggle.
+// nothing starred is not drawn, and no kind is a toggle. With nothing to
+// list, one muted line under the hairline, "Your saved views will display
+// here, learn more"; with nothing saved, Start here first, over the sections.
 //
 // B2.2: New view opens the Focus panel's editor in the page, not a dialog.
 // Done saves one view; Cancel and Escape save none. An Escape that closes the
@@ -141,6 +143,94 @@ const SEED = [
     page.url().endsWith("/saved-views?tab=listings"),
     page.url(),
   );
+  await ctx.close();
+}
+
+// --- H20: Start here and the empty line ---------------------------------
+
+/** The menu's items in order, each by its hook, and the empty line's look. */
+async function readOrder(page) {
+  return page.evaluate(() => {
+    const m = document.querySelector("[data-profile-menu]");
+    const items = [...m.querySelectorAll('[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]')].map(
+      (e) =>
+        (e.hasAttribute("data-profile-menu-start") && "start") ||
+        (e.hasAttribute("data-profile-menu-bookmarks") && "saved") ||
+        (e.closest("[data-profile-menu-empty]") && "learn-more") ||
+        (e.hasAttribute("data-profile-menu-kind-link") && `kind:${e.getAttribute("data-profile-menu-kind-link")}`) ||
+        e.getAttribute("data-profile-menu-group-toggle") ||
+        "row",
+    );
+    const empty = m.querySelector("[data-profile-menu-empty]");
+    const link = empty?.querySelector("a");
+    return {
+      items: items.join(),
+      startOutside: !!m.querySelector(":scope > [data-profile-menu-start]"),
+      empty: empty && {
+        text: empty.textContent.replace(/\s+/g, " ").trim(),
+        size: getComputedStyle(empty).fontSize,
+        href: link?.getAttribute("href"),
+        linkColor: getComputedStyle(link).color,
+        color: getComputedStyle(empty).color,
+        underOutside: !!empty.closest('[data-profile-menu-section="saved"]'),
+      },
+    };
+  });
+}
+const CASES = [
+  { name: "nothing saved", seed: null, items: "start,saved,learn-more,advanced", empty: true, start: true },
+  {
+    name: "saved, nothing starred",
+    seed: [link("/base/morpho", "Morpho markets", "morpho", 8453, false)],
+    items: "saved,learn-more,advanced",
+    empty: true,
+    start: false,
+  },
+  {
+    name: "something starred",
+    seed: SEED,
+    items: "saved,kind:listings,row,kind:wallets,row,advanced",
+    empty: false,
+    start: false,
+  },
+];
+for (const c of CASES) {
+  const { ctx, page } = await fresh(c.seed);
+  await page.goto(`${BASE}/about`, { waitUntil: "networkidle", timeout: 180000 });
+  await page.waitForTimeout(1000);
+  await openMenu(page);
+  const o = await readOrder(page);
+  check(`H20 ${c.name}: the items in order (${c.items})`, o.items === c.items, o.items);
+  check(`H20 ${c.name}: Start here ${c.start ? "first, over the sections" : "absent"}`, o.startOutside === c.start);
+  check(
+    `H20 ${c.name}: the empty line ${c.empty ? "shown" : "absent"}`,
+    !!o.empty === c.empty,
+    JSON.stringify(o.empty),
+  );
+  if (o.empty) {
+    check(
+      `H20 ${c.name}: the empty line reads as asked, 12px muted, in Saved views, learn more to /saved-views in link blue`,
+      o.empty.text === "Your saved views will display here, learn more" &&
+        o.empty.size === "12px" &&
+        o.empty.underOutside &&
+        o.empty.href === "/saved-views" &&
+        o.empty.linkColor !== o.empty.color,
+      JSON.stringify(o.empty),
+    );
+    // Keyboard: from the Saved views header, ArrowDown reaches learn more.
+    await page.locator("[data-profile-menu-bookmarks]").focus();
+    await page.keyboard.press("ArrowDown");
+    const onLink = await page.evaluate(() => !!document.activeElement?.closest("[data-profile-menu-empty]"));
+    check(`H20 ${c.name}: ArrowDown from Saved views lands on learn more`, onLink);
+    await page.keyboard.press("Enter");
+    await page.waitForURL(/\/saved-views/, { timeout: 60000 }).catch(() => {});
+    const closed = !(await page.$("[data-profile-menu]"));
+    check(
+      `H20 ${c.name}: learn more opens /saved-views and closes the menu`,
+      page.url().endsWith("/saved-views") && closed,
+      page.url(),
+    );
+  }
   await ctx.close();
 }
 
