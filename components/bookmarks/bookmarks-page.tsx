@@ -1,7 +1,7 @@
 "use client";
 
 // The bookmarks page's body (rails-ops ui-jobs 480), drawn in the app shell: Back's row (H7), then one header row,
-// the heading (B1) with the tabs Overview, Focus views, Listings, Wallets and
+// the heading (B1) with the tabs Overview, Focus, Listings, Wallets and
 // Positions (B4, ui-jobs 521, 530 and 557; broadest first), over the chosen
 // kind's list (B2), the components in components/shared/bookmark-list.tsx.
 // The tab rides in the URL (`?tab=focus`, `?tab=listings`, `?tab=wallets`,
@@ -10,9 +10,9 @@
 // how to save one and opening its list, and under the cards the Backup
 // section on the page's background (Miles 13 Nov 2026), with export and
 // import (`?tab=backup` opens the Overview at it). New view opens the Focus
-// panel's editor in the page's flow on the Focus views tab, under the table or
+// panel's editor in the page's flow on the Focus tab, under the table or
 // its empty state (Miles 13 Nov 2026); a row's Edit keeps the panel.
-// Leaving the Focus views tab closes it.
+// Leaving the Focus tab closes it.
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
@@ -31,13 +31,14 @@ import { useSavedLinks } from "@/components/shared/saved-items";
 import { SAVED_NAME } from "@/components/shared/bookmarks-name";
 import { walletHref } from "@/components/shared/front-door-search";
 import { SAMPLE_WALLET } from "@/lib/shared/sample-wallet";
-import { FOOT_LINK, PROFILE_CLEARANCE, START_CTA } from "@/lib/shared/ui-grammar";
+import { TAB_ACTIVE, TAB_IDLE } from "@/components/shared/rail-header";
+import { COUNT_BADGE, FOOT_LINK, PROFILE_CLEARANCE, START_CTA } from "@/lib/shared/ui-grammar";
 
 type Tab = "overview" | "focus" | "listings" | "wallets" | "positions";
 type Kind = Exclude<Tab, "overview">;
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
-  { id: "focus", label: "Focus views" },
+  { id: "focus", label: "Focus" },
   { id: "listings", label: "Listings" },
   { id: "wallets", label: "Wallets" },
   { id: "positions", label: "Positions" },
@@ -69,7 +70,7 @@ export function BookmarksPage() {
   const views = useSavedLinks("view");
   const scope = useAssetScope();
   const [tab, setTab] = useState<Tab>("overview");
-  /** New view's editor, open in the Focus views tab. */
+  /** New view's editor, open in the Focus tab. */
   const [creating, setCreating] = useState(false);
   // It opens with its name field focused and in view.
   useEffect(() => {
@@ -125,7 +126,7 @@ export function BookmarksPage() {
   const nothing = counts.wallets + counts.positions + counts.listings + counts.focus === 0;
   const carries = andList(
     [
-      counts.focus ? plural(counts.focus, "focus view") : "",
+      counts.focus ? `Focus (${counts.focus})` : "",
       counts.listings ? plural(counts.listings, "listing") : "",
       counts.wallets ? plural(counts.wallets, "wallet") : "",
       counts.positions ? plural(counts.positions, "position") : "",
@@ -163,7 +164,11 @@ export function BookmarksPage() {
             className={`${FOOT_LINK} cursor-pointer font-semibold`}
             data-saved-card-open={kind}
           >
-            {`Open ${plural(counts[kind], noun)}`}
+            {kind !== "focus"
+              ? `Open ${plural(counts[kind], noun)}`
+              : counts.focus === 1
+                ? "Open focus"
+                : `Open ${counts.focus} saved`}
           </button>
         ) : (
           <span className="text-rb-500">None saved yet</span>
@@ -194,8 +199,11 @@ export function BookmarksPage() {
           <Bookmark className="size-6 shrink-0" aria-hidden="true" />
           {SAVED_NAME}
         </h1>
+        {/* The explorer sub-nav's type (H5, `TAB_ACTIVE`/`TAB_IDLE`) with each
+            count in the profile menu's `COUNT_BADGE`, drawn only above 0 (Miles
+            13 Nov 2026). */}
         <div
-          className="-mx-4 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0"
+          className="-mx-4 flex items-center gap-4 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0"
           role="tablist"
           aria-label="Saved views"
           data-anatomy="B4"
@@ -209,11 +217,23 @@ export function BookmarksPage() {
               aria-selected={tab === t.id}
               aria-controls="saved-panel"
               onClick={() => choose(t.id)}
-              className={`${tab === t.id ? "pill-active" : "pill-idle"} min-h-11 shrink-0 cursor-pointer whitespace-nowrap sm:min-h-0`}
+              className="group focus-ring inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-sm sm:min-h-0"
               data-saved-tab={t.id}
             >
-              {t.label}
-              {ready && counts[t.id] > 0 && <span className="ml-1.5 tabular-nums opacity-70">{counts[t.id]}</span>}
+              <span
+                className={
+                  tab === t.id
+                    ? TAB_ACTIVE
+                    : `${TAB_IDLE} group-hover:text-blue-600 dark:group-hover:text-[var(--text-link)]`
+                }
+              >
+                {t.label}
+              </span>
+              {ready && counts[t.id] > 0 && (
+                <span className={COUNT_BADGE} data-saved-tab-count={counts[t.id]}>
+                  {counts[t.id]}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -238,11 +258,11 @@ export function BookmarksPage() {
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {kindCard(
                   "focus",
-                  "Focus views",
-                  "focus view",
+                  "Focus",
+                  "focus",
                   <>
-                    A focus view keeps Rails to the assets and chains you choose. Start one here, or open Assets and
-                    choose <Term>Add to focus</Term> in an asset row&apos;s ⋮ menu.
+                    Focus keeps Rails to the assets and chains you choose. Start one here, or open Assets and choose{" "}
+                    <Term>Add to focus</Term> in an asset row&apos;s ⋮ menu.
                   </>,
                   <>
                     {newView}
@@ -355,9 +375,9 @@ export function BookmarksPage() {
                 active={scope.active?.id ?? null}
                 empty={
                   <div data-anatomy="B3">
-                    <p className="font-semibold text-foreground">No focus views yet.</p>
+                    <p className="font-semibold text-foreground">Nothing in focus yet.</p>
                     <p className="mt-1 text-sm text-rb-500">
-                      A focus view keeps Rails to the assets and chains you choose. Make one here, or press{" "}
+                      Focus keeps Rails to the assets and chains you choose. Make one here, or press{" "}
                       <span className="font-semibold text-foreground">Use this view</span> on a focus link.
                     </p>
                   </div>

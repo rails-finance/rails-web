@@ -262,6 +262,9 @@ function WalletRow({ session, onDone }: { session: WalletSession; onDone: () => 
       href={walletHref(primary)}
       role="menuitem"
       onClick={onDone}
+      // The facehash and the name, or the short address when there is none
+      // (Miles 13 Nov 2026); a named row keeps its address in the tooltip.
+      title={name ? primary : undefined}
       className={`${ITEM} gap-4`}
       data-profile-menu-wallet={primary}
     >
@@ -269,7 +272,6 @@ function WalletRow({ session, onDone }: { session: WalletSession; onDone: () => 
         <Facehash address={primary} size={22} />
       </span>
       <span className="min-w-0 flex-1 truncate font-medium">{name ?? short(primary)}</span>
-      {name && <span className="shrink-0 font-mono text-xs text-rb-500">{short(primary)}</span>}
     </Link>
   );
 }
@@ -661,7 +663,7 @@ export function ProfileMenu() {
                   )}
                   {/* Focus views: the starred views, the view in use, and Off (ui-jobs 652). */}
                   {menuViews.length > 0 && (
-                    <KindGroup menuId={menuId} kind="focus" label="Focus views" count={counts.focus} onDone={done}>
+                    <KindGroup menuId={menuId} kind="focus" label="Focus" count={counts.focus} onDone={done}>
                       <div data-profile-menu-focus-views={menuViews.length}>
                         {menuViews.map((v) => (
                           <button

@@ -603,7 +603,7 @@ await phone.close();
     );
   const viewHref = await sp.locator('[data-bookmark-row="view"] a').first().getAttribute("href");
   check(
-    "SV /saved-views tabs Overview, Focus views, Listings, Wallets, Positions; the old ?tab=views opens Listings with the view opening its URL",
+    "SV /saved-views tabs Overview, Focus, Listings, Wallets, Positions; the old ?tab=views opens Listings with the view opening its URL",
     tabs.join() === "overview,focus,listings*,wallets,positions" && viewHref === VIEW,
     JSON.stringify({ tabs, viewHref }),
   );

@@ -228,7 +228,7 @@ export function BookmarkBackup({ className = "", empty = false }: { className?: 
     a.download = name;
     a.click();
     URL.revokeObjectURL(url);
-    const what = [count ? plural(count, "saved item") : "", views.length ? plural(views.length, "focus view") : ""]
+    const what = [count ? plural(count, "saved item") : "", views.length ? `Focus (${views.length})` : ""]
       .filter(Boolean)
       .join(" and ");
     setNotice(`${what} written to ${name}.`);
@@ -249,7 +249,7 @@ export function BookmarkBackup({ className = "", empty = false }: { className?: 
           : focusViews.importList(held.focusViews, Number(held.version) < STARS_SEEDED_FROM);
       const parts = [
         result.read ? `${plural(result.read, "saved item")}, ${result.added} new` : "",
-        v && v.read ? `${plural(v.read, "focus view")}, ${v.added} new` : "",
+        v && v.read ? `Focus (${v.read}), ${v.added} new` : "",
       ].filter(Boolean);
       setNotice(parts.length ? `Read ${parts.join("; ")}.` : "That backup carries nothing saved.");
     } catch (e) {
@@ -765,7 +765,7 @@ export function FocusViewList({
   return (
     <>
       {undo}
-      <DataTable caption="Focus views" stacked rowHeight="one" tableClassName="text-sm" data-bookmark-list="focus">
+      <DataTable caption="Focus" stacked rowHeight="one" tableClassName="text-sm" data-bookmark-list="focus">
         <DataTableHead>
           <DataTableHeader label="Name" />
           <DataTableHeader label="Assets" />
@@ -913,7 +913,7 @@ function FocusViewRow({
           <StarToggle on={!!view.starred} label={label} onToggle={() => focusViews.toggleStar(view.id)} />
           {editing ? (
             <RenameField
-              label="Focus view name"
+              label="Focus name"
               initial={view.name ?? ""}
               placeholder={holds}
               maxLength={60}

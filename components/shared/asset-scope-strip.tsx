@@ -995,7 +995,7 @@ function AssetScopePanel({
     </div>
   );
 
-  const title = linkMode ? "Focus from a link" : !viewId ? "New focus view" : PANEL_TITLE;
+  const title = linkMode ? "Focus from a link" : !viewId ? "New focus" : PANEL_TITLE;
 
   if (inline)
     return (
