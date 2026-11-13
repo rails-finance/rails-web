@@ -10,7 +10,7 @@
 // row's ⋮ (D7).
 
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
-import { Check, GripVertical, Star, Upload } from "lucide-react";
+import { Check, Download, GripVertical, Star, Upload } from "lucide-react";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { INPLACE_TEXT, NAV_BUTTON, POSITION_TAG_TONE } from "@/lib/shared/ui-grammar";
 
@@ -195,9 +195,10 @@ function plural(n: number, one: string, many = `${one}s`): string {
 
 /** Export and Import on the page's background (the Backup section has no
  *  card; Miles 13 Nov 2026): a resting tile, NAV_BUTTON's ground, so they
- *  read as buttons there. */
+ *  read as buttons there, each with its icon (a download, an upload) where
+ *  the section heading's icon was. */
 const BACKUP_BUTTON =
-  "cursor-pointer rounded-lg bg-rb-100 px-2.5 py-1.5 text-[11px] font-semibold text-rb-500 transition-colors hover:bg-rb-200 hover:text-foreground focus-ring dark:bg-rb-800 dark:hover:bg-rb-700";
+  "inline-flex items-center gap-1.5 cursor-pointer rounded-lg bg-rb-100 px-2.5 py-1.5 text-[11px] font-semibold text-rb-500 transition-colors hover:bg-rb-200 hover:text-foreground focus-ring dark:bg-rb-800 dark:hover:bg-rb-700";
 
 /** Export to file and Import from file, with the line that reports what
  *  either did. The file is a JSON backup of every saved item (version 3, one
@@ -266,6 +267,7 @@ export function BookmarkBackup({ className = "", empty = false }: { className?: 
       <div className={`flex flex-wrap items-center gap-2 ${empty ? "mt-3" : ""}`}>
         {!empty && (
           <button type="button" onClick={handleExport} className={BACKUP_BUTTON}>
+            <Download className="size-3.5 shrink-0" aria-hidden="true" />
             Export to file
           </button>
         )}
@@ -275,7 +277,7 @@ export function BookmarkBackup({ className = "", empty = false }: { className?: 
           className={empty ? NAV_BUTTON : BACKUP_BUTTON}
           data-bookmark-import-button=""
         >
-          {empty && <Upload className="size-4 shrink-0" aria-hidden="true" />}
+          <Upload className={`${empty ? "size-4" : "size-3.5"} shrink-0`} aria-hidden="true" />
           Import from file
         </button>
         <input

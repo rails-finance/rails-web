@@ -13,7 +13,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Bookmark, HardDriveDownload, Plus, Signpost } from "lucide-react";
+import { Bookmark, Plus, Signpost } from "lucide-react";
 import { DetailBackButton } from "@/components/shared/detail-back-row";
 import {
   BookmarkBackup,
@@ -272,10 +272,7 @@ export function BookmarksPage() {
                 data-saved-card="backup"
                 data-saved-backup=""
               >
-                <h2 id="saved-card-backup" className="flex items-center gap-2 text-base font-semibold text-foreground">
-                  <span className="text-rb-500">
-                    <HardDriveDownload className="size-4" aria-hidden="true" />
-                  </span>
+                <h2 id="saved-card-backup" className="text-base font-semibold text-foreground">
                   Backup
                 </h2>
                 <p className="mt-2 text-sm leading-relaxed text-rb-500">
