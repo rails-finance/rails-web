@@ -124,7 +124,7 @@ test("withdrawals: a pause leads; Yearn's idle part; Umbrella's cooldown; unread
   assert.equal(yh.withdrawals.headline, "All of this position could be withdrawn at the last read");
   assert.equal(
     yh.withdrawals.sentence,
-    "0% of the vault's assets idle at the last read. All of them were lent to its strategies, which pay a withdrawal as far as they can free the asset. The figure for this position is the vault's maxWithdraw, which counts what its strategies can free through the withdrawal queue.",
+    "0% of the vault's assets idle at the last read. All of them were lent to its strategies, which pay a withdrawal as far as they can free the asset. This position's figure is the vault's maxWithdraw, which counts what its strategies can free through the withdrawal queue.",
   );
   const u = lines({
     family: "umbrella-stake",

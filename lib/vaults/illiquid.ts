@@ -29,8 +29,8 @@
 // adapted rate at target: the rate the market charges until it next settles.
 // At its maximum the rate at target cannot adapt higher, and at full
 // utilisation the rate is the ceiling, MAX_RATE_AT_TARGET × CURVE_STEEPNESS =
-// 800% a year. The sentence prints each caught market's rate and names the
-// ceiling only where the rate rounds to it.
+// 800% a year. The sentence prints each caught market's rate, and calls it the
+// rate ceiling only where every rate rounds to it.
 //
 // Pure, with no imports: scripts/test/vault-illiquid.test.mjs reads it.
 

@@ -465,7 +465,7 @@ export const morphoPriceSourceProv = (
   ],
 });
 
-/** The "rate ceiling" tag (R1.1.2): the vault pages' illiquid test on the
+/** The "rate model at maximum" tag (R1.1.2): the vault pages' illiquid test on the
  *  market alone (lib/vaults/illiquid.ts `atRateCeiling`). */
 export const morphoRateCeilingProv = (
   coords: MorphoMarketCoords,
@@ -475,7 +475,7 @@ export const morphoRateCeilingProv = (
   pclass: "state",
   source: { block: coords.blockNumber },
   verify: recompute("AdaptiveCurveIrm.rateAtTarget(id)", coords),
-  summary: `Rate ceiling — the market is ${(t.utilisation * 100).toFixed(2)}% borrowed on the AdaptiveCurveIRM, and its rate at target, the stored \`rateAtTarget(id)\` moved over the ${t.elapsed.toLocaleString("en-US")} seconds since the market last settled, is at the IRM's maximum of 200% a year${atBlock(coords)}. At full utilization the borrow rate is then four times that, 800% a year, before compounding. The vault pages' "Markets at the rate ceiling" uses the same test.`,
+  summary: `Rate model at maximum — the market is ${(t.utilisation * 100).toFixed(2)}% borrowed on the AdaptiveCurveIRM, and its rate at target, the stored \`rateAtTarget(id)\` moved over the ${t.elapsed.toLocaleString("en-US")} seconds since the market last settled, is at the IRM's maximum of 200% a year${atBlock(coords)}. At full utilization the borrow rate is then four times that, 800% a year, before compounding. The vault pages' "Markets fully borrowed, the rate model at its maximum" uses the same test.`,
   contract: irmContract(coords),
   via: `${LANE} · AdaptiveCurveIrm.rateAtTarget(id) ${readAt(coords)} · adapted to the block`,
   formula: "utilization ≥ 99.9% and rateAtTarget × e^(speed × err × elapsed) ≥ 200% a year",

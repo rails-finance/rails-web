@@ -31,8 +31,8 @@ const YIELD_CONCEPT = {
 };
 
 export const STEWARD_TIP = {
-  curator: "Morpho's Curator: the address that chooses which markets the vault lends to, and their caps.",
-  owner: "Morpho's Owner. The vault names no Curator, so the Owner chooses the markets and their caps.",
+  curator: "Morpho's curator: the address that chooses which markets the vault lends to, and their caps.",
+  owner: "Morpho's owner: the vault names no curator, so this address chooses the markets and their caps.",
   umbrella: "Umbrella's owner: the one address that can slash the stake token.",
   roleManager:
     "Yearn's role manager: the address that hands out every role over the vault, from adding a strategy to shutting it down.",

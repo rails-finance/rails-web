@@ -244,7 +244,7 @@ export function protectsLine(f: ProtectsFact): ProtectsLine {
           (f.roleManager === ZERO
             ? "No role manager is set."
             : `The role manager, ${shortHex(f.roleManager)}, assigns every role.`) +
-          " Yearn's contract reference lists no delay on any role holder's change; Rails has not read the vault's source.",
+          " Yearn's documentation lists no delay on a role holder's change; the vault's code may add one.",
         gap: "Whether a role holder works behind a timelock of its own is not read.",
       };
     case "aave-gov": {

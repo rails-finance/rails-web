@@ -201,7 +201,7 @@ function exitWords(
               // The holder figure is maxWithdraw(holder), which draws on the
               // strategies through the default queue, so it can exceed idle.
               holder
-                ? "The figure for this position is the vault's maxWithdraw, which counts what its strategies can free through the withdrawal queue."
+                ? "This position's figure is the vault's maxWithdraw, which counts what its strategies can free through the withdrawal queue."
                 : "",
             ]
               .filter(Boolean)
