@@ -3,7 +3,15 @@
 // Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { assetKey, builtOnSymbols, familyOf, NATIVE } from "../../lib/shared/asset-family.ts";
+import {
+  assetKey,
+  builtOnSymbols,
+  FAMILY_ROWS,
+  FAMILY_SYMBOLS,
+  familyDisplaySymbol,
+  familyOf,
+  NATIVE,
+} from "../../lib/shared/asset-family.ts";
 import {
   formatAssetsParam,
   formatChainsParam,
@@ -112,6 +120,27 @@ test("?assets= carries a symbol that would not read back as its address", () => 
   assert.deepEqual(parseAssetsParam(v, odd), [{ chain: 8453, token: WUSD, builtOn: true }]);
   const spaced = formatAssetsParam([{ chain: 1, token: WUSD, builtOn: false }], () => "RST0001 BY DANUBE", odd);
   assert.equal(spaced, `1:${WUSD}`);
+});
+
+test("?assets= round-trips a Pendle LP by its stored symbol, and shows it as LP <market>", () => {
+  const lp = FAMILY_ROWS.find((r) => r.kind === "lp");
+  const [chain, token] = lp.token.split(":");
+  const index = new Map();
+  for (const [key, sym] of Object.entries(FAMILY_SYMBOLS)) {
+    const [c, t] = key.split(":");
+    const s = sym.toLowerCase();
+    index.set(s, [...(index.get(s) ?? []), { chain: Number(c), token: t }]);
+  }
+  const symOf = (c, t) => FAMILY_SYMBOLS[assetKey(c, t)] ?? null;
+  const pick = { chain: Number(chain), token, builtOn: false };
+  const v = formatAssetsParam([pick], symOf, index);
+  assert.equal(v, `${chain}:${lp.symbol.toLowerCase()}`);
+  assert.deepEqual(parseAssetsParam(v, index), [pick]);
+  // A link written before ui-jobs 654 carries the same hyphenated key.
+  assert.deepEqual(parseAssetsParam(`1:${lp.symbol.toLowerCase()}+`, index), [{ ...pick, builtOn: true }]);
+  assert.match(lp.symbol, /^LP-/);
+  assert.equal(familyDisplaySymbol(lp.symbol), `LP ${lp.symbol.slice(3)}`);
+  assert.equal(familyDisplaySymbol("WETH"), "WETH");
 });
 
 test("?chains= reads slugs and ids, and writes slugs", () => {

@@ -74,7 +74,7 @@ const row = (token: string, underlying: string, kind: FamilyKind, symbol: string
 const pendle = (yieldToken: string, name: string, pt: string, yt: string, lp: string): FamilyRow[] => [
   row(k1(pt), k1(yieldToken), "pt", `PT-${name}`),
   row(k1(yt), k1(yieldToken), "yt", `YT-${name}`),
-  row(k1(lp), k1(yieldToken), "lp", `LP ${name}`),
+  row(k1(lp), k1(yieldToken), "lp", `LP-${name}`),
 ];
 
 export const FAMILY_ROWS: FamilyRow[] = [
@@ -156,6 +156,13 @@ export const FAMILY_ROWS: FamilyRow[] = [
   row(k1(BOLD), k1(RETH), "debt", "BOLD"),
   row(k1("0x9cf12ccd6020b6888e4d4c4e4c7aca33c1eb91f8"), k1(YSYBOLD), "debt", "USDaf"),
 ];
+
+/** A Pendle LP's stored symbol, `LP-<market>`, is a `?assets=` key (a link
+ *  symbol takes no space); Rails shows it as "LP <market>" (rails-ops ui-jobs
+ *  654, P9). Every other symbol shows as stored. */
+const LP_SYMBOLS = new Set(FAMILY_ROWS.filter((r) => r.kind === "lp").map((r) => r.symbol));
+export const familyDisplaySymbol = (symbol: string): string =>
+  LP_SYMBOLS.has(symbol) ? `LP ${symbol.slice(3)}` : symbol;
 
 /** Every symbol the seed table names, by key. */
 export const FAMILY_SYMBOLS: Record<string, string> = (() => {

@@ -8,13 +8,13 @@
 import { Facehash } from "@/components/shared/facehash";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { ChainGlyph } from "@/components/shared/chain-toggle";
-import { effectivePicks, scopeSymbolOf, useAssetScope, type AssetPick } from "@/lib/shared/asset-scope";
+import { effectivePicks, scopeLabelOf, useAssetScope, type AssetPick } from "@/lib/shared/asset-scope";
 import type { ChainId } from "@/lib/shared/chains";
 
 /** A chain's mark in its own colour, so Base's square reads as Base. */
 const CHAIN_TINT: Record<number, string> = { 8453: "#0052FF" };
 
-const symbolOf = (p: AssetPick) => scopeSymbolOf(p.chain, p.token) ?? p.token;
+const symbolOf = (p: AssetPick) => scopeLabelOf(p.chain, p.token) ?? p.token;
 
 /** The facehash (or its placeholder) with Focus's ring and badge. */
 export function FocusAvatar({ face, size = 20 }: { face: string | null; size?: number }) {

@@ -24,7 +24,7 @@
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 import { useHydrated } from "@/hooks/useHydrated";
-import { assetKey, familyOf } from "@/lib/shared/asset-family";
+import { assetKey, familyDisplaySymbol, familyOf } from "@/lib/shared/asset-family";
 import { SCOPE_TOKENS } from "@/lib/shared/asset-scope-tokens";
 import { notifyUrlChanged } from "@/lib/shared/use-url-search-params";
 import {
@@ -100,6 +100,13 @@ export function registerSymbols(entries: Iterable<{ chain: number; token: string
 
 export const scopeSymbolOf = (chain: number, token: string): string | null =>
   BY_KEY.get(assetKey(chain, token)) ?? NAMED.get(assetKey(chain, token)) ?? null;
+
+/** The symbol as Rails shows it (asset-family `familyDisplaySymbol`); links
+ *  and lookups keep `scopeSymbolOf`. */
+export const scopeLabelOf = (chain: number, token: string): string | null => {
+  const s = scopeSymbolOf(chain, token);
+  return s == null ? null : familyDisplaySymbol(s);
+};
 
 /** One record per asset across chains: the address tables name one token per
  *  symbol per chain, so a symbol's tokens on different chains are one asset

@@ -7,7 +7,7 @@
 
 import { useMemo, useState } from "react";
 import { Lock } from "lucide-react";
-import { chainNameOf, openFocusPanel, scopeSymbolOf, useAssetScope, type AssetScope } from "@/lib/shared/asset-scope";
+import { chainNameOf, openFocusPanel, scopeLabelOf, useAssetScope, type AssetScope } from "@/lib/shared/asset-scope";
 import { INPLACE_TEXT } from "@/lib/shared/ui-grammar";
 
 export interface ScopedRows<T> {
@@ -94,7 +94,7 @@ export function ScopeNote<T>({
 
 /** "BOLD +2", or the chains under a chain-only focus: the locked chip's words. */
 export function focusChipLabel(scope: Pick<AssetScope, "picks" | "chains">): string {
-  const names = [...new Set(scope.picks.map((p) => scopeSymbolOf(p.chain, p.token) ?? `${p.token.slice(0, 6)}…`))];
+  const names = [...new Set(scope.picks.map((p) => scopeLabelOf(p.chain, p.token) ?? `${p.token.slice(0, 6)}…`))];
   const list = names.length ? names : scope.chains.map(chainNameOf);
   return list.length ? `${list[0]}${list.length > 1 ? ` +${list.length - 1}` : ""}` : "";
 }
