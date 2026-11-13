@@ -12,7 +12,7 @@ export const metadata = listingMetadata({
   title: "Morpho Blue on Optimism · Markets",
   canonicalPath: "/optimism/morpho/markets",
   description:
-    "Every Morpho Blue market on Optimism, grouped by the token it lends: its collateral, LLTV, size, rates and utilisation, read from the chain.",
+    "Every Morpho Blue market on Optimism, grouped by the token it lends: its collateral, LLTV, size, rates and utilization, read from the chain.",
 });
 
 export default function MorphoOptimismMarketsPage() {

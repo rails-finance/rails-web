@@ -2,11 +2,11 @@
 
 // An Aave V4 hub asset's history (anatomy M3.4, ui-jobs 548): each completed UTC
 // day's closing drawn rate, from rails-server's hub-asset-history
-// (lib/api/fetch-aave-v4-reserve.ts), on Lightweight Charts
-// (components/shared/lw-chart-kit.tsx). One pane, the drawn rate solid in the
+// (lib/api/fetch-aave-v4-reserve.ts), stated as the borrow APY (lib/aave-v4/rates.ts),
+// on Lightweight Charts (components/shared/lw-chart-kit.tsx). One pane, the APY solid in the
 // foreground (color-grammar §1); a readout above follows the cursor, the latest
 // day otherwise, with its receipt. 90D and 1Y narrow the loaded year; All asks
-// the route for the asset's whole history. Utilisation is not held for past
+// the route for the asset's whole history. Utilization is not held for past
 // days, so the page says so under the chart.
 
 import { useEffect, useRef, useState } from "react";
@@ -15,6 +15,7 @@ import { Prov } from "@/components/shared/provenance";
 import { lwTickLabel, useLwColors, useLwLib } from "@/components/shared/lw-chart-kit";
 import { formatDate } from "@/lib/date";
 import { ratePercentText } from "@/lib/shared/rate-percent";
+import { v4Apy, v4ApyText } from "@/lib/aave-v4/rates";
 import { historyRateProv } from "@/lib/aave-v4/market-provenance";
 import type { V4History } from "@/lib/api/fetch-aave-v4-reserve";
 
@@ -111,7 +112,7 @@ export function AaveV4DrawnRateHistory({
     const c = chart.current;
     const s = series.current;
     if (!c || !s || !points.length) return;
-    s.setData(points.map((p) => ({ time: dayTime(p.date), value: p.drawnApr * 100 })));
+    s.setData(points.map((p) => ({ time: dayTime(p.date), value: v4Apy(p.drawnApr) * 100 })));
     const last = dayTime(points[points.length - 1].date);
     const width = span === "90D" ? 90 * DAY_S : span === "1Y" ? 365 * DAY_S : null;
     if (width == null) c.timeScale().fitContent();
@@ -158,10 +159,10 @@ export function AaveV4DrawnRateHistory({
           <span className="text-foreground">{formatDate(dayTime(p.date))}</span>
           {cursor == null && <span>latest</span>}
           <span className="inline-flex items-center gap-1.5">
-            Drawn rate
+            Borrow APY
             <Prov info={historyRateProv(symbol, hub, p)}>
               <span className="text-foreground" data-history-borrow="">
-                {ratePercentText(p.drawnApr)}
+                {v4ApyText(p.drawnApr)}
               </span>
             </Prov>
           </span>

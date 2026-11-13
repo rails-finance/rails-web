@@ -1,7 +1,7 @@
 // The Parameters section's "?" (anatomy M3.5, Layer 2): one plain bullet per
 // row, in the order the section draws them, under the side that sets them.
 // The rows a reserve does not draw (Price published and Paused off Base, Optimal
-// usage without a curve) have no bullet. True of any spoke reserve; the figures
+// usage ratio without a curve) have no bullet. True of any spoke reserve; the figures
 // are in the section, their sources in each figure's receipt.
 //
 // The facts, from aave/aave-v4 at a3ef63e: ISpoke.sol 41, 57–60, 70–72 (the
@@ -57,11 +57,11 @@ const WORDS = {
   },
   hub: {
     addCap: (n: Names): LearnMoreDetail => ({
-      bold: "Add cap",
+      bold: "Supply cap",
       text: `The most ${n.symbol} suppliers on ${n.spoke} can put into the ${n.hub} hub, in total.`,
     }),
     drawCap: (n: Names): LearnMoreDetail => ({
-      bold: "Draw cap",
+      bold: "Borrow cap",
       text: `The most ${n.symbol} borrowers on ${n.spoke} can owe the ${n.hub} hub, in total.`,
     }),
     liquidityFee: (n: Names): LearnMoreDetail => ({
@@ -73,7 +73,7 @@ const WORDS = {
       text: `Whether the ${n.hub} hub takes ${n.spoke}'s ${n.symbol} supplies, withdrawals, borrows and repayments. A halted or inactive line takes none of them.`,
     }),
     optimal: (n: Names): LearnMoreDetail => ({
-      bold: "Optimal usage",
+      bold: "Optimal usage ratio",
       text: `The share of the hub's ${n.symbol} lent out at which the borrow rate starts to climb steeply.`,
     }),
   },

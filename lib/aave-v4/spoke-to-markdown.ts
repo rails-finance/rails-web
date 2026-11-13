@@ -23,6 +23,7 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAaveV4Event } from "@/lib/shared/types/event-shape";
 import { type PriceEntry, resolvePrice } from "@/lib/aave/prices";
 import { liquidationBuffer, type AaveSpokeCardInfo, type ReserveStats } from "@/lib/aave-v4/spoke-cards";
+import { v4Apy } from "@/lib/aave-v4/rates";
 import { hubChipParts } from "@/components/protocol/aave-v4/aave-v4-spoke-constants";
 import { actionLabel, getEventActionKey } from "@/lib/shared/event-filter-helpers";
 
@@ -154,7 +155,7 @@ function openHeadlines(args: AaveV4SpokeMarkdownArgs): string[] {
 
   // Health factor — Aave's own liquidation trigger (liquidates at 1.0).
   if (card.healthFactor != null) {
-    out.push(`- **Health factor:** ${num(card.healthFactor, 2)} (Aave liquidates at 1.0)`);
+    out.push(`- **Health factor:** ${num(card.healthFactor, 2)} (liquidatable below 1.0)`);
   }
 
   // Liquidation buffer — single collateral → concrete liq price; multi → the
@@ -162,7 +163,7 @@ function openHeadlines(args: AaveV4SpokeMarkdownArgs): string[] {
   // never a single asset's solo price for a multi-collateral basket).
   const buf = liquidationBuffer(card);
   if (buf.liquidatable) {
-    out.push(`- **Liquidation:** position is at or below a 1.0 health factor — liquidatable now.`);
+    out.push(`- **Liquidation:** position is below a 1.0 health factor — liquidatable now.`);
   } else if (buf.single) {
     let line = `- **Liquidation price:** ${usd(buf.single.liqPrice)} / ${buf.single.symbol} (current ${usd(buf.single.currentPrice)}`;
     if (buf.dropPct != null) line += ` — a ${num(buf.dropPct, 1)}% drop reaches liquidation`;
@@ -179,8 +180,8 @@ function openHeadlines(args: AaveV4SpokeMarkdownArgs): string[] {
   // "Collateral" = full deposit).
   let collLine = `- **Collateral:** ${usd(card.totalSupplyUsd)} supplied`;
   if (card.weightedCollateralUsd > 0) {
-    collLine += ` (${usd(card.weightedCollateralUsd)} backs the loan after the liquidation-threshold haircut`;
-    collLine += card.blendedLt != null ? `, ~${num(card.blendedLt * 100, 0)}% blended LT)` : ")";
+    collLine += ` (${usd(card.weightedCollateralUsd)} counts at the collateral factor`;
+    collLine += card.blendedLt != null ? `, ~${num(card.blendedLt * 100, 0)}% blended)` : ")";
   }
   out.push(collLine);
   if (card.supplyingSymbols.length) {
@@ -193,7 +194,7 @@ function openHeadlines(args: AaveV4SpokeMarkdownArgs): string[] {
     out.push(`- **Borrowing:** ${card.borrowingSymbols.join(", ")}`);
   }
   if (card.latestBorrowRate != null) {
-    out.push(`- **Borrow rate:** ${num(card.latestBorrowRate, 2)}% APR on current debt`);
+    out.push(`- **Borrow APY:** ${num(v4Apy(card.latestBorrowRate / 100) * 100, 2)}% on current debt`);
   }
   if (card.borrowingPowerUsd > 0) {
     out.push(
@@ -220,7 +221,7 @@ function openHeadlines(args: AaveV4SpokeMarkdownArgs): string[] {
   const pnl = card.interestPnl;
   if (pnl?.hasData) {
     const verb = pnl.netUsd >= 0 ? "earned" : "paid";
-    econ.push(`- **Net interest carry:** ${usd(Math.abs(pnl.netUsd))} ${verb} (supply interest − borrow interest)`);
+    econ.push(`- **Net interest carry:** ${usd(Math.abs(pnl.netUsd))} ${verb} (earned interest − accrued interest)`);
     for (const a of pnl.assets) {
       if (a.supplyInterest > 0) {
         econ.push(`  - ${a.symbol}: +${amt(a.supplyInterest)} earned (${usd(a.supplyInterestUsd)})`);

@@ -435,7 +435,7 @@ export default function MorphoPositionView({
             : undefined,
       });
     }
-    out.push({ symbol: v.loanSymbol, address: v.loanToken, label: `${v.loanSymbol}, the market's loan token` });
+    out.push({ symbol: v.loanSymbol, address: v.loanToken, label: `${v.loanSymbol}, the market's loan asset` });
     return out;
   }, [liveView, chain, positionId]);
 
@@ -463,7 +463,7 @@ export default function MorphoPositionView({
             price,
           ),
         },
-        { symbol: v.loanSymbol, address: v.loanToken, label: `${v.loanSymbol}, the market's loan token` },
+        { symbol: v.loanSymbol, address: v.loanToken, label: `${v.loanSymbol}, the market's loan asset` },
       ];
     });
   }, [liveView, morphoEvents, positionId]);
@@ -543,7 +543,7 @@ export default function MorphoPositionView({
               />
             )}
             {/* Lifetime flows: the bars and the line over the position's replay
-              (lib/morpho/flows.ts), in the loan token, in place of the tower
+              (lib/morpho/flows.ts), in the loan asset, in place of the tower
               (TO-DO-ui-jobs 206). */}
             {!onEventPage && liveView && (
               <LifetimeFlowsPanel

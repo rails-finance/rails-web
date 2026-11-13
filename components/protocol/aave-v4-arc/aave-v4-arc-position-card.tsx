@@ -4,10 +4,11 @@
 // position card: Supplied, Debt, Health factor and Borrow limit as headlines,
 // and no stats; under them the reserves table (ui-jobs 622), one row per
 // supplied reserve and one per borrowed, with its amount, dollars at the
-// spoke's oracle, collateral factor, borrow rate and interest over the last 30
+// spoke's oracle, collateral factor, borrow APY and interest over the last 30
 // days. Every figure is read when the page opens; the read stamp names the
 // blocks.
 
+import { v4Apy } from "@/lib/aave-v4/rates";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCard, type PositionCardSlots } from "@/components/shared/position-card";
 import {
@@ -111,7 +112,7 @@ function ReserveRow({ c, x, side }: { c: ArcReceiptContext; x: ArcReserveFigures
         {factor && <Prov info={arcReserveProv("collateral-factor", c, x)}>{pctText(x.collateralFactor!, 0)}</Prov>}
       </DataTableCell>
       <DataTableCell align="right" className={NUM} label={rate ? COLS.rate : undefined}>
-        {rate && <Prov info={arcReserveProv("borrow-rate", c, x)}>{pctText(x.drawnApr!)}</Prov>}
+        {rate && <Prov info={arcReserveProv("borrow-rate", c, x)}>{pctText(v4Apy(x.drawnApr!))}</Prov>}
       </DataTableCell>
       <DataTableCell align="right" className={NUM} label={interest ? COLS.interest : undefined}>
         {interest && interestValue(c, x, side, interest)}

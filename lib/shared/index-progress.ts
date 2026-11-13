@@ -99,11 +99,10 @@ export interface IndexProgress {
   indexes: IndexProgressEntry[];
 }
 
-/** The fill writes each index's sample (pidx_progress.sampled_at) about once
- *  an hour, late in the hour, held or not: on production the gap between
- *  samples ran 51 to 62 min over 12–13 Nov 2026. Late sits at 1.5 times that
- *  hour so a fill does not turn amber before each sample; past three hours it
- *  has stalled. */
+/** The fill plans each index every 10 min and writes its sample
+ *  (pidx_progress.sampled_at) at each plan, but none while the gateways refuse
+ *  its finalized-block reads. Past 90 min the heartbeat is late, which leaves
+ *  room for a plan slowed by retries; past three hours it has stalled. */
 export const HEARTBEAT_LATE = 90 * 60;
 export const HEARTBEAT_STALLED = 3 * 60 * 60;
 
@@ -115,13 +114,14 @@ const isoSecs = (iso: string | null | undefined): Secs | null => {
   return Number.isFinite(t) ? t / 1000 : null;
 };
 
-/** The time of the index's last heartbeat: the wall time of the fill's last
- *  sample where the server sends it, else the finalized head the fill last
- *  planned against. Null when the fill has not planned it yet. */
 /** The fields a fill's state reads: a progress entry, or a status entry's backfill. */
 export type FillReading = Pick<IndexProgressEntry, "heartbeatAt" | "head" | "percent" | "pace" | "held"> & {
   atHead: boolean | null;
 };
+
+/** The time of the index's last heartbeat: the wall time of the fill's last
+ *  sample where the server sends it, else the finalized head the fill last
+ *  planned against. Null when the fill has not planned it yet. */
 
 export const heartbeatTime = (e: FillReading): Secs | null => isoSecs(e.heartbeatAt) ?? e.head?.time ?? null;
 
@@ -136,8 +136,8 @@ export function heartbeatAge(t: Secs | null, now: Secs): Heartbeat {
 
 export const heartbeatState = (e: FillReading, now: Secs): Heartbeat => heartbeatAge(heartbeatTime(e), now);
 
-/** Whether a fill is moving. The fill writes its sample every hour even
- *  while it holds an index, so a fresh heartbeat alone does not mean blocks
+/** Whether a fill is moving. The fill writes its sample even while it
+ *  holds an index, so a fresh heartbeat alone does not mean blocks
  *  are being read. "not-gaining": no blocks read over the pace window (an
  *  hour or more of samples); "behind": read to within rounding of the head,
  *  then fell more than 30 min of blocks behind it. Null when neither holds. */

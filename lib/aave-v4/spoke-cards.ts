@@ -8,6 +8,7 @@
 // plus the chain-read liquidation thresholds (lib/aave-v4/liquidation-thresholds.ts). Interest
 // carry (computeAaveV4InterestPnl) additionally consumes chain-state balances.
 
+import { v4Apy } from "@/lib/aave-v4/rates";
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { interestSinceZero, numOrNull, type LaneRow } from "@/lib/shared/interest-since-zero";
@@ -1077,7 +1078,9 @@ export function liquidationBufferFrom(
 ): LiquidationBuffer {
   if (healthFactor == null || totalDebtUsd <= 0)
     return { dropPct: null, liquidatable: false, atLine: false, single: null };
-  if (healthFactor <= 1) return { dropPct: 0, liquidatable: true, atLine: false, single: null };
+  // Below 1.0 the spoke liquidates (aave.com/docs/aave-v4/positions/liquidations,
+  // `canLiquidate`: healthFactor < 1e18); at exactly 1 the position is at the line.
+  if (healthFactor < 1) return { dropPct: 0, liquidatable: true, atLine: false, single: null };
 
   const dropPct = (1 - 1 / healthFactor) * 100;
   const collateral = assetLiqPrices.filter((a) => a.liqPrice != null && a.currentPrice > 0);
@@ -1096,17 +1099,18 @@ export function liquidationBufferFrom(
   return { dropPct, liquidatable: false, atLine: healthFactor < AT_LINE_HF, single };
 }
 
-/** The debt's yearly interest in the debt's token at the latest borrow rate, when
- *  the position owes one asset and the rate is that asset's. */
+/** The debt's yearly interest in the debt's token at the latest borrow APY (the
+ *  rate compounded over a year), when the position owes one asset and the rate
+ *  is that asset's. */
 export function yearlyDebtCost(spoke: AaveSpokeCardInfo): { amount: number; symbol: string } | null {
   const debts = (spoke.debtLegs ?? []).filter((d) => d.amount > 0);
   if (debts.length !== 1 || spoke.latestBorrowRate == null) return null;
   const d = debts[0];
   if (spoke.latestBorrowRateSymbol && spoke.latestBorrowRateSymbol !== d.symbol) return null;
-  return { amount: (d.amount * spoke.latestBorrowRate) / 100, symbol: d.symbol };
+  return { amount: d.amount * v4Apy(spoke.latestBorrowRate / 100), symbol: d.symbol };
 }
 
-/** "USDC " before "borrow rate" when the position has borrowed more than one
+/** "USDC " before "borrow APY" when the position has borrowed more than one
  *  asset, so the rate says whose it is; "" otherwise. */
 export function rateSymbolLabel(spoke: AaveSpokeCardInfo): string {
   return spoke.debtReserveHistory.length > 1 && spoke.latestBorrowRateSymbol

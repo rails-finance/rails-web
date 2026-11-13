@@ -114,7 +114,7 @@ export default async function MorphoBaseMarketPage({ params, searchParams }: Par
                 chainId={MORPHO_BASE_CHAIN_ID}
                 marketId={id}
                 asset={{ symbol: view.market.loanSymbol, address: token, decimals: view.market.loanDecimals }}
-                pair={`${view.market.collateralSymbol ?? "no collateral"} / ${view.market.loanSymbol}`}
+                pair={`${view.market.loanSymbol} / ${view.market.collateralSymbol ?? "no collateral"}`}
               />
             </Suspense>
           )

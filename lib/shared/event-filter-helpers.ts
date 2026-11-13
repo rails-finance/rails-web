@@ -303,6 +303,16 @@ const MORPHO_OP_LABELS: Record<string, string> = {
   liquidation: "Liquidated",
 };
 
+// Morpho's own table, in the words of its docs (ui-jobs 628): the rows'
+// labels (MORPHO_EVENT_LABEL) say "Supply Collateral" and "Withdraw
+// Collateral". The table above stays as the shared fallback chain reads it, so
+// a roster that passes no protocol key keeps its words.
+const MORPHO_DOCS_OP_LABELS: Record<string, string> = {
+  ...MORPHO_OP_LABELS,
+  supply_collateral: "Supply Collateral",
+  withdraw_collateral: "Withdraw Collateral",
+};
+
 // Maker keys ARE already labels (see getEventActionKey), so they map to
 // themselves via the identity fallback; only the grab → "Liquidated" rename
 // needs an entry.
@@ -624,7 +634,7 @@ const PROTOCOL_OP_LABELS: Record<string, Record<string, string>> = {
   "liquity-v2-troves": LIQUITY_OP_LABELS,
   "aave-v4": AAVE_V4_OP_LABELS,
   "aave-v3": AAVE_V3_OP_LABELS,
-  morpho: MORPHO_OP_LABELS,
+  morpho: MORPHO_DOCS_OP_LABELS,
   "makerdao-vaults": MAKERDAO_OP_LABELS,
   spark: SPARK_OP_LABELS,
   maple: MAPLE_OP_LABELS,

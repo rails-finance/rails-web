@@ -862,8 +862,9 @@ const SHEET_WORDS_SUBJECTS = [
     path: "/ethereum/aave-v4/spoke/main/0x7eac02864fbae93de38394a3e7b72a22e9b5fa09",
     id: "0x93924cd94df220dd1ab3691d52e949bc413fa9fd03838d20dae69195db1d6898-6",
     risk: ["Health factor", "Collateral can fall"],
-    limits: ["LTV", "Still borrowable"],
-    params: ["Max LTV", "Liquidation threshold"],
+    // The V4 docs' words (ui-jobs 627): no Max LTV row while it has no figure.
+    limits: ["LTV", "Remaining borrowing power"],
+    params: ["Collateral factor"],
     optional: [],
     carried: 2,
   },
@@ -897,7 +898,8 @@ const SHEET_WORDS_SUBJECTS = [
     path: "/base/morpho/0xd13de0ab683e6b1eef10532759d9717b65d8a8bd/0x9103c3b4e834476c9a62ea009ba2c884ee42e94e6e314a26f04d312434191836",
     id: "0x17675f8d57fdd518d7cc8c8f607588887495778d8f00f00883920b29f7e2ff78:3",
     risk: ["LTV (liquidation at 86.0%)", "Collateral can fall"],
-    limits: ["Still borrowable", "Borrow rate"],
+    // Morpho's docs' word for the rate (ui-jobs 628).
+    limits: ["Still borrowable", "Borrow APY"],
     params: ["LLTV", "Oracle price"],
     optional: [],
     carried: 1,

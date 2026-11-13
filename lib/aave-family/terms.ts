@@ -2,7 +2,7 @@
 // (rails-ops decision 0065; ui-jobs 611). Each family takes its docs' term in
 // its docs' spelling; Seamless, whose docs host is gone, takes Aave V3's
 // (0065 point 10). The terms tables are
-// rails-ops reference/official-docs/{aave-v3,spark,seamless}.md.
+// rails-ops reference/official-docs/{aave-v3,spark,seamless,aave-v4}.md.
 //
 // Pure, with one type import, so a unit test can read it.
 
@@ -71,6 +71,37 @@ export const AAVE_FAMILY_TERMS: Record<AaveFamilyId, AaveFamilyTerms> = {
   },
 };
 
+/** Aave V4's words (ui-jobs 627; rails-ops reference/official-docs/aave-v4.md,
+ *  Terms): aave.com/docs/aave-v4 says "supply APY" and "borrow APY",
+ *  "utilization", "optimal usage ratio", "Collateral Factor", "supply caps,
+ *  borrow caps", "Spoke", "liquidation price", "Target Health Factor",
+ *  "max-bonus threshold", "Dynamic Config". V4 has no E-Mode, so it keeps a
+ *  record of its own beside the Aave V3 Pools'. The rates are the hub's stored
+ *  drawn rate compounded each second (lib/aave-family/apy.ts): the hub accrues
+ *  its drawn index linearly between updates and carries it forward at each
+ *  one, so the year's growth is the compounded rate. */
+export const AAVE_V4_TERMS = {
+  rateForm: "apy",
+  supplyRate: "Supply APY",
+  borrowRate: "Borrow APY",
+  supplyRateText: "supply APY",
+  borrowRateText: "borrow APY",
+  rateUnit: "APY",
+  utilization: "Utilization",
+  utilizationText: "utilization",
+  kink: "Optimal usage ratio",
+  kinkText: "optimal usage ratio",
+  collateralFactor: "Collateral factor",
+  collateralFactorText: "collateral factor",
+  supplyCap: "Supply cap",
+  borrowCap: "Borrow cap",
+  spokes: "Spokes",
+  liquidationPrice: "Liquidation price",
+  targetHealthFactor: "Target health factor",
+  maxBonusThreshold: "Max-bonus threshold",
+  dynamicConfig: "Dynamic Config",
+} as const satisfies Omit<AaveFamilyTerms, "emode" | "emodeLong"> & Record<string, string>;
+
 /** A family's terms by its id, a market key or a page's market word (every
  *  Aave V3 Pool reads Aave's). */
 export function aaveFamilyTerms(
@@ -83,9 +114,9 @@ export function aaveFamilyTerms(
 
 /** A reserve's rate (the Pool's stored rate as a fraction a year) in the
  *  family's form: unchanged as an APR, compounded as an APY. */
-export function familyRate(t: AaveFamilyTerms, apr: number): number;
-export function familyRate(t: AaveFamilyTerms, apr: number | null | undefined): number | null;
-export function familyRate(t: AaveFamilyTerms, apr: number | null | undefined): number | null {
+export function familyRate(t: Pick<AaveFamilyTerms, "rateForm">, apr: number): number;
+export function familyRate(t: Pick<AaveFamilyTerms, "rateForm">, apr: number | null | undefined): number | null;
+export function familyRate(t: Pick<AaveFamilyTerms, "rateForm">, apr: number | null | undefined): number | null {
   if (apr == null) return null;
   return t.rateForm === "apy" ? (aprToApy(apr) ?? apr) : apr;
 }

@@ -51,11 +51,11 @@ import {
   morphoBorrowRateNowProv,
   morphoYearlyCostProv,
 } from "@/lib/morpho/event-provenance";
-import { capacityProv, type MorphoChainCoords } from "@/lib/morpho/position-provenance";
+import { capacityProv, morphoHealthFactorProv, type MorphoChainCoords } from "@/lib/morpho/position-provenance";
+import { morphoApy, MORPHO_TERMS } from "@/lib/morpho/terms";
 import { formatNumber, formatExact } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
 import { CARD_VOCAB, notRecordedNote } from "@/lib/shared/card-vocab";
-import { capacityShare } from "@/lib/shared/capacity-share";
 import { pct } from "@/components/shared/ratio-bar";
 import type { MorphoCurrentDebt, MorphoListedRead, MorphoPositionSummary } from "@/lib/sources/api/morpho-positions";
 import type { MorphoChainPositionResponse } from "@/lib/api/fetch-morpho-position";
@@ -76,7 +76,7 @@ import { RevealTip } from "@/components/shared/reveal-tip";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 
 const ORACLE_LINE_TIP =
-  "The collateral valued in the loan token at the market's oracle, the price Morpho's liquidation test uses.";
+  "The collateral valued in the loan asset at the market's oracle, the price Morpho's liquidation test uses.";
 
 export interface MorphoPositionView {
   positionId: string;
@@ -500,23 +500,48 @@ export function useMorphoCardSlots({
     // An amount with no icon or USD line on the detail card: named (decision 0066 point 2).
     heads = [collateral, { id: "debt", label: CARD_VOCAB.debt, value: debtValue, tier: "amount" }];
 
-    // The LTV headline, from the page's live read: debt over the collateral's
-    // value at the market's oracle. A listing reads no market (decision 0018).
+    // The risk headline, from the page's live read: the health factor as
+    // Morpho's docs define it (collateral value × LLTV ÷ debt), with the LTV
+    // and the market's LLTV on the line under it (ui-jobs 628). A listing
+    // reads no market (decision 0018).
     const ltvUsable =
       chain && chain.currentDebt > 0 && chain.maxBorrow > 0 && chain.ltv != null && chain.ltv > 0 ? chain : null;
     if (detail && live !== undefined && hasDebt) {
+      const lltvNow = live?.lltv ?? v.lltv;
+      const hf = ltvUsable?.healthFactor ?? null;
       heads.push({
-        id: "ltv",
-        label: "LTV",
-        // The share of the LLTV line the debt has reached stands in the tip
-        // (TO-DO-position-card 341).
-        labelTip: `Loan-to-value: the debt over the collateral's value at the market's oracle. The market liquidates at its LLTV, ${pct(live?.lltv ?? v.lltv)}${ltvUsable ? `; the debt has reached ${capacityShare(ltvUsable.currentDebt, ltvUsable.maxBorrow).text} of that line` : ""}.`,
+        id: "health-factor",
+        label: MORPHO_TERMS.healthFactor,
+        labelTip:
+          "The collateral's value at the market's oracle times the LLTV, over the debt. Above 1 the position is healthy; below 1 it can be liquidated.",
         pending: live === null,
-        value: ltvUsable ? (
-          <Prov info={capacityProv("Loan-to-value", "live debt ÷ collateral value", chainCoords, readBy)}>
-            {pct(ltvUsable.ltv as number)}
-          </Prov>
-        ) : null,
+        value:
+          ltvUsable && hf != null ? (
+            <Prov
+              info={morphoHealthFactorProv(
+                {
+                  collateralValue: ltvUsable.collateralValue,
+                  lltv: ltvUsable.lltv,
+                  debt: ltvUsable.currentDebt,
+                  healthFactor: hf,
+                  loanSymbol: v.loanSymbol,
+                },
+                chainCoords,
+                readBy,
+              )}
+            >
+              {hf.toFixed(2)}
+            </Prov>
+          ) : null,
+        sub: ltvUsable ? (
+          <span className="whitespace-nowrap">
+            LTV{" "}
+            <Prov info={capacityProv("Loan-to-value", "live debt ÷ collateral value", chainCoords, readBy)}>
+              {pct(ltvUsable.ltv as number)}
+            </Prov>{" "}
+            · LLTV {pct(lltvNow)}
+          </span>
+        ) : undefined,
       });
     }
 
@@ -530,24 +555,24 @@ export function useMorphoCardSlots({
         left.push(
           {
             id: "borrow-rate",
-            label: "Borrow rate",
+            label: MORPHO_TERMS.borrowRate,
             value: (
               <Prov info={morphoBorrowRateNowProv(apr)}>
-                <PanelFigure>{(apr * 100).toFixed(2)}%</PanelFigure> APR
+                <PanelFigure>{(morphoApy(apr) * 100).toFixed(2)}%</PanelFigure>
               </Prov>
             ),
-            tip: "The market's borrow rate now, read from its interest rate model at the head block. It moves with how much of the market is lent out.",
+            tip: "The market's borrow rate now, from its interest rate model at the head block, compounded over a year. It moves with the market's utilization.",
           },
           {
             id: "yearly-cost",
             label: "Costs per year",
             value: (
               <Prov info={morphoYearlyCostProv(v.loanSymbol, apr)}>
-                ~<AmountText value={debtNow * apr} format="compact" />
+                ~<AmountText value={debtNow * morphoApy(apr)} format="compact" />
               </Prov>
             ),
             asset: loanAsset,
-            tip: "The debt now times the borrow rate: what a year costs while the rate holds.",
+            tip: "The debt now times the Borrow APY: what a year costs while the rate holds.",
           },
         );
       }
@@ -607,7 +632,7 @@ export function useMorphoCardSlots({
                 {Math.round((1 - 1 / hf) * 100)}%
               </Prov>
             ),
-            tip: `How far the ${collSym} price at the market's oracle can fall before the debt reaches the LLTV line and the position can be liquidated.`,
+            tip: `How far the ${collSym} price at the market's oracle can fall before the LTV reaches the LLTV and the position can be liquidated.`,
           });
         }
       }

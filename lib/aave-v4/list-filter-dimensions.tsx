@@ -265,7 +265,7 @@ export function aaveV4ListDimensions(
   const hubs: SerializableDimension<AaveV4ListFilters> = {
     id: "hubs",
     label: "Hub",
-    group: "Market",
+    group: "Hub and spoke",
     cardinality: "multi",
     param: "hubs",
     options: HUB_OPTIONS,
@@ -284,7 +284,7 @@ export function aaveV4ListDimensions(
   const spokes: SerializableDimension<AaveV4ListFilters> = {
     id: "spokes",
     label: "Spoke",
-    group: "Market",
+    group: "Hub and spoke",
     cardinality: "multi",
     param: "spokes",
     options: spokeOptions,

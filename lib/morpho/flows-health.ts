@@ -88,7 +88,7 @@ export function morphoHealthSource(chain: number, loanSymbol: string): HealthSou
       line: {
         formula: "above the LLTV the position can be liquidated",
         summary:
-          "Liquidation line — the market's liquidation loan-to-value (LLTV), fixed when the market was created: above it a liquidator can repay the debt and take collateral.",
+          "LLTV — fixed when the market was created: above it a liquidator can repay the debt and take collateral.",
       },
       help: `on the same days: the debt over the collateral's value at the market oracle's price, in ${loanSymbol}. The oracle is read at each event's block, so a day between events keeps the last event's price and is drawn dotted; the debt grows by the market's interest. The red line is the market's LLTV, fixed when the market was created; above it the position can be liquidated. The list in the tip picks it or the collateral's price.`,
     },
