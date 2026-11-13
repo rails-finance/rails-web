@@ -11,8 +11,8 @@
  * Which URLs: a URL literal whose host is in content/official-docs.json's
  * `families` (less `notDocumentation`), found in
  *   - app/, lib/ and components/ (.ts, .tsx): string literals, and template
- *     literals that start from a constant of the same file (`${DOCS}/x`, with
- *     `const DOCS = "https://…"`); a template that does not resolve is counted
+ *     literals that start from a constant of the same file (`${DOCS}/x` or `DOCS + "/x"`, with
+ *     `const DOCS = "https://…"`); a template over `${version}` is expanded for v3 and v4 (TEMPLATE_VALUES); any other template that does not resolve is counted
  *     and listed, not fetched;
  *   - content/ (.yaml, .json): every URL, the event-prose `doc_urls`, modal
  *     `links` and concept `sources` among them.
@@ -30,6 +30,10 @@ const args = process.argv.slice(2);
 const LIST = args.includes("--list");
 const ONLY = args.find((a) => a.startsWith("--only="))?.slice(7) ?? null;
 const UA = "Mozilla/5.0 (compatible; docs-link-check/1.0)";
+
+// Template variables the script expands, by name: the values Rails uses
+// (lib/uniswap/types.ts UniswapVersion). A template with any other variable is listed, not fetched.
+const TEMPLATE_VALUES = { version: ["v3", "v4"] };
 
 const docs = JSON.parse(readFileSync(join(ROOT, "content/official-docs.json"), "utf8"));
 const hosts = new Set(Object.values(docs.families).flat());
@@ -82,19 +86,25 @@ for (const f of walk(join(ROOT, "app"), [".ts", ".tsx"])
     consts[m[1]] = m[2];
     const uses = src.match(new RegExp(`\\b${m[1].replace(/\$/g, "\\$")}\\b`, "g")).length;
     const inTemplates = src.split("${" + m[1] + "}").length - 1;
-    if (inTemplates > 0 && uses === inTemplates + 1) baseOnly.add(m[1]);
+    const inConcats = [...src.matchAll(new RegExp(`\\b${m[1].replace(/\$/g, "\\$")}\\s*\\+\\s*["'\`]`, "g"))].length;
+    if (inTemplates + inConcats > 0 && uses === inTemplates + inConcats + 1) baseOnly.add(m[1]);
   }
   const lines = src.split("\n");
   for (const [i, line] of lines.entries()) {
     const where = `${rel}:${i + 1}`;
     const def = line.match(/(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=/);
     if (!(def && baseOnly.has(def[1]))) for (const m of line.matchAll(URL_RE)) add(m[0], where);
+    for (const m of line.matchAll(/\b([A-Za-z_$][\w$]*)\s*\+\s*["'`]([^"'`$]*)["'`]/g))
+      if (consts[m[1]]) add(consts[m[1]] + m[2], where);
     for (const m of line.matchAll(/`\$\{([A-Za-z_$][\w$]*)\}([^`]*)`/g)) {
       const base = consts[m[1]];
       if (!base) continue;
       const rest = m[2];
       if (rest.includes("${")) {
-        if (hosts.has(new URL(base).host)) unresolved.push({ where, text: m[0] });
+        const vars = [...rest.matchAll(/\$\{([A-Za-z_$][\w$]*)\}/g)].map((v) => v[1]);
+        if (vars.every((v) => TEMPLATE_VALUES[v]) && new Set(vars).size === 1) {
+          for (const val of TEMPLATE_VALUES[vars[0]]) add(base + rest.replace(/\$\{[A-Za-z_$][\w$]*\}/g, val), where);
+        } else if (hosts.has(new URL(base).host)) unresolved.push({ where, text: m[0] });
         continue;
       }
       add(base + rest, where);

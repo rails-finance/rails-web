@@ -969,7 +969,7 @@ doc_urls:
   BORROW_HEALTH: |-
     https://docs.spark.finance/products/sparklend/guides/borrowing-assets#what-is-the-health-factor
   BORROW_RATE: |-
-    https://docs.spark.finance/products/sparklend/guides/borrowing-assets#what-is-the-difference-between-transparent-and-variable-rate
+    https://docs.spark.finance/products/sparklend/guides/borrowing-assets#how-are-dai-and-usds-borrow-rates-set
   REPAY_ASSET: |-
     https://docs.spark.finance/products/sparklend/guides/borrowing-assets#what-asset-do-i-need-to-repay
   REPAYING: |-
@@ -1093,7 +1093,7 @@ L5:
           Borrowing assets
         doc: BORROWING
       - label: |-
-          Variable and transparent rates
+          How borrow rates are set
         doc: BORROW_RATE
       - label: |-
           E-mode
@@ -1374,7 +1374,7 @@ L5:
           Supply and borrow caps
         doc: SUPPLY_CAPS
       - label: |-
-          Variable and transparent rates
+          How borrow rates are set
         doc: BORROW_RATE
 
 # ── The info page (/ethereum/spark/info, zone Z5): the glossary under How it works ──
