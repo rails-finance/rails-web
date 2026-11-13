@@ -16,6 +16,7 @@ import { isCompoundV2Event } from "@/lib/shared/types/event-shape";
 import type { CompoundV2PositionView } from "@/components/protocol/compound-v2/compound-v2-position-card";
 import type { CompoundV2ChainResponse } from "@/lib/api/fetch-compound-v2-position";
 import { num, amt, usd, fmtUtc, txCell } from "@/lib/shared/position-markdown";
+import { compoundV2HasSeizeShare } from "@/lib/compound-v2/asset-catalog";
 import {
   markdownFirstTimestamp,
   markdownTimelineSlice,
@@ -148,7 +149,7 @@ export function compoundV2PositionToMarkdown(args: CompoundV2PositionMarkdownArg
         );
       }
       lines.push(
-        `- **Liquidation mechanics:** close factor ${num(live.closeFactor * 100, 0)}% (max share of one debt per liquidation — partial by design), liquidation incentive ${num(Math.max(0, live.liquidationIncentive - 1) * 100, 0)}%; the protocol keeps its own burned share of every seizure`,
+        `- **Liquidation mechanics:** close factor ${num(live.closeFactor * 100, 0)}% (max share of one debt per liquidation — partial by design), liquidation incentive ${num(Math.max(0, live.liquidationIncentive - 1) * 100, 0)}%; in a market with a protocol seize share, the protocol keeps a burned share of each seizure`,
       );
       for (const m of live.markets) {
         const rates =
@@ -164,7 +165,10 @@ export function compoundV2PositionToMarkdown(args: CompoundV2PositionMarkdownArg
                 : "") +
             (m.priceUsd != null
               ? `, oracle price ${usd(m.priceUsd)}${m.priceHasFeed ? "" : " (a fixed price set by governance, no feed)"}`
-              : ""),
+              : "") +
+            (compoundV2HasSeizeShare(m.market)
+              ? ""
+              : ", no protocol seize share: a liquidator receives every seized cToken"),
         );
       }
       lines.push("");

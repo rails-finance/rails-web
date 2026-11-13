@@ -31,6 +31,26 @@ export interface ComptrollerVocabFamily {
   oracleName: string;
   /** The via line's lane: "Compound V2 markets". */
   lane: string;
+  /** The year rates are printed over, where it is a fixed count of periods
+   *  (Compound V2's 2,628,000 blocks); null where they run on the rate
+   *  model's own constant (Moonwell's `timestampsPerYear()`). */
+  rateYear: ComptrollerRateYear | null;
+}
+
+/** A fixed year of rate periods and where it comes from. */
+export interface ComptrollerRateYear {
+  periods: number;
+  /** Where the count comes from, in plain words. */
+  source: string;
+  /** The page that states it. */
+  href: string;
+}
+
+/** What one market's rate receipts read: the per-period rate as read, and the
+ *  model's periods-a-year constant. */
+export interface ComptrollerRateRead {
+  perPeriodRaw?: string | null;
+  modelPeriodsPerYear?: number | null;
 }
 
 /** Where a figure was read: the block, and the contracts behind one market. */
@@ -294,9 +314,49 @@ export const cmUtilisationProv = stamped(
   }),
 );
 
-/** A rate a year: the market's per-period rate times the model's periods a year. */
-export const cmRateProv = stamped((f, c, side: "supply" | "borrow"): Provenance => {
+const en = (n: number) => n.toLocaleString("en-US");
+
+/** The model's periods-a-year constant, named as the one it sets its per-period curve with. */
+const modelYearSentence = (f: ComptrollerVocabFamily, read?: ComptrollerRateRead): string =>
+  `The market's rate model answers \`${periodsPerYear(f)}()\`${read?.modelPeriodsPerYear != null ? ` ${en(read.modelPeriodsPerYear)}` : ""}: the constant it uses to set its per-${f.period} curve from its yearly terms.`;
+
+/** A rate a year: the market's per-period rate times the family's year, or
+ *  the model's periods a year where the family has no fixed year. */
+export const cmRateProv = stamped((f, c, side: "supply" | "borrow", read?: ComptrollerRateRead): Provenance => {
   const method = `${side}Rate${perPeriod(f)}`;
+  const y = f.rateYear;
+  if (y)
+    return {
+      kind: "chain-derived",
+      pclass: "state",
+      source: { block: c.blockNumber },
+      verify: {
+        kind: "recompute",
+        text: `To check: ask ${node(f)} for the ${f.token}'s ${method}() at block ${c.blockNumber} and multiply it by ${en(y.periods)}.`,
+      },
+      summary: `${sym(c)} ${side} rate — the ${f.token}'s \`${method}\` at block ${c.blockNumber}, divided by 1e18 and multiplied by ${en(y.periods)} ${f.period}s a year, as a simple APR. Interest accrues once a ${f.period}, and ${en(y.periods)} is a year of ${y.source}. ${modelYearSentence(f, read)}`,
+      contract: marketContract(f, c),
+      via: via(f, `${f.token}.${method} × ${en(y.periods)}`),
+      formula: `rate per ${f.period} ÷ 1e18 × ${en(y.periods)}`,
+      inputs: [
+        {
+          label: `rate per ${f.period}`,
+          ...(read?.perPeriodRaw ? { value: BigInt(read.perPeriodRaw).toLocaleString("en-US") } : {}),
+          kind: "chain",
+          pclass: "state",
+          note: `${f.token}.${method}, a 1e18 mantissa`,
+          contract: marketContract(f, c),
+        },
+        {
+          label: `${f.period}s a year`,
+          value: en(y.periods),
+          kind: "offchain",
+          pclass: "offchain",
+          note: y.source,
+          verify: { kind: "link", href: y.href, text: `${f.name}'s docs` },
+        },
+      ],
+    };
   return {
     kind: "chain-derived",
     pclass: "state",
@@ -423,7 +483,13 @@ export const cmPauseProv = stamped((f, c, side: "supply" | "borrow", paused: boo
 
 /** One term of the market's rate model, as a year. */
 export const cmRateTermProv = stamped(
-  (f, c, term: "base" | "multiplier" | "kink" | "jump", whitePaper: boolean): Provenance => {
+  (
+    f,
+    c,
+    term: "base" | "multiplier" | "kink" | "jump",
+    whitePaper: boolean,
+    read?: ComptrollerRateRead,
+  ): Provenance => {
     const method =
       term === "kink"
         ? "kink"
@@ -439,16 +505,26 @@ export const cmRateTermProv = stamped(
       kink: "the utilisation where the borrow rate turns steeper",
       jump: "how fast the borrow rate climbs with utilisation above the kink",
     }[term];
+    const y = f.rateYear;
+    const modelYear = read?.modelPeriodsPerYear != null ? ` of ${en(read.modelPeriodsPerYear)}` : "";
     const scale =
-      term === "kink" || whitePaper
+      term === "kink" || (whitePaper && !y)
         ? "scaled by 1e18"
-        : `scaled by 1e18 and multiplied by the model's \`${periodsPerYear(f)}\``;
+        : y
+          ? `scaled by 1e18${whitePaper ? `, divided by the model's \`${periodsPerYear(f)}()\`${modelYear}` : ""} and multiplied by ${en(y.periods)} ${f.period}s a year`
+          : `scaled by 1e18 and multiplied by the model's \`${periodsPerYear(f)}\``;
+    const tail =
+      term === "kink" || !y
+        ? ""
+        : whitePaper
+          ? ` The model stores this term a year and divides it by its \`${periodsPerYear(f)}()\` for the per-${f.period} rate; ${en(y.periods)} is the year the market's rates are printed over (${y.source}).`
+          : ` The model set this per-${f.period} term from a yearly one on its \`${periodsPerYear(f)}()\`${modelYear}; ${en(y.periods)} is the year the market's rates are printed over (${y.source}).`;
     return {
-      kind: term === "kink" || whitePaper ? "chain" : "chain-derived",
+      kind: term === "kink" || (whitePaper && !y) ? "chain" : "chain-derived",
       pclass: "state",
       source: { block: c.blockNumber },
       verify: check(f, `the rate model's ${method}()`, c),
-      summary: `${sym(c)} ${name} — the rate model's \`${method}\` at block ${c.blockNumber}, ${scale}: ${meaning}.`,
+      summary: `${sym(c)} ${name} — the rate model's \`${method}\` at block ${c.blockNumber}, ${scale}: ${meaning}.${tail}`,
       contract: irmContract(c),
       via: via(f, `${f.token}.interestRateModel → model.${method}`),
     };
@@ -461,7 +537,7 @@ export const cmCurveProv = stamped(
     kind: "chain-derived",
     pclass: "state",
     source: { block: c.blockNumber },
-    summary: `${sym(c)} rate curve — the borrow rate the market's rate model gives at each utilisation, from its terms at block ${c.blockNumber}. ${model.shape === "jump" ? "Below the kink the rate is base + multiplier × utilisation; above it the jump multiplier adds to it for the utilisation past the kink." : "The rate is base + multiplier × utilisation, climbing evenly."} The supply rate is the borrow rate times utilisation, less the reserve factor.`,
+    summary: `${sym(c)} rate curve — the borrow rate the market's rate model gives at each utilisation, from its terms at block ${c.blockNumber}. ${model.shape === "jump" ? "Below the kink the rate is base + multiplier × utilisation; above it the jump multiplier adds to it for the utilisation past the kink." : "The rate is base + multiplier × utilisation, climbing evenly."} The supply rate is the borrow rate times utilisation, less the reserve factor.${f.rateYear ? ` The curve and its terms are per-${f.period} rates times ${en(f.rateYear.periods)} ${f.period}s a year, the year the supply and borrow rates are printed over.` : ""}`,
     contract: irmContract(c),
     via: via(f, `${f.token}.interestRateModel → model terms`),
     formula:
