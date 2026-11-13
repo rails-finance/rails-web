@@ -46,7 +46,7 @@ export function EulerVaultSection({ r }: { r: EulerPositionRead }) {
           : [
               {
                 key: "borrowWindow" as const,
-                text: VAULT_SECTION.borrowApyWindow(p.window.indexGrowth, p.window.days),
+                text: VAULT_SECTION.debtGrowthText(p.window.indexGrowth, p.window.days),
               },
             ]),
       ];

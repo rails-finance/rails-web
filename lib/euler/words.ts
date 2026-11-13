@@ -209,7 +209,7 @@ export const VAULT_SECTION = {
   none: "–",
   shareGrowthText: (g: number, days: number) => growthText(g, days),
   borrowApyNow: (now: number) => `${rate(now)} now`,
-  borrowApyWindow: (g: number, days: number) => `debts grew ${growthText(g, days)}`,
+  debtGrowthText: (g: number, days: number) => `debts grew ${rate(g)} over ${days.toFixed(1)} days`,
   priceText: (p: EulerPosition) => inUnit(p.price, p.unit) ?? "not priced",
 };
 
