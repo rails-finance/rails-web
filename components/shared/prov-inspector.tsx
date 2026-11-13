@@ -218,6 +218,7 @@ export function ProvInspectorMenu({ onExit }: { onExit?: () => void }) {
             role="menu"
             aria-label="Inspector"
             data-prov-inspect-dropdown=""
+            data-anatomy="H7.4.1"
             className="profile-drop absolute z-[var(--z-popover)] w-64 max-w-[calc(100vw-32px)] rounded-xl border border-rb-200 bg-background p-2 shadow-xl dark:border-rb-800 dark:bg-rb-900"
             style={{ top: place.top, right: Math.max(16, place.right) }}
           >
