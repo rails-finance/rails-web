@@ -176,7 +176,7 @@ export function BookmarksPage() {
         <div
           className="-mx-4 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0"
           role="tablist"
-          aria-label="Saved items"
+          aria-label="Saved views"
           data-anatomy="B4"
         >
           {TABS.map((t) => (

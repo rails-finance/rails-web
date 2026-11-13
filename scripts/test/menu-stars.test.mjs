@@ -224,3 +224,13 @@ test("an import keeps the file's view stars, or stars what a file from before 65
     ["x", "y"],
   );
 });
+
+test("a wallet an old build just added does not stop the seeding", () => {
+  const unstarred = [1, 2, 3].map((n) => wallet(n));
+  browser({
+    "rails-saved": JSON.stringify(unstarred),
+    "rails-bookmarks": JSON.stringify([{ ...wallet(9), kind: undefined }]),
+  });
+  const shown = menuEntries(loadBookmarks());
+  assert.deepEqual(shown.map((w) => w.key).sort(), [addr(1), addr(2), addr(3), addr(9)].sort());
+});

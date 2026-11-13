@@ -217,7 +217,7 @@ export function BookmarkBackup({ className = "", empty = false }: { className?: 
     const backup = { ...exportBookmarks(), ...(views.length ? { focusViews: views } : {}) };
     const count = backup.bookmarks.length;
     if (count + views.length === 0) {
-      setNotice("No saved items to export yet.");
+      setNotice("No saved views to export yet.");
       return;
     }
     const name = bookmarksBackupFilename();
@@ -260,7 +260,7 @@ export function BookmarkBackup({ className = "", empty = false }: { className?: 
     <div className={className} data-bookmark-backup="">
       {empty && (
         <p className="text-sm text-rb-500">
-          Saved items in another browser? Export them there, then import the file here.
+          Saved views in another browser? Export them there, then import the file here.
         </p>
       )}
       <div className={`flex flex-wrap items-center gap-2 ${empty ? "mt-3" : ""}`}>
@@ -491,7 +491,7 @@ function StarToggle({ on, label, onToggle }: { on: boolean; label: string; onTog
         onToggle();
       }}
       aria-label={on ? `Unstar ${label}` : `Star ${label}`}
-      title={on ? "Starred: shown in the profile menu" : "Star to show in the profile menu"}
+      title={on ? "Shown in the profile menu" : "Show in the profile menu"}
       className={`-my-2 inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors sm:size-7 ${
         on ? "text-foreground" : "text-rb-400 hover:text-foreground dark:text-rb-500 dark:hover:text-foreground"
       }`}

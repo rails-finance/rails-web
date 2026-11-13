@@ -383,8 +383,11 @@ function reconcileLegacyWallets(): void {
       const addr = primaryOf(row);
       const at = all.findIndex((r) => isWallet(r) && primaryOf(r) === addr);
       if (at < 0) {
-        // A new bookmark starts starred (ui-jobs 652).
-        added.push({ ...mergeRows([], [row]).rows[0], starred: true });
+        // A new bookmark starts starred (ui-jobs 652); before the stars are
+        // seeded it waits for the seeding, which would otherwise read its
+        // star as the reader's and skip the wallets.
+        const seeded = localStorage.getItem(STARS_KEY) !== null;
+        added.push({ ...mergeRows([], [row]).rows[0], ...(seeded ? { starred: true } : {}) });
         changed = true;
         continue;
       }

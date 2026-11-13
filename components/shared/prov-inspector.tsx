@@ -116,6 +116,7 @@ export function ProvInspectorIndicator() {
   return (
     <span
       tabIndex={0}
+      role="img"
       className="prov-inspect-on group"
       data-anatomy="H7.4"
       data-prov-inspect-on=""
