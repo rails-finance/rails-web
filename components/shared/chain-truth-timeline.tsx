@@ -82,16 +82,7 @@ import { flowMoment } from "@/lib/shared/flow-moment";
 import { FlowMomentCard, type MomentNeighbour } from "@/components/shared/flow-moment-card";
 import { Link2, List, Lock, X } from "lucide-react";
 import { BlockTransactionsContext, blockTransactionsOf } from "@/components/shared/chain-truth-event";
-import {
-  CTRL_GHOST,
-  CTRL_OFF,
-  CTRL_ON,
-  CTRL_ON_ACCENT,
-  CTRL_ON_HOVER,
-  FOOT_ARROW,
-  FOOT_LINK,
-  FOOT_WORDS,
-} from "@/lib/shared/ui-grammar";
+import { CTRL_GHOST, CTRL_OFF, CTRL_ON, CTRL_ON_ACCENT, CTRL_ON_HOVER, FOOT_LINK } from "@/lib/shared/ui-grammar";
 import { unreadTokensIn } from "@/lib/shared/decimals-unread";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useParams, usePathname } from "next/navigation";
@@ -2014,10 +2005,7 @@ function ChainTruthTimelineBody({
         <div className="flex items-center justify-between gap-3 flex-wrap text-sm text-rb-500">
           <span>One event from this position&rsquo;s history</span>
           <a href={viewInTimelineHref} className={`shrink-0 ${FOOT_LINK}`}>
-            <span className={FOOT_WORDS}>View in timeline</span>
-            <span className={FOOT_ARROW} aria-hidden="true">
-              →
-            </span>
+            View in timeline
           </a>
         </div>
         {pinnedEvent ? (

@@ -335,7 +335,7 @@ export function StageRail() {
           href="/about/architecture"
           className="whitespace-nowrap text-sm font-medium text-blue-600 dark:text-[var(--text-link)] transition-colors hover:underline"
         >
-          Read the technical architecture&nbsp;→
+          Read the technical architecture
         </Link>
       </p>
     </div>

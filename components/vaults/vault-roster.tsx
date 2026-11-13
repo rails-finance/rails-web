@@ -48,7 +48,7 @@ import { VaultIndexTable, useVaultIndexSort } from "@/components/vaults/vault-in
 import type { ChainId } from "@/lib/shared/chains";
 import type { BaseListFilters } from "@/lib/shared/list-filter";
 import { notifyUrlChanged, useUrlSearchParams } from "@/lib/shared/use-url-search-params";
-import { PAGE_LINK, FOOT_ARROW, FOOT_LINK, FOOT_WORDS } from "@/lib/shared/ui-grammar";
+import { PAGE_LINK, FOOT_LINK } from "@/lib/shared/ui-grammar";
 import { VAULT_INDEX_HREF } from "@/lib/vaults/routes";
 import { vaultRosterShownProv } from "@/lib/vaults/roster-provenance";
 import { shortAddress } from "@/lib/shared/vault-amount-text";
@@ -482,10 +482,7 @@ export function VaultRoster({
         {head.infoHref && (
           <p>
             <Link href={head.infoHref} className={`text-xs font-semibold ${FOOT_LINK}`} prefetch={false}>
-              <span className={FOOT_WORDS}>How this is built</span>
-              <span className={FOOT_ARROW} aria-hidden="true">
-                →
-              </span>
+              How this is built
             </Link>
           </p>
         )}
@@ -497,7 +494,7 @@ export function VaultRoster({
             <>
               {" "}
               <Link href={head.listingHref} className={PAGE_LINK} prefetch={false} data-link="every-holder">
-                Every holder <span aria-hidden>→</span>
+                Every holder
               </Link>
             </>
           )}
@@ -505,7 +502,7 @@ export function VaultRoster({
             <>
               {" "}
               <Link href={indexHref} className={PAGE_LINK} prefetch={false} data-link="vault-index">
-                All vaults <span aria-hidden>→</span>
+                All vaults
               </Link>
             </>
           )}

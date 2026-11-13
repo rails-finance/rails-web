@@ -15,7 +15,7 @@ import { LearnMore } from "@/components/shared/learn-more-modal";
 import { SectionReadStamp } from "@/components/shared/read-stamp";
 import { ProvSection, SectionHeading, SectionMenu } from "@/components/shared/section-menu";
 import { SectionExplainer } from "@/components/shared/section-explainer";
-import { FOOT_ARROW, FOOT_LINK, FOOT_WORDS } from "@/lib/shared/ui-grammar";
+import { FOOT_LINK } from "@/lib/shared/ui-grammar";
 import type {
   CollateralTerms,
   EntryLink,
@@ -53,10 +53,7 @@ export function EntryLinks({ entries }: { entries: EntryLink[] }) {
     <div className="mt-auto flex flex-col items-start gap-1 pt-3" data-anatomy="R6">
       {entries.map((e) => (
         <Link key={e.href + e.label} href={e.href} className={`text-[13px] font-medium ${FOOT_LINK}`} {...e.hooks}>
-          <span className={FOOT_WORDS}>{e.label}</span>
-          <span className={FOOT_ARROW} aria-hidden="true">
-            →
-          </span>
+          {e.label}
         </Link>
       ))}
     </div>

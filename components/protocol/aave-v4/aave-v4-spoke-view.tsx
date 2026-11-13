@@ -90,7 +90,7 @@ import { AAVE_V4_TIMELINE_RUNS } from "@/lib/aave-v4/timeline-runs";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { DetailBackButton, DetailTopRow } from "@/components/shared/detail-back-row";
-import { SECTION_HEADING, CTRL_GHOST, FOOT_ARROW, FOOT_LINK, FOOT_WORDS } from "@/lib/shared/ui-grammar";
+import { SECTION_HEADING, CTRL_GHOST, FOOT_LINK } from "@/lib/shared/ui-grammar";
 import { ChevronDown } from "lucide-react";
 import {
   FlowsKey,
@@ -728,10 +728,7 @@ function AaveV4SpokePageInner({
           <IndexNotice className="text-sm text-rb-500 mb-3" onRetry={() => setTailTry((n) => n + 1)} />
           <p className="text-sm text-rb-500">
             <Link href={walletFilterHref} className={FOOT_LINK}>
-              <span className={FOOT_WORDS}>See this wallet&rsquo;s other spokes</span>
-              <span className={FOOT_ARROW} aria-hidden="true">
-                →
-              </span>
+              See this wallet&rsquo;s other spokes
             </Link>
           </p>
         </div>
@@ -752,10 +749,7 @@ function AaveV4SpokePageInner({
             </p>
             <p className="text-sm text-rb-500">
               <Link href={walletFilterHref} className={FOOT_LINK}>
-                <span className={FOOT_WORDS}>See this wallet&rsquo;s other spokes</span>
-                <span className={FOOT_ARROW} aria-hidden="true">
-                  →
-                </span>
+                See this wallet&rsquo;s other spokes
               </Link>
             </p>
           </div>

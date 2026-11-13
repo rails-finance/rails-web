@@ -47,7 +47,7 @@ import type { PwnBookCollateralLine, PwnBookCreditLine, PwnLoanBook } from "@/li
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
-import { INLINE_LINK, FOOT_ARROW, FOOT_LINK, FOOT_WORDS } from "@/lib/shared/ui-grammar";
+import { INLINE_LINK, FOOT_LINK } from "@/lib/shared/ui-grammar";
 import { AssetUnit } from "@/components/shared/asset-unit";
 import { useMemo } from "react";
 import { AimGate } from "@/components/shared/aim-gate";
@@ -117,10 +117,7 @@ function OpenBookSection({ book }: { book: PwnLoanBook }) {
               collateral, principal, what it owes and its due date.
             </p>
             <Link href={OPEN_BOOK_HREF} className={`mt-2 text-[13px] ${FOOT_LINK}`}>
-              <span className={FOOT_WORDS}>Loans in escrow, soonest deadline first</span>
-              <span className={FOOT_ARROW} aria-hidden="true">
-                →
-              </span>
+              Loans in escrow, soonest deadline first
             </Link>
           </>
         )}
@@ -417,10 +414,7 @@ function DefaultsSection({ book }: { book: PwnLoanBook }) {
               listing, filtered to the defaults and ordered by the deadline each one passed.
             </p>
             <Link href={DEFAULTS_HREF} className={`mt-2 text-[13px] ${FOOT_LINK}`}>
-              <span className={FOOT_WORDS}>Defaulted loans, most recent deadline first</span>
-              <span className={FOOT_ARROW} aria-hidden="true">
-                →
-              </span>
+              Defaulted loans, most recent deadline first
             </Link>
           </>
         )}

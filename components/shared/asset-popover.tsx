@@ -38,7 +38,7 @@ import { useChainId } from "@/lib/shared/chain-context";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { getTokenAddress } from "@/lib/shared/token-addresses";
 import Link from "next/link";
-import { FOOT_ARROW, FOOT_LINK, FOOT_WORDS } from "@/lib/shared/ui-grammar";
+import { FOOT_LINK } from "@/lib/shared/ui-grammar";
 import { usePathname } from "next/navigation";
 import { PriceUnitMark } from "@/components/assets/price-unit-mark";
 import { fmtChange, PriceSparkline } from "@/components/assets/price-sparkline";
@@ -220,10 +220,7 @@ function PendleMarketLine({ chain, contract }: { chain: ChainId; contract: strin
   return (
     <div className="border-t border-[var(--rb-tooltip-border)] pt-2" data-asset-popover-line="pendle-market">
       <Link href={href} className={`self-start font-medium ${FOOT_LINK}`} data-asset-popover-pendle={m.market}>
-        <span className={FOOT_WORDS}>Open its Pendle market</span>
-        <span className={FOOT_ARROW} aria-hidden="true">
-          →
-        </span>
+        Open its Pendle market
       </Link>
     </div>
   );
@@ -293,10 +290,7 @@ function AssetPageRow({ chain, contract, symbol }: { chain: ChainId; contract: s
           {PRICELESS_WHY}
         </p>
         <Link href={open} className={`self-start font-medium ${FOOT_LINK}`} data-asset-popover-open={open}>
-          <span className={FOOT_WORDS}>{WORDS.open(symbol)}</span>
-          <span className={FOOT_ARROW} aria-hidden="true">
-            →
-          </span>
+          {WORDS.open(symbol)}
         </Link>
       </div>
     );
@@ -343,10 +337,7 @@ function AssetPageRow({ chain, contract, symbol }: { chain: ChainId; contract: s
         </p>
       )}
       <Link href={open} className={`self-start font-medium ${FOOT_LINK}`} data-asset-popover-open={open}>
-        <span className={FOOT_WORDS}>{WORDS.open(row.symbol)}</span>
-        <span className={FOOT_ARROW} aria-hidden="true">
-          →
-        </span>
+        {WORDS.open(row.symbol)}
       </Link>
     </div>
   );

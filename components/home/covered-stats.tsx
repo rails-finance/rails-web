@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FOOT_ARROW, FOOT_LINK, FOOT_WORDS } from "@/lib/shared/ui-grammar";
+import { FOOT_LINK } from "@/lib/shared/ui-grammar";
 import type { CoveredPositions } from "@/lib/home/covered-positions";
 import type { HomeStats } from "@/lib/home/home-stats";
 import { formatValueHeld, spokenValueHeld, type ValueHeld } from "@/lib/home/value-held";
@@ -143,10 +143,7 @@ const LABEL = "font-sans font-light tracking-tight text-rb-500 text-lg sm:text-x
 function FiguresLink() {
   return (
     <Link href="/about/figures" className={`mt-4 text-sm font-medium ${FOOT_LINK}`} data-anatomy="S3.3">
-      <span className={FOOT_WORDS}>How these are counted</span>
-      <span className={FOOT_ARROW} aria-hidden="true">
-        →
-      </span>
+      How these are counted
     </Link>
   );
 }

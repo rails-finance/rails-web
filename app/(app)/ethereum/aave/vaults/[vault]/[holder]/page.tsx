@@ -60,7 +60,7 @@ import {
 } from "@/lib/aave-vaults/vault-provenance";
 import { sectionPositionMetadata } from "@/lib/shared/page-metadata";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
-import { PAGE_LINK, FOOT_ARROW, FOOT_LINK, FOOT_WORDS } from "@/lib/shared/ui-grammar";
+import { PAGE_LINK, FOOT_LINK } from "@/lib/shared/ui-grammar";
 import { resolveAaveVaultHolder } from "@/lib/aave-vaults/vault-holder";
 import { ethereumVaultHref, ethereumVaultsListingHref } from "@/lib/vaults/routes";
 import { loadAaveEthereumVault, type AaveEthereumVaultResponse } from "@/lib/sources/chain/aave-ethereum-vault";
@@ -554,10 +554,7 @@ export default async function AaveEthereumVaultPositionPage({ params }: Props) {
                   prefetch={false}
                   data-link="vault-market"
                 >
-                  <span className={FOOT_WORDS}>{vaultName}</span>
-                  <span className={FOOT_ARROW} aria-hidden="true">
-                    →
-                  </span>
+                  {vaultName}
                 </Link>
                 <Link
                   href={ethereumVaultsListingHref({ vault: address })}
@@ -566,10 +563,7 @@ export default async function AaveEthereumVaultPositionPage({ params }: Props) {
                   data-link="vault-positions"
                   data-positions-vault={address}
                 >
-                  <span className={FOOT_WORDS}>Every holder</span>
-                  <span className={FOOT_ARROW} aria-hidden="true">
-                    →
-                  </span>
+                  Every holder
                 </Link>
               </p>
             )}

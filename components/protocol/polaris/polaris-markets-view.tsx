@@ -41,7 +41,7 @@ import type { PolarisBook } from "@/lib/sources/api/polaris-book";
 import type { PolarisMarketBook } from "@/lib/sources/api/polaris-positions";
 import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
-import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { FOOT_LINK } from "@/lib/shared/ui-grammar";
 import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
 import { polarisMarketKeys } from "@/lib/polaris/focus-keys";
 
@@ -282,10 +282,9 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
           </p>
         )}
         <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
-          <Link href={`${POLARIS_BASE_PATH}?market=${market}`} className={INLINE_LINK}>
+          <Link href={`${POLARIS_BASE_PATH}?market=${market}`} className={FOOT_LINK}>
             Browse the {stable} positions
           </Link>
-          .
         </p>
       </div>
     </div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { FOOT_ARROW, FOOT_LINK, FOOT_WORDS } from "@/lib/shared/ui-grammar";
+import { FOOT_LINK } from "@/lib/shared/ui-grammar";
 
 import { protocolIconSrc } from "@/lib/shared/protocols";
 import { chainExplorers } from "@/lib/shared/explorer-rank";
@@ -219,10 +219,7 @@ export function ProtocolRow() {
               className={`ml-auto shrink-0 text-sm font-medium ${FOOT_LINK}`}
               data-home-coverage=""
             >
-              <span className={FOOT_WORDS}>See detailed coverage</span>
-              <span className={FOOT_ARROW} aria-hidden="true">
-                →
-              </span>
+              See detailed coverage
             </Link>
           </div>
         </>

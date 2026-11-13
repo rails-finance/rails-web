@@ -54,7 +54,7 @@ import { YearnVaultTimeline } from "@/components/vaults/yearn-vault-timeline";
 import { computeVaultPositionEconomics } from "@/lib/aave-vaults/position-economics";
 import { sectionPositionMetadata } from "@/lib/shared/page-metadata";
 import { explorerUrl } from "@/lib/shared/chains";
-import { FOOT_ARROW, FOOT_LINK, FOOT_WORDS } from "@/lib/shared/ui-grammar";
+import { FOOT_LINK } from "@/lib/shared/ui-grammar";
 import { shortAddress } from "@/lib/shared/vault-amount-text";
 import { yearnVaultHref, yearnVaultRosterHref } from "@/lib/vaults/routes";
 import { resolveYearnVaultHolder } from "@/lib/yearn/vault-holder";
@@ -427,10 +427,7 @@ export default async function YearnVaultHoldingPage({ params }: Props) {
                   prefetch={false}
                   data-link="vault-market"
                 >
-                  <span className={FOOT_WORDS}>{vaultName}</span>
-                  <span className={FOOT_ARROW} aria-hidden="true">
-                    →
-                  </span>
+                  {vaultName}
                 </Link>
               </p>
             )}

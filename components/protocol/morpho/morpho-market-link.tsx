@@ -15,7 +15,7 @@ import { useRouter } from "next/navigation";
 import { startNavigationProgress } from "@/components/nav/navigation-progress";
 import { useChainId } from "@/lib/shared/chain-context";
 import { morphoMarketHref } from "@/lib/morpho/market-routes";
-import { FOOT_ARROW, FOOT_LINK, FOOT_WORDS } from "@/lib/shared/ui-grammar";
+import { FOOT_LINK } from "@/lib/shared/ui-grammar";
 
 export function MorphoMarketPair({
   label,
@@ -70,10 +70,7 @@ export function MorphoMarketPageLine({
         className={`text-xs font-semibold ${FOOT_LINK}`}
         prefetch={false}
       >
-        <span className={FOOT_WORDS}>The {label} market</span>
-        <span className={FOOT_ARROW} aria-hidden="true">
-          →
-        </span>
+        The {label} market
       </Link>
     </p>
   );

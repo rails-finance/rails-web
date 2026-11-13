@@ -62,7 +62,7 @@ import {
   DataTableGroupRow,
 } from "@/components/shared/data-table/data-table";
 import { ratePercentText } from "@/lib/shared/rate-percent";
-import { INLINE_LINK, FOOT_ARROW, FOOT_LINK, FOOT_WORDS } from "@/lib/shared/ui-grammar";
+import { INLINE_LINK, FOOT_LINK } from "@/lib/shared/ui-grammar";
 import { ARC_CHAIN_ID, chainMeta, explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { morphoBlueContract } from "@/lib/morpho/asset-catalog";
@@ -809,12 +809,7 @@ function Group({
           )}
           <p className="mt-1 text-[13px]">
             <Link href={tokenHref} prefetch={false} className={FOOT_LINK} data-morpho-token-link={g.loanToken}>
-              <span className={FOOT_WORDS}>
-                {more > 0 ? `All ${n(g.markets)} ${g.loanSymbol} markets, ${n(more)} more` : `${g.loanSymbol} markets`}
-              </span>
-              <span className={FOOT_ARROW} aria-hidden="true">
-                →
-              </span>
+              {more > 0 ? `All ${n(g.markets)} ${g.loanSymbol} markets, ${n(more)} more` : `${g.loanSymbol} markets`}
             </Link>
           </p>
         </div>
