@@ -72,7 +72,8 @@ import {
   units,
 } from "@/lib/pendle/format";
 import { impliedApyProv, markProv, maturityProv, tvlProv, underlyingProv, valueProv } from "@/lib/pendle/provenance";
-import { PENDLE_WORDS, emptyPool } from "@/lib/pendle/words";
+import { PENDLE_WORDS } from "@/lib/pendle/words";
+import { emptyPool } from "@/lib/pendle/rules";
 import { UNDERLYING_LABEL_TIP, underlyingProtocol } from "@/lib/pendle/underlying";
 import { pendleMarketHref, pendleWalletHref } from "@/lib/pendle/routes";
 import type { PendleRoster, PendleRosterEntry } from "@/lib/pendle/types";
@@ -111,8 +112,8 @@ const SORT_NOTE: Partial<Record<SortKey, string>> = {
 const nameOf = (m: PendleRosterEntry) => marketName(m.tokens);
 const assetOf = (m: PendleRosterEntry) => assetSymbol(m.tokens);
 const tvlOf = (m: PendleRosterEntry) => units(m.tvl?.asset, assetDecimals(m.tokens));
-/** An empty pool (lib/pendle/words.ts emptyPool): its stored rate is not shown. */
-const emptyOf = (m: PendleRosterEntry) => m.expired === false && emptyPool(m.tvl, m.tokens.sy.decimals);
+/** An empty pool (lib/pendle/rules.ts): its stored rate is not shown. */
+const emptyOf = (m: PendleRosterEntry) => emptyPool(m.expired, m.tvl, m.tokens.sy.decimals);
 
 /** The PT's price in the asset: ptToSy × SY.exchangeRate(), both 1e18-scaled. */
 function ptToAsset(m: PendleRosterEntry): string | null {
@@ -250,7 +251,8 @@ function rosterCsv(markets: PendleRosterEntry[]): string {
       t.market.address,
       underlyingOf(m),
       assetOf(m),
-      m.impliedApy == null ? "" : m.impliedApy.toFixed(6),
+      // The table's figure: blank where it shows none (matured, unread, an empty pool).
+      figureOf("apy", m)?.toFixed(6) ?? "",
       exact(m.tvl?.asset, assetDecimals(t)) ?? "",
       ptToAsset(m) == null ? "" : String(rate(ptToAsset(m))),
       new Date(t.expiry * 1000).toISOString().slice(0, 10),

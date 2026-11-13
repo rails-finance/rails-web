@@ -44,12 +44,8 @@ import {
 import { UNDERLYING_LABEL_TIP, underlyingProtocol } from "@/lib/pendle/underlying";
 import type { PendlePosition, PendleTimelineRow, PendleToken } from "@/lib/pendle/types";
 import { pendleMarketHref } from "@/lib/pendle/routes";
+import { ptHolding } from "@/lib/pendle/rules";
 import { LP_SYMBOL_NOTE, PENDLE_WORDS as W, lpName } from "@/lib/pendle/words";
-
-/** Whether the wallet holds PT at the block (getUserPYInfo's ptBalance). */
-export function heldPt(p: PendlePosition): boolean {
-  return p.balances.pt != null && p.balances.pt !== "0";
-}
 
 /** Whether the wallet holds nothing in the market at the block. */
 export function positionClosed(p: PendlePosition): boolean {
@@ -122,7 +118,8 @@ export function PendlePositionCard({
   const entry = p.apy.entry;
   // A fixed rate is the yield of holding PT (rails-ops ui-jobs 654): none is
   // shown where the wallet holds no PT at the block.
-  const holdsPt = heldPt(p);
+  const holding = ptHolding(p);
+  const holdsPt = holding === "held";
   const heads: PositionCardHead[] = [
     {
       id: "value",
@@ -142,17 +139,19 @@ export function PendlePositionCard({
             {apyText(entry.ptWeighted)}
           </Prov>
         ),
-      sub: !holdsPt
-        ? W.noPtHeld
-        : entry.buys === 0
-          ? "no PT bought through a router"
-          : `${entry.buys === 1 ? "1 PT buy" : `weighted over ${entry.buys} PT buys`}${entry.unpriced ? `, ${entry.unpriced} unpriced` : ""}`,
+      sub:
+        holding === "none"
+          ? W.noPtHeld
+          : holding === "unread"
+            ? undefined
+            : entry.buys === 0
+              ? "no PT bought through a router"
+              : `${entry.buys === 1 ? "1 PT buy" : `weighted over ${entry.buys} PT buys`}${entry.unpriced ? `, ${entry.unpriced} unpriced` : ""}`,
     },
     {
       id: "implied-apy",
       label: "Implied APY now",
-      labelTip:
-        "Pendle's docs: the market consensus of the future APY of an asset. Read at this block; it ends at maturity.",
+      labelTip: "Pendle's docs: the market consensus of the future APY of an asset. It ends at maturity.",
       value:
         p.apy.current == null ? (
           expired ? (
@@ -324,8 +323,8 @@ export function PendlePositionCard({
       </p>
       {expired ? (
         <p>
-          The market has matured: each PT redeems for up to one {asset}, YT is worth nothing and keeps any yield it had
-          not claimed, swaps are closed, and LP can still be removed.
+          The market has matured: each PT redeems for up to one {asset}, YT is worth nothing and keeps any unclaimed
+          yield, swaps are closed, and LP can still be removed.
         </p>
       ) : (
         <p>

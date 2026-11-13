@@ -10,9 +10,8 @@ export const PENDLE_WORDS = {
   /** P2: Pendle's Swap page names a trade's rate "Effective Fixed APY". */
   effectiveFixedApy: "Effective Fixed APY",
   effectiveFixedApyTip:
-    "Pendle's docs: the fixed APY you are effectively getting from a trade, after price impact and swap fees. Here, each PT buy's rate, weighted by the PT bought.",
-  tradeApyTip:
-    "Pendle's docs: the fixed APY you are effectively getting from this trade, after price impact and swap fees.",
+    "Pendle's docs: the fixed APY a trade effectively returns, after price impact and swap fees. Here, each PT buy's rate, weighted by the PT bought.",
+  tradeApyTip: "Pendle's docs: the fixed APY this trade effectively returns, after price impact and swap fees.",
   noPtHeld: "no PT held",
   /** P3: the token a market splits; "YT" alone is the Yield Token. */
   yieldBearingToken: "Yield-bearing token",
@@ -39,19 +38,3 @@ export const LP_SYMBOL_NOTE = "On chain the LP token's symbol is PENDLE-LPT.";
 
 /** P4: the market title in the docs' form, the accounting asset in brackets (market page only). */
 export const marketTitleWithAsset = (name: string, asset: string) => `${name} (${asset})`;
-
-/**
- * An empty pool: its liquidity in SY is under 0.000001 SY (the smallest figure
- * Rails prints, "<0.000001"). Read from the roster's and the market page's
- * `tvl.sy`; no chain call. Such a pool's implied APY is the rate its last trade
- * stored (rails-ops reference/official-docs/pendle.md, Read on chain 2), so
- * Rails shows none.
- */
-export function emptyPool(tvl: { sy: string } | null | undefined, syDecimals: number | null): boolean {
-  if (tvl == null || syDecimals == null) return false;
-  try {
-    return BigInt(tvl.sy) < BigInt(10) ** BigInt(Math.max(syDecimals - 6, 0));
-  } catch {
-    return false;
-  }
-}

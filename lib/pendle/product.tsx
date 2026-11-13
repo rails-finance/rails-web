@@ -60,7 +60,8 @@ import {
   syRateProv,
   tvlProv,
 } from "@/lib/pendle/provenance";
-import { LP_SYMBOL_NOTE, PENDLE_WORDS as W, emptyPool, marketTitleWithAsset } from "@/lib/pendle/words";
+import { LP_SYMBOL_NOTE, PENDLE_WORDS as W, marketTitleWithAsset } from "@/lib/pendle/words";
+import { emptyPool } from "@/lib/pendle/rules";
 import type { PendleMarketPage, PendleRoster, PendleTokenMeta } from "@/lib/pendle/types";
 import type { Loadable, MarketModel, ProductHead, ProductSection } from "@/lib/shared/product/model";
 
@@ -83,7 +84,7 @@ const TIP = {
   active: "Markets before their maturity, of all markets",
   matured: "Markets past their maturity, where each PT redeems for up to one unit of its asset",
   tvl: "The pool's SY plus its PT at the PT's price, in the market's asset",
-  empty: "The pool holds under 0.000001 SY, so no trade sets a rate: the stored rate is its last trade's",
+  empty: "The pool holds under 0.000001 SY. Its stored rate is the last trade's.",
   apy: "Pendle's docs: the market consensus of the future APY of an asset, from the ratio of the YT price to the PT price",
   pt: "What one PT is worth in the market's asset; it reaches one at maturity",
   yt: "What one YT is worth in the market's asset; it collects the yield until maturity",
@@ -255,7 +256,7 @@ interface Ctx {
   lp: number | null;
   sy: number | null;
   spot: boolean;
-  /** An empty pool (lib/pendle/words.ts emptyPool): no implied APY shown. */
+  /** An empty pool (lib/pendle/rules.ts): no implied APY shown. */
   empty: boolean;
 }
 
@@ -277,7 +278,7 @@ function ctxOf(m: PendleMarketPage): Ctx {
     lp: unitRate(marks.lpToAsset, t.market.decimals, dec),
     sy: unitRate(marks.syToAsset, t.sy.decimals, dec),
     spot: !expired && marks.source === "routerstatic-spot",
-    empty: !expired && emptyPool(live.tvl, t.sy.decimals),
+    empty: emptyPool(live.expired, live.tvl, t.sy.decimals),
   };
 }
 

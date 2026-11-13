@@ -15,7 +15,8 @@ import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
 import { rowAssetKeys } from "@/lib/shared/focus-row-keys";
 import { SECTION_HEADING, CARD_INSET_START } from "@/lib/shared/ui-grammar";
 import { PendleReadNotice } from "@/components/protocol/pendle/pendle-read-notice";
-import { UnderlyingLabel, heldPt, positionClosed } from "@/components/protocol/pendle/pendle-position-card";
+import { UnderlyingLabel, positionClosed } from "@/components/protocol/pendle/pendle-position-card";
+import { ptHolding } from "@/lib/pendle/rules";
 import {
   PENDLE_CHAIN_ID,
   amountText,
@@ -67,12 +68,12 @@ function ListingCard({ p, w }: { p: PendlePosition; w: PendleWalletPositions }) 
         id: "entry-apy",
         label: PENDLE_WORDS.effectiveFixedApy,
         value:
-          p.apy.entry.ptWeighted == null || !heldPt(p) ? null : (
+          p.apy.entry.ptWeighted == null || ptHolding(p) !== "held" ? null : (
             <Prov info={entryApyProv(p.apy.entry.buys, p.apy.entry.unpriced)} value={p.apy.entry.ptWeighted.toFixed(6)}>
               {apyText(p.apy.entry.ptWeighted)}
             </Prov>
           ),
-        sub: heldPt(p) ? undefined : PENDLE_WORDS.noPtHeld,
+        sub: ptHolding(p) === "none" ? PENDLE_WORDS.noPtHeld : undefined,
       },
       {
         id: "implied-apy",

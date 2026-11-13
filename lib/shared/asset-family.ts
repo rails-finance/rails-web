@@ -74,7 +74,7 @@ const row = (token: string, underlying: string, kind: FamilyKind, symbol: string
 const pendle = (yieldToken: string, name: string, pt: string, yt: string, lp: string): FamilyRow[] => [
   row(k1(pt), k1(yieldToken), "pt", `PT-${name}`),
   row(k1(yt), k1(yieldToken), "yt", `YT-${name}`),
-  row(k1(lp), k1(yieldToken), "lp", `LP-${name}`),
+  row(k1(lp), k1(yieldToken), "lp", `LP ${name}`),
 ];
 
 export const FAMILY_ROWS: FamilyRow[] = [

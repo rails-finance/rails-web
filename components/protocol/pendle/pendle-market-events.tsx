@@ -37,7 +37,7 @@ const GROUPS: { key: Group; label: string }[] = [
   { key: "pt", label: "PT trades" },
   { key: "yt", label: "YT trades" },
   { key: "liquidity", label: "Liquidity" },
-  { key: "mint", label: "Mint, redeem and wrap" },
+  { key: "mint", label: "Mint, redeem, wrap and unwrap" },
   { key: "limit", label: "Limit fills" },
 ];
 const GROUP_OF: Record<PendleEventKind, Group> = {

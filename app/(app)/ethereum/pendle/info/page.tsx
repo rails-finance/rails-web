@@ -27,13 +27,13 @@ const GLOSSARY: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "SY",
     definition:
-      "Pendle's standard wrapper around a yield-bearing token. Every market trades against its SY, and the SY's exchange rate says how much of the underlying asset one SY is worth.",
+      "Pendle's standard wrapper around a yield-bearing token. Every market trades against its SY, and the SY's exchange rate says how much of the accounting asset one SY is worth.",
     sources: [{ label: "SY", href: `${DOCS}/YieldTokenization/SY` }],
   },
   {
     term: "PT",
     definition:
-      "The principal token: a claim on one unit of the market's accounting asset at maturity, unless negative yield holds the exchange rate under its Watermark Rate (the docs' Negative Yield page). Before maturity it trades below that, and the discount is the fixed yield a buyer locks in.",
+      "The principal token: a claim on up to one unit of the market's accounting asset at maturity. Before maturity it trades below that, and the discount is the fixed yield a buyer locks in. By the docs' Negative Yield page, a PT redeems for less while the exchange rate sits under its Watermark Rate.",
     sources: [
       { label: "PT", href: `${DOCS}/YieldTokenization/PT` },
       { label: "Negative Yield", href: `${DOCS}/NegativeYield` },
@@ -124,7 +124,7 @@ export default function PendleInfoPage() {
       views={[
         {
           heading: "Markets",
-          body: "Every market the routers have named, with how many are active and how many have matured, the active markets first. A market's page shows its liquidity, implied APY, PT price and maturity, the YT and LP prices and the SY exchange rate, how the market is built, its pool and its latest router events.",
+          body: "Every market the routers have named, with how many are active and how many have matured, the active markets first. A market's page shows its liquidity, implied APY, PT price, maturity, YT and LP prices, SY exchange rate, pool and latest router events.",
         },
         {
           heading: "Wallet and position pages",
