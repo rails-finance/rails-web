@@ -42,6 +42,7 @@ import { formatExact } from "@/lib/utils/format";
 import { BlockRef } from "@/components/shared/block-ref";
 import { untracedInputs } from "@/lib/shared/prov-untraced";
 import { resolveClass, weakestClass } from "@/lib/shared/prov-class";
+import { entrySig } from "@/lib/shared/prov-signature";
 
 export { resolveClass };
 
@@ -180,20 +181,6 @@ export interface ProvReceiptEntry {
 }
 
 const EMPTY_ENTRIES: ProvReceiptEntry[] = [];
-
-/** Content signature — registration re-runs on every render, so re-registering
- *  an unchanged value must be a silent no-op (no emit, no re-render loop). */
-const entrySig = (e: Omit<ProvReceiptEntry, "order">) =>
-  [
-    e.value,
-    e.display,
-    e.symbol ?? "",
-    e.echo ? "echo" : "",
-    e.info.summary,
-    e.info.formula ?? "",
-    e.info.via ?? "",
-    (e.info.inputs ?? []).map((i) => `${i.label}:${i.value ?? ""}`).join("|"),
-  ].join("§");
 
 /** Per-card store of the traced values mounted inside a scope. A tiny external
  *  store (not React state) so <Prov> can register from an every-render effect
