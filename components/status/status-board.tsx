@@ -144,7 +144,7 @@ function allowanceLine(a: Allowance, gateways: readonly GatewayCounter[]): strin
   const names = (ids: number[]) => andList(ids.map(chainName));
   const covers = shared.length ? `, one counter for ${names(shared)}` : "";
   const reserve = a.floorBytes != null ? `, ${mb(a.floorBytes)} kept in reserve` : "";
-  const reset = a.resetsAt ? `. It resets 24 h after its first read, next at ${hhmm(a.resetsAt)}` : "";
+  const reset = a.resetsAt ? `, in a 24 h window that next resets at ${hhmm(a.resetsAt)}` : "";
   const others = own.length
     ? ` ${names(own)} ${own.length > 1 ? "each draw" : "draws"} on a counter of ${own.length > 1 ? "their" : "its"} own.`
     : "";

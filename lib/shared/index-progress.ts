@@ -78,8 +78,8 @@ export interface GatewayCounter extends Allowance {
 }
 
 /** Which chains share the allowance's counter and which count on their own.
- *  A counter resets 24 h after its first read, so chains with the same reset
- *  time (within a minute) draw on one counter. */
+ *  Each counter runs a 24 h window, so chains with the same reset time
+ *  (within a minute) draw on one counter. */
 export function counterChains(
   allowance: Allowance,
   gateways: readonly GatewayCounter[],
