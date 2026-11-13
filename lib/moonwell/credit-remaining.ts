@@ -8,9 +8,11 @@
 
 import { CAPACITY_SHARE_CEILING } from "@/lib/shared/capacity-share";
 
-/** (limit − debt) ÷ limit; null where the credit limit is zero. */
+/** (limit − debt) ÷ limit; −Infinity for debt against a zero limit (the
+ *  text states the floor), null for neither. */
 export function creditRemainingShare(limitUsd: number, debtUsd: number): number | null {
-  return limitUsd > 0 ? (limitUsd - debtUsd) / limitUsd : null;
+  if (limitUsd > 0) return (limitUsd - debtUsd) / limitUsd;
+  return debtUsd > 0 ? -Infinity : null;
 }
 
 /** The share as a percentage to one place; past the capacity-share ceiling
