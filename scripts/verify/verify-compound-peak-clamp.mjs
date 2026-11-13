@@ -26,7 +26,7 @@ const BASE = process.env.BASE ?? "http://localhost:3000";
 
 // The peak-debt column label, from lib/shared/card-vocab.ts (`peakDebt`). One
 // constant, so the presence and the absence below cannot drift apart.
-const PEAK_DEBT = "Highest recorded debt";
+const PEAK_DEBT = "Highest recorded borrow balance";
 
 // Pure lender: supplied 3 WETH, withdrew the full balance + interest. Its peak
 // borrow is the interest tail — a phantom, not a borrow.

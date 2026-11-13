@@ -72,7 +72,8 @@ const LANES = [
   { api: "moonwell-base", line: "Health factor", debt: borrowsDebt, path: (r) => `/base/moonwell/${r.wallet}` },
   {
     api: "compound-base",
-    line: "Borrowing limit used",
+    // The card's risk head in Compound's docs' word (ui-jobs 629).
+    line: "Borrowing capacity used",
     debt: (r) => Math.max(0, -Number(r.base?.amount ?? 0)),
     path: (r) => `/base/compound-v3/${r.market}/${r.account}`,
   },

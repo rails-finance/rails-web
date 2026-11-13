@@ -261,7 +261,7 @@ export function CompoundAbsorbBreakdown({
             {baseAmt(split.cleared)}
           </Prov>
         </StatCard>
-        <StatCard label="Left over after the absorb (lent)">
+        <StatCard label="Left over after the absorb (supplied)">
           <Prov
             info={absorbCreditProv(sym, coords, { paidOut: formatExactDecimal(split.paidOut) })}
             value={split.credit}
@@ -269,9 +269,9 @@ export function CompoundAbsorbBreakdown({
           >
             {baseAmt(split.credit)}
           </Prov>
-          <div className="mt-1 text-xs text-rb-500">stays in the account as a lent balance</div>
+          <div className="mt-1 text-xs text-rb-500">stays in the account as a supplied balance</div>
         </StatCard>
-        <StatCard label="Total credited">
+        <StatCard label="Total paid out">
           <Prov
             info={absorbCreditedUsdProv(sym, coords, { paidOut: formatExactDecimal(split.paidOut) })}
             value={formatUsdValue(creditedUsd)}
@@ -299,7 +299,7 @@ export function CompoundAbsorbBreakdown({
             ))}
           </div>
         </StatCard>
-        <StatCard label="Credited for it">
+        <StatCard label="Paid out for it">
           <Prov
             info={absorbCreditedUsdProv(sym, coords, { paidOut: formatExactDecimal(split.paidOut) })}
             value={formatUsdValue(creditedUsd)}
@@ -310,15 +310,15 @@ export function CompoundAbsorbBreakdown({
           {creditCheck != null && (
             <div className="mt-1 text-xs text-rb-500">
               {oneFactor != null ? (
-                <>credited at {pct(oneFactor)} of value (liquidation factor): </>
+                <>paid out at {pct(oneFactor)} of value (liquidation factor): </>
               ) : (
-                <>each asset credited at its share of value (liquidation factor): </>
+                <>each asset paid out at its share of value (liquidation factor): </>
               )}
               {joinTerms("liquidation")}
             </div>
           )}
         </StatCard>
-        <StatCard label={keptUsd >= 0 ? "Kept by the protocol" : "Covered by the protocol's reserves"}>
+        <StatCard label={keptUsd >= 0 ? "Liquidation penalty" : "Covered by the protocol's reserves"}>
           <Prov
             info={absorbKeptProv(coords, {
               seizedUsd: formatUsdValue(seizedUsd),
@@ -331,15 +331,15 @@ export function CompoundAbsorbBreakdown({
           <div className="mt-1 text-xs text-rb-500">
             {keptUsd >= 0
               ? oneFactor != null
-                ? `the protocol keeps 100% − ${pct(oneFactor)} = ${pct(1 - oneFactor)} of the seized value; what the absorb cost the account`
-                : `${seizedUsd > 0 ? `${((keptUsd / seizedUsd) * 100).toFixed(2)}% of the seized value; ` : ""}what the absorb cost the account`
-              : "the debt was worth more than the credited collateral, and the reserves took the difference"}
+                ? `100% − ${pct(oneFactor)} = ${pct(1 - oneFactor)} of the seized value, kept by the protocol`
+                : `${seizedUsd > 0 ? `${((keptUsd / seizedUsd) * 100).toFixed(2)}% of the seized value, ` : ""}kept by the protocol`
+              : "the debt was worth more than the collateral paid out for, and the reserves took the difference"}
           </div>
         </StatCard>
       </div>
       {line != null && factors && (
         <p className="text-xs leading-relaxed text-rb-500" data-absorb-line="">
-          The line it crossed: collateral{" "}
+          The liquidation point it crossed: collateral{" "}
           <Prov
             info={absorbLineProv(coords, {
               terms: priced.map((l) => `${l.symbol} ${l.usdValue} × ${factorOf(l.address)!.liquidate}`).join(" + "),
@@ -366,8 +366,8 @@ export function CompoundAbsorbBreakdown({
       {line == null && priced.length > 0 && coords.blockNumber != null && addrKey !== "" && (
         <p className="text-xs leading-relaxed text-rb-500" data-absorb-line-state={factorsState}>
           {factorsState === "failed"
-            ? `The line it crossed needs each asset's factors at block ${(coords.blockNumber! - 1).toLocaleString("en-US")}, the block before the absorb, and that read failed on this load. Reload the page to try again.`
-            : `Reading the line it crossed: each asset's factors at block ${(coords.blockNumber! - 1).toLocaleString("en-US")}, the block before the absorb…`}
+            ? `The liquidation point it crossed needs each asset's factors at block ${(coords.blockNumber! - 1).toLocaleString("en-US")}, the block before the absorb, and that read failed on this load. Reload the page to try again.`
+            : `Reading the liquidation point it crossed: each asset's factors at block ${(coords.blockNumber! - 1).toLocaleString("en-US")}, the block before the absorb…`}
         </p>
       )}
       {moves.length > 0 && previous && (
@@ -391,8 +391,8 @@ export function CompoundAbsorbBreakdown({
           {rates && rates.prev != null && rates.read != null ? (
             <>
               {" "}
-              The borrow rate moves with how much of the market is lent out: it was {ratePct(rates.prev)} a year at the
-              previous event and {ratePct(rates.read)} at the absorb
+              The Borrow APR moves with how much of the market is lent out: it was {ratePct(rates.prev)} at the previous
+              event and {ratePct(rates.read)} at the absorb
               {avgRate > Math.max(rates.prev, rates.read) * 1.5 ? ", so it ran well above both in between" : ""}.
             </>
           ) : null}

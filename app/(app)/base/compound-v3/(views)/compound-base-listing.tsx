@@ -59,8 +59,8 @@ export function CompoundBaseListing({
 
   return (
     <ChainTruthListingPage<CompoundPositionSummary, CompoundListFilters>
-      title="Compound V3 Positions"
-      noun="positions"
+      title="Compound V3 Accounts"
+      noun="accounts"
       basePath="/base/compound-v3"
       defaults={COMPOUND_BASE_LIST_DEFAULTS}
       sortOptions={COMPOUND_BASE_SORT_OPTIONS}

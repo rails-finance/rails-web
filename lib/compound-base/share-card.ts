@@ -105,9 +105,9 @@ export function compoundBaseShareCardModel(
   if (side === "borrow") {
     const debtUsd = usdSafe && market.basePrice > 0 ? market.debtValue : null;
     if (debtUsd != null) {
-      stats.push({ label: CARD_VOCAB.debt, value: formatUsd(debtUsd) });
+      stats.push({ label: "Borrow balance", value: formatUsd(debtUsd) });
     } else {
-      stats.push({ label: CARD_VOCAB.debt, value: `${formatCompact(borrow)} ${market.baseSymbol}` });
+      stats.push({ label: "Borrow balance", value: `${formatCompact(borrow)} ${market.baseSymbol}` });
     }
   }
 

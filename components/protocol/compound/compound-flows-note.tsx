@@ -27,7 +27,7 @@ export function CompoundFlowsNote({ facts, baseSymbol, ethQuoted }: CompoundFlow
   return (
     <div className="space-y-2" data-compound-flows-note="" data-anatomy="F14">
       <p>
-        Each flow is valued in USD at Comet&apos;s oracle price at its block, the price its liquidation engine reads
+        Each flow is valued in USD at Comet&apos;s price feed at its block, the price its liquidation engine reads
         {ethQuoted
           ? `; this market prices in ETH, so each price is converted at Comet's WETH/USD at the same block`
           : ""}
@@ -35,21 +35,21 @@ export function CompoundFlowsNote({ facts, baseSymbol, ethQuoted }: CompoundFlow
       </p>
       {two && roles?.debt !== false && (
         <p>
-          The debt side adds up to what the position owes in {baseSymbol}: borrowed, plus the interest accrued, less
-          what was repaid and what an absorb cleared. Each event states the {baseSymbol} balance the chain held at its
-          block (the account&apos;s principal at the market&apos;s borrow index) and the interest since the previous
-          event (the previous principal at this block&apos;s index, less the previous balance), so the interest between
-          two events is exact to the base unit. Comet has no borrow or repay call: a supply into a debt repays it and
-          lends the rest, and a withdrawal past the balance borrows. Between events the debt grows at the rate the
-          market charged until the next one; after the last, at its borrow rate now.
+          The debt side adds up to the account&apos;s borrow balance in {baseSymbol}: borrowed, plus the interest
+          accrued, less what was repaid and what an absorb cleared. Each event states the {baseSymbol} balance the chain
+          held at its block (the account&apos;s principal at the market&apos;s borrow index) and the interest since the
+          previous event (the previous principal at this block&apos;s index, less the previous balance), so the interest
+          between two events is exact to the base unit. Comet has no borrow or repay call: a supply into a debt repays
+          it and lends the rest, and a withdrawal past the balance borrows. Between events the debt grows at the rate
+          the market charged until the next one; after the last, at its Borrow APR now.
         </p>
       )}
       {lent && (
         <p>
-          The {two ? "lent " + baseSymbol : "bar"} adds up to what the position has supplied: supplied, plus the
+          The {two ? "supplied " + baseSymbol : "bar"} adds up to what the account has supplied: supplied, plus the
           interest earned, less what was withdrawn. The interest between two events is exact to the base unit, from the
           principal at the market&apos;s supply index. Between events the supply grows at the rate the market paid until
-          the next one; after the last, at its supply rate now.
+          the next one; after the last, at its Supply APR now.
         </p>
       )}
       {facts && facts.absorbs > 0 && (
@@ -57,7 +57,7 @@ export function CompoundFlowsNote({ facts, baseSymbol, ethQuoted }: CompoundFlow
           {n(facts.absorbs, "An absorb", "absorbs")} liquidated the account: Comet takes every collateral asset (Seized
           by the absorb) and clears the debt (Cleared by the absorb).
           {facts.credits > 0
-            ? ` Where the seized collateral was credited at more than the debt, the rest was lent to the account in ${baseSymbol} (Left over after the absorb).`
+            ? ` Where the seized collateral was paid out at more than the debt, the rest was supplied to the account in ${baseSymbol} (Left over after the absorb).`
             : ""}{" "}
           Comet later sells the seized collateral to buyers for its reserves (buyCollateral), which moves nothing in
           this account.
@@ -65,8 +65,8 @@ export function CompoundFlowsNote({ facts, baseSymbol, ethQuoted }: CompoundFlow
       )}
       {facts && facts.transfers > 0 && (
         <p>
-          Received by transfer and Sent by transfer are collateral or lent {baseSymbol} moved between accounts inside
-          Comet, with nothing leaving the protocol.
+          Received by transfer and Sent by transfer are collateral or supplied {baseSymbol} moved between accounts
+          inside Comet, with nothing leaving the protocol.
           {facts.unlogged > 0
             ? ` Comet logs no event for the borrowing side of a ${baseSymbol} transfer: where the balance moved by more than the events and the interest state (${n(facts.unlogged, "one event", "events")}), the move is Borrowed to send by transfer, or Repaid by a transfer in where it rose.`
             : ""}
@@ -85,7 +85,7 @@ export function CompoundFlowsNote({ facts, baseSymbol, ethQuoted }: CompoundFlow
             ? `${n(facts.priced, "One event is", "events are")} valued at the prices read at its block; ${n(facts.nearest, "one takes", "take")} the nearest priced event's. `
             : "Every event is valued at the prices at its block. "}
           {facts.between === "store"
-            ? "Between events each asset is valued at Comet's oracle price at the end of each day; the last stop takes the oracle's price at the latest block."
+            ? "Between events each asset is valued at Comet's price feed at the end of each day; the last stop takes the price feed at the latest block."
             : "No daily price is recorded for Compound V3, so between events each asset keeps the price of its latest event, and a price more than 30 days old is stated as such."}
         </p>
       )}
@@ -97,11 +97,11 @@ export function compoundFlowsContent(): LearnMoreContent {
   return {
     title: "About the lifetime flows",
     intro:
-      "The bars add up every event Compound V3 has recorded for this position, each at Comet's oracle price at its block, and the line under them draws what it held and owed at the end of each day.",
+      "The bars add up every event Compound V3 has recorded for this account, each at Comet's price feed at its block, and the line under them draws what it held and owed at the end of each day.",
     stepsHeading: "How it's built:",
     steps: [
-      "Collateral: deposited and received, less withdrawn, sent and seized by an absorb, each at its block's price, plus the change in those prices since (Market move), is what the position holds.",
-      "Debt: borrowed, plus the interest accrued, less repaid and cleared by an absorb, is what the position owes: its principal at the market's borrow index.",
+      "Collateral: supplied and received, less withdrawn, sent and seized by an absorb, each at its block's price, plus the change in those prices since (Market move), is what the account holds.",
+      "Borrow balance: borrowed, plus the interest accrued, less repaid and cleared by an absorb, is what the account owes: its principal at the market's borrow index.",
       "Supply: supplied, plus the interest earned, less withdrawn, is what a lender holds: its principal at the market's supply index.",
     ],
     detailsHeading: "Key concepts:",

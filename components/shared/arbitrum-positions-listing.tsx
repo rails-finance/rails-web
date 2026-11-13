@@ -107,6 +107,9 @@ interface FamilyConfig {
   txTop: number;
   /** The receipt for a stored dollar total, or the health factor. */
   receipt: (what: string, row: ArbitrumReadRow) => Provenance;
+  /** What the listing counts, where the family's docs name it otherwise
+   *  than "positions" (Compound V3's "accounts"). */
+  noun?: string;
 }
 
 const blockOf = (row: ArbitrumReadRow) => row.blockNumber ?? "unknown";
@@ -135,6 +138,7 @@ const FAMILIES: Record<ArbitrumPositionsFamily, FamilyConfig> = {
   },
   "compound-v3": {
     session: "compound-v3-arbitrum",
+    noun: "accounts",
     // 5,033 transactions, 21 Oct 2026.
     txTop: 10000,
     receipt: (what, row) => ({
@@ -561,8 +565,8 @@ export function ArbitrumPositionsListing({
   return (
     <>
       <ChainTruthListingPage<Card, ArbitrumPositionsFilters>
-        title={`${entry.label} positions read`}
-        noun="positions"
+        title={`${entry.label} ${cfg.noun ?? "positions"} read`}
+        noun={cfg.noun ?? "positions"}
         basePath={`${entry.href}/positions`}
         defaults={DEFAULTS}
         sortOptions={SORTS}

@@ -26,7 +26,7 @@ export const usd = (x: number) =>
 export const pctText = (x: number, digits = 2) => `${(x * 100).toFixed(digits)}%`;
 
 export const FRONT_DOOR = {
-  line: "A wallet's Compound V3 accounts on Optimism: what it lends, borrows and puts up as collateral in each Comet, in dollars at the Comet's price feeds, its borrowing limit and its interest over the last 30 days.",
+  line: "A wallet's Compound V3 accounts on Optimism: what it lends, borrows and puts up as collateral in each Comet, in dollars at the Comet's price feeds, its borrowing capacity and its interest over the last 30 days.",
   links: { markets: "Market overview" },
 };
 
@@ -54,34 +54,35 @@ export const CARD_WORDS = {
   collateral: "Collateral",
   collateralTip: (base: string) =>
     `The collateral supplied to the ${base} market, in dollars at its price feeds. Collateral earns no interest and backs borrowing of ${base}.`,
-  lent: "Lent",
+  lent: "Supplied",
   lentTip: (base: string) =>
-    `The ${base} lent to the market, with the interest it has earned, in dollars at its price feed.`,
-  debtTip: (base: string) => `The ${base} borrowed from the market, including the interest accrued at its borrow rate.`,
-  limit: "Borrowing limit used",
+    `The ${base} supplied to the market, with the interest it has earned, in dollars at its price feed.`,
+  debtTip: (base: string) => `The ${base} borrowed from the market, including the interest accrued at its Borrow APR.`,
+  limit: "Borrowing capacity used",
   limitTip:
-    "The debt as a share of the borrowing limit, which each collateral's borrow factor sets. The account is absorbed at a higher line, set by the liquidate factors.",
-  noDebt: "no debt",
+    "The borrow balance as a share of the account's borrowing capacity, which each collateral's Borrow CF (borrow collateral factor) sets. The account becomes liquidatable at a higher level, set by the Liquidation CFs (liquidation collateral factors).",
+  noDebt: "no borrow balance",
   room: "Room to borrow",
   roomTip:
-    "How much more of the base the account can borrow before it reaches its borrowing limit, from the Comet's collateral balances, prices and borrow factors.",
-  absorbedAt: "Absorbed at",
+    "How much more of the base the account can borrow before it reaches its borrowing capacity, from the Comet's collateral balances, price feeds and Borrow CFs.",
+  absorbedAt: "Liquidation point",
   absorbedAtTip:
-    "The debt at which the protocol can absorb the account: each collateral's value at the Comet's price times its liquidate factor, in base tokens.",
-  lineReached: "Absorb line reached",
+    "Liquidation point is Rails's name; Compound's docs name no such level. It is the borrow balance at which the account becomes liquidatable: each collateral's value at the Comet's price feed times its Liquidation CF (liquidation collateral factor), in base tokens.",
+  lineReached: "Liquidation point reached",
   lineReachedTip:
-    "The debt as a share of the absorb line. The Comet's isLiquidatable says whether the account is past it.",
+    "The borrow balance as a share of the liquidation point, Rails's name for the level. The Comet's isLiquidatable says whether the account is liquidatable.",
   drop: "Liquidates on a drop of",
-  dropTip: "How far the collateral's value can fall, every asset together, before the debt reaches the absorb line.",
-  past: "past it",
+  dropTip:
+    "How far the collateral's value can fall, every asset together, before the borrow balance reaches the liquidation point.",
+  past: "liquidatable",
   reached: "reached",
   collateralRow: (sym: string) => `${sym} collateral`,
-  columns: { asset: "Asset", amount: "Amount", factors: "Borrow / liquidate factors" },
-  baseRow: (sym: string, lend: boolean) => `${sym} ${lend ? "lent" : "borrowed"}`,
-  supplyRateLabel: "Supply rate",
-  borrowRateLabel: "Borrow rate",
+  columns: { asset: "Asset", amount: "Amount", factors: "Borrow CF / Liquidation CF" },
+  baseRow: (sym: string, lend: boolean) => `${sym} ${lend ? "supplied" : "borrowed"}`,
+  supplyRateLabel: "Supply APR",
+  borrowRateLabel: "Borrow APR",
   rateTip:
-    "The Comet's rate at its utilisation now, a year, as an APR. The 30-day line is the interest added over the last 30 days.",
+    "The Comet's rate at its utilization now, a year, without compounding. The 30-day line is the interest added over the last 30 days.",
   interest30: "Interest, 30 days:",
   withheld: {
     opened: "opened inside the window",
@@ -106,7 +107,7 @@ export function cardExplainer(p: OpcPositionFigures): { title: string; bullets: 
       title: "What this account holds",
       bullets: [
         lend
-          ? `It lends ${amount(p.supplied, p.baseSymbol)} to the ${p.label} market.`
+          ? `It supplies ${amount(p.supplied, p.baseSymbol)} to the ${p.label} market.`
           : p.borrowed > 0
             ? `It borrows ${amount(p.borrowed, p.baseSymbol)} from the ${p.label} market.`
             : `It neither lends nor borrows ${p.baseSymbol}.`,
@@ -119,11 +120,11 @@ export function cardExplainer(p: OpcPositionFigures): { title: string; bullets: 
   ];
   if (p.limitUsed != null)
     groups.push({
-      title: "How close it is to absorption",
+      title: "How close it is to liquidation",
       bullets: [
-        `It uses ${pctText(p.limitUsed, 0)} of its borrowing limit, set by each collateral's borrow factor.`,
-        `At ${pctText(p.lineReached ?? 0, 0)} of the absorb line, set by the liquidate factors, ${p.isLiquidatable ? "the Comet can absorb it now" : "it is not absorbable"}.`,
-        "When the debt passes the absorb line, anyone can call absorb: the Comet takes the collateral and the debt, and credits the account part of the collateral's value.",
+        `It uses ${pctText(p.limitUsed, 0)} of its borrowing capacity, set by each collateral's Borrow CF.`,
+        `At ${pctText(p.lineReached ?? 0, 0)} of the liquidation point, set by the Liquidation CFs, ${p.isLiquidatable ? "it is liquidatable now" : "it is not liquidatable"}.`,
+        "When the debt passes the liquidation point, anyone can call absorb: the Comet takes the collateral and the debt, and pays the account each collateral's liquidation factor of its value.",
       ],
     });
   groups.push({
@@ -140,7 +141,7 @@ export function cardExplainer(p: OpcPositionFigures): { title: string; bullets: 
 export function accountLine(f: OpcAccountFigures): string {
   const side =
     f.supplied > 0
-      ? `lends ${amount(f.supplied, f.baseSymbol)}`
+      ? `supplies ${amount(f.supplied, f.baseSymbol)}`
       : f.borrowed > 0
         ? `borrows ${amount(f.borrowed, f.baseSymbol)}`
         : null;
