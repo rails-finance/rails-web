@@ -957,7 +957,7 @@ function eventSlots(
       const feePct = feeKept > 0 && collOut > 0 ? (feeKept / (collOut + feeKept)) * 100 : null;
       const feeClause: ClauseInput =
         urgent && red != null && !(feeKept > 0)
-          ? clause(<>No redemption fee was kept by the Trove.</>)
+          ? clause(<>The Trove kept no redemption fee.</>)
           : redFeeFig() != null
             ? clause(
                 <>

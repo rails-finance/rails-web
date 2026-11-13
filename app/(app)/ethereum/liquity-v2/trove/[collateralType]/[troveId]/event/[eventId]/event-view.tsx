@@ -110,8 +110,10 @@ export default function EventView({
   const surplusClaimed = surplus?.claimed != null;
   const open = trove?.status === "open";
   // The branch's shutdown, as the trove page reads it (ui-jobs 612, 626): the
-  // replay's interest stops there.
-  const shutdown = useBranchShutdown("liquity-v2", collateralType, open);
+  // prose takes it on any Trove (an urgent redemption, ui-jobs 619), the
+  // replay's accrual on an open one only.
+  const branchShutdown = useBranchShutdown("liquity-v2", collateralType, trove != null);
+  const shutdown = open ? branchShutdown : null;
   const { flowFocus } = useTroveFlows({
     flowEvents,
     collSymbol,
@@ -125,8 +127,8 @@ export default function EventView({
     shutdownAt: shutdown?.at ?? null,
   });
   const troveMeta = useMemo(
-    () => ({ owner: owner ?? null, total, shutdownAt: shutdown?.at ?? null }),
-    [owner, total, shutdown?.at],
+    () => ({ owner: owner ?? null, total, shutdownAt: branchShutdown?.at ?? null }),
+    [owner, total, branchShutdown?.at],
   );
 
   if (!trove || !events) {

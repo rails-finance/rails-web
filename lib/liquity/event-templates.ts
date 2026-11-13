@@ -11,7 +11,8 @@
 
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { FAQ_URLS } from "@/lib/shared/faq-urls";
-import { fmtMaxLtv } from "@/lib/liquity/ltv";
+import { fmtMaxLtv, LIQUITY_FAMILY_TERMS } from "@/lib/liquity/ltv";
+import { liquityShutdownConcept } from "@/lib/shared/learn-more-content";
 import { eventProseEngine, fillWords } from "@/lib/shared/event-prose/engine";
 import type { EventTemplate as SharedTemplate, ModalData, ProseFile, Words } from "@/lib/shared/event-prose/types";
 import type { EchoKey } from "@/lib/liquity/event-prose";
@@ -88,8 +89,8 @@ export function troveWords(id: string, values: Record<string, string | number> =
 export interface L5Options {
   collateralType?: string;
   /** A redemption on a shut-down branch (redemptionPath): the redemption
-   *  modal keeps its intro and links, without the fee kept by the trove and
-   *  the rate queue, which hold only for a standard redemption. */
+   *  modal keeps its intro and links, and the Branch shutdown concept takes the
+   *  place of the fee kept by the trove and the rate queue. */
   urgentPath?: boolean;
   delegated?: boolean;
   delegateName?: string;
@@ -108,10 +109,11 @@ function modal(key: L5Key, o: L5Options = {}): LearnMoreContent {
       coll_type: o.collateralType ?? FILE.L5_words.coll_type_unknown,
     };
   } else if (key === "redemption" && o.urgentPath) {
+    // The shared Branch shutdown concept (learn-more-content.ts) in place of
+    // the fee and queue concepts.
     const c = PROSE.modal(d, form, values);
     delete c.extraParagraphs;
-    delete c.detailsHeading;
-    delete c.details;
+    c.details = [liquityShutdownConcept(LIQUITY_FAMILY_TERMS["liquity-v2"], "redemption")];
     return c;
   } else if (key === "adjust") {
     values = {

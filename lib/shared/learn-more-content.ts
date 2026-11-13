@@ -1163,7 +1163,9 @@ export function liquityForkRateContent(p: LiquityForkLearnMoreParams): LearnMore
 
 /** `urgent`: the modal as an urgent-path event shows it (a redemption on a
  *  shut-down branch, lib/liquity-fork/shutdown.ts `redemptionPath`): the rate
- *  queue's routing, the value-for-value step and the dormant queue go. */
+ *  queue's routing and the dormant queue go, the exchange carries the bonus,
+ *  and the ratio's direction is left to the event's own figures (a bonus b
+ *  raises the ratio only above a collateral ratio of 1 + b). */
 export function liquityForkRedemptionContent(p: LiquityForkLearnMoreParams, urgent = false): LearnMoreContent {
   if (urgent)
     return {
@@ -1171,8 +1173,9 @@ export function liquityForkRedemptionContent(p: LiquityForkLearnMoreParams, urge
       intro: `Any ${p.stablecoin} holder can redeem it against the system at $1 face value, the peg mechanism.`,
       stepsHeading: "What happens to a redeemed Trove:",
       steps: [
-        "It gives up collateral at the branch oracle price for the debt cancelled.",
-        p.terms.ltv ? "Its LTV FALLS as a result." : `Its ${p.terms.ratioText} RISES as a result.`,
+        p.terms.shutdownBonus
+          ? `It gives up collateral worth the debt cancelled plus the ${p.terms.shutdownBonus} bonus, at the branch oracle price.`
+          : "It gives up collateral worth the debt cancelled plus a bonus, at the branch oracle price.",
       ],
       detailsHeading: "Key concepts:",
       details: [liquityShutdownConcept(p.terms, "redemption")],
@@ -1184,7 +1187,7 @@ export function liquityForkRedemptionContent(p: LiquityForkLearnMoreParams, urge
     stepsHeading: "What happens to a redeemed Trove:",
     steps: [
       "It gives up collateral at the branch oracle price and sheds the same value of debt. Net value is preserved.",
-      p.terms.ltv ? "Its LTV FALLS as a result." : `Its ${p.terms.ratioText} RISES as a result.`,
+      p.terms.ltv ? "Its LTV falls." : `Its ${p.terms.ratioText} rises.`,
       `A partial redemption that leaves the Trove below the minimum debt makes it ${p.terms.dormantText}${p.terms.dormant === "Zombie" ? "" : " (Zombie in the contracts)"} and takes it out of the rate-ordered queue. The branch's most recent ${p.terms.dormantNoun} with debt left is redeemed first.`,
     ],
     detailsHeading: "Key concepts:",

@@ -30,6 +30,7 @@ import { SurplusBullet } from "@/components/protocol/liquity-family/surplus-bull
 import { ShutdownBullet } from "@/components/protocol/liquity-family/shutdown-bullet";
 import type { BranchShutdownState } from "@/lib/liquity-fork/shutdown";
 import { shutdownDay } from "@/lib/shared/liquity-family-shutdown";
+import { liquityDebtBreakdownForm } from "@/lib/liquity/economics";
 import { formatCompact } from "@/lib/shared/format-compact";
 
 // V2 TroveManager per branch — the contract the chain values are read from.
@@ -397,6 +398,7 @@ function buildOpenItems({
     via: troveWords("prov_mgmt_rate_via"),
   };
   if (displayAccruedInterest !== undefined) {
+    const breakdown = liquityDebtBreakdownForm(shut?.at, trove.activity.lastActivityAt);
     const interestNode = (
       <Prov info={accruedProv}>
         <HighlightableValue type="interest" state="after" value={displayAccruedInterest}>
@@ -407,9 +409,11 @@ function buildOpenItems({
     add(
       "holdings",
       <span key="debt-breakdown" className="text-rb-500">
-        {shut
-          ? troveNodes("debt_breakdown_shutdown", { interest: interestNode, date: shutdownDay(shut.at) })
-          : troveNodes("debt_breakdown", { interest: interestNode })}
+        {breakdown === "stopped" && shut
+          ? troveNodes("debt_breakdown_stopped", { date: shutdownDay(shut.at) })
+          : breakdown === "shutdown" && shut
+            ? troveNodes("debt_breakdown_shutdown", { interest: interestNode, date: shutdownDay(shut.at) })
+            : troveNodes("debt_breakdown", { interest: interestNode })}
         {trove.batch.isMember && displayManagementFee !== undefined && displayManagementFee > 0 && (
           <span>
             {" "}

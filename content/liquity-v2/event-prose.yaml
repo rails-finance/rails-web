@@ -925,6 +925,8 @@ trove_words:
     The debt includes {interest} of interest accrued since the last event
   debt_breakdown_shutdown: |-
     The debt includes {interest} of interest accrued until the branch shut down on {date}
+  debt_breakdown_stopped: |-
+    Interest stopped when the branch shut down on {date}
   debt_breakdown_fee: |-
     and {fee} of delegate fees
   coll_worth: |-
@@ -1508,6 +1510,19 @@ templates:
           variant at_event, a zombie with debt left
         text: |-
           It can be closed by repaying the debt and withdrawing the collateral, or restored by borrowing above the minimum.
+      # On a shut-down branch (the urgent path, redemptionPath) closing remains and borrowing does not:
+      # rails-ops reference/official-docs/liquity-v2.md row 26 ("closing, surplus claims and shutdown
+      # redemptions remain").
+      redeem.zombie_zero_close:
+        when: |-
+          variant at_event, a zombie with no debt left, on a shut-down branch
+        text: |-
+          It can be closed by withdrawing the collateral.
+      redeem.zombie_low_close:
+        when: |-
+          variant at_event, a zombie with debt left, on a shut-down branch
+        text: |-
+          It can be closed by repaying the debt and withdrawing the collateral.
     order:
       - redeem.no_detail
       - redeem.what
@@ -1519,15 +1534,25 @@ templates:
       - redeem.zombie_zero_next
       - redeem.zombie_low
       - redeem.zombie_low_next
+      - redeem.zombie_zero_close
+      - redeem.zombie_low_close
       - same_block
     groups:
       happened: [redeem.no_detail, redeem.what, redeem.why_batch, redeem.why_owner, same_block]
       adds_up: [redeem.result, redeem.result_no_fee]
-      leaves: [redeem.zombie_zero, redeem.zombie_zero_next, redeem.zombie_low, redeem.zombie_low_next]
+      leaves:
+        [
+          redeem.zombie_zero,
+          redeem.zombie_zero_next,
+          redeem.zombie_low,
+          redeem.zombie_low_next,
+          redeem.zombie_zero_close,
+          redeem.zombie_low_close,
+        ]
     alternates:
       - [redeem.result, redeem.result_no_fee]
       - [redeem.why_batch, redeem.why_owner, redeem.zombie_zero, redeem.zombie_low]
-      - [redeem.zombie_zero_next, redeem.zombie_low_next]
+      - [redeem.zombie_zero_next, redeem.zombie_low_next, redeem.zombie_zero_close, redeem.zombie_low_close]
 
   - id: liquity2.delegation.join
     title: |-

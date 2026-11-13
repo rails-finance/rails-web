@@ -277,10 +277,8 @@ export function LiquityFlowsExplanation({
             ? `Between events, ${coll} takes the branch's price at each day's close`
             : `Between events, ${coll} keeps its latest event's price`}
         </ExplainBullet>
-        <ExplainBullet>
-          Debt is {debt} at $1, plus interest at the Trove&apos;s rate
-          {shutDown ? "; this Trove's interest stopped when its branch shut down" : ""}
-        </ExplainBullet>
+        <ExplainBullet>Debt is {debt} at $1, plus interest at the Trove&apos;s rate</ExplainBullet>
+        {shutDown && <ExplainBullet>Interest stopped when the branch shut down</ExplainBullet>}
         {meta.isInBatch && <ExplainBullet>Its interest splits into interest and the batch fee by rate</ExplainBullet>}
         {lives > 1 && (
           <ExplainBullet>

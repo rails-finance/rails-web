@@ -625,12 +625,13 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
         if (ctx.isInBatch && ctx.batchManager) sp.say("redeem.why_batch", rate);
         else sp.say("redeem.why_owner", rate);
       }
+      // On a shut-down branch borrowing is gone, so the next step is closing only.
       if (zombie && stateAfter.debt === 0) {
         sp.say("redeem.zombie_zero");
-        sp.say("redeem.zombie_zero_next");
+        sp.say(urgentPath ? "redeem.zombie_zero_close" : "redeem.zombie_zero_next");
       } else if (zombie) {
         sp.say("redeem.zombie_low");
-        sp.say("redeem.zombie_low_next");
+        sp.say(urgentPath ? "redeem.zombie_low_close" : "redeem.zombie_low_next");
       }
       break;
     }

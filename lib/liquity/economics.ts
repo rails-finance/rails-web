@@ -286,6 +286,18 @@ export function liquityAccrualNow(now: number, shutdownAt: number | null | undef
   return shutdownAt != null ? Math.min(now, shutdownAt) : now;
 }
 
+/** The card's debt sentence on a Trove (ui-jobs 626): the interest since the
+ *  last event; on a shut-down branch, up to the shutdown; and where the last
+ *  event came at or after the shutdown, no interest has accrued since it, so
+ *  the sentence says the interest stopped, with no figure. */
+export function liquityDebtBreakdownForm(
+  shutdownAt: number | null | undefined,
+  lastEventAt: number,
+): "open" | "shutdown" | "stopped" {
+  if (shutdownAt == null) return "open";
+  return lastEventAt >= shutdownAt ? "stopped" : "shutdown";
+}
+
 export function computeLiquityEconomics(
   events: MinimalEvent[],
   opts: {

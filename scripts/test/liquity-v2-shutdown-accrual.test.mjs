@@ -63,4 +63,9 @@ test("the card's debt sentence names the shutdown and its date", () => {
   );
   assert.doesNotMatch(s, /since the last event/);
   assert.match(troveWords("debt_breakdown", { interest: "1 BOLD" }), /since the last event$/);
+  // The last event at or after the shutdown: no figure.
+  assert.equal(
+    troveWords("debt_breakdown_stopped", { date: shutdownDay(SHUTDOWN) }),
+    `Interest stopped when the branch shut down on ${shutdownDay(SHUTDOWN)}`,
+  );
 });
