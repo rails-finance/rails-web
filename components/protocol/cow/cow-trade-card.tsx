@@ -215,7 +215,8 @@ export function CowTradeCard({
       body: (
         <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed">
           <li>
-            This wallet&rsquo;s order sold {soldWords} and bought {boughtWords} through {COW_TERMS.settlement}.
+            This wallet&rsquo;s order sold {soldWords} and bought {boughtWords} through{" "}
+            {COW_TERMS.settlement.replace(/'/g, "’")}.
           </li>
           {price && (
             <li>
