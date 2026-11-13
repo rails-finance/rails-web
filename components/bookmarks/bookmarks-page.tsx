@@ -123,7 +123,7 @@ export function BookmarksPage() {
   const nothing = counts.wallets + counts.positions + counts.listings + counts.focus === 0;
   const carries = andList(
     [
-      counts.focus ? `Focus (${counts.focus})` : "",
+      counts.focus ? "your focus settings" : "",
       counts.listings ? plural(counts.listings, "listing") : "",
       counts.wallets ? plural(counts.wallets, "wallet") : "",
       counts.positions ? plural(counts.positions, "position") : "",
