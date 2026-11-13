@@ -183,8 +183,10 @@ export function BookmarksPage() {
       </div>
       {/* The heading (B1), and under it the tabs (B4) on a row of their own at
           every width (Miles, 13 Nov 2026; ui-jobs 652); on a phone the row
-          scrolls sideways. */}
-      <div className="mb-6 mt-6 flex flex-col gap-3">
+          scrolls sideways. From sm, 48px under Back, 28px to the tabs and 56px
+          to the panel (Miles's spacing guide, 13 Nov 2026); a phone keeps
+          less, its tabs' 44px row already spacing them. */}
+      <div className="mb-8 mt-8 flex flex-col gap-3 sm:mb-14 sm:mt-12 sm:gap-7">
         {/* The page's name after an outline bookmark (Miles 13 Nov 2026); the
             profile menu's row draws none. */}
         <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground" data-anatomy="B1">
@@ -291,7 +293,7 @@ export function BookmarksPage() {
                   no card of its own, on the column's edge (Miles 13 Nov 2026). */}
               <section
                 id="saved-backup"
-                className="mt-10 scroll-mt-6"
+                className="mt-10 scroll-mt-6 sm:mt-12"
                 aria-labelledby="saved-card-backup"
                 data-saved-card="backup"
                 data-saved-backup=""
