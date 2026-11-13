@@ -14,8 +14,8 @@ const factoryProv = (name: string, nfpm: string, factory: string): Provenance =>
   pclass: "state",
   source: { block: REGISTER_BLOCK },
   contract: { name: `NonfungiblePositionManager, ${name}`, address: nfpm },
-  summary: `The ${name} position manager's factory — factory() at block 56,875,602, read 13 Nov 2026: ${factory}, the factory Rails reads for this deployment.`,
-  via: "nfpm.factory() @ block 56,875,602",
+  summary: `Factory — the ${name} position manager's factory() returns ${factory}, the factory Rails reads for this deployment.`,
+  via: "nfpm.factory() @ block 56,875,602, read 13 Nov 2026",
   verify: {
     kind: "recompute",
     text: `To check: ask any Base archive node for factory() on ${nfpm} at block 56,875,602.`,
@@ -25,7 +25,7 @@ const factoryProv = (name: string, nfpm: string, factory: string): Provenance =>
 export const AERODROME_DOCS_AND_CHAIN: readonly InfoDocsAndChain[] = [
   {
     claim:
-      "The docs' Slipstream contract table lists one position manager and one pool factory. Rails reads three position managers, each answering the factory Rails pairs it with.",
+      "The docs' Slipstream contract table lists one position manager and one pool factory. Rails reads three position managers, each with its factory.",
     docs: {
       label: "Docs",
       lead: "the Security page's Slipstream table lists",
@@ -37,11 +37,11 @@ export const AERODROME_DOCS_AND_CHAIN: readonly InfoDocsAndChain[] = [
     },
     chain: [
       {
-        words: "the gauge caps position manager's factory() is its factory at block 56,875,602",
+        words: "the gauge caps position manager's factory() returns the gauge caps CLFactory Rails reads",
         prov: factoryProv("gauge caps", AERODROME.nfpm.caps!, AERODROME.factory.caps!),
       },
       {
-        words: "the gauges v3 position manager's at the same block",
+        words: "the gauges v3 position manager's returns the gauges v3 CLFactory",
         prov: factoryProv("gauges v3", AERODROME.nfpm.gv3!, AERODROME.factory.gv3!),
       },
     ],

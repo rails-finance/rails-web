@@ -510,11 +510,16 @@ function partProv(key: string, part: "yours" | "pool", c: AeroReceiptContext): P
 /** What the section's read stamp lists as read. */
 export function readContracts(c: AeroReceiptContext) {
   const { p, r } = c;
+  // rails-server looks for the depositor only on Base: the gauge's Deposit and ClaimRewards logs and the
+  // position manager's Transfer logs near the stake, then stakedContains(candidate, id) on each candidate,
+  // then earned(depositor, id). The answer names only the depositor found, so these calls are listed
+  // only then, when they were surely made.
+  const found = r.staked?.depositor != null;
   return [
     {
       name: "Slipstream NonfungiblePositionManager",
       address: r.nfpm,
-      reads: "positions(id), ownerOf(id)",
+      reads: found ? "positions(id), ownerOf(id), Transfer logs to the gauge" : "positions(id), ownerOf(id)",
     },
     {
       name: `Slipstream pool ${p.base.symbol}/${p.quote.symbol}`,
@@ -527,12 +532,11 @@ export function readContracts(c: AeroReceiptContext) {
           {
             name: "Slipstream gauge",
             address: r.staked.gauge,
-            // The calls made on this chain: the depositor lookup, stakedContains and earned exist only
-            // where the site names the depositor, and earned only once one is found.
             reads: [
               "rewards(id), rewardGrowthInside(id), depositTimestamp(id), lastUpdateTime(id), gaugeFactory()",
-              ...(p.site.namesDepositor ? ["stakedContains(wallet, id)"] : []),
-              ...(r.staked.depositor ? ["earned(depositor, id)"] : []),
+              ...(found
+                ? ["Deposit and ClaimRewards logs", "stakedContains(candidate, id)", "earned(depositor, id)"]
+                : []),
             ].join(", "),
           },
         ]

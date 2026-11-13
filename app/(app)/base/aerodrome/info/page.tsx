@@ -83,14 +83,16 @@ const howItWorks: readonly [ReactNode, ...ReactNode[]] = [
   </>,
   <>
     Each week veAERO holders vote on how much AERO each pool&apos;s gauge pays out. Those voters receive the pool&apos;s
-    trading fees from staked liquidity and a share from unstaked liquidity, a week later by Aerodrome&apos;s docs.
+    trading fees from staked liquidity and a share from unstaked liquidity a week later, as Aerodrome&apos;s docs
+    describe.
   </>,
   <>
     Aerodrome&apos;s{" "}
     <a href={UPGRADE} className={INLINE_LINK} target="_blank" rel="noopener">
       upgrade guide
     </a>{" "}
-    says the upgrade to Aero opens on October 22, 00:00 UTC; liquid AERO converts 1 : 1 and liquid VELO at 0.044.
+    says the upgrade to Aero opened on 22 October, 00:00 UTC, and that liquid AERO converts 1 : 1 and liquid VELO at
+    0.044.
   </>,
   <>
     Every figure is in the pool&apos;s quote token, the one it prices the other in, at the pool&apos;s price. AERO is
@@ -167,7 +169,8 @@ const contracts: InfoReadContract[] = [
   },
   {
     name: "Each gauge factory",
-    reads: "the share of the AERO to claim that unstaking early gives up, and the pool's minimum time staked.",
+    reads:
+      "the share of the AERO to claim that unstaking early gives up, and the pool's minimum time staked. Where it does not answer, no penalty is shown.",
   },
   {
     name: "AERO/USDC pool",

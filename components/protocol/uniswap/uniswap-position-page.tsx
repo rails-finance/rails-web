@@ -25,7 +25,7 @@ import { cardProv } from "@/lib/uniswap/provenance";
 import type { Provenance } from "@/components/shared/provenance";
 import { UnansweredLine } from "@/components/shared/unanswered-line";
 import type { UniToken, UniswapVersion } from "@/lib/uniswap/types";
-import { POSITION_PAGE, num } from "@/lib/uniswap/words";
+import { POSITION_PAGE, isClosed, num } from "@/lib/uniswap/words";
 
 /** One read per request: the metadata and the page share it. */
 export const loadUniswapPosition = cache(
@@ -42,6 +42,7 @@ export function poolAssets({
   quote,
   valueNow,
   price,
+  closed,
   worthInfo,
   priceInfo,
 }: {
@@ -49,20 +50,26 @@ export function poolAssets({
   quote: UniToken;
   valueNow: number;
   price: number;
+  /** A closed position has no worth to show: the chip leads with the pool's price. */
+  closed: boolean;
   worthInfo: Provenance;
   priceInfo: Provenance;
 }) {
   return [
-    {
-      symbol: quote.symbol,
-      address: quote.address,
-      price: valueNow,
-      unit: quote.symbol,
-      figure: `${num(valueNow)} ${quote.symbol}`,
-      triggerLabel: "Worth",
-      label: `The position's worth in ${quote.symbol}, at the pool's price`,
-      info: worthInfo,
-    },
+    ...(closed
+      ? []
+      : [
+          {
+            symbol: quote.symbol,
+            address: quote.address,
+            price: valueNow,
+            unit: quote.symbol,
+            figure: `${num(valueNow)} ${quote.symbol}`,
+            triggerLabel: "Worth",
+            label: `The position's worth in ${quote.symbol}, at the pool's price`,
+            info: worthInfo,
+          },
+        ]),
     price >= 0.001
       ? {
           symbol: base.symbol,
@@ -132,6 +139,7 @@ export async function UniswapPositionPage({
               quote: p.quote,
               valueNow: p.valueNow,
               price: p.price,
+              closed: isClosed(p),
               worthInfo: cardProv("worth", { p, r }),
               priceInfo: cardProv("price", { p, r }),
             })}

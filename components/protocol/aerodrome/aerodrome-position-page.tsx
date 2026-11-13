@@ -75,15 +75,15 @@ export async function AerodromePositionPage({
               session={session}
               fallbackHref={wallet ? `${home}/${wallet}` : home}
               showStamp={false}
-              // A closed position has no worth to show: the chip leads with the pool's price.
               assets={poolAssets({
                 base: p.base,
                 quote: p.quote,
                 valueNow: p.valueNow,
                 price: p.price,
+                closed: BigInt(r.liquidity) === BigInt(0),
                 worthInfo: cardProv("worth", { p, r }),
                 priceInfo: cardProv("price", { p, r }),
-              }).slice(BigInt(r.liquidity) === BigInt(0) ? 1 : 0)}
+              })}
               priceReason={ORACLE_USD_REASON[session]}
               owner={wallet ? { wallet, chain, filterProtocol: null, href: `${home}/${wallet}` } : undefined}
               tools={false}
