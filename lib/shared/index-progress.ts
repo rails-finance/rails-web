@@ -250,6 +250,89 @@ export interface StatusWriter {
   lastRunAt?: string | null;
   lastRunOk?: boolean | null;
   lastRunError?: string | null;
+  /** Web-side: the census writer's latest run (the answer's `censusRuns`,
+   *  set by `withCensusRuns`). */
+  censusRun?: CensusRunStatus | null;
+}
+
+/** A vault census's latest run, per chain and family. A run stops by design
+ *  at its keyless gateway share or its deadline, writing no rows. */
+export interface CensusRunStatus {
+  chain: number;
+  family: string;
+  families: string[];
+  outcome: "completed" | "stopped-share" | "stopped-deadline" | "failed";
+  startedAt: string;
+  endedAt: string;
+  vaultsWritten: number | null;
+  chunksSaved: number | null;
+  stoppedAtVault: string | null;
+  gateway: string | null;
+  remainingMb: number | null;
+  floorMb: number | null;
+  resetsAt: string | null;
+  error: string | null;
+  shareStopsInARow: number;
+  stuckStopsInARow: number;
+  /** The census's next scheduled run, from its crontab; absent from an api
+   *  that predates it. */
+  nextRunAt?: string | null;
+}
+
+/** rails-server explorer-pipelines' name for the vault census writer. */
+export const CENSUS_WRITER = "vault-census";
+/** A census family by the status entry it writes for. */
+const CENSUS_FAMILY: Record<string, string> = { "aave-vaults": "aave", yearn: "yearn-v3" };
+/** Stops in the same vault with nothing written that read as an alarm (the
+ *  census wrapper's exit 3). */
+export const CENSUS_STUCK_STOPS = 3;
+
+/** How long past its due time a census may take to record its next run
+ *  before it reads late: the slots fall up to about 70 min after a gateway
+ *  reset, and a run takes up to about 40 min. */
+export const CENSUS_DUE_GRACE = 2 * 60 * 60;
+
+/** When a stopped census's next run is due: the first slot after the stop,
+ *  from the api's `nextRunAt` (which moves to tomorrow once today's slot has
+ *  started, so it is stepped back a schedule at a time to the stop); else
+ *  after the gateway's reset for a share stop; else a schedule's length after
+ *  the run. `after` marks a time the run follows rather than one it is set
+ *  for. Null for a run that did not stop, or with nothing to go on. */
+export function censusDue(w: StatusWriter): { at: Secs; after: boolean } | null {
+  const r = w.censusRun;
+  if (!r || !r.outcome.startsWith("stopped-")) return null;
+  let next = isoSecs(r.nextRunAt);
+  const ended = isoSecs(r.endedAt);
+  const every = w.expectEverySec;
+  if (next != null) {
+    if (ended != null && every) while (next - every > ended) next -= every;
+    return { at: next, after: false };
+  }
+  const reset = isoSecs(r.resetsAt);
+  if (r.outcome === "stopped-share" && reset != null) return { at: reset, after: true };
+  const ran = isoSecs(w.lastRunAt) ?? isoSecs(r.startedAt);
+  return ran != null && w.expectEverySec ? { at: ran + w.expectEverySec, after: false } : null;
+}
+
+/** Each census writer with its latest run, where the answer has one. */
+export function withCensusRuns(s: IndexStatus): IndexStatus {
+  const runs = s.censusRuns;
+  if (!runs?.length) return s;
+  return {
+    ...s,
+    entries: s.entries.map((e) => {
+      const family = CENSUS_FAMILY[e.protocol];
+      if (!family || !e.live?.writers.some((w) => w.name === CENSUS_WRITER)) return e;
+      const run = runs.find((r) => r.chain === e.chain && r.family === family) ?? null;
+      return {
+        ...e,
+        live: {
+          ...e.live,
+          writers: e.live.writers.map((w) => (w.name === CENSUS_WRITER ? { ...w, censusRun: run } : w)),
+        },
+      };
+    }),
+  };
 }
 
 /** The last hour of reads made when a page opens (the tier-request tally). */
@@ -297,6 +380,8 @@ export interface IndexStatus {
   prices?: PricesSection;
   /** Absent from an api that predates it. */
   headMisses?: HeadMiss[];
+  /** Absent from an api that predates it. */
+  censusRuns?: CensusRunStatus[];
 }
 
 // ── Prices: the oracle lane's feeds and rates, and the price fillers ───────
@@ -447,6 +532,17 @@ export function writerState(w: StatusWriter, now: Secs, e?: StatusEntry): Heartb
   const every = w.expectEverySec;
   // An event-driven writer has no schedule to be late against.
   if (t == null || !every) return "none";
+  // A census stops by design at its gateway share or its deadline: held
+  // until its next run is due (with CENSUS_DUE_GRACE), late after, stalled
+  // three schedules past it; an alarm
+  // once it has stopped in the same vault with nothing written
+  // CENSUS_STUCK_STOPS times.
+  const run = w.censusRun;
+  if (run) {
+    if (run.stuckStopsInARow >= CENSUS_STUCK_STOPS) return "stalled";
+    const due = censusDue(w);
+    if (due) return now <= due.at + CENSUS_DUE_GRACE ? "paused" : now - due.at > 3 * every ? "stalled" : "late";
+  }
   if (ran != null && w.lastRunOk === false) return "late";
   const age = now - t;
   return age > 3 * every ? "stalled" : age > 1.5 * every ? "late" : "fresh";

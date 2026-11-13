@@ -147,3 +147,95 @@ test("one failed read of seven stays fresh; two of seven are late; four of seven
   assert.equal(visitState({ lastHourVisits: 7, failedShare: 4 / 7 }), "stalled");
   assert.equal(visitState({ lastHourVisits: 1, failedShare: 1 }), "fresh");
 });
+
+// censusRuns: a census that stops at its share or deadline is held while the
+// run is recent; three stuck stops are an alarm; a failed run is late.
+import { withCensusRuns, censusDue } from "../../lib/shared/index-progress.ts";
+
+const censusRun = (over) => ({
+  chain: 1,
+  family: "aave",
+  families: ["stata"],
+  outcome: "stopped-share",
+  startedAt: at(3 * 3600),
+  endedAt: at(2 * 3600),
+  vaultsWritten: 0,
+  chunksSaved: 4,
+  stoppedAtVault: null,
+  gateway: "mainnet.gateway.tenderly.co",
+  remainingMb: 690,
+  floorMb: 700,
+  resetsAt: "2026-11-13T14:06:09.022Z",
+  error: null,
+  shareStopsInARow: 1,
+  stuckStopsInARow: 0,
+  ...over,
+});
+const censusWriter = (ranAgo, ok = true) => ({
+  name: "vault-census",
+  kind: "processor",
+  lastWriteAt: at(40 * 3600),
+  expectEverySec: 86400,
+  lastRunAt: at(ranAgo),
+  lastRunOk: ok,
+});
+const censusStatus = (run, writer = censusWriter(2 * 3600)) =>
+  withCensusRuns({
+    asOf: at(0),
+    entries: [
+      {
+        protocol: "aave-vaults",
+        chain: 1,
+        backfill: null,
+        live: { lane: "x", checkpoint: null, head: null, writers: [writer] },
+      },
+    ],
+    censusRuns: run ? [run] : [],
+  });
+
+test("a census stopped at its share is paused while the run is recent", () => {
+  const s = censusStatus(censusRun());
+  assert.equal(writerState(s.entries[0].live.writers[0], now, s.entries[0]), "paused");
+});
+
+test("a census past its due time and the grace with no newer run is late", () => {
+  const s = censusStatus(censusRun({ resetsAt: at(3 * 3600) }));
+  assert.equal(writerState(s.entries[0].live.writers[0], now, s.entries[0]), "late");
+});
+
+test("a census whose run never came reads stalled three schedules past its due time", () => {
+  const s = censusStatus(censusRun({ resetsAt: at(3 * 86400 + 60) }));
+  assert.equal(writerState(s.entries[0].live.writers[0], now, s.entries[0]), "stalled");
+});
+
+test("the next run comes from nextRunAt, else after the reset, else a schedule after the run", () => {
+  const w = (run, ranAgo = 2 * 3600) => ({ ...censusWriter(ranAgo), censusRun: run });
+  assert.deepEqual(censusDue(w(censusRun({ nextRunAt: "2026-11-13T14:12:00.000Z" }))), {
+    at: Date.parse("2026-11-13T14:12:00Z") / 1000,
+    after: false,
+  });
+  // nextRunAt has moved to tomorrow's slot; the due time is the first slot after the stop.
+  assert.deepEqual(
+    censusDue(w(censusRun({ endedAt: "2026-11-12T14:40:00.000Z", nextRunAt: "2026-11-14T14:12:00.000Z" }))),
+    { at: Date.parse("2026-11-13T14:12:00Z") / 1000, after: false },
+  );
+  assert.deepEqual(censusDue(w(censusRun())), { at: Date.parse("2026-11-13T14:06:09.022Z") / 1000, after: true });
+  assert.deepEqual(censusDue(w(censusRun({ outcome: "stopped-deadline", resetsAt: null }))), {
+    at: now - 2 * 3600 + 86400,
+    after: false,
+  });
+  assert.equal(censusDue(w(censusRun({ outcome: "completed" }))), null);
+});
+
+test("three stops in the same vault are stalled; a failed run is late", () => {
+  const stuck = censusStatus(censusRun({ stuckStopsInARow: 3 }));
+  assert.equal(writerState(stuck.entries[0].live.writers[0], now, stuck.entries[0]), "stalled");
+  const failed = censusStatus(censusRun({ outcome: "failed", error: "boom" }), censusWriter(2 * 3600, false));
+  assert.equal(writerState(failed.entries[0].live.writers[0], now, failed.entries[0]), "late");
+});
+
+test("an answer without censusRuns leaves the census writer as it was", () => {
+  const s = censusStatus(null);
+  assert.equal(s.entries[0].live.writers[0].censusRun, undefined);
+  assert.equal(writerState(s.entries[0].live.writers[0], now, s.entries[0]), "fresh");
+});
