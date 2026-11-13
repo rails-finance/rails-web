@@ -54,7 +54,7 @@ export function fluidPositionToMarkdown(args: FluidPositionMarkdownArgs): string
       `Balances are the VaultResolver's live SETTLED read where taken (the vault's own fetchLatestPosition ` +
       `settlement math — every liquidation sweep and interest accrued to the block applied). Each timeline row's ` +
       `balance is the same settled figure read at that row's block. Fluid liquidates price-band ticks whose events name NO position — the attribution rows are ` +
-      `settled boundary reads, exact including partial liquidations. Fluid runs NO USD feed: the vault's own oracle ` +
+      `settled boundary reads, exact including partial liquidations. The vault's oracle ` +
       `prices the collateral in the debt token, so every valuation and risk figure below is in the vault's own ` +
       `two-token space. Everything drifts as the market and position change. Not financial advice.`,
   );
@@ -98,7 +98,7 @@ export function fluidPositionToMarkdown(args: FluidPositionMarkdownArgs): string
           `- **Oracle price:** 1 ${colSym} = ${amt(live.oraclePriceLiquidateDebtPerCol)} ${debtSym} — the vault's own oracle (liquidate leg), the exact price space the engine judges in`,
         );
       lines.push(
-        `- **Position ratio:** ${pct(live.ratio)} (debt ÷ collateral at that price) vs the vault's lines: borrowing gates at ${pct(live.collateralFactor, 0)} (collateral factor), liquidation above ${pct(live.liquidationThreshold, 0)}, full absorption above ${pct(live.liquidationMaxLimit, 0)}; liquidation penalty ${pct(live.liquidationPenalty)}`,
+        `- **Debt to collateral ratio:** ${pct(live.ratio)} (debt ÷ collateral at that price) vs the vault's lines: collateral factor ${pct(live.collateralFactor, 0)} (borrowing stops), liquidation threshold ${pct(live.liquidationThreshold, 0)}, liquidation max limit ${pct(live.liquidationMaxLimit, 0)} (100% of the position gets liquidated); liquidation penalty ${pct(live.liquidationPenalty)}`,
       );
       if (live.liqPriceDebtPerCol != null) {
         const drop =
@@ -119,7 +119,7 @@ export function fluidPositionToMarkdown(args: FluidPositionMarkdownArgs): string
         );
       if (live.isSmartCol || live.isSmartDebt)
         lines.push(
-          `- **Smart legs:** ${live.isSmartCol ? "collateral" : ""}${live.isSmartCol && live.isSmartDebt ? " and " : ""}${live.isSmartDebt ? "debt" : ""} in Fluid DEX pool shares — amounts are shares (share→token conversion is the DexResolver's job, not asserted here)`,
+          `- **Smart legs:** ${live.isSmartCol ? "collateral" : ""}${live.isSmartCol && live.isSmartDebt ? " and " : ""}${live.isSmartDebt ? "debt" : ""} in DEX shares — amounts are shares (share→token conversion is the DexResolver's job, not asserted here)`,
         );
       lines.push("");
     }
@@ -197,8 +197,7 @@ function forensicsSection(events: BaseActivityEvent[], colSym: string, debtSym: 
     `_Every figure is a chain read pinned to the liquidation's own block. The legs are the vault's settlement math ` +
       `(fetchLatestPosition at B−1 minus the same read at B); the price is the vault's OWN oracle at B — not the ` +
       `VaultResolver's configs.oraclePriceLiquidate, which is the same number at head but has no bytecode to answer ` +
-      `at these blocks. Values are stated in ${debtSym} because that is the only unit Fluid quotes: the protocol has ` +
-      `no USD feed, and a dollar figure here would be an assumption its contracts never make._`,
+      `at these blocks. Values are stated in ${debtSym}, the unit the vault's oracle prices collateral in._`,
   );
   if (anyPenalty) {
     out.push("");

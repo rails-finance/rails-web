@@ -806,6 +806,7 @@ const MORPHO_DOC_URLS = {
 // settlement views, and these explainers say why that is trustworthy.
 
 const FLUID_DOC_URL = "https://docs.fluid.io";
+const FLUID_GUIDES_TERMS_URL = "https://fluid.guides.instadapp.io/vault-protocol/protocol-details";
 
 export function fluidOperateContent(kind: "deposit" | "borrow" | "composite"): LearnMoreContent {
   const intro =
@@ -845,7 +846,7 @@ export function fluidLiquidationContent(absorbed: boolean): LearnMoreContent {
   return {
     title: absorbed ? "How absorption works" : "How Fluid liquidations work",
     intro: absorbed
-      ? "When a position sinks past the vault's maximum liquidation limit, the vault takes over its remaining debt and collateral, leaving the position empty. No event of the position's own records it."
+      ? "When a position passes the vault's liquidation max limit, 100% of it gets liquidated: the protocol absorbs its collateral and settles its debt, leaving the position empty. No event of the position's own records it."
       : "When a position's debt grows too large against its collateral, a liquidator repays part of the debt and takes collateral worth a little more in return. Fluid does this for a whole price band of positions at once, so the on-chain event names no single position.",
     detailsHeading: "Key concepts:",
     details: [
@@ -862,7 +863,10 @@ export function fluidLiquidationContent(absorbed: boolean): LearnMoreContent {
         text: "a swept position usually keeps most of its collateral and debt. Fluid liquidates only enough to restore the band's health, so 'liquidated' rarely means emptied. A fully liquidated position is flagged explicitly.",
       },
     ],
-    links: [{ label: "Fluid docs", url: FLUID_DOC_URL }],
+    links: [
+      { label: "Fluid docs", url: FLUID_DOC_URL },
+      { label: "Fluid guides: Protocol Details", url: FLUID_GUIDES_TERMS_URL },
+    ],
   };
 }
 

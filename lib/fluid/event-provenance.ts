@@ -332,7 +332,7 @@ export const atBlockOraclePriceProv = (
     source === "fluid-oracle-liquidate"
       ? "Read from the liquidate leg of the oracle's operate/liquidate split — the leg the engine itself uses to price a seizure."
       : "Read from the oracle's single exchange rate: this vault predates the operate/liquidate split, so there is no second rate to choose between and this one IS the liquidate price."
-  } Fluid prices in the debt token by design; no USD is asserted anywhere, because the protocol runs no USD feed.`,
+  } The vault's oracle prices collateral in the debt token.`,
   contract: oracleContract(oracle),
   via: `vault oracle · ${oracleGetter(source)} eth_call at the event's block · scaled 1e(27 + debt decimals − collateral decimals)`,
   inputs: eventInputs(coords, [

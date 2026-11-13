@@ -44,7 +44,7 @@ export function FluidFlowsNote({ facts, collSymbol, debtSymbol }: FluidFlowsNote
           {facts.liquidations > 0 &&
             `${n(facts.liquidations, "A liquidation", "liquidations")} took collateral (Seized in liquidations) and cleared debt (Cleared by liquidations). `}
           {facts.absorbs > 0 &&
-            `${n(facts.absorbs, "An absorb", "absorbs")} by the vault, which takes over a position past its liquidation limit, ${facts.absorbs === 1 ? "is" : "are"} counted in the same lines. `}
+            `${n(facts.absorbs, "An absorb", "absorbs")}, where the protocol absorbs a position's collateral and settles its debt, ${facts.absorbs === 1 ? "is" : "are"} counted in the same lines. `}
           Each one&apos;s figures are the vault&apos;s balances read either side of its block.
           {facts.unrecorded > 0 &&
             ` ${facts.unrecorded === 1 ? "Once" : `${facts.unrecorded.toLocaleString("en-US")} times`}, a balance stood lower at an event than the event before it left it, with no liquidation recorded between them. In a Fluid vault only a liquidation lowers a balance between the owner's operations, so that fall is counted in the liquidation lines.`}
@@ -109,7 +109,7 @@ export function fluidFlowsContent(): LearnMoreContent {
     details: [
       {
         bold: "Debt-token units",
-        text: "each vault's oracle prices its collateral in its debt token, and Fluid has no USD price, so every figure is in the debt token.",
+        text: "each vault's oracle prices its collateral in its debt token, so every figure is in the debt token.",
       },
       {
         bold: "Exchange prices",
@@ -117,9 +117,15 @@ export function fluidFlowsContent(): LearnMoreContent {
       },
       {
         bold: "Liquidation and absorb",
-        text: "liquidators take collateral and clear debt from positions past the liquidation threshold; past the liquidation limit the vault absorbs the position's collateral and debt itself.",
+        text: "liquidators take collateral and clear debt from positions past the liquidation threshold. Past the liquidation max limit, 100% of a position gets liquidated. In an absorb, the protocol absorbs the collateral and settles the debt.",
       },
     ],
-    links: [{ label: "docs.fluid.io", url: DOCS }],
+    links: [
+      { label: "docs.fluid.io", url: DOCS },
+      {
+        label: "Fluid guides: Protocol Details",
+        url: "https://fluid.guides.instadapp.io/vault-protocol/protocol-details",
+      },
+    ],
   };
 }

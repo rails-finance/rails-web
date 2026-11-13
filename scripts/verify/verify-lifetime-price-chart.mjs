@@ -707,7 +707,7 @@ const PAGES = [
     path: "/ethereum/fluid/6",
     lwOnly: true,
     ratio: {
-      label: "Position ratio",
+      label: "Debt to collateral ratio",
       liquidates: "above",
       head: "position-ratio",
       lineRow: "liquidates-above",
@@ -722,7 +722,7 @@ const PAGES = [
     path: "/ethereum/fluid/8538",
     lwOnly: true,
     ratio: {
-      label: "Position ratio",
+      label: "Debt to collateral ratio",
       liquidates: "above",
       head: "position-ratio",
       lineRow: "liquidates-above",
@@ -742,7 +742,7 @@ const PAGES = [
     lwOnly: true,
     changes: { day: 20007, name: "Liquidation threshold", from: "85 %", to: "88 %", block: 20944531 },
     ratio: {
-      label: "Position ratio",
+      label: "Debt to collateral ratio",
       liquidates: "above",
       head: "position-ratio",
       lineRow: "liquidates-above",
@@ -772,7 +772,7 @@ const PAGES = [
       outside: 20229,
     },
     ratio: {
-      label: "Position ratio",
+      label: "Debt to collateral ratio",
       liquidates: "above",
       head: "position-ratio",
       lineRow: "liquidates-above",

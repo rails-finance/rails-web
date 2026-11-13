@@ -891,7 +891,7 @@ const SHEET_WORDS_SUBJECTS = [
     name: "Fluid",
     path: "/ethereum/fluid/11044",
     id: "withdraw:09dc1e0d4e197230f505de564bd5e1d7ab3ff1299462a9bf36f08d72a512ffcc:355:11044",
-    risk: ["Position ratio", "Collateral can fall"],
+    risk: ["Debt to collateral ratio", "Collateral can fall"],
     limits: ["Still borrowable", "Borrow rate"],
     params: ["Collateral factor", "Liquidation threshold", "Liquidation penalty"],
     optional: [],

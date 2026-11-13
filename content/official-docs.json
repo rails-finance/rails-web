@@ -1,5 +1,5 @@
 {
-  "note": "Family key to the hosts of the protocol's official documentation (rails-ops/standards/prose-limits-and-zones.md, 4.3; Miles, 8 Oct 2026). check:prose-limits fails a modal or strings-file link whose host is not in its family's list. A family key is the content/<dir> name where a strings file exists, the roster id elsewhere. aave.com covers its /docs, /help and /faq pages; fxprotocol.gitbook.io, ebisu.gitbook.io and developers.skyeco.com are official by Miles's ruling (8 Oct 2026, ui-jobs 315); github.com is official for makerdao by Miles's ruling of 13 Oct 2026 (ui-jobs 315), for the Sky org's frozen docs dump only; docs.yearn.fi is official for yearn by Miles's ruling of 20 Oct 2026 (ui-jobs 407); docs.liquity.org stands for basedollar because the fork's own host (docs.basedollar.money) does not answer, and Basedollar copies and adapts the Liquity V2 design (Miles via the manager, 2 Nov 2026).",
+  "note": "Family key to the hosts of the protocol's official documentation (rails-ops/standards/prose-limits-and-zones.md, 4.3; Miles, 8 Oct 2026). check:prose-limits fails a modal or strings-file link whose host is not in its family's list. A family key is the content/<dir> name where a strings file exists, the roster id elsewhere. aave.com covers its /docs, /help and /faq pages; fxprotocol.gitbook.io, ebisu.gitbook.io and developers.skyeco.com are official by Miles's ruling (8 Oct 2026, ui-jobs 315); github.com is official for makerdao by Miles's ruling of 13 Oct 2026 (ui-jobs 315), for the Sky org's frozen docs dump only; docs.yearn.fi is official for yearn by Miles's ruling of 20 Oct 2026 (ui-jobs 407); docs.liquity.org stands for basedollar because the fork's own host (docs.basedollar.money) does not answer, and Basedollar copies and adapts the Liquity V2 design (Miles via the manager, 2 Nov 2026); fluid.guides.instadapp.io is official for fluid by Miles's ruling of 13 Nov 2026 (ui-jobs 634, F1).",
   "families": {
     "liquity-v2": ["docs.liquity.org"],
     "liquity-v1": ["docs.liquity.org"],
@@ -21,7 +21,7 @@
     "moonwell": ["docs.moonwell.fi"],
     "maple": ["docs.maple.finance"],
     "frankencoin": ["docs.frankencoin.com"],
-    "fluid": ["docs.fluid.io"],
+    "fluid": ["docs.fluid.io", "fluid.guides.instadapp.io"],
     "dolomite": ["docs.dolomite.io"],
     "llamalend": ["docs.curve.finance"],
     "polaris": ["docs.polaris.finance"],

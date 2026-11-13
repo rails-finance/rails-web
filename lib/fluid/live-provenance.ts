@@ -102,7 +102,7 @@ const liveBorrowRateProv_ = (vault: string, pair?: string): Provenance => ({
   pclass: "state",
   verify: recompute("Re-run VaultResolver.positionByNftId and read vaultData.exchangePricesAndRates.borrowRateVault"),
   summary:
-    "The vault's current borrow rate, annual. It is the resolver's rates block (exchangePricesAndRates.borrowRateVault), the liquidity layer's rate with the vault's magnifier applied, and it floats with how heavily the vault is used; this is the rate at the head block.",
+    "The vault's current borrow rate, annual. It is the resolver's rates block (exchangePricesAndRates.borrowRateVault), the Liquidity Layer's rate with the vault's magnifier applied, and it floats with how heavily the vault is used; this is the rate at the head block.",
   contract: vaultContract(vault, pair),
   via: `${LANE_VIA} · VaultResolver.positionByNftId @ head · exchangePricesAndRates.borrowRateVault`,
 });

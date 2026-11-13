@@ -28,6 +28,7 @@ const POSITIONS = `${DOCS}/integrate/vault-user-positions.html`;
 const HEALTH = `${POSITIONS}#health-factors-collateral-factor-liquidation-threshold-penalty-etc`;
 const SMART = `${POSITIONS}#smart-debt-smart-col-amounts`;
 const LIQUIDATION = `${DOCS}/integrate/liquidation-swaps.html#fluid-liquidation-swaps`;
+const TERMS = "https://fluid.guides.instadapp.io/vault-protocol/protocol-details";
 
 const UL = "list-disc space-y-1 pl-5";
 
@@ -57,16 +58,22 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
     sources: [{ label: "Smart debt and smart collateral amounts", href: SMART }],
   },
   {
-    term: "Borrow limit",
+    term: "Collateral factor",
     definition:
-      "The borrow limit is the most a position may borrow, as a share of its collateral's value. The vault refuses to lend beyond it.",
-    sources: [{ label: "Vault configuration", href: HEALTH }],
+      "The collateral factor is the share of the collateral's value that can be borrowed against. The vault refuses to lend beyond it.",
+    sources: [
+      { label: "Health factors: Collateral factor, Liquidation threshold, penalty etc.", href: HEALTH },
+      { label: "Protocol Details", href: TERMS },
+    ],
   },
   {
     term: "Liquidation threshold",
     definition:
       "The liquidation threshold is the debt-to-collateral share at which liquidation can start. A position with debt above it can be liquidated.",
-    sources: [{ label: "Vault configuration", href: HEALTH }],
+    sources: [
+      { label: "Health factors: Collateral factor, Liquidation threshold, penalty etc.", href: HEALTH },
+      { label: "Protocol Details", href: TERMS },
+    ],
   },
   {
     term: "Liquidation",
@@ -78,7 +85,7 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
     term: "Exchange price",
     definition:
       "A vault counts each position in raw units and turns them into token amounts through its exchange prices, which grow as interest accrues. The growth between two dates is the interest over them.",
-    sources: [{ label: "Vault user positions", href: POSITIONS }],
+    sources: [{ label: "Get all user vault positions", href: POSITIONS }],
   },
 ];
 
@@ -165,20 +172,20 @@ export default function InfoPage() {
         <>
           The vault&apos;s <GlossaryLink term="Oracle">oracle</GlossaryLink> prices the collateral in the debt token.
           Some vaults are <GlossaryLink term="Smart vault">smart vaults</GlossaryLink>, where a side is held as shares
-          of a DEX pool and counted in shares.
+          of a DEX pool and counted in DEX shares.
         </>,
         <>
           Each vault sets its limits as shares of the collateral&apos;s value. The{" "}
-          <GlossaryLink term="Borrow limit">borrow limit</GlossaryLink> is the most a position may borrow. Debt above
-          the <GlossaryLink term="Liquidation threshold">liquidation threshold</GlossaryLink> can be{" "}
+          <GlossaryLink term="Collateral factor">collateral factor</GlossaryLink> is the most a position may borrow.
+          Debt above the <GlossaryLink term="Liquidation threshold">liquidation threshold</GlossaryLink> can be{" "}
           <GlossaryLink term="Liquidation">liquidated</GlossaryLink>.
         </>,
         <>
           Interest accrues through the vault&apos;s <GlossaryLink term="Exchange price">exchange prices</GlossaryLink>:
           collateral grows at the supply rate and debt at the borrow rate.{" "}
           {FLUID_BASE_DOLLARS
-            ? "Fluid runs no dollar feed, so Rails values each side at Aave V3's price on Base."
-            : "Fluid runs no dollar feed, so every figure is in the vault's tokens."}
+            ? "The vault's oracle prices collateral in the debt token. Rails values each side in dollars at Aave V3's price on Base."
+            : "The vault's oracle prices collateral in the debt token, so every figure is in the vault's tokens."}
         </>,
       ]}
       reads={reads}
