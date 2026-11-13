@@ -107,7 +107,8 @@ import {
   type AlchemixLineRatios,
   type AlchemixUnderlyingUnit,
 } from "@/lib/alchemix/readings-before";
-import { redemptionNet, shareFallToLiquidation, sumRedemptionNets } from "@/lib/alchemix/redemption-net";
+import { redemptionNet, shareFallToLiquidation } from "@/lib/alchemix/redemption-net";
+import { sumRedemptionNets } from "@/lib/alchemix/redemption-net-sum";
 import {
   AlchemixPositionExplanation,
   fallPct,

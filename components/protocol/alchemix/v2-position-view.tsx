@@ -53,8 +53,6 @@ import type { AlchemixV2PositionData } from "@/types/api/alchemix";
 import { AmountText } from "@/components/shared/amount-text";
 import { ALCHEMIX_V2_DOCS, V2_WORDS } from "@/lib/alchemix/transmuter-words";
 
-const block = (n: number) => n.toLocaleString("en-US");
-
 export function AlchemixV2PositionView({
   deployment,
   position,
@@ -153,9 +151,8 @@ export function AlchemixV2PositionView({
         </ul>
       ) : null}
       <p>
-        Alchemix V2&rsquo;s positions were migrated to V3 in April 2026. The figures above are the snapshot: the
-        Alchemist&rsquo;s reading at block {block(p.frozenAtBlock)} on {closedOn(p.closedAt)}, and nothing has moved
-        them since. That day the market&rsquo;s collateral moved to the{" "}
+        Alchemix V2&rsquo;s positions were migrated to V3 in April 2026. The figures above are the snapshot taken on{" "}
+        {closedOn(p.closedAt)}. That day the market&rsquo;s collateral moved to the{" "}
         <a
           href={explorerUrl(chainId, "address", p.closure.sweptTo)}
           target="_blank"

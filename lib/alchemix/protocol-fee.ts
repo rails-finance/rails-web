@@ -24,12 +24,18 @@ export interface ProtocolFeeStep {
   bps: number;
   /** What the step rests on, for the receipt. */
   read: string;
+  /** The day the step began, for copy that dates the change; absent on the
+   *  first step. */
+  fromDate?: string;
 }
 
-/** The block of the Base Alchemist's ProtocolFeeUpdated(0), and its date. */
+/** The block of the Base Alchemist's ProtocolFeeUpdated(0). No Base
+ *  redemption shares the block: Rails's index (positions 14 and 77, open across
+ *  it, whose timelines carry every line redemption) has none between blocks
+ *  53,500,000 and 53,600,000, checked 13 Nov 2026, so the whole block counts at
+ *  the new fee. */
 export const BASE_FEE_CHANGE_BLOCK = 53_552_996;
-export const BASE_FEE_CHANGE_DATE = "5 Nov 2026";
-export const BASE_FEE_HEAD_READ = 56_868_319;
+const BASE_FEE_HEAD_READ = 56_868_319;
 
 const ETHEREUM: ProtocolFeeStep[] = [
   {
@@ -48,7 +54,8 @@ const BASE: ProtocolFeeStep[] = [
   {
     fromBlock: BASE_FEE_CHANGE_BLOCK,
     bps: 0,
-    read: `ProtocolFeeUpdated(0) at block ${BASE_FEE_CHANGE_BLOCK.toLocaleString("en-US")} (${BASE_FEE_CHANGE_DATE}), and protocolFee() 0 at blocks 53,638,119, 54,284,159 and ${BASE_FEE_HEAD_READ.toLocaleString("en-US")} on 13 Nov 2026`,
+    fromDate: "5 Nov 2026",
+    read: `ProtocolFeeUpdated(0) at block ${BASE_FEE_CHANGE_BLOCK.toLocaleString("en-US")} (5 Nov 2026 16:15:39 UTC), and protocolFee() 0 at blocks 53,638,119, 54,284,159 and ${BASE_FEE_HEAD_READ.toLocaleString("en-US")} on 13 Nov 2026`,
   },
 ];
 
@@ -73,5 +80,23 @@ export function protocolFeeNow(chainId: number, key: string): ProtocolFeeStep | 
   return steps ? steps[steps.length - 1] : null;
 }
 
+/** Every step of a line, oldest first. */
+export function protocolFeeSteps(chainId: number, key: string): readonly ProtocolFeeStep[] {
+  return SCHEDULES[`${chainId}:${key}`] ?? [];
+}
+
+const pct = (bps: number) => `${(bps / 100).toString()}%`;
+
+/** A line's fee now and, where it changed, what it was until the change:
+ *  "0% on Base, where it was 0.1% until 5 Nov 2026". */
+export function protocolFeeHistoryWords(chainId: number, key: string, where?: string): string {
+  const steps = protocolFeeSteps(chainId, key);
+  const now = steps[steps.length - 1];
+  const prev = steps[steps.length - 2];
+  if (!now) return "";
+  const head = `${pct(now.bps)}${where ? ` on ${where}` : ""}`;
+  return prev && now.fromDate ? `${head}, where it was ${pct(prev.bps)} until ${now.fromDate}` : head;
+}
+
 /** The fee as the modals state it, true of every line. */
-export const PROTOCOL_FEE_WORDS = `0.25% on Ethereum, and 0% on Base, where it was 0.1% until block ${BASE_FEE_CHANGE_BLOCK.toLocaleString("en-US")} on ${BASE_FEE_CHANGE_DATE}`;
+export const PROTOCOL_FEE_WORDS = `${protocolFeeHistoryWords(1, "eth-alusd", "Ethereum")}, and ${protocolFeeHistoryWords(8453, "base-alusdb", "Base")}`;

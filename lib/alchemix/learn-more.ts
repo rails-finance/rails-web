@@ -63,7 +63,7 @@ const CORE_COLLATERAL = {
 
 const CORE_EARMARKED = {
   bold: "Earmarked debt",
-  text: "set aside to be repaid by redemptions: the part of the debt the Transmuter has claimed as its depositors' deposits matured. It grows block by block. A redemption clears it, and so does the holder repaying with vault shares (the earmarked part is paid first, with the market's protocol fee) or closing the position with its collateral.",
+  text: "set aside to be repaid by redemptions: the part of the debt the Transmuter has claimed as its depositors' deposits matured. It grows block by block. A redemption clears it, and so does the holder repaying with vault shares (the earmarked part is paid first, with the market's redemption fee) or closing the position with its collateral.",
 };
 
 const CORE_LTV = {
@@ -146,7 +146,7 @@ export const ALCHEMIX_BURN_REPAY: LearnMoreContent = {
     CORE_EARMARKED,
     {
       bold: "Repay",
-      text: `pays the debt with vault shares. Each share counts at its value in the asset underneath at that block, one synthetic per unit, and the market keeps a protocol fee in shares on the part that pays off earmarked debt (${PROTOCOL_FEE_WORDS}).`,
+      text: `pays the debt with vault shares. Each share counts at its value in the asset underneath at that block, one synthetic per unit, and the market keeps a redemption fee in shares on the part that pays off earmarked debt (${PROTOCOL_FEE_WORDS}).`,
     },
   ],
   links: [ALCHEMIX_DOCS.repay, ALCHEMIX_DOCS.borrowerFee, ALCHEMIX_DOCS.transmuterFlow],
@@ -173,7 +173,7 @@ export const ALCHEMIX_SELF_LIQUIDATE: LearnMoreContent = {
     },
     {
       bold: "The fee",
-      text: `is the market's protocol fee on those earmarked shares (${PROTOCOL_FEE_WORDS}), paid to Alchemix's fee receiver. The rest of the debt is paid without a fee, and no liquidator fee applies.`,
+      text: `is the market's redemption fee on those earmarked shares (${PROTOCOL_FEE_WORDS}), paid to Alchemix's protocol fee receiver. The rest of the debt is paid without a fee.`,
     },
     {
       bold: "Shares used",
@@ -199,19 +199,19 @@ export const ALCHEMIX_HOW_IT_WORKS: LearnMoreContent = {
   steps: [
     "Someone holding alUSD deposits it in the market's Transmuter, where it vests over a term measured in blocks.",
     "As those deposits vest, the Alchemist earmarks a matching amount of debt across every open position on the market, in proportion to each position's unearmarked debt: it sets that debt aside to be repaid by redemptions. That is each position's Earmarked debt figure, and it grows block by block.",
-    `When a depositor claims, the Transmuter redeems: every open position's earmarked debt is cleared by the same ratio, and the Alchemist takes collateral for it. Vault shares worth one unit of the asset underneath (USDC, or WETH on alETH) for each unit of debt cleared go to the Transmuter, and the market's redemption fee on top of those shares (${PROTOCOL_FEE_WORDS}) goes to Alchemix's fee receiver.`,
+    `When a depositor claims, the Transmuter redeems: every open position's earmarked debt is cleared by the same ratio, and the Alchemist takes collateral for it. Vault shares worth one unit of the asset underneath (USDC, or WETH on alETH) for each unit of debt cleared go to the Transmuter, and the market's redemption fee on top of those shares (${PROTOCOL_FEE_WORDS}) goes to Alchemix's protocol fee receiver.`,
     "The Transmuter pays the depositor in those vault shares (mixUSDC on the alUSD market) for the part of the deposit that has vested, one unit of the asset underneath for each alUSD, and returns the rest as alUSD.",
   ],
   // The depositor's side, which a borrower reading a redemption also needs: a
   // claim can come before maturity, and what that costs.
   extraParagraphs: [
-    "A deposit vests a little every block, in equal parts from the block it is made to its maturity block. The depositor can claim at any time. A claim before maturity pays out only the part whose blocks have passed, returns the rest as alUSD and charges an early exit fee on that rest (1% on every early claim so far). So claiming early gives up vesting the rest and pays the fee; to vest it, the depositor deposits it again and waits a new full term.",
+    "A deposit vests a little every block, in equal parts from the block it is made to its maturity block. The depositor can claim at any time. A claim before maturity pays out only the part whose blocks have passed, returns the rest as alUSD and charges an early exit fee on that rest (1% on every early claim so far). To vest the rest, the depositor deposits it again and waits a new full term.",
   ],
   detailsHeading: "What it means for a borrower",
   details: [
     {
       bold: "The loan is repaid over time without the holder acting.",
-      text: "Each redemption lowers the debt by what it clears and the collateral by that much plus the redemption fee, so the position's collateral less its debt falls by about the fee each time. Each redemption card states the difference for that position as its net and the fee inside it.",
+      text: `Each redemption lowers the debt by what it clears and the collateral by that much plus the market's redemption fee (${PROTOCOL_FEE_WORDS}), so the position's collateral less its debt falls by about that fee each time. Each redemption card states the difference for that position as its net and the fee inside it.`,
     },
     {
       bold: "The vault's share price decides what is left over.",
@@ -263,7 +263,7 @@ export const ALCHEMIX_LINE_WIDE: LearnMoreContent = {
   details: [
     {
       bold: "Redemption",
-      text: "clears every open position's earmarked debt on the market at once, by one ratio, and takes shares from each one's collateral: shares worth the debt cleared for the Transmuter, and the market's redemption fee on top for Alchemix's fee receiver.",
+      text: `clears every open position's earmarked debt on the market at once, by one ratio, and takes shares from each one's collateral: shares worth the debt cleared for the Transmuter, and the market's redemption fee on top (${PROTOCOL_FEE_WORDS}) for Alchemix's protocol fee receiver.`,
     },
     {
       bold: "Batch liquidation",
@@ -309,7 +309,7 @@ export function alchemixPositionContent(status: string, infoHref: string): Learn
       },
       {
         bold: "Earmarked debt",
-        text: "set aside to be repaid by redemptions: the part of the debt the market's Transmuter has claimed. Holders of the synthetic deposit it in the Transmuter, and as those deposits vest the Alchemist earmarks a matching amount of debt across every open position on the market, in proportion to each position's unearmarked debt. The figure grows block by block, so a reading holds at its block. A redemption clears earmarked debt and takes vault shares worth it from the collateral, plus the market's redemption fee. The holder can also clear it: a repay with vault shares pays the earmarked part first, with the same fee, and closing the position with its collateral pays all of it. The explorer's Info page, linked below, walks through the whole cycle.",
+        text: `set aside to be repaid by redemptions: the part of the debt the market's Transmuter has claimed. Holders of the synthetic deposit it in the Transmuter, and as those deposits vest the Alchemist earmarks a matching amount of debt across every open position on the market, in proportion to each position's unearmarked debt. The figure grows block by block, so a reading holds at its block. A redemption clears earmarked debt and takes vault shares worth it from the collateral, plus the market's redemption fee (${PROTOCOL_FEE_WORDS}). The holder can also clear it: a repay with vault shares pays the earmarked part first, with the same fee, and closing the position with its collateral pays all of it. The explorer's Info page, linked below, walks through the whole cycle.`,
       },
       {
         bold: "LTV",
@@ -365,7 +365,7 @@ export const ALCHEMIX_LIFETIME_FLOWS: LearnMoreContent = {
     },
     {
       bold: "Repays",
-      text: "the shares a repay pays with come from the caller's wallet, so they are not drawn; only the protocol fee on the earmarked part leaves the collateral.",
+      text: "the shares a repay pays with come from the caller's wallet, so they are not drawn; only the redemption fee on the earmarked part leaves the collateral.",
     },
     {
       bold: "LTV",
@@ -400,7 +400,7 @@ export const ALCHEMIX_V2: LearnMoreContent = {
     },
     {
       bold: "The account's figures",
-      text: "are the migration's snapshot, read once from the paused contracts, and not at each event.",
+      text: "are the migration's snapshot, read once from the paused contracts.",
     },
   ],
   links: [ALCHEMIX_DOCS.v3Migration, ALCHEMIX_DOCS.v2Alchemist],

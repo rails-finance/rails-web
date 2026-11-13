@@ -40,7 +40,6 @@ export function claimPayoutParts(a: {
   mytSymbol: string;
   vestedRaw: string;
   synthetic: string;
-  block: number;
   value: ClaimPayoutValue | null;
 }): ClaimPayoutParts {
   const paid = `The claim paid out ${fmtRaw2(a.sharesRaw, 18)} ${a.mytSymbol}`;
@@ -49,6 +48,6 @@ export function claimPayoutParts(a: {
   return {
     paid,
     worth: `${fmtRaw2(a.value.assetsRaw, a.value.decimals)} ${a.value.symbol}`,
-    rest: ` at block ${a.block.toLocaleString("en-US")}, for ${vested}`,
+    rest: `, for ${vested}`,
   };
 }

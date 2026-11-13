@@ -257,7 +257,7 @@ function legStats(
           }
           // The line's redemption fee, inside the shares taken: the main part
           // of the net (lib/alchemix/redemption-net).
-          if (net.fee) {
+          if (net.fee && net.fee.bps > 0) {
             stats.push({
               label: `${(net.fee.bps / 100).toLocaleString("en-US")}% redemption fee`,
               value: formatExact(scaled(net.fee.sharesRaw) ?? 0),

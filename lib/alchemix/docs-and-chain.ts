@@ -71,7 +71,7 @@ const feeChangeProv: Provenance = {
 export const ALCHEMIX_BASE_DOCS_AND_CHAIN: readonly InfoDocsAndChain[] = [
   {
     claim:
-      "The docs give the Base borrower redemption fee as 0.00% on the fees page and 0.10% in the FAQ. The Alchemist charges 0 now; it charged 10 basis points until it was set to 0 at block 53,552,996 on 5 Nov 2026.",
+      "The docs give the Base borrower redemption fee as 0.00% on the fees page and 0.10% in the FAQ. The Alchemist charges 0 now; it charged 0.10% until it was set to 0 on 5 Nov 2026.",
     docs: {
       quotes: [
         { words: "0.00% on Base", href: `${DOCS}/user/concepts/fees#borrower-redemption-fee` },

@@ -53,7 +53,7 @@ export const loadTransmuterPosition = cache(
 
 /** The claim's payout in the asset under the vault, read at the claim's block
  *  (lib/sources/chain/alchemix-claim-value.ts). The vault is the token the
- *  claim's own flow paid out; null where there is no claim or the read fails. */
+ *  claim's flow paid out; null where there is no claim or the read fails. */
 export async function loadTransmuterClaimValue(
   chainId: ChainId,
   p: AlchemixTransmuterPositionData<BaseActivityEvent>,

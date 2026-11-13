@@ -213,7 +213,6 @@ export function TransmuterPositionView({
           mytSymbol,
           vestedRaw,
           synthetic: p.syntheticSymbol,
-          block: p.claim.blockNumber,
           value: valued ? { assetsRaw: claimValue.assetsRaw, symbol: underlying, decimals: underlyingDecimals } : null,
         })
       : null;
@@ -234,8 +233,7 @@ export function TransmuterPositionView({
           </Prov>
         </>
       ) : null}
-      {parts.rest} Alchemix&rsquo;s docs describe a claim as paying one unit of the asset underneath for each alAsset
-      vested.
+      {parts.rest}
     </p>
   ) : null;
   const explanation = (
@@ -243,12 +241,7 @@ export function TransmuterPositionView({
       <p>
         A Transmuter position holds {p.syntheticSymbol} until a maturity counted in blocks, vesting a little every
         block, and a claim pays out the vested part in {mytSymbol}. The holder can claim before maturity: the claim then
-        returns the part not yet vested as {p.syntheticSymbol}, less an early exit fee, so claiming early gives up
-        vesting that part and pays the fee on it. Every figure here is one of the Transmuter&rsquo;s events, replayed,
-        or arithmetic over them
-        {parts?.worth
-          ? ", except the payout's value below, read from the vault at the claim's block."
-          : "; none is read from the contract at a block."}
+        returns the part not yet vested as {p.syntheticSymbol}, less an early exit fee.
       </p>
       {early && p.claim?.claimed ? (
         <p>

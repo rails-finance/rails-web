@@ -12,7 +12,7 @@
 import type { ReactNode } from "react";
 import { ProseExplainer, H, type ExplainerItem } from "@/lib/shared/explainer-prose";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import type { RedemptionNetTotal } from "@/lib/alchemix/redemption-net";
+import type { RedemptionNetTotal } from "@/lib/alchemix/redemption-net-sum";
 import { formatNumber } from "@/lib/utils/format";
 import type { AlchemixLiveState } from "@/types/api/alchemix";
 import { AmountText } from "@/components/shared/amount-text";
@@ -191,7 +191,9 @@ function explanationParts({
   const takeShares = earmarked && sharePrice ? earmarked.formatted / sharePrice : null;
   const takeFee = takeShares != null && feeBps ? (takeShares * feeBps) / 10000 : null;
 
-  const fee = net?.total.fee && net.total.restRaw != null ? net.total.fee : null;
+  // A summed fee of zero shares (every redemption at 0 bps) states nothing.
+  const fee =
+    net?.total.fee && net.total.restRaw != null && BigInt(net.total.fee.sharesRaw) > BigInt(0) ? net.total.fee : null;
   const rest = fee && net?.total.restRaw != null ? Number(net.total.restRaw) / 1e18 : null;
   const one = redemptions.count === 1;
 
@@ -311,7 +313,11 @@ function explanationParts({
     ) : null,
     redemptions.cleared > 0 && net && netN != null && net.prov && fee ? (
       <>
-        The market&rsquo;s {(fee.bps / 100).toLocaleString("en-US")}% redemption fee is{" "}
+        {fee.bps != null ? (
+          <>The market&rsquo;s {(fee.bps / 100).toLocaleString("en-US")}% redemption fee is </>
+        ) : (
+          <>The market&rsquo;s redemption fee, at the rate in force at each redemption, is </>
+        )}
         {signed(-Number(fee.valueRaw) / 1e18)} {net.underlyingSymbol} of that net (
         <AmountText value={Number(fee.sharesRaw) / 1e18} /> {mytSymbol}).
       </>

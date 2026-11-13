@@ -89,14 +89,14 @@ export function v2Sentence(e: AlchemixV2Event, a: Amount | null): string | null 
           : `${amt} was repaid. The log from before 11 May 2022 does not state how much debt that cleared.`
         : null;
     case "liquidate":
-      // Alchemix V2's Liquidate is the account holder's own action, which the
+      // Alchemix V2's Liquidate is the account holder's action, which the
       // V2 docs call a self-liquidation: it "will use a user's collateral to
       // repay outstanding debt" (rails-ops reference/official-docs/alchemix.md,
       // V2A; reference/alchemix-v2-frozen-record.md).
       return amt
         ? cleared
-          ? `The holder repaid ${cleared} of debt with ${amt} shares of their own collateral, a self-liquidation in Alchemix's V2 docs.`
-          : `The holder used ${amt} shares of their own collateral to repay debt, a self-liquidation in Alchemix's V2 docs. The log from before 11 May 2022 does not state how much debt that cleared.`
+          ? `The holder repaid ${cleared} of debt with ${amt} shares of their collateral, a self-liquidation in Alchemix's V2 docs.`
+          : `The holder used ${amt} shares of their collateral to repay debt, a self-liquidation in Alchemix's V2 docs. The log from before 11 May 2022 does not state how much debt that cleared.`
         : null;
     default:
       return null;

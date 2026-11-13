@@ -643,7 +643,7 @@ export function alchemixEventClauses(
             ),
           );
           const net = opts.redemptionNet;
-          const fee = net && net.status === "stated" ? net.fee : null;
+          const fee = net && net.status === "stated" && net.fee && net.fee.bps > 0 ? net.fee : null;
           const pct = fee ? `${(fee.bps / 100).toLocaleString("en-US")}%` : null;
           out.push(
             clause(
