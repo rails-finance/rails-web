@@ -236,23 +236,23 @@ const fluidVaultIdentityProv_ = (vaultType: number, coords: FluidVaultCoords): P
   ],
 });
 
-/** Open positions in one vault — vaultState.totalPositions. */
+/** Positions one vault has minted, open or closed — vaultState.totalPositions. */
 const fluidVaultPositionsProv_ = (coords: FluidVaultCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: coords.blockNumber },
   verify: recompute("vaultState.totalPositions", coords),
-  summary: `Positions in the vault — its own \`vaultState.totalPositions\`${atBlock(coords)}: every position NFT the vault has minted and not burned.`,
+  summary: `Positions opened in the vault — its \`vaultState.totalPositions\`${atBlock(coords)}: every position NFT the vault has minted, open or closed. A position emptied of collateral and debt stays in the count.`,
   contract: vaultContract(coords),
   via: `${LANE} · getVaultEntireData(vault) · vaultState.totalPositions @ head`,
 });
 
-/** Σ totalPositions over the roster. */
+/** Σ totalPositions over the roster: every position minted, open or closed. */
 const fluidRosterPositionsProv_ = (coords: FluidVaultCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: coords.blockNumber },
-  summary: `Positions across the roster — Σ each vault's \`vaultState.totalPositions\`${atBlock(coords)}. Each leg a resolver read; the sum is ours.`,
+  summary: `Positions opened across the roster — Σ each vault's \`vaultState.totalPositions\`${atBlock(coords)}: every position NFT the vaults have minted, open or closed. Each leg a resolver read; the sum is ours.`,
   contract: VAULT_RESOLVER_CONTRACT,
   via: `${LANE} · Σ vaultState.totalPositions @ head`,
   formula: "Σ totalPositions over the roster",
@@ -285,3 +285,17 @@ export const fluidVaultPositionsProv = stamped(fluidVaultPositionsProv_);
 export const fluidRosterPositionsProv = stamped(fluidRosterPositionsProv_);
 export const fluidBorrowableProv = stamped(fluidBorrowableProv_);
 export const fluidVaultUsedProv = stamped(fluidVaultUsedProv_);
+
+// ── the open count (ui-jobs 633) ─────────────────────────────────────────────
+
+/** Open positions across every vault — Rails's index, the positions
+ *  listing's Status: Open total. Indexed: no chain slot holds this count. */
+export const fluidOpenPositionsProv = (readAt: string, readAtText: string): Provenance => ({
+  kind: "derived",
+  pclass: "indexed",
+  source: { timestamp: readAt },
+  summary: `Open positions across every vault — Rails's index of Fluid positions on Ethereum, read ${readAtText}. A position is open while it holds collateral or debt: the server's last resolver read of the position (\`positionByNftId\`) decides where it has one, and the replay of the position's events where it has not. The positions listing's Status: Open counts by the same rule.`,
+  contract: VAULT_RESOLVER_CONTRACT,
+  via: "Rails's server · /api/fluid/positions?status=open · total",
+  formula: "count of positions with collateral > 0 or debt > 0",
+});

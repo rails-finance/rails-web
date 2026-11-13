@@ -393,7 +393,7 @@ export function FluidPositionExplanation({
   if (live && live.vaultTotalPositions != null && live.vaultTotalPositions > 0) {
     list.push(
       <>
-        One of <H>{live.vaultTotalPositions}</H> positions in this vault
+        One of <H>{live.vaultTotalPositions}</H> positions opened in this vault
         {live.vaultTotalSupply != null && live.vaultTotalBorrow != null ? (
           <>
             {" "}

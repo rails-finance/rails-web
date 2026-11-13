@@ -159,7 +159,7 @@ export interface FluidVaultRow {
    *  anything nameable), and null without collateral or a speaking oracle. */
   aggregateRatio: number | null;
 
-  /** Open positions in the vault, its own count (vaultState.totalPositions). */
+  /** Positions the vault has minted, open or closed (vaultState.totalPositions). */
   totalPositions: number;
   /** What borrowers can take now, in the debt token, before the vault's borrow
    *  limit at the Liquidity layer (limitsAndAvailability.borrowable). Null on
