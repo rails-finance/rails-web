@@ -884,7 +884,7 @@ L5:
           Pendle principal token
         only: pt
         text: |-
-          a PT redeems for one unit of its underlying token at maturity and trades below that until then, so its oracle price rises toward maturity.
+          a PT redeems for one unit of its accounting asset at maturity and trades below that until then, so its oracle price rises toward maturity.
         sources: [{ label: "Pendle docs: Principal Token", doc: PENDLE_PT }]
     links:
       - label: |-
@@ -1109,7 +1109,7 @@ L5:
           Pendle principal token
         only: pt
         text: |-
-          a PT redeems for one unit of its underlying token at maturity and trades below that until then, so its oracle price rises toward maturity.
+          a PT redeems for one unit of its accounting asset at maturity and trades below that until then, so its oracle price rises toward maturity.
         sources: [{ label: "Pendle docs: Principal Token", doc: PENDLE_PT }]
     links:
       - label: |-
@@ -1155,7 +1155,7 @@ L5:
           Pendle principal token
         only: pt
         text: |-
-          a PT redeems for one unit of its underlying token at maturity and trades below that until then, so its oracle price rises toward maturity.
+          a PT redeems for one unit of its accounting asset at maturity and trades below that until then, so its oracle price rises toward maturity.
         sources: [{ label: "Pendle docs: Principal Token", doc: PENDLE_PT }]
     links:
       - label: |-
@@ -1193,7 +1193,7 @@ L5:
           Pendle principal token
         only: pt
         text: |-
-          a PT redeems for one unit of its underlying token at maturity and trades below that until then, so its oracle price rises toward maturity.
+          a PT redeems for one unit of its accounting asset at maturity and trades below that until then, so its oracle price rises toward maturity.
         sources: [{ label: "Pendle docs: Principal Token", doc: PENDLE_PT }]
     links:
       - label: |-

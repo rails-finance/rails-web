@@ -25,7 +25,7 @@ export const metadata = listingMetadata({
   title: "Pendle markets on Ethereum",
   canonicalPath: "/ethereum/pendle/markets",
   description:
-    "Every Pendle market on Ethereum the routers have named: its implied APY, pool and maturity read at one block, grouped by the protocol behind its yield token.",
+    "Every Pendle market on Ethereum the routers have named: its implied APY, pool and maturity read at one block, grouped by the protocol behind its yield-bearing token.",
 });
 
 export default async function PendleMarketsPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {

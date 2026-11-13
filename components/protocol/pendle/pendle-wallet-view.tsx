@@ -29,6 +29,7 @@ import {
   shortAddress,
 } from "@/lib/pendle/format";
 import { entryApyProv, impliedApyProv, maturityProv, valueProv } from "@/lib/pendle/provenance";
+import { PENDLE_WORDS } from "@/lib/pendle/words";
 import { pendleWalletHref } from "@/lib/pendle/routes";
 import type { PendlePosition, PendleWalletPositions } from "@/lib/pendle/types";
 import type { PendleReadFailure } from "@/lib/sources/api/pendle";
@@ -64,14 +65,14 @@ function ListingCard({ p, w }: { p: PendlePosition; w: PendleWalletPositions }) 
       },
       {
         id: "entry-apy",
-        label: "Fixed APY at entry",
+        label: PENDLE_WORDS.effectiveFixedApy,
         value:
           p.apy.entry.ptWeighted == null || !heldPt(p) ? null : (
             <Prov info={entryApyProv(p.apy.entry.buys, p.apy.entry.unpriced)} value={p.apy.entry.ptWeighted.toFixed(6)}>
               {apyText(p.apy.entry.ptWeighted)}
             </Prov>
           ),
-        sub: heldPt(p) ? undefined : "no PT held",
+        sub: heldPt(p) ? undefined : PENDLE_WORDS.noPtHeld,
       },
       {
         id: "implied-apy",

@@ -91,8 +91,8 @@ export function valueProv(
     return {
       kind: "derived",
       pclass: "state",
-      summary: `Value. The PT, YT and LP legs and the unclaimed interest, each at its mark, in ${asset} at block ${n(block)}.`,
-      formula: "PT + YT + LP + unclaimed interest",
+      summary: `Value. The PT, YT and LP legs and the unclaimed yield, each at its mark, in ${asset} at block ${n(block)}.`,
+      formula: "PT + YT + LP + unclaimed yield",
       source: { block },
       verify: { kind: "rollup", text: "The sum of the four values on the card." },
     };
@@ -100,7 +100,7 @@ export function valueProv(
     return {
       kind: "derived",
       pclass: "state",
-      summary: `Unclaimed interest. The yield this wallet's YT has earned and not claimed, in SY from RouterStatic, then in ${asset} at the SY's exchange rate.`,
+      summary: `Unclaimed yield. The yield this wallet's YT has earned and not claimed, after Pendle's 5% YT fee, in SY from RouterStatic, then in ${asset} at the SY's exchange rate.`,
       formula: "unclaimedInterest × SY.exchangeRate() ÷ 10¹⁸",
       contract: ROUTER_STATIC,
       source: { block },
@@ -119,7 +119,7 @@ export function valueProv(
     return {
       kind: "derived",
       pclass: "state",
-      summary: "YT value. The market has expired, so YT is worth nothing; any unclaimed interest stays claimable.",
+      summary: "YT value. The market has expired, so YT is worth nothing; any unclaimed yield stays claimable.",
       formula: "0",
       source: { block },
       verify: callCheck("market.isExpired()", block),
@@ -142,7 +142,7 @@ export function impliedApyProv(market: string, block: number, lnRate: string | n
   return {
     kind: "derived",
     pclass: "state",
-    summary: `Implied APY. The fixed rate the market prices PT at: e to the power of its last stored ln implied rate, less one, at block ${n(block)}.`,
+    summary: `Implied APY. Pendle's docs: the market consensus of the future APY of an asset. Here, e to the power of its last stored ln implied rate, less one, at block ${n(block)}.`,
     formula: "e^(lastLnImpliedRate ÷ 10¹⁸) − 1",
     inputs: lnRate ? [{ label: "lastLnImpliedRate", value: lnRate, kind: "chain", pclass: "state" }] : undefined,
     contract: { name: "Pendle market", address: market },
@@ -156,7 +156,7 @@ export function entryApyProv(buys: number, unpriced: number): Provenance {
   return {
     kind: "derived",
     pclass: "indexed",
-    summary: `Fixed APY at entry. Each PT buy this wallet paid for through a Pendle router, priced at the asset it paid and the time left to maturity, weighted by the PT it bought: ${buys} ${buys === 1 ? "buy" : "buys"}${unpriced ? `, ${unpriced} without a price` : ""}.`,
+    summary: `Effective Fixed APY. Each PT buy this wallet paid for through a Pendle router, priced at the asset it paid and the time left to maturity, weighted by the PT it bought: ${buys} ${buys === 1 ? "buy" : "buys"}${unpriced ? `, ${unpriced} without a price` : ""}.`,
     formula: "Σ (PT ÷ asset paid)^(year ÷ time to expiry) − 1, weighted by PT",
     verify: { kind: "rollup", text: "The buys are the Buy PT rows of the timeline below, each with its rate." },
   };
@@ -281,7 +281,7 @@ export function tradeApyProv(row: PendleTimelineRow): Provenance {
     kind: "derived",
     pclass: "emitted",
     summary:
-      "Fixed APY of the trade. The PT per asset of this trade, raised to a year over the time left to maturity, less one.",
+      "Effective Fixed APY of the trade. The PT per asset of this trade, raised to a year over the time left to maturity, less one.",
     formula: "(PT ÷ asset)^(year ÷ time to expiry) − 1",
     source: { block: row.block, txHash: row.txHash },
     verify: {
@@ -306,7 +306,7 @@ export function tvlProv(market: string, block: number): Provenance {
   return {
     kind: "derived",
     pclass: "state",
-    summary: `Pool size. The market's SY plus its PT at the PT's rate in SY, then in the asset at the SY's exchange rate, at block ${n(block)}.`,
+    summary: `Liquidity. The market's SY plus its PT at the PT's rate in SY, then in the asset at the SY's exchange rate, at block ${n(block)}.`,
     formula: "(totalSy + totalPt × ptToSy ÷ 10¹⁸) × SY.exchangeRate() ÷ 10¹⁸",
     contract: { name: "Pendle market", address: market },
     source: { block },
@@ -335,12 +335,12 @@ export function poolStateProv(
 
 /** A market token: which contract read names it. */
 export function marketTokenProv(
-  role: "Wrapped token" | "SY" | "PT" | "YT" | "LP" | "Reward",
+  role: "Yield-bearing token" | "SY" | "PT" | "YT" | "LP" | "Reward",
   tok: PendleToken,
   market: string,
 ): Provenance {
   const via =
-    role === "Wrapped token"
+    role === "Yield-bearing token"
       ? "SY.yieldToken()"
       : role === "Reward"
         ? "market.getRewardTokens()"
@@ -427,7 +427,7 @@ export function syRateProv(sy: PendleToken, block: number, asset: string): Prove
   return {
     kind: "chain",
     pclass: "state",
-    summary: `SY price. What one ${symbolOf(sy)} is worth in ${asset}: the SY's exchangeRate() at block ${n(block)}.`,
+    summary: `SY exchange rate. What one ${symbolOf(sy)} is worth in ${asset}: the SY's exchangeRate() at block ${n(block)}.`,
     contract: { name: symbolOf(sy), address: sy.address },
     via: "exchangeRate()",
     source: { block },

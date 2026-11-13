@@ -15,8 +15,9 @@ import { Prov } from "@/components/shared/provenance";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { PendleTokenIcon, type PendleTokenKind } from "@/components/protocol/pendle/pendle-token-icon";
-import { marketName, symbolOf } from "@/lib/pendle/format";
+import { symbolOf } from "@/lib/pendle/format";
 import { marketTokenProv } from "@/lib/pendle/provenance";
+import { PENDLE_WORDS, lpName } from "@/lib/pendle/words";
 import type { PendleMarketPage, PendleToken } from "@/lib/pendle/types";
 
 const SY_TIP =
@@ -74,8 +75,8 @@ export function PendleTokenStrip({ m }: { m: PendleMarketPage }) {
   const rewards = Object.entries(m.rewardTokens).map(([address, r]) => ({ address, ...r }));
   return (
     <div className="flex flex-col gap-3 rounded-lg bg-raised px-4 py-3 sm:flex-row sm:flex-wrap sm:items-end sm:gap-x-4 sm:px-5">
-      <Step label="Wrapped token">
-        <Item m={m} tok={t.yieldToken} kind="yield" role="Wrapped token" />
+      <Step label={PENDLE_WORDS.yieldBearingToken}>
+        <Item m={m} tok={t.yieldToken} kind="yield" role="Yield-bearing token" />
       </Step>
       <Arrow />
       <Step
@@ -100,7 +101,7 @@ export function PendleTokenStrip({ m }: { m: PendleMarketPage }) {
       </Step>
       <span className="hidden h-8 w-px self-end bg-rb-300 sm:block dark:bg-rb-700" aria-hidden />
       <Step label="Pool: PT with SY">
-        <Item m={m} tok={t.market} kind="lp" role="LP" name={`LP ${marketName(t)}`} />
+        <Item m={m} tok={t.market} kind="lp" role="LP" name={lpName(t)} />
       </Step>
       {rewards.length > 0 && (
         <>

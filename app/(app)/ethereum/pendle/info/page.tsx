@@ -17,6 +17,7 @@ import {
   PENDLE_ROUTER_V3,
   PENDLE_ROUTER_V4,
 } from "@/lib/pendle/format";
+import { LP_SYMBOL_NOTE, PENDLE_WORDS } from "@/lib/pendle/words";
 
 export const metadata = infoMetadata("pendle");
 
@@ -32,19 +33,21 @@ const GLOSSARY: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "PT",
     definition:
-      "The principal token: a claim on up to one unit of the market's asset at maturity. Before maturity it trades below that, and the discount is the fixed yield a buyer locks in.",
-    sources: [{ label: "PT", href: `${DOCS}/YieldTokenization/PT` }],
+      "The principal token: a claim on one unit of the market's accounting asset at maturity, unless negative yield holds the exchange rate under its Watermark Rate (the docs' Negative Yield page). Before maturity it trades below that, and the discount is the fixed yield a buyer locks in.",
+    sources: [
+      { label: "PT", href: `${DOCS}/YieldTokenization/PT` },
+      { label: "Negative Yield", href: `${DOCS}/NegativeYield` },
+    ],
   },
   {
     term: "YT",
     definition:
-      "The yield token: the right to the yield of the underlying token until maturity. It pays that yield as interest the holder claims, and is worth nothing after maturity.",
+      "The Yield Token: the right to the yield of the yield-bearing token until maturity. The holder claims that yield, and YT is worth nothing after maturity.",
     sources: [{ label: "YT", href: `${DOCS}/YieldTokenization/YT` }],
   },
   {
     term: "LP",
-    definition:
-      "A share of a market's pool, which holds PT and SY and earns the pool's swap fees and rewards. It can be removed before and after maturity.",
+    definition: `A share of a market's pool, which holds PT and SY. ${PENDLE_WORDS.lpEarns} It can be removed before and after maturity. ${LP_SYMBOL_NOTE}`,
     sources: [{ label: "AMM", href: `${DOCS}/LiquidityEngines/AMM#liquidity-providers-lp` }],
   },
   {
@@ -116,16 +119,16 @@ export default function PendleInfoPage() {
         "A Pendle market splits a yield-bearing token into PT, which redeems for up to one unit of the asset at maturity, and YT, which collects the yield until then.",
         "Each market's pool trades PT against SY, and the price of PT gives the market's implied APY.",
         "Rails values PT, YT and LP at Pendle's oracle, a 15-minute average, where the market's oracle is ready, and at RouterStatic's spot rate where it is not, then in the asset at the SY's exchange rate.",
-        "The protocol behind each yield token is a Rails label: the chain does not name it.",
+        "The protocol behind each yield-bearing token is a Rails label: the chain does not name it.",
       ]}
       views={[
         {
           heading: "Markets",
-          body: "Every market the routers have named, with how many are active and how many have matured, the active markets first. A market's page shows its TVL, implied APY, PT price and maturity, the YT, LP and SY prices, how the market is built, its pool and its latest router events.",
+          body: "Every market the routers have named, with how many are active and how many have matured, the active markets first. A market's page shows its liquidity, implied APY, PT price and maturity, the YT and LP prices and the SY exchange rate, how the market is built, its pool and its latest router events.",
         },
         {
           heading: "Wallet and position pages",
-          body: "A wallet's page lists one card per market. A position's page shows its value, fixed APY at entry against the implied APY now, its maturity, its lifetime flows by leg and its router events.",
+          body: "A wallet's page lists one card per market. A position's page shows its value, Effective Fixed APY against the implied APY now, its maturity, its lifetime flows by leg and its router events.",
         },
       ]}
       notCovered="Arbitrum, Base and the other chains Pendle runs on are not read yet, and PT, YT and LP transfers wait on the next phase."

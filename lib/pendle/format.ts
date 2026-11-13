@@ -106,9 +106,11 @@ export const KIND_LABEL: Record<PendleEventKind, string> = {
   "swap-pt-yt": "Swap PT and YT",
   "mint-py": "Mint PT and YT",
   "redeem-py": "Redeem PT and YT",
-  "mint-sy": "Mint SY",
-  "redeem-sy": "Redeem SY",
-  exit: "Exit",
+  // P5 (ui-jobs 654): the docs' verbs, "Wrap" and "Unwrap" (SY page) and
+  // "Redeem" (PT page, Dashboard) for a matured exit.
+  "mint-sy": "Wrap",
+  "redeem-sy": "Unwrap",
+  exit: "Redeem",
   "limit-fill": "Limit order fill",
 };
 
@@ -128,7 +130,7 @@ export function legToken(
   if (leg === "pt") return t.pt;
   if (leg === "yt") return t.yt;
   if (leg === "sy") return t.sy;
-  return { ...t.market, symbol: t.market.symbol === "PENDLE-LPT" ? `LP-${marketName(t)}` : t.market.symbol };
+  return { ...t.market, symbol: t.market.symbol === "PENDLE-LPT" ? `LP ${marketName(t)}` : t.market.symbol };
 }
 
 export const LEG_NAME = { pt: "PT", yt: "YT", lp: "LP" } as const;
