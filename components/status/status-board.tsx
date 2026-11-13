@@ -73,10 +73,8 @@ import {
   liveMiss,
   withHeadMisses,
   withFillRunner,
-  fillQueue,
-  QUEUE_LATE,
-  type FillRunner,
-  type FillReading,
+  queueWords,
+  queueLine,
   counterChains,
   type GatewayCounter,
   type FillHold,
@@ -179,42 +177,9 @@ function missLine(m: HeadMiss): string {
     : `${plan.charAt(0).toLowerCase()}${plan.slice(1)}: its read of the finalized block failed.`;
 }
 
-/** The store kinds the fill's runner works through, by job kind. */
-const RUNNER_KIND: Record<string, string> = {
-  "vault-life": "vault-life store",
-  "aave-position": "Aave position store",
-  "ctoken-liquidity": "cToken liquidity store",
-  "fx-event": "f(x) event store",
-  "llamalend-event": "LlamaLend event store",
-  logs: "log",
-};
-
-/** What the runner is on, for an index waiting its turn. */
-function runnerWords(r: FillRunner): string {
-  const j = r.job;
-  if (!j) return "the fill's next job";
-  if (j.kind === "index") {
-    const [protocol, chain] = j.key.split(":");
-    const net = CHAINS[Number(chain) as ChainId]?.name ?? `chain ${chain}`;
-    return `the ${protocolLabel(protocol, Number(chain))} index on ${net}`;
-  }
-  return `a ${RUNNER_KIND[j.kind] ?? j.kind} job (${n(j.done)} of ${n(j.of)} read)`;
-}
-
-/** A fill's wait for its turn where it decides the state (see fillState):
- *  the heartbeat fresh, no hold or head miss, and not moving. */
-function waiting(e: FillReading, now: number) {
-  if (heartbeatState(e, now) !== "fresh" || e.held || liveMiss(e, now) || !fillStall(e)) return null;
-  return fillQueue(e, now);
-}
-
-/** The status word of a fill waiting its turn: "Queued", or "Queued for
- *  2 days" once late. Null when it is not waiting. */
-function queueWords(e: FillReading, now: number): string | null {
-  const q = waiting(e, now);
-  if (!q) return null;
-  return q.since != null && now - q.since > QUEUE_LATE ? `Queued for ${ageWords(now - q.since)}` : "Queued";
-}
+/** A fill index's runner, named by the roster: "the Balancer V3 index on Base". */
+const indexName = (protocol: string, chain: number) =>
+  `the ${protocolLabel(protocol, chain)} index on ${CHAINS[chain as ChainId]?.name ?? `chain ${chain}`}`;
 
 function heartbeatLine(e: IndexProgressEntry, now: number, allowance: Allowance | null = null): string {
   const t = heartbeatTime(e);
@@ -234,14 +199,8 @@ function heartbeatLine(e: IndexProgressEntry, now: number, allowance: Allowance 
   const hb = heartbeatState(e, now);
   if (held && state !== "fresh" && hb !== "late" && hb !== "stalled") return `${held} ${line}`;
   const stall = fillStall(e);
-  const q = waiting(e, now);
-  if (q) {
-    const since =
-      q.since != null
-        ? ` Its last walk started at ${utcTime(q.since)}, ${ageWords(now - q.since)} ago.`
-        : " None of its walks has started yet.";
-    return `${queueWords(e, now)}: waiting its turn behind ${runnerWords(q.runner)}.${since} The fill last wrote at ${utcTime(t)}, ${ageWords(now - t)} ago.`;
-  }
+  const queued = queueLine(e, now, utcTime, indexName);
+  if (queued) return queued;
   return stall ? `${line} ${STALL_WORDS[stall]}` : line;
 }
 

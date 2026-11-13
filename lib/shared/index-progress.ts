@@ -197,6 +197,62 @@ export function fillQueue(
   return { since: isoSecs(j.lastStartedAt), runner: r };
 }
 
+/** The store each runner job kind reads into, as the board names it. */
+const RUNNER_KIND: Record<string, string> = {
+  "vault-life": "the vault-life store",
+  "aave-position": "the Aave position store",
+  "ctoken-liquidity": "the cToken liquidity store",
+  "fx-event": "the f(x) event store",
+  "llamalend-event": "the LlamaLend event store",
+  logs: "the log reads",
+};
+
+/** What the runner is on, for an index waiting its turn: another index
+ *  (named by `index`), a store with its progress, or its next job. */
+export function runnerWords(r: FillRunner, index: (protocol: string, chain: number) => string): string {
+  const j = r.job;
+  if (!j) return "the fill's next job";
+  if (j.kind === "index") {
+    const [protocol, chain] = j.key.split(":");
+    return index(protocol, Number(chain));
+  }
+  const n = (x: number) => x.toLocaleString("en-US");
+  return `${RUNNER_KIND[j.kind] ?? `the ${j.kind} jobs`} (${n(j.done)} of ${n(j.of)} read)`;
+}
+
+/** A fill's wait for its turn where it decides the state (see fillState):
+ *  the heartbeat fresh, no hold or head miss, and not moving. */
+export function fillWaiting(e: FillReading, now: Secs): ReturnType<typeof fillQueue> {
+  if (heartbeatState(e, now) !== "fresh" || e.held || liveMiss(e, now) || !fillStall(e)) return null;
+  return fillQueue(e, now);
+}
+
+/** The status word of a fill waiting its turn: "Queued", or "Queued for
+ *  30 h 5 min" once late (ageWords: hours under 48 h, then days). Null when
+ *  it is not waiting. */
+export function queueWords(e: FillReading, now: Secs): string | null {
+  const q = fillWaiting(e, now);
+  if (!q) return null;
+  return q.since != null && now - q.since > QUEUE_LATE ? `Queued for ${ageWords(now - q.since)}` : "Queued";
+}
+
+/** The row line of a fill waiting its turn, null when it is not waiting. */
+export function queueLine(
+  e: FillReading,
+  now: Secs,
+  at: (t: Secs) => string,
+  index: (protocol: string, chain: number) => string,
+): string | null {
+  const q = fillWaiting(e, now);
+  const t = heartbeatTime(e);
+  if (!q || t == null) return null;
+  const since =
+    q.since != null
+      ? ` Its last run started at ${at(q.since)}, ${ageWords(now - q.since)} ago.`
+      : " None of its runs has started yet.";
+  return `${queueWords(e, now)}: waiting its turn behind ${runnerWords(q.runner, index)}.${since} The fill last wrote at ${at(t)}, ${ageWords(now - t)} ago.`;
+}
+
 /** The fill plans each index every 10 min and writes its sample
  *  (pidx_progress.sampled_at) at each plan, but none while the gateways refuse
  *  its finalized-block reads. Past 90 min the heartbeat is late, which leaves
