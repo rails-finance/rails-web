@@ -27,7 +27,7 @@ export const usd = (x: number) =>
 export const pctText = (x: number, digits = 2) => `${(x * 100).toFixed(digits)}%`;
 
 export const frontDoorWords = ({ chain }: Dep) => ({
-  line: `A wallet's Morpho Blue positions on ${chain}, each with its collateral, debt and LTV against the market's LLTV, in dollars where ${chain} has a price feed for the loan asset, and its interest over the last 30 days.`,
+  line: `A wallet's Morpho Blue positions on ${chain}, each with its collateral, debt and health factor, in dollars where ${chain} has a price feed for the loan asset, and its interest over the last 30 days.`,
   links: { markets: "Markets" },
   heading: "Morpho Blue positions",
   none: `This address holds no Morpho Blue position on ${chain}.`,
@@ -65,8 +65,6 @@ export const CARD_WORDS = {
   supplied: "Supplied",
   suppliedTip: "What the wallet has lent to the market, with its interest to the block read.",
   ltv: "LTV",
-  ltvTip: "Debt divided by the collateral's value at the market's oracle price. The market liquidates at its LLTV.",
-  ltvLine: (lltv: number) => `of ${pctText(lltv, 1)} LLTV`,
   borrowRate: "Borrow APY",
   borrowRateTip:
     "The market's borrow rate from its rate model, compounded over a year. It follows how much of the market is lent out.",

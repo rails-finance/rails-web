@@ -3,8 +3,8 @@
 // An Euler V2 holding's card (J1; rails-ops reference/read-on-visit-candidates-572.md,
 // row 10). A deposit: what its shares redeem for, what the share price added
 // over 30 days, and the loan it backs. A loan: the debt, the collateral's value,
-// health, and the interest over 30 days, with each collateral on a row of the
-// band under it (J1.1). Dollars only where the vault's unit of account is USD.
+// the health score, and the interest over 30 days, with each collateral and its
+// borrow and liquidation LTVs on a row of the band under it (J1.1). Dollars only where the vault's unit of account is USD.
 
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { PositionCard, type PositionCardHead, type PositionCardSlots } from "@/components/shared/position-card";
@@ -42,6 +42,7 @@ function CollateralBand({ c }: { c: EulerReceiptContext }) {
               <th className="px-3 py-1.5 font-medium">Vault</th>
               <th className="px-3 py-1.5 text-right font-medium">{CARD_WORDS.bandAmount}</th>
               {p.unit.kind !== "off" && <th className="px-3 py-1.5 text-right font-medium">{CARD_WORDS.bandValue}</th>}
+              <th className="px-3 py-1.5 text-right font-medium">{CARD_WORDS.bandBorrowLtv}</th>
               <th className="px-3 py-1.5 text-right font-medium">{CARD_WORDS.bandLtv}</th>
             </tr>
           </thead>
@@ -63,7 +64,10 @@ function CollateralBand({ c }: { c: EulerReceiptContext }) {
                     )}
                   </td>
                 )}
-                <td className="px-3 py-1.5 text-right tabular-nums">
+                <td className="px-3 py-1.5 text-right tabular-nums" data-euler-ltv="borrow">
+                  <Prov info={collateralProv(i, "ltvBorrow", c)}>{rate(x.ltvBorrow)}</Prov>
+                </td>
+                <td className="px-3 py-1.5 text-right tabular-nums" data-euler-ltv="liquidation">
                   <Prov info={collateralProv(i, "ltv", c)}>{rate(x.ltvLiquidation)}</Prov>
                 </td>
               </tr>
@@ -77,7 +81,7 @@ function CollateralBand({ c }: { c: EulerReceiptContext }) {
 }
 
 /** Earned in 30 days or Interest in 30 days: the figure where the holding matched at both reads,
- *  its value and the vault's APY over the window under it; otherwise "Opened" or "Changed inside the 30
+ *  its value and the vault's growth over the window under it; otherwise "Opened" or "Changed inside the 30
  *  days", and the (i) says why (Fluid's treatment). */
 function windowHead(c: EulerReceiptContext, id: "earned" | "interest"): PositionCardHead {
   const { p } = c;
@@ -97,7 +101,7 @@ function windowHead(c: EulerReceiptContext, id: "earned" | "interest"): Position
         </span>
       ),
     };
-  const apy = loan ? p.window.borrowApy : p.window.supplyApy;
+  const g = loan ? p.window.indexGrowth : p.window.shareGrowth;
   return {
     ...head,
     value: (
@@ -107,10 +111,10 @@ function windowHead(c: EulerReceiptContext, id: "earned" | "interest"): Position
     ),
     usd: valueLine(inUnit(p.windowValue, p.unit), cardProv(id, c)),
     sub:
-      apy === null ? undefined : (
+      g === null ? undefined : (
         <span data-figure={`${id}-rate`}>
-          <Prov info={vaultProv(loan ? "borrowApyWindow" : "supplyApyWindow", c)}>
-            {(loan ? CARD_WORDS.interestApy : CARD_WORDS.earnedApy)(apy)}
+          <Prov info={vaultProv(loan ? "borrowWindow" : "supplyWindow", c)}>
+            {(loan ? CARD_WORDS.interestGrowth : CARD_WORDS.earnedGrowth)(g, p.window.days)}
           </Prov>
         </span>
       ),
