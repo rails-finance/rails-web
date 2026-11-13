@@ -30,10 +30,11 @@ import { ROBINHOOD_LABEL, RobinhoodSoon } from "@/components/shared/robinhood-so
 import { ScopeNote } from "@/components/shared/asset-scope-note";
 import { useScopedRoster } from "@/lib/shared/explorer-scope";
 
-// Row state grammar, same as the nav menu's:
-//   rest    → text-foreground; hover → blue-600, blue-400 in dark ("this goes somewhere")
+// Row states (Miles 13 Nov 2026, ui-jobs 661):
+//   rest    → text-foreground on a transparent border; hover → the border turns
+//             blue-500, NAV_BUTTON's hover, the text unchanged
 //   current → muted + semibold, not clickable (you can't navigate to here)
-const ROW_REST = `font-medium text-foreground ${CHROME_HOVER}`;
+const ROW_REST = "font-medium text-foreground hover:border-blue-500";
 const ROW_CURRENT = "font-semibold text-rb-500 pointer-events-none";
 
 /** One explorer row: icon chip and label, navigating to the listing. */
@@ -52,7 +53,7 @@ function ExplorerRow({
       data-switcher-explorer=""
       aria-current={isActive ? "page" : undefined}
       onClick={isActive ? undefined : onNavigate}
-      className={`flex min-w-0 items-center gap-2.5 rounded-lg px-2 py-3 text-sm transition-colors focus-ring ${
+      className={`flex min-w-0 items-center gap-2.5 rounded-lg border border-transparent px-2 py-3 text-sm transition-colors focus-ring ${
         isActive ? ROW_CURRENT : ROW_REST
       }`}
     >
