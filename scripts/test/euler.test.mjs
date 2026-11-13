@@ -21,7 +21,11 @@ export async function resolve(specifier, context, next) {
 }`;
 register(`data:text/javascript,${encodeURIComponent(hooks)}`);
 
-const { eulerPosition, eulerWindow, scaled, unitShow, walletRows } = await import("../../lib/euler/position.ts");
+const { eulerPosition, eulerWindow, liquidatable, scaled, unitShow, walletRows } = await import(
+  "../../lib/euler/position.ts"
+);
+const { growthToApy, spyToApy, EULER_YEAR_SECONDS } = await import("../../lib/euler/apy.ts");
+const { healthText } = await import("../../lib/euler/words.ts");
 
 const USDC = { address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", symbol: "USDC", decimals: 6 };
 const AERO = { address: "0x3f5bF3EdAc59d650D8fDf9657a71F2f904A3a4Ee", symbol: "AERO", decimals: 18 };
@@ -121,19 +125,20 @@ test("a loan: debt, its value, collateral, health and the window's interest", ()
   close(p.price, 0.99974633);
   close(p.borrowedValue, 1681.877428 * 0.99974633);
   close(p.collateralValue, 2620.042531736244);
-  close(p.health, 1.324471, 1e-6);
+  close(p.health, 2227036151975807199847 / 1681450786152839240000, 1e-12);
   assert.equal(p.collaterals[0].ltvLiquidation, 0.85);
   const days = (HEAD.time - THEN.time) / 86_400;
   close(p.window.days, days);
   const g = 1030853138883472077081401640 / 1022156470651751066595445631 - 1;
   close(p.window.indexGrowth, g, 1e-9);
-  close(p.window.borrowRateYear, (g * 365) / days, 1e-9);
+  close(p.window.borrowApy, (1 + g) ** (365.2425 / days) - 1, 1e-9);
   // Opened: no debt at the past block, so no 30-day figure.
   assert.equal(p.windowState, "opened");
   assert.equal(p.interest, null);
   assert.equal(p.windowValue, null);
-  // interestRate is per second, scaled by 10^27.
-  close(p.borrowRateNow, (11512255653400157300 * 31_536_000) / 1e27, 1e-6);
+  // interestRate is per second, scaled by 10^27, compounded each second over 365.2425 days.
+  close(p.borrowApyNow, (1 + 11512255653400157300 / 1e27) ** 31_556_952 - 1, 1e-6);
+  assert.equal(p.liquidatable, false);
   close(p.utilisation, 77561607179 / 78963887439, 1e-9);
 });
 
@@ -161,7 +166,7 @@ test("a deposit: what the shares redeem for, and the share price's change on the
   close(p.windowValue, 0.012907 * 0.99974633);
   const g = 1022350 / 1015828 - 1;
   close(p.window.shareGrowth, g);
-  close(p.window.supplyRateYear, (g * 365) / p.window.days);
+  close(p.window.supplyApy, (1 + g) ** (365.2425 / p.window.days) - 1);
   assert.equal(p.health, null);
   assert.equal(p.collateralValue, null);
 });
@@ -170,9 +175,9 @@ test("a vault younger than the window: no earned or interest figure", () => {
   const p = eulerPosition({ ...loan, past: null });
   assert.equal(p.interest, null);
   assert.equal(p.earned, null);
-  assert.equal(p.window.borrowRateYear, null);
+  assert.equal(p.window.borrowApy, null);
   assert.equal(p.windowState, "opened");
-  assert.equal(eulerWindow({ ...loan, past: null }).supplyRateYear, null);
+  assert.equal(eulerWindow({ ...loan, past: null }).supplyApy, null);
 });
 
 test("a loan matched at both reads: the debt now less the debt then", () => {
@@ -298,4 +303,53 @@ test("walletRows: a loan vault the account also holds shares in draws its loan, 
       ["deposit", "3463909001596505"],
     ],
   );
+});
+
+test("borrow APY: the per-second rate compounded over 365.2425 days, as Euler's docs state it", () => {
+  assert.equal(EULER_YEAR_SECONDS, 365.2425 * 86_400);
+  // eUSDC-102 on Base, read 13 Nov 2026: 74.12% simple, 109.95% compounded.
+  const apy = spyToApy("23503239886949630103");
+  assert.equal((apy * 100).toFixed(2), "109.95");
+  close(apy, 1.0994819088938, 1e-12);
+  // A low rate: 1% simple over the year compounds to e^0.01 − 1, about 1.005%.
+  const low = BigInt(Math.round((0.01 / 31_556_952) * 1e27)).toString();
+  close(spyToApy(low), Math.expm1(0.01), 1e-9);
+  assert.equal(spyToApy("0"), 0);
+  assert.equal(spyToApy(BigInt(0)), 0);
+});
+
+test("a window's growth compounded to a year", () => {
+  close(growthToApy(0.01, 365.2425), 0.01, 1e-12);
+  close(growthToApy(0.01, 30), 1.01 ** (365.2425 / 30) - 1, 1e-12);
+  assert.equal(growthToApy(0, 30), 0);
+  assert.equal(growthToApy(null, 30), null);
+  assert.equal(growthToApy(0.01, 0), null);
+});
+
+test("health: two decimals, three within 0.01 of 1, and never a rounded 1 for a value that is not 1", () => {
+  assert.equal(healthText(1.22), "1.22");
+  assert.equal(healthText(1.004), "1.004");
+  assert.equal(healthText(0.996), "0.996");
+  assert.equal(healthText(0.99), "0.990");
+  assert.equal(healthText(1.01), "1.010");
+  assert.equal(healthText(0.98), "0.98");
+  assert.equal(healthText(1), "1.000");
+  assert.equal(healthText(0.9996), "0.9996");
+  assert.equal(healthText(1.0004), "1.0004");
+});
+
+test("liquidatable at a health of exactly 1, on the raw values", () => {
+  assert.equal(liquidatable({ collateralValue: "1000", liabilityValue: "1000" }), true);
+  assert.equal(liquidatable({ collateralValue: "999", liabilityValue: "1000" }), true);
+  assert.equal(liquidatable({ collateralValue: "1001", liabilityValue: "1000" }), false);
+  const atOne = eulerPosition({
+    ...loan,
+    borrow: {
+      ...loan.borrow,
+      liquidation: { collateralValue: "1681450786152839240000", liabilityValue: "1681450786152839240000" },
+    },
+  });
+  assert.equal(atOne.health, 1);
+  assert.equal(atOne.liquidatable, true);
+  assert.equal(healthText(atOne.health), "1.000");
 });

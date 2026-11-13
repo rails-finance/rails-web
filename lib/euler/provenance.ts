@@ -5,7 +5,9 @@
 
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import type { EulerPosition, EulerWalletRow } from "@/lib/euler/position";
+import { GROWTH_APY_FORMULA, SPY_APY_FORMULA } from "@/lib/euler/apy";
 import type { BlockRef, EulerPositionRead, EulerWalletRead } from "@/lib/euler/types";
+import { healthText, rate } from "@/lib/euler/words";
 
 const n = (v: number) => v.toLocaleString("en-US");
 const date = (t: number) => new Date(t * 1000).toISOString().slice(0, 10);
@@ -141,10 +143,10 @@ export function cardProv(key: CardKey, c: EulerReceiptContext): Provenance {
         kind: "derived",
         pclass: "state",
         source: head,
-        summary: `Health — the collateral's value at liquidation LTVs over the debt's value, as the ${v.symbol} vault states them at ${at(r.head)}: ${p.health === null ? "–" : p.health.toFixed(4)}.`,
+        summary: `Health — the collateral's value at liquidation LTVs over the debt's value, as the ${v.symbol} vault states them at ${at(r.head)}: ${p.health === null ? "–" : `${healthText(p.health)}, ${p.liquidatable ? "at or below 1, so the loan can be liquidated" : "above 1"}`}.`,
         contract: vaultC(c),
         via: headVia(r),
-        formula: "collateralValue ÷ liabilityValue, from accountLiquidity(account, liquidation = true)",
+        formula: "collateralValue ÷ liabilityValue",
         inputs: [
           chain(
             "accountLiquidity(account, true) · collateralValue",
@@ -228,8 +230,11 @@ export function collateralProv(i: number, part: "amount" | "value" | "ltv", c: E
   };
 }
 
-export type VaultLineKey = "supplied" | "borrowed" | "utilisation" | "shareGrowth" | "borrowRate" | "price";
-export function vaultProv(key: VaultLineKey, c: EulerReceiptContext): Provenance {
+export type VaultLineKey = "supplied" | "borrowed" | "utilisation" | "shareGrowth" | "borrowApy" | "price";
+/** The receipts of the 30-day APYs: the vault line's borrow figure, and the card's lines under the 30-day figures. */
+export type WindowApyKey = "borrowApyWindow" | "supplyApyWindow";
+const days = (r: EulerPositionRead) => ((r.head.time - r.then.time) / 86_400).toFixed(4);
+export function vaultProv(key: VaultLineKey | WindowApyKey, c: EulerReceiptContext): Provenance {
   const { p, r } = c;
   const v = r.vault;
   const head = { block: r.head.block };
@@ -279,19 +284,48 @@ export function vaultProv(key: VaultLineKey, c: EulerReceiptContext): Provenance
           chain(`convertToAssets(10^${v.decimals}) @ ${n(r.then.block)}`, r.past?.sharePrice ?? "–"),
         ],
       };
-    case "borrowRate":
+    case "borrowApy":
       return {
         kind: "derived",
         pclass: "state",
         source: head,
-        summary: `Borrow rate — the vault's per-second rate at ${at(r.head)} times a year's seconds, and the interest index's growth from ${at(r.then)} annualised simply.`,
+        summary: `Borrow APY — the ${v.symbol} vault's per-second rate at ${at(r.head)}, compounded each second over a year: ${rate(p.borrowApyNow)}. Euler vaults compound each second, checked on Base: eUSDC-102's stored interest index grew by (1 + rate)^180 from block 56,709,381 to 56,710,281.`,
+        contract: vaultC(c),
+        via: headVia(r),
+        formula: SPY_APY_FORMULA,
+        inputs: [
+          chain(`interestRate() @ ${n(r.head.block)}, per second, scaled by 10^27`, v.interestRate),
+          derived("Seconds in a year: 365.2425 × 86,400, an average Gregorian year in Euler's docs", "31,556,952"),
+        ],
+      };
+    case "borrowApyWindow":
+      return {
+        kind: "derived",
+        pclass: "state",
+        source: head,
+        summary: `Borrow APY over the 30 days — the ${v.symbol} vault's interest index at ${at(r.then)} and ${at(r.head)}, its growth between them compounded to a year: ${p.window.borrowApy === null ? "–" : rate(p.window.borrowApy)}.`,
         contract: vaultC(c),
         via: bothVia(r),
-        formula: "interestRate × 31,536,000 ÷ 10^27; (index_now ÷ index_then − 1) × 365 ÷ days",
+        formula: GROWTH_APY_FORMULA("interestAccumulator"),
         inputs: [
-          chain("interestRate()", v.interestRate),
-          chain(`interestAccumulator() @ ${n(r.head.block)}`, v.interestAccumulator),
-          chain(`interestAccumulator() @ ${n(r.then.block)}`, r.past?.interestAccumulator ?? "–"),
+          chain(`interestAccumulator() now @ ${n(r.head.block)}`, v.interestAccumulator),
+          chain(`interestAccumulator() then @ ${n(r.then.block)}`, r.past?.interestAccumulator ?? "–"),
+          derived("Days between the blocks", days(r)),
+        ],
+      };
+    case "supplyApyWindow":
+      return {
+        kind: "derived",
+        pclass: "state",
+        source: head,
+        summary: `APY over the 30 days — the ${v.symbol} vault's share price at ${at(r.then)} and ${at(r.head)}, its growth between them compounded to a year: ${p.window.supplyApy === null ? "–" : rate(p.window.supplyApy)}.`,
+        contract: vaultC(c),
+        via: bothVia(r),
+        formula: GROWTH_APY_FORMULA("convertToAssets"),
+        inputs: [
+          chain(`convertToAssets(10^${v.decimals}) now @ ${n(r.head.block)}`, v.sharePrice),
+          chain(`convertToAssets(10^${v.decimals}) then @ ${n(r.then.block)}`, r.past?.sharePrice ?? "–"),
+          derived("Days between the blocks", days(r)),
         ],
       };
     case "price":
