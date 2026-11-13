@@ -21,8 +21,7 @@ import { BASEDOLLAR_BRANCHES, DEBT_ADDRESS, DEBT_SYMBOL } from "@/lib/basedollar
 import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { unlaunchedRobotsForPath } from "@/lib/shared/page-metadata";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 
 export const dynamic = "force-dynamic";
 
@@ -73,7 +72,6 @@ export default async function BasedollarBranchesPage() {
             docsLink: { label: "Basedollar", url: "https://basedollar.money" },
           }}
         />
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
         <ProvInspectorLayer />
       </div>
     </div>

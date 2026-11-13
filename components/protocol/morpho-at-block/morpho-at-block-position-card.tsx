@@ -3,11 +3,12 @@
 // A Morpho Blue position read on visit, on Arc or Optimism (rails-ops ui-jobs
 // 577 and 578), on the shared
 // position card with the Morpho card's headlines: Collateral, Debt (or
-// Supplied), LTV against the market's LLTV, and the borrow rate (or the supply
-// rate); the panel's rows carry each side's amount and dollars, the 30 days'
+// Supplied), the health factor with LTV and LLTV under it (ui-jobs 628c), and
+// the Borrow APY (or the Supply APY); the panel's rows carry each side's amount and dollars, the 30 days'
 // interest, the room to borrow and the drop that liquidates. Every figure is
 // read when the page opens; the read stamp names the blocks.
 
+import { HEALTH_FACTOR_TIP, morphoApy, MORPHO_TERMS } from "@/lib/morpho/terms";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCard, type PositionCardSlots, type PositionPanelRow } from "@/components/shared/position-card";
 import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups";
@@ -178,13 +179,31 @@ function slots(r: MorphoAtBlockPositionRead, dep: MorphoAtBlockDeployment): Posi
           <span className="text-rb-500">{CARD_WORDS.noDebt}</span>
         ),
       },
-      {
-        id: "ltv",
-        label: CARD_WORDS.ltv,
-        labelTip: CARD_WORDS.ltvTip,
-        value: f.ltv != null ? <Prov info={morphoAtBlockProv("ltv", c)}>{pctText(f.ltv, 1)}</Prov> : null,
-        sub: CARD_WORDS.ltvLine(f.lltv),
-      },
+      // The health factor with LTV and LLTV under it, as on the Morpho card;
+      // a position with no debt has none (ui-jobs 628c).
+      ...(borrows
+        ? [
+            {
+              id: "health-factor",
+              label: MORPHO_TERMS.healthFactor,
+              labelTip: HEALTH_FACTOR_TIP,
+              value:
+                f.healthFactor != null ? (
+                  <Prov info={morphoAtBlockProv("health", c)}>{f.healthFactor.toFixed(2)}</Prov>
+                ) : null,
+              sub: (
+                <span className="whitespace-nowrap">
+                  {f.ltv != null && (
+                    <>
+                      {CARD_WORDS.ltv} <Prov info={morphoAtBlockProv("ltv", c)}>{pctText(f.ltv, 1)}</Prov> ·{" "}
+                    </>
+                  )}
+                  {MORPHO_TERMS.lltv} {pctText(f.lltv, 1)}
+                </span>
+              ),
+            },
+          ]
+        : []),
       borrows || !(f.supplied > 0)
         ? {
             id: "borrow-rate",
@@ -192,7 +211,7 @@ function slots(r: MorphoAtBlockPositionRead, dep: MorphoAtBlockDeployment): Posi
             labelTip: CARD_WORDS.borrowRateTip,
             value:
               f.borrowApr != null ? (
-                <Prov info={morphoAtBlockProv("borrow-rate", c)}>{pctText(f.borrowApr)}</Prov>
+                <Prov info={morphoAtBlockProv("borrow-rate", c)}>{pctText(morphoApy(f.borrowApr))}</Prov>
               ) : null,
           }
         : {
@@ -201,7 +220,7 @@ function slots(r: MorphoAtBlockPositionRead, dep: MorphoAtBlockDeployment): Posi
             labelTip: CARD_WORDS.supplyRateTip,
             value:
               f.supplyApr != null ? (
-                <Prov info={morphoAtBlockProv("supply-rate", c)}>{pctText(f.supplyApr)}</Prov>
+                <Prov info={morphoAtBlockProv("supply-rate", c)}>{pctText(morphoApy(f.supplyApr))}</Prov>
               ) : null,
           },
     ],

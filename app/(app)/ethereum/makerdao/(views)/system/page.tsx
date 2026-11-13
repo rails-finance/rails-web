@@ -6,8 +6,7 @@ import { MakerSystemView, MakerSystemStamp } from "@/components/protocol/makerda
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { loadMakerSystemFromChain } from "@/lib/sources/chain/makerdao-system";
 import { protocolForHref } from "@/lib/shared/protocols";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { FocusSourceGate } from "@/components/shared/aim-gate";
 import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
 
@@ -48,7 +47,6 @@ export default async function MakerSystemPage() {
           what="MakerDAO's system"
         >
           <MakerSystemView data={data} />
-          <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
         </FocusSourceGate>
         <ProvInspectorLayer />
       </div>

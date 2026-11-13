@@ -3,7 +3,7 @@
 // The readout under the card (U5; rails-ops ui-jobs 569): a table of two
 // columns, the block 30 days back and the block read now, the wallet's rows
 // first, then the pool's, each figure traced to its reads
-// (lib/balancer/provenance.ts). The section is one receipts scope its ⋮ arms
+// (lib/balancer/provenance.ts). The section is one receipts scope
 // (decision 0059).
 
 import { ProvSection, SectionHeading, SectionMenu } from "@/components/shared/section-menu";

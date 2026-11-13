@@ -32,14 +32,15 @@ export function HeaderBar() {
             ui-jobs 514); the panel's top row draws its open glyph in the same
             place, closing it. Centre: the Rails mark and name, a link home, on
             every page but home, whose hero carries them.
-            Right: H20 alone, the theme switch and the way into /start being in
+            Right: H20, with "Exit inspector" left of it while the inspector
+            is armed; the theme switch and the way into /start being in
             its menu. Below md the beta pill is in the footer
             (components/nav/phone-beta.tsx). */}
         <div className="justify-self-start">
           <SearchLauncher placement="header" />
         </div>
         {isHome ? <span /> : <HomeBrand />}
-        <div className="flex items-center justify-self-end" data-header-cluster="">
+        <div className="flex items-center gap-2 justify-self-end" data-header-cluster="">
           <ProfileMenu />
         </div>
       </div>

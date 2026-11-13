@@ -83,7 +83,7 @@ const MORPHO_BASE_TX_TOP = 10000;
 const MORPHO_BASE_SIZE_TOP = 150_000_000;
 
 const MORPHO_BASE_SIZE_NOTE =
-  "Debt and collateral in the market's loan token, collateral at the market's stored oracle price.";
+  "Debt and collateral in the market's loan asset, collateral at the market's stored oracle price.";
 
 export interface MorphoBaseListFilters extends BaseListFilters {
   /** open / closed / liquidated — multi (OR). */
@@ -227,7 +227,7 @@ export function morphoBaseListDimensions(
   return [
     {
       id: "loanTokens",
-      label: "Loan token",
+      label: "Loan asset",
       group: "Assets",
       cardinality: "multi",
       param: "loan",
@@ -268,8 +268,8 @@ export function morphoBaseListDimensions(
       setDebt: (f, debt) => ({ ...f, debt }),
       getColl: (f) => f.collValue,
       setColl: (f, collValue) => ({ ...f, collValue }),
-      debtUnit: "loan token",
-      collUnit: "loan token",
+      debtUnit: "loan asset",
+      collUnit: "loan asset",
       collId: "collvalue",
       debtAliases: ["state"],
       top: MORPHO_BASE_SIZE_TOP,

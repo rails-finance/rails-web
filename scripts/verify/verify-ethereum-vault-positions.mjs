@@ -767,9 +767,8 @@ async function readListingDom(qs = "") {
     : "";
   const roster = await page.locator("[data-roster-drawer]").count();
   const introOnFace = await page.locator("[data-intro-drawer]").count();
-  const inspector = await page.locator("button.prov-inspect-toggle").count();
   await page.close();
-  return { status, cards, body: bodyText, stance, roster, introOnFace, inspector };
+  return { status, cards, body: bodyText, stance, roster, introOnFace };
 }
 
 /** The section's about page — /ethereum/aave/vaults/info, the (i) in the rail.
@@ -1330,15 +1329,16 @@ check(
 );
 await railPage.close();
 
-// The face is the figures it read and nothing else. All three of these were on
-// it before this change — the "How this listing is built" drawer, the roster
-// drawer, and the provenance inspector's toggle — and each is asserted ABSENT
+// The face is the figures it read and nothing else. Both of these were on
+// it before this change — the "How this listing is built" drawer and the roster
+// drawer — and each is asserted ABSENT (the inspector toggle that was a third
+// left the app in ui-jobs 625)
 // by the selector it actually rendered under, so a drawer put back would go
 // red here rather than quietly returning.
 check(
-  "L14d the listing face carries no intro drawer, no roster drawer and no provenance inspector",
-  dom.introOnFace === 0 && dom.roster === 0 && dom.inspector === 0,
-  `[data-intro-drawer] ${dom.introOnFace}, [data-roster-drawer] ${dom.roster}, button.prov-inspect-toggle ${dom.inspector}`,
+  "L14d the listing face carries no intro drawer and no roster drawer",
+  dom.introOnFace === 0 && dom.roster === 0,
+  `[data-intro-drawer] ${dom.introOnFace}, [data-roster-drawer] ${dom.roster}`,
 );
 
 await browser.close();

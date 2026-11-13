@@ -14,13 +14,13 @@
 // debt then grown by the vault's interest index alone, so nothing was borrowed
 // or repaid; its interest is the debt now less the debt then. A holding that
 // was zero at the past block was opened inside the window, and any other
-// difference changed it: neither states a figure. The yearly rates are the
-// vault's, as APYs (lib/euler/apy.ts): the rate now compounded each second, and
-// the window's growth compounded to a year.
+// difference changed it: neither states a figure. The borrow APY is the vault's
+// rate now compounded each second (lib/euler/apy.ts); the 30-day rates are the
+// window's growth, the share price's and the interest index's.
 //
 // Pure: imports nothing through `@/`, so scripts/test can load it.
 
-import { growthToApy, spyToApy } from "./apy";
+import { spyToApy } from "./apy";
 import { EULER_DOLLARS, type EulerPositionRead, type EulerWalletRead, type Token } from "./types";
 
 const DAY = 86_400;
@@ -53,12 +53,8 @@ export interface EulerWindow {
   days: number;
   /** Share price growth over the window, as a fraction; null where the vault had no price then. */
   shareGrowth: number | null;
-  /** That growth compounded to a year, as an APY. */
-  supplyApy: number | null;
   /** Interest index growth over the window, as a fraction. */
   indexGrowth: number | null;
-  /** That growth compounded to a year, as an APY. */
-  borrowApy: number | null;
 }
 
 export interface EulerPosition {
@@ -145,13 +141,7 @@ export function eulerWindow(r: EulerPositionRead): EulerWindow {
   const a0 = r.past?.interestAccumulator ? BigInt(r.past.interestAccumulator) : null;
   const shareGrowth = p0 && p0 > BigInt(0) ? Number(p1 - p0) / Number(p0) : null;
   const indexGrowth = a0 && a0 > BigInt(0) ? scaled(((a1 - a0) * RAY) / a0, 27) : null;
-  return {
-    days,
-    shareGrowth,
-    supplyApy: growthToApy(shareGrowth, days),
-    indexGrowth,
-    borrowApy: growthToApy(indexGrowth, days),
-  };
+  return { days, shareGrowth, indexGrowth };
 }
 
 /** Euler's boundary on the raw values: liquidation when the collateral at liquidation LTVs is not greater than the debt. */

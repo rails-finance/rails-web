@@ -17,7 +17,7 @@ export const revalidate = 600;
 export const metadata = {
   title: "Morpho Blue markets on Base",
   description:
-    "Every Morpho Blue market on Base, grouped by the token it lends: its collateral, LLTV, size, rates and utilisation.",
+    "Every Morpho Blue market on Base, grouped by the token it lends: its collateral, LLTV, size, rates and utilization.",
   ...unlaunchedRobotsForPath("/base/morpho/markets"),
 };
 

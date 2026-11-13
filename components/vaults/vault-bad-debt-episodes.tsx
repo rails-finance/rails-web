@@ -210,7 +210,7 @@ function EpisodeRow({ e }: { e: BadDebtEpisode }) {
       <DataTableCell label="Market" wide valign="middle" className="break-all lg:whitespace-nowrap lg:break-normal">
         <Prov info={badDebtMarketProv(e)}>
           <a href={e.market.href} className={INLINE_LINK} title={e.marketId}>
-            {e.market.collateralSymbol}/{e.market.loanSymbol}
+            {e.market.loanSymbol} / {e.market.collateralSymbol}
           </a>{" "}
           <span className="text-rb-500">{lltvText(e.market.lltv)}</span>
         </Prov>

@@ -234,7 +234,7 @@ const vaultLegLltvProv_ = (c: MorphoVaultCoords): Provenance => ({
     kind: "recompute",
     text: "The market id is keccak256(abi.encode(params)); recompute the hash from these params — or call idToMarketParams(id) — to confirm this lltv defines the market.",
   },
-  summary: `Loan-to-value for ${legName(c)} — \`idToMarketParams(id).lltv\`${atBlock(c)}, the market's ONE risk number: the borrow limit and the liquidation line at once. Fixed at creation and immutable, because the market id IS keccak256(abi.encode(params)).`,
+  summary: `LLTV for ${legName(c)} — \`idToMarketParams(id).lltv\`${atBlock(c)}, the market's one risk parameter: the most a position may borrow, and the LTV past which it can be liquidated. Fixed at creation and immutable, because the market id IS keccak256(abi.encode(params)).`,
   contract: blueContract(),
   via: `${lane(c)} · Morpho.idToMarketParams(id).lltv`,
 });
