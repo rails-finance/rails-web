@@ -821,6 +821,12 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
           ...latestSource(coords),
         };
 
+  // The indexed debt's class: an unbatched Trove's is TroveUpdated's `_debt`,
+  // the latest log's field as decoded (rails-server mv_ebisu_positions, mig
+  // 292; mv_asymmetry_positions, mig 073; mv_basedollar_positions, mig 163:
+  // `debt` from the branch's trove_updated rows), so Emitted. A batched
+  // Trove's is computed by the index, its batch debt shares ÷ the batch's
+  // total shares × BatchUpdated's `_debt`, so Indexed.
   const positionDebtProv = (coords?: LiquityForkCoords): Provenance => ({
     kind: coords?.isBatched ? "chain-derived" : "chain",
     pclass: coords?.isBatched ? "indexed" : "emitted",
