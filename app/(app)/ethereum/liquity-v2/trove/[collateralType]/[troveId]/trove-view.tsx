@@ -279,7 +279,7 @@ export default function TroveView({
   // The branch's shutdown (ui-jobs 612), read live: no V2 branch records one.
   // The branch's state names an urgent redemption on any Trove, open or not
   // (ui-jobs 619); the card and the accrual clock take it on an open Trove
-  // only, as a closed Trove keeps its own word and accrues nothing.
+  // only, as a closed Trove keeps its recorded state and accrues nothing.
   const branchShutdown = useBranchShutdown("liquity-v2", collateralType, troveData != null);
   const shutdown = troveData?.status === "open" ? branchShutdown : null;
 
