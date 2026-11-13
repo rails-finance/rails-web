@@ -56,6 +56,56 @@ const Term = ({ children }: { children: ReactNode }) => (
   <span className="font-semibold text-foreground">{children}</span>
 );
 
+/** The tab row (B4). Below sm the five tabs are wider than a phone, so the
+ *  row scrolls sideways: a cut edge fades out, and the chosen tab is
+ *  scrolled into view when it changes and once the counts draw (ui-jobs 677). */
+function TabRow({ tab, ready, children }: { tab: Tab; ready: boolean; children: ReactNode }) {
+  const row = useRef<HTMLDivElement>(null);
+  const [cut, setCut] = useState({ start: false, end: false });
+  const measure = () => {
+    const el = row.current;
+    if (!el) return;
+    const start = el.scrollLeft > 1;
+    const end = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+    setCut((c) => (c.start === start && c.end === end ? c : { start, end }));
+  };
+  useEffect(() => {
+    const el = row.current;
+    const chosen = el?.querySelector<HTMLElement>(`[data-saved-tab="${tab}"]`);
+    if (el && chosen && el.scrollWidth > el.clientWidth) {
+      // The tab whole inside the fades, scrolling the row alone.
+      const pad = 32;
+      const left = chosen.getBoundingClientRect().left - el.getBoundingClientRect().left + el.scrollLeft;
+      const right = left + chosen.offsetWidth;
+      if (left - pad < el.scrollLeft) el.scrollLeft = Math.max(0, left - pad);
+      else if (right + pad > el.scrollLeft + el.clientWidth) el.scrollLeft = right + pad - el.clientWidth;
+    }
+    measure();
+  }, [tab, ready]);
+  useEffect(() => {
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+  const fade = [
+    cut.start ? "transparent, #000 32px" : "#000",
+    cut.end ? "#000 calc(100% - 32px), transparent" : "#000",
+  ];
+  return (
+    <div
+      ref={row}
+      onScroll={measure}
+      className="-mx-4 flex items-center gap-4 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:gap-x-8 sm:overflow-visible sm:px-0"
+      style={cut.start || cut.end ? { maskImage: `linear-gradient(to right, ${fade.join(", ")})` } : undefined}
+      role="tablist"
+      aria-label="Saved views"
+      data-anatomy="B4"
+      data-saved-tabs-cut={[cut.start ? "start" : "", cut.end ? "end" : ""].filter(Boolean).join(" ") || undefined}
+    >
+      {children}
+    </div>
+  );
+}
+
 const CARD = "flex flex-col rounded-2xl border border-rb-300/40 bg-raised p-5 dark:border-rb-700/40";
 
 export function BookmarksPage() {
@@ -183,7 +233,7 @@ export function BookmarksPage() {
       </div>
       {/* The heading (B1), and under it the tabs (B4) on a row of their own at
           every width (Miles, 13 Nov 2026; ui-jobs 652); on a phone the row
-          scrolls sideways. From sm, 48px under Back, 28px to the tabs and 56px
+          scrolls sideways (TabRow). From sm, 48px under Back, 28px to the tabs and 56px
           to the panel (Miles's spacing guide, 13 Nov 2026); a phone keeps
           less, its tabs' 44px row already spacing them. */}
       <div className="mb-8 mt-8 flex flex-col gap-3 sm:mb-14 sm:mt-12 sm:gap-7">
@@ -195,13 +245,9 @@ export function BookmarksPage() {
         </h1>
         {/* The explorer sub-nav's type (H5, `TAB_ACTIVE`/`TAB_IDLE`) with each
             count in the profile menu's `COUNT_BADGE`, drawn only above 0 (Miles
-            13 Nov 2026). */}
-        <div
-          className="-mx-4 flex items-center gap-4 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0"
-          role="tablist"
-          aria-label="Saved views"
-          data-anatomy="B4"
-        >
+            13 Nov 2026); 32px apart from sm, twice H5's gap, so a tab and its
+            count read as one (ui-jobs 677). */}
+        <TabRow tab={tab} ready={!!ready}>
           {TABS.map((t) => (
             <button
               key={t.id}
@@ -230,7 +276,7 @@ export function BookmarksPage() {
               )}
             </button>
           ))}
-        </div>
+        </TabRow>
       </div>
       {/* Nothing draws until the browser's list is read, so a reader with
           saved items never sees the empty state flash first. */}

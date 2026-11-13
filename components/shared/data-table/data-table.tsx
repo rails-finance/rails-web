@@ -37,6 +37,10 @@
 // header row hides, the lead zone narrows to a 4px bar in the protocol's hue,
 // the row header spans the card, the other cells sit two to a line, each with
 // its `label`, a `wide` cell on a line of its own, an empty cell not drawn.
+// `compact` (with `stacked`) draws each card as a list row:
+// the row header on the first line, the other cells after it on one wrapping
+// line indented by `--dt-indent` (set by the caller), the labels for a
+// screen reader alone, the ⋮ centred on the first line (`.dt-compact`).
 // The hairlines, the hover block and the linked row's border carry over;
 // pinning (D3) does not apply.
 //
@@ -98,6 +102,7 @@ export function DataTable({
   anatomy,
   stacked = false,
   stackBelow = "sm",
+  compact = false,
   rowHeight,
   tableClassName = "",
   className = "",
@@ -118,6 +123,10 @@ export function DataTable({
   /** Where the cards give way to the table: `lg` for a table too wide for a
    *  tablet (`.dt-stack-lg`). The row heights then start at lg. */
   stackBelow?: "sm" | "lg";
+  /** With `stacked`: each card a list row, its other
+   *  cells on one line under the row header, unlabelled on screen
+   *  (`.dt-compact`). The caller sets `--dt-indent` to its name's start. */
+  compact?: boolean;
   /** From sm every row is one fixed height, each cell middle-aligned, the
    *  caller keeping its content inside it (a long name truncates): `one`
    *  line, 60px (room for a 36px icon); `two`, 68px (a name over a one-line
@@ -141,7 +150,7 @@ export function DataTable({
           {...frame}
         >
           <table
-            className={`dt w-full border-separate border-spacing-0 ${stacked ? "dt-stacked" : ""} ${stacked && stackBelow === "lg" ? "dt-stack-lg" : ""} ${tableClassName}`}
+            className={`dt w-full border-separate border-spacing-0 ${stacked ? "dt-stacked" : ""} ${stacked && stackBelow === "lg" ? "dt-stack-lg" : ""} ${stacked && compact ? "dt-compact" : ""} ${tableClassName}`}
             aria-label={caption ? undefined : label}
             role={stacked ? "table" : undefined}
           >
