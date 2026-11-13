@@ -46,7 +46,7 @@ const feeProv = (block: number, bps: number): Provenance => ({
   pclass: "state",
   source: { block },
   contract: BASE_ALCHEMIST,
-  summary: `The Base Alchemist's protocolFee — ${bps} basis points at block ${block.toLocaleString("en-US")}, read 13 Nov 2026. It was 10 at block 52,992,079 and 0 at blocks 53,638,119, 54,284,159 and 56,868,319, so the change lies between 52,992,080 and 53,638,119.`,
+  summary: `The Base Alchemist's protocolFee — ${bps} basis points at block ${block.toLocaleString("en-US")}, read 13 Nov 2026. The Alchemist set it from 10 to 0 at block 53,552,996.`,
   via: `protocolFee() @ block ${block.toLocaleString("en-US")}`,
   verify: {
     kind: "recompute",
@@ -54,10 +54,24 @@ const feeProv = (block: number, bps: number): Provenance => ({
   },
 });
 
+const feeChangeProv: Provenance = {
+  kind: "chain",
+  pclass: "emitted",
+  source: { block: 53_552_996, txHash: "0x018e252984d2d8a7a8cb75c63ab8c718063b1b0c83f95bdbb8ba3a4f4e742fee" },
+  contract: BASE_ALCHEMIST,
+  summary:
+    "The Base Alchemist's fee change — ProtocolFeeUpdated(0) at block 53,552,996 (5 Nov 2026 16:15:39 UTC), the one such log in blocks 52,992,080 to 53,638,118, read 13 Nov 2026. protocolFee() read 10 at block 52,992,079 and 0 at 53,638,119.",
+  via: "eth_getLogs on the Base Alchemist, blocks 52,992,080 to 53,638,118 · ProtocolFeeUpdated",
+  verify: {
+    kind: "recompute",
+    text: `To check: ask any Base node for the Alchemist ${BASE_ALCHEMIST.address}'s ProtocolFeeUpdated logs from block 52,992,080 to 53,638,118.`,
+  },
+};
+
 export const ALCHEMIX_BASE_DOCS_AND_CHAIN: readonly InfoDocsAndChain[] = [
   {
     claim:
-      "The docs give the Base borrower redemption fee as 0.00% on the fees page and 0.10% in the FAQ. The Alchemist charges 0 now; it charged 10 basis points until a block between 52,992,080 and 53,638,119.",
+      "The docs give the Base borrower redemption fee as 0.00% on the fees page and 0.10% in the FAQ. The Alchemist charges 0 now; it charged 10 basis points until it was set to 0 at block 53,552,996 on 5 Nov 2026.",
     docs: {
       quotes: [
         { words: "0.00% on Base", href: `${DOCS}/user/concepts/fees#borrower-redemption-fee` },
@@ -67,7 +81,7 @@ export const ALCHEMIX_BASE_DOCS_AND_CHAIN: readonly InfoDocsAndChain[] = [
     },
     chain: [
       { words: "protocolFee is 0 at block 56,868,319", prov: feeProv(56_868_319, 0) },
-      { words: "10 at block 52,992,079", prov: feeProv(52_992_079, 10) },
+      { words: "ProtocolFeeUpdated(0) at block 53,552,996", prov: feeChangeProv },
     ],
   },
   {

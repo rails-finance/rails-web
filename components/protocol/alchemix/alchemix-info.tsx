@@ -14,9 +14,9 @@ import { transmuterListingPath, v2LinesForChain, v2ListingPath, type AlchemixDep
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { ALCHEMIX_BASE_DOCS_AND_CHAIN } from "@/lib/alchemix/docs-and-chain";
 import {
-  BASE_FEE_FIRST_ZERO,
+  BASE_FEE_CHANGE_BLOCK,
+  BASE_FEE_CHANGE_DATE,
   BASE_FEE_HEAD_READ,
-  BASE_FEE_LAST_TEN,
   protocolFeeNow,
 } from "@/lib/alchemix/protocol-fee";
 
@@ -53,7 +53,7 @@ export function AlchemixInfoPage({ deployment }: { deployment: AlchemixDeploymen
   const feeSentence =
     feeNow != null && feeNow > 0
       ? `Each redemption also charges a protocol fee of ${(feeNow / 100).toString()}% of the collateral that pays off the debt, taken from the borrowers' collateral and sent to Alchemix's fee receiver.`
-      : `The Alchemist can charge a protocol fee on the collateral each redemption takes, sent to Alchemix's fee receiver. On ${chain} it is 0%, read at block ${BASE_FEE_HEAD_READ.toLocaleString("en-US")}; it was 0.1% until a block between ${(BASE_FEE_LAST_TEN + 1).toLocaleString("en-US")} and ${BASE_FEE_FIRST_ZERO.toLocaleString("en-US")}.`;
+      : `The Alchemist can charge a protocol fee on the collateral each redemption takes, sent to Alchemix's fee receiver. On ${chain} it is 0%, read at block ${BASE_FEE_HEAD_READ.toLocaleString("en-US")}; it was 0.1% until block ${BASE_FEE_CHANGE_BLOCK.toLocaleString("en-US")} on ${BASE_FEE_CHANGE_DATE}.`;
   const alusdb = lines.some((l) => l.key === "base-alusdb");
   const vaults = and([...new Set(lines.map((l) => `${l.myt} holds ${l.underlying}`))]);
   const synthKinds = lines.some((l) => l.underlying === "WETH")

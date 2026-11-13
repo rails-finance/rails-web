@@ -56,7 +56,6 @@ import {
 } from "@/lib/alchemix/readings-before";
 import { redemptionNet } from "@/lib/alchemix/redemption-net";
 import { lineProtocolFeeStep } from "@/lib/alchemix/lines";
-import { unreadFee } from "@/lib/alchemix/protocol-fee";
 
 const WAD = 1e18;
 
@@ -148,7 +147,6 @@ export function AlchemixEventCard({
     underlyingDecimals,
     mytSymbol,
     protocolFeeBps: feeBps,
-    protocolFeeUnread: unreadFee(feeStep),
     collateralTakenRaw: isRedemption ? collateralTakenRaw(lead, before) : null,
     readingBefore: before,
     lineEventInBlock,

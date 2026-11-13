@@ -3,32 +3,20 @@
 // Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import {
-  BASE_FEE_FIRST_ZERO,
-  BASE_FEE_LAST_TEN,
-  protocolFeeAt,
-  protocolFeeNow,
-  unreadFee,
-} from "../../lib/alchemix/protocol-fee.ts";
+import { BASE_FEE_CHANGE_BLOCK, protocolFeeAt, protocolFeeNow } from "../../lib/alchemix/protocol-fee.ts";
 import { claimPayoutParts } from "../../lib/alchemix/claim-payout.ts";
 
-// Read 13 Nov 2026: protocolFee() 10 at Base block 52,992,079; 0 at 53,638,119.
-test("Base: a redemption at or before the last block read at 10 pays 10 bps", () => {
-  assert.equal(protocolFeeAt(8453, "base-alusdb", 52_000_000)?.bps, 10);
-  assert.equal(protocolFeeAt(8453, "base-alusdb", BASE_FEE_LAST_TEN)?.bps, 10);
+// Read 13 Nov 2026: ProtocolFeeUpdated(0) on the Base Alchemist at block 53,552,996.
+test("Base: a redemption before the change block pays 10 bps", () => {
+  assert.equal(protocolFeeAt(8453, "base-alusdb", 52_492_070)?.bps, 10);
+  assert.equal(protocolFeeAt(8453, "base-alusdb", 53_030_294)?.bps, 10);
+  assert.equal(protocolFeeAt(8453, "base-alusdb", BASE_FEE_CHANGE_BLOCK - 1)?.bps, 10);
 });
 
-test("Base: between the two reads the fee is unread and the surface says so", () => {
-  const step = protocolFeeAt(8453, "base-alusdb", BASE_FEE_LAST_TEN + 1);
-  assert.equal(step?.bps, null);
-  assert.match(unreadFee(step) ?? "", /after block 52,992,079 is unread/);
-  assert.equal(protocolFeeAt(8453, "base-alusdb", BASE_FEE_FIRST_ZERO - 1)?.bps, null);
-});
-
-test("Base: from the first block read at 0, and after, the fee is 0", () => {
-  assert.equal(protocolFeeAt(8453, "base-alusdb", BASE_FEE_FIRST_ZERO)?.bps, 0);
+test("Base: at the change block and after, the fee is 0", () => {
+  assert.equal(BASE_FEE_CHANGE_BLOCK, 53_552_996);
+  assert.equal(protocolFeeAt(8453, "base-alusdb", BASE_FEE_CHANGE_BLOCK)?.bps, 0);
   assert.equal(protocolFeeAt(8453, "base-alusdb", 56_535_333)?.bps, 0);
-  assert.equal(unreadFee(protocolFeeAt(8453, "base-alusdb", 56_535_333)), null);
   assert.equal(protocolFeeNow(8453, "base-alusdb")?.bps, 0);
 });
 

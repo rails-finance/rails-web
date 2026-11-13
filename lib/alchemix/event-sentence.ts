@@ -20,7 +20,6 @@ import type { TransmuterEarlyClaim } from "@/lib/alchemix/transmuter-early-claim
 import { lineProtocolFeeStep } from "@/lib/alchemix/lines";
 import { firstSentenceText } from "@/lib/alchemix/sentence-text";
 import { alchemixEventHeading } from "@/lib/alchemix/event-label";
-import { unreadFee } from "@/lib/alchemix/protocol-fee";
 
 /** What the page knows beyond the rows: the line's share ticker and its
  *  underlying's decimals (the Alchemist), the claim's split (the Transmuter). */
@@ -58,7 +57,6 @@ export function alchemixEventSentence(
     underlyingDecimals: page.underlyingDecimals ?? null,
     mytSymbol: page.mytSymbol ?? "shares",
     protocolFeeBps: lineProtocolFeeStep(ctx.chainId, ctx.lineKey, event.blockNumber)?.bps ?? null,
-    protocolFeeUnread: unreadFee(lineProtocolFeeStep(ctx.chainId, ctx.lineKey, event.blockNumber)),
     collateralTakenRaw: null,
     redemptionNet: null,
     underlyingSymbol: null,
