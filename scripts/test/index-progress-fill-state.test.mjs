@@ -268,3 +268,127 @@ test("visit window starts at the previous clock hour of the snapshot", () => {
   assert.equal(visitWindowStart(h(14, 0, 0)), h(13));
   assert.equal(visitWindowStart(h(14, 0, 30)), h(13));
 });
+
+// Two censuses on one entry: each writer takes its own run, by censusScope,
+// else by censusFamilies, else by the entry's family.
+import { censusScopeOf } from "../../lib/shared/index-progress.ts";
+
+test("each Morpho census writer takes its own run", () => {
+  const mm = censusRun({ family: "metamorpho", families: ["morpho"], outcome: "completed" });
+  const v2 = censusRun({ family: "vault-v2", families: ["morpho-v2"], outcome: "failed", error: "RangeError: x" });
+  const base = censusRun({ chain: 8453, family: "vault-v2", families: ["morpho-v2"], outcome: "completed" });
+  const s = withCensusRuns({
+    asOf: at(0),
+    entries: [
+      {
+        protocol: "morpho",
+        chain: 1,
+        backfill: null,
+        live: {
+          lane: "x",
+          checkpoint: null,
+          head: null,
+          writers: [
+            { name: "morpho-processor", kind: "processor", lastWriteAt: at(60), newest: null },
+            { ...censusWriter(3600), censusScope: "metamorpho" },
+            { ...censusWriter(3600, false), censusFamilies: ["morpho-v2"] },
+          ],
+        },
+      },
+    ],
+    censusRuns: [mm, base, v2],
+  });
+  const [, a, b] = s.entries[0].live.writers;
+  assert.equal(a.censusRun.family, "metamorpho");
+  assert.equal(b.censusRun, v2);
+  assert.equal(censusScopeOf(a, "morpho"), "metamorpho");
+  assert.equal(writerState(b, now, s.entries[0]), "late");
+});
+
+test("an answer without censusScope still matches by the entry's family", () => {
+  const s = censusStatus(censusRun());
+  assert.equal(s.entries[0].live.writers[0].censusRun.family, "aave");
+  assert.equal(censusScopeOf(s.entries[0].live.writers[0], "aave-vaults"), "aave");
+});
+
+import { errorKind } from "../../lib/shared/index-progress.ts";
+
+test("an error shows its class name, never its text", () => {
+  assert.equal(
+    errorKind("RangeError: Maximum call stack size exceeded\n    at main (/app/src/x.ts:1:1)"),
+    "RangeError",
+  );
+  assert.equal(errorKind("Error: connect ECONNREFUSED 10.0.0.1:5432"), "Upstream refused");
+  assert.equal(errorKind("fetch failed to 10.0.0.1"), "Error");
+  assert.equal(errorKind("socket timed out"), "Timeout");
+});
+
+test("a held census does not take a row with its own index; a late one raises it", () => {
+  const held = { ...censusWriter(2 * 3600), censusRun: censusRun() };
+  const failed = { ...censusWriter(2 * 3600, false), censusRun: censusRun({ outcome: "failed", error: "RangeError" }) };
+  const row = (writers, checkpoint = { block: 1, time: null, updatedAt: at(60) }) => ({
+    protocol: "morpho",
+    chain: 1,
+    backfill: null,
+    live: { lane: "sieve", checkpoint, head: null, writers },
+  });
+  assert.equal(pipelineState(row([held]), now), "fresh");
+  assert.equal(pipelineState(row([held, failed]), now), "late");
+  assert.equal(pipelineState(row([held], null), now), "paused");
+});
+
+import { pipelineHeartbeat, hasOwnIndex } from "../../lib/shared/index-progress.ts";
+
+test("a row with its own index takes its last write from the index, not a census", () => {
+  const stale = {
+    name: "base-lending-copy",
+    kind: "copy-worker",
+    lastWriteAt: at(5 * 3600),
+    expectEverySec: 600,
+    newest: null,
+  };
+  const census = { ...censusWriter(600), lastWriteAt: at(600) };
+  const e = {
+    protocol: "morpho",
+    chain: 8453,
+    backfill: null,
+    live: { lane: "x", checkpoint: null, head: null, writers: [stale, census] },
+  };
+  assert.equal(pipelineHeartbeat(e, now), now - 5 * 3600);
+  assert.equal(pipelineState(e, now), "stalled");
+  const alone = { ...e, protocol: "yearn", live: { ...e.live, writers: [census] } };
+  assert.equal(pipelineHeartbeat(alone, now), now - 600);
+});
+
+test("a never-run writer is no index of its own: a held census still holds the row", () => {
+  const never = {
+    name: "base-lending-copy",
+    kind: "copy-worker",
+    lastWriteAt: null,
+    lastRunAt: null,
+    expectEverySec: 600,
+    newest: null,
+  };
+  const held = { ...censusWriter(2 * 3600), censusRun: censusRun() };
+  const e = {
+    protocol: "morpho",
+    chain: 8453,
+    backfill: null,
+    live: { lane: "x", checkpoint: null, head: null, writers: [never, held] },
+  };
+  assert.equal(writerState(never, now, e), "none");
+  assert.equal(hasOwnIndex(e, now), false);
+  assert.equal(pipelineState(e, now), "paused");
+  assert.equal(pipelineHeartbeat(e, now), now - 40 * 3600);
+});
+
+test("a failed census whose last write is three schedules old reads stalled", () => {
+  const failed = (wroteAgo) => ({
+    ...censusWriter(3 * 3600, false),
+    lastWriteAt: at(wroteAgo),
+    censusRun: censusRun({ outcome: "failed", error: "RangeError: x" }),
+  });
+  assert.equal(writerState(failed(4 * 86400), now), "stalled");
+  assert.equal(writerState(failed(2 * 86400), now), "late");
+  assert.equal(writerState({ ...failed(4 * 86400), name: "morpho-processor", censusRun: undefined }, now), "late");
+});

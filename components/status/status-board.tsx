@@ -63,6 +63,11 @@ import {
   type HeadMiss,
   type CensusRunStatus,
   CENSUS_STUCK_STOPS,
+  CENSUS_WRITER,
+  CENSUS_LABEL,
+  censusScopeOf,
+  hasOwnIndex,
+  type StatusWriter,
   censusDue,
   withCensusRuns,
   liveMiss,
@@ -217,7 +222,7 @@ const shortAddress = (a: string) => (a.length > 12 ? `${a.slice(0, 6)}…${a.sli
 
 /** How a census's latest run ended, where it stopped or failed; null when it
  *  completed. The stop's time is left out where it is the last write's. */
-function censusLine(r: CensusRunStatus, lastWriteAt: string | null): string | null {
+function censusLine(r: CensusRunStatus, lastWriteAt: string | null, subject = "The census"): string | null {
   const endedAt = Date.parse(r.endedAt) / 1000;
   const write = lastWriteAt ? Date.parse(lastWriteAt) / 1000 : null;
   const ended = write != null && Math.abs(endedAt - write) < 60 ? "" : ` at ${utcTime(endedAt)}`;
@@ -235,14 +240,14 @@ function censusLine(r: CensusRunStatus, lastWriteAt: string | null): string | nu
           : "";
       const reset = r.resetsAt ? ` The gateway resets at ${hhmm(r.resetsAt)}.` : "";
       const row = r.shareStopsInARow > 1 ? ` (${r.shareStopsInARow} in a row)` : "";
-      return `The census stopped at its share of the free gateway${ended}${row}${left}.${reset}${stuck}`;
+      return `${subject} stopped at its share of the free gateway${ended}${row}${left}.${reset}${stuck}`;
     }
     case "stopped-deadline": {
       const at = r.stoppedAtVault ? ` in vault ${shortAddress(r.stoppedAtVault)}` : "";
-      return `The census stopped at its time limit${at}${ended}.${stuck}`;
+      return `${subject} stopped at its time limit${at}${ended}.${stuck}`;
     }
     case "failed":
-      return `The census failed${ended} (${errorKind(r.error) ?? "Error"}).`;
+      return `${subject} failed${ended} (${errorKind(r.error) ?? "Error"}).`;
   }
 }
 
@@ -251,9 +256,15 @@ function censusLine(r: CensusRunStatus, lastWriteAt: string | null): string | nu
  *  known) and the row line's label ("Next run in 4 h 52 min (14:12 UTC)").
  *  Null otherwise. */
 function censusDueWords(e: StatusEntry, now: number): { status: string; label: string } | null {
-  const w = e.live?.writers.find((x) => x.censusRun);
-  const due = w && writerState(w, now, e) === "paused" ? censusDue(w) : null;
-  if (!due) return null;
+  // Of the held censuses, the one due first, on a row whose sole index is a
+  // census; a row held by its own index never takes a census's words.
+  if (hasOwnIndex(e, now)) return null;
+  const held = censusWriters(e)
+    .map((w) => ({ w, due: writerState(w, now, e) === "paused" ? censusDue(w) : null }))
+    .filter((x): x is { w: StatusWriter; due: { at: number; after: boolean } } => x.due != null)
+    .sort((a, b) => a.due.at - b.due.at);
+  if (!held.length) return null;
+  const { due } = held[0];
   const slot = hhmm(new Date(due.at * 1000).toISOString());
   if (due.after) return { status: `After ${slot}`, label: `Next run after ${slot}` };
   if (due.at - now < 60) return { status: "Due now", label: `Next run due now (${slot})` };
@@ -261,9 +272,28 @@ function censusDueWords(e: StatusEntry, now: number): { status: string; label: s
   return { status: `In ${left}`, label: `Next run in ${left} (${slot})` };
 }
 
+const censusWriters = (e: StatusEntry) => (e.live?.writers ?? []).filter((w) => w.name === CENSUS_WRITER);
+
+/** A census writer's name on the board: its family's, else the writer's. */
+function censusLabel(w: StatusWriter, e: StatusEntry): string {
+  const scope = censusScopeOf(w, e.protocol) ?? w.censusRun?.family;
+  return (scope && CENSUS_LABEL[scope]) ?? w.name;
+}
+
+/** Each census's run line for the row: "The census" alone, else named. */
+function censusLines(e: StatusEntry): string[] {
+  const ws = censusWriters(e);
+  return ws
+    .map(
+      (w) =>
+        w.censusRun && censusLine(w.censusRun, w.lastWriteAt, ws.length > 1 ? `The ${censusLabel(w, e)}` : undefined),
+    )
+    .filter((l): l is string => !!l);
+}
+
 function pipelineLine(e: StatusEntry, now: number): string {
-  const t = pipelineHeartbeat(e);
-  const census = e.live?.writers.map((w) => w.censusRun && censusLine(w.censusRun, w.lastWriteAt)).find(Boolean);
+  const t = pipelineHeartbeat(e, now);
+  const census = censusLines(e).join(" ");
   const due = pipelineState(e, now) === "paused" ? censusDueWords(e, now) : null;
   const label = due?.label ?? HEARTBEAT_WORDS[pipelineState(e, now)];
   if (t != null) return `${label}: last write at ${utcTime(t)}, ${ageWords(now - t)} ago.${census ? ` ${census}` : ""}`;
@@ -312,7 +342,7 @@ function cellView(c: StatusCell, now: number, allowance: Allowance | null, asOf:
       status: (hb === "paused" && censusDueWords(c.entry, now)?.status) || STATUS_WORDS[hb],
       index: partial ? "Partial" : "Full",
       indexRank: partial ? 50 : 100,
-      last: pipelineHeartbeat(c.entry),
+      last: pipelineHeartbeat(c.entry, now),
       lane,
       title: pipelineLine(c.entry, now),
     };
@@ -651,8 +681,13 @@ function PipelineDetail({ e, now, asOf }: { e: StatusEntry; now: number; asOf: n
           <h4 className="text-xs font-semibold uppercase tracking-wider text-rb-500">Writers</h4>
           <ul className="mt-2 flex flex-col gap-2">
             {live.writers.map((w) => (
-              <li key={w.name} className="border-l-2 border-rb-200 pl-3 text-xs dark:border-rb-700">
-                <span className="font-semibold text-foreground">{w.name}</span>
+              <li
+                key={`${w.name}:${censusScopeOf(w, e.protocol) ?? w.censusRun?.family ?? ""}`}
+                className="border-l-2 border-rb-200 pl-3 text-xs dark:border-rb-700"
+              >
+                <span className="font-semibold text-foreground">
+                  {w.name === CENSUS_WRITER ? censusLabel(w, e) : w.name}
+                </span>
                 <span
                   className={`ml-1.5 inline-block h-1.5 w-1.5 rounded-full align-middle ${DOT[writerState(w, now, e)]}`}
                 />

@@ -261,6 +261,10 @@ export interface StatusWriter {
   /** Web-side: the census writer's latest run (the answer's `censusRuns`,
    *  set by `withCensusRuns`). */
   censusRun?: CensusRunStatus | null;
+  /** A census writer's family (metamorpho, vault-v2, aave, yearn-v3), where
+   *  one entry carries several censuses; censusFamilies on some answers. */
+  censusScope?: string | null;
+  censusFamilies?: string[] | null;
 }
 
 /** A vault census's latest run, per chain and family. A run stops by design
@@ -289,8 +293,25 @@ export interface CensusRunStatus {
 
 /** rails-server explorer-pipelines' name for the vault census writer. */
 export const CENSUS_WRITER = "vault-census";
-/** A census family by the status entry it writes for. */
+/** A census family by the status entry it writes for, for an answer whose
+ *  census writers carry no censusScope. */
 const CENSUS_FAMILY: Record<string, string> = { "aave-vaults": "aave", yearn: "yearn-v3" };
+/** Each census family's name on the board. */
+export const CENSUS_LABEL: Record<string, string> = {
+  metamorpho: "MetaMorpho census",
+  "vault-v2": "Vault V2 census",
+  aave: "Aave census",
+  "yearn-v3": "Yearn V3 census",
+};
+
+/** The census family a writer stands for: its censusScope, else its one
+ *  censusFamilies entry the board names, else the family of the entry it
+ *  writes for. */
+export function censusScopeOf(w: StatusWriter, protocol: string): string | null {
+  if (w.name !== CENSUS_WRITER) return null;
+  const named = w.censusFamilies?.find((f) => f in CENSUS_LABEL);
+  return w.censusScope ?? named ?? CENSUS_FAMILY[protocol] ?? null;
+}
 /** Stops in the same vault with nothing written that read as an alarm (the
  *  census wrapper's exit 3). */
 export const CENSUS_STUCK_STOPS = 3;
@@ -329,14 +350,24 @@ export function withCensusRuns(s: IndexStatus): IndexStatus {
   return {
     ...s,
     entries: s.entries.map((e) => {
-      const family = CENSUS_FAMILY[e.protocol];
-      if (!family || !e.live?.writers.some((w) => w.name === CENSUS_WRITER)) return e;
-      const run = runs.find((r) => r.chain === e.chain && r.family === family) ?? null;
+      if (!e.live?.writers.some((w) => w.name === CENSUS_WRITER)) return e;
+      const runOf = (w: StatusWriter) => {
+        const scope = censusScopeOf(w, e.protocol);
+        const fams = w.censusFamilies ?? [];
+        // censusFamilies may name the run's family or its sub-families.
+        const named = (r: CensusRunStatus) => fams.includes(r.family) || r.families.some((f) => fams.includes(f));
+        return (
+          runs.find(
+            (r) =>
+              r.chain === e.chain && (w.censusScope ? r.family === scope : fams.length ? named(r) : r.family === scope),
+          ) ?? null
+        );
+      };
       return {
         ...e,
         live: {
           ...e.live,
-          writers: e.live.writers.map((w) => (w.name === CENSUS_WRITER ? { ...w, censusRun: run } : w)),
+          writers: e.live.writers.map((w) => (w.name === CENSUS_WRITER ? { ...w, censusRun: runOf(w) } : w)),
         },
       };
     }),
@@ -461,7 +492,9 @@ export function errorKind(e: string | null): string | null {
   if (!e) return null;
   if (/whitelist|allowlist|forbidden|unauthori[sz]ed|\b40[13]\b|refus/i.test(e)) return "Upstream refused";
   if (/time(d)? ?out/i.test(e)) return "Timeout";
-  return "Error";
+  // A JavaScript error's class name carries no host or address.
+  const cls = /^([A-Z][A-Za-z]*Error)\b/.exec(e)?.[1];
+  return cls ?? "Error";
 }
 
 /** One cell of the status table, from either route. */
@@ -567,9 +600,14 @@ export function writerState(w: StatusWriter, now: Secs, e?: StatusEntry): Heartb
     const due = censusDue(w);
     if (due) return now <= due.at + CENSUS_DUE_GRACE ? "paused" : now - due.at > 3 * every ? "stalled" : "late";
   }
-  if (ran != null && w.lastRunOk === false) return "late";
-  const age = now - t;
-  return age > 3 * every ? "stalled" : age > 1.5 * every ? "late" : "fresh";
+  const ageState = (at: Secs) => (now - at > 3 * every ? "stalled" : now - at > 1.5 * every ? "late" : "fresh");
+  if (ran != null && w.lastRunOk === false) {
+    // A census writes on every run that completes, so after a failed run its
+    // last write's age stands: stalled once three schedules old.
+    const wrote = isoSecs(w.lastWriteAt);
+    return w.name === CENSUS_WRITER && wrote != null && ageState(wrote) === "stalled" ? "stalled" : "late";
+  }
+  return ageState(t);
 }
 
 const RANK: Record<Heartbeat, number> = { none: 0, fresh: 1, paused: 2, late: 3, stalled: 4 };
@@ -577,22 +615,42 @@ const RANK: Record<Heartbeat, number> = { none: 0, fresh: 1, paused: 2, late: 3,
 /** A pipeline's state: the worst of its scheduled writers. A writer that
  *  runs on events (no `expectEverySec`) only shows how long the protocol has
  *  been quiet, so with none scheduled the lane's checkpoint decides (Sieve
- *  moving means data is arriving), else the backfill's heartbeat. */
+ *  moving means data is arriving), else the backfill's heartbeat. A census
+ *  on a row with its own index (another scheduled writer, or a lane
+ *  checkpoint) raises the row when late or stalled, but its hold does not
+ *  take the row's state. */
 export function pipelineState(e: StatusEntry, now: Secs): Heartbeat {
-  const states = (e.live?.writers ?? [])
-    .filter((w) => w.expectEverySec)
-    .map((w) => writerState(w, now, e))
-    .filter((h) => h !== "none");
-  if (states.length) return states.reduce((a, b) => (RANK[b] > RANK[a] ? b : a));
-  const moved = isoSecs(e.live?.checkpoint?.updatedAt);
-  if (moved != null) return heartbeatAge(moved, now);
+  const worst = (hs: Heartbeat[]) => hs.reduce((a, b) => (RANK[b] > RANK[a] ? b : a), "none" as Heartbeat);
+  const scheduled = (e.live?.writers ?? []).filter((w) => w.expectEverySec);
+  const stateOf = (ws: StatusWriter[]) => ws.map((w) => writerState(w, now, e)).filter((h) => h !== "none");
+  const main = stateOf(scheduled.filter((w) => w.name !== CENSUS_WRITER));
+  const census = stateOf(scheduled.filter((w) => w.name === CENSUS_WRITER));
+  if (hasOwnIndex(e, now)) {
+    const index = main.length ? worst(main) : heartbeatAge(isoSecs(e.live?.checkpoint?.updatedAt), now);
+    return worst([index, ...census.filter((h) => h !== "paused")]);
+  }
+  if (census.length) return worst(census);
   return heartbeatAge(isoSecs(e.backfill?.heartbeatAt), now);
 }
 
+/** Whether a row has an index of its own beside any census: another
+ *  scheduled writer with a state (one that has never run has none), or a
+ *  lane checkpoint. */
+export function hasOwnIndex(e: StatusEntry, now: Secs): boolean {
+  const ws = e.live?.writers ?? [];
+  return (
+    ws.some((w) => w.name !== CENSUS_WRITER && w.expectEverySec && writerState(w, now, e) !== "none") ||
+    isoSecs(e.live?.checkpoint?.updatedAt) != null
+  );
+}
+
 /** A pipeline's heartbeat: the backfill's wall time, else the newest write any
- *  writer stamped. Null when none stamps a wall time. */
-export function pipelineHeartbeat(e: StatusEntry): Secs | null {
-  const times = [e.backfill?.heartbeatAt, ...(e.live?.writers ?? []).map((w) => w.lastWriteAt)]
+ *  writer stamped, leaving out a census on a row with its own index. Null when
+ *  none stamps a wall time. */
+export function pipelineHeartbeat(e: StatusEntry, now: Secs): Secs | null {
+  const own = hasOwnIndex(e, now);
+  const writers = (e.live?.writers ?? []).filter((w) => !own || w.name !== CENSUS_WRITER);
+  const times = [e.backfill?.heartbeatAt, ...writers.map((w) => w.lastWriteAt)]
     .map(isoSecs)
     .filter((t): t is Secs => t != null);
   return times.length ? Math.max(...times) : null;
