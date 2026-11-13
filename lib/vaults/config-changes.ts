@@ -122,7 +122,7 @@ function next(
 const str = (v: string | string[] | undefined): string => (Array.isArray(v) ? "" : (v ?? ""));
 const list = (v: string | string[] | undefined): string[] => (Array.isArray(v) ? v : []);
 
-/** "1 day", "7 days", "36 hours", "at once". */
+/** "1 day", "7 days", "36 hours", "no wait". */
 export function timelockText(seconds: number): string {
   if (seconds <= 0) return "no wait";
   if (seconds % DAY === 0) return seconds === DAY ? "1 day" : `${(seconds / DAY).toLocaleString("en-US")} days`;

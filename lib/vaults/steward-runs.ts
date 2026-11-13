@@ -6,7 +6,7 @@
 // that passed it on. "Ran before": every run in the vault has ended, and the
 // directory does not list the address as the vault's steward now.
 //
-// Pure, no `@/` import (scripts/test/vault-steward-runs.test.mjs loads it).
+// Pure, no `@/` import (scripts/test/vault-config-changes.test.mjs loads it).
 
 import type { MetaMorphoCoverage, MetaMorphoRoleRun, MetaMorphoRoleVault } from "./config-changes";
 
