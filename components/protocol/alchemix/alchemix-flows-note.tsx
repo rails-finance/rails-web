@@ -50,7 +50,7 @@ export function AlchemixFlowsNote({
       {facts && facts.repays > 0 && (
         <p>
           {n(facts.repays, "A repay", "repays")} paid {shares(facts.repaySharesIn)} {sh} in from the caller&apos;s
-          wallet, which the bars do not draw: only the protocol fee on the earmarked part left the collateral (Repay
+          wallet, which the bars do not draw: only the redemption fee on the earmarked part left the collateral (Repay
           fees).
           {facts.unresolved > 0
             ? ` ${n(facts.unresolved, "One repayment's", "repayments'")} cleared debt was not resolved when ${facts.unresolved === 1 ? "its log was" : "their logs were"} captured, so it is not drawn.`

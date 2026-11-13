@@ -109,7 +109,7 @@ function closeItems(close: AlchemixCloseFacts, sym: string, mytSymbol: string): 
       )}
       {s.feeRaw > BigInt(0) ? (
         <>
-          , with a protocol fee of{" "}
+          , with a redemption fee of{" "}
           <span className="tabular-nums">
             {shares(s.feeRaw)} {mytSymbol}
           </span>{" "}

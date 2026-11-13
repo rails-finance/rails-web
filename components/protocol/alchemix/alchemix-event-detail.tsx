@@ -139,7 +139,7 @@ function legStats(
     }
     case "force_repay":
       stat("Paid off earmarked debt", "credit_to_yield", mytSymbol);
-      stat("Protocol fee", "protocol_fee_total", mytSymbol);
+      stat("Redemption fee", "protocol_fee_total", mytSymbol);
       stat("Requested", "amount", sym);
       break;
     case "self_liquidated": {

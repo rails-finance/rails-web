@@ -126,7 +126,7 @@ export function resolvedAtCaptureProv(
     via: `${ALCHEMIX_VIA} · ${debt ? "debt_credit" : "collateral_fee"}${raw ? `: ${raw}` : ""}`,
     formula: debt
       ? "min(the offered amount converted to debt at this block, the position's debt, the market's total debt)"
-      : "the protocol fee leg of the same transaction's share transfer",
+      : "the redemption fee leg of the same transaction's share transfer",
     verify: {
       kind: "recompute",
       text: "To check: add up the transfers in this transaction.",
@@ -752,7 +752,7 @@ export function redemptionFeeProv(
   return {
     kind: "chain-derived",
     pclass: "state",
-    summary: `Redemption fee — the market's ${fee.bps / 100}% protocol fee, charged on every redemption in ${mytSymbol} on top of the shares the Transmuter gets, and paid to Alchemix's fee receiver. It is the main part of the net`,
+    summary: `Redemption fee — the market's ${fee.bps / 100}% fee, charged on every redemption in ${mytSymbol} on top of the shares the Transmuter gets, and paid to Alchemix's protocol fee receiver. It is the main part of the net`,
     contract: alchemistContract(coords),
     via: `protocolFee() = ${fee.bps} bps · getCDP(${coords.tokenId}) at blocks ${n.fromBlock} and ${n.atBlock} · the ${mytSymbol} share price at block ${n.atBlock}`,
     formula:

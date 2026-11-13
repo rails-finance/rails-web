@@ -347,14 +347,14 @@ export function alchemixEventClauses(
           clause(
             protocolFeeBps != null ? (
               <>
-                A protocol fee of {shown(ctx.resolvedAtCapture.collateralFee, myt)} left the collateral for
-                Alchemix&rsquo;s fee receiver: {(protocolFeeBps / 100).toLocaleString("en-US")}% of the shares that paid
-                off earmarked debt.
+                A redemption fee of {shown(ctx.resolvedAtCapture.collateralFee, myt)} left the collateral for
+                Alchemix&rsquo;s protocol fee receiver: {(protocolFeeBps / 100).toLocaleString("en-US")}% of the shares
+                that paid off earmarked debt.
               </>
             ) : (
               <>
-                A protocol fee of {shown(ctx.resolvedAtCapture.collateralFee, myt)} left the collateral for
-                Alchemix&rsquo;s fee receiver, charged on the shares that paid off earmarked debt.
+                A redemption fee of {shown(ctx.resolvedAtCapture.collateralFee, myt)} left the collateral for
+                Alchemix&rsquo;s protocol fee receiver, charged on the shares that paid off earmarked debt.
               </>
             ),
           ),
@@ -377,11 +377,11 @@ export function alchemixEventClauses(
         out.push(
           clause(
             <>
-              Alchemix took a protocol fee of {shown(raw.protocol_fee_total, myt)} from the collateral
+              Alchemix took a redemption fee of {shown(raw.protocol_fee_total, myt)} from the collateral
               {protocolFeeBps != null ? (
                 <>, {(protocolFeeBps / 100).toLocaleString("en-US")}% of those shares,</>
               ) : null}{" "}
-              and paid it to its fee receiver.
+              and paid it to its protocol fee receiver.
             </>,
           ),
         );
@@ -421,10 +421,12 @@ export function alchemixEventClauses(
       out.push(
         clause(
           split && split.feeRaw > BigInt(0) ? (
-            <>That protocol fee is the only charge for closing this way: a close with collateral pays no liquidator.</>
+            <>
+              That redemption fee is the only charge for closing this way: a close with collateral pays no liquidator.
+            </>
           ) : (
             <>
-              No fee was charged: the protocol fee applies only to earmarked debt, and a close with collateral pays no
+              No fee was charged: the redemption fee applies only to earmarked debt, and a close with collateral pays no
               liquidator.
             </>
           ),
