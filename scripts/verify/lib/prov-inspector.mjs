@@ -17,6 +17,15 @@ export const ARMED = "[data-prov-inspect-on]";
 const H20 = '[data-anatomy="H20"]:visible';
 const SWITCH = "[data-profile-menu-prov]";
 
+/** With the profile menu open, open its Advanced group where it is closed (it
+ *  starts closed; Miles 13 Nov 2026), so the switch is drawn. */
+export async function openAdvanced(page) {
+  const head = await page
+    .waitForSelector('[data-profile-menu-group-toggle="advanced"]', { timeout: 4_000 })
+    .catch(() => null);
+  if (head && (await head.getAttribute("aria-expanded")) === "false") await head.click().catch(() => {});
+}
+
 /** Turn the profile menu's switch on (where it reads off) and wait for the
  *  page to arm. The menu is closed from its control: Escape would also be the
  *  inspector's. */
@@ -30,6 +39,7 @@ export async function armInspector(page) {
       .first()
       .click({ timeout: 10_000 })
       .catch(() => {});
+    await openAdvanced(page);
     const sw = await page.waitForSelector(SWITCH, { timeout: 4_000 }).catch(() => null);
     if (!sw) continue;
     if ((await sw.getAttribute("data-profile-menu-prov")) === "off") await sw.click().catch(() => {});

@@ -391,8 +391,9 @@ check(!/beta/i.test(mHeaderBeta), "home @390: the header carries no beta pill");
 const mFooterBeta = await mHomePage.locator("footer [data-phone-beta]").isVisible();
 check(mFooterBeta, "home @390: the beta pill is in the footer");
 // The profile control's menu (ui-jobs 504, 582, 586; Miles 13 Nov 2026): a
-// menu button; with nothing saved, Saved views, Start here and Advanced, no
-// group and no theme switch; a full-width sheet at
+// menu button; with nothing saved, Saved views, Start here and Advanced
+// (closed until opened, the inspector switch inside), no other group and no
+// theme switch; a full-width sheet at
 // the foot of the screen (ui-jobs 507)
 // below md; Escape closes it and returns focus.
 const h20 = mHomePage.locator('header [data-anatomy="H20"]');
@@ -407,10 +408,12 @@ const sheet = await mHomePage.evaluate(() => {
     role: m?.getAttribute("role"),
     width: r ? Math.round(r.width) : 0,
     bottom: r ? Math.round(r.bottom) : 0,
-    empty: !m?.querySelector("[data-profile-menu-group]"),
+    groups: [...(m?.querySelectorAll("[data-profile-menu-group]") ?? [])]
+      .map((h) => `${h.getAttribute("data-profile-menu-group")}:${h.getAttribute("aria-expanded")}`)
+      .join(","),
     themes: m?.querySelectorAll("[data-theme-option]").length ?? -1,
     first: m?.querySelector('[role="menuitem"]')?.getAttribute("href") ?? null,
-    manage: !!m?.querySelector("[data-profile-menu-prov]"),
+    shut: !m?.querySelector("[data-profile-menu-prov]"),
     start: !!m?.querySelector('a[data-profile-menu-start][href="/start"]'),
     scrim: !!document.querySelector("[data-profile-menu-scrim]"),
   };
@@ -419,13 +422,23 @@ check(
   sheet.role === "menu" &&
     sheet.width === 390 &&
     sheet.bottom === 800 &&
-    sheet.empty &&
-    sheet.manage &&
+    sheet.groups === "advanced:false" &&
+    sheet.shut &&
     sheet.start &&
     sheet.scrim &&
     sheet.themes === 0 &&
     sheet.first === "/saved-views",
-  `home @390: H20 opens a full-width sheet at the screen's foot over a dim: Saved views first, Start here, no group, no theme switch, the inspector switch (${JSON.stringify(sheet)})`,
+  `home @390: H20 opens a full-width sheet at the screen's foot over a dim: Saved views first, Start here, Advanced closed, no other group, no theme switch (${JSON.stringify(sheet)})`,
+);
+// Advanced opens on a press and shows the inspector switch.
+await mHomePage.locator('[data-profile-menu-group-toggle="advanced"]').click();
+const advanced = await mHomePage.evaluate(() => ({
+  open: document.querySelector('[data-profile-menu-group-toggle="advanced"]')?.getAttribute("aria-expanded"),
+  manage: !!document.querySelector("[data-profile-menu] [data-profile-menu-prov]"),
+}));
+check(
+  advanced.open === "true" && advanced.manage,
+  `home @390: Advanced opens and shows the inspector switch (${JSON.stringify(advanced)})`,
 );
 // A press on the dim closes the sheet.
 await mHomePage.waitForTimeout(300);

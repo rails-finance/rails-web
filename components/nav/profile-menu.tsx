@@ -5,10 +5,15 @@
 // The menu has no heading of its own. Top down: "Saved views" to /saved-views,
 // whatever is saved (ui-jobs 652); with nothing saved, "New to Rails? Start
 // here" to /start (ui-jobs 509); then four groups, Focus, Listings, Wallets
-// and Positions, each under a small muted heading that is a label and takes
-// no focus; last, Advanced, holding the switch "Inspector" (decision 0062;
-// ui-jobs 571, 651). The theme is set at the brand rail's foot from md and at
-// the wallet panel's foot below md (components/nav/theme-switch.tsx).
+// and Positions; last, Advanced, holding the switch "Inspector" (decision
+// 0062; ui-jobs 571, 651). Each group's heading is a small muted toggle that
+// opens and closes it (Miles 13 Nov 2026): every group starts open but
+// Advanced, and the reader's choice per group is kept in this browser
+// (`OPEN_KEY`). Its chevron follows the dropdown rule for collapsible groups
+// (lib/shared/ui-grammar.ts `disclosureChevron`): down and always shown while
+// the group is closed; up while it is open, shown on the heading's hover or
+// keyboard focus and always on a touch screen. The theme is set at the brand rail's foot from md and
+// at the wallet panel's foot below md (components/nav/theme-switch.tsx).
 //
 // Stars alone decide what each group lists (ui-jobs 652): Focus lists the
 // views starred on /saved-views?tab=focus and, while it is unstarred, the view
@@ -33,10 +38,11 @@
 // scrolls with the page as one piece with the control (ui-jobs 602) (H2 below md, the column's corner from md;
 // components/nav/rail-shell.tsx). Escape, a press outside and a lookup close
 // it, and focus returns to the control; the arrow keys, Home and End move
-// through its items, the headings left out.
+// through its items, the headings included and a closed group's rows left
+// out; on a heading ArrowRight opens the group and ArrowLeft closes it.
 
 import { CHROME_HOVER, CHROME_HOVER_ON } from "@/components/nav/chrome-hover";
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -53,7 +59,7 @@ import { walletHref } from "@/components/shared/front-door-search";
 import { SAMPLE_WALLET } from "@/lib/shared/sample-wallet";
 import { focusViews, useAssetScope } from "@/lib/shared/asset-scope";
 import { focusShort } from "@/components/shared/aim-gate";
-import { START_CTA } from "@/lib/shared/ui-grammar";
+import { DISCLOSURE_HEAD, START_CTA, disclosureChevron } from "@/lib/shared/ui-grammar";
 import type { ChainId } from "@/lib/shared/chains";
 import type { SavedLink, WalletSession } from "@/lib/shared/sessions";
 import { setProvPreference, useProvPreference } from "@/lib/shared/prov-preference";
@@ -73,20 +79,99 @@ const GROUP = "mt-6";
 /** A row: 44px tall, a blue rounded outline on hover and keyboard focus. */
 const ITEM =
   "flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-left text-[15px] text-foreground outline-none transition-shadow hover:ring-1 hover:ring-blue-500 focus-visible:ring-[1.5px] focus-visible:ring-blue-500";
+/** The Saved views row: ITEM's size, a link's hover in place of the ring, its
+ *  text and icon turning link blue; keyboard focus adds the ring (Miles 13
+ *  Nov 2026). */
+const SAVED_ROW =
+  "group/saved flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-left text-[15px] text-foreground outline-none transition-colors hover:text-blue-600 focus-visible:text-blue-600 focus-visible:ring-[1.5px] focus-visible:ring-blue-500 dark:hover:text-[var(--text-link)] dark:focus-visible:text-[var(--text-link)]";
+const SAVED_ICON =
+  "size-4 shrink-0 text-rb-500 transition-colors group-hover/saved:text-blue-600 group-focus-visible/saved:text-blue-600 dark:group-hover/saved:text-[var(--text-link)] dark:group-focus-visible/saved:text-[var(--text-link)]";
 /** A long name fades at the line's end, with no ellipsis. */
 const FADE =
   "min-w-0 flex-1 overflow-hidden whitespace-nowrap [mask-image:linear-gradient(to_right,#000_calc(100%-2rem),transparent)]";
-/** A group's heading: the app's small label, muted (Miles 13 Nov 2026). */
-const LABEL = "flex min-h-6 items-center px-3 text-[11px] font-medium uppercase tracking-wider text-rb-500";
+/** A group's heading: the app's small label, muted, a toggle that opens and
+ *  closes the group (Miles 13 Nov 2026). */
+const HEADING = `${DISCLOSURE_HEAD} flex min-h-8 w-full cursor-pointer items-center gap-1 rounded-lg px-3 text-left text-[11px] font-medium uppercase tracking-wider text-rb-500 outline-none transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:ring-[1.5px] focus-visible:ring-blue-500`;
+
+type GroupKind = "focus" | "listings" | "wallets" | "positions" | "advanced";
+/** Which groups stand open, kept per browser as a small JSON map. */
+const OPEN_KEY = "rails-profile-menu-open";
+/** Every group open but Advanced, so the inspector's switch waits to be asked for. */
+const OPEN_DEFAULT: Record<GroupKind, boolean> = {
+  focus: true,
+  listings: true,
+  wallets: true,
+  positions: true,
+  advanced: false,
+};
+function readOpen(): Record<GroupKind, boolean> {
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem(OPEN_KEY) ?? "{}");
+    const next = { ...OPEN_DEFAULT };
+    if (raw && typeof raw === "object") {
+      for (const k of Object.keys(OPEN_DEFAULT) as GroupKind[]) {
+        const v = (raw as Record<string, unknown>)[k];
+        if (typeof v === "boolean") next[k] = v;
+      }
+    }
+    return next;
+  } catch {
+    return { ...OPEN_DEFAULT };
+  }
+}
+function writeOpen(open: Record<GroupKind, boolean>) {
+  try {
+    localStorage.setItem(OPEN_KEY, JSON.stringify(open));
+  } catch {
+    // Storage refused (a private window, a full quota): the choice lasts the visit.
+  }
+}
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
-/** A group's heading: a label naming the group, which `aria-labelledby` reads. */
-function GroupHeading({ id, group, label }: { id: string; group: string; label: string }) {
+/** A group under its heading, a disclosure toggle that names the group
+ *  (`aria-labelledby`). Closed, the rows are not drawn, so they leave the tab
+ *  and arrow-key order. */
+function MenuGroup({
+  menuId,
+  group,
+  label,
+  open,
+  onToggle,
+  hook,
+  children,
+}: {
+  menuId: string;
+  group: GroupKind;
+  label: string;
+  open: boolean;
+  onToggle: (g: GroupKind) => void;
+  /** The group's own data attribute, for the verifiers. */
+  hook?: Record<string, string>;
+  children: ReactNode;
+}) {
+  const headId = `${menuId}-${group}`;
+  const bodyId = `${headId}-rows`;
   return (
-    <p id={id} className={LABEL} data-profile-menu-group={group}>
-      {label}
-    </p>
+    <div role="group" aria-labelledby={headId} className={GROUP} data-open={open ? "true" : "false"} {...hook}>
+      <button
+        id={headId}
+        type="button"
+        role="menuitem"
+        aria-expanded={open}
+        aria-controls={bodyId}
+        onClick={() => onToggle(group)}
+        className={HEADING}
+        data-profile-menu-group={group}
+        data-profile-menu-group-toggle={group}
+      >
+        {label}
+        <ChevronDown className={disclosureChevron(open)} strokeWidth={2} aria-hidden="true" />
+      </button>
+      <div id={bodyId} hidden={!open} className="mt-1">
+        {open && children}
+      </div>
+    </div>
   );
 }
 
@@ -177,13 +262,18 @@ function ProvInspectorSwitch({ onDone }: { onDone: () => void }) {
   const descId = useId();
   return (
     <div
-      // ITEM's row with no hover ring: on hover the label turns teal, the
-      // switch's on colour (ui-jobs 651). The focus ring answers the
-      // keyboard.
-      className="relative flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-[15px] text-foreground has-[[role=menuitemcheckbox]:focus-visible]:ring-[1.5px] has-[[role=menuitemcheckbox]:focus-visible]:ring-blue-500"
+      // ITEM's row with no hover ring: on hover the crosshair and the label
+      // turn teal, the switch's on colour (ui-jobs 651; Miles 13 Nov 2026).
+      // The (?) stands over the switch's hit area, so hovering it turns
+      // neither. The focus ring answers the keyboard.
+      className="group/prov relative flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-[15px] text-foreground has-[[role=menuitemcheckbox]:focus-visible]:ring-[1.5px] has-[[role=menuitemcheckbox]:focus-visible]:ring-blue-500"
       data-anatomy="H20.1"
     >
-      <Crosshair className="size-5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+      <Crosshair
+        className="size-5 shrink-0 transition-colors group-has-[[role=menuitemcheckbox]:hover]/prov:text-teal-600 dark:group-has-[[role=menuitemcheckbox]:hover]/prov:text-teal-400"
+        strokeWidth={1.75}
+        aria-hidden="true"
+      />
       <button
         type="button"
         role="menuitemcheckbox"
@@ -250,6 +340,19 @@ export function ProfileMenu() {
   const menu = useRef<HTMLDivElement>(null);
   const menuId = useId();
   useEffect(() => setMounted(true), []);
+  const [groupsOpen, setGroupsOpen] = useState(OPEN_DEFAULT);
+  // Read as the menu opens, before it paints, so another tab's choice holds too.
+  useLayoutEffect(() => {
+    if (open) setGroupsOpen(readOpen());
+  }, [open]);
+  const toggleGroup = useCallback(
+    (g: GroupKind) => {
+      const next = { ...groupsOpen, [g]: !groupsOpen[g] };
+      setGroupsOpen(next);
+      writeOpen(next);
+    },
+    [groupsOpen],
+  );
 
   const face = bookmarks == null ? null : (bookmarks[0]?.addresses[0] ?? SAMPLE_WALLET);
   const rows = menuEntries(bookmarks ?? []);
@@ -339,6 +442,12 @@ export function ProfileMenu() {
       } else if (e.key === "End") {
         e.preventDefault();
         go(items.length - 1);
+      } else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        // On a group's heading, ArrowRight opens it and ArrowLeft closes it.
+        const head = document.activeElement as HTMLElement | null;
+        if (!head?.hasAttribute("data-profile-menu-group-toggle")) return;
+        e.preventDefault();
+        if ((head.getAttribute("aria-expanded") === "true") === (e.key === "ArrowLeft")) head.click();
       } else if (e.key === "Tab") {
         close(false);
       }
@@ -359,14 +468,20 @@ export function ProfileMenu() {
   ] as const;
   const linkGroup = (g: (typeof linkGroups)[number]) =>
     g.rows.length > 0 && (
-      <div key={g.kind} role="group" aria-labelledby={`${menuId}-${g.kind}`} className={GROUP}>
-        <GroupHeading id={`${menuId}-${g.kind}`} group={g.kind} label={g.label} />
-        <div className="mt-1" data-profile-menu-links={g.kind}>
+      <MenuGroup
+        key={g.kind}
+        menuId={menuId}
+        group={g.kind}
+        label={g.label}
+        open={groupsOpen[g.kind]}
+        onToggle={toggleGroup}
+      >
+        <div data-profile-menu-links={g.kind}>
           {g.rows.map((l) => (
             <LinkRow key={l.key} link={l} onDone={done} />
           ))}
         </div>
-      </div>
+      </MenuGroup>
     );
 
   return (
@@ -437,8 +552,14 @@ export function ProfileMenu() {
             >
               {/* First, the way to /saved-views, whatever is saved (Miles 13
                   Nov 2026; ui-jobs 652). */}
-              <Link href={SAVED_PATH} role="menuitem" onClick={done} className={ITEM} data-profile-menu-bookmarks="">
-                <Bookmark className="size-4 shrink-0 text-rb-500" fill="currentColor" aria-hidden="true" />
+              <Link
+                href={SAVED_PATH}
+                role="menuitem"
+                onClick={done}
+                className={SAVED_ROW}
+                data-profile-menu-bookmarks=""
+              >
+                <Bookmark className={SAVED_ICON} fill="currentColor" aria-hidden="true" />
                 <span className="font-medium">{SAVED_NAME}</span>
               </Link>
               {/* With nothing saved, the way in (ui-jobs 509). */}
@@ -456,9 +577,15 @@ export function ProfileMenu() {
               )}
               {/* Focus: the starred views, the view in use, and Off (ui-jobs 652). */}
               {menuViews.length > 0 && (
-                <div role="group" aria-labelledby={`${menuId}-focus`} className={GROUP} data-profile-menu-focus="">
-                  <GroupHeading id={`${menuId}-focus`} group="focus" label="Focus" />
-                  <div className="mt-1" data-profile-menu-focus-views={menuViews.length}>
+                <MenuGroup
+                  menuId={menuId}
+                  group="focus"
+                  label="Focus"
+                  open={groupsOpen.focus}
+                  onToggle={toggleGroup}
+                  hook={{ "data-profile-menu-focus": "" }}
+                >
+                  <div data-profile-menu-focus-views={menuViews.length}>
                     <>
                       {menuViews.map((v) => (
                         <button
@@ -490,28 +617,34 @@ export function ProfileMenu() {
                       </button>
                     </>
                   </div>
-                </div>
+                </MenuGroup>
               )}
               {linkGroup(linkGroups[0])}
               {rows.length > 0 && (
-                <div role="group" aria-labelledby={`${menuId}-wallets`} className={GROUP}>
-                  <GroupHeading id={`${menuId}-wallets`} group="wallets" label="Wallets" />
-                  <div className="mt-1" data-profile-menu-wallets="">
+                <MenuGroup
+                  menuId={menuId}
+                  group="wallets"
+                  label="Wallets"
+                  open={groupsOpen.wallets}
+                  onToggle={toggleGroup}
+                >
+                  <div data-profile-menu-wallets="">
                     {rows.map((s) => (
                       <WalletRow key={s.key} session={s} onDone={done} />
                     ))}
                   </div>
-                </div>
+                </MenuGroup>
               )}
               {linkGroup(linkGroups[1])}
-              <div role="group" aria-labelledby={`${menuId}-advanced`} className={GROUP}>
-                <p id={`${menuId}-advanced`} className={LABEL}>
-                  Advanced
-                </p>
-                <div className="mt-1">
-                  <ProvInspectorSwitch onDone={done} />
-                </div>
-              </div>
+              <MenuGroup
+                menuId={menuId}
+                group="advanced"
+                label="Advanced"
+                open={groupsOpen.advanced}
+                onToggle={toggleGroup}
+              >
+                <ProvInspectorSwitch onDone={done} />
+              </MenuGroup>
             </div>
           </>,
           document.body,

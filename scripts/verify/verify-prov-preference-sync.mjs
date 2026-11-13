@@ -8,6 +8,7 @@
 
 import { chromium } from "playwright";
 import { BASE, bypassHeaders } from "./lib/host.mjs";
+import { openAdvanced } from "./lib/prov-inspector.mjs";
 
 const PATH = "/ethereum/aave-v3/0x8008316e61985599dc62d69716bab3ebe643c0a8?market=core";
 const KEY = "rails-prov-inspector";
@@ -43,6 +44,7 @@ async function state() {
   let sw = null;
   for (let i = 0; i < 4 && sw == null; i++) {
     await page.locator(H20).click();
+    await openAdvanced(page);
     sw = await page
       .waitForSelector(SWITCH, { timeout: 3000 })
       .then((e) => e.getAttribute("data-profile-menu-prov"))
@@ -53,6 +55,7 @@ async function state() {
 }
 async function pressSwitch() {
   await page.locator(H20).click();
+  await openAdvanced(page);
   await page.waitForSelector(SWITCH, { timeout: 5000 });
   await page.locator(SWITCH).click();
   await page.waitForTimeout(500);

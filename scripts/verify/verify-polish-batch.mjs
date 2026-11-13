@@ -589,8 +589,8 @@ await phone.close();
     .locator("[data-profile-menu-group]")
     .evaluateAll((els) => els.map((e) => e.getAttribute("data-profile-menu-group")));
   check(
-    "SV profile menu groups: the ones holding something, listings and wallets (ui-jobs 586)",
-    groups.join() === "listings,wallets",
+    "SV profile menu groups: the ones holding something, listings and wallets, then Advanced (ui-jobs 586)",
+    groups.join() === "listings,wallets,advanced",
     groups.join(),
   );
   await sp.keyboard.press("Escape");
