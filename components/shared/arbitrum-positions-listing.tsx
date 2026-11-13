@@ -421,8 +421,9 @@ export function CometReadCard({ row, comet }: { row: ArbitrumReadRow; comet: Com
   };
   const heads: PositionCardHead[] = [
     usdHead("collateral", CARD_VOCAB.collateral, m.collateralUsd, posted, "posted", r("Collateral")),
-    baseHead("debt", CARD_VOCAB.debt, m.baseBorrowed, m.borrowUsd, "borrowed", "Debt"),
-    baseHead("supply", CARD_VOCAB.supply, m.baseSupplied, m.supplyUsd, "lent", "Supply"),
+    // Compound's docs' words (ui-jobs 629).
+    baseHead("debt", "Borrow balance", m.baseBorrowed, m.borrowUsd, "borrowed", "Borrow balance"),
+    baseHead("supply", "Supplied", m.baseSupplied, m.supplyUsd, "supplied", "Supplied"),
   ];
   const status: PositionCardStatus | null = m.isLiquidatable ? { word: "Liquidatable", tone: "caution" } : null;
   return (
