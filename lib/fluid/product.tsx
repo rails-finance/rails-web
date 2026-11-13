@@ -6,7 +6,7 @@
 // carries what an R3 page would. fTokens and the Liquidity layer stay out.
 //
 //   • The roster (R1, /ethereum/fluid/vaults): one head for the protocol
-//     (Vaults, Positions), then one house table grouped by vault type, T1 to
+//     (Vaults, Open positions over the count opened), then one house table grouped by vault type, T1 to
 //     T4 (R1.1). A vault's sizes are in its own tokens, so no group or head
 //     sums them. Every row opens its vault's page.
 //   • A vault's page (R2, /ethereum/fluid/vaults/<id>): the head (house labels,
@@ -36,6 +36,7 @@ import { serverReadOf, type ServerRead } from "@/lib/shared/server-head-read";
 import { FLUID_ADDRESSES, poolShareLabel, vaultKindOf, type FluidVaultKind } from "@/lib/fluid/asset-catalog";
 import {
   fluidBorrowableProv,
+  fluidOpenPositionsProv,
   fluidOraclePriceProv,
   fluidRosterPositionsProv,
   fluidRosterProv,
@@ -49,6 +50,8 @@ import {
   type FluidVaultCoords,
 } from "@/lib/fluid/vaults-provenance";
 import type { FluidVaultDetail, FluidVaultRow, FluidVaultsChainResponse } from "@/lib/sources/chain/fluid-vaults";
+import type { FluidOpenCount } from "@/lib/fluid/open-count";
+import { COUNT_WORDS, openedInAll, utcStamp } from "@/lib/fluid/count-words";
 import type { Loadable, MarketModel, ProductHead, ProductSection } from "@/lib/shared/product/model";
 
 // ── Words ────────────────────────────────────────────────────────────────────
@@ -77,7 +80,7 @@ const TIP = {
   supplyRate: "What collateral earns a year, as an APR",
   borrowRate: "What borrowers pay a year, as an APR",
   used: "The whole vault's debt ÷ its collateral's value at the oracle's price",
-  positions: "Positions open in the vault",
+  positions: COUNT_WORDS.openedTip,
   smartRate: "On a smart leg the vault's rate is the DEX pool's fee and reward share alone, so it is not stated",
 };
 
@@ -298,7 +301,15 @@ function rosterRow(v: FluidVaultRow, block: number, readBy?: ServerRead): Groupe
   };
 }
 
-function RosterExplainer({ data, positions }: { data: FluidVaultsChainResponse; positions: number }) {
+function RosterExplainer({
+  data,
+  open,
+  positions,
+}: {
+  data: FluidVaultsChainResponse;
+  open: number | null;
+  positions: number;
+}) {
   const s = data.summary;
   return (
     <>
@@ -315,7 +326,17 @@ function RosterExplainer({ data, positions }: { data: FluidVaultsChainResponse; 
           ladder.
         </ExplainBullet>
         <ExplainBullet>
-          <Fig bold>{positions.toLocaleString("en-US")}</Fig> positions are open across them.
+          {open != null ? (
+            <>
+              <Fig bold>{open.toLocaleString("en-US")}</Fig> positions are open across them, of{" "}
+              <Fig>{positions.toLocaleString("en-US")}</Fig> opened in all.
+            </>
+          ) : (
+            <>
+              <Fig bold>{positions.toLocaleString("en-US")}</Fig> positions have been opened across them, open or
+              closed.
+            </>
+          )}
         </ExplainBullet>
       </ExplainGroup>
       <ExplainGroup title="Reading the table">
@@ -331,7 +352,7 @@ function RosterExplainer({ data, positions }: { data: FluidVaultsChainResponse; 
   );
 }
 
-export function FluidRosterPage({ data }: { data: FluidVaultsChainResponse }) {
+export function FluidRosterPage({ data, open }: { data: FluidVaultsChainResponse; open: FluidOpenCount | null }) {
   const protocol = protocolForHref(ROOT)!;
   if (data.chainStale)
     return (
@@ -361,9 +382,24 @@ export function FluidRosterPage({ data }: { data: FluidVaultsChainResponse }) {
       },
       {
         slot: "population",
-        label: "Positions",
-        tip: "Positions open across every vault",
-        value: <Prov info={fluidRosterPositionsProv(sc)}>{positions.toLocaleString("en-US")}</Prov>,
+        label: COUNT_WORDS.openLabel,
+        tip: COUNT_WORDS.openTip,
+        value: (
+          <span data-fluid-open-positions={open?.total ?? ""}>
+            {open ? (
+              <Prov info={fluidOpenPositionsProv(open.readAt, utcStamp(open.readAt))}>
+                {open.total.toLocaleString("en-US")}
+              </Prov>
+            ) : (
+              <span className="text-rb-500" title={COUNT_WORDS.openMissing}>
+                none
+              </span>
+            )}
+            <span className="block text-[11px] font-normal text-rb-500" data-fluid-positions-opened={positions}>
+              <Prov info={fluidRosterPositionsProv(sc)}>{openedInAll(positions)}</Prov>
+            </span>
+          </span>
+        ),
       },
     ],
     notes: (
@@ -422,7 +458,10 @@ export function FluidRosterPage({ data }: { data: FluidVaultsChainResponse }) {
         docsLink,
       ],
     },
-    explainer: { body: <RosterExplainer data={data} positions={positions} />, label: "roster explanation" },
+    explainer: {
+      body: <RosterExplainer data={data} open={open?.total ?? null} positions={positions} />,
+      label: "roster explanation",
+    },
     learnMore: null,
     anatomy: "M4",
   };
@@ -471,7 +510,7 @@ export function FluidRosterPage({ data }: { data: FluidVaultsChainResponse }) {
                 className: "min-w-[220px] text-foreground",
                 wide: true,
               },
-              { key: "positions", label: "Positions", align: "right", tip: TIP.positions, className: NUM },
+              { key: "positions", label: COUNT_WORDS.openedLabel, align: "right", tip: TIP.positions, className: NUM },
             ],
             groups,
             defaultSort: { key: "name", dir: "asc" },
@@ -592,7 +631,8 @@ function VaultExplainer({ x }: { x: Ctx }) {
       </ExplainGroup>
       <ExplainGroup title="Positions and the ladder">
         <ExplainBullet>
-          <Fig bold>{v.totalPositions.toLocaleString("en-US")}</Fig> positions are open.
+          <Fig bold>{v.totalPositions.toLocaleString("en-US")}</Fig>{" "}
+          {v.totalPositions === 1 ? "position has" : "positions have"} been opened in this vault, open or closed.
         </ExplainBullet>
         <ExplainBullet>
           A position may borrow up to <Fig bold>{pctText(v.collateralFactor)}</Fig> of its collateral&apos;s value.
@@ -622,7 +662,7 @@ function vaultMarkdown(x: Ctx): string {
     ...(v.supplyRatePct != null ? [`- Supply rate: ${ratePercentText(v.supplyRatePct / 100)} APR`] : []),
     ...(v.borrowRatePct != null ? [`- Borrow rate: ${ratePercentText(v.borrowRatePct / 100)} APR`] : []),
     ...(v.aggregateRatio != null ? [`- Used: ${pctText(v.aggregateRatio, 1)}`] : []),
-    `- Positions: ${v.totalPositions}`,
+    `- Positions opened, open or closed: ${v.totalPositions}`,
     `- Borrow to: ${pctText(v.collateralFactor)}`,
     `- Liquidate from: ${pctText(v.liquidationThreshold)}`,
     `- Absorb from: ${pctText(v.liquidationMaxLimit)}`,
@@ -736,7 +776,7 @@ function headOf(x: Ctx): ProductHead {
       },
       {
         slot: "population",
-        label: "Positions",
+        label: COUNT_WORDS.openedLabel,
         tip: TIP.positions,
         value: <Prov info={fluidVaultPositionsProv(c)}>{v.totalPositions.toLocaleString("en-US")}</Prov>,
       },

@@ -13,6 +13,7 @@ import {
   type InfoView,
 } from "@/components/shared/protocol-info-page";
 import { FLUID_ADDRESSES } from "@/lib/fluid/asset-catalog";
+import { FLUID_DOCS_AND_CHAIN } from "@/lib/fluid/docs-and-chain";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
@@ -108,8 +109,9 @@ const views: readonly [InfoView, ...InfoView[]] = [
     body: (
       <p>
         The vaults page lists every vault Fluid has created, grouped by type (T1 to T4, by which sides hold DEX pool
-        shares), with its collateral, debt, rates, positions and limits. Each vault opens its own page, with what can be
-        borrowed now, the oracle price and the liquidation penalty.{" "}
+        shares), with its collateral, debt, rates, the positions it has opened and its limits. The page&apos;s head
+        counts the positions open now. Each vault opens its own page, with what can be borrowed now, the oracle price
+        and the liquidation penalty.{" "}
         <Link href="/ethereum/fluid/vaults" className={INLINE_LINK}>
           Open the vaults page to see every vault
         </Link>
@@ -130,7 +132,7 @@ const reads: InfoReads = {
       name: "VaultResolver",
       address: FLUID_ADDRESSES.VAULT_RESOLVER,
       reads:
-        "the list of vaults, then each vault's tokens, limits, oracle price, totals, rates, positions and what can be borrowed now.",
+        "the list of vaults, then each vault's tokens, limits, oracle price, totals, rates, the positions it has minted and what can be borrowed now.",
     },
     {
       name: "DexResolver",
@@ -139,7 +141,7 @@ const reads: InfoReads = {
     },
     { name: "Each token", reads: "its symbol and decimals, so amounts read in whole tokens." },
   ],
-  how: "The vaults page reads the VaultResolver at each load, and a vault's page at most every ten minutes, through Rails's server where it answers. Position histories come from Rails's server store of Fluid's events.",
+  how: "The vaults page reads the VaultResolver at each load, and a vault's page at most every ten minutes, through Rails's server where it answers. Position histories come from Rails's server store of Fluid's events, and the vaults page's count of open positions from its index of Fluid positions.",
   notes: [
     "The VaultResolver's read of the whole list fails as a unit when one vault's read fails, so Rails reads each vault on its own; a vault whose read fails is left out, and the vaults page says how many.",
     "On a smart side the vault's own rate is only the DEX pool's fee and reward share, so its pages state no rate there. Fluid's Liquidity layer, which sets the rates of token sides, is outside this explorer.",
@@ -193,6 +195,7 @@ export default function InfoPage() {
       views={views}
       search="You can search by owner wallet or NFT id. The listing filters by Status (open or closed), Debt (the amount borrowed), Vault kind (Standard pairs or Smart vaults), History (Liquidated before or Never liquidated) and Transactions (how many a position has), and sorts by Recent activity, Debt size, Collateral size or Event count."
       docs={{ label: "Fluid documentation", href: DOCS }}
+      docsAndChain={FLUID_DOCS_AND_CHAIN}
     />
   );
 }
