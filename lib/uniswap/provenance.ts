@@ -7,7 +7,7 @@
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import { uniDeployment, type UniDeployment } from "@/lib/uniswap/deployments";
 import type { PoolPosition } from "@/lib/uniswap/position";
-import { dayGridPhrase, type UniPositionRead } from "@/lib/uniswap/types";
+import { dayGridPhrase, type UniPositionRead, type UniToken } from "@/lib/uniswap/types";
 import { TERMS, type RowKey } from "@/lib/uniswap/words";
 
 /** The contracts a deployment's receipts name (lib/uniswap/deployments.ts). */
@@ -55,6 +55,18 @@ const both = (c: UniReceiptContext) => `${at(c.r.head)} and ${at(c.r.then)}`;
 const chain = (label: string, value: string): ProvInput => ({ label, value, kind: "chain", pclass: "state" });
 const derived = (label: string, value: string): ProvInput => ({ label, value, kind: "derived" });
 
+/** The pool price's two decimals, token0's and token1's: rails-server reads
+ *  each token's decimals(); the native coin's are fixed. Shared with
+ *  Slipstream's price receipt (lib/aerodrome/provenance.ts). */
+export function priceDecimalsInputs(token0: UniToken, token1: UniToken): ProvInput[] {
+  return ([token0, token1] as const).map((t, i) => {
+    const label = `decimals${i} · ${t.symbol}`;
+    return /^0x0{40}$/i.test(t.address)
+      ? derived(`${label}, the native coin`, String(t.decimals))
+      : chain(`${label} decimals()`, String(t.decimals));
+  });
+}
+
 /** The card's figures. */
 export function cardProv(
   key: "price" | "holds" | "worth" | "uncollected" | "opened" | "range" | "cake",
@@ -73,7 +85,7 @@ export function cardProv(
         contract: poolContract(c),
         via: via(c, `block ${n(r.head.block)}`),
         formula: "(sqrtPriceX96 ÷ 2^96)² × 10^(decimals0 − decimals1)",
-        inputs: [chain(`${slot0(c)} · sqrtPriceX96`, r.now.sqrtPriceX96)],
+        inputs: [chain(`${slot0(c)} · sqrtPriceX96`, r.now.sqrtPriceX96), ...priceDecimalsInputs(r.token0, r.token1)],
       };
     case "holds":
       return {

@@ -13,7 +13,10 @@ import { COW_TERMS } from "@/lib/cow/terms";
 
 export const COW_CHAIN_ID = 1 as const;
 export const GPV2_SETTLEMENT = "0x9008d19f58aabd9ed0d60971565aa8510560ab41";
-const SETTLEMENT = { name: COW_TERMS.settlement, address: GPV2_SETTLEMENT };
+const SETTLEMENT = {
+  name: `${COW_TERMS.settlement} (${COW_TERMS.settlementContract})`,
+  address: GPV2_SETTLEMENT,
+};
 
 /** A token as the page names it: the symbol token_meta holds, else none. */
 export interface CowTokenLabel {

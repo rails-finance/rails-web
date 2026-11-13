@@ -25,6 +25,8 @@ export const PENDLE_WORDS = {
   syRate: "SY exchange rate",
   /** An empty pool's implied APY (the desk's pick). */
   noLiquidity: "no liquidity",
+  /** The tip on "no liquidity", on the market head and the markets roster. */
+  noLiquidityTip: "The pool holds under 0.000001 SY. Its stored rate is the last trade's.",
   /** P13: the AMM page's list of what an LP earns. */
   lpEarns:
     "By Pendle's AMM page, LP earns PT fixed yield, underlying yield (SY yield), swap fees and PENDLE incentives.",
