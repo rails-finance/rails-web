@@ -62,6 +62,7 @@ import { VAULT_HEAD_WORDS, vaultT1Kind } from "@/lib/vaults/head-words";
 import { NotLoaded } from "@/components/shared/not-loaded";
 import type { SheetRow } from "@/components/shared/event-sheet";
 import { vaultSheet } from "@/components/vaults/vault-sheet";
+import { withScaleNote } from "@/lib/vaults/asset-scale-words";
 
 /** A raw integer and the number a formatter wants, from one string. Scaled here
  *  at the render edge and nowhere earlier — the row data is wei-exact. */
@@ -118,6 +119,10 @@ export interface VaultTimelineRowProps {
   persistPrefix: string;
   /** The family's "?" (`vaultEventContent`). */
   learnMore: LearnMoreContent;
+  /** Why no amount in the asset is printed (its decimals disagree, ui-jobs
+   *  664): the asset leg leaves the spine, the share price and every amount
+   *  in the asset read "—", and each receipt keeps its read with the reason. */
+  withheld?: string;
 }
 
 export function VaultTimelineRow({
@@ -138,6 +143,7 @@ export function VaultTimelineRow({
   icon,
   persistPrefix,
   learnMore,
+  withheld,
 }: VaultTimelineRowProps) {
   // Each row's receipts name THAT row's block and transaction, not the page's.
   const rowCoords: VaultTimelineCoords = { ...coords, blockNumber: event.blockNumber, txHash: event.txHash };
@@ -157,7 +163,7 @@ export function VaultTimelineRow({
 
   // The asset leg leads, where the contract emitted one: it is what the holder
   // actually put in or took out, in the token they think in.
-  if (event.assets && (isDeposit || isWithdrawal)) {
+  if (event.assets && (isDeposit || isWithdrawal) && !withheld) {
     const value = Number(event.assets) / Math.pow(10, ad);
     tokens.push({ symbol: assetSymbol, direction: isDeposit ? "right" : "left", value });
   }
@@ -210,7 +216,7 @@ export function VaultTimelineRow({
     caption: party
       ? `${kind} ${VAULT_HEAD_WORDS.sep} ${party.prefix} ${party.address.slice(0, 6)}…${party.address.slice(-4)}`
       : kind,
-    cells: rowCells(event, rowCoords, shareUnit, assetSymbol, prov, extraCells),
+    cells: rowCells(event, rowCoords, shareUnit, assetSymbol, prov, extraCells, withheld),
     sheet: vaultSheet({
       event,
       earlier,
@@ -220,6 +226,7 @@ export function VaultTimelineRow({
       vaultAddress,
       prov,
       extraRows: extraRows?.(rowCoords),
+      withheld,
     }),
     ledgers: { none: "a vault row states one share token, with no flows panel" },
     notes: (
@@ -230,6 +237,7 @@ export function VaultTimelineRow({
         assetSymbol={assetSymbol}
         prov={prov}
         detailNotes={detailNotes}
+        withheld={withheld}
       />
     ),
     explainer: { body: <ProseExplainer items={lines.slice(1)} />, first: lines[0] },
@@ -253,6 +261,7 @@ function rowCells(
   assetSymbol: string,
   prov: VaultTimelineProvKit,
   extraCells?: (rowCoords: VaultTimelineCoords) => EventCellSpec[],
+  withheld?: string,
 ): EventCellSpec[] {
   const sd = event.shareDecimals;
   const ad = event.assetDecimals;
@@ -282,21 +291,25 @@ function rowCells(
       key: "share-price",
       label: `Share price at this block · ${assetSymbol}`,
       figure: "row-share-price",
-      tip: event.sharePriceReverted
-        ? `convertToAssets(10^${sd}) reverted at block ${event.blockNumber.toLocaleString("en-US")}, so the vault states no share price there. Asking again at that block returns the same revert.`
-        : `convertToAssets(10^${sd}) at block ${event.blockNumber.toLocaleString("en-US")}, the block this address's transaction landed in.`,
+      tip: withheld
+        ? withheld
+        : event.sharePriceReverted
+          ? `convertToAssets(10^${sd}) reverted at block ${event.blockNumber.toLocaleString("en-US")}, so the vault states no share price there. Asking again at that block returns the same revert.`
+          : `convertToAssets(10^${sd}) at block ${event.blockNumber.toLocaleString("en-US")}, the block this address's transaction landed in.`,
       // A reading at the row's block: the row did not move it.
       changed: false,
-      value: event.sharePriceAtBlock
-        ? {
-            after: {
-              text: sharePriceText(rawAmount(event.sharePriceAtBlock, ad), ad),
-              info: prov.sharePrice(coords, sd),
-            },
-          }
-        : event.sharePriceReverted
-          ? { none: "Reverted" }
-          : { after: { text: <NotLoaded className="text-sm font-semibold text-rb-500" /> } },
+      value: withheld
+        ? { none: "—" }
+        : event.sharePriceAtBlock
+          ? {
+              after: {
+                text: sharePriceText(rawAmount(event.sharePriceAtBlock, ad), ad),
+                info: prov.sharePrice(coords, sd),
+              },
+            }
+          : event.sharePriceReverted
+            ? { none: "Reverted" }
+            : { after: { text: <NotLoaded className="text-sm font-semibold text-rb-500" /> } },
     },
     {
       kind: "stat",
@@ -329,6 +342,7 @@ function RowNotes({
   assetSymbol,
   prov,
   detailNotes,
+  withheld,
 }: {
   event: VaultHolderEvent;
   coords: VaultTimelineCoords;
@@ -336,6 +350,7 @@ function RowNotes({
   assetSymbol: string;
   prov: VaultTimelineProvKit;
   detailNotes?: (rowCoords: VaultTimelineCoords) => ReactNode;
+  withheld?: string;
 }) {
   const ad = event.assetDecimals;
   const balanceBeforeRaw = (BigInt(event.balanceAfter) - BigInt(event.sharesDelta)).toString();
@@ -360,7 +375,18 @@ function RowNotes({
     >
       {(event.kind === "deposit" || event.kind === "withdrawal") && (
         <p className="mt-1 max-w-3xl text-[12px] leading-relaxed text-rb-500" data-figure="row-asset-leg">
-          {event.assets ? (
+          {event.assets && withheld ? (
+            <span data-asset-scale-withheld="">
+              The vault stated the other leg in the ERC-4626{" "}
+              <code>{event.kind === "deposit" ? "Deposit" : "Withdraw"}</code> event of this same transaction;{" "}
+              <Prov
+                info={withScaleNote(prov.assets(coords, event.kind === "deposit" ? "deposit" : "withdrawal"), withheld)}
+              >
+                its amount
+              </Prov>{" "}
+              is not shown. {withheld}
+            </span>
+          ) : event.assets ? (
             <>
               The vault stated the other leg:{" "}
               <Prov info={prov.assets(coords, event.kind === "deposit" ? "deposit" : "withdrawal")}>

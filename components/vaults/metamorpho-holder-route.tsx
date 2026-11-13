@@ -61,7 +61,7 @@ import { loadHoldingWorth } from "@/lib/vaults/holding-worth-read";
 import type { PlainHoldingHistory } from "@/lib/vaults/holding-worth";
 import { HoldingReceiptsScope } from "@/components/vaults/holding-receipts-scope";
 import { loadAssetScales } from "@/lib/vaults/asset-scale";
-import { assetScaleAbsentTip } from "@/lib/vaults/asset-scale-words";
+import { assetScaleAbsentTip, assetScaleReceiptNote, withScaleNote } from "@/lib/vaults/asset-scale-words";
 import { HOLDING_REWARDS, vaultPlainHoldingContent } from "@/lib/vaults/card-words";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { LatestPrices, type LatestPriceAsset } from "@/components/shared/latest-prices";
@@ -230,10 +230,12 @@ async function VaultTimelineSection({
   data,
   holder,
   onEventPage,
+  withheld,
 }: {
   data: MorphoBaseVaultResponse;
   holder: string;
   onEventPage: boolean;
+  withheld?: string;
 }) {
   const { timeline, economics, flowTimeline } = await loadHistory(data, holder);
   return (
@@ -250,6 +252,7 @@ async function VaultTimelineSection({
           claimRaw={data.holder.claim?.raw ?? null}
           shareSymbol={data.vault.symbol || shortAddr(data.vault.address)}
           assetSymbol={data.vault.asset.symbol}
+          withheld={withheld}
         />
       )}
       <MorphoBaseVaultTimeline
@@ -259,6 +262,7 @@ async function VaultTimelineSection({
         assetSymbol={data.vault.asset.symbol}
         decimalsOffset={data.vault.decimalsOffset}
         chainId={data.chainId}
+        amountsWithheld={withheld}
       />
     </>
   );
@@ -458,15 +462,18 @@ export async function MetaMorphoHolderRoute({ chainId, params }: Props & { chain
       price: !data.chainStale && !scale && data.sharePrice.value > 0 ? data.sharePrice.value : undefined,
       unit: !data.chainStale && !scale && data.sharePrice.value > 0 ? data.vault.asset.symbol : undefined,
       label: `One share in ${data.vault.asset.symbol}, the vault's convertToAssets`,
-      info: vaultSharePriceProv({
-        chainId,
-        readBy: serverReadOf(data),
-        blockNumber: data.blockNumber,
-        vault: data.vault.address,
-        vaultName: data.vault.name || undefined,
-        assetSymbol: data.vault.asset.symbol,
-        shareSymbol: data.vault.symbol || undefined,
-      }),
+      info: withScaleNote(
+        vaultSharePriceProv({
+          chainId,
+          readBy: serverReadOf(data),
+          blockNumber: data.blockNumber,
+          vault: data.vault.address,
+          vaultName: data.vault.name || undefined,
+          assetSymbol: data.vault.asset.symbol,
+          shareSymbol: data.vault.symbol || undefined,
+        }),
+        scale ? assetScaleReceiptNote(data.vault.asset.symbol, scale) : null,
+      ),
     },
   ];
 
@@ -478,7 +485,7 @@ export async function MetaMorphoHolderRoute({ chainId, params }: Props & { chain
         </div>
       }
     >
-      <VaultTimelineSection data={data} holder={data.holder.address} onEventPage={onEventPage} />
+      <VaultTimelineSection data={data} holder={data.holder.address} onEventPage={onEventPage} withheld={withheld} />
     </Suspense>
   ) : null;
 

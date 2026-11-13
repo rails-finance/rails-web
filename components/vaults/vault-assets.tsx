@@ -196,6 +196,7 @@ export function VaultAssets({
   chart,
   keyColours,
   look,
+  amountsWithheld,
 }: {
   rows: VaultAssetRow[];
   assetSymbol: string;
@@ -223,6 +224,10 @@ export function VaultAssets({
    *  amount compact (`formatCompact`, as V6's Total assets) with its full text
    *  in a title and `data-figure-full`. The MetaMorpho page passes it. */
   look?: "index";
+  /** Why no amount in the asset is printed (its decimals disagree, ui-jobs
+   *  664): each Amount cell stands as "—" (its receipt kept), the band's
+   *  titles drop the amount, and the line under the heading gives the reason. */
+  amountsWithheld?: string;
 }) {
   const ix = look === "index";
   const amountText = (a: RawAmount) => (ix ? formatCompact(a.value) : assetText(a, assetDecimals));
@@ -242,7 +247,9 @@ export function VaultAssets({
     key: l.key,
     f: of(l.amount ?? BigInt(0)),
     rampIndex: l.order,
-    title: `${typeof l.r.venue === "string" ? l.r.venue : l.key} · ${text(l.amount ?? BigInt(0))} ${assetSymbol} · ${pctText(of(l.amount ?? BigInt(0)))}`,
+    title: amountsWithheld
+      ? `${typeof l.r.venue === "string" ? l.r.venue : l.key} · ${pctText(of(l.amount ?? BigInt(0)))}`
+      : `${typeof l.r.venue === "string" ? l.r.venue : l.key} · ${text(l.amount ?? BigInt(0))} ${assetSymbol} · ${pctText(of(l.amount ?? BigInt(0)))}`,
     data: { "data-alloc-amount": (l.amount ?? BigInt(0)).toString() },
     wrap: l.r.amountProv
       ? (bar: ReactNode) => (
@@ -259,7 +266,9 @@ export function VaultAssets({
       f: of(sum),
       rampIndex: 0,
       collected: true,
-      title: `${n(plan.collected.length)} more · ${text(sum)} ${assetSymbol} · ${pctText(of(sum))}`,
+      title: amountsWithheld
+        ? `${n(plan.collected.length)} more · ${pctText(of(sum))}`
+        : `${n(plan.collected.length)} more · ${text(sum)} ${assetSymbol} · ${pctText(of(sum))}`,
       data: {
         "data-alloc-collected-count": String(plan.collected.length),
         "data-alloc-collected-sum": sum.toString(),
@@ -284,6 +293,12 @@ export function VaultAssets({
       >
         <p className="mt-1 text-[13px] text-rb-500" data-prov-exempt>
           {line}
+          {amountsWithheld && (
+            <span data-asset-scale-withheld="">
+              {" · "}
+              <HeadingTip text="amounts: decimals disagree" tip={amountsWithheld} />
+            </span>
+          )}
         </p>
       </SectionHeading>
       {chart === undefined && (
@@ -347,6 +362,10 @@ export function VaultAssets({
                 {r.offBand ? (
                   <span className="text-rb-500" data-cell="leg-assets">
                     —
+                  </span>
+                ) : amountsWithheld && r.amount ? (
+                  <span className="text-rb-500" data-cell="leg-assets" data-asset-scale-withheld="">
+                    {r.amountProv ? <Prov info={r.amountProv}>—</Prov> : "—"}
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1.5">

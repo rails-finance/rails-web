@@ -22,6 +22,7 @@ import type { Provenance } from "@/components/shared/provenance";
 import { assetText, sharePriceText, shareText } from "@/lib/shared/vault-amount-text";
 import type { VaultHolderEvent, VaultTimelineCoords } from "@/lib/shared/vault-holder-timeline";
 import type { VaultTimelineProvKit } from "@/components/vaults/vault-timeline-row";
+import { withScaleNote } from "@/lib/vaults/asset-scale-words";
 
 const WORDS = {
   side: "Vault shares",
@@ -73,6 +74,9 @@ export interface VaultSheetArgs {
   prov: VaultTimelineProvKit;
   /** Rows a family adds to the breakdown. */
   extraRows?: SheetRow[];
+  /** Why no amount in the asset is printed (its decimals disagree, ui-jobs
+   *  664): every amount in it reads "—", each receipt kept with the reason. */
+  withheld?: string;
 }
 
 const pow10 = (n: number): bigint => BigInt(10) ** BigInt(n);
@@ -97,11 +101,13 @@ export function vaultSheet({
   vaultAddress,
   prov,
   extraRows = [],
+  withheld,
 }: VaultSheetArgs): EventSheet | undefined {
   const sd = event.shareDecimals;
   const ad = event.assetDecimals;
   const sharesText = (r: bigint, plus = false) => withSign(r, (a) => shareText(num(a, sd), sd), plus);
-  const assetsText = (r: bigint, plus = false) => withSign(r, (a) => assetText(num(a, ad), ad), plus);
+  const assetsText = (r: bigint, plus = false) =>
+    withheld ? "—" : withSign(r, (a) => assetText(num(a, ad), ad), plus);
   const shares = (text: string, info: Provenance, raw: string): NonNullable<SheetRow["amount"]> => ({
     text,
     symbol: shareUnit,
@@ -112,7 +118,7 @@ export function vaultSheet({
   const asset = (text: string, info?: Provenance): NonNullable<SheetRow["amount"]> => ({
     text,
     symbol: assetSymbol,
-    info,
+    info: info && withScaleNote(info, withheld),
   });
 
   const after = BigInt(event.balanceAfter);
@@ -274,9 +280,9 @@ export function vaultSheet({
       amount:
         priceNow != null
           ? {
-              text: sharePriceText(num(priceNow, ad), ad),
+              text: withheld ? "—" : sharePriceText(num(priceNow, ad), ad),
               symbol: assetSymbol,
-              info: prov.sharePrice(coords, sd),
+              info: withScaleNote(prov.sharePrice(coords, sd), withheld),
               value: event.sharePriceAtBlock ?? undefined,
             }
           : { text: event.sharePriceReverted ? WORDS.reverted : WORDS.unread },

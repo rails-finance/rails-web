@@ -13,6 +13,7 @@
 // caption. Both answer on the server, and the panel is drawn only where the
 // gate passed (`computed` non-null).
 
+import { HeadingTip } from "@/components/shared/tip-label";
 import type { ReactNode } from "react";
 
 import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
@@ -41,10 +42,22 @@ export interface VaultFlowsPanelProps {
   claimRaw: string | null;
   shareSymbol: string;
   assetSymbol: string;
+  /** Why no amount in the asset is printed (its decimals disagree, ui-jobs
+   *  664): the panel, drawn in the asset, stands as "—" with the reason. */
+  withheld?: string;
 }
 
 export function VaultFlowsPanel(props: VaultFlowsPanelProps) {
   if (!props.computed || !props.timeline) return null;
+  if (props.withheld)
+    return (
+      <section className="mb-6" data-vault-flows-withheld={props.holder} data-asset-scale-withheld="">
+        <h2 className="text-lg font-semibold text-foreground">Lifetime flows</h2>
+        <p className="mt-1 text-sm text-rb-500">
+          <span className="text-foreground">—</span> <HeadingTip text="decimals disagree" tip={props.withheld} />
+        </p>
+      </section>
+    );
   const { data, flows } = props.computed;
   const total = flows.counts.mints + flows.counts.burns + flows.counts.transfersIn + flows.counts.transfersOut;
   // The panel's own totals in the asset, as it draws them: what came in, what

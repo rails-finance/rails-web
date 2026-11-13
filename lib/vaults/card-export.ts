@@ -19,8 +19,15 @@ const n = (v: number) => v.toLocaleString("en-US");
 function headlines(v: VaultSummary, y: VaultYield | undefined): [string, string][] {
   const unit = v.asset.symbol;
   return [
-    ["Total assets", v.totalAssets ? `${assetText(v.totalAssets, v.asset.decimals)} ${unit}` : "not read"],
-    ["Share price", v.sharePrice ? `${sharePriceText(v.sharePrice, v.asset.decimals)} ${unit}` : "not read"],
+    // An asset whose decimals disagree exports an empty cell (ui-jobs 664).
+    [
+      "Total assets",
+      v.assetScale ? "" : v.totalAssets ? `${assetText(v.totalAssets, v.asset.decimals)} ${unit}` : "not read",
+    ],
+    [
+      "Share price",
+      v.assetScale ? "" : v.sharePrice ? `${sharePriceText(v.sharePrice, v.asset.decimals)} ${unit}` : "not read",
+    ],
     [
       "Yield",
       y && "yearly" in y

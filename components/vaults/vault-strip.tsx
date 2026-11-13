@@ -109,6 +109,7 @@ function changeSentence(tile: StripTile, v: VaultSummary, w: Measured, jump?: Va
     tile === "holders"
       ? n(Number(w.to.raw))
       : assetText({ raw: w.to.raw, value: Number(BigInt(w.to.raw)) / 10 ** v.asset.decimals }, v.asset.decimals);
+  if (tile !== "holders" && v.assetScale) return `from 0${tail}`;
   return `from 0 to ${to}${tile === "holders" ? "" : ` ${v.asset.symbol}`}${tail}`;
 }
 
@@ -231,9 +232,10 @@ function stripCsv(v: VaultSummary, s: VaultStripSeries): string {
       const h = ho.get(day);
       return [
         new Date(day * 86_400_000).toISOString().slice(0, 10),
-        a ? unit(a.raw) : "",
+        // An asset whose decimals disagree exports empty amounts (ui-jobs 664).
+        a && !v.assetScale ? unit(a.raw) : "",
         a ? String(a.block) : "",
-        p ? unit(p.raw) : "",
+        p && !v.assetScale ? unit(p.raw) : "",
         p ? String(p.block) : "",
         h ? h.raw : "",
         h ? String(h.block) : "",

@@ -48,3 +48,16 @@ export function assetScaleAbsentTip(symbol: string, s: AssetScale): string {
     `Read at ${s.stated}, an amount in ${symbol} comes out ${times} times too ${s.implied > s.stated ? "large" : "small"}, so none is shown.`
   );
 }
+
+/** The one sentence a receipt adds where it shows an amount in the asset at
+ *  the scale that disagrees (ui-jobs 664): the raw read stays, and says so. */
+export function assetScaleReceiptNote(symbol: string, s: AssetScale): string {
+  const k = Math.abs(s.implied - s.stated);
+  const times = TIMES[k] ?? `10^${k}`;
+  return `${symbol} states ${s.stated} decimals but converts to ${s.wraps.symbol} at ${s.implied}, so an amount in ${symbol} here, read at ${s.stated}, is ${times} times too ${s.implied > s.stated ? "large" : "small"}.`;
+}
+
+/** A receipt with that sentence after its summary; unchanged without one. */
+export function withScaleNote<P extends { summary?: string }>(p: P, note: string | null | undefined): P {
+  return note ? { ...p, summary: `${p.summary ?? ""} ${note}`.trim() } : p;
+}
