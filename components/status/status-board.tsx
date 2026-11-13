@@ -41,6 +41,7 @@ import {
   errorKind,
   fillStall,
   fillState,
+  heartbeatState,
   heartbeatTime,
   percentWords,
   pipelineHeartbeat,
@@ -135,11 +136,14 @@ function heartbeatLine(e: IndexProgressEntry, now: number, allowance: Allowance 
   const held = heldLine(e.held, allowance);
   const t = heartbeatTime(e);
   if (t == null) return "The fill has not reported this index yet.";
-  const words = HEARTBEAT_WORDS[fillState(e, now)];
+  const state = fillState(e, now);
+  const words = HEARTBEAT_WORDS[state];
   const line = heartbeatIsWallTime(e)
     ? `${words}: the fill last wrote at ${utcTime(t)}, ${ageWords(now - t)} ago.`
     : `${words}: last planned against the finalized block of ${utcTime(t)}, ${ageWords(now - t)} ago.`;
-  if (held && fillState(e, now) !== "fresh") return `${held} ${line}`;
+  // A late or stalled heartbeat outranks a stored hold (see fillState).
+  const hb = heartbeatState(e, now);
+  if (held && state !== "fresh" && hb !== "late" && hb !== "stalled") return `${held} ${line}`;
   const stall = fillStall(e);
   return stall ? `${line} ${STALL_WORDS[stall]}` : line;
 }

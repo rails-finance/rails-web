@@ -120,15 +120,18 @@ export function fillStall(e: IndexProgressEntry): "not-gaining" | "behind" | nul
 }
 
 /** A fill's state: its heartbeat's age, and never better than late while it
- *  is not moving. */
+ *  is not moving. A hold shows only while the heartbeat is fresh: the server
+ *  restores holds from storage, so a hold alone does not show the loop is
+ *  running, and a late or stalled heartbeat wins over it. */
 export function fillState(e: IndexProgressEntry, now: Secs): Heartbeat {
+  const hb = heartbeatState(e, now);
+  if (hb === "late" || hb === "stalled") return hb;
   // Held on purpose: the allowance, or the fill's switch. A check runs in
   // seconds and reads as the heartbeat; an error or a failed job is late.
   const r = e.held?.reason;
   if (r === "egress-floor" || r === "paused") return "paused";
   if (r === "fill-error" || r === "job-failed") return "late";
-  const hb = heartbeatState(e, now);
-  return fillStall(e) && (hb === "fresh" || hb === "none") ? "late" : hb;
+  return fillStall(e) ? "late" : hb;
 }
 
 /** "4 min", "2 h 10 min", "3 days": the age of a time, for a heartbeat. */
