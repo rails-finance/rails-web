@@ -13,7 +13,7 @@
 // (components/vaults/vault-index-table.tsx, V6).
 //
 // FACETS (ListToolbar, kept in the URL so Save listing and Copy link keep
-// them): Underlying (the Rails label of the protocol behind the yield token,
+// them): Underlying protocol (the Rails label of the protocol behind the yield token,
 // lib/pendle/underlying.ts, "Not labelled" a value of its own), Maturity
 // (active by default; `?maturity=matured` or `all`), Asset. The search narrows
 // by market, PT, yield token, asset and any of the market's addresses.
@@ -342,7 +342,11 @@ export function PendleRosterTable({
       clearDefault: (s) => ({ ...s, facets: { ...s.facets, maturity: ["all"] } }),
       chipLabel: (v) => (v[0] === "matured" ? "Matured" : v[0] === "all" ? "Every market" : "Active"),
     };
-    return [multi("underlying", "Underlying", underlyingOf), maturity, multi("asset", "Asset", assetOf)];
+    return [
+      multi("underlying", PENDLE_WORDS.underlyingProtocol, underlyingOf),
+      maturity,
+      multi("asset", "Asset", assetOf),
+    ];
   }, [markets]);
 
   const state: RosterFilters = { q: query, sortBy: sort, sortOrder: dir, facets };
@@ -386,7 +390,9 @@ export function PendleRosterTable({
 
   const criteria = [
     ...(maturityChoice !== "all" ? [maturityChoice === "active" ? "active markets" : "matured markets"] : []),
-    ...(facets.underlying?.length ? [`underlying ${facets.underlying.join(", ")}`] : []),
+    ...(facets.underlying?.length
+      ? [`${PENDLE_WORDS.underlyingProtocol.toLowerCase()} ${facets.underlying.join(", ")}`]
+      : []),
     ...(facets.asset?.length ? [`asset ${facets.asset.join(", ")}`] : []),
     ...(needle ? [`search “${query.trim()}”`] : []),
   ];
@@ -451,8 +457,8 @@ export function PendleRosterTable({
         }
       >
         <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-rb-500">
-          Each row opens its market&rsquo;s page. Underlying is a Rails label for the protocol behind each yield-bearing
-          token.
+          Each row opens its market&rsquo;s page. {PENDLE_WORDS.underlyingProtocol} is a Rails label for the protocol
+          behind each yield-bearing token.
         </p>
       </SectionHeading>
       <div className="mt-3">
