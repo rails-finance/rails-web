@@ -97,6 +97,7 @@ export function moonwellFlowsContent(): LearnMoreContent {
     ],
     links: [
       { label: "mTokens", url: `${DOCS}/developers/protocol/mtokens` },
+      { label: "Comptroller", url: `${DOCS}/developers/protocol/comptroller#responsibilities` },
       { label: "Credit and liquidations", url: `${DOCS}/moonwell-overview/borrow/credit-and-liquidations` },
       { label: "Protocol information", url: `${DOCS}/protocol-information/protocol-information` },
     ],

@@ -1083,7 +1083,7 @@ L5:
       - bold: |-
           Borrow APY
         text: |-
-          a rate compounded each second for a year; per Spark's docs, DAI and USDS follow utilization around a Sky Governance anchor, others supply and demand.
+          a rate compounded each second for a year; per Spark's docs, DAI and USDS follow utilization around a Sky governance anchor, others supply and demand.
       - bold: |-
           Credit delegation
         text: |-
