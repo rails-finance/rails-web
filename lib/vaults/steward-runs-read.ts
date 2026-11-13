@@ -2,7 +2,10 @@
 // piece C): rails-server's roles route on Ethereum and Base for a MetaMorpho
 // steward (curator, or owner where no curator is set, the steward line's
 // rule), worked by lib/vaults/steward-runs.ts against the vaults the directory
-// says it runs now. A Maple pool delegate has no such record: null.
+// says it runs now. A chain whose answer failed, or came back with no coverage
+// (the index has not read it), is unread: its vaults get no start date and
+// none of them counts as ran before. A Maple pool delegate has no such
+// record: null.
 //
 // SERVER-ONLY: the reads use RAILS_API_URL and the bearer token.
 
@@ -19,6 +22,8 @@ export type StewardRunsRead =
       runs: StewardRuns;
       /** `<chainId>:<address>` → the vault page, for ran-before vaults the directory still lists. */
       hrefs: Record<string, string>;
+      /** The chains whose record did not answer; the other chain's is stated. */
+      unread: number[];
     }
   | { kind: "unread" };
 
@@ -31,10 +36,12 @@ export async function loadStewardRuns(record: StewardRecordRead): Promise<Stewar
   if (role !== "curator" && role !== "owner") return null;
   const answers = await Promise.all(CHAINS.map((c) => fetchMetaMorphoRoles(c, record.steward.address, role)));
   const chains: StewardRunsChain[] = [];
-  for (const a of answers) {
-    if (a.kind !== "ok") return { kind: "unread" };
-    chains.push({ chainId: a.data.chainId, coverage: a.data.coverage, vaults: a.data.vaults });
-  }
+  const unread: number[] = [];
+  answers.forEach((a, i) => {
+    if (a.kind !== "ok" || (a.data.coverage.index == null && a.data.coverage.sieve == null)) unread.push(CHAINS[i]);
+    else chains.push({ chainId: a.data.chainId, coverage: a.data.coverage, vaults: a.data.vaults });
+  });
+  if (chains.length === 0) return { kind: "unread" };
   const current = new Set(
     record.vaults
       .filter((v) => vaultIndexProtocol(v) === "morpho")
@@ -58,5 +65,5 @@ export async function loadStewardRuns(record: StewardRecordRead): Promise<Stewar
       // No links: the names still stand.
     }
   }
-  return { kind: "ok", runs, hrefs };
+  return { kind: "ok", runs, hrefs, unread };
 }

@@ -27,30 +27,53 @@ export function VaultConfigChanges({ view }: { view: ConfigChangesView }) {
   if (view.kind === "unread")
     return (
       <p className="mt-2 text-[13px] leading-snug text-rb-500" data-anatomy="V9.1" data-protects-changes="unread">
-        Recent configuration changes are not read here: Rails&rsquo;s record of them did not answer.
+        Recent configuration changes are not shown: Rails&rsquo;s record of them did not answer.
       </p>
     );
 
-  const { count, rows } = view;
+  const { count, rows, scope } = view;
+  const scoped = scope.kind === "scoped";
+  // Where the record starts after the window or stops short of the page's block, the line names its reach.
+  const reach = (
+    <>
+      from {scope.from} through block {n(scope.through)}, where Rails&rsquo;s record stops.
+    </>
+  );
   if (count === 0)
     return (
-      <p className="mt-2 text-[13px] leading-snug text-rb-500" data-anatomy="V9.1" data-protects-changes="0">
-        <span className="font-semibold text-foreground">
-          <Prov info={view.countProv}>No configuration change</Prov> in the last 30 days.
-        </span>
-        {view.through != null && (
-          <> Rails&rsquo;s index holds the vault&rsquo;s logs through block {n(view.through)}.</>
+      <p
+        className="mt-2 text-[13px] leading-snug text-rb-500"
+        data-anatomy="V9.1"
+        data-protects-changes="0"
+        data-changes-scoped={scoped ? "" : undefined}
+      >
+        {scoped ? (
+          <span className="font-semibold text-foreground">
+            <Prov info={view.countProv}>None</Prov> {reach}
+          </span>
+        ) : (
+          <>
+            <span className="font-semibold text-foreground">
+              <Prov info={view.countProv}>No configuration change</Prov> in the last 30 days.
+            </span>{" "}
+            Logs read through block {n(scope.through)}.
+          </>
         )}
       </p>
     );
 
   const latest = rows[0];
   return (
-    <div className="mt-2" data-anatomy="V9.1" data-protects-changes={count}>
+    <div
+      className="mt-2"
+      data-anatomy="V9.1"
+      data-protects-changes={count}
+      data-changes-scoped={scoped ? "" : undefined}
+    >
       <p className="text-[13px] leading-snug text-rb-500">
         <span className="font-semibold text-foreground">
-          <Prov info={view.countProv}>{n(count)}</Prov> configuration change{count === 1 ? "" : "s"} in the last 30
-          days.
+          <Prov info={view.countProv}>{n(count)}</Prov> configuration change{count === 1 ? "" : "s"}{" "}
+          {scoped ? reach : "in the last 30 days."}
         </span>{" "}
         {count === 1 ? "On" : "The latest, on"} <Prov info={latest.dateProv}>{latest.date}</Prov>:{" "}
         <span data-change-latest={latest.event}>

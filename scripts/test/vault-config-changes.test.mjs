@@ -5,10 +5,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  acceptanceOf,
   changeRows,
   changeWords,
+  changesScope,
   coveredThrough,
   recentChanges,
+  timelockAdjective,
   timelockText,
 } from "../../lib/vaults/config-changes.ts";
 import { spanOf, stewardRuns } from "../../lib/vaults/steward-runs.ts";
@@ -43,6 +46,12 @@ const F = {
   market: (id) => (id === ID ? "the wstETH market" : null),
 };
 
+/** The block a log at NOW sits at: the page's block. */
+const HEAD = 1_000_000 + Math.floor(NOW / 12) - 140_000_000;
+/** One change in words against `all`, the page's timelock read and whether the answer was truncated. */
+const W = (c, all, timelock = null, truncated = false) =>
+  changeWords(c, { all, truncated, timelock, asOf: { block: HEAD, time: NOW } }, F);
+
 const newestFirst = (xs) => [...xs].sort((a, b) => b.blockNumber - a.blockNumber || b.logIndex - a.logIndex);
 
 test("the window is the 30 days to the page's block time, at or before its block", () => {
@@ -60,75 +69,58 @@ test("a cap names its market and the value before where an earlier SetCap is in 
   const first = log("SetCap", { caller: A1, id: ID, cap: "5000000" }, 40);
   const up = log("SetCap", { caller: A1, id: ID, cap: "7000000" }, 3);
   const all = newestFirst([first, up]);
-  assert.equal(changeWords(up, all, F, DAY, NOW).text, "Cap on the wstETH market raised from 5 USDC to 7 USDC");
-  assert.equal(changeWords(first, all, F, DAY, NOW).text, "Cap on the wstETH market set to 5 USDC");
+  assert.equal(W(up, all, DAY).text, "Cap on the wstETH market raised from 5 USDC to 7 USDC");
+  assert.equal(W(first, all, DAY).text, "Cap on the wstETH market set to 5 USDC");
   const down = log("SetCap", { caller: A1, id: ID2, cap: "0" }, 2);
   const prev = log("SetCap", { caller: A1, id: ID2, cap: "1000000" }, 50);
-  assert.match(
-    changeWords(down, [down, prev], F, DAY, NOW).text,
-    /^Cap on market 0xcdcd…cdcd lowered from 1 USDC to zero$/,
-  );
+  assert.match(W(down, [down, prev], DAY).text, /^Cap on market 0xcdcd…cdcd lowered from 1 USDC to zero$/);
   const max = log("SetCap", { caller: A1, id: ID, cap: ((1n << 184n) - 1n).toString() }, 1);
-  assert.match(changeWords(max, [max], F, DAY, NOW).text, /largest cap the contract takes/);
+  assert.match(W(max, [max], DAY).text, /largest cap the contract takes/);
 });
 
 test("a submitted cap waits for the timelock in force then, or says when it was accepted", () => {
   const tl = log("SetTimelock", { caller: A1, newTimelock: String(3 * DAY) }, 100);
   const sub = log("SubmitCap", { caller: A1, id: ID, cap: "9000000" }, 1);
-  const w = changeWords(sub, newestFirst([tl, sub]), F, 7 * DAY, NOW);
+  const w = W(sub, newestFirst([tl, sub]), 7 * DAY);
   assert.equal(w.waiting.validAt, sub.blockTime + 3 * DAY);
   assert.equal(w.waiting.acceptedBy, null);
-  assert.match(w.text, /waits for the 3 days timelock and can be accepted from day -2 ago$/);
+  assert.match(w.text, /waits for the 3-day timelock and can be accepted from day -2 ago$/);
   // No SetTimelock in the answer: the page's read of the timelock.
-  assert.equal(changeWords(sub, [sub], F, 7 * DAY, NOW).waiting.timelock, 7 * DAY);
-  // Accepted: the SetCap with the same market and cap that follows.
+  assert.equal(W(sub, [sub], 7 * DAY).waiting.timelock, 7 * DAY);
+  // Accepted: the SetCap with the same market and cap that follows, once the timelock has run.
+  const earlier = log("SubmitCap", { caller: A1, id: ID, cap: "9000000" }, 5);
   const acc = log("SetCap", { caller: A2, id: ID, cap: "9000000" }, 0);
-  const wa = changeWords(sub, newestFirst([tl, sub, acc]), F, 7 * DAY, NOW);
+  const wa = W(earlier, newestFirst([tl, earlier, acc]), 7 * DAY);
   assert.equal(wa.waiting.acceptedBy, acc);
   assert.match(wa.text, /; accepted on day 0 ago$/);
   // Past its time with no acceptance in the record.
   const oldSub = log("SubmitCap", { caller: A1, id: ID, cap: "9000000" }, 20);
-  assert.match(
-    changeWords(oldSub, newestFirst([tl, oldSub]), F, null, NOW).text,
-    /no acceptance follows in the record$/,
-  );
+  assert.match(W(oldSub, newestFirst([tl, oldSub]), null).text, /no acceptance follows in the record$/);
 });
 
 test("queues, roles and the timelock in words", () => {
   const q1 = log("SetSupplyQueue", { caller: A1, newSupplyQueue: [ID] }, 40);
   const q2 = log("SetSupplyQueue", { caller: A1, newSupplyQueue: [ID, ID2] }, 2);
-  assert.equal(
-    changeWords(q2, [q2, q1], F, null, NOW).text,
-    "Supply queue changed from 1 market to 2 markets: 1 added",
-  );
+  assert.equal(W(q2, [q2, q1], null).text, "Supply queue changed from 1 market to 2 markets: 1 added");
   const q3 = log("SetSupplyQueue", { caller: A1, newSupplyQueue: [ID2, ID] }, 1);
-  assert.equal(changeWords(q3, [q3, q2, q1], F, null, NOW).text, "Supply queue reordered, 2 markets");
+  assert.equal(W(q3, [q3, q2, q1], null).text, "Supply queue reordered, 2 markets");
   const q4 = log("SetSupplyQueue", { caller: A1, newSupplyQueue: [ID2, ID] }, 0.5);
-  assert.equal(changeWords(q4, [q4, q3], F, null, NOW).text, "Supply queue set again with the same 2 markets");
+  assert.equal(W(q4, [q4, q3], null).text, "Supply queue set again with the same 2 markets");
   const q5 = log("SetSupplyQueue", { caller: A1, newSupplyQueue: [ID2, "0x" + "ef".repeat(32)] }, 0.2);
-  assert.equal(
-    changeWords(q5, [q5, q4], F, null, NOW).text,
-    "Supply queue changed, still 2 markets: 1 added, 1 removed",
-  );
+  assert.equal(W(q5, [q5, q4], null).text, "Supply queue changed, still 2 markets: 1 added, 1 removed");
   const w = log("SetWithdrawQueue", { caller: A1, newWithdrawQueue: [ID] }, 2);
-  assert.equal(changeWords(w, [w], F, null, NOW).text, "Withdraw queue set to 1 market");
-  assert.equal(
-    changeWords(log("SetCurator", { newCurator: A2 }, 1), [], F, null, NOW).text,
-    "Curator set to 0x2222…2222",
-  );
-  assert.equal(
-    changeWords(log("SetGuardian", { caller: A1, guardian: ZERO }, 1), [], F, null, NOW).text,
-    "Guardian removed",
-  );
+  assert.equal(W(w, [w], null).text, "Withdraw queue set to 1 market");
+  assert.equal(W(log("SetCurator", { newCurator: A2 }, 1), [], null).text, "Curator set to 0x2222…2222");
+  assert.equal(W(log("SetGuardian", { caller: A1, guardian: ZERO }, 1), [], null).text, "Guardian removed");
   const t0 = log("SetTimelock", { caller: A1, newTimelock: String(DAY) }, 90);
   const t1 = log("SetTimelock", { caller: A1, newTimelock: String(7 * DAY) }, 1);
-  assert.equal(changeWords(t1, [t1, t0], F, null, NOW).text, "Timelock changed from 1 day to 7 days");
+  assert.equal(W(t1, [t1, t0], null).text, "Timelock changed from 1 day to 7 days");
   assert.equal(
-    changeWords(log("OwnershipTransferred", { previousOwner: A1, newOwner: A2 }, 1), [], F, null, NOW).text,
+    W(log("OwnershipTransferred", { previousOwner: A1, newOwner: A2 }, 1), [], null).text,
     "Owner changed from 0x1111…1111 to 0x2222…2222",
   );
   assert.equal(
-    changeWords(log("OwnershipTransferred", { previousOwner: A1, newOwner: ZERO }, 1), [], F, null, NOW).text,
+    W(log("OwnershipTransferred", { previousOwner: A1, newOwner: ZERO }, 1), [], null).text,
     "Ownership renounced",
   );
   assert.equal(timelockText(36 * 3600), "36 hours");
@@ -136,7 +128,7 @@ test("queues, roles and the timelock in words", () => {
 
 test("rows and coverage", () => {
   const a = log("SetCap", { caller: A1, id: ID, cap: "1000000" }, 5);
-  const rows = changeRows([a], { block: a.blockNumber, time: NOW }, F, null);
+  const rows = changeRows({ all: [a], truncated: false, timelock: null, asOf: { block: a.blockNumber, time: NOW } }, F);
   assert.equal(rows.length, 1);
   assert.equal(coveredThrough({ index: { fromBlock: 1, throughBlock: 50 }, sieve: null }), 50);
   assert.equal(
@@ -144,6 +136,85 @@ test("rows and coverage", () => {
     60,
   );
   assert.equal(coveredThrough({ index: null, sieve: null }), null);
+});
+
+test("an accepted cap reads as accepted, bounded by the next submission, validAt and the page's block", () => {
+  const tl = log("SetTimelock", { caller: A1, newTimelock: String(3 * DAY) }, 100);
+  const sub = log("SubmitCap", { caller: A1, id: ID, cap: "9000000" }, 10);
+  // A SetCap of the same value before validAt is not the acceptance (it cannot be).
+  const early = log("SetCap", { caller: A1, id: ID, cap: "9000000" }, 9);
+  assert.equal(acceptanceOf(newestFirst([tl, sub, early]), sub, sub.blockTime + 3 * DAY, HEAD), null);
+  // Revoked, then submitted again and accepted: the first submission is not accepted.
+  const again = log("SubmitCap", { caller: A1, id: ID, cap: "9000000" }, 8);
+  const acc = log("SetCap", { caller: A2, id: ID, cap: "9000000" }, 4);
+  const all = newestFirst([tl, sub, again, acc]);
+  assert.equal(W(sub, all).accepted, null);
+  assert.match(W(sub, all).text, /no acceptance follows in the record$/);
+  assert.equal(W(again, all).accepted, acc);
+  // After the page's block: not yet.
+  assert.equal(acceptanceOf(all, again, again.blockTime + 3 * DAY, acc.blockNumber - 1), null);
+  // No timelock known (truncated answer, no SetTimelock in it): an acceptance still reads as accepted.
+  const t = W(again, newestFirst([again, acc]), 7 * DAY, true);
+  assert.equal(t.waiting, undefined);
+  assert.equal(t.accepted, acc);
+  assert.match(t.text, /; accepted on day 4 ago$/);
+});
+
+test("a truncated answer infers no timelock from outside it", () => {
+  const sub = log("SubmitCap", { caller: A1, id: ID, cap: "9000000" }, 1);
+  // Whole answer, no SetTimelock: the page's read dates it.
+  assert.equal(W(sub, [sub], 7 * DAY, false).waiting.timelock, 7 * DAY);
+  // Truncated: no date.
+  const t = W(sub, [sub], 7 * DAY, true);
+  assert.equal(t.waiting, undefined);
+  assert.equal(
+    t.text,
+    "Cap of 9 USDC on the wstETH market submitted; it waits for the timelock, and no acceptance follows in the record",
+  );
+  // A SetTimelock inside the truncated answer still counts.
+  const tl = log("SetTimelock", { caller: A1, newTimelock: String(DAY) }, 5);
+  assert.equal(W(sub, newestFirst([tl, sub]), 7 * DAY, true).waiting.timelock, DAY);
+  // Truncated with no earlier SetCap in it: "set to".
+  const cap = log("SetCap", { caller: A1, id: ID, cap: "1000000" }, 1);
+  assert.equal(W(cap, [cap], null, true).text, "Cap on the wstETH market set to 1 USDC");
+});
+
+test("timelock words: the adjective before a noun, none for no wait", () => {
+  assert.equal(timelockAdjective(3 * DAY), "3-day");
+  assert.equal(timelockAdjective(36 * 3600), "36-hour");
+  assert.equal(timelockAdjective(0), null);
+  assert.equal(timelockText(0), "none");
+  const t0 = log("SetTimelock", { caller: A1, newTimelock: String(7 * DAY) }, 60);
+  const t1 = log("SetTimelock", { caller: A1, newTimelock: "0" }, 1);
+  assert.equal(W(t1, [t1, t0]).text, "Timelock changed from 7 days to none");
+  assert.equal(W(t1, [t1]).text, "Timelock set to none");
+});
+
+test("the scope: unread with no coverage, scoped where the record stops short or starts late", () => {
+  const asOf = { block: 30_000_000 };
+  assert.deepEqual(changesScope({ index: null, sieve: null }, 1, asOf), { kind: "unread" });
+  // Within a day of blocks (7,200 on Ethereum): whole.
+  assert.deepEqual(changesScope({ index: { fromBlock: 1, throughBlock: 29_993_000 }, sieve: null }, 1, asOf), {
+    kind: "whole",
+    through: 29_993_000,
+  });
+  // More than a day short: scoped from the window's start.
+  assert.deepEqual(changesScope({ index: { fromBlock: 1, throughBlock: 29_990_000 }, sieve: null }, 1, asOf), {
+    kind: "scoped",
+    through: 29_990_000,
+    fromBlock: null,
+  });
+  // Base's day is 43,200 blocks.
+  assert.equal(
+    changesScope({ index: { fromBlock: 1, throughBlock: 29_960_000 }, sieve: null }, 8453, asOf).kind,
+    "whole",
+  );
+  // Starts after the window's first block (30 days of 7,200 back): scoped from that block.
+  assert.deepEqual(changesScope({ index: { fromBlock: 29_900_000, throughBlock: 30_000_000 }, sieve: null }, 1, asOf), {
+    kind: "scoped",
+    through: 30_000_000,
+    fromBlock: 29_900_000,
+  });
 });
 
 const run = (from, until) => ({

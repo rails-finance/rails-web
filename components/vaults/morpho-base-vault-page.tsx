@@ -180,8 +180,9 @@ export function MorphoBaseVaultPage({
   holders: VaultHolders | null;
   /** The vaults this steward runs now, from the /vaults directory; null where it did not answer. */
   stewardRecord: StewardRecordRead;
-  /** The steward's runs from rails-server's roles route (V14.2, V14.3); null where it has none to read. */
-  stewardRuns?: StewardRunsRead | null;
+  /** The steward's runs from rails-server's roles route (V14.2, V14.3), streamed: the record draws them
+   *  behind Suspense as they arrive; resolving to null, none is shown. */
+  stewardRuns?: Promise<StewardRunsRead | null>;
   /** The bad-debt episodes in the steward's vaults (V14.1), streamed by the route. */
   badDebt?: ReactNode;
 }) {

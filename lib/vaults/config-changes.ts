@@ -5,7 +5,9 @@
 // page's block time; the eight configuration events count, the two
 // reallocation events do not. Each change is said from its log's arguments,
 // with the value before it where an earlier log of the same kind is in the
-// answer. Facts only: no change is called good or bad.
+// answer; a truncated answer infers nothing from outside it. The section is
+// scoped to how far Rails's record reaches (`changesScope`). Facts only: no
+// change is called good or bad.
 //
 // Pure, no `@/` import (scripts/test/vault-config-changes.test.mjs loads it):
 // dates and amounts come in through `ChangeFormat`.
@@ -83,6 +85,38 @@ export const shortHex = (a: string): string => `${a.slice(0, 6)}…${a.slice(-4)
 export const coveredThrough = (c: MetaMorphoCoverage): number | null =>
   c.sieve?.throughBlock ?? c.index?.throughBlock ?? null;
 
+/** About a day of blocks per chain: Ethereum's 12-second slots, Base's 2-second blocks. A record that
+ *  stops further than this short of the page's block, or starts after the window's first block
+ *  (estimated with the same block times), scopes what the section says. */
+export const LAG_BLOCKS: Record<number, number> = { 1: 7_200, 8453: 43_200 };
+
+/** How the record covers the 30 days: unread (no coverage), whole, or scoped to where it starts or stops. */
+export type ChangesScope =
+  | { kind: "unread" }
+  | { kind: "whole"; through: number }
+  | {
+      kind: "scoped";
+      through: number;
+      /** The first block the record holds where that is after the window's start; null, the window's start. */
+      fromBlock: number | null;
+    };
+
+export function changesScope(
+  coverage: MetaMorphoCoverage,
+  chainId: number,
+  asOf: { block: number },
+  days = WINDOW_DAYS,
+): ChangesScope {
+  const through = coveredThrough(coverage);
+  if (through == null) return { kind: "unread" };
+  const day = LAG_BLOCKS[chainId] ?? LAG_BLOCKS[1];
+  const windowStart = asOf.block - days * day;
+  const from = coverage.index?.fromBlock ?? coverage.sieve?.fromBlock ?? null;
+  const late = from != null && from > windowStart ? from : null;
+  if (asOf.block - through > day || late != null) return { kind: "scoped", through, fromBlock: late };
+  return { kind: "whole", through };
+}
+
 /** The changes at or before `block` whose time falls in the `days` before `time`, newest first as given. */
 export function recentChanges(
   changes: readonly MetaMorphoChange[],
@@ -122,13 +156,21 @@ function next(
 const str = (v: string | string[] | undefined): string => (Array.isArray(v) ? "" : (v ?? ""));
 const list = (v: string | string[] | undefined): string[] => (Array.isArray(v) ? v : []);
 
-/** "1 day", "7 days", "36 hours", "no wait". */
+/** "1 day", "7 days", "36 hours", "none". */
 export function timelockText(seconds: number): string {
-  if (seconds <= 0) return "no wait";
+  if (seconds <= 0) return "none";
   if (seconds % DAY === 0) return seconds === DAY ? "1 day" : `${(seconds / DAY).toLocaleString("en-US")} days`;
   if (seconds % 3600 === 0) return seconds === 3600 ? "1 hour" : `${(seconds / 3600).toLocaleString("en-US")} hours`;
   const d = seconds / DAY;
   return `${d.toLocaleString("en-US", { maximumFractionDigits: 1 })} days`;
+}
+
+/** Before a noun: "3-day", "36-hour", "1.5-day"; null for no wait. */
+export function timelockAdjective(seconds: number): string | null {
+  if (seconds <= 0) return null;
+  if (seconds % DAY === 0) return `${(seconds / DAY).toLocaleString("en-US")}-day`;
+  if (seconds % 3600 === 0) return `${(seconds / 3600).toLocaleString("en-US")}-hour`;
+  return `${(seconds / DAY).toLocaleString("en-US", { maximumFractionDigits: 1 })}-day`;
 }
 
 export interface ChangeFormat {
@@ -150,31 +192,67 @@ function capOf(f: ChangeFormat, raw: string): string {
   return f.amount(raw);
 }
 
-/** The timelock in force at `c`: the latest SetTimelock before it, else `fallback`. */
-export function timelockAt(all: readonly MetaMorphoChange[], c: MetaMorphoChange, fallback: number | null) {
+/** The timelock in force at `c`: the latest SetTimelock before it in the answer; else, where the
+ *  answer is whole (not truncated), `fallback`, the page's read. A truncated answer infers none. */
+export function timelockAt(
+  all: readonly MetaMorphoChange[],
+  c: MetaMorphoChange,
+  fallback: number | null,
+  truncated = false,
+) {
   const t = previous(all, c, (x) => x.event === "SetTimelock");
   if (t) return { seconds: Number(str(t.args.newTimelock)), from: t };
-  return fallback == null ? null : { seconds: fallback, from: null };
+  return fallback == null || truncated ? null : { seconds: fallback, from: null };
+}
+
+/** The SetCap that accepted a SubmitCap: same market and cap, after it, before the next SubmitCap on
+ *  the market (a later submission replaces a revoked or pending one), at or after `validAt` where
+ *  known, at or before the page's block. */
+export function acceptanceOf(
+  all: readonly MetaMorphoChange[],
+  c: MetaMorphoChange,
+  validAt: number | null,
+  asOfBlock: number,
+): MetaMorphoChange | null {
+  const id = str(c.args.id);
+  const cap = str(c.args.cap);
+  const bound = next(all, c, (x) => x.event === "SubmitCap" && str(x.args.id) === id);
+  return next(
+    all,
+    c,
+    (x) =>
+      x.event === "SetCap" &&
+      str(x.args.id) === id &&
+      str(x.args.cap) === cap &&
+      x.blockNumber <= asOfBlock &&
+      (validAt == null || x.blockTime >= validAt) &&
+      (!bound || before(x, bound) < 0),
+  );
+}
+
+/** What a change is read against: every change the answer holds, newest first; whether the answer
+ *  was truncated; the vault's timelock at the page's read; the page's block and time. */
+export interface ChangeContext {
+  all: readonly MetaMorphoChange[];
+  truncated: boolean;
+  timelock: number | null;
+  asOf: { block: number; time: number };
 }
 
 export interface ChangeWords {
   /** The change in one sentence, no full stop. */
   text: string;
-  /** SubmitCap: when the cap can be accepted, and the SetCap that accepted it where one follows. */
+  /** SubmitCap: when the cap can be accepted (where the timelock in force is known), and the SetCap that accepted it where one follows. */
   waiting?: { validAt: number; timelock: number; acceptedBy: MetaMorphoChange | null };
+  /** SubmitCap: the SetCap that accepted it; null where none follows in the record. */
+  accepted?: MetaMorphoChange | null;
   /** The earlier log the "from" value comes from. */
   previous: MetaMorphoChange | null;
 }
 
-/** One change in words. `all` is every change the answer holds (for the value before); `timelock`
- *  is the vault's timelock at the page's read, used where no SetTimelock precedes a SubmitCap. */
-export function changeWords(
-  c: MetaMorphoChange,
-  all: readonly MetaMorphoChange[],
-  f: ChangeFormat,
-  timelock: number | null,
-  now: number,
-): ChangeWords {
+/** One change in words. A "from" value comes only from an earlier log in the answer. */
+export function changeWords(c: MetaMorphoChange, ctx: ChangeContext, f: ChangeFormat): ChangeWords {
+  const { all } = ctx;
   const a = c.args;
   switch (c.event) {
     case "SetCap": {
@@ -192,22 +270,34 @@ export function changeWords(
     case "SubmitCap": {
       const id = str(a.id);
       const cap = str(a.cap);
-      const tl = timelockAt(all, c, timelock);
+      const tl = timelockAt(all, c, ctx.timelock, ctx.truncated);
       const head = `Cap of ${capOf(f, cap)} on ${marketOf(f, id)} submitted`;
-      if (!tl) return { text: `${head}; it waits for the timelock`, previous: null };
-      const validAt = c.blockTime + tl.seconds;
-      const accepted = next(all, c, (x) => x.event === "SetCap" && str(x.args.id) === id && str(x.args.cap) === cap);
+      const validAt = tl ? c.blockTime + tl.seconds : null;
+      const accepted = acceptanceOf(all, c, validAt, ctx.asOf.block);
+      if (!tl || validAt == null)
+        return accepted
+          ? { text: `${head}; accepted on ${f.date(accepted.blockTime)}`, accepted, previous: null }
+          : {
+              text: `${head}; it waits for the timelock, and no acceptance follows in the record`,
+              accepted,
+              previous: null,
+            };
       const waiting = { validAt, timelock: tl.seconds, acceptedBy: accepted };
-      if (accepted) return { text: `${head}; accepted on ${f.date(accepted.blockTime)}`, waiting, previous: null };
-      if (validAt > now)
+      if (accepted)
+        return { text: `${head}; accepted on ${f.date(accepted.blockTime)}`, waiting, accepted, previous: null };
+      if (validAt > ctx.asOf.time) {
+        const adj = timelockAdjective(tl.seconds);
         return {
-          text: `${head}; it waits for the ${timelockText(tl.seconds)} timelock and can be accepted from ${f.date(validAt)}`,
+          text: `${head}; it waits for the ${adj ? `${adj} ` : ""}timelock and can be accepted from ${f.date(validAt)}`,
           waiting,
+          accepted,
           previous: null,
         };
+      }
       return {
         text: `${head}; it could be accepted from ${f.date(validAt)}, and no acceptance follows in the record`,
         waiting,
+        accepted,
         previous: null,
       };
     }
@@ -274,11 +364,6 @@ export interface ChangeRowWords {
   words: ChangeWords;
 }
 
-export function changeRows(
-  all: readonly MetaMorphoChange[],
-  asOf: { block: number; time: number },
-  f: ChangeFormat,
-  timelock: number | null,
-): ChangeRowWords[] {
-  return recentChanges(all, asOf).map((c) => ({ change: c, words: changeWords(c, all, f, timelock, asOf.time) }));
+export function changeRows(ctx: ChangeContext, f: ChangeFormat): ChangeRowWords[] {
+  return recentChanges(ctx.all, ctx.asOf).map((c) => ({ change: c, words: changeWords(c, ctx, f) }));
 }

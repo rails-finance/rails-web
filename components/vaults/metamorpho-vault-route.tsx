@@ -9,8 +9,8 @@
 // (lib/vaults/holders-read.ts), Yield the daily store's, the steward's record
 // the /vaults directory's (lib/vaults/steward-record.ts) with its runs from
 // rails-server's roles route (lib/vaults/steward-runs-read.ts). What protects it,
-// The protocol underneath and the record's bad-debt episodes stream behind
-// their own Suspense.
+// The protocol underneath, the record's runs and its bad-debt episodes stream
+// behind their own Suspense.
 //
 // THE PAGE LINKS TO THE FILTERED LISTING, IT DOES NOT LIST. The Holders
 // headline links to the position listing filtered to this address. What ONE
@@ -108,15 +108,16 @@ export async function MetaMorphoVaultRoute({
   const holderParam = firstParam((await searchParams).holder);
   if (holderParam && holderParam.trim()) redirect(metaMorphoVaultHref(chainId, address, holderParam.trim()));
 
+  // The steward's runs stream: the record's Since cells and ran-before list wait on this
+  // promise behind their own Suspense, so the page's first byte does not wait on the roles reads.
+  const stewardRecordRead = loadStewardRecord(chainId, address, null);
+  const stewardRuns = stewardRecordRead.then(loadStewardRuns).catch(() => null);
   const [data, census, series, holders, stewardRecord] = await Promise.all([
     load(chainId, address, undefined),
     loadVaultCensusRow(chainId, address),
     loadVaultPageSeries(chainId, address),
     loadVaultHolders(chainId, address, "morpho"),
-    loadStewardRecord(chainId, address, null).then(async (record) => ({
-      record,
-      runs: await loadStewardRuns(record),
-    })),
+    stewardRecordRead,
   ]);
   const [assetScales, config] = data.chainStale
     ? [{}, null]
@@ -147,8 +148,8 @@ export async function MetaMorphoVaultRoute({
               factory={metaMorphoFactoryAddress(chainId, data.vault.factory)}
               config={config}
               holders={holders}
-              stewardRecord={stewardRecord.record}
-              stewardRuns={stewardRecord.runs}
+              stewardRecord={stewardRecord}
+              stewardRuns={stewardRuns}
               badDebt={
                 <Suspense fallback={null}>
                   <VaultBadDebtSection chainId={chainId} vault={address} />

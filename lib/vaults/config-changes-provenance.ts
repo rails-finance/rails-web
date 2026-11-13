@@ -81,8 +81,10 @@ export const configChangeProv = (
   const extra = [
     w.previous ? `The value before is from ${logOf(chainId, w.previous)}.` : null,
     w.waiting
-      ? `It can be accepted ${timelockText(w.waiting.timelock)} after it was submitted, the timelock in force then${w.waiting.acceptedBy ? `; ${logOf(chainId, w.waiting.acceptedBy)} accepted it` : ""}. A revoked submission writes a log Rails does not read yet.`
-      : null,
+      ? `It can be accepted ${w.waiting.timelock > 0 ? `${timelockText(w.waiting.timelock)} after it was submitted` : "as soon as it is submitted"}, by the timelock in force then${w.waiting.acceptedBy ? `; ${logOf(chainId, w.waiting.acceptedBy)} accepted it` : ""}. An acceptance is a SetCap with the same market and cap, at or after that time and before the next SubmitCap on the market; a revoked submission writes a log Rails does not read yet.`
+      : w.accepted
+        ? `${logOf(chainId, w.accepted)} accepted it: a SetCap with the same market and cap before the next SubmitCap on the market. The timelock in force then is not in the answer.`
+        : null,
   ]
     .filter(Boolean)
     .join(" ");
@@ -168,8 +170,8 @@ export const stewardBeforeCountProv = (
 ): Provenance => ({
   kind: "chain-derived",
   pclass: "emitted",
-  summary: `Vaults it ran before — ${n(count)} MetaMorpho vaults on Base and Ethereum where every run of ${address} as ${role} has ended, from ${chains.map((c) => rolesRoute(c.chainId, address, role)).join(" and ")}. ${chains.map((c) => `${reach(c.chainId, c.coverage)}.`).join(" ")}`,
-  via: `Rails index · MetaMorpho ${ROLE_EVENT[role]} on Base and Ethereum`,
+  summary: `Vaults it ran before — ${n(count)} MetaMorpho vaults on ${chains.map((c) => chainWord(c.chainId)).join(" and ")} where every run of ${address} as ${role} has ended, from ${chains.map((c) => rolesRoute(c.chainId, address, role)).join(" and ")}. ${chains.map((c) => `${reach(c.chainId, c.coverage)}.`).join(" ")}`,
+  via: `Rails index · MetaMorpho ${ROLE_EVENT[role]} on ${chains.map((c) => chainWord(c.chainId)).join(" and ")}`,
   formula: "count(vaults where every run has an end)",
   verify: {
     kind: "recompute",

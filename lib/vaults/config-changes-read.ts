@@ -12,7 +12,7 @@ import { fetchMetaMorphoChanges, type MetaMorphoChangesChainId } from "@/lib/api
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { formatDate } from "@/lib/date";
-import { CONFIG_EVENTS, WINDOW_DAYS, changeRows, coveredThrough, type ChangeFormat } from "@/lib/vaults/config-changes";
+import { CONFIG_EVENTS, WINDOW_DAYS, changeRows, changesScope, type ChangeFormat } from "@/lib/vaults/config-changes";
 import { configChangeCountProv, configChangeDateProv, configChangeProv } from "@/lib/vaults/config-changes-provenance";
 
 /** What the read needs from the vault page: the vault, its asset, its markets, its block. */
@@ -46,8 +46,9 @@ export type ConfigChangesView =
       chainId: number;
       count: number;
       countProv: Provenance;
-      /** The last block Rails's index holds for the vault; null before its first read. */
-      through: number | null;
+      /** How far Rails's record reaches: the whole window, or scoped from `from` (the window's
+       *  first date, or "block N" where the record starts later) through block `through`. */
+      scope: { kind: "whole" | "scoped"; from: string; through: number };
       rows: ConfigChangeRowView[];
     };
 
@@ -82,13 +83,16 @@ export async function readConfigChanges(
   const d = answer.data;
   const time = s.asOf.time ?? Math.floor(Date.now() / 1000);
   const asOf = { block: s.asOf.block, time };
+  const scope = changesScope(d.coverage, s.chainId, asOf);
+  if (scope.kind === "unread") return { kind: "unread" };
+  const windowFrom = time - WINDOW_DAYS * 86_400;
   const names = marketNames(s.markets);
   const f: ChangeFormat = {
     date: formatDate,
     amount: (raw) => `${formatCompact(Number(raw) / 10 ** s.asset.decimals)} ${s.asset.symbol}`,
     market: (id) => names.get(id.toLowerCase()) ?? null,
   };
-  const rows = changeRows(d.changes, asOf, f, timelock);
+  const rows = changeRows({ all: d.changes, truncated: d.truncated, timelock, asOf }, f);
   const vault = { name: s.vault.name, address: s.vault.address.toLowerCase() };
   return {
     kind: "ok",
@@ -98,10 +102,17 @@ export async function readConfigChanges(
       s.chainId,
       vault,
       rows.length,
-      { fromTime: time - WINDOW_DAYS * 86_400, block: s.asOf.block },
+      { fromTime: windowFrom, block: s.asOf.block },
       d.coverage,
     ),
-    through: coveredThrough(d.coverage),
+    scope: {
+      kind: scope.kind,
+      from:
+        scope.kind === "scoped" && scope.fromBlock != null
+          ? `block ${scope.fromBlock.toLocaleString("en-US")}`
+          : formatDate(windowFrom),
+      through: scope.through,
+    },
     rows: rows.map(({ change: c, words: w }) => ({
       key: `${c.blockNumber}:${c.txIndex}:${c.logIndex}:${c.event}`,
       event: c.event,
@@ -111,7 +122,7 @@ export async function readConfigChanges(
       textProv: configChangeProv(s.chainId, vault, c, w, d.coverage),
       block: c.blockNumber,
       txHref: explorerUrl(s.chainId as ChainId, "tx-logs", c.txHash),
-      waiting: c.event === "SubmitCap" && !w.waiting?.acceptedBy,
+      waiting: c.event === "SubmitCap" && !w.accepted,
     })),
   };
 }
