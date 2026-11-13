@@ -9,6 +9,7 @@ import type { VaultYield } from "@/lib/vaults/yield";
 import type { VaultIlliquid } from "@/lib/vaults/illiquid";
 import { formatUnitsExact } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
+import { assetScaleReceiptNote } from "@/lib/vaults/asset-scale-words";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -22,7 +23,7 @@ export const vaultYieldProv = (v: VaultSummary, y: Measured): Provenance => {
     kind: "derived",
     pclass: "state",
     source: { block: y.to.block },
-    summary: `Yield — Rails's figure: the share price's growth over the ${y.days} days to block ${n(y.to.block)}, annualised simply. One share was ${at(y.from)} and ${at(y.to)}, each the vault's \`convertToAssets\` stored once a day in the daily price store. It is net of the fees the vault takes inside the share; rewards paid outside the share are not in it, and it is no forecast.${y.jump ? ` ${y.jump.fromDay != null ? "A span of days" : "One day"} carries most of the move: ${(y.jump.change * 100).toFixed(2)}% between two stored days, ${y.jump.fromDay != null ? `from ${formatDate(new Date(y.jump.fromDay * 86_400_000))} to ${formatDate(new Date(y.jump.day * 86_400_000))}` : `on ${formatDate(new Date(y.jump.day * 86_400_000))}`}.` : ""}`,
+    summary: `Yield — Rails's figure: the share price's growth over the ${y.days} days to block ${n(y.to.block)}, annualised simply. One share was ${at(y.from)} and ${at(y.to)}, each the vault's \`convertToAssets\` stored once a day in the daily price store. It is net of the fees the vault takes inside the share; rewards paid outside the share are not in it, and it is no forecast.${y.jump ? ` ${y.jump.fromDay != null ? "A span of days" : "One day"} carries most of the move: ${(y.jump.change * 100).toFixed(2)}% between two stored days, ${y.jump.fromDay != null ? `from ${formatDate(new Date(y.jump.fromDay * 86_400_000))} to ${formatDate(new Date(y.jump.day * 86_400_000))}` : `on ${formatDate(new Date(y.jump.day * 86_400_000))}`}.` : ""}${v.assetScale ? ` ${assetScaleReceiptNote(v.asset.symbol, v.assetScale)}` : ""}`,
     contract: { name: v.name ?? v.catalogName ?? "vault", address: v.address },
     via: "daily price store · convertToAssets(10 ** decimals) once per UTC day @ the day's last block",
     formula: `(p1 / p0 − 1) × 365 / ${y.days}`,
@@ -76,4 +77,33 @@ export const vaultWithdrawableProv = (v: VaultSummary, il: VaultIlliquid): Prove
     places: v.asset.decimals,
     why: `${v.asset.symbol} has ${v.asset.decimals} decimals`,
   },
+});
+
+/** The wrapped asset's own share-price change beside an Umbrella stake's
+ *  Yield (decision 0047 as amended, ui-jobs 664): the asset's two stored
+ *  `convertToAssets` reads, never added into the stake's figure. */
+export const vaultAssetGrowthProv = (v: VaultSummary, y: Measured): Provenance => ({
+  kind: "derived",
+  pclass: "state",
+  source: { block: y.to.block },
+  summary: `The wrapped ${v.asset.symbol}'s share price — its \`convertToAssets\` of one whole share, stored once a day in the daily price store, went from ${formatUnitsExact(y.from.raw, v.asset.decimals)} at block ${n(y.from.block)} to ${formatUnitsExact(y.to.raw, v.asset.decimals)} at block ${n(y.to.block)}, in the token ${v.asset.symbol} wraps. This vault's share price, in ${v.asset.symbol}, does not show that growth; the two are stated apart and never added.`,
+  contract: { name: v.asset.symbol, address: v.asset.address },
+  via: "daily price store · convertToAssets(10 ** decimals) once per UTC day @ the day's last block",
+  formula: "p1 / p0 − 1",
+  inputs: [
+    {
+      label: `p0 · block ${n(y.from.block)}`,
+      value: formatUnitsExact(y.from.raw, v.asset.decimals),
+      kind: "chain",
+      pclass: "state",
+      note: `${v.asset.symbol}'s convertToAssets of one whole share, stored for that day`,
+    },
+    {
+      label: `p1 · block ${n(y.to.block)}`,
+      value: formatUnitsExact(y.to.raw, v.asset.decimals),
+      kind: "chain",
+      pclass: "state",
+      note: "the latest stored day",
+    },
+  ],
 });

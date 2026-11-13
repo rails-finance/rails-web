@@ -26,12 +26,29 @@ export function impliedDecimals(stated: number, wrapsDecimals: number, per1e18: 
 
 const TIMES: Record<number, string> = { 3: "a thousand", 6: "a million", 9: "a billion", 12: "a trillion" };
 
-/** The pill's sentence. */
+/** The pill's sentence: the same words as the tip under a withheld figure,
+ *  since the page prints no amount in the asset. */
 export function assetScaleSentence(symbol: string, s: AssetScale): string {
+  return assetScaleAbsentTip(symbol, s);
+}
+
+/** Why an amount in the asset is not shown (ui-jobs 664): the tip on "decimals
+ *  disagree" where a headline, a share price or a holder's amount stands as
+ *  "—". The figure read at the stated decimals is a power of ten off, so none
+ *  is printed. */
+export function assetScaleAbsentTip(symbol: string, s: AssetScale): string {
+  return `${assetScaleReceiptNote(symbol, s)} None is shown.`;
+}
+
+/** The one sentence a receipt adds where it shows an amount in the asset at
+ *  the scale that disagrees (ui-jobs 664): the raw read stays, and says so. */
+export function assetScaleReceiptNote(symbol: string, s: AssetScale): string {
   const k = Math.abs(s.implied - s.stated);
   const times = TIMES[k] ?? `10^${k}`;
-  return (
-    `${symbol} states ${s.stated} decimals, but converts to ${s.wraps.symbol} at ${s.implied}. ` +
-    `Amounts in ${symbol} here are read at ${s.stated}, so they read ${times} times too ${s.implied > s.stated ? "large" : "small"}.`
-  );
+  return `${symbol} states ${s.stated} decimals but converts to ${s.wraps.symbol} at ${s.implied}, so an amount in ${symbol} read at ${s.stated} comes out ${times} times too ${s.implied > s.stated ? "large" : "small"}.`;
+}
+
+/** A receipt with that sentence after its summary; unchanged without one. */
+export function withScaleNote<P extends { summary?: string }>(p: P, note: string | null | undefined): P {
+  return note ? { ...p, summary: `${p.summary ?? ""} ${note}`.trim() } : p;
 }

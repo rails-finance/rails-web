@@ -1575,13 +1575,13 @@ doc_urls:
   OVERVIEW_SUPPLY: https://aave.com/docs/aave-v3/overview#supply
   OVERVIEW_BORROW: https://aave.com/docs/aave-v3/overview#borrow
   INTEREST_RATES: https://aave.com/docs/aave-v3/overview#interest-rates
-  CREDIT_DELEGATION: https://aave.com/docs/aave-v3/guides/credit-delegation#approving-the-delegation
+  CREDIT_DELEGATION: https://aave.com/docs/aave-v3/guides/credit-delegation#approve-the-delegation
   ATOKEN: https://aave.com/docs/aave-v3/smart-contracts/tokenization#atoken
-  GATEWAY: https://aave.com/docs/aave-v3/smart-contracts/wrapped-token-gateway#write-methods-withdraweth
+  GATEWAY: https://aave.com/docs/aave-v3/smart-contracts/wrapped-token-gateway#withdraweth
   SWAP_TOKENS: https://aave.com/docs/aave-v3/smart-contracts/swap-features#swap-tokens
   SWAP_REPAY: https://aave.com/docs/aave-v3/smart-contracts/swap-features#repay-with-collateral
   SWAP_COLLATERAL: https://aave.com/docs/aave-v3/smart-contracts/swap-features#collateral-swap
-  SWAP_DEBT: https://aave.com/docs/aave-v3/smart-contracts/swap-features#borrow-position-swap
+  SWAP_DEBT: https://aave.com/docs/aave-v3/smart-contracts/swap-features#debt-swap
   SWAP_WITHDRAW: https://aave.com/docs/aave-v3/smart-contracts/swap-features#withdraw-swap
   FAQ_FLASH_LOAN: https://aave.com/faq#other-features-what-is-a-flash-loan
   FAQ_LIQ_PRICE: https://aave.com/faq#liquidations-what-is-my-liquidation-price

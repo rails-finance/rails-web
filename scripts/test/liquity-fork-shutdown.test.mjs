@@ -80,3 +80,14 @@ test("with no record, only a live shutdown draws the state", () => {
   assert.equal(s?.at, 1_800_000_000);
   assert.equal(s?.record, null);
 });
+
+test("a redemption at or after the branch's shutdown is the urgent path", async () => {
+  const { redemptionPath } = await import("../../lib/liquity-fork/shutdown.ts");
+  const at = 1_787_265_479;
+  assert.equal(redemptionPath(at - 1, at), "ordinary");
+  assert.equal(redemptionPath(at, at), "urgent");
+  // Ebisu's sUSDe redemption of 7 Oct 2026, block 26,139,958.
+  assert.equal(redemptionPath(1_791_369_467, at), "urgent");
+  assert.equal(redemptionPath(1_791_369_467, null), "ordinary");
+  assert.equal(redemptionPath(1_791_369_467, undefined), "ordinary");
+});

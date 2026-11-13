@@ -28,6 +28,8 @@ import type { MetaMorphoChainId } from "@/lib/metamorpho/vault-roster";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
+const MORPHO_VAULT_V2_DOCS = "https://docs.morpho.org/learn/concepts/vault-v2/";
+
 /** The chain's own facts in the paragraphs. */
 const WORDS: Record<MetaMorphoChainId, { window: string; finalized: string }> = {
   8453: {
@@ -56,8 +58,15 @@ export async function MetaMorphoVaultsInfo({ chainId }: { chainId: MetaMorphoCha
         <code>totalSupply()</code> wei-exact at the census block the listing states. A sweep that came back short cannot
         pass that check, so a silent partial answer becomes a refused load and the previous census stands. Transfers,
         first seen, last activity and what the holding address is all come from that sweep, at that block. The one
-        priced figure on a card, Value · USD, is the census&rsquo;s too and is explained below; there is no rate and no
-        yield on any vault page here.
+        priced figure on a card, Value · USD, is the census&rsquo;s too and is explained below.
+      </p>
+      {/* ui-jobs 664, VA9: the docs' V2, which this section does not list. */}
+      <p data-intro-v2>
+        <a href={MORPHO_VAULT_V2_DOCS} target="_blank" rel="noopener" className="link-external">
+          Morpho&rsquo;s docs
+        </a>{" "}
+        name Morpho Vault V2 the primary vault surface and say &ldquo;Morpho Vaults V1 are now legacy&rdquo;; this
+        section lists MetaMorpho (V1) vaults only.
       </p>
       <p data-intro-blocks>
         Three blocks, and this section never reduces them to one. The census block the listing states is when membership

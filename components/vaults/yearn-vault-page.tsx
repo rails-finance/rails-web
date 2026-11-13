@@ -65,6 +65,17 @@ const n = (v: number) => v.toLocaleString("en-US");
 const eth = (kind: "address" | "block", v: string | number) => explorerUrl(CHAIN_ID, kind, v);
 /** A strategy's cap at uint256's top: the role manager set none. */
 const MAX_UINT = (BigInt(1) << BigInt(256)) - BigInt(1);
+
+/** What Yearn's docs say of a vault by name, beside where the page says who
+ *  made it (ui-jobs 664, VA11). Keyed by the vault's address, lowercased. */
+const YEARN_DOCS_ON_VAULT: Record<string, { quote: string; source: string; label: string }> = {
+  // rSWELL: listed, since a Yearn V3 factory made it.
+  "0x358d94b5b2f147d741088803d932acb566acb7b6": {
+    quote: "was built on Yearn V3 contracts but was not deployed by yearn",
+    source: "https://docs.yearn.fi/getting-started/guides/user-faq",
+    label: "Yearn's User FAQ",
+  },
+};
 const UNREAD = <NotLoaded className="text-base font-normal text-rb-500" />;
 
 /** A span of seconds in a reader's words: whole days, else whole hours. */
@@ -107,6 +118,7 @@ export function YearnVaultPage({
 }) {
   const registry = useReceiptRegistry();
   const y = data.vault;
+  const docsOnVault = YEARN_DOCS_ON_VAULT[y.address.toLowerCase()];
   const createdAt = useBlockTime(CHAIN_ID, y.createdBlock > 0 ? y.createdBlock : null);
   const v = yearnVaultPageSummary(data, census);
   // A figure on total assets under the dust floor is too small to measure (ui-jobs 542).
@@ -171,8 +183,9 @@ export function YearnVaultPage({
     },
     {
       id: "deployed",
-      label: "Deployed",
-      tip: "What the vault records as lent to its strategies, updated when a strategy reports.",
+      // Yearn's docs' word, totalDebt / debt (ui-jobs 664, VA5).
+      label: "Debt",
+      tip: "What the vault has sent to its strategies, updated when a strategy reports.",
       asset,
       value: fig(
         "total-debt",
@@ -263,10 +276,10 @@ export function YearnVaultPage({
           #{s.position} ·{" "}
           {s.maxDebt ? (
             <Prov info={yearnVaultStrategyCapProv(coords, s.address)}>
-              {BigInt(s.maxDebt.raw) === MAX_UINT ? "no cap" : `cap ${assetText(s.maxDebt, ad)}`}
+              {BigInt(s.maxDebt.raw) === MAX_UINT ? "no max debt" : `max debt ${assetText(s.maxDebt, ad)}`}
             </Prov>
           ) : (
-            "cap not read"
+            "max debt not read"
           )}
         </>
       ),
@@ -381,6 +394,14 @@ export function YearnVaultPage({
           block={y.createdBlock > 0 ? y.createdBlock : null}
           by={`the Yearn V3 ${y.apiVersion} factory`}
         />
+        {docsOnVault && (
+          <ExplainBullet>
+            <a href={docsOnVault.source} target="_blank" rel="noopener" className="link-external">
+              {docsOnVault.label}
+            </a>{" "}
+            says it &ldquo;{docsOnVault.quote}&rdquo;.
+          </ExplainBullet>
+        )}
       </ExplainGroup>
     </div>
   );
@@ -397,7 +418,7 @@ export function YearnVaultPage({
     stats: [
       ["Shares issued", y.totalSupply ? shareText(y.totalSupply, y.shareDecimals ?? ad) : "not read"],
       ["Idle", y.totalIdle ? `${assetText(y.totalIdle, ad)} ${unit}` : "not read"],
-      ["Deployed", y.totalDebt ? `${assetText(y.totalDebt, ad)} ${unit}` : "not read"],
+      ["Debt", y.totalDebt ? `${assetText(y.totalDebt, ad)} ${unit}` : "not read"],
       ["Profit unlock", y.profitMaxUnlockTime != null ? spanWords(y.profitMaxUnlockTime) : "not read"],
       ["Steward (role manager)", y.roleManager ?? "not read"],
       ["Accountant", y.accountant ?? "none set"],

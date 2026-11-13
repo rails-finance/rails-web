@@ -69,6 +69,9 @@ import {
   type AaveVaultCoords,
 } from "@/lib/aave-vaults/vault-provenance";
 
+/** A rate stored in basis points, as a percentage: 450 is "4.50%". */
+const bpsPercent = (bps: number) => `${(bps / 100).toFixed(2)}%`;
+
 const n = (v: number) => v.toLocaleString("en-US");
 const eth = (kind: "address", v: string) => explorerUrl(MAINNET_CHAIN_ID, kind, v);
 const UNREAD = <NotLoaded className="text-base font-normal text-rb-500" />;
@@ -85,6 +88,7 @@ export function AaveEthereumVaultPage({
   data,
   census,
   yieldFigure: storeYield,
+  assetYield,
   strip,
   attestation,
   holders,
@@ -94,6 +98,9 @@ export function AaveEthereumVaultPage({
   data: AaveEthereumVaultResponse;
   census: VaultCensusRow | null;
   yieldFigure?: VaultYield;
+  /** An Umbrella stake's asset's own Yield measure, for the Yield subline
+   *  (ui-jobs 664). */
+  assetYield?: VaultYield;
   /** The store's three daily series for the strip (V5); null where it did not answer. */
   strip: VaultStripSeries | null;
   attestation: AaveVaultAttestation;
@@ -103,7 +110,7 @@ export function AaveEthereumVaultPage({
   const registry = useReceiptRegistry();
   const { vault } = data;
   const family = vault.family;
-  const v = aaveEthereumVaultPageSummary(data, attestation.kind === "book", census);
+  const v = { ...aaveEthereumVaultPageSummary(data, attestation.kind === "book", census), assetYield };
   // A figure on total assets under the dust floor is too small to measure (ui-jobs 542).
   const yieldFigure = measuredYield(storeYield, v.totalAssets?.raw);
   const unit = vault.asset.symbol;
@@ -192,8 +199,9 @@ export function AaveEthereumVaultPage({
       },
       {
         id: "deposit-cap",
-        label: "Deposit cap",
-        tip: "The most the vault takes in deposits.",
+        // Aave's docs' field, supplyCap (ui-jobs 664, VA6).
+        label: "Supply cap",
+        tip: `The most ${unit} the vault takes.`,
         asset,
         value: fig(
           "sgho-supply-cap",
@@ -209,7 +217,7 @@ export function AaveEthereumVaultPage({
       {
         id: "remaining-capacity",
         label: "Remaining capacity",
-        tip: "The room left under the deposit cap.",
+        tip: "The room left under the supply cap.",
         asset,
         value: fig(
           "sgho-capacity",
@@ -225,12 +233,16 @@ export function AaveEthereumVaultPage({
       {
         id: "target-rate",
         label: "Target rate",
-        sub: "basis points, a setting",
-        tip: "The rate the index moves at, as governance set it, in the basis points the contract stores.",
+        sub: "a setting",
+        // A percentage, as Aave's docs state it (ui-jobs 664, VA6).
+        tip:
+          s.targetRateBps != null
+            ? `The rate the index moves at, as governance set it. The contract stores it as ${n(s.targetRateBps)} basis points.`
+            : "The rate the index moves at, as governance set it.",
         value: fig(
           "sgho-target-rate",
           s.targetRateBps != null ? (
-            <Prov info={aaveVaultTargetRateProv(coords, s.targetRateBps)}>{n(s.targetRateBps)}</Prov>
+            <Prov info={aaveVaultTargetRateProv(coords, s.targetRateBps)}>{bpsPercent(s.targetRateBps)}</Prov>
           ) : (
             UNREAD
           ),
@@ -254,7 +266,7 @@ export function AaveEthereumVaultPage({
     );
     exportStats.push(
       [`${unit} the contract holds`, s.assetHeld ? assetText(s.assetHeld, ad) : "not read"],
-      ["Deposit cap", s.supplyCap ? assetText(s.supplyCap, ad) : "not read"],
+      ["Supply cap", s.supplyCap ? assetText(s.supplyCap, ad) : "not read"],
       ["Remaining capacity", s.remainingCapacity ? assetText(s.remainingCapacity, ad) : "not read"],
       ["Target rate (basis points)", s.targetRateBps != null ? String(s.targetRateBps) : "not read"],
       ["Index last updated", s.lastUpdate != null ? utcInstant(s.lastUpdate) : "not read"],
@@ -304,7 +316,7 @@ export function AaveEthereumVaultPage({
         <ExplainGroup title="Rate">
           {s.targetRateBps != null && (
             <ExplainBullet>
-              The target rate is <Fig>{n(s.targetRateBps)}</Fig> basis points, a setting governance can change.
+              The target rate is <Fig>{bpsPercent(s.targetRateBps)}</Fig>, a setting governance can change.
             </ExplainBullet>
           )}
           <YieldBullets yieldFigure={yieldFigure} rewards="rewards paid outside the share" />

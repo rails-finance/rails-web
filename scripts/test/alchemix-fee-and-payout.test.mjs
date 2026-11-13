@@ -3,7 +3,13 @@
 // Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { BASE_FEE_CHANGE_BLOCK, feeCharged, protocolFeeAt, protocolFeeNow } from "../../lib/alchemix/protocol-fee.ts";
+import {
+  BASE_FEE_CHANGE_BLOCK,
+  feeCharged,
+  feeListed,
+  protocolFeeAt,
+  protocolFeeNow,
+} from "../../lib/alchemix/protocol-fee.ts";
 import { claimPayoutParts } from "../../lib/alchemix/claim-payout.ts";
 import { sumRedemptionNets } from "../../lib/alchemix/redemption-net-sum.ts";
 
@@ -93,4 +99,12 @@ test('a repay\'s logged fee of "0" (Base at 0 bps) states no fee; a positive one
   assert.equal(feeCharged(null), false);
   assert.equal(feeCharged(undefined), false);
   assert.equal(feeCharged("2500000000000000"), true);
+});
+
+test("an event sheet leaves out a logged fee of zero and keeps a present one it cannot read as zero", () => {
+  assert.equal(feeListed("0"), false);
+  assert.equal(feeListed(null), false);
+  assert.equal(feeListed(undefined), false);
+  assert.equal(feeListed("2500000000000000"), true);
+  assert.equal(feeListed("0.5"), true);
 });

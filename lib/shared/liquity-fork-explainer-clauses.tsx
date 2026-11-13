@@ -124,6 +124,7 @@ import {
 import { getForkBatchManagerName } from "@/lib/shared/fork-batch-managers";
 import { AmountText } from "@/components/shared/amount-text";
 import { familyRatioPct, fmtLtv, type LiquityFamilyTerms } from "@/lib/liquity/ltv";
+import type { RedemptionPath } from "@/lib/liquity-fork/shutdown";
 
 const shortAddress = (a: string): string => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
@@ -233,13 +234,21 @@ const fmtColl = (h?: string): string => forkCollAmount(Number(h));
 
 // ── the variant table ────────────────────────────────────────────────────────
 
+/** The event's facts the row alone does not carry. `redemption`: which path
+ *  reached the Trove (lib/liquity-fork/shutdown.ts, `redemptionPath`); the
+ *  urgent path drops what holds only for a standard redemption. */
+export interface LiquityForkEventFacts {
+  redemption?: RedemptionPath;
+}
+
 export function liquityForkEventSlots(
   ctx: LiquityForkEventContext,
   coords: LiquityForkCoords,
   fork: LiquityForkCopy,
   b: LiquityForkExplainerProvs,
+  facts: LiquityForkEventFacts = {},
 ): EventProseSlots {
-  const slots = eventSlots(ctx, coords, fork, b);
+  const slots = eventSlots(ctx, coords, fork, b, facts);
   const redist = redistClauses(ctx, coords, fork, b);
   const withRedist = redist.length > 0 ? { ...slots, changed: [...(slots.changed ?? []), ...redist] } : slots;
   // A redemption states its ratio in its own clauses, step by step where
@@ -411,6 +420,7 @@ function eventSlots(
   coords: LiquityForkCoords,
   fork: LiquityForkCopy,
   b: LiquityForkExplainerProvs,
+  facts: LiquityForkEventFacts,
 ): EventProseSlots {
   const coll = ctx.collateralSymbol;
   const debt = fork.stablecoin;
@@ -910,6 +920,10 @@ function eventSlots(
       // reaches the lowest-rate Troves in the queue, and a zombie (a Trove
       // redeemed under the minimum debt) is out of that queue and reached as
       // the branch's most recent zombie.
+      // The urgent path (a shut-down branch) reaches Troves the redeemer
+      // picks, keeps no fee in them, and leaves no queue for a next
+      // redemption: the sentences resting on those go.
+      const urgent = facts.redemption === "urgent";
       const minDebt = fork.minDebt;
       const preDebt = debtAfter - debtMove; // the debt this redemption acted on (interest included)
       const wasZombie = minDebt != null && preDebt > DEBT_EPS && preDebt < minDebt;
@@ -924,8 +938,9 @@ function eventSlots(
       );
       const happened = (
         <>
-          {indefiniteArticle(debt)} {debt} holder redeemed against the branch, and this Trove ({why}) gave up{" "}
-          {collDeltaFig()} of collateral while {debtDeltaFig()} of its debt was cancelled at $1 face
+          {indefiniteArticle(debt)} {debt} holder redeemed against the branch, and this Trove
+          {urgent ? null : <> ({why})</>} gave up {collDeltaFig()} of collateral while {debtDeltaFig()} of its debt was
+          cancelled at $1 face
           {emittedPrice != null ? (
             <>
               , with {coll} priced at {redPriceFig()}, the figure the branch emitted with the redemption
@@ -941,15 +956,17 @@ function eventSlots(
       const collOut = Math.abs(collDelta);
       const feePct = feeKept > 0 && collOut > 0 ? (feeKept / (collOut + feeKept)) * 100 : null;
       const feeClause: ClauseInput =
-        redFeeFig() != null
-          ? clause(
-              <>
-                The redeemer paid a redemption fee of {redFeeFig()}
-                {feePct != null ? <> ({feePct.toFixed(2)}% of the collateral redeemed from this Trove)</> : null}, and
-                the Trove kept it as collateral.
-              </>,
-            )
-          : null;
+        urgent && red != null && !(feeKept > 0)
+          ? clause(<>The Trove kept no redemption fee.</>)
+          : redFeeFig() != null
+            ? clause(
+                <>
+                  The redeemer paid a redemption fee of {redFeeFig()}
+                  {feePct != null ? <> ({feePct.toFixed(2)}% of the collateral redeemed from this Trove)</> : null}, and
+                  the Trove kept it as collateral.
+                </>,
+              )
+            : null;
       // This Trove's part of the branch-wide act: the whole of it, or a slice
       // with its share.
       const ownCleared = Math.abs(debtMove);
@@ -974,7 +991,8 @@ function eventSlots(
                 <>
                   This Trove&rsquo;s part was {forkAmount(ownCleared)} {debt}
                   {actual > 0 ? <>, {((ownCleared / actual) * 100).toFixed(2)}%</> : null} of a {redActFig()} redemption
-                  against the {coll} branch{shortfall}; the redemption reached lower-rate Troves first.
+                  against the {coll} branch{shortfall}
+                  {urgent ? null : <>; the redemption reached lower-rate Troves first</>}.
                 </>,
               );
 
@@ -1028,22 +1046,25 @@ function eventSlots(
             clause(
               <>
                 That cleared the Trove&rsquo;s debt entirely; it now holds only {collAfterFig()} of collateral and is{" "}
-                {t.dormantText}, out of the rate queue.
+                {t.dormantText}
+                {urgent ? null : <>, out of the rate queue</>}.
               </>,
             ),
             ...redemptionContext,
             showAccrued ? interestClause() : null,
           ],
           meansNow: [
-            clause(
-              <>
-                With no debt the Trove accrues no interest. The owner can close it to take back the collateral
-                {forkLiquidationReserve(fork.protocolName) ? (
-                  <> and the {forkLiquidationReserve(fork.protocolName)} liquidation reserve</>
-                ) : null}
-                , or borrow again above the minimum to rejoin the queue.
-              </>,
-            ),
+            urgent
+              ? clause(<>With no debt the Trove accrues no interest.</>)
+              : clause(
+                  <>
+                    With no debt the Trove accrues no interest. The owner can close it to take back the collateral
+                    {forkLiquidationReserve(fork.protocolName) ? (
+                      <> and the {forkLiquidationReserve(fork.protocolName)} liquidation reserve</>
+                    ) : null}
+                    , or borrow again above the minimum to rejoin the queue.
+                  </>,
+                ),
           ],
         };
       }
@@ -1073,59 +1094,77 @@ function eventSlots(
           ),
           ...redemptionContext,
           stepsClause,
-          becameZombie
+          becameZombie && urgent
             ? clause(
                 <>
-                  This redemption left the debt under the branch&rsquo;s {formatNumber(minDebt!)} {debt} minimum, so the
-                  Trove is now {t.dormantText}, out of the rate queue. As the branch&rsquo;s most recent {t.dormantNoun}
-                  , it is the first Trove the next redemption reaches.
+                  This redemption left the debt under the branch&rsquo;s {formatNumber(minDebt!)} {debt} minimum.
                 </>,
               )
-            : null,
-        ],
-        meansNow: [
-          clause(
-            ratioMove != null ? (
-              <>
-                Redemption swaps debt for collateral at the branch&rsquo;s price, and the Trove keeps the fee
-                {ratioMove === easing ? (
-                  <>
-                    , so this one {easing} the {t.ratioText} from {forkCrText(rd(redFrom!))} to {forkCrText(rd(cr2!))}
-                  </>
-                ) : ratioMove === "kept" ? (
-                  <>
-                    , so a redemption {t.ltv ? "lowers" : "raises"} the {t.ratioText}; this one moved it by less than
-                    0.01% ({forkCrText(rd(cr2!))})
-                  </>
-                ) : (
-                  <>
-                    : this one took the {t.ratioText} from {forkCrText(rd(redFrom!))} to {forkCrText(rd(cr2!))}
-                  </>
-                )}
-                .
-              </>
-            ) : (
-              <>
-                Redemption swaps debt for collateral at the branch&rsquo;s price, and the Trove keeps the fee, so a
-                redemption on its own {t.ltv ? "lowers" : "raises"} the {t.ratioText}.
-              </>
-            ),
-          ),
-          wasZombie || becameZombie
-            ? clause(
-                <>
-                  The owner can close the Trove to take back its collateral, or borrow back above{" "}
-                  {formatNumber(minDebt!)} {debt} to rejoin the rate queue.
-                </>,
-              )
-            : minDebt != null
+            : becameZombie
               ? clause(
                   <>
-                    A redemption that leaves a Trove under the branch&rsquo;s {formatNumber(minDebt)} {debt} minimum
-                    debt makes it {t.dormantText}, out of the rate-ordered queue.
+                    This redemption left the debt under the branch&rsquo;s {formatNumber(minDebt!)} {debt} minimum, so
+                    the Trove is now {t.dormantText}, out of the rate queue. As the branch&rsquo;s most recent{" "}
+                    {t.dormantNoun}, it is the first Trove the next redemption reaches.
                   </>,
                 )
               : null,
+        ],
+        meansNow: [
+          urgent
+            ? ratioMove != null && ratioMove !== "kept"
+              ? clause(
+                  <>
+                    This redemption {ratioMove} the {t.ratioText} from {forkCrText(rd(redFrom!))} to{" "}
+                    {forkCrText(rd(cr2!))}.
+                  </>,
+                )
+              : null
+            : clause(
+                ratioMove != null ? (
+                  <>
+                    Redemption swaps debt for collateral at the branch&rsquo;s price, and the Trove keeps the fee
+                    {ratioMove === easing ? (
+                      <>
+                        , so this one {easing} the {t.ratioText} from {forkCrText(rd(redFrom!))} to{" "}
+                        {forkCrText(rd(cr2!))}
+                      </>
+                    ) : ratioMove === "kept" ? (
+                      <>
+                        , so a redemption {t.ltv ? "lowers" : "raises"} the {t.ratioText}; this one moved it by less
+                        than 0.01% ({forkCrText(rd(cr2!))})
+                      </>
+                    ) : (
+                      <>
+                        : this one took the {t.ratioText} from {forkCrText(rd(redFrom!))} to {forkCrText(rd(cr2!))}
+                      </>
+                    )}
+                    .
+                  </>
+                ) : (
+                  <>
+                    Redemption swaps debt for collateral at the branch&rsquo;s price, and the Trove keeps the fee, so a
+                    redemption on its own {t.ltv ? "lowers" : "raises"} the {t.ratioText}.
+                  </>
+                ),
+              ),
+          urgent
+            ? null
+            : wasZombie || becameZombie
+              ? clause(
+                  <>
+                    The owner can close the Trove to take back its collateral, or borrow back above{" "}
+                    {formatNumber(minDebt!)} {debt} to rejoin the rate queue.
+                  </>,
+                )
+              : minDebt != null
+                ? clause(
+                    <>
+                      A redemption that leaves a Trove under the branch&rsquo;s {formatNumber(minDebt)} {debt} minimum
+                      debt makes it {t.dormantText}, out of the rate-ordered queue.
+                    </>,
+                  )
+                : null,
         ],
       };
     }
@@ -1431,6 +1470,7 @@ export function liquityForkExplainerTeaser(
   coords: LiquityForkCoords,
   fork: LiquityForkCopy,
   b: LiquityForkExplainerProvs,
+  facts: LiquityForkEventFacts = {},
 ): ReactNode | null {
-  return splitLead(eventClauses(liquityForkEventSlots(ctx, coords, fork, b))).lead;
+  return splitLead(eventClauses(liquityForkEventSlots(ctx, coords, fork, b, facts))).lead;
 }

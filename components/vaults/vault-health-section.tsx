@@ -25,6 +25,11 @@ export interface VaultHealthSectionProps {
   vault: { address: string; name: string; assetSymbol: string; decimals: number };
   /** `totalAssets()` at the page block, raw; null where unread. */
   totalAssetsRaw: string | null;
+  /** Why no amount in the asset is printed (its decimals disagree, ui-jobs
+   *  664): the Size line says so in place of the totals. */
+  amountsWithheld?: string;
+  /** The sentence each receipt adds after an amount in that asset (664). */
+  scaleNote?: string;
   block: number;
   readBy?: ServerRead | null;
   /** The holder's claim and `maxWithdraw` at the block, raw. */
@@ -63,7 +68,12 @@ export async function VaultHealthSection(p: VaultHealthSectionProps) {
   });
   const lines = healthLines(
     health,
-    { family: p.family, assetSymbol: p.vault.assetSymbol, decimals: p.vault.decimals },
+    {
+      family: p.family,
+      assetSymbol: p.vault.assetSymbol,
+      decimals: p.vault.decimals,
+      amountsWithheld: p.amountsWithheld,
+    },
     WORDS,
   );
   return (
@@ -73,6 +83,7 @@ export async function VaultHealthSection(p: VaultHealthSectionProps) {
       vault={{
         ...p.vault,
         address,
+        ...(p.scaleNote ? { scaleNote: p.scaleNote } : {}),
         priceKey: series?.priceKey ?? `vault:${p.chainId}:${address}`,
         assetsKey: series?.assetsKey ?? `vault-assets:${p.chainId}:${address}`,
       }}

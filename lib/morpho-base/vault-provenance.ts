@@ -121,7 +121,7 @@ const vaultTotalSupplyProv_ = (c: MorphoVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("MetaMorpho.totalSupply()", c),
-  summary: `Total shares — the ERC-20 \`totalSupply()\` of the vault's own share token${atBlock(c)}. Every share in existence, and the denominator of every proportional figure on this page.`,
+  summary: `Shares issued — the ERC-20 \`totalSupply()\` of the vault's own share token${atBlock(c)}. Every share in existence, and the denominator of every proportional figure on this page.`,
   contract: vaultContract(c),
   via: `${lane(c)} · MetaMorpho.totalSupply() @ the pinned block`,
 });

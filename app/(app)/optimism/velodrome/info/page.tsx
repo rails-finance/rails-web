@@ -21,7 +21,6 @@ import { DEPLOYMENT_LABEL } from "@/lib/aerodrome/words";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { ProvSection } from "@/components/shared/section-menu";
 
 export const metadata = infoMetadata("velodrome");
@@ -113,7 +112,6 @@ const howItWorks: readonly [ReactNode, ...ReactNode[]] = [
     <Prov info={REWARD_TOKEN_READ}>
       The wstETH/USDC pool&apos;s gauge, the one gauge checked, still names VELO as its reward token.
     </Prov>
-    <ProvInspectorLayer />
   </ProvSection>,
   <>
     Every figure is in the pool&apos;s quote token, the one it prices the other in, at the pool&apos;s price. VELO is

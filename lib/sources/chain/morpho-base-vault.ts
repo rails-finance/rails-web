@@ -566,7 +566,8 @@ export async function loadMorphoBaseVault(
     })) as Call[];
     const at = (name: (typeof scalars)[number]) => ok(head[scalars.indexOf(name)]);
 
-    const name = at("name") as string | undefined;
+    // Trimmed for display (ui-jobs 664: one vault's name() starts with a space).
+    const name = (at("name") as string | undefined)?.trim();
     const assetAddress = (at("asset") as string | undefined)?.toLowerCase();
     const totalAssetsRaw = at("totalAssets") as bigint | undefined;
     const totalSupplyRaw = at("totalSupply") as bigint | undefined;

@@ -61,6 +61,7 @@ import type {
 } from "@/lib/shared/vault-holder-timeline";
 import { NotLoaded } from "@/components/shared/not-loaded";
 import { planAllocation } from "@/lib/vaults/allocation-plan";
+import { withScaleNote } from "@/lib/vaults/asset-scale-words";
 
 const ZERO = BigInt(0);
 const n = (v: number) => v.toLocaleString("en-US");
@@ -74,11 +75,21 @@ const metaExtra = (event: VaultHolderEvent): MetaMorphoEventExtra | null =>
 export const legLabel = (leg: VaultAllocationLeg): string =>
   leg.isIdle ? "Idle market" : (leg.collateralSymbol ?? (leg.marketId ? shortId(leg.marketId) : "Market not loaded"));
 
-const legTitle = (leg: VaultAllocationLeg, assetSymbol: string, assetDecimals: number, share: number): string =>
-  `${legLabel(leg)} ${leg.marketId ? shortId(leg.marketId) : ""} · ${assetText(
-    { raw: leg.attributed ?? "0", value: Number(leg.attributed ?? 0) / Math.pow(10, assetDecimals) },
-    assetDecimals,
-  )} ${assetSymbol} · ${pctText(share)} of this address's claim at this block · queue position ${leg.queueIndex + 1}`;
+const legTitle = (
+  leg: VaultAllocationLeg,
+  assetSymbol: string,
+  assetDecimals: number,
+  share: number,
+  withheld?: string,
+): string =>
+  `${legLabel(leg)} ${leg.marketId ? shortId(leg.marketId) : ""} · ${
+    withheld
+      ? ""
+      : `${assetText(
+          { raw: leg.attributed ?? "0", value: Number(leg.attributed ?? 0) / Math.pow(10, assetDecimals) },
+          assetDecimals,
+        )} ${assetSymbol} · `
+  }${pctText(share)} of this address's claim at this block · queue position ${leg.queueIndex + 1}`;
 
 const attributedOf = (leg: VaultAllocationLeg): bigint | null =>
   leg.attributed == null ? null : BigInt(leg.attributed);
@@ -130,11 +141,14 @@ export interface VaultAllocationBandProps {
   /** The newest row. The interval rule and the proportional statement are said
    *  once for the page, under the first band. */
   first: boolean;
+  /** Why no amount in the asset is printed (its decimals disagree, ui-jobs
+   *  664): the segments' titles keep the shares only. */
+  withheld?: string;
 }
 
 /** The band, in the row's `band` slot: full panel width, so its
  *  grid lines up with the detail grid under it. */
-export function VaultAllocationBand({ event, coords, assetSymbol, first }: VaultAllocationBandProps) {
+export function VaultAllocationBand({ event, coords, assetSymbol, first, withheld }: VaultAllocationBandProps) {
   const extra = metaExtra(event);
   const legs = extra?.allocation ?? null;
   const ad = event.assetDecimals;
@@ -158,7 +172,7 @@ export function VaultAllocationBand({ event, coords, assetSymbol, first }: Vault
     key: leg.marketId || `queue-${leg.queueIndex}`,
     f: share(leg),
     rampIndex: leg.queueIndex,
-    title: legTitle(leg, assetSymbol, ad, share(leg)),
+    title: legTitle(leg, assetSymbol, ad, share(leg), withheld),
     // The raw figure this segment's width came from, stamped where a check can
     // read it: a width off a formatted caption is blind to a wei-level break.
     data: {
@@ -167,7 +181,7 @@ export function VaultAllocationBand({ event, coords, assetSymbol, first }: Vault
     },
     wrap: (bar: ReactNode) => (
       <Prov
-        info={morphoVaultAllocationLegProv(coords, leg, operands)}
+        info={withScaleNote(morphoVaultAllocationLegProv(coords, leg, operands), withheld)}
         value={`${leg.attributed ?? "not loaded"}`}
         symbol={assetSymbol}
         className="block h-full"
@@ -190,10 +204,15 @@ export function VaultAllocationBand({ event, coords, assetSymbol, first }: Vault
         "data-alloc-collected-sum": sum.toString(),
         "data-alloc-collected-ids": plan.collected.map((l) => l.marketId || `queue-${l.queueIndex}`).join(","),
       },
-      title: `${n(plan.collected.length)} more markets · ${assetText({ raw: sum.toString(), value: Number(sum) / Math.pow(10, ad) }, ad)} ${assetSymbol} · ${pctText(f)} of this address's claim at this block`,
+      title: withheld
+        ? `${n(plan.collected.length)} more markets · ${pctText(f)} of this address's claim at this block`
+        : `${n(plan.collected.length)} more markets · ${assetText({ raw: sum.toString(), value: Number(sum) / Math.pow(10, ad) }, ad)} ${assetSymbol} · ${pctText(f)} of this address's claim at this block`,
       wrap: (bar: ReactNode) => (
         <Prov
-          info={morphoVaultAllocationCollectedProv(coords, plan.collected.length, plan.collected)}
+          info={withScaleNote(
+            morphoVaultAllocationCollectedProv(coords, plan.collected.length, plan.collected),
+            withheld,
+          )}
           value={sum.toString()}
           symbol={assetSymbol}
           className="block h-full"
@@ -288,16 +307,21 @@ export interface VaultAllocationDetailProps {
   earlier: VaultHolderEvent | null;
   coords: VaultTimelineCoords;
   assetSymbol: string;
+  /** Why no amount in the asset is printed (ui-jobs 664): the two amount
+   *  columns stand as "—", their receipts kept. */
+  withheld?: string;
 }
 
 /** The record: every leg, uncollected, with the denominator that divided it. */
-export function VaultAllocationDetail({ event, earlier, coords, assetSymbol }: VaultAllocationDetailProps) {
+export function VaultAllocationDetail({ event, earlier, coords, assetSymbol, withheld }: VaultAllocationDetailProps) {
   const extra = metaExtra(event);
   const legs = extra?.allocation ?? null;
   const ad = event.assetDecimals;
   if (!legs) return null;
 
   const operands = { holderShares: extra?.holderSharesAtBlock ?? null, totalSupply: extra?.totalSupplyAtBlock ?? null };
+  // The receipt keeps its raw read and says the decimals disagree (ui-jobs 664).
+  const note = withheld ?? null;
   const total = legs.reduce((s, l) => s + (attributedOf(l) ?? ZERO), ZERO);
   const raw = (v: string) => ({ raw: v, value: Number(v) / Math.pow(10, ad) });
 
@@ -355,8 +379,8 @@ export function VaultAllocationDetail({ event, earlier, coords, assetSymbol }: V
                     {leg.vaultSupplied == null ? (
                       <NotLoaded />
                     ) : (
-                      <Prov info={morphoVaultAllocationSuppliedProv(coords, leg)}>
-                        {assetText(raw(leg.vaultSupplied), ad)}
+                      <Prov info={withScaleNote(morphoVaultAllocationSuppliedProv(coords, leg), note)}>
+                        {withheld ? "—" : assetText(raw(leg.vaultSupplied), ad)}
                       </Prov>
                     )}
                   </td>
@@ -364,8 +388,8 @@ export function VaultAllocationDetail({ event, earlier, coords, assetSymbol }: V
                     {leg.attributed == null ? (
                       <NotLoaded />
                     ) : (
-                      <Prov info={morphoVaultAllocationLegProv(coords, leg, operands)}>
-                        {assetText(raw(leg.attributed), ad)}
+                      <Prov info={withScaleNote(morphoVaultAllocationLegProv(coords, leg, operands), note)}>
+                        {withheld ? "—" : assetText(raw(leg.attributed), ad)}
                       </Prov>
                     )}
                   </td>

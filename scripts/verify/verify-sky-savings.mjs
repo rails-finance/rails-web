@@ -254,10 +254,9 @@ for (const [name, holder] of Object.entries(HOLDERS)) {
     `${name} page: the check line names the block and no population count`,
     /Checked against the contract at block [\d,]+/.test(got.text) && !/addresses that ever held/.test(got.text),
   );
-  check(
-    `${name} page: figures are read at the newest block when the page loads`,
-    /the newest block when the page loaded/.test(got.text),
-  );
+  // The head is a pattern, "Sky Savings · sUSDS on Ethereum · block N"; the
+  // sentence is in the block's receipt (ui-jobs 660).
+  check(`${name} page: the head names the block`, /Sky Savings · sUSDS on Ethereum · block\s*[\d,]+/.test(got.text));
   check(`${name} page: no "exactly" in the copy`, !/\bexactly\b/.test(got.text));
   if (positions[name].events.length === pos.data.activity.events) {
     const ev = positions[name].events;

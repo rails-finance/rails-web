@@ -42,7 +42,9 @@ import { ethereumVaultHref } from "@/lib/vaults/routes";
 import { loadAaveEthereumVault } from "@/lib/sources/chain/aave-ethereum-vault";
 import { RailHeader } from "@/components/shared/rail-header";
 import { loadVaultCensusRow } from "@/lib/vaults/census-read";
-import { loadVaultPageSeries } from "@/lib/vaults/yield-read";
+import { loadVaultPageSeries, loadVaultYields } from "@/lib/vaults/yield-read";
+import type { VaultYield } from "@/lib/vaults/yield";
+import { VAULT_FAMILIES } from "@/lib/vaults/families";
 import { loadVaultHolders } from "@/lib/vaults/holders-read";
 import { FocusSourceGate } from "@/components/shared/aim-gate";
 
@@ -98,10 +100,17 @@ export default async function AaveEthereumVaultRoute({ params, searchParams }: P
   if (!data.served) notFound();
 
   const attestation = aaveVaultAttestation(address, data.vault.family);
-  const [census, series, holders] = await Promise.all([
+  // An Umbrella stake's asset is a static aToken whose share price the daily
+  // store keeps: its Yield measure goes on the stake's Yield subline (ui-jobs
+  // 664). One store read, cached an hour; no chain read.
+  const assetAddress = data.vault.asset.address.toLowerCase();
+  const [census, series, holders, assetYields] = await Promise.all([
     loadVaultCensusRow(MAINNET_CHAIN_ID, address),
     loadVaultPageSeries(MAINNET_CHAIN_ID, address),
     loadVaultHolders(MAINNET_CHAIN_ID, address, data.vault.family),
+    VAULT_FAMILIES[data.vault.family].assetGrows
+      ? loadVaultYields(MAINNET_CHAIN_ID, [assetAddress])
+      : Promise.resolve({} as Record<string, VaultYield>),
   ]);
 
   return (
@@ -121,6 +130,7 @@ export default async function AaveEthereumVaultRoute({ params, searchParams }: P
               data={data}
               census={census}
               yieldFigure={series.yieldFigure}
+              assetYield={assetYields[assetAddress]}
               strip={series.strip}
               attestation={attestation}
               holders={holders}

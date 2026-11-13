@@ -90,3 +90,10 @@ export function protocolFeeSteps(chainId: number, key: string): readonly Protoco
 export function feeCharged(raw: string | null | undefined): boolean {
   return raw != null && /^\d+$/.test(raw) && BigInt(raw) > BigInt(0);
 }
+
+/** Whether an event sheet lists a logged fee: present and not a logged zero.
+ *  A present amount that is not a plain integer stays listed, since
+ *  `feeCharged` cannot say it is zero. */
+export function feeListed(raw: string | null | undefined): boolean {
+  return raw != null && (feeCharged(raw) || !/^\d+$/.test(raw));
+}

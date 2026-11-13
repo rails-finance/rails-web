@@ -197,14 +197,15 @@ export function CowTradeCard({
     // The head is words (rails-ops decision 0045); the amounts stand on the
     // spine's flanks beside their tokens.
     // Below `sm`, where the spine draws no flanks, the head carries the two
-    // amounts, signed out of and into the wallet.
+    // amounts under the spine's words, unsigned: the order's proceeds can go
+    // to a receiver other than this wallet.
     head: {
       label: `Sold ${tokenText(sell)} for ${tokenText(buy)}`,
       deltas:
         sold != null && bought != null
           ? [
-              { value: -sold, symbol: sell.symbol ?? "", address: sell.address, prov: sellProv },
-              { value: bought, symbol: buy.symbol ?? "", address: buy.address, prov: buyProv },
+              { label: "Sold", value: sold, symbol: sell.symbol ?? "", address: sell.address, prov: sellProv },
+              { label: "Bought", value: bought, symbol: buy.symbol ?? "", address: buy.address, prov: buyProv },
             ]
           : [],
     },

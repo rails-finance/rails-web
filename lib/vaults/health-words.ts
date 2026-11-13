@@ -57,6 +57,9 @@ export interface HealthContext {
   /** The page says once that stewards are shown by address (the comparison);
    *  each line then leaves it out. */
   attestationSaid?: boolean;
+  /** Why no amount in the asset is printed (ui-jobs 664): the Size line
+   *  states it in place of the totals. */
+  amountsWithheld?: string;
 }
 
 export const STEWARD_ATTESTATION = "Rails shows the address until a name for it is attested.";
@@ -240,8 +243,9 @@ function withdrawalsLine(w: WithdrawalsFigure, c: HealthContext, f: HealthFormat
 /** The five lines in drawing order. */
 export function healthLines(h: Health, c: HealthContext, f: HealthFormat): HealthLine[] {
   const s = h.size;
-  const size =
-    s.kind === "none"
+  const size = c.amountsWithheld
+    ? none("size", c.amountsWithheld)
+    : s.kind === "none"
       ? none("size", SERIES_NONE[s.reason](c.family))
       : s.kind === "young"
         ? line(
@@ -253,12 +257,12 @@ export function healthLines(h: Health, c: HealthContext, f: HealthFormat): Healt
           ? line(
               "size",
               `From nothing in ${s.span.to.day - s.span.from.day} days`,
-              `Held ${f.amount(rawValue(s.span.to.raw, c.decimals))} ${c.assetSymbol} at the last read, nothing on ${f.day(s.span.from.day)}.`,
+              `Held ${f.amount(rawValue(s.span.to.raw, c.decimals))} ${c.assetSymbol} on ${f.day(s.span.to.day)}, nothing on ${f.day(s.span.from.day)}.`,
             )
           : line(
               "size",
               `${signedPct(s.change)} in ${s.span.to.day - s.span.from.day} days`,
-              `Held ${f.amount(rawValue(s.span.to.raw, c.decimals))} ${c.assetSymbol} at the last read, ${f.amount(rawValue(s.span.from.raw, c.decimals))} on ${f.day(s.span.from.day)}.`,
+              `Held ${f.amount(rawValue(s.span.to.raw, c.decimals))} ${c.assetSymbol} on ${f.day(s.span.to.day)}, ${f.amount(rawValue(s.span.from.raw, c.decimals))} on ${f.day(s.span.from.day)}.`,
             );
 
   const y = h.yield;

@@ -95,14 +95,14 @@ export function aaveVaultCardContent(family: "sgho" | "stata" | "umbrella-stake"
       ? [
           {
             bold: "Target rate",
-            text: "the rate the index moves at, in basis points, as governance set it. A setting the next vote can change.",
+            text: "the rate the index moves at, as governance set it; the contract stores it in basis points. A setting the next vote can change.",
           },
           {
             bold: "Two figures",
             text: "total assets is what the index says the shares are worth; the GHO the contract holds is its token balance. Withdrawals are clamped to the balance.",
           },
           {
-            bold: "Deposit cap",
+            bold: "Supply cap",
             text: "the most the vault takes; remaining capacity is the room left under it.",
           },
           YIELD_CONCEPT,

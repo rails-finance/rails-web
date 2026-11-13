@@ -136,6 +136,9 @@ export interface MorphoBaseVaultTimelineProps {
   decimalsOffset: number | null;
   /** The chain the vault is on; Base where omitted (ui-jobs 486). */
   chainId?: 1 | 8453;
+  /** Why no amount in the asset is printed (its decimals disagree, ui-jobs
+   *  664): each row's amounts in the asset read "—" with the reason. */
+  amountsWithheld?: string;
 }
 
 export function MorphoBaseVaultTimeline({
@@ -145,6 +148,7 @@ export function MorphoBaseVaultTimeline({
   assetSymbol,
   decimalsOffset,
   chainId = MORPHO_BASE_CHAIN_ID,
+  amountsWithheld,
 }: MorphoBaseVaultTimelineProps) {
   const coords: VaultTimelineCoords = {
     chainId,
@@ -367,6 +371,7 @@ export function MorphoBaseVaultTimeline({
                   prov={PROV}
                   persistPrefix="morpho-base-vault"
                   icon={row.kind === "transfer-self" ? "no-change" : undefined}
+                  withheld={amountsWithheld}
                   band={
                     <VaultAllocationBand
                       event={row}
@@ -374,6 +379,7 @@ export function MorphoBaseVaultTimeline({
                       assetSymbol={assetSymbol}
                       // The newest row (index 0) states the rule.
                       first={i === 0}
+                      withheld={amountsWithheld}
                     />
                   }
                   extraCells={(rowCoords) => [shareOfVaultCell(row, rowCoords, shareUnit)]}
@@ -391,6 +397,7 @@ export function MorphoBaseVaultTimeline({
                       earlier={i >= 0 ? (timeline.events[i + 1] ?? null) : null}
                       coords={rowCoords}
                       assetSymbol={assetSymbol}
+                      withheld={amountsWithheld}
                     />
                   )}
                 />

@@ -33,6 +33,7 @@ import { releaseLabel, type VaultFamily } from "@/lib/vaults/families";
 import type { VaultIlliquid, VaultLiquidity } from "@/lib/vaults/illiquid";
 import { hasLostAssets } from "@/lib/vaults/lost-assets";
 import type { AssetScale } from "@/lib/vaults/asset-scale-words";
+import type { VaultYield } from "@/lib/vaults/yield";
 import { tooSmallToMeasure } from "@/lib/vaults/yield";
 
 /** What the chain or the venue states about a vault's standing, as a pill
@@ -109,6 +110,10 @@ export interface VaultSummary {
   /** Where the asset's decimals disagree with its conversion: the standing
    *  `decimals-disagree` and its reading. */
   assetScale?: AssetScale;
+  /** Where the vault's asset is itself a vault whose share price the daily
+   *  store keeps (an Umbrella stake on a static aToken): that series' Yield
+   *  measure, for the Yield subline (decision 0047 as amended, ui-jobs 664). */
+  assetYield?: VaultYield;
   /** The block the vault was created in, where the catalogue holds it. */
   createdBlock: number | null;
   /** The position census for this vault: every address it counted, live and
@@ -311,7 +316,11 @@ export function maplePoolSummary(
 
 /** The name a row prints: the live `name()`, else the catalogue's snapshot,
  *  else the share symbol, else null (the row then prints the address). */
-export const vaultDisplayName = (v: VaultSummary): string | null => v.name ?? v.catalogName ?? v.symbol;
+const trimmed = (s: string | null) => s?.trim() || null;
+
+/** The name a surface shows and sorts by, trimmed (ui-jobs 664). */
+export const vaultDisplayName = (v: VaultSummary): string | null =>
+  trimmed(v.name) ?? trimmed(v.catalogName) ?? trimmed(v.symbol);
 
 // ── The vault pages' reads (V2) ─────────────────────────────────────────────
 // Each vault page reads its vault at one block with its own loader; these turn

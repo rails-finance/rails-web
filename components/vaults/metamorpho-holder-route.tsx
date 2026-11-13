@@ -60,6 +60,8 @@ import { VaultHoldingPlainCard } from "@/components/vaults/vault-holding-plain-c
 import { loadHoldingWorth } from "@/lib/vaults/holding-worth-read";
 import type { PlainHoldingHistory } from "@/lib/vaults/holding-worth";
 import { HoldingReceiptsScope } from "@/components/vaults/holding-receipts-scope";
+import { loadAssetScales } from "@/lib/vaults/asset-scale";
+import { assetScaleAbsentTip, assetScaleReceiptNote, withScaleNote } from "@/lib/vaults/asset-scale-words";
 import { HOLDING_REWARDS, vaultPlainHoldingContent } from "@/lib/vaults/card-words";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { LatestPrices, type LatestPriceAsset } from "@/components/shared/latest-prices";
@@ -228,10 +230,12 @@ async function VaultTimelineSection({
   data,
   holder,
   onEventPage,
+  withheld,
 }: {
   data: MorphoBaseVaultResponse;
   holder: string;
   onEventPage: boolean;
+  withheld?: string;
 }) {
   const { timeline, economics, flowTimeline } = await loadHistory(data, holder);
   return (
@@ -248,6 +252,7 @@ async function VaultTimelineSection({
           claimRaw={data.holder.claim?.raw ?? null}
           shareSymbol={data.vault.symbol || shortAddr(data.vault.address)}
           assetSymbol={data.vault.asset.symbol}
+          withheld={withheld}
         />
       )}
       <MorphoBaseVaultTimeline
@@ -257,6 +262,7 @@ async function VaultTimelineSection({
         assetSymbol={data.vault.asset.symbol}
         decimalsOffset={data.vault.decimalsOffset}
         chainId={data.chainId}
+        amountsWithheld={withheld}
       />
     </>
   );
@@ -266,7 +272,15 @@ async function VaultTimelineSection({
  *  page's reads at its block, and a promise over the history for the sums and
  *  the worth line, so the card paints before the sweeps answer. An address
  *  with no balance waits for the history, which says whether it ever held. */
-async function HoldingCardSection({ data, holder }: { data: MorphoBaseVaultResponse; holder: string }) {
+async function HoldingCardSection({
+  data,
+  holder,
+  withheld,
+}: {
+  data: MorphoBaseVaultResponse;
+  holder: string;
+  withheld?: string;
+}) {
   if (!data.holder) return null;
   const { vault } = data;
   const h = data.holder;
@@ -318,13 +332,22 @@ async function HoldingCardSection({ data, holder }: { data: MorphoBaseVaultRespo
       never={never}
       history={history}
       rewards={HOLDING_REWARDS.morpho}
+      withheld={withheld}
       learnMore={vaultPlainHoldingContent(vault.asset.symbol, shareSymbol, HOLDING_REWARDS.morpho)}
     />
   );
 }
 
 /** "How the vault is doing" (V7) from this page's read of the vault. */
-function HealthSection({ data }: { data: MorphoBaseVaultResponse }) {
+function HealthSection({
+  data,
+  withheld,
+  scaleNote,
+}: {
+  data: MorphoBaseVaultResponse;
+  withheld?: string;
+  scaleNote?: string;
+}) {
   const { vault } = data;
   const liquidity = data.liquidity;
   const name = vault.name || shortAddr(vault.address);
@@ -335,6 +358,8 @@ function HealthSection({ data }: { data: MorphoBaseVaultResponse }) {
       family="metamorpho"
       vault={{ address: vault.address, name, assetSymbol: vault.asset.symbol, decimals: vault.asset.decimals }}
       totalAssetsRaw={data.totalAssets.raw}
+      amountsWithheld={withheld}
+      scaleNote={scaleNote}
       block={data.blockNumber}
       readBy={serverReadOf(data)}
       exit={
@@ -426,6 +451,12 @@ export async function MetaMorphoHolderRoute({ chainId, params }: Props & { chain
   const vaultName = data.vault.name || shortAddr(address);
   const subject = lookup.address ? shortAddr(lookup.address) : typed;
   const factory = metaMorphoFactoryAddress(chainId, data.vault.factory);
+  // An asset whose decimals disagree (Coinshift USDL's wUSDL): no amount in it
+  // is printed, the reason in its place (ui-jobs 664).
+  const scale = data.chainStale
+    ? undefined
+    : (await loadAssetScales(chainId, [data.vault.asset.address]))[data.vault.asset.address.toLowerCase()];
+  const withheld = scale ? assetScaleAbsentTip(data.vault.asset.symbol, scale) : undefined;
 
   // The top row's price dropdown. A holder holds SHARES, and the one price the
   // vault states about them is its own `convertToAssets` — one whole share in
@@ -437,18 +468,21 @@ export async function MetaMorphoHolderRoute({ chainId, params }: Props & { chain
     {
       symbol: data.vault.symbol || shortAddr(data.vault.address),
       address: data.vault.address,
-      price: !data.chainStale && data.sharePrice.value > 0 ? data.sharePrice.value : undefined,
-      unit: !data.chainStale && data.sharePrice.value > 0 ? data.vault.asset.symbol : undefined,
+      price: !data.chainStale && !scale && data.sharePrice.value > 0 ? data.sharePrice.value : undefined,
+      unit: !data.chainStale && !scale && data.sharePrice.value > 0 ? data.vault.asset.symbol : undefined,
       label: `One share in ${data.vault.asset.symbol}, the vault's convertToAssets`,
-      info: vaultSharePriceProv({
-        chainId,
-        readBy: serverReadOf(data),
-        blockNumber: data.blockNumber,
-        vault: data.vault.address,
-        vaultName: data.vault.name || undefined,
-        assetSymbol: data.vault.asset.symbol,
-        shareSymbol: data.vault.symbol || undefined,
-      }),
+      info: withScaleNote(
+        vaultSharePriceProv({
+          chainId,
+          readBy: serverReadOf(data),
+          blockNumber: data.blockNumber,
+          vault: data.vault.address,
+          vaultName: data.vault.name || undefined,
+          assetSymbol: data.vault.asset.symbol,
+          shareSymbol: data.vault.symbol || undefined,
+        }),
+        scale ? assetScaleReceiptNote(data.vault.asset.symbol, scale) : null,
+      ),
     },
   ];
 
@@ -460,7 +494,7 @@ export async function MetaMorphoHolderRoute({ chainId, params }: Props & { chain
         </div>
       }
     >
-      <VaultTimelineSection data={data} holder={data.holder.address} onEventPage={onEventPage} />
+      <VaultTimelineSection data={data} holder={data.holder.address} onEventPage={onEventPage} withheld={withheld} />
     </Suspense>
   ) : null;
 
@@ -590,7 +624,7 @@ export async function MetaMorphoHolderRoute({ chainId, params }: Props & { chain
                 </div>
               }
             >
-              <HoldingCardSection data={data} holder={data.holder.address} />
+              <HoldingCardSection data={data} holder={data.holder.address} withheld={withheld} />
             </Suspense>
           )}
           {!data.chainStale && !onEventPage && data.holder && (
@@ -601,7 +635,11 @@ export async function MetaMorphoHolderRoute({ chainId, params }: Props & { chain
                 </div>
               }
             >
-              <HealthSection data={data} />
+              <HealthSection
+                data={data}
+                withheld={withheld}
+                scaleNote={scale ? assetScaleReceiptNote(data.vault.asset.symbol, scale) : undefined}
+              />
             </Suspense>
           )}
           {!data.chainStale && timelineSlot && <HoldingReceiptsScope>{timelineSlot}</HoldingReceiptsScope>}

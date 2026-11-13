@@ -224,8 +224,7 @@ const DOCS_AND_CHAIN_SCOPE = "docs-and-chain";
 
 /** The docs-and-chain section, after the glossary whose terms it qualifies.
  *  Drawn only where an explorer passes at least one entry. One receipts
- *  scope, and its inspector layer rides with it. A page that passes no
- *  docsAndChain may mount a receipt and a layer of its own. */
+ *  scope; the page's one inspector layer is mounted by `ProtocolInfoPage`. */
 function InfoDocsAndChainSection({ items }: { items: readonly InfoDocsAndChain[] }) {
   return (
     <div className="mt-5">
@@ -256,7 +255,6 @@ function InfoDocsAndChainSection({ items }: { items: readonly InfoDocsAndChain[]
           ))}
         </ul>
       </ProvSection>
-      <ProvInspectorLayer />
     </div>
   );
 }
@@ -425,6 +423,10 @@ export function ProtocolInfoPage({
           {docs.label}
         </a>
       </p>
+      {/* The page's one inspector layer, for the docs-and-chain receipts and
+          any receipt an explorer passes in its own slots. It draws nothing
+          until a figure is picked. */}
+      <ProvInspectorLayer />
     </div>
   );
 }

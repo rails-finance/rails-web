@@ -589,18 +589,19 @@ const swapSuppliedProv = (sym: string, coords: V3Coords): Provenance => ({
   ]),
 });
 
-/** What a supply from a swap's order sold: the Trade log's `sellAmount` plus its
- *  `feeAmount`, which left the owner's wallet, not the position (mig 250). */
+/** What a supply from a swap's order sold: the Trade log's `sellAmount`, which
+ *  includes its `feeAmount` and left the owner's wallet, not the position
+ *  (migs 250, 472). */
 const swapSoldProv = (sym: string, coords: V3Coords, raw?: string | null): Provenance => {
   const named = getProtocolContract(GPV2_SETTLEMENT, coords.chainId ?? MAINNET_CHAIN_ID);
   return {
     kind: "chain-derived",
     pclass: "emitted",
     verify: txVerify(coords),
-    summary: `The ${sym} the order sold — the amount CoW's settlement wrote into its trade log as sold, plus the fee it wrote beside it. It came out of this account's wallet, so no balance in this position moved by it.`,
+    summary: `The ${sym} the order sold — the amount CoW's settlement wrote into its trade log as sold, which includes CoW's fee. It came out of this account's wallet, so no balance in this position moved by it.`,
     contract: { name: named?.name ?? "GPv2Settlement", address: GPV2_SETTLEMENT },
-    via: `rails-server index of GPv2Settlement Trade logs · Trade log · sellAmount + feeAmount${raw ? ` = ${raw}` : ""}`,
-    formula: "sellAmount + feeAmount",
+    via: `rails-server index of GPv2Settlement Trade logs · Trade log · sellAmount${raw ? ` = ${raw}` : ""}`,
+    formula: "sellAmount (feeAmount inside it)",
     inputs: eventInputs(
       coords,
       raw
@@ -610,7 +611,7 @@ const swapSoldProv = (sym: string, coords: V3Coords, raw?: string | null): Prove
               value: raw,
               kind: "chain" as const,
               pclass: "emitted" as const,
-              note: "Trade `sellAmount` + `feeAmount`",
+              note: "Trade `sellAmount`, the fee included",
             },
           ]
         : [],

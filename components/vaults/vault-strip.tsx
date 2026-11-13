@@ -97,16 +97,19 @@ type Measured = Extract<SeriesWindow, { from: VaultYieldRead }>;
 
 /** The tile's sentence for a measured window. */
 function changeSentence(tile: StripTile, v: VaultSummary, w: Measured, jump?: VaultYieldJump) {
-  const tail = ` over the last ${w.days} days`;
+  // The window ends on the latest stored day, which can be a day behind the
+  // card's read: the tile names that day (ui-jobs 664).
+  const tail = ` over the ${w.days} days to ${dayText(w.to.day)}`;
   if (w.change != null) {
     return `${changeText(w.change)}${tail}${jump ? jumpTail(jump, dayText) : ""}`;
   }
   // A window that starts at zero has no percentage; the move is stated.
-  if (BigInt(w.to.raw) === BigInt(0)) return `0 throughout the last ${w.days} days`;
+  if (BigInt(w.to.raw) === BigInt(0)) return `0 throughout the ${w.days} days to ${dayText(w.to.day)}`;
   const to =
     tile === "holders"
       ? n(Number(w.to.raw))
       : assetText({ raw: w.to.raw, value: Number(BigInt(w.to.raw)) / 10 ** v.asset.decimals }, v.asset.decimals);
+  if (tile !== "holders" && v.assetScale) return `from 0${tail}`;
   return `from 0 to ${to}${tile === "holders" ? "" : ` ${v.asset.symbol}`}${tail}`;
 }
 
@@ -167,7 +170,10 @@ function SeriesTile({
         <p className="mt-1 text-[13px] text-foreground" data-strip-sentence="">
           <Prov info={stripChangeProv(tile, v, series.key, w)}>{changeSentence(tile, v, w, jump)}</Prov>
         </p>
-        <Sparkline points={w.points} label={`${label}, one read a day over the last ${w.days} days`} />
+        <Sparkline
+          points={w.points}
+          label={`${label}, one read a day over the ${w.days} days to ${dayText(w.to.day)}`}
+        />
       </Tile>
     );
   }
@@ -229,9 +235,10 @@ function stripCsv(v: VaultSummary, s: VaultStripSeries): string {
       const h = ho.get(day);
       return [
         new Date(day * 86_400_000).toISOString().slice(0, 10),
-        a ? unit(a.raw) : "",
+        // An asset whose decimals disagree exports empty amounts (ui-jobs 664).
+        a && !v.assetScale ? unit(a.raw) : "",
         a ? String(a.block) : "",
-        p ? unit(p.raw) : "",
+        p && !v.assetScale ? unit(p.raw) : "",
         p ? String(p.block) : "",
         h ? h.raw : "",
         h ? String(h.block) : "",

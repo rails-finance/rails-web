@@ -30,6 +30,7 @@ import { ColourNote, RULE, Tile, VAULT_CARD_TILE, VAULT_GRID } from "@/component
 import { HOLDERS_SCOPE, VaultWhoHolds } from "@/components/vaults/vault-who-holds";
 import { VaultStewardRecord } from "@/components/vaults/vault-steward-record";
 import type { StewardRecordRead } from "@/lib/vaults/steward-record";
+import type { StewardRunsRead } from "@/lib/vaults/steward-runs-read";
 import { VaultConfiguration } from "@/components/vaults/vault-config";
 import { metaMorphoConfigTile } from "@/components/vaults/vault-config-columns";
 import type { VaultStripSeries } from "@/lib/vaults/yield-read";
@@ -65,7 +66,13 @@ import type { MorphoBaseVaultResponse } from "@/lib/sources/chain/morpho-base-va
 import type { VaultCensusRow } from "@/lib/aave-vaults/vault-position";
 import { metaMorphoVaultHref, metaMorphoVaultsListingHref } from "@/lib/vaults/routes";
 import { morphoBaseVaultPageSummary, withAssetScale } from "@/lib/vaults/summary";
-import type { AssetScale } from "@/lib/vaults/asset-scale-words";
+import {
+  assetScaleAbsentTip,
+  assetScaleReceiptNote,
+  withScaleNote,
+  type AssetScale,
+} from "@/lib/vaults/asset-scale-words";
+import { HeadingTip } from "@/components/shared/tip-label";
 import { vaultStewardProv, vaultVenueProv } from "@/lib/vaults/card-provenance";
 import { vaultAssetsExports, type VaultExportModel } from "@/lib/vaults/card-export";
 import {
@@ -153,6 +160,7 @@ export function MorphoBaseVaultPage({
   config,
   holders,
   stewardRecord,
+  stewardRuns,
   badDebt,
 }: {
   /** "What protects it" and "The protocol underneath" (V9, V10), streamed by the route. */
@@ -172,6 +180,9 @@ export function MorphoBaseVaultPage({
   holders: VaultHolders | null;
   /** The vaults this steward runs now, from the /vaults directory; null where it did not answer. */
   stewardRecord: StewardRecordRead;
+  /** The steward's runs from rails-server's roles route (V14.2, V14.3), streamed: the record draws them
+   *  behind Suspense as they arrive; resolving to null, none is shown. */
+  stewardRuns?: Promise<StewardRunsRead | null>;
   /** The bad-debt episodes in the steward's vaults (V14.1), streamed by the route. */
   badDebt?: ReactNode;
 }) {
@@ -200,16 +211,30 @@ export function MorphoBaseVaultPage({
   const name = vault.name || shortAddress(vault.address);
   const holdersHref = metaMorphoVaultsListingHref(chainId, { vault: vault.address });
 
+  // An asset whose decimals disagree (ui-jobs 664): every amount in it stands
+  // as "—" with the reason; each receipt keeps its raw read and says so.
+  const withheld = v.assetScale ? assetScaleAbsentTip(unit, v.assetScale) : null;
+  const note = v.assetScale ? assetScaleReceiptNote(unit, v.assetScale) : null;
+  const noted = <P extends { summary: string }>(p: P) => withScaleNote(p, note);
+  const withheldValue = (figure: string, prov: Provenance) => (
+    <span data-figure={figure} data-asset-scale-withheld="">
+      <Prov info={noted(prov)}>—</Prov>
+    </span>
+  );
+  const withheldSub = withheld ? <HeadingTip text="decimals disagree" tip={withheld} /> : undefined;
+
   const receipts = {
-    totalAssets: vaultTotalAssetsProv(coords),
-    sharePrice: vaultSharePriceProv(coords),
+    totalAssets: noted(vaultTotalAssetsProv(coords)),
+    sharePrice: noted(vaultSharePriceProv(coords)),
     ...(data.lostAssets
       ? {
-          lostAssets: vaultLostAssetsProv(coords),
-          heldAssets: vaultHeldAssetsProv(coords, {
-            totalAssets: data.totalAssets.raw,
-            lostAssets: data.lostAssets.raw,
-          }),
+          lostAssets: noted(vaultLostAssetsProv(coords)),
+          heldAssets: noted(
+            vaultHeldAssetsProv(coords, {
+              totalAssets: data.totalAssets.raw,
+              lostAssets: data.lostAssets.raw,
+            }),
+          ),
         }
       : {}),
   };
@@ -232,7 +257,10 @@ export function MorphoBaseVaultPage({
       id: "allocated",
       label: "Allocated in Morpho Blue",
       tip: "The vault's supply in each Morpho Blue market, summed as Morpho Blue last settled them. Total assets adds the interest since, so either figure can be the larger.",
-      value: (
+      sub: withheldSub,
+      value: withheld ? (
+        withheldValue("allocated", vaultAllocatedProv(coords))
+      ) : (
         <span data-figure="allocated">
           <InAssetFigure
             value={data.allocated.value}
@@ -248,7 +276,10 @@ export function MorphoBaseVaultPage({
       id: "unaccrued",
       label: "Unaccrued interest",
       tip: "Total assets minus the allocated sum: interest the vault counts that the markets have not settled yet.",
-      value: (
+      sub: withheldSub,
+      value: withheld ? (
+        withheldValue("gap", vaultGapProv(coords))
+      ) : (
         <span data-figure="gap">
           <InAssetFigure
             value={data.gap.value}
@@ -280,8 +311,10 @@ export function MorphoBaseVaultPage({
       id: "lost-assets",
       label: "Lost assets",
       tip: "On a MetaMorpho V1.1 vault, the part of total assets that no market holds. The share price has not been lowered for it.",
-      asset,
-      value: (
+      ...(withheld ? { sub: withheldSub } : { asset }),
+      value: withheld ? (
+        withheldValue("lost-assets", vaultLostAssetsProv(coords))
+      ) : (
         <span data-figure="lost-assets">
           <Prov info={vaultLostAssetsProv(coords)}>
             <StatAmount amount={lostStat} decimals={ad} symbol={unit} />
@@ -344,20 +377,29 @@ export function MorphoBaseVaultPage({
   const explanation = (
     <div data-vault-explanation="">
       <ExplainGroup title="Holdings">
-        <ExplainBullet>
-          This vault lends{" "}
-          <Fig>
-            {assetText(data.totalAssets, ad)} {unit}
-          </Fig>{" "}
-          across <Fig>{n(funded.length)}</Fig> Morpho Blue markets for the holders of its shares.
-        </ExplainBullet>
-        <ExplainBullet>
-          Morpho Blue last settled{" "}
-          <Fig>
-            {assetText(data.allocated, ad)} {unit}
-          </Fig>{" "}
-          of it; the rest is interest it has not booked yet.
-        </ExplainBullet>
+        {withheld ? (
+          <ExplainBullet>
+            This vault lends across <Fig>{n(funded.length)}</Fig> Morpho Blue markets for the holders of its shares.{" "}
+            {withheld}
+          </ExplainBullet>
+        ) : (
+          <>
+            <ExplainBullet>
+              This vault lends{" "}
+              <Fig>
+                {assetText(data.totalAssets, ad)} {unit}
+              </Fig>{" "}
+              across <Fig>{n(funded.length)}</Fig> Morpho Blue markets for the holders of its shares.
+            </ExplainBullet>
+            <ExplainBullet>
+              Morpho Blue last settled{" "}
+              <Fig>
+                {assetText(data.allocated, ad)} {unit}
+              </Fig>{" "}
+              of it; the rest is interest it has not booked yet.
+            </ExplainBullet>
+          </>
+        )}
       </ExplainGroup>
       <ExplainGroup title="Risk">
         <ExplainBullet>
@@ -387,14 +429,17 @@ export function MorphoBaseVaultPage({
   const exportModel: VaultExportModel = {
     stats: [
       ["Shares issued", `${shareText(data.totalSupply, vault.decimals)} ${vault.symbol}`],
-      ["Allocated in Morpho Blue", `${assetText(data.allocated, ad)} ${unit}`],
-      ["Unaccrued interest", `${assetText(data.gap, ad)} ${unit}`],
+      // An asset whose decimals disagree exports an empty cell (ui-jobs 664).
+      ["Allocated in Morpho Blue", withheld ? "" : `${assetText(data.allocated, ad)} ${unit}`],
+      ["Unaccrued interest", withheld ? "" : `${assetText(data.gap, ad)} ${unit}`],
       [`Steward (${steward.role})`, steward.address],
-      ...(lostStat ? ([["Lost assets", `${assetText(lostStat, ad)} ${unit}`]] as [string, string][]) : []),
+      ...(lostStat
+        ? ([["Lost assets", withheld ? "" : `${assetText(lostStat, ad)} ${unit}`]] as [string, string][])
+        : []),
     ],
     rows: legs.map((l) => [
       `${l.isIdle ? "Idle market" : (l.collateralSymbol ?? shortId(l.id))} ${l.id}`,
-      assetText(l.assets, ad),
+      withheld ? "" : assetText(l.assets, ad),
       l.shareOfAllocated == null ? "" : pctText(l.shareOfAllocated),
     ]),
   };
@@ -431,7 +476,7 @@ export function MorphoBaseVaultPage({
         </>
       ),
       amount: leg.assets,
-      amountProv: vaultLegAssetsProv(legCoords),
+      amountProv: noted(vaultLegAssetsProv(legCoords)),
       share: leg.shareOfAllocated,
       shareProv: vaultLegShareProv(legCoords),
       hooks: { "data-leg": leg.id },
@@ -458,7 +503,8 @@ export function MorphoBaseVaultPage({
   const c = v.census;
   const heads: PositionCardHead[] = vaultHeads({ vault: v, yieldFigure, holdersHref, receipts, detail: true }).map(
     (h) => {
-      if (h.id === "total-assets" && v.totalAssets)
+      // An asset whose decimals disagree keeps vaultHeads's "—" (ui-jobs 664).
+      if (h.id === "total-assets" && v.totalAssets && !v.assetScale)
         return {
           ...h,
           value: (
@@ -474,7 +520,7 @@ export function MorphoBaseVaultPage({
             </span>
           ),
         };
-      if (h.id === "share-price" && v.sharePrice)
+      if (h.id === "share-price" && v.sharePrice && !v.assetScale)
         return {
           ...h,
           value: (
@@ -589,6 +635,7 @@ export function MorphoBaseVaultPage({
             chart={alloc.chart}
             keyColours={alloc.keyColours}
             look="index"
+            amountsWithheld={withheld ?? undefined}
             line={
               <>
                 <PanelFigure>{n(funded.length)}</PanelFigure> of {n(legs.length)} markets in the withdraw queue hold a
@@ -642,7 +689,7 @@ export function MorphoBaseVaultPage({
         </Tile>
 
         <Tile id="steward-record" wide>
-          <VaultStewardRecord record={stewardRecord} role={steward.role} badDebt={badDebt} />
+          <VaultStewardRecord record={stewardRecord} role={steward.role} runs={stewardRuns} badDebt={badDebt} />
         </Tile>
 
         <Tile id="configuration" wide last>

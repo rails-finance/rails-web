@@ -116,7 +116,7 @@ function figuresOf(cells) {
   const wm = w.match(/^([\d.,]+)% of the vault's assets (withdrawable|idle)/);
   if (wm) withdrawable = pctOf(wm[1]);
   else if (/^Withdrawals are paused/.test(w)) withdrawable = 0;
-  const held = (cells.size ?? "").match(/Held [\d.,]+[KMBT]? (\S+) at the last read/);
+  const held = (cells.size ?? "").match(/Held [\d.,]+[KMBT]? (\S+) on \d/);
   return { yearly30, range, withdrawable, heldAsset: held ? held[1] : null };
 }
 

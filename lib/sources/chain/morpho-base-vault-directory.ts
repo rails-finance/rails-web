@@ -245,7 +245,8 @@ async function readDirectory(chainId: MetaMorphoChainId): Promise<MorphoBaseVaul
           address: vault.address,
           factory: vault.factory,
           createdBlock: vault.createdBlock,
-          name: (at("name") as string | undefined) ?? null,
+          // Trimmed for display and sorting (ui-jobs 664: " Usual Boosted USDC").
+          name: (at("name") as string | undefined)?.trim() || null,
           censusName: vault.name,
           asset: {
             address: vault.asset,

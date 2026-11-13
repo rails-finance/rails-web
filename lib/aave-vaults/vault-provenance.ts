@@ -192,7 +192,7 @@ const aaveVaultTargetRateProv_ = (c: AaveVaultCoords, bps: number): Provenance =
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("targetRate()", c),
-  summary: `Target rate — \`targetRate()\` reads ${bps} basis points${atBlock(c)}: the rate the risk council has set on the vault, in the units the contract stores it in. It is the setting at this block and not a forecast of what a holder earns — the council can change it, and this page states no return, no annualisation and no yield series.`,
+  summary: `Target rate — \`targetRate()\` reads ${bps} basis points${atBlock(c)}, which the card states as ${(bps / 100).toFixed(2)}%: the rate the risk council has set on the vault. It is the setting at this block, not a forecast of what a holder earns.`,
   contract: vaultContract(c),
   via: `${LANE} · targetRate() @ the pinned block`,
 });
@@ -203,7 +203,7 @@ const aaveVaultSupplyCapProv_ = (c: AaveVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("supplyCap()", c),
-  summary: `Deposit cap — \`supplyCap()\`${atBlock(c)}, in ${asset(c)}: the ceiling the risk council has set on what this vault will hold. What is left of it is the cap minus \`totalAssets()\`, which is what the vault's own \`maxDeposit()\` answers — the two agree exactly. A configuration read: the council can move the cap.`,
+  summary: `Supply cap — \`supplyCap()\`${atBlock(c)}, in ${asset(c)}: the ceiling the risk council has set on what this vault will hold. What is left of it is the cap minus \`totalAssets()\`, which \`maxDeposit()\` answers. A configuration read: the council can move the cap.`,
   contract: vaultContract(c),
   via: `${LANE} · supplyCap() @ the pinned block`,
 });

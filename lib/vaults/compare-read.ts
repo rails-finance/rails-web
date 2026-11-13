@@ -39,6 +39,7 @@ import { chainName, vaultIndexHref } from "@/lib/vaults/index-rosters";
 import { vaultDisplayName, type VaultSummary } from "@/lib/vaults/summary";
 import { vaultHealth, shareOf, type HealthInput } from "@/lib/vaults/health";
 import { healthLines, shortHex, type HealthLine } from "@/lib/vaults/health-words";
+import { assetScaleAbsentTip } from "@/lib/vaults/asset-scale-words";
 import { loadVaultHealthSeries } from "@/lib/vaults/health-read";
 import { illiquidSentence } from "@/lib/vaults/illiquid";
 import { tooSmallToMeasure } from "@/lib/vaults/yield";
@@ -428,7 +429,14 @@ export async function readCompare(keys: readonly string[]): Promise<CompareRead>
       readAt: r.readAt,
       lines: healthLines(
         health,
-        { family: v.family, assetSymbol: v.asset.symbol, decimals: v.asset.decimals, attestationSaid: true },
+        {
+          family: v.family,
+          assetSymbol: v.asset.symbol,
+          decimals: v.asset.decimals,
+          attestationSaid: true,
+          // An asset whose decimals disagree: no amount in it (ui-jobs 664).
+          ...(v.assetScale ? { amountsWithheld: assetScaleAbsentTip(v.asset.symbol, v.assetScale) } : {}),
+        },
         WORDS,
       ),
       fees: r.fees,
@@ -436,7 +444,7 @@ export async function readCompare(keys: readonly string[]): Promise<CompareRead>
       holders: holders[i],
       figures: {
         asset: v.asset.symbol,
-        held: v.totalAssets ? held(v) : null,
+        held: v.totalAssets && !v.assetScale ? held(v) : null,
         yearly30: y ? y.yearly30 : null,
         range: y && y.yearly30 > 0 && y.low != null && y.high != null ? y.high - y.low : null,
         withdrawable: w == null ? null : w.paused ? 0 : w.share,
