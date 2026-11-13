@@ -206,6 +206,14 @@ export function disclosureChevron(open: boolean): string {
 }
 
 /**
+ * A section's header in a menu that is cut into sections (Miles 13 Nov 2026,
+ * mockup; first in the profile menu, H20: "Saved views", "Advanced"): the
+ * menu's row size in sentence case, semibold, muted. Below it, a subgroup's
+ * heading keeps the small uppercase label (11px), one level down.
+ */
+export const MENU_SECTION_HEAD = "text-[15px] font-semibold text-rb-500";
+
+/**
  * A standalone link at a card's foot ("Open 2 listings", "Assets", "See a
  * sample wallet"; Miles 13 Nov 2026, first on /saved-views): link blue at
  * rest whether it opens another page or changes this one's URL, its words

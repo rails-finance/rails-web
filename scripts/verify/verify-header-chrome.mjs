@@ -390,11 +390,11 @@ const mHeaderBeta = await mHomePage.locator('header[data-anatomy="H2"]').first()
 check(!/beta/i.test(mHeaderBeta), "home @390: the header carries no beta pill");
 const mFooterBeta = await mHomePage.locator("footer [data-phone-beta]").isVisible();
 check(mFooterBeta, "home @390: the beta pill is in the footer");
-// The profile control's menu (ui-jobs 504, 582, 586; Miles 13 Nov 2026): a
-// menu button; with nothing saved, Saved views, Start here and Advanced
+// The profile control's menu (ui-jobs 504, 582, 586; Miles 13 Nov 2026,
+// mockup): a menu button; two sections, Saved views (its header a link with
+// no toggle; with nothing saved, Start here under its hairline) and Advanced
 // (closed until opened, the inspector switch inside), no other group and no
-// theme switch; a full-width sheet at
-// the foot of the screen (ui-jobs 507)
+// theme switch; a full-width sheet at the foot of the screen (ui-jobs 507)
 // below md; Escape closes it and returns focus.
 const h20 = mHomePage.locator('header [data-anatomy="H20"]');
 check((await h20.getAttribute("aria-haspopup")) === "menu", "H20 is a menu button");
@@ -408,13 +408,17 @@ const sheet = await mHomePage.evaluate(() => {
     role: m?.getAttribute("role"),
     width: r ? Math.round(r.width) : 0,
     bottom: r ? Math.round(r.bottom) : 0,
+    sections: [...(m?.querySelectorAll("[data-profile-menu-section]") ?? [])]
+      .map((e) => e.getAttribute("data-profile-menu-section"))
+      .join(","),
+    savedToggle: !!m?.querySelector("[data-profile-menu-bookmarks][aria-expanded]"),
     groups: [...(m?.querySelectorAll("[data-profile-menu-group]") ?? [])]
       .map((h) => `${h.getAttribute("data-profile-menu-group")}:${h.getAttribute("aria-expanded")}`)
       .join(","),
     themes: m?.querySelectorAll("[data-theme-option]").length ?? -1,
     first: m?.querySelector('[role="menuitem"]')?.getAttribute("href") ?? null,
     shut: !m?.querySelector("[data-profile-menu-prov]"),
-    start: !!m?.querySelector('a[data-profile-menu-start][href="/start"]'),
+    start: !!m?.querySelector('[data-profile-menu-section="saved"] a[data-profile-menu-start][href="/start"]'),
     scrim: !!document.querySelector("[data-profile-menu-scrim]"),
   };
 });
@@ -422,13 +426,15 @@ check(
   sheet.role === "menu" &&
     sheet.width === 390 &&
     sheet.bottom === 800 &&
+    sheet.sections === "saved,advanced" &&
+    !sheet.savedToggle &&
     sheet.groups === "advanced:false" &&
     sheet.shut &&
     sheet.start &&
     sheet.scrim &&
     sheet.themes === 0 &&
     sheet.first === "/saved-views",
-  `home @390: H20 opens a full-width sheet at the screen's foot over a dim: Saved views first, Start here, Advanced closed, no other group, no theme switch (${JSON.stringify(sheet)})`,
+  `home @390: H20 opens a full-width sheet at the screen's foot over a dim: the sections Saved views (first, no toggle, Start here inside) and Advanced (closed), no other group, no theme switch (${JSON.stringify(sheet)})`,
 );
 // Advanced opens on a press and shows the inspector switch.
 await mHomePage.locator('[data-profile-menu-group-toggle="advanced"]').click();
