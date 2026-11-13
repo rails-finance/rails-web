@@ -895,7 +895,7 @@ export function AlchemistPositionView({
                         className="link"
                         title={alchemixV2PositionName(l.syntheticSymbol ?? sym, l.account)}
                       >
-                        V2 history →
+                        V2 history
                       </Link>
                     ))
                   : null,

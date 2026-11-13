@@ -12,7 +12,7 @@
 // static before dynamic, and no wallet address is the literal string "system".
 
 import Link from "next/link";
-import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { FOOT_LINK } from "@/lib/shared/ui-grammar";
 import { LiquityV1SystemView, LiquityV1SystemStamp } from "@/components/protocol/liquity-v1/liquity-v1-system-view";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { loadLiquityV1SystemFromChain } from "@/lib/sources/chain/liquity-v1-system";
@@ -56,7 +56,7 @@ export default async function LiquityV1SystemPage() {
             <>
               <LiquityV1SystemStamp data={data} />
               <p className="mt-1 text-sm text-rb-500">
-                <Link href="/ethereum/liquity-v1/info#glossary" className={INLINE_LINK}>
+                <Link href="/ethereum/liquity-v1/info#glossary" className={FOOT_LINK}>
                   Terms and sources
                 </Link>
               </p>

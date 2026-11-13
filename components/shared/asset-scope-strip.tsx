@@ -58,7 +58,7 @@ import {
   type AssetPick,
   manageHref,
 } from "@/lib/shared/asset-scope";
-import { OVERLAY_HEADING, PAGE_LINK, PAGE_SCRIM, RESET_LINK } from "@/lib/shared/ui-grammar";
+import { OVERLAY_HEADING, PAGE_LINK, PAGE_SCRIM, RESET_LINK, FOOT_LINK } from "@/lib/shared/ui-grammar";
 
 const chainName = (c: number) => SCOPE_CHAINS[c] ?? chainNameOf(c);
 const symbolOf = (p: Pick<AssetPick, "chain" | "token">) =>
@@ -873,10 +873,10 @@ function AssetScopePanel({
         <Link
           href={manageHref()}
           onClick={onClose}
-          className={`self-start text-xs ${PAGE_LINK}`}
+          className={`self-start text-xs font-semibold ${FOOT_LINK}`}
           data-asset-scope-manage=""
         >
-          Add from all assets <span aria-hidden>→</span>
+          Add from all assets
         </Link>
       )}
       <FocusChains draft={draft} setChains={setChains} />

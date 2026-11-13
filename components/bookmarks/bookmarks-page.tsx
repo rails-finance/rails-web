@@ -27,7 +27,7 @@ import { useSavedLinks } from "@/components/shared/saved-items";
 import { SAVED_NAME } from "@/components/shared/bookmarks-name";
 import { walletHref } from "@/components/shared/front-door-search";
 import { SAMPLE_WALLET } from "@/lib/shared/sample-wallet";
-import { FOOT_ARROW, FOOT_LINK, FOOT_WORDS, PROFILE_CLEARANCE, START_CTA } from "@/lib/shared/ui-grammar";
+import { FOOT_LINK, PROFILE_CLEARANCE, START_CTA } from "@/lib/shared/ui-grammar";
 
 type Tab = "overview" | "focus" | "listings" | "wallets" | "positions";
 type Kind = Exclude<Tab, "overview">;
@@ -139,10 +139,7 @@ export function BookmarksPage() {
             className={`${FOOT_LINK} cursor-pointer font-semibold`}
             data-saved-card-open={kind}
           >
-            <span className={FOOT_WORDS}>{`Open ${plural(counts[kind], noun)}`}</span>
-            <span className={FOOT_ARROW} aria-hidden="true">
-              →
-            </span>
+            {`Open ${plural(counts[kind], noun)}`}
           </button>
         ) : (
           <span className="text-rb-500">None saved yet</span>
@@ -210,10 +207,7 @@ export function BookmarksPage() {
                     <Signpost className="size-4 shrink-0" aria-hidden="true" />
                   </Link>
                   <Link href={walletHref(SAMPLE_WALLET)} className={`text-sm ${FOOT_LINK}`} data-bookmarks-sample="">
-                    <span className={FOOT_WORDS}>See a sample wallet</span>
-                    <span className={FOOT_ARROW} aria-hidden="true">
-                      →
-                    </span>
+                    See a sample wallet
                   </Link>
                 </div>
               )}
@@ -229,10 +223,7 @@ export function BookmarksPage() {
                   <>
                     {newView}
                     <Link href="/assets" className={FOOT_LINK} data-saved-card-assets="">
-                      <span className={FOOT_WORDS}>Assets</span>
-                      <span className={FOOT_ARROW} aria-hidden="true">
-                        →
-                      </span>
+                      Assets
                     </Link>
                   </>,
                 )}

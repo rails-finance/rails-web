@@ -60,7 +60,7 @@ import {
 } from "@/lib/aave-vaults/vault-provenance";
 import { sectionPositionMetadata } from "@/lib/shared/page-metadata";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
-import { PAGE_LINK } from "@/lib/shared/ui-grammar";
+import { PAGE_LINK, FOOT_LINK } from "@/lib/shared/ui-grammar";
 import { resolveAaveVaultHolder } from "@/lib/aave-vaults/vault-holder";
 import { ethereumVaultHref, ethereumVaultsListingHref } from "@/lib/vaults/routes";
 import { loadAaveEthereumVault, type AaveEthereumVaultResponse } from "@/lib/sources/chain/aave-ethereum-vault";
@@ -548,17 +548,22 @@ export default async function AaveEthereumVaultPositionPage({ params }: Props) {
                 <span data-vault-block={data.blockNumber}>
                   {AAVE_FAMILY_SINGULAR[data.vault.family]}, deployed by Aave
                 </span>
-                <Link href={ethereumVaultHref(address)} className={PAGE_LINK} prefetch={false} data-link="vault-market">
-                  {vaultName} <span aria-hidden>→</span>
+                <Link
+                  href={ethereumVaultHref(address)}
+                  className={`text-xs font-semibold ${FOOT_LINK}`}
+                  prefetch={false}
+                  data-link="vault-market"
+                >
+                  {vaultName}
                 </Link>
                 <Link
                   href={ethereumVaultsListingHref({ vault: address })}
-                  className={PAGE_LINK}
+                  className={`text-xs font-semibold ${FOOT_LINK}`}
                   prefetch={false}
                   data-link="vault-positions"
                   data-positions-vault={address}
                 >
-                  Every holder <span aria-hidden>→</span>
+                  Every holder
                 </Link>
               </p>
             )}

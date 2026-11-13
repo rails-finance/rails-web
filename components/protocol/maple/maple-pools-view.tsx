@@ -137,9 +137,6 @@ function PoolCard({ s, cat }: { s: MaplePoolState; cat: MaplePool }) {
           >
             <TokenChipIcon symbol={cat.assetSymbol} size={20} filterable={false} />
             <span>{cat.symbol}</span>
-            <span aria-hidden className="font-normal text-rb-500">
-              →
-            </span>
           </Link>
           <div className="flex shrink-0 items-center gap-2">
             <SectionReadStamp

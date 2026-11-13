@@ -12,7 +12,7 @@
 // The check: for each branch, take the troves at the front of the chain-read
 // queue (/api/chain/<proto>/branches — still built, since the branch card's
 // rate span, average rate and TCR are read off the same walk), then follow the
-// page's own "<SYM> queue →" link and read the trove ids the listing renders.
+// page's own "<SYM> queue" link and read the trove ids the listing renders.
 //
 //   • SET membership, not sequence. Within one rate the protocol's linked list
 //     has an order the index's ORDER BY does not reproduce, and neither is
@@ -96,7 +96,7 @@ for (const [proto, cfg] of targets) {
       assert(!hasLink, `${sym}: sorted list empty (${branch.queue.length} zombie(s)) — no queue link offered`);
       continue;
     }
-    assert(hasLink, `${sym}: the branches page offers a "${sym} queue →" link`);
+    assert(hasLink, `${sym}: the branches page offers a "${sym} queue" link`);
     if (!hasLink) continue;
     const href = await link.getAttribute("href");
 

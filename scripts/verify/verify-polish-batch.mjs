@@ -429,7 +429,7 @@ check(
 );
 check(
   "P phone @390: the link reads View a live position and goes to the Trove",
-  sample.text === "View a live position →" && /^\/ethereum\/liquity-v2\/trove\//.test(sample.href ?? ""),
+  sample.text === "View a live position" && /^\/ethereum\/liquity-v2\/trove\//.test(sample.href ?? ""),
   JSON.stringify(sample),
 );
 check(

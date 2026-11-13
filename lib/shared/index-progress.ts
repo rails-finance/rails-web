@@ -184,11 +184,19 @@ export function fillStall(e: FillReading): "not-gaining" | "behind" | null {
   return null;
 }
 
+/** Time after a refusal's reset for the fill's next two plans to resume. */
+export const MISS_RESUME_GRACE = 20 * 60;
+
 /** The fill's head miss on this chain while it is current: recorded within
- *  HEARTBEAT_LATE, so a miss an api stopped replacing does not stand. */
+ *  HEARTBEAT_LATE, so a miss an api stopped replacing does not stand; a
+ *  refusal also lapses MISS_RESUME_GRACE after its reset, so a fill that does
+ *  not resume falls back to its heartbeat. */
 export function liveMiss(e: FillReading, now: Secs): HeadMiss | null {
   const at = isoSecs(e.headMiss?.at);
-  return e.headMiss && at != null && now - at <= HEARTBEAT_LATE ? e.headMiss : null;
+  if (!e.headMiss || at == null || now - at > HEARTBEAT_LATE) return null;
+  const until = isoSecs(e.headMiss.until);
+  if (e.headMiss.reason === "gateway-refused" && until != null && now > until + MISS_RESUME_GRACE) return null;
+  return e.headMiss;
 }
 
 /** A fill's state: its heartbeat's age, and never better than late while it
