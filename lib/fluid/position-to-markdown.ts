@@ -115,7 +115,7 @@ export function fluidPositionToMarkdown(args: FluidPositionMarkdownArgs): string
       if (rates.length > 0) lines.push(`- **Vault rates (annual, floating):** ${rates.join(" · ")}`);
       if (live.vaultTotalPositions != null)
         lines.push(
-          `- **Vault context:** one of ${live.vaultTotalPositions} positions (${amt(live.vaultTotalSupply ?? 0)} ${colSym} supplied / ${amt(live.vaultTotalBorrow ?? 0)} ${debtSym} borrowed vault-wide)`,
+          `- **Vault context:** one of ${live.vaultTotalPositions} positions opened in the vault, open or closed (${amt(live.vaultTotalSupply ?? 0)} ${colSym} supplied / ${amt(live.vaultTotalBorrow ?? 0)} ${debtSym} borrowed vault-wide)`,
         );
       if (live.isSmartCol || live.isSmartDebt)
         lines.push(
