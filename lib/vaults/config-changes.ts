@@ -101,10 +101,13 @@ export type ChangesScope =
       fromBlock: number | null;
     };
 
+/** `createdBlock`: the vault's creation block, from the answer. A record that starts at the vault's
+ *  creation, inside the window, misses nothing: it starts late only after both. */
 export function changesScope(
   coverage: MetaMorphoCoverage,
   chainId: number,
   asOf: { block: number },
+  createdBlock = 0,
   days = WINDOW_DAYS,
 ): ChangesScope {
   const through = coveredThrough(coverage);
@@ -112,7 +115,7 @@ export function changesScope(
   const day = LAG_BLOCKS[chainId] ?? LAG_BLOCKS[1];
   const windowStart = asOf.block - days * day;
   const from = coverage.index?.fromBlock ?? coverage.sieve?.fromBlock ?? null;
-  const late = from != null && from > windowStart ? from : null;
+  const late = from != null && from > Math.max(windowStart, createdBlock) ? from : null;
   if (asOf.block - through > day || late != null) return { kind: "scoped", through, fromBlock: late };
   return { kind: "whole", through };
 }
@@ -278,7 +281,7 @@ export function changeWords(c: MetaMorphoChange, ctx: ChangeContext, f: ChangeFo
         return accepted
           ? { text: `${head}; accepted on ${f.date(accepted.blockTime)}`, accepted, previous: null }
           : {
-              text: `${head}; it waits for the timelock, and no acceptance follows in the record`,
+              text: `${head}; no acceptance follows in the record`,
               accepted,
               previous: null,
             };

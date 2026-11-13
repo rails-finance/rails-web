@@ -167,10 +167,8 @@ test("a truncated answer infers no timelock from outside it", () => {
   // Truncated: no date.
   const t = W(sub, [sub], 7 * DAY, true);
   assert.equal(t.waiting, undefined);
-  assert.equal(
-    t.text,
-    "Cap of 9 USDC on the wstETH market submitted; it waits for the timelock, and no acceptance follows in the record",
-  );
+  assert.equal(t.text, "Cap of 9 USDC on the wstETH market submitted; no acceptance follows in the record");
+  assert.equal(t.accepted, null);
   // A SetTimelock inside the truncated answer still counts.
   const tl = log("SetTimelock", { caller: A1, newTimelock: String(DAY) }, 5);
   assert.equal(W(sub, newestFirst([tl, sub]), 7 * DAY, true).waiting.timelock, DAY);
@@ -208,6 +206,16 @@ test("the scope: unread with no coverage, scoped where the record stops short or
   assert.equal(
     changesScope({ index: { fromBlock: 1, throughBlock: 29_960_000 }, sieve: null }, 8453, asOf).kind,
     "whole",
+  );
+  // A vault younger than the window: the record starts at its creation and misses nothing.
+  assert.deepEqual(
+    changesScope({ index: { fromBlock: 29_950_000, throughBlock: 30_000_000 }, sieve: null }, 1, asOf, 29_950_000),
+    { kind: "whole", through: 30_000_000 },
+  );
+  // Starting after both the window and the vault's creation is late.
+  assert.equal(
+    changesScope({ index: { fromBlock: 29_960_000, throughBlock: 30_000_000 }, sieve: null }, 1, asOf, 29_950_000).kind,
+    "scoped",
   );
   // Starts after the window's first block (30 days of 7,200 back): scoped from that block.
   assert.deepEqual(changesScope({ index: { fromBlock: 29_900_000, throughBlock: 30_000_000 }, sieve: null }, 1, asOf), {

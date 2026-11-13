@@ -83,7 +83,7 @@ export async function readConfigChanges(
   const d = answer.data;
   const time = s.asOf.time ?? Math.floor(Date.now() / 1000);
   const asOf = { block: s.asOf.block, time };
-  const scope = changesScope(d.coverage, s.chainId, asOf);
+  const scope = changesScope(d.coverage, s.chainId, asOf, d.createdBlock);
   if (scope.kind === "unread") return { kind: "unread" };
   const windowFrom = time - WINDOW_DAYS * 86_400;
   const names = marketNames(s.markets);

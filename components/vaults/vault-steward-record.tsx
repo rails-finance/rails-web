@@ -149,6 +149,7 @@ export function VaultStewardRecord({
         .filter((v) => stewardVaultKey(v) === current || !holdsNothing(v))
         .filter((v, i) => i < LIMIT || stewardVaultKey(v) === current);
   const only = count === 1 && stewardVaultKey(self) === current;
+  const tableProps = { label: `The vaults ${shortAddress(steward.address)} runs`, shown, current, rosters, address };
   const beforeLine = runs && (
     <Suspense fallback={null}>
       <BeforeLine runs={runs} address={address} />
@@ -182,31 +183,14 @@ export function VaultStewardRecord({
             It runs {countFig} vaults Rails lists on Base and Ethereum.{beforeLine}
           </p>
           <div className="mt-3">
-            <DataTable
-              label={`The vaults ${shortAddress(steward.address)} runs`}
-              tableClassName="text-sm sm:[&_tbody_tr]:h-12 sm:[&_tbody_tr]:py-0"
-              stacked
-            >
-              <DataTableHead>
-                <DataTableLeadHeader plain />
-                <DataTableHeader label="Vault" />
-                <DataTableHeader label="Asset" />
-                <DataTableHeader label="Held" align="right" />
-                {runs && <DataTableHeader label="Since" align="right" />}
-              </DataTableHead>
-              <DataTableBody>
-                {shown.map((v) => (
-                  <StewardRow
-                    key={stewardVaultKey(v)}
-                    v={v}
-                    isCurrent={stewardVaultKey(v) === current}
-                    rosters={rosters}
-                    runs={runs}
-                    address={address}
-                  />
-                ))}
-              </DataTableBody>
-            </DataTable>
+            {runs ? (
+              // The table draws at once without Since; the column joins once the runs resolve to a read.
+              <Suspense fallback={<StewardTable {...tableProps} read={null} />}>
+                <StewardTableWithRuns {...tableProps} runs={runs} />
+              </Suspense>
+            ) : (
+              <StewardTable {...tableProps} read={null} />
+            )}
           </div>
           {shown.length < sorted.length && (
             <button
@@ -238,6 +222,47 @@ export function VaultStewardRecord({
       {badDebt}
     </ProvSection>
   );
+}
+
+interface StewardTableProps {
+  label: string;
+  shown: VaultSummary[];
+  current: string;
+  rosters: StewardRecordRoster[];
+  address: string;
+}
+
+/** The vaults table; with a read of the steward's runs, the Since column (V14.2). */
+function StewardTable({ label, shown, current, rosters, address, read }: StewardTableProps & { read: RunsOk | null }) {
+  return (
+    <DataTable label={label} tableClassName="text-sm sm:[&_tbody_tr]:h-12 sm:[&_tbody_tr]:py-0" stacked>
+      <DataTableHead>
+        <DataTableLeadHeader plain />
+        <DataTableHeader label="Vault" />
+        <DataTableHeader label="Asset" />
+        <DataTableHeader label="Held" align="right" />
+        {read && <DataTableHeader label="Since" align="right" />}
+      </DataTableHead>
+      <DataTableBody>
+        {shown.map((v) => (
+          <StewardRow
+            key={stewardVaultKey(v)}
+            v={v}
+            isCurrent={stewardVaultKey(v) === current}
+            rosters={rosters}
+            read={read}
+            address={address}
+          />
+        ))}
+      </DataTableBody>
+    </DataTable>
+  );
+}
+
+/** The table once the runs resolve: Since only where some chain's record was read. */
+function StewardTableWithRuns(props: StewardTableProps & { runs: RunsPromise }) {
+  const { runs, ...rest } = props;
+  return <StewardTable {...rest} read={okOf(use(runs))} />;
 }
 
 type RunsPromise = Promise<StewardRunsRead | null>;
@@ -294,21 +319,27 @@ function SelfSince({ runs, v, address }: { runs: RunsPromise; v: VaultSummary; a
   );
 }
 
-/** One row's Since cell (V14.2): the start of the open run where the record holds one. */
-function SinceCell({ runs, v, address }: { runs: RunsPromise; v: VaultSummary; address: string }) {
-  const r = okOf(use(runs));
-  const since: StewardSince | undefined =
-    r && vaultIndexProtocol(v) === "morpho" ? r.runs.since[stewardVaultKey(v)] : undefined;
-  if (r && since)
+/** One row's Since cell (V14.2): the start of the open run where the record holds one; a dash
+ *  saying why where it does not (the row's chain unread, a Maple pool, no open run in the record). */
+function SinceCell({ read, v, address }: { read: RunsOk; v: VaultSummary; address: string }) {
+  const morpho = vaultIndexProtocol(v) === "morpho";
+  const since: StewardSince | undefined = morpho ? read.runs.since[stewardVaultKey(v)] : undefined;
+  if (since)
     return (
       <span className="text-foreground" data-anatomy="V14.2" data-steward-since={since.run.fromBlock}>
-        <Prov info={stewardSinceProv(address, r.runs.role, since)}>{formatDate(since.run.fromTime)}</Prov>
+        <Prov info={stewardSinceProv(address, read.runs.role, since)}>{formatDate(since.run.fromTime)}</Prov>
       </span>
     );
+  const unread = morpho && read.unread.includes(v.chainId);
+  const why = !morpho
+    ? "Rails's record of role changes covers MetaMorpho vaults"
+    : unread
+      ? `Rails's record of curator and owner changes on ${chainMeta(v.chainId as ChainId).name} did not answer`
+      : "Rails's record of role changes holds no start for this run";
   return (
-    <span className="text-rb-500" title="Rails's record of role changes holds no start for this run">
+    <span className="text-rb-500" title={why} data-steward-since-none={unread ? "unread" : morpho ? "none" : "other"}>
       <span aria-hidden>&ndash;</span>
-      <span className="sr-only">no start in Rails&rsquo;s record</span>
+      <span className="sr-only">{unread ? "not read" : "no start in Rails’s record"}</span>
     </span>
   );
 }
@@ -467,14 +498,14 @@ function StewardRow({
   v,
   isCurrent,
   rosters,
-  runs,
+  read,
   address,
 }: {
   v: VaultSummary;
   isCurrent: boolean;
   rosters: StewardRecordRoster[];
-  /** The Since column (V14.2), streamed: the open run where the roles route holds one. */
-  runs?: RunsPromise;
+  /** The steward's runs, resolved; null, no Since column. */
+  read: RunsOk | null;
   address: string;
 }) {
   const r = rosterOf(rosters, v);
@@ -562,11 +593,9 @@ function StewardRow({
           </span>
         )}
       </DataTableCell>
-      {runs && (
+      {read && (
         <DataTableCell label="Since" align="right" valign="middle" className="whitespace-nowrap tabular-nums">
-          <Suspense fallback={null}>
-            <SinceCell runs={runs} v={v} address={address} />
-          </Suspense>
+          <SinceCell read={read} v={v} address={address} />
         </DataTableCell>
       )}
     </DataTableRow>
