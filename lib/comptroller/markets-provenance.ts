@@ -374,7 +374,10 @@ export const cmRateProv = stamped((f, c, side: "supply" | "borrow", read?: Compt
         kind: "offchain",
         pclass: "offchain",
         note: a.source,
-        ...(a.href ? { verify: { kind: "link" as const, href: a.href, text: `${f.name}'s docs` } } : {}),
+        // Where the docs state the form, its steps are the docs' definition (ui-jobs 671).
+        ...(a.href
+          ? { definition: true as const, verify: { kind: "link" as const, href: a.href, text: `${f.name}'s docs` } }
+          : {}),
       },
     ],
   };

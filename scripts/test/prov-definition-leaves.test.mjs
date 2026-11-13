@@ -140,3 +140,33 @@ test("Euler: the Borrow APY's head drops Indexed, the year being the docs'", asy
     "vault Borrow APY",
   );
 });
+
+test("Compound V2: the APY receipts' heads drop Off-chain, the docs' formula constants being definitions", async () => {
+  const E = await import("../../lib/compound-v2/event-provenance.ts");
+  const M = await import("../../lib/comptroller/markets-provenance.ts");
+  const F = await import("../../lib/comptroller/families.ts");
+  const read = { perBlockRaw: "91459164853", modelBlocksPerYear: 2_102_400 };
+  heads(
+    E.borrowRateProv("DAI", read),
+    "blocks a day, days a year",
+    ["state", "offchain"],
+    ["state"],
+    "position Borrow APY",
+  );
+  const c = { blockNumber: 24_000_000, symbol: "DAI", market: "0x5d3a536e4d6dbd6114cc1ead35777bab948e3643" };
+  const v2 = F.vocabFamily(F.COMPTROLLER_FAMILIES["compound-v2"]);
+  for (const side of ["borrow", "supply"])
+    heads(
+      M.cmRateProv(v2, c, side, { perPeriodRaw: "91459164853" }),
+      "compounding steps a year",
+      ["state", "offchain"],
+      ["state"],
+      `market ${side} APY`,
+    );
+  // Moonwell's every-second compounding is Rails's form: still counted.
+  for (const key of ["moonwell", "moonwell-base"]) {
+    const p = M.cmRateProv(F.vocabFamily(F.COMPTROLLER_FAMILIES[key]), c, "borrow", { perPeriodRaw: "1000000000" });
+    assert.deepEqual(head(p), ["state", "offchain"], `${key}: unchanged`);
+    assert.ok(!p.inputs.some((i) => i.definition), `${key}: no definition leaf`);
+  }
+});
