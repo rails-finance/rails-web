@@ -767,6 +767,9 @@ export function AaveV4ReservePage({
     const names = namesOf(sp, line);
     const held = heldOn(d);
     const notIndexed = notIndexedSection(d);
+    // Not borrowable here and drawn nowhere on the hub: no rate is paid, so the
+    // curve is one line, and it and Parameters each run full width.
+    const noCurve = f.borrowable === false && f.hubDrawn === 0;
     const { history: historySection, holders: holderSections } = indexedSections(d, sp, line, names, f, {
       history,
       kept,
@@ -788,7 +791,7 @@ export function AaveV4ReservePage({
             scope: "reserve-curve",
             anatomy: "M3.3",
             title: "Rate curve",
-            pair: "left",
+            pair: noCurve ? undefined : "left",
             tools: {
               links: [
                 {
@@ -800,21 +803,19 @@ export function AaveV4ReservePage({
                 },
               ],
             },
-            // Not borrowable here and drawn nowhere on the hub: no rate is paid, so one line.
-            body:
-              f.borrowable === false && f.hubDrawn === 0 ? (
-                <p className={NOTE} data-rate-curve-none="">
-                  Not borrowable on this spoke: no rate applies.
-                </p>
-              ) : (
-                <RateCurve curve={curveOf(f, names)} />
-              ),
+            body: noCurve ? (
+              <p className={NOTE} data-rate-curve-none="">
+                Not borrowable on this spoke: no rate applies.
+              </p>
+            ) : (
+              <RateCurve curve={curveOf(f, names)} />
+            ),
           },
           {
             scope: "reserve-parameters",
             anatomy: "M3.5",
             title: "Parameters",
-            pair: "right",
+            pair: noCurve ? undefined : "right",
             learnMore: v4ParametersLearnMore(names, {
               published: line.base?.feedUpdatedAt != null,
               paused: Boolean(line.base),
