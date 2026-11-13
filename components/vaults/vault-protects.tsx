@@ -24,6 +24,8 @@ import {
   protectsMarkdown,
   type ProtectsLine,
 } from "@/lib/vaults/protects-words";
+import { VaultConfigChanges } from "@/components/vaults/vault-config-changes";
+import type { ConfigChangesView } from "@/lib/vaults/config-changes-read";
 
 export interface ProtectsSectionData {
   line: ProtectsLine;
@@ -57,6 +59,7 @@ function OneSection({
   block,
   vaultName,
   look,
+  changes,
 }: {
   which: keyof typeof SECTIONS;
   data: ProtectsSectionData | null;
@@ -64,6 +67,7 @@ function OneSection({
   block: number;
   vaultName: string;
   look: ProtectsLook;
+  changes?: ConfigChangesView;
 }) {
   const s = SECTIONS[which];
   const line = data?.line;
@@ -144,6 +148,7 @@ function OneSection({
             {UNREAD_TEXT}
           </p>
         )}
+        {changes && <VaultConfigChanges view={changes} />}
       </div>
       <SectionExplainer
         label={s.explainer.label}
@@ -176,6 +181,7 @@ export function VaultProtects({
   protects,
   underneath,
   look = "framed",
+  changes,
 }: {
   chainId: ChainId;
   /** The block both sections were read at; 0 where the read failed. */
@@ -184,10 +190,20 @@ export function VaultProtects({
   protects: ProtectsSectionData | null;
   underneath: ProtectsSectionData | null;
   look?: ProtectsLook;
+  /** MetaMorpho: the recent configuration changes (V9.1), under the protects line. */
+  changes?: ConfigChangesView;
 }) {
   return (
     <>
-      <OneSection which="protects" data={protects} chainId={chainId} block={block} vaultName={vaultName} look={look} />
+      <OneSection
+        which="protects"
+        data={protects}
+        chainId={chainId}
+        block={block}
+        vaultName={vaultName}
+        look={look}
+        changes={changes}
+      />
       <OneSection
         which="underneath"
         data={underneath}

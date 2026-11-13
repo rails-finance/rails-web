@@ -40,6 +40,7 @@ import { TokenChipIcon } from "./token-chip-icon";
 import { ProvCoverageBounds } from "./prov-coverage-tripwire";
 import { formatExact } from "@/lib/utils/format";
 import { BlockRef } from "@/components/shared/block-ref";
+import { untracedInputs } from "@/lib/shared/prov-untraced";
 
 // Dev gates the coverage tripwire (scope bookends + the <Prov> coverage stamp);
 // Next inlines NODE_ENV, so the prod bundle carries neither.
@@ -412,27 +413,6 @@ export function useReceiptRegistry(): ReceiptRegistry {
 
 const shortHex = (a: string) => (a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a);
 
-/** Formula words that aren't operands — never flagged by the receipt's
- *  untraced-input self-audit. */
-const FORMULA_STOPWORDS = new Set([
-  "rounded",
-  "rounding",
-  "up",
-  "down",
-  "the",
-  "of",
-  "at",
-  "to",
-  "per",
-  "and",
-  "or",
-  "wei",
-  "abs",
-  "min",
-  "max",
-  "sum",
-]);
-
 // The dock is reachable (click-select, not hover) so it can hold live controls.
 function CopyBtn({ text, title = "Copy" }: { text: string; title?: string }) {
   const [copied, setCopied] = useState(false);
@@ -753,28 +733,12 @@ export function ProvReceipt({
   const { vcls, isComputed, leaves } = classifyValue(info);
   const hasSource = block != null || Boolean(txHash) || Boolean(info.contract);
 
-  // Self-audit: every identifier the formula names should be traceable to an
-  // input row. A named-but-untraced operand is exactly the gap the inspector
-  // exists to expose, so it renders as a visible caution in development builds only
-  // (ui-jobs sky-savings 18; plus a dev console warning) rather than a silent, plausible-looking omission. Matching is
-  // lenient (substring, either direction: "shares" ↔ "borrowShares") so only
-  // wholly-missing operands flag. Runs only when the vocabulary enumerates
-  // inputs at all — a zero-input indexed rollup is a different, visible state.
-  const untraced =
-    info.formula && leaves.length > 0
-      ? [
-          ...new Set(
-            (info.formula.match(/\b[A-Za-z_][A-Za-z0-9_]{2,}\b/g) ?? []).filter((t) => {
-              const lt = t.toLowerCase();
-              if (FORMULA_STOPWORDS.has(lt)) return false;
-              return !leaves.some((l) => {
-                const ll = l.label.toLowerCase();
-                return ll.includes(lt) || lt.includes(ll);
-              });
-            }),
-          ),
-        ]
-      : [];
+  // Self-audit (lib/shared/prov-untraced.ts): a formula's operand with no input
+  // row renders as a visible caution in development builds only (ui-jobs
+  // sky-savings 18; plus a dev console warning). Runs only when the vocabulary
+  // enumerates inputs at all — a zero-input indexed rollup is a different,
+  // visible state.
+  const untraced = untracedInputs(info.formula, leaves);
   useEffect(() => {
     if (untraced.length > 0 && process.env.NODE_ENV !== "production") {
       console.warn(

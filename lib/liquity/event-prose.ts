@@ -16,6 +16,7 @@
 // Pure TypeScript with no React, so the export script loads it with type
 // stripping (scripts/exports-liquity-v2.mjs).
 
+import { redemptionPath } from "@/lib/liquity-fork/shutdown";
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import type { BaseActivityEvent, GasCost } from "@/lib/shared/types/activity";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
@@ -134,6 +135,9 @@ export interface LiquityProseInput {
   /** When the owner claimed a liquidation's surplus: undefined while unclaimed
    *  or unknown, null when claimed but undated. */
   surplusClaimedAt?: number | null;
+  /** The branch's shutdown time (unix seconds) where the page knows it: a
+   *  redemption at or after it is the urgent path (redemptionPath). */
+  shutdownAt?: number | null;
 }
 
 // ── The engine's functions over this file ────────────────────────────────────
@@ -412,8 +416,9 @@ function redemptionToday(
   return vsToday > 0 ? "higher" : null;
 }
 
-function l5For(key: L5Key, ctx: LiquityContext, variant: string): LearnMoreContent {
+function l5For(key: L5Key, ctx: LiquityContext, variant: string, urgentPath: boolean): LearnMoreContent {
   return L5[key]({
+    urgentPath,
     collateralType: ctx.collateralType,
     delegated: ctx.isInBatch,
     delegateName: ctx.batchManager ? getBatchManagerByAddress(ctx.batchManager)?.name : undefined,
@@ -424,6 +429,10 @@ function l5For(key: L5Key, ctx: LiquityContext, variant: string): LearnMoreConte
 /** The event's five levels (L3 apart: lib/liquity/event-ledgers.ts). */
 export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
   const { ctx, event, previousEvent, currentEvent, currentPrice, ledger, surplusClaimedAt } = input;
+  // A redemption on a shut-down branch: the urgent path, which reaches the
+  // Troves its redeemer picks, not the lowest rates (lib/liquity-fork/shutdown.ts).
+  const urgentPath =
+    REDEMPTION_OPS.has(ctx.operation) && redemptionPath(event.timestamp, input.shutdownAt) === "urgent";
   const collDecimals = input.collDecimals ?? null;
   const sel = pick(ctx);
   const variant = sel.variant;
@@ -606,22 +615,23 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
       v.coll_taken_usd = collTaken * price;
       v.redemption_result_usd = debtCleared - collTaken * price;
       sp.say("redeem.what", { debt_cleared: "debt_change", coll_taken: "coll_change" });
-      if (price > 0) {
+      if (price > 0 && !urgentPath) {
         if (num(v.redemption_result_usd) >= 0.5) sp.say("redeem.result");
         else sp.say("redeem.result_no_fee");
       }
       const zombie = ctx.isZombieTrove;
       const rate = { rate_after: "rate_after" as const };
-      if (!zombie) {
+      if (!zombie && !urgentPath) {
         if (ctx.isInBatch && ctx.batchManager) sp.say("redeem.why_batch", rate);
         else sp.say("redeem.why_owner", rate);
       }
+      // On a shut-down branch borrowing is gone, so the next step is closing only.
       if (zombie && stateAfter.debt === 0) {
         sp.say("redeem.zombie_zero");
-        sp.say("redeem.zombie_zero_next");
+        sp.say(urgentPath ? "redeem.zombie_zero_close" : "redeem.zombie_zero_next");
       } else if (zombie) {
         sp.say("redeem.zombie_low");
-        sp.say("redeem.zombie_low_next");
+        sp.say(urgentPath ? "redeem.zombie_low_close" : "redeem.zombie_low_next");
       }
       break;
     }
@@ -836,7 +846,7 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
     L2: stateBefore && stateAfter ? liquityL2(input, accrual!) : null,
     L4: said.L4,
     list: said.list,
-    L5: { key: t.L5, content: l5For(t.L5, ctx, variant) },
+    L5: { key: t.L5, content: l5For(t.L5, ctx, variant, urgentPath) },
     footer: {
       gas,
       gasCost: paid ? { eth: paid.gasCostEth, usd: paid.gasCostUsd } : null,

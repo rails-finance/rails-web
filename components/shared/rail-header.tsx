@@ -31,6 +31,7 @@ import { RecencyStamp } from "@/components/shared/recency-stamp";
 import { INFO_PATH } from "@/components/shared/info-disclosure";
 import { ChainGlyph } from "@/components/shared/chain-toggle";
 import { CHAINS, type ChainId } from "@/lib/shared/chains";
+import { TAB_BASE } from "@/lib/shared/ui-grammar";
 
 /** The explorer's chain, muted, a label and not a control. On the title row
  *  its glyph alone follows the protocol's name (Miles, 6 Nov 2026, ui-jobs
@@ -81,13 +82,15 @@ export type RailVenue = "listing" | "subPage" | "info";
 // bottom border so the active underline never shifts the baseline; the idle
 // border is just transparent.
 //
+// TAB_BASE lives in lib/shared/ui-grammar.ts, which the profile menu's kinds
+// (H20) also wear.
+//
 // EXPORTED, so a second rail component wears the same three classes rather
 // than a copy of them: a second rail that drifted a letter-spacing would read
 // as a second product. The vaults section had its own rail on these classes
 // until decision 0028 retired the section and folded every vault layer under
 // its protocol's explorer, so this file is the only rail today — the export
 // stands for whatever rail comes next.
-export const TAB_BASE = "border-b pb-0.5 text-[11px] font-semibold uppercase tracking-[0.14em]";
 export const TAB_ACTIVE = `${TAB_BASE} border-current text-foreground`;
 export const TAB_IDLE = `${TAB_BASE} border-transparent text-rb-500 transition-colors hover:text-blue-600 dark:hover:text-[var(--text-link)]`;
 
