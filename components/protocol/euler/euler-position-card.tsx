@@ -11,9 +11,9 @@ import { PositionCard, type PositionCardHead, type PositionCardSlots } from "@/c
 import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups";
 import { PoolReadStamp, Segs } from "@/components/protocol/uniswap/uniswap-readout";
 import { eulerPosition } from "@/lib/euler/position";
-import { cardProv, collateralProv, readContracts, type EulerReceiptContext } from "@/lib/euler/provenance";
+import { cardProv, collateralProv, readContracts, vaultProv, type EulerReceiptContext } from "@/lib/euler/provenance";
 import type { EulerPositionRead } from "@/lib/euler/types";
-import { CARD_WORDS, cardExplainer, inUnit, num, rate, short } from "@/lib/euler/words";
+import { CARD_WORDS, cardExplainer, healthText, inUnit, num, rate, short } from "@/lib/euler/words";
 
 /** Every figure's read stamp on an Euler page. */
 export function EulerReadStamp({ c, what }: { c: EulerReceiptContext; what: string }) {
@@ -77,7 +77,7 @@ function CollateralBand({ c }: { c: EulerReceiptContext }) {
 }
 
 /** Earned in 30 days or Interest in 30 days: the figure where the holding matched at both reads,
- *  its value and the vault's yearly rate under it; otherwise "Opened" or "Changed inside the 30
+ *  its value and the vault's APY over the window under it; otherwise "Opened" or "Changed inside the 30
  *  days", and the (i) says why (Fluid's treatment). */
 function windowHead(c: EulerReceiptContext, id: "earned" | "interest"): PositionCardHead {
   const { p } = c;
@@ -97,7 +97,7 @@ function windowHead(c: EulerReceiptContext, id: "earned" | "interest"): Position
         </span>
       ),
     };
-  const year = loan ? p.window.borrowRateYear : p.window.supplyRateYear;
+  const apy = loan ? p.window.borrowApy : p.window.supplyApy;
   return {
     ...head,
     value: (
@@ -107,8 +107,12 @@ function windowHead(c: EulerReceiptContext, id: "earned" | "interest"): Position
     ),
     usd: valueLine(inUnit(p.windowValue, p.unit), cardProv(id, c)),
     sub:
-      year === null ? undefined : (
-        <span data-figure={`${id}-rate`}>{(loan ? CARD_WORDS.interestYear : CARD_WORDS.earnedYear)(year)}</span>
+      apy === null ? undefined : (
+        <span data-figure={`${id}-rate`}>
+          <Prov info={vaultProv(loan ? "borrowApyWindow" : "supplyApyWindow", c)}>
+            {(loan ? CARD_WORDS.interestApy : CARD_WORDS.earnedApy)(apy)}
+          </Prov>
+        </span>
       ),
   };
 }
@@ -172,7 +176,7 @@ function slots(r: EulerPositionRead): PositionCardSlots {
       id: "health",
       label: CARD_WORDS.health,
       labelTip: CARD_WORDS.healthTip,
-      value: p.health === null ? null : <Prov info={cardProv("health", c)}>{p.health.toFixed(2)}</Prov>,
+      value: p.health === null ? null : <Prov info={cardProv("health", c)}>{healthText(p.health)}</Prov>,
       sub: CARD_WORDS.healthSub,
     });
     heads.push(windowHead(c, "interest"));
