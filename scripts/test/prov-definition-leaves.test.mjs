@@ -118,3 +118,25 @@ test("Morpho: the market Borrow APY's year loses its dot; the head stays State",
   heads(M.morphoBorrowRateProv(c, 0.0498), "seconds per year", ["state"], ["state"], "market Borrow APY");
   heads(M.morphoBorrowRateProv(c, null), "seconds per year", ["state"], ["state"], "market Borrow APY, unread");
 });
+
+test("Euler: the Borrow APY's head drops Indexed, the year being the docs'", async () => {
+  const E = await import("../../lib/euler/provenance.ts");
+  const c = {
+    p: { borrowApyNow: 1.0995 },
+    r: {
+      head: { block: 56_710_281, time: 1_763_000_000 },
+      vault: {
+        symbol: "eUSDC-102",
+        address: "0xeef57677c2fc1a930eed234e3545e750c88f6743",
+        interestRate: "23503239886949630103",
+      },
+    },
+  };
+  heads(
+    E.vaultProv("borrowApy", c),
+    "Seconds in a year: 365.2425 × 86,400, an average Gregorian year in Euler's docs",
+    ["state", "indexed"],
+    ["state"],
+    "vault Borrow APY",
+  );
+});
