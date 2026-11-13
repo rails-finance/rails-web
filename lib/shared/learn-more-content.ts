@@ -1111,7 +1111,7 @@ export function liquityForkBorrowingContent(
         t.ltv
           ? "Each collateral branch is its own market with its own Max LTV; above it, anyone can liquidate the Trove."
           : `Each collateral branch is its own market with its own ${t.limitText}; below it, anyone can liquidate the Trove.`,
-        `The chosen interest rate is also the Trove's place in the redemption queue: redemptions sweep the LOWEST rates first, so a higher rate buys ${p.stablecoin} peg protection at a carrying cost.`,
+        `The chosen interest rate is also the Trove's place in the redemption queue: redemptions sweep the lowest rates first, so a higher rate buys ${p.stablecoin} peg protection at a carrying cost.`,
         `Drawing ${p.stablecoin} pays ${forkFeePhrase(t, "a")} added to the debt, and a fixed liquidation reserve is set aside apart from the collateral.`,
       ],
       links: forkLinks(p, "open"),
@@ -1183,7 +1183,7 @@ export function liquityForkRedemptionContent(p: LiquityForkLearnMoreParams, urge
     };
   return {
     title: "How redemptions work",
-    intro: `Any ${p.stablecoin} holder can redeem it against the system at $1 face value, the peg mechanism. Redemptions are routed across branches by their unbacked portions and, within a branch, sweep the LOWEST user-set interest rates first (${p.terms.ltv ? "not the highest LTV" : `not the lowest ${p.terms.ratioText}`}, the V1 difference).`,
+    intro: `Any ${p.stablecoin} holder can redeem it against the system at $1 face value, the peg mechanism. Redemptions are routed across branches by their unbacked portions and, within a branch, sweep the lowest user-set interest rates first.`,
     stepsHeading: "What happens to a redeemed Trove:",
     steps: [
       "It gives up collateral at the branch oracle price and sheds the same value of debt. Net value is preserved.",
@@ -1203,7 +1203,7 @@ export function liquityForkLiquidationContent(p: LiquityForkLearnMoreParams): Le
     stepsHeading: "The mechanics:",
     steps: [
       "Liquidation closes the whole Trove: collateral is seized, debt cleared.",
-      "Stability Pool depositors buy the collateral at a discount; redistributed portions land on other Troves as pending gains (collateral AND debt), settled on their next touch.",
+      "Stability Pool depositors buy the collateral at a discount; redistributed portions land on other Troves as pending gains (collateral and debt), settled on their next touch.",
       "The Stability Pool and the other Troves take collateral worth at most the debt plus the branch's liquidation penalty. Any collateral above that is the owner's surplus, credited to them in the branch's CollSurplusPool to claim.",
       `Each branch sets its own ${p.terms.limitShort}, so the same price move can liquidate one branch's Troves and not another's.`,
     ],
