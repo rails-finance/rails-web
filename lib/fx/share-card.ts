@@ -45,7 +45,7 @@ export function fxShareCardModel(position: FxPositionSummary | null, subject: st
     // detail card keeps its own label rather than borrowing the shared CDP
     // one, and this card matches it verbatim.
     if (position.settled.debtRatio != null) {
-      stats.push({ label: "Debt ratio", value: `${(position.settled.debtRatio * 100).toFixed(1)}%` });
+      stats.push({ label: "LTV", value: `${(position.settled.debtRatio * 100).toFixed(1)}%` });
     }
   }
 

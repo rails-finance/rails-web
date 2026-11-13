@@ -44,7 +44,15 @@ import { protocolForHref } from "@/lib/shared/protocols";
 import { fxEventFallbackContent } from "@/lib/shared/learn-more-content";
 import { serverReadAt, stampServerRead, type ServerRead } from "@/lib/shared/server-head-read";
 import { FX_ADDRESSES, FX_POOL_KEYS, FX_POOLS, isFxPoolKey, type FxPoolKey } from "@/lib/fx/asset-catalog";
-import { FX_FUNDING_RULE, fxAnchorSentence, fxFundingNow, fxFundingTip } from "@/lib/fx/statement-words";
+import {
+  FX_FUNDING_RULE,
+  FX_MINTED_AFTER,
+  FX_WORDS,
+  fxAnchorSentence,
+  fxFundingNow,
+  fxFundingTip,
+  fxPoolPurpose,
+} from "@/lib/fx/statement-words";
 import type { FxPoolSystem, FxSystemChainResponse, FxTickRow } from "@/lib/sources/chain/fx-system";
 import {
   capacityProv,
@@ -177,7 +185,7 @@ function structureOf(c: Ctx): TicksStructure {
     kind: "ticks",
     ticks: {
       label: "Ticks holding debt",
-      tip: "Positions with nearly the same debt ratio share a tick; the pool rebalances and liquidates a tick whole",
+      tip: "Positions with nearly the same LTV share a tick; the pool rebalances and liquidates a tick whole",
       value: (
         <Prov info={stamp(c, occupiedTicksProv(label, p.address))} value={formatExact(p.occupiedTicks)}>
           {p.occupiedTicks.toLocaleString("en-US")}
@@ -186,8 +194,8 @@ function structureOf(c: Ctx): TicksStructure {
       hooks: { "data-fx-ticks": String(p.occupiedTicks) },
     },
     rebalance: {
-      label: "Rebalance from",
-      tip: `From this debt ratio, at the min price, a keeper can rebalance a whole tick for a ${pctOf(p.rebalanceBonus, 1)} bonus`,
+      label: "Rebalance line",
+      tip: `From this LTV, at the min price, a keeper can rebalance a whole tick for a ${pctOf(p.rebalanceBonus, 1)} bounty`,
       value: (
         <Prov info={stamp(c, rungProv("rebalance", label, p.address))} value={formatExact(p.rebalanceRatio * 100)}>
           {pctOf(p.rebalanceRatio, 0)}
@@ -195,8 +203,8 @@ function structureOf(c: Ctx): TicksStructure {
       ),
     },
     liquidation: {
-      label: "Liquidation from",
-      tip: `From this debt ratio, at the min price, a keeper can liquidate a whole tick for a ${pctOf(p.liquidateBonus, 1)} bonus`,
+      label: "Liquidation line",
+      tip: `From this LTV, at the min price, a keeper can liquidate a whole tick for a ${pctOf(p.liquidateBonus, 1)} bounty`,
       value: (
         <Prov info={stamp(c, rungProv("liquidate", label, p.address))} value={formatExact(p.liquidateRatio * 100)}>
           {pctOf(p.liquidateRatio, 0)}
@@ -206,7 +214,7 @@ function structureOf(c: Ctx): TicksStructure {
     oracle: {
       unit: `USD per ${p.normalizedSymbol}`,
       min: { label: "Min price", tip: "Borrowing, rebalancing and liquidation", value: leg("min", p.priceMin) },
-      anchor: { label: "Anchor price", tip: "A position's debt ratio", value: leg("anchor", p.priceAnchor) },
+      anchor: { label: "Anchor price", tip: "A position's LTV", value: leg("anchor", p.priceAnchor) },
       max: { label: "Max price", tip: "Redemption", value: leg("max", p.priceMax) },
     },
   };
@@ -228,9 +236,7 @@ function PoolExplainer({ p }: { p: FxPoolSystem }) {
           </Fig>{" "}
           of collateral against <Fig bold>{formatCompact(p.totalRawDebt)} fxUSD</Fig> of debt.
         </ExplainBullet>
-        <ExplainBullet>
-          Each position locks {p.tokenSymbol} and borrows fxUSD against it, a leveraged long on {p.normalizedSymbol}.
-        </ExplainBullet>
+        <ExplainBullet>Each position locks {p.tokenSymbol} and borrows fxUSD against it.</ExplainBullet>
         <ExplainBullet>
           {curly(funding.before)}
           <Fig bold>{funding.figure}</Fig>
@@ -238,21 +244,22 @@ function PoolExplainer({ p }: { p: FxPoolSystem }) {
         </ExplainBullet>
         {ratio != null && (
           <ExplainBullet>
-            The pool&rsquo;s debt ratio <Fig bold>{pctOf(ratio, 1)}</Fig> is that debt over the collateral&rsquo;s value
-            at the anchor price.
+            The pool&rsquo;s LTV <Fig bold>{pctOf(ratio, 1)}</Fig> is that debt over the collateral&rsquo;s value at the
+            anchor price.
           </ExplainBullet>
         )}
         <ExplainBullet>
-          <Fig bold>{p.positionsMinted.toLocaleString("en-US")}</Fig> positions have been opened in it.
+          <Fig bold>{p.positionsMinted.toLocaleString("en-US")}</Fig>
+          {FX_MINTED_AFTER}
         </ExplainBullet>
       </ExplainGroup>
       <ExplainGroup title="Ticks">
         <ExplainBullet>
-          Positions with nearly the same debt ratio share a tick, and <Fig bold>{p.occupiedTicks}</Fig> ticks hold debt.
+          Positions with nearly the same LTV share a tick, and <Fig bold>{p.occupiedTicks}</Fig> ticks hold debt.
         </ExplainBullet>
         <ExplainBullet>
-          From a debt ratio of <Fig bold>{pctOf(p.rebalanceRatio, 0)}</Fig> a keeper can rebalance a whole tick: it
-          repays part of the debt and takes collateral plus a bonus.
+          From an LTV of <Fig bold>{pctOf(p.rebalanceRatio, 0)}</Fig> a keeper can rebalance a whole tick: it repays
+          part of the debt and takes collateral plus a bounty.
         </ExplainBullet>
         <ExplainBullet>
           From <Fig bold>{pctOf(p.liquidateRatio, 0)}</Fig> the whole tick can be liquidated.
@@ -304,16 +311,16 @@ function poolMarkdown(p: FxPoolSystem, block: number): string {
   return [
     `# f(x) ${poolLabel(p)}`,
     "",
-    `Leveraged longs that lock ${p.tokenSymbol} and borrow fxUSD against it, on Ethereum.`,
+    `${fxPoolPurpose(p.tokenSymbol, p.normalizedSymbol)} On Ethereum.`,
     "",
     `- Supplied: ${formatNumber(p.totalRawColl)} ${p.normalizedSymbol} (${usd(p.totalRawColl * p.priceAnchor)} at the anchor price)`,
     `- Borrowed: ${formatNumber(p.totalRawDebt)} fxUSD`,
     `- Funding rate: ${pctOf(p.fundingRatioAnnual, 2)} a year, on collateral`,
-    ...(ratio != null ? [`- Debt ratio: ${pctOf(ratio, 2)}`] : []),
-    `- Positions ever opened: ${p.positionsMinted}`,
+    ...(ratio != null ? [`- LTV: ${pctOf(ratio, 2)}`] : []),
+    `- ${FX_WORDS.openedLabel} (positions minted): ${p.positionsMinted}`,
     `- Ticks holding debt: ${p.occupiedTicks}`,
-    `- Rebalance from: ${pctOf(p.rebalanceRatio, 2)} (bonus ${pctOf(p.rebalanceBonus, 1)})`,
-    `- Liquidation from: ${pctOf(p.liquidateRatio, 2)} (bonus ${pctOf(p.liquidateBonus, 1)})`,
+    `- Rebalance line: ${pctOf(p.rebalanceRatio, 2)} (bounty ${pctOf(p.rebalanceBonus, 1)})`,
+    `- Liquidation line: ${pctOf(p.liquidateRatio, 2)} (bounty ${pctOf(p.liquidateBonus, 1)})`,
     `- Prices, USD per ${p.normalizedSymbol}: min ${formatNumber(p.priceMin)}, anchor ${formatNumber(p.priceAnchor)}, max ${formatNumber(p.priceMax)}`,
     `- ${redemptionWords(p)}`,
     "",
@@ -359,7 +366,7 @@ function head(c: Ctx, overview: boolean): ProductHead {
     scope: `pool-${p.key}`,
     title: label,
     titleHref: listing,
-    purpose: `Leveraged longs on ${p.normalizedSymbol}: each position locks ${p.tokenSymbol} and borrows fxUSD against it.`,
+    purpose: fxPoolPurpose(p.tokenSymbol, p.normalizedSymbol),
     figures: [
       {
         slot: "sizeIn",
@@ -398,7 +405,7 @@ function head(c: Ctx, overview: boolean): ProductHead {
         ? [
             {
               slot: "usage" as const,
-              label: "Debt ratio",
+              label: "LTV",
               tip: "Borrowed ÷ the collateral's value at the anchor price, across the pool",
               value: (
                 <Prov info={stamp(c, poolDebtRatioProv(label, p.address, p.oracle))} value={formatExact(ratio * 100)}>
@@ -410,7 +417,8 @@ function head(c: Ctx, overview: boolean): ProductHead {
         : []),
       {
         slot: "population",
-        label: "Positions ever opened",
+        label: FX_WORDS.openedLabel,
+        tip: FX_WORDS.openedTip,
         value: (
           <Prov info={stamp(c, positionsMintedProv(label, p.address))} value={formatExact(p.positionsMinted)}>
             {p.positionsMinted.toLocaleString("en-US")}
@@ -456,9 +464,9 @@ const ORACLE_HELP = (p: FxPoolSystem): LearnMoreContent => ({
   details: [
     {
       bold: "Min price",
-      text: "the pool judges borrowing, rebalancing and liquidation at it, so every tick's debt ratio uses it.",
+      text: "the pool judges borrowing, rebalancing and liquidation at it, so every tick's LTV uses it.",
     },
-    { bold: "Anchor price", text: "a position's debt ratio, as its page states it, uses the anchor." },
+    { bold: "Anchor price", text: "a position's LTV, as its page states it, uses the anchor." },
     { bold: "Max price", text: "a redeemer's collateral is priced at it, the price least in the redeemer's favour." },
   ],
   extraParagraphs: [
@@ -510,12 +518,12 @@ function LadderStrip({ c }: { c: Ctx }) {
         <div
           className="absolute inset-y-0 w-px bg-foreground/40"
           style={{ left: `${x(p.rebalanceRatio)}%` }}
-          title={`Rebalance from ${pctOf(p.rebalanceRatio, 0)}`}
+          title={`Rebalance line ${pctOf(p.rebalanceRatio, 0)}`}
         />
         <div
           className="absolute inset-y-0 w-0.5 bg-red-500"
           style={{ left: `${x(p.liquidateRatio)}%` }}
-          title={`Liquidation from ${pctOf(p.liquidateRatio, 0)}`}
+          title={`Liquidation line ${pctOf(p.liquidateRatio, 0)}`}
         />
         {drawn.map((t) => (
           <div
@@ -525,7 +533,7 @@ function LadderStrip({ c }: { c: Ctx }) {
               left: `${x(t.debtRatio as number)}%`,
               height: `${Math.max(4, Math.sqrt(t.rawDebt / maxDebt) * 100)}%`,
             }}
-            title={`Tick ${t.tick} · debt ratio ${pctOf(t.debtRatio as number, 2)} · ${formatCompact(t.rawDebt)} fxUSD · ${amt(t.rawColl)} ${p.normalizedSymbol}`}
+            title={`Tick ${t.tick} · LTV ${pctOf(t.debtRatio as number, 2)} · ${formatCompact(t.rawDebt)} fxUSD · ${amt(t.rawColl)} ${p.normalizedSymbol}`}
           />
         ))}
       </div>
@@ -545,7 +553,7 @@ function LadderStrip({ c }: { c: Ctx }) {
           </Prov>
         </span>
         <span>
-          rebalance from{" "}
+          rebalance line{" "}
           <Prov
             info={stamp(c, rungProv("rebalance", label, p.address))}
             value={formatExact(p.rebalanceRatio * 100)}
@@ -553,10 +561,10 @@ function LadderStrip({ c }: { c: Ctx }) {
           >
             <span className="text-foreground">{pctOf(p.rebalanceRatio, 0)}</span>
           </Prov>{" "}
-          (+{pctOf(p.rebalanceBonus, 1)} bonus)
+          (+{pctOf(p.rebalanceBonus, 1)} bounty)
         </span>
         <span>
-          liquidate from{" "}
+          liquidation line{" "}
           <Prov
             info={stamp(c, rungProv("liquidate", label, p.address))}
             value={formatExact(p.liquidateRatio * 100)}
@@ -564,13 +572,13 @@ function LadderStrip({ c }: { c: Ctx }) {
           >
             <span className="text-foreground">{pctOf(p.liquidateRatio, 0)}</span>
           </Prov>{" "}
-          (+{pctOf(p.liquidateBonus, 1)} bonus)
+          (+{pctOf(p.liquidateBonus, 1)} bounty)
         </span>
       </div>
       <p className="mt-2 max-w-3xl text-[12px] leading-relaxed text-rb-500">
-        Each column is a tick at its debt ratio, at the min price. Heights follow the square root of a tick&rsquo;s
-        debt, so the small ticks stay visible beside the largest; the table below has every figure. Funding moves every
-        column right at once. Neighbouring ticks can overlap here.
+        Each column is a tick at its LTV, at the min price. Heights follow the square root of a tick&rsquo;s debt, so
+        the small ticks stay visible beside the largest; the table below has every figure. Funding moves every column
+        right at once. Neighbouring ticks can overlap here.
       </p>
     </div>
   );
@@ -672,7 +680,7 @@ function TickRow({ c, t, mine }: { c: Ctx; t: FxTickRow; mine: boolean }) {
           </span>
         )}
       </DataTableCell>
-      <DataTableCell label="Debt ratio" className={cell}>
+      <DataTableCell label="LTV" className={cell}>
         {t.debtRatio != null ? (
           <Prov info={stamp(c, tickRatioProv(label, p.address, t.tick))} value={formatExact(t.debtRatio * 100)}>
             <span className="text-foreground">{pctOf(t.debtRatio, 2)}</span>
@@ -756,7 +764,7 @@ function TickTable({ c }: { c: Ctx }) {
       <DataTable label={`${poolLabel(p)} ticks, top down`} stacked tableClassName="text-sm sm:min-w-[36rem]">
         <DataTableHead>
           <DataTableHeader label="Tick" />
-          <DataTableHeader label="Debt ratio" title="Each tick's debt over its collateral at the min price" />
+          <DataTableHeader label="LTV" title="Each tick's debt over its collateral at the min price" />
           <DataTableHeader label="Debt" align="right" />
           <DataTableHeader label="Share of pool" align="right" />
           <DataTableHeader label="Collateral" align="right" />
@@ -835,7 +843,7 @@ function Funding({ c }: { c: Ctx }) {
               .join(" · ")}
           </Prov>
         </Stat>
-        <Stat label="Redemption per tick" note="of a tick's debt in one pass">
+        <Stat label={FX_WORDS.redeemLabel} note={FX_WORDS.redeemNote}>
           <Prov info={stamp(c, maxRedeemProv(label, p.address))} value={formatExact(p.maxRedeemPerTick * 100)}>
             {pctOf(p.maxRedeemPerTick, 0)}
           </Prov>
