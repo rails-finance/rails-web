@@ -17,6 +17,7 @@ import { isLineOnChain } from "@/lib/alchemix/lines";
 import type { ChainId } from "@/lib/shared/chains";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { AlchemixTransmuterPositionData } from "@/types/api/alchemix";
+import { readTransmuterClaimValue, type TransmuterClaimValue } from "@/lib/sources/chain/alchemix-claim-value";
 
 const FETCH_TIMEOUT_MS = 8000;
 
@@ -49,3 +50,20 @@ export const loadTransmuterPosition = cache(
     }
   },
 );
+
+/** The claim's payout in the asset under the vault, read at the claim's block
+ *  (lib/sources/chain/alchemix-claim-value.ts). The vault is the token the
+ *  claim's own flow paid out; null where there is no claim or the read fails. */
+export async function loadTransmuterClaimValue(
+  chainId: ChainId,
+  p: AlchemixTransmuterPositionData<BaseActivityEvent>,
+): Promise<TransmuterClaimValue | null> {
+  const c = p.claim;
+  if (p.status !== "claimed" || !c?.claimed || c.claimed.raw === "0") return null;
+  const claim = p.events.find(
+    (e) => (e.context?.data as { eventType?: string } | undefined)?.eventType === "transmuter_position_claimed",
+  );
+  const vault = claim?.flows.find((f) => f.tokenSymbol === c.claimed!.symbol)?.token;
+  if (!vault) return null;
+  return readTransmuterClaimValue(chainId, vault, c.claimed.raw.split(".")[0], c.blockNumber);
+}

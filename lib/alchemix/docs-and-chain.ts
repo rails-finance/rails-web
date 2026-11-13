@@ -1,0 +1,60 @@
+// Where Alchemix's docs and the Base Transmuter differ: rails-ops
+// reference/official-docs/alchemix.md, "Docs and chain disagree", entry 2
+// (ui-jobs 646, chain read 5). The blocks and values are the register's.
+
+import type { InfoDocsAndChain } from "@/components/shared/protocol-info-page";
+import type { Provenance } from "@/components/shared/provenance";
+
+const BASE_TRANSMUTER = { name: "Transmuter V3", address: "0x5b1c7180c630d3b2b6782df70f43ae5ea80425ba" };
+const DOCS = "https://docs.alchemix.fi";
+const TERM_SET_BLOCK = 53_552_820;
+const TERM_SET_TX = "0xa601101c10a56721c69467f1c7e436d0e365eb593b8d34baad2486aee82e3c88";
+
+const termSetProv: Provenance = {
+  kind: "chain",
+  pclass: "emitted",
+  source: { block: TERM_SET_BLOCK, txHash: TERM_SET_TX },
+  contract: BASE_TRANSMUTER,
+  summary:
+    "The Base Transmuter's term — TransmutationTimeUpdated(12,096,000) at block 53,552,820, the one such log between position 161's deposit (block 53,546,284) and position 162's (block 53,707,578), read 13 Nov 2026. Positions 131 to 161 carry the term before it, 1,209,600 blocks.",
+  via: "eth_getLogs on the Base Transmuter, blocks 53,546,284 to 53,707,578 · TransmutationTimeUpdated",
+  verify: {
+    kind: "recompute",
+    text: `To check: ask any Base node for the Transmuter ${BASE_TRANSMUTER.address}'s logs from block 53,546,284 to 53,707,578, and read the TransmutationTimeUpdated value.`,
+  },
+};
+
+const shortTermProv: Provenance = {
+  kind: "chain",
+  pclass: "state",
+  source: { block: 54_749_242 },
+  contract: BASE_TRANSMUTER,
+  summary:
+    "Position 160's term in time — the timestamps of block 53,539,642 (its deposit, 1,793,868,631) and block 54,749,242 (its maturity, 1,794,140,224), 1,209,600 blocks apart, read 13 Nov 2026: 271,593 seconds, 3 days 3 hours.",
+  via: "eth_getBlockByNumber(53,539,642) and (54,749,242) · timestamp difference",
+  formula: "1,794,140,224 − 1,793,868,631 = 271,593 s",
+  verify: {
+    kind: "recompute",
+    text: "To check: ask any Base node for the timestamps of blocks 53,539,642 and 54,749,242 and subtract.",
+  },
+};
+
+export const ALCHEMIX_BASE_DOCS_AND_CHAIN: readonly InfoDocsAndChain[] = [
+  {
+    claim:
+      "The docs give the Base Transmuter a four-week term. Positions 131 to 161 were opened under a term of 1,209,600 blocks, which for position 160 ran 3 days 3 hours; positions from 162 on carry a term of 12,096,000 blocks.",
+    docs: {
+      quotes: [
+        {
+          words: "The Base Transmuter redeems alUSDb for USDC 1:1 after a four-week term",
+          href: `${DOCS}/user/concepts/alAssets#alusdb-on-base`,
+        },
+      ],
+      read: "13 Nov 2026",
+    },
+    chain: [
+      { words: "the Transmuter set 12,096,000 blocks at block 53,552,820", prov: termSetProv },
+      { words: "position 160's 1,209,600 blocks took 271,593 seconds", prov: shortTermProv },
+    ],
+  },
+];
