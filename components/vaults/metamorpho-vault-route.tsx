@@ -7,7 +7,8 @@
 // vault and of Blue, the fee and the guardian at the same block
 // (lib/vaults/config-read.ts); Holders and Who holds it are the census's
 // (lib/vaults/holders-read.ts), Yield the daily store's, the steward's record
-// the /vaults directory's (lib/vaults/steward-record.ts). What protects it,
+// the /vaults directory's (lib/vaults/steward-record.ts) with its runs from
+// rails-server's roles route (lib/vaults/steward-runs-read.ts). What protects it,
 // The protocol underneath and the record's bad-debt episodes stream behind
 // their own Suspense.
 //
@@ -50,6 +51,7 @@ import { FocusSourceGate } from "@/components/shared/aim-gate";
 import { readVaultConfig } from "@/lib/vaults/config-read";
 import { loadVaultHolders } from "@/lib/vaults/holders-read";
 import { loadStewardRecord } from "@/lib/vaults/steward-record";
+import { loadStewardRuns } from "@/lib/vaults/steward-runs-read";
 
 export type MetaMorphoVaultParams = {
   params: Promise<{ vault: string }>;
@@ -111,7 +113,10 @@ export async function MetaMorphoVaultRoute({
     loadVaultCensusRow(chainId, address),
     loadVaultPageSeries(chainId, address),
     loadVaultHolders(chainId, address, "morpho"),
-    loadStewardRecord(chainId, address, null),
+    loadStewardRecord(chainId, address, null).then(async (record) => ({
+      record,
+      runs: await loadStewardRuns(record),
+    })),
   ]);
   const [assetScales, config] = data.chainStale
     ? [{}, null]
@@ -142,7 +147,8 @@ export async function MetaMorphoVaultRoute({
               factory={metaMorphoFactoryAddress(chainId, data.vault.factory)}
               config={config}
               holders={holders}
-              stewardRecord={stewardRecord}
+              stewardRecord={stewardRecord.record}
+              stewardRuns={stewardRecord.runs}
               badDebt={
                 <Suspense fallback={null}>
                   <VaultBadDebtSection chainId={chainId} vault={address} />
@@ -154,6 +160,18 @@ export async function MetaMorphoVaultRoute({
                     subject={{ chainId, address, kind: "metamorpho" }}
                     vaultName={data.vault.name || shortAddr(address)}
                     look="paragraph"
+                    changes={{
+                      chainId,
+                      vault: { address, name: data.vault.name || shortAddr(address) },
+                      asset: { symbol: data.vault.asset.symbol, decimals: data.vault.asset.decimals },
+                      markets: data.legs.map((l) => ({
+                        id: l.id,
+                        collateralSymbol: l.collateralSymbol,
+                        isIdle: l.isIdle,
+                        lltv: l.lltv,
+                      })),
+                      asOf: { block: data.blockNumber, time: data.head?.blockTime ?? null },
+                    }}
                   />
                 </Suspense>
               }

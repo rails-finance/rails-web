@@ -6,9 +6,11 @@
 // by lib/vaults/steward-record.ts. The steward is the curator, else the owner;
 // a Maple pool's delegate. Rails states the facts with their receipts and
 // scores nothing. Its bad-debt episodes (V14.1, components/vaults/vault-bad-
-// debt-episodes.tsx) stream in under the vaults table on MetaMorpho pages; the
-// later parts (vaults run before, illiquid stretches, time to response) join
-// this section.
+// debt-episodes.tsx) stream in under the vaults table on MetaMorpho pages.
+// For a MetaMorpho steward, rails-server's roles route adds since when it runs
+// each vault (V14.2, a Since column) and the vaults it ran before (V14.3),
+// read by lib/vaults/steward-runs-read.ts; a Maple pool delegate has neither.
+// The later parts (illiquid stretches, time to response) join this section.
 //
 // Held is total assets in each vault's asset. The directory carries no USD,
 // so the rows order by asset: the page's vault's asset first, then the others
@@ -47,6 +49,10 @@ import { vaultIndexRowReceipts } from "@/lib/vaults/row-receipts";
 import type { StewardRecordRead, StewardRecordRoster } from "@/lib/vaults/steward-record";
 import { vaultDisplayName, type VaultSteward, type VaultSummary } from "@/lib/vaults/summary";
 import { assetScaleAbsentTip, assetScaleReceiptNote, withScaleNote } from "@/lib/vaults/asset-scale-words";
+import { formatDate } from "@/lib/date";
+import type { StewardRunsRead } from "@/lib/vaults/steward-runs-read";
+import { spanOf, type StewardBefore, type StewardRunRole, type StewardSince } from "@/lib/vaults/steward-runs";
+import { stewardBeforeCountProv, stewardBeforeProv, stewardSinceProv } from "@/lib/vaults/config-changes-provenance";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -96,9 +102,12 @@ const leadOf = (v: VaultSummary) =>
 export function VaultStewardRecord({
   record,
   role,
+  runs,
   badDebt,
 }: {
   record: StewardRecordRead;
+  /** The steward's runs (V14.2, V14.3), MetaMorpho pages only; absent or null, none is shown. */
+  runs?: StewardRunsRead | null;
   /** The bad-debt episodes (V14.1), drawn under the vaults table. */
   badDebt?: ReactNode;
   /** The page's read of the steward's role: the heading where the directory did not answer. */
@@ -138,6 +147,24 @@ export function VaultStewardRecord({
         .filter((v) => stewardVaultKey(v) === current || !holdsNothing(v))
         .filter((v, i) => i < LIMIT || stewardVaultKey(v) === current);
   const only = count === 1 && stewardVaultKey(self) === current;
+  const ok = runs?.kind === "ok" ? runs : null;
+  const runRole = ok?.runs.role;
+  const sinceOf = (v: VaultSummary) =>
+    ok && vaultIndexProtocol(v) === "morpho" ? ok.runs.since[stewardVaultKey(v)] : undefined;
+  const selfSince = sinceOf(self);
+  const beforeCount = ok ? ok.runs.before.length : 0;
+  const beforeLine = ok && runRole && (
+    <>
+      {" "}
+      It ran{" "}
+      <span className="font-semibold text-foreground" data-steward-before-count={beforeCount}>
+        <Prov info={stewardBeforeCountProv(address, runRole, beforeCount, ok.runs.chains)}>
+          {beforeCount === 0 ? "no other vault" : `${n(beforeCount)} other vault${beforeCount === 1 ? "" : "s"}`}
+        </Prov>
+      </span>{" "}
+      as {runRole} before.
+    </>
+  );
 
   return (
     <ProvSection scope={STEWARD_RECORD_SCOPE} data-anatomy="V14" data-steward-record={address}>
@@ -153,11 +180,23 @@ export function VaultStewardRecord({
           <span data-steward-count={count}>
             <Prov info={countProv}>no other vault</Prov>
           </span>{" "}
-          Rails lists on Base and Ethereum.
+          Rails lists on Base and Ethereum.{beforeLine}
+          {selfSince && runRole && (
+            <>
+              {" "}
+              It has been this vault&rsquo;s {runRole} since{" "}
+              <span data-anatomy="V14.2" data-steward-since={selfSince.run.fromBlock}>
+                <Prov info={stewardSinceProv(address, runRole, selfSince)}>{formatDate(selfSince.run.fromTime)}</Prov>
+              </span>
+              .
+            </>
+          )}
         </p>
       ) : (
         <>
-          <p className="mt-3 text-[13px] text-rb-500">It runs {countFig} vaults Rails lists on Base and Ethereum.</p>
+          <p className="mt-3 text-[13px] text-rb-500">
+            It runs {countFig} vaults Rails lists on Base and Ethereum.{beforeLine}
+          </p>
           <div className="mt-3">
             <DataTable
               label={`The vaults ${shortAddress(steward.address)} runs`}
@@ -169,6 +208,7 @@ export function VaultStewardRecord({
                 <DataTableHeader label="Vault" />
                 <DataTableHeader label="Asset" />
                 <DataTableHeader label="Held" align="right" />
+                {ok && <DataTableHeader label="Since" align="right" />}
               </DataTableHead>
               <DataTableBody>
                 {shown.map((v) => (
@@ -177,6 +217,7 @@ export function VaultStewardRecord({
                     v={v}
                     isCurrent={stewardVaultKey(v) === current}
                     rosters={rosters}
+                    since={ok && runRole ? { run: sinceOf(v), role: runRole, address } : undefined}
                   />
                 ))}
               </DataTableBody>
@@ -204,8 +245,132 @@ export function VaultStewardRecord({
           </p>
         </>
       )}
+      {runs?.kind === "unread" && (
+        <p className="mt-2 text-[13px] text-rb-500" data-steward-runs-unread="">
+          Rails&rsquo;s record of curator and owner changes did not answer, so since when it runs each vault and the
+          vaults it ran before are not stated.
+        </p>
+      )}
+      {ok && runRole && ok.runs.before.length > 0 && (
+        <RanBefore before={ok.runs.before} hrefs={ok.hrefs} role={runRole} address={address} />
+      )}
       {badDebt}
     </ProvSection>
+  );
+}
+
+/** The ran-before table draws this many rows until "Show all", as the vaults table does. */
+const BEFORE_LIMIT = 12;
+
+/** The vaults the steward ran before (V14.3): each vault, its chain, and the span its runs cover. */
+function RanBefore({
+  before,
+  hrefs,
+  role,
+  address,
+}: {
+  before: StewardBefore[];
+  hrefs: Record<string, string>;
+  role: StewardRunRole;
+  address: string;
+}) {
+  const [all, setAll] = useState(false);
+  const shown = all ? before : before.slice(0, BEFORE_LIMIT);
+  return (
+    <div className="mt-5" data-anatomy="V14.3" data-steward-before={before.length}>
+      <h3 className="text-sm font-semibold text-foreground">Vaults it ran before</h3>
+      <p className="mt-1 text-[13px] text-rb-500">
+        MetaMorpho vaults on Base and Ethereum where each of its runs as {role} has ended, the latest end first.
+      </p>
+      <div className="mt-3">
+        <DataTable label="Vaults it ran before" tableClassName="text-sm" stacked>
+          <DataTableHead>
+            <DataTableLeadHeader plain />
+            <DataTableHeader label="Vault" />
+            <DataTableHeader label="Ran" align="right" />
+          </DataTableHead>
+          <DataTableBody>
+            {shown.map((b) => (
+              <BeforeRow
+                key={`${b.chainId}:${b.vault}`}
+                b={b}
+                href={hrefs[`${b.chainId}:${b.vault}`]}
+                role={role}
+                address={address}
+              />
+            ))}
+          </DataTableBody>
+        </DataTable>
+      </div>
+      {shown.length < before.length && (
+        <button
+          type="button"
+          onClick={() => setAll(true)}
+          className={`mt-2 inline-block text-[13px] ${INLINE_LINK}`}
+          data-steward-before-show-all=""
+        >
+          Show all {n(before.length)}
+        </button>
+      )}
+    </div>
+  );
+}
+
+const morphoLead = (chainId: number) =>
+  protocolForPathname(vaultIndexRosterHref("morpho", chainId))?.id ?? VAULT_FAMILIES.metamorpho.venue;
+
+function BeforeRow({
+  b,
+  href,
+  role,
+  address,
+}: {
+  b: StewardBefore;
+  href: string | undefined;
+  role: StewardRunRole;
+  address: string;
+}) {
+  const { from, until } = spanOf(b);
+  const name = b.name ?? <span className="font-mono">{shortAddress(b.vault)}</span>;
+  return (
+    <DataTableRow
+      href={href}
+      data-steward-before-vault={`${b.chainId}:${b.vault}`}
+      data-steward-before-from={from.fromBlock}
+      data-steward-before-until={until.untilBlock ?? undefined}
+    >
+      <DataTableLeadCell
+        plain
+        protocol={morphoLead(b.chainId)}
+        protocolName={VAULT_INDEX_PROTOCOL_LABEL.morpho}
+        chain={b.chainId as ChainId}
+      />
+      <DataTableCell rowHeader valign="middle" className="sm:w-full sm:max-w-0">
+        <span className="flex min-w-0 items-center gap-2">
+          <DataTableLeadMark protocol={morphoLead(b.chainId)} chain={b.chainId as ChainId} />
+          {href ? (
+            <DataTableRowLink href={href} className="min-w-0 truncate text-sm font-semibold" title={b.name ?? b.vault}>
+              {name}
+            </DataTableRowLink>
+          ) : (
+            <span className="min-w-0 truncate text-sm font-semibold text-foreground" title={b.name ?? b.vault}>
+              {name}
+            </span>
+          )}
+        </span>
+      </DataTableCell>
+      <DataTableCell
+        label="Ran"
+        align="right"
+        valign="middle"
+        className="whitespace-nowrap tabular-nums text-foreground"
+      >
+        <Prov info={stewardBeforeProv(address, role, b)}>
+          {formatDate(from.fromTime)} &ndash; {until.untilTime != null ? formatDate(until.untilTime) : "–"}
+        </Prov>
+        {b.runs.length > 1 && <span className="text-rb-500"> &middot; {n(b.runs.length)} runs</span>}
+      </DataTableCell>
+    </DataTableRow>
   );
 }
 
@@ -213,10 +378,13 @@ function StewardRow({
   v,
   isCurrent,
   rosters,
+  since,
 }: {
   v: VaultSummary;
   isCurrent: boolean;
   rosters: StewardRecordRoster[];
+  /** The Since column (V14.2): the open run where the roles route holds one. */
+  since?: { run: StewardSince | undefined; role: StewardRunRole; address: string };
 }) {
   const r = rosterOf(rosters, v);
   const receipts = vaultIndexRowReceipts({ blockNumber: r?.block, readBy: r?.readBy }, v);
@@ -303,6 +471,22 @@ function StewardRow({
           </span>
         )}
       </DataTableCell>
+      {since && (
+        <DataTableCell label="Since" align="right" valign="middle" className="whitespace-nowrap tabular-nums">
+          {since.run ? (
+            <span className="text-foreground" data-anatomy="V14.2" data-steward-since={since.run.run.fromBlock}>
+              <Prov info={stewardSinceProv(since.address, since.role, since.run)}>
+                {formatDate(since.run.run.fromTime)}
+              </Prov>
+            </span>
+          ) : (
+            <span className="text-rb-500" title="Rails's record of role changes holds no start for this run">
+              <span aria-hidden>&ndash;</span>
+              <span className="sr-only">no start in Rails&rsquo;s record</span>
+            </span>
+          )}
+        </DataTableCell>
+      )}
     </DataTableRow>
   );
 }
