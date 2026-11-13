@@ -486,7 +486,7 @@ function marketsCsv(x: Ctx): string {
     "borrow_apr",
     "collateral_factor",
     "reserve_factor",
-    "utilization",
+    "utilisation",
     "supply_cap",
     "borrow_cap",
     "supply_paused",
