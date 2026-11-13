@@ -23,13 +23,13 @@
 // brand rail's foot from md and at the wallet panel's foot below md
 // (components/nav/theme-switch.tsx).
 //
-// A kind is drawn when something of it is saved; Focus views also while a
+// A kind is drawn when it holds something starred; Focus views also while a
 // view is in use. Stars alone decide the entries under it (ui-jobs 652): Focus
 // views lists the views starred on /saved-views?tab=focus and, while it is
 // unstarred, the view in use, so Focus can always be turned off here; then
 // Off (lib/shared/asset-scope.ts `menuViews`). Listings, Wallets and
 // Positions list the items starred on /saved-views (lib/shared/sessions.ts
-// `menuEntries`). A kind with nothing starred is its item alone. Long names
+// `menuEntries`). Its count is every item of the kind saved. Long names
 // fade at the line's end (`FADE`); rows read nothing, showing what the
 // browser holds.
 //
@@ -184,8 +184,8 @@ function MenuSection({
 }
 
 /** One saved kind in Saved views: its item, a link to its tab on /saved-views
- *  with the number saved, and under it the starred entries (none drawn when
- *  none is starred). It does not collapse (Miles 13 Nov 2026). */
+ *  with the number saved, and under it the starred entries. It does not
+ *  collapse (Miles 13 Nov 2026). */
 function KindGroup({
   menuId,
   kind,
@@ -199,7 +199,7 @@ function KindGroup({
   label: string;
   count: number;
   onDone: () => void;
-  children?: ReactNode;
+  children: ReactNode;
 }) {
   const headId = `${menuId}-${kind}`;
   return (
@@ -219,7 +219,7 @@ function KindGroup({
           {count}
         </span>
       </Link>
-      {children && <div className="mt-1">{children}</div>}
+      <div className="mt-1">{children}</div>
     </div>
   );
 }
@@ -510,8 +510,10 @@ export function ProfileMenu() {
     };
   }, [open, close]);
 
-  // A kind is drawn when something of it is saved (Focus also while a view
-  // is in use); its starred entries are listed under it (ui-jobs 652).
+  // A kind is drawn when it holds something starred (Focus views also while
+  // a view is in use), its starred entries under it (Miles 13 Nov 2026,
+  // "only present if there are starred items"). Its count is every item of
+  // the kind saved (ui-jobs 665-a, with Miles).
   const counts: Record<SavedKind, number> = {
     focus: scope.ready ? scope.views.length : 0,
     listings: views?.length ?? 0,
@@ -519,15 +521,13 @@ export function ProfileMenu() {
     positions: positions?.length ?? 0,
   };
   const linkKind = (kind: "listings" | "positions", label: string, list: SavedLink[]) =>
-    counts[kind] > 0 && (
+    list.length > 0 && (
       <KindGroup menuId={menuId} kind={kind} label={label} count={counts[kind]} onDone={done}>
-        {list.length > 0 && (
-          <div data-profile-menu-links={kind}>
-            {list.map((l) => (
-              <LinkRow key={l.key} link={l} onDone={done} />
-            ))}
-          </div>
-        )}
+        <div data-profile-menu-links={kind}>
+          {list.map((l) => (
+            <LinkRow key={l.key} link={l} onDone={done} />
+          ))}
+        </div>
       </KindGroup>
     );
 
@@ -629,52 +629,48 @@ export function ProfileMenu() {
                     </Link>
                   )}
                   {/* Focus views: the starred views, the view in use, and Off (ui-jobs 652). */}
-                  {(counts.focus > 0 || menuViews.length > 0) && (
+                  {menuViews.length > 0 && (
                     <KindGroup menuId={menuId} kind="focus" label="Focus views" count={counts.focus} onDone={done}>
-                      {menuViews.length > 0 && (
-                        <div data-profile-menu-focus-views={menuViews.length}>
-                          {menuViews.map((v) => (
-                            <button
-                              key={v.id}
-                              type="button"
-                              role="menuitemradio"
-                              aria-checked={scope.active?.id === v.id}
-                              onClick={() => focusViews.use(v.id)}
-                              className={ITEM}
-                              data-profile-menu-focus-view={v.id}
-                            >
-                              <RadioMark on={scope.active?.id === v.id} />
-                              <span className="flex min-w-0 flex-1 items-center">
-                                <ViewIcons picks={v.assets} chains={v.chains} />
-                                <span className={`${FADE} ml-1 font-medium`}>{viewName(v)}</span>
-                              </span>
-                            </button>
-                          ))}
+                      <div data-profile-menu-focus-views={menuViews.length}>
+                        {menuViews.map((v) => (
                           <button
+                            key={v.id}
                             type="button"
                             role="menuitemradio"
-                            aria-checked={!scope.on}
-                            onClick={() => scope.clear()}
+                            aria-checked={scope.active?.id === v.id}
+                            onClick={() => focusViews.use(v.id)}
                             className={ITEM}
-                            data-profile-menu-focus-off=""
+                            data-profile-menu-focus-view={v.id}
                           >
-                            <RadioMark on={!scope.on} />
-                            Off
+                            <RadioMark on={scope.active?.id === v.id} />
+                            <span className="flex min-w-0 flex-1 items-center">
+                              <ViewIcons picks={v.assets} chains={v.chains} />
+                              <span className={`${FADE} ml-1 font-medium`}>{viewName(v)}</span>
+                            </span>
                           </button>
-                        </div>
-                      )}
+                        ))}
+                        <button
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={!scope.on}
+                          onClick={() => scope.clear()}
+                          className={ITEM}
+                          data-profile-menu-focus-off=""
+                        >
+                          <RadioMark on={!scope.on} />
+                          Off
+                        </button>
+                      </div>
                     </KindGroup>
                   )}
                   {linkKind("listings", "Listings", listings)}
-                  {counts.wallets > 0 && (
+                  {rows.length > 0 && (
                     <KindGroup menuId={menuId} kind="wallets" label="Wallets" count={counts.wallets} onDone={done}>
-                      {rows.length > 0 && (
-                        <div data-profile-menu-wallets="">
-                          {rows.map((s) => (
-                            <WalletRow key={s.key} session={s} onDone={done} />
-                          ))}
-                        </div>
-                      )}
+                      <div data-profile-menu-wallets="">
+                        {rows.map((s) => (
+                          <WalletRow key={s.key} session={s} onDone={done} />
+                        ))}
+                      </div>
                     </KindGroup>
                   )}
                   {linkKind("positions", "Positions", held)}

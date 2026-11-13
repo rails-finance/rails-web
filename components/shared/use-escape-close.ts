@@ -37,6 +37,17 @@ function isClosed(layer: Element): boolean {
   );
 }
 
+/** Whether a modal, dialog, menu or listbox stands open on the page, other
+ *  than one containing `inside`: the layer test above, for another Escape
+ *  owner (the inline focus view editor, asset-scope-strip.tsx). */
+export function otherLayerOpen(inside?: Element | null): boolean {
+  for (const layer of document.querySelectorAll(LAYER)) {
+    if (isClosed(layer)) continue;
+    if (!inside || !layer.contains(inside)) return true;
+  }
+  return false;
+}
+
 function onKeyDown(e: KeyboardEvent) {
   if (e.key !== "Escape" || e.defaultPrevented) return;
   const top = stack[stack.length - 1];

@@ -11,9 +11,11 @@
 // section on the page's background (Miles 13 Nov 2026), with export and
 // import (`?tab=backup` opens the Overview at it). New view opens the Focus
 // panel's editor in the page's flow on the Focus views tab, under the table or
-// its empty state (Miles 13 Nov 2026); a row's Edit keeps the panel.
+// its empty state (Miles 13 Nov 2026); a row's Edit keeps the panel. Its
+// draft is kept for the browser tab, so a return from "Add from all assets"
+// reopens it; leaving the Focus views tab drops it.
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Bookmark, Plus, Signpost } from "lucide-react";
 import { DetailBackButton } from "@/components/shared/detail-back-row";
@@ -25,7 +27,7 @@ import {
   useBookmarks,
 } from "@/components/shared/bookmark-list";
 import { useAssetScope } from "@/lib/shared/asset-scope";
-import { FocusViewEditor } from "@/components/shared/asset-scope-strip";
+import { FocusViewEditor, clearFocusViewDraft, hasFocusViewDraft } from "@/components/shared/asset-scope-strip";
 import { useSavedLinks } from "@/components/shared/saved-items";
 import { SAVED_NAME } from "@/components/shared/bookmarks-name";
 import { walletHref } from "@/components/shared/front-door-search";
@@ -77,8 +79,14 @@ export function BookmarksPage() {
     input?.focus({ preventScroll: true });
     input?.closest("[data-focus-view-editor]")?.scrollIntoView({ block: "nearest" });
   }, [creating]);
+  /** The tab last read from the address: a change of it, not a render that
+   *  has yet to catch up, is what closes the editor. */
+  const urlTab = useRef<Tab | null>(null);
   useEffect(() => {
-    setTab(tabFromUrl());
+    urlTab.current = tabFromUrl();
+    setTab(urlTab.current);
+    // Back from "Add from all assets": the editor reopens on its kept draft.
+    if (tabFromUrl() === "focus" && hasFocusViewDraft()) setCreating(true);
     if (new URLSearchParams(window.location.search).get("tab") === "backup")
       requestAnimationFrame(() => document.getElementById("saved-backup")?.scrollIntoView({ block: "start" }));
   }, []);
@@ -86,14 +94,18 @@ export function BookmarksPage() {
   // (ui-jobs 582): read it again when the address changes.
   useEffect(() => {
     const t = tabFromUrl();
-    if (t !== tab) {
+    if (t !== urlTab.current) {
+      urlTab.current = t;
       setTab(t);
       setCreating(false);
+      clearFocusViewDraft();
     }
   });
   const choose = (t: Tab) => {
+    urlTab.current = t;
     setTab(t);
     setCreating(false);
+    clearFocusViewDraft();
     const url = new URL(window.location.href);
     if (t === "overview") url.searchParams.delete("tab");
     else url.searchParams.set("tab", t);
