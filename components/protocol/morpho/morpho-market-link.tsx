@@ -15,7 +15,7 @@ import { useRouter } from "next/navigation";
 import { startNavigationProgress } from "@/components/nav/navigation-progress";
 import { useChainId } from "@/lib/shared/chain-context";
 import { morphoMarketHref } from "@/lib/morpho/market-routes";
-import { PAGE_LINK } from "@/lib/shared/ui-grammar";
+import { FOOT_LINK } from "@/lib/shared/ui-grammar";
 
 export function MorphoMarketPair({
   label,
@@ -50,7 +50,7 @@ export function MorphoMarketPair({
   );
 }
 
-/** "The USDC / AAPLc market →" — drawn by a listing whose search is exactly one
+/** "The USDC / AAPLc market" — drawn by a listing whose search is exactly one
  *  market id, from the first row it returned (every row is that market). */
 export function MorphoMarketPageLine({
   label,
@@ -65,8 +65,12 @@ export function MorphoMarketPageLine({
   if (!loanToken) return null;
   return (
     <p className="mb-3 text-sm">
-      <Link href={morphoMarketHref(chainId, loanToken, marketId)} className={PAGE_LINK} prefetch={false}>
-        The {label} market <span aria-hidden>→</span>
+      <Link
+        href={morphoMarketHref(chainId, loanToken, marketId)}
+        className={`text-xs font-semibold ${FOOT_LINK}`}
+        prefetch={false}
+      >
+        The {label} market
       </Link>
     </p>
   );

@@ -208,27 +208,19 @@ export function disclosureChevron(open: boolean): string {
 /**
  * A section's header in a menu that is cut into sections (Miles 13 Nov 2026,
  * mockup; first in the profile menu, H20: "Saved views", "Advanced"): the
- * menu's row size in sentence case, semibold, muted. Below it, a subgroup's
- * heading keeps the small uppercase label (11px), one level down.
+ * menu's row size in sentence case, semibold, muted. Below it, a kind's item
+ * takes the explorer tabs' small uppercase type (11px), one level down.
  */
 export const MENU_SECTION_HEAD = "text-[15px] font-semibold text-rb-500";
 
 /**
- * A standalone link at a card's foot ("Open 2 listings", "Assets", "See a
- * sample wallet"; Miles 13 Nov 2026, first on /saved-views): link blue at
- * rest whether it opens another page or changes this one's URL, its words
- * underlined on hover, and a trailing → that shows only on hover and keyboard
- * focus, and always on a touch screen (`hover: none`), as `disclosureChevron`
- * does. The arrow hides by opacity, so the words never shift; no fade under
- * reduced motion. At least 44px tall below sm. The link carries FOOT_LINK,
- * its words FOOT_WORDS, and the arrow, `aria-hidden`, FOOT_ARROW:
- *   <a className={FOOT_LINK}><span className={FOOT_WORDS}>Assets</span><span className={FOOT_ARROW} aria-hidden="true">→</span></a>
+ * A link standing alone at a card's or section's foot ("Open 2 listings",
+ * "Assets", "See a sample wallet"; Miles 13 Nov 2026): link blue at rest
+ * whether it opens another page or changes this one's URL, underlined on
+ * hover, with no arrow. At least 44px tall below sm.
  */
 export const FOOT_LINK =
-  "group/foot inline-flex min-h-11 items-center rounded-sm text-blue-600 focus-ring sm:min-h-0 dark:text-[var(--text-link)]";
-export const FOOT_WORDS = "underline-offset-2 group-hover/foot:underline";
-export const FOOT_ARROW =
-  "ml-1 opacity-0 transition-opacity motion-reduce:transition-none group-hover/foot:opacity-100 group-focus-visible/foot:opacity-100 [@media(hover:none)]:opacity-100";
+  "inline-flex min-h-11 items-center rounded-sm text-blue-600 underline-offset-2 hover:underline focus-ring sm:min-h-0 dark:text-[var(--text-link)]";
 
 /** A position page's section heading in sentence case: "Lifetime flows". */
 export const SECTION_HEADING = "text-xs font-bold";

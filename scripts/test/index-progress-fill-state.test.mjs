@@ -95,7 +95,7 @@ test("gateways resetting with the allowance share its counter; the rest count al
 
 // headMisses: a refusal at the last heartbeat is a pause until the reset; a
 // failed read is late; a miss no heartbeat replaced does not stand.
-import { withHeadMisses } from "../../lib/shared/index-progress.ts";
+import { withHeadMisses, MISS_RESUME_GRACE } from "../../lib/shared/index-progress.ts";
 
 const refused = (ago) => ({ chain: 1, reason: "gateway-refused", until: "2026-11-13T14:06:09.022Z", at: at(ago) });
 
@@ -112,6 +112,18 @@ test("a failed read is late, and stalled once the samples are three hours old", 
   const miss = { chain: 1, reason: "read-failed", until: null, at: at(60) };
   assert.equal(fillState({ ...entry(20 * 60, hold), headMiss: miss }, now), "late");
   assert.equal(fillState({ ...entry(HEARTBEAT_STALLED + 60, null), headMiss: miss }, now), "stalled");
+});
+
+test("a refusal lapses once its reset and the resume grace have passed", () => {
+  const reset = Date.parse("2026-11-13T14:06:09.022Z") / 1000;
+  const miss = { chain: 1, reason: "gateway-refused", until: "2026-11-13T14:06:09.022Z", at: "2026-11-13T14:06:00Z" };
+  const old = { ...entry(HEARTBEAT_STALLED + 60, null), heartbeatAt: "2026-11-13T05:58:32Z", headMiss: miss };
+  assert.equal(fillState(old, reset + 10 * 60), "paused");
+  assert.equal(fillState(old, reset + MISS_RESUME_GRACE + 60), "stalled");
+  // With no readable until, the refusal stands for HEARTBEAT_LATE after its at.
+  for (const until of [null, "not a time"]) {
+    assert.equal(fillState({ ...old, headMiss: { ...miss, until } }, reset + MISS_RESUME_GRACE + 60), "paused");
+  }
 });
 
 test("a miss older than the late limit no longer stands", () => {

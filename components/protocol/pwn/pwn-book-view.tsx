@@ -47,7 +47,7 @@ import type { PwnBookCollateralLine, PwnBookCreditLine, PwnLoanBook } from "@/li
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
-import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { INLINE_LINK, FOOT_LINK } from "@/lib/shared/ui-grammar";
 import { AssetUnit } from "@/components/shared/asset-unit";
 import { useMemo } from "react";
 import { AimGate } from "@/components/shared/aim-gate";
@@ -116,11 +116,8 @@ function OpenBookSection({ book }: { book: PwnLoanBook }) {
               The loans themselves are the listing&rsquo;s subject: ordered by deadline, it states each one&rsquo;s
               collateral, principal, what it owes and its due date.
             </p>
-            <Link
-              href={OPEN_BOOK_HREF}
-              className="mt-2 inline-block text-[13px] text-blue-600 dark:text-[var(--text-link)] hover:underline"
-            >
-              Loans in escrow, soonest deadline first <span aria-hidden>→</span>
+            <Link href={OPEN_BOOK_HREF} className={`mt-2 text-[13px] ${FOOT_LINK}`}>
+              Loans in escrow, soonest deadline first
             </Link>
           </>
         )}
@@ -416,11 +413,8 @@ function DefaultsSection({ book }: { book: PwnLoanBook }) {
               Which loans lapsed, what each lender took or can still claim, and what repayment went unpaid is the
               listing, filtered to the defaults and ordered by the deadline each one passed.
             </p>
-            <Link
-              href={DEFAULTS_HREF}
-              className="mt-2 inline-block text-[13px] text-blue-600 dark:text-[var(--text-link)] hover:underline"
-            >
-              Defaulted loans, most recent deadline first <span aria-hidden>→</span>
+            <Link href={DEFAULTS_HREF} className={`mt-2 text-[13px] ${FOOT_LINK}`}>
+              Defaulted loans, most recent deadline first
             </Link>
           </>
         )}

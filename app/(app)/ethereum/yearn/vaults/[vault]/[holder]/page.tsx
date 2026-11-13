@@ -54,7 +54,7 @@ import { YearnVaultTimeline } from "@/components/vaults/yearn-vault-timeline";
 import { computeVaultPositionEconomics } from "@/lib/aave-vaults/position-economics";
 import { sectionPositionMetadata } from "@/lib/shared/page-metadata";
 import { explorerUrl } from "@/lib/shared/chains";
-import { PAGE_LINK } from "@/lib/shared/ui-grammar";
+import { FOOT_LINK } from "@/lib/shared/ui-grammar";
 import { shortAddress } from "@/lib/shared/vault-amount-text";
 import { yearnVaultHref, yearnVaultRosterHref } from "@/lib/vaults/routes";
 import { resolveYearnVaultHolder } from "@/lib/yearn/vault-holder";
@@ -421,8 +421,13 @@ export default async function YearnVaultHoldingPage({ params }: Props) {
               <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-rb-500">
                 {/* The release; the card names the block. */}
                 <span data-vault-block={data.blockNumber}>Yearn V3 {data.vault.apiVersion}</span>
-                <Link href={yearnVaultHref(address)} className={PAGE_LINK} prefetch={false} data-link="vault-market">
-                  {vaultName} <span aria-hidden>→</span>
+                <Link
+                  href={yearnVaultHref(address)}
+                  className={`text-xs font-semibold ${FOOT_LINK}`}
+                  prefetch={false}
+                  data-link="vault-market"
+                >
+                  {vaultName}
                 </Link>
               </p>
             )}

@@ -48,7 +48,7 @@ import { VaultIndexTable, useVaultIndexSort } from "@/components/vaults/vault-in
 import type { ChainId } from "@/lib/shared/chains";
 import type { BaseListFilters } from "@/lib/shared/list-filter";
 import { notifyUrlChanged, useUrlSearchParams } from "@/lib/shared/use-url-search-params";
-import { PAGE_LINK } from "@/lib/shared/ui-grammar";
+import { FOOT_LINK, INLINE_LINK, PAGE_LINK } from "@/lib/shared/ui-grammar";
 import { VAULT_INDEX_HREF } from "@/lib/vaults/routes";
 import { vaultRosterShownProv } from "@/lib/vaults/roster-provenance";
 import { shortAddress } from "@/lib/shared/vault-amount-text";
@@ -481,8 +481,8 @@ export function VaultRoster({
         {head.drawer}
         {head.infoHref && (
           <p>
-            <Link href={head.infoHref} className={PAGE_LINK} prefetch={false}>
-              How this is built <span aria-hidden>→</span>
+            <Link href={head.infoHref} className={`text-xs font-semibold ${FOOT_LINK}`} prefetch={false}>
+              How this is built
             </Link>
           </p>
         )}
@@ -493,16 +493,21 @@ export function VaultRoster({
           {head.listingHref && (
             <>
               {" "}
-              <Link href={head.listingHref} className={PAGE_LINK} prefetch={false} data-link="every-holder">
-                Every holder <span aria-hidden>→</span>
+              <Link href={head.listingHref} className={INLINE_LINK} prefetch={false} data-link="every-holder">
+                Every holder
               </Link>
             </>
           )}
+          {head.listingHref && indexHref && (
+            <span aria-hidden="true" className="px-1.5">
+              ·
+            </span>
+          )}
           {indexHref && (
             <>
-              {" "}
-              <Link href={indexHref} className={PAGE_LINK} prefetch={false} data-link="vault-index">
-                All vaults <span aria-hidden>→</span>
+              {!head.listingHref && " "}
+              <Link href={indexHref} className={INLINE_LINK} prefetch={false} data-link="vault-index">
+                All vaults
               </Link>
             </>
           )}

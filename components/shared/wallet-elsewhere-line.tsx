@@ -66,7 +66,7 @@ export function WalletElsewhereLine({ wallet }: { wallet: string }) {
       <Link
         href={`/wallet/${address}`}
         prefetch={false}
-        className="rounded-sm underline-offset-2 transition-colors hover:text-foreground hover:underline focus-ring"
+        className="rounded-sm transition-colors hover:text-blue-600 focus-visible:text-blue-600 focus-ring dark:hover:text-[var(--text-link)] dark:focus-visible:text-[var(--text-link)]"
       >
         {line.text}
       </Link>

@@ -176,7 +176,12 @@ function lostWords(lost: LostAssetsRead | null | undefined, c: HealthContext, f:
 }
 
 /** The vault's own exit figure: a headline, and the clause that explains it. */
-function exitWords(e: ExitInput, share: number | null, caught: string | null): { head: string; rest: string } {
+function exitWords(
+  e: ExitInput,
+  share: number | null,
+  caught: string | null,
+  holder: boolean,
+): { head: string; rest: string } {
   if (e.kind === "cooldown")
     return {
       head: `A cooldown of ${durationText(e.cooldownSeconds)}`,
@@ -189,9 +194,18 @@ function exitWords(e: ExitInput, share: number | null, caught: string | null): {
       rest:
         s >= 0.999
           ? "Idle assets sit in the vault, ready for a withdrawal."
-          : s === 0
-            ? "All of them were lent to its strategies, which pay a withdrawal as far as they can free the asset."
-            : "The rest was lent to its strategies, which pay a withdrawal as far as they can free the asset.",
+          : [
+              s === 0
+                ? "All of them were lent to its strategies, which pay a withdrawal as far as they can free the asset."
+                : "The rest was lent to its strategies, which pay a withdrawal as far as they can free the asset.",
+              // The holder figure is maxWithdraw(holder), which draws on the
+              // strategies through the default queue, so it can exceed idle.
+              holder
+                ? "This position's figure is the vault's maxWithdraw, which counts what its strategies can free through the withdrawal queue."
+                : "",
+            ]
+              .filter(Boolean)
+              .join(" "),
     };
   return {
     head: `${flooredPct(s)} of the vault's assets withdrawable at the last read`,
@@ -211,8 +225,8 @@ function withdrawalsLine(w: WithdrawalsFigure, c: HealthContext, f: HealthFormat
       "withdrawals",
       w.reason === "family" ? (WITHDRAWALS_UNREAD[c.family] ?? "The read did not answer.") : "The read did not answer.",
     );
-  const exit = w.exit ? exitWords(w.exit, w.share, w.caught) : null;
   const holder = w.holder && BigInt(w.holder.claim) > BigInt(0) ? holderWords(w.holder, c, f) : null;
+  const exit = w.exit ? exitWords(w.exit, w.share, w.caught, holder != null) : null;
   const head = w.paused ? "Withdrawals are paused" : (holder ?? exit?.head ?? "The vault is shut down");
   const rest = [
     w.shutdown && head !== "The vault is shut down" ? "The vault is shut down." : "",

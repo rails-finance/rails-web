@@ -68,7 +68,7 @@ import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import { cometPriceProv } from "@/lib/compound/event-provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { useWalletContext } from "@/components/nav/wallet-context";
-import { NAV_LINK } from "@/lib/shared/ui-grammar";
+import { FOOT_LINK } from "@/lib/shared/ui-grammar";
 import { shortAddr } from "@/lib/shared/format-event";
 import { marketOf } from "@/lib/compound/asset-catalog";
 import {
@@ -638,8 +638,8 @@ export default function CompoundPositionView({
                 <span className="font-mono">{shortAddr(wallet)}</span> has no {marketLabel} position
               </p>
               <p className="text-sm text-rb-500">
-                <Link href={walletFilterHref} className={`underline ${NAV_LINK}`}>
-                  See this wallet&rsquo;s other positions →
+                <Link href={walletFilterHref} className={FOOT_LINK}>
+                  See this wallet&rsquo;s other positions
                 </Link>
               </p>
             </div>

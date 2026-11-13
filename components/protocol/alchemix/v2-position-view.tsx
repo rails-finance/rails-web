@@ -20,6 +20,7 @@
 
 import { useEffect, useMemo } from "react";
 import Link from "next/link";
+import { FOOT_LINK } from "@/lib/shared/ui-grammar";
 import { useParams } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
@@ -199,7 +200,7 @@ export function AlchemixV2PositionView({
         </p>
       ) : null}
       {p.v3Successors.length > 0 ? null : (
-        <Link href={deployment.basePath} className="link inline-block">
+        <Link href={deployment.basePath} className={FOOT_LINK}>
           Browse V3 positions
         </Link>
       )}

@@ -43,7 +43,7 @@ import { morphoListedViewFromLive, morphoViewFromSweep } from "@/lib/morpho/swep
 import { morphoHasCollateralRaw, morphoHasDebt } from "@/lib/morpho/position-legs";
 import { explorerUrl } from "@/lib/shared/chains";
 import { CaptureSourceProvider } from "@/lib/shared/capture-source";
-import { PAGE_LINK } from "@/lib/shared/ui-grammar";
+import { PAGE_LINK, FOOT_LINK } from "@/lib/shared/ui-grammar";
 import { StoreFirstRead, SweepInFlight } from "@/components/shared/sweep-in-flight";
 
 /** The receipts a hub row's LIVE card cites — the same head read of the
@@ -174,7 +174,7 @@ export function MorphoWalletView({
           <p className="text-[12px] text-rb-500">
             This address is a MetaMorpho vault, {vaultNote.name}.{" "}
             <Link href={vaultNote.href} className={PAGE_LINK} prefetch={false}>
-              Vault exposure <span aria-hidden>&rarr;</span>
+              Vault exposure
             </Link>
           </p>
         ) : d.vaultHoldings ? (
@@ -233,17 +233,20 @@ export function MorphoWalletView({
                 {!sweptClean && timeline.positions.length > 0 && (
                   <p className="text-sm text-rb-500">{w.notWholeWallet}</p>
                 )}
-                {!sweptClean &&
-                  rows.map(({ pos }) => (
-                    <Link
-                      key={pos.marketId}
-                      href={d.positionHref(wallet, pos.marketId)}
-                      className={PAGE_LINK}
-                      prefetch={false}
-                    >
-                      {pos.marketLabel} <span aria-hidden>→</span>
-                    </Link>
-                  ))}
+                {!sweptClean && rows.length > 0 && (
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                    {rows.map(({ pos }) => (
+                      <Link
+                        key={pos.marketId}
+                        href={d.positionHref(wallet, pos.marketId)}
+                        className={`text-xs font-semibold ${FOOT_LINK}`}
+                        prefetch={false}
+                      >
+                        {pos.marketLabel}
+                      </Link>
+                    ))}
+                  </div>
+                )}
                 {unswept.length > 0 && (
                   <p className="text-sm text-rb-500">
                     {w.unswept(unswept.length === 1 ? "One market" : `${unswept.length} markets`)}

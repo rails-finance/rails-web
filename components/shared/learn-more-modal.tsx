@@ -3,6 +3,20 @@
 import { createContext, useState, useCallback, useContext, useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { sentenceCase } from "@/lib/shared/sentence-case";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+
+/** The rails.finance host, with or without www: a Quick link there is a Rails page. */
+const RAILS_HOST = /^https?:\/\/(www\.)?rails\.finance(?=[/?#]|$)/i;
+
+/** A Quick link to a Rails page: a path on this site, or a rails.finance URL. */
+function isRailsPath(url: string): boolean {
+  return (url.startsWith("/") && !url.startsWith("//")) || RAILS_HOST.test(url);
+}
+
+/** A rails.finance URL as its path, so it opens on the host the reader is on. */
+function railsPath(url: string): string {
+  return url.replace(RAILS_HOST, "") || "/";
+}
 
 // ── Content types ────────────────────────────────────────────────────────────
 
@@ -250,10 +264,11 @@ export function LearnMoreModal({
                 <div className="space-y-1">
                   {content.links.map((link, i) =>
                     // A path on this site (an explorer's info page) opens in
-                    // place; everything else is an outside source.
-                    link.url.startsWith("/") ? (
-                      <a key={i} href={link.url} className="block text-xs link-external hover:underline">
-                        → {link.label}
+                    // place, in the link blue; everything else is an outside
+                    // source, in pink (color-grammar §4a, §4b).
+                    isRailsPath(link.url) ? (
+                      <a key={i} href={railsPath(link.url)} className={`block w-fit text-xs ${INLINE_LINK}`}>
+                        {link.label}
                       </a>
                     ) : (
                       <a
