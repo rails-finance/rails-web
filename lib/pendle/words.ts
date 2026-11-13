@@ -30,7 +30,7 @@ export const PENDLE_WORDS = {
   /** 662: Rails's grouping by the protocol behind a market's yield-bearing token; the docs' "underlying" is an asset. */
   underlyingProtocol: "Underlying protocol",
   underlyingProtocolTip:
-    "The protocol behind this market's yield-bearing token, as Rails labels it. Pendle's docs use \"underlying\" for the asset.",
+    "The protocol behind this market's yield-bearing token, as Rails labels it. Pendle's docs call it \"the underlying protocol of the SY token\".",
   /** P13: the AMM page's list of what an LP earns. */
   lpEarns:
     "By Pendle's AMM page, LP earns PT fixed yield, underlying yield (SY yield), swap fees and PENDLE incentives.",
