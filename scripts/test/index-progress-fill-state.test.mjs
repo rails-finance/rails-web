@@ -392,3 +392,86 @@ test("a failed census whose last write is three schedules old reads stalled", ()
   assert.equal(writerState(failed(2 * 86400), now), "late");
   assert.equal(writerState({ ...failed(4 * 86400), name: "morpho-processor", censusRun: undefined }, now), "late");
 });
+
+// Queued: an index waiting its turn while the runner works on another job.
+import { fillQueue, withFillRunner, QUEUE_LATE } from "../../lib/shared/index-progress.ts";
+
+test("an index waiting its turn reads queued, late past a day, and as its pace once the runner stops", () => {
+  const runner = {
+    state: "running",
+    job: { kind: "vault-life", key: "1:0xa:0xb", done: 700, of: 1781, since: at(300) },
+    progressAt: at(30),
+  };
+  const job = (startedAgo) => ({
+    pending: 1,
+    pendingCost: 8898,
+    running: false,
+    lastStartedAt: startedAgo == null ? null : at(startedAgo),
+  });
+  const still = { ...entry(5 * 60, null), pace: { blocksPerHour: 0, headBlocksPerHour: 1800, since: now - 3600 } };
+  assert.equal(fillState({ ...still, job: job(3600), runner }, now), "paused");
+  assert.equal(fillState({ ...still, job: job(null), runner }, now), "paused");
+  assert.equal(fillState({ ...still, job: job(QUEUE_LATE + 60), runner }, now), "late");
+  // The runner has not advanced for over 10 min, or is held: the pace decides.
+  assert.equal(fillState({ ...still, job: job(3600), runner: { ...runner, progressAt: at(11 * 60) } }, now), "late");
+  assert.equal(
+    fillState({ ...still, job: job(3600), runner: { ...runner, state: "held: the store passed 300 GB" } }, now),
+    "late",
+  );
+  // Its own job running, nothing pending, or an older api: no queue.
+  assert.equal(fillQueue({ job: { ...job(60), running: true }, runner }, now), null);
+  assert.equal(fillQueue({ job: { ...job(60), pending: 0 }, runner }, now), null);
+  // Top-ups alone pending (5 or less a job) are no wait.
+  assert.equal(fillQueue({ job: { ...job(null), pending: 2, pendingCost: 7 }, runner }, now), null);
+  assert.equal(fillState(still, now), "late");
+  // A moving index is not queued, whatever its jobs say.
+  assert.equal(fillState({ ...entry(5 * 60, null), job: job(60), runner }, now), "fresh");
+  // withFillRunner sets the runner on fill entries; an older api is unchanged.
+  const p = { asOf: at(0), indexes: [{ chain: 1 }], fillRunner: runner };
+  assert.equal(withFillRunner(p).indexes[0].runner, runner);
+  const old = { asOf: at(0), indexes: [{ chain: 1 }] };
+  assert.equal(withFillRunner(old), old);
+});
+
+import { queueLine, queueWords } from "../../lib/shared/index-progress.ts";
+
+test("a queued fill's words and line name what it waits behind and its last run", () => {
+  const hhmm = (t) => new Date(t * 1000).toISOString().slice(11, 16) + " UTC";
+  const name = (p, c) => `the ${p} index on ${c}`;
+  const still = { ...entry(5 * 60, null), pace: { blocksPerHour: 0, headBlocksPerHour: 1800, since: now - 3600 } };
+  const store = {
+    state: "running",
+    job: { kind: "vault-life", key: "1:0xa:0xb", done: 700, of: 1339, since: at(300) },
+    progressAt: at(30),
+  };
+  const job = (startedAgo) => ({
+    pending: 2,
+    pendingCost: 57891,
+    running: false,
+    lastStartedAt: startedAgo == null ? null : at(startedAgo),
+  });
+  const e = { ...still, job: job(3600), runner: store };
+  assert.equal(queueWords(e, now), "Queued");
+  assert.equal(
+    queueLine(e, now, hhmm, name),
+    `Queued: waiting its turn behind the vault-life store (700 of 1,339 read). Its last run started at ${hhmm(now - 3600)}, 1 h ago. The fill last wrote at ${hhmm(now - 300)}, 5 min ago.`,
+  );
+  // Past a day: hours under 48 h, then days.
+  assert.equal(queueWords({ ...e, job: job(30 * 3600 + 300) }, now), "Queued for 30 h 5 min");
+  assert.equal(queueWords({ ...e, job: job(3 * 86400) }, now), "Queued for 3 days");
+  // Behind another index, between jobs, and with no run started.
+  const behindIndex = {
+    ...e,
+    runner: { ...store, job: { ...store.job, kind: "index", key: "balancer-v3:8453:vault" } },
+  };
+  assert.match(queueLine(behindIndex, now, hhmm, name), /behind the balancer-v3 index on 8453\./);
+  assert.match(queueLine({ ...e, runner: { ...store, job: null } }, now, hhmm, name), /behind the fill's next job\./);
+  assert.match(queueLine({ ...e, job: job(null) }, now, hhmm, name), /None of its runs has started yet\./);
+  assert.match(
+    queueLine({ ...e, runner: { ...store, job: { ...store.job, kind: "logs" } } }, now, hhmm, name),
+    /behind the log reads \(700 of 1,339 read\)/,
+  );
+  // Not waiting: no line, no word.
+  assert.equal(queueLine({ ...e, held: { reason: "paused", detail: null, since: null } }, now, hhmm, name), null);
+  assert.equal(queueWords(entry(5 * 60, null), now), null);
+});

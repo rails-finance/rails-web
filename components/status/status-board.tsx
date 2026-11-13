@@ -72,6 +72,9 @@ import {
   withCensusRuns,
   liveMiss,
   withHeadMisses,
+  withFillRunner,
+  queueWords,
+  queueLine,
   counterChains,
   type GatewayCounter,
   type FillHold,
@@ -174,6 +177,10 @@ function missLine(m: HeadMiss): string {
     : `${plan.charAt(0).toLowerCase()}${plan.slice(1)}: its read of the finalized block failed.`;
 }
 
+/** A fill index's runner, named by the roster: "the Balancer V3 index on Base". */
+const indexName = (protocol: string, chain: number) =>
+  `the ${protocolLabel(protocol, chain)} index on ${CHAINS[chain as ChainId]?.name ?? `chain ${chain}`}`;
+
 function heartbeatLine(e: IndexProgressEntry, now: number, allowance: Allowance | null = null): string {
   const t = heartbeatTime(e);
   const miss = liveMiss(e, now);
@@ -192,6 +199,8 @@ function heartbeatLine(e: IndexProgressEntry, now: number, allowance: Allowance 
   const hb = heartbeatState(e, now);
   if (held && state !== "fresh" && hb !== "late" && hb !== "stalled") return `${held} ${line}`;
   const stall = fillStall(e);
+  const queued = queueLine(e, now, utcTime, indexName);
+  if (queued) return queued;
   return stall ? `${line} ${STALL_WORDS[stall]}` : line;
 }
 
@@ -325,7 +334,9 @@ function cellView(c: StatusCell, now: number, allowance: Allowance | null, asOf:
     const stall = fillStall(c.fill);
     return {
       hb,
-      status: stall && hb === "late" && !c.fill.held && !liveMiss(c.fill, now) ? "Not gaining" : STATUS_WORDS[hb],
+      status:
+        queueWords(c.fill, now) ||
+        (stall && hb === "late" && !c.fill.held && !liveMiss(c.fill, now) ? "Not gaining" : STATUS_WORDS[hb]),
       index: percentWords(c.fill),
       indexRank: c.fill.atHead ? 100 : (c.fill.percent ?? 0),
       last: heartbeatTime(c.fill),
@@ -893,8 +904,8 @@ export function StatusBoard({ source, view }: { source: StatusSource; view: Stat
 
   const cells =
     source.route === "status"
-      ? cellsFromStatus(withCensusRuns(withHeadMisses(source.data)), protocolLabel)
-      : cellsFromProgress(withHeadMisses(source.data));
+      ? cellsFromStatus(withCensusRuns(withFillRunner(withHeadMisses(source.data))), protocolLabel)
+      : cellsFromProgress(withFillRunner(withHeadMisses(source.data)));
   const atHead = (protocol: string, ch: number) =>
     cells.some((c) => c.protocol === protocol && c.chain === ch && c.fill?.atHead === true);
   const next = nextItems(atHead);
@@ -968,7 +979,7 @@ export function StatusBoard({ source, view }: { source: StatusSource; view: Stat
                     : h === "stalled"
                       ? `Stalled: past 3 times its schedule, or ${pct(VISIT_FAIL_STALLED)} failing`
                       : h === "paused"
-                        ? "Paused: held for the daily allowance"
+                        ? "Paused: held for the daily allowance, or queued behind another job"
                         : "Not measured: no write time or visit, or too few visit reads to judge"}
               </span>
             ))}

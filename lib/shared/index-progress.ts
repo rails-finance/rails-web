@@ -56,6 +56,30 @@ export interface IndexProgressEntry {
   /** Web-side: why the fill's last heartbeat wrote no sample on this chain
    *  (the answer's `headMisses`, set by `withHeadMisses`). */
   headMiss?: HeadMiss | null;
+  /** The index's filter jobs in the fill's queue, summed; absent from an api
+   *  that predates it, null where the index has none. */
+  job?: IndexJob | null;
+  /** Web-side: the fill's runner (the answer's `fillRunner`, set by
+   *  `withFillRunner`). */
+  runner?: FillRunner | null;
+}
+
+/** An index's jobs in the fill's queue (at_block_fill_jobs, kind index).
+ *  lastStartedAt is its walks' latest start (a job costing more than
+ *  INDEX_TOPUP_COST); a top-up's start does not count. */
+export interface IndexJob {
+  pending: number;
+  pendingCost: number;
+  running: boolean;
+  lastStartedAt: string | null;
+}
+
+/** The fill's single runner: its state, the job it is on (null between
+ *  jobs) and the last time a job advanced or finished. */
+export interface FillRunner {
+  state: string;
+  job: { kind: string; key: string; done: number; of: number; since: string } | null;
+  progressAt: string | null;
 }
 
 /** A fill's hold on an index: the free gateway's allowance under the floor
@@ -115,6 +139,8 @@ export interface IndexProgress {
   indexes: IndexProgressEntry[];
   /** Absent from an api that predates it. */
   headMisses?: HeadMiss[];
+  /** Absent from an api that predates it; null while the fill is off. */
+  fillRunner?: FillRunner | null;
 }
 
 const missOn = (misses: HeadMiss[] | undefined, chain: number) => misses?.find((m) => m.chain === chain) ?? null;
@@ -130,6 +156,101 @@ export function withHeadMisses<T extends IndexProgress | IndexStatus>(s: T): T {
       e.backfill?.pipeline === "fill" ? { ...e, backfill: { ...e.backfill, headMiss: missOn(misses, e.chain) } } : e,
     ),
   };
+}
+
+/** Each fill index with the fill's runner, where the answer has one. */
+export function withFillRunner<T extends IndexProgress | IndexStatus>(s: T): T {
+  const runner = s.fillRunner;
+  if (runner === undefined) return s;
+  if ("indexes" in s) return { ...s, indexes: s.indexes.map((e) => ({ ...e, runner })) };
+  return {
+    ...s,
+    entries: s.entries.map((e) =>
+      e.backfill?.pipeline === "fill" ? { ...e, backfill: { ...e.backfill, runner } } : e,
+    ),
+  };
+}
+
+/** How long the runner may go without a job advancing and still count as
+ *  working; past it an index waiting its turn reads as its pace does. */
+export const RUNNER_IDLE = 10 * 60;
+/** The fill's top-up cost: a job at or under it runs out of turn after each
+ *  plan, so pending top-ups alone are no wait (at-block-fill.ts). */
+export const INDEX_TOPUP_COST = 5;
+/** How long an index may wait for its turn before the wait reads late. */
+export const QUEUE_LATE = 24 * 60 * 60;
+
+/** An index waiting its turn: walks pending (more than top-ups) and none running, while the runner
+ *  works on another job (not held, paused, idle, stopped or failing) and has
+ *  advanced within RUNNER_IDLE. `since` is its last walk's start, null if
+ *  none has started. Null when it is not waiting. */
+export function fillQueue(
+  e: Pick<IndexProgressEntry, "job" | "runner">,
+  now: Secs,
+): { since: Secs | null; runner: FillRunner } | null {
+  const j = e.job;
+  const r = e.runner;
+  if (!j || j.pending === 0 || j.pendingCost <= INDEX_TOPUP_COST * j.pending || j.running || !r) return null;
+  if (/^(paused|held|idle|stopped|error)/.test(r.state)) return null;
+  const moved = isoSecs(r.progressAt);
+  if (moved == null || now - moved > RUNNER_IDLE) return null;
+  return { since: isoSecs(j.lastStartedAt), runner: r };
+}
+
+/** The store each runner job kind reads into, as the board names it. */
+const RUNNER_KIND: Record<string, string> = {
+  "vault-life": "the vault-life store",
+  "aave-position": "the Aave position store",
+  "ctoken-liquidity": "the cToken liquidity store",
+  "fx-event": "the f(x) event store",
+  "llamalend-event": "the LlamaLend event store",
+  logs: "the log reads",
+};
+
+/** What the runner is on, for an index waiting its turn: another index
+ *  (named by `index`), a store with its progress, or its next job. */
+export function runnerWords(r: FillRunner, index: (protocol: string, chain: number) => string): string {
+  const j = r.job;
+  if (!j) return "the fill's next job";
+  if (j.kind === "index") {
+    const [protocol, chain] = j.key.split(":");
+    return index(protocol, Number(chain));
+  }
+  const n = (x: number) => x.toLocaleString("en-US");
+  return `${RUNNER_KIND[j.kind] ?? `the ${j.kind} jobs`} (${n(j.done)} of ${n(j.of)} read)`;
+}
+
+/** A fill's wait for its turn where it decides the state (see fillState):
+ *  the heartbeat fresh, no hold or head miss, and not moving. */
+export function fillWaiting(e: FillReading, now: Secs): ReturnType<typeof fillQueue> {
+  if (heartbeatState(e, now) !== "fresh" || e.held || liveMiss(e, now) || !fillStall(e)) return null;
+  return fillQueue(e, now);
+}
+
+/** The status word of a fill waiting its turn: "Queued", or "Queued for
+ *  30 h 5 min" once late (ageWords: hours under 48 h, then days). Null when
+ *  it is not waiting. */
+export function queueWords(e: FillReading, now: Secs): string | null {
+  const q = fillWaiting(e, now);
+  if (!q) return null;
+  return q.since != null && now - q.since > QUEUE_LATE ? `Queued for ${ageWords(now - q.since)}` : "Queued";
+}
+
+/** The row line of a fill waiting its turn, null when it is not waiting. */
+export function queueLine(
+  e: FillReading,
+  now: Secs,
+  at: (t: Secs) => string,
+  index: (protocol: string, chain: number) => string,
+): string | null {
+  const q = fillWaiting(e, now);
+  const t = heartbeatTime(e);
+  if (!q || t == null) return null;
+  const since =
+    q.since != null
+      ? ` Its last run started at ${at(q.since)}, ${ageWords(now - q.since)} ago.`
+      : " None of its runs has started yet.";
+  return `${queueWords(e, now)}: waiting its turn behind ${runnerWords(q.runner, index)}.${since} The fill last wrote at ${at(t)}, ${ageWords(now - t)} ago.`;
 }
 
 /** The fill plans each index every 10 min and writes its sample
@@ -150,7 +271,7 @@ const isoSecs = (iso: string | null | undefined): Secs | null => {
 /** The fields a fill's state reads: a progress entry, or a status entry's backfill. */
 export type FillReading = Pick<
   IndexProgressEntry,
-  "heartbeatAt" | "head" | "percent" | "pace" | "held" | "headMiss"
+  "heartbeatAt" | "head" | "percent" | "pace" | "held" | "headMiss" | "job" | "runner"
 > & {
   atHead: boolean | null;
 };
@@ -216,7 +337,12 @@ export function fillState(e: FillReading, now: Secs): Heartbeat {
   const r = e.held?.reason;
   if (r === "egress-floor" || r === "paused") return "paused";
   if (r === "fill-error" || r === "job-failed") return "late";
-  return fillStall(e) ? "late" : hb;
+  if (!fillStall(e)) return hb;
+  // Not moving because it waits its turn behind another job: a wait by
+  // design, late once QUEUE_LATE has passed since its last run started.
+  const q = e.held ? null : fillQueue(e, now);
+  if (q) return q.since != null && now - q.since > QUEUE_LATE ? "late" : "paused";
+  return "late";
 }
 
 /** "4 min", "2 h 10 min", "3 days": the age of a time, for a heartbeat. */
@@ -421,6 +547,8 @@ export interface IndexStatus {
   prices?: PricesSection;
   /** Absent from an api that predates it. */
   headMisses?: HeadMiss[];
+  /** Absent from an api that predates it; null while the fill is off. */
+  fillRunner?: FillRunner | null;
   /** Absent from an api that predates it. */
   censusRuns?: CensusRunStatus[];
 }
