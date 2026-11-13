@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
+import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { BlockRef } from "@/components/shared/block-ref";
 import { SpineTipContext } from "@/components/shared/spine-column";
 import { EventDateContext } from "@/components/shared/event-time";
@@ -19,7 +19,8 @@ import { AssetChooser, type AssetChooserOption } from "@/components/shared/asset
 import { CowAccountCard } from "@/components/protocol/cow/cow-account-card";
 import { CowTradeCard } from "@/components/protocol/cow/cow-trade-card";
 import { formatDate } from "@/lib/date";
-import { COW_CHAIN_ID, type CowTokenLabel } from "@/lib/cow/trade";
+import { COW_CHAIN_ID, checkpointProv, type CowTokenLabel } from "@/lib/cow/trade";
+import { COW_FILLS_SENTENCE, COW_TERMS } from "@/lib/cow/terms";
 import type { CowTrade, CowTradesPage, CowWalletTokens } from "@/lib/cow/types";
 import { SECTION_HEADING, CARD_INSET_START } from "@/lib/shared/ui-grammar";
 import { useAssetScope } from "@/lib/shared/asset-scope";
@@ -186,26 +187,40 @@ export function CowWalletView({
     summary && summary.trades > 0 && summary.firstTimestamp != null ? (
       <div className="space-y-2 text-sm leading-relaxed">
         <p>
-          This wallet has settled {n(summary.trades)} {summary.trades === 1 ? "trade" : "trades"} through CoW on
-          Ethereum since {formatDate(summary.firstTimestamp)}, in {n(tokens?.tokens.length ?? 0)} tokens. Each is a
-          Trade log of the settlement contract naming this wallet as the order&rsquo;s owner.
+          This wallet has settled {n(summary.trades)} {summary.trades === 1 ? "trade" : "trades"} through{" "}
+          {COW_TERMS.name} on Ethereum since {formatDate(summary.firstTimestamp)}, in {n(tokens?.tokens.length ?? 0)}{" "}
+          tokens. Each is a Trade log of the settlement contract naming this wallet as the order&rsquo;s owner.{" "}
+          {COW_FILLS_SENTENCE}
         </p>
+        {/* Read on chain: an Eth-flow sale's Trade log names the Eth-flow
+            contract as owner (rails-ops reference/official-docs/cow.md). */}
         <p>
-          ETH sold through CoW&rsquo;s EthFlow contract is recorded under that contract, so those sales are not counted
-          here.
+          ETH sold through {COW_TERMS.name}&rsquo;s {COW_TERMS.ethFlow} is recorded under that contract, so those sales
+          are not counted here.
         </p>
       </div>
     ) : null;
 
   return (
     <div className="space-y-6 py-8">
-      <DetailTopRow session="cow" wallet={wallet} owner={{ wallet }} assets={[]} tools />
+      <DetailTopRow
+        session="cow"
+        wallet={wallet}
+        owner={{ wallet }}
+        assets={[]}
+        pricesSubject={COW_TERMS.pricesSubject}
+        tools
+      />
 
       {asOf && (
-        <p className="text-xs text-rb-500" data-cow-asof={asOf.block}>
-          CoW · Ethereum · every figure at <BlockRef block={asOf.block} chainId={COW_CHAIN_ID} />, the newest block
-          Rails had read when the page loaded
-        </p>
+        <ProvReceiptsScope registry={registry}>
+          <p className="text-xs text-rb-500" data-cow-asof={asOf.block}>
+            {COW_TERMS.name} · Ethereum · block{" "}
+            <Prov info={checkpointProv(asOf)} value={String(asOf.block)}>
+              <BlockRef block={asOf.block} chainId={COW_CHAIN_ID} />
+            </Prov>
+          </p>
+        </ProvReceiptsScope>
       )}
 
       {readFailed != null && !tokens && (
@@ -219,7 +234,7 @@ export function CowWalletView({
       )}
 
       {tokens && summary && summary.trades === 0 && (
-        <p className="text-sm text-rb-500">No CoW trade names this wallet as the order&rsquo;s owner.</p>
+        <p className="text-sm text-rb-500">No {COW_TERMS.name} trade names this wallet as the order&rsquo;s owner.</p>
       )}
 
       {tokens && summary && summary.trades > 0 && (

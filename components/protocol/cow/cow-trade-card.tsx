@@ -2,7 +2,7 @@
 
 // One CoW trade on the shared event-card shell (components/shared/event-card.tsx):
 // T1 the trade in words, the spine's token rows (sold into the settlement,
-// bought back to the wallet) with the amounts on their flanks; every token
+// bought for the order; the Trade log names no receiver) with the amounts on their flanks; every token
 // icon on the card opens the asset's panel (AssetPopover); T2 Sold, Bought, the
 // executed price, the fee where the log carries one, the settlement
 // transaction and its block; T3 the trade in words. No USD: phase 1 reads no
@@ -33,6 +33,8 @@ import {
   tradeAmountProv,
   type CowTokenLabel,
 } from "@/lib/cow/trade";
+import { COW_TERMS, cowFeeSentence } from "@/lib/cow/terms";
+import { executedPriceNone } from "@/lib/cow/price";
 
 /** A token's icon that opens its panel (AssetPopover): the contract, and the
  *  asset page's row and link where Rails has a page for it. */
@@ -126,11 +128,11 @@ export function CowTradeCard({
       key: "price",
       label: "Executed price",
       changed: false,
-      inputs: ["sold", "bought"],
+      inputs: fee ? ["sold", "fee", "bought"] : ["sold", "bought"],
       figure: "cow-price",
       value: price
         ? { after: { text: price.text, info: executedPriceProv(trade, sell, buy, price), value: price.value } }
-        : { none: "Decimals not read" },
+        : { none: executedPriceNone(trade, sell.decimals, buy.decimals) ?? "Decimals not read" },
     },
     ...(fee
       ? [
@@ -208,23 +210,22 @@ export function CowTradeCard({
     },
     caption: "Trade",
     cells,
-    ledgers: { none: "A trade holds no balance in CoW." },
+    ledgers: { none: `A trade holds no balance in ${COW_TERMS.name}.` },
     explainer: {
       body: (
         <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed">
           <li>
-            This wallet sold {soldWords} and bought {boughtWords} through CoW&rsquo;s settlement contract.
+            This wallet&rsquo;s order sold {soldWords} and bought {boughtWords} through{" "}
+            {COW_TERMS.settlement.replace(/'/g, "’")}.
           </li>
           {price && (
             <li>
-              One {tokenText(price.base)} cost {price.text.split(" = ")[1]} in this trade.
+              One {tokenText(price.base)} cost {price.text.split(" = ")[1]} in this trade
+              {fee ? ", on the sold amount less the fee" : ""}.
             </li>
           )}
-          {fee && (
-            <li>
-              The settlement kept {amountText(fee, sell)} {tokenText(sell)} of the sold amount as its fee.
-            </li>
-          )}
+          {fee && <li>{cowFeeSentence(`${amountText(fee, sell)} ${tokenText(sell)}`)}</li>}
+          <li>Fees are part of the trade&rsquo;s execution, so Sold and Bought are amounts after fees.</li>
           <li>
             A solver sent the settlement transaction
             {others > 0

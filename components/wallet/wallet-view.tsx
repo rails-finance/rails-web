@@ -49,6 +49,7 @@ import type { WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/
 import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
 import { useAssetScope } from "@/lib/shared/asset-scope";
 import { walletPositionAssetKeys } from "@/lib/wallet/aim-assets";
+import { COW_TERMS } from "@/lib/cow/terms";
 
 const TILE = "rounded-2xl border border-rb-300/40 bg-raised px-5 py-4 dark:border-rb-700/40";
 const H2 = "text-sm font-semibold uppercase tracking-wide text-foreground/80";
@@ -322,7 +323,7 @@ function Trades({ address, cow }: { address: string; cow: Promise<CowWalletEntry
       {last && <> – {last}</>}
     </>
   );
-  const label = `CoW on ${chainMeta(COW_CHAIN).name}, ${plural(s.trades, "trade")}`;
+  const label = `${COW_TERMS.name} on ${chainMeta(COW_CHAIN).name}, ${plural(s.trades, "trade")}`;
   return (
     <section aria-labelledby="wallet-trades" data-wallet-trades="cow" data-anatomy="W7">
       <h2 id="wallet-trades" className={`${H2} mb-3`}>
@@ -332,12 +333,12 @@ function Trades({ address, cow }: { address: string; cow: Promise<CowWalletEntry
       <DataTable label="Trades" stacked rowHeight="one" tableClassName="text-sm">
         <DataTableBody>
           <DataTableRow href={cowHref(address)} data-wallet-trades-row="cow">
-            <DataTableLeadCell protocol="cow" protocolName="CoW" chain={COW_CHAIN} />
+            <DataTableLeadCell protocol="cow" protocolName={COW_TERMS.name} chain={COW_CHAIN} />
             <DataTableCell rowHeader className="whitespace-nowrap">
               <span className="flex items-center gap-2">
                 <DataTableLeadMark protocol="cow" chain={COW_CHAIN} />
                 <DataTableRowLink href={cowHref(address)} aria-label={label} className="font-medium">
-                  CoW
+                  {COW_TERMS.name}
                 </DataTableRowLink>
               </span>
             </DataTableCell>

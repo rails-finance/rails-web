@@ -10,6 +10,7 @@ import { BlockRef } from "@/components/shared/block-ref";
 import { formatDate } from "@/lib/date";
 import { COW_CHAIN_ID, walletCountProv, walletTradeAtProv } from "@/lib/cow/trade";
 import type { CowAsOf, CowWalletSummary } from "@/lib/cow/types";
+import { COW_TERMS } from "@/lib/cow/terms";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -53,7 +54,7 @@ export function CowAccountCard({
   const slots: PositionCardSlots = {
     surface: "detail",
     status: null,
-    identity: <span className="text-xs font-semibold text-foreground">CoW account</span>,
+    identity: <span className="text-xs font-semibold text-foreground">{COW_TERMS.identity}</span>,
     heads: [
       {
         id: "trades",

@@ -39,7 +39,7 @@ export interface NextItem {
 export const NEXT: NextItem[] = [
   {
     key: "cow-l2",
-    name: "CoW",
+    name: "CoW Protocol",
     mark: "cow",
     chains: [8453, 42161],
     stage: "indexing",
