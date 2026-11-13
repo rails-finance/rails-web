@@ -10,8 +10,10 @@
 //
 // 1. "Saved views", with its bookmark, a link to /saved-views whatever is
 //    saved (ui-jobs 652), link blue on hover; it never collapses. An inset
-//    hairline under it, then, with nothing to list, the line "Your saved
-//    views will display here, learn more" (`data-profile-menu-empty`); else
+//    hairline under it, then, with nothing to list, one line
+//    (`data-profile-menu-empty`): "Your saved views will display here, learn
+//    more" with nothing saved, "Starred saved views show here, learn more"
+//    with something saved and nothing starred; else
 //    one item per saved kind, Focus views, Listings, Wallets and Positions,
 //    in the explorer tabs' type (H5) with the number saved in a count
 //    badge, each a link to its tab on /saved-views (Miles 13 Nov 2026).
@@ -79,9 +81,9 @@ import {
   INLINE_LINK,
   MENU_SECTION_HEAD,
   START_CTA,
+  TAB_BASE,
   disclosureChevron,
 } from "@/lib/shared/ui-grammar";
-import { TAB_BASE } from "@/components/shared/rail-header";
 import type { ChainId } from "@/lib/shared/chains";
 import type { SavedLink, WalletSession } from "@/lib/shared/sessions";
 import { setProvPreference, useProvPreference } from "@/lib/shared/prov-preference";
@@ -642,10 +644,11 @@ export function ProfileMenu() {
                 {/* Inset: the hairline stays inside the panel's padding. */}
                 <div aria-hidden="true" className={`mt-1 ${HAIRLINE}`} data-profile-menu-rule="inset" />
                 <div data-profile-menu-saved-body="">
-                  {/* Nothing to list: one line saying what will (Miles 13 Nov 2026). */}
+                  {/* Nothing to list: one line saying what will (Miles 13 Nov 2026),
+                      naming the stars once something is saved. */}
                   {!listed && (
                     <p className="mt-3 px-3 text-xs text-rb-500" data-profile-menu-empty="">
-                      Your saved views will display here,{" "}
+                      {anything ? "Starred saved views show here," : "Your saved views will display here,"}{" "}
                       <Link
                         href={SAVED_PATH}
                         role="menuitem"

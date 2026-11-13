@@ -5,21 +5,22 @@
 // its /saved-views tab in the explorer tabs' type, with every item of the
 // kind saved counted in a pill and its starred entries under it; a kind with
 // nothing starred is not drawn, and no kind is a toggle. With nothing to
-// list, one muted line under the hairline, "Your saved views will display
-// here, learn more"; with nothing saved, Start here first, over the sections.
+// list, one muted line under the hairline: "Your saved views will display
+// here, learn more" with nothing saved, "Starred saved views show here,
+// learn more" with something saved and nothing starred; with nothing saved,
+// Start here first, over the sections.
 //
 // B2.2: New view opens the Focus panel's editor in the page, not a dialog.
 // Done saves one view; Cancel and Escape save none. An Escape that closes the
-// profile menu opened over the editor leaves the draft alone. "Add from all
-// assets" keeps the draft for the tab, and the way back reopens the editor
-// on it; Cancel clears it.
+// profile menu opened over the editor leaves the draft alone. The inline
+// editor has no "Add from all assets" (it edits the view in use on /assets);
+// the panel a row's Edit opens keeps it.
 
 import { chromium } from "playwright";
 import { BASE, bypassHeaders } from "./lib/host.mjs";
 
 const H20 = '[data-anatomy="H20"]:visible';
 const EDITOR = "[data-focus-view-editor]";
-const DRAFT_KEY = "rails-focus-view-draft";
 
 let checked = 0;
 let failures = 0;
@@ -178,12 +179,18 @@ async function readOrder(page) {
   });
 }
 const CASES = [
-  { name: "nothing saved", seed: null, items: "start,saved,learn-more,advanced", empty: true, start: true },
+  {
+    name: "nothing saved",
+    seed: null,
+    items: "start,saved,learn-more,advanced",
+    empty: "Your saved views will display here, learn more",
+    start: true,
+  },
   {
     name: "saved, nothing starred",
     seed: [link("/base/morpho", "Morpho markets", "morpho", 8453, false)],
     items: "saved,learn-more,advanced",
-    empty: true,
+    empty: "Starred saved views show here, learn more",
     start: false,
   },
   {
@@ -204,13 +211,13 @@ for (const c of CASES) {
   check(`H20 ${c.name}: Start here ${c.start ? "first, over the sections" : "absent"}`, o.startOutside === c.start);
   check(
     `H20 ${c.name}: the empty line ${c.empty ? "shown" : "absent"}`,
-    !!o.empty === c.empty,
+    !!o.empty === !!c.empty,
     JSON.stringify(o.empty),
   );
   if (o.empty) {
     check(
       `H20 ${c.name}: the empty line reads as asked, 12px muted, in Saved views, learn more to /saved-views in link blue`,
-      o.empty.text === "Your saved views will display here, learn more" &&
+      o.empty.text === c.empty &&
         o.empty.size === "12px" &&
         o.empty.underOutside &&
         o.empty.href === "/saved-views" &&
@@ -249,7 +256,6 @@ for (const c of CASES) {
         return -1;
       }
     });
-  const draft = () => page.evaluate((k) => sessionStorage.getItem(k), DRAFT_KEY);
   const open = async () => {
     await page.locator("[data-focus-view-new]").click();
     await page.waitForSelector(EDITOR);
@@ -271,10 +277,7 @@ for (const c of CASES) {
   check("B2.2: nothing is saved while the editor is open", (await views()) === 0, String(await views()));
   await page.locator("[data-focus-view-editor-done]").click();
   await page.waitForTimeout(300);
-  check(
-    "B2.2: Done saves one view and closes the editor",
-    (await views()) === 1 && !(await page.$(EDITOR)) && (await draft()) === null,
-  );
+  check("B2.2: Done saves one view and closes the editor", (await views()) === 1 && !(await page.$(EDITOR)));
 
   await open();
   await chain(1).click();
@@ -310,38 +313,19 @@ for (const c of CASES) {
     JSON.stringify(kept),
   );
 
-  // Add from all assets, then back: the editor reopens on its draft.
-  await page.locator(`${EDITOR} [data-asset-scope-manage]`).click();
-  await page.waitForURL((u) => !u.pathname.startsWith("/saved-views"), { timeout: 60000 }).catch(() => {});
-  const away = { url: page.url(), draft: await draft() };
+  // "Add from all assets": not in the inline editor; still in the panel a
+  // row's Edit opens.
   check(
-    "B2.2: Add from all assets leaves the page with the draft kept for the tab",
-    !away.url.includes("/saved-views") && !!away.draft && JSON.parse(away.draft).name === "Kept",
-    JSON.stringify(away),
+    "B2.2: the inline editor has no Add from all assets",
+    (await page.locator(`${EDITOR} [data-asset-scope-manage]`).count()) === 0,
   );
-  await page.goBack({ waitUntil: "networkidle" });
-  await page.waitForSelector(EDITOR, { timeout: 30000 }).catch(() => {});
-  const back = await page.evaluate((sel) => {
-    const ed = document.querySelector(sel);
-    return {
-      url: location.pathname + location.search,
-      editor: !!ed,
-      name: ed?.querySelector("input")?.value,
-      chain: ed?.querySelector('[data-focus-chain="1"]')?.getAttribute("aria-pressed"),
-    };
-  }, EDITOR);
+  await page.locator(`${EDITOR} [data-focus-view-editor-cancel]`).click();
+  await page.locator('[data-bookmark-row="focus"] [data-row-menu]').first().click();
+  await page.locator('[data-row-menu-list] [role="menuitem"]', { hasText: "Edit" }).first().click();
+  await page.waitForSelector("[data-asset-scope-dialog]", { timeout: 10000 }).catch(() => {});
   check(
-    "B2.2: back on /saved-views?tab=focus the editor reopens on the draft",
-    back.url === "/saved-views?tab=focus" && back.editor && back.name === "Kept" && back.chain === "true",
-    JSON.stringify(back),
-  );
-  await page.locator("[data-focus-view-editor-cancel]").click();
-  await page.waitForTimeout(300);
-  await page.reload({ waitUntil: "networkidle" });
-  await page.waitForTimeout(800);
-  check(
-    "B2.2: Cancel clears the draft; a reload opens no editor",
-    (await draft()) === null && !(await page.$(EDITOR)) && (await views()) === 1,
+    "B2.2: the panel a row's Edit opens keeps Add from all assets",
+    (await page.locator("[data-asset-scope-dialog] [data-asset-scope-manage]").count()) === 1,
   );
   await ctx.close();
 }

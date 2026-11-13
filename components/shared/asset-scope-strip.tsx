@@ -23,7 +23,7 @@
 // dialog, the panel) the press is "Change"; outside one (a gate, a row's ⋮,
 // a list's chip) it is "Change focus".
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { otherLayerOpen } from "@/components/shared/use-escape-close";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -108,45 +108,6 @@ export function AssetScopeStrip() {
       )}
     </>
   );
-}
-
-/** The inline editor's draft, kept for the tab (sessionStorage) so a trip
- *  to /assets by "Add from all assets" and back finds it (ui-jobs 665). */
-const DRAFT_KEY = "rails-focus-view-draft";
-type Draft = { name: string; assets: AssetPick[]; chains: number[] };
-function readDraft(): Draft | null {
-  try {
-    const raw: unknown = JSON.parse(sessionStorage.getItem(DRAFT_KEY) ?? "null");
-    if (!raw || typeof raw !== "object") return null;
-    const d = raw as Partial<Draft>;
-    return {
-      name: typeof d.name === "string" ? d.name : "",
-      assets: Array.isArray(d.assets) ? d.assets : [],
-      chains: Array.isArray(d.chains) ? d.chains.filter((c) => typeof c === "number") : [],
-    };
-  } catch {
-    return null;
-  }
-}
-function writeDraft(d: Draft) {
-  try {
-    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(d));
-  } catch {
-    // Storage refused: the draft lasts while the editor is open.
-  }
-}
-/** Drops the kept draft: Done, Cancel, Escape, or leaving the tab. */
-export function clearFocusViewDraft() {
-  try {
-    sessionStorage.removeItem(DRAFT_KEY);
-  } catch {
-    // Storage refused: nothing was kept.
-  }
-}
-/** Whether a draft with something in it is kept, so /saved-views reopens the editor. */
-export function hasFocusViewDraft(): boolean {
-  const d = readDraft();
-  return !!d && (d.name.trim() !== "" || d.assets.length > 0 || d.chains.length > 0);
 }
 
 /** The Focus panel's body in the page's flow, for a new view (/saved-views'
@@ -777,9 +738,8 @@ const keyOf = (p: Pick<AssetPick, "chain" | "token">) => optionKey({ chain: p.ch
  *
  * `inline`: drawn in the page's flow in place of the modal (/saved-views'
  * New view, Miles 13 Nov 2026): a new view saved by Done alone, put in use;
- * Cancel and Escape close it with nothing saved. Its draft is kept for the
- * tab (`DRAFT_KEY`), so "Add from all assets" and a return to the page find
- * it again; Done and Cancel clear it.
+ * Cancel and Escape close it with nothing saved. It has no "Add from all
+ * assets", which edits the view in use on /assets, not this draft.
  */
 function AssetScopePanel({
   mode: initial,
@@ -805,26 +765,15 @@ function AssetScopePanel({
   const [target] = useState(() => (initial === "edit" ? focusViews.find(view) : null));
   const [mode] = useState<PanelMode>(initial === "edit" && !target ? "new" : initial);
   const [viewId, setViewId] = useState<string | null>(target?.id ?? null);
-  const [kept] = useState(() => (inline ? readDraft() : null));
   const [draft, setDraft] = useState<Focus>(() =>
     mode === "link" && proposal
       ? proposal.focus
       : target
         ? { assets: target.assets, chains: target.chains }
-        : kept
-          ? { assets: kept.assets, chains: kept.chains }
-          : { assets: [], chains: [] },
+        : { assets: [], chains: [] },
   );
-  const [name, setName] = useState<string>((mode === "link" ? proposal?.name : target?.name) ?? kept?.name ?? "");
+  const [name, setName] = useState<string>((mode === "link" ? proposal?.name : target?.name) ?? "");
   const frame = useRef<HTMLElement>(null);
-  useEffect(() => {
-    if (inline) writeDraft({ name, assets: draft.assets, chains: draft.chains });
-  }, [inline, name, draft]);
-  /** The inline editor closed with nothing saved: the draft goes too. */
-  const discard = useCallback(() => {
-    clearFocusViewDraft();
-    onClose();
-  }, [onClose]);
   const linkMode = mode === "link";
 
   // A link's proposal closed without a choice is "Not now".
@@ -854,11 +803,11 @@ function AssetScopePanel({
       const inside = !!frame.current?.contains(document.activeElement);
       if (!inside && otherLayerOpen()) return;
       e.preventDefault();
-      discard();
+      onClose();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [inline, discard]);
+  }, [inline, onClose]);
 
   const commit = (next: Focus) => {
     const f = { assets: next.assets.map(withRecord), chains: next.chains };
@@ -954,7 +903,7 @@ function AssetScopePanel({
         chainName={chainName}
         anatomy={undefined}
       />
-      {!linkMode && (
+      {!linkMode && !inline && (
         <Link
           href={manageHref()}
           onClick={onClose}
@@ -1022,7 +971,7 @@ function AssetScopePanel({
             {inline && (
               <button
                 type="button"
-                onClick={discard}
+                onClick={onClose}
                 className={`ml-auto ${RESET_LINK} ${TAP}`}
                 data-focus-view-editor-cancel=""
               >
@@ -1032,10 +981,7 @@ function AssetScopePanel({
             <button
               type="button"
               onClick={() => {
-                if (inline) {
-                  if (holds) focusViews.add(draft, name.trim() || undefined);
-                  clearFocusViewDraft();
-                }
+                if (inline && holds) focusViews.add(draft, name.trim() || undefined);
                 onClose();
               }}
               data-focus-view-editor-done={inline ? "" : undefined}

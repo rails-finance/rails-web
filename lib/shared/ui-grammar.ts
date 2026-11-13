@@ -214,6 +214,14 @@ export function disclosureChevron(open: boolean): string {
 export const MENU_SECTION_HEAD = "text-[15px] font-semibold text-rb-500";
 
 /**
+ * The explorer tabs' type (H5, components/shared/rail-header.tsx `TAB_ACTIVE`,
+ * `TAB_IDLE`), worn also by the profile menu's kinds (H20): 11px, semibold,
+ * uppercase, 0.14em tracking, with a bottom border so a lit tab's underline
+ * never shifts the baseline.
+ */
+export const TAB_BASE = "border-b pb-0.5 text-[11px] font-semibold uppercase tracking-[0.14em]";
+
+/**
  * A link standing alone at a card's or section's foot ("Open 2 listings",
  * "Assets", "See a sample wallet"; Miles 13 Nov 2026): link blue at rest
  * whether it opens another page or changes this one's URL, underlined on
