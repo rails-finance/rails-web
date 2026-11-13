@@ -72,6 +72,28 @@ export interface Allowance {
   seenAt: string | null;
 }
 
+/** One gateway's counter as the server last saw it. */
+export interface GatewayCounter extends Allowance {
+  chain: number;
+}
+
+/** Which chains share the allowance's counter and which count on their own.
+ *  A counter resets 24 h after its first read, so chains with the same reset
+ *  time (within a minute) draw on one counter. */
+export function counterChains(
+  allowance: Allowance,
+  gateways: readonly GatewayCounter[],
+): { shared: number[]; own: number[] } {
+  const at = isoSecs(allowance.resetsAt);
+  const shared: number[] = [];
+  const own: number[] = [];
+  for (const g of gateways) {
+    const t = isoSecs(g.resetsAt);
+    (at != null && t != null && Math.abs(t - at) < 60 ? shared : own).push(g.chain);
+  }
+  return { shared, own };
+}
+
 export interface IndexProgress {
   asOf: string;
   indexes: IndexProgressEntry[];
@@ -222,7 +244,7 @@ export interface IndexStatus {
   asOf: string;
   entries: StatusEntry[];
   lanes?: { lane: string; chain: number; checkpoint: StatusLive["checkpoint"]; unreachable?: { error: string } }[];
-  gateways?: unknown[];
+  gateways?: GatewayCounter[];
   allowance?: Allowance | null;
   prices?: PricesSection;
 }

@@ -74,3 +74,20 @@ test("other writers keep their own interval", () => {
   };
   assert.equal(writerState(w, now, status(60, null)), "stalled");
 });
+
+// counterChains: chains whose counters reset together share one.
+import { counterChains } from "../../lib/shared/index-progress.ts";
+
+test("gateways resetting with the allowance share its counter; the rest count alone", () => {
+  const a = { host: "arbitrum.gateway.tenderly.co", resetsAt: "2026-11-13T14:06:09.022Z" };
+  const g = (chain, resetsAt) => ({ chain, resetsAt });
+  const r = counterChains(a, [
+    g(1, "2026-11-13T14:06:09.022Z"),
+    g(10, "2026-11-14T06:44:56.759Z"),
+    g(5042, "2026-11-14T06:44:56.829Z"),
+    g(8453, "2026-11-13T14:06:09.022Z"),
+    g(42161, "2026-11-13T14:06:09.022Z"),
+    g(11155111, "2026-11-13T14:06:09.022Z"),
+  ]);
+  assert.deepEqual(r, { shared: [1, 8453, 42161, 11155111], own: [10, 5042] });
+});

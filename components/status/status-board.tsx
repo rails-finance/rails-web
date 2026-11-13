@@ -57,6 +57,8 @@ import {
   type IndexProgressEntry,
   type IndexStatus,
   type Allowance,
+  counterChains,
+  type GatewayCounter,
   type FillHold,
   type StatusCell,
   type StatusEntry,
@@ -130,6 +132,23 @@ function heldLine(h: FillHold | null | undefined, allowance: Allowance | null): 
     case "job-failed":
       return `A filter job failed${since} and waits for the next plan${detail}.`;
   }
+}
+
+const andList = (xs: string[]) => (xs.length < 2 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
+
+/** The free gateway's counter the fill reads through: the chains it covers,
+ *  what is left, and when it resets; the chains with a counter of their own. */
+function allowanceLine(a: Allowance, gateways: readonly GatewayCounter[]): string | null {
+  if (a.remaining == null || a.allowanceToday == null) return null;
+  const { shared, own } = counterChains(a, gateways);
+  const names = (ids: number[]) => andList(ids.map(chainName));
+  const covers = shared.length ? `, one counter for ${names(shared)}` : "";
+  const reserve = a.floorBytes != null ? `, ${mb(a.floorBytes)} kept in reserve` : "";
+  const reset = a.resetsAt ? `. It resets 24 h after its first read, next at ${hhmm(a.resetsAt)}` : "";
+  const others = own.length
+    ? ` ${names(own)} ${own.length > 1 ? "each draw" : "draws"} on a counter of ${own.length > 1 ? "their" : "its"} own.`
+    : "";
+  return `${providerWords(a.host)}'s daily allowance${covers}: ${mb(a.remaining)} of ${mb(a.allowanceToday)} left${reserve}${reset}. The full-history fill and reads on visit draw on it.${others}`;
 }
 
 function heartbeatLine(e: IndexProgressEntry, now: number, allowance: Allowance | null = null): string {
@@ -760,6 +779,8 @@ export function StatusBoard({ source, view }: { source: StatusSource; view: Stat
   const next = nextItems(atHead);
   const chains = chainsOf(cells, next);
   const allowance = source.route === "status" ? (source.data.allowance ?? null) : null;
+  const gateways = source.route === "status" ? (source.data.gateways ?? []) : [];
+  const allowanceText = allowance ? allowanceLine(allowance, gateways) : null;
   const prices = source.route === "status" ? (source.data.prices ?? null) : null;
   const pricesOpen = view.kind === "prices";
   const chain: ChainId = view.kind === "chain" ? view.chain : 1;
@@ -831,13 +852,9 @@ export function StatusBoard({ source, view }: { source: StatusSource; view: Stat
               </span>
             ))}
           </div>
-          {allowance?.remaining != null && allowance.allowanceToday != null && (
+          {allowanceText && (
             <p className="mb-3 text-xs text-rb-500" data-anatomy="Y2.1">
-              {providerWords(allowance.host)}&apos;s daily allowance, one for every chain: {mb(allowance.remaining)} of{" "}
-              {mb(allowance.allowanceToday)} left
-              {allowance.floorBytes != null && `, ${mb(allowance.floorBytes)} kept in reserve`}
-              {allowance.resetsAt && `, resets at ${hhmm(allowance.resetsAt)}`}. The full-history fill and reads on
-              visit draw on it.
+              {allowanceText}
             </p>
           )}
           <DataTable
