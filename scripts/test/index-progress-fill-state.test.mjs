@@ -120,6 +120,10 @@ test("a refusal lapses once its reset and the resume grace have passed", () => {
   const old = { ...entry(HEARTBEAT_STALLED + 60, null), heartbeatAt: "2026-11-13T05:58:32Z", headMiss: miss };
   assert.equal(fillState(old, reset + 10 * 60), "paused");
   assert.equal(fillState(old, reset + MISS_RESUME_GRACE + 60), "stalled");
+  // With no readable until, the refusal stands for HEARTBEAT_LATE after its at.
+  for (const until of [null, "not a time"]) {
+    assert.equal(fillState({ ...old, headMiss: { ...miss, until } }, reset + MISS_RESUME_GRACE + 60), "paused");
+  }
 });
 
 test("a miss older than the late limit no longer stands", () => {
