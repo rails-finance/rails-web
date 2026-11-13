@@ -392,3 +392,41 @@ test("a failed census whose last write is three schedules old reads stalled", ()
   assert.equal(writerState(failed(2 * 86400), now), "late");
   assert.equal(writerState({ ...failed(4 * 86400), name: "morpho-processor", censusRun: undefined }, now), "late");
 });
+
+// Queued: an index waiting its turn while the runner works on another job.
+import { fillQueue, withFillRunner, QUEUE_LATE } from "../../lib/shared/index-progress.ts";
+
+test("an index waiting its turn reads queued, late past a day, and as its pace once the runner stops", () => {
+  const runner = {
+    state: "running",
+    job: { kind: "vault-life", key: "1:0xa:0xb", done: 700, of: 1781, since: at(300) },
+    progressAt: at(30),
+  };
+  const job = (startedAgo) => ({
+    pending: 1,
+    pendingCost: 8898,
+    running: false,
+    lastStartedAt: startedAgo == null ? null : at(startedAgo),
+  });
+  const still = { ...entry(5 * 60, null), pace: { blocksPerHour: 0, headBlocksPerHour: 1800, since: now - 3600 } };
+  assert.equal(fillState({ ...still, job: job(3600), runner }, now), "paused");
+  assert.equal(fillState({ ...still, job: job(null), runner }, now), "paused");
+  assert.equal(fillState({ ...still, job: job(QUEUE_LATE + 60), runner }, now), "late");
+  // The runner has not advanced for over 10 min, or is held: the pace decides.
+  assert.equal(fillState({ ...still, job: job(3600), runner: { ...runner, progressAt: at(11 * 60) } }, now), "late");
+  assert.equal(
+    fillState({ ...still, job: job(3600), runner: { ...runner, state: "held: the store passed 300 GB" } }, now),
+    "late",
+  );
+  // Its own job running, nothing pending, or an older api: no queue.
+  assert.equal(fillQueue({ job: { ...job(60), running: true }, runner }, now), null);
+  assert.equal(fillQueue({ job: { ...job(60), pending: 0 }, runner }, now), null);
+  assert.equal(fillState(still, now), "late");
+  // A moving index is not queued, whatever its jobs say.
+  assert.equal(fillState({ ...entry(5 * 60, null), job: job(60), runner }, now), "fresh");
+  // withFillRunner sets the runner on fill entries; an older api is unchanged.
+  const p = { asOf: at(0), indexes: [{ chain: 1 }], fillRunner: runner };
+  assert.equal(withFillRunner(p).indexes[0].runner, runner);
+  const old = { asOf: at(0), indexes: [{ chain: 1 }] };
+  assert.equal(withFillRunner(old), old);
+});
