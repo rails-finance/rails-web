@@ -1,5 +1,5 @@
-// The profile menu's kinds and /saved-views' inline New view (rails-ops
-// TO-DO-ui-jobs 665; Miles 13 Nov 2026).
+// The profile menu's kinds and /saved-views' new focus row (rails-ops
+// TO-DO-ui-jobs 665, 672; Miles 13 Nov 2026).
 //
 // H20: under Saved views, each kind holding something starred is a link to
 // its /saved-views tab in the explorer tabs' type, with every item of the
@@ -10,11 +10,12 @@
 // learn more" with something saved and nothing starred; with nothing saved,
 // Start here first, over the sections.
 //
-// B2.2: New view opens the Focus panel's editor in the page, not a dialog.
-// Done saves one view; Cancel and Escape save none. An Escape that closes the
-// profile menu opened over the editor leaves the draft alone. The inline
-// editor has no "Add from all assets" (it edits the view in use on /assets);
-// the panel a row's Edit opens keeps it.
+// B2.2: the Focus table ends in a row that makes a new focus, drawn with no
+// views too; the Overview card's "New focus" opens the tab with the caret in
+// it. Done saves one view at the table's end; the × and Escape save none. An
+// Escape that closes the profile menu opened over the row leaves the draft
+// alone. The row has no "Add from all assets" (it edits the view in use on
+// /assets); the panel a row's Edit opens keeps it.
 
 import { chromium } from "playwright";
 import { BASE, bypassHeaders } from "./lib/host.mjs";
@@ -241,13 +242,43 @@ for (const c of CASES) {
   await ctx.close();
 }
 
-// --- B2.2: the inline editor ----------------------------------------------
+// --- B2.2: the new focus row ---------------------------------------------
 
 {
   const { ctx, page } = await fresh(null);
-  await page.goto(`${BASE}/saved-views?tab=focus`, { waitUntil: "networkidle", timeout: 180000 });
-  await page.waitForSelector("[data-focus-view-new]");
+  await page.goto(`${BASE}/saved-views`, { waitUntil: "networkidle", timeout: 180000 });
+  await page.waitForSelector("[data-saved-card-new]");
   await page.waitForTimeout(800);
+  const card = await page.evaluate(() => {
+    const c = document.querySelector('[data-saved-card="focus"]');
+    return {
+      foot: c.querySelector("[data-saved-card-new]")?.textContent.trim(),
+      assets: c.querySelector("p [data-saved-card-assets]")?.getAttribute("href"),
+      newView: !!c.querySelector("[data-focus-view-new]"),
+    };
+  });
+  check(
+    "B4: with no focus, the Focus card's one foot link is New focus, Assets a link in its prose",
+    card.foot === "New focus" && card.assets === "/assets" && !card.newView,
+    JSON.stringify(card),
+  );
+  await page.locator("[data-saved-card-new]").click();
+  await page.waitForSelector(EDITOR);
+  const opened = await page.evaluate((sel) => {
+    const row = document.querySelector(sel);
+    return {
+      tab: new URL(location.href).searchParams.get("tab"),
+      inTable: !!row.closest('[data-bookmark-list="focus"]'),
+      dialog: !!row.closest('[role="dialog"]'),
+      caret: !!document.activeElement && row.contains(document.activeElement),
+    };
+  }, EDITOR);
+  check(
+    "B2.2: New focus opens the Focus tab with the caret in the table's new row",
+    opened.tab === "focus" && opened.inTable && !opened.dialog && opened.caret,
+    JSON.stringify(opened),
+  );
+
   const views = () =>
     page.evaluate(() => {
       try {
@@ -256,67 +287,60 @@ for (const c of CASES) {
         return -1;
       }
     });
-  const open = async () => {
-    await page.locator("[data-focus-view-new]").click();
-    await page.waitForSelector(EDITOR);
-  };
   const chain = (id) => page.locator(`${EDITOR} [data-focus-chain="${id}"]`);
+  const draft = () =>
+    page.evaluate((sel) => {
+      const row = document.querySelector(sel);
+      return {
+        name: row?.querySelector("input")?.value,
+        chain: row?.querySelector('[data-focus-chain="1"]')?.getAttribute("aria-pressed"),
+      };
+    }, EDITOR);
 
-  await open();
-  const inline = await page.evaluate((sel) => {
-    const ed = document.querySelector(sel);
-    return { inPanel: !!ed.closest("#saved-panel"), dialog: !!ed.closest('[role="dialog"]') };
-  }, EDITOR);
-  check(
-    "B2.2: New view opens the editor in the page, not in a dialog",
-    inline.inPanel && !inline.dialog,
-    JSON.stringify(inline),
-  );
   await page.locator(`${EDITOR} input`).first().fill("Base only");
   await chain(8453).click();
-  check("B2.2: nothing is saved while the editor is open", (await views()) === 0, String(await views()));
+  check("B2.2: nothing is saved before Done", (await views()) === 0, String(await views()));
   await page.locator("[data-focus-view-editor-done]").click();
   await page.waitForTimeout(300);
-  check("B2.2: Done saves one view and closes the editor", (await views()) === 1 && !(await page.$(EDITOR)));
+  const after = await draft();
+  check(
+    "B2.2: Done saves one view and empties the row",
+    (await views()) === 1 && after.name === "" && after.chain === "false",
+    JSON.stringify(after),
+  );
+  const order = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-bookmark-list="focus"] tbody tr')].map((r) =>
+      r.hasAttribute("data-focus-view-editor") ? "new" : "view",
+    ),
+  );
+  check("B2.2: the saved view sits over the new row", order.join() === "view,new", order.join());
 
-  await open();
   await chain(1).click();
   await page.locator("[data-focus-view-editor-cancel]").click();
   await page.waitForTimeout(300);
-  check("B2.2: Cancel closes the editor with nothing saved", (await views()) === 1 && !(await page.$(EDITOR)));
+  check("B2.2: the × empties the row with nothing saved", (await views()) === 1 && (await draft()).chain === "false");
 
-  await open();
   await chain(1).click();
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
-  check("B2.2: Escape closes the editor with nothing saved", (await views()) === 1 && !(await page.$(EDITOR)));
+  check("B2.2: Escape empties the row with nothing saved", (await views()) === 1 && (await draft()).chain === "false");
 
-  // The profile menu over the open editor: its Escape closes the menu alone.
-  await open();
+  // The profile menu over the row: its Escape closes the menu alone.
   await page.locator(`${EDITOR} input`).first().fill("Kept");
   await chain(1).click();
   await openMenu(page);
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
-  const kept = await page.evaluate((sel) => {
-    const ed = document.querySelector(sel);
-    return {
-      menu: !!document.querySelector("[data-profile-menu]"),
-      editor: !!ed,
-      name: ed?.querySelector("input")?.value,
-      chain: ed?.querySelector('[data-focus-chain="1"]')?.getAttribute("aria-pressed"),
-    };
-  }, EDITOR);
+  const kept = { menu: !!(await page.$("[data-profile-menu]")), ...(await draft()) };
   check(
-    "B2.2: Escape on the profile menu over the editor closes the menu and leaves the draft",
-    !kept.menu && kept.editor && kept.name === "Kept" && kept.chain === "true",
+    "B2.2: Escape on the profile menu over the row closes the menu and leaves the draft",
+    !kept.menu && kept.name === "Kept" && kept.chain === "true",
     JSON.stringify(kept),
   );
 
-  // "Add from all assets": not in the inline editor; still in the panel a
-  // row's Edit opens.
+  // "Add from all assets": not in the row; still in the panel a row's Edit opens.
   check(
-    "B2.2: the inline editor has no Add from all assets",
+    "B2.2: the new row has no Add from all assets",
     (await page.locator(`${EDITOR} [data-asset-scope-manage]`).count()) === 0,
   );
   await page.locator(`${EDITOR} [data-focus-view-editor-cancel]`).click();
@@ -327,6 +351,12 @@ for (const c of CASES) {
     "B2.2: the panel a row's Edit opens keeps Add from all assets",
     (await page.locator("[data-asset-scope-dialog] [data-asset-scope-manage]").count()) === 1,
   );
+  await page.keyboard.press("Escape");
+
+  // The card again, now one view is saved.
+  await page.locator('[data-saved-tab="overview"]').click();
+  const foot = await page.locator('[data-saved-card="focus"] [data-saved-card-open]').textContent();
+  check("B4: with one focus saved, the card's foot link reads Open 1 saved", foot.trim() === "Open 1 saved", foot);
   await ctx.close();
 }
 

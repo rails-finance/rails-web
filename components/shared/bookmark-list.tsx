@@ -10,7 +10,7 @@
 // row's ⋮ (D7).
 
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
-import { Check, Download, GripVertical, Star, Upload } from "lucide-react";
+import { Check, Download, GripVertical, Plus, Star, Upload, X } from "lucide-react";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { INPLACE_TEXT, NAV_BUTTON, POSITION_TAG_TONE } from "@/lib/shared/ui-grammar";
 
@@ -30,11 +30,21 @@ import {
 } from "@/components/shared/data-table/data-table";
 
 import { walletHref } from "@/components/shared/front-door-search";
-import { focusName, ViewIcons, viewName } from "@/components/shared/asset-scope-strip";
+import { chainName, FOCUS_OPTIONS, focusName, ViewIcons, viewName } from "@/components/shared/asset-scope-strip";
+import { AssetChooser, optionKey } from "@/components/shared/asset-chooser";
+import { otherLayerOpen } from "@/components/shared/use-escape-close";
 import { ChainGlyph } from "@/components/icons/chain-glyphs";
 import { launchedChains } from "@/lib/shared/protocols";
 import type { ChainId } from "@/lib/shared/chains";
-import { chainNameOf, focusViews, openFocusPanel, scopeLink, type FocusView } from "@/lib/shared/asset-scope";
+import {
+  chainNameOf,
+  focusViews,
+  openFocusPanel,
+  scopeLink,
+  withRecord,
+  type AssetPick,
+  type FocusView,
+} from "@/lib/shared/asset-scope";
 import {
   bookmarksBackupFilename,
   exportBookmarks,
@@ -716,18 +726,22 @@ function SavedLinkRow({ link, move }: { link: SavedLink; move: RowMove }) {
   );
 }
 
-/** The saved Focus views (ui-jobs 557), or `empty` when there are none: a
- *  table moved, renamed and removed as the saved links are, with the link
- *  copied (`&view=` carrying the name) and Use putting a view in use. A
- *  removed view can be put back for a few seconds (Undo). */
+/** The saved Focus views (ui-jobs 557), with `empty` over the table when
+ *  there are none: a table moved, renamed and removed as the saved links are,
+ *  with the link copied (`&view=` carrying the name) and Use putting a view in
+ *  use. A removed view can be put back for a few seconds (Undo). Its last row
+ *  makes a new one (`NewFocusRow`; Miles 13 Nov 2026), drawn with no views
+ *  too; `start` changing puts the caret in its name. */
 export function FocusViewList({
   views,
   active,
   empty,
+  start = 0,
 }: {
   views: FocusView[];
   active: string | null;
   empty: ReactNode;
+  start?: number;
 }) {
   const moveOf = useRowDrag("view", focusViews.move);
   const isPhone = useMediaQuery(PHONE_QUERY);
@@ -755,17 +769,20 @@ export function FocusViewList({
       </button>
     </p>
   );
-  if (views.length === 0)
-    return (
-      <>
-        {undo}
-        {empty}
-      </>
-    );
   return (
     <>
       {undo}
-      <DataTable caption="Focus" stacked rowHeight="one" tableClassName="text-sm" data-bookmark-list="focus">
+      {views.length === 0 && empty}
+      {/* The frame's sideways scroll would clip the new row's asset list, and
+          the table stacks before it could need one. */}
+      <DataTable
+        caption="Focus"
+        stacked
+        rowHeight="one"
+        className={views.length === 0 ? "mt-4 !overflow-visible" : "!overflow-visible"}
+        tableClassName="text-sm"
+        data-bookmark-list="focus"
+      >
         <DataTableHead>
           <DataTableHeader label="Name" />
           <DataTableHeader label="Assets" />
@@ -784,6 +801,7 @@ export function FocusViewList({
               move={moveOf(i, views.length, v.id)}
             />
           ))}
+          <NewFocusRow at={views.length} start={start} />
         </DataTableBody>
       </DataTable>
     </>
@@ -792,8 +810,8 @@ export function FocusViewList({
 
 const UNDO_MS = 8000;
 
-/** Use and In use: a small teal button on a soft teal fill, "New view"'s
- *  shape at the row's text size (Miles 13 Nov 2026): using a view changes
+/** Use and In use (and the new row's Done): a small teal button on a soft
+ *  teal fill at the row's text size (Miles 13 Nov 2026): using a view changes
  *  the scope in place, so teal. Below sm an invisible band takes the press to
  *  44px tall. */
 const USE_BUTTON =
@@ -952,25 +970,46 @@ function FocusViewRow({
   );
 }
 
-/** A view's chains as one toggle per launched chain (Miles, 10 Nov 2026):
- *  in focus in text ink, the rest dimmed (rb-500 in dark, so a mark that is
- *  off still reads; Miles 13 Nov 2026); a press adds or drops the chain, as
- *  the panel's Chains part does. None pressed is every chain. A view of
- *  chains alone keeps its last chain, since an emptied view is removed. */
+/** A view's chains as one toggle per launched chain (Miles, 10 Nov 2026),
+ *  `ChainMarks` on the saved view: a press adds or drops the chain, as the
+ *  panel's Chains part does. A view of chains alone keeps its last chain,
+ *  since an emptied view is removed. */
 function ViewChainToggles({ view }: { view: FocusView }) {
+  return (
+    <ChainMarks
+      chains={view.chains}
+      label={`Chains in ${viewName(view)}`}
+      locked={(id) => view.chains.length === 1 && view.chains[0] === id && view.assets.length === 0}
+      onChange={(chains) => focusViews.edit(view.id, { assets: view.assets, chains })}
+      hook="data-focus-view-chain"
+    />
+  );
+}
+
+/** One toggle per launched chain: in focus in text ink, the rest dimmed
+ *  (rb-500 in dark, so a mark that is off still reads; Miles 13 Nov 2026).
+ *  None pressed is every chain, "All". */
+function ChainMarks({
+  chains,
+  label,
+  locked = () => false,
+  onChange,
+  hook,
+}: {
+  chains: number[];
+  label: string;
+  locked?: (id: number) => boolean;
+  onChange: (chains: number[]) => void;
+  hook: "data-focus-view-chain" | "data-focus-chain";
+}) {
   const all = launchedChains().map((c) => c.id);
   const toggle = (id: number) =>
-    focusViews.edit(view.id, {
-      assets: view.assets,
-      chains: view.chains.includes(id)
-        ? view.chains.filter((c) => c !== id)
-        : all.filter((c) => c === id || view.chains.includes(c)),
-    });
+    onChange(chains.includes(id) ? chains.filter((c) => c !== id) : all.filter((c) => c === id || chains.includes(c)));
   return (
-    <span className="relative z-[2] flex items-center gap-0.5" role="group" aria-label={`Chains in ${viewName(view)}`}>
+    <span className="relative z-[2] flex items-center gap-0.5" role="group" aria-label={label}>
       {all.map((id) => {
-        const on = view.chains.includes(id);
-        const last = on && view.chains.length === 1 && view.assets.length === 0;
+        const on = chains.includes(id);
+        const last = on && locked(id);
         const name = chainNameOf(id);
         return (
           <button
@@ -983,15 +1022,143 @@ function ViewChainToggles({ view }: { view: FocusView }) {
             className={`inline-flex size-11 items-center justify-center rounded-md transition-colors sm:size-7 ${
               on ? "text-foreground" : "text-rb-400/80 hover:text-rb-500 dark:text-rb-500 dark:hover:text-rb-400"
             } ${last ? "cursor-default" : "cursor-pointer hover:bg-rb-200/60 dark:hover:bg-rb-800"}`}
-            data-focus-view-chain={id}
+            {...{ [hook]: id }}
           >
             <ChainGlyph id={id as ChainId} className="h-3.5 w-3.5" />
             <span className="sr-only">{name}</span>
           </button>
         );
       })}
-      {view.chains.length === 0 && <span className="ml-1.5 text-xs text-rb-500">All</span>}
+      {chains.length === 0 && <span className="ml-1.5 text-xs text-rb-500">All</span>}
     </span>
+  );
+}
+
+const pickKey = (p: Pick<AssetPick, "chain" | "token">) => optionKey({ chain: p.chain, address: p.token });
+
+/** The Focus table's last row, a new focus (Miles 13 Nov 2026): a name, the
+ *  assets added through AssetChooser as pills, and the chains as the rows'
+ *  marks. Nothing is saved until Done, which saves it at the table's end, put
+ *  in use, and empties the row. The × and Escape empty it with nothing saved;
+ *  Escape is the row's while focus is inside it or no other layer (a menu,
+ *  dialog or listbox) stands open over the page, and an open asset list takes
+ *  it first. */
+function NewFocusRow({ at, start }: { at: number; start: number }) {
+  const [assets, setAssets] = useState<AssetPick[]>([]);
+  const [chains, setChains] = useState<number[]>([]);
+  const [name, setName] = useState("");
+  const input = useRef<HTMLInputElement>(null);
+  const holds = assets.length > 0 || chains.length > 0;
+  const dirty = holds || name.trim() !== "";
+  const reset = () => {
+    setAssets([]);
+    setChains([]);
+    setName("");
+  };
+  const done = () => {
+    if (!holds) return;
+    focusViews.add({ assets: assets.map(withRecord), chains }, name.trim() || undefined, at);
+    reset();
+  };
+
+  useEffect(() => {
+    if (!start) return;
+    input.current?.focus({ preventScroll: true });
+    input.current?.closest("tr")?.scrollIntoView({ block: "nearest" });
+  }, [start]);
+
+  useEffect(() => {
+    if (!dirty) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      const inside = !!input.current?.closest("tr")?.contains(document.activeElement);
+      if (!inside && otherLayerOpen()) return;
+      e.preventDefault();
+      reset();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [dirty]);
+
+  const choose = (keys: string[]) => {
+    const had = new Map(assets.map((p) => [pickKey(p), p]));
+    setAssets(
+      keys.map((k) => {
+        const p = had.get(k);
+        if (p) return p;
+        const [chain, token] = k.split(":");
+        return { chain: Number(chain), token, builtOn: true };
+      }),
+    );
+  };
+
+  return (
+    <DataTableRow data-focus-view-editor="" data-focus-view-new-row="" data-anatomy="B2.2">
+      <DataTableCell rowHeader valign="middle" className="max-sm:pr-12 sm:w-[34%] sm:max-w-0 sm:min-w-[200px]">
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="hidden size-4 shrink-0 sm:block" aria-hidden="true" />
+          <span className="-my-2 inline-flex size-11 shrink-0 items-center justify-center text-rb-400 sm:size-7 dark:text-rb-500">
+            <Plus className="size-4" aria-hidden="true" />
+          </span>
+          <input
+            ref={input}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                done();
+              }
+            }}
+            aria-label="New focus name"
+            placeholder={holds ? focusName(assets, chains) : "New focus"}
+            maxLength={60}
+            className="min-w-0 flex-1 rounded border border-rb-300 bg-raised px-1.5 py-0.5 text-base font-bold text-foreground outline-none placeholder:font-normal placeholder:text-rb-500 focus:border-teal-500 sm:text-sm dark:border-rb-700"
+          />
+        </span>
+      </DataTableCell>
+      <DataTableCell label="Assets" valign="middle" wide className="sm:w-[40%] sm:py-2">
+        <AssetChooser
+          options={FOCUS_OPTIONS}
+          selected={assets.map(pickKey)}
+          onChange={choose}
+          label="Add an asset"
+          addLabel="Add an asset"
+          topLabel="Most built on"
+          countNoun={null}
+          chainName={chainName}
+        />
+      </DataTableCell>
+      <DataTableCell label="Chains" valign="middle" className="whitespace-nowrap">
+        <ChainMarks chains={chains} label="Chains in the new focus" onChange={setChains} hook="data-focus-chain" />
+      </DataTableCell>
+      <DataTableCell valign="middle" className="whitespace-nowrap max-sm:mb-3 max-sm:self-end">
+        <button
+          type="button"
+          onClick={done}
+          disabled={!holds}
+          title={holds ? undefined : "Add an asset or a chain first"}
+          className={`inline-flex ${USE_BUTTON} disabled:cursor-default disabled:opacity-50 disabled:hover:bg-teal-600/10 dark:disabled:hover:bg-teal-400/10`}
+          data-focus-view-editor-done=""
+        >
+          Done
+        </button>
+      </DataTableCell>
+      <DataTableCell valign="middle" className={MENU_CELL}>
+        {dirty && (
+          <button
+            type="button"
+            onClick={reset}
+            aria-label="Cancel the new focus"
+            title="Cancel"
+            className={`${ICON_BUTTON} hover:text-foreground`}
+            data-focus-view-editor-cancel=""
+          >
+            <X className="size-4" aria-hidden="true" />
+          </button>
+        )}
+      </DataTableCell>
+    </DataTableRow>
   );
 }
 
