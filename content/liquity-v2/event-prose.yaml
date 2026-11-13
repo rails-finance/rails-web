@@ -114,7 +114,7 @@ placeholders:
   mcr:
     rounding: pct_whole
     means: |-
-      the branch's minimum collateral ratio (110% for WETH)
+      the open branch's minimum collateral ratio
   min_debt:
     rounding: count
     means: |-
@@ -150,7 +150,7 @@ placeholders:
   max_ltv:
     rounding: ratio
     means: |-
-      the branch's Max LTV, 1 ÷ its minimum collateral ratio (90.91% for WETH)
+      the open branch's Max LTV, 1 ÷ its minimum collateral ratio
   liq_price_before:
     rounding: usd
     means: |-
@@ -715,6 +715,8 @@ group_words:
 L5_words:
   coll_type_unknown: |-
     this collateral
+  max_ltv_unknown: |-
+    set per branch
   delegate_named: |-
     the {delegate_name} delegate
   delegate_unnamed: |-
@@ -2011,7 +2013,8 @@ templates:
 #                          Liquity's FAQ (FAQ_URLS)
 # The interest-rate modal has `intro_delegated` and, on its first detail,
 # `text_delegated`: what it says when a delegate sets the trove's rate.
-# The liquidation modal's intro reads {max_ltv} and {coll_type}.
+# The adjust modal's second paragraph and the liquidation modal's intro read
+# {max_ltv} and {coll_type}: the open branch's figure and its collateral.
 # Each concept that states a mechanism rests on a row of rails-ops
 # reference/official-docs/liquity-v2.md, and its link is that row's page.
 L5:
@@ -2022,7 +2025,7 @@ L5:
       An adjustment changes a trove without closing it. The owner can add or withdraw collateral, borrow more BOLD, or repay some of the debt.
     extraParagraphs:
       - |-
-        Adding collateral or repaying makes the trove safer. Withdrawing collateral or borrowing more brings it closer to liquidation. An adjustment must keep the LTV under the branch's Max LTV (90.91% for WETH), or it is rejected.
+        Adding collateral or repaying makes the trove safer. Withdrawing collateral or borrowing more brings it closer to liquidation. An adjustment must keep the LTV under the branch's Max LTV ({max_ltv} for {coll_type}), or it is rejected.
       - |-
         Adjusting doesn't change the interest rate, which is a separate action. The rate matters because it decides how early the trove is redeemed against.
     detailsHeading: |-

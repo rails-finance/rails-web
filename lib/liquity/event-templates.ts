@@ -82,9 +82,9 @@ export function troveWords(id: string, values: Record<string, string | number> =
   return TROVE.fill(id, values);
 }
 
-/** The liquidation modal names the branch's minimum; the interest-rate modal
- *  names who controls the trove's rate; the close modal knows a close with no
- *  debt left. */
+/** The adjust and liquidation modals name the branch's Max LTV; the
+ *  interest-rate modal names who controls the trove's rate; the close modal
+ *  knows a close with no debt left. */
 export interface L5Options {
   collateralType?: string;
   delegated?: boolean;
@@ -103,6 +103,14 @@ function modal(key: L5Key, o: L5Options = {}): LearnMoreContent {
       max_ltv: fmtMaxLtv(o.collateralType ?? "WETH") ?? "",
       coll_type: o.collateralType ?? FILE.L5_words.coll_type_unknown,
     };
+  } else if (key === "adjust") {
+    values = {
+      max_ltv: fmtMaxLtv(o.collateralType) ?? FILE.L5_words.max_ltv_unknown,
+      coll_type: o.collateralType ?? FILE.L5_words.coll_type_unknown,
+    };
+    const c = PROSE.modal(d, form, values);
+    if (c.extraParagraphs) c.extraParagraphs = c.extraParagraphs.map((p) => fillWords(p, values));
+    return c;
   } else if (delegated) {
     values = {
       delegate: o.delegateName
