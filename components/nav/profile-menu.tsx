@@ -8,29 +8,30 @@
 // 1. "Saved views", with its bookmark, a link to /saved-views whatever is
 //    saved (ui-jobs 652), link blue on hover; it never collapses. An inset
 //    hairline under it, then: with nothing saved, "New to Rails? Start here"
-//    to /start (ui-jobs 509); then the subgroups Focus, Listings, Wallets and
-//    Positions, each under a small uppercase subheading.
+//    to /start (ui-jobs 509); then one item per saved kind, Focus views,
+//    Listings, Wallets and Positions, in the explorer tabs' type (H5) with
+//    the number saved in a count badge, each a link to its tab on
+//    /saved-views (Miles 13 Nov 2026). Under each, its starred entries.
 // 2. A hairline across the whole panel, then "Advanced", a toggle holding the
 //    switch "Inspector" (decision 0062; ui-jobs 571, 651).
 //
-// Advanced and each subgroup open and close from their heading: the subgroups
-// start open, Advanced closed, and the reader's choice per group is kept in
-// this browser (`OPEN_KEY`). The subheadings' toggles hang on one flag,
-// `SUBGROUPS_COLLAPSE`. The chevron follows the dropdown rule for collapsible
-// groups (lib/shared/ui-grammar.ts `disclosureChevron`): down and always shown
-// while the group is closed; up while it is open, shown on the heading's
-// hover or keyboard focus and always on a touch screen. The theme is set at
-// the brand rail's foot from md and at the wallet panel's foot below md
+// Advanced alone opens and closes: it starts closed and the reader's choice
+// is kept in this browser (`OPEN_KEY`). Its chevron follows the dropdown rule
+// for collapsible groups (lib/shared/ui-grammar.ts `disclosureChevron`): down
+// and always shown while closed; up while open, shown on the header's hover
+// or keyboard focus and always on a touch screen. The theme is set at the
+// brand rail's foot from md and at the wallet panel's foot below md
 // (components/nav/theme-switch.tsx).
 //
-// Stars alone decide what each group lists (ui-jobs 652): Focus lists the
-// views starred on /saved-views?tab=focus and, while it is unstarred, the view
-// in use, so Focus can always be turned off here; then Off
-// (lib/shared/asset-scope.ts `menuViews`). Listings, Wallets and Positions
-// list the items starred on /saved-views (lib/shared/sessions.ts
-// `menuEntries`). A group with nothing to list is not drawn. Long names fade
-// at the line's end (`FADE`); rows read nothing, showing what the browser
-// holds.
+// A kind is drawn when something of it is saved; Focus views also while a
+// view is in use. Stars alone decide the entries under it (ui-jobs 652): Focus
+// views lists the views starred on /saved-views?tab=focus and, while it is
+// unstarred, the view in use, so Focus can always be turned off here; then
+// Off (lib/shared/asset-scope.ts `menuViews`). Listings, Wallets and
+// Positions list the items starred on /saved-views (lib/shared/sessions.ts
+// `menuEntries`). A kind with nothing starred is its item alone. Long names
+// fade at the line's end (`FADE`); rows read nothing, showing what the
+// browser holds.
 //
 // From md a dropdown under the control, right edges aligned, dropping in with
 // a small bounce (globals.css `.profile-drop`), no taller than the window
@@ -46,8 +47,9 @@
 // scrolls with the page as one piece with the control (ui-jobs 602) (H2 below md, the column's corner from md;
 // components/nav/rail-shell.tsx). Escape, a press outside and a lookup close
 // it, and focus returns to the control; the arrow keys, Home and End move
-// through its items, the headings included and a closed group's rows left
-// out; on a heading ArrowRight opens the group and ArrowLeft closes it.
+// through its items in order (Saved views, Start here, each kind and its
+// rows, Advanced, the switch), Advanced's rows left out while it is closed; on
+// Advanced ArrowRight opens it and ArrowLeft closes it.
 
 import { CHROME_HOVER, CHROME_HOVER_ON } from "@/components/nav/chrome-hover";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
@@ -67,7 +69,8 @@ import { walletHref } from "@/components/shared/front-door-search";
 import { SAMPLE_WALLET } from "@/lib/shared/sample-wallet";
 import { focusViews, useAssetScope } from "@/lib/shared/asset-scope";
 import { focusShort } from "@/components/shared/aim-gate";
-import { DISCLOSURE_HEAD, MENU_SECTION_HEAD, START_CTA, disclosureChevron } from "@/lib/shared/ui-grammar";
+import { COUNT_BADGE, DISCLOSURE_HEAD, MENU_SECTION_HEAD, START_CTA, disclosureChevron } from "@/lib/shared/ui-grammar";
+import { TAB_BASE } from "@/components/shared/rail-header";
 import type { ChainId } from "@/lib/shared/chains";
 import type { SavedLink, WalletSession } from "@/lib/shared/sessions";
 import { setProvPreference, useProvPreference } from "@/lib/shared/prov-preference";
@@ -82,12 +85,7 @@ const START_PATH = "/start";
 /** The gap kept under the dropdown when it scrolls within the window. */
 const DROP_MARGIN = 16;
 
-/** Whether the subheadings in Saved views open and close their subgroups
- *  (Miles 13 Nov 2026, to be confirmed). False draws them as plain labels
- *  with their subgroups always open. */
-const SUBGROUPS_COLLAPSE = true;
-
-/** The room between the subgroups; the first sits closer to the hairline. */
+/** The room between the kinds; the first sits closer to the hairline. */
 const GROUP = "mt-6 first:mt-3";
 /** A row: 44px tall, a blue rounded outline on hover and keyboard focus. */
 const ITEM =
@@ -104,24 +102,19 @@ const HAIRLINE = "border-t border-rb-200 dark:border-rb-700";
 /** A long name fades at the line's end, with no ellipsis. */
 const FADE =
   "min-w-0 flex-1 overflow-hidden whitespace-nowrap [mask-image:linear-gradient(to_right,#000_calc(100%-2rem),transparent)]";
-/** A subgroup's heading: the app's small label, muted. */
-const SUBHEAD_TEXT = "text-[11px] font-medium uppercase tracking-wider text-rb-500";
-/** As a toggle that opens and closes the subgroup (Miles 13 Nov 2026). */
-const HEADING = `${DISCLOSURE_HEAD} flex min-h-8 w-full cursor-pointer items-center gap-1 rounded-lg px-3 text-left ${SUBHEAD_TEXT} outline-none transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:ring-[1.5px] focus-visible:ring-blue-500`;
-/** As a plain label, while `SUBGROUPS_COLLAPSE` is off. */
-const HEADING_STATIC = `flex min-h-8 items-center px-3 ${SUBHEAD_TEXT}`;
+/** A kind's item in Saved views: a link to its tab on /saved-views in the
+ *  explorer tabs' type (H5, `TAB_BASE`: 11px, semibold, uppercase, tracked),
+ *  muted, the foreground on hover and keyboard focus, then its count in the
+ *  count badge (Miles 13 Nov 2026). */
+const KIND_ITEM =
+  "flex min-h-8 w-full cursor-pointer items-center gap-2 rounded-lg px-3 text-left text-rb-500 outline-none transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:ring-[1.5px] focus-visible:ring-blue-500";
 
-type GroupKind = "focus" | "listings" | "wallets" | "positions" | "advanced";
-/** Which groups stand open, kept per browser as a small JSON map. */
+type SavedKind = "focus" | "listings" | "wallets" | "positions";
+type GroupKind = "advanced";
+/** Which collapsible sections stand open, kept per browser as a small JSON map. */
 const OPEN_KEY = "rails-profile-menu-open";
-/** Every group open but Advanced, so the inspector's switch waits to be asked for. */
-const OPEN_DEFAULT: Record<GroupKind, boolean> = {
-  focus: true,
-  listings: true,
-  wallets: true,
-  positions: true,
-  advanced: false,
-};
+/** Advanced starts closed, so the inspector's switch waits to be asked for. */
+const OPEN_DEFAULT: Record<GroupKind, boolean> = { advanced: false };
 function readOpen(): Record<GroupKind, boolean> {
   try {
     const raw: unknown = JSON.parse(localStorage.getItem(OPEN_KEY) ?? "{}");
@@ -147,19 +140,15 @@ function writeOpen(open: Record<GroupKind, boolean>) {
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
-/** A group under its heading, a disclosure toggle that names the group
- *  (`aria-labelledby`). Closed, the rows are not drawn, so they leave the tab
- *  and arrow-key order. A subgroup of Saved views takes the small heading
- *  (`SUBGROUPS_COLLAPSE` off: a plain label, always open); the Advanced
- *  section takes the section header (`section`). */
-function MenuGroup({
+/** A collapsible section under its header, a disclosure toggle that names
+ *  it (`aria-labelledby`): Advanced. Closed, the rows are not drawn, so they
+ *  leave the tab and arrow-key order. */
+function MenuSection({
   menuId,
   group,
   label,
   open,
   onToggle,
-  section = false,
-  hook,
   children,
 }: {
   menuId: string;
@@ -167,47 +156,70 @@ function MenuGroup({
   label: string;
   open: boolean;
   onToggle: (g: GroupKind) => void;
-  /** A section's header in place of a subgroup's heading. */
-  section?: boolean;
-  /** The group's own data attribute, for the verifiers. */
-  hook?: Record<string, string>;
   children: ReactNode;
 }) {
   const headId = `${menuId}-${group}`;
   const bodyId = `${headId}-rows`;
-  const toggles = section || SUBGROUPS_COLLAPSE;
-  const shown = open || !toggles;
   return (
-    <div
-      role="group"
-      aria-labelledby={headId}
-      className={section ? undefined : GROUP}
-      data-open={shown ? "true" : "false"}
-      {...hook}
-    >
-      {toggles ? (
-        <button
-          id={headId}
-          type="button"
-          role="menuitem"
-          aria-expanded={open}
-          aria-controls={bodyId}
-          onClick={() => onToggle(group)}
-          className={section ? SECTION_TOGGLE : HEADING}
-          data-profile-menu-group={group}
-          data-profile-menu-group-toggle={group}
-        >
-          {label}
-          <ChevronDown className={disclosureChevron(open)} strokeWidth={2} aria-hidden="true" />
-        </button>
-      ) : (
-        <div id={headId} className={HEADING_STATIC} data-profile-menu-group={group}>
-          {label}
-        </div>
-      )}
-      <div id={bodyId} hidden={!shown} className="mt-1">
-        {shown && children}
+    <div role="group" aria-labelledby={headId} data-open={open ? "true" : "false"} data-profile-menu-section={group}>
+      <button
+        id={headId}
+        type="button"
+        role="menuitem"
+        aria-expanded={open}
+        aria-controls={bodyId}
+        onClick={() => onToggle(group)}
+        className={SECTION_TOGGLE}
+        data-profile-menu-group={group}
+        data-profile-menu-group-toggle={group}
+      >
+        {label}
+        <ChevronDown className={disclosureChevron(open)} strokeWidth={2} aria-hidden="true" />
+      </button>
+      <div id={bodyId} hidden={!open} className="mt-1">
+        {open && children}
       </div>
+    </div>
+  );
+}
+
+/** One saved kind in Saved views: its item, a link to its tab on /saved-views
+ *  with the number saved, and under it the starred entries (none drawn when
+ *  none is starred). It does not collapse (Miles 13 Nov 2026). */
+function KindGroup({
+  menuId,
+  kind,
+  label,
+  count,
+  onDone,
+  children,
+}: {
+  menuId: string;
+  kind: SavedKind;
+  label: string;
+  count: number;
+  onDone: () => void;
+  children?: ReactNode;
+}) {
+  const headId = `${menuId}-${kind}`;
+  return (
+    <div role="group" aria-labelledby={headId} className={GROUP} data-profile-menu-kind={kind}>
+      <Link
+        id={headId}
+        href={`${SAVED_PATH}?tab=${kind}`}
+        role="menuitem"
+        aria-label={`${label}, ${count} saved`}
+        onClick={onDone}
+        className={KIND_ITEM}
+        data-profile-menu-group={kind}
+        data-profile-menu-kind-link={kind}
+      >
+        <span className={`${TAB_BASE} border-transparent`}>{label}</span>
+        <span className={COUNT_BADGE} data-profile-menu-count={count}>
+          {count}
+        </span>
+      </Link>
+      {children && <div className="mt-1">{children}</div>}
     </div>
   );
 }
@@ -480,7 +492,7 @@ export function ProfileMenu() {
         e.preventDefault();
         go(items.length - 1);
       } else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
-        // On a group's heading, ArrowRight opens it and ArrowLeft closes it.
+        // On Advanced's header, ArrowRight opens it and ArrowLeft closes it.
         const head = document.activeElement as HTMLElement | null;
         if (!head?.hasAttribute("data-profile-menu-group-toggle")) return;
         e.preventDefault();
@@ -498,27 +510,25 @@ export function ProfileMenu() {
     };
   }, [open, close]);
 
-  // A group is drawn only when it holds something (ui-jobs 586).
-  const linkGroups = [
-    { kind: "listings", label: "Listings", rows: listings },
-    { kind: "positions", label: "Positions", rows: held },
-  ] as const;
-  const linkGroup = (g: (typeof linkGroups)[number]) =>
-    g.rows.length > 0 && (
-      <MenuGroup
-        key={g.kind}
-        menuId={menuId}
-        group={g.kind}
-        label={g.label}
-        open={groupsOpen[g.kind]}
-        onToggle={toggleGroup}
-      >
-        <div data-profile-menu-links={g.kind}>
-          {g.rows.map((l) => (
-            <LinkRow key={l.key} link={l} onDone={done} />
-          ))}
-        </div>
-      </MenuGroup>
+  // A kind is drawn when something of it is saved (Focus also while a view
+  // is in use); its starred entries are listed under it (ui-jobs 652).
+  const counts: Record<SavedKind, number> = {
+    focus: scope.ready ? scope.views.length : 0,
+    listings: views?.length ?? 0,
+    wallets: bookmarks?.length ?? 0,
+    positions: positions?.length ?? 0,
+  };
+  const linkKind = (kind: "listings" | "positions", label: string, list: SavedLink[]) =>
+    counts[kind] > 0 && (
+      <KindGroup menuId={menuId} kind={kind} label={label} count={counts[kind]} onDone={done}>
+        {list.length > 0 && (
+          <div data-profile-menu-links={kind}>
+            {list.map((l) => (
+              <LinkRow key={l.key} link={l} onDone={done} />
+            ))}
+          </div>
+        )}
+      </KindGroup>
     );
 
   return (
@@ -618,18 +628,11 @@ export function ProfileMenu() {
                       <Signpost className="ml-auto size-4 shrink-0" aria-hidden="true" />
                     </Link>
                   )}
-                  {/* Focus: the starred views, the view in use, and Off (ui-jobs 652). */}
-                  {menuViews.length > 0 && (
-                    <MenuGroup
-                      menuId={menuId}
-                      group="focus"
-                      label="Focus"
-                      open={groupsOpen.focus}
-                      onToggle={toggleGroup}
-                      hook={{ "data-profile-menu-focus": "" }}
-                    >
-                      <div data-profile-menu-focus-views={menuViews.length}>
-                        <>
+                  {/* Focus views: the starred views, the view in use, and Off (ui-jobs 652). */}
+                  {(counts.focus > 0 || menuViews.length > 0) && (
+                    <KindGroup menuId={menuId} kind="focus" label="Focus views" count={counts.focus} onDone={done}>
+                      {menuViews.length > 0 && (
+                        <div data-profile-menu-focus-views={menuViews.length}>
                           {menuViews.map((v) => (
                             <button
                               key={v.id}
@@ -658,43 +661,37 @@ export function ProfileMenu() {
                             <RadioMark on={!scope.on} />
                             Off
                           </button>
-                        </>
-                      </div>
-                    </MenuGroup>
+                        </div>
+                      )}
+                    </KindGroup>
                   )}
-                  {linkGroup(linkGroups[0])}
-                  {rows.length > 0 && (
-                    <MenuGroup
-                      menuId={menuId}
-                      group="wallets"
-                      label="Wallets"
-                      open={groupsOpen.wallets}
-                      onToggle={toggleGroup}
-                    >
-                      <div data-profile-menu-wallets="">
-                        {rows.map((s) => (
-                          <WalletRow key={s.key} session={s} onDone={done} />
-                        ))}
-                      </div>
-                    </MenuGroup>
+                  {linkKind("listings", "Listings", listings)}
+                  {counts.wallets > 0 && (
+                    <KindGroup menuId={menuId} kind="wallets" label="Wallets" count={counts.wallets} onDone={done}>
+                      {rows.length > 0 && (
+                        <div data-profile-menu-wallets="">
+                          {rows.map((s) => (
+                            <WalletRow key={s.key} session={s} onDone={done} />
+                          ))}
+                        </div>
+                      )}
+                    </KindGroup>
                   )}
-                  {linkGroup(linkGroups[1])}
+                  {linkKind("positions", "Positions", held)}
                 </div>
               </div>
               {/* The second section: a hairline across the whole panel, through
                   its padding, then Advanced (Miles 13 Nov 2026, mockup). */}
               <div aria-hidden="true" className={`-mx-3 mt-4 mb-2 ${HAIRLINE}`} data-profile-menu-rule="full" />
-              <MenuGroup
+              <MenuSection
                 menuId={menuId}
                 group="advanced"
                 label="Advanced"
                 open={groupsOpen.advanced}
                 onToggle={toggleGroup}
-                section
-                hook={{ "data-profile-menu-section": "advanced" }}
               >
                 <ProvInspectorSwitch onDone={done} />
-              </MenuGroup>
+              </MenuSection>
             </div>
           </>,
           document.body,
