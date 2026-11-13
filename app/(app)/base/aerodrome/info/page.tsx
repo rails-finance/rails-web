@@ -16,6 +16,7 @@ import {
   type InfoView,
   GUIDE_NO_LEARN_MORE,
 } from "@/components/shared/protocol-info-page";
+import { AERODROME_DOCS_AND_CHAIN } from "@/lib/aerodrome/docs-and-chain";
 import { AERO_CONTRACTS } from "@/lib/aerodrome/types";
 import { DEPLOYMENT_LABEL } from "@/lib/aerodrome/words";
 import { infoMetadata } from "@/lib/shared/page-metadata";
@@ -33,6 +34,7 @@ const AERO_PRICE_POOLS = {
 } as const;
 
 const UL = "list-disc space-y-1 pl-5";
+const UPGRADE = "https://aerodrome.finance/docs/upgrade";
 
 const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
   {
@@ -49,7 +51,8 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
   },
   {
     term: "AERO",
-    definition: "AERO is Aerodrome's token. Gauges pay it to staked positions.",
+    definition:
+      "AERO is Aerodrome's token. Gauges pay it to staked positions, which Aerodrome's docs call AERO emissions.",
     sources: [DOCS],
   },
   {
@@ -79,8 +82,15 @@ const howItWorks: readonly [ReactNode, ...ReactNode[]] = [
     <GlossaryLink term="AERO">AERO</GlossaryLink> at the rate the gauge pays.
   </>,
   <>
-    Each week AERO holders who lock their AERO vote on how much AERO each pool&apos;s gauge pays out. Those voters
-    receive the pool&apos;s trading fees from staked liquidity and a share from unstaked liquidity.
+    Each week veAERO holders vote on how much AERO each pool&apos;s gauge pays out. Those voters receive the pool&apos;s
+    trading fees from staked liquidity and a share from unstaked liquidity, a week later by Aerodrome&apos;s docs.
+  </>,
+  <>
+    Aerodrome&apos;s{" "}
+    <a href={UPGRADE} className={INLINE_LINK} target="_blank" rel="noopener">
+      upgrade guide
+    </a>{" "}
+    says the upgrade to Aero opens on October 22, 00:00 UTC; liquid AERO converts 1 : 1 and liquid VELO at 0.044.
   </>,
   <>
     Every figure is in the pool&apos;s quote token, the one it prices the other in, at the pool&apos;s price. AERO is
@@ -196,6 +206,7 @@ export default function InfoPage() {
       howItWorks={howItWorks}
       reads={reads}
       views={views}
+      docsAndChain={AERODROME_DOCS_AND_CHAIN}
       docs={DOCS}
     />
   );
