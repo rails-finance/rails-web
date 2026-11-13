@@ -2,12 +2,13 @@
 
 // The provenance inspector — the page-level target mode.
 // ----------------------------------------------------------------------------
-// Armed in one place, the profile menu's switch (H20.1, decision 0062; ui-jobs
-// 625): while it is on, the layer arms each page view on arrival, on the
-// routes in lib/shared/prov-preference-routes.ts. Three ways put it down, all
-// through `putDownInspector`, which turns the switch off too: the switch,
-// "Exit inspector" beside the profile control (<ProvInspectorExit>), and
-// Escape's second press.
+// Armed in one place, the profile menu's switch "Inspector" (H20.1, decision
+// 0062; ui-jobs 625, 651): while it is on, the layer arms each page view on
+// arrival, on the routes in lib/shared/prov-preference-routes.ts. Two ways
+// put it down, both through `putDownInspector`, which turns the switch off too:
+// the switch and Escape's second press. While it is armed on a page with a
+// traced value, the header shows the inspector indicator beside the profile
+// control (<ProvInspectorIndicator>, H7.4), which turns nothing off.
 //
 // - <ProvInspectorLayer> — armed, every scoped <Prov> on the page is a click
 //   target with a light dotted underline (the coverage map). A pick anchors
@@ -26,7 +27,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
+import { Crosshair, X } from "lucide-react";
 import {
   CLASS_CSS,
   CLASS_META,
@@ -36,6 +37,7 @@ import {
   LadderModal,
   locateEntries,
   provInspector,
+  provTraced,
   ProvReceipt,
   receiptLabel,
   resolveClass,
@@ -46,8 +48,8 @@ import { useParams, usePathname } from "next/navigation";
 import { setProvPreference, useProvPreference } from "@/lib/shared/prov-preference";
 import { provPreferenceAllows } from "@/lib/shared/prov-preference-routes";
 
-/** Put the inspector down from a control the reader pressed (the exit
- *  button, Escape's second rung, the profile menu's switch): one state, so
+/** Put the inspector down from a control the reader pressed (Escape's
+ *  second rung, the profile menu's switch): one state, so
  *  the saved preference (decision 0062) goes off with it and the switch reads
  *  off at once (ui-jobs 624). Leaving a page disarms with `setArmed(false)`
  *  alone and keeps the preference. */
@@ -71,11 +73,13 @@ export function ProvInspectorLayer() {
   const allowed = provPreferenceAllows(pathname, params);
   // Escape, in rungs: an open popover closes first; a second press disarms.
   // An Escape that closes an open menu or modal (the profile menu, a ⋮) is
-  // theirs, so it never turns the switch off.
+  // theirs, so it never turns the switch off. A menu that heard it first has
+  // closed by the time this runs (the switch turned on with the profile menu
+  // open), so its `preventDefault` counts as the menu's claim (ui-jobs 651).
   useEffect(() => {
     if (!armed) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
+      if (e.key !== "Escape" || e.defaultPrevented) return;
       if (provInspector.getPin()) provInspector.unpin();
       else if (!document.querySelector(OPEN_OVERLAY)) putDownInspector();
     };
@@ -85,7 +89,9 @@ export function ProvInspectorLayer() {
   // Leaving the page puts the tool down.
   useEffect(() => () => provInspector.setArmed(false), []);
   // The preference arms each page view on arrival, on the routes that pass
-  // the coverage gate; turned off, the inspector goes down.
+  // the coverage gate; turned off, the inspector goes down. Values that mount
+  // later are pickable as they land; the header indicator waits for the first
+  // (ui-jobs 651).
   useEffect(() => {
     provInspector.setArmed(preference && allowed);
   }, [preference, allowed, pathname]);
@@ -94,29 +100,42 @@ export function ProvInspectorLayer() {
   return pin ? <InspectorPopover key={`${pin.key}:${pin.tick}`} pin={pin} /> : null;
 }
 
-/** "Exit inspector" (ui-jobs 624.2): beside the profile control (H20), in the
- *  site header, the column's corner or the position bar, while the inspector
- *  is armed. Puts it down with the saved preference; `onExit` takes focus
- *  where the button stood. */
-export function ProvInspectorExit({ onExit }: { onExit?: () => void }) {
+const INSPECTOR_TIP = "Click a figure to see where it comes from.";
+
+/** The header's inspector indicator, H7.4 (ui-jobs 624.2, redrawn in 651):
+ *  beside the profile control (H20), the teal crosshair, drawn only while the
+ *  inspector is armed and the page has at least one traced value mounted
+ *  (`provTraced`); otherwise nothing. It says the inspector is on and does
+ *  nothing on a press: the profile menu's switch (H20.1) is the one way to
+ *  turn it off. Focusable, with a tip on hover and keyboard focus in the house
+ *  tooltip's look (RevealTip opens on a press, so this draws its own). */
+export function ProvInspectorIndicator() {
   const armed = useSyncExternalStore(provInspector.subscribe, provInspector.getArmed, () => false);
-  if (!armed) return null;
+  const traced = useSyncExternalStore(provTraced.subscribe, provTraced.getAny, () => false);
+  if (!armed || !traced) return null;
   return (
-    <button
-      type="button"
-      className="prov-inspect-exit"
+    <span
+      tabIndex={0}
+      role="img"
+      className="prov-inspect-on group"
       data-anatomy="H7.4"
-      aria-label="Exit inspector"
-      onClick={() => {
-        putDownInspector();
-        onExit?.();
-      }}
+      data-prov-inspect-on=""
+      aria-label={`Inspector on. ${INSPECTOR_TIP}`}
     >
-      <X aria-hidden />
-      <span>
-        Exit<span className="max-sm:hidden"> inspector</span>
+      <Crosshair className="prov-inspect-on-icon" strokeWidth={1.75} aria-hidden="true" />
+      <span
+        aria-hidden="true"
+        data-prov-inspect-tip=""
+        className="pointer-events-none invisible absolute right-0 top-full z-[var(--z-dropdown)] mt-2.5 w-max max-w-[min(20rem,calc(100vw-1.5rem))] whitespace-normal rounded-2xl border p-3 text-xs font-medium text-foreground opacity-0 shadow-lg transition-opacity duration-100 group-hover:visible group-hover:opacity-100 group-focus-visible:visible group-focus-visible:opacity-100"
+        style={{ background: "var(--rb-tooltip-bg)", borderColor: "var(--rb-tooltip-border)" }}
+      >
+        {INSPECTOR_TIP}
+        <span
+          className="absolute bottom-full right-3 -mb-[5px] size-2.5 rotate-45 border-l border-t"
+          style={{ background: "var(--rb-tooltip-bg)", borderColor: "var(--rb-tooltip-border)" }}
+        />
       </span>
-    </button>
+    </span>
   );
 }
 

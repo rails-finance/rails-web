@@ -96,9 +96,12 @@ const railLauncher = await rail.locator('button[data-anatomy="H15.1"]:visible').
 check(railLauncher === 1, `the brand rail carries the sidebar toggle (${railLauncher})`);
 const railHome = await rail.locator('a[href="/"][data-rail-home]').count();
 check(railHome === 1, `the rail's mark links home (${railHome})`);
-// The theme is set in the profile control's menu from md (ui-jobs 504).
-const railToggle = await rail.locator('button[aria-label^="Switch to"]').count();
-check(railToggle === 0, `the brand rail carries no theme toggle, ui-jobs 504 (${railToggle})`);
+// The theme switch stands at the rail's foot from md (Miles 13 Nov 2026):
+// Light, Dark and Auto as one radio group, over the beta pill.
+const railTheme = await rail
+  .locator('[role="radiogroup"][data-theme-switch="rail"] [role="radio"]')
+  .evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")).join(","));
+check(railTheme === "Light,Dark,Auto", `the brand rail carries the theme switch at its foot (${railTheme})`);
 // The grid glyph (497) went with ui-jobs 503: the chooser is in the wallet panel.
 const railGrid = await rail.locator("button[data-chooser-trigger]").count();
 check(railGrid === 0, `the brand rail carries no grid glyph, ui-jobs 503 (${railGrid})`);
@@ -327,7 +330,7 @@ check(mLauncher === 1, `mobile header keeps the panel's launcher (${mLauncher})`
 const mBookmarks = await mob.locator('header button[aria-label="Bookmarks"]').count();
 check(mBookmarks === 0, `mobile header carries no bookmarks button, retired 1 Nov 2026 (${mBookmarks})`);
 const mToggle = await mob.locator('header button[aria-label^="Switch to"]:visible').count();
-check(mToggle === 0, `mobile header carries no theme toggle, its switch is in H20's menu, ui-jobs 507 (${mToggle})`);
+check(mToggle === 0, `mobile header carries no theme toggle, its switch is at the wallet panel's foot (${mToggle})`);
 const mSwitcherAll = await mob.locator("button[data-chooser-trigger]").count();
 check(mSwitcherAll === 0, `mobile draws no grid glyph, ui-jobs 503 (${mSwitcherAll})`);
 const mOrder = await mob.evaluate(() => {
@@ -357,6 +360,20 @@ const launcher = mHomePage.locator('header button[data-search-launcher="header"]
 const lBox = await launcher.boundingBox();
 await launcher.click();
 await mHomePage.waitForTimeout(500);
+// Below md the theme switch stands at the panel's foot (Miles 13 Nov 2026).
+const panelTheme = await mHomePage.evaluate(() => {
+  const p = document.querySelector('[data-anatomy="H16"]')?.getBoundingClientRect();
+  const g = document.querySelector('[data-theme-switch="panel"]');
+  const r = g?.getBoundingClientRect();
+  return {
+    options: [...(g?.querySelectorAll('[role="radio"]') ?? [])].map((b) => b.textContent.trim()).join(","),
+    atFoot: !!p && !!r && r.height > 0 && Math.round(p.bottom - r.bottom) <= 24,
+  };
+});
+check(
+  panelTheme.options === "Light,Dark,Auto" && panelTheme.atFoot,
+  `home @390: the wallet panel carries the theme switch at its foot (${JSON.stringify(panelTheme)})`,
+);
 const panelRow = await mHomePage.evaluate(() => {
   const c = document.querySelector("[data-wallet-panel-close]")?.getBoundingClientRect();
   return { x: c ? Math.round(c.x) : null, y: c ? Math.round(c.y) : null };
@@ -373,8 +390,10 @@ const mHeaderBeta = await mHomePage.locator('header[data-anatomy="H2"]').first()
 check(!/beta/i.test(mHeaderBeta), "home @390: the header carries no beta pill");
 const mFooterBeta = await mHomePage.locator("footer [data-phone-beta]").isVisible();
 check(mFooterBeta, "home @390: the beta pill is in the footer");
-// The profile control's menu (ui-jobs 504, 582, 586): a menu button; with
-// nothing saved, the theme switch, Start here and Advanced, no group; a full-width sheet at
+// The profile control's menu (ui-jobs 504, 582, 586; Miles 13 Nov 2026): a
+// menu button; with nothing saved, Saved views, Start here and Advanced
+// (closed until opened, the inspector switch inside), no other group and no
+// theme switch; a full-width sheet at
 // the foot of the screen (ui-jobs 507)
 // below md; Escape closes it and returns focus.
 const h20 = mHomePage.locator('header [data-anatomy="H20"]');
@@ -389,9 +408,12 @@ const sheet = await mHomePage.evaluate(() => {
     role: m?.getAttribute("role"),
     width: r ? Math.round(r.width) : 0,
     bottom: r ? Math.round(r.bottom) : 0,
-    empty: !m?.querySelector("[data-profile-menu-group]"),
-    themes: [...(m?.querySelectorAll("[data-theme-option]") ?? [])].map((b) => b.textContent.trim()).join(","),
-    manage: !!m?.querySelector("[data-profile-menu-prov]"),
+    groups: [...(m?.querySelectorAll("[data-profile-menu-group]") ?? [])]
+      .map((h) => `${h.getAttribute("data-profile-menu-group")}:${h.getAttribute("aria-expanded")}`)
+      .join(","),
+    themes: m?.querySelectorAll("[data-theme-option]").length ?? -1,
+    first: m?.querySelector('[role="menuitem"]')?.getAttribute("href") ?? null,
+    shut: !m?.querySelector("[data-profile-menu-prov]"),
     start: !!m?.querySelector('a[data-profile-menu-start][href="/start"]'),
     scrim: !!document.querySelector("[data-profile-menu-scrim]"),
   };
@@ -400,12 +422,23 @@ check(
   sheet.role === "menu" &&
     sheet.width === 390 &&
     sheet.bottom === 800 &&
-    sheet.empty &&
-    sheet.manage &&
+    sheet.groups === "advanced:false" &&
+    sheet.shut &&
     sheet.start &&
     sheet.scrim &&
-    sheet.themes === "Light,Dark,Auto",
-  `home @390: H20 opens a full-width sheet at the screen's foot over a dim: the theme switch, Start here, no group, the provenance inspector switch (${JSON.stringify(sheet)})`,
+    sheet.themes === 0 &&
+    sheet.first === "/saved-views",
+  `home @390: H20 opens a full-width sheet at the screen's foot over a dim: Saved views first, Start here, Advanced closed, no other group, no theme switch (${JSON.stringify(sheet)})`,
+);
+// Advanced opens on a press and shows the inspector switch.
+await mHomePage.locator('[data-profile-menu-group-toggle="advanced"]').click();
+const advanced = await mHomePage.evaluate(() => ({
+  open: document.querySelector('[data-profile-menu-group-toggle="advanced"]')?.getAttribute("aria-expanded"),
+  manage: !!document.querySelector("[data-profile-menu] [data-profile-menu-prov]"),
+}));
+check(
+  advanced.open === "true" && advanced.manage,
+  `home @390: Advanced opens and shows the inspector switch (${JSON.stringify(advanced)})`,
 );
 // A press on the dim closes the sheet.
 await mHomePage.waitForTimeout(300);

@@ -1,21 +1,28 @@
 "use client";
 
 // The profile control (H20) and its menu (rails-ops ui-jobs 504, redrawn in
-// 582 to Miles's mockup of 11 Nov 2026). The menu has no heading of its own.
-// Top down: the theme as a three-way segment; with nothing saved, "New to
-// Rails? Start here" to /start (ui-jobs 509); then four groups, Focus,
-// Listings, Wallets and Positions, each under a heading that links to its tab
-// on /bookmarks (a cog at the group's right on hover or keyboard focus; on a
-// touch screen see HEADING_TOUCH); last, Advanced, holding the provenance
-// inspector switch (decision 0062; ui-jobs 571).
+// 582 to Miles's mockup of 11 Nov 2026, laid out anew by Miles 13 Nov 2026).
+// The menu has no heading of its own. Top down: "Saved views" to /saved-views,
+// whatever is saved (ui-jobs 652); with nothing saved, "New to Rails? Start
+// here" to /start (ui-jobs 509); then four groups, Focus, Listings, Wallets
+// and Positions; last, Advanced, holding the switch "Inspector" (decision
+// 0062; ui-jobs 571, 651). Each group's heading is a small muted toggle that
+// opens and closes it (Miles 13 Nov 2026): every group starts open but
+// Advanced, and the reader's choice per group is kept in this browser
+// (`OPEN_KEY`). Its chevron follows the dropdown rule for collapsible groups
+// (lib/shared/ui-grammar.ts `disclosureChevron`): down and always shown while
+// the group is closed; up while it is open, shown on the heading's hover or
+// keyboard focus and always on a touch screen. The theme is set at the brand rail's foot from md and
+// at the wallet panel's foot below md (components/nav/theme-switch.tsx).
 //
-// Focus offers one saved view, the one chosen on /bookmarks?tab=focus (else
-// the view in use, else the first saved; lib/shared/asset-scope.ts
-// `menuView`), and Off. Listings, Wallets and Positions each list the items
-// starred on /bookmarks, up to five, or with none starred the first five, in
-// the reader's order (ui-jobs 586; lib/shared/sessions.ts `menuEntries`). A
-// group is drawn only when it holds something. Long names fade at the line's
-// end (`FADE`); rows read nothing, showing what the browser holds.
+// Stars alone decide what each group lists (ui-jobs 652): Focus lists the
+// views starred on /saved-views?tab=focus and, while it is unstarred, the view
+// in use, so Focus can always be turned off here; then Off
+// (lib/shared/asset-scope.ts `menuViews`). Listings, Wallets and Positions
+// list the items starred on /saved-views (lib/shared/sessions.ts
+// `menuEntries`). A group with nothing to list is not drawn. Long names fade
+// at the line's end (`FADE`); rows read nothing, showing what the browser
+// holds.
 //
 // From md a dropdown under the control, right edges aligned, dropping in with
 // a small bounce (globals.css `.profile-drop`), no taller than the window
@@ -31,15 +38,15 @@
 // scrolls with the page as one piece with the control (ui-jobs 602) (H2 below md, the column's corner from md;
 // components/nav/rail-shell.tsx). Escape, a press outside and a lookup close
 // it, and focus returns to the control; the arrow keys, Home and End move
-// through its items.
+// through its items, the headings included and a closed group's rows left
+// out; on a heading ArrowRight opens the group and ArrowLeft closes it.
 
 import { CHROME_HOVER, CHROME_HOVER_ON } from "@/components/nav/chrome-hover";
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { useParams, usePathname } from "next/navigation";
-import { Check, ChevronDown, CircleHelp, Crosshair, Monitor, Moon, Settings, Signpost, Sun } from "lucide-react";
-import { useTheme } from "next-themes";
+import { usePathname } from "next/navigation";
+import { Check, ChevronDown, CircleHelp, Crosshair, Signpost } from "lucide-react";
 
 import { Facehash } from "@/components/shared/facehash";
 import { FocusAvatar } from "@/components/shared/focus-avatar";
@@ -52,16 +59,14 @@ import { walletHref } from "@/components/shared/front-door-search";
 import { SAMPLE_WALLET } from "@/lib/shared/sample-wallet";
 import { focusViews, useAssetScope } from "@/lib/shared/asset-scope";
 import { focusShort } from "@/components/shared/aim-gate";
-import { START_CTA } from "@/lib/shared/ui-grammar";
+import { DISCLOSURE_HEAD, START_CTA, disclosureChevron } from "@/lib/shared/ui-grammar";
 import type { ChainId } from "@/lib/shared/chains";
 import type { SavedLink, WalletSession } from "@/lib/shared/sessions";
 import { setProvPreference, useProvPreference } from "@/lib/shared/prov-preference";
-import { provPreferenceAllows } from "@/lib/shared/prov-preference-routes";
-import { ProvInspectorExit, putDownInspector } from "@/components/shared/prov-inspector";
+import { ProvInspectorIndicator, putDownInspector } from "@/components/shared/prov-inspector";
 import { menuEntries } from "@/lib/shared/sessions";
-import { RevealTip } from "@/components/shared/reveal-tip";
+import { SAVED_NAME, SAVED_PATH } from "@/components/shared/bookmarks-name";
 
-const BOOKMARKS_PATH = "/bookmarks";
 /** The control's and the menu's accessible name: what the menu holds as a whole. */
 const MENU_NAME = "Saved and settings";
 /** The guided way in (G, /start), reached from this menu (ui-jobs 509). */
@@ -69,58 +74,102 @@ const START_PATH = "/start";
 /** The gap kept under the dropdown when it scrolls within the window. */
 const DROP_MARGIN = 16;
 
-/** The room between the menu's groups (Miles's mockup: about 32px). */
-const GROUP = "mt-8";
+/** The room between the menu's groups. */
+const GROUP = "mt-6";
 /** A row: 44px tall, a blue rounded outline on hover and keyboard focus. */
 const ITEM =
   "flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-left text-[15px] text-foreground outline-none transition-shadow hover:ring-1 hover:ring-blue-500 focus-visible:ring-[1.5px] focus-visible:ring-blue-500";
+/** The Saved views row: ITEM's size, its words alone on the rows' content
+ *  edge, a link's hover in place of the ring, the words turning link blue;
+ *  keyboard focus adds the ring (Miles 13 Nov 2026). */
+const SAVED_ROW =
+  "flex min-h-11 w-full cursor-pointer items-center rounded-lg px-3 text-left text-[15px] font-medium text-foreground outline-none transition-colors hover:text-blue-600 focus-visible:text-blue-600 focus-visible:ring-[1.5px] focus-visible:ring-blue-500 dark:hover:text-[var(--text-link)] dark:focus-visible:text-[var(--text-link)]";
 /** A long name fades at the line's end, with no ellipsis. */
 const FADE =
   "min-w-0 flex-1 overflow-hidden whitespace-nowrap [mask-image:linear-gradient(to_right,#000_calc(100%-2rem),transparent)]";
-/** A group's label, muted (Advanced; the linked headings add the blue). */
-const LABEL = "px-3 text-[15px] text-rb-500";
+/** A group's heading: the app's small label, muted, a toggle that opens and
+ *  closes the group (Miles 13 Nov 2026). */
+const HEADING = `${DISCLOSURE_HEAD} flex min-h-8 w-full cursor-pointer items-center gap-1 rounded-lg px-3 text-left text-[11px] font-medium uppercase tracking-wider text-rb-500 outline-none transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:ring-[1.5px] focus-visible:ring-blue-500`;
 
-/** On a touch screen nothing hovers, so a heading shows that it links in one
- *  of two ways. The cog always shown, muted, is in use; Miles is weighing the
- *  headings drawn blue instead. Swap `HEADING_TOUCH` to change it. */
-const TOUCH_HEADINGS = {
-  cog: { head: "", cog: "[@media(hover:none)]:opacity-100" },
-  blue: { head: "[@media(hover:none)]:text-blue-600 dark:[@media(hover:none)]:text-[var(--text-link)]", cog: "" },
-} as const;
-const HEADING_TOUCH = TOUCH_HEADINGS.cog;
+type GroupKind = "focus" | "listings" | "wallets" | "positions" | "advanced";
+/** Which groups stand open, kept per browser as a small JSON map. */
+const OPEN_KEY = "rails-profile-menu-open";
+/** Every group open but Advanced, so the inspector's switch waits to be asked for. */
+const OPEN_DEFAULT: Record<GroupKind, boolean> = {
+  focus: true,
+  listings: true,
+  wallets: true,
+  positions: true,
+  advanced: false,
+};
+function readOpen(): Record<GroupKind, boolean> {
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem(OPEN_KEY) ?? "{}");
+    const next = { ...OPEN_DEFAULT };
+    if (raw && typeof raw === "object") {
+      for (const k of Object.keys(OPEN_DEFAULT) as GroupKind[]) {
+        const v = (raw as Record<string, unknown>)[k];
+        if (typeof v === "boolean") next[k] = v;
+      }
+    }
+    return next;
+  } catch {
+    return { ...OPEN_DEFAULT };
+  }
+}
+function writeOpen(open: Record<GroupKind, boolean>) {
+  try {
+    localStorage.setItem(OPEN_KEY, JSON.stringify(open));
+  } catch {
+    // Storage refused (a private window, a full quota): the choice lasts the visit.
+  }
+}
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
-/** A group's heading: a link to its tab on /bookmarks, blue with the cog at
- *  the group's right on hover or keyboard focus. */
-function GroupHeading({
-  id,
+/** A group under its heading, a disclosure toggle that names the group
+ *  (`aria-labelledby`). Closed, the rows are not drawn, so they leave the tab
+ *  and arrow-key order. */
+function MenuGroup({
+  menuId,
   group,
-  tab,
   label,
-  onDone,
+  open,
+  onToggle,
+  hook,
+  children,
 }: {
-  id: string;
-  group: string;
-  tab: string;
+  menuId: string;
+  group: GroupKind;
   label: string;
-  onDone: () => void;
+  open: boolean;
+  onToggle: (g: GroupKind) => void;
+  /** The group's own data attribute, for the verifiers. */
+  hook?: Record<string, string>;
+  children: ReactNode;
 }) {
+  const headId = `${menuId}-${group}`;
+  const bodyId = `${headId}-rows`;
   return (
-    <Link
-      id={id}
-      href={`${BOOKMARKS_PATH}?tab=${tab}`}
-      role="menuitem"
-      onClick={onDone}
-      className={`group/head flex min-h-8 items-center justify-between rounded-lg text-rb-500 outline-none transition-colors hover:text-blue-600 focus-visible:text-blue-600 dark:hover:text-[var(--text-link)] dark:focus-visible:text-[var(--text-link)] ${LABEL} ${HEADING_TOUCH.head}`}
-      data-profile-menu-group={group}
-    >
-      {label}
-      <Settings
-        className={`size-[18px] shrink-0 opacity-0 transition-opacity group-hover/head:opacity-100 group-focus-visible/head:opacity-100 ${HEADING_TOUCH.cog}`}
-        aria-hidden="true"
-      />
-    </Link>
+    <div role="group" aria-labelledby={headId} className={GROUP} data-open={open ? "true" : "false"} {...hook}>
+      <button
+        id={headId}
+        type="button"
+        role="menuitem"
+        aria-expanded={open}
+        aria-controls={bodyId}
+        onClick={() => onToggle(group)}
+        className={HEADING}
+        data-profile-menu-group={group}
+        data-profile-menu-group-toggle={group}
+      >
+        {label}
+        <ChevronDown className={disclosureChevron(open)} strokeWidth={2} aria-hidden="true" />
+      </button>
+      <div id={bodyId} hidden={!open} className="mt-1">
+        {open && children}
+      </div>
+    </div>
   );
 }
 
@@ -191,143 +240,70 @@ function LinkRow({ link, onDone }: { link: SavedLink; onDone: () => void }) {
   );
 }
 
-const THEMES = [
-  { value: "light", label: "Light", Icon: Sun },
-  { value: "dark", label: "Dark", Icon: Moon },
-  { value: "system", label: "Auto", Icon: Monitor },
-] as const;
-
-/** Light, dark or the system's: a three-way segment, the one chosen on a
- *  raised tile. */
-function ThemeSwitch() {
-  const { theme, setTheme } = useTheme();
-  return (
-    <div role="group" aria-label="Theme" className="flex gap-1" data-profile-menu-theme="">
-      {THEMES.map(({ value, label, Icon }) => {
-        const on = (theme ?? "system") === value;
-        return (
-          <button
-            key={value}
-            type="button"
-            role="menuitemradio"
-            aria-checked={on}
-            onClick={() => setTheme(value)}
-            className={`flex min-h-10 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg px-2 text-sm transition-colors outline-none focus-visible:ring-[1.5px] focus-visible:ring-blue-500 ${
-              on
-                ? "bg-rb-100 font-medium text-foreground dark:bg-rb-800"
-                : "text-rb-500 hover:text-foreground hover:ring-1 hover:ring-blue-500"
-            }`}
-            data-theme-option={value}
-          >
-            <Icon className="size-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
-            {label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 const PROV_ABOUT_PATH = "/about/provenance";
 const ITEMS = '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]';
-const PROV_HELP =
-  "Underlines each figure that has a receipt: click one to see the contract call, the block and the maths behind it. Switched on here, it stays on across the pages that support it.";
 
-/** The provenance inspector's one switch (decision 0062; ui-jobs 571, 625):
- *  arms the inspector on arrival on every page that has passed the coverage
- *  gate (lib/shared/prov-preference-routes.ts). Off by default.
+/** The inspector's one switch, "Inspector" (decision 0062; ui-jobs 571, 625,
+ *  651): arms the inspector on arrival on every page that has passed the
+ *  coverage gate (lib/shared/prov-preference-routes.ts). Off by default.
  *
- *  The row is one switch; its "?" opens the house tooltip (RevealTip) and is
- *  a sibling of the switch, standing over the switch's stretched hit area
- *  (`after:inset-0`), so a press on it explains and never toggles (ui-jobs 602).
+ *  One line, the height of the other rows. Its "?" is a link to
+ *  /about/provenance that closes the menu; it is a sibling of the switch,
+ *  standing over the switch's stretched hit area (`after:inset-0`), so a press
+ *  on it navigates and never toggles (ui-jobs 602, 603, 651).
  *
- *  On a page off the list the switch reads "Not on this page", is disabled and
- *  shows off; the saved choice is kept and arms the next page that supports
- *  it (ui-jobs 625). */
+ *  The switch reads the saved choice alone and toggles it on every page
+ *  (Miles 13 Nov 2026); whether the page arms is the inspector's call
+ *  (components/shared/prov-inspector.tsx, `provPreferenceAllows`). */
 function ProvInspectorSwitch({ onDone }: { onDone: () => void }) {
-  const saved = useProvPreference();
-  const allowed = provPreferenceAllows(usePathname(), useParams());
-  const on = saved && allowed;
-  const noteId = useId();
+  const on = useProvPreference();
+  const descId = useId();
   return (
     <div
-      // ITEM's row, its ring answering the switch's hover and focus.
-      // Disabled, no hover ring and no pointer; the focus ring stays.
-      className={`relative flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-[15px] text-foreground has-[[role=menuitemcheckbox]:focus-visible]:ring-[1.5px] has-[[role=menuitemcheckbox]:focus-visible]:ring-blue-500 ${
-        allowed
-          ? "cursor-pointer has-[[role=menuitemcheckbox]:hover]:ring-1 has-[[role=menuitemcheckbox]:hover]:ring-blue-500"
-          : ""
-      }`}
+      // ITEM's row with no hover ring: on hover the crosshair and the label
+      // turn teal, the switch's on colour (ui-jobs 651; Miles 13 Nov 2026).
+      // The (?) stands over the switch's hit area, so hovering it turns
+      // neither. The focus ring answers the keyboard.
+      className="group/prov relative flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-[15px] text-foreground has-[[role=menuitemcheckbox]:focus-visible]:ring-[1.5px] has-[[role=menuitemcheckbox]:focus-visible]:ring-blue-500"
       data-anatomy="H20.1"
     >
-      <Crosshair className="size-5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
-      {/* The label over its subtitle line, a title over a text-xs line.
-          Neither span is positioned, so the switch's hit area and the tip's
-          bubble still stand on the row. */}
-      <span className="flex min-w-0 flex-col py-1.5">
-        <span className="flex min-w-0 items-center gap-3">
-          <button
-            type="button"
-            role="menuitemcheckbox"
-            aria-checked={on}
-            aria-disabled={allowed ? undefined : true}
-            aria-describedby={allowed ? undefined : noteId}
-            onClick={() => {
-              if (!allowed) return;
-              if (on) putDownInspector();
-              else setProvPreference(true);
-            }}
-            className={`min-w-0 truncate text-left outline-none after:absolute after:inset-0 after:rounded-lg after:content-[''] ${
-              allowed ? "" : "cursor-default text-rb-500"
-            }`}
-            data-profile-menu-prov={allowed ? (on ? "on" : "off") : "unavailable"}
-          >
-            Provenance inspector
-          </button>
-          <RevealTip
-            // `!static`: the bubble stands on the row (the menu clips a bubble
-            // anchored at the "?"), opening up from the row's left edge.
-            className="-ml-1.5 !static"
-            wrap
-            tip={<span className="block w-64 font-normal leading-snug">{PROV_HELP}</span>}
-          >
-            <button
-              type="button"
-              aria-label="About the provenance inspector"
-              className="relative z-10 inline-flex rounded-full p-0.5 text-rb-400 hover:text-foreground focus-visible:outline-2 focus-visible:outline-blue-500"
-              data-profile-menu-prov-help=""
-            >
-              <CircleHelp className="size-3.5" aria-hidden="true" />
-            </button>
-          </RevealTip>
-        </span>
-        {/* The page half of the "?" (ui-jobs 603): a link to /about/provenance,
-            standing over the switch's stretched hit area as the "?" does, so a
-            press on it navigates and never toggles. */}
-        <span className="flex items-center gap-1 self-start text-xs leading-5 text-rb-500">
-          {!allowed && (
-            <>
-              <span id={noteId} data-profile-menu-prov-unavailable="">
-                Not on this page
-              </span>
-              <span aria-hidden="true">·</span>
-            </>
-          )}
-          <Link
-            href={PROV_ABOUT_PATH}
-            role="menuitem"
-            onClick={onDone}
-            className="relative z-10 whitespace-nowrap rounded-sm outline-none hover:text-blue-600 focus-visible:text-blue-600 focus-visible:ring-[1.5px] focus-visible:ring-blue-500 dark:hover:text-[var(--text-link)] dark:focus-visible:text-[var(--text-link)]"
-            data-profile-menu-prov-about=""
-          >
-            How it works
-          </Link>
-        </span>
+      <Crosshair
+        className="size-5 shrink-0 transition-colors group-has-[[role=menuitemcheckbox]:hover]/prov:text-teal-600 dark:group-has-[[role=menuitemcheckbox]:hover]/prov:text-teal-400"
+        strokeWidth={1.75}
+        aria-hidden="true"
+      />
+      <button
+        type="button"
+        role="menuitemcheckbox"
+        aria-checked={on}
+        aria-describedby={descId}
+        onClick={() => {
+          if (on) putDownInspector();
+          else setProvPreference(true);
+        }}
+        className="min-w-0 truncate text-left outline-none transition-colors after:absolute after:inset-0 after:rounded-lg after:content-[''] hover:text-teal-600 dark:hover:text-teal-400"
+        data-profile-menu-prov={on ? "on" : "off"}
+      >
+        Inspector
+      </button>
+      <span id={descId} className="sr-only">
+        Shows where each figure comes from.
       </span>
+      <Link
+        href={PROV_ABOUT_PATH}
+        role="menuitem"
+        aria-label="About the inspector"
+        onClick={onDone}
+        className="relative z-10 -ml-1.5 inline-flex rounded-full p-0.5 text-rb-400 outline-none hover:text-foreground focus-visible:text-foreground focus-visible:ring-[1.5px] focus-visible:ring-blue-500"
+        data-profile-menu-prov-help=""
+        data-profile-menu-prov-about=""
+      >
+        <CircleHelp className="size-3.5" aria-hidden="true" />
+      </Link>
       <span
         className={`pointer-events-none relative ml-auto inline-flex h-5 w-9 shrink-0 rounded-full transition-colors ${
           on ? "bg-teal-500" : "bg-rb-300 dark:bg-rb-700"
-        } ${allowed ? "" : "opacity-50"}`}
+        }`}
         aria-hidden="true"
       >
         <span
@@ -362,16 +338,30 @@ export function ProfileMenu() {
   const menu = useRef<HTMLDivElement>(null);
   const menuId = useId();
   useEffect(() => setMounted(true), []);
+  const [groupsOpen, setGroupsOpen] = useState(OPEN_DEFAULT);
+  // Read as the menu opens, before it paints, so another tab's choice holds too.
+  useLayoutEffect(() => {
+    if (open) setGroupsOpen(readOpen());
+  }, [open]);
+  const toggleGroup = useCallback(
+    (g: GroupKind) => {
+      const next = { ...groupsOpen, [g]: !groupsOpen[g] };
+      setGroupsOpen(next);
+      writeOpen(next);
+    },
+    [groupsOpen],
+  );
 
   const face = bookmarks == null ? null : (bookmarks[0]?.addresses[0] ?? SAMPLE_WALLET);
-  // The starred of each kind, or the first five (ui-jobs 586).
   const rows = menuEntries(bookmarks ?? []);
   const listings = menuEntries(views ?? []);
   const held = menuEntries(positions ?? []);
   const focusOn = scope.ready && scope.on;
-  const menuView = scope.menuView;
-  /** Anything saved, focus views included, takes "Start here" out of the menu. */
-  const anything = rows.length > 0 || listings.length > 0 || held.length > 0 || (scope.ready && scope.views.length > 0);
+  const menuViews = scope.menuViews;
+  /** Anything saved, starred or not, focus views included, takes "Start here"
+   *  out of the menu. */
+  const anything =
+    !!bookmarks?.length || !!views?.length || !!positions?.length || (scope.ready && scope.views.length > 0);
   const focusLabel = scope.active?.name || focusShort(scope.picks, scope.chains);
 
   const close = useCallback((refocus = true) => {
@@ -450,6 +440,12 @@ export function ProfileMenu() {
       } else if (e.key === "End") {
         e.preventDefault();
         go(items.length - 1);
+      } else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        // On a group's heading, ArrowRight opens it and ArrowLeft closes it.
+        const head = document.activeElement as HTMLElement | null;
+        if (!head?.hasAttribute("data-profile-menu-group-toggle")) return;
+        e.preventDefault();
+        if ((head.getAttribute("aria-expanded") === "true") === (e.key === "ArrowLeft")) head.click();
       } else if (e.key === "Tab") {
         close(false);
       }
@@ -465,26 +461,33 @@ export function ProfileMenu() {
 
   // A group is drawn only when it holds something (ui-jobs 586).
   const linkGroups = [
-    { kind: "listings", tab: "listings", label: "Listings", rows: listings },
-    { kind: "positions", tab: "positions", label: "Positions", rows: held },
+    { kind: "listings", label: "Listings", rows: listings },
+    { kind: "positions", label: "Positions", rows: held },
   ] as const;
   const linkGroup = (g: (typeof linkGroups)[number]) =>
     g.rows.length > 0 && (
-      <div key={g.kind} role="group" aria-labelledby={`${menuId}-${g.kind}`} className={GROUP}>
-        <GroupHeading id={`${menuId}-${g.kind}`} group={g.kind} tab={g.tab} label={g.label} onDone={done} />
-        <div className="mt-1" data-profile-menu-links={g.kind}>
+      <MenuGroup
+        key={g.kind}
+        menuId={menuId}
+        group={g.kind}
+        label={g.label}
+        open={groupsOpen[g.kind]}
+        onToggle={toggleGroup}
+      >
+        <div data-profile-menu-links={g.kind}>
           {g.rows.map((l) => (
             <LinkRow key={l.key} link={l} onDone={done} />
           ))}
         </div>
-      </div>
+      </MenuGroup>
     );
 
   return (
     <>
-      {/* While the inspector is armed, its way out stands left of the control
-          (ui-jobs 624.2). */}
-      <ProvInspectorExit onExit={() => trigger.current?.focus()} />
+      {/* While the inspector is armed on a page with a traced value, the
+          inspector indicator stands left of the control (ui-jobs 624.2,
+          651). */}
+      <ProvInspectorIndicator />
       <button
         ref={trigger}
         type="button"
@@ -545,42 +548,59 @@ export function ProfileMenu() {
               // itself (ui-jobs 586).
               style={place.phone ? undefined : { top: place.top, right: place.right, maxHeight: place.room }}
             >
-              <ThemeSwitch />
-              {/* With nothing saved, the way in, after the theme (Miles, 11
-                  Nov 2026); with anything saved there is none (ui-jobs 509). */}
+              {/* First, the way to /saved-views, whatever is saved (Miles 13
+                  Nov 2026; ui-jobs 652). */}
+              <Link
+                href={SAVED_PATH}
+                role="menuitem"
+                onClick={done}
+                className={SAVED_ROW}
+                data-profile-menu-bookmarks=""
+              >
+                {SAVED_NAME}
+              </Link>
+              {/* With nothing saved, the way in (ui-jobs 509). */}
               {!anything && (
                 <Link
                   href={START_PATH}
                   role="menuitem"
                   onClick={done}
-                  className={`mt-6 flex w-full ${START_CTA}`}
+                  className={`mt-3 flex w-full ${START_CTA}`}
                   data-profile-menu-start=""
                 >
                   New to Rails? Start here
                   <Signpost className="ml-auto size-4 shrink-0" aria-hidden="true" />
                 </Link>
               )}
-              {/* Focus: the one view chosen for this menu and Off (ui-jobs
-                  582); the others are on /bookmarks?tab=focus. */}
-              {menuView && (
-                <div role="group" aria-labelledby={`${menuId}-focus`} className={GROUP} data-profile-menu-focus="">
-                  <GroupHeading id={`${menuId}-focus`} group="focus" tab="focus" label="Focus" onDone={done} />
-                  <div className="mt-1" data-profile-menu-focus-views={scope.views.length}>
+              {/* Focus: the starred views, the view in use, and Off (ui-jobs 652). */}
+              {menuViews.length > 0 && (
+                <MenuGroup
+                  menuId={menuId}
+                  group="focus"
+                  label="Focus"
+                  open={groupsOpen.focus}
+                  onToggle={toggleGroup}
+                  hook={{ "data-profile-menu-focus": "" }}
+                >
+                  <div data-profile-menu-focus-views={menuViews.length}>
                     <>
-                      <button
-                        type="button"
-                        role="menuitemradio"
-                        aria-checked={scope.active?.id === menuView.id}
-                        onClick={() => focusViews.use(menuView.id)}
-                        className={ITEM}
-                        data-profile-menu-focus-view={menuView.id}
-                      >
-                        <RadioMark on={scope.active?.id === menuView.id} />
-                        <span className="flex min-w-0 flex-1 items-center">
-                          <ViewIcons picks={menuView.assets} chains={menuView.chains} />
-                          <span className={`${FADE} ml-1 font-medium`}>{viewName(menuView)}</span>
-                        </span>
-                      </button>
+                      {menuViews.map((v) => (
+                        <button
+                          key={v.id}
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={scope.active?.id === v.id}
+                          onClick={() => focusViews.use(v.id)}
+                          className={ITEM}
+                          data-profile-menu-focus-view={v.id}
+                        >
+                          <RadioMark on={scope.active?.id === v.id} />
+                          <span className="flex min-w-0 flex-1 items-center">
+                            <ViewIcons picks={v.assets} chains={v.chains} />
+                            <span className={`${FADE} ml-1 font-medium`}>{viewName(v)}</span>
+                          </span>
+                        </button>
+                      ))}
                       <button
                         type="button"
                         role="menuitemradio"
@@ -594,28 +614,34 @@ export function ProfileMenu() {
                       </button>
                     </>
                   </div>
-                </div>
+                </MenuGroup>
               )}
               {linkGroup(linkGroups[0])}
               {rows.length > 0 && (
-                <div role="group" aria-labelledby={`${menuId}-wallets`} className={GROUP}>
-                  <GroupHeading id={`${menuId}-wallets`} group="wallets" tab="wallets" label="Wallets" onDone={done} />
-                  <div className="mt-1" data-profile-menu-wallets="">
+                <MenuGroup
+                  menuId={menuId}
+                  group="wallets"
+                  label="Wallets"
+                  open={groupsOpen.wallets}
+                  onToggle={toggleGroup}
+                >
+                  <div data-profile-menu-wallets="">
                     {rows.map((s) => (
                       <WalletRow key={s.key} session={s} onDone={done} />
                     ))}
                   </div>
-                </div>
+                </MenuGroup>
               )}
               {linkGroup(linkGroups[1])}
-              <div role="group" aria-labelledby={`${menuId}-advanced`} className={GROUP}>
-                <p id={`${menuId}-advanced`} className={`${LABEL} flex min-h-8 items-center`}>
-                  Advanced
-                </p>
-                <div className="mt-1">
-                  <ProvInspectorSwitch onDone={done} />
-                </div>
-              </div>
+              <MenuGroup
+                menuId={menuId}
+                group="advanced"
+                label="Advanced"
+                open={groupsOpen.advanced}
+                onToggle={toggleGroup}
+              >
+                <ProvInspectorSwitch onDone={done} />
+              </MenuGroup>
             </div>
           </>,
           document.body,

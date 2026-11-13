@@ -7,12 +7,13 @@
 // The tab rides in the URL (`?tab=focus`, `?tab=listings`, `?tab=wallets`,
 // `?tab=positions`; the old `?tab=views` opens Listings). With no tab, the
 // Overview (Miles, 10 Nov 2026): a card per kind that can be saved, saying
-// how to save one and opening its list, and the backup card with export and
+// how to save one and opening its list, and under the cards the Backup
+// section on the page's background (Miles 13 Nov 2026), with export and
 // import (`?tab=backup` opens the Overview at it).
 
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Bookmark, Focus, HardDriveDownload, Layers, ListFilter, Plus, Signpost, Wallet } from "lucide-react";
+import { Bookmark, Plus, Signpost } from "lucide-react";
 import { DetailBackButton } from "@/components/shared/detail-back-row";
 import {
   BookmarkBackup,
@@ -26,7 +27,7 @@ import { useSavedLinks } from "@/components/shared/saved-items";
 import { SAVED_NAME } from "@/components/shared/bookmarks-name";
 import { walletHref } from "@/components/shared/front-door-search";
 import { SAMPLE_WALLET } from "@/lib/shared/sample-wallet";
-import { INLINE_LINK, INPLACE_TEXT, PROFILE_CLEARANCE, START_CTA } from "@/lib/shared/ui-grammar";
+import { FOOT_ARROW, FOOT_LINK, FOOT_WORDS, PROFILE_CLEARANCE, START_CTA } from "@/lib/shared/ui-grammar";
 
 type Tab = "overview" | "focus" | "listings" | "wallets" | "positions";
 type Kind = Exclude<Tab, "overview">;
@@ -68,8 +69,8 @@ export function BookmarksPage() {
     if (new URLSearchParams(window.location.search).get("tab") === "backup")
       requestAnimationFrame(() => document.getElementById("saved-backup")?.scrollIntoView({ block: "start" }));
   }, []);
-  // A heading in the profile menu (H20) can change the tab while this page
-  // stays mounted (ui-jobs 582): read it again when the address changes.
+  // A link to `?tab=` can change the tab while this page stays mounted
+  // (ui-jobs 582): read it again when the address changes.
   useEffect(() => {
     const t = tabFromUrl();
     if (t !== tab) setTab(t);
@@ -84,10 +85,10 @@ export function BookmarksPage() {
   };
 
   const ready = bookmarks && positions && views && scope.ready;
-  /** Over the Listings, Wallets and Positions tables (ui-jobs 586). */
+  /** Over every kind's table, focus views included (ui-jobs 586, 652). */
   const starNote = (
     <p className="mb-3 text-sm text-rb-500" data-star-note="">
-      Starred items appear in the profile menu, up to five.
+      Starred items appear in the profile menu.
     </p>
   );
   const counts: Record<Tab, number> = {
@@ -122,12 +123,11 @@ export function BookmarksPage() {
     </button>
   );
 
-  /** A kind's card on the Overview: what it keeps, how to save one, and the
-   *  press that opens its list. */
-  const kindCard = (kind: Kind, icon: ReactNode, title: string, noun: string, how: ReactNode, extra?: ReactNode) => (
+  /** A kind's card on the Overview: its heading alone (Miles 13 Nov 2026),
+   *  what it keeps, how to save one, and the foot link that opens its list. */
+  const kindCard = (kind: Kind, title: string, noun: string, how: ReactNode, extra?: ReactNode) => (
     <section className={CARD} aria-labelledby={`saved-card-${kind}`} data-saved-card={kind}>
-      <h2 id={`saved-card-${kind}`} className="flex items-center gap-2 text-base font-semibold text-foreground">
-        <span className="text-rb-500">{icon}</span>
+      <h2 id={`saved-card-${kind}`} className="text-base font-semibold text-foreground">
         {title}
       </h2>
       <p className="mt-2 flex-1 text-sm leading-relaxed text-rb-500">{how}</p>
@@ -136,10 +136,13 @@ export function BookmarksPage() {
           <button
             type="button"
             onClick={() => choose(kind)}
-            className={`inline-flex min-h-11 items-center font-semibold sm:min-h-0 ${INPLACE_TEXT}`}
+            className={`${FOOT_LINK} cursor-pointer font-semibold`}
             data-saved-card-open={kind}
           >
-            {`Open ${plural(counts[kind], noun)}`}
+            <span className={FOOT_WORDS}>{`Open ${plural(counts[kind], noun)}`}</span>
+            <span className={FOOT_ARROW} aria-hidden="true">
+              →
+            </span>
           </button>
         ) : (
           <span className="text-rb-500">None saved yet</span>
@@ -160,18 +163,20 @@ export function BookmarksPage() {
       <div className={`flex min-h-[38px] items-center ${PROFILE_CLEARANCE}`} data-anatomy="H7" data-back-row="">
         <DetailBackButton fallbackHref="/" />
       </div>
-      {/* One header row: the heading (B1) and the tabs (B4); on a phone the
-          tabs are one row under it that scrolls sideways (Miles, 10 Nov 2026). */}
-      <div className="mb-6 mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6">
+      {/* The heading (B1), and under it the tabs (B4) on a row of their own at
+          every width (Miles, 13 Nov 2026; ui-jobs 652); on a phone the row
+          scrolls sideways. */}
+      <div className="mb-6 mt-6 flex flex-col gap-3">
+        {/* The page's name after an outline bookmark (Miles 13 Nov 2026); the
+            profile menu's row draws none. */}
         <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground" data-anatomy="B1">
-          {/* The saved-state glyph the wallet menu draws (ui-jobs 493, 494). */}
-          <Bookmark className="size-6 shrink-0" fill="currentColor" aria-hidden="true" />
+          <Bookmark className="size-6 shrink-0" aria-hidden="true" />
           {SAVED_NAME}
         </h1>
         <div
           className="-mx-4 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0"
           role="tablist"
-          aria-label="Saved items"
+          aria-label="Saved views"
           data-anatomy="B4"
         >
           {TABS.map((t) => (
@@ -204,15 +209,17 @@ export function BookmarksPage() {
                     New to Rails? Start here
                     <Signpost className="size-4 shrink-0" aria-hidden="true" />
                   </Link>
-                  <Link href={walletHref(SAMPLE_WALLET)} className={`text-sm ${INLINE_LINK}`} data-bookmarks-sample="">
-                    See a sample wallet →
+                  <Link href={walletHref(SAMPLE_WALLET)} className={`text-sm ${FOOT_LINK}`} data-bookmarks-sample="">
+                    <span className={FOOT_WORDS}>See a sample wallet</span>
+                    <span className={FOOT_ARROW} aria-hidden="true">
+                      →
+                    </span>
                   </Link>
                 </div>
               )}
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {kindCard(
                   "focus",
-                  <Focus className="size-4" aria-hidden="true" />,
                   "Focus views",
                   "focus view",
                   <>
@@ -221,14 +228,16 @@ export function BookmarksPage() {
                   </>,
                   <>
                     {newView}
-                    <Link href="/assets" className={INLINE_LINK} data-saved-card-assets="">
-                      Assets →
+                    <Link href="/assets" className={FOOT_LINK} data-saved-card-assets="">
+                      <span className={FOOT_WORDS}>Assets</span>
+                      <span className={FOOT_ARROW} aria-hidden="true">
+                        →
+                      </span>
                     </Link>
                   </>,
                 )}
                 {kindCard(
                   "listings",
-                  <ListFilter className="size-4" aria-hidden="true" />,
                   "Listings",
                   "listing",
                   <>
@@ -238,7 +247,6 @@ export function BookmarksPage() {
                 )}
                 {kindCard(
                   "wallets",
-                  <Wallet className="size-4" aria-hidden="true" />,
                   "Wallets",
                   "wallet",
                   <>
@@ -248,7 +256,6 @@ export function BookmarksPage() {
                 )}
                 {kindCard(
                   "positions",
-                  <Layers className="size-4" aria-hidden="true" />,
                   "Positions",
                   "position",
                   <>
@@ -256,17 +263,16 @@ export function BookmarksPage() {
                   </>,
                 )}
               </div>
+              {/* Backup is a section on the page's background under the cards,
+                  no card of its own, on the column's edge (Miles 13 Nov 2026). */}
               <section
                 id="saved-backup"
-                className={`${CARD} mt-4 scroll-mt-6`}
+                className="mt-10 scroll-mt-6"
                 aria-labelledby="saved-card-backup"
                 data-saved-card="backup"
                 data-saved-backup=""
               >
-                <h2 id="saved-card-backup" className="flex items-center gap-2 text-base font-semibold text-foreground">
-                  <span className="text-rb-500">
-                    <HardDriveDownload className="size-4" aria-hidden="true" />
-                  </span>
+                <h2 id="saved-card-backup" className="text-base font-semibold text-foreground">
                   Backup
                 </h2>
                 <p className="mt-2 text-sm leading-relaxed text-rb-500">
@@ -328,15 +334,10 @@ export function BookmarksPage() {
           )}
           {tab === "focus" && (
             <>
-              {scope.views.length > 0 && (
-                <p className="mb-3 text-sm text-rb-500" data-focus-menu-note="">
-                  The profile menu offers one focus view. Choose it here with Show in menu.
-                </p>
-              )}
+              {scope.views.length > 0 && starNote}
               <FocusViewList
                 views={scope.views}
                 active={scope.active?.id ?? null}
-                menu={scope.menuView?.id ?? null}
                 empty={
                   <div data-anatomy="B3">
                     <p className="font-semibold text-foreground">No focus views yet.</p>

@@ -1976,36 +1976,30 @@ label[for] {
 .dark [data-prov-inspect] {
   text-decoration-color: rgb(45 212 191 / 0.28); /* teal-400 */
 }
-/* "Exit inspector", beside the profile control (H20; ui-jobs 624.2) */
-.prov-inspect-exit {
+/* The header's inspector indicator, beside the profile control (H7.4;
+   ui-jobs 624.2, 651): the menu row's crosshair in teal; its tip opens on
+   hover and keyboard focus (prov-inspector.tsx `ProvInspectorIndicator`). */
+.prov-inspect-on {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: 9999px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
+  justify-content: center;
+  width: 36px;
+  height: 38px;
+  border-radius: 8px;
   flex: none;
   color: rgb(13 148 136); /* teal-600 */
-  background: rgb(238 249 246);
-  border: 1px solid rgb(13 148 136 / 0.35);
 }
-.prov-inspect-exit svg {
-  width: 14px;
-  height: 14px;
+.prov-inspect-on:focus-visible {
+  outline: 2px solid rgb(59 130 246); /* blue-500 */
+  outline-offset: 0;
 }
-.prov-inspect-exit:hover {
-  background: rgb(13 148 136 / 0.14);
-}
-.dark .prov-inspect-exit {
+.dark .prov-inspect-on {
   color: rgb(45 212 191); /* teal-400 */
-  background: rgb(15 40 37);
-  border-color: rgb(45 212 191 / 0.35);
 }
-.dark .prov-inspect-exit:hover {
-  background: rgb(45 212 191 / 0.16);
+.prov-inspect-on-icon {
+  width: 20px;
+  height: 20px;
 }
 /* the popover — the receipt pinned AT the value; a bottom sheet under 640px.
    Teal-washed ground ties it to the tool's colorway (halo, dotted targets,

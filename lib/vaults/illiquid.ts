@@ -25,9 +25,12 @@
 // That sum is stated for every vault tested (ui-jobs 553: "n% of it can leave
 // today"); the markets and the standing only where the test catches one.
 //
-// The borrow rate is the IRM's curve at the stored utilisation over the
-// adapted rate at target: at its maximum it cannot adapt higher, and at full utilisation it is the ceiling,
-// MAX_RATE_AT_TARGET × CURVE_STEEPNESS = 800% a year.
+// The borrow rate is the IRM's curve at the settled utilisation over the
+// adapted rate at target: the rate the market charges until it next settles.
+// At its maximum the rate at target cannot adapt higher, and at full
+// utilisation the rate is the ceiling, MAX_RATE_AT_TARGET × CURVE_STEEPNESS =
+// 800% a year. The sentence prints each caught market's rate, and calls it the
+// rate ceiling only where every rate rounds to it.
 //
 // Pure, with no imports: scripts/test/vault-illiquid.test.mjs reads it.
 
@@ -104,7 +107,8 @@ export interface IlliquidMarket {
   share: number;
   /** Borrow over supply, 0..1. */
   utilisation: number;
-  /** The IRM's curve at `utilisation` over the adapted rate at target, a year, simple. */
+  /** The IRM's curve at the settled utilisation over the adapted rate at
+   *  target, a year, simple: the rate the market charges until it next settles. */
   borrowRateYearly: number;
   lastUpdate: number;
 }
@@ -255,7 +259,7 @@ export function vaultIlliquid(
         vaultAssets: l.vaultAssets.toString(),
         share,
         utilisation,
-        borrowRateYearly: borrowRateYearly(rateAtTarget, utilisation),
+        borrowRateYearly: borrowRateYearly(rateAtTarget, l.settledUtilisation),
         lastUpdate: l.lastUpdate,
       });
     }
@@ -316,5 +320,13 @@ export function illiquidSentence(il: VaultIlliquid): string {
     : illiquidPct(low) === illiquidPct(high)
       ? `each ${illiquidPct(low)}`
       : `${illiquidPct(low)} to ${illiquidPct(high)}`;
-  return `The ${names} market${one ? " holds" : "s hold"} ${illiquidPct(il.share)} of the vault, ${borrowed} borrowed at the rate ceiling (${ratePct(RATE_CEILING_YEARLY)} a year, before compounding).`;
+  const ceiling = ratePct(RATE_CEILING_YEARLY);
+  const rates = il.markets.map((m) => m.borrowRateYearly);
+  const lo = ratePct(Math.min(...rates));
+  const hi = ratePct(Math.max(...rates));
+  const rate =
+    lo === ceiling && hi === ceiling
+      ? `at the rate ceiling (${ceiling} a year, before compounding)`
+      : `at ${lo === hi ? lo : `${lo} to ${hi}`} a year, before compounding (the ceiling is ${ceiling})`;
+  return `The ${names} market${one ? " holds" : "s hold"} ${illiquidPct(il.share)} of the vault, ${borrowed} borrowed ${rate}.`;
 }
