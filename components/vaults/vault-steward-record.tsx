@@ -46,6 +46,7 @@ import {
 import { vaultIndexRowReceipts } from "@/lib/vaults/row-receipts";
 import type { StewardRecordRead, StewardRecordRoster } from "@/lib/vaults/steward-record";
 import { vaultDisplayName, type VaultSteward, type VaultSummary } from "@/lib/vaults/summary";
+import { assetScaleAbsentTip } from "@/lib/vaults/asset-scale-words";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -223,6 +224,7 @@ function StewardRow({
   const name = vaultDisplayName(v);
   const nameText = name ?? <span className="font-mono">{shortAddress(v.address)}</span>;
   const held = v.totalAssets;
+  const withheld = v.assetScale ? assetScaleAbsentTip(v.asset.symbol, v.assetScale) : undefined;
   const heldProv: Provenance | undefined = receipts.totalAssets;
   return (
     <DataTableRow
@@ -261,7 +263,20 @@ function StewardRow({
         valign="middle"
         className="whitespace-nowrap font-semibold tabular-nums text-foreground"
       >
-        {held ? (
+        {held && withheld ? (
+          // Decimals disagree (ui-jobs 664): no amount in the asset; the raw
+          // read stays on the cell, where the order within the token uses it.
+          <span
+            className="text-rb-500"
+            data-cell="steward-held"
+            data-raw={held.raw}
+            data-held-withheld=""
+            title={withheld}
+          >
+            <span aria-hidden>&ndash;</span>
+            <span className="sr-only">{withheld}</span>
+          </span>
+        ) : held ? (
           <span
             className="inline-flex items-center gap-1.5 sm:justify-end"
             data-cell="steward-held"

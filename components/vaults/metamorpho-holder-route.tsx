@@ -339,7 +339,15 @@ async function HoldingCardSection({
 }
 
 /** "How the vault is doing" (V7) from this page's read of the vault. */
-function HealthSection({ data, withheld }: { data: MorphoBaseVaultResponse; withheld?: string }) {
+function HealthSection({
+  data,
+  withheld,
+  scaleNote,
+}: {
+  data: MorphoBaseVaultResponse;
+  withheld?: string;
+  scaleNote?: string;
+}) {
   const { vault } = data;
   const liquidity = data.liquidity;
   const name = vault.name || shortAddr(vault.address);
@@ -351,6 +359,7 @@ function HealthSection({ data, withheld }: { data: MorphoBaseVaultResponse; with
       vault={{ address: vault.address, name, assetSymbol: vault.asset.symbol, decimals: vault.asset.decimals }}
       totalAssetsRaw={data.totalAssets.raw}
       amountsWithheld={withheld}
+      scaleNote={scaleNote}
       block={data.blockNumber}
       readBy={serverReadOf(data)}
       exit={
@@ -626,7 +635,11 @@ export async function MetaMorphoHolderRoute({ chainId, params }: Props & { chain
                 </div>
               }
             >
-              <HealthSection data={data} withheld={withheld} />
+              <HealthSection
+                data={data}
+                withheld={withheld}
+                scaleNote={scale ? assetScaleReceiptNote(data.vault.asset.symbol, scale) : undefined}
+              />
             </Suspense>
           )}
           {!data.chainStale && timelineSlot && <HoldingReceiptsScope>{timelineSlot}</HoldingReceiptsScope>}

@@ -8,6 +8,7 @@ import { formatDate } from "@/lib/date";
 import { formatUnitsExact } from "@/lib/utils/format";
 import type { Health, HealthKey, Span, StewardRole } from "@/lib/vaults/health";
 import { yearlyOf } from "@/lib/vaults/health";
+import { withScaleNote } from "@/lib/vaults/asset-scale-words";
 import type { VaultYieldRead } from "@/lib/vaults/yield";
 
 const n = (v: number) => v.toLocaleString("en-US");
@@ -21,6 +22,9 @@ export interface HealthReceiptVault {
   decimals: number;
   priceKey: string;
   assetsKey: string;
+  /** Where the asset's decimals disagree (ui-jobs 664): the sentence a receipt
+   *  adds after an amount it prints in the asset at the stated scale. */
+  scaleNote?: string;
 }
 
 const ROLE_CALL: Record<StewardRole, string> = {
@@ -48,6 +52,16 @@ const spanInputs = (v: HealthReceiptVault, label: string, s: Span): ProvInput[] 
   readInput(`${label} to`, v, s.to),
 ];
 
+/** The lines whose receipt prints an amount in the asset. A yield or a fall is
+ *  a ratio of two reads at one scale, so its percentage stands either way. */
+const PRINTS_AMOUNTS: ReadonlySet<Health[HealthKey]["kind"]> = new Set([
+  "size",
+  "yield",
+  "falls",
+  "lost-only",
+  "withdrawals",
+]);
+
 /** The receipt of one line; null where the line states no read. */
 export function healthLineProv(
   key: HealthKey,
@@ -55,6 +69,11 @@ export function healthLineProv(
   v: HealthReceiptVault,
   chainBlock: number,
 ): Provenance | null {
+  const p = lineProv(key, health, v, chainBlock);
+  return p && v.scaleNote && PRINTS_AMOUNTS.has(health[key].kind) ? withScaleNote(p, v.scaleNote) : p;
+}
+
+function lineProv(key: HealthKey, health: Health, v: HealthReceiptVault, chainBlock: number): Provenance | null {
   const contract = { name: v.name, address: v.address };
   const b = health[key];
   switch (b.kind) {
