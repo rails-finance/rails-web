@@ -84,7 +84,7 @@ function countsLine(n: number, counts: { open: number; closed: number; liquidate
     counts.closed > 0 ? `${count(counts.closed)} closed` : null,
     counts.liquidated > 0 ? `${count(counts.liquidated)} liquidated` : null,
   ].filter((p): p is string => p != null);
-  const noun = n === 1 ? "Comet position" : "Comet positions";
+  const noun = n === 1 ? "Comet account" : "Comet accounts";
   const spread = parts.length === 1 && n > 1 ? `${n === 2 ? "both" : "all"} ${parts[0].split(" ")[1]}` : joinAnd(parts);
   const liq =
     liquidatable > 0
@@ -113,7 +113,7 @@ export function compoundHolderStrip(
     // No read: the history names the Comets, and nothing says which are open.
     const n = comets.length;
     return {
-      countsLine: `The history names ${count(n)} ${n === 1 ? "Comet position" : "Comet positions"} for this wallet.`,
+      countsLine: `The history names ${count(n)} ${n === 1 ? "Comet account" : "Comet accounts"} for this wallet.`,
       counts: { open: 0, closed: 0, liquidated: 0 },
       legs: [],
       truncated: false,

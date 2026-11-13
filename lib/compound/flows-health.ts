@@ -33,14 +33,14 @@ export function cometFactorRead(
 ): FactorRead {
   const lt: Record<string, number> = { [SUPPLY_ASSET]: 0 };
   for (const [token, f] of Object.entries(answer.factors)) lt[collAsset(token.toLowerCase())] = f.liquidate;
-  return { day: Math.floor(timestamp / DAY_S), block: answer.block, lt };
+  return { day: Math.floor(timestamp / DAY_S), block: answer.block, lt, line: 1 };
 }
 
 /** The card's read as today's factors. */
 export function cometTodayRead(chain: CompoundMarketChainResponse, now: number): FactorRead {
   const lt: Record<string, number> = { [SUPPLY_ASSET]: 0 };
   for (const c of chain.collateral) lt[collAsset(c.address.toLowerCase())] = c.liquidateCollateralFactor;
-  return { day: Math.floor(now / DAY_S), block: chain.blockNumber, lt };
+  return { day: Math.floor(now / DAY_S), block: chain.blockNumber, lt, line: 1 };
 }
 
 /** The card's read as the view's lines, in the Comet's quote unit. */
@@ -67,22 +67,34 @@ export function cometHealthSource(chain: number, changed = false): HealthSource 
     oracle: "the Comet's",
     pool: "the Comet",
     chain,
-    factor: "liquidate collateral factor",
-    factors: ["liquidate factors", "liquidate collateral factors"],
+    factor: "Liquidation CF",
+    factors: ["Liquidation CFs", "liquidation collateral factors"],
     readAt: changed
       ? "read at the block of each day's last event and of each upgrade that changed one"
       : "read at the block of each day's last event",
-    held: "the liquidate collateral factors the Comet held at the end of block {block}",
-    live: "the card's read of the Comet now: liquidation capacity ÷ debt, in base tokens",
+    held: "the liquidation collateral factors the Comet held at the end of block {block}",
+    live: "the card's read of the Comet now: debt ÷ liquidation capacity, in base tokens",
     levels: {
       formula: BASKET_LEVEL_FORMULA,
+      label: "Liquidation point",
       summary:
-        "Liquidation level — the asset's price at which the health factor reaches 1, with every other balance and price as they stood on the day and the liquidate collateral factors the Comet held at the day's last read.",
+        "Liquidation point, Rails's name; Compound's docs name no such level. The asset's price at which the borrow balance reaches 100% of the liquidation point, with every other balance and price as they stood on the day and the liquidation collateral factors the Comet held at the day's last read.",
       here: {
-        live: "Here at today's balances and prices and the card's health factor.",
-        read: "Here at the balances and prices of {day}, against the liquidate collateral factors the Comet held at the end of block {block}.",
+        live: "Here at today's balances and prices and the card's Liquidation point reached.",
+        read: "Here at the balances and prices of {day}, against the liquidation collateral factors the Comet held at the end of block {block}.",
       },
     },
-    below: "the Comet lets anyone absorb the account",
+    below: "the account is liquidatable and anyone may call absorb on it",
+    ratio: {
+      label: "Liquidation point reached",
+      liquidates: "above",
+      formula: "debt value ÷ (Σ collateral × price × Liquidation CF)",
+      line: {
+        formula: "past 100% the account is liquidatable",
+        summary:
+          "Liquidation point, Rails's name; Compound's docs name no such level. At 100% the borrow balance equals each collateral's value times its Liquidation CF, added up; past it the account is liquidatable and anyone may call absorb on it.",
+      },
+      help: "on the same days: the borrow balance as a share of the liquidation point, each collateral at the Comet's price feed and Liquidation CF that day. The red line is 100%; past it the account is liquidatable. The list in the tip picks it or the collateral's price.",
+    },
   };
 }

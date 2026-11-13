@@ -9,9 +9,10 @@
 // the key its positions' routes already use.
 //
 // Surface rules (decision 0059): house labels where the measure is the same
-// (Supplied, Borrowed, Supply rate, Borrow rate, Utilisation); Compound's words
-// where it differs (Kink, Reserves, Min borrow on the head's structure slot;
-// Borrow, Liquidate, Credited on the collateral). Comet addresses, function
+// (Supplied, Borrowed); Compound's docs' words elsewhere (Supply APR, Borrow
+// APR, Utilization, Kink, Reserves, Min borrow on the head's structure slot;
+// Borrow CF, Liquidation CF, Liquidation factor on the collateral; rails-ops
+// reference/official-docs/compound.md). Comet addresses, function
 // names and explorer links live in receipts and the ⋮; the contracts Rails
 // reads are on the info page ("How Rails reads it").
 
@@ -87,7 +88,7 @@ import type {
 export const COMPOUND_V3_TERMS: ProductTerms = {
   market: { one: "market", many: "markets" },
   reserve: { one: "collateral asset", many: "collateral assets" },
-  position: { one: "position", many: "positions" },
+  position: { one: "account", many: "accounts" },
 };
 
 const DOCS = "https://docs.compound.xyz";
@@ -134,7 +135,7 @@ const CHAINS: Record<CometChainKey, ChainSpec> = {
     listing: null,
     positions: {
       href: "/arbitrum/compound-v3/positions",
-      title: "Positions Rails has read",
+      title: "Accounts Rails has read",
       subtitle: "Every Compound V3 wallet read on Arbitrum",
     },
   },
@@ -216,7 +217,7 @@ function structureOf({ m, coords }: Ctx): CometStructure {
     kind: "comet",
     kink: {
       label: "Kink",
-      tip: "The utilisation where the rates turn steep: above it, borrowing costs rise fast",
+      tip: "The utilization where the rates turn steep: above it, borrowing costs rise fast",
       value: (
         <>
           <Prov info={cvKinkProv("borrow", coords)}>{pctText(m.borrowKink, 0)}</Prov>
@@ -232,7 +233,7 @@ function structureOf({ m, coords }: Ctx): CometStructure {
     },
     reserves: {
       label: "Reserves",
-      tip: "The base the market holds against bad debt. Below the target it sells collateral taken in liquidations to refill them; at or above it, those sales stop. The line can run negative.",
+      tip: "The market's reserves of its base asset. By Compound's docs, reserves are a balance of the base or collateral asset that protects users from bad debt. Below the target the market sells collateral taken in liquidations; at or above it, those sales stop. The line can run negative.",
       value: (
         <>
           <Prov info={cvReservesProv("line", coords)}>
@@ -250,7 +251,7 @@ function structureOf({ m, coords }: Ctx): CometStructure {
     },
     minBorrow: {
       label: "Min borrow",
-      tip: "The smallest debt a new borrow may leave; repayments may leave less",
+      tip: "The smallest borrow balance a borrow may leave: a borrow that would leave less reverts, a first borrow or a later one. A repayment may leave less.",
       value: (
         <>
           <Prov info={cvBaseBorrowMinProv(coords)}>
@@ -276,7 +277,7 @@ function UtilisationBar({ m }: { m: CompoundV3MarketRow }) {
   return (
     <div className="w-full min-w-40" data-comet-utilisation-bar="">
       <RatioBar fill={m.utilization} ticks={ticks} />
-      <p className="mt-1.5 text-[11px] text-rb-500">Utilisation against the kink</p>
+      <p className="mt-1.5 text-[11px] text-rb-500">Utilization against the kink</p>
     </div>
   );
 }
@@ -311,19 +312,19 @@ function CometExplainer({ m }: { m: CompoundV3MarketRow }) {
       </ExplainGroup>
       <ExplainGroup title="Rates">
         <ExplainBullet>
-          Lenders earn <Fig bold>{pctText(m.supplyApr, 2)}</Fig> a year.
+          Lenders earn <Fig bold>{pctText(m.supplyApr, 2)}</Fig> a year, the Supply APR.
         </ExplainBullet>
         <ExplainBullet>
-          Borrowers pay <Fig bold>{pctText(m.borrowApr, 2)}</Fig> a year.
+          Borrowers pay <Fig bold>{pctText(m.borrowApr, 2)}</Fig> a year, the Borrow APR.
         </ExplainBullet>
         {sameKink(m) ? (
           <ExplainBullet>
-            Both rates rise with utilisation and turn steep above the kink at <Fig bold>{pctText(m.borrowKink, 0)}</Fig>
+            Both rates rise with utilization and turn steep above the kink at <Fig bold>{pctText(m.borrowKink, 0)}</Fig>
             .
           </ExplainBullet>
         ) : (
           <ExplainBullet>
-            Both rates rise with utilisation; the borrow rate turns steep above{" "}
+            Both rates rise with utilization; the borrow rate turns steep above{" "}
             <Fig bold>{pctText(m.borrowKink, 0)}</Fig> and the supply rate above{" "}
             <Fig bold>{pctText(m.supplyKink, 0)}</Fig>.
           </ExplainBullet>
@@ -338,7 +339,7 @@ function CometExplainer({ m }: { m: CompoundV3MarketRow }) {
             )
           }
         >
-          Utilisation <Fig bold>{pctText(m.utilization)}</Fig> is the share of the supply on loan.
+          Utilization <Fig bold>{pctText(m.utilization)}</Fig> is the share of the supply on loan.
         </ExplainBullet>
       </ExplainGroup>
       <ExplainGroup title="Reserves">
@@ -377,7 +378,7 @@ function CometExplainer({ m }: { m: CompoundV3MarketRow }) {
             </>
           ) : (
             <>
-              A new borrow must leave a debt of at least{" "}
+              A borrow must leave a borrow balance of at least{" "}
               <Fig bold>
                 {qty(m.baseBorrowMin)} {sym}
               </Fig>
@@ -429,18 +430,18 @@ function cometMarkdown(c: Ctx): string {
     "",
     `- Supplied: ${qty(m.totalSupplyBase)} ${sym} (${val(m.totalSupplyValue, m.quoteUnit)})`,
     `- Borrowed: ${qty(m.totalBorrowBase)} ${sym} (${val(m.totalBorrowValue, m.quoteUnit)})`,
-    `- Supply rate: ${pctText(m.supplyApr, 2)} APR`,
-    `- Borrow rate: ${pctText(m.borrowApr, 2)} APR`,
-    `- Utilisation: ${pctText(m.utilization, 2)}`,
+    `- Supply APR: ${pctText(m.supplyApr, 2)}`,
+    `- Borrow APR: ${pctText(m.borrowApr, 2)}`,
+    `- Utilization: ${pctText(m.utilization, 2)}`,
     `- Kink: borrow ${pctText(m.borrowKink, 0)}, supply ${pctText(m.supplyKink, 0)}`,
     `- Reserves: ${qty(m.reservesBase)} ${sym} of ${qty(m.targetReservesBase)} ${sym} target`,
     `- Min borrow: ${qty(m.baseBorrowMin)} ${sym}`,
     "",
-    "| Collateral | Supplied | Value | Cap used | Borrow | Liquidate | Credited |",
-    "|---|---|---|---|---|---|---|",
+    "| Collateral | Supplied | Value | Cap used | Borrow CF | Liquidation CF | Liquidation factor | Penalty |",
+    "|---|---|---|---|---|---|---|---|",
     ...m.collateral.map(
       (x) =>
-        `| ${x.symbol} | ${qty(x.totalSupplied)} | ${val(x.suppliedValue, m.quoteUnit)} | ${x.capUsed == null ? "cap 0" : pctText(x.capUsed, 0)} | ${x.borrowCollateralFactor === 0 ? "off" : pctText(x.borrowCollateralFactor, 0)} | ${pctText(x.liquidateCollateralFactor, 0)} | ${pctText(x.liquidationFactor, 0)} |`,
+        `| ${x.symbol} | ${qty(x.totalSupplied)} | ${val(x.suppliedValue, m.quoteUnit)} | ${x.capUsed == null ? "cap 0" : pctText(x.capUsed, 0)} | ${x.borrowCollateralFactor === 0 ? "off" : pctText(x.borrowCollateralFactor, 0)} | ${pctText(x.liquidateCollateralFactor, 0)} | ${pctText(x.liquidationFactor, 0)} | ${pctText(1 - x.liquidationFactor, 0)} |`,
     ),
     "",
     `Read from ${spec.name} at block ${c.block.toLocaleString("en-US")}.`,
@@ -468,7 +469,7 @@ function head(c: Ctx, overview: boolean): ProductHead {
           internal: true,
         },
     listing
-      ? { item: "positions", title: "Positions", subtitle: `Every ${m.label} position`, href: listing, internal: true }
+      ? { item: "positions", title: "Accounts", subtitle: `Every ${m.label} account`, href: listing, internal: true }
       : spec.positions
         ? { item: "positions", ...spec.positions, internal: true }
         : null,
@@ -521,19 +522,19 @@ function head(c: Ctx, overview: boolean): ProductHead {
       },
       {
         slot: "rateIn",
-        label: "Supply rate",
-        tip: `What lenders of ${sym} earn now, as an APR`,
+        label: "Supply APR",
+        tip: `What suppliers of ${sym} earn now, a year, without compounding`,
         value: <Prov info={cvRateProv("supply", coords)}>{pctText(m.supplyApr, 2)}</Prov>,
       },
       {
         slot: "rateOut",
-        label: "Borrow rate",
-        tip: `What borrowers of ${sym} pay now, as an APR`,
+        label: "Borrow APR",
+        tip: `What borrowers of ${sym} pay now, a year, without compounding`,
         value: <Prov info={cvRateProv("borrow", coords)}>{pctText(m.borrowApr, 2)}</Prov>,
       },
       {
         slot: "usage",
-        label: "Utilisation",
+        label: "Utilization",
         tip: `Borrowed ÷ supplied, both in ${sym}`,
         value: <Prov info={cvUtilizationProv(coords)}>{pctText(m.utilization)}</Prov>,
       },
@@ -605,11 +606,12 @@ function Tip({
 }
 
 const CAP_TIP = "The share of the supply cap in use: amount supplied ÷ cap, both in the asset's own units.";
-const BORROW_TIP = "Collateral factor for borrowing: the share of this asset's value that can be borrowed against.";
+const BORROW_TIP =
+  "Borrow collateral factor (borrowCollateralFactor): the share of this asset's value that can be borrowed against.";
 const LIQUIDATE_TIP =
-  "Liquidation collateral factor: the share of this asset's value that counts toward the liquidation line.";
-const CREDITED_TIP =
-  "Comet's liquidation factor: the share of this asset's value an account is credited at if it is absorbed. The protocol keeps the rest.";
+  "Liquidation collateral factor (liquidateCollateralFactor): the share of this asset's value that can be borrowed, interest included, before an account becomes liquidatable.";
+const LIQUIDATION_FACTOR_TIP =
+  "Liquidation factor (liquidationFactor): the share of this asset's value paid out to an account in the base asset when it is liquidated. The rest, beneath it, is the penalty.";
 
 /** A column's name with its tip: over the column from lg, and as a card's
  *  label below it (D6). */
@@ -702,7 +704,7 @@ function CollateralRow({ x, c }: { x: CompoundV3CollateralRow; c: Ctx }) {
       <DataTableCell
         align="right"
         className={`${FIGURE_CELL} text-foreground/80`}
-        label={<TipLabel text="Borrow" tip={BORROW_TIP} align="start" />}
+        label={<TipLabel text="Borrow CF" tip={BORROW_TIP} align="start" />}
       >
         {x.borrowCollateralFactor === 0 ? (
           <Tip text="Borrowing against this asset is switched off." name="Borrowing off" align="end">
@@ -715,16 +717,20 @@ function CollateralRow({ x, c }: { x: CompoundV3CollateralRow; c: Ctx }) {
       <DataTableCell
         align="right"
         className={`${FIGURE_CELL} text-foreground/80`}
-        label={<TipLabel text="Liquidate" tip={LIQUIDATE_TIP} align="start" />}
+        label={<TipLabel text="Liquidation CF" tip={LIQUIDATE_TIP} align="start" />}
       >
         <Prov info={cvCollateralFactorProv("liquidate", cc)}>{pctText(x.liquidateCollateralFactor, 0)}</Prov>
       </DataTableCell>
       <DataTableCell
         align="right"
         className={`${FIGURE_CELL} text-foreground/80`}
-        label={<TipLabel text="Credited" tip={CREDITED_TIP} align="start" />}
+        label={<TipLabel text="Liquidation factor" tip={LIQUIDATION_FACTOR_TIP} align="start" />}
       >
         <Prov info={cvCollateralFactorProv("liquidation", cc)}>{pctText(x.liquidationFactor, 0)}</Prov>
+        {/* The penalty is 100% less the factor: no read of its own. */}
+        <div className="text-[11px] text-rb-500" data-prov-exempt="" data-comet-penalty="">
+          {pctText(1 - x.liquidationFactor, 0)} penalty
+        </div>
       </DataTableCell>
     </DataTableRow>
   );
@@ -764,9 +770,12 @@ function CollateralBody({ c }: { c: Ctx }) {
             <DataTableHeader label="Supplied" align="right" />
             <DataTableHeader label="Value" align="right" />
             <DataTableHeader label={<TipLabel text="Cap used" tip={CAP_TIP} align="start" />} />
-            <DataTableHeader label={<TipLabel text="Borrow" tip={BORROW_TIP} align="end" />} align="right" />
-            <DataTableHeader label={<TipLabel text="Liquidate" tip={LIQUIDATE_TIP} align="end" />} align="right" />
-            <DataTableHeader label={<TipLabel text="Credited" tip={CREDITED_TIP} align="end" />} align="right" />
+            <DataTableHeader label={<TipLabel text="Borrow CF" tip={BORROW_TIP} align="end" />} align="right" />
+            <DataTableHeader label={<TipLabel text="Liquidation CF" tip={LIQUIDATE_TIP} align="end" />} align="right" />
+            <DataTableHeader
+              label={<TipLabel text="Liquidation factor" tip={LIQUIDATION_FACTOR_TIP} align="end" />}
+              align="right"
+            />
           </DataTableHead>
           <DataTableBody>
             {m.collateral.map((x) => (
@@ -783,16 +792,19 @@ const COLLATERAL_HELP: LearnMoreContent = {
   title: "How to read the collateral",
   intro:
     "The collateral a Compound V3 market accepts, as its contract lists it. Each bar is the amount supplied against the asset's supply cap, in the asset's own units.",
-  detailsHeading: "The three factors, in Compound's words:",
+  detailsHeading: "The three factors, as Compound's docs name them:",
   details: [
     {
-      bold: "Borrow",
-      text: "the share of an asset's value that can be borrowed against. Off means borrowing against it is switched off.",
+      bold: "Borrow CF",
+      text: "the borrow collateral factor, the share of an asset's value that can be borrowed against. Off means borrowing against it is switched off.",
     },
-    { bold: "Liquidate", text: "the share of an asset's value that counts toward the liquidation line." },
     {
-      bold: "Credited",
-      text: "the liquidation factor: the share of its value an account is credited at if it is absorbed. The protocol keeps the rest.",
+      bold: "Liquidation CF",
+      text: "the liquidation collateral factor, the share of an asset's value that can be borrowed before the account becomes liquidatable.",
+    },
+    {
+      bold: "Liquidation factor",
+      text: "the share of its value paid out to the account when it is liquidated. The rest is the penalty, shown beneath it.",
     },
   ],
   extraParagraphs: [
@@ -881,18 +893,18 @@ export function cometModel(
 const LEARN_MORE: LearnMoreContent = {
   title: "How a Compound V3 market works",
   intro:
-    "Each Compound V3 market is one contract, a Comet, that lends a single base asset. Lenders supply the base asset and earn interest; borrowers deposit collateral and borrow the base asset alone. Markets share nothing with each other.",
+    "Each Compound V3 market is one contract, a Comet, that lends a single base asset. Lenders supply the base asset and earn interest; borrowers supply collateral and borrow the base asset alone. Markets share nothing with each other.",
   detailsHeading: "Key terms:",
   details: [
-    { bold: "Utilisation", text: "the share of the supplied base asset that is on loan. Both rates follow it." },
-    { bold: "Kink", text: "the utilisation where the rates turn steep, to draw lenders in and borrowers out." },
+    { bold: "Utilization", text: "the share of the supplied base asset that is on loan. Both rates follow it." },
+    { bold: "Kink", text: "the utilization where the rates turn steep, to draw lenders in and borrowers out." },
     {
       bold: "Reserves",
-      text: "base the market holds against bad debt. Below its target the market sells collateral taken in liquidations to refill them.",
+      text: "a balance of the base or collateral asset the market holds against bad debt. Below its target the market sells collateral taken in liquidations.",
     },
     {
-      bold: "Absorb",
-      text: "Compound's liquidation: the market takes over an account's debt and collateral and credits the borrower part of the collateral's value.",
+      bold: "Liquidation",
+      text: "anyone may call absorb on a liquidatable account: the market takes over its debt and collateral and pays it the collateral's value less a penalty.",
     },
   ],
   links: [{ label: "Compound III docs", url: `${DOCS}/` }],

@@ -51,12 +51,12 @@ const views: readonly [InfoView, ...InfoView[]] = [
         <ul className={`${UL} mt-2`}>
           <li>
             The account card shows the collateral and what the wallet lends or owes, each in dollars at the
-            market&apos;s price feeds, and the share of its borrowing limit used.
+            market&apos;s price feeds, and the share of its borrowing capacity used.
           </li>
           <li>
-            Each collateral asset shows its borrow and liquidate factors; the base balance shows its rate and the
+            Each collateral asset shows its Borrow CF and Liquidation CF; the base balance shows its rate and the
             interest it gathered over the last 30 days; a borrower&apos;s card shows its room to borrow and the debt at
-            which the market can absorb it.
+            which it becomes liquidatable, its liquidation point.
           </li>
         </ul>
       </>
@@ -82,7 +82,7 @@ const reads: InfoReads = {
       name: `${USDC.label} (Comet)`,
       address: USDC.comet,
       reads:
-        "its supply and borrowing, utilisation, both rates and their kinks, reserves and their target, minimum borrow, and each collateral asset's factors, supply cap and total; for a wallet, its balance and principal in the base asset, each collateral and the market's verdict on it.",
+        "its supply and borrowing, utilization, both rates and their kinks, reserves and their target, minimum borrow, and each collateral asset's factors, supply cap and total; for a wallet, its balance and principal in the base asset, each collateral and the market's verdict on it.",
     },
     ...REST.map((m) => ({ name: `${m.label} (Comet)`, address: m.comet, reads: `the same as ${USDC.label}.` })),
     {
@@ -118,7 +118,7 @@ export default function InfoPage() {
       tracks={
         <>
           The Rails Compound V3 explorer on Optimism shows a wallet&apos;s account in each market: its collateral, what
-          it lends or owes in dollars, its borrowing limit and the interest over the last 30 days. It also shows{" "}
+          it lends or owes in dollars, its borrowing capacity and the interest over the last 30 days. It also shows{" "}
           <Link href={`${OPC_ROUTE}/markets`} className={INLINE_LINK}>
             the three markets
           </Link>

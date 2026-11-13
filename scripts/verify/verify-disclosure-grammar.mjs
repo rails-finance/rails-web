@@ -872,15 +872,12 @@ const SHEET_WORDS_SUBJECTS = [
     name: "Compound V3",
     path: "/ethereum/compound-v3/usdc/0xd51c5283b8727206bf9be2b2db4e5673efaf519c",
     id: "0x1b24d1761a9ca435f2b63b76ed2f6b7b119c9474b37e2fc2c60e7266b9e55fec-1",
-    risk: ["Borrowing limit used", "Collateral can fall"],
-    limits: ["Still borrowable", "Borrow rate"],
-    params: [
-      "WETH borrow collateral factor",
-      "WETH liquidate collateral factor",
-      "WBTC borrow collateral factor",
-      "WBTC liquidate collateral factor",
-    ],
+    // Compound's docs' words (ui-jobs 629): the debt side is the borrow balance.
+    risk: ["Borrowing capacity used", "Collateral can fall"],
+    limits: ["Still borrowable", "Borrow APR"],
+    params: ["WETH Borrow CF", "WETH Liquidation CF", "WBTC Borrow CF", "WBTC Liquidation CF"],
     optional: [],
+    headings: ["Collateral", "Borrow balance"],
     carried: 2,
   },
   {

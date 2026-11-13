@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 export const metadata = listingMetadata({
-  title: "Explore Compound V3 positions",
+  title: "Explore Compound V3 accounts",
   canonicalPath: "/ethereum/compound-v3",
   description:
     "Every Compound V3 account on Ethereum: what each wallet has lent, borrowed and put up as collateral in each market, with its full history.",
