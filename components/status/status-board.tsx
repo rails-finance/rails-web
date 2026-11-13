@@ -238,8 +238,8 @@ function heartbeatLine(e: IndexProgressEntry, now: number, allowance: Allowance 
   if (q) {
     const since =
       q.since != null
-        ? ` Its last run started at ${utcTime(q.since)}, ${ageWords(now - q.since)} ago.`
-        : " It has not run yet.";
+        ? ` Its last walk started at ${utcTime(q.since)}, ${ageWords(now - q.since)} ago.`
+        : " None of its walks has started yet.";
     return `${queueWords(e, now)}: waiting its turn behind ${runnerWords(q.runner)}.${since} The fill last wrote at ${utcTime(t)}, ${ageWords(now - t)} ago.`;
   }
   return stall ? `${line} ${STALL_WORDS[stall]}` : line;

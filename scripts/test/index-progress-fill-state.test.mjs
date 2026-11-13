@@ -421,6 +421,8 @@ test("an index waiting its turn reads queued, late past a day, and as its pace o
   // Its own job running, nothing pending, or an older api: no queue.
   assert.equal(fillQueue({ job: { ...job(60), running: true }, runner }, now), null);
   assert.equal(fillQueue({ job: { ...job(60), pending: 0 }, runner }, now), null);
+  // Top-ups alone pending (5 or less a job) are no wait.
+  assert.equal(fillQueue({ job: { ...job(null), pending: 2, pendingCost: 7 }, runner }, now), null);
   assert.equal(fillState(still, now), "late");
   // A moving index is not queued, whatever its jobs say.
   assert.equal(fillState({ ...entry(5 * 60, null), job: job(60), runner }, now), "fresh");

@@ -64,7 +64,9 @@ export interface IndexProgressEntry {
   runner?: FillRunner | null;
 }
 
-/** An index's jobs in the fill's queue (at_block_fill_jobs, kind index). */
+/** An index's jobs in the fill's queue (at_block_fill_jobs, kind index).
+ *  lastStartedAt is its walks' latest start (a job costing more than
+ *  INDEX_TOPUP_COST); a top-up's start does not count. */
 export interface IndexJob {
   pending: number;
   pendingCost: number;
@@ -172,20 +174,23 @@ export function withFillRunner<T extends IndexProgress | IndexStatus>(s: T): T {
 /** How long the runner may go without a job advancing and still count as
  *  working; past it an index waiting its turn reads as its pace does. */
 export const RUNNER_IDLE = 10 * 60;
+/** The fill's top-up cost: a job at or under it runs out of turn after each
+ *  plan, so pending top-ups alone are no wait (at-block-fill.ts). */
+export const INDEX_TOPUP_COST = 5;
 /** How long an index may wait for its turn before the wait reads late. */
 export const QUEUE_LATE = 24 * 60 * 60;
 
-/** An index waiting its turn: jobs pending and none running, while the runner
+/** An index waiting its turn: walks pending (more than top-ups) and none running, while the runner
  *  works on another job (not held, paused, idle, stopped or failing) and has
- *  advanced within RUNNER_IDLE. `since` is its last run's start, null if none
- *  has started. Null when it is not waiting. */
+ *  advanced within RUNNER_IDLE. `since` is its last walk's start, null if
+ *  none has started. Null when it is not waiting. */
 export function fillQueue(
   e: Pick<IndexProgressEntry, "job" | "runner">,
   now: Secs,
 ): { since: Secs | null; runner: FillRunner } | null {
   const j = e.job;
   const r = e.runner;
-  if (!j || j.pending === 0 || j.running || !r) return null;
+  if (!j || j.pending === 0 || j.pendingCost <= INDEX_TOPUP_COST * j.pending || j.running || !r) return null;
   if (/^(paused|held|idle|stopped|error)/.test(r.state)) return null;
   const moved = isoSecs(r.progressAt);
   if (moved == null || now - moved > RUNNER_IDLE) return null;
