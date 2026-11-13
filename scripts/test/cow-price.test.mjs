@@ -20,7 +20,7 @@ export async function resolve(specifier, context, next) {
 }`;
 register(`data:text/javascript,${encodeURIComponent(hooks)}`);
 
-const { executedRatio, soldLessFee } = await import("../../lib/cow/price.ts");
+const { executedRatio, executedPriceNone, soldLessFee } = await import("../../lib/cow/price.ts");
 
 test("a fee-bearing trade's price runs on the sold amount less the fee", () => {
   const sell = "83249501379607435875";
@@ -48,4 +48,11 @@ test("no price without decimals, or with a fee not below the sold amount", () =>
   assert.equal(executedRatio("100", "5", "0", null, 6), null);
   assert.equal(executedRatio("100", "5", "100", 6, 6), null);
   assert.equal(soldLessFee("100", "120"), null);
+});
+
+test("a fee not below the sold amount has its own reason, not the decimals'", () => {
+  assert.equal(executedPriceNone({ sellAmount: "100", feeAmount: "100" }, 6, 6), "no amount sold after the fee");
+  assert.equal(executedPriceNone({ sellAmount: "100", feeAmount: "120" }, 6, 6), "no amount sold after the fee");
+  assert.equal(executedPriceNone({ sellAmount: "100", feeAmount: "20" }, 6, 6), null);
+  assert.equal(executedPriceNone({ sellAmount: "100", feeAmount: "100" }, null, 6), null);
 });

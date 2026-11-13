@@ -995,7 +995,7 @@ const SPECS: ProtocolSpec[] = [
     // and chroma per theme.
     brand: 309,
     tags: ["Trades"],
-    desc: "Every trade a wallet settled through CoW, read from the settlement contract's logs and chosen by token",
+    desc: "Every trade a wallet settled through CoW Protocol, read from the settlement contract's logs and chosen by token",
     positionListing: false,
     subPages: [],
   },

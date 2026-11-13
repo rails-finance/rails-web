@@ -13,7 +13,7 @@ import { COW_TERMS } from "@/lib/cow/terms";
 
 export const COW_CHAIN_ID = 1 as const;
 export const GPV2_SETTLEMENT = "0x9008d19f58aabd9ed0d60971565aa8510560ab41";
-const SETTLEMENT = { name: `GPv2Settlement (${COW_TERMS.name})`, address: GPV2_SETTLEMENT };
+const SETTLEMENT = { name: COW_TERMS.settlement, address: GPV2_SETTLEMENT };
 
 /** A token as the page names it: the symbol token_meta holds, else none. */
 export interface CowTokenLabel {
@@ -74,7 +74,7 @@ const scaling = (raw: string, tok: CowTokenLabel) =>
 const FIELD = { sell: "sellAmount", buy: "buyAmount", fee: "feeAmount" } as const;
 const WORDS = {
   sell: (s: string) =>
-    `Sold — the ${s} this wallet's order sent to the ${COW_TERMS.name} settlement contract in this trade, as the contract recorded it in its Trade log.`,
+    `Sold — the ${s} this wallet's order sent to ${COW_TERMS.settlement} in this trade, as the contract recorded it in its Trade log. By ${COW_TERMS.name}'s docs, fees are part of the trade's execution, so the amount is after fees.`,
   buy: (s: string) =>
     `Bought — the ${s} the settlement contract paid out for this wallet's order in this trade, as its Trade log recorded it.`,
   fee: (s: string) => `Fee — the trade's fee amount, paid in the sold token (${s}), as its Trade log recorded it.`,
@@ -191,7 +191,7 @@ export function walletCountProv(asOf: { block: number }, what: string, value: nu
   return {
     kind: "chain-derived",
     pclass: "indexed",
-    summary: `${what} — counted over every Trade log of ${COW_TERMS.name}'s settlement contract whose owner is this wallet, through block ${asOf.block.toLocaleString("en-US")}: ${value.toLocaleString("en-US")}.`,
+    summary: `${what} — counted over every Trade log of ${COW_TERMS.settlement} whose owner is this wallet, through block ${asOf.block.toLocaleString("en-US")}: ${value.toLocaleString("en-US")}.`,
     contract: SETTLEMENT,
     via: "Trade logs · owner = this wallet",
     source: { block: asOf.block },

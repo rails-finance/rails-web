@@ -13,6 +13,18 @@ export function soldLessFee(sellAmount: string, feeAmount: string): string | nul
   return net > BigInt(0) ? net.toString() : null;
 }
 
+/** Why a trade has no executed price, where the reason is the amounts: the
+ *  fee is not below the sold amount. Null otherwise (decimals are the
+ *  caller's own reason). */
+export function executedPriceNone(
+  trade: { sellAmount: string; feeAmount: string },
+  sellDecimals: number | null,
+  buyDecimals: number | null,
+): string | null {
+  if (sellDecimals == null || buyDecimals == null) return null;
+  return soldLessFee(trade.sellAmount, trade.feeAmount) == null ? "no amount sold after the fee" : null;
+}
+
 /** The executed price both ways round, each amount scaled by its token's
  *  decimals: bought per unit sold and sold per unit bought, the sold side
  *  less the fee. Null when a side's decimals are not read or an amount is 0. */

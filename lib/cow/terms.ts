@@ -10,6 +10,10 @@ export const COW_TERMS = {
   identity: "Owner",
   /** What the shared Prices control is for on a CoW page (C9). */
   pricesSubject: "wallet",
+  /** The settlement contract, on CoW's own pages (receipts' contract leaf,
+   *  explanation). Other families' party chips keep the shared entry in
+   *  `lib/shared/known-infrastructure.ts`. */
+  settlement: "CoW Protocol's settlement contract",
   /** The Eth-flow contract (C6), in the docs' spelling. */
   ethFlow: "Eth-flow contract",
 } as const;
