@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import type { MoonwellFlowsFacts } from "@/hooks/useMoonwellFlows";
 
-const DOCS = "https://docs.moonwell.fi/moonwell/protocol-information/lending-and-borrowing";
+const DOCS = "https://docs.moonwell.fi/moonwell";
 
 const n = (k: number, one: string, many: string) => (k === 1 ? one : `${k.toLocaleString("en-US")} ${many}`);
 
@@ -95,6 +95,11 @@ export function moonwellFlowsContent(): LearnMoreContent {
         text: "a liquidator repays part of the debt and takes mTokens of the collateral at a bonus; a share of what it takes stays in the market as the protocol's reserves.",
       },
     ],
-    links: [{ label: "Moonwell docs", url: DOCS }],
+    links: [
+      { label: "mTokens", url: `${DOCS}/developers/protocol/mtokens` },
+      { label: "Comptroller", url: `${DOCS}/developers/protocol/comptroller#responsibilities` },
+      { label: "Credit and liquidations", url: `${DOCS}/moonwell-overview/borrow/credit-and-liquidations` },
+      { label: "Protocol information", url: `${DOCS}/protocol-information/protocol-information` },
+    ],
   };
 }
