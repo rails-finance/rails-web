@@ -5,14 +5,17 @@
 // mapped into the shared A3 shell (components/shared/product/reserve-page.tsx).
 //   head (M3.1, M3.2): the symbol, its state tags, "A reserve of the <spoke>
 //        spoke, drawn from the <hub> hub"; the band Supplied and Borrowed (this
-//        spoke, the hub's total under each), Available, Supply APY, Borrow APY
-//        and Utilization (the hub), each figure naming its side;
-//   M3.3 the rate curve, the hub strategy's constants and the premium, beside
-//        M3.5 the spoke's and the hub's parameters;
+//        spoke, the hub's total under each), Available (this spoke), Supply APY,
+//        Borrow APY and Utilization (the hub), each figure naming its side;
+//   M3.3 the rate curve, the hub strategy's constants and the premium (one line
+//        where the spoke doesn't lend the asset and the hub has none drawn),
+//        beside M3.5 the spoke's and the hub's parameters;
 //   M3.4 the hub asset's daily borrow APY; M3.6 the spoke's and the hub's
-//        configuration changes, newest first (lib/aave-v4/config-words.ts; one
-//        line on Base, not indexed there);
-//   M3.7 beside M3.8, the largest suppliers and borrowers of this spoke reserve.
+//        configuration changes, newest first (lib/aave-v4/config-words.ts);
+//   M3.7 beside M3.8, the largest suppliers and borrowers of this spoke reserve,
+//        each holder's share of the spoke's side.
+// What the store doesn't hold on a chain (Base: history and changes; Arc: those
+// and the holders) is one tile with one line (`notIndexedSection`).
 // Drawn on the tile layout (ui-jobs 675): no panel fills, hairlines between.
 // The head is one read (`/api/at-block/aave-v4/reserve`); a token the spoke lists
 // from two hubs needs `?hub=`, and without it the page asks which.
@@ -20,6 +23,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Prov } from "@/components/shared/provenance";
+import { pctText as sharePct } from "@/lib/shared/vault-amount-text";
+import { holderShareProv } from "@/lib/shared/aave-reserve-reads-provenance";
 import { readStampProv } from "@/components/shared/read-stamp";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { ExplainBullet, ExplainGroup, Fig } from "@/components/shared/explain-groups";
@@ -56,7 +61,6 @@ import {
 } from "@/lib/aave-v4/markets";
 import {
   availableProv,
-  configChangesBaseProv,
   curveProv,
   drawnRateProv,
   headValueProv,
@@ -403,6 +407,7 @@ function indexedSections(
   sp: V4Spoke,
   l: V4Line,
   names: V4Names,
+  f: V4ReserveFigures,
   x: IndexedReads,
 ): { history: ProductSection; holders: ProductSection[] } {
   const h = x.kept;
@@ -426,11 +431,7 @@ function indexedSections(
         : undefined,
     },
     body:
-      d.chain !== "ethereum" ? (
-        <p className={NOTE} data-reserve-not-indexed="">
-          Not indexed yet on {chainMeta(d.chainId).name}.
-        </p>
-      ) : h && h.points.length > 0 ? (
+      h && h.points.length > 0 ? (
         <div>
           <AaveV4DrawnRateHistory
             h={h}
@@ -452,24 +453,18 @@ function indexedSections(
       ),
   };
   const hd = x.holders;
-  const holders: ProductSection[] = readOnVisit(d)
-    ? [
-        {
-          scope: "reserve-holders",
-          anatomy: "M3.7 M3.8",
-          title: "Largest suppliers and borrowers",
-          tools: {},
-          body: (
-            <p className={NOTE} data-reserve-not-indexed="">
-              Not indexed yet on {chainMeta(d.chainId).name}.
-            </p>
-          ),
-        },
-      ]
-    : hd.state === "ok"
+  const holders: ProductSection[] =
+    hd.state === "ok"
       ? (["suppliers", "borrowers"] as const).map((side) => {
           const rows = hd.data[side];
           const amountLabel = side === "suppliers" ? "Supplied" : "Borrowed";
+          // The share's denominator is the side the table ranks, on this spoke:
+          // its supplied assets, or what it owes (drawn plus premium) for borrowers.
+          const total = side === "suppliers" ? f.spokeSupplied : f.spokeBorrowed;
+          const totalWhat =
+            side === "suppliers"
+              ? `the ${sp.name} spoke's total supplied (getSpokeAddedAssets)`
+              : `the ${sp.name} spoke's total borrowed, drawn plus premium (getSpokeTotalOwed)`;
           return {
             scope: `reserve-${side}`,
             anatomy: side === "suppliers" ? "M3.7" : "M3.8",
@@ -504,13 +499,30 @@ function indexedSections(
                 unit={{ symbol: names.symbol, address: l.underlying }}
                 refreshedAt={hd.data.refreshedAt}
                 leftOut={hd.data.leftOut?.[side]?.length ?? 0}
+                shareTip={total > 0 ? `Each holder's ${names.symbol} over ${totalWhat}` : undefined}
                 rows={rows.map((r) => {
-                  const t = formatCompactTitled(Number(r.amount) / 10 ** l.decimals);
+                  const amount = Number(r.amount) / 10 ** l.decimals;
+                  const t = formatCompactTitled(amount);
                   return {
                     wallet: r.wallet,
                     rank: r.rank,
                     href: `${d.root}/spoke/${sp.slug}/${r.wallet}`,
                     hooks: { "data-holder-amount": r.amount },
+                    share:
+                      total > 0 ? (
+                        <Prov
+                          info={holderShareProv({
+                            symbol: names.symbol,
+                            side: side === "suppliers" ? "supplied" : "borrowed",
+                            wallet: r.wallet,
+                            amount,
+                            total,
+                            totalWhat,
+                          })}
+                        >
+                          {sharePct(amount / total)}
+                        </Prov>
+                      ) : undefined,
                     amount: (
                       <Prov
                         info={holderAmountProv(
@@ -543,8 +555,38 @@ function indexedSections(
   return { history, holders };
 }
 
-/** M3.6: the spoke's and the hub's configuration changes, newest first; on
- *  Base one line, the route holding Ethereum's tables only. */
+/** What the deployment's store holds for a reserve page: Ethereum holds the
+ *  history, the changes and the holders; Base the holders; Arc none. */
+function heldOn(d: V4Deployment) {
+  return { history: d.chain === "ethereum", changes: d.chain === "ethereum", holders: !readOnVisit(d) };
+}
+
+/** M3.4, M3.6, M3.7 and M3.8 where the store holds none of them: one tile, one
+ *  line, as on Aave V3 on Arbitrum ("History, changes and holders"). */
+function notIndexedSection(d: V4Deployment): ProductSection | null {
+  const held = heldOn(d);
+  const parts = [
+    !held.history && { word: "history", anatomy: "M3.4" },
+    !held.changes && { word: "changes", anatomy: "M3.6" },
+    !held.holders && { word: "holders", anatomy: "M3.7 M3.8" },
+  ].filter((x): x is { word: string; anatomy: string } => Boolean(x));
+  if (parts.length === 0) return null;
+  const words = parts.map((x) => x.word);
+  const list = words.length === 1 ? words[0] : `${words.slice(0, -1).join(", ")} and ${words.at(-1)}`;
+  return {
+    scope: "reserve-indexed",
+    anatomy: parts.map((x) => x.anatomy).join(" "),
+    title: list[0].toUpperCase() + list.slice(1),
+    tools: {},
+    body: (
+      <p className={NOTE} data-reserve-not-indexed="">
+        Not indexed yet on {chainMeta(d.chainId).name}.
+      </p>
+    ),
+  };
+}
+
+/** M3.6: the spoke's and the hub's configuration changes, newest first. */
 function changesSection(
   d: V4Deployment,
   sp: V4Spoke,
@@ -558,18 +600,6 @@ function changesSection(
     anatomy: "M3.6",
     title: "Configuration changes",
   };
-  if (d.chain !== "ethereum")
-    return {
-      ...base,
-      tools: {},
-      body: (
-        <p className={NOTE} data-reserve-not-indexed="">
-          <Prov info={configChangesBaseProv(f, names, chainMeta(d.chainId).name)}>
-            Rails has not indexed Aave V4&apos;s configuration changes on {chainMeta(d.chainId).name} yet.
-          </Prov>
-        </p>
-      ),
-    };
   if (q.state !== "ok") return { ...base, tools: {}, body: missingLine(q, "configuration changes", 240) };
   const log = q.data;
   const changes = v4ReserveChanges(log, {
@@ -735,7 +765,9 @@ export function AaveV4ReservePage({
   else {
     const f = settleHead(head.data);
     const names = namesOf(sp, line);
-    const { history: historySection, holders: holderSections } = indexedSections(d, sp, line, names, {
+    const held = heldOn(d);
+    const notIndexed = notIndexedSection(d);
+    const { history: historySection, holders: holderSections } = indexedSections(d, sp, line, names, f, {
       history,
       kept,
       span,
@@ -768,7 +800,15 @@ export function AaveV4ReservePage({
                 },
               ],
             },
-            body: <RateCurve curve={curveOf(f, names)} />,
+            // Not borrowable here and drawn nowhere on the hub: no rate is paid, so one line.
+            body:
+              f.borrowable === false && f.hubDrawn === 0 ? (
+                <p className={NOTE} data-rate-curve-none="">
+                  Not borrowable on this spoke: no rate applies.
+                </p>
+              ) : (
+                <RateCurve curve={curveOf(f, names)} />
+              ),
           },
           {
             scope: "reserve-parameters",
@@ -813,9 +853,10 @@ export function AaveV4ReservePage({
             },
             body: <V4Parameters f={f} line={line} names={names} />,
           },
-          historySection,
-          changesSection(d, sp, f, names, configLog, kept),
-          ...holderSections,
+          ...(held.history ? [historySection] : []),
+          ...(held.changes ? [changesSection(d, sp, f, names, configLog, kept)] : []),
+          ...(notIndexed ? [notIndexed] : []),
+          ...(held.holders ? holderSections : []),
         ],
       },
     };

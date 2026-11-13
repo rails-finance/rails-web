@@ -496,28 +496,6 @@ export function v4ConfigChangeProv(
   };
 }
 
-/** Base: the change log's tables are Ethereum's only. */
-export function configChangesBaseProv(
-  f: V4ReserveFigures,
-  o: { symbol: string; spoke: string; hub: string },
-  chain = "Base",
-): Provenance {
-  return {
-    kind: "chain",
-    summary: `Every change to ${o.symbol}'s settings on ${o.spoke} is an event on-chain. The ${o.spoke} spoke logs its reserve, collateral and liquidation settings, the ${o.hub} hub the asset's settings and this spoke's credit line. ${CONFIG_LOG} reads them from Ethereum's tables; ${chain} has none yet.`,
-    contract: spokeContract(f, o.spoke),
-    inputs: [
-      {
-        label: `${o.spoke} spoke`,
-        value: f.spokeAddress,
-        kind: "chain",
-        note: "reserve, collateral and liquidation settings",
-      },
-      { label: `${o.hub} hub`, value: f.hubAddress, kind: "chain", note: "asset settings and the spoke's credit line" },
-    ],
-  };
-}
-
 /** A token amount from the head read, valued at the spoke oracle's price. */
 export function headValueProv(
   f: V4ReserveFigures,

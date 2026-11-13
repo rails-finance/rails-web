@@ -46,7 +46,8 @@
 //      the Parameters section's "?" (M3.5) opens the plain-words panel, the
 //      spoke's rows then the hub's; on Main USDC the 29 Oct freeze's node is a
 //      snowflake in the warning tone and the 6 Nov draw-cap raise's a gauge
-//      with the up arrow. On Base the one line.
+//      with the up arrow. On Base the one "Not indexed yet" line of the
+//      "History and changes" tile.
 //
 // Run:
 //   BASE=http://localhost:3000 node scripts/verify/verify-aave-reserve-page.mjs
@@ -507,8 +508,10 @@ for (const f of process.env.V4_ONLY ? [] : FIXTURES) {
     const target = holders.suppliers[0].positionPath;
     await page.goto(`${BASE}${wantHref}`, NAV);
     const cell = page
-      .locator(`[data-holders="suppliers"] tr[data-holder-row="${holders.suppliers[0].wallet}"] td`)
-      .last();
+      .locator(
+        `[data-holders="suppliers"] tr[data-holder-row="${holders.suppliers[0].wallet}"] td:has([data-holder-amount])`,
+      )
+      .first();
     await cell.waitFor({ timeout: WAIT });
     await cell.click({ position: { x: 4, y: 4 } });
     // A path carries its Pool's `?market=` on Prime and EtherFi.
@@ -567,7 +570,7 @@ for (const f of V4_FIXTURES) {
   if (!cfg) {
     check(
       `${tag} 11a Base states the one line`,
-      /not indexed Aave V4's configuration changes on Base yet/.test(got.notIndexed ?? "") && got.rows.length === 0,
+      /Not indexed yet on Base/.test(got.notIndexed ?? "") && got.rows.length === 0,
       norm(got.notIndexed),
     );
     await page.close();

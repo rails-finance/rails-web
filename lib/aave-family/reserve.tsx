@@ -44,7 +44,8 @@ import { historyFrom, useReserveReads, type Read, type ReserveHistory } from "@/
 import { heldLine, reserveChanges } from "@/lib/shared/aave-reserve-config-words";
 import { reserveChangesExplained } from "@/lib/shared/aave-reserve-config-explain";
 import { compactFigure } from "@/lib/shared/compact-figure";
-import { configChangeProv, holderAmountProv } from "@/lib/shared/aave-reserve-reads-provenance";
+import { configChangeProv, holderAmountProv, holderShareProv } from "@/lib/shared/aave-reserve-reads-provenance";
+import { pctText } from "@/lib/shared/vault-amount-text";
 import { formatDate } from "@/lib/date";
 import { chainMeta, explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { aaveMarketConfig, type AaveMarketConfig, type AaveMarketKey } from "@/lib/shared/aave-market-configs";
@@ -630,6 +631,13 @@ function indexedSections(
       ? (["suppliers", "borrowers"] as const).map((side) => {
           const rows = hd.data[side];
           const amountLabel = side === "suppliers" ? "Supplied" : "Borrowed";
+          // The share's denominator is the side the table ranks: the supply
+          // token's totalSupply for suppliers, the variable debt token's for borrowers.
+          const total = side === "suppliers" ? r.supplied : r.borrowed;
+          const totalWhat =
+            side === "suppliers"
+              ? "the total supplied (the supply token's totalSupply())"
+              : "the total borrowed (the variable debt token's totalSupply())";
           return {
             scope: `reserve-${side}`,
             anatomy: side === "suppliers" ? "M3.7" : "M3.8",
@@ -654,13 +662,30 @@ function indexedSections(
                 unit={{ symbol: r.symbol, address: r.address }}
                 refreshedAt={hd.data.refreshedAt}
                 leftOut={hd.data.leftOut?.[side]?.length ?? 0}
+                shareTip={total > 0 ? `Each holder's ${r.symbol} over ${totalWhat}` : undefined}
                 rows={rows.map((x) => {
-                  const t = formatCompactTitled(Number(x.amount) / 10 ** r.decimals);
+                  const amount = Number(x.amount) / 10 ** r.decimals;
+                  const t = formatCompactTitled(amount);
                   return {
                     wallet: x.wallet,
                     rank: x.rank,
                     href: x.positionPath,
                     hooks: { "data-holder-amount": x.amount },
+                    share:
+                      total > 0 ? (
+                        <Prov
+                          info={holderShareProv({
+                            symbol: r.symbol,
+                            side: side === "suppliers" ? "supplied" : "borrowed",
+                            wallet: x.wallet,
+                            amount,
+                            total,
+                            totalWhat,
+                          })}
+                        >
+                          {pctText(amount / total)}
+                        </Prov>
+                      ) : undefined,
                     amount: (
                       <Prov
                         info={holderAmountProv(

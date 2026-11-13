@@ -18,6 +18,7 @@ import {
   DataTableRowLink,
 } from "@/components/shared/data-table/data-table";
 import { AssetUnit } from "@/components/shared/asset-unit";
+import { HeadingTip } from "@/components/shared/tip-label";
 import { Facehash } from "@/components/shared/facehash";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { formatAgeShort } from "@/lib/date";
@@ -51,6 +52,8 @@ export interface HolderRow {
   rank: number;
   href: string;
   amount: ReactNode;
+  /** The amount over the reserve's total on its side, with its receipt. */
+  share?: ReactNode;
   hooks?: Record<`data-${string}`, string>;
 }
 
@@ -74,6 +77,7 @@ export function HoldersTable({
   unit,
   refreshedAt,
   leftOut,
+  shareTip,
 }: {
   side: "suppliers" | "borrowers";
   rows: HolderRow[];
@@ -84,6 +88,8 @@ export function HoldersTable({
   refreshedAt: string | null;
   /** Protocol accounts the ranking leaves out (decision 0024). */
   leftOut: number;
+  /** The Share column's tip, naming its denominator; no column without it. */
+  shareTip?: string;
 }) {
   const age = refreshedAt ? formatAgeShort(refreshedAt, new Date()) : null;
   return (
@@ -102,6 +108,11 @@ export function HoldersTable({
             <DataTableHeader label="#" className="w-10" />
             <DataTableHeader label="Account" />
             <DataTableHeader label={amountLabel} align="right" />
+            {shareTip && (
+              <DataTableHeader align="right">
+                <HeadingTip text="Share" tip={shareTip} />
+              </DataTableHeader>
+            )}
           </DataTableHead>
           <DataTableBody>
             {rows.map((x) => (
@@ -118,6 +129,11 @@ export function HoldersTable({
                     <AssetUnit symbol={unit.symbol} address={unit.address} />
                   </span>
                 </DataTableCell>
+                {shareTip && (
+                  <DataTableCell align="right" className="whitespace-nowrap tabular-nums" data-holder-share="">
+                    {x.share ?? <span data-prov-exempt="">—</span>}
+                  </DataTableCell>
+                )}
               </DataTableRow>
             ))}
           </DataTableBody>
