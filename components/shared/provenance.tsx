@@ -342,6 +342,45 @@ export class ProvInspectorStore {
 
 export const provInspector = new ProvInspectorStore();
 
+/** How many scoped <Prov> values are mounted on the page, across every
+ *  surface's registry, and the path that settled with none: what tells the
+ *  inspector's controls whether the page has anything to inspect (ui-jobs
+ *  651; prov-inspector.tsx `useInspectable`). Emits only when the page goes
+ *  from none to some or back, or settles, so a listing's churn re-renders
+ *  nothing. A value that mounts clears the settled path. */
+export class ProvTracedStore {
+  private count = 0;
+  private settled: string | null = null;
+  private listeners = new Set<() => void>();
+  add = () => {
+    if (++this.count !== 1) return;
+    this.settled = null;
+    this.emit();
+  };
+  remove = () => {
+    if (--this.count === 0) this.emit();
+  };
+  /** The page at `path` has settled with nothing traced. */
+  settle = (path: string) => {
+    if (this.count > 0 || this.settled === path) return;
+    this.settled = path;
+    this.emit();
+  };
+  subscribe = (fn: () => void) => {
+    this.listeners.add(fn);
+    return () => {
+      this.listeners.delete(fn);
+    };
+  };
+  getAny = () => this.count > 0;
+  getSettled = () => this.settled;
+  private emit() {
+    this.listeners.forEach((fn) => fn());
+  }
+}
+
+export const provTraced = new ProvTracedStore();
+
 /** Wrap a card's content so every <Prov> inside reports into its receipts
  *  panel. The shell owns the registry. In dev the children mount between
  *  coverage-tripwire bookends — value-shaped text no <Prov> covers gets a red
@@ -1149,7 +1188,11 @@ export function Prov({
   });
   useEffect(() => {
     if (!registry) return;
-    return () => registry.unregister(id);
+    provTraced.add();
+    return () => {
+      registry.unregister(id);
+      provTraced.remove();
+    };
   }, [registry, id]);
   // The unscoped tripwire. Once per receipt label, so a listing of 100 rows
   // reports the shape of the gap rather than 100 copies of it.

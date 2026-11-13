@@ -338,7 +338,8 @@ let vaultsInspector = 0;
     await p.locator("[data-compare-columns]").waitFor({ timeout: WAIT });
     await p.waitForTimeout(1500);
     const armedHere =
-      (await p.locator(".prov-inspect-exit").count()) + (await p.locator("[data-prov-pickable]").count());
+      (await p.locator('.prov-inspect-exit[data-prov-inspect-exit="active"]').count()) +
+      (await p.locator("[data-prov-pickable]").count());
     await p.close();
     check(
       "2g the switch on, the page does not arm (the switch arms /vaults)",

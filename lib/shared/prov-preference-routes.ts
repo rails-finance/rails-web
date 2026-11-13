@@ -6,8 +6,9 @@
 // ui-jobs 625 (event pages, info pages, Optimism and Arc) were swept under
 // ui-jobs 641 (13 Nov 2026); what that sweep left open is ui-jobs 648-651
 // and the infra list's "rails-api answers 502 read_failed for three at-block
-// routes". On a route off the list nothing can be inspected and the switch
-// reads "not on this page" (components/nav/profile-menu.tsx).
+// routes". On a route off the list nothing can be inspected: the switch is
+// dimmed and the header's inspector button shows paused (ui-jobs 651,
+// components/shared/prov-inspector.tsx `useInspectable`).
 //
 // Entries are App Router templates without route groups. A `[param]` segment
 // matches only where the route served that param (`useParams()`), so a static

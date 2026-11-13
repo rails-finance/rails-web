@@ -1,6 +1,7 @@
 // focus: about Rails itself; no asset or chain to filter
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { Crosshair } from "lucide-react";
 import type { Metadata } from "next";
 import { HOME_SHARE_IMAGE, SITE_URL, twitterCard } from "@/lib/shared/page-metadata";
 import { DetailBackButton } from "@/components/shared/detail-back-row";
@@ -71,18 +72,24 @@ export default function ProvenancePage() {
 
       <Section title="Turning it on">
         <p className="body-text">
-          The inspector has one switch: <strong className="text-foreground">Provenance inspector</strong>, under
-          Advanced in the profile menu at the top right. Once on, it stays on from page to page, on the pages that
-          support it. While it is on, <strong className="text-foreground">Exit inspector</strong> stands beside the
-          profile menu and turns it off.
+          The inspector has one switch: <strong className="text-foreground">Inspector</strong>, under Advanced in the
+          profile menu at the top right. Once on, it stays on from page to page, on the pages that support it. While it
+          is on, a teal crosshair{" "}
+          <Crosshair
+            className="inline size-4 align-[-3px] text-teal-600 dark:text-teal-400"
+            strokeWidth={1.75}
+            aria-hidden="true"
+          />{" "}
+          with a small x stands beside the profile menu, and a click on it turns the inspector off. On a page with
+          nothing to inspect the crosshair is grey and struck through, and a click turns the inspector off the same way.
         </p>
       </Section>
 
       <Section title="Underlined figures">
         <p className="body-text">
-          While the provenance inspector is on, each figure with a receipt has a dotted underline. A click or a tap on
-          one opens its receipt beside it; on a phone the receipt opens as a sheet at the foot of the screen. A click
-          elsewhere closes it. Escape closes an open receipt, and a second Escape turns the inspector off.
+          While the inspector is on, each figure with a receipt has a dotted underline. A click or a tap on one opens
+          its receipt beside it; on a phone the receipt opens as a sheet at the foot of the screen. A click elsewhere
+          closes it. Escape closes an open receipt, and a second Escape turns the inspector off.
         </p>
       </Section>
 

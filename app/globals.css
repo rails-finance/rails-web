@@ -1976,36 +1976,82 @@ label[for] {
 .dark [data-prov-inspect] {
   text-decoration-color: rgb(45 212 191 / 0.28); /* teal-400 */
 }
-/* "Exit inspector", beside the profile control (H20; ui-jobs 624.2) */
+/* The header's inspector button, beside the profile control (H7.4; ui-jobs
+   624.2, an icon from 651): the menu row's crosshair, teal with an x badge
+   while active, grey and struck through while paused (nothing to inspect). */
 .prov-inspect-exit {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: 9999px;
-  font-size: 12px;
-  font-weight: 600;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
   cursor: pointer;
-  white-space: nowrap;
   flex: none;
   color: rgb(13 148 136); /* teal-600 */
-  background: rgb(238 249 246);
-  border: 1px solid rgb(13 148 136 / 0.35);
-}
-.prov-inspect-exit svg {
-  width: 14px;
-  height: 14px;
+  transition: background-color 150ms;
 }
 .prov-inspect-exit:hover {
-  background: rgb(13 148 136 / 0.14);
+  background: rgb(13 148 136 / 0.12);
+}
+.prov-inspect-exit:focus-visible {
+  outline: 2px solid rgb(59 130 246); /* blue-500 */
+  outline-offset: 0;
 }
 .dark .prov-inspect-exit {
   color: rgb(45 212 191); /* teal-400 */
-  background: rgb(15 40 37);
-  border-color: rgb(45 212 191 / 0.35);
 }
 .dark .prov-inspect-exit:hover {
-  background: rgb(45 212 191 / 0.16);
+  background: rgb(45 212 191 / 0.14);
+}
+.prov-inspect-exit[data-prov-inspect-exit="paused"] {
+  color: var(--color-rb-500);
+}
+.dark .prov-inspect-exit[data-prov-inspect-exit="paused"] {
+  color: var(--color-rb-400);
+}
+/* paused takes the chrome's neutral tile on hover (chrome-hover.ts) */
+.prov-inspect-exit[data-prov-inspect-exit="paused"]:hover {
+  background: color-mix(in srgb, var(--color-rb-200) 70%, transparent);
+}
+.dark .prov-inspect-exit[data-prov-inspect-exit="paused"]:hover {
+  background: color-mix(in srgb, var(--color-rb-700) 70%, transparent);
+}
+.prov-inspect-exit-icon {
+  position: relative;
+  display: inline-flex;
+}
+.prov-inspect-exit-icon > svg {
+  width: 20px;
+  height: 20px;
+}
+.prov-inspect-exit-badge {
+  position: absolute;
+  top: -4px;
+  right: -5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  background: rgb(20 184 166); /* teal-500, the switch's on colour */
+  color: white;
+  box-shadow: 0 0 0 1.5px var(--background);
+}
+.prov-inspect-exit-badge svg {
+  width: 8px;
+  height: 8px;
+}
+.prov-inspect-exit-slash {
+  position: absolute;
+  inset: 0;
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
 }
 /* the popover — the receipt pinned AT the value; a bottom sheet under 640px.
    Teal-washed ground ties it to the tool's colorway (halo, dotted targets,

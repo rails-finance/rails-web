@@ -2,12 +2,18 @@
 
 // The provenance inspector — the page-level target mode.
 // ----------------------------------------------------------------------------
-// Armed in one place, the profile menu's switch (H20.1, decision 0062; ui-jobs
-// 625): while it is on, the layer arms each page view on arrival, on the
-// routes in lib/shared/prov-preference-routes.ts. Three ways put it down, all
-// through `putDownInspector`, which turns the switch off too: the switch,
-// "Exit inspector" beside the profile control (<ProvInspectorExit>), and
-// Escape's second press.
+// Armed in one place, the profile menu's switch "Inspector" (H20.1, decision
+// 0062; ui-jobs 625, 651): while it is on, the layer arms each page view on
+// arrival, on the routes in lib/shared/prov-preference-routes.ts. Three ways
+// put it down, all through `putDownInspector`, which turns the switch off too:
+// the switch, the header's inspector button beside the profile control
+// (<ProvInspectorExit>, H7.4), and Escape's second press.
+//
+// The header button has two states while the switch is on (ui-jobs 651):
+// active, a teal crosshair with an x badge, on a page with something to
+// inspect; paused, a grey crosshair struck through, on a page with nothing to
+// inspect (`useInspectable`). Either press turns the switch off, so the header
+// never holds a dead control. With the switch off it draws nothing.
 //
 // - <ProvInspectorLayer> — armed, every scoped <Prov> on the page is a click
 //   target with a light dotted underline (the coverage map). A pick anchors
@@ -26,7 +32,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
+import { Crosshair, X } from "lucide-react";
 import {
   CLASS_CSS,
   CLASS_META,
@@ -36,6 +42,7 @@ import {
   LadderModal,
   locateEntries,
   provInspector,
+  provTraced,
   ProvReceipt,
   receiptLabel,
   resolveClass,
@@ -85,7 +92,9 @@ export function ProvInspectorLayer() {
   // Leaving the page puts the tool down.
   useEffect(() => () => provInspector.setArmed(false), []);
   // The preference arms each page view on arrival, on the routes that pass
-  // the coverage gate; turned off, the inspector goes down.
+  // the coverage gate; turned off, the inspector goes down. Arming does not wait
+  // for a traced value: values that mount later are pickable as they land.
+  // Whether the page has any is the header button's state alone (ui-jobs 651).
   useEffect(() => {
     provInspector.setArmed(preference && allowed);
   }, [preference, allowed, pathname]);
@@ -94,27 +103,104 @@ export function ProvInspectorLayer() {
   return pin ? <InspectorPopover key={`${pin.key}:${pin.tick}`} pin={pin} /> : null;
 }
 
-/** "Exit inspector" (ui-jobs 624.2): beside the profile control (H20), in the
- *  site header, the column's corner or the position bar, while the inspector
- *  is armed. Puts it down with the saved preference; `onExit` takes focus
- *  where the button stood. */
+/** Skeletons and busy regions: the page is still loading what it may trace. */
+const LOADING = '[aria-busy="true"], .animate-pulse, [data-flows-skeleton]';
+/** How long a listed page may show no traced value before it can count as
+ *  having nothing to inspect. */
+const SETTLE_MS = 2500;
+/** The wait's ceiling: a request that never answers does not hold the page
+ *  inspectable for good. */
+const SETTLE_MAX_MS = 20000;
+
+/** Requests the page has in flight. Most surfaces fetch on mount with a bare
+ *  `fetch` and show no skeleton while they wait, so the count is the one
+ *  signal common to all of them. The wrapper is installed once, on the first
+ *  `useInspectable`, and changes nothing about a request. */
+let inFlight = 0;
+let watching = false;
+function watchFetches() {
+  if (watching || typeof window === "undefined") return;
+  watching = true;
+  const fetch = window.fetch;
+  window.fetch = function (this: unknown, ...args: Parameters<typeof window.fetch>) {
+    inFlight += 1;
+    return fetch.apply(this ?? window, args).finally(() => {
+      inFlight -= 1;
+    });
+  } as typeof window.fetch;
+}
+
+/** Whether the page has something to inspect (ui-jobs 651). Nothing, when the
+ *  route is off lib/shared/prov-preference-routes.ts, or when it is on the
+ *  list and no scoped <Prov> is mounted once the page has settled: SETTLE_MS
+ *  after arrival with no traced value, then no request in flight and no
+ *  skeleton or `aria-busy` region in <main> for two checks running (capped at
+ *  SETTLE_MAX_MS). Until then the page counts as inspectable, so a page whose
+ *  values arrive with its data never flashes the paused state. The verdict is
+ *  shared (`provTraced`), so the menu's switch reads the header's. A value
+ *  that mounts makes the page inspectable again; one that leaves starts the
+ *  wait over. */
+export function useInspectable(): boolean {
+  const pathname = usePathname();
+  const allowed = provPreferenceAllows(pathname, useParams());
+  const traced = useSyncExternalStore(provTraced.subscribe, provTraced.getAny, () => false);
+  const settled = useSyncExternalStore(provTraced.subscribe, provTraced.getSettled, () => null);
+  useEffect(() => {
+    watchFetches();
+    if (!allowed || traced) return;
+    const start = Date.now();
+    let quiet = 0;
+    let timer = 0;
+    const check = () => {
+      const root = document.querySelector("main") ?? document.body;
+      const busy = inFlight > 0 || root.querySelector(LOADING) != null;
+      quiet = busy ? 0 : quiet + 1;
+      if (quiet >= 2 || Date.now() - start >= SETTLE_MAX_MS) provTraced.settle(pathname);
+      else timer = window.setTimeout(check, 500);
+    };
+    timer = window.setTimeout(check, SETTLE_MS);
+    return () => window.clearTimeout(timer);
+  }, [allowed, traced, pathname]);
+  return allowed && (traced || settled !== pathname);
+}
+
+/** The header's inspector button, H7.4 (ui-jobs 624.2, redrawn as an icon in
+ *  651): beside the profile control (H20), in the site header, the column's
+ *  corner or the position bar, while the switch is on. Active on a page with
+ *  something to inspect, paused on one with nothing; a press on either puts
+ *  the inspector down with the saved preference. `onExit` takes focus where
+ *  the button stood. The tip is `title`: the house RevealTip opens on a press,
+ *  and the press here is the exit. */
 export function ProvInspectorExit({ onExit }: { onExit?: () => void }) {
-  const armed = useSyncExternalStore(provInspector.subscribe, provInspector.getArmed, () => false);
-  if (!armed) return null;
+  const preference = useProvPreference();
+  const inspectable = useInspectable();
+  if (!preference) return null;
+  const state = inspectable ? "active" : "paused";
+  const tip = inspectable ? "Exit inspector" : "Inspector is on; nothing to inspect on this page";
   return (
     <button
       type="button"
       className="prov-inspect-exit"
       data-anatomy="H7.4"
-      aria-label="Exit inspector"
+      data-prov-inspect-exit={state}
+      aria-label={tip}
+      title={tip}
       onClick={() => {
         putDownInspector();
         onExit?.();
       }}
     >
-      <X aria-hidden />
-      <span>
-        Exit<span className="max-sm:hidden"> inspector</span>
+      <span className="prov-inspect-exit-icon" aria-hidden="true">
+        <Crosshair strokeWidth={1.75} />
+        {inspectable ? (
+          <span className="prov-inspect-exit-badge">
+            <X strokeWidth={3.5} />
+          </span>
+        ) : (
+          <svg className="prov-inspect-exit-slash" viewBox="0 0 24 24">
+            <line x1="3" y1="3" x2="21" y2="21" />
+          </svg>
+        )}
       </span>
     </button>
   );
