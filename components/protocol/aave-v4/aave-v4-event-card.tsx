@@ -12,7 +12,9 @@ import { eventGas } from "@/components/shared/event-price-row";
 import { EventLedgerContext, ROW_CELLS } from "@/components/shared/event-ledger-context";
 import type { SpineColumnProps, SpineWarningLeg } from "@/components/shared/spine-column";
 import { EventPageContext } from "@/components/shared/event-page-aside";
-import { useContext } from "react";
+import { SheetCollectContext } from "@/components/shared/group-sheet";
+import { useCallback, useContext, useState } from "react";
+import { prefetchHealthFactorAround } from "@/lib/aave-v4/use-health-factor-around";
 import { AAVE_V4_HEAD_WORDS } from "@/lib/aave-v4/event-templates";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
@@ -163,6 +165,16 @@ export function AaveV4EventCard({
     txGroup,
     externalBy: extBy ?? undefined,
   });
+  // The health-factor read starts when the card first opens, or at mount for
+  // a member of a group whose sheet is shown: the collector mounts members
+  // only then.
+  const collected = useContext(SheetCollectContext) != null;
+  const [opened, setOpened] = useState(false);
+  const onOpen = useCallback(() => setOpened(true), []);
+  const prefetch = () => {
+    if (isCollateralToggle) return;
+    prefetchHealthFactorAround(ctx.spokeAddress, ctx.owner ?? event.wallet, event.blockNumber, ctx.reserveSymbol);
+  };
   // T2: the snapshot as a balance sheet (ui-jobs 330), a collateral toggle as
   // its cell, the prices at this block and the gas in the price row (309).
   const { cells, prices, sheet } = useAaveV4Cells({
@@ -174,6 +186,7 @@ export function AaveV4EventCard({
     previous: previousEvent?.context.data,
     repaid,
     address: symAddress,
+    active: opened || collected,
   });
 
   const slots: EventCardSlots = {
@@ -211,6 +224,8 @@ export function AaveV4EventCard({
       ),
     },
     learnMore: <LearnMore inline content={aaveV4LearnMoreContent(ctx)} />,
+    onIntent: prefetch,
+    onOpen,
   };
 
   return (

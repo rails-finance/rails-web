@@ -38,7 +38,12 @@ import {
   type EventProvDetail,
 } from "@/lib/aave-v4/position-provenance";
 import { ExactTip } from "@/components/shared/amount-text";
-import { useHealthFactorAround, hfOf, premiumAt } from "@/lib/aave-v4/use-health-factor-around";
+import {
+  useHealthFactorAround,
+  hfOf,
+  premiumAt,
+  type HealthFactorAround,
+} from "@/lib/aave-v4/use-health-factor-around";
 import type { EventSheet } from "@/components/shared/event-sheet";
 import { aaveV4Label } from "@/lib/aave-v4/event-label";
 import { aaveV4Sheet } from "./aave-v4-event-sheet";
@@ -112,6 +117,9 @@ export interface AaveV4EventDetailProps {
   repaid?: string[];
   /** The moved reserve's contract, from the event's flows. */
   address?: string;
+  /** Whether the card has opened (or its group's sheet is shown): the health
+   *  factor is read from then on, so a closed row asks for nothing. */
+  active: boolean;
 }
 
 /** Render a single position row — with before→after if this asset changed,
@@ -227,6 +235,7 @@ export function useAaveV4Cells({
   previous,
   repaid,
   address,
+  active,
 }: AaveV4EventDetailProps): {
   cells: EventCellSpec[];
   prices: EventPriceChip[];
@@ -248,14 +257,16 @@ export function useAaveV4Cells({
   const isLiq = ctx.eventType === "liquidation";
   const isToggle = ctx.eventType === "collateral_toggle";
   // Every event that moves a balance shows the health factor either side of it,
-  // read from the spoke; a collateral toggle moves none.
-  const hfAround = useHealthFactorAround(
-    !isToggle,
+  // read from the spoke once the card opens; a collateral toggle moves none.
+  // Until then the read stands as loading, so the opened grid holds its place.
+  const hfRead = useHealthFactorAround(
+    !isToggle && active,
     ctx.spokeAddress,
     ctx.owner ?? wallet,
     blockNumber,
     ctx.reserveSymbol,
   );
+  const hfAround: HealthFactorAround = !isToggle && !active ? { status: "loading" } : hfRead;
 
   const isSupplySide = ctx.eventType === "supply" || ctx.eventType === "withdraw";
   const isDebtSide = ctx.eventType === "borrow" || ctx.eventType === "repay";
