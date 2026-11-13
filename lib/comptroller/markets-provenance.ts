@@ -35,6 +35,21 @@ export interface ComptrollerVocabFamily {
    *  (Compound V2's 2,628,000 blocks); null where they run on the rate
    *  model's own constant (Moonwell's `timestampsPerYear()`). */
   rateYear: ComptrollerRateYear | null;
+  /** How the family's APY is formed from the per-period rate. */
+  apy: ComptrollerApy;
+}
+
+/** The APY's form: how often the rate compounds and who states it. */
+export interface ComptrollerApy {
+  /** Compounding steps a year: 365 (Compound V2's docs, daily) or 31,536,000 (Moonwell, every second). */
+  steps: number;
+  formula: string;
+  /** Where the form comes from, in the receipts' words. */
+  source: string;
+  /** The docs page that states it; null where the form is Rails's. */
+  href: string | null;
+  /** The plain words for the compounding, as a tip says it. */
+  compounding: string;
 }
 
 /** A fixed year of rate periods and where it comes from. */
@@ -294,13 +309,13 @@ export const cmAvailableProv = stamped(
   }),
 );
 
-/** Utilisation as the rate model computes it. */
+/** Utilization as the rate model computes it. */
 export const cmUtilisationProv = stamped(
   (f, c, model: Pick<ComptrollerRateModel, "reservesInUtil">): Provenance => ({
     kind: "chain-derived",
     pclass: "state",
     source: { block: c.blockNumber },
-    summary: `${sym(c)} utilisation — ${model.reservesInUtil ? "borrows ÷ (cash + borrows − reserves)" : "borrows ÷ (cash + borrows)"} at block ${c.blockNumber}, the quotient the market's rate model prices the borrow rate from.`,
+    summary: `${sym(c)} utilization — ${model.reservesInUtil ? "borrows ÷ (cash + borrows − reserves)" : "borrows ÷ (cash + borrows)"} at block ${c.blockNumber}, the quotient the market's rate model prices the borrow rate from.`,
     contract: marketContract(f, c),
     via: via(f, `${f.token}.totalBorrows, getCash${model.reservesInUtil ? ", totalReserves" : ""}`),
     formula: model.reservesInUtil ? "borrows ÷ (cash + borrows − reserves)" : "borrows ÷ (cash + borrows)",
@@ -320,65 +335,46 @@ const en = (n: number) => n.toLocaleString("en-US");
 const modelYearSentence = (f: ComptrollerVocabFamily, read?: ComptrollerRateRead): string =>
   `The market's rate model answers \`${periodsPerYear(f)}()\`${read?.modelPeriodsPerYear != null ? ` ${en(read.modelPeriodsPerYear)}` : ""}: the constant it uses to set its per-${f.period} curve from its yearly terms.`;
 
-/** A rate a year: the market's per-period rate times the family's year, or
- *  the model's periods a year where the family has no fixed year. */
+/** A rate as an APY: the market's per-period rate compounded the family's way
+ *  (lib/comptroller/apy.ts), with the simple year beside it where the family
+ *  prints a fixed one. */
 export const cmRateProv = stamped((f, c, side: "supply" | "borrow", read?: ComptrollerRateRead): Provenance => {
   const method = `${side}Rate${perPeriod(f)}`;
   const y = f.rateYear;
-  if (y)
-    return {
-      kind: "chain-derived",
-      pclass: "state",
-      source: { block: c.blockNumber },
-      verify: {
-        kind: "recompute",
-        text: `To check: ask ${node(f)} for the ${f.token}'s ${method}() at block ${c.blockNumber} and multiply it by ${en(y.periods)}.`,
-      },
-      summary: `${sym(c)} ${side} rate — the ${f.token}'s \`${method}\` at block ${c.blockNumber}, divided by 1e18 and multiplied by ${en(y.periods)} ${f.period}s a year, as a simple APR. Interest accrues once a ${f.period}, and ${en(y.periods)} is a year of ${y.source}. ${modelYearSentence(f, read)}`,
-      contract: marketContract(f, c),
-      via: via(f, `${f.token}.${method} × ${en(y.periods)}`),
-      formula: `rate per ${f.period} ÷ 1e18 × ${en(y.periods)}`,
-      inputs: [
-        {
-          label: `rate per ${f.period}`,
-          ...(read?.perPeriodRaw ? { value: BigInt(read.perPeriodRaw).toLocaleString("en-US") } : {}),
-          kind: "chain",
-          pclass: "state",
-          note: `${f.token}.${method}, a 1e18 mantissa`,
-          contract: marketContract(f, c),
-        },
-        {
-          label: `${f.period}s a year`,
-          value: en(y.periods),
-          kind: "offchain",
-          pclass: "offchain",
-          note: y.source,
-          verify: { kind: "link", href: y.href, text: `${f.name}'s docs` },
-        },
-      ],
-    };
+  const a = f.apy;
+  const raw = read?.perPeriodRaw ? BigInt(read.perPeriodRaw) : null;
+  const simple =
+    y && raw != null
+      ? ` As a simple rate on ${en(y.periods)} ${f.period}s a year (${y.source}) it is ${((Number(raw) / 1e18) * y.periods * 100).toFixed(2)}%.`
+      : "";
   return {
     kind: "chain-derived",
     pclass: "state",
     source: { block: c.blockNumber },
-    summary: `${sym(c)} ${side} rate — the ${f.token}'s \`${method}\` times the rate model's \`${periodsPerYear(f)}\` at block ${c.blockNumber}, as a simple APR. ${f.name} accrues interest per ${f.period}.`,
+    verify: {
+      kind: "recompute",
+      text: `To check: ask ${node(f)} for the ${f.token}'s ${method}() at block ${c.blockNumber} and compute ${a.formula}.`,
+    },
+    summary: `${sym(c)} ${side} APY — the ${f.token}'s \`${method}\` at block ${c.blockNumber}, ${a.source}: ${a.formula}.${simple}${y ? ` ${modelYearSentence(f, read)}` : ""}`,
     contract: marketContract(f, c),
-    via: via(f, `${f.token}.${method} × model.${periodsPerYear(f)}`),
-    formula: `rate per ${f.period} × ${f.period}s a year`,
+    via: via(f, `${f.token}.${method} → APY`),
+    formula: a.formula,
     inputs: [
       {
         label: `rate per ${f.period}`,
+        ...(raw != null ? { value: raw.toLocaleString("en-US") } : {}),
         kind: "chain",
         pclass: "state",
-        note: `${f.token}.${method}`,
+        note: `${f.token}.${method}, a 1e18 mantissa`,
         contract: marketContract(f, c),
       },
       {
-        label: `${f.period}s a year`,
-        kind: "chain",
-        pclass: "state",
-        note: `model.${periodsPerYear(f)}`,
-        contract: irmContract(c),
+        label: "compounding steps a year",
+        value: en(a.steps),
+        kind: "offchain",
+        pclass: "offchain",
+        note: a.source,
+        ...(a.href ? { verify: { kind: "link" as const, href: a.href, text: `${f.name}'s docs` } } : {}),
       },
     ],
   };
@@ -474,7 +470,7 @@ export const cmPauseProv = stamped((f, c, side: "supply" | "borrow", paused: boo
     source: { block: c.blockNumber },
     verify: check(f, `the Comptroller's ${method}(${c.market ?? f.token})`, c),
     summary: paused
-      ? `${sym(c)} ${verb} paused — the Comptroller's \`${method}(${f.token})\` is true at block ${c.blockNumber}. New ${verb} is refused; repaying, withdrawing and liquidating still run.`
+      ? `${sym(c)} ${verb} paused — the Comptroller's \`${method}(${f.token})\` is true at block ${c.blockNumber}. New ${verb} is refused; repaying and withdrawing still run.`
       : `${sym(c)} ${verb} open — the Comptroller's \`${method}(${f.token})\` is false at block ${c.blockNumber}.`,
     contract: comptroller(f),
     via: via(f, `Comptroller.${method}(${f.token})`),
@@ -500,10 +496,10 @@ export const cmRateTermProv = stamped(
           : `${term === "jump" ? "jumpMultiplier" : term === "base" ? "baseRate" : "multiplier"}${perPeriod(f)}`;
     const name = { base: "base rate", multiplier: "multiplier", kink: "kink", jump: "jump multiplier" }[term];
     const meaning = {
-      base: "the borrow rate at zero utilisation",
-      multiplier: "how fast the borrow rate climbs with utilisation below the kink",
-      kink: "the utilisation where the borrow rate turns steeper",
-      jump: "how fast the borrow rate climbs with utilisation above the kink",
+      base: "the borrow rate at zero utilization",
+      multiplier: "how fast the borrow rate climbs with utilization below the kink",
+      kink: "the utilization where the borrow rate turns steeper",
+      jump: "how fast the borrow rate climbs with utilization above the kink",
     }[term];
     const y = f.rateYear;
     const modelYear = read?.modelPeriodsPerYear != null ? ` of ${en(read.modelPeriodsPerYear)}` : "";
@@ -517,8 +513,8 @@ export const cmRateTermProv = stamped(
       term === "kink" || !y
         ? ""
         : whitePaper
-          ? ` The model stores this term a year and divides it by its \`${periodsPerYear(f)}()\` for the per-${f.period} rate; ${en(y.periods)} is the year the market's rates are printed over (${y.source}).`
-          : ` The model set this per-${f.period} term from a yearly one on its \`${periodsPerYear(f)}()\`${modelYear}; ${en(y.periods)} is the year the market's rates are printed over (${y.source}).`;
+          ? ` The model stores this term a year and divides it by its \`${periodsPerYear(f)}()\` for the per-${f.period} rate; the term is a simple rate on ${en(y.periods)} ${f.period}s a year (${y.source}).`
+          : ` The model set this per-${f.period} term from a yearly one on its \`${periodsPerYear(f)}()\`${modelYear}; the term is a simple rate on ${en(y.periods)} ${f.period}s a year (${y.source}).`;
     return {
       kind: term === "kink" || (whitePaper && !y) ? "chain" : "chain-derived",
       pclass: "state",
@@ -537,7 +533,7 @@ export const cmCurveProv = stamped(
     kind: "chain-derived",
     pclass: "state",
     source: { block: c.blockNumber },
-    summary: `${sym(c)} rate curve — the borrow rate the market's rate model gives at each utilisation, from its terms at block ${c.blockNumber}. ${model.shape === "jump" ? "Below the kink the rate is base + multiplier × utilisation; above it the jump multiplier adds to it for the utilisation past the kink." : "The rate is base + multiplier × utilisation, climbing evenly."} The supply rate is the borrow rate times utilisation, less the reserve factor.${f.rateYear ? ` The curve and its terms are per-${f.period} rates times ${en(f.rateYear.periods)} ${f.period}s a year, the year the supply and borrow rates are printed over.` : ""}`,
+    summary: `${sym(c)} rate curve — the borrow rate the market's rate model gives at each utilization, from its terms at block ${c.blockNumber}. ${model.shape === "jump" ? "Below the kink the rate is base + multiplier × utilization; above it the jump multiplier adds to it for the utilization past the kink." : "The rate is base + multiplier × utilization, climbing evenly."} The supply rate is the borrow rate times utilization, less the reserve factor. The terms are simple rates a year${f.rateYear ? ` (per-${f.period} rates times ${en(f.rateYear.periods)} ${f.period}s)` : ""}; the curve draws them as APYs, ${f.apy.source}: ${f.apy.formula}.`,
     contract: irmContract(c),
     via: via(f, `${f.token}.interestRateModel → model terms`),
     formula:

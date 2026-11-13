@@ -166,7 +166,7 @@ function readStat(
 export const FX_HEADS: EventCellHead[] = [
   { kind: "ledger", side: "collateral", label: "Collateral" },
   { kind: "ledger", side: "debt", label: "Debt" },
-  { kind: "stat", label: "Debt ratio" },
+  { kind: "stat", label: "LTV" },
 ];
 
 /** The opened card: getPosition and getPositionDebtRatio at block − 1 and at
@@ -264,7 +264,7 @@ export function useFxOpened({
     for (const s of [
       keyed("collateral", coll ? { ...coll, ...collLedger } : null),
       keyed("debt", debt ? { ...debt, ...debtLedger } : null),
-      keyed("ratio", readStat(`Debt ratio${tag}`, "ratio", normalizedSymbol, before, after, coords, px), [
+      keyed("ratio", readStat(`LTV${tag}`, "ratio", normalizedSymbol, before, after, coords, px), [
         "collateral",
         "debt",
       ]),
@@ -302,7 +302,7 @@ export function useFxOpened({
             {state?.expenseRatio != null && (
               <span className="font-normal text-rb-500">
                 {" "}
-                {Math.round(state.expenseRatio * 100)}% of the liquidation bonus
+                {Math.round(state.expenseRatio * 100)}% of the liquidation bounty
               </span>
             )}
           </NoteLine>,
@@ -461,7 +461,7 @@ export function useFxOpened({
     const ratio = keyed(
       "ratio",
       readStat(
-        "Debt ratio",
+        "LTV",
         "ratio",
         normalizedSymbol,
         before,

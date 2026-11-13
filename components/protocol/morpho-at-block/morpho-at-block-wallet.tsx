@@ -26,6 +26,7 @@ import {
   type MorphoAtBlockWalletRead,
 } from "@/lib/morpho-at-block/types";
 import { amount, CARD_WORDS, frontDoorWords, pairName, pctText, usd } from "@/lib/morpho-at-block/words";
+import { MORPHO_TERMS } from "@/lib/morpho/terms";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 
 function Figure({
@@ -87,10 +88,10 @@ function rowFigures(f: MorphoAtBlockFigures, c: MorphoAtBlockReceiptContext) {
         <Figure c={c} usdKey="usd-debt" unitKey="debt" value={f.debt} valueUsd={f.debtUsd} unit={f.loan.symbol} />
       </span>,
     );
-  if (f.ltv != null)
+  if (f.healthFactor != null)
     parts.push(
-      <span key="l">
-        {CARD_WORDS.ltv} <Prov info={morphoAtBlockProv("ltv", c)}>{pctText(f.ltv, 1)}</Prov>
+      <span key="h">
+        {MORPHO_TERMS.healthFactor} <Prov info={morphoAtBlockProv("health", c)}>{f.healthFactor.toFixed(2)}</Prov>
       </span>,
     );
   return parts.flatMap((p, i) => (i ? [" · ", p] : [p]));

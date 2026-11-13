@@ -47,8 +47,8 @@ export function CompoundListing({ initialItems, initialTotal, initialKey, initia
 
   return (
     <ChainTruthListingPage<CompoundPositionSummary, CompoundListFilters>
-      title="Compound V3 Positions"
-      noun="positions"
+      title="Compound V3 Accounts"
+      noun="accounts"
       basePath="/ethereum/compound-v3"
       defaults={COMPOUND_LIST_DEFAULTS}
       sortOptions={COMPOUND_SORT_OPTIONS}

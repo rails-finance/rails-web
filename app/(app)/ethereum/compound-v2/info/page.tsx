@@ -57,13 +57,13 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "Account liquidity",
     definition:
-      "Account liquidity is a wallet's borrowing room: its entered supply times each collateral factor, minus what it owes. A negative result is a shortfall, and the wallet can be liquidated.",
+      "Account liquidity is the room a wallet has left to borrow: its entered supply times each collateral factor, minus what it owes. A negative result is a shortfall, and the wallet can be liquidated.",
     sources: [{ label: "Account liquidity", href: COMPTROLLER + "/#account-liquidity" }],
   },
   {
     term: "Liquidation",
     definition:
-      "A liquidation happens to a wallet whose debt passes its borrowing limit. A liquidator repays part of the debt and takes collateral at a discount.",
+      "A liquidation happens to a wallet whose debt passes its borrow limit. A liquidator repays part of the debt and takes collateral at a discount.",
     sources: [{ label: "Liquidate borrow", href: CTOKENS + "/#liquidate-borrow" }],
   },
   {
@@ -80,7 +80,7 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "Liquidation incentive",
     definition:
-      "The liquidation incentive is the extra collateral a liquidator receives for repaying a wallet's debt. Part of that extra collateral goes to the reserves of the seized collateral's market.",
+      "The liquidation incentive is the extra collateral a liquidator receives for repaying a wallet's debt, stated as a multiple: at 1.08 the seized collateral is worth 1.08 times the debt repaid, 8% extra. Most markets keep 2.8% of the seized cTokens for their reserves.",
     sources: [{ label: "Liquidation incentive", href: COMPTROLLER + "/#liquidation-incentive" }],
   },
   {
@@ -122,7 +122,7 @@ const reads: InfoReads = {
     {
       name: "Each market's rate model",
       reads:
-        "the base rate, multiplier, kink and jump multiplier that set the borrow rate, and the blocks a year the rates are counted over. The five oldest markets run the first model, which has no kink.",
+        "the base rate, multiplier, kink and jump multiplier that set the borrow rate, and the blocks a year the model sets its curve with. The five oldest markets run the first model, which has no kink.",
     },
   ],
   how: "The markets pages read these contracts through Rails's server at most every ten minutes, and a wallet page reads the wallet's markets at each load.",
@@ -195,9 +195,9 @@ export default function InfoPage() {
         <>
           A wallet supplies a token and <GlossaryLink term="Entering a market">enters the market</GlossaryLink>, so the
           supply counts as collateral (the assets that back a loan). It can then borrow up to its{" "}
-          <GlossaryLink term="Account liquidity">account liquidity</GlossaryLink>, its borrowing room: each entered
-          supply times its <GlossaryLink term="Collateral factor">collateral factor</GlossaryLink>, minus its debt. If
-          the room turns negative, a <GlossaryLink term="Liquidator">liquidator</GlossaryLink> steps in.
+          <GlossaryLink term="Account liquidity">account liquidity</GlossaryLink>, the room it has left to borrow: each
+          entered supply times its <GlossaryLink term="Collateral factor">collateral factor</GlossaryLink>, minus its
+          debt. If the room turns negative, a <GlossaryLink term="Liquidator">liquidator</GlossaryLink> steps in.
         </>,
         <>
           Every market sits under one <GlossaryLink term="Comptroller">Comptroller</GlossaryLink>, which sets these

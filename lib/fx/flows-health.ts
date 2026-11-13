@@ -78,49 +78,48 @@ export const FX_HEALTH_SOURCE: HealthSource = {
   oracle: "the pool oracle's",
   pool: "the pool",
   chain: 1,
-  factors: ["liquidation ratio", "rebalance and liquidation ratios"],
+  factors: ["liquidation line", "rebalance and liquidation lines"],
   readAt: "read at the block of each day's last event",
   priceAt: [
     "that each event was valued at, held between events",
     "that the latest event on or before the day was valued at",
   ],
-  held: "the pool's rebalance and liquidation ratios read at block {block}",
-  live: "the card's debt ratio now: the settled debt over the collateral's value at the oracle's anchor price",
+  held: "the pool's rebalance and liquidation lines read at block {block}",
+  live: "the card's LTV now: the settled debt over the collateral's value at the oracle's anchor price",
   stepped: true,
   levels: {
-    formula: "debts ÷ (colls × liquidation ratio)",
+    formula: "debts ÷ (colls × liquidation line)",
     summary:
-      "Liquidation level — the collateral's price, in fxUSD, at which the position's debt ratio reaches the pool's liquidation ratio: the debt divided by the collateral and the ratio. The pool judges its lines at the oracle's min price.",
+      "Liquidation level — the collateral's price, in fxUSD, at which the position's LTV reaches the pool's liquidation line: the debt divided by the collateral and the line. The pool judges its lines at the oracle's min price.",
     here: {
-      live: "Here at the card's settled debt and collateral, against the pool's liquidation ratio now.",
-      read: "Here at the debt and collateral after the event at block {block}, against the pool's liquidation ratio read there.",
+      live: "Here at the card's settled debt and collateral, against the pool's liquidation line now.",
+      read: "Here at the debt and collateral after the event at block {block}, against the pool's liquidation line read there.",
     },
   },
   ratio: {
-    label: "Debt ratio",
+    label: "LTV",
     liquidates: "above",
     formula: "debts ÷ (colls × oracle price)",
     line: {
-      formula: "above the liquidation ratio the position can be liquidated",
-      summary:
-        "Liquidation line — the pool's liquidation ratio (getLiquidateRatios): from this debt ratio a keeper can liquidate the position.",
+      formula: "above the liquidation line the position can be liquidated",
+      summary: "Liquidation line — the pool's getLiquidateRatios: from this LTV a keeper can liquidate the position.",
     },
     warn: {
       verb: "Rebalances",
-      formula: "above the rebalance ratio the position's tick can be rebalanced",
+      formula: "above the rebalance line the position's tick can be rebalanced",
       summary:
-        "Rebalance line — the pool's rebalance ratio (getRebalanceRatios): from this debt ratio a keeper can rebalance the position's tick, taking collateral to repay debt.",
+        "Rebalance line — the pool's getRebalanceRatios: from this LTV a keeper can rebalance the position's tick, taking collateral to repay debt.",
       level: {
-        formula: "debts ÷ (colls × rebalance ratio)",
+        formula: "debts ÷ (colls × rebalance line)",
         summary:
-          "Rebalance level — the collateral's price, in fxUSD, at which the position's debt ratio reaches the pool's rebalance ratio: the debt divided by the collateral and the ratio. The pool judges its lines at the oracle's min price.",
+          "Rebalance level — the collateral's price, in fxUSD, at which the position's LTV reaches the pool's rebalance line: the debt divided by the collateral and the line. The pool judges its lines at the oracle's min price.",
         here: {
-          live: "Here at the card's settled debt and collateral, against the pool's rebalance ratio now.",
-          read: "Here at the debt and collateral after the event at block {block}, against the pool's rebalance ratio read there.",
+          live: "Here at the card's settled debt and collateral, against the pool's rebalance line now.",
+          read: "Here at the debt and collateral after the event at block {block}, against the pool's rebalance line read there.",
         },
       },
     },
-    help: "on the same days: the debt over the collateral at the price each event was valued at, held between events and drawn dotted there. The red line is the pool's liquidation ratio and the dashed amber line its rebalance ratio, each as read at the block of the day's last event; above them a keeper can liquidate the position or rebalance its tick. The list in the tip picks it or the collateral's price.",
+    help: "on the same days: the debt over the collateral at the price each event was valued at, held between events and drawn dotted there. The red line is the pool's liquidation line and the dashed amber line its rebalance line, each as read at the block of the day's last event; above them a keeper can liquidate the position or rebalance its tick. The list in the tip picks it or the collateral's price.",
   },
 };
 
@@ -130,20 +129,20 @@ export const FX_HEALTH_SOURCE: HealthSource = {
 export const FX_LOG_HEALTH_SOURCE: HealthSource = {
   ...FX_HEALTH_SOURCE,
   readAt: "in force each day (the pool's setter logs, and the read at each day's last event)",
-  held: "the pool's rebalance and liquidation ratios in force at block {block}",
+  held: "the pool's rebalance and liquidation lines in force at block {block}",
   ratio: {
     ...FX_HEALTH_SOURCE.ratio!,
     line: {
-      formula: "above the liquidation ratio the position can be liquidated",
+      formula: "above the liquidation line the position can be liquidated",
       summary:
-        "Liquidation line — the pool's liquidation ratio in force that day (getLiquidateRatios, set by its UpdateLiquidateRatios logs): from this debt ratio a keeper can liquidate the position.",
+        "Liquidation line — the pool's, in force that day (getLiquidateRatios, set by its UpdateLiquidateRatios logs): from this LTV a keeper can liquidate the position.",
     },
     warn: {
       ...FX_HEALTH_SOURCE.ratio!.warn!,
       summary:
-        "Rebalance line — the pool's rebalance ratio in force that day (getRebalanceRatios, set by its UpdateRebalanceRatios logs): from this debt ratio a keeper can rebalance the position's tick, taking collateral to repay debt.",
+        "Rebalance line — the pool's, in force that day (getRebalanceRatios, set by its UpdateRebalanceRatios logs): from this LTV a keeper can rebalance the position's tick, taking collateral to repay debt.",
     },
-    help: "on the same days: the debt over the collateral at the price each event was valued at, held between events and drawn dotted there. The red line is the pool's liquidation ratio and the dashed amber line its rebalance ratio in force that day, which step where f(x) governance changed them, each change a pink diamond on the events row; above them a keeper can liquidate the position or rebalance its tick. The list in the tip picks it or the collateral's price.",
+    help: "on the same days: the debt over the collateral at the price each event was valued at, held between events and drawn dotted there. The red line is the pool's liquidation line and the dashed amber line its rebalance line in force that day, which step where f(x) governance changed them, each change a pink diamond on the events row; above them a keeper can liquidate the position or rebalance its tick. The list in the tip picks it or the collateral's price.",
   },
 };
 
@@ -153,7 +152,7 @@ export const FX_LOG_STEADY_SOURCE: HealthSource = {
   ...FX_LOG_HEALTH_SOURCE,
   ratio: {
     ...FX_LOG_HEALTH_SOURCE.ratio!,
-    help: "on the same days: the debt over the collateral at the price each event was valued at, held between events and drawn dotted there. The red line is the pool's liquidation ratio and the dashed amber line its rebalance ratio in force that day, from the pool's setter logs, unchanged across this life; above them a keeper can liquidate the position or rebalance its tick. The list in the tip picks it or the collateral's price.",
+    help: "on the same days: the debt over the collateral at the price each event was valued at, held between events and drawn dotted there. The red line is the pool's liquidation line and the dashed amber line its rebalance line in force that day, from the pool's setter logs, unchanged across this life; above them a keeper can liquidate the position or rebalance its tick. The list in the tip picks it or the collateral's price.",
   },
 };
 

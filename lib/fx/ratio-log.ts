@@ -123,7 +123,7 @@ export function fxMergedReads(eventReads: readonly FactorRead[], changeReads: re
   return [...eventReads, ...changeReads.filter((r) => !at.has(r.block))].sort((a, b) => a.block - b.block);
 }
 
-const LINE_NAME: Record<FxRatioLine, string> = { liquidate: "Liquidation ratio", rebalance: "Rebalance ratio" };
+const LINE_NAME: Record<FxRatioLine, string> = { liquidate: "Liquidation line", rebalance: "Rebalance line" };
 const LINE_EVENT: Record<FxRatioLine, string> = {
   liquidate: "UpdateLiquidateRatios",
   rebalance: "UpdateRebalanceRatios",
@@ -150,7 +150,7 @@ export function fxRatioChanges(log: FxRatioLog | null | undefined, poolName: str
       prov: {
         kind: "chain",
         pclass: "emitted",
-        summary: `The ${poolName} pool's ${LINE_NAME[s.line].toLowerCase()}, set to ${to} by its ${LINE_EVENT[s.line]} log at block ${s.block.toLocaleString("en-US")}, with a bonus of ${fxRatioWords(s.bonusRatio)}. Before it, ${from}. ${LINE_LETS[s.line]}; the change applies to every position of the pool.`,
+        summary: `The ${poolName} pool's ${LINE_NAME[s.line].toLowerCase()}, set to ${to} by its ${LINE_EVENT[s.line]} log at block ${s.block.toLocaleString("en-US")}, with a bounty of ${fxRatioWords(s.bonusRatio)}. Before it, ${from}. ${LINE_LETS[s.line]}; the change applies to every position of the pool.`,
         contract: { name: `f(x) ${poolName} pool`, address: log.address },
         via: `${s.sieve ? `the mainnet Sieve's capture of the pool's ${LINE_EVENT[s.line]}` : "rails-server at-block store"} · /api/at-block/fx/ratio-log`,
         source: { block: s.block, txHash: tx },

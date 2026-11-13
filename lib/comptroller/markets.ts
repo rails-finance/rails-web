@@ -48,11 +48,11 @@ export interface ComptrollerMarket {
   borrowCapOneUnit: boolean;
   mintPaused: boolean;
   borrowPaused: boolean;
-  /** A year, as fractions. */
+  /** APYs, as fractions (lib/comptroller/apy.ts). */
   supplyApr: number | null;
   borrowApr: number | null;
-  /** The per-period rates as read and the model's periods-a-year constant,
-   *  for the receipts where the family prints a fixed year (Compound V2); null elsewhere. */
+  /** The per-period rates as read, for the receipts, and the model's
+   *  periods-a-year constant (Compound V2's blocksPerYear(); null for Moonwell). */
   supplyRatePerPeriodRaw: string | null;
   borrowRatePerPeriodRaw: string | null;
   modelPeriodsPerYear: number | null;
@@ -170,8 +170,8 @@ export function fromMoonwell(data: MoonwellMarketsResponse, family: "moonwell" |
         borrowPaused: m.borrowPaused,
         supplyApr: m.supplyApr != null ? m.supplyApr / 100 : null,
         borrowApr: m.borrowApr != null ? m.borrowApr / 100 : null,
-        supplyRatePerPeriodRaw: null,
-        borrowRatePerPeriodRaw: null,
+        supplyRatePerPeriodRaw: m.supplyRatePerTimestampRaw ?? null,
+        borrowRatePerPeriodRaw: m.borrowRatePerTimestampRaw ?? null,
         modelPeriodsPerYear: null,
         reserveFactor: m.reserveFactor,
         irm: m.interestRateModel,

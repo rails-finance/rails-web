@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   return listingMetadata({
     title: `Compound V3 ${m.label} on Optimism`,
     canonicalPath: `/optimism/compound-v3/markets/${m.key}`,
-    description: `Compound V3's ${m.baseSymbol} market on Optimism, read when the page opens: its supply and borrow rates, utilisation against the kink, reserves against their target, minimum borrow and every collateral asset's terms.`,
+    description: `Compound V3's ${m.baseSymbol} market on Optimism, read when the page opens: its supply and borrow rates, utilization against the kink, reserves against their target, minimum borrow and every collateral asset's terms.`,
   });
 }
 

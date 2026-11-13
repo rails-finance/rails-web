@@ -282,12 +282,12 @@ function fxEventSlotsBase(ctx: FxContext, coords: FxCoords, read: FxRowRead): Ev
     after?.ratio == null
       ? null
       : before?.ratio == null || before.ratio === 0
-        ? clause(<>The debt ratio after it was {ratioFig(after, "after")}.</>)
+        ? clause(<>The LTV after it was {ratioFig(after, "after")}.</>)
         : pctOf(before.ratio) === pctOf(after.ratio)
-          ? clause(<>The debt ratio stayed at {ratioFig(after, "after")}.</>)
+          ? clause(<>The LTV stayed at {ratioFig(after, "after")}.</>)
           : clause(
               <>
-                The debt ratio went from {ratioFig(before, "before")} to {ratioFig(after, "after")}.
+                The LTV went from {ratioFig(before, "before")} to {ratioFig(after, "after")}.
               </>,
             );
 
@@ -459,10 +459,10 @@ function fxEventSlotsBase(ctx: FxContext, coords: FxCoords, read: FxRowRead): Ev
             </Fig>
             {before.ratio != null && after.ratio != null && after.colls > 0 ? (
               pctOf(before.ratio) === pctOf(after.ratio) ? (
-                <>; its debt ratio stayed at {ratioFig(after, "after")}</>
+                <>; its LTV stayed at {ratioFig(after, "after")}</>
               ) : (
                 <>
-                  ; its debt ratio went from {ratioFig(before, "before")} to {ratioFig(after, "after")}
+                  ; its LTV went from {ratioFig(before, "before")} to {ratioFig(after, "after")}
                 </>
               )
             ) : null}
@@ -481,12 +481,12 @@ function fxEventSlotsBase(ctx: FxContext, coords: FxCoords, read: FxRowRead): Ev
         {before?.minPrice != null ? <>, {usd(before.minPrice)} at the block before</> : null}
         {line != null ? (
           <>
-            : it {what === "rebalance" ? "rebalances" : "liquidates"} a tick whose debt ratio there is{" "}
+            : it {what === "rebalance" ? "rebalances" : "liquidates"} a tick whose LTV there is{" "}
             {pctOf(line).replace(".0%", "%")} or more
           </>
         ) : null}
         {what === "rebalance" ? <>, and a rebalance brings the tick back toward that line at that price</> : null}. The
-        debt ratios on this row are read at the anchor price
+        LTVs on this row are read at the anchor price
         {before?.anchorPrice != null ? <> ({usd(before.anchorPrice)})</> : null}, at or above the min, so they can show
         below the line.
       </>,
@@ -782,7 +782,7 @@ function fxEventSlotsBase(ctx: FxContext, coords: FxCoords, read: FxRowRead): Ev
                   {formatTinyNonZero(kept)} {normSym}
                 </Fig>
                 {read.expenseRatio != null ? (
-                  <>, its {Math.round(read.expenseRatio * 100)}% share of the liquidation bonus</>
+                  <>, its {Math.round(read.expenseRatio * 100)}% share of the liquidation bounty</>
                 ) : null}
                 , so the collateral the keeper received and the protocol&rsquo;s share add up to what the position lost.
               </>,
@@ -808,8 +808,8 @@ function fxEventSlotsBase(ctx: FxContext, coords: FxCoords, read: FxRowRead): Ev
           clause(
             before?.ratio != null && before.liquidateLine != null ? (
               <>
-                Position #{id}&rsquo;s debt ratio stood at {ratioFig(before, "before")} at the block before; the {sym}{" "}
-                pool liquidates from {pctOf(before.liquidateLine).replace(".0%", "%")}
+                Position #{id}&rsquo;s LTV stood at {ratioFig(before, "before")} at the block before; the {sym} pool
+                liquidates from {pctOf(before.liquidateLine).replace(".0%", "%")}
                 {before.ratio < before.liquidateLine ? (
                   <>, a line the ratio crossed within this block as the price moved</>
                 ) : null}
@@ -817,12 +817,12 @@ function fxEventSlotsBase(ctx: FxContext, coords: FxCoords, read: FxRowRead): Ev
               </>
             ) : before?.ratio != null ? (
               <>
-                Position #{id}&rsquo;s debt ratio stood at {ratioFig(before, "before")} at the block before, high enough
-                for the {sym} pool to allow its liquidation.
+                Position #{id}&rsquo;s LTV stood at {ratioFig(before, "before")} at the block before, high enough for
+                the {sym} pool to allow its liquidation.
               </>
             ) : (
               <>
-                Position #{id}&rsquo;s debt ratio crossed the {sym} pool&rsquo;s liquidation line.
+                Position #{id}&rsquo;s LTV crossed the {sym} pool&rsquo;s liquidation line.
               </>
             ),
           ),
@@ -833,12 +833,12 @@ function fxEventSlotsBase(ctx: FxContext, coords: FxCoords, read: FxRowRead): Ev
             ? clause(
                 <>
                   The liquidation emptied the position. The owner keeps the fxUSD they borrowed; collateral beyond the
-                  repaid debt and the bonus would have stayed in the position, and none did.
+                  repaid debt and the bounty would have stayed in the position, and none did.
                 </>,
               )
             : clause(
                 <>
-                  Collateral beyond the repaid debt and the bonus stays in the position for the owner, who keeps the
+                  Collateral beyond the repaid debt and the bounty stays in the position for the owner, who keeps the
                   fxUSD they borrowed.
                 </>,
               ),
@@ -887,9 +887,10 @@ function fxEventSlotsBase(ctx: FxContext, coords: FxCoords, read: FxRowRead): Ev
           meansNow: [
             clause(
               <>
-                A redemption swaps fxUSD for collateral at the oracle&rsquo;s max price, at most 20% of a tick per pass;
-                today the manager opens it only while fxUSD trades below its peg. The position gave up debt and
-                collateral worth the same at that price, and stays open; the owner did not act.
+                A redemption swaps fxUSD for collateral at the oracle&rsquo;s max price, at most 20% of each
+                position&rsquo;s debt at a time; today the manager opens it only while fxUSD trades below its peg. The
+                position gave up debt and collateral worth the same at that price, and stays open; the owner did not
+                act.
               </>,
             ),
           ],
@@ -914,7 +915,7 @@ function fxEventSlotsBase(ctx: FxContext, coords: FxCoords, read: FxRowRead): Ev
         meansNow: [
           clause(
             <>
-              The keeper is paid by the rebalance bonus
+              The keeper is paid by the rebalance bounty
               {read.expenseRatio != null ? (
                 <>, of which the protocol keeps {Math.round(read.expenseRatio * 100)}%</>
               ) : null}

@@ -3,7 +3,7 @@
 // Moonwell position detail — reference depth, chain-state-first, the 3-section
 // anatomy (card → economics → timeline). Every value is chain-direct or
 // chain-derived: position state + timeline replayed from the captured mToken
-// events, and the risk surfaces (health factor, runway, borrow capacity,
+// events, and the risk surfaces (credit remaining, runway, borrow capacity,
 // market rates, the position narration) read live from the protocol's own
 // contracts via /api/chain/moonwell/position — per-market balances +
 // borrowBalanceStored, the Comptroller's oracle prices and collateral factors,
@@ -410,9 +410,8 @@ export default function MoonwellPositionView({
                   surface="detail"
                   viewHref={tl.viewHref}
                   captions={captions ?? undefined}
-                  // The Health factor, the room left to borrow and the distance to
-                  // liquidation come from the live Comptroller read, inside the
-                  // card's receipts scope.
+                  // Credit remaining and the credit limit come from the live
+                  // Comptroller read, inside the card's receipts scope.
                   chain={chain}
                   exports={exports}
                   // The Explanation is now pure layman prose about those same face

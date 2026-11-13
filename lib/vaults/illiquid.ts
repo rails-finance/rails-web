@@ -304,7 +304,7 @@ const list = (xs: string[]) =>
 
 /** The first sentence: which markets, how much of the vault, how borrowed.
  *  "The RLP market holds 99.9% of the vault, 100% borrowed at the rate
- *  ceiling (800% a year)." */
+ *  ceiling (800% a year, before compounding)." */
 export function illiquidSentence(il: VaultIlliquid): string {
   const names = list(il.markets.map(marketName));
   const one = il.markets.length === 1;
@@ -316,5 +316,5 @@ export function illiquidSentence(il: VaultIlliquid): string {
     : illiquidPct(low) === illiquidPct(high)
       ? `each ${illiquidPct(low)}`
       : `${illiquidPct(low)} to ${illiquidPct(high)}`;
-  return `The ${names} market${one ? " holds" : "s hold"} ${illiquidPct(il.share)} of the vault, ${borrowed} borrowed at the rate ceiling (${ratePct(RATE_CEILING_YEARLY)} a year).`;
+  return `The ${names} market${one ? " holds" : "s hold"} ${illiquidPct(il.share)} of the vault, ${borrowed} borrowed at the rate ceiling (${ratePct(RATE_CEILING_YEARLY)} a year, before compounding).`;
 }

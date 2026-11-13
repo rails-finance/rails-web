@@ -66,13 +66,13 @@ function marketSection(view: CompoundPositionView, chain: CompoundMarketChainRes
     // Unwound: the headline is what the position held at its height (chain-state
     // token amounts only — the market's oracle prices the PRESENT, not history).
     if (view.peak.lentBase > 0) {
-      lines.push(`- **Highest recorded lent base:** ${amt(view.peak.lentBase)} ${view.base.symbol}`);
+      lines.push(`- **Highest recorded supplied base:** ${amt(view.peak.lentBase)} ${view.base.symbol}`);
     }
     for (const c of view.peak.collateral) {
       lines.push(`- **Highest recorded collateral:** ${c.decimalsUnread ? "not loaded" : amt(c.amount)} ${c.symbol}`);
     }
     if (view.peak.borrowedBase > 0) {
-      lines.push(`- **Highest recorded borrow:** ${amt(view.peak.borrowedBase)} ${view.base.symbol}`);
+      lines.push(`- **Highest recorded borrow balance:** ${amt(view.peak.borrowedBase)} ${view.base.symbol}`);
     }
     lines.push("");
     return lines;
@@ -82,10 +82,12 @@ function marketSection(view: CompoundPositionView, chain: CompoundMarketChainRes
   // overlay landed, else the replayed principal.
   const baseNote = eff.isChain ? "incl. accrued interest" : "principal from the event replay, ex-interest";
   if (eff.side === "lend") {
-    lines.push(`- **Lent base:** ${tokenWithUsd(view, view.base.address, eff.amount, view.base.symbol)} (${baseNote})`);
+    lines.push(
+      `- **Supplied base:** ${tokenWithUsd(view, view.base.address, eff.amount, view.base.symbol)} (${baseNote})`,
+    );
   } else if (eff.side === "borrow") {
     lines.push(
-      `- **Borrowed base:** ${tokenWithUsd(view, view.base.address, Math.abs(eff.amount), view.base.symbol)} (${baseNote})`,
+      `- **Borrow balance:** ${tokenWithUsd(view, view.base.address, Math.abs(eff.amount), view.base.symbol)} (${baseNote})`,
     );
   }
   if (view.collateral.length > 0) {
@@ -105,17 +107,17 @@ function marketSection(view: CompoundPositionView, chain: CompoundMarketChainRes
   if (chain && !chain.chainStale) {
     if (chain.healthFactor != null) {
       lines.push(
-        `- **Health factor:** ${num(chain.healthFactor, 2)} (liquidation capacity ÷ debt; Comet absorbs at 1.0)`,
+        `- **Liquidation point reached:** ${chain.healthFactor > 0 ? `${num(100 / chain.healthFactor, 1)}%` : "—"} (debt ÷ liquidation capacity; liquidatable past 100%; "liquidation point" is Rails's name, Compound's docs name no such level)`,
       );
       lines.push(
         `- **Contract's own verdicts:** isBorrowCollateralized ${chain.isBorrowCollateralized ? "true" : "false"}, isLiquidatable ${chain.isLiquidatable ? "true" : "false"}`,
       );
       lines.push(
-        `- **Borrow capacity:** ${num(chain.borrowCapacity, 2)} ${chain.quoteUnit} · **liquidation line:** ${num(chain.liquidationCapacity, 2)} ${chain.quoteUnit} · **debt:** ${num(chain.debtValue, 2)} ${chain.quoteUnit}`,
+        `- **Borrowing capacity:** ${num(chain.borrowCapacity, 2)} ${chain.quoteUnit} · **liquidation point:** ${num(chain.liquidationCapacity, 2)} ${chain.quoteUnit} · **borrow balance:** ${num(chain.debtValue, 2)} ${chain.quoteUnit}`,
       );
     }
     lines.push(
-      `- **Market rates (at block ${chain.blockNumber}):** supply ${num(chain.supplyApr * 100, 2)}% APR, borrow ${num(chain.borrowApr * 100, 2)}% APR, utilization ${num(chain.utilization * 100, 1)}%`,
+      `- **Market rates (at block ${chain.blockNumber}):** Supply APR ${num(chain.supplyApr * 100, 2)}%, Borrow APR ${num(chain.borrowApr * 100, 2)}%, utilization ${num(chain.utilization * 100, 1)}%`,
     );
   }
   lines.push("");
@@ -126,19 +128,19 @@ export function compoundPositionsToMarkdown(args: CompoundPositionsMarkdownArgs)
   const { wallet, views, chainByMarket, events, generatedAt } = args;
   const lines: string[] = [];
 
-  lines.push(`# Compound V3 (Comet) positions`);
+  lines.push(`# Compound V3 (Comet) accounts`);
   lines.push("");
   lines.push(
     `> Point-in-time snapshot generated ${fmtUtc(generatedAt.getTime() / 1000)}. ` +
       `Balances are the replayed Comet events upgraded to the contract's live balanceOf where read, ` +
-      `USD is Comet's own on-chain oracle (getPrice), and the account verdicts ` +
+      `USD is Comet's price feeds (getPrice), and the account verdicts ` +
       `(isBorrowCollateralized / isLiquidatable) are the contract's own. ` +
       `Everything drifts as the market and position change. Not financial advice.`,
   );
   lines.push("");
   lines.push(`- **Wallet:** ${wallet}`);
   lines.push(
-    `- **Markets held:** ${views.length} (a wallet holds one single-base / multi-collateral position per Comet market)`,
+    `- **Markets held:** ${views.length} (a wallet holds one single-base / multi-collateral account per Comet market)`,
   );
   lines.push("");
 

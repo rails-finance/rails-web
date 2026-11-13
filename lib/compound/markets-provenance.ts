@@ -10,7 +10,7 @@
 //     third-party verifiable: re-run the eth_call at the block against any node.
 //   • oracle  — the market's own getPrice on a configured feed (the same price
 //     its liquidation engine uses), and any value multiplied through it.
-//   • derived — a ratio or Σ over those reads (utilisation-of-the-roster, a
+//   • derived — a ratio or Σ over those reads (utilization-of-the-roster, a
 //     value sum), chain-derived and no further than its weakest input.
 //
 // The structured `source: { block }` slot rides every builder ALONGSIDE naming
@@ -108,32 +108,32 @@ const cvMarketValueProvUnstamped = (side: "supplied" | "borrowed", coords: Compo
 
 // ── market-level: rate curve ─────────────────────────────────────────────────
 
-/** Utilisation — Comet's own getUtilization (totalBorrow ÷ totalSupply of the
+/** Utilization — Comet's own getUtilization (totalBorrow ÷ totalSupply of the
  *  base), the number the whole rate curve is written against. */
 const cvUtilizationProvUnstamped = (coords: CompoundMarketCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: coords.blockNumber },
   verify: recompute("Comet.getUtilization", coords),
-  summary: `Utilisation — the market's own \`getUtilization\`${atBlock(coords)}: totalBorrow ÷ totalSupply of the base, the contract's OWN arithmetic (1e18-scaled). Every point on the rate curve is priced from this one number.`,
+  summary: `Utilization — the market's own \`getUtilization\`${atBlock(coords)}: totalBorrow ÷ totalSupply of the base, the contract's OWN arithmetic (1e18-scaled). Every point on the rate curve is priced from this one number.`,
   contract: cometContract(coords),
   via: `${LANE} · Comet.getUtilization @ head`,
 });
 
-/** A rate-curve kink — the utilisation a curve turns steep at (supplyKink /
+/** A rate-curve kink — the utilization a curve turns steep at (supplyKink /
  *  borrowKink), a governance-set slot on the same axis as the fill. */
 const cvKinkProvUnstamped = (which: "supply" | "borrow", coords: CompoundMarketCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: coords.blockNumber },
   verify: recompute(`Comet.${which}Kink`, coords),
-  summary: `${which === "supply" ? "Supply" : "Borrow"}-rate kink — the market's \`${which}Kink\`${atBlock(coords)}: the utilisation the ${which} curve turns steep at, governance-set (1e18-scaled). It sits on the utilisation axis, so it is drawn against the fill.`,
+  summary: `${which === "supply" ? "Supply" : "Borrow"}-rate kink — the market's \`${which}Kink\`${atBlock(coords)}: the utilization the ${which} curve turns steep at, governance-set (1e18-scaled). It sits on the utilization axis, so it is drawn against the fill.`,
   contract: cometContract(coords),
   via: `${LANE} · Comet.${which}Kink @ head`,
 });
 
 /** A live annualised rate — getSupplyRate / getBorrowRate at the current
- *  utilisation, the contract's per-second answer × seconds per year. */
+ *  utilization, the contract's per-second answer × seconds per year. */
 const cvRateProvUnstamped = (side: "supply" | "borrow", coords: CompoundMarketCoords): Provenance => {
   const method = side === "supply" ? "getSupplyRate" : "getBorrowRate";
   return {
@@ -141,7 +141,7 @@ const cvRateProvUnstamped = (side: "supply" | "borrow", coords: CompoundMarketCo
     pclass: "state",
     source: { block: coords.blockNumber },
     verify: recompute(`Comet.${method}`, coords),
-    summary: `${side === "supply" ? "Supply" : "Borrow"} APR — the market's \`${method}\` at the current utilisation${atBlock(coords)}, annualized from the contract's per-second rate (× 31,536,000). The rate the contract itself would apply this block, read at the utilisation it reports.`,
+    summary: `${side === "supply" ? "Supply" : "Borrow"} APR — the market's \`${method}\` at the current utilization${atBlock(coords)}, annualized from the contract's per-second rate (× 31,536,000). The rate the contract itself would apply this block, read at the utilization it reports.`,
     contract: cometContract(coords),
     via: `${LANE} · Comet.${method}(utilization) × seconds/year @ head`,
     formula: "per-second rate × seconds per year",

@@ -139,8 +139,8 @@ function buildMoonwellLiqForensics(
     premium: seizedValue / clearedValue - 1,
     premiumProv: liqPremiumProv(coords, { seized: formatUsdValue(seizedValue), cleared: formatUsdValue(clearedValue) }),
     premiumReference: {
-      label: "Incentive at block",
-      value: `+${((ctx.incentiveAtBlock - 1) * 100).toFixed(2)}%`,
+      label: "Liquidation incentive",
+      value: `${ctx.incentiveAtBlock.toFixed(2)}×`,
       prov: liqIncentiveRefProv(coords, comptroller, ctx.raw?.incentiveRaw),
     },
     pricePills: [

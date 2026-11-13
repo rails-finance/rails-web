@@ -75,6 +75,9 @@ import type { CompoundV2CardCaptions } from "@/lib/compound-v2/economics";
 import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
 import { compoundV2PositionModal } from "@/lib/compound-v2/event-templates";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
+
+/** The headline over every supplied market (ui-jobs 631, V4). */
+const SUPPLIED = "Supplied";
 import type {
   CompoundV2PositionSummary,
   CompoundV2SupplyAmount,
@@ -441,14 +444,15 @@ export function useCompoundV2CardSlots({
   const heads: PositionCardHead[] = [
     {
       id: "collateral",
-      label: CARD_VOCAB.collateral,
+      // Every supplied market, entered or not: the docs' supplied balance.
+      label: SUPPLIED,
       value:
         v.supplies.length === 0 ? null : collUsd != null ? (
-          <UsdFigure usd={collUsd.usd} info={usdProv(marketBy, "Collateral", collUsd.fixed)} form="compact" />
+          <UsdFigure usd={collUsd.usd} info={usdProv(marketBy, "Supplied", collUsd.fixed)} form="compact" />
         ) : (
           <TokenStack lines={suppliesShown.map(supplyUnit)} />
         ),
-      total: collUsd != null ? { usd: collUsd.usd, info: usdProv(marketBy, "Collateral", collUsd.fixed) } : undefined,
+      total: collUsd != null ? { usd: collUsd.usd, info: usdProv(marketBy, "Supplied", collUsd.fixed) } : undefined,
       assets: v.supplies.length > 0 ? <InlineAssetCluster assets={suppliesShown.map(markOf)} /> : undefined,
     },
     {
@@ -485,7 +489,7 @@ export function useCompoundV2CardSlots({
       usd:
         collUsd != null ? (
           <span className="font-bold text-green-400">
-            <Prov info={usdProv(marketBy, "Collateral", collUsd.fixed)}>{formatUsdValue(collUsd.usd)}</Prov>
+            <Prov info={usdProv(marketBy, "Supplied", collUsd.fixed)}>{formatUsdValue(collUsd.usd)}</Prov>
           </span>
         ) : null,
     };
@@ -528,11 +532,11 @@ export function useCompoundV2CardSlots({
   // The headlines' read-mores on a detail card.
   const HEAD_TIP = {
     collateral:
-      "What the account supplies to Compound's markets, in dollars at Compound's oracle prices, earning each market's supply rate. The markets entered as collateral back its borrowing.",
+      "What the account supplies to Compound's markets, entered or not, in dollars at Compound's oracle prices, earning each market's supply APY. Only the markets entered as collateral back its borrowing.",
     debt: "What the account owes Compound's markets, in dollars at Compound's oracle prices, including the interest accrued at each market's borrow rate.",
   };
   const tipped = (h: PositionCardHead): PositionCardHead =>
-    h.labelTip || !(h.label === CARD_VOCAB.collateral || h.label === CARD_VOCAB.debt)
+    h.labelTip || !(h.id === "collateral" || h.id === "debt")
       ? h
       : { ...h, labelTip: h.id === "debt" ? HEAD_TIP.debt : HEAD_TIP.collateral };
 
@@ -594,15 +598,15 @@ export function useCompoundV2CardSlots({
     ? [
         {
           id: "borrow-rate",
-          label: rate.avg ? "Average borrow rate" : "Borrow rate",
+          label: rate.avg ? "Average borrow APY" : "Borrow APY",
           value: (
             <Prov info={stampServerRead(rate.avg ? avgBorrowRateProv() : borrowRateProv(rate.symbol, rate), marketBy)}>
               {rate.pct.toFixed(2)}%
             </Prov>
           ),
           tip: rate.avg
-            ? "The borrowed markets' current variable rates, averaged by each debt's dollar value at Compound's oracle prices."
-            : `The ${rate.symbol ?? "market"} market's current variable borrow rate: its borrowRatePerBlock, read from the chain, times the 2,628,000 blocks in a year of 12-second blocks.`,
+            ? "The borrowed markets' current variable APYs, averaged by each debt's dollar value at Compound's oracle prices."
+            : `The ${rate.symbol ?? "market"} market's current variable borrow APY: its borrowRatePerBlock, read from the chain, by Compound's docs' formula, 7,200 blocks a day compounded daily.`,
         },
       ]
     : [];

@@ -144,7 +144,7 @@ export const liqCollsProv = (tokenSym: string, coords: FxCoords, raw?: string | 
   kind: "chain",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `Collateral sent to the liquidator — the LiquidatePosition event's colls field${atBlock(coords)}, in ${tokenSym} as transferred. The manager scales the seized amount down to the token and subtracts the protocol's share of the bonus before it emits and transfers it (PoolManager _afterRebalanceOrLiquidate).`,
+  summary: `Collateral sent to the liquidator — the LiquidatePosition event's colls field${atBlock(coords)}, in ${tokenSym} as transferred. The manager scales the seized amount down to the token and subtracts the protocol's share of the bounty before it emits and transfers it (PoolManager _afterRebalanceOrLiquidate).`,
   contract: poolContract(coords),
   via: `${FX_VIA} · LiquidatePosition log · ${fieldSeg("colls", raw)}`,
   inputs: eventInputs(coords),
@@ -220,7 +220,7 @@ export const settledDebtRatioProv = (atBlockNum?: number | null): Provenance => 
   kind: "chain",
   pclass: "state",
   verify: stateVerify("getPositionDebtRatio", atBlockNum ?? null),
-  summary: `The position's debt ratio${atBlockNum != null ? ` at block ${atBlockNum}` : ""} — the pool's own \`getPositionDebtRatio\` view, read server-side in the settled sweep and scaled from 1e18 to 0–1. The contract's own risk figure — the same math its liquidation path runs — not a Rails recomputation. The pool oracle quotes three prices and this ratio is judged at the ANCHOR leg: chain-verified as debts × 1e36 ÷ (colls × anchor price), BigInt-exact on both pools (scripts/verify-fx-chain.mjs). The collateral's USD figure beside it uses the oracle's conservative min (liquidate) leg instead — a deliberately different price, named where it renders.`,
+  summary: `The position's LTV${atBlockNum != null ? ` at block ${atBlockNum}` : ""} — the pool's own \`getPositionDebtRatio\` view, read server-side in the settled sweep and scaled from 1e18 to 0–1. The contract's own risk figure — the same math its liquidation path runs — not a Rails recomputation. The pool oracle quotes three prices and this ratio is judged at the ANCHOR leg: chain-verified as debts × 1e36 ÷ (colls × anchor price), BigInt-exact on both pools (scripts/verify-fx-chain.mjs). The collateral's USD figure beside it uses the oracle's conservative min (liquidate) leg instead — a deliberately different price, named where it renders.`,
   contract: { name: "AaveFundingPool", address: "" },
   via: "pool getPositionDebtRatio (eth_call)",
 });
@@ -282,7 +282,7 @@ export const tickRebAmountProv = (
   verify: txVerify(coords),
   summary: redeem
     ? `The ${unit} of this redemption across the pool — the Redeem event's ${which === "colls" ? "collateral field: the token paid to the redeemer, after the protocol's redeem fee" : "debts field: the fxUSD the redeemer paid in and the manager burned"}${atBlock(coords)}. Shared across every tick it took from; this position's change is the getPosition read beside it.`
-    : `The ${unit} the whole ${poolWide ? "pool" : "tick"} gave up in this ${liquidate ? "liquidation run" : "rebalance"} — the ${liquidate ? "Liquidate" : poolWide ? "Rebalance" : "RebalanceTick"} event's ${which === "colls" ? "collateral field, in the token as transferred to the keeper, net of the protocol's share of the bonus" : which === "fxusd" ? "fxUSD debt field" : "stable-side debt field"}${atBlock(coords)}. Shared across every position ${poolWide ? "the sweep touched" : "in the tick"}; this position's change is the getPosition read beside it.`,
+    : `The ${unit} the whole ${poolWide ? "pool" : "tick"} gave up in this ${liquidate ? "liquidation run" : "rebalance"} — the ${liquidate ? "Liquidate" : poolWide ? "Rebalance" : "RebalanceTick"} event's ${which === "colls" ? "collateral field, in the token as transferred to the keeper, net of the protocol's share of the bounty" : which === "fxusd" ? "fxUSD debt field" : "stable-side debt field"}${atBlock(coords)}. Shared across every position ${poolWide ? "the sweep touched" : "in the tick"}; this position's change is the getPosition read beside it.`,
   contract: poolContract(coords),
   via: `captured ${redeem ? "Redeem" : liquidate ? "Liquidate" : poolWide ? "Rebalance" : "RebalanceTick"} log · ${fieldSeg(which === "colls" ? "colls" : which === "fxusd" ? "fxUSDDebts" : "stableDebts", raw)}`,
   inputs: eventInputs(coords),
@@ -520,7 +520,7 @@ export const lifetimeCollateralDriftProv = (
 export const fxPositionUsdProv = (normalizedSym: string, priceBlock?: number | null): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
-  summary: `The position's collateral valued in USD — the settled collateral (the pool's own getPosition, NORMALIZED ${normalizedSym} units) multiplied by the pool oracle's USD price per normalized unit${priceBlock != null ? `, read at block ${priceBlock}` : ""}. Both legs are chain reads at named blocks — the same oracle the pool's own liquidation math consults. The oracle quotes three prices (anchor / min / max) and this figure uses the MIN leg — the conservative price the protocol itself calls getLiquidatePrice, chain-verified as the one the sweep snapshots (scripts/verify-fx-chain.mjs). The debt ratio beside it is judged at the ANCHOR leg instead, so the two figures deliberately sit at different prices. Normalized amounts only: an operate's token-unit deltas are never priced with this figure.`,
+  summary: `The position's collateral valued in USD — the settled collateral (the pool's own getPosition, NORMALIZED ${normalizedSym} units) multiplied by the pool oracle's USD price per normalized unit${priceBlock != null ? `, read at block ${priceBlock}` : ""}. Both legs are chain reads at named blocks — the same oracle the pool's own liquidation math consults. The oracle quotes three prices (anchor / min / max) and this figure uses the MIN leg — the conservative price the protocol itself calls getLiquidatePrice, chain-verified as the one the sweep snapshots (scripts/verify-fx-chain.mjs). The LTV beside it is judged at the ANCHOR leg instead, so the two figures deliberately sit at different prices. Normalized amounts only: an operate's token-unit deltas are never priced with this figure.`,
   contract: { name: "AaveFundingPool", address: "" },
   via: "settled collateral × pool oracle min (liquidate) price (both eth_call at named blocks)",
   formula: "settled colls × oracle min (liquidate) price",
@@ -554,8 +554,7 @@ export const rowStateProv = (
   coords: FxCoords,
 ): Provenance => {
   const block = coords.blockNumber != null ? (when === "before" ? coords.blockNumber - 1 : coords.blockNumber) : null;
-  const what =
-    side === "coll" ? `Collateral (${sym})` : side === "debt" ? "fxUSD debt" : "Debt ratio (anchor oracle price)";
+  const what = side === "coll" ? `Collateral (${sym})` : side === "debt" ? "fxUSD debt" : "LTV (anchor oracle price)";
   return {
     kind: "chain",
     pclass: "state",
@@ -572,7 +571,7 @@ export const rowChangeProv = (side: "coll" | "debt" | "ratio", sym: string, coor
   kind: "chain-derived",
   pclass: "state",
   verify: rowReadVerify(coords.blockNumber),
-  summary: `${side === "coll" ? `Collateral (${sym})` : side === "debt" ? "fxUSD debt" : "Debt ratio"} this row moved — getPosition${side === "ratio" ? "DebtRatio" : ""} at the block less the same read at the block before. Everything else in the block that touched the position is in it.`,
+  summary: `${side === "coll" ? `Collateral (${sym})` : side === "debt" ? "fxUSD debt" : "LTV"} this row moved — getPosition${side === "ratio" ? "DebtRatio" : ""} at the block less the same read at the block before. Everything else in the block that touched the position is in it.`,
   contract: poolContract(coords),
   via: "read at the block − read at block − 1",
   formula: "after − before",
@@ -609,7 +608,7 @@ export const stethEquivalentProv = (what: string, coords: FxCoords): Provenance 
 export const protocolShareProv = (sym: string, coords: FxCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
-  summary: `The protocol's share of the bonus — the collateral the position lost (getPosition at block − 1 less at the block) minus what reached the keeper, both in ${sym}. The manager keeps getLiquidationExpenseRatio of the bonus.`,
+  summary: `The protocol's share of the bounty — the collateral the position lost (getPosition at block − 1 less at the block) minus what reached the keeper, both in ${sym}. The manager keeps getLiquidationExpenseRatio of the bounty.`,
   contract: poolContract(coords),
   via: "collateral lost − collateral sent to the keeper",
   formula: "(before − after) − sent",
@@ -697,7 +696,7 @@ export const poolLineProv = (
       kind: "chain",
       pclass: "state",
       verify: stateVerify(which === "rebalance" ? "getRebalanceRatios" : "getLiquidateRatios", block ?? null),
-      summary: `The pool's ${which === "rebalance" ? "rebalance" : "liquidation"} line — the debt ratio from which a keeper may ${which === "rebalance" ? "rebalance a tick" : "liquidate"}, and its bonus: the pool's ${which === "rebalance" ? "getRebalanceRatios" : "getLiquidateRatios"}${block != null ? ` at block ${block}` : ""}.`,
+      summary: `The pool's ${which === "rebalance" ? "rebalance" : "liquidation"} line — the LTV from which a keeper may ${which === "rebalance" ? "rebalance a tick" : "liquidate"}, and its bounty: the pool's ${which === "rebalance" ? "getRebalanceRatios" : "getLiquidateRatios"}${block != null ? ` at block ${block}` : ""}.`,
       contract: { name: "AaveFundingPool", address: "" },
       via: `pool ${which === "rebalance" ? "getRebalanceRatios" : "getLiquidateRatios"} (eth_call)`,
     },
@@ -711,7 +710,7 @@ export const oracleLegAtProv = (leg: "anchor" | "min", sym: string, block: numbe
   verify: { kind: "recompute", text: `Re-run pool.priceOracle().getPrice() at block ${block}` },
   summary:
     leg === "anchor"
-      ? `The oracle's anchor price, USD per ${sym}, at block ${block} — the same block as the collateral and debt. getPositionDebtRatio divides by it, so the debt ratio and this dollar figure agree: debt ÷ (collateral × anchor) = the ratio.`
+      ? `The oracle's anchor price, USD per ${sym}, at block ${block} — the same block as the collateral and debt. getPositionDebtRatio divides by it, so the LTV and this dollar figure agree: debt ÷ (collateral × anchor) = the ratio.`
       : `The oracle's min price, USD per ${sym}, at block ${block} — the same block as the collateral and debt. The pool checks borrowing and withdrawing (the 85.5% ceiling), rebalancing (from 88%) and liquidation (from 95%) against it: BasePool.operate uses getExchangePrice, rebalance getPrice's min leg, liquidate getLiquidatePrice, all the min leg.`,
   contract: { name: "AaveFundingPool", address: "" },
   via: "pool.priceOracle() · getPrice() (archive eth_call at the settled block)",
@@ -721,7 +720,7 @@ export const oracleLegAtProv = (leg: "anchor" | "min", sym: string, block: numbe
 export const anchorUsdProv = (sym: string, block: number | null): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
-  summary: `The collateral in USD — the settled collateral (getPosition, ${sym}) times the oracle's anchor price${block != null ? ` at block ${block}` : ""}, the price the debt ratio uses, so the debt divided by this figure is the ratio.`,
+  summary: `The collateral in USD — the settled collateral (getPosition, ${sym}) times the oracle's anchor price${block != null ? ` at block ${block}` : ""}, the price the LTV uses, so the debt divided by this figure is the ratio.`,
   contract: { name: "AaveFundingPool", address: "" },
   via: "settled colls × anchor price (same block)",
   formula: "colls × anchor",
@@ -731,7 +730,7 @@ export const anchorUsdProv = (sym: string, block: number | null): Provenance => 
 export const minRatioProv = (block: number): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
-  summary: `The debt ratio judged at the oracle's min price — the settled debt divided by the settled collateral times the min price, all at block ${block}. The pool's lines (85.5% for borrowing, 88% rebalance, 95% liquidation) compare against this figure.`,
+  summary: `The LTV judged at the oracle's min price — the settled debt divided by the settled collateral times the min price, all at block ${block}. The pool's lines (85.5% for borrowing, 88% rebalance, 95% liquidation) compare against this figure.`,
   contract: { name: "AaveFundingPool", address: "" },
   via: "debts ÷ (colls × min price)",
   formula: "debts ÷ (colls × min)",
@@ -752,9 +751,9 @@ export const minTriggerPriceProv = (line: string, sym: string): Provenance => ({
 export const triggerPriceProv = (line: string, sym: string): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
-  summary: `Price at which this position reaches ${line} — the anchor price times the debt ratio divided by ${line}, in USD per ${sym}. It holds collateral and debt where they are now; funding keeps taking collateral, which raises the ratio slowly.`,
+  summary: `Price at which this position reaches ${line} — the anchor price times the LTV divided by ${line}, in USD per ${sym}. It holds collateral and debt where they are now; funding keeps taking collateral, which raises the ratio slowly.`,
   contract: { name: "AaveFundingPool", address: "" },
-  via: "anchor price × debt ratio ÷ line",
+  via: "anchor price × LTV ÷ line",
   formula: "anchor × ratio ÷ line",
 });
 
