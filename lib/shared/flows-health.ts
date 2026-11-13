@@ -122,6 +122,8 @@ export interface HealthSource {
     of?: (lines: readonly HealthLine[], hf: number) => Map<string, number>;
     formula: string;
     summary?: string;
+    /** The level's name on the chart's mark (PriceLevel.label). */
+    label?: string;
     here?: { live: string; read: string };
   };
   /** The view in the card's terms where the card states a ratio against a
@@ -419,6 +421,7 @@ export function healthView(
       level: {
         points: pts,
         formula: src.levels?.formula ?? BASKET_LEVEL_FORMULA,
+        ...(src.levels?.label ? { label: src.levels.label } : {}),
         summary:
           src.levels?.summary ??
           `Liquidation level. The asset's price at which the health factor reaches 1, with every other balance and price as they stood on the day and the ${factors} ${src.pool} held at the day's last event.`,

@@ -18,6 +18,7 @@ import { formatExact } from "@/lib/utils/format";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import { effectiveBorrowAPR, borrowRatesByDebt } from "@/lib/aave-v4/borrow-rate";
+import { v4Apy } from "@/lib/aave-v4/rates";
 import type { AaveV4Context } from "@/lib/shared/types/protocols/aave-v4";
 import { AAVE_V4_LABELS, aaveV4Label, aaveV4T1Kind } from "@/lib/aave-v4/event-label";
 import type { Provenance } from "@/components/shared/provenance";
@@ -214,14 +215,17 @@ export function useAaveV4HeadSpec({
   }
 
   // The rate pill only on a borrow or repay, where it follows the moved
-  // asset's icon and is that asset's rate; an echo of the detail's Borrow
-  // Rate row.
+  // asset's icon and is that asset's borrow APY; an echo of the detail's
+  // Borrow APY row.
   const apr = effectiveBorrowAPR(ctx);
   const ratePill =
     showInterestRates && !swap && (ctx.eventType === "borrow" || ctx.eventType === "repay") && apr
       ? {
-          pct: parseFloat(apr) * 100,
-          prov: heldDebtRateProv({ ...coord, asset: borrowRatesByDebt(ctx)[0]?.symbol ?? ctx.reserveSymbol }),
+          pct: v4Apy(parseFloat(apr)) * 100,
+          prov: heldDebtRateProv(
+            { ...coord, asset: borrowRatesByDebt(ctx)[0]?.symbol ?? ctx.reserveSymbol },
+            parseFloat(apr),
+          ),
         }
       : undefined;
 

@@ -866,8 +866,9 @@ const SHEET_WORDS_SUBJECTS = [
     path: "/ethereum/aave-v4/spoke/main/0x7eac02864fbae93de38394a3e7b72a22e9b5fa09",
     id: "0x93924cd94df220dd1ab3691d52e949bc413fa9fd03838d20dae69195db1d6898-6",
     risk: ["Health factor", "Collateral can fall"],
-    limits: ["LTV", "Still borrowable"],
-    params: ["Max LTV", "Liquidation threshold"],
+    // The V4 docs' words (ui-jobs 627): no Max LTV row while it has no figure.
+    limits: ["LTV", "Remaining borrowing power"],
+    params: ["Collateral factor"],
     optional: [],
     carried: 2,
   },
