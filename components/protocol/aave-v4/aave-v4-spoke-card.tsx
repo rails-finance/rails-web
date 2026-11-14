@@ -31,6 +31,7 @@ import { Icon } from "@/components/icons/icon";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
+import { symbolOnly } from "@/lib/shared/asset-mark";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { type HubTier, hubChipLabel } from "@/components/protocol/aave-v4/aave-v4-spoke-constants";
 import { type AaveSpokeCardInfo, liquidationBuffer, rateSymbolLabel, yearlyDebtCost } from "@/lib/aave-v4/spoke-cards";
@@ -72,20 +73,21 @@ import { PARTIAL_LABEL_SUFFIX, partialSumProv } from "@/lib/aave-v4/unpriced";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { useAaveV4Deployment } from "@/lib/aave-v4/deployment";
 import { PanelFigure } from "@/components/shared/position-card-panel";
+import { v4Apy } from "@/lib/aave-v4/rates";
 
 export type { AaveSpokeCardInfo };
 
 // The interest figures are added since each balance last started from zero.
-const supplyInterestProv = () => interestSinceZeroProv("Supply interest inside the collateral");
-const borrowInterestProv = () => interestSinceZeroProv("Borrow interest inside the debt");
+const supplyInterestProv = () => interestSinceZeroProv("Earned interest inside the collateral");
+const borrowInterestProv = () => interestSinceZeroProv("Accrued interest inside the debt");
 
 /**
  * A headline USD figure (collateral, debt, supplied). The on-chain-oracle
  * total when every contributing asset is oracle-priced, traced as read from
  * the chain; otherwise the DefiLlama figure, which sums only the assets a price
  * covers and is marked partial when one is missing (RULE: Rails never invents a
- * price, lib/aave-v4/unpriced.ts). The panel's "Not in the totals" row names
- * what is missing.
+ * price, lib/aave-v4/unpriced.ts). The figure's "(partial)" tip and its
+ * receipt (`partialSumProv`) name what is missing.
  */
 function HeadlineUsd({
   defillamaUsd,
@@ -192,8 +194,8 @@ function interestRow(spoke: AaveSpokeCardInfo, side: "supply" | "debt"): Positio
   return side === "supply"
     ? {
         id: "supply-interest",
-        label: "Supply interest",
-        tip: "The supply interest inside the collateral, in dollars: what the supplied balance holds beyond its deposits and withdrawals since it last started from zero.",
+        label: "Earned interest",
+        tip: "The interest the supplied balance has earned, in dollars: what it holds beyond its supplies and withdrawals since it last started from zero.",
         value: (
           <span>
             <Prov info={supplyInterestProv()}>
@@ -205,8 +207,8 @@ function interestRow(spoke: AaveSpokeCardInfo, side: "supply" | "debt"): Positio
       }
     : {
         id: "borrow-interest",
-        label: "Borrow interest",
-        tip: "The borrow interest inside the debt, in dollars: what the debt holds beyond its draws and repayments since it last started from zero.",
+        label: "Accrued interest",
+        tip: "The interest the debt has accrued, in dollars: what it holds beyond its borrows and repayments since it last started from zero.",
         value: (
           <span>
             <Prov info={borrowInterestProv()}>
@@ -244,8 +246,8 @@ function liquidationRow(spoke: AaveSpokeCardInfo): PositionPanelRow | null {
     const debt = aaveV4DisplaySymbol(a.symbol);
     return {
       id: "liquidates-at",
-      label: "Liquidates at",
-      tip: `The ${coll} price, in ${debt}, at which the health factor reaches 1 and the position can be liquidated. The debt moves with the collateral, so the price between the two is the one that matters.`,
+      label: "Liquidation price",
+      tip: `The ${coll} price, in ${debt}, at which the health factor reaches 1; below it the position can be liquidated. The debt moves with the collateral, so the price between the two is the one that matters.`,
       value: (
         <span className="inline-flex items-center gap-1">
           <TokenChipIcon symbol={buf.single.symbol} size={14} filterable={false} />
@@ -261,8 +263,8 @@ function liquidationRow(spoke: AaveSpokeCardInfo): PositionPanelRow | null {
   if (buf.single)
     return {
       id: "liquidates-at",
-      label: "Liquidates at",
-      tip: `The ${aaveV4DisplaySymbol(buf.single.symbol)} price at which the health factor reaches 1 and the position can be liquidated: its market price divided by the health factor.`,
+      label: "Liquidation price",
+      tip: `The ${aaveV4DisplaySymbol(buf.single.symbol)} price at which the health factor reaches 1, below which the position can be liquidated: its market price divided by the health factor.`,
       value: (
         <span className="inline-flex items-center gap-1">
           <TokenChipIcon symbol={buf.single.symbol} size={14} filterable={false} />
@@ -273,7 +275,7 @@ function liquidationRow(spoke: AaveSpokeCardInfo): PositionPanelRow | null {
   return {
     id: "liquidation-drop",
     label: "Liquidates on a drop of",
-    tip: "How far the dollar value of all the collateral can fall, the debt standing still, before the health factor reaches 1 and the position can be liquidated: 1 − 1 ÷ health factor.",
+    tip: "How far the dollar value of all the collateral can fall, the debt standing still, before the health factor reaches 1, below which the position can be liquidated: 1 − 1 ÷ health factor.",
     value: <Prov info={LIQ_DROP_PROV}>{buf.dropPct.toFixed(0)}%</Prov>,
   };
 }
@@ -401,7 +403,9 @@ export function useAaveV4SpokeCardSlots({
   // position is never worth under a cent, so that reading means a price still
   // loading.
   const supplyUsdPending = spoke.supplyingSymbols.length > 0 && spoke.totalSupplyUsd < 0.01;
-  const cluster = (symbols: string[]) => (symbols.length > 0 ? <InlineAssetCluster symbols={symbols} /> : undefined);
+  // The spoke's rows name their reserves by symbol alone.
+  const cluster = (symbols: string[]) =>
+    symbols.length > 0 ? <InlineAssetCluster assets={symbols.map(symbolOnly)} /> : undefined;
   const onc = spoke.onchainUsd;
 
   // A side of one asset states its amount, the dollars beneath; a side of
@@ -415,6 +419,30 @@ export function useAaveV4SpokeCardSlots({
   const oneSupply = single(supplyLegs, spoke.supplyingSymbols);
   const oneColl = single(collLegs, spoke.supplyBreakdown.collateralSymbols);
   const oneDebt = single(debtLegs, spoke.borrowingSymbols);
+  // Supplies not enabled as collateral: they cannot be seized and do not move
+  // the health factor. The on-chain figure (supply − collateral, both priced)
+  // where it stands, else the DefiLlama one, on a line under the Collateral
+  // headline (TO-DO-position-card 341).
+  const nonCollUsd = spoke.supplyBreakdown.nonCollateralUsd;
+  const onchainNonColl = onc && onc.supply != null && onc.collateral != null ? onc.supply - onc.collateral : null;
+  const nonCollSub: ReactNode =
+    !supplyOnly && nonCollUsd > 0
+      ? (() => {
+          const v = fmtUsd(onchainNonColl ?? nonCollUsd);
+          return (
+            <span data-collateral-sub="not-collateral">
+              +
+              <RevealTip tip={v.title}>
+                <Prov info={onchainNonColl != null ? usdProvOnchain("Supplied, not collateral") : NONCOLL_USD_PROV}>
+                  {v.display}
+                </Prov>
+              </RevealTip>{" "}
+              supplied, not collateral
+            </span>
+          );
+        })()
+      : undefined;
+
   const heads: PositionCardHead[] = supplyOnly
     ? [
         {
@@ -452,6 +480,7 @@ export function useAaveV4SpokeCardSlots({
           // lives in the health factor.
           id: "collateral",
           label: CARD_VOCAB.collateral,
+          sub: nonCollSub,
           ...(oneColl
             ? oneAssetHead(
                 oneColl,
@@ -521,49 +550,7 @@ export function useAaveV4SpokeCardSlots({
   const present = (rows: (PositionPanelRow | null)[]): PositionPanelRow[] =>
     rows.filter((r): r is PositionPanelRow => r != null);
 
-  // What a fallback total leaves out. The on-chain totals are whole or
-  // absent, so the row stands only when a head shows the fallback figure.
-  const fallbackShown = supplyOnly ? onc?.supply == null : onc?.collateral == null || onc?.debt == null;
-  const unpricedRow: PositionPanelRow | null =
-    fallbackShown && spoke.unpricedSymbols.length > 0
-      ? {
-          id: "unpriced",
-          label: "Not in the totals",
-          tip: "Assets held here that no price source covers. The dollar figures above leave them out and are marked partial.",
-          value: (
-            <span className="inline-flex flex-wrap items-center gap-x-1.5">
-              <InlineAssetCluster symbols={spoke.unpricedSymbols} size={16} overlap={4} max={6} />
-              no price source
-            </span>
-          ),
-        }
-      : null;
-
-  // Supplies not enabled as collateral: they cannot be seized and do not move
-  // the health factor. The on-chain figure (supply − collateral, both priced)
-  // where it stands, else the DefiLlama one.
-  const nonCollUsd = spoke.supplyBreakdown.nonCollateralUsd;
-  const onchainNonColl = onc && onc.supply != null && onc.collateral != null ? onc.supply - onc.collateral : null;
-  const nonCollRow: PositionPanelRow | null =
-    !supplyOnly && nonCollUsd > 0
-      ? (() => {
-          const v = fmtUsd(onchainNonColl ?? nonCollUsd);
-          return {
-            id: "not-collateral",
-            label: "Supplied, not collateral",
-            tip: "Supplies the position has not enabled as collateral, in dollars. They cannot be seized and do not count toward the health factor.",
-            value: (
-              <RevealTip tip={v.title}>
-                <Prov info={onchainNonColl != null ? usdProvOnchain("Supplied, not collateral") : NONCOLL_USD_PROV}>
-                  {v.display}
-                </Prov>
-              </RevealTip>
-            ),
-          };
-        })()
-      : null;
-
-  // The liquidation threshold the health factor weighs the collateral at: one
+  // The collateral factor the health factor weighs the collateral at: one
   // asset's, or the dollar-weighted blend of several.
   const ltPct = spoke.blendedLt != null && spoke.blendedLt > 0 ? Math.round(spoke.blendedLt * 100) : null;
   const blended = spoke.supplyBreakdown.collateralSymbols.length > 1;
@@ -571,10 +558,10 @@ export function useAaveV4SpokeCardSlots({
     !supplyOnly && ltPct != null
       ? {
           id: "liquidation-threshold",
-          label: blended ? "Blended liquidation threshold" : "Liquidation threshold",
+          label: blended ? "Blended collateral factor" : "Collateral factor",
           tip: blended
-            ? "Each collateral asset's liquidation threshold weighted by its dollar share, as the spoke reports them: the part of the collateral's value the health factor counts."
-            : "The collateral's liquidation threshold, as the spoke reports it: the part of its value the health factor counts.",
+            ? "Each collateral asset's collateral factor weighted by its dollar share, as the spoke reports them: the part of the collateral's value the health factor counts."
+            : "The collateral factor the spoke reports for the collateral: the part of its value the health factor counts.",
           value: <Prov info={BLENDED_LT_PROV}>{ltPct}%</Prov>,
         }
       : null;
@@ -586,9 +573,14 @@ export function useAaveV4SpokeCardSlots({
     !supplyOnly && rate !== null
       ? {
           id: "borrow-rate",
-          label: ratePrefix ? `${ratePrefix}borrow rate` : "Borrow rate",
-          tip: "The latest borrow rate recorded on this spoke for the borrowed asset, from its most recent rate event.",
-          value: <Prov info={BORROW_RATE_PROV}>{rate.toFixed(2)}%</Prov>,
+          label: ratePrefix ? `${ratePrefix}borrow APY` : "Borrow APY",
+          // The position's risk premium stands in the tip (TO-DO-position-card 341).
+          tip: `The latest borrow APY recorded on this spoke for the borrowed asset, from its most recent rate event: the hub's borrow rate compounded over a year.${
+            riskPremium && riskPremium > 0
+              ? ` Aave V4 prices risk per position: the collateral held here carries a risk premium of ${(riskPremium * 100).toFixed(2)}% on top of the hub's base borrow rate.`
+              : ""
+          }`,
+          value: <Prov info={BORROW_RATE_PROV}>{(v4Apy(rate / 100) * 100).toFixed(2)}%</Prov>,
         }
       : null;
   const yearly = yearlyDebtCost(spoke);
@@ -597,7 +589,7 @@ export function useAaveV4SpokeCardSlots({
       ? {
           id: "yearly-cost",
           label: "Costs per year",
-          tip: "What the debt costs in a year at the latest borrow rate, in the borrowed token, if the rate and the debt stay where they are.",
+          tip: "What the debt costs in a year at the latest borrow APY, in the borrowed token, if the rate and the debt stay where they are.",
           value: (
             <TokenFigure symbol={yearly.symbol}>
               <span>
@@ -607,16 +599,6 @@ export function useAaveV4SpokeCardSlots({
           ),
         }
       : null;
-  const premiumRow: PositionPanelRow | null =
-    riskPremium && riskPremium > 0
-      ? {
-          id: "risk-premium",
-          label: "Risk premium",
-          tip: "Aave V4 prices risk per position: the collateral held here carries a premium on top of the hub's base borrow rate.",
-          value: `${(riskPremium * 100).toFixed(2)}%`,
-        }
-      : null;
-
   return {
     surface: "detail",
     status: null,
@@ -628,8 +610,8 @@ export function useAaveV4SpokeCardSlots({
     menu,
     foot,
     panel: [
-      present([unpricedRow, nonCollRow, interestRow(spoke, "supply"), ltRow]),
-      present([interestRow(spoke, "debt"), rateRow, costRow, premiumRow, supplyOnly ? null : liquidationRow(spoke)]),
+      present([interestRow(spoke, "supply"), ltRow]),
+      present([interestRow(spoke, "debt"), rateRow, costRow, supplyOnly ? null : liquidationRow(spoke)]),
     ],
   };
 }

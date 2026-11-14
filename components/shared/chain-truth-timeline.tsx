@@ -82,7 +82,7 @@ import { flowMoment } from "@/lib/shared/flow-moment";
 import { FlowMomentCard, type MomentNeighbour } from "@/components/shared/flow-moment-card";
 import { Link2, List, Lock, X } from "lucide-react";
 import { BlockTransactionsContext, blockTransactionsOf } from "@/components/shared/chain-truth-event";
-import { CTRL_GHOST, CTRL_OFF, CTRL_ON, CTRL_ON_ACCENT, CTRL_ON_HOVER } from "@/lib/shared/ui-grammar";
+import { CTRL_GHOST, CTRL_OFF, CTRL_ON, CTRL_ON_ACCENT, CTRL_ON_HOVER, FOOT_LINK } from "@/lib/shared/ui-grammar";
 import { unreadTokensIn } from "@/lib/shared/decimals-unread";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useParams, usePathname } from "next/navigation";
@@ -241,7 +241,7 @@ export function EventNotFoundNotice({ id, chainId }: { id: string; chainId: Chai
             <a
               href={explorerUrl(chainId, "tx-logs", hashMatch[0])}
               target="_blank"
-              rel="noopener noreferrer"
+              rel="noopener"
               className="link-external"
             >
               View the transaction on the chain&rsquo;s explorer
@@ -2004,8 +2004,8 @@ function ChainTruthTimelineBody({
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-3 flex-wrap text-sm text-rb-500">
           <span>One event from this position&rsquo;s history</span>
-          <a href={viewInTimelineHref} className="text-blue-600 hover:underline dark:text-[var(--text-link)] shrink-0">
-            View in timeline →
+          <a href={viewInTimelineHref} className={`shrink-0 ${FOOT_LINK}`}>
+            View in timeline
           </a>
         </div>
         {pinnedEvent ? (

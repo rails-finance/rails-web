@@ -36,15 +36,16 @@ import { isLiquityEvent } from "@/lib/shared/types/event-shape";
 import { batchRateDebtMove } from "@/lib/liquity/batch-rate-move";
 import type { DayObs, PriceLevel, PriceMarks } from "@/lib/shared/price-series";
 import { levelByDay } from "@/lib/shared/price-series";
+import { formatDate } from "@/lib/date";
 import { branchMcr } from "@/lib/liquity/event-safety";
 import {
   getLiquidationThreshold,
   LIQUIDATION_PRICE_FORMULA,
-  liquidationPriceSummary,
   troveLiquidationPrice,
 } from "@/lib/utils/liquidation-utils";
 import { compareWithinBlock } from "@/lib/shared/event-order";
 import { forkMcrAt, type ForkMcrStep } from "@/lib/shared/liquity-fork-ops";
+import { fmtLtv, fmtMaxLtv, liquityFamilyTerms, ltvLiquidationPriceSummary } from "@/lib/liquity/ltv";
 
 /** Liquity V2's year (Constants.sol `ONE_YEAR = 365 days`); its forks share it. */
 const ONE_YEAR_S = 31_536_000;
@@ -171,7 +172,14 @@ export function liquityFlowBuckets(surplusClaimed: boolean, family: LiquityFamil
     // Each inflow after Borrowed has its texture; interest is dashed
     // (standards/lexicon.md, lifetime bars' fills).
     { key: LQ.interest, label: "Interest", event: "", side: "debt", dir: "in", hatch: "dashes" },
-    { key: LQ.upfront, label: "Upfront fees", event: "Upfront fee", side: "debt", dir: "in", hatch: "checker" },
+    {
+      key: LQ.upfront,
+      label: "Upfront Borrowing Fees",
+      event: "Upfront Borrowing Fee",
+      side: "debt",
+      dir: "in",
+      hatch: "checker",
+    },
     { key: LQ.batchFee, label: "Batch management fees", event: "", side: "debt", dir: "in", hatch: "dots" },
     {
       key: LQ.redistDebt,
@@ -256,6 +264,9 @@ export interface LiquityFlowOptions {
    *  the liquidation level beside it, for the branch named (Liquity V1: "ETH",
    *  its 110 % minimum). */
   priceView?: { collateralType: string; fork?: LiquityForkLevel };
+  /** Unix seconds the Trove's branch shut down (ui-jobs 612): interest stops
+   *  accruing then, and the liquidation level ends there. */
+  shutdownAt?: number | null;
 }
 
 /** A fork branch's minimum for the price view's level (Ebisu, Asymmetry,
@@ -431,9 +442,14 @@ export function liquityLiqLevel(
     now: number;
     live?: Pick<LiquityLive, "coll" | "debt"> | null;
     mcrAt?: (ts: number) => number;
+    /** The branch's shutdown: the level stops there, with no live point. */
+    shutdownAt?: number | null;
   },
 ): Pick<PriceLevel, "points" | "end"> | null {
-  const evs = replayLiquity(events).map((r) => r.ev);
+  const shutAt = o.shutdownAt != null && o.shutdownAt < o.now ? o.shutdownAt : null;
+  const evs = replayLiquity(events)
+    .map((r) => r.ev)
+    .filter((e) => shutAt == null || e.ts <= shutAt);
   if (evs.length === 0 || (o.mcrAt == null && branchMcr(o.collateralType) == null)) return null;
   const mcrAt = o.mcrAt;
   const liq = (debt: number, coll: number, ts: number) =>
@@ -449,6 +465,14 @@ export function liquityLiqLevel(
     liquidation: e.kind === "liquidation",
     e,
   }));
+  if (shutAt != null) {
+    // The last point is the level at the shutdown; nothing is drawn after it.
+    const level = levelByDay(steps, {
+      now: shutAt,
+      at: ({ e }, t) => liq(e.debtAfter * accrualFactor(e.rate, e.fee, e.ts, t), e.collAfter, t),
+    });
+    return level && level.end === "today" ? { ...level, end: "shutdown" } : level;
+  }
   return levelByDay(steps, {
     now: o.now,
     at: ({ e }, t) => liq(e.debtAfter * accrualFactor(e.rate, e.fee, e.ts, t), e.collAfter, t),
@@ -528,6 +552,8 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
   const today = Math.floor(o.now / DAY_S);
   const last = replayed[replayed.length - 1].ev;
   const open = last.collAfter > DUST || last.debtAfter > DUST;
+  // Interest stops accruing at the branch's shutdown.
+  const accrueTo = (t: number) => (o.shutdownAt != null ? Math.min(t, o.shutdownAt) : t);
   const livePrice = o.live?.price != null && o.live.price > 0 ? o.live.price : null;
 
   // The collateral's recorded prices, by day (the last each day), the
@@ -553,13 +579,15 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
     const end = Math.min((d + 1) * DAY_S, o.now);
     while (ei + 1 < replayed.length && replayed[ei + 1].ev.ts <= end) ei++;
     const e = replayed[ei].ev;
-    debtObs.push([d, e.ts <= end ? accrualFactor(e.rate, e.fee, e.ts, end) : 1]);
+    debtObs.push([d, e.ts <= end ? accrualFactor(e.rate, e.fee, e.ts, accrueTo(end)) : 1]);
   }
 
   // Now: the live read where the page has one, else the last recorded
   // balances with the interest built since.
   const nowColl = open ? (o.live?.coll ?? last.collAfter) : 0;
-  const nowDebt = open ? (o.live?.debt ?? last.debtAfter * accrualFactor(last.rate, last.fee, last.ts, o.now)) : 0;
+  const nowDebt = open
+    ? (o.live?.debt ?? last.debtAfter * accrualFactor(last.rate, last.fee, last.ts, accrueTo(o.now)))
+    : 0;
   const pricedNow = livePrice ?? replayed[replayed.length - 1].price;
   const pending: NonNullable<FlowTimeline["live"]["pending"]> = [];
   if (open && o.live) {
@@ -629,9 +657,14 @@ const dayOf = (ts: number) =>
 /** A fork's minimum through the life in words: each listed step, then today's. */
 function forkMcrWords(f: LiquityForkLevel): string {
   const steps = [...(f.mcrBefore ?? [])].sort((a, b) => a.untilBlock - b.untilBlock);
-  return [...steps.map((st) => `${pctOf(st.mcr)} until ${dayOf(st.untilTimestamp)}`), `${pctOf(f.mcr)} since`].join(
-    ", ",
-  );
+  const lim = forkLimitOf(f);
+  return [...steps.map((st) => `${lim(st.mcr)} until ${dayOf(st.untilTimestamp)}`), `${lim(f.mcr)} since`].join(", ");
+}
+
+/** A fork's limit as its docs state it (decision 0065): the Max LTV, 1 ÷ the
+ *  MCR, or the MCR itself. */
+function forkLimitOf(f: LiquityForkLevel): (mcr: number) => string {
+  return liquityFamilyTerms(f.name).ltv ? (m) => fmtLtv(100 / m, 2) : pctOf;
 }
 
 /** A fork's level in the receipt: the minimum in force each day, and what
@@ -640,18 +673,26 @@ function forkLevelWords(
   f: LiquityForkLevel,
   symbol: string,
 ): Pick<PriceLevel, "formula" | "summary" | "formulaBefore"> {
+  const t = liquityFamilyTerms(f.name);
+  const lim = forkLimitOf(f);
+  // The limit's short name in a sentence: "minimum", "MCR" or "Max LTV".
+  const word = t.limitShort;
   const steps = [...(f.mcrBefore ?? [])].sort((a, b) => a.untilBlock - b.untilBlock);
   const formula = (m: number) =>
-    `${LIQUIDATION_PRICE_FORMULA.replace("MCR", pctOf(m))} after each event, with interest accruing between`;
+    t.ltv
+      ? `debt ÷ (collateral × ${lim(m)}) after each event, with interest accruing between`
+      : `${LIQUIDATION_PRICE_FORMULA.replace("MCR", pctOf(m))} after each event, with interest accruing between`;
   const history =
     steps.length > 0
-      ? `${f.name}'s governance moved this branch's minimum (${forkMcrWords(f)}, each change read from the branch manager's log); each day is drawn against the minimum in force at its end.`
+      ? `${f.name}'s governance moved this branch's ${word} (${forkMcrWords(f)}, each change read from the branch manager's log); each day is drawn against the ${word} in force at its end.`
       : f.stepsRead
-        ? `No branch manager log has moved this branch's ${pctOf(f.mcr)} minimum.`
-        : `Today's ${pctOf(f.mcr)} minimum is held across the life: no earlier value is listed for this branch.`;
+        ? `No branch manager log has moved this branch's ${lim(f.mcr)} ${word}.`
+        : `Today's ${lim(f.mcr)} ${word} is held across the life: no earlier value is listed for this branch.`;
   return {
     formula: formula(f.mcr),
-    summary: `Liquidation price. The ${symbol} price at which the Trove's collateral ratio reaches the ${f.name} branch's minimum; its debt × the minimum ÷ its collateral. Below that price the Trove can be liquidated. ${history}`,
+    summary: t.ltv
+      ? `Liquidation price. The ${symbol} price at which the Trove's LTV reaches the ${f.name} branch's Max LTV; its debt ÷ (its collateral × the Max LTV). Below that price the Trove can be liquidated. ${history}`
+      : `Liquidation price. The ${symbol} price at which the Trove's ${t.ratioText} reaches the ${f.name} branch's ${word}; its debt × the ${word} ÷ its collateral. Below that price the Trove can be liquidated. ${history}`,
     ...(steps.length > 0
       ? {
           formulaBefore: steps.map((st) => ({
@@ -665,16 +706,20 @@ function forkLevelWords(
 
 /** A fork's sentence in the charts' how-to-read. */
 function forkLevelHelp(f: LiquityForkLevel): string {
+  const t = liquityFamilyTerms(f.name);
+  const lim = forkLimitOf(f);
+  const word = t.limitShort;
   const at =
     (f.mcrBefore?.length ?? 0) > 0
-      ? `at the minimum in force each day (${forkMcrWords(f)})`
+      ? `at the ${word} in force each day (${forkMcrWords(f)})`
       : f.stepsRead
-        ? `at the branch's ${pctOf(f.mcr)} minimum, which no governance log has moved`
-        : `at today's ${pctOf(f.mcr)} minimum, held across the life`;
+        ? `at the branch's ${lim(f.mcr)} ${t.ltv ? word : t.limitText}, which no governance log has moved`
+        : `at today's ${lim(f.mcr)} ${word}, held across the life`;
   const priced = f.pricedRows
     ? ` The branch PriceFeed's price is recorded on the Trove's ${f.pricedRows} alone, and today's is read live; between them the last one is carried.`
     : "";
-  return `on the same days; the red line is where the Trove liquidates, its debt × the minimum ÷ its collateral after each event, ${at}.${priced}`;
+  const how = t.ltv ? "its debt ÷ (its collateral × the Max LTV)" : `its debt × the ${word} ÷ its collateral`;
+  return `on the same days; the red line is where the Trove liquidates, ${how} after each event, ${at}.${priced}`;
 }
 
 /** Liquity V2's price view marks for the collateral: each row's price on
@@ -706,8 +751,14 @@ function liquityPriceMarks(
     collateralType,
     now: o.now,
     live: o.live,
+    shutdownAt: o.shutdownAt,
     ...(fork ? { mcrAt: (ts: number) => forkMcrAt(fork, { timestamp: ts }) } : {}),
   });
+  // The how-to-read says where a level cut short by the shutdown ends.
+  const shutWords =
+    level?.end === "shutdown" && o.shutdownAt != null
+      ? ` It ends on ${formatDate(o.shutdownAt)}, when the branch shut down.`
+      : "";
   const mcrPct = getLiquidationThreshold(collateralType);
   const v1 = o.family === "v1";
   const firstDay = Math.floor(replayed[0].ev.ts / DAY_S);
@@ -717,7 +768,7 @@ function liquityPriceMarks(
   return {
     events: marks,
     ...(level && fork
-      ? { level: { ...level, ...forkLevelWords(fork, collateralType) }, help: forkLevelHelp(fork) }
+      ? { level: { ...level, ...forkLevelWords(fork, collateralType) }, help: forkLevelHelp(fork) + shutWords }
       : level
         ? {
             level: {
@@ -732,13 +783,18 @@ function liquityPriceMarks(
                     },
                   }
                 : {
-                    formula: `${LIQUIDATION_PRICE_FORMULA.replace("MCR", `${mcrPct}%`)} after each event, with interest accruing between`,
-                    summary: liquidationPriceSummary(collateralType, mcrPct),
+                    // Liquity V2: the level in LTV terms, as its docs state
+                    // the limit (decision 0065).
+                    formula: `debt ÷ (collateral × ${fmtMaxLtv(collateralType) ?? "Max LTV"}) after each event, with interest accruing between`,
+                    summary: ltvLiquidationPriceSummary(collateralType, collateralType),
                   }),
             },
           }
         : {}),
     ...(v1 && level ? { help: LIQUITY_V1_LEVEL_HELP } : {}),
+    ...(!v1 && !fork && shutWords
+      ? { help: `on the same days; the red line is where the position liquidates.${shutWords}` }
+      : {}),
     ...(sparseBefore != null ? { sparseBefore } : {}),
   };
 }

@@ -28,7 +28,8 @@ export type AaveV4L5Key =
   | "leverage"
   | "position"
   | "hubs"
-  | "base_hub";
+  | "base_hub"
+  | "arc_hub";
 
 /** The file's sections beyond the ones every family has. */
 interface AaveV4ProseFile extends ProseFile<AaveV4L5Key> {

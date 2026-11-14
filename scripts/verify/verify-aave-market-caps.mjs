@@ -31,10 +31,10 @@
 //      carries a field-max cap (no pill) and an automator maximum.
 //   7. Seamless: every row carries the frozen tag.
 //   8. A reserve with LTV 0 and no eMode loan-to-value reads "Not collateral"
-//      in its Collateral cell; one with an eMode loan-to-value reads "eMode
+//      in its Collateral cell; one with an eMode loan-to-value reads "E-Mode
 //      only"; one with an LTV reads "LTV% / LT%".
 //   9. No non-zero rate reads 0.00% (each page).
-//  11. /ethereum/aave-v3/market is the overview of Core, Prime and EtherFi:
+//  11. /ethereum/aave-v3/markets is the overview of Core, Prime and EtherFi:
 //      three panels, each linking its reserves view (`?market=`), and no
 //      reserves table.
 //  10. Available's receipt names the formula that applies (each page): every
@@ -57,11 +57,11 @@ const ROWS_TIMEOUT_MS = 180000;
 const FIELD_MAX = 2 ** 36 - 1;
 
 const PAGES = [
-  { name: "core", path: "/ethereum/aave-v3/market?market=core", api: "/api/chain/aave-v3/market" },
-  { name: "base", path: "/base/aave-v3/market", api: "/api/chain/aave-v3-base/market" },
+  { name: "core", path: "/ethereum/aave-v3/markets?market=core", api: "/api/chain/aave-v3/market" },
+  { name: "base", path: "/base/aave-v3/markets", api: "/api/chain/aave-v3-base/market" },
   { name: "arbitrum", path: "/arbitrum/aave-v3/markets", api: "/api/chain/aave-v3-arbitrum/market" },
-  { name: "spark", path: "/ethereum/spark/market", api: "/api/chain/spark/market" },
-  { name: "seamless", path: "/base/seamless/market", api: "/api/chain/seamless/market" },
+  { name: "spark", path: "/ethereum/spark/markets", api: "/api/chain/spark/market" },
+  { name: "seamless", path: "/base/seamless/markets", api: "/api/chain/seamless/market" },
 ];
 
 let failures = 0;
@@ -237,7 +237,7 @@ for (const p of PAGES) {
     } else check("core 8a an LTV-0 reserve with no eMode LTV exists", false);
     if (emodeLtv) {
       const t = await collText(emodeLtv.address);
-      check(`core 8b ${emodeLtv.symbol} (LTV 0, eMode LTV) reads "eMode only"`, t === "eMode only", t);
+      check(`core 8b ${emodeLtv.symbol} (LTV 0, eMode LTV) reads "E-Mode only"`, t === "E-Mode only", t);
     } else check("core 8b an LTV-0 reserve with an eMode LTV exists", false);
     if (lends) {
       const t = await collText(lends.address);
@@ -271,7 +271,8 @@ for (const p of PAGES) {
         ? /Pool\.getVirtualUnderlyingBalance\(asset\) at block \d+/
         : /supplied − borrowed; this Pool has no virtual balance/i;
     let text = "";
-    if (await armInspector(wide)) {
+    // Armed from the profile menu's switch (ui-jobs 625).
+    if (await armInspector(wide).catch(() => false)) {
       await wide
         .locator("tr[data-reserve-row]")
         .first()
@@ -286,6 +287,8 @@ for (const p of PAGES) {
           .innerText()
           .catch(() => ""),
       );
+      // The receipt, then the inspector: the page is left unarmed.
+      await wide.keyboard.press("Escape");
       await wide.keyboard.press("Escape");
     }
     check(`${p.name} 10b ${first?.symbol} Available receipt names its formula`, want.test(text), text.slice(0, 140));
@@ -332,7 +335,7 @@ for (const p of PAGES) {
 // ── 11. The Ethereum overview: three panels, each linking its reserves ─────
 {
   const ov = await browser.newPage({ viewport: { width: 1280, height: 1000 } });
-  await ov.goto(`${BASE}/ethereum/aave-v3/market`, NAV);
+  await ov.goto(`${BASE}/ethereum/aave-v3/markets`, NAV);
   await ov
     .waitForFunction(() => document.querySelectorAll("[data-market-reserves-link]").length >= 3, null, {
       timeout: ROWS_TIMEOUT_MS,
@@ -347,9 +350,9 @@ for (const p of PAGES) {
   );
   const rowsOnOverview = await ov.locator("tr[data-reserve-row]").count();
   const wantPanels = [
-    ["aave-v3", "/ethereum/aave-v3/market?market=core"],
-    ["aave-v3-prime", "/ethereum/aave-v3/market?market=prime"],
-    ["aave-v3-etherfi", "/ethereum/aave-v3/market?market=etherfi"],
+    ["aave-v3", "/ethereum/aave-v3/markets?market=core"],
+    ["aave-v3-prime", "/ethereum/aave-v3/markets?market=prime"],
+    ["aave-v3-etherfi", "/ethereum/aave-v3/markets?market=etherfi"],
   ];
   const okPanels =
     panels.length === 3 &&

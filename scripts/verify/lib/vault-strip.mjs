@@ -28,10 +28,18 @@ export async function readVaultStrip(page) {
       days: t.querySelector("[data-strip-line]")?.getAttribute("data-strip-days") ?? null,
       sentence: (t.querySelector("[data-strip-sentence]")?.textContent ?? "").replace(/\s+/g, " ").trim(),
     }));
+    // In document order, the section-level V codes either side of the strip:
+    // siblings on most vault pages, tiles of the grid on MetaMorpho's.
+    const sections = [...document.querySelectorAll("[data-anatomy]")].filter(
+      (e) =>
+        /(?:^|\s)V\d+(?:\s|$)/.test(e.getAttribute("data-anatomy") ?? "") && !strip.contains(e) && !e.contains(strip),
+    );
+    const before = sections.filter((e) => e.compareDocumentPosition(strip) & Node.DOCUMENT_POSITION_FOLLOWING);
+    const after = sections.filter((e) => e.compareDocumentPosition(strip) & Node.DOCUMENT_POSITION_PRECEDING);
+    const code = (e) => (e?.getAttribute("data-anatomy") ?? "").split(/\s+/).find((c) => /^V\d+$/.test(c));
     return {
-      afterCard: strip.previousElementSibling?.getAttribute("data-anatomy") === "V2",
-      beforeAssets: strip.nextElementSibling?.getAttribute("data-anatomy") === "V3",
-      caption: strip.querySelector("[data-strip-caption]")?.textContent?.trim() ?? null,
+      afterCard: code(before[before.length - 1]) === "V2",
+      beforeAssets: code(after[0]) === "V3",
       tiles,
     };
   });
@@ -66,11 +74,8 @@ const DATE = /\b\d{1,2} [A-Z][a-z]{2} \d{4}\b/g;
 const WINDOW = /\b\d+ days\b/g;
 const PCT = /[+\-−]?[\d,]+(?:\.\d+)?%/g;
 
-/**
- * The checks. `censusFamily`: false on Yearn, whose Holders tile states that
- * there is no census.
- */
-export function vaultStripChecks(check, id, strip, store, { chain, vault, censusFamily }) {
+/** The checks. Every family the strip draws for has a census (Yearn's since ui-jobs 585). */
+export function vaultStripChecks(check, id, strip, store, { chain, vault }) {
   check(
     `${id}a the strip (V5) draws under the vault card and above "Where the assets are", tiles Total assets, Share price, Holders`,
     strip != null &&
@@ -118,8 +123,9 @@ export function vaultStripChecks(check, id, strip, store, { chain, vault, census
       bad.push(`${t.tile}: change ${t.change} vs own ${ownChange}`);
     if (t.days !== own.days.join(","))
       bad.push(`${t.tile}: line days ${t.days?.split(",").length} vs store's ${own.days.length}`);
-    if (!t.sentence.includes(`block ${Number(t.toBlock).toLocaleString("en-US")}`))
-      bad.push(`${t.tile}: sentence "${t.sentence}" does not name block ${t.toBlock}`);
+    // The two reads' blocks are the sentence's receipt (ui-jobs 549/550): the
+    // surface names the window, never a block.
+    if (/\bblock\b/.test(t.sentence)) bad.push(`${t.tile}: sentence "${t.sentence}" names a block`);
   }
   check(
     `${id}b each tile's change, its two reads and its line's days equal the daily store's own answer`,
@@ -135,29 +141,16 @@ export function vaultStripChecks(check, id, strip, store, { chain, vault, census
     .map((t) => [t.tile, t.sentence.replace(STATED_BLOCK, "").replace(DATE, "").replace(WINDOW, "").replace(PCT, "")])
     .filter(([, rest]) => /\d/.test(rest));
   check(
-    `${id}c the strip prints no absolute figure: its sentences name changes, blocks and dates`,
-    figures.length === 0 && strip.caption != null && !/\d/.test(strip.caption),
-    figures.map(([t, rest]) => `${t}: "${rest}"`).join("; ") || `caption "${strip.caption}"`,
+    `${id}c the strip prints no absolute figure: its sentences name changes, windows and dates`,
+    figures.length === 0,
+    figures.map(([t, rest]) => `${t}: "${rest}"`).join("; ") || "no figure",
   );
 
   const holders = strip.tiles.find((t) => t.tile === "holders");
-  if (censusFamily) {
-    check(
-      `${id}d the Holders tile draws the store's series, or the census's read with no line`,
-      holders != null &&
-        (holders.change != null || holders.none === "young" || (holders.census != null && holders.days == null)),
-      holders ? `"${holders.sentence}"` : "no tile",
-    );
-  } else {
-    // Yearn has no census, so until the store serves a holders series the tile
-    // says so; once it serves one the tile draws it (components/vaults/vault-strip.tsx),
-    // and ${id}b has held its change and days to the store.
-    check(
-      `${id}d the Holders tile on Yearn draws the store's series, or states that there is no census and draws no line`,
-      holders != null &&
-        (holders.change != null ||
-          (holders.census === "none" && /no census/.test(holders.sentence) && holders.days == null)),
-      holders ? `"${holders.sentence}"` : "no tile",
-    );
-  }
+  check(
+    `${id}d the Holders tile draws the store's series, or the census's read with no line`,
+    holders != null &&
+      (holders.change != null || holders.none === "young" || (holders.census != null && holders.days == null)),
+    holders ? `"${holders.sentence}"` : "no tile",
+  );
 }

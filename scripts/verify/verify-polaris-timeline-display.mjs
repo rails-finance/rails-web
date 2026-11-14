@@ -5,8 +5,7 @@
 //
 //   (a) usdp/8's display menu offers Transaction hashes and the market-note
 //       items, no "Collateral Ratio" (Miles, 18 Oct 2026: the ratio is the
-//       sheet's, never a row chip) and no "Collapse like events" (no run
-//       card: measured, 0 no-change touches).
+//       sheet's, never a row chip).
 //   (c) No row carries a ratio chip: none on usdp/8, none on usdp/175's
 //       liquidation or open row; the liquidation's metric and forensics
 //       the sheet's ratio states the at-fire ratio, red.
@@ -107,7 +106,6 @@ const pct1 = (pct) => {
   return `${fx(pct, d)}%`;
 };
 const pct2 = (pct) => `${pct.toFixed(2)}%`;
-// "Timeline values" left Display with its off state (326, `5b5c19b`).
 // "Figures first" since ui-jobs 370 (FIGURES_FIRST_ITEM, timeline-toolbar.tsx).
 const MENU_LABELS = ["Transaction hashes", "Figures first"];
 
@@ -285,11 +283,10 @@ try {
   // (ui-jobs 118; "Open all market notes" went with 14499408, ui-jobs 399).
   const NOTE_LABELS = ["market notes"];
   check(
-    "a. usdp/8's display menu offers Transaction hashes and Figures first, then Market notes, no Collateral Ratio and no collapse item",
+    "a. usdp/8's display menu offers Transaction hashes and Figures first, then Market notes and no Collateral Ratio",
     menu.length === MENU_LABELS.length + NOTE_LABELS.length &&
       MENU_LABELS.every((l, i) => menu[i] === l.toLowerCase()) &&
       NOTE_LABELS.every((l, i) => menu[MENU_LABELS.length + i] === l) &&
-      !menu.includes("collapse like events") &&
       !menu.includes("collateral ratio"),
     JSON.stringify(menu),
   );

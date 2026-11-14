@@ -151,16 +151,6 @@ const yearnVaultShutdownProv_ = (c: YearnVaultCoords): Provenance => ({
   via: `${LANE} · VaultV3.isShutdown() @ the pinned block`,
 });
 
-/** How many catalogued vaults in one asset hold something at the block. */
-const yearnAssetGroupCountProv_ = (c: YearnVaultCoords, count: number): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  summary: `${count === 1 ? "One vault" : `${n(count)} vaults`} denominated in ${asset(c)} with a non-zero \`totalAssets()\`${atBlock(c)} — a count over this page's reads, one per catalogued vault whose immutable \`asset()\` is ${asset(c)}. Vaults in this asset that read zero are counted in the trailing group and are never dropped.`,
-  via: `${LANE} · count of catalogued vaults with asset() = ${asset(c)} and totalAssets() > 0 @ the pinned block`,
-  formula: `count of catalogued vaults where asset() = ${asset(c)} and totalAssets() > 0`,
-});
-
 /** How many catalogued vaults hold nothing at the block — a reading, one per
  *  vault, and never the vaults whose call went unanswered. */
 const yearnEmptyCountProv_ = (c: YearnVaultCoords, count: number, catalogSize: number): Provenance => ({
@@ -216,7 +206,7 @@ const yearnVaultDebtProv_ = (c: YearnVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("totalDebt()", c),
-  summary: `Deployed — the vault's \`totalDebt()\`${atBlock(c)}, in ${asset(c)}: the sum the vault records as lent to its strategies. It moves when a strategy is funded, when the vault pulls from one, and when a strategy reports a gain or a loss; between reports it is the last figure recorded and not a live mark.`,
+  summary: `Debt — the vault's \`totalDebt()\`${atBlock(c)}, in ${asset(c)}: the sum the vault records as lent to its strategies. It moves when a strategy is funded, when the vault pulls from one, and when a strategy reports a gain or a loss; between reports it is the last figure recorded and not a live mark.`,
   contract: vaultContract(c),
   via: `${LANE} · VaultV3.totalDebt() @ the pinned block`,
 });
@@ -256,7 +246,7 @@ const yearnVaultStrategyCapProv_ = (c: YearnVaultCoords, strategy: string): Prov
     kind: "recompute",
     text: `Call strategies(${strategy}) on ${c.vault ?? "the vault"}${c.blockNumber != null ? ` at block ${n(c.blockNumber)}` : ""} and read max_debt`,
   },
-  summary: `Cap on this strategy — \`strategies(${strategy.slice(0, 10)}…).max_debt\`${atBlock(c)}, in ${asset(c)}: the most the vault may lend it. The role manager sets it, and it is a limit on future funding and never a claim about what the strategy holds now.`,
+  summary: `Max debt of this strategy — \`strategies(${strategy.slice(0, 10)}…).max_debt\`${atBlock(c)}, in ${asset(c)}: the most the vault may lend it. The role manager sets it, and it is a limit on future funding and never a claim about what the strategy holds now.`,
   contract: vaultContract(c),
   via: `${LANE} · VaultV3.strategies(strategy).max_debt @ the pinned block`,
 });
@@ -296,7 +286,6 @@ export const yearnVaultTotalAssetsProv = withServerRead(yearnVaultTotalAssetsPro
 export const yearnVaultSharePriceProv = withServerRead(yearnVaultSharePriceProv_);
 export const yearnVaultEndorsedProv = withServerRead(yearnVaultEndorsedProv_);
 export const yearnVaultShutdownProv = withServerRead(yearnVaultShutdownProv_);
-export const yearnAssetGroupCountProv = withServerRead(yearnAssetGroupCountProv_);
 export const yearnEmptyCountProv = withServerRead(yearnEmptyCountProv_);
 export const yearnEndorsedCountProv = withServerRead(yearnEndorsedCountProv_);
 export const yearnVaultTotalSupplyProv = withServerRead(yearnVaultTotalSupplyProv_);

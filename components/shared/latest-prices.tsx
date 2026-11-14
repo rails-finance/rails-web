@@ -52,6 +52,10 @@ export type LatestPriceAsset = Omit<PriceStripAsset, "price"> & {
   /** Where this asset leads the trigger, the count says what it counts
    *  ("+1 more price"). Unset, it reads "+1". */
   moreInWords?: boolean;
+  /** The figure as the view's card writes it (Uniswap: "1.481 WETH"), drawn
+   *  in the trigger and the row in place of `fmtNative`, so chip and card
+   *  agree on precision. */
+  figure?: string;
 };
 
 /** The block a closed position's prices were read at: its closing row. */
@@ -66,6 +70,7 @@ export function LatestPrices({
   reason,
   at,
   bare = false,
+  subject = "position",
 }: {
   assets: LatestPriceAsset[];
   reason?: string;
@@ -75,6 +80,9 @@ export function LatestPrices({
   /** Set on a closed position: the prices are the closing block's, and the
    *  panel says so under its heading. */
   at?: PricesAt;
+  /** What the control prices, in its accessible name and empty panel: the
+   *  family's word ("wallet" on CoW, rails-ops ui-jobs 657 C9). */
+  subject?: string;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -136,8 +144,8 @@ export function LatestPrices({
         aria-haspopup="menu"
         aria-label={
           assets.length === 0
-            ? "Prices for this position"
-            : `${anyPriced ? (at ? "Prices at closing for" : "Prices for") : "Assets in"} this position: ${assets.length} ${assets.length === 1 ? "asset" : "assets"}`
+            ? `Prices for this ${subject}`
+            : `${anyPriced ? (at ? "Prices at closing for" : "Prices for") : "Assets in"} this ${subject}: ${assets.length} ${assets.length === 1 ? "asset" : "assets"}`
         }
         className={`${CTRL_GHOST} ${open ? CTRL_ON : CTRL_OFF} h-7 gap-1 rounded-md px-1.5 text-xs sm:gap-1.5 sm:px-2`}
       >
@@ -157,7 +165,8 @@ export function LatestPrices({
             {priced(first) && first.info ? (
               <Prov info={first.info} value={String(first.price)} symbol={first.symbol}>
                 <span className="tabular-nums font-bold text-green-400">
-                  {first.unit ? fmtNative(first.price as number, first.unit) : fmtPrice(first.price as number)}
+                  {first.figure ??
+                    (first.unit ? fmtNative(first.price as number, first.unit) : fmtPrice(first.price as number))}
                 </span>
               </Prov>
             ) : (
@@ -165,9 +174,11 @@ export function LatestPrices({
                 className={`tabular-nums ${priced(first) ? "font-bold text-green-400" : "font-medium text-rb-500"}`}
               >
                 {priced(first)
-                  ? first.unit
-                    ? fmtNative(first.price as number, first.unit)
-                    : fmtPrice(first.price as number)
+                  ? first.figure
+                    ? first.figure
+                    : first.unit
+                      ? fmtNative(first.price as number, first.unit)
+                      : fmtPrice(first.price as number)
                   : first.symbol}
               </span>
             )}
@@ -233,6 +244,7 @@ export function LatestPrices({
                         title={a.label ?? a.symbol}
                         showSymbol
                         bare
+                        figure={a.figure}
                       />
                     </AssetPageLink>
                   </li>
@@ -261,7 +273,7 @@ export function LatestPrices({
           ) : (
             assets.length === 0 && (
               <p className="px-4 pb-2 pt-1 text-xs leading-relaxed text-rb-500">
-                This explorer does not price the position&rsquo;s assets yet.
+                This explorer does not price the {subject}&rsquo;s assets yet.
               </p>
             )
           )}

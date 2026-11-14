@@ -63,7 +63,7 @@ function gradeSentence(line: AlchemixLineCoverage): string {
   return (
     `${line.displayName} has had ${line.redemptionCount.toLocaleString("en-US")} ` +
     `redemption${line.redemptionCount === 1 ? "" : "s"}, the first at block ${block(line.firstRedemptionBlock)}. ` +
-    `A redemption clears every open position's set-aside debt at once, with nothing in a position's own events to ` +
+    `A redemption clears every open position's earmarked debt at once, with nothing in a position's own events to ` +
     `see, so from that block a position's events alone miss what the redemptions cleared. The figures shown are ` +
     `read from the contract's getCDP at the block beside them.`
   );
@@ -71,7 +71,7 @@ function gradeSentence(line: AlchemixLineCoverage): string {
 
 export function AlchemixLinesPanel({ lines }: { lines: AlchemixLineCoverage[] }) {
   if (lines.length === 0) {
-    return <p className="text-sm text-rb-500">No line on this chain answered.</p>;
+    return <p className="text-sm text-rb-500">No market on this chain answered.</p>;
   }
   return (
     // The shared sub-page panel: the raised rounded-xl card every protocol-level
@@ -93,12 +93,12 @@ export function AlchemixLinesPanel({ lines }: { lines: AlchemixLineCoverage[] })
           {line.unsweptRedemptions > 0 ? (
             <p className={PROSE}>
               {line.unsweptRedemptions.toLocaleString("en-US")} of those redemptions have not been swept yet, so the
-              readings on this line do not cover every block at which a debt could have stepped.
+              readings on this market do not cover every block at which a debt could have stepped.
             </p>
           ) : null}
           {line.staleHeadReadings > 0 ? (
             <p className={PROSE}>
-              {line.staleHeadReadings.toLocaleString("en-US")} positions on this line have no current reading. Their
+              {line.staleHeadReadings.toLocaleString("en-US")} positions on this market have no current reading. Their
               figures come from their own events alone and miss what redemptions cleared.
             </p>
           ) : null}
@@ -194,7 +194,7 @@ export function AlchemixV2CoveragePanel({ lines }: { lines: AlchemixV2LineCovera
           {line.contractsScannedWhole < line.contractsScanned ? (
             <p className={PROSE}>
               {plural(line.contractsScanned - line.contractsScannedWhole, "contract stops", "contracts stop")} short of
-              that block, so the history on this line is missing its end.
+              that block, so the history on this market is missing its end.
             </p>
           ) : null}
           {line.staleReads > 0 ? (

@@ -1,6 +1,6 @@
 // Pure transform: one Aave-V3-architecture market's live reserve roster → the
-// view model for the shared market-overview surface (/aave-v3/market,
-// /spark/market). The V3-family sibling of lib/aave-v4/hub-view.ts, adjusted
+// view model for the shared market-overview surface (/aave-v3/markets,
+// /spark/markets). The V3-family sibling of lib/aave-v4/hub-view.ts, adjusted
 // for the single-market reality: one summary (not a hub band) + per-reserve
 // rows. Kept side-effect-free and out of the component so the aggregation
 // logic is one readable place.
@@ -13,6 +13,8 @@
 import type { AaveMarketReserve } from "@/lib/api/fetch-aave-market-overview";
 import type { ServerRead } from "@/lib/shared/server-head-read";
 import { assetClass, ASSET_CLASS_TITLE, type AssetClass } from "@/lib/aave-v4/asset-class";
+import type { AaveMarketKey } from "@/lib/shared/aave-market-configs";
+import { aaveFamilyTerms, familyRate } from "@/lib/aave-family/terms";
 
 export interface MarketReserveRow extends AaveMarketReserve {
   cls: AssetClass;
@@ -25,6 +27,13 @@ export interface MarketReserveRow extends AaveMarketReserve {
   borrowCapState: CapState;
   /** Every way this reserve is closed to new business; empty when open. */
   closed: ClosedRoute[];
+  /** The two rates in the family's form (lib/aave-family/terms.ts): the
+   *  stored rate on Aave V3 and Seamless, the APY on SparkLend. */
+  supplyRate: number;
+  borrowRate: number;
+  /** On the docs' deprecated-as-collateral list, with a loan-to-value of 0 on
+   *  the chain (AaveMarketConfig.deprecatedCollateral). */
+  deprecated: boolean;
 }
 
 // ── Caps ─────────────────────────────────────────────────────────────────────
@@ -167,8 +176,11 @@ export function buildAaveMarketView(
     pool: string;
     oracle: string;
     capAutomator?: string;
+    /** Lowercased addresses the docs list as deprecated as collateral. */
+    deprecated?: readonly string[];
   },
 ): AaveMarketView {
+  const terms = aaveFamilyTerms(identity.protocol as AaveMarketKey);
   const rows: MarketReserveRow[] = reserves.map((r) => {
     const cls = assetClass(r.symbol);
     const supplyCapState = capSide(r, "supply");
@@ -182,6 +194,9 @@ export function buildAaveMarketView(
       supplyCapState,
       borrowCapState,
       closed: closedRoutes(r, supplyCapState, borrowCapState),
+      supplyRate: familyRate(terms, r.supplyApr),
+      borrowRate: familyRate(terms, r.borrowApr),
+      deprecated: (identity.deprecated ?? []).includes(r.address.toLowerCase()) && (r.bps?.ltv ?? 1) === 0,
     };
   });
 

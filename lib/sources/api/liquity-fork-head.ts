@@ -15,7 +15,9 @@
 //
 // SERVER-ONLY.
 
+import { parseAbi, type ContractFunctionParameters } from "viem";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
+import { chainClient } from "@/lib/sources/chain/rpc";
 import { routeGate } from "./route-gate";
 import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
@@ -78,6 +80,8 @@ interface BranchRaw {
   first: string | null;
   last: string | null;
   size: string | null;
+  /** TroveManager.lastZombieTroveId; absent from a server that predates it (read here instead). */
+  lastZombieTroveId?: string | null;
   ids: (string | null)[];
   headWalk: string[];
   tailWalk: string[];
@@ -114,6 +118,76 @@ async function ask<T>(path: string, params: Record<string, string>): Promise<T |
 }
 
 const big = (s: string | null): bigint | null => (s == null ? null : BigInt(s));
+
+const POINTER_ABI = parseAbi([
+  "function lastZombieTroveId() view returns (uint256)",
+  "function getLatestTroveData(uint256 troveId) view returns ((uint256 entireDebt, uint256 entireColl, uint256 redistBoldDebtGain, uint256 redistCollGain, uint256 accruedInterest, uint256 recordedDebt, uint256 annualInterestRate, uint256 weightedRecordedDebt, uint256 accruedBatchManagementFee, uint256 lastInterestRateAdjTime))",
+]);
+
+/** Fills lastZombieTroveId, and its Trove's data, where the server's answer predates them: one
+ *  multicall at the answer's block, a second only when a pointer's Trove went unread. Once the
+ *  server reads the pointer this returns without a call. */
+async function withPointers(
+  chainId: number,
+  block: number,
+  pairs: { b: LiquityForkBranchConfig; r: BranchRaw }[],
+): Promise<void> {
+  const missing = pairs.filter(({ r }) => r.lastZombieTroveId === undefined);
+  if (missing.length === 0) return;
+  const client = chainClient(chainId as ChainId);
+  const blockNumber = BigInt(block);
+  try {
+    const got = await client.multicall({
+      allowFailure: true,
+      blockNumber,
+      contracts: missing.map(
+        ({ b }) =>
+          ({
+            address: b.troveManager,
+            abi: POINTER_ABI,
+            functionName: "lastZombieTroveId",
+          }) as ContractFunctionParameters,
+      ),
+    });
+    missing.forEach(({ r }, i) => {
+      r.lastZombieTroveId = got[i].status === "success" ? String(got[i].result) : null;
+    });
+    const unread = missing.filter(
+      ({ r }) => r.lastZombieTroveId && r.lastZombieTroveId !== "0" && !r.troves[r.lastZombieTroveId]?.data,
+    );
+    if (unread.length === 0) return;
+    const datas = await client.multicall({
+      allowFailure: true,
+      blockNumber,
+      contracts: unread.map(
+        ({ b, r }) =>
+          ({
+            address: b.troveManager,
+            abi: POINTER_ABI,
+            functionName: "getLatestTroveData",
+            args: [BigInt(r.lastZombieTroveId!)],
+          }) as ContractFunctionParameters,
+      ),
+    });
+    unread.forEach(({ r }, i) => {
+      const d = datas[i].status === "success" ? (datas[i].result as Record<string, bigint>) : null;
+      r.troves[r.lastZombieTroveId!] = {
+        data: d
+          ? {
+              entireDebt: String(d.entireDebt),
+              entireColl: String(d.entireColl),
+              annualInterestRate: String(d.annualInterestRate),
+            }
+          : null,
+        status: 4,
+      };
+    });
+  } catch {
+    missing.forEach(({ r }) => {
+      if (r.lastZombieTroveId === undefined) r.lastZombieTroveId = null;
+    });
+  }
+}
 const fetchedOf = (b: BranchRaw): [bigint, boolean] | null =>
   b.fetchPrice ? [BigInt(b.fetchPrice.price), b.fetchPrice.oracleDown] : null;
 
@@ -124,6 +198,11 @@ export async function serverLiquityForkBranches(cfg: LiquityForkConfig): Promise
   if (!raw) return null;
   const configs = Object.values(cfg.branches);
   if (!configs.every((b) => raw.branches[b.key])) return null;
+  await withPointers(
+    FORK_CHAIN[cfg.protocol],
+    raw.blockNumber,
+    configs.map((b) => ({ b, r: raw.branches[b.key] })),
+  );
   const branches = configs.map((b) => {
     const r = raw.branches[b.key];
     return settleBranch(
@@ -148,6 +227,7 @@ export async function serverLiquityForkBranches(cfg: LiquityForkConfig): Promise
             : null;
         },
         statusOf: (id) => r.troves[id.toString()]?.status ?? null,
+        lastZombieId: big(r.lastZombieTroveId ?? null),
       },
       IDS_CAP,
     );
@@ -171,6 +251,7 @@ export async function serverLiquityForkTrove(
   });
   if (!raw) return null;
   const r = raw.branch;
+  await withPointers(FORK_CHAIN[cfg.protocol], raw.blockNumber, [{ b, r }]);
   const d = raw.trove.data;
   const data: TroveDataRead | null = d
     ? {
@@ -195,6 +276,7 @@ export async function serverLiquityForkTrove(
     icrRaw: big(raw.trove.icr),
     walk: r.headWalk.map((x) => BigInt(x)),
     entireDebtOf: (id) => big(r.troves[id.toString()]?.data?.entireDebt ?? null),
+    lastZombieId: big(r.lastZombieTroveId ?? null),
   });
   return answer.chainStale ? answer : { ...answer, head: raw.head };
 }

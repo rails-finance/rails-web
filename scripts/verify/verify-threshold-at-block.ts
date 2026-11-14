@@ -17,7 +17,7 @@
 // (/api/chain/dolomite/risk-log).
 //
 // Held: the picks are healthReadPicks' over the events; every day's line is
-// the answer of the latest pick on or before it (Alchemix the lower bound,
+// the answer of the latest pick on or before it (Alchemix one over the lower bound,
 // Dolomite 1 + the core's ratio for the account), the days before the first
 // pick taking its answer, dotted; the markers are the steps (Alchemix, seen
 // at a pick) or the setter logs that moved a value on a market the account
@@ -188,8 +188,8 @@ for (const f of F.alchemix) {
     });
     const t = flatTimeline(f.events, ALCHEMIX_MYT_KEY, ALCHEMIX_DEBT_KEY);
     const h = checkLine(f.name, t, reads, alchemixHealthSource(f.chain, "USDC", "mixUSDC"));
-    // Collateralisation = 2 ÷ 1 on every day: the line alone moves.
-    assert.ok(h.points.every((p) => Math.abs(p[1] - 2) < 1e-12));
+    // LTV = 1 ÷ 2 on every day: the line alone moves.
+    assert.ok(h.points.every((p) => Math.abs(p[1] - 0.5) < 1e-12));
     // No step in these lives: the bound has stood at one value, so no marker.
     const bounds = new Set(reads.map((r) => r.line));
     const changes = alchemixBoundChanges(h.level!.points, null, f.alchemist);
@@ -214,13 +214,13 @@ test("alchemix: a stepped answer moves the line on the pick's day and draws its 
   const c = changes[0];
   assert.equal(c.day, Math.floor(picks[k].timestamp / DAY_S));
   assert.equal(c.block, picks[k].blockNumber);
-  assert.equal(c.name, "Lower bound");
-  assert.equal(c.from, "105.3%");
-  assert.equal(c.to, "110.0%");
+  assert.equal(c.name, "Liquidation threshold");
+  assert.equal(c.from, "95.0%");
+  assert.equal(c.to, "90.9%");
   assert.match(c.prov.summary, /seen at the read at block/);
   // A step at today's card read is marked at the card's block.
   const today = alchemixBoundChanges(
-    [...h.level!.points.slice(0, -1), [h.level!.points.at(-1)![0], 1.2, null]],
+    [...h.level!.points.slice(0, -1), [h.level!.points.at(-1)![0], 1 / 1.2, null]],
     999,
     null,
   );
@@ -655,7 +655,7 @@ test("aave: a listing, an LTV-only set and a block that ends where it began draw
   // Block 25,037,701 sets one reserve 75 % → 0.01 % → 75 % twice.
   assert.ok(!all.some((c) => c.block === 25_037_701), "the round trip");
   // An account in no e-mode sees no category change.
-  assert.ok(!all.some((c) => c.name.startsWith("E-mode")));
+  assert.ok(!all.some((c) => c.name.startsWith("E-Mode")));
 });
 
 test("aave: the v3.2 upgrade's re-emitted memberships and a membership change", () => {
@@ -696,7 +696,7 @@ test("aave: the v3.2 upgrade's re-emitted memberships and a membership change", 
   };
   const out = aaveConfigChanges(synth, held, [sw]).filter((c) => c.block === last.block + 10);
   assert.equal(out.length, 1);
-  assert.equal(out[0].name, "WETH threshold in e-mode “ETH correlated”");
+  assert.equal(out[0].name, "WETH threshold in E-Mode “ETH correlated”");
   assert.ok(out[0].moves);
   const reserveLt = [...core.logs].reverse().find((l) => l.kind === "collateral" && l.asset === weth) as { lt: number };
   assert.equal(out[0].to, factorPct(reserveLt.lt / 1e4));
@@ -757,7 +757,7 @@ test("aave on Base: a category change and a switch in one block are ordered by t
   const change = { block: 200, transactionIndex: 8, logIndex: 0 };
   assert.deepEqual(
     names(log(change), sw(5, 40)),
-    ["E-mode “ETH correlated” liquidation threshold 93 % → 95 %"],
+    ["E-Mode “ETH correlated” liquidation threshold 93 % → 95 %"],
     "the switch's transaction came first",
   );
   // The answer before transactionIndex: the change's tx-local 0 against the switch's block-wide 40.
@@ -941,7 +941,7 @@ test("fx: a change between two events steps the line on its day and draws its ma
   const [first, last] = fxLife(p);
   const inLife = changesByDay(fxRatioChanges(log, "wstETH"), first, last).flatMap((d) => d.changes);
   assert.equal(inLife.length, 1, "one marker inside the life");
-  assert.equal(`${inLife[0].name} ${inLife[0].from} → ${inLife[0].to}`, "Liquidation ratio 95 % → 90 %");
+  assert.equal(`${inLife[0].name} ${inLife[0].from} → ${inLife[0].to}`, "Liquidation line 95 % → 90 %");
   assert.equal(inLife[0].day, Math.floor(gap.ts / DAY_S));
   assert.ok(inLife[0].prov.summary.includes("UpdateLiquidateRatios"));
   // The event reads as the chain would give them under this log.

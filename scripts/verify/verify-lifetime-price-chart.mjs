@@ -102,7 +102,8 @@
 // of the sUSDS price, today the card's, no level, the how-to-read naming chi.
 // The forks and Polaris (step 6, `level`, `checkLevelView`): Ebisu WBTC 3876
 // (liquidated) and weETH 1065 (closed), whose level steps by the two minimums'
-// ratio on 4 Jan 2026, Ebisu stcUSD 6774 and Basedollar cbETH 6846 (open:
+// ratio on 4 Jan 2026, Ebisu stcUSD 6774 (open on a shut-down branch: the card
+// states no "Liquidates at" and the level ends on the shutdown's day, ui-jobs 612) and Basedollar cbETH 6846 (open:
 // today's level the card's "Liquidates at"), Asymmetry ysyBOLD 4577, scrvUSD 2145
 // and Basedollar wstETH 1150 (closed: the level ends that day), Polaris USDp
 // 2420 and GOLDp 18 (open: today's level the card's price × 115 % ÷ its ratio),
@@ -134,52 +135,58 @@ import { chromium } from "playwright";
 import { BASE as HOST_BASE, bypassHeaders, hostFetch } from "./lib/host.mjs";
 
 const BASE = (process.env.BASE_URL ?? HOST_BASE).replace(/\/$/, "");
-/** Morpho's view (step 6): the card's LTV, its LLTV in the "Share of the
- *  LLTV line" row, today's level the price its "Liquidates on a drop of"
- *  names; days between events dotted. */
+/** Morpho's view (step 6): the card's LTV and LLTV, on the line under its
+ *  Health factor headline (`lineFromHeadText`, ui-jobs 628), today's level the
+ *  price its "Liquidates on a drop of" names; days between events dotted. */
 const MORPHO_RATIO = {
   label: "LTV",
   liquidates: "above",
-  head: "ltv",
-  lineRow: "lltv-share",
-  linePattern: /LLTV (\d+(?:\.\d+)?)%/,
+  head: "health-factor",
+  lineRow: "health-factor",
+  lineFromHeadText: true,
+  linePattern: /LLTV,? (\d+(?:\.\d+)?)%/,
   dropRow: "liquidation-drop",
   held: true,
   help: ["the market oracle's price", "fixed when the market was created", "drawn dotted"],
 };
-/** f(x)'s view (step 6): the card's debt ratio, its "Liquidates from" and
- *  "Rebalances from" lines, today's levels its "Liquidates at" and
- *  "Rebalances at"; days between events dotted. */
+/** f(x)'s view (step 6): the card's debt ratio, its liquidation and
+ *  rebalance lines (in the tips of "Liquidates at" and "Rebalances at",
+ *  TO-DO-position-card 341; past the rebalance line the liquidation line is in
+ *  the "Rebalances at" tip), today's levels those two stats; days between
+ *  events dotted. */
 const FX_RATIO = {
-  label: "Debt ratio",
+  label: "LTV",
   liquidates: "above",
   head: "debt-ratio",
-  lineRow: "liquidation-line",
-  warnRow: "rebalance-line",
+  lineRow: "liquidation-at",
+  lineTipRows: ["liquidation-at", "rebalance-at"],
+  linePattern: /(\d+(?:\.\d+)?)%,? (?:liquidation line|from which a keeper can liquidate)/,
+  warnRow: "rebalance-at",
+  warnPattern: /(\d+(?:\.\d+)?)% rebalance line/,
   warnVerb: "Rebalances",
   levelRow: "liquidation-at",
   warnLevelRow: "rebalance-at",
   held: true,
   help: ["the price each event was valued at", "rebalance ratio", "in force that day", "unchanged across this life"],
 };
-/** Alchemix V3's view (steps 6 and 8): the card's Collateralisation against
- *  its "Liquidates at", the lower bound read at each picked event's block
- *  (`atBlock`: the first day's line against the route's answer there); the
- *  share price's level today the price its "Liquidates on a share-price drop
- *  of" names; days with no reading dotted. */
+/** Alchemix V3's view (steps 6 and 8): the card's LTV against its
+ *  "Liquidation threshold", one over the lower bound read at each picked
+ *  event's block (`atBlock`: the first day's line against the route's answer
+ *  there); the share price's level today the price its "Drop to liquidation"
+ *  names; days with no reading dotted. */
 const alchemixRatio = (chain, alchemist) => ({
-  label: "Collateralisation",
-  liquidates: "below",
-  headRow: "collateralisation",
-  lineRow: "liquidation-line",
+  label: "LTV",
+  liquidates: "above",
+  headRow: "ltv",
+  lineRow: "liquidation-threshold",
   dropRow: "liquidates-on-drop",
   held: true,
   // eth-aleth/726 held collateral and no debt for 114 days before its mint.
   firstWithin: 160,
-  help: ["the vault's share price", "lower bound in force at each event", "drawn dotted"],
+  help: ["the vault's share price", "liquidation threshold in force at each event", "drawn dotted"],
   atBlock: (block) => [
     `/api/chain/alchemix/bound-at-block?chain=${chain}&alchemist=${alchemist}&block=${block}`,
-    (b) => b?.lowerBound,
+    (b) => (b?.lowerBound > 0 ? 1 / b.lowerBound : NaN),
   ],
 });
 const ALX_ETH_ALUSD = "0xeb83112d925268bede86654c13d423a987587e3e";
@@ -226,7 +233,7 @@ const PAGES = [
     health: true,
     changes: {
       day: 20348,
-      name: "E-mode “PT-USDe USDe Nov 2025” liquidation threshold",
+      name: "E-Mode “PT-USDe USDe Nov 2025” liquidation threshold",
       from: "91.50 %",
       to: "92 %",
       block: 23382225,
@@ -700,7 +707,7 @@ const PAGES = [
     path: "/ethereum/fluid/6",
     lwOnly: true,
     ratio: {
-      label: "Position ratio",
+      label: "Debt to collateral ratio",
       liquidates: "above",
       head: "position-ratio",
       lineRow: "liquidates-above",
@@ -715,7 +722,7 @@ const PAGES = [
     path: "/ethereum/fluid/8538",
     lwOnly: true,
     ratio: {
-      label: "Position ratio",
+      label: "Debt to collateral ratio",
       liquidates: "above",
       head: "position-ratio",
       lineRow: "liquidates-above",
@@ -735,7 +742,7 @@ const PAGES = [
     lwOnly: true,
     changes: { day: 20007, name: "Liquidation threshold", from: "85 %", to: "88 %", block: 20944531 },
     ratio: {
-      label: "Position ratio",
+      label: "Debt to collateral ratio",
       liquidates: "above",
       head: "position-ratio",
       lineRow: "liquidates-above",
@@ -765,7 +772,7 @@ const PAGES = [
       outside: 20229,
     },
     ratio: {
-      label: "Position ratio",
+      label: "Debt to collateral ratio",
       liquidates: "above",
       head: "position-ratio",
       lineRow: "liquidates-above",
@@ -860,7 +867,7 @@ const PAGES = [
     ...forkPace("ebisu", "weETH", "ebUSD", "last"),
     path: "/ethereum/ebisu/weeth/106525219326064530299176858413070691994107358379893271777150080609961810096862",
     lwOnly: true,
-    changes: { day: 20457, name: "Minimum ratio", from: "128 %", to: "120 %", block: 24160712 },
+    changes: { day: 20457, name: "Minimum Collateral Ratio", from: "128 %", to: "120 %", block: 24160712 },
     level: {
       asset: "weETH",
       endDay: 20624,
@@ -873,7 +880,16 @@ const PAGES = [
     ...forkPace("ebisu", "stcUSD", "ebUSD", "today"),
     path: "/ethereum/ebisu/stcusd/6774201543947923016744174294482881587816035374101342731108014726689376691497",
     lwOnly: true,
-    level: { asset: "stcUSD", card: "liquidates-at", help: ["115% minimum, which no governance log has moved"] },
+    level: {
+      asset: "stcUSD",
+      card: "liquidates-at",
+      // Shut down 20 Aug 2026 22:37 UTC (ui-jobs 612): the level ends that day.
+      shutdownDay: 20685,
+      help: [
+        "115% Minimum Collateral Ratio (MCR), which no governance log has moved",
+        "It ends on 20 Aug 2026, when the branch shut down.",
+      ],
+    },
   },
   {
     // Closed on 8 Nov 2026 00:10 UTC (day 20765): no "Liquidates at" since.
@@ -881,14 +897,14 @@ const PAGES = [
     ...forkPace("asymmetry", "scrvUSD", "USDaf", "last"),
     path: "/ethereum/asymmetry/scrvusd/21455407195608252231693499135014282170032223495298941722085434215551435526302",
     lwOnly: true,
-    level: { asset: "scrvUSD", endDay: 20765, help: ["today's 110% minimum, held across the life"] },
+    level: { asset: "scrvUSD", endDay: 20765, help: ["today's 90.91% Max LTV, held across the life"] },
   },
   {
     id: "asymmetry ysybold 4577 (closed)",
     ...forkPace("asymmetry", "ysyBOLD", "USDaf", "last"),
     path: "/ethereum/asymmetry/ysybold/45771828629529054463940548704077640517998892185928814218152521258795699925919",
     lwOnly: true,
-    level: { asset: "ysyBOLD", endDay: 20392, help: ["today's", "minimum, held across the life"] },
+    level: { asset: "ysyBOLD", endDay: 20392, help: ["today's", "Max LTV, held across the life"] },
   },
   {
     id: "basedollar cbeth 6846",
@@ -1040,9 +1056,9 @@ const PAGES = [
     lwOnly: true,
     band: { asset: "WBTC", closed: true },
   },
-  // Alchemix V3 (steps 6 and 8, `ratio` and `alchemix`): the
-  // collateralisation against the lower bound read at each picked event's
-  // block, over the vault's share price per reading.
+  // Alchemix V3 (steps 6 and 8, `ratio` and `alchemix`): the LTV against
+  // the liquidation threshold read at each picked event's block, over the
+  // vault's share price per reading.
   // Ethereum eth-alusd/1142 (open, 61 line redemptions) and eth-aleth/726
   // (closed with its collateral 26 Oct 2026); Base base-alusdb/23 (open) and
   // base-alusdb/29 (closed with its collateral). No Alchemist position has
@@ -1426,7 +1442,7 @@ async function checkRatio(page, tag, pg) {
   const head = r.headRow
     ? await page.$eval(`[data-panel-row="${r.headRow}"] dd`, (d) => d.textContent ?? "").catch(() => null)
     : await page.$eval(`[data-card-head="${r.head}"]`, (h) => h.textContent ?? "").catch(() => null);
-  // A closed Alchemist position's row reads "No debt".
+  // A closed Alchemist position's LTV row reads "—".
   const open = head != null && (!r.headRow || /%/.test(head));
   if (open) {
     check(
@@ -1434,20 +1450,55 @@ async function checkRatio(page, tag, pg) {
       end.block === "" && !end.none && pct(end.text) === pct(head),
       `chart ${end.text}, card ${head}`,
     );
-    const lineCard = await page.$eval(`[data-panel-row="${r.lineRow}"] dd`, (d) => d.textContent ?? "").catch(() => "");
+    // A stat's tip, from the first of `ids` the card draws.
+    const rowTip = async (ids) => {
+      for (const id of ids) {
+        const tip = page.locator(`[data-panel-row="${id}"] [data-heading-tip]`).first();
+        if ((await tip.count()) === 0) continue;
+        try {
+          await tip.click({ timeout: 3000 });
+          const text = await page.locator('[role="tooltip"]').first().textContent({ timeout: 3000 });
+          await page.keyboard.press("Escape");
+          return text ?? "";
+        } catch {
+          return "";
+        }
+      }
+      return "";
+    };
+    const lineCard = r.lineTipRows
+      ? await rowTip(r.lineTipRows)
+      : r.lineFromHeadText
+        ? (head ?? "")
+        : r.lineFromHeadTip
+          ? await (async () => {
+              try {
+                await page
+                  .locator(`[data-card-head="${r.lineRow}"] [data-heading-tip]`)
+                  .first()
+                  .click({ timeout: 3000 });
+                const text = await page.locator('[role="tooltip"]').first().textContent({ timeout: 3000 });
+                await page.keyboard.press("Escape");
+                return text ?? "";
+              } catch {
+                return "";
+              }
+            })()
+          : await page.$eval(`[data-panel-row="${r.lineRow}"] dd`, (d) => d.textContent ?? "").catch(() => "");
     const cardLine = r.linePattern ? Number(lineCard.match(r.linePattern)?.[1] ?? NaN) : pct(lineCard);
     check(
-      `${tag}: today's line is the card's ${r.lineRow.replace(/-/g, " ")}`,
+      `${tag}: today's line is the card's ${r.lineRow.replace(/-/g, " ")}${r.lineFromHeadTip || r.lineTipRows ? " tip" : r.lineFromHeadText ? " line" : ""}`,
       end.line != null && Math.abs(end.line * 100 - cardLine) < 0.05,
       `chart ${end.line}, card ${lineCard}`,
     );
     if (r.warnRow) {
-      const warnCard = await page
-        .$eval(`[data-panel-row="${r.warnRow}"] dd`, (d) => d.textContent ?? "")
-        .catch(() => "");
+      const warnCard = r.warnPattern
+        ? await rowTip([r.warnRow])
+        : await page.$eval(`[data-panel-row="${r.warnRow}"] dd`, (d) => d.textContent ?? "").catch(() => "");
+      const warnLine = r.warnPattern ? Number(warnCard.match(r.warnPattern)?.[1] ?? NaN) : pct(warnCard);
       check(
-        `${tag}: today's second line is the card's ${r.warnRow.replace(/-/g, " ")}`,
-        end.warn != null && Math.abs(end.warn * 100 - pct(warnCard)) < 0.05,
+        `${tag}: today's second line is the card's ${r.warnRow.replace(/-/g, " ")}${r.warnPattern ? " tip" : ""}`,
+        end.warn != null && Math.abs(end.warn * 100 - warnLine) < 0.05,
         `chart ${end.warn}, card ${warnCard}`,
       );
     }
@@ -2363,7 +2414,21 @@ async function checkLevelView(page, tag, pg) {
   check(`${tag}: the level is drawn`, pts.length > 0, `${pts.length} days`);
   if (pts.length === 0) return;
   const days = pts.map((p) => p[0]);
-  if (want.card === "liquidates-at") {
+  // A Trove on a shut-down branch (ui-jobs 612: Ebisu since 20 Aug 2026) is
+  // open with no liquidation to state: its card draws no "Liquidates at".
+  const shutDown = await page
+    .$eval("[data-card-status]", (e) => e.getAttribute("data-card-status") === "shut down")
+    .catch(() => false);
+  if (want.card === "liquidates-at" && shutDown) {
+    const rows = await page.$$('[data-panel-row="liquidates-at"]');
+    check(`${tag}: a shut-down branch's card states no "Liquidates at"`, rows.length === 0, `${rows.length} rows`);
+    // The level stops at the branch's shutdown: nothing is drawn after it.
+    check(
+      `${tag}: the level ends on the shutdown's day`,
+      Math.max(...days) === want.shutdownDay,
+      `last ${Math.max(...days)}, want ${want.shutdownDay}`,
+    );
+  } else if (want.card === "liquidates-at") {
     const card = await page.$eval('[data-panel-row="liquidates-at"] dd', (d) => d.textContent ?? "").catch(() => "");
     const m = card.replace(/,/g, "").match(/\$(\d+(?:\.(\d+))?)(K?)/);
     const k = m?.[3] ? 1000 : 1;
@@ -2471,7 +2536,7 @@ async function checkShareLine(page, tag) {
 }
 
 /** Alchemix V3 (step 6): the vault's share price stands in the list beside
- *  the collateralisation, one point per day with a reading at that reading's
+ *  the LTV, one point per day with a reading at that reading's
  *  block, drawn dotted between, today the card's "Share price" row to six
  *  places at the card's reading block; it carries the level; the bound line's
  *  receipt says it is today's, held across the life. */
@@ -2487,11 +2552,11 @@ async function checkAlchemixShare(page, tag, pg) {
   const listed = await page.$$eval("[data-price-asset]", (bs) => bs.map((b) => b.dataset.priceAsset));
   await page.keyboard.press("Escape");
   check(
-    `${tag}: the list holds the collateralisation and the share price alone`,
-    listed.length === 2 && listed[0] === "Collateralisation",
+    `${tag}: the list holds the LTV and the share price alone`,
+    listed.length === 2 && listed[0] === "LTV",
     listed.join(","),
   );
-  // The bound line's words, on the collateralisation.
+  // The threshold line's words, on the LTV.
   const sl = page.locator(PRICE_STRIP).first();
   await sl.focus();
   await page.keyboard.press("End");
@@ -2502,8 +2567,8 @@ async function checkAlchemixShare(page, tag, pg) {
   });
   const levelHelp = await howToRead(page);
   check(
-    `${tag}: the bound line's words say it is the bound in force at each event`,
-    /lower bound in force at each event/.test(levelHelp) &&
+    `${tag}: the threshold line's words say it is the threshold in force at each event`,
+    /liquidation threshold in force at each event/.test(levelHelp) &&
       /read at the block of each day's last event/.test(levelHelp),
     liqText || levelHelp.slice(0, 300),
   );
@@ -2536,7 +2601,7 @@ async function checkAlchemixShare(page, tag, pg) {
     };
   });
   const card = await page.$eval('[data-panel-row="share-price"] dd', (d) => d.textContent ?? "").catch(() => "");
-  const cardV = card.match(/= (\d+\.\d{6}) /)?.[1];
+  const cardV = card.match(/(\d+\.\d{6})/)?.[1];
   const chartV = end.text.match(/(\d+\.\d{6})/)?.[1];
   if (!pg.alchemix.closed) {
     const reading = await page
@@ -2560,7 +2625,7 @@ async function checkAlchemixShare(page, tag, pg) {
     help.includes("convertToAssets") && help.includes("drawn dotted"),
     help.slice(0, 400),
   );
-  await pick("Collateralisation");
+  await pick("LTV");
 }
 
 /** The card's top-row figure as `fmtNative` prints it

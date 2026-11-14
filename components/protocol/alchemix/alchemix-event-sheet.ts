@@ -13,8 +13,9 @@
 // events and the line's redemptions, each an event on this timeline, so the
 // self-repayment is a redemption card's debt row and the debt carries no
 // interest row. Risk: the LTV and how far the collateral's worth can fall
-// before the liquidation ratio. Limits: what can still be minted; the max LTV
-// and the liquidation ratio, read at the page's latest block, as parameters.
+// before the liquidation threshold. Limits: what can still be minted; the max
+// LTV and the liquidation threshold, read at the page's latest block, as
+// parameters. Each is one over the Alchemist's getter (lib/alchemix/ltv.ts).
 //
 // A block with no stated reading has no sheet (the cells draw the reading in
 // force, or say why there is none). With no reading before, only the log's
@@ -39,7 +40,8 @@ import {
   emittedAmountProv,
   lineRatioProv,
   readingChangeProv,
-  readingCollateralisationProv,
+  readingCollateralValueProv,
+  readingLtvProv,
   stateAtBlockFromReadingProv,
   type AlchemixCoords,
 } from "@/lib/alchemix/event-provenance";
@@ -50,6 +52,7 @@ import {
   type AlchemixUnderlyingUnit,
 } from "@/lib/alchemix/readings-before";
 import { SELF_LIQUIDATION_LABEL } from "./alchemix-event-header";
+import { ltvExact, ltvOfCollateralization, ltvPct, ltvPrint } from "@/lib/alchemix/ltv";
 
 const WORDS = {
   ltv: "LTV",
@@ -57,12 +60,12 @@ const WORDS = {
   fall_caption: "Before liquidation, if the debt’s value holds.",
   borrowable: "Still borrowable",
   max_ltv: "Max LTV",
-  liq_ratio: "Liquidation ratio",
-  set_aside: "Set aside for repayment",
+  liq_threshold: "Liquidation threshold",
+  earmarked: "Earmarked",
   block_events: "This block’s events",
   no_debt: "No debt",
   closed: "Closed",
-  liquidatable: "At or below the liquidation ratio",
+  liquidatable: "At or above the liquidation threshold",
   no_price: "No share price at this block",
   unread: "Not read on this page",
 };
@@ -72,12 +75,12 @@ const TIPS = {
   coll_event:
     "The vault shares this event added or took: the Alchemist's reading of the position at this block less its reading at the previous event, valued at the share price read at this block.",
   coll_redemption:
-    "The vault shares the line's redemption took from this position to pay the debt it cleared, the line's fee included: the reading at the previous event less the reading at this block.",
+    "The vault shares the redemption took from this position to pay the debt it cleared, the market's fee included: the reading at the previous event less the reading at this block.",
   coll_log: "The vault shares the log states this transaction deposited or withdrew.",
   debt_event: (sym: string, face: boolean) =>
     `The ${sym} this event added or cleared: the Alchemist's reading of the position at this block less its reading at the previous event${face ? `, at the ${sym}'s $1 face` : ""}.`,
   debt_redemption:
-    "The debt the line's redemption cleared from this position, the Alchemist's self-repayment, paid with the position's vault shares: the reading at the previous event less the reading at this block.",
+    "The debt the redemption cleared from this position, the Alchemist's self-repayment, paid with the position's vault shares: the reading at the previous event less the reading at this block.",
   debt_log: (sym: string) => `The ${sym} the log states this transaction minted or burned.`,
   block: (n: number) =>
     `This block holds ${n} of this position's events and one reading covers them all, so the figure is their change together.`,
@@ -89,22 +92,22 @@ const TIPS = {
     "The vault shares held just before this event, from the reading at the previous event, valued at the share price read at this block.",
   last_debt: "The debt once the previous event on this timeline had run, read from the Alchemist at that block.",
   before_debt:
-    "The debt just before this event: debt moves only at the position's events and the line's redemptions, each an event on this timeline, so it is the reading at the previous event.",
-  set_aside:
-    "The part of the debt earmarked for the line's redemptions, read from the Alchemist at this block; a redemption pays it down.",
+    "The debt just before this event: debt moves only at the position's events and the market's redemptions, each an event on this timeline, so it is the reading at the previous event.",
+  earmarked:
+    "Earmarked debt: the part of the debt set aside to be repaid by the market's redemptions, read from the Alchemist at this block; a redemption pays it down.",
   coll_total: (under: string, usd: boolean) =>
     `The vault shares held after this event, and their worth in ${under} at the share price read at this block${usd ? `, then at ${under}'s price now` : ""}.`,
   debt_total: (sym: string, face: boolean) =>
     `The debt after this event, read from the Alchemist at this block${face ? `, at the ${sym}'s $1 face` : ""}.`,
   ltv: (under: string) =>
     `The debt as a share of the collateral's worth after this event, both counted in ${under} at the share price read at this block.`,
-  fall: "How far the collateral's worth can fall, the debt held, before the position reaches the liquidation ratio: one less the liquidation ratio over the collateralisation.",
+  fall: "How far the collateral's worth can fall, the debt held, before the position reaches the liquidation threshold: one less the LTV over the liquidation threshold.",
   borrowable:
-    "What the position could still mint after this event before it reaches its max LTV: the collateral's worth over the line's minimum collateralisation, less the debt.",
+    "What the position could still mint after this event before it reaches its max LTV: the collateral's worth times the max LTV, less the debt.",
   max_ltv:
-    "The most the position may borrow against its collateral's worth: one over the line's minimum collateralisation, read from the Alchemist.",
-  liq_ratio:
-    "The collateralisation, the collateral's worth over the debt, at or below which anyone may liquidate the position, read from the Alchemist.",
+    "The most the position may borrow against its collateral's worth: one over the Alchemist's minimumCollateralization.",
+  liq_threshold:
+    "The LTV at or above which anyone may liquidate the position: one over the Alchemist's collateralizationLowerBound.",
 };
 
 const ONE_WEI = BigInt(1);
@@ -115,7 +118,6 @@ const units = (raw: string | bigint) => Number(raw) / 10 ** DECIMALS;
 const abs = (v: bigint) => (v < ZERO ? -v : v);
 const signedAmount = (v: bigint) => `${v < ZERO ? "−" : ""}${fmtPositionAmount(units(abs(v)))}`;
 const signedExact = (v: bigint) => `${v < ZERO ? "−" : "+"}${formatUnitsExact(abs(v).toString(), DECIMALS)}`;
-const pct2 = (n: number) => `${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 const pts = (a: number) => `${a.toFixed(2)} pts`;
 const fallText = (n: number) => `${n < 10 ? n.toFixed(1) : n.toFixed(0)}%`;
 
@@ -196,31 +198,31 @@ const yieldProv = (
   ],
 });
 
-/** A figure from this reading and the line's ratio read at the page's block. */
-const ratioDerivedProv = (
+/** A figure from this reading's LTV and the line's threshold read at the
+ *  page's block. */
+const thresholdDerivedProv = (
   what: string,
   formula: string,
   atBlock: number,
-  ratioRaw: string,
+  ltv: number,
   ratios: AlchemixLineRatios,
-  getter: "minimumCollateralization" | "collateralizationLowerBound",
   coords: AlchemixCoords,
 ): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
-  summary: `${what}. This position's collateralisation at block ${atBlock} against the line's ${getter === "minimumCollateralization" ? "minimum collateralisation" : "liquidation ratio"} read at block ${ratios.asOfBlock}.`,
+  summary: `${what}. This position's LTV at block ${atBlock} against the market's liquidation threshold read at block ${ratios.asOfBlock}.`,
   contract: { name: "Alchemist V3", address: coords.emitter },
-  via: `getCDP(${coords.tokenId}) and the share price at block ${atBlock}; ${getter}() at block ${ratios.asOfBlock}`,
+  via: `getCDP(${coords.tokenId}) and the share price at block ${atBlock}; collateralizationLowerBound() at block ${ratios.asOfBlock}`,
   formula,
-  verify: { kind: "recompute", text: "Recompute it from the collateralisation and the line's ratio" },
+  verify: { kind: "recompute", text: "Recompute it from the LTV and the market's liquidation threshold" },
   source: { block: atBlock },
   inputs: [
-    { label: "collateralisation", value: ratioRaw, kind: "chain-derived", note: "1e18 is 100%" },
+    { label: "LTV", value: ltvExact(ltv), kind: "chain-derived", note: "debt ÷ (collateral × share price)" },
     {
-      label: getter,
-      value: getter === "minimumCollateralization" ? ratios.minimumRaw : ratios.lowerBoundRaw,
+      label: "collateralizationLowerBound",
+      value: ratios.lowerBoundRaw,
       kind: "chain",
-      note: `read at block ${ratios.asOfBlock}; 1e18 is 100%`,
+      note: `read at block ${ratios.asOfBlock}; 1e18 is 100%; the liquidation threshold is 1 ÷ this`,
     },
   ],
 });
@@ -529,10 +531,9 @@ export function alchemixSheet({
           ? (sharesUsd("Collateral after this event", collAfter, sp, atBlock) as { text: string; info: Provenance })
           : {
               text: `${fmtPositionAmount(units(collAfter) * sp)} ${under}`,
-              info: readingCollateralisationProv(
+              info: readingCollateralValueProv(
                 state.collateralRaw,
                 state.sharePriceRaw!,
-                state.debtRaw,
                 atBlock,
                 dec!,
                 mytSymbol,
@@ -549,22 +550,22 @@ export function alchemixSheet({
           info: faceProv("Debt after this event", sym, formatUnitsExact(state.debtRaw, DECIMALS)),
         };
 
-  // Set-aside: part of the debt, stated at this block alone (decisions/0032).
-  const setAside: SheetRow[] =
+  // Earmarked: part of the debt, stated at this block alone (decisions/0032).
+  const earmarked: SheetRow[] =
     state.earmarkedRaw != null && BigInt(state.earmarkedRaw) > ZERO
       ? [
           {
-            key: "set-aside",
-            label: WORDS.set_aside,
+            key: "earmarked",
+            label: WORDS.earmarked,
             amount: {
               text: fmtPositionAmount(units(state.earmarkedRaw)),
               symbol: sym,
               address: syntheticAddress,
-              info: reading(WORDS.set_aside, sym, state.earmarkedRaw),
+              info: reading("Earmarked debt", sym, state.earmarkedRaw),
               value: formatUnitsExact(state.earmarkedRaw, DECIMALS),
             },
-            usd: faceUsd("Set aside for repayment", BigInt(state.earmarkedRaw)),
-            tip: TIPS.set_aside,
+            usd: faceUsd("Earmarked debt", BigInt(state.earmarkedRaw)),
+            tip: TIPS.earmarked,
           },
         ]
       : [];
@@ -591,7 +592,7 @@ export function alchemixSheet({
       carry: debtCarry,
       before: debtCarry.length > 0 ? debtBefore : undefined,
       rows: debtRows,
-      assets: setAside,
+      assets: earmarked,
       total: debtTotal,
       totalAmount: {
         text: fmtPositionAmount(units(debtAfter)),
@@ -612,12 +613,11 @@ export function alchemixSheet({
   const ratioBefore = before ? readingCollateralisationRaw(before, dec) : null;
   const closed = collAfter === ZERO && debtAfter === ZERO;
   const noDebt = debtAfter === ZERO;
-  const ltvOf = (r: string | null) => (r != null && Number(r) > 0 ? (1e18 / Number(r)) * 100 : null);
-  const ltv = ltvOf(ratioAfter);
-  const ltvPrev = ltvOf(ratioBefore);
+  const ltv = ltvOfCollateralization(ratioAfter);
+  const ltvPrev = ltvOfCollateralization(ratioBefore);
   const ratioProv =
-    ratioAfter != null && unit
-      ? readingCollateralisationProv(
+    ltv != null && unit
+      ? readingLtvProv(
           state.collateralRaw,
           state.sharePriceRaw!,
           state.debtRaw,
@@ -630,10 +630,10 @@ export function alchemixSheet({
       : null;
   const noneWhy = closed ? WORDS.closed : noDebt ? WORDS.no_debt : WORDS.no_price;
 
-  const fallOf = (r: string | null) =>
-    r != null && ratios && Number(r) > 0 ? (1 - Number(ratios.lowerBoundRaw) / Number(r)) * 100 : null;
-  const fall = fallOf(ratioAfter);
-  const fallPrev = fallOf(ratioBefore);
+  const threshold = ratios ? ltvOfCollateralization(ratios.lowerBoundRaw) : null;
+  const fallOf = (l: number | null) => (l != null && threshold != null ? (1 - l / threshold) * 100 : null);
+  const fall = fallOf(ltv);
+  const fallPrev = fallOf(ltvPrev);
 
   const risk: SheetStat[] = [
     {
@@ -641,20 +641,10 @@ export function alchemixSheet({
       label: WORDS.ltv,
       tip: TIPS.ltv(under),
       value:
-        ltv != null && ratioProv
-          ? {
-              text: pct2(ltv),
-              value: pct2(ltv),
-              info: {
-                ...ratioProv,
-                summary: `LTV at block ${atBlock}. The debt over the ${mytSymbol} held valued in ${under} at the share price read with it, one debt unit counted as one ${under}`,
-                formula: "debt ÷ (collateral × share price)",
-              },
-            }
-          : { none: noneWhy },
+        ltv != null && ratioProv ? { text: ltvPrint(ltv), value: ltvPrint(ltv), info: ratioProv } : { none: noneWhy },
       change:
         ltv != null && ltvPrev != null
-          ? { text: changeText(ltv - ltvPrev, pts), info: sinceProv("LTV change, in percentage points") }
+          ? { text: changeText((ltv - ltvPrev) * 100, pts), info: sinceProv("LTV change, in percentage points") }
           : null,
     },
     {
@@ -662,20 +652,19 @@ export function alchemixSheet({
       label: WORDS.fall,
       tip: TIPS.fall,
       value:
-        ratioAfter == null
+        ltv == null
           ? { none: noneWhy }
           : !ratios
             ? { none: WORDS.unread }
             : fall != null && fall > 0
               ? {
                   text: fallText(fall),
-                  info: ratioDerivedProv(
+                  info: thresholdDerivedProv(
                     "Collateral can fall",
-                    "1 − liquidation ratio ÷ collateralisation",
+                    "1 − LTV ÷ liquidation threshold",
                     atBlock,
-                    ratioAfter,
+                    ltv,
                     ratios,
-                    "collateralizationLowerBound",
                     coords,
                   ),
                 }
@@ -710,11 +699,11 @@ export function alchemixSheet({
                 info: {
                   kind: "chain-derived",
                   pclass: "state",
-                  summary: `Still borrowable at block ${atBlock}. The ${mytSymbol} held valued in ${under} at the share price read with it, over the line's minimum collateralisation read at block ${ratios.asOfBlock}, less the debt, one debt unit counted as one ${under}.`,
+                  summary: `Still borrowable at block ${atBlock}. The ${mytSymbol} held valued in ${under} at the share price read with it, times the market's max LTV read at block ${ratios.asOfBlock}, less the debt, one debt unit counted as one ${under}.`,
                   contract: { name: "Alchemist V3", address: coords.emitter },
                   via: `getCDP(${coords.tokenId}) and the share price at block ${atBlock}; minimumCollateralization() at block ${ratios.asOfBlock}`,
-                  formula: "collateral × share price ÷ minimum collateralisation − debt",
-                  verify: { kind: "recompute", text: "Recompute it from the reading and the line's minimum" },
+                  formula: "collateral × share price × max LTV − debt, max LTV = 1 ÷ minimumCollateralization",
+                  verify: { kind: "recompute", text: "Recompute it from the reading and the market's max LTV" },
                   source: { block: atBlock },
                   inputs: [
                     {
@@ -749,7 +738,6 @@ export function alchemixSheet({
           : null,
     },
   ];
-  const ratioPct = (raw: string) => pct2(Number(raw) / 1e16);
   const params: SheetStat[] = [
     {
       key: "max-ltv",
@@ -757,24 +745,18 @@ export function alchemixSheet({
       tip: TIPS.max_ltv,
       value: ratios
         ? {
-            text: pct2((1e18 / Number(ratios.minimumRaw)) * 100),
-            info: {
-              ...lineRatioProv("minimumCollateralization", ratios.minimumRaw, ratios.asOfBlock, coords),
-              kind: "chain-derived",
-              summary: `Max LTV. One over the line's minimum collateralisation, read at block ${ratios.asOfBlock}; a mint or a withdrawal must leave the position below it`,
-              formula: "1 ÷ minimum collateralisation",
-              scaling: undefined,
-            },
+            text: ltvPct(ratios.minimumRaw),
+            info: lineRatioProv("minimumCollateralization", ratios.minimumRaw, ratios.asOfBlock, coords),
           }
         : { none: WORDS.unread },
     },
     {
-      key: "liquidation-ratio",
-      label: WORDS.liq_ratio,
-      tip: TIPS.liq_ratio,
+      key: "liquidation-threshold",
+      label: WORDS.liq_threshold,
+      tip: TIPS.liq_threshold,
       value: ratios
         ? {
-            text: ratioPct(ratios.lowerBoundRaw),
+            text: ltvPct(ratios.lowerBoundRaw),
             info: lineRatioProv("collateralizationLowerBound", ratios.lowerBoundRaw, ratios.asOfBlock, coords),
           }
         : { none: WORDS.unread },

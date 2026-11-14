@@ -195,44 +195,11 @@ const check = (name, cond, detail = "") => {
 
 const browser = await chromium.launch();
 
-async function open(width, url, { flattenRuns = true } = {}) {
+async function open(width, url) {
   const ctx = await browser.newContext({
     viewport: { width, height: 900 },
     permissions: ["clipboard-read", "clipboard-write"],
   });
-  // "Collapse like events" defaults on (TimelineDisplayProvider) and, for a
-  // wallet whose activity clusters into long same-kind streaks, can swallow
-  // the very event these checks click into a run row — whose member cards
-  // mount only once the row is expanded, and whose `?at=` landing never
-  // resolves for a run-nested target (chain-truth-timeline.tsx's own
-  // documented gap, a later pass, not this batch's to close). Flattening
-  // runs for every context here tests the event-share feature on its own
-  // terms, independent of that separate, already-tracked limitation.
-  //
-  // ⚠️ NOT ON A SERVED-FOLDER PAGE. Since rails-ops decision 0021 the flag
-  // does nothing there: a served page's folders are not a reader's choice, and
-  // a stored `collapseRuns: false` opens none of them. (Before 0021 it opened
-  // every folder in view, one read each, and the SparkLend subject ran out
-  // this file's 900 s.) Writing it would state a flattening that does not
-  // happen, so a served page is tested as a reader meets it: the `?at=`
-  // landing resolves by event key, and `verifyServedFolders` passes
-  // `flattenRuns: false` for the same reason.
-  //
-  // Every Aave V3, SparkLend and Moonwell Base page is served unless it opts
-  // out with `?folders=0`. So the test is made here, off the URL, rather than
-  // left to each caller: the listing subjects, the "View in timeline" link and
-  // the fabricated-id pages all reach those families without saying so.
-  const target = new URL(url);
-  const servedFolders =
-    /^\/(ethereum\/(aave-v3|spark)|base\/moonwell)\/0x/.test(target.pathname) &&
-    target.searchParams.get("folders") !== "0";
-  if (flattenRuns && !servedFolders) {
-    await ctx.addInitScript(() => {
-      try {
-        localStorage.setItem("timeline-display-v3", JSON.stringify({ collapseRuns: false }));
-      } catch {}
-    });
-  }
   const page = await ctx.newPage();
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -1664,7 +1631,7 @@ async function verifyServedFolders(name, { listingPath, rowHrefRe, apiPath, para
 
   // ── 1 + 2 + 8: the page itself, with `?folders=1` ──────────────────────
   const pageUrl = `${BASE}${rowHref}${rowHref.includes("?") ? "&" : "?"}folders=1`;
-  const { ctx, page } = await open(1280, pageUrl, { flattenRuns: false });
+  const { ctx, page } = await open(1280, pageUrl);
   await page.waitForSelector("[data-event-id]", { timeout: 60000 }).catch(() => {});
   const presses = await exhaustPaging(page);
   const folderRows = await page.locator(GROUP_FRAME).count();
@@ -1743,7 +1710,6 @@ async function verifyServedFolders(name, { listingPath, rowHrefRe, apiPath, para
     const { ctx: landCtx, page: landPage } = await open(
       1280,
       `${BASE}${positionPath}?at=${encodeURIComponent(memberId)}&folders=1`,
-      { flattenRuns: false },
     );
     await landPage.waitForSelector(`[data-event-id="${memberId}"]`, { timeout: 60000 }).catch(() => {});
     check(
@@ -1879,7 +1845,7 @@ await verifySheet("liquity-v2");
  *  and the body Copy for LLM puts on the clipboard; an unknown id answers 404.
  *  The event page's one menu, the ⋮ at the card's top right (the design rounds
  *  of 6 Nov 2026), holds Copy link, the explorer, View as Markdown (a new tab,
- *  at the route) and Copy for LLM, then Inspect provenance; a copy row
+ *  at the route) and Copy for LLM; a copy row
  *  confirms in place. The View in timeline tile beside it is the one way to
  *  the timeline; the page draws no T1 and so no number pill. The facts table
  *  has the Time row and the Transaction row with its copy. Neither the card's nor the page's
@@ -1913,23 +1879,16 @@ async function verifyLiquityMarkdown(subject) {
   const fake = await fetch(`${BASE}${positionPath}/event/${encodeURIComponent(FAKE_ID)}.md`);
   check(`${name}: an unknown event's Markdown answers 404`, fake.status === 404, String(fake.status));
 
-  // The event's ⋮ at the card's top right: View in timeline, Inspect
-  // provenance, Copy transaction hash, then the page's rows (ui-jobs 535).
+  // The event's ⋮ at the card's top right: View in timeline, Copy
+  // transaction hash, then the page's rows (ui-jobs 535). Inspect provenance
+  // left it in ui-jobs 625.
   const TRIGGER = "[data-event-page-card] [data-event-head-menu] [data-event-menu] > button";
   const MENU = '[data-event-menu] [role="menu"]';
   const COPY_LLM = `${MENU} [data-menu-item="copy-for-llm"]`;
   const COPY_LINK_BTN = `${MENU} [data-menu-item="copy-link"]`;
   const VIEW_MD = `${MENU} [data-menu-item="view-markdown"]`;
   const COPY_HASH = '[data-event-page-facts] [data-copy-fact="transaction"]';
-  const WANT = [
-    "view-timeline",
-    "show-provenance",
-    "copy-hash",
-    "copy-link",
-    "view-explorer",
-    "view-markdown",
-    "copy-for-llm",
-  ];
+  const WANT = ["view-timeline", "copy-hash", "copy-link", "view-explorer", "view-markdown", "copy-for-llm"];
   const TX_ID = /^(0x[0-9a-f]{64})/i.exec(decodedId)?.[1]?.toLowerCase() ?? null;
   {
     const { ctx, page, errors } = await open(1280, link);
@@ -1955,8 +1914,6 @@ async function verifyLiquityMarkdown(subject) {
       JSON.stringify(items) === JSON.stringify(WANT),
       JSON.stringify(items),
     );
-    const provRow = await page.locator(`${MENU} [data-prov-scope-toggle]`).count();
-    check(`${name} event page: the ⋮ holds Inspect provenance`, provRow === 1, `${provRow} found`);
     const timelineLinks = await page.locator("[data-event-id] a[href*='?at=']").count();
     check(`${name} event page: one timeline link`, timelineLinks === 1, `${timelineLinks} found`);
     const timelineHref = await page.locator(IN_TIMELINE).first().getAttribute("href");
@@ -2524,7 +2481,7 @@ async function factsOnPositionPage(positionPath, eventId) {
  *  Null where this subject's life has no group, which is a fact about the
  *  subject and is reported as one rather than passed over. */
 async function idInsideACollapsedRun(positionPath) {
-  const grouped = await open(1280, `${BASE}${positionPath}`, { flattenRuns: false });
+  const grouped = await open(1280, `${BASE}${positionPath}`);
   await grouped.page.waitForSelector("[data-event-id]", { timeout: 60000 }).catch(() => {});
   await exhaustPaging(grouped.page);
   const shown = new Set(await eventIds(grouped.page));
@@ -2586,7 +2543,7 @@ async function verifyVaultOwn(name, subject, { runPath = null } = {}) {
   )
     return;
   const runLink = `${BASE}${runFrom}/event/${encodeURIComponent(run.hidden)}`;
-  const { ctx: runCtx, page: runPage, errors: runErrors } = await open(1280, runLink, { flattenRuns: false });
+  const { ctx: runCtx, page: runPage, errors: runErrors } = await open(1280, runLink);
   const runIds = await eventIds(runPage);
   check(
     `${name} · own: an event inside a collapsed run pins to exactly one card`,

@@ -31,7 +31,7 @@ const alchemist = (coords: AlchemixV2Coords) => ({ name: "Alchemist V2", address
 function inputs(coords: AlchemixV2Coords, extra: ProvInput[] = []): ProvInput[] {
   const out: ProvInput[] = [
     ...extra,
-    { label: "line", value: coords.lineKey, kind: "offchain", note: "one synthetic, V2" },
+    { label: "market", value: coords.lineKey, kind: "offchain", note: "one synthetic, V2" },
     { label: "account", value: coords.account, kind: "chain", note: "a V2 position is a wallet account" },
   ];
   if (coords.blockNumber != null) out.push({ label: "block", value: String(coords.blockNumber), kind: "chain" });
@@ -58,7 +58,7 @@ export function v2FrozenDebtProv(
   return {
     kind: "chain",
     pclass: "state",
-    summary: `Debt at close. accounts(${coords.account}).debt on the V2 Alchemist at block ${frozenAtBlock}; a negative figure is credit the account never drew`,
+    summary: `Debt in the snapshot. accounts(${coords.account}).debt on the V2 Alchemist at block ${frozenAtBlock}; a negative figure is credit the account never drew`,
     contract: alchemist(coords),
     via: `accounts(${coords.account}) at block ${frozenAtBlock}`,
     verify: {
@@ -83,7 +83,7 @@ export function v2SharesProv(
   return {
     kind: "chain",
     pclass: "state",
-    summary: `${yieldSymbol} shares at close. positions(${coords.account}, ${yieldToken}) on the V2 Alchemist at block ${frozenAtBlock}`,
+    summary: `${yieldSymbol} shares in the snapshot. positions(${coords.account}, ${yieldToken}) on the V2 Alchemist at block ${frozenAtBlock}`,
     contract: alchemist(coords),
     via: `positions(account, ${yieldToken}).shares at block ${frozenAtBlock}`,
     verify: { kind: "recompute", text: `Call positions(${coords.account}, ${yieldToken}) at block ${frozenAtBlock}` },
@@ -112,7 +112,7 @@ export function v2UnderlyingProv(
   return {
     kind: "chain-derived",
     pclass: "state",
-    summary: `${symbol} behind the ${yieldSymbol} shares. The share count at close taken to the underlying at the Alchemist's rate that block`,
+    summary: `${symbol} behind the ${yieldSymbol} shares. The share count in the snapshot taken to the underlying at the Alchemist's rate that block`,
     contract: alchemist(coords),
     formula: `shares × getUnderlyingTokensPerShare ÷ 10^${yieldDecimals}`,
     via: `getUnderlyingTokensPerShare = ${perShareRaw} at block ${frozenAtBlock}`,

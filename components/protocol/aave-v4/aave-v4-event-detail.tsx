@@ -1,5 +1,6 @@
 "use client";
 
+import { v4Apy } from "@/lib/aave-v4/rates";
 import type { EventCellSpec } from "@/components/shared/event-cells";
 import type { EventPriceChip } from "@/components/shared/event-price-row";
 import type { AaveV4Context, AaveV4PriceSource } from "@/lib/shared/types/protocols/aave-v4";
@@ -37,7 +38,12 @@ import {
   type EventProvDetail,
 } from "@/lib/aave-v4/position-provenance";
 import { ExactTip } from "@/components/shared/amount-text";
-import { useHealthFactorAround, hfOf, premiumAt } from "@/lib/aave-v4/use-health-factor-around";
+import {
+  useHealthFactorAround,
+  hfOf,
+  premiumAt,
+  type HealthFactorAround,
+} from "@/lib/aave-v4/use-health-factor-around";
 import type { EventSheet } from "@/components/shared/event-sheet";
 import { aaveV4Label } from "@/lib/aave-v4/event-label";
 import { aaveV4Sheet } from "./aave-v4-event-sheet";
@@ -75,7 +81,7 @@ function pricePillTitle(symbol: string, source: AaveV4PriceSource, block?: numbe
     : `${aaveV4DisplaySymbol(symbol)} price at this event's block${block != null ? ` ${block.toLocaleString("en-US")}` : ""} (${sourceLabel})`;
 }
 
-/** A single held-debt asset's borrow rate — `4.35% [icon] USDC`. Mirrors the
+/** A single held-debt asset's borrow APY — `4.35% [icon] USDC`. Mirrors the
  *  Debt card's `PositionRow` grammar so a multi-debt position reads its rates
  *  the same way it reads its balances: one labelled row per asset. */
 function BorrowRateRow({ symbol, apr, coord }: { symbol: string; apr: string; coord: EventProvDetail }) {
@@ -83,8 +89,11 @@ function BorrowRateRow({ symbol, apr, coord }: { symbol: string; apr: string; co
   return (
     <span className="inline-flex items-center gap-1.5 text-sm">
       <span className="font-semibold">
-        <Prov info={heldDebtRateProv({ ...coord, asset: symbol })} icon={<TokenChipIcon symbol={symbol} size={16} />}>
-          {(parseFloat(apr) * 100).toFixed(2)}%
+        <Prov
+          info={heldDebtRateProv({ ...coord, asset: symbol }, parseFloat(apr))}
+          icon={<TokenChipIcon symbol={symbol} size={16} />}
+        >
+          {(v4Apy(parseFloat(apr)) * 100).toFixed(2)}%
         </Prov>
       </span>
       {showTickerLabels && <span className="text-xs">{aaveV4DisplaySymbol(symbol)}</span>}
@@ -108,6 +117,9 @@ export interface AaveV4EventDetailProps {
   repaid?: string[];
   /** The moved reserve's contract, from the event's flows. */
   address?: string;
+  /** Whether the card has opened (or its group's sheet is shown): the health
+   *  factor is read from then on, so a closed row asks for nothing. */
+  active: boolean;
 }
 
 /** Render a single position row — with before→after if this asset changed,
@@ -223,6 +235,7 @@ export function useAaveV4Cells({
   previous,
   repaid,
   address,
+  active,
 }: AaveV4EventDetailProps): {
   cells: EventCellSpec[];
   prices: EventPriceChip[];
@@ -244,14 +257,16 @@ export function useAaveV4Cells({
   const isLiq = ctx.eventType === "liquidation";
   const isToggle = ctx.eventType === "collateral_toggle";
   // Every event that moves a balance shows the health factor either side of it,
-  // read from the spoke; a collateral toggle moves none.
-  const hfAround = useHealthFactorAround(
-    !isToggle,
+  // read from the spoke once the card opens; a collateral toggle moves none.
+  // Until then the read stands as loading, so the opened grid holds its place.
+  const hfRead = useHealthFactorAround(
+    !isToggle && active,
     ctx.spokeAddress,
     ctx.owner ?? wallet,
     blockNumber,
     ctx.reserveSymbol,
   );
+  const hfAround: HealthFactorAround = !isToggle && !active ? { status: "loading" } : hfRead;
 
   const isSupplySide = ctx.eventType === "supply" || ctx.eventType === "withdraw";
   const isDebtSide = ctx.eventType === "borrow" || ctx.eventType === "repay";
@@ -592,7 +607,7 @@ export function useAaveV4Cells({
     cells.push({
       kind: "stat",
       key: "borrow-rate",
-      label: debtRates.length > 1 ? "Borrow Rates" : "Borrow Rate",
+      label: "Borrow APY",
       // Moved where this asset's rate differs, at the two places shown, from
       // the one the previous event on the spoke recorded.
       changed: thisRate != null && previousRate != null && pctOf(parseFloat(thisRate.apr)) !== pctOf(previousRate),

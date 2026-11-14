@@ -1,50 +1,53 @@
 "use client";
 
 import Link from "next/link";
-import { usePriceStripActive } from "@/components/shared/price-strip";
 import { FeedbackCluster } from "@/components/shared/feedback-cluster";
 import { LwNotice } from "@/components/shared/lw-attribution";
 import { PhoneBeta } from "@/components/nav/phone-beta";
 
 /** Slim app footer used on protocol pages (/liquity-v2, /trove/*).
  *  Single row: copyright + legal on the left, the shared feedback cluster
- *  (heading + ask + teal Send-feedback pill) on the right. No rule above it —
- *  the page's last section ends where it ends (Miles, 2026-09-02). The "Built
+ *  (heading + ask + teal Send-feedback pill) on the right. No ground of its
+ *  own: the page's ground runs through it, and a hairline at its top, as wide
+ *  as the text, is the division (Miles, 12 Nov 2026; ui-jobs 602). The "Built
  *  with support from Liquity" credit has been retired from this surface — it
  *  lives on the marketing site footer (see SiteFooter) where the messaging
  *  context fits — and so has the Coverage link: the depth matrix is reached
- *  from the explorer's own info page, not the legal row.
- *
- *  When a detail page mounts the fixed bottom PriceStrip, the footer pads its
- *  bottom so its content clears the strip instead of sitting behind it. */
+ *  from the explorer's own info page, not the legal row. */
 export function AppFooter() {
-  const priceStripActive = usePriceStripActive();
   return (
-    <footer className="mt-32 bg-raised" data-anatomy="H8">
-      <div className={`max-w-7xl mx-auto px-4 pt-6 ${priceStripActive ? "pb-20" : "pb-6"}`}>
-        <div className="flex flex-col md:flex-row justify-between items-center md:items-start gap-6 md:gap-4">
-          <div className="flex flex-col md:flex-row items-center gap-4">
-            <div className="flex items-center gap-2">
-              <p className="text-xs text-rb-500">© {new Date().getUTCFullYear()} Rails</p>
-              <PhoneBeta />
+    <footer className="mt-32" data-anatomy="H8">
+      {/* The hairline spans the text's width, in the muted text tone at half strength. */}
+      <div className="max-w-7xl mx-auto px-4">
+        <div className="border-t border-rb-500/50 pt-6 pb-6">
+          <div className="flex flex-col md:flex-row justify-between items-center md:items-start gap-6 md:gap-4">
+            <div className="flex flex-col md:flex-row items-center gap-4">
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-rb-500">© {new Date().getUTCFullYear()} Rails</p>
+                <PhoneBeta />
+              </div>
+              <div className="flex gap-4">
+                <Link href="/privacy" className="text-rb-500 hover:text-foreground text-xs transition-colors">
+                  Privacy Policy
+                </Link>
+                <Link href="/terms" className="text-rb-500 hover:text-foreground text-xs transition-colors">
+                  Terms of Service
+                </Link>
+              </div>
             </div>
-            <div className="flex gap-4">
-              <Link href="/privacy" className="text-rb-500 hover:text-foreground text-xs transition-colors">
-                Privacy Policy
-              </Link>
-              <Link href="/terms" className="text-rb-500 hover:text-foreground text-xs transition-colors">
-                Terms of Service
-              </Link>
-            </div>
-          </div>
-          {/* The shared feedback cluster (its own modal state) — the slim
+            {/* The shared feedback cluster (its own modal state) — the slim
               inline variant: no heading, ask + pill on one row in small text. */}
-          <FeedbackCluster variant="inline" />
+            <FeedbackCluster variant="inline" />
+          </div>
+          {/* The charts' attribution (Lightweight Charts' licence), on every page. */}
+          <p
+            className="mt-4 text-center text-[11px] text-rb-500 md:text-left"
+            data-lw-attribution=""
+            data-anatomy="H8.2"
+          >
+            <LwNotice />
+          </p>
         </div>
-        {/* The charts' attribution (Lightweight Charts' licence), on every page. */}
-        <p className="mt-4 text-center text-[11px] text-rb-500 md:text-left" data-lw-attribution="" data-anatomy="H8.2">
-          <LwNotice />
-        </p>
       </div>
     </footer>
   );

@@ -2,7 +2,7 @@
 
 // Redemptions that cleared nothing from this position and took nothing from
 // it, said once in the place their rows would have stood. A redemption belongs
-// to the whole line, so a position with no debt set aside carries every one of
+// to the whole line, so a position with no earmarked debt carries every one of
 // them on its timeline and none of them changes it (eth-aleth/776 carried 53).
 // The members stay one click away, under the sentence.
 
@@ -34,8 +34,8 @@ export function AlchemixQuietRedemptions({
   const sym = events[0]?.context.data.syntheticSymbol ?? "";
   const sentence =
     n === 1
-      ? `A redemption on the ${sym} line while this position had no debt set aside for repayment. It did not change the position.`
-      : `${n.toLocaleString("en-US")} redemptions on the ${sym} line while this position had no debt set aside for repayment. None of them changed it.`;
+      ? `A redemption on the ${sym} market while this position had no earmarked debt. It did not change the position.`
+      : `${n.toLocaleString("en-US")} redemptions on the ${sym} market while this position had no earmarked debt. None of them changed it.`;
   return (
     <NoteRowShell
       icon="no-change"

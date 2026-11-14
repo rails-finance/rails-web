@@ -8,20 +8,24 @@
 // protocol, a Maple pool's opening Maple's pools page. Facets: Token (by
 // symbol, across chains), Network and Protocol, with the rosters' search.
 // Each roster was read at its block and the read-at line names each one.
-// No USD and no cross-asset total. The index carries no receipts and offers
-// no inspector (Miles, 8 Nov 2026): each vault's page keeps them.
+// No USD and no cross-asset total. The rows open receipts at their roster's
+// block, through each family's builders (lib/vaults/row-receipts.ts), picked
+// while the inspector is armed (decision 0062 point 5; ui-jobs 571, 625).
 
 import Link from "next/link";
-import { ProvUnscoped } from "@/components/shared/provenance";
-import { VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
-import { VaultIndexTable, useVaultIndexSort } from "@/components/vaults/vault-index-table";
+import { ProvSection } from "@/components/shared/section-menu";
+import { ROSTER_SCOPE, VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
+import { CompareBar } from "@/components/vaults/compare-selection";
 import { isoSeconds, RosterBlock, RosterReadStamp } from "@/components/vaults/roster-read-stamp";
 import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { protocolForPathname } from "@/lib/shared/protocols";
 import { PAGE_LINK } from "@/lib/shared/ui-grammar";
 import { symbolsOfKeyword } from "@/lib/shared/asset-categories";
 import type { VaultSummary } from "@/lib/vaults/summary";
+import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
+import { assetKey } from "@/lib/shared/asset-family";
 import type { VaultYield } from "@/lib/vaults/yield";
+import { vaultIndexRowReceipts } from "@/lib/vaults/row-receipts";
 import {
   chainName,
   VAULT_INDEX_PROTOCOL_LABEL,
@@ -74,10 +78,6 @@ const TOKEN_FACET: VaultRosterFacet = {
   labelOf: (s) => s,
 };
 
-/** The index states no receipts: its figures are plain, each vault's page
- *  carries them (check:prov reads this). */
-export const PROV_EXEMPT = "the cross-protocol index states no receipts; each vault's page carries them (ui-jobs 538)";
-
 export function VaultIndexView({
   initialSearch,
   vaults,
@@ -113,7 +113,6 @@ export function VaultIndexView({
     : [];
   // `?network=` and `?protocol=` (written by the roster, which keeps its
   // facets in the URL here) choose those facets on arrival, as `?asset=` does.
-  const indexSort = useVaultIndexSort(initialSearch ?? "");
   const arrival = new URLSearchParams(initialSearch ?? "");
   const chosen = (id: string, known: string[]) =>
     (arrival.get(id) ?? "")
@@ -127,6 +126,10 @@ export function VaultIndexView({
     ...(networks.length > 0 ? { network: networks } : {}),
     ...(protocols.length > 0 ? { protocol: protocols } : {}),
   };
+
+  // The asset preference (ui-jobs 557): a vault is kept when its asset or its
+  // share token is one of the reader's (sBOLD and ysyBOLD are share tokens).
+  const scoped = useScopedRows(vaults, (v) => [assetKey(v.chainId, v.asset.address), assetKey(v.chainId, v.address)]);
 
   const hooksOf = (v: VaultSummary) => ({
     "data-protocol": vaultIndexProtocol(v),
@@ -142,6 +145,12 @@ export function VaultIndexView({
     at: r.readBy?.blockTime ?? isoSeconds(r.readAt),
   });
   const counts = rosters.filter((r) => !r.chainStale);
+  // Each row's receipts name its roster's block.
+  const readByRoster = new Map(rosters.map((r) => [vaultIndexRosterKey(r), r]));
+  const receiptsOf = (v: VaultSummary) => {
+    const r = readByRoster.get(vaultIndexRosterKeyOf(v));
+    return vaultIndexRowReceipts({ blockNumber: r?.blockNumber || undefined, readBy: r?.readBy }, v);
+  };
 
   // One stamp for the oldest roster's read; the panel names each roster's block.
   const readAt = <RosterReadStamp reads={counts.map(readOf)} />;
@@ -172,50 +181,40 @@ export function VaultIndexView({
   );
 
   return (
-    // The whole index is exempt from the coverage tripwire, its reason on the
-    // element (the tripwire reads `data-prov-exempt`).
-    <div data-prov-exempt={PROV_EXEMPT}>
-      <ProvUnscoped>
-        <VaultRoster
-          initialSearch={initialSearch}
-          vaults={vaults}
-          yields={yields}
-          chainId={MAINNET_CHAIN_ID as ChainId}
-          blockNumber={0}
-          chainStale={rosters.every((r) => r.chainStale)}
-          skel="index"
-          facets={FACETS}
-          assetFacet={TOKEN_FACET}
-          initialFilters={initialFilters}
-          facetsInUrl
-          hrefOf={vaultIndexHref}
-          holdersHrefOf={vaultIndexHoldersHref}
-          receiptsOf={() => ({})}
-          hooksOf={hooksOf}
-          mobileSort={indexSort.mobileSort}
-          table={(rows, part) => (
-            <VaultIndexTable
-              rows={rows}
-              part={part}
-              initialSearch={initialSearch ?? ""}
-              yieldOf={(v) => yields[vaultIndexKey(v)]}
-              leadOf={(v) => LEAD_IDS[vaultIndexRosterKeyOf(v)] ?? null}
-              hrefOf={vaultIndexHref}
-              holdersHrefOf={vaultIndexHoldersHref}
-              hooksOf={hooksOf}
-            />
-          )}
-          head={{
-            census: null,
-            censusFigure: "index-census",
-            listingHref: null,
-            infoHref: null,
-            indexHref: null,
-            readAt,
-            drawer,
-          }}
-        />
-      </ProvUnscoped>
+    <div>
+      <ScopeNote scoped={scoped} noun={["vault", "vaults"]} className="mb-2" />
+      <ProvSection scope={ROSTER_SCOPE} as="div">
+        <div {...scoped.listProps}>
+          <VaultRoster
+            initialSearch={initialSearch}
+            vaults={scoped.rows}
+            yieldOf={(v) => yields[vaultIndexKey(v)]}
+            chainId={MAINNET_CHAIN_ID as ChainId}
+            blockNumber={0}
+            chainStale={rosters.every((r) => r.chainStale)}
+            skel="index"
+            facets={FACETS}
+            assetFacet={TOKEN_FACET}
+            initialFilters={initialFilters}
+            facetsInUrl
+            hrefOf={vaultIndexHref}
+            holdersHrefOf={vaultIndexHoldersHref}
+            receiptsOf={receiptsOf}
+            hooksOf={hooksOf}
+            leadOf={(v) => LEAD_IDS[vaultIndexRosterKeyOf(v)] ?? null}
+            head={{
+              census: null,
+              censusFigure: "index-census",
+              listingHref: null,
+              infoHref: null,
+              indexHref: null,
+              readAt,
+              drawer,
+            }}
+          />
+        </div>
+      </ProvSection>
+      <CompareBar />
     </div>
   );
 }

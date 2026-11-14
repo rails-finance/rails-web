@@ -26,6 +26,8 @@ import { morphoExports } from "@/components/protocol/morpho/morpho-export-menu";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
+import { oraclePriceProv } from "@/lib/morpho/position-provenance";
+import { atBlockOraclePriceProv } from "@/lib/morpho/event-provenance";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { useMorphoBaseWalletReads } from "@/lib/morpho-base/use-wallet-reads";
@@ -194,15 +196,28 @@ export function MorphoMarketPositionView({
         price: oracle,
         unit: oracle ? loanSymbol : undefined,
         label: `${collateralSymbol} in ${loanSymbol} (the market's oracle)`,
+        info:
+          oracle && liveClean
+            ? oraclePriceProv(
+                {
+                  collSym: collateralSymbol,
+                  loanSym: loanSymbol,
+                  oracle: liveClean.oracle,
+                  block: liveClean.blockNumber,
+                  lane: `GET ${d.routes.wallet}`,
+                },
+                { marketId: market, chainId: d.chainId },
+              )
+            : undefined,
       });
     }
     out.push({
       symbol: loanSymbol,
       address: pos?.loanToken ?? live?.loanToken,
-      label: `${loanSymbol}, the market's loan token`,
+      label: `${loanSymbol}, the market's loan asset`,
     });
     return out;
-  }, [pos, live, liveClean]);
+  }, [pos, live, liveClean, market, d.routes.wallet, d.chainId]);
 
   // A closed position's prices: the market oracle at the closing block, which
   // the sweep carries on liquidation rows only; otherwise the dropdown is left
@@ -224,11 +239,23 @@ export function MorphoMarketPositionView({
           price,
           unit: loanSymbol,
           label: `${collateralSymbol} in ${loanSymbol} (the market's oracle)`,
+          info: atBlockOraclePriceProv(
+            collateralSymbol,
+            loanSymbol,
+            {
+              txHash: row.txHash,
+              blockNumber: row.blockNumber,
+              marketId: market,
+              chainId: d.chainId,
+              source: captureSource,
+            },
+            price,
+          ),
         },
-        { symbol: loanSymbol, address: pos.loanToken, label: `${loanSymbol}, the market's loan token` },
+        { symbol: loanSymbol, address: pos.loanToken, label: `${loanSymbol}, the market's loan asset` },
       ];
     });
-  }, [closed, pos, exportEvents]);
+  }, [closed, pos, exportEvents, market, d.chainId, captureSource]);
 
   return (
     // Every event card's custody line names whichever source answered — the
@@ -238,7 +265,7 @@ export function MorphoMarketPositionView({
         <DetailTopRow
           session={d.session}
           wallet={wallet}
-          owner={{ wallet, vault: vaultOwner }}
+          owner={{ wallet, chain: d.chainId, vault: vaultOwner }}
           assets={stripAssets}
           priceReason={ORACLE_USD_REASON[d.session]}
           closed={closed}

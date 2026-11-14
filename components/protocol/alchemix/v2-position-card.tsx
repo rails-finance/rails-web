@@ -2,10 +2,10 @@
 // TO-DO-position-card 322, 323): the listing row, and the heads and outcome
 // its page's card reuses.
 //
-// EVERY V2 POSITION IS CLOSED, AT 2026-04-02. V2 was wound down that day and
-// every figure is the Alchemist's read at the frozen block. The card is a
-// closed card: the figures at close as its heads, Closed and the date as its
-// outcome, the block under them.
+// EVERY V2 POSITION WAS MIGRATED, AT 2026-04-02. Every figure is the
+// Alchemist's read at the frozen block, the migration's snapshot (the docs'
+// word, ui-jobs 646). The card is a closed card: the snapshot's figures as its
+// heads, Migrated and the date as its outcome, the block under them.
 //
 // THE DEBT IS SIGNED. A negative debt is credit the account never drew, and is
 // stated as credit, never as a negative owed.
@@ -36,6 +36,7 @@ import {
   AlchemixTag,
   alchemixChip,
 } from "@/components/protocol/alchemix/alchemix-position-card";
+import { V2_WORDS } from "@/lib/alchemix/transmuter-words";
 
 /** alUSD and alETH are 18 decimals each, read from the tokens. */
 const SYNTHETIC_DECIMALS = 18;
@@ -46,18 +47,18 @@ export function closedOn(date: string): string {
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 }
 
-export const V2_STATUS: PositionCardStatus = { word: "Closed", tone: "muted" };
+export const V2_STATUS: PositionCardStatus = { word: V2_WORDS.status, tone: "muted" };
 
 export function v2DebtHead(p: AlchemixV2PositionSummary, prov?: Provenance): PositionCardHead {
   const d = p.frozenDebt;
   if (!d) {
     return {
       id: "debt-at-close",
-      label: "Debt at close",
+      label: V2_WORDS.debtSnapshot,
       value: (
         <NotLoaded
           className="text-rb-500"
-          title="The chain didn't answer for this position's debt at close. It shows once it does."
+          title="The chain didn't answer for this position's debt in the snapshot. It shows once it does."
         />
       ),
     };
@@ -71,7 +72,7 @@ export function v2DebtHead(p: AlchemixV2PositionSummary, prov?: Provenance): Pos
   );
   return {
     id: "debt-at-close",
-    label: d.sign === "credit" ? "Credit at close" : "Debt at close",
+    label: d.sign === "credit" ? V2_WORDS.creditSnapshot : V2_WORDS.debtSnapshot,
     value: prov ? (
       <Prov info={prov} value={exact} symbol={p.syntheticSymbol}>
         {figure}
@@ -92,7 +93,7 @@ export function v2CollateralHead(
   if (held.length === 0) {
     return {
       id: "collateral-at-close",
-      label: "Collateral at close",
+      label: V2_WORDS.collateralSnapshot,
       value: <span className="text-rb-500">None</span>,
     };
   }
@@ -108,7 +109,7 @@ export function v2CollateralHead(
   const rest = held.length - 1;
   return {
     id: "collateral-at-close",
-    label: "Collateral at close",
+    label: V2_WORDS.collateralSnapshot,
     value: prov ? (
       <Prov info={prov} value={exact} symbol={u.symbol}>
         {figure}
@@ -141,20 +142,20 @@ export function v3SuccessorLinks(
   );
 }
 
-/** The outcome: Closed on the wind-down date, the frozen block under it, and
+/** The outcome: Migrated on the snapshot date, the frozen block under it, and
  *  "Now on V3" beside it, as links (`links`) or, on a listing row, a count. */
 export function v2Outcome(p: AlchemixV2PositionSummary, links?: ReactNode): PositionCardOutcome {
   const n = p.v3Successors.length;
   return {
-    word: "Closed",
+    word: V2_WORDS.status,
     dates: [{ at: Date.parse(`${p.closedAt}T00:00:00Z`) / 1000 }],
     footnote: (
       <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
-        read at <BlockRef block={p.frozenAtBlock} size={12} />
+        {V2_WORDS.snapshotAt} <BlockRef block={p.frozenAtBlock} size={12} />
       </div>
     ),
     extra: {
-      label: "Now on V3",
+      label: V2_WORDS.nowOnV3,
       value: (
         <div className="mt-2 text-sm">
           {n > 0 ? (

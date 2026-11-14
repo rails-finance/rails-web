@@ -268,8 +268,8 @@ const skip = (name, why) => {
   skipped++;
 };
 
-// 2026-10-20 (ui-jobs 407, V1): a roster row is the shared card's listing
-// surface. It states total assets in the listing's compact form ("413.0M", the
+// 2026-11-12 (ui-jobs 605): a roster row is a row of the house table (V6). It
+// states total assets in the listing's compact form ("413.0M", the
 // exact value on `data-prov-exact`) and the share price by the print rules'
 // share-price rule (two to six places, whatever the asset's decimals). Both
 // rules restated here from their definitions (lib/shared/format-compact.ts,
@@ -319,9 +319,10 @@ const context = await browser.newContext({ viewport: { width: 1280, height: 900 
 const page = await context.newPage();
 
 // ── 0: the roster answers, and states one block ─────────────────────────────
-// ui-jobs 485: every row, by size, which is what the roster checks below read;
-// the last section checks the default view (endorsed, Size) against it.
-const res0 = await page.goto(`${BASE}/ethereum/yearn/vaults?show=all&sortBy=size`, { waitUntil: "networkidle" });
+// ui-jobs 485: every row, and (ui-jobs 605) the table sorted by Total assets,
+// which is what the roster checks below read; the last section checks the
+// default view (100+ holders, Holders) against it.
+const res0 = await page.goto(`${BASE}/ethereum/yearn/vaults?show=all&sort=assets`, { waitUntil: "networkidle" });
 check("0a GET /ethereum/yearn/vaults answers 200", res0?.status() === 200, `status ${res0?.status()}`);
 await page.waitForSelector("[data-roster-panel] [data-vault-row]", { timeout: 120_000 });
 
@@ -393,11 +394,12 @@ const rows = await page.locator("[data-roster-panel] [data-vault-row]").evaluate
     endorsed: el.getAttribute("data-endorsed"),
     raw: el.getAttribute("data-total-assets-raw"),
     sharePriceRaw: el.getAttribute("data-share-price-raw"),
-    groupAsset: el.closest("[data-asset-group]")?.getAttribute("data-asset-group") ?? null,
+    held: el.getAttribute("data-held-assets-raw"),
+    token: el.getAttribute("data-token"),
     inEmpty: Boolean(el.closest("[data-empty-rows]")),
-    // 2026-10-20 (ui-jobs 407, V1): the row is a card; the family word is its
-    // family pill and the mark sits on the asset icon.
-    familyText: el.querySelector('[data-pill="family"]')?.textContent?.trim() ?? null,
+    // 2026-11-12 (ui-jobs 605): the row is a table row; the family word is its
+    // Kind cell, and the one-protocol roster draws no protocol mark.
+    familyText: el.querySelector('[data-cell="kind"]')?.textContent?.trim() ?? null,
     hasMark: Boolean(el.querySelector("[data-venue-mark]")),
     hasBadge: Boolean(el.querySelector("[data-endorsed-badge]")),
     amountText: el.querySelector('[data-cell="total-assets"]')?.textContent?.trim() ?? null,
@@ -442,36 +444,39 @@ check(
     : `${rows.length - ownUnread} compared, ${ownUnread} own reads unanswered`,
 );
 
-// ── 3: grouping and order ───────────────────────────────────────────────────
+// ── 3: the table and its order ──────────────────────────────────────────────
+// 2026-11-12 (ui-jobs 605): one flat table, no group per asset; the Asset
+// facet narrows by asset. Read under `?sort=assets`: by token A to Z, the most
+// held first inside each token.
 const funded = rows.filter((r) => r.group === "funded");
-const wrongGroup = funded.filter(
-  (r) => r.groupAsset !== r.asset || CATALOG_BY_ADDRESS.get(r.address)?.asset.address !== r.asset,
-);
+const wrongAsset = funded.filter((r) => CATALOG_BY_ADDRESS.get(r.address)?.asset.address !== r.asset);
 check(
-  "3a every funded row sits in the group of its catalogued asset",
-  wrongGroup.length === 0,
-  wrongGroup
+  "3a every funded row states its catalogued asset",
+  wrongAsset.length === 0,
+  wrongAsset
     .slice(0, 3)
     .map((r) => r.address)
     .join("; ") || `${funded.length} funded rows`,
 );
-const groupsOnPage = new Set(funded.map((r) => r.groupAsset));
-const ownFundedAssets = new Set(
-  CATALOG.filter((r) => (ownTotal.get(r.address) ?? BigInt(0)) > BigInt(0)).map((r) => r.asset.address),
-);
+const groupHeads = await page.locator("[data-roster-panel] [data-asset-group]").count();
+const fundedTables = await page.locator("[data-roster-panel] [data-vault-table='funded']").count();
 check(
-  "3b the group set is the distinct assets of the vaults this script read as funded",
-  groupsOnPage.size === ownFundedAssets.size && [...groupsOnPage].every((a) => ownFundedAssets.has(a)),
-  `page ${groupsOnPage.size} groups, own ${ownFundedAssets.size}`,
+  "3b the funded vaults are one table, with no group per asset",
+  groupHeads === 0 && fundedTables === 1,
+  `${fundedTables} funded table(s), ${groupHeads} asset group(s)`,
 );
 let outOfOrder = 0;
-for (const asset of groupsOnPage) {
-  const inGroup = funded.filter((r) => r.groupAsset === asset);
-  for (let i = 1; i < inGroup.length; i++) {
-    if (BigInt(inGroup[i - 1].raw) < BigInt(inGroup[i].raw)) outOfOrder++;
-  }
+for (let i = 1; i < funded.length; i++) {
+  const [a, b] = [funded[i - 1], funded[i]];
+  const t = a.token.localeCompare(b.token, "en-US", { sensitivity: "base" });
+  // Total assets sorts by the figure the column shows (ui-jobs 664).
+  if (t > 0 || (t === 0 && BigInt(b.raw) > BigInt(a.raw))) outOfOrder++;
 }
-check("3c inside every group the raw totals are non-increasing", outOfOrder === 0, `${outOfOrder} out-of-order pairs`);
+check(
+  "3c under ?sort=assets the rows run by token A to Z, the largest total assets first inside each token",
+  outOfOrder === 0,
+  `${outOfOrder} out-of-order pairs`,
+);
 
 // ── 4: the three kinds of row account for the whole catalogue ───────────────
 const emptyRows = rows.filter((r) => r.group === "empty");
@@ -499,8 +504,8 @@ check(
 );
 
 // ── 6: the printed amount follows the print rule ────────────────────────────
-const byGroupSize = [...groupsOnPage]
-  .map((asset) => funded.filter((r) => r.groupAsset === asset))
+const byGroupSize = [...new Set(funded.map((r) => r.token))]
+  .map((token) => funded.filter((r) => r.token === token))
   .sort((a, b) => b.length - a.length)
   .slice(0, 3);
 const amountTextBad = [];
@@ -511,9 +516,9 @@ for (const group of byGroupSize) {
   if (!r.amountText?.startsWith(want)) amountTextBad.push(`${r.address}: "${r.amountText}" vs "${want}"`);
 }
 check(
-  "6  the printed total follows the amount rule on the largest row of the three largest groups",
+  "6  the printed total follows the amount rule on the largest row of the three tokens with the most vaults",
   amountTextBad.length === 0 && byGroupSize.length === 3,
-  amountTextBad.join("; ") || `${byGroupSize.length} groups sampled`,
+  amountTextBad.join("; ") || `${byGroupSize.length} tokens sampled`,
 );
 
 // ── 7: share price, at the ASSET's decimals ─────────────────────────────────
@@ -548,7 +553,11 @@ const priceTextBad = [];
 for (const r of priceSample) {
   const decimals = CATALOG_BY_ADDRESS.get(r.address).asset.decimals;
   if (!r.sharePriceRaw) continue;
-  const want = expectedSharePriceText(r.sharePriceRaw, decimals);
+  // Past a million the table prints the share price compact (ui-jobs 605, V6).
+  const want =
+    Number(r.sharePriceRaw) / Math.pow(10, decimals) >= 1e6
+      ? expectedCompactText(r.sharePriceRaw, decimals)
+      : expectedSharePriceText(r.sharePriceRaw, decimals);
   if (!r.sharePriceText?.startsWith(want)) priceTextBad.push(`${r.address}: "${r.sharePriceText}" vs "${want}"`);
 }
 check(
@@ -579,12 +588,14 @@ check(
     .map((r) => `${r.address}: page ${r.endorsed} vs own ${ownEndorsed.get(r.address)}`)
     .join("; ") || `${rows.length} compared, ${[...ownEndorsed.values()].filter((v) => v === true).length} endorsed`,
 );
-const markWrong = rows.filter((r) => r.hasMark !== (r.endorsed === "true"));
+// 2026-11-12 (ui-jobs 605): the one-protocol roster omits the lead column, so
+// no row draws the Yearn mark; the endorsed badge is earned as before.
+const markWrong = rows.filter((r) => r.hasMark);
 const badgeWrong = rows.filter((r) => r.hasBadge !== (r.endorsed === "true"));
 check(
-  "8b the Yearn mark and the endorsed badge sit on exactly the endorsed rows (0027 call 1)",
+  "8b the endorsed badge sits on exactly the endorsed rows (0027 call 1), and no row draws a mark it did not earn",
   markWrong.length === 0 && badgeWrong.length === 0,
-  `${markWrong.length} rows with a mark they did not earn or missing one, ${badgeWrong.length} likewise for the badge`,
+  `${markWrong.length} rows with a mark, ${badgeWrong.length} rows with a badge they did not earn or missing one`,
 );
 
 // ── 9: the family word is on every row ──────────────────────────────────────
@@ -703,9 +714,9 @@ const f2 = rowOf(F2);
 const f3 = rowOf(F3);
 const f4 = rowOf(F4);
 check(
-  "12a F1 (USDC-1 yVault) is endorsed and funded, with the mark and the badge",
-  Boolean(f1) && f1.endorsed === "true" && f1.group === "funded" && f1.hasMark && f1.hasBadge,
-  f1 ? `endorsed ${f1.endorsed}, group ${f1.group}, mark ${f1.hasMark}, badge ${f1.hasBadge}` : "row absent",
+  "12a F1 (USDC-1 yVault) is endorsed and funded, with the badge",
+  Boolean(f1) && f1.endorsed === "true" && f1.group === "funded" && f1.hasBadge,
+  f1 ? `endorsed ${f1.endorsed}, group ${f1.group}, badge ${f1.hasBadge}` : "row absent",
 );
 check(
   "12b F2 (Katana Pre-Deposit USDC) is unendorsed and funded — the family word, no mark, no badge",
@@ -717,11 +728,11 @@ check(
     f2.familyText?.includes("Yearn V3"),
   f2 ? `endorsed ${f2.endorsed}, group ${f2.group}, mark ${f2.hasMark}, family "${f2.familyText}"` : "row absent",
 );
-const usdcGroup = f2 ? funded.filter((r) => r.groupAsset === f2.asset) : [];
+const usdcGroup = f2 ? funded.filter((r) => r.token === f2.token) : [];
 check(
-  "12c ordering by assets puts the unendorsed F2 at the head of its group — 0027 call 1 working, not a bug",
+  "12c ordering by assets puts the unendorsed F2 at the head of its token — 0027 call 1 working, not a bug",
   usdcGroup[0]?.address === F2,
-  `head of the group is ${usdcGroup[0]?.address}`,
+  `head of the token is ${usdcGroup[0]?.address}`,
 );
 // The served roster can name a factory before it has made a vault (3.1.1, seen
 // 3 Nov 2026), so "newest" is the newest release a catalogued vault carries.
@@ -894,7 +905,7 @@ if ((await page.locator("[data-prov-tripwire]").count()) > 0) {
   await page.waitForSelector('[data-anatomy="V5"]', { timeout: 120_000 }).catch(() => null);
   const strip = await readVaultStrip(page);
   const store = await readStoreSeries(BASE, 1, stripVault);
-  vaultStripChecks(check, "17", strip, store, { chain: 1, vault: stripVault, censusFamily: false });
+  vaultStripChecks(check, "17", strip, store, { chain: 1, vault: stripVault });
 }
 
 // ── the default view (ui-jobs 485) ──────────────────────────────────────────
@@ -905,7 +916,6 @@ await checkRosterView({
   scope: "[data-roster-panel]",
   check,
   tag: "20",
-  holders: false,
 });
 
 await browser.close();

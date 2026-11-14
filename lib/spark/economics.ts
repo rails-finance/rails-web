@@ -14,6 +14,7 @@
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { SparkPositionView } from "@/components/protocol/spark/spark-position-card";
 import type { SparkPositionChainResponse } from "@/lib/api/fetch-spark-position";
+import { aprToApy } from "@/lib/aave-family/apy";
 import {
   positionSupplyProv,
   positionDebtProv,
@@ -142,7 +143,13 @@ export function computeSparkCardCaptions(
   /** The folders served beside the rows: a side they moved states no interest. */
   folders?: readonly ServedFolder[] | null,
 ): SparkCardCaptions {
-  return computeAaveV3CardCaptions(view, events, chain, lifetimeOf(events, precomputedLifetime), rowEvents, folders);
+  // SparkLend states its rates as APY (ui-jobs 611): the borrow figure is
+  // each reserve's rate compounded (lib/aave-family/apy.ts) before the
+  // debt-weighted average, so `borrowRate.pct` is an APY.
+  const apyChain = chain
+    ? { ...chain, reserves: chain.reserves.map((r) => ({ ...r, borrowApr: aprToApy(r.borrowApr) ?? r.borrowApr })) }
+    : chain;
+  return computeAaveV3CardCaptions(view, events, apyChain, lifetimeOf(events, precomputedLifetime), rowEvents, folders);
 }
 
 export function computeSparkEconomics(

@@ -167,7 +167,7 @@ function legSpec(
       break;
     }
     case "force_repay": {
-      deltas.push(shares("credit_to_yield", scaled(raw.credit_to_yield), "Paid off set-aside debt"));
+      deltas.push(shares("credit_to_yield", scaled(raw.credit_to_yield), "Paid off earmarked debt"));
       const fee = scaled(raw.protocol_fee_total);
       if (fee > 0) deltas.push(shares("protocol_fee_total", fee, "Fee"));
       spec = { ...spec, labelOnSpine: true };
@@ -176,7 +176,7 @@ function legSpec(
     case "self_liquidated": {
       // The holder's own close: a plain holder-action label, no caution pill.
       // No spine row carries the number, so the header does. The log's amount
-      // repeats the set-aside shares the force repay beside it states, so the
+      // repeats the earmarked shares the force repay beside it states, so the
       // card draws the rest; the collateral swept back has no log and is
       // measured from the reading before (lib/alchemix/self-liquidation.ts).
       const split = selfLiquidationSplit(leg, siblings, before);
@@ -316,7 +316,7 @@ function legSpec(
         deltas.push({
           value: scaled(raw.amount),
           symbol: sym,
-          label: "Across the whole line",
+          label: "Across the whole market",
           noSpineCounterpart: true,
           tone: "caution",
           prov: emittedAmountProv("amount", sym, raw.amount, coords),

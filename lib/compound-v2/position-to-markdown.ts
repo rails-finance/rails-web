@@ -16,6 +16,7 @@ import { isCompoundV2Event } from "@/lib/shared/types/event-shape";
 import type { CompoundV2PositionView } from "@/components/protocol/compound-v2/compound-v2-position-card";
 import type { CompoundV2ChainResponse } from "@/lib/api/fetch-compound-v2-position";
 import { num, amt, usd, fmtUtc, txCell } from "@/lib/shared/position-markdown";
+import { compoundV2HasSeizeShare } from "@/lib/compound-v2/asset-catalog";
 import {
   markdownFirstTimestamp,
   markdownTimelineSlice,
@@ -108,7 +109,7 @@ export function compoundV2PositionToMarkdown(args: CompoundV2PositionMarkdownArg
         lines.push(
           `- **${r.symbol} (${r.cSymbol}):** ${tokenWithUsd(view, r.market, amount, r.symbol)} (${basis})` +
             (entered === false
-              ? " — NOT entered as collateral: backs no borrowing, can't be seized"
+              ? " — NOT entered as collateral: backs no borrowing"
               : disabled === true
                 ? " — this market is DISABLED as collateral (zero collateral factor): it earns but backs nothing"
                 : ""),
@@ -134,26 +135,26 @@ export function compoundV2PositionToMarkdown(args: CompoundV2PositionMarkdownArg
       lines.push(`## Live risk (at block ${live.blockNumber})`);
       lines.push("");
       lines.push(
-        `- **Comptroller's own verdict (getAccountLiquidity):** ` +
+        `- **Account liquidity (the Comptroller's getAccountLiquidity):** ` +
           (live.shortfallUsd > 0
             ? `shortfall ${usd(live.shortfallUsd)} — the account is liquidatable now`
-            : `${usd(live.liquidityUsd)} of liquidity still unborrowed`),
+            : `${usd(live.liquidityUsd)}, the room left to borrow`),
       );
       if (live.healthReplica != null) {
         lines.push(
-          `- **Health-factor replica:** ${num(live.healthReplica, 2)} (CF-weighted capacity ÷ debt — client arithmetic mirroring the Comptroller's walk, NOT a contract figure; the verdict above is the authoritative judgement. 1.0 corresponds to the shortfall line — one collateral factor, so the borrow limit IS the liquidation line)`,
+          `- **Liquidation line used:** ${num((1 / live.healthReplica) * 100, 1)}% (debt ÷ CF-weighted capacity — Rails's name for a ratio Compound's docs do not state; client arithmetic mirroring the Comptroller's walk, NOT a contract figure; the account liquidity above is the authoritative judgement. 100% is the shortfall line — one collateral factor, so the borrow limit IS the liquidation line)`,
         );
         lines.push(
           `- **Collateral (entered):** ${usd(live.collateralValueUsd)} · **capacity line:** ${usd(live.collateralCapacityUsd)} · **debt:** ${usd(live.debtValueUsd)}`,
         );
       }
       lines.push(
-        `- **Liquidation mechanics:** close factor ${num(live.closeFactor * 100, 0)}% (max share of one debt per liquidation — partial by design), liquidation incentive ${num(Math.max(0, live.liquidationIncentive - 1) * 100, 0)}%; the protocol keeps its own burned share of every seizure`,
+        `- **Liquidation mechanics:** close factor ${num(live.closeFactor * 100, 0)}% (max share of one debt per liquidation — partial by design), liquidation incentive ${num(live.liquidationIncentive, 2)}× (${num(Math.max(0, live.liquidationIncentive - 1) * 100, 0)}% extra); in a market with a protocol seize share, the protocol keeps 2.8% of the seized cTokens, burned`,
       );
       for (const m of live.markets) {
         const rates =
           m.supplyApr != null && m.borrowApr != null
-            ? `supply ${num(m.supplyApr * 100, 2)}% APR, borrow ${num(m.borrowApr * 100, 2)}% APR`
+            ? `supply APY ${num(m.supplyApr * 100, 2)}%, borrow APY ${num(m.borrowApr * 100, 2)}% (Compound's docs' formula, compounded daily)`
             : "rates unavailable";
         lines.push(
           `- **${m.symbol} market:** ${rates}` +
@@ -164,7 +165,10 @@ export function compoundV2PositionToMarkdown(args: CompoundV2PositionMarkdownArg
                 : "") +
             (m.priceUsd != null
               ? `, oracle price ${usd(m.priceUsd)}${m.priceHasFeed ? "" : " (a fixed price set by governance, no feed)"}`
-              : ""),
+              : "") +
+            (compoundV2HasSeizeShare(m.market)
+              ? ""
+              : ", no protocol seize share: a liquidator receives every seized cToken"),
         );
       }
       lines.push("");

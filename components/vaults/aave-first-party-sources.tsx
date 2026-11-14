@@ -54,7 +54,7 @@ export function AaveFirstPartySources() {
       <ul className="mt-3 max-w-3xl space-y-2 text-[12px] text-rb-500">
         {AAVE_FIRST_PARTY_SOURCES.map((source) => (
           <li key={source.url} data-first-party-source={source.url}>
-            <a href={source.url} target="_blank" rel="noopener noreferrer" className="link-external font-semibold">
+            <a href={source.url} target="_blank" rel="noopener" className="link-external font-semibold">
               {source.label}
             </a>{" "}
             · {source.note}

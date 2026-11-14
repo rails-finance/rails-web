@@ -4,19 +4,30 @@
 // section under the vault card on every family. At its head the allocation
 // band (decision 0043 point 4, the one `band`; the plan in
 // lib/vaults/allocation-plan.ts), beneath it one table in the house style
-// (components/shared/data-table), Venue · Amount · Share of this vault · Links, in the source's own order with Idle as a row. "Share
+// (components/shared/data-table), Venue · Amount · Share of this vault, in the source's own order with Idle as a row. "Share
 // of this vault" is a fraction of one vault's book, both terms reads of the
 // vault at one block (survey §7.3); its header tip names the denominator. One
 // line under the heading; the rest is behind the section's "?".
 //
 // From sm every row is two lines, 64px (D1 `rowHeight="two"`): the venue over its
 // sub-label, each truncating with its full text in a `title` where it is
-// text. Amount carries the asset's mark (`AssetUnit`). Rows are unlinked: a
-// venue has no one Rails page (a Morpho market has two, a strategy or a
-// reserve none). Below sm each row is a card (D6): the venue across, Amount
-// and Share two-up under their names, the links on a line at the foot.
+// text. Amount carries the asset's mark (`AssetUnit`). A venue opens Rails's
+// page for it where there is one (a Morpho market, an Aave reserve, a Yearn or
+// MetaMorpho vault), else it is text; its contract and ids are the venue's receipt. The
+// section's ⋮ carries the Rails pages for the whole table and the exports
+// (components/shared/section-menu.tsx).
+// Below sm each row is a card (D6): the venue across, Amount and Share two-up
+// under their names.
 
 import type { ReactNode } from "react";
+import Link from "next/link";
+import {
+  ProvSection,
+  SectionHeading,
+  SectionMenu,
+  type SectionMenuExports,
+  type SectionMenuLink,
+} from "@/components/shared/section-menu";
 import { AllocationBar, type AllocationSegment } from "@/components/shared/ratio-bar";
 import { LearnMore, type LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { Prov, type Provenance } from "@/components/shared/provenance";
@@ -30,10 +41,17 @@ import {
   DataTableHead,
   DataTableHeader,
   DataTableRow,
+  DataTableRowLink,
 } from "@/components/shared/data-table/data-table";
+import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { assetText, pctText } from "@/lib/shared/vault-amount-text";
 import type { RawAmount } from "@/lib/sources/chain/morpho-base-vault";
 import { planAllocation } from "@/lib/vaults/allocation-plan";
+import { formatCompact } from "@/lib/shared/format-compact";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { SegmentBar, type SegmentSlice } from "@/components/shared/segment-bar";
+import { assetSliceColours } from "@/lib/shared/slice-colours";
+import { tokenColour } from "@/lib/shared/token-colours";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -41,6 +59,15 @@ export interface VaultAssetRow {
   key: string;
   /** The venue's name: a market's collateral, a strategy, the wrapped reserve. */
   venue: ReactNode;
+  /** Rails's page for the venue, where there is one. */
+  href?: string;
+  /** The venue's mark: a market's collateral, a hop's reserve. Absent, the
+   *  vault's asset (a strategy or an idle balance holds that). */
+  icon?: { symbol: string; address: string };
+  /** The venue's receipt: its contract, its market id. */
+  venueProv?: Provenance;
+  /** `data-*` hooks on the venue's name. */
+  venueHooks?: Record<string, string>;
   /** The venue's sub-label: a market's LLTV and id, a strategy's cap. */
   sub?: ReactNode;
   /** In the vault's asset; null where the read did not answer. */
@@ -51,12 +78,108 @@ export interface VaultAssetRow {
   /** Over the table's denominator; null where there is none to state. */
   share: number | null;
   shareProv?: Provenance;
-  links?: ReactNode;
   /** A row the band does not draw (a wrapper hop, which holds no amount of
    *  this vault's asset). */
   offBand?: boolean;
   /** `data-*` hooks a verifier reads. */
   hooks?: Record<string, string>;
+}
+
+/** The section's name (`data-prov-scope`). */
+export const ASSETS_SCOPE = "vault-assets";
+
+/** Where the assets are as a segment bar (V3.1), on the vault-page grid: the
+ *  band's plan (a venue of 2% or more alone, the rest one slice), each venue
+ *  in its mark's colour (a market's collateral, else the asset's;
+ *  lib/shared/slice-colours.ts), each row's share keyed by its slice's
+ *  colour, and each row lit with its slice (`data-seg`). Returns the rows with
+ *  their hooks, the chart, and the key. With fewer than two segments there is
+ *  nothing to tell apart: no bar, no key (`chart: null`). Where nothing
+ *  answered, no chart, and the section states the empty band. */
+export function allocationBar(
+  rows: VaultAssetRow[],
+  {
+    asset,
+    venue,
+  }: {
+    /** The vault's asset: the mark of a row with none of its own. */
+    asset: { symbol: string; address: string };
+    /** What a row is, one and many: the bar's label and the collected slice's. */
+    venue: { one: string; many: string };
+  },
+): { rows: VaultAssetRow[]; chart: ReactNode | null | undefined; keyColours: Record<string, string> } {
+  const plan = planAllocation(
+    rows
+      .map((r, order) => ({ r, order, key: r.key, amount: r.amount ? BigInt(r.amount.raw) : null }))
+      .filter(({ r }) => !r.offBand),
+  );
+  const planTotal = Number(plan.total);
+  const parts = plan.shown.map((l) => ({
+    key: l.key,
+    label: typeof l.r.venue === "string" ? l.r.venue : l.key,
+    share: Number(l.amount ?? BigInt(0)) / planTotal,
+    rest: false,
+  }));
+  if (plan.collected.length)
+    parts.push({
+      key: "collected",
+      label: `${n(plan.collected.length)} more ${venue.many}`,
+      share: plan.collected.reduce((t, l) => t + Number(l.amount ?? BigInt(0)), 0) / planTotal,
+      rest: true,
+    });
+  // The icon's colour by symbol, then address, the order the icon resolves in.
+  const iconOf = new Map(rows.map((r) => [r.key, r.icon ?? asset]));
+  const colours = assetSliceColours(
+    parts.map((sl) => {
+      const t = iconOf.get(sl.key) ?? asset;
+      return sl.rest ? { rest: true } : { token: t.address, colour: tokenColour(t.symbol) ?? tokenColour(t.address) };
+    }),
+  );
+  const slices: SegmentSlice[] = parts.map(({ key, label, share }, i) => ({ key, label, share, colour: colours[i] }));
+  if (planTotal > 0 && slices.length < 2) return { rows, chart: null, keyColours: {} };
+  const keyColours: Record<string, string> = {};
+  /** Each row's segment, for the row and its segment to light together. */
+  const segOf = new Map<string, string>();
+  for (const sl of slices)
+    if (sl.key !== "collected") {
+      keyColours[sl.key] = sl.colour;
+      segOf.set(sl.key, sl.key);
+    }
+  for (const l of plan.collected) {
+    keyColours[l.key] = colours[colours.length - 1];
+    segOf.set(l.key, "collected");
+  }
+  const chart =
+    planTotal > 0 && slices.length > 0 ? (
+      <div className="pt-4 pb-4" data-assets-bar="" data-anatomy="V3.1">
+        <SegmentBar
+          slices={slices}
+          scope={ALLOCATION_SCOPE}
+          label={`Where this vault's ${asset.symbol} is, by ${venue.one}`}
+        />
+      </div>
+    ) : undefined;
+  return {
+    rows: rows.map((r) => (segOf.has(r.key) ? { ...r, hooks: { ...r.hooks, "data-seg": segOf.get(r.key)! } } : r)),
+    chart,
+    keyColours,
+  };
+}
+
+/** The bar's and its rows' linking scope (the tile's `segScope`). */
+export const ALLOCATION_SCOPE = "allocation";
+
+/** The venue: its receipt around the name. A row with a page opens it from
+ *  anywhere on the row (D4); the name is the one keyboard stop. */
+function venueOf(r: VaultAssetRow): ReactNode {
+  const name = r.venueProv ? <Prov info={r.venueProv}>{r.venue}</Prov> : r.venue;
+  return r.href ? (
+    <DataTableRowLink href={r.href} data-venue-link="">
+      {name}
+    </DataTableRowLink>
+  ) : (
+    name
+  );
 }
 
 export function VaultAssets({
@@ -67,6 +190,13 @@ export function VaultAssets({
   line,
   shareTip,
   learnMore,
+  menu,
+  limit,
+  allHref,
+  chart,
+  keyColours,
+  look,
+  amountsWithheld,
 }: {
   rows: VaultAssetRow[];
   assetSymbol: string;
@@ -78,7 +208,31 @@ export function VaultAssets({
   /** The "Share of this vault" header's read-more: what divides what. */
   shareTip: string;
   learnMore: LearnMoreContent;
+  /** The section ⋮'s rows. */
+  menu: { links?: SectionMenuLink[]; exports?: SectionMenuExports };
+  /** Draw the first `limit` rows; the band draws every row either way. */
+  limit?: number;
+  /** Where every row is, linked under a capped table. */
+  allHref?: string;
+  /** A chart above the table, in place of the band, at the section's width;
+   *  null: neither chart nor band. */
+  chart?: ReactNode | null;
+  /** The chart's key: a colour square before each row's share, by row key. */
+  keyColours?: Record<string, string>;
+  /** `index`: the /vaults index's rows (V6): 14px type, the venue's mark at
+   *  28px and its name semibold, the figures semibold in the foreground, an
+   *  amount compact (`formatCompact`, as V6's Total assets) with its full text
+   *  in a title and `data-figure-full`. The MetaMorpho page passes it. */
+  look?: "index";
+  /** Why no amount in the asset is printed (its decimals disagree, ui-jobs
+   *  664): each Amount cell stands as "—" (its receipt kept), the band's
+   *  titles drop the amount, and the line under the heading gives the reason. */
+  amountsWithheld?: string;
 }) {
+  const ix = look === "index";
+  const amountText = (a: RawAmount) => (ix ? formatCompact(a.value) : assetText(a, assetDecimals));
+  const capped = limit != null && rows.length > limit;
+  const tableRows = capped ? rows.slice(0, limit) : rows;
   const banded = rows
     .map((r, order) => ({ r, order }))
     .filter(({ r }) => !r.offBand)
@@ -93,7 +247,9 @@ export function VaultAssets({
     key: l.key,
     f: of(l.amount ?? BigInt(0)),
     rampIndex: l.order,
-    title: `${typeof l.r.venue === "string" ? l.r.venue : l.key} · ${text(l.amount ?? BigInt(0))} ${assetSymbol} · ${pctText(of(l.amount ?? BigInt(0)))}`,
+    title: amountsWithheld
+      ? `${typeof l.r.venue === "string" ? l.r.venue : l.key} · ${pctText(of(l.amount ?? BigInt(0)))}`
+      : `${typeof l.r.venue === "string" ? l.r.venue : l.key} · ${text(l.amount ?? BigInt(0))} ${assetSymbol} · ${pctText(of(l.amount ?? BigInt(0)))}`,
     data: { "data-alloc-amount": (l.amount ?? BigInt(0)).toString() },
     wrap: l.r.amountProv
       ? (bar: ReactNode) => (
@@ -110,7 +266,9 @@ export function VaultAssets({
       f: of(sum),
       rampIndex: 0,
       collected: true,
-      title: `${n(plan.collected.length)} more · ${text(sum)} ${assetSymbol} · ${pctText(of(sum))}`,
+      title: amountsWithheld
+        ? `${n(plan.collected.length)} more · ${pctText(of(sum))}`
+        : `${n(plan.collected.length)} more · ${text(sum)} ${assetSymbol} · ${pctText(of(sum))}`,
       data: {
         "data-alloc-collected-count": String(plan.collected.length),
         "data-alloc-collected-sum": sum.toString(),
@@ -121,31 +279,41 @@ export function VaultAssets({
   const shareHead = <HeadingTip text="Share of this vault" tip={shareTip} />;
 
   return (
-    <section
-      className="mb-6"
+    <ProvSection
+      scope={ASSETS_SCOPE}
+      className="mb-4"
       data-anatomy="V3"
       data-skel-section="vault-allocation"
       data-alloc-total={total.toString()}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold text-foreground">Where the assets are</h2>
-          <p className="mt-1 text-[13px] text-rb-500" data-prov-exempt>
-            {line}
-          </p>
+      <SectionHeading
+        title="Where the assets are"
+        help={<LearnMore inline content={learnMore} ariaLabel="Where the assets are, learn more" />}
+        menu={<SectionMenu scope={ASSETS_SCOPE} title="Where the assets are" {...menu} />}
+      >
+        <p className="mt-1 text-[13px] text-rb-500" data-prov-exempt>
+          {line}
+          {amountsWithheld && (
+            <span data-asset-scale-withheld="">
+              {" · "}
+              <HeadingTip text="amounts: decimals disagree" tip={amountsWithheld} />
+            </span>
+          )}
+        </p>
+      </SectionHeading>
+      {chart === undefined && (
+        <div className="mt-3 [&>div]:px-0">
+          <AllocationBar
+            segments={segments}
+            ariaLabel={`Where this vault's ${assetSymbol} is`}
+            emptyLabel={total === BigInt(0) ? "Nothing to divide at this block." : undefined}
+          />
         </div>
-        <LearnMore inline content={learnMore} ariaLabel="Where the assets are, learn more" />
-      </div>
-      <div className="mt-3 [&>div]:px-0">
-        <AllocationBar
-          segments={segments}
-          ariaLabel={`Where this vault's ${assetSymbol} is`}
-          emptyLabel={total === BigInt(0) ? "Nothing to divide at this block." : undefined}
-        />
-      </div>
+      )}
+      {chart != null && <div className="mt-3">{chart}</div>}
       <DataTable
         className="mt-2"
-        tableClassName="text-[12px]"
+        tableClassName={ix ? "text-sm" : "text-[12px]"}
         label={`Where this vault's ${assetSymbol} is, by venue`}
         stacked
         rowHeight="two"
@@ -154,49 +322,80 @@ export function VaultAssets({
           <DataTableHeader label="Venue" />
           <DataTableHeader label="Amount" align="right" />
           <DataTableHeader align="right">{shareHead}</DataTableHeader>
-          <DataTableHeader label="Links" align="right" />
         </DataTableHead>
         <DataTableBody>
-          {rows.map((r) => (
-            <DataTableRow key={r.key} {...r.hooks}>
+          {tableRows.map((r) => (
+            <DataTableRow key={r.key} href={r.href} {...r.hooks}>
               <DataTableCell rowHeader className="sm:w-full sm:max-w-0">
-                <span
-                  className="block text-foreground sm:truncate"
-                  title={typeof r.venue === "string" ? r.venue : undefined}
-                  data-cell="venue"
-                >
-                  {r.venue}
-                </span>
-                {r.sub != null && (
-                  <span
-                    className="block text-[11px] [overflow-wrap:anywhere] text-rb-500 sm:truncate"
-                    title={typeof r.sub === "string" ? r.sub : undefined}
-                  >
-                    {r.sub}
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  <TokenChipIcon
+                    symbol={r.icon?.symbol ?? assetSymbol}
+                    address={r.icon?.address ?? assetAddress}
+                    size={ix ? 28 : 20}
+                    filterable={false}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <span
+                      className={`block text-foreground sm:truncate ${ix ? "font-semibold" : ""}`}
+                      title={typeof r.venue === "string" ? r.venue : undefined}
+                      data-cell="venue"
+                      {...r.venueHooks}
+                    >
+                      {venueOf(r)}
+                    </span>
+                    {r.sub != null && (
+                      <span
+                        className={`block ${ix ? "text-[12px]" : "text-[11px]"} [overflow-wrap:anywhere] text-rb-500 sm:truncate`}
+                        title={typeof r.sub === "string" ? r.sub : undefined}
+                      >
+                        {r.sub}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </DataTableCell>
-              <DataTableCell label="Amount" align="right" className="whitespace-nowrap tabular-nums text-foreground">
+              <DataTableCell
+                label="Amount"
+                align="right"
+                className={`whitespace-nowrap tabular-nums text-foreground ${ix ? "font-semibold" : ""}`}
+              >
                 {r.offBand ? (
                   <span className="text-rb-500" data-cell="leg-assets">
                     —
                   </span>
+                ) : amountsWithheld && r.amount ? (
+                  <span className="text-rb-500" data-cell="leg-assets" data-asset-scale-withheld="">
+                    {r.amountProv ? <Prov info={r.amountProv}>—</Prov> : "—"}
+                  </span>
                 ) : (
                   <span className="inline-flex items-center gap-1.5">
-                    <span data-cell="leg-assets" {...(r.amountFigure ? { "data-figure": r.amountFigure } : {})}>
+                    <span
+                      data-cell="leg-assets"
+                      title={
+                        r.amount && amountText(r.amount) !== assetText(r.amount, assetDecimals)
+                          ? `${assetText(r.amount, assetDecimals)} ${assetSymbol}`
+                          : undefined
+                      }
+                      {...(r.amountFigure ? { "data-figure": r.amountFigure } : {})}
+                      {...(ix && r.amount ? { "data-figure-full": assetText(r.amount, assetDecimals) } : {})}
+                    >
                       {r.amount == null ? (
                         <NotLoaded />
                       ) : r.amountProv ? (
-                        <Prov info={r.amountProv}>{assetText(r.amount, assetDecimals)}</Prov>
+                        <Prov info={r.amountProv}>{amountText(r.amount)}</Prov>
                       ) : (
-                        assetText(r.amount, assetDecimals)
+                        amountText(r.amount)
                       )}
                     </span>
                     {r.amount != null && <AssetUnit symbol={assetSymbol} address={assetAddress} />}
                   </span>
                 )}
               </DataTableCell>
-              <DataTableCell label={shareHead} align="right" className="whitespace-nowrap tabular-nums text-rb-500">
+              <DataTableCell
+                label={shareHead}
+                align="right"
+                className={`whitespace-nowrap tabular-nums ${ix ? "font-semibold text-foreground" : "text-rb-500"}`}
+              >
                 <span data-cell="leg-share">
                   {r.share == null ? (
                     "—"
@@ -206,14 +405,30 @@ export function VaultAssets({
                     pctText(r.share)
                   )}
                 </span>
-              </DataTableCell>
-              <DataTableCell align="right" wide className="whitespace-nowrap max-sm:pt-0">
-                {r.links}
+                {keyColours?.[r.key] && (
+                  <i
+                    aria-hidden
+                    className="ml-1.5 inline-block size-2.5 rounded-[2px] align-[-1px]"
+                    style={{ background: keyColours[r.key] }}
+                    data-key-colour=""
+                  />
+                )}
               </DataTableCell>
             </DataTableRow>
           ))}
         </DataTableBody>
       </DataTable>
-    </section>
+      {capped && allHref && (
+        <Link
+          href={allHref}
+          prefetch={false}
+          className={`mt-2 inline-block text-[13px] ${INLINE_LINK}`}
+          data-assets-show-all=""
+          data-assets-keys={rows.map((r) => r.key).join(" ")}
+        >
+          Show all {n(rows.length)}
+        </Link>
+      )}
+    </ProvSection>
   );
 }

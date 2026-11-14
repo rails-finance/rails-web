@@ -271,3 +271,125 @@ export const llamaSummaryDebtProv = stamped(
     formula: "Σ total_debt over the crvUSD markets",
   }),
 );
+
+// ── one market's page (ui-jobs 549 step 7) ───────────────────────────────────
+
+/** A market's identity: its Controller, AMM and monetary policy, the row's
+ *  receipt on the roster and the head's subtitle on its page. */
+export const llamaMarketIdentityProv = stamped(
+  (c: LlamalendMarketCoords): Provenance => ({
+    kind: "chain",
+    pclass: "state",
+    source: { block: c.blockNumber },
+    summary: `${pair(c)} — one isolated LlamaLend market, keyed by its Controller. Its AMM (LLAMMA) holds the collateral in bands; its monetary policy sets the rate. Listed by its factory's own roster${atBlock(c)}.`,
+    contract: controllerContract(c),
+    via: `${LANE} · factory roster → Controller.amm(), Controller.monetary_policy() @ head`,
+    inputs: [
+      { label: "controller", value: c.controller, kind: "chain", contract: controllerContract(c) },
+      { label: "AMM (LLAMMA)", value: c.amm, kind: "chain", contract: ammContract(c) },
+      { label: "monetary policy", value: c.monetaryPolicy, kind: "chain", contract: policyContract(c) },
+    ],
+  }),
+);
+
+/** Σ total_debt over one roster group's markets, all lending crvUSD. */
+export const llamaGroupDebtProv = stamped(
+  (group: string, c: LlamalendMarketCoords): Provenance => ({
+    kind: "chain-derived",
+    pclass: "state",
+    source: { block: c.blockNumber },
+    summary: `Borrowed on the ${group} markets — Σ \`total_debt\` over the group's markets${atBlock(c)}, every one lending crvUSD, so the sum is in crvUSD. Each leg a live Controller read; the sum is ours.`,
+    via: `${LANE} · Σ Controller.total_debt over the group @ head`,
+    formula: "Σ total_debt over the group",
+  }),
+);
+
+/** Σ n_loans over one roster group's markets. */
+export const llamaGroupLoansProv = stamped(
+  (group: string, c: LlamalendMarketCoords): Provenance => ({
+    kind: "chain-derived",
+    pclass: "state",
+    source: { block: c.blockNumber },
+    summary: `Open loans on the ${group} markets — Σ \`n_loans\` over the group's markets${atBlock(c)}.`,
+    via: `${LANE} · Σ Controller.n_loans over the group @ head`,
+    formula: "Σ n_loans over the group",
+  }),
+);
+
+/** The borrowed token on the Controller: free to borrow now. */
+export const llamaAvailableProv = stamped(
+  (c: LlamalendMarketCoords): Provenance => ({
+    kind: "chain",
+    pclass: "state",
+    source: { block: c.blockNumber },
+    verify: recompute("borrowedToken.balanceOf(controller)", c),
+    summary: `${pair(c)} available — the borrowed token's own \`balanceOf(controller)\`${atBlock(c)}: what a new loan can draw now. ${c.utilisationBasis === "crvUSD debt ceiling" ? "On a mint market the factory mints crvUSD onto the Controller up to the debt ceiling, so this is the room left under it." : "On a lend market it is the lenders' deposits not lent."}`,
+    contract: controllerContract(c),
+    via: `${LANE} · borrowedToken.balanceOf(controller) @ head`,
+  }),
+);
+
+/** A lend market's supplied total: what is lent plus what is available. */
+export const llamaSuppliedProv = stamped(
+  (c: LlamalendMarketCoords): Provenance => ({
+    kind: "chain-derived",
+    pclass: "state",
+    source: { block: c.blockNumber },
+    summary: `${pair(c)} supplied — lenders' deposits: the market's \`total_debt\` plus the borrowed token still on the Controller${atBlock(c)}. The utilisation's denominator.`,
+    contract: controllerContract(c),
+    via: `${LANE} · Controller.total_debt + borrowedToken.balanceOf(controller) @ head`,
+    formula: "total_debt + balanceOf(controller)",
+  }),
+);
+
+/** A mint market's debt ceiling, from the crvUSD ControllerFactory. */
+export const llamaCeilingProv = stamped(
+  (c: LlamalendMarketCoords): Provenance => ({
+    kind: "chain",
+    pclass: "state",
+    source: { block: c.blockNumber },
+    verify: recompute("ControllerFactory.debt_ceiling(controller)", c),
+    summary: `${pair(c)} debt ceiling — the crvUSD ControllerFactory's \`debt_ceiling(controller)\`${atBlock(c)}: the most crvUSD this mint market may have out. Set by Curve's governance.`,
+    contract: { name: "crvUSD ControllerFactory", address: LLAMALEND_ADDRESSES.CRVUSD_FACTORY },
+    via: `${LANE} · ControllerFactory.debt_ceiling(controller) @ head`,
+  }),
+);
+
+/** What a lend market's vault pays lenders now: Vault.lend_apr(). */
+export const llamaSupplyRateProv = stamped(
+  (vault: string | null, c: LlamalendMarketCoords): Provenance => ({
+    kind: "chain",
+    pclass: "state",
+    source: { block: c.blockNumber },
+    verify: recompute("Vault.lend_apr", c),
+    summary: `${pair(c)} supply rate — the market's ERC-4626 vault's own \`lend_apr()\`${atBlock(c)} (1e18 fraction a year, an APR): the interest borrowers are charged now, spread over every lender's deposit, less any fee the market takes.`,
+    contract: { name: `${pair(c)} vault`, address: vault ?? undefined },
+    via: `${LANE} · Vault.lend_apr() @ head`,
+  }),
+);
+
+/** The rate the AMM charges borrowers now: AMM.rate() a year. */
+export const llamaChargedRateProv = stamped(
+  (c: LlamalendMarketCoords): Provenance => ({
+    kind: "chain-derived",
+    pclass: "state",
+    source: { block: c.blockNumber },
+    verify: recompute("AMM.rate", c),
+    summary: `${pair(c)} rate charged now — the AMM's stored \`rate()\`${atBlock(c)} (per second at 1e18) × ${SECONDS_PER_YEAR.toLocaleString("en-US")} seconds a year. Interest accrues at this rate until the next loan action, when the Controller writes the monetary policy's rate in its place.`,
+    contract: ammContract(c),
+    via: `${LANE} · AMM.rate() × seconds/year @ head`,
+  }),
+);
+
+/** The semi-log curve: the policy's min_rate and max_rate. */
+export const llamaCurveProv = stamped(
+  (c: LlamalendMarketCoords): Provenance => ({
+    kind: "chain-derived",
+    pclass: "state",
+    source: { block: c.blockNumber },
+    summary: `${pair(c)} rate curve — the monetary policy's \`min_rate()\` and \`max_rate()\`${atBlock(c)} (per second at 1e18, × ${SECONDS_PER_YEAR.toLocaleString("en-US")} a year). The policy sets the borrow rate at utilisation U to min × (max ÷ min)^U; Rails draws the curve only where that formula gives back the policy's own \`rate(controller)\` at this block.`,
+    contract: policyContract(c),
+    via: `${LANE} · monetary_policy.min_rate(), max_rate() @ head`,
+    formula: "rate(U) = min_rate × (max_rate ÷ min_rate)^U",
+  }),
+);

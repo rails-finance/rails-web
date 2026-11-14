@@ -2,9 +2,19 @@
 // typed template (rails-ops standards/info-page-template.md). One component so the routes
 // share the glossary and the page's shape; what differs per chain is the markets, the listing
 // and the market view, each stated from that chain's roster (lib/compound*/asset-catalog.ts).
+// Optimism's info page (app/(app)/optimism/compound-v3/info) takes the glossary and the
+// "how it works" items from here.
 
 import Link from "next/link";
-import { GlossaryLink, ProtocolInfoPage, type InfoTerm, type InfoView } from "@/components/shared/protocol-info-page";
+import {
+  GlossaryLink,
+  ProtocolInfoPage,
+  type InfoReadContract,
+  type InfoReads,
+  type InfoTerm,
+  type InfoView,
+} from "@/components/shared/protocol-info-page";
+import { cometDeploymentOf } from "@/lib/compound/deployments";
 import { BaseLendingCoverageNote } from "@/components/shared/base-lending-coverage-banner";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
@@ -17,13 +27,13 @@ const LIQUIDATION = `${DOCS}/liquidation/`;
 export type CompoundV3InfoDeployment = "ethereum" | "base" | "arbitrum";
 
 const SEARCH_0 =
-  "You can search by wallet address. The listing filters by Status (open, closed or liquidated), Market, Debt and Collateral by size in US dollars, History (liquidated before) and Transactions, and sorts by recent activity, debt or collateral.";
+  "You can search by wallet address. The listing filters by Status (open, closed or liquidated), Market, Debt and Collateral by size in US dollars, History (liquidated before) and Transactions, and sorts by recent activity, borrow balance or collateral.";
 const SEARCH_1 =
-  "You can search by wallet address. The listing filters by Status (open, closed or liquidated), Market, Debt and Collateral by size in US dollars, History (liquidated before) and Transactions, and sorts by recent activity, debt or collateral.";
+  "You can search by wallet address. The listing filters by Status (open, closed or liquidated), Market, Debt and Collateral by size in US dollars, History (liquidated before) and Transactions, and sorts by recent activity, borrow balance or collateral.";
 const SEARCH_2 =
   "You can search by wallet address, which finds the wallets already read. To read any other wallet, enter it on the protocol page. The listing filters by Debt, Collateral and Transactions, and sorts by last activity, last opened, collateral or debt.";
 
-const GLOSSARY: readonly [InfoTerm, ...InfoTerm[]] = [
+export const GLOSSARY: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "Comet",
     definition:
@@ -45,25 +55,25 @@ const GLOSSARY: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "Collateral",
     definition:
-      "Collateral is a token a wallet deposits to back its borrowing. Each collateral asset has a factor, the percentage of its value that counts toward borrowing. The collateral earns no interest.",
+      "Collateral is a token a wallet supplies to back its borrowing. Each collateral asset has a borrow collateral factor (Borrow CF), the percentage of its value that can be borrowed. The collateral earns no interest.",
     sources: [{ label: "Collateral and borrowing", href: `${BORROWING}#collateral--borrowing` }],
   },
   {
     term: "Interest rate",
     definition:
-      "Supplying the base asset earns the supply rate and borrowing it costs the borrow rate. Both rise as more of the base asset is lent out, and interest builds up every second.",
+      "Supplying the base asset earns the supply rate and borrowing it costs the borrow rate. Both rise as more of the base asset is lent out, and interest accrues every second. Rails shows each a year without compounding, as the docs' Supply APR and Borrow APR.",
     sources: [{ label: "Interest rates", href: `${DOCS}/interest-rates/#interest-rates` }],
   },
   {
     term: "Liquidation",
     definition:
-      "A wallet becomes liquidatable when its debt exceeds what its collateral covers. That is measured with the liquidation factors, the percentages of each collateral asset's value that count toward staying safe. They are higher than the borrowing factors, which limit how much a wallet can borrow.",
+      "A wallet becomes liquidatable when its debt exceeds what its collateral covers. That is measured with the liquidation collateral factors (Liquidation CF), the percentages of each collateral asset's value that can be borrowed before an account is liquidatable. They are higher than the borrow collateral factors, which set its borrowing capacity.",
     sources: [{ label: "Liquidatable accounts", href: `${LIQUIDATION}#liquidatable-accounts` }],
   },
   {
     term: "Absorb",
     definition:
-      "Absorbing is the liquidation step. Any address can absorb a liquidatable account, and the Comet then takes over the account's debt and collateral. The borrower is paid the collateral's value minus a penalty, in the base asset.",
+      "Absorb is the function that liquidates an account. Any address can call it on a liquidatable account, and the Comet then takes over the account's debt and collateral. The borrower is paid the collateral's value minus a penalty, in the base asset: each asset's liquidation factor is the share paid.",
     sources: [{ label: "Absorb", href: `${LIQUIDATION}#absorb` }],
   },
   {
@@ -74,15 +84,15 @@ const GLOSSARY: readonly [InfoTerm, ...InfoTerm[]] = [
   },
 ];
 
-const WHAT_IT_IS = (
+export const WHAT_IT_IS = (
   <>
-    Compound V3 is a lending protocol. People supply crypto to earn interest, or deposit{" "}
-    <GlossaryLink term="Collateral">collateral</GlossaryLink> and borrow against it. On this page an account is the
-    balances one wallet (an address that holds crypto) has in one market.
+    Compound V3, which Compound&apos;s docs call Compound III, is a lending protocol. People supply crypto to earn
+    interest, or supply <GlossaryLink term="Collateral">collateral</GlossaryLink> and borrow against it. On this page an
+    account is the balances one wallet (an address that holds crypto) has in one market.
   </>
 );
 
-const ONE_BASE_ASSET = (
+export const ONE_BASE_ASSET = (
   <>
     Each market is a smart contract called a <GlossaryLink term="Comet">Comet</GlossaryLink>, with one{" "}
     <GlossaryLink term="Base asset">base asset</GlossaryLink>. Suppliers of the base asset earn interest, and borrowers
@@ -90,21 +100,73 @@ const ONE_BASE_ASSET = (
   </>
 );
 
-const INTEREST = (
+export const INTEREST = (
   <>
     The <GlossaryLink term="Interest rate">interest rate</GlossaryLink> on supplying and on borrowing rises as more of
     the base asset is lent out. Each market sets its own rates.
   </>
 );
 
-const LIQUIDATION_ITEM = (
+export const LIQUIDATION_ITEM = (
   <>
     When an account&apos;s debt passes what its collateral covers, anyone can trigger its{" "}
-    <GlossaryLink term="Liquidation">liquidation</GlossaryLink>, and the market takes over its debt and collateral.
-    Compound calls this step <GlossaryLink term="Absorb">absorbing</GlossaryLink>. The market pays the borrower the
-    collateral&apos;s value minus a penalty, from its <GlossaryLink term="Reserves">reserves</GlossaryLink>.
+    <GlossaryLink term="Liquidation">liquidation</GlossaryLink>, and the market takes over its debt and collateral. The
+    step is the Comet&apos;s <GlossaryLink term="Absorb">absorb</GlossaryLink> function. The market pays the borrower
+    the collateral&apos;s value minus a penalty, from its <GlossaryLink term="Reserves">reserves</GlossaryLink>.
   </>
 );
+
+// Slot 2a (decision 0059 point 6): the contracts the markets pages and
+// position pages read, and the roster facts that left the markets page.
+const CONFIGURATOR: Record<CompoundV3InfoDeployment, string> = {
+  ethereum: "0x316f9708bb98af7da9c68c1c3b5e79039cd336e3",
+  base: "0x45939657d1ca34a8fa39a924b71d28fe8431e581",
+  arbitrum: "0xb21b06d71c75973babde35b49ffdac3f82ad3775",
+};
+
+const ROSTER_NOTE: Record<CompoundV3InfoDeployment, string> = {
+  ethereum:
+    "No contract lists a chain's Comets, so the roster is stated: the three Ethereum markets Rails indexes, of the seven Compound's docs list.",
+  base: "No contract lists a chain's Comets, so the roster is stated. A name will not settle it on Base: four different contracts answer to cUSDCv3 and one of them is Compound's. The five markets here are the ones Compound's Configurator deployed.",
+  arbitrum:
+    "No contract lists a chain's Comets, so the roster is stated: the four in Compound's own deployment records for Arbitrum, each answering to the same governor on chain.",
+};
+
+function readsFor(deployment: CompoundV3InfoDeployment): InfoReads {
+  const [first, ...rest] = cometDeploymentOf(deployment).markets;
+  const comets: [InfoReadContract, ...InfoReadContract[]] = [
+    {
+      name: `${first.label} (Comet)`,
+      address: first.comet,
+      reads:
+        "its supply and borrowing, utilization, both rates and their kinks, reserves and their target, minimum borrow, and each collateral asset's factors, supply cap and total; for a wallet, its balance in the base asset and each collateral.",
+    },
+    ...rest.map((m) => ({ name: `${m.label} (Comet)`, address: m.comet, reads: `the same as ${first.label}.` })),
+  ];
+  return {
+    contracts: [
+      ...comets,
+      {
+        name: "Configurator",
+        address: CONFIGURATOR[deployment],
+        reads:
+          deployment === "base"
+            ? "the contract that deployed the five markets and through which governance sets their terms. Rails takes the markets it deployed as the roster, and reads each market's terms from its Comet."
+            : "the contract through which governance sets each market's terms. Rails reads those terms from each Comet.",
+      },
+      {
+        name: "Each asset's price feed",
+        reads:
+          "the Comet names one feed for its base asset and one for each collateral asset. Rails asks the Comet for each feed's price, the price its liquidations use. The WETH market prices in ETH.",
+      },
+    ],
+    how:
+      deployment === "arbitrum"
+        ? "The markets pages read every Comet from the chain at most every ten minutes, and an account page reads the wallet's market at each load."
+        : "The markets pages read every Comet through Rails's server at most every ten minutes, and an account page reads the wallet's market at each load.",
+    notes: [ROSTER_NOTE[deployment]],
+  };
+}
 
 function marketsView(href: string, body: string): InfoView {
   return {
@@ -130,8 +192,9 @@ export function CompoundV3InfoPage({ deployment }: { deployment: CompoundV3InfoD
         session="compound"
         tracks={
           <>
-            The Rails Compound V3 explorer shows every account in Compound V3&apos;s three Ethereum markets, whether
-            still open, closed or liquidated, and the full history of each one. It also shows{" "}
+            The Rails Compound V3 explorer shows every account in three of Compound V3&apos;s Ethereum markets, those
+            lending USDC, WETH and USDT, whether still open, closed or liquidated, and the full history of each one. It
+            also shows{" "}
             <Link href="/ethereum/compound-v3/markets" className={INLINE_LINK}>
               the markets
             </Link>{" "}
@@ -139,9 +202,13 @@ export function CompoundV3InfoPage({ deployment }: { deployment: CompoundV3InfoD
           </>
         }
         glossary={GLOSSARY}
+        reads={readsFor("ethereum")}
         howItWorks={[
           WHAT_IT_IS,
-          <>Ethereum has three markets, with USDC, WETH and USDT as their base assets. {ONE_BASE_ASSET}</>,
+          <>
+            Compound&apos;s docs list seven markets on Ethereum; Rails reads three, with USDC, WETH and USDT as their
+            base assets. {ONE_BASE_ASSET}
+          </>,
           INTEREST,
           LIQUIDATION_ITEM,
         ]}
@@ -167,7 +234,7 @@ export function CompoundV3InfoPage({ deployment }: { deployment: CompoundV3InfoD
             ),
           },
           {
-            heading: "Position page",
+            heading: "Account page",
             body: (
               <ul className={UL}>
                 <li>
@@ -197,13 +264,14 @@ export function CompoundV3InfoPage({ deployment }: { deployment: CompoundV3InfoD
           <>
             The Rails Compound V3 explorer shows the accounts in Compound V3&apos;s five Base markets, whether still
             open or closed, and the full history of each one. It also shows{" "}
-            <Link href="/base/compound-v3/market" className={INLINE_LINK}>
+            <Link href="/base/compound-v3/markets" className={INLINE_LINK}>
               the markets
             </Link>{" "}
             themselves, with their interest rates and reserves.
           </>
         }
         glossary={GLOSSARY}
+        reads={readsFor("base")}
         howItWorks={[
           WHAT_IT_IS,
           <>
@@ -237,13 +305,13 @@ export function CompoundV3InfoPage({ deployment }: { deployment: CompoundV3InfoD
                   unreadListed={false}
                   subject="these five markets"
                   subjectPossessive="the earliest market’s"
-                  noun="position"
+                  noun="account"
                 />
               </>
             ),
           },
           {
-            heading: "Position page",
+            heading: "Account page",
             body: (
               <ul className={UL}>
                 <li>The top card shows the account&apos;s balances in one market, read from its contract.</li>
@@ -255,7 +323,7 @@ export function CompoundV3InfoPage({ deployment }: { deployment: CompoundV3InfoD
             ),
           },
           marketsView(
-            "/base/compound-v3/market",
+            "/base/compound-v3/markets",
             "The market view shows each Base market with its base asset, collateral assets, interest rates and reserves.",
           ),
         ]}
@@ -278,6 +346,7 @@ export function CompoundV3InfoPage({ deployment }: { deployment: CompoundV3InfoD
         </>
       }
       glossary={GLOSSARY}
+      reads={readsFor("arbitrum")}
       howItWorks={[
         WHAT_IT_IS,
         <>
@@ -300,7 +369,7 @@ export function CompoundV3InfoPage({ deployment }: { deployment: CompoundV3InfoD
                 <li>
                   The listing draws on each day&apos;s most active wallets and any wallet a reader has opened. The{" "}
                   <Link href="/arbitrum/compound-v3/positions" className={INLINE_LINK}>
-                    positions listing
+                    accounts listing
                   </Link>{" "}
                   holds the open accounts.
                 </li>
@@ -310,7 +379,7 @@ export function CompoundV3InfoPage({ deployment }: { deployment: CompoundV3InfoD
           ),
         },
         {
-          heading: "Position page",
+          heading: "Account page",
           body: (
             <ul className={UL}>
               <li>

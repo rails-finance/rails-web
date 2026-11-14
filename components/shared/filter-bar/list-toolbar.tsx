@@ -7,7 +7,7 @@
 // object and the toolbar reads/writes it. Holds no state of its own — the param
 // object (URL-backed) is the source of truth.
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { useHydrated } from "@/hooks/useHydrated";
 import { SearchBox } from "@/components/shared/front-door-search";
 import { FilterSections } from "@/components/shared/filter-bar/filter-sections";
@@ -31,10 +31,12 @@ export interface ListToolbarProps<F extends BaseListFilters> {
   /** In place of `count`, a count line the page writes (the vault roster's
    *  "N of M funded vaults", with its receipt). */
   countNode?: ReactNode;
+  /** A locked chip drawn first in the chip row (FilterChips `lead`). */
+  chipsLead?: ReactNode;
   /** The search box's skeleton anchor (`data-skel-section`); "listing-toolbar"
    *  by default. */
   skel?: string;
-  /** The ⋮ at the row's right end (N1.7): save this view, copy its link
+  /** The ⋮ at the row's right end (N1.7): save listing, copy its link
    *  (ui-jobs 521). The chain-truth listings draw it. */
   viewMenu?: boolean;
   /** The sheet's figure and noun ("Show 80 funded vaults") where the page
@@ -54,6 +56,9 @@ export interface ListToolbarProps<F extends BaseListFilters> {
   countFor?: (draft: F) => number | Promise<number>;
   /** The sheet's noun for a draft, where the selection names it. */
   nounFor?: (draft: F) => string;
+  /** Keys in the search field, for a listing whose search does more than
+   *  filter (the Pendle roster's wallet row takes Enter). */
+  onSearchKeyDown?: (e: ReactKeyboardEvent<HTMLInputElement>) => void;
 }
 
 export function ListToolbar<F extends BaseListFilters>({
@@ -64,6 +69,7 @@ export function ListToolbar<F extends BaseListFilters>({
   searchPlaceholder = "Search wallet or id",
   count,
   countNode,
+  chipsLead,
   skel = "listing-toolbar",
   viewMenu = false,
   sheetCount,
@@ -71,6 +77,7 @@ export function ListToolbar<F extends BaseListFilters>({
   countPending = false,
   countFor,
   nounFor,
+  onSearchKeyDown,
 }: ListToolbarProps<F>) {
   // Inert until this strip's handlers are attached — including the search box,
   // which pre-hydration accepts typing into a value React then overwrites from
@@ -97,6 +104,7 @@ export function ListToolbar<F extends BaseListFilters>({
           size="sm"
           anatomy="N1.1 H15"
           inputRef={searchRef}
+          onKeyDown={onSearchKeyDown}
           className="flex-1 min-w-[200px] max-sm:basis-full"
         />
         {/* Below sm the facets are one Filters button opening the sheet
@@ -137,7 +145,14 @@ export function ListToolbar<F extends BaseListFilters>({
           />
         )}
       </div>
-      <FilterChips dimensions={dimensions} filters={filters} onChange={onChange} count={count} countNode={countNode} />
+      <FilterChips
+        dimensions={dimensions}
+        filters={filters}
+        onChange={onChange}
+        count={count}
+        countNode={countNode}
+        lead={chipsLead}
+      />
     </div>
   );
 }

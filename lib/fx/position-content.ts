@@ -12,6 +12,7 @@ import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import type { FxPoolTerms } from "@/lib/sources/chain/fx-terms";
 import { formatNumber } from "@/lib/utils/format";
 import { fxScheduleFull } from "@/lib/fx/row-figures";
+import { fxBonusClause } from "@/lib/fx/statement-words";
 
 const FX_DOC_URL = "https://fxprotocol.gitbook.io/fx-docs";
 
@@ -20,7 +21,7 @@ const pct = (r: number): string => `${(r * 100).toFixed(2).replace(/\.?0+$/, "")
 function mechanics(pool: string, t: FxPoolTerms | null): { bold: string; text: string }[] {
   return [
     {
-      bold: "Debt ratio",
+      bold: "LTV",
       text: t
         ? `fxUSD debt divided by the collateral's value at the oracle's anchor price. The pool judges its lines at the oracle's min price, which is at or below the anchor: borrowing and withdrawing stop at ${pct(t.maxBorrowRatio)}; from ${pct(t.rebalanceRatio)} a keeper can rebalance the position's tick, and from ${pct(t.liquidateRatio)} liquidate it. A rebalanced row can therefore show a ratio a little under ${pct(t.rebalanceRatio)}.`
         : `fxUSD debt divided by the collateral's value at the oracle's anchor price. The pool judges its lines at the oracle's min price: past the ${pool} pool's rebalance line a keeper can rebalance the position's tick, and past its liquidation line liquidate it.`,
@@ -28,16 +29,16 @@ function mechanics(pool: string, t: FxPoolTerms | null): { bold: string; text: s
     {
       bold: "Who acts",
       text: t
-        ? `rebalances and liquidations are run by keepers: any address may call them, and the bonus pays them (${pct(t.rebalanceBonus)} of the collateral taken on a rebalance, ${pct(t.liquidateBonus)} on a liquidation). The protocol keeps ${pct(t.expenseRatio)} of each bonus.`
-        : "rebalances and liquidations are run by keepers: any address may call them, and a bonus in collateral pays them. The protocol keeps a share of each bonus.",
+        ? `rebalances and liquidations are run by keepers: any address may call them, and the bounty pays them (${fxBonusClause(t.rebalanceBonus, t.liquidateBonus)}). The protocol keeps ${pct(t.expenseRatio)} of each bounty.`
+        : "rebalances and liquidations are run by keepers: any address may call them, and a bounty in collateral pays them. The protocol keeps a share of each bounty.",
     },
     {
       bold: "Rebalance",
-      text: "the keeper repays part of the tick's debt and takes collateral worth that debt plus the bonus. Every position in the tick keeps less of both and stays open, back at the rebalance line.",
+      text: "the keeper repays part of the tick's debt and takes collateral worth that debt plus the bounty. Every position in the tick keeps less of both and stays open, back at the rebalance line.",
     },
     {
       bold: "Liquidation",
-      text: "the keeper repays the debt and takes collateral worth it plus the bonus; collateral beyond that stays in the position for the owner. When the collateral falls short, the keeper takes all of it and the unpaid debt is added to every other position. The owner keeps the fxUSD borrowed.",
+      text: "the keeper repays the debt and takes collateral worth it plus the bounty; collateral beyond that stays in the position for the owner. When the collateral falls short, the keeper takes all of it and the unpaid debt is added to every other position. The owner keeps the fxUSD borrowed.",
     },
   ];
 }
@@ -78,7 +79,7 @@ export function fxPositionContent(opts: {
   if (status === "liquidated") {
     return {
       title: "About this position",
-      intro: `This position was liquidated when its debt ratio reached the ${pool} pool's liquidation line. The debt line above compares what its transactions add up to with the pool's final reading.`,
+      intro: `This position was liquidated when its LTV reached the ${pool} pool's liquidation line. The debt line above compares what its transactions add up to with the pool's final reading.`,
       detailsHeading: "Key concepts:",
       details: [...mechanics(pool, t), nft],
       links: [{ label: "f(x) docs", url: FX_DOC_URL }],

@@ -50,7 +50,7 @@ export function CompoundV2FlowsNote({ facts }: { facts: CompoundV2FlowsFacts | n
         (facts.liquidations > 0 || facts.transfersIn > 0 || facts.transfersOut > 0 || facts.seizedAsLiquidator > 0) && (
           <p>
             {facts.liquidations > 0
-              ? `${n(facts.liquidations, "A liquidation", "liquidations")} repaid debt (Repaid by liquidators) and took cTokens from the collateral, the protocol's share included (Seized in liquidations). `
+              ? `${n(facts.liquidations, "A liquidation", "liquidations")} repaid debt (Repaid by liquidators) and took cTokens from the collateral, with the protocol's share where the market takes one (Seized in liquidations). `
               : ""}
             {facts.transfersIn > 0 || facts.transfersOut > 0
               ? "cTokens can change hands like any token: those another wallet sent in are Received by transfer, those sent out are cTokens sent, at the underlying they stood for at that block. "

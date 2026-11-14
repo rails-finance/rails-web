@@ -122,17 +122,17 @@ export function fluidEconomicsExplanation(data: FluidTowerData): ReactNode {
     items.push(
       <span key="smart">
         {isSmartLeg(collUnit) && isSmartLeg(debtUnit)
-          ? "Both legs of this vault are smart — collateral and debt are shares of a Fluid liquidity pair rather than a single token, so each side's amount is a share count, not a token balance."
+          ? "Both legs of this vault are smart: collateral and debt are DEX shares, so each side's amount is a share count."
           : isSmartLeg(collUnit)
-            ? "The collateral leg of this vault is smart — it is a share of a Fluid liquidity pair rather than a single token, so the amount above is a share count, not a token balance."
-            : "The debt leg of this vault is smart — it is a share of a Fluid liquidity pair rather than a single token, so the amount above is a share count, not a token balance."}
+            ? "The collateral leg of this vault is smart: it is DEX shares, so the amount above is a share count."
+            : "The debt leg of this vault is smart: it is DEX shares, so the amount above is a share count."}
       </span>,
     );
   }
   items.push(
     <span key="token-units">
-      Fluid prices no side in USD here, so every figure above is shown in the vault&apos;s own token — collateral and
-      debt bars are not directly comparable in height.
+      Every figure above is shown in the vault&apos;s own tokens, so collateral and debt bars are not directly
+      comparable in height.
     </span>,
   );
 
@@ -162,13 +162,13 @@ export function fluidEconomicsContent(): LearnMoreContent {
     steps: [
       "Flows are replayed from every deposit, withdraw, borrow and repay the position's own LogOperate events recorded — a single composite operation can move both legs at once.",
       "Liquidation impact is read from the vault's own settlement views at the blocks before and after the sweep.",
-      "Current balances come from the vault's own resolver at the block the page reads, with interest already included; Fluid has no on-chain USD price at this depth, so every figure stays in its own token.",
+      "Current balances come from the vault's own resolver at the block the page reads, with interest already included. The vault's oracle prices collateral in the debt token, and every figure stays in its own token.",
     ],
     detailsHeading: "Key concepts:",
     details: [
       {
         bold: "Smart collateral / smart debt",
-        text: "a vault leg can be a share of a Fluid liquidity pair rather than a single token — the position then earns or owes in pool shares, not a plain balance.",
+        text: "a vault leg can be DEX shares; the position then earns or owes in DEX shares.",
       },
       {
         bold: "Interest between events",

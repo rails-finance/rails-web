@@ -34,8 +34,6 @@
  *     sentinel gets in lib/fluid/asset-catalog.ts.
  */
 
-export const shortAddress = (addr: string): string => `${addr.slice(0, 6)}…${addr.slice(-4)}`;
-
 /** The Comptroller — the authority on which markets are listed, and the
  *  contract whose oracle prices them. */
 export const COMPOUND_V2_ADDRESSES = {
@@ -305,3 +303,43 @@ export const COMPOUND_V2_NO_SEIZE_SHARE: ReadonlySet<string> = new Set([
   "sai",
   "wbtc",
 ]);
+
+/** True where the seized market's cToken keeps the protocol's 2.8% seize share. */
+export function compoundV2HasSeizeShare(collateralMarket: string): boolean {
+  return !COMPOUND_V2_NO_SEIZE_SHARE.has(collateralMarket);
+}
+
+/** The event a seize-share question is asked of, and the kinds of the
+ *  account's other events in its transaction (`seize_out`, `seize_burn`, …). */
+interface SeizeShareQuestion {
+  eventType: string;
+  market: string;
+  collateralMarket?: string | null;
+}
+
+/** Whether an event's seizure carried the protocol's share: false in the seven
+ *  markets without one, and false where the borrower's side of the transaction
+ *  holds a seizure leg and no burned leg (a seizure from before the share, 2020);
+ *  undefined where a liquidation names no collateral. */
+export function compoundV2SeizeShareOf(ctx: SeizeShareQuestion, legs?: readonly string[]): boolean | undefined {
+  const seized = ctx.eventType === "liquidation" ? ctx.collateralMarket : (ctx.collateralMarket ?? ctx.market);
+  if (!seized) return undefined;
+  if (!compoundV2HasSeizeShare(seized)) return false;
+  const borrowerSide = ctx.eventType === "liquidation" || ctx.eventType === "seize_out";
+  if (borrowerSide && legs && legs.includes("seize_out") && !legs.includes("seize_burn")) return false;
+  return true;
+}
+
+/** An event modal's seize-share form: `no_share` in a market without one,
+ *  `none_taken` for a seizure that carried none in a market that has one, and a
+ *  liquidation that names its collateral reads `share` where it was taken. */
+export function compoundV2SeizeForm(ctx: SeizeShareQuestion, legs?: readonly string[]): string[] {
+  if (!ctx.eventType.startsWith("seize") && ctx.eventType !== "liquidation") return [];
+  const share = compoundV2SeizeShareOf(ctx, legs);
+  if (share === undefined) return [];
+  const seized = (
+    ctx.eventType === "liquidation" ? ctx.collateralMarket : (ctx.collateralMarket ?? ctx.market)
+  ) as string;
+  if (share === false) return [compoundV2HasSeizeShare(seized) ? "none_taken" : "no_share"];
+  return ctx.eventType === "liquidation" ? ["share"] : [];
+}

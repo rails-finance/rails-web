@@ -4,6 +4,7 @@
 // (components/protocol/liquity-fork/liquity-fork-event-card.tsx) with this
 // deployment's words, stable and provenance vocabulary.
 
+import { LIQUITY_FAMILY_TERMS } from "@/lib/liquity/ltv";
 import type { BaseActivityEvent, AsymmetryContext } from "@/lib/shared/types/event-shape";
 import {
   LiquityForkEventCard,
@@ -16,6 +17,7 @@ import { DEBT_SYMBOL, ASYMMETRY_DOCS, MIN_DEBT, resolveBranch } from "@/lib/asym
 // topic (ASYMMETRY_DOCS — read and verified against docs.asymmetry.finance,
 // 2026-09-28, Miles's OK).
 export const ASYMMETRY_FORK = {
+  terms: LIQUITY_FAMILY_TERMS.asymmetry,
   protocolName: "Asymmetry",
   stablecoin: DEBT_SYMBOL,
   minDebt: MIN_DEBT,

@@ -15,7 +15,7 @@ import type { OriginEnvelope } from "@/lib/shared/types/event-shape";
 import { formatExact } from "@/lib/utils/format";
 import { exactDebtAfter, exactDebtBefore } from "@/lib/liquity/utils/interest-calculator";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
-import { gasEscrowReceipt, type LiquityGasEscrow } from "@/lib/shared/liquity-gas-escrow";
+import { gasEscrowReceipt, LIQUIDATION_RESERVE_TERMS, type LiquityGasEscrow } from "@/lib/shared/liquity-gas-escrow";
 
 const INDEX_VIA = "rails-server index of decoded Liquity V2 logs";
 
@@ -206,7 +206,7 @@ export function upfrontFeeProv(
       info: {
         kind: "chain-derived",
         verify: changeVerify(coords),
-        summary: `Upfront fee (${debtSym}) charged by this rate change — the delegate changed the batch's rate within 7 days of its previous change, so the protocol added a one-off fee to every Trove in the batch. No log states it per trove: it is the rest of the debt's move once the interest and management fee since the previous event are taken out.`,
+        summary: `Upfront Borrowing Fee (${debtSym}) charged by this rate change — the delegate changed the batch's rate within 7 days of its previous change, so the protocol added a one-off fee to every Trove in the batch. No log states it per trove: it is the rest of the debt's move once the interest and management fee since the previous event are taken out.`,
         formula: "debt after − debt before − interest − management fee",
         inputs: eventInputs({ ...coords, asset: debtSym }),
       },
@@ -222,7 +222,7 @@ export function upfrontFeeProv(
       kind: "chain",
       pclass: "emitted",
       verify: changeVerify(coords),
-      summary: `Upfront fee (${debtSym}) charged by this operation — a one-off borrowing fee added to the trove's debt.`,
+      summary: `Upfront Borrowing Fee (${debtSym}) charged by this operation — a one-off borrowing fee added to the trove's debt.`,
       contract: { name: "TroveManager", address: TROVE_MANAGER[(ctx.collateralType ?? "").toLowerCase()] },
       via: `${streamVia()} · ${originSeg(troveOperation.origin?.debtIncreaseFromUpfrontFee, {
         event: "TroveOperation",
@@ -458,6 +458,8 @@ export const LIQUITY_V2_GAS_ESCROW: LiquityGasEscrow = {
   address: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
   source: "Constants.sol ETH_GAS_COMPENSATION",
   label: "0.0375 WETH",
+  // The docs' name ("a liquidation reserve of 0.0375 ETH"; decision 0065).
+  terms: LIQUIDATION_RESERVE_TERMS,
 };
 
 /** The escrow's receipt at an event: the constant, and the transaction whose

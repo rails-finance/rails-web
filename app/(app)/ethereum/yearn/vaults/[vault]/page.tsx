@@ -1,8 +1,8 @@
 // ONE YEARN V3 VAULT'S PAGE — /ethereum/yearn/vaults/<vault>.
 // ----------------------------------------------------------------------------
-// The vault card (V2), where the assets are (V3) and the holder finder (V4),
-// rails-ops ui-jobs 407, drawn by components/vaults/yearn-vault-page.tsx from
-// one block's read of the vault. A fund factsheet (decision 0017, which 0028
+// The vault card (V2) and the grid of tiles under it (V13; rails-ops ui-jobs
+// 407, 584), drawn by components/vaults/yearn-vault-page.tsx from one block's
+// read of the vault; Holders and Who holds it are the census's. A fund factsheet (decision 0017, which 0028
 // left standing). `?holder=` is the finder's submit and is sent on to the
 // holder's own page one segment down.
 //
@@ -15,20 +15,25 @@
 // the rail above the H1 says so. The line under the H1 names the release and the
 // asset, and carries no link to the protocol.
 
-import { cache } from "react";
+import { cache, Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { RailHeader } from "@/components/shared/rail-header";
 import { YearnVaultPage } from "@/components/vaults/yearn-vault-page";
+import { VaultProtectsSection } from "@/components/vaults/vault-protects-section";
 import { listingMetadata } from "@/lib/shared/page-metadata";
-import { yearnVaultHref } from "@/lib/vaults/routes";
+import { metaMorphoVaultHref, yearnVaultHref } from "@/lib/vaults/routes";
+import { metaMorphoRosterEntry } from "@/lib/metamorpho/vault-roster";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { loadYearnEthereumVault } from "@/lib/sources/chain/yearn-ethereum-vault";
-import { isYearnRosterVault } from "@/lib/yearn/vault-roster";
+import { isYearnRosterVault, yearnRosterEntry } from "@/lib/yearn/vault-roster";
 import { YEARN_CHAIN_ID } from "@/lib/sources/chain/yearn-ethereum-vault-directory";
 import { loadVaultPageSeries } from "@/lib/vaults/yield-read";
+import { loadVaultHolders } from "@/lib/vaults/holders-read";
+import { loadVaultCensusRow } from "@/lib/vaults/census-read";
+import { FocusSourceGate } from "@/components/shared/aim-gate";
 
 // Every figure is a slot read at the head — nothing about this is cacheable
 // across requests.
@@ -62,7 +67,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function YearnVaultRoute({ params, searchParams }: Props) {
   const { vault } = await params;
   const address = vault.toLowerCase();
-  if (!(await isYearnRosterVault(address))) notFound();
+  const entry = await yearnRosterEntry(address);
+  if (!entry) notFound();
 
   // The finder's submit (V4), sent on to the holder's own path as typed; the
   // holder route resolves a name and states every outcome. `redirect()`
@@ -70,26 +76,60 @@ export default async function YearnVaultRoute({ params, searchParams }: Props) {
   const typed = firstParam((await searchParams).holder)?.trim();
   if (typed) redirect(yearnVaultHref(address, typed));
 
-  const [data, series] = await Promise.all([load(address), loadVaultPageSeries(YEARN_CHAIN_ID, address)]);
+  const [data, series, census, holders] = await Promise.all([
+    load(address),
+    loadVaultPageSeries(YEARN_CHAIN_ID, address),
+    loadVaultCensusRow(YEARN_CHAIN_ID, address, "yearn-v3"),
+    loadVaultHolders(YEARN_CHAIN_ID, address, "yearn-v3"),
+  ]);
+  // The strategies that are roster vaults with a page here (a Yearn V3 vault,
+  // a MetaMorpho vault on Ethereum): "Where the assets are" opens them.
+  const strategyPages: Record<string, string> = {};
+  await Promise.all(
+    data.strategies.map(async (s) => {
+      const a = s.address.toLowerCase();
+      if (await isYearnRosterVault(a)) strategyPages[a] = yearnVaultHref(a);
+      else if (await metaMorphoRosterEntry(MAINNET_CHAIN_ID, a))
+        strategyPages[a] = metaMorphoVaultHref(MAINNET_CHAIN_ID, a);
+    }),
+  );
 
   return (
-    <div className="min-h-screen">
-      <div className="py-8">
-        <header className="mb-5" data-skel-section="page-header">
-          <RailHeader session="yearn" venue="subPage" />
-        </header>
+    <FocusSourceGate source={data.vault} chain={1} what="This vault">
+      <div className="min-h-screen">
+        <div className="py-8">
+          <header className="mb-5" data-skel-section="page-header">
+            <RailHeader session="yearn" venue="subPage" />
+          </header>
 
-        {data.chainStale ? (
-          <p className="max-w-3xl text-[13px] leading-relaxed text-rb-500">
-            This vault could not be read from chain just now, so no figure is stated for it.
-          </p>
-        ) : (
-          <YearnVaultPage data={data} yieldFigure={series.yieldFigure} strip={series.strip} />
-        )}
+          {data.chainStale ? (
+            <p className="max-w-3xl text-[13px] leading-relaxed text-rb-500">
+              This vault could not be read from chain just now, so no figure is stated for it.
+            </p>
+          ) : (
+            <YearnVaultPage
+              data={data}
+              yieldFigure={series.yieldFigure}
+              strip={series.strip}
+              strategyPages={strategyPages}
+              census={census}
+              holders={holders}
+              protects={
+                <Suspense fallback={null}>
+                  <VaultProtectsSection
+                    subject={{ chainId: YEARN_CHAIN_ID, address, kind: "yearn-v3", createdBlock: entry.createdBlock }}
+                    vaultName={entry.name}
+                    look="paragraph"
+                  />
+                </Suspense>
+              }
+            />
+          )}
 
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
-        <ProvInspectorLayer />
+          {/* The inspector, armed from the profile menu's switch. */}
+          <ProvInspectorLayer />
+        </div>
       </div>
-    </div>
+    </FocusSourceGate>
   );
 }

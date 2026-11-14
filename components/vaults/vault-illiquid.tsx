@@ -27,8 +27,8 @@ const marketProv = (
   source: { block: il.block },
   summary:
     what === "utilisation"
-      ? `Borrowed — the ${marketName(m)} market's totalBorrowAssets over its totalSupplyAssets, as Morpho Blue last settled it, read at block ${n(il.block)}.`
-      : `Borrow rate — Rails's figure: the AdaptiveCurveIRM's curve at the market's utilisation over its rate at target, a year, simple. The rate at target is the stored rateAtTarget adapted over the time since the market last settled, to block ${n(il.block)}; it is at the IRM's maximum, 200% a year, so at full utilisation the rate is the ceiling, 800% a year.`,
+      ? `Borrowed — the ${marketName(m)} market's totalBorrowAssets over its totalSupplyAssets, with interest accrued to block ${n(il.block)}.`
+      : `Borrow rate — Rails's figure: the AdaptiveCurveIRM's curve at the utilisation Morpho Blue last settled over its rate at target, a year, before compounding: the rate the market charges from this block until it next settles. The rate at target is the stored rateAtTarget adapted to block ${n(il.block)}; it is at the IRM's maximum of 200% a year, so a fully used market charges the ceiling, 800% a year.`,
   contract: { name: `Morpho Blue market ${m.id.slice(0, 10)}…` },
   via:
     what === "utilisation"
@@ -43,7 +43,7 @@ export function VaultIlliquidMarkets({ vault: v, il }: { vault: VaultSummary; il
       className="mt-4 rounded-lg border border-rb-300 px-3 py-2.5 text-[12px] leading-relaxed dark:border-rb-700"
       data-vault-illiquid={il.block}
     >
-      <p className="font-semibold text-foreground">Markets at the rate ceiling</p>
+      <p className="font-semibold text-foreground">Markets fully borrowed, the rate model at its maximum</p>
       <table className="mt-2 w-full text-left tabular-nums max-sm:hidden">
         <thead className="text-[11px] text-rb-500">
           <tr>

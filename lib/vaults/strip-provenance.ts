@@ -7,6 +7,12 @@ import type { VaultSummary } from "@/lib/vaults/summary";
 import type { SeriesWindow, VaultYieldRead } from "@/lib/vaults/yield";
 import { formatUnitsExact } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
+import { assetScaleReceiptNote } from "@/lib/vaults/asset-scale-words";
+
+/** The decimals-disagree sentence where a tile's reads are amounts in the
+ *  asset (ui-jobs 664); none for holders. */
+const scaleNote = (tile: StripTile, v: VaultSummary) =>
+  tile !== "holders" && v.assetScale ? ` ${assetScaleReceiptNote(v.asset.symbol, v.assetScale)}` : "";
 
 const n = (v: number) => v.toLocaleString("en-US");
 const dayText = (day: number) => formatDate(new Date(day * 86_400_000));
@@ -39,7 +45,7 @@ export const stripChangeProv = (tile: StripTile, v: VaultSummary, key: string, w
     kind: "derived",
     pclass: "state",
     source: { block: w.to.block },
-    summary: `${LABEL[tile]} — over the ${w.days} days to block ${n(w.to.block)}, ${READ[tile].what} went from ${at(w.from)} to ${at(w.to)}, each stored once a day in Rails's daily store as \`${key}\`.${w.change == null ? " The window starts at zero, so no percentage is stated." : ""}`,
+    summary: `${LABEL[tile]} — over the ${w.days} days to block ${n(w.to.block)}, ${READ[tile].what} went from ${at(w.from)} to ${at(w.to)}, each stored once a day in Rails's daily store as \`${key}\`.${w.change == null ? " The window starts at zero, so no percentage is stated." : ""}${scaleNote(tile, v)}`,
     contract: { name: v.name ?? v.catalogName ?? v.symbol ?? "vault", address: v.address },
     via: `daily store · ${READ[tile].via} once per UTC day @ the day's last block`,
     formula: w.change == null ? "from → to" : "to / from − 1",

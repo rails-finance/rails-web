@@ -64,10 +64,11 @@ import { groupEventsByTx } from "@/lib/shared/explainer-prose";
 import { previousEventById, previousEventByTx, previousPastFolders } from "@/lib/compound/row-facts";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
-import type { PriceStripAsset } from "@/components/shared/price-strip";
+import type { LatestPriceAsset } from "@/components/shared/latest-prices";
+import { cometPriceProv } from "@/lib/compound/event-provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { useWalletContext } from "@/components/nav/wallet-context";
-import { NAV_LINK } from "@/lib/shared/ui-grammar";
+import { FOOT_LINK } from "@/lib/shared/ui-grammar";
 import { shortAddr } from "@/lib/shared/format-event";
 import { marketOf } from "@/lib/compound/asset-catalog";
 import {
@@ -504,10 +505,10 @@ export default function CompoundPositionView({
 
   // The top row's price dropdown: the open market's base +
   // held collateral at Comet's own oracle price.
-  const stripAssets = useMemo<PriceStripAsset[]>(() => {
+  const stripAssets = useMemo<LatestPriceAsset[]>(() => {
     if (!view || view.status !== "open") return [];
     const seen = new Set<string>();
-    const out: PriceStripAsset[] = [];
+    const out: LatestPriceAsset[] = [];
     const assets = [
       { symbol: view.base.symbol, address: view.base.address },
       ...view.collateral.filter((c) => c.amount > 0).map((c) => ({ symbol: c.symbol, address: c.address })),
@@ -518,7 +519,13 @@ export default function CompoundPositionView({
       if (seen.has(addr)) continue;
       seen.add(addr);
       const p = view.priceByAddress?.[addr];
-      if (typeof p === "number" && p > 0) out.push({ symbol: a.symbol, address: a.address, price: p });
+      if (typeof p === "number" && p > 0)
+        out.push({
+          symbol: a.symbol,
+          address: a.address,
+          price: p,
+          info: cometPriceProv(a.symbol, { comet: view.comet, marketLabel: view.marketLabel }),
+        });
     }
     return out;
   }, [view]);
@@ -631,8 +638,8 @@ export default function CompoundPositionView({
                 <span className="font-mono">{shortAddr(wallet)}</span> has no {marketLabel} position
               </p>
               <p className="text-sm text-rb-500">
-                <Link href={walletFilterHref} className={`underline ${NAV_LINK}`}>
-                  See this wallet&rsquo;s other positions →
+                <Link href={walletFilterHref} className={FOOT_LINK}>
+                  See this wallet&rsquo;s other positions
                 </Link>
               </p>
             </div>

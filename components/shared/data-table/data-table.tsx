@@ -6,51 +6,54 @@
 // draws them into these parts.
 // ----------------------------------------------------------------------------
 // A real <table>: a caption or label, `<th scope="col">` headers, an optional
-// `<th scope="row">` cell. Each row reads as one rounded block: the table is
-// `border-separate` with no horizontal spacing and a small vertical gap, the
-// stripe lies on the cells, and only the first and last cells round their
-// outer corners. Stripes alternate the raised and sunken surfaces; a hovered
-// row keeps its ground and takes a thin neutral border (`--edge-row-hover`),
-// drawn as a linked row's is. The frame scrolls sideways inside itself,
-// never the page; a pinned cell carries its row's stripe.
+// `<th scope="row">` cell. Rows sit on the page's ground, a hairline between
+// them (`--edge-row-line`). A hovered row lifts into a rounded block
+// (`--surface-row-hover`) whose top and bottom lie on the hairlines above and
+// below it (which it replaces while hovered, so nothing moves) and whose ends
+// reach past them by the 8px corner radius, into the frame's padding. The row visuals live in
+// `table.dt` (app/globals.css). The frame scrolls sideways inside itself, never
+// the page; a pinned cell carries the page's ground.
 //
 // A LINKED ROW. `DataTableRow href` with one `DataTableRowLink` in a cell
 // (the row's name, the one link a keyboard reaches). Every cell lays a hidden
 // copy of the link over itself (`tabIndex={-1}`, `aria-hidden`), so a press
 // anywhere on the row opens it: a cell, unlike a <tr>, positions reliably in
 // every engine. Other controls and armed receipts stand above the copies.
-// Hovered, or focused from the keyboard, the row takes the listing cards' blue
-// border (POSITION_CARD_FRAME_BOX), drawn by each cell along its top and
-// bottom and by the end cells round their outer corners, and its name stays
+// Hovered, or focused from the keyboard, the lifted block also takes the
+// listing cards' blue border (POSITION_CARD_FRAME_BOX), and its name stays
 // foreground: a clickable card takes the border, not blue text
 // (standards/color-grammar.md §4a).
 //
 // ANATOMY (rails-ops reference/app-anatomy.md, region D): D1 the frame and
 // its rows, D2 a sortable header, D3 the sideways scroll and pinned cells
 // (on the frame), D4 a linked row, D5 the lead cell, D6 stacked rows (on the
-// frame in D3's place).
+// frame in D3's place), D7 a row's ⋮ menu, D8 a group's parent row and its
+// children.
 //
 // STACKED ROWS (D6, opt-in: `DataTable stacked`; `stackBelow="lg"` for a
 // table too wide for a tablet). Below sm (or lg) the same <table>
 // reflows into cards by CSS (`.dt-stacked`, app/globals.css), with explicit
 // ARIA roles so a screen reader still reads rows of labelled cells: the
-// header row hides, the lead zone narrows to a 6px edge in the protocol's hue
-// (W4's pattern below sm), the row header spans the card, the other cells sit
-// two to a line, each with its `label`, a `wide` cell on a line of its own,
-// an empty cell not drawn. A table with no lead zone has no edge. Stripes,
-// corners, the gap, the linked row and its border carry over; pinning (D3)
-// does not apply.
+// header row hides, the lead zone narrows to a 4px bar in the protocol's hue,
+// the row header spans the card, the other cells sit two to a line, each with
+// its `label`, a `wide` cell on a line of its own, an empty cell not drawn.
+// The hairlines, the hover block and the linked row's border carry over;
+// pinning (D3) does not apply.
 //
 // THE LEAD COLUMN. Where rows span protocols or chains, each row opens with
 // the protocol's tinted zone (components/shared/row-zone.tsx, the wallet's
-// History lead): `DataTableLeadHeader` and `DataTableLeadCell`. Where the zone
-// meets the next cell the body's corners curve in over the hue (the frame is
-// `isolate`, so the hue behind them stays inside the table).
+// History lead), a rounded tile inset in its cell: `DataTableLeadHeader` and
+// `DataTableLeadCell`.
 
 import Link from "next/link";
+import { createPortal } from "react-dom";
+import { Check, ChevronRight, EllipsisVertical } from "lucide-react";
 import {
   createContext,
   useContext,
+  useEffect,
+  useRef,
+  useState,
   type AnchorHTMLAttributes,
   type HTMLAttributes,
   type ReactNode,
@@ -68,23 +71,9 @@ type Align = "left" | "right";
 /** The cell's padding; a caller adds its own sizes and type. */
 export const DATA_TABLE_PAD = "px-2 py-2.5 sm:px-3";
 
-/** A pill or tag on a row: a ground apart from both stripes (the canvas in
- *  light, rb-600 in dark); the caller adds its size and case. */
-export const DATA_TABLE_PILL = "rounded-sm bg-background text-foreground/80 dark:bg-rb-600 dark:text-foreground/70";
-
-/** The row block's surfaces and corners, on every body cell. */
-const CELL_SURFACE = "group-odd/dt-row:bg-raised group-even/dt-row:bg-sunken first:rounded-l-2xl last:rounded-r-2xl";
-
-/** The row's hover border, drawn by each cell's ::after along its top and
- *  bottom and by the end cells round their outer sides and corners, so the
- *  row's height never moves. A sticky cell is positioned already. */
-const ROW_EDGE =
-  "after:pointer-events-none after:absolute after:inset-0 after:z-20 after:border-y after:border-transparent after:transition-colors after:content-[''] first:after:rounded-l-2xl first:after:border-l last:after:rounded-r-2xl last:after:border-r";
-/** An unlinked row's border: neutral, on hover only. */
-const PLAIN_EDGE = "group-hover/dt-row:after:border-[var(--edge-row-hover)]";
-/** A linked row's: blue-500 on hover and on keyboard focus; the cell holds
- *  its cover. */
-const LINKED_EDGE = "group-hover/dt-row:after:border-blue-500 group-focus-within/dt-row:after:border-blue-500";
+/** A pill or tag on a row: a ground that reads on the page and on the hover
+ *  block; the caller adds its size and case. */
+export const DATA_TABLE_PILL = "rounded-sm bg-rb-200 text-foreground/80 dark:bg-white/8 dark:text-foreground/70";
 
 /** The row's link, which each cell's cover repeats. */
 const RowHref = createContext<string | null>(null);
@@ -96,8 +85,8 @@ const Stacked = createContext(false);
 /** D1's `rowHeight`, from sm (from lg where the table stacks below lg). The
  *  class names are written out for Tailwind to find. */
 const ROW_HEIGHT = {
-  sm: { one: "sm:h-14 sm:py-0", two: "sm:h-16 sm:py-0", three: "sm:h-19 sm:py-0" },
-  lg: { one: "lg:h-14 lg:py-0", two: "lg:h-16 lg:py-0", three: "lg:h-19 lg:py-0" },
+  sm: { one: "sm:h-15 sm:py-0", two: "sm:h-17 sm:py-0", three: "sm:h-20 sm:py-0" },
+  lg: { one: "lg:h-15 lg:py-0", two: "lg:h-17 lg:py-0", three: "lg:h-20 lg:py-0" },
 } as const;
 const RowHeight = createContext<string>("");
 
@@ -131,8 +120,8 @@ export function DataTable({
   stackBelow?: "sm" | "lg";
   /** From sm every row is one fixed height, each cell middle-aligned, the
    *  caller keeping its content inside it (a long name truncates): `one`
-   *  line, 56px (room for a 28px icon); `two`, 64px (a name over a one-line
-   *  sub-label); `three`, 76px (a bar over two lines of text). */
+   *  line, 60px (room for a 36px icon); `two`, 68px (a name over a one-line
+   *  sub-label); `three`, 80px (a bar over two lines of text). */
   rowHeight?: "one" | "two" | "three";
   tableClassName?: string;
   className?: string;
@@ -141,15 +130,18 @@ export function DataTable({
   return (
     // `relative`: a visually hidden span inside a cell is placed against the
     // frame, so it never widens the page.
+    // `py-px`: the hover block's border reaches 1px past a row's top and
+    // bottom, and the scroll frame clips what overflows it, so the first and
+    // last rows' borders need the pixel inside the frame.
     <Stacked.Provider value={stacked}>
       <RowHeight.Provider value={rowHeight ? ROW_HEIGHT[stacked ? stackBelow : "sm"][rowHeight] : ""}>
         <div
-          className={`relative isolate max-w-full overflow-x-auto ${className}`}
+          className={`relative isolate -mx-2 max-w-[calc(100%+1rem)] overflow-x-auto px-2 py-px ${className}`}
           data-anatomy={[anatomy, "D1", stacked ? "D6" : "D3"].filter(Boolean).join(" ")}
           {...frame}
         >
           <table
-            className={`w-full border-separate border-spacing-x-0 border-spacing-y-1 ${stacked ? "dt-stacked" : ""} ${stacked && stackBelow === "lg" ? "dt-stack-lg" : ""} ${tableClassName}`}
+            className={`dt w-full border-separate border-spacing-0 ${stacked ? "dt-stacked" : ""} ${stacked && stackBelow === "lg" ? "dt-stack-lg" : ""} ${tableClassName}`}
             aria-label={caption ? undefined : label}
             role={stacked ? "table" : undefined}
           >
@@ -246,7 +238,7 @@ export function DataTableHeader({
       role={stacked ? "columnheader" : undefined}
       aria-sort={sorted}
       data-anatomy={sort || ariaSort ? "D2" : undefined}
-      className={`${DATA_TABLE_PAD} pb-1.5 text-xs font-semibold whitespace-nowrap text-rb-500 ${
+      className={`${DATA_TABLE_PAD} pb-2 text-xs font-semibold whitespace-nowrap text-rb-500 ${
         align === "right" ? "text-right" : "text-left"
       } ${sticky ? `${sticky} z-10 bg-background` : ""} ${className}`}
       {...rest}
@@ -277,14 +269,19 @@ export function DataTableHeader({
 const LINKED_ROW =
   "[&_a:not([data-row-cover])]:relative [&_a:not([data-row-cover])]:z-10 [&_button]:relative [&_button]:z-10 [&_[role=button]]:relative [&_[role=button]]:z-10";
 
-/** A body row: the block the cells draw. `href`: the whole row opens it, and
- *  one cell holds a `DataTableRowLink` to the same place. */
+/** A body row. `href`: the whole row opens it, and one cell holds a
+ *  `DataTableRowLink` to the same place. `drawer`: the row opens under the row
+ *  before it (hidden or shown), so no hairline divides the two. `child`: a
+ *  row under a group's parent (`DataTableGroupRow`), indented on a lifted
+ *  ground (D8). */
 export function DataTableRow({
   href,
+  drawer = false,
+  child = false,
   className = "",
   children,
   ...rest
-}: HTMLAttributes<HTMLTableRowElement> & { href?: string }) {
+}: HTMLAttributes<HTMLTableRowElement> & { href?: string; drawer?: boolean; child?: boolean }) {
   const stacked = useContext(Stacked);
   return (
     <RowHref.Provider value={href ?? null}>
@@ -292,6 +289,8 @@ export function DataTableRow({
         role={stacked ? "row" : undefined}
         className={`group/dt-row ${href ? LINKED_ROW : ""} ${className}`}
         data-anatomy={href ? "D4" : undefined}
+        data-dt-drawer={drawer ? "" : undefined}
+        data-dt-child={child ? "" : undefined}
         {...rest}
       >
         {children}
@@ -323,6 +322,27 @@ export function DataTableRowLink({
   );
 }
 
+/** An amount cell (D1): the token amount over its dollar value in muted 12px,
+ *  the dollar value only where Rails reads an oracle at a named block
+ *  (rails-ops decision 0047). `tag` (a cap pill) sits beside the dollars, so
+ *  the cell keeps two lines; with no `value` it sits under the amount. Both
+ *  lines follow the cell's alignment. */
+export function DataTableAmount({ amount, value, tag }: { amount: ReactNode; value?: ReactNode; tag?: ReactNode }) {
+  return (
+    <span className="inline-flex flex-col leading-snug align-middle" data-dt-amount="">
+      <span className="block text-foreground/80">{amount}</span>
+      {(value != null || tag) && (
+        <span className="block text-[12px] text-rb-500">
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+            {value}
+            {tag}
+          </span>
+        </span>
+      )}
+    </span>
+  );
+}
+
 /** A cell's cover: the row's link again, hidden from the keyboard and from a
  *  screen reader, under the cell's content. */
 function RowCover({ href }: { href: string }) {
@@ -331,8 +351,8 @@ function RowCover({ href }: { href: string }) {
   );
 }
 
-/** A body cell. `rowHeader` draws `<th scope="row">`; `sticky` pins it with
- *  its stripe (`max-sm:sticky max-sm:left-0`). `pad={false}` drops the padding. */
+/** A body cell. `rowHeader` draws `<th scope="row">`; `sticky` pins it on
+ *  the page's ground (`max-sm:sticky max-sm:left-0`). `pad={false}` drops the padding. */
 export function DataTableCell({
   rowHeader = false,
   align = "left",
@@ -362,7 +382,7 @@ export function DataTableCell({
   const stacked = useContext(Stacked);
   const height = useContext(RowHeight);
   const named = stacked && label ? <span className="dt-cell-label">{label}</span> : null;
-  const cls = `${CELL_SURFACE} ${valign === "middle" || height ? "align-middle" : "align-top"} ${height} ${wide ? "dt-cell-wide" : ""} ${sticky ? "" : "relative"} ${ROW_EDGE} ${href ? LINKED_EDGE : PLAIN_EDGE} ${pad ? DATA_TABLE_PAD : ""} ${align === "right" ? "text-right" : "text-left"} ${
+  const cls = `${valign === "middle" || height ? "align-middle" : "align-top"} ${height} ${wide ? "dt-cell-wide" : ""} ${sticky ? "bg-background" : "relative"} ${pad ? DATA_TABLE_PAD : ""} ${align === "right" ? "text-right" : "text-left"} ${
     sticky ? `${sticky} z-10` : ""
   } ${className}`;
   const cover = href ? <RowCover href={href} /> : null;
@@ -386,13 +406,13 @@ export function DataTableCell({
 }
 
 /** The lead column's header: no visible label, its name for a screen reader. */
-export function DataTableLeadHeader({ sticky = "" }: { sticky?: string }) {
+export function DataTableLeadHeader({ sticky = "", plain }: { sticky?: string; plain?: boolean }) {
   const stacked = useContext(Stacked);
   return (
     <th
       scope="col"
       role={stacked ? "columnheader" : undefined}
-      className={`w-16 p-0 sm:w-[95px] ${sticky ? `${sticky} z-10 bg-background` : ""}`}
+      className={`${plain ? "w-[76px]" : "w-[124px]"} p-0 ${sticky ? `${sticky} z-10 bg-background` : ""}`}
     >
       <span className="sr-only">Protocol and chain</span>
     </th>
@@ -400,28 +420,53 @@ export function DataTableLeadHeader({ sticky = "" }: { sticky?: string }) {
 }
 
 /** The lead cell: the protocol's tinted zone with its mark and the chain's
- *  glyph, spanning the row's height, with the protocol's and the chain's
- *  names for a screen reader. The hue runs on under the next cell, whose left
- *  corners round over it (`.dt-lead` curve in globals.css), so the row's body
- *  reads as a panel set into the hue. */
+ *  glyph, a wide rounded tile centred in the row and shorter than it, with the
+ *  protocol's and the chain's names for a screen reader. `plain` on a row that
+ *  is not a position (the vault index, /about/figures, /coverage): the mark and
+ *  the glyph in grey, no tint, which marks a position (C20); below the stacking
+ *  width the cell is not drawn and `DataTableLeadMark` carries both. */
 export function DataTableLeadCell({
   protocol,
   protocolName,
   chain,
   sticky = "",
+  plain,
 }: {
   /** The `protocols.ts` id: the tint and the mark. */
   protocol: string;
   protocolName: string;
   chain: ChainId;
   sticky?: string;
+  plain?: boolean;
 }) {
+  if (plain)
+    return (
+      <DataTableCell
+        pad={false}
+        sticky={sticky}
+        valign="middle"
+        className="w-[76px] py-5! pl-5! pr-0!"
+        title={`${protocolName} on ${chainMeta(chain).name}`}
+        data-anatomy="D5"
+        data-lead-plain=""
+        data-row-zone={protocol}
+        data-row-zone-chain={chainMeta(chain).name}
+      >
+        <span className="sr-only">
+          {protocolName} on {chainMeta(chain).name}
+        </span>
+        <span className="flex items-center gap-2.5 text-rb-500" aria-hidden>
+          <ProtocolIcon id={protocol} className="h-[18px] w-[18px] shrink-0 [&:is(img)]:grayscale" />
+          <ChainGlyph id={chain} className="h-[18px] w-[18px] shrink-0" />
+        </span>
+      </DataTableCell>
+    );
   return (
-    // h-px: a cell with a height lets its child fill the row's height.
     <DataTableCell
       pad={false}
       sticky={sticky}
-      className="relative h-px w-16 sm:w-[95px]"
+      valign="middle"
+      className="w-[124px] p-5!"
       style={hueStyle(protocol)}
       title={`${protocolName} on ${chainMeta(chain).name}`}
       data-anatomy="D5"
@@ -429,7 +474,7 @@ export function DataTableLeadCell({
       data-row-zone-chain={chainMeta(chain).name}
     >
       <span className="sr-only">{protocolName} on </span>
-      <RowZone id={protocol} chain={chain} className="h-full min-h-11 w-16 rounded-l-2xl sm:w-[95px]" />
+      <RowZone id={protocol} chain={chain} className="h-11 w-[84px] rounded-[14px]" />
     </DataTableCell>
   );
 }
@@ -443,5 +488,226 @@ export function DataTableLeadMark({ protocol, chain }: { protocol: string; chain
       <ProtocolIcon id={protocol} className="h-4 w-4 shrink-0 [&:is(img)]:grayscale" />
       <ChainGlyph id={chain} className="h-4 w-4 shrink-0" />
     </span>
+  );
+}
+
+/** One entry of a row's ⋮ menu (D7): a button, or a link with `href`.
+ *  `checked` marks an entry that is on (a vault in the comparison). */
+export interface DataTableRowMenuItem {
+  key: string;
+  label: ReactNode;
+  onSelect?: () => void;
+  href?: string;
+  checked?: boolean;
+  hooks?: Record<`data-${string}`, string | undefined>;
+}
+
+/** Under the button, or above it where the menu would run past the viewport's foot. */
+function placeMenu(r: DOMRect, height: number): { top?: number; bottom?: number; right: number } {
+  const right = window.innerWidth - r.right;
+  if (r.bottom + 4 + height > window.innerHeight && r.top - 4 - height > 0)
+    return { bottom: window.innerHeight - r.top + 4, right };
+  return { top: r.bottom + 4, right };
+}
+
+/** A row's ⋮ menu (D7): the actions every row carries, in the row's last
+ *  cell. Shown on the row's hover and keyboard focus, and always where the
+ *  screen has no hover (touch); open, it stays. The menu opens in a portal,
+ *  fixed under its button, since the frame's sideways scroll clips anything
+ *  inside it; it follows its button on a scroll and closes on a resize,
+ *  Escape or a press outside. It opens upward where there is no room below.
+ *  Where the screen has no hover its button and items are 44px tall. */
+export function DataTableRowMenu({ label, items }: { label: string; items: DataTableRowMenuItem[] }) {
+  const [at, setAt] = useState<{ top?: number; bottom?: number; right: number } | null>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const open = at != null;
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setAt(null);
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (!menu.current?.contains(t) && !button.current?.contains(t)) close();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      close();
+      button.current?.focus();
+    };
+    // A scroll moves the menu with its button; a button scrolled out of
+    // sight closes it.
+    const follow = () => {
+      const r = button.current?.getBoundingClientRect();
+      if (!r || r.bottom < 0 || r.top > window.innerHeight) return close();
+      setAt(placeMenu(r, menu.current?.offsetHeight ?? 0));
+    };
+    menu.current
+      ?.querySelector<HTMLElement>("[role=menuitem], [role=menuitemcheckbox]")
+      ?.focus({ preventScroll: true });
+    window.addEventListener("pointerdown", onDown, true);
+    window.addEventListener("keydown", onKey, true);
+    window.addEventListener("scroll", follow, true);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("pointerdown", onDown, true);
+      window.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("scroll", follow, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [open]);
+  const toggle = () => {
+    if (open) return setAt(null);
+    const r = button.current?.getBoundingClientRect();
+    // Before the menu is drawn its height is estimated from its items.
+    if (r) setAt(placeMenu(r, items.length * 44 + 8));
+  };
+  const ITEM =
+    "flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[13px] text-foreground outline-none hover:bg-[var(--surface-hover)] focus-visible:bg-[var(--surface-hover)] [@media(hover:none)]:min-h-11";
+  return (
+    <>
+      <button
+        ref={button}
+        type="button"
+        aria-label={label}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={toggle}
+        data-row-menu=""
+        data-anatomy="D7"
+        className={`inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-rb-500 [@media(hover:none)]:h-11 [@media(hover:none)]:w-11 transition-opacity hover:bg-[var(--surface-hover)] hover:text-foreground focus-ring group-hover/dt-row:opacity-100 group-focus-within/dt-row:opacity-100 [@media(hover:none)]:opacity-100 ${
+          open ? "opacity-100" : "opacity-0"
+        }`}
+      >
+        <EllipsisVertical className="h-4 w-4" aria-hidden />
+      </button>
+      {open &&
+        createPortal(
+          <div
+            ref={menu}
+            role="menu"
+            aria-label={label}
+            style={{ position: "fixed", top: at.top, bottom: at.bottom, right: at.right }}
+            className="z-50 min-w-48 rounded-lg border border-rb-200 bg-[var(--surface-overlay)] p-1 shadow-lg dark:border-rb-700"
+            data-row-menu-list=""
+          >
+            {items.map((it) =>
+              it.href ? (
+                <Link
+                  key={it.key}
+                  href={it.href}
+                  prefetch={false}
+                  role="menuitem"
+                  className={ITEM}
+                  onClick={() => setAt(null)}
+                  {...it.hooks}
+                >
+                  {it.label}
+                </Link>
+              ) : (
+                <button
+                  key={it.key}
+                  type="button"
+                  role={it.checked == null ? "menuitem" : "menuitemcheckbox"}
+                  aria-checked={it.checked == null ? undefined : it.checked}
+                  className={ITEM}
+                  onClick={() => {
+                    it.onSelect?.();
+                    setAt(null);
+                  }}
+                  {...it.hooks}
+                >
+                  {it.checked != null && (
+                    <Check className={`h-3.5 w-3.5 shrink-0 ${it.checked ? "" : "invisible"}`} aria-hidden />
+                  )}
+                  {it.label}
+                </button>
+              ),
+            )}
+          </div>,
+          document.body,
+        )}
+    </>
+  );
+}
+
+/** A group's parent row (D8): a chevron, the group's name and its figures; a
+ *  press anywhere on the row opens or closes the group, whose rows follow it
+ *  as `DataTableRow child`. The button holds the keyboard and `aria-expanded`.
+ *  Two forms: `colSpan`, one cell across the table with the figures in
+ *  `summary` (a category); or `cells`, the group's own figures in the table's
+ *  columns after the name cell (`DataTableCell`s), in line with its rows (a
+ *  Morpho pair). `nameClassName` sets the name cell's classes in that form. */
+export function DataTableGroupRow({
+  open,
+  onToggle,
+  colSpan,
+  cells,
+  nameClassName = "",
+  label,
+  summary,
+  toggleHooks,
+  ...rest
+}: {
+  open: boolean;
+  onToggle: () => void;
+  label: ReactNode;
+  summary?: ReactNode;
+  toggleHooks?: Record<`data-${string}`, string | undefined>;
+} & (
+  | { colSpan: number; cells?: never; nameClassName?: never }
+  | { cells: ReactNode; nameClassName?: string; colSpan?: never }
+) &
+  Omit<HTMLAttributes<HTMLTableRowElement>, "children" | "onClick">) {
+  const stacked = useContext(Stacked);
+  const name = (
+    <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={onToggle}
+        className="inline-flex cursor-pointer items-center gap-2 rounded-sm text-left text-[14px] font-semibold text-foreground focus-ring"
+        {...toggleHooks}
+      >
+        <ChevronRight
+          className={`h-4 w-4 shrink-0 text-rb-500 transition-transform ${open ? "rotate-90" : ""}`}
+          aria-hidden
+        />
+        {label}
+      </button>
+      {summary && <span className="text-[12px] tabular-nums text-rb-500">{summary}</span>}
+    </span>
+  );
+  return (
+    <tr
+      role={stacked ? "row" : undefined}
+      className="group/dt-row cursor-pointer"
+      data-dt-parent=""
+      data-anatomy="D8"
+      data-open={open ? "" : undefined}
+      onClick={(e) => {
+        // A control in the row (the toggle, a receipt, a link) keeps its press.
+        if ((e.target as HTMLElement).closest("button, a, [role=button]") == null) onToggle();
+      }}
+      {...rest}
+    >
+      {cells == null ? (
+        <th
+          scope="row"
+          role={stacked ? "rowheader" : undefined}
+          colSpan={colSpan}
+          className={`relative text-left font-normal align-middle ${DATA_TABLE_PAD} sm:h-14 sm:py-0`}
+        >
+          {name}
+        </th>
+      ) : (
+        <>
+          <DataTableCell rowHeader valign="middle" className={nameClassName}>
+            {name}
+          </DataTableCell>
+          {cells}
+        </>
+      )}
+    </tr>
   );
 }

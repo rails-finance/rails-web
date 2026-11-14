@@ -25,14 +25,13 @@ import { Facehash } from "@/components/shared/facehash";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { WalletMenu } from "@/components/shared/wallet-menu";
-import { ToolsMenu } from "@/components/shared/tools-menu";
 import { WalletElsewhereLine } from "@/components/shared/wallet-elsewhere-line";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { protocolForSession } from "@/lib/shared/protocols";
-import type { ChainId } from "@/lib/shared/chains";
+import { CHAINS, type ChainId } from "@/lib/shared/chains";
 import { fetchAddressKind, type AddressKind } from "@/lib/api/fetch-address-kind";
 import { ProtocolGlyph, ProtocolIcon } from "@/components/icons/protocol-glyphs";
-import { Prov, ProvReceiptsScope, provInspector, useReceiptRegistry } from "@/components/shared/provenance";
+import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { managerProv } from "@/lib/shared/manager-provenance";
 
 /** The shell both surfaces draw. `title` is the name line (the h1 and what
@@ -86,7 +85,11 @@ function SafeIcon({ className }: { className?: string }) {
  *  carries its name when it answers one. Where the chain names who runs the
  *  account (ui-jobs 440), the label is the kind's word, a middle dot and the
  *  product ("Safe · DeFi Saver"), and the tip says what the product can do. */
-function addressKindWords(k: Exclude<AddressKind, { kind: "account" }>): {
+function addressKindWords(
+  k: Exclude<AddressKind, { kind: "account" }>,
+  /** The chain the contract tip names; Ethereum where the page names none. */
+  chainName = "Ethereum",
+): {
   Icon: LucideIcon | ComponentType<{ className?: string }>;
   label: string | null;
   tip: string;
@@ -136,14 +139,23 @@ function addressKindWords(k: Exclude<AddressKind, { kind: "account" }>): {
         Icon: FileCode2,
         label: named ?? null,
         tip: named
-          ? `A smart contract named ${named}: a program on Ethereum, not a wallet someone holds a key to.`
-          : "A smart contract: a program on Ethereum, not a wallet someone holds a key to.",
+          ? `A smart contract named ${named}: a program on ${chainName}, not a wallet someone holds a key to.`
+          : `A smart contract: a program on ${chainName}, not a wallet someone holds a key to.`,
       };
     }
   }
 }
 
-function AddressKindLabel({ wallet, chainId }: { wallet: string; chainId: ChainId }) {
+function AddressKindLabel({
+  wallet,
+  chainId,
+  chainName,
+}: {
+  wallet: string;
+  chainId: ChainId;
+  /** The chain the contract tip names; Ethereum where omitted. */
+  chainName?: string;
+}) {
   const [kind, setKind] = useState<AddressKind | null>(null);
   const registry = useReceiptRegistry();
   useEffect(() => {
@@ -157,7 +169,7 @@ function AddressKindLabel({ wallet, chainId }: { wallet: string; chainId: ChainI
     };
   }, [wallet, chainId]);
   if (!kind || kind.kind === "account") return null;
-  const w = addressKindWords(kind);
+  const w = addressKindWords(kind, chainName);
   const manager = kind.kind === "safe" || kind.kind === "contract" ? kind.manager : undefined;
   const info = manager && (kind.kind === "safe" || kind.kind === "contract") ? managerProv(kind, chainId) : null;
   const tip = (
@@ -180,25 +192,14 @@ function AddressKindLabel({ wallet, chainId }: { wallet: string; chainId: ChainI
   if (!manager) return <span className="flex min-w-0 shrink-[100]">{tip}</span>;
   return (
     // Gives way before the address does (shrink-[100]). The product's mark
-    // after the words opens the manager's receipt (anatomy H13), as the
-    // timeline bar's mark opens the bar's: it arms the heading's scope and
-    // pins the receipt at the mark.
+    // after the words carries the manager's receipt (anatomy H13), picked
+    // while the inspector is armed, as the timeline bar's mark carries the
+    // bar's.
     <span className="flex min-w-0 shrink-[100] items-center gap-1">
       {tip}
       {info ? (
-        <ProvReceiptsScope registry={registry} scopeId="wallet-heading" bounds={false}>
-          <button
-            type="button"
-            className="flex shrink-0 cursor-pointer rounded-sm focus-ring"
-            data-account-manager-receipt={manager.product}
-            aria-label={`Who runs this account: ${manager.name}`}
-            onClick={(e) => {
-              const el = e.currentTarget;
-              provInspector.setArmed(true, "wallet-heading");
-              const entry = registry.getEntries().find((x) => !x.echo && x.el && el.contains(x.el));
-              if (entry?.el) provInspector.pin(entry, registry, entry.el);
-            }}
-          >
+        <ProvReceiptsScope registry={registry} bounds={false}>
+          <span className="flex shrink-0 rounded-sm" data-account-manager-receipt={manager.product}>
             <Prov info={info} value={manager.name} className="flex shrink-0 items-center">
               <ProtocolIcon
                 id={manager.icon}
@@ -206,7 +207,7 @@ function AddressKindLabel({ wallet, chainId }: { wallet: string; chainId: ChainI
               />
               <span className="sr-only">{manager.name}</span>
             </Prov>
-          </button>
+          </span>
         </ProvReceiptsScope>
       ) : (
         <ProtocolIcon id={manager.icon} className="size-3.5 shrink-0 [&:is(img)]:opacity-80 [&:is(img)]:grayscale" />
@@ -218,6 +219,9 @@ function AddressKindLabel({ wallet, chainId }: { wallet: string; chainId: ChainI
 export interface PositionOwner {
   /** The wallet; null or undefined while the page has not read it. */
   wallet: string | null | undefined;
+  /** The page's chain, which a contract's tip names ("a program on Base"); the tip says Ethereum
+   *  where omitted. */
+  chain?: ChainId;
   ensName?: string | null;
   /** Where a pill (a vault, or a page passing `href`) filters its listing to
    *  this wallet. Defaults to the page's session; null leaves the label
@@ -246,9 +250,9 @@ export function PositionWalletHeading({
   /** The page's explorer: the chain of the address kind, and the default for
    *  the listing link. */
   session: SessionProtocol;
-  /** The Tools menu with the page's export shapes; a bare menu without;
-   *  false for none, on a page whose card carries the menu (ui-jobs 270). */
-  tools?: ReactNode | false;
+  /** The Tools menu with the page's export shapes; absent or false for none
+   *  (a page whose card carries the menu, ui-jobs 270). */
+  tools?: ReactNode;
   /** The price and recency strip, before Tools (ui-jobs 272), on a page that
    *  draws no detail card (ui-jobs 430). */
   strip?: ReactNode;
@@ -284,7 +288,13 @@ export function PositionWalletHeading({
         <>
           {pill && owner.prefix}
           {pill && (owner.wrap ? owner.wrap(pill) : pill)}
-          {owner.wallet && chainId != null && <AddressKindLabel wallet={owner.wallet} chainId={chainId} />}
+          {owner.wallet && chainId != null && (
+            <AddressKindLabel
+              wallet={owner.wallet}
+              chainId={chainId}
+              chainName={owner.chain != null ? CHAINS[owner.chain].name : undefined}
+            />
+          )}
           {owner.extra}
         </>
       }
@@ -299,9 +309,7 @@ export function PositionWalletHeading({
               {strip}
             </span>
           )}
-          {tools !== false && (
-            <span className="ml-auto flex min-h-7 shrink-0 items-center">{tools || <ToolsMenu />}</span>
-          )}
+          {tools && <span className="ml-auto flex min-h-7 shrink-0 items-center">{tools}</span>}
         </>
       }
     />

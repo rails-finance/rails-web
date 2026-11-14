@@ -16,6 +16,7 @@ import { isMoonwellEvent } from "@/lib/shared/types/event-shape";
 import type { MoonwellPositionView } from "@/components/protocol/moonwell/moonwell-position-card";
 import type { MoonwellChainResponse } from "@/lib/api/fetch-moonwell-position";
 import { num, amt, usd, fmtUtc, txCell } from "@/lib/shared/position-markdown";
+import { creditRemainingShare, creditRemainingText } from "@/lib/moonwell/credit-remaining";
 import {
   markdownFirstTimestamp,
   markdownTimelineSlice,
@@ -108,7 +109,7 @@ export function moonwellPositionToMarkdown(args: MoonwellPositionMarkdownArgs): 
         const entered = live?.markets.find((m) => m.market === r.market)?.entered;
         lines.push(
           `- **${r.symbol}:** ${tokenWithUsd(view, r.address, amount, r.symbol)} (${basis})` +
-            (entered === false ? " — NOT entered as collateral: backs no borrowing, can't be seized" : ""),
+            (entered === false ? " — NOT entered as collateral: backs no borrowing" : ""),
         );
       }
       lines.push("");
@@ -130,26 +131,29 @@ export function moonwellPositionToMarkdown(args: MoonwellPositionMarkdownArgs): 
       lines.push(`## Live risk (at block ${live.blockNumber})`);
       lines.push("");
       lines.push(
-        `- **Comptroller's own verdict (getAccountLiquidity):** ` +
+        `- **Credit remaining (the Comptroller's getAccountLiquidity):** ` +
           (live.shortfallUsd > 0
             ? `shortfall ${usd(live.shortfallUsd)} — the account is liquidatable now`
-            : `${usd(live.liquidityUsd)} of liquidity still unborrowed`),
+            : `${usd(live.liquidityUsd)}, what the account can still borrow`),
       );
+      const credit = creditRemainingShare(live.collateralCapacityUsd, live.debtValueUsd);
+      if (credit != null && live.debtValueUsd > 0) {
+        lines.push(
+          `- **Credit remaining, as a share of the credit limit:** ${creditRemainingText(credit)} ((credit limit − debt) ÷ credit limit, Moonwell's docs' form; at 0% the account can be liquidated)`,
+        );
+      }
       if (live.healthFactor != null) {
         lines.push(
-          `- **Health factor:** ${num(live.healthFactor, 2)} (CF-weighted capacity ÷ debt; the shortfall begins at 1.0 — one collateral factor, so the borrow limit IS the liquidation line)`,
-        );
-        lines.push(
-          `- **Collateral (entered):** ${usd(live.collateralValueUsd)} · **capacity line:** ${usd(live.collateralCapacityUsd)} · **debt:** ${usd(live.debtValueUsd)}`,
+          `- **Collateral (entered):** ${usd(live.collateralValueUsd)} · **credit limit:** ${usd(live.collateralCapacityUsd)} · **debt:** ${usd(live.debtValueUsd)}`,
         );
       }
       lines.push(
-        `- **Liquidation mechanics:** close factor ${num(live.closeFactor * 100, 0)}% (max share of one debt per liquidation), liquidation incentive ${num(Math.max(0, live.liquidationIncentive - 1) * 100, 0)}%`,
+        `- **Liquidation mechanics:** close factor ${num(live.closeFactor * 100, 0)}% (max share of one debt per liquidation), liquidation incentive ${num(live.liquidationIncentive, 2)}× (${num(Math.max(0, live.liquidationIncentive - 1) * 100, 0)}% extra)`,
       );
       for (const m of live.markets) {
         const rates =
           m.supplyApr != null && m.borrowApr != null
-            ? `supply ${num(m.supplyApr * 100, 2)}% APR, borrow ${num(m.borrowApr * 100, 2)}% APR`
+            ? `supply APY ${num(m.supplyApr * 100, 2)}%, borrow APY ${num(m.borrowApr * 100, 2)}% (compounded every second)`
             : "rates unavailable";
         lines.push(
           `- **${m.symbol} market:** ${rates}, collateral factor ${num(m.collateralFactor * 100, 0)}%` +

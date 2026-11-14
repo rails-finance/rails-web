@@ -7,7 +7,7 @@ import { asV3Market, ORACLE_BY_MARKET, POOL_BY_MARKET, V3_SYMBOL_BY_ADDR } from 
 // size, rates, risk config and the market's own oracle price, read at the
 // chain head (three multicall bursts). `?market=prime|etherfi` reads that
 // market's Pool and oracle (lib/aave-v3/asset-catalog.ts AAVE_V3_MARKETS);
-// none reads Core, through rails-server's head surface. Feeds /aave-v3/market
+// none reads Core, through rails-server's head surface. Feeds /aave-v3/markets
 // and its reserve pages. The reader returns a chainStale stub on RPC failure,
 // so this route never 500s into the surface. Node runtime; the success
 // response is cacheable for ten minutes at the edge, the failure stub is not.

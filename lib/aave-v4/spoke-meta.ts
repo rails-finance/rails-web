@@ -40,6 +40,8 @@ const SPOKE_SLUG_TO_NAME: Record<string, string> = {
   lombard: "Lombard BTC",
   treasury: "Treasury",
   "stablecoin-correlated": "Stablecoin Correlated",
+  "usdg-syrup": "USDG Syrup",
+  "usdg-paxg": "USDG PAXG",
   // Legacy slug: /aave-v4/spoke/global-dollar/… links predate the display rename
   // (hub "Global Dollar" / spoke "Stablecoin Correlated"). Kept so they resolve.
   "global-dollar": "Stablecoin Correlated",
@@ -233,8 +235,9 @@ export function getSpokeMeta(name: string): SpokeMeta | null {
 // backend still emits the pre-rename display name ("Global Dollar") for the
 // usdg_pendle spoke on at least one deploy, while the key itself is stable.
 //
-// Treasury has no deployed address yet (rails-server-onboarding's config notes
-// it as "unknown"), so it is intentionally omitted here too.
+// Treasury (0xB9B0…3155) is omitted: the Core hub lists it as its fee receiver,
+// supply only, with no reserves and no wallet's position (rails-ops
+// reference/official-docs/aave-v4.md, Docs and chain disagree, entry 4).
 export const SPOKE_ADDRESS_BY_KEY: Record<string, `0x${string}`> = {
   main: "0x94e7a5dcbe816e498b89ab752661904e2f56c485",
   bluechip: "0x973a023a77420ba610f06b3858ad991df6d85a08",
@@ -284,6 +287,16 @@ export const SPOKE_NAME_TO_KEY: Record<string, string> = {
   // Legacy alias: pre-rename URLs/bookmarks resolved this spoke as "Global
   // Dollar". Kept so the chain-state fetch still resolves for those.
   "Global Dollar": "usdg_pendle",
+  "USDG Syrup": "usdg_syrup",
+  "USDG PAXG": "usdg_paxg",
   // Aave V4 on Base.
   Mag7: "mag7",
 };
+
+/** A spoke's URL slug from the api's spoke key ("ethena_corr" → "ethena-correlated"),
+ *  through its display name; the key with `_` written `-` for a spoke this build
+ *  has not heard of. */
+export function spokeSlugOfKey(key: string, name?: string): string {
+  const named = Object.entries(SPOKE_NAME_TO_KEY).find(([n, k]) => k === key && slugifySpoke(n))?.[0];
+  return slugifySpoke(named ?? name ?? "") ?? key.replace(/_/g, "-");
+}

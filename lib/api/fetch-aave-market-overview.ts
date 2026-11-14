@@ -7,7 +7,7 @@
 // price — read LIVE from the chain (Pool.getReservesList → getReserveData +
 // IAaveOracle.getAssetPrice, one multicall burst; lib/sources/chain/
 // aave-market-overview.ts). Feeds the shared market-overview surface at
-// /aave-v3/market and /spark/market — the V3-family counterpart of Aave V4's
+// /aave-v3/markets and /spark/markets — the V3-family counterpart of Aave V4's
 // /aave-v4/hubs comparison (single market, so one summary card, not a band).
 //
 // Amounts arrive as token-unit numbers (BigInt-safe scaled server-side), USD is
@@ -104,6 +104,8 @@ export interface AaveMarketReserve {
   /** The reserve's outstanding deficit on a v3.3+ Pool (Pool.getReserveDeficit),
    *  token units; null where the Pool has no such getter. */
   deficit?: number | null;
+  /** The same in the token's smallest unit, as the getter returned it. */
+  deficitRaw?: string | null;
   /** The price source the market's oracle reads for this asset
    *  (IAaveOracle.getSourceOfAsset), lowercased; null where it does not answer. */
   oracleSource?: string | null;
@@ -123,6 +125,8 @@ export interface AaveMarketOverviewResponse {
   stored?: StoredHeadRead;
   /** True when the RPC read failed — reserves is empty, show a retry state. */
   chainStale: boolean;
+  /** With `chainStale`: the read was refused at the daily read ceiling (lib/shared/read-ceiling.ts). */
+  readCeiling?: boolean;
   /** SparkLend's CapAutomator, when the market has one. */
   capAutomator?: string;
   reserves: AaveMarketReserve[];

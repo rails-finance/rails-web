@@ -1,6 +1,8 @@
 "use client";
 
-// A Pendle market's router events, newest first, on the timeline's furniture:
+// A Pendle market's router events, newest first, as a section of the market's
+// page (R2) with its own receipts scope and ⋮ (Download CSV of the loaded
+// rows), on the timeline's furniture:
 // the toolbar strip (L1) with the count (L1.2) and the types-of-event filter
 // (L1.3, the shared FilterDropdown), the rows on the spine as event cards (T1,
 // L3), and "Show 50 more" (L9). Each row names its wallet (the receiver; on a
@@ -16,11 +18,13 @@ import { FilterDropdown } from "@/components/shared/filter-dropdown";
 import { SpineTipContext } from "@/components/shared/spine-column";
 import { EventDateContext } from "@/components/shared/event-time";
 import { Prov } from "@/components/shared/provenance";
+import { ProvSection, SectionHeading } from "@/components/shared/section-menu";
+import { ToolsFor } from "@/components/shared/product/product-head";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
-import { CARD_INSET_START, SECTION_HEADING } from "@/lib/shared/ui-grammar";
+import { CARD_INSET_START } from "@/lib/shared/ui-grammar";
 import { notifyUrlChanged, useUrlSearchParams } from "@/lib/shared/use-url-search-params";
 import { PendleEventCard } from "@/components/protocol/pendle/pendle-event-card";
-import { flowProv } from "@/lib/pendle/provenance";
+import { marketEventsProv } from "@/lib/pendle/provenance";
 import type { PendleEventKind, PendleMarketEvent, PendleMarketPage, PendleTokenMeta } from "@/lib/pendle/types";
 
 const n = (v: number) => v.toLocaleString("en-US");
@@ -33,7 +37,7 @@ const GROUPS: { key: Group; label: string }[] = [
   { key: "pt", label: "PT trades" },
   { key: "yt", label: "YT trades" },
   { key: "liquidity", label: "Liquidity" },
-  { key: "mint", label: "Mint and redeem" },
+  { key: "mint", label: "Mint, redeem, wrap and unwrap" },
   { key: "limit", label: "Limit fills" },
 ];
 const GROUP_OF: Record<PendleEventKind, Group> = {
@@ -53,6 +57,30 @@ const GROUP_OF: Record<PendleEventKind, Group> = {
 };
 
 const keyOf = (r: PendleMarketEvent) => `${r.txHash}-${r.logIndex}`;
+
+/** The loaded rows as CSV: one row per leg, raw amounts. */
+function eventsCsv(rows: PendleMarketEvent[]): string {
+  const head = "block,timestamp,tx_hash,log_index,router,event,kind,caller,receiver,leg,token,amount_raw";
+  const lines = rows.flatMap((r) =>
+    (r.legs.length ? r.legs : [null]).map((l) =>
+      [
+        r.block,
+        new Date(r.timestamp * 1000).toISOString(),
+        r.txHash,
+        r.logIndex,
+        r.router,
+        r.event,
+        r.kind,
+        r.caller ?? "",
+        r.receiver ?? "",
+        l?.leg ?? "",
+        l?.token ?? "",
+        l?.amount ?? "",
+      ].join(","),
+    ),
+  );
+  return [head, ...lines].join("\n");
+}
 
 export function PendleMarketEvents({
   m,
@@ -127,18 +155,33 @@ export function PendleMarketEvents({
       : `${n(total)} ${total === 1 ? "event" : "events"}`;
 
   return (
-    <section className="space-y-4" data-anatomy="P3" aria-label="Router events" data-pendle-market-events="">
+    <ProvSection scope="market-events" className="mb-8 space-y-4" data-anatomy="P3" data-pendle-market-events="">
       <div className="space-y-3" data-anatomy="L1">
-        <h2 className={`${SECTION_HEADING} ${CARD_INSET_START}`} data-anatomy="L1.1">
-          Router events
-        </h2>
+        <SectionHeading
+          title={<span data-anatomy="L1.1">Router events</span>}
+          menu={
+            <ToolsFor
+              scope="market-events"
+              title="Router events"
+              tools={{
+                exports: {
+                  csv: {
+                    filename: `pendle-${m.tokens.market.address}-events.csv`,
+                    build: () => eventsCsv(rows),
+                    subtitle: "The events loaded so far, one row per leg",
+                  },
+                },
+              }}
+            />
+          }
+        />
         <div className="flex w-full flex-wrap items-center gap-2 sm:justify-end">
           <span
-            className={`basis-full whitespace-nowrap text-xs tabular-nums text-rb-500 sm:basis-auto ${CARD_INSET_START} sm:pl-0`}
+            className="basis-full whitespace-nowrap text-xs tabular-nums text-rb-500 sm:basis-auto"
             data-anatomy="L1.2"
             data-pendle-count=""
           >
-            <Prov info={flowProv("Router events", total)} value={String(total)}>
+            <Prov info={marketEventsProv(total)} value={String(total)}>
               {countLine}
             </Prov>
           </span>
@@ -209,6 +252,6 @@ export function PendleMarketEvents({
           </button>
         </div>
       )}
-    </section>
+    </ProvSection>
   );
 }

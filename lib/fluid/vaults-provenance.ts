@@ -109,9 +109,8 @@ type FluidConfigField = "collateralFactor" | "liquidationThreshold" | "liquidati
 const CONFIG_GLOSS: Record<FluidConfigField, string> = {
   collateralFactor: "the ratio a position can borrow up to",
   liquidationThreshold: "the ratio at which a position becomes liquidatable",
-  liquidationMaxLimit:
-    "the ratio past which the vault stops selling to liquidators and absorbs the position onto its own book (why an absorbed liquidation pays no bonus)",
-  liquidationPenalty: "the premium floor the engine guarantees a liquidator",
+  liquidationMaxLimit: "the liquidation max limit, the ratio above which 100% of a position gets liquidated",
+  liquidationPenalty: "the liquidation penalty a liquidated position pays beyond the debt cleared",
 };
 
 /** A vault's governance-set risk rung — one of the config block's 1e4-scaled
@@ -147,9 +146,7 @@ const fluidOraclePriceProv_ = (coords: FluidVaultCoords): Provenance => ({
  *  figure is DEX pool SHARES (a quantity, not a token). */
 const fluidVaultSizeProv_ = (side: "supply" | "borrow", smartLeg: boolean, coords: FluidVaultCoords): Provenance => {
   const field = side === "supply" ? "totalSupplyVault" : "totalBorrowVault";
-  const unit = smartLeg
-    ? "DEX pool shares — the leg holds shares of a Fluid DEX pool, a quantity, not a token"
-    : "the leg's own token units";
+  const unit = smartLeg ? "DEX shares — the leg holds shares of a Fluid DEX pool" : "the leg's own token units";
   return {
     kind: "chain",
     pclass: "state",
@@ -204,7 +201,7 @@ const fluidVaultRateProv_ = (side: "supply" | "borrow", coords: FluidVaultCoords
     pclass: "state",
     source: { block: coords.blockNumber },
     verify: recompute(`exchangePricesAndRates.${field}`, coords),
-    summary: `The vault's current ${side} rate, annual${atBlock(coords)} — the resolver's own rates block (\`exchangePricesAndRates.${field}\`, a 1e2-precision percent): the liquidity-layer rate with the vault's reward or fee magnifier applied. Rates float with utilisation; this is the rate at this block, not a projection.`,
+    summary: `The vault's current ${side} rate, annual${atBlock(coords)} — the resolver's own rates block (\`exchangePricesAndRates.${field}\`, a 1e2-precision percent): the Liquidity Layer rate with the vault's reward or fee magnifier applied. Rates float with utilization; this is the rate at this block, not a projection.`,
     contract: vaultContract(coords),
     via: `${LANE} · VaultResolver.getAllVaultsAddresses() → getVaultEntireData(vault) · exchangePricesAndRates.${field} @ head`,
   };
@@ -216,3 +213,86 @@ export const fluidOraclePriceProv = stamped(fluidOraclePriceProv_);
 export const fluidVaultSizeProv = stamped(fluidVaultSizeProv_);
 export const fluidSmartLegProv = stamped(fluidSmartLegProv_);
 export const fluidVaultRateProv = stamped(fluidVaultRateProv_);
+
+// ── one vault's page (ui-jobs 549 step 7) ────────────────────────────────────
+
+/** A vault's identity: its address, id and type, the row's receipt on the
+ *  roster and the subtitle's on its page. */
+const fluidVaultIdentityProv_ = (vaultType: number, coords: FluidVaultCoords): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  source: { block: coords.blockNumber },
+  verify: recompute("constantVariables", coords),
+  summary: `Fluid vault ${coords.vaultId ?? ""}${coords.pair ? ` (${coords.pair})` : ""} — minted by the VaultFactory, read through the VaultResolver${atBlock(coords)}. Its type (\`constantVariables.vaultType\` ${vaultType}) says which legs hold DEX pool shares: 10000 a plain pair (T1), 20000 smart collateral (T2), 30000 smart debt (T3), 40000 both (T4).`,
+  contract: vaultContract(coords),
+  via: ROSTER_VIA,
+  inputs: [
+    { label: "vault", value: coords.vault, kind: "chain", contract: vaultContract(coords) },
+    { label: "vault id", value: String(coords.vaultId ?? ""), kind: "chain" },
+    { label: "oracle", value: coords.oracle ?? "none", kind: "chain" },
+  ],
+});
+
+/** Positions one vault has minted, open or closed — vaultState.totalPositions. */
+const fluidVaultPositionsProv_ = (coords: FluidVaultCoords): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  source: { block: coords.blockNumber },
+  verify: recompute("vaultState.totalPositions", coords),
+  summary: `Positions opened in the vault — its \`vaultState.totalPositions\`${atBlock(coords)}: every position NFT the vault has minted, open or closed. A position emptied of collateral and debt stays in the count.`,
+  contract: vaultContract(coords),
+  via: `${LANE} · getVaultEntireData(vault) · vaultState.totalPositions @ head`,
+});
+
+/** Σ totalPositions over the roster: every position minted, open or closed. */
+const fluidRosterPositionsProv_ = (coords: FluidVaultCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  source: { block: coords.blockNumber },
+  summary: `Positions opened across the roster — Σ each vault's \`vaultState.totalPositions\`${atBlock(coords)}: every position NFT the vaults have minted, open or closed. Each leg a resolver read; the sum is ours.`,
+  contract: VAULT_RESOLVER_CONTRACT,
+  via: `${LANE} · Σ vaultState.totalPositions @ head`,
+  formula: "Σ totalPositions over the roster",
+});
+
+/** What borrowers can take now — limitsAndAvailability.borrowable. */
+const fluidBorrowableProv_ = (coords: FluidVaultCoords): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  source: { block: coords.blockNumber },
+  verify: recompute("limitsAndAvailability.borrowable", coords),
+  summary: `Available to borrow — the resolver's \`limitsAndAvailability.borrowable\`${atBlock(coords)}, in ${coords.debtSym ?? "the debt token"}: the least of the vault's borrow limit at the Liquidity Layer and the Liquidity Layer's free balance of the token.`,
+  contract: VAULT_RESOLVER_CONTRACT,
+  via: `${LANE} · getVaultEntireData(vault) · limitsAndAvailability.borrowable @ head`,
+});
+
+/** The vault's aggregate ratio: total borrow ÷ (total supply × liquidate price). */
+const fluidVaultUsedProv_ = (coords: FluidVaultCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  source: { block: coords.blockNumber },
+  summary: `Used — the vault's total borrow ÷ (its total supply × the oracle's liquidate price)${atBlock(coords)}: the whole vault's debt as a share of its collateral's value, on the axis the ladder's rungs sit on. It is the vault's aggregate; one position can sit far above it.`,
+  contract: vaultContract(coords),
+  via: `${LANE} · totalBorrowVault ÷ (totalSupplyVault × configs.oraclePriceLiquidate) @ head`,
+  formula: "totalBorrowVault ÷ (totalSupplyVault × oraclePriceLiquidate)",
+});
+
+export const fluidVaultIdentityProv = stamped(fluidVaultIdentityProv_);
+export const fluidVaultPositionsProv = stamped(fluidVaultPositionsProv_);
+export const fluidRosterPositionsProv = stamped(fluidRosterPositionsProv_);
+export const fluidBorrowableProv = stamped(fluidBorrowableProv_);
+export const fluidVaultUsedProv = stamped(fluidVaultUsedProv_);
+
+// ── the open count (ui-jobs 633) ─────────────────────────────────────────────
+
+/** Open positions across every vault — Rails's index, the positions
+ *  listing's Status: Open total. Indexed: no chain slot holds this count. */
+export const fluidOpenPositionsProv = (readAt: string, readAtText: string): Provenance => ({
+  kind: "derived",
+  pclass: "indexed",
+  source: { timestamp: readAt },
+  summary: `Open positions across every vault — Rails's index of Fluid positions on Ethereum, read ${readAtText}. A position is open while it holds collateral or debt: the server's last resolver read of the position (\`positionByNftId\`) decides where it has one, and the replay of the position's events where it has not. The positions listing's Status: Open counts by the same rule.`,
+  contract: VAULT_RESOLVER_CONTRACT,
+  via: "Rails's server · /api/fluid/positions?status=open · total",
+  formula: "count of positions with collateral > 0 or debt > 0",
+});

@@ -66,8 +66,10 @@ const V2_BATCHED =
 // AUTHORSHIP, not phrasing — each regex accepts any wording that credits the
 // right party and still goes red if the parties swap.
 const BORROWER = /the (?:rate the )?borrower chooses(?: it)?/;
+// The forks name the party in their docs' word (decision 0065): Ebisu's and
+// Asymmetry's "delegate", where the copy said "batch manager".
 const DELEGATE =
-  /(?:interest-)?batch manager (?:sets it on the owner|rather than by the owner)|set by its batch manager/;
+  /(?:interest-)?(?:batch manager|delegate) (?:sets it on the owner|rather than by the owner)|set by its (?:batch manager|delegate)/;
 
 let failures = 0;
 const assert = (cond, msg) => {
@@ -207,7 +209,7 @@ console.log("§3 Liquity V2 'How borrowing works' modal — on a batched trove")
   // Confirm this really is an openTroveAndJoinBatch — the reader for whom the
   // old sentence was flatly untrue. Without this the section would assert the
   // copy against an ordinary borrower and the fixture would prove nothing.
-  assert(/joined batch manager/i.test(openCard), "the fixture trove opened straight into a batch");
+  assert(/joined delegate/i.test(openCard), "the fixture trove opened straight into a batch");
 
   // The Learn-More trigger, scoped to THIS card — an unscoped document-wide
   // search picks up whichever card comes first in the DOM.
@@ -232,7 +234,7 @@ console.log("§3 Liquity V2 'How borrowing works' modal — on a batched trove")
   }, MODAL_SEL);
   assert(/How borrowing works/i.test(modal), "the borrowing modal is the one open");
   assert(
-    /the borrower sets the rate,? or delegates it to a batch manager/.test(modal),
+    /the borrower sets the rate,? or delegates it to a third party/.test(modal),
     "the modal names the delegation route",
   );
   assert(!modal.includes("the borrower chooses the rate"), "the modal no longer asserts sole borrower authorship");
@@ -256,7 +258,7 @@ console.log("§4 fork fallback modal copy (module level — no live page reaches
   const body = fn.slice(0, fn.indexOf("\n}\n"));
   assert(!body.includes("each borrower chooses their own annual rate"), "fallback no longer asserts sole authorship");
   assert(
-    body.includes("set by the borrower, or by the interest-batch manager the borrower delegates to"),
+    body.includes("set by the borrower, or by the ${p.terms.delegate} the borrower delegates to"),
     "fallback names both rate-authorship routes",
   );
 }

@@ -7,9 +7,9 @@
 //     CF-weighted capacity, a replica of the Comptroller's walk). Compound V2
 //     has ONE collateral factor per market, so the borrowing limit and the
 //     liquidation line coincide;
-//   • the panel: where the line sits in debt, the room the Comptroller's own
-//     liquidity figure leaves to borrow, and the drop the collateral basket can
-//     take (1 − 1/health, from the replica).
+//   • the panel: where the line sits in debt, the Comptroller's account
+//     liquidity (the docs' word for the room left to borrow), and the drop the
+//     collateral basket can take (1 − debt ÷ capacity, from the replica).
 //
 // The verdict in words is the Explanation's.
 
@@ -21,8 +21,10 @@ import { formatCompactUsd } from "@/lib/shared/format-compact";
 import { compoundV2CapacityProv, comptrollerVerdictProv } from "@/lib/compound-v2/position-provenance";
 import type { CompoundV2ChainResponse } from "@/lib/api/fetch-compound-v2-position";
 
+// "Liquidation line used" is Rails's name: Compound's docs give the account
+// liquidity and its shortfall, and no ratio (ui-jobs 631, V2).
 const LINE_TIP =
-  "The debt as a share of the liquidation line: each market's collateral factor sets both the borrowing limit and that line. At 100% the account can be liquidated.";
+  "The debt as a share of the liquidation line: each market's collateral factor sets both the borrow limit and that line. At 100% the account can be liquidated. Rails's name for the ratio; Compound's docs state the account liquidity and its shortfall in dollars.";
 
 /** The risk headline for an account with debt; null without debt (a
  *  supply-only account has no line to stand against). Pending while the
@@ -51,7 +53,7 @@ export function compoundV2RiskHead(chain: CompoundV2ChainResponse | null, hasDeb
 }
 
 /** The panel rows the Comptroller read adds: the liquidation line on the
- *  collateral side; the room to borrow and the drop to liquidation on the debt
+ *  collateral side; the account liquidity and the drop to liquidation on the debt
  *  side. Both empty before the read lands, and for an account with nothing
  *  counting toward the line. */
 export function compoundV2LineRows(chain: CompoundV2ChainResponse | null): {
@@ -84,20 +86,30 @@ export function compoundV2LineRows(chain: CompoundV2ChainResponse | null): {
     debt: [
       {
         id: "room-to-borrow",
-        label: "Room to borrow",
+        label: "Account liquidity",
         value: (
           <Prov info={comptrollerVerdictProv("Account liquidity", serverReadOf(chain))}>
             {formatCompactUsd(chain.liquidityUsd)}
           </Prov>
         ),
-        tip: "How many more dollars the account can borrow before the liquidation line: the Comptroller's account liquidity, read at the latest block.",
+        tip: "The room left to borrow: how many more dollars the account can borrow before the liquidation line, as the Comptroller's getAccountLiquidity states it at the latest block.",
       },
       ...(dropPct != null
         ? [
             {
               id: "liquidation-drop",
               label: "Liquidates on a drop of",
-              value: `${dropPct}%`,
+              value: (
+                <Prov
+                  info={compoundV2CapacityProv(
+                    "Drop to liquidation",
+                    "1 − debt value ÷ CF-weighted capacity (replica)",
+                    serverReadOf(chain),
+                  )}
+                >
+                  {dropPct}%
+                </Prov>
+              ),
               tip: "How far the collateral can fall in value, with the debt held, before the account reaches the liquidation line. Client arithmetic over the Comptroller's reads (a replica of its walk).",
             },
           ]

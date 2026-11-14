@@ -90,7 +90,7 @@ import { AAVE_V4_TIMELINE_RUNS } from "@/lib/aave-v4/timeline-runs";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { DetailBackButton, DetailTopRow } from "@/components/shared/detail-back-row";
-import { SECTION_HEADING, NAV_LINK, CTRL_GHOST } from "@/lib/shared/ui-grammar";
+import { SECTION_HEADING, CTRL_GHOST, FOOT_LINK } from "@/lib/shared/ui-grammar";
 import { ChevronDown } from "lucide-react";
 import {
   FlowsKey,
@@ -727,8 +727,8 @@ function AaveV4SpokePageInner({
           </p>
           <IndexNotice className="text-sm text-rb-500 mb-3" onRetry={() => setTailTry((n) => n + 1)} />
           <p className="text-sm text-rb-500">
-            <Link href={walletFilterHref} className={`underline ${NAV_LINK}`}>
-              See this wallet&rsquo;s other spokes →
+            <Link href={walletFilterHref} className={FOOT_LINK}>
+              See this wallet&rsquo;s other spokes
             </Link>
           </p>
         </div>
@@ -748,8 +748,8 @@ function AaveV4SpokePageInner({
               {shortAddr(wallet)} has no activity on the {spokeName} spoke
             </p>
             <p className="text-sm text-rb-500">
-              <Link href={walletFilterHref} className={`underline ${NAV_LINK}`}>
-                See this wallet&rsquo;s other spokes →
+              <Link href={walletFilterHref} className={FOOT_LINK}>
+                See this wallet&rsquo;s other spokes
               </Link>
             </p>
           </div>
@@ -778,7 +778,7 @@ function AaveV4SpokePageInner({
         <DetailTopRow
           session={session}
           wallet={wallet}
-          owner={{ wallet }}
+          owner={{ wallet, chain: deployment.chainId }}
           assets={stripAssets}
           closed={positionClosed}
           // The card's ⋮ carries the menu; an event page draws no Tools.
@@ -1104,7 +1104,7 @@ function AaveV4SpokeTowerBlock({
           {flowsPending && (
             <div data-flows-read="pending">
               <div className="flex min-h-[28px] items-center">{title}</div>
-              <LifetimeFlowsSkeleton />
+              <LifetimeFlowsSkeleton viewToggle={false} />
             </div>
           )}
           <div id="aave-v4-flows-ledger" hidden={!ledgerShown}>
@@ -1136,7 +1136,7 @@ function AaveV4SpokeTowerBlock({
                 <p className="leading-relaxed">
                   These figures add up every event on this spoke. What left the position (withdrawals, repayments,
                   liquidations) is valued at its price when it left, and what is still held at the latest block&apos;s
-                  price. Deposited and Borrowed are set so each side balances, so a price change while a token was held
+                  price. Supplied and Borrowed are set so each side balances, so a price change while a token was held
                   shows in them.
                   {totals.unpricedSymbols.length > 0 && (
                     <>
@@ -1149,7 +1149,7 @@ function AaveV4SpokeTowerBlock({
                 <div className="flex items-start gap-2 leading-relaxed">
                   <span className="select-none text-rb-500">•</span>
                   <span>
-                    {fig(totals.depositedUsd)} of collateral deposited over the position&apos;s life
+                    {fig(totals.depositedUsd)} of collateral supplied over the position&apos;s life
                     {totals.supplyInterestUsd > 0.01 && <> and {fig(totals.supplyInterestUsd)} earned in interest</>}
                     {totals.withdrawnUsd > 0.01 && <>, then {fig(totals.withdrawnUsd)} withdrawn</>}
                     {totals.liquidatedCollUsd > 0.01 && (

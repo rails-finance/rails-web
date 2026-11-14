@@ -192,7 +192,7 @@ const aaveVaultTargetRateProv_ = (c: AaveVaultCoords, bps: number): Provenance =
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("targetRate()", c),
-  summary: `Target rate — \`targetRate()\` reads ${bps} basis points${atBlock(c)}: the rate the risk council has set on the vault, in the units the contract stores it in. It is the setting at this block and not a forecast of what a holder earns — the council can change it, and this page states no return, no annualisation and no yield series.`,
+  summary: `Target rate — \`targetRate()\` reads ${bps} basis points${atBlock(c)}, which the card states as ${(bps / 100).toFixed(2)}%: the rate the risk council has set on the vault. It is the setting at this block, not a forecast of what a holder earns.`,
   contract: vaultContract(c),
   via: `${LANE} · targetRate() @ the pinned block`,
 });
@@ -203,7 +203,7 @@ const aaveVaultSupplyCapProv_ = (c: AaveVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("supplyCap()", c),
-  summary: `Deposit cap — \`supplyCap()\`${atBlock(c)}, in ${asset(c)}: the ceiling the risk council has set on what this vault will hold. What is left of it is the cap minus \`totalAssets()\`, which is what the vault's own \`maxDeposit()\` answers — the two agree exactly. A configuration read: the council can move the cap.`,
+  summary: `Supply cap — \`supplyCap()\`${atBlock(c)}, in ${asset(c)}: the ceiling the risk council has set on what this vault will hold. What is left of it is the cap minus \`totalAssets()\`, which \`maxDeposit()\` answers. A configuration read: the council can move the cap.`,
   contract: vaultContract(c),
   via: `${LANE} · supplyCap() @ the pinned block`,
 });
@@ -253,16 +253,6 @@ const aaveVaultReserveHopProv_ = (c: AaveVaultCoords, reserveSymbol: string): Pr
   summary: `Reserve covered — ${reserveSymbol}, reached by reading this stake token's \`asset()\`${atBlock(c)} and, where that answer is itself a static aToken, that wrapper's own \`asset()\`. Three of the four stake tokens hold a wrapped aToken rather than the reserve asset, so a holder is three hops from the reserve; stkGHO holds GHO directly.`,
   via: `${LANE} · asset() on the stake token, then asset() on the wrapper @ the pinned block`,
   formula: "stakeToken.asset() → (stataToken.asset() where that is a wrapper)",
-});
-
-/** How many funded vaults hold one asset — a count over the same reads. */
-const aaveVaultAssetGroupCountProv_ = (c: AaveVaultCoords, n: number): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  summary: `${n === 1 ? "One vault" : `${n} vaults`} over ${asset(c)} — the listed vaults whose \`asset()\` is ${asset(c)} and whose \`totalAssets()\` was above zero${atBlock(c)}. A vault that read zero sits in the trailing group.`,
-  via: `${LANE} · count of listed vaults per asset() @ the pinned block`,
-  formula: "count of listed vaults where asset() = this asset and totalAssets() > 0",
 });
 
 /** The address-book pill: Aave publishes this vault's address. */
@@ -410,17 +400,6 @@ const aaveUmbrellaWrapperPriceProv_ = (c: AaveVaultCoords, wrapperSymbol: string
   via: `${LANE} · wrapper.convertToAssets(one whole share) @ the pinned block`,
 });
 
-/** The holder's claim carried through the wrapper into reserve units. */
-const aaveUmbrellaWrapperClaimProv_ = (c: AaveVaultCoords, wrapperSymbol: string): Provenance => ({
-  kind: "chain",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  verify: recompute(`${wrapperSymbol}.convertToAssets(the holder's claim)`, c),
-  summary: `The same claim in ${reserveOf(c)} — the wrapper's own \`convertToAssets()\` applied to this holder's ${wrapperSymbol} claim${atBlock(c)}. Three reads in a row, each answered by the contract that owns the question: the stake token converts the holder's shares to ${wrapperSymbol}, the wrapper converts that to ${reserveOf(c)}. The figure is what the two contracts say at one block — not what a redemption would return, which depends on the cooldown and on nothing being slashed first.`,
-  contract: { name: wrapperSymbol },
-  via: `${LANE} · wrapper.convertToAssets(holder claim) @ the pinned block`,
-});
-
 // ── the holder ───────────────────────────────────────────────────────────────
 
 /** `balanceOf(holder)` — the one figure everything else on the holder half
@@ -455,17 +434,6 @@ const aaveVaultCooldownStateProv_ = (c: AaveVaultCoords): Provenance => ({
   summary: `Cooldown state — \`getStakerCooldown()\` for this address${atBlock(c)}: the amount it covers, when the cooldown ends and how long the window after it lasts, exactly as the token stores them. Which of the four states that is — none started, waiting, open, or passed — is a comparison against THIS BLOCK's own timestamp, read with the block, never against the reader's clock. Only one cooldown record exists per address at a time, and an outgoing transfer decays it.`,
   contract: vaultContract(c),
   via: `${LANE} · getStakerCooldown(holder) @ the pinned block`,
-});
-
-/** What the holding address IS — a mechanism, never an identity. */
-const aaveVaultHolderShapeProv_ = (c: AaveVaultCoords, kind: string, codeSize: number): Provenance => ({
-  kind: "chain",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  verify: recompute("eth_getCode(the holder)", c),
-  summary: `What this address is — \`eth_getCode\`${atBlock(c)} returned ${codeSize === 0 ? "no code" : `${codeSize} bytes`}, read as ${kind}. Every verdict here is a read: an empty answer is an externally owned account, a 23-byte \`0xef0100…\` code is the EIP-7702 delegation indicator, a released Safe singleton is an exact address match, an \`asset()\` plus a \`totalSupply()\` is a contract answering the ERC-4626 accessors, and an implementation slot is a pointer to another address to read. No app is named from any of it, and an address with a computed stake is not an identified person.`,
-  contract: { name: "the holding address", address: c.holder },
-  via: `${LANE} · eth_getCode(holder) @ the pinned block`,
 });
 
 /** THE NAME, and whose claim it is. A registry citation, not a reading of the
@@ -735,7 +703,6 @@ export const aaveVaultATokenProv = withServerRead(aaveVaultATokenProv_);
 export const aaveVaultCooldownProv = withServerRead(aaveVaultCooldownProv_);
 export const aaveVaultSlashableProv = withServerRead(aaveVaultSlashableProv_);
 export const aaveVaultReserveHopProv = withServerRead(aaveVaultReserveHopProv_);
-export const aaveVaultAssetGroupCountProv = withServerRead(aaveVaultAssetGroupCountProv_);
 export const aaveVaultBookProv = withServerRead(aaveVaultBookProv_);
 export const aaveVaultEmptyCountProv = withServerRead(aaveVaultEmptyCountProv_);
 export const aaveSghoAssetHeldProv = withServerRead(aaveSghoAssetHeldProv_);
@@ -747,11 +714,9 @@ export const aaveUmbrellaMaxSlashableProv = withServerRead(aaveUmbrellaMaxSlasha
 export const aaveUmbrellaCustodyProv = withServerRead(aaveUmbrellaCustodyProv_);
 export const aaveUmbrellaOwnerProv = withServerRead(aaveUmbrellaOwnerProv_);
 export const aaveUmbrellaWrapperPriceProv = withServerRead(aaveUmbrellaWrapperPriceProv_);
-export const aaveUmbrellaWrapperClaimProv = withServerRead(aaveUmbrellaWrapperClaimProv_);
 export const aaveVaultHolderSharesProv = withServerRead(aaveVaultHolderSharesProv_);
 export const aaveVaultHolderFractionProv = withServerRead(aaveVaultHolderFractionProv_);
 export const aaveVaultCooldownStateProv = withServerRead(aaveVaultCooldownStateProv_);
-export const aaveVaultHolderShapeProv = withServerRead(aaveVaultHolderShapeProv_);
 export const aaveAttestedNameProv = withServerRead(aaveAttestedNameProv_);
 export const aaveVaultCatalogueMemberProv = withServerRead(aaveVaultCatalogueMemberProv_);
 export const aaveVaultCensusBalanceProv = withServerRead(aaveVaultCensusBalanceProv_);

@@ -35,7 +35,7 @@ export function ChangeSide({ value, link }: { value: string; link?: FlowChangeLi
     <a
       href={link.href}
       target="_blank"
-      rel="noopener noreferrer"
+      rel="noopener"
       className="underline decoration-dotted underline-offset-2"
       data-flow-change-link=""
     >
@@ -124,7 +124,7 @@ export function ProtocolChangeRow({ group }: { group: ProtocolChangeGroup }) {
               <a
                 href={explorerUrl(chainId, "tx", hash)}
                 target="_blank"
-                rel="noopener noreferrer"
+                rel="noopener"
                 className="link-external text-xs"
                 data-protocol-change-tx={hash}
               >

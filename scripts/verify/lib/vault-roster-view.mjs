@@ -2,10 +2,10 @@
 // components/vaults/vault-roster.tsx), as the roster verifiers check it.
 // ----------------------------------------------------------------------------
 // A roster opens on its preset: a vault with a census when it counts 100+
-// current holders, a Yearn vault when the Registry endorses it, any other
-// vault kept. `?show=all` lifts it. The sort is Holders where a census
-// exists (else Size), `?sortBy=size` and `?sortBy=newest` the others. Every
-// row carries the hooks this reads (`data-holders-live`, `data-standing`,
+// current holders, a Yearn vault the census has no row for when the Registry
+// endorses it, any other vault kept. `?show=all` lifts it. Every roster draws
+// the house table (ui-jobs 538, 605), sorted by `?sort=` and `?dir=`, Holders
+// by default. Every row carries the hooks this reads (`data-holders-live`, `data-standing`,
 // `data-vault-family`, `data-created-block`, `data-total-assets-raw`).
 //
 //   import { checkRosterView } from "./lib/vault-roster-view.mjs";
@@ -34,11 +34,6 @@ export async function readRosterRows(page, scope) {
       return {
         address: el.getAttribute("data-vault-row"),
         group: el.getAttribute("data-group"),
-        groupKey: el.closest("[data-asset-group]")
-          ? `${el.closest("[data-asset-group]").getAttribute("data-asset-group-chain")}:${el
-              .closest("[data-asset-group]")
-              .getAttribute("data-asset-group")}`
-          : null,
         family: el.getAttribute("data-vault-family"),
         live: live ? Number(live) : null,
         standing: (el.getAttribute("data-standing") ?? "").split(" ").filter(Boolean),
@@ -52,56 +47,21 @@ export async function readRosterRows(page, scope) {
   );
 }
 
-/** Rows by group, in page order. */
-function groups(rows) {
-  const out = new Map();
-  for (const r of rows.filter((x) => x.group === "funded")) {
-    if (!out.has(r.groupKey)) out.set(r.groupKey, []);
-    out.get(r.groupKey).push(r);
-  }
-  return [...out.values()];
-}
-
 /** Pairs out of order under a comparator that says a may precede b. */
 const outOfOrder = (list, ok) => list.slice(1).filter((b, i) => !ok(list[i], b)).length;
 
-/** a may precede b under Holders: counted first, more holders first, ties and
- *  the uncounted by size. */
-const holdersOk = (a, b) =>
-  a.live != null && b.live == null
-    ? true
-    : a.live == null && b.live != null
-      ? false
-      : a.live != null && a.live !== b.live
-        ? a.live > b.live
-        : (a.held ?? a.raw) >= (b.held ?? b.raw);
-/** Size ranks by what the vault holds: total assets less lost assets (ui-jobs 543). */
-const sizeOk = (a, b) => (a.held ?? a.raw) >= (b.held ?? b.raw);
-const newestOk = (a, b) =>
-  a.created != null && b.created == null
-    ? true
-    : a.created == null && b.created != null
-      ? false
-      : a.created != null && a.created !== b.created
-        ? a.created > b.created
-        : (a.held ?? a.raw) >= (b.held ?? b.raw);
-/** Groups under Holders and Newest compare their first rows on the key alone. */
-const holdersKeyOk = (a, b) => (a.live == null ? b.live == null : b.live == null || a.live >= b.live);
-const newestKeyOk = (a, b) => (a.created == null ? b.created == null : b.created == null || a.created >= b.created);
-
 /** The table's order (ui-jobs 538): under Holders, counted rows first, most
- *  open holders first; under Total assets, by token, the larger held figure
- *  first inside one token (ui-jobs 543). */
+ *  open holders first; under Total assets, by token, the larger total assets
+ *  first inside one token (ui-jobs 664). */
 const tableHoldersOk = (a, b) => (a.live == null ? b.live == null : b.live == null || a.live >= b.live);
 const tokenCmp = (a, b) => a.token.localeCompare(b.token, "en-US", { sensitivity: "base" });
-const tableAssetsOk = (a, b) => tokenCmp(a, b) < 0 || (tokenCmp(a, b) === 0 && (a.held ?? a.raw) >= (b.held ?? b.raw));
+const tableAssetsOk = (a, b) => tokenCmp(a, b) < 0 || (tokenCmp(a, b) === 0 && a.raw >= b.raw);
 
 /**
  * The default view against `?show=all`, the preset's chip and its removal, and
- * the sorts. `holders`: the roster has a census (Holders is its default).
- * `table`: the rows are the index's table, which sorts by `?sort=`, not in groups.
+ * the table's sorts.
  */
-export async function checkRosterView({ page, base, route, scope, check, tag, holders = true, table = false }) {
+export async function checkRosterView({ page, base, route, scope, check, tag }) {
   const go = async (q) => {
     await page.goto(`${base}${route}${q}`, { waitUntil: "networkidle", timeout: 300_000 });
     await page.waitForSelector(`${scope} [data-vault-row]`, { timeout: 120_000 });
@@ -114,7 +74,7 @@ export async function checkRosterView({ page, base, route, scope, check, tag, ho
     }));
 
   // Everything, then the default.
-  await go("?show=all&sortBy=size");
+  await go("?show=all&sort=assets");
   const all = await readRosterRows(page, scope);
   const allFunded = all.filter((r) => r.group === "funded");
   const want = new Set(allFunded.filter(presetKeeps).map((r) => r.address));
@@ -147,24 +107,13 @@ export async function checkRosterView({ page, base, route, scope, check, tag, ho
     emptyDrawn === wantEmpty && (await page.locator(`${scope} [data-empty-group]`).count()) > 0 === wantEmpty > 0,
     `${emptyDrawn} drawn, ${wantEmpty} kept`,
   );
-  if (table) {
+  {
     const bad = outOfOrder(defFunded, tableHoldersOk);
     check(
       `${tag}e Holders is the default sort: counted rows first, most open holders first`,
       bad === 0,
       `${bad} rows out of order`,
     );
-  } else if (holders) {
-    const bad = groups(def).reduce((a, g) => a + outOfOrder(g, holdersOk), 0);
-    const firsts = groups(def).map((g) => g[0]);
-    check(
-      `${tag}e Holders is the default sort: counted rows first, most current holders first, the rest by size`,
-      bad === 0 && outOfOrder(firsts, holdersKeyOk) === 0,
-      `${bad} rows out of order, ${outOfOrder(firsts, holdersKeyOk)} groups`,
-    );
-  } else {
-    const bad = groups(def).reduce((a, g) => a + outOfOrder(g, sizeOk), 0);
-    check(`${tag}e Size is the default sort where there is no census`, bad === 0, `${bad} rows out of order`);
   }
 
   // Removing the chip writes ?show=all and draws every row; Reset returns.
@@ -187,22 +136,18 @@ export async function checkRosterView({ page, base, route, scope, check, tag, ho
     page.url(),
   );
 
-  if (table) {
+  {
     await go("?show=all&sort=assets");
     const rows = (await readRosterRows(page, scope)).filter((r) => r.group === "funded");
     const bad = outOfOrder(rows, tableAssetsOk);
     check(
-      `${tag}h ?sort=assets: by token, the most held first inside each token`,
+      `${tag}h ?sort=assets: by token, the largest total assets first inside each token`,
       bad === 0,
       `${bad} rows out of order`,
     );
     // The rule is the header's tip, read with the sort button (no line above the table).
     for (const [key, word, rule] of [
-      [
-        "assets",
-        "total assets",
-        "Sorts by token, then by what the vault holds within each token: total assets less lost assets.",
-      ],
+      ["assets", "total assets", "Sorts by token, then by total assets within each token."],
       ["price", "share price", "Sorts by token, then by share price within each token."],
     ]) {
       const th = page.locator(`${scope} [data-vault-table='funded'] th[data-sort-key='${key}']`);
@@ -219,25 +164,5 @@ export async function checkRosterView({ page, base, route, scope, check, tag, ho
       );
     }
     check(`${tag}j no sort line above the table`, (await page.locator(`${scope} [data-sort-note]`).count()) === 0);
-    return;
-  }
-
-  // Size and Newest, by URL, over every row.
-  const bySize = groups(all);
-  const sizeGroupsBad = outOfOrder(bySize, (a, b) => a.length >= b.length);
-  check(
-    `${tag}h ?sortBy=size: largest first inside each group, groups by vault count`,
-    bySize.reduce((a, g) => a + outOfOrder(g, sizeOk), 0) === 0 && sizeGroupsBad === 0,
-    `${bySize.reduce((a, g) => a + outOfOrder(g, sizeOk), 0)} rows, ${sizeGroupsBad} groups out of order`,
-  );
-  if (all.some((r) => r.created != null)) {
-    await go("?show=all&sortBy=newest");
-    const g = groups(await readRosterRows(page, scope));
-    const bad = g.reduce((a, x) => a + outOfOrder(x, newestOk), 0);
-    const gBad = outOfOrder(
-      g.map((x) => x[0]),
-      newestKeyOk,
-    );
-    check(`${tag}i ?sortBy=newest: newest created block first`, bad === 0 && gBad === 0, `${bad} rows, ${gBad} groups`);
   }
 }

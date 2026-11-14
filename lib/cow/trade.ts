@@ -8,10 +8,15 @@ import type { Provenance } from "@/components/shared/provenance";
 import { explorerUrl } from "@/lib/shared/chains";
 import { formatNumber, shiftDecimal } from "@/lib/utils/format";
 import type { CowTrade } from "@/lib/cow/types";
+import { executedRatio, soldLessFee } from "@/lib/cow/price";
+import { COW_TERMS } from "@/lib/cow/terms";
 
 export const COW_CHAIN_ID = 1 as const;
 export const GPV2_SETTLEMENT = "0x9008d19f58aabd9ed0d60971565aa8510560ab41";
-const SETTLEMENT = { name: "GPv2Settlement (CoW)", address: GPV2_SETTLEMENT };
+const SETTLEMENT = {
+  name: `${COW_TERMS.settlement} (${COW_TERMS.settlementContract})`,
+  address: GPV2_SETTLEMENT,
+};
 
 /** A token as the page names it: the symbol token_meta holds, else none. */
 export interface CowTokenLabel {
@@ -43,17 +48,16 @@ export function amountText(raw: string, t: CowTokenLabel): string {
   return n == null ? `${raw} (raw)` : formatNumber(n);
 }
 
-/** The executed price, stated per unit of the dearer token: "1 WETH = 2,320.4 USDT". */
+/** The executed price, stated per unit of the dearer token: "1 WETH = 2,320.4 USDT".
+ *  The sold side is the log's sellAmount less its feeAmount (`lib/cow/price.ts`). */
 export function executedPrice(
   trade: CowTrade,
   sell: CowTokenLabel,
   buy: CowTokenLabel,
 ): { text: string; value: string; base: CowTokenLabel; quote: CowTokenLabel } | null {
-  const s = amountNumber(trade.sellAmount, sell.decimals);
-  const b = amountNumber(trade.buyAmount, buy.decimals);
-  if (s == null || b == null || s === 0 || b === 0) return null;
-  const perSell = b / s;
-  const [base, quote, ratio] = perSell >= 1 ? [sell, buy, perSell] : [buy, sell, s / b];
+  const r = executedRatio(trade.sellAmount, trade.buyAmount, trade.feeAmount, sell.decimals, buy.decimals);
+  if (r == null) return null;
+  const [base, quote, ratio] = r.perSell >= 1 ? [sell, buy, r.perSell] : [buy, sell, r.perBuy];
   // exponent-safe: the receipt key, never drawn
   const value = ratio.toPrecision(8);
   return { text: `1 ${tokenText(base)} = ${formatNumber(ratio)} ${tokenText(quote)}`, value, base, quote };
@@ -73,11 +77,10 @@ const scaling = (raw: string, tok: CowTokenLabel) =>
 const FIELD = { sell: "sellAmount", buy: "buyAmount", fee: "feeAmount" } as const;
 const WORDS = {
   sell: (s: string) =>
-    `Sold — the ${s} this wallet's order sent to the CoW settlement contract in this trade, as the contract recorded it in its Trade log.`,
+    `Sold — the ${s} this wallet's order sent to ${COW_TERMS.settlement} in this trade, as the contract recorded it in its Trade log. By ${COW_TERMS.name}'s docs, fees are part of the trade's execution, so the amount is after fees.`,
   buy: (s: string) =>
     `Bought — the ${s} the settlement contract paid out for this wallet's order in this trade, as its Trade log recorded it.`,
-  fee: (s: string) =>
-    `Fee — the ${s} the settlement contract kept from the sold amount for this trade, as its Trade log recorded it.`,
+  fee: (s: string) => `Fee — the trade's fee amount, paid in the sold token (${s}), as its Trade log recorded it.`,
 };
 
 /** A Trade log field's receipt. */
@@ -103,11 +106,14 @@ export function executedPriceProv(
   price: NonNullable<ReturnType<typeof executedPrice>>,
 ): Provenance {
   const perSell = price.base.address === sell.address;
+  const fee = t.feeAmount !== "0";
+  const soldSide = fee ? "amount sold less the fee" : "amount sold";
+  const soldTerm = fee ? "(sold − fee)" : "sold";
   return {
     kind: "derived",
     pclass: "emitted",
-    summary: `Executed price — what one ${tokenText(price.base)} cost in ${tokenText(price.quote)} in this trade: the ${perSell ? "amount bought divided by the amount sold" : "amount sold divided by the amount bought"}, each scaled by its token's decimals.`,
-    formula: perSell ? "bought ÷ sold" : "sold ÷ bought",
+    summary: `Executed price — what one ${tokenText(price.base)} cost in ${tokenText(price.quote)} in this trade: the ${perSell ? `amount bought divided by the ${soldSide}` : `${soldSide} divided by the amount bought`}, each scaled by its token's decimals.${fee ? ` ${COW_TERMS.name}'s docs state the execution price after deducting fees from the amount sold, and the Trade log's sold amount includes the fee.` : ""}`,
+    formula: perSell ? `bought ÷ ${soldTerm}` : `${soldTerm} ÷ bought`,
     inputs: [
       {
         label: `sold (${tokenText(sell)}, ${sell.decimals ?? "?"} decimals)`,
@@ -115,6 +121,22 @@ export function executedPriceProv(
         kind: "chain",
         pclass: "emitted",
       },
+      ...(fee
+        ? [
+            {
+              label: `fee (${tokenText(sell)}, ${sell.decimals ?? "?"} decimals)`,
+              value: t.feeAmount,
+              kind: "chain" as const,
+              pclass: "emitted" as const,
+            },
+            {
+              label: `sold − fee (${tokenText(sell)})`,
+              value: soldLessFee(t.sellAmount, t.feeAmount) ?? "0",
+              kind: "derived" as const,
+              pclass: "emitted" as const,
+            },
+          ]
+        : []),
       {
         label: `bought (${tokenText(buy)}, ${buy.decimals ?? "?"} decimals)`,
         value: t.buyAmount,
@@ -126,7 +148,9 @@ export function executedPriceProv(
     source: coords(t),
     verify: {
       kind: "recompute",
-      text: "To check: divide the two amounts of this trade's Trade log, each by its token's decimals.",
+      text: fee
+        ? "To check: subtract the fee from the sold amount of this trade's Trade log, then divide the two amounts, each by its token's decimals."
+        : "To check: divide the two amounts of this trade's Trade log, each by its token's decimals.",
     },
   };
 }
@@ -140,6 +164,18 @@ export function settlementBlockProv(t: CowTrade): Provenance {
     contract: SETTLEMENT,
     source: coords(t),
     verify: logsLink(t),
+  };
+}
+
+/** The page head's block: the checkpoint every figure on the page is read at. */
+export function checkpointProv(asOf: { block: number }): Provenance {
+  return {
+    kind: "chain-derived",
+    pclass: "indexed",
+    summary: `Block — every figure on this page is read at block ${asOf.block.toLocaleString("en-US")}, the newest block Rails had read when the page loaded.`,
+    contract: SETTLEMENT,
+    via: "Trade logs · read to this block",
+    source: { block: asOf.block },
   };
 }
 
@@ -158,7 +194,7 @@ export function walletCountProv(asOf: { block: number }, what: string, value: nu
   return {
     kind: "chain-derived",
     pclass: "indexed",
-    summary: `${what} — counted over every Trade log of CoW's settlement contract whose owner is this wallet, through block ${asOf.block.toLocaleString("en-US")}: ${value.toLocaleString("en-US")}.`,
+    summary: `${what} — counted over every Trade log of ${COW_TERMS.settlement} whose owner is this wallet, through block ${asOf.block.toLocaleString("en-US")}: ${value.toLocaleString("en-US")}.`,
     contract: SETTLEMENT,
     via: "Trade logs · owner = this wallet",
     source: { block: asOf.block },

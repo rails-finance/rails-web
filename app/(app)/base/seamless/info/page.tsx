@@ -1,3 +1,4 @@
+// focus: the explorer's explainer; the shell's gate stands over the explorer
 // About this explorer — Seamless on Base, drawn on the typed template
 // (rails-ops standards/info-page-template.md). Seamless's own documentation site is offline
 // (reference/official-docs/seamless.md), so the glossary links the Aave V3 documentation, the
@@ -32,7 +33,7 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "Supplied",
     definition:
-      "Supplied assets are the assets a wallet has deposited into the Pool to earn interest. The wallet can withdraw them again, with their interest.",
+      "Supplied assets are the assets a wallet has supplied to the Pool to earn interest. The wallet can withdraw them again, with their interest.",
     sources: [{ label: "Supply", href: DOCS + "/overview#supply" }],
   },
   {
@@ -113,7 +114,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
       <p>
         The market page shows each reserve with its size, rates, risk settings and price, and explains the supply and
         borrow caps and the frozen reserves.{" "}
-        <Link href="/base/seamless/market" className={INLINE_LINK}>
+        <Link href="/base/seamless/markets" className={INLINE_LINK}>
           Open the market page
         </Link>
         .
@@ -130,7 +131,7 @@ export default function InfoPage() {
         <>
           The Rails Seamless explorer shows every account in Seamless&apos;s lending market on Base, whether still open
           or closed, and the full history of each one. It also shows{" "}
-          <Link href="/base/seamless/market" className={INLINE_LINK}>
+          <Link href="/base/seamless/markets" className={INLINE_LINK}>
             the market
           </Link>{" "}
           itself: its assets, with their rates, risk settings and prices.
@@ -154,7 +155,7 @@ export default function InfoPage() {
           <a
             href={explorerUrl(BASE_CHAIN_ID, "tx-logs", SEAMLESS_FREEZE_TX)}
             target="_blank"
-            rel="noopener noreferrer"
+            rel="noopener"
             className="link-external"
           >
             one transaction

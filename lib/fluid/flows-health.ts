@@ -44,18 +44,18 @@ export const FLUID_HEALTH_SOURCE: HealthSource = {
   factors: ["liquidation threshold", "liquidation threshold"],
   readAt: "today, held across the life",
   held: "today's liquidation threshold (read at block {block}), held across the life: the threshold at a past block is not stored",
-  live: "the card's position ratio now: debt ÷ (collateral × the vault oracle's liquidate price)",
+  live: "the card's debt to collateral ratio now: debt ÷ (collateral × the vault oracle's liquidate price)",
   levels: {
     formula: "debt ÷ (collateral × liquidation threshold)",
     summary:
-      "Liquidation level — the collateral's price, in debt per collateral, at which the position ratio reaches the vault's liquidation threshold: the debt divided by the collateral and the threshold, at the day's balances and today's threshold, held across the life.",
+      "Liquidation level — the collateral's price, in debt per collateral, at which the debt to collateral ratio reaches the vault's liquidation threshold: the debt divided by the collateral and the threshold, at the day's balances and today's threshold, held across the life.",
     here: {
       live: "Here at the card's balances and threshold now.",
       read: "Here at the balances of {day}, against today's liquidation threshold (read at block {block}), held across the life.",
     },
   },
   ratio: {
-    label: "Position ratio",
+    label: "Debt to collateral ratio",
     liquidates: "above",
     formula: "debt ÷ (collateral × vault oracle price)",
     line: {
@@ -76,7 +76,7 @@ export const FLUID_HISTORY_HEALTH_SOURCE: HealthSource = {
   levels: {
     formula: "debt ÷ (collateral × liquidation threshold)",
     summary:
-      "Liquidation level — the collateral's price, in debt per collateral, at which the position ratio reaches the vault's liquidation threshold: the debt divided by the collateral and the threshold, at the day's balances and the threshold in force that day.",
+      "Liquidation level — the collateral's price, in debt per collateral, at which the debt to collateral ratio reaches the vault's liquidation threshold: the debt divided by the collateral and the threshold, at the day's balances and the threshold in force that day.",
     here: {
       live: "Here at the card's balances and threshold now.",
       read: "Here at the balances of {day}, against the liquidation threshold in force that day, set at block {block}.",

@@ -54,7 +54,11 @@ import {
   priceAtBlockProv,
   type CompoundV2Coords,
 } from "@/lib/compound-v2/event-provenance";
-import { COMPOUND_V2_ADDRESSES, COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
+import {
+  COMPOUND_V2_ADDRESSES,
+  COMPOUND_V2_MARKET_BY_KEY,
+  compoundV2SeizeShareOf,
+} from "@/lib/compound-v2/asset-catalog";
 import { CTokenLiquidationBreakdown } from "@/components/shared/ctoken-liquidation-breakdown";
 import {
   pillPriceChips,
@@ -134,8 +138,8 @@ function buildCompoundV2LiqForensics(
       numeraire,
     }),
     premiumReference: {
-      label: "Incentive at block",
-      value: `+${(incPct * 100).toFixed(2)}%`,
+      label: "Liquidation incentive",
+      value: `${(1 + incPct).toFixed(2)}×`,
       prov: liqIncentiveRefProv(coords),
     },
     pricePills: [
@@ -270,7 +274,7 @@ export function useCompoundV2Cells({ ctx, txHash, blockNumber, wallet, eventId, 
       transition: reconstructTransition({
         after: ctx.cTokensAfter,
         change: ctx.cTokensDelta,
-        changeProv: seizeLegProv(cSym, ctx.eventType, coords, ctx.raw?.cTokens),
+        changeProv: seizeLegProv(cSym, ctx.eventType, coords, ctx.raw?.cTokens, compoundV2SeizeShareOf(ctx)),
         beforeProv: cTokensBeforeProv(cSym, coords),
       }),
     });
@@ -300,7 +304,7 @@ export function useCompoundV2Cells({ ctx, txHash, blockNumber, wallet, eventId, 
         label: "Collateral seized",
         value: fmt(ctx.seizeTokens),
         symbol: collCSym,
-        prov: seizeTokensProv(collCSym, coords, ctx.raw?.seizeTokens),
+        prov: seizeTokensProv(collCSym, coords, ctx.raw?.seizeTokens, compoundV2SeizeShareOf(ctx)),
       });
     }
   }

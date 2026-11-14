@@ -69,6 +69,7 @@ export default async function SkySavingsPositionPage({ params }: Props) {
   // The sealed block the figures were read at (ui-jobs 512).
   return (
     <PositionReadProvider
+      focus={{ source: data.position.data }}
       key={holder}
       read={await timedRead(chainRead(data.asOf.block, data.asOf.timestamp), MAINNET_CHAIN_ID)}
     >

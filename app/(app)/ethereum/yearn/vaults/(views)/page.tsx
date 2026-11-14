@@ -11,12 +11,12 @@
 // reader chooses to open, and a surface a reader chooses is a surface a reader
 // can link to. The loader caches for five minutes and never caches a failure.
 //
-// NO CENSUS. The rows' Holders slot reads "no census" and there is no listing
-// link; one address's holding opens from the vault page's finder (V4). The
-// rows are V1 vault rows (ui-jobs 407).
+// Holders is the position census's (family `yearn-v3`, ui-jobs 585), at the
+// census block. There is no positions listing, so the figure links nowhere;
+// one address's holding opens from the vault page's finder (V4). The rows are
+// V1 vault rows (ui-jobs 407).
 import { serverReadOf } from "@/lib/shared/server-head-read";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { yearnVaultCardContent } from "@/lib/vaults/card-words";
 import { YearnVaultDirectoryView } from "@/components/vaults/yearn-vault-directory-view";
@@ -25,8 +25,10 @@ import { listingMetadata } from "@/lib/shared/page-metadata";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { loadYearnVaultRoster } from "@/lib/yearn/vault-roster";
 import { yearnVaultSummaries } from "@/lib/vaults/summary";
+import { fetchVaultPositions } from "@/lib/api/fetch-vault-positions";
+import type { VaultCensusRow } from "@/lib/aave-vaults/vault-position";
 import { loadVaultYields } from "@/lib/vaults/yield-read";
-import { toURLSearchParams, type RawSearchParams } from "@/lib/shared/listing-ssr";
+import { ssrHop, toURLSearchParams, type RawSearchParams } from "@/lib/shared/listing-ssr";
 
 export const dynamic = "force-dynamic";
 
@@ -41,13 +43,35 @@ export async function generateMetadata() {
   });
 }
 
+/** The census header for Yearn V3: the rows' Holders figure. An unanswered
+ *  census leaves the figure out. */
+async function loadCensus(): Promise<VaultCensusRow[]> {
+  try {
+    const hop = await ssrHop();
+    const r = await fetchVaultPositions({
+      chainId: YEARN_CHAIN_ID,
+      families: "yearn-v3",
+      overlay: false,
+      limit: 1,
+      ...hop,
+    });
+    return r.census;
+  } catch (error) {
+    console.error("The vault census did not answer for the Yearn roster:", error);
+    return [];
+  }
+}
+
 export default async function YearnVaultRosterPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const initialSearch = toURLSearchParams(await searchParams).toString();
   const data = await loadYearnEthereumVaultDirectory();
-  const yields = await loadVaultYields(
-    YEARN_CHAIN_ID,
-    data.rows.map((r) => r.address),
-  );
+  const [census, yields] = await Promise.all([
+    loadCensus(),
+    loadVaultYields(
+      YEARN_CHAIN_ID,
+      data.rows.map((r) => r.address),
+    ),
+  ]);
 
   return (
     <div className="min-h-screen">
@@ -59,18 +83,19 @@ export default async function YearnVaultRosterPage({ searchParams }: { searchPar
         <div data-roster-panel>
           <YearnVaultDirectoryView
             initialSearch={initialSearch}
-            vaults={yearnVaultSummaries(data)}
+            vaults={yearnVaultSummaries(data, census)}
             yields={yields}
             blockNumber={data.blockNumber}
             readBy={serverReadOf(data)}
             chainStale={data.chainStale}
             catalogSize={data.catalogSize}
             censusBlock={data.censusBlock}
+            holdersBlock={census.length > 0 ? Math.max(...census.map((c) => c.censusBlock)) : null}
             endorsementUnread={data.rows.filter((r) => r.endorsed == null).map((r) => r.address)}
           />
         </div>
 
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
+        {/* The inspector, armed from the profile menu's switch. */}
         <ProvInspectorLayer />
       </div>
     </div>

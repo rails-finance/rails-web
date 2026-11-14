@@ -47,12 +47,17 @@ import type { RawAmount } from "@/lib/sources/chain/morpho-base-vault";
  *  mechanics deployed by one issuer. A single-valued axis is not a facet, so
  *  Base's listing offers no family menu and the word only ever appears on a
  *  card, beside the share symbol, as the mechanism that vault runs on. The
- *  curator who runs it is a NAME and never reaches a row. */
-export type VaultPositionFamily = AaveVaultFamily | "morpho";
+ *  curator who runs it is a NAME and never reaches a row. Ethereum's census
+ *  also writes `morpho` for MetaMorpho there and `yearn-v3` for Yearn V3
+ *  (ui-jobs 584). */
+export type VaultPositionFamily = AaveVaultFamily | "morpho" | "yearn-v3";
 
-/** The holder-shape vocabulary the census classifier writes, which is the same
- *  set `AaveVaultHolderShape["kind"]` carries on the vault page — the two
- *  surfaces must say one thing about one address. */
+/** The holder shapes the census classifier writes (rails-server
+ *  census-vault-positions.ts), less `vault-self`: a Yearn V3 vault's own
+ *  locked profit, which the census leaves out of its participants. The Aave
+ *  kinds match `AaveVaultHolderShape["kind"]` on the vault page, so the two
+ *  surfaces say one thing about one address. A `vault-v2-adapter` holds V1
+ *  shares for a Vault V2 vault, so the same money is stated in both vaults. */
 export type VaultPositionShape =
   | "eoa"
   | "delegated-account"
@@ -62,7 +67,10 @@ export type VaultPositionShape =
   | "eip1167-proxy"
   | "contract"
   | "aave-vault"
-  | "metamorpho-vault";
+  | "metamorpho-vault"
+  | "vault-v2"
+  | "yearn-v3-vault"
+  | "vault-v2-adapter";
 
 export const VAULT_POSITION_SHAPES: readonly VaultPositionShape[] = [
   "eoa",
@@ -74,6 +82,9 @@ export const VAULT_POSITION_SHAPES: readonly VaultPositionShape[] = [
   "contract",
   "aave-vault",
   "metamorpho-vault",
+  "vault-v2",
+  "yearn-v3-vault",
+  "vault-v2-adapter",
 ];
 
 /** The shape as a card states it: ONE MECHANISM WORD, never an app. A wallet
@@ -90,6 +101,9 @@ export const VAULT_SHAPE_WORD: Record<VaultPositionShape, string | null> = {
   contract: "contract",
   "aave-vault": "a vault in this catalogue",
   "metamorpho-vault": "a vault in this catalogue",
+  "vault-v2": "a vault in this catalogue",
+  "yearn-v3-vault": "a vault in this catalogue",
+  "vault-v2-adapter": "a Vault V2 adapter",
 };
 
 /** The shape as a FACET names it — the menu says the mechanism in full,
@@ -104,6 +118,9 @@ export const VAULT_SHAPE_FACET_LABEL: Record<VaultPositionShape, string> = {
   contract: "Contract",
   "aave-vault": "A vault in this catalogue",
   "metamorpho-vault": "A vault in this catalogue",
+  "vault-v2": "A vault in this catalogue",
+  "yearn-v3-vault": "A vault in this catalogue",
+  "vault-v2-adapter": "Vault V2 adapter",
 };
 
 export const isVaultPositionShape = (v: string): v is VaultPositionShape =>

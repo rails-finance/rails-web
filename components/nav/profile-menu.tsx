@@ -1,65 +1,257 @@
 "use client";
 
-// The profile control (H20) and its menu (rails-ops ui-jobs 504): the facehash
-// with a chevron, a menu button. The menu has no heading of its own: each group
-// carries its own label (ui-jobs 524). Top down: with nothing saved, "New to
-// Rails? Start here" to /start as a blue button across the top (ui-jobs 509);
-// the filled bookmark and "Saved wallets", then the first ten in the reader's
-// order (lib/shared/sessions.ts; /bookmarks orders them) or, with none, how to
-// save one; "Saved positions" (ui-jobs 530) and "Saved views" (ui-jobs 521),
-// the first five of each, drawn when there is one; "Manage saved items →" to
-// /bookmarks; the theme switch. From md a dropdown under the control, right
-// edges aligned; below md a sheet from the foot of the screen over a dim (ui-jobs 507), rising
-// over 220ms (globals.css `.profile-sheet`). Rows show what the
-// browser holds (name, ENS, address) and read nothing.
+// The profile control (H20) and its menu (rails-ops ui-jobs 504, redrawn in
+// 582 to Miles's mockup of 11 Nov 2026, cut into two sections to Miles's
+// mockup of 13 Nov 2026). The menu has no heading of its own. Each section
+// opens with a header in `MENU_SECTION_HEAD` (lib/shared/ui-grammar.ts):
+//
+// First, with nothing saved, "New to Rails? Start here" to /start (ui-jobs
+// 509), over the sections (Miles 13 Nov 2026).
+//
+// 1. "Saved views", with its bookmark, a link to /saved-views whatever is
+//    saved (ui-jobs 652), link blue on hover; it never collapses. An inset
+//    hairline under it, then, with nothing to list, one line
+//    (`data-profile-menu-empty`): "Your saved views will display here, learn
+//    more" with nothing saved, "Starred saved views show here, learn more"
+//    with something saved and nothing starred; else
+//    one item per saved kind, Focus views, Listings, Wallets and Positions,
+//    in the explorer tabs' type (H5) with the number saved in a count
+//    badge, each a link to its tab on /saved-views (Miles 13 Nov 2026).
+//    Under each, its starred entries.
+// 2. A hairline across the whole panel, then "Advanced", a toggle holding the
+//    switch "Inspector" (decision 0062; ui-jobs 571, 651).
+//
+// Advanced alone opens and closes: it starts closed and the reader's choice
+// is kept in this browser (`OPEN_KEY`). Its chevron follows the dropdown rule
+// for collapsible groups (lib/shared/ui-grammar.ts `disclosureChevron`): down
+// and always shown while closed; up while open, shown on the header's hover
+// or keyboard focus and always on a touch screen. The theme is set at the
+// brand rail's foot from md and at the wallet panel's foot below md
+// (components/nav/theme-switch.tsx).
+//
+// A kind is drawn when it holds something starred; Focus views also while a
+// view is in use. Stars alone decide the entries under it (ui-jobs 652): Focus
+// views lists the views starred on /saved-views?tab=focus and, while it is
+// unstarred, the view in use, so Focus can always be turned off here; then
+// Off (lib/shared/asset-scope.ts `menuViews`). Listings, Wallets and
+// Positions list the items starred on /saved-views (lib/shared/sessions.ts
+// `menuEntries`). Its count is every item of the kind saved. Long names
+// fade at the line's end (`FADE`); rows read nothing, showing what the
+// browser holds.
+//
+// From md a dropdown under the control, right edges aligned, dropping in with
+// a small bounce (globals.css `.profile-drop`), no taller than the window
+// below it, scrolling within itself; below md a sheet from the foot of the
+// screen over a dim (ui-jobs 507), rising over 220ms (`.profile-sheet`).
 //
 // The face is the first saved wallet's; with none, the sample wallet's
 // (lib/shared/sample-wallet.ts). Until the browser's list is read a faint
 // square holds the place.
 //
 // The menu is a portal positioned against the control, so it stands over the
-// page wherever the control sits (H2 below md, the column's corner from md;
+// page wherever the control sits; from md it is placed in page coordinates and
+// scrolls with the page as one piece with the control (ui-jobs 602) (H2 below md, the column's corner from md;
 // components/nav/rail-shell.tsx). Escape, a press outside and a lookup close
 // it, and focus returns to the control; the arrow keys, Home and End move
-// through its items. The dropdown drops in with a small bounce
-// (globals.css `.profile-drop`, the wallet panel's spring timing).
+// through its items in order (Start here, Saved views, learn more or each
+// kind and its rows, Advanced, the switch), Advanced's rows left out while it is closed; on
+// Advanced ArrowRight opens it and ArrowLeft closes it.
 
 import { CHROME_HOVER, CHROME_HOVER_ON } from "@/components/nav/chrome-hover";
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bookmark, ChevronDown, Monitor, Moon, Settings, Signpost, Sun } from "lucide-react";
-import { useTheme } from "next-themes";
+import { Bookmark, Check, ChevronDown, CircleHelp, Crosshair, Signpost } from "lucide-react";
 
 import { Facehash } from "@/components/shared/facehash";
+import { FocusAvatar } from "@/components/shared/focus-avatar";
+import { ViewIcons, viewName } from "@/components/shared/asset-scope-strip";
 import { useBookmarks } from "@/components/shared/bookmark-list";
 import { savedName, useSavedLinks } from "@/components/shared/saved-items";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
-import { BOOKMARKS_NAME } from "@/components/shared/bookmarks-name";
+import { ChainGlyph } from "@/components/shared/chain-toggle";
 import { walletHref } from "@/components/shared/front-door-search";
 import { SAMPLE_WALLET } from "@/lib/shared/sample-wallet";
-import { CTRL_OFF, CTRL_ON, START_CTA } from "@/lib/shared/ui-grammar";
+import { focusViews, useAssetScope } from "@/lib/shared/asset-scope";
+import { focusShort } from "@/components/shared/aim-gate";
+import {
+  COUNT_BADGE,
+  DISCLOSURE_HEAD,
+  INLINE_LINK,
+  MENU_SECTION_HEAD,
+  START_CTA,
+  TAB_BASE,
+  disclosureChevron,
+} from "@/lib/shared/ui-grammar";
+import type { ChainId } from "@/lib/shared/chains";
 import type { SavedLink, WalletSession } from "@/lib/shared/sessions";
+import { setProvPreference, useProvPreference } from "@/lib/shared/prov-preference";
+import { ProvInspectorIndicator, putDownInspector } from "@/components/shared/prov-inspector";
+import { menuEntries } from "@/lib/shared/sessions";
+import { SAVED_NAME, SAVED_PATH } from "@/components/shared/bookmarks-name";
 
-const BOOKMARKS_PATH = "/bookmarks";
 /** The control's and the menu's accessible name: what the menu holds as a whole. */
 const MENU_NAME = "Saved and settings";
-/** A group's small label (Saved wallets, Saved positions, Saved views). */
-const GROUP_LABEL = "flex items-center gap-2 px-3 pb-2 pt-2 text-sm font-semibold text-foreground";
-/** "New to Rails? Start here" across the menu's top. */
-const START_BUTTON = `mb-1 flex w-full ${START_CTA}`;
 /** The guided way in (G, /start), reached from this menu (ui-jobs 509). */
 const START_PATH = "/start";
-/** The menu lists this many wallets, and this many of each other kind; the
- *  rest are on /bookmarks. */
-const MENU_ROWS = 10;
-const MENU_LINK_ROWS = 5;
+/** The gap kept under the dropdown when it scrolls within the window. */
+const DROP_MARGIN = 16;
 
+/** The room between the kinds; the first sits closer to the hairline. */
+const GROUP = "mt-6 first:mt-3";
+/** A row: 44px tall, a blue rounded outline on hover and keyboard focus. */
 const ITEM =
-  "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors focus:outline-none focus-visible:bg-rb-100 hover:bg-rb-100 dark:hover:bg-rb-800 dark:focus-visible:bg-rb-800";
+  "flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-left text-[15px] text-foreground outline-none transition-shadow hover:ring-1 hover:ring-blue-500 focus-visible:ring-[1.5px] focus-visible:ring-blue-500";
+/** The Saved views header: the section head's look on a row's box, a link's
+ *  hover in place of the ring, the bookmark and words turning link blue;
+ *  keyboard focus adds the ring (Miles 13 Nov 2026). */
+const SAVED_HEAD = `flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-lg px-3 text-left ${MENU_SECTION_HEAD} outline-none transition-colors hover:text-blue-600 focus-visible:text-blue-600 focus-visible:ring-[1.5px] focus-visible:ring-blue-500 dark:hover:text-[var(--text-link)] dark:focus-visible:text-[var(--text-link)]`;
+/** The Advanced header: the section head's look, a toggle, the foreground on
+ *  hover and keyboard focus. */
+const SECTION_TOGGLE = `${DISCLOSURE_HEAD} flex min-h-11 w-full cursor-pointer items-center gap-1 rounded-lg px-3 text-left ${MENU_SECTION_HEAD} outline-none transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:ring-[1.5px] focus-visible:ring-blue-500`;
+/** The menu's hairline colour. */
+const HAIRLINE = "border-t border-rb-200 dark:border-rb-700";
+/** A long name fades at the line's end, with no ellipsis. */
+const FADE =
+  "min-w-0 flex-1 overflow-hidden whitespace-nowrap [mask-image:linear-gradient(to_right,#000_calc(100%-2rem),transparent)]";
+/** A kind's item in Saved views: a link to its tab on /saved-views in the
+ *  explorer tabs' type (H5, `TAB_BASE`: 11px, semibold, uppercase, tracked),
+ *  muted, the foreground on hover and keyboard focus, then its count in the
+ *  count badge (Miles 13 Nov 2026). */
+const KIND_ITEM =
+  "flex min-h-8 w-full cursor-pointer items-center gap-2 rounded-lg px-3 text-left text-rb-500 outline-none transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:ring-[1.5px] focus-visible:ring-blue-500";
+
+type SavedKind = "focus" | "listings" | "wallets" | "positions";
+type GroupKind = "advanced";
+/** Which collapsible sections stand open, kept per browser as a small JSON map. */
+const OPEN_KEY = "rails-profile-menu-open";
+/** Advanced starts closed, so the inspector's switch waits to be asked for. */
+const OPEN_DEFAULT: Record<GroupKind, boolean> = { advanced: false };
+function readOpen(): Record<GroupKind, boolean> {
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem(OPEN_KEY) ?? "{}");
+    const next = { ...OPEN_DEFAULT };
+    if (raw && typeof raw === "object") {
+      for (const k of Object.keys(OPEN_DEFAULT) as GroupKind[]) {
+        const v = (raw as Record<string, unknown>)[k];
+        if (typeof v === "boolean") next[k] = v;
+      }
+    }
+    return next;
+  } catch {
+    return { ...OPEN_DEFAULT };
+  }
+}
+function writeOpen(open: Record<GroupKind, boolean>) {
+  try {
+    localStorage.setItem(OPEN_KEY, JSON.stringify(open));
+  } catch {
+    // Storage refused (a private window, a full quota): the choice lasts the visit.
+  }
+}
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
+
+/** A collapsible section under its header, a disclosure toggle that names
+ *  it (`aria-labelledby`): Advanced. Closed, the rows are not drawn, so they
+ *  leave the tab and arrow-key order. */
+function MenuSection({
+  menuId,
+  group,
+  label,
+  open,
+  onToggle,
+  children,
+}: {
+  menuId: string;
+  group: GroupKind;
+  label: string;
+  open: boolean;
+  onToggle: (g: GroupKind) => void;
+  children: ReactNode;
+}) {
+  const headId = `${menuId}-${group}`;
+  const bodyId = `${headId}-rows`;
+  return (
+    <div role="group" aria-labelledby={headId} data-open={open ? "true" : "false"} data-profile-menu-section={group}>
+      <button
+        id={headId}
+        type="button"
+        role="menuitem"
+        aria-expanded={open}
+        aria-controls={bodyId}
+        onClick={() => onToggle(group)}
+        className={SECTION_TOGGLE}
+        data-profile-menu-group={group}
+        data-profile-menu-group-toggle={group}
+      >
+        {label}
+        <ChevronDown className={disclosureChevron(open)} strokeWidth={2} aria-hidden="true" />
+      </button>
+      <div id={bodyId} hidden={!open} className="mt-1">
+        {open && children}
+      </div>
+    </div>
+  );
+}
+
+/** One saved kind in Saved views: its item, a link to its tab on /saved-views
+ *  with the number saved, and under it the starred entries. It does not
+ *  collapse (Miles 13 Nov 2026). */
+function KindGroup({
+  menuId,
+  kind,
+  label,
+  count,
+  onDone,
+  children,
+}: {
+  menuId: string;
+  kind: SavedKind;
+  label: string;
+  count: number;
+  onDone: () => void;
+  children: ReactNode;
+}) {
+  const headId = `${menuId}-${kind}`;
+  return (
+    <div role="group" aria-labelledby={headId} className={GROUP} data-profile-menu-kind={kind}>
+      <Link
+        id={headId}
+        href={`${SAVED_PATH}?tab=${kind}`}
+        role="menuitem"
+        aria-label={`${label}, ${count} saved`}
+        onClick={onDone}
+        className={KIND_ITEM}
+        data-profile-menu-group={kind}
+        data-profile-menu-kind-link={kind}
+      >
+        <span className={`${TAB_BASE} border-transparent`}>{label}</span>
+        <span className={COUNT_BADGE} data-profile-menu-count={count}>
+          {count}
+        </span>
+      </Link>
+      <div className="mt-1">{children}</div>
+    </div>
+  );
+}
+
+/** The radio mark of a Focus row: ticked for the view in use, or Off. */
+function RadioMark({ on }: { on: boolean }) {
+  return (
+    <span
+      className={`inline-flex size-5 shrink-0 items-center justify-center rounded-full border ${
+        on
+          ? "border-teal-600 bg-teal-600 text-white dark:border-teal-500 dark:bg-teal-500 dark:text-rb-950"
+          : "border-rb-300 dark:border-rb-700"
+      }`}
+      aria-hidden="true"
+    >
+      {on && <Check className="size-3.5" strokeWidth={3} />}
+    </span>
+  );
+}
 
 function WalletRow({ session, onDone }: { session: WalletSession; onDone: () => void }) {
   const primary = session.addresses[0];
@@ -70,20 +262,25 @@ function WalletRow({ session, onDone }: { session: WalletSession; onDone: () => 
       href={walletHref(primary)}
       role="menuitem"
       onClick={onDone}
-      className={ITEM}
+      // The facehash and the name, or the short address when there is none
+      // (Miles 13 Nov 2026); a named row keeps its address in the tooltip.
+      title={name ? primary : undefined}
+      className={`${ITEM} gap-4`}
       data-profile-menu-wallet={primary}
     >
       <span className="shrink-0" style={{ borderRadius: 5, boxShadow: "0 0 0 2px var(--facehash-ring)" }}>
-        <Facehash address={primary} size={20} />
+        <Facehash address={primary} size={22} />
       </span>
-      <span className="min-w-0 flex-1 truncate font-semibold text-foreground">{name ?? short(primary)}</span>
-      {name && <span className="shrink-0 font-mono text-xs text-rb-500">{short(primary)}</span>}
+      <span className="min-w-0 flex-1 truncate font-medium">{name ?? short(primary)}</span>
     </Link>
   );
 }
 
-/** A saved position or view: the explorer's mark, the name, the chain. */
+/** A saved listing or position: the explorer's and the chain's marks, then
+ *  the name (a position's chain after it, muted), fading at the line's end. */
 function LinkRow({ link, onDone }: { link: SavedLink; onDone: () => void }) {
+  const chain = link.chain ? Number(link.chain.id) : NaN;
+  const after = link.ended?.word ?? (link.kind === "position" ? link.chain?.name : undefined);
   return (
     <Link
       href={link.key}
@@ -93,64 +290,112 @@ function LinkRow({ link, onDone }: { link: SavedLink; onDone: () => void }) {
       data-profile-menu-link={link.kind}
       data-href={link.key}
     >
-      <span className="flex size-5 shrink-0 items-center justify-center text-rb-500">
-        {link.protocol && <ProtocolIcon id={link.protocol.id} className="size-4" />}
+      <span className="flex shrink-0 items-center gap-1.5 text-rb-500">
+        <span className="flex size-4 items-center justify-center">
+          {link.protocol && <ProtocolIcon id={link.protocol.id} className="size-4" />}
+        </span>
+        <span className="flex size-4 items-center justify-center">
+          {Number.isInteger(chain) && <ChainGlyph chainId={chain as ChainId} className="h-4 w-auto" />}
+        </span>
       </span>
-      <span className="min-w-0 flex-1 truncate font-semibold text-foreground">{savedName(link)}</span>
-      {link.ended ? (
-        <span className="shrink-0 text-xs text-rb-500">{link.ended.word}</span>
-      ) : (
-        link.kind === "position" &&
-        link.chain && <span className="shrink-0 text-xs text-rb-500">{link.chain.name}</span>
-      )}
+      <span className={`${FADE} font-medium`}>
+        {savedName(link)}
+        {after && <span className="ml-3 font-normal text-rb-500">{after}</span>}
+      </span>
     </Link>
   );
 }
 
-const THEMES = [
-  { value: "light", label: "Light", Icon: Sun },
-  { value: "dark", label: "Dark", Icon: Moon },
-  { value: "system", label: "Auto", Icon: Monitor },
-] as const;
+const PROV_ABOUT_PATH = "/about/provenance";
+const ITEMS = '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]';
 
-/** Light, dark or the system's, as three radio items in the menu. */
-function ThemeSwitch() {
-  const { theme, setTheme } = useTheme();
+/** The inspector's one switch, "Inspector" (decision 0062; ui-jobs 571, 625,
+ *  651): arms the inspector on arrival on every page that has passed the
+ *  coverage gate (lib/shared/prov-preference-routes.ts). Off by default.
+ *
+ *  One line, the height of the other rows. Its "?" is a link to
+ *  /about/provenance that closes the menu; it is a sibling of the switch,
+ *  standing over the switch's stretched hit area (`after:inset-0`), so a press
+ *  on it navigates and never toggles (ui-jobs 602, 603, 651).
+ *
+ *  The switch reads the saved choice alone and toggles it on every page
+ *  (Miles 13 Nov 2026); whether the page arms is the inspector's call
+ *  (components/shared/prov-inspector.tsx, `provPreferenceAllows`). */
+function ProvInspectorSwitch({ onDone }: { onDone: () => void }) {
+  const on = useProvPreference();
+  const descId = useId();
   return (
-    <div role="group" aria-label="Theme" className="flex gap-1" data-profile-menu-theme="">
-      {THEMES.map(({ value, label, Icon }) => {
-        const on = (theme ?? "system") === value;
-        return (
-          <button
-            key={value}
-            type="button"
-            role="menuitemradio"
-            aria-checked={on}
-            onClick={() => setTheme(value)}
-            className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-              on ? CTRL_ON : CTRL_OFF
-            }`}
-            data-theme-option={value}
-          >
-            <Icon className="size-3.5 shrink-0" aria-hidden="true" />
-            {label}
-          </button>
-        );
-      })}
+    <div
+      // ITEM's row with no hover ring: on hover the crosshair and the label
+      // turn teal, the switch's on colour (ui-jobs 651; Miles 13 Nov 2026).
+      // The (?) stands over the switch's hit area, so hovering it turns
+      // neither. The focus ring answers the keyboard.
+      className="group/prov relative flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-[15px] text-foreground has-[[role=menuitemcheckbox]:focus-visible]:ring-[1.5px] has-[[role=menuitemcheckbox]:focus-visible]:ring-blue-500"
+      data-anatomy="H20.1"
+    >
+      <Crosshair
+        className="size-5 shrink-0 transition-colors group-has-[[role=menuitemcheckbox]:hover]/prov:text-teal-600 dark:group-has-[[role=menuitemcheckbox]:hover]/prov:text-teal-400"
+        strokeWidth={1.75}
+        aria-hidden="true"
+      />
+      <button
+        type="button"
+        role="menuitemcheckbox"
+        aria-checked={on}
+        aria-describedby={descId}
+        onClick={() => {
+          if (on) putDownInspector();
+          else setProvPreference(true);
+        }}
+        className="min-w-0 truncate text-left outline-none transition-colors after:absolute after:inset-0 after:rounded-lg after:content-[''] hover:text-teal-600 dark:hover:text-teal-400"
+        data-profile-menu-prov={on ? "on" : "off"}
+      >
+        Inspector
+      </button>
+      <span id={descId} className="sr-only">
+        Shows where each figure comes from.
+      </span>
+      <Link
+        href={PROV_ABOUT_PATH}
+        role="menuitem"
+        aria-label="About the inspector"
+        onClick={onDone}
+        className="relative z-10 -ml-1.5 inline-flex rounded-full p-0.5 text-rb-400 outline-none hover:text-foreground focus-visible:text-foreground focus-visible:ring-[1.5px] focus-visible:ring-blue-500"
+        data-profile-menu-prov-help=""
+        data-profile-menu-prov-about=""
+      >
+        <CircleHelp className="size-3.5" aria-hidden="true" />
+      </Link>
+      <span
+        className={`pointer-events-none relative ml-auto inline-flex h-5 w-9 shrink-0 rounded-full transition-colors ${
+          on ? "bg-teal-500" : "bg-rb-300 dark:bg-rb-700"
+        }`}
+        aria-hidden="true"
+      >
+        <span
+          className={`absolute top-0.5 size-4 rounded-full bg-white shadow transition-transform ${
+            on ? "translate-x-[18px]" : "translate-x-0.5"
+          }`}
+        />
+      </span>
     </div>
   );
 }
-
-const ITEMS = '[role="menuitem"], [role="menuitemradio"]';
 
 export function ProfileMenu() {
   const bookmarks = useBookmarks();
   const positions = useSavedLinks("position");
   const views = useSavedLinks("view");
   const pathname = usePathname();
+  const scope = useAssetScope();
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [place, setPlace] = useState<{ top: number; right: number; phone: boolean } | null>(null);
+  const [place, setPlace] = useState<{
+    top: number;
+    right: number;
+    room: number;
+    phone: boolean;
+  } | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   // When a press outside closed the menu, the click that ends the same press
   // can land on the control under the dim and would open it again: a press on
@@ -159,39 +404,63 @@ export function ProfileMenu() {
   const menu = useRef<HTMLDivElement>(null);
   const menuId = useId();
   useEffect(() => setMounted(true), []);
+  const [groupsOpen, setGroupsOpen] = useState(OPEN_DEFAULT);
+  // Read as the menu opens, before it paints, so another tab's choice holds too.
+  useLayoutEffect(() => {
+    if (open) setGroupsOpen(readOpen());
+  }, [open]);
+  const toggleGroup = useCallback(
+    (g: GroupKind) => {
+      const next = { ...groupsOpen, [g]: !groupsOpen[g] };
+      setGroupsOpen(next);
+      writeOpen(next);
+    },
+    [groupsOpen],
+  );
 
   const face = bookmarks == null ? null : (bookmarks[0]?.addresses[0] ?? SAMPLE_WALLET);
-  const rows = (bookmarks ?? []).slice(0, MENU_ROWS);
-  const links = [
-    { kind: "positions", label: "Saved positions", rows: (positions ?? []).slice(0, MENU_LINK_ROWS) },
-    { kind: "views", label: "Saved views", rows: (views ?? []).slice(0, MENU_LINK_ROWS) },
-  ].filter((g) => g.rows.length > 0);
-  const anything = rows.length > 0 || links.length > 0;
+  const rows = menuEntries(bookmarks ?? []);
+  const listings = menuEntries(views ?? []);
+  const held = menuEntries(positions ?? []);
+  const focusOn = scope.ready && scope.on;
+  const menuViews = scope.menuViews;
+  /** Anything saved, starred or not, focus views included, takes "Start here"
+   *  out of the menu. */
+  const anything =
+    !!bookmarks?.length || !!views?.length || !!positions?.length || (scope.ready && scope.views.length > 0);
+  const focusLabel = scope.active?.name || focusShort(scope.picks, scope.chains);
 
   const close = useCallback((refocus = true) => {
     setOpen(false);
     if (refocus) requestAnimationFrame(() => trigger.current?.focus());
   }, []);
+  const done = useCallback(() => close(false), [close]);
 
   // A navigation closes it.
   useEffect(() => setOpen(false), [pathname]);
 
   // Placed under the control: from md its right edge on the control's, below
-  // md across the viewport.
+  // md across the viewport. The dropdown is placed in page coordinates
+  // (`position: absolute` against the document), so the browser scrolls it
+  // with the page in the same frame as the control; a fixed box re-placed
+  // from a scroll listener trails the page by a frame (ui-jobs 602). `room`
+  // is the window's height below the control at opening, the dropdown's
+  // ceiling.
   const measure = useCallback(() => {
     const r = trigger.current?.getBoundingClientRect();
     if (!r) return;
-    setPlace({ top: r.bottom + 8, right: window.innerWidth - r.right, phone: window.innerWidth < 768 });
+    setPlace({
+      top: r.bottom + 8 + window.scrollY,
+      right: document.documentElement.clientWidth - r.right,
+      room: window.innerHeight - (r.bottom + 8) - DROP_MARGIN,
+      phone: window.innerWidth < 768,
+    });
   }, []);
   useLayoutEffect(() => {
     if (!open) return;
     measure();
     window.addEventListener("resize", measure);
-    window.addEventListener("scroll", measure, { passive: true });
-    return () => {
-      window.removeEventListener("resize", measure);
-      window.removeEventListener("scroll", measure);
-    };
+    return () => window.removeEventListener("resize", measure);
   }, [open, measure]);
 
   // Below md the sheet holds the page still under it, as the wallet panel
@@ -237,6 +506,12 @@ export function ProfileMenu() {
       } else if (e.key === "End") {
         e.preventDefault();
         go(items.length - 1);
+      } else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        // On Advanced's header, ArrowRight opens it and ArrowLeft closes it.
+        const head = document.activeElement as HTMLElement | null;
+        if (!head?.hasAttribute("data-profile-menu-group-toggle")) return;
+        e.preventDefault();
+        if ((head.getAttribute("aria-expanded") === "true") === (e.key === "ArrowLeft")) head.click();
       } else if (e.key === "Tab") {
         close(false);
       }
@@ -250,13 +525,40 @@ export function ProfileMenu() {
     };
   }, [open, close]);
 
+  // A kind is drawn when it holds something starred (Focus views also while
+  // a view is in use), its starred entries under it (Miles 13 Nov 2026,
+  // "only present if there are starred items"). Its count is every item of
+  // the kind saved (ui-jobs 665-a, with Miles).
+  const counts: Record<SavedKind, number> = {
+    focus: scope.ready ? scope.views.length : 0,
+    listings: views?.length ?? 0,
+    wallets: bookmarks?.length ?? 0,
+    positions: positions?.length ?? 0,
+  };
+  /** Whether Saved views lists anything: a kind drawn, or the view in use. */
+  const listed = menuViews.length + listings.length + rows.length + held.length > 0;
+  const linkKind = (kind: "listings" | "positions", label: string, list: SavedLink[]) =>
+    list.length > 0 && (
+      <KindGroup menuId={menuId} kind={kind} label={label} count={counts[kind]} onDone={done}>
+        <div data-profile-menu-links={kind}>
+          {list.map((l) => (
+            <LinkRow key={l.key} link={l} onDone={done} />
+          ))}
+        </div>
+      </KindGroup>
+    );
+
   return (
     <>
+      {/* While the inspector is armed on a page with a traced value, the
+          inspector indicator stands left of the control (ui-jobs 624.2,
+          651). */}
+      <ProvInspectorIndicator />
       <button
         ref={trigger}
         type="button"
-        aria-label={MENU_NAME}
-        title={MENU_NAME}
+        aria-label={focusOn ? `${MENU_NAME}. Focus mode: ${focusLabel}` : MENU_NAME}
+        title={focusOn ? `Focus mode: ${focusLabel}` : MENU_NAME}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
@@ -273,16 +575,13 @@ export function ProfileMenu() {
         data-anatomy="H20"
         data-profile-face={face ?? undefined}
         // Neutral, with the chrome's tile on hover and while open (ui-jobs
-        // 516): the menu opens in place.
-        className={`flex shrink-0 cursor-pointer items-center gap-0.5 rounded-lg py-[9px] pl-[9px] pr-1 text-foreground transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+        // 516): the menu opens in place. Below sm an invisible band takes the
+        // press to 44px tall without moving the header.
+        className={`relative flex shrink-0 cursor-pointer items-center gap-0.5 rounded-lg py-[9px] pl-[9px] pr-1 max-sm:before:absolute max-sm:before:-inset-y-[3px] max-sm:before:inset-x-0 max-sm:before:content-[''] text-foreground transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
           open ? CHROME_HOVER_ON : CHROME_HOVER
         }`}
       >
-        {face ? (
-          <Facehash address={face} size={20} mono />
-        ) : (
-          <span className="block size-5 rounded-[4.4px] bg-current opacity-30" aria-hidden="true" />
-        )}
+        <FocusAvatar face={face} />
         <ChevronDown className={`size-3.5 shrink-0 ${open ? "rotate-180" : ""}`} aria-hidden="true" />
       </button>
       {mounted &&
@@ -305,73 +604,123 @@ export function ProfileMenu() {
               role="menu"
               aria-label={MENU_NAME}
               data-profile-menu=""
-              className={`fixed z-[var(--z-popover)] border border-rb-200 bg-background p-2 shadow-xl dark:border-rb-800 dark:bg-rb-900 ${
+              data-profile-menu-variant={place.phone ? "sheet" : "drop"}
+              className={`${place.phone ? "fixed" : "absolute"} z-[var(--z-popover)] overflow-y-auto overscroll-contain border border-rb-200 bg-background px-3 pb-4 pt-3 shadow-xl dark:border-rb-800 dark:bg-rb-900 ${
                 place.phone
-                  ? "profile-sheet inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-2xl border-x-0 border-b-0 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
+                  ? "profile-sheet inset-x-0 bottom-0 max-h-[85dvh] rounded-t-2xl border-x-0 border-b-0 pb-[max(1rem,env(safe-area-inset-bottom))]"
                   : "profile-drop w-80 rounded-xl"
               }`}
-              style={place.phone ? undefined : { top: place.top, right: place.right }}
+              // The dropdown stops above the window's foot and scrolls within
+              // itself (ui-jobs 586).
+              style={place.phone ? undefined : { top: place.top, right: place.right, maxHeight: place.room }}
             >
-              {/* With none saved, the way in fills the menu's top (Miles, 6 Nov
-                  2026); with a wallet saved there is none (ui-jobs 509). */}
+              {/* With nothing saved, the way in, first in the menu (ui-jobs 509;
+                  Miles 13 Nov 2026). */}
               {!anything && (
                 <Link
                   href={START_PATH}
                   role="menuitem"
-                  onClick={() => close(false)}
-                  className={START_BUTTON}
+                  onClick={done}
+                  className={`mb-3 flex w-full ${START_CTA}`}
                   data-profile-menu-start=""
                 >
                   New to Rails? Start here
-                  <Signpost className="size-4 shrink-0 ml-auto" aria-hidden="true" />
+                  <Signpost className="ml-auto size-4 shrink-0" aria-hidden="true" />
                 </Link>
               )}
-              <div role="group" aria-labelledby={`${menuId}-wallets`}>
-                <p id={`${menuId}-wallets`} className={GROUP_LABEL} data-profile-menu-group="wallets">
-                  <Bookmark className="size-4 shrink-0" fill="currentColor" aria-hidden="true" />
-                  {BOOKMARKS_NAME}
-                </p>
-                {rows.length > 0 ? (
-                  <div className="pb-1" data-profile-menu-wallets="">
-                    {rows.map((s) => (
-                      <WalletRow key={s.key} session={s} onDone={() => close(false)} />
-                    ))}
-                  </div>
-                ) : (
-                  <p className="px-3 pb-1 text-sm text-rb-500" data-profile-menu-empty="">
-                    To save a wallet, press the bookmark beside its address on its wallet page.
-                  </p>
-                )}
-              </div>
-              {links.map((g) => (
-                <div key={g.kind} role="group" aria-labelledby={`${menuId}-${g.kind}`}>
-                  <p id={`${menuId}-${g.kind}`} className={GROUP_LABEL} data-profile-menu-group={g.kind}>
-                    <Bookmark className="size-4 shrink-0" fill="currentColor" aria-hidden="true" />
-                    {g.label}
-                  </p>
-                  <div className="pb-1" data-profile-menu-links={g.kind}>
-                    {g.rows.map((l) => (
-                      <LinkRow key={l.key} link={l} onDone={() => close(false)} />
-                    ))}
-                  </div>
-                </div>
-              ))}
-              {anything && <div className="mx-1 border-t border-rb-200 dark:border-rb-800" />}
-              <div className="py-1">
+              {/* The first section, Saved views: its header is the way to
+                  /saved-views, whatever is saved, and never collapses (Miles
+                  13 Nov 2026, mockup; ui-jobs 652). */}
+              <div role="group" aria-labelledby={`${menuId}-saved`} data-profile-menu-section="saved">
                 <Link
-                  href={BOOKMARKS_PATH}
+                  id={`${menuId}-saved`}
+                  href={SAVED_PATH}
                   role="menuitem"
-                  onClick={() => close(false)}
-                  className={`${ITEM} text-blue-600 dark:text-[var(--text-link)]`}
-                  data-profile-menu-manage=""
+                  onClick={done}
+                  className={SAVED_HEAD}
+                  data-profile-menu-bookmarks=""
                 >
-                  <Settings className="size-4 shrink-0" aria-hidden="true" />
-                  Manage saved items →
+                  <Bookmark className="size-4 shrink-0" strokeWidth={2} aria-hidden="true" />
+                  {SAVED_NAME}
                 </Link>
+                {/* Inset: the hairline stays inside the panel's padding. */}
+                <div aria-hidden="true" className={`mt-1 ${HAIRLINE}`} data-profile-menu-rule="inset" />
+                <div data-profile-menu-saved-body="">
+                  {/* Nothing to list: one line saying what will (Miles 13 Nov 2026),
+                      naming the stars once something is saved. */}
+                  {!listed && (
+                    <p className="mt-3 px-3 text-xs text-rb-500" data-profile-menu-empty="">
+                      {anything ? "Starred saved views show here," : "Your saved views will display here,"}{" "}
+                      <Link
+                        href={SAVED_PATH}
+                        role="menuitem"
+                        onClick={done}
+                        className={`${INLINE_LINK} whitespace-nowrap rounded-sm outline-none focus-visible:ring-[1.5px] focus-visible:ring-blue-500`}
+                      >
+                        learn more
+                      </Link>
+                    </p>
+                  )}
+                  {/* Focus views: the starred views, the view in use, and Off (ui-jobs 652). */}
+                  {menuViews.length > 0 && (
+                    <KindGroup menuId={menuId} kind="focus" label="Focus" count={counts.focus} onDone={done}>
+                      <div data-profile-menu-focus-views={menuViews.length}>
+                        {menuViews.map((v) => (
+                          <button
+                            key={v.id}
+                            type="button"
+                            role="menuitemradio"
+                            aria-checked={scope.active?.id === v.id}
+                            onClick={() => focusViews.use(v.id)}
+                            className={ITEM}
+                            data-profile-menu-focus-view={v.id}
+                          >
+                            <RadioMark on={scope.active?.id === v.id} />
+                            <span className="flex min-w-0 flex-1 items-center">
+                              <ViewIcons picks={v.assets} chains={v.chains} />
+                              <span className={`${FADE} ml-1 font-medium`}>{viewName(v)}</span>
+                            </span>
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={!scope.on}
+                          onClick={() => scope.clear()}
+                          className={ITEM}
+                          data-profile-menu-focus-off=""
+                        >
+                          <RadioMark on={!scope.on} />
+                          Off
+                        </button>
+                      </div>
+                    </KindGroup>
+                  )}
+                  {linkKind("listings", "Listings", listings)}
+                  {rows.length > 0 && (
+                    <KindGroup menuId={menuId} kind="wallets" label="Wallets" count={counts.wallets} onDone={done}>
+                      <div data-profile-menu-wallets="">
+                        {rows.map((s) => (
+                          <WalletRow key={s.key} session={s} onDone={done} />
+                        ))}
+                      </div>
+                    </KindGroup>
+                  )}
+                  {linkKind("positions", "Positions", held)}
+                </div>
               </div>
-              <div className="px-1 pb-1 pt-1">
-                <ThemeSwitch />
-              </div>
+              {/* The second section: a hairline across the whole panel, through
+                  its padding, then Advanced (Miles 13 Nov 2026, mockup). */}
+              <div aria-hidden="true" className={`-mx-3 mt-4 mb-2 ${HAIRLINE}`} data-profile-menu-rule="full" />
+              <MenuSection
+                menuId={menuId}
+                group="advanced"
+                label="Advanced"
+                open={groupsOpen.advanced}
+                onToggle={toggleGroup}
+              >
+                <ProvInspectorSwitch onDone={done} />
+              </MenuSection>
             </div>
           </>,
           document.body,

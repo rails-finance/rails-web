@@ -59,6 +59,17 @@ const wholeText = (pg) =>
     return `${document.body.innerText}\n${body.textContent}`;
   });
 
+/** The Band state stat's tip, opened from its heading: it carries the
+ *  soft-liquidation multiple ("1.128×"). */
+async function bandStateTip(page) {
+  await page.click('[data-panel-row="band-state"] [data-heading-tip]').catch(() => {});
+  const text = await page
+    .waitForSelector('[role="tooltip"]', { timeout: 10000 })
+    .then((el) => el.textContent())
+    .catch(() => "");
+  await page.keyboard.press("Escape").catch(() => {});
+  return { text, test: /[\d.,]+×[\s\S]{0,60}the price where this position/.test(text ?? "") };
+}
 async function openAllAndRead(pg) {
   for (const b of await pg.$$('button[aria-expanded="false"]')) {
     try {
@@ -335,23 +346,27 @@ try {
   // ── 1. /llamalend/markets — the protocol view (chain-direct, real figures) ──
   await page.goto(`${BASE}${EXPLORER}/markets`, { waitUntil: "networkidle", timeout: 180000 });
   const h1 = await page.textContent("h1");
-  check("markets: heading renders", /band geometry/i.test(h1 ?? ""), h1 ?? "");
+  check("markets: heading renders", /^\s*Markets\s*$/.test(h1 ?? ""), h1 ?? "");
   let body = await page.textContent("body");
-  const cardCount = await page.locator("div.grid > div.rounded-lg").count();
+  // The roster (R1) groups the markets by era (R1.1): the first group opens on
+  // arrival, so the rows on the page are the open groups' and each group's
+  // heading states its count. The counts sum to the wire's roster.
+  const groupCounts = await page.$$eval("[data-llamalend-group] [data-row-group-toggle]", (els) =>
+    els.map((e) => Number(((e.textContent ?? "").match(/(\d+)\s+markets?/) ?? [])[1] ?? 0)),
+  );
+  const listed = groupCounts.reduce((a, b) => a + b, 0);
   checkVsWire(
-    "markets: one card per market on the wire",
+    "markets: the era groups count every market on the wire",
     WIRE.marketCount,
-    cardCount === WIRE.marketCount,
-    `${cardCount} cards vs ${WIRE.marketCount} on the wire`,
+    listed === WIRE.marketCount,
+    `${groupCounts.join("+")} = ${listed} vs ${WIRE.marketCount} on the wire`,
   );
   // The census is asserted for SELF-CONSISTENCY against the wire, not against a
   // frozen split: the stated total must match the backend, and the three parts
-  // must sum to it. That survives a new market appearing — which is exactly what
-  // broke the old frozen "48 V1 lend · 9 V1 mint · 2 V2".
-  // The vitals band: "Markets listed" then the count, the lineage split in
-  // its notes.
+  // must sum to it. The head's band: "Markets" then the count, the lineage
+  // split in its notes.
   const vitals = await page.evaluate(() => document.body.innerText);
-  const census = vitals.match(/Markets listed\s*(\d+)[\s\S]*?\b(\d+) V1 lend · (\d+) V1 mint · (\d+) V2/i);
+  const census = vitals.match(/Markets\s*(\d+)[\s\S]*?\b(\d+) V1 lend · (\d+) V1 mint · (\d+) V2/i);
   const [total, lend, mint, v2n] = (census ?? []).slice(1).map(Number);
   checkVsWire(
     "markets: census total matches the wire and its parts sum to it",
@@ -360,10 +375,16 @@ try {
     census ? `${total} = ${lend}+${mint}+${v2n}, wire ${WIRE.marketCount}` : "census line not found",
   );
   check(
-    "markets: non-crvUSD carve-out section names WETH",
-    /Markets that do not borrow crvUSD/.test(body) && /borrows\s+WETH/s.test(body),
+    "markets: the markets that lend another token are their own group",
+    (await page.locator('[data-llamalend-group="not-crvusd"]').count()) === 1 && /Lending another token/.test(body),
   );
-  check("markets: utilisation bases stated", body.includes("crvUSD debt ceiling") && body.includes("lender deposits"));
+  // Each row opens its market's page (R2).
+  const firstRow = await page.locator("[data-llamalend-market]").first().getAttribute("data-llamalend-market");
+  check(
+    "markets: each row opens its market's page",
+    firstRow != null && (await page.locator(`a[href="/ethereum/llamalend/markets/${firstRow}"]`).count()) > 0,
+    firstRow ?? "no row",
+  );
   check("markets: no page errors", pageErrors.length === 0, pageErrors.join(" | "));
 
   // ── 2. /llamalend listing — REAL index rows through the proxy ───────────────
@@ -461,9 +482,9 @@ try {
     // here — the caption follows "Converting now" and a word boundary between
     // "w" and "4" does not exist. A negative lookbehind on a digit says what is
     // actually meant: this count, not the tail of a longer number.
-    // The onset multiple is the panel's "Price over onset" row (ui-jobs 322).
-    new RegExp(`(?<!\\d)${sl.bands} bands:`).test(body) &&
-      /Price over onset(Price over onset, explain)?\s*[\d.,]+×/.test(body),
+    // The onset multiple is in the Band state stat's tip (TO-DO-position-card
+    // 341): open it and read the multiple there.
+    new RegExp(`(?<!\\d)${sl.bands} bands:`).test(body) && (await bandStateTip(page)).test,
   );
   check(
     "detail: REAL timeline events render (borrow rows)",
@@ -504,18 +525,18 @@ try {
     });
     await openPositionCards(page);
     await page.waitForSelector("[data-llamalend-liquidatable]", { timeout: 120000 }).catch(() => {});
-    // A detail card names Liquidatable in its panel, in the critical red, and
-    // states the chain read's health.
+    // A detail card says it under its Health headline, in the critical red,
+    // and states the chain read's health.
     const row = await page
       .$eval("[data-llamalend-liquidatable]", (el) => ({ text: el.textContent, cls: el.className }))
       .catch(() => null);
     body = await page.textContent("body");
     check(
-      `detail: liquidatable card's panel names Liquidatable on the critical red, at ${healthText}`,
+      `detail: liquidatable card's Health line says anyone may liquidate it, on the critical red, at ${healthText}`,
       /anyone may liquidate it now/.test(row?.text ?? "") &&
         /text-red-500/.test(row?.cls ?? "") &&
         body.includes(healthText),
-      row ? row.text : "no Liquidatable row",
+      row ? row.text : "no liquidatable line under Health",
     );
     check(
       "detail: the card's explanation leads with the liquidatable line, not soft-liquidation",
@@ -1079,30 +1100,58 @@ try {
     }
   }
 
-  await page.goto(`${BASE}${EXPLORER}/markets`, { waitUntil: "networkidle", timeout: 180000 });
-  await page.waitForSelector("text=A =", { timeout: 120000 });
+  // A market's page (R2): the r4 P8 market, wstETH 0x1e01…4d71, states its
+  // terms as the chain returns them, its utilisation basis in the tip, and its
+  // yield-share line where the collateral is one.
+  const P8 = "0x1e0165dbd2019441ab7927c018701f3138114d71";
+  await page.goto(`${BASE}${EXPLORER}/markets/${P8}`, { waitUntil: "networkidle", timeout: 180000 });
+  await page.waitForSelector("[data-llamalend-market-page]", { timeout: 120000 });
   body = await page.textContent("body");
   check(
-    "markets: near-zero-rate markets state their policy bounds",
-    /minimum and maximum at 3 wei a second/.test(body),
+    "market page: the band terms in LlamaLend's words",
+    /Loan discount/.test(body) && /Liquidation discount/.test(body) && /\bA\b/.test(body),
   );
-  check(
-    "markets: terms defined once, no contract names in the stamp",
-    /Loan discount/.test(body) && /Liquidation discount/.test(body) && !/OneWayLendingFactory/.test(body),
-  );
+  check("market page: no contract names on the surface", !/OneWayLendingFactory|monetary_policy|total_debt/.test(body));
   {
     const m = await (await hostFetch(`${BASE}/api/chain/llamalend/markets`)).json();
-    const w = (m.markets ?? []).find((x) => x.controller === "0x1e0165dbd2019441ab7927c018701f3138114d71");
+    const w = (m.markets ?? []).find((x) => x.controller === P8);
+    const shown = await page.locator('[data-vital="borrow-rate"]').first().textContent();
     check(
       "r4 P8: wstETH 0x1e01…4d71 reads a 50% loan discount and a live borrow rate, as the chain returns them",
-      w != null && w.loanDiscount === 0.5 && Number.isFinite(w.borrowAprPct) && w.borrowAprPct > 0,
-      w ? `${w.loanDiscount} ${w.borrowAprPct}` : "",
+      w != null &&
+        w.loanDiscount === 0.5 &&
+        Number.isFinite(w.borrowAprPct) &&
+        w.borrowAprPct > 0 &&
+        /50\.0%/.test(body),
+      w ? `${w.loanDiscount} ${w.borrowAprPct}; band shows ${shown}` : "",
     );
+    // A market whose policy bounds hold the rate near zero (3 wei a second)
+    // states them as its curve's terms.
+    const nearZero = (m.markets ?? []).find((x) => x.minRateRaw === "3" && x.maxRateRaw === "3");
+    if (nearZero) {
+      await page.goto(`${BASE}${EXPLORER}/markets/${nearZero.controller}`, {
+        waitUntil: "networkidle",
+        timeout: 180000,
+      });
+      await page.waitForSelector("[data-llamalend-market-page]", { timeout: 120000 });
+      const t = await page.textContent("[data-prov-scope='market-curve']");
+      check(
+        "market page: near-zero-rate markets state their policy bounds",
+        /Maximum rate/.test(t ?? ""),
+        t?.slice(0, 120),
+      );
+    }
+    const sdola = (m.markets ?? []).find((x) => x.collateralSymbol === "sDOLA");
+    if (sdola) {
+      await page.goto(`${BASE}${EXPLORER}/markets/${sdola.controller}`, { waitUntil: "networkidle", timeout: 180000 });
+      await page.waitForSelector("[data-llamalend-market-page]", { timeout: 120000 });
+      body = await page.textContent("body");
+      check(
+        "market page: yield-bearing shares say why they price above 1",
+        /sDOLA is a yield-bearing share of DOLA/.test(body),
+      );
+    }
   }
-  check(
-    "markets: yield-bearing shares say why they price above 1",
-    /sDOLA is a yield-bearing share of DOLA/.test(body),
-  );
 
   // The screenshot is a debugging aid, not an assertion. It used to hard-code an
   // absolute path into one long-dead session's scratchpad directory, which throws

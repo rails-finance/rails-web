@@ -9,7 +9,16 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ARBITRUM_CHAIN_ID, CHAINS, SEPOLIA_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import {
+  ARBITRUM_CHAIN_ID,
+  ARC_CHAIN_ID,
+  CHAINS,
+  OPTIMISM_CHAIN_ID,
+  ROBINHOOD_CHAIN_ID,
+  SEPOLIA_CHAIN_ID,
+  type ChainId,
+} from "@/lib/shared/chains";
+import { ChainGlyph as ChainMarkGlyph } from "@/components/icons/chain-glyphs";
 import { ARBITRUM_MARK_PATH } from "@/components/shared/explorer-mark";
 import { launchedChains } from "@/lib/shared/protocols";
 import { CTRL_GHOST, ctrlWaking } from "@/lib/shared/ui-grammar";
@@ -17,7 +26,7 @@ import { useHydrated } from "@/hooks/useHydrated";
 
 /** The segmented control's row and segment, exported so another switch (the
  *  Alchemix position-type tabs, the Maple pool switch) wears the same control.
- *  The theme switch's style (profile-menu.tsx; Miles, 6 Nov 2026): no track,
+ *  The theme switch's style as it stood in the profile menu (Miles, 6 Nov 2026): no track,
  *  rounded-md segments, the chosen one holding the soft fill the others show on
  *  hover. In dark the fill is rb-600 (hover rb-700), a step lighter than the
  *  page canvas (CTRL_ON's rb-800 is darker than it); tints of white or black
@@ -53,6 +62,11 @@ export function ChainGlyph({ chainId, className = "" }: { chainId: ChainId; clas
         <path d={ARBITRUM_MARK_PATH} />
       </svg>
     );
+  }
+  if (chainId === OPTIMISM_CHAIN_ID || chainId === ARC_CHAIN_ID || chainId === ROBINHOOD_CHAIN_ID) {
+    // The marks in components/icons/chain-glyphs.tsx, so a chain without a case
+    // here draws its own mark rather than the Ethereum diamond below.
+    return <ChainMarkGlyph id={chainId} className={`shrink-0 ${className}`} />;
   }
   if (chainId === SEPOLIA_CHAIN_ID) {
     // Sepolia is an Ethereum testnet, so it wears the Ethereum diamond as an
@@ -101,9 +115,12 @@ export function ChainToggleButtons({
   chainId,
   onChange,
   extra,
+  chains = TOGGLE_CHAINS,
 }: {
   chainId: ChainId;
   onChange: (id: ChainId) => void;
+  /** The chains offered; the launched ones unless the asset preference narrows them. */
+  chains?: ChainId[];
   /** A trailing choice outside CHAINS (the home page's "coming soon" chain).
    *  While it is active no chain segment is. */
   extra?: { label: string; active: boolean; onSelect: () => void; glyph?: ReactNode };
@@ -114,7 +131,7 @@ export function ChainToggleButtons({
       className={extra ? `${SEGMENT_SHELL} max-w-full flex-wrap justify-center` : SEGMENT_SHELL}
       {...ctrlWaking(hydrated)}
     >
-      {TOGGLE_CHAINS.map((id) => {
+      {chains.map((id) => {
         const active = chainId === id && !extra?.active;
         return (
           <button

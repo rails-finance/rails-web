@@ -20,7 +20,7 @@
 //
 // ui-jobs 302: on the event card header (T1) the chevron comes last in the left
 // cluster, after the verb, the amounts and icons that show and any rate pill;
-// an asset icon hides with its amount while Timeline values is on (≥640 px);
+// an asset icon hides with its amount (≥640 px);
 // the chevron appears 0.5 s after the pointer enters the header and hides at
 // once on leave, keyboard focus shows it at once, the position card's rows keep
 // the instant reveal.
@@ -61,19 +61,13 @@ function check(name, ok, detail = "") {
 
 const browser = await chromium.launch();
 
-async function open(width, path, { touch = false, store = null, valuesOff = false } = {}) {
+async function open(width, path, { touch = false, store = null } = {}) {
   const ctx = await browser.newContext({
     viewport: { width, height: 1000 },
     hasTouch: touch,
     isMobile: touch,
     extraHTTPHeaders: bypassHeaders(),
   });
-  if (valuesOff)
-    await ctx.addInitScript(() => {
-      try {
-        localStorage.setItem("timeline-display-v3", JSON.stringify({ showTimelineValues: false }));
-      } catch {}
-    });
   if (store)
     await ctx.addInitScript(
       ([k, v]) => {
@@ -249,20 +243,17 @@ const headerLayout = (card) =>
     flowsGap != null && flowsGap >= 0 && flowsGap <= 8,
     `${flowsGap}px`,
   );
-  const flowsMenu = await f1
-    .evaluate((row) => {
-      const menu = row.querySelector("[data-panel-menu]");
-      if (!menu) return null;
-      return {
-        rightGap: Math.round(row.getBoundingClientRect().right - menu.getBoundingClientRect().right),
-        help: !!row.querySelector('[data-anatomy="F16"]'),
-      };
-    })
+  // The panel's ⋮ held only Inspect provenance and left with it (ui-jobs 625).
+  const flowsHead = await f1
+    .evaluate((row) => ({
+      menu: !!row.querySelector("[data-panel-menu]"),
+      help: !!row.querySelector('[data-anatomy="F16"]'),
+    }))
     .catch(() => null);
   check(
-    "2b. the Lifetime flows ⋮ stands at the header's right end, no ? in the header",
-    !!flowsMenu && flowsMenu.rightGap <= 6 && !flowsMenu.help,
-    JSON.stringify(flowsMenu),
+    "2b. the Lifetime flows header draws no ⋮ and no ?",
+    !!flowsHead && !flowsHead.menu && !flowsHead.help,
+    JSON.stringify(flowsHead),
   );
   // A press before hydration is lost: pressed until the modal shows.
   const howTo = page.locator('[data-flow-help="F16"] button').first();
@@ -434,15 +425,14 @@ const headerLayout = (card) =>
     .locator('[data-event-menu] [role="menu"] [data-menu-item]')
     .evaluateAll((els) => els.map((e) => e.getAttribute("data-menu-item")))
     .catch(() => []);
-  // ui-jobs 535: Open event page, Inspect provenance, Copy transaction hash,
-  // then Hide the row's type of event.
+  // ui-jobs 535, 625: Open event page, Copy transaction hash, then Hide the
+  // row's type of event.
   const after = items.slice(1);
-  const order = ["show-provenance", "copy-hash", "hide-group", "hide-type"];
+  const order = ["copy-hash", "hide-group", "hide-type"];
   check(
-    "4b. a press on it opens the menu: Open event page, Inspect provenance, Copy transaction hash, then Hide the row's type of event where the timeline has more than one",
+    "4b. a press on it opens the menu: Open event page, Copy transaction hash, then Hide the row's type of event where the timeline has more than one",
     items[0] === "view-page" &&
-      items[1] === "show-provenance" &&
-      items[2] === "copy-hash" &&
+      items[1] === "copy-hash" &&
       after.every((i) => order.includes(i)) &&
       after.every((i, k) => k === 0 || order.indexOf(after[k - 1]) < order.indexOf(i)),
     JSON.stringify(items),
@@ -722,12 +712,12 @@ const SHEET_WORDS_SUBJECTS = [
     name: "Liquity V2 Trove …545773770 #3",
     path: "/ethereum/liquity-v2/trove/WETH/29779854367542649123526514384205099621162281315544372345570836626121545773770",
     id: "0xe5509980170a44f3f5878afd1b13d3e797cba9789b1509de475fcb9fb97ad930_1",
-    risk: ["Collateral Ratio", "Liquidates at"],
+    risk: ["LTV", "Liquidates at"],
     limits: ["Interest Rate"],
-    params: ["Minimum ratio", "Critical ratio"],
+    params: ["Max LTV", "Critical Collateral Ratio (CCR)"],
     optional: ["Delegate's fee"],
-    // The gas compensation escrow, a footnote under Risk and Limits (ui-jobs 388).
-    note: /^0\.0375 WETH \(\$[\d,.]+\) held in escrow$/,
+    // The liquidation reserve, a footnote under Risk and Limits (ui-jobs 388).
+    note: /^0\.0375 WETH \(\$[\d,.]+\) held as the liquidation reserve$/,
   },
   {
     name: "Aave V3 0x9ff6…0de5 Borrow",
@@ -736,7 +726,7 @@ const SHEET_WORDS_SUBJECTS = [
     risk: ["Health factor", "Collateral can fall"],
     limits: ["LTV", "Still borrowable"],
     params: ["Max LTV", "Liquidation threshold"],
-    optional: ["eMode"],
+    optional: ["E-Mode"],
   },
   {
     name: "Aave V3 0xc593…5948 Repay with collateral",
@@ -745,7 +735,7 @@ const SHEET_WORDS_SUBJECTS = [
     risk: ["Health factor", "Collateral can fall"],
     limits: ["LTV", "Still borrowable"],
     params: ["Max LTV", "Liquidation threshold"],
-    optional: ["eMode"],
+    optional: ["E-Mode"],
   },
   // The families that moved to the sheet (ui-jobs 330), one subject each, the
   // fixtures verify-event-share.mjs holds. `carried`: the sides whose carry
@@ -806,9 +796,10 @@ const SHEET_WORDS_SUBJECTS = [
     name: "Ebisu",
     path: "/ethereum/ebisu/WBTC/75911241408635389930317354588378809432274724767733080584082611717827843647638",
     id: "0x8496531fb5d25fc73d0d2df3695176b44d86f057871e9b89a5de224f16590a18-0",
-    risk: ["Collateral ratio", "Liquidates at"],
+    // Ebisu's docs' terms (decision 0065); "Critical ratio" is Rails's.
+    risk: ["Collateralization ratio", "Liquidation price"],
     limits: ["Interest rate"],
-    params: ["Minimum ratio", "Critical ratio"],
+    params: ["Minimum Collateral Ratio", "Critical ratio"],
     optional: [],
     // The escrow states its amount alone on the WBTC branch: no WETH price.
     note: /^0\.0375 WETH held in escrow$/,
@@ -850,9 +841,9 @@ const SHEET_WORDS_SUBJECTS = [
     name: "f(x)",
     path: "/ethereum/fx/wsteth-249",
     id: "0x8766352d623d50606f8a6929ee945523619b5e9c81a83d5dcf740f3c15a0f795:21",
-    risk: ["Debt ratio", "Price to tick"],
+    risk: ["LTV", "Price to tick"],
     limits: ["Pool drift"],
-    params: ["Rebalance ratio", "Liquidation ratio"],
+    params: ["Rebalance line", "Liquidation line"],
     optional: [],
     carried: 2,
   },
@@ -871,8 +862,9 @@ const SHEET_WORDS_SUBJECTS = [
     path: "/ethereum/aave-v4/spoke/main/0x7eac02864fbae93de38394a3e7b72a22e9b5fa09",
     id: "0x93924cd94df220dd1ab3691d52e949bc413fa9fd03838d20dae69195db1d6898-6",
     risk: ["Health factor", "Collateral can fall"],
-    limits: ["LTV", "Still borrowable"],
-    params: ["Max LTV", "Liquidation threshold"],
+    // The V4 docs' words (ui-jobs 627): no Max LTV row while it has no figure.
+    limits: ["LTV", "Remaining borrowing power"],
+    params: ["Collateral factor"],
     optional: [],
     carried: 2,
   },
@@ -880,22 +872,19 @@ const SHEET_WORDS_SUBJECTS = [
     name: "Compound V3",
     path: "/ethereum/compound-v3/usdc/0xd51c5283b8727206bf9be2b2db4e5673efaf519c",
     id: "0x1b24d1761a9ca435f2b63b76ed2f6b7b119c9474b37e2fc2c60e7266b9e55fec-1",
-    risk: ["Borrowing limit used", "Collateral can fall"],
-    limits: ["Still borrowable", "Borrow rate"],
-    params: [
-      "WETH borrow collateral factor",
-      "WETH liquidate collateral factor",
-      "WBTC borrow collateral factor",
-      "WBTC liquidate collateral factor",
-    ],
+    // Compound's docs' words (ui-jobs 629): the debt side is the borrow balance.
+    risk: ["Borrowing capacity used", "Collateral can fall"],
+    limits: ["Still borrowable", "Borrow APR"],
+    params: ["WETH Borrow CF", "WETH Liquidation CF", "WBTC Borrow CF", "WBTC Liquidation CF"],
     optional: [],
+    headings: ["Collateral", "Borrow balance"],
     carried: 2,
   },
   {
     name: "Fluid",
     path: "/ethereum/fluid/11044",
     id: "withdraw:09dc1e0d4e197230f505de564bd5e1d7ab3ff1299462a9bf36f08d72a512ffcc:355:11044",
-    risk: ["Position ratio", "Collateral can fall"],
+    risk: ["Debt to collateral ratio", "Collateral can fall"],
     limits: ["Still borrowable", "Borrow rate"],
     params: ["Collateral factor", "Liquidation threshold", "Liquidation penalty"],
     optional: [],
@@ -906,7 +895,8 @@ const SHEET_WORDS_SUBJECTS = [
     path: "/base/morpho/0xd13de0ab683e6b1eef10532759d9717b65d8a8bd/0x9103c3b4e834476c9a62ea009ba2c884ee42e94e6e314a26f04d312434191836",
     id: "0x17675f8d57fdd518d7cc8c8f607588887495778d8f00f00883920b29f7e2ff78:3",
     risk: ["LTV (liquidation at 86.0%)", "Collateral can fall"],
-    limits: ["Still borrowable", "Borrow rate"],
+    // Morpho's docs' word for the rate (ui-jobs 628).
+    limits: ["Still borrowable", "Borrow APY"],
     params: ["LLTV", "Oracle price"],
     optional: [],
     carried: 1,

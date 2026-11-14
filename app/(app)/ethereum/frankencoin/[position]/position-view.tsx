@@ -425,9 +425,8 @@ export default function FrankencoinPositionView({
                     lifetimeDebt={lifetimeDebt}
                     surface="detail"
                     viewHref={tl.viewHref}
-                    // The running challenge, the phase length and the minting
-                    // cooldown come from the position's slots at head; the
-                    // challenge tally from the index.
+                    // The running challenge comes from the position's slots
+                    // at head; the challenge tally from the index.
                     live={chain}
                     challengeTally={summary ? summary.challengeCount : null}
                     exports={exports}

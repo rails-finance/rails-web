@@ -43,7 +43,7 @@ export default async function MoonwellPositionPage({ params }: Props) {
   const [tail, read] = await Promise.all([loadMoonwellPositionTail(wallet), indexReadAt(MAINNET_CHAIN_ID)]);
 
   return (
-    <PositionReadProvider key={wallet} read={tail.position ? read : null}>
+    <PositionReadProvider focus={{ source: tail.position }} key={wallet} read={tail.position ? read : null}>
       <MoonwellPositionView
         // Keyed on the wallet so a client-side navigation to another account
         // remounts with that account's server tail as its initial state.

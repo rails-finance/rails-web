@@ -32,6 +32,7 @@ import {
   units,
 } from "@/lib/pendle/format";
 import { eventAssetProv, legProv, tradeApyProv } from "@/lib/pendle/provenance";
+import { PENDLE_WORDS } from "@/lib/pendle/words";
 import type {
   PendleMarketTokens,
   PendleRole,
@@ -152,7 +153,7 @@ export function PendleEventCard({
     cells.push({
       kind: "stat",
       key: "apy",
-      label: "Fixed APY of the trade",
+      label: PENDLE_WORDS.effectiveFixedApy,
       changed: false,
       value: { after: { text: apyText(row.impliedApy), info: tradeApyProv(row), value: row.impliedApy.toFixed(6) } },
     });
@@ -168,7 +169,7 @@ export function PendleEventCard({
           key="r"
           href={explorerUrl(PENDLE_CHAIN_ID, "address", router.address)}
           target="_blank"
-          rel="noopener noreferrer"
+          rel="noopener"
           className="link-muted text-xs"
         >
           {router.name} ↗
@@ -258,7 +259,10 @@ export function PendleEventCard({
             </li>
           )}
           {row.impliedApy != null && (
-            <li>The PT in this trade was priced at a fixed {apyText(row.impliedApy)} a year to maturity.</li>
+            <li>
+              The PT in this trade was priced at an Effective Fixed APY of {apyText(row.impliedApy)}.{" "}
+              {PENDLE_WORDS.tradeApyTip}
+            </li>
           )}
           {row.partial && (
             <li>The log does not give every leg of this wallet&rsquo;s side, so some legs are missing.</li>

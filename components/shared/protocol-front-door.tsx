@@ -14,8 +14,7 @@ import type { SessionProtocol } from "@/lib/shared/sessions";
 import { protocolForSession } from "@/lib/shared/protocols";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { FrontDoorSearch } from "@/components/shared/front-door-search";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { NAV_PILL } from "@/lib/shared/ui-grammar";
 import { ChainLabel } from "@/components/shared/rail-header";
 
@@ -61,7 +60,6 @@ export function ProtocolFrontDoor({ session }: { session: SessionProtocol }) {
           ))}
         </nav>
       </div>
-      <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
       <ProvInspectorLayer />
     </>
   );

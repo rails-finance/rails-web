@@ -24,6 +24,12 @@
 
 import type { Provenance, ProvInput, ProvVerify } from "@/components/shared/provenance";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import {
+  COMPOUND_V2_BLOCKS_PER_YEAR,
+  COMPOUND_V2_YEAR_DOCS,
+  COMPOUND_V2_YEAR_SOURCE,
+} from "@/lib/compound-v2/rate-year";
+import { COMPOUND_V2_APY_FORMULA, COMPOUND_V2_BLOCKS_PER_DAY, COMPOUND_V2_DAYS_PER_YEAR } from "@/lib/comptroller/apy";
 
 // Custody, not origin — the via line's leading segment only (the embedded
 // receipt renderer drops it; provenance-receipts-grammar §3). Summaries state
@@ -209,12 +215,19 @@ export const liqDebtRepaidProv = (sym: string, coords: CompoundV2Coords, raw?: s
 });
 
 /** Collateral-market cTokens seized in a liquidation (`seizeTokens` — the SUM
- *  of the liquidator's leg and the protocol's burned cut). */
-export const seizeTokensProv = (cSym: string, coords: CompoundV2Coords, raw?: string | null): Provenance => ({
+ *  of the liquidator's leg and, where the market has a seize share, the
+ *  protocol's burned cut). `share` is false for the seven markets without one
+ *  (compoundV2HasSeizeShare); undefined where the collateral is not named. */
+export const seizeTokensProv = (
+  cSym: string,
+  coords: CompoundV2Coords,
+  raw?: string | null,
+  share?: boolean,
+): Provenance => ({
   kind: "chain",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `Collateral seized in this liquidation — ${cSym} (the collateral market's receipt token) taken from the borrower, exactly as the borrowed market's cToken emitted it${atBlock(coords)}, scaled by the cToken's 8 decimals. This figure is the SUM of the seizure's two legs: the liquidator's share and the protocol's own cut (protocolSeizeShare), which is burned. Each leg is its own Transfer in the same transaction, so both also appear on the collateral market's balance lane — as seizures, not as transfers the borrower made.`,
+  summary: `Collateral seized in this liquidation — ${cSym} (the collateral market's receipt token) taken from the borrower, exactly as the borrowed market's cToken emitted it${atBlock(coords)}, scaled by the cToken's 8 decimals. ${share === false ? "This market's cToken takes no protocol share, so the whole figure is one Transfer to the liquidator in the same transaction, and it appears on the collateral market's balance lane as a seizure." : "This figure is the SUM of the seizure's two legs: the liquidator's share and the protocol's own cut (protocolSeizeShare), which is burned. Each leg is its own Transfer in the same transaction, so both also appear on the collateral market's balance lane — as seizures, not as transfers the borrower made."}`,
   contract: ctokenContract(coords),
   via: `${COMPOUND_V2_VIA} · LiquidateBorrow log · ${fieldSeg("seizeTokens", raw)}`,
   inputs: eventInputs(coords),
@@ -222,12 +235,14 @@ export const seizeTokensProv = (cSym: string, coords: CompoundV2Coords, raw?: st
 
 /** One NAMED seizure leg (seize_out / seize_in / seize_burn) — a Transfer log
  *  the index attributed to a same-tx LiquidateBorrow, bounded between the
- *  liquidation's own repay leg and the LiquidateBorrow itself. */
+ *  liquidation's own repay leg and the LiquidateBorrow itself. `share` as on
+ *  `seizeTokensProv`. */
 export const seizeLegProv = (
   cSym: string,
   leg: "seize_out" | "seize_in" | "seize_burn",
   coords: CompoundV2Coords,
   raw?: string | null,
+  share?: boolean,
 ): Provenance => ({
   kind: "chain-derived",
   pclass: "emitted",
@@ -236,7 +251,7 @@ export const seizeLegProv = (
     leg === "seize_out"
       ? `${cSym} taken from this position in a liquidation seizure — the borrower→liquidator Transfer leg the seize emitted${atBlock(coords)}, scaled by the cToken's 8 decimals. The leg is attributed to the same-transaction LiquidateBorrow (its position between the liquidation's repay leg and the LiquidateBorrow log is the chain fact), so it renders as collateral being TAKEN — not as a transfer the borrower made.`
       : leg === "seize_in"
-        ? `${cSym} this wallet received as the liquidator in a seizure — the borrower→liquidator Transfer leg the seize emitted${atBlock(coords)}, scaled by the cToken's 8 decimals, attributed to the same-transaction LiquidateBorrow. Worth the repaid debt plus the liquidation incentive, less the protocol's own burned cut.`
+        ? `${cSym} this wallet received as the liquidator in a seizure — the borrower→liquidator Transfer leg the seize emitted${atBlock(coords)}, scaled by the cToken's 8 decimals, attributed to the same-transaction LiquidateBorrow. Worth the repaid debt plus the liquidation incentive${share === false ? ": this market takes no protocol share, so the liquidator receives every seized cToken" : ", less the protocol's own burned cut"}.`
         : `The protocol's cut of this seizure — the borrower→cToken Transfer leg (protocolSeizeShare, 2.8% of the seize), burned: totalSupply drops and no wallet receives it${atBlock(coords)}. A real loss to the borrower with no counterparty. Liquidations before the protocolSeizeShare upgrade (2021) have no such leg.`,
   contract: ctokenContract(coords),
   via: `${COMPOUND_V2_VIA} · Transfer log (seize leg, paired to same-tx LiquidateBorrow) · ${fieldSeg("amount", raw)}`,
@@ -256,6 +271,7 @@ export function movedDeltaProv(
   cSym: string,
   coords: CompoundV2Coords,
   raw?: string | null,
+  share?: boolean,
 ): Provenance | undefined {
   switch (eventType) {
     case "mint":
@@ -267,7 +283,7 @@ export function movedDeltaProv(
     case "transfer_out":
       return transferAmountProv(cSym, eventType === "transfer_in" ? "in" : "out", coords, raw);
     case "seize_in":
-      return seizeLegProv(cSym, "seize_in", coords, raw);
+      return seizeLegProv(cSym, "seize_in", coords, raw, share);
     default:
       return undefined;
   }
@@ -647,36 +663,91 @@ export const fixedPriceLineProv = (sym: string): Provenance => ({
   via: "oracle getConfig · fixedPrice (priceFeed == 0)",
 });
 
-/** The live per-block borrow rate on one market, annualized on ITS model's
- *  own blocksPerYear (not one constant across the roster). */
-export const borrowRateProv = (sym?: string): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  verify: {
-    kind: "recompute",
-    text: "Re-run the cToken.borrowRatePerBlock eth_call and multiply by the market's own interestRateModel.blocksPerYear()",
-  },
-  summary: `The current variable borrow rate${sym ? ` on the ${sym} market` : ""} — the cToken's \`borrowRatePerBlock\` read at head, annualized on the market's OWN interest rate model's \`blocksPerYear()\` constant. The roster does not agree on one: cETH's model says 2,628,000 while the others say 2,102,400, so the annualization is each model's own arithmetic, not a wall-clock estimate. Simple multiplication, not compounding.`,
-  contract: { name: "cToken", address: "" },
-  via: "cToken borrowRatePerBlock (eth_call at head) × interestRateModel.blocksPerYear()",
-  formula: "per-block rate × the model's own blocks per year",
-  inputs: [
-    { label: "per-block rate", kind: "chain", pclass: "state", note: "borrowRatePerBlock at head" },
-    { label: "blocks per year", kind: "chain", pclass: "state", note: "the market's own model's constant" },
-  ],
-});
+/** One market's price on the position page's price list: the Comptroller
+ *  oracle's getUnderlyingPrice, the price its liquidity math reads. A no-feed
+ *  market's is the stored constant (`fixedPriceLineProv`). */
+export const compoundV2PriceProv = (sym: string, fixed: boolean): Provenance =>
+  fixed
+    ? fixedPriceLineProv(sym)
+    : {
+        kind: "chain",
+        pclass: "oracle",
+        verify: { kind: "recompute", text: "Re-run the oracle's getUnderlyingPrice eth_call for this market" },
+        summary: `${sym} price in USD — the Comptroller oracle's getUnderlyingPrice for the ${sym} market, the price the Comptroller's liquidity math reads.`,
+        contract: { name: "Compound Open Price Feed (Comptroller oracle)", address: "" },
+        via: "oracle getUnderlyingPrice(cToken), scaled by 10^(36 − underlying decimals)",
+      };
 
-/** Debt-USD-weighted average borrow rate across several borrowed markets. */
+/** The model's `blocksPerYear()` as the constant behind its per-block curve. */
+const modelYearSentence = (bpy: number | null | undefined): string =>
+  bpy != null
+    ? `The market's rate model answers \`blocksPerYear()\` ${bpy.toLocaleString("en-US")}: the constant it uses to set its per-block curve from its yearly terms.`
+    : "The market's rate model answers `blocksPerYear()`: the constant it uses to set its per-block curve from its yearly terms.";
+
+/** The compounding input on a Compound V2 APY receipt: the docs' 7,200 blocks a day over 365 days. */
+const docsDailyInput: ProvInput = {
+  label: "blocks a day, days a year",
+  value: `${COMPOUND_V2_BLOCKS_PER_DAY.toLocaleString("en-US")}, ${COMPOUND_V2_DAYS_PER_YEAR}`,
+  kind: "offchain",
+  pclass: "offchain",
+  definition: true,
+  note: "Compound's docs' APY formula: 12-second blocks, compounded daily",
+  verify: {
+    kind: "link",
+    href: COMPOUND_V2_YEAR_DOCS,
+    text: "Compound's docs: Calculating the APY Using Rate Per Block",
+  },
+};
+
+/** The live per-block borrow rate on one market as an APY, by Compound's docs'
+ *  formula (lib/comptroller/apy.ts). */
+export const borrowRateProv = (
+  sym?: string,
+  read?: { perBlockRaw?: string | null; modelBlocksPerYear?: number | null },
+): Provenance => {
+  const simple =
+    read?.perBlockRaw != null
+      ? ` As a simple rate on ${COMPOUND_V2_BLOCKS_PER_YEAR.toLocaleString("en-US")} blocks a year (${COMPOUND_V2_YEAR_SOURCE}) it is ${((Number(read.perBlockRaw) / 1e18) * COMPOUND_V2_BLOCKS_PER_YEAR * 100).toFixed(2)}%.`
+      : "";
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    verify: {
+      kind: "recompute",
+      text: `To check: ask any Ethereum node for the cToken's borrowRatePerBlock() and compute ${COMPOUND_V2_APY_FORMULA}.`,
+    },
+    summary: `The current variable borrow APY${sym ? ` on the ${sym} market` : ""} — the cToken's \`borrowRatePerBlock\` read at head, by Compound's docs' APY formula: ${COMPOUND_V2_APY_FORMULA}, 7,200 blocks a day compounded daily.${simple} ${modelYearSentence(read?.modelBlocksPerYear)}`,
+    contract: { name: "cToken", address: "" },
+    via: "cToken borrowRatePerBlock (eth_call at head) → APY",
+    formula: COMPOUND_V2_APY_FORMULA,
+    inputs: [
+      {
+        label: "per-block rate",
+        ...(read?.perBlockRaw ? { value: BigInt(read.perBlockRaw).toLocaleString("en-US") } : {}),
+        kind: "chain",
+        pclass: "state",
+        note: "borrowRatePerBlock at head, a 1e18 mantissa",
+      },
+      docsDailyInput,
+    ],
+  };
+};
+
+/** Debt-USD-weighted average borrow APY across several borrowed markets. */
 export const avgBorrowRateProv = (): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
-  summary:
-    "Debt-weighted average of the markets' current borrow rates — averaged across the markets this position borrows: each market's borrowRatePerBlock (annualized on its own model's blocksPerYear) weighted by that debt's USD value at Compound's own oracle price. All legs are chain reads at head.",
+  summary: `Debt-weighted average of the markets' current borrow APYs — averaged across the markets this position borrows: each market's borrowRatePerBlock as an APY by Compound's docs' formula (${COMPOUND_V2_APY_FORMULA}), weighted by that debt's USD value at Compound's oracle price. All legs are chain reads at head.`,
   contract: { name: "cToken", address: "" },
-  via: "Σ (rate × debt USD) ÷ Σ debt USD, per borrowed market",
-  formula: "Σ (rate × weight) ÷ Σ weight",
+  via: "Σ (APY × debt USD) ÷ Σ debt USD, per borrowed market",
+  formula: "Σ (APY × weight) ÷ Σ weight",
   inputs: [
-    { label: "rate", kind: "chain", pclass: "state", note: "borrowRatePerBlock per market, annualized on its model" },
+    {
+      label: "APY",
+      kind: "chain-derived",
+      pclass: "state",
+      note: "borrowRatePerBlock per market, by the docs' formula",
+    },
     { label: "weight", kind: "chain-derived", pclass: "oracle", note: "debt × oracle getUnderlyingPrice" },
   ],
 });

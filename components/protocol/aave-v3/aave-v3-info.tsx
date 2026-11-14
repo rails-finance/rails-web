@@ -76,7 +76,7 @@ export function AaveV3InfoPage({ deployment }: { deployment: AaveV3InfoDeploymen
           <>
             The Rails Aave V3 explorer shows every account on Ethereum, whether still open or closed, across the Core,
             Prime and EtherFi markets, and the full history of each one. It also shows the reserves of{" "}
-            <Link href="/ethereum/aave-v3/market" className={INLINE_LINK}>
+            <Link href="/ethereum/aave-v3/markets" className={INLINE_LINK}>
               the Core market
             </Link>
             , with their rates, risk settings and prices.
@@ -113,7 +113,7 @@ export function AaveV3InfoPage({ deployment }: { deployment: AaveV3InfoDeploymen
           },
           POSITION_PAGE,
           marketView(
-            "/ethereum/aave-v3/market",
+            "/ethereum/aave-v3/markets",
             "The market view shows each Core reserve with its size, rates, risk settings and price.",
             "Use the Core market link",
           ),
@@ -133,7 +133,7 @@ export function AaveV3InfoPage({ deployment }: { deployment: AaveV3InfoDeploymen
           {base
             ? "The Rails Aave V3 explorer shows every account on Aave V3's Base market, whether still open or closed, and the full history of each one. It also shows the reserves of "
             : "The Rails Aave V3 explorer shows the accounts on Arbitrum that Rails has read, with the full history of each one, and a wallet appears once someone opens it. It also shows the reserves of "}
-          <Link href={base ? "/base/aave-v3/market" : "/arbitrum/aave-v3/markets"} className={INLINE_LINK}>
+          <Link href={base ? "/base/aave-v3/markets" : "/arbitrum/aave-v3/markets"} className={INLINE_LINK}>
             the {chain} market
           </Link>
           , with their rates, risk settings and prices.
@@ -197,7 +197,7 @@ export function AaveV3InfoPage({ deployment }: { deployment: AaveV3InfoDeploymen
             },
         POSITION_PAGE,
         marketView(
-          base ? "/base/aave-v3/market" : "/arbitrum/aave-v3/markets",
+          base ? "/base/aave-v3/markets" : "/arbitrum/aave-v3/markets",
           `The market view shows each ${chain} reserve with its size, rates, risk settings and price.`,
           `Use the ${chain} market link`,
         ),

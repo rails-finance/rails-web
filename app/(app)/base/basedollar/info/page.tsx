@@ -1,3 +1,4 @@
+// focus: the explorer's explainer; the shell's gate stands over the explorer
 // About this explorer — a page of its own on the rail's sub-nav, drawn on
 // ProtocolInfoPage (rails-ops standards/info-page-template.md). Basedollar has no
 // reachable documentation site (docs.basedollar.money does not answer), so the glossary
@@ -7,6 +8,7 @@ import Link from "next/link";
 import { ProtocolInfoPage, GlossaryLink, type InfoTerm, type InfoView } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { fmtLtv } from "@/lib/liquity/ltv";
 
 export const metadata = infoMetadata("basedollar");
 
@@ -15,6 +17,9 @@ const BORROWING = FAQ + "/borrowing-and-liquidations";
 const REDEMPTIONS = FAQ + "/redemptions-and-delegation";
 
 const UL = "mt-1.5 list-disc space-y-1 pl-5";
+
+// Every branch's Max LTV: 1 ÷ its 110% MCR (lib/basedollar/asset-catalog.ts).
+const MAX_LTV = fmtLtv(100 / 1.1, 2);
 
 const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
   {
@@ -41,10 +46,10 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
     ],
   },
   {
-    term: "Collateral ratio",
+    term: "LTV",
     definition:
-      "The collateral ratio is the value of a Trove's collateral divided by its debt. A ratio of 150% means the Trove holds $150 of collateral for every $100 of debt.",
-    sources: [{ label: "Collateral ratio and LTV (Liquity V2 FAQ)", href: BORROWING + "#how-do-i-decide-on-my-ltv" }],
+      "LTV, loan-to-value, is a Trove's debt divided by the value of its collateral. An LTV of 80% means $80 of debt for every $100 of collateral. Each branch sets a Max LTV, and a Trove above it can be liquidated.",
+    sources: [{ label: "Choosing an LTV (Liquity V2 FAQ)", href: BORROWING + "#how-do-i-decide-on-my-ltv" }],
   },
   {
     term: "Interest rate",
@@ -67,7 +72,7 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "Liquidation",
     definition:
-      "A liquidation closes a Trove whose collateral ratio has fallen below the minimum of its branch. The borrower keeps the BD that was minted and loses the collateral. The Trove's status then reads Liquidated, where a Trove its owner repaid and closed reads Closed.",
+      "A liquidation closes a Trove whose LTV has risen above the Max LTV of its branch. The borrower keeps the BD that was minted and loses the collateral. The Trove's status then reads Liquidated, where a Trove its owner repaid and closed reads Closed.",
     sources: [
       {
         label: "How liquidations work (Liquity V2 FAQ)",
@@ -170,9 +175,8 @@ export default function InfoPage() {
         <>
           Basedollar keeps one <GlossaryLink term="Branch">branch</GlossaryLink> for each of five collateral tokens:
           WETH, wstETH, rETH and cbETH, which represent ether, and wcbBTC, which represents bitcoin. Basedollar&apos;s
-          contracts require every branch to keep a Trove&apos;s{" "}
-          <GlossaryLink term="Collateral ratio">collateral ratio</GlossaryLink>, its collateral value divided by its
-          debt, at 110% or more.
+          contracts require every branch to keep a Trove&apos;s <GlossaryLink term="LTV">LTV</GlossaryLink>, its debt
+          divided by its collateral value, at {MAX_LTV} or less, its Max LTV.
         </>,
         <>
           The borrower of each Trove chooses its <GlossaryLink term="Interest rate">interest rate</GlossaryLink>. A
@@ -181,10 +185,9 @@ export default function InfoPage() {
           back up. A redemption takes from the lowest-rate Troves first.
         </>,
         <>
-          When a Trove&apos;s collateral ratio falls below the minimum, a{" "}
-          <GlossaryLink term="Liquidation">liquidation</GlossaryLink> closes it. The branch&apos;s{" "}
-          <GlossaryLink term="Stability Pool">Stability Pool</GlossaryLink> pays off the debt with BD that other users
-          deposited, and those depositors receive the collateral.
+          When a Trove&apos;s LTV rises above the Max LTV, a <GlossaryLink term="Liquidation">liquidation</GlossaryLink>{" "}
+          closes it. The branch&apos;s <GlossaryLink term="Stability Pool">Stability Pool</GlossaryLink> pays off the
+          debt with BD that other users deposited, and those depositors receive the collateral.
         </>,
         <>
           Basedollar&apos;s contracts set the minimum debt of a Trove at 200 BD. A redemption repays part of a

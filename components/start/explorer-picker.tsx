@@ -4,6 +4,9 @@
 // explorers grouped by chain as the explorer chooser (H4) groups them. In "find" mode
 // (the protocol's site is down) each explorer opens with its wallet search
 // focused: a listing through `?find=1`, a front door (N5) the same way.
+// Under the asset preference (ui-jobs 557) only the explorers that list one of
+// the reader's assets stand, under the chains that have one; the note over the
+// groups says what was hidden.
 
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
@@ -11,6 +14,8 @@ import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { ChainGlyph } from "@/components/shared/chain-toggle";
 import { launchedChains, protocolsForChain, type ProtocolEntry } from "@/lib/shared/protocols";
 import type { RosterKey } from "@/lib/start/tree";
+import { ScopeNote } from "@/components/shared/asset-scope-note";
+import { useScopedRoster } from "@/lib/shared/explorer-scope";
 
 /** The query that puts the cursor in a listing's or front door's search. */
 export const FIND_PARAM = "find";
@@ -23,13 +28,15 @@ function hrefFor(entry: ProtocolEntry, mode: RosterKey): string {
 }
 
 export function ExplorerPicker({ mode }: { mode: RosterKey }) {
+  const roster = useScopedRoster();
   const groups = launchedChains()
-    .map((chain) => ({ chain, entries: protocolsForChain(chain.id) }))
+    .map((chain) => ({ chain, entries: protocolsForChain(chain.id).filter((p) => roster.shows(p.id)) }))
     .filter((g) => g.entries.length > 0);
 
   return (
     <div data-anatomy="G4" data-start-roster={mode}>
-      <div className="flex flex-col gap-6">
+      <ScopeNote scoped={roster} noun={["explorer", "explorers"]} className="mb-4" />
+      <div className="flex flex-col gap-6" {...roster.listProps}>
         {groups.map(({ chain, entries }) => (
           <section key={chain.id} aria-label={chain.name}>
             <h3 className="mb-2 flex items-center gap-2 text-sm font-medium text-rb-500">

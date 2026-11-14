@@ -40,7 +40,7 @@ import { fileURLToPath } from "node:url";
 import { createPublicClient, http, parseAbi } from "viem";
 import { mainnet } from "viem/chains";
 import { chromium } from "playwright";
-import { armInspector, armScope } from "./lib/prov-inspector.mjs";
+import { armInspector } from "./lib/prov-inspector.mjs";
 import { BASE, bypassHeaders } from "./lib/host.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -254,10 +254,9 @@ for (const [name, holder] of Object.entries(HOLDERS)) {
     `${name} page: the check line names the block and no population count`,
     /Checked against the contract at block [\d,]+/.test(got.text) && !/addresses that ever held/.test(got.text),
   );
-  check(
-    `${name} page: figures are read at the newest block when the page loads`,
-    /the newest block when the page loaded/.test(got.text),
-  );
+  // The head is a pattern, "Sky Savings · sUSDS on Ethereum · block N"; the
+  // sentence is in the block's receipt (ui-jobs 660).
+  check(`${name} page: the head names the block`, /Sky Savings · sUSDS on Ethereum · block\s*[\d,]+/.test(got.text));
   check(`${name} page: no "exactly" in the copy`, !/\bexactly\b/.test(got.text));
   if (positions[name].events.length === pos.data.activity.events) {
     const ev = positions[name].events;
@@ -511,17 +510,18 @@ check("rate history lists every change", rows === String(rates.data.ssr.length),
   for (const t of ["chi", "rho", "ssr", "drip", "Vow", "suck", "wei"])
     check(`learn more: defines ${t}`, modal.includes(`Term: ${t}`));
   await p2.keyboard.press("Escape");
-  // Arming is per section since ui-jobs 284, so the receipts are opened a
-  // section at a time: the position card, then Lifetime flows. A timeline
-  // card's figures trace from its own Trace rows, not from an armed scope.
+  // Armed from the profile menu's switch (ui-jobs 625), page-wide; the
+  // receipts are opened a section at a time: the position card, then
+  // Lifetime flows.
   check("mixed page: the inspector arms", await armInspector(p2));
   const opened = {};
   const untraced = [];
   let scaling = null;
   let share = null;
-  const openLit = async (section) => {
+  const SECTIONS = { card: '[data-prov-scope="position-card"]', flows: "[data-lifetime-flows-panel]" };
+  const openIn = async (section) => {
     opened[section] = 0;
-    const boxes = p2.locator("[data-prov-lit] span.prov-locate-box");
+    const boxes = p2.locator(`${SECTIONS[section]} span.prov-locate-box`);
     const nb = await boxes.count();
     for (let i = 0; i < nb; i++) {
       const bx = boxes.nth(i);
@@ -539,12 +539,8 @@ check("rate history lists every change", rows === String(rates.data.ssr.length),
       await p2.waitForTimeout(80);
     }
   };
-  await openLit("card");
-  check(
-    "mixed page: Lifetime flows arms",
-    await armScope(p2, "flows", { menu: "[data-lifetime-flows-panel] [data-panel-menu]" }),
-  );
-  await openLit("flows");
+  await openIn("card");
+  await openIn("flows");
   check(
     `mixed page: no receipt shows "Untraced input" (${JSON.stringify(opened)} opened)`,
     opened.card > 0 && opened.flows > 0 && untraced.length === 0,

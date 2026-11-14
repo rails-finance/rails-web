@@ -60,7 +60,15 @@ test("counted rows add; an uncounted row is named, not added", () => {
   assert.equal(v.rows[1].prices, "on-chain oracle");
   assert.equal(v.rows[1].exemption, null);
   assert.deepEqual(v.notCounted, [
-    { chainId: 1, surface: null, href: null, label: "Fluid", chainName: "Ethereum", reason: "no USD price" },
+    {
+      protocol: "fluid",
+      chainId: 1,
+      surface: null,
+      href: null,
+      label: "Fluid",
+      chainName: "Ethereum",
+      reason: "no USD price",
+    },
   ]);
 });
 
@@ -127,7 +135,15 @@ test("rows match on slug and chain; the vaults surface reads after the chain", (
   );
   assert.equal(v.rows[0].chainName, "Base vaults");
   assert.deepEqual(v.notCounted, [
-    { chainId: 8453, surface: null, href: null, label: "Morpho Blue", chainName: "Base", reason: "no price" },
+    {
+      protocol: "morpho-base",
+      chainId: 8453,
+      surface: null,
+      href: null,
+      label: "Morpho Blue",
+      chainName: "Base",
+      reason: "no price",
+    },
   ]);
   assert.equal(v.rows[0].surface, "vaults");
 });

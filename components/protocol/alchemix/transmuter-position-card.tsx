@@ -11,14 +11,14 @@
 // in blocks, and the maturity the server serves was settled from the value in
 // force when the position was created (never the parameter read at head, which
 // has moved six times per mainnet line). Whether it has matured is said against
-// the block the line is indexed to. The days are an estimate at the chain's
+// the block the market is indexed to. The days are an estimate at the chain's
 // block time and say so. A maturing position headlines the date that estimate
 // lands on, marked "≈", with the block under it and the arithmetic on hover and
 // in the receipt. A matured or claimed one keeps the block: the data carries no
 // timestamp for the block it matured at.
 //
-// THE CLAIM IS TWO AMOUNTS IN TWO UNITS: the converted part, paid out in vault
-// shares, and the rest of the stake handed back as the synthetic. Neither is
+// THE CLAIM IS TWO AMOUNTS IN TWO UNITS: the vested part, paid out in vault
+// shares, and the rest of the deposit returned as the synthetic. Neither is
 // drawn in the other's unit. A claimed position is a closed card: its stake and
 // maturity as heads, Claimed as the outcome, what was paid out beside it.
 
@@ -37,10 +37,14 @@ import { Prov, type Provenance } from "@/components/shared/provenance";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { formatUnitsExact } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
+import { blockSpanSeconds, secondsPerBlock } from "@/lib/shared/block-rate";
 import type { TransmuterMaturityEstimate } from "@/lib/alchemix/transmuter-provenance";
 import { alchemixMarketWord } from "@/lib/alchemix/naming";
 import type { AlchemixAmount, AlchemixTransmuterPositionSummary } from "@/types/api/alchemix";
 import { transmuterEarlyClaim } from "@/lib/alchemix/transmuter-early-claim";
+import { TRANSMUTER_WORDS as TW } from "@/lib/alchemix/transmuter-words";
+import { getKnownInfrastructure } from "@/lib/shared/known-infrastructure";
+import type { ChainId } from "@/lib/shared/chains";
 import { AmountText } from "@/components/shared/amount-text";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { BlockRef } from "@/components/shared/block-ref";
@@ -55,10 +59,6 @@ const block = (n: number) => n.toLocaleString("en-US");
 /** The synthetic and every vault share are 18 decimals on every line. */
 const WAD_DECIMALS = 18;
 
-/** Seconds per block, for the estimate beside a block count and nowhere else:
- *  twelve-second slots on Ethereum, two seconds on Base. */
-const SECONDS_PER_BLOCK: Record<number, number> = { 1: 12, 8453: 2 };
-
 export type TransmuterState = "maturing" | "matured" | "claimed";
 
 export function transmuterState(p: AlchemixTransmuterPositionSummary): TransmuterState {
@@ -69,7 +69,7 @@ export function transmuterState(p: AlchemixTransmuterPositionSummary): Transmute
 /** The tag: Claimed, the one end state. A maturing or matured position is
  *  live, and the Matures at headline says which. */
 export function transmuterStatus(p: AlchemixTransmuterPositionSummary): PositionCardStatus | null {
-  return p.status === "claimed" ? { word: "Claimed", tone: "muted" } : null;
+  return p.status === "claimed" ? { word: TW.claimed, tone: "muted" } : null;
 }
 
 /** An amount from a log: the headline form, the exact figure on hover, inside
@@ -90,18 +90,17 @@ function amountFigure(a: AlchemixAmount, symbol: string, prov?: Provenance): Rea
   );
 }
 
-/** "about 3 days", from a block count at the chain's block time. */
-export function aboutDuration(blocks: number, chainId: number): string | null {
-  const spb = SECONDS_PER_BLOCK[chainId];
-  if (!spb) return null;
-  const hours = (blocks * spb) / 3600;
+/** "about 3 days", from a span in seconds. */
+export function aboutDuration(seconds: number): string {
+  const hours = seconds / 3600;
   if (hours < 1) return "under an hour";
   if (hours < 48) return `about ${Math.round(hours)} hours`;
   return `about ${Math.round(hours / 24)} days`;
 }
 
 /** The date a maturing position is estimated to mature, from the blocks still
- *  to go at the chain's block time, counted from `nowMs`. Null once matured or
+ *  to go at the chain's block time in each era (lib/shared/block-rate.ts; Base's
+ *  0.2 s from Denim, ui-jobs 615), counted from `nowMs`. Null once matured or
  *  claimed, on a chain with no block time here, or before the browser's clock
  *  has arrived (`nowMs` null): a server render and a browser an hour apart
  *  would otherwise draw two dates. */
@@ -110,7 +109,7 @@ export function transmuterMaturityEstimate(
   nowMs: number | null,
 ): TransmuterMaturityEstimate | null {
   const m = p.maturity;
-  const spb = SECONDS_PER_BLOCK[p.chainId];
+  const spb = m.referenceBlock == null ? null : secondsPerBlock(p.chainId, m.referenceBlock);
   if (
     nowMs == null ||
     p.status === "claimed" ||
@@ -122,12 +121,14 @@ export function transmuterMaturityEstimate(
     return null;
   }
   const fromMs = nowMs;
+  const seconds = Math.round(blockSpanSeconds(p.chainId, m.referenceBlock, m.referenceBlock + m.blocksRemaining) ?? 0);
   return {
     referenceBlock: m.referenceBlock,
     blocksRemaining: m.blocksRemaining,
     secondsPerBlock: spb,
+    seconds,
     fromMs,
-    atMs: fromMs + m.blocksRemaining * spb * 1000,
+    atMs: fromMs + seconds * 1000,
   };
 }
 
@@ -152,7 +153,7 @@ export function transmuterHeads(
   let title: string | undefined;
   let note: ReactNode = null;
   if (estimate) {
-    const about = aboutDuration(estimate.blocksRemaining, p.chainId);
+    const about = aboutDuration(estimate.seconds);
     figure = (
       <span className="inline-flex items-center gap-1.5 whitespace-nowrap tabular-nums max-sm:text-lg">
         <Clock className="size-4 shrink-0 text-rb-500" aria-hidden />≈ {formatDate(new Date(estimate.atMs))}
@@ -160,32 +161,32 @@ export function transmuterHeads(
     );
     title =
       `Estimated: block ${block(m.maturationBlock)} is ${block(estimate.blocksRemaining)} blocks past block ` +
-      `${block(estimate.referenceBlock)}, the block the line is indexed to. At ${estimate.secondsPerBlock} seconds a block ` +
-      `that is ${about ?? `${block(estimate.blocksRemaining * estimate.secondsPerBlock)} seconds`} from now.`;
+      `${block(estimate.referenceBlock)}, the block the market is indexed to. At ${estimate.secondsPerBlock} seconds a block ` +
+      `that is ${about} from now.`;
     note = (
       <>
         <BlockRef block={m.maturationBlock} size={12} />
-        {about ? ` · ${about}` : ""}
+        {` · ${about}`}
       </>
     );
   } else if (p.status !== "claimed" && m.referenceBlock != null && m.matured) {
     note = (
       <>
-        matured; the line is indexed to <BlockRef block={m.referenceBlock} size={12} />
+        matured; the market is indexed to <BlockRef block={m.referenceBlock} size={12} />
       </>
     );
   }
   return [
     {
       id: "deposited",
-      label: "Deposited",
+      label: TW.deposited,
       value: amountFigure(p.staked, p.staked.symbol, prov.staked),
       assets: alchemixChip(p.staked.symbol),
       sub: listing ? <BlockRef block={m.startBlock} size={12} /> : undefined,
     },
     {
       id: "matures-at",
-      label: "Matures at",
+      label: TW.maturesAt,
       value: <span title={title}>{prov.maturity ? <Prov info={prov.maturity}>{figure}</Prov> : figure}</span>,
       sub: note ? <span className="tabular-nums">{note}</span> : undefined,
     },
@@ -202,17 +203,17 @@ export function transmuterPanel(
     [
       {
         id: "staked-at",
-        label: "Deposited at",
+        label: TW.depositedAt,
         value: <BlockRef block={p.maturity.startBlock} />,
-        tip: "The block the stake was made at, from the Transmuter's PositionCreated log.",
+        tip: "The block the deposit was made at.",
       },
       ...(estimate
         ? [
             {
               id: "maturity-block",
-              label: "Maturity block",
+              label: TW.maturityBlock,
               value: <BlockRef block={p.maturity.maturationBlock} />,
-              tip: "The block the stake finishes converting at, settled from the conversion time in force when the position was created. The date above is an estimate from it at the chain's block time.",
+              tip: "The block the deposit finishes vesting at. The date above estimates it at the chain's block time.",
             },
           ]
         : []),
@@ -220,9 +221,9 @@ export function transmuterPanel(
     [
       {
         id: "claimed",
-        label: "Claimed",
+        label: TW.claimed,
         value: <span className="text-rb-500">Not yet</span>,
-        tip: "A claim pays out the converted part of the stake in vault shares and burns the position. None has been made.",
+        tip: "A claim pays out the vested part of the deposit in vault shares and burns the position's NFT. None has been made.",
       },
     ],
   ];
@@ -248,11 +249,11 @@ export function transmuterOutcome(
           {amountFigure(c.unclaimed, c.unclaimed.symbol, prov.returned)}
           <TokenChipIcon symbol={c.unclaimed.symbol} size={14} filterable={false} />
         </span>{" "}
-        handed back unconverted
+        {TW.returnedUnvested}
       </div>
     ) : null;
   return {
-    word: "Claimed",
+    word: TW.claimed,
     dates: at != null ? [{ at }] : undefined,
     footnote: (
       <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
@@ -261,7 +262,7 @@ export function transmuterOutcome(
       </div>
     ),
     extra: {
-      label: "Paid out",
+      label: TW.paidOut,
       value: (
         <div className="mt-2">
           <span className="inline-flex items-center gap-1.5 text-lg font-bold text-foreground/80">
@@ -281,6 +282,13 @@ export function transmuterOutcome(
   };
 }
 
+/** "Claimed by", naming the claimer where the address registry knows it
+ *  (Alchemix's Router, from the docs' contract pages). */
+export function transmuterClaimedByPrefix(p: AlchemixTransmuterPositionSummary, lead: string = TW.claimedBy): string {
+  const known = getKnownInfrastructure(p.claim?.claimer, p.chainId as ChainId);
+  return known ? `${lead} ${known.name}` : lead;
+}
+
 export function transmuterListingSlots(
   p: AlchemixTransmuterPositionSummary,
   session: SessionProtocol,
@@ -296,7 +304,7 @@ export function transmuterListingSlots(
         chain={p.chainName ?? `chain ${p.chainId}`}
         wallet={holder}
         session={session}
-        prefix={p.owner ? undefined : "claimed by"}
+        prefix={p.owner ? undefined : transmuterClaimedByPrefix(p, "claimed by")}
       />
     ),
     heads: transmuterHeads(p, estimate, {}, true),

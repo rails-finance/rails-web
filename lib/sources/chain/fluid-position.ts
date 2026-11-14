@@ -90,7 +90,7 @@ export interface FluidPositionChainResponse {
   /** Governance risk lines, as fractions of 1 (chain 1e4 percents ÷ 1e4):
    *  borrowing gates at collateralFactor; liquidation fires above
    *  liquidationThreshold; above liquidationMaxLimit the position can be
-   *  fully absorbed; liquidationPenalty is the liquidator's bonus. */
+   *  fully absorbed; liquidationPenalty is what a liquidated position pays beyond the debt cleared. */
   collateralFactor: number;
   liquidationThreshold: number;
   liquidationMaxLimit: number;

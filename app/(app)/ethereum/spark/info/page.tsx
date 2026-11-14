@@ -1,9 +1,11 @@
+// focus: the explorer's explainer; the shell's gate stands over the explorer
 // About this explorer — the page on the rail's sub-nav, drawn on the typed
 // template (rails-ops standards/info-page-template.md). The glossary text lives in
 // content/spark/event-prose.yaml.
 
 import Link from "next/link";
 import { GlossaryLink, ProtocolInfoPage } from "@/components/shared/protocol-info-page";
+import { SPARK_DOCS_AND_CHAIN } from "@/lib/spark/docs-and-chain";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { sparkGlossary } from "@/lib/spark/event-templates";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
@@ -20,7 +22,7 @@ export default function InfoPage() {
         <>
           The Rails SparkLend explorer shows the account of every wallet on SparkLend on Ethereum, whether still open,
           closed or liquidated, and the full history of each one. It also shows the{" "}
-          <Link href="/ethereum/spark/market" className={INLINE_LINK}>
+          <Link href="/ethereum/spark/markets" className={INLINE_LINK}>
             market as a whole
           </Link>
           : the size of every asset it lists, the interest rates suppliers earn and borrowers pay on it, and its risk
@@ -80,9 +82,9 @@ export default function InfoPage() {
           heading: "Market page",
           body: (
             <p>
-              The market page lists every asset in the Pool with its size, its supply and borrow rates and its risk
+              The market page lists every asset in the Pool with its size, its supply and borrow APYs and its risk
               settings, read live.{" "}
-              <Link href="/ethereum/spark/market" className={INLINE_LINK}>
+              <Link href="/ethereum/spark/markets" className={INLINE_LINK}>
                 See the SparkLend market
               </Link>
               .
@@ -90,6 +92,7 @@ export default function InfoPage() {
           ),
         },
       ]}
+      docsAndChain={SPARK_DOCS_AND_CHAIN}
       docs={{ label: "SparkLend documentation", href: "https://docs.spark.finance/products/sparklend" }}
     />
   );

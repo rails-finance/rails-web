@@ -867,7 +867,6 @@ async function readListingDom(qs = "") {
     : "";
   const roster = await page.locator("[data-roster-drawer]").count();
   const introOnFace = await page.locator("[data-intro-drawer]").count();
-  const inspector = await page.locator("button.prov-inspect-toggle").count();
   const body = bodyText;
   // The rail this page wears. Since rails-ops decision 0028 the vault layer is
   // a view of the Morpho Blue Base explorer, so the row is that explorer's
@@ -885,7 +884,7 @@ async function readListingDom(qs = "") {
   );
   const sectionMark = await page.locator("[data-vaults-identity]").count();
   await page.close();
-  return { status, cards, body, stance, identity, sectionMark, roster, introOnFace, inspector };
+  return { status, cards, body, stance, identity, sectionMark, roster, introOnFace };
 }
 
 /** The vault layer's about page — /base/morpho/vaults/info.
@@ -1096,7 +1095,10 @@ else
 // The shape vocabulary is restated here rather than imported: a check that read
 // its option list off the thing under test could not catch a shape being
 // dropped from the facet, and a dropped shape is rows that no selection can
-// reach. Σ over it must be the chain total exactly.
+// reach. Its source is the census classifier (rails-server
+// census-vault-positions.ts, `DeepClassify` and the adapter shape), less
+// `vault-self`, which the census leaves out of participants. Σ over it must be
+// the unfiltered total (the census header's participants) exactly.
 const SHAPES = [
   "eoa",
   "delegated-account",
@@ -1107,10 +1109,13 @@ const SHAPES = [
   "contract",
   "aave-vault",
   "metamorpho-vault",
+  "vault-v2",
+  "yearn-v3-vault",
+  "vault-v2-adapter",
 ];
 let shapeSum = 0;
 for (const s of SHAPES) shapeSum += (await readRoute(`chain=${CHAIN}&shape=${s}&limit=1&overlay=0`)).pagination.total;
-check("L3b Σ over the shape facet == the chain total", shapeSum === chainTotal, `${shapeSum} vs ${chainTotal}`);
+check("L3b Σ over the shape facet == the unfiltered total", shapeSum === chainTotal, `${shapeSum} vs ${chainTotal}`);
 
 const vaultSum = censusRows.reduce((s, c) => s + c.participants, 0);
 check(
@@ -1324,13 +1329,17 @@ if (neverHeldCensus.length === 0) {
       .evaluateAll((els) => els.map((e) => e.getAttribute("data-vault-row"))),
   );
   await rosterPage.close();
+  // 2026-11-12 (ui-jobs 605): the roster is the house table (V6), whose Holders
+  // is the census's open count, unlinked at zero; so the rows with no link are
+  // the vaults no address holds at the census block, never-held ones among them.
   const notStated = neverHeldCensus.filter((c) => !statedNone.has(c.vault));
+  const noneOpen = censusRows.filter((c) => c.liveCount === 0 && CATALOG_BY_ADDRESS.has(c.vault));
   check(
-    "L6b every never-held vault is STATED on the roster page as 'no holder yet'",
-    notStated.length === 0 && statedNone.size === neverHeldCensus.length,
+    "L6b every never-held vault is STATED on the roster page with no holder (a 0, unlinked)",
+    notStated.length === 0 && statedNone.size === noneOpen.length,
     notStated.length
       ? `${notStated.length} of ${neverHeldCensus.length} not stated, e.g. ${notStated[0].vault}`
-      : `${statedNone.size} roster rows say "no holder yet", and the census counts ${neverHeldCensus.length}`,
+      : `${statedNone.size} roster rows state no open holder, the census counts ${noneOpen.length} (${neverHeldCensus.length} never held)`,
   );
   const rowBad = [];
   for (const c of neverHeldCensus.slice(0, 8)) {
@@ -1602,10 +1611,12 @@ async function rosterLinks() {
   return hrefs;
 }
 const rosterHrefs = await rosterLinks();
-const heldCensus = censusRows.filter((c) => c.participants > 0);
+// 2026-11-12 (ui-jobs 605): the table links Holders where the census counts an
+// open holder.
+const heldCensus = censusRows.filter((c) => c.liveCount > 0);
 const rosterMissing = heldCensus.filter((c) => !rosterHrefs.includes(`/base/morpho/vaults/positions?vault=${c.vault}`));
 check(
-  "L12a the roster page links every held vault to the listing filtered to it",
+  "L12a the roster page links every vault with an open holder to the listing filtered to it",
   heldCensus.length > 0 && rosterMissing.length === 0,
   rosterMissing.length
     ? `${rosterMissing.length} of ${heldCensus.length} unlinked, e.g. ${rosterMissing[0].vault}`
@@ -1695,14 +1706,14 @@ check(
 );
 await railPage.close();
 
-// The face is the figures it read and nothing else. All three of these were on
-// it before the chrome moved — the "How this listing is built" drawer, the
-// roster drawer, and the provenance inspector's toggle — and each is asserted
-// ABSENT by the selector it actually rendered under.
+// The face is the figures it read and nothing else. Both of these were on
+// it before the chrome moved — the "How this listing is built" drawer and the
+// roster drawer (the inspector toggle that was a third left the app in
+// ui-jobs 625) — and each is asserted ABSENT by the selector it actually rendered under.
 check(
-  "L14d the listing face carries no intro drawer, no roster drawer and no provenance inspector",
-  dom.introOnFace === 0 && dom.roster === 0 && dom.inspector === 0,
-  `[data-intro-drawer] ${dom.introOnFace}, [data-roster-drawer] ${dom.roster}, button.prov-inspect-toggle ${dom.inspector}`,
+  "L14d the listing face carries no intro drawer and no roster drawer",
+  dom.introOnFace === 0 && dom.roster === 0,
+  `[data-intro-drawer] ${dom.introOnFace}, [data-roster-drawer] ${dom.roster}`,
 );
 
 // ⚠️ THE THREE-BLOCKS PARAGRAPH NAMES NO BLOCK OF ITS OWN. In the drawer it

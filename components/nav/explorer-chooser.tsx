@@ -9,6 +9,11 @@
 // home directory and the site footer, not from here (Miles, 5 Nov 2026). It opens on Ethereum, the first chain, whatever the page's chain (Miles,
 // 4 Nov 2026).
 //
+// Under the asset preference (ui-jobs 557) only the explorers that list one of
+// the reader's assets stand here, every one of them on its chain, and only the
+// chains that have one; Robinhood and the "View all" split step aside, and
+// the note under the roster says what was hidden.
+//
 // Rows are roster-derived (`protocolsForChain`), never hardcoded: a new
 // explorer lands here by being added to `lib/shared/protocols`.
 
@@ -16,18 +21,20 @@ import { CHROME_HOVER } from "@/components/nav/chrome-hover";
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CHAINS, MAINNET_CHAIN_ID, type ChainId, type ChainMeta } from "@/lib/shared/chains";
-import { protocolsForChain, protocolForPathname, type ProtocolEntry } from "@/lib/shared/protocols";
+import { CHAINS, MAINNET_CHAIN_ID, ROBINHOOD_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import { launchedChains, protocolForPathname, protocolsForChain, type ProtocolEntry } from "@/lib/shared/protocols";
 import { chainExplorers } from "@/lib/shared/explorer-rank";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { ChainGlyph } from "@/components/shared/chain-toggle";
-import { HomeOnlyChainGlyph } from "@/components/icons/chain-glyphs";
 import { ROBINHOOD_LABEL, RobinhoodSoon } from "@/components/shared/robinhood-soon";
+import { ScopeNote } from "@/components/shared/asset-scope-note";
+import { useScopedRoster } from "@/lib/shared/explorer-scope";
 
-// Row state grammar, same as the nav menu's:
-//   rest    → text-foreground; hover → blue-600, blue-400 in dark ("this goes somewhere")
+// Row states (Miles 13 Nov 2026, ui-jobs 661):
+//   rest    → text-foreground on a transparent border; hover → the border turns
+//             blue-500, NAV_BUTTON's hover, the text unchanged
 //   current → muted + semibold, not clickable (you can't navigate to here)
-const ROW_REST = `font-medium text-foreground ${CHROME_HOVER}`;
+const ROW_REST = "font-medium text-foreground hover:border-blue-500";
 const ROW_CURRENT = "font-semibold text-rb-500 pointer-events-none";
 
 /** One explorer row: icon chip and label, navigating to the listing. */
@@ -46,7 +53,7 @@ function ExplorerRow({
       data-switcher-explorer=""
       aria-current={isActive ? "page" : undefined}
       onClick={isActive ? undefined : onNavigate}
-      className={`flex min-w-0 items-center gap-2.5 rounded-lg px-2 py-3 text-sm transition-colors focus-ring ${
+      className={`flex min-w-0 items-center gap-2.5 rounded-lg border border-transparent px-[7px] py-[11px] text-sm transition-colors focus-ring ${
         isActive ? ROW_CURRENT : ROW_REST
       }`}
     >
@@ -66,7 +73,9 @@ export const PANEL_HEADING = "text-sm font-semibold text-rb-500";
 export function ExplorerChooser({ onNavigate }: { onNavigate: () => void }) {
   const pathname = usePathname();
   const activeEntry = protocolForPathname(pathname);
-  const chains = (Object.values(CHAINS) as ChainMeta[]).filter((c) => protocolsForChain(c.id).length > 0);
+  const roster = useScopedRoster();
+  const { filtering } = roster;
+  const chains = launchedChains().filter((c) => roster.chainShows(c.id));
 
   const [selectedId, setSelectedId] = useState<ChainId>(MAINNET_CHAIN_ID);
   // Robinhood: a chain with no explorers yet; selecting it shows the
@@ -79,19 +88,26 @@ export function ExplorerChooser({ onNavigate }: { onNavigate: () => void }) {
     setShowAll(false);
   };
 
-  const chain = CHAINS[selectedId] ?? CHAINS[MAINNET_CHAIN_ID];
+  const chain = chains.find((c) => c.id === selectedId) ?? chains[0] ?? CHAINS[MAINNET_CHAIN_ID];
   const { featured, all } = chainExplorers(chain.id);
-  const rows = showAll ? all : featured;
-  const name = robinhood ? ROBINHOOD_LABEL : chain.name;
+  const rows = filtering ? all.filter((p) => roster.shows(p.id)) : showAll ? all : featured;
+  const onRobinhood = robinhood && !filtering;
+  const name = onRobinhood ? ROBINHOOD_LABEL : chain.name;
+  const none = filtering && chains.length === 0;
 
   return (
-    <div className="pt-8" data-anatomy="H4" data-explorer-chooser="">
+    <div
+      className="pt-8"
+      data-anatomy="H4"
+      data-explorer-chooser=""
+      data-scope-unknown={roster.unknown.map((p) => p.id).join(" ") || undefined}
+    >
       <h2 className={`${PANEL_HEADING} mb-3`}>Choose a chain, select a protocol</h2>
       <div className="flex items-center gap-1">
         <div role="tablist" aria-label="Blockchain" className="-ml-2 flex items-center gap-1" data-switcher-tabs="">
           {chains.map((c) => {
-            const selected = !robinhood && c.id === chain.id;
-            const count = protocolsForChain(c.id).length;
+            const selected = !onRobinhood && c.id === chain.id;
+            const count = protocolsForChain(c.id).filter((p) => roster.shows(p.id)).length;
             return (
               <button
                 key={c.id}
@@ -109,32 +125,36 @@ export function ExplorerChooser({ onNavigate }: { onNavigate: () => void }) {
               </button>
             );
           })}
-          <button
-            type="button"
-            role="tab"
-            aria-selected={robinhood}
-            aria-label={ROBINHOOD_LABEL}
-            title={ROBINHOOD_LABEL}
-            onClick={() => setRobinhood(true)}
-            data-switcher-robinhood=""
-            className={`${TAB} ${robinhood ? TAB_ON : TAB_OFF}`}
-          >
-            <HomeOnlyChainGlyph id="robinhood" className="h-5 w-5" />
-          </button>
+          {!filtering && (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={robinhood}
+              aria-label={ROBINHOOD_LABEL}
+              title={ROBINHOOD_LABEL}
+              onClick={() => setRobinhood(true)}
+              data-switcher-robinhood=""
+              className={`${TAB} ${robinhood ? TAB_ON : TAB_OFF}`}
+            >
+              <ChainGlyph chainId={ROBINHOOD_CHAIN_ID} className="h-5 w-5" />
+            </button>
+          )}
         </div>
       </div>
       {/* The selected chain's name, a muted heading over its explorers
           (Miles, 5 Nov 2026). */}
-      <p className="mt-7 truncate text-sm font-semibold text-rb-500" data-chooser-chain-name="">
-        {name}
-      </p>
+      {!none && (
+        <p className="mt-7 truncate text-sm font-semibold text-rb-500" data-chooser-chain-name="">
+          {name}
+        </p>
+      )}
 
-      {robinhood ? (
+      {none ? null : onRobinhood ? (
         <p role="tabpanel" aria-label={ROBINHOOD_LABEL} className="pt-3 text-sm leading-relaxed text-rb-500">
           <RobinhoodSoon />
         </p>
       ) : (
-        <nav role="tabpanel" aria-label={chain.name} className="pt-2">
+        <nav role="tabpanel" aria-label={chain.name} className="pt-2" {...roster.listProps}>
           <div className="-mx-2 grid grid-cols-2 gap-x-2">
             {rows.map((entry) => (
               <ExplorerRow
@@ -145,7 +165,7 @@ export function ExplorerChooser({ onNavigate }: { onNavigate: () => void }) {
               />
             ))}
           </div>
-          {all.length > featured.length && (
+          {!filtering && all.length > featured.length && (
             <button
               type="button"
               onClick={() => setShowAll((v) => !v)}
@@ -158,6 +178,7 @@ export function ExplorerChooser({ onNavigate }: { onNavigate: () => void }) {
           )}
         </nav>
       )}
+      <ScopeNote scoped={roster} noun={["explorer", "explorers"]} className="mt-3" />
     </div>
   );
 }

@@ -22,10 +22,15 @@
 // holds far more than its stored totals say. Each leg's share is over the
 // queue's sum. What can be withdrawn is, per leg, the lesser of the vault's
 // assets there and the market's free liquidity (supply less borrow), summed.
+// That sum is stated for every vault tested (ui-jobs 553: "n% of it can leave
+// today"); the markets and the standing only where the test catches one.
 //
-// The borrow rate is the IRM's curve at the stored utilisation over the
-// adapted rate at target: at its maximum it cannot adapt higher, and at full utilisation it is the ceiling,
-// MAX_RATE_AT_TARGET × CURVE_STEEPNESS = 800% a year.
+// The borrow rate is the IRM's curve at the settled utilisation over the
+// adapted rate at target: the rate the market charges until it next settles.
+// At its maximum the rate at target cannot adapt higher, and at full
+// utilisation the rate is the ceiling, MAX_RATE_AT_TARGET × CURVE_STEEPNESS =
+// 800% a year. The sentence prints each caught market's rate, and calls it the
+// rate ceiling only where every rate rounds to it.
 //
 // Pure, with no imports: scripts/test/vault-illiquid.test.mjs reads it.
 
@@ -79,6 +84,19 @@ export interface IlliquidLegInput {
   rateAtTarget: bigint | null;
 }
 
+/** What can leave a vault at a block, for every vault tested: the queue's
+ *  sum and the withdrawable part of it, and the markets that make it
+ *  illiquid where the test catches one. */
+export interface VaultLiquidity {
+  block: number;
+  /** Σ over the legs of the vault's assets, raw: the figure `totalAssets()` sums. */
+  queueAssets: string;
+  /** Σ over the legs of min(vault's assets, supply − borrow), raw. */
+  withdrawable: string;
+  /** Null where no market is caught. */
+  illiquid: VaultIlliquid | null;
+}
+
 /** A market the test caught. Amounts are raw strings in the vault's asset. */
 export interface IlliquidMarket {
   id: string;
@@ -89,7 +107,8 @@ export interface IlliquidMarket {
   share: number;
   /** Borrow over supply, 0..1. */
   utilisation: number;
-  /** The IRM's curve at `utilisation` over the adapted rate at target, a year, simple. */
+  /** The IRM's curve at the settled utilisation over the adapted rate at
+   *  target, a year, simple: the rate the market charges until it next settles. */
   borrowRateYearly: number;
   lastUpdate: number;
 }
@@ -190,6 +209,18 @@ export function adaptedRateAtTarget(rateAtTarget: bigint, utilisation: number, e
   return BigInt(Math.floor(adapted));
 }
 
+/** The market half of the test: a market at the rate ceiling is 99.9% or more
+ *  borrowed on its chain's AdaptiveCurveIRM, and its rate at target, adapted
+ *  `elapsed` seconds from the stored one at the settled utilisation, is at the
+ *  IRM's maximum. The vault test adds the 10% share; the markets roster tags
+ *  the market alone (ui-jobs 549). The caller checks the IRM and the
+ *  utilisation (`needsRateAtTarget`, `fullyBorrowedShare`). */
+export const atRateCeiling = (rateAtTarget: bigint, settledUtilisation: number, elapsed: number): boolean =>
+  adaptedRateAtTarget(rateAtTarget, settledUtilisation, elapsed) >= MAX_RATE_AT_TARGET;
+
+/** `fullyBorrowed` over a ratio already taken: borrow over supply, 0..1. */
+export const fullyBorrowedShare = (utilisation: number): boolean => utilisation * Number(UTIL_DEN) >= Number(UTIL_NUM);
+
 /** The AdaptiveCurveIRM's borrow rate at a utilisation, a year, simple. */
 export function borrowRateYearly(rateAtTarget: bigint, utilisation: number): number {
   const err = errAt(utilisation);
@@ -198,13 +229,14 @@ export function borrowRateYearly(rateAtTarget: bigint, utilisation: number): num
 }
 
 /** The test over one vault's queue at one block, whose unix second is
- *  `timestamp`: null where no market is caught. */
+ *  `timestamp`: what can leave, and the caught markets (`illiquid`, null
+ *  where none is caught). Null where the queue holds nothing. */
 export function vaultIlliquid(
   chainId: number,
   block: number,
   timestamp: number,
   legs: readonly IlliquidLegInput[],
-): VaultIlliquid | null {
+): VaultLiquidity | null {
   const zero = ZERO;
   const sum = legs.reduce((s, l) => s + l.vaultAssets, zero);
   if (sum === zero) return null;
@@ -217,8 +249,8 @@ export function vaultIlliquid(
     const share = Number((l.vaultAssets * BigInt(1_000_000)) / sum) / 1_000_000;
     if (share < ILLIQUID_MIN_SHARE || !needsRateAtTarget(chainId, l) || l.rateAtTarget == null) continue;
     const utilisation = Number((l.borrowAssets * BigInt(1_000_000)) / l.supplyAssets) / 1_000_000;
-    const rateAtTarget = adaptedRateAtTarget(l.rateAtTarget, l.settledUtilisation, timestamp - l.lastUpdate);
-    if (rateAtTarget >= MAX_RATE_AT_TARGET) {
+    if (atRateCeiling(l.rateAtTarget, l.settledUtilisation, timestamp - l.lastUpdate)) {
+      const rateAtTarget = adaptedRateAtTarget(l.rateAtTarget, l.settledUtilisation, timestamp - l.lastUpdate);
       caught += l.vaultAssets;
       markets.push({
         id: l.id,
@@ -227,19 +259,29 @@ export function vaultIlliquid(
         vaultAssets: l.vaultAssets.toString(),
         share,
         utilisation,
-        borrowRateYearly: borrowRateYearly(rateAtTarget, utilisation),
+        borrowRateYearly: borrowRateYearly(rateAtTarget, l.settledUtilisation),
         lastUpdate: l.lastUpdate,
       });
     }
   }
-  if (markets.length === 0) return null;
+  const base = { block, queueAssets: sum.toString(), withdrawable: withdrawable.toString() };
+  if (markets.length === 0) return { ...base, illiquid: null };
   return {
-    block,
-    markets,
-    share: Number((caught * BigInt(1_000_000)) / sum) / 1_000_000,
-    withdrawable: withdrawable.toString(),
+    ...base,
+    illiquid: {
+      block,
+      markets,
+      share: Number((caught * BigInt(1_000_000)) / sum) / 1_000_000,
+      withdrawable: base.withdrawable,
+    },
   };
 }
+
+/** The withdrawable share of the queue, 0..1. */
+export const withdrawableShare = (l: Pick<VaultLiquidity, "queueAssets" | "withdrawable">): number =>
+  BigInt(l.queueAssets) === ZERO
+    ? 0
+    : Number((BigInt(l.withdrawable) * BigInt(1_000_000)) / BigInt(l.queueAssets)) / 1_000_000;
 
 // ── The words ───────────────────────────────────────────────────────────────
 
@@ -266,7 +308,7 @@ const list = (xs: string[]) =>
 
 /** The first sentence: which markets, how much of the vault, how borrowed.
  *  "The RLP market holds 99.9% of the vault, 100% borrowed at the rate
- *  ceiling (800% a year)." */
+ *  ceiling (800% a year, before compounding)." */
 export function illiquidSentence(il: VaultIlliquid): string {
   const names = list(il.markets.map(marketName));
   const one = il.markets.length === 1;
@@ -278,5 +320,13 @@ export function illiquidSentence(il: VaultIlliquid): string {
     : illiquidPct(low) === illiquidPct(high)
       ? `each ${illiquidPct(low)}`
       : `${illiquidPct(low)} to ${illiquidPct(high)}`;
-  return `The ${names} market${one ? " holds" : "s hold"} ${illiquidPct(il.share)} of the vault, ${borrowed} borrowed at the rate ceiling (${ratePct(RATE_CEILING_YEARLY)} a year).`;
+  const ceiling = ratePct(RATE_CEILING_YEARLY);
+  const rates = il.markets.map((m) => m.borrowRateYearly);
+  const lo = ratePct(Math.min(...rates));
+  const hi = ratePct(Math.max(...rates));
+  const rate =
+    lo === ceiling && hi === ceiling
+      ? `at the rate ceiling (${ceiling} a year, before compounding)`
+      : `at ${lo === hi ? lo : `${lo} to ${hi}`} a year, before compounding (the ceiling is ${ceiling})`;
+  return `The ${names} market${one ? " holds" : "s hold"} ${illiquidPct(il.share)} of the vault, ${borrowed} borrowed ${rate}.`;
 }

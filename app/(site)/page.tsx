@@ -1,3 +1,5 @@
+import { HomeFocusExample, HomeFocusFiguresNote } from "@/components/home/home-focus";
+import { LIVE_EXAMPLE_COLLATERAL } from "@/lib/home/live-example";
 import type { Metadata } from "next";
 import { CoveredStats } from "@/components/home/covered-stats";
 import { HomeHero } from "@/components/home/home-hero";
@@ -79,14 +81,17 @@ export default async function Home() {
         {/* From sm the framed sample stands 128px clear of the value line and of
             the directory (Miles, 5 Nov 2026); a phone's button keeps 64px. */}
         <section className="pb-16 sm:pb-32" data-anatomy="S3">
+          <HomeFocusFiguresNote />
           <CoveredStats covered={covered} stats={stats} valueHeld={valueHeld} />
         </section>
 
         {/* Live example — a real trove in browser chrome; its hover pill
             links to the live position. */}
-        <section className="pb-16 sm:pb-32" data-anatomy="S2">
-          <LiveExampleFrame data={liveExample && packLiveExample(liveExample)} />
-        </section>
+        <HomeFocusExample symbols={[LIVE_EXAMPLE_COLLATERAL, "BOLD"]}>
+          <section className="pb-16 sm:pb-32" data-anatomy="S2">
+            <LiveExampleFrame data={liveExample && packLiveExample(liveExample)} />
+          </section>
+        </HomeFocusExample>
 
         {/* Explorer directory — one uniform row of tiles on the gradient's
             constant floor, directly above the "DeFi for everyone" band. */}
@@ -99,7 +104,7 @@ export default async function Home() {
       {/* ═══ The page's lower half (Miles, 5 Nov 2026): one gradient, the mirror
           of the top section's, from the floor S5 stands on back to the top's
           tone at the foot, with 64px more under the last band so the footer
-          (the raised tone, ui-jobs 509) stands clear of it. It starts where the top section ends, so the
+          (which takes the end tone, ui-jobs 602) stands clear of it. It starts where the top section ends, so the
           darkest band stays at S5 however tall the directory opens; the bands
           below draw no ground of their own. ═══ */}
       <div
@@ -173,7 +178,7 @@ export default async function Home() {
                     <a
                       href="https://t.me/railsfinance"
                       target="_blank"
-                      rel="noopener noreferrer"
+                      rel="noopener"
                       aria-label="railsfinance on Telegram"
                       className="text-pink-500 hover:underline underline-offset-2"
                     >

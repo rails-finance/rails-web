@@ -5,7 +5,7 @@ import { SPARK_ADDRESSES, SPARK_SYMBOL_BY_ADDR } from "@/lib/spark/asset-catalog
 
 // Live SparkLend market overview — every reserve on the single SparkLend Pool
 // with its size, rates, risk config and SparkLend's own oracle price, read at
-// the chain head. Feeds /spark/market. Same shared reader as Aave V3 Core
+// the chain head. Feeds /spark/markets. Same shared reader as Aave V3 Core
 // (SparkLend is an Aave V3 fork with the identical Pool/oracle surface).
 //
 // The success response is cacheable for ten minutes at the edge, the

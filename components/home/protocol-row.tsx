@@ -2,14 +2,25 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { FOOT_LINK } from "@/lib/shared/ui-grammar";
 
 import { protocolIconSrc } from "@/lib/shared/protocols";
 import { chainExplorers } from "@/lib/shared/explorer-rank";
-import { CHAINS, MAINNET_CHAIN_ID, BASE_CHAIN_ID, SEPOLIA_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import {
+  CHAINS,
+  MAINNET_CHAIN_ID,
+  BASE_CHAIN_ID,
+  ROBINHOOD_CHAIN_ID,
+  SEPOLIA_CHAIN_ID,
+  type ChainId,
+} from "@/lib/shared/chains";
 import { ProtocolGlyph, hasProtocolGlyph } from "@/components/icons/protocol-glyphs";
-import { ChainToggleButtons } from "@/components/shared/chain-toggle";
-import { HomeOnlyChainGlyph } from "@/components/icons/chain-glyphs";
+import { ChainGlyph, ChainToggleButtons } from "@/components/shared/chain-toggle";
 import { ROBINHOOD_LABEL, RobinhoodSoon } from "@/components/shared/robinhood-soon";
+import { ScopeNote } from "@/components/shared/asset-scope-note";
+import { launchedChains } from "@/lib/shared/protocols";
+import { useScopedRoster } from "@/lib/shared/explorer-scope";
+import { HistoryTag } from "@/components/shared/history-tag";
 
 /** Tile width classes chosen per list size so every breakpoint fills its
  *  rows evenly: a chain's eight most used divide by 2/4/8, a list of 6 by 2/3/6. A new
@@ -28,8 +39,10 @@ const HOME_FEATURED = 12;
 
 const STORAGE_KEY = "home-chain-toggle";
 
-/** Stored value for the home-only Robinhood choice. It has no ChainId and
- *  no explorers; selecting it swaps the tiles for a coming-soon message. */
+/** Stored value for the Robinhood choice. Robinhood Chain is registered
+ *  (ROBINHOOD_CHAIN_ID) but has no explorers, so `launchedChains()` leaves it
+ *  out of the toggle's chains and this choice is added by hand; selecting it
+ *  swaps the tiles for a coming-soon message. */
 const ROBINHOOD_STORED = "robinhood";
 
 // Ethereum is the default — both the server render and the client's first
@@ -101,25 +114,46 @@ export function ProtocolRow() {
   // The chain's most used explorers and "View all", as the drawer's chooser
   // lists them (lib/shared/explorer-rank.ts); "View all" opens the rest in
   // place.
-  const { featured, all } = chainExplorers(chainId, HOME_FEATURED);
-  const protocols = showAll ? all : featured;
+  //
+  // Under the asset preference (ui-jobs 557; Miles, 9 Nov 2026) the toggle
+  // offers only the chains with an explorer that lists one of the reader's
+  // assets, Robinhood steps aside, and the tiles are every such explorer on
+  // the chain; the note under them says what was hidden. A stored chain the
+  // preference hides gives way to the first it keeps.
+  const roster = useScopedRoster();
+  const { filtering } = roster;
+  const chains = launchedChains()
+    .map((c) => c.id)
+    .filter((id) => roster.chainShows(id));
+  const shownChain = filtering && !chains.includes(chainId) ? (chains[0] ?? chainId) : chainId;
+  const onRobinhood = robinhood && !filtering;
+  const none = filtering && chains.length === 0;
+  const { featured, all } = chainExplorers(shownChain, HOME_FEATURED);
+  const protocols = filtering ? all.filter((p) => roster.shows(p.id)) : showAll ? all : featured;
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4">
-      <div className="mb-6">
-        <ChainToggleButtons
-          chainId={chainId}
-          onChange={handleChange}
-          extra={{
-            label: ROBINHOOD_LABEL,
-            active: robinhood,
-            onSelect: handleRobinhood,
-            glyph: <HomeOnlyChainGlyph id="robinhood" className="h-3.5 w-3.5 shrink-0 max-[380px]:hidden" />,
-          }}
-        />
+      <div className="mb-6" data-home-chains="" {...roster.listProps}>
+        {!none && (
+          <ChainToggleButtons
+            chainId={shownChain}
+            onChange={handleChange}
+            chains={chains}
+            extra={
+              filtering
+                ? undefined
+                : {
+                    label: ROBINHOOD_LABEL,
+                    active: robinhood,
+                    onSelect: handleRobinhood,
+                    glyph: <ChainGlyph chainId={ROBINHOOD_CHAIN_ID} className="h-3.5 w-3.5 max-[380px]:hidden" />,
+                  }
+            }
+          />
+        )}
       </div>
 
-      {robinhood ? (
+      {none ? null : onRobinhood ? (
         // Starts where the tiles start and holds their height (a tile row,
         // py-3 + 2rem mark, and the View all row), so the page holds still on
         // a switch.
@@ -128,7 +162,12 @@ export function ProtocolRow() {
         </p>
       ) : (
         <>
-          <div className="flex flex-wrap gap-2">
+          <div
+            className="flex flex-wrap gap-2"
+            data-home-tiles=""
+            {...roster.listProps}
+            data-scope-unknown={roster.unknown.map((p) => p.id).join(" ") || undefined}
+          >
             {protocols.map((p) => (
               <Link
                 key={p.id}
@@ -146,15 +185,25 @@ export function ProtocolRow() {
                     style={{ borderRadius: "20%" }}
                   />
                 )}
-                <span className="text-sm font-semibold whitespace-nowrap">{p.label}</span>
+                {p.history ? (
+                  // Decisions 0061 and 0063: the tag under the name, both inside the
+                  // mark's 2rem, so a tagged tile keeps the row height.
+                  <span className="flex min-w-0 flex-col items-start">
+                    <span className="text-sm font-semibold leading-4 whitespace-nowrap">{p.label}</span>
+                    <HistoryTag id={p.id} tip="title" />
+                  </span>
+                ) : (
+                  <span className="text-sm font-semibold whitespace-nowrap">{p.label}</span>
+                )}
               </Link>
             ))}
           </div>
           {/* Under the tiles: View all on the left, in the muted foreground
               (show/hide needs no utility hue; Miles, 6 Nov 2026), and the
               chain's coverage link on the right, in the link blue. */}
-          <div className="-mx-2 mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-            {all.length > featured.length && (
+          <div className="-mx-2 mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2" {...roster.listProps}>
+            <ScopeNote scoped={roster} noun={["explorer", "explorers"]} className="px-2 py-1" />
+            {!filtering && all.length > featured.length && (
               <button
                 type="button"
                 onClick={() => setShowAll((v) => !v)}
@@ -166,15 +215,16 @@ export function ProtocolRow() {
               </button>
             )}
             <Link
-              href={`/coverage/${CHAINS[chainId].slug}`}
-              className="ml-auto shrink-0 rounded-sm px-2 py-1 text-sm font-medium text-blue-600 underline-offset-4 hover:underline focus-ring dark:text-[var(--text-link)]"
+              href={`/coverage/${CHAINS[shownChain].slug}`}
+              className={`ml-auto shrink-0 text-sm font-medium ${FOOT_LINK}`}
               data-home-coverage=""
             >
-              See detailed coverage <span>→</span>
+              See detailed coverage
             </Link>
           </div>
         </>
       )}
+      {none && <ScopeNote scoped={roster} noun={["explorer", "explorers"]} />}
     </div>
   );
 }

@@ -23,6 +23,7 @@ import {
 } from "@/lib/alchemix/transmuter-provenance";
 import { transmuterEarlyClaim } from "@/lib/alchemix/transmuter-early-claim";
 import type { AlchemixTransmuterPositionSummary } from "@/types/api/alchemix";
+import { TRANSMUTER_WORDS as TW } from "@/lib/alchemix/transmuter-words";
 
 const scaled = (raw: string): number => Number(raw.split(".")[0]) / 1e18;
 
@@ -59,7 +60,7 @@ export function computeTransmuterEconomics(
         prov: early
           ? transmuterEarlyClaimProv("converted", sym, early, claimCoords)
           : transmuterConvertedProv(sym, p.staked.raw, claim.unclaimed.raw, claimCoords),
-        flowLabel: "Converted",
+        flowLabel: TW.vested,
       });
     }
     if (early && BigInt(early.exitFeeRaw) > BigInt(0)) {
@@ -69,7 +70,7 @@ export function computeTransmuterEconomics(
         amount: Number(early.exitFeeRaw) / 1e18,
         usd: null,
         prov: transmuterEarlyClaimProv("exit-fee", sym, early, claimCoords),
-        flowLabel: "Early exit fee",
+        flowLabel: TW.earlyExitFee,
       });
     }
     if (returnedRaw > BigInt(0)) {
@@ -79,7 +80,7 @@ export function computeTransmuterEconomics(
         amount: Number(returnedRaw) / 1e18,
         usd: null,
         prov: transmuterEmittedProv("amount_unclaimed", sym, claim.unclaimed.raw, claimCoords),
-        flowLabel: "Handed back",
+        flowLabel: TW.returned,
       });
     }
   }
@@ -124,8 +125,8 @@ export function computeTransmuterEconomics(
     },
     collateralUnit: sym,
     debtUnit: myt,
-    collateralTitle: "Staked",
-    debtTitle: "Payout",
-    collateralInflowLabel: "Staked",
+    collateralTitle: TW.deposited,
+    debtTitle: TW.payout,
+    collateralInflowLabel: TW.deposited,
   };
 }

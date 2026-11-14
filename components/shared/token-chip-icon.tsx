@@ -26,7 +26,14 @@
 import { createContext, useContext, useState } from "react";
 import { UnknownTokenSvg } from "@/components/shared/unknown-token-svg";
 import { useChainId } from "@/lib/shared/chain-context";
-import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import {
+  ARBITRUM_CHAIN_ID,
+  ARC_CHAIN_ID,
+  BASE_CHAIN_ID,
+  MAINNET_CHAIN_ID,
+  OPTIMISM_CHAIN_ID,
+  ROBINHOOD_CHAIN_ID,
+} from "@/lib/shared/chains";
 import { getLocalTokenIcon } from "@/lib/shared/local-token-icons";
 import { PT_UNDERLYING_BASE, PT_UNDERLYING_MAINNET } from "@/lib/shared/pt-underlying";
 import { getTokenAddress } from "@/lib/shared/token-addresses";
@@ -160,9 +167,17 @@ export function TokenChipIcon({
   //
   // A PT the generated map has not seen — a market listed since the last run —
   // keeps the letter, and still gets the badge.
-  // Arbitrum has no generated map yet; Ethereum's would key the wrong contracts.
+  // Arbitrum, Optimism, Arc and Robinhood Chain have no generated map yet;
+  // Ethereum's would key the wrong contracts.
   const ptTable =
-    chainId === BASE_CHAIN_ID ? PT_UNDERLYING_BASE : chainId === ARBITRUM_CHAIN_ID ? {} : PT_UNDERLYING_MAINNET;
+    chainId === BASE_CHAIN_ID
+      ? PT_UNDERLYING_BASE
+      : chainId === ARBITRUM_CHAIN_ID ||
+          chainId === OPTIMISM_CHAIN_ID ||
+          chainId === ARC_CHAIN_ID ||
+          chainId === ROBINHOOD_CHAIN_ID
+        ? {}
+        : PT_UNDERLYING_MAINNET;
   const ptUnderlying = address ? ptTable[address.toLowerCase()] : undefined;
   const isPt = /^PT-/i.test(rawLookup);
   // Resolve as though the caller had asked for the underlying — symbol AND

@@ -120,7 +120,7 @@ const Z1_IDS = [
   "debt_breakdown_fee",
   "coll_worth",
   "coll_secures",
-  "coll_ratio",
+  "ltv_ratio",
   "liq_runway",
   "liq_runway_now",
   "rate_cost_delegate",

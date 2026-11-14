@@ -27,9 +27,9 @@
 // No `eth_getLogs` anywhere: every read here is an `eth_call` at one block.
 //
 // ── WHAT EACH SECTION ASSERTS ────────────────────────────────────────────────
-//   S1  THE STRIP. Under the detail card's heading-button row: a "Redeemable
-//       now" cluster wearing the chain's own figure name, and an "Exit" cluster
-//       naming the contract's own function words. No `.w-64` runway and no
+//   S1  THE STRIP. What could be withdrawn is the holder line of the readout's
+//       Withdrawals line (V7) since the holder card went plain (V8, ui-jobs
+//       553; Exit's function words left the face, decision 0059). No `.w-64` runway and no
 //       progress/meter element anywhere in the strip — the strip is WORDS ONLY
 //       (Miles, 2026-09-09). The redeemable figure equals this script's own call
 //       at the page's own block, printed by this script's own copy of the
@@ -46,7 +46,7 @@
 //       with a body over 10 KB. `twitter:image` likewise.
 //   S4  BOOKMARKS. Bookmarks are one list per browser, keyed by address
 //       (rails-ops TO-DO-ui-jobs 431). The wallet menu's bookmark row writes the
-//       holder into `rails-bookmarks` (S4a/b); the bookmarks page (/bookmarks)
+//       holder into `rails-bookmarks` (S4a/b); the bookmarks page (/saved-views)
 //       lists a row opening `/wallet/<holder>` (S4c). A per-explorer list from before 431 (`<explorer>-sessions`) is
 //       merged into the one list on the first read, keeping its custom name,
 //       and the old key is left in place (S4d). The vault listing filtered to
@@ -171,6 +171,8 @@ const bas = createPublicClient({
 const VAULT_ABI = parseAbi([
   "function maxRedeem(address) view returns (uint256)",
   "function maxWithdraw(address) view returns (uint256)",
+  "function balanceOf(address) view returns (uint256)",
+  "function convertToAssets(uint256) view returns (uint256)",
   "function symbol() view returns (string)",
   "function decimals() view returns (uint8)",
   "function asset() view returns (address)",
@@ -313,14 +315,15 @@ for (const f of fixtures) {
   if (!f) continue;
   const { context, page, url, status } = await openFixture(f);
   const isBase = f.chain === 8453;
-  // Redeemable now is `maxWithdraw` in the asset on every family since ui-jobs
-  // 407 step 4; Umbrella's `maxRedeem` is its subline.
-  const figure = "holder-max-withdraw";
+  // What could be withdrawn is `maxWithdraw` against the claim, in the
+  // readout's Withdrawals line (V7) since ui-jobs 553.
+  const figure = "withdrawals";
   check(`S1·${f.label} the position page answers 200`, status === 200, `status ${status} · ${url}`);
 
   // The card's own frame streams in behind a Suspense boundary; wait for it
   // rather than racing it, so an absent card is a finding and not a timing.
   await page.waitForSelector("[data-position-card], [data-position-card-absent]", { timeout: 120_000 }).catch(() => {});
+  await page.waitForSelector("[data-health-line='withdrawals']", { timeout: 120_000 }).catch(() => {});
   const strip = await page.evaluate((figureName) => {
     const inner = document.querySelector("[data-position-card]");
     if (!inner) return { card: false };
@@ -329,27 +332,12 @@ for (const f of fixtures) {
     // `rowExtra` as two children of one frame, so the strip is looked for on
     // the FRAME rather than inside the stats block.
     const card = inner.parentElement ?? inner;
-    const fig = card.querySelector(`[data-figure="${figureName}"]`);
-    const exit = card.querySelector('[data-figure="holder-exit"]');
+    const fig = document.querySelector(`[data-health-line="${figureName}"]`);
     const cooldown = card.querySelector('[data-figure="holder-cooldown"]');
-    // THE HEADING-BUTTON ROW. `InfoTabsDisclosure` draws its disclosure
-    // buttons and `rowExtra` as children of one flex row; the buttons carry no
-    // text at all (an info glyph and a chevron), so the row is found by the
-    // button's own aria-label. A cluster is ON that row when walking up from it
-    // reaches an element that DIRECTLY contains such a button — which is what
-    // riding `rowExtra` means structurally, and what a cluster rendered
-    // anywhere else on the card would fail.
-    // Since ui-jobs 407 step 4 the figures are stats of the holder card
-    // (`[data-position-panel]`), and the card is the root asked below.
-    const onButtonRow = (el) => !!el?.closest("[data-position-panel]");
     const root = inner;
     return {
       card: true,
-      figureText: fig ? (fig.textContent || "").trim() : null,
-      figureRaw: inner.getAttribute("data-max-withdraw-raw"),
-      figureOnRow: onButtonRow(fig),
-      exitText: exit ? (exit.textContent || "").trim() : null,
-      exitOnRow: onButtonRow(exit),
+      figureText: fig ? (fig.textContent || "").replace(/\s+/g, " ").trim() : null,
       cooldownText: cooldown ? (cooldown.textContent || "").trim() : null,
       runways: root ? root.querySelectorAll(".w-64").length : -1,
       meters: root ? root.querySelectorAll('progress, meter, [role="progressbar"]').length : -1,
@@ -367,20 +355,9 @@ for (const f of fixtures) {
   }
 
   check(
-    `S1a·${f.label} the redeemable figure is a stat of the holder card`,
-    strip.figureOnRow,
+    `S1a·${f.label} the readout states what of this position could be withdrawn`,
+    /could be withdrawn/.test(strip.figureText ?? ""),
     JSON.stringify({ figure, text: strip.figureText }),
-  );
-  check(
-    `S1b·${f.label} the exit is a stat beside it`,
-    strip.exitOnRow && !!strip.exitText,
-    JSON.stringify(strip.exitText),
-  );
-  check(
-    `S1c·${f.label} the exit names the contract's own functions`,
-    strip.exitText ===
-      (isBase ? "withdraw() or redeem()" : f.family === "umbrella-stake" ? "cooldown(), then redeem()" : "redeem()"),
-    JSON.stringify(strip.exitText),
   );
   check(`S1d·${f.label} no runway in the strip`, strip.runways === 0, `.w-64 elements: ${strip.runways}`);
   check(`S1e·${f.label} no meter in the strip`, strip.meters === 0, `progress/meter elements: ${strip.meters}`);
@@ -395,22 +372,41 @@ for (const f of fixtures) {
   if (strip.block > 0) {
     const client = isBase ? bas : eth;
     let own = null;
+    let claim = null;
     try {
+      const at = { blockNumber: BigInt(strip.block) };
       own = await client.readContract({
         address: f.vault,
         abi: VAULT_ABI,
         functionName: "maxWithdraw",
         args: [f.holder],
-        blockNumber: BigInt(strip.block),
+        ...at,
+      });
+      const shares = await client.readContract({
+        address: f.vault,
+        abi: VAULT_ABI,
+        functionName: "balanceOf",
+        args: [f.holder],
+        ...at,
+      });
+      claim = await client.readContract({
+        address: f.vault,
+        abi: VAULT_ABI,
+        functionName: "convertToAssets",
+        args: [shares],
+        ...at,
       });
     } catch (error) {
-      check(`S1h·${f.label} the redeemable figure is this script's own read`, false, scrub(error.message));
+      check(`S1h·${f.label} the withdrawable line is this script's own read`, false, scrub(error.message));
     }
-    if (own != null) {
+    if (own != null && claim != null) {
+      // The line's three forms: all of it, none of it, or a part of it.
+      const want =
+        own >= claim ? /All of this position/ : own === BigInt(0) ? /None of this position/ : /of this position's/;
       check(
-        `S1h·${f.label} the redeemable figure is this script's own maxWithdraw read`,
-        strip.figureRaw === own.toString(),
-        `card ${strip.figureRaw} (${JSON.stringify(strip.figureText)}), own ${own} @ ${strip.block}`,
+        `S1h·${f.label} the withdrawable line is this script's own maxWithdraw against its own claim`,
+        want.test(strip.figureText ?? ""),
+        `line ${JSON.stringify(strip.figureText)}, own maxWithdraw ${own}, claim ${claim} @ ${strip.block}`,
       );
     }
   }
@@ -555,12 +551,12 @@ for (const f of fixtures) {
 const KEY = "rails-bookmarks";
 const MIGRATED = "rails-bookmarks-migrated";
 
-/** Open the bookmarks page (/bookmarks, B2; the wallet panel stopped drawing
+/** Open the bookmarks page (/saved-views, B2; the wallet panel stopped drawing
  *  a list on 4 Nov 2026, ui-jobs 480) and read its rows: each row's link to
  *  the wallet view (`data-bookmark-open`, not the protocol links under the
  *  name) and its label. */
 async function bookmarkRows(page) {
-  await page.goto(`${BASE_URL}/bookmarks`, { waitUntil: "networkidle", timeout: 180_000 });
+  await page.goto(`${BASE_URL}/saved-views?tab=wallets`, { waitUntil: "networkidle", timeout: 180_000 });
   await page.waitForSelector("[data-bookmark-open]", { timeout: 15_000 }).catch(() => {});
   return page.evaluate(() =>
     [...document.querySelectorAll("[data-bookmark-open]")].map((a) => ({

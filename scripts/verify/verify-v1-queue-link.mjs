@@ -106,7 +106,7 @@ assert(troveLinks === 0, `no per-Trove links on the system page (${troveLinks} f
 
 console.log("\n=== B. the link");
 const link = page.locator('a:has-text("Open the queue in the listing")').first();
-assert((await link.count()) > 0, "the system page offers an 'Open the queue in the listing →' link");
+assert((await link.count()) > 0, "the system page offers an 'Open the queue in the listing' link");
 if ((await link.count()) === 0) {
   await browser.close();
   console.log(`\nFAIL — ${failures} assertion(s)`);

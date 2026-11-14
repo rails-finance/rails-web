@@ -8,6 +8,8 @@
 // (rails-ops TO-DO-next-protocols, Pendle, Miles 8 Nov 2026). A yield token not
 // listed here is drawn without a group.
 
+import { PENDLE_WORDS } from "./words";
+
 const LABELS: Record<string, string> = {
   // 3Jane: USD3 and its staked form.
   "0x056b269eb1f75477a8666ae8c7fe01b64dd55ecc": "3Jane",
@@ -45,11 +47,10 @@ const LABELS: Record<string, string> = {
   "0xcccc62962d17b8914c62d74ffb843d73b2a3cccc": "Cap",
 };
 
-/** The Rails label for the protocol behind a yield token, or null where Rails has none. */
+/** The Rails label for the protocol behind a yield-bearing token, or null where Rails has none. */
 export function underlyingProtocol(yieldToken: string): string | null {
   return LABELS[yieldToken.toLowerCase()] ?? null;
 }
 
 /** The words every surface uses beside a label. */
-export const UNDERLYING_LABEL_TIP =
-  "Rails groups Pendle markets by the protocol behind each yield token. The chain does not name that protocol: this label is Rails' reading of who issues the token.";
+export const UNDERLYING_LABEL_TIP = PENDLE_WORDS.underlyingProtocolTip;

@@ -66,7 +66,7 @@ export function WorkInProgressStrip() {
           <Link
             href={RAILS_X_URL}
             target="_blank"
-            rel="noopener noreferrer"
+            rel="noopener"
             className="font-medium text-blue-600 dark:text-[var(--text-link)] hover:underline"
           >
             {RAILS_X_AT}

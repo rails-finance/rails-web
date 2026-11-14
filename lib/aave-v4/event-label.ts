@@ -17,9 +17,9 @@ export const AAVE_V4_LABELS = {
 
 /** A position swap's word, by kind; a leverage is not called a swap. */
 export const AAVE_V4_SWAP_LABELS = {
-  collateral_swap: "Collateral swap",
-  debt_swap: "Debt swap",
-  repay_with_collateral: "Repay with collateral",
+  collateral_swap: "Supply swap",
+  debt_swap: "Borrow swap",
+  repay_with_collateral: "Repay with supply",
   leverage: "Leverage",
 } as const;
 

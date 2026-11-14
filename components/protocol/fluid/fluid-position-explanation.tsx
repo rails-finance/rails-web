@@ -115,7 +115,7 @@ function FluidClosedPositionExplanation({
     list.push(
       <>
         Liquidation sweeps hit it <H>{v.liquidationCount}</H> time{v.liquidationCount === 1 ? "" : "s"} : a Fluid
-        liquidation is partial by design, clearing just enough each pass to restore the position&rsquo;s health
+        liquidation takes only what brings the position back to its liquidation threshold
         {v.fullyLiquidated ? (
           <>, until the final sweep emptied it entirely.</>
         ) : (
@@ -328,7 +328,7 @@ export function FluidPositionExplanation({
     if (live.oraclePriceLiquidateDebtPerCol != null) {
       list.push(
         <>
-          Fluid uses no dollar prices: the vault&rsquo;s oracle prices {colSym} directly in {debtSym}:{" "}
+          The vault&rsquo;s oracle prices {colSym} in {debtSym}:{" "}
           <H>
             1 {colSym} = {formatNumber(live.oraclePriceLiquidateDebtPerCol)} {debtSym}
           </H>{" "}
@@ -338,10 +338,11 @@ export function FluidPositionExplanation({
     }
     list.push(
       <>
-        The position ratio is the debt as a share of the collateral&rsquo;s value at the vault&rsquo;s liquidation
-        price, a loan-to-value: <H>{pct(live.ratio)}</H>. Borrowing stops at <H>{pct(live.collateralFactor)}</H>; above{" "}
-        <H>{pct(live.liquidationThreshold)}</H> anyone can liquidate the position (with a {pct(live.liquidationPenalty)}{" "}
-        penalty), and above {pct(live.liquidationMaxLimit)} it can be absorbed entirely.
+        The debt to collateral ratio is the debt as a share of the collateral&rsquo;s value at the vault&rsquo;s
+        liquidation price: <H>{pct(live.ratio)}</H>. Borrowing stops at the collateral factor,{" "}
+        <H>{pct(live.collateralFactor)}</H>; above the liquidation threshold, <H>{pct(live.liquidationThreshold)}</H>,
+        anyone can liquidate the position (with a {pct(live.liquidationPenalty)} penalty), and above the liquidation max
+        limit, {pct(live.liquidationMaxLimit)}, 100% of it gets liquidated.
       </>,
     );
     const dropPct =
@@ -354,8 +355,8 @@ export function FluidPositionExplanation({
       list.push(
         <>
           {colSym} can fall about <H>{dropPct}%</H> against {debtSym} (to <AmountText value={live.liqPriceDebtPerCol} />{" "}
-          {debtSym}) before liquidation begins. A Fluid liquidation is partial by design: it clears just enough to make
-          the position healthy again.
+          {debtSym}) before liquidation begins. A Fluid liquidation takes only what brings the position back to its
+          liquidation threshold.
         </>,
       );
     }
@@ -371,11 +372,11 @@ export function FluidPositionExplanation({
     list.push(
       <>
         {live.isSmartCol && live.isSmartDebt
-          ? "Both legs are Fluid DEX pool shares, not single tokens"
+          ? "Both legs are DEX shares"
           : live.isSmartCol
-            ? "The collateral leg is Fluid DEX pool shares, not a single token"
-            : "The debt leg is Fluid DEX pool shares, not a single token"}
-        : amounts here are pool shares, and the vault&rsquo;s oracle prices the pair in those share units.
+            ? "The collateral leg is DEX shares"
+            : "The debt leg is DEX shares"}
+        : amounts here are share counts, and the vault&rsquo;s oracle prices the pair in those share units.
       </>,
     );
   }
@@ -393,7 +394,7 @@ export function FluidPositionExplanation({
   if (live && live.vaultTotalPositions != null && live.vaultTotalPositions > 0) {
     list.push(
       <>
-        One of <H>{live.vaultTotalPositions}</H> positions in this vault
+        One of <H>{live.vaultTotalPositions}</H> positions opened in this vault
         {live.vaultTotalSupply != null && live.vaultTotalBorrow != null ? (
           <>
             {" "}

@@ -19,7 +19,7 @@ export function LinkedTx({ txHash, className = "", chainId }: LinkedTxProps) {
     <a
       href={explorerUrl(chainId ?? ctxChain, "tx-logs", txHash)}
       target="_blank"
-      rel="noopener noreferrer"
+      rel="noopener"
       onClick={(e) => e.stopPropagation()}
       className={`text-blue-600 dark:text-[var(--text-link)] hover:underline font-mono text-xs ${className}`}
     >

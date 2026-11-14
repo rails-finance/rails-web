@@ -106,6 +106,7 @@ const MECHANIC_ABI = parseAbi([
   // umbrella stake token
   "function getCooldown() view returns (uint256)",
   "function getUnstakeWindow() view returns (uint256)",
+  "function owner() view returns (address)",
   // Umbrella itself, about a reserve
   "function isReserveSlashable(address reserve) view returns (bool, uint256)",
   // sGHO
@@ -158,6 +159,8 @@ export interface AaveEthereumVaultRow {
   cooldownSeconds: number | null;
   /** umbrella: `getUnstakeWindow()`, in seconds. */
   unstakeWindowSeconds: number | null;
+  /** umbrella: `owner()`, the one address that can slash it, lowercased. */
+  owner?: string | null;
   /** umbrella: the reserve this stake token covers, hopped from `asset()`. */
   reserve: { address: string; symbol: string } | null;
   /** umbrella: `Umbrella.isReserveSlashable(reserve)`'s first word. False is a
@@ -291,6 +294,8 @@ async function readDirectory(): Promise<AaveEthereumVaultDirectoryResponse> {
         plan.push({ row: i, kind: "cooldown" });
         contracts.push({ address: v.address as `0x${string}`, abi: MECHANIC_ABI, functionName: "getUnstakeWindow" });
         plan.push({ row: i, kind: "unstakeWindow" });
+        contracts.push({ address: v.address as `0x${string}`, abi: MECHANIC_ABI, functionName: "owner" });
+        plan.push({ row: i, kind: "owner" });
         const reserve = reserveOf(i);
         if (reserve) {
           contracts.push({
@@ -363,6 +368,9 @@ async function readDirectory(): Promise<AaveEthereumVaultDirectoryResponse> {
         totalSupply: totalSupplyRaw == null || dec == null ? null : amount(totalSupplyRaw, dec),
         sharePrice: sharePriceRaw == null || !assetScaled ? null : amount(sharePriceRaw, assetDecimals),
         aToken: ((answered(i, "aToken") as string | undefined) ?? null)?.toLowerCase() ?? null,
+        ...(v.family === "umbrella-stake"
+          ? { owner: ((answered(i, "owner") as string | undefined) ?? null)?.toLowerCase() ?? null }
+          : {}),
         cooldownSeconds: cooldown == null ? null : Number(cooldown),
         unstakeWindowSeconds: unstakeWindow == null ? null : Number(unstakeWindow),
         reserve:
@@ -396,7 +404,8 @@ async function readDirectory(): Promise<AaveEthereumVaultDirectoryResponse> {
 const isReadable = (d: AaveEthereumVaultDirectoryResponse) =>
   !d.chainStale && d.rows.length > 0 && d.rows.some((r) => r.totalAssets != null && BigInt(r.totalAssets.raw) >= ZERO);
 
-const cachedDirectory = unstable_cache(readDirectory, ["aave-ethereum-vault-directory"], {
+// The key's version moves when a row gains a field (the stake's owner, ui-jobs 549 step 4).
+const cachedDirectory = unstable_cache(readDirectory, ["aave-ethereum-vault-directory", "2"], {
   revalidate: AAVE_VAULT_DIRECTORY_REVALIDATE_SECONDS,
 });
 

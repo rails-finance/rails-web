@@ -1,3 +1,4 @@
+// focus: a legal page; no asset or chain to filter
 import type { Metadata } from "next";
 import { HOME_SHARE_IMAGE, SITE_URL, twitterCard } from "@/lib/shared/page-metadata";
 import { LEGAL_LAST_UPDATED } from "@/lib/shared/site-dates";
@@ -77,7 +78,7 @@ export default function TermsPage() {
             <li>Rails does not provide investment, financial, legal, or tax advice</li>
             <li>
               No information on Rails should be interpreted as an endorsement or recommendation to buy, sell, or hold
-              any asset
+              any asset, use any protocol, or follow any strategy
             </li>
             <li>Past performance data displayed is not indicative of future results</li>
             <li>You are solely responsible for evaluating the risks of your DeFi interactions</li>
@@ -169,7 +170,8 @@ export default function TermsPage() {
           <h2 className="text-2xl font-semibold text-rb-500 mb-4">10. Third-Party Services</h2>
           <p className="text-rb-500 mb-4">
             Rails may display information from or link to third-party services, including DeFi protocols and blockchain
-            networks. We are not responsible for the content, accuracy, or practices of these third parties.
+            networks. Rails is not affiliated with the protocols, token issuers, or oracle providers it shows. We are
+            not responsible for the content, accuracy, or practices of these third parties.
           </p>
         </section>
 

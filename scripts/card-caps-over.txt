@@ -1,0 +1,4 @@
+# Position-card slot builders over the caps (4 headlines, 6 stats; decision 0040),
+# each waiting on its protocol's review (TO-DO-position-card 341). Written by
+# `node scripts/check-card-caps.mjs --write`; the counts are the most the source can reach.
+

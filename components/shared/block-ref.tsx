@@ -15,6 +15,10 @@ import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 //
 // `chainId` links the number to the chain's explorer, as the plain-text lines
 // did; without it the number is text.
+//
+// A stated block is a coordinate, the block a reading was taken at, so the
+// stamp carries `data-prov-exempt` (receipts grammar, the coverage tripwire:
+// a receipt's source coordinates hold the block; it is no figure to trace).
 
 export function BlockRef({
   block,
@@ -48,11 +52,12 @@ export function BlockRef({
       <a
         href={explorerUrl(chainId, "block", String(block).replace(/,/g, ""))}
         target="_blank"
-        rel="noopener noreferrer"
+        rel="noopener"
         className={`${linkClassName} ${shell}`}
         title={name}
         aria-label={name}
         data-block-ref=""
+        data-prov-exempt=""
         onClick={onClick}
       >
         {icon}
@@ -61,7 +66,7 @@ export function BlockRef({
     );
   }
   return (
-    <span role="group" aria-label={name} title={name} className={shell} data-block-ref="">
+    <span role="group" aria-label={name} title={name} className={shell} data-block-ref="" data-prov-exempt="">
       {icon}
       <span aria-hidden className="contents">
         {number}

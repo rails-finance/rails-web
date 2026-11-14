@@ -1,7 +1,6 @@
 "use client";
 
 import { Fragment, useEffect, useState } from "react";
-import Link from "next/link";
 import { Ban, Check, ChevronDown, Clock, Info, Minus } from "lucide-react";
 
 import {
@@ -14,8 +13,19 @@ import {
   type DepthCell,
   type DepthKey,
 } from "@/lib/shared/coverage";
-import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
+import {
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableHead,
+  DataTableHeader,
+  DataTableLeadCell,
+  DataTableLeadHeader,
+  DataTableRow,
+  DataTableRowLink,
+} from "@/components/shared/data-table/data-table";
 import { explorerName } from "@/lib/shared/protocols";
+import { HistoryTag } from "@/components/shared/history-tag";
 import type { ChainId } from "@/lib/shared/chains";
 
 /** Popovers and tooltips open their copy with a capital, applied HERE and only
@@ -46,19 +56,23 @@ function CellMark({ cell }: { cell: DepthCell }) {
   }
   if ("except" in cell) {
     return (
-      <span title={`All but ${cell.except}`} className="inline-block">
-        <Check className="h-[18px] w-[18px] text-green-500" aria-label={`Included, except ${cell.except}`} />
-      </span>
+      <Check className="h-[18px] w-[18px] text-green-500 inline-block" aria-label={`Included, except ${cell.except}`} />
     );
   }
   if ("awaiting" in cell) {
-    return (
-      <span title={sentenceCase(cell.awaiting)} className="inline-block">
-        <Clock className="h-4 w-4 text-rb-400" aria-label="Built, awaiting the first on-chain instance" />
-      </span>
-    );
+    return <Clock className="h-4 w-4 text-rb-400 inline-block" aria-label="Built, awaiting the first on-chain instance" />;
   }
   return <Ban className="h-4 w-4 text-rb-400 inline-block" aria-label="The protocol can't provide this" />;
+}
+
+/** A plain mark's tooltip. It sits on the cell, not the mark: the row's
+ *  cover (D4) lies over the mark, and a hover on the cover still shows the
+ *  cell's title. */
+function cellTitle(cell: DepthCell): string | undefined {
+  if (typeof cell !== "object") return undefined;
+  if ("except" in cell) return `All but ${cell.except}`;
+  if ("awaiting" in cell) return sentenceCase(cell.awaiting);
+  return undefined;
 }
 
 /** Every capability label breaks onto exactly two stacked lines, uniformly —
@@ -107,20 +121,24 @@ const TRIGGER_CLASS =
  *  substantive page copy that should ship in the HTML regardless of open
  *  state, and `aria-controls` needs a present element to reference.
  *
- * Opens downward from the cell. Anchored `left-0` by default; the last two
- * capability columns (Liquidation forensics, Protocol views) anchor `right-0`
- * instead so the box opens inward and never clips the page's right edge. */
+ * Opens downward from the cell, or upward on the table's last two rows: the
+ * table's frame scrolls (D3), so a box running past the last row would be
+ * cut off inside it. Anchored `left-0` by default; the last two capability
+ * columns (Liquidation forensics, Protocol views) anchor `right-0` instead so
+ * the box opens inward and never clips the page's right edge. */
 function CellNote({
   id,
   text,
   open,
   clampRight,
+  up = false,
   maxWidthClass = "max-w-[26ch]",
 }: {
   id: string;
   text: string;
   open: boolean;
   clampRight: boolean;
+  up?: boolean;
   /** Widened for the header popovers — the `verification` capability's
    *  `detail` runs to ~55 words, and the cells' default 26ch renders it very
    *  tall. Existing cell callers are unaffected (the default is unchanged). */
@@ -130,7 +148,7 @@ function CellNote({
     <span
       id={id}
       role="tooltip"
-      className={`absolute top-full z-[var(--z-dropdown)] mt-2 w-max ${maxWidthClass} text-left rounded-md bg-foreground px-2.5 py-1.5 text-xs text-background shadow-lg ${clampRight ? "right-0" : "left-0"} ${open ? "" : "hidden"}`}
+      className={`absolute ${up ? "bottom-full mb-2" : "top-full mt-2"} z-[var(--z-dropdown)] w-max ${maxWidthClass} text-left rounded-md bg-foreground px-2.5 py-1.5 text-xs text-background shadow-lg ${clampRight ? "right-0" : "left-0"} ${open ? "" : "hidden"}`}
     >
       {sentenceCase(text)}
     </span>
@@ -178,6 +196,7 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
   const essayOpen = (id: string) => open?.kind === "essay" && open.id === id;
   const cellOpen = (id: string, key: DepthKey) => open?.kind === "cell" && open.id === id && open.key === key;
   const headerOpen = (key: DepthKey) => open?.kind === "header" && open.key === key;
+  const rows = coverageRows(comingSoon, chainId);
 
   // Escape closes whatever is open — a cell popover OR the essay drawer.
   useEffect(() => {
@@ -241,30 +260,29 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
           cell for the why)
         </span>
       </p>
-      {/* Column 1 is 30% (34% before the brand rail took 56px, ui-jobs 498):
-          at 1280 the capability labels' lines then fit their columns.
-          table-fixed, or the browser grows column 1 to fit the longest desc and
-          starves the mark columns unevenly. With it the seven capability
-          columns split the remainder equally. Every header label is forced
+      {/* table-fixed, or the browser grows the name column to fit the longest
+          desc and starves the mark columns unevenly. With it the lead column
+          takes its 95px, the name column 26% (18% below xl, where the
+          capability labels would otherwise overrun their columns), and the
+          capability columns split the remainder equally. Every header label is forced
           onto two lines by splitHeaderLabel (not the browser's own wrap), so
           all seven sit at the same height and stay aligned along the row. */}
-      <table className="w-full table-fixed border-collapse">
-        <thead>
-          <tr className="border-b border-rb-200 dark:border-rb-800">
-            <th scope="col" className="w-[30%] text-left align-bottom pb-3 pr-6">
-              <span className="sr-only">Explorer</span>
-            </th>
-            {CAPABILITIES.map((cap, capIndex) => {
-              // Same last-two-columns clamp as the cell popovers: Liquidation
-              // forensics / Protocol views open inward instead of clipping
-              // the page's right edge.
-              const clampRight = capIndex >= CAPABILITIES.length - 2;
-              const isOpen = headerOpen(cap.key);
-              const wrapId = `coverage-header-wrap-${cap.key}`;
-              const popoverId = `coverage-header-${cap.key}`;
-              const [line1, line2] = splitHeaderLabel(cap.label);
-              return (
-                <th key={cap.key} scope="col" className="align-bottom pb-3 px-2 text-center">
+      <DataTable label="Explorer capability matrix" tableClassName="table-fixed">
+        <DataTableHead>
+          <DataTableLeadHeader plain />
+          <DataTableHeader label={<span className="sr-only">Explorer</span>} className="w-[18%] xl:w-[26%]" />
+          {CAPABILITIES.map((cap, capIndex) => {
+            // Same last-two-columns clamp as the cell popovers: Liquidation
+            // forensics / Protocol views open inward instead of clipping
+            // the page's right edge.
+            const clampRight = capIndex >= CAPABILITIES.length - 2;
+            const isOpen = headerOpen(cap.key);
+            const wrapId = `coverage-header-wrap-${cap.key}`;
+            const popoverId = `coverage-header-${cap.key}`;
+            const [line1, line2] = splitHeaderLabel(cap.label);
+            return (
+              <DataTableHeader key={cap.key} className="align-bottom">
+                <div className="flex justify-center">
                   <span id={wrapId} className="relative inline-flex">
                     <button
                       type="button"
@@ -296,56 +314,41 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
                       maxWidthClass="max-w-[34ch]"
                     />
                   </span>
-                </th>
-              );
-            })}
-          </tr>
-        </thead>
-        <tbody>
-          {coverageRows(comingSoon, chainId).map((row, i) => {
-            // Stripe by MERGED-row index parity, never nth-child/even — the
-            // always-mounted (and often hidden) drawer rows break DOM parity,
-            // so a CSS pseudo-class would tint the wrong rows, and the
-            // coming-soon row participates in the same parity as any other
-            // row rather than resetting it. The dark: variant isn't
-            // decorative: rb-200 is mode-split and resolves light in dark
-            // mode, so bare bg-rb-200/50 would flash a light stripe on the
-            // dark canvas. Row 1 stays canvas so the header border reads clean.
-            const stripe = i % 2 === 1 ? "bg-rb-200/50 dark:bg-rb-850" : "";
+                </div>
+              </DataTableHeader>
+            );
+          })}
+        </DataTableHead>
+        <DataTableBody>
+          {rows.map((row, i) => {
+            const up = i >= rows.length - 2;
 
             // A coming-soon row makes NO capability claims: unlike every
             // explorer row below, it carries no per-capability mark, no essay
-            // and no cell popover — just an icon, a linked name, a neutral
-            // "Coming soon" pill, and one muted note spanning every
+            // and no cell popover — just its lead zone, a linked name, a
+            // neutral "Coming soon" pill, and one muted note spanning every
             // capability column. That's what keeps it unaudited on purpose:
             // there's nothing here for a reader to mistake for a claim about
             // a live explorer.
             if (row.kind === "soon") {
               const soon = row.entry;
               return (
-                <tr key={soon.id} className={`${i > 0 ? "border-t border-rb-200 dark:border-rb-800" : ""} ${stripe}`}>
-                  <th scope="row" className="text-left font-normal align-top py-3 pr-6 pl-4">
-                    <div className="flex items-start gap-2.5">
-                      <ProtocolIcon id={soon.iconId} className="h-6 w-6 shrink-0 mt-0.5" />
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Link
-                            href={soon.href}
-                            className="text-sm font-semibold text-foreground transition-colors hover:text-blue-600 dark:hover:text-[var(--text-link)]"
-                          >
-                            <span className="whitespace-nowrap">{soon.label}</span>
-                          </Link>
-                          <span className="rounded-full bg-rb-200 px-2 py-0.5 text-[10px] font-medium text-rb-500 dark:bg-rb-800 dark:text-rb-400">
-                            Coming soon
-                          </span>
-                        </div>
-                      </div>
+                <DataTableRow key={soon.id} href={soon.href}>
+                  <DataTableLeadCell plain protocol={soon.iconId} protocolName={soon.label} chain={chainId} />
+                  <DataTableCell rowHeader>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <DataTableRowLink href={soon.href} className="text-sm font-semibold">
+                        <span className="whitespace-nowrap">{soon.label}</span>
+                      </DataTableRowLink>
+                      <span className="rounded-full bg-rb-200 px-2 py-0.5 text-[10px] font-medium text-rb-500 dark:bg-rb-800 dark:text-rb-400">
+                        Coming soon
+                      </span>
                     </div>
-                  </th>
-                  <td colSpan={CAPABILITIES.length} className="align-top py-3 px-2 text-xs text-rb-500">
+                  </DataTableCell>
+                  <DataTableCell colSpan={CAPABILITIES.length} className="text-xs text-rb-500">
                     {soon.note}
-                  </td>
-                </tr>
+                  </DataTableCell>
+                </DataTableRow>
               );
             }
 
@@ -364,51 +367,41 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
               // <tbody> and <tr> is silently reparented by the HTML table
               // parser, which hydrates as a mismatch.
               <Fragment key={p.id}>
-                {/* The divider is border-t on all but the first row. A border-b
-                    scheme would draw the seam between a row and its OWN drawer,
-                    visually attaching each drawer to the protocol below it. */}
-                <tr className={`${i > 0 ? "border-t border-rb-200 dark:border-rb-800" : ""} ${stripe}`}>
-                  {/* pl-4: breathing room off the row's left edge — flush read
-                      as cramped once the zebra stripe gave the row a visible
-                      band. The stripe lives on the <tr>, so it still runs
-                      full-width behind this padding. */}
-                  <th scope="row" className="text-left font-normal align-top py-3 pr-6 pl-4">
-                    <div className="flex items-start gap-2.5">
-                      <ProtocolIcon id={p.id} className="h-6 w-6 shrink-0 mt-0.5" />
-                      {/* min-w-0, or the flex child won't wrap the desc. */}
-                      <div className="min-w-0">
-                        {/* Only the label is the anchor — wrapping the icon and
-                            desc too would swallow them into the link text. */}
-                        <Link
-                          href={p.href}
-                          className="text-sm font-semibold text-foreground transition-colors hover:text-blue-600 dark:hover:text-[var(--text-link)]"
-                        >
-                          <span className="whitespace-nowrap">{p.label}</span>
-                        </Link>
-                        <p className="text-xs leading-snug text-rb-500 mt-0.5">{p.desc}</p>
-                        {hasEssay && (
-                          <button
-                            type="button"
-                            onClick={() => setOpen(rowEssayOpen ? null : { kind: "essay", id: p.id })}
-                            aria-expanded={rowEssayOpen}
-                            aria-controls={essayPanelId}
-                            aria-label={
-                              rowEssayOpen
-                                ? `Hide why ${explorerName(p)} doesn't go deeper`
-                                : `Show why ${explorerName(p)} doesn't go deeper`
-                            }
-                            className={`mt-1.5 ${TRIGGER_CLASS}`}
-                          >
-                            <ChevronDown
-                              className={`h-3 w-3 transition-transform ${rowEssayOpen ? "rotate-180" : ""}`}
-                              aria-hidden="true"
-                            />
-                            <span className="text-xs">Why not deeper</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </th>
+                <DataTableRow href={p.href}>
+                  <DataTableLeadCell plain protocol={p.id} protocolName={p.label} chain={chainId} />
+                  <DataTableCell rowHeader>
+                    {/* The name is the row's one link (D4); the desc and the
+                        essay trigger sit under it, outside the link text. */}
+                    <DataTableRowLink href={p.href} className="text-sm font-semibold">
+                      <span className="whitespace-nowrap">{p.label}</span>
+                    </DataTableRowLink>
+                    {p.history && (
+                      <span className="ml-2 align-[1px]">
+                        <HistoryTag id={p.id} />
+                      </span>
+                    )}
+                    <p className="text-xs leading-snug text-rb-500 mt-0.5">{p.desc}</p>
+                    {hasEssay && (
+                      <button
+                        type="button"
+                        onClick={() => setOpen(rowEssayOpen ? null : { kind: "essay", id: p.id })}
+                        aria-expanded={rowEssayOpen}
+                        aria-controls={essayPanelId}
+                        aria-label={
+                          rowEssayOpen
+                            ? `Hide why ${explorerName(p)} doesn't go deeper`
+                            : `Show why ${explorerName(p)} doesn't go deeper`
+                        }
+                        className={`mt-1.5 ${TRIGGER_CLASS}`}
+                      >
+                        <ChevronDown
+                          className={`h-3 w-3 transition-transform ${rowEssayOpen ? "rotate-180" : ""}`}
+                          aria-hidden="true"
+                        />
+                        <span className="text-xs">Why not deeper</span>
+                      </button>
+                    )}
+                  </DataTableCell>
                   {CAPABILITIES.map((cap, capIndex) => {
                     const cell = cellFor(p.id, cap.key);
                     // The last two columns (Liquidation forensics, Protocol
@@ -423,8 +416,9 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
                       const isOpen = cellOpen(p.id, cap.key);
                       const popoverId = `coverage-cell-${p.id}-${cap.key}`;
                       return (
-                        <td key={cap.key} className="text-center align-top pt-3.5 px-2">
-                          <span id={wrapId} className="relative inline-flex">
+                        <DataTableCell key={cap.key}>
+                          <div className="flex justify-center">
+                            <span id={wrapId} className="relative inline-flex">
                             <button
                               type="button"
                               onClick={() => setOpen(isOpen ? null : { kind: "cell", id: p.id, key: cap.key })}
@@ -443,9 +437,10 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
                                 aria-hidden="true"
                               />
                             </button>
-                            <CellNote id={popoverId} text={viewNote} open={isOpen} clampRight={clampRight} />
+                            <CellNote id={popoverId} text={viewNote} open={isOpen} clampRight={clampRight} up={up} />
                           </span>
-                        </td>
+                          </div>
+                        </DataTableCell>
                       );
                     }
                     // ⊘ "can't provide it": an info mark on the cell opens a
@@ -455,8 +450,9 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
                       const isOpen = cellOpen(p.id, cap.key);
                       const popoverId = `coverage-cell-${p.id}-${cap.key}`;
                       return (
-                        <td key={cap.key} className="text-center align-top pt-3.5 px-2">
-                          <span id={wrapId} className="relative inline-flex">
+                        <DataTableCell key={cap.key}>
+                          <div className="flex justify-center">
+                            <span id={wrapId} className="relative inline-flex">
                             <button
                               type="button"
                               onClick={() => setOpen(isOpen ? null : { kind: "cell", id: p.id, key: cap.key })}
@@ -475,44 +471,46 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
                                 aria-hidden="true"
                               />
                             </button>
-                            <CellNote id={popoverId} text={cell.why} open={isOpen} clampRight={clampRight} />
+                            <CellNote id={popoverId} text={cell.why} open={isOpen} clampRight={clampRight} up={up} />
                           </span>
-                        </td>
+                          </div>
+                        </DataTableCell>
                       );
                     }
                     return (
-                      <td key={cap.key} className="text-center align-top pt-3.5 px-2">
-                        <CellMark cell={cell} />
-                      </td>
+                      <DataTableCell key={cap.key} title={cellTitle(cell)}>
+                        <div className="flex justify-center">
+                          <CellMark cell={cell} />
+                        </div>
+                      </DataTableCell>
                     );
                   })}
-                </tr>
+                </DataTableRow>
                 {hasEssay && (
-                  // Same stripe as the parent row so an open drawer reads as
-                  // part of its row, not a band of its own.
-                  <tr className={`${rowEssayOpen ? "" : "hidden"} ${stripe}`}>
-                    {/* Derived, never the literal column count. */}
-                    <td colSpan={CAPABILITIES.length + 1} className="pb-5 pr-6">
-                      {/* pl-[50px]: lines the drawer prose up under the row's
-                          NAME/desc text, not its icon — the panel cell starts
-                          at the row's left edge (this <td> spans every column),
-                          so it must reproduce the icon column's own offset:
-                          the th's pl-4 (16px) + the icon's w-6 (24px) + the
-                          icon/text gap-2.5 (10px) = 50px. */}
-                      <div id={essayPanelId} className="max-w-[80ch] pl-[50px]">
+                  // An unlinked drawer row under its explorer row, one cell
+                  // across every column, the lead column's included.
+                  <DataTableRow drawer className={rowEssayOpen ? "" : "hidden"}>
+                    {/* Derived, never the literal column count: the lead, the
+                        name and each capability. */}
+                    <DataTableCell colSpan={CAPABILITIES.length + 2} className="pb-5 pr-6">
+                      {/* pl-[95px]: lines the drawer prose up under the row's
+                          NAME text. This cell starts at the row's left edge, so
+                          it adds the lead column's 95px to the padding the
+                          name cell and this one share. */}
+                      <div id={essayPanelId} className="max-w-[80ch] pl-[95px]">
                         {/* Header-less by design: the "Why not deeper" trigger
                             that opened this panel already named what it is —
                             a repeated label here would just restate it. */}
                         <p className="body-text">{note}</p>
                       </div>
-                    </td>
-                  </tr>
+                    </DataTableCell>
+                  </DataTableRow>
                 )}
               </Fragment>
             );
           })}
-        </tbody>
-      </table>
+        </DataTableBody>
+      </DataTable>
     </section>
   );
 }

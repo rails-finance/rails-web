@@ -63,9 +63,21 @@ function load(spoke: string, wallet: string, block: number, asset?: string) {
   return p;
 }
 
+/** Start the read a card will make when it opens (pointer-over or focus of
+ *  its row), so the opened grid finds it in the cache. */
+export function prefetchHealthFactorAround(
+  spoke: string | undefined,
+  wallet: string | undefined,
+  blockNumber?: number,
+  asset?: string,
+): void {
+  if (!spoke || !wallet || blockNumber == null) return;
+  void load(spoke, wallet, blockNumber, asset);
+}
+
 /** The health factor at the end of the block before an event and of its own
  *  block, read from the spoke, with the position's risk premium. Fetched when
- *  the opened card mounts. `asset` (the event's reserve symbol) also reads its
+ *  `enabled`: the card passes it once it opens. `asset` (the event's reserve symbol) also reads its
  *  collateral flag and premium debt; the grid and the explanation pass the same
  *  one so they share the request. */
 export function useHealthFactorAround(

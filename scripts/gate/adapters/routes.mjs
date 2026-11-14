@@ -761,15 +761,15 @@ const vaultDirectory = (directory, chainId) => () =>
 
 const SYSTEM = [
   // components/shared/aave-market-page.tsx, at each page's apiRoute.
-  { id: "aave-v3-market", match: re(`/ethereum/aave-v3/market`), routes: () => ["/api/chain/aave-v3/market"] },
-  { id: "aave-v3-base-market", match: re(`/base/aave-v3/market`), routes: () => ["/api/chain/aave-v3-base/market"] },
+  { id: "aave-v3-market", match: re(`/ethereum/aave-v3/markets`), routes: () => ["/api/chain/aave-v3/market"] },
+  { id: "aave-v3-base-market", match: re(`/base/aave-v3/markets`), routes: () => ["/api/chain/aave-v3-base/market"] },
   {
     id: "aave-v3-arbitrum-markets",
     match: re(`/arbitrum/aave-v3/markets`),
     routes: () => ["/api/chain/aave-v3-arbitrum/market"],
   },
-  { id: "spark-market", match: re(`/ethereum/spark/market`), routes: () => ["/api/chain/spark/market"] },
-  { id: "seamless-market", match: re(`/base/seamless/market`), routes: () => ["/api/chain/seamless/market"] },
+  { id: "spark-market", match: re(`/ethereum/spark/markets`), routes: () => ["/api/chain/spark/market"] },
+  { id: "seamless-market", match: re(`/base/seamless/markets`), routes: () => ["/api/chain/seamless/market"] },
   // loadCompoundV3Markets / loadCompoundV2Markets, served by the markets routes.
   {
     id: "compound-v3-markets",
@@ -778,7 +778,7 @@ const SYSTEM = [
   },
   {
     id: "compound-v3-base-market",
-    match: re(`/base/compound-v3/market`),
+    match: re(`/base/compound-v3/markets`),
     routes: () => ["/api/chain/compound-base/markets"],
   },
   {
@@ -801,7 +801,7 @@ const SYSTEM = [
   { id: "morpho-markets", match: re(`/ethereum/morpho/markets`), routes: () => ["/api/chain/morpho/markets"] },
   { id: "morpho-base-markets", match: re(`/base/morpho/markets`), routes: () => ["/api/chain/morpho-base/markets"] },
   {
-    // components/protocol/morpho/morpho-arbitrum-markets-view.tsx
+    // loadMorphoMarketsFromChain on the Arbitrum deployment.
     id: "morpho-arbitrum-markets",
     match: re(`/arbitrum/morpho/markets`),
     routes: () => ["/api/chain/morpho-arbitrum/markets"],
@@ -864,7 +864,7 @@ const SYSTEM = [
   {
     // lib/alchemix/lines-page-data.ts: each position type's coverage rows.
     id: "alchemix-lines",
-    match: re(`/(ethereum|base)/alchemix/lines`),
+    match: re(`/(ethereum|base)/alchemix/markets`),
     routes: ([, chain]) =>
       captureUrls(() => {
         const d = chain === "base" ? ALCHEMIX_BASE : ALCHEMIX_ETHEREUM;

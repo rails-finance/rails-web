@@ -1,3 +1,4 @@
+// focus: the explorer's explainer; the shell's gate stands over the explorer
 // About this explorer — Liquity V2 on Ethereum, drawn on the typed template
 // (rails-ops standards/info-page-template.md). Every glossary source is Liquity's
 // official documentation (rails-ops reference/official-docs/liquity-v2.md).
@@ -6,6 +7,7 @@ import Link from "next/link";
 import { GlossaryLink, ProtocolInfoPage, type InfoTerm, type InfoView } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { fmtMaxLtv } from "@/lib/liquity/ltv";
 
 export const metadata = infoMetadata("liquity-v2");
 
@@ -14,6 +16,10 @@ const BORROWING = `${DOCS}/borrowing-and-liquidations`;
 const REDEMPTIONS = `${DOCS}/redemptions-and-delegation`;
 
 const UL = "list-disc space-y-1 pl-5";
+
+// Each branch's Max LTV, 1 ÷ its MCR (lib/liquity/ltv.ts).
+const MAX_LTV_WETH = fmtMaxLtv("WETH");
+const MAX_LTV_LST = fmtMaxLtv("wstETH");
 
 const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
   {
@@ -32,33 +38,33 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
     sources: [{ label: "What is Liquity V2", href: DOCS + "/general#what-is-liquity-v2" }],
   },
   {
-    term: "Collateral ratio",
+    term: "LTV",
     definition:
-      "The collateral ratio is the value of a Trove's collateral divided by its debt. A ratio of 110% means $110 of collateral for every $100 of debt.",
+      "LTV, loan-to-value, is a Trove's debt divided by the value of its collateral. An LTV of 80% means $80 of debt for every $100 of collateral. Each branch sets a Max LTV, and a Trove above it can be liquidated.",
     sources: [{ label: "Choosing an LTV", href: BORROWING + "#how-do-i-decide-on-my-ltv" }],
   },
   {
     term: "Interest rate",
     definition:
-      "Each borrower sets the interest rate on a Trove and can change it. A change within 7 days of the last change adds an upfront fee. A low rate costs less but puts the Trove earlier in the redemption queue.",
+      "Each borrower sets the interest rate on a Trove and can change it. A change within 7 days of the last change adds an Upfront Borrowing Fee. A low rate costs less but puts the Trove earlier in the redemption queue.",
     sources: [{ label: "User-set rates", href: BORROWING + "#what-are-user-set-rates" }],
   },
   {
-    term: "Upfront fee",
+    term: "Upfront Borrowing Fee",
     definition:
-      "The upfront fee is charged when a borrower opens a Trove, adds debt, joins a batch, or changes the rate within 7 days of the last change. It equals 7 days of average interest and is added to the debt.",
+      "The Upfront Borrowing Fee is charged when a borrower opens a Trove, adds debt, joins a batch, or changes the rate within 7 days of the last change. It equals 7 days of average interest and is added to the debt.",
     sources: [{ label: "Other borrowing fees", href: BORROWING + "#are-there-any-other-fees-related-to-borrowing" }],
   },
   {
     term: "Liquidation reserve",
     definition:
-      "Opening a Trove also sets aside a reserve of 0.0375 WETH. It pays the gas, the fee for a transaction on Ethereum, if the Trove is ever liquidated. The reserve is returned when the Trove closes.",
+      "Opening a Trove also sets aside a liquidation reserve of 0.0375 WETH, a refundable gas deposit. It pays the gas, the fee for a transaction on Ethereum, if the Trove is ever liquidated. The reserve is returned when the Trove closes.",
     sources: [{ label: "Refundable gas deposit", href: BORROWING + "#what-is-the-refundable-gas-deposit" }],
   },
   {
-    term: "Batch manager",
+    term: "Delegate",
     definition:
-      "A batch manager sets one interest rate for all the Troves in its batch and charges a yearly management fee, which is added to the debt on top of the interest. A manager can change the rate only within a range set in advance. A Trove that leaves a batch sets its own interest rate again.",
+      "A delegate sets one interest rate for all the Troves in its batch and charges a yearly management fee, which is added to the debt on top of the interest. A delegate can change the rate only within a range set in advance. A Trove that leaves a batch sets its own interest rate again.",
     sources: [{ label: "Delegation of interest rates", href: REDEMPTIONS + "#what-is-delegation-of-interest-rates" }],
   },
   {
@@ -96,8 +102,7 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
   },
   {
     term: "Liquidation",
-    definition:
-      "A Trove is liquidated when its collateral ratio falls below 110% on WETH or 120% on wstETH and rETH. The Stability Pool then absorbs the Trove's debt and takes its collateral. The borrower usually pays a 5% penalty and can claim the remaining collateral.",
+    definition: `A Trove is liquidated when its LTV rises above the Max LTV: ${MAX_LTV_WETH} on WETH or ${MAX_LTV_LST} on wstETH and rETH. The Stability Pool then absorbs the Trove's debt and takes its collateral. The borrower usually pays a 5% penalty and can claim the remaining collateral.`,
     sources: [{ label: "How liquidations work", href: BORROWING + "#how-do-liquidations-work-in-liquity-v2" }],
   },
   {
@@ -120,13 +125,13 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "TCR",
     definition:
-      "The total collateral ratio (TCR) is the collateral ratio of a whole branch: the value of all its collateral divided by all its debt. It shows the branch's overall health.",
+      "The Total Collateral Ratio (TCR) is the collateral ratio of a whole branch: the value of all its collateral divided by all its debt. It shows the branch's overall health.",
     sources: [{ label: "Safety Mode", href: BORROWING + "#what-is-safety-mode" }],
   },
   {
     term: "Shutdown",
     definition:
-      "A branch shuts down when its TCR falls below the shutdown ratio (110% for WETH, 120% for wstETH and rETH) or its price feed, the service that reports the collateral's price, fails. A shutdown is permanent.",
+      "A branch shuts down when its TCR falls below the Shutdown Collateral Ratio (SCR) (110% for WETH, 120% for wstETH and rETH) or its price feed, the service that reports the collateral's price, fails. A shutdown is permanent.",
     sources: [{ label: "Shutdown Mode", href: BORROWING + "#what-is-shutdown-mode" }],
   },
 ];
@@ -137,8 +142,8 @@ const views: readonly [InfoView, ...InfoView[]] = [
     body: (
       <ul className={UL}>
         <li>
-          Each card shows one Trove with its collateral, debt, interest rate and collateral ratio. The card also shows
-          the liquidation price, the collateral price at which the Trove would be liquidated.
+          Each card shows one Trove with its collateral, debt, interest rate and LTV. The card also shows the
+          liquidation price, the collateral price at which the Trove would be liquidated.
         </li>
         <li>A Trove in a batch shows the manager&apos;s name where Rails knows it.</li>
         <li>
@@ -153,16 +158,16 @@ const views: readonly [InfoView, ...InfoView[]] = [
     body: (
       <ul className={UL}>
         <li>
-          The top card shows the collateral, the debt and the collateral ratio. An open Trove also shows its interest
-          rate, its yearly cost, its liquidation price and the share of the redemption queue ahead of it. The queue is
-          the Troves in the order redemptions reach them.
+          The top card shows the collateral, the debt and the LTV. An open Trove also shows its interest rate, its
+          yearly cost, its liquidation price and the share of the redemption queue ahead of it. The queue is the Troves
+          in the order redemptions reach them.
         </li>
         <li>
           The wallet chip names the Trove&apos;s latest owner, and the history belongs to the Trove whoever held it.
         </li>
         <li>
-          A Trove can change without its owner acting: interest accrues, a batch manager changes the batch&apos;s rate,
-          a redemption repays part of it, and a redistribution adds debt and collateral.
+          A Trove can change without its owner acting: interest accrues, a delegate changes the batch&apos;s rate, a
+          redemption repays part of it, and a redistribution adds debt and collateral.
         </li>
         <li>
           A Trove&apos;s NFT can be transferred to another wallet, which changes the owner and leaves the loan as it
@@ -170,7 +175,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
         </li>
         <li>The lifetime flows panel totals every borrow, repayment, fee and redemption, with the net result.</li>
         <li>
-          The timeline lists each event, newest first, including a batch manager&apos;s rate changes and the redemptions
+          The timeline lists each event, newest first, including a delegate&apos;s rate changes and the redemptions
           against the Trove.
         </li>
       </ul>
@@ -181,7 +186,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
     body: (
       <p>
         The branches page shows, for each branch, its debt, collateral, number of Troves, span of interest rates, TCR
-        and minimum collateral ratios. It links each branch to its Troves in redemption order.{" "}
+        and Max LTVs. It links each branch to its Troves in redemption order.{" "}
         <Link href="/ethereum/liquity-v2/branches" className={INLINE_LINK}>
           Open the branches page
         </Link>{" "}
@@ -216,9 +221,9 @@ export default function InfoPage() {
         </>,
         <>
           The borrower sets the <GlossaryLink term="Interest rate">interest rate</GlossaryLink> and can change it, or
-          hand it to a <GlossaryLink term="Batch manager">batch manager</GlossaryLink> who sets one rate for many
-          Troves. Interest is added to the debt as it accrues, and the minimum debt is 2,000 BOLD. Opening a Trove adds
-          an <GlossaryLink term="Upfront fee">upfront fee</GlossaryLink> to the debt and holds a{" "}
+          hand it to a <GlossaryLink term="Delegate">delegate</GlossaryLink> who sets one rate for many Troves. Interest
+          is added to the debt as it accrues, and the minimum debt is 2,000 BOLD. Opening a Trove adds an{" "}
+          <GlossaryLink term="Upfront Borrowing Fee">Upfront Borrowing Fee</GlossaryLink> to the debt and holds a{" "}
           <GlossaryLink term="Liquidation reserve">liquidation reserve</GlossaryLink>.
         </>,
         <>
@@ -232,19 +237,19 @@ export default function InfoPage() {
         <>
           Liquity V2 has three <GlossaryLink term="Branch">branches</GlossaryLink>: WETH, wstETH and rETH, which are
           forms of ETH. A Trove is <GlossaryLink term="Liquidation">liquidated</GlossaryLink> when its{" "}
-          <GlossaryLink term="Collateral ratio">collateral ratio</GlossaryLink> falls below 110% on WETH or 120% on the
-          others, and the <GlossaryLink term="Stability Pool">Stability Pool</GlossaryLink> absorbs it. Any shortfall is
-          a <GlossaryLink term="Redistribution">redistribution</GlossaryLink> to the branch&apos;s other Troves.
+          <GlossaryLink term="LTV">LTV</GlossaryLink> rises above {MAX_LTV_WETH} on WETH or {MAX_LTV_LST} on the others,
+          and the <GlossaryLink term="Stability Pool">Stability Pool</GlossaryLink> absorbs it. Any shortfall is a{" "}
+          <GlossaryLink term="Redistribution">redistribution</GlossaryLink> to the branch&apos;s other Troves.
         </>,
         <>
-          Each branch has a <GlossaryLink term="TCR">TCR</GlossaryLink>. Below the shutdown ratio, or when its price
-          feed (the service that reports the collateral&apos;s price) fails, the branch goes into{" "}
+          Each branch has a <GlossaryLink term="TCR">TCR</GlossaryLink>. Below its Shutdown Collateral Ratio (SCR), or
+          when its price feed (the service that reports the collateral&apos;s price) fails, the branch goes into{" "}
           <GlossaryLink term="Shutdown">shutdown</GlossaryLink>: borrowing, adjustments (changes to a Trove&apos;s
           collateral or debt), rate changes and batch operations stop, while closing and redemptions continue.
         </>,
       ]}
       views={views}
-      search="You can search by wallet address, ENS name or Trove ID. The listing filters by Status, Collateral, Redemptions (Redeemed or Never redeemed) and Delegation (Delegated or Individual), and sorts by Recent activity, Debt, Collateral, Ratio or Interest Rate."
+      search="You can search by wallet address, ENS name or Trove ID. The listing filters by Status, Collateral, Redemptions (Redeemed or Never redeemed) and Delegation (Delegated or Individual), and sorts by Recent activity, Debt, Collateral, LTV or Interest Rate."
       docs={{ label: "Liquity V2 documentation", href: DOCS }}
     />
   );

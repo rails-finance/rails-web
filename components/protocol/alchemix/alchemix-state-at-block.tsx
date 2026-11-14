@@ -23,7 +23,7 @@
 // 3. AN ABSENT READING IS NOT A ZERO. A custody Transfer moves neither axis, so
 //    it is not a block the sweep stops at: 1,867 of production's 4,988 position
 //    Transfers have no reading. Those draw debt and collateral from the reading
-//    in force at that block, muted as unchanged, and never set-aside, which
+//    in force at that block, muted as unchanged, and never earmarked debt, which
 //    grows every block (decisions/0032 point 6); with no earlier reading on the
 //    timeline they draw one sentence. A measured
 //    zero draws the grid with "0" in it via the grid's own `formatCompact`,
@@ -56,7 +56,7 @@ import {
   carriedReadingProv,
   lineRatioProv,
   readingChangeProv,
-  readingCollateralisationProv,
+  readingLtvProv,
   stateAtBlockFromReadingProv,
   type AlchemixCoords,
 } from "@/lib/alchemix/event-provenance";
@@ -69,6 +69,7 @@ import {
 } from "@/lib/alchemix/readings-before";
 import { Prov } from "@/components/shared/provenance";
 import { BlockRef } from "@/components/shared/block-ref";
+import { ltvOfCollateralization, ltvPct, ltvPrint } from "@/lib/alchemix/ltv";
 
 const block = (n: number) => n.toLocaleString("en-US");
 
@@ -113,23 +114,6 @@ export interface AlchemixStateAtBlockProps {
   before?: AlchemixReading | null;
 }
 
-/** A 1e18-scaled ratio in the event grid: two places, Liquity's event grid,
- *  so a small move still shows between before and after. */
-function gridRatio(raw: string): string {
-  const pct = Number(raw) / 1e16;
-  if (pct >= 10000) return ">10k%";
-  return `${pct.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
-}
-
-/** A 1e18-scaled ratio as the position card draws it. */
-function ratioPct(raw: string): string {
-  const pct = Number(raw) / 1e16;
-  if (pct >= 10000) return ">10k%";
-  return pct < 1000
-    ? `${pct.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
-    : `${Math.round(pct).toLocaleString("en-US")}%`;
-}
-
 /** The reading as the card's cells, and the line that stands under them where
  *  the block has no reading of its own. */
 export interface AlchemixReadingCells {
@@ -165,7 +149,7 @@ export function useAlchemixReadingCells({
       };
     }
     // A custody move: neither axis moved. The figures in force are shown
-    // muted, the way an untouched axis is, and set-aside is left out because
+    // muted, the way an untouched axis is, and earmarked debt is left out because
     // it grows every block and a reading holds it at its own block alone.
     if (inForce && eventBlock != null && inForce.debtRaw != null && inForce.collateralRaw != null) {
       const carried = (label: string, raw: string, symbol: string): ChainTruthStat => ({
@@ -239,23 +223,25 @@ export function useAlchemixReadingCells({
     };
   };
 
-  // Collateralisation at each reading, from its own share price. Where the
-  // before reading gives none, the after stands alone.
+  // LTV at each reading, from its own share price. Where the before reading
+  // gives none, the after stands alone.
   const underSym = unit?.symbol ?? "the asset underneath";
   const ratioAfter = readingCollateralisationRaw(
     { collateralRaw: state.collateralRaw, debtRaw: state.debtRaw, sharePriceRaw: state.sharePriceRaw ?? null },
     unit?.decimals ?? null,
   );
   const ratioBefore = before ? readingCollateralisationRaw(before, unit?.decimals ?? null) : null;
+  const ltvAfter = ltvOfCollateralization(ratioAfter);
+  const ltvBefore = ltvOfCollateralization(ratioBefore);
   const ratioStat: ChainTruthStat | null =
-    ratioAfter != null && unit && state.collateralRaw != null && state.debtRaw != null && state.sharePriceRaw
+    ltvAfter != null && unit && state.collateralRaw != null && state.debtRaw != null && state.sharePriceRaw
       ? {
-          label: "Collateralisation",
-          value: String(Number(ratioAfter) / 1e16),
+          label: "LTV",
+          value: String(ltvAfter * 100),
           symbol: "",
-          display: gridRatio(ratioAfter),
+          display: ltvPrint(ltvAfter),
           changed: ratioBefore == null || ratioBefore !== ratioAfter,
-          prov: readingCollateralisationProv(
+          prov: readingLtvProv(
             state.collateralRaw,
             state.sharePriceRaw,
             state.debtRaw,
@@ -266,19 +252,19 @@ export function useAlchemixReadingCells({
             coords,
           ),
           transition:
-            ratioBefore != null &&
+            ltvBefore != null &&
             before &&
             before.collateralRaw != null &&
             before.debtRaw != null &&
             before.sharePriceRaw != null &&
             ratioBefore !== ratioAfter
               ? (() => {
-                  const pts = (Number(ratioAfter) - Number(ratioBefore)) / 1e16;
+                  const pts = (ltvAfter - ltvBefore) * 100;
                   const change = `${pts >= 0 ? "+" : "−"}${Math.abs(pts).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
                   return {
-                    before: gridRatio(ratioBefore),
-                    beforeExact: String(Number(ratioBefore) / 1e16),
-                    beforeProv: readingCollateralisationProv(
+                    before: ltvPrint(ltvBefore),
+                    beforeExact: String(ltvBefore * 100),
+                    beforeProv: readingLtvProv(
                       before.collateralRaw!,
                       before.sharePriceRaw!,
                       before.debtRaw!,
@@ -290,7 +276,7 @@ export function useAlchemixReadingCells({
                     ),
                     change,
                     changeExact: `${pts >= 0 ? "+" : "−"}${Math.abs(pts)}`,
-                    changeProv: readingChangeProv("Collateralisation", "%", before.blockNumber, atBlock, coords),
+                    changeProv: readingChangeProv("LTV", "%", before.blockNumber, atBlock, coords),
                   } satisfies ChainTruthTransition;
                 })()
               : undefined,
@@ -313,13 +299,13 @@ export function useAlchemixReadingCells({
       {
         content: (
           <>
-            minimum{" "}
+            max{" "}
             <Prov info={lineRatioProv("minimumCollateralization", ratios.minimumRaw, ratios.asOfBlock, coords)}>
-              {ratioPct(ratios.minimumRaw)}
+              {ltvPct(ratios.minimumRaw)}
             </Prov>
-            {" · "}liquidation at{" "}
+            {" · "}liquidation threshold{" "}
             <Prov info={lineRatioProv("collateralizationLowerBound", ratios.lowerBoundRaw, ratios.asOfBlock, coords)}>
-              {ratioPct(ratios.lowerBoundRaw)}
+              {ltvPct(ratios.lowerBoundRaw)}
             </Prov>
             , read at <BlockRef block={ratios.asOfBlock} />
           </>
@@ -329,7 +315,7 @@ export function useAlchemixReadingCells({
   const cells = [
     cell(axis("Debt", state.debtRaw, syntheticSymbol, before?.debtRaw), "debt"),
     cell(axis("Collateral", state.collateralRaw, mytSymbol, before?.collateralRaw), "collateral"),
-    cell(axis("Set aside for repayment", state.earmarkedRaw, syntheticSymbol, before?.earmarkedRaw), "set-aside"),
+    cell(axis("Earmarked", state.earmarkedRaw, syntheticSymbol, before?.earmarkedRaw), "earmarked"),
     ratioCell,
   ].filter((c): c is EventCellSpec => c != null);
 

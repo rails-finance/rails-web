@@ -1,13 +1,12 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { useIsHome } from "@/hooks/useIsHome";
 
 import { HomeBrand } from "@/components/nav/home-brand";
 import { ProfileMenu } from "@/components/nav/profile-menu";
 import { SearchLauncher, useSlashToSearch } from "@/components/shared/front-door-search";
 
 export function HeaderBar() {
-  const pathname = usePathname();
   // `/` reaches the search from every page; the bar is mounted on all of them.
   useSlashToSearch();
 
@@ -16,7 +15,7 @@ export function HeaderBar() {
   // instead of stacking above it — otherwise the body background shows through
   // the header strip and breaks the gradient. HomeHero's top padding reserves
   // the room. The chrome is the same on every page (ui-jobs 498).
-  const isHome = pathname === "/";
+  const isHome = useIsHome();
 
   return (
     <header
@@ -33,14 +32,16 @@ export function HeaderBar() {
             ui-jobs 514); the panel's top row draws its open glyph in the same
             place, closing it. Centre: the Rails mark and name, a link home, on
             every page but home, whose hero carries them.
-            Right: H20 alone, the theme switch and the way into /start being in
-            its menu. Below md the beta pill is in the footer
+            Right: H20, with the inspector indicator (H7.4) left of it
+            while the inspector is armed on a page with a traced value
+            (ui-jobs 651); the way into /start is in its menu, the theme
+            switch at the wallet panel's foot. Below md the beta pill is in the footer
             (components/nav/phone-beta.tsx). */}
         <div className="justify-self-start">
           <SearchLauncher placement="header" />
         </div>
         {isHome ? <span /> : <HomeBrand />}
-        <div className="flex items-center justify-self-end" data-header-cluster="">
+        <div className="flex items-center gap-2 justify-self-end" data-header-cluster="">
           <ProfileMenu />
         </div>
       </div>

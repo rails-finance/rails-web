@@ -125,10 +125,48 @@ const LEGACY_EXPLORER_PATHS: [string, string][] = [
   ["/morpho-arbitrum", "/arbitrum/morpho"],
   // Compound V3 on Arbitrum never had a pre-0016 path; the row is for check:routes.
   ["/compound-v3-arbitrum", "/arbitrum/compound-v3"],
+  // Compound V3 on Optimism never had a pre-0016 path; the row is for check:routes.
+  ["/compound-v3-optimism", "/optimism/compound-v3"],
   // CoW never had a pre-0016 path; the row is for check:routes.
   ["/cow", "/ethereum/cow"],
   // Pendle never had a pre-0016 path; the row is for check:routes.
   ["/pendle", "/ethereum/pendle"],
+  // Uniswap never had a pre-0016 path; the rows are for check:routes.
+  ["/uniswap-v3", "/ethereum/uniswap-v3"],
+  ["/uniswap-v4", "/ethereum/uniswap-v4"],
+  // Aerodrome never had a pre-0016 path; the row is for check:routes.
+  ["/aerodrome", "/base/aerodrome"],
+  // Nor Velodrome (ui-jobs 578).
+  ["/velodrome", "/optimism/velodrome"],
+  // Uniswap on Base and Arbitrum and PancakeSwap V3 never had pre-0016 paths;
+  // the rows, keyed by roster id, are for check:routes.
+  ["/uniswap-v3-base", "/base/uniswap-v3"],
+  ["/uniswap-v3-arbitrum", "/arbitrum/uniswap-v3"],
+  ["/uniswap-v4-arbitrum", "/arbitrum/uniswap-v4"],
+  ["/uniswap-v3-optimism", "/optimism/uniswap-v3"],
+  ["/uniswap-v4-optimism", "/optimism/uniswap-v4"],
+  ["/pancakeswap-v3-base", "/base/pancakeswap-v3"],
+  ["/pancakeswap-v3-arbitrum", "/arbitrum/pancakeswap-v3"],
+  ["/uniswap-v3-arc", "/arc/uniswap-v3"],
+  ["/uniswap-v4-arc", "/arc/uniswap-v4"],
+  // Lido never had a pre-0016 path; the row is for check:routes.
+  ["/lido", "/ethereum/lido"],
+  // Fluid on Base never had a pre-0016 path; the row is for check:routes.
+  ["/fluid-base", "/base/fluid"],
+  // Morpho Blue on Arc never had a pre-0016 path; the row is for check:routes.
+  ["/morpho-arc", "/arc/morpho"],
+  // Morpho Blue on Optimism never had a pre-0016 path; the row is for check:routes.
+  ["/morpho-optimism", "/optimism/morpho"],
+  // Aave V4 on Arc never had a pre-0016 path; the row is for check:routes.
+  ["/aave-v4-arc", "/arc/aave-v4"],
+  // Aave V3 on Optimism never had a pre-0016 path; the row is for check:routes.
+  ["/aave-v3-optimism", "/optimism/aave-v3"],
+  // Euler V2 never had a pre-0016 path; the rows are for check:routes.
+  ["/euler-v2-base", "/base/euler-v2"],
+  ["/euler-v2-arbitrum", "/arbitrum/euler-v2"],
+  // Balancer V3 never had a pre-0016 path; the row is for check:routes.
+  ["/balancer-v3", "/ethereum/balancer-v3"],
+  ["/balancer-v3-arbitrum", "/arbitrum/balancer-v3"],
   // Polaris never had a pre-0016 path; the row exists because check:routes
   // wants every explorer forwarded from its bare slug, and a bare /polaris is
   // the address anyone will guess.
@@ -142,6 +180,15 @@ const LEGACY_EXPLORER_PATHS: [string, string][] = [
   // Polaris's does, and a bare /yearn is unambiguous — one Yearn door, and V3
   // is the only version covered.
   ["/yearn", "/ethereum/yearn"],
+  // A roster segment moved to `markets` (rails-ops decision 0059 point 8): the
+  // market page and its reserve pages, query strings kept (`?market=core`).
+  ["/ethereum/aave-v3/market", "/ethereum/aave-v3/markets"],
+  ["/base/aave-v3/market", "/base/aave-v3/markets"],
+  ["/ethereum/spark/market", "/ethereum/spark/markets"],
+  ["/base/seamless/market", "/base/seamless/markets"],
+  ["/ethereum/aave-v4/market", "/ethereum/aave-v4/markets"],
+  ["/base/aave-v4/market", "/base/aave-v4/markets"],
+  ["/base/compound-v3/market", "/base/compound-v3/markets"],
 ];
 
 /** The deployed commit's date, for the sitemap's `lastmod`
@@ -163,13 +210,6 @@ const nextConfig: NextConfig = {
   // `next dev` would otherwise write an AGENTS.md into the repo; this repo
   // keeps only CLAUDE.md and README.md as prose (rails-ops decision 0004).
   agentRules: false,
-  // Next 15.5.7 dev: webpack reports framer-motion's server vendor chunk as
-  // compiled but never writes `.next/server/vendor-chunks/framer-motion@….js`,
-  // so any route that SSRs a framer-motion component 500s with
-  // "Cannot find module './vendor-chunks/framer-motion…'". Transpiling it bundles
-  // framer-motion into each route's own chunks instead of the vendor-chunk split,
-  // sidestepping the unwritten-chunk bug. (Drop once on a Next that emits it.)
-  transpilePackages: ["framer-motion"],
   experimental: {
     // Compile in a child process. Next turns the build worker off by default
     // when a config has a `webpack` function (the YAML loader below), so
@@ -216,6 +256,16 @@ const nextConfig: NextConfig = {
       fallback: [],
     };
   },
+  // rails-ops decision 0060: another site learns the origin, never the path
+  // (Rails URLs carry wallet addresses).
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [{ key: "Referrer-Policy", value: "strict-origin-when-cross-origin" }],
+      },
+    ];
+  },
   async redirects() {
     return [
       // Legacy explorer paths — collapsed to a single hop to the new canonical
@@ -235,6 +285,20 @@ const nextConfig: NextConfig = {
         source: "/explorer",
         destination: "/",
         permanent: true,
+      },
+      // The saved items page moved from /bookmarks (ui-jobs 652); a `?tab=`
+      // query rides along.
+      {
+        source: "/bookmarks",
+        destination: "/saved-views",
+        permanent: true,
+      },
+      // Status is one page per chain, as coverage is; the bare path opens
+      // Ethereum's (rails-ops ui-jobs 583).
+      {
+        source: "/status",
+        destination: "/status/ethereum",
+        permanent: false,
       },
       // Coverage is one page per chain; the bare path opens Ethereum's.
       // Temporary, so a chain chooser can take /coverage later.
@@ -322,14 +386,6 @@ const nextConfig: NextConfig = {
         destination: "/about",
         permanent: true,
       },
-      // Compound V3's Ethereum markets page is /markets; Base's is /market
-      // (the Base roster's own tab). The plural lands on it rather than on the
-      // wallet route, which would read "markets" as an address.
-      {
-        source: "/base/compound-v3/markets",
-        destination: "/base/compound-v3/market",
-        permanent: false,
-      },
       // An f(x) position sits at /ethereum/fx/<pool>-<id>; a /positions/
       // segment in front of the slug (the shape other explorers use) lands
       // on it.
@@ -362,6 +418,9 @@ const nextConfig: NextConfig = {
       // here because Next's `redirects` matcher is case-insensitive — a
       // `source: "/aave-v4/spoke/Main/:wallet"` rule would also catch the
       // canonical lowercase `main` and self-loop.
+      // Alchemix's overview page took the docs' word, markets, on 12 Nov 2026.
+      { source: "/ethereum/alchemix/lines", destination: "/ethereum/alchemix/markets", permanent: true },
+      { source: "/base/alchemix/lines", destination: "/base/alchemix/markets", permanent: true },
     ];
   },
 };

@@ -1,6 +1,8 @@
 import type { LearnMoreContent, LearnMoreLink } from "@/components/shared/learn-more-modal";
+import { aaveFamilyTerms } from "@/lib/aave-family/terms";
 import { SEAMLESS_DOCS_URL } from "@/lib/aave-v3/protocol-name";
 import { FAQ_URLS, AAVE_FAQ_URLS } from "@/lib/shared/faq-urls";
+import { fmtMaxLtv, LIQUITY_FAMILY_TERMS, type LiquityFamilyTerms } from "@/lib/liquity/ltv";
 import type { VaultPositionFamily } from "@/lib/aave-vaults/vault-position";
 import { indefiniteArticle, viewWord } from "@/lib/utils/format";
 
@@ -151,6 +153,33 @@ export function lifetimeFlowsStackContent(opts: {
 
 // ── CoW ─────────────────────────────────────────────────────────────
 
+// ── Liquity family — what a branch's shutdown changes (ui-jobs 612) ────────
+//
+// In Liquity V2's docs' terms ("What is Shutdown Mode?": interest stops
+// accruing, standard redemptions skip the branch, a shutdown redemption pays a
+// collateral bonus). General, so every family's modal carries it whether or not
+// a branch is shut down (modal grammar §1). The Trove modals hold five Key
+// concepts (modal grammar §4), so there it is one sentence of "Branch scoping"
+// (`liquityShutdownSentence`); the redemption and flows modals carry it as a
+// concept of its own.
+export function liquityShutdownSentence(terms: Pick<LiquityFamilyTerms, "branch" | "shutdownBonus">): string {
+  const bonus = terms.shutdownBonus ? `a ${terms.shutdownBonus} bonus` : "a bonus";
+  return `A shut-down ${terms.branch} stops borrowing, adjustments and interest; standard redemptions skip it, and a shutdown redemption takes collateral at ${bonus}.`;
+}
+
+export function liquityShutdownConcept(
+  terms: Pick<LiquityFamilyTerms, "branch" | "shutdownBonus">,
+  surface: "redemption" | "flows",
+): { bold: string; text: string } {
+  const branch = terms.branch;
+  const bonus = terms.shutdownBonus ? `a ${terms.shutdownBonus} bonus` : "a bonus";
+  const text =
+    surface === "redemption"
+      ? `standard redemptions skip a shut-down ${branch}. A shutdown redemption takes its collateral at ${bonus} to the redeemer, from the Troves the redeemer picks.`
+      : `a Trove's interest stops accruing when its ${branch} shuts down.`;
+  return { bold: "Branch shutdown", text };
+}
+
 // ── Liquity — Live position panel (the trove summary's "?" FAQ) ──────────────
 //
 // Panel-scoped FAQ for the live trove position card. It consolidates the
@@ -166,19 +195,20 @@ export function liquityPositionContent(opts: {
   isBatched?: boolean;
 }): LearnMoreContent {
   const { collateralType, status, isBatched } = opts;
-  const isETH = collateralType === "WETH" || collateralType === "ETH";
-  const minCR = isETH ? "110%" : "120%";
+  // The docs state a Trove's risk as LTV against the branch's Max LTV
+  // (decision 0065): 1 ÷ the branch's MCR.
+  const maxLtv = fmtMaxLtv(collateralType) ?? "the branch's Max LTV";
 
   if (status === "liquidated") {
     return {
       title: "About this position",
       intro:
-        "This trove was liquidated when its collateral ratio fell below the minimum threshold. The panel above reconstructs its final state: peak debt, collateral, and how long it stayed open.",
+        "This trove was liquidated when its LTV rose above the Max LTV. The panel above reconstructs its final state: peak debt, collateral, and how long it stayed open.",
       detailsHeading: "Key concepts:",
       details: [
         {
-          bold: "Liquidation threshold",
-          text: `a trove is liquidated once its collateral ratio drops below ${minCR} for ${collateralType}. Anyone can trigger the liquidation.`,
+          bold: "Max LTV",
+          text: `a trove is liquidated once its LTV rises above ${maxLtv} for ${collateralType}. Anyone can trigger the liquidation.`,
         },
         {
           bold: "Trove NFT",
@@ -218,14 +248,14 @@ export function liquityPositionContent(opts: {
   // Open trove — the live, interactive case.
   const details: LearnMoreContent["details"] = [
     {
-      bold: "Collateral ratio",
-      text: `the collateral's USD value relative to the debt. It must stay above ${minCR} for ${collateralType} or the trove can be liquidated.`,
+      bold: "LTV",
+      text: `the debt relative to the collateral's USD value. It must stay below ${maxLtv} for ${collateralType} or the trove can be liquidated.`,
     },
   ];
   if (isBatched) {
     details.push({
       bold: "Interest delegation",
-      text: "a batch manager sets this trove's rate and charges a management fee on top of the interest, both accruing to the debt.",
+      text: "a delegate sets this trove's rate and charges a management fee on top of the interest, both accruing to the debt.",
     });
   } else {
     details.push({
@@ -240,7 +270,7 @@ export function liquityPositionContent(opts: {
     },
     {
       bold: "Branch scoping",
-      text: `each collateral type is its own branch with its own redemption queue. A redemption is split across branches in proportion to each branch's unbacked debt, so the queue this trove stands in is the ${collateralType} branch's own.`,
+      text: `each collateral type is its own branch with its own redemption queue. A redemption is split across branches in proportion to each branch's unbacked debt, so the queue this trove stands in is the ${collateralType} branch's own. ${liquityShutdownSentence(LIQUITY_FAMILY_TERMS["liquity-v2"])}`,
     },
     {
       bold: "Trove NFT",
@@ -249,7 +279,7 @@ export function liquityPositionContent(opts: {
   );
 
   const links: LearnMoreContent["links"] = [
-    { label: "How do I decide on my collateral ratio?", url: FAQ_URLS.LTV_COLLATERAL_RATIO },
+    { label: "How do I decide on my LTV?", url: FAQ_URLS.LTV_COLLATERAL_RATIO },
   ];
   if (isBatched) {
     links.push({ label: "What is interest-rate delegation?", url: FAQ_URLS.DELEGATION });
@@ -286,11 +316,11 @@ export function liquityLifetimeFlowsContent(opts: { isBatched?: boolean } = {}):
       {
         bold: "Carrying cost",
         text: opts.isBatched
-          ? "the interest plus the delegate's management fee that accrue to the debt each day and year."
-          : "the interest that accrues to the debt each day and year at the trove's chosen rate.",
+          ? "the interest plus the delegate's management fee that accrue to the debt each day and year; it stops if the branch shuts down."
+          : "the interest that accrues to the debt each day and year at the trove's chosen rate; it stops if the branch shuts down.",
       },
       {
-        bold: "Upfront fee",
+        bold: "Upfront Borrowing Fee",
         text: "a one-time borrowing fee taken when debt is drawn, equivalent to about 7 days of average interest.",
       },
       {
@@ -340,7 +370,7 @@ export function aaveV4EconomicsContent(
   const details: LearnMoreContent["details"] = [
     {
       bold: "Collateral tower",
-      text: `what was deposited${has.supplyInterest ? " plus the interest it earned" : ""}, set against what left: withdrawals${has.liquidations ? " and collateral seized in liquidations" : ""}. What remains is the collateral held today.`,
+      text: `what was supplied${has.supplyInterest ? " plus the interest it earned" : ""}, set against what left: withdrawals${has.liquidations ? " and collateral seized in liquidations" : ""}. What remains is the collateral held today.`,
     },
     {
       bold: "Debt tower",
@@ -666,7 +696,7 @@ const FX_DOC_URL = "https://fxprotocol.gitbook.io/fx-docs";
 export function fxOperateContent(kind: "open" | "reopen" | "adjust" | "close"): LearnMoreContent {
   const intro =
     kind === "open" || kind === "reopen"
-      ? "Opening a position deposits collateral into one of f(x)'s pools (wstETH or WBTC) and mints fxUSD debt against it, creating a leveraged long held as an ERC-721 position NFT."
+      ? "Opening a position deposits collateral into one of f(x)'s pools (wstETH or WBTC) and mints fxUSD debt against it, as a position held as an ERC-721 NFT."
       : kind === "close"
         ? "Closing repays the position's remaining fxUSD debt and withdraws its collateral, emptying the position. The final repay amount settles whatever the debt really was at that block, including every socialized adjustment accrued since the last touch."
         : "Adjusting moves a position's collateral and/or fxUSD debt in one operation: deposits, withdrawals, borrows and repays are one call to the pool manager with a signed amount for each side.";
@@ -693,7 +723,7 @@ export function fxOperateContent(kind: "open" | "reopen" | "adjust" | "close"): 
       },
       {
         bold: "Funding costs",
-        text: "leverage is financed through Aave: the pool passes Aave's borrow rate through as a continuous funding charge on collateral, with no per-position event. It simply shows up in the settled reading.",
+        text: "charged on every position's collateral with no event, at Aave's USDC borrow rate while the Stability Pool is short of USDC (f(x)'s docs), 0% otherwise.",
       },
       {
         bold: "Two unit systems",
@@ -711,12 +741,12 @@ export function fxLiquidationContent(expenseRatio?: number | null): LearnMoreCon
   return {
     title: "How liquidations & rebalances work",
     intro:
-      "f(x) positions sit in ticks: buckets of positions with nearly the same debt ratio. When a tick's debt ratio reaches the pool's rebalance line, a keeper can rebalance it; when it reaches the higher liquidation line, a keeper can liquidate. The pool judges both at the oracle's min price, which is at or below the anchor price the rows' ratios are read at. Keepers are any address that calls the manager; they are paid by the bonus. Since March 2025 a liquidation runs from the pool's top tick down, and the manager logs one event for the whole run; a rebalance can target one tick or run the same way.",
+      "f(x) positions sit in ticks: buckets of positions with nearly the same LTV. When a tick's LTV reaches the pool's rebalance line, a keeper can rebalance it; when it reaches the higher liquidation line, a keeper can liquidate. The pool judges both at the oracle's min price, which is at or below the anchor price the rows' ratios are read at. Keepers are any address that calls the manager; they are paid by the bounty. Since March 2025 a liquidation runs from the pool's top tick down, and the manager logs one event for the whole run; a rebalance can target one tick or run the same way.",
     extraParagraphs: [
-      "A rebalance repays part of the tick's fxUSD debt and takes collateral worth that debt plus the rebalance bonus, bringing the tick back to the rebalance line. Every position in the tick loses collateral and debt in proportion and stays open. The position has no event of its own for it; the timeline places the rebalance on its history and reads the position before and after.",
-      "A liquidation repays the position's debt and takes collateral worth it plus the liquidation bonus. Collateral beyond that stays in the position for the owner. When the collateral cannot cover the debt and the bonus, the liquidator takes all of it, and the debt it did not cover is added to every other position in the pool through the pool's debt index.",
-      `Of each bonus the protocol keeps a share${expenseRatio != null ? `, ${Math.round(expenseRatio * 100)}% at the latest read` : ""}, so the collateral the keeper receives is less than what the position lost. The owner keeps the fxUSD they borrowed.`,
-      "A redemption is the third way a position changes without its owner: anyone may pay fxUSD into the manager for collateral at the oracle's max price, taken from the highest-ratio ticks first, at most 20% of a tick per pass. Today the manager opens it only while fxUSD trades below its peg; six redemptions have run, all on the wstETH pool in March 2025.",
+      "A rebalance repays part of the tick's fxUSD debt and takes collateral worth that debt plus the rebalance bounty, bringing the tick back to the rebalance line. Every position in the tick loses collateral and debt in proportion and stays open. The position has no event of its own for it; the timeline places the rebalance on its history and reads the position before and after.",
+      "A liquidation repays the position's debt and takes collateral worth it plus the liquidation bounty. Collateral beyond that stays in the position for the owner. When the collateral cannot cover the debt and the bounty, the liquidator takes all of it, and the debt it did not cover is added to every other position in the pool through the pool's debt index.",
+      `Of each bounty the protocol keeps a share${expenseRatio != null ? `, ${Math.round(expenseRatio * 100)}% at the latest read` : ""}, so the collateral the keeper receives is less than what the position lost. The owner keeps the fxUSD they borrowed.`,
+      "A redemption is the third way a position changes without its owner: anyone may pay fxUSD into the manager for collateral at the oracle's max price, taken from the highest-ratio ticks first, at most 20% of each position's debt at a time. Today the manager opens it only while fxUSD trades below its peg; six redemptions have run, all on the wstETH pool in March 2025.",
     ],
     links: [{ label: "f(x) docs", url: FX_DOC_URL }],
   };
@@ -739,12 +769,12 @@ export function fxEventFallbackContent(): LearnMoreContent {
   return {
     title: "How f(x) positions work",
     intro:
-      "f(x) V2 splits yield-bearing collateral into fxUSD (a stable token) and leveraged long positions. A position deposits wstETH or WBTC, mints fxUSD against it, and pays a funding rate that follows Aave's borrow rate.",
+      "f(x) V2 lends fxUSD (a stablecoin) against wstETH or WBTC. A position mints fxUSD against its collateral; the docs call a leveraged one an xPOSITION and a plain loan fxMINT. By f(x)'s docs, a position pays funding at Aave's USDC borrow rate while the Stability Pool is short of USDC.",
     detailsHeading: "Key concepts:",
     details: [
       {
         bold: "The tick tree",
-        text: "positions are grouped by debt ratio into ticks; protocol-level rebalances and redemptions operate on whole ticks at once, socializing the adjustment across every position inside.",
+        text: "positions are grouped by LTV into ticks; protocol-level rebalances and redemptions operate on whole ticks at once, socializing the adjustment across every position inside.",
       },
       {
         bold: "Settled state",
@@ -765,7 +795,7 @@ export function fxEventFallbackContent(): LearnMoreContent {
 const MORPHO_DOC_URLS = {
   OVERVIEW: "https://docs.morpho.org/",
   MARKET: "https://docs.morpho.org/learn/concepts/market/",
-  VAULT: "https://docs.morpho.org/learn/concepts/vault/",
+  VAULT: "https://docs.morpho.org/curate/concepts/roles/#morpho-vaults-v1-roles",
 } as const;
 
 // ── Fluid (Instadapp) ─────────────────────────────────────────────────────────
@@ -776,6 +806,7 @@ const MORPHO_DOC_URLS = {
 // settlement views, and these explainers say why that is trustworthy.
 
 const FLUID_DOC_URL = "https://docs.fluid.io";
+const FLUID_GUIDES_TERMS_URL = "https://fluid.guides.instadapp.io/vault-protocol/protocol-details";
 
 export function fluidOperateContent(kind: "deposit" | "borrow" | "composite"): LearnMoreContent {
   const intro =
@@ -800,7 +831,7 @@ export function fluidOperateContent(kind: "deposit" | "borrow" | "composite"): L
       },
       {
         bold: "Signed deltas, one event",
-        text: "LogOperate(user, nftId, colAmt, debtAmt, to) is the only action event: positive amounts deposit/borrow, negative amounts withdraw/repay; either leg can be zero.",
+        text: "the vault's LogOperate(user, nftId, colAmt, debtAmt, to) is the only action event: positive amounts deposit/borrow, negative amounts withdraw/repay; either leg can be zero. The LogOperate in Fluid's docs is the Liquidity Layer's event, which has a different signature.",
       },
       {
         bold: "Interest accrues between events",
@@ -815,7 +846,7 @@ export function fluidLiquidationContent(absorbed: boolean): LearnMoreContent {
   return {
     title: absorbed ? "How absorption works" : "How Fluid liquidations work",
     intro: absorbed
-      ? "When a position sinks past the vault's maximum liquidation limit, the vault takes over its remaining debt and collateral, leaving the position empty. No event of the position's own records it."
+      ? "When a position passes the vault's liquidation max limit, 100% of it gets liquidated: the protocol absorbs its collateral and settles its debt, leaving the position empty. No event of the position's own records it."
       : "When a position's debt grows too large against its collateral, a liquidator repays part of the debt and takes collateral worth a little more in return. Fluid does this for a whole price band of positions at once, so the on-chain event names no single position.",
     detailsHeading: "Key concepts:",
     details: [
@@ -829,10 +860,13 @@ export function fluidLiquidationContent(absorbed: boolean): LearnMoreContent {
       },
       {
         bold: "Partial by design",
-        text: "a swept position usually keeps most of its collateral and debt. Fluid liquidates only enough to restore the band's health, so 'liquidated' rarely means emptied. A fully liquidated position is flagged explicitly.",
+        text: "a swept position usually keeps most of its collateral and debt. Fluid liquidates only what brings the band back to its liquidation threshold, so 'liquidated' rarely means emptied. A fully liquidated position is flagged explicitly.",
       },
     ],
-    links: [{ label: "Fluid docs", url: FLUID_DOC_URL }],
+    links: [
+      { label: "Fluid docs", url: FLUID_DOC_URL },
+      { label: "Fluid guides: Protocol Details", url: FLUID_GUIDES_TERMS_URL },
+    ],
   };
 }
 
@@ -1026,6 +1060,9 @@ export interface LiquityForkLearnMoreParams {
   minDebt?: number;
   /** One live-verified link (site or docs root) — the fallback below. */
   docsLink?: { label: string; url: string };
+  /** The deployment's documented terms (decision 0065): the ratio, its
+   *  limit, the delegate. */
+  terms: LiquityFamilyTerms;
   /** Question-level docs links, keyed by the card topic that wants them. */
   docsByTopic?: {
     trove?: { label: string; url: string }[];
@@ -1048,12 +1085,22 @@ const forkLinks = (
   return p.docsLink ? [p.docsLink] : undefined;
 };
 
+/** The fee drawing debt adds, in a sentence: the docs' name, and how much it
+ *  is where the name does not say. */
+const forkFeePhrase = (t: LiquityFamilyTerms, what: "a" | "the same") => {
+  const art = what === "the same" ? "the same" : indefiniteArticle(t.upfrontFeeText).toLowerCase();
+  return /^7-day/.test(t.upfrontFeeText)
+    ? `${art} ${t.upfrontFeeText}`
+    : `${art} ${t.upfrontFeeText} (a week of average branch interest)`;
+};
+
 export function liquityForkBorrowingContent(
   p: LiquityForkLearnMoreParams,
   eventType: "openTrove" | "adjustTrove" | "closeTrove" = "adjustTrove",
 ): LearnMoreContent {
   const Art = indefiniteArticle(p.protocolName);
   const art = Art === "An" ? "an" : "a";
+  const t = p.terms;
 
   if (eventType === "openTrove") {
     return {
@@ -1061,9 +1108,11 @@ export function liquityForkBorrowingContent(
       intro: `${Art} ${p.protocolName} Trove holds one branch's collateral and mints ${p.stablecoin} against it, at an interest rate the borrower sets themselves: the Liquity V2 architecture. Interest accrues continuously into the debt from the moment the Trove opens.`,
       stepsHeading: "The mechanics:",
       steps: [
-        "Each collateral branch is its own market with its own minimum collateral ratio; below it, anyone can liquidate the Trove.",
-        `The chosen interest rate is also the Trove's place in the redemption queue: redemptions sweep the LOWEST rates first, so a higher rate buys ${p.stablecoin} peg protection at a carrying cost.`,
-        `Drawing ${p.stablecoin} pays an upfront fee (a week of average branch interest) added to the debt, and a fixed liquidation reserve is set aside apart from the collateral.`,
+        t.ltv
+          ? "Each collateral branch is its own market with its own Max LTV; above it, anyone can liquidate the Trove."
+          : `Each collateral branch is its own market with its own ${t.limitText}; below it, anyone can liquidate the Trove.`,
+        `The chosen interest rate is also the Trove's place in the redemption queue: redemptions sweep the lowest rates first, so a higher rate buys ${p.stablecoin} peg protection at a carrying cost.`,
+        `Drawing ${p.stablecoin} pays ${forkFeePhrase(t, "a")} added to the debt, and a fixed liquidation reserve is set aside apart from the collateral.`,
       ],
       links: forkLinks(p, "open"),
     };
@@ -1088,8 +1137,10 @@ export function liquityForkBorrowingContent(
     intro: `An adjustment changes ${art} ${p.protocolName} Trove's collateral or debt without closing it: adding or withdrawing collateral, drawing more ${p.stablecoin}, or repaying some of what's owed.`,
     stepsHeading: "The mechanics:",
     steps: [
-      "The collateral ratio moves with whichever side changed; it must stay above the branch's minimum or the adjustment reverts.",
-      `Drawing new ${p.stablecoin} pays the same upfront fee opening one does (a week of average branch interest); repaying does not.`,
+      t.ltv
+        ? "The LTV moves with whichever side changed; it must stay below the branch's Max LTV or the adjustment reverts."
+        : `The ${t.ratioText} moves with whichever side changed; it must stay above the branch's ${t.limitText} or the adjustment reverts.`,
+      `Drawing new ${p.stablecoin} pays ${forkFeePhrase(t, "the same")} opening one does; repaying does not.`,
       "The interest rate itself is untouched by an adjustment. Changing it is its own, separate action.",
     ],
     links: forkLinks(p, "adjust"),
@@ -1110,16 +1161,37 @@ export function liquityForkRateContent(p: LiquityForkLearnMoreParams): LearnMore
   };
 }
 
-export function liquityForkRedemptionContent(p: LiquityForkLearnMoreParams): LearnMoreContent {
+/** `urgent`: the modal as an urgent-path event shows it (a redemption on a
+ *  shut-down branch, lib/liquity-fork/shutdown.ts `redemptionPath`): the rate
+ *  queue's routing and the dormant queue go, the exchange carries the bonus,
+ *  and the ratio's direction is left to the event's own figures (a bonus b
+ *  raises the ratio only above a collateral ratio of 1 + b). */
+export function liquityForkRedemptionContent(p: LiquityForkLearnMoreParams, urgent = false): LearnMoreContent {
+  if (urgent)
+    return {
+      title: "How redemptions work",
+      intro: `Any ${p.stablecoin} holder can redeem it against the system at $1 face value, the peg mechanism.`,
+      stepsHeading: "What happens to a redeemed Trove:",
+      steps: [
+        p.terms.shutdownBonus
+          ? `It gives up collateral worth the debt cancelled plus the ${p.terms.shutdownBonus} bonus, at the branch oracle price.`
+          : "It gives up collateral worth the debt cancelled plus a bonus, at the branch oracle price.",
+      ],
+      detailsHeading: "Key concepts:",
+      details: [liquityShutdownConcept(p.terms, "redemption")],
+      links: forkLinks(p, "redemption"),
+    };
   return {
     title: "How redemptions work",
-    intro: `Any ${p.stablecoin} holder can redeem it against the system at $1 face value, the peg mechanism. Redemptions are routed across branches by their unbacked portions and, within a branch, sweep the LOWEST user-set interest rates first (not the lowest collateral ratio, the V1 difference).`,
+    intro: `Any ${p.stablecoin} holder can redeem it against the system at $1 face value, the peg mechanism. Redemptions are routed across branches by their unbacked portions and, within a branch, sweep the lowest user-set interest rates first.`,
     stepsHeading: "What happens to a redeemed Trove:",
     steps: [
       "It gives up collateral at the branch oracle price and sheds the same value of debt. Net value is preserved.",
-      "Its collateral ratio RISES as a result.",
-      `A partial redemption that leaves the Trove below the minimum debt makes it dormant (Zombie in the contracts) and takes it out of the rate-ordered queue. The branch's most recent dormant Trove with debt left is redeemed first.`,
+      p.terms.ltv ? "Its LTV falls." : `Its ${p.terms.ratioText} rises.`,
+      `A partial redemption that leaves the Trove below the minimum debt makes it ${p.terms.dormantText}${p.terms.dormant === "Zombie" ? "" : " (Zombie in the contracts)"} and takes it out of the rate-ordered queue. The branch's most recent ${p.terms.dormantNoun} with debt left is redeemed first.`,
     ],
+    detailsHeading: "Key concepts:",
+    details: [liquityShutdownConcept(p.terms, "redemption")],
     links: forkLinks(p, "redemption"),
   };
 }
@@ -1127,13 +1199,13 @@ export function liquityForkRedemptionContent(p: LiquityForkLearnMoreParams): Lea
 export function liquityForkLiquidationContent(p: LiquityForkLearnMoreParams): LearnMoreContent {
   return {
     title: "How liquidations work",
-    intro: `A Trove whose collateral ratio falls below its branch minimum (at the branch's oracle price) can be liquidated by anyone. The debt is absorbed by the branch's Stability Pool (${p.stablecoin} deposits), or redistributed to the branch's other Troves when the pool runs short.`,
+    intro: `A Trove whose ${p.terms.ltv ? "LTV rises above its branch's Max LTV" : `${p.terms.ratioText} falls below its branch ${p.terms.limitText}`} (at the branch's oracle price) can be liquidated by anyone. The debt is absorbed by the branch's Stability Pool (${p.stablecoin} deposits), or redistributed to the branch's other Troves when the pool runs short.`,
     stepsHeading: "The mechanics:",
     steps: [
       "Liquidation closes the whole Trove: collateral is seized, debt cleared.",
-      "Stability Pool depositors buy the collateral at a discount; redistributed portions land on other Troves as pending gains (collateral AND debt), settled on their next touch.",
+      "Stability Pool depositors buy the collateral at a discount; redistributed portions land on other Troves as pending gains (collateral and debt), settled on their next touch.",
       "The Stability Pool and the other Troves take collateral worth at most the debt plus the branch's liquidation penalty. Any collateral above that is the owner's surplus, credited to them in the branch's CollSurplusPool to claim.",
-      "Each branch sets its own minimum ratio, so the same price move can liquidate one branch's Troves and not another's.",
+      `Each branch sets its own ${p.terms.limitShort}, so the same price move can liquidate one branch's Troves and not another's.`,
     ],
     links: forkLinks(p, "liquidation"),
   };
@@ -1142,10 +1214,10 @@ export function liquityForkLiquidationContent(p: LiquityForkLearnMoreParams): Le
 export function liquityForkBatchContent(p: LiquityForkLearnMoreParams): LearnMoreContent {
   return {
     title: "How interest-rate batches work",
-    intro: `A Trove can delegate its interest rate to a batch manager (the V2 delegation model): the manager sets one rate for every Trove in the batch, adjusting it as market conditions move. This is active peg management without the owner touching the Trove.`,
+    intro: `A Trove can delegate its interest rate to a ${p.terms.delegate}${p.terms.delegateGloss ? `, ${p.terms.delegateGloss},` : ""} (the V2 delegation model): the ${p.terms.delegate} sets one rate for every Trove in the batch, adjusting it as market conditions move. This is active peg management without the owner touching the Trove.`,
     stepsHeading: "What batching changes:",
     steps: [
-      "The batch manager (within owner-approved bounds) controls the rate, and with it the batch's redemption-queue position.",
+      `The ${p.terms.delegate} (within owner-approved bounds) controls the rate, and with it the batch's redemption-queue position.`,
       `A batched Trove's debt is tracked as a share of the batch total, so the exact ${p.stablecoin} figure is derived from batch shares.`,
       "Leaving the batch returns the rate to self-management.",
     ],
@@ -1156,7 +1228,7 @@ export function liquityForkBatchContent(p: LiquityForkLearnMoreParams): LearnMor
 export function liquityForkEventFallbackContent(p: LiquityForkLearnMoreParams): LearnMoreContent {
   return {
     title: `How ${p.protocolName} Troves work`,
-    intro: `${p.protocolName} runs the Liquity V2 architecture: per-branch Troves minting ${p.stablecoin} at a user-set interest rate, redemptions at $1 face sweeping the lowest rates first, per-branch minimum collateral ratios, and Stability Pools absorbing liquidations.`,
+    intro: `${p.protocolName} runs the Liquity V2 architecture: per-branch Troves minting ${p.stablecoin} at a user-set interest rate, redemptions at $1 face sweeping the lowest rates first, per-branch ${p.terms.ltv ? "Max LTVs" : "Minimum Collateral Ratios (MCRs)"}, and Stability Pools absorbing liquidations.`,
     detailsHeading: "Key concepts:",
     details: [
       {
@@ -1165,11 +1237,11 @@ export function liquityForkEventFallbackContent(p: LiquityForkLearnMoreParams): 
         // no specific mechanic for, on a Trove that may well be batched. A
         // batched Trove's rate is its manager's, so the rate's author is
         // stated as either route rather than asserted to be the borrower.
-        text: "each Trove carries its own annual rate: set by the borrower, or by the interest-batch manager the borrower delegates to; interest accrues continuously into the debt, and the rate doubles as the redemption-queue position.",
+        text: `each Trove carries its own annual rate: set by the borrower, or by the ${p.terms.delegate} the borrower delegates to; interest accrues continuously into the debt, and the rate doubles as the redemption-queue position.`,
       },
       {
         bold: "Per-branch risk",
-        text: "every collateral branch has its own TroveManager, oracle and minimum collateral ratio. One branch's stress does not liquidate another's Troves.",
+        text: `every collateral branch has its own TroveManager, oracle and ${p.terms.limitText}. One branch's stress does not liquidate another's Troves.`,
       },
       {
         bold: "Redemption queue",
@@ -1479,8 +1551,14 @@ const VAULT_EVENT_LINKS: Record<VaultPositionFamily | "yearn", LearnMoreLink[]> 
   sgho: [{ label: "Savings GHO (sGHO)", url: "https://aave.com/docs/ecosystem/gho/sgho" }],
   stata: [{ label: "Static aTokens", url: "https://aave.com/docs/aave-v3/smart-contracts/tokenization" }],
   "umbrella-stake": [{ label: "Umbrella", url: "https://aave.com/docs/aave-v3/umbrella" }],
-  morpho: [{ label: "Morpho vaults", url: "https://docs.morpho.org/learn/concepts/vault/" }],
+  morpho: [
+    {
+      label: "Morpho Vaults V1 yield",
+      url: "https://docs.morpho.org/curate/concepts/yield/#yield-in-morpho-vaults-v1-legacy",
+    },
+  ],
   yearn: [{ label: "Yearn documentation", url: "https://docs.yearn.fi/getting-started/intro" }],
+  "yearn-v3": [{ label: "Yearn documentation", url: "https://docs.yearn.fi/getting-started/intro" }],
 };
 
 /** The "?" on a vault timeline row (ui-jobs 309): what a row is and what its
@@ -1525,10 +1603,11 @@ export function emodeSwitchContent(protocol: "aave" | "spark" | "seamless"): Lea
       : protocol === "seamless"
         ? { label: "Seamless documentation", url: SEAMLESS_DOCS_URL }
         : { label: "Aave V3 overview: Efficiency Mode", url: "https://aave.com/docs/aave-v3/overview" };
+  // Each family's spelling (lib/aave-family/terms.ts; ui-jobs 611).
+  const t = aaveFamilyTerms(protocol === "aave" ? "aave-v3" : protocol);
   return {
-    title: "How e-mode works",
-    intro:
-      "E-mode is a setting on the whole account. Choosing a category lets collateral in that category count at the category's limits in place of each asset's own.",
+    title: `How ${t.emode} works`,
+    intro: `${t.emodeLong} (${t.emode}) is a setting on the whole account. Choosing a category lets collateral in that category count at the category's limits in place of each asset's own.`,
     detailsHeading: "Key concepts:",
     details: [
       {
@@ -1544,7 +1623,7 @@ export function emodeSwitchContent(protocol: "aave" | "spark" | "seamless"): Lea
         text: "moves with the switch although nothing is supplied or borrowed, because the same collateral now counts at other limits.",
       },
       {
-        bold: "Borrowing in e-mode",
+        bold: `Borrowing in ${t.emode}`,
         text: "an account in a category may borrow only assets in that category.",
       },
     ],

@@ -16,6 +16,7 @@
 // Pure TypeScript with no React, so the export script loads it with type
 // stripping (scripts/exports-liquity-v2.mjs).
 
+import { redemptionPath } from "@/lib/liquity-fork/shutdown";
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import type { BaseActivityEvent, GasCost } from "@/lib/shared/types/activity";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
@@ -50,6 +51,7 @@ import {
 import { collChangeProv, debtChangeProv, liquityRedistOnAdjust } from "@/lib/liquity/event-provenance";
 import { isNoChangeAdjust, LIQUITY_MIN_DEBT, TROVE_DELTA_EPSILON } from "@/lib/liquity/trove-ops";
 import { getBatchManagerByAddress, getBatchManagerName } from "@/lib/liquity/batch-managers";
+import { liquityV2MaxLtvPct } from "@/lib/liquity/ltv";
 import { formatDate } from "@/lib/date";
 import { formatGasCost } from "@/lib/shared/format-event";
 import { usdShown } from "@/lib/shared/usd-display";
@@ -133,6 +135,9 @@ export interface LiquityProseInput {
   /** When the owner claimed a liquidation's surplus: undefined while unclaimed
    *  or unknown, null when claimed but undated. */
   surplusClaimedAt?: number | null;
+  /** The branch's shutdown time (unix seconds) where the page knows it: a
+   *  redemption at or after it is the urgent path (redemptionPath). */
+  shutdownAt?: number | null;
 }
 
 // ── The engine's functions over this file ────────────────────────────────────
@@ -411,8 +416,9 @@ function redemptionToday(
   return vsToday > 0 ? "higher" : null;
 }
 
-function l5For(key: L5Key, ctx: LiquityContext, variant: string): LearnMoreContent {
+function l5For(key: L5Key, ctx: LiquityContext, variant: string, urgentPath: boolean): LearnMoreContent {
   return L5[key]({
+    urgentPath,
     collateralType: ctx.collateralType,
     delegated: ctx.isInBatch,
     delegateName: ctx.batchManager ? getBatchManagerByAddress(ctx.batchManager)?.name : undefined,
@@ -423,6 +429,10 @@ function l5For(key: L5Key, ctx: LiquityContext, variant: string): LearnMoreConte
 /** The event's five levels (L3 apart: lib/liquity/event-ledgers.ts). */
 export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
   const { ctx, event, previousEvent, currentEvent, currentPrice, ledger, surplusClaimedAt } = input;
+  // A redemption on a shut-down branch: the urgent path, which reaches the
+  // Troves its redeemer picks, not the lowest rates (lib/liquity-fork/shutdown.ts).
+  const urgentPath =
+    REDEMPTION_OPS.has(ctx.operation) && redemptionPath(event.timestamp, input.shutdownAt) === "urgent";
   const collDecimals = input.collDecimals ?? null;
   const sel = pick(ctx);
   const variant = sel.variant;
@@ -468,6 +478,7 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
   const safety = stateBefore && stateAfter ? liquityEventSafety(ctx, previousEvent) : null;
   if (safety) {
     v.mcr = safety.mcr;
+    if (safety.mcr > 0) v.max_ltv = 100 / safety.mcr;
     if (safety.crBefore != null) v.cr_before_same_price = safety.crBefore;
     if (safety.crAfter != null) v.cr_after = safety.crAfter;
     if (safety.liqPriceBefore != null) v.liq_price_before = safety.liqPriceBefore;
@@ -604,22 +615,23 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
       v.coll_taken_usd = collTaken * price;
       v.redemption_result_usd = debtCleared - collTaken * price;
       sp.say("redeem.what", { debt_cleared: "debt_change", coll_taken: "coll_change" });
-      if (price > 0) {
+      if (price > 0 && !urgentPath) {
         if (num(v.redemption_result_usd) >= 0.5) sp.say("redeem.result");
         else sp.say("redeem.result_no_fee");
       }
       const zombie = ctx.isZombieTrove;
       const rate = { rate_after: "rate_after" as const };
-      if (!zombie) {
+      if (!zombie && !urgentPath) {
         if (ctx.isInBatch && ctx.batchManager) sp.say("redeem.why_batch", rate);
         else sp.say("redeem.why_owner", rate);
       }
+      // On a shut-down branch borrowing is gone, so the next step is closing only.
       if (zombie && stateAfter.debt === 0) {
         sp.say("redeem.zombie_zero");
-        sp.say("redeem.zombie_zero_next");
+        sp.say(urgentPath ? "redeem.zombie_zero_close" : "redeem.zombie_zero_next");
       } else if (zombie) {
         sp.say("redeem.zombie_low");
-        sp.say("redeem.zombie_low_next");
+        sp.say(urgentPath ? "redeem.zombie_low_close" : "redeem.zombie_low_next");
       }
       break;
     }
@@ -731,9 +743,16 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
       v.coll_liquidated = collLiquidated;
       v.coll_liquidated_usd = collUsd;
       v.liquidation_price = liq.price;
-      v.cr_at_liquidation =
+      // The LTV at the liquidation's price: the debt it cleared over the
+      // collateral it took, the inverse of the collateral ratio.
+      const crAtLiquidation =
         collUsd > 0 && debtCleared > 0 ? (collUsd / debtCleared) * 100 : stateBefore.collateralRatio;
-      sp.say("liq.what");
+      const maxLtv = liquityV2MaxLtvPct(ctx.collateralType);
+      if (crAtLiquidation > 0 && maxLtv != null) {
+        v.ltv_at_liquidation = 10000 / crAtLiquidation;
+        v.max_ltv = maxLtv;
+        sp.say("liq.what");
+      }
       const claimable = liq.collSurplus > 0 && liq.debtRedistributed === 0;
       const surplusUsd = liq.collSurplus * liq.price;
       if (claimable) {
@@ -827,7 +846,7 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
     L2: stateBefore && stateAfter ? liquityL2(input, accrual!) : null,
     L4: said.L4,
     list: said.list,
-    L5: { key: t.L5, content: l5For(t.L5, ctx, variant) },
+    L5: { key: t.L5, content: l5For(t.L5, ctx, variant, urgentPath) },
     footer: {
       gas,
       gasCost: paid ? { eth: paid.gasCostEth, usd: paid.gasCostUsd } : null,
@@ -1016,13 +1035,16 @@ export function liquityL2(input: LiquityProseInput, accrual: LiquityAccrual): Li
     }
     lines.push(debtLine);
 
+    // LTV, the inverse of the collateral ratio the state carries.
     const crHasChange = fig.cr.before !== 0 && fig.cr.before !== fig.cr.after;
-    const crAfter = isClose
+    const ltvAfter = isClose
       ? L2_WORDS.closed
-      : stateAfter.debt === 0
-        ? L2_WORDS.not_applicable
-        : `${fig.cr.after.toFixed(2)}%`;
-    lines.push(`${L2_WORDS.collateral_ratio}: ${arrow(crHasChange ? `${fig.cr.before.toFixed(2)}%` : null, crAfter)}`);
+      : stateAfter.debt === 0 || !(fig.cr.after > 0)
+        ? "—"
+        : `${(10000 / fig.cr.after).toFixed(2)}%`;
+    lines.push(
+      `${L2_WORDS.ltv}: ${arrow(crHasChange && fig.cr.before > 0 ? `${(10000 / fig.cr.before).toFixed(2)}%` : null, ltvAfter)}`,
+    );
   }
   if (fig.showGrid) {
     const r = fig.rate;

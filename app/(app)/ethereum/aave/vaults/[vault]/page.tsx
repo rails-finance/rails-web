@@ -1,9 +1,9 @@
 // One Aave vault's page — /ethereum/aave/vaults/<vault>.
 // ----------------------------------------------------------------------------
-// The vault card (V2), where the assets are (V3) and the holder finder (V4),
-// rails-ops ui-jobs 407, drawn by components/vaults/aave-ethereum-vault-page.tsx
-// from one pinned read of the vault and of the contracts it hops to; Holders
-// is the census's, Yield the daily store's. The Holders headline links to the
+// The vault card (V2) and the grid of tiles under it (V13; rails-ops ui-jobs
+// 407, 584), drawn by components/vaults/aave-ethereum-vault-page.tsx from one
+// pinned read of the vault and of the contracts it hops to; Holders and Who
+// holds it are the census's, Yield the daily store's. The Holders headline links to the
 // section's listing filtered to this vault.
 //
 // `?holder=` IS NOT A READING HERE. It is what the native GET form emits, and
@@ -28,12 +28,12 @@
 // gives: chain 1 is the render layer's default, so every explorer link under
 // /ethereum/… resolves to Etherscan with no extra wiring.
 
-import { cache } from "react";
+import { cache, Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { VaultProtectsSection } from "@/components/vaults/vault-protects-section";
 import { AaveEthereumVaultPage } from "@/components/vaults/aave-ethereum-vault-page";
 import { listingMetadata } from "@/lib/shared/page-metadata";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
@@ -42,7 +42,11 @@ import { ethereumVaultHref } from "@/lib/vaults/routes";
 import { loadAaveEthereumVault } from "@/lib/sources/chain/aave-ethereum-vault";
 import { RailHeader } from "@/components/shared/rail-header";
 import { loadVaultCensusRow } from "@/lib/vaults/census-read";
-import { loadVaultPageSeries } from "@/lib/vaults/yield-read";
+import { loadVaultPageSeries, loadVaultYields } from "@/lib/vaults/yield-read";
+import type { VaultYield } from "@/lib/vaults/yield";
+import { VAULT_FAMILIES } from "@/lib/vaults/families";
+import { loadVaultHolders } from "@/lib/vaults/holders-read";
+import { FocusSourceGate } from "@/components/shared/aim-gate";
 
 // Every figure is a call at the head — nothing about this is cacheable across
 // requests.
@@ -96,35 +100,56 @@ export default async function AaveEthereumVaultRoute({ params, searchParams }: P
   if (!data.served) notFound();
 
   const attestation = aaveVaultAttestation(address, data.vault.family);
-  const [census, series] = await Promise.all([
+  // An Umbrella stake's asset is a static aToken whose share price the daily
+  // store keeps: its Yield measure goes on the stake's Yield subline (ui-jobs
+  // 664). One store read, cached an hour; no chain read.
+  const assetAddress = data.vault.asset.address.toLowerCase();
+  const [census, series, holders, assetYields] = await Promise.all([
     loadVaultCensusRow(MAINNET_CHAIN_ID, address),
     loadVaultPageSeries(MAINNET_CHAIN_ID, address),
+    loadVaultHolders(MAINNET_CHAIN_ID, address, data.vault.family),
+    VAULT_FAMILIES[data.vault.family].assetGrows
+      ? loadVaultYields(MAINNET_CHAIN_ID, [assetAddress])
+      : Promise.resolve({} as Record<string, VaultYield>),
   ]);
 
   return (
-    <div className="min-h-screen">
-      <div className="py-8">
-        <header className="mb-5" data-skel-section="page-header">
-          <RailHeader session="aave-vaults" venue="subPage" />
-        </header>
+    <FocusSourceGate source={data.vault} chain={1} what="This vault">
+      <div className="min-h-screen">
+        <div className="py-8">
+          <header className="mb-5" data-skel-section="page-header">
+            <RailHeader session="aave-vaults" venue="subPage" />
+          </header>
 
-        {data.chainStale ? (
-          <p className="max-w-3xl text-[13px] leading-relaxed text-rb-500">
-            This vault could not be read from chain just now, so no figure is stated for it.
-          </p>
-        ) : (
-          <AaveEthereumVaultPage
-            data={data}
-            census={census}
-            yieldFigure={series.yieldFigure}
-            strip={series.strip}
-            attestation={attestation}
-          />
-        )}
+          {data.chainStale ? (
+            <p className="max-w-3xl text-[13px] leading-relaxed text-rb-500">
+              This vault could not be read from chain just now, so no figure is stated for it.
+            </p>
+          ) : (
+            <AaveEthereumVaultPage
+              data={data}
+              census={census}
+              yieldFigure={series.yieldFigure}
+              assetYield={assetYields[assetAddress]}
+              strip={series.strip}
+              attestation={attestation}
+              holders={holders}
+              protects={
+                <Suspense fallback={null}>
+                  <VaultProtectsSection
+                    subject={{ chainId: MAINNET_CHAIN_ID, address, kind: data.vault.family }}
+                    vaultName={data.vault.name || shortAddr(address)}
+                    look="paragraph"
+                  />
+                </Suspense>
+              }
+            />
+          )}
 
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
-        <ProvInspectorLayer />
+          {/* The inspector, armed from the profile menu's switch. */}
+          <ProvInspectorLayer />
+        </div>
       </div>
-    </div>
+    </FocusSourceGate>
   );
 }

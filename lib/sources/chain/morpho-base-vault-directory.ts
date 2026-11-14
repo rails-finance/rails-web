@@ -64,7 +64,7 @@ import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
 import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { resolveErc20Meta } from "./erc20-meta";
 import { readMetaMorphoIlliquid } from "./metamorpho-illiquid";
-import type { VaultIlliquid } from "@/lib/vaults/illiquid";
+import type { VaultLiquidity } from "@/lib/vaults/illiquid";
 import type { RawAmount } from "./morpho-base-vault";
 import { type MorphoBaseVaultFactory } from "@/lib/morpho-base/vault-catalog";
 import {
@@ -142,9 +142,13 @@ export interface MorphoBaseVaultDirectoryRow {
   /** `lostAssets()` at the pinned block, in the asset's units. Null where the
    *  call reverted (V1.0 keeps no such ledger) or did not answer. */
   lostAssets: RawAmount | null;
-  /** The illiquid test at the pinned block (lib/vaults/illiquid.ts): null
-   *  where the vault was read and not caught, absent where it was not read. */
-  illiquid?: VaultIlliquid | null;
+  /** What can leave the vault at the pinned block, and the illiquid test's
+   *  caught markets (lib/vaults/illiquid.ts); absent where it was not read. */
+  liquidity?: VaultLiquidity;
+  /** The withdraw queue's market ids at the pinned block, lowercased, read
+   *  with the illiquid test; absent where the vault holds nothing or the read
+   *  did not answer. */
+  queue?: string[];
 }
 
 export interface MorphoBaseVaultDirectoryResponse {
@@ -241,7 +245,8 @@ async function readDirectory(chainId: MetaMorphoChainId): Promise<MorphoBaseVaul
           address: vault.address,
           factory: vault.factory,
           createdBlock: vault.createdBlock,
-          name: (at("name") as string | undefined) ?? null,
+          // Trimmed for display and sorting (ui-jobs 664: " Usual Boosted USDC").
+          name: (at("name") as string | undefined)?.trim() || null,
           censusName: vault.name,
           asset: {
             address: vault.asset,
@@ -259,19 +264,24 @@ async function readDirectory(chainId: MetaMorphoChainId): Promise<MorphoBaseVaul
       }),
     );
 
-    // The illiquid test (ui-jobs 540) on every vault holding assets, at the
-    // same block. A failed read leaves the rows untested, never liquid.
+    // The illiquid test (ui-jobs 540) and what can leave (553) on every vault
+    // holding assets, at the same block. A failed read leaves the rows
+    // untested, never liquid.
     try {
       const funded = rows.filter((r) => r.totalAssets != null && BigInt(r.totalAssets.raw) > ZERO);
-      const illiquid = await readMetaMorphoIlliquid(
+      const queues = new Map<string, string[]>();
+      const liquidity = await readMetaMorphoIlliquid(
         client,
         chainId,
         blockNumber,
         funded.map((r) => r.address.toLowerCase()),
+        queues,
       );
       for (const r of funded) {
         const key = r.address.toLowerCase();
-        if (illiquid.has(key)) r.illiquid = illiquid.get(key)!;
+        const l = liquidity.get(key);
+        if (l) r.liquidity = l;
+        if (queues.has(key)) r.queue = queues.get(key)!;
       }
     } catch (error) {
       console.error(`Morpho vault directory: the illiquid read failed (chain ${chainId}):`, error);
@@ -298,9 +308,9 @@ async function readDirectory(chainId: MetaMorphoChainId): Promise<MorphoBaseVaul
 const isReadable = (d: MorphoBaseVaultDirectoryResponse) =>
   !d.chainStale && d.rows.some((r) => r.totalAssets != null && BigInt(r.totalAssets.raw) >= ZERO);
 
-// The arguments are part of the cache key, so each chain is its own entry; Base
-// keeps the key it had.
-const cachedDirectory = unstable_cache(readDirectory, ["morpho-base-vault-directory"], {
+// The arguments are part of the cache key, so each chain is its own entry. The
+// key's version moves when a row gains a field (the queue, ui-jobs 549 step 4).
+const cachedDirectory = unstable_cache(readDirectory, ["morpho-base-vault-directory", "2"], {
   revalidate: DIRECTORY_REVALIDATE_SECONDS,
 });
 

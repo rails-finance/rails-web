@@ -13,15 +13,16 @@
 // labeled a REPLICA everywhere it renders — unlike Moonwell's, it has not been
 // proven exact against the Comptroller's truncation order.
 //
-// Rates are per BLOCK (original V2), annualized on each market's OWN interest
-// rate model's blocksPerYear() — cETH's model says 2,628,000, the rest
-// 2,102,400; one hardcoded constant would misstate the biggest market by 25%.
+// Rates are per BLOCK (original V2), as APYs by the docs' formula
+// (lib/comptroller/apy.ts). Each market's model's blocksPerYear() is
+// still read: the constant the model sets its per-block curve with.
 //
 // SERVER-ONLY.
 
 import { parseAbi, getAddress, type ContractFunctionParameters, type PublicClient } from "viem";
 import { alchemyClient } from "./rpc";
 import { COMPOUND_V2_MARKETS, COMPOUND_V2_ADDRESSES, CTOKEN_DECIMALS } from "@/lib/compound-v2/asset-catalog";
+import { compoundV2Apy } from "@/lib/comptroller/apy";
 import type { CompoundV2ChainMarket, CompoundV2ChainResponse } from "@/lib/api/fetch-compound-v2-position";
 import { withServerHead } from "@/lib/sources/api/lender-position-head";
 
@@ -146,7 +147,7 @@ export async function loadCompoundV2PositionFromChain(
     }).filter((t) => t.balance > ZERO || t.borrow > ZERO);
 
     // Pass 2 (touched markets only): the oracle's price + config, and each
-    // market's own model's blocksPerYear.
+    // market's model's blocksPerYear.
     let second: Res[] = [];
     if (touched.length > 0 && oracle && !isZeroAddr(oracle)) {
       second = (await client.multicall({
@@ -202,7 +203,7 @@ export async function loadCompoundV2PositionFromChain(
       const blocksPerYear = bpyRaw != null && bpyRaw > ZERO ? Number(bpyRaw) : null;
       const apr = (r: Res | undefined): number | null => {
         const v = ok<bigint>(r);
-        return v != null && blocksPerYear != null ? (Number(v) / FACTOR) * blocksPerYear : null;
+        return v != null ? compoundV2Apy(v) : null;
       };
 
       if (priceUsd != null) {

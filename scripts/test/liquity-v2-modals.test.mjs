@@ -1,0 +1,48 @@
+// Liquity V2's "?" modals name the open branch's Max LTV (rails-ops ui-jobs 589):
+// the adjust modal reads 90.91% on WETH (MCR 110%) and 83.33% on wstETH and rETH
+// (MCR 120%), and stays a sentence on a branch Rails does not know.
+// Run: npm test
+//
+// The loader imports through `@/` and reads a `.yaml` file (scripts/lib/app-resolver.mjs).
+import test from "node:test";
+import assert from "node:assert/strict";
+import { registerAppResolver } from "../lib/app-resolver.mjs";
+
+registerAppResolver();
+
+const { L5 } = await import("../../lib/liquity/event-templates.ts");
+
+const maxLtvSentence = (c) => c.extraParagraphs.find((p) => /Max LTV/.test(p));
+
+test("the adjust modal states the open branch's Max LTV", () => {
+  assert.match(maxLtvSentence(L5.adjust({ collateralType: "WETH" })), /Max LTV \(90\.91% for WETH\)/);
+  for (const t of ["wstETH", "rETH"])
+    assert.match(maxLtvSentence(L5.adjust({ collateralType: t })), new RegExp(`Max LTV \\(83\\.33% for ${t}\\)`));
+});
+
+test("the adjust modal stays a sentence without a known branch", () => {
+  const s = maxLtvSentence(L5.adjust({}));
+  assert.doesNotMatch(s, /[{}]|\d+\.\d+%/);
+  assert.match(s, /Max LTV \(set per branch for this collateral\)/);
+});
+
+test("the liquidation modal reads the same figure", () => {
+  assert.match(L5.liquidation({ collateralType: "rETH" }).intro, /Max LTV \(83\.33% for rETH\)/);
+  assert.match(L5.liquidation({ collateralType: "WETH" }).intro, /Max LTV \(90\.91% for WETH\)/);
+});
+
+test("the liquidation modal takes the adjust modal's fallback without a known branch", () => {
+  const s = L5.liquidation({}).intro;
+  assert.doesNotMatch(s, /[{}]|\d+\.\d+%/);
+  assert.match(s, /Max LTV \(set per branch for this collateral\)/);
+});
+
+test("the redemption modal on the urgent path drops the fee kept and the rate queue", () => {
+  const ordinary = L5.redemption({ collateralType: "WETH" });
+  assert.ok(ordinary.extraParagraphs.some((p) => /fee stays in the trove/.test(p)));
+  const urgent = L5.redemption({ collateralType: "WETH", urgentPath: true });
+  const text = JSON.stringify(urgent);
+  assert.doesNotMatch(text, /stays in the trove|lowest first|redemption queue/);
+  assert.equal(urgent.title, ordinary.title);
+  assert.equal(urgent.intro, ordinary.intro);
+});

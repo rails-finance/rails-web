@@ -14,6 +14,8 @@
 // borrowed; the weighted max LTV, the liquidation threshold and the eMode
 // category as parameters.
 
+import { isBelowOne } from "@/lib/aave-family/health";
+import { aaveFamilyTermsOfPool, type AaveFamilyTerms } from "@/lib/aave-family/terms";
 import type { Provenance } from "@/components/shared/provenance";
 import {
   SHEET_WORDS,
@@ -59,13 +61,12 @@ const WORDS = {
   fall: "Collateral can fall",
   fall_caption: "Before liquidation, if the debt’s value holds.",
   no_debt: "No debt",
-  liquidatable: "At or below 1",
+  liquidatable: "Below 1",
   one_asset: "One asset on both sides",
   ltv: "LTV",
   borrowable: "Still borrowable",
   max_ltv: "Max LTV",
   threshold: "Liquidation threshold",
-  emode: "eMode",
   unread: "Not available at this block",
 };
 
@@ -93,7 +94,7 @@ const TIPS = {
   total: (side: FlowSide) =>
     `The ${side === "collateral" ? "collateral" : "debt"}'s total in dollars after this transaction, read from the Pool at the oracle's prices at this block; where the side holds one reserve, its amount beside the dollars.`,
   health:
-    "The Pool's health factor for the account after this transaction: the collateral times the weighted liquidation threshold, divided by the debt; at or below 1 the position can be liquidated.",
+    "The Pool's health factor for the account after this transaction: the collateral times the weighted liquidation threshold, divided by the debt; below 1 the position can be liquidated.",
   fall: "How far the collateral's total value can fall, the debt's value held, before the health factor reaches 1: one less one over the health factor.",
   ltv: "The debt's dollar value as a share of the collateral's after this transaction, at the oracle's prices at this block.",
   borrowable:
@@ -102,8 +103,8 @@ const TIPS = {
     "The share of the collateral the account can borrow against, each reserve's LTV weighted by its dollar value, from the Pool's configuration at this block.",
   threshold:
     "The share of the collateral above which the debt makes the position liquidatable, each reserve's threshold weighted by its dollar value, from the Pool's configuration at this block.",
-  emode:
-    "The efficiency-mode category the account had chosen; a reserve in it is borrowed against at the category's LTV and liquidation threshold.",
+  emode: (t: AaveFamilyTerms) =>
+    `The ${t.emode} category the account had chosen; a reserve in it is borrowed against at the category's LTV and liquidation threshold.`,
 };
 
 type Leg = "supply" | "debt";
@@ -470,7 +471,15 @@ export function aaveFamilySheet({
       value:
         drop != null
           ? { text: `${drop.toFixed(0)}%`, info: dropProv }
-          : { none: sameAsset ? WORDS.one_asset : hf == null ? WORDS.no_debt : hf <= 1 ? WORDS.liquidatable : "—" },
+          : {
+              none: sameAsset
+                ? WORDS.one_asset
+                : hf == null
+                  ? WORDS.no_debt
+                  : isBelowOne(hf)
+                    ? WORDS.liquidatable
+                    : "—",
+            },
       change:
         drop != null && dropPrev != null
           ? {
@@ -556,8 +565,8 @@ export function aaveFamilySheet({
                 const f = emodeFigure(state, state.emode!.after, "after", coords);
                 return {
                   key: "emode",
-                  label: WORDS.emode,
-                  tip: TIPS.emode,
+                  label: aaveFamilyTermsOfPool(coords.pool).emode,
+                  tip: TIPS.emode(aaveFamilyTermsOfPool(coords.pool)),
                   value: { text: f.text, info: f.prov, value: f.value },
                 };
               })(),

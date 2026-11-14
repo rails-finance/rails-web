@@ -36,7 +36,7 @@ import type { SparkLife } from "@/lib/spark/lives";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
-import { TokenAmountNotLoaded, loadedSymbols } from "@/components/shared/not-loaded";
+import { TokenAmountNotLoaded, loadedMarks } from "@/components/shared/not-loaded";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { Icon } from "@/components/icons/icon";
@@ -51,8 +51,10 @@ import {
   sparkPeakSupplyProv,
   sparkPeakBorrowProv,
   sparkLiqPriceProv,
+  sparkLiqDropProv,
 } from "@/lib/spark/event-provenance";
-import { accountDataProv, reserveDataProv, avgBorrowRateProv } from "@/lib/spark/position-provenance";
+import { accountDataProv, borrowApyProv, avgBorrowApyProv } from "@/lib/spark/position-provenance";
+import { AAVE_FAMILY_TERMS } from "@/lib/aave-family/terms";
 import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { sparkLiquidationRead, type SparkCardCaptions } from "@/lib/spark/economics";
 import { sparkPositionModal } from "@/lib/spark/event-templates";
@@ -108,16 +110,18 @@ const COLLATERAL_TIP =
   "What the account supplies that backs its borrowing, valued at SparkLend's oracle prices (the price feed SparkLend liquidates with). A supply is held as spTokens, SparkLend's receipt token, whose balance grows as interest accrues.";
 
 const DEBT_TIP =
-  "What the account owes SparkLend, valued at SparkLend's oracle prices, including the interest accrued at each asset's borrow rate. A borrow is held as variable debt tokens, whose balance grows as interest accrues.";
+  "What the account owes SparkLend, valued at SparkLend's oracle prices, including the interest accrued at each asset's borrow APY. A borrow is held as variable debt tokens, whose balance grows as interest accrues.";
 
 const NOT_COLLATERAL_TIP =
-  "Supplied and earning the supply rate, but backing no borrowing: its collateral switch is off, or SparkLend gives it a liquidation threshold of 0 (USDC, USDT, USDS and PYUSD).";
+  "Supplied and earning the supply APY, but backing no borrowing: its collateral switch is off, or SparkLend gives it a liquidation threshold of 0 (USDC, USDT, USDS and PYUSD).";
 
 const PEAK_NOT_COLLATERAL_TIP =
-  "Supplied and earning the supply rate, but never backing borrowing: the account never turned its collateral switch on (SparkLend gives USDC, USDT, USDS and PYUSD a liquidation threshold of 0).";
+  "Supplied and earning the supply APY, but never backing borrowing: the account never turned its collateral switch on (SparkLend gives USDC, USDT, USDS and PYUSD a liquidation threshold of 0).";
 
 const HF_TIP =
-  "The collateral, each asset counted up to its liquidation threshold, divided by the debt, at SparkLend's oracle prices. At or below 1, anyone can liquidate the account.";
+  "The collateral, each asset counted up to its liquidation threshold, divided by the debt, at SparkLend's oracle prices. Below 1, anyone can liquidate the account.";
+
+const SPARK_TERMS = AAVE_FAMILY_TERMS.spark;
 
 /** "24 days · 7 Oct - 31 Oct 2025", one line per life. */
 function LivesLines({ lives }: { lives: readonly SparkLife[] }) {
@@ -251,7 +255,12 @@ function TokenStack({
             <Prov
               info={side === "supply" ? positionSupplyProv(r.symbol, atBlock) : positionDebtProv(r.symbol, atBlock)}
             >
-              <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
+              <AssetAmount
+                value={r.amount}
+                symbol={r.symbol}
+                address={r.address}
+                exact={formatUnitsExact(r.amountRaw, r.decimals)}
+              />
             </Prov>
           )}
         </span>
@@ -286,6 +295,7 @@ function PeakLines({
               <AssetAmount
                 value={r.amount}
                 symbol={r.symbol}
+                address={r.address}
                 exact={formatUnitsExact(r.amountRaw, r.decimals)}
                 iconSize={iconSize}
               />
@@ -378,6 +388,44 @@ export interface SparkPositionCardProps {
   exports?: PositionCardExports | null;
 }
 
+/** A closed card's panel: the peaks of reserves that never backed borrowing. */
+function closedPanel(peakOthers: SparkReserveAmount[]): PositionPanelColumns | undefined {
+  if (peakOthers.length === 0) return undefined;
+  return [
+    [
+      {
+        id: "peak-not-collateral",
+        label: "Supplied, not collateral",
+        tip: PEAK_NOT_COLLATERAL_TIP,
+        value: (
+          <span data-spark-not-collateral="">
+            {peakOthers.length > 1 ? (
+              // A count of the peaks the overlay lists, each with its receipt.
+              <span data-prov-exempt="">{peakOthers.length} assets</span>
+            ) : (
+              <PeakLines reserves={peakOthers} side="supply" iconSize={16} />
+            )}
+          </span>
+        ),
+        // Many assets: their count opens the peaks, so the cell holds one
+        // line. The peaks carry no USD (PeakLines).
+        breakdown:
+          peakOthers.length > 1
+            ? {
+                assets: loadedMarks(peakOthers),
+                panel: (
+                  <span className="text-sm font-semibold tabular-nums text-foreground" data-spark-peak-breakdown="">
+                    <PeakLines reserves={peakOthers} side="supply" iconSize={16} />
+                  </span>
+                ),
+              }
+            : undefined,
+      },
+    ],
+    [],
+  ];
+}
+
 /** SparkLend's slots for the shared position card. */
 export function useSparkCardSlots({
   v,
@@ -431,15 +479,12 @@ export function useSparkCardSlots({
   let heads: PositionCardHead[];
   let outcome: PositionCardOutcome | undefined;
   let notice: ReactNode;
-  // A closed card's panel: the peaks of reserves that never backed borrowing.
-  let closedPanel: PositionPanelColumns | undefined;
   if (ended) {
     // The wallet holds no open reserves, so the headline is what each asset
     // held at its height. Where the peaks are read, a side the account never
     // held reads "None": no supply backed borrowing (the switches read), or
     // nothing was borrowed.
     const peakColl = v.peakSupplies.filter((r) => !isOther(r));
-    const peakOthers = v.peakSupplies.filter(isOther);
     const peaksRead = v.peakSupplies.length + v.peakBorrows.length > 0;
     heads = [
       {
@@ -463,41 +508,6 @@ export function useSparkCardSlots({
           ) : null,
       },
     ];
-    if (peakOthers.length > 0) {
-      closedPanel = [
-        [
-          {
-            id: "peak-not-collateral",
-            label: "Supplied, not collateral",
-            tip: PEAK_NOT_COLLATERAL_TIP,
-            value: (
-              <span data-spark-not-collateral="">
-                {peakOthers.length > 1 ? (
-                  // A count of the peaks the overlay lists, each with its receipt.
-                  <span data-prov-exempt="">{peakOthers.length} assets</span>
-                ) : (
-                  <PeakLines reserves={peakOthers} side="supply" iconSize={16} />
-                )}
-              </span>
-            ),
-            // Many assets: their count opens the peaks, so the cell holds one
-            // line. The peaks carry no USD (PeakLines).
-            breakdown:
-              peakOthers.length > 1
-                ? {
-                    symbols: loadedSymbols(peakOthers),
-                    panel: (
-                      <span className="text-sm font-semibold tabular-nums text-foreground" data-spark-peak-breakdown="">
-                        <PeakLines reserves={peakOthers} side="supply" iconSize={16} />
-                      </span>
-                    ),
-                  }
-                : undefined,
-          },
-        ],
-        [],
-      ];
-    }
     outcome = {
       word: v.status === "liquidated" ? "Liquidated" : "Closed",
       dates: [{ at: v.status === "liquidated" && outcomeAt != null ? outcomeAt : v.lastActivityAt }],
@@ -546,9 +556,7 @@ export function useSparkCardSlots({
         label: id === "collateral" ? CARD_VOCAB.collateral : CARD_VOCAB.debt,
         labelTip: detail ? (id === "collateral" ? COLLATERAL_TIP : DEBT_TIP) : undefined,
         assets:
-          reserves.length > 0 ? (
-            <InlineAssetCluster symbols={loadedSymbols(splitDust(ranked, usdOf).shown)} />
-          ) : undefined,
+          reserves.length > 0 ? <InlineAssetCluster assets={loadedMarks(splitDust(ranked, usdOf).shown)} /> : undefined,
         total:
           usd != null ? { usd, info: sparkUsdProvOnchain(id === "collateral" ? "Collateral" : "Borrowed") } : undefined,
         // One oracle-USD figure leads each side; where a reserve is unpriced the
@@ -616,7 +624,7 @@ export function useSparkCardSlots({
     learnMore: ended ? sparkPositionModal(v.status) : sparkPositionModal(v.status, v.borrows.length > 0),
     menu: { leading: () => <SparkMenuRows wallet={v.wallet} />, exports: exports ?? null },
   };
-  if (outcome) return { ...detailCommon, outcome, panel: closedPanel };
+  if (outcome) return { ...detailCommon, outcome, panel: closedPanel(v.peakSupplies.filter(isOther)) };
 
   // ── Each side's reserve rows, and the panel: the supply side's values on
   //    the left, the debt's and its risk on the right. A side whose total is
@@ -669,7 +677,7 @@ export function useSparkCardSlots({
         </span>
       ),
       breakdown: {
-        symbols: loadedSymbols(splitDust(othersRanked, usdOf).shown),
+        assets: loadedMarks(splitDust(othersRanked, usdOf).shown),
         total,
         panel: (
           <AssetBreakdownPanel
@@ -709,21 +717,24 @@ export function useSparkCardSlots({
   if (rate) {
     right.push({
       id: "borrow-rate",
-      label: rate.avg ? "Average borrow rate" : "Borrow rate",
+      label: rate.avg ? `Average ${SPARK_TERMS.borrowRateText}` : SPARK_TERMS.borrowRate,
       value: (
         <Prov
           info={
             rate.avg
-              ? avgBorrowRateProv()
-              : reserveDataProv("Variable borrow APR", "currentVariableBorrowRate", rate.symbol)
+              ? avgBorrowApyProv()
+              : borrowApyProv(
+                  rate.symbol,
+                  chain?.reserves.find((r) => r.hasBorrow && r.symbol === rate.symbol)?.borrowApr ?? null,
+                )
           }
         >
           {rate.pct.toFixed(2)}%
         </Prov>
       ),
       tip: rate.avg
-        ? "The variable borrow rates on the borrowed reserves now, weighted by each debt's oracle USD value."
-        : `The variable borrow rate SparkLend's Pool charges on ${rate.symbol ?? "the borrowed reserve"} now, read from the reserve's data.`,
+        ? "The borrow APYs on the borrowed reserves now, weighted by each debt's oracle USD value."
+        : `What borrowing ${rate.symbol ?? "the borrowed reserve"} costs a year with interest compounding, from the variable borrow rate SparkLend's Pool reads now.`,
     });
   }
   const borrowInterest = interestRow("debt", captions?.debtInterestUsd, captions?.debtInterestSince);
@@ -737,7 +748,7 @@ export function useSparkCardSlots({
           {formatCompactUsd(chain.availableBorrowsUsd)}
         </Prov>
       ),
-      tip: "How much more, in USD, the account can borrow before it reaches its loan-to-value limit, from the Pool's account read.",
+      tip: "How much more, in USD, the account can borrow before it reaches its Max LTV, from the Pool's account read.",
     });
   }
   // The liquidation read, from the live health factor: one supplied reserve
@@ -761,7 +772,7 @@ export function useSparkCardSlots({
       right.push({
         id: "liquidates-on-drop",
         label: "Liquidates on a drop of",
-        value: `${read.dropPct.toFixed(0)}%`,
+        value: <Prov info={sparkLiqDropProv()}>{read.dropPct.toFixed(0)}%</Prov>,
         tip: "How far the collateral's value at SparkLend's oracle prices can fall before the health factor reaches 1.",
       });
     }

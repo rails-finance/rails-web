@@ -44,6 +44,11 @@ export const LLAMALEND_ADDRESSES = {
   CRVUSD: "0xf939e0a03fb07f59a73314e73794be0e57ac1b4e",
 } as const;
 
+/** The splitter the crvUSD ControllerFactory names as its fee receiver
+ *  (`fee_receiver()`, read 2026-11-09): the scrvUSD vault's RewardsHandler and
+ *  the DAO's FeeCollector (TO-DO-ui-jobs 169). */
+export const CRVUSD_FEE_SPLITTER = "0x2dfd89449faff8a532790667bab21cf733c064f2";
+
 /** monetary_policy rate() is a per-second rate at 1e18; APR by simple
  *  multiplication (the same reading Curve's own UI leads with). */
 export const SECONDS_PER_YEAR = 31_536_000;
@@ -57,8 +62,6 @@ export const FACTORY_LABEL: Record<LlamalendFactoryKind, string> = {
   crvusd: "V1 mint market (crvUSD)",
   v2: "V2 market",
 };
-
-export const shortAddress = (addr: string): string => `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 
 /** Canonical lowercase 0x-address form; null when the string is not one. */
 export function normalizeAddressParam(raw: string): string | null {

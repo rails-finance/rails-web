@@ -15,7 +15,7 @@
 //
 // WHAT THE NET IS MADE OF. Each redemption the Alchemist sends the Transmuter
 // shares worth the debt cleared, and sends its fee receiver `protocolFee` bps
-// on top of those shares (25 on Ethereum, 10 on Base; a MYT Transfer to
+// on top of those shares (the fee at the redemption's block, lib/alchemix/protocol-fee.ts; a MYT Transfer to
 // protocolFeeReceiver in every redemption transaction, measured at exactly
 // 0.25% of the Transmuter's transfer). A position is debited its part of both:
 // its redeemed debt × (line shares out ÷ line debt redeemed) since its own last
@@ -42,9 +42,10 @@ export type RedemptionNet =
       takenValueRaw: string;
       /** cleared − taken value, signed, at 18 decimals of the underlying. */
       netRaw: string;
-      /** The line's redemption fee inside the shares taken. Null where the
-       *  line's fee rate is not known. */
-      fee: { bps: number; sharesRaw: string; valueRaw: string } | null;
+      /** The line's redemption fee inside the shares taken, at the rate in
+       *  force at the redemption's block (0 bps gives zero shares). Null where
+       *  the line's fee rate is not known. */
+      fee: { bps: number; sharesRaw: string; valueRaw: string; read: string | null } | null;
       /** netRaw + the fee's value: what the net is besides the fee. Null with
        *  no fee figure. */
       restRaw: string | null;
@@ -60,6 +61,8 @@ export function redemptionNet(
   before: AlchemixReading | null,
   underlyingDecimals: number | null,
   protocolFeeBps: number | null = null,
+  /** What the fee figure rests on (lib/alchemix/protocol-fee.ts), for its receipt. */
+  feeRead: string | null = null,
 ): RedemptionNet | null {
   const ctx = event.context.data;
   const cleared = ctx.debtClearedFromReadings;
@@ -73,12 +76,13 @@ export function redemptionNet(
   }
   const takenValue = (BigInt(taken) * BigInt(price) * TEN ** BigInt(18 - underlyingDecimals)) / WAD;
   const net = BigInt(cleared.amountRaw) - takenValue;
-  let fee: { bps: number; sharesRaw: string; valueRaw: string } | null = null;
+  let fee: { bps: number; sharesRaw: string; valueRaw: string; read: string | null } | null = null;
   let rest: bigint | null = null;
-  if (protocolFeeBps != null && protocolFeeBps > 0) {
+  // A known fee of 0 is a fee (zero shares), distinct from an unknown one.
+  if (protocolFeeBps != null) {
     const feeShares = (BigInt(taken) * BigInt(protocolFeeBps)) / BigInt(10000 + protocolFeeBps);
     const feeValue = (feeShares * BigInt(price) * TEN ** BigInt(18 - underlyingDecimals)) / WAD;
-    fee = { bps: protocolFeeBps, sharesRaw: feeShares.toString(), valueRaw: feeValue.toString() };
+    fee = { bps: protocolFeeBps, sharesRaw: feeShares.toString(), valueRaw: feeValue.toString(), read: feeRead };
     rest = net + feeValue;
   }
   return {
@@ -96,61 +100,12 @@ export function redemptionNet(
   };
 }
 
-/** The position's redemptions summed. `net` is null unless every redemption
- *  with a cleared-and-taken pair has a stated net: a sum that skips one would
- *  look complete and not be. */
-export interface RedemptionNetTotal {
-  counted: number;
-  missingPrice: number;
-  netRaw: string | null;
-  /** The redemption fee summed, where every summed net carries one. */
-  fee: { bps: number; sharesRaw: string; valueRaw: string } | null;
-  restRaw: string | null;
-}
-
-export function sumRedemptionNets(nets: (RedemptionNet | null)[]): RedemptionNetTotal {
-  let counted = 0;
-  let missingPrice = 0;
-  let total = BigInt(0);
-  let feeShares = BigInt(0);
-  let feeValue = BigInt(0);
-  let rest = BigInt(0);
-  let bps: number | null = null;
-  let everyFee = true;
-  for (const n of nets) {
-    if (n == null) continue;
-    if (n.status === "no-share-price") {
-      missingPrice++;
-      continue;
-    }
-    counted++;
-    total += BigInt(n.netRaw);
-    if (n.fee && n.restRaw != null && (bps == null || bps === n.fee.bps)) {
-      bps = n.fee.bps;
-      feeShares += BigInt(n.fee.sharesRaw);
-      feeValue += BigInt(n.fee.valueRaw);
-      rest += BigInt(n.restRaw);
-    } else {
-      everyFee = false;
-    }
-  }
-  const whole = missingPrice === 0 && counted > 0;
-  const withFee = whole && everyFee && bps != null;
-  return {
-    counted,
-    missingPrice,
-    netRaw: whole ? total.toString() : null,
-    fee: withFee ? { bps: bps as number, sharesRaw: feeShares.toString(), valueRaw: feeValue.toString() } : null,
-    restRaw: withFee ? rest.toString() : null,
-  };
-}
-
 /** How far the vault's share price could fall before the position reaches the
- *  line's liquidation line. Debt and collateral are counted in one underlying,
- *  so collateralisation moves with the share price alone: it scales by
- *  (1 − fall), and liquidation is at the lower bound, so
- *  fall = 1 − lowerBound ÷ collateralisation. Null with no debt; zero at or
- *  below the line. */
+ *  line's liquidation threshold. Debt and collateral are counted in one
+ *  underlying, so the LTV moves with the share price alone: it scales by
+ *  1 ÷ (1 − fall), and liquidation is at the threshold, 1 ÷ lowerBound, so
+ *  fall = 1 − LTV ÷ threshold = 1 − lowerBound ÷ (totalValue ÷ debt). Null
+ *  with no debt; zero at or past the threshold. */
 export function shareFallToLiquidation(collateralizationRaw: string | null, lowerBoundRaw: string): number | null {
   if (collateralizationRaw == null) return null;
   const ratio = Number(collateralizationRaw);

@@ -2,9 +2,15 @@
 // Ethereum (rails-ops ui-jobs 407, 486). Each chain's page.tsx is these two
 // exports with its chain fixed.
 // ----------------------------------------------------------------------------
-// The vault card (V2), where the assets are (V3) and the holder finder (V4),
-// drawn by components/vaults/morpho-base-vault-page.tsx from one pinned read of
-// the vault and of Blue; Holders is the census's, Yield the daily store's.
+// The holder finder (V4), the vault card (V2) and the grid of tiles, drawn by
+// components/vaults/morpho-base-vault-page.tsx from one pinned read of the
+// vault and of Blue, the fee and the guardian at the same block
+// (lib/vaults/config-read.ts); Holders and Who holds it are the census's
+// (lib/vaults/holders-read.ts), Yield the daily store's, the steward's record
+// the /vaults directory's (lib/vaults/steward-record.ts) with its runs from
+// rails-server's roles route (lib/vaults/steward-runs-read.ts). What protects it,
+// The protocol underneath, the record's runs and its bad-debt episodes stream
+// behind their own Suspense.
 //
 // THE PAGE LINKS TO THE FILTERED LISTING, IT DOES NOT LIST. The Holders
 // headline links to the position listing filtered to this address. What ONE
@@ -24,12 +30,13 @@
 //
 // SERVER-ONLY.
 
-import { cache } from "react";
+import { cache, Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { VaultProtectsSection } from "@/components/vaults/vault-protects-section";
+import { VaultBadDebtSection } from "@/components/vaults/vault-bad-debt-section";
 import { MorphoBaseVaultPage as MorphoBaseVaultPageView } from "@/components/vaults/morpho-base-vault-page";
 import { listingMetadata } from "@/lib/shared/page-metadata";
 import { RailHeader } from "@/components/shared/rail-header";
@@ -39,6 +46,12 @@ import { metaMorphoVaultHref } from "@/lib/vaults/routes";
 import { loadMorphoBaseVault } from "@/lib/sources/chain/morpho-base-vault";
 import { loadVaultCensusRow } from "@/lib/vaults/census-read";
 import { loadVaultPageSeries } from "@/lib/vaults/yield-read";
+import { loadAssetScales } from "@/lib/vaults/asset-scale";
+import { FocusSourceGate } from "@/components/shared/aim-gate";
+import { readVaultConfig } from "@/lib/vaults/config-read";
+import { loadVaultHolders } from "@/lib/vaults/holders-read";
+import { loadStewardRecord } from "@/lib/vaults/steward-record";
+import { loadStewardRuns } from "@/lib/vaults/steward-runs-read";
 
 export type MetaMorphoVaultParams = {
   params: Promise<{ vault: string }>;
@@ -95,36 +108,81 @@ export async function MetaMorphoVaultRoute({
   const holderParam = firstParam((await searchParams).holder);
   if (holderParam && holderParam.trim()) redirect(metaMorphoVaultHref(chainId, address, holderParam.trim()));
 
-  const [data, census, series] = await Promise.all([
+  // The steward's runs stream: the record's Since cells and ran-before list wait on this
+  // promise behind their own Suspense, so the page's first byte does not wait on the roles reads.
+  const stewardRecordRead = loadStewardRecord(chainId, address, null);
+  const stewardRuns = stewardRecordRead.then(loadStewardRuns).catch(() => null);
+  const [data, census, series, holders, stewardRecord] = await Promise.all([
     load(chainId, address, undefined),
     loadVaultCensusRow(chainId, address),
     loadVaultPageSeries(chainId, address),
+    loadVaultHolders(chainId, address, "morpho"),
+    stewardRecordRead,
   ]);
+  const [assetScales, config] = data.chainStale
+    ? [{}, null]
+    : await Promise.all([
+        loadAssetScales(chainId, [data.vault.asset.address]),
+        readVaultConfig(chainId, address, data.blockNumber, data.vault.createdBlock),
+      ]);
 
   return (
-    <div className="min-h-screen">
-      <div className="py-8">
-        <header className="mb-5" data-skel-section="page-header">
-          <RailHeader session={metaMorphoSession(chainId)} venue="subPage" />
-        </header>
+    <FocusSourceGate source={data.vault} chain={chainId} what="This vault">
+      <div className="min-h-screen">
+        <div className="py-8">
+          <header className="mb-5" data-skel-section="page-header">
+            <RailHeader session={metaMorphoSession(chainId)} venue="subPage" />
+          </header>
 
-        {data.chainStale ? (
-          <p className="max-w-3xl text-[13px] leading-relaxed text-rb-500">
-            This vault could not be read from chain just now, so no figure is stated for it.
-          </p>
-        ) : (
-          <MorphoBaseVaultPageView
-            data={data}
-            census={census}
-            yieldFigure={series.yieldFigure}
-            strip={series.strip}
-            factory={metaMorphoFactoryAddress(chainId, data.vault.factory)}
-          />
-        )}
+          {data.chainStale || !config ? (
+            <p className="max-w-3xl text-[13px] leading-relaxed text-rb-500">
+              This vault could not be read from chain just now, so no figure is stated for it.
+            </p>
+          ) : (
+            <MorphoBaseVaultPageView
+              data={data}
+              census={census}
+              assetScales={assetScales}
+              yieldFigure={series.yieldFigure}
+              strip={series.strip}
+              factory={metaMorphoFactoryAddress(chainId, data.vault.factory)}
+              config={config}
+              holders={holders}
+              stewardRecord={stewardRecord}
+              stewardRuns={stewardRuns}
+              badDebt={
+                <Suspense fallback={null}>
+                  <VaultBadDebtSection chainId={chainId} vault={address} />
+                </Suspense>
+              }
+              protects={
+                <Suspense fallback={null}>
+                  <VaultProtectsSection
+                    subject={{ chainId, address, kind: "metamorpho" }}
+                    vaultName={data.vault.name || shortAddr(address)}
+                    look="paragraph"
+                    changes={{
+                      chainId,
+                      vault: { address, name: data.vault.name || shortAddr(address) },
+                      asset: { symbol: data.vault.asset.symbol, decimals: data.vault.asset.decimals },
+                      markets: data.legs.map((l) => ({
+                        id: l.id,
+                        collateralSymbol: l.collateralSymbol,
+                        isIdle: l.isIdle,
+                        lltv: l.lltv,
+                      })),
+                      asOf: { block: data.blockNumber, time: data.head?.blockTime ?? null },
+                    }}
+                  />
+                </Suspense>
+              }
+            />
+          )}
 
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
-        <ProvInspectorLayer />
+          {/* The inspector, armed from the profile menu's switch. */}
+          <ProvInspectorLayer />
+        </div>
       </div>
-    </div>
+    </FocusSourceGate>
   );
 }

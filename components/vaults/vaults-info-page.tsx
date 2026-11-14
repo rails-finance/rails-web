@@ -21,6 +21,7 @@
 // anatomy lives here, once.
 
 import Link from "next/link";
+import { FOOT_LINK } from "@/lib/shared/ui-grammar";
 import type { ReactNode } from "react";
 import { RailHeader } from "@/components/shared/rail-header";
 import { CHAINS, type ChainId } from "@/lib/shared/chains";
@@ -53,10 +54,7 @@ export function VaultsInfoPage({
           page keeps. A vault is never a row in the matrix (rails-ops decision
           0014); the protocol its factory deployed it under is. */}
       <p className="mt-4 text-sm text-rb-500">
-        <Link
-          href={`/coverage/${CHAINS[chainId].slug}`}
-          className="whitespace-nowrap font-medium text-foreground underline decoration-dotted underline-offset-2 transition-colors hover:text-blue-600 dark:hover:text-[var(--text-link)]"
-        >
+        <Link href={`/coverage/${CHAINS[chainId].slug}`} className={`whitespace-nowrap font-medium ${FOOT_LINK}`}>
           What Rails covers
         </Link>
       </p>

@@ -21,7 +21,21 @@ export interface LiquityGasEscrow {
   source: string;
   /** The amount as the receipt prints it ("0.0375 WETH"). */
   label: string;
+  /** The deployment's own name for the amount and the footnote's words, where
+   *  its documentation names it (Liquity V2: "Liquidation reserve", decision
+   *  0065). Absent, the receipts and the footnote say "Gas compensation
+   *  escrow". */
+  terms?: GasEscrowTerms;
 }
+
+/** A deployment's name for the escrow and the footnote's words after the
+ *  figures, one per move. */
+export type GasEscrowTerms = Record<GasEscrowMove, string> & {
+  name: string;
+  /** The Trove ratio the escrow stays outside of, in the docs' term ("LTV");
+   *  absent, "collateral ratio". */
+  ratio?: string;
+};
 
 /** What an event does to the escrow: sends it (the open), holds it (every
  *  event between), returns it (the close), pays it to the liquidator. */
@@ -32,8 +46,19 @@ export function gasEscrowMove(kind: { open: boolean; close: boolean; liquidation
   return kind.open ? "sent" : kind.close ? "returned" : kind.liquidation ? "paid" : "held";
 }
 
-/** The footnote's words after the figures, the same on every family. */
-const NOTE_WORDS: Record<GasEscrowMove, string> & { name: string } = {
+/** The liquidation reserve's words, for a deployment whose docs call the
+ *  escrow its "liquidation reserve" (Liquity V2 and the forks that follow
+ *  its docs; decision 0065). */
+export const LIQUIDATION_RESERVE_TERMS: GasEscrowTerms = {
+  name: "Liquidation reserve",
+  sent: "held as the liquidation reserve since the open",
+  held: "held as the liquidation reserve",
+  returned: "liquidation reserve returned",
+  paid: "liquidation reserve paid to the liquidator",
+};
+
+/** The footnote's words after the figures, where the docs name no escrow. */
+const NOTE_WORDS: GasEscrowTerms = {
   name: "Gas compensation escrow",
   sent: "held in escrow since the open",
   held: "held in escrow",
@@ -54,14 +79,17 @@ export function gasEscrowFootnote(a: {
   info: Provenance;
   usd?: SheetFigure;
   tip: string;
+  /** The deployment's words (`LiquityGasEscrow.terms`); absent, the escrow's. */
+  terms?: GasEscrowTerms;
 }): SheetFootnote {
+  const words = a.terms ?? NOTE_WORDS;
   return {
     key: "escrow",
     amount: { text: a.text, symbol: a.symbol, info: a.info, value: String(a.amount) },
     usd: a.usd,
-    words: NOTE_WORDS[a.move],
+    words: words[a.move],
     tip: a.tip,
-    name: NOTE_WORDS.name,
+    name: words.name,
   };
 }
 
@@ -72,12 +100,13 @@ export function gasEscrowProv(
   move: GasEscrowMove,
   at: { verify?: ProvVerify; inputs?: ProvInput[]; block?: number },
 ): Provenance {
-  const what = `the fixed ${e.label} every ${e.protocol} Trove sends to its branch's GasPool beside its collateral at the open, held apart from the collateral and outside the collateral ratio`;
+  const name = e.terms?.name ?? NOTE_WORDS.name;
+  const what = `the fixed ${e.label} every ${e.protocol} Trove sends to its branch's GasPool beside its collateral at the open, held apart from the collateral and outside the ${e.terms?.ratio ?? "collateral ratio"}`;
   const summary = {
-    sent: `Gas compensation escrow sent at the open. ${what}. The close returns it and a liquidation pays it to the liquidator. The TroveUpdated log does not carry it; this transaction's ${e.symbol} Transfer to the GasPool does.`,
-    returned: `Gas compensation escrow returned at the close. ${what}, sent back by the GasPool. This transaction's ${e.symbol} Transfer from the GasPool carries it; the TroveUpdated log does not.`,
-    paid: `Gas compensation escrow paid to the liquidator. ${what}, paid out by the GasPool to the address that called the liquidation, beside its share of the collateral. This transaction's ${e.symbol} Transfer from the GasPool carries it.`,
-    held: `Gas compensation escrow held by the branch's GasPool${at.block != null ? ` at block ${at.block}` : ""}. ${what}. No event between the open and the close moves it.`,
+    sent: `${name} sent at the open. ${what}. The close returns it and a liquidation pays it to the liquidator. The TroveUpdated log does not carry it; this transaction's ${e.symbol} Transfer to the GasPool does.`,
+    returned: `${name} returned at the close. ${what}, sent back by the GasPool. This transaction's ${e.symbol} Transfer from the GasPool carries it; the TroveUpdated log does not.`,
+    paid: `${name} paid to the liquidator. ${what}, paid out by the GasPool to the address that called the liquidation, beside its share of the collateral. This transaction's ${e.symbol} Transfer from the GasPool carries it.`,
+    held: `${name} held by the branch's GasPool${at.block != null ? ` at block ${at.block}` : ""}. ${what}. No event between the open and the close moves it.`,
   }[move];
   return {
     kind: "chain-derived",

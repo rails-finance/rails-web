@@ -825,11 +825,17 @@ async function readPage(vault, holder, { expandRows = false } = {}) {
     unreadText: await text("[data-figure='timeline-unread']"),
     accrualText: await text("[data-figure='timeline-accrual']"),
     cooldownState: await attr("[data-position-card]", "data-holder-cooldown-state"),
-    // The holder card's Cooldown stat, its label and its value.
-    holderCooldownText: await text("[data-panel-row='cooldown']"),
+    // The holder card's Cooldown line, its label and its value.
+    holderCooldownText: await text("[data-position-card] p:has([data-figure='holder-cooldown'])"),
     bodyText: (await page.locator("body").innerText()).replace(/\s+/g, " "),
+    // The vault's readout (V7, ui-jobs 553) states the vault's 30-day yield as a
+    // yearly rate (decision 0047); 8b reads the rest of the page.
+    bodyTextOutsideReadout: await page.evaluate(() => {
+      const readout = document.querySelector("[data-vault-health]");
+      const t = document.body.innerText;
+      return (readout ? t.replace(readout.innerText, " ") : t).replace(/\s+/g, " ");
+    }),
     cardStatus: await attr("[data-position-card]", "data-status"),
-    cardValueUsdE8: await attr("[data-position-card]", "data-value-usd-e8"),
     timelineText: (await page.locator("[data-vault-timeline]").count())
       ? (await page.locator("[data-vault-timeline]").first().innerText()).replace(/\s+/g, " ")
       : "",
@@ -1610,11 +1616,9 @@ check(
         .join(", "),
 );
 
-// ═══ 8: one USD figure at most, no APY, no rate of return ══════════════════
-// Since mig 206 the position card carries ONE dollar figure — Value · USD,
-// the census's oracle read at the census block — so the rule is no longer "no
-// dollar figure" but "no dollar figure other than that stat": an open, priced
-// card accounts for exactly one, and a closed or unpriced one for none.
+// ═══ 8: no USD figure, no APY, no rate of return ══════════════════
+// The holder card (V8, ui-jobs 553) states its figures in the vault's asset
+// and carries no dollar figure, so a sampled page carries none.
 const USD_FIGURE_RE = /\$\s?\d[\d,.]*[KMB]?/g;
 const USD_SUFFIX_RE = /\b\d[\d,]*(?:\.\d+)?\s?USD\b/;
 // A rate of return is a FIGURE wearing a period, so the test is the figure and
@@ -1630,22 +1634,19 @@ const bad8b = [];
 for (const f of FIXTURES) {
   const p = PAGES.get(`${f.vault}:${f.holder}`);
   const figures = p.bodyText.match(USD_FIGURE_RE) ?? [];
-  const expected = p.cardStatus === "live" && p.cardValueUsdE8 ? 1 : 0;
+  // The holder card (V8, ui-jobs 553) carries no dollar figure.
+  const expected = 0;
   const suffix = p.bodyText.match(USD_SUFFIX_RE);
   if (figures.length !== expected || suffix)
     bad8a.push(
-      `${short(f.vault)}/${short(f.holder)}: ${figures.length} dollar figure(s) (${figures.join(", ") || "none"}) for a ${p.cardStatus ?? "?"} card ${p.cardValueUsdE8 ? "with" : "without"} a value${suffix ? `; "${suffix[0]}"` : ""}`,
+      `${short(f.vault)}/${short(f.holder)}: ${figures.length} dollar figure(s) (${figures.join(", ") || "none"}) on a ${p.cardStatus ?? "?"} card${suffix ? `; "${suffix[0]}"` : ""}`,
     );
-  const ret = p.bodyText.match(RETURN_RE);
+  const ret = p.bodyTextOutsideReadout.match(RETURN_RE);
   if (ret) bad8b.push(`${short(f.vault)}/${short(f.holder)}: "${ret[0]}"`);
 }
+check("8a no sampled page carries a dollar figure", bad8a.length === 0, bad8a.join(", ") || `${FIXTURES.length} pages`);
 check(
-  "8a the only dollar figure on any sampled page is the card's Value · USD stat",
-  bad8a.length === 0,
-  bad8a.join(", ") || `${FIXTURES.length} pages`,
-);
-check(
-  "8b no APY, no annualised figure and no rate of return",
+  "8b no APY, no annualised figure and no rate of return outside the vault's readout",
   bad8b.length === 0,
   bad8b.join(", ") || `${FIXTURES.length} pages`,
 );

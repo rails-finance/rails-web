@@ -2,7 +2,7 @@
 
 // The market's rates at both ends of a row's interest line: after the
 // account's previous event and just before this one. Comet charges and pays
-// at the rate its utilisation gives at each moment, so a balance's growth
+// at the rate its utilization gives at each moment, so a balance's growth
 // between two events is an average of the rates in between, and these two
 // reads bracket it (app/api/chain/compound/rates).
 

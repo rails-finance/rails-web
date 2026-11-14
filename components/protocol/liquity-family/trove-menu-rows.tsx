@@ -47,7 +47,7 @@ export function TroveMenuRows({
           icon={<ImageIcon size={16} />}
           title="Trove NFT"
           subtitle="Open it on OpenSea"
-          onClick={() => window.open(nftUrl, "_blank", "noopener,noreferrer")}
+          onClick={() => window.open(nftUrl, "_blank", "noopener")}
         />
       )}
       <ToolsMenuItem

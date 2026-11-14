@@ -11,6 +11,8 @@
 
 import type { LearnMoreContent, LearnMoreLink } from "@/components/shared/learn-more-modal";
 import { forkLiquidationReserve } from "@/lib/shared/liquity-fork-ops";
+import { fmtLtv, liquityFamilyTerms } from "@/lib/liquity/ltv";
+import { liquityShutdownSentence } from "@/lib/shared/learn-more-content";
 
 export interface LiquityForkPositionContentParams {
   /** Display name ("Ebisu" | "Asymmetry" | "Base Dollar"). */
@@ -21,6 +23,9 @@ export interface LiquityForkPositionContentParams {
   isBatched?: boolean;
   /** A redemption left the Trove below the branch's minimum debt. */
   isZombie?: boolean;
+  /** The Trove's branch is shut down (ui-jobs 612): the dormant Trove's
+   *  concept drops borrowing back above the minimum. */
+  shutDown?: boolean;
   /** This branch's minimum collateral ratio, e.g. "115%" — omit rather than guess. */
   minCR?: string;
   /** Live-verified docs/site link(s) — one or more question-level links where
@@ -30,21 +35,32 @@ export interface LiquityForkPositionContentParams {
 }
 
 export function liquityForkPositionContent(opts: LiquityForkPositionContentParams): LearnMoreContent {
-  const { name, debtSymbol, status, isBatched, isZombie, minCR, docsLinks } = opts;
+  const { name, debtSymbol, status, isBatched, isZombie, shutDown, minCR, docsLinks } = opts;
   const reserve = forkLiquidationReserve(name);
   const links = docsLinks && docsLinks.length > 0 ? docsLinks : undefined;
+  // The deployment's documented terms (decision 0065). In LTV terms the
+  // branch's limit is its Max LTV, 1 ÷ the minimum ratio.
+  const t = liquityFamilyTerms(name);
   const minCRText = minCR ? `below ${minCR}` : "below its branch's minimum";
+  const maxLtv = minCR ? fmtLtv(10000 / parseFloat(minCR), 2) : null;
 
   if (status === "liquidated") {
     return {
       title: "About this position",
-      intro: `This Trove was liquidated when its collateral ratio fell ${minCRText}. The panel above reconstructs its final state: peak collateral, ${debtSymbol} debt, and how long it stayed open.`,
+      intro: t.ltv
+        ? `This Trove was liquidated when its LTV rose ${maxLtv ? `above ${maxLtv}` : "above its branch's Max LTV"}. The panel above reconstructs its final state: peak collateral, ${debtSymbol} debt, and how long it stayed open.`
+        : `This Trove was liquidated when its ${t.ratioText} fell ${minCR ? minCRText : `below its branch's ${t.limitText}`}. The panel above reconstructs its final state: peak collateral, ${debtSymbol} debt, and how long it stayed open.`,
       detailsHeading: "Key concepts:",
       details: [
-        {
-          bold: "Liquidation threshold",
-          text: `each ${name} branch sets its own minimum collateral ratio, checked against the branch's own oracle price. Anyone can trigger the liquidation once a Trove falls below it. The minimum named above is the one in force when this Trove was liquidated.`,
-        },
+        t.ltv
+          ? {
+              bold: "Max LTV",
+              text: `each ${name} branch sets its own Max LTV, checked against the branch's own oracle price. Anyone can trigger the liquidation once a Trove rises above it. The Max LTV named above is the one in force when this Trove was liquidated.`,
+            }
+          : {
+              bold: "Liquidation threshold",
+              text: `each ${name} branch sets its own ${t.limitText}, checked against the branch's own oracle price. Anyone can trigger the liquidation once a Trove falls below it. The ${t.limitShort} named above is the one in force when this Trove was liquidated.`,
+            },
         {
           bold: "Trove NFT",
           text: "ownership of a Trove is an ERC-721 NFT. One address can hold many Troves, each a separate position, even within the same branch.",
@@ -77,41 +93,54 @@ export function liquityForkPositionContent(opts: LiquityForkPositionContentParam
 
   // Open Trove — the live, interactive case.
   const details: LearnMoreContent["details"] = [
-    {
-      bold: "Collateral ratio",
-      text: `the collateral's value relative to the ${debtSymbol} debt. It must stay ${minCR ? `above ${minCR}` : "above the branch's minimum"} or the Trove can be liquidated.`,
-    },
+    t.ltv
+      ? {
+          bold: "LTV",
+          text: `the ${debtSymbol} debt relative to the collateral's value. It must stay ${maxLtv ? `below ${maxLtv}` : "below the branch's Max LTV"} or the Trove can be liquidated.`,
+        }
+      : {
+          bold: t.ratio,
+          text: `the collateral's value relative to the ${debtSymbol} debt. It must stay ${minCR ? `above ${minCR}` : `above the branch's ${t.limitText}`} or the Trove can be liquidated.`,
+        },
   ];
   if (isBatched) {
     details.push({
       bold: "Interest delegation",
-      text: "a batch manager sets this Trove's rate and charges a management fee on top of the interest, both accruing to the debt.",
+      text: `a ${t.delegate} sets this Trove's rate and charges a management fee on top of the interest, both accruing to the debt.`,
     });
   } else {
     details.push({
       bold: "Interest rate",
-      text: "the borrower sets the rate, or delegates it to a batch manager. Lower rates cost less but sit earlier in the redemption queue.",
+      text: `the borrower sets the rate, or delegates it to a ${t.delegate}. Lower rates cost less but sit earlier in the redemption queue.`,
     });
   }
+  const nft = "ownership of a Trove is an ERC-721 NFT. One address can hold many Troves, each a separate position.";
   if (isZombie) {
+    // A dormant Trove's concept makes six; the modal holds five (modal grammar
+    // §4). The two shortest, the ratio and the Trove NFT, share one term with
+    // their sentences unchanged, and this variant leaves out the shutdown
+    // sentence (ui-jobs 612). On a shut-down branch the owner cannot borrow
+    // back above the minimum, so that sentence goes.
+    details[0] = {
+      bold: `${details[0].bold} and Trove NFT`,
+      text: `${details[0].text} ${nft[0].toUpperCase()}${nft.slice(1)}`,
+    };
     details.push({
-      bold: "Dormant Trove",
-      text: `a redemption can leave a Trove below its branch's minimum debt. It then leaves the rate-ordered queue: while it is the branch's most recent one still owing ${debtSymbol}, the next redemption on the branch takes from it first. The owner can bring its debt back above the minimum, which returns it to the queue, or close it and take back the collateral${reserve ? ` and the ${reserve} liquidation reserve` : ""}. The contracts tag it Zombie.`,
+      bold: t.dormantNoun.charAt(0).toUpperCase() + t.dormantNoun.slice(1),
+      text: `a redemption can leave a Trove below its branch's minimum debt. It then leaves the rate-ordered queue: while it is the branch's most recent one still owing ${debtSymbol}, the next redemption on the branch takes from it first.${shutDown ? "" : ` The owner can bring its debt back above the minimum, which returns it to the queue, or close it and take back the collateral${reserve ? ` and the ${reserve} liquidation reserve` : ""}.`}${t.dormant === "Zombie" ? "" : " The contracts tag it Zombie."}`,
     });
   }
+  const scoping = `each collateral type is its own ${t.branch === "branch" ? "branch" : `${t.branch} (a branch)`} with its own oracle, ${t.limitText} and redemption queue, so one branch's stress does not liquidate another's Troves.`;
   details.push(
     {
       bold: "Redemption exposure",
-      text: `any ${debtSymbol} holder can redeem it against the system at $1 face value, sweeping each branch's queue from the lowest user-set interest rate upward, not the lowest collateral ratio. A redeemed Trove gives up collateral worth the debt it sheds: it deleverages, but its net value is preserved.`,
+      text: `any ${debtSymbol} holder can redeem it against the system at $1 face value, sweeping each branch's queue from the lowest user-set interest rate upward. A redeemed Trove gives up collateral worth the debt it sheds: it deleverages, but its net value is preserved.`,
     },
     {
       bold: "Branch scoping",
-      text: `each collateral type is its own branch with its own oracle, minimum ratio and redemption queue, so one branch's stress does not liquidate another's Troves.`,
+      text: isZombie ? scoping : `${scoping} ${liquityShutdownSentence(t)}`,
     },
-    {
-      bold: "Trove NFT",
-      text: "ownership of a Trove is an ERC-721 NFT. One address can hold many Troves, each a separate position.",
-    },
+    ...(isZombie ? [] : [{ bold: "Trove NFT", text: nft }]),
   );
 
   return {

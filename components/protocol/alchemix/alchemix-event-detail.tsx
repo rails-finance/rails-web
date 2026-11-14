@@ -47,8 +47,9 @@ import {
   type AlchemixUnderlyingUnit,
 } from "@/lib/alchemix/readings-before";
 import { redemptionNet } from "@/lib/alchemix/redemption-net";
-import { lineProtocolFeeBps } from "@/lib/alchemix/lines";
+import { lineProtocolFeeStep } from "@/lib/alchemix/lines";
 import { selfLiquidationSplit } from "@/lib/alchemix/self-liquidation";
+import { feeListed } from "@/lib/alchemix/protocol-fee";
 import {
   closeFromReadingProv,
   selfLiquidationRestProv,
@@ -126,8 +127,9 @@ function legStats(
         changed: credit != null,
         prov: resolvedAtCaptureProv("debt credit", sym, credit, coords),
       });
+      // A logged zero (Base at 0 bps) is no fee: the card states none either.
       const fee = ctx.resolvedAtCapture?.collateralFee ?? null;
-      if (fee != null) {
+      if (fee != null && feeListed(fee)) {
         stats.push({
           label: "Fee taken in shares",
           value: formatExact(scaled(fee) ?? 0),
@@ -138,12 +140,12 @@ function legStats(
       break;
     }
     case "force_repay":
-      stat("Paid off set-aside debt", "credit_to_yield", mytSymbol);
-      stat("Protocol fee", "protocol_fee_total", mytSymbol);
+      stat("Paid off earmarked debt", "credit_to_yield", mytSymbol);
+      stat("Redemption fee", "protocol_fee_total", mytSymbol);
       stat("Requested", "amount", sym);
       break;
     case "self_liquidated": {
-      // The log's amount repeats the force repay's set-aside shares; the sweep
+      // The log's amount repeats the force repay's earmarked shares; the sweep
       // back to the holder has no log (lib/alchemix/self-liquidation.ts).
       const split = selfLiquidationSplit(leg, siblings, before);
       if (split && split.setAsideRaw > BigInt(0)) {
@@ -186,7 +188,7 @@ function legStats(
       stat("Fee in the asset underneath", "fee_in_underlying", mytSymbol);
       break;
     case "redemption": {
-      stat("Redeemed across the line", "amount", sym);
+      stat("Redeemed across the market", "amount", sym);
       // The per-position figures are not in the log: each is this position's
       // reading either side of the redemption, subtracted. A zero stands as an
       // answer; the unavailable case drops the row, which is the only way the
@@ -222,7 +224,8 @@ function legStats(
         }
         // The net for the holder, in the underlying: Liquity's redemption
         // P/L, over the same two readings (lib/alchemix/redemption-net).
-        const net = redemptionNet(leg, before, unit?.decimals ?? null, lineProtocolFeeBps(ctx.chainId, ctx.lineKey));
+        const feeStep = lineProtocolFeeStep(ctx.chainId, ctx.lineKey, leg.blockNumber);
+        const net = redemptionNet(leg, before, unit?.decimals ?? null, feeStep?.bps ?? null, feeStep?.read ?? null);
         if (net?.status === "stated" && unit) {
           const n = Number(net.netRaw) / WAD;
           const sign = n > 0 ? "+" : n < 0 ? "−" : "";
@@ -256,7 +259,7 @@ function legStats(
           }
           // The line's redemption fee, inside the shares taken: the main part
           // of the net (lib/alchemix/redemption-net).
-          if (net.fee) {
+          if (net.fee && net.fee.bps > 0) {
             stats.push({
               label: `${(net.fee.bps / 100).toLocaleString("en-US")}% redemption fee`,
               value: formatExact(scaled(net.fee.sharesRaw) ?? 0),
@@ -367,7 +370,7 @@ export function useAlchemixDetail({ legs, mytSymbol, coordsFor }: AlchemixEventD
       ) : null}
       {lineCtx ? (
         <p className="px-5 pb-3 text-[11px] leading-relaxed text-rb-500">
-          This event belongs to the whole line. It is on this timeline because it fell inside this position&rsquo;s
+          This event belongs to the whole market. It is on this timeline because it fell inside this position&rsquo;s
           life.
           {clearedSpan ? (
             <>

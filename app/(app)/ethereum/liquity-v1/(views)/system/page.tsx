@@ -12,13 +12,15 @@
 // static before dynamic, and no wallet address is the literal string "system".
 
 import Link from "next/link";
-import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { FOOT_LINK } from "@/lib/shared/ui-grammar";
 import { LiquityV1SystemView, LiquityV1SystemStamp } from "@/components/protocol/liquity-v1/liquity-v1-system-view";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { loadLiquityV1SystemFromChain } from "@/lib/sources/chain/liquity-v1-system";
 import { protocolForHref } from "@/lib/shared/protocols";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { AimGate } from "@/components/shared/aim-gate";
+import { assetKey } from "@/lib/shared/asset-family";
+import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
 
 // ISR, ten minutes. This is a protocol aggregate, not a wallet's page: the
 // same render serves every visitor, so re-reading the contracts per request
@@ -30,10 +32,14 @@ export const revalidate = 600;
 export const metadata = {
   title: "Liquity V1 system",
   description:
-    "Liquity V1's system state and redemption queue: total collateral ratio, the Stability Pool, and the base rate.",
+    "Liquity V1's system state and redemption queue: total collateral ratio, the Stability Pool, and the baseRate.",
 };
 
 const PROTOCOL = protocolForHref("/ethereum/liquity-v1")!;
+
+/** Focus (ui-jobs 557): the system counts by its own tokens, LUSD and LQTY,
+ *  and its one collateral, ETH (as WETH). */
+const FOCUS_KEYS = [TOKEN_ADDRESSES.LUSD, TOKEN_ADDRESSES.LQTY, TOKEN_ADDRESSES.WETH].map((t) => assetKey(1, t));
 
 export default async function LiquityV1SystemPage() {
   // Read straight from the loader rather than through this deployment's own
@@ -50,7 +56,7 @@ export default async function LiquityV1SystemPage() {
             <>
               <LiquityV1SystemStamp data={data} />
               <p className="mt-1 text-sm text-rb-500">
-                <Link href="/ethereum/liquity-v1/info#glossary" className={INLINE_LINK}>
+                <Link href="/ethereum/liquity-v1/info#glossary" className={FOOT_LINK}>
                   Terms and sources
                 </Link>
               </p>
@@ -58,8 +64,9 @@ export default async function LiquityV1SystemPage() {
           }
         />
 
-        <LiquityV1SystemView data={data} />
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
+        <AimGate keys={FOCUS_KEYS} chain={1} what="Liquity V1's system">
+          <LiquityV1SystemView data={data} />
+        </AimGate>
         <ProvInspectorLayer />
       </div>
     </div>

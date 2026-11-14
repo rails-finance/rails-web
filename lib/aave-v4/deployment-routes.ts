@@ -5,3 +5,4 @@ export const AAVE_V4_API_ROOT = "/api/aave-v4";
 export const AAVE_V4_ORACLE_ROUTE = "/api/oracle/aave-v4";
 export const AAVE_V4_BASE_API_ROOT = "/api/aave-v4-base";
 export const AAVE_V4_BASE_ORACLE_ROUTE = "/api/oracle/aave-v4-base";
+export const AAVE_V4_ARC_API_ROOT = "/api/aave-v4-arc";

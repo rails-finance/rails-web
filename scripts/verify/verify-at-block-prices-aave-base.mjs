@@ -31,7 +31,7 @@
 // card is read on its Figures tab (370).
 
 import { chromium } from "playwright";
-import { armScope } from "./lib/prov-inspector.mjs";
+import { receiptIn } from "./lib/prov-inspector.mjs";
 import { BASE, hostFetch, bypassHeaders } from "./lib/host.mjs";
 import { openCardOnFigures } from "./lib/card-tabs.mjs";
 import { openGroup } from "./lib/group-rows.mjs";
@@ -146,41 +146,12 @@ function legStatFor(card, label) {
     .locator('xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " rounded-xl ")][1]');
 }
 
-/** The receipt behind a value on an event's card. Since ui-jobs 308 a position
- *  view arms provenance per section and a timeline card's ⋮ carries no
- *  "Inspect provenance"; the event page's card ⋮ does (`armScope`, as
- *  verify-aave-v3-position-state reads it). So the receipt is read on the
- *  event's page: `pick` finds the value's scope on that page's card. */
+/** The receipt behind a value on an event's card, read on the timeline where
+ *  the card stands open: the inspector is armed from the profile menu's switch
+ *  (ui-jobs 625), which does not arm event pages. `pick` finds the value's
+ *  scope on the card. */
 async function openReceiptFor(page, card, valueText, pick = (c) => c) {
-  const id = await card.getAttribute("data-event-id");
-  if (!id) return null;
-  const at = new URL(page.url());
-  // A page from browser.newPage() owns a context that refuses a second page
-  // ("Please use browser.newContext()"), so the event page gets its own.
-  const ev = await browser.newPage({ extraHTTPHeaders: bypassHeaders() });
-  try {
-    await ev.goto(`${at.origin}${at.pathname}/event/${encodeURIComponent(id)}`, {
-      waitUntil: "domcontentloaded",
-      timeout: 240000,
-    });
-    const evCard = ev.locator(`[data-event-id="${id}"]`).first();
-    await evCard.waitFor({ timeout: 120000 });
-    await evCard
-      .locator('[data-position-state="ready"], [data-position-state="unavailable"]')
-      .first()
-      .waitFor({ timeout: 60000 })
-      .catch(() => {});
-    if (!(await armScope(ev, id, { menu: evCard.locator("[data-event-menu]").first() }))) return null;
-    const target = pick(evCard).locator("span.prov-locate-box").filter({ hasText: valueText }).first();
-    if ((await target.count()) === 0) return null;
-    await target.scrollIntoViewIfNeeded();
-    await target.click();
-    const pop = ev.locator(".prov-inspect-pop");
-    await pop.waitFor({ state: "visible", timeout: 10000 });
-    return await pop.innerText();
-  } finally {
-    await ev.close();
-  }
+  return receiptIn(pick(card), valueText);
 }
 
 const browser = await chromium.launch();

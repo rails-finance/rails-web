@@ -4,14 +4,22 @@
 // ----------------------------------------------------------------------------
 // A reserve page sits at `<marketHref>/<asset>`, the asset its lowercased
 // underlying address (the key /assets/<chain>/<token> uses). Aave V3 on
-// Ethereum runs three Pools on one route: /ethereum/aave-v3/market is the
+// Ethereum runs three Pools on one route: /ethereum/aave-v3/markets is the
 // overview of all three (a panel each), and `?market=core|prime|etherfi`, the
 // selector the Aave V3 wallet pages and listing read (lib/aave-v3/asset-
 // catalog.ts asV3Market), is one Pool's panel and reserves table. A sub-route
 // would collide with the reserve page's `[asset]` segment.
 
-import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import {
+  ARBITRUM_CHAIN_ID,
+  BASE_CHAIN_ID,
+  MAINNET_CHAIN_ID,
+  OPTIMISM_CHAIN_ID,
+  type ChainId,
+} from "@/lib/shared/chains";
 import { asV3Market, type AaveV3MarketKey } from "@/lib/aave-v3/asset-catalog";
+import { SEAMLESS_FREEZE_DATE, SEAMLESS_FREEZE_TX } from "@/lib/seamless/asset-catalog";
+import { explorerUrl } from "@/lib/shared/chains";
 
 export type AaveMarketKey =
   | "aave-v3"
@@ -19,6 +27,7 @@ export type AaveMarketKey =
   | "aave-v3-etherfi"
   | "aave-v3-base"
   | "aave-v3-arbitrum"
+  | "aave-v3-optimism"
   | "spark"
   | "seamless";
 
@@ -43,9 +52,17 @@ export interface AaveMarketConfig {
   marketLabel: string;
   purpose: string;
   /** Which Aave V3 market explainer the "?" opens; SparkLend has its own. */
-  modal: "aave-v3" | "aave-v3-base" | "aave-v3-arbitrum" | "seamless" | "spark";
+  modal: "aave-v3" | "aave-v3-base" | "aave-v3-arbitrum" | "aave-v3-optimism" | "seamless" | "spark";
   /** Listing URL filtered to one asset on one side, where the listing supports it. */
   assetHref?: (symbol: string, side: "supply" | "borrow") => string;
+  /** Off-site pages the market head's ⋮ carries besides the Pool and oracle. */
+  offsite?: { item: string; title: string; subtitle: string; href: string }[];
+  /** Reserves the protocol's docs list as deprecated as collateral, held as
+   *  data with the page and the day it was read: the chain cannot tell them
+   *  apart (a reserve with a loan-to-value of 0 and a threshold above 0 is
+   *  also one the docs call borrow-only, DAI at 0.01%, or a frozen one). The
+   *  tag draws only where the chain also reads a loan-to-value of 0. */
+  deprecatedCollateral?: { assets: readonly string[]; words: string; source: string; read: string };
 }
 
 const ETHEREUM_AAVE_V3: Record<AaveV3MarketKey, AaveMarketConfig> = {
@@ -53,9 +70,9 @@ const ETHEREUM_AAVE_V3: Record<AaveV3MarketKey, AaveMarketConfig> = {
     key: "aave-v3",
     chainId: MAINNET_CHAIN_ID,
     apiRoute: "/api/chain/aave-v3/market",
-    marketHref: "/ethereum/aave-v3/market",
+    marketHref: "/ethereum/aave-v3/markets",
     marketQuery: "",
-    reservesHref: "/ethereum/aave-v3/market?market=core",
+    reservesHref: "/ethereum/aave-v3/markets?market=core",
     listingHref: "/ethereum/aave-v3",
     positionsHref: "/ethereum/aave-v3?market=core",
     protocolName: "Aave V3",
@@ -68,9 +85,9 @@ const ETHEREUM_AAVE_V3: Record<AaveV3MarketKey, AaveMarketConfig> = {
     key: "aave-v3-prime",
     chainId: MAINNET_CHAIN_ID,
     apiRoute: "/api/chain/aave-v3/market?market=prime",
-    marketHref: "/ethereum/aave-v3/market",
+    marketHref: "/ethereum/aave-v3/markets",
     marketQuery: "?market=prime",
-    reservesHref: "/ethereum/aave-v3/market?market=prime",
+    reservesHref: "/ethereum/aave-v3/markets?market=prime",
     listingHref: "/ethereum/aave-v3",
     positionsHref: "/ethereum/aave-v3?market=prime",
     protocolName: "Aave V3",
@@ -83,9 +100,9 @@ const ETHEREUM_AAVE_V3: Record<AaveV3MarketKey, AaveMarketConfig> = {
     key: "aave-v3-etherfi",
     chainId: MAINNET_CHAIN_ID,
     apiRoute: "/api/chain/aave-v3/market?market=etherfi",
-    marketHref: "/ethereum/aave-v3/market",
+    marketHref: "/ethereum/aave-v3/markets",
     marketQuery: "?market=etherfi",
-    reservesHref: "/ethereum/aave-v3/market?market=etherfi",
+    reservesHref: "/ethereum/aave-v3/markets?market=etherfi",
     listingHref: "/ethereum/aave-v3",
     positionsHref: "/ethereum/aave-v3?market=etherfi",
     protocolName: "Aave V3",
@@ -109,9 +126,9 @@ export const AAVE_V3_BASE_MARKET: AaveMarketConfig = {
   key: "aave-v3-base",
   chainId: BASE_CHAIN_ID,
   apiRoute: "/api/chain/aave-v3-base/market",
-  marketHref: "/base/aave-v3/market",
+  marketHref: "/base/aave-v3/markets",
   marketQuery: "",
-  reservesHref: "/base/aave-v3/market",
+  reservesHref: "/base/aave-v3/markets",
   listingHref: "/base/aave-v3",
   positionsHref: "/base/aave-v3",
   protocolName: "Aave V3",
@@ -137,20 +154,52 @@ export const AAVE_V3_ARBITRUM_MARKET: AaveMarketConfig = {
   modal: "aave-v3-arbitrum",
 };
 
+/** Aave V3 on Optimism (ui-jobs 578): read on visit through rails-server's
+ *  /api/at-block/aave-v3-optimism/markets, held 30 s there. No listing, so the
+ *  positions href is the front door. */
+export const AAVE_V3_OPTIMISM_MARKET: AaveMarketConfig = {
+  key: "aave-v3-optimism",
+  chainId: OPTIMISM_CHAIN_ID,
+  apiRoute: "/api/aave-v3-optimism/market",
+  marketHref: "/optimism/aave-v3/markets",
+  marketQuery: "",
+  reservesHref: "/optimism/aave-v3/markets",
+  listingHref: "/optimism/aave-v3",
+  positionsHref: "/optimism/aave-v3",
+  protocolName: "Aave V3",
+  marketLabel: "Aave V3 · Optimism",
+  purpose:
+    "Aave V3's Optimism deployment: its own Pool, its own reserves and its own risk parameters, separate from the Ethereum market of the same name.",
+  modal: "aave-v3-optimism",
+};
+
 export const SPARK_MARKET: AaveMarketConfig = {
   key: "spark",
   chainId: MAINNET_CHAIN_ID,
   apiRoute: "/api/chain/spark/market",
-  marketHref: "/ethereum/spark/market",
+  marketHref: "/ethereum/spark/markets",
   marketQuery: "",
-  reservesHref: "/ethereum/spark/market",
+  reservesHref: "/ethereum/spark/markets",
   listingHref: "/ethereum/spark",
   positionsHref: "/ethereum/spark",
   protocolName: "SparkLend",
   marketLabel: "SparkLend",
   purpose:
-    "The single SparkLend market: an Aave-V3-architecture Pool governed by Sky, centred on stablecoin liquidity against sDAI, ETH and BTC collateral.",
+    "The single SparkLend market: an Aave-V3-architecture Pool governed by Sky, centred on stablecoin liquidity against WETH, wstETH, weETH, WBTC and cbBTC collateral.",
   modal: "spark",
+  // docs.spark.finance, Overview of Markets: "Deprecated as collateral: sDAI,
+  // sUSDS, LBTC … LTV set to 0, so they no longer add borrowing power."
+  deprecatedCollateral: {
+    assets: [
+      "0x83f20f44975d03b1b09e64809b757c47f942beea", // sDAI
+      "0xa3931d71877c0e7a3148cb7eb4463524fec27fbd", // sUSDS
+      "0x8236a87084f8b84306f72007f36f2618a5634494", // LBTC
+    ],
+    words: "Deprecated as collateral: LTV set to 0, so they no longer add borrowing power.",
+    source:
+      "https://docs.spark.finance/products/sparklend/guides/overview-of-markets#active-deprecated-and-frozen-markets",
+    read: "12 Nov 2026",
+  },
   assetHref: (symbol, side) =>
     `/ethereum/spark?${side === "supply" ? "supply" : "borrow"}=${encodeURIComponent(symbol)}`,
 };
@@ -159,9 +208,9 @@ export const SEAMLESS_MARKET: AaveMarketConfig = {
   key: "seamless",
   chainId: BASE_CHAIN_ID,
   apiRoute: "/api/chain/seamless/market",
-  marketHref: "/base/seamless/market",
+  marketHref: "/base/seamless/markets",
   marketQuery: "",
-  reservesHref: "/base/seamless/market",
+  reservesHref: "/base/seamless/markets",
   listingHref: "/base/seamless",
   positionsHref: "/base/seamless",
   protocolName: "Seamless",
@@ -169,6 +218,14 @@ export const SEAMLESS_MARKET: AaveMarketConfig = {
   purpose:
     "An Aave V3 fork on Base with its own Pool, reserves, risk parameters and oracle, frozen since April 2025 and winding down.",
   modal: "seamless",
+  offsite: [
+    {
+      item: "freeze",
+      title: "The freeze on Basescan",
+      subtitle: `The transaction that froze every reserve, ${SEAMLESS_FREEZE_DATE}`,
+      href: explorerUrl(BASE_CHAIN_ID, "tx-logs", SEAMLESS_FREEZE_TX),
+    },
+  ],
 };
 
 /** A reserve's page under its market. */
@@ -188,6 +245,8 @@ export function aaveMarketConfig(key: AaveMarketKey): AaveMarketConfig {
       return AAVE_V3_BASE_MARKET;
     case "aave-v3-arbitrum":
       return AAVE_V3_ARBITRUM_MARKET;
+    case "aave-v3-optimism":
+      return AAVE_V3_OPTIMISM_MARKET;
     case "spark":
       return SPARK_MARKET;
     case "seamless":

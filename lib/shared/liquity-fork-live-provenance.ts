@@ -39,6 +39,7 @@ import { BASEDOLLAR_PRICE_GRADES } from "@/lib/basedollar/price-feeds";
 import { EBISU_PRICE_GRADES } from "@/lib/ebisu/price-feeds";
 import { ASYMMETRY_PRICE_GRADES } from "@/lib/asymmetry/price-feeds";
 import { LIQUITY_V2_BRANCHES, DEBT_SYMBOL as LIQUITY_V2_DEBT } from "@/lib/liquity/asset-catalog";
+import { LTV_LIQUIDATION_PRICE_FORMULA, liquityFamilyTerms } from "@/lib/liquity/ltv";
 
 /** One input a branch PriceFeed reads (fork playbook §6 grading). */
 export interface LiquityForkPriceLeg {
@@ -204,6 +205,8 @@ interface ForkLiveConfig {
 
 function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
   const LANE_VIA = `GET /api/chain/${cfg.protocolId}/position`;
+  // The deployment's documented terms for a Trove's ratio (decision 0065).
+  const terms = liquityFamilyTerms(cfg.protocolId);
   const ROSTER_VIA = `GET /api/chain/${cfg.protocolId}/branches`;
   const tmContract = (sym: string) => ({
     name: `${cfg.protocolName} ${sym} TroveManager`,
@@ -271,14 +274,26 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
       via: `${LANE_VIA} · TroveManager.getLatestTroveData(): annual interest rate`,
       scaling,
     }),
-    contractIcrProv: (sym) => ({
-      kind: "chain",
-      pclass: "state",
-      verify: recompute("TroveManager", "getCurrentICR"),
-      summary: `Collateral ratio. The TroveManager's OWN getCurrentICR at the branch's own oracle price, computed by the contract at the latest block (the arithmetic identity entireColl × price ÷ entireDebt is verified BigInt-exact by scripts/verify-liquity-forks-chain.mjs).`,
-      contract: tmContract(sym),
-      via: `${LANE_VIA} · TroveManager.getCurrentICR @ head`,
-    }),
+    contractIcrProv: (sym) =>
+      terms.ltv
+        ? {
+            kind: "chain-derived",
+            pclass: "state",
+            verify: recompute("TroveManager", "getCurrentICR"),
+            summary: `LTV. The Trove's entire debt ÷ its collateral's dollar value at the branch's own oracle price: 1 ÷ the TroveManager's OWN getCurrentICR, computed by the contract at the latest block (the arithmetic identity entireColl × price ÷ entireDebt is verified BigInt-exact by scripts/verify-liquity-forks-chain.mjs).`,
+            contract: tmContract(sym),
+            via: `${LANE_VIA} · 1 ÷ TroveManager.getCurrentICR @ head`,
+            formula: "1 ÷ ICR",
+            inputs: [{ label: "ICR", kind: "chain", pclass: "state", note: "TroveManager.getCurrentICR @ head" }],
+          }
+        : {
+            kind: "chain",
+            pclass: "state",
+            verify: recompute("TroveManager", "getCurrentICR"),
+            summary: `${terms.ratio}. The TroveManager's OWN getCurrentICR at the branch's own oracle price, computed by the contract at the latest block (the arithmetic identity entireColl × price ÷ entireDebt is verified BigInt-exact by scripts/verify-liquity-forks-chain.mjs).`,
+            contract: tmContract(sym),
+            via: `${LANE_VIA} · TroveManager.getCurrentICR @ head`,
+          },
     forkPriceProv: (sym, stale) => {
       const g = gradedPrice(sym);
       return {
@@ -310,10 +325,12 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
       kind: "chain-derived",
       pclass: "state",
       verify: recompute("TroveManager", "getLatestTroveData"),
-      summary: `Liquidation price. The ${sym} price at which this trove's collateral ratio hits the branch minimum; entire debt × MCR ÷ entire collateral, every input a chain read at the same block (the liquidation equation rearranged for price).`,
+      summary: terms.ltv
+        ? `Liquidation price. The ${sym} price at which this trove's LTV reaches the branch's Max LTV; entire debt ÷ (entire collateral × Max LTV), Max LTV = 1 ÷ MCR, every input a chain read at the same block (the liquidation equation rearranged for price).`
+        : `Liquidation price. The ${sym} price at which this trove's ${terms.ratioText} hits the branch ${terms.limitText}; entire debt × MCR ÷ entire collateral, every input a chain read at the same block (the liquidation equation rearranged for price).`,
       contract: tmContract(sym),
       via: `${LANE_VIA} · derived ratio`,
-      formula: "entire debt × MCR ÷ entire collateral",
+      formula: terms.ltv ? LTV_LIQUIDATION_PRICE_FORMULA : "entire debt × MCR ÷ entire collateral",
       inputs: [
         { label: "entire debt", kind: "chain", pclass: "state", note: "getLatestTroveData() at the latest block" },
         {
@@ -337,8 +354,8 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
     debtInFrontProv: (sym) => ({
       kind: "chain-derived",
       pclass: "state",
-      verify: recompute("SortedTroves", "getFirst/getNext + TroveManager.getLatestTroveData"),
-      summary: `${cfg.stablecoin} debt redeemed before this trove. The sum of entire debt across the ${sym} branch troves sitting at LOWER interest rates (redemptions sweep the lowest user-set rate first in this family, not the lowest collateral ratio), from a live walk of the branch's own SortedTroves in its descending-rate order. Branch-scoped: cross-branch redemption routing splits by each branch's unbacked portion, and dormant Troves (outside the list) are redeemed before everything in it.`,
+      verify: recompute("SortedTroves", "getFirst/getNext + TroveManager.getLatestTroveData + lastZombieTroveId"),
+      summary: `${cfg.stablecoin} debt redeemed before this trove. The entire debt of the ${sym} branch troves sitting at LOWER interest rates (redemptions sweep the lowest user-set rate first in this family, not the lowest collateral ratio), from a live walk of the branch's own SortedTroves in its descending-rate order, plus the Trove the TroveManager holds as lastZombieTroveId when it has debt: the one dormant Trove a redemption takes, before the whole list. Branch-scoped: cross-branch redemption routing splits by each branch's unbacked portion.`,
       contract: {
         name: `${cfg.protocolName} ${sym} SortedTroves`,
         address: cfg.branchBySymbol[sym]?.sortedTroves ?? "",
@@ -463,7 +480,7 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
       pclass: "state",
       verify: recompute("TroveManager", "getTroveStatus + getTroveIdsCount/getTroveFromTroveIdsArray"),
       summary:
-        `A dormant Trove (status 4, Zombie, on the ${sym} branch's TroveManager). A partial redemption left it below the branch minimum debt, so the protocol removed it from SortedTroves. While it still carries debt it is redeemed BEFORE everything in the list, so a dormant Trove with debt leads the queue here; one redeemed to zero debt keeps its collateral on the branch but stands outside every redemption path. Found through the TroveManager's trove-ids array (it enumerates every trove the branch has, listed or not), because a walk of the sorted list alone cannot see it.` +
+        `A dormant Trove (status 4, Zombie, on the ${sym} branch's TroveManager). A partial redemption left it below the branch minimum debt, so the protocol removed it from SortedTroves. The one the TroveManager holds as lastZombieTroveId is redeemed before everything in the list while it has debt, and leads the queue here; every other dormant Trove stands outside every redemption path and keeps its collateral on the branch. Found through the TroveManager's trove-ids array (it enumerates every trove the branch has, listed or not), because a walk of the sorted list alone cannot see it.` +
         (idsCapped ? ` The enumeration is bounded on this read, so the dormant count is a floor, not a census.` : ""),
       contract: tmContract(sym),
       via: `${ROSTER_VIA} · TroveManager.getTroveIdsCount / getTroveFromTroveIdsArray + getTroveStatus @ head`,

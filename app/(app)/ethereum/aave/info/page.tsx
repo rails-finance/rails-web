@@ -1,3 +1,4 @@
+// focus: the explorer's explainer; the shell's gate stands over the explorer
 // The explorer's about page — /ethereum/aave/info, the (i) in the rail.
 // ----------------------------------------------------------------------------
 // Every explorer's rail carries an (i) at `<href>/info`, and this explorer's

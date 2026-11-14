@@ -4,18 +4,21 @@
 // ----------------------------------------------------------------------------
 // What /base/morpho/vaults and /ethereum/morpho/vaults show — the Vaults tab of
 // the Morpho Blue rail on each chain (ui-jobs 486).
-// One vault row (V1, components/vaults/vault-row.tsx) per catalogued vault,
-// grouped by asset, through the shared roster (components/vaults/
-// vault-roster.tsx). What the family supplies: its receipts, its Family facet
-// (the two factory releases), the census sentence and the intro drawer.
+// One table row (V6) per catalogued vault, through the shared roster
+// (components/vaults/vault-roster.tsx; ui-jobs 605). What the family supplies:
+// its receipts, its Family facet (the two factory releases, also the Kind
+// cell), the census sentence and the intro drawer. Compare ticks as on /vaults
+// (E2, E3).
 //
 // SHARE PRICE is `convertToAssets(10^18)` — one whole share, in the vault's
 // own asset. No USD.
 
 import type { ReactNode } from "react";
 import type { ServerRead } from "@/lib/shared/server-head-read";
-import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
-import { VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
+import { Prov } from "@/components/shared/provenance";
+import { ProvSection } from "@/components/shared/section-menu";
+import { ROSTER_SCOPE, RosterMenu, VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
+import { CompareBar } from "@/components/vaults/compare-selection";
 import { isoSeconds, RosterBlock } from "@/components/vaults/roster-read-stamp";
 import {
   metaMorphoVaultHref,
@@ -27,14 +30,11 @@ import { chainMeta } from "@/lib/shared/chains";
 import {
   vaultDirectoryCensusProv,
   vaultDirectoryEmptyCountProv,
-  vaultDirectoryGroupCountProv,
-  vaultDirectoryNameProv,
-  vaultDirectorySharePriceProv,
-  vaultDirectoryTotalAssetsProv,
   type MorphoVaultCoords,
 } from "@/lib/morpho-base/vault-provenance";
 import { releaseLabel } from "@/lib/vaults/families";
-import { vaultDisplayName, type VaultSummary } from "@/lib/vaults/summary";
+import { metaMorphoRowReceipts } from "@/lib/vaults/row-receipts";
+import type { VaultSummary } from "@/lib/vaults/summary";
 import type { VaultYield } from "@/lib/vaults/yield";
 
 const n = (v: number) => v.toLocaleString("en-US");
@@ -49,6 +49,7 @@ const FACETS: VaultRosterFacet[] = [
   },
 ];
 
+// Focus (ui-jobs 557): VaultRoster keeps the vaults in focus (useScopedRows).
 export function VaultDirectoryView({
   chainId,
   initialSearch,
@@ -79,12 +80,6 @@ export function VaultDirectoryView({
 }) {
   const coords: MorphoVaultCoords = { chainId, blockNumber: blockNumber || undefined, readBy };
   const chain = chainMeta(chainId).name;
-  const rowCoords = (v: VaultSummary): MorphoVaultCoords => ({
-    ...coords,
-    vault: v.address,
-    vaultName: vaultDisplayName(v) ?? undefined,
-    assetSymbol: v.asset.symbol,
-  });
 
   const readBlock = (
     <RosterBlock
@@ -96,45 +91,54 @@ export function VaultDirectoryView({
       chainId={chainId}
     />
   );
-  const registry = useReceiptRegistry();
   return (
-    <ProvReceiptsScope registry={registry}>
-      <VaultRoster
-        initialSearch={initialSearch}
-        readTime={readBy?.blockTime}
-        vaults={vaults}
-        yields={yields}
-        chainId={chainId}
-        blockNumber={blockNumber}
-        chainStale={chainStale}
-        skel="directory"
-        facets={FACETS}
-        hrefOf={(v) => metaMorphoVaultHref(chainId, v.address)}
-        holdersHrefOf={(v) => metaMorphoVaultsListingHref(chainId, { vault: v.address })}
-        receiptsOf={(v) => ({
-          name: vaultDirectoryNameProv(rowCoords(v)),
-          totalAssets: vaultDirectoryTotalAssetsProv(rowCoords(v)),
-          sharePrice: vaultDirectorySharePriceProv(rowCoords(v)),
-        })}
-        hooksOf={(v) => ({ "data-family": v.release ?? "" })}
-        groupCountProv={(assetSymbol, count) => vaultDirectoryGroupCountProv({ ...coords, assetSymbol }, count)}
-        emptyCountProv={(count) => vaultDirectoryEmptyCountProv(coords, count, catalogSize)}
-        head={{
-          censusFigure: "directory-census",
-          census: (
-            <>
-              <Prov info={vaultDirectoryCensusProv(coords, { catalogSize, censusBlock })}>
-                The {n(catalogSize)} vaults the two MetaMorpho factories had made at block {n(censusBlock)}
-              </Prov>
-              {withCensus ? "; Holders counts every address that has held a share." : "."}
-            </>
-          ),
-          listingHref: withCensus ? metaMorphoVaultsListingHref(chainId) : null,
-          infoHref: `${metaMorphoVaultRosterHref(chainId)}/info`,
-          drawer: <MorphoRosterDrawer block={readBlock} chain={chain} />,
-        }}
-      />
-    </ProvReceiptsScope>
+    <>
+      <ProvSection scope={ROSTER_SCOPE} as="div">
+        <VaultRoster
+          initialSearch={initialSearch}
+          readTime={readBy?.blockTime}
+          vaults={vaults}
+          yieldOf={(v) => yields[v.address]}
+          kindOf={(v) => v.releaseLabel}
+          chainId={chainId}
+          blockNumber={blockNumber}
+          chainStale={chainStale}
+          skel="directory"
+          facets={FACETS}
+          hrefOf={(v) => metaMorphoVaultHref(chainId, v.address)}
+          holdersHrefOf={(v) => metaMorphoVaultsListingHref(chainId, { vault: v.address })}
+          receiptsOf={(v) => metaMorphoRowReceipts({ ...coords, chainId }, v)}
+          hooksOf={(v) => ({ "data-family": v.release ?? "" })}
+          emptyCountProv={(count) => vaultDirectoryEmptyCountProv(coords, count, catalogSize)}
+          head={{
+            censusFigure: "directory-census",
+            census: (
+              <>
+                <Prov info={vaultDirectoryCensusProv(coords, { catalogSize, censusBlock })}>
+                  The {n(catalogSize)} vaults the two MetaMorpho factories had made at block {n(censusBlock)}
+                </Prov>
+                {withCensus ? "; Holders counts every address holding a share." : "."}
+              </>
+            ),
+            listingHref: withCensus ? metaMorphoVaultsListingHref(chainId) : null,
+            infoHref: `${metaMorphoVaultRosterHref(chainId)}/info`,
+            menu: (
+              <RosterMenu
+                listingHref={withCensus ? metaMorphoVaultsListingHref(chainId) : null}
+                infoHref={`${metaMorphoVaultRosterHref(chainId)}/info`}
+                docs={{
+                  title: "Morpho's documentation",
+                  subtitle: "docs.morpho.org: Vaults V1 roles",
+                  href: "https://docs.morpho.org/curate/concepts/roles/#morpho-vaults-v1-roles",
+                }}
+              />
+            ),
+            drawer: <MorphoRosterDrawer block={readBlock} chain={chain} />,
+          }}
+        />
+      </ProvSection>
+      <CompareBar />
+    </>
   );
 }
 
@@ -149,19 +153,19 @@ function MorphoRosterDrawer({ block, chain }: { block: ReactNode; chain: string 
       </p>
       <h3 className="text-[13px] font-semibold text-foreground">What this page is</h3>
       <p>
-        One row is one vault the two MetaMorpho factories deployed on {chain}, grouped by asset. The list is a floor: a
-        vault deployed without a factory emits no creation event, a vault created since the census block joins when the
-        census runs again, and the Vault V2 family is outside it. Names are read live, because a V1.1 owner can rename a
-        vault. Every figure is a call answered at {block}, re-read at most every five minutes.
+        One row is one vault the two MetaMorpho factories deployed on {chain}. The list is a floor: a vault deployed
+        without a factory emits no creation event, a vault created since the census block joins when the census runs
+        again, and the Vault V2 family is outside it. Names are read live, because a V1.1 owner can rename a vault.
+        Every figure is a call answered at {block}, re-read at most every five minutes.
       </p>
       <h3 className="text-[13px] font-semibold text-foreground">What the figures leave out</h3>
       <p>
         Amounts are in each vault&rsquo;s own asset and nothing is priced in USD, so two assets are never ordered or
         added together. Yield is Rails&rsquo;s figure: the share price&rsquo;s growth over 30 days, annualised simply,
         net of the fees the vault takes inside the share; rewards paid outside the share, such as MORPHO, are not in it.
-        Holders counts every address the census has seen hold a share, live and closed, at its own block: a floor, since
-        an address is often a wrapper. An empty vault answered zero to <code>totalAssets()</code>; a vault with no
-        holder has never minted a share.
+        Holders counts every address holding a share at the census&rsquo;s own block: a floor, since an address is often
+        a wrapper. An empty vault answered zero to <code>totalAssets()</code>; a vault with no holder has never minted a
+        share.
       </p>
     </>
   );

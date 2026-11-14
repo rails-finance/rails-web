@@ -192,9 +192,16 @@ export interface CompoundV2CardCaptions {
   supplyInterestUsd: number | null;
   /** USD of accrued borrow interest included in the debt figure. */
   debtInterestUsd: number | null;
-  /** Current variable borrow APR (%). `avg` when debt-USD-weighted across
-   *  several borrowed markets; `symbol` names the market when single. */
-  borrowRate: { pct: number; avg: boolean; symbol?: string } | null;
+  /** Current variable borrow APY (%). `avg` when debt-USD-weighted across
+   *  several borrowed markets; `symbol` names the market when single, with
+   *  its per-block rate and its model's blocksPerYear() for the receipt. */
+  borrowRate: {
+    pct: number;
+    avg: boolean;
+    symbol?: string;
+    perBlockRaw?: string | null;
+    modelBlocksPerYear?: number | null;
+  } | null;
 }
 
 /** USD of accrued interest included in one side's figure — per live market,
@@ -265,8 +272,8 @@ export function computeCompoundV2CardCaptions(
       ? replayCompoundV2Lifetime(events)
       : null;
 
-  // Borrow rate — from the per-market chain read (borrowRatePerBlock,
-  // annualized on the market's own model). One borrowed market → its own
+  // Borrow rate — from the per-market chain read (borrowRatePerBlock ×
+  // 2,628,000 blocks). One borrowed market → its own
   // rate; several → the debt-USD-weighted average, with the strict guard
   // (every borrowed market rated AND oracle-priced, else omit).
   let borrowRate: CompoundV2CardCaptions["borrowRate"] = null;
@@ -274,7 +281,15 @@ export function computeCompoundV2CardCaptions(
   const rateOf = (market: string): number | null => view.ratesByMarket?.[market]?.borrowApr ?? null;
   if (borrowed.length === 1) {
     const r = rateOf(borrowed[0].market);
-    if (r != null) borrowRate = { pct: r * 100, avg: false, symbol: borrowed[0].symbol };
+    const read = view.ratesByMarket?.[borrowed[0].market];
+    if (r != null)
+      borrowRate = {
+        pct: r * 100,
+        avg: false,
+        symbol: borrowed[0].symbol,
+        perBlockRaw: read?.borrowRatePerBlockRaw ?? null,
+        modelBlocksPerYear: read?.blocksPerYear ?? null,
+      };
   } else if (borrowed.length > 1 && borrowed.every((b) => rateOf(b.market) != null)) {
     let wSum = 0;
     let rSum = 0;

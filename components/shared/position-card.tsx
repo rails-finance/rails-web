@@ -66,16 +66,14 @@ import {
   POSITION_CARD_PAD,
 } from "@/lib/shared/ui-grammar";
 import {
-  POSITION_CARD_SCOPE,
   Prov,
   ProvInert,
   ProvReceiptsScope,
   ProvUnscoped,
   type Provenance,
-  useProvScopeLit,
   useReceiptRegistry,
 } from "@/components/shared/provenance";
-import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
+import { SectionExplainer, type SectionExplainerSlot } from "@/components/shared/section-explainer";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import {
   POSITION_CARD_MAX_HEADS,
@@ -109,6 +107,9 @@ export interface PositionCardStatus {
   /** The tag's read-more: a "?" after the tag on a detail card, drawn as a
    *  panel row's is. */
   tip?: string;
+  /** A sub-code the tag also carries where the state has its own key row
+   *  (rails-ops reference/app-anatomy.md): "C6.1", a shut-down Trove. */
+  anatomy?: string;
 }
 
 /** One headline figure. */
@@ -116,8 +117,9 @@ export interface PositionCardHead {
   /** The headline's name: its React key and `data-card-head`. */
   id: string;
   label: string;
-  /** What the label means, on hover or tap (a dotted underline). */
-  labelTip?: string;
+  /** What the label means, on hover or tap (a dotted underline). A detail
+   *  card's tip can carry receipts (a node); a listing keeps a string one. */
+  labelTip?: ReactNode;
   /** Keep `labelTip` on a listing card, where tips are otherwise quiet: a
    *  headline whose label needs its meaning in the row (Polaris's estimated
    *  ratio). */
@@ -125,6 +127,13 @@ export interface PositionCardHead {
   /** An icon after the label. The closed card's peaks carry their asset here
    *  (Liquity V2's closed face); an open headline puts it in `assets`. */
   labelIcon?: ReactNode;
+  /** Which size the figure takes (decision 0066; ui-jobs 604): an `amount` the
+   *  position holds (collateral, debt, total assets) at the headline size, a
+   *  `measure` of it (a ratio, a rate, a price, a count) a step down on the
+   *  same baseline. Unset, a head with assets, a USD line or a breakdown is an
+   *  amount and any other a measure. A card with no amount draws every head at
+   *  the headline size. */
+  tier?: "amount" | "measure";
   /** The large figure, drawn in the card's figure type. The family keeps its
    *  `Prov`, `FadeNumber` and `HighlightableValue` inside it. `null` draws a
    *  dash. */
@@ -150,16 +159,9 @@ export interface PositionCardHead {
   total?: { usd: number; info: Provenance };
 }
 
-/** The (i) Explanation at the foot of a detail card. */
-export interface PositionCardExplainer {
-  /** The pane's prose; `null` draws no (i). */
-  body: ReactNode | null;
-  /** Open the pane on mount (a surface that remembers it). */
-  defaultOpen?: boolean;
-  onToggle?: (open: boolean) => void;
-  /** The pane's copy-this-view link. */
-  viewHref?: () => string;
-}
+/** The (i) Explanation at the foot of a detail card, drawn through the
+ *  shared `SectionExplainer`. */
+export type PositionCardExplainer = SectionExplainerSlot;
 
 /** The export shapes on the card's ⋮: Copy Position, View as Markdown,
  *  Download CSV (`ExportMenu`'s props). */
@@ -213,6 +215,11 @@ interface PositionCardSlotsCommon {
    *  Detail draws them at the right of the (i) row, listing at the right of
    *  the heading row. `null` where a card has none. */
   counters: PositionCardCounters | null;
+  /** `false` on a card that is not a position (the vault card V2, the vault
+   *  row V1), on a page that names its protocol and chain: no sidebar (C20),
+   *  which marks a position, and no C20.1. A detail card keeps the chain's
+   *  glyph at the heading row's right end at every width (C20.2). */
+  sidebar?: false;
 }
 
 interface PositionCardDetailCommon extends PositionCardSlotsCommon {
@@ -228,9 +235,11 @@ interface PositionCardDetailCommon extends PositionCardSlotsCommon {
   menu: PositionCardMenu | null;
   /** A full-width strip beneath the panel (Morpho Base's allocation band). */
   band?: ReactNode;
-  /** A card-specific line at the foot, above the (i) row (a loading status,
-   *  a block stamp). */
+  /** A card-specific line at the foot, above the (i) row (a loading status). */
   foot?: ReactNode;
+  /** The read stamp at the right of the heading row, before the ⋮ (a vault
+   *  card's "Read 10:12 UTC", `SectionReadStamp`). */
+  stamp?: ReactNode;
 }
 
 /** An open position on its page: the panel is required (empty columns draw
@@ -416,7 +425,7 @@ function PositionCardRow({
   /** The headline's name (`data-card-head`). */
   head: string;
   label: string;
-  labelTip?: string;
+  labelTip?: ReactNode;
   headerIcon?: ReactNode;
   /** A "?" read-more after the label (the Outcome's `tip`). */
   help?: string;
@@ -434,7 +443,7 @@ function PositionCardRow({
         ) : (
           // A listing passes a labelTip only where the head keeps it.
           <QuietTipsContext.Provider value={false}>
-            <TipLabel text={label} tip={labelTip} />
+            <TipLabel text={label} tip={typeof labelTip === "string" ? labelTip : undefined} />
           </QuietTipsContext.Provider>
         )}
         {headerIcon}
@@ -451,7 +460,7 @@ function StatusTag({ status }: { status: PositionCardStatus }) {
     <span className="inline-flex items-center">
       <span
         className={`rounded-xs px-1.5 py-0.5 text-[11px] font-semibold ${POSITION_TAG_TONE[status.tone]}`}
-        data-anatomy="C6"
+        data-anatomy={status.anatomy ? `C6 ${status.anatomy}` : "C6"}
       >
         {status.word}
       </span>
@@ -480,18 +489,29 @@ function ListingPill({ status }: { status: PositionCardStatus | null }) {
   return (
     <span
       className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${status ? POSITION_TAG_TONE[status.tone] : OPEN_PILL}`}
-      data-anatomy="C6"
+      data-anatomy={status?.anatomy ? `C6 ${status.anatomy}` : "C6"}
     >
       {status ? status.word.toUpperCase() : "OPEN"}
     </span>
   );
 }
 
+/** A head's resolved tier (`PositionCardHead.tier`). */
+const tierOf = (h: PositionCardHead): "amount" | "measure" =>
+  h.tier ?? (h.assets != null || h.usd !== undefined || h.breakdown != null ? "amount" : "measure");
+
+/** A measure's figure: a step under the headline size, in a line box of the
+ *  headline's height and dropped to its baseline. */
+const MEASURE_TYPE = "!text-lg lg:!text-xl !font-semibold h-8 lg:h-9 flex items-end lg:pb-px";
+
 function HeadBody({
   head,
   toggle,
+  measure = false,
 }: {
   head: PositionCardHead;
+  /** Drawn a step down (`MEASURE_TYPE`). */
+  measure?: boolean;
   /** The breakdown's button, where the side has one on a detail card. */
   toggle?: {
     open: boolean;
@@ -540,7 +560,7 @@ function HeadBody({
       ) : head.value == null ? (
         <StatDash />
       ) : (
-        <StatValue>
+        <StatValue className={measure ? MEASURE_TYPE : undefined}>
           {trigger ? (
             trigger
           ) : head.assets ? (
@@ -598,6 +618,8 @@ function OpenGrid({ heads, detail }: { heads: PositionCardHead[]; detail: boolea
   };
   const exact = formatUsdValue;
   const title = openHead ? (openHead.total ? `${openHead.label} ${exact(openHead.total.usd)}` : openHead.label) : "";
+  // Tiers apply only where the card holds an amount to stand over its measures.
+  const tiered = heads.some((h) => tierOf(h) === "amount");
   return (
     <>
       <div className={OPEN_GRID} data-anatomy="C10">
@@ -611,7 +633,7 @@ function OpenGrid({ heads, detail }: { heads: PositionCardHead[]; detail: boolea
             headerIcon={h.labelIcon}
             explain={detail}
           >
-            <HeadBody head={h} toggle={toggleOf(h)} />
+            <HeadBody head={h} toggle={toggleOf(h)} measure={tiered && tierOf(h) === "measure"} />
           </PositionCardRow>
         ))}
       </div>
@@ -763,8 +785,10 @@ function DetailMenu({
 // only where its figure exists), so no static count or tuple type can see the
 // number a card reaches; the shell counts what it is handed. Outside
 // production an over-cap card warns once in the console and carries
-// `data-card-over-cap`; it renders as it is, since which value goes is
-// Miles's call (warn-level until he rules on the cards over today).
+// `data-card-over-cap`; it renders as it is. `npm run check:card-caps`
+// (scripts/check-card-caps.mjs) fails on a family's slot builder that can
+// reach past the caps unless scripts/card-caps-over.txt lists it, pending
+// that protocol's review.
 const warnedOverCap = new Set<string>();
 function overCap(slots: PositionCardSlots): string | null {
   if (process.env.NODE_ENV === "production") return null;
@@ -785,7 +809,6 @@ function overCap(slots: PositionCardSlots): string | null {
 export function PositionCard({ slots }: { slots: PositionCardSlots }) {
   const registry = useReceiptRegistry();
   const detail = slots.surface === "detail";
-  const lit = useProvScopeLit(detail ? POSITION_CARD_SCOPE : null);
   const closed = slots.outcome != null;
   const { extra: countersExtra, ...meta } = slots.counters ?? {};
   const counters = slots.counters ? (
@@ -812,48 +835,53 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
   const edge = useContext(PositionCardEdgeContext);
   const wallet = !detail && edge?.surface === "wallet";
   const identity = usePositionCardIdentity();
-  // Below md the sidebar's protocol and chain stand in the heading row (C20.1,
-  // C20.2); from md the panel carries them.
-  const chainPill = identity ? (
-    <span className="flex items-center md:hidden">
-      {/* Outside the row's quiet tips: the glyph's tip names the chain. */}
-      <QuietTipsContext.Provider value={false}>
-        <RevealTip tip={identity.chain.name} focusable align="end" className="rounded-sm focus-ring">
-          <span
-            role="img"
-            aria-label={identity.chain.name}
-            className="flex h-4 items-center text-brand-zone"
-            data-pill="chain"
-            data-anatomy="C20.2"
-          >
-            <ChainGlyph id={identity.chain.id} className="h-4 w-4" />
-          </span>
-        </RevealTip>
-      </QuietTipsContext.Provider>
-    </span>
-  ) : null;
+  // A card with a sidebar: below md its protocol and chain stand in the
+  // heading row (C20.1, C20.2), from md the panel carries them. A card with
+  // none (`sidebar: false`): a detail card's chain glyph at every width.
+  const barred = identity != null && slots.sidebar !== false;
+  const narrowOnly = barred ? "md:hidden" : "";
+  const chainPill =
+    identity && (barred || detail) ? (
+      <span className={`flex items-center ${narrowOnly}`}>
+        {/* Outside the row's quiet tips: the glyph's tip names the chain. */}
+        <QuietTipsContext.Provider value={false}>
+          <RevealTip tip={identity.chain.name} focusable align="end" className="rounded-sm focus-ring">
+            <span
+              role="img"
+              aria-label={identity.chain.name}
+              className="flex h-4 items-center text-brand-zone"
+              data-pill="chain"
+              data-anatomy="C20.2"
+            >
+              <ChainGlyph id={identity.chain.id} className="h-4 w-4" />
+            </span>
+          </RevealTip>
+        </QuietTipsContext.Provider>
+      </span>
+    ) : null;
   // On a detail card the name is the link to the explorer (C20.1).
   const markHref = detail ? identity?.protocol.href : undefined;
-  const protocolMark = identity ? (
-    <span
-      className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-zone md:hidden"
-      data-card-protocol={identity.protocol.id}
-      data-anatomy="C20.1"
-    >
-      <ProtocolIcon id={identity.protocol.id} className="h-4 w-4 shrink-0 text-rb-500" />
-      {markHref ? (
-        <Link
-          href={markHref}
-          aria-label={`${identity.protocol.name} explorer`}
-          className="whitespace-nowrap rounded-sm transition-colors hover:text-foreground focus-visible:text-foreground focus-ring"
-        >
-          {identity.protocol.name}
-        </Link>
-      ) : (
-        identity.protocol.name
-      )}
-    </span>
-  ) : null;
+  const protocolMark =
+    barred && identity ? (
+      <span
+        className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-zone md:hidden"
+        data-card-protocol={identity.protocol.id}
+        data-anatomy="C20.1"
+      >
+        <ProtocolIcon id={identity.protocol.id} className="h-4 w-4 shrink-0 text-rb-500" />
+        {markHref ? (
+          <Link
+            href={markHref}
+            aria-label={`${identity.protocol.name} explorer`}
+            className="whitespace-nowrap rounded-sm transition-colors hover:text-foreground focus-visible:text-foreground focus-ring"
+          >
+            {identity.protocol.name}
+          </Link>
+        ) : (
+          identity.protocol.name
+        )}
+      </span>
+    ) : null;
   const panel = detail ? slots.panel : undefined;
   const over = overCap(slots);
 
@@ -902,6 +930,11 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
             {/* The page's price strip and recency stamp (H7.2, H6; ui-jobs
                     430), handed over by DetailTopRow. The negative margin keeps
                     the row at its text height. */}
+            {slots.stamp && (
+              <span className="flex shrink-0 items-center max-md:ml-auto" data-card-stamp="">
+                {slots.stamp}
+              </span>
+            )}
             <PositionCardStripSlot>
               {(strip) => (
                 <span
@@ -912,7 +945,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
                 </span>
               )}
             </PositionCardStripSlot>
-            {chainPill && <span className="max-md:ml-auto md:hidden">{chainPill}</span>}
+            {chainPill && <span className={`${slots.stamp ? "" : "max-md:ml-auto "}${narrowOnly}`}>{chainPill}</span>}
           </span>
         ) : (
           ((!wallet && slots.tag) || (wallet && edge?.stamp) || chainPill) && (
@@ -957,7 +990,8 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
         (closed ? (
           <PositionCardPanel columns={panel} />
         ) : (
-          <div data-nosnippet="">
+          // A hairline between the headlines and the stats (decision 0066 point 5).
+          <div className="mt-6 border-t border-rb-500/50" data-nosnippet="" data-card-rule="">
             <PositionCardPanel columns={panel} />
           </div>
         ))}
@@ -976,12 +1010,11 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
       data-card-status={slots.status ? slots.status.word.toLowerCase() : "live"}
       data-skel-section={detail ? "detail-card" : "listing-row"}
       data-anatomy={detail ? "P1 C1" : (slots.anatomy ?? "C1")}
-      data-prov-scope={detail ? POSITION_CARD_SCOPE : undefined}
-      data-prov-lit={lit ? "" : undefined}
+      data-prov-scope={detail ? "position-card" : undefined}
       data-card-over-cap={over ?? undefined}
-      className={identity ? `${POSITION_CARD_FRAME_BOX} relative flex` : POSITION_CARD_FRAME}
+      className={barred ? `${POSITION_CARD_FRAME_BOX} relative flex` : POSITION_CARD_FRAME}
       style={
-        identity
+        barred
           ? ({
               "--brand-hue": identity.hue ?? 0,
               ...(identity.hue == null ? { "--brand-strength": 0 } : {}),
@@ -989,7 +1022,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
           : undefined
       }
     >
-      {identity && (
+      {barred && (
         <>
           {/* The zone's tint: the card's shape clipped to its left edge, a
               border below md and the panel (with the body's rounded corners
@@ -1000,7 +1033,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
       )}
       <div
         className={
-          identity
+          barred
             ? `relative min-w-0 flex-1 md:rounded-[15px] md:bg-raised ${POSITION_CARD_PAD} max-md:pl-[26px]`
             : "contents"
         }
@@ -1011,23 +1044,15 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
           <>
             {slots.band}
             {slots.foot}
-            <ProvenanceInfoTabs
-              className="mt-3"
+            <SectionExplainer
+              slot={slots.explainer}
               rowExtra={
                 counters ? <span className="ml-auto flex items-center gap-2 self-center">{counters}</span> : undefined
               }
-              // The (i) pane restates the live figures in words.
-              explanation={
-                slots.explainer.body == null ? undefined : closed ? (
-                  slots.explainer.body
-                ) : (
-                  <div data-nosnippet="">{slots.explainer.body}</div>
-                )
-              }
+              // The (i) pane restates the live figures in words; a closed
+              // card's are final, so search may quote them.
+              snippet={closed}
               learnMore={slots.learnMore}
-              viewHref={slots.explainer.viewHref}
-              explanationDefaultOpen={slots.explainer.defaultOpen}
-              onExplanationToggle={slots.explainer.onToggle}
               anatomy={CARD_ANATOMY}
               label={explanationLabel(slots.heading)}
             />
@@ -1040,9 +1065,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
   return detail ? (
     // verify-unscoped-prov's tripwire: return `frame` bare from this branch and
     // every detail card's figures report as unscoped.
-    <ProvReceiptsScope registry={registry} scopeId={POSITION_CARD_SCOPE}>
-      {frame}
-    </ProvReceiptsScope>
+    <ProvReceiptsScope registry={registry}>{frame}</ProvReceiptsScope>
   ) : (
     <ProvUnscoped>{frame}</ProvUnscoped>
   );

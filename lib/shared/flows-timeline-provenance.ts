@@ -182,10 +182,13 @@ export function ledgerPartProv(
  *  transaction, one dollar a token. */
 export function faceUsdProv(symbol: string, amount: string, which: "before" | "after"): Provenance {
   return {
-    kind: "chain-derived",
+    kind: "derived",
     summary: `Debt ${which} this event in USD. The ${symbol} owed ${which} the transaction at its $1 face, as the Lifetime flows count it.`,
-    formula: `${symbol} × $1`,
-    inputs: [{ label: "debt", value: `${amount} ${symbol}`, kind: "chain", note: which }],
+    formula: "debt × $1",
+    inputs: [
+      { label: "debt", value: `${amount} ${symbol}`, kind: "chain", note: which },
+      { label: "face", value: "$1", kind: "derived", definition: true, note: `${symbol} redeems at $1` },
+    ],
   };
 }
 

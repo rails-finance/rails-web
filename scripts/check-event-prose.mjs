@@ -71,6 +71,8 @@ const FAMILIES = {
     },
     /** Sections a modal's intro fills from (read as `FILE.<section>.x`). */
     modalWords: "L5_words",
+    /** Modal fields the loader fills beyond the intros (the adjust modal's Max LTV). */
+    modalFilled: ["L5.adjust.extraParagraphs"],
     /** Files that print the file's words, scanned for the ids they read. */
     readers: [
       "lib/liquity/event-prose.ts",
@@ -962,10 +964,12 @@ function checkFamily(family, F) {
       ]),
       ...(m.links ?? []).map((l, i) => [`links[${i}].label`, l?.label]),
     ];
-    // Only the intros are filled (modal() in the loader); a brace elsewhere would print as typed.
+    // Only the intros, and the fields a family names in `modalFilled`, are filled (modal() in
+    // the loader); a brace elsewhere would print as typed.
     for (const [f, s] of strings) {
       if (!isLine(s) || !/\{/.test(s)) continue;
-      if (f === "intro" || f === "intro_delegated") placeholders(`L5.${k}.${f}`, s, modalNames, false);
+      const filled = (F.modalFilled ?? []).includes(`L5.${k}.${f.replace(/\[\d+\]$/, "")}`);
+      if (f === "intro" || f === "intro_delegated" || filled) placeholders(`L5.${k}.${f}`, s, modalNames, false);
       else fail(`L5.${k}.${f}: has a placeholder, and the code fills only a modal's intro`);
     }
   }

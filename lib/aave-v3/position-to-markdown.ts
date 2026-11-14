@@ -262,7 +262,7 @@ export function aaveV3PositionToMarkdown(args: AaveV3PositionMarkdownArgs): stri
   if (chain && !chain.chainStale) {
     lines.push(...aaveLtvLines(chain));
     if (chain.availableBorrowsUsd > 0) {
-      lines.push(`- **Available to borrow:** ${usd(chain.availableBorrowsUsd)} more before the LTV cap`);
+      lines.push(`- **Available to borrow:** ${usd(chain.availableBorrowsUsd)} more before the Max LTV`);
     }
   }
   lines.push("");

@@ -1,3 +1,4 @@
+// focus: about Rails itself; no asset or chain to filter
 import Link from "next/link";
 import type { Metadata } from "next";
 import { HOME_SHARE_IMAGE, SITE_URL, twitterCard } from "@/lib/shared/page-metadata";
@@ -36,6 +37,10 @@ export default function AboutPage() {
         wallet connection, no signatures, no login.{" "}
         <Link href="/about/architecture" className={LINK}>
           How the data gets to the page
+        </Link>
+        {" · "}
+        <Link href="/about/provenance" className={LINK}>
+          How to check a figure
         </Link>
       </p>
 

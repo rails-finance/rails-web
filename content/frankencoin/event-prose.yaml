@@ -437,7 +437,8 @@ words:
 # ── The position card's explanation (zone Z1): an unheaded lead, then bullets
 # under Holdings, Risk, Rate and History when two of them hold two or more
 # bullets. Risk holds at most four: the declared price with the room it leaves,
-# a running challenge, a running pause and the expiry.
+# a running challenge or else the challenge phases, a running pause and the
+# expiry.
 # Read by positionWords / positionNodes (lib/frankencoin/event-templates.ts). ──
 position_words:
   heading_holdings: |-
@@ -471,6 +472,8 @@ position_words:
     The owner declared {price} ZCHF per {coll_symbol} as the liquidation price.
   challenged_now: |-
     {challenged} {coll_symbol} of the collateral is under challenge right now.
+  challenge_phases: |-
+    A challenge of the declared price runs two phases of {phase} each.
   paused: |-
     Minting and withdrawals are paused until {until} after a price raise.
   expires: |-

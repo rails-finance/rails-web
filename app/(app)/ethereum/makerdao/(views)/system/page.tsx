@@ -6,8 +6,9 @@ import { MakerSystemView, MakerSystemStamp } from "@/components/protocol/makerda
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { loadMakerSystemFromChain } from "@/lib/sources/chain/makerdao-system";
 import { protocolForHref } from "@/lib/shared/protocols";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { FocusSourceGate } from "@/components/shared/aim-gate";
+import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
 
 // ISR, ten minutes. This is a protocol aggregate, not a wallet's page: the
 // same render serves every visitor, so re-reading the contracts per request
@@ -34,8 +35,19 @@ export default async function MakerSystemPage() {
       <div className="py-8">
         <SubPageHeader protocol={PROTOCOL} title="The Vat" stamp={<MakerSystemStamp data={data} />} />
 
-        <MakerSystemView data={data} />
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
+        {/* Focus (ui-jobs 557): the Vat counts by DAI, MKR and the collateral of
+            the ilks a wallet can open a vault in (ETH as WETH). */}
+        <FocusSourceGate
+          source={{
+            own: [TOKEN_ADDRESSES.DAI, TOKEN_ADDRESSES.MKR],
+            eth: data.ilks.some((i) => i.userVaultType && i.collateralSymbol === "ETH") ? TOKEN_ADDRESSES.WETH : null,
+            vaults: data.ilks.filter((i) => i.userVaultType).map((i) => ({ collateralSymbol: i.collateralSymbol })),
+          }}
+          chain={1}
+          what="MakerDAO's system"
+        >
+          <MakerSystemView data={data} />
+        </FocusSourceGate>
         <ProvInspectorLayer />
       </div>
     </div>

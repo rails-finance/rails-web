@@ -1,11 +1,11 @@
 "use client";
 
 // One vault HOLDING as a listing card — the pair `(vault, holder)` — for the
-// Aave vault layer on Ethereum and MetaMorpho on Base (Yearn has no census and
-// no listing). The card is a slot builder (rails-ops TO-DO-position-card 322,
+// Aave vault layer on Ethereum and MetaMorpho on Base (Yearn has no listing).
+// The card is a slot builder (rails-ops TO-DO-position-card 322,
 // 323, 324): `vaultCardSlots` turns the census row and the listing's live read
 // into one `PositionCardSlots` object and the shared `PositionCard` draws it.
-// The holder page draws components/vaults/vault-holding-card.tsx.
+// The holder page draws components/vaults/vault-holding-plain-card.tsx (V8).
 //
 // Heads: Balance (the shares, with the census's USD beneath) and Share of the
 // vault; a closed holding has one head, Closed by, and the Outcome column. The
@@ -60,6 +60,7 @@ const n = (v: number) => v.toLocaleString("en-US");
 const FAMILY_SINGULAR: Record<VaultPositionFamily, string> = {
   ...AAVE_FAMILY_SINGULAR,
   morpho: "MetaMorpho vault",
+  "yearn-v3": "Yearn V3 vault",
 };
 
 /** Which chain a row was censused on, and the routes that follow from it. */

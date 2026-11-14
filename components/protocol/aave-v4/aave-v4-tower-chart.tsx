@@ -69,7 +69,7 @@ const OUTFLOW_PRICE_NOTE =
 const inflowProv = (side: "supply" | "debt") =>
   accumProv(
     side === "supply"
-      ? "Total collateral deposited over the position's life"
+      ? "Total collateral supplied over the position's life"
       : "Total borrowed over the position's life",
     {
       formula:
@@ -825,7 +825,7 @@ export function AaveV4TowerChart({
     if (usd < LIFETIME_DUST_USD) return [];
     const earning = allRows.filter((r) => (side === "supply" ? r.supplyInterestUsd : r.debtInterestUsd) > 0);
     const one = earning.length === 1 ? earning[0] : null;
-    const label = side === "supply" ? "Interest earned" : "Accrued interest";
+    const label = side === "supply" ? "Earned interest" : "Accrued interest";
     const v = fmtUsd(usd);
     return [
       {
@@ -855,11 +855,11 @@ export function AaveV4TowerChart({
       ? [
           {
             sign: "",
-            label: partialLabel("Deposited (all time)", depositedExcluded),
+            label: partialLabel("Supplied (all time)", depositedExcluded),
             amount: totalAmount(totalDepositedUsd, depositedExcluded),
             swatchStyle: { backgroundColor: COLLATERAL_FADED },
             icon: collSideSymbol ? <TokenChipIcon symbol={collSideSymbol} size={14} filterable={false} /> : undefined,
-            prov: partialSumProv(depositedProv(), "Deposited (all time)", depositedExcluded),
+            prov: partialSumProv(depositedProv(), "Supplied (all time)", depositedExcluded),
           } as BreakdownRow,
         ]
       : []),
@@ -984,7 +984,7 @@ export function AaveV4TowerChart({
           placeholder: collPlaceholder,
           sideBarTooltip: collSideBar ? (
             <div className="flex items-center gap-1.5">
-              <span>Deposited + interest earned</span>
+              <span>Supplied + interest earned</span>
               {dirArrow("in")}
               <span className="ml-auto tabular-nums">{fmtUsd(depositedBarUsd).title}</span>
             </div>

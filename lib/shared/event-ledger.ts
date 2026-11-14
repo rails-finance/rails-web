@@ -105,7 +105,7 @@ const THIS_ROW: Record<string, string> = {
   Redemption: "This redemption",
   Liquidation: "This liquidation",
   Liquidated: "This liquidation",
-  "Upfront fee": "This upfront fee",
+  "Upfront Borrowing Fee": "This Upfront Borrowing Fee",
   Redistribution: "This redistribution",
   "Transferred in": "This transfer in",
   "Transferred out": "This transfer out",

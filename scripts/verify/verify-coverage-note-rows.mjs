@@ -17,8 +17,8 @@
  * included-capability pill on a mobile card is its own trigger, opening a
  * bottom sheet with that capability's `detail` (capability-sheet.tsx) — see
  * mobile()'s own assertions. Single-open accordion across all THREE header/
- * cell/essay grammars; zebra-by-data-index, full-bleed colSpan and border-t
- * seams all still hold. The mobile card stack's own disclosure (protocol view
+ * cell/essay grammars; one ground for every row (no stripes), full-bleed
+ * colSpan and the house table's hairlines all still hold. The mobile card stack's own disclosure (protocol view
  * + structural note, unrelated to the capability sheet) is unchanged.
  *
  * Visibility is asserted with innerText / bounding boxes, never textContent —
@@ -42,8 +42,8 @@
  * That row makes NO capability claims: an icon, a linked name, a neutral
  * "Coming soon" pill, and one muted note spanned across every capability
  * column, never a mark or a disclosure trigger of its own. Row order, pill
- * neutrality, the spanned colSpan, the absent marks/triggers, and zebra
- * parity through that row are all asserted below, with the row count and its
+ * neutrality, the spanned colSpan and the absent marks/triggers are all
+ * asserted below, with the row count and its
  * expected neighbours derived from the page's own `COMING_SOON` array (never
  * hardcoded to "LlamaLend V2" specifically).
  */
@@ -328,7 +328,8 @@ async function desktop(theme) {
   // end-to-end, derived from source rather than asserting two hardcoded
   // neighbour names — a second coming-soon entry (or a reordered roster)
   // moves the expectation with it.
-  const rowLabels = (await table.locator("th[scope=row] a").allTextContents()).map((s) =>
+  // The row's own link (D4): every cell also carries a hidden cover link.
+  const rowLabels = (await table.locator("th[scope=row] a[data-row-link]").allTextContents()).map((s) =>
     s.replace(/\s+/g, " ").trim(),
   );
   assert(rowLabels.length === TOTAL_ROWS, `${TOTAL_ROWS} row-header labels found`);
@@ -365,7 +366,12 @@ async function desktop(theme) {
       `the note cell spans all ${CAP_COUNT} capability columns (colspan=${soonColSpan})`,
     );
     assert((await soonNoteCell.innerText()).length > 0, "the coming-soon note text renders in the spanned cell");
-    assert((await soonRow.locator("td svg").count()) === 0, "the coming-soon row carries NO capability marks");
+    // The lead zone (D5) draws the protocol's and chain's marks; no other cell
+    // carries one.
+    assert(
+      (await soonRow.locator("td:not([data-anatomy~='D5']) svg").count()) === 0,
+      "the coming-soon row carries NO capability marks",
+    );
     assert((await soonRow.locator("button").count()) === 0, "the coming-soon row has no essay or popover trigger");
   } else {
     // Empty list — assert the ABSENCE rather than skipping, or an accidental
@@ -426,61 +432,41 @@ async function desktop(theme) {
   // combined disclosure, just not for desktop's essay row anymore). Scoped to
   // `td`s that wrap an essay panel div — the coming-soon row's own spanned
   // `<td>` also carries a `colspan` (asserted separately above, at CAP_COUNT
-  // not CAP_COUNT + 1) and must NOT be counted as an essay row here.
+  // not CAP_COUNT + 2) and must NOT be counted as an essay row here. The essay
+  // cell spans the lead column, the name column and every capability.
   const spans = await table
     .locator("tbody tr td[colspan]")
     .filter({ has: page.locator("[id^='coverage-details-']") })
     .evaluateAll((tds) => tds.map((td) => Number(td.getAttribute("colspan"))));
   assert(spans.length === NOTED.length, `${NOTED.length} essay rows (one per protocol with a structural note)`);
   assert(
-    spans.every((s) => s === CAP_COUNT + 1),
-    `every essay row spans ${CAP_COUNT + 1} columns`,
+    spans.every((s) => s === CAP_COUNT + 2),
+    `every essay row spans ${CAP_COUNT + 2} columns`,
   );
 
-  // Divider sits ABOVE each row (border-t), not below — otherwise the seam
-  // falls between a row and its own note.
-  const borderT = await markRows.evaluateAll((trs) => trs.map((tr) => getComputedStyle(tr).borderTopWidth !== "0px"));
-  assert(borderT[0] === false, "first row has no top border");
+  // Rows part on a hairline (D1): the cells' bottom border, no gap and no
+  // border on the row, on the page's ground (no stripes). A seam on the row
+  // would fall between a row and its own drawer.
+  const spacing = await table.evaluate((t) => getComputedStyle(t).borderSpacing);
+  assert(/^0px( 0px)?$/.test(spacing), `rows sit flush, parted by a hairline (border-spacing ${spacing})`);
+  const borders = await markRows.evaluateAll((trs) =>
+    trs.map((tr) => getComputedStyle(tr).borderTopWidth !== "0px" || getComputedStyle(tr).borderBottomWidth !== "0px"),
+  );
+  assert(!borders.some(Boolean), "no row carries a top or bottom border");
+  const hairline = await markRows
+    .nth(0)
+    .evaluate((tr) => getComputedStyle(tr.querySelector("th[scope=row]")).borderBottomWidth);
+  assert(hairline === "1px", `a data row's cells draw a 1px hairline under it (${hairline})`);
+  const grounds = await markRows.evaluateAll((trs) =>
+    trs.map((tr) => getComputedStyle(tr.querySelector("th[scope=row]")).backgroundColor),
+  );
   assert(
-    borderT.slice(1).every(Boolean),
-    `rows 2..${borderT.length} each carry a top border (${borderT.slice(1).filter(Boolean).length}/${borderT.length - 1})`,
-  );
-  const borderB = await markRows.evaluateAll((trs) =>
-    trs.map((tr) => getComputedStyle(tr).borderBottomWidth !== "0px"),
-  );
-  assert(!borderB.some(Boolean), "no row carries a bottom border");
-
-  /* Zebra striping — asserted in BOTH themes (this fn runs for each). Row 1 is
-     canvas; row 2 carries the alternate tint, so their computed backgrounds
-     must differ. Parity is by data index, not nth-child, so the always-mounted
-     essay rows can't shift the pattern. */
-  const bg1 = await markRows.nth(0).evaluate((tr) => getComputedStyle(tr).backgroundColor);
-  const bg2 = await markRows.nth(1).evaluate((tr) => getComputedStyle(tr).backgroundColor);
-  assert(bg1 !== bg2, `zebra: data row 2 background differs from row 1 (${bg1} vs ${bg2})`);
-
-  // The coming-soon row participates in the SAME merged-index parity as any
-  // other row — no reset, no row of its own outside the pattern. Read every
-  // markRow's background + text once, locate the soon row by its label, and
-  // check it differs from its immediate neighbours (alternation holds right
-  // across it, not just at rows 1/2 above).
-  const zebraRows = await markRows.evaluateAll((trs) =>
-    trs.map((tr) => ({ bg: getComputedStyle(tr).backgroundColor, text: tr.innerText })),
+    new Set(grounds).size === 1,
+    `every data row lies on one ground, no stripes (${[...new Set(grounds)].join(", ")})`,
   );
   if (HAS_SOON) {
-    const soonZebraIdx = zebraRows.findIndex((r) => r.text.includes(EXPECTED_ROWS[SOON_IDX].label));
-    assert(soonZebraIdx !== -1, "the coming-soon row is found among the striped rows");
-    if (soonZebraIdx > 0) {
-      assert(
-        zebraRows[soonZebraIdx].bg !== zebraRows[soonZebraIdx - 1].bg,
-        "the coming-soon row's stripe differs from the row above it",
-      );
-    }
-    if (soonZebraIdx < zebraRows.length - 1) {
-      assert(
-        zebraRows[soonZebraIdx].bg !== zebraRows[soonZebraIdx + 1].bg,
-        "the coming-soon row's stripe differs from the row below it",
-      );
-    }
+    const soonIdx = (await markRows.allInnerTexts()).findIndex((t) => t.includes(EXPECTED_ROWS[SOON_IDX].label));
+    assert(soonIdx !== -1, "the coming-soon row is found among the data rows");
   }
 
   /* Collapsed state — visibility asserted two independent ways, once for each
@@ -694,16 +680,24 @@ async function desktop(theme) {
   const tableBox = await table.boundingBox();
   const mapleCellBox = await mapleEssay.locator("xpath=ancestor::td[1]").boundingBox();
   assert(Math.abs(mapleCellBox.width - tableBox.width) < 4, "essay panel cell spans the full table width");
-  // The open essay row shares its parent data row's background, so it reads
-  // as part of that row rather than a band of its own.
+  // The open essay row reads as its data row's block: the same ground, and
+  // no hairline between them.
   const rowBgs = await mapleEssay.evaluate((el) => {
-    const noteRow = el.closest("tr");
-    const dataRow = noteRow.previousElementSibling;
-    return { note: getComputedStyle(noteRow).backgroundColor, data: getComputedStyle(dataRow).backgroundColor };
+    const noteCell = el.closest("td");
+    const dataCell = noteCell.closest("tr").previousElementSibling.querySelector("th[scope=row]");
+    return {
+      note: getComputedStyle(noteCell).backgroundColor,
+      data: getComputedStyle(dataCell).backgroundColor,
+      line: getComputedStyle(dataCell).borderBottomColor,
+    };
   });
   assert(
     rowBgs.note === rowBgs.data,
     `open essay row shares its parent's background (${rowBgs.note} === ${rowBgs.data})`,
+  );
+  assert(
+    /rgba\(0, 0, 0, 0\)|transparent/.test(rowBgs.line),
+    `no hairline between a data row and its open essay (${rowBgs.line})`,
   );
 
   /* Single-open ACROSS ROWS, and across kinds: opening morpho's views popover
@@ -930,9 +924,11 @@ async function desktop(theme) {
     .evaluateAll((els) => els.map((e) => e.id));
   assert(new Set(panelIds).size === panelIds.length, "every popover/essay/header panel id is unique across the table");
 
-  /* Theme sanity with a panel open. */
-  const seam = await markRows.nth(3).evaluate((tr) => getComputedStyle(tr).borderTopColor);
-  console.log(`  (${theme} seam colour: ${seam})`);
+  /* Theme sanity with a panel open: the hairline follows the theme. */
+  const seam = await markRows
+    .nth(3)
+    .evaluate((tr) => getComputedStyle(tr.querySelector("th[scope=row]")).borderBottomColor);
+  console.log(`  (${theme} hairline: ${seam})`);
 
   await page.close();
   return { seam, width: sectionBox.width };
@@ -1043,7 +1039,7 @@ async function mobile(theme) {
   // desktop — both read from the one shared coverageRows() helper, so a drift
   // between the two layouts would show up here.
   const mobileLabels = (
-    await page.locator("section.lg\\:hidden div.rounded-2xl.bg-raised span.font-semibold").allTextContents()
+    await page.locator("section.lg\\:hidden div.rounded-2xl.bg-raised a > span.font-semibold").allTextContents()
   ).map((s) => s.trim());
   assert(mobileLabels.length === TOTAL_ROWS, `${TOTAL_ROWS} mobile card labels found`);
   assert(
@@ -1153,7 +1149,8 @@ async function comingSoon() {
   // CSS-hidden (`lg:hidden`) at this desktop viewport — `a[href]` presence
   // alone doesn't tell hidden from shown, so this counts only the copy inside
   // the (visible) table.
-  const tableLinks = await page.locator(`table a[href='${soonHref}']`).count();
+  // The row's own link; the cells' hidden covers (D4) repeat its href.
+  const tableLinks = await page.locator(`table a[data-row-link][href='${soonHref}']`).count();
   assert(tableLinks === 1, `exactly one ${soonHref} link renders in the table row (${tableLinks})`);
   await page.close();
 }
@@ -1209,7 +1206,7 @@ async function base() {
 
 const light = await desktop("light");
 const dark = await desktop("dark");
-assert(light.seam !== dark.seam, `light and dark seams differ (${light.seam} vs ${dark.seam})`);
+assert(light.seam !== dark.seam, `light and dark hairlines differ (${light.seam} vs ${dark.seam})`);
 await mobile("light");
 await comingSoon();
 await base();

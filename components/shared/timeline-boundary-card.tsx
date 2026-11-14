@@ -166,7 +166,7 @@ export function TimelineBoundaryCard({ boundary: b, protocolKey, csvExport, isLa
     <a
       href={explorerUrl(chainId, "block", b.cutBlock)}
       target="_blank"
-      rel="noopener noreferrer"
+      rel="noopener"
       className="link-external"
       onClick={(e) => e.stopPropagation()}
     >

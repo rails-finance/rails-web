@@ -1,7 +1,9 @@
 "use client";
 
-// The Pendle market roster on the house table (components/shared/data-table):
-// one row per market the router record names, read at one block.
+// The Pendle market roster's table section (R1.2, under the roster's R0 head,
+// lib/pendle/product.tsx): one row per market the router record names, read
+// at one block, in its own receipts scope with its ⋮ (Download CSV) on the
+// house table (components/shared/data-table).
 // ----------------------------------------------------------------------------
 // D1 one-line rows (`rowHeight="one"`); D2 sortable headers, the sort in `?sort=` and `?dir=`, each
 // written only off its default (maturity, soonest first); D3 the market pinned
@@ -10,20 +12,37 @@
 // lead zone: one protocol on one chain. Worked example: the vault index table
 // (components/vaults/vault-index-table.tsx, V6).
 //
-// FACETS (ListToolbar, kept in the URL so Save this view and Copy link keep
-// them): Underlying (the Rails label of the protocol behind the yield token,
+// FACETS (ListToolbar, kept in the URL so Save listing and Copy link keep
+// them): Underlying protocol (the Rails label of the protocol behind the yield token,
 // lib/pendle/underlying.ts, "Not labelled" a value of its own), Maturity
 // (active by default; `?maturity=matured` or `all`), Asset. The search narrows
-// by market, PT, yield token, asset and address.
+// by market, PT, yield token, asset and any of the market's addresses.
+//
+// WALLET ROW (N1.1): a wallet address or ENS name that matches no market draws
+// one row above the table opening that wallet's Pendle positions; Enter in the
+// field opens it too, and ↓ moves focus to it. Every market, PT, YT, SY, yield token and asset address is
+// in the roster, and none of them is a wallet, so the check is the search over
+// every market whatever the facets: no read per keystroke. An ENS name resolves
+// on Enter or on the row.
 //
 // Every market figure keeps its receipt.
 
-import { useCallback, useMemo, useState, type ReactNode } from "react";
-import { Prov, ProvReceiptsScope, useReceiptRegistry, type Provenance } from "@/components/shared/provenance";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+} from "react";
+import { Prov, type Provenance } from "@/components/shared/provenance";
+import { ProvSection, SectionHeading } from "@/components/shared/section-menu";
+import { ToolsFor } from "@/components/shared/product/product-head";
 import { AssetUnit } from "@/components/shared/asset-unit";
 import { RevealTip } from "@/components/shared/reveal-tip";
-import { BlockRef } from "@/components/shared/block-ref";
-import { FrontDoorSearch } from "@/components/shared/front-door-search";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
+import { lookable, useLookup } from "@/components/shared/front-door-search";
 import { PendleTokenIcon } from "@/components/protocol/pendle/pendle-token-icon";
 import { ListToolbar } from "@/components/shared/filter-bar/list-toolbar";
 import type { FilterDimension } from "@/components/shared/filter-bar/types";
@@ -40,9 +59,7 @@ import {
 } from "@/components/shared/data-table/data-table";
 import { notifyUrlChanged, useUrlSearchParams } from "@/lib/shared/use-url-search-params";
 import { formatCompact } from "@/lib/shared/format-compact";
-import { CARD_INSET_START } from "@/lib/shared/ui-grammar";
 import {
-  PENDLE_CHAIN_ID,
   apyText,
   assetDecimals,
   assetSymbol,
@@ -51,17 +68,12 @@ import {
   maturityDate,
   maturityWords,
   rate,
+  shortAddress,
   units,
 } from "@/lib/pendle/format";
-import {
-  impliedApyProv,
-  markProv,
-  maturityProv,
-  readBlockProv,
-  tvlProv,
-  underlyingProv,
-  valueProv,
-} from "@/lib/pendle/provenance";
+import { impliedApyProv, markProv, maturityProv, tvlProv, underlyingProv, valueProv } from "@/lib/pendle/provenance";
+import { PENDLE_WORDS } from "@/lib/pendle/words";
+import { emptyPool } from "@/lib/pendle/rules";
 import { UNDERLYING_LABEL_TIP, underlyingProtocol } from "@/lib/pendle/underlying";
 import { pendleMarketHref, pendleWalletHref } from "@/lib/pendle/routes";
 import type { PendleRoster, PendleRosterEntry } from "@/lib/pendle/types";
@@ -83,7 +95,7 @@ interface Column {
 const COLUMNS: readonly Column[] = [
   { key: "market", label: "Market", first: "asc", numeric: false },
   { key: "apy", label: "Implied APY", first: "desc", numeric: true },
-  { key: "tvl", label: "TVL", first: "desc", numeric: true },
+  { key: "tvl", label: PENDLE_WORDS.liquidity, first: "desc", numeric: true },
   { key: "pt", label: "PT price", first: "desc", numeric: true },
   { key: "maturity", label: "Maturity", first: "asc", numeric: true },
 ];
@@ -91,8 +103,8 @@ const DEFAULT_SORT: SortKey = "maturity";
 
 /** How a column sorts, where that is not plain from its figure. */
 const SORT_NOTE: Partial<Record<SortKey, string>> = {
-  apy: "The fixed rate the market prices PT at, at this block. Sorts by that rate; a matured market has none and sorts last.",
-  tvl: "The pool's SY and its PT at the PT's rate, in the market's asset. Sorts by asset, then by TVL within each asset.",
+  apy: "Pendle's docs: the market consensus of the future APY of an asset. Sorts by that rate; a matured market or an empty pool has none and sorts last.",
+  tvl: "The pool's SY and its PT at the PT's rate, in the market's asset. Sorts by asset, then by liquidity within each asset.",
   pt: "What one PT is worth in the market's asset. Sorts by asset, then by price within each asset.",
   maturity: "Sorts by the expiry date, soonest first.",
 };
@@ -100,6 +112,8 @@ const SORT_NOTE: Partial<Record<SortKey, string>> = {
 const nameOf = (m: PendleRosterEntry) => marketName(m.tokens);
 const assetOf = (m: PendleRosterEntry) => assetSymbol(m.tokens);
 const tvlOf = (m: PendleRosterEntry) => units(m.tvl?.asset, assetDecimals(m.tokens));
+/** An empty pool (lib/pendle/rules.ts): its stored rate is not shown. */
+const emptyOf = (m: PendleRosterEntry) => emptyPool(m.expired, m.tvl, m.tokens.sy.decimals);
 
 /** The PT's price in the asset: ptToSy × SY.exchangeRate(), both 1e18-scaled. */
 function ptToAsset(m: PendleRosterEntry): string | null {
@@ -111,7 +125,7 @@ function ptToAsset(m: PendleRosterEntry): string | null {
 function figureOf(key: SortKey, m: PendleRosterEntry): number | null {
   switch (key) {
     case "apy":
-      return m.impliedApy;
+      return emptyOf(m) ? null : m.impliedApy;
     case "tvl":
       return tvlOf(m);
     case "pt":
@@ -168,6 +182,25 @@ function facetsFromSearch(search: string): Facets {
   };
 }
 
+/** Whether a market answers the search: its names, its tokens' symbols, its
+ *  Rails label and every address it is built from. */
+function searchMatch(m: PendleRosterEntry, want: string): boolean {
+  const t = m.tokens;
+  return [
+    nameOf(m),
+    t.pt.symbol,
+    t.yieldToken.symbol,
+    assetOf(m),
+    underlyingOf(m),
+    t.market.address,
+    t.pt.address,
+    t.yt.address,
+    t.sy.address,
+    t.yieldToken.address,
+    t.asset.address,
+  ].some((x) => x != null && x.toLowerCase().includes(want));
+}
+
 function writeParams(next: Record<string, string | null>) {
   const p = new URLSearchParams(window.location.search);
   for (const [k, v] of Object.entries(next)) v == null || v === "" ? p.delete(k) : p.set(k, v);
@@ -208,7 +241,32 @@ const NONE = (
   </span>
 );
 
-export function PendleRosterView({
+/** Every market as CSV, whatever the filters. */
+function rosterCsv(markets: PendleRosterEntry[]): string {
+  const q = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+  const rows = markets.map((m) => {
+    const t = m.tokens;
+    return [
+      nameOf(m),
+      t.market.address,
+      underlyingOf(m),
+      assetOf(m),
+      // The table's figure: blank where it shows none (matured, unread, an empty pool).
+      figureOf("apy", m)?.toFixed(6) ?? "",
+      exact(m.tvl?.asset, assetDecimals(t)) ?? "",
+      ptToAsset(m) == null ? "" : String(rate(ptToAsset(m))),
+      new Date(t.expiry * 1000).toISOString().slice(0, 10),
+      maturityOf(m),
+    ]
+      .map((v) => q(String(v)))
+      .join(",");
+  });
+  return ["market,address,underlying,asset,implied_apy,tvl_in_asset,pt_price_in_asset,maturity,status", ...rows].join(
+    "\n",
+  );
+}
+
+export function PendleRosterTable({
   roster,
   at,
   initialSearch,
@@ -217,7 +275,6 @@ export function PendleRosterView({
   at: number;
   initialSearch: string;
 }) {
-  const registry = useReceiptRegistry();
   const markets = roster.markets;
   const [query, setQuery] = useState("");
   const [facets, setFacets] = useState<Facets>(() => facetsFromSearch(initialSearch));
@@ -285,7 +342,11 @@ export function PendleRosterView({
       clearDefault: (s) => ({ ...s, facets: { ...s.facets, maturity: ["all"] } }),
       chipLabel: (v) => (v[0] === "matured" ? "Matured" : v[0] === "all" ? "Every market" : "Active"),
     };
-    return [multi("underlying", "Underlying", underlyingOf), maturity, multi("asset", "Asset", assetOf)];
+    return [
+      multi("underlying", PENDLE_WORDS.underlyingProtocol, underlyingOf),
+      maturity,
+      multi("asset", "Asset", assetOf),
+    ];
   }, [markets]);
 
   const state: RosterFilters = { q: query, sortBy: sort, sortOrder: dir, facets };
@@ -305,22 +366,33 @@ export function PendleRosterView({
       (mat === "all" || maturityOf(m) === mat) &&
       ((s.facets.underlying?.length ?? 0) === 0 || s.facets.underlying.includes(underlyingOf(m))) &&
       ((s.facets.asset?.length ?? 0) === 0 || s.facets.asset.includes(assetOf(m))) &&
-      (want === "" ||
-        [
-          nameOf(m),
-          m.tokens.pt.symbol,
-          m.tokens.yieldToken.symbol,
-          assetOf(m),
-          m.tokens.market.address,
-          m.tokens.pt.address,
-          underlyingOf(m),
-        ].some((x) => x != null && x.toLowerCase().includes(want)));
+      (want === "" || searchMatch(m, want));
   };
   const shown = markets.filter(passesFor(state)).sort(comparator(sort, dir));
 
+  const typed = query.trim();
+  const walletKind = lookable(typed);
+  const wallet = walletKind != null && !markets.some((m) => searchMatch(m, needle)) ? walletKind : null;
+  const lookup = useLookup(pendleWalletHref);
+  const { setProblem } = lookup;
+  useEffect(() => setProblem(null), [typed, setProblem]);
+  const onSearchKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (wallet == null) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      document.querySelector<HTMLElement>("[data-pendle-wallet-row] :is(a, button)")?.focus();
+      return;
+    }
+    if (e.key !== "Enter" || lookup.resolving) return;
+    e.preventDefault();
+    void lookup.lookUp(typed);
+  };
+
   const criteria = [
     ...(maturityChoice !== "all" ? [maturityChoice === "active" ? "active markets" : "matured markets"] : []),
-    ...(facets.underlying?.length ? [`underlying ${facets.underlying.join(", ")}`] : []),
+    ...(facets.underlying?.length
+      ? [`${PENDLE_WORDS.underlyingProtocol.toLowerCase()} ${facets.underlying.join(", ")}`]
+      : []),
     ...(facets.asset?.length ? [`asset ${facets.asset.join(", ")}`] : []),
     ...(needle ? [`search “${query.trim()}”`] : []),
   ];
@@ -358,21 +430,44 @@ export function PendleRosterView({
   };
 
   return (
-    <ProvReceiptsScope registry={registry}>
-      <div data-pendle-roster="">
-        <p className={`mb-4 text-xs text-rb-500 ${CARD_INSET_START}`} data-pendle-asof={roster.block}>
-          Every market Pendle&rsquo;s routers have named, read at block{" "}
-          <Prov info={readBlockProv(roster.block)} value={String(roster.block)}>
-            <BlockRef block={roster.block} chainId={PENDLE_CHAIN_ID} />
-          </Prov>
-          . Underlying is a Rails label for the protocol behind each yield token.
+    <ProvSection
+      scope="markets-table"
+      className="mb-8"
+      data-anatomy="R1.2"
+      data-pendle-roster=""
+      data-pendle-asof={String(roster.block)}
+      data-skel-section="page-table"
+    >
+      <SectionHeading
+        title="Markets"
+        menu={
+          <ToolsFor
+            scope="markets-table"
+            title="Markets"
+            tools={{
+              exports: {
+                csv: {
+                  filename: "pendle-ethereum-markets.csv",
+                  build: () => rosterCsv(markets),
+                  subtitle: "Every market, whatever the filters",
+                },
+              },
+            }}
+          />
+        }
+      >
+        <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-rb-500">
+          Each row opens its market&rsquo;s page. {PENDLE_WORDS.underlyingProtocol} is a Rails label for the protocol
+          behind each yield-bearing token.
         </p>
+      </SectionHeading>
+      <div className="mt-3">
         <ListToolbar
           dimensions={dimensions}
           filters={state}
           onChange={onToolbar}
           sortOptions={[]}
-          searchPlaceholder="Market, token or address"
+          searchPlaceholder="Market, token, address or wallet"
           countNode={countNode}
           sheetCount={{ total: shown.length, noun: "markets" }}
           countFor={(draft) => markets.filter(passesFor(draft)).length}
@@ -389,6 +484,7 @@ export function PendleRosterView({
           }}
           viewMenu
           skel="pendle-roster-facets"
+          onSearchKeyDown={onSearchKeyDown}
         />
 
         {/* The chosen sort's note, below sm where no header carries it. */}
@@ -398,11 +494,15 @@ export function PendleRosterView({
           </p>
         )}
 
+        {wallet && <WalletRow typed={typed} kind={wallet} lookup={lookup} />}
+
         {shown.length === 0 ? (
-          <p className="text-[13px] text-rb-500">No market matches.</p>
+          wallet ? null : (
+            <p className="text-[13px] text-rb-500">No market matches.</p>
+          )
         ) : (
           <DataTable
-            caption="Pendle markets on Ethereum; TVL and PT price are in each market's asset"
+            caption="Pendle markets on Ethereum; liquidity and PT price are in each market's asset"
             tableClassName="min-w-[720px] text-sm"
             stacked
             rowHeight="one"
@@ -433,7 +533,7 @@ export function PendleRosterView({
           </DataTable>
         )}
       </div>
-    </ProvReceiptsScope>
+    </ProvSection>
   );
 }
 
@@ -499,7 +599,19 @@ function Row({ m, block, at }: { m: PendleRosterEntry; block: number; at: number
       {cell(
         "apy",
         "Implied APY",
-        m.impliedApy == null ? null : (
+        emptyOf(m) ? (
+          <RevealTip
+            tip={PENDLE_WORDS.noLiquidityTip}
+            label={`${PENDLE_WORDS.noLiquidity}: ${PENDLE_WORDS.noLiquidityTip}`}
+            focusable
+            wrap
+            className="focus-ring rounded-sm"
+          >
+            <span className="font-normal text-rb-500" data-pendle-empty="">
+              — <span className="tip-underline text-[11px]">{PENDLE_WORDS.noLiquidity}</span>
+            </span>
+          </RevealTip>
+        ) : m.impliedApy == null ? null : (
           <Prov info={impliedApyProv(t.market.address, block, null)} value={m.impliedApy.toFixed(6)}>
             {apyText(m.impliedApy)}
           </Prov>
@@ -507,7 +619,7 @@ function Row({ m, block, at }: { m: PendleRosterEntry; block: number; at: number
       )}
       {cell(
         "tvl",
-        "TVL",
+        PENDLE_WORDS.liquidity,
         m.tvl?.asset == null || tvl == null ? null : (
           <InAsset m={m}>
             <Prov info={tvlProv(t.market.address, block)} value={exact(m.tvl.asset, dec) ?? m.tvl.asset} symbol={asset}>
@@ -548,7 +660,47 @@ function Row({ m, block, at }: { m: PendleRosterEntry; block: number; at: number
   );
 }
 
-/** The search (H15) landing on a wallet's Pendle positions. */
-export function PendleWalletSearch() {
-  return <FrontDoorSearch href={(wallet) => pendleWalletHref(wallet)} />;
+const WALLET_ROW =
+  "flex w-full cursor-pointer items-center gap-2.5 rounded-lg border border-rb-200 bg-raised px-3 py-2.5 text-left text-sm text-foreground transition-colors duration-150 hover:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-rb-600";
+
+/** The search's wallet row (N1.1): a pasted address is a link; an ENS name
+ *  resolves on the press, the reason under the row where it does not. */
+function WalletRow({
+  typed,
+  kind,
+  lookup,
+}: {
+  typed: string;
+  kind: "address" | "ens";
+  lookup: ReturnType<typeof useLookup>;
+}) {
+  const label = (
+    <>
+      <span className="min-w-0 truncate">
+        {lookup.resolving ? "Looking up…" : `View ${kind === "ens" ? typed : shortAddress(typed)}’s Pendle positions`}
+      </span>
+      <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-blue-600 dark:text-[var(--text-link)]" aria-hidden="true" />
+    </>
+  );
+  return (
+    <div className="mb-4" data-pendle-wallet-row={kind}>
+      {kind === "address" ? (
+        <Link href={pendleWalletHref(typed)} className={WALLET_ROW}>
+          {label}
+        </Link>
+      ) : (
+        <button
+          type="button"
+          className={WALLET_ROW}
+          disabled={lookup.resolving}
+          onClick={() => void lookup.lookUp(typed)}
+        >
+          {label}
+        </button>
+      )}
+      <p className="mt-1.5 text-[13px] text-rb-500 empty:hidden" aria-live="polite">
+        {lookup.problem}
+      </p>
+    </div>
+  );
 }

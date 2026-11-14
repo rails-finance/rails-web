@@ -39,7 +39,7 @@ import { Prov, type Provenance } from "@/components/shared/provenance";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { AssetPopover } from "@/components/shared/asset-popover";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { useFlowFocus } from "@/components/shared/flow-focus-context";
+import { useFlowFocus, useFlowMark } from "@/components/shared/flow-focus-context";
 import { ChangeSwapValue, type SwapFigure } from "@/components/shared/change-swap-value";
 import { ListChevronsIcon } from "@/components/shared/list-chevrons-icon";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
@@ -352,6 +352,7 @@ function beforeShown(s: SheetSide): SheetRow | undefined {
 }
 
 function SidePanel({ s, breakdown, col }: { s: SheetSide; breakdown: boolean; col: Col }) {
+  const markOf = useFlowMark();
   const touched = s.rows.length > 0;
   const before = beforeShown(s);
   const carry = breakdown && (s.carry.length > 0 || before);
@@ -384,7 +385,7 @@ function SidePanel({ s, breakdown, col }: { s: SheetSide; breakdown: boolean; co
             tip={s.name ? s.tip : s.side === "collateral" ? WORDS.tipCollateral : WORDS.tipDebt}
           />
         </h3>
-        {s.icons.length > 0 && <InlineAssetCluster symbols={s.icons} size={16} overlap={5} max={4} />}
+        {s.icons.length > 0 && <InlineAssetCluster assets={s.icons.map(markOf)} size={16} overlap={5} max={4} />}
       </div>
       <div className={`${GRID} group/side`} data-sheet-usd={noUsd ? "none" : undefined}>
         {carry && (
@@ -419,19 +420,24 @@ function SidePanel({ s, breakdown, col }: { s: SheetSide; breakdown: boolean; co
             {s.assets?.map((r) => (
               <Row key={r.key} r={r} tone="plain" col={col} />
             ))}
+            {/* The repaid row's 0.00 and $0 are drawn by the sheet for every
+                asset the side holds none of: exempt from the coverage
+                tripwire as a status, as a count is. */}
             {(s.repaid?.length ?? 0) > 0 && (
-              <Row
-                r={{
-                  key: "repaid",
-                  label: WORDS.repaid(s.repaid!.length),
-                  note: s.repaid!.join(", "),
-                  amount: { text: "0.00" },
-                  usd: { text: "$0" },
-                  tip: s.repaidTip,
-                }}
-                tone="muted"
-                col={col}
-              />
+              <div className="contents" data-prov-exempt="">
+                <Row
+                  r={{
+                    key: "repaid",
+                    label: WORDS.repaid(s.repaid!.length),
+                    note: s.repaid!.join(", "),
+                    amount: { text: "0.00" },
+                    usd: { text: "$0" },
+                    tip: s.repaidTip,
+                  }}
+                  tone="muted"
+                  col={col}
+                />
+              </div>
             )}
           </div>
         )}

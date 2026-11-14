@@ -21,7 +21,11 @@ export function PendlePositionView({ data, market }: { data: PendleWalletPositio
   const registry = useReceiptRegistry();
   return (
     <ProvReceiptsScope registry={registry}>
-      <PositionReadProvider read={{ kind: "chain", block: data.block, at: data.timestamp }}>
+      {/* Focus (ui-jobs 557): the market is in focus when its PT, YT, SY, yield token or LP is. */}
+      <PositionReadProvider
+        focus={{ source: p.tokens }}
+        read={{ kind: "chain", block: data.block, at: data.timestamp }}
+      >
         <div className="space-y-6 py-8">
           <DetailTopRow
             session="pendle"

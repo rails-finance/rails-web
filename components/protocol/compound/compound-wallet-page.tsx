@@ -71,7 +71,8 @@ import { scaleCompoundChainBalance } from "@/lib/api/fetch-compound-position";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-import type { PriceStripAsset } from "@/components/shared/price-strip";
+import type { LatestPriceAsset } from "@/components/shared/latest-prices";
+import { cometPriceProv } from "@/lib/compound/event-provenance";
 import { TimelineConfirmationFooter, TimelineCoverageFooter } from "@/components/shared/timeline-coverage-footer";
 import { boundaryFromChainCoverage } from "@/lib/shared/timeline-boundary";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
@@ -115,7 +116,7 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isCompoundEvent } from "@/lib/shared/types/event-shape";
 import { decodeEventId } from "@/lib/shared/page-metadata";
 import { StoreFirstRead, SweepInFlight } from "@/components/shared/sweep-in-flight";
-import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { FOOT_LINK } from "@/lib/shared/ui-grammar";
 
 /** The history as the route answers it: flat, or — asked `?group=1`, the
  *  page default — as ROWS, where `events` holds only the ungrouped events of
@@ -865,9 +866,9 @@ export function CompoundWalletView({
 
   // Ambient oracle-price pill: every priced token the wallet holds, in its
   // market's own unit converted to dollars by the protocol's own feeds.
-  const stripAssets = useMemo<PriceStripAsset[]>(() => {
+  const stripAssets = useMemo<LatestPriceAsset[]>(() => {
     const seen = new Set<string>();
-    const out: PriceStripAsset[] = [];
+    const out: LatestPriceAsset[] = [];
     for (const v of views) {
       if (v.status !== "open") continue;
       const assets = [
@@ -880,7 +881,12 @@ export function CompoundWalletView({
         const p = v.priceByAddress?.[addr];
         if (typeof p === "number" && p > 0) {
           seen.add(addr);
-          out.push({ symbol: a.symbol, address: a.address, price: p });
+          out.push({
+            symbol: a.symbol,
+            address: a.address,
+            price: p,
+            info: cometPriceProv(a.symbol, { comet: v.comet, marketLabel: v.marketLabel }),
+          });
         }
       }
     }
@@ -895,7 +901,7 @@ export function CompoundWalletView({
             <DetailTopRow
               session={d.session}
               wallet={wallet}
-              owner={{ wallet }}
+              owner={{ wallet, chain: d.deployment.chainId }}
               assets={stripAssets}
               closed={views.length > 0 && views.every((v) => v.status !== "open")}
               // Each market's card carries its exports on its ⋮; the event
@@ -950,7 +956,7 @@ export function CompoundWalletView({
                   </p>
                 )}
                 <p className="mt-3 text-sm">
-                  <Link href={d.walletHref(wallet)} className={INLINE_LINK}>
+                  <Link href={d.walletHref(wallet)} className={FOOT_LINK}>
                     Every market this wallet has touched
                   </Link>
                 </p>
@@ -976,13 +982,13 @@ export function CompoundWalletView({
               <div className="space-y-10">
                 {!pinnedRoute && onlyMarket == null && (
                   <p className="text-[11px] text-rb-500">
-                    This wallet has a position in{" "}
+                    This wallet has an account in{" "}
                     <span className="text-foreground">
                       {sections.length} of {d.words.chainPossessive}{" "}
                       {data?.marketsScanned ?? d.deployment.markets.length}
                     </span>{" "}
                     Compound markets; the others hold nothing for it. Each market is separate: nothing is
-                    cross-collateralised between them, so there is no combined health factor here and no total. The
+                    cross-collateralised between them, so there is no combined liquidation point here and no total. The
                     markets do not all price in the same unit.
                   </p>
                 )}

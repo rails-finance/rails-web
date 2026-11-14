@@ -29,9 +29,6 @@ export const MOONWELL_ADDRESSES = {
   WETH_ROUTER: "0xa218a4776e2487eaa25e738e6d6a64f21593ca22",
 } as const;
 
-/** Short, copy-friendly form of a wallet address. */
-export const shortAddress = (addr: string): string => `${addr.slice(0, 6)}…${addr.slice(-4)}`;
-
 // ── Market catalog ───────────────────────────────────────────────────────────
 // Market keys mirror the backend's `market` tag ('weth' | 'usdc' | 'usdt' |
 // 'cbbtc'). mTokens are 8-dp ERC-20s; collateralFactor is the Comptroller's

@@ -14,7 +14,7 @@ const ZERO = BigInt(0);
 const isFunded = (v: VaultSummary) => v.totalAssets != null && BigInt(v.totalAssets.raw ?? "0") > ZERO;
 
 /** The preset: 100+ current holders where the vault has a census, endorsed
- *  where it is a Yearn vault, every other vault kept. */
+ *  where it is a Yearn vault the census has no row for, every other vault kept. */
 export function inRosterPreset(v: VaultSummary): boolean {
   if (v.census != null) return v.census.live >= ROSTER_HOLDERS_MIN;
   if (v.family === "yearn-v3") return v.standing.includes("endorsed");

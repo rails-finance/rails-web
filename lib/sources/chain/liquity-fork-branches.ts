@@ -32,6 +32,8 @@ import type { LiquityForkConfig, LiquityForkBranchConfig } from "./liquity-fork-
 import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { serverLiquityForkBranches } from "@/lib/sources/api/liquity-fork-head";
 import { emptyBranch, settleBranch, settleBranches, type RosterTroveRead } from "./liquity-fork-settle";
+import { readForkShutdown } from "./liquity-fork-shutdown";
+import { branchShutdownState, type BranchShutdownLive, type BranchShutdownState } from "@/lib/liquity-fork/shutdown";
 
 const TM_ABI = parseAbi([
   "function getLatestTroveData(uint256 troveId) view returns ((uint256 entireDebt, uint256 entireColl, uint256 redistBoldDebtGain, uint256 redistCollGain, uint256 accruedInterest, uint256 recordedDebt, uint256 annualInterestRate, uint256 weightedRecordedDebt, uint256 accruedBatchManagementFee, uint256 lastInterestRateAdjTime))",
@@ -40,6 +42,7 @@ const TM_ABI = parseAbi([
   "function getEntireBranchColl() view returns (uint256)",
   "function getTroveIdsCount() view returns (uint256)",
   "function getTroveFromTroveIdsArray(uint256 index) view returns (uint256)",
+  "function lastZombieTroveId() view returns (uint256)",
 ]);
 // fetchPrice mutates on-chain; declared view so eth_call simulates it.
 const PF_ABI = parseAbi([
@@ -66,8 +69,8 @@ export interface LiquityForkQueueEntry {
   entireDebt: number;
   /** Entire collateral, same reckoning. */
   entireColl: number;
-  /** True for a zombie: below the minimum debt after a partial redemption, so
-   *  outside the sorted list and redeemed before everything in it. */
+  /** True for the branch's lastZombieTroveId: a dormant Trove a redemption takes before the
+   *  sorted list. No other dormant Trove is in the queue. */
   zombie: boolean;
   /** Σ entire debt of everything ahead of this trove in the queue — what
    *  redemptions consume before they reach it. */
@@ -126,6 +129,9 @@ export interface LiquityForkBranchState {
   /** True when this branch's reads failed; the row renders as unavailable
    *  rather than as an empty branch. */
   stale: boolean;
+  /** The branch's shutdown: its catalog's record and the live read (ui-jobs 612).
+   *  Absent or null where it reads live or not known, and on a read pinned to a block. */
+  shutdown?: BranchShutdownState | null;
 }
 
 export interface LiquityForkBranchesResponse {
@@ -158,6 +164,23 @@ export async function loadLiquityForkBranchesFromChain(
   cfg: LiquityForkConfig,
   atBlock?: number,
 ): Promise<LiquityForkBranchesResponse> {
+  if (atBlock !== undefined) return loadRoster(cfg, atBlock);
+  // The shutdown read rides beside the roster's: one multicall per deployment, cached.
+  const [roster, live] = await Promise.all([
+    loadRoster(cfg),
+    readForkShutdown(cfg).catch((): Record<string, BranchShutdownLive> => ({})),
+  ]);
+  const byKey = new Map(Object.values(cfg.branches).map((b) => [b.key, b]));
+  return {
+    ...roster,
+    branches: roster.branches.map((b) => ({
+      ...b,
+      shutdown: branchShutdownState(byKey.get(b.key)?.shutdownRecord, live[b.key]),
+    })),
+  };
+}
+
+async function loadRoster(cfg: LiquityForkConfig, atBlock?: number): Promise<LiquityForkBranchesResponse> {
   const configs = Object.values(cfg.branches);
   if (atBlock === undefined) {
     const served = await serverLiquityForkBranches(cfg);
@@ -209,6 +232,7 @@ async function loadBranch(
         atTm("getTroveIdsCount"),
         { address: st, abi: ST_ABI, functionName: "getLast" } as ContractFunctionParameters,
         { address: st, abi: ST_ABI, functionName: "getSize" } as ContractFunctionParameters,
+        atTm("lastZombieTroveId"),
       ],
     });
     const r = (i: number): unknown => (phase1[i].status === "success" ? phase1[i].result : null);
@@ -219,6 +243,7 @@ async function loadBranch(
     const idsCount = r(4) as bigint | null;
     const lastId = r(5) as bigint | null;
     const listSize = r(6) as bigint | null;
+    const lastZombieId = r(7) as bigint | null;
     // Aggregates are the row's reason to exist — without them there is no
     // branch to show (and nothing to walk).
     if (branchDebtRaw == null || branchCollRaw == null) return emptyBranch(b);
@@ -259,7 +284,11 @@ async function loadBranch(
 
     // Phase 3 — every trove's live data + status in one batch: the listed
     // queue and the unlisted candidates together.
-    const subjects = [...listed, ...unlisted];
+    const pointer =
+      lastZombieId != null && lastZombieId !== BigInt(0) && !allIds.some((x) => x === lastZombieId)
+        ? [lastZombieId]
+        : [];
+    const subjects = [...listed, ...unlisted, ...pointer];
     const datas =
       subjects.length > 0
         ? ((await client.multicall({
@@ -292,6 +321,7 @@ async function loadBranch(
         allIds,
         dataOf: (x) => dataBy.get(String(x)) ?? null,
         statusOf: (x) => statusBy.get(String(x)) ?? null,
+        lastZombieId,
       },
       IDS_CAP,
     );

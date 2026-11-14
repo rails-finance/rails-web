@@ -8,6 +8,7 @@ import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { serverReadVia } from "@/lib/aave-v3/position-provenance";
 import type { Provenance, ProvVerify } from "@/components/shared/provenance";
 import { SPARK_ADDRESSES } from "@/lib/spark/asset-catalog";
+import { APY_FORMULA } from "@/lib/aave-family/apy";
 
 const POOL_CONTRACT: Provenance["contract"] = { name: "SparkLend Pool", address: SPARK_ADDRESSES.POOL };
 
@@ -42,38 +43,54 @@ export function accountDataProv(
   };
 }
 
-/** A reserve-level economics field read from Pool.getReserveData @ head — the
- *  current supply / variable-borrow APR, the reserve factor, or the reserve's
- *  utilization. Pool-wide reserve state at the latest block, not the wallet's
- *  own position. */
-export function reserveDataProv(what: string, field: string, asset?: string): Provenance {
+/** A rate as the receipt's input states it: the Pool's annual rate as a
+ *  fraction, the stored ray divided by 10^27 (rails-server serves the
+ *  fraction, not the ray integer). */
+const rateFraction = (apr: number): string => apr.toFixed(12).replace(/0+$/, "").replace(/\.$/, "");
+
+/** One borrowed reserve's borrow APY: its variable borrow rate from
+ *  Pool.getReserveData @ head, compounded each second for a year
+ *  (lib/aave-family/apy.ts; ui-jobs 611). */
+export function borrowApyProv(symbol: string | undefined, apr: number | null | undefined): Provenance {
   return {
-    kind: "chain",
+    kind: "chain-derived",
     pclass: "state",
     verify: STATE_VERIFY,
-    summary: `${what}${asset ? ` for ${asset}` : ""} — read from SparkLend's Pool.getReserveData at the latest block. The reserve's own pool-wide rate/state, not an event-replay approximation.`,
+    summary: `Borrow APY${symbol ? ` on ${symbol}` : ""}. The reserve's variable borrow rate, read from SparkLend's Pool.getReserveData at the latest block as a rate a year (ray-scaled, 10^27 = 100%), compounded every second over a 365-day year.`,
     contract: POOL_CONTRACT,
-    via: `GET /api/chain/spark/position · getReserveData @ head · ${field}`,
-    inputs: asset ? [{ label: "reserve", value: asset, kind: "chain" }] : undefined,
+    via: `GET /api/chain/spark/position · getReserveData @ head · currentVariableBorrowRate ÷ 10^27, compounded`,
+    formula: APY_FORMULA,
+    inputs: [
+      {
+        label: "rate",
+        ...(apr != null ? { value: rateFraction(apr) } : {}),
+        kind: "chain",
+        pclass: "state",
+        note: "currentVariableBorrowRate ÷ 10^27, a year",
+      },
+      { label: "seconds a year", value: "31,536,000", kind: "chain-derived", definition: true, note: "365 days" },
+    ],
   };
 }
 
-/** Debt-USD-weighted average variable borrow APR across the borrowed reserves —
- *  the card's one-figure debt caption when the position borrows several
- *  reserves at once. Every leg on-chain: each rate is Pool.getReserveData @
- *  head; the weights are the chain debt balances valued at SparkLend's oracle. */
-export function avgBorrowRateProv(): Provenance {
+/** The debt-weighted average borrow APY across the borrowed reserves. */
+export function avgBorrowApyProv(): Provenance {
   return {
     kind: "chain-derived",
     pclass: "state",
     verify: STATE_VERIFY,
     summary:
-      "Average variable borrow rate across the borrowed reserves — each reserve's currentVariableBorrowRate from Pool.getReserveData at the latest block, weighted by its oracle-valued debt (chain debt balance × IAaveOracle price). One figure for a multi-reserve debt side; the per-reserve rates are in the Reserve rates panel below.",
+      "Average borrow APY across the borrowed reserves. Each reserve's currentVariableBorrowRate from Pool.getReserveData at the latest block, compounded every second over a 365-day year, then weighted by its oracle-valued debt (chain debt balance × IAaveOracle price).",
     contract: POOL_CONTRACT,
-    via: "GET /api/chain/spark/position · getReserveData @ head · Σ rate × debt USD ÷ Σ debt USD",
-    formula: "Σ (rate × debt USD) ÷ Σ debt USD",
+    via: "GET /api/chain/spark/position · getReserveData @ head · Σ APY × debt USD ÷ Σ debt USD",
+    formula: `Σ (APY × debt USD) ÷ Σ debt USD, APY = ${APY_FORMULA}`,
     inputs: [
-      { label: "rates", kind: "chain", pclass: "state", note: "currentVariableBorrowRate per borrowed reserve" },
+      {
+        label: "rates",
+        kind: "chain",
+        pclass: "state",
+        note: "currentVariableBorrowRate ÷ 10^27 per borrowed reserve",
+      },
       { label: "debt USD", kind: "chain-derived", note: "chain debt balance × IAaveOracle getAssetPrice" },
     ],
   };

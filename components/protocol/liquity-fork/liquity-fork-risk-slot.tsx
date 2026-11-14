@@ -17,6 +17,7 @@ import { pct } from "@/components/shared/ratio-bar";
 import { formatExact, formatPrice } from "@/lib/utils/format";
 import type { LiquityForkTroveChainResponse } from "@/lib/api/fetch-liquity-fork-position";
 import { formatCompact } from "@/lib/shared/format-compact";
+import { fmtLtv, liquityFamilyTerms } from "@/lib/liquity/ltv";
 
 // A debt-token figure: the figure, then the token's icon.
 const amount = (figure: ReactNode, symbol: string) => <TokenFigure symbol={symbol}>{figure}</TokenFigure>;
@@ -25,16 +26,17 @@ export function liquityForkPanelColumns(chain: LiquityForkTroveChainResponse): P
   if (chain.chainStale || (chain.status !== "active" && chain.status !== "zombie")) return [[], []];
   const debtSym = FORK_DEBT_SYMBOL[chain.protocol] ?? "";
   const vocab = forkLiveVocab(chain.protocol, forkReadBy(chain));
+  const terms = liquityFamilyTerms(chain.protocol);
   const left: PositionPanelRow[] = [];
   const right: PositionPanelRow[] = [];
 
   if (chain.status === "zombie") {
-    // A zombie is outside the rate-sorted list: with no debt a redemption cannot
-    // reach it; with debt it is reached only as the branch's most recent zombie.
+    // A dormant Trove is outside the rate-sorted list: redeemed first as the branch's
+    // lastZombieTroveId, out of every redemption otherwise.
     left.push({
       id: "redemption",
       label: "Redemption",
-      value: chain.entireDebt > 0 ? "Outside the rate queue" : "Not redeemable",
+      value: chain.redeemedFirst ? "Redeemed first" : "Not redeemable",
     });
   }
   if (chain.status === "active" && chain.debtInFront != null) {
@@ -99,8 +101,10 @@ export function liquityForkPanelColumns(chain: LiquityForkTroveChainResponse): P
     const room = Math.max(0, (chain.entireColl * chain.priceUsd) / chain.mcr - chain.entireDebt);
     const roomProv: Provenance = {
       kind: "derived",
-      summary: `Room to borrow. The further ${debtSym} debt this Trove could carry before its collateral ratio reaches the ${chain.symbol} branch's ${pct(chain.mcr)} minimum (MCR), at today's price: the collateral's worth divided by the minimum, less the debt.`,
-      formula: "collateral × price ÷ MCR − debt",
+      summary: terms.ltv
+        ? `Room to borrow. The further ${debtSym} debt this Trove could carry before its LTV reaches the ${chain.symbol} branch's ${fmtLtv(100 / chain.mcr, 2)} Max LTV, at today's price: the collateral's worth times the Max LTV (1 ÷ MCR), less the debt.`
+        : `Room to borrow. The further ${debtSym} debt this Trove could carry before its ${terms.ratioText} reaches the ${chain.symbol} branch's ${pct(chain.mcr)} ${terms.limitText}, at today's price: the collateral's worth divided by the MCR, less the debt.`,
+      formula: terms.ltv ? "collateral × price × Max LTV − debt" : "collateral × price ÷ MCR − debt",
       inputs: [
         {
           label: "collateral",
@@ -109,6 +113,9 @@ export function liquityForkPanelColumns(chain: LiquityForkTroveChainResponse): P
           pclass: "state",
         },
         { label: "price", value: `$${formatExact(chain.priceUsd)}`, kind: "chain", pclass: "oracle" },
+        ...(terms.ltv
+          ? [{ label: "Max LTV", value: fmtLtv(100 / chain.mcr, 2), kind: "derived" as const, note: "1 ÷ MCR" }]
+          : []),
         { label: "MCR", value: pct(chain.mcr), kind: "chain", pclass: "indexed", note: "branch constant" },
         { label: "debt", value: `${formatExact(chain.entireDebt)} ${debtSym}`, kind: "chain", pclass: "state" },
       ],
@@ -116,7 +123,9 @@ export function liquityForkPanelColumns(chain: LiquityForkTroveChainResponse): P
     right.push({
       id: "room-to-borrow",
       label: "Room to borrow",
-      tip: `How much more ${debtSym} this Trove could borrow before its collateral ratio falls to the branch's ${pct(chain.mcr)} minimum, at today's price. Below that minimum it can be liquidated.`,
+      tip: terms.ltv
+        ? `How much more ${debtSym} this Trove could borrow before its LTV rises to the branch's ${fmtLtv(100 / chain.mcr, 2)} Max LTV, at today's price. Above that Max LTV it can be liquidated.`
+        : `How much more ${debtSym} this Trove could borrow before its ${terms.ratioText} falls to the branch's ${pct(chain.mcr)} ${terms.limitText}, at today's price. Below that ${terms.limitShort} it can be liquidated.`,
       value: amount(
         <Prov info={roomProv} value={formatExact(room)} symbol={debtSym}>
           {formatCompact(room)}

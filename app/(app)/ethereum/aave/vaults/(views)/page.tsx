@@ -22,8 +22,7 @@
 // figures the census header carries and traces neither.
 
 import { serverReadOf } from "@/lib/shared/server-head-read";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { AaveVaultDirectoryView } from "@/components/vaults/aave-vault-directory-view";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { protocolForHref } from "@/lib/shared/protocols";
@@ -101,7 +100,7 @@ export default async function EthereumVaultRosterPage({ searchParams }: { search
           />
         </div>
 
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
+        {/* The inspector, armed from the profile menu's switch. */}
         <ProvInspectorLayer />
       </div>
     </div>

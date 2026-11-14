@@ -41,7 +41,9 @@ import type { PolarisBook } from "@/lib/sources/api/polaris-book";
 import type { PolarisMarketBook } from "@/lib/sources/api/polaris-positions";
 import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
-import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { FOOT_LINK } from "@/lib/shared/ui-grammar";
+import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
+import { polarisMarketKeys } from "@/lib/polaris/focus-keys";
 
 const pct = (f: number, dp = 2): string => `${(f * 100).toFixed(dp)}%`;
 
@@ -280,10 +282,9 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
           </p>
         )}
         <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
-          <Link href={`${POLARIS_BASE_PATH}?market=${market}`} className={INLINE_LINK}>
+          <Link href={`${POLARIS_BASE_PATH}?market=${market}`} className={FOOT_LINK}>
             Browse the {stable} positions
           </Link>
-          .
         </p>
       </div>
     </div>
@@ -292,6 +293,8 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
 
 export function PolarisMarketsView({ chain, book }: { chain: PolarisMarketsChainResponse; book: PolarisBook }) {
   const registry = useReceiptRegistry();
+  // Focus (ui-jobs 557): the markets whose stablecoin or collateral is in focus.
+  const scoped = useScopedRows([...POLARIS_MARKETS], polarisMarketKeys, () => POLARIS_CHAIN_ID);
   if (chain.chainStale && book.bookStale) {
     return (
       <div className="py-12 text-center text-rb-500">
@@ -306,8 +309,9 @@ export function PolarisMarketsView({ chain, book }: { chain: PolarisMarketsChain
     <ProvReceiptsScope registry={registry}>
       <section>
         <h2 className="text-sm font-semibold text-foreground">The two markets</h2>
-        <div className="mt-3 grid gap-3 lg:grid-cols-2">
-          {POLARIS_MARKETS.map((market) => (
+        <ScopeNote scoped={scoped} noun={["market", "markets"]} className="mt-2" />
+        <div className="mt-3 grid gap-3 lg:grid-cols-2" {...scoped.listProps}>
+          {scoped.rows.map((market) => (
             <MarketCard
               key={market}
               chain={chain.markets.find((m) => m.market === market) ?? null}

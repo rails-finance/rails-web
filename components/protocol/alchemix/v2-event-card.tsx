@@ -45,6 +45,7 @@ import {
   type Amount,
 } from "@/lib/alchemix/v2-lines";
 import { ALCHEMIX_HEAD_WORDS, alchemixV2Kind } from "@/lib/alchemix/head-words";
+import { V2_WORDS } from "@/lib/alchemix/transmuter-words";
 
 const VERB: Record<AlchemixV2Context["eventType"], string> = {
   deposit: "Deposit",
@@ -56,7 +57,7 @@ const VERB: Record<AlchemixV2Context["eventType"], string> = {
   // selling their own collateral shares — nobody else is involved, so the
   // card reads as a repayment, not a liquidation (rails-ops
   // reference/alchemix-v2-frozen-record.md).
-  liquidate: "Repay from collateral",
+  liquidate: V2_WORDS.selfLiquidation,
 };
 
 function coordsOf(e: AlchemixV2Event): AlchemixV2Coords {

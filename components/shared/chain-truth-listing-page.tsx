@@ -31,7 +31,11 @@ import {
   type ListDimension,
   type SerializableDimension,
 } from "@/lib/shared/list-filter";
-import { protocolForHref } from "@/lib/shared/protocols";
+import { protocolForHref, protocolForPathname } from "@/lib/shared/protocols";
+import { useAssetScope } from "@/lib/shared/asset-scope";
+import { rowAssetKeys } from "@/lib/shared/focus-row-keys";
+import { FocusCountNote, FocusLockChip } from "@/components/shared/asset-scope-note";
+import { CHAINS } from "@/lib/shared/chains";
 import { useUrlSearchParams, notifyUrlChanged } from "@/lib/shared/use-url-search-params";
 
 /** In-memory strategy: fetch everything once, filter + sort client-side. */
@@ -180,6 +184,26 @@ export interface ChainTruthListingPageProps<T, F extends BaseListFilters, Ext = 
   countLine?: (filters: F) => { noun?: string; note?: string } | null;
   /** Opt-in line under the empty state for the live selection; null for none. */
   emptyNote?: (filters: F) => ReactNode | null;
+  /** A locked chip drawn first in the chip row (AIM's, ui-jobs 557). */
+  chipsLead?: ReactNode;
+  /** In place of the result count at the chip row's end, given the count. */
+  countNode?: (total: number) => ReactNode;
+  /** Focus mode (ui-jobs 557): by default the shell keeps the rows that touch
+   *  the focus, each row's keys read from the row on the explorer's chain
+   *  (lib/shared/focus-row-keys.ts), with the locked chip and a count that says
+   *  what it hid. A paged listing judges only the page it holds, and says so.
+   *  `keysOf` where a row's keys need more than that; `false` where the config
+   *  applies Focus itself (Morpho Ethereum asks the server). */
+  focus?: false | { keysOf?: (item: T) => string[]; noun?: [string, string] };
+}
+
+/** The chain a listing's route sits on: its explorer's, else its first segment's. */
+function chainOfBase(basePath: string): number | null {
+  const entry = protocolForPathname(basePath);
+  if (entry) return entry.chainId;
+  const slug = basePath.split("/")[1];
+  const hit = Object.values(CHAINS).find((c) => c.slug === slug);
+  return hit ? hit.id : null;
 }
 
 export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefined>({
@@ -206,6 +230,9 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
   titleAs,
   countLine,
   emptyNote,
+  chipsLead,
+  countNode,
+  focus,
 }: ChainTruthListingPageProps<T, F, Ext>) {
   const searchParams = useUrlSearchParams(initialSearch ?? "");
 
@@ -477,8 +504,37 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
   // selection, whether this view is a holder's own set and what the band says.
   // The memory tier has no server total, so it is handed the row count it
   // rendered — which for that tier IS the whole set.
+
+  // Focus (ui-jobs 557): the rows that touch the focus, unless the config
+  // applies it itself.
+  const scope = useAssetScope();
+  const [focusPeek, setFocusPeek] = useState(false);
+  const focusChain = chainOfBase(basePath);
+  const focusing = focus !== false && scope.on && focusChain != null;
+  const keysOf = (focus && focus.keysOf) || ((r: T) => rowAssetKeys(r, focusChain ?? 1));
+  const shown = useMemo<T[]>(
+    () => (focusing && !focusPeek ? visible.filter((r) => scope.matches(keysOf(r), focusChain ?? undefined)) : visible),
+    // keysOf is a pure accessor of the row.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [visible, focusing, focusPeek, scope.matches, focusChain],
+  );
+  const pagedFocus = strategy.kind === "server";
+  const focusNoun: [string, string] = (focus && focus.noun) || [noun.replace(/s$/, ""), noun];
+  const focusCount = focusing
+    ? () => (
+        <FocusCountNote
+          shown={shown.length}
+          total={visible.length}
+          noun={focusNoun}
+          peek={focusPeek}
+          setPeek={setFocusPeek}
+          page={pagedFocus && total > visible.length}
+        />
+      )
+    : undefined;
+
   const above = renderAbove
-    ? renderAbove({ items: visible, total: strategy.kind === "server" ? total : visible.length, filters })
+    ? renderAbove({ items: shown, total: strategy.kind === "server" ? total : shown.length, filters })
     : undefined;
 
   // The listing's route already names the protocol — resolve it from `basePath`
@@ -487,42 +543,53 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
   const directoryEntry = protocolForHref(basePath);
 
   return (
-    <ChainTruthListing<T, F>
-      title={typeof title === "function" ? title(filters) : title}
-      protocol={directoryEntry}
-      headerExtra={headerExtra}
-      above={above}
-      emptyNote={
-        (strategy.kind === "server" && strategy.search
-          ? listingSearchNote(filters.q, strategy.search.takesId)
-          : null) ??
-        emptyNote?.(filters) ??
-        undefined
-      }
-      identity={identity}
-      titleHidden={titleHidden}
-      titleAs={titleAs}
-      items={visible}
-      loading={loading}
-      refreshing={refreshing}
-      viewKey={viewKey}
-      pagination={pagination}
-      error={error != null ? (renderError?.(error) ?? <ListingUnavailable onRetry={retry} />) : undefined}
-      renderCard={renderCard}
-      hrefFor={hrefFor}
-      keyFor={keyFor}
-      noun={noun}
-      filter={{
-        dimensions: renderDims,
-        filters: { ...filters, q: qDraft },
-        onChange,
-        sortOptions: typeof sortOptions === "function" ? sortOptions(filters) : sortOptions,
-        searchPlaceholder,
-        // Every chain-truth listing can be saved as a view (N1.7, ui-jobs 521).
-        viewMenu: true,
-        countFor,
-        nounFor: (draft: F) => (strategy.kind === "server" ? countLine?.(draft)?.noun : undefined) ?? noun,
-      }}
-    />
+    <div data-scope-list="" {...(scope.ready ? { "data-scope-ready": "" } : {})}>
+      <ChainTruthListing<T, F>
+        title={typeof title === "function" ? title(filters) : title}
+        protocol={directoryEntry}
+        headerExtra={headerExtra}
+        above={above}
+        emptyNote={
+          (strategy.kind === "server" && strategy.search
+            ? listingSearchNote(filters.q, strategy.search.takesId)
+            : null) ??
+          emptyNote?.(filters) ??
+          undefined
+        }
+        identity={identity}
+        titleHidden={titleHidden}
+        titleAs={titleAs}
+        items={shown}
+        loading={loading}
+        refreshing={refreshing}
+        viewKey={viewKey}
+        pagination={pagination}
+        error={error != null ? (renderError?.(error) ?? <ListingUnavailable onRetry={retry} />) : undefined}
+        renderCard={renderCard}
+        hrefFor={hrefFor}
+        keyFor={keyFor}
+        noun={noun}
+        filter={{
+          dimensions: renderDims,
+          filters: { ...filters, q: qDraft },
+          onChange,
+          sortOptions: typeof sortOptions === "function" ? sortOptions(filters) : sortOptions,
+          searchPlaceholder,
+          // Every chain-truth listing can be saved as a view (N1.7, ui-jobs 521).
+          viewMenu: true,
+          countFor,
+          nounFor: (draft: F) => (strategy.kind === "server" ? countLine?.(draft)?.noun : undefined) ?? noun,
+          chipsLead: chipsLead ?? (focusing ? <FocusLockChip /> : undefined),
+          countNode:
+            !loading && error == null
+              ? countNode
+                ? countNode(total)
+                : focusCount
+                  ? focusCount()
+                  : undefined
+              : undefined,
+        }}
+      />
+    </div>
   );
 }

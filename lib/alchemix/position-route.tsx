@@ -12,6 +12,7 @@
 // explorer: the two would be different positions wearing the same id.
 
 import { PositionReadProvider } from "@/components/shared/position-read";
+import { alchemistFocusSource } from "@/lib/alchemix/focus-source";
 import { indexReadAt } from "@/lib/shared/position-read-server";
 import { chainRead } from "@/lib/shared/position-read";
 import type { Metadata } from "next";
@@ -89,7 +90,11 @@ export async function AlchemixPositionPage({
   const v2History = await loadV2History(deployment, tail.position.v2Predecessors ?? [], !tail.hasMore);
 
   return (
-    <PositionReadProvider key={`${lineKey}:${tokenId}`} read={read}>
+    <PositionReadProvider
+      focus={{ source: alchemistFocusSource(deployment, tail.position, live) }}
+      key={`${lineKey}:${tokenId}`}
+      read={read}
+    >
       <AlchemistPositionView
         // Keyed on the position so a client-side move to another one remounts
         // with the new server tail as its initial state.

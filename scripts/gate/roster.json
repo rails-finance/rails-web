@@ -8,7 +8,7 @@
     "source": "lib/shared/protocols.ts"
   },
   {
-    "page": "/ethereum/aave-v3/market",
+    "page": "/ethereum/aave-v3/markets",
     "chain": "ethereum",
     "protocol": "aave-v3",
     "state": "system",
@@ -96,7 +96,7 @@
     "source": "lib/shared/protocols.ts"
   },
   {
-    "page": "/base/aave-v3/market",
+    "page": "/base/aave-v3/markets",
     "chain": "base",
     "protocol": "aave-v3",
     "state": "system",
@@ -464,11 +464,11 @@
     "source": "lib/shared/protocols.ts"
   },
   {
-    "page": "/ethereum/alchemix/lines",
+    "page": "/ethereum/alchemix/markets",
     "chain": "ethereum",
     "protocol": "alchemix",
     "state": "system",
-    "picked_for": "the explorer's lines sub-page",
+    "picked_for": "the explorer's markets sub-page",
     "source": "lib/shared/protocols.ts"
   },
   {
@@ -544,11 +544,11 @@
     "source": "lib/shared/protocols.ts"
   },
   {
-    "page": "/base/alchemix/lines",
+    "page": "/base/alchemix/markets",
     "chain": "base",
     "protocol": "alchemix",
     "state": "system",
-    "picked_for": "the explorer's lines sub-page",
+    "picked_for": "the explorer's markets sub-page",
     "source": "lib/shared/protocols.ts"
   },
   {
@@ -896,7 +896,7 @@
     "source": "lib/shared/protocols.ts"
   },
   {
-    "page": "/base/compound-v3/market",
+    "page": "/base/compound-v3/markets",
     "chain": "base",
     "protocol": "compound-v3",
     "state": "system",
@@ -2216,7 +2216,7 @@
     "source": "lib/shared/protocols.ts"
   },
   {
-    "page": "/base/seamless/market",
+    "page": "/base/seamless/markets",
     "chain": "base",
     "protocol": "seamless",
     "state": "system",
@@ -2320,7 +2320,7 @@
     "source": "lib/shared/protocols.ts"
   },
   {
-    "page": "/ethereum/spark/market",
+    "page": "/ethereum/spark/markets",
     "chain": "ethereum",
     "protocol": "spark",
     "state": "system",

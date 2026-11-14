@@ -49,12 +49,13 @@ import {
   morphoPeakBorrowedProv,
   morphoPeakOwedProv,
   morphoBorrowRateNowProv,
+  morphoYearlyCostProv,
 } from "@/lib/morpho/event-provenance";
-import { capacityProv, lltvProv, type MorphoChainCoords } from "@/lib/morpho/position-provenance";
+import { capacityProv, morphoHealthFactorProv, type MorphoChainCoords } from "@/lib/morpho/position-provenance";
+import { HEALTH_FACTOR_TIP, morphoApy, MORPHO_TERMS } from "@/lib/morpho/terms";
 import { formatNumber, formatExact } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
 import { CARD_VOCAB, notRecordedNote } from "@/lib/shared/card-vocab";
-import { capacityShare } from "@/lib/shared/capacity-share";
 import { pct } from "@/components/shared/ratio-bar";
 import type { MorphoCurrentDebt, MorphoListedRead, MorphoPositionSummary } from "@/lib/sources/api/morpho-positions";
 import type { MorphoChainPositionResponse } from "@/lib/api/fetch-morpho-position";
@@ -75,7 +76,7 @@ import { RevealTip } from "@/components/shared/reveal-tip";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 
 const ORACLE_LINE_TIP =
-  "The collateral valued in the loan token at the market's oracle, the price Morpho's liquidation test uses.";
+  "The collateral valued in the loan asset at the market's oracle, the price Morpho's liquidation test uses.";
 
 export interface MorphoPositionView {
   positionId: string;
@@ -358,6 +359,7 @@ export function useMorphoCardSlots({
   let outcome: PositionCardOutcome | undefined;
   const left: PositionPanelRow[] = [];
   const right: PositionPanelRow[] = [];
+  let foot: ReactNode = null;
   let learnMore: LearnMoreContent;
 
   if (ended) {
@@ -495,23 +497,50 @@ export function useMorphoCardSlots({
     ) : hasDebt ? (
       <Prov info={positionBorrowedProv(v.loanSymbol, v.atBlock, coords)}>{loanFigure(v.borrowed)}</Prov>
     ) : null;
-    heads = [collateral, { id: "debt", label: CARD_VOCAB.debt, value: debtValue }];
+    // An amount with no icon or USD line on the detail card: named (decision 0066 point 2).
+    heads = [collateral, { id: "debt", label: CARD_VOCAB.debt, value: debtValue, tier: "amount" }];
 
-    // The LTV headline, from the page's live read: debt over the collateral's
-    // value at the market's oracle. A listing reads no market (decision 0018).
+    // The risk headline, from the page's live read: the health factor as
+    // Morpho's docs define it (collateral value × LLTV ÷ debt), with the LTV
+    // and the market's LLTV on the line under it (ui-jobs 628). A listing
+    // reads no market (decision 0018).
     const ltvUsable =
       chain && chain.currentDebt > 0 && chain.maxBorrow > 0 && chain.ltv != null && chain.ltv > 0 ? chain : null;
     if (detail && live !== undefined && hasDebt) {
+      const lltvNow = live?.lltv ?? v.lltv;
+      const hf = ltvUsable?.healthFactor ?? null;
       heads.push({
-        id: "ltv",
-        label: "LTV",
-        labelTip: `Loan-to-value: the debt over the collateral's value at the market's oracle. The market liquidates at its LLTV, ${pct(live?.lltv ?? v.lltv)}.`,
+        id: "health-factor",
+        label: MORPHO_TERMS.healthFactor,
+        labelTip: HEALTH_FACTOR_TIP,
         pending: live === null,
-        value: ltvUsable ? (
-          <Prov info={capacityProv("Loan-to-value", "live debt ÷ collateral value", chainCoords, readBy)}>
-            {pct(ltvUsable.ltv as number)}
-          </Prov>
-        ) : null,
+        value:
+          ltvUsable && hf != null ? (
+            <Prov
+              info={morphoHealthFactorProv(
+                {
+                  collateralValue: ltvUsable.collateralValue,
+                  lltv: ltvUsable.lltv,
+                  debt: ltvUsable.currentDebt,
+                  healthFactor: hf,
+                  loanSymbol: v.loanSymbol,
+                },
+                chainCoords,
+                readBy,
+              )}
+            >
+              {hf.toFixed(2)}
+            </Prov>
+          ) : null,
+        sub: ltvUsable ? (
+          <span className="whitespace-nowrap">
+            LTV{" "}
+            <Prov info={capacityProv("Loan-to-value", "live debt ÷ collateral value", chainCoords, readBy)}>
+              {pct(ltvUsable.ltv as number)}
+            </Prov>{" "}
+            · LLTV {pct(lltvNow)}
+          </span>
+        ) : undefined,
       });
     }
 
@@ -525,53 +554,46 @@ export function useMorphoCardSlots({
         left.push(
           {
             id: "borrow-rate",
-            label: "Borrow rate",
+            label: MORPHO_TERMS.borrowRate,
             value: (
               <Prov info={morphoBorrowRateNowProv(apr)}>
-                <PanelFigure>{(apr * 100).toFixed(2)}%</PanelFigure> APR
+                <PanelFigure>{(morphoApy(apr) * 100).toFixed(2)}%</PanelFigure>
               </Prov>
             ),
-            tip: "The market's borrow rate now, read from its interest rate model at the head block. It moves with how much of the market is lent out.",
+            tip: "The market's borrow rate now, from its interest rate model at the head block, compounded over a year. It moves with the market's utilization.",
           },
           {
             id: "yearly-cost",
             label: "Costs per year",
             value: (
-              <>
-                ~<AmountText value={debtNow * apr} format="compact" />
-              </>
+              <Prov info={morphoYearlyCostProv(v.loanSymbol, apr)}>
+                ~<AmountText value={debtNow * morphoApy(apr)} format="compact" />
+              </Prov>
             ),
             asset: loanAsset,
-            tip: "The debt now times the borrow rate: what a year costs while the rate holds.",
+            tip: "The debt now times the Borrow APY: what a year costs while the rate holds.",
           },
         );
       }
+      // What the debt's interest is counted to: a line at the card's foot
+      // (TO-DO-position-card 341).
       if (listed && hasDebt) {
-        left.push({
-          id: "interest-to",
-          label: "Interest to block",
-          value: <BlockRef block={listed.L.block} />,
-          tip: "The debt includes interest accrued to this block, the block every figure on the card was read at.",
-        });
+        foot = (
+          <>
+            The debt includes interest to block <BlockRef block={listed.L.block} />, the block every figure on the card
+            was read at.
+          </>
+        );
       } else if (v.currentDebt?.index?.stale) {
-        left.push({
-          id: "interest-to",
-          label: "Interest to",
-          value: (
-            <>
-              <PanelFigure>{formatDate(v.currentDebt.index.readAt)}</PanelFigure> (
-              <BlockRef block={v.currentDebt.index.block} />)
-            </>
-          ),
-          tip: "The market's interest index was last read at this block, so the debt includes interest to that date.",
-        });
+        foot = (
+          <>
+            The debt includes interest to {formatDate(v.currentDebt.index.readAt)} (block{" "}
+            <BlockRef block={v.currentDebt.index.block} />
+            ), when the market&apos;s interest index was last read.
+          </>
+        );
       } else if (!listed && !v.currentDebt && hasDebt) {
-        left.push({
-          id: "debt-basis",
-          label: "Debt basis",
-          value: "borrowed less repaid; interest not read",
-          tip: "The market's index was not read, so the debt is what was borrowed less what was repaid, without interest.",
-        });
+        foot = <>The debt is what was borrowed less what was repaid: the market&apos;s interest index was not read.</>;
       }
       if (chain && chain.currentDebt > 0 && chain.maxBorrow > 0) {
         left.push({
@@ -592,31 +614,6 @@ export function useMorphoCardSlots({
 
       // The right column: the distance to liquidation.
       if (ltvUsable) {
-        const share = capacityShare(ltvUsable.currentDebt, ltvUsable.maxBorrow);
-        right.push({
-          id: "lltv-share",
-          label: "Share of the LLTV line",
-          value: (
-            <>
-              <Prov
-                info={capacityProv(
-                  "Debt share of the liquidation line",
-                  "debt ÷ (collateral value × lltv)",
-                  chainCoords,
-                  readBy,
-                )}
-              >
-                <PanelFigure>{share.text}</PanelFigure>
-              </Prov>{" "}
-              (LLTV{" "}
-              <Prov info={lltvProv(chainCoords, readBy)}>
-                <PanelFigure>{pct(ltvUsable.lltv)}</PanelFigure>
-              </Prov>
-              )
-            </>
-          ),
-          tip: "The debt as a share of the most the collateral supports at the market's LLTV. At 100% the position can be liquidated.",
-        });
         const hf = ltvUsable.healthFactor;
         if (hf != null && hf > 1) {
           right.push({
@@ -634,7 +631,7 @@ export function useMorphoCardSlots({
                 {Math.round((1 - 1 / hf) * 100)}%
               </Prov>
             ),
-            tip: `How far the ${collSym} price at the market's oracle can fall before the debt reaches the LLTV line and the position can be liquidated.`,
+            tip: `How far the ${collSym} price at the market's oracle can fall before the LTV reaches the LLTV and the position can be liquidated.`,
           });
         }
       }
@@ -671,7 +668,12 @@ export function useMorphoCardSlots({
     menu,
   };
   if (outcome) return { ...detailCommon, outcome };
-  return { ...detailCommon, outcome: undefined, panel: [left, right] };
+  return {
+    ...detailCommon,
+    outcome: undefined,
+    panel: [left, right],
+    foot: foot ? <p className="mt-3 text-xs text-rb-500">{foot}</p> : undefined,
+  };
 }
 
 /** The Morpho position card: its slots, drawn by the shared card. */

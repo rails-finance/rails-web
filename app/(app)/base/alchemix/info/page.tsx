@@ -1,3 +1,4 @@
+// focus: the explorer's explainer; the shell's gate stands over the explorer
 // About this explorer, drawn on the typed template (rails-ops
 // standards/info-page-template.md). The content is shared by both chains
 // (components/protocol/alchemix/alchemix-info).

@@ -1,3 +1,4 @@
+// focus: the explorer's explainer; the shell's gate stands over the explorer
 // About this explorer — Aave V4 on Base. The page is the shared Aave V4 info
 // component (components/protocol/aave-v4/aave-v4-info.tsx).
 

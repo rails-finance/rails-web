@@ -1,10 +1,21 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { HistoryTag } from "@/components/shared/history-tag";
 import { formatFlowUsd } from "@/lib/shared/flows-timeline";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { formatValueHeld, spokenValueHeld, type ValueHeld, type ValueHeldPlace } from "@/lib/home/value-held";
-import { CHAINS, type ChainId } from "@/lib/shared/chains";
-import { ChainGlyph } from "@/components/icons/chain-glyphs";
+import type { ChainId } from "@/lib/shared/chains";
+import {
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableHead,
+  DataTableHeader,
+  DataTableLeadCell,
+  DataTableLeadHeader,
+  DataTableLeadMark,
+  DataTableRow,
+} from "@/components/shared/data-table/data-table";
 
 /**
  * The body of /about/figures (ui-jobs 523; the home band's (i) modal until 6 Nov
@@ -39,12 +50,14 @@ const fmtBlock = (b: { from: number; to: number }) =>
 
 const fmtShare = (share: number) => (share < 0.001 ? "<0.1%" : `${(share * 100).toFixed(1)}%`);
 
-const ROW = "border-t border-rb-200 align-top dark:border-rb-700";
-const CELL = "py-2 pr-4 last:pr-0";
+const TEXT = "text-rb-500";
 
 /** The three tables share one set of columns (Miles, 6 Nov 2026): the
- *  explorer, its chain as a glyph, a figure, the block, and a text column, so
- *  they read as one ledger; a column a table has nothing for stays empty. */
+ *  explorer's lead zone (its protocol and chain, D5), the explorer, a figure,
+ *  the block, and a text column, so they read as one ledger; a column a table
+ *  has nothing for stays empty. On the house table (rails-ops ui-jobs 539: D1,
+ *  D5, D6 cards below sm), unlinked: a row's explorer links its listing where
+ *  it has one. */
 function FiguresTable({
   heads,
   label,
@@ -55,60 +68,48 @@ function FiguresTable({
   children: ReactNode;
 }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[640px] table-fixed text-left text-sm tabular-nums" aria-label={label}>
-        <colgroup>
-          <col className="w-[24%]" />
-          <col className="w-14" />
-          <col className="w-24" />
-          <col className="w-48" />
-          <col />
-        </colgroup>
-        <thead className="text-rb-500">
-          <tr>
-            <th scope="col" className="py-2 pr-4 font-medium">
-              Explorer
-            </th>
-            <th scope="col" className="py-2 pr-4 font-medium">
-              Chain
-            </th>
-            <th scope="col" className="py-2 pr-4 text-right font-medium">
-              {heads[0]}
-            </th>
-            <th scope="col" className="py-2 pr-4 font-medium">
-              {heads[1]}
-            </th>
-            <th scope="col" className="py-2 font-medium">
-              {heads[2]}
-            </th>
-          </tr>
-        </thead>
-        <tbody>{children}</tbody>
-      </table>
-    </div>
+    <DataTable label={label} stacked tableClassName="text-left text-sm tabular-nums sm:min-w-[640px] sm:table-fixed">
+      <colgroup>
+        <col className="w-16 sm:w-[95px]" />
+        <col className="w-[24%]" />
+        <col className="w-24" />
+        <col className="w-48" />
+        <col />
+      </colgroup>
+      <DataTableHead>
+        <DataTableLeadHeader plain />
+        <DataTableHeader label="Explorer" />
+        <DataTableHeader label={heads[0]} align="right" />
+        <DataTableHeader label={heads[1]} />
+        <DataTableHeader label={heads[2]} />
+      </DataTableHead>
+      <DataTableBody>{children}</DataTableBody>
+    </DataTable>
   );
 }
 
-/** The explorer (a link to its listing, "vaults" after it for a vault
- *  surface) and its chain's glyph, named for a screen reader and on hover. */
-function PlaceCells({ place, label }: { place: ValueHeldPlace; label: string }) {
-  const chain = CHAINS[place.chainId as ChainId];
+/** The explorer's lead zone, then its name (a link to its listing, "vaults"
+ *  after it for a vault surface), with the zone's marks on a card's first line. */
+function PlaceCells({ place, label, tagged }: { place: ValueHeldPlace; label: string; tagged?: boolean }) {
   return (
     <>
-      <td className={CELL}>
-        {place.href ? (
-          <Link href={place.href} className={INLINE_LINK} data-figures-explorer={`${place.chainId}:${label}`}>
-            {label}
-          </Link>
-        ) : (
-          <span className="text-foreground">{label}</span>
-        )}
-        {place.surface && <span className="text-rb-500"> {place.surface}</span>}
-      </td>
-      <td className={CELL} title={chain?.name}>
-        <ChainGlyph id={place.chainId as ChainId} className="inline-block h-4 w-4 align-[-3px] text-rb-500" />
-        <span className="sr-only">{chain?.name ?? place.chainId}</span>
-      </td>
+      <DataTableLeadCell plain protocol={place.protocol} protocolName={label} chain={place.chainId as ChainId} />
+      <DataTableCell rowHeader>
+        <span className="flex items-center gap-2">
+          <DataTableLeadMark protocol={place.protocol} chain={place.chainId as ChainId} />
+          <span>
+            {place.href ? (
+              <Link href={place.href} className={INLINE_LINK} data-figures-explorer={`${place.chainId}:${label}`}>
+                {label}
+              </Link>
+            ) : (
+              <span className="text-foreground">{label}</span>
+            )}
+            {place.surface && <span className="text-rb-500"> {place.surface}</span>}
+          </span>
+          {tagged && <HistoryTag id={place.protocol} />}
+        </span>
+      </DataTableCell>
     </>
   );
 }
@@ -137,15 +138,19 @@ export function FiguresBody({ value, caption }: { value: ValueHeld | null; capti
           <Heading>Held, by explorer</Heading>
           <FiguresTable heads={["Share", "Block", "Prices"]} label="Held, by explorer">
             {value.rows.map((r) => (
-              <tr key={r.key} className={ROW}>
+              <DataTableRow key={r.key}>
                 <PlaceCells place={r} label={r.label} />
-                <td className={`${CELL} text-right`}>{fmtShare(r.share)}</td>
-                <td className={`${CELL} whitespace-nowrap`}>{r.block ? fmtBlock(r.block) : "—"}</td>
-                <td className={`${CELL} text-rb-500`}>
+                <DataTableCell label="Share" align="right">
+                  {fmtShare(r.share)}
+                </DataTableCell>
+                <DataTableCell label="Block" className="whitespace-nowrap">
+                  {r.block ? fmtBlock(r.block) : "—"}
+                </DataTableCell>
+                <DataTableCell label="Prices" wide className={TEXT}>
                   {r.oracleOf ?? r.prices}
                   {r.exemption && `; ${r.exemption}`}
-                </td>
-              </tr>
+                </DataTableCell>
+              </DataTableRow>
             ))}
           </FiguresTable>
 
@@ -154,12 +159,14 @@ export function FiguresBody({ value, caption }: { value: ValueHeld | null; capti
               <Heading>Not counted</Heading>
               <FiguresTable heads={["", "", "Reason"]} label="Not counted">
                 {value.notCounted.map((n) => (
-                  <tr key={`${n.label}:${n.chainId}:${n.surface}:${n.reason}`} className={ROW}>
-                    <PlaceCells place={n} label={n.label} />
-                    <td className={CELL} />
-                    <td className={CELL} />
-                    <td className={`${CELL} text-rb-500`}>{n.reason}</td>
-                  </tr>
+                  <DataTableRow key={`${n.label}:${n.chainId}:${n.surface}:${n.reason}`}>
+                    <PlaceCells place={n} label={n.label} tagged />
+                    <DataTableCell />
+                    <DataTableCell />
+                    <DataTableCell label="Reason" wide className={TEXT}>
+                      {n.reason}
+                    </DataTableCell>
+                  </DataTableRow>
                 ))}
               </FiguresTable>
             </>
@@ -170,16 +177,20 @@ export function FiguresBody({ value, caption }: { value: ValueHeld | null; capti
               <Heading>Left out of counted explorers</Heading>
               <FiguresTable heads={["Value", "", "What, and why"]} label="Left out of counted explorers">
                 {value.leftOut.map((l) => (
-                  <tr key={`${l.label}:${l.chainId}:${l.surface}:${l.reason}`} className={ROW}>
+                  <DataTableRow key={`${l.label}:${l.chainId}:${l.surface}:${l.reason}`}>
                     <PlaceCells place={l} label={l.label} />
-                    <td className={`${CELL} text-right`}>
-                      {l.usd !== null && l.usd >= 0.5 ? formatFlowUsd(l.usd) : ""}
-                    </td>
-                    <td className={CELL} />
-                    <td className={`${CELL} text-rb-500`}>
+                    {l.usd !== null && l.usd >= 0.5 ? (
+                      <DataTableCell label="Value" align="right">
+                        {formatFlowUsd(l.usd)}
+                      </DataTableCell>
+                    ) : (
+                      <DataTableCell />
+                    )}
+                    <DataTableCell />
+                    <DataTableCell label="What, and why" wide className={TEXT}>
                       <span className="text-foreground">{l.what}</span>: {l.reason}
-                    </td>
-                  </tr>
+                    </DataTableCell>
+                  </DataTableRow>
                 ))}
               </FiguresTable>
             </>

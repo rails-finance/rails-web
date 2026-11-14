@@ -10,7 +10,7 @@
 //     third-party verifiable: re-run the eth_call at the block against any node.
 //   • oracle  — the market's own getPrice on a configured feed (the same price
 //     its liquidation engine uses), and any value multiplied through it.
-//   • derived — a ratio or Σ over those reads (utilisation-of-the-roster, a
+//   • derived — a ratio or Σ over those reads (utilization-of-the-roster, a
 //     value sum), chain-derived and no further than its weakest input.
 //
 // The structured `source: { block }` slot rides every builder ALONGSIDE naming
@@ -30,6 +30,7 @@
 
 import type { Provenance } from "@/components/shared/provenance";
 import { stampHeadRead, type ServerRead } from "@/lib/shared/server-head-read";
+import { chainMeta, explorerUrl, type ChainId } from "@/lib/shared/chains";
 
 const LANE = "live Comet reads (/compound/markets)";
 
@@ -107,32 +108,32 @@ const cvMarketValueProvUnstamped = (side: "supplied" | "borrowed", coords: Compo
 
 // ── market-level: rate curve ─────────────────────────────────────────────────
 
-/** Utilisation — Comet's own getUtilization (totalBorrow ÷ totalSupply of the
+/** Utilization — Comet's own getUtilization (totalBorrow ÷ totalSupply of the
  *  base), the number the whole rate curve is written against. */
 const cvUtilizationProvUnstamped = (coords: CompoundMarketCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: coords.blockNumber },
   verify: recompute("Comet.getUtilization", coords),
-  summary: `Utilisation — the market's own \`getUtilization\`${atBlock(coords)}: totalBorrow ÷ totalSupply of the base, the contract's OWN arithmetic (1e18-scaled). Every point on the rate curve is priced from this one number.`,
+  summary: `Utilization — the market's own \`getUtilization\`${atBlock(coords)}: totalBorrow ÷ totalSupply of the base, the contract's OWN arithmetic (1e18-scaled). Every point on the rate curve is priced from this one number.`,
   contract: cometContract(coords),
   via: `${LANE} · Comet.getUtilization @ head`,
 });
 
-/** A rate-curve kink — the utilisation a curve turns steep at (supplyKink /
+/** A rate-curve kink — the utilization a curve turns steep at (supplyKink /
  *  borrowKink), a governance-set slot on the same axis as the fill. */
 const cvKinkProvUnstamped = (which: "supply" | "borrow", coords: CompoundMarketCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: coords.blockNumber },
   verify: recompute(`Comet.${which}Kink`, coords),
-  summary: `${which === "supply" ? "Supply" : "Borrow"}-rate kink — the market's \`${which}Kink\`${atBlock(coords)}: the utilisation the ${which} curve turns steep at, governance-set (1e18-scaled). It sits on the utilisation axis, so it is drawn against the fill.`,
+  summary: `${which === "supply" ? "Supply" : "Borrow"}-rate kink — the market's \`${which}Kink\`${atBlock(coords)}: the utilization the ${which} curve turns steep at, governance-set (1e18-scaled). It sits on the utilization axis, so it is drawn against the fill.`,
   contract: cometContract(coords),
   via: `${LANE} · Comet.${which}Kink @ head`,
 });
 
 /** A live annualised rate — getSupplyRate / getBorrowRate at the current
- *  utilisation, the contract's per-second answer × seconds per year. */
+ *  utilization, the contract's per-second answer × seconds per year. */
 const cvRateProvUnstamped = (side: "supply" | "borrow", coords: CompoundMarketCoords): Provenance => {
   const method = side === "supply" ? "getSupplyRate" : "getBorrowRate";
   return {
@@ -140,7 +141,7 @@ const cvRateProvUnstamped = (side: "supply" | "borrow", coords: CompoundMarketCo
     pclass: "state",
     source: { block: coords.blockNumber },
     verify: recompute(`Comet.${method}`, coords),
-    summary: `${side === "supply" ? "Supply" : "Borrow"} APR — the market's \`${method}\` at the current utilisation${atBlock(coords)}, annualized from the contract's per-second rate (× 31,536,000). The rate the contract itself would apply this block, read at the utilisation it reports.`,
+    summary: `${side === "supply" ? "Supply" : "Borrow"} APR — the market's \`${method}\` at the current utilization${atBlock(coords)}, annualized from the contract's per-second rate (× 31,536,000). The rate the contract itself would apply this block, read at the utilization it reports.`,
     contract: cometContract(coords),
     via: `${LANE} · Comet.${method}(utilization) × seconds/year @ head`,
     formula: "per-second rate × seconds per year",
@@ -228,6 +229,25 @@ const cvCollateralValueProvUnstamped = (coords: CompoundMarketCoords): Provenanc
   ],
 });
 
+/** One collateral asset's identity — the token the Comet's roster names
+ *  (getAssetInfo), linked on the chain's explorer. The product page keeps the
+ *  link off its surface (rails-ops decision 0059 point 2); it lives here. */
+const cvCollateralIdentityProvUnstamped = (chainId: ChainId, coords: CompoundMarketCoords): Provenance => {
+  const sym = coords.collateralSymbol ?? "This asset";
+  const token = coords.collateralAsset ?? "";
+  const explorer = chainMeta(chainId).explorerName;
+  return {
+    kind: "chain",
+    pclass: "state",
+    source: { block: coords.blockNumber },
+    verify: { kind: "etherscan", href: explorerUrl(chainId, "address", token), text: `${sym} token on ${explorer}` },
+    summary: `${sym} is collateral in the ${coords.baseSymbol ?? "base"} Comet. The market's \`getAssetInfo\`${atBlock(coords)} names its token, ${token}, with its price feed, scale, factors and supply cap. The symbol is the token's own ERC-20 read.`,
+    contract: cometContract(coords),
+    via: `${LANE} · Comet.getAssetInfo(i) · asset @ head`,
+    inputs: [{ label: "token", value: token, kind: "chain", pclass: "state", note: "getAssetInfo(i).asset" }],
+  };
+};
+
 /** A collateral asset's governance factor — borrowCollateralFactor /
  *  liquidateCollateralFactor / liquidationFactor, off getAssetInfo. */
 const cvCollateralFactorProvUnstamped = (
@@ -257,23 +277,6 @@ const cvCollateralFactorProvUnstamped = (
   };
 };
 
-// ── roster summary (block-level; no single contract) ─────────────────────────
-
-/** A quote-unit total over the markets sharing one unit — Σ of the per-market
- *  values (never blended across units). */
-const cvSummaryValueProvUnstamped = (
-  side: "supplied" | "borrowed",
-  unit: string,
-  coords: CompoundMarketCoords,
-): Provenance => ({
-  kind: "chain-derived",
-  pclass: "oracle",
-  source: { block: coords.blockNumber },
-  summary: `${unit === "USD" ? "Dollar-market" : `${unit}-market`} ${side} — Σ over the markets quoting in ${unit} of each one's ${side} value${atBlock(coords)} (base total × its own oracle price). One unit per sum: markets in other units stand apart, never blended into this figure.`,
-  via: `${LANE} · Σ per-market ${side} value over the ${unit} markets @ head`,
-  formula: `Σ ${unit}-market ${side} value`,
-});
-
 // ── the exported builders, stamped with who read the block ──────────────────
 
 /** A builder's receipt, stamped with the read its coordinates (the last argument) carry. */
@@ -298,4 +301,4 @@ export const cvCollateralBackingProv = stamped(cvCollateralBackingProvUnstamped)
 export const cvCollateralSuppliedProv = stamped(cvCollateralSuppliedProvUnstamped);
 export const cvCollateralValueProv = stamped(cvCollateralValueProvUnstamped);
 export const cvCollateralFactorProv = stamped(cvCollateralFactorProvUnstamped);
-export const cvSummaryValueProv = stamped(cvSummaryValueProvUnstamped);
+export const cvCollateralIdentityProv = stamped(cvCollateralIdentityProvUnstamped);

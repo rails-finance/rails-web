@@ -13,10 +13,12 @@ import { useRouter } from "next/navigation";
 import type { TroveSummary } from "@/types/api/trove";
 import type { OraclePricesData } from "@/types/api/oracle";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
-import { liquityFlowTimeline, liquityFocusEvents, liquityV2FlowEvents } from "@/lib/shared/liquity-flows";
-import { FlowFocusContext, useFlowFocusRoot, useFlowFocusValue } from "@/components/shared/flow-focus-context";
+import { liquityV2FlowEvents } from "@/lib/shared/liquity-flows";
+import { FlowFocusContext } from "@/components/shared/flow-focus-context";
+import { useTroveFlows } from "@/components/trove/TroveBody";
 import { liquityDailyBranch, useLiquityDailyPrices } from "@/hooks/useLiquityDailyPrices";
 import { useLiquityCollSurplus } from "@/hooks/useLiquityCollSurplus";
+import { useBranchShutdown } from "@/hooks/useBranchShutdown";
 import { useWalletContext } from "@/components/nav/wallet-context";
 import { eventPagePlace, troveHolder } from "@/lib/liquity/event-page";
 import { liquityV2Explorer } from "@/lib/liquity/explorer";
@@ -94,9 +96,10 @@ export default function EventView({
     [lastLiquidation, surplus],
   );
 
-  // The replay the card's ledgers read, with the trove page's inputs: the
-  // history, the branch's daily price, the clock set on mount, and today's
-  // oracle price for an open Trove.
+  // The replay the card's ledgers read, through the trove page's hook
+  // (useTroveFlows) with its inputs: the history, the branch's daily price,
+  // the clock set on mount, and today's oracle price for an open Trove. The
+  // page reads no head state, so the replay's live leg carries the price only.
   const collSymbol = trove?.collateralType ?? collateralType;
   const debtSymbol = liquityEvents[0]?.context.data.assetType || "BOLD";
   const currentPrice = prices?.[collSymbol.toLowerCase() as keyof OraclePricesData];
@@ -106,26 +109,27 @@ export default function EventView({
   const daily = useLiquityDailyPrices(liquityDailyBranch(collSymbol));
   const surplusClaimed = surplus?.claimed != null;
   const open = trove?.status === "open";
-  const flowTimeline = useMemo(
-    () =>
-      now == null || !daily.settled
-        ? null
-        : liquityFlowTimeline(flowEvents, {
-            collSymbol,
-            debtSymbol,
-            surplusClaimed,
-            now,
-            dailyColl: daily.obs,
-            live: open ? { price: currentPrice ?? null } : null,
-          }),
-    [flowEvents, collSymbol, debtSymbol, surplusClaimed, now, daily.settled, daily.obs, open, currentPrice],
+  // The branch's shutdown, as the trove page reads it (ui-jobs 612, 626): the
+  // prose takes it on any Trove (an urgent redemption, ui-jobs 619), the
+  // replay's accrual on an open one only.
+  const branchShutdown = useBranchShutdown("liquity-v2", collateralType, trove != null);
+  const shutdown = open ? branchShutdown : null;
+  const { flowFocus } = useTroveFlows({
+    flowEvents,
+    collSymbol,
+    debtSymbol,
+    surplusClaimed,
+    now,
+    daily,
+    open,
+    price: currentPrice,
+    liveState: undefined,
+    shutdownAt: shutdown?.at ?? null,
+  });
+  const troveMeta = useMemo(
+    () => ({ owner: owner ?? null, total, shutdownAt: branchShutdown?.at ?? null }),
+    [owner, total, branchShutdown?.at],
   );
-  const focusEvents = useMemo(
-    () => liquityFocusEvents(flowEvents, collSymbol, debtSymbol),
-    [flowEvents, collSymbol, debtSymbol],
-  );
-  const flowFocus = useFlowFocusValue(useFlowFocusRoot(focusEvents), flowTimeline);
-  const troveMeta = useMemo(() => ({ owner: owner ?? null, total }), [owner, total]);
 
   if (!trove || !events) {
     return (

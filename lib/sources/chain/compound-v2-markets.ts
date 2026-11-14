@@ -31,13 +31,11 @@
 //     convention, so a whole token's USD is price / 1e(36 − ud).
 //   • rates are per BLOCK on Compound V2 proper (borrowRatePerBlock), NOT per
 //     timestamp — the opposite of Moonwell, which kept its Base/Moonbeam
-//     per-second convention. Annualized on EACH MARKET'S OWN interest rate
-//     model's `blocksPerYear()`, read from that model, because the roster does
-//     not agree on one: cETH's model says 2,628,000 (12s blocks) while every
-//     other market's still says 2,102,400 (the pre-Merge 15s assumption). One
-//     hardcoded constant would misstate the protocol's largest market — $43M of
-//     ETH — by 25%. The constant is the model's own, so the annualization is
-//     the protocol's arithmetic rather than a wall-clock estimate of ours.
+//     per-second convention. Annualised on 2,628,000 blocks, the year of
+//     12-second blocks Compound's docs count (lib/compound-v2/rate-year.ts).
+//     Each model's `blocksPerYear()` is still read: 2,628,000 on cETH's,
+//     2,102,400 on the rest. It is the constant the model sets its per-block
+//     curve with, and the receipts name it as that.
 //
 // Two structural facts the roster actually contains, stated rather than smoothed:
 //   • 8 of 20 markets have collateralFactor == 0. That is not a risk parameter
@@ -70,6 +68,9 @@ import {
   handResolvedUnderlying,
   isCEth,
 } from "@/lib/compound-v2/asset-catalog";
+import { jumpRateModel, whitePaperModel, type ComptrollerRateModel } from "@/lib/comptroller/rate-model";
+import { COMPOUND_V2_BLOCKS_PER_YEAR } from "@/lib/compound-v2/rate-year";
+import { compoundV2Apy } from "@/lib/comptroller/apy";
 
 const ZERO = BigInt(0);
 
@@ -77,6 +78,11 @@ const COMPTROLLER_ABI = parseAbi([
   "function getAllMarkets() view returns (address[])",
   "function oracle() view returns (address)",
   "function markets(address cToken) view returns (bool isListed, uint256 collateralFactorMantissa, bool isComped)",
+  "function borrowCaps(address cToken) view returns (uint256)",
+  "function mintGuardianPaused(address cToken) view returns (bool)",
+  "function borrowGuardianPaused(address cToken) view returns (bool)",
+  "function closeFactorMantissa() view returns (uint256)",
+  "function liquidationIncentiveMantissa() view returns (uint256)",
 ]);
 
 const CTOKEN_ABI = parseAbi([
@@ -101,7 +107,26 @@ const CTOKEN_ABI = parseAbi([
  *     against the fill. The five oldest markets run the original
  *     WhitePaperInterestRateModel, which HAS no kink — a straight line with no
  *     turn. Those markets get no tick rather than a made-up one. */
-const IRM_ABI = parseAbi(["function kink() view returns (uint256)", "function blocksPerYear() view returns (uint256)"]);
+const IRM_ABI = parseAbi([
+  "function kink() view returns (uint256)",
+  "function blocksPerYear() view returns (uint256)",
+  // The jump-rate model's terms, per block (lib/comptroller/rate-model.ts).
+  "function baseRatePerBlock() view returns (uint256)",
+  "function multiplierPerBlock() view returns (uint256)",
+  "function jumpMultiplierPerBlock() view returns (uint256)",
+  // The white-paper model's terms, a year; the jump-rate getters revert there.
+  "function baseRate() view returns (uint256)",
+  "function multiplier() view returns (uint256)",
+]);
+const IRM_CALLS = [
+  "kink",
+  "blocksPerYear",
+  "baseRatePerBlock",
+  "multiplierPerBlock",
+  "jumpMultiplierPerBlock",
+  "baseRate",
+  "multiplier",
+] as const;
 
 const ORACLE_ABI = parseAbi([
   "function getUnderlyingPrice(address cToken) view returns (uint256)",
@@ -160,21 +185,33 @@ export interface CompoundV2MarketRow {
   collateralDisabled: boolean;
   isListed: boolean;
 
-  /** Annual percent (5.2 = 5.2%), from the protocol's own per-BLOCK rates on
-   *  THIS market's model's own blocks-per-year constant. Null when the rate
-   *  call fails. */
+  /** APY in percent (5.2 = 5.2%): the per-BLOCK rate by the docs' formula
+   *  (lib/comptroller/apy.ts). Null when the rate call fails. */
   supplyApr: number | null;
   borrowApr: number | null;
+  /** The per-block rates as read (1e18 mantissas), for the receipts. */
+  supplyRatePerBlockRaw: string | null;
+  borrowRatePerBlockRaw: string | null;
   reserveFactor: number | null;
 
   /** This market's interest rate model, and the two things read from it. */
   interestRateModel: string | null;
-  /** The blocks/year the model annualizes with — 2,628,000 on cETH's model,
-   *  2,102,400 on the rest. Not one constant across the roster. */
+  /** The model's `blocksPerYear()`, the constant it sets its per-block curve
+   *  with: 2,628,000 on cETH's model, 2,102,400 on the rest. */
   blocksPerYear: number | null;
   /** The utilisation the rate curve turns at, as a fraction (0.8 = 80%). Null
    *  on the five oldest markets, whose WhitePaper model has no kink at all. */
   kink: number | null;
+  /** The model's terms as annual fractions on 2,628,000 blocks; null where the model answers neither shape. */
+  rateModel: ComptrollerRateModel | null;
+
+  /** The Comptroller's borrow cap in the underlying; null at 0 (uncapped). Compound V2 has no supply cap. */
+  borrowCap: number | null;
+  /** The cap is one base unit of the underlying: closed to new borrowing. */
+  borrowCapOneUnit: boolean;
+  /** The pause guardian has paused supplying (minting) or borrowing in this market. */
+  mintPaused: boolean;
+  borrowPaused: boolean;
 }
 
 export interface CompoundV2MarketsResponse {
@@ -203,6 +240,9 @@ export interface CompoundV2MarketsResponse {
      *  be read without leaning on a frozen constant. */
     totalSuppliedUsdWithFeed: number | null;
     totalBorrowedUsdWithFeed: number | null;
+    /** The Comptroller's close factor and liquidation incentive (1.08 = seize 108%). */
+    closeFactor: number | null;
+    liquidationIncentive: number | null;
   };
   /** True when the chain read failed and we returned an empty roster. */
   chainStale: boolean;
@@ -223,6 +263,8 @@ function empty(): CompoundV2MarketsResponse {
       utilisation: null,
       totalSuppliedUsdWithFeed: null,
       totalBorrowedUsdWithFeed: null,
+      closeFactor: null,
+      liquidationIncentive: null,
     },
     chainStale: true,
   };
@@ -262,7 +304,7 @@ async function readMarkets(client: PublicClient): Promise<CompoundV2MarketsRespo
   // The Comptroller states its own roster and its own oracle. Neither is
   // hardcoded: a view that hardcoded the market list would be asserting a
   // roster rather than reading one.
-  const [cTokens, oracle] = await Promise.all([
+  const [cTokens, oracle, closeFactorRaw, liqIncentiveRaw] = await Promise.all([
     client.readContract({
       address: COMPOUND_V2_ADDRESSES.COMPTROLLER as `0x${string}`,
       abi: COMPTROLLER_ABI,
@@ -275,9 +317,21 @@ async function readMarkets(client: PublicClient): Promise<CompoundV2MarketsRespo
       functionName: "oracle",
       ...atBlock,
     }),
+    client.readContract({
+      address: COMPOUND_V2_ADDRESSES.COMPTROLLER as `0x${string}`,
+      abi: COMPTROLLER_ABI,
+      functionName: "closeFactorMantissa",
+      ...atBlock,
+    }),
+    client.readContract({
+      address: COMPOUND_V2_ADDRESSES.COMPTROLLER as `0x${string}`,
+      abi: COMPTROLLER_ABI,
+      functionName: "liquidationIncentiveMantissa",
+      ...atBlock,
+    }),
   ]);
 
-  const PER_MARKET = 11;
+  const PER_MARKET = 14;
   const results = (await client.multicall({
     allowFailure: true,
     ...atBlock,
@@ -295,6 +349,19 @@ async function readMarkets(client: PublicClient): Promise<CompoundV2MarketsRespo
           { address: c, abi: CTOKEN_ABI, functionName: "reserveFactorMantissa" },
           { address: COMPOUND_V2_ADDRESSES.COMPTROLLER, abi: COMPTROLLER_ABI, functionName: "markets", args: [c] },
           { address: c, abi: CTOKEN_ABI, functionName: "interestRateModel" },
+          { address: COMPOUND_V2_ADDRESSES.COMPTROLLER, abi: COMPTROLLER_ABI, functionName: "borrowCaps", args: [c] },
+          {
+            address: COMPOUND_V2_ADDRESSES.COMPTROLLER,
+            abi: COMPTROLLER_ABI,
+            functionName: "mintGuardianPaused",
+            args: [c],
+          },
+          {
+            address: COMPOUND_V2_ADDRESSES.COMPTROLLER,
+            abi: COMPTROLLER_ABI,
+            functionName: "borrowGuardianPaused",
+            args: [c],
+          },
         ] as const,
     ),
   })) as Res[];
@@ -307,10 +374,7 @@ async function readMarkets(client: PublicClient): Promise<CompoundV2MarketsRespo
     ...atBlock,
     contracts: irmOf.flatMap((irm) => {
       const addr = (irm && !isZeroAddr(irm) ? irm : COMPOUND_V2_ADDRESSES.COMPTROLLER) as `0x${string}`;
-      return [
-        { address: addr, abi: IRM_ABI, functionName: "kink" },
-        { address: addr, abi: IRM_ABI, functionName: "blocksPerYear" },
-      ] as const;
+      return IRM_CALLS.map((functionName) => ({ address: addr, abi: IRM_ABI, functionName }));
     }),
   })) as Res[];
 
@@ -407,16 +471,17 @@ async function readMarkets(client: PublicClient): Promise<CompoundV2MarketsRespo
     const collateralDisabled = cfMantissa != null && cfMantissa === ZERO;
     const collateralFactor = cfMantissa != null && cfMantissa > ZERO ? Number(cfMantissa) / 1e18 : null;
 
-    // Annualize on THIS market's model's own constant. Without a readable
-    // model there is no constant to annualize with, so the rate is null; a
-    // guess of 2,102,400 would misstate cETH by 25%.
-    const kinkRaw = ok<bigint>(irmRes[i * 2]);
-    const bpyRaw = ok<bigint>(irmRes[i * 2 + 1]);
+    // Annualise on the docs' 2,628,000 blocks; the model's blocksPerYear()
+    // is kept for the receipts and the white-paper terms.
+    const irm = (k: (typeof IRM_CALLS)[number]) => ok<bigint>(irmRes[i * IRM_CALLS.length + IRM_CALLS.indexOf(k)]);
+    const kinkRaw = irm("kink");
+    const bpyRaw = irm("blocksPerYear");
     const blocksPerYear = bpyRaw != null && bpyRaw > ZERO ? Number(bpyRaw) : null;
     const apr = (r: Res | undefined): number | null => {
       const v = ok<bigint>(r);
-      return v != null && blocksPerYear != null ? (Number(v) / 1e18) * blocksPerYear * 100 : null;
+      return v != null ? compoundV2Apy(v) * 100 : null;
     };
+    const rawOf = (r: Res | undefined): string | null => ok<bigint>(r)?.toString() ?? null;
 
     return {
       cToken,
@@ -445,6 +510,8 @@ async function readMarkets(client: PublicClient): Promise<CompoundV2MarketsRespo
 
       supplyApr: apr(results[base + 7]),
       borrowApr: apr(results[base + 6]),
+      supplyRatePerBlockRaw: rawOf(results[base + 7]),
+      borrowRatePerBlockRaw: rawOf(results[base + 6]),
       reserveFactor: (() => {
         const v = ok<bigint>(results[base + 8]);
         return v != null ? Number(v) / 1e18 : null;
@@ -453,6 +520,28 @@ async function readMarkets(client: PublicClient): Promise<CompoundV2MarketsRespo
       interestRateModel: irmOf[i] && !isZeroAddr(irmOf[i]) ? getAddress(irmOf[i]!).toLowerCase() : null,
       blocksPerYear,
       kink: kinkRaw != null && kinkRaw > ZERO ? Number(kinkRaw) / 1e18 : null,
+      rateModel:
+        jumpRateModel(
+          {
+            base: irm("baseRatePerBlock"),
+            multiplier: irm("multiplierPerBlock"),
+            jump: irm("jumpMultiplierPerBlock"),
+            kink: kinkRaw,
+          },
+          COMPOUND_V2_BLOCKS_PER_YEAR,
+        ) ??
+        whitePaperModel(
+          { baseRate: irm("baseRate"), multiplier: irm("multiplier") },
+          { periods: COMPOUND_V2_BLOCKS_PER_YEAR, modelPeriods: blocksPerYear },
+        ),
+
+      borrowCap: (() => {
+        const v = ok<bigint>(results[base + 11]);
+        return v != null && v > ZERO ? scaleRaw(v, underlyingDecimals) : null;
+      })(),
+      borrowCapOneUnit: ok<bigint>(results[base + 11]) === BigInt(1),
+      mintPaused: ok<boolean>(results[base + 12]) === true,
+      borrowPaused: ok<boolean>(results[base + 13]) === true,
     };
   });
 
@@ -481,6 +570,8 @@ async function readMarkets(client: PublicClient): Promise<CompoundV2MarketsRespo
       utilisation: supplied != null && borrowed != null && supplied > 0 ? borrowed / supplied : null,
       totalSuppliedUsdWithFeed: withFeed.length > 0 ? sum(withFeed, "totalSupplyUsd") : null,
       totalBorrowedUsdWithFeed: withFeed.length > 0 ? sum(withFeed, "totalBorrowsUsd") : null,
+      closeFactor: closeFactorRaw > ZERO ? Number(closeFactorRaw) / 1e18 : null,
+      liquidationIncentive: liqIncentiveRaw > ZERO ? Number(liqIncentiveRaw) / 1e18 : null,
     },
     chainStale: false,
   };

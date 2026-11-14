@@ -3,7 +3,7 @@
 // Moonwell position detail — reference depth, chain-state-first, the 3-section
 // anatomy (card → economics → timeline). Every value is chain-direct or
 // chain-derived: position state + timeline replayed from the captured mToken
-// events, and the risk surfaces (health factor, runway, borrow capacity,
+// events, and the risk surfaces (credit remaining, runway, borrow capacity,
 // market rates, the position narration) read live from the protocol's own
 // contracts via /api/chain/moonwell/position — per-market balances +
 // borrowBalanceStored, the Comptroller's oracle prices and collateral factors,
@@ -64,7 +64,8 @@ import { MoonwellFlowsNote, moonwellFlowsContent } from "@/components/protocol/m
 import { useMoonwellFlows } from "@/hooks/useMoonwellFlows";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
-import type { PriceStripAsset } from "@/components/shared/price-strip";
+import type { LatestPriceAsset } from "@/components/shared/latest-prices";
+import { moonwellPriceProv } from "@/lib/moonwell/position-provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { externalActor, summariseExternalActors, withOpeningActors } from "@/lib/shared/external-actor";
 import { liquidationStories } from "@/lib/shared/ctoken-liquidation-story";
@@ -356,16 +357,17 @@ export default function MoonwellPositionView({
 
   // The top row's price dropdown: the on-chain oracle price of each
   // market the account currently touches.
-  const stripAssets = useMemo<PriceStripAsset[]>(() => {
+  const stripAssets = useMemo<LatestPriceAsset[]>(() => {
     if (!view || view.status !== "open") return [];
     const seen = new Set<string>();
-    const out: PriceStripAsset[] = [];
+    const out: LatestPriceAsset[] = [];
     for (const r of [...view.supplies, ...view.borrows]) {
       const a = r.address.toLowerCase();
       if (seen.has(a)) continue;
       seen.add(a);
       const p = view.priceByAddress?.[a];
-      if (typeof p === "number" && p > 0) out.push({ symbol: r.symbol, address: r.address, price: p });
+      if (typeof p === "number" && p > 0)
+        out.push({ symbol: r.symbol, address: r.address, price: p, info: moonwellPriceProv(r.symbol) });
     }
     return out;
   }, [view]);
@@ -408,9 +410,8 @@ export default function MoonwellPositionView({
                   surface="detail"
                   viewHref={tl.viewHref}
                   captions={captions ?? undefined}
-                  // The Health factor, the room left to borrow and the distance to
-                  // liquidation come from the live Comptroller read, inside the
-                  // card's receipts scope.
+                  // Credit remaining and the credit limit come from the live
+                  // Comptroller read, inside the card's receipts scope.
                   chain={chain}
                   exports={exports}
                   // The Explanation is now pure layman prose about those same face

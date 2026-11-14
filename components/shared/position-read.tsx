@@ -17,6 +17,8 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { useChainId } from "@/lib/shared/chain-context";
 import { explorerUrl } from "@/lib/shared/chains";
 import { positionReadWords, sameRead, type PositionRead } from "@/lib/shared/position-read";
+import { AimGate } from "@/components/shared/aim-gate";
+import { rowAssetKeys } from "@/lib/shared/focus-row-keys";
 
 interface ReadStore {
   read: PositionRead | null;
@@ -26,7 +28,19 @@ interface ReadStore {
 const PositionReadContext = createContext<ReadStore | null>(null);
 
 /** The page's read. Key it with the view, so a navigation to another position starts from that page's read. */
-export function PositionReadProvider({ read, children }: { read: PositionRead | null; children: ReactNode }) {
+export function PositionReadProvider({
+  read,
+  children,
+  focus,
+}: {
+  read: PositionRead | null;
+  children: ReactNode;
+  /** Focus (ui-jobs 557): the position the page loaded, whose token addresses
+   *  (lib/shared/focus-row-keys.ts) decide whether it is in focus. A position
+   *  outside the focus is gated whole; one inside shows whole, its events
+   *  included. A position with no token Rails can read is not gated. */
+  focus?: { source: unknown; what?: string };
+}) {
   const chainId = useChainId();
   const [live, setLive] = useState<PositionRead | null>(null);
   const [times, setTimes] = useState<ReadonlyMap<number, number>>(() => new Map());
@@ -47,7 +61,19 @@ export function PositionReadProvider({ read, children }: { read: PositionRead | 
   }, [chainId, untimed, times]);
   const timed =
     shown && shown.at == null && shown.block != null ? { ...shown, at: times.get(shown.block) ?? null } : shown;
-  return <PositionReadContext.Provider value={{ read: timed, report }}>{children}</PositionReadContext.Provider>;
+  const keys = focus ? rowAssetKeys(focus.source, chainId) : [];
+  return (
+    <PositionReadContext.Provider value={{ read: timed, report }}>
+      {keys.length > 0 ? (
+        <AimGate keys={keys} chain={chainId} what={focus?.what ?? "This position"}>
+          {children}
+        </AimGate>
+      ) : (
+        children
+      )}
+      <PositionReadReceipt />
+    </PositionReadContext.Provider>
+  );
 }
 
 /** A family's live read, once its figures stand on it; null or undefined leaves the stamp as it is. */
@@ -62,13 +88,37 @@ export function useReportPositionRead(read: PositionRead | null | undefined): vo
   }, [report, kind, block, at]);
 }
 
-/** The stamp, muted, in the card's heading row. */
-export function PositionReadStamp() {
-  const store = useContext(PositionReadContext);
+/** The read in words, its block linking to the chain's explorer. */
+function ReadWords({ read }: { read: PositionRead }) {
   const chainId = useChainId();
-  const read = store?.read;
-  if (!read) return null;
   const { lead, tail } = positionReadWords(read);
+  return (
+    <>
+      {lead}
+      {read.block != null && (
+        <>
+          {" "}
+          <a
+            href={explorerUrl(chainId, "block", read.block)}
+            target="_blank"
+            rel="noopener"
+            className="rounded-sm hover:text-foreground focus-ring"
+          >
+            {read.block.toLocaleString("en-US")}
+          </a>
+        </>
+      )}
+      {tail}
+    </>
+  );
+}
+
+/** The stamp, muted, in the card's heading row: drawn only for a stored read,
+ *  to say the latest read failed. Otherwise H6 beside it states the read's age,
+ *  block and time (Miles, 12 Nov 2026; ui-jobs 602). */
+export function PositionReadStamp() {
+  const read = useContext(PositionReadContext)?.read;
+  if (!read || read.kind !== "stored") return null;
   return (
     <span
       className="text-[11px] text-rb-500 tabular-nums"
@@ -78,21 +128,26 @@ export function PositionReadStamp() {
       // The block and the time are the read's own coordinates.
       data-prov-exempt
     >
-      {lead}
-      {read.block != null && (
-        <>
-          {" "}
-          <a
-            href={explorerUrl(chainId, "block", read.block)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-sm hover:text-foreground focus-ring"
-          >
-            {read.block.toLocaleString("en-US")}
-          </a>
-        </>
-      )}
-      {tail}
+      <ReadWords read={read} />
     </span>
+  );
+}
+
+/** The page's receipt, one muted line at the foot of the page above the footer:
+ *  the read behind the figures in full, in the served HTML, quotable where the
+ *  figures carry `data-nosnippet` (Miles, 12 Nov 2026; ui-jobs 602). */
+function PositionReadReceipt() {
+  const read = useContext(PositionReadContext)?.read;
+  if (!read) return null;
+  return (
+    <p
+      className="mt-16 text-[11px] text-rb-500 tabular-nums"
+      data-anatomy="C5.2"
+      data-position-read-receipt={read.kind}
+      data-position-read-block={read.block ?? undefined}
+      data-prov-exempt
+    >
+      <ReadWords read={read} />.
+    </p>
   );
 }

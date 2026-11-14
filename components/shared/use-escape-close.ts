@@ -37,6 +37,14 @@ function isClosed(layer: Element): boolean {
   );
 }
 
+/** Whether a modal, dialog, menu or listbox stands open on the page: the
+ *  layer test above, for another Escape owner (the new-focus row on
+ *  /saved-views, `NewFocusRow` in bookmark-list.tsx). */
+export function otherLayerOpen(): boolean {
+  for (const layer of document.querySelectorAll(LAYER)) if (!isClosed(layer)) return true;
+  return false;
+}
+
 function onKeyDown(e: KeyboardEvent) {
   if (e.key !== "Escape" || e.defaultPrevented) return;
   const top = stack[stack.length - 1];

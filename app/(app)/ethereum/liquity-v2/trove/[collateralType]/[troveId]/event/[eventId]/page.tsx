@@ -6,6 +6,8 @@ import { eventPagePlace } from "@/lib/liquity/event-page";
 import { liquityV2Explorer } from "@/lib/liquity/explorer";
 import { truncateTroveId } from "@/lib/liquity/share-card";
 import type { OraclePricesData } from "@/types/api/oracle";
+import { FocusSourceGate } from "@/components/shared/aim-gate";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import EventView from "./event-view";
 
 interface Props {
@@ -58,16 +60,19 @@ export default async function LiquityV2EventPage({ params }: Props) {
   const { collateralType, troveId, eventId } = await params;
   const history = await loadTroveHistory(collateralType, troveId);
   if (history.missing) notFound();
+  // Focus (ui-jobs 557): under the Trove's gate, as the Trove page stands.
   return (
-    <EventView
-      key={`${collateralType}:${troveId}:${eventId}`}
-      collateralType={collateralType}
-      troveId={troveId}
-      eventId={decodeEventId(eventId)}
-      trove={history.trove}
-      events={history.events}
-      totalEvents={history.hasMore ? history.totalEvents : null}
-      prices={history.prices}
-    />
+    <FocusSourceGate source={history.trove} chain={MAINNET_CHAIN_ID} what="This position">
+      <EventView
+        key={`${collateralType}:${troveId}:${eventId}`}
+        collateralType={collateralType}
+        troveId={troveId}
+        eventId={decodeEventId(eventId)}
+        trove={history.trove}
+        events={history.events}
+        totalEvents={history.hasMore ? history.totalEvents : null}
+        prices={history.prices}
+      />
+    </FocusSourceGate>
   );
 }

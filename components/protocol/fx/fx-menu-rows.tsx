@@ -39,7 +39,7 @@ export function FxMenuRows({
         icon={<ImageIcon size={16} />}
         title="Position NFT"
         subtitle="Open it on OpenSea"
-        onClick={() => window.open(nftUrl, "_blank", "noopener,noreferrer")}
+        onClick={() => window.open(nftUrl, "_blank", "noopener")}
       />
       <ToolsMenuItem
         icon={copied === "link" ? <Icon name="check" size={16} /> : <Link2 size={16} className="-rotate-45" />}

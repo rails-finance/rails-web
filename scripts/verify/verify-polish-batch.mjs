@@ -429,7 +429,7 @@ check(
 );
 check(
   "P phone @390: the link reads View a live position and goes to the Trove",
-  sample.text === "View a live position →" && /^\/ethereum\/liquity-v2\/trove\//.test(sample.href ?? ""),
+  sample.text === "View a live position" && /^\/ethereum\/liquity-v2\/trove\//.test(sample.href ?? ""),
   JSON.stringify(sample),
 );
 check(
@@ -440,7 +440,7 @@ check(
 await phone.close();
 
 // Saved wallets in the reader's order (ui-jobs 504): a list stored before the
-// order is shown newest first; a move on /bookmarks persists, and the profile
+// order is shown newest first; a move on /saved-views persists, and the profile
 // menu lists them in that order.
 {
   const W = [
@@ -460,7 +460,7 @@ await phone.close();
     if (!localStorage.getItem("rails-bookmarks")) localStorage.setItem("rails-bookmarks", JSON.stringify(rows));
   }, held);
   const bp = await ctx.newPage();
-  await bp.goto(`${BASE}/bookmarks`, { waitUntil: "networkidle" });
+  await bp.goto(`${BASE}/saved-views?tab=wallets`, { waitUntil: "networkidle" });
   await bp.waitForSelector("[data-bookmark-row]");
   const order = () =>
     bp.locator("[data-bookmark-open]").evaluateAll((as) => as.map((a) => a.getAttribute("href").split("/").pop()));
@@ -470,7 +470,8 @@ await phone.close();
     first.join() === [W[2], W[1], W[0]].join(),
     first.join(),
   );
-  await bp.locator("[data-bookmark-row]").first().locator('[data-bookmark-move="down"]').click();
+  await bp.locator("[data-bookmark-row]").first().locator("[data-row-menu]").click();
+  await bp.locator('[data-row-menu-list] [data-bookmark-move="down"]').click();
   await bp.reload({ waitUntil: "networkidle" });
   await bp.waitForSelector("[data-bookmark-row]");
   const moved = await order();
@@ -513,7 +514,7 @@ await phone.close();
 // `rails-saved` with a kind per entry, started from the wallet-only
 // `rails-bookmarks`, which keeps its old shape for builds from before. A
 // wallet such a build adds there joins the list and the views stay; the
-// profile menu groups Wallets, Positions, Views in that order, and /bookmarks
+// profile menu groups Focus, Listings, Wallets, Positions in that order (ui-jobs 582), and /saved-views
 // has the same three tabs, each row opening its saved page. A listing's ⋮
 // (N1.7) saves the view under its URL.
 {
@@ -556,11 +557,7 @@ await phone.close();
   const items = await sp
     .locator('[data-view-menu] [role="menu"] [data-menu-item]')
     .evaluateAll((els) => els.map((e) => e.getAttribute("data-menu-item")));
-  check(
-    "SV the listing ⋮ holds Save this view and Copy link",
-    items.join() === "save-view,copy-view-link",
-    items.join(),
-  );
+  check("SV the listing ⋮ holds Save listing and Copy link", items.join() === "save-view,copy-view-link", items.join());
   await sp.locator('[data-menu-item="save-view"]').click();
   const saved = (await read("rails-saved")).find((r) => r.kind === "view");
   check(
@@ -591,9 +588,13 @@ await phone.close();
   const groups = await sp
     .locator("[data-profile-menu-group]")
     .evaluateAll((els) => els.map((e) => e.getAttribute("data-profile-menu-group")));
-  check("SV profile menu groups: wallets, views", groups.join() === "wallets,views", groups.join());
+  check(
+    "SV profile menu groups: the subgroups holding something, listings and wallets, then Advanced (ui-jobs 586; Miles 13 Nov 2026)",
+    groups.join() === "listings,wallets,advanced",
+    groups.join(),
+  );
   await sp.keyboard.press("Escape");
-  await sp.goto(`${BASE}/bookmarks?tab=views`, { waitUntil: "networkidle" });
+  await sp.goto(`${BASE}/saved-views?tab=views`, { waitUntil: "networkidle" });
   await sp.waitForSelector('[data-bookmark-row="view"]');
   const tabs = await sp
     .locator("[data-saved-tab]")
@@ -602,8 +603,8 @@ await phone.close();
     );
   const viewHref = await sp.locator('[data-bookmark-row="view"] a').first().getAttribute("href");
   check(
-    "SV /bookmarks tabs Wallets, Positions, Views; ?tab=views lists the view opening its URL",
-    tabs.join() === "wallets,positions,views*" && viewHref === VIEW,
+    "SV /saved-views tabs Overview, Focus, Listings, Wallets, Positions; the old ?tab=views opens Listings with the view opening its URL",
+    tabs.join() === "overview,focus,listings*,wallets,positions" && viewHref === VIEW,
     JSON.stringify({ tabs, viewHref }),
   );
   await ctx.close();

@@ -30,8 +30,10 @@ import type { MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
 import type { MaplePool } from "@/lib/maple/asset-catalog";
 import type { VaultCensusRow } from "@/lib/aave-vaults/vault-position";
 import { releaseLabel, type VaultFamily } from "@/lib/vaults/families";
-import type { VaultIlliquid } from "@/lib/vaults/illiquid";
+import type { VaultIlliquid, VaultLiquidity } from "@/lib/vaults/illiquid";
 import { hasLostAssets } from "@/lib/vaults/lost-assets";
+import type { AssetScale } from "@/lib/vaults/asset-scale-words";
+import type { VaultYield } from "@/lib/vaults/yield";
 import { tooSmallToMeasure } from "@/lib/vaults/yield";
 
 /** What the chain or the venue states about a vault's standing, as a pill
@@ -41,15 +43,23 @@ import { tooSmallToMeasure } from "@/lib/vaults/yield";
  *  `illiquid`: Rails's test over the chain's reads of a MetaMorpho vault's
  *  markets (lib/vaults/illiquid.ts, ui-jobs 540). `lost-assets`: a MetaMorpho
  *  V1.1 vault's `lostAssets()` is 1% or more of its total (lib/vaults/lost-assets.ts,
- *  ui-jobs 543). */
-export type VaultStanding = "endorsed" | "shut-down" | "paused" | "address-book" | "illiquid" | "lost-assets";
+ *  ui-jobs 543). `decimals-disagree`: the asset's stated decimals disagree with
+ *  the scale its conversion works at (lib/vaults/asset-scale.ts). */
+export type VaultStanding =
+  | "endorsed"
+  | "shut-down"
+  | "paused"
+  | "address-book"
+  | "illiquid"
+  | "lost-assets"
+  | "decimals-disagree";
 
 /** Who runs the vault, by the role the contract names: a MetaMorpho
  *  `curator()` (or its `owner()` where no curator is named), an Umbrella
  *  stake token's `owner()`, a Yearn V3 vault's `role_manager()`. An address:
  *  names wait on attestation (decision 0017 point 5). */
 export interface VaultSteward {
-  role: "curator" | "owner" | "roleManager";
+  role: "curator" | "owner" | "roleManager" | "poolDelegate";
   address: string;
 }
 
@@ -93,11 +103,22 @@ export interface VaultSummary {
   /** The markets that make a MetaMorpho vault illiquid, at the read block;
    *  absent where the vault is not caught or was not tested. */
   illiquid?: VaultIlliquid;
+  /** What can leave a MetaMorpho vault at the read block: the withdraw
+   *  queue's sum and the part of it its markets hold free (ui-jobs 553);
+   *  absent where it was not read. */
+  withdrawable?: Pick<VaultLiquidity, "block" | "queueAssets" | "withdrawable">;
+  /** Where the asset's decimals disagree with its conversion: the standing
+   *  `decimals-disagree` and its reading. */
+  assetScale?: AssetScale;
+  /** Where the vault's asset is itself a vault whose share price the daily
+   *  store keeps (an Umbrella stake on a static aToken): that series' Yield
+   *  measure, for the Yield subline (decision 0047 as amended, ui-jobs 664). */
+  assetYield?: VaultYield;
   /** The block the vault was created in, where the catalogue holds it. */
   createdBlock: number | null;
   /** The position census for this vault: every address it counted, live and
-   *  closed (a floor), and how many held shares at its block. Null where there
-   *  is no census (Yearn) or the census did not answer. */
+   *  closed (a floor), and how many held shares at its block. Null where the
+   *  read names no census (Maple) or the census did not answer. */
   census: { holders: number; live: number; sumMatches: boolean; atBlock: number } | null;
   /** The block every figure above was read at, and when that read was taken. */
   readAt: { block: number; timestamp: string };
@@ -108,6 +129,15 @@ const readAt = (d: { blockNumber: number; readAt: string }) => ({ block: d.block
 /** The "lost assets" standing's test, the dust floor applied. */
 const lostOf = (total: RawAmount | null, lost: RawAmount | null) =>
   hasLostAssets(total?.raw, lost?.raw, tooSmallToMeasure);
+
+/** A MetaMorpho read's liquidity as the summary carries it. */
+const liquidityOf = (l: VaultLiquidity | undefined): Pick<VaultSummary, "illiquid" | "withdrawable"> =>
+  l == null
+    ? {}
+    : {
+        ...(l.illiquid ? { illiquid: l.illiquid } : {}),
+        withdrawable: { block: l.block, queueAssets: l.queueAssets, withdrawable: l.withdrawable },
+      };
 
 /** Census rows by lowercased vault address. */
 export function censusByVault(rows: readonly VaultCensusRow[]): Map<string, VaultCensusRow> {
@@ -148,10 +178,10 @@ export function morphoBaseVaultSummary(
     lostAssets: r.lostAssets,
     steward: r.curator ? { role: "curator", address: r.curator } : r.owner ? { role: "owner", address: r.owner } : null,
     standing: [
-      ...(r.illiquid ? (["illiquid"] as const) : []),
+      ...(r.liquidity?.illiquid ? (["illiquid"] as const) : []),
       ...(lostOf(r.totalAssets, r.lostAssets) ? (["lost-assets"] as const) : []),
     ],
-    ...(r.illiquid ? { illiquid: r.illiquid } : {}),
+    ...liquidityOf(r.liquidity),
     createdBlock: r.createdBlock,
     census: censusOf(census),
     readAt: readAt(d),
@@ -209,8 +239,12 @@ export const aaveEthereumVaultSummaries = (
 
 /** A Yearn V3 vault on Ethereum. Its share has the asset's decimals (Yearn V3's
  *  `decimals()` returns the asset's); the directory reads no `totalSupply()`
- *  and no role manager, and there is no census. */
-export function yearnVaultSummary(r: YearnVaultDirectoryRow, d: YearnVaultDirectoryResponse): VaultSummary {
+ *  and no role manager. */
+export function yearnVaultSummary(
+  r: YearnVaultDirectoryRow,
+  d: YearnVaultDirectoryResponse,
+  census?: VaultCensusRow,
+): VaultSummary {
   const standing: VaultStanding[] = [];
   if (r.endorsed === true) standing.push("endorsed");
   if (r.shutdown === true) standing.push("shut-down");
@@ -232,19 +266,25 @@ export function yearnVaultSummary(r: YearnVaultDirectoryRow, d: YearnVaultDirect
     steward: null,
     standing,
     createdBlock: r.createdBlock,
-    census: null,
+    census: censusOf(census),
     readAt: readAt(d),
   };
 }
 
-export const yearnVaultSummaries = (d: YearnVaultDirectoryResponse): VaultSummary[] =>
-  d.rows.map((r) => yearnVaultSummary(r, d));
+export const yearnVaultSummaries = (
+  d: YearnVaultDirectoryResponse,
+  census: readonly VaultCensusRow[] = [],
+): VaultSummary[] => {
+  const by = censusByVault(census);
+  return d.rows.map((r) => yearnVaultSummary(r, d, by.get(r.address)));
+};
 
 /** A Maple syrup pool on Ethereum (ERC-4626), from the pools page's read
  *  (lib/sources/chain/maple-pool-state.ts): `totalAssets()`, `totalSupply()`
  *  and `convertToAssets(1e6)` at one block. `state` is absent where the read
  *  did not answer for this pool; its figures are then null. The pool's name is
- *  the share symbol the catalogue holds; there is no census and no steward. */
+ *  the share symbol the catalogue holds; there is no census. Its steward is
+ *  the pool delegate. */
 export function maplePoolSummary(
   p: MaplePool,
   state: MaplePoolState | undefined,
@@ -266,7 +306,7 @@ export function maplePoolSummary(
     totalSupply: state ? amount(state.raw.totalSupply, state.totalSupply) : null,
     sharePrice: state ? amount(state.raw.navRate, state.navRate) : null,
     lostAssets: null,
-    steward: null,
+    steward: state?.poolDelegate ? { role: "poolDelegate", address: state.poolDelegate } : null,
     standing: [],
     createdBlock: p.deployBlock,
     census: null,
@@ -276,7 +316,11 @@ export function maplePoolSummary(
 
 /** The name a row prints: the live `name()`, else the catalogue's snapshot,
  *  else the share symbol, else null (the row then prints the address). */
-export const vaultDisplayName = (v: VaultSummary): string | null => v.name ?? v.catalogName ?? v.symbol;
+const trimmed = (s: string | null) => s?.trim() || null;
+
+/** The name a surface shows and sorts by, trimmed (ui-jobs 664). */
+export const vaultDisplayName = (v: VaultSummary): string | null =>
+  trimmed(v.name) ?? trimmed(v.catalogName) ?? trimmed(v.symbol);
 
 // ── The vault pages' reads (V2) ─────────────────────────────────────────────
 // Each vault page reads its vault at one block with its own loader; these turn
@@ -302,10 +346,10 @@ export function morphoBaseVaultPageSummary(d: MorphoBaseVaultResponse, census: V
     lostAssets: d.lostAssets,
     steward: v.curator ? { role: "curator", address: v.curator } : { role: "owner", address: v.owner },
     standing: [
-      ...(d.illiquid ? (["illiquid"] as const) : []),
+      ...(d.liquidity?.illiquid ? (["illiquid"] as const) : []),
       ...(lostOf(d.totalAssets, d.lostAssets) ? (["lost-assets"] as const) : []),
     ],
-    ...(d.illiquid ? { illiquid: d.illiquid } : {}),
+    ...liquidityOf(d.liquidity),
     createdBlock: v.createdBlock,
     census: censusOf(census ?? undefined),
     readAt: { block: d.blockNumber, timestamp: "" },
@@ -345,8 +389,8 @@ export function aaveEthereumVaultPageSummary(
   };
 }
 
-/** A Yearn V3 vault's page read. There is no census. */
-export function yearnVaultPageSummary(d: YearnVaultResponse): VaultSummary {
+/** A Yearn V3 vault's page read. */
+export function yearnVaultPageSummary(d: YearnVaultResponse, census: VaultCensusRow | null): VaultSummary {
   const v = d.vault;
   const standing: VaultStanding[] = [];
   if (v.endorsed === true) standing.push("endorsed");
@@ -369,7 +413,13 @@ export function yearnVaultPageSummary(d: YearnVaultResponse): VaultSummary {
     steward: v.roleManager ? { role: "roleManager", address: v.roleManager } : null,
     standing,
     createdBlock: v.createdBlock,
-    census: null,
+    census: censusOf(census ?? undefined),
     readAt: { block: d.blockNumber, timestamp: "" },
   };
+}
+
+/** The summary with the asset's scale reading applied, where it disagrees. */
+export function withAssetScale(v: VaultSummary, scales: Record<string, AssetScale>): VaultSummary {
+  const scale = scales[v.asset.address.toLowerCase()];
+  return scale ? { ...v, assetScale: scale, standing: [...v.standing, "decimals-disagree"] } : v;
 }

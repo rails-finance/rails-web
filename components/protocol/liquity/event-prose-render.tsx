@@ -33,6 +33,8 @@ export interface LiquityTroveMeta {
   owner: string | null;
   /** The trove's whole event count. */
   total: number;
+  /** The branch's shutdown time (ui-jobs 612), where the page read one. */
+  shutdownAt?: number | null;
 }
 export const LiquityTroveMetaContext = createContext<LiquityTroveMeta | null>(null);
 
@@ -49,6 +51,7 @@ export function useLiquityEventProse(
   const events = focus?.events;
   const ledger = events?.find((e) => e.id === event.id) ?? null;
   const claimedAt = claim ? claim.timestamp : undefined;
+  const shutdownAt = useContext(LiquityTroveMetaContext)?.shutdownAt ?? null;
   return useMemo(
     () =>
       liquityEventProse({
@@ -61,8 +64,9 @@ export function useLiquityEventProse(
         collDecimals: model && events ? liquityEventDecimals(model, events, event.id, "collateral") : null,
         debtDecimals: model && events ? liquityEventDecimals(model, events, event.id, "debt") : null,
         surplusClaimedAt: claimedAt,
+        shutdownAt,
       }),
-    [ctx, event, previousEvent, currentPrice, ledger, model, events, claimedAt],
+    [ctx, event, previousEvent, currentPrice, ledger, model, events, claimedAt, shutdownAt],
   );
 }
 
@@ -110,7 +114,7 @@ export function ProseSentenceText({ s, ctx, coords }: { s: ProseSentence; ctx: L
               key={i}
               href={explorerUrl(MAINNET_CHAIN_ID, "address", seg.address)}
               target="_blank"
-              rel="noopener noreferrer"
+              rel="noopener"
               onClick={(e) => e.stopPropagation()}
               className="text-pink-500 hover:text-pink-600 transition-colors"
             >

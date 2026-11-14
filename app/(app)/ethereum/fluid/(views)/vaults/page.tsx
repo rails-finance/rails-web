@@ -1,44 +1,34 @@
-// Fluid protocol view (/fluid/vaults) — every vault the factory has minted and
-// each one's own risk ladder, read live from the VaultResolver at one head
-// block. Server-rendered: a read-only aggregate with no interactivity to
-// hydrate for, so the first paint carries the real figures rather than a
-// skeleton (the same posture as the fork branch views).
+// Fluid's vaults (/ethereum/fluid/vaults), archetype A1 on the shared product
+// shell (rails-ops ui-jobs 549 step 7; decision 0059). Fluid calls each borrow
+// market a vault: one head for the protocol, then every vault the factory has
+// minted in one house table grouped by vault type, each row opening the vault's
+// page (/ethereum/fluid/vaults/<id>). The figures are one head-block read of
+// the VaultResolver; lib/fluid/product.tsx maps them into the model. The head's
+// open count is one read of Rails's index (lib/fluid/open-count.ts), made
+// beside the chain read.
+//
+// Rendered per request, as before: the roster read is the one it made.
 
-import { FluidVaultsView, FluidVaultsStamp } from "@/components/protocol/fluid/fluid-vaults-view";
-import { SubPageHeader } from "@/components/shared/sub-page-header";
+import { FluidRosterPage } from "@/lib/fluid/product";
 import { loadFluidVaultsFromChain } from "@/lib/sources/chain/fluid-vaults";
-import { protocolForHref } from "@/lib/shared/protocols";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { loadFluidOpenCount } from "@/lib/fluid/open-count";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Fluid vaults",
   description:
-    "Every Fluid vault and its three thresholds: where borrowing stops, where liquidation starts, and where the vault absorbs a position outright.",
+    "Every Fluid vault: its collateral and debt, rates, positions and its ladder of three rungs: the collateral factor, the liquidation threshold and the liquidation max limit.",
 };
 
-const PROTOCOL = protocolForHref("/ethereum/fluid")!;
-
 export default async function FluidVaultsPage() {
-  // Straight to the loader rather than through this deployment's own
-  // /api/chain/fluid/vaults route — same code, one less hop on the server.
-  const data = await loadFluidVaultsFromChain();
-
+  const [data, open] = await Promise.all([loadFluidVaultsFromChain(), loadFluidOpenCount()]);
   return (
-    <div className="min-h-screen">
-      <div className="py-8">
-        <SubPageHeader
-          protocol={PROTOCOL}
-          title="Vaults & their risk ladders"
-          stamp={<FluidVaultsStamp data={data} />}
-        />
-
-        <FluidVaultsView data={data} />
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
-        <ProvInspectorLayer />
-      </div>
-    </div>
+    <>
+      <FluidRosterPage data={data} open={open} />
+      {/* The inspector, armed from the profile menu's switch. */}
+      <ProvInspectorLayer />
+    </>
   );
 }

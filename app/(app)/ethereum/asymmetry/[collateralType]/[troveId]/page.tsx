@@ -61,6 +61,7 @@ export default async function AsymmetryTrovePage({ params, searchParams }: Props
 
   return (
     <PositionReadProvider
+      focus={{ source: tail.trove }}
       key={`${collateralType}:${troveId}:${grouped ? "rows" : "events"}`}
       read={tail.trove ? read : null}
     >

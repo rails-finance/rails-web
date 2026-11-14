@@ -13,6 +13,7 @@ const CALL: Record<VaultSteward["role"], string> = {
   curator: "curator()",
   owner: "owner()",
   roleManager: "role_manager()",
+  poolDelegate: "poolDelegate() on the PoolManager",
 };
 
 const contractOf = (v: VaultSummary) => ({ name: v.name ?? v.catalogName ?? v.symbol ?? "vault", address: v.address });
@@ -32,6 +33,34 @@ export const vaultStewardProv = (v: VaultSummary, s: VaultSteward, readBy?: Serv
     readBy,
   );
 
+/** The count of vaults a steward runs (rails-ops ui-jobs 554, piece C): the
+ *  directory's MetaMorpho and Maple rows on Base and Ethereum whose steward
+ *  is this address, at each roster's block. */
+export const stewardVaultCountProv = (
+  steward: string,
+  count: number,
+  listed: number,
+  rosters: { protocol: string; chainId: number; block: number }[],
+): Provenance => {
+  const at = rosters
+    .map(
+      (r) =>
+        `${r.protocol === "maple" ? "Maple" : "MetaMorpho"} on ${r.chainId === 1 ? "Ethereum" : "Base"} at block ${n(r.block)}`,
+    )
+    .join(", ");
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    summary: `Vaults this steward runs — ${n(count)} of the ${n(listed)} MetaMorpho and Maple rows in the vault directory whose steward is ${steward}. Read ${at}.`,
+    via: "vault directory · rows where curator(), else owner(), or poolDelegate() = this address @ each roster's block",
+    formula: "count(rows where steward = address)",
+    verify: {
+      kind: "recompute",
+      text: `To check: at the blocks named, call curator() on each MetaMorpho vault in the directory (owner() where it returns the zero address) and poolDelegate() on each Maple PoolManager, and count the ones that return ${steward}.`,
+    },
+  };
+};
+
 /** A venue's share of this vault: its amount over the table's denominator,
  *  both read at the same block. */
 export const vaultVenueShareProv = (
@@ -49,6 +78,43 @@ export const vaultVenueShareProv = (
       contract: contractOf(v),
       via: `chain · ${venue} ÷ ${denominator} @ the pinned block`,
       formula: `${venue} ÷ ${denominator}`,
+    },
+    readBy,
+  );
+
+/** A venue of "Where the assets are": the contract or market it is, which the
+ *  table's surface names only by its asset or its name. `ids` are the
+ *  coordinates the surface leaves out (a Morpho market's id, a strategy's
+ *  address), each a labelled input. */
+export const vaultVenueProv = (
+  v: VaultSummary,
+  {
+    venue,
+    what,
+    via,
+    contract,
+    ids = [],
+  }: {
+    /** The venue as the table names it. */
+    venue: string;
+    /** One sentence: what the venue is, and what the vault holds there. */
+    what: string;
+    /** The call that names the venue: "withdrawQueue(i) · idToMarketParams(id)". */
+    via: string;
+    contract?: { name: string; address?: string };
+    ids?: { label: string; value: string }[];
+  },
+  readBy?: ServerRead | null,
+): Provenance =>
+  stampServerRead(
+    {
+      kind: "chain",
+      pclass: "state",
+      source: { block: v.readAt.block },
+      summary: `${venue} — ${what} Read at block ${n(v.readAt.block)}.`,
+      contract: contract ?? contractOf(v),
+      via: `chain · ${via} @ the pinned block`,
+      inputs: ids.map((i) => ({ label: i.label, value: i.value, kind: "chain" as const, pclass: "state" as const })),
     },
     readBy,
   );

@@ -29,19 +29,19 @@ export function AlchemixFlowsNote({
   return (
     <div className="space-y-2" data-alchemix-flows-note="" data-anatomy="F14">
       <p>
-        Every figure is in {u}, the asset under the vault, as the card&apos;s collateralisation counts it: the {sh}{" "}
-        collateral at the vault&apos;s share price read with each reading, and each {sym} owed as one {u}, the
-        Alchemist&apos;s accounting. The collateral side&apos;s last line, Share price move, is the change in that share
-        price since each flow.
+        Every figure is in {u}, the asset under the vault, as the card&apos;s LTV counts it: the {sh} collateral at the
+        vault&apos;s share price read with each reading, and each {sym} owed as one {u}, the Alchemist&apos;s
+        accounting. The collateral side&apos;s last line, Share price move, is the change in that share price since each
+        flow.
       </p>
       <p>
         What the position holds and owes on each day is the getCDP reading in force, taken at every block where it could
-        move, the line&apos;s redemptions included. No interest accrues on the debt.
+        move, the market&apos;s redemptions included. No interest accrues on the debt.
       </p>
       {facts && facts.redemptions > 0 && (
         <p>
-          {n(facts.redemptions, "A line redemption", "line redemptions")} cleared debt set aside for repayment and took
-          collateral; each figure is the difference of the readings either side of it.
+          {n(facts.redemptions, "A redemption", "redemptions")} cleared earmarked debt, the part set aside for
+          redemptions to repay, and took collateral; each figure is the difference of the readings either side of it.
           {facts.redemptionsUnstated > 0
             ? ` ${n(facts.redemptionsUnstated, "One redemption's", "redemptions'")} figures cannot be stated, another step falling between ${facts.redemptionsUnstated === 1 ? "its" : "their"} readings, so the bars leave ${facts.redemptionsUnstated === 1 ? "it" : "them"} out.`
             : ""}
@@ -50,7 +50,7 @@ export function AlchemixFlowsNote({
       {facts && facts.repays > 0 && (
         <p>
           {n(facts.repays, "A repay", "repays")} paid {shares(facts.repaySharesIn)} {sh} in from the caller&apos;s
-          wallet, which the bars do not draw: only the protocol fee on the set-aside part left the collateral (Repay
+          wallet, which the bars do not draw: only the redemption fee on the earmarked part left the collateral (Repay
           fees).
           {facts.unresolved > 0
             ? ` ${n(facts.unresolved, "One repayment's", "repayments'")} cleared debt was not resolved when ${facts.unresolved === 1 ? "its log was" : "their logs were"} captured, so it is not drawn.`

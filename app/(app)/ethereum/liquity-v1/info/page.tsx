@@ -1,3 +1,4 @@
+// focus: the explorer's explainer; the shell's gate stands over the explorer
 // About this explorer — the page on the rail's sub-nav, drawn on the typed
 // template (rails-ops standards/info-page-template.md). The glossary text lives in
 // content/liquity-v1/event-prose.yaml.
@@ -80,7 +81,7 @@ export default function InfoPage() {
           body: (
             <p>
               The system page shows the total collateral ratio against the 150% line, the Stability Pool against the
-              system's debt, and the <GlossaryLink term="Fees">base rate</GlossaryLink> that the fees start from and
+              system's debt, and the <GlossaryLink term="Fees">baseRate</GlossaryLink> that the fees start from and
               decay from.{" "}
               <Link href="/ethereum/liquity-v1/system" className={INLINE_LINK}>
                 See the system state and redemption queue

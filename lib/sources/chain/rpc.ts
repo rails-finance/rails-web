@@ -24,17 +24,46 @@ import "server-only";
 // loaders (Node runtime), never from a client component — the keys must not
 // reach the browser bundle.
 
-import { createPublicClient, fallback, http, type Chain, type PublicClient, type Transport } from "viem";
-import { arbitrum, base, mainnet, sepolia } from "viem/chains";
+import { createPublicClient, defineChain, fallback, http, type Chain, type PublicClient, type Transport } from "viem";
+import { arbitrum, base, mainnet, optimism, sepolia } from "viem/chains";
 import {
   ARBITRUM_CHAIN_ID,
+  ARC_CHAIN_ID,
   BASE_CHAIN_ID,
+  CHAINS,
   MAINNET_CHAIN_ID,
+  OPTIMISM_CHAIN_ID,
+  ROBINHOOD_CHAIN_ID,
   SEPOLIA_CHAIN_ID,
   chainMeta,
   type ChainId,
   type ChainMeta,
 } from "@/lib/shared/chains";
+
+/** Arc, which viem does not define: the values from Arc's docs ("Connect to
+ *  Arc"), with Multicall3 at the canonical address (its code answers there). */
+const arc = defineChain({
+  id: ARC_CHAIN_ID,
+  name: "Arc",
+  nativeCurrency: CHAINS[ARC_CHAIN_ID].nativeCurrency!,
+  rpcUrls: { default: { http: ["https://rpc.mainnet.arc.io"] } },
+  blockExplorers: { default: { name: CHAINS[ARC_CHAIN_ID].explorerName, url: CHAINS[ARC_CHAIN_ID].explorerBase } },
+  contracts: { multicall3: { address: "0xcA11bde05977b3631167028862bE2a173976CA11" } },
+});
+
+/** Robinhood Chain, which viem does not define: the values from Robinhood's
+ *  docs (docs.robinhood.com/chain). The public RPC below is not an archive
+ *  node (no state at a past block) and caps `eth_getLogs` at 10,000,000 blocks
+ *  per call. No Multicall3 is declared: none has been checked there yet. */
+const robinhood = defineChain({
+  id: ROBINHOOD_CHAIN_ID,
+  name: CHAINS[ROBINHOOD_CHAIN_ID].name,
+  nativeCurrency: { symbol: "ETH", name: "Ether", decimals: 18 },
+  rpcUrls: { default: { http: ["https://rpc.mainnet.chain.robinhood.com"] } },
+  blockExplorers: {
+    default: { name: CHAINS[ROBINHOOD_CHAIN_ID].explorerName, url: CHAINS[ROBINHOOD_CHAIN_ID].explorerBase },
+  },
+});
 
 const VIEM_CHAINS: Record<ChainId, Chain> = {
   [MAINNET_CHAIN_ID]: mainnet,
@@ -42,6 +71,10 @@ const VIEM_CHAINS: Record<ChainId, Chain> = {
   // Multicall3 sits at the canonical address on Arbitrum One too, and viem's
   // definition carries it.
   [ARBITRUM_CHAIN_ID]: arbitrum,
+  // viem's OP Mainnet carries Multicall3 at the canonical address.
+  [OPTIMISM_CHAIN_ID]: optimism,
+  [ARC_CHAIN_ID]: arc,
+  [ROBINHOOD_CHAIN_ID]: robinhood,
   // viem's definition carries Multicall3 at the canonical address, so
   // `multicall()` works on Sepolia without a contracts override.
   [SEPOLIA_CHAIN_ID]: sepolia,

@@ -469,7 +469,11 @@ export function compoundEventSheet(input: CompoundSheetInput): EventSheet | unde
 
     return {
       side,
-      ...(lentAlone ? { name: COMPOUND_WORDS.sheet_lent_side } : {}),
+      ...(lentAlone
+        ? { name: COMPOUND_WORDS.sheet_lent_side }
+        : side === "debt"
+          ? { name: COMPOUND_WORDS.sheet_debt_side }
+          : {}),
       icons: hs.filter((h) => h.after > (h.base ? dust : DUST)).map((h) => h.symbol),
       carry,
       before,

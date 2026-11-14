@@ -51,7 +51,7 @@ export default async function AaveV4BaseSpokePage({ params }: Props) {
   const read = await timedRead(tail.spokePositions ? (readOfHeadAnswer(tail.chain) ?? indexRead) : null, BASE_CHAIN_ID);
 
   return (
-    <PositionReadProvider key={`${spokeSlug}:${wallet}`} read={read}>
+    <PositionReadProvider focus={{ source: tail.spokePositions }} key={`${spokeSlug}:${wallet}`} read={read}>
       <AaveV4SpokeView
         key={`${spokeSlug}:${wallet}`}
         wallet={wallet}

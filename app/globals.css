@@ -58,8 +58,6 @@
      Ordinary in-page stacking (sticky headers, chart layers, the header at 40)
      stays as plain numbers. */
   --z-dropdown: 50; /* in-page dropdowns and tooltips, below every window */
-  --z-inspect-halo: 55; /* the provenance inspector's armed ring on the viewport */
-  --z-inspect-exit: 56; /* the inspector's exit chip, over its halo */
   --z-modal: 9999;
   --z-popover: 10000;
   --z-modal-over-popover: 10001;
@@ -161,10 +159,12 @@
      `html.dark`. canvas = `--background`, overlay = `--surface-overlay`. */
   --surface-raised: var(--color-rb-100); /* cards, panels, inputs, active in-place control */
   --surface-sunken: var(--color-rb-200); /* segmented tracks, inset chips, recessed wells */
+  --edge-row-line: var(--color-rb-200); /* the hairline between the house table's rows (D1) */
+  --surface-row-hover: var(--color-rb-100); /* the house table's hovered row, a rounded block (D1) */
   --surface-marker: var(--color-rb-200); /* small inline tags: badges, count pills, token chips */
   --surface-skeleton: var(--color-rb-100); /* loading shimmer — matched to --surface-raised */
   --surface-selected: var(--color-rb-300); /* pressed/active segment in a toggle group */
-  --edge-row-hover: var(--color-rb-400); /* a hovered unlinked table row's outline (D1) */
+  --edge-row-hover: var(--color-rb-400); /* a neutral outline on a floating tip */
   --surface-field: oklch(
     0.9939 calc(0.0082 * var(--paper-chroma)) var(--paper-hue)
   ); /* prominent text inputs — near-white "type here" affordance */
@@ -285,6 +285,11 @@
      `--brand-strength: 0` on a card with no hue draws a grey zone. */
   --brand-zone-l: 0.93;
   --brand-zone-c: 0.035;
+  /* The blue band (hues 215 to 305, fullest at 260) is at sRGB's edge at
+     0.93, so its panel steps darker and stronger there, by up to these
+     (TO-DO-position-card 427): a 15° step then reads on the panel. */
+  --brand-zone-blue-l: -0.04;
+  --brand-zone-blue-c: 0.017;
   --brand-edge-l: 0.8;
   --brand-edge-c: 0.08;
   --brand-zone-text: color-mix(in oklch, var(--foreground) 25%, transparent);
@@ -300,6 +305,8 @@
      Morpho's near #1e3a7a, the 22 Oct 2026 mock-ups. */
   --brand-zone-l: 0.31;
   --brand-zone-c: 0.075;
+  --brand-zone-blue-l: 0;
+  --brand-zone-blue-c: 0.03;
   --brand-edge-l: 0.45;
   --brand-edge-c: 0.1;
   --brand-zone-text: color-mix(in oklch, var(--foreground) 25%, transparent);
@@ -435,6 +442,8 @@ html.dark {
      rendering a step darker via the override. */
   --surface-raised: rgb(20 22 30); /* = rb-800 (inlined) */
   --surface-sunken: rgb(15 16 23); /* = rb-900 (inlined) */
+  --edge-row-line: rgb(41 46 60); /* a step lighter than the canvas */
+  --surface-row-hover: rgb(31 36 48); /* lifted off the canvas */
   --surface-marker: rgb(20 22 30);
   --surface-skeleton: rgb(20 22 30);
   --surface-selected: rgb(25 28 38); /* = rb-700 */
@@ -465,7 +474,12 @@ html.dark {
 /* The sidebar's tint (C20): `--brand-hue` resolves on the element that draws
    it, inherited from the card's frame. */
 @utility bg-brand-zone {
-  background-color: oklch(var(--brand-zone-l) calc(var(--brand-zone-c) * var(--brand-strength, 1)) var(--brand-hue, 0));
+  --brand-blue: max(0, 1 - max(var(--brand-hue, 0) - 260, 260 - var(--brand-hue, 0)) / 45);
+  background-color: oklch(
+    calc(var(--brand-zone-l) + var(--brand-zone-blue-l) * var(--brand-blue) * var(--brand-strength, 1))
+      calc((var(--brand-zone-c) + var(--brand-zone-blue-c) * var(--brand-blue)) * var(--brand-strength, 1))
+      var(--brand-hue, 0)
+  );
 }
 @utility bg-brand-edge {
   background-color: oklch(var(--brand-edge-l) calc(var(--brand-edge-c) * var(--brand-strength, 1)) var(--brand-hue, 0));
@@ -519,12 +533,24 @@ html.dark {
 }
 
 /* The read-more cue (ui-jobs 384): the dotted underline under a label, figure
-   or mark that opens a tooltip. One strength for the whole site: change
-   --tip-underline-alpha to re-tune every cue at once. `tip-underline` is the
-   text form; --tip-underline-color is the same ink for a border-bottom cue
-   under an icon. */
+   or mark that opens a tooltip. It shows on hover, on keyboard focus and while
+   the tip is open, and is absent at rest (ui-jobs 602, Miles 12 Nov 2026). One
+   strength for the whole site: --tip-underline-alpha. The hover scope (and a
+   button that wraps a cue, such as the timeline's tenure toggle, on keyboard
+   focus) sets
+   --tip-underline-color; `tip-underline` is the text form, and a border-bottom
+   cue under an icon takes the same var. Set in the scope as an unresolved
+   value, currentColor is the cue's own colour. */
 :root {
   --tip-underline-alpha: 30%;
+  --tip-underline-color: transparent;
+}
+.tip-underline:hover,
+.cursor-help:hover,
+[data-reveal-tip]:hover,
+[data-reveal-tip]:focus-visible,
+[data-reveal-tip][aria-expanded="true"],
+button:focus-visible .tip-underline {
   --tip-underline-color: color-mix(in srgb, currentColor var(--tip-underline-alpha), transparent);
 }
 @utility tip-underline {
@@ -631,16 +657,22 @@ body {
     .spine-seg > .spine-content {
       display: contents;
     }
+    /* The caption lies over the cell's 36px foot (spine-column.tsx,
+       `max-sm:min-h-9`), one line of it exactly: in the row under the cell,
+       pulled up by that height. A caption that wraps to a second line grows
+       the row by that line, below the node, and the list's line runs on
+       behind it (ui-jobs 620). */
     .spine-seg > .spine-content > .spine-t1 {
-      grid-row: 1;
+      grid-row: 2;
       grid-column: 1;
-      align-self: end;
+      align-self: start;
+      margin-top: -2.25rem;
       position: relative;
       z-index: 30;
       pointer-events: none;
     }
     .spine-seg > .spine-content > .spine-body {
-      grid-row: 2;
+      grid-row: 3;
       grid-column: 1;
     }
     .spine-num,
@@ -1931,162 +1963,43 @@ label[for] {
   outline-color: rgb(45 212 191); /* teal-400 */
 }
 /* ── The page-level provenance inspector ──────────────────────────────────
-   The target tool (prov-inspector.tsx): one armed mode for the whole page.
-   Armed, every scoped <Prov> gets the pickable treatment above PLUS a resting
-   dotted underline — the visible map of which figures are traceable — and a
-   click pins the figure's receipt into a popover anchored at the value. */
+   The target tool (prov-inspector.tsx): one armed mode for the whole page,
+   armed from the profile menu's switch (H20.1). Armed, every scoped <Prov>
+   gets the pickable treatment above PLUS a light resting dotted underline —
+   the visible map of which figures are traceable — and a click pins the
+   figure's receipt into a popover anchored at the value. */
 [data-prov-inspect] {
-  text-decoration: underline dotted rgb(13 148 136 / 0.55); /* teal-600 */
+  text-decoration: underline dotted rgb(13 148 136 / 0.3); /* teal-600 */
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
 }
 .dark [data-prov-inspect] {
-  text-decoration-color: rgb(45 212 191 / 0.5); /* teal-400 */
+  text-decoration-color: rgb(45 212 191 / 0.28); /* teal-400 */
 }
-/* the dock toggle — the picktoggle's grammar sized for the floating strip; the
-   scoped row of a ⋮ menu (ui-jobs 284) wears the same */
-.prov-inspect-toggle,
-.prov-scope-toggle {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  color: var(--color-rb-500);
-  cursor: pointer;
+/* The header's inspector indicator, beside the profile control (H7.4;
+   ui-jobs 624.2, 651): the menu row's crosshair in teal; its tip opens on
+   hover and keyboard focus (prov-inspector.tsx `ProvInspectorIndicator`). */
+.prov-inspect-on {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 6px;
-  border-radius: 0.375rem;
+  justify-content: center;
+  width: 36px;
+  height: 38px;
+  border-radius: 8px;
   flex: none;
-  transition:
-    color 0.15s ease,
-    background-color 0.15s ease;
-}
-.prov-inspect-toggle:hover,
-.prov-scope-toggle:hover {
-  color: var(--foreground);
-}
-.prov-inspect-toggle svg,
-.prov-scope-toggle svg {
-  width: 16px;
-  height: 16px;
-}
-.prov-inspect-toggle[aria-pressed="true"],
-.prov-scope-toggle[aria-pressed="true"] {
   color: rgb(13 148 136); /* teal-600 */
-  background: rgb(13 148 136 / 0.1);
 }
-.dark .prov-inspect-toggle[aria-pressed="true"],
-.dark .prov-scope-toggle[aria-pressed="true"] {
+.prov-inspect-on:focus-visible {
+  outline: 2px solid rgb(59 130 246); /* blue-500 */
+  outline-offset: 0;
+}
+.dark .prov-inspect-on {
   color: rgb(45 212 191); /* teal-400 */
-  background: rgb(45 212 191 / 0.1);
 }
-.prov-inspect-hint {
-  font-size: 11px;
-  white-space: nowrap;
-}
-/* the toggle as a row of the Tools dropdown: the panel's title/subtitle shape
-   instead of the dock's icon button. These rules follow the dock ones so the
-   armed teal wash gives way to the panel's own hover treatment, leaving the
-   crosshair to carry the armed colour it inherits. Inset + rounded like
-   .overlay-item, so the row reads as a button within the panel rather than a
-   full-bleed strip; the same reasoning stretches its width to the panel
-   minus this margin, so no explicit width is set here. */
-.prov-inspect-toggle-menu {
-  align-items: flex-start;
-  gap: 12px;
-  margin: 2px 4px;
-  padding: 8px 12px;
-  border-radius: 0.5rem;
-  text-align: left;
-  background: transparent;
-}
-.prov-inspect-toggle-menu svg {
-  margin-top: 2px;
-  flex: none;
-}
-@media (hover: hover) {
-  .prov-inspect-toggle-menu:hover {
-    background: var(--surface-hover);
-  }
-  :is(.dark) .prov-inspect-toggle-menu:hover {
-    background: rgba(196, 205, 217, 0.08);
-  }
-}
-/* the armed halo's own way out, on a page whose toggle is behind a menu that
-   has closed. Sits over the halo and under the popover (z 60), and at
-   the LEFT end of the bottom edge: the right end is where the dock sits on the
-   pages that still have one, and where a card's end flank lands — a pick that
-   hit this chip instead would put the tool down rather than trace a value. */
-.prov-inspect-exit {
-  position: fixed;
-  z-index: var(--z-inspect-exit);
-  left: 12px;
-  bottom: max(12px, env(safe-area-inset-bottom));
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: 9999px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  color: rgb(13 148 136); /* teal-600 */
-  background: rgb(238 249 246);
-  border: 1px solid rgb(13 148 136 / 0.35);
-  box-shadow: 0 6px 20px rgb(13 148 136 / 0.18);
-}
-.prov-inspect-exit svg {
-  width: 14px;
-  height: 14px;
-}
-.prov-inspect-exit:hover {
-  background: rgb(13 148 136 / 0.14);
-}
-.dark .prov-inspect-exit {
-  color: rgb(45 212 191); /* teal-400 */
-  background: rgb(15 40 37);
-  border-color: rgb(45 212 191 / 0.35);
-  box-shadow: 0 6px 20px rgb(0 0 0 / 0.45);
-}
-.dark .prov-inspect-exit:hover {
-  background: rgb(45 212 191 / 0.16);
-}
-/* the armed halo — a fixed inset ring + inward glow on the whole viewport
-   while the tool is on (the browser-extension "operating" treatment), so the
-   mode reads at any scroll position. Pointer-transparent; under the popover. */
-.prov-inspect-halo {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-inspect-halo);
-  pointer-events: none;
-  box-shadow:
-    inset 0 0 0 2px rgb(13 148 136 / 0.5),
-    inset 0 0 40px 6px rgb(13 148 136 / 0.16);
-  animation: prov-halo-in 0.3s ease;
-}
-.dark .prov-inspect-halo {
-  box-shadow:
-    inset 0 0 0 2px rgb(45 212 191 / 0.45),
-    inset 0 0 40px 6px rgb(45 212 191 / 0.14);
-}
-/* armed on one section (ui-jobs 284), the halo's ring on that section alone:
-   the position card, Lifetime flows or the event page's event. */
-[data-prov-lit] {
-  box-shadow:
-    0 0 0 2px rgb(13 148 136 / 0.5),
-    0 0 24px 4px rgb(13 148 136 / 0.16);
-  animation: prov-halo-in 0.3s ease;
-}
-.dark [data-prov-lit] {
-  box-shadow:
-    0 0 0 2px rgb(45 212 191 / 0.45),
-    0 0 24px 4px rgb(45 212 191 / 0.14);
-}
-@keyframes prov-halo-in {
-  from {
-    opacity: 0;
-  }
+.prov-inspect-on-icon {
+  width: 20px;
+  height: 20px;
 }
 /* the popover — the receipt pinned AT the value; a bottom sheet under 640px.
    Teal-washed ground ties it to the tool's colorway (halo, dotted targets,
@@ -2120,6 +2033,15 @@ label[for] {
   box-shadow:
     0 12px 32px rgb(0 0 0 / 0.5),
     0 2px 8px rgb(0 0 0 / 0.35);
+}
+/* the popover's frame standing in a page's flow: /about/provenance's example
+   receipt (components/about/provenance-example.tsx) */
+.prov-inspect-sample {
+  position: relative;
+  z-index: auto;
+  max-width: 100%;
+  max-height: none;
+  margin: 0;
 }
 .prov-inspect-sheet {
   inset: auto 0 0 0;
@@ -2377,30 +2299,88 @@ html[data-wallet-panel-open] body > :not([data-wallet-panel-root]) *::after {
   }
 }
 
-/* The house table's lead zone (D5; components/shared/data-table): its hue runs
-   on under the next cell, whose left corners round over it, so the row's body
-   reads as a panel set into the hue. Behind the cells (z-index -1, inside the
-   frame's `isolate`); the cells' own grounds cover it but at the corners. */
-[data-anatomy~="D5"]::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 100%;
-  width: 1rem;
-  z-index: -1;
-  background-color: oklch(var(--brand-zone-l) calc(var(--brand-zone-c) * var(--brand-strength, 1)) var(--brand-hue, 0));
+/* The house table's rows (D1; components/shared/data-table): a hairline
+   between rows only; a hovered row lifts into a rounded block
+   whose top and bottom lie on the hairlines above and below it and whose ends
+   reach 8px past them, the corner radius, so a hairline stops where the
+   corner's curve begins (the frame's padding, -mx-2 px-2, makes the room); drawn by each cell's
+   ::before (the end cells rounding the outer corners); the hairlines it covers
+   are not drawn while it is hovered, so nothing moves. A linked row (D4) adds the
+   blue-500 border round the same block (::after), on hover and on keyboard
+   focus. A drawer row opens under the row before it, no hairline between.
+   In a layer, so a cell's own utilities win. */
+@layer components {
+  table.dt > tbody > tr > :is(td, th) {
+    border-bottom: 1px solid var(--edge-row-line);
+    transition: border-color 150ms;
+  }
+  table.dt > tbody > tr:last-child > *,
+  table.dt > tbody > tr:has(+ tr.hidden:last-child) > *,
+  table.dt > tbody > tr:has(+ tr[data-dt-drawer]:not(.hidden)) > *,
+  table.dt > tbody > tr:is(:not([data-dt-parent]):hover, [data-anatomy~="D4"]:focus-within) > *,
+  table.dt > tbody > tr:has(+ tr:is(:not([data-dt-parent]):hover, [data-anatomy~="D4"]:focus-within)) > *,
+  table.dt > tbody > tr:has(+ tr.hidden + tr:not([data-dt-parent]):hover) > * {
+    border-bottom-color: transparent;
+  }
+  table.dt > tbody > tr > *::before,
+  table.dt > tbody > tr > *::after {
+    content: "";
+    position: absolute;
+    inset: -1px 0;
+    pointer-events: none;
+  }
+  table.dt > tbody > tr > *::before {
+    z-index: -1;
+    transition: background-color 150ms;
+  }
+  table.dt > tbody > tr > *::after {
+    z-index: 20;
+    border-block: 1px solid transparent;
+    transition: border-color 150ms;
+  }
+  table.dt > tbody > tr > :first-child::before,
+  table.dt > tbody > tr > :first-child::after {
+    left: -8px;
+    border-top-left-radius: 0.5rem;
+    border-bottom-left-radius: 0.5rem;
+  }
+  table.dt > tbody > tr > :first-child::after {
+    border-left: 1px solid transparent;
+  }
+  table.dt > tbody > tr > :last-child::before,
+  table.dt > tbody > tr > :last-child::after {
+    right: -8px;
+    border-top-right-radius: 0.5rem;
+    border-bottom-right-radius: 0.5rem;
+  }
+  table.dt > tbody > tr > :last-child::after {
+    border-right: 1px solid transparent;
+  }
+  table.dt > tbody > tr:not([data-dt-parent]):hover > *::before,
+  table.dt > tbody > tr[data-anatomy~="D4"]:focus-within > *::before {
+    background-color: var(--surface-row-hover);
+  }
+  table.dt > tbody > tr[data-anatomy~="D4"]:is(:not([data-dt-parent]):hover, :focus-within) > *::after {
+    border-color: var(--color-blue-500);
+  }
 }
-[data-anatomy~="D5"] + * {
-  border-top-left-radius: 1rem;
-  border-bottom-left-radius: 1rem;
+/* A group's rows (D8): under their parent row on the page's ground, the first
+   cell indented past the parent's chevron. Unlayered, so the indent wins over
+   the cells' padding utilities. */
+/* A parent row (D8) draws no hover block: its chevron brightens instead. */
+table.dt > tbody > tr[data-dt-parent]:hover > :first-child button[aria-expanded] > svg {
+  color: var(--foreground);
+}
+table.dt > tbody > tr[data-dt-child] > :first-child {
+  padding-left: 2.25rem;
 }
 
 /* The house table's stacked rows (D6; components/shared/data-table). Below sm
    (below lg with `stackBelow="lg"`, `.dt-stack-lg`; the `dt-cards` variant
    holds both) a table that opts in (`DataTable stacked`) reads each row as a card: the
-   same elements reflowed, the stripes and the linked row's border moving
-   from the cells to the row. Unlayered, so it wins over the cells' utilities. */
+   same elements reflowed, the hairline, the hover block and the linked row's
+   border moving from the cells to the row. Unlayered, so it wins over the
+   cells' utilities. */
 .dt-cell-label,
 .dt-lead-mark {
   display: none;
@@ -2426,97 +2406,114 @@ table.dt-stacked {
     & > tbody {
       display: flex;
       flex-direction: column;
-      gap: 0.25rem;
     }
     & > tbody > tr {
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       position: relative;
-      padding-left: 6px;
-      border-radius: 1rem;
-      overflow: hidden;
+      padding: 8px 4px;
+      border-bottom: 1px solid var(--edge-row-line);
+      transition: border-color 150ms;
     }
-    /* The card's body, a panel in the stripe: right of the 6px hue edge, its
-       left corners rounded over the hue (D5's curve at this width). */
-    & > tbody > tr::before {
-      content: "";
-      position: absolute;
-      inset: 0 0 0 6px;
-      z-index: -1;
-      border-radius: 1rem;
-      background-color: var(--surface-raised);
-      transition: background-color 150ms;
+    & > tbody > tr:last-child,
+    & > tbody > tr:has(+ tr.hidden:last-child),
+    & > tbody > tr:has(+ tr[data-dt-drawer]:not(.hidden)),
+    & > tbody > tr:not([data-dt-parent]):hover,
+    & > tbody > tr[data-anatomy~="D4"]:focus-within,
+    & > tbody > tr:has(+ tr:is(:not([data-dt-parent]):hover, [data-anatomy~="D4"]:focus-within)),
+    & > tbody > tr:has(+ tr.hidden + tr:not([data-dt-parent]):hover) {
+      border-bottom-color: transparent;
     }
-    & > tbody > tr:nth-child(even)::before {
-      background-color: var(--surface-sunken);
-    }
-    /* The hue behind the panel's corners: the edge's own run-on, widened to
-       the card's full height under the panel. */
-    & > tbody > tr > [data-anatomy~="D5"]::before {
-      left: 0;
-      width: 1.375rem;
-      z-index: -2;
-    }
-    & > tbody > tr > [data-anatomy~="D5"] + * {
-      border-radius: 0;
-    }
-    & > tbody > tr > * {
-      display: block;
-      position: relative;
-      background-color: transparent;
-      border-radius: 0;
-      text-align: left;
-    }
-    /* The row's hover border: one outline round the card, in place of the
-       cells'; neutral, blue on a linked row. */
-    & > tbody > tr > *::after {
-      display: none;
-    }
+    /* The hover block and the linked row's border: top and bottom on the
+       hairlines, 8px (the corner radius) past their ends. */
+    & > tbody > tr::before,
     & > tbody > tr::after {
       content: "";
       position: absolute;
-      inset: 0;
-      z-index: 20;
+      inset: -1px -8px;
+      border-radius: 0.5rem;
       pointer-events: none;
+    }
+    & > tbody > tr::before {
+      z-index: -1;
+      transition: background-color 150ms;
+    }
+    & > tbody > tr::after {
+      z-index: 20;
       border: 1px solid transparent;
-      border-radius: 1rem;
       transition: border-color 150ms;
     }
-    & > tbody > tr:hover::after {
-      border-color: var(--edge-row-hover);
+    & > tbody > tr:not([data-dt-parent]):hover::before,
+    & > tbody > tr[data-anatomy~="D4"]:focus-within::before {
+      background-color: var(--surface-row-hover);
     }
     & > tbody > tr[data-anatomy~="D4"]:hover::after,
     & > tbody > tr[data-anatomy~="D4"]:focus-within::after {
       border-color: var(--color-blue-500);
     }
+    /* A group's rows (D8): indented cards on the page's ground. */
+    & > tbody > tr[data-dt-child] {
+      padding-left: 1.25rem;
+    }
+    /* A parent of one spanning cell is a line across the list; one with
+       cells (D8's \`cells\` form) is a card like any row. */
+    & > tbody > tr[data-dt-parent]:not(:has(> td)) {
+      display: block;
+    }
+    & > tbody > tr[data-dt-child] > :first-child {
+      padding-left: 0.5rem;
+    }
+    & > tbody > tr > * {
+      display: block;
+      position: relative;
+      background-color: transparent;
+      border-bottom: 0;
+      text-align: left;
+    }
+    & > tbody > tr > *::before,
+    & > tbody > tr > *::after {
+      display: none;
+    }
     & > tbody > tr > [role="rowheader"],
     & > tbody > tr > .dt-cell-wide {
       grid-column: 1 / -1;
     }
+    /* A row's ⋮ (D7) at the card's top right. */
+    & > tbody > tr > .dt-row-menu {
+      position: absolute;
+      top: 10px;
+      right: 8px;
+      width: auto;
+      padding: 0;
+      z-index: 10;
+    }
     & > tbody > tr > [role="cell"]:empty {
       display: none;
     }
-    /* No lead zone, no edge: the card's body runs to its left side. */
-    & > tbody > tr:not(:has(> [data-anatomy~="D5"])) {
-      padding-left: 0;
+    /* The lead zone: a 4px bar in the protocol's hue at the card's left, its
+       glyphs moved to the card's first line (`DataTableLeadMark`); its names
+       stay for a screen reader. */
+    & > tbody > tr:has(> [data-anatomy~="D5"]:not([data-lead-plain])) {
+      padding-left: 14px;
     }
-    & > tbody > tr:not(:has(> [data-anatomy~="D5"]))::before {
-      left: 0;
+    /* A plain lead (not a position) has no edge: its glyphs are on the card's
+       first line. */
+    & > tbody > tr > [data-lead-plain] {
+      display: none;
     }
-    /* The lead zone: a 6px edge in the protocol's hue, its glyphs moved to the
-       card's first line (`DataTableLeadMark`); its names stay for a screen reader. */
     & > tbody > tr > [data-anatomy~="D5"] {
       position: absolute;
-      inset: 0 auto 0 0;
-      width: 6px;
+      inset: 14px auto 14px 6px;
+      width: 4px;
       height: auto;
       padding: 0;
     }
     & > tbody > tr > [data-anatomy~="D5"] > [data-closed-zone] {
-      width: 6px;
+      width: 4px;
       height: 100%;
       min-height: 0;
-      border-radius: 0;
+      padding: 0;
+      border-radius: 2px;
     }
     & > tbody > tr > [data-anatomy~="D5"] > [data-closed-zone] :is(svg, img) {
       display: none;
@@ -2541,4 +2538,12 @@ table.dt-stacked {
   table.dt-stacked.dt-stack-lg > tbody > tr {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+}
+
+/* The asset preference (ui-jobs 557): with a preference or `?assets=` present
+   (html[data-asset-scope], set before first paint in app/layout.tsx), a
+   filtered list waits for its filter instead of drawing whole first. */
+html[data-asset-scope] [data-scope-list]:not([data-scope-ready]),
+html[data-chain-focus] [data-chain-gate]:not([data-scope-ready]) {
+  visibility: hidden;
 }

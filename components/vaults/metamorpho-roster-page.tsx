@@ -19,8 +19,7 @@
 // SERVER-ONLY.
 
 import { serverReadOf } from "@/lib/shared/server-head-read";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { morphoVaultCardContent } from "@/lib/vaults/card-words";
 import { VaultDirectoryView } from "@/components/vaults/vault-directory-view";
@@ -30,8 +29,9 @@ import { ssrHop } from "@/lib/shared/listing-ssr";
 import { protocolForPathname } from "@/lib/shared/protocols";
 import type { VaultCensusRow } from "@/lib/aave-vaults/vault-position";
 import type { MetaMorphoChainId } from "@/lib/metamorpho/vault-roster";
-import { morphoBaseVaultSummaries } from "@/lib/vaults/summary";
+import { morphoBaseVaultSummaries, withAssetScale } from "@/lib/vaults/summary";
 import { loadVaultYields } from "@/lib/vaults/yield-read";
+import { loadAssetScales } from "@/lib/vaults/asset-scale";
 import { metaMorphoVaultRosterHref } from "@/lib/vaults/routes";
 
 /** The census header alone — one row per catalogued vault, no live overlay:
@@ -63,12 +63,14 @@ export async function MetaMorphoRosterPage({
 }) {
   const protocol = protocolForPathname(metaMorphoVaultRosterHref(chainId))!;
   const data = await loadMetaMorphoVaultDirectory(chainId);
-  const [census, yields] = await Promise.all([
+  const [census, yields, scales] = await Promise.all([
     loadMetaMorphoCensus(chainId),
     loadVaultYields(
       chainId,
       data.rows.map((r) => r.address),
     ),
+    // The "decimals disagree" standing, as the index reads it (ui-jobs 664).
+    loadAssetScales(chainId, [...new Set(data.rows.map((r) => r.asset.address))]),
   ]);
 
   return (
@@ -83,7 +85,7 @@ export async function MetaMorphoRosterPage({
           <VaultDirectoryView
             chainId={chainId}
             initialSearch={initialSearch}
-            vaults={morphoBaseVaultSummaries(data, census)}
+            vaults={morphoBaseVaultSummaries(data, census).map((v) => withAssetScale(v, scales))}
             yields={yields}
             blockNumber={data.blockNumber}
             readBy={serverReadOf(data)}
@@ -94,7 +96,7 @@ export async function MetaMorphoRosterPage({
           />
         </div>
 
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
+        {/* The inspector, armed from the profile menu's switch. */}
         <ProvInspectorLayer />
       </div>
     </div>

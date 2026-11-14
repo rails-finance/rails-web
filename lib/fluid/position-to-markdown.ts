@@ -54,7 +54,7 @@ export function fluidPositionToMarkdown(args: FluidPositionMarkdownArgs): string
       `Balances are the VaultResolver's live SETTLED read where taken (the vault's own fetchLatestPosition ` +
       `settlement math — every liquidation sweep and interest accrued to the block applied). Each timeline row's ` +
       `balance is the same settled figure read at that row's block. Fluid liquidates price-band ticks whose events name NO position — the attribution rows are ` +
-      `settled boundary reads, exact including partial liquidations. Fluid runs NO USD feed: the vault's own oracle ` +
+      `settled boundary reads, exact including partial liquidations. The vault's oracle ` +
       `prices the collateral in the debt token, so every valuation and risk figure below is in the vault's own ` +
       `two-token space. Everything drifts as the market and position change. Not financial advice.`,
   );
@@ -98,7 +98,7 @@ export function fluidPositionToMarkdown(args: FluidPositionMarkdownArgs): string
           `- **Oracle price:** 1 ${colSym} = ${amt(live.oraclePriceLiquidateDebtPerCol)} ${debtSym} — the vault's own oracle (liquidate leg), the exact price space the engine judges in`,
         );
       lines.push(
-        `- **Position ratio:** ${pct(live.ratio)} (debt ÷ collateral at that price) vs the vault's lines: borrowing gates at ${pct(live.collateralFactor, 0)} (collateral factor), liquidation above ${pct(live.liquidationThreshold, 0)}, full absorption above ${pct(live.liquidationMaxLimit, 0)}; liquidation penalty ${pct(live.liquidationPenalty)}`,
+        `- **Debt to collateral ratio:** ${pct(live.ratio)} (debt ÷ collateral at that price) vs the vault's lines: collateral factor ${pct(live.collateralFactor, 0)} (borrowing stops), liquidation threshold ${pct(live.liquidationThreshold, 0)}, liquidation max limit ${pct(live.liquidationMaxLimit, 0)} (100% of the position gets liquidated); liquidation penalty ${pct(live.liquidationPenalty)}`,
       );
       if (live.liqPriceDebtPerCol != null) {
         const drop =
@@ -106,7 +106,7 @@ export function fluidPositionToMarkdown(args: FluidPositionMarkdownArgs): string
             ? ` — ${num((1 - live.liqPriceDebtPerCol / live.oraclePriceLiquidateDebtPerCol) * 100, 0)}% below the current oracle price`
             : "";
         lines.push(
-          `- **Liquidation price:** ${amt(live.liqPriceDebtPerCol)} ${debtSym} per ${colSym} (borrow ÷ (supply × threshold))${drop}. Fluid liquidations are partial by design — a sweep clears only enough to restore the swept tick's health`,
+          `- **Liquidation price:** ${amt(live.liqPriceDebtPerCol)} ${debtSym} per ${colSym} (borrow ÷ (supply × threshold))${drop}. A Fluid liquidation takes only what brings a position back to its liquidation threshold`,
         );
       }
       const rates: string[] = [];
@@ -115,11 +115,11 @@ export function fluidPositionToMarkdown(args: FluidPositionMarkdownArgs): string
       if (rates.length > 0) lines.push(`- **Vault rates (annual, floating):** ${rates.join(" · ")}`);
       if (live.vaultTotalPositions != null)
         lines.push(
-          `- **Vault context:** one of ${live.vaultTotalPositions} positions (${amt(live.vaultTotalSupply ?? 0)} ${colSym} supplied / ${amt(live.vaultTotalBorrow ?? 0)} ${debtSym} borrowed vault-wide)`,
+          `- **Vault context:** one of ${live.vaultTotalPositions} positions opened in the vault, open or closed (${amt(live.vaultTotalSupply ?? 0)} ${colSym} supplied / ${amt(live.vaultTotalBorrow ?? 0)} ${debtSym} borrowed vault-wide)`,
         );
       if (live.isSmartCol || live.isSmartDebt)
         lines.push(
-          `- **Smart legs:** ${live.isSmartCol ? "collateral" : ""}${live.isSmartCol && live.isSmartDebt ? " and " : ""}${live.isSmartDebt ? "debt" : ""} in Fluid DEX pool shares — amounts are shares (share→token conversion is the DexResolver's job, not asserted here)`,
+          `- **Smart legs:** ${live.isSmartCol ? "collateral" : ""}${live.isSmartCol && live.isSmartDebt ? " and " : ""}${live.isSmartDebt ? "debt" : ""} in DEX shares — amounts are shares (share→token conversion is the DexResolver's job, not asserted here)`,
         );
       lines.push("");
     }
@@ -197,17 +197,15 @@ function forensicsSection(events: BaseActivityEvent[], colSym: string, debtSym: 
     `_Every figure is a chain read pinned to the liquidation's own block. The legs are the vault's settlement math ` +
       `(fetchLatestPosition at B−1 minus the same read at B); the price is the vault's OWN oracle at B — not the ` +
       `VaultResolver's configs.oraclePriceLiquidate, which is the same number at head but has no bytecode to answer ` +
-      `at these blocks. Values are stated in ${debtSym} because that is the only unit Fluid quotes: the protocol has ` +
-      `no USD feed, and a dollar figure here would be an assumption its contracts never make._`,
+      `at these blocks. Values are stated in ${debtSym}, the unit the vault's oracle prices collateral in._`,
   );
   if (anyPenalty) {
     out.push("");
     out.push(
       `_The realized premium is derived from the two legs alone and never from the vault penalty beside it, so the ` +
-        `two are an independent check. The penalty is a FLOOR the engine guarantees, not a target: across Fluid's ` +
-        `whole history a real-sized sweep meets or exceeds its vault's constant essentially always, and reproduces ` +
-        `it exactly in the large majority — so a figure above the constant means that sweep cleared the tick on ` +
-        `better terms than the minimum. On a seizure small enough that the ` +
+        `two are an independent check. Across Fluid's liquidation history a real-sized sweep meets or exceeds its ` +
+        `vault's penalty almost always, and matches it in most; a figure above the penalty is the sweep clearing ` +
+        `the tick on better terms. On a seizure small enough that the ` +
         `tick-settled legs quantize, the ratio is dominated by that rounding and can land either side._`,
     );
   }

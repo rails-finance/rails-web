@@ -15,7 +15,7 @@
  *
  * Edits are staged: the sheet holds a draft of the filters, and only the
  * primary button writes it, through the same `onChange` the desktop panels
- * use (so the URL, Save this view and Copy link follow). Its count is the
+ * use (so the URL, Save listing and Copy link follow). Its count is the
  * listing's own until the draft changes, then `countFor(draft)`, which runs
  * the listing's own filtering (in memory, or the server's total). Escape and
  * the back control at the top close the sheet and drop the draft; a facet's
@@ -157,6 +157,7 @@ export function FilterSheet<F>({
             className="inline-flex min-w-4 h-4 px-1 items-center justify-center rounded-full bg-teal-700 text-white dark:bg-teal-400 dark:text-rb-900 text-[10px] font-bold tabular-nums"
             aria-hidden="true"
             data-filter-sheet-count={active}
+            data-prov-exempt
           >
             {active}
           </span>

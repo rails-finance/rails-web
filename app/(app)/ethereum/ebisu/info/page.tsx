@@ -1,9 +1,11 @@
+// focus: the explorer's explainer; the shell's gate stands over the explorer
 // About this explorer — a page of its own on the rail's sub-nav, drawn on
 // ProtocolInfoPage (rails-ops standards/info-page-template.md). Docs host:
 // ebisu.gitbook.io/ebisu-money (official by Miles's ruling of 8 Oct 2026).
 
 import Link from "next/link";
 import { ProtocolInfoPage, GlossaryLink, type InfoTerm, type InfoView } from "@/components/shared/protocol-info-page";
+import { EBISU_DOCS_AND_CHAIN } from "@/lib/ebisu/docs-and-chain";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
@@ -32,22 +34,22 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "Branch",
     definition:
-      "A branch is the part of Ebisu that handles one collateral type. Each branch has its own Troves, its own Stability Pool and its own minimum collateral ratio.",
+      "A branch is the part of Ebisu that handles one collateral type. Each branch has its own Troves, its own Stability Pool and its own Minimum Collateral Ratio (MCR).",
     sources: [
       { label: "Borrowing ebUSD", href: BORROWING },
       { label: "Earning ebUSD yield", href: STABILITY },
     ],
   },
   {
-    term: "Collateral ratio",
+    term: "Collateralization ratio",
     definition:
-      "The collateral ratio is the value of a Trove's collateral divided by its debt. A ratio of 150% means the Trove holds $150 of collateral for every $100 of debt.",
+      "The collateralization ratio (CR) is the value of a Trove's collateral divided by its debt. A CR of 150% means the Trove holds $150 of collateral for every $100 of debt.",
     sources: [{ label: "How Ebisu works", href: HOW_IT_WORKS }],
   },
   {
-    term: "Minimum collateral ratio",
+    term: "Minimum Collateral Ratio",
     definition:
-      "Each branch sets a minimum collateral ratio. A Trove whose ratio falls below the minimum of its branch can be liquidated.",
+      "Each branch sets a Minimum Collateral Ratio (MCR). A Trove whose CR falls below the MCR of its branch can be liquidated.",
     sources: [
       { label: "How Ebisu works", href: HOW_IT_WORKS },
       { label: "Borrowing ebUSD", href: BORROWING },
@@ -68,7 +70,7 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "Liquidation",
     definition:
-      "A liquidation closes a Trove whose collateral ratio has fallen below the minimum. The branch's Stability Pool pays off the Trove's debt with its ebUSD, and the pool's depositors receive the Trove's collateral. The borrower keeps the ebUSD that was minted and loses the collateral.",
+      "A liquidation closes a Trove whose CR has fallen below the MCR. The branch's Stability Pool pays off the Trove's debt with its ebUSD, and the pool's depositors receive the Trove's collateral. The borrower keeps the ebUSD that was minted and loses the collateral.",
     sources: [
       { label: "How Ebisu works", href: HOW_IT_WORKS },
       { label: "Earning ebUSD yield", href: STABILITY },
@@ -89,13 +91,13 @@ const views: readonly [InfoView, ...InfoView[]] = [
       <ul className={UL}>
         <li>Each row is one Trove.</li>
         <li>
-          A row shows the Trove&apos;s collateral, its ebUSD debt, its collateral ratio and the dollar value of its
-          collateral.
+          A row shows the Trove&apos;s collateral, its ebUSD debt, its collateralization ratio and the dollar value of
+          its collateral.
         </li>
         <li>A row also shows the interest rate the borrower chose and the Trove&apos;s status.</li>
         <li>
           A Trove is Open, Closed or Liquidated. An Open Trove that a redemption has left below the minimum debt of
-          2,000 ebUSD, the smallest debt the protocol allows a Trove to hold, is marked Dormant.
+          2,000 ebUSD, the smallest debt the protocol allows a Trove to hold, is a zombie position, marked Zombie.
         </li>
       </ul>
     ),
@@ -113,9 +115,9 @@ const views: readonly [InfoView, ...InfoView[]] = [
     heading: "Branches page",
     body: (
       <p>
-        The branches page shows the five branches side by side, with the minimum collateral ratio of each: 120% for
-        weETH and WBTC, 115% for sUSDe and stcUSD and 135% for LBTC. It also shows the order in which redemptions reach
-        the branches.{" "}
+        The branches page shows the five branches side by side, with the Minimum Collateral Ratio (MCR) of each: 120%
+        for weETH and WBTC, 115% for sUSDe and stcUSD and 135% for LBTC. It also shows the order in which redemptions
+        reach the branches.{" "}
         <Link href="/ethereum/ebisu/branches" className={INLINE_LINK}>
           See the branches
         </Link>
@@ -149,15 +151,15 @@ export default function InfoPage() {
         <>
           Ebisu keeps one <GlossaryLink term="Branch">branch</GlossaryLink> for each of five collateral tokens: weETH
           (staked ether), sUSDe and stcUSD (yield-bearing stablecoins), WBTC (wrapped bitcoin) and LBTC (another bitcoin
-          token). A Trove&apos;s <GlossaryLink term="Collateral ratio">collateral ratio</GlossaryLink> is its collateral
-          value divided by its debt. Each branch sets a{" "}
-          <GlossaryLink term="Minimum collateral ratio">minimum</GlossaryLink>: 120% for weETH and WBTC, 115% for sUSDe
-          and stcUSD and 135% for LBTC.
+          token). A Trove&apos;s <GlossaryLink term="Collateralization ratio">collateralization ratio</GlossaryLink>{" "}
+          (CR) is its collateral value divided by its debt. Each branch sets a{" "}
+          <GlossaryLink term="Minimum Collateral Ratio">Minimum Collateral Ratio</GlossaryLink> (MCR): 120% for weETH
+          and WBTC, 115% for sUSDe and stcUSD and 135% for LBTC.
         </>,
         <>
-          Governance, the holders who vote on Ebisu&apos;s rules, can change a minimum. Each past liquidation is checked
-          against the minimum that applied at the time, not today&apos;s. For example, weETH&apos;s minimum was 128%
-          until 4 January 2026, and WBTC&apos;s was 132%.
+          Governance, the holders who vote on Ebisu&apos;s rules, can change an MCR. Each past liquidation is checked
+          against the MCR that applied at the time, not today&apos;s. For example, weETH&apos;s MCR was 128% until 4
+          January 2026, and WBTC&apos;s was 132%.
         </>,
         <>
           The borrower of each Trove sets its own <GlossaryLink term="Interest rate">interest rate</GlossaryLink>. A
@@ -166,18 +168,18 @@ export default function InfoPage() {
           ebUSD near one dollar.
         </>,
         <>
-          When a Trove&apos;s collateral ratio falls below the minimum, a{" "}
-          <GlossaryLink term="Liquidation">liquidation</GlossaryLink> closes it. The branch&apos;s{" "}
-          <GlossaryLink term="Stability Pool">Stability Pool</GlossaryLink> pays off the debt with ebUSD that other
-          users deposited, and those depositors receive the collateral. The borrower keeps the ebUSD but loses the
-          collateral. If the pool cannot cover the whole debt, the rest is redistributed across the branch&apos;s other
-          Troves. Drawing ebUSD, at opening or later, also charges an upfront fee, which is added to the Trove&apos;s
-          debt.
+          When a Trove&apos;s CR falls below the MCR, a <GlossaryLink term="Liquidation">liquidation</GlossaryLink>{" "}
+          closes it. The branch&apos;s <GlossaryLink term="Stability Pool">Stability Pool</GlossaryLink> pays off the
+          debt with ebUSD that other users deposited, and those depositors receive the collateral. The borrower keeps
+          the ebUSD but loses the collateral. If the pool cannot cover the whole debt, the rest is redistributed across
+          the branch&apos;s other Troves. Drawing ebUSD, at opening or later, also charges an upfront borrow fee, which
+          is added to the Trove&apos;s debt.
         </>,
       ]}
       glossary={glossary}
       views={views}
       search="You can search by Trove id, collateral or owner. The listing filters by Status, Collateral, Debt (ebUSD), Collateral (USD) and Transactions, which keeps the Troves whose number of transactions falls in a range you choose, and sorts by Recent activity, Collateral, Debt (ebUSD) or Interest rate."
+      docsAndChain={EBISU_DOCS_AND_CHAIN}
       docs={{ label: "Ebisu documentation", href: DOCS }}
     />
   );

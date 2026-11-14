@@ -10,6 +10,7 @@
 // A figure about one position belongs at T2 or T3, never here.
 
 import type { LearnMoreContent, LearnMoreLink } from "@/components/shared/learn-more-modal";
+import { ALCHEMIX_V2_DOCS } from "@/lib/alchemix/transmuter-words";
 
 const DOCS = "https://docs.alchemix.fi";
 
@@ -46,6 +47,8 @@ export const ALCHEMIX_DOCS = {
   v3Migration: { label: "The V2 to V3 migration", url: `${DOCS}/user/v3-migration` },
   contractsEthereum: { label: "Contract addresses on Ethereum", url: `${DOCS}/dev/contracts/ethereum` },
   contractsBase: { label: "Contract addresses on Base", url: `${DOCS}/dev/contracts/base` },
+  fixedYield: { label: "Fixed Yield (the app's Transmuter page)", url: `${DOCS}/user/tutorials/redeem-alassets` },
+  v2Alchemist: { label: "Alchemix V2: the Alchemist", url: `${ALCHEMIX_V2_DOCS}/alchemix-ecosystem/alchemist` },
 } satisfies Record<string, LearnMoreLink>;
 
 // ── The shared core ─────────────────────────────────────────────────────────
@@ -57,46 +60,46 @@ const CORE_COLLATERAL = {
   text: "vault shares: mixUSDC is a vault over USDC, mixWETH one over WETH. The position holds the shares, and what they are worth in the asset underneath moves with the vault's share price, which can fall as well as rise.",
 };
 
-const CORE_SET_ASIDE = {
-  bold: "Set aside for repayment",
-  text: "the part of the debt the Transmuter has claimed as its depositors' deposits matured. It grows block by block. A line redemption clears it, and so does the holder repaying with vault shares (the set-aside part is paid first, with the line's protocol fee) or closing the position with its collateral.",
+const CORE_EARMARKED = {
+  bold: "Earmarked debt",
+  text: "set aside to be repaid by redemptions: the part of the debt the Transmuter has claimed as its depositors' deposits matured. It grows block by block. A redemption clears it, and so does the holder repaying with vault shares (the earmarked part is paid first, with the market's redemption fee) or closing the position with its collateral.",
 };
 
-const CORE_RATIO = {
-  bold: "Collateralisation",
-  text: "the collateral in the asset underneath divided by the debt, with one synthetic counted as one unit of that asset. Minting and withdrawing must leave it above the line's minimum. At the line's liquidation line or below, anyone can liquidate the position.",
+const CORE_LTV = {
+  bold: "LTV",
+  text: "the debt divided by the collateral in the asset underneath, with one synthetic counted as one unit of that asset. Minting and withdrawing must leave it below the market's max LTV. At the market's liquidation threshold or above, anyone can liquidate the position.",
 };
 
 const CORE_NO_INTEREST = {
   bold: "Interest",
-  text: "none accrues on the debt. It changes only when the holder mints, burns or repays, or when a line redemption clears part of it.",
+  text: "none accrues on the debt. It changes only when the holder mints, burns or repays, or when a redemption clears part of it.",
 };
 
 const CORE_ROUTER = {
   bold: "The router",
-  text: "a contract on each line that can do several steps for the holder in one transaction. The position NFT can pass through it and come back inside that transaction, and nobody's ownership changes.",
+  text: "a contract on each market that can do several steps for the holder in one transaction. The position NFT can pass through it and come back inside that transaction, and nobody's ownership changes.",
 };
 
 // ── One modal per act ───────────────────────────────────────────────────────
 
 const OPENING =
-  "An Alchemix position is opened by depositing vault shares into the line's Alchemist, which mints an NFT that is the position.";
+  "An Alchemix position is opened by depositing vault shares into the market's Alchemist, which mints an NFT that is the position.";
 
 /** An opening that deposited and minted nothing. */
 export const ALCHEMIX_OPEN_DEPOSIT: LearnMoreContent = {
   title: "Opening a position",
   intro: `${OPENING} A position opened this way starts with collateral and no debt; minting against it comes later.`,
   detailsHeading: "Key concepts",
-  details: [CORE_COLLATERAL, CORE_RATIO, CORE_ROUTER],
+  details: [CORE_COLLATERAL, CORE_LTV, CORE_ROUTER],
   links: [ALCHEMIX_DOCS.selfRepayingLoans, ALCHEMIX_DOCS.takeALoan, ALCHEMIX_DOCS.myt, ALCHEMIX_DOCS.router],
 };
 
 /** An opening that also minted in the same transaction. */
 export const ALCHEMIX_OPEN_MINT: LearnMoreContent = {
   title: "Opening a position and minting",
-  intro: `${OPENING} The same transaction can also mint the line's synthetic against that deposit, so the position starts with a debt as well as collateral. The debt is the synthetic minted, one for one, and the Alchemist refuses a mint beyond what the line's minimum collateralisation allows.`,
+  intro: `${OPENING} The same transaction can also mint the market's synthetic against that deposit, so the position starts with a debt as well as collateral. The debt is the synthetic minted, one for one, and the Alchemist refuses a mint beyond what the market's max LTV allows.`,
   detailsHeading: "Key concepts",
-  details: [CORE_COLLATERAL, CORE_RATIO, CORE_NO_INTEREST, CORE_ROUTER],
+  details: [CORE_COLLATERAL, CORE_LTV, CORE_NO_INTEREST, CORE_ROUTER],
   links: [ALCHEMIX_DOCS.takeALoan, ALCHEMIX_DOCS.selfRepayingLoans, ALCHEMIX_DOCS.myt, ALCHEMIX_DOCS.router],
 };
 
@@ -104,9 +107,9 @@ export const ALCHEMIX_OPEN_MINT: LearnMoreContent = {
 export const ALCHEMIX_DEPOSIT: LearnMoreContent = {
   title: "Depositing collateral",
   intro:
-    "A deposit adds vault shares to a position that already exists. It moves the collateral only; the debt stays where it was, so collateralisation rises.",
+    "A deposit adds vault shares to a position that already exists. It moves the collateral only; the debt stays where it was, so the LTV falls.",
   detailsHeading: "Key concepts",
-  details: [CORE_COLLATERAL, CORE_RATIO, CORE_ROUTER],
+  details: [CORE_COLLATERAL, CORE_LTV, CORE_ROUTER],
   links: [ALCHEMIX_DOCS.takeALoan, ALCHEMIX_DOCS.myt, ALCHEMIX_DOCS.router],
 };
 
@@ -114,18 +117,18 @@ export const ALCHEMIX_DEPOSIT: LearnMoreContent = {
 export const ALCHEMIX_DEPOSIT_MINT: LearnMoreContent = {
   title: "Depositing and minting in one step",
   intro:
-    "A holder can add vault shares and mint the line's synthetic against them in one transaction. The collateral rises by the shares deposited and the debt by the synthetic minted, one for one. The Alchemist checks collateralisation once both have landed and refuses a mint beyond what the line's minimum allows, so a holder minting as much as the deposit allows ends each step at about that minimum.",
+    "A holder can add vault shares and mint the market's synthetic against them in one transaction. The collateral rises by the shares deposited and the debt by the synthetic minted, one for one. The Alchemist checks the LTV once both have landed and refuses a mint beyond what the market's max LTV allows, so a holder minting as much as the deposit allows ends each step at about that max LTV.",
   detailsHeading: "Key concepts",
-  details: [CORE_COLLATERAL, CORE_RATIO, CORE_NO_INTEREST, CORE_ROUTER],
+  details: [CORE_COLLATERAL, CORE_LTV, CORE_NO_INTEREST, CORE_ROUTER],
   links: [ALCHEMIX_DOCS.takeALoan, ALCHEMIX_DOCS.alAssets, ALCHEMIX_DOCS.myt, ALCHEMIX_DOCS.router],
 };
 
 export const ALCHEMIX_MINT: LearnMoreContent = {
   title: "Minting debt",
   intro:
-    "Minting draws the line's synthetic (alUSD, alETH or alUSDb) against the position's collateral, and adds the amount minted to the debt one for one. The synthetic goes to an address the holder names.",
+    "Minting draws the market's synthetic (alUSD, alETH or alUSDb) against the position's collateral, and adds the amount minted to the debt one for one. The synthetic goes to an address the holder names.",
   detailsHeading: "Key concepts",
-  details: [CORE_RATIO, CORE_NO_INTEREST, CORE_SET_ASIDE],
+  details: [CORE_LTV, CORE_NO_INTEREST, CORE_EARMARKED],
   links: [ALCHEMIX_DOCS.takeALoan, ALCHEMIX_DOCS.alAssets, ALCHEMIX_DOCS.selfRepayingLoans],
 };
 
@@ -139,11 +142,11 @@ export const ALCHEMIX_BURN_REPAY: LearnMoreContent = {
       bold: "Burn",
       text: "takes the synthetic out of circulation and lowers the debt by the same amount. The collateral does not move.",
     },
+    CORE_EARMARKED,
     {
       bold: "Repay",
-      text: "pays the debt with vault shares. Each share counts at its value in the asset underneath at that block, one synthetic per unit, and the line keeps a protocol fee in shares on the part that pays off debt set aside for repayment (0.25% on Ethereum, 0.1% on Base).",
+      text: `pays the debt with vault shares. Each share counts at its value in the asset underneath at that block, one synthetic per unit, and the market keeps its redemption fee, where one is charged, in shares on the part that pays off earmarked debt.`,
     },
-    CORE_SET_ASIDE,
   ],
   links: [ALCHEMIX_DOCS.repay, ALCHEMIX_DOCS.borrowerFee, ALCHEMIX_DOCS.transmuterFlow],
 };
@@ -151,9 +154,9 @@ export const ALCHEMIX_BURN_REPAY: LearnMoreContent = {
 export const ALCHEMIX_WITHDRAW: LearnMoreContent = {
   title: "Withdrawing collateral",
   intro:
-    "A withdrawal takes vault shares out of the position to an address the holder names. The debt does not move, so collateralisation falls, and the Alchemist refuses a withdrawal that would not leave it above the line's minimum.",
+    "A withdrawal takes vault shares out of the position to an address the holder names. The debt does not move, so the LTV rises, and the Alchemist refuses a withdrawal that would not leave it below the market's max LTV.",
   detailsHeading: "Key concepts",
-  details: [CORE_RATIO, CORE_ROUTER, CORE_COLLATERAL],
+  details: [CORE_LTV, CORE_ROUTER, CORE_COLLATERAL],
   links: [ALCHEMIX_DOCS.withdraw, ALCHEMIX_DOCS.router, ALCHEMIX_DOCS.liquidations],
 };
 
@@ -164,16 +167,16 @@ export const ALCHEMIX_SELF_LIQUIDATE: LearnMoreContent = {
   detailsHeading: "What the close does",
   details: [
     {
-      bold: "Debt set aside for repayment",
-      text: "is paid first, as a force repay in the same transaction, whose event states the shares used and the fee.",
+      bold: "Earmarked debt",
+      text: "set aside to be repaid by redemptions. It is paid first, as a force repay in the same transaction, whose event states the shares used and the fee.",
     },
     {
       bold: "The fee",
-      text: "is the line's protocol fee on those set-aside shares (0.25% on Ethereum, 0.1% on Base), paid to Alchemix's fee receiver. The rest of the debt is paid without a fee, and no liquidator fee applies.",
+      text: `is the market's redemption fee, where one is charged, on those earmarked shares, paid to Alchemix's protocol fee receiver. The rest of the debt is paid without a fee.`,
     },
     {
       bold: "Shares used",
-      text: "are in the close's own event, which counts every share that paid debt, the set-aside part included.",
+      text: "are in the close's own event, which counts every share that paid debt, the earmarked part included.",
     },
     {
       bold: "Collateral returned",
@@ -185,36 +188,36 @@ export const ALCHEMIX_SELF_LIQUIDATE: LearnMoreContent = {
 };
 
 /** The protocol's central idea, the one a reader has to own to read an
- *  Alchemix timeline: Transmuter deposits maturing are what set debt aside and
+ *  Alchemix timeline: Transmuter deposits maturing are what earmark debt and
  *  what redemptions clear. Opened from every redemption card. */
 export const ALCHEMIX_HOW_IT_WORKS: LearnMoreContent = {
   title: "How Alchemix repays a loan",
   intro:
-    "Every Alchemix line has two halves. The Alchemist holds borrowers' positions: vault shares in, a synthetic token such as alUSD out. The Transmuter takes that synthetic back from anyone who holds it and, over time, turns it into the vault shares borrowers put up. The second half is what repays the first.",
+    "Every Alchemix market has two halves. The Alchemist holds borrowers' positions: vault shares in, a synthetic token such as alUSD out. The Transmuter takes that synthetic back from anyone who holds it and, over time, turns it into the vault shares borrowers put up. The second half is what repays the first.",
   stepsHeading: "How a redemption happens",
   steps: [
-    "Someone holding alUSD deposits it in the line's Transmuter, where it matures over a period measured in blocks.",
-    "As those deposits mature, the Alchemist sets aside a matching amount of debt across every open position on the line, in proportion to what each position owes. That is each position's Set aside for repayment figure, and it grows block by block.",
-    "When a depositor claims, the Transmuter redeems: every open position's set-aside debt is cleared by the same ratio, and the Alchemist takes collateral for it. Vault shares worth one unit of the asset underneath (USDC, or WETH on alETH) for each unit of debt cleared go to the Transmuter, and the line's redemption fee, 0.25% on top of those shares on Ethereum and 0.1% on Base, goes to Alchemix's fee receiver.",
-    "The Transmuter pays the depositor in those vault shares (mixUSDC on the alUSD line) for the part of the deposit that has matured, and hands back the rest as alUSD.",
+    "Someone holding alUSD deposits it in the market's Transmuter, where it vests over a term measured in blocks.",
+    "As those deposits vest, the Alchemist earmarks a matching amount of debt across every open position on the market, in proportion to each position's unearmarked debt. That is each position's Earmarked debt figure, and it grows block by block.",
+    `When a depositor claims, the Transmuter redeems: every open position's earmarked debt is cleared by the same ratio, and the Alchemist takes collateral for it. Vault shares worth one unit of the asset underneath (USDC, or WETH on alETH) for each unit of debt cleared go to the Transmuter, and the market's redemption fee, where one is charged, on top of those shares goes to Alchemix's protocol fee receiver.`,
+    "The Transmuter pays the depositor in those vault shares (mixUSDC on the alUSD market) for the part of the deposit that has vested, one unit of the asset underneath for each alUSD, and returns the rest as alUSD.",
   ],
   // The depositor's side, which a borrower reading a redemption also needs: a
   // claim can come before maturity, and what that costs.
   extraParagraphs: [
-    "A deposit converts a little every block, in equal parts from the block it is made to its maturity block. The depositor can claim at any time. A claim before maturity converts only the part whose blocks have passed, hands the rest back as alUSD and keeps an early exit fee on that rest (1% on every early claim so far). So claiming early gives up converting the rest and pays the fee; to convert it, the depositor deposits it again and waits a new full term.",
+    "A deposit vests a little every block, in equal parts from the block it is made to its maturity block. The depositor can claim at any time. A claim before maturity pays out only the part whose blocks have passed, returns the rest as alUSD and charges an early exit fee on that rest. To vest the rest, the depositor deposits it again and waits a new full term.",
   ],
   detailsHeading: "What it means for a borrower",
   details: [
     {
       bold: "The loan is repaid over time without the holder acting.",
-      text: "Each redemption lowers the debt by what it clears and the collateral by that much plus the redemption fee, so the position's collateral less its debt falls by about the fee each time. Each redemption card states the difference for that position as its net and the fee inside it.",
+      text: `Each redemption lowers the debt by what it clears and the collateral by that much plus the market's redemption fee, where one is charged, so the position's collateral less its debt falls by about that fee each time. Each redemption card states the difference for that position as its net and the fee inside it.`,
     },
     {
       bold: "The vault's share price decides what is left over.",
       text: "A rising share price grows the collateral while the debt stays put. A share price can also fall, and then the collateral shrinks.",
     },
     {
-      bold: "A redemption row is the line's event.",
+      bold: "A redemption row is the market's event.",
       text: "It names no position. The explorer reads each position before and after it to state what it cleared and took from that one.",
     },
     {
@@ -223,7 +226,7 @@ export const ALCHEMIX_HOW_IT_WORKS: LearnMoreContent = {
     },
     {
       bold: "A position that falls too low can be liquidated by anyone.",
-      text: "Its collateralisation is the collateral in the asset underneath divided by the debt, with one synthetic counted as one unit of that asset. Minting more or withdrawing must leave it above the line's minimum. If a falling share price takes it to the line's liquidation line or below, anyone can liquidate the position: the Alchemist uses its collateral to repay debt until the ratio is back above the minimum, and pays the liquidator 1.5% of the collateral above the debt, in shares from the position. Where the collateral no longer covers the debt, or the whole line is below its global minimum, the entire debt is cleared from the collateral and the liquidator's fee, 1.5% of the debt, comes from the line's fee vault in the asset underneath. The position card states both lines, read from the Alchemist.",
+      text: "Its LTV is the debt divided by the collateral in the asset underneath, with one synthetic counted as one unit of that asset. Minting more or withdrawing must leave it below the market's max LTV. If a falling share price takes it to the market's liquidation threshold or above, anyone can liquidate the position: the Alchemist uses its collateral to repay debt until the LTV is back below the max LTV, and pays the liquidator 1.5% of the collateral above the debt, in shares from the position. Where the collateral no longer covers the debt, or the whole market is below its global minimum collateralization, the entire debt is cleared from the collateral and the liquidator's fee, 1.5% of the debt, comes from the market's fee vault in the asset underneath. The position card states the max LTV and the liquidation threshold, read from the Alchemist.",
     },
   ],
   links: [
@@ -238,28 +241,28 @@ export const ALCHEMIX_HOW_IT_WORKS: LearnMoreContent = {
 export const ALCHEMIX_LIQUIDATION: LearnMoreContent = {
   title: "When a position is liquidated",
   intro:
-    "A position whose collateralisation reaches the line's liquidation line or falls below it can be liquidated by anyone: shares are taken from it and put against the debt, and the liquidator is paid a fee.",
+    "A position whose LTV reaches the market's liquidation threshold or rises above it can be liquidated by anyone: shares are taken from it and put against the debt, and the liquidator is paid a fee.",
   detailsHeading: "What the event states",
   details: [
     { bold: "Shares taken", text: "are in the log, so they are shown." },
     { bold: "Debt cleared", text: "shows in the card's before and after figures." },
     {
       bold: "The fee",
-      text: "is 1.5% of the collateral above the debt, paid to the liquidator in shares from the position. Where the collateral no longer covers the debt, or the whole line is below its global minimum, the entire debt is cleared and the fee, 1.5% of the debt, is paid in the asset underneath from the line's fee vault. If the vault holds less, a fee shortfall event records what was owed and what was paid.",
+      text: "is 1.5% of the collateral above the debt, paid to the liquidator in shares from the position. Where the collateral no longer covers the debt, or the whole market is below its global minimum collateralization, the entire debt is cleared and the fee, 1.5% of the debt, is paid in the asset underneath from the market's fee vault. If the vault holds less, a fee shortfall event records what was owed and what was paid.",
     },
   ],
   links: [ALCHEMIX_DOCS.liquidations, ALCHEMIX_DOCS.liquidatorFee],
 };
 
 export const ALCHEMIX_LINE_WIDE: LearnMoreContent = {
-  title: "Events that belong to the whole line",
+  title: "Events that belong to the whole market",
   intro:
     "Some events on this timeline name no position at all. They are here because they fell inside this position's life, and the holder did none of them.",
   detailsHeading: "The kinds",
   details: [
     {
       bold: "Redemption",
-      text: "clears every open position's set-aside debt on the line at once, by one ratio, and takes shares from each one's collateral: shares worth the debt cleared for the Transmuter, and the line's redemption fee on top for Alchemix's fee receiver.",
+      text: `clears every open position's earmarked debt on the market at once, by one ratio, and takes shares from each one's collateral: shares worth the debt cleared for the Transmuter, and the market's redemption fee, where one is charged, on top for Alchemix's protocol fee receiver.`,
     },
     {
       bold: "Batch liquidation",
@@ -284,15 +287,15 @@ export const ALCHEMIX_CUSTODY: LearnMoreContent = {
  *  timeline under it, true of any position on any line. Liquity V2's
  *  `liquityPositionContent` ("About This Position") is the model; this
  *  position's own figures are in the card's Explanation pane. `infoHref` is
- *  the explorer's Info page, where the set-aside entry sends the reader for
+ *  the explorer's Info page, where the earmarked entry sends the reader for
  *  the whole repayment cycle. */
 export function alchemixPositionContent(status: string, infoHref: string): LearnMoreContent {
   return {
     title: "About this position",
     intro:
       status === "closed"
-        ? "An Alchemix position is an NFT holding vault shares as collateral against a debt in the line's synthetic. This one has closed: its debt and collateral are zero, and the timeline below is its whole life."
-        : "An Alchemix position is an NFT holding vault shares as collateral against a debt in the line's synthetic. No interest accrues on the debt, and the line's redemptions pay it down over time from the collateral.",
+        ? "An Alchemix position is an NFT holding vault shares as collateral against a debt in the market's synthetic. This one has closed: its debt and collateral are zero, and the timeline below is its whole life."
+        : "An Alchemix position is an NFT holding vault shares as collateral against a debt in the market's synthetic. No interest accrues on the debt, and the market's redemptions pay it down over time from the collateral.",
     detailsHeading: "Key concepts",
     details: [
       {
@@ -301,27 +304,27 @@ export function alchemixPositionContent(status: string, infoHref: string): Learn
       },
       {
         bold: "The debt",
-        text: "is owed in the line's synthetic (alUSD, alETH or alUSDb), a token the position minted against its collateral. Alchemix counts one synthetic as one unit of the asset underneath.",
+        text: "is owed in the market's synthetic (alUSD, alETH or alUSDb), a token the position minted against its collateral. Alchemix counts one synthetic as one unit of the asset underneath.",
       },
       {
-        bold: "Set aside for repayment",
-        text: "the part of the debt the line's Transmuter has claimed. Holders of the synthetic deposit it in the Transmuter, and as those deposits mature the Alchemist sets aside a matching amount of debt across every open position on the line, in proportion to what each owes. The figure grows block by block, so a reading holds at its block. A line redemption clears set-aside debt and takes vault shares worth it from the collateral, plus the line's redemption fee. The holder can also clear it: a repay with vault shares pays the set-aside part first, with the same fee, and closing the position with its collateral pays all of it. The explorer's Info page, linked below, walks through the whole cycle.",
+        bold: "Earmarked debt",
+        text: `set aside to be repaid by redemptions: the part of the debt the market's Transmuter has claimed. Holders of the synthetic deposit it in the Transmuter, and as those deposits vest the Alchemist earmarks a matching amount of debt across every open position on the market, in proportion to each position's unearmarked debt. The figure grows block by block, so a reading holds at its block. A redemption clears earmarked debt and takes vault shares worth it from the collateral, plus the market's redemption fee, where one is charged. The holder can also clear it: a repay with vault shares pays the earmarked part first, with the same fee, and closing the position with its collateral pays all of it. The explorer's Info page, linked below, walks through the whole cycle.`,
       },
       {
-        bold: "Collateralisation",
-        text: "the collateral in the asset underneath divided by the debt, with one synthetic counted as one unit of that asset. Minting more or withdrawing must leave it above the line's minimum.",
+        bold: "LTV",
+        text: "the debt divided by the collateral in the asset underneath, with one synthetic counted as one unit of that asset. Minting more or withdrawing must leave it below the market's max LTV.",
       },
       {
         bold: "What can bring a liquidation",
-        text: "only the vault's share price. Debt and collateral are both counted in the asset underneath, so that asset's dollar price does not move collateralisation; a fall in the share price can take a position to its liquidation line.",
+        text: "only the vault's share price. Debt and collateral are both counted in the asset underneath, so that asset's dollar price does not move the LTV; a fall in the share price can take a position to its liquidation threshold.",
       },
       {
         bold: "Liquidation",
-        text: "at the line's liquidation line or below, anyone can liquidate the position. The Alchemist uses its collateral to repay debt until the ratio is back above the minimum, and pays the liquidator 1.5% of the collateral above the debt, in shares from the position. Where the collateral no longer covers the debt, or the whole line is below its global minimum, the entire debt is cleared from the collateral and the liquidator's fee, 1.5% of the debt, comes from the line's fee vault in the asset underneath.",
+        text: "at the market's liquidation threshold or above, anyone can liquidate the position. The Alchemist uses its collateral to repay debt until the LTV is back below the max LTV, and pays the liquidator 1.5% of the collateral above the debt, in shares from the position. Where the collateral no longer covers the debt, or the whole market is below its global minimum collateralization, the entire debt is cleared from the collateral and the liquidator's fee, 1.5% of the debt, comes from the market's fee vault in the asset underneath.",
       },
       {
         bold: "Before and after on an event card",
-        text: "each card shows debt, collateral and set-aside before and after it. The after figures are the reading at the card's block, and the before figures the reading at the previous card's block.",
+        text: "each card shows debt, collateral and earmarked debt before and after it. The after figures are the reading at the card's block, and the before figures the reading at the previous card's block.",
       },
       {
         bold: "The position NFT",
@@ -349,23 +352,23 @@ export const ALCHEMIX_LIFETIME_FLOWS: LearnMoreContent = {
     "The bars add up every event of this position over its whole life, and the line under them draws what it held and owed at the end of each day. Every figure is in the asset under the vault (USDC or WETH): the collateral at the vault's share price, each unit of the synthetic owed counted as one unit of that asset, as the Alchemist counts it. No dollar figure is used.",
   stepsHeading: "How it's built:",
   steps: [
-    "Collateral: deposited, less withdrawn, put against debt set aside for repayment, taken as repay fees, taken by the line's redemptions, used to pay the debt at a close or returned at a close, each at the share price of its block, plus the change in that share price since (Share price move), is what the position holds.",
-    "Debt: minted, less burned, repaid, repaid from the collateral, cleared by the line's redemptions and paid off at a close, is what the position owes.",
+    "Collateral: deposited, less withdrawn, put against earmarked debt, taken as repay fees, taken by the market's redemptions, used to pay the debt at a close or returned at a close, each at the share price of its block, plus the change in that share price since (Share price move), is what the position holds.",
+    "Debt: minted, less burned, repaid, repaid from the collateral, cleared by the market's redemptions and paid off at a close, is what the position owes.",
     "The held and owed figures on each day are the getCDP reading in force, never a sum of the events.",
   ],
   detailsHeading: "Key concepts:",
   details: [
     {
       bold: "Redemptions",
-      text: "a redemption belongs to the whole line and names no position. What it cleared and took from this position is the difference of the readings either side of it, never a figure from its own event.",
+      text: "a redemption belongs to the whole market and names no position. What it cleared and took from this position is the difference of the readings either side of it, never a figure from its own event.",
     },
     {
       bold: "Repays",
-      text: "the shares a repay pays with come from the caller's wallet, so they are not drawn; only the protocol fee on the set-aside part leaves the collateral.",
+      text: "the shares a repay pays with come from the caller's wallet, so they are not drawn; only the redemption fee on the earmarked part leaves the collateral.",
     },
     {
-      bold: "Collateralisation",
-      text: "the chart opens on the collateral over the debt, against the Alchemist's lower bound. The lower bound is today's, held across the life: it is not indexed at past blocks.",
+      bold: "LTV",
+      text: "the chart opens on the debt over the collateral, against the liquidation threshold. The threshold is read at the block of the last event on each of the latest 60 days with events, and held from one read to the next. The days before the first read take its threshold, dotted.",
     },
     {
       bold: "Interest",
@@ -379,7 +382,7 @@ export const ALCHEMIX_LIFETIME_FLOWS: LearnMoreContent = {
 export const ALCHEMIX_V2: LearnMoreContent = {
   title: "Alchemix V2 events",
   intro:
-    "Alchemix V2 is the version that ran before V3. It closed on 2 April 2026. Where a V2 account was carried into a V3 position, the V3 position's page shows the V2 events for context and adds no V2 figure to its own: they are one obligation at two points in time.",
+    "Alchemix V2 is the version that ran before V3. Its positions were migrated to V3 in April 2026. Where a V2 account was carried into a V3 position, the V3 position's page shows the V2 events for context and adds no V2 figure to its own: they are one obligation at two points in time.",
   detailsHeading: "What a V2 event records",
   details: [
     {
@@ -392,21 +395,21 @@ export const ALCHEMIX_V2: LearnMoreContent = {
     },
     {
       bold: "A V2 Liquidate",
-      text: "is the account holder repaying their own debt by selling their own collateral shares. Nobody else is involved.",
+      text: "is what Alchemix's V2 docs call a self-liquidation: it uses the account's collateral to repay its debt. Only the holder could start one; by those docs, \"A user's collateral will never be liquidated unless they do it themselves\".",
     },
     {
       bold: "The account's figures",
-      text: "were read once, when V2 closed, and not at each event.",
+      text: "are the migration's snapshot, read once from the paused contracts.",
     },
   ],
-  links: [ALCHEMIX_DOCS.v3Migration],
+  links: [ALCHEMIX_DOCS.v3Migration, ALCHEMIX_DOCS.v2Alchemist],
 };
 
 /** The "?" on a Transmuter position's event. */
 export const ALCHEMIX_TRANSMUTER: LearnMoreContent = {
   title: "How the Transmuter works",
   intro:
-    "The Transmuter takes an alAsset and converts it into vault shares over a fixed term. A deposit opens a position, held as an NFT, that converts a little every block until it matures.",
+    "The Transmuter takes an alAsset and pays it out in vault shares over a fixed term, the Transmutation Time. A deposit opens a position, held as an NFT, that vests a little every block until it matures.",
   detailsHeading: "Key concepts:",
   details: [
     {
@@ -415,16 +418,16 @@ export const ALCHEMIX_TRANSMUTER: LearnMoreContent = {
     },
     {
       bold: "Maturity",
-      text: "the block by which the whole deposit has converted. Before it, only the part of the term that has passed has converted.",
+      text: "the block by which the whole deposit has vested. Before it, only the part of the term that has passed has vested.",
     },
     {
       bold: "Claim",
-      text: "ends the position and burns its NFT. It pays out the converted part in vault shares and hands back the alAsset still to convert.",
+      text: "ends the position and burns its NFT. It pays out the vested part in vault shares, one unit of the asset underneath for each alAsset vested, and returns the alAsset not yet vested.",
     },
     {
       bold: "Early exit fee",
-      text: "a claim before maturity gives up part of the alAsset still to convert, which the Transmuter keeps.",
+      text: "a claim before maturity pays a share of the alAsset not yet vested as a fee, which goes to Alchemix's protocol fee receiver. Alchemix's docs also call it the Early Transmutation Fee and the early exit penalty, and the app shows it as the Early Claim Penalty.",
     },
   ],
-  links: [ALCHEMIX_DOCS.transmuter],
+  links: [ALCHEMIX_DOCS.transmuter, ALCHEMIX_DOCS.fixedYield],
 };

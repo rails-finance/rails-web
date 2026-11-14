@@ -29,11 +29,36 @@ export function ExplainHeading({ children }: { children: ReactNode }) {
   return <h4 className="text-sm font-semibold text-rb-500">{children}</h4>;
 }
 
-export function ExplainBullet({ children, ...rest }: { children: ReactNode } & Record<`data-${string}`, string>) {
+export function ExplainBullet({
+  children,
+  sub,
+  subOf,
+  ...rest
+}: { children: ReactNode; sub?: ReactNode; subOf?: string } & Record<`data-${string}`, string>) {
   return (
     <li className="flex items-start gap-2" {...rest}>
       <span aria-hidden className="select-none">
         •
+      </span>
+      <span className="min-w-0">
+        {children}
+        {sub != null && sub !== false && (
+          <ul className="mt-1 space-y-1" data-explain-sub={subOf}>
+            {sub}
+          </ul>
+        )}
+      </span>
+    </li>
+  );
+}
+
+/** A bullet under another: a figure the band draws under a figure, or a clause
+ *  that continues the bullet above. It reads in the muted tone, one step in. */
+export function ExplainSub({ children, ...rest }: { children: ReactNode } & Record<`data-${string}`, string>) {
+  return (
+    <li className="flex items-start gap-2" {...rest}>
+      <span aria-hidden className="select-none">
+        ◦
       </span>
       <span className="min-w-0">{children}</span>
     </li>

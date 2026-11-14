@@ -18,8 +18,9 @@
 // position that survived a challenge stays an open card, its tally in the
 // panel (named as challenges, never "liquidations"), and a running challenge
 // is the notice above the headlines. There is NO health headline and no
-// invented health factor: the declared price, the challenges, the expiry and
-// the cooldown carry the risk, as panel rows.
+// invented health factor: the declared price, the challenges and the expiry
+// carry the risk, as panel rows; the challenge phases and a running cooldown
+// are the Explanation's (TO-DO-position-card 341).
 //
 // The card view builds from EITHER lane: `viewFromSummary` (the index row,
 // the latest MintingUpdate absolutes) or `viewFromChain` (the live overlay,
@@ -50,7 +51,7 @@ import { Prov } from "@/components/shared/provenance";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import { latestAbsoluteProv, peakAbsoluteProv, lifetimeFlowProv } from "@/lib/frankencoin/event-provenance";
 import type { FrankencoinLifetimeDebt } from "@/lib/frankencoin/flows";
-import { fmtZchf, phaseText } from "@/lib/frankencoin/figures";
+import { fmtZchf } from "@/lib/frankencoin/figures";
 import {
   liveMintedProv,
   liveCollateralProv,
@@ -63,9 +64,9 @@ import type { Provenance } from "@/components/shared/provenance";
 import type { FrankencoinPositionSummary, FrankencoinPositionStatus } from "@/lib/sources/api/frankencoin-positions";
 import type { FrankencoinChainResponse } from "@/lib/api/fetch-frankencoin-position";
 import { AmountText } from "@/components/shared/amount-text";
-import { formatDate, formatDayMonth } from "@/lib/date";
+import { formatDate } from "@/lib/date";
 import { PanelFigure } from "@/components/shared/position-card-panel";
-import { serverReadOf, type ServerRead } from "@/lib/shared/server-head-read";
+import { serverReadOf, stampServerRead, type ServerRead } from "@/lib/shared/server-head-read";
 
 export interface FrankencoinPositionView {
   /** Lowercased Position contract address — the identity. */
@@ -141,6 +142,28 @@ const liqPriceProv = (v: FrankencoinPositionView): Provenance =>
   v.basis === "chain"
     ? liveLiqPriceProv(v.collateralSymbol, v.collateralDecimals, v.position, v.readBy)
     : latestAbsoluteProv("price", v.collateralSymbol, v.collateralDecimals);
+
+/** A panel figure worked from the card's traced reads, stamped with the
+ *  read they share. Each input is a getter on the position, or the latest
+ *  MintingUpdate on the indexed lane. */
+const derivedProv = (
+  v: FrankencoinPositionView,
+  summary: string,
+  formula: string,
+  inputs: { label: string; note: string }[],
+): Provenance =>
+  stampServerRead(
+    {
+      kind: "chain-derived",
+      pclass: "state",
+      summary,
+      contract: { name: "Frankencoin Position", address: v.position },
+      via: `${v.basis === "chain" ? "GET /api/chain/frankencoin/position" : "the latest MintingUpdate"} · ${formula}`,
+      formula,
+      inputs: inputs.map((i) => ({ label: i.label, kind: "chain" as const, pclass: "state" as const, note: i.note })),
+    },
+    v.basis === "chain" ? v.readBy : undefined,
+  );
 
 /** The position's contract address, which is its identity. */
 function PositionAddress({ v }: { v: FrankencoinPositionView }) {
@@ -309,8 +332,7 @@ export interface FrankencoinPositionCardProps {
   ending?: FrankencoinEnding | null;
   /** The debt's lifetime totals, for a closed card's lifetime line. */
   lifetimeDebt?: FrankencoinLifetimeDebt | null;
-  /** The page's live read of the position contract: the running challenge,
-   *  the phase length and the minting cooldown. */
+  /** The page's live read of the position contract: the running challenge. */
   live?: FrankencoinChainResponse | null;
   /** The challenge tally from the index, or null while it has not landed. */
   challengeTally?: number | null;
@@ -533,7 +555,22 @@ export function useFrankencoinCardSlots({
       left.push({
         id: "headroom",
         label: "Headroom",
-        value: <AmountText value={Math.max(0, v.collateral * v.liqPrice - v.minted)} format="compact" />,
+        value: (
+          <Prov
+            info={derivedProv(
+              v,
+              "Headroom — the ZCHF more debt the collateral backs at the owner-declared liquidation price: the collateral times that price, less the minted debt.",
+              "collateral × price − minted",
+              [
+                { label: "collateral", note: `the ${sym} the position holds (collateral().balanceOf(position))` },
+                { label: "price", note: "the owner-declared liquidation price (price())" },
+                { label: "minted", note: "the ZCHF minted against it (minted())" },
+              ],
+            )}
+          >
+            <AmountText value={Math.max(0, v.collateral * v.liqPrice - v.minted)} format="compact" />
+          </Prov>
+        ),
         asset: { symbol: "ZCHF" },
         tip: "The ZCHF more debt the collateral backs at the declared liquidation price: the collateral at that price, less the debt.",
       });
@@ -552,18 +589,6 @@ export function useFrankencoinCardSlots({
           </>
         ),
       tip: "How many times anyone has challenged the position's declared price, from its indexed history.",
-    });
-  }
-  if (live?.challengePeriod != null && live.challengePeriod > 0) {
-    left.push({
-      id: "challenge-phases",
-      label: "Challenge phases",
-      value: (
-        <>
-          <PanelFigure>{phaseText(live.challengePeriod)}</PanelFigure> each
-        </>
-      ),
-      tip: "The length of each of a challenge's two phases, from the position's challengePeriod() at the latest block.",
     });
   }
   if (v.annualInterestPPM != null) {
@@ -587,7 +612,22 @@ export function useFrankencoinCardSlots({
       label: "Repays in full",
       value: (
         <TokenFigure symbol="ZCHF">
-          <AmountText value={v.minted - v.reserveHeld} format="compact" />
+          <Prov
+            info={derivedProv(
+              v,
+              "Repays in full — the ZCHF that repays the debt: the minted debt less the reserve share held back at minting (minted × reserveContribution() ÷ 1,000,000), which repaying returns.",
+              "minted − minted × reserveContribution ÷ 1e6",
+              [
+                { label: "minted", note: "the ZCHF minted (minted())" },
+                {
+                  label: "reserveContribution",
+                  note: "the reserve share of each mint, parts per million (reserveContribution())",
+                },
+              ],
+            )}
+          >
+            <AmountText value={v.minted - v.reserveHeld} format="compact" />
+          </Prov>
         </TokenFigure>
       ),
       tip: "The ZCHF that repays the debt: the rest of the debt is the reserve share held back at minting, which repaying returns.",
@@ -603,21 +643,6 @@ export function useFrankencoinCardSlots({
         </>
       ),
       tip: "When the position expires, from its expiration() at the latest block. It is fixed for the life of the position.",
-    });
-  }
-  const cooling = live?.cooldownActive && live.cooldownUntil != null;
-  if (live && (cooling || !live.mintingDisabledForGood)) {
-    right.push({
-      id: "cooldown",
-      label: "Minting cooldown",
-      value: cooling ? (
-        <>
-          until <PanelFigure>{formatDayMonth(live.cooldownUntil as number)}</PanelFigure>
-        </>
-      ) : (
-        "None"
-      ),
-      tip: "Minting and withdrawals pause for a cooldown after the owner raises the declared price, read from the position at the latest block.",
     });
   }
   return { ...detailCommon, outcome: undefined, panel: [left, right] };

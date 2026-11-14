@@ -102,7 +102,7 @@ function TxHashLink() {
     <a
       href={explorerUrl(chainId, "tx", txHash)}
       target="_blank"
-      rel="noopener noreferrer"
+      rel="noopener"
       className="hidden font-mono text-xs text-rb-500 underline-offset-2 transition-colors hover:text-[var(--text-external)] hover:underline sm:inline"
       title={txHash}
       data-event-tx-hash={txHash}

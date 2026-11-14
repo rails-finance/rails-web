@@ -15,11 +15,13 @@
 //   • the whole card is a <Link>: a click on a tip opens or closes it and
 //     never navigates (preventDefault + stopPropagation).
 //   • <Prov> arms a click-to-trace on the same value when the provenance
-//     inspector is on: while it is armed a click is the trace's, and the tip
-//     leaves it alone.
+//     inspector is on: a tip inside a pickable value leaves its press (click,
+//     Enter, Space) to the trace; every other tip opens as usual
+//     (`tipYieldsToTrace`, ui-jobs 623).
 
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { provInspector } from "@/components/shared/provenance";
+import { tipYieldsToTrace } from "@/lib/shared/tip-yields";
 
 /** Inside a tip that already answers a hover (the closed ledger cell's USD
  *  tip), a nested RevealTip shows its children and opens no second bubble. */
@@ -125,6 +127,7 @@ export function RevealTip({
         focusable
           ? (e) => {
               if (e.key !== "Enter" && e.key !== " ") return;
+              if (tipYieldsToTrace(ref.current, provInspector.getArmed())) return;
               e.preventDefault();
               e.stopPropagation();
               setOpen((o) => !o);
@@ -132,8 +135,8 @@ export function RevealTip({
           : undefined
       }
       onClick={(e) => {
-        // While the inspector is armed the click traces the value.
-        if (provInspector.getArmed()) return;
+        // Inside a value the inspector can pick, the click traces it.
+        if (tipYieldsToTrace(ref.current, provInspector.getArmed())) return;
         e.preventDefault();
         e.stopPropagation();
         setOpen((o) => !o);

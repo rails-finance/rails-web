@@ -1,5 +1,5 @@
 // Aave-V3-family MARKET-SURFACE provenance vocabulary — the receipts for
-// /aave-v3/market and /spark/market, one block's reading of one Pool.
+// /aave-v3/markets and /spark/markets, one block's reading of one Pool.
 // ----------------------------------------------------------------------------
 // The market-overview surface is shared across the V3 family (SparkLend is an
 // Aave V3 fork on its own Pool + oracle deployment), so the vocabulary is a
@@ -30,8 +30,11 @@
 // stored read and why; `readBy: null` (the web read the chain) names the block
 // alone. A caller that passes no `readBy` keeps "@ head".
 
+import { aaveMarketConfig } from "@/lib/shared/aave-market-configs";
 import type { Provenance } from "@/components/shared/provenance";
 import { stampHeadRead, type ServerRead } from "@/lib/shared/server-head-read";
+import { aaveFamilyTerms, type AaveFamilyTerms } from "@/lib/aave-family/terms";
+import { APY_FORMULA } from "@/lib/aave-family/apy";
 
 /** The identity of a market-overview receipt: the block, and the two live
  *  contracts the surface read from (threaded from the payload). Reserve-level
@@ -56,6 +59,9 @@ export interface AaveMarketVocab {
   reserveCountProv: () => Provenance;
   /** One reserve's supplied / borrowed value in USD. */
   reserveValueProv: (side: "supplied" | "borrowed", symbol: string) => Provenance;
+  /** One reserve's supplied total in tokens, where the row states no dollars
+   *  (a reserve with no market price). */
+  reserveTokensProv: (symbol: string) => Provenance;
   /** One reserve's available underlying: the Pool's virtual balance where it
    *  has one (v3.3+), else supplied less borrowed. */
   reserveAvailableProv: (
@@ -69,8 +75,11 @@ export interface AaveMarketVocab {
   reserveEModeLtProv: (symbol: string, categories: { label: string; lt: number; ltv?: number }[]) => Provenance;
   /** One reserve's oracle price. */
   reservePriceProv: (symbol: string) => Provenance;
-  /** One reserve's live borrow / supply rate. */
-  reserveRateProv: (side: "borrow" | "supply", symbol: string) => Provenance;
+  /** The family's words (lib/aave-family/terms.ts). */
+  terms: AaveFamilyTerms;
+  /** One reserve's live borrow / supply rate, in the family's form; `apr` is
+   *  the stored rate, the APY's input where the family states an APY. */
+  reserveRateProv: (side: "borrow" | "supply", symbol: string, apr?: number | null) => Provenance;
   /** One reserve's reserve factor — the protocol's cut of borrow interest. */
   reserveFactorProv: (symbol: string) => Provenance;
   /** One reserve's loan-to-value, from the delivered basis-point integer. */
@@ -96,6 +105,9 @@ export interface AaveMarketVocab {
   flagProv: (flag: "frozen" | "paused", symbol: string) => Provenance;
   /** A loan-to-value of 0 on a reserve that still carries a threshold. */
   ltvZeroProv: (symbol: string) => Provenance;
+  /** A reserve the protocol's docs list as deprecated as collateral, where the
+   *  chain reads its loan-to-value as 0 (SparkLend). Null on a market with no list. */
+  deprecatedProv: (symbol: string) => Provenance | null;
   /** Isolation mode (a debt ceiling) and siloed borrowing. */
   isolatedProv: (symbol: string, ceilingUsd: number) => Provenance;
   siloedProv: (symbol: string) => Provenance;
@@ -138,6 +150,7 @@ interface AaveMarketConfig {
     | "aave-v3-etherfi"
     | "aave-v3-base"
     | "aave-v3-arbitrum"
+    | "aave-v3-optimism"
     | "seamless"
     | "spark";
   poolName: string;
@@ -172,7 +185,9 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
         : `Re-run the ${call} eth_call against any node`,
   });
 
+  const terms = aaveFamilyTerms(cfg.protocol);
   return (coords: AaveMarketCoords): AaveMarketVocab => ({
+    terms,
     marketTotalProv: (side) => ({
       kind: "chain-derived",
       pclass: "oracle",
@@ -223,6 +238,15 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
           note: "IAaveOracle.getAssetPrice @ head",
         },
       ],
+    }),
+    reserveTokensProv: (symbol) => ({
+      kind: "chain",
+      pclass: "state",
+      source: { block: coords.blockNumber },
+      verify: recompute("aToken.totalSupply", coords),
+      summary: `${symbol} supplied. The reserve's aToken totalSupply${atBlock(coords)}, in tokens: the reserve has no market price, so the row states its size in ${symbol}.`,
+      contract: poolContract(coords),
+      via: `${cfg.lane} · aToken totalSupply @ head`,
     }),
     reserveAvailableProv: (symbol, { priced, basis, deficit }) => {
       const oracleLeg = {
@@ -277,7 +301,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
       pclass: "state",
       source: { block: coords.blockNumber },
       verify: recompute("Pool.getConfiguration", coords),
-      summary: `${symbol} liquidation threshold. Decoded from the reserve's configuration word${atBlock(coords)} (Pool.getConfiguration), the collateral ratio past which a position holding it becomes liquidatable. Zero means the reserve cannot be collateral ON ITS OWN, though an efficiency-mode category can still lend it one, which the eMode figure beside this states. A governance-set slot.`,
+      summary: `${symbol} liquidation threshold. Decoded from the reserve's configuration word${atBlock(coords)} (Pool.getConfiguration), the collateral ratio past which a position holding it becomes liquidatable. Zero means the reserve cannot be collateral ON ITS OWN, though an ${terms.emode} category can still lend it one, which the ${terms.emode} figure beside this states. A governance-set slot.`,
       contract: poolContract(coords),
       via: `${cfg.lane} · Pool.getConfiguration · liquidationThreshold @ head`,
     }),
@@ -286,7 +310,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
       pclass: "state",
       source: { block: coords.blockNumber },
       verify: recompute("Pool.getEModeCategory* ", coords),
-      summary: `${symbol} in efficiency mode. The threshold the Pool applies to this reserve for a wallet inside ${categories.length === 1 ? "the category" : "one of the categories"} ${categories.map((c) => `${c.label} (${c.ltv != null ? `loan-to-value ${(c.ltv * 100).toFixed(2)}%, ` : ""}threshold ${(c.lt * 100).toFixed(2)}%)`).join(", ")}${atBlock(coords)}, IN PLACE of the reserve's usual threshold. Read from the Pool's eMode categories: the collateral bitmap and threshold on the newer Pools, the category each reserve names for itself on the pre-3.2 ones. Which category applies is each wallet's own choice (getUserEMode), so a market table can only list them.`,
+      summary: `${symbol} in ${terms.emode}. The threshold the Pool applies to this reserve for a wallet inside ${categories.length === 1 ? "the category" : "one of the categories"} ${categories.map((c) => `${c.label} (${c.ltv != null ? `loan-to-value ${(c.ltv * 100).toFixed(2)}%, ` : ""}threshold ${(c.lt * 100).toFixed(2)}%)`).join(", ")}${atBlock(coords)}, IN PLACE of the reserve's usual threshold. Read from the Pool's ${terms.emode} categories: the collateral bitmap and threshold on the newer Pools, the category each reserve names for itself on the pre-3.2 ones. Which category applies is each wallet's own choice (getUserEMode), so a market table can only list them.`,
       contract: poolContract(coords),
       via: `${cfg.lane} · Pool eMode category threshold + membership @ head`,
     }),
@@ -299,15 +323,39 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
       contract: oracleContract(coords),
       via: `${cfg.lane} · IAaveOracle.getAssetPrice @ head`,
     }),
-    reserveRateProv: (side, symbol) => ({
-      kind: "chain",
-      pclass: "state",
-      source: { block: coords.blockNumber },
-      verify: recompute("Pool.getReserveData", coords),
-      summary: `${symbol} ${side} rate. The reserve's ${side === "borrow" ? "variable borrow" : "supply"} rate off \`getReserveData\`${atBlock(coords)} (the Pool's per-second rate, ray-scaled, expressed here as an annual percentage). What the Pool applied at that block.`,
-      contract: poolContract(coords),
-      via: `${cfg.lane} · Pool.getReserveData · ${side === "borrow" ? "currentVariableBorrowRate" : "currentLiquidityRate"} @ head`,
-    }),
+    reserveRateProv: (side, symbol, apr) => {
+      const field = side === "borrow" ? "currentVariableBorrowRate" : "currentLiquidityRate";
+      if (terms.rateForm === "apy")
+        return {
+          kind: "chain-derived",
+          pclass: "state",
+          source: { block: coords.blockNumber },
+          verify: recompute("Pool.getReserveData", coords),
+          summary: `${symbol} ${side} APY. The reserve's ${side === "borrow" ? "variable borrow" : "supply"} rate off \`getReserveData\`${atBlock(coords)}, a rate a year (ray-scaled, 10^27 = 100%), compounded every second over a 365-day year.`,
+          contract: poolContract(coords),
+          via: `${cfg.lane} · Pool.getReserveData · ${field} ÷ 10^27, compounded @ head`,
+          formula: APY_FORMULA,
+          inputs: [
+            {
+              label: "rate",
+              ...(apr != null ? { value: apr.toFixed(12).replace(/0+$/, "").replace(/\.$/, "") } : {}),
+              kind: "chain",
+              pclass: "state",
+              note: `${field} ÷ 10^27, a year`,
+            },
+            { label: "seconds a year", value: "31,536,000", kind: "chain-derived", definition: true, note: "365 days" },
+          ],
+        };
+      return {
+        kind: "chain",
+        pclass: "state",
+        source: { block: coords.blockNumber },
+        verify: recompute("Pool.getReserveData", coords),
+        summary: `${symbol} ${side} rate. The reserve's ${side === "borrow" ? "variable borrow" : "supply"} rate off \`getReserveData\`${atBlock(coords)} (the Pool's per-second rate, ray-scaled, expressed here as an annual percentage). What the Pool applied at that block.`,
+        contract: poolContract(coords),
+        via: `${cfg.lane} · Pool.getReserveData · ${field} @ head`,
+      };
+    },
     reserveFactorProv: (symbol) => ({
       kind: "chain",
       pclass: "state",
@@ -467,10 +515,27 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
       pclass: "state",
       source: { block: coords.blockNumber },
       verify: recompute("Pool.getConfiguration", coords),
-      summary: `${symbol} backs no new borrowing. Its loan-to-value is 0 and its liquidation threshold is above 0${atBlock(coords)}, and no efficiency-mode category lends it a loan-to-value. A position holding it keeps it as collateral against what it owes; it adds nothing to what the position can borrow.`,
+      summary: `${symbol} backs no new borrowing. Its loan-to-value is 0 and its liquidation threshold is above 0${atBlock(coords)}, and no ${terms.emode} category lends it a loan-to-value. A position holding it keeps it as collateral against what it owes; it adds nothing to what the position can borrow.`,
       contract: poolContract(coords),
       via: `${cfg.lane} · Pool.getConfiguration · bits 0-15 (ltv) = 0, bits 16-31 (liquidationThreshold) > 0; eMode category loan-to-values @ head`,
     }),
+    deprecatedProv: (symbol) => {
+      const dep = aaveMarketConfig(cfg.protocol).deprecatedCollateral;
+      if (!dep) return null;
+      return {
+        kind: "offchain",
+        pclass: "offchain",
+        source: { block: coords.blockNumber },
+        summary: `${symbol} deprecated. The protocol's docs list it as "${dep.words}" (read ${dep.read}). The chain agrees on the loan-to-value: the reserve's configuration${atBlock(coords)} holds an LTV of 0. The chain alone cannot mark a reserve deprecated: a loan-to-value of 0 with a threshold above 0 is also a borrow-only reserve or a frozen one.`,
+        contract: poolContract(coords),
+        via: `${dep.source} · Pool.getConfiguration · bits 0-15 (ltv) = 0 @ head`,
+        verify: { kind: "link", href: dep.source, text: `The docs' Overview of Markets, read ${dep.read}` },
+        inputs: [
+          { label: "docs", value: dep.source, kind: "offchain", pclass: "offchain", note: `read ${dep.read}` },
+          { label: "ltv", value: "0", kind: "chain", pclass: "state", note: "Pool.getConfiguration bits 0-15" },
+        ],
+      };
+    },
     isolatedProv: (symbol, ceilingUsd) => ({
       kind: "chain",
       pclass: "state",
@@ -503,7 +568,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
       pclass: priced ? "oracle" : "state",
       source: { block: coords.blockNumber },
       verify: recompute("Pool.getReserveDeficit", coords),
-      summary: `${symbol} deficit. Pool.getReserveDeficit(asset)${atBlock(coords)}: debt a liquidation wrote off with no collateral left to cover it (DeficitCreated), not yet repaid by the protocol${priced ? ", valued at the market's IAaveOracle price" : ""}. It is the gap between supplied − borrowed and the Pool's virtual balance.`,
+      summary: `${symbol} deficit. Pool.getReserveDeficit(asset)${atBlock(coords)}: debt a liquidation wrote off with no collateral left to cover it (DeficitCreated), not yet covered${priced ? ", valued at the market's IAaveOracle price" : ""}. It is the gap between supplied − borrowed and the Pool's virtual balance.`,
       contract: poolContract(coords),
       via: `${cfg.lane} · Pool.getReserveDeficit(asset)${priced ? " × IAaveOracle price" : ""} @ head`,
     }),
@@ -536,7 +601,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
       kind: "chain-derived",
       pclass: "state",
       source: { block: coords.blockNumber },
-      summary: `${symbol} rate curves. The borrow rate at each utilisation from the reserve's rate strategy ${c.strategy}${atBlock(coords)}: base + slope1 × U ÷ optimal up to the optimal utilisation, then base + slope1 + slope2 × (U − optimal) ÷ (1 − optimal). The supply rate is borrow rate × U × (1 − reserve factor). The marked point is the reserve's utilisation and the rates the Pool applies now.`,
+      summary: `${symbol} rate curves. The borrow rate at each ${terms.utilizationText} from the reserve's rate strategy ${c.strategy}${atBlock(coords)}: base + slope1 × U ÷ optimal up to the optimal ${terms.utilizationText}, then base + slope1 + slope2 × (U − optimal) ÷ (1 − optimal). The supply rate is borrow rate × U × (1 − reserve factor).${terms.rateForm === "apy" ? ` Each rate is drawn as an APY, compounded every second over a 365-day year: ${APY_FORMULA}.` : ""} The marked point is the reserve's ${terms.utilizationText} and the rates the Pool applies now.`,
       contract: { name: `${symbol} rate strategy`, address: c.strategy },
       via:
         c.method === "getInterestRateData"
@@ -556,7 +621,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
       pclass: "state",
       source: { block: coords.blockNumber },
       verify: recompute(`${k.method}`, coords),
-      summary: `${symbol} rate kink. The utilisation at which the reserve's borrow rate starts to climb steeply, read from its interest-rate strategy${atBlock(coords)}. The tick on the utilisation bar marks it.`,
+      summary: `${symbol} ${terms.kinkText}. The ${terms.utilizationText} at which the reserve's borrow rate starts to climb steeply, read from its interest-rate strategy${atBlock(coords)}. The tick on the ${terms.utilizationText} bar marks it.`,
       contract: { name: `${symbol} interest-rate strategy`, address: k.strategy },
       via: `${cfg.lane} · getReserveData.interestRateStrategyAddress → ${k.method === "getOptimalUsageRatio" ? "getOptimalUsageRatio(asset)" : "OPTIMAL_USAGE_RATIO()"} @ head`,
       ...(k.raw
@@ -574,50 +639,67 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
   });
 }
 
-const FACTORIES: Record<string, (coords: AaveMarketCoords) => AaveMarketVocab> = {
-  "aave-v3": makeVocab({
+const CONFIGS: Record<string, AaveMarketConfig> = {
+  "aave-v3": {
     protocol: "aave-v3",
     poolName: "Aave V3 Core Pool",
     oracleName: "Aave V3 IAaveOracle",
     lane: "GET /api/chain/aave-v3/market",
-  }),
-  "aave-v3-prime": makeVocab({
+  },
+  "aave-v3-prime": {
     protocol: "aave-v3-prime",
     poolName: "Aave V3 Prime Pool",
     oracleName: "Aave V3 Prime IAaveOracle",
     lane: "GET /api/chain/aave-v3/market?market=prime",
-  }),
-  "aave-v3-etherfi": makeVocab({
+  },
+  "aave-v3-etherfi": {
     protocol: "aave-v3-etherfi",
     poolName: "Aave V3 EtherFi Pool",
     oracleName: "Aave V3 EtherFi IAaveOracle",
     lane: "GET /api/chain/aave-v3/market?market=etherfi",
-  }),
-  "aave-v3-base": makeVocab({
+  },
+  "aave-v3-base": {
     protocol: "aave-v3-base",
     poolName: "Aave V3 Base Pool",
     oracleName: "Aave V3 Base IAaveOracle",
     lane: "GET /api/chain/aave-v3-base/market",
-  }),
-  "aave-v3-arbitrum": makeVocab({
+  },
+  "aave-v3-arbitrum": {
     protocol: "aave-v3-arbitrum",
     poolName: "Aave V3 Arbitrum Pool",
     oracleName: "Aave V3 Arbitrum IAaveOracle",
     lane: "GET /api/chain/aave-v3-arbitrum/market",
-  }),
-  seamless: makeVocab({
+  },
+  "aave-v3-optimism": {
+    protocol: "aave-v3-optimism",
+    poolName: "Aave V3 Optimism Pool",
+    oracleName: "Aave V3 Optimism IAaveOracle",
+    lane: "GET /api/at-block/aave-v3-optimism/markets",
+  },
+  seamless: {
     protocol: "seamless",
     poolName: "Seamless Pool",
     oracleName: "Seamless IAaveOracle",
     lane: "GET /api/chain/seamless/market",
-  }),
-  spark: makeVocab({
+  },
+  spark: {
     protocol: "spark",
     poolName: "SparkLend Pool",
     oracleName: "SparkLend IAaveOracle",
     lane: "GET /api/chain/spark/market",
-  }),
+  },
 };
+
+const FACTORIES: Record<string, (coords: AaveMarketCoords) => AaveMarketVocab> = Object.fromEntries(
+  Object.entries(CONFIGS).map(([k, c]) => [k, makeVocab(c)]),
+);
+
+/** The names the receipts give a market's Pool and oracle, and the lane it is
+ *  read through: the read stamp's receipt lists them. */
+export function aaveMarketContractNames(protocol: string): { pool: string; oracle: string; lane: string } {
+  const c = CONFIGS[protocol] ?? CONFIGS["aave-v3"];
+  return { pool: c.poolName, oracle: c.oracleName, lane: c.lane };
+}
 
 /** "@ head" in the via line and the inputs' notes named as the block. */
 function atNamedBlock(p: Provenance, block: number | undefined): Provenance {
@@ -641,7 +723,35 @@ export function aaveMarketVocab(protocol: string, coords: AaveMarketCoords): Aav
   return Object.fromEntries(
     Object.entries(vocab).map(([k, build]) => [
       k,
-      (...a: unknown[]) => stamp((build as (...x: unknown[]) => Provenance)(...a)),
+      typeof build === "function"
+        ? (...a: unknown[]) => stamp((build as (...x: unknown[]) => Provenance)(...a))
+        : build,
     ]),
   ) as unknown as AaveMarketVocab;
+}
+
+/** The contracts one market read asks, and what of each: the read stamp's
+ *  receipt lists them (components/shared/read-stamp.tsx readStampProv). */
+export function aaveMarketReadContracts(
+  protocol: string,
+  data: { pool: string; oracle: string; capAutomator?: string },
+): { name: string; address: string; reads: string }[] {
+  const names = aaveMarketContractNames(protocol);
+  return [
+    {
+      name: names.pool,
+      address: data.pool,
+      reads: "getReservesList(), getReserveData(asset), getConfiguration(asset)",
+    },
+    { name: names.oracle, address: data.oracle, reads: "getAssetPrice(asset), getSourceOfAsset(asset)" },
+    ...(data.capAutomator
+      ? [
+          {
+            name: "SparkLend CapAutomator",
+            address: data.capAutomator,
+            reads: "supplyCapConfigs(asset), borrowCapConfigs(asset)",
+          },
+        ]
+      : []),
+  ];
 }

@@ -347,13 +347,13 @@ export function fluidCardSlots({
   const debtName = fluidLegName(v, "borrow", chain);
 
   const heads: PositionCardHead[] = [
-    { id: "collateral", label: CARD_VOCAB.collateral, value: legFigure(v, "supply", chain) },
-    { id: "debt", label: CARD_VOCAB.debt, value: legFigure(v, "borrow", chain) },
+    { id: "collateral", label: CARD_VOCAB.collateral, tier: "amount", value: legFigure(v, "supply", chain) },
+    { id: "debt", label: CARD_VOCAB.debt, tier: "amount", value: legFigure(v, "borrow", chain) },
   ];
   if (riskLive) {
     heads.push({
       id: "position-ratio",
-      label: "Position ratio",
+      label: "Debt to collateral ratio",
       labelTip:
         "Debt divided by collateral at the vault oracle's liquidate price, the figure Fluid's liquidation engine compares with the vault's risk lines.",
       value: (
@@ -364,7 +364,7 @@ export function fluidCardSlots({
     });
   } else if (detail && chainPending && hasDebt) {
     // The third slot waits for the read to land, so the row does not jump.
-    heads.push({ id: "position-ratio", label: "Position ratio", value: null, pending: true });
+    heads.push({ id: "position-ratio", label: "Debt to collateral ratio", value: null, pending: true });
   }
 
   if (!detail) return { ...common, surface: "listing", menu: null, tag, heads };
@@ -397,8 +397,8 @@ export function fluidCardSlots({
     right.push(
       {
         id: "borrow-room",
-        label: "Room to the borrow limit",
-        tip: "How much more debt the position can take before it reaches the vault's borrow limit (its collateral factor), where Fluid stops lending. Read from the vault on chain at the latest block.",
+        label: "Room to borrow",
+        tip: "How much more debt the position can take before it reaches the vault's collateral factor, where Fluid stops lending. Read from the vault on chain at the latest block.",
         value: (
           <>
             <TokenFigure symbol={debtSym} figure={`${formatExact(headroom)} ${debtSym}`}>
@@ -421,14 +421,14 @@ export function fluidCardSlots({
             >
               <PanelFigure>{pct(riskLive.collateralFactor)}</PanelFigure>
             </Prov>{" "}
-            limit
+            collateral factor
           </>
         ),
       },
       {
         id: "liquidates-above",
-        label: "Liquidates above",
-        tip: "The ratio above which Fluid can liquidate the position: the vault's liquidation threshold, read from its settings on chain at the latest block.",
+        label: "Liquidation threshold",
+        tip: "The ratio above which Fluid can liquidate the position, read from the vault's settings on chain at the latest block.",
         value: (
           <Prov
             info={vaultConfigProv(

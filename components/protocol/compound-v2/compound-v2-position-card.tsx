@@ -47,6 +47,7 @@ import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import type { AssetBreakdown } from "@/components/shared/asset-donut";
+import type { AssetMark } from "@/lib/shared/asset-mark";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { formatUnitsExact, formatUsdValue } from "@/lib/utils/format";
 import { formatUsd } from "@/lib/shared/format-event";
@@ -74,6 +75,9 @@ import type { CompoundV2CardCaptions } from "@/lib/compound-v2/economics";
 import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
 import { compoundV2PositionModal } from "@/lib/compound-v2/event-templates";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
+
+/** The headline over every supplied market (ui-jobs 631, V4). */
+const SUPPLIED = "Supplied";
 import type {
   CompoundV2PositionSummary,
   CompoundV2SupplyAmount,
@@ -108,8 +112,8 @@ export interface CompoundV2PositionView {
   /** Markets whose price is a stored constant with NO feed (the oracle's own
    *  getConfig says so) — the flag every USD surface must carry. */
   priceFixedByMarket?: Record<string, boolean>;
-  /** Annualized per-block rates per market key (from the same multicall). */
-  ratesByMarket?: Record<string, { borrowApr: number | null; supplyApr: number | null }>;
+  /** Per-block rates × 2,628,000 blocks per market key (from the same multicall). */
+  ratesByMarket?: CompoundV2PositionSummary["ratesByMarket"];
   /** The block the exchange rates, prices and rates above were read at and
    *  who answered (`CompoundV2PositionSummary.marketRead`). */
   marketRead?: CompoundV2PositionSummary["marketRead"];
@@ -122,6 +126,15 @@ export interface CompoundV2PositionView {
 /** The figure a supply line asserts: the current value (interest included)
  *  when the chain read landed, the replayed principal otherwise. */
 const supplyAmount = (r: CompoundV2SupplyAmount): number => r.current ?? r.principal;
+
+/** A market's underlying token address, for its icon: the catalog's (none
+ *  for cETH, whose ETH mark resolves by symbol). The timeline's chips read the
+ *  same address from the row's flows. */
+const underlyingOf = (market: string): string | undefined => COMPOUND_V2_MARKET_BY_KEY[market]?.underlying ?? undefined;
+const markOf = (r: { market: string; symbol: string }): AssetMark => ({
+  symbol: r.symbol,
+  address: underlyingOf(r.market) ?? null,
+});
 
 /** On-chain oracle USD for one line; null when Compound didn't price it. */
 function lineUsd(v: CompoundV2PositionView, market: string, amount: number): number | null {
@@ -259,7 +272,12 @@ function peakValue(lines: CompoundV2PeakAmount[], side: "supply" | "debt"): Reac
       {lines.map((r) => (
         <div key={r.market}>
           <Prov info={side === "supply" ? peakSupplyProv(r.symbol) : peakDebtProv(r.symbol)}>
-            <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
+            <AssetAmount
+              value={r.amount}
+              symbol={r.symbol}
+              address={underlyingOf(r.market)}
+              exact={formatUnitsExact(r.amountRaw, r.decimals)}
+            />
           </Prov>
         </div>
       ))}
@@ -400,6 +418,7 @@ export function useCompoundV2CardSlots({
         <AssetAmount
           value={supplyAmount(r)}
           symbol={r.symbol}
+          address={underlyingOf(r.market)}
           exact={r.current != null ? formatUnitsExact(r.cTokensRaw, 8) : String(r.principal)}
           {...(r.current != null ? { exactUnit: r.cSymbol } : {})}
         />
@@ -409,7 +428,12 @@ export function useCompoundV2CardSlots({
   const borrowUnit = (r: CompoundV2BorrowAmount) => (
     <div key={r.market}>
       <Prov info={borrowProv(r, serverReadOf(chain))}>
-        <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
+        <AssetAmount
+          value={r.amount}
+          symbol={r.symbol}
+          address={underlyingOf(r.market)}
+          exact={formatUnitsExact(r.amountRaw, r.decimals)}
+        />
       </Prov>
     </div>
   );
@@ -420,15 +444,16 @@ export function useCompoundV2CardSlots({
   const heads: PositionCardHead[] = [
     {
       id: "collateral",
-      label: CARD_VOCAB.collateral,
+      // Every supplied market, entered or not: the docs' supplied balance.
+      label: SUPPLIED,
       value:
         v.supplies.length === 0 ? null : collUsd != null ? (
-          <UsdFigure usd={collUsd.usd} info={usdProv(marketBy, "Collateral", collUsd.fixed)} form="compact" />
+          <UsdFigure usd={collUsd.usd} info={usdProv(marketBy, "Supplied", collUsd.fixed)} form="compact" />
         ) : (
           <TokenStack lines={suppliesShown.map(supplyUnit)} />
         ),
-      total: collUsd != null ? { usd: collUsd.usd, info: usdProv(marketBy, "Collateral", collUsd.fixed) } : undefined,
-      assets: v.supplies.length > 0 ? <InlineAssetCluster symbols={suppliesShown.map((r) => r.symbol)} /> : undefined,
+      total: collUsd != null ? { usd: collUsd.usd, info: usdProv(marketBy, "Supplied", collUsd.fixed) } : undefined,
+      assets: v.supplies.length > 0 ? <InlineAssetCluster assets={suppliesShown.map(markOf)} /> : undefined,
     },
     {
       id: "debt",
@@ -440,7 +465,7 @@ export function useCompoundV2CardSlots({
           <TokenStack lines={borrowsShown.map(borrowUnit)} />
         ),
       total: debtUsd != null ? { usd: debtUsd.usd, info: usdProv(marketBy, "Borrowed", debtUsd.fixed) } : undefined,
-      assets: v.borrows.length > 0 ? <InlineAssetCluster symbols={borrowsShown.map((r) => r.symbol)} /> : undefined,
+      assets: v.borrows.length > 0 ? <InlineAssetCluster assets={borrowsShown.map(markOf)} /> : undefined,
     },
   ];
   // One market on a side: its amount with its icon, the dollars beneath (the
@@ -454,6 +479,7 @@ export function useCompoundV2CardSlots({
           <AssetAmount
             value={supplyAmount(r)}
             symbol={r.symbol}
+            address={underlyingOf(r.market)}
             exact={r.current != null ? formatUnitsExact(r.cTokensRaw, 8) : String(r.principal)}
             {...(r.current != null ? { exactUnit: r.cSymbol } : {})}
           />
@@ -463,7 +489,7 @@ export function useCompoundV2CardSlots({
       usd:
         collUsd != null ? (
           <span className="font-bold text-green-400">
-            <Prov info={usdProv(marketBy, "Collateral", collUsd.fixed)}>{formatUsdValue(collUsd.usd)}</Prov>
+            <Prov info={usdProv(marketBy, "Supplied", collUsd.fixed)}>{formatUsdValue(collUsd.usd)}</Prov>
           </span>
         ) : null,
     };
@@ -474,7 +500,12 @@ export function useCompoundV2CardSlots({
       ...heads[1],
       value: (
         <Prov info={borrowProv(r, serverReadOf(chain))}>
-          <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
+          <AssetAmount
+            value={r.amount}
+            symbol={r.symbol}
+            address={underlyingOf(r.market)}
+            exact={formatUnitsExact(r.amountRaw, r.decimals)}
+          />
         </Prov>
       ),
       assets: undefined,
@@ -501,11 +532,11 @@ export function useCompoundV2CardSlots({
   // The headlines' read-mores on a detail card.
   const HEAD_TIP = {
     collateral:
-      "What the account supplies to Compound's markets, in dollars at Compound's oracle prices, earning each market's supply rate. The markets entered as collateral back its borrowing.",
+      "What the account supplies to Compound's markets, entered or not, in dollars at Compound's oracle prices, earning each market's supply APY. Only the markets entered as collateral back its borrowing.",
     debt: "What the account owes Compound's markets, in dollars at Compound's oracle prices, including the interest accrued at each market's borrow rate.",
   };
   const tipped = (h: PositionCardHead): PositionCardHead =>
-    h.labelTip || !(h.label === CARD_VOCAB.collateral || h.label === CARD_VOCAB.debt)
+    h.labelTip || !(h.id === "collateral" || h.id === "debt")
       ? h
       : { ...h, labelTip: h.id === "debt" ? HEAD_TIP.debt : HEAD_TIP.collateral };
 
@@ -519,7 +550,7 @@ export function useCompoundV2CardSlots({
       const usd = lineUsd(v, r.market, supplyAmount(r));
       return {
         id: `supply-${r.market}`,
-        symbol: r.symbol,
+        ...markOf(r),
         usd,
         amount: (
           <>
@@ -544,7 +575,7 @@ export function useCompoundV2CardSlots({
       const usd = lineUsd(v, r.market, r.amount);
       return {
         id: `borrow-${r.market}`,
-        symbol: r.symbol,
+        ...markOf(r),
         usd,
         amount: (
           <>
@@ -567,15 +598,15 @@ export function useCompoundV2CardSlots({
     ? [
         {
           id: "borrow-rate",
-          label: rate.avg ? "Average borrow rate" : "Borrow rate",
+          label: rate.avg ? "Average borrow APY" : "Borrow APY",
           value: (
-            <Prov info={stampServerRead(rate.avg ? avgBorrowRateProv() : borrowRateProv(rate.symbol), marketBy)}>
+            <Prov info={stampServerRead(rate.avg ? avgBorrowRateProv() : borrowRateProv(rate.symbol, rate), marketBy)}>
               {rate.pct.toFixed(2)}%
             </Prov>
           ),
           tip: rate.avg
-            ? "The borrowed markets' current variable rates, averaged by each debt's dollar value at Compound's oracle prices."
-            : `The ${rate.symbol ?? "market"} market's current variable borrow rate: its borrowRatePerBlock, read from the chain and annualised on the market's interest rate model.`,
+            ? "The borrowed markets' current variable APYs, averaged by each debt's dollar value at Compound's oracle prices."
+            : `The ${rate.symbol ?? "market"} market's current variable borrow APY: its borrowRatePerBlock, read from the chain, by Compound's docs' formula, 7,200 blocks a day compounded daily.`,
         },
       ]
     : [];

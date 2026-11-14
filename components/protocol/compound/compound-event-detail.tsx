@@ -381,7 +381,7 @@ export function useCompoundCells({
               usdValue: ctx.usdValue,
             })
           : cometPriceAtBlockProv(ctx.assetSymbol, coords),
-      title: `${ctx.assetSymbol} price at this event: ${absorb ? "the absorb's value over its amount" : `${m.label}'s oracle at block ${blockNumber?.toLocaleString("en-US") ?? ""}`}`,
+      title: `${ctx.assetSymbol} price at this event: ${absorb ? "the absorb's value over its amount" : `${m.label}'s price feed at block ${blockNumber?.toLocaleString("en-US") ?? ""}`}`,
     });
   }
 

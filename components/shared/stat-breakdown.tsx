@@ -13,11 +13,12 @@ import { AnchoredPanel } from "@/components/shared/asset-popover";
 import { Prov, ProvInert, type Provenance } from "@/components/shared/provenance";
 import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import { formatUsdValue } from "@/lib/utils/format";
+import type { AssetMark } from "@/lib/shared/asset-mark";
 
 /** A stat row's breakdown: the button's icons and the overlay it opens. */
 export interface PanelRowBreakdown {
-  /** The assets' symbols, largest first, for the button's icon cluster. */
-  symbols: string[];
+  /** The assets, largest first, for the button's icon cluster. */
+  assets: AssetMark[];
   /** The overlay heading's exact total and its receipt, where the assets are priced. */
   total?: { usd: number; info: Provenance };
   /** The overlay's body. */
@@ -28,7 +29,7 @@ export function StatBreakdown({
   id,
   label,
   figure,
-  breakdown: { symbols, total, panel },
+  breakdown: { assets, total, panel },
 }: {
   /** The button's `data-stat-breakdown-toggle`: the row's id. */
   id: string;
@@ -60,7 +61,7 @@ export function StatBreakdown({
         aria-controls={open ? panelId : undefined}
         aria-label={[
           total ? `${label} ${formatUsdValue(total.usd)}` : label,
-          `${symbols.length} assets`,
+          `${assets.length} assets`,
           "show breakdown",
         ].join(", ")}
         className={`-mx-1.5 -my-1 inline-flex max-w-full cursor-pointer flex-wrap items-center gap-x-1.5 rounded-xl px-1.5 py-1 text-left transition-colors hover:bg-rb-200/70 focus-ring dark:hover:bg-rb-700/60 ${open ? "bg-rb-200/70 dark:bg-rb-700/60" : ""}`}
@@ -70,7 +71,7 @@ export function StatBreakdown({
         <QuietTipsContext.Provider value={true}>
           <ProvInert>{figure}</ProvInert>
           <span className="inline-flex shrink-0 items-center">
-            <InlineAssetCluster symbols={symbols} size={16} overlap={5} />
+            <InlineAssetCluster assets={assets} size={16} overlap={5} />
           </span>
         </QuietTipsContext.Provider>
       </button>

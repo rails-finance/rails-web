@@ -29,6 +29,7 @@ import type { ChainTruthTowerData, TowerLine } from "@/lib/shared/chain-truth-ec
 import { isAlchemixV2Event, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { v2FrozenDebtProv, v2SummedProv, v2UnderlyingProv, type AlchemixV2Coords } from "@/lib/alchemix/v2-provenance";
 import type { AlchemixV2PositionSummary } from "@/types/api/alchemix";
+import { V2_WORDS } from "@/lib/alchemix/transmuter-words";
 
 const SYNTHETIC_DECIMALS = 18;
 
@@ -97,8 +98,8 @@ export function computeAlchemixV2Economics(
       symbol: sym,
       amount: scaled(liquidated.raw, SYNTHETIC_DECIMALS),
       usd: null,
-      prov: v2SummedProv("Repaid from collateral", sym, liquidated.count, coords),
-      flowLabel: "Repaid from collateral",
+      prov: v2SummedProv(V2_WORDS.selfLiquidation, sym, liquidated.count, coords),
+      flowLabel: V2_WORDS.selfLiquidation,
     });
   }
 
@@ -170,8 +171,8 @@ export function computeAlchemixV2Economics(
     },
     collateralUnit: oneUnit ? held[0]?.symbol : undefined,
     debtUnit: sym,
-    collateralTitle: "Held at close",
-    debtTitle: "Owed at close",
+    collateralTitle: V2_WORDS.heldSnapshot,
+    debtTitle: V2_WORDS.owedSnapshot,
     debtInflowLabel: "Minted",
   };
 }

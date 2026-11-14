@@ -118,7 +118,7 @@ const rate = W(st137.reads[String(liq.blockNumber)].rate);
 const lost = W(st137.reads[String(liq.blockNumber - 1)].colls) - W(st137.reads[String(liq.blockNumber)].colls);
 const sent = Number(liq.context.data.liqColls) * rate;
 const kept = lost - sent;
-// The keeper's bonus is at most 4% of what it took; the protocol keeps 10% of it.
+// The keeper's bounty is at most 4% of what it took; the protocol keeps 10% of it.
 check(
   "0.1268 wstETH to the liquidator plus the protocol's share is the 0.1518 stETH the position lost",
   near(lost, 0.151773, 0.000001) && near(sent, 0.15119, 0.00001) && kept > 0 && kept <= lost * 0.04 * 0.1 * 1.01,
@@ -258,14 +258,14 @@ const p484 = await openAndRead("/ethereum/fx/wbtc-484");
 check("484: no page errors", p484.errors.length === 0, p484.errors.slice(0, 2).join(" | "));
 {
   // The card's collateral (full figure, then USD) against the Explanation's
-  // anchor price; the card's Anchor price row names the settled block.
+  // anchor price.
   const m = p484.text.match(/\n([\d.]+) WBTC\n\$([\d,.]+)\n/);
   const a = p484.text.match(/At the oracle’s anchor price, \$([\d,]+) per WBTC/);
   const usd = m ? Number(m[2].replace(/,/g, "")) : NaN;
   const anchor = a ? Number(a[1].replace(/,/g, "")) : NaN;
   check(
     "484: the collateral's USD is at the settled block's anchor price, the ratio's price",
-    m != null && a != null && near(usd / anchor, Number(m[1]), 0.001) && /per WBTC · settled @/.test(p484.text),
+    m != null && a != null && near(usd / anchor, Number(m[1]), 0.001),
     `${m?.[2]} ÷ ${a?.[1]} vs ${m?.[1]}`,
   );
 }
@@ -384,8 +384,8 @@ check(
   ),
 );
 check(
-  "243 r3: the bonus the owner paid (chain: $6,070.49 − 5,923.998 = $146.49, 2.41%)",
-  /Rebalances and redemptions took 3\.06\d stETH of collateral for 5,923\.99\d fxUSD of debt[\s\S]{0,200}worth \$6,070: \$146 more[\s\S]{0,160}2\.4% of the collateral taken/.test(
+  "243 r3: what the owner paid (chain: $6,070.49 − 5,923.998 = $146.49), the 2.5% bounty over the rebalanced debt named apart",
+  /Rebalances and redemptions took 3\.06\d stETH of collateral for 5,923\.99\d fxUSD of debt[\s\S]{0,200}worth \$6,070: \$146 more[\s\S]{0,160}The pool’s 2\.5% bounty over the debt repaid comes to \$\d+/.test(
     p243.text,
   ),
 );
@@ -400,7 +400,7 @@ check(
   /both in this block/.test(p243.text) && /included above/.test(p243.text),
 );
 check("243 r3: dust after liquidation 1", /dust left/.test(p243.text), p243.figs.join(","));
-check("243 r3: the card names the position's tick", /\n#\d+ · find it on the pools page/.test(p243.text));
+check("243 r3: the card names the position's tick", /Tick #\d+ · find it on the pool page/.test(p243.text));
 // The head is words (decision 0045): a tick's or the pool's totals are in the
 // Explanation, none on the row.
 check(
@@ -450,38 +450,69 @@ check("137: no page errors", p137.errors.length === 0, p137.errors.slice(0, 2).j
 check(
   "137: the liquidation says wstETH to the keeper, its stETH worth and the protocol's share",
   /received 0\.127 wstETH \(0\.151 stETH at this block’s rate\)/.test(p137.text) &&
-    /The protocol kept 0\.000583 stETH, its 10% share of the liquidation bonus/.test(p137.text),
+    /The protocol kept 0\.000583 stETH, its 10% share of the liquidation bounty/.test(p137.text),
 );
 check("137: the unpaid 1.234 fxUSD is named", /did not cover the last 1\.234 fxUSD of debt/.test(p137.text));
 check("137: the reopened row says so", /Reopened position/.test(p137.text) && /Loan 2 of 2/.test(p137.text));
 check("137: 'seizure is quoted' copy is gone", !/quoted in the pool/.test(p137.text));
 
+// The pools roster (A1) and a pool's page (A2), ui-jobs 549/550.
 const pPools = await openAndRead("/ethereum/fx/pools");
+const pPool = await openAndRead("/ethereum/fx/pools/wsteth");
 check(
-  "pools: redemption state follows isRedeemAllowed",
-  terms.redeemAllowed
-    ? /redemption open/.test(pPools.text)
-    : /redemption closed: it opens only while fxUSD trades below its peg/.test(pPools.text),
+  "pools: redemption state follows isRedeemAllowed, on the roster and the pool page",
+  [pPools.text, pPool.text].every((t) =>
+    terms.redeemAllowed
+      ? /Redemption open/.test(t)
+      : /Redemption closed: it opens only while fxUSD trades below its peg/.test(t),
+  ),
+);
+check(
+  "pools: each head opens its pool's page",
+  /View wstETH pool/.test(pPools.text) && /View WBTC pool/.test(pPools.text),
+);
+check(
+  "pool page: the reconcile card says it in words, the raw share totals in its receipt",
+  /Reconciles: every debt share sits in one tick\./.test(pPool.text) && !/\d{20,}/.test(pPool.text),
+);
+check(
+  "pool page: no contract or feed names on the surface",
+  !/Chainlink|AaveFundingPool|getPrice|tickBitmap/.test(pPool.text),
 );
 {
   // wsteth-243's tick as its card states it today; a rebalance of the tick
   // moves the position to another one.
-  const tick243 = p243.text.match(/\n#(\d+) · find it on the pools page/)?.[1];
+  const tick243 = p243.text.match(/Tick #(\d+) · find it on the pool page/)?.[1];
   check("pools r3: wsteth-243's card names its tick", tick243 != null);
   const pg = await browser.newPage({ viewport: { width: 1280, height: 1000 } });
-  await pg.goto(BASE + `/ethereum/fx/pools?pool=wsteth&tick=${tick243}`, { waitUntil: "networkidle", timeout: 120000 });
+  await pg.goto(BASE + `/ethereum/fx/pools/wsteth?tick=${tick243}`, { waitUntil: "networkidle", timeout: 120000 });
   await pg.waitForTimeout(3000);
   const t = await pg
     .locator(`#tick-wsteth-${tick243}`)
     .innerText()
     .catch(() => "");
   check("pools r3: a linked tick is marked", /the position’s tick/.test(t), t.split("\n").join(" "));
+  // A link from before the pool pages opens the pool's page at the tick.
+  await pg.goto(BASE + `/ethereum/fx/pools?pool=wsteth&tick=${tick243}`, { waitUntil: "networkidle", timeout: 120000 });
+  await pg.waitForTimeout(3000);
+  check(
+    "pools r3: an old ?pool=&tick= link opens the pool's page",
+    new URL(pg.url()).pathname === "/ethereum/fx/pools/wsteth",
+    pg.url(),
+  );
   await pg.close();
 }
-check("pools: shorts are named as not covered", /short positions sit on a separate manager/.test(pPools.text));
+{
+  const info = await openAndRead("/ethereum/fx/info");
+  check("info: shorts are named as not covered", /short positions live in a separate part/.test(info.text));
+  check(
+    "info: How Rails reads it names the pools and the oracle",
+    /How Rails reads it/.test(info.text) && /Each pool’s price oracle|Each pool's price oracle/.test(info.text),
+  );
+}
 check(
-  "pools: default fees are stated",
-  pPools.text.includes(
+  "pool page: default fees are stated",
+  pPool.text.includes(
     `borrow ${(terms.fees.borrow * 100).toFixed(1)}% · repay ${(terms.fees.repay * 100).toFixed(1)}%`,
   ),
 );

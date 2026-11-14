@@ -766,8 +766,8 @@ function liquidationSlots(
 
   const happened = isAbsorb ? (
     <>
-      This position fell beyond the vault&rsquo;s maximum liquidation limit, so Fluid absorbed what remained of its
-      collateral and debt.
+      This position passed the third of the vault&rsquo;s limits, the liquidation max limit, so 100% of it was
+      liquidated: the protocol absorbed its collateral and settled its debt.
     </>
   ) : (
     <>
@@ -794,7 +794,7 @@ function liquidationSlots(
           <a
             href={explorerUrl(MAINNET_CHAIN_ID, "address", ctx.liquidator)}
             target="_blank"
-            rel="noopener noreferrer"
+            rel="noopener"
             className={INLINE_LINK}
             onClick={(e) => e.stopPropagation()}
           >
@@ -872,8 +872,8 @@ function valuedSentence(
       At the vault&rsquo;s oracle price at the time, the {isAbsorb ? "absorbed" : "seized"} collateral was worth{" "}
       {seizedFig} against {clearedFig} cleared — a{" "}
       <strong className="font-semibold text-foreground">{premiumStr}</strong>{" "}
-      {isAbsorb ? "margin kept by the vault" : "premium to the liquidator"}.{costSentence} Fluid quotes everything in
-      the debt token — it uses no dollar prices.
+      {isAbsorb ? "margin kept by the vault" : "premium to the liquidator"}.{costSentence} The vault&rsquo;s oracle
+      prices collateral in the debt token.
     </>,
   );
 }

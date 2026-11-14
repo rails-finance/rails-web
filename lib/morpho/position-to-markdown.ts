@@ -11,6 +11,7 @@
 // deliberately excludes. A PURE function of the data already in scope on the
 // detail page — no fetching.
 
+import { lifBonusText, lifText, morphoApy } from "@/lib/morpho/terms";
 import { NOT_LOADED_CELL, unreadToken } from "@/lib/shared/decimals-unread";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isMorphoEvent } from "@/lib/shared/types/event-shape";
@@ -60,9 +61,9 @@ export function morphoPositionToMarkdown(args: MorphoPositionMarkdownArgs): stri
   lines.push("");
   lines.push(
     `> Point-in-time snapshot generated ${fmtUtc(generatedAt.getTime() / 1000)}. ` +
-      `All values are in the market's OWN units — the loan token (${loan}) — because a Morpho oracle ` +
-      `quotes collateral in loan-asset terms, never USD; no dollar figure is asserted anywhere. ` +
-      `Balances are the position's own contract slots; the health arithmetic replicates Morpho's ` +
+      `All values are in the market's loan asset (${loan}), because a Morpho oracle ` +
+      `quotes collateral in loan-asset terms; no dollar figure is stated. ` +
+      `Balances are the position's contract slots; the health arithmetic replicates Morpho's ` +
       `internal _isHealthy (the contract exposes no public verdict getter). ` +
       `Everything drifts as the market and position change. Not financial advice.`,
   );
@@ -70,11 +71,11 @@ export function morphoPositionToMarkdown(args: MorphoPositionMarkdownArgs): stri
   lines.push(`- **Status:** ${view.status[0].toUpperCase() + view.status.slice(1)}`);
   lines.push(`- **Market:** ${view.marketLabel} (id ${view.marketId})`);
   lines.push(`- **Borrower:** ${view.owner}`);
-  lines.push(`- **Liquidation LTV (LLTV):** ${num(view.lltv * 100, 1)}%`);
+  lines.push(`- **LLTV (Liquidation Loan-To-Value):** ${num(view.lltv * 100, 1)}%`);
   if (view.everLiquidated) lines.push(`- **Liquidated at least once over its life.**`);
   if (view.badDebt > 0)
     lines.push(
-      `- **Bad debt written off:** ${view.loanDecimalsUnread ? notLoaded(loan, view.loanToken) : `${num(view.badDebt)} ${loan}`} — the share of the cleared debt the seized collateral could not cover, socialized to this market's lenders.`,
+      `- **Bad debt realized:** ${view.loanDecimalsUnread ? notLoaded(loan, view.loanToken) : `${num(view.badDebt)} ${loan}`} — the share of the cleared debt the seized collateral could not cover, socialized to this market's lenders.`,
     );
   lines.push("");
 
@@ -113,8 +114,8 @@ export function morphoPositionToMarkdown(args: MorphoPositionMarkdownArgs): stri
       }
       if (chain.healthFactor != null) {
         lines.push(
-          `- **Health factor:** ${num(chain.healthFactor, 2)} (liquidation capacity ÷ debt; liquidatable below 1.0)` +
-            (chain.healthy != null ? ` — _isHealthy replica says ${chain.healthy ? "healthy" : "NOT healthy"}` : ""),
+          `- **Health factor:** ${num(chain.healthFactor, 2)} (collateral value × LLTV ÷ debt; liquidatable below 1.0)` +
+            (chain.healthy != null ? ` — _isHealthy replica says ${chain.healthy ? "healthy" : "not healthy"}` : ""),
         );
       }
       if (chain.oraclePrice > 0 && scaled) {
@@ -129,13 +130,13 @@ export function morphoPositionToMarkdown(args: MorphoPositionMarkdownArgs): stri
         );
       }
       lines.push(
-        `- **Market rates (at block ${chain.blockNumber}):** borrow ${num(chain.borrowApr * 100, 2)}% APR, ` +
-          `supply ${num(chain.supplyApr * 100, 2)}% APR, utilization ${num(chain.utilization * 100, 1)}%, ` +
+        `- **Market rates (at block ${chain.blockNumber}):** Borrow APY ${num(morphoApy(chain.borrowApr) * 100, 2)}%, ` +
+          `Supply APY ${num(morphoApy(chain.supplyApr) * 100, 2)}%, utilization ${num(chain.utilization * 100, 1)}%, ` +
           `fee ${num(chain.fee * 100, 0)}%`,
       );
       if (chain.lif > 1) {
         lines.push(
-          `- **Liquidation incentive:** ${num((chain.lif - 1) * 100, 1)}% discount a liquidator seizes collateral at, past the LLTV line`,
+          `- **Liquidation Incentive Factor:** ${lifText(chain.lif)} (${lifBonusText(chain.lif)} to a liquidator in collateral over the debt it repays, past the LLTV)`,
         );
       }
     }

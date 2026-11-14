@@ -15,7 +15,8 @@
 // aToken / variableDebtToken `balanceOf` at the indexed head. The headlines are
 // each side's oracle-USD total with the reserves' icons beside it; the panel
 // holds one row per reserve, the borrow rate, the interest inside each side,
-// the room to borrow, the liquidation read and the eMode category. A LISTING
+// the room to borrow and the liquidation read; the eMode category sits on the
+// identity line beside the market badge. A LISTING
 // card carries no health factor (rails-ops decision 0018): a listing exists to
 // find a position, and risk is read live on the position page — whose Pool
 // getUserAccountData read is the only HF this card ever shows.
@@ -39,7 +40,7 @@ import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
 import { PanelFigure } from "@/components/shared/position-card-panel";
 import { TokenFigure } from "@/components/shared/token-figure";
-import { TokenAmountNotLoaded, loadedSymbols } from "@/components/shared/not-loaded";
+import { TokenAmountNotLoaded, loadedMarks } from "@/components/shared/not-loaded";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { ExactSpan } from "@/components/shared/amount-text";
@@ -236,7 +237,12 @@ function ReserveAmounts({
           {r.decimalsUnread ? (
             <TokenAmountNotLoaded address={r.address} label={r.symbol} />
           ) : (
-            <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
+            <AssetAmount
+              value={r.amount}
+              symbol={r.symbol}
+              address={r.address}
+              exact={formatUnitsExact(r.amountRaw, r.decimals)}
+            />
           )}
         </Prov>
       ))}
@@ -432,6 +438,7 @@ export function useAaveV3CardSlots({
                 <AssetAmount
                   value={r.amount}
                   symbol={r.symbol}
+                  address={r.address}
                   exact={formatUnitsExact(r.amountRaw, r.decimals)}
                   iconSize={iconSize}
                 />
@@ -461,7 +468,7 @@ export function useAaveV3CardSlots({
               breakdown:
                 peakOthers.length > 1
                   ? {
-                      symbols: loadedSymbols(peakOthers),
+                      assets: loadedMarks(peakOthers),
                       panel: (
                         <span className="text-sm font-semibold tabular-nums text-foreground">{othersLines(16)}</span>
                       ),
@@ -575,7 +582,7 @@ export function useAaveV3CardSlots({
         ),
       pending: reserves.length > 0 && pending,
       total: usd != null ? { usd, info: dep.usd(usdWhat, v.market) } : undefined,
-      assets: reserves.length > 0 && usd != null ? <InlineAssetCluster symbols={loadedSymbols(shown)} /> : undefined,
+      assets: reserves.length > 0 && usd != null ? <InlineAssetCluster assets={loadedMarks(shown)} /> : undefined,
     };
   };
 
@@ -738,7 +745,7 @@ export function useAaveV3CardSlots({
       ? {
           id: "borrow-room",
           label: "Room to borrow",
-          tip: "How much more the account can borrow, in dollars, before it reaches its loan-to-value limit, as the Pool gives it at the latest block.",
+          tip: "How much more the account can borrow, in dollars, before it reaches its Max LTV, as the Pool gives it at the latest block.",
           value: (
             <Prov info={accountDataProv("Available to borrow", "availableBorrowsBase", chainPool, v.readBy)}>
               {formatCompactUsd(chain.availableBorrowsUsd)}
@@ -782,20 +789,24 @@ export function useAaveV3CardSlots({
               id: "liquidation-drop",
               label: "Liquidates on a drop of",
               tip: "How far the dollar value of all the collateral can fall, the debt standing still, before the health factor reaches 1 and the account can be liquidated: 1 − 1 ÷ health factor.",
-              value: `${liq.dropPct.toFixed(0)}%`,
+              value: <Prov info={dep.liqDrop(v.market)}>{liq.dropPct.toFixed(0)}%</Prov>,
             }
           : null;
 
+  // The E-Mode category the account has chosen, on the identity line beside
+  // the market badge (as the Aave V3 Optimism card draws it).
   const emode = chain?.emode ?? null;
-  const emodeRow: PositionPanelRow | null =
-    emode && chainPool
-      ? {
-          id: "emode",
-          label: "eMode",
-          tip: "The efficiency-mode category the account has chosen: a reserve in it is borrowed against at the category's loan-to-value and liquidation threshold, as the Pool gives them at the latest block.",
-          value: <Prov info={userEmodeProv(emode.label, chainPool)}>{emode.label}</Prov>,
-        }
-      : null;
+  const emodeIdentity =
+    emode && chainPool ? (
+      <span className="flex items-center gap-2">
+        {marketBadge}
+        <span className="text-xs font-semibold text-rb-500" data-emode={emode.id}>
+          E-Mode: <Prov info={userEmodeProv(emode.label, chainPool)}>{emode.label}</Prov>
+        </span>
+      </span>
+    ) : (
+      identity
+    );
 
   // The supplies that back no borrowing: many and priced, their total and
   // icons open the breakdown (C19); otherwise each line under the total.
@@ -809,7 +820,7 @@ export function useAaveV3CardSlots({
             tip: NOT_COLLATERAL_TIP,
             value: <Prov info={dep.usd("Supplied, not collateral", v.market)}>{formatCompactUsd(otherUsd)}</Prov>,
             breakdown: {
-              symbols: loadedSymbols(othersSplit.shown),
+              assets: loadedMarks(othersSplit.shown),
               total: { usd: otherUsd, info: dep.usd("Supplied, not collateral", v.market) },
               panel: (
                 <AssetBreakdownPanel
@@ -869,15 +880,13 @@ export function useAaveV3CardSlots({
   );
   return {
     ...common,
+    identity: emodeIdentity,
     heads: withRows,
     surface: "detail",
     explainer,
     learnMore,
     menu: menuSlot,
-    panel: [
-      present([interestRow("supply"), notCollRow, emodeRow]),
-      present([rateRow, interestRow("debt"), roomRow, liqRow]),
-    ],
+    panel: [present([interestRow("supply"), notCollRow]), present([rateRow, interestRow("debt"), roomRow, liqRow])],
   };
 }
 

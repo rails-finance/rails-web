@@ -13,6 +13,7 @@
 // body is wrapped in <ProvSource> so every receipt cites the one head block it
 // was read at.
 
+import { LIQUITY_FAMILY_TERMS } from "@/lib/liquity/ltv";
 import {
   LiquityForkBranchesView,
   LiquityForkBranchesStamp,
@@ -20,12 +21,14 @@ import {
 import { ProvSource } from "@/components/shared/provenance";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { loadLiquityForkBranchesFromChain } from "@/lib/sources/chain/liquity-fork-branches";
+import { branchesPageTitle } from "@/lib/liquity-fork/shutdown";
 import type { LiquityForkConfig, LiquityForkBranchConfig } from "@/lib/sources/chain/liquity-fork-position";
 import { LIQUITY_V2_BRANCHES, DEBT_SYMBOL } from "@/lib/liquity/asset-catalog";
+import { branchScopeKeys } from "@/lib/shared/asset-family";
+import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
 import { listingMetadata } from "@/lib/shared/page-metadata";
 import { protocolForHref } from "@/lib/shared/protocols";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +36,7 @@ export const metadata = listingMetadata({
   title: "Liquity V2 branches",
   canonicalPath: "/ethereum/liquity-v2/branches",
   description:
-    "Liquity V2's three collateral branches and the order redemption reaches them, each branch with its own oracle, minimum collateral ratio and terms.",
+    "Liquity V2's three collateral branches and the order redemption reaches them, each branch with its own oracle, Max LTV and terms.",
 });
 
 const CFG: LiquityForkConfig = {
@@ -54,7 +57,7 @@ export default async function LiquityV2BranchesPage() {
       <div className="py-8">
         <SubPageHeader
           protocol={PROTOCOL}
-          title="Branches & how redemption reaches them"
+          title={branchesPageTitle(data.branches)}
           stamp={<LiquityForkBranchesStamp data={data} />}
         />
 
@@ -63,6 +66,7 @@ export default async function LiquityV2BranchesPage() {
         <div data-skel-section="page-table">
           <ProvSource source={{ block: data.blockNumber }}>
             <LiquityForkBranchesView
+              scopeKeys={branchScopeKeys(1, LIQUITY_V2_BRANCHES, TOKEN_ADDRESSES.BOLD)}
               data={data}
               protocolName="Liquity V2"
               basePath="/ethereum/liquity-v2"
@@ -71,11 +75,11 @@ export default async function LiquityV2BranchesPage() {
                 protocolName: "Liquity V2",
                 stablecoin: DEBT_SYMBOL,
                 docsLink: { label: "Liquity docs", url: "https://docs.liquity.org" },
+                terms: LIQUITY_FAMILY_TERMS["liquity-v2"],
               }}
             />
           </ProvSource>
         </div>
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
         <ProvInspectorLayer />
       </div>
     </div>

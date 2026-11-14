@@ -40,44 +40,39 @@ import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { AaveVaultTimeline } from "@/components/vaults/aave-vault-timeline";
 import { VaultFlowsPanel } from "@/components/vaults/vault-flows-panel";
 import { vaultFlowTimeline } from "@/lib/vaults/vault-flows";
-import { vaultHoldingHistory, type VaultHoldingHistory } from "@/lib/vaults/earned";
-import { VaultHoldingCard } from "@/components/vaults/vault-holding-card";
-import { HoldingExplanation } from "@/components/vaults/holding-explanation";
+import { vaultHoldingHistory } from "@/lib/vaults/earned";
+import { VaultHoldingPlainCard } from "@/components/vaults/vault-holding-plain-card";
+import { loadHoldingWorth } from "@/lib/vaults/holding-worth-read";
+import type { PlainHoldingHistory } from "@/lib/vaults/holding-worth";
 import { HoldingReceiptsScope } from "@/components/vaults/holding-receipts-scope";
-import { HolderShapeLine } from "@/components/vaults/holder-shape-line";
 import { CatalogueMemberLink } from "@/components/vaults/aave-vault-holder-parts";
-import { ExplainBullet, Fig } from "@/components/shared/explain-groups";
-import { Prov } from "@/components/shared/provenance";
-import { HOLDING_REWARDS, vaultHoldingContent } from "@/lib/vaults/card-words";
+import { ExplainBullet } from "@/components/shared/explain-groups";
+import { cooldownWords } from "@/lib/aave-vaults/cooldown-words";
+import { HOLDING_REWARDS, vaultPlainHoldingContent } from "@/lib/vaults/card-words";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { LatestPrices, type LatestPriceAsset } from "@/components/shared/latest-prices";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { AAVE_FAMILY_SINGULAR } from "@/components/vaults/aave-vault-format";
-import { assetText } from "@/lib/shared/vault-amount-text";
-import { cooldownSentence, cooldownWords } from "@/lib/aave-vaults/cooldown-words";
 import {
-  aaveAttestedNameProv,
-  aaveUmbrellaWrapperClaimProv,
   aaveVaultCooldownStateProv,
-  aaveVaultHolderShapeProv,
   aaveVaultSharePriceProv,
   type AaveVaultCoords,
 } from "@/lib/aave-vaults/vault-provenance";
 import { sectionPositionMetadata } from "@/lib/shared/page-metadata";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
-import { PAGE_LINK } from "@/lib/shared/ui-grammar";
+import { PAGE_LINK, FOOT_LINK } from "@/lib/shared/ui-grammar";
 import { resolveAaveVaultHolder } from "@/lib/aave-vaults/vault-holder";
 import { ethereumVaultHref, ethereumVaultsListingHref } from "@/lib/vaults/routes";
 import { loadAaveEthereumVault, type AaveEthereumVaultResponse } from "@/lib/sources/chain/aave-ethereum-vault";
 import { loadAaveEthereumVaultTimelineWithTail } from "@/lib/sources/chain/aave-ethereum-vault-timeline";
 import { computeVaultPositionEconomics } from "@/lib/aave-vaults/position-economics";
 import { fetchVaultTail, putVaultTail } from "@/lib/api/fetch-vault-tail";
-import { fetchVaultPositions } from "@/lib/api/fetch-vault-positions";
 import { ssrHop } from "@/lib/shared/listing-ssr";
 import { AAVE_VAULT_TAIL_VERSION, type VaultTimelineCoords } from "@/lib/shared/vault-holder-timeline";
-import type { VaultPositionRow } from "@/lib/aave-vaults/vault-position";
 import { BlockRef } from "@/components/shared/block-ref";
 import { serverReadOf } from "@/lib/shared/server-head-read";
+import { VaultHealthSection } from "@/components/vaults/vault-health-section";
+import { FocusSourceGate } from "@/components/shared/aim-gate";
 
 // Every figure is a call at the head with the holder in the path — nothing
 // about this is cacheable across requests.
@@ -210,7 +205,14 @@ const loadHistory = cache(async (data: AaveEthereumVaultResponse, holder: string
         vaultTimelineNoteProv(coords, n as AaveVaultNote),
       )
     : [];
-  return { timeline, economics, flowTimeline: withChanges(flowTimeline, changes), card };
+  return {
+    timeline,
+    economics,
+    flowTimeline: withChanges(flowTimeline, changes),
+    card,
+    allEvents,
+    replayed: economics != null && flowTimeline != null,
+  };
 });
 
 /** The Lifetime flows panel and the timeline, streamed in behind a Suspense
@@ -256,39 +258,16 @@ async function VaultTimelineSection({
   );
 }
 
-/** The holder card (components/vaults/vault-holding-card.tsx).
- *
- *  Its live figures are this page's reads at its block; its census figures
- *  (the transfer count, first seen, the dollar value, what the address is)
- *  come from the store through this deployment's listing proxy, where the
- *  census has a row. Earned is a promise over the history, so the card paints
- *  before the sweeps answer.
- *
- *  THE EXIT IS THE CONTRACT'S OWN FUNCTION, per family. sGHO and a static
- *  aToken redeem outright; an Umbrella stake token cannot be redeemed until a
- *  cooldown has been started and waited out, so its exit names both calls in
- *  the order they must happen. */
+/** The holder card (components/vaults/vault-holding-plain-card.tsx): this
+ *  page's reads at its block, and a promise over the history for the sums and
+ *  the worth line, so the card paints before the sweeps answer. An address
+ *  with no balance waits for the history, which says whether it ever held. */
 async function HoldingCardSection({ data, holder }: { data: AaveEthereumVaultResponse; holder: string }) {
   if (!data.holder) return null;
-  const hop = (await ssrHop()) ?? undefined;
-  let rows: VaultPositionRow[] = [];
-  try {
-    const page = await fetchVaultPositions({
-      chainId: MAINNET_CHAIN_ID,
-      vault: data.vault.address,
-      q: holder,
-      limit: 1,
-      ...hop,
-    });
-    rows = page.data;
-  } catch (error) {
-    console.error("The holder card's census row did not answer:", error);
-  }
-  const census = rows.find((r) => r.holder.toLowerCase() === holder.toLowerCase()) ?? null;
   const { vault } = data;
   const h = data.holder;
   const family = vault.family;
-  const sd = vault.shareDecimals ?? census?.shareDecimals ?? 18;
+  const sd = vault.shareDecimals ?? 18;
   const shareSymbol = vault.symbol ?? shortAddr(vault.address);
   const coords: AaveVaultCoords = {
     blockNumber: data.blockNumber,
@@ -300,18 +279,32 @@ async function HoldingCardSection({ data, holder }: { data: AaveEthereumVaultRes
     reserveSymbol: data.umbrella?.reserve?.symbol,
     holder: h.address,
   };
-  const history: Promise<VaultHoldingHistory> =
+  const unread = {
+    earned: { status: "unreplayed" as const, block: data.blockNumber },
+    firstSeen: null,
+    worth: null,
+  };
+  const history: Promise<PlainHoldingHistory> =
     vault.shareDecimals == null
-      ? Promise.resolve({ earned: { status: "unreplayed" as const, block: data.blockNumber }, firstSeen: null })
+      ? Promise.resolve(unread)
       : loadHistory(data, holder).then(
-          (r) => r.card,
-          () => ({ earned: { status: "unreplayed" as const, block: data.blockNumber }, firstSeen: null }),
+          async (r) => ({
+            ...r.card,
+            worth: await loadHoldingWorth(r.allEvents, {
+              chainId: MAINNET_CHAIN_ID,
+              vault: vault.address,
+              shareDecimals: sd,
+              replayed: r.replayed,
+              block: data.blockNumber,
+              blockTimestamp: r.timeline.blockTimestamp,
+              claimRaw: h.claim?.raw ?? null,
+            }),
+          }),
+          () => unread,
         );
-  const wrapper = data.umbrella?.wrapper;
-  const reserve = data.umbrella?.reserve;
-  const umbrella = family === "umbrella-stake";
+  const never = BigInt(h.shares.raw) === BigInt(0) && (await history).firstSeen == null;
   return (
-    <VaultHoldingCard
+    <VaultHoldingPlainCard
       coords={{
         readBy: serverReadOf(data),
         chainId: MAINNET_CHAIN_ID,
@@ -333,75 +326,83 @@ async function HoldingCardSection({ data, holder }: { data: AaveEthereumVaultRes
       claim={h.claim}
       totalSupply={data.totalSupply}
       dust={h.dust}
-      maxWithdraw={h.maxWithdraw}
-      maxRedeem={umbrella ? h.maxRedeem : undefined}
-      exit={umbrella ? "cooldown(), then redeem()" : "redeem()"}
+      never={never}
+      history={history}
       cooldown={
         h.cooldown
-          ? {
-              state: h.cooldown.state,
-              text: cooldownWords(h.cooldown),
-              sentence: cooldownSentence(h.cooldown, sd),
-              prov: aaveVaultCooldownStateProv(coords),
-            }
+          ? { state: h.cooldown.state, text: cooldownWords(h.cooldown), prov: aaveVaultCooldownStateProv(coords) }
           : undefined
       }
-      census={census}
-      history={history}
-      learnMore={vaultHoldingContent(vault.asset.symbol, shareSymbol, census != null, HOLDING_REWARDS[family])}
-      explanation={
-        <HoldingExplanation
-          blockNumber={data.blockNumber}
-          censusBlock={census?.census.block ?? null}
-          assetSymbol={vault.asset.symbol}
-          rewards={HOLDING_REWARDS[family]}
-          shape={
-            h.shape ? (
-              <HolderShapeLine
-                shape={h.shape}
-                blockNumber={data.blockNumber}
-                chainId={MAINNET_CHAIN_ID}
-                prov={aaveVaultHolderShapeProv(coords, h.shape.kind, h.shape.codeSize)}
-                nameProv={h.shape.kind === "attested" ? aaveAttestedNameProv(coords, h.shape.attested) : undefined}
-              />
-            ) : undefined
-          }
-          extra={
-            <>
-              {h.catalogued && (
-                <ExplainBullet data-figure="holder-catalogued">
-                  It is itself <CatalogueMemberLink vault={h.catalogued} coords={coords} what="This holder" />, one
-                  vault in Aave&rsquo;s layer holding another:{" "}
-                  <Link
-                    href={ethereumVaultsListingHref({ vault: h.catalogued.address })}
-                    className={PAGE_LINK}
-                    prefetch={false}
-                    data-link="holder-vault-holders"
-                    data-holder-vault-holders={h.catalogued.address}
-                  >
-                    its holders
-                  </Link>
-                  .
-                </ExplainBullet>
-              )}
-              {wrapper && h.claim && wrapper.holderClaim && (
-                <ExplainBullet>
-                  Through the wrapper the claim is{" "}
-                  <Fig>
-                    <span data-figure="holder-wrapper-claim">
-                      <Prov info={aaveUmbrellaWrapperClaimProv(coords, wrapper.symbol ?? "the wrapper")}>
-                        {assetText(wrapper.holderClaim, reserve?.decimals ?? vault.asset.decimals)}
-                      </Prov>
-                    </span>{" "}
-                    {reserve?.symbol ?? ""}
-                  </Fig>
-                  , a conversion at this block.
-                </ExplainBullet>
-              )}
-            </>
-          }
-        />
+      rewards={HOLDING_REWARDS[family]}
+      learnMore={vaultPlainHoldingContent(vault.asset.symbol, shareSymbol, HOLDING_REWARDS[family])}
+      extra={
+        h.catalogued ? (
+          <ExplainBullet data-figure="holder-catalogued">
+            It is itself <CatalogueMemberLink vault={h.catalogued} coords={coords} what="This holder" />, one vault in
+            Aave&rsquo;s layer holding another:{" "}
+            <Link
+              href={ethereumVaultsListingHref({ vault: h.catalogued.address })}
+              className={PAGE_LINK}
+              prefetch={false}
+              data-link="holder-vault-holders"
+              data-holder-vault-holders={h.catalogued.address}
+            >
+              its holders
+            </Link>
+            .
+          </ExplainBullet>
+        ) : undefined
       }
+    />
+  );
+}
+
+/** "How the vault is doing" (V7) from this page's read of the vault. */
+function HealthSection({ data }: { data: AaveEthereumVaultResponse }) {
+  const { vault } = data;
+  const name = vault.name || shortAddr(vault.address);
+  const u = vault.family === "umbrella-stake" ? data.umbrella : null;
+  return (
+    <VaultHealthSection
+      chainId={MAINNET_CHAIN_ID}
+      family={vault.family}
+      vault={{ address: vault.address, name, assetSymbol: vault.asset.symbol, decimals: vault.asset.decimals }}
+      totalAssetsRaw={data.totalAssets?.raw ?? null}
+      block={data.blockNumber}
+      readBy={serverReadOf(data)}
+      exit={
+        u && u.cooldownSeconds != null && u.unstakeWindowSeconds != null
+          ? {
+              kind: "cooldown",
+              block: data.blockNumber,
+              cooldownSeconds: u.cooldownSeconds,
+              windowSeconds: u.unstakeWindowSeconds,
+            }
+          : null
+      }
+      holder={
+        data.holder?.claim && data.holder.maxWithdraw
+          ? { block: data.blockNumber, claim: data.holder.claim.raw, maxWithdraw: data.holder.maxWithdraw.raw }
+          : null
+      }
+      paused={data.sgho?.paused === true}
+      steward={u?.owner ? { role: "umbrellaOwner", address: u.owner, block: data.blockNumber } : null}
+      contracts={[
+        {
+          name,
+          address: vault.address,
+          reads: u ? "totalAssets(), getCooldown(), getUnstakeWindow(), owner()" : "totalAssets()",
+        },
+      ]}
+      links={[
+        {
+          title: "The vault's page",
+          subtitle: name,
+          href: ethereumVaultHref(vault.address),
+          item: "vault-page",
+          internal: true,
+        },
+      ]}
     />
   );
 }
@@ -489,109 +490,127 @@ export default async function AaveEthereumVaultPositionPage({ params }: Props) {
   ) : null;
 
   return (
-    <div className="min-h-screen">
-      <div className="py-8">
-        <header className="mb-5" data-skel-section="page-header">
-          {/* Smart-back returns the reader wherever they came from; a fresh tab
+    <FocusSourceGate source={data.vault} chain={1} what="This vault">
+      <div className="min-h-screen">
+        <div className="py-8">
+          <header className="mb-5" data-skel-section="page-header">
+            {/* Smart-back returns the reader wherever they came from; a fresh tab
               lands on the vault section's listing. The price and recency strip
               sits in the holder's address row, Back stands alone, and Tools
               closes the row. The share is quoted in the vault's asset. */}
-          <DetailTopRow
-            session="aave-vaults"
-            fallbackHref={ethereumVaultsListingHref()}
-            assets={shareAssets}
-            priceReason={ORACLE_USD_REASON["aave-vaults"]}
-            owner={{
-              wallet: lookup.address,
-              ensName: lookup.ensName,
-              filterProtocol: null,
-              // The bookmark the card's wallet pill carried: the position page's
-              // card leaves the wallet to this row.
-            }}
-            // The card's ⋮ carries the menu; an event page draws no Tools.
-            tools={false}
-          />
-          {!onEventPage && (
-            <>
-              <h2
-                className="text-2xl font-semibold text-foreground"
-                data-vault-page={address}
-                data-vault-family={data.vault.family}
-              >
-                {/* The wallet heading above names a resolved holder. */}
-                {!lookup.address && <span className="font-mono">{subject}</span>}
-                <span className={`${lookup.address ? "" : "ml-2 "}text-base font-normal text-rb-500`}>
-                  in {vaultName}
-                </span>
-              </h2>
-              {/* How the subject was REACHED — a fact about the page rather than
+            <DetailTopRow
+              session="aave-vaults"
+              fallbackHref={ethereumVaultsListingHref()}
+              assets={shareAssets}
+              priceReason={ORACLE_USD_REASON["aave-vaults"]}
+              owner={{
+                wallet: lookup.address,
+                ensName: lookup.ensName,
+                filterProtocol: null,
+                // The bookmark the card's wallet pill carried: the position page's
+                // card leaves the wallet to this row.
+              }}
+              // The card's ⋮ carries the menu; an event page draws no Tools.
+              tools={false}
+            />
+            {!onEventPage && (
+              <>
+                <h2
+                  className="text-2xl font-semibold text-foreground"
+                  data-vault-page={address}
+                  data-vault-family={data.vault.family}
+                >
+                  {/* The wallet heading above names a resolved holder. */}
+                  {!lookup.address && <span className="font-mono">{subject}</span>}
+                  <span className={`${lookup.address ? "" : "ml-2 "}text-base font-normal text-rb-500`}>
+                    in {vaultName}
+                  </span>
+                </h2>
+                {/* How the subject was REACHED — a fact about the page rather than
               about the address, and stated here because the header is always
               drawn. The card below carries the identity itself; the census has
               no row for an address it has never seen, so a card is not
               somewhere this note could always live. */}
-              {lookup.kind === "ens" && lookup.address && (
-                <p className="mt-1 text-[11px] text-rb-500" data-holder-ens={lookup.typed}>
-                  {lookup.typed} · resolved through mainnet ENS
-                </p>
-              )}
-            </>
-          )}
-          {data.chainStale ? (
-            <p className="mt-3 max-w-3xl text-[13px] leading-relaxed text-rb-500">
-              This vault could not be read from chain just now, so no figure is stated for this address in it.
-            </p>
-          ) : onEventPage ? null : (
-            <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-rb-500">
-              {/* The family; the card names the block. */}
-              <span data-vault-block={data.blockNumber}>
-                {AAVE_FAMILY_SINGULAR[data.vault.family]}, deployed by Aave
-              </span>
-              <Link href={ethereumVaultHref(address)} className={PAGE_LINK} prefetch={false} data-link="vault-market">
-                {vaultName} <span aria-hidden>→</span>
-              </Link>
-              <Link
-                href={ethereumVaultsListingHref({ vault: address })}
-                className={PAGE_LINK}
-                prefetch={false}
-                data-link="vault-positions"
-                data-positions-vault={address}
-              >
-                Every holder <span aria-hidden>→</span>
-              </Link>
-            </p>
-          )}
-        </header>
+                {lookup.kind === "ens" && lookup.address && (
+                  <p className="mt-1 text-[11px] text-rb-500" data-holder-ens={lookup.typed}>
+                    {lookup.typed} · resolved through mainnet ENS
+                  </p>
+                )}
+              </>
+            )}
+            {data.chainStale ? (
+              <p className="mt-3 max-w-3xl text-[13px] leading-relaxed text-rb-500">
+                This vault could not be read from chain just now, so no figure is stated for this address in it.
+              </p>
+            ) : onEventPage ? null : (
+              <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-rb-500">
+                {/* The family; the card names the block. */}
+                <span data-vault-block={data.blockNumber}>
+                  {AAVE_FAMILY_SINGULAR[data.vault.family]}, deployed by Aave
+                </span>
+                <Link
+                  href={ethereumVaultHref(address)}
+                  className={`text-xs font-semibold ${FOOT_LINK}`}
+                  prefetch={false}
+                  data-link="vault-market"
+                >
+                  {vaultName}
+                </Link>
+                <Link
+                  href={ethereumVaultsListingHref({ vault: address })}
+                  className={`text-xs font-semibold ${FOOT_LINK}`}
+                  prefetch={false}
+                  data-link="vault-positions"
+                  data-positions-vault={address}
+                >
+                  Every holder
+                </Link>
+              </p>
+            )}
+          </header>
 
-        {/* An input that named no address is a stated reading, not a 404: the
+          {/* An input that named no address is a stated reading, not a 404: the
             vault is real, the question was asked, and this is the answer to
             what was typed. */}
-        {lookup.error === "invalid" && (
-          <p className="mb-6 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-lookup-error="invalid">
-            That is neither of the two accepted forms. A holding is opened with a 20-byte address starting{" "}
-            <code>0x</code>, or an ENS name ending <code>.eth</code>.
-          </p>
-        )}
-        {lookup.error === "unresolved" && (
-          <p className="mb-6 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-lookup-error="unresolved">
-            No address is recorded for {lookup.typed} on Ethereum mainnet at the time of this read.
-          </p>
-        )}
+          {lookup.error === "invalid" && (
+            <p className="mb-6 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-lookup-error="invalid">
+              That is neither of the two accepted forms. A holding is opened with a 20-byte address starting{" "}
+              <code>0x</code>, or an ENS name ending <code>.eth</code>.
+            </p>
+          )}
+          {lookup.error === "unresolved" && (
+            <p className="mb-6 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-lookup-error="unresolved">
+              No address is recorded for {lookup.typed} on Ethereum mainnet at the time of this read.
+            </p>
+          )}
 
-        {!data.chainStale && !onEventPage && data.holder && (
-          <Suspense
-            fallback={
-              <div className="mb-6" data-skel-section="vault-position-card-pending">
-                <SkeletonBlock height={120} />
-              </div>
-            }
-          >
-            <HoldingCardSection data={data} holder={data.holder.address} />
-          </Suspense>
-        )}
-        {!data.chainStale && timelineSlot && <HoldingReceiptsScope>{timelineSlot}</HoldingReceiptsScope>}
+          {!data.chainStale && !onEventPage && data.holder && (
+            <Suspense
+              fallback={
+                <div className="mb-6" data-skel-section="vault-position-card-pending">
+                  <SkeletonBlock height={120} />
+                </div>
+              }
+            >
+              <HoldingCardSection data={data} holder={data.holder.address} />
+            </Suspense>
+          )}
+          {!data.chainStale && !onEventPage && data.holder && (
+            <Suspense
+              fallback={
+                <div className="mb-6" data-skel-section="vault-health-pending">
+                  <SkeletonBlock height={220} />
+                </div>
+              }
+            >
+              <HealthSection data={data} />
+            </Suspense>
+          )}
+          {!data.chainStale && timelineSlot && <HoldingReceiptsScope>{timelineSlot}</HoldingReceiptsScope>}
 
-        <ProvInspectorLayer />
+          <ProvInspectorLayer />
+        </div>
       </div>
-    </div>
+    </FocusSourceGate>
   );
 }

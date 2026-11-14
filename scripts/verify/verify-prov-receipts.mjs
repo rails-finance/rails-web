@@ -1,7 +1,7 @@
 // Live in-browser verification of the market-surface provenance rollout — the
 // views whose figures registered as market-level receipts across the pilot and
-// the follow-on wave: /compound/markets, /aave-v3/market, /spark/market,
-// /base/aave-v3/market, /base/seamless/market, /compound-v2/markets,
+// the follow-on wave: /compound/markets, /aave-v3/markets, /spark/markets,
+// /base/aave-v3/markets, /base/seamless/markets, /compound-v2/markets,
 // /moonwell/markets, /morpho/markets, /fluid/vaults,
 // /llamalend/markets, /dolomite/markets, /aave-v4/hubs, /liquity-v2/branches.
 // Run against a dev server:  BASE=http://localhost:3000 node scripts/verify/verify-prov-receipts.mjs
@@ -15,9 +15,9 @@
 // hang. The page-level provenance inspector (prov-inspector.tsx) is THE
 // receipt surface now, so the same claims are asserted against it:
 //
-//   1. The inspector toggle mounts (button.prov-inspect-toggle) — the page
-//      participates in the provenance surface. Presence alone no longer
-//      proves receipts exist (the toggle mounts unconditionally), so:
+//   1. The profile menu's switch arms the page (the indicator "[data-prov-inspect-on]" stands
+//      beside the profile control; ui-jobs 625) — the page participates in
+//      the provenance surface. Armed alone does not prove receipts exist, so:
 //   2. Arming stamps ≥1 pickable value ([data-prov-pickable]) — the page's
 //      figures are REGISTERED receipts, not just prose. Polled with a
 //      deadline: these surfaces fetch on mount, and scoped values register
@@ -43,7 +43,7 @@
 // plan).
 
 import { chromium } from "playwright";
-import { armInspector, openInspectorHome } from "./lib/prov-inspector.mjs";
+import { armInspector } from "./lib/prov-inspector.mjs";
 import { BASE, bypassHeaders } from "./lib/host.mjs";
 
 let failures = 0;
@@ -55,10 +55,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const PAGES = [
   { name: "/ethereum/compound-v3/markets", path: "/ethereum/compound-v3/markets", strip: true },
-  { name: "/ethereum/aave-v3/market", path: "/ethereum/aave-v3/market", strip: true },
-  { name: "/ethereum/spark/market", path: "/ethereum/spark/market", strip: true },
-  { name: "/base/aave-v3/market", path: "/base/aave-v3/market", strip: true },
-  { name: "/base/seamless/market", path: "/base/seamless/market", strip: true },
+  { name: "/ethereum/aave-v3/markets", path: "/ethereum/aave-v3/markets", strip: true },
+  { name: "/ethereum/spark/markets", path: "/ethereum/spark/markets", strip: true },
+  { name: "/base/aave-v3/markets", path: "/base/aave-v3/markets", strip: true },
+  { name: "/base/seamless/markets", path: "/base/seamless/markets", strip: true },
   { name: "/ethereum/compound-v2/markets", path: "/ethereum/compound-v2/markets", strip: true },
   { name: "/ethereum/moonwell/markets", path: "/ethereum/moonwell/markets", strip: true },
   { name: "/ethereum/morpho/markets", path: "/ethereum/morpho/markets", strip: true },
@@ -112,22 +112,20 @@ async function runPage(page, p) {
   page.on("pageerror", (e) => pageErrors.push(`${p.name}: ${e}`));
   await page.goto(`${BASE}${p.path}`, { waitUntil: "domcontentloaded", timeout: 240000 });
 
-  // 1. The inspector — part of the page shell, reached through the Tools menu
-  //    on a position view and straight from the dock on a Market-type page.
-  //    The shell takes a moment to paint, so try until it does.
+  // 1. The profile menu's switch arms the page. The shell takes a moment to
+  //    paint, so try until it does.
   let mounted = false;
   const mountDeadline = Date.now() + 60000;
   while (Date.now() < mountDeadline) {
-    mounted = await openInspectorHome(page);
+    mounted = await armInspector(page);
     if (mounted) break;
     await sleep(500);
   }
-  check(`${p.name}: provenance inspector mounts`, mounted);
+  check(`${p.name}: the profile menu's switch arms the page`, mounted);
   if (!mounted) return;
 
-  // 2. Arm and wait for the coverage map. The tool is STICKY — armInspector
-  //    reads the halo first, so a second call never puts it back down.
-  await armInspector(page);
+  // 2. Wait for the coverage map. The tool is STICKY — armInspector reads the
+  //    armed state first, so a second call never puts it back down.
   await sleep(250);
   const deadline = Date.now() + 90000;
   let pickable = 0;
@@ -139,7 +137,7 @@ async function runPage(page, p) {
     // handler — it vanishes silently (measured live: the three slowest
     // pages stayed at 0 pickable for the full 90s while 400+ scoped values
     // sat on the page). Re-assert the armed state every round — armInspector
-    // reads the halo first, and the tool is sticky, so a blind click disarms.
+    // reads the armed state first.
     await armInspector(page).catch(() => {});
     await sleep(2000);
   }

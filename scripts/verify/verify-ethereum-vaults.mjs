@@ -329,9 +329,10 @@ const page = await context.newPage();
  *  and the run stops with the wait's own message. */
 const ROSTER = "/ethereum/aave/vaults";
 async function openRoster(target = page) {
-  // ui-jobs 485: every row, by size, which is what the roster checks read; the
-  // last section checks the default view (the preset, Holders) against it.
-  const res = await target.goto(`${BASE}${ROSTER}?show=all&sortBy=size`, { waitUntil: "networkidle" });
+  // ui-jobs 485: every row, and (ui-jobs 605) the table sorted by Total assets,
+  // which is what the roster checks read; the last section checks the default
+  // view (the preset, Holders) against it.
+  const res = await target.goto(`${BASE}${ROSTER}?show=all&sort=assets`, { waitUntil: "networkidle" });
   await target.waitForSelector("[data-roster-panel] [data-vault-row]", { timeout: 90000 });
   return res;
 }
@@ -446,7 +447,8 @@ const readRows = async () =>
       asset: el.getAttribute("data-asset"),
       raw: el.getAttribute("data-total-assets-raw"),
       sharePriceRaw: el.getAttribute("data-share-price-raw"),
-      groupAsset: el.closest("[data-asset-group]")?.getAttribute("data-asset-group") ?? null,
+      held: el.getAttribute("data-held-assets-raw"),
+      token: el.getAttribute("data-token"),
       inEmpty: Boolean(el.closest("[data-empty-rows]")),
       amountText: el.querySelector('[data-cell="total-assets"]')?.textContent?.trim() ?? null,
       sharePriceText: el.querySelector('[data-cell="share-price"]')?.textContent?.trim() ?? null,
@@ -549,47 +551,43 @@ check(
   totalMismatch.slice(0, 3).join("; ") || `${rows.length} compared, ${ownUnread} own reads unanswered`,
 );
 
-// ── 3: grouping and order ───────────────────────────────────────────────────
-// 2026-10-20 (ui-jobs 407, V1): every vault roster groups by asset, so this
-// one does too, and the family moved to a facet and a pill on the row. The
-// assertions are the Base roster's 3a–3c, against this script's own reads (1c
+// ── 3: the table and its order ──────────────────────────────────────────────
+// 2026-11-12 (ui-jobs 605): the roster is the house table (V6), one flat table
+// with no group per asset; the Asset facet narrows by asset. The family is a
+// facet and the Kind cell. Read under `?sort=assets`: by token A to Z, the
+// most held first inside each token, against this script's own reads (1c
 // holds each row's family to the chain's).
 const funded = rows.filter((r) => r.group === "funded");
-const groupAssets = await page
-  .locator("[data-roster-panel] [data-asset-group]")
-  .evaluateAll((els) => els.map((e) => e.getAttribute("data-asset-group")));
-const ownFundedAssets = [
-  ...new Set(
-    CHAIN_ROSTER.filter((r) => BigInt(OWN.get(r.address)?.totalAssets ?? 0) > 0n).map((r) => OWN.get(r.address).asset),
-  ),
-];
+const groupHeads = await page.locator("[data-roster-panel] [data-asset-group]").count();
+const fundedTables = await page.locator("[data-roster-panel] [data-vault-table='funded']").count();
 check(
-  "3a one group per asset among the funded vaults, by this script's own reads, and no other",
-  ownFundedAssets.every((a) => groupAssets.includes(a)) && groupAssets.length === ownFundedAssets.length,
-  `${groupAssets.length} groups on the page, ${ownFundedAssets.length} funded assets read`,
+  "3a the funded vaults are one table, with no group per asset",
+  groupHeads === 0 && fundedTables === 1,
+  `${fundedTables} funded table(s), ${groupHeads} asset group(s)`,
 );
-const misplaced = funded.filter((r) => r.groupAsset !== OWN.get(r.address)?.asset);
+const misplaced = funded.filter((r) => r.asset !== OWN.get(r.address)?.asset);
 check(
-  "3b every funded row sits in the group of its own asset()",
+  "3b every funded row states its own asset()",
   misplaced.length === 0,
   misplaced
     .slice(0, 3)
-    .map((r) => `${short(r.address)} in ${r.groupAsset}`)
-    .join("; ") || `${funded.length} funded rows placed`,
+    .map((r) => `${short(r.address)} states ${r.asset}`)
+    .join("; ") || `${funded.length} funded rows checked`,
 );
+const tokens = [...new Set(funded.map((r) => r.token))];
 let disorder = 0;
 let comparablePairs = 0;
-for (const asset of groupAssets) {
-  const inGroup = funded.filter((r) => r.groupAsset === asset);
-  for (let i = 1; i < inGroup.length; i++) {
-    comparablePairs++;
-    if (BigInt(inGroup[i].raw) > BigInt(inGroup[i - 1].raw)) disorder++;
-  }
+for (let i = 1; i < funded.length; i++) {
+  const [a, b] = [funded[i - 1], funded[i]];
+  comparablePairs++;
+  const t = a.token.localeCompare(b.token, "en-US", { sensitivity: "base" });
+  // Total assets sorts by the figure the column shows (ui-jobs 664).
+  if (t > 0 || (t === 0 && BigInt(b.raw) > BigInt(a.raw))) disorder++;
 }
 check(
-  "3c inside every group the totals are non-increasing (largest first)",
+  "3c under ?sort=assets the rows run by token A to Z, the largest total assets first inside each token",
   disorder === 0,
-  `${disorder} out-of-order pairs across ${comparablePairs} pairs in ${groupAssets.length} groups`,
+  `${disorder} out-of-order pairs across ${comparablePairs} pairs over ${tokens.length} tokens`,
 );
 
 // ── 4: the three kinds of row add up ────────────────────────────────────────
@@ -620,20 +618,20 @@ check(
   `stated ${statedEmpty}, drawn ${emptyRows.length}, own ${ownEmpty}`,
 );
 
-// ── 6: the print rule on the largest row of the three largest groups ────────
+// ── 6: the print rule on the largest row of the first three tokens ──────────
 const printBad = [];
-const sampleGroups = groupAssets.slice(0, 3);
-for (const asset of sampleGroups) {
-  const top = funded.find((r) => r.groupAsset === asset);
+const sampleGroups = tokens.slice(0, 3);
+for (const token of sampleGroups) {
+  const top = funded.find((r) => r.token === token);
   if (!top) continue;
   const decimals = ASSET.get(OWN.get(top.address).asset)?.decimals;
   const want = expectedCompactText(OWN.get(top.address).totalAssets, Number(decimals));
   if (!top.amountText?.startsWith(want)) printBad.push(`${short(top.address)}: "${top.amountText}" vs "${want}"`);
 }
 check(
-  "6  the largest row of the three largest groups prints its total by the listing's compact rule",
+  "6  the largest row of the first three tokens prints its total by the listing's compact rule",
   printBad.length === 0 && sampleGroups.length > 0,
-  printBad.join("; ") || `${sampleGroups.length} groups sampled`,
+  printBad.join("; ") || `${sampleGroups.length} tokens sampled`,
 );
 
 // ── 7: the share price, and the decimals trap it exists for ─────────────────
@@ -989,7 +987,7 @@ check(
   await page.waitForSelector('[data-anatomy="V5"]', { timeout: 120_000 }).catch(() => null);
   const strip = await readVaultStrip(page);
   const store = await readStoreSeries(BASE, 1, stripVault);
-  vaultStripChecks(check, "17", strip, store, { chain: 1, vault: stripVault, censusFamily: true });
+  vaultStripChecks(check, "17", strip, store, { chain: 1, vault: stripVault });
 }
 
 // ── the default view (ui-jobs 485) ──────────────────────────────────────────

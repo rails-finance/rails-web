@@ -23,9 +23,9 @@ export type VaultFamily = "metamorpho" | "sgho" | "stata" | "umbrella-stake" | "
  *  on Base, `morpho` on Ethereum. */
 export type VaultExplorer = "morpho-base" | "morpho" | "aave-vaults" | "yearn";
 
-/** The census's word for a family. The Base census writes `morpho` for every
- *  MetaMorpho vault; Yearn has no census. */
-export type VaultCensusFamily = "morpho" | "sgho" | "stata" | "umbrella-stake";
+/** The census's word for a family. The census writes `morpho` for every
+ *  MetaMorpho vault and `yearn-v3` for Yearn V3. */
+export type VaultCensusFamily = "morpho" | "sgho" | "stata" | "umbrella-stake" | "yearn-v3";
 
 export interface VaultFamilyEntry {
   /** Maple's explorer is a lender explorer with no vault holder pages, so it
@@ -38,10 +38,24 @@ export interface VaultFamilyEntry {
   label: string;
   /** The same, for one vault. */
   singular: string;
+  /** What kind of vault it is, in words that hold across venues: the
+   *  index's Kind column (ui-jobs 553). */
+  kind: string;
   /** The census's word, or null where there is no census. */
   census: VaultCensusFamily | null;
   /** The served roster's family, where the box serves one. */
   served: "metamorpho" | "yearn-v3" | null;
+  /** The protocol's documented word for the figure nearest Rails's Yield,
+   *  attributed, with the difference in a few words: the Yield tip's last
+   *  sentence (decision 0047, amended 13 Nov 2026; ui-jobs 664 VA1). */
+  yieldDocsWord?: string;
+  /** The Share price tip's last sentence, where the docs name the figure
+   *  another way (ui-jobs 664 VA2). */
+  sharePriceDocsWord?: string;
+  /** The vault's asset is a vault whose share grows (Umbrella's stake on a
+   *  static aToken): the Yield subline adds the asset's own growth over the
+   *  same days, never added into one figure (decision 0047 as amended). */
+  assetGrows?: true;
 }
 
 export const VAULT_FAMILIES: Record<VaultFamily, VaultFamilyEntry> = {
@@ -50,22 +64,29 @@ export const VAULT_FAMILIES: Record<VaultFamily, VaultFamilyEntry> = {
     venue: "morpho",
     label: "MetaMorpho",
     singular: "MetaMorpho vault",
+    kind: "Curated vault",
     census: "morpho",
     served: "metamorpho",
+    yieldDocsWord:
+      "Morpho's docs call a figure on the same basis (post-fee, excludes rewards) the “realized average APY”; Morpho's API states it compounded.",
   },
   sgho: {
     explorer: "aave-vaults",
     venue: "aave-v3",
     label: "Savings GHO",
     singular: "Savings GHO",
+    kind: "Savings GHO",
     census: "sgho",
     served: null,
+    yieldDocsWord:
+      "Aave's docs state Savings GHO's rate as a “fixed APR”; this figure is the share price's realised growth at that rate.",
   },
   stata: {
     explorer: "aave-vaults",
     venue: "aave-v3",
     label: "Static aTokens",
     singular: "Static aToken",
+    kind: "Static aToken",
     census: "stata",
     served: null,
   },
@@ -74,22 +95,29 @@ export const VAULT_FAMILIES: Record<VaultFamily, VaultFamilyEntry> = {
     venue: "aave-v3",
     label: "Umbrella stake tokens",
     singular: "Umbrella stake token",
+    kind: "Umbrella stake token",
     census: "umbrella-stake",
     served: null,
+    assetGrows: true,
   },
   "yearn-v3": {
     explorer: "yearn",
     venue: "yearn",
     label: "Yearn V3",
     singular: "Yearn V3 vault",
-    census: null,
+    kind: "Allocator vault",
+    census: "yearn-v3",
     served: "yearn-v3",
+    yieldDocsWord:
+      "Yearn's docs call the nearest figure the “Monthly APY”, from the share price's change over 30 days; the docs' figure compounds.",
+    sharePriceDocsWord: "Yearn's contract also answers it as pricePerShare.",
   },
   "maple-pool": {
     explorer: "maple",
     venue: "maple",
     label: "Maple pools",
     singular: "Maple pool",
+    kind: "Credit pool",
     census: null,
     served: null,
   },

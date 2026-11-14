@@ -105,7 +105,7 @@ placeholders:
   liquidity:
     rounding: usd
     means: |-
-      the borrowing room the Comptroller still leaves
+      the account liquidity the Comptroller states, the room left to borrow
   shortfall:
     rounding: usd
     means: |-
@@ -125,11 +125,11 @@ placeholders:
   supply_apr:
     rounding: ratio_frac
     means: |-
-      the highest supply rate among the supplied markets, per year
+      the highest supply APY among the supplied markets
   rate:
     rounding: ratio_frac
     means: |-
-      the borrow rate the debt accrues at, per year
+      the borrow APY the debt accrues at
   count:
     rounding: count
     means: |-
@@ -186,14 +186,12 @@ words:
     times
   # T2's balance sheet (ui-jobs 330): the Risk and Limits rows, the parameter
   # rows and the words for a figure the page does not hold.
-  sheet_health: |-
-    Health factor
   sheet_fall: |-
     Collateral can fall
   sheet_limit_used: |-
-    Borrowing limit used
+    Borrow limit used
   sheet_borrowable: |-
-    Still borrowable
+    Account liquidity
   sheet_collateral_factor: |-
     {market_symbol} collateral factor
   sheet_unread: |-
@@ -233,16 +231,14 @@ words:
     The assets this account once borrowed and owes none of after this event.
   tip_debt_total: |-
     The debt's total in dollars after this transaction: each market's accountBorrows at Compound's latest oracle price by this event. Where the side holds one market, its amount stands beside the dollars.
-  tip_health: |-
-    The Comptroller's health factor after this event: each entered market's collateral times its collateral factor, over the debt; at 1 or below the account can be liquidated.
   tip_fall: |-
-    How far the collateral's total value can fall, the debt's value held, before the health factor reaches 1: one less one over the health factor.
+    How far the collateral's total value can fall, the debt's value held, before the account liquidity reaches zero: one less the debt over the borrow limit.
   tip_limit_used: |-
-    The debt as a share of the borrowing limit, each entered market's collateral times its collateral factor; the same factor sets the liquidation line, so Compound liquidates at 100%.
+    The debt as a share of the borrow limit, each entered market's collateral times its collateral factor; the same factor sets the liquidation line, so Compound liquidates at 100%.
   tip_borrowable: |-
-    What the account could still borrow in dollars after this event: the borrowing limit less the debt, as the Comptroller's getAccountLiquidity states it.
+    The room left to borrow, in dollars, after this event: the borrow limit less the debt, as the Comptroller's getAccountLiquidity states it.
   tip_collateral_factor: |-
-    The share of the {market_symbol} supplied that counts toward the borrowing limit, set by governance in the Comptroller's markets() for the market.
+    The share of the {market_symbol} supplied that counts toward the borrow limit, set by governance in the Comptroller's markets() for the market.
   # The timeline head (rails-ops decision 0045, TO-DO-ui-jobs 367): the kind
   # as a past participle, then at most one clause for what the spine cannot
   # show, after the middle dot. Read through COMPOUND_V2_HEAD_WORDS
@@ -284,7 +280,7 @@ words:
 
 # ── The position card's explanation (zone Z1): an unheaded lead, then bullets
 # under Holdings, Risk, Rate and History when two of them hold two or more
-# bullets. Risk holds at most four: the borrowing room or shortfall, the debt
+# bullets. Risk holds at most four: the account liquidity or shortfall, the debt
 # against the liquidation line, the fall to liquidation, and a deprecated
 # borrow. Read by positionWords / positionNodes
 # (lib/compound-v2/event-templates.ts). ──
@@ -319,7 +315,7 @@ position_words:
   disabled: |-
     The {disabled_syms} market is entered, but its collateral factor is zero, so it backs nothing.
   liquidity: |-
-    Compound's risk check shows {liquidity} of borrowing room still unused.
+    Compound's risk check shows {liquidity} of account liquidity, the room left to borrow.
   shortfall: |-
     Compound's risk check shows a {shortfall} shortfall: the account is liquidatable now.
   idle_room: |-
@@ -337,11 +333,11 @@ position_words:
   earns_nothing: |-
     The supply earns nothing now.
   earns_rate: |-
-    The supplied markets earn their supply rates, up to {supply_apr} APR.
+    The supplied markets earn their supply APYs, up to {supply_apr}.
   borrow_rate: |-
-    The debt accrues at a {rate} borrow rate.
+    The debt accrues at a {rate} borrow APY.
   borrow_rate_avg: |-
-    The debt accrues at an average {rate} borrow rate.
+    The debt accrues at an average {rate} borrow APY.
   liquidated_open: |-
     The account has been liquidated {count} {time_word} and is still open.
   operators: |-
@@ -797,7 +793,7 @@ L5:
         text: |-
           supplying alone does not make a deposit collateral; the wallet enters the market in a separate call.
       - bold: |-
-          Cross-collateralisation
+          Cross-collateralization
         text: |-
           the Comptroller, Compound's risk contract, pools every entered market into one account, each weighted by its collateral factor.
       - bold: |-
@@ -830,7 +826,7 @@ L5:
       - bold: |-
           Effect on liquidity
         text: |-
-          withdrawing removes collateral, so the account's borrowing room falls; the market blocks a withdrawal that would leave debt uncovered.
+          withdrawing removes collateral, so the account liquidity falls; the market blocks a withdrawal that would leave debt uncovered.
       - bold: |-
           Entered markets only
         text: |-
@@ -878,7 +874,7 @@ L5:
     title: |-
       How repaying works
     intro: |-
-      Repaying returns borrowed assets to the market, clearing debt and restoring the account's borrowing room.
+      Repaying returns borrowed assets to the market, clearing debt and restoring the account liquidity.
     detailsHeading: |-
       Key concepts:
     details:
@@ -889,7 +885,7 @@ L5:
       - bold: |-
           Account liquidity
         text: |-
-          the borrow limit minus the debt; repaying lowers the debt, so the room to borrow grows.
+          the borrow limit minus the debt; repaying lowers the debt, so the account liquidity grows.
       - bold: |-
           The emitted debt figure
         text: |-
@@ -976,11 +972,17 @@ L5:
       - bold: |-
           Liquidation incentive
         text: |-
-          the liquidator seizes cTokens worth the repaid debt plus the 8% incentive, in a collateral market it chooses.
+          the liquidator seizes cTokens worth 1.08× the repaid debt, 8% extra, in a collateral market it chooses.
       - bold: |-
           The protocol's share
         text: |-
-          most markets keep 2.8% of the seized cTokens for the protocol, and a few take none.
+          most markets keep 2.8% of the seized cTokens for the protocol, and a few take none; seizures from before the share was added took none.
+        text_share: |-
+          this collateral market keeps 2.8% of the seized cTokens for the protocol, so the liquidator's part is worth about 1.05× the repaid debt.
+        text_no_share: |-
+          this collateral market takes no protocol share, so the liquidator receives every seized cToken.
+        text_none_taken: |-
+          no protocol share was taken from this seizure, so the liquidator received every seized cToken.
       - bold: |-
           Deprecated markets
         text: |-
@@ -1014,6 +1016,8 @@ L5:
           the seized total is the liquidator's part plus the protocol's 2.8% share, so the liquidator's part alone understates the loss.
         text_no_share: |-
           this market takes no protocol share, so the liquidator receives every seized cToken.
+        text_none_taken: |-
+          no protocol share was taken from this seizure, so the liquidator received every seized cToken.
       - bold: |-
           Receipt tokens move
         text: |-
@@ -1034,14 +1038,14 @@ L5:
     title: |-
       How seized collateral arrives
     intro: |-
-      A liquidator receives these cTokens for repaying part of a liquidatable account's debt. They are its side of a seizure, worth the repaid debt plus the liquidation incentive.
+      A liquidator receives these cTokens for repaying part of a liquidatable account's debt. They are its side of a seizure, worth the repaid debt times the liquidation incentive, less any protocol share.
     detailsHeading: |-
       Key concepts:
     details:
       - bold: |-
           One seizure, two parts
         text: |-
-          the seized total is the liquidator's part plus the protocol's 2.8% share, so the liquidator's part alone understates the loss.
+          in a market with the protocol's share, 2.8% of the seized total goes to the protocol; older seizures paid none.
         text_no_share: |-
           this market takes no protocol share, so the liquidator receives every seized cToken.
       - bold: |-
@@ -1121,7 +1125,7 @@ L5:
     title: |-
       About this position
     intro: |-
-      This panel explains the account in plain words. It covers what is supplied in each Compound V2 market, what is borrowed against it, and the borrowing room the Comptroller leaves.
+      This panel explains the account in plain words. It covers what is supplied in each Compound V2 market, what is borrowed against it, and the account liquidity the Comptroller states.
     detailsHeading: |-
       Key concepts:
     details:

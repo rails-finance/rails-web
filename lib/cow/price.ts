@@ -1,0 +1,48 @@
+// A CoW trade's executed price in the docs' form: "after deducting fees from
+// the amount sold" (docs.cow.fi, CoW Explorer, "By order"). A Trade log's
+// sellAmount includes its feeAmount (read on chain, rails-ops
+// reference/official-docs/cow.md, "Read on chain"), so the price runs on
+// sellAmount − feeAmount.
+
+import { shiftDecimal } from "../utils/format";
+
+/** The sold amount less the fee, as a raw integer string; null when the fee
+ *  is not below the sold amount. */
+export function soldLessFee(sellAmount: string, feeAmount: string): string | null {
+  const net = BigInt(sellAmount) - BigInt(feeAmount);
+  return net > BigInt(0) ? net.toString() : null;
+}
+
+/** Why a trade has no executed price, where the reason is the amounts: the
+ *  fee is not below the sold amount, or an amount scales to zero at its
+ *  token's decimals. Null otherwise (decimals are the caller's own reason). */
+export function executedPriceNone(
+  trade: { sellAmount: string; buyAmount: string; feeAmount: string },
+  sellDecimals: number | null,
+  buyDecimals: number | null,
+): string | null {
+  if (sellDecimals == null || buyDecimals == null) return null;
+  const soldNet = soldLessFee(trade.sellAmount, trade.feeAmount);
+  if (soldNet == null || Number(shiftDecimal(soldNet, sellDecimals)) === 0) return "no amount sold after the fee";
+  if (Number(shiftDecimal(trade.buyAmount, buyDecimals)) === 0) return "no amount bought";
+  return null;
+}
+
+/** The executed price both ways round, each amount scaled by its token's
+ *  decimals: bought per unit sold and sold per unit bought, the sold side
+ *  less the fee. Null when a side's decimals are not read or an amount is 0. */
+export function executedRatio(
+  sellAmount: string,
+  buyAmount: string,
+  feeAmount: string,
+  sellDecimals: number | null,
+  buyDecimals: number | null,
+): { perSell: number; perBuy: number; soldNet: string } | null {
+  if (sellDecimals == null || buyDecimals == null) return null;
+  const soldNet = soldLessFee(sellAmount, feeAmount);
+  if (soldNet == null) return null;
+  const s = Number(shiftDecimal(soldNet, sellDecimals));
+  const b = Number(shiftDecimal(buyAmount, buyDecimals));
+  if (s === 0 || b === 0) return null;
+  return { perSell: b / s, perBuy: s / b, soldNet };
+}

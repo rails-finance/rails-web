@@ -220,7 +220,8 @@ export function aaveV4FocusEvents(
 }
 
 /** Aave V3's buckets under the V4 timeline's event names (its liquidation
- *  row reads "Liquidation"). */
+ *  row reads "Liquidation"); the supply bucket keeps Aave V3's "Supplied",
+ *  the V4 docs' word too (ui-jobs 627). */
 const AAVE_V4_FLOW_BUCKETS: FlowBucket[] = AAVE_V3_FLOW_BUCKETS.map((b) =>
   b.event === "Liquidated" ? { ...b, event: "Liquidation" } : b,
 );

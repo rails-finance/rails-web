@@ -23,6 +23,7 @@ import type { PositionCardExports } from "@/components/shared/position-card";
 import type { LiquityTroveSurplus } from "@/components/protocol/liquity-family/types";
 import { troveWords } from "@/lib/liquity/event-templates";
 import { TroveSummaryStack } from "@/components/trove/TroveSummaryStack";
+import type { BranchShutdownState } from "@/lib/liquity-fork/shutdown";
 import { LifetimeFlowsPanel, type FlowsRead } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import {
@@ -38,7 +39,7 @@ import {
   type FlowFocusValue,
 } from "@/components/shared/flow-focus-context";
 import { troveLives } from "@/lib/shared/liquity-flows-explanation";
-import { computeLiquityEconomics } from "@/lib/liquity/economics";
+import { computeLiquityEconomics, liquityAccrualNow } from "@/lib/liquity/economics";
 import { LiquityFlowsExplanation } from "@/lib/liquity/economics-explanation";
 import { liquityLifetimeFlowsContent } from "@/lib/shared/learn-more-content";
 import { CollSurplusClaimCard } from "@/components/protocol/liquity-family/coll-surplus-claim-card";
@@ -71,6 +72,7 @@ export function useTroveFlows({
   open,
   price,
   liveState,
+  shutdownAt = null,
 }: {
   flowEvents: LiquityFlowEvent[];
   collSymbol: string;
@@ -81,6 +83,9 @@ export function useTroveFlows({
   open: boolean;
   price: number | undefined;
   liveState: TroveStateData | undefined;
+  /** Unix seconds the branch shut down (ui-jobs 612): interest and the
+   *  liquidation level stop there. */
+  shutdownAt?: number | null;
 }): { flowTimeline: FlowTimeline | null; flowFocus: FlowFocusValue } {
   const flowTimeline = useMemo(
     () =>
@@ -92,6 +97,7 @@ export function useTroveFlows({
             surplusClaimed,
             now,
             dailyColl: daily.obs,
+            shutdownAt,
             priceView: { collateralType: collSymbol },
             live: open
               ? {
@@ -108,7 +114,19 @@ export function useTroveFlows({
                 }
               : null,
           }),
-    [flowEvents, collSymbol, debtSymbol, surplusClaimed, now, open, price, liveState, daily.settled, daily.obs],
+    [
+      flowEvents,
+      collSymbol,
+      debtSymbol,
+      surplusClaimed,
+      now,
+      open,
+      price,
+      liveState,
+      daily.settled,
+      daily.obs,
+      shutdownAt,
+    ],
   );
   // The panel and the timeline are tied by the day: "Sync to chart",
   // each day's mark, and each card's sum as of its event, read from the same
@@ -128,8 +146,12 @@ export interface TroveBodyProps {
   debtInFront: number | null;
   trovesAhead: number | null;
   queueDebtTotal?: number | null;
+  /** The dormant Trove is the branch's lastZombieTroveId; null where unread. */
+  redeemedFirst?: boolean | null;
   debtInFrontLoading: boolean;
   surplus?: LiquityTroveSurplus | null;
+  /** The branch's shutdown (ui-jobs 612); none on the home page. */
+  shutdown?: BranchShutdownState | null;
   /** The card ⋮'s export shapes; null draws the ⋮ with the identity rows and
    *  the provenance row only. */
   exports: PositionCardExports | null;
@@ -175,8 +197,10 @@ export function TroveBody({
   debtInFront,
   trovesAhead,
   queueDebtTotal,
+  redeemedFirst,
   debtInFrontLoading,
   surplus,
+  shutdown,
   exports,
   loadingMessage,
   topRow,
@@ -231,11 +255,14 @@ export function TroveBody({
     [chronoIndex, chrono],
   );
 
+  // One clock for the debt, interest and cost figures: a shut-down branch's
+  // accrual stops at the shutdown (ui-jobs 626).
+  const accrualNow = liquityAccrualNow(now, shutdown?.at);
   const economics = computeLiquityEconomics(economicsEvents, {
     currentPrice,
     collateralType: trove.collateralType,
     surplusClaimed,
-    now,
+    now: accrualNow,
   });
 
   return (
@@ -249,9 +276,11 @@ export function TroveBody({
           debtInFront={debtInFront}
           trovesAhead={trovesAhead}
           queueDebtTotal={queueDebtTotal}
+          redeemedFirst={redeemedFirst}
           debtInFrontLoading={debtInFrontLoading}
           viewHref={tl.viewHref}
           surplus={surplus}
+          shutdown={shutdown}
           exports={exports}
           loadingStatus={{ message: loadingMessage, snapshotDate: lastEventTs ?? undefined }}
         />
@@ -268,7 +297,8 @@ export function TroveBody({
               <LiquityFlowsExplanation
                 economics={economics.economics}
                 meta={economics.economics._meta}
-                now={now}
+                now={accrualNow}
+                shutDown={shutdown != null}
                 currentPrice={currentPrice}
                 surplusClaimed={surplusClaimed}
                 unpriced={unpricedEvents(flowEvents)}

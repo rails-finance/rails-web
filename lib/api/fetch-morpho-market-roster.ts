@@ -29,6 +29,9 @@ export interface MorphoMarketRosterEntry {
   loanSymbol: string;
   /** null on an idle / supply-only market, which has no collateral side. */
   collateralSymbol: string | null;
+  /** The sides' token addresses, lowercased (Focus matches a side by address). */
+  loanToken?: string;
+  collateralToken?: string | null;
   /** Liquidation LTV as a 0..1 fraction. */
   lltvFraction: number;
   /** Positions indexed in this market, of any status. */

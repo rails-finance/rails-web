@@ -311,8 +311,8 @@ for (const spec of SPECIMENS) {
 // The head carries the kind and the delegate clause, the widest it gets
 // (decision 0045 moved the deltas and the rate pill to the spine). The widths are
 // chosen around the 640px (sm) hand-off that `lib/shared/header-values.ts`
-// governs: with the default-on "Timeline values" preference, header amounts
-// hide at ≥sm so the SpineColumn can carry them. So the CROWDED case is just
+// governs: header amounts hide at ≥sm so the SpineColumn can carry
+// them. So the CROWDED case is just
 // BELOW 640, where the deltas are still inline AND the chip is present — the
 // wide case is lighter, not heavier. 600px is therefore the real stress test
 // and 640px the control; the assertions below prove the two differ, so a green

@@ -409,8 +409,8 @@ export const NO_APP_DIR = new Set(["liquity-fork"]);
 // View components that live outside components/protocol/<proto>/ because a
 // family shares them.
 export const SHARED_VIEW_COMPONENTS = {
-  "aave-v3": ["components/shared/aave-market-views.tsx"],
-  spark: ["components/shared/aave-market-views.tsx"],
+  "aave-v3": ["components/shared/aave-reserve-parts.tsx", "lib/aave-family/product.tsx", "lib/aave-family/reserve.tsx"],
+  spark: ["components/shared/aave-reserve-parts.tsx", "lib/aave-family/product.tsx", "lib/aave-family/reserve.tsx"],
 };
 // The hoist escape hatch: files whose CODE legitimately carries a banned
 // identifier (maple-pools-view reads the pools' totalAssets field) keep their

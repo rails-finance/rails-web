@@ -17,10 +17,10 @@
 // cross-check. No risk color on the figures — the numbers carry the meaning.
 //
 // ⇒ LIQUIDATABLE OUTRANKS IT. When health(user, true) reads below 0, anyone
-// may liquidate the position now, whatever the AMM has converted: the panel's
-// Liquidatable row says so in CRITICAL red (color-grammar.md: the line is the
-// protocol's, so the colour is a claim of fact), and a listing row, which has
-// no panel, says it in its pill.
+// may liquidate the position now, whatever the AMM has converted: the line
+// under the Health headline says so in CRITICAL red (color-grammar.md: the
+// line is the protocol's, so the colour is a claim of fact), and a listing
+// row, which has no health, says it in its pill.
 //
 // ⚠️ USD only where the borrowed token IS crvUSD (~$1): debt is already in
 // crvUSD, collateral through the AMM's own price_oracle. The handful of
@@ -46,7 +46,12 @@ import { WalletPill } from "@/components/shared/wallet-pill";
 import { formatUnitsExact, formatUsdValue } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
 import { serverReadOf, type ServerRead } from "@/lib/shared/server-head-read";
-import { positionStateProv, positionIndexProv, llamalendUsdProv } from "@/lib/llamalend/event-provenance";
+import {
+  positionStateProv,
+  positionIndexProv,
+  positionClosedCollateralProv,
+  llamalendUsdProv,
+} from "@/lib/llamalend/event-provenance";
 import { llamalendPositionContent } from "@/lib/llamalend/position-content";
 import { type LlamalendFactoryKind, type LlamalendVersion } from "@/lib/llamalend/asset-catalog";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
@@ -231,8 +236,8 @@ export function useLlamalendCardSlots({
   const open = v.status === "open";
 
   // What the position is doing NOW, neutral unless anyone may liquidate it. A
-  // detail card names Liquidatable in its panel; a listing row has none, so its
-  // pill says it.
+  // detail card says it under its Health headline; a listing row has none, so
+  // its pill says it.
   const liquidatable = open && v.liquidatable === true && v.healthFull != null;
   const status: PositionCardStatus | null =
     v.status === "liquidated"
@@ -269,23 +274,34 @@ export function useLlamalendCardSlots({
       {
         id: "final-collateral",
         label: CARD_VOCAB.finalCollateral,
-        value: (
-          <AssetAmount
-            value={v.collateral ?? 0}
-            symbol={v.collateralSymbol}
-            exact={v.collateralRaw != null ? formatUnitsExact(v.collateralRaw, v.collateralDecimals) : "0"}
-          />
-        ),
+        // An unstated collateral (the sentinel) shows 0 by the rule above,
+        // and its receipt says so.
+        value:
+          v.collateral != null ? (
+            <Prov info={stateProv(v, v.collateralSymbol, "collateral")}>
+              <AssetAmount
+                value={v.collateral}
+                symbol={v.collateralSymbol}
+                exact={v.collateralRaw != null ? formatUnitsExact(v.collateralRaw, v.collateralDecimals) : undefined}
+              />
+            </Prov>
+          ) : (
+            <Prov info={positionClosedCollateralProv(v.collateralSymbol, v.controller)}>
+              <AssetAmount value={0} symbol={v.collateralSymbol} exact="0" />
+            </Prov>
+          ),
       },
       {
         id: "final-debt",
         label: CARD_VOCAB.finalDebt,
         value: (
-          <AssetAmount
-            value={v.debt}
-            symbol={v.borrowedSymbol}
-            exact={formatUnitsExact(v.debtRaw, v.borrowedDecimals)}
-          />
+          <Prov info={stateProv(v, v.borrowedSymbol, "debt")}>
+            <AssetAmount
+              value={v.debt}
+              symbol={v.borrowedSymbol}
+              exact={formatUnitsExact(v.debtRaw, v.borrowedDecimals)}
+            />
+          </Prov>
         ),
       },
     ];

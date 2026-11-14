@@ -67,7 +67,7 @@ export function expandIndex(w: SearchIndexWire): SearchIndex {
   };
 }
 
-export type SuggestionKind = "Wallet" | "Bookmark" | "Explorer" | "Vault" | "Token";
+export type SuggestionKind = "Wallet" | "Bookmark" | "Chain" | "Explorer" | "Vault" | "Token";
 
 export interface Suggestion {
   /** Stable within one list: the row's DOM id is formed from it. */
@@ -81,6 +81,11 @@ export interface Suggestion {
   href?: string;
   address?: string;
   ens?: string;
+  /** A token row's symbol, as the index carries it (the AIM button maps it to
+   *  the chooser's tokens, components/shared/aim-search-button.tsx). */
+  symbol?: string;
+  /** A chain row's chain name, as the index carries it (the Focus button maps it to the chain). */
+  chain?: string;
 }
 
 /** A bookmark as the matcher needs it. */
@@ -90,6 +95,17 @@ export interface SuggestBookmark {
   label: string | null;
   /** Every name the bookmark answers to: its custom name and each ENS name. */
   names?: readonly string[];
+}
+
+/** What Focus mode (ui-jobs 557) lets through, while it is on: the rows that
+ *  name a chain or an asset show only where they are in focus. Wallets and
+ *  bookmarks stay. */
+export interface SuggestScope {
+  /** A chain, by the index's name for it. */
+  chain: (name: string) => boolean;
+  token: (symbol: string) => boolean;
+  vault: (v: SearchVault) => boolean;
+  explorer: (href: string) => boolean;
 }
 
 export const SUGGESTION_LIMIT = 8;
@@ -145,6 +161,7 @@ export function suggest(
   index: SearchIndex | null,
   bookmarks: readonly SuggestBookmark[],
   ens?: string | null | "unreachable",
+  scope?: SuggestScope | null,
 ): Suggestion[] {
   const typed = raw.trim();
   const q = typed.toLowerCase();
@@ -154,7 +171,7 @@ export function suggest(
   // 1. The exact identifier: a full address (a vault in the index first), or
   //    a complete ENS name.
   if (ADDRESS_RE.test(typed)) {
-    for (const v of index?.vaults ?? []) if (v[5] === q) rows.push(vaultRow(v));
+    for (const v of index?.vaults ?? []) if (v[5] === q && (!scope || scope.vault(v))) rows.push(vaultRow(v));
     const marked = bookmarks.find((b) => b.address === q);
     rows.push(
       marked
@@ -208,19 +225,41 @@ export function suggest(
   //    a vault the census shows empty follows every funded match.
   if (index && q.length >= 2) {
     const named: { row: Suggestion; tier: number; kind: number; order: number; empty?: boolean }[] = [];
+    // A chain, from the explorers' chains: its row goes to its coverage page
+    // and carries the Focus button (components/shared/aim-search-button.tsx).
+    const chainCount = new Map<string, number>();
+    for (const [, chain] of index.explorers) chainCount.set(chain, (chainCount.get(chain) ?? 0) + 1);
+    [...chainCount].forEach(([chain, count], i) => {
+      const tier = matchTier(chain, q);
+      if (tier >= 3 && (!scope || scope.chain(chain)))
+        named.push({
+          row: {
+            key: `c:${chain}`,
+            kind: "Chain",
+            name: chain,
+            detail: `${count} explorer${count === 1 ? "" : "s"}`,
+            chain,
+            href: `/coverage/${chain.toLowerCase()}`,
+          },
+          tier,
+          kind: -1,
+          order: i,
+        });
+    });
     index.explorers.forEach(([name, chain, href], i) => {
       const tier = Math.max(matchTier(name, q), matchTier(`${name} ${chain}`, q));
-      if (tier > 0)
+      if (tier > 0 && (!scope || scope.explorer(href)))
         named.push({ row: { key: `x:${href}`, kind: "Explorer", name, detail: chain, href }, tier, kind: 0, order: i });
     });
     index.tokens.forEach(([symbol], i) => {
       const tier = matchTier(symbol, q);
-      if (tier >= 3)
+      if (tier >= 3 && (!scope || scope.token(symbol)))
         named.push({
           row: {
             key: `t:${symbol}`,
             kind: "Token",
             name: `${symbol} vaults`,
+            symbol,
             href: `/vaults?asset=${encodeURIComponent(symbol)}`,
           },
           tier,
@@ -242,7 +281,8 @@ export function suggest(
         Math.min(matchTier(v[3], q), 1),
         addressPrefix && v[5].startsWith(q) ? 1 : 0,
       );
-      if (tier > 0) named.push({ row: vaultRow(v), tier, kind: 2, order: i, empty: i >= index.emptyFrom });
+      if (tier > 0 && (!scope || scope.vault(v)))
+        named.push({ row: vaultRow(v), tier, kind: 2, order: i, empty: i >= index.emptyFrom });
     });
     named.sort(
       (a, b) => Number(!!a.empty) - Number(!!b.empty) || b.tier - a.tier || a.kind - b.kind || a.order - b.order,

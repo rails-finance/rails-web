@@ -49,7 +49,7 @@ import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
 import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { resolveErc20Meta, assertDecimalsRead } from "./erc20-meta";
 import { legInput, readBorrowRates, readNeedsBorrowRate, readRatesAtTarget } from "./metamorpho-illiquid";
-import { needsRateAtTarget, vaultIlliquid, type IlliquidLegInput, type VaultIlliquid } from "@/lib/vaults/illiquid";
+import { needsRateAtTarget, vaultIlliquid, type IlliquidLegInput, type VaultLiquidity } from "@/lib/vaults/illiquid";
 import { MORPHO_BASE_BLUE, MORPHO_BASE_CHAIN_ID } from "@/lib/morpho-base/asset-catalog";
 import { type MorphoBaseVaultCatalogEntry, type MorphoBaseVaultFactory } from "@/lib/morpho-base/vault-catalog";
 import {
@@ -319,9 +319,9 @@ export interface MorphoBaseVaultResponse {
   gap: RawAmount;
 
   legs: MorphoBaseVaultLeg[];
-  /** The illiquid test at `blockNumber` (lib/vaults/illiquid.ts): null where
-   *  the vault is not caught, absent where it was not tested. */
-  illiquid?: VaultIlliquid | null;
+  /** What can leave the vault at `blockNumber`, and the illiquid test's caught
+   *  markets (lib/vaults/illiquid.ts); absent where it was not tested. */
+  liquidity?: VaultLiquidity;
   holder: MorphoBaseVaultHolder | null;
 }
 
@@ -566,7 +566,8 @@ export async function loadMorphoBaseVault(
     })) as Call[];
     const at = (name: (typeof scalars)[number]) => ok(head[scalars.indexOf(name)]);
 
-    const name = at("name") as string | undefined;
+    // Trimmed for display (ui-jobs 664: one vault's name() starts with a space).
+    const name = (at("name") as string | undefined)?.trim();
     const assetAddress = (at("asset") as string | undefined)?.toLowerCase();
     const totalAssetsRaw = at("totalAssets") as bigint | undefined;
     const totalSupplyRaw = at("totalSupply") as bigint | undefined;
@@ -732,7 +733,7 @@ export async function loadMorphoBaseVault(
     // each market accrued to it and each hot market's rate at target:
     // lib/vaults/illiquid.ts. A queue with a leg unread, or a rate that did
     // not answer, is left untested.
-    let illiquid: VaultIlliquid | null | undefined;
+    let liquidity: VaultLiquidity | undefined;
     try {
       const reads = ids.map((id, i) => ({
         id,
@@ -762,12 +763,13 @@ export async function loadMorphoBaseVault(
         const hot = inputs.filter((l) => needsRateAtTarget(chainId, l));
         const rates = hot.length > 0 ? await readRatesAtTarget(client, blockNumber, hot) : new Map<string, bigint>();
         if (inputs.length === accrued.length && hot.every((l) => rates.has(l.id)))
-          illiquid = vaultIlliquid(
-            chainId,
-            Number(blockNumber),
-            timestamp,
-            inputs.map((l) => ({ ...l, rateAtTarget: rates.get(l.id) ?? null })),
-          );
+          liquidity =
+            vaultIlliquid(
+              chainId,
+              Number(blockNumber),
+              timestamp,
+              inputs.map((l) => ({ ...l, rateAtTarget: rates.get(l.id) ?? null })),
+            ) ?? undefined;
       }
     } catch (error) {
       console.error(`Morpho vault ${vaultAddress}: the illiquid read failed:`, error);
@@ -838,7 +840,7 @@ export async function loadMorphoBaseVault(
       allocated: amount(allocatedRaw, assetDecimals),
       gap: amount(totalAssetsRaw - allocatedRaw, assetDecimals),
       legs,
-      ...(illiquid !== undefined ? { illiquid } : {}),
+      ...(liquidity ? { liquidity } : {}),
       holder:
         holderShares == null || holderAddress == null
           ? null
@@ -897,4 +899,77 @@ export async function loadMorphoBaseHolderShape(
     assetIsVaultShares: false,
     assetIsVaultAsset: false,
   };
+}
+
+/** The markets in each vault's withdraw queue, and each market's params, read
+ *  at one head block: the reads `loadMorphoBaseVault` makes for its legs,
+ *  batched across vaults (rails-ops ui-jobs 554, the steward's bad-debt
+ *  episodes). A vault that does not answer `withdrawQueueLength` is left out of
+ *  `queues`. Ids lowercased, 0x-prefixed; `lltv` raw at 1e18. */
+export interface MetaMorphoWithdrawQueues {
+  blockNumber: number;
+  queues: Record<string, string[]>;
+  params: Record<string, { loanToken: string; collateralToken: string; oracle: string; irm: string; lltv: string }>;
+}
+
+export async function readMetaMorphoWithdrawQueues(
+  chainId: MetaMorphoChainId,
+  vaults: string[],
+): Promise<MetaMorphoWithdrawQueues> {
+  const client = vaultHeadClient(chainId);
+  const blockNumber = await client.getBlockNumber();
+  const addrs = vaults.map((v) => v.toLowerCase() as `0x${string}`);
+  const lengths = (await client.multicall({
+    contracts: addrs.map((address) => ({ address, abi: VAULT_ABI, functionName: "withdrawQueueLength" as const })),
+    allowFailure: true,
+    blockNumber,
+  })) as Call[];
+  const slots: { vault: string; i: number }[] = [];
+  addrs.forEach((vault, k) => {
+    const len = ok(lengths[k]) as bigint | undefined;
+    for (let i = 0; len != null && i < Number(len); i++) slots.push({ vault, i });
+  });
+  const entries = (await client.multicall({
+    contracts: slots.map((s) => ({
+      address: s.vault as `0x${string}`,
+      abi: VAULT_ABI,
+      functionName: "withdrawQueue" as const,
+      args: [BigInt(s.i)],
+    })),
+    allowFailure: true,
+    blockNumber,
+  })) as Call[];
+  const queues: Record<string, string[]> = {};
+  addrs.forEach((vault, k) => {
+    if (ok(lengths[k]) != null) queues[vault] = [];
+  });
+  slots.forEach((s, k) => {
+    const id = ok(entries[k]) as string | undefined;
+    if (typeof id === "string") queues[s.vault].push(id.toLowerCase());
+  });
+  const ids = [...new Set(Object.values(queues).flat())];
+  const blue = MORPHO_BASE_BLUE as `0x${string}`;
+  const reads = (await client.multicall({
+    contracts: ids.map((id) => ({
+      address: blue,
+      abi: BLUE_ABI,
+      functionName: "idToMarketParams" as const,
+      args: [id as `0x${string}`],
+    })),
+    allowFailure: true,
+    blockNumber,
+  })) as Call[];
+  const params: MetaMorphoWithdrawQueues["params"] = {};
+  ids.forEach((id, k) => {
+    const p = ok(reads[k]) as MarketParamsTuple | undefined;
+    if (p)
+      params[id] = {
+        loanToken: p[0].toLowerCase(),
+        collateralToken: p[1].toLowerCase(),
+        oracle: p[2].toLowerCase(),
+        irm: p[3].toLowerCase(),
+        lltv: String(p[4]),
+      };
+  });
+  return { blockNumber: Number(blockNumber), queues, params };
 }

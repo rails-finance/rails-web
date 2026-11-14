@@ -1,6 +1,5 @@
-// The saved wallets' name (Miles, 4 Nov 2026; rails-ops ui-jobs 492): the
-// profile menu's wallets label (H20) and the wallet panel's foot link (H16).
-// The page that holds every saved kind is SAVED_NAME (ui-jobs 521, 530): the
-// tab title and B1's h1. The URL stays /bookmarks.
-export const BOOKMARKS_NAME = "Saved wallets";
-export const SAVED_NAME = "Saved";
+// The name of the page that holds every saved kind (ui-jobs 492, 521, 530,
+// 652): the tab title, B1's h1 and the profile menu's row to it. Its path is
+// `SAVED_PATH`; /bookmarks redirects there (next.config.ts).
+export const SAVED_NAME = "Saved views";
+export const SAVED_PATH = "/saved-views";

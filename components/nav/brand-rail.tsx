@@ -8,7 +8,9 @@
 // from the same place. The beta pill is at the foot. A press anywhere else on
 // the rail does what the toggle does, the cursor an arrow pointing the way the
 // panel will move (e-resize to open, w-resize to close; Miles, 6 Nov 2026):
-// a pointer convenience, the toggle stays the keyboard's control.
+// a pointer convenience, the toggle stays the keyboard's control. Over the
+// pill the theme switch, one button that steps Light, Dark and Auto (Miles 13
+// Nov 2026, components/nav/theme-switch.tsx).
 //
 // IT IS A SURFACE, NOT A MARGIN (68): `bg-raised` is the same tone the cards
 // and panels take, so the strip reads as chrome the page sits beside rather
@@ -26,6 +28,7 @@ import Link from "next/link";
 import type { MouseEvent } from "react";
 
 import { RailsMark } from "@/components/nav/rails-mark";
+import { ThemeSwitch } from "@/components/nav/theme-switch";
 import { SearchLauncher } from "@/components/shared/front-door-search";
 import { toggleWalletPanel, useWalletPanelOpen } from "@/components/nav/wallet-panel";
 
@@ -82,9 +85,9 @@ export function BrandRail() {
           </Link>
           <SearchLauncher placement="rail" />
         </div>
-        {/* The pill flush to the left edge. The theme switch is in the
-            profile control's menu (H20, ui-jobs 504). */}
-        <div className="flex w-full flex-col items-center">
+        {/* The theme switch over the pill, the pill flush to the left edge. */}
+        <div className="flex w-full flex-col items-center gap-3">
+          <ThemeSwitch placement="rail" />
           <BetaPill />
         </div>
       </aside>

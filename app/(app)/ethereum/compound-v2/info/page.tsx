@@ -1,9 +1,17 @@
+// focus: the explorer's explainer; the shell's gate stands over the explorer
 // About this explorer — Compound V2 on Ethereum, drawn on the typed template
 // (rails-ops standards/info-page-template.md). Every link is Compound's official
 // documentation (rails-ops reference/official-docs/compound-v2.md).
 
 import Link from "next/link";
-import { GlossaryLink, ProtocolInfoPage, type InfoTerm, type InfoView } from "@/components/shared/protocol-info-page";
+import {
+  GlossaryLink,
+  ProtocolInfoPage,
+  type InfoReads,
+  type InfoTerm,
+  type InfoView,
+} from "@/components/shared/protocol-info-page";
+import { COMPTROLLER_FAMILIES } from "@/lib/comptroller/families";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
@@ -49,13 +57,13 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "Account liquidity",
     definition:
-      "Account liquidity is a wallet's borrowing room: its entered supply times each collateral factor, minus what it owes. A negative result is a shortfall, and the wallet can be liquidated.",
+      "Account liquidity is the room a wallet has left to borrow: its entered supply times each collateral factor, minus what it owes. A negative result is a shortfall, and the wallet can be liquidated.",
     sources: [{ label: "Account liquidity", href: COMPTROLLER + "/#account-liquidity" }],
   },
   {
     term: "Liquidation",
     definition:
-      "A liquidation happens to a wallet whose debt passes its borrowing limit. A liquidator repays part of the debt and takes collateral at a discount.",
+      "A liquidation happens to a wallet whose debt passes its borrow limit. A liquidator repays part of the debt and takes collateral at a discount.",
     sources: [{ label: "Liquidate borrow", href: CTOKENS + "/#liquidate-borrow" }],
   },
   {
@@ -72,7 +80,7 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "Liquidation incentive",
     definition:
-      "The liquidation incentive is the extra collateral a liquidator receives for repaying a wallet's debt. Part of that extra collateral goes to the reserves of the seized collateral's market.",
+      "The liquidation incentive is the extra collateral a liquidator receives for repaying a wallet's debt, stated as a multiple: at 1.08 the seized collateral is worth 1.08 times the debt repaid, 8% extra. Most markets keep 2.8% of the seized cTokens for their reserves.",
     sources: [{ label: "Liquidation incentive", href: COMPTROLLER + "/#liquidation-incentive" }],
   },
   {
@@ -88,6 +96,37 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
     sources: [{ label: "Price Feed", href: DOCS + "/prices/#introduction" }],
   },
 ];
+
+const CV2 = COMPTROLLER_FAMILIES["compound-v2"];
+
+/** Slot 2a: the contracts behind the markets pages. */
+const reads: InfoReads = {
+  contracts: [
+    {
+      name: "Comptroller",
+      address: CV2.comptroller,
+      reads:
+        "the list of markets, the oracle it uses, the close factor and liquidation incentive, and for each market its collateral factor, borrow cap and whether supplying or borrowing is paused.",
+    },
+    {
+      name: "Each market's cToken",
+      reads:
+        "what is supplied, borrowed and held as cash, the reserves, the supply and borrow rates, the reserve factor and which rate model the market uses.",
+    },
+    {
+      name: "Price oracle",
+      address: CV2.oracle,
+      reads:
+        "each market's price, the one the Comptroller uses for liquidations, and whether a price feed stands behind it or governance stored a fixed price.",
+    },
+    {
+      name: "Each market's rate model",
+      reads:
+        "the base rate, multiplier, kink and jump multiplier that set the borrow rate, and the blocks a year the model sets its curve with. The five oldest markets run the first model, which has no kink.",
+    },
+  ],
+  how: "The markets pages read these contracts through Rails's server at most every ten minutes, and a wallet page reads the wallet's markets at each load.",
+};
 
 const views: readonly [InfoView, ...InfoView[]] = [
   {
@@ -119,8 +158,9 @@ const views: readonly [InfoView, ...InfoView[]] = [
     heading: "Markets page",
     body: (
       <p>
-        The markets page lists every market the Comptroller holds, with how much is supplied and borrowed in each, and
-        flags the markets with a fixed price.{" "}
+        The markets page lists every market the Comptroller holds, with how much is supplied, borrowed and available in
+        each, its rates and its collateral factor, and flags the markets with a fixed price. Each market opens a page
+        with its rate curve and parameters.{" "}
         <Link href="/ethereum/compound-v2/markets" className={INLINE_LINK}>
           See every market
         </Link>
@@ -145,6 +185,7 @@ export default function InfoPage() {
         </>
       }
       glossary={glossary}
+      reads={reads}
       howItWorks={[
         <>
           Compound V2 is a pooled lending protocol. A market is a pool of one token that people supply and borrow. A
@@ -154,9 +195,9 @@ export default function InfoPage() {
         <>
           A wallet supplies a token and <GlossaryLink term="Entering a market">enters the market</GlossaryLink>, so the
           supply counts as collateral (the assets that back a loan). It can then borrow up to its{" "}
-          <GlossaryLink term="Account liquidity">account liquidity</GlossaryLink>, its borrowing room: each entered
-          supply times its <GlossaryLink term="Collateral factor">collateral factor</GlossaryLink>, minus its debt. If
-          the room turns negative, a <GlossaryLink term="Liquidator">liquidator</GlossaryLink> steps in.
+          <GlossaryLink term="Account liquidity">account liquidity</GlossaryLink>, the room it has left to borrow: each
+          entered supply times its <GlossaryLink term="Collateral factor">collateral factor</GlossaryLink>, minus its
+          debt. If the room turns negative, a <GlossaryLink term="Liquidator">liquidator</GlossaryLink> steps in.
         </>,
         <>
           Every market sits under one <GlossaryLink term="Comptroller">Comptroller</GlossaryLink>, which sets these

@@ -28,10 +28,10 @@
 //   5  a Maple row shows the Yield slot's "no daily series yet" state
 //   6  four rows' Total assets (each Morpho, Aave, Yearn, the largest each) equal
 //      the protocol roster's raw figure for the same vault at the same block
-//   7  every row links under its protocol, to a vault its roster lists; two
-//      links per protocol answer 200
+//   7  every row links under its protocol, to a vault its roster lists (a
+//      Maple pool to /ethereum/maple/pools/<key>); two links per protocol answer 200
 //   8  the rosters' heads link the index
-//   9  the index draws no receipt and offers no provenance inspector (ui-jobs 538);
+//   9  the index's rows carry receipts and the page offers the inspector (ui-jobs 571);
 //      every Total assets and Share price figure names its asset
 //  10  the default view (ui-jobs 485): the preset's rows against ?show=all,
 //      its chip, the counts line, its removal and Reset, and the table's
@@ -44,6 +44,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { checkRosterView, presetKeeps, readRosterRows } from "./lib/vault-roster-view.mjs";
+import { armInspector } from "./lib/prov-inspector.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BASE = process.env.BASE ?? "http://localhost:3033";
@@ -106,6 +107,8 @@ const ROSTER = {
   },
 };
 const KEYS = Object.keys(ROSTER);
+/** A Maple pool's catalogue key by its address: the slug of its page. */
+const MAPLE_KEY = {};
 const keyOf = (r) => `${r.protocol}:${r.chain}`;
 const LABEL = { morpho: "Morpho", aave: "Aave", yearn: "Yearn", maple: "Maple" };
 
@@ -165,6 +168,8 @@ for (const k of KEYS) {
   const src = fs.readFileSync(path.join(ROOT, "lib/maple/asset-catalog.ts"), "utf8");
   const body = src.slice(src.indexOf("export const MAPLE_POOLS"), src.indexOf("/** Pool key → catalog entry"));
   expected["maple:1"] = (body.match(/^\s+key: "/gm) || []).length;
+  // Each pool's page is /ethereum/maple/pools/<key> (ui-jobs 549 step 4).
+  for (const m of body.matchAll(/key: "([^"]+)",[\s\S]*?pool: "(0x[0-9a-f]{40})"/g)) MAPLE_KEY[m[2]] = m[1];
 }
 console.log(`rosters state: ${KEYS.map((k) => `${k} ${expected[k]}`).join(", ")}`);
 /** A protocol's rows across its rosters. */
@@ -352,20 +357,17 @@ for (const k of KEYS.filter((k) => ROSTER[k].protocol !== "maple")) {
     const R = ROSTER[keyOf(r)];
     if (!R) return true;
     if (!r.href) return true;
-    if (r.protocol === "maple") return r.href !== R.prefix;
+    if (r.protocol === "maple") return r.href !== `${R.prefix}/${MAPLE_KEY[r.address]}`;
     return r.href !== `${R.prefix}${r.address}`;
   });
   check("7a every row links to its vault under its protocol", bad.length === 0, `${bad.length} off-pattern`);
   const unlisted = rows.filter((r) => {
-    if (r.protocol === "maple") return false;
+    if (r.protocol === "maple")
+      return !(rosterPages[keyOf(r)]?.html ?? "").includes(`data-maple-pool-card="${MAPLE_KEY[r.address]}"`);
     const html = rosterPages[keyOf(r)]?.html ?? "";
     return !html.includes(`data-vault-row="${r.address}"`) && !html.includes(r.address);
   });
-  check(
-    "7b every non-Maple row is a vault its roster page lists",
-    unlisted.length === 0,
-    `${unlisted.length} unlisted`,
-  );
+  check("7b every row is a vault its roster page lists", unlisted.length === 0, `${unlisted.length} unlisted`);
   const sample = KEYS.flatMap((k) => [...new Set(byRoster[k].map((r) => r.href))].slice(0, 2));
   for (const href of sample) {
     const r = await fetch(`${BASE}${href}`, { signal: AbortSignal.timeout(300_000) });
@@ -383,14 +385,20 @@ for (const k of KEYS) {
   );
 }
 
-// ── 9: no receipts and no inspector (ui-jobs 538) ───────────────────────
+// ── 9: receipts and the inspector (ui-jobs 571, decision 0062) ──────────
+// /vaults became inspectable: each row traces its figures, and the page
+// offers the inspector. ui-jobs 538's "no receipts" no longer holds.
 {
   const receipts = await page
     .locator("[data-vault-index] .prov-locate-box, [data-vault-index] [data-prov-covered]")
     .count();
-  check("9a the index draws no receipt", receipts === 0, `${receipts} receipt spans`);
-  const tools = await page.locator("button.prov-inspect-toggle, [data-prov-tripwire]").count();
-  check("9b the page offers no provenance inspector", tools === 0, `${tools} inspector controls`);
+  check("9a the index's rows carry receipts", receipts > 0, `${receipts} receipt spans`);
+  // The profile menu's switch arms the page (ui-jobs 625); put down again
+  // after, so the checks below read the page unarmed.
+  const armed = await armInspector(page);
+  const picks = await page.locator("[data-vault-index] [data-prov-pickable]").count();
+  check("9b the profile menu's switch arms the index's rows", armed && picks > 0, `${picks} pickable values`);
+  if (armed) await page.keyboard.press("Escape");
 }
 
 // ── 9c: no figure reads unitless (decision 0028 point 8) ────────────────────
@@ -421,7 +429,6 @@ await checkRosterView({
   scope: "[data-vault-index]",
   check,
   tag: "10",
-  table: true,
 });
 
 // ── 11: a token link keeps the preset, and lifts it where it would empty ───

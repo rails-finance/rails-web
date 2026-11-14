@@ -7,19 +7,21 @@
 // LiquityForkBranchesView holds the presentation — Asymmetry renders the same
 // component off its own roster.
 
+import { LIQUITY_FAMILY_TERMS } from "@/lib/liquity/ltv";
+import { branchScopeKeys } from "@/lib/shared/asset-family";
 import {
   LiquityForkBranchesView,
   LiquityForkBranchesStamp,
 } from "@/components/protocol/liquity-fork/liquity-fork-branches-view";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { loadLiquityForkBranchesFromChain } from "@/lib/sources/chain/liquity-fork-branches";
+import { branchesPageTitle } from "@/lib/liquity-fork/shutdown";
 import type { LiquityForkConfig } from "@/lib/sources/chain/liquity-fork-position";
-import { BASEDOLLAR_BRANCHES, DEBT_SYMBOL } from "@/lib/basedollar/asset-catalog";
+import { BASEDOLLAR_BRANCHES, DEBT_ADDRESS, DEBT_SYMBOL } from "@/lib/basedollar/asset-catalog";
 import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { unlaunchedRobotsForPath } from "@/lib/shared/page-metadata";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 
 export const dynamic = "force-dynamic";
 
@@ -52,15 +54,17 @@ export default async function BasedollarBranchesPage() {
       <div className="py-8">
         <SubPageHeader
           protocol={PROTOCOL}
-          title="Branches & how redemption reaches them"
+          title={branchesPageTitle(data.branches)}
           stamp={<LiquityForkBranchesStamp data={data} />}
         />
 
         <LiquityForkBranchesView
+          scopeKeys={branchScopeKeys(8453, BASEDOLLAR_BRANCHES, DEBT_ADDRESS)}
           data={data}
           protocolName="Basedollar"
           basePath="/base/basedollar"
           learnMore={{
+            terms: LIQUITY_FAMILY_TERMS.basedollar,
             protocolName: "Basedollar",
             stablecoin: DEBT_SYMBOL,
             // The one live-verified Basedollar link (docs.basedollar.money doesn't
@@ -68,7 +72,6 @@ export default async function BasedollarBranchesPage() {
             docsLink: { label: "Basedollar", url: "https://basedollar.money" },
           }}
         />
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
         <ProvInspectorLayer />
       </div>
     </div>

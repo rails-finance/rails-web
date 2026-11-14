@@ -9,11 +9,11 @@
 // listing's first page are fetched together; the listing fixed to one market
 // needs no market roster, so none is fetched.
 
-import { cache } from "react";
+import { cache, Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { RailHeader } from "@/components/shared/rail-header";
-import { MorphoMarketView } from "@/components/protocol/morpho/morpho-market-view";
+import { MorphoMarketVaults } from "@/components/protocol/morpho/morpho-market-vaults";
+import { MorphoMarketPage as MorphoMarketShell } from "@/lib/morpho/product";
 import { loadMorphoMarketFromChain } from "@/lib/sources/chain/morpho-markets";
 import { marketViewData } from "@/lib/morpho/markets-shape";
 import { morphoMarketHref } from "@/lib/morpho/market-routes";
@@ -26,8 +26,8 @@ import {
   MORPHO_LIST_DEFAULTS,
 } from "@/lib/morpho/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { AimGate } from "@/components/shared/aim-gate";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -35,6 +35,7 @@ export const maxDuration = 30;
 
 const ADDRESS = /^0x[0-9a-f]{40}$/;
 const MARKET_ID = /^0x[0-9a-f]{64}$/;
+const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
 const load = cache((id: string) => loadMorphoMarketFromChain(id));
 
 type Params = {
@@ -48,7 +49,11 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const id = marketId.toLowerCase();
   if (!ADDRESS.test(token) || !MARKET_ID.test(id)) return { title: "Morpho Blue market" };
   const m = (await load(id))?.market;
-  const pair = m ? `${m.loanSymbol} / ${m.collateralSymbol ?? "no collateral"}` : "Morpho Blue market";
+  const pair = !m
+    ? "Morpho Blue market"
+    : m.isIdle
+      ? `${m.loanSymbol} idle market`
+      : `${m.loanSymbol} / ${m.collateralSymbol ?? "no collateral"}`;
   return {
     title: `${pair} · Morpho Blue`,
     description: `One Morpho Blue market, ${pair}: what it holds, how used, its oracle price and when that price was published, and every position in it.`,
@@ -85,31 +90,41 @@ export default async function MorphoMarketPage({ params, searchParams }: Params)
   if (!data || data.params.loanToken.toLowerCase() !== token) notFound();
   const view = marketViewData(data);
 
-  return (
-    <div className="min-h-screen">
-      <div className="pt-8">
-        <header className="mb-2">
-          <div className="mb-2.5">
-            <RailHeader session="morpho" venue="subPage" />
-          </div>
-          {view ? (
-            <MorphoMarketView data={view} chainId={MAINNET_CHAIN_ID} />
-          ) : (
-            <>
-              <h1 className="text-2xl font-semibold text-foreground">Morpho Blue market</h1>
-              <p className="mt-2 text-sm text-rb-500">This market could not be read from chain at this block.</p>
-            </>
-          )}
-        </header>
+  const pair = data.params.collateralToken === ZERO_ADDR ? "Idle market" : "Morpho Blue market";
 
-        <MorphoListing
-          {...initial}
-          initialSearch={sp.toString()}
-          market={{ id, path: morphoMarketHref(MAINNET_CHAIN_ID, token, id) }}
-        />
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
-        <ProvInspectorLayer />
-      </div>
-    </div>
+  // AIM (ui-jobs 557): the market counts where its loan or collateral token is in the set.
+  const aimKeys = [token, data.params.collateralToken.toLowerCase()]
+    .filter((a) => a !== ZERO_ADDR)
+    .map((a) => `${MAINNET_CHAIN_ID}:${a}`);
+
+  return (
+    <AimGate keys={aimKeys} chain={MAINNET_CHAIN_ID} what="This Morpho market">
+      <MorphoMarketShell
+        data={view}
+        chainId={MAINNET_CHAIN_ID}
+        pair={pair}
+        positions={{ href: "/ethereum/morpho", label: "All Morpho Blue positions" }}
+        vaults={
+          view && (
+            <Suspense fallback={null}>
+              <MorphoMarketVaults
+                chainId={MAINNET_CHAIN_ID}
+                marketId={id}
+                asset={{ symbol: view.market.loanSymbol, address: token, decimals: view.market.loanDecimals }}
+                pair={`${view.market.loanSymbol} / ${view.market.collateralSymbol ?? "no collateral"}`}
+              />
+            </Suspense>
+          )
+        }
+        listing={
+          <MorphoListing
+            {...initial}
+            initialSearch={sp.toString()}
+            market={{ id, path: morphoMarketHref(MAINNET_CHAIN_ID, token, id) }}
+          />
+        }
+      />
+      <ProvInspectorLayer />
+    </AimGate>
   );
 }

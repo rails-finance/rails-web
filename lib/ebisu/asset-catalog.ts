@@ -15,6 +15,7 @@
 
 import { chainMeta, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { ForkMcrStep } from "@/lib/shared/liquity-fork-ops";
+import type { BranchShutdownRecord, ShutdownRead } from "@/lib/liquity-fork/shutdown";
 
 export interface EbisuBranch {
   /** Lowercase branch key as stored in the MV (weeth | susde | wbtc | lbtc | stcusd). */
@@ -27,6 +28,17 @@ export interface EbisuBranch {
   collateralAddr: string;
   /** The branch's TroveManager — emits TroveUpdated / TroveOperation. */
   troveManager: string;
+  /** The branch's ActivePool: `TroveManager.borrowerOperations().activePool()`, its
+   *  `troveManagerAddress()` pointing back at `troveManager` and its `collToken()` at
+   *  `collateralAddr` (read at block 26,400,160, 12 Nov 2026). */
+  activePool: string;
+  /** Where the branch answers its shutdown (ui-jobs 612): `ActivePool.shutdownTime()`.
+   *  This fork's `TroveManager.shutdownTime()` reverts. */
+  shutdownRead: ShutdownRead;
+  /** The admin's shutdown of the branch and its withdrawal of the pools'
+   *  collateral, from the transactions (ui-jobs 608, 612): the page's default
+   *  render, which the live read confirms (decision 0054 ruling 2). */
+  shutdownRecord?: BranchShutdownRecord;
   /** The branch's EbisuBranchManager (TM storage slot 15) — holds the
    *  MCR/CCR/SCR below and runs redemptions: it emits Redemption and
    *  RedemptionFeePaidToTrove. */
@@ -65,6 +77,26 @@ export interface EbisuBranch {
   liquidationPenaltyRedist: number;
 }
 
+/** The admin Safe 0x25b85831…ed07's shutdown of all five branches: tx
+ *  0xcf1dc077…4514a, block 25,799,370, 20 Aug 2026 22:37:59 UTC; every
+ *  ActivePool's `shutdownTime()` returns its block time (ui-jobs 608). */
+const EBISU_SHUTDOWN = {
+  at: 1_787_265_479,
+  tx: "0xcf1dc077db5a5139e9b0c58ef0726882260e3d1f1c0dfb43b84deaf55894514a",
+  block: 25_799_370,
+};
+/** The admin's `withdrawCollateral()` across nine pool proxies: tx 0x66f27bc3…53b9,
+ *  block 26,238,016, 21 Oct 2026 02:35:11 UTC. Its Transfer logs: the sUSDe and stcUSD
+ *  ActivePools' whole balances to the Safe, dust from other weETH, WBTC and LBTC pools. */
+const EBISU_WITHDRAWAL = {
+  at: 1_792_550_111,
+  tx: "0x66f27bc34cf779d9fc2d0da56a80883990b166d871b41d24ba6fd77ea40f53b9",
+  block: 26_238_016,
+};
+/** From each remaining Trove's owner, read 12 Nov 2026 (ui-jobs 608): `repayBold`
+ *  and `withdrawColl` revert `IsShutDown()`, `closeTrove` underflows on the empty pool. */
+const EBISU_REVERTS = ["repayBold", "withdrawColl", "closeTrove"] as const;
+
 export const EBISU_BRANCHES: Record<string, EbisuBranch> = {
   weeth: {
     key: "weeth",
@@ -72,6 +104,17 @@ export const EBISU_BRANCHES: Record<string, EbisuBranch> = {
     decimals: 18,
     collateralAddr: "0xcd5fe23c85820f7b72d0926fc9b05b43e359b7ee",
     troveManager: "0x0eabd8c3f7b4058093c1e9b147c93b4d9f6f54d4",
+    activePool: "0x99a5a86d6e5a6f8b96d15cb71be5bace474f81a6",
+    shutdownRead: {
+      contract: "ActivePool",
+      address: "0x99a5a86d6e5a6f8b96d15cb71be5bace474f81a6",
+      call: "shutdownTime",
+    },
+    shutdownRecord: {
+      by: "admin",
+      shutdown: EBISU_SHUTDOWN,
+      withdrawal: EBISU_WITHDRAWAL,
+    },
     branchManager: "0xc0b550a3c6b81521da89562dac10f331d7d3de40",
     priceFeed: "0x36fb029e6feec43d96be2f8ccc0e572d1663f5fc",
     sortedTroves: "0xcf24189972002ecb283b453571e829249cde039c",
@@ -97,6 +140,22 @@ export const EBISU_BRANCHES: Record<string, EbisuBranch> = {
     decimals: 18,
     collateralAddr: "0x9d39a5de30e57443bff2a8307a4256c8797a3497",
     troveManager: "0xcc522ac32fa51cb234da97c4b3a0bba9f1c578ae",
+    activePool: "0x83a095a74839ad88c24e77f1e9a54baaa7ff5157",
+    shutdownRead: {
+      contract: "ActivePool",
+      address: "0x83a095a74839ad88c24e77f1e9a54baaa7ff5157",
+      call: "shutdownTime",
+    },
+    shutdownRecord: {
+      by: "admin",
+      shutdown: EBISU_SHUTDOWN,
+      withdrawal: {
+        ...EBISU_WITHDRAWAL,
+        pool: "0x83a095a74839ad88c24e77f1e9a54baaa7ff5157",
+        amount: "1987.507296796691221496",
+      },
+      reverts: EBISU_REVERTS,
+    },
     branchManager: "0x6e2c51cf113f45235f6e2bc2d9f7db195d98e895",
     priceFeed: "0x3e58fb6ffd3a568487c72a170411ebf7be6a2062",
     sortedTroves: "0x95e098daefa015349ded8e2e6e5a445aa64d67ca",
@@ -113,6 +172,17 @@ export const EBISU_BRANCHES: Record<string, EbisuBranch> = {
     decimals: 8,
     collateralAddr: "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
     troveManager: "0xee49febd1b4469cbe0d5114a95d7cf831f3c7a48",
+    activePool: "0x5c806d1f8ea290fe39642048e64b9f2ee031036f",
+    shutdownRead: {
+      contract: "ActivePool",
+      address: "0x5c806d1f8ea290fe39642048e64b9f2ee031036f",
+      call: "shutdownTime",
+    },
+    shutdownRecord: {
+      by: "admin",
+      shutdown: EBISU_SHUTDOWN,
+      withdrawal: EBISU_WITHDRAWAL,
+    },
     branchManager: "0x26507af4c68ea91d31e76f5eaaafdac73f2f5cbd",
     priceFeed: "0x83387ff1234c2525ec0eb37dfe30d005356a222b",
     sortedTroves: "0x4e5e60cd7d33b00e308504f75bb6737c14f113dd",
@@ -138,6 +208,17 @@ export const EBISU_BRANCHES: Record<string, EbisuBranch> = {
     decimals: 8,
     collateralAddr: "0x8236a87084f8b84306f72007f36f2618a5634494",
     troveManager: "0x088582f656eb5b148d575c054680255e8b11b3c7",
+    activePool: "0x89fd2c36d0134ea7c8c069e2c641f3dec95d3d73",
+    shutdownRead: {
+      contract: "ActivePool",
+      address: "0x89fd2c36d0134ea7c8c069e2c641f3dec95d3d73",
+      call: "shutdownTime",
+    },
+    shutdownRecord: {
+      by: "admin",
+      shutdown: EBISU_SHUTDOWN,
+      withdrawal: EBISU_WITHDRAWAL,
+    },
     branchManager: "0x84572792d91ba1ea1d67fe3476354de317af387e",
     priceFeed: "0x71aa4e0ae5435aa3d4724d14df91c5a26720cc4f",
     sortedTroves: "0x4fc7fc8cd3a9b6e50f1305f80e62e79488621f1e",
@@ -154,6 +235,22 @@ export const EBISU_BRANCHES: Record<string, EbisuBranch> = {
     decimals: 18,
     collateralAddr: "0x88887be419578051ff9f4eb6c858a951921d8888",
     troveManager: "0xa0911635345ea7ee6c4a50f23e06f2fb1fcf5190",
+    activePool: "0xff88be162e679517d9d3729be67495084fb98b69",
+    shutdownRead: {
+      contract: "ActivePool",
+      address: "0xff88be162e679517d9d3729be67495084fb98b69",
+      call: "shutdownTime",
+    },
+    shutdownRecord: {
+      by: "admin",
+      shutdown: EBISU_SHUTDOWN,
+      withdrawal: {
+        ...EBISU_WITHDRAWAL,
+        pool: "0xff88be162e679517d9d3729be67495084fb98b69",
+        amount: "14404.929434772406579198",
+      },
+      reverts: EBISU_REVERTS,
+    },
     branchManager: "0x0c906ba27a9b747653ed16b82d77a7a8eefeb19c",
     priceFeed: "0xdb0cd67899e071a8798a58c9d2dd43795833c71d",
     sortedTroves: "0xf5b66656ee851ee9dfd3b89d19a453f50fb9139e",

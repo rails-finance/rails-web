@@ -23,7 +23,7 @@
 //      own read at the stated block, wei-exact
 //   3  grouping: every funded row sits in the group of its catalogued asset;
 //      the group set == the distinct assets of funded vaults; inside every
-//      group the held totals (totalAssets less lostAssets, ui-jobs 543) are
+//      group the total assets (the figure the column shows, ui-jobs 664) are
 //      non-increasing
 //   4  funded + empty + unread == catalog size, and unread == 0
 //   5  the empty group is collapsed at rest, expands to exactly the stated N
@@ -200,8 +200,8 @@ const skip = (name, why) => {
   skipped++;
 };
 
-// 2026-10-20 (ui-jobs 407, V1): a roster row is the shared card's listing
-// surface. It states total assets in the listing's compact form ("413.0M", the
+// 2026-11-12 (ui-jobs 605): a roster row is a row of the house table (V6). It
+// states total assets in the listing's compact form ("413.0M", the
 // exact value on `data-prov-exact`) and the share price by the print rules'
 // share-price rule (two to six places, whatever the asset's decimals). Both
 // rules restated here from their definitions (lib/shared/format-compact.ts,
@@ -239,9 +239,10 @@ const page = await context.newPage();
 // vault. Every roster check below reads inside `[data-roster-panel]`, the
 // wrapper the rows have carried since they were a drawer, so nothing under it
 // changed with the move.
-// ui-jobs 485: every row, by size, which is what the roster checks below read;
-// section 16 checks the default view (the preset, Holders) against it.
-const res0 = await page.goto(`${BASE}/base/morpho/vaults?show=all&sortBy=size`, { waitUntil: "networkidle" });
+// ui-jobs 485: every row, and (ui-jobs 605) the table sorted by Total assets,
+// which is what the roster checks below read; section 16 checks the default
+// view (the preset, Holders) against it.
+const res0 = await page.goto(`${BASE}/base/morpho/vaults?show=all&sort=assets`, { waitUntil: "networkidle" });
 check("0a GET /base/morpho/vaults answers 200", res0?.status() === 200, `status ${res0?.status()}`);
 await page.waitForSelector("[data-roster-panel] [data-vault-row]", { timeout: 120_000 });
 
@@ -309,7 +310,7 @@ const readRows = async () =>
       raw: el.getAttribute("data-total-assets-raw"),
       held: el.getAttribute("data-held-assets-raw"),
       sharePriceRaw: el.getAttribute("data-share-price-raw"),
-      groupAsset: el.closest("[data-asset-group]")?.getAttribute("data-asset-group") ?? null,
+      token: el.getAttribute("data-token"),
       inEmpty: Boolean(el.closest("[data-empty-rows]")),
       amountText: el.querySelector('[data-cell="total-assets"]')?.textContent?.trim() ?? null,
       sharePriceText: el.querySelector('[data-cell="share-price"]')?.textContent?.trim() ?? null,
@@ -352,37 +353,36 @@ check(
     : `${rows.length - ownUnread} compared, ${ownUnread} own reads unanswered`,
 );
 
-// ── 3: grouping and order ───────────────────────────────────────────────────
+// ── 3: the table and its order ──────────────────────────────────────────────
+// 2026-11-12 (ui-jobs 605): one flat table, no group per asset; the Asset
+// facet narrows by asset. Read under `?sort=assets`: by token A to Z, the largest
+// total assets first inside each token.
 const funded = rows.filter((r) => r.group === "funded");
-const wrongGroup = funded.filter(
-  (r) => r.groupAsset !== r.asset || CATALOG_BY_ADDRESS.get(r.address)?.asset !== r.asset,
-);
+const wrongAsset = funded.filter((r) => CATALOG_BY_ADDRESS.get(r.address)?.asset !== r.asset);
 check(
-  "3a every funded row sits in the group of its catalogued asset",
-  wrongGroup.length === 0,
-  `${wrongGroup.length} of ${funded.length} misplaced`,
+  "3a every funded row states its catalogued asset",
+  wrongAsset.length === 0,
+  `${wrongAsset.length} of ${funded.length} wrong`,
 );
-const ownFundedAssets = new Set(CATALOG.filter((r) => (ownTotal.get(r.address) ?? 0n) > 0n).map((r) => r.asset));
-const pageGroups = new Set(
-  await page
-    .locator("[data-roster-panel] [data-asset-group]")
-    .evaluateAll((els) => els.map((e) => e.getAttribute("data-asset-group"))),
-);
+const groupHeads = await page.locator("[data-roster-panel] [data-asset-group]").count();
+const fundedTables = await page.locator("[data-roster-panel] [data-vault-table='funded']").count();
 check(
-  "3b the group set equals the distinct assets of funded vaults, by this script's own read",
-  pageGroups.size === ownFundedAssets.size && [...ownFundedAssets].every((a) => pageGroups.has(a)),
-  `${pageGroups.size} groups on the page, ${ownFundedAssets.size} funded assets read`,
+  "3b the funded vaults are one table, with no group per asset",
+  groupHeads === 0 && fundedTables === 1,
+  `${fundedTables} funded table(s), ${groupHeads} asset group(s)`,
 );
+const tokens = [...new Set(funded.map((r) => r.token))];
 let disorder = 0;
-for (const asset of pageGroups) {
-  // Size ranks by what the vault holds, total assets less lost assets (ui-jobs 543).
-  const inGroup = funded.filter((r) => r.groupAsset === asset).map((r) => BigInt(r.held || r.raw));
-  for (let i = 1; i < inGroup.length; i++) if (inGroup[i] > inGroup[i - 1]) disorder++;
+for (let i = 1; i < funded.length; i++) {
+  // Total assets ranks by the figure the column shows (ui-jobs 664).
+  const [a, b] = [funded[i - 1], funded[i]];
+  const t = a.token.localeCompare(b.token, "en-US", { sensitivity: "base" });
+  if (t > 0 || (t === 0 && BigInt(b.raw) > BigInt(a.raw))) disorder++;
 }
 check(
-  "3c inside every group the held totals are non-increasing (largest first)",
+  "3c under ?sort=assets the rows run by token A to Z, the largest total assets first inside each token",
   disorder === 0,
-  `${disorder} out-of-order pairs across ${pageGroups.size} groups`,
+  `${disorder} out-of-order pairs over ${tokens.length} tokens`,
 );
 
 // ── 4: the three kinds of row add up ────────────────────────────────────────
@@ -414,10 +414,8 @@ check(
 );
 
 // ── 6: the print rule on the largest rows ───────────────────────────────────
-const groupOrder = await page
-  .locator("[data-roster-panel] [data-asset-group]")
-  .evaluateAll((els) => els.map((e) => e.getAttribute("data-asset-group")));
-const sampleAssets = groupOrder.slice(0, 3);
+// The largest row of each of the first three tokens, by its asset.
+const sampleAssets = tokens.slice(0, 3).map((t) => funded.find((r) => r.token === t).asset);
 const decimalsRead = await client.multicall({
   contracts: sampleAssets.map((a) => ({ address: a, abi: ERC20_ABI, functionName: "decimals" })),
   allowFailure: false,
@@ -425,13 +423,13 @@ const decimalsRead = await client.multicall({
 });
 let printBad = [];
 sampleAssets.forEach((asset, i) => {
-  const top = funded.find((r) => r.groupAsset === asset);
+  const top = funded.find((r) => r.asset === asset);
   if (!top) return;
   const want = expectedCompactText(top.raw, Number(decimalsRead[i]));
   if (!top.amountText?.startsWith(want)) printBad.push(`${top.address}: "${top.amountText}" vs "${want}"`);
 });
 check(
-  "6  the largest row of the three largest groups prints by the listing's compact rule",
+  "6  the largest row of the first three tokens prints by the listing's compact rule",
   printBad.length === 0 && sampleAssets.length === 3,
   printBad.join("; ") || `${sampleAssets.length} sampled`,
 );
@@ -616,7 +614,11 @@ const priceTextBad = [];
 priceSample.forEach((r) => {
   const decimals = priceAssetDecimals.get(r.asset);
   if (decimals == null || !r.sharePriceRaw) return;
-  const want = expectedSharePriceText(r.sharePriceRaw, decimals);
+  // Past a million the table prints the share price compact (ui-jobs 605, V6).
+  const want =
+    Number(r.sharePriceRaw) / Math.pow(10, decimals) >= 1e6
+      ? expectedCompactText(r.sharePriceRaw, decimals)
+      : expectedSharePriceText(r.sharePriceRaw, decimals);
   if (!r.sharePriceText?.startsWith(want)) priceTextBad.push(`${r.address}: "${r.sharePriceText}" vs "${want}"`);
 });
 check(
@@ -634,7 +636,7 @@ check(
   await page.waitForSelector('[data-anatomy="V5"]', { timeout: 120_000 }).catch(() => null);
   const strip = await readVaultStrip(page);
   const store = await readStoreSeries(BASE, 8453, stripVault);
-  vaultStripChecks(check, "17", strip, store, { chain: 8453, vault: stripVault, censusFamily: true });
+  vaultStripChecks(check, "17", strip, store, { chain: 8453, vault: stripVault });
 }
 
 // ── 16: the default view (ui-jobs 485) ──────────────────────────────────────

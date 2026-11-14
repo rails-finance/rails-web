@@ -49,7 +49,7 @@ import {
 
 /** Every bucket an Aave-family position can fill, in drawing order. */
 export const AAVE_V3_FLOW_BUCKETS: FlowBucket[] = [
-  { key: "deposited", label: "Deposited", event: "Supply", side: "collateral", dir: "in" },
+  { key: "deposited", label: "Supplied", event: "Supply", side: "collateral", dir: "in" },
   {
     key: "received",
     label: "Received by transfer",

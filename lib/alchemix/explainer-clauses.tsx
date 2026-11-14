@@ -39,9 +39,10 @@
 // receipt of the figure it governs. The bullets here are specific to the
 // event. Two reading caveats are said on the card they concern:
 // `alchemixReadingClauses` (a block holding more of this position's events
-// than the card draws) and `alchemixBetweenReadingsClauses` (what set-aside
+// than the card draws) and `alchemixBetweenReadingsClauses` (what earmarked debt
 // and the share price did between the reading before and this block).
 
+import { feeCharged } from "@/lib/alchemix/protocol-fee";
 import type {
   AlchemixStateAtBlockFromReading,
   AlchemixV3Context,
@@ -103,7 +104,7 @@ const who = (addr: string | null | undefined): string => (addr ? shortAddr(addr)
 /** An address, named as the line's router where it is one. */
 const whoOn = (ctx: Pick<AlchemixV3Context, "chainId" | "lineKey">, addr: string | null | undefined): string =>
   addr && isLineRouter(ctx.chainId, ctx.lineKey, addr)
-    ? `Alchemix's router for this line (${shortAddr(addr)})`
+    ? `Alchemix's router for this market (${shortAddr(addr)})`
     : who(addr);
 
 const sameAddr = (a: string | null | undefined, b: string | null | undefined): boolean =>
@@ -236,7 +237,8 @@ export interface AlchemixClauseOptions {
    *  the reading before it less the reading at it (lib/alchemix/readings-before).
    *  Null where the two readings are not in hand. */
   collateralTakenRaw?: string | null;
-  /** The line's protocol fee in basis points, for the repay fee's rate. */
+  /** The line's protocol fee in basis points at this block, for the repay
+   *  fee's rate (lib/alchemix/protocol-fee.ts). */
   protocolFeeBps?: number | null;
   /** A redemption's net for this position (lib/alchemix/redemption-net), and
    *  the underlying it is in. */
@@ -336,24 +338,25 @@ export function alchemixEventClauses(
             <>
               {" "}
               That cleared {shown(credit, sym)}: each share counts at its value in the asset underneath at this block,
-              one {sym} per unit, up to whichever is smaller, the position&rsquo;s debt or the line&rsquo;s.
+              one {sym} per unit, up to whichever is smaller, the position&rsquo;s debt or the market&rsquo;s.
             </>,
           ),
         );
       }
-      if (ctx.resolvedAtCapture?.collateralFee) {
+      // A fee of "0" (a market at 0 bps) states nothing, as force_repay does.
+      const collateralFee = ctx.resolvedAtCapture?.collateralFee;
+      if (collateralFee != null && feeCharged(collateralFee)) {
         out.push(
           clause(
             protocolFeeBps != null ? (
               <>
-                A protocol fee of {shown(ctx.resolvedAtCapture.collateralFee, myt)} left the collateral for
-                Alchemix&rsquo;s fee receiver: {(protocolFeeBps / 100).toLocaleString("en-US")}% of the shares that paid
-                off debt set aside for repayment.
+                A redemption fee of {shown(collateralFee, myt)} left the collateral for Alchemix&rsquo;s protocol fee
+                receiver: {(protocolFeeBps / 100).toLocaleString("en-US")}% of the shares that paid off earmarked debt.
               </>
             ) : (
               <>
-                A protocol fee of {shown(ctx.resolvedAtCapture.collateralFee, myt)} left the collateral for
-                Alchemix&rsquo;s fee receiver, charged on the shares that paid off debt set aside for repayment.
+                A redemption fee of {shown(collateralFee, myt)} left the collateral for Alchemix&rsquo;s protocol fee
+                receiver, charged on the shares that paid off earmarked debt.
               </>
             ),
           ),
@@ -367,7 +370,7 @@ export function alchemixEventClauses(
       out.push(
         clause(
           <>
-            {shown(raw.credit_to_yield, myt)} of collateral paid off this position&rsquo;s debt set aside for repayment
+            {shown(raw.credit_to_yield, myt)} of collateral paid off this position&rsquo;s earmarked debt
             {inClose ? ", the first step of closing it" : ""}.
           </>,
         ),
@@ -376,11 +379,11 @@ export function alchemixEventClauses(
         out.push(
           clause(
             <>
-              Alchemix took a protocol fee of {shown(raw.protocol_fee_total, myt)} from the collateral
+              Alchemix took a redemption fee of {shown(raw.protocol_fee_total, myt)} from the collateral
               {protocolFeeBps != null ? (
                 <>, {(protocolFeeBps / 100).toLocaleString("en-US")}% of those shares,</>
               ) : null}{" "}
-              and paid it to its fee receiver.
+              and paid it to its protocol fee receiver.
             </>,
           ),
         );
@@ -420,12 +423,9 @@ export function alchemixEventClauses(
       out.push(
         clause(
           split && split.feeRaw > BigInt(0) ? (
-            <>That protocol fee is the only charge for closing this way: a close with collateral pays no liquidator.</>
+            <>That redemption fee is the only charge for this close.</>
           ) : (
-            <>
-              No fee was charged: the protocol fee applies only to debt set aside for repayment, and a close with
-              collateral pays no liquidator.
-            </>
+            <>No fee was charged on this close.</>
           ),
         ),
       );
@@ -459,13 +459,13 @@ export function alchemixEventClauses(
               fee != null ? (
                 <>
                   {" "}
-                  The liquidator was paid {fee} of the asset underneath from the line&rsquo;s fee vault, outside this
+                  The liquidator was paid {fee} of the asset underneath from the market&rsquo;s fee vault, outside this
                   position.
                 </>
               ) : (
                 <>
                   {" "}
-                  The liquidator was paid in the asset underneath from the line&rsquo;s fee vault, outside this
+                  The liquidator was paid in the asset underneath from the market&rsquo;s fee vault, outside this
                   position; its decimals come from a reading of this position and none has been taken, so no figure is
                   given.
                 </>
@@ -536,7 +536,7 @@ export function alchemixEventClauses(
               : null;
         const routed = opening?.forwardedTo ? (
           isLineRouter(ctx.chainId, ctx.lineKey, opening.mintedTo) ? (
-            <> That first address is Alchemix&rsquo;s router for this line, which the transaction went through.</>
+            <> That first address is Alchemix&rsquo;s router for this market, which the transaction went through.</>
           ) : (
             <> That first address is a contract the transaction routed through.</>
           )
@@ -612,7 +612,7 @@ export function alchemixEventClauses(
       out.push(
         clause(
           <>
-            The line&rsquo;s Transmuter redeemed {shown(raw.amount, sym)} across every open position at once, when a
+            The market&rsquo;s Transmuter redeemed {shown(raw.amount, sym)} across every open position at once, when a
             staker claimed a matured deposit; nobody holding this position acted.
           </>,
         ),
@@ -635,22 +635,22 @@ export function alchemixEventClauses(
           out.push(
             clause(
               <>
-                Here it cleared {shown(cleared.amountRaw, sym)} of debt set aside for repayment and took{" "}
+                Here it cleared {shown(cleared.amountRaw, sym)} of earmarked debt and took{" "}
                 {shown(collateralTakenRaw, myt)} of collateral, measured from this position&rsquo;s readings either side
                 of it.
               </>,
             ),
           );
           const net = opts.redemptionNet;
-          const fee = net && net.status === "stated" ? net.fee : null;
+          const fee = net && net.status === "stated" && net.fee && net.fee.bps > 0 ? net.fee : null;
           const pct = fee ? `${(fee.bps / 100).toLocaleString("en-US")}%` : null;
           out.push(
             clause(
               fee ? (
                 <>
-                  {shown(fee.sharesRaw, myt)} of those are the line&rsquo;s {pct} redemption fee, which the Alchemist
-                  charges on every redemption on top of the shares the Transmuter gets and pays to Alchemix&rsquo;s fee
-                  receiver. The rest went to the Transmuter, which pays its stakers in them.
+                  {shown(fee.sharesRaw, myt)} of those are the market&rsquo;s {pct} redemption fee, which the Alchemist
+                  charges on every redemption on top of the shares the Transmuter gets and pays to Alchemix&rsquo;s
+                  protocol fee receiver. The rest went to the Transmuter, which pays its stakers in them.
                 </>
               ) : (
                 <>Those {myt} went to the Transmuter, which pays its stakers in them.</>
@@ -682,7 +682,7 @@ export function alchemixEventClauses(
                       <>
                         {" "}
                         The {pct} fee is {signed(-feeN)} {under} of it. The other {signed(restN)} {under} is how the
-                        Alchemist charges a position: at the line&rsquo;s average shares per unit of debt across every
+                        Alchemist charges a position: at the market&rsquo;s average shares per unit of debt across every
                         redemption since this position&rsquo;s own last event, while the share price moved between them.
                       </>
                     ) : (
@@ -697,15 +697,15 @@ export function alchemixEventClauses(
           out.push(
             clause(
               <>
-                Here it cleared {shown(cleared.amountRaw, sym)} of debt set aside for repayment, measured from this
-                position&rsquo;s readings either side of it, and took {myt} from the collateral for it, including the
-                line&rsquo;s redemption fee.
+                Here it cleared {shown(cleared.amountRaw, sym)} of earmarked debt, measured from this position&rsquo;s
+                readings either side of it, and took {myt} from the collateral for it
+                {protocolFeeBps ? <>, including the market&rsquo;s redemption fee.</> : <>.</>}
               </>,
             ),
           );
         }
       }
-      // Set aside also grows every block, so this redemption's own clearing is
+      // Earmarked debt also grows every block, so this redemption's own clearing is
       // rarely the whole story behind its before/after move (rails-ops
       // decisions/0032). Stated once here, with both figures, rather than left
       // to the position card's general caveat.
@@ -718,7 +718,7 @@ export function alchemixEventClauses(
             out.push(
               clause(
                 <>
-                  Set aside for repayment moved by more than the {shown(cleared.amountRaw, sym)} cleared here: another{" "}
+                  Earmarked debt moved by more than the {shown(cleared.amountRaw, sym)} cleared here: another{" "}
                   {amount(grew.toString())} {sym} matured into it since the reading before this one.
                 </>,
               ),
@@ -781,7 +781,7 @@ export function alchemixEventClauses(
 /** The one reading caveat that belongs to a single card: its block holds more
  *  of this position's events than the card draws, so the reading is where the
  *  position stood after all of them. The caveats that hold for every card
- *  (the figures are readings, collateral is a share count, set-aside grows
+ *  (the figures are readings, collateral is a share count, earmarked debt grows
  *  between readings) are said once, on the position card's Explanation pane
  *  and in its "About this position" modal, and on each figure's receipt.
  *
@@ -803,22 +803,22 @@ export function alchemixReadingClauses(
   ];
 }
 
-/** The kinds that leave set-aside where `_earmark` put it: what a card made of
- *  these alone shows moving there built up between the two readings. A burn is
- *  one of them (chain `getCDP` either side of a burn moves set-aside by one
- *  block of accrual); a repay is not, since it pays set-aside first. */
+/** The kinds that leave earmarked debt where `_earmark` put it: what a card
+ *  made of these alone shows moving there built up between the two readings.
+ *  A burn is one of them (chain `getCDP` either side of a burn moves earmarked
+ *  debt by one block of accrual); a repay is not, since it pays it first. */
 const LEAVES_SET_ASIDE = new Set(["deposit", "mint", "withdraw", "transfer", "burn"]);
 
-/** A set-aside figure in the bullets: at most two decimals from 1 up, so the
+/** An earmarked figure in the bullets: at most two decimals from 1 up, so the
  *  three figures of a repay's sentence add up as printed. */
 const setAsideFigure = (wei: bigint): string => {
   const n = Number(wei) / WAD;
   return n >= 1 ? n.toLocaleString("en-US", { maximumFractionDigits: 2 }) : formatCompactTitled(n).display;
 };
 
-/** The set-aside part of the debt a repay cleared, in the synthetic's wei. A
- *  repay pays set-aside first, so where set-aside is still above zero after it
- *  the whole credit was set-aside debt; where it reached zero, the part is what
+/** The earmarked part of the debt a repay cleared, in the synthetic's wei. A
+ *  repay pays earmarked debt first, so where it is still above zero after it
+ *  the whole credit was earmarked debt; where it reached zero, the part is what
  *  the protocol fee was charged on (fee ÷ rate, in shares, at this block's
  *  share price). Null where the figures for either are not in hand. */
 function repaySetAsidePartRaw(
@@ -859,15 +859,15 @@ export interface AlchemixBetweenReadingsOptions {
    *  back through. */
   protocolFeeBps?: number | null;
   /** A line-scope row (a redemption) shares this card's block, so the reading
-   *  at it is past that too and set-aside's move is not this card's alone. */
+   *  at it is past that too and earmarked debt's move is not this card's alone. */
   lineEventInBlock?: boolean;
 }
 
 /** What moved between the reading before this card and the reading at its
- *  block that the transaction did not move: set-aside, as Transmuter stakes
- *  matured, and the vault's share price, where it moved collateralisation. On a
- *  card whose legs leave set-aside alone, and on a repay, which states what
- *  set-aside stood at in its block and how much of it the repay cleared. A
+ *  block that the transaction did not move: earmarked debt, as Transmuter
+ *  stakes matured, and the vault's share price, where it moved the LTV. On a
+ *  card whose legs leave earmarked debt alone, and on a repay, which states
+ *  what it stood at in its block and how much of it the repay cleared. A
  *  redemption states its own. */
 export function alchemixBetweenReadingsClauses(
   legs: AlchemistEvent[],
@@ -899,7 +899,7 @@ export function alchemixBetweenReadingsClauses(
               : "this transaction";
   const out: ClauseInput[] = [];
   // The reading at this block is past every event in it. A line redemption in
-  // the same block moves set-aside too, so then its move is not this card's to
+  // the same block moves earmarked debt too, so then its move is not this card's to
   // explain; a repay, whose figure is derived from that reading, also needs the
   // block to hold none of the position's events beyond this card.
   const blockIsCards = !opts.lineEventInBlock && (!repay || at.positionEventsInBlock <= legs.length);
@@ -907,10 +907,10 @@ export function alchemixBetweenReadingsClauses(
   const part =
     repay && blockIsCards ? repaySetAsidePartRaw(repay, at, opts.protocolFeeBps ?? null, unit.decimals) : null;
   if (blockIsCards && at.earmarkedRaw != null && before.earmarkedRaw != null && part != null && part > BigInt(0)) {
-    // Set-aside just before the repay: what it left plus what it cleared.
+    // Earmarked debt just before the repay: what it left plus what it cleared.
     const after = BigInt(at.earmarkedRaw);
     const stood = after + part;
-    // Rose only by more than the printed figure shows: where set-aside is
+    // Rose only by more than the printed figure shows: where earmarked debt is
     // derived from the fee, its last digits are the fee's rounding.
     const rose =
       stood > BigInt(before.earmarkedRaw) && setAsideFigure(stood) !== setAsideFigure(BigInt(before.earmarkedRaw));
@@ -919,11 +919,11 @@ export function alchemixBetweenReadingsClauses(
         <>
           {rose ? (
             <>
-              Set aside had risen to {setAsideFigure(stood)} {sym} {sincePrevious}
+              Earmarked debt had risen to {setAsideFigure(stood)} {sym} {sincePrevious}
             </>
           ) : (
             <>
-              Set aside stood at {setAsideFigure(stood)} {sym} at this block
+              Earmarked debt stood at {setAsideFigure(stood)} {sym} at this block
             </>
           )}
           ; this repay cleared {setAsideFigure(part)} of it, leaving{" "}
@@ -937,15 +937,15 @@ export function alchemixBetweenReadingsClauses(
       out.push(
         clause(
           <>
-            Set aside rose {formatCompactTitled(Number(grew) / WAD).display} {sym} {sincePrevious}, as Transmuter stakes
-            matured; {act} did not move it.
+            Earmarked debt rose {formatCompactTitled(Number(grew) / WAD).display} {sym} {sincePrevious}, as Transmuter
+            stakes matured; {act} did not move it.
           </>,
         ),
       );
     }
   }
-  // The share price's part of the collateralisation move: the collateral
-  // before, revalued at this block's price, over the debt before.
+  // The share price's part of the LTV move: the debt before over the
+  // collateral before, revalued at this block's price, less the LTV before.
   const dec = unit.decimals;
   if (
     dec != null &&
@@ -954,12 +954,15 @@ export function alchemixBetweenReadingsClauses(
     before.collateralRaw != null &&
     before.debtRaw != null &&
     BigInt(before.debtRaw) > BigInt(0) &&
+    BigInt(before.collateralRaw) > BigInt(0) &&
     before.sharePriceRaw !== at.sharePriceRaw
   ) {
     const p0 = Number(before.sharePriceRaw) / 10 ** dec;
     const p1 = Number(at.sharePriceRaw) / 10 ** dec;
-    const points = ((Number(before.collateralRaw) / WAD) * (p1 - p0) * 100) / (Number(before.debtRaw) / WAD);
-    if (Math.abs(points) >= 0.005) {
+    const coll = Number(before.collateralRaw) / WAD;
+    const debt = Number(before.debtRaw) / WAD;
+    const points = (debt / (coll * p1) - debt / (coll * p0)) * 100;
+    if (p0 > 0 && p1 > 0 && Math.abs(points) >= 0.005) {
       const digits = Math.min(dec, 6);
       const price = (p: number) =>
         p.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
@@ -968,7 +971,7 @@ export function alchemixBetweenReadingsClauses(
           <>
             {span ? <>Over the same {span}</> : <>Since the previous card</>} the vault&rsquo;s share price{" "}
             {p1 > p0 ? "rose" : "fell"} from {price(p0)} to {price(p1)} {unit.symbol ?? "in the asset underneath"},
-            which moved collateralisation {points > 0 ? "up" : "down"} by about{" "}
+            which moved the LTV {points > 0 ? "up" : "down"} by about{" "}
             {Math.abs(points).toLocaleString("en-US", { maximumFractionDigits: 2 })} points.
           </>,
         ),

@@ -12,10 +12,13 @@
 // flows segment and its tip, so the four name the same parts.
 //
 // The bonus: what the rebalances and redemptions took in collateral, valued at
-// the oracle's min price at the block before each (the price a rebalance is
-// judged and paid at, BasePool.rebalance), less the debt they cleared. A
-// rebalance pays the keeper the pool's rebalance bonus on top of the debt, so
-// this is what the owner paid for being rebalanced.
+// the oracle's min price at the block before each, less the debt they cleared;
+// and the bounty, the pool's rebalance bounty (getRebalanceRatios at the block
+// before) over the debt each rebalance cleared. The pool pays a rebalance at
+// its min price when the rebalance runs, which can sit under the block
+// before's: on the WBTC pool the rebalances of 4 and 8 Nov 2026 ran about 2%
+// under the anchor (rails-ops reference/official-docs/fx.md, "Docs and chain
+// disagree" 6), so the two differ by that move.
 
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isFxEvent } from "@/lib/shared/types/event-shape";
@@ -49,7 +52,16 @@ export interface FxNoTxParts {
   /** Rebalances and redemptions: collateral valued at the min price of the
    *  block before each, less the debt they cleared. Null until the prices
    *  are in. */
-  bonus: { collUsd: number; debt: number; coll: number } | null;
+  bonus: {
+    collUsd: number;
+    debt: number;
+    coll: number;
+    /** The pool's rebalance bounty over the debt each rebalance cleared, in
+     *  fxUSD; null where a block's bounty ratio is unread. */
+    bounty: number | null;
+    /** The bounty ratio when every rebalance block read the same one. */
+    bountyRatio: number | null;
+  } | null;
 }
 
 type Kind = "rebalance" | "redemption" | "poolLiquidation";
@@ -106,6 +118,8 @@ export function fxNoTxParts(
   let collUsd = 0;
   let bonusDebt = 0;
   let bonusColl = 0;
+  let bounty: number | null = 0;
+  const ratios = new Set<number>();
   let priced = true;
   for (const [block, { kind, ts }] of kindOf) {
     if (ownBlocks.has(block)) return null;
@@ -123,6 +137,15 @@ export function fxNoTxParts(
       else collUsd += -c.coll * (Number(min) / WAD);
       bonusDebt += -c.debt;
       bonusColl += -c.coll;
+      if (kind === "rebalance") {
+        const raw = reads[String(block - 1)]?.rebalanceBonus;
+        if (raw == null || bounty == null) bounty = null;
+        else {
+          const r = Number(raw) / 1e9;
+          ratios.add(r);
+          bounty += -c.debt * r;
+        }
+      }
     }
   }
   if (parts.poolLiquidation) parts.poolLiquidation.poolRepaid = poolRepaid;
@@ -133,6 +156,15 @@ export function fxNoTxParts(
     poolLiquidations: parts.poolLiquidation,
     leftUnpaid,
     badDebt: cleared + leftUnpaid - gap,
-    bonus: priced && bonusColl > 0 ? { collUsd, debt: bonusDebt, coll: bonusColl } : null,
+    bonus:
+      priced && bonusColl > 0
+        ? {
+            collUsd,
+            debt: bonusDebt,
+            coll: bonusColl,
+            bounty,
+            bountyRatio: bounty != null && ratios.size === 1 ? [...ratios][0] : null,
+          }
+        : null,
   };
 }

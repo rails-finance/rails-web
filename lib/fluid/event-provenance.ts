@@ -332,7 +332,7 @@ export const atBlockOraclePriceProv = (
     source === "fluid-oracle-liquidate"
       ? "Read from the liquidate leg of the oracle's operate/liquidate split — the leg the engine itself uses to price a seizure."
       : "Read from the oracle's single exchange rate: this vault predates the operate/liquidate split, so there is no second rate to choose between and this one IS the liquidate price."
-  } Fluid prices in the debt token by design; no USD is asserted anywhere, because the protocol runs no USD feed.`,
+  } The vault's oracle prices collateral in the debt token.`,
   contract: oracleContract(oracle),
   via: `vault oracle · ${oracleGetter(source)} eth_call at the event's block · scaled 1e(27 + debt decimals − collateral decimals)`,
   inputs: eventInputs(coords, [
@@ -414,7 +414,7 @@ export const liqPremiumProv = (
   },
   summary: `The premium realized on this liquidation — the seized collateral's value (at the vault oracle's price this block, in ${debtSym}) over the debt cleared, minus one. This is what the liquidator actually took, not what the vault promises.${
     vals.penaltyPct != null
-      ? ` It is derived from the two settled legs alone and never from the vault's liquidationPenalty shown beside it, so the two are an independent check. The penalty is a FLOOR the engine guarantees, not a target: across Fluid's whole liquidation history a real-sized sweep meets or exceeds its vault's constant essentially always, and reproduces it exactly in the large majority. A figure sitting ABOVE the constant is therefore ordinary — the sweep cleared the tick on terms better than the minimum. On a seizure small enough that the tick-settled legs quantize, the ratio is dominated by that rounding and can land either side.`
+      ? ` It is derived from the two settled legs alone and never from the vault's liquidationPenalty shown beside it, so the two are an independent check. Across Fluid's liquidation history a real-sized sweep meets or exceeds its vault's penalty almost always, and matches it in most; a figure above the penalty is the sweep clearing the tick on better terms. On a seizure small enough that the tick-settled legs quantize, the ratio is dominated by that rounding and can land either side.`
       : ""
   }`,
   contract: vaultContract(coords),
@@ -471,7 +471,7 @@ export const liqPenaltyAtBlockProv = (coords: FluidCoords, pct: number): Provena
         ? `Re-run eth_getStorageAt(vault, slot 1) at block ${coords.blockNumber} against an archive node — vaultVariables2 bits [72-81], 1e4-scaled`
         : "Re-run eth_getStorageAt(vault, slot 1) against an archive node — vaultVariables2 bits [72-81], 1e4-scaled",
   },
-  summary: `The vault's own liquidation penalty at this block — the bonus its engine is configured to hand a liquidator, read from the vault's vaultVariables2 slot (bits [72-81], 1e4-scaled). Governance can change it, so it is a per-block fact and read at this block, not today's. It is shown as the reference the realized premium above is measured against: a floor the engine guarantees rather than a figure it targets, so a realized premium at the constant is the ordinary case and one above it means the sweep cleared on better terms than the minimum. The premium is computed from the settled legs and never consults this number — that independence is what makes the pair worth showing.`,
+  summary: `The vault's own liquidation penalty at this block — what a liquidated position pays in collateral beyond the debt cleared, read from the vault's vaultVariables2 slot (bits [72-81], 1e4-scaled). Governance can change it, so it is a per-block fact and read at this block, not today's. It is shown as the reference the realized premium above is measured against: a realized premium at the penalty is the ordinary case and one above it means the sweep cleared on better terms than the minimum. The premium is computed from the settled legs and never consults this number — that independence is what makes the pair worth showing.`,
   contract: vaultContract(coords),
   via: "vault storage · vaultVariables2 (slot 1) bits [72-81] at the event's block · 1e4-scaled",
   inputs: eventInputs(coords, [

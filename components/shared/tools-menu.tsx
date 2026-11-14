@@ -2,36 +2,23 @@
 
 // Tools — the one instrument menu on a position or detail view.
 // ----------------------------------------------------------------------------
-// A spanner trigger opening a dropdown that holds the page's instruments: the
-// provenance inspector's toggle, then whatever export shapes the caller adds
-// (ExportMenu passes the three "Copy for LLM" items). Before this the export
-// shapes were their own trigger and the inspector's toggle rode in the fixed
-// bottom dock; the dock is gone from these views, so the two live together.
-//
-// While the inspector is armed the trigger carries a small dot in the
-// provenance teal (teal-600, teal-400 in dark, ui-jobs 535). The dot
-// is always in the DOM and merely uncoloured at rest, so arming the tool never
-// moves the row.
-//
-// A caller with no export shapes (the vault holder pages) renders <ToolsMenu />
-// with no children: the menu is then the inspector alone, which is what those
-// pages had in the dock.
+// A spanner trigger opening a dropdown that holds the export shapes the caller
+// adds (ExportMenu passes the three "Copy for LLM" items). The provenance
+// inspector is armed from the profile menu (H20.1; ui-jobs 625), so a menu
+// with no rows draws nothing.
 //
 // The `card` variant is the position card's one menu (ui-jobs 270, 246): a ⋮
-// trigger at the right end of the card's heading (ui-jobs 295), the position's rows
-// (`leading`) first, the export shapes, then "Inspect provenance", which arms the
-// inspector on the card alone (ui-jobs 284). The `event` and `panel` menus end
-// on the same row for their section where the caller names one (`provScope`).
-// Below sm these open as a sheet with each row full width.
+// trigger at the right end of the card's heading (ui-jobs 295), the position's
+// rows (`leading`) first, then the export shapes. The `event`, `panel` and
+// `view` menus draw the same trigger for an event card, a section and a
+// listing. Below sm these open as a sheet with each row full width.
 
 import Link from "next/link";
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Check, ChevronDown, EllipsisVertical, Wrench } from "lucide-react";
 import { CTRL_GHOST, CTRL_OFF, CTRL_ON, OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { MobileSheet } from "@/components/shared/mobile-sheet";
-import { POSITION_CARD_SCOPE, provInspector } from "@/components/shared/provenance";
-import { ProvInspectorToggle, ProvScopeToggle } from "@/components/shared/prov-inspector";
 
 /** One row of the Tools menu: icon, title, one line of subtitle. With `href`
  *  the row is a link (`external` opens it in a new tab). `copied` marks a copy
@@ -48,6 +35,8 @@ export function ToolsMenuItem({
   item,
   expanded,
   internal,
+  offsite,
+  checked,
 }: {
   icon: ReactNode;
   title: ReactNode;
@@ -65,16 +54,21 @@ export function ToolsMenuItem({
   /** A row that goes to another page of Rails: its title and icon in link
    *  blue (`--text-link`, ui-jobs 535). */
   internal?: boolean;
+  /** A row that leaves Rails (the chain's explorer, the protocol's app or
+   *  docs): its title and icon in the off-site pink (`--text-external`). */
+  offsite?: boolean;
+  /** A switch row (the Morpho roster's "Show all markets"): its state, drawn
+   *  as `role="menuitemcheckbox"` with `aria-checked`. */
+  checked?: boolean;
 }) {
   const className =
     "flex items-start gap-3 mx-1 my-0.5 rounded-lg px-3 py-2 text-left transition-colors hover:bg-[var(--surface-hover)] focus-visible:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-[rgba(196,205,217,0.08)] dark:focus-visible:bg-[rgba(196,205,217,0.08)]";
+  const tone = internal ? "text-[var(--text-link)]" : offsite ? "text-[var(--text-external)]" : null;
   const body = (
     <>
-      <span className={`mt-0.5 shrink-0 ${internal ? "text-[var(--text-link)]" : "text-rb-500"}`}>{icon}</span>
+      <span className={`mt-0.5 shrink-0 ${tone ?? "text-rb-500"}`}>{icon}</span>
       <span className="min-w-0">
-        <span className={`block text-sm font-semibold ${internal ? "text-[var(--text-link)]" : "text-foreground"}`}>
-          {title}
-        </span>
+        <span className={`block text-sm font-semibold ${tone ?? "text-foreground"}`}>{title}</span>
         <span className="block text-xs text-rb-500">{subtitle}</span>
       </span>
     </>
@@ -86,15 +80,7 @@ export function ToolsMenuItem({
   };
   if (href) {
     return external ? (
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        role="menuitem"
-        className={className}
-        onClick={onClick}
-        {...data}
-      >
+      <a href={href} target="_blank" rel="noopener" role="menuitem" className={className} onClick={onClick} {...data}>
         {body}
       </a>
     ) : (
@@ -104,7 +90,15 @@ export function ToolsMenuItem({
     );
   }
   return (
-    <button type="button" onClick={onClick} disabled={disabled} role="menuitem" className={className} {...data}>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      role={checked === undefined ? "menuitem" : "menuitemcheckbox"}
+      aria-checked={checked}
+      className={className}
+      {...data}
+    >
       {body}
     </button>
   );
@@ -115,7 +109,11 @@ export function ToolsMenuItem({
 function moveFocus(e: React.KeyboardEvent<HTMLElement>) {
   const keys = ["ArrowDown", "ArrowUp", "Home", "End"];
   if (!keys.includes(e.key)) return;
-  const items = [...e.currentTarget.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])')];
+  const items = [
+    ...e.currentTarget.querySelectorAll<HTMLElement>(
+      '[role="menuitem"]:not([disabled]), [role="menuitemcheckbox"]:not([disabled])',
+    ),
+  ];
   if (items.length === 0) return;
   e.preventDefault();
   const at = items.indexOf(document.activeElement as HTMLElement);
@@ -137,16 +135,12 @@ export function ToolsMenu({
   leading,
   label,
   heading,
-  provScope,
-  scopeInline,
-  onScopeArm,
   children,
 }: {
   /** `tools`: the spanner trigger of a page row. `card`: the position card's
    *  ⋮ menu, a sheet on a phone. `event`: the event card's ⋮ at its header's
    *  right end, the card menu named by `label` and `heading`. `panel`: the
-   *  same for a panel's header (Lifetime flows), its last row the panel's
-   *  "Inspect provenance" (`provScope`). `view`: the listing's ⋮ at the
+   *  same for a section's header. `view`: the listing's ⋮ at the
    *  right end of its sort and filter row (N1.7, ui-jobs 521), named like
    *  `event`. */
   variant?: "tools" | "card" | "event" | "panel" | "view";
@@ -154,45 +148,26 @@ export function ToolsMenu({
    *  the menu's close like `children`. */
   leading?: (close: () => void) => ReactNode;
   /** What the caller's shapes act on, added to the trigger's accessible
-   *  name ("Tools: Export this position"). Absent on a menu that carries only
-   *  the inspector. */
+   *  name ("Tools: Export this position"). */
   ariaLabel?: string;
   /** The `event` menu's accessible name and its sheet's heading. */
   label?: string;
   heading?: string;
-  /** The section a menu's last row arms the inspector on (ui-jobs 284), and
-   *  the row's subtitle. The `card` menu's is the position card. */
-  provScope?: { id: string; hint: string };
-  /** The caller places the Inspect provenance row among its own: `children`
-   *  takes it as its second argument (the event menu, ui-jobs 535). */
-  scopeInline?: boolean;
-  /** Called as Inspect provenance arms the scope (`ProvScopeToggle` `onArm`). */
-  onScopeArm?: () => void;
   /** Flash the trigger as the confirmation for a copy taken from the menu —
    *  the menu closes on action, so the trigger is where the answer lands. */
   copied?: boolean;
-  /** The caller's rows, under the inspector. Handed the menu's close so a row
-   *  can shut the panel when it acts. */
-  children?: (close: () => void, scopeRow?: ReactNode) => ReactNode;
+  /** The caller's rows. Handed the menu's close so a row can shut the panel
+   *  when it acts. */
+  children?: (close: () => void) => ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  // The event and panel menus: the card menu's trigger and rows, named by
-  // `label` and `heading`; a panel's ends on its section's "Inspect provenance".
+  // The event, panel and view menus: the card menu's trigger and rows, named
+  // by `label` and `heading`.
   const eventMenu = variant === "event" || variant === "panel" || variant === "view";
   const card = variant === "card" || eventMenu;
-  const scope =
-    provScope ??
-    (variant === "card" ? { id: POSITION_CARD_SCOPE, hint: "Click a value on this card to trace it" } : null);
-  // The trigger's dot: armed page-wide on the Tools menu; armed on this
-  // section, or page-wide, on a ⋮.
-  const armed = useSyncExternalStore(
-    provInspector.subscribe,
-    () => (scope ? provInspector.armedFor(scope.id) : provInspector.getArmed()),
-    () => false,
-  );
   const isPhone = useMediaQuery(PHONE_QUERY);
   const sheet = card && isPhone;
   const close = () => setOpen(false);
@@ -203,9 +178,8 @@ export function ToolsMenu({
   };
 
   // Close on outside click / Escape — mirrors the listing sort dropdown. While
-  // the inspector is armed Escape belongs to the inspector's own ladder, which
-  // is mounted on document too; closing this panel as well is harmless because
-  // the panel is shut by the time a pick can be made.
+  // the inspector is armed Escape is also the inspector's ladder, which is
+  // mounted on document too; closing this panel as well is harmless.
   useEffect(() => {
     // The sheet closes from its own scrim and Escape; its rows are portalled
     // outside `ref`, so the outside-press rule would shut it under a tap.
@@ -231,51 +205,22 @@ export function ToolsMenu({
   useEffect(() => {
     if (!open) return;
     const t = window.setTimeout(() =>
-      menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not([disabled])')?.focus({ preventScroll: true }),
+      menuRef.current
+        ?.querySelector<HTMLElement>('[role="menuitem"]:not([disabled]), [role="menuitemcheckbox"]:not([disabled])')
+        ?.focus({ preventScroll: true }),
     );
     return () => window.clearTimeout(t);
   }, [open, sheet]);
 
   const rows = (
     <>
-      {card ? (
-        <>
-          {leading?.(close)}
-          {leading && children && <div className="mx-3 my-1 border-t border-rb-300 dark:border-rb-700" />}
-          {scopeInline
-            ? children?.(
-                close,
-                scope ? (
-                  <ProvScopeToggle
-                    scope={scope.id}
-                    hint={scope.hint}
-                    onPick={closeToTrigger}
-                    onArm={onScopeArm}
-                    openerRef={triggerRef}
-                  />
-                ) : undefined,
-              )
-            : children?.(close)}
-          {scope && !scopeInline && (
-            <>
-              {(leading || children) && <div className="mx-3 my-1 border-t border-rb-300 dark:border-rb-700" />}
-              <ProvScopeToggle scope={scope.id} hint={scope.hint} onPick={closeToTrigger} openerRef={triggerRef} />
-            </>
-          )}
-        </>
-      ) : (
-        <>
-          <ProvInspectorToggle variant="menu" onPick={closeToTrigger} openerRef={triggerRef} />
-          {children && (
-            <>
-              <div className="mx-3 my-1 border-t border-rb-300 dark:border-rb-700" />
-              {children(close)}
-            </>
-          )}
-        </>
-      )}
+      {leading?.(close)}
+      {leading && children && <div className="mx-3 my-1 border-t border-rb-300 dark:border-rb-700" />}
+      {children?.(close)}
     </>
   );
+  // Nothing to offer: no trigger.
+  if (!leading && !children) return null;
 
   if (card) {
     const name = eventMenu ? (label ?? "") : "Position menu";
@@ -305,13 +250,6 @@ export function ToolsMenu({
           ) : (
             <EllipsisVertical className="h-4 w-4" aria-hidden="true" />
           )}
-          {scope && (
-            <span
-              data-prov-armed={armed ? "" : undefined}
-              className={`absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full ${armed ? "bg-teal-600 dark:bg-teal-400" : "bg-transparent"}`}
-              aria-hidden="true"
-            />
-          )}
         </button>
         {open &&
           (sheet ? (
@@ -325,7 +263,7 @@ export function ToolsMenu({
                 role="menu"
                 aria-label={name}
                 onKeyDown={moveFocus}
-                className="-mx-4 [&_[role=menuitem]]:min-h-11 [&_[role=menuitem]]:w-[calc(100%-0.5rem)]"
+                className="-mx-4 [&_[role=menuitem]]:min-h-11 [&_[role=menuitem]]:w-[calc(100%-0.5rem)] [&_[role=menuitemcheckbox]]:min-h-11 [&_[role=menuitemcheckbox]]:w-[calc(100%-0.5rem)]"
               >
                 {rows}
               </div>
@@ -363,11 +301,6 @@ export function ToolsMenu({
             so the spanner stands for the word. The accessible name says it
             either way, and a copy's confirmation always shows. */}
         <span className={copied ? undefined : "hidden sm:inline"}>{copied ? "Copied" : "Tools"}</span>
-        <span
-          data-prov-armed={armed ? "" : undefined}
-          className={`h-1.5 w-1.5 rounded-full ${armed ? "bg-teal-600 dark:bg-teal-400" : "bg-transparent"}`}
-          aria-hidden="true"
-        />
         {copied ? (
           <Check className="h-3.5 w-3.5" aria-hidden="true" />
         ) : (

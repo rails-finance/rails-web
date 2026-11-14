@@ -18,7 +18,6 @@ import { RecencyStamp } from "@/components/shared/recency-stamp";
 import { LatestPrices, type LatestPriceAsset, type PricesAt } from "@/components/shared/latest-prices";
 import { usePublishTodayPrices } from "@/components/shared/price-basis";
 import { usePublishPositionCardStrip } from "@/components/shared/position-card-strip";
-import { ToolsMenu } from "@/components/shared/tools-menu";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { PositionWalletHeading, type PositionOwner } from "@/components/shared/wallet-heading";
 import { usePublishHeadingWallet } from "@/components/shared/event-page-aside";
@@ -135,6 +134,7 @@ export function DetailTopRow({
   showStamp = true,
   assets = [],
   priceReason,
+  pricesSubject,
   closed = false,
   closing,
   owner,
@@ -147,6 +147,9 @@ export function DetailTopRow({
   showStamp?: boolean;
   assets?: LatestPriceAsset[];
   priceReason?: string;
+  /** What the Prices control prices, from the family's terms; "position"
+   *  where none is given. */
+  pricesSubject?: string;
   /** The position is closed. Today's prices say nothing about it, so the
    *  dropdown shows `closing` in their place, or is left out when the family
    *  has no price at the closing block. */
@@ -176,13 +179,14 @@ export function DetailTopRow({
   usePublishTodayPrices(assets);
   const prices = (bare: boolean) =>
     eventPage ? null : !closed ? (
-      <LatestPrices assets={assets} reason={priceReason} bare={bare} />
+      <LatestPrices assets={assets} reason={priceReason} bare={bare} subject={pricesSubject} />
     ) : (
       closingPriced && (
         <LatestPrices
           assets={closing.assets}
           reason={priceReason}
           bare={bare}
+          subject={pricesSubject}
           at={{ block: closing.block, timestamp: closing.timestamp }}
         />
       )
@@ -218,13 +222,8 @@ export function DetailTopRow({
             </>
           )}
         </div>
-        {/* Tools is part of the row, not of the export menu that usually fills
-            it: a caller renders its shapes only once the view has loaded
-            (`{view && <ExportMenu …/>}`), and the provenance inspector has to
-            be reachable before then and on a view that never resolves — which
-            is what the dock used to guarantee. A bare menu carries the
-            inspector alone until the shapes arrive. */}
-        {!owner && !eventPage && (children || <ToolsMenu />)}
+        {/* The page's Tools menu, once the caller has export shapes to give. */}
+        {!owner && !eventPage && children}
       </div>
       {owner && (
         <div className="mt-6">

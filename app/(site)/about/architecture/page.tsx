@@ -1,3 +1,4 @@
+// focus: about Rails itself; no asset or chain to filter
 import type { Metadata } from "next";
 import { DetailBackButton } from "@/components/shared/detail-back-row";
 import { HOME_SHARE_IMAGE, SITE_URL, twitterCard } from "@/lib/shared/page-metadata";
@@ -133,10 +134,10 @@ export default function ArchitecturePage() {
         <a
           href="https://github.com/rails-finance/rails-web"
           target="_blank"
-          rel="noopener noreferrer"
-          className="underline hover:text-pink-500 transition-colors"
+          rel="noopener"
+          className="link-external hover:underline"
         >
-          View on GitHub →
+          View on GitHub ↗
         </a>
       </p>
     </div>

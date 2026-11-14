@@ -9,7 +9,8 @@ import { OraclePricesData } from "@/types/api/oracle";
 import { formatPrice, formatUsdValue, formatExact } from "@/lib/utils/format";
 import { formatDateRange, formatDuration } from "@/lib/date";
 import { getBatchManagerByAddress } from "@/lib/services/batch-manager-service";
-import { getLiquidationThreshold, troveLiquidationPrice, formatLiquidationPrice } from "@/lib/utils/liquidation-utils";
+import { troveLiquidationPrice, formatLiquidationPrice } from "@/lib/utils/liquidation-utils";
+import { fmtMaxLtv, liquityV2Mcr, ltvPct } from "@/lib/liquity/ltv";
 import { troveDebtInFrontProv, troveQueueShareProv } from "@/lib/liquity/trove-queue-provenance";
 import { liquityTroveFaceProv, troveAnnualCostProv } from "@/lib/liquity/trove-card-provenance";
 import { liveFromTroveState, viewFromTroveSummary } from "@/lib/liquity/trove-card-view";
@@ -26,6 +27,10 @@ import type { LiquityTroveSurplus } from "@/components/protocol/liquity-family/t
 import { troveWords } from "@/lib/liquity/event-templates";
 import { troveNodes } from "@/lib/liquity/trove-nodes";
 import { SurplusBullet } from "@/components/protocol/liquity-family/surplus-bullet";
+import { ShutdownBullet } from "@/components/protocol/liquity-family/shutdown-bullet";
+import type { BranchShutdownState } from "@/lib/liquity-fork/shutdown";
+import { shutdownDay } from "@/lib/shared/liquity-family-shutdown";
+import { liquityDebtBreakdownForm } from "@/lib/liquity/economics";
 import { formatCompact } from "@/lib/shared/format-compact";
 
 // V2 TroveManager per branch — the contract the chain values are read from.
@@ -45,11 +50,16 @@ interface UseTroveExplanationItemsArgs {
    *  and branch-debt bullets read (the same live figure the compact
    *  RedemptionRunway's fill divides by). */
   queueDebtTotal?: number | null;
+  /** A dormant Trove is the branch's lastZombieTroveId; null where the pointer is unread. */
+  redeemedFirst?: boolean | null;
   /** A liquidated trove's collateral surplus, read at the head. */
   surplus?: LiquityTroveSurplus | null;
   /** A closed trove's debt just before the close, where the page knows it:
    *  0 when redemption had cleared it and the owner closed a zombie. */
   debtAtClose?: number | null;
+  /** The branch's shutdown (ui-jobs 612): its bullet leads, and the runway,
+   *  the rate's cost and the queue go. */
+  shutdown?: BranchShutdownState | null;
 }
 
 /** The trove pane's content: a subject-first, colon-terminated status lead
@@ -94,21 +104,34 @@ export function useTroveExplanationItems({
   debtInFront,
   trovesAhead,
   queueDebtTotal,
+  redeemedFirst,
   surplus,
   debtAtClose,
+  shutdown,
 }: UseTroveExplanationItemsArgs): TroveExplanation {
   return useMemo(() => {
     if (trove.status === "liquidated") return buildLiquidatedItems(trove, surplus ?? null);
     if (trove.status === "closed")
       return buildClosedItems(trove, debtAtClose === 0 && trove.activity.redemptionCount > 0);
-    return buildOpenItems({ trove, liveState, prices, debtInFront, queueDebtTotal });
-  }, [trove, liveState, prices, debtInFront, trovesAhead, queueDebtTotal, surplus, debtAtClose]);
+    return buildOpenItems({ trove, liveState, prices, debtInFront, queueDebtTotal, redeemedFirst, shutdown });
+  }, [
+    trove,
+    liveState,
+    prices,
+    debtInFront,
+    trovesAhead,
+    queueDebtTotal,
+    redeemedFirst,
+    surplus,
+    debtAtClose,
+    shutdown,
+  ]);
 }
 
 function buildLiquidatedItems(trove: TroveSummary, surplus: LiquityTroveSurplus | null): TroveExplanation {
   const items: Bullet[] = [];
   const add = (group: Group, node: React.ReactNode) => items.push({ group, node });
-  const liquidationThreshold = getLiquidationThreshold(trove.collateralType);
+  const maxLtv = fmtMaxLtv(trove.collateralType) ?? "—";
   const truncatedTroveId = trove.id.length > 10 ? `${trove.id.slice(0, 6)}...${trove.id.slice(-4)}` : trove.id;
   const duration = formatDuration(trove.activity.createdAt, trove.activity.lastActivityAt);
   const dateRange = formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt);
@@ -122,7 +145,7 @@ function buildLiquidatedItems(trove: TroveSummary, surplus: LiquityTroveSurplus 
             {truncatedTroveId}
           </HighlightableValue>
         ),
-        threshold: liquidationThreshold,
+        max_ltv: maxLtv,
         coll_type: trove.collateralType,
       })}
     </span>
@@ -269,9 +292,12 @@ function buildOpenItems({
   prices,
   debtInFront,
   queueDebtTotal,
+  redeemedFirst,
+  shutdown,
 }: UseTroveExplanationItemsArgs): TroveExplanation {
   const items: Bullet[] = [];
   const add = (group: Group, node: React.ReactNode) => items.push({ group, node });
+  const shut = shutdown ?? null;
   const batchManagerInfo = getBatchManagerByAddress(trove.batch.manager);
 
   const displayDebt = liveState?.debt.entire ?? trove.debt.current;
@@ -309,7 +335,7 @@ function buildOpenItems({
   const currentPrice = hasLiveData ? prices[collateralTokenKey] : null;
   const collateralUsd = hasLiveData && currentPrice ? displayCollateral * currentPrice : null;
   const collateralRatio = hasLiveData && collateralUsd && displayDebt > 0 ? (collateralUsd / displayDebt) * 100 : null;
-  const mcr = getLiquidationThreshold(trove.collateralType);
+  const mcr = liquityV2Mcr(trove.collateralType);
 
   // ── Provenance ────────────────────────────────────────────────────────────
   // The displayed numbers come from one of two chain-rooted origins:
@@ -334,18 +360,24 @@ function buildOpenItems({
     collUsd: collateralUsd,
     crPct: collateralRatio,
     liqPrice: null,
-    mcrPct: mcr,
+    mcrPct: mcr != null ? Math.round(mcr * 100) : undefined,
   });
   const priceProv = collateralPriceInfo(coll_type);
 
+  // The live getLatestTroveData read is State; the index's snapshot, Indexed
+  // (as the card's collateral leaf, liquityTroveFaceProv). Both figures come
+  // from the live read today.
+  const accruedClass = isLive ? ("state" as const) : ("indexed" as const);
   const accruedProv: Provenance = {
     kind: "chain",
+    pclass: accruedClass,
     summary: troveWords("prov_accrued"),
     contract: tmContract,
     via: stateOriginVia(isLive, troveWords("field_accrued_interest")),
   };
   const mgmtFeeProv: Provenance = {
     kind: "chain",
+    pclass: accruedClass,
     summary: troveWords("prov_mgmt_fee"),
     contract: tmContract,
     via: stateOriginVia(isLive, troveWords("field_accrued_fee")),
@@ -366,18 +398,22 @@ function buildOpenItems({
     via: troveWords("prov_mgmt_rate_via"),
   };
   if (displayAccruedInterest !== undefined) {
+    const breakdown = liquityDebtBreakdownForm(shut?.at, trove.activity.lastActivityAt);
+    const interestNode = (
+      <Prov info={accruedProv}>
+        <HighlightableValue type="interest" state="after" value={displayAccruedInterest}>
+          {formatPrice(displayAccruedInterest)} BOLD
+        </HighlightableValue>
+      </Prov>
+    );
     add(
       "holdings",
       <span key="debt-breakdown" className="text-rb-500">
-        {troveNodes("debt_breakdown", {
-          interest: (
-            <Prov info={accruedProv}>
-              <HighlightableValue type="interest" state="after" value={displayAccruedInterest}>
-                {formatPrice(displayAccruedInterest)} BOLD
-              </HighlightableValue>
-            </Prov>
-          ),
-        })}
+        {breakdown === "stopped" && shut
+          ? troveNodes("debt_breakdown_stopped", { date: shutdownDay(shut.at) })
+          : breakdown === "shutdown" && shut
+            ? troveNodes("debt_breakdown_shutdown", { interest: interestNode, date: shutdownDay(shut.at) })
+            : troveNodes("debt_breakdown", { interest: interestNode })}
         {trove.batch.isMember && displayManagementFee !== undefined && displayManagementFee > 0 && (
           <span>
             {" "}
@@ -437,24 +473,42 @@ function buildOpenItems({
     );
   }
 
-  if (hasLiveData && collateralRatio) {
-    // The ratio read as a multiple: a 211.6% CR means the collateral is worth
-    // 2.12× the debt (NOT "211.6% more than" it — that reading overstates by
-    // the debt itself). The 110% minimum states once, in the runway bullet.
-    const currentCollateralRatio = collateralRatio.toFixed(1);
-    const crMultiple = (collateralRatio / 100).toFixed(2);
+  if (shut) {
+    // A shut-down branch: the shutdown leads the holdings; no runway, cost or queue place follows.
+    items.unshift({
+      group: "holdings",
+      node: (
+        <span key="shutdown" className="text-rb-500">
+          <ShutdownBullet
+            protocol="liquity-v2"
+            state={shut}
+            symbol={trove.collateralType}
+            debtSymbol="BOLD"
+            coll={displayCollateral}
+            debt={displayDebt}
+          />
+        </span>
+      ),
+    });
+  }
+
+  const ltv = ltvPct(collateralRatio);
+  if (hasLiveData && ltv != null) {
+    // The LTV read as a multiple: an 84.4% LTV means the debt is worth 0.84×
+    // the collateral. The Max LTV states once, in the runway bullet.
+    const currentLtv = ltv.toFixed(1);
     add(
       "risk",
       <span key="collateral-ratio" className="text-rb-500">
-        {troveNodes("coll_ratio", {
-          ratio: (
+        {troveNodes("ltv_ratio", {
+          ltv: (
             <Prov info={crProv}>
-              <HighlightableValue type="collRatio" state="after" value={parseFloat(currentCollateralRatio)}>
-                {currentCollateralRatio}%
+              <HighlightableValue type="collRatio" state="after" value={parseFloat(currentLtv)}>
+                {currentLtv}%
               </HighlightableValue>
             </Prov>
           ),
-          multiple: crMultiple,
+          multiple: (ltv / 100).toFixed(2),
         })}
       </span>,
     );
@@ -474,7 +528,7 @@ function buildOpenItems({
         })
       : null;
   const liqPriceProv = fp.liq;
-  if (currentPrice && liqPrice && liqPrice > 0) {
+  if (!shut && currentPrice && liqPrice && liqPrice > 0) {
     // The runway: the fall to the liquidation price, both the twins of the
     // card's "% from liquidation" and "Liquidates at" chrome, so both bold.
     const headroomPct = ((currentPrice - liqPrice) / currentPrice) * 100;
@@ -512,7 +566,9 @@ function buildOpenItems({
       </HighlightableValue>
     </Prov>
   );
-  if (trove.batch.isMember) {
+  if (shut) {
+    // No rate change and no accrual after a shutdown: the rate's bullet goes.
+  } else if (trove.batch.isMember) {
     // Who sets the rate and the fee they charge; the yearly costs are the
     // card's costs line, and two figures fill the bullet.
     add(
@@ -524,7 +580,7 @@ function buildOpenItems({
             <a
               href={batchManagerInfo.website}
               target="_blank"
-              rel="noopener noreferrer"
+              rel="noopener"
               title={troveWords("delegate_visit", { name: batchManagerInfo.name })}
               className="inline-flex items-center gap-0.5 hover:text-pink-500 transition-colors"
             >
@@ -562,16 +618,34 @@ function buildOpenItems({
   // runway chip's twin, so it carries the same receipt). The general
   // mechanics are Layer-2 material in the "?" modal (the 2026-07-25
   // Layer-2-in-Layer-1 audit).
-  if (trove.isZombie) {
-    // A zombie is outside the branch's rate-sorted list (ui-jobs 456).
+  if (shut) {
+    // No queued redemption after a shutdown.
+  } else if (trove.isZombie) {
+    // A dormant Trove is outside the branch's rate-sorted list; the next redemption takes it first
+    // only as the branch's lastZombieTroveId.
     add(
       "risk",
       displayDebt > 0 ? (
         <span key="zombie" className="text-rb-500">
           A partial redemption left this Trove below the branch&rsquo;s minimum debt, which makes it <H>dormant</H>: out
-          of the rate-ordered redemption queue. While it is the branch&rsquo;s most recent dormant Trove, it is the
-          first Trove the next redemption reaches. The owner can close it to take back the collateral, or borrow back
-          above the minimum to rejoin the queue.
+          of the rate-ordered redemption queue.{" "}
+          {redeemedFirst === true ? (
+            <>
+              The TroveManager holds it as the branch&rsquo;s last dormant Trove (lastZombieTroveId), so the next
+              redemption on the branch takes it first.
+            </>
+          ) : redeemedFirst === false ? (
+            <>
+              A redemption reaches only the dormant Trove the TroveManager holds as lastZombieTroveId, and that is
+              another Trove, so no redemption reaches this one.
+            </>
+          ) : (
+            <>
+              While it is the branch&rsquo;s most recent dormant Trove, it is the first Trove the next redemption
+              reaches.
+            </>
+          )}{" "}
+          The owner can close it to take back the collateral, or borrow back above the minimum to rejoin the queue.
         </span>
       ) : (
         <span key="zombie" className="text-rb-500">
@@ -624,7 +698,7 @@ function buildOpenItems({
             <a
               href={nftUrl}
               target="_blank"
-              rel="noopener noreferrer"
+              rel="noopener"
               title={troveWords("nft_open_title")}
               className="inline-flex items-center gap-0.5 hover:text-pink-500 transition-colors"
             >

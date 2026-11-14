@@ -12,10 +12,9 @@
 //     markets carry a stored fixedPrice and NO feed (cSAI at $14.4263) —
 //     `priceHasFeed` says which, so every USD surface can label the basis.
 //   • borrow/supplyRatePerBlock — per-BLOCK rates (original V2; the opposite
-//     of Moonwell's per-timestamp convention), annualized on EACH MARKET'S
-//     OWN interest rate model's blocksPerYear() — cETH's model says 2,628,000
-//     while the rest say 2,102,400, so one hardcoded constant would misstate
-//     the biggest market by 25%.
+//     of Moonwell's per-timestamp convention), as APYs by the docs' formula
+//     (lib/comptroller/apy.ts). Each model's blocksPerYear() is read
+//     for the receipts: the constant the model sets its per-block curve with.
 //
 // Every catalog market is read at one block, through rails-server's head
 // routes and, when the latest read fails, its stored snapshot (surface
@@ -35,6 +34,7 @@ import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import type { StoredHeadRead } from "@/lib/shared/server-head-read";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { COMPOUND_V2_MARKETS, COMPOUND_V2_ADDRESSES, CTOKEN_DECIMALS } from "@/lib/compound-v2/asset-catalog";
+import { compoundV2Apy } from "@/lib/comptroller/apy";
 
 const CTOKEN_ABI = parseAbi([
   "function exchangeRateStored() view returns (uint256)",
@@ -66,11 +66,13 @@ export interface CompoundV2MarketState {
   priceUsd: number | null;
   /** False when the price is a stored constant with no feed behind it. */
   priceHasFeed: boolean;
-  /** Annualized simple rates (fraction, e.g. 0.0135 = 1.35% APR) — per-block
-   *  rate × this market's own model's blocksPerYear. */
+  /** APYs as fractions (0.0135 = 1.35%), the per-block rate by the docs'
+   *  formula (lib/comptroller/apy.ts). */
   borrowApr: number | null;
   supplyApr: number | null;
-  /** The model's own annualization constant. */
+  /** The per-block borrow rate as read (a 1e18 mantissa), for the receipt. */
+  borrowRatePerBlockRaw: string | null;
+  /** The model's `blocksPerYear()`, the constant it sets its per-block curve with. */
   blocksPerYear: number | null;
 }
 
@@ -147,7 +149,7 @@ async function readMarketState(client: PublicClient): Promise<CompoundV2MarketSt
   const oracle = ok<string>(first[0]);
   if (!oracle || isZeroAddr(oracle)) return out;
 
-  // Second pass: each market's oracle price + config, and its OWN model's
+  // Second pass: each market's oracle price + config, and its model's
   // blocksPerYear (the five oldest markets' WhitePaper model still answers it).
   const irmOf = COMPOUND_V2_MARKETS.map((_, i) => ok<string>(first[1 + i * PER_MARKET + 3]));
   let second: Res[] = [];
@@ -193,7 +195,7 @@ async function readMarketState(client: PublicClient): Promise<CompoundV2MarketSt
     const blocksPerYear = bpyRaw != null && bpyRaw > ZERO ? Number(bpyRaw) : null;
     const apr = (r: Res | undefined): number | null => {
       const v = ok<bigint>(r);
-      return v != null && blocksPerYear != null ? (Number(v) / 1e18) * blocksPerYear : null;
+      return v != null ? compoundV2Apy(v) : null;
     };
 
     out.set(m.key, {
@@ -204,6 +206,7 @@ async function readMarketState(client: PublicClient): Promise<CompoundV2MarketSt
       priceHasFeed,
       borrowApr: apr(first[1 + i * PER_MARKET + 1]),
       supplyApr: apr(first[1 + i * PER_MARKET + 2]),
+      borrowRatePerBlockRaw: ok<bigint>(first[1 + i * PER_MARKET + 1])?.toString() ?? null,
       blocksPerYear,
     });
   });

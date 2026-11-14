@@ -18,11 +18,18 @@ import { formatUnitsExact } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
 import { assetText, sharePriceText } from "@/lib/shared/vault-amount-text";
 import type { VaultStanding, VaultSummary } from "@/lib/vaults/summary";
-import type { VaultFamily } from "@/lib/vaults/families";
+import { VAULT_FAMILIES, type VaultFamily } from "@/lib/vaults/families";
 import { changeText, jumpTail, measuredYield, yieldText, type VaultYield } from "@/lib/vaults/yield";
-import { vaultHoldersProv, vaultWithdrawableProv, vaultYieldProv } from "@/lib/vaults/row-provenance";
+import {
+  vaultAssetGrowthProv,
+  vaultHoldersProv,
+  vaultWithdrawableProv,
+  vaultYieldProv,
+} from "@/lib/vaults/row-provenance";
 import { illiquidSentence, type VaultIlliquid } from "@/lib/vaults/illiquid";
 import { heldAssetsRaw } from "@/lib/vaults/lost-assets";
+import { assetScaleAbsentTip, assetScaleSentence } from "@/lib/vaults/asset-scale-words";
+import { HeadingTip } from "@/components/shared/tip-label";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -45,6 +52,7 @@ export const STANDING_WORD: Record<VaultStanding, string> = {
   "address-book": "in Aave’s address book",
   illiquid: "illiquid",
   "lost-assets": "lost assets",
+  "decimals-disagree": "decimals disagree",
 };
 
 const VENUE: Record<VaultFamily, VaultVenue> = {
@@ -60,12 +68,15 @@ export const VAULT_PILL =
   "rounded-sm bg-rb-300 px-1.5 py-0.5 text-[11px] text-foreground/80 dark:bg-rb-700 dark:text-foreground/60";
 
 export const YIELD_LABEL_TIP =
-  "Rails's figure: the share price's growth over 30 days from the daily store, annualised simply. Net of the fees the vault takes inside the share; rewards paid outside the share are not in it.";
+  "The share price's growth over 30 days from the daily store, annualised simply. Net of the fees the vault takes inside the share; rewards paid outside the share are not in it.";
+
+/** A tip with the family's documented word after it (ui-jobs 664). */
+const withDocsWord = (tip: string, word: string | undefined) => (word ? `${tip} ${word}` : tip);
 
 /** The card's read-mores for the four headlines (decision 0038). */
 export const VAULT_HEAD_TIPS = {
-  totalAssets: "The vault's totalAssets(): everything its shares are a claim on, in its asset, at this block.",
-  sharePrice: "What one whole share converts to in the asset, answered by the vault's convertToAssets at this block.",
+  totalAssets: "Everything the vault's shares are a claim on, in its asset.",
+  sharePrice: "What one whole share of the vault converts to in its asset.",
   yield:
     "Rails's interpretation of two reads of the share price from the daily store, 30 days apart, annualised simply. Net of the fees the vault takes inside the share; rewards paid outside the share are not counted. No forecast.",
   holders:
@@ -112,6 +123,9 @@ export function VaultPills({
           key={s}
           className={VAULT_PILL}
           data-pill={s}
+          title={
+            s === "decimals-disagree" && v.assetScale ? assetScaleSentence(v.asset.symbol, v.assetScale) : undefined
+          }
           {...(s === "endorsed"
             ? { "data-endorsed-badge": "" }
             : s === "shut-down"
@@ -147,7 +161,7 @@ const withProv = (info: Provenance | undefined, text: string) => (info ? <Prov i
 
 /** The Yield slot's caution on an illiquid vault (ui-jobs 540): which markets
  *  hold it, and what can be withdrawn at the read block. `detail` prints the
- *  full figures with the receipt; the row, the compact form. */
+ *  full figures; the row, the compact form. Both carry the receipt (ui-jobs 551). */
 export function IlliquidCaution({ vault: v, il, detail }: { vault: VaultSummary; il: VaultIlliquid; detail: boolean }) {
   const raw = BigInt(il.withdrawable);
   const amount = { raw: il.withdrawable, value: Number(raw) / 10 ** v.asset.decimals };
@@ -161,17 +175,17 @@ export function IlliquidCaution({ vault: v, il, detail }: { vault: VaultSummary;
     <span className="mt-1 block" data-yield-illiquid={il.markets.map((m) => m.id).join(" ")}>
       {illiquidSentence(il)}{" "}
       <span data-illiquid-withdrawable={il.withdrawable}>
-        {detail ? <Prov info={vaultWithdrawableProv(v, il)}>{out}</Prov> : out}
+        <Prov info={vaultWithdrawableProv(v, il)}>{out}</Prov>
       </span>
-      {total != null ? ` of ${total}` : ""} {v.asset.symbol} can be withdrawn at block {n(il.block)}.
+      {total != null ? ` of ${total}` : ""} {v.asset.symbol} can be withdrawn.
     </span>
   );
 }
 
 /** The Total assets slot's caution on a vault whose total includes lost assets
  *  (ui-jobs 543): what was lost and what the vault holds, at the read block.
- *  `detail` prints the full figures with their receipts; the row, the compact
- *  form. The words are lib/vaults/lost-assets.ts `lostAssetsSentence`. */
+ *  `detail` prints the full figures; the row, the compact form. Both carry the
+ *  receipts (ui-jobs 551). The words are lib/vaults/lost-assets.ts `lostAssetsSentence`. */
 export function LostAssetsCaution({
   vault: v,
   receipts,
@@ -188,13 +202,40 @@ export function LostAssetsCaution({
   const text = (a: { raw: string; value: number }) => (detail ? assetText(a, d) : formatCompact(a.value));
   return (
     <span className="block" data-total-assets-lost="">
-      Includes{" "}
-      <span data-lost-assets={v.lostAssets.raw}>
-        {detail ? withProv(receipts.lostAssets, text(v.lostAssets)) : text(v.lostAssets)}
-      </span>{" "}
-      {v.asset.symbol} lost at block {n(v.readAt.block)}. The vault holds{" "}
-      <span data-held-assets={heldRaw}>{detail ? withProv(receipts.heldAssets, text(held)) : text(held)}</span>{" "}
-      {v.asset.symbol}; the share price has not been lowered for the loss, so the holders who withdraw last carry it.
+      Includes <span data-lost-assets={v.lostAssets.raw}>{withProv(receipts.lostAssets, text(v.lostAssets))}</span>{" "}
+      {v.asset.symbol} of lost assets. The vault holds{" "}
+      <span data-held-assets={heldRaw}>{withProv(receipts.heldAssets, text(held))}</span> {v.asset.symbol}; the share
+      price has not been lowered for the loss, so the holders who withdraw last carry it.
+    </span>
+  );
+}
+
+/** "; the wrapped waEthUSDC's share price +0.35% over the same days": an
+ *  Umbrella stake's asset grows inside its own share, which the stake's share
+ *  price cannot show (decision 0047 as amended, ui-jobs 664). Stated beside
+ *  the Yield subline, never added into the figure. */
+function AssetGrowth({ v, y }: { v: VaultSummary; y: MeasuredYield }) {
+  const a = v.assetYield;
+  if (!VAULT_FAMILIES[v.family].assetGrows || !a || !("yearly" in a)) return null;
+  const same = a.from.day === y.from.day && a.to.day === y.to.day;
+  return (
+    <span data-asset-growth={a.change}>
+      {`; the wrapped ${v.asset.symbol}'s share price `}
+      <Prov info={vaultAssetGrowthProv(v, a)}>{changeText(a.change)}</Prov>
+      {same ? " over the same days" : ` over the ${a.days} days to ${formatDate(new Date(a.to.day * 86_400_000))}`}
+    </span>
+  );
+}
+
+/** "decimals disagree" under a "—" where the vault's asset states decimals
+ *  its conversion does not work at (ui-jobs 664): the reason on a press on
+ *  the card, in a title on the row. */
+function ScaleWithheld({ v, detail }: { v: VaultSummary; detail: boolean }) {
+  if (!v.assetScale) return null;
+  const tip = assetScaleAbsentTip(v.asset.symbol, v.assetScale);
+  return (
+    <span data-asset-scale={v.assetScale.implied}>
+      {detail ? <HeadingTip text="decimals disagree" tip={tip} /> : <span title={tip}>decimals disagree</span>}
     </span>
   );
 }
@@ -203,18 +244,17 @@ export function LostAssetsCaution({
  *  figures and gives every label its read-more; else the row's compact form. */
 type MeasuredYield = Extract<VaultYield, { yearly: number }>;
 
-/** The Yield subline's words: "share price +0.42% over the 30 days to block
- *  N", and the one-off move where there is one. */
+/** The Yield subline's words: "share price +0.42% over the 30 days to 12 Nov
+ *  2026" (the latest stored day, decision 0047 point 2), and the one-off move
+ *  where there is one. The two reads' blocks are the figure's receipt. */
 export const yieldSublineText = (y: MeasuredYield): string =>
-  `share price ${changeText(y.change)} over the ${y.days} days to block ${n(y.to.block)}${
+  `share price ${changeText(y.change)} over the ${y.days} days to ${formatDate(new Date(y.to.day * 86_400_000))}${
     y.jump ? jumpTail(y.jump, (d) => formatDate(new Date(d * 86_400_000))) : ""
   }`;
 
-/** "The vault holds 0.000002 USDC at block N.": the too-small subline. */
+/** "The vault holds 0.000002 USDC.": the too-small subline. */
 export const tooSmallSentence = (v: VaultSummary): string =>
-  v.totalAssets
-    ? `The vault holds ${assetText(v.totalAssets, v.asset.decimals)} ${v.asset.symbol} at block ${n(v.readAt.block)}.`
-    : "";
+  v.totalAssets ? `The vault holds ${assetText(v.totalAssets, v.asset.decimals)} ${v.asset.symbol}.` : "";
 
 export function vaultHeads({
   vault: v,
@@ -234,51 +274,64 @@ export function vaultHeads({
     {
       id: "total-assets",
       label: "Total assets",
+      // The vault's figures carry their asset inside the value (InAsset), so
+      // the tiers are named (decision 0066 point 2).
+      tier: "amount",
       labelTip: detail ? VAULT_HEAD_TIPS.totalAssets : undefined,
-      value: v.totalAssets ? (
-        <span
-          data-cell="total-assets"
-          {...(detail ? { "data-figure": "total-assets", "data-raw": v.totalAssets.raw } : {})}
-        >
-          <InAsset v={v} exact={formatUnitsExact(v.totalAssets.raw, v.asset.decimals)}>
-            {detail ? (
-              // A phone's half-width column cannot hold nine digits and cents
-              // at headline size: it reads the compact form, the full figure
-              // from sm up, which carries the receipt.
-              <>
-                <span className="sm:hidden" data-prov-exempt="">
-                  {formatCompact(v.totalAssets.value)}
-                </span>
-                <span className="hidden sm:inline" data-figure-value="">
-                  {withProv(receipts.totalAssets, assetText(v.totalAssets, v.asset.decimals))}
-                </span>
-              </>
-            ) : (
-              withProv(receipts.totalAssets, formatCompact(v.totalAssets.value))
-            )}
-          </InAsset>
-        </span>
-      ) : null,
-      ...(v.standing.includes("lost-assets")
-        ? { sub: <LostAssetsCaution vault={v} receipts={receipts} detail={detail} /> }
-        : {}),
+      value:
+        v.totalAssets && !v.assetScale ? (
+          <span
+            data-cell="total-assets"
+            {...(detail ? { "data-figure": "total-assets", "data-raw": v.totalAssets.raw } : {})}
+          >
+            <InAsset v={v} exact={formatUnitsExact(v.totalAssets.raw, v.asset.decimals)}>
+              {detail ? (
+                // A phone's half-width column cannot hold nine digits and cents
+                // at headline size: it reads the compact form, the full figure
+                // from sm up, which carries the receipt.
+                <>
+                  <span className="sm:hidden" data-prov-exempt="">
+                    {formatCompact(v.totalAssets.value)}
+                  </span>
+                  <span className="hidden sm:inline" data-figure-value="">
+                    {withProv(receipts.totalAssets, assetText(v.totalAssets, v.asset.decimals))}
+                  </span>
+                </>
+              ) : (
+                withProv(receipts.totalAssets, formatCompact(v.totalAssets.value))
+              )}
+            </InAsset>
+          </span>
+        ) : null,
+      // The scale first: a vault with both never prints the caution's amounts
+      // at a scale that is off (ui-jobs 664).
+      ...(v.assetScale
+        ? { sub: <ScaleWithheld v={v} detail={detail} /> }
+        : v.standing.includes("lost-assets")
+          ? { sub: <LostAssetsCaution vault={v} receipts={receipts} detail={detail} /> }
+          : {}),
     },
     {
       id: "share-price",
       label: "Share price",
-      labelTip: detail ? VAULT_HEAD_TIPS.sharePrice : undefined,
-      value: v.sharePrice ? (
-        <span
-          data-cell="share-price"
-          {...(detail ? { "data-figure": "share-price", "data-raw": v.sharePrice.raw } : {})}
-        >
-          <InAsset v={v} exact={formatUnitsExact(v.sharePrice.raw, v.asset.decimals)}>
-            <span data-figure-value="">
-              {withProv(receipts.sharePrice, sharePriceText(v.sharePrice, v.asset.decimals))}
-            </span>
-          </InAsset>
-        </span>
-      ) : null,
+      tier: "measure",
+      labelTip: detail
+        ? withDocsWord(VAULT_HEAD_TIPS.sharePrice, VAULT_FAMILIES[v.family].sharePriceDocsWord)
+        : undefined,
+      value:
+        v.sharePrice && !v.assetScale ? (
+          <span
+            data-cell="share-price"
+            {...(detail ? { "data-figure": "share-price", "data-raw": v.sharePrice.raw } : {})}
+          >
+            <InAsset v={v} exact={formatUnitsExact(v.sharePrice.raw, v.asset.decimals)}>
+              <span data-figure-value="">
+                {withProv(receipts.sharePrice, sharePriceText(v.sharePrice, v.asset.decimals))}
+              </span>
+            </InAsset>
+          </span>
+        ) : null,
+      ...(v.assetScale ? { sub: <ScaleWithheld v={v} detail={detail} /> } : {}),
     },
   ];
 
@@ -287,11 +340,12 @@ export function vaultHeads({
   // no figure and a subline saying why; a vault under the dust floor is too
   // small to measure (ui-jobs 542). The interpretation tip goes with the label.
   const yieldFigure = measuredYield(storeYield, v.totalAssets?.raw);
+  const docsWord = VAULT_FAMILIES[v.family].yieldDocsWord;
   if (yieldFigure && "yearly" in yieldFigure) {
     heads.push({
       id: "yield",
       label: "Yield",
-      labelTip: detail ? VAULT_HEAD_TIPS.yield : YIELD_LABEL_TIP,
+      labelTip: withDocsWord(detail ? VAULT_HEAD_TIPS.yield : YIELD_LABEL_TIP, docsWord),
       labelTipOnListing: true,
       value: (
         <span
@@ -315,6 +369,7 @@ export function vaultHeads({
             : {})}
         >
           {yieldSublineText(yieldFigure)}
+          <AssetGrowth v={v} y={yieldFigure} />
           {v.illiquid && <IlliquidCaution vault={v} il={v.illiquid} detail={detail} />}
         </span>
       ),
@@ -323,7 +378,7 @@ export function vaultHeads({
     heads.push({
       id: "yield",
       label: "Yield",
-      labelTip: detail ? VAULT_HEAD_TIPS.yield : undefined,
+      labelTip: detail ? withDocsWord(VAULT_HEAD_TIPS.yield, docsWord) : undefined,
       value: (
         <span className="text-[15px] font-normal text-rb-500" data-cell="yield" data-yield-none="too-small">
           too small to measure
@@ -341,7 +396,7 @@ export function vaultHeads({
     heads.push({
       id: "yield",
       label: "Yield",
-      labelTip: detail ? VAULT_HEAD_TIPS.yield : undefined,
+      labelTip: detail ? withDocsWord(VAULT_HEAD_TIPS.yield, docsWord) : undefined,
       value: null,
       sub: (
         <span data-yield-none={none}>

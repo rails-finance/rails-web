@@ -9,7 +9,8 @@
 //     itself prices with; USD scale 1e(36 − underlying decimals). Chain-derived
 //     USD, survives the on-chain-only gate.
 //   • borrow/supplyRatePerTimestamp — per-SECOND rates (Moonwell's Base/
-//     Moonbeam accrual convention), annualized here (× 31,536,000).
+//     Moonbeam accrual convention), as APYs compounded every second of
+//     31,536,000 (lib/comptroller/apy.ts).
 //
 // The four markets are read at one block, through rails-server's head routes
 // and, when the latest read fails, its stored snapshot (surface
@@ -24,12 +25,14 @@
 
 import { getAddress, parseAbi, type PublicClient } from "viem";
 import { chainClient } from "./rpc";
+import { moonwellApy } from "@/lib/comptroller/apy";
 import { withHeadSnapshot } from "@/lib/sources/api/head-snapshot";
 import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
 import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import type { StoredHeadRead } from "@/lib/shared/server-head-read";
 import { BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { resolveErc20Meta, scaleRaw, assertDecimalsRead } from "./erc20-meta";
+import { jumpRateModel, type ComptrollerRateModel } from "@/lib/comptroller/rate-model";
 import {
   MOONWELL_MARKETS,
   MOONWELL_ADDRESSES,
@@ -48,10 +51,10 @@ const ORACLE_ABI = parseAbi(["function getUnderlyingPrice(address mToken) view r
 const SECONDS_PER_YEAR = 31_536_000;
 
 /** A per-TIMESTAMP rate (1e18 mantissa, Moonwell's per-second accrual) as an
- *  annualized simple fraction — one definition for every surface that states
- *  a Moonwell rate, on either deployment. */
-export function annualizePerTimestamp(raw: bigint | string): number {
-  return (Number(BigInt(raw)) / 1e18) * SECONDS_PER_YEAR;
+ *  APY fraction (lib/comptroller/apy.ts) — one definition for every surface
+ *  that states a Moonwell rate, on either deployment. */
+export function perTimestampApy(raw: bigint | string): number {
+  return moonwellApy(BigInt(raw));
 }
 
 export interface MoonwellMarketState {
@@ -63,7 +66,7 @@ export interface MoonwellMarketState {
   exchangeRateRaw: string;
   /** Oracle USD per whole underlying token (chain-derived). */
   priceUsd: number | null;
-  /** Annualized simple rates (fraction, e.g. 0.0135 = 1.35% APR). */
+  /** APYs as fractions (0.0135 = 1.35%), compounded every second. */
   borrowApr: number | null;
   supplyApr: number | null;
 }
@@ -149,7 +152,7 @@ async function readMarketState(client: PublicClient): Promise<MoonwellMarketStat
         ? Number(price.result as bigint) / 10 ** (36 - m.decimals)
         : null;
     const apr = (r: { status: string; result?: unknown } | undefined): number | null =>
-      r?.status === "success" && r.result != null ? annualizePerTimestamp(r.result as bigint) : null;
+      r?.status === "success" && r.result != null ? perTimestampApy(r.result as bigint) : null;
     out.set(m.key, {
       market: m.key,
       exchangeRate,
@@ -189,10 +192,11 @@ async function readMarketState(client: PublicClient): Promise<MoonwellMarketStat
 //   • Accrual does NOT transfer. Moonwell kept its Base/Moonbeam per-SECOND
 //     convention: borrowRatePerTimestamp() answers and borrowRatePerBlock()
 //     REVERTS (verified 2026-07-16, scripts/verify-moonwell-chain.mjs asserts
-//     the same). Rates are annualized on the rate model's OWN
-//     timestampsPerYear() — 31,536,000 on all four models — with the file's
-//     SECONDS_PER_YEAR as the fallback when a model won't answer, because
-//     per-timestamp is wall-clock seconds by definition. No blocksPerYear
+//     the same). Rates are APYs compounded every second of 31,536,000
+//     (lib/comptroller/apy.ts); the curve's terms are annualized on the rate
+//     model's timestampsPerYear() — 31,536,000 on all four models — with the
+//     file's SECONDS_PER_YEAR as the fallback when a model won't answer,
+//     because per-timestamp is wall-clock seconds by definition. No blocksPerYear
 //     notion appears anywhere in this lane.
 //   • The oracle lane simplifies. Moonwell's oracle is one Chainlink wrapper
 //     for every market (provenance grade: chain-derived) — there is no
@@ -244,7 +248,18 @@ const ROSTER_MTOKEN_ABI = parseAbi([
 const ROSTER_IRM_ABI = parseAbi([
   "function kink() view returns (uint256)",
   "function timestampsPerYear() view returns (uint256)",
+  // The jump-rate model's terms, per second (lib/comptroller/rate-model.ts).
+  "function baseRatePerTimestamp() view returns (uint256)",
+  "function multiplierPerTimestamp() view returns (uint256)",
+  "function jumpMultiplierPerTimestamp() view returns (uint256)",
 ]);
+const ROSTER_IRM_CALLS = [
+  "kink",
+  "timestampsPerYear",
+  "baseRatePerTimestamp",
+  "multiplierPerTimestamp",
+  "jumpMultiplierPerTimestamp",
+] as const;
 
 export interface MoonwellMarketRow {
   /** The mToken address — the key. */
@@ -304,12 +319,15 @@ export interface MoonwellMarketRow {
   mintPaused: boolean;
   borrowPaused: boolean;
 
-  /** Annual percent (5.2 = 5.2%) from the protocol's own per-SECOND rates on
-   *  the model's own timestampsPerYear. (The overlay lane's
-   *  MoonwellMarketState above reports fractions; this row matches the
-   *  protocol view's rendering, which prints percents.) */
+  /** APY in percent (5.2 = 5.2%) from the protocol's per-SECOND rates,
+   *  compounded every second of 31,536,000 (lib/comptroller/apy.ts). (The
+   *  overlay lane's MoonwellMarketState above reports fractions; this row
+   *  matches the protocol view's rendering, which prints percents.) */
   supplyApr: number | null;
   borrowApr: number | null;
+  /** The per-second rates as read (1e18 mantissas), for the receipts. */
+  supplyRatePerTimestampRaw: string | null;
+  borrowRatePerTimestampRaw: string | null;
   reserveFactor: number | null;
 
   /** This market's interest rate model and the two things read from it. */
@@ -320,6 +338,8 @@ export interface MoonwellMarketRow {
   /** The utilisation the rate curve turns at, as a fraction — per-market,
    *  never assumed; the roster does not share one. */
   kink: number | null;
+  /** The model's terms as annual fractions; null where the model does not answer them. */
+  rateModel: ComptrollerRateModel | null;
 }
 
 export interface MoonwellMarketsResponse {
@@ -482,10 +502,7 @@ async function readMarkets(client: PublicClient, deployment: MoonwellDeployment)
     ...atBlock,
     contracts: irmOf.flatMap((irm) => {
       const addr = (irm && !isZeroAddr(irm) ? irm : comptroller) as `0x${string}`;
-      return [
-        { address: addr, abi: ROSTER_IRM_ABI, functionName: "kink" },
-        { address: addr, abi: ROSTER_IRM_ABI, functionName: "timestampsPerYear" },
-      ] as const;
+      return ROSTER_IRM_CALLS.map((functionName) => ({ address: addr, abi: ROSTER_IRM_ABI, functionName }));
     }),
   })) as Res[];
 
@@ -552,17 +569,18 @@ async function readMarkets(client: PublicClient, deployment: MoonwellDeployment)
     const supplyCapOneUnit = oneUnit(results[base + 11]);
     const borrowCapOneUnit = oneUnit(results[base + 12]);
 
-    // Annualize the per-SECOND rates on the model's own timestampsPerYear;
-    // fall back to the file's
-    // SECONDS_PER_YEAR when a model won't answer — per-timestamp is
-    // wall-clock seconds by definition, so the constant is the convention
-    // itself, not a guess about block cadence.
-    const kinkRaw = ok<bigint>(irmRes[i * 2]);
-    const tpyRaw = ok<bigint>(irmRes[i * 2 + 1]);
+    // The per-SECOND rates as APYs compounded every second of 31,536,000
+    // (lib/comptroller/apy.ts). The model's timestampsPerYear still sets its
+    // curve's terms, with the file's SECONDS_PER_YEAR where a model won't
+    // answer — per-timestamp is wall-clock seconds by definition.
+    const irm = (k: (typeof ROSTER_IRM_CALLS)[number]) =>
+      ok<bigint>(irmRes[i * ROSTER_IRM_CALLS.length + ROSTER_IRM_CALLS.indexOf(k)]);
+    const kinkRaw = irm("kink");
+    const tpyRaw = irm("timestampsPerYear");
     const timestampsPerYear = tpyRaw != null && tpyRaw > ZERO ? Number(tpyRaw) : null;
     const apr = (r: Res | undefined): number | null => {
       const v = ok<bigint>(r);
-      return v != null ? (Number(v) / 1e18) * (timestampsPerYear ?? SECONDS_PER_YEAR) * 100 : null;
+      return v != null ? moonwellApy(v) * 100 : null;
     };
 
     return {
@@ -598,6 +616,8 @@ async function readMarkets(client: PublicClient, deployment: MoonwellDeployment)
 
       supplyApr: apr(results[base + 7]),
       borrowApr: apr(results[base + 6]),
+      supplyRatePerTimestampRaw: ok<bigint>(results[base + 7])?.toString() ?? null,
+      borrowRatePerTimestampRaw: ok<bigint>(results[base + 6])?.toString() ?? null,
       reserveFactor: (() => {
         const v = ok<bigint>(results[base + 8]);
         return v != null ? Number(v) / 1e18 : null;
@@ -606,6 +626,15 @@ async function readMarkets(client: PublicClient, deployment: MoonwellDeployment)
       interestRateModel: irmOf[i] && !isZeroAddr(irmOf[i]) ? getAddress(irmOf[i]!).toLowerCase() : null,
       timestampsPerYear,
       kink: kinkRaw != null && kinkRaw > ZERO ? Number(kinkRaw) / 1e18 : null,
+      rateModel: jumpRateModel(
+        {
+          base: irm("baseRatePerTimestamp"),
+          multiplier: irm("multiplierPerTimestamp"),
+          jump: irm("jumpMultiplierPerTimestamp"),
+          kink: kinkRaw,
+        },
+        timestampsPerYear ?? SECONDS_PER_YEAR,
+      ),
     };
   });
 

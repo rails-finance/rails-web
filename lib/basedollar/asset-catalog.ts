@@ -17,6 +17,7 @@
 // sibling fork.
 
 import { chainMeta, BASE_CHAIN_ID } from "@/lib/shared/chains";
+import type { BranchShutdownRecord, ShutdownRead } from "@/lib/liquity-fork/shutdown";
 
 export interface BasedollarBranch {
   /** Lowercase branch key as stored in the MV (weth | wsteth | reth | wcbbtc | cbeth). */
@@ -29,6 +30,11 @@ export interface BasedollarBranch {
   collateralAddr: string;
   /** The branch's TroveManager — emits TroveUpdated / TroveOperation. */
   troveManager: string;
+  /** Where the branch answers its shutdown (ui-jobs 612): `TroveManager.shutdownTime()`,
+   *  0 while live. Every branch answered 0 on 12 Nov 2026. */
+  shutdownRead: ShutdownRead;
+  /** The branch's shutdown as recorded, where it is recorded (decision 0054 ruling 2). */
+  shutdownRecord?: BranchShutdownRecord;
   /** The branch's BorrowerOperations — owner of MCR/CCR/SCR/BCR here. */
   borrowerOperations: string;
   /** The branch's own PriceFeed. lastGoodPrice is STALE on quiet branches —
@@ -58,6 +64,11 @@ export const BASEDOLLAR_BRANCHES: Record<string, BasedollarBranch> = {
     decimals: 18,
     collateralAddr: "0x4200000000000000000000000000000000000006",
     troveManager: "0xa957d42c4c43eb97d5f71b8435eb638e5dd9f639",
+    shutdownRead: {
+      contract: "TroveManager",
+      address: "0xa957d42c4c43eb97d5f71b8435eb638e5dd9f639",
+      call: "shutdownTime",
+    },
     borrowerOperations: "0x1867772fba1bcc13d94eb22f1d100ce524148a3f",
     priceFeed: "0x40b4199347af7738643ef4a12a771f7421b84e7f",
     sortedTroves: "0x4f1d9102448fde06955a6cd20d085d6b468e92ad",
@@ -73,6 +84,11 @@ export const BASEDOLLAR_BRANCHES: Record<string, BasedollarBranch> = {
     decimals: 18,
     collateralAddr: "0xc1cba3fcea344f92d9239c08c0568f6f2f0ee452",
     troveManager: "0x79a6a3361eae4d4b80939206426f2320c11a4bfb",
+    shutdownRead: {
+      contract: "TroveManager",
+      address: "0x79a6a3361eae4d4b80939206426f2320c11a4bfb",
+      call: "shutdownTime",
+    },
     borrowerOperations: "0xc4b0a1011f2cb0438429724594d2ab3d4d8ef54a",
     priceFeed: "0x176363a20ba1dc75b418d7954f5222499b276186",
     sortedTroves: "0x4dad0339c1c33a247fc137f44bbc5dbe8df80ee1",
@@ -88,6 +104,11 @@ export const BASEDOLLAR_BRANCHES: Record<string, BasedollarBranch> = {
     decimals: 18,
     collateralAddr: "0xb6fe221fe9eef5aba221c348ba20a1bf5e73624c",
     troveManager: "0xd31987fcba98f471b6e4220c52f7741b11b2fc5e",
+    shutdownRead: {
+      contract: "TroveManager",
+      address: "0xd31987fcba98f471b6e4220c52f7741b11b2fc5e",
+      call: "shutdownTime",
+    },
     borrowerOperations: "0x69e933767974fcd7cabeea976226783f4b952521",
     priceFeed: "0x6627b94533be5bba42d1aaaf982330e9746b6133",
     sortedTroves: "0x637344c0634626bb5d3c8fd5cc0fb332558778f8",
@@ -103,6 +124,11 @@ export const BASEDOLLAR_BRANCHES: Record<string, BasedollarBranch> = {
     decimals: 18,
     collateralAddr: "0x92a7aee8afaa71ba0a9cc04a3dbe1f34237c33e0",
     troveManager: "0x835b04eefbb0e32d8f75cfe96acb527a42f1a0d9",
+    shutdownRead: {
+      contract: "TroveManager",
+      address: "0x835b04eefbb0e32d8f75cfe96acb527a42f1a0d9",
+      call: "shutdownTime",
+    },
     borrowerOperations: "0xb9a3c82486d0b6d72dec55fcc9192af09aaa393b",
     priceFeed: "0x9e191d9f3f3c138c81753acf6f4ec32e84daa89e",
     sortedTroves: "0xe55530a4205ec2eda84adf9f5efb2f456d5cb721",
@@ -118,6 +144,11 @@ export const BASEDOLLAR_BRANCHES: Record<string, BasedollarBranch> = {
     decimals: 18,
     collateralAddr: "0x2ae3f1ec7f1f5012cfeab0185bfc7aa3cf0dec22",
     troveManager: "0x482de97e667330afba99f8ced527118aec66f15d",
+    shutdownRead: {
+      contract: "TroveManager",
+      address: "0x482de97e667330afba99f8ced527118aec66f15d",
+      call: "shutdownTime",
+    },
     borrowerOperations: "0xfa6e7e44e538b2cf7d73720b2b1942ab28abd1d5",
     priceFeed: "0x23bb111e94ec68009da6b8fc50c19628a972b9e0",
     sortedTroves: "0x2792304889f35b60ccd79c3e173837bc6ec3ab44",

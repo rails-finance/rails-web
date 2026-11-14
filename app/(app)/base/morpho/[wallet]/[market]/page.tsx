@@ -69,7 +69,7 @@ export default async function MorphoBasePositionPage({ params, searchParams }: P
   const vaultOwner = morphoBaseVaultOwnerNote(wallet);
 
   return (
-    <PositionReadProvider key={`${wallet}:${market}`} read={tail.head ? read : null}>
+    <PositionReadProvider focus={{ source: tail.head }} key={`${wallet}:${market}`} read={tail.head ? read : null}>
       <MorphoBasePositionView
         // Keyed on the pair so a client-side navigation to another market or
         // account remounts with that position's server read as its initial state.

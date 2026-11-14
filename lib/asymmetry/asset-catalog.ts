@@ -14,6 +14,7 @@
 // by scripts/verify-liquity-forks-chain.mjs.
 
 import { chainMeta, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import type { BranchShutdownRecord, ShutdownRead } from "@/lib/liquity-fork/shutdown";
 
 export interface AsymmetryBranch {
   /** Lowercase branch key as stored in the MV (ysybold | scrvusd | susds | sfrxusd | tbtc | wbtc18 | cbbtc18). */
@@ -31,6 +32,11 @@ export interface AsymmetryBranch {
   collateralAddr: string;
   /** The branch's TroveManager — emits TroveUpdated / TroveOperation. */
   troveManager: string;
+  /** Where the branch answers its shutdown (ui-jobs 612): `TroveManager.shutdownTime()`,
+   *  0 while live. Every branch answered 0 on 12 Nov 2026. */
+  shutdownRead: ShutdownRead;
+  /** The branch's shutdown as recorded, where it is recorded (decision 0054 ruling 2). */
+  shutdownRecord?: BranchShutdownRecord;
   /** The branch's own PriceFeed (BO storage slot 2, chain-verified). The lane
    *  simulates fetchPrice via eth_call (lastGoodPrice lags between user ops). */
   priceFeed: string;
@@ -55,6 +61,11 @@ export const ASYMMETRY_BRANCHES: Record<string, AsymmetryBranch> = {
     decimals: 18,
     collateralAddr: "0x23346b04a7f55b8760e5860aa5a77383d63491cd",
     troveManager: "0xf8a25a2e4c863bb7cea7e4b4eeb3866bb7f11718",
+    shutdownRead: {
+      contract: "TroveManager",
+      address: "0xf8a25a2e4c863bb7cea7e4b4eeb3866bb7f11718",
+      call: "shutdownTime",
+    },
     priceFeed: "0x7f575323ddedfbad449fef5459fad031fe49520b",
     sortedTroves: "0x98d9b02b41cc2f8e72775da528401a33765bc166",
     troveNft: "0x63321ee523a8d4e23c65a9206da5a755dd6a72fe",
@@ -68,6 +79,11 @@ export const ASYMMETRY_BRANCHES: Record<string, AsymmetryBranch> = {
     decimals: 18,
     collateralAddr: "0x0655977feb2f289a4ab78af67bab0d17aab84367",
     troveManager: "0x7aff0173e3d7c5416d8caa3433871ef07568220d",
+    shutdownRead: {
+      contract: "TroveManager",
+      address: "0x7aff0173e3d7c5416d8caa3433871ef07568220d",
+      call: "shutdownTime",
+    },
     priceFeed: "0xf125c72ae447efdf3fa3601eda9ac0ebec06cbb8",
     sortedTroves: "0x233817bd6970f2ec7f6963b02ab941dec0a87a70",
     troveNft: "0x5aad68387cec384dc4d7af6bfc23f4f05e424d85",
@@ -81,6 +97,11 @@ export const ASYMMETRY_BRANCHES: Record<string, AsymmetryBranch> = {
     decimals: 18,
     collateralAddr: "0xa3931d71877c0e7a3148cb7eb4463524fec27fbd",
     troveManager: "0x53ce82ac43660aab1f80fecd1d74afe7a033d505",
+    shutdownRead: {
+      contract: "TroveManager",
+      address: "0x53ce82ac43660aab1f80fecd1d74afe7a033d505",
+      call: "shutdownTime",
+    },
     priceFeed: "0x2113468843cf2d0fd976690f4ec6e4213df46911",
     sortedTroves: "0x1d9cc5a514368e6f28eba79b2db8fa5c9484b058",
     troveNft: "0x0f462915322cc2ca01f2e1e3dc7c598c43929b55",
@@ -94,6 +115,11 @@ export const ASYMMETRY_BRANCHES: Record<string, AsymmetryBranch> = {
     decimals: 18,
     collateralAddr: "0xcf62f905562626cfcdd2261162a51fd02fc9c5b6",
     troveManager: "0x478e7c27193aca052964c3306d193446027630b0",
+    shutdownRead: {
+      contract: "TroveManager",
+      address: "0x478e7c27193aca052964c3306d193446027630b0",
+      call: "shutdownTime",
+    },
     priceFeed: "0x653df748bf7a692555dcdbf4c504a8c84807f7c7",
     sortedTroves: "0x7c1765fd1ab5afaed4a0a0ac74b2e4c45f5a5572",
     troveNft: "0x6563200449414f8d147d34d0f043045e48ddc89f",
@@ -107,6 +133,11 @@ export const ASYMMETRY_BRANCHES: Record<string, AsymmetryBranch> = {
     decimals: 18,
     collateralAddr: "0x18084fba666a33d37592fa2633fd49a74dd93a88",
     troveManager: "0xfb17d0402ae557e3efa549812b95e931b2b63bce",
+    shutdownRead: {
+      contract: "TroveManager",
+      address: "0xfb17d0402ae557e3efa549812b95e931b2b63bce",
+      call: "shutdownTime",
+    },
     priceFeed: "0xeaf3b36748d89d64ef1b6b3e1d7637c3e4745094",
     sortedTroves: "0xd7a4d09680b8211940f19e1d1d25dc6568a4e0d0",
     troveNft: "0x7ff33ef1a2dcb95c711cc13b890be183f6288e6b",
@@ -120,6 +151,11 @@ export const ASYMMETRY_BRANCHES: Record<string, AsymmetryBranch> = {
     decimals: 18,
     collateralAddr: "0xe065bc161b90c9c4bba2de7f1e194b70a3267c47",
     troveManager: "0x7bd47eca45ee18609d3d64ba683ce488ca9320a3",
+    shutdownRead: {
+      contract: "TroveManager",
+      address: "0x7bd47eca45ee18609d3d64ba683ce488ca9320a3",
+      call: "shutdownTime",
+    },
     priceFeed: "0x4b74d043336678d2f62dae6595bc42dccabc3bb1",
     sortedTroves: "0x4b677b2c2bdaa64bca08c62c4596d526e319ea7b",
     troveNft: "0xcc47da99965e3c8dd89b6e9305bb10232a314d23",
@@ -133,6 +169,11 @@ export const ASYMMETRY_BRANCHES: Record<string, AsymmetryBranch> = {
     decimals: 18,
     collateralAddr: "0x7fd713fe57fcd0a7636c152faba6bdc2d3b27d15",
     troveManager: "0x0291c873838f7b62d743952d268bebe9ace1efa4",
+    shutdownRead: {
+      contract: "TroveManager",
+      address: "0x0291c873838f7b62d743952d268bebe9ace1efa4",
+      call: "shutdownTime",
+    },
     priceFeed: "0xaf99e6cf5832222c0e22ef6bf0868c4ed7f2953f",
     sortedTroves: "0x2e937bbf06ad085e98d6eddec887589d61edd3b7",
     troveNft: "0x274d12cc490d93371e36e1204ae4988cb83d26a5",

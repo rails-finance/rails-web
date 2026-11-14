@@ -11,6 +11,12 @@ import { formatExact } from "@/lib/utils/format";
 import { formatCompactUsd, formatUsdValue } from "@/components/shared/economics-chart-primitives";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { forkLiquidationReserve } from "@/lib/shared/liquity-fork-ops";
+import { liquityFamilyTerms, type LiquityFamilyTerms } from "@/lib/liquity/ltv";
+import { liquityShutdownConcept } from "@/lib/shared/learn-more-content";
+import type { BranchShutdownState } from "@/lib/liquity-fork/shutdown";
+
+/** The fee drawing debt adds, named as the deployment's docs name it. */
+const upfrontInSentence = (t: LiquityFamilyTerms): string => `the ${t.upfrontFeeText}`;
 import { formatCompact } from "@/lib/shared/format-compact";
 
 const DUST = 1e-9;
@@ -24,6 +30,9 @@ export interface LiquityForkEconomicsParams {
    *  fork's docs were read (Ebisu, Asymmetry, 2026-09-28), else the single
    *  general link. */
   docsLinks?: LearnMoreLink[];
+  /** The branch's shutdown (ui-jobs 612): interest stopped and standard
+   *  redemptions skip the branch, so the panel's present-tense lines change. */
+  shutdown?: BranchShutdownState | null;
 }
 
 /** The Trove's redemptions as Liquity V2 states them: the debt they cleared at
@@ -63,9 +72,10 @@ const liquidatedLine = (side: TowerSideData) => side.liquidated.find((l) => l.fl
  *  derived from `data`. Returns null when there's nothing to narrate. */
 export function liquityForkEconomicsExplanation(
   data: LiquityForkTowerData,
-  { name, debtSymbol }: LiquityForkEconomicsParams,
+  { name, debtSymbol, shutdown }: LiquityForkEconomicsParams,
 ): ReactNode {
   const { collateral, debt, valued } = data;
+  const terms = liquityFamilyTerms(name);
   const collSym = sideSymbol(collateral, "collateral");
   const debtSym = sideSymbol(debt, debtSymbol);
   const bullets: ReactNode[] = [];
@@ -162,22 +172,37 @@ export function liquityForkEconomicsExplanation(
   if (collNow || debtNow) {
     bullets.push(
       <span key="current">
-        The trove currently holds {collNow ? fig(collNow.amount, collNow.usd, valued, collSym) : `no ${collSym}`}{" "}
-        backing {debtNow ? fig(debtNow.amount, debtNow.usd, valued, debtSym) : "no debt"}.
+        The trove {shutdown ? "records" : "currently holds"}{" "}
+        {collNow ? fig(collNow.amount, collNow.usd, valued, collSym) : `no ${collSym}`} backing{" "}
+        {debtNow ? fig(debtNow.amount, debtNow.usd, valued, debtSym) : "no debt"}.
       </span>,
     );
+    // A record that says closing reverts leaves no refund to state.
     if (reserve) {
-      bullets.push(<span key="liq-reserve">{reserve} is held in reserve and refunded when the trove is closed.</span>);
+      bullets.push(
+        <span key="liq-reserve">
+          {shutdown?.record?.reverts?.includes("closeTrove")
+            ? `${reserve} is held in reserve.`
+            : `${reserve} is held in reserve and refunded when the trove is closed.`}
+        </span>,
+      );
     }
   } else if (bullets.length > 0) {
     bullets.push(<span key="closed">The trove is closed. No collateral or debt remain.</span>);
   }
 
   bullets.push(
-    <span key="mechanic">
-      {name} is a Liquity V2 fork: this trove carries an interest rate (set by its owner or delegated to a batch
-      manager) that accrues into the debt, and redemptions sweep the branch&apos;s lowest rates first.
-    </span>,
+    shutdown ? (
+      <span key="mechanic">
+        {name} is a Liquity V2 fork: this trove&apos;s interest stopped when its {terms.branch} shut down, and standard
+        redemptions skip the {terms.branch}.
+      </span>
+    ) : (
+      <span key="mechanic">
+        {name} is a Liquity V2 fork: this trove carries an interest rate (set by its owner or by a {terms.delegate})
+        that accrues into the debt, and redemptions sweep the branch&apos;s lowest rates first.
+      </span>
+    ),
   );
 
   if (!valued) {
@@ -301,7 +326,7 @@ export function liquityForkEconomicsContent({
     stepsHeading: "How the tower is built:",
     steps: [
       "Deposited, withdrawn, borrowed and repaid are summed from the trove's own signed balance deltas, event by event.",
-      'Debt increases counted as "borrowed" include new draws, the one-time upfront fee, and interest applied whenever an operation touched the trove.',
+      `Debt increases counted as "borrowed" include new draws, ${upfrontInSentence(liquityFamilyTerms(name))}, and interest applied whenever an operation touched the trove.`,
       "Redemptions and liquidations are kept apart from voluntary flows, each in its own bar.",
       "USD values use the branch's oracle price for collateral, and appear only once that on-chain price has loaded.",
       "The borrower's net outcome from redemptions sets the debt they cleared against the collateral they took, valued at the price each Redemption log emitted, and again at the latest block's price.",
@@ -310,12 +335,13 @@ export function liquityForkEconomicsContent({
     details: [
       {
         bold: "User-set (or delegated) interest",
-        text: "each trove carries its own annual rate (set by the borrower or a batch manager they delegate to), accruing continuously into the debt.",
+        text: `each trove carries its own annual rate (set by the borrower or a ${liquityFamilyTerms(name).delegate} they delegate to), accruing continuously into the debt.`,
       },
       {
         bold: "Redemption queue",
         text: `${debtSymbol} holders can redeem at $1 face against the branch's lowest-rate troves first. This is a peg mechanism, not a penalty.`,
       },
+      liquityShutdownConcept(liquityFamilyTerms(name), "flows"),
     ],
     links: docsLinks && docsLinks.length > 0 ? docsLinks : undefined,
   };

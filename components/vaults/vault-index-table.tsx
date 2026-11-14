@@ -1,16 +1,21 @@
 "use client";
 
-// The cross-protocol vault index as a table (rails-ops ui-jobs 538, V6): the
-// rows of `/vaults`, drawn inside the shared roster's controls.
+// The vault table (rails-ops ui-jobs 538, V6): the rows of `/vaults` and of
+// every family's roster (ui-jobs 605), drawn inside the shared roster's controls.
 // ----------------------------------------------------------------------------
-// One row per vault in the house table (components/shared/data-table): the
-// lead zone (the protocol's tint, mark and chain, named for a screen reader
-// and in its tooltip), Vault (the asset's icon, the name linking the vault's
+// One row per vault in the house table (components/shared/data-table): on the
+// index the lead zone (the protocol's tint, mark and chain, named for a screen
+// reader and in its tooltip; `leadOf`), which a one-protocol roster omits
+// (ui-jobs 605), then Vault (the asset's icon, the name linking the vault's
 // page under its protocol, the standing pills beneath where there are any),
-// then Total assets, Share price, Yield and Holders (the census's open
-// count). The figures print as the row prints them (vaultHeads, yieldText) as
-// plain values: the index carries no receipts (Miles, 8 Nov 2026), and each
-// vault's page keeps them.
+// then Kind (the family's kind; on a roster its family and release, as its
+// cards printed them, `kindOf`), Total assets, Share price, Yield and Holders (the census's open
+// count), Steward, and last the Compare tick (E2, ui-jobs 553 door 3). The
+// figures print as the row prints them (vaultHeads, yieldText), each in its
+// family's receipt at its roster's block (decision 0062 point 5; ui-jobs
+// 571): every row is its own receipts scope, so the locator pulse stays in the
+// row. The name is the row's link and carries none, so a press on it opens
+// the vault while the inspector is armed.
 //
 // SORT. Each column header is a button; the sort lives in `?sort=` and
 // `?dir=`, each written only off its default (Holders, most first, as the
@@ -26,12 +31,13 @@
 // (ui-jobs 543), and the cell prints the stated total.
 //
 // The whole row links the vault's page (the name is the one focusable link).
-// BELOW sm each row reads as a card (D6): the protocol's hue as its left edge,
-// the mark and chain beside the asset's icon, the name across, the figures
+// BELOW sm each row reads as a card (D6): on the index the mark and chain
+// beside the asset's icon, the name across, the figures
 // two by two under their labels; the toolbar sorts (N1.3, `useVaultIndexSort`).
 
 import Link from "next/link";
 import { useCallback, type ReactNode } from "react";
+import { Prov, ProvReceiptsScope, useReceiptRegistry, type Provenance } from "@/components/shared/provenance";
 import type { ChainId } from "@/lib/shared/chains";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
@@ -48,11 +54,13 @@ import {
   DataTableLeadMark,
   DataTableRow,
   DataTableRowLink,
+  DataTableRowMenu,
 } from "@/components/shared/data-table/data-table";
 import {
   STANDING_WORD,
   tooSmallSentence,
   vaultHeads,
+  type VaultRowReceipts,
   yieldSublineText,
   YIELD_LABEL_TIP,
 } from "@/components/vaults/vault-heads";
@@ -63,9 +71,14 @@ import { VAULT_INDEX_PROTOCOL_LABEL, vaultIndexProtocol } from "@/lib/vaults/ind
 import { vaultDisplayName, type VaultStanding, type VaultSummary } from "@/lib/vaults/summary";
 import { measuredYield, yieldText, type VaultYield } from "@/lib/vaults/yield";
 import { illiquidSentence } from "@/lib/vaults/illiquid";
+import { vaultHoldersProv, vaultYieldProv } from "@/lib/vaults/row-provenance";
 import { heldAssetsRaw, lostAssetsSentence } from "@/lib/vaults/lost-assets";
+import { assetScaleAbsentTip, assetScaleSentence } from "@/lib/vaults/asset-scale-words";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { sharePriceText } from "@/lib/shared/vault-amount-text";
+import { useCompareSelection } from "@/components/vaults/compare-selection";
+import { compareKey } from "@/lib/vaults/compare";
+import { COMPARE_TICK } from "@/lib/vaults/compare-words";
 
 type SortKey = "vault" | "assets" | "price" | "yield" | "holders";
 
@@ -87,9 +100,17 @@ const COLUMNS: readonly Column[] = [
 
 const DEFAULT_SORT: SortKey = "holders";
 
+/** The steward's role, in the Steward cell's title. */
+const STEWARD_ROLE: Record<NonNullable<VaultSummary["steward"]>["role"], string> = {
+  curator: "Curator",
+  owner: "Owner",
+  roleManager: "Role manager",
+  poolDelegate: "Pool delegate",
+};
+
 /** How an amount in the vault's asset sorts: by token, then inside it. */
 const SORT_NOTE: Partial<Record<SortKey, string>> = {
-  assets: "Sorts by token, then by what the vault holds within each token: total assets less lost assets.",
+  assets: "Sorts by token, then by total assets within each token.",
   price: "Sorts by token, then by share price within each token.",
 };
 
@@ -111,18 +132,20 @@ function pillTitle(st: VaultStanding, v: VaultSummary): string {
       lost: formatCompact(v.lostAssets.value),
       held: formatCompact(heldOf(v, v.totalAssets.raw)),
       symbol: v.asset.symbol,
-      block: v.readAt.block,
     });
+  if (st === "decimals-disagree" && v.assetScale) return assetScaleSentence(v.asset.symbol, v.assetScale);
   return STANDING_WORD[st];
 }
 
-/** The key's figure; null sorts last both ways. */
+/** The key's figure; null sorts last both ways. Total assets sorts by the
+ *  figure the column shows (ui-jobs 664). A vault whose asset's decimals
+ *  disagree shows no amount in it, and sorts as none. */
 function figureOf(key: SortKey, v: VaultSummary, y: VaultYield | undefined): number | null {
   switch (key) {
     case "assets":
-      return v.totalAssets ? heldOf(v, v.totalAssets.raw) : null;
+      return v.assetScale ? null : (v.totalAssets?.value ?? null);
     case "price":
-      return v.sharePrice?.value ?? null;
+      return v.assetScale ? null : (v.sharePrice?.value ?? null);
     case "yield":
       return y && "yearly" in y ? y.yearly : null;
     case "holders":
@@ -166,6 +189,22 @@ function comparator(key: SortKey, dir: "asc" | "desc", yieldOf: (v: VaultSummary
 
 const n = (x: number) => x.toLocaleString("en-US");
 
+/** A figure in its receipt, where the family states one. */
+const traced = (info: Provenance | undefined, children: ReactNode) =>
+  info ? <Prov info={info}>{children}</Prov> : children;
+
+/** One row's receipts scope: its own registry, the roster's section id. A
+ *  table row takes no coverage bookends (`bounds={false}`); the section's
+ *  scope sweeps the table. */
+function RowScope({ children }: { children: ReactNode }) {
+  const registry = useReceiptRegistry();
+  return (
+    <ProvReceiptsScope registry={registry} bounds={false}>
+      {children}
+    </ProvReceiptsScope>
+  );
+}
+
 /** A figure in the vault's asset, its unit after it (`AssetUnit`). */
 function InAsset({ v, children, ...rest }: { v: VaultSummary; children: ReactNode; "data-cell": string }) {
   return (
@@ -175,6 +214,12 @@ function InAsset({ v, children, ...rest }: { v: VaultSummary; children: ReactNod
     </span>
   );
 }
+
+/** The hooks the vault card's pills carry (VaultPills), on the same pills. */
+const BADGE_HOOK: Partial<Record<VaultStanding, Record<string, string>>> = {
+  endorsed: { "data-endorsed-badge": "" },
+  "shut-down": { "data-shutdown-badge": "" },
+};
 
 /** A standing pill on a row, on the table's pill ground. */
 const PILL = `${DATA_TABLE_PILL} px-1.5 py-0.5 text-[11px]`;
@@ -222,7 +267,9 @@ export function VaultIndexTable({
   part,
   initialSearch,
   yieldOf,
+  receiptsOf,
   leadOf,
+  kindOf,
   hrefOf,
   holdersHrefOf,
   hooksOf,
@@ -232,9 +279,15 @@ export function VaultIndexTable({
   part: "funded" | "empty";
   initialSearch: string;
   yieldOf: (v: VaultSummary) => VaultYield | undefined;
+  /** The row's receipts: its family's, at its roster's block. */
+  receiptsOf: (v: VaultSummary) => VaultRowReceipts;
   /** The lead zone's `protocols.ts` id (the roster entry the vault's
-   *  directory sits under); null falls back to the family's venue. */
-  leadOf: (v: VaultSummary) => string | null;
+   *  directory sits under); null falls back to the family's venue. Null in
+   *  place of the function omits the lead column, header and cells: a
+   *  one-protocol roster (ui-jobs 605). */
+  leadOf: ((v: VaultSummary) => string | null) | null;
+  /** The Kind cell's words; absent, the family's kind. */
+  kindOf?: (v: VaultSummary) => string;
   hrefOf: (v: VaultSummary) => string;
   holdersHrefOf: (v: VaultSummary) => string | null;
   hooksOf: (v: VaultSummary) => Record<string, string>;
@@ -284,14 +337,17 @@ export function VaultIndexTable({
         </p>
       )}
       <DataTable
-        caption={`${part === "funded" ? "Vaults" : "Vaults that hold nothing"}; total assets and share price are in each vault’s asset`}
-        tableClassName="min-w-[640px] text-sm"
+        // The asset's mark beside every amount says which asset it is in
+        // (ui-jobs 664, VA12: the reading contract's remedy 1).
+        caption={part === "funded" ? "Vaults" : "Vaults that hold nothing"}
+        tableClassName="min-w-[940px] text-sm"
         stacked
         rowHeight="one"
       >
         <DataTableHead>
-          <DataTableLeadHeader />
-          {COLUMNS.map((c) => (
+          {leadOf && <DataTableLeadHeader plain />}
+          {COLUMNS.map((c) => [
+            c.key === "assets" && <DataTableHeader key="kind" label="Kind" data-col-head="kind" />,
             <DataTableHeader
               key={c.key}
               label={c.label}
@@ -303,21 +359,30 @@ export function VaultIndexTable({
               }}
               data-sort-key={c.key}
               after={headerTip(c.key)}
-            />
-          ))}
+            />,
+          ])}
+          <DataTableHeader label="Steward" data-col-head="steward" />
+          <DataTableHeader label={<span className="sr-only">Actions</span>} data-col-head="menu" />
         </DataTableHead>
         <DataTableBody>
           {sorted.map((v) => {
             const href = hrefOf(v);
-            // The figures as the row prints them, with no receipt (the index
-            // states none); Yield's text through the same formatter.
+            // The figures as the row prints them, each in its family's
+            // receipt; Yield's text and receipt through the same builders.
             const yf = measuredOf(v);
-            const heads = vaultHeads({ vault: v, yieldFigure: yf, holdersHref: null, receipts: {} });
+            const receipts = receiptsOf(v);
+            const heads = vaultHeads({ vault: v, yieldFigure: yf, holdersHref: null, receipts });
             const head = (id: string) => heads.find((h) => h.id === id);
-            const name = v.name ?? v.catalogName ?? v.symbol;
+            const name = vaultDisplayName(v);
             const raw = v.totalAssets?.raw ?? "";
             const c = v.census;
             const holdersHref = holdersHrefOf(v);
+            // An asset whose decimals disagree: no amount in it, the reason
+            // read to a screen reader; the row's pill carries it in a title
+            // (ui-jobs 664).
+            const withheld = v.assetScale ? assetScaleAbsentTip(v.asset.symbol, v.assetScale) : undefined;
+            const shownAssets = v.assetScale ? null : v.totalAssets;
+            const shownPrice = v.assetScale ? null : v.sharePrice;
             // `none`: what stands for an absent figure, for a screen reader
             // (the Yield slot's reason, with its `data-yield-none`).
             const cell = (id: string, label: string, value: ReactNode, none: ReactNode = "no figure") => (
@@ -351,124 +416,205 @@ export function VaultIndexTable({
                   data-link="vault-positions"
                   data-positions-vault={v.address}
                 >
-                  {n(c.live)}
+                  <Prov info={vaultHoldersProv(v, c)}>{n(c.live)}</Prov>
                 </Link>
               ) : (
                 <span data-cell="holders" data-positions-none="">
-                  {n(c.live)}
+                  <Prov info={vaultHoldersProv(v, c)}>{n(c.live)}</Prov>
                 </span>
               );
             return (
-              <DataTableRow
-                href={href}
-                key={`${v.chainId}:${v.address}`}
-                data-vault-row={v.address}
-                data-group={raw === "" ? "unread" : BigInt(raw) > BigInt(0) ? "funded" : "empty"}
-                data-asset={v.asset.address}
-                data-total-assets-raw={raw}
-                data-held-assets-raw={raw === "" ? "" : heldAssetsRaw(raw, v.lostAssets?.raw).toString()}
-                data-share-price-raw={v.sharePrice?.raw ?? ""}
-                data-vault-family={v.family}
-                data-holders-live={c?.live ?? ""}
-                data-standing={v.standing.join(" ")}
-                data-created-block={v.createdBlock ?? ""}
-                data-token={tokenOf(v)}
-                {...hooksOf(v)}
-              >
-                <DataTableLeadCell
-                  protocol={leadOf(v) ?? VAULT_FAMILIES[v.family].venue}
-                  protocolName={VAULT_INDEX_PROTOCOL_LABEL[vaultIndexProtocol(v)]}
-                  chain={v.chainId as ChainId}
-                />
-                {/* From sm one line: icon, name (truncating, its full text in a
-                    title), the standing pills after it. Below sm (D6) the name
-                    wraps and the pills take their own line from the card's edge. */}
-                <DataTableCell
-                  rowHeader
-                  valign="middle"
-                  className="sm:w-full sm:max-w-0 sm:min-w-[180px] xl:min-w-[260px]"
+              <RowScope key={`${v.chainId}:${v.address}`}>
+                <DataTableRow
+                  href={href}
+                  data-vault-row={v.address}
+                  data-group={raw === "" ? "unread" : BigInt(raw) > BigInt(0) ? "funded" : "empty"}
+                  data-asset={v.asset.address}
+                  data-total-assets-raw={raw}
+                  data-held-assets-raw={raw === "" ? "" : heldAssetsRaw(raw, v.lostAssets?.raw).toString()}
+                  data-share-price-raw={v.sharePrice?.raw ?? ""}
+                  data-vault-family={v.family}
+                  data-holders-live={c?.live ?? ""}
+                  data-standing={v.standing.join(" ")}
+                  data-created-block={v.createdBlock ?? ""}
+                  data-token={tokenOf(v)}
+                  {...hooksOf(v)}
                 >
-                  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 sm:flex-nowrap">
-                    <span className="shrink-0" data-prov-exempt>
-                      <TokenChipIcon
-                        symbol={v.asset.symbol}
-                        address={v.asset.address}
-                        size={28}
-                        filterable={false}
-                        untitled
-                      />
-                    </span>
-                    <DataTableLeadMark
+                  {leadOf && (
+                    <DataTableLeadCell
+                      plain
                       protocol={leadOf(v) ?? VAULT_FAMILIES[v.family].venue}
+                      protocolName={VAULT_INDEX_PROTOCOL_LABEL[vaultIndexProtocol(v)]}
                       chain={v.chainId as ChainId}
                     />
-                    <DataTableRowLink
-                      href={href}
-                      className="min-w-0 flex-1 text-sm font-semibold break-words sm:min-w-[7rem] sm:flex-initial sm:truncate"
-                      title={name ?? v.address}
-                      data-vault-link={v.address}
-                      data-vault-name
-                    >
-                      {name != null ? name : <span className="font-mono">{shortAddress(v.address)}</span>}
-                    </DataTableRowLink>
-                    {(v.standing.length > 0 || oneOff(yf)) && (
-                      // From sm the pills give way before the name's first 7rem.
-                      <span className="flex flex-wrap gap-1 max-sm:basis-full sm:min-w-0 sm:flex-nowrap sm:overflow-hidden">
-                        {v.standing.map((st) => (
-                          <span key={st} className={`${PILL} sm:truncate`} title={pillTitle(st, v)} data-pill={st}>
-                            {STANDING_WORD[st]}
-                          </span>
-                        ))}
-                        {yf && "yearly" in yf && yf.jump && (
-                          <span
-                            className={`${PILL} sm:truncate`}
-                            title={yieldSublineText(yf)}
-                            data-pill="one-off-move"
-                            data-yield-jump-day={yf.jump.day}
-                          >
-                            one-off move
-                          </span>
+                  )}
+                  {/* From sm one line: icon, name (truncating, its full text in a
+                    title), the standing pills after it. Below sm (D6) the name
+                    wraps and the pills take their own line from the card's edge. */}
+                  <DataTableCell
+                    rowHeader
+                    valign="middle"
+                    className="sm:w-full sm:max-w-0 sm:min-w-[180px] xl:min-w-[260px]"
+                  >
+                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 sm:flex-nowrap">
+                      <span className="shrink-0" data-prov-exempt>
+                        <TokenChipIcon
+                          symbol={v.asset.symbol}
+                          address={v.asset.address}
+                          size={28}
+                          filterable={false}
+                          untitled
+                        />
+                      </span>
+                      {leadOf && (
+                        <DataTableLeadMark
+                          protocol={leadOf(v) ?? VAULT_FAMILIES[v.family].venue}
+                          chain={v.chainId as ChainId}
+                        />
+                      )}
+                      <DataTableRowLink
+                        href={href}
+                        className="min-w-0 flex-1 text-sm font-semibold break-words sm:min-w-[7rem] sm:flex-initial sm:truncate"
+                        title={name ?? v.address}
+                        data-vault-link={v.address}
+                        data-vault-name
+                      >
+                        {name != null ? name : <span className="font-mono">{shortAddress(v.address)}</span>}
+                      </DataTableRowLink>
+                      {(v.standing.length > 0 || oneOff(yf)) && (
+                        // From sm the pills give way before the name's first 7rem.
+                        <span className="flex flex-wrap gap-1 max-sm:basis-full sm:min-w-0 sm:flex-nowrap sm:overflow-hidden">
+                          {v.standing.map((st) => (
+                            <span
+                              key={st}
+                              className={`${PILL} sm:truncate`}
+                              title={pillTitle(st, v)}
+                              data-pill={st}
+                              {...BADGE_HOOK[st]}
+                            >
+                              {traced(receipts.standing?.[st], STANDING_WORD[st])}
+                            </span>
+                          ))}
+                          {yf && "yearly" in yf && yf.jump && (
+                            <span
+                              className={`${PILL} sm:truncate`}
+                              title={yieldSublineText(yf)}
+                              data-pill="one-off-move"
+                              data-yield-jump-day={yf.jump.day}
+                            >
+                              one-off move
+                            </span>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  </DataTableCell>
+                  <DataTableCell label="Kind" valign="middle" className="whitespace-nowrap" data-col="kind">
+                    <span className="text-sm text-foreground" data-cell="kind">
+                      {kindOf ? kindOf(v) : VAULT_FAMILIES[v.family].kind}
+                    </span>
+                  </DataTableCell>
+                  {cell(
+                    "total-assets",
+                    "Total assets",
+                    shownAssets && (
+                      <InAsset v={v} data-cell="total-assets">
+                        {traced(receipts.totalAssets, formatCompact(shownAssets.value))}
+                      </InAsset>
+                    ),
+                    withheld,
+                  )}
+                  {cell(
+                    "share-price",
+                    "Share price",
+                    shownPrice && (
+                      <InAsset v={v} data-cell="share-price">
+                        {/* Past a million, compact (its full text in the
+                          title), so one vault's figure cannot widen the column. */}
+                        {traced(
+                          receipts.sharePrice,
+                          shownPrice.value >= 1e6 ? (
+                            <span title={sharePriceText(shownPrice, v.asset.decimals)}>
+                              {formatCompact(shownPrice.value)}
+                            </span>
+                          ) : (
+                            sharePriceText(shownPrice, v.asset.decimals)
+                          ),
                         )}
+                      </InAsset>
+                    ),
+                    withheld,
+                  )}
+                  {cell(
+                    "yield",
+                    "Yield",
+                    yf && "yearly" in yf ? (
+                      <span data-cell="yield">
+                        <Prov info={vaultYieldProv(v, yf)}>{yieldText(yf.yearly)}</Prov>
+                      </span>
+                    ) : yf?.none === "too-small" ? (
+                      <span
+                        data-cell="yield"
+                        data-yield-none="too-small"
+                        title={tooSmallSentence(v)}
+                        className="inline-block w-[6.5rem] leading-tight whitespace-normal"
+                      >
+                        too small to measure
+                      </span>
+                    ) : null,
+                    head("yield")?.sub,
+                  )}
+                  {cell("holders", "Holders", holders)}
+                  <DataTableCell label="Steward" valign="middle" className="whitespace-nowrap" data-col="steward">
+                    {v.steward ? (
+                      <span
+                        className="font-mono text-[13px] text-foreground"
+                        title={`${STEWARD_ROLE[v.steward.role]} ${v.steward.address}`}
+                        data-cell="steward"
+                        data-steward-role={v.steward.role}
+                      >
+                        {shortAddress(v.steward.address)}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-rb-500" data-cell="steward" data-steward-none="">
+                        <span aria-hidden>–</span>
+                        <span className="sr-only">no steward read</span>
                       </span>
                     )}
-                  </div>
-                </DataTableCell>
-                {cell(
-                  "total-assets",
-                  "Total assets",
-                  v.totalAssets && (
-                    <InAsset v={v} data-cell="total-assets">
-                      {formatCompact(v.totalAssets.value)}
-                    </InAsset>
-                  ),
-                )}
-                {cell(
-                  "share-price",
-                  "Share price",
-                  v.sharePrice && (
-                    <InAsset v={v} data-cell="share-price">
-                      {sharePriceText(v.sharePrice, v.asset.decimals)}
-                    </InAsset>
-                  ),
-                )}
-                {cell(
-                  "yield",
-                  "Yield",
-                  yf && "yearly" in yf ? (
-                    <span data-cell="yield">{yieldText(yf.yearly)}</span>
-                  ) : yf?.none === "too-small" ? (
-                    <span data-cell="yield" data-yield-none="too-small" title={tooSmallSentence(v)}>
-                      too small to measure
-                    </span>
-                  ) : null,
-                  head("yield")?.sub,
-                )}
-                {cell("holders", "Holders", holders)}
-              </DataTableRow>
+                  </DataTableCell>
+                  {/* The row's ⋮ (D7), Compare first (E2); it stands above the
+                    row's cover, and on a card sits at its top right. */}
+                  <DataTableCell valign="middle" className="dt-row-menu w-px whitespace-nowrap" data-col="menu">
+                    <VaultRowMenu vaultKey={compareKey(v.chainId, v.address)} name={name ?? v.address} />
+                  </DataTableCell>
+                </DataTableRow>
+              </RowScope>
             );
           })}
         </DataTableBody>
       </DataTable>
     </div>
+  );
+}
+
+/** A /vaults row's ⋮ (D7): the comparison entry (E2), through the same
+ *  selection as the asset step's tick, so the bar (E3) and a refused fifth
+ *  pick behave as there. */
+function VaultRowMenu({ vaultKey, name }: { vaultKey: string; name: string }) {
+  const { keys, toggle } = useCompareSelection();
+  const on = keys.includes(vaultKey);
+  return (
+    <DataTableRowMenu
+      label={`Actions for ${name}`}
+      items={[
+        {
+          key: "compare",
+          label: on ? COMPARE_TICK.remove : COMPARE_TICK.add,
+          checked: on,
+          onSelect: () => toggle(vaultKey),
+          hooks: { "data-anatomy": "E2", "data-compare-tick": vaultKey, "data-compare-checked": on ? "" : undefined },
+        },
+      ]}
+    />
   );
 }

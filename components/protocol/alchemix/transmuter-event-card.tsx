@@ -17,6 +17,7 @@
 // NO READING. These rows carry no `stateAtBlockFromReading`, and the card
 // states none: a Transmuter position has no getCDP.
 
+import { TRANSMUTER_WORDS as TW } from "@/lib/alchemix/transmuter-words";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import { gasPrice } from "@/components/shared/event-price-row";
 import { EventLedgerContext, ROW_CELLS } from "@/components/shared/event-ledger-context";
@@ -192,10 +193,10 @@ function detailStats(legs: TransmuterEvent[], mytSymbol: string, early: Transmut
         prov: transmuterEmittedProv(field, symbol, raw, coords),
       });
     };
-    if (d.eventType === "transmuter_position_created") stat("Staked", "amount_staked", d.syntheticSymbol);
+    if (d.eventType === "transmuter_position_created") stat(TW.deposited, "amount_staked", d.syntheticSymbol);
     if (d.eventType === "transmuter_position_claimed") {
-      stat("Paid out", "amount_claimed", claimShareSymbol(leg, mytSymbol));
-      stat("Handed back", "amount_unclaimed", d.syntheticSymbol);
+      stat(TW.paidOut, "amount_claimed", claimShareSymbol(leg, mytSymbol));
+      stat(TW.returned, "amount_unclaimed", d.syntheticSymbol);
       if (early) {
         const computed = (label: string, part: "converted" | "unconverted" | "exit-fee", raw: string) => {
           const exact = formatUnitsExact(raw, 18);
@@ -207,13 +208,13 @@ function detailStats(legs: TransmuterEvent[], mytSymbol: string, early: Transmut
             prov: transmuterEarlyClaimProv(part, d.syntheticSymbol, early, coords),
           });
         };
-        computed("Converted, by the blocks passed", "converted", early.convertedRaw);
-        computed("Not yet converted", "unconverted", early.unconvertedRaw);
-        computed("Early exit fee", "exit-fee", early.exitFeeRaw);
+        computed(TW.vestedByBlocks, "converted", early.convertedRaw);
+        computed(TW.notYetVested, "unconverted", early.unconvertedRaw);
+        computed(TW.earlyExitFee, "exit-fee", early.exitFeeRaw);
       }
     }
     if (d.eventType === "transmuter_position_poked")
-      stat("Removed from the cap", "amount_removed_from_cap", d.syntheticSymbol);
+      stat(TW.removedFromCap, "amount_removed_from_cap", d.syntheticSymbol);
   }
   return stats;
 }

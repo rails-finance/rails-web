@@ -5,8 +5,20 @@
 
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 
-const MORPHO_VAULT_DOCS = { label: "docs.morpho.org: Vaults", url: "https://docs.morpho.org/learn/concepts/vault/" };
-const MORPHO_MARKET_DOCS = { label: "docs.morpho.org: Markets", url: "https://docs.morpho.org/learn/concepts/market/" };
+// The cards describe MetaMorpho (Vaults V1) vaults: the docs' V1 sections,
+// not /learn/concepts/vault/, which answers with the Vault V2 page (ui-jobs 628).
+const MORPHO_VAULT_DOCS = {
+  label: "docs.morpho.org: Vaults V1 roles",
+  url: "https://docs.morpho.org/curate/concepts/roles/#morpho-vaults-v1-roles",
+};
+const MORPHO_VAULT_QUEUE_DOCS = {
+  label: "docs.morpho.org: Vaults V1 liquidity",
+  url: "https://docs.morpho.org/curate/concepts/liquidity/#curation-in-morpho-vaults-v1-legacy",
+};
+const MORPHO_MARKET_DOCS = {
+  label: "docs.morpho.org: Variable Rate Market",
+  url: "https://docs.morpho.org/learn/concepts/blue/#what-is-a-variable-rate-market",
+};
 const AAVE_DOCS = {
   sgho: { label: "aave.com: Savings GHO", url: "https://aave.com/docs/ecosystem/gho/sgho" },
   stata: { label: "aave.com: Static aTokens", url: "https://aave.com/docs/aave-v3/smart-contracts/tokenization" },
@@ -19,14 +31,14 @@ const YIELD_CONCEPT = {
 };
 
 export const STEWARD_TIP = {
-  curator: "The vault's curator(): the address that chooses which markets the vault lends to, and their caps.",
-  owner: "The vault's owner(). The vault names no curator(), so the owner chooses the markets and their caps.",
-  umbrella: "The stake token's owner(): the one address that can slash it.",
+  curator: "Morpho's curator: the address that chooses which markets the vault lends to, and their caps.",
+  owner: "Morpho's owner: the vault names no curator, so this address chooses the markets and their caps.",
+  umbrella: "Umbrella's owner: the one address that can slash the stake token.",
   roleManager:
-    "The vault's role_manager(): the address that hands out every role over the vault, from adding a strategy to shutting it down.",
+    "Yearn's role manager: the address that hands out every role over the vault, from adding a strategy to shutting it down.",
 } as const;
 
-export const SHARES_ISSUED_TIP = "The vault's totalSupply(): every share in existence at this block.";
+export const SHARES_ISSUED_TIP = "Every share of the vault in existence.";
 
 export const morphoVaultCardContent = (): LearnMoreContent => ({
   title: "How a MetaMorpho vault works",
@@ -65,10 +77,10 @@ export const morphoVaultAssetsContent = (): LearnMoreContent => ({
       bold: "Amount",
       text: "what the vault's supply shares in the market convert to, as Morpho Blue last settled the market.",
     },
-    { bold: "Share of this vault", text: "a market's amount over the sum across the queue, at the same block." },
+    { bold: "Share of this vault", text: "a market's amount over the sum across the queue." },
     { bold: "The band", text: "a market holding 2% or more draws on its own; the rest share the last segment." },
   ],
-  links: [MORPHO_MARKET_DOCS],
+  links: [MORPHO_VAULT_QUEUE_DOCS, MORPHO_MARKET_DOCS],
 });
 
 export function aaveVaultCardContent(family: "sgho" | "stata" | "umbrella-stake"): LearnMoreContent {
@@ -77,21 +89,21 @@ export function aaveVaultCardContent(family: "sgho" | "stata" | "umbrella-stake"
       ? "Savings GHO takes GHO and issues shares that convert to more GHO over time. An index the vault stores sets the conversion, and Aave governance sets the rate the index moves at."
       : family === "stata"
         ? "A static aToken wraps an Aave V3 supply position in shares whose count does not change. The aToken it holds earns the reserve's interest, so a share converts to more of the asset over time."
-        : "An Umbrella stake token takes a deposit and stands behind one Aave V3 reserve. If that reserve runs a deficit, the token's owner can slash the stake to cover it.";
+        : "An Umbrella stake token takes a deposit and stands behind one Aave V3 reserve. If that reserve runs a deficit, the token's owner can slash the stake: take part of it to cover the shortfall.";
   const details =
     family === "sgho"
       ? [
           {
             bold: "Target rate",
-            text: "the rate the index moves at, in basis points, as governance set it. A setting the next vote can change.",
+            text: "the rate the index moves at, as governance set it; the contract stores it in basis points. A setting the next vote can change.",
           },
           {
             bold: "Two figures",
             text: "total assets is what the index says the shares are worth; the GHO the contract holds is its token balance. Withdrawals are clamped to the balance.",
           },
           {
-            bold: "Deposit cap",
-            text: "the most the vault takes; remaining capacity is the vault's answer to maxDeposit.",
+            bold: "Supply cap",
+            text: "the most the vault takes; remaining capacity is the room left under it.",
           },
           YIELD_CONCEPT,
         ]
@@ -114,7 +126,7 @@ export function aaveVaultCardContent(family: "sgho" | "stata" | "umbrella-stake"
             },
             {
               bold: "Slashable",
-              text: "the most a slashing may take at this block, read from the contract's configuration.",
+              text: "the most a slashing may take, from the contract's configuration.",
             },
             {
               bold: "Rewards",
@@ -147,13 +159,13 @@ export function aaveVaultAssetsContent(family: "sgho" | "stata" | "umbrella-stak
           : "The stake token holds its asset. Where that asset is a static aToken, one more hop reaches the reserve it covers.",
     detailsHeading: "Key concepts:",
     details: [
-      { bold: "Amount", text: "the asset's balanceOf at the vault's address, read at this block." },
-      { bold: "Share of this vault", text: "the amount over the vault's totalAssets() at the same block." },
+      { bold: "Amount", text: "how much of the asset the vault holds there." },
+      { bold: "Share of this vault", text: "the amount over the vault's total assets." },
       ...(family === "umbrella-stake"
         ? [
             {
               bold: "The hop",
-              text: "what one share of the wrapper converts to in the reserve's asset, at this block.",
+              text: "what one share of the wrapper converts to in the reserve's asset.",
             },
           ]
         : []),
@@ -178,7 +190,7 @@ export const yearnVaultCardContent = (): LearnMoreContent => ({
     },
     {
       bold: "Endorsed",
-      text: "Yearn's Registry endorses the vault at this block. Anyone may deploy from the factory, so the address identifies the vault.",
+      text: "Yearn's Registry endorses the vault. Anyone may deploy from the factory, so the address identifies the vault.",
     },
     YIELD_CONCEPT,
   ],
@@ -199,36 +211,131 @@ export const yearnVaultAssetsContent = (): LearnMoreContent => ({
       bold: "Outside the queue",
       text: "a strategy taken out of the queue keeps its debt until the vault pulls it back.",
     },
-    { bold: "Share of this vault", text: "a row's amount over the vault's totalAssets() at the same block." },
+    { bold: "Share of this vault", text: "a row's amount over the vault's total assets." },
   ],
 });
 
-/** The holder card's "?" (ui-jobs 407 step 4, 410), every family. */
-export const vaultHoldingContent = (
+const MAPLE_DOCS = { label: "docs.maple.finance: Lenders", url: "https://docs.maple.finance" };
+
+/** The Steward's tip on a Maple pool: its pool delegate. */
+export const MAPLE_DELEGATE_TIP =
+  "The pool delegate runs the pool's lending: it funds and calls loans, and marks a loan as impaired.";
+
+export const maplePoolCardContent = (): LearnMoreContent => ({
+  title: "How a Maple pool works",
+  intro:
+    "A Maple pool takes one stablecoin and lends it to institutional borrowers against collateral that custodians hold off the chain. A lender owns shares, and a share converts to more of the asset as borrowers pay interest.",
+  detailsHeading: "Key concepts:",
+  details: [
+    {
+      bold: "Pool delegate",
+      text: "the manager that runs the pool's lending: it funds loans, calls open-term loans and marks a loan as impaired.",
+    },
+    {
+      bold: "Exit rate",
+      text: "what one share pays on withdrawal. It equals the share price unless a loan is marked as impaired; then a lender who exits takes a part of the mark.",
+    },
+    {
+      bold: "Withdrawal queue",
+      text: "withdrawals wait in a queue, first in, first out, and are paid from the cash in the pool as it allows.",
+    },
+    {
+      bold: "Yield",
+      text: "Rails keeps no daily share-price series for Maple pools, so the card states no yield figure.",
+    },
+  ],
+  links: [MAPLE_DOCS],
+});
+
+export const maplePoolAssetsContent = (): LearnMoreContent => ({
+  title: "Where a Maple pool's assets are",
+  intro:
+    "The pool keeps some cash, which pays withdrawals, and lends the rest through two loan books and any other strategy it uses. Together they make the pool's total assets.",
+  detailsHeading: "Key concepts:",
+  details: [
+    { bold: "Liquid now", text: "the asset in the pool, the only part a withdrawal can be paid from at once." },
+    { bold: "Fixed-term loans", text: "loans that run to a maturity date: principal and the interest accrued so far." },
+    {
+      bold: "Open-term loans",
+      text: "loans with no maturity, which the pool delegate can call for repayment with notice.",
+    },
+    { bold: "Other strategies", text: "on-chain strategies the pool lends through, apart from its loans." },
+    {
+      bold: "Collateral",
+      text: "custodians hold the loans' collateral off the chain. The chain records the loan book as Maple keeps it.",
+    },
+    { bold: "Share of this vault", text: "a row's amount over the pool's total assets." },
+  ],
+  links: [MAPLE_DOCS],
+});
+
+/** "Supplied by vaults" on a market or reserve page: the "?" per family. */
+export function suppliedByContent(family: "morpho" | "aave"): LearnMoreContent {
+  return family === "morpho"
+    ? {
+        title: "Vaults in this market",
+        intro:
+          "A MetaMorpho vault lends one asset through the Morpho Blue markets in its withdraw queue. These are the vaults on Rails's MetaMorpho roster whose queue names this market.",
+        detailsHeading: "Key concepts:",
+        details: [
+          {
+            bold: "Amount",
+            text: "what the vault's supply in this market converts to, as Morpho Blue last settled the market.",
+          },
+          {
+            bold: "Steward",
+            text: "the curator, which chooses the vault's markets and caps; the owner where no curator is named.",
+          },
+          {
+            bold: "A vault at zero",
+            text: "a market can sit in a queue with nothing supplied: the curator may supply it later.",
+          },
+        ],
+        links: [MORPHO_VAULT_QUEUE_DOCS],
+      }
+    : {
+        title: "Vaults over this reserve",
+        intro:
+          "A static aToken wraps a supply position in this reserve. An Umbrella stake stands behind it: its owner can slash the stake, taking part of it to cover a deficit on the reserve.",
+        detailsHeading: "Key concepts:",
+        details: [
+          { bold: "Amount", text: "the wrapper's total assets; for a stake, what it holds in the reserve's asset." },
+          {
+            bold: "Counted twice",
+            text: "a stake over a static aToken holds the wrapper's shares, so its amount is also inside the wrapper's row.",
+          },
+          { bold: "Steward", text: "a stake's owner. A static aToken names none." },
+        ],
+        links: [AAVE_DOCS.stata, AAVE_DOCS["umbrella-stake"]],
+      };
+}
+
+/** The holder pages' position card's "?" (V8, ui-jobs 553), every family. */
+export const vaultPlainHoldingContent = (
   assetSymbol: string,
   shareSymbol: string,
-  census: boolean,
   rewards: string,
 ): LearnMoreContent => ({
   title: "What a holding is",
-  intro: `A holding is one address's ${shareSymbol} in one vault. Every figure on the card is a read of the vault at a block the card names, in ${shareSymbol} or in ${assetSymbol}.`,
-  detailsHeading: "The headlines:",
+  intro: `A holding is one address's ${shareSymbol} in one vault. The vault's shares grow in ${assetSymbol} as the vault earns, so the card counts everything in ${assetSymbol}.`,
+  detailsHeading: "The figures:",
   details: [
-    { bold: "Balance", text: `the vault's balanceOf() for this address, in ${shareSymbol}.` },
-    { bold: "Share of the vault", text: "that balance over the vault's totalSupply(), both read at the same block." },
     {
-      bold: "Claim",
-      text: `the vault's convertToAssets() of that balance, in ${assetSymbol}.${census ? " Beneath it, the census's dollar value at its block, through Aave V3's oracle, where the oracle prices the asset." : ""}`,
+      bold: "Put in",
+      text: `every deposit, and every share received from another address at its worth that day.`,
     },
     {
-      bold: "Earned",
-      text: `the claim plus every amount that left, minus every amount that came in, in ${assetSymbol}. Deposits and withdrawals are the amounts the vault's events state; shares that arrived or left by transfer are valued at the share price read at that block. ${rewards[0].toUpperCase()}${rewards.slice(1)} are not counted. No figure where the replay of the address's transfers misses its balanceOf, or a transfer's share price did not answer.`,
+      bold: "Taken out",
+      text: `every withdrawal, and every share sent to another address at its worth that day.`,
     },
+    { bold: "Worth now", text: `what the shares convert to in ${assetSymbol} at the card's read.` },
+    {
+      bold: "Profit or loss",
+      text: `worth now plus what was taken out, minus what was put in. ${rewards[0].toUpperCase()}${rewards.slice(1)} are left out. Where one of the amounts could not be read, no figure is stated.`,
+    },
+    { bold: "The line", text: `the holding's worth at one read a day, from its first day to the card's read.` },
   ],
-  extraParagraphs: [
-    "Earned is a sum with no window: nothing here is annualised.",
-    "A zero is a reading; a call that did not answer is said in words.",
-  ],
+  extraParagraphs: ["These are readings of the past. Nothing here is a forecast or annualised."],
 });
 
 /** The rewards each family pays outside the share, which Earned leaves out. */

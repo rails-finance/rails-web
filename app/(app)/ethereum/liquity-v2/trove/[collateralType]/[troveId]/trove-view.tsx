@@ -33,6 +33,7 @@ import type { PositionRead } from "@/lib/shared/position-read";
 import { OraclePricesData, OraclePricesResponse } from "@/types/api/oracle";
 import { useDebtInFront } from "@/hooks/useDebtInFront";
 import { useLiquityCollSurplus } from "@/hooks/useLiquityCollSurplus";
+import { useBranchShutdown } from "@/hooks/useBranchShutdown";
 import { useWalletContext } from "@/components/nav/wallet-context";
 
 import { fetchTroveTimeline } from "@/lib/api/fetch-timeline";
@@ -131,6 +132,7 @@ export default function TroveView({
     debtInFront,
     trovesAhead,
     queueDebtTotal,
+    lastZombieTroveId,
     loading: debtInFrontLoading,
   } = useDebtInFront(
     troveData?.status === "open" ? collateralType : undefined,
@@ -274,6 +276,12 @@ export default function TroveView({
     owner: troveData?.status === "liquidated" ? effectiveOwner : null,
     liquidationTx: lastLiquidation?.txHash,
   });
+  // The branch's shutdown (ui-jobs 612), read live: no V2 branch records one.
+  // The branch's state names an urgent redemption on any Trove, open or not
+  // (ui-jobs 619); the card and the accrual clock take it on an open Trove
+  // only, as a closed Trove keeps its recorded state and accrues nothing.
+  const branchShutdown = useBranchShutdown("liquity-v2", collateralType, troveData != null);
+  const shutdown = troveData?.status === "open" ? branchShutdown : null;
 
   // The claim that paid the surplus out, as its own row (the index has none).
   const claimEvent = useMemo(
@@ -361,6 +369,7 @@ export default function TroveView({
     open: flowOpen,
     price: flowPrice,
     liveState,
+    shutdownAt: shutdown?.at ?? null,
   });
   // The branch's redemptions per day over the life, the protocol activity
   // chart under the events (lib/liquity-v2/redemption-pace.ts): to today, or
@@ -405,8 +414,12 @@ export default function TroveView({
 
   // What an event's Copy for LLM header names about the trove.
   const troveMeta = useMemo(
-    () => ({ owner: effectiveOwner ?? null, total: totalEvents ?? liquityEvents.length }),
-    [effectiveOwner, totalEvents, liquityEvents.length],
+    () => ({
+      owner: effectiveOwner ?? null,
+      total: totalEvents ?? liquityEvents.length,
+      shutdownAt: branchShutdown?.at ?? null,
+    }),
+    [effectiveOwner, totalEvents, liquityEvents.length, branchShutdown?.at],
   );
 
   if (loading) {
@@ -505,8 +518,10 @@ export default function TroveView({
         debtInFront={debtInFront}
         trovesAhead={trovesAhead}
         queueDebtTotal={queueDebtTotal}
+        redeemedFirst={lastZombieTroveId == null ? null : lastZombieTroveId === BigInt(troveId).toString()}
         debtInFrontLoading={debtInFrontLoading}
         surplus={surplus}
+        shutdown={shutdown}
         exports={troveExports({
           trove: troveData,
           liveState,

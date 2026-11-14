@@ -4,7 +4,7 @@
 // Complete as of MORPHO_ARBITRUM_CENSUS_BLOCK: createMarket() is Blue's only market-making entry
 // point and it always emits. Every id re-derives as keccak256(abi.encode(params)). The params are
 // immutable; supply, borrow and rates are read at a pinned block by
-// lib/sources/chain/morpho-arbitrum-markets.ts and never live here.
+// lib/sources/chain/morpho-markets.ts and never live here.
 //
 // Symbols and decimals are the tokens' own answers at the census block, null where a token gave
 // none (the zero address, and loan token 0xf8b3…6b57 behind four MUX3LP-sUSDC markets, whose

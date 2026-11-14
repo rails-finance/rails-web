@@ -180,7 +180,55 @@ export const INLINE_LINK = "text-blue-600 dark:text-[var(--text-link)] hover:und
  * `overlay-item` rows. See components/shared/filter-dropdown.tsx for the
  * reference panel.
  */
+/** The page behind an overlay lightened (light) or darkened (dark): the wallet
+ *  panel's scrim (H16.1), shared by the Focus dialog and panel. */
+export const PAGE_SCRIM = "bg-white/60 dark:bg-rb-950/70";
+
 export const OVERLAY_HEADING = "text-xs uppercase tracking-wider font-bold";
+
+/**
+ * A collapsible group's heading in a dropdown (Miles 13 Nov 2026; first in
+ * the profile menu, H20): the heading is a disclosure button carrying
+ * DISCLOSURE_HEAD, its chevron after the words takes `disclosureChevron`.
+ * One lucide ChevronDown, turned 180° to point up while the group is open.
+ * A closed group's chevron always shows, so a closed group signals it holds
+ * something; an open group's shows only on hover or keyboard focus of its
+ * heading, and always on a touch screen (`hover: none`). Hidden by opacity,
+ * so the heading keeps its width; no turn or fade under reduced motion.
+ */
+export const DISCLOSURE_HEAD = "group/disclosure";
+export function disclosureChevron(open: boolean): string {
+  return `size-3.5 shrink-0 transition-[rotate,opacity] motion-reduce:transition-none ${
+    open
+      ? "rotate-180 opacity-0 group-hover/disclosure:opacity-100 group-focus-visible/disclosure:opacity-100 [@media(hover:none)]:opacity-100"
+      : "opacity-100"
+  }`;
+}
+
+/**
+ * A section's header in a menu that is cut into sections (Miles 13 Nov 2026,
+ * mockup; first in the profile menu, H20: "Saved views", "Advanced"): the
+ * menu's row size in sentence case, semibold, muted. Below it, a kind's item
+ * takes the explorer tabs' small uppercase type (11px), one level down.
+ */
+export const MENU_SECTION_HEAD = "text-[15px] font-semibold text-rb-500";
+
+/**
+ * The explorer tabs' type (H5, components/shared/rail-header.tsx `TAB_ACTIVE`,
+ * `TAB_IDLE`), worn also by the profile menu's kinds (H20): 11px, semibold,
+ * uppercase, 0.14em tracking, with a bottom border so a lit tab's underline
+ * never shifts the baseline.
+ */
+export const TAB_BASE = "border-b pb-0.5 text-[11px] font-semibold uppercase tracking-[0.14em]";
+
+/**
+ * A link standing alone at a card's or section's foot ("Open 2 listings",
+ * "Assets", "See a sample wallet"; Miles 13 Nov 2026): link blue at rest
+ * whether it opens another page or changes this one's URL, underlined on
+ * hover, with no arrow. At least 44px tall below sm.
+ */
+export const FOOT_LINK =
+  "inline-flex min-h-11 items-center rounded-sm text-blue-600 underline-offset-2 hover:underline focus-ring sm:min-h-0 dark:text-[var(--text-link)]";
 
 /** A position page's section heading in sentence case: "Lifetime flows". */
 export const SECTION_HEADING = "text-xs font-bold";

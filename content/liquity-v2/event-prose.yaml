@@ -63,7 +63,7 @@ roundings:
   span: |-
     hours under a day (5 hours), else days at one place (3.2 days)
   manager: |-
-    the batch manager's name and short address (ARM (0xe507…b60a)), linked to the explorer
+    the delegate's name and short address (ARM (0xe507…b60a)), linked to the explorer
   address: |-
     a short address (0xf060…45f8), linked to the explorer
   text: |-
@@ -114,7 +114,7 @@ placeholders:
   mcr:
     rounding: pct_whole
     means: |-
-      the branch's minimum collateral ratio (110% for WETH)
+      the open branch's minimum collateral ratio
   min_debt:
     rounding: count
     means: |-
@@ -143,18 +143,22 @@ placeholders:
     rounding: ratio_whole
     means: |-
       collateral ratio after the event, percent
-  cr_at_liquidation:
-    rounding: ratio_pair
+  ltv_at_liquidation:
+    rounding: ratio
     means: |-
-      collateral ratio at the liquidation's price, percent
+      the LTV at the liquidation's price, percent (debt ÷ collateral value)
+  max_ltv:
+    rounding: ratio
+    means: |-
+      the open branch's Max LTV, 1 ÷ its minimum collateral ratio
   liq_price_before:
     rounding: usd
     means: |-
-      the price at which the trove would reach the minimum, before
+      the price at which the trove's LTV would reach the Max LTV, before
   liq_price_after:
     rounding: usd
     means: |-
-      the price at which the trove would reach the minimum, after
+      the price at which the trove's LTV would reach the Max LTV, after
   liq_distance_before:
     rounding: pct_whole
     means: |-
@@ -190,7 +194,7 @@ placeholders:
   upfront_fee:
     rounding: debt
     means: |-
-      the upfront fee added to the debt
+      the Upfront Borrowing Fee added to the debt
   accrued_total:
     rounding: accrued
     means: |-
@@ -230,15 +234,15 @@ placeholders:
   rate_setter:
     rounding: text
     means: |-
-      the batch manager's name, where a batch manager sets the rate
+      the delegate's name, where a delegate sets the rate
   manager:
     rounding: manager
     means: |-
-      the batch manager
+      the delegate
   former_manager:
     rounding: address
     means: |-
-      the batch manager the trove left
+      the delegate the trove left
   batch_rate:
     rounding: rate
     means: |-
@@ -358,7 +362,7 @@ placeholders:
   move_upfront:
     rounding: accrued
     means: |-
-      the upfront fee: the rest of the move
+      the Upfront Borrowing Fee: the rest of the move
   block:
     rounding: count
     means: |-
@@ -448,14 +452,14 @@ L1_words:
     claimable, claimed
   zombie: |-
     Dormant
-  # The gas compensation escrow, 0.0375 WETH, its own leg on the open and the
+  # The liquidation reserve (the GasPool's gas compensation), 0.0375 WETH, its own leg on the open and the
   # close (rails-ops TO-DO-ui-jobs 363).
   escrow_leg: |-
-    Gas escrow
+    Liquidation reserve
   spine_escrow_sent: |-
-    gas compensation escrow sent
+    liquidation reserve sent
   spine_escrow_returned: |-
-    gas compensation escrow returned
+    liquidation reserve returned
   # A pending debt applied: its one spine leg, spoken.
   spine_debt_added: |-
     added to the debt
@@ -502,7 +506,7 @@ L1_words:
     claimed
   # The Liquity V2 forks (Ebisu, Asymmetry, Basedollar) read these t1 words
   # too (lib/shared/liquity-fork-head-words.ts); this one is theirs alone, a
-  # batch manager's cut to its annual fee.
+  # delegate's cut to its annual fee.
   t1_lowered_fee: |-
     Lowered management fee
 
@@ -561,14 +565,14 @@ L2_words:
     At the latest block’s price, {price_today}, the redeemed {coll_symbol} would be worth {redemption_vs_today_usd} less than the debt it paid off
   redemption_today_higher: |-
     At the latest block’s price, {price_today}, the redeemed {coll_symbol} would be worth {redemption_vs_today_usd} more than the debt it paid off
-  collateral_ratio: |-
-    Collateral Ratio
+  ltv: |-
+    LTV
   # T2's balance sheet (ui-jobs 330): the event's rows a family names, and the
   # Risk and Limits rows.
   sheet_redistribution: |-
     Redistribution
   sheet_upfront_fee: |-
-    Upfront fee
+    Upfront Borrowing Fee
   sheet_fee: |-
     Management fee
   sheet_face: |-
@@ -577,10 +581,10 @@ L2_words:
     Liquidates at
   delegate_fee: |-
     Delegate's fee
-  minimum_ratio: |-
-    Minimum ratio
+  max_ltv: |-
+    Max LTV
   critical_ratio: |-
-    Critical ratio
+    Critical Collateral Ratio (CCR)
   # The sheet's read-more, one per row: what the figure is and where it is read.
   tip_coll_last: |-
     The Trove's {coll_symbol} after its previous event, from the TroveManager's log, at Liquity's {coll_symbol} price at that event.
@@ -601,7 +605,7 @@ L2_words:
   tip_debt_interest_asset: |-
     The interest in {debt_symbol}, counted at its $1.00 face.
   tip_debt_fee: |-
-    The batch manager's management fee the debt accrued since the previous event, in {debt_symbol}.
+    The delegate's management fee the debt accrued since the previous event, in {debt_symbol}.
   tip_debt_before: |-
     The debt just before this event: the previous event's debt plus the {accrual_noun} since.
   tip_debt_event: |-
@@ -612,25 +616,23 @@ L2_words:
     The debt that liquidated Troves passed to this one, applied at this event.
   tip_debt_total: |-
     The Trove's debt after this event, from the TroveManager's log, at $1 per {debt_symbol}.
-  tip_cr: |-
-    The collateral's dollar value divided by the debt after this event, at Liquity's {coll_symbol} price at this block.
   tip_ltv: |-
     The debt divided by the collateral's dollar value after this event, at Liquity's {coll_symbol} price at this block.
   tip_liquidates_at: |-
-    The {coll_symbol} price at which the Trove's collateral ratio meets the branch's minimum: the debt times the minimum ratio, divided by the collateral.
+    The {coll_symbol} price at which the Trove's LTV reaches the branch's Max LTV: the debt divided by the collateral times the Max LTV.
   tip_rate: |-
     The annual interest rate on the Trove's debt after this event, from the TroveManager's log.
   tip_delegate_fee: |-
-    The batch's annual management fee, set by its batch manager and charged on top of the interest rate.
-  tip_minimum_ratio: |-
-    The collateral ratio below which a Trove on the {coll_symbol} branch can be liquidated, a constant of the branch's contracts.
+    The batch's annual management fee, set by its delegate and charged on top of the interest rate.
+  tip_max_ltv: |-
+    The LTV above which a Trove on the {coll_symbol} branch can be liquidated, 1 ÷ the minimum collateral ratio the branch's contracts were deployed with.
   tip_critical_ratio: |-
     The branch-wide collateral ratio below which the {coll_symbol} branch restricts borrowing, a constant of the branch's contracts.
-  # The gas compensation escrow's footnote, under Risk and Limits on every
+  # The liquidation reserve's footnote, under Risk and Limits on every
   # event from the open to the close or the liquidation (rails-ops
-  # TO-DO-ui-jobs 388). Liquity's docs call it the liquidation reserve.
+  # TO-DO-ui-jobs 388; the docs' name, decision 0065).
   tip_escrow_note: |-
-    The gas compensation escrow: the 0.0375 WETH every Trove sends to its branch's GasPool at its open, on every branch, held apart from its collateral and outside the collateral ratio. Liquity calls it the liquidation reserve. It returns on close and goes to the liquidator on a liquidation.
+    The liquidation reserve: a refundable gas deposit of 0.0375 WETH every Trove sends to its branch's GasPool at its open, on every branch, held apart from its collateral and outside the LTV. It returns on close and goes to the liquidator on a liquidation.
 
 # ── Copy for LLM: the block's context header ──
 context_words:
@@ -713,6 +715,8 @@ group_words:
 L5_words:
   coll_type_unknown: |-
     this collateral
+  max_ltv_unknown: |-
+    set per branch
   delegate_named: |-
     the {delegate_name} delegate
   delegate_unnamed: |-
@@ -727,12 +731,14 @@ trove_words:
     The {coll_symbol} the Trove holds, its dollar value at the branch's {coll_symbol} price beneath. It backs the debt, and a liquidation or a redemption takes from it.
   card_tip_debt: |-
     The {debt_symbol} the Trove owes, including the interest accrued since its last event. Repaying it in full closes the Trove.
+  # A collateral-ratio deployment's tips (Ebisu), in its docs' terms
+  # (LiquityFamilyTerms, decision 0065).
   card_tip_cr: |-
-    The collateral's dollar value divided by the debt. Below the {coll_symbol} branch's minimum ratio the Trove can be liquidated.
+    The {ratio_text} (CR): the collateral's dollar value divided by the debt. Below the {coll_symbol} branch's {limit_text} the Trove can be liquidated.
   card_tip_ltv: |-
-    The debt divided by the collateral's dollar value. Above the {coll_symbol} branch's maximum the Trove can be liquidated.
+    The debt divided by the collateral's dollar value. Above the {coll_symbol} branch's Max LTV the Trove can be liquidated.
   card_tip_rate: |-
-    The annual rate the debt accrues interest at, chosen by the owner or set by its batch manager. Redemptions take Troves with lower rates first.
+    The annual rate the debt accrues interest at, chosen by the owner or set by its delegate. Redemptions take Troves with lower rates first.
   card_tip_debt_in_front: |-
     The {debt_symbol} debt of the {coll_symbol} branch's Troves paying a lower interest rate. Redemptions take that debt before they reach this Trove.
   card_tip_troves_in_front: |-
@@ -740,7 +746,22 @@ trove_words:
   card_tip_costs: |-
     A year's interest at today's rate: the debt times the annual interest rate. It moves with the rate and the debt.
   card_tip_liquidates_at: |-
-    The {coll_symbol} price at which the Trove's collateral ratio meets the branch's minimum: the debt times the minimum ratio, divided by the collateral.
+    The {coll_symbol} price at which the Trove's {ratio_text} meets the branch's {limit_text}: the debt times the {limit_short}, divided by the collateral.
+  card_tip_liquidates_at_ltv: |-
+    The {coll_symbol} price at which the Trove's LTV reaches the branch's Max LTV: the debt divided by the collateral times the Max LTV.
+  # An open Trove on a shut-down branch (ui-jobs 612): the heads that stay,
+  # in the state they are in. Interest stopped at the shutdown; whether the
+  # Trove can be liquidated has not been read.
+  card_tip_collateral_shutdown: |-
+    The {coll_symbol} the Trove records against its debt.
+  card_tip_debt_shutdown: |-
+    The {debt_symbol} the Trove records as owed. Interest stopped accruing when its branch shut down.
+  card_tip_cr_shutdown: |-
+    The {ratio_text} (CR): the collateral's dollar value divided by the debt.
+  card_tip_ltv_shutdown: |-
+    The debt divided by the collateral's dollar value.
+  card_tip_rate_shutdown: |-
+    The annual rate the Trove carried when its branch shut down. Interest stopped accruing then.
   # ── The Trove listing: its heading, noun and search box ──
   listing_title: |-
     Liquity V2 Troves
@@ -789,7 +810,7 @@ trove_words:
   run_adjusted: |-
     Adjusted
   run_phone_caption: |-
-    · {range}
+    {sep} {range}
   run_spoken: |-
     Adjusted, {range}
   run_count_one: |-
@@ -840,7 +861,7 @@ trove_words:
   run_sheet_interest: |-
     Interest and management fee
   run_sheet_upfront: |-
-    Upfront fees
+    Upfront Borrowing Fees
   run_sheet_event: |-
     #{number} · {date}
   run_sheet_sum: |-
@@ -883,7 +904,7 @@ trove_words:
   heading_history: |-
     History
   liq_lead: |-
-    Trove {id} was liquidated when its collateral ratio fell below the minimum threshold ({threshold}% for {coll_type}):
+    Trove {id} was liquidated when its LTV rose above the Max LTV ({max_ltv} for {coll_type}):
   liq_lifecycle: |-
     Trove was active for {duration} before liquidation from {range}
   liq_nft: |-
@@ -902,14 +923,18 @@ trove_words:
     This trove holds {coll} of collateral against {debt} of debt:
   debt_breakdown: |-
     The debt includes {interest} of interest accrued since the last event
+  debt_breakdown_shutdown: |-
+    The debt includes {interest} of interest accrued until the branch shut down on {date}
+  debt_breakdown_stopped: |-
+    Interest stopped when the branch shut down on {date}
   debt_breakdown_fee: |-
     and {fee} of delegate fees
   coll_worth: |-
     The collateral is worth {usd} at the latest {coll_type} price of {price}
   coll_secures: |-
     {coll} collateral secures this position
-  coll_ratio: |-
-    Collateral ratio of {ratio} means the collateral is worth {multiple}× the debt
+  ltv_ratio: |-
+    LTV of {ltv} means the debt is worth {multiple}× the collateral
   liq_runway: |-
     {coll_type} would need to fall {drop} to {price} before the trove can be liquidated
   liq_runway_now: |-
@@ -921,7 +946,7 @@ trove_words:
   delegate_visit: |-
     Visit {name} website
   delegate_fallback: |-
-    Batch Manager
+    Delegate
   debt_in_front: |-
     {debt} of debt at the same or lower rate is redeemed before or with this trove
   queue_share: |-
@@ -982,7 +1007,7 @@ trove_words:
 shared_sentences:
   market.fell:
     when: |-
-      the price fell since the trove's previous event by at least a quarter of the room the trove had above the minimum
+      the price fell since the trove's previous event by at least a quarter of the room the trove had below the Max LTV, in price
     text: |-
       {coll_symbol} had fallen {price_change} since the previous event, from {price_prev}.
   market.rose:
@@ -1153,7 +1178,7 @@ templates:
         when: |-
           the borrow charged an upfront fee
         text: |-
-          The owner borrowed {borrowed} {debt_symbol} more, paying an upfront fee of 7 days of average interest.
+          The owner borrowed {borrowed} {debt_symbol} more, paying an Upfront Borrowing Fee of 7 days of average interest.
       borrow.liq_distance:
         when: |-
           the trove has debt before and after
@@ -1250,7 +1275,7 @@ templates:
         when: |-
           variant add_borrow, an upfront fee
         text: |-
-          The owner added {added} {coll_symbol} of collateral and borrowed {borrowed} {debt_symbol} more, plus the upfront fee.
+          The owner added {added} {coll_symbol} of collateral and borrowed {borrowed} {debt_symbol} more, plus the Upfront Borrowing Fee.
       combined.what.add_repay:
         when: |-
           variant add_repay
@@ -1265,7 +1290,7 @@ templates:
         when: |-
           variant withdraw_borrow, an upfront fee
         text: |-
-          The owner withdrew {withdrawn} {coll_symbol} of collateral and borrowed {borrowed} {debt_symbol} more, plus the upfront fee.
+          The owner withdrew {withdrawn} {coll_symbol} of collateral and borrowed {borrowed} {debt_symbol} more, plus the Upfront Borrowing Fee.
       combined.what.withdraw_repay:
         when: |-
           variant withdraw_repay
@@ -1459,7 +1484,7 @@ templates:
         when: |-
           variant at_event, not a zombie, the trove is batched
         text: |-
-          It was redeemed because its {rate_after} rate, set by batch manager {rate_setter}, was among the lowest in the {coll_symbol} branch.
+          It was redeemed because its {rate_after} rate, set by delegate {rate_setter}, was among the lowest in the {coll_symbol} branch.
       redeem.why_owner:
         when: |-
           variant at_event, not a zombie, the owner sets the rate
@@ -1485,6 +1510,19 @@ templates:
           variant at_event, a zombie with debt left
         text: |-
           It can be closed by repaying the debt and withdrawing the collateral, or restored by borrowing above the minimum.
+      # On a shut-down branch (the urgent path, redemptionPath) closing remains and borrowing does not:
+      # rails-ops reference/official-docs/liquity-v2.md row 26 ("closing, surplus claims and shutdown
+      # redemptions remain").
+      redeem.zombie_zero_close:
+        when: |-
+          variant at_event, a zombie with no debt left, on a shut-down branch
+        text: |-
+          It can be closed by withdrawing the collateral.
+      redeem.zombie_low_close:
+        when: |-
+          variant at_event, a zombie with debt left, on a shut-down branch
+        text: |-
+          It can be closed by repaying the debt and withdrawing the collateral.
     order:
       - redeem.no_detail
       - redeem.what
@@ -1496,19 +1534,29 @@ templates:
       - redeem.zombie_zero_next
       - redeem.zombie_low
       - redeem.zombie_low_next
+      - redeem.zombie_zero_close
+      - redeem.zombie_low_close
       - same_block
     groups:
       happened: [redeem.no_detail, redeem.what, redeem.why_batch, redeem.why_owner, same_block]
       adds_up: [redeem.result, redeem.result_no_fee]
-      leaves: [redeem.zombie_zero, redeem.zombie_zero_next, redeem.zombie_low, redeem.zombie_low_next]
+      leaves:
+        [
+          redeem.zombie_zero,
+          redeem.zombie_zero_next,
+          redeem.zombie_low,
+          redeem.zombie_low_next,
+          redeem.zombie_zero_close,
+          redeem.zombie_low_close,
+        ]
     alternates:
       - [redeem.result, redeem.result_no_fee]
       - [redeem.why_batch, redeem.why_owner, redeem.zombie_zero, redeem.zombie_low]
-      - [redeem.zombie_zero_next, redeem.zombie_low_next]
+      - [redeem.zombie_zero_next, redeem.zombie_low_next, redeem.zombie_zero_close, redeem.zombie_low_close]
 
   - id: liquity2.delegation.join
     title: |-
-      Join batch manager
+      Join delegate
     when: |-
       setInterestBatchManager
     L5: delegation
@@ -1523,19 +1571,19 @@ templates:
     sentences:
       join.what:
         when: |-
-          the batch manager is known
+          the delegate is known
         text: |-
-          This trove handed its interest rate to batch manager {manager}.
+          This trove handed its interest rate to delegate {manager}.
       join.what_plain:
         when: |-
-          the batch manager is not known
+          the delegate is not known
         text: |-
-          This trove handed its interest rate to a batch manager.
+          This trove handed its interest rate to a delegate.
       join.fee:
         when: |-
           joining charged an upfront fee
         text: |-
-          Joining the batch added a {upfront_fee} {debt_symbol} upfront fee to the debt.
+          Joining the batch added a {upfront_fee} {debt_symbol} Upfront Borrowing Fee to the debt.
       join.rate:
         when: |-
           the rate after is known
@@ -1556,7 +1604,7 @@ templates:
 
   - id: liquity2.delegation.leave
     title: |-
-      Leave batch manager
+      Leave delegate
     when: |-
       removeFromBatch
     L5: delegation
@@ -1570,14 +1618,14 @@ templates:
     sentences:
       leave.what:
         when: |-
-          the batch manager is known
+          the delegate is known
         text: |-
-          This trove left batch manager {former_manager}, so the owner sets its interest rate again.
+          This trove left delegate {former_manager}, so the owner sets its interest rate again.
       leave.what_plain:
         when: |-
-          the batch manager is not known
+          the delegate is not known
         text: |-
-          This trove left its batch manager, so the owner sets its interest rate again.
+          This trove left its delegate, so the owner sets its interest rate again.
       leave.fees:
         when: |-
           more than 0.01 of management fee accrued since the previous event
@@ -1587,7 +1635,7 @@ templates:
         when: |-
           leaving charged an upfront fee
         text: |-
-          Leaving the batch added a {upfront_fee} {debt_symbol} upfront fee to the debt.
+          Leaving the batch added a {upfront_fee} {debt_symbol} Upfront Borrowing Fee to the debt.
       leave.rate:
         when: |-
           the rate moved
@@ -1608,9 +1656,9 @@ templates:
 
   - id: liquity2.delegation.rate_update
     title: |-
-      Batch manager rate change
+      Delegate rate change
     when: |-
-      setBatchManagerAnnualInterestRate: the trove's batch manager set the batch's rate
+      setBatchManagerAnnualInterestRate: the trove's delegate set the batch's rate
     L5: delegation
     variants:
       raised: |-
@@ -1633,17 +1681,17 @@ templates:
         when: |-
           variant raised
         text: |-
-          The batch manager raised the delegated interest rate from {rate_before|rate_step} to {rate_after|rate_step} APR.
+          The delegate raised the delegated interest rate from {rate_before|rate_step} to {rate_after|rate_step} APR.
       bru.lowered:
         when: |-
           variant lowered
         text: |-
-          The batch manager lowered the delegated interest rate from {rate_before|rate_step} to {rate_after|rate_step} APR.
+          The delegate lowered the delegated interest rate from {rate_before|rate_step} to {rate_after|rate_step} APR.
       bru.kept:
         when: |-
           variant kept
         text: |-
-          The batch manager kept the delegated interest rate at {rate_after} APR.
+          The delegate kept the delegated interest rate at {rate_after} APR.
       bru.interest:
         when: |-
           the debt moved by 0.01 or more, interest of 0.005 or more
@@ -1658,7 +1706,7 @@ templates:
         when: |-
           the debt moved by 0.01 or more, the change fell inside the 7-day cooldown and left a remainder
         text: |-
-          Upfront fee {move_upfront} {debt_symbol}: the manager changed the rate again within 7 days.
+          Upfront Borrowing Fee {move_upfront} {debt_symbol}: the delegate changed the rate again within 7 days.
     order:
       - bru.raised
       - bru.lowered
@@ -1707,17 +1755,17 @@ templates:
         when: |-
           variant join_batch, manager and fee known
         text: |-
-          It joined batch manager {manager}, which sets its rate, for a {batch_fee_rate} management fee.
+          It joined delegate {manager}, which sets its rate, for a {batch_fee_rate} management fee.
       open.join_no_fee:
         when: |-
           variant join_batch, no management fee
         text: |-
-          It joined batch manager {manager}, which sets its rate.
+          It joined delegate {manager}, which sets its rate.
       open.join_plain:
         when: |-
           variant join_batch, manager not known
         text: |-
-          It joined a batch manager, which sets its rate.
+          It joined a delegate, which sets its rate.
     order:
       - open.what
       - liq.after
@@ -1819,7 +1867,7 @@ templates:
         when: |-
           variant destructive
         text: |-
-          This trove was liquidated: its collateral ratio had dropped to {cr_at_liquidation}, below the {mcr} liquidation line for {coll_symbol}.
+          This trove was liquidated: its LTV had risen to {ltv_at_liquidation}, above the {max_ltv} Max LTV for {coll_symbol}.
       liq.surplus:
         when: |-
           variant destructive, a surplus, not claimed yet
@@ -1895,7 +1943,7 @@ templates:
         when: |-
           a batch update rode with it
         text: |-
-          A batch manager applied the trove’s accrued interest at the same time.
+          A delegate applied the trove’s accrued interest at the same time.
     order:
       - apply.what
       - apply.what_coll
@@ -1991,8 +2039,9 @@ templates:
 #   links                  each a label and `faq`, an id the code resolves to
 #                          Liquity's FAQ (FAQ_URLS)
 # The interest-rate modal has `intro_delegated` and, on its first detail,
-# `text_delegated`: what it says when a batch manager sets the trove's rate.
-# The liquidation modal's intro reads {min_cr}, {max_ltv} and {coll_type}.
+# `text_delegated`: what it says when a delegate sets the trove's rate.
+# The adjust modal's second paragraph and the liquidation modal's intro read
+# {max_ltv} and {coll_type}: the open branch's figure and its collateral.
 # Each concept that states a mechanism rests on a row of rails-ops
 # reference/official-docs/liquity-v2.md, and its link is that row's page.
 L5:
@@ -2003,14 +2052,14 @@ L5:
       An adjustment changes a trove without closing it. The owner can add or withdraw collateral, borrow more BOLD, or repay some of the debt.
     extraParagraphs:
       - |-
-        Adding collateral or repaying makes the trove safer. Withdrawing collateral or borrowing more brings it closer to liquidation. An adjustment must keep the LTV under the branch maximum (90.91% for WETH, a 110% collateral ratio), or it is rejected.
+        Adding collateral or repaying makes the trove safer. Withdrawing collateral or borrowing more brings it closer to liquidation. An adjustment must keep the LTV under the branch's Max LTV ({max_ltv} for {coll_type}), or it is rejected.
       - |-
         Adjusting doesn't change the interest rate, which is a separate action. The rate matters because it decides how early the trove is redeemed against.
     detailsHeading: |-
       Key concepts:
     details:
       - bold: |-
-          Upfront fee
+          Upfront Borrowing Fee
         text: |-
           borrowing more adds a one-time fee of 7 days of the branch's average interest to the debt.
       - bold: |-
@@ -2074,7 +2123,7 @@ L5:
     title: |-
       How liquidations work
     intro: |-
-      A trove can be liquidated once its collateral ratio falls below {min_cr} for {coll_type}, a maximum LTV of {max_ltv}. Anyone can trigger the liquidation.
+      A trove can be liquidated once its LTV rises above the branch's Max LTV ({max_ltv} for {coll_type}). Anyone can trigger the liquidation.
     detailsHeading: |-
       Key concepts:
     details:
@@ -2117,15 +2166,15 @@ L5:
       Key concepts:
     details:
       - bold: |-
-          Collateral ratio
+          LTV
         text: |-
-          the value of the collateral relative to the debt, which must stay above the branch minimum.
+          the debt relative to the value of the collateral, which must stay below the branch's Max LTV.
       - bold: |-
           Interest rate
         text: |-
-          the borrower sets the rate or delegates it to a batch manager; lower rates cost less and are redeemed sooner.
+          the borrower sets the rate or delegates it to a third party; lower rates cost less and are redeemed sooner.
       - bold: |-
-          Upfront fee
+          Upfront Borrowing Fee
         text: |-
           a one-time borrowing fee of 7 days of average interest, added to the Trove's debt.
       - bold: |-
@@ -2187,18 +2236,18 @@ L5:
     title: |-
       How interest rates work
     intro: |-
-      Each trove carries an annual interest rate that is added to its debt over time. The borrower can change the rate at any time, or delegate it to a batch manager that sets one rate for many troves.
+      Each trove carries an annual interest rate that is added to its debt over time. The borrower can change the rate at any time, or hand it to a delegate that sets one rate for many troves.
     intro_delegated: |-
-      Each trove carries an annual interest rate that is added to its debt over time. This trove's rate is set by {delegate}, a batch manager that sets one rate for many troves.
+      Each trove carries an annual interest rate that is added to its debt over time. This trove's rate is set by {delegate}, a delegate that sets one rate for many troves.
     detailsHeading: |-
       Key concepts:
     details:
       - bold: |-
           Who sets the rate
         text: |-
-          the borrower sets the rate or delegates it to a batch manager; lower rates cost less but sit earlier in the redemption queue.
+          the borrower sets the rate or delegates it to a third party; lower rates cost less but sit earlier in the redemption queue.
         text_delegated: |-
-          the batch manager sets the rate for every trove in its batch; lower rates cost less but sit earlier in the redemption queue.
+          the delegate sets the rate for every trove in its batch; lower rates cost less but sit earlier in the redemption queue.
       - bold: |-
           Continuous accrual
         text: |-
@@ -2222,14 +2271,14 @@ L5:
     title: |-
       How interest delegation works
     intro: |-
-      A trove can hand its interest rate to a batch manager. The manager sets one rate for a group of troves and charges a management fee.
+      A trove can hand its interest rate to a delegate. The delegate sets one rate for a batch of troves and charges a management fee.
     detailsHeading: |-
       Key concepts:
     details:
       - bold: |-
-          Batch manager
+          Delegate
         text: |-
-          a delegate that sets a single interest rate, within a preset range, for every trove in its batch.
+          a third party that sets a single interest rate, within a preset range, for every trove in its batch.
       - bold: |-
           Management fee
         text: |-
@@ -2285,7 +2334,7 @@ L5:
       - bold: |-
           Trove
         text: |-
-          the borrowing position — collateral in, BOLD out, with a collateral ratio to keep above the threshold.
+          the borrowing position — collateral in, BOLD out, with an LTV to keep below the Max LTV.
       - bold: |-
           Interest rate
         text: |-

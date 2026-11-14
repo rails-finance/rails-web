@@ -56,7 +56,11 @@ export default async function TrovePage({ params }: Props) {
   if (tail.missing) notFound();
 
   return (
-    <PositionReadProvider key={`${collateralType}:${troveId}`} read={tail.trove ? read : null}>
+    <PositionReadProvider
+      focus={{ source: tail.trove }}
+      key={`${collateralType}:${troveId}`}
+      read={tail.trove ? read : null}
+    >
       <TroveView
         // Keyed on the trove so a client-side navigation to another position
         // remounts with the new server tail as its initial state, rather than

@@ -31,12 +31,14 @@ import { QuietTipsContext } from "@/components/shared/reveal-tip";
 import { createPortal } from "react-dom";
 import { MobileSheet } from "@/components/shared/mobile-sheet";
 import { provInspector } from "@/components/shared/provenance";
+import { tipYieldsToTrace } from "@/lib/shared/tip-yields";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { useChainId } from "@/lib/shared/chain-context";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { getTokenAddress } from "@/lib/shared/token-addresses";
 import Link from "next/link";
+import { FOOT_LINK } from "@/lib/shared/ui-grammar";
 import { usePathname } from "next/navigation";
 import { PriceUnitMark } from "@/components/assets/price-unit-mark";
 import { fmtChange, PriceSparkline } from "@/components/assets/price-sparkline";
@@ -55,7 +57,7 @@ const WORDS = {
   contract: "Contract",
   price: "Price",
   source: "Price source",
-  open: (symbol: string) => `Open ${symbol} →`,
+  open: (symbol: string) => `Open ${symbol}`,
 };
 
 const POP_W = 288;
@@ -119,8 +121,8 @@ export function AssetPopover({
         data-prov-hidden=""
         className={`inline-flex cursor-pointer items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 ${className ?? ""}`}
         onClick={(e) => {
-          // While the inspector is armed the click traces the figure.
-          if (provInspector.getArmed()) return;
+          // Inside a figure the inspector can pick, the click traces it.
+          if (tipYieldsToTrace(triggerRef.current, provInspector.getArmed())) return;
           e.preventDefault();
           e.stopPropagation();
           setOpen((o) => !o);
@@ -217,8 +219,8 @@ function PendleMarketLine({ chain, contract }: { chain: ChainId; contract: strin
   const href = pendleMarketHref(m.market);
   return (
     <div className="border-t border-[var(--rb-tooltip-border)] pt-2" data-asset-popover-line="pendle-market">
-      <Link href={href} className="font-medium text-foreground hover:underline" data-asset-popover-pendle={m.market}>
-        Open its Pendle market →
+      <Link href={href} className={`self-start font-medium ${FOOT_LINK}`} data-asset-popover-pendle={m.market}>
+        Open its Pendle market
       </Link>
     </div>
   );
@@ -287,7 +289,7 @@ function AssetPageRow({ chain, contract, symbol }: { chain: ChainId; contract: s
         <p className="text-[11px] text-rb-500" data-asset-popover-priceless="">
           {PRICELESS_WHY}
         </p>
-        <Link href={open} className="font-medium text-foreground hover:underline" data-asset-popover-open={open}>
+        <Link href={open} className={`self-start font-medium ${FOOT_LINK}`} data-asset-popover-open={open}>
           {WORDS.open(symbol)}
         </Link>
       </div>
@@ -334,7 +336,7 @@ function AssetPageRow({ chain, contract, symbol }: { chain: ChainId; contract: s
           {row.asOf ? `, its stored rounds to block ${row.asOf.block.toLocaleString("en-US")}` : ""}, last 30 days
         </p>
       )}
-      <Link href={open} className="font-medium text-foreground hover:underline" data-asset-popover-open={open}>
+      <Link href={open} className={`self-start font-medium ${FOOT_LINK}`} data-asset-popover-open={open}>
         {WORDS.open(row.symbol)}
       </Link>
     </div>
@@ -351,7 +353,7 @@ function ContractLine({ chain, contract }: { chain: ChainId; contract: string })
         <a
           href={explorerUrl(chain, "token", contract)}
           target="_blank"
-          rel="noopener noreferrer"
+          rel="noopener"
           className="link-external font-mono"
           aria-label={`${WORDS.contract} ${contract}`}
         >

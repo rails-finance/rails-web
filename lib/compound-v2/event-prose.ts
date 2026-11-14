@@ -13,7 +13,7 @@
 import type { BaseActivityEvent, CompoundV2Context } from "@/lib/shared/types/event-shape";
 import type { EventProseCore } from "@/lib/shared/event-prose/types";
 import { isCompoundV2Deprecated } from "@/lib/compound-v2/deprecated-markets";
-import { COMPOUND_V2_MARKET_BY_KEY, COMPOUND_V2_NO_SEIZE_SHARE } from "@/lib/compound-v2/asset-catalog";
+import { COMPOUND_V2_MARKET_BY_KEY, compoundV2SeizeForm } from "@/lib/compound-v2/asset-catalog";
 import { compoundV2Modal, PROSE, type CompoundV2L5Key } from "@/lib/compound-v2/event-templates";
 
 export type CompoundV2Event = BaseActivityEvent & { context: { protocol: "compound-v2"; data: CompoundV2Context } };
@@ -106,10 +106,9 @@ function modalKey(ctx: CompoundV2Context, id: string): CompoundV2L5Key {
   return L5_OF[id];
 }
 
-/** The modal's forms: a seizure in a market with no protocol share reads differently. */
-function modalForm(ctx: CompoundV2Context): string[] {
-  const seized = ctx.collateralMarket ?? ctx.market;
-  return ctx.eventType.startsWith("seize") && COMPOUND_V2_NO_SEIZE_SHARE.has(seized) ? ["no_share"] : [];
+/** The kinds of the account's events in this event's transaction. */
+export function seizeLegs(input: Pick<CompoundV2ProseInput, "siblings" | "self">): string[] {
+  return [input.self, ...input.siblings].map((e) => e.context.data.eventType);
 }
 
 /** One event's explanation and modal. */
@@ -205,7 +204,7 @@ export function compoundV2EventProse(input: CompoundV2ProseInput): CompoundV2Eve
   // ── The run's sentences ──
   const said = PROSE.finish(run, variant);
   const key = modalKey(ctx, t.id);
-  return { ...said, L5: { key, content: compoundV2Modal(key, modalForm(ctx)) } };
+  return { ...said, L5: { key, content: compoundV2Modal(key, compoundV2SeizeForm(ctx, seizeLegs(input))) } };
 }
 
 /** L4 as the explanation prints it: one flat run, or one run per group. */

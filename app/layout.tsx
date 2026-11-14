@@ -15,6 +15,7 @@ import { WalletPanel } from "@/components/nav/wallet-panel";
 import { NavigationProgress } from "@/components/nav/navigation-progress";
 import { WalletContextProvider } from "@/components/nav/wallet-context";
 import { ThemeScript } from "@/components/ThemeScript";
+import { ASSET_SCOPE_SCRIPT } from "@/lib/shared/asset-preference";
 import { BetaStrip } from "@/components/shared/beta-strip";
 import { WorkInProgressStrip } from "@/components/shared/work-in-progress-strip";
 import { SITE_URL, TWITTER_HANDLE } from "@/lib/shared/page-metadata";
@@ -56,7 +57,7 @@ export const viewport: Viewport = {
 // advertise.
 //
 // Note what is claimed and what isn't: the foundation below (every position,
-// replayed from the protocol's own events, receipts) IS identical across every
+// read from the chain, receipts) IS identical across every
 // explorer. Depth is not — it varies per explorer, and the per-chain coverage
 // pages (/coverage/<chain>, off lib/shared/coverage.ts) are the one place that
 // states it, so the share copy points there rather than flattening the
@@ -87,7 +88,7 @@ const COVERAGE_PATHS = launchedProductionChains()
 // The home page is the front door, one search (decision 0051), so the title and
 // the share card say the door; the brand leads.
 const SITE_TITLE = "Rails - Look up a wallet";
-const OG_DESCRIPTION = `Look up a wallet by address or ENS name and see its DeFi positions. Rails explores ${PROTOCOL_COUNT} DeFi protocols on ${PRODUCTION_CHAIN_NAMES}, plus Polaris on Sepolia. Every position is replayed from the protocol's on-chain events, with a receipt on every number.`;
+const OG_DESCRIPTION = `Look up a wallet by address or ENS name and see its DeFi positions. Rails explores ${PROTOCOL_COUNT} DeFi protocols on ${PRODUCTION_CHAIN_NAMES}, plus Polaris on Sepolia. Every position is read from the chain, with a receipt on every number.`;
 // Opens on /about's first two sentences (`lib/shared/site-copy.ts`, ui-jobs
 // 475), so a search summary built from it says what /about says.
 const SITE_DESCRIPTION = `${SITE_LEAD} ${SITE_METHOD} Look up any wallet by address or ENS name, or browse every open position. How deep each explorer goes is stated per protocol at ${COVERAGE_PATHS}.`;
@@ -132,7 +133,7 @@ export const metadata: Metadata = {
         // fresh rather than served stale from their cache. Bump the hash
         // (`shasum -a 256 public/og/home.png | cut -c1-8`) whenever
         // `pnpm og` changes this file's bytes.
-        url: "/og/home-3a7eee3f.png",
+        url: "/og/home-42a176a8.png",
         width: 1200,
         height: 630,
         alt: `Look up a wallet on Rails: ${PROTOCOL_COUNT} DeFi protocols on ${PRODUCTION_CHAIN_NAMES}, plus Polaris on Sepolia`,
@@ -143,7 +144,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: SITE_TITLE,
     description: OG_DESCRIPTION,
-    images: ["/og/home-3a7eee3f.png"],
+    images: ["/og/home-42a176a8.png"],
     creator: TWITTER_HANDLE,
     site: TWITTER_HANDLE,
   },
@@ -187,6 +188,10 @@ export default function RootLayout({
               "(function(){try{var d=document.documentElement.dataset;if(localStorage.getItem('rails-hero-seen'))d.heroSeen='1';if(sessionStorage.getItem('rails-tracks-seen'))d.tracksSeen='1'}catch(e){}})()",
           }}
         />
+        {/* The asset preference (ui-jobs 557): marks <html data-asset-scope>
+            before first paint, so a filtered list waits for its filter
+            rather than drawing whole first (globals.css). */}
+        <script dangerouslySetInnerHTML={{ __html: ASSET_SCOPE_SCRIPT }} />
       </head>
       <body
         className={`${dmSans.className} ${dmSans.variable} antialiased bg-background text-foreground min-h-screen flex flex-col overflow-x-hidden min-w-[320px]`}

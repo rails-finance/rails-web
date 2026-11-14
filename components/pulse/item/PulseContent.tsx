@@ -78,7 +78,7 @@ export function PulseContent({ event }: { event: TimelineEvent }) {
         <a
           href={event.postUrl}
           target="_blank"
-          rel="noreferrer"
+          rel="noopener"
           className="group block relative rounded-lg bg-rb-50/50 dark:bg-rb-900/50 hover:bg-silver dark:hover:bg-rb-950/50 overflow-hidden transition-all cursor-pointer"
         >
           {blogContent}
@@ -184,7 +184,7 @@ export function PulseContent({ event }: { event: TimelineEvent }) {
         <a
           href={event.postUrl}
           target="_blank"
-          rel="noreferrer"
+          rel="noopener"
           aria-label={event.content}
           className="absolute inset-0"
         />

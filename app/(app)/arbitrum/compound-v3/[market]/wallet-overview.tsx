@@ -13,6 +13,9 @@ import type { CometMarket } from "@/lib/compound/asset-catalog";
 import type { CompoundMarketChainResponse } from "@/lib/api/fetch-compound-position";
 import type { CompoundWalletChainResponse } from "@/lib/api/fetch-compound-wallet";
 import { COMPOUND_ARBITRUM_PAGE } from "@/lib/compound-arbitrum/page-deployment";
+import { COMPOUND_ARBITRUM_CHAIN_ID } from "@/lib/compound-arbitrum/asset-catalog";
+import { FocusSourceGate } from "@/components/shared/aim-gate";
+import { overviewCardFocusSource } from "@/lib/compound/overview-focus";
 import type { CaptureSource } from "@/lib/shared/capture-source";
 import { CompoundArbitrumOverviewCards, type OverviewCard } from "./overview-cards";
 
@@ -84,45 +87,60 @@ export function CompoundArbitrumWalletOverview({
 
   return (
     <div className="py-8 space-y-6">
-      <DetailTopRow
-        session="compound-v3-arbitrum"
-        wallet={wallet}
-        owner={{ wallet }}
-        assets={stripAssets(head)}
-        closed={markets.length > 0 && markets.every((m) => m.chain == null)}
-        tools={false}
-      />
+      {/* Focus (ui-jobs 557): the wallet is held behind the gate when none of
+          its Comets names a token in focus; the cards keep the ones that do. */}
+      <FocusSourceGate
+        source={cards.map((c) =>
+          overviewCardFocusSource(
+            COMPOUND_ARBITRUM_PAGE.deployment.markets.find((m) => m.key === c.key),
+            c.live,
+          ),
+        )}
+        chain={COMPOUND_ARBITRUM_CHAIN_ID}
+        what="This wallet"
+      >
+        <DetailTopRow
+          session="compound-v3-arbitrum"
+          wallet={wallet}
+          owner={{ wallet, chain: 42161 }}
+          assets={stripAssets(head)}
+          closed={markets.length > 0 && markets.every((m) => m.chain == null)}
+          tools={false}
+        />
 
-      {untouched ? (
-        <div className="py-12 text-center text-rb-500">
-          <p className="mb-1">{W.untouchedTitle}</p>
-          <p className="text-sm">{W.untouchedBody(scanned)}</p>
-        </div>
-      ) : markets.length === 0 ? (
-        <div className="py-12 text-center text-rb-500">
-          {head ? (
-            <>
-              <p className="mb-1">{W.emptyNowTitle}</p>
-              <p className="text-sm">
-                All {scanned} markets were asked, and none holds a balance, a debt or collateral for this address.{" "}
-                {history === "missing" ? "Whether it ever did waits on the history, which has not answered yet." : null}
-                {history === "not-whole" ? W.emptyNowHistory.notWhole : null}
-              </p>
-            </>
-          ) : (
-            <>
-              <p className="mb-1">Couldn&apos;t read this wallet&apos;s positions.</p>
-              <p className="text-sm">The Comets did not answer in time; reload to ask again.</p>
-            </>
-          )}
-        </div>
-      ) : (
-        <section className="space-y-3">
-          {strip && <HolderStrip {...strip} />}
-          <CompoundArbitrumOverviewCards cards={cards} captureSource={captureSource} />
-          {historyLine && <p className="text-sm text-rb-500">{historyLine}</p>}
-        </section>
-      )}
+        {untouched ? (
+          <div className="py-12 text-center text-rb-500">
+            <p className="mb-1">{W.untouchedTitle}</p>
+            <p className="text-sm">{W.untouchedBody(scanned)}</p>
+          </div>
+        ) : markets.length === 0 ? (
+          <div className="py-12 text-center text-rb-500">
+            {head ? (
+              <>
+                <p className="mb-1">{W.emptyNowTitle}</p>
+                <p className="text-sm">
+                  All {scanned} markets were asked, and none holds a balance, a debt or collateral for this address.{" "}
+                  {history === "missing"
+                    ? "Whether it ever did waits on the history, which has not answered yet."
+                    : null}
+                  {history === "not-whole" ? W.emptyNowHistory.notWhole : null}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="mb-1">Couldn&apos;t read this wallet&apos;s positions.</p>
+                <p className="text-sm">The Comets did not answer in time; reload to ask again.</p>
+              </>
+            )}
+          </div>
+        ) : (
+          <section className="space-y-3">
+            {strip && <HolderStrip {...strip} />}
+            <CompoundArbitrumOverviewCards cards={cards} captureSource={captureSource} />
+            {historyLine && <p className="text-sm text-rb-500">{historyLine}</p>}
+          </section>
+        )}
+      </FocusSourceGate>
 
       <ProvInspectorLayer />
     </div>

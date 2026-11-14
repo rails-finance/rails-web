@@ -57,7 +57,11 @@ export default async function SparkPositionPage({ params, searchParams }: Props)
   const [tail, read] = await Promise.all([loadSparkPositionTail(wallet, grouped), indexReadAt(MAINNET_CHAIN_ID)]);
 
   return (
-    <PositionReadProvider key={`${wallet}:${grouped ? "rows" : "events"}`} read={tail.position ? read : null}>
+    <PositionReadProvider
+      focus={{ source: tail.position }}
+      key={`${wallet}:${grouped ? "rows" : "events"}`}
+      read={tail.position ? read : null}
+    >
       <SparkPositionDetail
         // Keyed on the wallet AND the shape of its history, so a client-side
         // navigation to either remounts with the new server tail as its initial

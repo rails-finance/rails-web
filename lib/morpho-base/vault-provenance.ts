@@ -43,7 +43,6 @@
 import { withServerRead, type ServerRead } from "@/lib/shared/server-head-read";
 import type { Provenance } from "@/components/shared/provenance";
 import { MORPHO_BASE_BLUE } from "@/lib/morpho-base/asset-catalog";
-import type { MorphoBaseVaultHolderShape } from "@/lib/sources/chain/morpho-base-vault";
 
 /** The chain a receipt's reads were on: Base unless the coordinates say Ethereum. */
 const chainWord = (c: MorphoVaultCoords) => (c.chainId === 1 ? "Ethereum" : "Base");
@@ -122,7 +121,7 @@ const vaultTotalSupplyProv_ = (c: MorphoVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("MetaMorpho.totalSupply()", c),
-  summary: `Total shares — the ERC-20 \`totalSupply()\` of the vault's own share token${atBlock(c)}. Every share in existence, and the denominator of every proportional figure on this page.`,
+  summary: `Shares issued — the ERC-20 \`totalSupply()\` of the vault's own share token${atBlock(c)}. Every share in existence, and the denominator of every proportional figure on this page.`,
   contract: vaultContract(c),
   via: `${lane(c)} · MetaMorpho.totalSupply() @ the pinned block`,
 });
@@ -235,7 +234,7 @@ const vaultLegLltvProv_ = (c: MorphoVaultCoords): Provenance => ({
     kind: "recompute",
     text: "The market id is keccak256(abi.encode(params)); recompute the hash from these params — or call idToMarketParams(id) — to confirm this lltv defines the market.",
   },
-  summary: `Loan-to-value for ${legName(c)} — \`idToMarketParams(id).lltv\`${atBlock(c)}, the market's ONE risk number: the borrow limit and the liquidation line at once. Fixed at creation and immutable, because the market id IS keccak256(abi.encode(params)).`,
+  summary: `LLTV for ${legName(c)} — \`idToMarketParams(id).lltv\`${atBlock(c)}, the market's one risk parameter: the most a position may borrow, and the LTV past which it can be liquidated. Fixed at creation and immutable, because the market id IS keccak256(abi.encode(params)).`,
   contract: blueContract(),
   via: `${lane(c)} · Morpho.idToMarketParams(id).lltv`,
 });
@@ -293,89 +292,6 @@ const vaultGapProv_ = (c: MorphoVaultCoords): Provenance => ({
 });
 
 // ── one holder ───────────────────────────────────────────────────────────────
-
-/** What the address IS — the code read behind the shape sentence. The evidence
- *  is spelled out per verdict, because the verdict is only as good as the read:
- *  a Safe is an exact singleton match, an ERC-4626 is a contract that answered
- *  two accessors, and a proxy is an address in a slot. NOTHING here is inferred
- *  from an ABI shape — a proxy's implementation is printed, not interpreted. */
-const vaultHolderShapeProv_ = (c: MorphoVaultCoords, shape: MorphoBaseVaultHolderShape): Provenance => {
-  const at = atBlock(c);
-  const size = `${shape.codeSize.toLocaleString("en-US")} bytes`;
-  const named = (name: string | null, symbol: string | null) =>
-    name || symbol ? ` It answered \`name()\` ${name ?? "not at all"} and \`symbol()\` ${symbol ?? "not at all"}.` : "";
-  const evidence = (() => {
-    switch (shape.kind) {
-      case "eoa":
-        return `\`eth_getCode\`${at} came back empty, so this address carries no code at that block: an externally owned account, controlled by a key rather than by a contract. Code can be deployed to an address later, which is why the block is named.`;
-      case "delegated-account":
-        return `\`eth_getCode\`${at} returned exactly 23 bytes: \`0xef0100\` followed by ${shape.delegate}. That is the EIP-7702 delegation indicator — the account is still an externally owned account, controlled by a key, and the code it runs is the code at that address. The delegate is stated, not identified: what that contract is takes reading it, and an account can point at a different one, or at none, in a later block.`;
-      case "metamorpho-vault":
-        return `\`eth_getCode\`${at} returned ${size}, and the address is one of the MetaMorpho vaults this directory's own ${chainWord(c)} census recorded, which is where the name comes from. Its \`asset()\` answered ${shape.asset ?? "nothing"}.`;
-      case "safe":
-        return `\`eth_getCode\`${at} returned ${size}, and its ${shape.evidence} names ${shape.singleton} — the released Safe ${shape.version} singleton. The match is exact against a known deployment; no part of it is read off the ABI.`;
-      case "erc4626":
-        return `\`eth_getCode\`${at} returned ${size}; \`asset()\` answered ${shape.asset} and \`totalSupply()\` answered, which is the ERC-4626 pair.${named(shape.name, shape.symbol)} That it holds shares for others is what the standard says a vault does; who those others are is not on chain here.`;
-      case "erc1967-proxy":
-        return `\`eth_getCode\`${at} returned ${size}, and \`eth_getStorageAt\` on the EIP-1967 implementation slot ${shape.slot} answered ${shape.slotValue} — the address ${shape.implementation}. The implementation is stated, not identified: what that contract is takes reading it.`;
-      case "eip1167-proxy":
-        return `\`eth_getCode\`${at} returned ${size}, and the code IS the EIP-1167 minimal proxy, with ${shape.implementation} embedded in it. The implementation is stated, not identified.`;
-      case "contract":
-        return `\`eth_getCode\`${at} returned ${size}. Nothing further was established: \`asset()\` did not answer, storage slot 0 names no Safe singleton, and the EIP-1967 implementation slot is empty.${named(shape.name, shape.symbol)}`;
-    }
-  })();
-  return {
-    kind: "chain",
-    pclass: "state",
-    source: { block: c.blockNumber },
-    // NOT `recompute(…)`: that helper says "re-run the eth_call", and this
-    // verdict rests on eth_getCode and eth_getStorageAt, which are not calls.
-    verify: {
-      kind: "recompute",
-      text:
-        c.blockNumber != null
-          ? `Re-run eth_getCode on this address at block ${c.blockNumber} against any ${chainWord(c)} node`
-          : `Re-run eth_getCode on this address against any ${chainWord(c)} node`,
-    },
-    summary: `What this address is — read from the address itself at the same block as every figure beside it. ${evidence} This says what kind of thing holds the shares; it does not say who controls it.`,
-    contract: { name: "the address looked up", address: c.holder },
-    via: `${lane(c)} · eth_getCode / eth_getStorageAt / asset() on the holder @ the pinned block`,
-  };
-};
-
-/** The attribution itself — the page's central figure, and the one whose receipt
- *  must state what kind of claim it is. */
-const vaultAttributedProv_ = (c: MorphoVaultCoords): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  summary: `Attributed ${asset(c)} in ${legName(c)}${atBlock(c)} — this address's share of the vault applied to the vault's own supplied balance in that market, floored to whole units. It is PROPORTIONAL, not fund-tracing: vault shares are fungible and deposits were pooled before the curator allocated them, so no on-chain fact ties a particular deposit to a particular market. Two addresses holding equal shares carry equal figures here, whatever they deposited and whenever.`,
-  contract: blueContract(),
-  via: `${lane(c)} · balanceOf(holder) × leg assets ÷ totalSupply @ the pinned block`,
-  formula: "floor(shares × leg assets ÷ totalSupply)",
-  inputs: [
-    { label: "shares", kind: "chain", pclass: "state", note: "MetaMorpho.balanceOf(holder) @ the pinned block" },
-    {
-      label: "leg assets",
-      kind: "chain-derived",
-      pclass: "state",
-      note: "the vault's stored supplied assets in this market",
-    },
-    { label: "totalSupply", kind: "chain", pclass: "state", note: "MetaMorpho.totalSupply @ the pinned block" },
-  ],
-});
-
-/** Σ of the attributed rows — the holder's slice of the STORED legs, which is a
- *  different question from `convertToAssets` beside it. */
-const vaultAttributedTotalProv_ = (c: MorphoVaultCoords): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  summary: `Total attributed ${asset(c)}${atBlock(c)} — Σ over the rows above. This is the address's share of the vault's STORED positions in Blue, each row floored to whole units. The claim figure beside it is the vault's own answer for the same balance, computed against its extrapolated total and against a share count that includes the fee shares its next accrual would mint — so the two differ slightly, and either can be the larger.`,
-  contract: blueContract(),
-  via: `${lane(c)} · Σ floor(shares × leg assets ÷ totalSupply) @ the pinned block`,
-  formula: "Σ floor(shares × leg assets ÷ totalSupply)",
-});
 
 // ── the directory: every catalogued vault, at one block ──────────────────────
 // The roster lists the census itself: one row per catalogued
@@ -450,17 +366,6 @@ const vaultDirectorySharePriceProv_ = (c: MorphoVaultCoords): Provenance => ({
   via: `${lane(c)} · MetaMorpho.convertToAssets(one share) @ the pinned block`,
 });
 
-/** How many catalogued vaults in one asset hold something at the block — a
- *  count over the rows' `totalAssets()` reads, and the size of a group. */
-const vaultDirectoryGroupCountProv_ = (c: MorphoVaultCoords, n: number): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  summary: `${n === 1 ? "One vault" : `${n.toLocaleString("en-US")} vaults`} denominated in ${asset(c)} with a non-zero \`totalAssets()\`${atBlock(c)} — a count over the directory's own reads, one per catalogued vault whose immutable \`asset()\` is ${asset(c)}. Vaults in this asset that read zero are counted in the trailing group instead, not dropped.`,
-  via: `${lane(c)} · count of catalogued vaults with asset() = ${asset(c)} and totalAssets() > 0 @ the pinned block`,
-  formula: `count of catalogued vaults where asset() = ${asset(c)} and totalAssets() > 0`,
-});
-
 /** How many catalogued vaults hold nothing at the block. A READING, not an
  *  omission: each answered zero to `totalAssets()`; a vault whose read did not
  *  answer is counted separately and never here. */
@@ -495,12 +400,8 @@ export const vaultLegShareProv = withServerRead(vaultLegShareProv_);
 export const vaultLegLltvProv = withServerRead(vaultLegLltvProv_);
 export const vaultAllocatedProv = withServerRead(vaultAllocatedProv_);
 export const vaultGapProv = withServerRead(vaultGapProv_);
-export const vaultHolderShapeProv = withServerRead(vaultHolderShapeProv_);
-export const vaultAttributedProv = withServerRead(vaultAttributedProv_);
-export const vaultAttributedTotalProv = withServerRead(vaultAttributedTotalProv_);
 export const vaultDirectoryCensusProv = withServerRead(vaultDirectoryCensusProv_);
 export const vaultDirectoryNameProv = withServerRead(vaultDirectoryNameProv_);
 export const vaultDirectoryTotalAssetsProv = withServerRead(vaultDirectoryTotalAssetsProv_);
 export const vaultDirectorySharePriceProv = withServerRead(vaultDirectorySharePriceProv_);
-export const vaultDirectoryGroupCountProv = withServerRead(vaultDirectoryGroupCountProv_);
 export const vaultDirectoryEmptyCountProv = withServerRead(vaultDirectoryEmptyCountProv_);

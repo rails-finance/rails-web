@@ -32,13 +32,13 @@ import {
   flowsBuildingLine,
   flowsWaitingLine,
   type FlowsBuilding,
+  type FlowsSkeletonShape,
   LifetimeFlowsSkeleton,
   LifetimeFlowsWaiting,
 } from "@/components/shared/lifetime-flows-skeleton";
 import { useLifeCount } from "@/lib/shared/life-count-store";
 import { useSkeletonSizes } from "@/hooks/useSkeletonSizes";
-import { FLOWS_SCOPE, ProvReceiptsScope, useProvScopeLit, useReceiptRegistry } from "@/components/shared/provenance";
-import { ToolsMenu } from "@/components/shared/tools-menu";
+import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import {
   FlowsCompactContext,
   FlowsKeyNodeContext,
@@ -93,6 +93,10 @@ export interface LifetimeFlowsPanelProps {
    *  panel's face keeps figures, bars, chart, controls and the axis caption
    *  (rails-ops TO-DO-ui-jobs §251). */
   outcome?: ReactNode;
+  /** The skeleton's shape where the page knows it before the history lands:
+   *  one side for a savings position, a switch row over the bars. Two sides
+   *  by default. */
+  skeleton?: FlowsSkeletonShape;
 }
 
 const FLOWS_ANATOMY = { explanation: "F8", learnMore: "F9" };
@@ -127,6 +131,7 @@ export function LifetimeFlowsPanel({
   title = "Lifetime flows",
   collapseKey: collapseKeyProp,
   outcome,
+  skeleton,
 }: LifetimeFlowsPanelProps) {
   const pathname = usePathname();
   const collapseKey = collapseKeyProp !== undefined ? collapseKeyProp : flowsCollapseKeyForPathname(pathname);
@@ -149,7 +154,6 @@ export function LifetimeFlowsPanel({
   const reactId = useId();
   const bodyId = collapseKey ? `flows-body-${collapseKey}` : reactId;
   const registry = useReceiptRegistry();
-  const lit = useProvScopeLit(FLOWS_SCOPE);
   // A card's "View on chart" opens a collapsed panel.
   const move = useFlowFocusState((s) => s.move?.n ?? 0);
   useEffect(() => {
@@ -197,12 +201,11 @@ export function LifetimeFlowsPanel({
 
   return (
     // Its own receipts scope: every traced figure in the panel registers here.
-    <ProvReceiptsScope registry={registry} scopeId={FLOWS_SCOPE}>
+    <ProvReceiptsScope registry={registry}>
       {/* The card's sidebar carried on (P2.1, TO-DO-position-card 427). */}
       <SectionSidebar section="flows" hidden={none || undefined}>
         <section
-          data-prov-scope={FLOWS_SCOPE}
-          data-prov-lit={lit ? "" : undefined}
+          data-prov-scope="flows"
           data-skel-section="detail-economics"
           {...(loading || infoOpen ? { "data-skel-pause": "" } : {})}
           data-lifetime-flows-panel=""
@@ -216,8 +219,7 @@ export function LifetimeFlowsPanel({
           style={loading && remembered["detail-economics"] ? { minHeight: remembered["detail-economics"] } : undefined}
         >
           {collapseKey && <script dangerouslySetInnerHTML={{ __html: collapseScript() }} suppressHydrationWarning />}
-          {/* The chevron follows the heading; the ⋮ stands at the right end
-            (ui-jobs 295). */}
+          {/* The chevron follows the heading. */}
           <div
             className="disc-row pointer-events-none relative z-10 flex min-h-[28px] items-center justify-between gap-2"
             data-anatomy="F1"
@@ -252,17 +254,6 @@ export function LifetimeFlowsPanel({
                 <HeaderHelp flowsKey={flowsKey} />
               </div>
             )}
-            {/* The ⋮ at the right end (ui-jobs 295): Inspect provenance on the
-              panel alone (ui-jobs 284); each section's "?" carries the
-              how-to-read. Collapsed, nothing stands to inspect: no ⋮. */}
-            <div className="pointer-events-auto -mr-1 shrink-0" data-flows-menu-slot="">
-              <ToolsMenu
-                variant="panel"
-                label={`${title} menu`}
-                heading={title}
-                provScope={{ id: FLOWS_SCOPE, hint: "Click a value in this panel to trace it" }}
-              />
-            </div>
           </div>
           <div id={bodyId} {...(collapseKey ? { "data-flows-body": "" } : {})}>
             {scrubber != null ? (
@@ -289,7 +280,7 @@ export function LifetimeFlowsPanel({
                 <p className="sr-only" role="status">
                   {building ? flowsBuildingLine(building) : flowsWaitingLine(lifeCount)}
                 </p>
-                <LifetimeFlowsSkeleton compact={compact} />
+                <LifetimeFlowsSkeleton compact={compact} {...skeleton} />
                 <LifetimeFlowsWaiting count={lifeCount} line={building ? flowsBuildingLine(building) : undefined} />
               </div>
             )}

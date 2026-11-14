@@ -1,9 +1,18 @@
+// focus: the explorer's explainer; the shell's gate stands over the explorer
 // About this explorer — LlamaLend on Ethereum, drawn on the typed template
 // (rails-ops standards/info-page-template.md). Every link is Curve's official
 // documentation (rails-ops reference/official-docs/llamalend.md).
 
 import Link from "next/link";
-import { GlossaryLink, ProtocolInfoPage, type InfoTerm, type InfoView } from "@/components/shared/protocol-info-page";
+import {
+  GlossaryLink,
+  ProtocolInfoPage,
+  type InfoReads,
+  type InfoTerm,
+  type InfoView,
+} from "@/components/shared/protocol-info-page";
+import { CRVUSD_FEE_SPLITTER, LLAMALEND_ADDRESSES } from "@/lib/llamalend/asset-catalog";
+import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
@@ -114,8 +123,9 @@ const views: readonly [InfoView, ...InfoView[]] = [
     heading: "Markets page",
     body: (
       <p>
-        The markets page lists every market with its collateral token, its borrowed token, its total debt, its number of
-        loans and its terms.{" "}
+        The markets page lists every market by version, with its debt, borrow rate, utilisation, A, loan discount and
+        number of loans. Each market opens its own page, with its supplied and available amounts, both rates, its rate
+        curve where the policy has one, and its terms.{" "}
         <Link href="/ethereum/llamalend/markets" className={INLINE_LINK}>
           See every market
         </Link>
@@ -124,6 +134,50 @@ const views: readonly [InfoView, ...InfoView[]] = [
     ),
   },
 ];
+
+const ext = (address: string, label: string) => (
+  <a href={explorerUrl(MAINNET_CHAIN_ID, "address", address)} target="_blank" rel="noopener" className="link-external">
+    {label}
+  </a>
+);
+
+const reads: InfoReads = {
+  contracts: [
+    {
+      name: "OneWayLendingFactory",
+      address: LLAMALEND_ADDRESSES.ONEWAY_FACTORY,
+      reads: "the V1 lend markets: each one's controller, AMM, tokens and vault.",
+    },
+    {
+      name: "crvUSD ControllerFactory",
+      address: LLAMALEND_ADDRESSES.CRVUSD_FACTORY,
+      reads: "the V1 mint markets and each one's debt ceiling.",
+    },
+    {
+      name: "LlamaLend V2 Factory",
+      address: LLAMALEND_ADDRESSES.V2_FACTORY,
+      reads: "the V2 markets; each entry's addresses are told apart by asking each one what it is.",
+    },
+    {
+      name: "Each market's contracts",
+      reads:
+        "the controller's debt, loans and two discounts; the AMM's band width, oracle price and the rate it charges; the monetary policy's rate and its bounds; a lend market vault's rate for lenders.",
+    },
+  ],
+  how: "The markets page and each market's page read these contracts at most every ten minutes, through Rails's server where it answers. Position histories come from Rails's server store of LlamaLend's events.",
+  notes: [
+    <>
+      The V1 lend markets wired to the rate policy {ext("0x066a89bdf4efb6ad58427d278f16b7a2c53c3cee", "0x066a…3cee")}{" "}
+      charge a rate that follows time alone: it started at 10% a year on 25 May 2026 and rises about 90 points a year,
+      whatever the utilisation. Their pages say so in place of a rate curve.
+    </>,
+    <>
+      A mint market sends its interest to the crvUSD ControllerFactory&apos;s fee receiver, a splitter (
+      {ext(CRVUSD_FEE_SPLITTER, "0x2dfd…64f2")}) that pays the scrvUSD savings vault and the DAO&apos;s fee collector,
+      which distributes to veCRV holders.
+    </>,
+  ],
+};
 
 export default function InfoPage() {
   return (
@@ -166,6 +220,7 @@ export default function InfoPage() {
           below 0, hard liquidation applies: anyone may repay the position&apos;s debt and take what it holds.
         </>,
       ]}
+      reads={reads}
       views={views}
       search="You can search by borrower address. The listing filters by status, liquidated before, debt size, collateral size and transactions, and sorts by recent activity, debt or collateral."
       docs={{ label: "LlamaLend documentation", href: DOCS + "/overview" }}

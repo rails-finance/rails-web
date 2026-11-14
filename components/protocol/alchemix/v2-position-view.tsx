@@ -20,6 +20,7 @@
 
 import { useEffect, useMemo } from "react";
 import Link from "next/link";
+import { FOOT_LINK } from "@/lib/shared/ui-grammar";
 import { useParams } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
@@ -51,8 +52,7 @@ import { AlchemixMenuRows } from "@/components/protocol/alchemix/alchemix-menu-r
 import { AlchemixV2EventCard, type AlchemixV2Event } from "@/components/protocol/alchemix/v2-event-card";
 import type { AlchemixV2PositionData } from "@/types/api/alchemix";
 import { AmountText } from "@/components/shared/amount-text";
-
-const block = (n: number) => n.toLocaleString("en-US");
+import { ALCHEMIX_V2_DOCS, V2_WORDS } from "@/lib/alchemix/transmuter-words";
 
 export function AlchemixV2PositionView({
   deployment,
@@ -152,15 +152,15 @@ export function AlchemixV2PositionView({
         </ul>
       ) : null}
       <p>
-        Alchemix V2 was wound down on {closedOn(p.closedAt)}. The figures above are the Alchemist&rsquo;s reading at
-        block {block(p.frozenAtBlock)}, and nothing has moved them since. That day the collateral was swept to the{" "}
+        Alchemix V2&rsquo;s positions were migrated to V3 in April 2026. The figures above are the snapshot taken on{" "}
+        {closedOn(p.closedAt)}. That day the market&rsquo;s collateral moved to the{" "}
         <a
           href={explorerUrl(chainId, "address", p.closure.sweptTo)}
           target="_blank"
-          rel="noopener noreferrer"
+          rel="noopener"
           className="link-muted"
         >
-          Alchemix DAO Safe
+          {V2_WORDS.safe}
         </a>
         {p.closure.sweepTxHash ? (
           <>
@@ -169,7 +169,7 @@ export function AlchemixV2PositionView({
             <a
               href={explorerUrl(chainId, "tx", p.closure.sweepTxHash)}
               target="_blank"
-              rel="noopener noreferrer"
+              rel="noopener"
               className="link-muted"
             >
               one transaction
@@ -177,20 +177,30 @@ export function AlchemixV2PositionView({
           </>
         ) : null}
         {p.v3Successors.length > 0
-          ? ", and the V3 position this wallet holds is what this one became. The two are one obligation at two points in time, so no figure here is added to a V3 one."
-          : "."}
+          ? ". By Alchemix's docs, the Alchemix multisig then recreated each position in V3 from the snapshot. The V3 position this wallet holds is the same obligation at a later point, so no figure here is added to a V3 one."
+          : ". By Alchemix's docs, the Alchemix multisig then recreated each position in V3 from the snapshot."}
       </p>
       {economics ? (
         <p>
-          V2 paid debt down every block from the collateral&rsquo;s harvested yield, with no log at those blocks, so the
-          flows below do not add up to the debt at close.
+          By{" "}
+          <a
+            href={`${ALCHEMIX_V2_DOCS}/alchemix-ecosystem/alchemist`}
+            target="_blank"
+            rel="noopener"
+            className="link-muted"
+          >
+            Alchemix&rsquo;s V2 docs
+          </a>
+          , the collateral&rsquo;s yield was harvested from time to time and each harvest credited the account a share,
+          reducing its debt. No event on this account records a harvest, so the flows below do not add up to the debt in
+          the snapshot.
           {creditWithheld
             ? " A Repay or a Liquidate logged before 11 May 2022 does not state the debt it cleared, so no total of either is given."
             : ""}
         </p>
       ) : null}
       {p.v3Successors.length > 0 ? null : (
-        <Link href={deployment.basePath} className="link inline-block">
+        <Link href={deployment.basePath} className={FOOT_LINK}>
           Browse V3 positions
         </Link>
       )}

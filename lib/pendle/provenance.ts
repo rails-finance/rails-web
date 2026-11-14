@@ -91,8 +91,8 @@ export function valueProv(
     return {
       kind: "derived",
       pclass: "state",
-      summary: `Value. The PT, YT and LP legs and the unclaimed interest, each at its mark, in ${asset} at block ${n(block)}.`,
-      formula: "PT + YT + LP + unclaimed interest",
+      summary: `Value. The PT, YT and LP legs and the unclaimed yield, each at its mark, in ${asset} at block ${n(block)}.`,
+      formula: "PT + YT + LP + unclaimed yield",
       source: { block },
       verify: { kind: "rollup", text: "The sum of the four values on the card." },
     };
@@ -100,7 +100,7 @@ export function valueProv(
     return {
       kind: "derived",
       pclass: "state",
-      summary: `Unclaimed interest. The yield this wallet's YT has earned and not claimed, in SY from RouterStatic, then in ${asset} at the SY's exchange rate.`,
+      summary: `Unclaimed yield. The yield this wallet's YT has earned and not claimed, after Pendle's 5% YT fee, in SY from RouterStatic, then in ${asset} at the SY's exchange rate.`,
       formula: "unclaimedInterest × SY.exchangeRate() ÷ 10¹⁸",
       contract: ROUTER_STATIC,
       source: { block },
@@ -110,7 +110,7 @@ export function valueProv(
     return {
       kind: "derived",
       pclass: "state",
-      summary: `PT value. The market has expired, so each PT redeems for one ${asset}.`,
+      summary: `PT value. The market has expired; Rails values each PT at one ${asset}, the most it redeems for by Pendle's docs.`,
       formula: "PT balance × 1",
       source: { block },
       verify: callCheck("market.isExpired()", block),
@@ -119,7 +119,7 @@ export function valueProv(
     return {
       kind: "derived",
       pclass: "state",
-      summary: "YT value. The market has expired, so YT is worth nothing; any unclaimed interest stays claimable.",
+      summary: "YT value. The market has expired, so YT is worth nothing; any unclaimed yield stays claimable.",
       formula: "0",
       source: { block },
       verify: callCheck("market.isExpired()", block),
@@ -142,7 +142,7 @@ export function impliedApyProv(market: string, block: number, lnRate: string | n
   return {
     kind: "derived",
     pclass: "state",
-    summary: `Implied APY. The fixed rate the market prices PT at: e to the power of its last stored ln implied rate, less one, at block ${n(block)}.`,
+    summary: `Implied APY. Pendle's docs: the market consensus of the future APY of an asset. Here, e to the power of its last stored ln implied rate, less one, at block ${n(block)}.`,
     formula: "e^(lastLnImpliedRate ÷ 10¹⁸) − 1",
     inputs: lnRate ? [{ label: "lastLnImpliedRate", value: lnRate, kind: "chain", pclass: "state" }] : undefined,
     contract: { name: "Pendle market", address: market },
@@ -156,7 +156,7 @@ export function entryApyProv(buys: number, unpriced: number): Provenance {
   return {
     kind: "derived",
     pclass: "indexed",
-    summary: `Fixed APY at entry. Each PT buy this wallet paid for through a Pendle router, priced at the asset it paid and the time left to maturity, weighted by the PT it bought: ${buys} ${buys === 1 ? "buy" : "buys"}${unpriced ? `, ${unpriced} without a price` : ""}.`,
+    summary: `Effective Fixed APY. Each PT buy this wallet paid for through a Pendle router, priced at the asset it paid and the time left to maturity, weighted by the PT it bought: ${buys} ${buys === 1 ? "buy" : "buys"}${unpriced ? `, ${unpriced} without a price` : ""}.`,
     formula: "Σ (PT ÷ asset paid)^(year ÷ time to expiry) − 1, weighted by PT",
     verify: { kind: "rollup", text: "The buys are the Buy PT rows of the timeline below, each with its rate." },
   };
@@ -182,6 +182,18 @@ export function rewardProv(
     scaling:
       decimals == null ? undefined : { raw, from: "call", places: decimals, why: `${symbol} has ${decimals} decimals` },
     verify: callCheck(`RouterStatic ${fn}`, block),
+  };
+}
+
+/** The wallet page's block: the level-1 head's figure. */
+export function pageBlockProv(block: number): Provenance {
+  return {
+    kind: "chain",
+    pclass: "state",
+    summary: `Block — every figure on this page is read at block ${n(block)}, the newest block Rails had read when the page loaded.`,
+    contract: ROUTER_STATIC,
+    via: "RouterStatic reads · at this block",
+    source: { block },
   };
 }
 
@@ -281,7 +293,7 @@ export function tradeApyProv(row: PendleTimelineRow): Provenance {
     kind: "derived",
     pclass: "emitted",
     summary:
-      "Fixed APY of the trade. The PT per asset of this trade, raised to a year over the time left to maturity, less one.",
+      "Effective Fixed APY of the trade. The PT per asset of this trade, raised to a year over the time left to maturity, less one.",
     formula: "(PT ÷ asset)^(year ÷ time to expiry) − 1",
     source: { block: row.block, txHash: row.txHash },
     verify: {
@@ -306,7 +318,7 @@ export function tvlProv(market: string, block: number): Provenance {
   return {
     kind: "derived",
     pclass: "state",
-    summary: `Pool size. The market's SY plus its PT at the PT's rate in SY, then in the asset at the SY's exchange rate, at block ${n(block)}.`,
+    summary: `Liquidity. The market's SY plus its PT at the PT's rate in SY, then in the asset at the SY's exchange rate, at block ${n(block)}.`,
     formula: "(totalSy + totalPt × ptToSy ÷ 10¹⁸) × SY.exchangeRate() ÷ 10¹⁸",
     contract: { name: "Pendle market", address: market },
     source: { block },
@@ -333,25 +345,14 @@ export function poolStateProv(
   };
 }
 
-/** The block a roster is read at. */
-export function readBlockProv(block: number): Provenance {
-  return {
-    kind: "chain",
-    pclass: "state",
-    summary: `Read block. Every figure on this page is read at block ${n(block)}: the market's state, its marks and the SY's exchange rate.`,
-    source: { block },
-    verify: { kind: "rollup", text: "Each figure's receipt names this block." },
-  };
-}
-
 /** A market token: which contract read names it. */
 export function marketTokenProv(
-  role: "Wrapped token" | "SY" | "PT" | "YT" | "LP" | "Reward",
+  role: "Yield-bearing token" | "SY" | "PT" | "YT" | "LP" | "Reward",
   tok: PendleToken,
   market: string,
 ): Provenance {
   const via =
-    role === "Wrapped token"
+    role === "Yield-bearing token"
       ? "SY.yieldToken()"
       : role === "Reward"
         ? "market.getRewardTokens()"
@@ -369,5 +370,89 @@ export function marketTokenProv(
       href: explorerUrl(PENDLE_CHAIN_ID, "address", tok.address),
       text: "The contract on Etherscan",
     },
+  };
+}
+
+/** A count over the roster: every market the router record names, or those
+ *  before or past their maturity at the block. */
+export function rosterCountProv(which: "all" | "active" | "matured", count: number, block: number): Provenance {
+  const what =
+    which === "all"
+      ? `Markets. The ${n(count)} markets Pendle's routers have named through block ${n(block)}, from the router logs Rails holds.`
+      : which === "active"
+        ? `Active markets. The ${n(count)} markets whose isExpired() read false at block ${n(block)}.`
+        : `Matured markets. The ${n(count)} markets whose isExpired() read true at block ${n(block)}, or did not answer.`;
+  return {
+    kind: "derived",
+    pclass: which === "all" ? "indexed" : "state",
+    summary: what,
+    source: { block },
+    verify: { kind: "rollup", text: "The rows of the table, with the Maturity filter set to every market." },
+  };
+}
+
+/** A token's price in the asset: its mark in SY times the SY's exchange rate. */
+export function priceProv(
+  leg: "PT" | "YT" | "LP",
+  source: PendleMarkSource | null,
+  twapSeconds: number,
+  block: number,
+  asset: string,
+  expired: boolean,
+): Provenance {
+  if (expired && leg !== "LP")
+    return {
+      kind: "derived",
+      pclass: "state",
+      summary:
+        leg === "PT"
+          ? `PT price. The market has matured; Rails prices each PT at one ${asset}, the most it redeems for by Pendle's docs.`
+          : "YT price. The market has matured, so YT is worth nothing.",
+      formula: leg === "PT" ? "1" : "0",
+      source: { block },
+      verify: callCheck("market.isExpired()", block),
+    };
+  const mark = markProv(leg, source, twapSeconds, block);
+  return {
+    kind: "derived",
+    pclass: source === "oracle-twap" ? "oracle" : "state",
+    summary: `${leg} price. What one ${leg} is worth in ${asset}: its mark in SY ${source === "oracle-twap" ? `(Pendle's oracle, a ${twapSeconds / 60}-minute average)` : "(RouterStatic's spot rate)"}, times the SY's exchange rate, at block ${n(block)}.`,
+    formula: `${leg.toLowerCase()}ToSy × SY.exchangeRate() ÷ 10¹⁸`,
+    inputs: [
+      {
+        label: `${leg} mark`,
+        kind: "chain",
+        pclass: mark.pclass,
+        contract: mark.contract,
+        note: mark.via,
+      },
+      { label: "SY.exchangeRate()", kind: "chain", pclass: "state" },
+    ],
+    contract: mark.contract,
+    source: { block },
+    verify: callCheck(`${mark.contract?.name ?? "the oracle"} ${mark.via} and the SY's exchangeRate()`, block),
+  };
+}
+
+/** The SY's exchange rate: what one SY is worth in the asset. */
+export function syRateProv(sy: PendleToken, block: number, asset: string): Provenance {
+  return {
+    kind: "chain",
+    pclass: "state",
+    summary: `SY exchange rate. What one ${symbolOf(sy)} is worth in ${asset}: the SY's exchangeRate() at block ${n(block)}.`,
+    contract: { name: symbolOf(sy), address: sy.address },
+    via: "exchangeRate()",
+    source: { block },
+    verify: callCheck(`${symbolOf(sy)} exchangeRate()`, block),
+  };
+}
+
+/** The count of a market's router events. */
+export function marketEventsProv(events: number): Provenance {
+  return {
+    kind: "derived",
+    pclass: "indexed",
+    summary: `Router events. The ${n(events)} ${events === 1 ? "event" : "events"} Pendle's routers have logged on this market, from the router logs Rails holds.`,
+    verify: { kind: "rollup", text: "The rows below, read 50 at a time." },
   };
 }

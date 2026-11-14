@@ -42,6 +42,11 @@ export async function fetchAssetPricesServer(readerIp?: string | null): Promise<
   return (await buildAssetPrices(readerIp)).list;
 }
 
+/** The roster alone (GET /api/prices/assets), read a day at a time. */
+export async function fetchAssetRosterServer(readerIp?: string | null) {
+  return get<Omit<AssetRosterAnswer, "related">>("/api/prices/assets", readerIp);
+}
+
 /** The list, with the roster and the pages it was built from (the asset explorer's cards). */
 export async function buildAssetPrices(readerIp?: string | null) {
   const roster = await get<Omit<AssetRosterAnswer, "related">>("/api/prices/assets", readerIp);

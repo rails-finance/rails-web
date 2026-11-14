@@ -110,6 +110,24 @@ type ProtocolSpec = {
    *  is the one that puts it back in the nav, the sitemap and the matrix.
    *  Omitted means launched; `true` is the only other value. */
   unlaunched?: true;
+  /** How far back Rails's index of this explorer reaches (rails-ops decisions
+   *  0061 and 0063), drawn as the history tag (`HistoryTag`) on every surface
+   *  that shows the roster:
+   *  - "none": not yet indexed. Figures are read from the chain when a page
+   *    opens, and the tag reads "Read on visit".
+   *  - "from-date": indexed from a start block after the protocol's
+   *    deployment. The tag reads "History from <start date>", the date drawn
+   *    from the index's start block (app/api/history-start/route.ts), so a
+   *    backfill moves it with no edit here.
+   *  Omitted means indexed from deployment, with no tag; the field goes in the
+   *  commit where the index's start block reaches the deployment block. */
+  history?: "none" | "from-date";
+  /** `false`: indexed, but no listing page draws the index yet, so the
+   *  explorer answers one wallet or one position at a time (/coverage's "In
+   *  every explorer" caveat names it). The field goes in the change that adds
+   *  the listing. Omitted means it has one, or it is not indexed (`history:
+   *  "none"`), which the caveat words on its own. */
+  listing?: false;
   /** This explorer's protocol-level sub-pages, in tab order. The first is the
    *  overview beside the position listing — the branch roster, market roster,
    *  system state, hub comparison or loan book — and every explorer carries
@@ -188,10 +206,10 @@ const SPECS: ProtocolSpec[] = [
     label: "Aave V3",
     chainId: 1,
     slug: "aave-v3",
-    brand: 336,
+    brand: 339,
     tags: ["Lend", "Borrow"],
     desc: "Single-pool lending on Ethereum: one cross-collateralised account per wallet, valued at Aave's oracle, with every liquidation traced",
-    subPages: [{ segment: "market", label: "Market overview", tab: "Market" }],
+    subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
     id: "aave-v3-base",
@@ -202,7 +220,7 @@ const SPECS: ProtocolSpec[] = [
     protocolKey: "aave-v3",
     tags: ["Lend", "Borrow"],
     desc: "Aave V3's Base deployment, a separate Pool with its own reserves and risk parameters: every wallet's account read whole from the contracts",
-    subPages: [{ segment: "market", label: "Market overview", tab: "Market" }],
+    subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
     // Aave V3 on Arbitrum One, position-first (rails-ops
@@ -221,15 +239,54 @@ const SPECS: ProtocolSpec[] = [
     subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
+    // Morpho Blue on Arc (rails-ops ui-jobs 577), read from the chain when a
+    // page opens: a front door taking a wallet, its positions at
+    // `<route>/<wallet>`, each opening `<route>/<wallet>/<market id>`; the
+    // Markets pages are the shared Morpho pages, fed by rails-server's
+    // /api/at-block/morpho-arc routes. Unlaunched while Miles reads it.
+    id: "morpho-arc",
+    session: "morpho-arc",
+    label: "Morpho Blue",
+    chainId: 5042,
+    slug: "morpho",
+    protocolKey: "morpho",
+    tags: ["Lend", "Borrow"],
+    desc: "Morpho Blue on Arc: a wallet's positions across every market, each with its collateral, debt and LTV against the market's line, and 30 days of interest",
+    positionListing: false,
+    history: "none",
+    unlaunched: true,
+    subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
+  },
+  {
+    // Morpho Blue on Optimism (rails-ops ui-jobs 578), Arc's pages on
+    // Optimism's deployment, fed by rails-server's /api/at-block/morpho-optimism
+    // routes. Unlaunched while Miles reads it.
+    id: "morpho-optimism",
+    session: "morpho-optimism",
+    label: "Morpho Blue",
+    chainId: 10,
+    slug: "morpho",
+    protocolKey: "morpho",
+    tags: ["Lend", "Borrow"],
+    desc: "Morpho Blue on Optimism: a wallet's positions across every market, each with its collateral, debt and LTV against the market's line, and 30 days of interest",
+    positionListing: false,
+    history: "none",
+    unlaunched: true,
+    subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
+  },
+  {
     id: "aave-v4",
     session: "aave-v4",
     label: "Aave V4",
     chainId: 1,
     slug: "aave-v4",
-    brand: 280,
+    brand: 294,
     tags: ["Lend", "Borrow"],
     desc: "Multi-spoke lending with unified liquidity across asset classes",
-    subPages: [{ segment: "hubs", label: "Hub comparison", tab: "Hubs" }],
+    subPages: [
+      { segment: "markets", label: "Spokes", tab: "Spokes" },
+      { segment: "hubs", label: "Hubs", tab: "Hubs" },
+    ],
   },
   {
     // Aave V4's Base deployment — the Equities hub and its one spoke, Mag7:
@@ -245,7 +302,52 @@ const SPECS: ProtocolSpec[] = [
     protocolKey: "aave-v4",
     tags: ["Lend", "Borrow"],
     desc: "Aave V4 on Base: the Equities hub's Mag7 spoke, where Coinbase tokenized stocks back USDC loans, each stock price stated with when it was published",
-    subPages: [{ segment: "hubs", label: "Equities hub", tab: "Hub" }],
+    subPages: [
+      { segment: "markets", label: "Spokes", tab: "Spokes" },
+      { segment: "hubs", label: "Hubs", tab: "Hubs" },
+    ],
+  },
+  {
+    // Aave V4 on Arc (rails-ops ui-jobs 577): the Core hub and its three
+    // lending spokes (Main, Forex, USDC Maple), read from the chain when a
+    // page opens. A front door taking a wallet, its spoke accounts at
+    // `<route>/<wallet>`, each opening `<route>/spoke/<spoke>/<wallet>`; the
+    // Spokes and Hubs pages are Ethereum's and Base's, fed by rails-server's
+    // /api/at-block/aave-v4-arc routes. Unlaunched while Miles reads it.
+    id: "aave-v4-arc",
+    session: "aave-v4-arc",
+    label: "Aave V4",
+    chainId: 5042,
+    slug: "aave-v4",
+    protocolKey: "aave-v4",
+    tags: ["Lend", "Borrow"],
+    desc: "Aave V4 on Arc: a wallet's accounts on the Core hub's three spokes, each with its balances in dollars at the spoke's oracle, its health factor and 30 days of interest",
+    positionListing: false,
+    history: "none",
+    unlaunched: true,
+    subPages: [
+      { segment: "markets", label: "Spokes", tab: "Spokes" },
+      { segment: "hubs", label: "Hubs", tab: "Hubs" },
+    ],
+  },
+  {
+    // Aave V3 on Optimism (rails-ops ui-jobs 578): one Pool, read from the
+    // chain when a page opens. A front door taking a wallet, its account at
+    // `<route>/<wallet>`, and the market overview and reserve pages that
+    // Ethereum, Base and Arbitrum draw, fed by rails-server's
+    // /api/at-block/aave-v3-optimism routes. Unlaunched while Miles reads it.
+    id: "aave-v3-optimism",
+    session: "aave-v3-optimism",
+    label: "Aave V3",
+    chainId: 10,
+    slug: "aave-v3",
+    protocolKey: "aave-v3",
+    tags: ["Lend", "Borrow"],
+    desc: "Aave V3 on Optimism: a wallet's account on the Pool, its balances in dollars at Aave's oracle, its health factor and 30 days of interest",
+    positionListing: false,
+    history: "none",
+    unlaunched: true,
+    subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
     // Aave's VAULT LAYER, and a third Aave row on Ethereum beside the two pool
@@ -258,7 +360,7 @@ const SPECS: ProtocolSpec[] = [
     label: "Aave vaults",
     chainId: 1,
     slug: "aave",
-    brand: 336,
+    brand: 339,
     tags: ["Vaults", "Savings"],
     desc: "Aave's vaults (savings GHO, Umbrella stake tokens and static aTokens): each vault's size and share price, and every address that holds one",
     // No position listing: a holder's share in a vault is not a position in the
@@ -266,6 +368,60 @@ const SPECS: ProtocolSpec[] = [
     // is this sub-page and `/ethereum/aave` opens on it.
     positionListing: false,
     subPages: [{ segment: "vaults", label: "Vaults overview", tab: "Vaults", holderListing: true }],
+  },
+  {
+    // Aerodrome Slipstream on Base (rails-ops ui-jobs 566), Uniswap's door 1
+    // on Base: a front door taking a wallet, its positions at
+    // `<route>/<wallet>`, each opening `<route>/position/<deployment>/<id>`
+    // (ids overlap across Slipstream's three position managers). Reads come
+    // from rails-server's at-block routes (lib/api/fetch-aerodrome.ts).
+    id: "aerodrome",
+    session: "aerodrome",
+    label: "Aerodrome",
+    chainId: 8453,
+    slug: "aerodrome",
+    // Hue 256.5 (427's spread, between wallet-view hues), from Aerodrome's blue #0433FF (264) in oklch (the mark's second stripe, from
+    // the favicon in aerodrome-finance/agents on GitHub).
+    brand: 256.5,
+    tags: ["Liquidity"],
+    desc: "Concentrated liquidity on Base, staked or not: a position's range, fees or AERO and pool over the last 30 days",
+    positionListing: false,
+    history: "none",
+    subPages: [],
+  },
+  {
+    // Balancer V3 on Ethereum (rails-ops ui-jobs 569), Uniswap's door 1: a
+    // front door taking a wallet, the pools it holds a share of at
+    // `<route>/<wallet>`, each opening `<route>/position/<pool>/<wallet>` (a
+    // pool share is a Vault balance, so the pool and the wallet name it). Reads
+    // come from rails-server's at-block routes (lib/api/fetch-balancer.ts); a
+    // wallet's pools are found in Rails's index of the Vault's transfers since
+    // deployment, so it carries no `history`.
+    id: "balancer-v3",
+    session: "balancer-v3",
+    label: "Balancer V3",
+    chainId: 1,
+    slug: "balancer-v3",
+    tags: ["Liquidity"],
+    desc: "BPT on Ethereum: a wallet's part of each pool's tokens and the pool over the last 30 days",
+    positionListing: false,
+    listing: false,
+    subPages: [],
+  },
+  {
+    // Balancer V3 on Arbitrum (rails-ops ui-jobs 569): Ethereum's explorer on
+    // the same Vault address, its 30-day read at a UTC midnight's block.
+    id: "balancer-v3-arbitrum",
+    session: "balancer-v3-arbitrum",
+    label: "Balancer V3",
+    chainId: 42161,
+    slug: "balancer-v3",
+    protocolKey: "balancer-v3",
+    tags: ["Liquidity"],
+    desc: "BPT on Arbitrum: a wallet's part of each pool's tokens and the pool over the last 30 days",
+    positionListing: false,
+    listing: false,
+    subPages: [],
   },
   {
     // Alchemix V3's ETHEREUM lines — alUSD and alETH. Two entries rather than a
@@ -277,10 +433,10 @@ const SPECS: ProtocolSpec[] = [
     label: "Alchemix",
     chainId: 1,
     slug: "alchemix",
-    brand: 50,
+    brand: 99,
     tags: ["CDP", "Yield"],
     desc: "Self-repaying loans against yield-bearing vault tokens: each position's debt and collateral, dated by block, and the redemptions that moved them",
-    subPages: [{ segment: "lines", label: "Lines overview", tab: "Lines" }],
+    subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
   },
   {
     // Alchemix V3's BASE line — alUSDb. Its own Alchemist, its own Transmuter,
@@ -297,8 +453,8 @@ const SPECS: ProtocolSpec[] = [
     slug: "alchemix",
     protocolKey: "alchemix",
     tags: ["CDP", "Yield"],
-    desc: "Alchemix V3 on Base: every position on the alUSDb line, its debt and collateral rebuilt from its events and dated by block",
-    subPages: [{ segment: "lines", label: "Lines overview", tab: "Lines" }],
+    desc: "Alchemix V3 on Base: every position on the alUSDb market, its debt and collateral rebuilt from its events and dated by block",
+    subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
   },
   {
     id: "asymmetry",
@@ -306,7 +462,7 @@ const SPECS: ProtocolSpec[] = [
     label: "Asymmetry",
     chainId: 1,
     slug: "asymmetry",
-    brand: 240,
+    brand: 189,
     tags: ["CDP"],
     desc: "A Liquity V2 fork minting USDaf across seven collateral branches: each Trove's collateral and debt read from events",
     subPages: [{ segment: "branches", label: "Branches", tab: "Branches" }],
@@ -317,7 +473,7 @@ const SPECS: ProtocolSpec[] = [
     label: "Compound V2",
     chainId: 1,
     slug: "compound-v2",
-    brand: 160,
+    brand: 159,
     tags: ["Lend", "Borrow"],
     desc: "The original cToken markets over six years: every account's supplies, borrows and liquidations, with the markets read live at /compound-v2/markets",
     subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
@@ -328,7 +484,7 @@ const SPECS: ProtocolSpec[] = [
     label: "Compound V3",
     chainId: 1,
     slug: "compound-v3",
-    brand: 160,
+    brand: 159,
     tags: ["Lend", "Borrow"],
     desc: "Compound V3 markets replayed from events: each account's signed base principal and every collateral asset traceable",
     subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
@@ -347,7 +503,7 @@ const SPECS: ProtocolSpec[] = [
     protocolKey: "compound",
     tags: ["Lend", "Borrow"],
     desc: "Compound V3's Base deployment: five Comets read live, and a wallet's standing in every one of them found by asking each market",
-    subPages: [{ segment: "market", label: "Market overview", tab: "Market" }],
+    subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
   },
   {
     // Compound V3 on Arbitrum One, position-first (rails-ops
@@ -366,12 +522,53 @@ const SPECS: ProtocolSpec[] = [
     subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
+    // Compound V3 on Optimism (rails-ops ui-jobs 578): three Comets, read from
+    // the chain when a page opens. A front door taking a wallet, its Comets at
+    // `<route>/<wallet>`, one Comet's account at `<route>/<comet>/<wallet>`, and
+    // the Markets pages Ethereum, Base and Arbitrum draw, fed by rails-server's
+    // /api/at-block/compound-v3-optimism routes. Unlaunched while Miles reads it.
+    id: "compound-v3-optimism",
+    session: "compound-v3-optimism",
+    label: "Compound V3",
+    chainId: 10,
+    slug: "compound-v3",
+    protocolKey: "compound",
+    tags: ["Lend", "Borrow"],
+    desc: "Compound V3 on Optimism: a wallet's account in each of three Comets, its balances at each Comet's price feeds, its borrowing limit and 30 days of interest",
+    positionListing: false,
+    history: "none",
+    unlaunched: true,
+    subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
+  },
+  {
+    // Velodrome Slipstream on Optimism (rails-ops ui-jobs 578), on Aerodrome's
+    // pages (lib/aerodrome/sites.ts): a front door taking a wallet, its
+    // positions at `<route>/<wallet>`, each opening
+    // `<route>/position/<deployment>/<id>` (ids overlap across the two position
+    // managers). Reads come from rails-server's /api/at-block/velodrome routes.
+    // Unlaunched while Miles reads it.
+    id: "velodrome",
+    session: "velodrome",
+    label: "Velodrome",
+    chainId: 10,
+    slug: "velodrome",
+    // Hue 31.5 (427's spread), from Velodrome's red #FF1100 (30) in oklch (the mark's outer band, from
+    // the favicon on velodrome.finance).
+    brand: 31.5,
+    tags: ["Liquidity"],
+    desc: "Concentrated liquidity on Optimism, staked or not: a position's range, fees or VELO and pool over the last 30 days",
+    positionListing: false,
+    history: "none",
+    unlaunched: true,
+    subPages: [],
+  },
+  {
     id: "dolomite",
     session: "dolomite",
     label: "Dolomite",
     chainId: 1,
     slug: "dolomite",
-    brand: 195,
+    brand: 144,
     tags: ["Lend", "Borrow"],
     desc: "Dolomite margin accounts, one per owner and account number: balances and debts from the contract's events, each account's liquidation line read live",
     subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
@@ -382,7 +579,7 @@ const SPECS: ProtocolSpec[] = [
     label: "Basedollar",
     chainId: 8453,
     slug: "basedollar",
-    brand: 80,
+    brand: 114,
     tags: ["CDP"],
     desc: "A Liquity V2 fork on Base minting BD across five collateral branches, captured from Base: each Trove's collateral and debt read from events",
     subPages: [{ segment: "branches", label: "Branches", tab: "Branches" }],
@@ -393,10 +590,48 @@ const SPECS: ProtocolSpec[] = [
     label: "Ebisu",
     chainId: 1,
     slug: "ebisu",
-    brand: 350,
+    brand: 9,
     tags: ["CDP"],
-    desc: "A Liquity V2 fork minting ebUSD across five collateral branches: each Trove's collateral and debt read from events",
+    // The shutdown's date is the catalog's record (lib/ebisu/asset-catalog.ts,
+    // EBISU_SHUTDOWN; ui-jobs 608, 612).
+    desc: "A Liquity V2 fork that minted ebUSD across five collateral branches, shut down on 20 Aug 2026: each Trove's collateral and debt read from events",
     subPages: [{ segment: "branches", label: "Branches", tab: "Branches" }],
+  },
+  {
+    // Euler V2 on Base and Arbitrum (rails-ops reference/read-on-visit-candidates-572.md,
+    // row 10): a vault kit under one connector, the same code on both chains and
+    // separate vaults, so two entries. The route is a front door taking a
+    // wallet; its accounts are at `<route>/<wallet>`, each holding opening
+    // `<route>/position/<account>/<vault>`. Reads come from rails-server's
+    // at-block routes (lib/api/fetch-euler.ts). No Ethereum entry: its 902
+    // vaults put a wallet's read over the tier's budget.
+    id: "euler-v2-base",
+    session: "euler-v2-base",
+    label: "Euler V2",
+    chainId: 8453,
+    slug: "euler-v2",
+    protocolKey: "euler-v2",
+    // DRAFT: hue 166.5 (427's spread), near the green of Euler's app (160); Miles to confirm.
+    brand: 166.5,
+    tags: ["Lend", "Borrow"],
+    desc: "Euler's vaults on Base: a wallet's 256 accounts, each loan with its collateral and health, and each deposit over the last 30 days",
+    positionListing: false,
+    history: "none",
+    unlaunched: true,
+    subPages: [],
+  },
+  {
+    id: "euler-v2-arbitrum",
+    session: "euler-v2-arbitrum",
+    label: "Euler V2",
+    chainId: 42161,
+    slug: "euler-v2",
+    protocolKey: "euler-v2",
+    tags: ["Lend", "Borrow"],
+    desc: "Euler's vaults on Arbitrum: a wallet's 256 accounts, each loan with its collateral and health, and each deposit over the last 30 days",
+    positionListing: false,
+    listing: false,
+    subPages: [],
   },
   {
     id: "fluid",
@@ -404,10 +639,29 @@ const SPECS: ProtocolSpec[] = [
     label: "Fluid",
     chainId: 1,
     slug: "fluid",
-    brand: 260,
+    brand: 234,
     tags: ["Lend", "Borrow", "CDP"],
     desc: "Fluid vault positions as NFTs: deposits and borrows from the chain, and each liquidation's effect on every position it touched",
     subPages: [{ segment: "vaults", label: "Vaults overview", tab: "Vaults" }],
+  },
+  {
+    // Fluid's vaults on Base (rails-ops ui-jobs 574), read on visit: a front
+    // door taking a wallet, its positions at `<route>/<wallet>`, each opening
+    // `<route>/position/<id>`. A separate entry from Ethereum's indexed
+    // explorer. Reads come from rails-server's at-block routes
+    // (lib/api/fetch-fluid-base.ts). Unlaunched while Miles reads it.
+    id: "fluid-base",
+    session: "fluid-base",
+    label: "Fluid",
+    chainId: 8453,
+    slug: "fluid",
+    protocolKey: "fluid",
+    tags: ["Borrow", "CDP"],
+    desc: "Fluid vault positions on Base: a position's collateral, debt, ratio to its limits and interest over the last 30 days",
+    positionListing: false,
+    history: "none",
+    unlaunched: true,
+    subPages: [],
   },
   {
     id: "frankencoin",
@@ -415,7 +669,7 @@ const SPECS: ProtocolSpec[] = [
     label: "Frankencoin",
     chainId: 1,
     slug: "frankencoin",
-    brand: 25,
+    brand: 39,
     tags: ["Borrow", "CDP"],
     desc: "Oracle-free ZCHF loans, each a separate contract whose owner declares the liquidation price, which anyone can challenge by auction, all in native units",
     subPages: [{ segment: "system", label: "System overview", tab: "System" }],
@@ -426,10 +680,30 @@ const SPECS: ProtocolSpec[] = [
     label: "f(x) Protocol",
     chainId: 1,
     slug: "fx",
-    brand: 15,
+    brand: 54,
     tags: ["Leverage", "CDP"],
-    desc: "Leveraged f(x) positions on wstETH and WBTC: every event from the chain, current state from the pools, and shared funding costs split per position",
+    desc: "f(x) positions on wstETH and WBTC: every event from the chain, current state from the pools, and shared funding costs split per position",
     subPages: [{ segment: "pools", label: "Pools overview", tab: "Pools" }],
+  },
+  {
+    // Lido on Ethereum (rails-ops ui-jobs 570): a front door taking a wallet
+    // and stating Lido's totals, the wallet's stake (stETH and wstETH) and its
+    // withdrawal requests at `<route>/<wallet>`. A wallet holds one Lido stake,
+    // so its wallet page is its position page. Reads come from rails-server's
+    // at-block routes (lib/api/fetch-lido.ts).
+    id: "lido",
+    session: "lido",
+    label: "Lido",
+    chainId: 1,
+    slug: "lido",
+    // Hue 241.5 (427's spread), a draft read off Lido's blue mark (public/icons/protocols/lido.png).
+    brand: 241.5,
+    tags: ["Staking"],
+    desc: "Staked ether on Ethereum: a wallet's stETH and wstETH in ETH, its change over the last 30 days, and its withdrawal requests",
+    positionListing: false,
+    unlaunched: true,
+    history: "none",
+    subPages: [],
   },
   {
     id: "liquity-v1",
@@ -437,7 +711,7 @@ const SPECS: ProtocolSpec[] = [
     label: "Liquity V1",
     chainId: 1,
     slug: "liquity-v1",
-    brand: 270,
+    brand: 279,
     tags: ["Borrow"],
     desc: "The original interest-free Trove: ETH collateral and exact LUSD debt emitted per event",
     subPages: [{ segment: "system", label: "System overview", tab: "System" }],
@@ -448,7 +722,7 @@ const SPECS: ProtocolSpec[] = [
     label: "Liquity V2",
     chainId: 1,
     slug: "liquity-v2",
-    brand: 270,
+    brand: 279,
     tags: ["Borrow"],
     desc: "Borrow the BOLD stablecoin with user-set interest rates",
     subPages: [{ segment: "branches", label: "Branches", tab: "Branches" }],
@@ -459,7 +733,7 @@ const SPECS: ProtocolSpec[] = [
     label: "LlamaLend",
     chainId: 1,
     slug: "llamalend",
-    brand: 20,
+    brand: 24,
     tags: ["Borrow"],
     desc: "Curve's LlamaLend markets, where liquidation happens gradually across a price band: each loan's soft-liquidation state read live and cross-checked",
     subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
@@ -470,7 +744,7 @@ const SPECS: ProtocolSpec[] = [
     label: "MakerDAO",
     chainId: 1,
     slug: "makerdao",
-    brand: 180,
+    brand: 174,
     tags: ["CDP"],
     desc: "MakerDAO vaults and LockStake urns read from the chain, every value traceable",
     subPages: [{ segment: "system", label: "System overview", tab: "System" }],
@@ -481,7 +755,7 @@ const SPECS: ProtocolSpec[] = [
     label: "Maple",
     chainId: 1,
     slug: "maple",
-    brand: 30,
+    brand: 84,
     tags: ["Lend", "RWA"],
     desc: "Maple's institutional credit pools from the lender's side: share balances, the withdrawal queue, and what is liquid now against what is lent out",
     subPages: [{ segment: "pools", label: "Pools overview", tab: "Pools" }],
@@ -492,7 +766,7 @@ const SPECS: ProtocolSpec[] = [
     label: "Moonwell",
     chainId: 1,
     slug: "moonwell",
-    brand: 250,
+    brand: 204,
     tags: ["Lend", "Borrow"],
     desc: "A Compound v2 fork newly on Ethereum: exact mToken balances replayed from events, debt from emitted balances",
     subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
@@ -569,6 +843,72 @@ const SPECS: ProtocolSpec[] = [
     subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
+    // PancakeSwap V3 on Base and Arbitrum (rails-ops ui-jobs 575), a Uniswap
+    // V3 fork read by Uniswap's pages (components/protocol/uniswap, with
+    // `protocol: "pancakeswap"`): a front door taking a wallet, its positions
+    // at `<route>/<wallet>` (staked in the farm or not), each opening
+    // `<route>/position/<id>`. Unlaunched until decision 0061's launch list
+    // holds.
+    id: "pancakeswap-v3-base",
+    session: "pancakeswap-v3-base",
+    label: "PancakeSwap V3",
+    chainId: 8453,
+    slug: "pancakeswap-v3",
+    // Hue 61.5 (427's spread), from the bunny's #D1884F (57) in oklch (pancakeswap/pancake-developer, docs/public/logo.svg).
+    brand: 61.5,
+    tags: ["Liquidity"],
+    desc: "PancakeSwap V3 on Base, staked in its farm or not: a position's range, fees, CAKE and pool over the last 30 days",
+    positionListing: false,
+    unlaunched: true,
+    history: "none",
+    subPages: [],
+  },
+  {
+    id: "pancakeswap-v3-arbitrum",
+    session: "pancakeswap-v3-arbitrum",
+    label: "PancakeSwap V3",
+    chainId: 42161,
+    slug: "pancakeswap-v3",
+    protocolKey: "pancakeswap-v3-base",
+    tags: ["Liquidity"],
+    desc: "PancakeSwap V3 on Arbitrum, staked in its farm or not: a position's range, fees, CAKE and pool over the last 30 days",
+    positionListing: false,
+    unlaunched: true,
+    history: "none",
+    subPages: [],
+  },
+  {
+    // Uniswap V3 and V4 on Arc (rails-ops ui-jobs 577), on the same pages as
+    // Arbitrum's, read from the chain when a page opens. Unlaunched while
+    // Miles reads it.
+    id: "uniswap-v3-arc",
+    session: "uniswap-v3-arc",
+    label: "Uniswap V3",
+    chainId: 5042,
+    slug: "uniswap-v3",
+    protocolKey: "uniswap-v3",
+    tags: ["Liquidity"],
+    desc: "Uniswap V3 on Arc: a position's range, fees and pool over the last 30 days",
+    positionListing: false,
+    unlaunched: true,
+    history: "none",
+    subPages: [],
+  },
+  {
+    id: "uniswap-v4-arc",
+    session: "uniswap-v4-arc",
+    label: "Uniswap V4",
+    chainId: 5042,
+    slug: "uniswap-v4",
+    protocolKey: "uniswap-v4",
+    tags: ["Liquidity"],
+    desc: "Uniswap's singleton pools on Arc, hooks included: a position's range, fees and pool over the last 30 days",
+    positionListing: false,
+    unlaunched: true,
+    history: "none",
+    subPages: [],
+  },
+  {
     // Pendle on Ethereum, phase 1: a wallet's PT, YT and LP per market at a
     // pinned block, from the routers' events and chain reads. A Pendle market
     // is not a share vault and holds no loan, so there is no position listing
@@ -578,9 +918,9 @@ const SPECS: ProtocolSpec[] = [
     label: "Pendle",
     chainId: 1,
     slug: "pendle",
-    // Hue 260, read off pendle.finance's favicon #1A2E4F (known-infrastructure's
+    // Hue 219 (427's spread), from pendle.finance's favicon #1A2E4F (258) (known-infrastructure's
     // PENDLE_BAR).
-    brand: 260,
+    brand: 219,
     tags: ["Fixed yield", "Yield trading"],
     desc: "A wallet's principal, yield and liquidity tokens in each Pendle market, valued at Pendle's oracle and read at one block",
     positionListing: false,
@@ -595,7 +935,7 @@ const SPECS: ProtocolSpec[] = [
     label: "Polaris",
     chainId: 11155111,
     slug: "polaris",
-    brand: 220,
+    brand: 211.5,
     tags: ["CDP", "Stablecoin"],
     desc: "Polaris on the Sepolia testnet: USDp and GOLDp minted against pETH, every position from the market's events, liquidations absorbed by stability pools",
     subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
@@ -606,7 +946,7 @@ const SPECS: ProtocolSpec[] = [
     label: "PWN",
     chainId: 1,
     slug: "pwn",
-    brand: 180,
+    brand: 129,
     tags: ["P2P", "Fixed-term"],
     desc: "Peer-to-peer fixed-term loans read from events: each loan's collateral, credit and terms traceable",
     subPages: [{ segment: "book", label: "Loan book", tab: "Loan book" }],
@@ -617,10 +957,10 @@ const SPECS: ProtocolSpec[] = [
     label: "Seamless",
     chainId: 8453,
     slug: "seamless",
-    brand: 285,
+    brand: 354,
     tags: ["Lend", "Borrow"],
     desc: "An Aave V3 fork on Base, frozen since April 2025: every position read whole from the contracts, and none of them can grow",
-    subPages: [{ segment: "market", label: "Market overview", tab: "Market" }],
+    subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
     // Sky Savings (sUSDS on Ethereum). Sky rebranded MakerDAO, and a saver is
@@ -633,7 +973,7 @@ const SPECS: ProtocolSpec[] = [
     label: "Sky Savings",
     chainId: 1,
     slug: "sky-savings",
-    brand: 280,
+    brand: 324,
     tags: ["Savings"],
     desc: "Every sUSDS holder on Ethereum: the balance, its worth in USDS and the interest earned, from the token's logs and checked against the contract",
     subPages: [{ segment: "rates", label: "Savings Rate history", tab: "Rate" }],
@@ -646,15 +986,16 @@ const SPECS: ProtocolSpec[] = [
     // position listing. Launched 4 Nov 2026 (Miles).
     id: "cow",
     session: "cow",
-    label: "CoW",
+    // The docs' name (docs.cow.fi; rails-ops ui-jobs 657, C11).
+    label: "CoW Protocol",
     chainId: 1,
     slug: "cow",
-    // Hue 307, read off CoW's brand purple #490072 (its kit pairs it with
+    // Hue 309 (427's spread), from CoW's brand purple #490072 (307) (its kit pairs it with
     // #F996EE, hue 331); the zone draws the hue at the site's fixed lightness
     // and chroma per theme.
-    brand: 307,
+    brand: 309,
     tags: ["Trades"],
-    desc: "Every trade a wallet settled through CoW, read from the settlement contract's logs and chosen by token",
+    desc: "Every trade a wallet settled through CoW Protocol, read from the settlement contract's logs and chosen by token",
     positionListing: false,
     subPages: [],
   },
@@ -664,10 +1005,120 @@ const SPECS: ProtocolSpec[] = [
     label: "SparkLend",
     chainId: 1,
     slug: "spark",
-    brand: 25,
+    brand: 69,
     tags: ["Lend", "Borrow"],
     desc: "SparkLend, an Aave V3 fork, replayed from events: each reserve's principal traceable and valued at the Pool's oracle",
-    subPages: [{ segment: "market", label: "Market overview", tab: "Market" }],
+    subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
+  },
+  {
+    // Uniswap V3 and V4 on Ethereum (rails-ops ui-jobs 556): two versions,
+    // two entries. The route is a front door taking a wallet; its positions
+    // are at `<route>/<wallet>`, each opening `<route>/position/<id>`. A pool
+    // has no page yet, so there is no sub-page and no position listing. Reads
+    // come from rails-server's at-block routes (lib/api/fetch-uniswap.ts).
+    id: "uniswap-v3",
+    session: "uniswap-v3",
+    label: "Uniswap V3",
+    chainId: 1,
+    slug: "uniswap-v3",
+    // DRAFT: hue 1.5 (427's spread), from Uniswap's pink #FF007A (4) in oklch, the space this
+    // field takes (its HSL hue is 331).
+    brand: 1.5,
+    tags: ["Liquidity"],
+    desc: "Concentrated liquidity on Ethereum: a position's range, fees and pool over the last 30 days, read from the pool at two blocks",
+    positionListing: false,
+    history: "none",
+    subPages: [],
+  },
+  {
+    id: "uniswap-v4",
+    session: "uniswap-v4",
+    label: "Uniswap V4",
+    chainId: 1,
+    slug: "uniswap-v4",
+    brand: 1.5,
+    tags: ["Liquidity"],
+    desc: "Uniswap's singleton pools on Ethereum, hooks included: a position's range, fees and pool over the last 30 days",
+    positionListing: false,
+    history: "none",
+    subPages: [],
+  },
+  {
+    // Uniswap V3 on Base (rails-ops ui-jobs 568) and V3 and V4 on Arbitrum
+    // (573), each its own entry on the Ethereum explorers' pages
+    // (components/protocol/uniswap, with a chain): Base reads no position's
+    // history. Unlaunched until decision 0061's launch list holds.
+    id: "uniswap-v3-base",
+    session: "uniswap-v3-base",
+    label: "Uniswap V3",
+    chainId: 8453,
+    slug: "uniswap-v3",
+    protocolKey: "uniswap-v3",
+    tags: ["Liquidity"],
+    desc: "Uniswap V3 on Base: a position's range, fees and pool over the last 30 days",
+    positionListing: false,
+    unlaunched: true,
+    history: "none",
+    subPages: [],
+  },
+  {
+    id: "uniswap-v3-arbitrum",
+    session: "uniswap-v3-arbitrum",
+    label: "Uniswap V3",
+    chainId: 42161,
+    slug: "uniswap-v3",
+    protocolKey: "uniswap-v3",
+    tags: ["Liquidity"],
+    desc: "Uniswap V3 on Arbitrum: a position's range, fees and pool over the last 30 days",
+    positionListing: false,
+    unlaunched: true,
+    history: "none",
+    subPages: [],
+  },
+  {
+    id: "uniswap-v4-arbitrum",
+    session: "uniswap-v4-arbitrum",
+    label: "Uniswap V4",
+    chainId: 42161,
+    slug: "uniswap-v4",
+    protocolKey: "uniswap-v4",
+    tags: ["Liquidity"],
+    desc: "Uniswap's singleton pools on Arbitrum, hooks included: a position's range, fees and pool over the last 30 days",
+    positionListing: false,
+    unlaunched: true,
+    history: "none",
+    subPages: [],
+  },
+  {
+    // Uniswap V3 and V4 on Optimism (rails-ops ui-jobs 578), on the same pages
+    // as Arbitrum's, read from the chain when a page opens. Unlaunched while
+    // Miles reads it.
+    id: "uniswap-v3-optimism",
+    session: "uniswap-v3-optimism",
+    label: "Uniswap V3",
+    chainId: 10,
+    slug: "uniswap-v3",
+    protocolKey: "uniswap-v3",
+    tags: ["Liquidity"],
+    desc: "Uniswap V3 on Optimism: a position's range, fees and pool over the last 30 days",
+    positionListing: false,
+    unlaunched: true,
+    history: "none",
+    subPages: [],
+  },
+  {
+    id: "uniswap-v4-optimism",
+    session: "uniswap-v4-optimism",
+    label: "Uniswap V4",
+    chainId: 10,
+    slug: "uniswap-v4",
+    protocolKey: "uniswap-v4",
+    tags: ["Liquidity"],
+    desc: "Uniswap's singleton pools on Optimism, hooks included: a position's range, fees and pool over the last 30 days",
+    positionListing: false,
+    unlaunched: true,
+    history: "none",
+    subPages: [],
   },
   {
     // The first entry here whose WHOLE PRODUCT is vaults, and therefore a
@@ -682,7 +1133,7 @@ const SPECS: ProtocolSpec[] = [
     label: "Yearn V3",
     chainId: 1,
     slug: "yearn",
-    brand: 260,
+    brand: 249,
     tags: ["Vaults", "Yield"],
     desc: "Every vault the V3 factories made, endorsed or not, each one's totals, share price and endorsement read from chain at one block",
     // No position listing, for the reason Aave's vault layer has none: a
@@ -730,6 +1181,11 @@ export const PROTOCOLS: ProtocolEntry[] = SPECS.map((spec) => {
  *  The rule of thumb: if the surface is how a reader FINDS an explorer, it
  *  reads this; if it is how a page the reader is already on draws itself, it
  *  reads `PROTOCOLS`. */
+/** A roster entry's history kind, by its roster id; null for an explorer
+ *  indexed from deployment, which wears no history tag. */
+export const historyOf = (id: string): "none" | "from-date" | null =>
+  PROTOCOLS.find((p) => p.id === id)?.history ?? null;
+
 export const LAUNCHED_PROTOCOLS: ProtocolEntry[] = PROTOCOLS.filter((p) => !p.unlaunched);
 
 /** One row per distinct launched protocol VERSION — the roster deduplicated on
@@ -783,7 +1239,7 @@ export function isUnlaunchedPath(pathname: string | null): boolean {
  *  step. Today all three chains are offered. The order is `CHAINS`', which is
  *  the display order the toggle wants (Ethereum, Base, Sepolia). */
 export function launchedChains(): ChainMeta[] {
-  return (Object.values(CHAINS) as ChainMeta[]).filter((c) => LAUNCHED_PROTOCOLS.some((p) => p.chainId === c.id));
+  return (Object.values(CHAINS) as ChainMeta[]).filter((c) => isLaunchedChain(c.id));
 }
 
 /** The PRODUCTION chains Rails offers — the launched chains minus the
@@ -807,11 +1263,24 @@ export function launchedProductionChainNames(): string {
   return names.length <= 2 ? names.join(" and ") : `${names.slice(0, -1).join(", ")}, and ${names.at(-1)}`;
 }
 
-/** Is this chain's own front door (`/coverage/<slug>`) offered? False while
- *  every explorer on the chain is unlaunched — the coverage page would be a
- *  directory of pages nothing else links. */
+/** THE CHAIN LAUNCH FLAG: a chain is launched when it has at least one launched
+ *  explorer. False for a chain with no explorers at all (Robinhood Chain while
+ *  its first explorers are built) and for one whose every explorer is
+ *  unlaunched. Every surface a reader finds a chain on asks this, directly or
+ *  through `launchedChains()`: the home chain tabs, the nav, the chain toggle,
+ *  Focus's chain picks, /coverage's chain list, the sitemap, /about, llms.txt
+ *  and StructuredData. An unlaunched chain's /coverage/<slug> still serves,
+ *  with the work-in-progress strip and `index: false`. Tested in
+ *  scripts/test/chain-launch.test.mjs. */
 export function isLaunchedChain(chainId: ChainId): boolean {
-  return LAUNCHED_PROTOCOLS.some((p) => p.chainId === chainId);
+  return chainLaunchedIn(PROTOCOLS, chainId);
+}
+
+/** The rule over any roster: some entry on the chain is not flagged
+ *  `unlaunched`. `some` over no entries is false, so a chain with none is
+ *  unlaunched. */
+export function chainLaunchedIn(roster: readonly Pick<ProtocolEntry, "chainId" | "unlaunched">[], chainId: ChainId) {
+  return roster.some((p) => p.chainId === chainId && !p.unlaunched);
 }
 
 /** The singular noun each protocol's positions go by, for per-position page
@@ -849,10 +1318,13 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   morpho: "Position",
   "morpho-base": "Position",
   "morpho-arbitrum": "Position",
+  "morpho-arc": "Position",
+  "morpho-optimism": "Position",
   spark: "Position",
   compound: "Position",
   "compound-base": "Position",
   "compound-v3-arbitrum": "Position",
+  "compound-v3-optimism": "Position",
   "compound-v2": "Position",
   dolomite: "Account",
   pwn: "Loans",
@@ -872,6 +1344,30 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   // A wallet's trades: the page titles name them, and nothing lists positions.
   cow: "Trades",
   pendle: "Position",
+  "uniswap-v3": "Position",
+  "uniswap-v4": "Position",
+  aerodrome: "Position",
+  velodrome: "Position",
+  "uniswap-v3-base": "Position",
+  "uniswap-v3-arbitrum": "Position",
+  "uniswap-v4-arbitrum": "Position",
+  "uniswap-v3-optimism": "Position",
+  "uniswap-v4-optimism": "Position",
+  "pancakeswap-v3-base": "Position",
+  "pancakeswap-v3-arbitrum": "Position",
+  "uniswap-v3-arc": "Position",
+  "uniswap-v4-arc": "Position",
+  // A wallet's stETH and wstETH; the page names it a stake.
+  lido: "Stake",
+  "fluid-base": "Position",
+  "aave-v4-arc": "Position",
+  "aave-v3-optimism": "Position",
+  // One account's holding in one vault.
+  "euler-v2-base": "Position",
+  "euler-v2-arbitrum": "Position",
+  // A Vault balance of a pool's shares; the page names it a pool share.
+  "balancer-v3": "Position",
+  "balancer-v3-arbitrum": "Position",
 };
 
 /** The listing-tab vocabulary: the position noun pluralised ("Troves",
@@ -919,6 +1415,10 @@ export function protocolIconSrc(id: string): string {
   const brand = id.replace(/-(base|arbitrum)$/, "");
   // Compound V3 on Arbitrum is keyed by its server lane, `compound-v3-arbitrum`;
   // its mark is Compound's, as Base's (`compound-base`) is.
+  // Uniswap V4 takes Uniswap's mark; the repo holds no V4 image of its own.
+  if (brand === "uniswap-v4") return "/icons/protocols/uniswap.png";
+  // Balancer V3 takes Balancer's mark.
+  if (brand === "balancer-v3") return "/icons/protocols/balancer.png";
   return `/icons/protocols/${brand === "compound-v3" ? "compound" : brand}.png`;
 }
 

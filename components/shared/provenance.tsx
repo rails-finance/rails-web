@@ -4,8 +4,8 @@
 // ----------------------------------------------------------------------------
 // A surface (event card, position card, economics tower/panel, market row)
 // wraps itself in a <ProvReceiptsScope>; every `<Prov info={…}>` value inside
-// registers into the scope's registry. The page-level inspector (the dock's
-// target tool, prov-inspector.tsx) is the one reader: armed, every scoped
+// registers into the scope's registry. The page-level inspector
+// (prov-inspector.tsx) is the one reader: armed, every scoped
 // value is a click target, and a pick pins that figure's receipt into a
 // popover at the value. Outside a scope `<Prov>` renders children verbatim
 // (zero DOM). The per-card Provenance heading-button + receipts pane — this
@@ -40,6 +40,11 @@ import { TokenChipIcon } from "./token-chip-icon";
 import { ProvCoverageBounds } from "./prov-coverage-tripwire";
 import { formatExact } from "@/lib/utils/format";
 import { BlockRef } from "@/components/shared/block-ref";
+import { untracedInputs } from "@/lib/shared/prov-untraced";
+import { resolveClass, weakestClass } from "@/lib/shared/prov-class";
+import { entrySig } from "@/lib/shared/prov-signature";
+
+export { resolveClass };
 
 // Dev gates the coverage tripwire (scope bookends + the <Prov> coverage stamp);
 // Next inlines NODE_ENV, so the prod bundle carries neither.
@@ -79,6 +84,10 @@ export interface ProvInput {
   verify?: ProvVerify;
   /** The contract this leaf was read from — surfaces in the leaf's detail rows. */
   contract?: { name: string; address?: string };
+  /** A constant the protocol defines (a stablecoin's $1 face), not a read: the
+   *  leaf carries no class dot and the value's class skips it
+   *  (lib/shared/prov-class.ts). */
+  definition?: true;
 }
 export interface Provenance {
   kind: ProvKind;
@@ -173,20 +182,6 @@ export interface ProvReceiptEntry {
 
 const EMPTY_ENTRIES: ProvReceiptEntry[] = [];
 
-/** Content signature — registration re-runs on every render, so re-registering
- *  an unchanged value must be a silent no-op (no emit, no re-render loop). */
-const entrySig = (e: Omit<ProvReceiptEntry, "order">) =>
-  [
-    e.value,
-    e.display,
-    e.symbol ?? "",
-    e.echo ? "echo" : "",
-    e.info.summary,
-    e.info.formula ?? "",
-    e.info.via ?? "",
-    (e.info.inputs ?? []).map((i) => `${i.label}:${i.value ?? ""}`).join("|"),
-  ].join("§");
-
 /** Per-card store of the traced values mounted inside a scope. A tiny external
  *  store (not React state) so <Prov> can register from an every-render effect
  *  without cascading re-renders — only the inspector's popover subscribes. */
@@ -227,9 +222,6 @@ export class ReceiptRegistry {
 
 interface ReceiptsScope {
   registry: ReceiptRegistry;
-  /** The section's name for scoped arming (ui-jobs 284): "position-card",
-   *  "flows", or an event's id. A nested scope without one takes its parent's. */
-  scopeId: string | null;
 }
 const ProvReceiptsScopeCtx = createContext<ReceiptsScope | null>(null);
 
@@ -293,14 +285,8 @@ const warnedUnscoped = new Set<string>();
 // question was asked, no panel round-trip. Sticky by design: a pick keeps the
 // mode armed so the reader can walk value to value; Escape closes the popover
 // first, then the mode. A module singleton, not a context — one page, one
-// tool; the dock toggle and the layer both talk to this store.
-//
-// Scoped arming (ui-jobs 284): `setArmed(true, scope)` arms one section — the
-// position card ("position-card"), Lifetime flows ("flows") or one event (its
-// id) — and only the <Prov>s whose nearest ProvReceiptsScope carries that
-// `scopeId` become targets. The page-level tool arms with no scope, which
-// marks every scoped value. The halo, the exit button and the Escape ladder
-// read `armed` alone, so they behave the same either way.
+// tool. It is armed in one place, the profile menu's switch (H20.1; ui-jobs
+// 625): the layer arms each page view from the saved preference.
 
 export interface ProvInspectorPin {
   /** The pinned figure's identity (entryKey) — the popover keys a remount on it. */
@@ -317,30 +303,15 @@ export interface ProvInspectorPin {
 
 export class ProvInspectorStore {
   private armed = false;
-  private scope: string | null = null;
-  private opener: HTMLElement | null = null;
   private pinned: ProvInspectorPin | null = null;
   private tick = 0;
   private listeners = new Set<() => void>();
-  /** Arm or disarm. `scope` names the one section to arm (null: the whole
-   *  page); `opener` is the control that armed it, which takes focus back when
-   *  the mode is put down (`restoreFocus`). Switching scope while armed
-   *  unpins. */
-  setArmed = (on: boolean, scope: string | null = null, opener: HTMLElement | null = null) => {
-    const nextScope = on ? scope : null;
-    if (this.armed === on && this.scope === nextScope) return;
+  /** Arm or disarm; either way an open receipt closes. */
+  setArmed = (on: boolean) => {
+    if (this.armed === on) return;
     this.armed = on;
-    this.scope = nextScope;
     this.pinned = null;
-    if (on) this.opener = opener;
     this.emit();
-  };
-  /** Hand focus back to the control that armed the mode, where it is still on
-   *  the page. */
-  restoreFocus = () => {
-    const el = this.opener;
-    this.opener = null;
-    if (el?.isConnected) el.focus({ preventScroll: true });
   };
   pin = (entry: ProvReceiptEntry, registry: ReceiptRegistry, el: HTMLElement) => {
     this.pinned = { key: entryKey(entry), entry, registry, el, tick: ++this.tick };
@@ -358,10 +329,6 @@ export class ProvInspectorStore {
     };
   };
   getArmed = () => this.armed;
-  getScope = () => this.scope;
-  /** Armed for the section `scopeId`: armed page-wide, or armed on it. */
-  armedFor = (scopeId: string | null | undefined) =>
-    this.armed && (this.scope == null || (scopeId != null && this.scope === scopeId));
   getPin = () => this.pinned;
   private emit() {
     this.listeners.forEach((fn) => fn());
@@ -370,10 +337,32 @@ export class ProvInspectorStore {
 
 export const provInspector = new ProvInspectorStore();
 
-/** The scoped-arming names of the position page's sections (ui-jobs 284). An
- *  event's scope is its id. */
-export const POSITION_CARD_SCOPE = "position-card";
-export const FLOWS_SCOPE = "flows";
+/** How many scoped <Prov> values are mounted on the page, across every
+ *  surface's registry: the header's inspector menu (H7.4) is drawn only while
+ *  there is at least one (ui-jobs 651). Emits only when the page goes from
+ *  none to some or back, so a listing's churn re-renders nothing. */
+export class ProvTracedStore {
+  private count = 0;
+  private listeners = new Set<() => void>();
+  add = () => {
+    if (++this.count === 1) this.emit();
+  };
+  remove = () => {
+    if (--this.count === 0) this.emit();
+  };
+  subscribe = (fn: () => void) => {
+    this.listeners.add(fn);
+    return () => {
+      this.listeners.delete(fn);
+    };
+  };
+  getAny = () => this.count > 0;
+  private emit() {
+    this.listeners.forEach((fn) => fn());
+  }
+}
+
+export const provTraced = new ProvTracedStore();
 
 /** Wrap a card's content so every <Prov> inside reports into its receipts
  *  panel. The shell owns the registry. In dev the children mount between
@@ -389,18 +378,12 @@ export function ProvReceiptsScope({
   registry,
   children,
   bounds = true,
-  scopeId,
 }: {
   registry: ReceiptRegistry;
   children: ReactNode;
   bounds?: boolean;
-  /** The section's name for scoped arming: "position-card", "flows", or the
-   *  event's id. Absent, a nested scope takes its parent's. */
-  scopeId?: string;
 }) {
-  const parent = useContext(ProvReceiptsScopeCtx);
-  const id = scopeId ?? parent?.scopeId ?? null;
-  const value = useMemo(() => ({ registry, scopeId: id }), [registry, id]);
+  const value = useMemo(() => ({ registry }), [registry]);
   return (
     <ProvReceiptsScopeCtx.Provider value={value}>
       {DEV && bounds ? <ProvCoverageBounds>{children}</ProvCoverageBounds> : children}
@@ -408,26 +391,10 @@ export function ProvReceiptsScope({
   );
 }
 
-/** Whether the inspector is armed for the section `scopeId`: armed page-wide,
- *  or armed on that section. What opens a collapsed thing so an armed click
- *  can reach the value inside. */
-export function useProvArmedFor(scopeId: string | null | undefined): boolean {
-  return useSyncExternalStore(
-    provInspector.subscribe,
-    () => provInspector.armedFor(scopeId),
-    () => false,
-  );
-}
-
-/** Whether the inspector is armed on the section `scopeId` alone: the
- *  section then wears the ring (`[data-prov-lit]`, app/globals.css), in the
- *  page-wide halo's place. */
-export function useProvScopeLit(scopeId: string | null | undefined): boolean {
-  return useSyncExternalStore(
-    provInspector.subscribe,
-    () => provInspector.getArmed() && scopeId != null && provInspector.getScope() === scopeId,
-    () => false,
-  );
+/** Whether the inspector is armed: what opens a collapsed thing so an armed
+ *  click can reach the value inside. */
+export function useProvArmed(): boolean {
+  return useSyncExternalStore(provInspector.subscribe, provInspector.getArmed, () => false);
 }
 
 /** Lazily create a surface's ReceiptRegistry — stable across renders. The
@@ -439,27 +406,6 @@ export function useReceiptRegistry(): ReceiptRegistry {
 }
 
 const shortHex = (a: string) => (a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a);
-
-/** Formula words that aren't operands — never flagged by the receipt's
- *  untraced-input self-audit. */
-const FORMULA_STOPWORDS = new Set([
-  "rounded",
-  "rounding",
-  "up",
-  "down",
-  "the",
-  "of",
-  "at",
-  "to",
-  "per",
-  "and",
-  "or",
-  "wei",
-  "abs",
-  "min",
-  "max",
-  "sum",
-]);
 
 // The dock is reachable (click-select, not hover) so it can hold live controls.
 function CopyBtn({ text, title = "Copy" }: { text: string; title?: string }) {
@@ -503,38 +449,16 @@ export const CLASS_CSS: Record<ProvClass, string> = {
   offchain: "prov-cls-offchain",
 };
 
-/** Map a 4-kind gate value to a distance class when the vocabulary hasn't named
- *  one precisely. Best-effort — a vocabulary overrides it with `pclass` (e.g. a
- *  slot read is `chain` but `state`, an oracle price is `chain-derived` but the
- *  `oracle` class). The gate itself is unchanged; this only drives the display. */
-export function resolveClass(kind: ProvKind, pclass?: ProvClass): ProvClass {
-  if (pclass) return pclass;
-  switch (kind) {
-    case "chain":
-      return "emitted";
-    case "chain-derived":
-      return "oracle";
-    case "derived":
-      return "indexed";
-    case "offchain":
-      return "offchain";
-  }
-}
-
 /** The value's display class + computed flag — shared by the receipt pane and
  *  the receipts-panel rows. A vocabulary-stated `pclass` wins. Otherwise a
  *  COMPUTED value (formula over inputs) inherits the furthest class among its
  *  actual inputs — the weakest link — so a ratio whose price input is an oracle
  *  read doesn't badge as if it WERE an oracle read. Plain reads fall back to
  *  the kind map. */
-export const CLASS_RANK: Record<ProvClass, number> = { emitted: 0, state: 1, oracle: 2, indexed: 3, offchain: 4 };
 export function classifyValue(info: Provenance): { vcls: ProvClass; isComputed: boolean; leaves: ProvInput[] } {
   const leaves = (info.inputs ?? []).filter((i) => !["block", "tx"].includes(i.label.toLowerCase()));
   const isComputed = Boolean(info.formula && leaves.length > 0);
-  const weakest = leaves.reduce<ProvClass | null>((acc, l) => {
-    const c = resolveClass(l.kind, l.pclass);
-    return !acc || CLASS_RANK[c] > CLASS_RANK[acc] ? c : acc;
-  }, null);
+  const weakest = weakestClass(leaves);
   const vcls = info.pclass ?? (isComputed && weakest ? weakest : resolveClass(info.kind));
   return { vcls, isComputed, leaves };
 }
@@ -546,7 +470,7 @@ export function classifyValue(info: Provenance): { vcls: ProvClass; isComputed: 
 function VerifyRow({ v }: { v: ProvVerify }) {
   if ((v.kind === "etherscan" || v.kind === "link") && v.href)
     return (
-      <a className="prov-verify prov-verify-link" href={v.href} target="_blank" rel="noopener noreferrer">
+      <a className="prov-verify prov-verify-link" href={v.href} target="_blank" rel="noopener">
         <ExternalLink aria-hidden />
         <span>{v.text}</span>
       </a>
@@ -558,7 +482,7 @@ function ContractLink({ c }: { c: { name: string; address?: string } }) {
   const chainId = useChainId();
   if (!c.address) return <span>{c.name}</span>;
   return (
-    <a href={explorerUrl(chainId, "address", c.address)} target="_blank" rel="noopener noreferrer">
+    <a href={explorerUrl(chainId, "address", c.address)} target="_blank" rel="noopener">
       {c.name} {shortHex(c.address)}
     </a>
   );
@@ -644,13 +568,13 @@ function isFigure(value: string): boolean {
  *  direction and size of the rounding — not just the general rule. */
 function NotationModal({ display, exact, onClose }: { display: string; exact: string; onClose: () => void }) {
   // Recover both figures. `exact` is a grouped decimal ("43,041.84"); `display`
-  // is the compact form ("43K"), expanded via its K/M/B multiplier.
+  // is the compact form ("43K"), expanded via its K/M/B/T/Q multiplier.
   const exactN = parseFloat(exact.replace(/−/g, "-").replace(/,/g, ""));
   const m = display
     .replace(/−/g, "-")
     .replace(/,/g, "")
-    .match(/^([+-]?[0-9]*\.?[0-9]+)\s*([KMB])?$/i);
-  const mult = m?.[2] ? ({ K: 1e3, M: 1e6, B: 1e9 }[m[2].toUpperCase()] ?? 1) : 1;
+    .match(/^([+-]?[0-9]*\.?[0-9]+)\s*([KMBTQ])?$/i);
+  const mult = m?.[2] ? ({ K: 1e3, M: 1e6, B: 1e9, T: 1e12, Q: 1e15 }[m[2].toUpperCase()] ?? 1) : 1;
   const displayN = m ? parseFloat(m[1]) * mult : null;
 
   let adjustment: ReactNode = null;
@@ -781,28 +705,12 @@ export function ProvReceipt({
   const { vcls, isComputed, leaves } = classifyValue(info);
   const hasSource = block != null || Boolean(txHash) || Boolean(info.contract);
 
-  // Self-audit: every identifier the formula names should be traceable to an
-  // input row. A named-but-untraced operand is exactly the gap the inspector
-  // exists to expose, so it renders as a visible caution in development builds only
-  // (ui-jobs sky-savings 18; plus a dev console warning) rather than a silent, plausible-looking omission. Matching is
-  // lenient (substring, either direction: "shares" ↔ "borrowShares") so only
-  // wholly-missing operands flag. Runs only when the vocabulary enumerates
-  // inputs at all — a zero-input indexed rollup is a different, visible state.
-  const untraced =
-    info.formula && leaves.length > 0
-      ? [
-          ...new Set(
-            (info.formula.match(/\b[A-Za-z_][A-Za-z0-9_]{2,}\b/g) ?? []).filter((t) => {
-              const lt = t.toLowerCase();
-              if (FORMULA_STOPWORDS.has(lt)) return false;
-              return !leaves.some((l) => {
-                const ll = l.label.toLowerCase();
-                return ll.includes(lt) || lt.includes(ll);
-              });
-            }),
-          ),
-        ]
-      : [];
+  // Self-audit (lib/shared/prov-untraced.ts): a formula's operand with no input
+  // row renders as a visible caution in development builds only (ui-jobs
+  // sky-savings 18; plus a dev console warning). Runs only when the vocabulary
+  // enumerates inputs at all — a zero-input indexed rollup is a different,
+  // visible state.
+  const untraced = untracedInputs(info.formula, leaves);
   useEffect(() => {
     if (untraced.length > 0 && process.env.NODE_ENV !== "production") {
       console.warn(
@@ -851,13 +759,7 @@ export function ProvReceipt({
       if (/\blogs?\b/i.test(s)) linkIdx = i;
     });
     const link = (text: string) => (
-      <a
-        className="prov-via-verify"
-        href={viaVerify.href}
-        target="_blank"
-        rel="noopener noreferrer"
-        title={viaVerify.text}
-      >
+      <a className="prov-via-verify" href={viaVerify.href} target="_blank" rel="noopener" title={viaVerify.text}>
         {text}
         <ExternalLink aria-hidden />
       </a>
@@ -987,13 +889,17 @@ export function ProvReceipt({
                 const cls = resolveClass(inp.kind, inp.pclass);
                 return (
                   <Fragment key={i}>
-                    <span className={`prov-row-dot ${CLASS_CSS[cls]}`} title={CLASS_META[cls]} />
+                    {inp.definition ? (
+                      <span aria-hidden />
+                    ) : (
+                      <span className={`prov-row-dot ${CLASS_CSS[cls]}`} title={CLASS_META[cls]} />
+                    )}
                     <span className="prov-row-label">{inp.label}</span>
                     <span className="prov-row-cell">
                       {inp.value && <span className="prov-row-value">{inp.value}</span>}
                       {inp.contract && <ContractLink c={inp.contract} />}
                       {(inp.verify?.kind === "etherscan" || inp.verify?.kind === "link") && inp.verify.href && (
-                        <a href={inp.verify.href} target="_blank" rel="noopener noreferrer">
+                        <a href={inp.verify.href} target="_blank" rel="noopener">
                           {inp.verify.text}
                         </a>
                       )}
@@ -1021,7 +927,7 @@ export function ProvReceipt({
               )}
               {txHash && (
                 <span className="prov-src-item">
-                  <a href={explorerUrl(chainId, "tx-logs", txHash)} target="_blank" rel="noopener noreferrer">
+                  <a href={explorerUrl(chainId, "tx-logs", txHash)} target="_blank" rel="noopener">
                     tx {shortHex(txHash)}
                   </a>
                   <CopyBtn text={txHash} title="Copy tx hash" />
@@ -1179,9 +1085,8 @@ export function Prov({
   // re-render only on arm/disarm, never on registry churn. Only scoped values
   // subscribe meaningfully; outside a scope there is no registry to resolve a
   // receipt from, so the tool ignores the span.
-  // Scoped arming (ui-jobs 284): armed on another section leaves this one inert.
   const inert = useContext(ProvInertCtx);
-  const inspecting = useProvArmedFor(scope?.scopeId) && registry != null && !inert;
+  const inspecting = useProvArmed() && registry != null && !inert;
   // Structured capture. `display` = the value as it READS on the card: the
   // rendered text minus decoration (`[data-prov-hidden]` — hover tooltips, token
   // glyphs), whitespace-collapsed. The exact figure comes from the `value` prop,
@@ -1211,7 +1116,11 @@ export function Prov({
   });
   useEffect(() => {
     if (!registry) return;
-    return () => registry.unregister(id);
+    provTraced.add();
+    return () => {
+      registry.unregister(id);
+      provTraced.remove();
+    };
   }, [registry, id]);
   // The unscoped tripwire. Once per receipt label, so a listing of 100 rows
   // reports the shape of the gap rather than 100 copies of it.
@@ -1242,8 +1151,10 @@ export function Prov({
   // pulse's target — data-prov-active lands here while its receipt is pinned).
   // The dev-only coverage stamp tells the tripwire this value is traced.
   const handlePick = (e: SyntheticEvent) => {
-    // Header values sit inside the card's clickable detail-toggle div — a
-    // pick must pin the receipt, never collapse the card.
+    // The click rule (decision 0062 point 4): a pick pins the receipt and
+    // nothing else. Header values sit inside the card's clickable
+    // detail-toggle div, and a listing's figures inside the row's link: the
+    // pick must not collapse the card or follow the link.
     e.stopPropagation();
     e.preventDefault();
     if (!registry) return;

@@ -1,4 +1,5 @@
-// f(x) V2 SYSTEM-lane provenance vocabulary — the /fx/pools protocol view.
+// f(x) V2 SYSTEM-lane provenance vocabulary — the pools overview and each
+// pool's page (/ethereum/fx/pools, /ethereum/fx/pools/<pool>).
 // ----------------------------------------------------------------------------
 // The position lane (event-provenance.ts) traces one xPOSITION through captured
 // events and the settled sweep. This lane traces the OTHER direction: the
@@ -20,6 +21,7 @@
 
 import type { Provenance, ProvInput, ProvVerify } from "@/components/shared/provenance";
 import { FX_ADDRESSES } from "./asset-catalog";
+import { fxAnchorBasis, fxAnchorSentence, type FxAnchorSource } from "./statement-words";
 
 /** The route every figure on this page arrives through. */
 const SYSTEM_VIA = "GET /api/chain/fx/pools";
@@ -32,18 +34,6 @@ const STATE_VERIFY: ProvVerify = {
   kind: "recompute",
   text: "Re-run the eth_call against any node at the stamped block",
 };
-
-// ── The roster ───────────────────────────────────────────────────────────────
-
-export const poolRosterProv = (): Provenance => ({
-  kind: "chain",
-  pclass: "state",
-  summary:
-    "The pool roster — exactly two AaveFundingPools hang off the one PoolManager (wstETH and WBTC; chain-verified complete, two RegisterPool events ever). Each pool answers the manager's getPoolInfo with a live capacity, which is only ever set at registration — a roster proof that needs no log scan.",
-  contract: POOL_MANAGER,
-  via: `${SYSTEM_VIA} · PoolManager.getPoolInfo per pool @ the pinned block`,
-  verify: STATE_VERIFY,
-});
 
 // ── Pool totals (the pool's own getters) ─────────────────────────────────────
 
@@ -65,21 +55,10 @@ export const poolDebtProv = (label: string, address: string): Provenance => ({
   verify: STATE_VERIFY,
 });
 
-export const totalDebtAllPoolsProv = (): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  summary:
-    "fxUSD debt summed across both pools. Debt is one unit system everywhere (fxUSD, 1e18), so this sum is safe — unlike collateral, which the two pools hold in different units and which is deliberately never summed here.",
-  contract: POOL_MANAGER,
-  via: `${SYSTEM_VIA} · Σ pool.getTotalRawDebts() across the roster`,
-  formula: "Σ getTotalRawDebts over both pools",
-  verify: STATE_VERIFY,
-});
-
 export const positionsMintedProv = (label: string, address: string): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
-  summary: `Positions ever minted in the ${label} — the pool's own getNextPositionId minus one (ids are assigned sequentially from 1; the pool contract is itself the position ERC721). A count of everything ever opened.`,
+  summary: `Positions ever minted in the ${label} — the pool's own getNextPositionId minus one (ids are assigned sequentially from 1; the pool contract is the position ERC721). It counts every position NFT minted, open or closed.`,
   contract: pool(label, address),
   via: `${SYSTEM_VIA} · pool.getNextPositionId() − 1`,
   formula: "getNextPositionId − 1",
@@ -145,6 +124,28 @@ export const fundingCheckpointProv = (label: string, address: string): Provenanc
   verify: STATE_VERIFY,
 });
 
+/** The pool-wide debt ratio: all its debt over its collateral at the anchor. */
+export const poolDebtRatioProv = (label: string, address: string, oracleAddr: string): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary: `The ${label}'s LTV as a whole. Its total fxUSD debt over the value of its total collateral at the oracle's anchor price, the price a position's stated LTV is judged at. The pool's own totals and the oracle's anchor leg, all from the same pinned-block read.`,
+  contract: pool(label, address),
+  via: `${SYSTEM_VIA} · derived ratio at the anchor leg`,
+  formula: "getTotalRawDebts ÷ (getTotalRawCollaterals × anchor price)",
+  inputs: [
+    { label: "total raw debt", kind: "chain", pclass: "state", note: "pool.getTotalRawDebts()" },
+    { label: "total raw collateral", kind: "chain", pclass: "state", note: "pool.getTotalRawCollaterals()" },
+    {
+      label: "anchor price",
+      kind: "chain",
+      pclass: "oracle",
+      note: "oracle.getPrice() anchor leg",
+      contract: { name: "PriceOracle", address: oracleAddr },
+    },
+  ],
+  verify: STATE_VERIFY,
+});
+
 // ── The oracle's three legs ──────────────────────────────────────────────────
 
 export const oracleLegProv = (
@@ -153,12 +154,13 @@ export const oracleLegProv = (
   address: string,
   oracleAddr: string,
   normalizedSym: string,
+  anchor: FxAnchorSource,
 ): Provenance => ({
   kind: "chain",
   pclass: "oracle",
   summary:
     leg === "anchor"
-      ? `The oracle's ANCHOR leg — USD per NORMALIZED unit (${normalizedSym}, 1e18), read from the ${label}'s own price oracle at the pinned block. The leg a POSITION's stated debt ratio is judged at (chain-verified: getPositionDebtRatio == debts × 1e36 ÷ (colls × anchor), BigInt-exact). Not the leg this page's tick ratios use — ticks are judged the way the engines judge them, at the min leg.`
+      ? `The oracle's ANCHOR leg — USD per NORMALIZED unit (${normalizedSym}, 1e18), read from the ${label}'s own price oracle at the pinned block. ${fxAnchorSentence(anchor)} ${fxAnchorBasis(anchor)} The min and max legs are the lowest and highest of the anchor and the on-chain spot prices, each falling back to the anchor when a spot price strays too far from it. The leg a POSITION's stated LTV is judged at (chain-verified: getPositionDebtRatio == debts × 1e36 ÷ (colls × anchor), BigInt-exact). Not the leg this page's tick ratios use — ticks are judged the way the engines judge them, at the min leg.`
       : leg === "min"
         ? `The oracle's MIN leg — the lowest of its price sources, USD per NORMALIZED unit (${normalizedSym}). The leg the protocol's own rebalance and liquidation sweeps judge a TICK at (its getLiquidatePrice getter returns exactly this leg), which is why every tick ratio on this page uses it and says so.`
         : `The oracle's MAX leg — the highest of its price sources, USD per NORMALIZED unit (${normalizedSym}). The leg redemption prices collateral at (getRedeemPrice returns exactly this leg): a redeemer surrenders fxUSD and receives collateral valued at the max, the leg least favorable to them.`,
@@ -174,24 +176,24 @@ export const rungProv = (which: "open" | "rebalance" | "liquidate", label: strin
   pclass: "state",
   summary:
     which === "open"
-      ? `The borrow cap — the top of the ${label}'s own getDebtRatioRange. A position can only be opened or adjusted while its debt ratio (judged at the anchor leg) stays at or under this; it is the only rung a position holder ever interacts with voluntarily.`
+      ? `The borrow cap — the top of the ${label}'s own getDebtRatioRange. A position can only be opened or adjusted while its LTV (judged at the anchor leg) stays at or under this; it is the only line a position holder ever interacts with voluntarily.`
       : which === "rebalance"
-        ? `The rebalance rung — the ${label}'s own getRebalanceRatios. From this debt ratio (judged at the MIN leg) the whole TICK can be rebalanced: a keeper repays enough of the tick's debt to bring it back to this line and takes collateral plus the bonus. Every position in the tick loses collateral and debt pro-rata, and none of them emits an event.`
-        : `The liquidation rung — the ${label}'s own getLiquidateRatios. From this debt ratio (judged at the MIN leg) the whole tick is liquidatable; past it a rebalance is refused (ErrorRebalanceOnLiquidatableTick) and the tick clears through liquidation with the larger bonus. Any bad debt beyond the collateral is written off against every remaining position — the terminal, eventless socialization.`,
+        ? `The rebalance line — the ${label}'s own getRebalanceRatios. From this LTV (judged at the MIN leg) the whole TICK can be rebalanced: a keeper repays enough of the tick's debt to bring it back to this line and takes collateral plus the bounty. Every position in the tick loses collateral and debt pro-rata, and none of them emits an event.`
+        : `The liquidation line — the ${label}'s own getLiquidateRatios. From this LTV (judged at the MIN leg) the whole tick is liquidatable; past it a rebalance is refused (ErrorRebalanceOnLiquidatableTick) and the tick clears through liquidation with the larger bounty. Any bad debt beyond the collateral is written off against every remaining position — the terminal, eventless socialization.`,
   contract: pool(label, address),
   via:
     which === "open"
       ? `${SYSTEM_VIA} · pool.getDebtRatioRange() · max ÷ 1e18`
       : which === "rebalance"
-        ? `${SYSTEM_VIA} · pool.getRebalanceRatios() ÷ 1e18 (bonus ÷ 1e9)`
-        : `${SYSTEM_VIA} · pool.getLiquidateRatios() ÷ 1e18 (bonus ÷ 1e9)`,
+        ? `${SYSTEM_VIA} · pool.getRebalanceRatios() ÷ 1e18 (bounty ÷ 1e9)`
+        : `${SYSTEM_VIA} · pool.getLiquidateRatios() ÷ 1e18 (bounty ÷ 1e9)`,
   verify: STATE_VERIFY,
 });
 
 export const maxRedeemProv = (label: string, address: string): Provenance => ({
   kind: "chain",
   pclass: "state",
-  summary: `Redemption's per-tick cap — the ${label}'s own getMaxRedeemRatioPerTick. Redemption walks the ladder from the top tick down, taking at most this fraction of a tick's debt per pass before moving to the next, pricing collateral at the oracle's max leg. It skips underwater ticks and dust ticks (below 1e9 debt shares) — the same skip lines this page's dust count is drawn on.`,
+  summary: `Redemption's per-tick cap — the ${label}'s own getMaxRedeemRatioPerTick. Redemption walks the ladder from the top tick down, taking at most this fraction of a tick's debt per pass before moving to the next, pricing collateral at the oracle's max leg. It skips underwater ticks and dust ticks (below 1e9 debt shares) — the same skip lines this page's dust count is drawn on. Every position in a tick holds a share of its debt, so a tick's fraction is the same fraction of each position's debt, which is how f(x)'s docs state the cap: "Max redeemed fxUSD proportion of xPOSITION at a time".`,
   contract: pool(label, address),
   via: `${SYSTEM_VIA} · pool.getMaxRedeemRatioPerTick() ÷ 1e9`,
   verify: STATE_VERIFY,
@@ -252,17 +254,6 @@ export const occupiedTicksProv = (label: string, address: string): Provenance =>
   contract: pool(label, address),
   via: `${SYSTEM_VIA} · pool.tickBitmap(word) × 256 words · set bits`,
   formula: "set bits across tickBitmap[-128..127]",
-  verify: STATE_VERIFY,
-});
-
-export const totalPositionsMintedProv = (): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  summary:
-    "Positions ever minted across both pools — Σ of each pool's own getNextPositionId minus one (ids are sequential from 1 per pool; each pool is its own ERC721). Everything ever opened.",
-  contract: POOL_MANAGER,
-  via: `${SYSTEM_VIA} · Σ pool.getNextPositionId() − 1 across the roster`,
-  formula: "Σ (getNextPositionId − 1) over both pools",
   verify: STATE_VERIFY,
 });
 
@@ -331,7 +322,7 @@ export const tickCollProv = (
 export const tickRatioProv = (label: string, address: string, tick: number): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
-  summary: `Tick ${tick}'s current debt ratio, judged the way the protocol's own engines judge a tick. Raw debt × 1e36 ÷ (raw collateral × the oracle's MIN leg) — the exact comparison the rebalance and liquidation sweeps run (their code takes the min price; getLiquidatePrice IS the min leg). Deliberately NOT the anchor leg a position's stated ratio uses; the two judgments coexist in the protocol and are named apart here. Funding moves this ratio for every tick at once — the ladder drifts toward the rungs while every position stands still.`,
+  summary: `Tick ${tick}'s current LTV, judged the way the protocol's own engines judge a tick. Raw debt × 1e36 ÷ (raw collateral × the oracle's MIN leg) — the exact comparison the rebalance and liquidation sweeps run (their code takes the min price; getLiquidatePrice IS the min leg). Deliberately NOT the anchor leg a position's stated ratio uses; the two judgments coexist in the protocol and are named apart here. Funding moves this ratio for every tick at once — the ladder drifts toward the rungs while every position stands still.`,
   contract: pool(label, address),
   via: `${SYSTEM_VIA} · derived ratio at the min leg`,
   formula: "tick raw debt × 1e36 ÷ (tick raw coll × min price)",
@@ -355,7 +346,14 @@ export const tickShareProv = (label: string, address: string, tick: number): Pro
 
 // ── The reconciliation — the page's spine ────────────────────────────────────
 
-export const ladderReconcileProv = (label: string, address: string, ok: boolean, tickCount: number): Provenance => ({
+export const ladderReconcileProv = (
+  label: string,
+  address: string,
+  ok: boolean,
+  tickCount: number,
+  /** The two raw integers and their difference, where the caller has them. */
+  totals?: { ticks: string; pool: string },
+): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   summary: ok
@@ -365,8 +363,31 @@ export const ladderReconcileProv = (label: string, address: string, ok: boolean,
   via: `${SYSTEM_VIA} · derived check (integer share space)`,
   formula: "Σ tickTreeData debt shares over the bitmap == getDebtAndCollateralShares().debtShares",
   inputs: [
-    { label: "Σ tick debt shares", kind: "chain-derived", pclass: "state", note: "summed over every set bitmap bit" },
-    { label: "total debt shares", kind: "chain", pclass: "state", note: "pool.getDebtAndCollateralShares()" },
+    {
+      label: "Σ tick debt shares",
+      ...(totals ? { value: totals.ticks } : {}),
+      kind: "chain-derived",
+      pclass: "state",
+      note: "summed over every set bitmap bit",
+    },
+    {
+      label: "total debt shares",
+      ...(totals ? { value: totals.pool } : {}),
+      kind: "chain",
+      pclass: "state",
+      note: "pool.getDebtAndCollateralShares()",
+    },
+    ...(totals
+      ? [
+          {
+            label: "residual",
+            value: (BigInt(totals.pool) - BigInt(totals.ticks)).toString(),
+            kind: "chain-derived" as const,
+            pclass: "state" as const,
+            note: "total − Σ ticks, in raw integer shares",
+          },
+        ]
+      : []),
   ],
   verify: STATE_VERIFY,
 });
@@ -390,7 +411,7 @@ export const dustTicksProv = (label: string, address: string, pastLiquidate: num
   pclass: "state",
   summary: `Ticks below the protocol's own dust line in the ${label} — raw debt under 1e9 wei of fxUSD (10^-9 fxUSD), the exact threshold the rebalance and liquidation sweeps skip a tick at (redemption skips the same figure in debt shares). Their bits stay set in the bitmap because their debt is not zero, so they are counted here and included in the reconciliation${
     pastLiquidate > 0
-      ? `; ${pastLiquidate} of them sit(s) past the liquidation rung and will simply never be cleared — not worth any keeper's transaction, which is itself a statement about how the engines work`
+      ? `; ${pastLiquidate} of them sit(s) past the liquidation line and will simply never be cleared — not worth any keeper's transaction, which is itself a statement about how the engines work`
       : ""
   }. Excluded from the distribution drawing only, never from the arithmetic.`,
   contract: pool(label, address),

@@ -31,7 +31,7 @@ export const COMPOUND_BASE_POSITIONS_ROUTE = "/api/compound-base/positions";
 // for this route to allowlist debt/coll through.
 export const COMPOUND_BASE_SORT_OPTIONS: SortOption[] = [
   { value: "recent", label: RECENT_ACTIVITY_LABEL },
-  { value: "debt", label: "Debt" },
+  { value: "debt", label: "Borrow balance" },
   { value: "coll", label: "Collateral" },
 ];
 

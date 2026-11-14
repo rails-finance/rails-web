@@ -30,6 +30,7 @@ import type { Provenance, ProvInput, ProvScaling, ProvVerify } from "@/component
 import type { OriginEnvelope } from "@/lib/shared/types/event-shape";
 import { explorerUrl, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { formatExact } from "@/lib/utils/format";
+import { liquityFamilyTerms } from "@/lib/liquity/ltv";
 
 /** Event/position coordinates a caller threads through to the receipts. */
 export interface LiquityForkCoords {
@@ -136,6 +137,9 @@ const originDeltaSeg = (o: OriginEnvelope | null | undefined, fallback: string):
   o ? `${o.event} logs · Δ${o.param} · ÷10^${o.scale}` : fallback;
 
 export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
+  // The deployment's documented terms (decision 0065).
+  const terms = liquityFamilyTerms(cfg.protocolName);
+  const Delegate = terms.delegate.charAt(0).toUpperCase() + terms.delegate.slice(1);
   // Custody, not origin — the via line's leading segment only (the embedded
   // receipt renderer drops it; provenance-receipts-grammar §3). A via line
   // without this lead is written as one segment, or its first would drop.
@@ -466,7 +470,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     kind: "chain",
     pclass: "emitted",
     verify: txVerify(coords),
-    summary: `Upfront fee added to the debt. A one-off fee ${cfg.protocolName} adds to a Trove's debt when it opens, borrows more or joins a batch (about a week of the branch's average interest), and when the owner changes the rate soon after the last change. Nothing is paid at the time; the fee becomes part of what the Trove owes.`,
+    summary: `${terms.upfrontFee} added to the debt. A one-off fee ${cfg.protocolName} adds to a Trove's debt when it opens, borrows more or joins a batch (about a week of the branch's average interest), and when the owner changes the rate soon after the last change. Nothing is paid at the time; the fee becomes part of what the Trove owes.`,
     contract: troveManagerContract(coords),
     via: `${streamVia()} · TroveOperation log · _debtIncreaseFromUpfrontFee · ÷10^18`,
     inputs: [
@@ -719,24 +723,46 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
   const liqPremiumProv = (
     coords: LiquityForkCoords,
     vals: { seizedUsd: string; clearedUsd: string; mcrPct?: number },
-  ): Provenance => ({
-    kind: "chain-derived",
-    pclass: "oracle",
-    formula: "collateral value ÷ cleared debt",
-    verify: txVerify(coords),
-    summary: `Collateral ratio at liquidation. The Trove's whole collateral at the branch's price, divided by the debt the liquidation cleared, on the balances logged at its previous change. The contract gives the Stability Pool depositors (or, in a redistribution, the branch's other Troves) the debt plus the branch's liquidation penalty, pays the liquidator a small part of the collateral, and leaves anything above that for the owner to claim.${
-      vals.mcrPct != null
-        ? ` A Trove can be liquidated only below the branch's minimum collateral ratio of ${vals.mcrPct}%.`
-        : ""
-    }`,
-    contract: troveManagerContract(coords),
-    via: "collateral × price ÷ cleared debt",
-    inputs: [
-      { label: "collateral value", value: vals.seizedUsd, kind: "chain", note: "collateral × price at block" },
-      { label: "cleared", value: vals.clearedUsd, kind: "chain", note: "debt at $1 face" },
-      ...eventInputs(coords),
-    ],
-  });
+  ): Provenance =>
+    terms.ltv
+      ? {
+          // The docs state a Trove's risk as LTV (decision 0065): the debt
+          // cleared over the collateral's value.
+          kind: "chain-derived",
+          pclass: "oracle",
+          formula: "cleared debt ÷ collateral value",
+          verify: txVerify(coords),
+          summary: `LTV at liquidation. The debt the liquidation cleared, divided by the Trove's whole collateral at the branch's price, on the balances logged at its previous change. The contract gives the Stability Pool depositors (or, in a redistribution, the branch's other Troves) the debt plus the branch's liquidation penalty, pays the liquidator a small part of the collateral, and leaves anything above that for the owner to claim.${
+            vals.mcrPct != null
+              ? ` A Trove can be liquidated only above the branch's Max LTV of ${(10000 / vals.mcrPct).toFixed(2)}%, 1 ÷ its minimum collateral ratio of ${vals.mcrPct}%.`
+              : ""
+          }`,
+          contract: troveManagerContract(coords),
+          via: "cleared debt ÷ (collateral × price)",
+          inputs: [
+            { label: "cleared", value: vals.clearedUsd, kind: "chain", note: "debt at $1 face" },
+            { label: "collateral value", value: vals.seizedUsd, kind: "chain", note: "collateral × price at block" },
+            ...eventInputs(coords),
+          ],
+        }
+      : {
+          kind: "chain-derived",
+          pclass: "oracle",
+          formula: "collateral value ÷ cleared debt",
+          verify: txVerify(coords),
+          summary: `${terms.ratio} at liquidation. The Trove's whole collateral at the branch's price, divided by the debt the liquidation cleared, on the balances logged at its previous change. The contract gives the Stability Pool depositors (or, in a redistribution, the branch's other Troves) the debt plus the branch's liquidation penalty, pays the liquidator a small part of the collateral, and leaves anything above that for the owner to claim.${
+            vals.mcrPct != null
+              ? ` A Trove can be liquidated only below the branch's ${terms.limitText} of ${vals.mcrPct}%.`
+              : ""
+          }`,
+          contract: troveManagerContract(coords),
+          via: "collateral × price ÷ cleared debt",
+          inputs: [
+            { label: "collateral value", value: vals.seizedUsd, kind: "chain", note: "collateral × price at block" },
+            { label: "cleared", value: vals.clearedUsd, kind: "chain", note: "debt at $1 face" },
+            ...eventInputs(coords),
+          ],
+        };
 
   /** A branch's liquidation penalty — the constant the branch applies to the
    *  debt the Stability Pool absorbs, or to the debt it redistributes. Where
@@ -781,7 +807,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
       ? {
           kind: "chain",
           pclass: "indexed",
-          summary: `Annual interest rate at the Trove's latest change. The rate of its batch, as the batch last logged it at or before that change. The batch manager can change the batch's rate between this Trove's changes; the Trove's page reads the current rate. The contract stores a rate as a fraction with 18 decimal places, shown here as a percentage.`,
+          summary: `Annual interest rate at the Trove's latest change. The rate of its batch, as the batch last logged it at or before that change. The ${terms.delegate} can change the batch's rate between this Trove's changes; the Trove's page reads the current rate. The contract stores a rate as a fraction with 18 decimal places, shown here as a percentage.`,
           contract: troveManagerContract(coords),
           via: `${streamVia()} · BatchUpdated log (this Trove's batch, latest at or before its last change) · _annualInterestRate · ÷10^16`,
           ...latestSource(coords),
@@ -795,6 +821,12 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
           ...latestSource(coords),
         };
 
+  // The indexed debt's class: an unbatched Trove's is TroveUpdated's `_debt`,
+  // the latest log's field as decoded (rails-server mv_ebisu_positions, mig
+  // 292; mv_asymmetry_positions, mig 073; mv_basedollar_positions, mig 163:
+  // `debt` from the branch's trove_updated rows), so Emitted. A batched
+  // Trove's is computed by the index, its batch debt shares ÷ the batch's
+  // total shares × BatchUpdated's `_debt`, so Indexed.
   const positionDebtProv = (coords?: LiquityForkCoords): Provenance => ({
     kind: coords?.isBatched ? "chain-derived" : "chain",
     pclass: coords?.isBatched ? "indexed" : "emitted",
@@ -891,7 +923,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
       verify: txVerify(coords),
       summary: `Annual interest rate at this event. ${
         coords?.isBatched
-          ? "the rate of this Trove's batch, as the batch last logged it at or before this event. The batch manager sets it for every Trove in the batch."
+          ? `the rate of this Trove's batch, as the batch last logged it at or before this event. The ${terms.delegate} sets it for every Trove in the batch.`
           : "the rate the contract logged for the Trove at this event."
       }${scaling ? "" : " The contract stores a rate as a fraction with 18 decimal places, shown here as a percentage."}`,
       contract: troveManagerContract(coords),
@@ -945,12 +977,15 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
   ): Provenance => ({
     kind: "chain-derived",
     pclass: "oracle",
-    summary:
-      vals.which === "after"
-        ? `Collateral ratio after this event. The collateral's dollar value at the branch price for this block, divided by the debt.`
-        : `Collateral ratio before this event. The Trove's previous collateral and debt, valued at the same price as the ratio after, so the two differ only by what this event moved.`,
+    summary: terms.ltv
+      ? vals.which === "after"
+        ? `LTV after this event. The debt divided by the collateral's dollar value at the branch price for this block.`
+        : `LTV before this event. The Trove's previous debt and collateral, valued at the same price as the LTV after, so the two differ only by what this event moved.`
+      : vals.which === "after"
+        ? `${terms.ratio} after this event. The collateral's dollar value at the branch price for this block, divided by the debt.`
+        : `${terms.ratio} before this event. The Trove's previous collateral and debt, valued at the same price as the ratio after, so the two differ only by what this event moved.`,
     contract: cfg.priceFeedContract(coords.collateralType),
-    formula: "collateral × price ÷ debt × 100",
+    formula: terms.ltv ? "debt ÷ (collateral × price) × 100" : "collateral × price ÷ debt × 100",
     inputs: [
       { label: "collateral", value: opVal(vals.coll), kind: "chain", pclass: "emitted", note: vals.which },
       priceInput(coords, vals.priceUsd),
@@ -1042,7 +1077,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     kind: "chain-derived",
     pclass: "emitted",
     verify: txVerify(coords),
-    summary: `Premature-adjustment fee this Trove carried. The batch manager changed the rate inside the protocol's cooldown after its last change, so ${cfg.protocolName} added a fee to the batch's debt. Each member Trove carries it in proportion to its shares of the batch.`,
+    summary: `Premature-adjustment fee this Trove carried. The ${terms.delegate} changed the rate inside the protocol's cooldown after its last change, so ${cfg.protocolName} added a fee to the batch's debt. Each member Trove carries it in proportion to its shares of the batch.`,
     contract: troveManagerContract(coords),
     via: `${streamVia()} · BatchUpdated log · _debtIncreaseFromUpfrontFee × shares ÷ _totalDebtShares · ÷10^18`,
     formula: "batch fee × Trove shares ÷ total shares",
@@ -1066,11 +1101,11 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     kind: "chain",
     pclass: "emitted",
     verify: txVerify(coords),
-    summary: `Batch manager at this event. The address the owner handed control of the Trove's interest rate to, logged with the Trove's change. A Trove in a batch pays the rate its manager sets for the whole batch, plus the manager's annual fee. The manager cannot move the Trove's collateral or debt.`,
+    summary: `${Delegate} at this event. The address the owner handed control of the Trove's interest rate to, logged with the Trove's change. A Trove in a batch pays the rate its manager sets for the whole batch, plus the manager's annual fee. The manager cannot move the Trove's collateral or debt.`,
     contract: troveManagerContract(coords),
     via: `${streamVia()} · BatchedTroveUpdated log · _interestBatchManager`,
     inputs: [
-      { label: "manager", value: address, kind: "chain", pclass: "emitted", note: "batch manager at this event" },
+      { label: "manager", value: address, kind: "chain", pclass: "emitted", note: `${terms.delegate} at this event` },
       ...eventInputs(coords),
     ],
   });

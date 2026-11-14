@@ -77,7 +77,7 @@ export const TWITTER_HANDLE = RAILS_X_AT;
 // bytes — `public/og/home.png` itself stays at its unhashed path too (kept on
 // disk for scripts/verify/verify-share-abuse.mjs's static-file census), and is
 // regenerated in place alongside this hashed copy.
-export const HOME_SHARE_IMAGE = "/og/home-3a7eee3f.png";
+export const HOME_SHARE_IMAGE = "/og/home-42a176a8.png";
 
 /** The Twitter card for a page that sets its own `openGraph` without
  *  `shareMetadata`: the same title and description, on the home share image.
@@ -184,7 +184,7 @@ function shareMetadata(opts: {
   };
 }
 
-const FOUNDATION = "replayed from the protocol's on-chain events, with a receipt on every number.";
+const FOUNDATION = "read from the chain, with a receipt on every number.";
 
 const isAddress = (s: string) => /^0x[a-fA-F0-9]{40}$/.test(s);
 
@@ -211,6 +211,9 @@ export function positionMetadata(opts: {
   /** `"dynamic"` for a route that carries its own `opengraph-image.tsx` —
    *  the position's own live card, not this explorer's generic one. */
   image?: "dynamic";
+  /** The description from the explorer's label and the noun, lowercased, as
+   *  the title names them; absent, the replay sentence. */
+  description?: (named: { label: string; noun: string }) => string;
 }): Metadata {
   const entry = protocolForSession(opts.session);
   // Text cannot carry the chain mark, so a Base explorer's title says it in
@@ -222,7 +225,9 @@ export function positionMetadata(opts: {
   // the prefix: a preview that shows only title + description must say whose
   // page this is, and "every event of this Moonwell position…" on its own
   // reads as Moonwell's.
-  const description = `A Rails replay of this ${label} ${noun.toLowerCase()}: every event from the protocol's on-chain events, with a receipt on every number.`;
+  const description = opts.description
+    ? opts.description({ label, noun: noun.toLowerCase() })
+    : `A Rails replay of this ${label} ${noun.toLowerCase()}: every event from the protocol's on-chain events, with a receipt on every number.`;
   return {
     // Plain, so the root `template: "Rails | %s"` wraps it — see the header.
     title,
@@ -240,6 +245,11 @@ export function positionMetadata(opts: {
     }),
   };
 }
+
+/** A read-on-visit position page's description (rails-ops decision 0061): the
+ *  position is read at the head, so there is no replay to name. */
+export const readAtHeadDescription = ({ label, noun }: { label: string; noun: string }) =>
+  `This ${label} ${noun}, read from the chain at the latest block, with a receipt on every number.`;
 
 /** Per-position page title for a surface that names its own SUBJECT rather than
  *  its explorer — the two vault-position routes, today.

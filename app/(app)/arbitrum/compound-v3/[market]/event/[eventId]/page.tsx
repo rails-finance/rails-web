@@ -2,6 +2,9 @@
 // (rails-ops reference/arbitrum-position-first-lane.md). The `market` segment
 // here holds the wallet. A 308 to the event's market page where the history
 // places it, else to the wallet's overview.
+//
+// focus: a redirect; the market page and the wallet overview it lands on
+// declare their own.
 
 import { notFound, permanentRedirect } from "next/navigation";
 import { decodeEventId } from "@/lib/shared/page-metadata";
