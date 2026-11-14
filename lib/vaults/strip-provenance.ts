@@ -20,8 +20,8 @@ const dayText = (day: number) => formatDate(new Date(day * 86_400_000));
 export type StripTile = "total-assets" | "share-price" | "holders";
 
 const READ: Record<StripTile, { what: string; via: string }> = {
-  "total-assets": { what: "the vault's `totalAssets()`", via: "totalAssets()" },
-  "share-price": { what: "one share's `convertToAssets`", via: "convertToAssets(10 ** decimals)" },
+  "total-assets": { what: "the vault's total assets", via: "totalAssets()" },
+  "share-price": { what: "the share price", via: "convertToAssets(10 ** decimals)" },
   holders: { what: "the count of addresses holding a share", via: "the census's holder count" },
 };
 
@@ -45,9 +45,9 @@ export const stripChangeProv = (tile: StripTile, v: VaultSummary, key: string, w
     kind: "derived",
     pclass: "state",
     source: { block: w.to.block },
-    summary: `${LABEL[tile]} — over the ${w.days} days to block ${n(w.to.block)}, ${READ[tile].what} went from ${at(w.from)} to ${at(w.to)}, each stored once a day in Rails's daily store as \`${key}\`.${w.change == null ? " The window starts at zero, so no percentage is stated." : ""}${scaleNote(tile, v)}`,
+    summary: `${LABEL[tile]} — over the ${w.days} days to block ${n(w.to.block)}, ${READ[tile].what} went from ${at(w.from)} to ${at(w.to)}, each read once a day at the day's last block.${w.change == null ? " The window starts at zero, so no percentage is stated." : ""}${scaleNote(tile, v)}`,
     contract: { name: v.name ?? v.catalogName ?? v.symbol ?? "vault", address: v.address },
-    via: `daily store · ${READ[tile].via} once per UTC day @ the day's last block`,
+    via: `daily reads · ${READ[tile].via} once per UTC day @ the day's last block`,
     formula: w.change == null ? "from → to" : "to / from − 1",
     inputs: [
       {
@@ -62,11 +62,11 @@ export const stripChangeProv = (tile: StripTile, v: VaultSummary, key: string, w
   };
 };
 
-/** A young series: the day the store's series begins. */
+/** A young series: the day the daily reads begin. */
 export const stripYoungProv = (tile: StripTile, v: VaultSummary, key: string, firstDay: number): Provenance => ({
   kind: "derived",
   pclass: "state",
-  summary: `${LABEL[tile]} — Rails's daily store holds \`${key}\` from ${dayText(firstDay)}, under the 30 days a change needs.`,
+  summary: `${LABEL[tile]} — the daily reads start on ${dayText(firstDay)}, under the 30 days a change needs.`,
   contract: { name: v.name ?? v.catalogName ?? v.symbol ?? "vault", address: v.address },
-  via: `daily store · ${READ[tile].via} once per UTC day`,
+  via: `daily reads · ${READ[tile].via} once per UTC day`,
 });

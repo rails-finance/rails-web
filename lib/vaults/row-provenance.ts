@@ -12,10 +12,16 @@ import { formatDate } from "@/lib/date";
 import { assetScaleReceiptNote } from "@/lib/vaults/asset-scale-words";
 
 const n = (v: number) => v.toLocaleString("en-US");
+/** The chain a check line asks a node on. */
+const chainWord = (v: VaultSummary) => (v.chainId === 8453 ? "Base" : "Ethereum");
+/** The addresses the census leaves out of Holders: the zero address, and on a
+ *  Yearn V3 vault the vault's address. */
+const leftOut = (v: VaultSummary) =>
+  v.family === "yearn-v3" ? "the zero address and the vault's address" : "the zero address";
 
 type Measured = Extract<VaultYield, { yearly: number }>;
 
-/** Yield: Rails's interpretation of two share-price reads from the daily store. */
+/** Yield: Rails's interpretation of two daily share-price reads. */
 export const vaultYieldProv = (v: VaultSummary, y: Measured): Provenance => {
   const at = (r: Measured["from"]) =>
     `${formatUnitsExact(r.raw, v.asset.decimals)} ${v.asset.symbol} at block ${n(r.block)}`;
@@ -23,9 +29,9 @@ export const vaultYieldProv = (v: VaultSummary, y: Measured): Provenance => {
     kind: "derived",
     pclass: "state",
     source: { block: y.to.block },
-    summary: `Yield — Rails's figure: the share price's growth over the ${y.days} days to block ${n(y.to.block)}, annualised simply. One share was ${at(y.from)} and ${at(y.to)}, each the vault's \`convertToAssets\` stored once a day in the daily price store. It is net of the fees the vault takes inside the share; rewards paid outside the share are not in it, and it is no forecast.${y.jump ? ` ${y.jump.fromDay != null ? "A span of days" : "One day"} carries most of the move: ${(y.jump.change * 100).toFixed(2)}% between two stored days, ${y.jump.fromDay != null ? `from ${formatDate(new Date(y.jump.fromDay * 86_400_000))} to ${formatDate(new Date(y.jump.day * 86_400_000))}` : `on ${formatDate(new Date(y.jump.day * 86_400_000))}`}.` : ""}${v.assetScale ? ` ${assetScaleReceiptNote(v.asset.symbol, v.assetScale)}` : ""}`,
+    summary: `Yield — Rails's figure: the share price's growth over the ${y.days} days to block ${n(y.to.block)}, annualised simply. One share was ${at(y.from)} and ${at(y.to)}, each read once a day at the day's last block. It is net of the fees the vault takes inside the share; rewards paid outside the share are not in it.${y.jump ? ` ${y.jump.fromDay != null ? "A span of days" : "One day"} carries most of the move: ${(y.jump.change * 100).toFixed(2)}% between two daily reads, ${y.jump.fromDay != null ? `from ${formatDate(new Date(y.jump.fromDay * 86_400_000))} to ${formatDate(new Date(y.jump.day * 86_400_000))}` : `on ${formatDate(new Date(y.jump.day * 86_400_000))}`}.` : ""}${v.assetScale ? ` ${assetScaleReceiptNote(v.asset.symbol, v.assetScale)}` : ""}`,
     contract: { name: v.name ?? v.catalogName ?? "vault", address: v.address },
-    via: "daily price store · convertToAssets(10 ** decimals) once per UTC day @ the day's last block",
+    via: "daily share-price reads · convertToAssets(10 ** decimals) once per UTC day @ the day's last block",
     formula: `(p1 / p0 − 1) × 365 / ${y.days}`,
     inputs: [
       {
@@ -54,11 +60,11 @@ export const vaultHoldersProv = (v: VaultSummary, c: NonNullable<VaultSummary["c
   source: { block: c.atBlock },
   verify: {
     kind: "recompute",
-    text: `Sweep this vault's Transfer stream from its creation to block ${n(c.atBlock)} and count the distinct addresses either side of each log`,
+    text: `To check: ask any ${chainWord(v)} archive node for this vault's Transfer logs from its creation to block ${n(c.atBlock)} and count the distinct addresses that sent or received shares, other than ${leftOut(v)} (0x…dEaD counts): the count matches the ${n(c.holders)} that have held a share.`,
   },
-  summary: `Holders — ${n(c.holders)} address${c.holders === 1 ? " has" : "es have"} held a share of this vault, ${n(c.live)} holding one at census block ${n(c.atBlock)}: every address either side of a \`Transfer\` it has emitted. A floor: an address is often a wrapper or a contract holding for others. ${c.sumMatches ? "Σ `balanceOf` over the set equalled `totalSupply()` at that block, so the set is whole." : "Σ `balanceOf` over the set did not equal `totalSupply()` at that block, so the set is not stated as whole."}`,
+  summary: `Holders — ${n(c.holders)} address${c.holders === 1 ? " has" : "es have"} held a share of this vault, ${n(c.live)} holding one at census block ${n(c.atBlock)}: every address that sent or received shares, other than ${leftOut(v)}. A floor: an address is often a wrapper or a contract holding for others. ${c.sumMatches ? "The balances of all these addresses added up to the shares issued at that block, so the set is whole." : "The balances of all these addresses did not add up to the shares issued at that block, so the set is not stated as whole."}`,
   contract: { name: v.name ?? v.catalogName ?? v.symbol ?? "vault", address: v.address },
-  via: "vault census · eth_getLogs(Transfer) @ the census block",
+  via: "vault census · Transfer logs + balanceOf(holder) @ the census block",
 });
 
 /** Can be withdrawn: the illiquid test's sum over the withdraw queue
@@ -86,9 +92,9 @@ export const vaultAssetGrowthProv = (v: VaultSummary, y: Measured): Provenance =
   kind: "derived",
   pclass: "state",
   source: { block: y.to.block },
-  summary: `The wrapped ${v.asset.symbol}'s share price — its \`convertToAssets\` of one whole share, stored once a day in the daily price store, went from ${formatUnitsExact(y.from.raw, v.asset.decimals)} at block ${n(y.from.block)} to ${formatUnitsExact(y.to.raw, v.asset.decimals)} at block ${n(y.to.block)}, in the token ${v.asset.symbol} wraps. This vault's share price, in ${v.asset.symbol}, does not show that growth; the two are stated apart and never added.`,
+  summary: `The wrapped ${v.asset.symbol}'s share price — one whole share of it, read once a day, went from ${formatUnitsExact(y.from.raw, v.asset.decimals)} at block ${n(y.from.block)} to ${formatUnitsExact(y.to.raw, v.asset.decimals)} at block ${n(y.to.block)}, in the token ${v.asset.symbol} wraps. This vault's share price, in ${v.asset.symbol}, does not show that growth, and the two are not added.`,
   contract: { name: v.asset.symbol, address: v.asset.address },
-  via: "daily price store · convertToAssets(10 ** decimals) once per UTC day @ the day's last block",
+  via: "daily share-price reads · convertToAssets(10 ** decimals) once per UTC day @ the day's last block",
   formula: "p1 / p0 − 1",
   inputs: [
     {

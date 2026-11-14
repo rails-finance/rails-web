@@ -25,24 +25,24 @@ const base = (c: HoldersCoords) => ({
 export const holderShareProv = (c: HoldersCoords, holder: string, ppm: number): Provenance => ({
   ...base(c),
   kind: "chain",
-  summary: `Share of the vault's shares at the census — ${shortAddress(holder)} held ${ppmPct(ppm)} of ${c.shareSymbol}: its balanceOf() over the share token's totalSupply(), both read by the Rails census at block ${n(c.censusBlock)} and kept.`,
-  via: "Rails census · balanceOf(holder) / totalSupply() @ the census block",
+  summary: `Share of the vault's shares at the census — ${shortAddress(holder)} held ${ppmPct(ppm)} of ${c.shareSymbol} at census block ${n(c.censusBlock)}: the shares it held over all shares issued.`,
+  via: "vault census · balanceOf(holder) / totalSupply() @ the census block",
 });
 
 /** One holder's shares. */
 export const holderBalanceProv = (c: HoldersCoords, holder: string, exact: string): Provenance => ({
   ...base(c),
   kind: "chain",
-  summary: `Shares held at the census — ${shortAddress(holder)} held ${exact} ${c.shareSymbol}: its balanceOf() on the share token, read by the Rails census at block ${n(c.censusBlock)} and kept.`,
-  via: "Rails census · balanceOf(holder) @ the census block",
+  summary: `Shares held at the census — ${shortAddress(holder)} held ${exact} ${c.shareSymbol} at census block ${n(c.censusBlock)}.`,
+  via: "vault census · balanceOf(holder) @ the census block",
 });
 
 /** The live holders at the census. */
 export const holdersCountProv = (c: HoldersCoords, live: number): Provenance => ({
   ...base(c),
   kind: "chain-derived",
-  summary: `Holders at the census — ${n(live)} addresses held a share of ${c.shareSymbol} at block ${n(c.censusBlock)}: the Rails census swept every Transfer of the vault to that block and read balanceOf() for each address it named.`,
-  via: "Rails census · eth_getLogs(Transfer) + balanceOf(holder) > 0 @ the census block",
+  summary: `Holders at the census — ${n(live)} addresses held a share of ${c.shareSymbol} at block ${n(c.censusBlock)}: of every address that sent or received shares of the vault up to that block, those with a balance above zero.`,
+  via: "vault census · Transfer logs + balanceOf(holder) > 0 @ the census block",
 });
 
 /** The holders the list does not name. */
@@ -56,5 +56,5 @@ export const otherHoldersShareProv = (c: HoldersCoords, rest: number, restPpm: n
   ...base(c),
   kind: "chain-derived",
   summary: `The other holders' share at the census — ${n(rest)} addresses held ${ppmPct(restPpm)} of ${c.shareSymbol}: the whole supply less the ${n(named)} named above, from the census at block ${n(c.censusBlock)}, where every balance summed to totalSupply().`,
-  via: "Rails census · 1 − Σ balanceOf(top holders) / totalSupply() @ the census block",
+  via: "vault census · 1 − Σ balanceOf(top holders) / totalSupply() @ the census block",
 });
