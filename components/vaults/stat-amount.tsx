@@ -14,11 +14,12 @@ import { formatUnitsExact, isFloorText } from "@/lib/utils/format";
 import type { RawAmount } from "@/lib/sources/chain/morpho-base-vault";
 import { assetText, shareText, statText } from "@/lib/shared/vault-amount-text";
 
-/** From here an amount reads compact: formatCompact's own threshold. */
+/** From here an amount reads compact: formatCompact's threshold. */
 export const COMPACT_FROM = 1_000;
 
 /** The compact figure. `full` is the print rule's text (title, `data-figure-full`, the screen
- *  reader's line); `exact` the receipt's figure. Goes inside the figure's `<Prov>`. */
+ *  reader's line, which leaves the unit to the one drawn beside it); `exact` the receipt's
+ *  figure. Goes inside the figure's `<Prov>`. */
 export function CompactFigure({
   value,
   full,
@@ -44,7 +45,7 @@ export function CompactFigure({
         {formatCompact(value)}
       </span>
       <span className="sr-only" data-prov-hidden="">
-        {said}
+        {full}
       </span>
     </>
   );

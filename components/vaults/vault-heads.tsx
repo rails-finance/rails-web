@@ -345,7 +345,8 @@ export function vaultHeads({
   // The slot draws whatever the store answers, so the four headlines align
   // (decision 0047 point 4): a figure where the store measures 30 days, else
   // no figure and a subline saying why; a vault under the dust floor is too
-  // small to measure (ui-jobs 542). The interpretation tip goes with the label.
+  // small to measure (ui-jobs 542). The interpretation tip goes with the label,
+  // and the unit, "Yield (APR)", only over a figure (ui-jobs 679).
   const yieldFigure = measuredYield(storeYield, v.totalAssets?.raw);
   const docsWord = VAULT_FAMILIES[v.family].yieldDocsWord;
   if (yieldFigure && "yearly" in yieldFigure) {
@@ -384,7 +385,7 @@ export function vaultHeads({
   } else if (yieldFigure?.none === "too-small" && v.totalAssets) {
     heads.push({
       id: "yield",
-      label: YIELD_LABEL,
+      label: "Yield",
       labelTip: detail ? withDocsWord(VAULT_HEAD_TIPS.yield, docsWord) : undefined,
       value: (
         <span className="text-[15px] font-normal text-rb-500" data-cell="yield" data-yield-none="too-small">
@@ -402,7 +403,7 @@ export function vaultHeads({
     const none = yieldFigure == null ? "unread" : yieldFigure.none;
     heads.push({
       id: "yield",
-      label: YIELD_LABEL,
+      label: "Yield",
       labelTip: detail ? withDocsWord(VAULT_HEAD_TIPS.yield, docsWord) : undefined,
       value: null,
       sub: (
