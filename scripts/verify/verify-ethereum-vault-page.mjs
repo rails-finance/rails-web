@@ -507,6 +507,9 @@ async function readVaultPage(vault, holder) {
     // A compact figure (the vault-page grid's V3, ui-jobs 584) keeps its full text in data-figure-full.
     const full = page.locator(`[data-figure="${name}"][data-figure-full]`);
     if ((await full.count()) > 0) return await full.first().getAttribute("data-figure-full");
+    // A compact stat (StatAmount from 1,000, ui-jobs 679) keeps it on its value.
+    const fullValue = page.locator(`[data-figure="${name}"] [data-figure-value][data-figure-full]`);
+    if ((await fullValue.count()) > 0) return await fullValue.first().getAttribute("data-figure-full");
     const value = page.locator(`[data-figure="${name}"] [data-figure-value]`);
     if ((await value.count()) > 0) return (await value.first().innerText()).replace(/\s+/g, " ").trim();
     return grab(`[data-figure="${name}"]`);

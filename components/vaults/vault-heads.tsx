@@ -19,7 +19,7 @@ import { formatDate } from "@/lib/date";
 import { assetText, sharePriceText } from "@/lib/shared/vault-amount-text";
 import type { VaultStanding, VaultSummary } from "@/lib/vaults/summary";
 import { VAULT_FAMILIES, type VaultFamily } from "@/lib/vaults/families";
-import { changeText, jumpTail, measuredYield, yieldText, type VaultYield } from "@/lib/vaults/yield";
+import { changeText, jumpTail, measuredYield, yieldPct, YIELD_LABEL, type VaultYield } from "@/lib/vaults/yield";
 import {
   vaultAssetGrowthProv,
   vaultHoldersProv,
@@ -344,7 +344,7 @@ export function vaultHeads({
   if (yieldFigure && "yearly" in yieldFigure) {
     heads.push({
       id: "yield",
-      label: "Yield",
+      label: YIELD_LABEL,
       labelTip: withDocsWord(detail ? VAULT_HEAD_TIPS.yield : YIELD_LABEL_TIP, docsWord),
       labelTipOnListing: true,
       value: (
@@ -354,7 +354,7 @@ export function vaultHeads({
           data-yield-to-block={yieldFigure.to.block}
           data-yield-days={yieldFigure.days}
         >
-          <Prov info={vaultYieldProv(v, yieldFigure)}>{yieldText(yieldFigure.yearly)}</Prov>
+          <Prov info={vaultYieldProv(v, yieldFigure)}>{yieldPct(yieldFigure.yearly)}</Prov>
         </span>
       ),
       sub: (
@@ -377,7 +377,7 @@ export function vaultHeads({
   } else if (yieldFigure?.none === "too-small" && v.totalAssets) {
     heads.push({
       id: "yield",
-      label: "Yield",
+      label: YIELD_LABEL,
       labelTip: detail ? withDocsWord(VAULT_HEAD_TIPS.yield, docsWord) : undefined,
       value: (
         <span className="text-[15px] font-normal text-rb-500" data-cell="yield" data-yield-none="too-small">
@@ -395,7 +395,7 @@ export function vaultHeads({
     const none = yieldFigure == null ? "unread" : yieldFigure.none;
     heads.push({
       id: "yield",
-      label: "Yield",
+      label: YIELD_LABEL,
       labelTip: detail ? withDocsWord(VAULT_HEAD_TIPS.yield, docsWord) : undefined,
       value: null,
       sub: (
