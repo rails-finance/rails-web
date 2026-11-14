@@ -2533,6 +2533,50 @@ table.dt-stacked {
     }
   }
 }
+/* A compact stacked table (`DataTable compact`, D6): each card a list row.
+   The row header on the first line, from the row's edge; the other cells
+   after it on one wrapping line from `--dt-indent`, where the caller's name
+   starts; the labels for a screen reader alone; the ⋮ centred on the first
+   line. */
+table.dt-stacked.dt-compact {
+  @variant dt-cards {
+    & > tbody > tr {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      column-gap: 12px;
+      padding: 4px 0 0 var(--dt-indent, 0px);
+    }
+    & > tbody > tr > [role="rowheader"] {
+      flex: 0 0 calc(100% + var(--dt-indent, 0px));
+      margin-left: calc(-1 * var(--dt-indent, 0px));
+      padding: 10px 48px 4px 0;
+    }
+    & > tbody > tr > [role="cell"] {
+      min-width: 0;
+      padding: 0 0 8px;
+    }
+    & > tbody > tr > .dt-cell-wide {
+      flex-basis: 100%;
+    }
+    & > tbody > tr > .dt-row-menu {
+      display: flex;
+      align-items: center;
+      top: 4px;
+      right: -6px;
+      height: 48px;
+      padding: 0;
+    }
+    & .dt-cell-label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+  }
+}
 /* A table that stacks below lg has room for three figures a line from sm. */
 @media (40rem <= width < 64rem) {
   table.dt-stacked.dt-stack-lg > tbody > tr {

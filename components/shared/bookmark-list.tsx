@@ -6,7 +6,8 @@
 // origin's localStorage under `rails-bookmarks` (lib/shared/sessions.ts), in
 // the reader's order: with `reorder`, rows move by drag and drop (from sm) and
 // by Move up and Move down in their ⋮ (ui-jobs 504). Each list is the house
-// table (components/shared/data-table), stacked below sm, every action in the
+// table (components/shared/data-table), stacked below sm as compact rows (the
+// name's line, then one line of what the row holds), every action in the
 // row's ⋮ (D7).
 
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
@@ -147,7 +148,14 @@ export function BookmarkList({
   const moveOf = useRowDrag("wallet");
   if (bookmarks.length === 0) return <>{empty}</>;
   return (
-    <DataTable caption="Saved wallets" stacked rowHeight="one" tableClassName="text-sm" data-bookmark-list="">
+    <DataTable
+      caption="Saved wallets"
+      stacked
+      compact
+      rowHeight="one"
+      tableClassName={`text-sm ${MARK_INDENT}`}
+      data-bookmark-list=""
+    >
       <DataTableHead>
         <DataTableHeader label="Wallet" />
         {summary && <DataTableHeader label="Positions" />}
@@ -186,8 +194,9 @@ export function SavedLinkList({
     <DataTable
       caption={kind === "position" ? "Saved positions" : "Saved listings"}
       stacked
+      compact
       rowHeight="one"
-      tableClassName="text-sm"
+      tableClassName={`text-sm ${MARK_INDENT}`}
       data-bookmark-list={kind}
     >
       <DataTableHead>
@@ -493,6 +502,17 @@ function RenameField({
 }
 
 const NAME_CELL = "sm:w-full sm:max-w-0 sm:min-w-[200px]";
+/** Where a compact row's name starts below sm, after the star (`STAR_EDGE`,
+ *  20px), a gap of 8, a 24px mark and a gap of 8: the second line's indent. */
+const MARK_INDENT = "[--dt-indent:60px]";
+/** Below sm the star's 44px press reaches into the gutter, its glyph on the
+ *  column's edge, and the next item 8px after the glyph. */
+const STAR_EDGE = "max-sm:-ml-3.5 max-sm:-mr-2.5";
+/** A part of a compact row's second line named to a screen reader, as its
+ *  column's header names it in the table. */
+const SrName = ({ children }: { children: ReactNode }) => <span className="sr-only">{children}: </span>;
+/** A compact row's second line below sm: small and muted. */
+const PHONE_LINE = "flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-rb-500";
 const MENU_CELL = "dt-row-menu w-px whitespace-nowrap";
 
 /** A saved entry's star (ui-jobs 586, 652), filled in the foreground colour
@@ -511,7 +531,7 @@ function StarToggle({ on, label, onToggle }: { on: boolean; label: string; onTog
       }}
       aria-label={on ? `Unstar ${label}` : `Star ${label}`}
       title={on ? "Shown in the profile menu" : "Show in the profile menu"}
-      className={`-my-2 inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors sm:size-7 ${
+      className={`-my-2 inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors sm:size-7 ${STAR_EDGE} ${
         on ? "text-foreground" : "text-rb-400 hover:text-foreground dark:text-rb-500 dark:hover:text-foreground"
       }`}
       data-bookmark-star={on ? "on" : "off"}
@@ -532,6 +552,7 @@ function shortAddress(a: string): string {
 function BookmarkRow({ session, summary, move }: { session: WalletSession; summary?: boolean; move?: RowMove }) {
   const [editing, setEditing] = useState(false);
   const [copied, copy] = useCopy();
+  const phone = useMediaQuery(PHONE_QUERY);
 
   const primary = session.addresses[0];
   const ens = session.ensNames[primary] || null;
@@ -559,7 +580,7 @@ function BookmarkRow({ session, summary, move }: { session: WalletSession; summa
           {move && <Grip />}
           <StarToggle on={!!session.starred} label={label} onToggle={() => toggleStar("wallet", primary)} />
           {editing ? (
-            <span className="flex min-w-0 flex-1 items-center gap-3">
+            <span className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
               {avatar}
               <RenameField
                 label="Wallet name"
@@ -578,7 +599,7 @@ function BookmarkRow({ session, summary, move }: { session: WalletSession; summa
             <DataTableRowLink
               href={href}
               draggable={false}
-              className="flex min-w-0 items-center gap-3"
+              className="flex min-w-0 items-center gap-2 sm:gap-3"
               data-bookmark-open=""
             >
               {avatar}
@@ -589,16 +610,41 @@ function BookmarkRow({ session, summary, move }: { session: WalletSession; summa
           )}
         </span>
       </DataTableCell>
-      {summary && (
-        <DataTableCell label="Positions" valign="middle" wide className="sm:min-w-[220px]">
-          <BookmarkSummary address={primary} />
-        </DataTableCell>
+      {phone ? (
+        // One line under the name: the protocols, and the address where a
+        // name stands in its place, each named to a screen reader.
+        (summary || label !== shortAddress(primary)) && (
+          <DataTableCell valign="middle">
+            <span className={PHONE_LINE}>
+              {summary && (
+                <span className="contents">
+                  <SrName>Positions</SrName>
+                  <BookmarkSummary address={primary} />
+                </span>
+              )}
+              {label !== shortAddress(primary) && (
+                <span className="font-mono" title={primary}>
+                  <SrName>Address</SrName>
+                  {shortAddress(primary)}
+                </span>
+              )}
+            </span>
+          </DataTableCell>
+        )
+      ) : (
+        <>
+          {summary && (
+            <DataTableCell label="Positions" valign="middle" wide className="sm:min-w-[220px]">
+              <BookmarkSummary address={primary} />
+            </DataTableCell>
+          )}
+          <DataTableCell label="Address" valign="middle" className="whitespace-nowrap">
+            <span className="font-mono text-xs text-rb-500" title={primary}>
+              {shortAddress(primary)}
+            </span>
+          </DataTableCell>
+        </>
       )}
-      <DataTableCell label="Address" valign="middle" className="whitespace-nowrap">
-        <span className="font-mono text-xs text-rb-500" title={primary}>
-          {shortAddress(primary)}
-        </span>
-      </DataTableCell>
       <DataTableCell valign="middle" className={MENU_CELL}>
         {copied}
         <DataTableRowMenu
@@ -660,7 +706,7 @@ function SavedLinkRow({ link, move }: { link: SavedLink; move: RowMove }) {
           <Grip />
           <StarToggle on={!!link.starred} label={label} onToggle={() => toggleStar(link.kind, link.key)} />
           {editing ? (
-            <span className="flex min-w-0 flex-1 items-center gap-3">
+            <span className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
               {glyph}
               <RenameField
                 label={`Saved ${noun} name`}
@@ -677,7 +723,7 @@ function SavedLinkRow({ link, move }: { link: SavedLink; move: RowMove }) {
             <DataTableRowLink
               href={link.key}
               draggable={false}
-              className="flex min-w-0 items-center gap-3"
+              className="flex min-w-0 items-center gap-2 sm:gap-3"
               data-bookmark-open={link.key}
             >
               {glyph}
@@ -686,18 +732,48 @@ function SavedLinkRow({ link, move }: { link: SavedLink; move: RowMove }) {
           )}
         </span>
       </DataTableCell>
-      {/* A stacked card draws no cell for what the entry lacks. */}
-      {(!phone || link.protocol) && (
+      {/* Below sm one line under the name: explorer · chain, and a closed
+          position's tag, each named to a screen reader. */}
+      {phone && (link.protocol || link.chain || link.ended) && (
+        <DataTableCell valign="middle">
+          <span className={PHONE_LINE}>
+            {(link.protocol || link.chain) && (
+              <span className="truncate">
+                {link.protocol && (
+                  <>
+                    <SrName>Explorer</SrName>
+                    {link.protocol.name}
+                  </>
+                )}
+                {link.protocol && link.chain && <span aria-hidden="true"> · </span>}
+                {link.chain && (
+                  <>
+                    <SrName>Chain</SrName>
+                    {link.chain.name}
+                  </>
+                )}
+              </span>
+            )}
+            {link.kind === "position" && link.ended && (
+              <span>
+                <SrName>Status</SrName>
+                <SavedEndedTag ended={link.ended} />
+              </span>
+            )}
+          </span>
+        </DataTableCell>
+      )}
+      {!phone && (
         <DataTableCell label="Explorer" valign="middle" className="whitespace-nowrap text-foreground/80">
           {link.protocol?.name}
         </DataTableCell>
       )}
-      {(!phone || link.chain) && (
+      {!phone && (
         <DataTableCell label="Chain" valign="middle" className="whitespace-nowrap text-foreground/80">
           {link.chain?.name}
         </DataTableCell>
       )}
-      {link.kind === "position" && (!phone || link.ended) && (
+      {link.kind === "position" && !phone && (
         <DataTableCell label="Status" valign="middle" className="whitespace-nowrap">
           {link.ended && <SavedEndedTag ended={link.ended} />}
         </DataTableCell>
@@ -785,9 +861,10 @@ export function FocusViewList({
       <DataTable
         caption="Focus"
         stacked
+        compact
         rowHeight="one"
         className={views.length === 0 ? "mt-4 !overflow-visible" : "!overflow-visible"}
-        tableClassName="text-sm"
+        tableClassName="text-sm [--dt-indent:28px]"
         data-bookmark-list="focus"
       >
         <DataTableHead>
@@ -932,7 +1009,7 @@ function FocusViewRow({
       data-editing={editing ? "" : undefined}
       {...d.props}
     >
-      <DataTableCell rowHeader valign="middle" className="sm:w-[34%] sm:max-w-0 sm:min-w-[200px]">
+      <DataTableCell rowHeader valign="middle" className="max-sm:!pr-32 sm:w-[34%] sm:max-w-0 sm:min-w-[200px]">
         <span className="flex min-w-0 items-center gap-2">
           <Grip />
           <StarToggle on={!!view.starred} label={label} onToggle={() => focusViews.toggleStar(view.id)} />
@@ -955,18 +1032,22 @@ function FocusViewRow({
       </DataTableCell>
       <DataTableCell label="Assets" valign="middle" className="sm:w-[40%] sm:max-w-0">
         {view.assets.length ? (
-          <span className="flex min-w-0 items-center gap-1 text-foreground/80">
+          <span className="flex min-w-0 items-center gap-1 text-foreground/80 max-sm:text-xs">
             <ViewIcons picks={view.assets} chains={[]} />
             <span className="truncate">{focusName(view.assets, [])}</span>
           </span>
         ) : (
-          <span className="text-rb-500">All assets</span>
+          <span className="text-rb-500 max-sm:text-xs">All assets</span>
         )}
       </DataTableCell>
       <DataTableCell label="Chains" valign="middle" className="whitespace-nowrap">
         <ViewChainToggles view={view} />
       </DataTableCell>
-      <DataTableCell valign="middle" className="whitespace-nowrap">
+      {/* Below sm, on the name's line before the ⋮. */}
+      <DataTableCell
+        valign="middle"
+        className="whitespace-nowrap max-sm:!absolute max-sm:top-[18px] max-sm:right-11 max-sm:!p-0"
+      >
         {use}
       </DataTableCell>
       <DataTableCell valign="middle" className={MENU_CELL}>
@@ -1105,7 +1186,9 @@ function NewFocusRow({ at, start }: { at: number; start: number }) {
       <DataTableCell rowHeader valign="middle" className="max-sm:pr-12 sm:w-[34%] sm:max-w-0 sm:min-w-[200px]">
         <span className="flex min-w-0 items-center gap-2">
           <span className="hidden size-4 shrink-0 sm:block" aria-hidden="true" />
-          <span className="-my-2 inline-flex size-11 shrink-0 items-center justify-center text-rb-400 sm:size-7 dark:text-rb-500">
+          <span
+            className={`-my-2 inline-flex size-11 shrink-0 items-center justify-center text-rb-400 sm:size-7 dark:text-rb-500 ${STAR_EDGE}`}
+          >
             <Plus className="size-4" aria-hidden="true" />
           </span>
           <input
