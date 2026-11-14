@@ -68,7 +68,10 @@ export function morphoHealthSource(chain: number, loanSymbol: string): HealthSou
     chain,
     factors: ["LLTV", "liquidation loan-to-value (LLTV)"],
     readAt: "fixed when the market was created",
-    priceAt: ["at each event's block, held between events", "at the latest event's block on or before the day"],
+    priceAt: [
+      "at the block of each day's last event, held between events",
+      "at the block of the last event on or before the day",
+    ],
     held: "the market's LLTV, fixed when the market was created",
     live: "the card's LTV now: the debt over the collateral's value at the market's oracle, from the live market read",
     stepped: true,
@@ -90,12 +93,12 @@ export function morphoHealthSource(chain: number, loanSymbol: string): HealthSou
         summary:
           "LLTV — fixed when the market was created: above it a liquidator can repay the debt and take collateral.",
       },
-      help: `on the same days: the debt over the collateral's value at the market oracle's price, in ${loanSymbol}. The oracle is read at each event's block, so a day between events keeps the last event's price and is drawn dotted; the debt grows by the market's interest. The red line is the market's LLTV, fixed when the market was created; above it the position can be liquidated. The list in the tip picks it or the collateral's price.`,
+      help: `on the same days: the debt over the collateral's value at the market oracle's price, in ${loanSymbol}. The oracle's price is taken after each day's last event, so a day between events keeps the last such price and is drawn dotted; the debt grows by the market's interest. The red line is the market's LLTV, fixed when the market was created; above it the position can be liquidated. The list in the tip picks it or the collateral's price.`,
     },
   };
 }
 
 /** The collateral price's sentence in the how-to-read. */
 export function morphoPriceHelp(loanSymbol: string): string {
-  return `on the same days, in ${loanSymbol} at the market oracle's price at each event's block, held between events and drawn dotted there; the red line is where the position liquidates, the debt ÷ (collateral × LLTV) after each event, grown by the market's interest between.`;
+  return `on the same days, in ${loanSymbol} at the market oracle's price after each day's last event, held between events and drawn dotted there; the red line is where the position liquidates, the debt ÷ (collateral × LLTV) after each event, grown by the market's interest between.`;
 }
