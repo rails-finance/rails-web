@@ -280,7 +280,7 @@ export function ReceiptCard({
           sheds the head's name clause). One card holds all the information,
           so the popover renders at its final height and never re-anchors. */}
       <div className="prov-inspect-body">
-        <ProvReceipt embedded info={e.info} value={e.value} display={e.display} symbol={e.symbol} source={e.source} />
+        <ProvReceipt info={e.info} value={e.value} display={e.display} source={e.source} />
       </div>
       {ladderOpen && <LadderModal onClose={() => setLadderOpen(false)} />}
     </>
