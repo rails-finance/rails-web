@@ -11,6 +11,7 @@ import {
   CLASS_LINES,
   CLASS_NAMES,
   COMPUTED_LINE,
+  DEFINITION_LINE,
   KIND_OF_FIGURE,
   KINDS_OF_FIGURE,
   LADDER_TITLE,
@@ -144,7 +145,9 @@ export default function ProvenancePage() {
             </Term>
           ))}
         </dl>
-        <p className="body-text">{COMPUTED_LINE}</p>
+        <p className="body-text">
+          {COMPUTED_LINE} {DEFINITION_LINE}
+        </p>
       </Section>
 
       <Section title="Checking a figure">

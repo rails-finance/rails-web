@@ -69,3 +69,15 @@ test("the modal draws these words and no prose of its own", () => {
   const text = [...body.matchAll(/>([^<>{}]*[A-Za-z][^<>{}]*)</g)].map((m) => m[1].trim()).filter(Boolean);
   assert.deepEqual(text, [], `literal prose in LadderModal: ${text.join(" | ")}`);
 });
+
+test("/about/provenance reads the shared words and copies none of them", () => {
+  const page = readFileSync(new URL("../../app/(site)/about/provenance/page.tsx", import.meta.url), "utf8");
+  for (const name of ["CLASS_LINES", "COMPUTED_LINE", "DEFINITION_LINE", "LADDER_TITLE"]) {
+    assert.match(page, new RegExp(`\\{${name}\\}|\\$\\{${name}\\}|${name}\\.map`), name);
+  }
+  // No literal copy: the sentences' distinctive phrases appear only through the constants.
+  for (const phrase of ["is not a read and has no dot", "as checkable as its furthest input", "stablecoin"]) {
+    assert.ok(!page.includes(phrase), `literal copy of "${phrase}" in page.tsx`);
+  }
+  for (const c of CLASS_LINES) assert.ok(!page.includes(c.line), `literal copy of the ${c.cls} line in page.tsx`);
+});
