@@ -115,8 +115,8 @@ export function pillFor<F>(group: PillGroup<F>, f: F): PillModel<F> {
       value = dimValue(active[0], f);
     } else {
       // Several dimensions in one group (Size: Debt and Collateral): each
-      // active one says its own name.
-      value = active.map((d) => `${d.label} ${dimValue(d, f)}`).join(", ");
+      // active one in its chip's words ("Debt $0").
+      value = active.map((d) => filterChipText(d, f).replace(": ", " ")).join(", ");
     }
   } else if (state === "default") {
     value = group.dims

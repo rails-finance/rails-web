@@ -159,6 +159,14 @@ test("a boolean shows its name only", () => {
 
 test("a group of several ranges names the one that is set", () => {
   assert.equal(pill({ ...base, debt: ["1000000-10000000"] }, "Size").value, "Debt $1M–$10M");
+  // The shared Size ranges label their panel "Debt (USD)"; the pill takes the chip's word.
+  const debtUsd = {
+    ...dims.find((d) => d.id === "debt"),
+    label: "Debt (USD)",
+    chipLabel: (v) => `Debt: ${v[0] === "-0" ? "$0" : v[0]}`,
+  };
+  const size = pillFor({ name: "Size", dims: [debtUsd, dims.find((d) => d.id === "coll")] }, { ...base, debt: ["-0"] });
+  assert.equal(size.spoken, "Size Debt $0");
 });
 
 test("a default that narrows the list is a locked set pill", () => {
