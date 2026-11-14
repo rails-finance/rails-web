@@ -81,12 +81,13 @@ const receipts = () => [
 
 function horizons() {
   return [
-    ["withheld exact", T.yearnVaultTimelineHorizonProv(row, 6_200, 5_000, false)],
-    ["withheld floor", T.yearnVaultTimelineHorizonProv(row, 5_970, 5_000, true)],
+    ["withheld exact", T.yearnVaultTimelineHorizonProv(row, 6_200, 5_000, "checked")],
+    ["withheld floor", T.yearnVaultTimelineHorizonProv(row, 5_970, 5_000, "floor")],
+    ["withheld unchecked", T.yearnVaultTimelineHorizonProv(row, 1_200, 5_000, "unchecked")],
   ];
 }
 
-test("Yearn V3 receipts: summaries in words, check lines open \"To check:\", via lines keep two segments", () => {
+test('Yearn V3 receipts: summaries in words, check lines open "To check:", via lines keep two segments', () => {
   for (const [name, p] of receipts()) {
     assert.ok(p.summary, `${name}: has a summary`);
     assert.ok(!p.summary.includes("`"), `${name}: no backtick in the summary — ${p.summary}`);

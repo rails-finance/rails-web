@@ -31,6 +31,7 @@ import type {
   VaultHolderEvent,
   VaultHolderReconcile,
   VaultTimelineCoords,
+  VaultWithheldBasis,
 } from "@/lib/shared/vault-holder-timeline";
 
 const LANE = "live Ethereum chain reads (/ethereum/aave/vaults)";
@@ -80,7 +81,9 @@ export const vaultTimelineGateProv = (c: VaultTimelineCoords, r: VaultHolderReco
   formula: "Σ (value where to == holder) − Σ (value where from == holder) == balanceOf(holder)",
 });
 
-/** The ceiling: the life was read whole and is larger than Rails stores.
+/** The ceiling: the rows are withheld, and the receipt says on which basis
+ *  (`VaultWithheldBasis`) — the third, `unchecked`, is a whole recount the
+ *  balance check never saw.
  *
  *  THE REFUSAL MOVED, AND THE WORDS MOVED WITH IT. It used to be a refusal to
  *  draw more rows than a page draws. It is now a refusal to keep a history
@@ -101,15 +104,17 @@ export const vaultTimelineHorizonProv = (
   c: VaultTimelineCoords,
   count: number,
   ceiling: number,
-  lowerBound: boolean,
+  basis: VaultWithheldBasis,
 ): Provenance => ({
   kind: "chain-derived",
   pclass: "emitted",
   source: { block: c.blockNumber },
-  summary: `Rows withheld — this address has ${lowerBound ? "at least " : ""}${count.toLocaleString("en-US")} of its own \`Transfer\` logs on this vault, above the ${ceiling.toLocaleString("en-US")} Rails keeps a stored history for. That bound is the store's own 8 MB body limit divided by a measured row, so it says the life is larger than Rails STORES rather than larger than a page can draw. The newest few are not drawn instead: a partial walk shown as a life is the one failure this gate exists to prevent, and the history check sums every row, so a page of rows could not be reconciled in any case. ${
-    lowerBound
-      ? `The count is a FLOOR, not a census: the node refused the whole-range sweep on response size — it will not answer one direction past 10,000 logs — so the range was walked in chunks of 1,000,000 blocks from block 0 and the walk stopped the moment the running count passed the horizon. Every chunk counted answered; a chunk that had refused would have been halved rather than skipped, and a count with a hole in it would have been reported as unread instead. Because the logs were never handed over whole, the balance check above could not be run on this address at all — which is why nothing is drawn rather than drawn with a caveat.`
-      : "The count itself is exact — both sweeps returned, and the balance check ran and agreed, before this decision was made."
+  summary: `Rows withheld — this address has ${basis === "floor" ? "at least " : ""}${count.toLocaleString("en-US")} of its own \`Transfer\` logs on this vault${basis === "unchecked" ? "." : `, above the ${ceiling.toLocaleString("en-US")} Rails keeps a stored history for. That bound is the store's own 8 MB body limit divided by a measured row, so it says the life is larger than Rails STORES rather than larger than a page can draw.`} The newest few are not drawn instead: a partial walk shown as a life is the one failure this gate exists to prevent, and the history check sums every row, so a page of rows could not be reconciled in any case. ${
+    basis === "unchecked"
+      ? "The balance check did not run: the query for this address's transfers failed, so the range was counted in chunks from block 0, every chunk answering. The count covers the whole range, but no check confirmed it, and no rows are drawn without one."
+      : basis === "floor"
+        ? `The count is a FLOOR, not a census: the node refused the whole-range sweep on response size — it will not answer one direction past 10,000 logs — so the range was walked in chunks of 1,000,000 blocks from block 0 and the walk stopped the moment the running count passed the horizon. Every chunk counted answered; a chunk that had refused would have been halved rather than skipped, and a count with a hole in it would have been reported as unread instead. Because the logs were never handed over whole, the balance check above could not be run on this address at all — which is why nothing is drawn rather than drawn with a caveat.`
+        : "The count itself is exact — both sweeps returned, and the balance check ran and agreed, before this decision was made."
   }`,
   contract: vaultContract(c),
   via: `${LANE} · eth_getLogs (Transfer, both directions) @ the pinned block`,

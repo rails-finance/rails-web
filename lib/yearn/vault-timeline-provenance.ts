@@ -34,7 +34,12 @@
 // truth-preserving delta replay.
 
 import type { Provenance } from "@/components/shared/provenance";
-import type { VaultHolderEvent, VaultHolderReconcile, VaultTimelineCoords } from "@/lib/shared/vault-holder-timeline";
+import type {
+  VaultHolderEvent,
+  VaultHolderReconcile,
+  VaultTimelineCoords,
+  VaultWithheldBasis,
+} from "@/lib/shared/vault-holder-timeline";
 
 const LANE = "live Ethereum chain reads (/ethereum/yearn/vaults)";
 
@@ -81,26 +86,25 @@ export const yearnVaultTimelineGateProv = (c: VaultTimelineCoords, r: VaultHolde
   formula: "Σ (value where to == holder) − Σ (value where from == holder) == balanceOf(holder)",
 });
 
-/** The ceiling: the life was read whole and is longer than one request draws.
- *
- *  TWO SHAPES, AND THE RECEIPT SAYS WHICH. `exact` is a whole read that was too
- *  long to build — both sweeps returned and the count is a census. A lower
- *  bound is a lane that would not hand the logs over at all, walked in chunks
- *  until the count passed the horizon and stopped there; the rows are withheld
- *  either way, but "at least N" and "N" are different claims. */
+/** The ceiling: the rows are withheld, and the receipt says on which basis
+ *  (`VaultWithheldBasis`): a whole read above the bound that the balance check
+ *  agreed with, a floor counted past the horizon, or a whole recount the check
+ *  never saw. "At least N", "N, checked" and "N, unchecked" are three claims. */
 export const yearnVaultTimelineHorizonProv = (
   c: VaultTimelineCoords,
   count: number,
   ceiling: number,
-  lowerBound: boolean,
+  basis: VaultWithheldBasis,
 ): Provenance => ({
   kind: "chain-derived",
   pclass: "emitted",
   source: { block: c.blockNumber },
-  summary: `Rows withheld — this address has ${lowerBound ? "at least " : ""}${count.toLocaleString("en-US")} transfers on this vault, above the ${ceiling.toLocaleString("en-US")} Rails builds for a page in one request. Each row needs its block's time and the vault's share price at that block, so the bound is set by how long a reader would wait. The newest rows are not drawn in place of the rest: a partial history shown as a whole one is the failure this check exists to prevent, and the history check sums every row, so a page of rows could not be reconciled. ${
-    lowerBound
-      ? `The count is a floor, and the answer may be more: the node refused the whole-range query on response size (it answers at most 10,000 logs in one direction), so the range was counted in chunks from the vault's creation block, and the count stopped once it passed ${ceiling.toLocaleString("en-US")}. Every chunk counted answered; a chunk that refused would have been halved and both halves counted. Because the logs were never handed over whole, the balance check could not be run on this address, so nothing is drawn.`
-      : "The count is exact: both queries returned, and the balance check ran and agreed, before this decision was made."
+  summary: `Rows withheld — this address has ${basis === "floor" ? "at least " : ""}${count.toLocaleString("en-US")} transfers on this vault${basis === "unchecked" ? "" : `, above the ${ceiling.toLocaleString("en-US")} Rails builds for a page in one request`}. ${basis === "unchecked" ? "" : "Each row needs its block's time and the vault's share price at that block, so the bound is set by how long a reader would wait. "}The newest rows are not drawn in place of the rest: a partial history shown as a whole one is the failure this check exists to prevent, and the history check sums every row, so a page of rows could not be reconciled. ${
+    basis === "unchecked"
+      ? "The balance check did not run: the query for this address's transfers failed, so the range was counted in chunks from the vault's creation block, every chunk answering. The count covers the whole range, but no check confirmed it, and no rows are drawn without one."
+      : basis === "floor"
+        ? `The count is a floor, and the answer may be more: the node refused the whole-range query on response size (it answers at most 10,000 logs in one direction), so the range was counted in chunks from the vault's creation block, and the count stopped once it passed ${ceiling.toLocaleString("en-US")}. Every chunk counted answered; a chunk that refused would have been halved and both halves counted. Because the logs were never handed over whole, the balance check could not be run on this address, so nothing is drawn.`
+        : "The count is exact: both queries returned, and the balance check ran and agreed, before this decision was made."
   }`,
   contract: vaultContract(c),
   via: `${LANE} · Transfer logs, sent and received @ the pinned block`,

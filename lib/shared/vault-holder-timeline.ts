@@ -414,6 +414,24 @@ export interface VaultHistorySource {
   building?: { keptRows: number; keptCut: number; totalRows: number };
 }
 
+/** Why a life's rows are withheld, and so what its count can claim.
+ *
+ *   • `checked`   — the transfers were read whole, the balance check ran and
+ *                   agreed, and the life is above the bound: the count is exact.
+ *   • `floor`     — a transfer query was refused, and the chunked recount
+ *                   (lib/sources/chain/vault-sweep-walk.ts) stopped once it
+ *                   passed `VAULT_TIMELINE_HORIZON`: the count is a lower bound.
+ *   • `unchecked` — a transfer query failed, and the recount covered the whole
+ *                   range without passing the horizon. The count is whole, but
+ *                   no logs were handed over, so the balance check never ran. */
+export type VaultWithheldBasis = "checked" | "floor" | "unchecked";
+
+/** The basis of a withheld count, from `withheldBasis` where the loader set it. */
+export const withheldBasisOf = (coverage: {
+  logCountIsLowerBound: boolean;
+  withheldBasis?: VaultWithheldBasis;
+}): VaultWithheldBasis => coverage.withheldBasis ?? (coverage.logCountIsLowerBound ? "floor" : "checked");
+
 export interface VaultHolderTimeline {
   vault: string;
   holder: string;
@@ -466,6 +484,10 @@ export interface VaultHolderTimeline {
      *  page must not print a floor as if it were a census — "at least N" and
      *  "N" are different claims and only one of them is true here. */
     logCountIsLowerBound: boolean;
+    /** What stands behind `withheldAbove`, set wherever a loader withholds
+     *  (`VaultWithheldBasis`). Absent on a loader that does not set it yet
+     *  (MetaMorpho on Base); `withheldBasisOf` then reads the older flag. */
+    withheldBasis?: VaultWithheldBasis;
     /** THE RENDER WINDOW, when the life is longer than the client is handed.
      *  `rows` of `of` were serialised into `events`, newest first; the rest of
      *  the life stayed on the server. ABSENT when the whole life was handed
