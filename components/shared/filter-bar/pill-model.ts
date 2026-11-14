@@ -65,10 +65,12 @@ export function groupDimensions<F>(dims: FilterDimension<F>[], filters: F): Pill
 }
 
 /** A dimension whose resting default narrows the list ("Status: Open", a
- *  "100+ holders" preset): a named default chip, or default values that are
- *  some of the options and not all of them. */
+ *  "100+ holders" preset): where the dimension names its default chip, that
+ *  chip read at the default (none for a default that narrows nothing, "Every
+ *  vault"), so the pill stays locked while set; else default
+ *  values that are some of the options and not all of them. */
 export function restsOnConstraint<F>(dim: FilterDimension<F>, f: F): boolean {
-  if (dim.defaultChip?.(f)) return true;
+  if (dim.defaultChip) return dim.defaultChip(dim.set(f, dim.defaultValues?.(f) ?? [])) != null;
   const def = dim.defaultValues?.(f) ?? [];
   return def.length > 0 && (dim.options.length === 0 || def.length < dim.options.length);
 }

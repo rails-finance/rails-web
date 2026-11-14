@@ -172,6 +172,32 @@ test("a default that narrows the list is a locked set pill", () => {
   assert.equal(changed.locked, true);
 });
 
+test("a default that narrows nothing is an unset pill", () => {
+  // The vault roster's Shown preset: "100+ holders" by default, "Every vault"
+  // where a link lifts it; its chip names only the first.
+  const shown = (arrival) => ({
+    id: "show",
+    label: "Shown",
+    group: "Shown",
+    cardinality: "single",
+    options: [
+      { value: "used", label: "100+ holders" },
+      { value: "all", label: "Every vault" },
+    ],
+    get: (s) => s.show,
+    set: (s, v) => ({ ...s, show: v.length ? v : [arrival] }),
+    defaultValues: () => [arrival],
+    defaultChip: (s) => (s.show[0] === "used" ? "100+ holders" : null),
+  });
+  const preset = pillFor({ name: "Shown", dims: [shown("used")] }, { show: ["used"] });
+  assert.deepEqual([preset.state, preset.locked, preset.value], ["default", true, "100+ holders"]);
+  // Widened by hand from the preset, it stays locked: its way back is Reset to default.
+  const widened = pillFor({ name: "Shown", dims: [shown("used")] }, { show: ["all"] });
+  assert.deepEqual([widened.state, widened.locked, widened.value], ["set", true, "Every vault"]);
+  const lifted = pillFor({ name: "Shown", dims: [shown("all")] }, { show: ["all"] });
+  assert.deepEqual([lifted.state, lifted.locked, lifted.spoken], ["unset", false, "Add Shown filter"]);
+});
+
 test("removing a filter puts its group back to the default", () => {
   const f = { ...base, debt: ["100-"], coll: ["-5000"], market: ["core"] };
   const size = groupDimensions(dims, f).find((g) => g.name === "Size");
