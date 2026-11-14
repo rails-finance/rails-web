@@ -92,6 +92,7 @@ import { withFolderActors } from "@/lib/shared/timeline-folder-reductions";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
 import { ExportMenu, type WholeHistoryFetch } from "@/components/shared/export-menu";
 import { compoundExports } from "@/components/protocol/compound/compound-export-menu";
+import { COMPOUND_V3_TERMS } from "@/lib/compound/product";
 import type { CompoundBaseMarketRows } from "@/lib/compound-base/timeline-folders";
 import { groupEventsByTx } from "@/lib/shared/explainer-prose";
 import { previousEventById, previousEventByTx } from "@/lib/compound/row-facts";
@@ -903,6 +904,7 @@ export function CompoundWalletView({
               wallet={wallet}
               owner={{ wallet, chain: d.deployment.chainId }}
               assets={stripAssets}
+              pricesSubject={COMPOUND_V3_TERMS.position.one}
               closed={views.length > 0 && views.every((v) => v.status !== "open")}
               // Each market's card carries its exports on its ⋮; the event
               // route, which draws no card, keeps the wallet's in the Tools.

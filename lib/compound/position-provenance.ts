@@ -69,7 +69,7 @@ export function capacityProv(
       kind: "chain-derived",
       pclass: "state",
       verify: stateVerify("collateralBalanceOf / getPrice / getAssetInfo"),
-      summary: `${what} — Σ collateral × oracle price × factor over the account's held assets, every input read from the market's Comet contract at the same block. Mirrors the contract's own account math (checked against its isBorrowCollateralized / isLiquidatable verdicts).`,
+      summary: `${what} — Σ collateral × price-feed price × factor over the account's held assets, every input read from the market's Comet contract at the same block. Mirrors the contract's own account math (checked against its isBorrowCollateralized / isLiquidatable verdicts).`,
       contract: cometContract(coords),
       via: `${LANE_VIA} · derived aggregate`,
       formula,

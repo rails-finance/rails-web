@@ -47,7 +47,7 @@ export const POSITION_PAGE = {
 };
 
 export const NOT_INDEXED =
-  "Not indexed yet on Optimism: this account's history and absorptions arrive when Rails indexes Compound V3 there.";
+  "Not indexed yet on Optimism: this account's history and liquidations arrive when Rails indexes Compound V3 there.";
 
 export const CARD_WORDS = {
   heading: "Position summary",
