@@ -90,8 +90,8 @@ const recompute = (call: string, c: AaveVaultCoords): Provenance["verify"] => ({
   kind: "recompute",
   text:
     c.blockNumber != null
-      ? `To check: ask any Ethereum archive node for the vault's ${call} at block ${c.blockNumber}.`
-      : `To check: ask any Ethereum node for the vault's ${call}.`,
+      ? `To check: ask any ${chainWord(c)} archive node for the vault's ${call} at block ${c.blockNumber}.`
+      : `To check: ask any ${chainWord(c)} node for the vault's ${call}.`,
 });
 
 const asset = (c: AaveVaultCoords) => c.assetSymbol ?? "the vault's asset";
@@ -100,8 +100,8 @@ const asset = (c: AaveVaultCoords) => c.assetSymbol ?? "the vault's asset";
  *  state what the catalogue is. */
 export const attestationClause = (a: AaveVaultAttestation): string =>
   a.kind === "book"
-    ? `Aave publishes this address as \`${a.constant}\` in its own address book (\`aave-dao/aave-address-book\`, \`src/ts/${a.file}.ts\`, commit ${AAVE_ADDRESS_BOOK_COMMIT.slice(0, 10)})`
-    : `Aave publishes \`${a.constant}\`, and that contract's own \`${a.call}\` returned this address`;
+    ? `Aave publishes this address as ${a.constant} in its address book (aave-dao/aave-address-book, src/ts/${a.file}.ts, commit ${AAVE_ADDRESS_BOOK_COMMIT.slice(0, 10)})`
+    : `Aave publishes ${a.constant}, and the list that contract returns includes this address`;
 
 // ── what the catalogue is ────────────────────────────────────────────────────
 
@@ -117,9 +117,9 @@ const aaveVaultCatalogueProv_ = (
   source: { block: c.blockNumber },
   verify: {
     kind: "recompute",
-    text: `Re-run StataTokenFactory.getStataTokens() and Umbrella.getStkTokens()${atBlock(c)} and count what they return`,
+    text: `To check: ask any Ethereum archive node${atBlock(c)} for StataTokenFactory.getStataTokens() and Umbrella.getStkTokens(), count what they return, and add one for sGHO.`,
   },
-  summary: `Vaults listed — ${counts.catalogSize}: sGHO, the ${counts.stakeCount} stake tokens \`Umbrella.getStkTokens()\` returned, and the ${counts.stataCount} static aTokens \`StataTokenFactory.getStataTokens()\` returned, every one of them read${atBlock(c)}. The roster is not a census and not a floor: both calls answer their whole family in one read, and sGHO is a single address Aave's address book names, so the list is complete AT THIS BLOCK by construction. A vault deployed one block earlier is in it. What is outside it is stated in the roster's intro drawer.`,
+  summary: `Vaults listed — ${counts.catalogSize}: sGHO, the ${counts.stakeCount} stake tokens Umbrella lists and the ${counts.stataCount} static aTokens the static aToken factory lists, every one of them read${atBlock(c)}. The list is complete at this block, so it is neither a census nor a floor: Umbrella and the factory each return their whole family in one read, and Aave's address book names sGHO. A vault deployed one block earlier is in it. What is outside it is stated in the roster's intro drawer.`,
   via: `${LANE} · getStataTokens() + getStkTokens() + GhoEthereum.SGHO @ the pinned block`,
   formula: "1 (sGHO) + getStkTokens().length + getStataTokens().length",
 });
@@ -132,7 +132,7 @@ const aaveVaultNameProv_ = (c: AaveVaultCoords, attestation: AaveVaultAttestatio
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("name()", c),
-  summary: `Vault name — the ERC-20 \`name()\` of the vault's own share token${atBlock(c)}: a name is a reading at a block, never an identity, and the address beside it is what tells two vaults apart. ${attestationClause(attestation)}.`,
+  summary: `Vault name — the name of the vault's share token${atBlock(c)}. A name is a reading at a block, so the address beside it tells two vaults apart. ${attestationClause(attestation)}.`,
   contract: vaultContract(c),
   via: `${LANE} · name() @ the pinned block`,
 });
@@ -143,16 +143,16 @@ const aaveVaultNameProv_ = (c: AaveVaultCoords, attestation: AaveVaultAttestatio
 const aaveVaultTotalAssetsProv_ = (c: AaveVaultCoords, family: AaveVaultFamily): Provenance => {
   const mechanic =
     family === "sgho"
-      ? `sGHO does NOT count the GHO it holds: \`totalAssets()\` is what its stored yield index says the shares are worth (\`convertToAssets(totalSupply())\`), and the GHO balance in the contract is a separate number that can be either side of it. Withdrawals are clamped to that balance, not to this figure.`
+      ? `sGHO does not count the GHO it holds: its total assets are what its stored yield index says the shares are worth, and the GHO balance in the contract is a separate number that can be either side of it. Withdrawals are limited to that balance.`
       : family === "stata"
-        ? `A static aToken's \`totalAssets()\` is its share supply valued at the Aave V3 Core Pool's liquidity index for the reserve it wraps, so it moves with the reserve's accrued interest and not with any action on the wrapper. It is close to, and need not equal, the aToken balance the wrapper holds — the difference is the wrapper's own floor rounding, stated rather than reconciled away.`
-        : `A stake token's \`totalAssets()\` is a STORED COUNTER incremented on deposit and decremented on withdrawal. Umbrella decrements it when it slashes, which is the only thing that moves this token's share price.`;
+        ? `A static aToken's total assets are its share supply valued at the Aave V3 Core Pool's liquidity index for the reserve it wraps, so they move with the reserve's accrued interest and with no action on the wrapper. They are close to the aToken balance the wrapper holds and need not equal it: the difference is the wrapper's floor rounding.`
+        : `A stake token's total assets are a counter stored in the contract, incremented on deposit and decremented on withdrawal. Umbrella decrements it when it slashes, which is the only thing that moves this token's share price.`;
   return {
     kind: "chain",
     pclass: "state",
     source: { block: c.blockNumber },
     verify: recompute("totalAssets()", c),
-    summary: `Total assets — the vault's own \`totalAssets()\`${atBlock(c)}, in ${asset(c)}. ${mechanic} A quantity of ${asset(c)} and nothing else: the section never orders or sums across two assets, and never converts one to USD. A zero here is a reading — the vault holds nothing at this block — not an absence.`,
+    summary: `Total assets — what the vault holds${atBlock(c)}, in ${asset(c)}. ${mechanic} The section does not order or add two assets, or convert one to USD. A zero here is a reading: the vault holds nothing at this block.`,
     contract: vaultContract(c),
     via: `${LANE} · totalAssets() @ the pinned block`,
   };
@@ -164,7 +164,7 @@ const aaveVaultTotalSupplyProv_ = (c: AaveVaultCoords, shareDecimals: number): P
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("totalSupply()", c),
-  summary: `Shares issued — the ERC-20 \`totalSupply()\` of the vault's own share token${atBlock(c)}, scaled by that token's own \`decimals()\` (${shareDecimals}) read at the same block. Every share in existence. Shares and assets are different units here: this vault's share decimals and its asset's decimals need not match.`,
+  summary: `Shares issued — every share in existence${atBlock(c)}, scaled by the share token's decimals (${shareDecimals}) read at the same block. Shares and assets are different units here: this vault's share decimals and its asset's decimals need not match.`,
   contract: vaultContract(c),
   via: `${LANE} · totalSupply() @ the pinned block`,
 });
@@ -177,7 +177,7 @@ const aaveVaultSharePriceProv_ = (c: AaveVaultCoords, shareDecimals: number): Pr
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute(`convertToAssets(10^${shareDecimals})`, c),
-  summary: `Share price — \`convertToAssets(10^${shareDecimals})\`${atBlock(c)}: what ONE whole share converts to in ${asset(c)}, answered by the vault. The exponent is this vault's OWN \`decimals()\`, read at the same block — Aave's share tokens are 6-, 8- and 18-decimal, and \`convertToAssets\` is linear, so asking with a fixed 10^18 would answer a different question on most of them. A quantity of ${asset(c)}; never a USD price.`,
+  summary: `Share price — what one whole share converts to${atBlock(c)}, in ${asset(c)}, as the vault answers. The exponent is this vault's decimals, read at the same block: Aave's share tokens have 6, 8 or 18 decimals and the conversion is linear, so asking with a fixed 10^18 would answer a different question on most of them.`,
   contract: vaultContract(c),
   via: `${LANE} · convertToAssets(one whole share) @ the pinned block`,
 });
@@ -192,7 +192,7 @@ const aaveVaultTargetRateProv_ = (c: AaveVaultCoords, bps: number): Provenance =
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("targetRate()", c),
-  summary: `Target rate — \`targetRate()\` reads ${bps} basis points${atBlock(c)}, which the card states as ${(bps / 100).toFixed(2)}%: the rate the risk council has set on the vault. It is the setting at this block, not a forecast of what a holder earns.`,
+  summary: `Target rate — ${bps} basis points${atBlock(c)}, which the card states as ${(bps / 100).toFixed(2)}%: the rate the risk council has set on the vault. It is the setting at this block and forecasts nothing a holder earns.`,
   contract: vaultContract(c),
   via: `${LANE} · targetRate() @ the pinned block`,
 });
@@ -203,7 +203,7 @@ const aaveVaultSupplyCapProv_ = (c: AaveVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("supplyCap()", c),
-  summary: `Supply cap — \`supplyCap()\`${atBlock(c)}, in ${asset(c)}: the ceiling the risk council has set on what this vault will hold. What is left of it is the cap minus \`totalAssets()\`, which \`maxDeposit()\` answers. A configuration read: the council can move the cap.`,
+  summary: `Supply cap — the ceiling the risk council has set on what this vault will hold${atBlock(c)}, in ${asset(c)}. What is left of it is the cap less total assets, which the vault answers as its remaining capacity. The council can move the cap.`,
   contract: vaultContract(c),
   via: `${LANE} · supplyCap() @ the pinned block`,
 });
@@ -214,7 +214,7 @@ const aaveVaultATokenProv_ = (c: AaveVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("aToken()", c),
-  summary: `Wrapped aToken — the wrapper's own \`aToken()\`${atBlock(c)}: the single Aave V3 aToken this ERC-4626 wraps. Everything the wrapper holds is that aToken, and its share price is that reserve's normalised income in the Core Pool.`,
+  summary: `Wrapped aToken — the single Aave V3 aToken this ERC-4626 wrapper wraps${atBlock(c)}. Everything the wrapper holds is that aToken, and its share price is that reserve's normalised income in the Core Pool.`,
   contract: vaultContract(c),
   via: `${LANE} · aToken() @ the pinned block`,
 });
@@ -226,7 +226,7 @@ const aaveVaultCooldownProv_ = (c: AaveVaultCoords, cooldown: number, window: nu
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("getCooldown() and getUnstakeWindow()", c),
-  summary: `Cooldown and unstake window — \`getCooldown()\` reads ${cooldown} seconds and \`getUnstakeWindow()\` ${window}${atBlock(c)}, both on this token. A holder starts the cooldown, waits it out, and may redeem only inside the window that follows; outside it the token's own \`maxRedeem()\` answers zero for a holder with a positive balance. That zero is a state, not missing data. Both figures are the token's configuration at this block, and Umbrella can change them.`,
+  summary: `Cooldown and unstake window — the cooldown is ${cooldown} seconds and the unstake window ${window}${atBlock(c)}, both on this token. A holder starts the cooldown, waits it out, and may redeem only inside the window that follows; outside it the token answers zero for what a holder with a positive balance can redeem. That zero is a reading of the token's state. Both figures are the token's settings at this block, and Umbrella can change them.`,
   contract: vaultContract(c),
   via: `${LANE} · getCooldown() + getUnstakeWindow() @ the pinned block`,
 });
@@ -238,7 +238,7 @@ const aaveVaultSlashableProv_ = (c: AaveVaultCoords, reserveSymbol: string, slas
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute(`Umbrella.isReserveSlashable(${reserveSymbol})`, c),
-  summary: `Slashable now — \`Umbrella.isReserveSlashable()\` answers ${slashable ? "true" : "false"} for ${reserveSymbol}${atBlock(c)}. ${slashable ? "A deficit is outstanding on that reserve, so Umbrella may slash this stake token to cover it." : "No deficit is outstanding on that reserve at this block, so there is nothing for Umbrella to slash this token for."} It is a reading about the reserve at one block and says nothing about what any holder would lose: a share of a slashing that has not happened is a projection, and this section does not state one. Past slashings are not read here — this page reads state, not history.`,
+  summary: `Slashable now — Umbrella reports that ${reserveSymbol} ${slashable ? "has" : "has no"} deficit outstanding${atBlock(c)}. ${slashable ? "A deficit is outstanding on that reserve, so Umbrella may slash this stake token to cover it." : "No deficit is outstanding on that reserve at this block, so there is nothing for Umbrella to slash this token for."} It is a reading about the reserve at one block and says nothing about what any holder would lose: a share of a slashing that has not happened is a projection, and this section states none. Past slashings are not read here; this page reads state at one block.`,
   contract: { name: "Umbrella", address: AAVE_UMBRELLA },
   via: `${LANE} · Umbrella.isReserveSlashable(reserve) @ the pinned block`,
 });
@@ -250,7 +250,7 @@ const aaveVaultReserveHopProv_ = (c: AaveVaultCoords, reserveSymbol: string): Pr
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
-  summary: `Reserve covered — ${reserveSymbol}, reached by reading this stake token's \`asset()\`${atBlock(c)} and, where that answer is itself a static aToken, that wrapper's own \`asset()\`. Three of the four stake tokens hold a wrapped aToken rather than the reserve asset, so a holder is three hops from the reserve; stkGHO holds GHO directly.`,
+  summary: `Reserve covered — ${reserveSymbol}, reached through the asset this stake token holds${atBlock(c)} and, where that asset is a static aToken, through the asset that wrapper holds. Three of the four stake tokens hold a wrapped aToken, so a holder is three hops from the reserve; stkGHO holds GHO directly.`,
   via: `${LANE} · asset() on the stake token, then asset() on the wrapper @ the pinned block`,
   formula: "stakeToken.asset() → (stataToken.asset() where that is a wrapper)",
 });
@@ -269,7 +269,7 @@ const aaveVaultEmptyCountProv_ = (c: AaveVaultCoords, n: number, catalogSize: nu
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
-  summary: `${n} of the ${catalogSize} vaults answered zero to \`totalAssets()\`${atBlock(c)} — each holds nothing at this block. A reading about each vault, not a gap in the read: a vault whose call did not answer is stated as unread, separately, and is not in this count. Each of them still answers a share price, and it is not parity.`,
+  summary: `${n} of the ${catalogSize} vaults hold nothing${atBlock(c)} — each answered zero for its total assets, a reading about the vault. A vault whose read did not answer is stated as unread, separately, and is not in this count. Each of them still answers a share price, and it is not one to one.`,
   via: `${LANE} · count of vaults with totalAssets() = 0 @ the pinned block`,
   formula: "count of listed vaults where totalAssets() = 0",
 });
@@ -295,7 +295,7 @@ const aaveSghoAssetHeldProv_ = (c: AaveVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute(`${asset(c)}.balanceOf(the vault)`, c),
-  summary: `${asset(c)} the contract holds — the ERC-20 \`balanceOf()\` of ${asset(c)} at the vault's own address${atBlock(c)}. This is NOT \`totalAssets()\`: that figure is what the vault's stored yield index says its shares are worth, and this one is the token balance. Withdrawals are clamped to this number, not to that one. The two can sit either side of each other and nothing here asserts an order between them.`,
+  summary: `${asset(c)} the contract holds — the ${asset(c)} balance at the vault's address${atBlock(c)}. It is a different figure from total assets, which is what the vault's stored yield index says its shares are worth. Withdrawals are limited to this balance. The two can sit either side of each other.`,
   contract: vaultContract(c),
   via: `${LANE} · asset.balanceOf(vault) @ the pinned block`,
 });
@@ -306,7 +306,7 @@ const aaveSghoCapacityProv_ = (c: AaveVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("maxDeposit()", c),
-  summary: `Remaining capacity — the vault's own \`maxDeposit()\`${atBlock(c)}, in ${asset(c)}: the deposit cap the risk council has set less what \`totalAssets()\` already counts. Answered by the contract, and the two agree exactly. It is the ceiling at this block — the council can move the cap.`,
+  summary: `Remaining capacity — what the vault will still accept${atBlock(c)}, in ${asset(c)}, as the vault answers: the deposit cap the risk council has set less total assets, and the two agree. It is the ceiling at this block; the council can move the cap.`,
   contract: vaultContract(c),
   via: `${LANE} · maxDeposit() @ the pinned block`,
 });
@@ -317,7 +317,7 @@ const aaveSghoLastUpdateProv_ = (c: AaveVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("lastUpdate()", c),
-  summary: `Index last updated — the vault's stored \`lastUpdate()\`${atBlock(c)}, as unix seconds. It is the moment the contract last wrote its yield index, NOT this block's own timestamp: the two differ by however long it has been since anyone touched the vault. Printed in UTC because the chain's clock is in UTC.`,
+  summary: `Index last updated — the time the contract last wrote its yield index${atBlock(c)}, in unix seconds. It differs from this block's timestamp by however long it has been since anyone touched the vault. Printed in UTC, the chain's clock.`,
   contract: vaultContract(c),
   via: `${LANE} · lastUpdate() @ the pinned block`,
 });
@@ -330,7 +330,7 @@ const aaveStataATokenBalanceProv_ = (c: AaveVaultCoords, aToken: string | null):
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("aToken.balanceOf(the wrapper)", c),
-  summary: `aToken held — the aToken's own \`balanceOf()\` at this wrapper's address${atBlock(c)}, in ${asset(c)}. An aToken balance rebases with the reserve's interest, so this is the wrapper's supply position in the Pool as the Pool itself reports it. Everything the wrapper holds is this one aToken: it wraps exactly one, and the factory allows one wrapper per underlying asset.`,
+  summary: `aToken held — the aToken balance at this wrapper's address${atBlock(c)}, in ${asset(c)}. An aToken balance rebases with the reserve's interest, so this is the wrapper's supply position in the Pool as the Pool reports it. Everything the wrapper holds is this one aToken: it wraps one, and the factory allows one wrapper per underlying asset.`,
   contract: { name: "aToken", address: aToken ?? undefined },
   via: `${LANE} · aToken.balanceOf(vault) @ the pinned block`,
 });
@@ -347,7 +347,7 @@ const aaveVaultBackedByProv_ = (c: AaveVaultCoords, stakeSymbol: string, stake: 
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
-  summary: `${stakeSymbol}'s share of this vault — that token's \`balanceOf()\` of this vault's share token over this vault's \`totalSupply()\`${atBlock(c)}, both read at that block. It appears here because the same token's own \`asset()\` returned this vault at that block, which is the chain saying these shares ARE its backing: the stake token's supply is a claim on this one position. So the two layers hold the same assets once, and a reader must not add them. A share of the shares is a share of the pool — shares are fungible and the vault pooled them — and the figure carries no ranking and no risk reading.`,
+  summary: `${stakeSymbol}'s share of this vault — that token's holding of this vault's shares over all shares issued${atBlock(c)}. It appears here because the stake token's asset is this vault at that block, so these shares are its backing: the stake token's supply is a claim on this one position. The two layers hold the same assets once, so their figures are not added. A share of the shares is a share of the pool, since shares are fungible and the vault pooled them, and the figure carries no ranking and no risk reading.`,
   contract: vaultContract(c),
   inputs: [{ label: "stake token", value: stake, kind: "chain", note: "the address the roster returned" }],
   via: `${LANE} · balanceOf(the stake token) ÷ totalSupply() @ the pinned block`,
@@ -362,7 +362,7 @@ const aaveUmbrellaMaxSlashableProv_ = (c: AaveVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("getMaxSlashableAssets()", c),
-  summary: `Slashable amount — the token's own \`getMaxSlashableAssets()\`${atBlock(c)}, in ${asset(c)}: what Umbrella could take out of this stake token at this block, which is its \`totalAssets()\` less the floor \`MIN_ASSETS_REMAINING()\` keeps in it. The contract's own configuration read, and not a claim that any of it will be taken. No share of it is attributed to any holder anywhere on this page: an amount someone would lose in an event that has not happened is a projection, not a reading.`,
+  summary: `Slashable amount — what Umbrella could take out of this stake token${atBlock(c)}, in ${asset(c)}: its total assets less the minimum the contract keeps in it. It is the contract's configuration and says nothing of whether any will be taken. No share of it is attributed to any holder on this page: an amount someone would lose in an event that has not happened is a projection.`,
   contract: vaultContract(c),
   via: `${LANE} · getMaxSlashableAssets() @ the pinned block`,
 });
@@ -373,7 +373,7 @@ const aaveUmbrellaCustodyProv_ = (c: AaveVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute(`${asset(c)}.balanceOf(the stake token)`, c),
-  summary: `${asset(c)} the token holds — the ERC-20 \`balanceOf()\` of ${asset(c)} at this stake token's address${atBlock(c)}. Worth stating beside \`totalAssets()\` because that figure is a STORED COUNTER, incremented on deposit and decremented on withdrawal and on a slashing. Where the two agree, the counter and the custody agree; a slashing moves both, and only a slashing moves this token's share price.`,
+  summary: `${asset(c)} the token holds — the ${asset(c)} balance at this stake token's address${atBlock(c)}. It sits beside total assets because total assets is a counter stored in the contract, incremented on deposit and decremented on withdrawal and on a slashing. Where the two agree, the counter and the custody agree; a slashing moves both, and only a slashing moves this token's share price.`,
   contract: vaultContract(c),
   via: `${LANE} · asset.balanceOf(vault) @ the pinned block`,
 });
@@ -384,7 +384,7 @@ const aaveUmbrellaOwnerProv_ = (c: AaveVaultCoords, owner: string): Provenance =
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("owner()", c),
-  summary: `Who can slash this token — its own \`owner()\`${atBlock(c)}. The slash entry point is owner-only, so the address this call returns is the only one that can take assets out of the token, and it reads as the Umbrella contract itself.`,
+  summary: `Who can slash this token — its owner${atBlock(c)}. Only the owner can call the slash entry point, so this address is the only one that can take assets out of the token, and it reads as the Umbrella contract.`,
   contract: vaultContract(c),
   via: `${LANE} · owner() @ the pinned block`,
 });
@@ -395,7 +395,7 @@ const aaveUmbrellaWrapperPriceProv_ = (c: AaveVaultCoords, wrapperSymbol: string
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute(`${wrapperSymbol}.convertToAssets(10^${decimals})`, c),
-  summary: `One whole ${wrapperSymbol} in ${reserveOf(c)} — \`convertToAssets(10^${decimals})\` asked of the WRAPPER this stake token holds${atBlock(c)}, with the exponent read from that wrapper's own \`decimals()\` at the same block. It is the second of three hops: a stake share converts to wrapper units, a wrapper unit converts to ${reserveOf(c)}.`,
+  summary: `One whole ${wrapperSymbol} in ${reserveOf(c)} — what one whole share of the wrapper this stake token holds converts to${atBlock(c)}, with the exponent read from that wrapper's decimals at the same block. It is the second of three hops: a stake share converts to wrapper units, a wrapper unit converts to ${reserveOf(c)}.`,
   contract: { name: wrapperSymbol, address: c.vault },
   via: `${LANE} · wrapper.convertToAssets(one whole share) @ the pinned block`,
 });
@@ -409,7 +409,7 @@ const aaveVaultHolderSharesProv_ = (c: AaveVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("balanceOf(the holder)", c),
-  summary: `Shares held — the ERC-20 \`balanceOf()\` of this vault's own share token at ${c.holder ?? "the address"}${atBlock(c)}, scaled by the share token's own \`decimals()\` read at the same block. A balance at one block and nothing more: it says what the address holds, never who the address is.`,
+  summary: `Shares held — this address's balance of the vault's share token${atBlock(c)}, scaled by the share token's decimals read at the same block. A balance at one block: it says what the address holds and nothing about who the address is.`,
   contract: vaultContract(c),
   via: `${LANE} · balanceOf(holder) @ the pinned block`,
 });
@@ -419,7 +419,7 @@ const aaveVaultHolderFractionProv_ = (c: AaveVaultCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
-  summary: `Share of the vault — this address's \`balanceOf()\` over the share token's \`totalSupply()\`${atBlock(c)}, both read at that block. A ratio of two integers in the same units, so no price and no conversion enters it. It is a share of the SHARES, which is a share of the pool: holders are not attributed to individual deposits, because shares are fungible and the vault pooled them.`,
+  summary: `Share of the vault — this address's shares over all shares issued${atBlock(c)}, both read at that block. A ratio of two integers in the same units, so no price and no conversion enters it. It is a share of the shares, which is a share of the pool: holders are not attributed to individual deposits, because shares are fungible and the vault pooled them.`,
   contract: vaultContract(c),
   via: `${LANE} · balanceOf(holder) ÷ totalSupply() @ the pinned block`,
   formula: "balanceOf(holder) ÷ totalSupply()",
@@ -431,7 +431,7 @@ const aaveVaultCooldownStateProv_ = (c: AaveVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("getStakerCooldown(the holder)", c),
-  summary: `Cooldown state — \`getStakerCooldown()\` for this address${atBlock(c)}: the amount it covers, when the cooldown ends and how long the window after it lasts, exactly as the token stores them. Which of the four states that is — none started, waiting, open, or passed — is a comparison against THIS BLOCK's own timestamp, read with the block, never against the reader's clock. Only one cooldown record exists per address at a time, and an outgoing transfer decays it.`,
+  summary: `Cooldown state — this address's cooldown record${atBlock(c)}: the amount it covers, when the cooldown ends and how long the window after it lasts, as the token stores them. Which of the four states that is (none started, waiting, open or passed) is a comparison with this block's timestamp, read with the block, and never with the reader's clock. Only one cooldown record exists per address at a time, and an outgoing transfer decays it.`,
   contract: vaultContract(c),
   via: `${LANE} · getStakerCooldown(holder) @ the pinned block`,
 });
@@ -451,14 +451,14 @@ const aaveAttestedNameProv_ = (c: AaveVaultCoords, a: AttestedAddress): Provenan
     a.via === "book"
       ? {
           kind: "none",
-          text: `Open \`src/ts/${a.file}.ts\` at commit ${a.commit.slice(0, 10)} of \`aave-dao/aave-address-book\` and read \`${attestedShortName(a)}\``,
+          text: `To check: open src/ts/${a.file}.ts at commit ${a.commit.slice(0, 10)} of aave-dao/aave-address-book and read ${attestedShortName(a)}.`,
         }
       : recompute(`${a.enumerator?.call} on ${a.enumerator?.constant}`, c),
-  summary: `The name of this address — ${attestedClause(a)}: ${a.what}. It is a REGISTRY CITATION and the distinction is the whole point: a verified source name in a block explorer is the name a deployer gave a file, and anyone can deploy a contract under any name. ${
+  summary: `The name of this address — ${attestedClause(a)}: ${a.what}. It is a registry citation, which is what makes it a name: a verified source name in a block explorer is the name a deployer gave a file, and anyone can deploy a contract under any name. ${
     a.via === "book"
-      ? "The commit is pinned rather than a branch, so a constant that moves shows up as a disagreement rather than as a silent update."
-      : "The roster answer is a chain read at the block beside it, so an address published after the pinned commit is still found — a different and weaker claim than the book naming the address itself, and this says which."
-  } Nothing about what the contract DOES is claimed beyond the publication's own vocabulary, and no app, owner or person is named from it.`,
+      ? "The commit is pinned, so a constant that moves shows up as a disagreement with it."
+      : "The roster's answer is a chain read at the block beside it, so an address published after the pinned commit is still found; that is a weaker claim than the book naming the address, and this says which."
+  } Nothing is claimed about what the contract does beyond the publication's words, and no app, owner or person is named from it.`,
   contract: { name: "the holding address", address: a.address },
   via:
     a.via === "book"
@@ -480,8 +480,8 @@ const aaveVaultCatalogueMemberProv_ = (c: AaveVaultCoords, what: string): Proven
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
-  summary: `${what} is itself in this catalogue — its address came back from \`StataTokenFactory.getStataTokens()\` or \`Umbrella.getStkTokens()\` at this same block${atBlock(c)}. Membership is a chain fact and not a name: the test is whether an enumerator Aave publishes returned the address, and the same call that decided which vaults this section lists decided this.`,
-  via: `${LANE} · the enumerators' own answer @ the pinned block`,
+  summary: `${what} is in this catalogue — its address came back from the static aToken factory's or Umbrella's list${atBlock(c)}. Membership is a chain fact: the test is whether a list Aave publishes returned the address, and the same read that decided which vaults this section lists decided this.`,
+  via: `${LANE} · getStataTokens() + getStkTokens() @ the pinned block`,
   formula: "address ∈ getStataTokens() ∪ getStkTokens() ∪ { GhoEthereum.SGHO }",
 });
 
@@ -502,10 +502,10 @@ const aaveVaultCatalogueMemberProv_ = (c: AaveVaultCoords, what: string): Proven
 export const aaveFirstPartySourcesProv = (count: number, fetchedOn: string): Provenance => ({
   kind: "offchain",
   pclass: "offchain",
-  summary: `Aave's own pages — ${count.toLocaleString("en-US")} pages the venue publishes about the three families this directory lists, each fetched on ${fetchedOn} and answering 200; the \`aave.com/docs\` ones serve the same page as raw markdown under \`Accept: text/markdown\`. They are CITED, NOT READ: no figure on this site comes from them, and the claim made here is only that Aave publishes them. Nothing in this block attributes a holding to an app — a holder in this section is the holder's own wallet address, and no row names an app.`,
+  summary: `Aave's pages — ${count.toLocaleString("en-US")} pages the venue publishes about the three families this directory lists, each fetched and found on ${fetchedOn}; the aave.com/docs ones serve the same page as raw markdown on request. They are cited and not read: no figure on this site comes from them, and the claim made here is that Aave publishes them. No row in this section names an app: a holder here is the holder's wallet address.`,
   verify: {
     kind: "none",
-    text: "Open each page: they are Aave's own, at aave.com and app.aave.com, and nothing on this site is computed from them",
+    text: "To check: open each page at aave.com and app.aave.com.",
   },
   via: `aave.com and app.aave.com · fetched ${fetchedOn}`,
 });
@@ -564,7 +564,7 @@ const aaveVaultCensusBalanceProv_ = (c: AaveVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.censusBlock },
   verify: recompute("balanceOf(the holder)", { ...c, blockNumber: c.censusBlock }),
-  summary: `Shares held at the census block — the ERC-20 \`balanceOf()\` of this vault's share token at ${c.holder ?? "the address"}${atCensus(c)}, read by the census and kept. It is stated here because the live read for this card did not answer, and an unread figure is stated as unread rather than shown as a zero or as a dash. What the address holds NOW is a different question and this page does not answer it.`,
+  summary: `Shares held at the census block — this address's balance of the vault's share token${atCensus(c)}, read by the census and kept. It is stated because the live read for this card did not answer, and an unread figure is stated as unread. What the address holds now is not answered on this page.`,
   contract: vaultContract(c),
   via: `${censusLane(c)} · balanceOf(holder) @ the census block`,
 });
@@ -583,11 +583,11 @@ const aaveVaultPositionSeenProv_ = (c: AaveVaultCoords, which: "first" | "last",
   source: { block },
   verify: {
     kind: "recompute",
-    text: `Sweep this vault's Transfer logs to block ${c.censusBlock ?? "the census block"} and take the ${which === "first" ? "lowest" : "highest"} block of the ones naming this address`,
+    text: `To check: ask any ${chainWord(c)} archive node for this vault's Transfer logs up to block ${c.censusBlock ?? "the census block"} and take the ${which === "first" ? "lowest" : "highest"} block among those naming this address.`,
   },
-  summary: `${which === "first" ? "First seen" : "Last activity"} — block ${block.toLocaleString("en-US")}, the ${which === "first" ? "lowest" : "highest"} block of any \`Transfer\` of this vault naming this address, out of the whole stream swept${atCensus(c)}. The date beside it is that block's own \`timestamp\`, read at that block and printed as one UTC instant. ${which === "last" ? "It is the last block this address moved shares of THIS vault — the address may have done anything at all since, elsewhere." : "Before it, this address had never held a share of this vault."}`,
+  summary: `${which === "first" ? "First seen" : "Last activity"} — block ${block.toLocaleString("en-US")}, the ${which === "first" ? "lowest" : "highest"} block of any transfer of this vault that names this address, in the whole history read${atCensus(c)}. The date beside it is that block's timestamp, printed as one UTC instant. ${which === "last" ? "It is the last block this address moved shares of this vault; the address may have done anything since, elsewhere." : "Before it, this address had never held a share of this vault."}`,
   contract: vaultContract(c),
-  via: `${censusLane(c)} · eth_getLogs(Transfer) + eth_getBlockByNumber @ the census block`,
+  via: `${censusLane(c)} · Transfer logs + block timestamp @ the census block`,
 });
 
 /** What the holding address is, as the CENSUS classified it — the same reads as
@@ -596,10 +596,13 @@ const aaveVaultPositionShapeProv_ = (c: AaveVaultCoords, kind: string, codeSize:
   kind: "chain",
   pclass: "state",
   source: { block: c.censusBlock },
-  verify: recompute("eth_getCode(the holder)", { ...c, blockNumber: c.censusBlock }),
-  summary: `What this address is — \`eth_getCode\`${atCensus(c)} returned ${codeSize === 0 ? "no code" : codeSize == null ? "code the census recorded no length for" : `${codeSize.toLocaleString("en-US")} bytes`}, read as ${kind}, and kept with the census row. Every verdict is a read: an empty answer is an externally owned account, a 23-byte \`0xef0100…\` code is the EIP-7702 delegation indicator, a released Safe singleton is an exact address match, an \`asset()\` plus a \`totalSupply()\` is a contract answering the ERC-4626 accessors, and an implementation slot is a pointer to another address to read. NO APP IS NAMED FROM ANY OF IT. A card states the mechanism and stops; what a contract does takes reading it, and nothing here reads it.`,
+  verify: {
+    kind: "recompute",
+    text: `To check: ask any ${chainWord(c)} archive node for the code at ${c.holder ?? "the address"}${atCensus(c)}.`,
+  },
+  summary: `What this address is — the census read the code at this address${atCensus(c)}: ${codeSize === 0 ? "no code" : codeSize == null ? "code the census recorded no length for" : `${codeSize.toLocaleString("en-US")} bytes`}, read as ${kind}, and kept with the census row. Every verdict is a read: no code is an externally owned account, 23 bytes of code starting 0xef0100 is the EIP-7702 delegation indicator, a released Safe singleton is an exact address match, a contract that answers for its asset and its total supply is answering the ERC-4626 accessors, and an implementation slot is a pointer to another address to read. No app is named from any of it. A card states the mechanism and stops; what a contract does takes reading it, and nothing here reads it.`,
   contract: { name: "the holding address", address: c.holder },
-  via: `${censusLane(c)} · eth_getCode(holder) @ the census block`,
+  via: `${censusLane(c)} · the holder's code @ the census block`,
 });
 
 /** The two lanes disagreeing — the card's one interpretive sentence, and it is
@@ -608,7 +611,7 @@ const aaveVaultPositionDivergenceProv_ = (c: AaveVaultCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
-  summary: `Two readings, two blocks — the census read this address's \`balanceOf\`${atCensus(c)} and this page read it again${atBlock(c)}, and the two disagree about whether anything is held. Both are true of their own block; neither is stated alone, because showing one would let a reading at one block stand as a claim about another. What happened between them is in the address's own timeline on the vault's page.`,
+  summary: `Two readings, two blocks — the census read this address's balance${atCensus(c)} and this page read it again${atBlock(c)}, and the two disagree about whether anything is held. Each is true at its block; neither is stated alone, because showing one would let a reading at one block stand as a claim about another. What happened between them is in the address's timeline on the vault's page.`,
   contract: vaultContract(c),
   via: `${LANE} · balanceOf(holder) @ the pinned block, beside ${censusLane(c)}`,
   formula: "balanceOf(holder) at the page's block, compared with balanceOf(holder) at the census block",
@@ -644,7 +647,7 @@ const aaveVaultValueUsdProv_ = (c: AaveVaultCoords, v: VaultPositionValue, share
   const assetSym = v.assetSymbol ?? "the vault's asset";
   const hop =
     v.underlyingUnitAssets != null
-      ? ` That asset is itself an ERC-4626 wrapper the oracle does not price directly, so the price is its UNDERLYING's — \`getAssetPrice(${v.pricedAsset ?? "the underlying"})\` — with one whole ${assetSym} converted through the wrapper's own \`convertToAssets()\` (${v.underlyingUnitAssets} underlying units at block ${block ?? "the census block"}).`
+      ? ` That asset is an ERC-4626 wrapper the oracle does not price directly, so the price is its underlying's, ${v.pricedAsset ?? "the underlying"}, with one whole ${assetSym} converted through the wrapper (${v.underlyingUnitAssets} underlying units at block ${block ?? "the census block"}).`
       : "";
   return {
     kind: "chain-derived",
@@ -652,9 +655,9 @@ const aaveVaultValueUsdProv_ = (c: AaveVaultCoords, v: VaultPositionValue, share
     source: { block },
     verify: {
       kind: "recompute",
-      text: `Re-run balanceOf(the holder) and convertToAssets(10^${shareDecimals}) on the vault, and getAssetPrice(${v.pricedAsset ?? "the asset"}) on the oracle, all at block ${block ?? "the census block"} against any ${chainWord(c)} archive node; multiply and truncate to 1e-8 dollars`,
+      text: `To check: ask any ${chainWord(c)} archive node, at block ${block ?? "the census block"}, for balanceOf(the holder) and convertToAssets(10^${shareDecimals}) on the vault and getAssetPrice(${v.pricedAsset ?? "the asset"}) on the oracle; multiply, and truncate to 1e-8 dollars.`,
     },
-    summary: `Value in USD at the census block — this address's \`balanceOf()\` at block ${block ?? "the census block"}, through the vault's own \`convertToAssets()\` at that block (one whole share = ${v.shareUnitAssets ?? "?"} raw units of ${assetSym}), priced by Aave V3's oracle on ${chainWord(c)}: \`IAaveOracle.getAssetPrice(${v.pricedAsset ?? "the asset"})\` answered ${v.oraclePriceE8 != null ? usdOf(v.oraclePriceE8) : "?"} USD at the same block.${hop} Computed once by the daily census with integer arithmetic and truncated — never read for this page — so it is what the position was worth at THAT block and says nothing about now. The oracle is Aave's, the feed Aave itself liquidates against on this chain, and not this vault's own protocol's: it is named here because which oracle is a choice, and the figure is only as true as the feed it names.`,
+    summary: `Value in USD at the census block — this address's balance at block ${block ?? "the census block"}, converted through the vault's share price at that block (one whole share = ${v.shareUnitAssets ?? "?"} raw units of ${assetSym}), and priced by Aave V3's oracle on ${chainWord(c)}, which gave ${v.oraclePriceE8 != null ? usdOf(v.oraclePriceE8) : "?"} USD for ${v.pricedAsset ?? "the asset"} at the same block.${hop} The daily census computed it once with integer arithmetic and truncated it, and this page does not read it again, so it is what the holding was worth at that block and says nothing about now. The oracle is Aave's, the feed Aave liquidates against on this chain, and is not this vault's protocol's: it is named because which oracle is a choice, and the figure is only as true as that feed.`,
     contract: oracleContract(c, v),
     via: `${censusLane(c)} · balanceOf(holder) × convertToAssets(1 share) × IAaveOracle.getAssetPrice(asset) @ the census block`,
     formula: `balanceOf(holder) ÷ 10^${shareDecimals} × convertToAssets(10^${shareDecimals}) ÷ 10^${v.assetDecimals ?? "assetDecimals"}${v.underlyingUnitAssets != null ? ` × ${v.underlyingUnitAssets} ÷ 10^${v.underlyingDecimals ?? "underlyingDecimals"}` : ""} × getAssetPrice(${v.pricedAsset ?? "asset"}) ÷ 1e8`,
@@ -671,8 +674,11 @@ const aaveVaultUnpricedProv_ = (c: AaveVaultCoords, v: VaultPositionValue): Prov
       kind: "chain",
       pclass: "oracle",
       source: { block },
-      verify: { kind: "none", text: "Nothing was read: there is no call to re-run until the census prices this vault" },
-      summary: `Not priced — the daily census has not yet run its price pass over this vault, so no oracle was asked and no USD figure exists for it. An empty slot rather than a zero or a dash: nothing was read, and the card says so. The next census tick prices every vault it sweeps.`,
+      verify: {
+        kind: "none",
+        text: "To check: there is nothing to ask a node for until the census prices this vault.",
+      },
+      summary: `Not priced — the daily census has not yet run its price pass over this vault, so no oracle was asked and no USD figure exists for it. The slot is empty because nothing was read. The next census run prices every vault it sweeps.`,
       contract: vaultContract(c),
       via: `${censusLane(c)} · no price columns yet`,
     };
@@ -683,9 +689,9 @@ const aaveVaultUnpricedProv_ = (c: AaveVaultCoords, v: VaultPositionValue): Prov
     source: { block },
     verify: {
       kind: "recompute",
-      text: `Re-run getAssetPrice(${v.asset ?? "the asset"}) on the oracle at block ${block} against any ${chainWord(c)} archive node — it reverts, or answers 0`,
+      text: `To check: ask any ${chainWord(c)} archive node for getAssetPrice(${v.asset ?? "the asset"}) on Aave V3's oracle at block ${block}; it reverts or answers 0.`,
     },
-    summary: `Not priced — Aave V3's oracle on ${chainWord(c)} (\`IAaveOracle.getAssetPrice\`) declined ${assetSym}${v.asset ? ` (${v.asset})` : ""} at block ${block}: the call reverted or answered zero, and a zero from a price feed is the feed declining, not a reading of value. So this card carries no USD figure at all — an empty slot, never a substitute from some other feed (chain-truth charter S3) — and the row sits outside every USD bracket and inside the listing's "Unpriced" set instead. Its shares, its claim in ${assetSym} and its share of the vault are stated exactly as they are.`,
+    summary: `Not priced — Aave V3's oracle on ${chainWord(c)} declined ${assetSym}${v.asset ? ` (${v.asset})` : ""} at block ${block}: the call reverted or answered zero, and a zero from a price feed is the feed declining. So this card carries no USD figure, and none from another feed (chain-truth charter S3); the row sits outside every USD bracket and inside the listing's "Unpriced" set. Its shares, its claim in ${assetSym} and its share of the vault are stated as read.`,
     contract: oracleContract(c, v),
     via: `${censusLane(c)} · IAaveOracle.getAssetPrice(asset) @ the census block — declined`,
   };
