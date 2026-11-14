@@ -55,9 +55,9 @@ export function CompoundFlowsNote({ facts, baseSymbol, ethQuoted }: CompoundFlow
       {facts && facts.absorbs > 0 && (
         <p>
           {n(facts.absorbs, "An absorb", "absorbs")} liquidated the account: Comet takes every collateral asset (Seized
-          by the absorb) and clears the debt (Cleared by the absorb).
+          at liquidation) and clears the debt (Cleared at liquidation).
           {facts.credits > 0
-            ? ` Where the seized collateral was paid out at more than the debt, the rest was supplied to the account in ${baseSymbol} (Left over after the absorb).`
+            ? ` Where the seized collateral was paid out at more than the debt, the rest was supplied to the account in ${baseSymbol} (Left over after the liquidation).`
             : ""}{" "}
           Comet later sells the seized collateral to buyers for its reserves (buyCollateral), which moves nothing in
           this account.
@@ -100,8 +100,8 @@ export function compoundFlowsContent(): LearnMoreContent {
       "The bars add up every event Compound V3 has recorded for this account, each at Comet's price feed at its block, and the line under them draws what it held and owed at the end of each day.",
     stepsHeading: "How it's built:",
     steps: [
-      "Collateral: supplied and received, less withdrawn, sent and seized by an absorb, each at its block's price, plus the change in those prices since (Market move), is what the account holds.",
-      "Borrow balance: borrowed, plus the interest accrued, less repaid and cleared by an absorb, is what the account owes: its principal at the market's borrow index.",
+      "Collateral: supplied and received, less withdrawn, sent and seized at liquidation, each at its block's price, plus the change in those prices since (Market move), is what the account holds.",
+      "Borrow balance: borrowed, plus the interest accrued, less repaid and cleared at liquidation, is what the account owes: its principal at the market's borrow index.",
       "Supply: supplied, plus the interest earned, less withdrawn, is what a lender holds: its principal at the market's supply index.",
     ],
     detailsHeading: "Key concepts:",

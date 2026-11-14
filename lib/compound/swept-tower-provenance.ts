@@ -26,7 +26,7 @@
 
 import type { Provenance, ProvVerify } from "@/components/shared/provenance";
 import type { CompoundTowerVocabulary } from "./economics";
-import { type CompoundCoords, type CompoundLifetimeFlow } from "./event-provenance";
+import { FLOW_NAME, type CompoundCoords, type CompoundLifetimeFlow } from "./event-provenance";
 
 const cometContract = (coords?: CompoundCoords) => ({
   name: coords?.marketLabel ? `Comet (${coords.marketLabel})` : "Comet",
@@ -51,7 +51,7 @@ const FLOW_STORY: Record<CompoundLifetimeFlow, string> = {
   "absorbed debt":
     "the debt the protocol cleared for this account in liquidations: the part of each AbsorbDebt's basePaidOut that took the base balance from negative up to zero",
   "absorb credit":
-    "the rest of each AbsorbDebt's basePaidOut: the seized collateral's credited value past the debt, left to the account as a lent balance",
+    "the rest of each AbsorbDebt's basePaidOut: what the protocol paid out for the seized collateral past the debt, left to the account as a supplied balance",
   "interest earned": "the interest the lent base earned between the account's events, row by row",
   "interest charged": "the interest the borrowed base was charged between the account's events, row by row",
   "supplied collateral": "every collateral amount this account supplied",
@@ -97,7 +97,7 @@ function cometLogVocabulary(lane: { via: string; whole: string; wholeAnd: string
       kind: "chain",
       pclass: "state",
       verify: stateVerify("collateralBalanceOf", coords.blockNumber),
-      summary: `The ${sym} collateral the account holds — read straight from the Comet with \`collateralBalanceOf\`${coords.blockNumber != null ? ` pinned to block ${coords.blockNumber.toLocaleString("en-US")}` : ""}. Collateral does not accrue in Comet, so this is also exactly what a replay of the account's own collateral supplies, withdrawals, transfers and absorptions arrives at — the timeline's running balance is checked against it.`,
+      summary: `The ${sym} collateral the account holds — read straight from the Comet with \`collateralBalanceOf\`${coords.blockNumber != null ? ` pinned to block ${coords.blockNumber.toLocaleString("en-US")}` : ""}. Collateral does not accrue in Comet, so this is also exactly what a replay of the account's own collateral supplies, withdrawals, transfers and liquidations arrives at — the timeline's running balance is checked against it.`,
       contract: cometContract(coords),
       via: "Comet · collateralBalanceOf at the pinned block",
     }),
@@ -105,7 +105,7 @@ function cometLogVocabulary(lane: { via: string; whole: string; wholeAnd: string
     lifetimeFlow: (flow, sym, coords): Provenance => ({
       kind: "chain-derived",
       pclass: "emitted",
-      summary: `Lifetime ${flow} (${sym}) — ${FLOW_STORY[flow]}, summed over every event the Comet has emitted for this account since the market's first block. Base flows split at the running balance's zero crossings — Comet's own semantics (a supply repays debt first; a withdraw past the balance is a borrow). Shown only when ${lane.whole}, and when the replayed collateral matches the Comet's own \`collateralBalanceOf\`.`,
+      summary: `Lifetime ${FLOW_NAME[flow] ?? flow} (${sym}) — ${FLOW_STORY[flow]}, summed over every event the Comet has emitted for this account since the market's first block. Base flows split at the running balance's zero crossings — Comet's own semantics (a supply repays debt first; a withdraw past the balance is a borrow). Shown only when ${lane.whole}, and when the replayed collateral matches the Comet's own \`collateralBalanceOf\`.`,
       contract: cometContract(coords),
       via: `${SWEEP_VIA} · Σ amount across the account's own logs · split at zero crossings`,
     }),
@@ -131,7 +131,7 @@ function cometLogVocabulary(lane: { via: string; whole: string; wholeAnd: string
     debtPrincipal: (sym, coords): Provenance => ({
       kind: "chain-derived",
       pclass: "emitted",
-      summary: `Borrowed ${sym} PRINCIPAL — the net of every draw, repayment and liquidation absorption the account's own Comet events moved, over every event the Comet has emitted for it since the market's first block. Principal only — the interest accrued since each draw is the separate accrued segment above it (principal + interest = the Comet's own borrowBalanceOf).`,
+      summary: `Borrowed ${sym} PRINCIPAL — the net of every draw, repayment and liquidation the account's own Comet events moved, over every event the Comet has emitted for it since the market's first block. Principal only — the interest accrued since each draw is the separate accrued segment above it (principal + interest = the Comet's own borrowBalanceOf).`,
       contract: cometContract(coords),
       via: `${SWEEP_VIA} · Σ (borrowed − repaid − absorbed) · first block → head`,
     }),

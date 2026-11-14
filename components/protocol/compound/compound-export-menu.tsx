@@ -6,6 +6,7 @@ import type { WholeHistoryFetch } from "@/components/shared/export-menu";
 import type { PositionCardExports } from "@/components/shared/position-card";
 import type { QueuedExportRequest } from "@/lib/shared/queued-export";
 import { compoundPositionsToMarkdown, type CompoundPositionsMarkdownArgs } from "@/lib/compound/position-to-markdown";
+import { COMPOUND_V3_TERMS } from "@/lib/compound/product";
 
 export function compoundExports({
   csvFilename,
@@ -34,5 +35,6 @@ export function compoundExports({
     queued,
     csvFilename,
     scopeNote,
+    ariaLabel: `Export this ${COMPOUND_V3_TERMS.position.one}`,
   };
 }

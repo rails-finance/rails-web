@@ -31,7 +31,7 @@ export function ProtocolFrontDoor({ session }: { session: SessionProtocol }) {
     markets && { href: markets.href, label: "Markets" },
     // The listing on a chain without an index holds only the wallets Rails
     // has read (Arbitrum item 31).
-    { href: entry.listingHref, label: "Positions Rails has read" },
+    { href: entry.listingHref, label: entry.listingLinkLabel ?? "Positions Rails has read" },
     { href: entry.infoHref, label: `About ${entry.label} on Rails` },
   ].filter((l): l is { href: string; label: string } => !!l);
 

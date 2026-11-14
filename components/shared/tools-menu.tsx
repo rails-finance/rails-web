@@ -135,6 +135,7 @@ export function ToolsMenu({
   leading,
   label,
   heading,
+  noun = "position",
   children,
 }: {
   /** `tools`: the spanner trigger of a page row. `card`: the position card's
@@ -152,6 +153,9 @@ export function ToolsMenu({
   ariaLabel?: string;
   /** The `event` menu's accessible name and its sheet's heading. */
   label?: string;
+  /** The family's unit, naming the card and Tools menus ("Position menu",
+   *  Compound V3's "Account menu"); lower case. */
+  noun?: string;
   heading?: string;
   /** Flash the trigger as the confirmation for a copy taken from the menu —
    *  the menu closes on action, so the trigger is where the answer lands. */
@@ -223,7 +227,7 @@ export function ToolsMenu({
   if (!leading && !children) return null;
 
   if (card) {
-    const name = eventMenu ? (label ?? "") : "Position menu";
+    const name = eventMenu ? (label ?? "") : `${noun[0].toUpperCase()}${noun.slice(1)} menu`;
     const wrapperData =
       variant === "panel"
         ? { "data-panel-menu": "" }

@@ -211,7 +211,7 @@ const headerLayout = (card) =>
     .locator('[data-card-menu] [role="menu"] [role="menuitem"]')
     .evaluateAll((els) => els.map((e) => e.getAttribute("data-menu-item") ?? e.textContent.trim().split("\n")[0]));
   const saveAt = c17Rows.indexOf("save-position");
-  const exportAt = c17Rows.findIndex((t) => /^Copy Position/.test(t));
+  const exportAt = c17Rows.findIndex((t) => /^Copy (Position|Account)/.test(t));
   check(
     "1g2. the card ⋮ carries Save position before the exports",
     saveAt > 0 && (exportAt < 0 || saveAt < exportAt),

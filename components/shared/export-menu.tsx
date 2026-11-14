@@ -79,6 +79,9 @@ export type ExportMenuProps = {
   variant?: "tools" | "card";
   /** The card menu's rows above the shapes (`ToolsMenu` leading). */
   leading?: (close: () => void) => ReactNode;
+  /** The family's unit in the rows and the menu's name ("Copy Position",
+   *  Compound V3's "Copy Account"); lower case. */
+  noun?: string;
 };
 
 export function ExportMenu({
@@ -91,6 +94,7 @@ export function ExportMenu({
   queued,
   variant,
   leading,
+  noun = "position",
 }: ExportMenuProps) {
   const [copied, setCopied] = useState(false);
   const [preparing, setPreparing] = useState(false);
@@ -169,19 +173,19 @@ export function ExportMenu({
 
   return (
     <>
-      <ToolsMenu ariaLabel={ariaLabel} copied={copied} variant={variant} leading={leading}>
+      <ToolsMenu ariaLabel={ariaLabel} copied={copied} variant={variant} leading={leading} noun={noun}>
         {(close) => (
           <>
             <ToolsMenuItem
               icon={<Copy size={16} />}
-              title="Copy Position"
+              title={`Copy ${noun[0].toUpperCase()}${noun.slice(1)}`}
               subtitle="Copy as Markdown for LLMs"
               onClick={() => void copyMarkdown(close)}
             />
             <ToolsMenuItem
               icon={<FileText size={16} />}
               title="View as Markdown"
-              subtitle="View this position as plain text"
+              subtitle={`View this ${noun} as plain text`}
               onClick={() => viewMarkdown(close)}
             />
             <ToolsMenuItem

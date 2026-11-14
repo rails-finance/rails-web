@@ -95,8 +95,8 @@ export interface CompoundLifetimeFlows {
   /** The debt an absorb cleared: the part of `basePaidOut` that took the
    *  base balance from negative up to zero. */
   absorbedDebt: number;
-  /** The rest of `basePaidOut`: the seized collateral's credited value past
-   *  the debt, left to the account as a lent balance. */
+  /** The rest of `basePaidOut`: what the protocol paid out for the seized
+   *  collateral past the debt, left to the account as a supplied balance. */
   absorbCredit?: number;
   /** `absorbedDebt` holds the credit past the debt too (see
    *  `CompoundLifetimeRaw.absorbUnsplit`); `absorbCredit` is then absent. */
@@ -263,8 +263,8 @@ export function splitCompoundBaseFlow(
   delta: bigint,
 ) {
   if (kind === "absorb_debt") {
-    // basePaidOut is the debt cleared plus whatever the credited collateral
-    // value left over: the debt leg takes the first, the credit the rest.
+    // basePaidOut is the debt cleared plus whatever the payout left past it:
+    // the debt leg takes the first, the credit leg the rest.
     const paid = absBig(delta);
     const cleared = minBig(paid, maxBig(ZERO, -before));
     acc.absorbedDebt += cleared;
