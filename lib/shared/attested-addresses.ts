@@ -154,8 +154,8 @@ export function attestedByGsmRegistry(address: string): AttestedAddress {
  *  `attestationClause` draws for a catalogue row. */
 export function attestedClause(a: AttestedAddress): string {
   return a.via === "book"
-    ? `${a.publisher} publishes this address as \`${a.constant}\` in its own address book (\`aave-dao/aave-address-book\`, \`src/ts/${a.file}.ts\`, commit ${a.commit.slice(0, 10)})`
-    : `${a.publisher} publishes \`${a.enumerator?.constant}\`, and that contract's own \`${a.enumerator?.call}\` returned this address`;
+    ? `${a.publisher} publishes this address as ${a.constant} in its address book (aave-dao/aave-address-book, src/ts/${a.file}.ts, commit ${a.commit.slice(0, 10)})`
+    : `${a.publisher} publishes ${a.enumerator?.constant}, and the list that contract returns includes this address`;
 }
 
 /** The constant's own short name — `GSM_USDT` out of `GhoEthereum.GSM_USDT`.

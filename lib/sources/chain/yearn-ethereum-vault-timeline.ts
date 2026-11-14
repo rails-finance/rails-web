@@ -275,6 +275,9 @@ export async function loadYearnEthereumVaultTimeline(
             logCount: counted.count,
             withheldAbove: counted.count,
             logCountIsLowerBound: !counted.exact,
+            // A recount that covered the whole range is a whole count the
+            // balance check never saw: the logs were not handed over.
+            withheldBasis: counted.exact ? "unchecked" : "floor",
           },
         },
         allEvents: [],
@@ -360,7 +363,10 @@ export async function loadYearnEthereumVaultTimeline(
     // here; the inline horizon is.
     if (transfers.length > VAULT_TIMELINE_HORIZON)
       return {
-        timeline: { ...base, coverage: { ...base.coverage, withheldAbove: transfers.length } },
+        timeline: {
+          ...base,
+          coverage: { ...base.coverage, withheldAbove: transfers.length, withheldBasis: "checked" },
+        },
         allEvents: [],
       };
 
