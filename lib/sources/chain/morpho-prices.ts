@@ -1,9 +1,11 @@
 // A Morpho Blue market's oracle price at a list of past blocks, for the
 // Lifetime flows panel's one price per UTC day (lib/morpho/price-days.ts;
-// rails-ops TO-DO-ui-jobs.md item 687). The market's params are read once a
-// process, at the highest block first asked (they are immutable, and a past
-// block replays from cache), then one oracle price() per block. The opened card's fuller read,
-// the borrow rate and the block before, stays on /api/chain/morpho/at-block.
+// rails-ops TO-DO-ui-jobs.md item 687). The market's params are read at head
+// once a process (they never change once the market exists; a market not
+// created answers a zero tuple, which is refused and not kept), then one
+// oracle price() per block; on Arbitrum a block that answers 0 is read once
+// more. The opened card's fuller read, the borrow rate and the block before,
+// stays on /api/chain/morpho/at-block.
 //
 // SERVER-ONLY.
 
@@ -35,7 +37,11 @@ export interface MorphoPricesDeps {
   client?: Pick<PublicClient, "readContract">;
   /** The loan and collateral tokens' decimals. */
   decimals?: (loanToken: string, collateralToken: string) => Promise<[number, number]>;
+  /** The back-off before an Arbitrum block that answered 0 is read again. */
+  retryMs?: number;
 }
+
+const RETRY_BACKOFF_MS = 500;
 
 async function readDecimals(loanToken: string, collateralToken: string, chainId: ChainId): Promise<[number, number]> {
   const metas = await resolveErc20Meta([loanToken.toLowerCase(), collateralToken.toLowerCase()], chainId);
@@ -60,13 +66,17 @@ export async function loadMorphoPricesAtBlocks(
   const key = `${deployment.chainId}:${marketId}`;
   let params = PARAMS.get(key);
   if (!params) {
-    params = client.readContract({
-      address: deployment.blue as `0x${string}`,
-      abi: MORPHO_ABI,
-      functionName: "idToMarketParams",
-      args: [marketId],
-      blockNumber: BigInt(sorted[sorted.length - 1]),
-    });
+    params = client
+      .readContract({
+        address: deployment.blue as `0x${string}`,
+        abi: MORPHO_ABI,
+        functionName: "idToMarketParams",
+        args: [marketId],
+      })
+      .then((p) => {
+        if (BigInt(p[2]) === BigInt(0)) throw new Error(`no Morpho Blue market ${marketId}`);
+        return p;
+      });
     PARAMS.set(key, params);
     params.catch(() => PARAMS.delete(key));
   }
@@ -76,20 +86,28 @@ export async function loadMorphoPricesAtBlocks(
   )(loanToken, collateralToken);
   const scale = 10 ** (36 + loanDecimals - collateralDecimals);
   const out: [number, number][] = sorted.map((b) => [b, 0]);
+  const priceAt = async (block: number): Promise<number> => {
+    try {
+      const raw = await client.readContract({
+        address: oracle,
+        abi: ORACLE_ABI,
+        functionName: "price",
+        blockNumber: BigInt(block),
+      });
+      return raw > BigInt(0) ? Number(raw) / scale : 0;
+    } catch {
+      return 0;
+    }
+  };
   let next = 0;
   const worker = async () => {
     while (next < sorted.length) {
       const i = next++;
-      try {
-        const raw = await client.readContract({
-          address: oracle,
-          abi: ORACLE_ABI,
-          functionName: "price",
-          blockNumber: BigInt(sorted[i]),
-        });
-        out[i][1] = raw > BigInt(0) ? Number(raw) / scale : 0;
-      } catch {
-        out[i][1] = 0;
+      out[i][1] = await priceAt(sorted[i]);
+      // The keyless Arbitrum gateway refuses now and then: once more.
+      if (out[i][1] === 0 && arbitrum) {
+        await new Promise((r) => setTimeout(r, deps.retryMs ?? RETRY_BACKOFF_MS));
+        out[i][1] = await priceAt(sorted[i]);
       }
     }
   };

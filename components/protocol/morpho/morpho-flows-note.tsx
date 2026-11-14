@@ -68,10 +68,10 @@ export function MorphoFlowsNote({ facts, loanSymbol, collSymbol, name }: MorphoF
       )}
       {borrower && facts && (
         <p>
-          The oracle is read once for each UTC day with events, at the block of that day&apos;s last event, and every
-          collateral flow that day is valued at that price; a liquidation keeps the price it ran on.
+          Every collateral flow takes the oracle&apos;s price after the last event of its UTC day; a liquidation keeps
+          the price it ran on.
           {facts.nearest > 0
-            ? ` ${n(facts.nearest, "One collateral flow takes", "collateral flows take")} the nearest priced day's price: the page reads at most ${MORPHO_PRICE_DAYS} days, and ${facts.nearest === 1 ? "its day was" : "their days were"} not read.`
+            ? ` ${n(facts.nearest, "One collateral flow takes", "collateral flows take")} the nearest priced day's price (the page prices at most ${MORPHO_PRICE_DAYS} days).`
             : ""}{" "}
           No daily oracle price is recorded, so between days with events the collateral keeps the price of the latest
           priced day, and a price more than 30 days old is stated as such.
@@ -87,7 +87,7 @@ export function morphoFlowsContent(name: string): LearnMoreContent {
     intro: `The bars add up every event ${name} has recorded for this position, in the market's loan asset, and the line under them draws what it held and owed at the end of each day.`,
     stepsHeading: "How it's built:",
     steps: [
-      "Collateral: supplied, less withdrawn, less seized in liquidations, each at the market oracle's price at the block of its day's last event, plus the change in that price since (Market move), is what the position holds.",
+      "Collateral: supplied, less withdrawn, less seized in liquidations, each at the market oracle's price on its day, plus the change in that price since (Market move), is what the position holds.",
       "Debt: borrowed, plus the interest accrued, less repaid, less repaid by liquidators and any bad debt realized, is what the position owes: its borrow shares at the market's totals.",
       "Supply: supplied, plus the interest earned, less withdrawn and any bad debt realized, is what a lender holds: its supply shares at the market's totals.",
     ],

@@ -33,20 +33,24 @@ import {
 import { MORPHO_PRICE_DAYS, morphoDayPriceMap, morphoPriceChunks, morphoPriceDayBlocks } from "@/lib/morpho/price-days";
 import type { MorphoPricesResponse } from "@/lib/sources/chain/morpho-prices";
 
-/** One request's prices by block; a failed request reads as none, and the
- *  days it held take the nearest priced day's price. */
+/** One request's prices by block, asked once more after a failure; a request
+ *  that fails twice reads as none, and the days it held take the nearest
+ *  priced day's price. */
 async function loadMorphoPrices(marketId: string, chainId: number, blocks: number[]): Promise<[number, number][]> {
-  // One spelling of the market, whichever the page holds, for one edge-cache
-  // entry per set of blocks; `v=1` keys a changed answer away from an older one.
+  // The one spelling the route takes (`parseMorphoPricesQuery`), for one
+  // edge-cache entry per set of blocks; `v=1` keys a changed answer away from an older one.
   const market = marketId.toLowerCase().replace(/^0x/, "");
   const url = `/api/chain/morpho/prices?chain=${chainId}&market=${market}&blocks=${blocks.join(",")}&v=1`;
-  try {
-    const r = await fetch(url);
-    const d = r.ok ? ((await r.json()) as MorphoPricesResponse) : null;
-    return Array.isArray(d?.prices) ? d.prices : [];
-  } catch {
-    return [];
-  }
+  const once = async (): Promise<[number, number][] | null> => {
+    try {
+      const r = await fetch(url);
+      const d = r.ok ? ((await r.json()) as MorphoPricesResponse) : null;
+      return Array.isArray(d?.prices) ? d.prices : null;
+    } catch {
+      return null;
+    }
+  };
+  return (await once()) ?? (await new Promise((r) => setTimeout(r, 800)).then(once)) ?? [];
 }
 const NO_EVENTS: never[] = [];
 
@@ -93,8 +97,8 @@ export function morphoRisk(
 
 export interface MorphoFlowsNoteFacts {
   roles: MorphoRoles;
-  /** Collateral flows valued at their day's oracle price (or a liquidation's
-   *  own), and at the nearest priced day's. */
+  /** Collateral flows valued at their day's oracle price (a liquidation at
+   *  the price it ran on), and at the nearest priced day's. */
   priced: number;
   nearest: number;
   /** Rows whose debt the answer states as principal (no market totals). */

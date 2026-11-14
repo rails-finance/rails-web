@@ -434,6 +434,8 @@ export interface FlowWords {
   /** How the Totals' Deposited and Borrowed price each flow, where it is not
    *  "each at the oracle price at its block". */
   throughput?: string;
+  /** The Totals receipt's formula, where it is not "Σ amount × price at block". */
+  throughputFormula?: string;
   /** The timeline's card for a moment between events (lib/shared/flow-moment.ts). */
   moment?: FlowMomentWords;
   /** What the value line draws, for the how-to-read, where the position has

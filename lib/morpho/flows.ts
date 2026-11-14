@@ -7,8 +7,8 @@
 // prices its collateral in its loan token. So the bars and the line are in the
 // loan token (`FlowTimeline.unit`), and the collateral is converted at the
 // market's oracle price once a UTC day, at the block of the day's last event
-// (lib/morpho/price-days.ts): liquidation rows carry their own (server mig
-// 112), and the page reads the others from /api/chain/morpho/prices.
+// (lib/morpho/price-days.ts): a liquidation row carries the price it ran on
+// (server mig 112), and the page reads the others from /api/chain/morpho/prices.
 //
 // Each row states the position after it, as the market's totals price its
 // shares (toAssetsUp on the debt, toAssetsDown on the supply), and the same
@@ -194,8 +194,8 @@ export interface MorphoFlowEvent {
   assetsDelta: number;
   /** A liquidation's |borrow delta|: repaid plus any bad debt. */
   loanRepaid: number;
-  /** The market oracle (loan token per collateral token): the row's own
-   *  (a liquidation's), else its day's, where either is known. */
+  /** The market oracle (loan token per collateral token): a liquidation's
+   *  price, else the row's day's, where either is known. */
   price: number | null;
   /** A sender and caller both other than the owner (the card's
    *  `externalActor` verdict). */
@@ -250,7 +250,7 @@ export function morphoLif(lltv: number): number {
 export interface MorphoReplayed {
   ev: MorphoFlowEvent;
   /** The oracle price the row is valued at, and whether it was the row's
-   *  own or its day's (else the nearest priced row's). */
+   *  or its day's (else the nearest priced row's). */
   price: number;
   ownPrice: boolean;
   legs: { bucket: string; amount: number }[];
@@ -626,7 +626,9 @@ export function morphoFlowWords(
   const collBasis = `the ${collSymbol} held after the last event by then, at the market oracle's price on the latest day that priced it, in ${loanSymbol}.`;
   return {
     held: "Still supplied",
-    throughput: "each at the market oracle's price at the block of its day's last event",
+    throughput:
+      "each at the market oracle's price at the block of its day's last event (a liquidation at the price it ran on)",
+    throughputFormula: "Σ amount × price",
     restBySide: {
       collateral: collRest,
       ...(roles.borrower ? { debt: "Interest since the last event" } : {}),
@@ -637,7 +639,7 @@ export function morphoFlowWords(
     },
     basis: {
       collateral: roles.borrower
-        ? `Every figure is in ${loanSymbol}, the market's loan asset; each ${collSymbol} flow is converted at the market oracle's price at the block of its day's last event.`
+        ? `Every figure is in ${loanSymbol}, the market's loan asset; each ${collSymbol} flow is converted at the market oracle's price on its day.`
         : `Every figure is in ${loanSymbol}, the market's loan asset.`,
       debt: `Every figure is in ${loanSymbol}, the market's loan asset.`,
     },
