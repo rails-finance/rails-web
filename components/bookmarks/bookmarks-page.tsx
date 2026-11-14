@@ -248,7 +248,7 @@ export function BookmarksPage() {
           <Bookmark className="size-6 shrink-0" aria-hidden="true" />
           {SAVED_NAME}
         </h1>
-        {/* The explorer sub-nav's type (H5, `TAB_ACTIVE`/`TAB_IDLE`) with each
+        {/* The tabs' type (`TAB_ACTIVE`/`TAB_IDLE`) with each
             count in the profile menu's `COUNT_BADGE`, drawn only above 0 (Miles
             13 Nov 2026); 32px apart from sm, twice H5's gap, so a tab and its
             count read as one (ui-jobs 677). */}

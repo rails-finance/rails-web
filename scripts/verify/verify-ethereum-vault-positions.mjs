@@ -1283,7 +1283,7 @@ check(
 // ═══ L14 — the explorer rail, and what the listing face no longer carries ══
 // Aave's vault layer is a roster subject now (rails-ops decision 0028), so the
 // row is its own `RailHeader` and the chain-scoped section's four-tab row is
-// gone. Its tabs are the sub-page and the (i) — there is no POSITIONS tab,
+// gone. Its sections menu holds the sub-page and About — there is no Positions link,
 // because a share in a vault is not a position the roster counts — and the lit
 // one is VAULTS, since this listing is a route UNDER that sub-page.
 // A href is read off the DOM and then FETCHED — a tab that points at a 404 is
@@ -1313,10 +1313,10 @@ for (const l of railLinks) {
   railStatus.push(`${l.href} ${r.status}`);
 }
 const wanted = ["/ethereum/aave/vaults", "/ethereum/aave/info"];
-const infoTab = railLinks.find((l) => l.label === "About this explorer");
+const infoTab = railLinks.find((l) => l.text === "About");
 const litTabs = railLinks.filter((l) => l.current === "page");
 check(
-  "L14c the listing draws ONE Aave vaults rail whose two tabs each resolve, with the (i) door named, VAULTS lit, and no section rail anywhere",
+  "L14c the listing draws ONE Aave vaults sections menu whose two links each resolve, with About named, VAULTS current, and no section rail anywhere",
   rail.length === 1 &&
     sectionRails === 0 &&
     railLinks.length === 2 &&

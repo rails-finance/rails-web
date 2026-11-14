@@ -124,20 +124,18 @@ for (const [proto, path] of [
   check(`1 ${proto} rail header shows currentColor glyph`, headerSvg === "svg", headerSvg);
 }
 
-// ── 2. Listing page: two rows — identity alone, then stamp + sub-nav ─────
-// The (i) drawer is retired: the intro lives at /info (linked from the rail
-// header's sub-nav). Since rails-ops ui-jobs 66 the rail is two rows at every
-// width — the protocol identity alone on the first, the recency stamp and the
-// sub-nav sharing the second (stamp on the left, sub-nav on the right) — so
-// the stamp no longer shares a row with the identity.
+// ── 2. Listing page: two rows — identity + sections menu, then the stamp ─
+// The (i) drawer is retired: the intro lives at /info (About in the sections
+// menu). Since ui-jobs 680 the sections menu follows the chain's glyph on the
+// title row, and a listing's recency stamp stands on a row of its own under it.
 await page.goto(`${BASE}/ethereum/dolomite`, { waitUntil: "networkidle" });
 const stampPlacement = await page.evaluate(() => {
   if (document.querySelector("button[aria-label*='introduction']")) return "drawer trigger still present";
   const nav = document.querySelector("nav[aria-label='Explorer sections']");
   if (!nav) return "no rail sub-nav";
-  const infoLink = nav.querySelector("a[aria-label='About this explorer']");
-  if (!infoLink) return "no (i) link in sub-nav";
-  if (!/\/info$/.test(infoLink.getAttribute("href") || "")) return "(i) href is not /info";
+  const infoLink = [...nav.querySelectorAll("a")].find((a) => a.textContent?.trim() === "About");
+  if (!infoLink) return "no About link in the sections menu";
+  if (!/\/info$/.test(infoLink.getAttribute("href") || "")) return "About's href is not /info";
   const identity = document.querySelector("[data-rail-identity]");
   // The stamp is a button that reads "3 min", the block number in
   // its peek, so it is found by its accessible name.
@@ -146,12 +144,13 @@ const stampPlacement = await page.evaluate(() => {
   if (!stamp) return "no recency stamp in rail header";
   // The stamp's peek (RevealTip) wraps the button; the row holds the wrapper.
   const stampRow = (stamp.closest("[data-reveal-tip]") ?? stamp).parentElement;
-  if (!stampRow || !stampRow.contains(nav)) return "stamp is not sharing a row with the sub-nav";
-  if (stampRow.contains(identity)) return "stamp still shares a row with the identity";
+  const titleRow = identity.closest("[data-anatomy='H3']");
+  if (!titleRow || !titleRow.contains(nav)) return "the sections menu is not on the title row";
+  if (!stampRow || stampRow.contains(identity) || stampRow.contains(nav)) return "stamp shares the title row";
   return "ok";
 });
 check(
-  "2 two rows: identity alone, stamp shares the sub-nav's row; (i) links to /info",
+  "2 two rows: identity and sections menu, then the stamp; About links to /info",
   stampPlacement === "ok",
   stampPlacement === "ok" ? "" : String(stampPlacement),
 );

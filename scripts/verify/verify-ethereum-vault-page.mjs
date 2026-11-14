@@ -615,7 +615,7 @@ async function readVaultPage(vault, holder) {
           return c.textContent ?? "";
         })
     ).replace(/\s+/g, " "),
-    // The section rail's tabs — a vault's market view is the roster's child,
+    // The sections menu's links — a vault's market view is the roster's child,
     // so VAULTS is the slot that must be lit here (0c).
     railTabs: await page.locator('nav[aria-label="Explorer sections"] a').evaluateAll((els) =>
       els.map((e) => ({

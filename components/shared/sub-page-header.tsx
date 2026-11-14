@@ -7,13 +7,12 @@
 // component is the single place that markup lives, driven by the roster
 // entry (`lib/shared/protocols.ts`) rather than restated per page.
 //
-// The context row is the shared `RailHeader` — identity on the left, the
-// rail's sub-nav on the right with this sub-page's tab active. The chain is
-// the mark inside the identity line, never a crumb word, and the sub-page's
-// own name is said by the lit tab rather than a "/ …" tail.
+// The context row is the shared `RailHeader` — identity, the chain's glyph,
+// then the sections menu. The chain is never a crumb word, and the menu's
+// trigger names the sub-page.
 //
 // The header carries NO explanatory prose: protocol explanation lives on the
-// rail's /info page (the (i) in the sub-nav), how-to-read-a-figure lives in
+// rail's /info page (About in the sections menu), how-to-read-a-figure lives in
 // the view's own receipts and tooltips, and deep mechanics in the "?"
 // LearnMore modal where a page has one. The header is title + stamp only.
 
@@ -24,7 +23,7 @@ import type { ProtocolEntry } from "@/lib/shared/protocols";
 
 export interface SubPageHeaderProps {
   /** The roster entry this sub-page belongs to — supplies the identity line
-   *  and the rail sub-nav. Look it up with `protocolForHref`/
+   *  and the sections menu. Look it up with `protocolForHref`/
    *  `protocolForSession` against the page's own basePath rather than
    *  hand-writing it. */
   protocol: ProtocolEntry;

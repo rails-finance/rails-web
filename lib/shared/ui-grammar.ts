@@ -209,13 +209,13 @@ export function disclosureChevron(open: boolean): string {
  * A section's header in a menu that is cut into sections (Miles 13 Nov 2026,
  * mockup; first in the profile menu, H20: "Saved views", "Advanced"): the
  * menu's row size in sentence case, semibold, muted. Below it, a kind's item
- * takes the explorer tabs' small uppercase type (11px), one level down.
+ * takes the tabs' small uppercase type (11px), one level down.
  */
 export const MENU_SECTION_HEAD = "text-[15px] font-semibold text-rb-500";
 
 /**
- * The explorer tabs' type (H5, components/shared/rail-header.tsx `TAB_ACTIVE`,
- * `TAB_IDLE`), worn also by the profile menu's kinds (H20): 11px, semibold,
+ * The tabs' type (components/shared/rail-header.tsx `TAB_ACTIVE`, `TAB_IDLE`;
+ * the saved tabs, B4), worn also by the profile menu's kinds (H20): 11px, semibold,
  * uppercase, 0.14em tracking, with a bottom border so a lit tab's underline
  * never shifts the baseline.
  */

@@ -15,7 +15,7 @@
 //    more" with nothing saved, "Starred saved views show here, learn more"
 //    with something saved and nothing starred; else
 //    one item per saved kind, Focus views, Listings, Wallets and Positions,
-//    in the explorer tabs' type (H5) with the number saved in a count
+//    in the tabs' type (`TAB_BASE`) with the number saved in a count
 //    badge, each a link to its tab on /saved-views (Miles 13 Nov 2026).
 //    Under each, its starred entries.
 // 2. A hairline across the whole panel, then "Advanced", a toggle holding the
@@ -116,7 +116,7 @@ const HAIRLINE = "border-t border-rb-200 dark:border-rb-700";
 const FADE =
   "min-w-0 flex-1 overflow-hidden whitespace-nowrap [mask-image:linear-gradient(to_right,#000_calc(100%-2rem),transparent)]";
 /** A kind's item in Saved views: a link to its tab on /saved-views in the
- *  explorer tabs' type (H5, `TAB_BASE`: 11px, semibold, uppercase, tracked),
+ *  tabs' type (`TAB_BASE`: 11px, semibold, uppercase, tracked),
  *  muted, the foreground on hover and keyboard focus, then its count in the
  *  count badge (Miles 13 Nov 2026). */
 const KIND_ITEM =
