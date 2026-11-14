@@ -118,7 +118,7 @@ const yearnVaultSharePriceProv_ = (c: YearnVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("convertToAssets(10 ** decimals)", c),
-  summary: `Share price — what one whole vault share converts to${atBlock(c)}, in ${asset(c)}, as the vault answers it; this page divides nothing out. The exponent is the asset's decimals: a V3 vault's share token has the same decimals as its asset.`,
+  summary: `Share price — what one whole vault share converts to${atBlock(c)}, in ${asset(c)}, as the vault answers it. The exponent is the asset's decimals: a V3 vault's share token has the same decimals as its asset.`,
   contract: vaultContract(c),
   via: `${LANE} · VaultV3.convertToAssets(one share) @ the pinned block`,
 });

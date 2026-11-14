@@ -410,7 +410,7 @@ const aaveVaultHolderSharesProv_ = (c: AaveVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("balanceOf(the holder)", c),
-  summary: `Shares held — this address's balance of the vault's share token${atBlock(c)}, scaled by the share token's decimals read at the same block. A balance at one block.`,
+  summary: `Shares held — this address's balance of the vault's share token${atBlock(c)}, scaled by the share token's decimals read at the same block.`,
   contract: vaultContract(c),
   via: `${LANE} · balanceOf(holder) @ the pinned block`,
 });
@@ -420,7 +420,7 @@ const aaveVaultHolderFractionProv_ = (c: AaveVaultCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
-  summary: `Share of the vault — this address's shares over all shares issued${atBlock(c)}, both read at that block. A ratio of two integers in the same units, so no price or conversion enters it.`,
+  summary: `Share of the vault — this address's shares over all shares issued${atBlock(c)}, both read at that block. A ratio of two integers in the same units.`,
   contract: vaultContract(c),
   via: `${LANE} · balanceOf(holder) ÷ totalSupply() @ the pinned block`,
   formula: "balanceOf(holder) ÷ totalSupply()",

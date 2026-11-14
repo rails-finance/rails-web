@@ -100,11 +100,11 @@ export const yearnVaultTimelineHorizonProv = (
   kind: "chain-derived",
   pclass: "emitted",
   source: { block: c.blockNumber },
-  summary: `Rows withheld — this address has ${basis === "floor" ? "at least " : ""}${count.toLocaleString("en-US")} transfers on this vault${basis === "unchecked" ? "" : `, above the ${ceiling.toLocaleString("en-US")} Rails builds for a page in one request`}. No rows are drawn: the history check sums every row, so a page of them could not be reconciled. ${
+  summary: `Rows withheld — this address has ${basis === "floor" ? "at least " : ""}${count.toLocaleString("en-US")} transfers on this vault${basis === "unchecked" ? "" : `, above the ${ceiling.toLocaleString("en-US")} rows a page can draw`}. No rows are drawn: the history check sums every row, so a page of them could not be reconciled. ${
     basis === "unchecked"
       ? "The balance check did not run: the query for this address's transfers failed, so the range was counted in chunks from the vault's creation block, every chunk answering. The count covers the whole range, but no check confirmed it, and no rows are drawn without one."
       : basis === "floor"
-        ? `The count is a floor, and the answer may be more: the node refused to return the whole range at once because the answer was too large, so the range was counted in chunks from the vault's creation block, and the count stopped once it passed ${ceiling.toLocaleString("en-US")}. Because the logs were never handed over whole, the balance check could not be run on this address, so nothing is drawn.`
+        ? `The count is a floor: the node refused to return the whole range at once because the answer was too large, so the range was counted in chunks from the vault's creation block, and the count stopped once it passed ${ceiling.toLocaleString("en-US")}. Because the logs were never handed over whole, the balance check could not be run on this address.`
         : "The count is exact: both queries returned, and the balance check ran and agreed."
   }`,
   contract: vaultContract(c),

@@ -228,13 +228,19 @@ test("The Withdrawn check line counts events, not burns: a burn with no withdraw
   assert.equal(out.flows.counts.burns, 2);
   assert.equal(out.flows.counts.legless, 1);
   const checks = [];
+  const summaries = [];
   const walk = (o) => {
     if (!o || typeof o !== "object") return;
     if (typeof o.verify?.text === "string") checks.push(o.verify.text);
+    if (typeof o.summary === "string" && o.verify) summaries.push(o.summary);
     for (const v of Object.values(o)) walk(v);
   };
   walk(out.data);
   const withdrawn = checks.find((t) => /Withdraw logs/.test(t));
   assert.ok(withdrawn, `a Withdrawn check line is drawn — ${checks.join(" | ")}`);
-  assert.match(withdrawn, /up to 2, since a mint or burn the vault emitted no such event for has none/);
+  assert.ok(
+    summaries.some((t) => /adds the asset amounts on up to 2 rows/.test(t)),
+    `the Withdrawn summary says "up to" — ${summaries.join(" | ")}`,
+  );
+  assert.match(withdrawn, /There are at most 2, since a mint or burn the vault emitted no such event for has none/);
 });

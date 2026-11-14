@@ -117,14 +117,14 @@ export const vaultTimelineHorizonProv = (
   summary: `Rows withheld — this address has ${basis === "floor" ? "at least " : ""}${count.toLocaleString("en-US")} transfers on this vault${
     basis === "checked"
       ? count > ceiling
-        ? `, above the ${ceiling.toLocaleString("en-US")} Rails keeps a stored history for.`
-        : `. It is above the ${VAULT_TIMELINE_HORIZON.toLocaleString("en-US")} rows Rails builds for a page in one request, and no stored history could be kept for it on this request.`
+        ? `, above the ${ceiling.toLocaleString("en-US")} rows a page can draw.`
+        : `, above the ${VAULT_TIMELINE_HORIZON.toLocaleString("en-US")} rows a page can draw without a stored history, and none could be kept on this request.`
       : "."
   } No rows are drawn: the history check sums every row, so a page of them could not be reconciled. ${
     basis === "unchecked"
       ? "The balance check did not run: the query for this address's transfers failed, so the range was counted in chunks from block 0, every chunk answering. The count covers the whole range, but no check confirmed it, and no rows are drawn without one."
       : basis === "floor"
-        ? `The count is a floor, and the answer may be more: the node refused to return the whole range at once because the answer was too large, so the range was counted in chunks from block 0, and the count stopped once it passed ${VAULT_TIMELINE_HORIZON.toLocaleString("en-US")}. Because the logs were never handed over whole, the balance check could not be run on this address, and nothing is drawn or stored.`
+        ? `The count is a floor: the node refused to return the whole range at once because the answer was too large, so the range was counted in chunks from block 0, and the count stopped once it passed ${VAULT_TIMELINE_HORIZON.toLocaleString("en-US")}. Because the logs were never handed over whole, the balance check could not be run on this address.`
         : "The count is exact: both queries returned, and the balance check ran and agreed."
   }`,
   contract: vaultContract(c),
@@ -333,10 +333,13 @@ export const vaultFlowProv = (
     // the mints or burns, and one the vault emitted no event for has none to add, so the event count is at most it.
     text:
       kind === "deposited" || kind === "withdrawn"
-        ? `To check: ask any ${chainWord(c)} archive node for this vault's ${kind === "deposited" ? "Deposit" : "Withdraw"} logs that name this address and add up their asset amounts: up to ${count}, since a mint or burn the vault emitted no such event for has none.`
-        : `To check: ask any ${chainWord(c)} archive node for this vault's logs that name this address and add up the ${count} that match.`,
+        ? `To check: ask any ${chainWord(c)} archive node for this vault's ${kind === "deposited" ? "Deposit" : "Withdraw"} logs that name this address and add up their asset amounts. There are at most ${count.toLocaleString("en-US")}, since a mint or burn the vault emitted no such event for has none.`
+        : `To check: ask any ${chainWord(c)} archive node for this vault's logs that name this address and add up the ${count.toLocaleString("en-US")} that match.`,
   },
-  summary: `A lifetime total — ${FLOW_CLAUSE[kind](unit)}. It sums ${count.toLocaleString("en-US")} row${count === 1 ? "" : "s"} of this address's whole history, the same rows the history check ran over; the timeline below draws the newest of them. Nothing here is priced.`,
+  summary:
+    kind === "deposited" || kind === "withdrawn"
+      ? `A lifetime total — ${FLOW_CLAUSE[kind](unit)}. It adds the asset amounts on up to ${count.toLocaleString("en-US")} row${count === 1 ? "" : "s"} of this address's whole history, the same rows the history check ran over; a mint or burn with no ${kind === "deposited" ? "Deposit" : "Withdraw"} event has none. The timeline below draws the newest of them. Nothing here is priced.`
+      : `A lifetime total — ${FLOW_CLAUSE[kind](unit)}. It sums ${count.toLocaleString("en-US")} row${count === 1 ? "" : "s"} of this address's whole history, the same rows the history check ran over; the timeline below draws the newest of them. Nothing here is priced.`,
   contract: vaultContract(c),
   via: `${LANE} · the holder's logs on the vault, summed`,
 });
@@ -350,7 +353,7 @@ export const vaultClaimNowProv = (c: VaultTimelineCoords): Provenance => ({
     kind: "recompute",
     text: `To check: ask any ${chainWord(c)} archive node for the vault's convertToAssets(balanceOf(${c.holder ?? "the address"})) at block ${c.blockNumber ?? 0}.`,
   },
-  summary: `Claim now — what the vault says this address's shares convert to${atBlock(c)}, in ${asset(c)}, read once. It is the contract's figure now, and differs from the sum of the deposits and withdrawals beside it.`,
+  summary: `Claim now — what the vault says this address's shares convert to${atBlock(c)}, in ${asset(c)}. It is the contract's figure now, and differs from the sum of the deposits and withdrawals beside it.`,
   contract: vaultContract(c),
   via: `${LANE} · convertToAssets(balanceOf(holder)) @ the pinned block`,
 });
