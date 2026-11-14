@@ -3,17 +3,12 @@
 // itself awaits) and the shared card renderer — no second read.
 
 import type { MoonwellChainResponse } from "@/lib/api/fetch-moonwell-position";
-import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
+import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import { linesUsd } from "@/lib/moonwell/supply-totals";
+import { creditRemainingStat } from "@/lib/moonwell/credit-remaining";
 import { formatUsd } from "@/lib/shared/format-event";
 import { shortSubject } from "@/lib/shared/page-metadata";
 import type { PositionCardModel } from "@/lib/share/position-card";
-
-/** Neutral HF headline — matches the Aave V3 mapper's identical reading (the
- *  ratio stops meaning anything as a number once it clears 100). */
-function hfLabel(hf: number): string {
-  return hf >= 100 ? "∞" : hf.toFixed(2);
-}
 
 /**
  * The Comptroller read carries no lifecycle status the way an indexed row
@@ -41,12 +36,11 @@ export function moonwellBaseShareCardModel(
     ...(supplied != null ? [{ label: "Supplied", value: formatUsd(supplied) }] : []),
     { label: CARD_VOCAB.debt, value: formatUsd(position.debtValueUsd) },
   ];
-  // Mirrors the detail card's own gate (moonwell-base-view.tsx): the risk
-  // slot only renders with a priced, positive HF, so the card states the
-  // same thing or nothing.
-  if (position.healthFactor != null && position.healthFactor > 0) {
-    stats.push({ label: ratioLabel("pooled"), value: hfLabel(position.healthFactor) });
-  }
+  // Credit remaining, as the card's headline states it (ui-jobs 632): the
+  // credit limit (entered supply × collateral factor) less the debt, over the
+  // limit; nothing where the account owes nothing.
+  const credit = creditRemainingStat(position.collateralCapacityUsd, position.debtValueUsd);
+  if (credit != null) stats.push({ label: "Credit remaining", value: credit });
 
   return {
     session: "moonwell-base",
