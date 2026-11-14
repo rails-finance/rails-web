@@ -1,14 +1,16 @@
 "use client";
 
-// SortControl — the shared sort widget for listing toolbars: an asc/desc flip
-// button + a "sort by" dropdown. Extracted from the near-verbatim markup the
-// Trove and Aave V4 list filters each inline, so every listing sorts through one
-// component. State-free: it reads sortBy/sortOrder and reports changes; the
-// caller owns where that state lives (URL param object).
+// SortPill — the listing's sort as one pill (N1.3, ui-jobs 681): "↓ Recent
+// activity ⌄", opening an editor with the sort keys and Ascending /
+// Descending. A pick applies at once, as the sort always has. State-free: it
+// reads sortBy/sortOrder and reports changes; the caller owns where that state
+// lives (URL param object).
 
-import { useEffect, useRef, useState } from "react";
-import { ArrowUp, ArrowDown, ChevronDown } from "lucide-react";
-import { CTRL_GHOST, CTRL_OFF, CTRL_ON, OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
+import { useRef, useState } from "react";
+import { Check } from "lucide-react";
+import { SortPillButton } from "@/components/shared/filter-bar/filter-pill";
+import { EditorShell } from "@/components/shared/filter-bar/pill-editor";
+import { sortSpoken } from "@/components/shared/filter-bar/pill-model";
 
 export interface SortOption {
   value: string;
@@ -21,75 +23,84 @@ export interface SortOption {
  *  three spellings across 27 files, and sentence case is the sweep's rule. */
 export const RECENT_ACTIVITY_LABEL = "Recent activity";
 
-export interface SortControlProps {
+export interface SortPillProps {
   options: SortOption[];
   sortBy: string;
   sortOrder: "asc" | "desc";
   onChange: (sortBy: string, sortOrder: "asc" | "desc") => void;
 }
 
-export function SortControl({ options, sortBy, sortOrder, onChange }: SortControlProps) {
+const FOCUS = "focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500";
+
+export function SortPill({ options, sortBy, sortOrder, onChange }: SortPillProps) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("pointerdown", onDown);
-    return () => document.removeEventListener("pointerdown", onDown);
-  }, [open]);
-
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const current = options.find((o) => o.value === sortBy)?.label ?? "Sort";
+  const close = () => {
+    setOpen(false);
+    buttonRef.current?.focus();
+  };
 
   return (
-    <div className="flex items-center gap-1" data-anatomy="N1.3">
-      <button
-        onClick={() => onChange(sortBy, sortOrder === "asc" ? "desc" : "asc")}
-        className={`${CTRL_GHOST} ${CTRL_OFF} w-8 h-8 rounded-md`}
-        aria-label={sortOrder === "asc" ? "Sort ascending: click to flip" : "Sort descending: click to flip"}
-        title={sortOrder === "asc" ? "Ascending" : "Descending"}
-      >
-        {sortOrder === "asc" ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
-      </button>
-      <div className="relative h-8" ref={ref}>
-        <button
-          onClick={() => setOpen(!open)}
-          className={`${CTRL_GHOST} ${open ? CTRL_ON : CTRL_OFF} gap-2 px-3 h-8 rounded-md text-xs font-medium min-w-[150px]`}
-          aria-expanded={open}
-        >
-          <span>{current}</span>
-          <ChevronDown
-            className={`w-3.5 h-3.5 text-rb-500 ml-auto transition-transform ${open ? "rotate-180" : ""}`}
-            aria-hidden="true"
-          />
-        </button>
-        {open && (
+    <div className="relative shrink-0" ref={anchorRef} data-anatomy="N1.3">
+      <SortPillButton
+        label={current}
+        order={sortOrder}
+        spoken={sortSpoken(current, sortOrder)}
+        expanded={open}
+        onOpen={() => setOpen((o) => !o)}
+        buttonRef={buttonRef}
+      />
+      {open && (
+        <EditorShell title="Sort" onClose={close} anchorRef={anchorRef} anatomy="N1.3.1" align="end">
+          <div role="radiogroup" aria-label="Sort by" className="flex flex-col">
+            {options.map((o) => {
+              const on = o.value === sortBy;
+              return (
+                <button
+                  key={o.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => {
+                    onChange(o.value, sortOrder);
+                    close();
+                  }}
+                  className={`flex min-h-11 sm:min-h-9 w-full items-center gap-3 rounded-md px-1 text-left text-sm hover:bg-rb-100 dark:hover:bg-rb-800 ${FOCUS} ${on ? "font-semibold" : ""}`}
+                  data-sort-option={o.value}
+                >
+                  <span className="flex-1">{o.label}</span>
+                  {on && <Check className="size-4 text-teal-700 dark:text-teal-400" aria-hidden="true" />}
+                </button>
+              );
+            })}
+          </div>
           <div
-            className="absolute top-full right-0 mt-2 z-[var(--z-dropdown)] min-w-[200px] overflow-hidden overlay-panel"
-            role="menu"
+            role="radiogroup"
+            aria-label="Order"
+            className="mt-3 grid grid-cols-2 gap-1 rounded-xl bg-rb-100 p-1 dark:bg-rb-900"
           >
-            <div className="flex items-center px-4 py-3">
-              <span className={OVERLAY_HEADING}>Sort</span>
-            </div>
-            <div className="my-1 mx-3 border-t border-rb-300 dark:border-rb-700" />
-            {options.map((o) => (
+            {(["asc", "desc"] as const).map((dir) => (
               <button
-                key={o.value}
-                onClick={() => {
-                  onChange(o.value, sortOrder);
-                  setOpen(false);
-                }}
-                className={`overlay-item ${o.value === sortBy ? "overlay-item-active" : ""}`}
-                role="menuitem"
+                key={dir}
+                type="button"
+                role="radio"
+                aria-checked={dir === sortOrder}
+                onClick={() => onChange(sortBy, dir)}
+                className={`h-10 sm:h-9 rounded-lg text-sm transition-colors ${FOCUS} ${
+                  dir === sortOrder
+                    ? "bg-background font-semibold text-foreground shadow-sm dark:bg-rb-700"
+                    : "text-rb-500 dark:text-rb-400/75 hover:text-foreground"
+                }`}
+                data-sort-order={dir}
               >
-                {o.label}
+                {dir === "asc" ? "Ascending" : "Descending"}
               </button>
             ))}
           </div>
-        )}
-      </div>
+        </EditorShell>
+      )}
     </div>
   );
 }

@@ -35,8 +35,10 @@ interface MobileSheetProps {
   header?: React.ReactNode;
   /** A drag handle at the top edge (dragging it down closes the sheet) and a
    *  close button in the top corner, for a sheet whose content is not a menu
-   *  a tap on an option closes (the Lifetime flows panel). */
-  dismiss?: boolean;
+   *  a tap on an option closes (the Lifetime flows panel). "handle" draws the
+   *  handle alone, for a sheet whose header holds its own controls in that
+   *  corner (a filter pill's editor, N1.11). */
+  dismiss?: boolean | "handle";
   children: React.ReactNode;
 }
 
@@ -201,6 +203,10 @@ export function MobileSheet({ label, onClose, mode = "modal", header, dismiss = 
             >
               <span className="h-1 w-10 rounded-full bg-rb-300 dark:bg-rb-600" />
             </div>
+          </>
+        )}
+        {dismiss === true && (
+          <>
             <button
               type="button"
               onClick={close}

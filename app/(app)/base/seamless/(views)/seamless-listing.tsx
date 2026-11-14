@@ -68,8 +68,6 @@ export function SeamlessListing({ initialItems, initialTotal, initialKey, initia
             data: r.rows,
             total: r.total,
           })),
-        fetchCount: (filters) =>
-          fetchAaveV3Positions({ ...seamlessFiltersToFetchParams(filters, 1), limit: 1 }).then((r) => r.total),
       })}
       initialItems={initialItems}
       initialTotal={initialTotal}
