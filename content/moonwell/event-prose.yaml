@@ -772,9 +772,9 @@ L5:
       A Moonwell account becomes liquidatable when its credit remaining reaches zero: the debt is no longer covered by the collateral-factor-weighted supply. Anyone, in practice automated bots, can then liquidate it.
     extraParagraphs:
       - |-
-        A liquidator repays part of one debt, at most the close factor of 50%. It seizes mTokens worth 1.10× the repaid debt, 10% extra: the liquidation incentive. The market keeps a share of the seized mTokens for its reserves, and the liquidator receives the rest.
+        A liquidator repays part of one debt, at most the close factor of 50%, and may liquidate again while the account stays short. It seizes mTokens worth 1.10× the repaid debt, 10% extra: the liquidation incentive.
       - |-
-        A liquidation is partial and repeatable: each one repays at most half of one debt, nudging the account back toward solvency.
+        Every Moonwell market keeps 3% of the seized mTokens for its reserves, and the liquidator receives the rest. Moonwell's docs give the split as 7% and 3%.
     links:
       - label: |-
           Avoiding liquidation

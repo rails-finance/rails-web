@@ -33,7 +33,8 @@ import { CHAINS } from "@/lib/shared/chains";
 const SCALE = {
   title: {
     icon: "h-8 w-8",
-    text: "text-[20px] leading-none",
+    // A name too long for the row ends in an ellipsis (RailHeader's min-w-0).
+    text: "text-[20px] leading-tight min-w-0 truncate",
     gap: "gap-2.5",
   },
   label: { icon: "h-4 w-4", text: "text-[11px] uppercase tracking-[0.14em]", gap: "gap-1.5" },
@@ -55,7 +56,7 @@ export function ProtocolIdentity({
   if (!entry) return null;
   const s = SCALE[scale];
   const link = (
-    <Link href={entry.href} data-rail-identity={entry.id} className={`group inline-flex items-center ${s.gap}`}>
+    <Link href={entry.href} data-rail-identity={entry.id} className={`group inline-flex min-w-0 items-center ${s.gap}`}>
       <ProtocolIcon
         id={entry.id}
         className={`${s.icon} shrink-0 text-foreground transition-colors group-hover:text-blue-600 dark:group-hover:text-[var(--text-link)]`}
@@ -71,10 +72,10 @@ export function ProtocolIdentity({
   // An explorer on a testnet says so once, beside its name, on every page of
   // it; the pill wears the card's muted status tag (C6).
   return (
-    <span className="inline-flex items-center gap-2">
+    <span className="inline-flex min-w-0 items-center gap-2">
       {link}
       <span
-        className="rounded-xs bg-rb-300 px-1.5 py-0.5 text-[11px] font-semibold text-foreground/70 dark:bg-rb-700"
+        className="shrink-0 rounded-xs bg-rb-300 px-1.5 py-0.5 text-[11px] font-semibold text-foreground/70 dark:bg-rb-700"
         data-testnet-pill=""
         data-anatomy="H3.1"
       >

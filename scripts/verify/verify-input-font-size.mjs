@@ -80,7 +80,7 @@ for (const [width, height] of [
       await page.locator("[data-filter-sheet]").waitFor({ state: "detached", timeout: 5000 });
     } else {
       const buttons = page.locator(
-        '[data-skel-section="listing-toolbar"] button[aria-haspopup="menu"], [data-skel-section="listing-toolbar"] button[aria-expanded]:not([aria-haspopup="dialog"])',
+        '[data-skel-section="listing-toolbar"] button[aria-haspopup="menu"], [data-skel-section="listing-toolbar"] button[aria-expanded]:not([aria-haspopup="dialog"]), [data-skel-section="listing-toolbar"] [data-pill-open]',
       );
       const n = Math.min(await buttons.count(), 8);
       for (let i = 0; i < n; i += 1) {

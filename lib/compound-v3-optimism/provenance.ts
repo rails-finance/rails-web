@@ -295,7 +295,7 @@ export function opcCardProv(key: OpcCardFigure, c: OpcReceiptContext): Provenanc
         kind: "chain",
         pclass: "state",
         ...base,
-        summary: `Absorb verdict. Whether the Comet can absorb the account, its isLiquidatable answer at ${at(c.head)}.`,
+        summary: `Liquidatable. Whether anyone can call absorb on the account: the Comet's isLiquidatable answer at ${at(c.head)}.`,
         via: `${blk} · Comet isLiquidatable(wallet)`,
         inputs: [
           chain("isLiquidatable", String(a.isLiquidatable)),

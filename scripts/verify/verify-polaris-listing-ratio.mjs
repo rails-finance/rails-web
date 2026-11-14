@@ -468,16 +468,10 @@ await page7.close();
   );
 
   const page8 = await openListing(context, `${BASE}/sepolia/polaris?market=usdp&sortBy=ratio&sortOrder=asc`);
-  // The sort dropdown sits beside the order button (aria-label "Sort
-  // ascending/descending — click to flip") inside the sort control; other
-  // aria-expanded buttons on the page (the chain switcher, the Debt facet)
-  // read like sort labels, so find it by that structure.
+  // The sort is one pill (N1.3, ui-jobs 681), found by its hook: its text is
+  // the key's label.
   const readSortLabel = (page) =>
-    page.evaluate(() => {
-      const order = document.querySelector('button[aria-label^="Sort "]');
-      const dropdown = order?.parentElement?.querySelector("button[aria-expanded]");
-      return dropdown?.textContent?.trim() ?? "";
-    });
+    page.evaluate(() => document.querySelector("[data-sort-pill]")?.textContent?.trim() ?? "");
   const sortLabel = await readSortLabel(page8);
   check("8c. the sort control reads Ratio with a market chosen", sortLabel === "Ratio", `"${sortLabel}"`);
   const cards8 = await readCards(page8);
@@ -542,13 +536,16 @@ await page7.close();
     const text = (document.body.innerText ?? "").replace(/\s+/g, " ");
     const facetButtons = [...document.querySelectorAll("button")].map((b) => (b.textContent ?? "").trim());
     return {
-      chip: /Debt: \$0(?!\.?\d)/.test(text),
+      // The Size pill (N1.10, ui-jobs 681) names the Debt range it holds.
+      chip: /Debt \$0(?!\.?\d)/.test(
+        document.querySelector('[data-filter-pill="Size"] [data-pill-open]')?.getAttribute("aria-label") ?? "",
+      ),
       history: facetButtons.some((t) => /^History\b/.test(t)) || /Liquidated before/.test(text),
       hasDebtLabel: /\bHas debt\b/.test(text),
     };
   });
   check(
-    '9d. the view draws its "Debt: $0" chip (the Size panel\'s range chip, ui-jobs 354)',
+    '9d. the view draws its Size pill set to "Debt $0" (the Size range, ui-jobs 354, 681)',
     chrome9.chip,
     JSON.stringify(chrome9),
   );

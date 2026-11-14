@@ -1667,8 +1667,9 @@ check(
   `${idOnPosition.rails} rail(s), ${idOnPosition.marks} section mark(s), ${idOnPosition.back} Back button(s)`,
 );
 
-// The explorer's four slots are one row (components/shared/rail-header.tsx):
-// the position listing, each sub-page in roster order, then the (i). A href is
+// The explorer's four sections are one menu (components/shared/rail-header.tsx,
+// ui-jobs 680): the position listing, each sub-page in roster order, then About.
+// The links stand in the page while the menu is closed. A href is
 // read off the DOM and then FETCHED — a tab pointing at a 404 is the failure
 // this is for, and a link check that only compared strings could not see it.
 // The VAULTS tab is the lit one: this listing is a route UNDER that sub-page.
@@ -1678,7 +1679,7 @@ const rail = await railPage.locator('nav[aria-label="Explorer sections"]').evalu
   navs.map((nav) =>
     Array.from(nav.querySelectorAll("a")).map((a) => ({
       href: a.getAttribute("href"),
-      label: a.getAttribute("aria-label"),
+      text: (a.textContent ?? "").trim(),
       link: a.getAttribute("data-link"),
       current: a.getAttribute("aria-current"),
     })),
@@ -1691,10 +1692,10 @@ for (const l of railLinks) {
   railStatus.push(`${l.href} ${r.status}`);
 }
 const wantedTabs = ["/base/morpho", "/base/morpho/markets", "/base/morpho/vaults", "/base/morpho/info"];
-const infoTab = railLinks.find((l) => l.label === "About this explorer");
+const infoTab = railLinks.find((l) => l.text === "About");
 const litTabs = railLinks.filter((l) => l.current === "page");
 check(
-  "L14c the listing draws ONE explorer rail whose four tabs each resolve, with the (i) door named, and VAULTS lit",
+  "L14c the listing draws ONE sections menu whose four links each resolve, with About named, and VAULTS current",
   rail.length === 1 &&
     railLinks.length === 4 &&
     wantedTabs.every((w) => railLinks.some((l) => l.href === w)) &&

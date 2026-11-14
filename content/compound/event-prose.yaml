@@ -91,15 +91,15 @@ placeholders:
   credit:
     rounding: compound_amount
     means: |-
-      the credit an absorb left past the debt, kept as a lent balance
+      what an absorb paid out past the debt, left as a supplied balance
   kept:
     rounding: usd_value
     means: |-
-      the value the protocol kept from the seized collateral, over the credit the account received
+      the liquidation penalty: the seized collateral's value over what the protocol paid out to the account
   short:
     rounding: usd_value
     means: |-
-      how far the seized collateral fell short of the credit
+      how far the seized collateral fell short of what the protocol paid out
   seized_usd:
     rounding: usd_value
     means: |-
@@ -732,9 +732,9 @@ templates:
     L5: absorb
     variants:
       plain: |-
-        the absorb cleared the debt and left no credit
+        the absorb cleared the debt and paid out nothing past it
       credit: |-
-        the credit passed the debt, and the rest stays as a lent balance
+        the payout passed the debt, and the rest stays as a supplied balance
     sentences:
       absorb.what:
         when: |-
@@ -753,12 +753,12 @@ templates:
           The absorb cleared {cleared} {asset_symbol} of debt, leaving {credit} {asset_symbol} as a supplied balance.
       absorb.kept:
         when: |-
-          the seized collateral was worth more than the credit
+          the seized collateral was worth more than the payout
         text: |-
           The protocol kept {kept} of the collateral's value, the liquidation penalty.
       absorb.short:
         when: |-
-          the seized collateral was worth less than the credit
+          the seized collateral was worth less than the payout
         text: |-
           The payout was {short} more than the collateral was worth; the protocol's reserves covered it.
     order:
@@ -1201,9 +1201,9 @@ L5:
         text: |-
           the same transfer shows as an out-leg on the sender and an in-leg on the recipient.
       - bold: |-
-          Health still enforced
+          Liquidatable is the limit
         text: |-
-          the transfer fails if it would make the sender's account liquidatable.
+          by Compound's docs, the transfer fails if it would make the sender's account liquidatable.
     links:
       - label: |-
           Transfer

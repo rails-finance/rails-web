@@ -261,7 +261,7 @@ export function CompoundAbsorbBreakdown({
             {baseAmt(split.cleared)}
           </Prov>
         </StatCard>
-        <StatCard label="Left over after the absorb (supplied)">
+        <StatCard label="Left over after the liquidation (supplied)">
           <Prov
             info={absorbCreditProv(sym, coords, { paidOut: formatExactDecimal(split.paidOut) })}
             value={split.credit}

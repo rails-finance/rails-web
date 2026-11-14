@@ -62,7 +62,8 @@ export interface MoonwellChainMarket {
   collateralFactor: number;
   /** getAssetsIn membership — false means this supply backs NOTHING. */
   entered: boolean;
-  /** Annualized simple rates (fraction) from the per-timestamp getters. */
+  /** The rates as APYs (fraction), the per-second getters compounded
+   *  (lib/comptroller/apy.ts). */
   supplyApr: number | null;
   borrowApr: number | null;
 }

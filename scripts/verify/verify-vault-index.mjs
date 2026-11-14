@@ -22,7 +22,7 @@
 //      equals the index's count for it, and the index's rows per protocol
 //      (funded + empty + unread) equal it; the sum equals the union
 //   2  the Protocol facet narrows the rows to each protocol's count, every
-//      row shown that protocol's, and Reset restores them
+//      row shown that protocol's, and the pill's × restores them
 //   3  the Network facet narrows to Base: exactly Morpho on Base's rows
 //   4  every row's lead zone (D5) names its protocol and its chain
 //   5  a Maple row shows the Yield slot's "no daily series yet" state
@@ -34,7 +34,7 @@
 //   9  the index's rows carry receipts and the page offers the inspector (ui-jobs 571);
 //      every Total assets and Share price figure names its asset
 //  10  the default view (ui-jobs 485): the preset's rows against ?show=all,
-//      its chip, the counts line, its removal and Reset, and the table's
+//      its Shown pill, the counts line, lifting and resetting it, and the table's
 //      sorts (ui-jobs 538: Holders by default, Total assets within each token)
 //  11  ?asset=ETH,WETH keeps the preset; a token it would empty lifts it
 // Sections 0 to 9 read /vaults?show=all and the rosters' ?show=all pages.
@@ -246,25 +246,17 @@ check(
 
 // ── 2: the Protocol facet ───────────────────────────────────────────────────
 const panel = page.locator("[data-vault-index]");
+// A facet is a filter pill (N1.10, ui-jobs 681): its editor ticks an option
+// and applies it; the pill's × puts it back.
 const pick = async (facet, option) => {
-  await panel
-    .locator("button", { hasText: new RegExp(`^${facet}`) })
-    .first()
-    .click();
-  await page.locator("[role='menuitemcheckbox']", { hasText: option }).first().click();
-  await page.keyboard.press("Escape");
+  await panel.locator(`[data-filter-pill="${facet}"] [data-pill-open]`).first().click();
+  const editor = page.locator(`[data-pill-editor="${facet}"]`).first();
+  await editor.locator("[data-pill-option]", { hasText: option }).first().click();
+  await editor.locator("[data-pill-editor-apply]").click();
   await page.waitForTimeout(300);
 };
 const reset = async (facet) => {
-  await panel
-    .locator("button", { hasText: new RegExp(`^${facet}`) })
-    .first()
-    .click();
-  await page
-    .locator("button", { hasText: /^Reset$/ })
-    .first()
-    .click();
-  await page.keyboard.press("Escape");
+  await panel.locator(`[data-filter-pill="${facet}"] [data-pill-remove]`).first().click();
   await page.waitForTimeout(300);
 };
 for (const p of PROTOCOLS) {
@@ -279,7 +271,7 @@ for (const p of PROTOCOLS) {
   await reset("Protocol");
 }
 await openEmpty();
-check("2b Reset restores every row", (await readRows()).length === union);
+check("2b the Protocol pill's × restores every row", (await readRows()).length === union);
 
 // ── 3: the Network facet ────────────────────────────────────────────────────
 await pick("Network", "Base");
@@ -438,14 +430,18 @@ await checkRosterView({
     await page.waitForSelector("[data-vault-index] [data-figure='shown-count']", { timeout: 120_000 });
     return {
       rows: await readRosterRows(page, "[data-vault-index]"),
-      chip: await page.locator("[data-vault-index] [data-default-chip='show']").count(),
+      // The preset in force: the Shown pill as a default pill. A link that
+      // lifts the preset arrives on "Every vault", which narrows nothing, and
+      // the pill is an unset "+ Shown" (N1.10, ui-jobs 681).
+      chip: await page.locator("[data-vault-index] [data-filter-pill='Shown'][data-pill-state='default']").count(),
+      unset: await page.locator("[data-vault-index] [data-filter-pill='Shown'][data-pill-state='unset']").count(),
     };
   };
   const all = (await open("?asset=ETH,WETH&show=all")).rows.filter((r) => r.group === "funded");
   const kept = await open("?asset=ETH,WETH");
   const keptFunded = kept.rows.filter((r) => r.group === "funded");
   check(
-    "11a ?asset=ETH,WETH keeps the preset: the WETH vaults it keeps, under the chip",
+    "11a ?asset=ETH,WETH keeps the preset: the WETH vaults it keeps, under the Shown pill",
     kept.chip === 1 &&
       all.length > 0 &&
       keptFunded.length === all.filter(presetKeeps).length &&
@@ -468,8 +464,8 @@ await checkRosterView({
     const n = lifted.rows.filter((r) => r.group === "funded").length;
     check(
       "11b a link whose token the preset would empty opens without it",
-      lifted.chip === 0 && n === hidden[1].length,
-      `${hidden[0]}: ${n} of ${hidden[1].length} drawn, chip ${lifted.chip}`,
+      lifted.chip === 0 && lifted.unset === 1 && n === hidden[1].length,
+      `${hidden[0]}: ${n} of ${hidden[1].length} drawn, default pill ${lifted.chip}, unset pill ${lifted.unset}`,
     );
   }
 }

@@ -114,7 +114,16 @@ function positionSubject(protocol: string | undefined): string {
 /** C17's "Save position" row (ui-jobs 530), after the family's identity rows.
  *  The default name is the card's identity (C5) as it reads. `ended` is the
  *  card's closed tag, kept on the entry so a saved row shows it. */
-export function SavePositionRow({ identityText, ended }: { identityText: () => string; ended?: SavedLink["ended"] }) {
+export function SavePositionRow({
+  identityText,
+  ended,
+  noun = "position",
+}: {
+  identityText: () => string;
+  ended?: SavedLink["ended"];
+  /** The family's unit ("Save position", Compound V3's "Save account"); lower case. */
+  noun?: string;
+}) {
   const pathname = usePathname();
   // Read as the menu opens (the row mounts with it).
   const [key, setKey] = useState<string | null>(null);
@@ -124,8 +133,8 @@ export function SavePositionRow({ identityText, ended }: { identityText: () => s
   return (
     <ToolsMenuItem
       icon={mark(!!saved)}
-      title={saved ? "Remove from saved" : "Save position"}
-      subtitle={saved ? savedName(saved) : "Keep it in your saved positions"}
+      title={saved ? "Remove from saved" : `Save ${noun}`}
+      subtitle={saved ? savedName(saved) : `Keep it in your saved ${noun}s`}
       item="save-position"
       onClick={() => {
         const place = placeOf(window.location.pathname);

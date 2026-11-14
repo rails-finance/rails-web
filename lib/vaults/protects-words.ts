@@ -244,8 +244,9 @@ export function protectsLine(f: ProtectsFact): ProtectsLine {
           (f.roleManager === ZERO
             ? "No role manager is set."
             : `The role manager, ${shortHex(f.roleManager)}, assigns every role.`) +
-          " Yearn's documentation lists no delay on a role holder's change; the vault's code may add one.",
-        gap: "Whether a role holder works behind a timelock of its own is not read.",
+          " The vault applies a role holder's change in the transaction that makes it, with no wait of its own." +
+          " Handing on the role manager takes two steps: the new address must accept.",
+        gap: "Whether a role holder's address is a timelock or a multisig is not read.",
       };
     case "aave-gov": {
       const guardian = `Aave's guardian, ${shortHex(f.gov.guardian)}, can cancel a change during the wait.`;

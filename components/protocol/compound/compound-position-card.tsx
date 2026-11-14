@@ -21,6 +21,7 @@
 //           block the balance was read at.
 //   closed  the highest recorded supply and debt, and the Outcome.
 
+import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { ListingTag } from "@/components/shared/listing-tag";
 import { useState, type ReactNode } from "react";
 import { Link2 } from "lucide-react";
@@ -647,6 +648,7 @@ export function useCompoundCardSlots({
   const menu: PositionCardMenu = {
     leading: pagePath ? () => <CompoundMenuRows pagePath={pagePath} /> : undefined,
     exports: exports ?? null,
+    noun: POSITION_NOUN[deployment].toLowerCase(),
   };
   const detailCommon = {
     ...common,

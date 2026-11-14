@@ -8,6 +8,7 @@
 // per asset with its amount, dollars and factors. Every figure is read when the
 // page opens; the read stamp names the blocks.
 
+import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCard, type PositionCardSlots, type PositionPanelRow } from "@/components/shared/position-card";
 import { PanelFigure } from "@/components/shared/position-card-panel";
@@ -237,7 +238,7 @@ function slots(r: OpcPositionRead): PositionCardSlots {
       },
     ],
     counters: null,
-    menu: { exports: null },
+    menu: { exports: null, noun: POSITION_NOUN["compound-v3-optimism"].toLowerCase() },
     stamp: (
       <PoolReadStamp
         chainId={OPTIMISM_CHAIN_ID}

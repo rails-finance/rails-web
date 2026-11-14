@@ -94,7 +94,7 @@ const cvMarketValueProvUnstamped = (side: "supplied" | "borrowed", coords: Compo
   summary: `${coords.baseSymbol ?? "Base"} ${side} valued in ${coords.quoteUnit ?? "the quote unit"} — the base ${side} multiplied by the market's OWN getPrice on its base feed${atBlock(coords)} (the price its liquidation engine uses, never a market API). The quote unit is the base asset's own unit, so an ETH market's value is ETH and is never summed with a dollar market's.`,
   contract: cometContract(coords),
   via: `${LANE} · Comet.total${side === "supplied" ? "Supply" : "Borrow"} × Comet.getPrice(base feed) @ head`,
-  formula: "base amount × oracle price",
+  formula: "base amount × price",
   inputs: [
     {
       label: "base amount",
@@ -102,7 +102,7 @@ const cvMarketValueProvUnstamped = (side: "supplied" | "borrowed", coords: Compo
       pclass: "state",
       note: `Comet.total${side === "supplied" ? "Supply" : "Borrow"} @ head`,
     },
-    { label: "oracle price", kind: "chain-derived", pclass: "oracle", note: "Comet.getPrice on the base feed @ head" },
+    { label: "price", kind: "chain-derived", pclass: "oracle", note: "Comet.getPrice on the base price feed @ head" },
   ],
 });
 
@@ -165,8 +165,8 @@ const cvReservesProvUnstamped = (kind: "line" | "target", coords: CompoundMarket
     verify: recompute(`Comet.${method}`, coords),
     summary:
       kind === "line"
-        ? `Reserve line — the market's \`getReserves\`${atBlock(coords)}, SIGNED base units: it can run negative. Below its target the market sells absorbed collateral at the configured discount to refill; at or above, those sales stop.`
-        : `Reserve target — the market's \`targetReserves\`${atBlock(coords)}: the level governance set for the reserve line, above which the market stops selling absorbed collateral.`,
+        ? `Reserve line — the market's \`getReserves\`${atBlock(coords)}, SIGNED base units: it can run negative. Below its target the market sells seized collateral at the configured discount to refill; at or above, those sales stop.`
+        : `Reserve target — the market's \`targetReserves\`${atBlock(coords)}: the level governance set for the reserve line, above which the market stops selling seized collateral.`,
     contract: cometContract(coords),
     via: `${LANE} · Comet.${method} @ head`,
   };
@@ -189,13 +189,13 @@ const cvCollateralBackingProvUnstamped = (coords: CompoundMarketCoords): Provena
   kind: "chain-derived",
   pclass: "oracle",
   source: { block: coords.blockNumber },
-  summary: `Collateral backing — the market's collateral valued in ${coords.quoteUnit ?? "the quote unit"}${atBlock(coords)}: Σ over the market's own roster (numAssets / getAssetInfo) of each asset's pooled total (totalsCollateral) × its configured oracle price. Every leg a live Comet read; the sum is ours.`,
+  summary: `Collateral backing — the market's collateral valued in ${coords.quoteUnit ?? "the quote unit"}${atBlock(coords)}: Σ over the market's own roster (numAssets / getAssetInfo) of each asset's pooled total (totalsCollateral) × its configured price feed's price. Every leg a live Comet read; the sum is ours.`,
   contract: cometContract(coords),
   via: `${LANE} · Σ totalsCollateral × getPrice over the roster @ head`,
-  formula: "Σ (collateral total × oracle price)",
+  formula: "Σ (collateral total × price)",
   inputs: [
     { label: "collateral total", kind: "chain", pclass: "state", note: "Comet.totalsCollateral per asset @ head" },
-    { label: "oracle price", kind: "chain-derived", pclass: "oracle", note: "Comet.getPrice per asset feed @ head" },
+    { label: "price", kind: "chain-derived", pclass: "oracle", note: "Comet.getPrice per asset price feed @ head" },
   ],
 });
 
@@ -222,10 +222,10 @@ const cvCollateralValueProvUnstamped = (coords: CompoundMarketCoords): Provenanc
   summary: `${coords.collateralSymbol ?? "Collateral"} value — its pooled total valued in ${coords.quoteUnit ?? "the quote unit"}${atBlock(coords)}: totalsCollateral × the market's OWN getPrice on this asset's configured feed. The price its liquidation engine uses.`,
   contract: cometContract(coords),
   via: `${LANE} · Comet.totalsCollateral × Comet.getPrice(asset feed) @ head`,
-  formula: "collateral total × oracle price",
+  formula: "collateral total × price",
   inputs: [
     { label: "collateral total", kind: "chain", pclass: "state", note: "Comet.totalsCollateral(asset) @ head" },
-    { label: "oracle price", kind: "chain-derived", pclass: "oracle", note: "Comet.getPrice on the asset feed @ head" },
+    { label: "price", kind: "chain-derived", pclass: "oracle", note: "Comet.getPrice on the asset price feed @ head" },
   ],
 });
 
@@ -264,8 +264,8 @@ const cvCollateralFactorProvUnstamped = (
     which === "borrow"
       ? "what new borrowing can be drawn against this collateral (0 means new borrowing is switched off while it stays liquidation-eligible)"
       : which === "liquidate"
-        ? "the collateral ratio at which a position holding this asset becomes absorbable"
-        : "the share of the collateral's value an absorbed account is credited";
+        ? "the collateral ratio at which an account holding this asset becomes liquidatable"
+        : "the share of the collateral's value paid out to a liquidated account";
   return {
     kind: "chain",
     pclass: "state",

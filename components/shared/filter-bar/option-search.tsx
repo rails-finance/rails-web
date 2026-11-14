@@ -2,9 +2,10 @@
 
 /**
  * Type-to-filter for long option lists — the shared half of the overlay filter
- * grammar, used by both surfaces that render an option list inside a popover:
- * the listing facet panels (components/shared/filter-bar/filter-sections.tsx)
- * and the overlay menus (components/shared/filter-dropdown.tsx).
+ * grammar, used by every surface that renders an option list in a panel: the
+ * filter pills' editors (components/shared/filter-bar/pill-editor.tsx), the
+ * phone filter sheet (./filter-sheet.tsx) and the overlay menus
+ * (components/shared/filter-dropdown.tsx).
  *
  * Why it exists: a dimension's options are whatever the data offers, and that
  * is not always a handful. The Morpho market roster is 1,283 markets; mounting

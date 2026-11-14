@@ -138,8 +138,6 @@ export function LiquityV2Listing({ initialItems, initialTotal, initialKey, initi
             data: r.data,
             total: r.pagination.total,
           })),
-        fetchCount: (filters) =>
-          fetchTroves({ ...liquityV2FiltersToFetchParams(filters, 1), limit: 1 }).then((r) => r.pagination.total),
       })}
       onFilters={onFilters}
       renderAbove={({ items, total, filters }) =>

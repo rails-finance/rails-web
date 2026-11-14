@@ -202,7 +202,7 @@ const listing = await browser.newPage();
 await listing.goto(BASE + href, { waitUntil: "networkidle" });
 await listing.waitForTimeout(1200);
 
-// THE DISCRIMINATING CHECK. SortControl resolves its label by looking the
+// THE DISCRIMINATING CHECK. SortPill resolves its label by looking the
 // current sortBy up in its own options — `options.find(...)?.label ?? "Sort"` —
 // so an unrecognised value leaves the control reading the bare word "Sort"
 // while the page renders perfectly and quietly serves recency. On a short list
@@ -214,16 +214,14 @@ await listing.waitForTimeout(1200);
 // failing. A verifier that crashes has not said anything about the page (see
 // run-all.mjs's three outcomes), so the locator must find the control whatever
 // it says, and the assertion reads its text afterwards.
-const sortControl = listing
-  .locator('button[aria-label*="Sort ascending"], button[aria-label*="Sort descending"]')
-  .first()
-  .locator("xpath=following-sibling::div[1]/button");
+// The sort pill (N1.3, ui-jobs 681) by its hook, whatever it says.
+const sortControl = listing.locator("[data-sort-pill]").first();
 const foundControl = (await sortControl.count()) > 0;
 assert(foundControl, "the listing toolbar renders a sort control");
-const sortLabel = foundControl ? (await sortControl.first().innerText()).trim() : "(no control)";
+const sortLabel = foundControl ? (await sortControl.innerText()).trim() : "(no control)";
 assert(sortLabel === "Ratio", `the sort control reads "Ratio" (got "${sortLabel}")`);
-const chips = await listing.locator("text=/Status: Open/i").count();
-assert(chips > 0, "the listing shows a 'Status: Open' chip — the status was applied, not ignored");
+const chips = await listing.locator("[data-filter-pill='Status']", { hasText: /Status\s*Open/i }).count();
+assert(chips > 0, "the listing shows a 'Status Open' pill — the status was applied, not ignored");
 
 console.log("\n=== D. the order is the protocol's");
 // Wallets come off each row's OWN href, never off its text: a card's text nodes

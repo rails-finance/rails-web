@@ -140,10 +140,10 @@ async function openPosition(url) {
 {
   const page = await openListing(`${BASE}/sepolia/polaris`);
   await page
-    .locator('[data-skel-section="listing-toolbar"] button', { hasText: /^Market$/ })
+    .locator('[data-skel-section="listing-toolbar"] [data-filter-pill="Market"] [data-pill-open]')
     .first()
     .click();
-  const menu = page.locator('[role="menuitemradio"]');
+  const menu = page.locator("[data-pill-editor] [data-pill-option]");
   await menu.first().waitFor({ state: "visible", timeout: 10000 });
   const options = await menu.evaluateAll((els) =>
     els.map((el) => ({
@@ -162,6 +162,8 @@ async function openPosition(url) {
     .filter({ hasText: /^USDp$/ })
     .first()
     .click();
+  // The editor stages the pick; its primary button writes it.
+  await page.locator("[data-pill-editor] [data-pill-editor-apply]").first().click();
   await page.waitForURL(/[?&]market=usdp(&|$)/, { timeout: 15000 }).catch(() => {});
   check("3b. picking USDp writes ?market=usdp", /[?&]market=usdp(&|$)/.test(page.url()), page.url());
   await page.close();
@@ -440,7 +442,7 @@ async function checkModal(name, { title, links }) {
 {
   const page = await openListing(`${BASE}/sepolia/polaris`);
   const labels = await page
-    .locator('[data-skel-section="listing-toolbar"] button[aria-expanded]')
+    .locator('[data-skel-section="listing-toolbar"] [data-sort-pill]')
     .evaluateAll((els) => els.map((b) => (b.textContent ?? "").trim()));
   check(
     '7a. the bare listing\'s sort menu reads "Recent activity"',
@@ -453,7 +455,7 @@ async function checkModal(name, { title, links }) {
   // constant (RECENT_ACTIVITY_LABEL, components/shared/filter-bar/sort-control.tsx).
   const v2 = await openListing(`${BASE}/ethereum/liquity-v2`);
   const v2Labels = await v2
-    .locator('[data-skel-section="listing-toolbar"] button[aria-expanded]')
+    .locator('[data-skel-section="listing-toolbar"] [data-sort-pill]')
     .evaluateAll((els) => els.map((b) => (b.textContent ?? "").trim()));
   check(
     "7b. Liquity V2's sort menu reads \"Recent activity\" too, the sweep's one spelling",

@@ -93,6 +93,7 @@ import { summariseExternalActors, withOpeningActors } from "@/lib/shared/externa
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
 import type { PositionCardExports } from "@/components/shared/position-card";
 import { compoundExports } from "@/components/protocol/compound/compound-export-menu";
+import { COMPOUND_V3_TERMS } from "@/lib/compound/product";
 
 /** Renders the single (market, wallet) position: the card, the live risk
  *  surfaces for that market (when its chain read landed), and the Lifetime
@@ -539,6 +540,7 @@ export default function CompoundPositionView({
             wallet={wallet}
             owner={{ wallet }}
             assets={stripAssets}
+            pricesSubject={COMPOUND_V3_TERMS.position.one}
             closed={view != null && view.status !== "open"}
             // The card's ⋮ carries the menu; an event page draws no Tools.
             tools={false}

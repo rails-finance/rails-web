@@ -30,7 +30,8 @@
 // "ctoken-rows"): the supply by the exchange rate the rows state, in a straight
 // line from one row to the next; the debt by its growth, each row's debt
 // before over the last row's debt after; after the last row, to the live read
-// (the market's exchange rate and borrow balance now), else at its rate now.
+// (the market's exchange rate and borrow balance now), else grown by its APY
+// now (lib/shared/ctoken-index.ts).
 // Prices: each row's at its block where the page read it, else the nearest
 // priced row's on the market; between events the daily store's price for the
 // day where the family passes one (Moonwell), else the last price is carried
@@ -49,9 +50,9 @@ import type {
   FlowWords,
 } from "@/lib/shared/flows-timeline";
 import { daysFromEvents } from "@/lib/shared/flows-timeline";
+import { indexAt, type IndexKnot } from "@/lib/shared/ctoken-index";
 
 const DAY_S = 86_400;
-const ONE_YEAR_S = 31_557_600;
 const DUST = 1e-12;
 
 /** Bucket keys. */
@@ -184,6 +185,7 @@ export interface CTokenLiveMarket {
   /** Underlying per whole cToken now. */
   exchangeRate: number | null;
   price: number | null;
+  /** The market's rates now, as APYs (lib/comptroller/apy.ts). */
   supplyApr: number | null;
   borrowApr: number | null;
 }
@@ -321,26 +323,7 @@ export function replayCToken(
 
 // ── The indexes between rows ────────────────────────────────────────────────
 
-type Knot = [ts: number, index: number];
-
-/** A market's index at `ts`: a straight line between the knots, flat before
- *  the first, and past the last at `apr` (simple) where given, else flat. */
-function indexAt(knots: Knot[], ts: number, apr: number | null): number | null {
-  if (knots.length === 0) return null;
-  if (ts <= knots[0][0]) return knots[0][1];
-  let lo = 0;
-  let hi = knots.length - 1;
-  while (lo < hi) {
-    const mid = (lo + hi + 1) >> 1;
-    if (knots[mid][0] <= ts) lo = mid;
-    else hi = mid - 1;
-  }
-  const [t0, i0] = knots[lo];
-  const next = knots[lo + 1];
-  if (!next) return i0 * (1 + (apr ?? 0) * ((ts - t0) / ONE_YEAR_S));
-  const [t1, i1] = next;
-  return t1 > t0 ? i0 + ((i1 - i0) * (ts - t0)) / (t1 - t0) : i1;
-}
+type Knot = IndexKnot;
 
 /** Each market's supply and debt index knots: one per row that states it,
  *  and now from the live read. */

@@ -20,6 +20,7 @@
 // detail page's live Comptroller read — the listing card still asserts no
 // health column (the listing snapshot carries none).
 
+import { isEnteredIn, linesUsd, suppliedUsd } from "@/lib/moonwell/supply-totals";
 import { headReadOf, serverReadOf, stampServerRead, type ServerRead } from "@/lib/shared/server-head-read";
 import { TitleTip } from "@/components/shared/reveal-tip";
 import type { ReactNode } from "react";
@@ -60,6 +61,11 @@ import { MoonwellMenuRows } from "./moonwell-menu-rows";
 import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
 import { TokenFigure } from "@/components/shared/token-figure";
 import { PanelFigure } from "@/components/shared/position-card-panel";
+
+/** The headline over every supplied market (ui-jobs 644, as Compound V2's in 631). */
+const SUPPLIED = "Supplied";
+/** Its receipt's name: the sum is over every supplied market. */
+const SUPPLIED_RECEIPT = "Every supplied market, entered or not,";
 
 export interface MoonwellPositionView {
   wallet: string;
@@ -116,16 +122,7 @@ const borrowLineUsd = (v: MoonwellPositionView) => (r: MoonwellPositionView["bor
  *  contributing market is unpriced, so a partial total is never asserted (it
  *  degrades to no headline). */
 function totalUsd(v: MoonwellPositionView, lines: { address: string; amount: number }[]): number | null {
-  let sum = 0;
-  let any = false;
-  for (const l of lines) {
-    if (l.amount <= 0) continue;
-    const u = lineUsd(v, l.address, l.amount);
-    if (u == null) return null;
-    sum += u;
-    any = true;
-  }
-  return any ? sum : null;
+  return linesUsd(lines, v.priceByAddress);
 }
 
 /** rails-server's read (live or stored) of the market state a view's
@@ -158,8 +155,7 @@ const FACTOR_TIP =
   "The share of each entered market's value that counts toward the borrow limit, as the Comptroller sets it now.";
 /** Whether a line's market is entered as collateral; true where membership
  *  is unknown, so nothing is split without a read behind it. */
-const isEntered = (v: MoonwellPositionView, address: string) =>
-  !v.entered || v.entered.some((e) => e.underlying === address.toLowerCase());
+const isEntered = (v: MoonwellPositionView, address: string) => isEnteredIn(v.entered, address);
 
 /** The stacked per-market amounts of a side with no complete USD total. */
 function AmountStack({ children }: { children: ReactNode }) {
@@ -303,10 +299,9 @@ export function useMoonwellCardSlots({
   // never entered is shown apart ("Supplied, not collateral").
   const vc: MoonwellPositionView = { ...v, supplies: v.supplies.filter((r) => isEntered(v, r.address)) };
   const vo: MoonwellPositionView = { ...v, supplies: v.supplies.filter((r) => !isEntered(v, r.address)) };
-  const collUsd = totalUsd(
-    vc,
-    vc.supplies.map((r) => ({ address: r.address, amount: supplyAmount(r) })),
-  );
+  // The "Supplied" headline sums every supplied market, entered or not, as
+  // Compound V2's does; the collateral figures read `vc` alone.
+  const supplyUsd = suppliedUsd(v.supplies, v.priceByAddress);
   const otherUsd = totalUsd(
     vo,
     vo.supplies.map((r) => ({ address: r.address, amount: supplyAmount(r) })),
@@ -314,10 +309,10 @@ export function useMoonwellCardSlots({
   const debtUsd = totalUsd(v, v.borrows);
   // Dust lines (under a cent) leave the icon cluster and the panel's rows;
   // the "Show dust" control puts them back.
-  const collDust = useDustLines(vc.supplies, supplyLineUsd(v));
+  const supplyDust = useDustLines(v.supplies, supplyLineUsd(v));
   const otherDust = useDustLines(vo.supplies, supplyLineUsd(v));
   const debtDust = useDustLines(v.borrows, borrowLineUsd(v));
-  const suppliesShown = splitDust(vc.supplies, supplyLineUsd(v)).shown;
+  const suppliesShown = splitDust(v.supplies, supplyLineUsd(v)).shown;
   const borrowsShown = splitDust(v.borrows, borrowLineUsd(v)).shown;
 
   const ended = v.status === "closed" || v.status === "liquidated";
@@ -378,13 +373,14 @@ export function useMoonwellCardSlots({
     heads = [
       {
         id: "collateral",
-        label: CARD_VOCAB.collateral,
+        // Every supplied market, entered or not: the docs' supplied balance.
+        label: SUPPLIED,
         value:
-          vc.supplies.length === 0 ? null : collUsd != null ? (
-            <UsdFigure usd={collUsd} what="Collateral" form="compact" marketBy={marketBy} />
+          v.supplies.length === 0 ? null : supplyUsd != null ? (
+            <UsdFigure usd={supplyUsd} what={SUPPLIED_RECEIPT} form="compact" marketBy={marketBy} />
           ) : (
             <AmountStack>
-              {collDust.lines.map((r) => (
+              {supplyDust.lines.map((r) => (
                 <Prov key={r.address} info={supplyProv(r)}>
                   <AssetAmount
                     value={supplyAmount(r)}
@@ -398,11 +394,13 @@ export function useMoonwellCardSlots({
             </AmountStack>
           ),
         assets:
-          vc.supplies.length > 0 ? (
+          v.supplies.length > 0 ? (
             <InlineAssetCluster assets={suppliesShown.map((r) => ({ symbol: r.symbol, address: r.address }))} />
           ) : undefined,
         total:
-          collUsd != null ? { usd: collUsd, info: stampServerRead(dep.card.usd("Collateral"), marketBy) } : undefined,
+          supplyUsd != null
+            ? { usd: supplyUsd, info: stampServerRead(dep.card.usd(SUPPLIED_RECEIPT), marketBy) }
+            : undefined,
       },
       {
         id: "debt",
@@ -434,8 +432,8 @@ export function useMoonwellCardSlots({
     ];
     // One market on a side: its amount with its icon, the dollars beneath
     // (the Liquity V2 headline).
-    if (vc.supplies.length === 1) {
-      const r = vc.supplies[0];
+    if (v.supplies.length === 1) {
+      const r = v.supplies[0];
       heads[0] = {
         ...heads[0],
         value: (
@@ -451,9 +449,9 @@ export function useMoonwellCardSlots({
         ),
         assets: undefined,
         usd:
-          collUsd != null ? (
+          supplyUsd != null ? (
             <span className="font-bold text-green-400">
-              <UsdFigure usd={collUsd} what="Collateral" form="cents" marketBy={marketBy} />
+              <UsdFigure usd={supplyUsd} what={SUPPLIED_RECEIPT} form="cents" marketBy={marketBy} />
             </span>
           ) : null,
       };
@@ -549,7 +547,7 @@ export function useMoonwellCardSlots({
     }),
     dust: control ?? undefined,
   });
-  const collBreakdown = supplyBreakdown("collateral", collDust);
+  const supplyHeadBreakdown = supplyBreakdown("collateral", supplyDust);
   // The supplies not entered as collateral: many and priced, their total and
   // icons open the breakdown (C19), as Aave V3's and Spark's do; otherwise
   // each line under the total.
@@ -661,18 +659,18 @@ export function useMoonwellCardSlots({
   // The headlines' read-mores on a detail card.
   const HEAD_TIP = {
     collateral:
-      "What the account supplies to Moonwell's markets, in dollars at Moonwell's oracle prices, earning each market's supply rate. The markets entered as collateral back its borrowing.",
-    debt: "What the account owes Moonwell's markets, in dollars at Moonwell's oracle prices, including the interest accrued at each market's borrow rate.",
+      "What the account supplies to Moonwell's markets, entered or not, in dollars at Moonwell's oracle prices, earning each market's supply APY. Only the markets entered as collateral back its borrowing.",
+    debt: "What the account owes Moonwell's markets, in dollars at Moonwell's oracle prices, including the interest accrued at each market's borrow APY.",
   };
   const tipped = (h: PositionCardHead): PositionCardHead =>
-    h.labelTip || !(h.label === CARD_VOCAB.collateral || h.label === CARD_VOCAB.debt)
+    h.labelTip || !(h.id === "collateral" || h.id === "debt")
       ? h
       : { ...h, labelTip: h.id === "debt" ? HEAD_TIP.debt : HEAD_TIP.collateral };
   const headsWithRows = heads
     .map(tipped)
     .map((h) =>
-      h.id === "collateral" && vc.supplies.length > 1
-        ? { ...h, breakdown: collBreakdown }
+      h.id === "collateral" && v.supplies.length > 1
+        ? { ...h, breakdown: supplyHeadBreakdown }
         : h.id === "debt" && v.borrows.length > 1
           ? { ...h, breakdown: debtBreakdown }
           : h,

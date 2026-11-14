@@ -216,7 +216,7 @@ export const seizeTokensProv = (mSym: string, coords: MoonwellCoords, raw?: stri
   kind: "chain",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `Collateral seized in this liquidation — ${mSym} (the collateral market's receipt token) transferred from the borrower to the liquidator, exactly as the borrowed market's mToken emitted it${atBlock(coords)}, scaled by the mToken's 8 decimals. The seize is itself an mToken Transfer in the same transaction, so it also appears on the collateral market's balance lane.`,
+  summary: `Collateral seized in this liquidation — ${mSym} (the collateral market's receipt token) taken from the borrower, as the borrowed market's mToken emitted it${atBlock(coords)}, scaled by the mToken's 8 decimals. Every Moonwell market's protocolSeizeShareMantissa read 3% on 14 Nov 2026 (Ethereum block 26,411,448, Base block 57,237,851): at that share the market keeps 3% of a seizure for its reserves and the liquidator receives the rest, 1.067× the repaid debt at the 1.10× incentive. The share at this event's block is not read. The seize moves as mToken Transfers in the same transaction, so it also appears on the collateral market's balance lane.`,
   contract: mtokenContract(coords),
   via: `${captureVia(coords)} · LiquidateBorrow log · ${fieldSeg("seizeTokens", raw)}`,
   inputs: eventInputs(coords),

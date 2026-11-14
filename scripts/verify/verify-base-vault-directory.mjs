@@ -437,13 +437,13 @@ check(
 // ── 7: the Family facet ─────────────────────────────────────────────────────
 // Scoped to the panel: the LISTING's own toolbar sits above this drawer with
 // facets of its own, and an unscoped click would press the wrong control.
+// The facet is the Family pill (N1.10, ui-jobs 681): its editor ticks the
+// option and applies it.
 const rosterPanel = page.locator("[data-roster-panel]");
-await rosterPanel
-  .locator("button", { hasText: /^Family/ })
-  .first()
-  .click();
-await page.locator("[role='menuitemcheckbox'], label, button", { hasText: "MetaMorpho V1.0" }).first().click();
-await page.keyboard.press("Escape");
+await rosterPanel.locator('[data-filter-pill="Family"] [data-pill-open]').first().click();
+const familyEditor = page.locator('[data-pill-editor="Family"]').first();
+await familyEditor.locator("[data-pill-option]", { hasText: "MetaMorpho V1.0" }).first().click();
+await familyEditor.locator("[data-pill-editor-apply]").click();
 await page.waitForTimeout(200);
 const facetRows = (await readRows()).filter((r) => r.group === "funded");
 const ownV10Funded = CATALOG.filter((r) => r.factory === "v1.0" && (ownTotal.get(r.address) ?? 0n) > 0n).length;
@@ -452,13 +452,13 @@ check(
   facetRows.length === ownV10Funded && facetRows.every((r) => r.family === "v1.0"),
   `${facetRows.length} shown, ${ownV10Funded} expected`,
 );
-// ui-jobs 485: the chip row's Reset also returns the preset (section 16), so
-// the Family chip's own remove is what clears the facet here.
+// ui-jobs 485: Clear all / Reset also returns the preset (section 16), so the
+// Family pill's own × is what clears the facet here.
 await rosterPanel.locator('button[aria-label="Remove Family filter"]').click();
 await page.waitForTimeout(200);
 const afterReset = (await readRows()).filter((r) => r.group === "funded").length;
 check(
-  "7b removing the Family chip restores every funded row",
+  "7b the Family pill's × restores every funded row",
   afterReset === funded.length,
   `${afterReset} of ${funded.length}`,
 );
