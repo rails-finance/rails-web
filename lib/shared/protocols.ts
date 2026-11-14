@@ -85,6 +85,9 @@ type ProtocolSpec = {
    *  position-first Arbitrum explorers (rails-ops TO-DO-arbitrum-scoping.md
    *  items 16 and 18). Omitted means the route is the listing. */
   frontDoor?: true;
+  /** The front door's link to the listing, in the family's unit; absent,
+   *  "Positions Rails has read". */
+  listingLinkLabel?: string;
   /** NOT LAUNCHED: this explorer serves at its URL and nothing on the site
    *  points at it. Every route under it renders exactly as it always did, with
    *  a strip at the top saying the surface is still being worked on; a reader
@@ -519,6 +522,7 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Lend", "Borrow"],
     desc: "Compound V3's Arbitrum deployment: four Comets read live, and any wallet's standing in each one read from the contracts at one block",
     frontDoor: true,
+    listingLinkLabel: "Accounts Rails has read",
     subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {

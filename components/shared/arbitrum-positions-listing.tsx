@@ -110,6 +110,10 @@ interface FamilyConfig {
   /** What the listing counts, where the family's docs name it otherwise
    *  than "positions" (Compound V3's "accounts"). */
   noun?: string;
+  /** The borrow side's word in the Size filter and the sort, where the
+   *  family's docs name it otherwise than "Debt" (Compound V3's "Borrow
+   *  balance"). */
+  debtWord?: string;
 }
 
 const blockOf = (row: ArbitrumReadRow) => row.blockNumber ?? "unknown";
@@ -139,6 +143,7 @@ const FAMILIES: Record<ArbitrumPositionsFamily, FamilyConfig> = {
   "compound-v3": {
     session: "compound-v3-arbitrum",
     noun: "accounts",
+    debtWord: "Borrow balance",
     // 5,033 transactions, 21 Oct 2026.
     txTop: 10000,
     receipt: (what, row) => ({
@@ -195,11 +200,11 @@ const DEFAULTS: ArbitrumPositionsFilters = {
   collateral: [],
 };
 
-const SORTS: SortOption[] = [
+const sortsOf = (debtWord = "Debt"): SortOption[] => [
   { value: "activity", label: "Last activity" },
   { value: "visited", label: "Last opened" },
   { value: "collateral", label: "Collateral" },
-  { value: "debt", label: "Debt" },
+  { value: "debt", label: debtWord },
 ];
 
 /** A card's dollar figures: its Comet's where it draws one, the wallet's
@@ -217,14 +222,20 @@ const collateralRangeOf = (c: Card): number | null => {
 };
 
 /** The Size panel's price line. */
+/** Each family's sort options, built once. */
+const SORTS = Object.fromEntries(
+  (Object.keys(FAMILIES) as ArbitrumPositionsFamily[]).map((k) => [k, sortsOf(FAMILIES[k].debtWord)]),
+) as Record<ArbitrumPositionsFamily, SortOption[]>;
+
 const SIZE_NOTE = "At each protocol's own oracle at the row's read block.";
 
 /** The Size panel over the cards: Debt, and Collateral as collateral plus
  *  supply. The old `?size=1000` bracket reads as `coll=1000-`. Then the
  *  Transactions range over the wallet's `txCount`; a wallet's Comet cards
  *  share its count. */
-function dimensions(txTop: number): ListDimension<ArbitrumPositionsFilters, Card>[] {
+function dimensions(txTop: number, debtLabel?: string): ListDimension<ArbitrumPositionsFilters, Card>[] {
   const [debt, coll] = sizeDimensions<ArbitrumPositionsFilters>({
+    debtLabel,
     getDebt: (f) => f.debt,
     setDebt: (f, d) => ({ ...f, debt: d }),
     getColl: (f) => f.coll,
@@ -323,7 +334,10 @@ const DIMENSIONS: Record<ArbitrumPositionsFamily, () => ListDimension<ArbitrumPo
     ...dimensions(FAMILIES["aave-v3"].txTop),
     collateralDimension(AAVE_COLLATERAL, (r) => r.collateralAssets),
   ],
-  "compound-v3": () => [...dimensions(FAMILIES["compound-v3"].txTop), COLLATERAL_DIMENSION],
+  "compound-v3": () => [
+    ...dimensions(FAMILIES["compound-v3"].txTop, FAMILIES["compound-v3"].debtWord),
+    COLLATERAL_DIMENSION,
+  ],
   morpho: () => [
     ...dimensions(FAMILIES.morpho.txTop),
     collateralDimension(MORPHO_COLLATERAL, (r) => r.collateralMarkets),
@@ -570,7 +584,7 @@ export function ArbitrumPositionsListing({
         noun={cfg.noun ?? "positions"}
         basePath={`${entry.href}/positions`}
         defaults={DEFAULTS}
-        sortOptions={SORTS}
+        sortOptions={SORTS[family]}
         searchPlaceholder="Search wallet address"
         // The roster resolves an explorer's own route only, so the rail header
         // comes in as the identity, and the title goes sr-only beneath it.

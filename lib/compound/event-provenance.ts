@@ -308,8 +308,8 @@ export const absorbSeizedUsdProv = (
   verify: txVerify(coords),
   summary:
     legs.length > 1
-      ? `What the seized collateral was worth at the liquidation — the sum of each AbsorbCollateral event's usdValue in this transaction (one absorb call seizes every collateral asset). Each addend is the Comet's value at its price feeds, emitted in the log${atBlock(coords)}.${quoteNote(coords)}`
-      : `What the seized collateral was worth at the liquidation — the AbsorbCollateral event's usdValue, the Comet's value at its price feed, emitted in the log${atBlock(coords)}.${quoteNote(coords)}`,
+      ? `What the seized collateral was worth at the liquidation — the sum of each AbsorbCollateral event's usdValue in this transaction (one absorb call seizes every collateral asset). Each addend is the Comet's valuation at its prices, emitted in the log${atBlock(coords)}.${quoteNote(coords)}`
+      : `What the seized collateral was worth at the liquidation — the AbsorbCollateral event's usdValue, the Comet's valuation at its price, emitted in the log${atBlock(coords)}.${quoteNote(coords)}`,
   contract: cometContract(coords),
   via: `${captureVia(coords)} · AbsorbCollateral log${legs.length > 1 ? "s" : ""} · usdValue`,
   inputs: eventInputs(
@@ -333,7 +333,7 @@ export const absorbPriceProv = (
   pclass: "emitted",
   formula: "usdValue ÷ amount",
   verify: txVerify(coords),
-  summary: `The price the protocol carried ${sym} at when it liquidated this account — the AbsorbCollateral or AbsorbDebt event's usdValue divided by the amount it moved, both emitted in the same log${atBlock(coords)}. This is the Comet's price feed at the liquidation, recovered from the event's two params.${quoteNote(coords)}`,
+  summary: `The price the protocol carried ${sym} at when it liquidated this account — the AbsorbCollateral or AbsorbDebt event's usdValue divided by the amount it moved, both emitted in the same log${atBlock(coords)}. This is the Comet's price at the liquidation, recovered from the event's two params.${quoteNote(coords)}`,
   contract: cometContract(coords),
   via: `${captureVia(coords)} · absorb log · usdValue ÷ amount`,
   inputs: eventInputs(coords, [
@@ -376,7 +376,7 @@ export const replayHeldProv = (
 ): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
-  summary: `${side === "collateral" ? "Collateral" : "Debt"} ${before ? "before" : "after"} this event${sym ? ` in ${sym}` : ", in USD"} — what the account ${side === "collateral" ? "held" : "owed"} ${before ? "just before the transaction ran" : "once the transaction had run"}, from the position's replay of its rows${sym ? "" : ": each asset's balance at the Comet's price feed at its latest priced row"}.`,
+  summary: `${side === "collateral" ? "Collateral" : "Debt"} ${before ? "before" : "after"} this event${sym ? ` in ${sym}` : ", in USD"} — what the account ${side === "collateral" ? "held" : "owed"} ${before ? "just before the transaction ran" : "once the transaction had run"}, from the position's replay of its rows${sym ? "" : ": each asset's balance at the Comet's price at its latest priced row"}.`,
   contract: cometContract(coords),
   via: "the position's replay of its rows (lib/compound/flows.ts)",
   inputs: eventInputs(coords),
@@ -597,9 +597,9 @@ export const compoundUsdProvOnchain = (what: string, coords?: CompoundCoords): P
   kind: "chain-derived",
   // Both legs on-chain; the oracle price is the furthest class, so it leads.
   pclass: "oracle",
-  summary: `${what} valued in USD at the Comet's price feeds — the chain-state token balance multiplied by the Chainlink price Comet's liquidation engine reads (\`getPrice\`). The cWETHv3 market's feeds quote in ETH, so its values are converted with Comet's WETH/USD price feed (read from the cUSDCv3 market).`,
+  summary: `${what} valued in USD at the Comet's prices — the chain-state token balance multiplied by the Chainlink price Comet's liquidation engine reads (\`getPrice\`). The cWETHv3 market's feeds quote in ETH, so its values are converted with Comet's WETH/USD price feed (read from the cUSDCv3 market).`,
   contract: cometContract(coords),
-  via: "chain balance × on-chain price feed",
+  via: "chain balance × Comet getPrice on its price feed",
   formula: "balance × price",
   inputs: [
     { label: "balance", kind: "chain", pclass: "state", note: "replayed position balance" },
@@ -632,7 +632,7 @@ export type CompoundLifetimeFlow =
  *  word the docs reserve for the function. */
 export const FLOW_NAME: Partial<Record<CompoundLifetimeFlow, string>> = {
   "absorbed debt": "debt cleared at liquidation",
-  "absorb credit": "paid out past the debt at liquidation",
+  "absorb credit": "left over after the liquidation",
   "absorbed collateral": "collateral seized at liquidation",
 };
 
@@ -735,7 +735,7 @@ export const absorbCreditedUsdProv = (sym: string, coords: CompoundCoords, vals:
   kind: "chain",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `What the protocol paid out for the seized collateral, in dollars. The AbsorbDebt event's usdValue${atBlock(coords)}, which is basePaidOut valued at the ${sym} price feed. Comet computes it as each seized asset's value times that asset's liquidation factor, added up.${quoteNote(coords)}`,
+  summary: `What the protocol paid out for the seized collateral, in dollars. The AbsorbDebt event's usdValue${atBlock(coords)}, which is basePaidOut valued at the Comet's ${sym} price. Comet computes it as each seized asset's value times that asset's liquidation factor, added up.${quoteNote(coords)}`,
   contract: cometContract(coords),
   via: `${captureVia(coords)} · AbsorbDebt log · usdValue`,
   inputs: eventInputs(coords, [{ label: "basePaidOut", value: vals.paidOut, kind: "chain", note: "AbsorbDebt" }]),

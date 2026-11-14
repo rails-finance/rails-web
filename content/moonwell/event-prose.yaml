@@ -774,7 +774,7 @@ L5:
       - |-
         A liquidator repays part of one debt, at most the close factor of 50%, and may liquidate again while the account stays short. It seizes mTokens worth 1.10× the repaid debt, 10% extra: the liquidation incentive.
       - |-
-        Every Moonwell market keeps 3% of the seized mTokens for its reserves, read on chain on 14 Nov 2026. The liquidator receives 1.067× the repaid debt, 6.7% extra, and the reserves 3.3%. Moonwell's docs give the split as 7% and 3%.
+        Every Moonwell market keeps 3% of the seized mTokens for its reserves, and the liquidator receives the rest. Moonwell's docs give the split as 7% and 3%.
     links:
       - label: |-
           Avoiding liquidation

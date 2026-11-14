@@ -43,6 +43,9 @@ import {
  *  its event_count stands in (10,361 events, 20 Oct 2026). */
 const COMPOUND_V3_TX_TOP = 20000;
 
+/** The borrow side's word, as the card and the sort say it (ui-jobs 629, 643). */
+const COMPOUND_V3_DEBT_WORD = "Borrow balance";
+
 /** The Size panel's price line on Ethereum. */
 const COMPOUND_V3_SIZE_NOTE = "At the latest indexed price per asset, as of the listing's last refresh.";
 
@@ -149,6 +152,7 @@ export function compoundListDimensions(
       setColl: (f, coll) => ({ ...f, coll }),
       panelNote: sizeNote,
       debtAliases: ["state"],
+      debtLabel: COMPOUND_V3_DEBT_WORD,
     }),
     {
       id: "liquidations",

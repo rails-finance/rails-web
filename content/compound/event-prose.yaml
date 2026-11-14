@@ -1201,9 +1201,9 @@ L5:
         text: |-
           the same transfer shows as an out-leg on the sender and an in-leg on the recipient.
       - bold: |-
-          Health still enforced
+          Liquidatable is the limit
         text: |-
-          the transfer fails if it would make the sender's account liquidatable.
+          by Compound's docs, the transfer fails if it would make the sender's account liquidatable.
     links:
       - label: |-
           Transfer

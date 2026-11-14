@@ -7,7 +7,7 @@
 // compounds daily over 365 days, Moonwell's every second of 31,536,000. The
 // index it extends is the chain's exchange rate or borrow growth, which
 // compounds as interest accrues, so past the last knot the index grows by
-// (1 + APY)^(elapsed ÷ a 365-day year), the APY's own year.
+// (1 + APY)^(elapsed ÷ a 365-day year), the APY's year.
 //
 // Pure, with no imports, so scripts/test runs it.
 

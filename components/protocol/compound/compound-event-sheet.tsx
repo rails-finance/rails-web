@@ -107,7 +107,7 @@ const atPriceUsdProv = (
 ): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
-  summary: `${what}, in US dollars. The amount times the Comet's price-feed price for ${h.symbol} ${h.atBlock ? "at this event's block" : "at the nearest row whose block was read"}.`,
+  summary: `${what}, in US dollars. The amount times the Comet's price for ${h.symbol} ${h.atBlock ? "at this event's block" : "at the nearest row whose block was read"}.`,
   formula: "amount × price",
   contract: cometContract(coords),
   inputs: [
@@ -135,7 +135,7 @@ function sideUsdProv(
   return {
     kind: "chain-derived",
     pclass: "oracle",
-    summary: `${what} ${when === "previous" ? "at the last event" : `${when} this event`}. What the account ${side === "collateral" ? "posted and lent" : "owed"} ${at}, in US dollars: each asset's balance from the position's replay of its rows times the Comet's price-feed price.`,
+    summary: `${what} ${when === "previous" ? "at the last event" : `${when} this event`}. What the account ${side === "collateral" ? "posted and lent" : "owed"} ${at}, in US dollars: each asset's balance from the position's replay of its rows times the Comet's price.`,
     formula: "Σ balance × price",
     contract: cometContract(coords),
     via: "the position's replay of its rows (lib/compound/flows.ts)",
@@ -406,7 +406,7 @@ export function compoundEventSheet(input: CompoundSheetInput): EventSheet | unde
               info: {
                 kind: "chain-derived",
                 pclass: "oracle",
-                summary: `Market move on the ${side} since the last event. The side's total just before this event, less its total once the previous event had run and the interest since, all in US dollars: the change the Comet's price feeds made to the balances held between the two. No token moved.`,
+                summary: `Market move on the ${side} since the last event. The side's total just before this event, less its total once the previous event had run and the interest since, all in US dollars: the change in the Comet's prices made to the balances held between the two. No token moved.`,
                 formula: "before this event − last event − interest since",
                 contract: cometContract(coords),
                 inputs: hs

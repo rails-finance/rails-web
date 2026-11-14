@@ -4,6 +4,7 @@
 
 import type { MoonwellChainResponse } from "@/lib/api/fetch-moonwell-position";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
+import { linesUsd } from "@/lib/moonwell/supply-totals";
 import { formatUsd } from "@/lib/shared/format-event";
 import { shortSubject } from "@/lib/shared/page-metadata";
 import type { PositionCardModel } from "@/lib/share/position-card";
@@ -30,8 +31,14 @@ export function moonwellBaseShareCardModel(
 ): PositionCardModel | null {
   if (!position || position.markets.length === 0) return null;
 
+  // "Supplied": every supplied market, entered or not, as the card's headline
+  // (ui-jobs 644); `collateralValueUsd` is the entered markets alone.
+  const supplied = linesUsd(
+    position.markets.map((m) => ({ address: m.underlying, amount: m.supplyUnderlying })),
+    Object.fromEntries(position.markets.filter((m) => m.priceUsd != null).map((m) => [m.underlying, m.priceUsd!])),
+  );
   const stats: PositionCardModel["stats"] = [
-    { label: CARD_VOCAB.collateral, value: formatUsd(position.collateralValueUsd) },
+    ...(supplied != null ? [{ label: "Supplied", value: formatUsd(supplied) }] : []),
     { label: CARD_VOCAB.debt, value: formatUsd(position.debtValueUsd) },
   ];
   // Mirrors the detail card's own gate (moonwell-base-view.tsx): the risk

@@ -424,7 +424,7 @@ export function compoundFlowBuckets(roles: CompoundRoles, filled: Set<string>): 
     { key: CV3.earned, label: "Interest earned", event: "", side: "collateral", dir: "in", hatch: "dashes" },
     {
       key: CV3.credit,
-      label: "Left over after the absorb",
+      label: "Left over after the liquidation",
       event: "Absorb",
       side: "collateral",
       dir: "in",
@@ -456,7 +456,7 @@ export function compoundFlowBuckets(roles: CompoundRoles, filled: Set<string>): 
     },
     {
       key: CV3.seized,
-      label: "Seized by the absorb",
+      label: "Seized at liquidation",
       event: "Absorb",
       side: "collateral",
       dir: "out",
@@ -485,7 +485,7 @@ export function compoundFlowBuckets(roles: CompoundRoles, filled: Set<string>): 
     },
     {
       key: CV3.cleared,
-      label: "Cleared by the absorb",
+      label: "Cleared at liquidation",
       event: "Absorb",
       side: "debt",
       dir: "out",

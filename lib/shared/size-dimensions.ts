@@ -58,6 +58,9 @@ export function sizeDimensions<F>(opts: {
   /** The second range's word where "Collateral" is wrong: "Deposited",
    *  "Supply". The label adds the unit; the chip reads "Deposited: ≥ $1K". */
   collLabel?: string;
+  /** The first range's word where "Debt" is not the family's: "Borrow
+   *  balance". The label adds the unit; the chip reads "Borrow balance: ≥ $1K". */
+  debtLabel?: string;
   /** The Debt range in the loan token rather than USD: "BOLD" draws
    *  "Debt (BOLD)" and "Debt: ≥ 1K BOLD"; a phrase ("loan token") reads the
    *  same way. */
@@ -71,10 +74,11 @@ export function sizeDimensions<F>(opts: {
   const spec = (unit?: string) => (unit ? { min: 0, max: top, unit } : { min: 0, max: top, usd: true });
   const sides = opts.sides ?? ["debt", "coll"];
   const collWord = opts.collLabel ?? "Collateral";
+  const debtWord = opts.debtLabel ?? "Debt";
   const collId = opts.collId ?? "coll";
   const debt: SerializableDimension<F> = {
     id: "debt",
-    label: `Debt (${opts.debtUnit ?? "USD"})`,
+    label: `${debtWord} (${opts.debtUnit ?? "USD"})`,
     group: "Size",
     cardinality: "range",
     range: spec(opts.debtUnit),
@@ -83,7 +87,7 @@ export function sizeDimensions<F>(opts: {
     options: [],
     get: opts.getDebt,
     set: (f, v) => opts.setDebt(f, debtRangeFromUrl(v)),
-    chipLabel: (v) => rangeChipLabel("Debt", v, !opts.debtUnit, opts.debtUnit),
+    chipLabel: (v) => rangeChipLabel(debtWord, v, !opts.debtUnit, opts.debtUnit),
   };
   const coll: SerializableDimension<F> = {
     id: collId,

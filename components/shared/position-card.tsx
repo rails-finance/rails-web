@@ -173,6 +173,8 @@ export type PositionCardExports = Omit<ExportMenuProps, "variant" | "leading">;
  *  exports the ⋮ holds the identity rows and the provenance row. */
 export interface PositionCardMenu {
   leading?: (close: () => void) => ReactNode;
+  /** The family's unit in the ⋮'s rows and name; absent, "position". */
+  noun?: string;
   exports?: PositionCardExports | null;
 }
 
@@ -770,13 +772,13 @@ function DetailMenu({
   const leading = (close: () => void) => (
     <>
       {menu.leading?.(close)}
-      <SavePositionRow identityText={identityText} ended={ended} />
+      <SavePositionRow identityText={identityText} ended={ended} noun={menu.noun} />
     </>
   );
   return menu.exports ? (
-    <ExportMenu variant="card" leading={leading} {...menu.exports} />
+    <ExportMenu variant="card" leading={leading} {...menu.exports} noun={menu.noun} />
   ) : (
-    <ToolsMenu variant="card" leading={leading} />
+    <ToolsMenu variant="card" leading={leading} noun={menu.noun} />
   );
 }
 

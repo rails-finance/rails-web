@@ -63,8 +63,9 @@ export interface CompoundV2ChainMarket {
   collateralDisabled: boolean;
   /** getAssetsIn membership — false means this supply backs NOTHING. */
   entered: boolean;
-  /** Annualised simple rates (fraction): the per-BLOCK getters × 2,628,000
-   *  blocks (lib/compound-v2/rate-year.ts). Null when the read fails. */
+  /** The rates as APYs (fraction): the per-block getters by Compound's docs'
+   *  formula, 7,200 blocks a day compounded daily over 365 days
+   *  (lib/comptroller/apy.ts). Null when the read fails. */
   supplyApr: number | null;
   borrowApr: number | null;
   /** The model's `blocksPerYear()`, the constant it sets its per-block curve with. */
