@@ -48,7 +48,8 @@ const vaultContract = (c: VaultTimelineCoords): Provenance["contract"] => ({
   address: c.vault,
 });
 
-const atBlock = (c: VaultTimelineCoords): string => (c.blockNumber != null ? ` at block ${c.blockNumber}` : "");
+const atBlock = (c: VaultTimelineCoords): string =>
+  c.blockNumber != null ? ` at block ${c.blockNumber.toLocaleString("en-US")}` : "";
 const asset = (c: VaultTimelineCoords) => c.assetSymbol ?? "the vault's asset";
 /** The chain a shared builder names: the flows and the two "now" figures are drawn on every vault family's
  *  holder page, MetaMorpho on Base among them. */
@@ -79,7 +80,7 @@ export const vaultTimelineGateProv = (c: VaultTimelineCoords, r: VaultHolderReco
     kind: "recompute",
     text: `To check: ask any Ethereum archive node for the vault's Transfer logs that name this address as sender and as receiver, blocks ${r.fromBlock} to ${r.toBlock}, add the values with their signs, and compare the sum with balanceOf(${c.holder ?? "the address"}) at block ${r.toBlock}.`,
   },
-  summary: `The history check — every transfer this address sent or received on this vault, replayed into a balance and compared with the vault's balance for it at block ${r.toBlock}. Over blocks ${r.fromBlock} to ${r.toBlock} the vault recorded ${r.logsOut} transfers from this address and ${r.logsIn} to it; their signed sum is ${r.replayed} and the vault's balance reads ${r.onChain}.${r.cutBalance != null ? ` The replay is in two halves: ${r.cutBalance} is the signed sum of every row kept at or below the stored cut, and the rest is this address's transfers from that cut to block ${r.toBlock}, read on this request. The check compares the sum of the two with the balance, so a kept half that had gone wrong fails here and does not reach the page.` : ""} ${r.reconciled ? "The two agree to the wei, which is why the rows below are drawn." : "The two do not agree, so no history is drawn: a node has been seen on this chain answering part of a question with a success status, and nothing in the answer tells that apart from an empty history."}${r.refetched ? ` The logs were asked for again after a pause, and ${r.refetchDiffered ? "the second answer held a different number of logs from the first, so the node answered one question two ways" : "no second answer came back with a different number of logs"}.` : ""}`,
+  summary: `The history check — every transfer this address sent or received on this vault, replayed into a balance and compared with the vault's balance for it at block ${r.toBlock.toLocaleString("en-US")}. Over blocks ${r.fromBlock.toLocaleString("en-US")} to ${r.toBlock.toLocaleString("en-US")} the vault recorded ${r.logsOut} transfers from this address and ${r.logsIn} to it; their signed sum is ${r.replayed} and the vault's balance reads ${r.onChain}.${r.cutBalance != null ? ` The replay is in two halves: ${r.cutBalance} is the signed sum of every row kept at or below the stored cut, and the rest is this address's transfers from that cut to block ${r.toBlock.toLocaleString("en-US")}, read on this request. The check compares the sum of the two with the balance, so a kept half that had gone wrong fails here and does not reach the page.` : ""} ${r.reconciled ? "The two agree to the wei, which is why the rows below are drawn." : "The two do not agree, so no history is drawn: a node has been seen on this chain answering part of a question with a success status, and nothing in the answer tells that apart from an empty history."}${r.refetched ? ` The logs were asked for again after a pause, and ${r.refetchDiffered ? "the second answer held a different number of logs from the first, so the node answered one question two ways" : "no second answer came back with a different number of logs"}.` : ""}`,
   contract: vaultContract(c),
   via: `${LANE} · Transfer logs, sent and received + balanceOf(holder) @ the pinned block`,
   formula: "Σ (value where to == holder) − Σ (value where from == holder) == balanceOf(holder)",
@@ -116,15 +117,15 @@ export const vaultTimelineHorizonProv = (
   summary: `Rows withheld — this address has ${basis === "floor" ? "at least " : ""}${count.toLocaleString("en-US")} transfers on this vault${
     basis === "checked"
       ? count > ceiling
-        ? `, above the ${ceiling.toLocaleString("en-US")} Rails keeps a stored history for. That bound is the store's 8 MB body limit divided by a measured row, so it says the history is larger than Rails stores, which is a different claim from larger than a page can draw.`
+        ? `, above the ${ceiling.toLocaleString("en-US")} Rails keeps a stored history for.`
         : `. It is above the ${VAULT_TIMELINE_HORIZON.toLocaleString("en-US")} rows Rails builds for a page in one request, and no stored history could be kept for it on this request.`
       : "."
-  } The newest rows are not drawn in place of the rest: a partial history shown as a whole one is the failure this check exists to prevent, and the history check sums every row, so a page of rows could not be reconciled. ${
+  } No rows are drawn: the history check sums every row, so a page of them could not be reconciled. ${
     basis === "unchecked"
       ? "The balance check did not run: the query for this address's transfers failed, so the range was counted in chunks from block 0, every chunk answering. The count covers the whole range, but no check confirmed it, and no rows are drawn without one."
       : basis === "floor"
-        ? `The count is a floor, and the answer may be more: the node refused the whole-range query on response size (it answers at most 10,000 logs in one direction), so the range was counted in chunks of 1,000,000 blocks from block 0, and the count stopped once it passed ${VAULT_TIMELINE_HORIZON.toLocaleString("en-US")}. Every chunk counted answered; a chunk that refused would have been halved, and a count with a hole in it would have been stated as unread. Because the logs were never handed over whole, the balance check could not be run on this address, and nothing is drawn or stored.`
-        : "The count is exact: both queries returned, and the balance check ran and agreed, before this decision was made."
+        ? `The count is a floor, and the answer may be more: the node refused to return the whole range at once because the answer was too large, so the range was counted in chunks from block 0, and the count stopped once it passed ${VAULT_TIMELINE_HORIZON.toLocaleString("en-US")}. Because the logs were never handed over whole, the balance check could not be run on this address, and nothing is drawn or stored.`
+        : "The count is exact: both queries returned, and the balance check ran and agreed."
   }`,
   contract: vaultContract(c),
   via: `${LANE} · Transfer logs, sent and received @ the pinned block`,
@@ -142,7 +143,7 @@ export const vaultTimelineBuildingProv = (
     kind: "recompute",
     text: `To check: ask any Ethereum archive node for the vault's Transfer logs that name this address, up to block ${building.keptCut} and up to the page's block, and count the transfers in each range (on a stake token, add its cooldown logs).`,
   },
-  summary: `History still loading — ${building.keptRows.toLocaleString("en-US")} of this address's ${building.totalRows.toLocaleString("en-US")} rows are kept, up to block ${building.keptCut}, and the rest are still to be read. Each row needs its block's time and the vault's share price at that row's block, so no reader waits for a history this long: it is read a chunk of blocks at a time, after this page is sent and on later visits. The rows are read oldest first, so what is kept is an unbroken run from the start of the history, and the store checks that its rows add up before it keeps them. No rows are drawn until the whole history is kept: the history check sums every row. The reading after this page reuses the logs already found; a later visit asks only for the logs above the kept block.`,
+  summary: `History still loading — ${building.keptRows.toLocaleString("en-US")} of this address's ${building.totalRows.toLocaleString("en-US")} rows are kept, up to block ${building.keptCut.toLocaleString("en-US")}, and the rest are still to be read. No rows are drawn until the whole history is kept: the history check sums every row.`,
   contract: vaultContract(c),
   via: `${LANE} · block timestamp + convertToAssets at each row's block, kept at a finalized cut`,
 });
@@ -158,7 +159,7 @@ export const vaultTimelineSharesProv = (c: VaultTimelineCoords, kind: VaultHolde
     kind: "recompute",
     text: `To check: open the Transfer log at this log index in ${c.txHash ?? "this transaction"} on a block explorer and read its value, the one field that is not indexed.`,
   },
-  summary: `Shares moved — the number of shares this row's transfer records${atBlock(c)}, in the share token's units. Which way they moved is decided by the two addresses it names: ${KIND_CLAUSE[kind]}. The zero address says whether shares were created, destroyed or handed on; no method name or label is read.`,
+  summary: `Shares moved — the number of shares this row's transfer records${atBlock(c)}, in the share token's units. Which way they moved is decided by the two addresses it names: ${KIND_CLAUSE[kind]}.`,
   contract: vaultContract(c),
   via: `${LANE} · the Transfer log in this transaction`,
 });
@@ -168,7 +169,7 @@ export const vaultTimelineBalanceAfterProv = (c: VaultTimelineCoords): Provenanc
   kind: "chain-derived",
   pclass: "emitted",
   source: { block: c.blockNumber, txHash: c.txHash },
-  summary: `Balance after — every share amount in this address's transfers up to and including this one, added with its sign, in share units. It is a replay, the same sum the history check compares with the vault's balance. It is a position inside the block: where an address has two transfers in one block, only the later one equals the balance at the end of that block. The check compares only the final position, which is always an end-of-block figure.`,
+  summary: `Balance after — every share amount in this address's transfers up to and including this one, added with its sign, in share units. It is a replay, the same sum the history check compares with the vault's balance. Inside a block it is a running figure: where an address has two transfers in one block, only the later one equals the balance at the end of that block.`,
   contract: vaultContract(c),
   via: `${LANE} · replay of this address's Transfer logs`,
   formula: "Σ (value where to == holder) − Σ (value where from == holder), up to this log",
@@ -180,7 +181,7 @@ export const vaultTimelineBalanceBeforeProv = (c: VaultTimelineCoords): Provenan
   kind: "chain-derived",
   pclass: "emitted",
   source: { block: c.blockNumber, txHash: c.txHash },
-  summary: `Balance before — the balance one transfer earlier: the balance after this transfer less this transfer's signed amount. It is integer arithmetic on two figures this row carries, so it is exact. A row whose amount is zero (a transfer whose two ends are this address, or a cooldown that moved no shares) states the same figure on both sides, and that equality is the reading.`,
+  summary: `Balance before — the balance one transfer earlier. It is integer arithmetic on two figures this row carries, so it is exact; a cooldown row, which moves no shares, states the same figure on both sides.`,
   contract: vaultContract(c),
   via: `${LANE} · replay of this address's Transfer logs`,
   formula: "balance after this transfer − this transfer's signed amount",
@@ -248,7 +249,7 @@ export const vaultTimelineNoteProv = (c: VaultTimelineCoords, note: AaveVaultNot
     kind: "recompute",
     text: `To check: ask any Ethereum archive node for the vault's logs of this event over the whole chain and open the one at block ${note.blockNumber}.`,
   },
-  summary: `A change to the vault's terms — ${NOTE_CLAUSE[note.kind]}, read at block ${note.blockNumber}. It is not this address's event: it moved every holder's terms at once, which is why it sits beside the rows and this page's event counts leave it out. The values are the log's, raw. What the vault's terms are now is in the sections above, read at the page's block.`,
+  summary: `A change to the vault's terms — ${NOTE_CLAUSE[note.kind]}, read at block ${note.blockNumber.toLocaleString("en-US")}. It is not this address's event: it moved every holder's terms at once, which is why it sits beside the rows and this page's event counts leave it out. The values are the log's, raw. What the vault's terms are now is in the sections above, read at the page's block.`,
   contract: vaultContract(c),
   via: `${LANE} · the vault's configuration log for this event`,
 });
@@ -330,7 +331,7 @@ export const vaultFlowProv = (
     kind: "recompute",
     text: `To check: ask any ${chainWord(c)} archive node for this vault's logs that name this address and add up the ${count} that match.`,
   },
-  summary: `A lifetime total — ${FLOW_CLAUSE[kind](unit)}. It sums ${count.toLocaleString("en-US")} row${count === 1 ? "" : "s"} of this address's whole history, the same rows the history check ran over; the timeline below draws the newest of them. Nothing is annualised, no two rows are subtracted from each other, and no figure here is priced.`,
+  summary: `A lifetime total — ${FLOW_CLAUSE[kind](unit)}. It sums ${count.toLocaleString("en-US")} row${count === 1 ? "" : "s"} of this address's whole history, the same rows the history check ran over; the timeline below draws the newest of them. Nothing here is priced.`,
   contract: vaultContract(c),
   via: `${LANE} · the holder's logs on the vault, summed`,
 });
@@ -344,7 +345,7 @@ export const vaultClaimNowProv = (c: VaultTimelineCoords): Provenance => ({
     kind: "recompute",
     text: `To check: ask any ${chainWord(c)} archive node for the vault's convertToAssets(balanceOf(${c.holder ?? "the address"})) at block ${c.blockNumber ?? 0}.`,
   },
-  summary: `Claim now — what the vault says this address's shares convert to${atBlock(c)}, in ${asset(c)}. It is one read at one block. The deposits and withdrawals beside it are the contract's figures at the blocks they happened at, and this is the contract's figure now, so it is a different quantity from their sum; the difference is neither drawn nor named here, since it is not a rate and this page reads nothing between those blocks and this one.`,
+  summary: `Claim now — what the vault says this address's shares convert to${atBlock(c)}, in ${asset(c)}, read once. It is the contract's figure now, and differs from the sum of the deposits and withdrawals beside it.`,
   contract: vaultContract(c),
   via: `${LANE} · convertToAssets(balanceOf(holder)) @ the pinned block`,
 });

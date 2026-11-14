@@ -171,10 +171,9 @@ export function YearnVaultTimeline({ timeline, vaultName, shareSymbol, assetSymb
               , more than this lane builds in one request.{" "}
               {timeline.coverage.logCountIsLowerBound ? (
                 <>
-                  The count is a floor rather than a census: the endpoint would not answer this address&rsquo;s whole
-                  sweep at once, so the range was walked in chunks and the walk stopped as soon as it passed what this
-                  page draws. Because the logs were never read whole, the balance check could not be run on this address
-                  at all.
+                  The count is a floor: the node would not return this address&rsquo;s whole history at once, so the
+                  range was counted a piece at a time, and the count stopped once it passed what this page draws.
+                  Because the logs were never read whole, the balance check could not be run on this address.
                 </>
               ) : (
                 <>

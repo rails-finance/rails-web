@@ -84,7 +84,8 @@ const vaultContract = (c: AaveVaultCoords): Provenance["contract"] => ({
   address: c.vault,
 });
 
-const atBlock = (c: AaveVaultCoords): string => (c.blockNumber != null ? ` at block ${c.blockNumber}` : "");
+const atBlock = (c: AaveVaultCoords): string =>
+  c.blockNumber != null ? ` at block ${c.blockNumber.toLocaleString("en-US")}` : "";
 
 const recompute = (call: string, c: AaveVaultCoords): Provenance["verify"] => ({
   kind: "recompute",
@@ -295,7 +296,7 @@ const aaveSghoAssetHeldProv_ = (c: AaveVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute(`${asset(c)}.balanceOf(the vault)`, c),
-  summary: `${asset(c)} the contract holds — the ${asset(c)} balance at the vault's address${atBlock(c)}. It is a different figure from total assets, which is what the vault's stored yield index says its shares are worth. Withdrawals are limited to this balance. The two can sit either side of each other.`,
+  summary: `${asset(c)} the contract holds — the ${asset(c)} balance at the vault's address${atBlock(c)}. It is a different figure from total assets, which is what the vault's stored yield index says its shares are worth. Withdrawals are limited to this balance.`,
   contract: vaultContract(c),
   via: `${LANE} · asset.balanceOf(vault) @ the pinned block`,
 });
@@ -306,7 +307,7 @@ const aaveSghoCapacityProv_ = (c: AaveVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("maxDeposit()", c),
-  summary: `Remaining capacity — what the vault will still accept${atBlock(c)}, in ${asset(c)}, as the vault answers: the deposit cap the risk council has set less total assets, and the two agree. It is the ceiling at this block; the council can move the cap.`,
+  summary: `Remaining capacity — what the vault will still accept${atBlock(c)}, in ${asset(c)}, as the vault answers it. It is the ceiling at this block; the council can move the cap.`,
   contract: vaultContract(c),
   via: `${LANE} · maxDeposit() @ the pinned block`,
 });
@@ -347,7 +348,7 @@ const aaveVaultBackedByProv_ = (c: AaveVaultCoords, stakeSymbol: string, stake: 
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
-  summary: `${stakeSymbol}'s share of this vault — that token's holding of this vault's shares over all shares issued${atBlock(c)}. It appears here because the stake token's asset is this vault at that block, so these shares are its backing: the stake token's supply is a claim on this one position. The two layers hold the same assets once, so their figures are not added. A share of the shares is a share of the pool, since shares are fungible and the vault pooled them, and the figure carries no ranking and no risk reading.`,
+  summary: `${stakeSymbol}'s share of this vault — that token's holding of this vault's shares over all shares issued${atBlock(c)}. It appears here because the stake token's asset is this vault at that block, so these shares are its backing: the stake token's supply is a claim on this one holding.`,
   contract: vaultContract(c),
   inputs: [{ label: "stake token", value: stake, kind: "chain", note: "the address the roster returned" }],
   via: `${LANE} · balanceOf(the stake token) ÷ totalSupply() @ the pinned block`,
@@ -373,7 +374,7 @@ const aaveUmbrellaCustodyProv_ = (c: AaveVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute(`${asset(c)}.balanceOf(the stake token)`, c),
-  summary: `${asset(c)} the token holds — the ${asset(c)} balance at this stake token's address${atBlock(c)}. It sits beside total assets because total assets is a counter stored in the contract, incremented on deposit and decremented on withdrawal and on a slashing. Where the two agree, the counter and the custody agree; a slashing moves both, and only a slashing moves this token's share price.`,
+  summary: `${asset(c)} the token holds — the ${asset(c)} balance at this stake token's address${atBlock(c)}. It sits beside total assets because total assets is a counter stored in the contract, incremented on deposit and decremented on withdrawal and on a slashing. A slashing moves both, and only a slashing moves this token's share price.`,
   contract: vaultContract(c),
   via: `${LANE} · asset.balanceOf(vault) @ the pinned block`,
 });
@@ -409,7 +410,7 @@ const aaveVaultHolderSharesProv_ = (c: AaveVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("balanceOf(the holder)", c),
-  summary: `Shares held — this address's balance of the vault's share token${atBlock(c)}, scaled by the share token's decimals read at the same block. A balance at one block: it says what the address holds and nothing about who the address is.`,
+  summary: `Shares held — this address's balance of the vault's share token${atBlock(c)}, scaled by the share token's decimals read at the same block. A balance at one block.`,
   contract: vaultContract(c),
   via: `${LANE} · balanceOf(holder) @ the pinned block`,
 });
@@ -419,7 +420,7 @@ const aaveVaultHolderFractionProv_ = (c: AaveVaultCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
-  summary: `Share of the vault — this address's shares over all shares issued${atBlock(c)}, both read at that block. A ratio of two integers in the same units, so no price and no conversion enters it. It is a share of the shares, which is a share of the pool: holders are not attributed to individual deposits, because shares are fungible and the vault pooled them.`,
+  summary: `Share of the vault — this address's shares over all shares issued${atBlock(c)}, both read at that block. A ratio of two integers in the same units, so no price or conversion enters it.`,
   contract: vaultContract(c),
   via: `${LANE} · balanceOf(holder) ÷ totalSupply() @ the pinned block`,
   formula: "balanceOf(holder) ÷ totalSupply()",
@@ -691,7 +692,7 @@ const aaveVaultUnpricedProv_ = (c: AaveVaultCoords, v: VaultPositionValue): Prov
       kind: "recompute",
       text: `To check: ask any ${chainWord(c)} archive node for getAssetPrice(${v.asset ?? "the asset"}) on Aave V3's oracle at block ${block}; it reverts or answers 0.`,
     },
-    summary: `Not priced — Aave V3's oracle on ${chainWord(c)} declined ${assetSym}${v.asset ? ` (${v.asset})` : ""} at block ${block}: the call reverted or answered zero, and a zero from a price feed is the feed declining. So this card carries no USD figure, and none from another feed (chain-truth charter S3); the row sits outside every USD bracket and inside the listing's "Unpriced" set. Its shares, its claim in ${assetSym} and its share of the vault are stated as read.`,
+    summary: `Not priced — Aave V3's oracle on ${chainWord(c)} declined ${assetSym}${v.asset ? ` (${v.asset})` : ""} at block ${block?.toLocaleString("en-US")}: the call reverted or answered zero, and a zero from a price feed is the feed declining. So this card carries no USD figure, and none from another feed (chain-truth charter S3); the row sits outside every USD bracket and inside the listing's "Unpriced" set. Its shares, its claim in ${assetSym} and its share of the vault are stated as read.`,
     contract: oracleContract(c, v),
     via: `${censusLane(c)} · IAaveOracle.getAssetPrice(asset) @ the census block — declined`,
   };

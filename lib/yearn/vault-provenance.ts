@@ -84,7 +84,7 @@ const yearnRosterCensusProv_ = (
     kind: "recompute",
     text: `To check: ask any Ethereum archive node for each factories(i) on the ReleaseRegistry at 0x0377b4daDDA86C89A0091772B79ba67d0E5F7198, read each factory's NewVault logs up to block ${n(census.censusBlock)}, and count the vaults.`,
   },
-  summary: `Vaults catalogued — ${n(census.catalogSize)}: every vault the five Yearn V3 factories had deployed on Ethereum at block ${n(census.censusBlock)}, each one recorded by its factory when it was created and checked against the factory, version and asset the vault reports. The roster is a floor: a Yearn V3 vault deployed without a factory leaves no such record and is absent from it, and a vault created since that block is absent until the census runs again. The factories come from the live release registry. The release registry the Yearn V3 Registry points to knows three of the five and misses 130 of these vaults, and the Registry's list of endorsed vaults mixes them with 48 tokenized strategies no factory made.`,
+  summary: `Vaults catalogued — ${n(census.catalogSize)}: every vault the five Yearn V3 factories had deployed on Ethereum at block ${n(census.censusBlock)}, each one recorded by its factory when it was created and checked against the factory, version and asset the vault reports. The roster is a floor: a Yearn V3 vault deployed without a factory leaves no such record and is absent from it, and a vault created since that block is absent until the census runs again. The factories come from the live release registry. The release registry the Yearn V3 Registry points to knows three of the five and misses many of these vaults, and the Registry's list of endorsed vaults mixes them with tokenized strategies no factory made.`,
   via: `${LANE} · NewVault on the five V3 factories, censused to block ${n(census.censusBlock)} · FACTORY(), apiVersion(), asset() on each vault`,
   formula: "count of NewVault logs across the five V3 factories up to the census block",
 });
@@ -96,7 +96,7 @@ const yearnVaultNameProv_ = (c: YearnVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("name()", c),
-  summary: `Vault name — the name of the vault's share token${atBlock(c)}, read live. A 3.0.4 or 3.1.0 vault can be renamed, so the name is a reading at this block. Four names on this roster are each carried by three different vaults, so the address beside the name tells them apart.`,
+  summary: `Vault name — the name of the vault's share token${atBlock(c)}, read live. A 3.0.4 or 3.1.0 vault can be renamed, so the name is a reading at this block. Some names on this roster are carried by more than one vault, so the address beside the name tells them apart.`,
   contract: vaultContract(c),
   via: `${LANE} · VaultV3.name() @ the pinned block`,
 });
@@ -118,7 +118,7 @@ const yearnVaultSharePriceProv_ = (c: YearnVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("convertToAssets(10 ** decimals)", c),
-  summary: `Share price — what one whole vault share converts to${atBlock(c)}, in ${asset(c)}, as the vault answers it; this page divides nothing out. The exponent is the asset's decimals: a V3 vault's share token has the same decimals as its asset, and the census refuses to write a vault that disagrees.`,
+  summary: `Share price — what one whole vault share converts to${atBlock(c)}, in ${asset(c)}, as the vault answers it; this page divides nothing out. The exponent is the asset's decimals: a V3 vault's share token has the same decimals as its asset.`,
   contract: vaultContract(c),
   via: `${LANE} · VaultV3.convertToAssets(one share) @ the pinned block`,
 });
@@ -167,7 +167,7 @@ const yearnEndorsedCountProv_ = (c: YearnVaultCoords, count: number, catalogSize
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
-  summary: `${n(count)} of the ${n(catalogSize)} catalogued vaults are endorsed${atBlock(c)} — the Yearn V3 Registry asked once for each vault, and the answers counted. Yearn can undo an endorsement, so this count belongs to this block. The roster below is every vault the factories made, and the badge marks the ones Yearn endorses.`,
+  summary: `${n(count)} of the ${n(catalogSize)} catalogued vaults are endorsed${atBlock(c)} — the Yearn V3 Registry asked once for each vault, and the answers counted. Yearn can undo an endorsement, so this count belongs to this block.`,
   contract: registryContract,
   via: `${LANE} · count of Registry.isEndorsed(vault) = true @ the pinned block`,
   formula: "count of catalogued vaults where Registry.isEndorsed(vault) is true",
@@ -184,7 +184,7 @@ const yearnVaultTotalSupplyProv_ = (c: YearnVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("totalSupply()", c),
-  summary: `Shares issued — every share in existence${atBlock(c)}, held across every depositor. A V3 vault's share token has the same decimals as its asset, so this figure and the total assets are scaled the same way; they are still quantities of two different things, and the page keeps them apart.`,
+  summary: `Shares issued — every share in existence${atBlock(c)}, held across every depositor, in share units.`,
   contract: vaultContract(c),
   via: `${LANE} · VaultV3.totalSupply() @ the pinned block`,
 });
