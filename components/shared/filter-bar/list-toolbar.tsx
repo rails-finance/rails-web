@@ -158,7 +158,7 @@ export function ListToolbar<F extends BaseListFilters>({
           value={filters.q}
           onChange={(q) => onChange({ ...filters, q })}
           placeholder={searchPlaceholder}
-          size="md"
+          size="pill"
           anatomy="N1.1 H15"
           inputRef={searchRef}
           onKeyDown={onSearchKeyDown}
