@@ -44,15 +44,3 @@ export function suppliedUsd(supplies: SupplyLine[], prices: Record<string, numbe
 /** Whether a market counts as collateral: entered, or no entered list read. */
 export const isEnteredIn = (entered: { underlying: string }[] | undefined, address: string): boolean =>
   !entered || entered.some((e) => e.underlying === address.toLowerCase());
-
-/** The entered markets alone: what backs borrowing. */
-export function enteredUsd(
-  supplies: SupplyLine[],
-  prices: Record<string, number> | undefined,
-  entered: { underlying: string }[] | undefined,
-): number | null {
-  return suppliedUsd(
-    supplies.filter((r) => isEnteredIn(entered, r.address)),
-    prices,
-  );
-}

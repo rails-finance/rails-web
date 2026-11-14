@@ -221,12 +221,12 @@ const collateralRangeOf = (c: Card): number | null => {
   return coll == null && supply == null ? null : (coll ?? 0) + (supply ?? 0);
 };
 
-/** The Size panel's price line. */
 /** Each family's sort options, built once. */
 const SORTS = Object.fromEntries(
   (Object.keys(FAMILIES) as ArbitrumPositionsFamily[]).map((k) => [k, sortsOf(FAMILIES[k].debtWord)]),
 ) as Record<ArbitrumPositionsFamily, SortOption[]>;
 
+/** The Size panel's price line. */
 const SIZE_NOTE = "At each protocol's own oracle at the row's read block.";
 
 /** The Size panel over the cards: Debt, and Collateral as collateral plus

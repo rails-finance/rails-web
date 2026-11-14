@@ -3,7 +3,7 @@
 // rails-ops ui-jobs 644. Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { enteredUsd, isEnteredIn, suppliedUsd } from "../../lib/moonwell/supply-totals.ts";
+import { isEnteredIn, suppliedUsd } from "../../lib/moonwell/supply-totals.ts";
 
 const USDC = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
 const WETH = "0x4200000000000000000000000000000000000006";
@@ -17,7 +17,13 @@ const entered = [{ underlying: USDC }];
 
 test("Supplied counts the un-entered supply; the collateral figure does not", () => {
   assert.equal(suppliedUsd(supplies, prices), 1500);
-  assert.equal(enteredUsd(supplies, prices, entered), 1000);
+  assert.equal(
+    suppliedUsd(
+      supplies.filter((r) => isEnteredIn(entered, r.address)),
+      prices,
+    ),
+    1000,
+  );
 });
 
 test("an unpriced supply leaves no partial total", () => {
@@ -26,7 +32,7 @@ test("an unpriced supply leaves no partial total", () => {
 
 test("no entered list read counts every market as entered", () => {
   assert.equal(isEnteredIn(undefined, WETH), true);
-  assert.equal(enteredUsd(supplies, prices, undefined), 1500);
+  assert.equal(isEnteredIn(undefined, USDC), true);
 });
 
 test("the principal stands in where no current value was read; nothing supplied is null", () => {

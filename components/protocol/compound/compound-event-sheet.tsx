@@ -406,7 +406,7 @@ export function compoundEventSheet(input: CompoundSheetInput): EventSheet | unde
               info: {
                 kind: "chain-derived",
                 pclass: "oracle",
-                summary: `Market move on the ${side} since the last event. The side's total just before this event, less its total once the previous event had run and the interest since, all in US dollars: the change in the Comet's prices made to the balances held between the two. No token moved.`,
+                summary: `Market move on the ${side} since the last event. The side's total just before this event, less its total once the previous event had run and the interest since, all in US dollars: the change the Comet's prices made to the balances held between the two. No token moved.`,
                 formula: "before this event − last event − interest since",
                 contract: cometContract(coords),
                 inputs: hs
