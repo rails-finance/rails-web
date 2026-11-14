@@ -66,7 +66,7 @@ const atBlock = (c: YearnVaultCoords): string => (c.blockNumber != null ? ` at b
 
 const recompute = (call: string, c: YearnVaultCoords): Provenance["verify"] => ({
   kind: "recompute",
-  text: `Call ${call} on ${c.vault ?? "the vault"}${c.blockNumber != null ? ` at block ${n(c.blockNumber)}` : ""} against any archive node`,
+  text: `To check: ask any Ethereum archive node for ${call} on ${c.vault ?? "the vault"}${c.blockNumber != null ? ` at block ${n(c.blockNumber)}` : ""}.`,
 });
 
 const asset = (c: YearnVaultCoords) => c.assetSymbol ?? "the vault's asset";
@@ -82,10 +82,10 @@ const yearnRosterCensusProv_ = (
   source: { block: census.censusBlock },
   verify: {
     kind: "recompute",
-    text: `Walk ReleaseRegistry.factories(i) on 0x0377b4daDDA86C89A0091772B79ba67d0E5F7198, sweep each factory's NewVault logs to block ${n(census.censusBlock)}, and count the vaults`,
+    text: `To check: ask any Ethereum archive node for each factories(i) on the ReleaseRegistry at 0x0377b4daDDA86C89A0091772B79ba67d0E5F7198, read each factory's NewVault logs up to block ${n(census.censusBlock)}, and count the vaults.`,
   },
-  summary: `Vaults catalogued — ${n(census.catalogSize)}: every vault the five Yearn V3 factories had deployed on Ethereum at block ${n(census.censusBlock)}, each one a \`NewVault\` log on its factory, checked against the vault's \`FACTORY()\`, \`apiVersion()\` and \`asset()\`. THE ROSTER IS A FLOOR: a \`VaultV3\` compiled and deployed without a factory emits no such log and is absent from it, and a vault created since that block is absent until the census re-runs. The factories come from the live release registry; the pointer \`Registry.releaseRegistry()\` answers knows three of the five and hides 130 of these vaults, and \`Registry.getAllEndorsedVaults()\` answers the endorsed subset mixed with 48 tokenized strategies no factory made.`,
-  via: `${LANE} · NewVault on the five V3 factories, censused to block ${n(census.censusBlock)}`,
+  summary: `Vaults catalogued — ${n(census.catalogSize)}: every vault the five Yearn V3 factories had deployed on Ethereum at block ${n(census.censusBlock)}, each one recorded by its factory when it was created and checked against the factory, version and asset the vault reports. The roster is a floor: a Yearn V3 vault deployed without a factory leaves no such record and is absent from it, and a vault created since that block is absent until the census runs again. The factories come from the live release registry. The release registry the Yearn V3 Registry points to knows three of the five and misses 130 of these vaults, and the Registry's list of endorsed vaults mixes them with 48 tokenized strategies no factory made.`,
+  via: `${LANE} · NewVault on the five V3 factories, censused to block ${n(census.censusBlock)} · FACTORY(), apiVersion(), asset() on each vault`,
   formula: "count of NewVault logs across the five V3 factories up to the census block",
 });
 
@@ -96,7 +96,7 @@ const yearnVaultNameProv_ = (c: YearnVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("name()", c),
-  summary: `Vault name — the ERC-20 \`name()\` of the vault's share token${atBlock(c)}, read live: a 3.0.4 or 3.1.0 vault can be renamed (\`setName\`), so the name is a reading at this block and never an identity. Four names on this roster are each carried by three different vaults, so the address beside the name is what tells them apart.`,
+  summary: `Vault name — the name of the vault's share token${atBlock(c)}, read live. A 3.0.4 or 3.1.0 vault can be renamed, so the name is a reading at this block. Four names on this roster are each carried by three different vaults, so the address beside the name tells them apart.`,
   contract: vaultContract(c),
   via: `${LANE} · VaultV3.name() @ the pinned block`,
 });
@@ -107,7 +107,7 @@ const yearnVaultTotalAssetsProv_ = (c: YearnVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("totalAssets()", c),
-  summary: `Total assets — the vault's \`totalAssets()\`${atBlock(c)}, in ${asset(c)}: what sits idle in the vault plus what its strategies report as debt. It is a quantity of ${asset(c)} and is compared only with vaults in the same asset — this roster groups by asset and never orders or sums across two of them, which would take a price no part of this page reads. A zero is a reading: the vault holds nothing at this block.`,
+  summary: `Total assets — what the vault holds${atBlock(c)}, in ${asset(c)}: the amount idle in the vault plus what its strategies report as debt. The roster groups vaults by asset and compares them only within one, since ordering or adding two assets would take a price this page does not read. A zero is a reading: the vault holds nothing at this block.`,
   contract: vaultContract(c),
   via: `${LANE} · VaultV3.totalAssets() @ the pinned block`,
 });
@@ -118,7 +118,7 @@ const yearnVaultSharePriceProv_ = (c: YearnVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("convertToAssets(10 ** decimals)", c),
-  summary: `Share price — \`convertToAssets(10 ** decimals)\`${atBlock(c)}: what ONE whole vault share converts to in ${asset(c)}, answered by the vault and never divided out by this page. The exponent is the asset's decimals, because a V3 vault's share token carries the same decimals as its asset — the census refuses to write when a vault disagrees with its asset on that. A quantity of ${asset(c)}, never converted to USD.`,
+  summary: `Share price — what one whole vault share converts to${atBlock(c)}, in ${asset(c)}, as the vault answers it; this page divides nothing out. The exponent is the asset's decimals: a V3 vault's share token has the same decimals as its asset, and the census refuses to write a vault that disagrees.`,
   contract: vaultContract(c),
   via: `${LANE} · VaultV3.convertToAssets(one share) @ the pinned block`,
 });
@@ -131,11 +131,11 @@ const yearnVaultEndorsedProv_ = (c: YearnVaultCoords, endorsed: boolean): Proven
   source: { block: c.blockNumber },
   verify: {
     kind: "recompute",
-    text: `Call isEndorsed(${c.vault ?? "the vault"}) on the Yearn V3 Registry ${YEARN_REGISTRY}${c.blockNumber != null ? ` at block ${n(c.blockNumber)}` : ""} against any archive node`,
+    text: `To check: ask any Ethereum archive node for isEndorsed(${c.vault ?? "the vault"}) on the Yearn V3 Registry ${YEARN_REGISTRY}${c.blockNumber != null ? ` at block ${n(c.blockNumber)}` : ""}.`,
   },
   summary: endorsed
-    ? `Endorsed — the Yearn V3 Registry answers \`isEndorsed()\` true for this vault${atBlock(c)}. Yearn can remove an endorsement, so the badge is a reading at this block and the block is printed with it. It is what the Yearn mark on this row stands for; an unendorsed vault made by the same factory carries the family word and no mark, because anyone can deploy one and name it anything.`
-    : `Not endorsed — the Yearn V3 Registry answers \`isEndorsed()\` false for this vault${atBlock(c)}. The vault came out of a Yearn V3 factory and runs Yearn's vault code, which is what the family word on the row says; the endorsement is a separate act by Yearn and this vault has none at this block.`,
+    ? `Endorsed — the Yearn V3 Registry lists this vault as endorsed${atBlock(c)}. Yearn can remove an endorsement, so the badge is a reading at this block and the block is printed with it. It is what the Yearn mark on this row stands for; an unendorsed vault made by the same factory carries the family word and no mark, because anyone can deploy one and name it anything.`
+    : `Not endorsed — the Yearn V3 Registry lists this vault as not endorsed${atBlock(c)}. The vault came out of a Yearn V3 factory and runs Yearn's vault code, which is what the family word on the row says; the endorsement is a separate act by Yearn and this vault has none at this block.`,
   contract: registryContract,
   via: `${LANE} · Registry.isEndorsed(vault) @ the pinned block`,
 });
@@ -146,7 +146,7 @@ const yearnVaultShutdownProv_ = (c: YearnVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("isShutdown()", c),
-  summary: `Shut down — the vault's \`isShutdown()\` answers true${atBlock(c)}: emergency shutdown has been called, so it accepts no further deposits and its strategies are being wound down. Withdrawals still work, and what it holds is the \`totalAssets()\` on this row.`,
+  summary: `Shut down — the vault reports that it is shut down${atBlock(c)}: emergency shutdown has been called, so it accepts no further deposits and its strategies are being wound down. Withdrawals still work, and what it holds is the total assets on this row.`,
   contract: vaultContract(c),
   via: `${LANE} · VaultV3.isShutdown() @ the pinned block`,
 });
@@ -157,7 +157,7 @@ const yearnEmptyCountProv_ = (c: YearnVaultCoords, count: number, catalogSize: n
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
-  summary: `${n(count)} of the ${n(catalogSize)} catalogued vaults answered zero to \`totalAssets()\`${atBlock(c)} — each holds nothing at this block, which is a reading about the vault and never a gap in the read. A vault whose call went unanswered is stated as unread, separately, and is absent from this count.`,
+  summary: `${n(count)} of the ${n(catalogSize)} catalogued vaults hold nothing${atBlock(c)} — each answered zero for its total assets, a reading about the vault. A vault whose read went unanswered is stated as unread, separately, and is not in this count.`,
   via: `${LANE} · count of catalogued vaults with totalAssets() = 0 @ the pinned block`,
   formula: "count of catalogued vaults where totalAssets() = 0",
 });
@@ -167,7 +167,7 @@ const yearnEndorsedCountProv_ = (c: YearnVaultCoords, count: number, catalogSize
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
-  summary: `${n(count)} of the ${n(catalogSize)} catalogued vaults are endorsed${atBlock(c)} — one \`Registry.isEndorsed()\` call per vault, counted. Endorsement is an act Yearn can undo, so this count belongs to this block alone; the roster below is every vault the factories made, and the badge marks which of them Yearn stands behind.`,
+  summary: `${n(count)} of the ${n(catalogSize)} catalogued vaults are endorsed${atBlock(c)} — the Yearn V3 Registry asked once for each vault, and the answers counted. Yearn can undo an endorsement, so this count belongs to this block. The roster below is every vault the factories made, and the badge marks the ones Yearn endorses.`,
   contract: registryContract,
   via: `${LANE} · count of Registry.isEndorsed(vault) = true @ the pinned block`,
   formula: "count of catalogued vaults where Registry.isEndorsed(vault) is true",
@@ -184,7 +184,7 @@ const yearnVaultTotalSupplyProv_ = (c: YearnVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("totalSupply()", c),
-  summary: `Shares issued — the vault's \`totalSupply()\`${atBlock(c)}: every share in existence, held across every depositor. A V3 vault's share token carries the same decimals as its asset, so this figure and the total assets above it are scaled the same way; they are quantities of two different things all the same, and the page keeps them apart.`,
+  summary: `Shares issued — every share in existence${atBlock(c)}, held across every depositor. A V3 vault's share token has the same decimals as its asset, so this figure and the total assets are scaled the same way; they are still quantities of two different things, and the page keeps them apart.`,
   contract: vaultContract(c),
   via: `${LANE} · VaultV3.totalSupply() @ the pinned block`,
 });
@@ -195,7 +195,7 @@ const yearnVaultIdleProv_ = (c: YearnVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("totalIdle()", c),
-  summary: `Idle — the vault's \`totalIdle()\`${atBlock(c)}, in ${asset(c)}: the part of the vault's assets sitting in the vault contract, which is what a withdrawal is served from before any strategy is touched.`,
+  summary: `Idle — the part of the vault's assets sitting in the vault contract${atBlock(c)}, in ${asset(c)}. A withdrawal is served from it before any strategy is touched.`,
   contract: vaultContract(c),
   via: `${LANE} · VaultV3.totalIdle() @ the pinned block`,
 });
@@ -206,7 +206,7 @@ const yearnVaultDebtProv_ = (c: YearnVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("totalDebt()", c),
-  summary: `Debt — the vault's \`totalDebt()\`${atBlock(c)}, in ${asset(c)}: the sum the vault records as lent to its strategies. It moves when a strategy is funded, when the vault pulls from one, and when a strategy reports a gain or a loss; between reports it is the last figure recorded and not a live mark.`,
+  summary: `Debt — the sum the vault records as lent to its strategies${atBlock(c)}, in ${asset(c)}. It moves when a strategy is funded, when the vault pulls from one, and when a strategy reports a gain or a loss; between reports it is the last figure recorded.`,
   contract: vaultContract(c),
   via: `${LANE} · VaultV3.totalDebt() @ the pinned block`,
 });
@@ -217,7 +217,7 @@ const yearnVaultQueueProv_ = (c: YearnVaultCoords, count: number): Provenance =>
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("get_default_queue()", c),
-  summary: `Withdrawal queue — \`get_default_queue()\`${atBlock(c)}: the ${count === 1 ? "one strategy" : `${n(count)} strategies`} a withdrawal walks, in this order, once the idle balance runs out. The role manager sets it and a V3 vault holds at most ten. A strategy taken out of the queue can still carry debt, so this order describes withdrawals and the vault's \`totalDebt()\` is what describes the whole.`,
+  summary: `Withdrawal queue — the vault's default queue${atBlock(c)}: the ${count === 1 ? "one strategy" : `${n(count)} strategies`} a withdrawal walks, in this order, once the idle balance runs out. The role manager sets it and a V3 vault holds at most ten. A strategy taken out of the queue can still carry debt, so this order describes withdrawals and the vault's total debt describes the whole.`,
   contract: vaultContract(c),
   via: `${LANE} · VaultV3.get_default_queue() @ the pinned block`,
   formula: "length of get_default_queue()",
@@ -230,9 +230,9 @@ const yearnVaultStrategyDebtProv_ = (c: YearnVaultCoords, strategy: string): Pro
   source: { block: c.blockNumber },
   verify: {
     kind: "recompute",
-    text: `Call strategies(${strategy}) on ${c.vault ?? "the vault"}${c.blockNumber != null ? ` at block ${n(c.blockNumber)}` : ""} and read current_debt`,
+    text: `To check: ask any Ethereum archive node for strategies(${strategy}) on ${c.vault ?? "the vault"}${c.blockNumber != null ? ` at block ${n(c.blockNumber)}` : ""} and read its current_debt.`,
   },
-  summary: `Debt to this strategy — \`strategies(${strategy.slice(0, 10)}…).current_debt\`${atBlock(c)}, in ${asset(c)}: what the vault records as lent to this one strategy. It is the vault's record and updates when the strategy reports, so a gain earned since its last report is absent from it until that report lands.`,
+  summary: `Debt to this strategy — what the vault records as lent to strategy ${strategy.slice(0, 10)}…${atBlock(c)}, in ${asset(c)}. It is the vault's record and updates when the strategy reports, so a gain earned since its last report is absent from it until the next report lands.`,
   contract: vaultContract(c),
   via: `${LANE} · VaultV3.strategies(strategy).current_debt @ the pinned block`,
 });
@@ -244,9 +244,9 @@ const yearnVaultStrategyCapProv_ = (c: YearnVaultCoords, strategy: string): Prov
   source: { block: c.blockNumber },
   verify: {
     kind: "recompute",
-    text: `Call strategies(${strategy}) on ${c.vault ?? "the vault"}${c.blockNumber != null ? ` at block ${n(c.blockNumber)}` : ""} and read max_debt`,
+    text: `To check: ask any Ethereum archive node for strategies(${strategy}) on ${c.vault ?? "the vault"}${c.blockNumber != null ? ` at block ${n(c.blockNumber)}` : ""} and read its max_debt.`,
   },
-  summary: `Max debt of this strategy — \`strategies(${strategy.slice(0, 10)}…).max_debt\`${atBlock(c)}, in ${asset(c)}: the most the vault may lend it. The role manager sets it, and it is a limit on future funding and never a claim about what the strategy holds now.`,
+  summary: `Max debt of this strategy — the most the vault may lend strategy ${strategy.slice(0, 10)}…${atBlock(c)}, in ${asset(c)}. The role manager sets it as a limit on future funding; what the strategy holds now is its debt.`,
   contract: vaultContract(c),
   via: `${LANE} · VaultV3.strategies(strategy).max_debt @ the pinned block`,
 });
@@ -259,8 +259,8 @@ const yearnVaultRoleProv_ = (c: YearnVaultCoords, role: "role manager" | "accoun
   verify: recompute(role === "accountant" ? "accountant()" : "role_manager()", c),
   summary:
     role === "accountant"
-      ? `Accountant — the vault's \`accountant()\`${atBlock(c)}: the contract the vault asks what fee to charge on a strategy's report. Stated as an address and only as an address; nothing on chain says who runs it.`
-      : `Role manager — the vault's \`role_manager()\`${atBlock(c)}: the address that hands out every role over this vault, including who may add a strategy, set a debt cap or shut it down. Stated as an address and only as an address; nothing on chain says who holds it.`,
+      ? `Accountant — the vault's accountant${atBlock(c)}: the contract the vault asks what fee to charge on a strategy's report. It is stated as an address, because nothing on chain says who runs it.`
+      : `Role manager — the address that hands out every role over this vault${atBlock(c)}, including who may add a strategy, set a debt cap or shut it down. It is stated as an address, because nothing on chain says who holds it.`,
   contract: vaultContract(c),
   via: `${LANE} · VaultV3.${role === "accountant" ? "accountant" : "role_manager"}() @ the pinned block`,
 });
@@ -273,8 +273,8 @@ const yearnVaultUnlockProv_ = (c: YearnVaultCoords, seconds: number): Provenance
   verify: recompute("profitMaxUnlockTime()", c),
   summary:
     seconds === 0
-      ? `Profit unlock — \`profitMaxUnlockTime()\` answers zero${atBlock(c)}: a gain a strategy reports reaches the share price the moment it is reported, in one step.`
-      : `Profit unlock — \`profitMaxUnlockTime()\` answers ${n(seconds)} seconds${atBlock(c)}: when a strategy reports a gain, the vault mints shares to its address and burns them over that span, so the share price climbs smoothly across it instead of jumping on the report. A loss lands at once.`,
+      ? `Profit unlock — zero seconds${atBlock(c)}: a gain a strategy reports reaches the share price the moment it is reported, in one step.`
+      : `Profit unlock — ${n(seconds)} seconds${atBlock(c)}: when a strategy reports a gain, the vault mints shares to its address and burns them over that span, so the share price climbs across it instead of jumping on the report. A loss lands at once.`,
   contract: vaultContract(c),
   via: `${LANE} · VaultV3.profitMaxUnlockTime() @ the pinned block`,
 });
