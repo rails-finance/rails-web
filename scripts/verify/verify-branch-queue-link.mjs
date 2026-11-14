@@ -89,6 +89,15 @@ for (const [proto, cfg] of targets) {
     const link = page.locator(`a:has-text("${sym} queue")`).first();
     const hasLink = (await link.count()) > 0;
 
+    // A shut-down branch takes no standard redemption, so it must offer NO
+    // link (ui-jobs 612, `79c3e91a`): the route's `shutdown` is the catalog's
+    // record, else the live shutdownTime() read, the state the page draws from.
+    if (branch.shutdown) {
+      const day = new Date(branch.shutdown.at * 1000).toISOString().slice(0, 10);
+      assert(!hasLink, `${sym}: shut down since ${day} — no queue link offered`);
+      continue;
+    }
+
     // A branch whose sorted list is empty must offer NO link: its only queue
     // members are zombies, which the link excludes, so the link would open an
     // empty listing under a heading promising that branch's queue.
@@ -105,11 +114,14 @@ for (const [proto, cfg] of targets) {
     await listing.waitForTimeout(1200);
 
     // The listing must have HONOURED the selection, not fallen back to its
-    // default view. Its own chips are the page's statement of what it applied.
-    const chips = await listing.locator("text=/Collateral:|Branch:|Status:/i").allTextContents();
+    // default view. Its set filter pills (N1.10, ui-jobs 681) are the page's
+    // statement of what it applied; each one's accessible name is "<name> <value>".
+    const pills = await listing
+      .locator('[data-filter-pill][data-pill-state="set"] [data-pill-open]')
+      .evaluateAll((bs) => bs.map((b) => b.getAttribute("aria-label") ?? ""));
     assert(
-      chips.some((c) => c.includes(sym)),
-      `${sym}: the listing shows a collateral/branch chip naming ${sym} (link honoured, not ignored)`,
+      pills.some((c) => new RegExp(`^(Collateral|Branch)\\b.*\\b${sym}\\b`).test(c)),
+      `${sym}: the listing shows a set collateral/branch pill naming ${sym} (link honoured, not ignored) — ${JSON.stringify(pills)}`,
     );
 
     // (id, rate) read off ONE row each, so the pairing can't slip — two
