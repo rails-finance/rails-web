@@ -162,6 +162,8 @@ async function openPosition(url) {
     .filter({ hasText: /^USDp$/ })
     .first()
     .click();
+  // The editor stages the pick; its primary button writes it.
+  await page.locator("[data-pill-editor] [data-pill-editor-apply]").first().click();
   await page.waitForURL(/[?&]market=usdp(&|$)/, { timeout: 15000 }).catch(() => {});
   check("3b. picking USDp writes ?market=usdp", /[?&]market=usdp(&|$)/.test(page.url()), page.url());
   await page.close();

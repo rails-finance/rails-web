@@ -536,13 +536,16 @@ await page7.close();
     const text = (document.body.innerText ?? "").replace(/\s+/g, " ");
     const facetButtons = [...document.querySelectorAll("button")].map((b) => (b.textContent ?? "").trim());
     return {
-      chip: /Debt: \$0(?!\.?\d)/.test(text),
+      // The Size pill (N1.10, ui-jobs 681) names the Debt range it holds.
+      chip: /Debt \$0(?!\.?\d)/.test(
+        document.querySelector('[data-filter-pill="Size"] [data-pill-open]')?.getAttribute("aria-label") ?? "",
+      ),
       history: facetButtons.some((t) => /^History\b/.test(t)) || /Liquidated before/.test(text),
       hasDebtLabel: /\bHas debt\b/.test(text),
     };
   });
   check(
-    '9d. the view draws its "Debt: $0" chip (the Size panel\'s range chip, ui-jobs 354)',
+    '9d. the view draws its Size pill set to "Debt $0" (the Size range, ui-jobs 354, 681)',
     chrome9.chip,
     JSON.stringify(chrome9),
   );
