@@ -5,7 +5,7 @@
 import { formatDate } from "@/lib/date";
 import { assetText, sharePriceText } from "@/lib/shared/vault-amount-text";
 import type { VaultSummary } from "@/lib/vaults/summary";
-import { changeText, jumpTail, yieldText, type VaultYield } from "@/lib/vaults/yield";
+import { changeText, jumpTail, yieldPct, YIELD_LABEL, type VaultYield } from "@/lib/vaults/yield";
 
 export interface VaultExportModel {
   /** The stats as printed: label and value in words. */
@@ -29,9 +29,10 @@ function headlines(v: VaultSummary, y: VaultYield | undefined): [string, string]
       v.assetScale ? "" : v.sharePrice ? `${sharePriceText(v.sharePrice, v.asset.decimals)} ${unit}` : "not read",
     ],
     [
-      "Yield",
+      // The unit only over a figure, as the card (ui-jobs 679).
+      y && "yearly" in y ? YIELD_LABEL : "Yield",
       y && "yearly" in y
-        ? `${yieldText(y.yearly)} (share price ${changeText(y.change)} over the ${y.days} days to block ${n(y.to.block)}${y.jump ? jumpTail(y.jump, (d) => formatDate(new Date(d * 86_400_000))) : ""})`
+        ? `${yieldPct(y.yearly)} (share price ${changeText(y.change)} over the ${y.days} days to block ${n(y.to.block)}${y.jump ? jumpTail(y.jump, (d) => formatDate(new Date(d * 86_400_000))) : ""})`
         : y?.none === "too-small" && v.totalAssets
           ? `too small to measure (the vault holds ${assetText(v.totalAssets, v.asset.decimals)} ${unit} at block ${n(v.readAt.block)})`
           : "no figure",

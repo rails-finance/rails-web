@@ -11,7 +11,7 @@
 // then Kind (the family's kind; on a roster its family and release, as its
 // cards printed them, `kindOf`), Total assets, Share price, Yield and Holders (the census's open
 // count), Steward, and last the Compare tick (E2, ui-jobs 553 door 3). The
-// figures print as the row prints them (vaultHeads, yieldText), each in its
+// figures print as the row prints them (vaultHeads, yieldPct), each in its
 // family's receipt at its roster's block (decision 0062 point 5; ui-jobs
 // 571): every row is its own receipts scope, so the locator pulse stays in the
 // row. The name is the row's link and carries none, so a press on it opens
@@ -69,7 +69,7 @@ import { shortAddress } from "@/lib/shared/vault-amount-text";
 import { VAULT_FAMILIES } from "@/lib/vaults/families";
 import { VAULT_INDEX_PROTOCOL_LABEL, vaultIndexProtocol } from "@/lib/vaults/index-rosters";
 import { vaultDisplayName, type VaultStanding, type VaultSummary } from "@/lib/vaults/summary";
-import { measuredYield, yieldText, type VaultYield } from "@/lib/vaults/yield";
+import { measuredYield, yieldPct, YIELD_LABEL, type VaultYield } from "@/lib/vaults/yield";
 import { illiquidSentence } from "@/lib/vaults/illiquid";
 import { vaultHoldersProv, vaultYieldProv } from "@/lib/vaults/row-provenance";
 import { heldAssetsRaw, lostAssetsSentence } from "@/lib/vaults/lost-assets";
@@ -94,7 +94,7 @@ const COLUMNS: readonly Column[] = [
   { key: "vault", label: "Vault", first: "asc", numeric: false },
   { key: "assets", label: "Total assets", first: "desc", numeric: true },
   { key: "price", label: "Share price", first: "desc", numeric: true },
-  { key: "yield", label: "Yield", first: "desc", numeric: true },
+  { key: "yield", label: YIELD_LABEL, first: "desc", numeric: true },
   { key: "holders", label: "Holders", first: "desc", numeric: true },
 ];
 
@@ -547,10 +547,10 @@ export function VaultIndexTable({
                   )}
                   {cell(
                     "yield",
-                    "Yield",
+                    YIELD_LABEL,
                     yf && "yearly" in yf ? (
                       <span data-cell="yield">
-                        <Prov info={vaultYieldProv(v, yf)}>{yieldText(yf.yearly)}</Prov>
+                        <Prov info={vaultYieldProv(v, yf)}>{yieldPct(yf.yearly)}</Prov>
                       </span>
                     ) : yf?.none === "too-small" ? (
                       <span

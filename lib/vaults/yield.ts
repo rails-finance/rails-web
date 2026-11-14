@@ -235,9 +235,16 @@ export function measuredYield(
 export const jumpTail = (jump: VaultYieldJump, day: (d: number) => string): string =>
   `, ${changeText(jump.change)} of it ${jump.fromDay != null ? `from ${day(jump.fromDay)} to ${day(jump.day)}` : `on ${day(jump.day)}`}`;
 
-/** "5.1% a year", to one decimal; a fall prints its minus. */
-export const yieldText = (yearly: number): string =>
-  `${(yearly * 100).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}% a year`;
+/** The Yield headline's label (ui-jobs 679): the unit in the heading, so the
+ *  figure reads "5.1%". APR: the figure is annualised simply, not compounded. */
+export const YIELD_LABEL = "Yield (APR)";
+
+/** "5.1%", to one decimal, under YIELD_LABEL; a fall prints its minus. */
+export const yieldPct = (yearly: number): string =>
+  `${(yearly * 100).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+
+/** "5.1% a year": the figure in a sentence, away from its heading. */
+export const yieldText = (yearly: number): string => `${yieldPct(yearly)} a year`;
 
 /** "+0.42%": the window's change, signed, to two decimals. */
 export const changeText = (change: number): string => {
