@@ -13,7 +13,7 @@
 // - <ProvInspectorLayer> — armed, every scoped <Prov> on the page is a click
 //   target with a light dotted underline (the coverage map). A pick anchors
 //   the figure's WHOLE receipt at the clicked value: name + figure + class
-//   dots (a button that opens the distance ladder) in the head, then the
+//   dots (a button that opens the class modal) in the head, then the
 //   summary, via, formula, operand rows, and source coordinates — one card,
 //   no second click, so it renders at its final height and never re-anchors.
 //   Sticky mode: the popover moves pick to pick; click-away closes the
@@ -43,6 +43,7 @@ import {
   type ProvReceiptEntry,
 } from "./provenance";
 import { involvedClasses } from "@/lib/shared/prov-class";
+import { LADDER_TITLE } from "@/lib/shared/prov-class-words";
 import { useParams, usePathname } from "next/navigation";
 import { setProvPreference, useProvPreference } from "@/lib/shared/prov-preference";
 import { provPreferenceAllows } from "@/lib/shared/prov-preference-routes";
@@ -230,7 +231,7 @@ export function ReceiptCard({
   entry: Pick<ProvReceiptEntry, "info" | "value" | "display" | "symbol" | "source">;
   onClose?: () => void;
 }) {
-  // The distance ladder, opened from the head's class dots.
+  // The class modal (LadderModal), opened from the head's class dots.
   const [ladderOpen, setLadderOpen] = useState(false);
   const { vcls, isComputed, leaves } = classifyValue(e.info);
   // The panel rows' bullet grammar: one dot per distinct class involved,
@@ -253,8 +254,8 @@ export function ReceiptCard({
         <button
           type="button"
           className="prov-rrow-dots"
-          title={`${involvedTitle}, what the colours mean`}
-          aria-label={`${involvedTitle}. What the colours mean`}
+          title={`${involvedTitle}. ${LADDER_TITLE}`}
+          aria-label={`${involvedTitle}. ${LADDER_TITLE}`}
           aria-haspopup="dialog"
           onClick={() => setLadderOpen(true)}
         >
@@ -279,7 +280,7 @@ export function ReceiptCard({
           sheds the head's name clause). One card holds all the information,
           so the popover renders at its final height and never re-anchors. */}
       <div className="prov-inspect-body">
-        <ProvReceipt embedded info={e.info} value={e.value} display={e.display} symbol={e.symbol} source={e.source} />
+        <ProvReceipt info={e.info} value={e.value} display={e.display} source={e.source} />
       </div>
       {ladderOpen && <LadderModal onClose={() => setLadderOpen(false)} />}
     </>
