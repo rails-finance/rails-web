@@ -5,7 +5,8 @@
 // neutral pills, and the four headlines in their order, Total assets · Share
 // price · Yield · Holders (decision 0047 point 5). The row prints the first
 // two in the compact form; the card through the print rules
-// (lib/shared/vault-amount-text.ts), with each label's read-more (decision 0038).
+// (lib/shared/vault-amount-text.ts), Total assets compact from 1,000
+// (CompactFigure), with each label's read-more (decision 0038).
 
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -13,6 +14,7 @@ import type { PositionCardHead } from "@/components/shared/position-card";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { VaultVenueMark, type VaultVenue } from "@/components/vaults/vault-venue-mark";
+import { COMPACT_FROM, CompactFigure } from "@/components/vaults/stat-amount";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { formatUnitsExact } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
@@ -157,7 +159,7 @@ function InAsset({ v, children, exact }: { v: VaultSummary; children: ReactNode;
   );
 }
 
-const withProv = (info: Provenance | undefined, text: string) => (info ? <Prov info={info}>{text}</Prov> : text);
+const withProv = (info: Provenance | undefined, text: ReactNode) => (info ? <Prov info={info}>{text}</Prov> : text);
 
 /** The Yield slot's caution on an illiquid vault (ui-jobs 540): which markets
  *  hold it, and what can be withdrawn at the read block. `detail` prints the
@@ -286,17 +288,22 @@ export function vaultHeads({
           >
             <InAsset v={v} exact={formatUnitsExact(v.totalAssets.raw, v.asset.decimals)}>
               {detail ? (
-                // A phone's half-width column cannot hold nine digits and cents
-                // at headline size: it reads the compact form, the full figure
-                // from sm up, which carries the receipt.
-                <>
-                  <span className="sm:hidden" data-prov-exempt="">
-                    {formatCompact(v.totalAssets.value)}
-                  </span>
-                  <span className="hidden sm:inline" data-figure-value="">
+                // The card's one compact rule at every width (ui-jobs 679).
+                Math.abs(v.totalAssets.value) >= COMPACT_FROM ? (
+                  withProv(
+                    receipts.totalAssets,
+                    <CompactFigure
+                      value={v.totalAssets.value}
+                      full={assetText(v.totalAssets, v.asset.decimals)}
+                      exact={formatUnitsExact(v.totalAssets.raw, v.asset.decimals)}
+                      symbol={v.asset.symbol}
+                    />,
+                  )
+                ) : (
+                  <span data-figure-value="">
                     {withProv(receipts.totalAssets, assetText(v.totalAssets, v.asset.decimals))}
                   </span>
-                </>
+                )
               ) : (
                 withProv(receipts.totalAssets, formatCompact(v.totalAssets.value))
               )}

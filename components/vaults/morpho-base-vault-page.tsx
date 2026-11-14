@@ -45,8 +45,7 @@ import {
   shortId,
   statText,
 } from "@/lib/shared/vault-amount-text";
-import { StatAmount } from "@/components/vaults/stat-amount";
-import { formatCompact } from "@/lib/shared/format-compact";
+import { COMPACT_FROM, CompactFigure, StatAmount } from "@/components/vaults/stat-amount";
 import { morphoBaseWalletHref } from "@/lib/morpho-base/routes";
 import { morphoLoanTokenHref, morphoMarketHref } from "@/lib/morpho/market-routes";
 import { listingHrefForWallet } from "@/lib/shared/protocols";
@@ -100,17 +99,17 @@ const CHAIN_WORDS = {
 /** Where the assets are draws this many markets, then links to every one. */
 const TOP_MARKETS = 5;
 
-/** From a million, a figure reads compact. */
+/** From a million, a share price reads compact. */
 const MILLION = 1_000_000;
 
 /** Every Blue position the vault holds, on the chain's explorer. */
 const blueWalletHref = (chainId: 1 | 8453, vault: string) =>
   chainId === 8453 ? morphoBaseWalletHref(vault) : (listingHrefForWallet("morpho", vault) ?? "/ethereum/morpho");
 
-/** A headline's or a stat's figure in the vault's asset: compact from a
- *  million (formatCompact, the V6 index's form), the full figure in its
- *  title and in `data-figure-full`; then the asset's mark, or its symbol in
- *  words where it has none. */
+/** A headline's or a stat's figure in the vault's asset: an amount compact
+ *  from 1,000 through the card's one rule (CompactFigure, ui-jobs 679), a
+ *  share price from a million (the V6 index's form); then the asset's mark,
+ *  or its symbol in words where it has none. */
 function InAssetFigure({
   value,
   full,
@@ -118,6 +117,7 @@ function InAssetFigure({
   asset,
   prov,
   head = false,
+  compactFrom = COMPACT_FROM,
 }: {
   value: number;
   full: ReactNode;
@@ -127,24 +127,25 @@ function InAssetFigure({
   prov: Provenance;
   /** At headline size. */
   head?: boolean;
+  /** From here the figure reads compact. */
+  compactFrom?: number;
 }) {
-  const big = Math.abs(value) >= MILLION;
-  const text = big ? formatCompact(value) : full;
+  const big = Math.abs(value) >= compactFrom;
   return (
     // A phone's half-width headline column holds about eight characters at
     // headline size; a longer figure steps down there rather than wrap.
     <span
-      className={`inline-flex max-w-full items-center gap-1.5 whitespace-nowrap ${head && typeof text === "string" && text.length > 8 ? "max-sm:text-[0.6em]" : ""}`}
+      className={`inline-flex max-w-full items-center gap-1.5 whitespace-nowrap ${head && !big && typeof full === "string" && full.length > 8 ? "max-sm:text-[0.6em]" : ""}`}
     >
-      <span
-        data-figure-value=""
-        data-figure-full={exact}
-        data-prov-exact={exact}
-        data-prov-symbol={asset.symbol}
-        title={big ? `${exact} ${asset.symbol}` : undefined}
-      >
-        <Prov info={prov}>{text}</Prov>
-      </span>
+      {big ? (
+        <Prov info={prov}>
+          <CompactFigure value={value} full={exact} exact={exact} symbol={asset.symbol} />
+        </Prov>
+      ) : (
+        <span data-figure-value="" data-figure-full={exact} data-prov-exact={exact} data-prov-symbol={asset.symbol}>
+          <Prov info={prov}>{full}</Prov>
+        </span>
+      )}
       <AssetUnit symbol={asset.symbol} address={asset.address} named={asset.named} />
     </span>
   );
@@ -533,6 +534,7 @@ export function MorphoBaseVaultPage({
                 asset={assetMark}
                 prov={receipts.sharePrice}
                 head
+                compactFrom={MILLION}
               />
             </span>
           ),
