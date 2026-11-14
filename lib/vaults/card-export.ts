@@ -29,7 +29,8 @@ function headlines(v: VaultSummary, y: VaultYield | undefined): [string, string]
       v.assetScale ? "" : v.sharePrice ? `${sharePriceText(v.sharePrice, v.asset.decimals)} ${unit}` : "not read",
     ],
     [
-      YIELD_LABEL,
+      // The unit only over a figure, as the card (ui-jobs 679).
+      y && "yearly" in y ? YIELD_LABEL : "Yield",
       y && "yearly" in y
         ? `${yieldPct(y.yearly)} (share price ${changeText(y.change)} over the ${y.days} days to block ${n(y.to.block)}${y.jump ? jumpTail(y.jump, (d) => formatDate(new Date(d * 86_400_000))) : ""})`
         : y?.none === "too-small" && v.totalAssets
