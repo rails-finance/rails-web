@@ -167,7 +167,14 @@ const FX_RATIO = {
   levelRow: "liquidation-at",
   warnLevelRow: "rebalance-at",
   held: true,
-  help: ["the price each event was valued at", "rebalance ratio", "in force that day", "unchanged across this life"],
+  // The help names both lines in the docs' words since ui-jobs 638 (`8b3fb2a6`).
+  help: [
+    "the price each event was valued at",
+    "the pool's liquidation line",
+    "its rebalance line",
+    "in force that day",
+    "unchanged across this life",
+  ],
 };
 /** Alchemix V3's view (steps 6 and 8): the card's LTV against its
  *  "Liquidation threshold", one over the lower bound read at each picked
@@ -213,6 +220,17 @@ const dolomiteRatio = (owner, accountNumber, extra = {}) => ({
  *  and where the range read ends ("today" on an open Trove, "last" the last
  *  row's day). */
 const forkPace = (fork, pace, unit, to) => ({ pace, paceFork: fork, paceUnit: unit, paceTo: to });
+
+/** A Comet's health view, in Compound's docs' words since ui-jobs 629
+ *  (`f9facc3d`, lib/compound/flows-health.ts): the borrow balance as a share of
+ *  the liquidation point, debt ÷ Σ collateral × price × Liquidation CF, its
+ *  red line at 100% and liquidatable above it. The inverse of the card's
+ *  chain read `healthFactor` (liquidation capacity ÷ debt). */
+const COMET_HEALTH = {
+  label: "Liquidation point reached",
+  line: /Liquidates above(, explain)?\s*100(\.0)?%/,
+  inverse: true,
+};
 
 const PAGES = [
   {
@@ -412,6 +430,7 @@ const PAGES = [
     path: "/ethereum/compound-v3/usdc/0x8279b19fbd91a651d811d233c2de8562d6ed30a7",
     lwOnly: true,
     health: true,
+    healthView: COMET_HEALTH,
     timeline: "/api/compound/timeline?wallet=0x8279b19fbd91a651d811d233c2de8562d6ed30a7&market=usdc&limit=1000",
     hf: {
       url: "/api/chain/compound/position?wallet=0x8279b19fbd91a651d811d233c2de8562d6ed30a7&market=usdc",
@@ -433,6 +452,7 @@ const PAGES = [
     path: "/base/compound-v3/usdc/0x2f42b066069945a71100aef832afdbe14d954e4b",
     lwOnly: true,
     health: true,
+    healthView: COMET_HEALTH,
     timeline: "/api/chain/compound-base/timeline?wallet=0x2f42b066069945a71100aef832afdbe14d954e4b",
     hf: {
       url: "/api/chain/compound-base/wallet?wallet=0x2f42b066069945a71100aef832afdbe14d954e4b",
@@ -451,6 +471,7 @@ const PAGES = [
     path: "/arbitrum/compound-v3/usdc/0x13adb56198ea3e0789c28a5528c07b4d5d674ce3",
     lwOnly: true,
     health: true,
+    healthView: COMET_HEALTH,
     timeline: "/api/chain/compound-arbitrum/timeline?wallet=0x13adb56198ea3e0789c28a5528c07b4d5d674ce3",
     hf: {
       url: "/api/chain/compound-arbitrum/wallet?wallet=0x13adb56198ea3e0789c28a5528c07b4d5d674ce3",
@@ -952,8 +973,8 @@ const PAGES = [
     lwOnly: true,
     level: { asset: "pETH", endDay: 20709, help: ["debt × 115%", "not drawn"] },
   },
-  // f(x) (steps 6 and 8): the debt ratio against the pool's liquidation
-  // ratio, its rebalance ratio the dashed line short of it, both in force
+  // f(x) (steps 6 and 8): the LTV against the pool's liquidation line, its
+  // rebalance line the dashed line short of it, both in force
   // each day (the event reads and the pool's setter logs); the collateral's
   // two levels. Neither pool has moved a ratio since its initialisation
   // (28 Oct 2026), so no life has a marker; the change path is checked
@@ -1254,6 +1275,10 @@ function headingText(h) {
   return `${picker} ${h.textContent ?? ""}`;
 }
 const HEALTH = "Health factor";
+/** The health view a fixture opens on: `pg.healthView`, else the Aave
+ *  family's health factor, its line at 1 and liquidatable below it. */
+const healthView = (pg) =>
+  pg?.healthView ?? { label: HEALTH, line: /Liquidates below(, explain)?\s*1\b/, inverse: false };
 
 /** The Aave family's health factor as its cards print it (hfLabelV3). */
 function hfLabel(hf) {
@@ -1267,7 +1292,9 @@ function hfLabel(hf) {
  *  account's events; today's figure is the card's health factor; where the
  *  card states "Liquidates at", that asset's level today is the card's. */
 async function checkHealth(page, tag, pg, listedAll) {
-  check(`${tag}: the picker lists the health factor first`, listedAll[0] === HEALTH, listedAll.join(","));
+  const hv = healthView(pg);
+  const name = hv.label === HEALTH ? "the health factor" : `"${hv.label}"`;
+  check(`${tag}: the picker lists ${name} first`, listedAll[0] === hv.label, listedAll.join(","));
   if ((await page.locator("[data-flows-combined] [data-flow-chart-engine=lw]").count()) > 0)
     await checkHealthDotted(page, tag);
   // The tip names its series by its mark: the picker's accessible name.
@@ -1276,10 +1303,9 @@ async function checkHealth(page, tag, pg, listedAll) {
   // where the cursor opens: the tip says so.
   check(
     pg.endsClosed
-      ? `${tag}: the chart opens on the health factor, on a close day with no debt`
-      : `${tag}: the chart opens on the health factor, its line at 1`,
-    heading.includes(`${HEALTH}`) &&
-      (pg.endsClosed ? heading.includes("No health factor") : /Liquidates below(, explain)?\s*1\b/.test(heading)),
+      ? `${tag}: the chart opens on ${name}, on a close day with no debt`
+      : `${tag}: the chart opens on ${name}, its line at ${hv.inverse ? "100%" : "1"}`,
+    heading.includes(hv.label) && (pg.endsClosed ? heading.includes("No health factor") : hv.line.test(heading)),
     heading,
   );
   const u = new URL(`${BASE}${pg.path}`);
@@ -1324,9 +1350,13 @@ async function checkHealth(page, tag, pg, listedAll) {
     const body = await hostFetch(`${BASE}${pg.hf.url}`).then((r) => r.json());
     const row = pg.hf.market ? (body.positions ?? []).find((x) => x.market === pg.hf.market) : body;
     const want = row?.[pg.hf.field];
-    const got = Number(end.text);
+    // A Comet's view prints the share of the liquidation point ("61.5%"):
+    // compared as the health factor it is the inverse of, at the same
+    // tolerance.
+    const pctRead = Number(end.text.match(/(\d+(?:\.\d+)?)%/)?.[1] ?? NaN);
+    const got = hv.inverse ? 100 / pctRead : Number(end.text);
     check(
-      `${tag}: today's health factor is the card's read (${pg.hf.field})`,
+      `${tag}: today's ${hv.inverse ? `${hv.label} is the inverse of` : "health factor is"} the card's read (${pg.hf.field})`,
       end.block === "" && want > 0 && Math.abs(got - want) <= 0.005 * want + 0.006,
       `chart ${end.text} (block ${end.block}), read ${want}`,
     );
@@ -1377,7 +1407,7 @@ async function checkHealth(page, tag, pg, listedAll) {
       `chart ${v} (${v != null ? formatLiquidationPrice(v) : "-"}), card ${liq}, price ${price}`,
     );
     await picker.click();
-    await page.locator(`[role="listbox"] [data-price-asset="${HEALTH}"]`).click();
+    await page.locator(`[role="listbox"] [data-price-asset="${hv.label}"]`).click();
   }
 }
 
@@ -2834,7 +2864,7 @@ async function checkPickedLevel(page, tag, listedAll, pg = {}) {
   // borrowed it (its supply and its debt): each listed entry is picked.
   for (const [sym, nth] of listedAll
     .map((x, i) => [x, listedAll.slice(0, i).filter((y) => y === x).length])
-    .filter(([x]) => x !== HEALTH)) {
+    .filter(([x]) => x !== healthView(pg).label)) {
     await picker.click();
     await page.locator(`[role="listbox"] [data-price-asset="${sym}"]`).nth(nth).click();
     await page.waitForTimeout(250);
@@ -2845,7 +2875,7 @@ async function checkPickedLevel(page, tag, listedAll, pg = {}) {
   }
   check(`${tag}: an asset picked from the list draws its level`, drawn.length > 0, drawn.join(", ") || "none");
   await picker.click();
-  await page.locator(`[role="listbox"] [data-price-asset="${HEALTH}"]`).click();
+  await page.locator(`[role="listbox"] [data-price-asset="${healthView(pg).label}"]`).click();
   await page.waitForTimeout(250);
 }
 
@@ -2942,7 +2972,7 @@ async function checkBasketLevels(page, tag, pg, listedAll) {
     `${got.join(", ")}${bad.length ? `; off: ${bad.join(",")}` : ""}`,
   );
   await picker.click();
-  await page.locator(`[role="listbox"] [data-price-asset="${HEALTH}"]`).click();
+  await page.locator(`[role="listbox"] [data-price-asset="${healthView(pg).label}"]`).click();
   await page.waitForTimeout(250);
 }
 
@@ -4231,7 +4261,7 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
     await page.waitForTimeout(2500);
     // The health view lands once its position-state reads have, and redraws
     // the price pane: every check below waits for it.
-    if (pg.health) await waitForHealth(page);
+    if (pg.health) await waitForHealth(page, healthView(pg).label);
     if (pg.ratio) await waitForHealth(page, pg.ratio.label);
     if (pg.band) await waitForHealth(page, "Health");
     // The protocol activity panel lands with its own read.
@@ -4347,7 +4377,7 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
     const listedAll = await page.$$eval("[data-price-asset]", (bs) => bs.map((b) => b.dataset.priceAsset));
     if ((await picker.count()) > 0) await page.keyboard.press("Escape");
     // The health view (Aave V3, ruling 7) is listed first; the assets follow.
-    const listed = listedAll.filter((s) => s !== HEALTH);
+    const listed = listedAll.filter((s) => s !== healthView(pg).label);
     if (pg.health) {
       await checkHealth(page, tag, pg, listedAll);
       if (!pg.noLevel) await checkPickedLevel(page, tag, listedAll, pg);
