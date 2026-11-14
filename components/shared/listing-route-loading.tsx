@@ -42,10 +42,10 @@ import { useSkeletonSizes } from "@/hooks/useSkeletonSizes";
 export function ListingRouteLoading() {
   const { sizes, remembered } = useSkeletonSizes();
   // The rail header is derived from the route alone (roster data, no fetch),
-  // so the REAL one renders here rather than a blank block — the identity +
-  // sub-nav row holding steady through a navigation instead of vanishing into
-  // the skeleton. The pathname is already the destination while this boundary
-  // shows, so the lit tab is the one being opened. Outside the pulse wrapper:
+  // so the REAL one renders here rather than a blank block — the title row
+  // and its sections menu holding steady through a navigation instead of
+  // vanishing into the skeleton. The pathname is already the destination while
+  // this boundary shows, so the menu names the section being opened. Outside the pulse wrapper:
   // it is content, not a placeholder.
   const pathname = usePathname();
   const entry = protocolForPathname(pathname);

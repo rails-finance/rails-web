@@ -1,34 +1,28 @@
 "use client";
 
-// RailHeader — the two-row header on every explorer surface. The protocol's
-// identity (ProtocolIdentity) takes the left of the first row, the chain's
-// glyph after the name (rails-ops TO-DO-ui-jobs 68, 497, 514): the two together
-// say what you are looking at and which chain it runs on, so they belong on
-// one line rather than one on the page and one in the chrome. The second row
-// carries the recency stamp on the left (the chain head is rail-level
-// context — the block the page reads against — not row furniture) and the
-// rail's sub-nav on the right. The sub-nav is live tab links — the position
-// listing (named by the protocol's own noun: TROVES, VAULTS, ACCOUNTS;
-// absent on an explorer that has none), then each of the roster's sub-pages
-// in order (MARKETS, BRANCHES, SYSTEM, …) — then, slightly apart, the (i)
-// link to the explorer's info page. On a sub-page the lit tab is the one
-// whose route holds the pathname, so a sub-page's nested routes (Morpho's
-// markets/[loanToken]) light their parent.
+// RailHeader — the title row on every explorer surface (rails-ops TO-DO-ui-jobs
+// 68, 497, 514, 680). The protocol's identity (ProtocolIdentity), the chain's
+// glyph after the name (ChainLabel), then the sections menu (SectionsMenu,
+// H5): the current section's name and a chevron, opening the explorer's
+// sections as links — the position listing (named by the protocol's noun:
+// Troves, Vaults, Accounts; absent on an explorer that has none), each of the
+// roster's sub-pages in order (Markets, Branches, System, …), then About, the
+// info page. On a sub-page the current section is the one whose route holds
+// the pathname, so a sub-page's nested routes (Morpho's markets/[loanToken])
+// mark their parent. A listing draws the recency stamp on a row under it.
 //
 // A POSITION PAGE DRAWS NO RAIL HEADER (rails-ops decisions/0052): the
 // wallet heading is its frame, with a line naming the protocol and linking
 // to its listing (components/shared/wallet-heading.tsx).
-//
-// The chain is the muted glyph after the protocol's name (ChainLabel); the
-// chooser that stood at the row's end is the brand rail's since ui-jobs 497.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { Check, ChevronDown } from "lucide-react";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { positionNounPlural, protocolForSession, subPageForPathname } from "@/lib/shared/protocols";
 import { ProtocolIdentity } from "@/components/shared/protocol-identity";
 import { RecencyStamp } from "@/components/shared/recency-stamp";
-import { INFO_PATH } from "@/components/shared/info-disclosure";
 import { ChainGlyph } from "@/components/shared/chain-toggle";
 import { CHAINS, type ChainId } from "@/lib/shared/chains";
 import { TAB_BASE } from "@/lib/shared/ui-grammar";
@@ -78,21 +72,155 @@ export function ChainLabel({
 /** Which surface of the rail is being looked at — decides the lit slot. */
 export type RailVenue = "listing" | "subPage" | "info";
 
-// Same 11px small-caps register as ProtocolIdentity. Every slot carries the
-// bottom border so the active underline never shifts the baseline; the idle
-// border is just transparent.
-//
-// TAB_BASE lives in lib/shared/ui-grammar.ts, which the profile menu's kinds
-// (H20) also wear.
-//
-// EXPORTED, so a second rail component wears the same three classes rather
-// than a copy of them: a second rail that drifted a letter-spacing would read
-// as a second product. The vaults section had its own rail on these classes
-// until decision 0028 retired the section and folded every vault layer under
-// its protocol's explorer, so this file is the only rail today — the export
-// stands for whatever rail comes next.
+// The tabs' type (TAB_BASE, lib/shared/ui-grammar.ts): every tab carries the
+// bottom border so the active underline never shifts the baseline. The
+// explorer sections were drawn as these tabs until ui-jobs 680; the saved
+// tabs (B4, components/bookmarks/bookmarks-page.tsx) wear them today.
 export const TAB_ACTIVE = `${TAB_BASE} border-current text-foreground`;
 export const TAB_IDLE = `${TAB_BASE} border-transparent text-rb-500 transition-colors hover:text-blue-600 dark:hover:text-[var(--text-link)]`;
+
+/** The info page's name in the sections menu, as the front door's link (N5). */
+const ABOUT = "About";
+
+/** A menu row: 44px tall, neutral at rest, link blue on hover and keyboard
+ *  focus (each row opens another page; color-grammar §4a), the blue focus
+ *  ring as the profile menu's rows (H20). */
+const SECTION_ITEM =
+  "flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-left text-[15px] text-foreground outline-none transition-colors hover:text-blue-600 focus-visible:text-blue-600 focus-visible:ring-[1.5px] focus-visible:ring-blue-500 dark:hover:text-[var(--text-link)] dark:focus-visible:text-[var(--text-link)]";
+
+const ITEMS = '[role="menuitem"]';
+
+interface Section {
+  href: string;
+  name: string;
+  current: boolean;
+}
+
+/** The explorer's sections as a menu after the chain's glyph (H5; Miles
+ *  14 Nov 2026, ui-jobs 680). The trigger names the current section, muted,
+ *  the foreground on hover and while open. Each section is a link, so a
+ *  modifier press opens it in a new tab. The menu stays in the page while
+ *  closed (`hidden`), so the links are there to read without opening it.
+ *  Keyboard as the profile menu (H20): the current row takes focus on
+ *  opening; the arrow keys, Home and End move through the rows; Escape closes
+ *  it and returns focus to the trigger; Tab, a press outside and a
+ *  navigation close it. */
+function SectionsMenu({ sections }: { sections: Section[] }) {
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const menuId = useId();
+  const current = sections.find((s) => s.current);
+
+  const close = useCallback((refocus = true) => {
+    setOpen(false);
+    if (refocus) requestAnimationFrame(() => trigger.current?.focus());
+  }, []);
+
+  useEffect(() => setOpen(false), [pathname]);
+
+  useEffect(() => {
+    if (!open) return;
+    const first = requestAnimationFrame(() => {
+      const items = menu.current?.querySelectorAll<HTMLElement>(ITEMS);
+      (menu.current?.querySelector<HTMLElement>('[aria-current="page"]') ?? items?.[0])?.focus();
+    });
+    const onPointer = (e: PointerEvent) => {
+      if (!wrap.current?.contains(e.target as Node)) close(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        close();
+        return;
+      }
+      if (!menu.current) return;
+      const items = Array.from(menu.current.querySelectorAll<HTMLElement>(ITEMS));
+      const at = items.indexOf(document.activeElement as HTMLElement);
+      const go = (i: number) => items[(i + items.length) % items.length]?.focus();
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        go(at + 1);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        go(at - 1);
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        go(0);
+      } else if (e.key === "End") {
+        e.preventDefault();
+        go(items.length - 1);
+      } else if (e.key === "Tab") {
+        close(false);
+      }
+    };
+    document.addEventListener("pointerdown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      cancelAnimationFrame(first);
+      document.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open, close]);
+
+  return (
+    <nav ref={wrap} aria-label="Explorer sections" className="relative shrink-0" data-anatomy="H5">
+      <button
+        ref={trigger}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={menuId}
+        onClick={() => setOpen((v) => !v)}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown" && !open) {
+            e.preventDefault();
+            setOpen(true);
+          }
+        }}
+        data-sections-trigger=""
+        // A 28px row with a 44px press area (after:), as the address menu's
+        // trigger (C7).
+        className={`relative flex h-7 cursor-pointer items-center gap-1 rounded-md px-1.5 text-[15px] font-medium leading-none transition-colors focus-ring after:absolute after:-inset-y-2 after:inset-x-0 after:content-[''] ${
+          open ? "text-foreground" : "text-rb-500 hover:text-foreground"
+        }`}
+      >
+        {current?.name ?? "Sections"}
+        <ChevronDown
+          className={`size-3.5 shrink-0 transition-transform motion-reduce:transition-none ${open ? "rotate-180" : ""}`}
+          aria-hidden="true"
+        />
+      </button>
+      <div
+        ref={menu}
+        id={menuId}
+        role="menu"
+        aria-label="Explorer sections"
+        hidden={!open}
+        data-sections-menu=""
+        // Under the trigger: its left edge on the trigger's from sm, its right
+        // edge on the trigger's below sm, so it stays inside a phone's width.
+        className="profile-drop absolute right-0 top-full sm:right-auto sm:left-0 z-[var(--z-dropdown)] mt-2 w-52 rounded-xl border border-rb-200 bg-background p-2 shadow-xl dark:border-rb-800 dark:bg-rb-900"
+      >
+        {sections.map((s) => (
+          <Link
+            key={s.href}
+            href={s.href}
+            role="menuitem"
+            aria-current={s.current ? "page" : undefined}
+            onClick={() => close(false)}
+            className={`${SECTION_ITEM} ${s.current ? "font-semibold" : ""}`}
+          >
+            <span className="min-w-0 flex-1 truncate">{s.name}</span>
+            {s.current && <Check className="size-4 shrink-0" strokeWidth={2.5} aria-hidden="true" />}
+          </Link>
+        ))}
+      </div>
+    </nav>
+  );
+}
 
 export function RailHeader({
   session,
@@ -101,84 +229,42 @@ export function RailHeader({
 }: {
   session: SessionProtocol;
   venue: RailVenue;
-  /** Render the shared RecencyStamp on the second row, left of the sub-nav
-   *  (decision 0006's freshness signal). On for listings; off where the page
-   *  reads no chain head (the info page) — rendering it there would assert a
-   *  freshness the page doesn't have, and the second row then carries the
-   *  sub-nav alone, right-aligned rather than left where the stamp would have
-   *  sat. */
+  /** Render the shared RecencyStamp on a row under the title (decision 0006's
+   *  freshness signal). On for listings; off where the page reads no chain
+   *  head (the info page). */
   stamp?: boolean;
 }) {
   const pathname = usePathname();
   const entry = protocolForSession(session);
   if (!entry) return null;
   const litSubPage = venue === "subPage" ? subPageForPathname(entry, pathname) : undefined;
+  const sections: Section[] = [
+    // A vault-native explorer has no position listing — a share in a vault is
+    // not a position in the roster's sense (rails-ops decision 0027 call 2) —
+    // so its first section is its first sub-page.
+    ...(entry.positionListing !== false
+      ? [{ href: entry.listingHref, name: positionNounPlural(session), current: venue === "listing" }]
+      : []),
+    ...entry.subPages.map((sub) => ({ href: sub.href, name: sub.tab, current: sub === litSubPage })),
+    { href: entry.infoHref, name: ABOUT, current: venue === "info" },
+  ];
   return (
-    // Two rows at every width (rails-ops TO-DO-ui-jobs 66). Pinning the
-    // sub-nav under the identity started as a fix for below `sm`: left to
-    // wrap on its own it landed in two places — beside the name on the
-    // markets and info pages, under it on the listing, whose recency stamp is
-    // what pushed it down — so the tabs jumped as the reader moved between
-    // the three (Miles, 2026-09-02). That reasoning is not a breakpoint's; a
-    // tab row that stays put is what makes the rail feel like one surface, at
-    // any width, so the split is unconditional now: the identity owns the
-    // first row by itself, the stamp and the sub-nav share the second.
     <div className="flex flex-col gap-2">
-      {/* The page's largest type (rails-ops TO-DO-ui-jobs 67). The first thing
-          the eye lands on is now what the page is about; the scale lives in
-          ProtocolIdentity, so every explorer wears the same one. The chain's
-          glyph follows the name, and `min-w-0` lets a long name shrink rather
-          than push it off. */}
+      {/* The page's largest type (rails-ops TO-DO-ui-jobs 67), set in
+          ProtocolIdentity. `min-w-0` lets a long name give way first, so the
+          chain's glyph and the sections menu stay on the line. */}
       <div className="flex items-center gap-3" data-anatomy="H3">
         <div className="flex min-w-0">
           <ProtocolIdentity session={session} scale="title" />
         </div>
         <ChainLabel chainId={entry.chainId} />
+        <SectionsMenu sections={sections} />
       </div>
-      {/* Right-aligned even with the stamp off (the info page): a lone nav
-          flush right still reads as one deliberate row, not a stamp-shaped
-          gap. With the stamp on, the two ends split it as before. */}
-      <div className={`flex flex-wrap items-center gap-x-4 gap-y-1.5 ${stamp ? "justify-between" : "justify-end"}`}>
-        {stamp && <RecencyStamp />}
-        <nav aria-label="Explorer sections" className="flex flex-wrap items-center gap-4" data-anatomy="H5">
-          {/* The position listing, where the explorer has one. A vault-native
-              explorer has none — a share in a vault is not a position in the
-              roster's sense (rails-ops decision 0027 call 2) — so its first tab
-              is its first sub-page and its own route opens on that sub-page. */}
-          {entry.positionListing !== false && (
-            <Link
-              href={entry.listingHref}
-              className={venue === "listing" ? TAB_ACTIVE : TAB_IDLE}
-              aria-current={venue === "listing" ? "page" : undefined}
-            >
-              {positionNounPlural(session)}
-            </Link>
-          )}
-          {entry.subPages.map((sub) => (
-            <Link
-              key={sub.segment}
-              href={sub.href}
-              className={sub === litSubPage ? TAB_ACTIVE : TAB_IDLE}
-              aria-current={sub === litSubPage ? "page" : undefined}
-            >
-              {sub.tab}
-            </Link>
-          ))}
-          {/* The (i) sits slightly apart from the tabs: it is the door to the
-              rail's ABOUT prose, not a third data surface. Same glyph as the
-              disclosure triggers, sized to the tab letters. */}
-          <Link
-            href={entry.infoHref}
-            aria-label="About this explorer"
-            aria-current={venue === "info" ? "page" : undefined}
-            className={`ml-1 ${venue === "info" ? TAB_ACTIVE : TAB_IDLE}`}
-          >
-            <svg className="mb-px inline-block h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path fillRule="evenodd" d={INFO_PATH} clipRule="evenodd" />
-            </svg>
-          </Link>
-        </nav>
-      </div>
+      {stamp && (
+        <div className="flex items-center">
+          <RecencyStamp />
+        </div>
+      )}
     </div>
   );
 }

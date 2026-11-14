@@ -137,9 +137,9 @@ export interface ChainTruthListingProps<T, F extends BaseListFilters = BaseListF
    *  nothing it reads (Alchemix: "Search takes a full address…"). */
   emptyNote?: ReactNode;
   /** Roster entry for the listing's protocol — renders the shared
-   *  `RailHeader` (identity + sub-nav tabs, this listing's tab active) in
-   *  place of a visible heading; `title` then lives in an sr-only h1. Omit
-   *  and the full title stands alone as the visible h1, with no tabs. */
+   *  `RailHeader` (identity + sections menu, naming this listing) in place
+   *  of a visible heading; `title` then lives in an sr-only h1. Omit and the
+   *  full title stands alone as the visible h1, with no sections menu. */
   protocol?: ProtocolEntry;
   /** For a listing that is a SECTION rather than an explorer (a chain's
    *  Vaults): the identity line drawn above the visible h1 where an explorer
@@ -206,11 +206,11 @@ export function ChainTruthListing<T, F extends BaseListFilters = BaseListFilters
 
   return (
     <div className="py-8">
-      {/* The rail header carries the whole visible heading duty: identity +
-          recency stamp (decision 0006 — the chain head the page reads
-          against) on the left, the sub-nav on the right with this listing's
-          tab active. The intro prose lives on the rail's /info page (the (i)
-          in the sub-nav), so nothing stacks underneath. The page keeps a real
+      {/* The rail header carries the whole visible heading duty: identity,
+          the sections menu naming this listing, and the recency stamp under
+          them (decision 0006 — the chain head the page reads against). The
+          intro prose lives on the rail's /info page (About in the sections
+          menu), so nothing stacks underneath. The page keeps a real
           h1 for readers that need one — the full title, sr-only.
           Without a roster entry there is no protocol rail to draw, and what
           stands in its place is the caller's `identity`: a section that hands
