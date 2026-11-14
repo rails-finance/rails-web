@@ -6,9 +6,10 @@
 // folder-served page reads the flat history once (the read its CSV export
 // makes), and a read short of the whole history is a failed read, since a
 // replay of part of a history would state the wrong lifetime. The market
-// oracle at each row's block comes from the row (liquidations) or from
-// /api/chain/morpho/at-block, the read the opened card makes, six at a time
-// (two on Arbitrum).
+// oracle is priced once a UTC day, at the block of the day's last row
+// (lib/morpho/price-days.ts): from that row where it carries a price (a
+// liquidation), else from /api/chain/morpho/prices, at most
+// MORPHO_PRICES_PER_REQUEST blocks a request, two requests at a time.
 // It also gives the page the value that ties the panel to the timeline
 // (components/shared/flow-focus-context.tsx).
 
@@ -17,8 +18,6 @@ import type { FlowsRead } from "@/components/shared/lifetime-flows-panel";
 import { useFlowFocusRoot, useFlowFocusValue, type FlowFocusValue } from "@/components/shared/flow-focus-context";
 import type { FlowTimeline } from "@/lib/shared/flows-timeline";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
-import { loadMorphoAtBlock } from "@/lib/morpho/use-market-at-block";
-import { ARBITRUM_CHAIN_ID } from "@/lib/shared/chains";
 import { useFlowsHealth } from "@/hooks/useFlowsHealth";
 import { MORPHO_COLL_KEY, morphoHealthSource, morphoLiqPrice, morphoLltvReads } from "@/lib/morpho/flows-health";
 import {
@@ -27,15 +26,28 @@ import {
   morphoFlowReplay,
   morphoFlowTimeline,
   morphoFocusEvents,
-  morphoPriceBlocks,
   morphoUnpriced,
   type MorphoLive,
   type MorphoRoles,
 } from "@/lib/morpho/flows";
+import { MORPHO_PRICE_DAYS, morphoDayPriceMap, morphoPriceChunks, morphoPriceDayBlocks } from "@/lib/morpho/price-days";
+import type { MorphoPricesResponse } from "@/lib/sources/chain/morpho-prices";
 
-/** At most this many blocks' oracle reads per page; the rest take the
- *  nearest priced row's price, and the Explanation counts them. */
-export const MORPHO_PRICE_READS = 250;
+/** One request's prices by block; a failed request reads as none, and the
+ *  days it held take the nearest priced day's price. */
+async function loadMorphoPrices(marketId: string, chainId: number, blocks: number[]): Promise<[number, number][]> {
+  // One spelling of the market, whichever the page holds, for one edge-cache
+  // entry per set of blocks; `v=1` keys a changed answer away from an older one.
+  const market = marketId.toLowerCase().replace(/^0x/, "");
+  const url = `/api/chain/morpho/prices?chain=${chainId}&market=${market}&blocks=${blocks.join(",")}&v=1`;
+  try {
+    const r = await fetch(url);
+    const d = r.ok ? ((await r.json()) as MorphoPricesResponse) : null;
+    return Array.isArray(d?.prices) ? d.prices : [];
+  } catch {
+    return [];
+  }
+}
 const NO_EVENTS: never[] = [];
 
 export interface MorphoFlowsInput {
@@ -81,8 +93,8 @@ export function morphoRisk(
 
 export interface MorphoFlowsNoteFacts {
   roles: MorphoRoles;
-  /** Collateral flows valued at their own block's oracle price, and at the
-   *  nearest priced row's. */
+  /** Collateral flows valued at their day's oracle price (or a liquidation's
+   *  own), and at the nearest priced day's. */
   priced: number;
   nearest: number;
   /** Rows whose debt the answer states as principal (no market totals). */
@@ -127,30 +139,28 @@ export function useMorphoFlows(p: MorphoFlowsInput): {
 
   const source = p.wholeEvents ?? fetched.events;
   const bare = useMemo(() => (source ? morphoFlowEvents(source) : []), [source]);
-  // The oracle at each block a row needs it, where any row holds collateral.
+  // One oracle read per UTC day with rows, where any row holds collateral.
   const blocks = useMemo(() => {
     const borrower = bare.some((e) => Math.abs(e.collDelta) > 0 || (e.collAfter ?? 0) > 0);
-    return borrower ? morphoPriceBlocks(bare, MORPHO_PRICE_READS) : [];
+    return borrower ? morphoPriceDayBlocks(bare, MORPHO_PRICE_DAYS) : [];
   }, [bare]);
   const blocksKey = `${p.marketId}:${p.chainId}:${blocks.join(",")}`;
   const [prices, setPrices] = useState<{ key: string; map: Map<number, number> } | null>(null);
   useEffect(() => {
     if (source == null) return;
     let live = true;
-    const list = blocks.slice();
-    const map = new Map<number, number>();
+    const chunks = morphoPriceChunks(blocks);
+    const reads = new Map<number, number>();
     let next = 0;
     const worker = async () => {
-      while (live && next < list.length) {
-        const b = list[next++];
-        const r = await loadMorphoAtBlock(p.marketId, b, p.chainId);
-        if (r && r.at.price > 0) map.set(b, r.at.price);
+      while (live && next < chunks.length) {
+        const chunk = chunks[next++];
+        for (const [b, price] of await loadMorphoPrices(p.marketId, p.chainId, chunk))
+          if (price > 0) reads.set(b, price);
       }
     };
-    // Two at a time on Arbitrum: the keyless gateway refuses a wide burst.
-    const atOnce = p.chainId === ARBITRUM_CHAIN_ID ? 2 : 6;
-    Promise.all(Array.from({ length: Math.min(atOnce, list.length) }, worker)).then(() => {
-      if (live) setPrices({ key: blocksKey, map });
+    Promise.all(Array.from({ length: Math.min(2, chunks.length) }, worker)).then(() => {
+      if (live) setPrices({ key: blocksKey, map: morphoDayPriceMap(bare, reads) });
     });
     return () => {
       live = false;

@@ -5,6 +5,7 @@
 import type { ReactNode } from "react";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import type { MorphoFlowsNoteFacts } from "@/hooks/useMorphoFlows";
+import { MORPHO_PRICE_DAYS } from "@/lib/morpho/price-days";
 
 const DOCS = {
   MARKET: "https://docs.morpho.org/learn/concepts/blue/",
@@ -31,7 +32,7 @@ export function MorphoFlowsNote({ facts, loanSymbol, collSymbol, name }: MorphoF
         Every figure is in {loanSymbol}, this market&apos;s loan asset: {name} prices nothing in USD, and the
         market&apos;s oracle prices {coll} in {loanSymbol}.
         {borrower &&
-          ` Each ${coll} flow is converted at the oracle's price at its block, so on the collateral side the last line, Market move, is the change in that price since each flow.`}
+          ` Each ${coll} flow is converted at the oracle's price on its day, so on the collateral side the last line, Market move, is the change in that price since each flow.`}
       </p>
       {borrower && (
         <p>
@@ -67,11 +68,13 @@ export function MorphoFlowsNote({ facts, loanSymbol, collSymbol, name }: MorphoF
       )}
       {borrower && facts && (
         <p>
+          The oracle is read once for each UTC day with events, at the block of that day&apos;s last event, and every
+          collateral flow that day is valued at that price; a liquidation keeps the price it ran on.
           {facts.nearest > 0
-            ? `${n(facts.priced, "One collateral flow is", "collateral flows are")} valued at the oracle price read at its block; ${n(facts.nearest, "one takes", "take")} the nearest priced event's. `
-            : "Every collateral flow is valued at the oracle price at its block. "}
-          No daily oracle price is recorded, so between events the collateral keeps the price of its latest priced
-          event, and a price more than 30 days old is stated as such.
+            ? ` ${n(facts.nearest, "One collateral flow takes", "collateral flows take")} the nearest priced day's price: the page reads at most ${MORPHO_PRICE_DAYS} days, and ${facts.nearest === 1 ? "its day was" : "their days were"} not read.`
+            : ""}{" "}
+          No daily oracle price is recorded, so between days with events the collateral keeps the price of the latest
+          priced day, and a price more than 30 days old is stated as such.
         </p>
       )}
     </div>
@@ -84,7 +87,7 @@ export function morphoFlowsContent(name: string): LearnMoreContent {
     intro: `The bars add up every event ${name} has recorded for this position, in the market's loan asset, and the line under them draws what it held and owed at the end of each day.`,
     stepsHeading: "How it's built:",
     steps: [
-      "Collateral: supplied, less withdrawn, less seized in liquidations, each at the market oracle's price at its block, plus the change in that price since (Market move), is what the position holds.",
+      "Collateral: supplied, less withdrawn, less seized in liquidations, each at the market oracle's price at the block of its day's last event, plus the change in that price since (Market move), is what the position holds.",
       "Debt: borrowed, plus the interest accrued, less repaid, less repaid by liquidators and any bad debt realized, is what the position owes: its borrow shares at the market's totals.",
       "Supply: supplied, plus the interest earned, less withdrawn and any bad debt realized, is what a lender holds: its supply shares at the market's totals.",
     ],
