@@ -51,12 +51,12 @@ const shares = (c: VaultTimelineCoords) => c.shareSymbol ?? "shares";
 
 /** What each `Transfer` classification means, said as the chain decides it. */
 const KIND_CLAUSE: Record<VaultHolderEvent["kind"], string> = {
-  deposit: "the `from` address is the zero address, so the shares were minted — a deposit",
-  withdrawal: "the `to` address is the zero address, so the shares were burned — a withdrawal",
+  deposit: "the sender is the zero address, so the shares were minted — a deposit",
+  withdrawal: "the receiver is the zero address, so the shares were burned — a withdrawal",
   "transfer-in":
-    "neither end is the zero address and this address is the `to`, so the shares arrived from another holder",
+    "neither end is the zero address and this address is the receiver, so the shares arrived from another holder",
   "transfer-out":
-    "neither end is the zero address and this address is the `from`, so the shares went to another holder",
+    "neither end is the zero address and this address is the sender, so the shares went to another holder",
   "transfer-self": "both ends of the transfer are this same address, so the balance did not move",
   // Yearn's reader emits no cooldown row — a Yearn V3 vault has no cooldown to
   // record. The arm exists because the shape is shared with a family that does.
@@ -73,11 +73,11 @@ export const yearnVaultTimelineGateProv = (c: VaultTimelineCoords, r: VaultHolde
   source: { block: c.blockNumber },
   verify: {
     kind: "recompute",
-    text: `To check: ask the vault for its Transfer logs with this address in topic1 and then in topic2 over blocks ${r.fromBlock}–${r.toBlock}, sum the values signed, and compare the sum with balanceOf(${c.holder ?? "the address"}) at block ${r.toBlock}.`,
+    text: `To check: ask any Ethereum archive node for the vault's Transfer logs that name this address as sender and as receiver, blocks ${r.fromBlock} to ${r.toBlock}, add the values with their signs, and compare the sum with balanceOf(${c.holder ?? "the address"}) at block ${r.toBlock}.`,
   },
-  summary: `The history check — every \`Transfer\` this address sent or received on this vault, replayed into a balance and compared against the vault's \`balanceOf\` at block ${r.toBlock}. Two \`eth_getLogs\` answered ${r.logsOut} outgoing and ${r.logsIn} incoming logs over blocks ${r.fromBlock}–${r.toBlock} — the range starts at the block the vault's creation log sits in, because the vault emitted nothing before it existed. Their signed sum is ${r.replayed} and \`balanceOf\` reads ${r.onChain}. ${r.reconciled ? "The two agree wei-exact, which is why the rows below are drawn at all." : "The two do not agree, so no history is drawn: a lane that answers part of a question with an HTTP 200 has been observed on this chain, and no status code, timing or count tells that apart from a genuinely empty history."}${r.refetched ? ` Both sweeps were run a second time after a pause, and the second answer ${r.refetchDiffered ? "returned a DIFFERENT log count from the first — direct evidence of a lane answering one question two ways" : "returned the same log count"}.` : ""}`,
+  summary: `The history check — every transfer this address sent or received on this vault, replayed into a balance and compared with the vault's balance for it at block ${r.toBlock}. Over blocks ${r.fromBlock} to ${r.toBlock} the vault recorded ${r.logsOut} transfers from this address and ${r.logsIn} to it; the range starts at the block the vault was created in, since it recorded nothing before. Their signed sum is ${r.replayed} and the vault's balance reads ${r.onChain}. ${r.reconciled ? "The two agree to the wei, which is why the rows below are drawn." : "The two do not agree, so no history is drawn: a node has been seen on this chain answering part of a question with a success status, and nothing in the answer tells that apart from an empty history."}${r.refetched ? ` The logs were asked for again after a pause, and ${r.refetchDiffered ? "the second answer held a different number of logs from the first, so the node answered one question two ways" : "no second answer came back with a different number of logs"}.` : ""}`,
   contract: vaultContract(c),
-  via: `${LANE} · eth_getLogs (Transfer, both directions) + balanceOf(holder) @ the pinned block`,
+  via: `${LANE} · Transfer logs, sent and received + balanceOf(holder) @ the pinned block`,
   formula: "Σ (value where to == holder) − Σ (value where from == holder) == balanceOf(holder)",
 });
 
@@ -97,13 +97,13 @@ export const yearnVaultTimelineHorizonProv = (
   kind: "chain-derived",
   pclass: "emitted",
   source: { block: c.blockNumber },
-  summary: `Rows withheld — this address appears in ${lowerBound ? "at least " : ""}${count.toLocaleString("en-US")} \`Transfer\` logs on this vault, above the ${ceiling.toLocaleString("en-US")} this lane builds in one request. Each row costs an \`eth_getBlockByNumber\` and an archive \`convertToAssets\` at the block that row is in, so the bound measures how long a visitor would wait for the reading. The newest few are not drawn in place of the rest: a partial walk shown as a life is the one failure this gate exists to prevent, and the history check sums every row, so a page of rows could not be reconciled in any case. ${
+  summary: `Rows withheld — this address has ${lowerBound ? "at least " : ""}${count.toLocaleString("en-US")} transfers on this vault, above the ${ceiling.toLocaleString("en-US")} Rails builds for a page in one request. Each row needs its block's time and the vault's share price at that block, so the bound is set by how long a reader would wait. The newest rows are not drawn in place of the rest: a partial history shown as a whole one is the failure this check exists to prevent, and the history check sums every row, so a page of rows could not be reconciled. ${
     lowerBound
-      ? `The count is a FLOOR — the answer is at least this many and may be more: the node refused the whole-range sweep on response size — it will not answer one direction past 10,000 logs — so the range was walked in chunks from the vault's creation block and stopped the moment the running count passed the horizon. Every chunk counted answered; a chunk that refused would have been halved and both halves counted. Because the logs were never handed over whole, the balance check above could not be run on this address at all, which is why nothing is drawn at all.`
-      : "The count is exact — both sweeps returned, and the balance check ran and agreed, before this decision was made."
+      ? `The count is a floor, and the answer may be more: the node refused the whole-range query on response size (it answers at most 10,000 logs in one direction), so the range was counted in chunks from the vault's creation block, and the count stopped once it passed ${ceiling.toLocaleString("en-US")}. Every chunk counted answered; a chunk that refused would have been halved and both halves counted. Because the logs were never handed over whole, the balance check could not be run on this address, so nothing is drawn.`
+      : "The count is exact: both queries returned, and the balance check ran and agreed, before this decision was made."
   }`,
   contract: vaultContract(c),
-  via: `${LANE} · eth_getLogs (Transfer, both directions) @ the pinned block`,
+  via: `${LANE} · Transfer logs, sent and received @ the pinned block`,
 });
 
 // ── a row's figures ──────────────────────────────────────────────────────────
@@ -115,9 +115,9 @@ export const yearnVaultTimelineSharesProv = (c: VaultTimelineCoords, kind: Vault
   source: { block: c.blockNumber, txHash: c.txHash },
   verify: {
     kind: "recompute",
-    text: `Read the Transfer log at this log index in ${c.txHash ?? "this transaction"} and decode its one non-indexed word`,
+    text: `To check: open the Transfer log at this log index in ${c.txHash ?? "this transaction"} on a block explorer and read its value, the one field that is not indexed.`,
   },
-  summary: `Shares moved — the \`value\` word of this row's \`Transfer\` log${atBlock(c)}, in the share token's units. Which way it moved is decided by the two indexed addresses: ${KIND_CLAUSE[kind]}. Nothing about the row is inferred from a method name or a label — the zero address is what says whether shares were created, destroyed or handed on.`,
+  summary: `Shares moved — the number of shares this row's transfer records${atBlock(c)}, in the share token's units. Which way they moved is decided by the two addresses it names: ${KIND_CLAUSE[kind]}. The zero address says whether shares were created, destroyed or handed on; no method name or label is read.`,
   contract: vaultContract(c),
   via: `${LANE} · the Transfer log in this transaction`,
 });
@@ -127,7 +127,7 @@ export const yearnVaultTimelineBalanceAfterProv = (c: VaultTimelineCoords): Prov
   kind: "chain-derived",
   pclass: "emitted",
   source: { block: c.blockNumber, txHash: c.txHash },
-  summary: `Balance after — every one of this address's \`Transfer\` values up to and including this log, added with its sign, in share units. Not a call: it is the replay, which is the same sum the history check above compares against the vault's \`balanceOf\`. It is a position INSIDE the block, so where an address has two logs in one block only the later one equals what \`balanceOf\` would answer at the end of that block. The check compares only the final position, which is always an end-of-block figure.`,
+  summary: `Balance after — every share amount in this address's transfers up to and including this one, added with its sign, in share units. It is a replay, the same sum the history check compares with the vault's balance. It is a position inside the block: where an address has two transfers in one block, only the later one equals the balance at the end of that block. The check compares only the final position, which is always an end-of-block figure.`,
   contract: vaultContract(c),
   via: `${LANE} · replay of this address's Transfer logs`,
   formula: "Σ (value where to == holder) − Σ (value where from == holder), up to this log",
@@ -139,10 +139,10 @@ export const yearnVaultTimelineBalanceBeforeProv = (c: VaultTimelineCoords): Pro
   kind: "chain-derived",
   pclass: "emitted",
   source: { block: c.blockNumber, txHash: c.txHash },
-  summary: `Balance before — the replayed position one log earlier, which is the balance after this log less this log's signed \`value\`. Integer arithmetic on two figures this row already carries, so it is exact: no call was made at the block before this one and none is implied. A row whose \`value\` is zero — a transfer whose two ends are this same address — states the same figure on both sides, and that equality is the reading.`,
+  summary: `Balance before — the balance one transfer earlier: the balance after this transfer less this transfer's signed amount. It is integer arithmetic on two figures this row carries, so it is exact, and nothing was read at the block before. A row whose amount is zero (a transfer whose two ends are this address) states the same figure on both sides.`,
   contract: vaultContract(c),
   via: `${LANE} · replay of this address's Transfer logs`,
-  formula: "balance after this log − this log's signed value",
+  formula: "balance after this transfer − this transfer's signed amount",
 });
 
 /** The asset leg, as the ERC-4626 event stated it. */
@@ -152,9 +152,9 @@ export const yearnVaultTimelineAssetsProv = (c: VaultTimelineCoords, kind: "depo
   source: { block: c.blockNumber, txHash: c.txHash },
   verify: {
     kind: "recompute",
-    text: `Read the ERC-4626 ${kind === "deposit" ? "Deposit" : "Withdraw"} log in ${c.txHash ?? "this transaction"} and decode its first non-indexed word`,
+    text: `To check: open the ERC-4626 ${kind === "deposit" ? "Deposit" : "Withdraw"} log in ${c.txHash ?? "this transaction"} on a block explorer and read its assets value, the first field that is not indexed.`,
   },
-  summary: `${kind === "deposit" ? "Deposited" : "Withdrawn"} — the \`assets\` word of the ERC-4626 \`${kind === "deposit" ? "Deposit" : "Withdraw"}\` event the vault emitted for this address in this same transaction${atBlock(c)}, in ${asset(c)}. It is the contract's figure for what moved, matched to this row by transaction AND by share count. Where a row states no asset leg, none was emitted — a plain transfer between two holders emits none — and this page states the shares alone.`,
+  summary: `${kind === "deposit" ? "Deposited" : "Withdrawn"} — the asset amount in the ${kind === "deposit" ? "deposit" : "withdrawal"} event the vault emitted for this address in this transaction${atBlock(c)}, in ${asset(c)}. It is the contract's figure for what moved, matched to this row by transaction and by share count. Where a row states no asset amount, none was emitted (a plain transfer between two holders emits none) and this page states the shares alone.`,
   contract: vaultContract(c),
   via: `${LANE} · the ERC-4626 ${kind === "deposit" ? "Deposit" : "Withdraw"} log in this transaction`,
 });
@@ -168,7 +168,7 @@ export const yearnVaultTimelineSharePriceProv = (c: VaultTimelineCoords, shareDe
     kind: "recompute",
     text: `To check: ask any Ethereum archive node for the vault's convertToAssets(10^${shareDecimals}) at block ${c.blockNumber ?? "this row's block"}.`,
   },
-  summary: `Share price at this event — \`convertToAssets(10^${shareDecimals})\` answered${atBlock(c)}, which is the block this address's transaction landed in — a block the holder chose by transacting. What ONE whole share converted to in ${asset(c)} at that moment, answered by the vault. The exponent is the \`decimals()\` this vault reported at the page's block: a Yearn V3 vault mirrors its asset's decimals and adds no offset, so on the 6-decimal assets that make up most of this roster a fixed 10^18 would ask a question a trillion times too large and print the answer as a price. This figure says nothing about any block between this row and the next — nothing was read there, and this page draws no line through it.`,
+  summary: `Share price at this event — what one whole share converted to in ${asset(c)}${atBlock(c)}, the block this address's transaction landed in, as the vault answered. The exponent is the decimals the vault reported at the page's block: a Yearn V3 vault mirrors its asset's decimals and adds no offset, so on the 6-decimal assets that make up most of this roster a fixed 10^18 would ask a question a trillion times too large. Nothing was read between this row and the next, and this page draws no line between them.`,
   contract: vaultContract(c),
   via: `${LANE} · convertToAssets(one whole share) @ the block this row is in`,
 });
@@ -179,9 +179,9 @@ export const yearnVaultTimelineAccrualProv = (c: VaultTimelineCoords): Provenanc
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
-  summary: `Why a harvest is not a row — a Yearn V3 vault's share price moves when a STRATEGY reports: the vault records the gain and releases it into the price across the \`profitMaxUnlockTime\` seconds that follow. Those \`StrategyReported\` and \`UpdateDebt\` logs are the vault's, not this address's, and they fire on a schedule nobody here chose. They are the mechanic behind each row's share price, named in that figure's receipt, and this page reads none of them as rows. A row is something this address did.`,
+  summary: `Why a harvest is not a row — a Yearn V3 vault's share price moves when a strategy reports: the vault records the gain and releases it into the price over the profit-unlock time that follows. Those reports and debt updates are the vault's events, and they fire on a schedule this address did not choose. They are the mechanic behind each row's share price, and this page draws none of them as rows: a row is something this address did.`,
   contract: vaultContract(c),
-  via: `${LANE} · the vault's accrual mechanic`,
+  via: `${LANE} · the vault's accrual mechanic · StrategyReported and UpdateDebt logs, not drawn`,
 });
 
 // ── the reading beside the rows ──────────────────────────────────────────────
