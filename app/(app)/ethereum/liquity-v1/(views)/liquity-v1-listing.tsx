@@ -58,10 +58,6 @@ export function LiquityV1Listing({ initialItems, initialTotal, initialKey, initi
             data: r.data,
             total: r.pagination.total,
           })),
-        fetchCount: (filters) =>
-          fetchLiquityV1Positions({ ...liquityV1FiltersToFetchParams(filters, 1), limit: 1 }).then(
-            (r) => r.pagination.total,
-          ),
       })}
       initialItems={initialItems}
       initialTotal={initialTotal}

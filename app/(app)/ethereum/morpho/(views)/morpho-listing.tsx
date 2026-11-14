@@ -279,12 +279,6 @@ export function MorphoListing({ initialItems, initialTotal, initialKey, initialS
           if (aimRef.current) setUnscoped(whole ? whole.pagination.total : null);
           return r ? { data: r.data, total: r.pagination.total } : { data: [], total: 0 };
         },
-        fetchCount: market
-          ? undefined
-          : async (f) => {
-              const { params } = await aimParams(f, 1);
-              return params ? (await fetchMorphoPositions({ ...params, limit: 1, offset: 0 })).pagination.total : 0;
-            },
       })}
       onFilters={setFilters}
       // A search that is exactly one market id gets that market's page, named

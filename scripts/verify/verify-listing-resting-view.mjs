@@ -13,16 +13,19 @@
 //      for the open params — the count is never read off the page under test;
 //   2  every card on the bare directory carries an open lifecycle pill (OPEN, or
 //      DORMANT on Liquity V2, which is an open trove redeemed below the floor);
-//   3  the bare directory draws no Status chip and no Reset link — the resting
+//   3  the bare directory's Status pill (N1.10) is a default pill naming the
+//      resting view, nothing is set and no reset is offered — the resting
 //      view is a contextual default, not a selection someone made;
 //   4  the bare directory's URL stays clean: no `status=` param;
 //   5  a search that names a holder relaxes the view to every status without
 //      touching the Status facet — the holder's closed position renders, the
-//      row count matches the API's total for that holder unfiltered, and there
-//      is still no chip (nothing was selected). Same for a position-id search;
-//   6  ticking Closed is a real selection: a chip appears, the URL carries the
-//      `status=` param, the total matches the API for that set — and removing
-//      the chip returns to the contextual default and the clean URL.
+//      row count matches the API's total for that holder unfiltered, and the
+//      Status pill is neither set nor a default (nothing was selected). Same
+//      for a position-id search;
+//   6  ticking Closed in the Status pill's editor is a real selection: the pill
+//      is set, the URL carries the `status=` param, the total matches the API
+//      for that set — and the editor's "Reset to default" returns to the
+//      contextual default and the clean URL.
 //
 // Every fixture is read from the API at run time (the holder of a closed
 // position, the ids, the totals). Nothing is pinned: the live index moves by the
@@ -203,34 +206,34 @@ async function waitForTotalChange(page, rowSel, itemsPerPage, previous, tries = 
   return readTotal(page, rowSel, itemsPerPage);
 }
 
-/** The active-filter chips row: the Status SELECTION chip's text, the DEFAULT
- *  chip's text, and whether Reset is drawn at all. Since web `2a948029` (16 Oct
- *  2026) a listing that rests on open positions names that default in a
- *  removable "Status: Open" chip (`FilterDimension.defaultChip`, drawn as
- *  `[data-default-chip="status"]`); it is the list's resting view, not a
- *  selection, so it is read apart from the selection chip and never counts as
- *  one. */
+/** The Status pill (N1.10, ui-jobs 681) read as the old chip row was: the
+ *  SELECTION ("Status: Open, Closed" while the pill is set), the DEFAULT
+ *  ("Status: Open" while it rests on a default that narrows the list), and
+ *  whether a reset is offered at all — the toolbar's Clear all / Reset
+ *  (`data-pill-clear`), drawn whenever any group is off its default (from sm
+ *  it is hidden by CSS until two are, so this reads its presence, not its
+ *  visibility). The pill's words come from its main button's accessible name
+ *  ("Status Open"). */
 async function readChips(page) {
   return page.evaluate(() => {
     const toolbar = document.querySelector('[data-skel-section="listing-toolbar"]');
-    const dflt = toolbar?.querySelector('[data-default-chip="status"]');
-    const defaultChip = dflt ? (dflt.textContent ?? "").replace(/\s+/g, " ").trim() : null;
-    let text = toolbar?.innerText ?? "";
-    if (defaultChip) text = text.replace(defaultChip, "");
-    const m = /Status:[^\n]*/.exec(text);
+    const pill = toolbar?.querySelector('[data-filter-pill="Status"]');
+    const state = pill?.getAttribute("data-pill-state") ?? null;
+    const name = pill?.querySelector("[data-pill-open]")?.getAttribute("aria-label") ?? "";
+    const words = name.startsWith("Status ") ? `Status: ${name.slice("Status ".length)}` : null;
     return {
-      statusChip: m ? m[0].trim() : null,
-      defaultChip,
-      reset: /(^|\n)\s*Reset\s*(\n|$)/.test(text),
+      statusChip: state === "set" ? words : null,
+      defaultChip: state === "default" ? words : null,
+      reset: toolbar?.querySelector("[data-pill-clear]") != null,
     };
   });
 }
 
-/** The resting view's own chip and nothing selected: the default "Status: Open"
- *  chip is drawn, no selection chip, no Reset. */
+/** The resting view and nothing selected: the Status pill is the default
+ *  "Status: Open", nothing is set, no reset is offered. */
 const restsOnOpen = (chips) => chips.defaultChip === "Status: Open" && chips.statusChip == null && !chips.reset;
 const describeChips = (chips) =>
-  `${chips.defaultChip ? `default "${chips.defaultChip}"` : "no default chip"}, ${chips.statusChip ?? "no selection chip"}${chips.reset ? ", Reset drawn" : ""}`;
+  `${chips.defaultChip ? `default "${chips.defaultChip}"` : "no default pill"}, ${chips.statusChip ? `set "${chips.statusChip}"` : "nothing set"}${chips.reset ? ", reset offered" : ""}`;
 
 /** Type into the listing's search box and let the driver's 300 ms debounce push
  *  the URL. Given `rowSel`, wait for the row set to CHANGE before reading it: a
@@ -255,21 +258,34 @@ async function search(page, text, rowSel) {
   }
 }
 
-/** Tick one option in a Status-group filter panel. The facet buttons are drawn
- *  after the toolbar's own skeleton clears (Aave V4 waits on its asset universe
- *  before the row renders at all), so wait for the control rather than for a
- *  fixed interval — a click landing on the skeleton is swallowed. */
+/** Open the Status pill's editor. The pills are drawn after the toolbar's own
+ *  skeleton clears (Aave V4 waits on its asset universe before the row renders
+ *  at all), so wait for the control rather than for a fixed interval — a click
+ *  landing on the skeleton is swallowed. */
+async function openStatus(page) {
+  const statusBtn = page.locator('[data-skel-section="listing-toolbar"] [data-filter-pill="Status"] [data-pill-open]');
+  await statusBtn.first().waitFor({ state: "visible", timeout: 60000 });
+  await statusBtn.first().click();
+  await page.locator('[data-pill-editor="Status"]').first().waitFor({ state: "visible", timeout: 10000 });
+}
+
+/** Tick one option in the Status pill's editor and apply it. */
 async function tickStatus(page, label) {
-  const statusBtn = page.getByRole("button", { name: "Status", exact: true }).first();
-  await statusBtn.waitFor({ state: "visible", timeout: 60000 });
-  await statusBtn.click();
+  await openStatus(page);
   await page
-    .locator('[role="menu"] button')
+    .locator('[data-pill-editor="Status"] [data-pill-option]')
     .filter({ hasText: new RegExp(`^${label}$`) })
     .first()
     .click();
-  await page.keyboard.press("Escape");
+  await page.locator('[data-pill-editor="Status"] [data-pill-editor-apply]').first().click();
   await page.waitForTimeout(1200);
+}
+
+/** The Status pill's way back: its editor's "Reset to default" (a default
+ *  pill draws no ×). */
+async function resetStatus(page) {
+  await openStatus(page);
+  await page.locator('[data-pill-editor="Status"] [data-pill-editor-remove]').first().click();
 }
 
 const browser = await chromium.launch();
@@ -342,7 +358,7 @@ if (wants("Liquity V2")) {
     `${barePills.length} rows: ${[...new Set(barePills)].join(", ") || "none"}`,
   );
   check(
-    label("3. the bare directory names its resting view in the Status: Open chip and draws no Reset"),
+    label("3. the bare directory names its resting view in the Status: Open default pill and offers no reset"),
     restsOnOpen(bareChips),
     describeChips(bareChips),
   );
@@ -371,9 +387,9 @@ if (wants("Liquity V2")) {
       `page ${searchTotal.total} (${searchTotal.from}) vs API ${holderTotal}`,
     );
     check(
-      label("5c. relaxing on a search selects nothing — still no chip, no Reset"),
+      label("5c. relaxing on a search selects nothing — no Status pill set or defaulted, no reset"),
       searchChips.statusChip == null && !searchChips.reset,
-      searchChips.statusChip ?? (searchChips.reset ? "Reset drawn" : "neither"),
+      searchChips.statusChip ?? (searchChips.reset ? "reset offered" : "neither"),
     );
     check(
       label("5d. every rendered pill is a real lifecycle word"),
@@ -395,16 +411,16 @@ if (wants("Liquity V2")) {
       `${idPills.length} row(s): ${idPills.join(", ") || "none"}`,
     );
     check(
-      label("5f. the id search draws no chip either"),
+      label("5f. the id search sets nothing either"),
       idChips.statusChip == null && !idChips.reset,
-      idChips.statusChip ?? (idChips.reset ? "Reset drawn" : "neither"),
+      idChips.statusChip ?? (idChips.reset ? "reset offered" : "neither"),
     );
     await byId.close();
   } else {
     check(label("5e. trove-id fixture"), false, "no closed trove id in the API answer");
   }
 
-  // ── 6. ticking Closed is a selection: chip, URL param, and back again ────
+  // ── 6. ticking Closed is a selection: set pill, URL param, and back again ────
   const picked = await openListing(context, `${BASE}/ethereum/liquity-v2`);
   await tickStatus(picked, "Closed");
   const pickedUrl = await picked.evaluate(() => window.location.search);
@@ -412,9 +428,9 @@ if (wants("Liquity V2")) {
   const pickedTotal = await readTotal(picked, ROWS, PER_PAGE);
   const pickedApi = await api("/api/troves?status=active,zombie,closed&limit=1");
   check(
-    label("6a. ticking Closed draws a Status chip"),
+    label("6a. ticking Closed sets the Status pill"),
     pickedChips.statusChip != null && pickedChips.reset,
-    `${pickedChips.statusChip ?? "no chip"}${pickedChips.reset ? " + Reset" : " + no Reset"}`,
+    `${pickedChips.statusChip ?? "nothing set"}${pickedChips.reset ? " + reset offered" : " + no reset"}`,
   );
   check(
     label("6b. ticking Closed writes the status param, closed included"),
@@ -427,20 +443,20 @@ if (wants("Liquity V2")) {
     `page ${pickedTotal.total} vs API ${pickedApi.pagination?.total} for status=active,zombie,closed`,
   );
 
-  // Remove the chip → back to the contextual default and the clean URL.
-  await picked.getByRole("button", { name: "Remove Status filter" }).first().click();
+  // Reset to default → back to the contextual default and the clean URL.
+  await resetStatus(picked);
   await picked.waitForTimeout(1200);
   const clearedUrl = await picked.evaluate(() => window.location.search);
   const clearedChips = await readChips(picked);
   const clearedTotal = await readTotal(picked, ROWS, PER_PAGE);
   check(
-    label("6d. removing the chip returns to the clean URL"),
+    label("6d. Reset to default returns to the clean URL"),
     !/(^|[?&])status=/.test(clearedUrl),
     `location.search "${clearedUrl}"`,
   );
   const openAfterCleared = (await api("/api/troves?status=active,zombie&limit=1")).pagination?.total;
   check(
-    label("6e. removing the chip returns to the open resting set"),
+    label("6e. Reset to default returns to the open resting set"),
     restsOnOpen(clearedChips) && withinIndex(clearedTotal.total, openTotal, openAfterCleared),
     `${describeChips(clearedChips)}, page ${clearedTotal.total} vs API ${openTotal}→${openAfterCleared}`,
   );
@@ -537,7 +553,7 @@ if (wants("Polaris")) {
     `${barePills.length} rows: ${[...new Set(barePills)].join(", ") || "none"}`,
   );
   check(
-    label("3. the bare directory names its resting view in the Status: Open chip and draws no Reset"),
+    label("3. the bare directory names its resting view in the Status: Open default pill and offers no reset"),
     restsOnOpen(bareChips),
     describeChips(bareChips),
   );
@@ -560,7 +576,7 @@ if (wants("Polaris")) {
     const searchTotal = await readTotal(bare, ROWS, PER_PAGE);
     // Known URL noise, not a defect: the encoder compares the effective set
     // against the PAGE-level default (["open"]), so a holder search writes the
-    // relaxed set out. It round-trips and draws no chip — the shared encode rule
+    // relaxed set out. It round-trips and sets no pill — the shared encode rule
     // (lib/shared/list-filter.ts:99-110) is deliberately page-level.
     info(label("5. after typing the holder"), `location.search "${searchUrl}"`);
     check(
@@ -574,9 +590,9 @@ if (wants("Polaris")) {
       `page ${searchTotal.total} (${searchTotal.from}) vs API ${closedHolder.total}`,
     );
     check(
-      label("5c. relaxing on a search selects nothing — still no chip, no Reset"),
+      label("5c. relaxing on a search selects nothing — no Status pill set or defaulted, no reset"),
       searchChips.statusChip == null && !searchChips.reset,
-      searchChips.statusChip ?? (searchChips.reset ? "Reset drawn" : "neither"),
+      searchChips.statusChip ?? (searchChips.reset ? "reset offered" : "neither"),
     );
     check(
       label("5d. every rendered pill is a real lifecycle word"),
@@ -612,9 +628,9 @@ if (wants("Polaris")) {
       `usdp/${closedId} pill ${idPills[endedIdx] ?? "not rendered"}`,
     );
     check(
-      label("5g. the id search draws no chip either"),
+      label("5g. the id search sets nothing either"),
       idChips.statusChip == null && !idChips.reset,
-      idChips.statusChip ?? (idChips.reset ? "Reset drawn" : "neither"),
+      idChips.statusChip ?? (idChips.reset ? "reset offered" : "neither"),
     );
     await byId.close();
   } else {
@@ -647,7 +663,7 @@ if (wants("Polaris")) {
     );
   }
 
-  // ── 6. ticking Closed is a selection: chip, URL param, and back again ────
+  // ── 6. ticking Closed is a selection: set pill, URL param, and back again ────
   const picked = await openListing(context, `${BASE}/sepolia/polaris`);
   await tickStatus(picked, "Closed");
   const pickedUrl = await picked.evaluate(() => window.location.search);
@@ -657,9 +673,9 @@ if (wants("Polaris")) {
   // open + closed, and that is the set the index is asked for.
   const pickedApi = await api("/api/polaris/positions?status=open,closed&limit=1");
   check(
-    label("6a. ticking Closed draws a Status chip"),
+    label("6a. ticking Closed sets the Status pill"),
     pickedChips.statusChip != null && pickedChips.reset,
-    `${pickedChips.statusChip ?? "no chip"}${pickedChips.reset ? " + Reset" : " + no Reset"}`,
+    `${pickedChips.statusChip ?? "nothing set"}${pickedChips.reset ? " + reset offered" : " + no reset"}`,
   );
   check(
     label("6b. ticking Closed writes the status param, closed included"),
@@ -672,20 +688,20 @@ if (wants("Polaris")) {
     `page ${pickedTotal.total} vs API ${pickedApi.pagination?.total} for status=open,closed`,
   );
 
-  // Remove the chip → back to the contextual default and the clean URL.
-  await picked.getByRole("button", { name: "Remove Status filter" }).first().click();
+  // Reset to default → back to the contextual default and the clean URL.
+  await resetStatus(picked);
   await picked.waitForTimeout(1200);
   const clearedUrl = await picked.evaluate(() => window.location.search);
   const clearedChips = await readChips(picked);
   const clearedTotal = await readTotal(picked, ROWS, PER_PAGE);
   check(
-    label("6d. removing the chip returns to the clean URL"),
+    label("6d. Reset to default returns to the clean URL"),
     !/(^|[?&])status=/.test(clearedUrl),
     `location.search "${clearedUrl}"`,
   );
   const openAfterCleared = (await api("/api/polaris/positions?status=open&limit=1")).pagination?.total;
   check(
-    label("6e. removing the chip returns to the open resting set"),
+    label("6e. Reset to default returns to the open resting set"),
     restsOnOpen(clearedChips) && withinIndex(clearedTotal.total, openTotal, openAfterCleared),
     `${describeChips(clearedChips)}, page ${clearedTotal.total} vs API ${openTotal}→${openAfterCleared}`,
   );
@@ -856,7 +872,7 @@ async function runRestingViewSection(spec) {
     `${barePills.length} rows: ${[...new Set(barePills)].join(", ") || "none"}`,
   );
   check(
-    label("3. the bare directory names its resting view in the Status: Open chip and draws no Reset"),
+    label("3. the bare directory names its resting view in the Status: Open default pill and offers no reset"),
     restsOnOpen(bareChips),
     describeChips(bareChips),
   );
@@ -887,9 +903,9 @@ async function runRestingViewSection(spec) {
       `page ${searchTotal.total} (${searchTotal.from}) vs index ${holder.total}`,
     );
     check(
-      label("5c. relaxing on a search selects nothing — still no chip, no Reset"),
+      label("5c. relaxing on a search selects nothing — no Status pill set or defaulted, no reset"),
       searchChips.statusChip == null && !searchChips.reset,
-      searchChips.statusChip ?? (searchChips.reset ? "Reset drawn" : "neither"),
+      searchChips.statusChip ?? (searchChips.reset ? "reset offered" : "neither"),
     );
     check(
       label("5d. every rendered pill is a real lifecycle word"),
@@ -923,9 +939,9 @@ async function runRestingViewSection(spec) {
         [...new Set(idPills)].join(", ") || "none",
       );
       check(
-        label("5g. the id search draws no chip either"),
+        label("5g. the id search sets nothing either"),
         idChips.statusChip == null && !idChips.reset,
-        idChips.statusChip ?? (idChips.reset ? "Reset drawn" : "neither"),
+        idChips.statusChip ?? (idChips.reset ? "reset offered" : "neither"),
       );
       await byId.close();
     }
@@ -979,9 +995,9 @@ async function runRestingViewSection(spec) {
   const pickedUrl = await picked.evaluate(() => window.location.search);
   const pickedChips = await readChips(picked);
   check(
-    label(`6a. ticking ${spec.ticked.label} draws a Status chip`),
+    label(`6a. ticking ${spec.ticked.label} sets the Status pill`),
     pickedChips.statusChip != null && pickedChips.reset,
-    `${pickedChips.statusChip ?? "no chip"}${pickedChips.reset ? " + Reset" : " + no Reset"}`,
+    `${pickedChips.statusChip ?? "nothing set"}${pickedChips.reset ? " + reset offered" : " + no reset"}`,
   );
   check(
     label(`6b. ticking ${spec.ticked.label} writes the status param`),
@@ -994,19 +1010,19 @@ async function runRestingViewSection(spec) {
     `page ${pickedTotal.total} vs index ${tickedBefore}→${tickedAfter} for ${spec.ticked.query || "no status param"}`,
   );
 
-  // Remove the chip → back to the contextual default and the clean URL.
-  await picked.getByRole("button", { name: "Remove Status filter" }).first().click();
+  // Reset to default → back to the contextual default and the clean URL.
+  await resetStatus(picked);
   const clearedTotal = await waitForTotalChange(picked, ROWS, PER_PAGE, pickedTotal.total);
   const clearedIndex = await indexTotal(spec.api, spec.open);
   const clearedUrl = await picked.evaluate(() => window.location.search);
   const clearedChips = await readChips(picked);
   check(
-    label("6d. removing the chip returns to the clean URL"),
+    label("6d. Reset to default returns to the clean URL"),
     !/(^|[?&])status=/.test(clearedUrl),
     `location.search "${clearedUrl}"`,
   );
   check(
-    label("6e. removing the chip returns to the open resting set"),
+    label("6e. Reset to default returns to the open resting set"),
     restsOnOpen(clearedChips) && withinIndex(clearedTotal.total, openAfter, clearedIndex),
     `${describeChips(clearedChips)}, page ${clearedTotal.total} vs index ${openAfter}→${clearedIndex}`,
   );
@@ -1395,10 +1411,10 @@ if (wants("PWN")) {
       barePills.every((p) => p != null && (OPEN_PILLS_ROSTER.has(p) || p === "DEFAULTED · UNCLAIMED")),
     `${barePills.length} rows: ${[...new Set(barePills)].join(", ") || "none"}`,
   );
-  // The resting view names its default in the "Status: in escrow" chip (lib/pwn/list-filter-dimensions.tsx
-  // `defaultChip`, removable since web `2a948029`): no selection, no Reset, nothing in the URL.
+  // The resting view names its default in the "Status: in escrow" default pill (lib/pwn/list-filter-dimensions.tsx
+  // `defaultChip`; N1.10 since ui-jobs 681): no selection, no reset offered, nothing in the URL.
   check(
-    label('3. the bare directory draws the default "Status: in escrow" chip and no Reset'),
+    label('3. the bare directory draws the default "Status: in escrow" pill and offers no reset'),
     bareChips.defaultChip === "Status: in escrow" && bareChips.statusChip == null && !bareChips.reset,
     describeChips(bareChips),
   );
@@ -1442,9 +1458,9 @@ if (wants("PWN")) {
       `page ${searchPills.length} vs index ${theirs.length}`,
     );
     check(
-      label("5c. relaxing on a search selects nothing — still no chip, no Reset"),
+      label("5c. relaxing on a search selects nothing — no Status pill set or defaulted, no reset"),
       searchChips.statusChip == null && !searchChips.reset,
-      searchChips.statusChip ?? (searchChips.reset ? "Reset drawn" : "neither"),
+      searchChips.statusChip ?? (searchChips.reset ? "reset offered" : "neither"),
     );
   } else {
     check(label("5. party fixture"), false, "no settled loan with a named party in the index's answer");
@@ -1472,9 +1488,9 @@ if (wants("PWN")) {
       [...new Set(idPills)].join(", ") || "none",
     );
     check(
-      label("5f. the id search draws no chip either"),
+      label("5f. the id search sets nothing either"),
       idChips.statusChip == null && !idChips.reset,
-      idChips.statusChip ?? (idChips.reset ? "Reset drawn" : "neither"),
+      idChips.statusChip ?? (idChips.reset ? "reset offered" : "neither"),
     );
     await byId.close();
   } else {
@@ -1493,9 +1509,9 @@ if (wants("PWN")) {
   const now = await allLoans();
   const expectOpenRepaid = now.filter((r) => r.status === "open" || r.status === "repaid").length;
   check(
-    label("6a. ticking Repaid draws a Status chip"),
+    label("6a. ticking Repaid sets the Status pill"),
     pickedChips.statusChip != null && pickedChips.reset,
-    `${pickedChips.statusChip ?? "no chip"}${pickedChips.reset ? " + Reset" : " + no Reset"}`,
+    `${pickedChips.statusChip ?? "nothing set"}${pickedChips.reset ? " + reset offered" : " + no reset"}`,
   );
   check(
     label("6b. ticking Repaid writes the status param"),
@@ -1508,18 +1524,18 @@ if (wants("PWN")) {
     `page ${pickedPills.length} vs index ${expectOpenRepaid} (open + repaid) of ${now.length} loans`,
   );
 
-  await picked.getByRole("button", { name: "Remove Status filter" }).first().click();
+  await resetStatus(picked);
   await waitForTotalChange(picked, ROWS, PER_PAGE, pickedPills.length);
   const clearedUrl = await picked.evaluate(() => window.location.search);
   const clearedChips = await readChips(picked);
   const clearedPills = await readPills(picked, ROWS);
   check(
-    label("6d. removing the chip returns to the clean URL"),
+    label("6d. Reset to default returns to the clean URL"),
     !/(^|[?&])status=/.test(clearedUrl),
     `location.search "${clearedUrl}"`,
   );
   check(
-    label("6e. removing the chip returns to the open resting set"),
+    label("6e. Reset to default returns to the open resting set"),
     clearedChips.defaultChip === "Status: in escrow" &&
       clearedChips.statusChip == null &&
       withinIndex(clearedPills.length, openAfter, now.filter((r) => r.status === "open").length),

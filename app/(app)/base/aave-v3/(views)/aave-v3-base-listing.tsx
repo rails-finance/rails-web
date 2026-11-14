@@ -59,8 +59,6 @@ export function AaveV3BaseListing({ initialItems, initialTotal, initialKey, init
             data: r.rows,
             total: r.total,
           })),
-        fetchCount: (filters) =>
-          fetchAaveV3Positions({ ...aaveV3BaseFiltersToFetchParams(filters, 1), limit: 1 }).then((r) => r.total),
       })}
       initialItems={initialItems}
       initialTotal={initialTotal}

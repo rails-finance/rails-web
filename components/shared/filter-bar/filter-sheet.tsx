@@ -1,8 +1,10 @@
 "use client";
 
 /**
- * FilterSheet — the listing toolbar's facets below sm (ui-jobs 544): a Filters
- * button carrying the count of active filters, opening a full-screen sheet.
+ * FilterSheet — every filter at once below sm (ui-jobs 544): the Filters
+ * button at the head of the pill row (a sliders glyph and, while any group is
+ * set, a badge with how many; ui-jobs 681), opening a bottom sheet over a
+ * scrim.
  * The sheet lists one row per dimension, its name at the left and the current
  * choice with a chevron at the right; a row opens that dimension's options
  * (multi, or single with three or more) as a sub-view with its own back
@@ -10,8 +12,9 @@
  * is on or off, a switch in its row; one with two options is a segmented
  * "Any / A / B" under its name ("A / B" where the dimension rests on one of
  * them, a preset); a range draws its slider under its name.
- * The footer holds "Clear filters" (every dimension back to its default) and
- * the primary button with the count the edits would give.
+ * The footer holds "Reset" (every dimension back to its default) and
+ * the primary button: the count the edits would give where the listing counts
+ * a draft from rows it holds, else "Apply".
  *
  * Edits are staged: the sheet holds a draft of the filters, and only the
  * primary button writes it, through the same `onChange` the desktop panels
@@ -44,7 +47,10 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react";
-import { CTRL_GHOST, CTRL_OFF, CTRL_ON, RESET_LINK } from "@/lib/shared/ui-grammar";
+import { CTRL_GHOST, CTRL_OFF, RESET_LINK } from "@/lib/shared/ui-grammar";
+import { PILL_NEUTRAL } from "@/components/shared/filter-bar/filter-pill";
+import { PRIMARY_BUTTON } from "@/components/shared/filter-bar/pill-editor";
+import { activeGroupCount, groupDimensions } from "@/components/shared/filter-bar/pill-model";
 import {
   type FilterDimension,
   type FilterOptionDef,
@@ -70,8 +76,8 @@ export interface FilterSheetProps<F> {
   /** True while the listing re-reads after an edit: the count is the last
    *  settled one until it lands. */
   countPending?: boolean;
-  /** The count a draft would give, with the listing's own filtering. Without
-   *  it an edited draft's button reads "Show results". */
+  /** The count a draft would give, from rows the listing holds. Without it
+   *  the button reads "Apply". */
   countFor?: (draft: F) => number | Promise<number>;
   /** The noun for a draft, where the selection names it ("open positions"
    *  while Status rests on Open). Without it, `count.noun`. */
@@ -129,8 +135,8 @@ export function FilterSheet<F>({
 }: FilterSheetProps<F>) {
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const dims = dimensions.filter((d) => !d.available || d.available(filters));
-  const active = dims.filter((d) => isDimensionActive(d, filters)).length;
+  // The badge counts what the pills show set: groups off their default.
+  const active = activeGroupCount(groupDimensions(dimensions, filters), filters);
 
   return (
     <>
@@ -143,18 +149,17 @@ export function FilterSheet<F>({
           window.history.pushState({ [SHEET_STATE]: "list" }, "");
           setOpen(true);
         }}
-        className={`${CTRL_GHOST} ${active > 0 ? CTRL_ON : CTRL_OFF} sm:hidden h-8 gap-1.5 px-3 rounded-md text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500`}
+        className={`${PILL_NEUTRAL} sm:hidden inline-flex shrink-0 items-center h-11 gap-2 px-3.5 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500`}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-label={active > 0 ? `Filters, ${active} active` : "Filters"}
         data-filter-sheet-open=""
         data-anatomy="N1.8.1"
       >
-        <SlidersHorizontal className="w-3.5 h-3.5" aria-hidden="true" />
-        <span>Filters</span>
+        <SlidersHorizontal className="w-[18px] h-[18px]" aria-hidden="true" />
         {active > 0 && (
           <span
-            className="inline-flex min-w-4 h-4 px-1 items-center justify-center rounded-full bg-teal-700 text-white dark:bg-teal-400 dark:text-rb-900 text-[10px] font-bold tabular-nums"
+            className="inline-flex min-w-5 h-5 px-1 items-center justify-center rounded-full bg-teal-700 text-white dark:bg-teal-400 dark:text-rb-900 text-xs font-bold tabular-nums"
             aria-hidden="true"
             data-filter-sheet-count={active}
             data-prov-exempt
@@ -385,9 +390,9 @@ function Sheet<F>({
   const pending = dirty ? draftPending : countPending;
   const noun = count ? (dirty && nounFor ? nounFor(filters) : count.noun) : "";
   const showLabel =
-    count && shown != null
+    count && shown != null && (countFor || !dirty)
       ? `Show ${shown.toLocaleString("en-US")} ${shown === 1 ? noun.replace(/s$/, "") : noun}`
-      : "Show results";
+      : "Apply";
   const apply = () => {
     flushRanges();
     closeSheet(draftRef.current !== applied ? draftRef.current : undefined);
@@ -398,115 +403,122 @@ function Sheet<F>({
   if (typeof document === "undefined") return null;
 
   return createPortal(
-    <div
-      ref={panelRef}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="filter-sheet-title"
-      className="fixed inset-0 z-[var(--z-modal)] flex flex-col bg-background text-foreground sm:hidden"
-      data-filter-sheet=""
-      data-anatomy="N1.8"
-    >
+    <div className="fixed inset-0 z-[var(--z-modal)] flex flex-col justify-end sm:hidden">
+      {/* The scrim: a press on it closes the sheet and drops the draft. */}
+      <div className="absolute inset-0 bg-black/50" onClick={() => closeSheet()} aria-hidden="true" />
       <div
-        className="flex h-14 shrink-0 items-center gap-1 border-b border-rb-200 dark:border-rb-700 px-2"
-        data-anatomy="N1.8.2"
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="filter-sheet-title"
+        className="relative flex max-h-[88vh] flex-col rounded-t-2xl bg-raised text-foreground shadow-xl dark:bg-rb-900"
+        data-filter-sheet=""
+        data-anatomy="N1.8"
       >
-        <button
-          type="button"
-          onClick={() => {
-            if (openDim) leaveSub();
-            else closeSheet();
-          }}
-          className={`${CTRL_GHOST} ${CTRL_OFF} size-10 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500`}
-          aria-label={openDim ? "Back to filters" : "Close filters"}
-          data-filter-sheet-back=""
+        <div className="flex h-5 shrink-0 items-center justify-center" aria-hidden="true">
+          <span className="h-1 w-10 rounded-full bg-rb-300 dark:bg-rb-600" />
+        </div>
+        <div
+          className="flex h-12 shrink-0 items-center gap-1 border-b border-rb-200 dark:border-rb-700 px-2"
+          data-anatomy="N1.8.2"
         >
-          <ChevronLeft className="w-5 h-5" aria-hidden="true" />
-        </button>
-        <h2 id="filter-sheet-title" className="flex-1 truncate text-base font-semibold">
-          {title}
-        </h2>
-        {openDim && isDimensionActive(openDim, filters) && (
           <button
             type="button"
-            onClick={() => onChange(resetDim(openDim, filters))}
-            className={`${RESET_LINK} px-3 py-2`}
+            onClick={() => {
+              if (openDim) leaveSub();
+              else closeSheet();
+            }}
+            className={`${CTRL_GHOST} ${CTRL_OFF} size-10 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500`}
+            aria-label={openDim ? "Back to filters" : "Close filters"}
+            data-filter-sheet-back=""
+          >
+            <ChevronLeft className="w-5 h-5" aria-hidden="true" />
+          </button>
+          <h2 id="filter-sheet-title" className="flex-1 truncate text-base font-semibold">
+            {title}
+          </h2>
+          {openDim && isDimensionActive(openDim, filters) && (
+            <button
+              type="button"
+              onClick={() => onChange(resetDim(openDim, filters))}
+              className={`${RESET_LINK} px-3 py-2`}
+            >
+              Reset
+            </button>
+          )}
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          {openDim ? (
+            <SwipeBack key={openDim.id} onBack={leaveSub}>
+              <DimensionView dim={openDim} filters={filters} onChange={onChange} onPicked={leaveSub} />
+            </SwipeBack>
+          ) : (
+            <ul className="px-4">
+              {dims.map((dim) => (
+                <li key={dim.id} className="border-b border-rb-200 dark:border-rb-800">
+                  {isToggle(dim) ? (
+                    <ToggleRow dim={dim} filters={filters} onChange={onChange} />
+                  ) : isSegmented(dim) ? (
+                    <SegmentRow dim={dim} filters={filters} onChange={onChange} />
+                  ) : dim.cardinality === "range" ? (
+                    <RangeRow
+                      dim={dim}
+                      filters={filters}
+                      // A delayed slider write lands on the newest draft, so it
+                      // never undoes an edit made in another row meanwhile.
+                      onChange={(next) => onChange(dim.set(draftRef.current, dim.get(next)))}
+                      flushRef={flushFor(dim.id)}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => openSub(dim.id)}
+                      className="flex w-full min-h-14 items-center gap-3 py-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                      data-filter-sheet-row={dim.id}
+                      data-anatomy="N1.8.3"
+                    >
+                      <span className="text-sm">{dim.label}</span>
+                      <span
+                        className={`ml-auto truncate text-sm ${isDimensionActive(dim, filters) ? "text-foreground font-medium" : "text-rb-500"}`}
+                      >
+                        {currentChoice(dim, filters)}
+                      </span>
+                      <ChevronRight className="w-4 h-4 shrink-0 text-rb-500" aria-hidden="true" />
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div
+          className="flex shrink-0 gap-3 border-t border-rb-200 dark:border-rb-700 px-4 pt-3"
+          data-anatomy="N1.8.8"
+          style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}
+        >
+          <button
+            type="button"
+            onClick={clearAll}
+            disabled={!anyActive}
+            className="flex-1 h-12 rounded-lg border border-rb-300 dark:border-rb-600 text-sm font-semibold text-foreground transition-colors hover:bg-rb-100 dark:hover:bg-rb-800 disabled:cursor-default disabled:text-rb-400 disabled:hover:bg-transparent dark:disabled:text-rb-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            data-filter-sheet-clear=""
           >
             Reset
           </button>
-        )}
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        {openDim ? (
-          <SwipeBack key={openDim.id} onBack={leaveSub}>
-            <DimensionView dim={openDim} filters={filters} onChange={onChange} onPicked={leaveSub} />
-          </SwipeBack>
-        ) : (
-          <ul className="px-4">
-            {dims.map((dim) => (
-              <li key={dim.id} className="border-b border-rb-200 dark:border-rb-800">
-                {isToggle(dim) ? (
-                  <ToggleRow dim={dim} filters={filters} onChange={onChange} />
-                ) : isSegmented(dim) ? (
-                  <SegmentRow dim={dim} filters={filters} onChange={onChange} />
-                ) : dim.cardinality === "range" ? (
-                  <RangeRow
-                    dim={dim}
-                    filters={filters}
-                    // A delayed slider write lands on the newest draft, so it
-                    // never undoes an edit made in another row meanwhile.
-                    onChange={(next) => onChange(dim.set(draftRef.current, dim.get(next)))}
-                    flushRef={flushFor(dim.id)}
-                  />
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => openSub(dim.id)}
-                    className="flex w-full min-h-14 items-center gap-3 py-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                    data-filter-sheet-row={dim.id}
-                    data-anatomy="N1.8.3"
-                  >
-                    <span className="text-sm">{dim.label}</span>
-                    <span
-                      className={`ml-auto truncate text-sm ${isDimensionActive(dim, filters) ? "text-foreground font-medium" : "text-rb-500"}`}
-                    >
-                      {currentChoice(dim, filters)}
-                    </span>
-                    <ChevronRight className="w-4 h-4 shrink-0 text-rb-500" aria-hidden="true" />
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      <div
-        className="flex shrink-0 gap-3 border-t border-rb-200 dark:border-rb-700 px-4 pt-3"
-        data-anatomy="N1.8.8"
-        style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}
-      >
-        <button
-          type="button"
-          onClick={clearAll}
-          disabled={!anyActive}
-          className="flex-1 h-12 rounded-lg border border-rb-300 dark:border-rb-600 text-sm font-semibold text-foreground transition-colors hover:bg-rb-100 dark:hover:bg-rb-800 disabled:cursor-default disabled:text-rb-400 disabled:hover:bg-transparent dark:disabled:text-rb-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-          data-filter-sheet-clear=""
-        >
-          Clear filters
-        </button>
-        <button
-          type="button"
-          onClick={apply}
-          className="flex-1 h-12 rounded-lg bg-teal-700 text-sm font-semibold text-white transition-colors hover:bg-teal-800 dark:bg-teal-400 dark:text-rb-900 dark:hover:bg-teal-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-          aria-busy={pending || undefined}
-          data-filter-sheet-show={shown ?? ""}
-        >
-          <span aria-live="polite" className={`tabular-nums transition-opacity ${pending ? "opacity-60" : ""}`}>
-            {showLabel}
-          </span>
-        </button>
+          <button
+            type="button"
+            onClick={apply}
+            className={`flex-1 h-12 text-sm ${PRIMARY_BUTTON}`}
+            aria-busy={pending || undefined}
+            data-filter-sheet-show={shown ?? ""}
+          >
+            <span aria-live="polite" className={`tabular-nums transition-opacity ${pending ? "opacity-60" : ""}`}>
+              {showLabel}
+            </span>
+          </button>
+        </div>
       </div>
     </div>,
     document.body,
