@@ -86,10 +86,10 @@ export function moonwellShareCardModel(
     const supplyLines = position.supplies.map((r) => ({ address: r.address, amount: supplyAmount(r) }));
     const collUsd = totalUsd(position, supplyLines);
     if (collUsd != null) {
-      stats.push({ label: CARD_VOCAB.collateral, value: formatUsd(collUsd) });
+      stats.push({ label: "Supplied", value: formatUsd(collUsd) });
     } else {
       const top = largestSupply(position.supplies);
-      if (top) stats.push({ label: CARD_VOCAB.collateral, value: `${formatCompact(top.amount)} ${top.symbol}` });
+      if (top) stats.push({ label: "Supplied", value: `${formatCompact(top.amount)} ${top.symbol}` });
     }
     const debtUsd = totalUsd(position, position.borrows);
     if (debtUsd != null) {

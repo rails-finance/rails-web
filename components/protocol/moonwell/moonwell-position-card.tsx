@@ -61,6 +61,9 @@ import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
 import { TokenFigure } from "@/components/shared/token-figure";
 import { PanelFigure } from "@/components/shared/position-card-panel";
 
+/** The headline over every supplied market (ui-jobs 644, as Compound V2's in 631). */
+const SUPPLIED = "Supplied";
+
 export interface MoonwellPositionView {
   wallet: string;
   /** "unread" is a listing row whose account has not been read from the
@@ -378,10 +381,11 @@ export function useMoonwellCardSlots({
     heads = [
       {
         id: "collateral",
-        label: CARD_VOCAB.collateral,
+        // Every supplied market, entered or not: the docs' supplied balance.
+        label: SUPPLIED,
         value:
           vc.supplies.length === 0 ? null : collUsd != null ? (
-            <UsdFigure usd={collUsd} what="Collateral" form="compact" marketBy={marketBy} />
+            <UsdFigure usd={collUsd} what={SUPPLIED} form="compact" marketBy={marketBy} />
           ) : (
             <AmountStack>
               {collDust.lines.map((r) => (
@@ -401,8 +405,7 @@ export function useMoonwellCardSlots({
           vc.supplies.length > 0 ? (
             <InlineAssetCluster assets={suppliesShown.map((r) => ({ symbol: r.symbol, address: r.address }))} />
           ) : undefined,
-        total:
-          collUsd != null ? { usd: collUsd, info: stampServerRead(dep.card.usd("Collateral"), marketBy) } : undefined,
+        total: collUsd != null ? { usd: collUsd, info: stampServerRead(dep.card.usd(SUPPLIED), marketBy) } : undefined,
       },
       {
         id: "debt",
@@ -453,7 +456,7 @@ export function useMoonwellCardSlots({
         usd:
           collUsd != null ? (
             <span className="font-bold text-green-400">
-              <UsdFigure usd={collUsd} what="Collateral" form="cents" marketBy={marketBy} />
+              <UsdFigure usd={collUsd} what={SUPPLIED} form="cents" marketBy={marketBy} />
             </span>
           ) : null,
       };
@@ -661,11 +664,11 @@ export function useMoonwellCardSlots({
   // The headlines' read-mores on a detail card.
   const HEAD_TIP = {
     collateral:
-      "What the account supplies to Moonwell's markets, in dollars at Moonwell's oracle prices, earning each market's supply rate. The markets entered as collateral back its borrowing.",
+      "What the account supplies to Moonwell's markets, entered or not, in dollars at Moonwell's oracle prices, earning each market's supply APY. Only the markets entered as collateral back its borrowing.",
     debt: "What the account owes Moonwell's markets, in dollars at Moonwell's oracle prices, including the interest accrued at each market's borrow rate.",
   };
   const tipped = (h: PositionCardHead): PositionCardHead =>
-    h.labelTip || !(h.label === CARD_VOCAB.collateral || h.label === CARD_VOCAB.debt)
+    h.labelTip || !(h.id === "collateral" || h.id === "debt")
       ? h
       : { ...h, labelTip: h.id === "debt" ? HEAD_TIP.debt : HEAD_TIP.collateral };
   const headsWithRows = heads
