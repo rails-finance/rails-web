@@ -248,21 +248,31 @@ export function MorphoBaseVaultTimeline({
             This address has {timeline.coverage.logCountIsLowerBound ? "at least " : ""}
             {n(withheld)} of its own share transfers on this vault
           </Prov>
-          , more than Rails keeps a stored history for.{" "}
-          {timeline.coverage.logCountIsLowerBound ? (
+          {withheldBasisOf(timeline.coverage) === "unchecked" ? (
             <>
-              The count is a floor rather than a census: the endpoint would not answer this address&rsquo;s whole sweep
-              at once, so the range was walked in chunks and the walk stopped as soon as it passed what this page draws.
-              Because the logs were never read whole, the balance check below the rows could not be run on this address
-              at all, and nothing about this address is kept in Rails&rsquo;s store of chain readings. A floor is a
-              statement that the answer is at least this, and storing it would turn it into a statement that it is this.
+              . The balance check did not run: the query for this address&rsquo;s transfers failed, so the count was
+              made in chunks and nothing confirmed it.{" "}
             </>
           ) : (
             <>
-              The whole history was read and it reconciles against the vault&rsquo;s own <code>balanceOf</code>; what is
-              withheld is the drawing of it.
+              , more than Rails keeps a stored history for.{" "}
+              {timeline.coverage.logCountIsLowerBound ? (
+                <>
+                  The count is a floor rather than a census: the endpoint would not answer this address&rsquo;s whole
+                  sweep at once, so the range was walked in chunks and the walk stopped as soon as it passed what this
+                  page draws. Because the logs were never read whole, the balance check below the rows could not be run
+                  on this address at all, and nothing about this address is kept in Rails&rsquo;s store of chain
+                  readings. A floor is a statement that the answer is at least this, and storing it would turn it into a
+                  statement that it is this.
+                </>
+              ) : (
+                <>
+                  The whole history was read and it reconciles against the vault&rsquo;s own <code>balanceOf</code>;
+                  what is withheld is the drawing of it.
+                </>
+              )}{" "}
             </>
-          )}{" "}
+          )}
           The newest rows are not shown in place of the rest. A part of a life shown as the whole of one is the failure
           this check exists to prevent.
         </p>
