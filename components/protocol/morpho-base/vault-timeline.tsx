@@ -74,7 +74,6 @@ import { vaultExplorer } from "@/lib/vaults/explorer";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { boundaryFromVaultDrawn } from "@/lib/shared/timeline-boundary";
 import { AAVE_VAULT_TIMELINE_KEY, aaveVaultTimelineRuns, vaultEventToActivity } from "@/lib/aave-vaults/timeline-runs";
-import { BASE_CHAIN_ID, chainMeta } from "@/lib/shared/chains";
 import { vaultTermsNotes, type MarketNote } from "@/lib/shared/market-note";
 import { MORPHO_BASE_CHAIN_ID } from "@/lib/morpho-base/asset-catalog";
 import {
@@ -98,6 +97,7 @@ import {
   type VaultHolderTimeline,
   type VaultNote,
   type VaultTimelineCoords,
+  withheldBasisOf,
 } from "@/lib/shared/vault-holder-timeline";
 import { NotLoaded } from "@/components/shared/not-loaded";
 import { vaultEventContent } from "@/lib/shared/learn-more-content";
@@ -242,10 +242,7 @@ export function MorphoBaseVaultTimeline({
               coords,
               withheld,
               tailMaxRows(chainId),
-              timeline.coverage.logCountIsLowerBound,
-              // On the floor path no gate ran, so the lane is the chain's own logs lane by name.
-              reconcile?.lane ??
-                (chainId === BASE_CHAIN_ID ? chainMeta(BASE_CHAIN_ID).logsRpcEnv : "ETHEREUM_LOGS_RPC_URL"),
+              withheldBasisOf(timeline.coverage),
             )}
           >
             This address has {timeline.coverage.logCountIsLowerBound ? "at least " : ""}
@@ -425,7 +422,6 @@ export function MorphoBaseVaultTimeline({
  *  the block the two were reconciled at. */
 function HistoryLine({ coords, timeline }: { coords: VaultTimelineCoords; timeline: VaultHolderTimeline }) {
   const h = timeline.history;
-  const lane = timeline.reconcile?.lane ?? "";
   if (!h || timeline.unread || !timeline.reconcile) return null;
   // The line is about the rows this page DREW. A gate that failed, a life above
   // what the store holds, and a life still being built all draw none, and each
@@ -440,7 +436,7 @@ function HistoryLine({ coords, timeline }: { coords: VaultTimelineCoords; timeli
       data-history-tail-rows={h.tailRows}
       data-history-head-rows={h.headRows}
     >
-      <Prov info={morphoVaultTimelineStoredRowsProv(coords, h, lane)}>
+      <Prov info={morphoVaultTimelineStoredRowsProv(coords, h)}>
         {h.source === "stored+head"
           ? `${n(h.tailRows)} rows at or below block ${n(h.cut ?? 0)} from Rails's store of chain readings, ${n(h.headRows)} rows above it read now`
           : `Every row read on this request`}
