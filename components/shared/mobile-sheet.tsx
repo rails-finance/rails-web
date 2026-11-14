@@ -17,7 +17,14 @@
 //     non-modal sheet Apple and Material both reserve for filters that apply
 //     as you go, as opposed to the Apply-button modal a commerce filter uses.
 
-import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type MutableRefObject,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { OVERLAY_HEADING, RESET_LINK } from "@/lib/shared/ui-grammar";
@@ -39,8 +46,24 @@ interface MobileSheetProps {
    *  handle alone, for a sheet whose header holds its own controls in that
    *  corner (a filter pill's editor, N1.11). */
   dismiss?: boolean | "handle";
+  /** The sheet takes a history entry at the same URL while open, so the
+   *  browser's Back (Android's back gesture) closes it. Its own controls leave
+   *  through that entry. Opt-in: a menu whose rows navigate must not step back
+   *  under its own navigation. */
+  backCloses?: boolean;
+  /** Set to a function that closes the sheet as its own controls do (slide
+   *  down, history entry gone) and then runs `after`: a caller that writes the
+   *  URL on its way out (a filter pill's Apply) writes it after the entry has
+   *  left. */
+  closeRef?: MutableRefObject<((after?: () => void) => void) | null>;
   children: React.ReactNode;
 }
+
+/** The `history.state` key of a sheet's entry (`backCloses`). */
+const SHEET_ENTRY = "mobileSheet";
+const ownsTop = () => (window.history.state as Record<string, unknown> | null)?.[SHEET_ENTRY] === true;
+
+const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
 
 /** The pinned header of a LIVE filter sheet: the menu's name in the overlay
  *  heading register, Reset when the caller says there is something to reset,
@@ -85,7 +108,16 @@ export function MobileSheetFilterHeader({
 /** How far, in px, the handle must be dragged down to close the sheet. */
 const DRAG_CLOSE_PX = 80;
 
-export function MobileSheet({ label, onClose, mode = "modal", header, dismiss = false, children }: MobileSheetProps) {
+export function MobileSheet({
+  label,
+  onClose,
+  mode = "modal",
+  header,
+  dismiss = false,
+  backCloses = false,
+  closeRef,
+  children,
+}: MobileSheetProps) {
   const [visible, setVisible] = useState(false);
   // The handle's drag: how far down the sheet follows the finger.
   const [drag, setDrag] = useState(0);
@@ -106,19 +138,74 @@ export function MobileSheet({ label, onClose, mode = "modal", header, dismiss = 
   }, []);
 
   // Closing plays the same transition in reverse, then unmounts — a bare
-  // onClose() here would cut the slide-down short.
-  const close = () => {
+  // onClose() here would cut the slide-down short. With a history entry, the
+  // entry goes first (Back), and the close finishes once it has.
+  const after = useRef<(() => void) | undefined>(undefined);
+  const finished = useRef(false);
+  const finish = () => {
+    if (finished.current) return;
+    finished.current = true;
+    window.setTimeout(() => {
+      onClose();
+      after.current?.();
+    }, 300);
+  };
+  const close = (then?: () => void) => {
     if (closingRef.current) return;
     closingRef.current = true;
+    after.current = then;
     setVisible(false);
-    window.setTimeout(onClose, 300);
+    if (backCloses && ownsTop()) {
+      window.history.back();
+      // Should popstate never come, close anyway.
+      window.setTimeout(finish, 800);
+    } else finish();
   };
+  if (closeRef) closeRef.current = close;
+
+  // The sheet's history entry: pushed on open, and Back closes the sheet.
+  useEffect(() => {
+    if (!backCloses) return;
+    // A remount in the same open (React's development double effect) finds
+    // its entry already on top.
+    if (!ownsTop()) window.history.pushState({ ...(window.history.state ?? {}), [SHEET_ENTRY]: true }, "");
+    const onPop = () => {
+      if (ownsTop()) return;
+      if (closingRef.current) finish();
+      else {
+        closingRef.current = true;
+        setVisible(false);
+        finish();
+      }
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per open
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       // A press already spent closing an (i) panel inside the sheet
       // (use-escape-close.ts) leaves the sheet open.
-      if (e.key === "Escape" && !e.defaultPrevented) close();
+      if (e.key === "Escape" && !e.defaultPrevented) {
+        close();
+        return;
+      }
+      // A modal sheet holds focus: Tab cycles inside it, never behind the scrim.
+      if (live || e.key !== "Tab" || !panelRef.current) return;
+      const els = [...panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)];
+      if (els.length === 0) return;
+      const first = els[0];
+      const last = els[els.length - 1];
+      const at = document.activeElement;
+      const inside = panelRef.current.contains(at);
+      if (e.shiftKey && (at === first || at === panelRef.current || !inside)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (at === last || !inside)) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
@@ -165,7 +252,7 @@ export function MobileSheet({ label, onClose, mode = "modal", header, dismiss = 
         className={`absolute inset-0 transition-opacity duration-300 ${
           live ? "bg-black/20" : "bg-black/50 backdrop-blur-sm"
         } ${visible ? "opacity-100" : "opacity-0"}`}
-        onClick={close}
+        onClick={() => close()}
         aria-hidden="true"
       />
       <div
@@ -209,7 +296,7 @@ export function MobileSheet({ label, onClose, mode = "modal", header, dismiss = 
           <>
             <button
               type="button"
-              onClick={close}
+              onClick={() => close()}
               aria-label="Close"
               className="absolute right-3 top-3 inline-flex size-9 items-center justify-center rounded-md text-rb-500 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rb-400"
               data-sheet-close=""

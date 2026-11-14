@@ -12,14 +12,14 @@
  * Edits are staged on a draft of the filters; the primary button writes it
  * through the toolbar's `onChange`, so the URL, the list and the count follow
  * as before. The button reads "Show {n}" only where the listing counts a draft
- * from rows it already holds (`countFor`, the in-memory listings); elsewhere
+ * from rows it holds (`countFor`, the in-memory listings); elsewhere
  * "Apply", since a count would be a new read. Escape and a press outside close
  * without applying; focus goes in on open and back to the pill on close.
  */
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import { Check } from "lucide-react";
-import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
+import { PHONE_QUERY } from "@/hooks/useMediaQuery";
 import { MobileSheet } from "@/components/shared/mobile-sheet";
 import { OVERLAY_HEADING, OVERLAY_SUBHEADING } from "@/lib/shared/ui-grammar";
 import {
@@ -54,6 +54,26 @@ const QUIET_TEXT = `text-sm text-rb-500 dark:text-rb-400/75 hover:text-foregroun
 
 const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
 
+/** Whether the viewport is a phone's, or null until that is known: an editor
+ *  draws nothing until then, so a phone never mounts (and focuses) the
+ *  popover for one frame before the sheet. */
+export function usePhone(): boolean | null {
+  const [phone, setPhone] = useState<boolean | null>(null);
+  useEffect(() => {
+    const mq = window.matchMedia(PHONE_QUERY);
+    setPhone(mq.matches);
+    const onChange = () => setPhone(mq.matches);
+    mq.addEventListener?.("change", onChange);
+    return () => mq.removeEventListener?.("change", onChange);
+  }, []);
+  return phone;
+}
+
+/** Below sm, leave through the sheet (its slide and its history entry), then
+ *  run `then`; from sm, close and run it at once. A write to the URL goes in
+ *  `then`, so it lands after the sheet's entry has left. */
+export type EditorLeave = (then?: () => void) => void;
+
 /** The shell: a popover from sm, a bottom sheet below it. */
 export function EditorShell({
   title,
@@ -64,6 +84,7 @@ export function EditorShell({
   children,
   anatomy = "N1.11",
   align = "start",
+  sheetCloseRef,
 }: {
   title: string;
   onClose: () => void;
@@ -79,15 +100,17 @@ export function EditorShell({
   /** The popover's edge under the pill: its left (a filter) or its right (the
    *  sort, at the row's end). */
   align?: "start" | "end";
+  /** Set to the sheet's own close below sm (MobileSheet `closeRef`). */
+  sheetCloseRef?: MutableRefObject<EditorLeave | null>;
 }) {
-  const isPhone = useMediaQuery(PHONE_QUERY);
+  const isPhone = usePhone();
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
 
   // Desktop: Escape and a press outside the pill and the popover close it.
   useEffect(() => {
-    if (isPhone) return;
+    if (isPhone !== false) return;
     const onDown = (e: PointerEvent) => {
       const t = e.target as Node;
       if (panelRef.current?.contains(t) || anchorRef.current?.contains(t)) return;
@@ -111,7 +134,7 @@ export function EditorShell({
   // viewport; focus goes to its first control.
   useLayoutEffect(() => {
     const el = panelRef.current;
-    if (!el || isPhone) return;
+    if (!el || isPhone !== false) return;
     el.style.transform = "";
     const r = el.getBoundingClientRect();
     const over = r.right - (window.innerWidth - 8);
@@ -119,12 +142,15 @@ export function EditorShell({
     el.querySelector<HTMLElement>(FOCUSABLE)?.focus();
   }, [isPhone]);
 
+  if (isPhone == null) return null;
   if (isPhone) {
     return (
       <MobileSheet
         label={title}
         onClose={onClose}
         dismiss="handle"
+        backCloses
+        closeRef={sheetCloseRef}
         header={
           <div className="flex items-center justify-between gap-3 pb-3">
             <h2 className="text-lg font-semibold">{title}</h2>
@@ -202,7 +228,15 @@ export function GroupEditor<F>({
     if (!r) flushers.current.set(id, (r = { current: null }));
     return r;
   };
-  const isPhone = useMediaQuery(PHONE_QUERY);
+  const isPhone = usePhone() === true;
+  const sheetClose = useRef<EditorLeave | null>(null);
+  const leave: EditorLeave = (then) => {
+    if (isPhone && sheetClose.current) sheetClose.current(then);
+    else {
+      onClose();
+      then?.();
+    }
+  };
 
   // The draft's count, where counting it costs no read.
   const dirty = draft !== applied;
@@ -234,13 +268,9 @@ export function GroupEditor<F>({
   const apply = () => {
     flushers.current.forEach((r) => r.current?.());
     const next = draftRef.current;
-    onClose();
-    if (next !== applied) onChange(next);
+    leave(next !== applied ? () => onChange(next) : undefined);
   };
-  const remove = () => {
-    onClose();
-    onChange(resetGroup(group, applied));
-  };
+  const remove = () => leave(() => onChange(resetGroup(group, applied)));
   const removeLabel = locked ? "Reset to default" : isPhone ? "Remove filter" : "Remove";
   const removeButton =
     locked || appliedActive ? (
@@ -274,6 +304,7 @@ export function GroupEditor<F>({
       onClose={onClose}
       anchorRef={anchorRef}
       topAction={removeButton}
+      sheetCloseRef={sheetClose}
       footer={{ left: isPhone ? undefined : removeButton, primary }}
     >
       <div className="flex flex-col gap-4">

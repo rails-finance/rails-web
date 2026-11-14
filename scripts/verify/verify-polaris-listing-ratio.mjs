@@ -468,16 +468,10 @@ await page7.close();
   );
 
   const page8 = await openListing(context, `${BASE}/sepolia/polaris?market=usdp&sortBy=ratio&sortOrder=asc`);
-  // The sort dropdown sits beside the order button (aria-label "Sort
-  // ascending/descending — click to flip") inside the sort control; other
-  // aria-expanded buttons on the page (the chain switcher, the Debt facet)
-  // read like sort labels, so find it by that structure.
+  // The sort is one pill (N1.3, ui-jobs 681), found by its hook: its text is
+  // the key's label.
   const readSortLabel = (page) =>
-    page.evaluate(() => {
-      const order = document.querySelector('button[aria-label^="Sort "]');
-      const dropdown = order?.parentElement?.querySelector("button[aria-expanded]");
-      return dropdown?.textContent?.trim() ?? "";
-    });
+    page.evaluate(() => document.querySelector("[data-sort-pill]")?.textContent?.trim() ?? "");
   const sortLabel = await readSortLabel(page8);
   check("8c. the sort control reads Ratio with a market chosen", sortLabel === "Ratio", `"${sortLabel}"`);
   const cards8 = await readCards(page8);

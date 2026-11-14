@@ -9,7 +9,7 @@
 import { useRef, useState } from "react";
 import { Check } from "lucide-react";
 import { SortPillButton } from "@/components/shared/filter-bar/filter-pill";
-import { EditorShell } from "@/components/shared/filter-bar/pill-editor";
+import { EditorShell, usePhone, type EditorLeave } from "@/components/shared/filter-bar/pill-editor";
 import { sortSpoken } from "@/components/shared/filter-bar/pill-model";
 
 export interface SortOption {
@@ -41,6 +41,18 @@ export function SortPill({ options, sortBy, sortOrder, onChange }: SortPillProps
     setOpen(false);
     buttonRef.current?.focus();
   };
+  // Below sm a pick closes the sheet first and then writes the URL, so the
+  // sheet's history entry has left (pill-editor `EditorLeave`); from sm the
+  // order stays open for another pick.
+  const isPhone = usePhone() === true;
+  const sheetClose = useRef<EditorLeave | null>(null);
+  const pickThenClose = (write: () => void) => {
+    if (isPhone && sheetClose.current) sheetClose.current(write);
+    else {
+      write();
+      close();
+    }
+  };
 
   return (
     <div className="relative shrink-0" ref={anchorRef} data-anatomy="N1.3">
@@ -53,7 +65,14 @@ export function SortPill({ options, sortBy, sortOrder, onChange }: SortPillProps
         buttonRef={buttonRef}
       />
       {open && (
-        <EditorShell title="Sort" onClose={close} anchorRef={anchorRef} anatomy="N1.3.1" align="end">
+        <EditorShell
+          title="Sort"
+          onClose={close}
+          anchorRef={anchorRef}
+          anatomy="N1.3.1"
+          align="end"
+          sheetCloseRef={sheetClose}
+        >
           <div role="radiogroup" aria-label="Sort by" className="flex flex-col">
             {options.map((o) => {
               const on = o.value === sortBy;
@@ -63,10 +82,7 @@ export function SortPill({ options, sortBy, sortOrder, onChange }: SortPillProps
                   type="button"
                   role="radio"
                   aria-checked={on}
-                  onClick={() => {
-                    onChange(o.value, sortOrder);
-                    close();
-                  }}
+                  onClick={() => pickThenClose(() => onChange(o.value, sortOrder))}
                   className={`flex min-h-11 sm:min-h-9 w-full items-center gap-3 rounded-md px-1 text-left text-sm hover:bg-rb-100 dark:hover:bg-rb-800 ${FOCUS} ${on ? "font-semibold" : ""}`}
                   data-sort-option={o.value}
                 >
@@ -87,7 +103,7 @@ export function SortPill({ options, sortBy, sortOrder, onChange }: SortPillProps
                 type="button"
                 role="radio"
                 aria-checked={dir === sortOrder}
-                onClick={() => onChange(sortBy, dir)}
+                onClick={() => (isPhone ? pickThenClose(() => onChange(sortBy, dir)) : onChange(sortBy, dir))}
                 className={`h-10 sm:h-9 rounded-lg text-sm transition-colors ${FOCUS} ${
                   dir === sortOrder
                     ? "bg-background font-semibold text-foreground shadow-sm dark:bg-rb-700"

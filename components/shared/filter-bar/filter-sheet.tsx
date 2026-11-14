@@ -12,7 +12,7 @@
  * is on or off, a switch in its row; one with two options is a segmented
  * "Any / A / B" under its name ("A / B" where the dimension rests on one of
  * them, a preset); a range draws its slider under its name.
- * The footer holds "Clear filters" (every dimension back to its default) and
+ * The footer holds "Reset" (every dimension back to its default) and
  * the primary button: the count the edits would give where the listing counts
  * a draft from rows it holds, else "Apply".
  *
@@ -505,7 +505,7 @@ function Sheet<F>({
             className="flex-1 h-12 rounded-lg border border-rb-300 dark:border-rb-600 text-sm font-semibold text-foreground transition-colors hover:bg-rb-100 dark:hover:bg-rb-800 disabled:cursor-default disabled:text-rb-400 disabled:hover:bg-transparent dark:disabled:text-rb-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
             data-filter-sheet-clear=""
           >
-            Clear filters
+            Reset
           </button>
           <button
             type="button"

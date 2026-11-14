@@ -10,8 +10,8 @@
  *   default — drawn as set, a chevron in place of the × (the group rests on a
  *             default it cannot drop); its editor offers "Reset to default".
  * Teal marks a control (color-grammar §4c). Presentational only: the caller
- * owns the editor and the filters. The accordion of Option B can draw the same
- * pill from the same model.
+ * owns the editor and the filters, so any other surface can draw the same pill
+ * from ./pill-model.
  */
 
 import type { ReactNode, Ref } from "react";

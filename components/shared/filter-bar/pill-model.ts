@@ -48,7 +48,7 @@ export const PILL_ORDER = ["Status", "Market", "Size", "Assets", "History", "Tra
 
 /** Bucket dimensions by `group` in registry order. A dimension hidden by
  *  `available` is dropped and an emptied group goes; an ungrouped dimension
- *  takes its own label as its group. */
+ *  takes its label as its group. */
 export function groupDimensions<F>(dims: FilterDimension<F>[], filters: F): PillGroup<F>[] {
   const order: string[] = [];
   const byName = new Map<string, FilterDimension<F>[]>();

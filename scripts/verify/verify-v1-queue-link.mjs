@@ -202,7 +202,7 @@ const listing = await browser.newPage();
 await listing.goto(BASE + href, { waitUntil: "networkidle" });
 await listing.waitForTimeout(1200);
 
-// THE DISCRIMINATING CHECK. SortControl resolves its label by looking the
+// THE DISCRIMINATING CHECK. SortPill resolves its label by looking the
 // current sortBy up in its own options — `options.find(...)?.label ?? "Sort"` —
 // so an unrecognised value leaves the control reading the bare word "Sort"
 // while the page renders perfectly and quietly serves recency. On a short list

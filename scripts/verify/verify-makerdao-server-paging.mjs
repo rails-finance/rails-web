@@ -91,17 +91,15 @@ async function total(page) {
   return m ? Number(m[1].replace(/,/g, "")) : null;
 }
 
-/** Open a filter group's panel by its button label. */
+/** Open a filter group's editor by its pill (N1.10, ui-jobs 681). */
 async function openGroup(page, label) {
-  await page.locator(`button:has-text("${label}")`).first().click();
-  await page.locator(".overlay-panel").first().waitFor({ state: "visible", timeout: 5000 });
+  await page.locator(`[data-filter-pill="${label}"] [data-pill-open]`).first().click();
+  await page.locator(`[data-pill-editor="${label}"]`).first().waitFor({ state: "visible", timeout: 5000 });
 }
 
-const closePanel = (page) => page.mouse.click(4, 4);
-
-/** Every option row in the open panel, as { label, meta }. */
+/** Every option row in the open editor, as { label, meta }. */
 async function panelOptions(page) {
-  return page.locator('.overlay-panel [role="menuitemcheckbox"]').evaluateAll((els) =>
+  return page.locator("[data-pill-editor] [data-pill-option]").evaluateAll((els) =>
     els.map((el) => {
       const spans = [...el.querySelectorAll("span")];
       const label = spans.find((s) => s.className.includes("flex-1"))?.textContent?.trim() ?? "";
@@ -178,8 +176,10 @@ async function main() {
 
   // ---- 3. picking one the old tier could not reach -------------------------
   let before = await hrefs(page);
-  await page.locator('.overlay-panel [role="menuitemcheckbox"]:has-text("GNO-A")').first().click();
-  await closePanel(page);
+  // The editor stages the pick; its primary button applies it (an outside
+  // click would close it without applying).
+  await page.locator('[data-pill-editor] [data-pill-option]:has-text("GNO-A")').first().click();
+  await page.locator("[data-pill-editor] [data-pill-editor-apply]").first().click();
   await settled(page, before);
 
   check(page.url().includes("ilk=GNO-A"), "pick: the selection is in the URL", page.url().split("?")[1] ?? "");

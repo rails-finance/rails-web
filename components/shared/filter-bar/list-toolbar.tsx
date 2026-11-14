@@ -75,8 +75,8 @@ export interface ListToolbarProps<F extends BaseListFilters> {
   };
   /** True while the listing re-reads after a change; the sheet's count waits. */
   countPending?: boolean;
-  /** The count a staged selection would give, from rows the listing already
-   *  holds. Given, the editors' button reads "Show {n}"; without it, "Apply". */
+  /** The count a staged selection would give, from rows the listing holds.
+   *  Given, the editors' button reads "Show {n}"; without it, "Apply". */
   countFor?: (draft: F) => number | Promise<number>;
   /** The noun for a draft, where the selection names it. */
   nounFor?: (draft: F) => string;
