@@ -430,8 +430,12 @@ await checkRosterView({
     await page.waitForSelector("[data-vault-index] [data-figure='shown-count']", { timeout: 120_000 });
     return {
       rows: await readRosterRows(page, "[data-vault-index]"),
-      // The preset in force: the Shown pill at its default (N1.10).
-      chip: await page.locator("[data-vault-index] [data-filter-pill='Shown'][data-pill-state='default']").count(),
+      // The preset in force: the Shown pill naming it. A link that lifts the
+      // preset arrives with "Every vault" as the default, which narrows
+      // nothing (N1.10).
+      chip: await page
+        .locator("[data-vault-index] [data-filter-pill='Shown'] [data-pill-open]")
+        .evaluateAll((els) => els.filter((b) => !/Every vault$/.test(b.getAttribute("aria-label") ?? "")).length),
     };
   };
   const all = (await open("?asset=ETH,WETH&show=all")).rows.filter((r) => r.group === "funded");
