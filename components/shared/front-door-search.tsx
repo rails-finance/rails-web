@@ -81,7 +81,7 @@ export const OPEN_SEARCH_EVENT = "rails-open-search";
 /** ⌘K: open the wallet panel, or close it when open. */
 export const TOGGLE_SEARCH_EVENT = "rails-toggle-search";
 
-type Size = "sm" | "md" | "lg";
+type Size = "sm" | "md" | "lg" | "pill";
 
 // Below sm every field is 16px: iOS Safari zooms the page on focus into any
 // field set smaller, and the zoom stays on the page the lookup lands on.
@@ -90,12 +90,15 @@ const FIELD: Record<Size, string> = {
   sm: "h-8 pl-8 pr-3 text-base sm:text-xs",
   md: "h-9 pl-8 pr-3 text-base sm:text-sm",
   lg: "h-12 pl-10 pr-3 text-base",
+  // The listing toolbar's field, level with the filter pills beside it (N1.10).
+  pill: "h-11 pl-10 pr-4 text-base sm:h-10 sm:text-sm",
 };
 /** The same fields without the magnifier, the left padding closed up. */
 const FIELD_PLAIN: Record<Size, string> = {
   sm: "h-8 px-3 text-base sm:text-xs",
   md: "h-9 px-3 text-base sm:text-sm",
   lg: "h-12 pl-5 pr-3 text-base",
+  pill: "h-11 px-4 text-base sm:h-10 sm:text-sm",
 };
 // The home page's field (the one lg search): a full pill whose placeholder
 // shows on hover and focus only, with a blue glow behind it in dark. The field
@@ -124,6 +127,7 @@ const GLYPH: Record<Size, { size: number; left: string }> = {
   sm: { size: 14, left: "left-3" },
   md: { size: 14, left: "left-3" },
   lg: { size: 18, left: "left-3.5" },
+  pill: { size: 14, left: "left-4" },
 };
 
 export interface SearchBoxProps {
@@ -214,7 +218,7 @@ export function SearchBox({
         // A hairline in light mode: on the white canvas the raised field is a
         // shade off the page and needs an edge to read as a field; in dark the
         // surface decides (EDGE).
-        className={`w-full ${size === "lg" ? HERO_FIELD : "rounded-md"} border border-rb-300 bg-raised ${SURFACE[surface].field} ${(SURFACE[surface].glyph ? FIELD : FIELD_PLAIN)[size]} text-foreground placeholder:text-rb-500 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+        className={`w-full ${size === "lg" ? HERO_FIELD : size === "pill" ? "rounded-full" : "rounded-md"} border border-rb-300 bg-raised ${SURFACE[surface].field} ${(SURFACE[surface].glyph ? FIELD : FIELD_PLAIN)[size]} text-foreground placeholder:text-rb-500 focus:outline-none focus:ring-2 focus:ring-blue-500`}
       />
     </div>
   );
