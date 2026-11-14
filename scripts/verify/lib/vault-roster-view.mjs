@@ -58,7 +58,7 @@ const tokenCmp = (a, b) => a.token.localeCompare(b.token, "en-US", { sensitivity
 const tableAssetsOk = (a, b) => tokenCmp(a, b) < 0 || (tokenCmp(a, b) === 0 && a.raw >= b.raw);
 
 /**
- * The default view against `?show=all`, the preset's chip and its removal, and
+ * The default view against `?show=all`, the preset's pill, lifting and resetting it, and
  * the table's sorts.
  */
 export async function checkRosterView({ page, base, route, scope, check, tag }) {
@@ -80,11 +80,22 @@ export async function checkRosterView({ page, base, route, scope, check, tag }) 
   const want = new Set(allFunded.filter(presetKeeps).map((r) => r.address));
   const wantEmpty = all.filter((r) => r.group === "empty" && presetKeeps(r)).length;
   await go("");
-  const chip = page.locator(`${scope} [data-default-chip="show"]`);
+  // The preset is the Shown pill (N1.10, ui-jobs 681): a default pill, a
+  // chevron and no ×; its editor lifts it ("Every vault") and resets it.
+  const pill = page.locator(`${scope} [data-filter-pill="Shown"]`);
+  const pillState = async () => ((await pill.count()) ? await pill.first().getAttribute("data-pill-state") : null);
+  const openShown = async () => {
+    await pill.first().locator("[data-pill-open]").click();
+    await page.locator('[data-pill-editor="Shown"]').first().waitFor({ state: "visible", timeout: 10_000 });
+  };
   check(
-    `${tag}a the roster opens on the preset, named in a removable chip`,
-    (await chip.count()) === 1 && (await chip.locator("button").count()) === 1,
-    (await chip.count()) ? (await chip.innerText()).trim() : "no chip",
+    `${tag}a the roster opens on the preset, named in a default pill with no ×`,
+    (await pill.count()) === 1 &&
+      (await pillState()) === "default" &&
+      (await pill.locator("[data-pill-remove]").count()) === 0,
+    (await pill.count())
+      ? `${await pillState()}: ${await pill.first().locator("[data-pill-open]").getAttribute("aria-label")}`
+      : "no pill",
   );
   const def = await readRosterRows(page, scope);
   const defFunded = def.filter((r) => r.group === "funded");
@@ -116,23 +127,28 @@ export async function checkRosterView({ page, base, route, scope, check, tag }) 
     );
   }
 
-  // Removing the chip writes ?show=all and draws every row; Reset returns.
-  await chip.locator("button").click();
+  // "Every vault" in the pill's editor writes ?show=all and draws every row;
+  // its "Reset to default" returns.
+  await openShown();
+  await page.locator('[data-pill-editor="Shown"] [data-pill-option="all"]').first().click();
+  await page.locator('[data-pill-editor="Shown"] [data-pill-editor-apply]').first().click();
   await page.waitForTimeout(500);
   const lifted = (await readRosterRows(page, scope)).filter((r) => r.group === "funded").length;
   check(
-    `${tag}f removing the chip writes ?show=all and draws every funded vault`,
-    new URL(page.url()).searchParams.get("show") === "all" && lifted === allFunded.length,
-    `${page.url()} → ${lifted} of ${allFunded.length}`,
+    `${tag}f "Every vault" in the Shown pill writes ?show=all, sets the pill and draws every funded vault`,
+    new URL(page.url()).searchParams.get("show") === "all" &&
+      (await pillState()) === "set" &&
+      lifted === allFunded.length,
+    `${page.url()} → ${lifted} of ${allFunded.length}, pill ${await pillState()}`,
   );
-  await page
-    .locator(`${scope} button`, { hasText: /^Reset$/ })
-    .first()
-    .click();
+  await openShown();
+  await page.locator('[data-pill-editor="Shown"] [data-pill-editor-remove]').first().click();
   await page.waitForTimeout(500);
   check(
-    `${tag}g Reset restores the preset and drops the param`,
-    !new URL(page.url()).searchParams.has("show") && (await shownCount()).shown === want.size,
+    `${tag}g the pill's Reset to default restores the preset and drops the param`,
+    !new URL(page.url()).searchParams.has("show") &&
+      (await shownCount()).shown === want.size &&
+      (await pillState()) === "default",
     page.url(),
   );
 
