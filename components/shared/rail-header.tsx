@@ -73,9 +73,8 @@ export function ChainLabel({
 export type RailVenue = "listing" | "subPage" | "info";
 
 // The tabs' type (TAB_BASE, lib/shared/ui-grammar.ts): every tab carries the
-// bottom border so the active underline never shifts the baseline. The
-// explorer sections were drawn as these tabs until ui-jobs 680; the saved
-// tabs (B4, components/bookmarks/bookmarks-page.tsx) wear them today.
+// bottom border so the active underline never shifts the baseline. The saved
+// tabs (B4) wear these.
 export const TAB_ACTIVE = `${TAB_BASE} border-current text-foreground`;
 export const TAB_IDLE = `${TAB_BASE} border-transparent text-rb-500 transition-colors hover:text-blue-600 dark:hover:text-[var(--text-link)]`;
 
@@ -112,6 +111,7 @@ function SectionsMenu({ sections }: { sections: Section[] }) {
   const trigger = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
   const menuId = useId();
+  const triggerId = useId();
   const current = sections.find((s) => s.current);
 
   const close = useCallback((refocus = true) => {
@@ -169,6 +169,7 @@ function SectionsMenu({ sections }: { sections: Section[] }) {
     <nav ref={wrap} aria-label="Explorer sections" className="relative shrink-0" data-anatomy="H5">
       <button
         ref={trigger}
+        id={triggerId}
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
@@ -197,7 +198,7 @@ function SectionsMenu({ sections }: { sections: Section[] }) {
         ref={menu}
         id={menuId}
         role="menu"
-        aria-label="Explorer sections"
+        aria-labelledby={triggerId}
         hidden={!open}
         data-sections-menu=""
         // Under the trigger: its left edge on the trigger's from sm, its right
@@ -209,6 +210,9 @@ function SectionsMenu({ sections }: { sections: Section[] }) {
             key={s.href}
             href={s.href}
             role="menuitem"
+            // Out of the tab order: the arrow keys move between the rows,
+            // and Tab leaves the menu.
+            tabIndex={-1}
             aria-current={s.current ? "page" : undefined}
             onClick={() => close(false)}
             className={`${SECTION_ITEM} ${s.current ? "font-semibold" : ""}`}
@@ -237,7 +241,15 @@ export function RailHeader({
   const pathname = usePathname();
   const entry = protocolForSession(session);
   if (!entry) return null;
-  const litSubPage = venue === "subPage" ? subPageForPathname(entry, pathname) : undefined;
+  // An explorer with no position listing redirects its own route to its first
+  // sub-page (/ethereum/aave, /ethereum/yearn), so that sub-page is current
+  // while the redirect lands.
+  const litSubPage =
+    venue === "subPage"
+      ? subPageForPathname(entry, pathname)
+      : venue === "listing" && entry.positionListing === false
+        ? entry.subPages[0]
+        : undefined;
   const sections: Section[] = [
     // A vault-native explorer has no position listing — a share in a vault is
     // not a position in the roster's sense (rails-ops decision 0027 call 2) —
@@ -258,7 +270,8 @@ export function RailHeader({
           <ProtocolIdentity session={session} scale="title" />
         </div>
         <ChainLabel chainId={entry.chainId} />
-        <SectionsMenu sections={sections} />
+        {/* An explorer with one section (About alone) draws no menu. */}
+        {sections.length > 1 && <SectionsMenu sections={sections} />}
       </div>
       {stamp && (
         <div className="flex items-center">

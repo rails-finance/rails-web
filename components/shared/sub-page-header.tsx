@@ -8,9 +8,8 @@
 // entry (`lib/shared/protocols.ts`) rather than restated per page.
 //
 // The context row is the shared `RailHeader` — identity, the chain's glyph,
-// then the sections menu naming this sub-page. The chain is never a crumb
-// word, and the sub-page's name is said by the menu's trigger rather than a
-// "/ …" tail.
+// then the sections menu. The chain is never a crumb word, and the menu's
+// trigger names the sub-page.
 //
 // The header carries NO explanatory prose: protocol explanation lives on the
 // rail's /info page (About in the sections menu), how-to-read-a-figure lives in
