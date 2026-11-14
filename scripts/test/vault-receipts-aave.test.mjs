@@ -180,3 +180,61 @@ test("Aave lifetime totals sum the whole history, and the timeline draws the new
   assert.match(s, /whole history/);
   assert.doesNotMatch(s, /exactly what is drawn|what is drawn there/);
 });
+
+test("The Withdrawn check line counts events, not burns: a burn with no withdraw event has none to add", async () => {
+  const E = await import("../../lib/aave-vaults/position-economics.ts");
+  const ev = (i, kind, sharesDelta, assets, balanceAfter) => ({
+    id: `e${i}`,
+    txHash: "0x" + String(i).repeat(64).slice(0, 64),
+    blockNumber: 23_000_000 + i,
+    timestamp: 1_760_000_000 + i,
+    logIndex: 0,
+    kind,
+    counterparty: null,
+    sharesDelta,
+    balanceAfter,
+    assets,
+    sharePriceAtBlock: "1000000",
+    shareDecimals: 6,
+  });
+  // Newest first: a mint, then two burns, one with its Withdraw event and one without (legless).
+  const events = [
+    ev(3, "withdrawal", "-1000000", null, "1000000"),
+    ev(2, "withdrawal", "-1000000", "1000000", "2000000"),
+    ev(1, "deposit", "3000000", "3000000", "3000000"),
+  ];
+  const out = E.computeVaultPositionEconomics({
+    timeline: {
+      vault: VAULT,
+      holder: HOLDER,
+      blockNumber: 24_000_000,
+      blockTimestamp: 1_770_000_000,
+      unread: null,
+      reconcile: reconcile({ replayed: "1000000", onChain: "1000000" }),
+      events,
+      notes: [],
+      coverage: { fromDeployment: true, logCount: 3, withheldAbove: null, logCountIsLowerBound: false },
+    },
+    coords: row,
+    sharesRaw: "1000000",
+    claimRaw: "1100000",
+    shareSymbol: "waEthUSDC",
+    shareDecimals: 6,
+    assetSymbol: "USDC",
+    assetDecimals: 6,
+    vaultAddress: VAULT,
+  });
+  assert.ok(out, "the tower is drawn");
+  assert.equal(out.flows.counts.burns, 2);
+  assert.equal(out.flows.counts.legless, 1);
+  const checks = [];
+  const walk = (o) => {
+    if (!o || typeof o !== "object") return;
+    if (typeof o.verify?.text === "string") checks.push(o.verify.text);
+    for (const v of Object.values(o)) walk(v);
+  };
+  walk(out.data);
+  const withdrawn = checks.find((t) => /Withdraw logs/.test(t));
+  assert.ok(withdrawn, `a Withdrawn check line is drawn — ${checks.join(" | ")}`);
+  assert.match(withdrawn, /up to 2, since a mint or burn the vault emitted no such event for has none/);
+});

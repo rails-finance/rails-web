@@ -1,6 +1,7 @@
 // A sweep chain 1's logs lane REFUSES comes back as a stated count, never as an
-// unread history: exact when rails-server's holder-logs route hands it over
-// (the usual case since the vault loaders read it first), a floor otherwise. Run: `npx tsx scripts/verify/verify-aave-vault-timeline-refused-sweep.ts`
+// unread history: exact and checked when rails-server's holder-logs route hands it
+// over (the usual case since the vault loaders read it first), otherwise a recount
+// with no check, a floor or a whole count by `coverage.withheldBasis`. Run: `npx tsx scripts/verify/verify-aave-vault-timeline-refused-sweep.ts`
 // ----------------------------------------------------------------------------
 // The loader is called directly rather than through a page, because what is
 // under test is the loader's own branch: chain 1's logs lane will not answer a
@@ -76,10 +77,11 @@ async function read(fixture: { label: string; vault: string; holder: string }) {
 }
 
 async function main() {
+  const { withheldBasisOf } = await import("@/lib/shared/vault-holder-timeline");
   const { data: rData, result: refused, ms: rMs } = await read(REFUSED);
   const t = refused.timeline;
   console.log(
-    `\n${REFUSED.label}\n  block ${rData.blockNumber}, ${rMs} ms — unread ${JSON.stringify(t.unread)}, logCount ${t.coverage.logCount}, withheldAbove ${t.coverage.withheldAbove}, lowerBound ${t.coverage.logCountIsLowerBound}, reconcile ${JSON.stringify(t.reconcile)}, rows ${t.events.length}, store ${refused.store === null ? "null" : "offered"}\n`,
+    `\n${REFUSED.label}\n  block ${rData.blockNumber}, ${rMs} ms — unread ${JSON.stringify(t.unread)}, logCount ${t.coverage.logCount}, withheldAbove ${t.coverage.withheldAbove}, basis ${withheldBasisOf(t.coverage)}, reconcile ${JSON.stringify(t.reconcile)}, rows ${t.events.length}, store ${refused.store === null ? "null" : "offered"}\n`,
   );
   check("the refused life is not stated as unread", t.unread === null, `unread ${JSON.stringify(t.unread)}`);
   check(
@@ -91,14 +93,18 @@ async function main() {
   check("nothing is offered to the store", refused.store === null, `store ${refused.store === null ? "null" : "set"}`);
   // The sweep comes from rails-server's holder-logs route first (the
   // loader's header), which hands this life over whole where the chain lane
-  // refuses it. Then the count is EXACT and the balance gate ran on it; only
-  // when that route does not answer does the loader fall to the lane, and the
-  // count is a floor with no gate.
-  if (t.coverage.logCountIsLowerBound) {
+  // refuses it. Then the basis is "checked": the count is exact and the
+  // balance gate ran on it. Only when that route does not answer does the
+  // loader fall to the lane's chunked recount, and then no logs were handed
+  // over and no gate ran: "floor" when the recount stopped past the horizon,
+  // "unchecked" when it covered the whole range under it
+  // (`VaultWithheldBasis`, lib/shared/vault-holder-timeline.ts).
+  const basis = withheldBasisOf(t.coverage);
+  if (basis === "floor" || basis === "unchecked") {
     check(
-      "no gate is claimed to have run (the lane's floor)",
+      `no gate is claimed to have run (the lane's recount, basis ${basis})`,
       t.reconcile === null,
-      "a floor has no logs to replay, so a reconcile object would be a check that did not happen",
+      "a recount has no logs to replay, so a reconcile object would be a check that did not happen",
     );
   } else {
     check(

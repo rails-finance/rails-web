@@ -329,7 +329,12 @@ export const vaultFlowProv = (
   source: { block: c.blockNumber },
   verify: {
     kind: "recompute",
-    text: `To check: ask any ${chainWord(c)} archive node for this vault's logs that name this address and add up the ${count} that match.`,
+    // A deposit or withdrawal figure sums the ERC-4626 events that came with this address's mints or burns; `count` is
+    // the mints or burns, and one the vault emitted no event for has none to add, so the event count is at most it.
+    text:
+      kind === "deposited" || kind === "withdrawn"
+        ? `To check: ask any ${chainWord(c)} archive node for this vault's ${kind === "deposited" ? "Deposit" : "Withdraw"} logs that name this address and add up their asset amounts: up to ${count}, since a mint or burn the vault emitted no such event for has none.`
+        : `To check: ask any ${chainWord(c)} archive node for this vault's logs that name this address and add up the ${count} that match.`,
   },
   summary: `A lifetime total — ${FLOW_CLAUSE[kind](unit)}. It sums ${count.toLocaleString("en-US")} row${count === 1 ? "" : "s"} of this address's whole history, the same rows the history check ran over; the timeline below draws the newest of them. Nothing here is priced.`,
   contract: vaultContract(c),
