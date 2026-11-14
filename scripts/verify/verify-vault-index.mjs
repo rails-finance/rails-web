@@ -430,12 +430,11 @@ await checkRosterView({
     await page.waitForSelector("[data-vault-index] [data-figure='shown-count']", { timeout: 120_000 });
     return {
       rows: await readRosterRows(page, "[data-vault-index]"),
-      // The preset in force: the Shown pill naming it. A link that lifts the
-      // preset arrives with "Every vault" as the default, which narrows
-      // nothing (N1.10).
-      chip: await page
-        .locator("[data-vault-index] [data-filter-pill='Shown'] [data-pill-open]")
-        .evaluateAll((els) => els.filter((b) => !/Every vault$/.test(b.getAttribute("aria-label") ?? "")).length),
+      // The preset in force: the Shown pill as a default pill. A link that
+      // lifts the preset arrives on "Every vault", which narrows nothing, and
+      // the pill is an unset "+ Shown" (N1.10, ui-jobs 681).
+      chip: await page.locator("[data-vault-index] [data-filter-pill='Shown'][data-pill-state='default']").count(),
+      unset: await page.locator("[data-vault-index] [data-filter-pill='Shown'][data-pill-state='unset']").count(),
     };
   };
   const all = (await open("?asset=ETH,WETH&show=all")).rows.filter((r) => r.group === "funded");
@@ -465,8 +464,8 @@ await checkRosterView({
     const n = lifted.rows.filter((r) => r.group === "funded").length;
     check(
       "11b a link whose token the preset would empty opens without it",
-      lifted.chip === 0 && n === hidden[1].length,
-      `${hidden[0]}: ${n} of ${hidden[1].length} drawn, chip ${lifted.chip}`,
+      lifted.chip === 0 && lifted.unset === 1 && n === hidden[1].length,
+      `${hidden[0]}: ${n} of ${hidden[1].length} drawn, default pill ${lifted.chip}, unset pill ${lifted.unset}`,
     );
   }
 }
