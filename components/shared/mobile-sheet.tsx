@@ -65,6 +65,10 @@ const ownsTop = () => (window.history.state as Record<string, unknown> | null)?.
 
 const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
 
+/** The open sheets, oldest first. Only the last one holds Tab: a sheet opened
+ *  from inside another (the Focus sheet's asset chooser) takes focus with it. */
+const openSheets: object[] = [];
+
 /** The pinned header of a LIVE filter sheet: the menu's name in the overlay
  *  heading register, Reset when the caller says there is something to reset,
  *  and an optional one-line status — the toolbar's count line, which the
@@ -125,6 +129,19 @@ export function MobileSheet({
   const closingRef = useRef(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const live = mode === "live";
+  // This sheet's place in `openSheets`, and whether it pushed a history entry
+  // (read from here, not from `history.state`, which a router refresh can
+  // rewrite while the sheet is open).
+  const token = useRef({});
+  const pushed = useRef(false);
+  useEffect(() => {
+    const me = token.current;
+    openSheets.push(me);
+    return () => {
+      const i = openSheets.lastIndexOf(me);
+      if (i >= 0) openSheets.splice(i, 1);
+    };
+  }, []);
 
   // Reading the panel's box makes the browser settle its off-screen starting
   // style before `visible` flips, so the transition has a frame to run from
@@ -155,7 +172,8 @@ export function MobileSheet({
     closingRef.current = true;
     after.current = then;
     setVisible(false);
-    if (backCloses && ownsTop()) {
+    if (backCloses && pushed.current) {
+      pushed.current = false;
       window.history.back();
       // Should popstate never come, close anyway.
       window.setTimeout(finish, 800);
@@ -168,9 +186,13 @@ export function MobileSheet({
     if (!backCloses) return;
     // A remount in the same open (React's development double effect) finds
     // its entry already on top.
-    if (!ownsTop()) window.history.pushState({ ...(window.history.state ?? {}), [SHEET_ENTRY]: true }, "");
+    if (!ownsTop()) {
+      window.history.pushState({ ...(window.history.state ?? {}), [SHEET_ENTRY]: true }, "");
+      pushed.current = true;
+    }
     const onPop = () => {
       if (ownsTop()) return;
+      pushed.current = false;
       if (closingRef.current) finish();
       else {
         closingRef.current = true;
@@ -191,8 +213,11 @@ export function MobileSheet({
         close();
         return;
       }
-      // A modal sheet holds focus: Tab cycles inside it, never behind the scrim.
+      // A modal sheet holds focus: Tab cycles inside it, never behind the
+      // scrim. Only the topmost open sheet does, so one opened from inside
+      // it keeps its own focus.
       if (live || e.key !== "Tab" || !panelRef.current) return;
+      if (openSheets[openSheets.length - 1] !== token.current) return;
       const els = [...panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)];
       if (els.length === 0) return;
       const first = els[0];
