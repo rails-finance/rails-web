@@ -35,8 +35,11 @@
 //   ~/.cache/rails-web/rpc-replay), so every worktree and the standing preview
 //   checkout share one warm cache and removing a worktree keeps it. Layout:
 //   <dir>/<chain>/<method>/<hash[0..2]>/<hash>.json. Delete the directory to
-//   start cold. Pins are written to <dir>/pins.json after each run; RPC_PIN=keep
-//   reuses the last run's pins, so a rerun of one script costs nothing upstream.
+//   start cold. RPC_PIN=keep starts from <dir>/pins.json, so a rerun of one script
+//   costs nothing upstream. A pin the file lacks is merged into it (rpc-pins-file.mjs:
+//   the file's keys win, never an empty set) when RPC_PIN=keep is set or RPC_CACHE_DIR
+//   names the proxy's own cache; a proxy on the shared default without RPC_PIN=keep
+//   leaves the file alone. To take new pins, remove pins.json and run with RPC_PIN=keep.
 //
 // Usage — run-all.mjs starts it and points the dev server at it. By hand:
 //
@@ -55,6 +58,7 @@
 import http from "node:http";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { readPinsFile, writePinsFile } from "./rpc-pins-file.mjs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -62,6 +66,8 @@ const PORT = Number(process.env.PORT ?? 8899);
 const CACHE_DIR = process.env.RPC_CACHE_DIR ?? join(homedir(), ".cache", "rails-web", "rpc-replay");
 const PINS_FILE = join(CACHE_DIR, "pins.json");
 const KEEP_PINS = process.env.RPC_PIN === "keep";
+/** The shared default cache's pins are written only by a proxy that started from them. */
+const WRITES_PINS = KEEP_PINS || process.env.RPC_CACHE_DIR != null;
 const QUIET = process.env.RPC_QUIET === "1";
 
 // ── the lanes ───────────────────────────────────────────────────────────────
@@ -197,18 +203,13 @@ function writeCache(path, method, params, result) {
 /** chain → hex block. Taken on the first head read of the run, or carried over
  *  from the last run with RPC_PIN=keep. */
 const pins = {};
-if (KEEP_PINS) {
-  try {
-    Object.assign(pins, JSON.parse(readFileSync(PINS_FILE, "utf8")));
-  } catch {
-    /* no pins yet: the first head read takes them */
-  }
-}
+// No pins yet: the first head read takes them.
+if (KEEP_PINS) Object.assign(pins, readPinsFile(PINS_FILE));
 
 function savePins() {
+  if (!WRITES_PINS) return;
   try {
-    mkdirSync(CACHE_DIR, { recursive: true });
-    writeFileSync(PINS_FILE, JSON.stringify(pins, null, 2));
+    writePinsFile(PINS_FILE, pins);
   } catch {
     /* a cache that cannot be written is a cold run, nothing worse */
   }

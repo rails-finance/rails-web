@@ -34,7 +34,8 @@
 // into the known-faults file's pass line (ui-jobs 432). A server this runner
 // did not start reads the chain on whatever URLs it was started with; the
 // count then covers nothing, and the table says so. RPC_PROXY=0 runs without
-// it; RPC_PIN=keep reuses the last run's pins so a rerun costs nothing upstream.
+// it; RPC_PIN=keep reuses the pins in the cache's pins.json so a rerun costs
+// nothing upstream, and only such a run adds a pin to that file.
 //
 // The `.ts` verifiers run through `tsx` (`tsx --test` for the node:test ones).
 // A script longer than the cap is run in parts (SPLIT below), each under it.
@@ -46,7 +47,7 @@
 //   ONLY=llamalend,prov node scripts/verify/run-all.mjs   (substring filter)
 //   JOBS=1 node scripts/verify/run-all.mjs                (default 2 — see below)
 //   RPC_PROXY=0 node scripts/verify/run-all.mjs           (no proxy, the key pays whole)
-//   RPC_PIN=keep node scripts/verify/run-all.mjs          (yesterday's pins, nothing upstream)
+//   RPC_PIN=keep node scripts/verify/run-all.mjs          (the kept pins, nothing upstream)
 //   SERVER_MAX_OLD_SPACE_MB=6144 node scripts/verify/run-all.mjs
 //        (off unless set: the server this runner starts gets
 //         NODE_OPTIONS=--max-old-space-size=6144, so a leak ends in a restart at a

@@ -57,7 +57,7 @@
 import { parseAbi, type ContractFunctionParameters } from "viem";
 import { chainBatchClient } from "./rpc";
 import { vaultHeadClient } from "@/lib/sources/api/head-reads-client";
-import { routeGate } from "@/lib/sources/api/route-gate";
+import { RouteDownAtBuild, routeGate } from "@/lib/sources/api/route-gate";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { resolveErc20Meta } from "./erc20-meta";
 import { readAaveEthereumCatalogue } from "./aave-ethereum-catalogue";
@@ -373,6 +373,7 @@ async function censusSweep(address: string): Promise<AaveEthereumHolderSweepResp
 export async function loadAaveEthereumHolderSweep(holder: string): Promise<AaveEthereumHolderSweepResponse> {
   const address = holder.toLowerCase();
   const census = await censusSweep(address).catch((error) => {
+    if (error instanceof RouteDownAtBuild) throw error;
     console.error("Aave Ethereum holder sweep: the census read failed —", error);
     return null;
   });

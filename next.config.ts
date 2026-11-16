@@ -219,6 +219,12 @@ const nextConfig: NextConfig = {
     // out of memory at "Linting and checking validity of types". In a worker,
     // the compiler's memory is released when compilation ends.
     webpackBuildWorker: true,
+    // A prerender whose rails-server route fails throws during the build
+    // (lib/sources/api/route-gate.ts); Next renders that page again up to twice.
+    // Two pages at a time per worker keep a build's burst from swamping the api
+    // (rails-ops TO-DO-ui-jobs.md item 686: 79 connect timeouts on 14 Nov 2026).
+    staticGenerationRetryCount: 2,
+    staticGenerationMaxConcurrency: 2,
   },
   // Content files (content/<protocol>/*.yaml, the strings a prose writer
   // edits) are parsed at build time into the module's data. Turbopack (the

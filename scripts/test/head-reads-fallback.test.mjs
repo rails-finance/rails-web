@@ -400,3 +400,40 @@ test("sky drip: an answer for another block, a refused connection or no RAILS_AP
   assert.equal((await readSkyDrip(DRIP_BLOCK))?.readBy, "chain");
   assert.equal(seen.api.length, 0);
 });
+
+// ── during `next build` (ui-jobs 686) ───────────────────────────────────────
+
+async function atBuild(run) {
+  process.env.NEXT_PHASE = "phase-production-build";
+  try {
+    await run();
+  } finally {
+    delete process.env.NEXT_PHASE;
+  }
+}
+
+test("head reads at build: a refused head throws to the reader and reads nothing from the chain", () =>
+  atBuild(async () => {
+    const seen = stubFetch(async () => {
+      throw new TypeError("fetch failed");
+    });
+    const c = headReadsClient(1);
+    await assert.rejects(c.readContract(read()), { name: "RouteDownAtBuild" });
+    await assert.rejects(c.getBlockNumber(), { name: "RouteDownAtBuild" });
+    assert.equal(seen.api.length, 2, "the head is asked again: nothing is marked down");
+    assert.deepEqual(seen.rpc, []);
+  }));
+
+test("head reads at build: a round that answers 503 throws to every reader in it", () =>
+  atBuild(async () => {
+    const seen = stubFetch(async (p) =>
+      p.startsWith("/api/at-block/head/block") ? json(headBody()) : json({ error: "down" }, 503),
+    );
+    const c = headReadsClient(1);
+    const got = await Promise.allSettled([c.readContract(read()), c.readContract(read())]);
+    assert.deepEqual(
+      got.map((g) => g.status === "rejected" && g.reason.name),
+      ["RouteDownAtBuild", "RouteDownAtBuild"],
+    );
+    assert.deepEqual(seen.rpc, []);
+  }));
