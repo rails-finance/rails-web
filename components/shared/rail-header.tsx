@@ -15,6 +15,7 @@
 // wallet heading is its frame, with a line naming the protocol and linking
 // to its listing (components/shared/wallet-heading.tsx).
 
+import { LifecycleLine } from "@/components/shared/lifecycle-line";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
@@ -273,6 +274,8 @@ export function RailHeader({
         {/* An explorer with one section (About alone) draws no menu. */}
         {sections.length > 1 && <SectionsMenu sections={sections} />}
       </div>
+      {/* A closing or closed explorer says so on every venue (H24.1; ui-jobs 612, 621). */}
+      <LifecycleLine id={entry.id} />
       {stamp && (
         <div className="flex items-center">
           <RecencyStamp />

@@ -18,8 +18,28 @@
 // polaris-position.ts) and the receipts say which leg produced each figure.
 
 import { SEPOLIA_CHAIN_ID } from "@/lib/shared/chains";
+import type { ProtocolLifecycle } from "@/lib/shared/lifecycle";
 
 export const POLARIS_CHAIN_ID = SEPOLIA_CHAIN_ID;
+
+/** This deployment closed on 16 Nov 2026 (ui-jobs 621): Polaris's notice, and
+ *  its testnet app's banner read that day. The contracts kept answering on
+ *  Sepolia (block 12,150,116, 21:56 UTC), so the state rests on the notice. */
+export const POLARIS_TESTNET_CLOSED: ProtocolLifecycle = {
+  state: "closed",
+  at: 1_794_787_200,
+  lead: "Polaris closed this testnet on",
+  rest: " and will redeploy it. Balances, positions and locks do not carry over; this deployment's history stays here.",
+  source: {
+    by: "Polaris",
+    quote:
+      "This testnet will be discontinued on Monday 16 November. It will redeploy shortly after. Balances, positions and locks will not carry over.",
+    href: "https://testnet.polaris.finance",
+    reads:
+      "This testnet has been retired, thanks to everyone for testing. A new version with protocol updates is coming soon. Balances, positions and locks won't carry over to the new deployment.",
+    readOn: "16 Nov 2026",
+  },
+};
 
 export type PolarisMarket = "usdp" | "goldp";
 

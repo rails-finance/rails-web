@@ -76,7 +76,8 @@ import {
   liveDebtUsdProv,
   polarisAnnualCostProv,
 } from "@/lib/polaris/live-provenance";
-import { PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
+import { formatDate } from "@/lib/date";
+import { POLARIS_TESTNET_CLOSED, PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
 import { POLARIS_WORDS, polarisPositionModal } from "@/lib/polaris/event-templates";
 import { polarisCdpNftUrl, polarisPositionHref } from "@/lib/polaris/routes";
 import {
@@ -409,7 +410,15 @@ export function polarisCardSlots({
       ? { word: "Liquidated", tone: "danger" }
       : v.status === "closed"
         ? { word: "Closed", tone: "muted" }
-        : null;
+        : // An open CDP on the closed testnet (ui-jobs 621), as a Trove on a
+          // shut-down branch reads "Shut down" (612).
+          POLARIS_TESTNET_CLOSED.state === "closed"
+          ? {
+              word: "Testnet closed",
+              tone: "caution",
+              tip: `Polaris closed this testnet on ${formatDate(POLARIS_TESTNET_CLOSED.at)}. Its balances, positions and locks do not carry over to the next deployment.`,
+            }
+          : null;
 
   const counters = {
     lastActivityAt: v.lastActivityAt,

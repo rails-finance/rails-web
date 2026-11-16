@@ -1,5 +1,6 @@
 "use client";
 
+import { LifecycleTileTag } from "@/components/shared/lifecycle-line";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { FOOT_LINK } from "@/lib/shared/ui-grammar";
@@ -185,12 +186,12 @@ export function ProtocolRow() {
                     style={{ borderRadius: "20%" }}
                   />
                 )}
-                {p.history ? (
+                {p.history || p.lifecycle ? (
                   // Decisions 0061 and 0063: the tag under the name, both inside the
                   // mark's 2rem, so a tagged tile keeps the row height.
                   <span className="flex min-w-0 flex-col items-start">
                     <span className="text-sm font-semibold leading-4 whitespace-nowrap">{p.label}</span>
-                    <HistoryTag id={p.id} tip="title" />
+                    {p.lifecycle ? <LifecycleTileTag id={p.id} /> : <HistoryTag id={p.id} tip="title" />}
                   </span>
                 ) : (
                   <span className="text-sm font-semibold whitespace-nowrap">{p.label}</span>
