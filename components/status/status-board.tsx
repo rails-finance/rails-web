@@ -229,15 +229,17 @@ function visitLine(v: VisitReads | null | undefined, asOf: number): string {
 
 const shortAddress = (a: string) => (a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a);
 
-/** How a census's latest run ended, where it stopped or failed; null when it
- *  completed. The stop's time is left out where it is the last write's. */
+/** How a census's latest run ended, where it stopped or failed, and the vault
+ *  it is stuck on; null when it completed with no stuck vault. The stop's time
+ *  is left out where it is the last write's. */
 function censusLine(r: CensusRunStatus, lastWriteAt: string | null, subject = "The census"): string | null {
   const endedAt = Date.parse(r.endedAt) / 1000;
   const write = lastWriteAt ? Date.parse(lastWriteAt) / 1000 : null;
   const ended = write != null && Math.abs(endedAt - write) < 60 ? "" : ` at ${utcTime(endedAt)}`;
   const sv = censusStuckVault(r);
+  const namedAbove = r.outcome === "stopped-deadline" && sv != null && sv.vault === r.stoppedAtVault;
   const stuck = sv
-    ? ` It has stopped in vault ${shortAddress(sv.vault)} with nothing written in ${sv.stopsInLast5} of the last 5 runs.`
+    ? ` It has stopped ${namedAbove ? "there" : `in vault ${shortAddress(sv.vault)}`} with nothing written in ${sv.stopsInLast5} of the last 5 runs.`
     : "";
   switch (r.outcome) {
     case "completed":
@@ -256,7 +258,7 @@ function censusLine(r: CensusRunStatus, lastWriteAt: string | null, subject = "T
       return `${subject} stopped at its time limit${at}${ended}.${stuck}`;
     }
     case "failed":
-      return `${subject} failed${ended} (${errorKind(r.error) ?? "Error"}).`;
+      return `${subject} failed${ended} (${errorKind(r.error) ?? "Error"}).${stuck}`;
   }
 }
 

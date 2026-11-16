@@ -412,7 +412,7 @@ export interface CensusRunStatus {
   error: string | null;
   shareStopsInARow: number;
   stuckStopsInARow: number;
-  /** A vault that stopped 2 of the scope's last 5 runs with nothing saved;
+  /** A vault that stopped 2 of the scope's last 5 runs with nothing written;
    *  absent from an api that predates it, read as null. */
   stuckVault?: { vault: string; stopsInLast5: number } | null;
   /** The census's next scheduled run, from its crontab; absent from an api
@@ -442,8 +442,7 @@ export function censusScopeOf(w: StatusWriter, protocol: string): string | null 
   return w.censusScope ?? named ?? CENSUS_FAMILY[protocol] ?? null;
 }
 /** The vault a census is stuck on (2 of its last 5 runs stopped there with
- *  nothing saved), per the api's `stuckVault`; null when none or the api
- *  omits the field. */
+ *  nothing written), or null. */
 export function censusStuckVault(
   run: CensusRunStatus | null | undefined,
 ): { vault: string; stopsInLast5: number } | null {
