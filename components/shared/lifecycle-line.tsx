@@ -6,7 +6,7 @@
 // position page's wallet heading and on the home tile. Nothing for a live
 // explorer.
 
-import { Prov } from "@/components/shared/provenance";
+import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { PROTOCOLS } from "@/lib/shared/protocols";
 import { LIFECYCLE_WORD, lifecycleDay, lifecycleProv, type ProtocolLifecycle } from "@/lib/shared/lifecycle";
 
@@ -36,22 +36,27 @@ export function LifecycleTileTag({ id }: { id: string }) {
 
 /** The pill and its line, the date carrying the announcement's receipt (H24.1). */
 export function LifecycleLine({ id, className = "" }: { id: string; className?: string }) {
+  // Its own receipts scope, so the date opens its receipt on every venue,
+  // the rail header's included.
+  const registry = useReceiptRegistry();
   const entry = entryOf(id);
   const lc = entry?.lifecycle;
   if (!entry || !lc) return null;
   return (
-    <p
-      className={`flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[13px] leading-relaxed text-rb-500 ${className}`}
-      data-anatomy="H24.1"
-      data-lifecycle-line={lc.state}
-    >
-      <span className="inline-flex translate-y-[-1px]">
-        <LifecycleTag lifecycle={lc} />
-      </span>
-      <span>
-        {lc.lead} <Prov info={lifecycleProv(entry.label, lc)}>{lifecycleDay(lc)}</Prov>
-        {lc.rest}
-      </span>
-    </p>
+    <ProvReceiptsScope registry={registry}>
+      <p
+        className={`flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[13px] leading-relaxed text-rb-500 ${className}`}
+        data-anatomy="H24.1"
+        data-lifecycle-line={lc.state}
+      >
+        <span className="inline-flex translate-y-[-1px]">
+          <LifecycleTag lifecycle={lc} />
+        </span>
+        <span>
+          {lc.lead} <Prov info={lifecycleProv(entry.label, lc)}>{lifecycleDay(lc)}</Prov>
+          {lc.rest}
+        </span>
+      </p>
+    </ProvReceiptsScope>
   );
 }

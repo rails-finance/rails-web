@@ -29,7 +29,7 @@ export const POLARIS_TESTNET_CLOSED: ProtocolLifecycle = {
   state: "closed",
   at: 1_794_787_200,
   lead: "Polaris closed this testnet on",
-  rest: " and will redeploy it. Balances, positions and locks do not carry over; this deployment's history stays here.",
+  rest: " and will redeploy it. Balances, positions and locks do not carry over to the new deployment; this deployment's history stays on Rails.",
   source: {
     by: "Polaris",
     quote:

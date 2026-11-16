@@ -1200,10 +1200,6 @@ export const PROTOCOLS: ProtocolEntry[] = SPECS.map((spec) => {
 export const historyOf = (id: string): "none" | "from-date" | null =>
   PROTOCOLS.find((p) => p.id === id)?.history ?? null;
 
-/** A roster entry's lifecycle by its roster id; null while it is live. */
-export const lifecycleOf = (id: string): ProtocolLifecycle | null =>
-  PROTOCOLS.find((p) => p.id === id)?.lifecycle ?? null;
-
 export const LAUNCHED_PROTOCOLS: ProtocolEntry[] = PROTOCOLS.filter((p) => !p.unlaunched);
 
 /** One row per distinct launched protocol VERSION — the roster deduplicated on

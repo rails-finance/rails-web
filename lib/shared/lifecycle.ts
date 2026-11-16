@@ -2,7 +2,7 @@
 // Closing or Closed, each with its date and its receipt. Live is the default
 // and is not written down; a roster entry that carries `lifecycle` is closing
 // or closed. The state is never inferred from low activity: its receipt is a
-// shutdown flag, a governance action or the team's own announcement.
+// shutdown flag, a governance action or the team's announcement.
 //
 // First use: Polaris's first Sepolia testnet, closed on 16 Nov 2026 (ui-jobs
 // 621). A Liquity V2 fork's branch shutdown is per branch and settles in

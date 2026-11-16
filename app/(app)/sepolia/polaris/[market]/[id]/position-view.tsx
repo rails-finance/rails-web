@@ -392,8 +392,8 @@ export default function PolarisPositionView({
                 expected, and the card stands on the index's last state. */}
             {!onEventPage && headUnanswered && view.lastActivityAt != null && (
               <p className="text-[13px] leading-relaxed text-rb-500" data-chain-unanswered="">
-                The testnet&rsquo;s contracts did not answer on this read, so the card shows the position as Rails last
-                indexed it, at its last transaction on {formatDate(view.lastActivityAt)}.
+                The chain did not answer on this read, so the card shows the position as last indexed, at its last
+                transaction on {formatDate(view.lastActivityAt)}.
               </p>
             )}
             {!onEventPage && (
