@@ -35,6 +35,7 @@ import type { StoredHeadRead } from "@/lib/shared/server-head-read";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { COMPOUND_V2_MARKETS, COMPOUND_V2_ADDRESSES, CTOKEN_DECIMALS } from "@/lib/compound-v2/asset-catalog";
 import { compoundV2Apy } from "@/lib/comptroller/apy";
+import { rethrowAtBuild } from "@/lib/sources/api/route-gate";
 
 const CTOKEN_ABI = parseAbi([
   "function exchangeRateStored() view returns (uint256)",
@@ -110,7 +111,8 @@ export async function resolveCompoundV2MarketState(): Promise<CompoundV2MarketSt
       };
     } else delete value.read;
     return value;
-  } catch {
+  } catch (err) {
+    rethrowAtBuild(err);
     return new Map(); // No read and no snapshot (or ALCHEMY_URL unset): amounts-only.
   }
 }
@@ -142,7 +144,8 @@ async function readMarketState(client: PublicClient): Promise<CompoundV2MarketSt
         ]),
       ],
     })) as Res[];
-  } catch {
+  } catch (err) {
+    rethrowAtBuild(err);
     return out;
   }
 
@@ -176,7 +179,8 @@ async function readMarketState(client: PublicClient): Promise<CompoundV2MarketSt
         ];
       }),
     })) as Res[];
-  } catch {
+  } catch (err) {
+    rethrowAtBuild(err);
     return out;
   }
 

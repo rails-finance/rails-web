@@ -36,6 +36,7 @@ import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import type { StoredHeadRead } from "@/lib/shared/server-head-read";
 import { COMPOUND_DEPLOYMENT, type CometDeployment, type CometMarket } from "@/lib/compound/asset-catalog";
 import { cometUsdOf } from "@/lib/compound/at-block-prices";
+import { rethrowAtBuild } from "@/lib/sources/api/route-gate";
 
 const COMET_ABI = parseAbi([
   "function baseTokenPriceFeed() view returns (address)",
@@ -123,7 +124,8 @@ async function readRosters(client: ReturnType<typeof chainClient>, comets: strin
     stale.forEach((c, k) => {
       if (counts[k]?.status === "success") rosterCache.set(c, { at: Date.now(), assets: byComet.get(c) ?? [] });
     });
-  } catch {
+  } catch (err) {
+    rethrowAtBuild(err);
     // No roster: only the assets asked for are priced.
   }
 }
@@ -185,7 +187,8 @@ export async function resolveCometPrices(
       };
     }
     return value;
-  } catch {
+  } catch (err) {
+    rethrowAtBuild(err);
     return new Map(); // No read and no snapshot: callers stay token-only.
   }
 }
@@ -333,7 +336,8 @@ async function resolveFromChain(reqs: CometPriceRequest[], deployment: CometDepl
               } as const),
         ),
       })) as unknown[];
-    } catch {
+    } catch (err) {
+      rethrowAtBuild(err);
       feedResults = [];
     }
     feedLookups.forEach((p, i) => {
@@ -366,7 +370,8 @@ async function resolveFromChain(reqs: CometPriceRequest[], deployment: CometDepl
           }) as const,
       ),
     })) as unknown[];
-  } catch {
+  } catch (err) {
+    rethrowAtBuild(err);
     priceResults = [];
   }
 
@@ -442,7 +447,8 @@ export async function cometEthUsdAtBlocks(deployment: CometDeployment, blocks: n
             out.set(block, price);
             return;
           }
-        } catch {
+        } catch (err) {
+          rethrowAtBuild(err);
           // This Comet did not exist or did not list WETH at that block: try the next.
         }
       }

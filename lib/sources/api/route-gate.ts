@@ -32,6 +32,12 @@ export class RouteDownAtBuild extends Error {
 
 const atBuild = () => process.env.NEXT_PHASE === "phase-production-build";
 
+/** First in a catch between a gate client and a prerender: rethrows the build's route
+ *  failure, so the page fails instead of caching its stub; any other error returns. */
+export function rethrowAtBuild(err: unknown): void {
+  if (err instanceof RouteDownAtBuild) throw err;
+}
+
 /** For an api-first client that asks without a gate: during `next build`, its route
  *  failing (`why`, or the error it threw) throws `RouteDownAtBuild`; otherwise nothing. */
 export function throwAtBuild(key: string, why: unknown): void {

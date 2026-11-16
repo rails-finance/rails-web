@@ -18,7 +18,7 @@
 import { parseAbi, type ContractFunctionParameters } from "viem";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { chainClient } from "@/lib/sources/chain/rpc";
-import { routeGate } from "./route-gate";
+import { routeGate, rethrowAtBuild } from "./route-gate";
 import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import type {
@@ -182,7 +182,8 @@ async function withPointers(
         status: 4,
       };
     });
-  } catch {
+  } catch (err) {
+    rethrowAtBuild(err);
     missing.forEach(({ r }) => {
       if (r.lastZombieTroveId === undefined) r.lastZombieTroveId = null;
     });

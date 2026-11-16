@@ -1,29 +1,32 @@
 // The replay proxy's pins file (rpc-counting-proxy.mjs; rails-ops TO-DO-ui-jobs.md item 686).
-// A proxy merges its pins into the file: it re-reads the file just before writing, the file's
-// keys win, it writes only when it holds a pin the file lacks, never an empty set, and through
-// a temp file renamed over the old one.
+// A proxy merges the pins its run took into the file: it re-reads the file just before writing,
+// the file's keys win, it writes only when it took a pin the file lacks, never an empty set,
+// never over a file it cannot read, and through a temp file renamed over the old one.
 
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
-/** The file's pins, or {} where it is missing or unreadable. */
+/** The file's pins: {} where it is missing, null where it cannot be read as a set of pins. */
 export function readPinsFile(file) {
+  if (!existsSync(file)) return {};
   try {
     const got = JSON.parse(readFileSync(file, "utf8"));
-    return got && typeof got === "object" && !Array.isArray(got) ? got : {};
+    return got && typeof got === "object" && !Array.isArray(got) ? got : null;
   } catch {
-    return {};
+    return null;
   }
 }
 
-/** Merge `pins` into `file`; true where the file was written. */
-export function writePinsFile(file, pins) {
+/** Merge the pins a run took into `file`: "written", "unchanged" (no pin the file lacks), or
+ *  "unreadable" (the file is left alone). */
+export function writePinsFile(file, taken) {
   const onDisk = readPinsFile(file);
-  if (!Object.keys(pins).some((k) => !(k in onDisk))) return false;
-  const merged = { ...pins, ...onDisk };
+  if (!onDisk) return "unreadable";
+  if (!Object.keys(taken).some((k) => !(k in onDisk))) return "unchanged";
+  const merged = { ...taken, ...onDisk };
   mkdirSync(dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
   writeFileSync(tmp, JSON.stringify(merged, null, 2));
   renameSync(tmp, file);
-  return true;
+  return "written";
 }

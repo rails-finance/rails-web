@@ -29,7 +29,7 @@
 // (`route-gate.ts`). The head waits 3 s so that a slow api leaves a server
 // render's 8 s budget (`position-tail-page-data.ts`) time for the chain read.
 // During `next build` a failed head or round throws to every reader waiting on
-// it instead (route-gate.ts), so a prerender fails rather than read the chain.
+// it instead (route-gate.ts), so a prerender fails.
 //
 // A build or an ISR render asks each round with `wait: 6000`: rails-server's
 // keyless gate holds the round up to 6 s for a slot before the paid leg, so a

@@ -220,10 +220,11 @@ const nextConfig: NextConfig = {
     // the compiler's memory is released when compilation ends.
     webpackBuildWorker: true,
     // A prerender whose rails-server route fails throws during the build
-    // (lib/sources/api/route-gate.ts); Next renders that page again up to twice.
+    // (lib/sources/api/route-gate.ts). The retry count is Next's total attempts per page
+    // (next/dist/export/worker.js, default 1): 3 renders a failed page twice more.
     // Two pages at a time per worker keep a build's burst from swamping the api
     // (rails-ops TO-DO-ui-jobs.md item 686: 79 connect timeouts on 14 Nov 2026).
-    staticGenerationRetryCount: 2,
+    staticGenerationRetryCount: 3,
     staticGenerationMaxConcurrency: 2,
   },
   // Content files (content/<protocol>/*.yaml, the strings a prose writer

@@ -36,10 +36,11 @@
 //   checkout share one warm cache and removing a worktree keeps it. Layout:
 //   <dir>/<chain>/<method>/<hash[0..2]>/<hash>.json. Delete the directory to
 //   start cold. RPC_PIN=keep starts from <dir>/pins.json, so a rerun of one script
-//   costs nothing upstream. A pin the file lacks is merged into it (rpc-pins-file.mjs:
-//   the file's keys win, never an empty set) when RPC_PIN=keep is set or RPC_CACHE_DIR
-//   names the proxy's own cache; a proxy on the shared default without RPC_PIN=keep
-//   leaves the file alone. To take new pins, remove pins.json and run with RPC_PIN=keep.
+//   costs nothing upstream. A pin the run took that the file lacks is merged into it
+//   (rpc-pins-file.mjs: the file's keys win, never an empty set, never over a file it
+//   cannot read) when RPC_PIN=keep is set or the cache is not the shared default; a
+//   proxy on the shared default without RPC_PIN=keep leaves the file alone. To take
+//   new pins, remove pins.json and run with RPC_PIN=keep.
 //
 // Usage — run-all.mjs starts it and points the dev server at it. By hand:
 //
@@ -61,14 +62,15 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { readPinsFile, writePinsFile } from "./rpc-pins-file.mjs";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 const PORT = Number(process.env.PORT ?? 8899);
-const CACHE_DIR = process.env.RPC_CACHE_DIR ?? join(homedir(), ".cache", "rails-web", "rpc-replay");
+const SHARED_CACHE_DIR = join(homedir(), ".cache", "rails-web", "rpc-replay");
+const CACHE_DIR = process.env.RPC_CACHE_DIR ?? SHARED_CACHE_DIR;
 const PINS_FILE = join(CACHE_DIR, "pins.json");
 const KEEP_PINS = process.env.RPC_PIN === "keep";
 /** The shared default cache's pins are written only by a proxy that started from them. */
-const WRITES_PINS = KEEP_PINS || process.env.RPC_CACHE_DIR != null;
+const WRITES_PINS = KEEP_PINS || resolve(CACHE_DIR) !== resolve(SHARED_CACHE_DIR);
 const QUIET = process.env.RPC_QUIET === "1";
 
 // ── the lanes ───────────────────────────────────────────────────────────────
@@ -205,13 +207,19 @@ function writeCache(path, method, params, result) {
 /** chain → hex block. Taken on the first head read of the run, or carried over
  *  from the last run with RPC_PIN=keep. */
 const pins = {};
-// No pins yet: the first head read takes them.
-if (KEEP_PINS) Object.assign(pins, readPinsFile(PINS_FILE));
+/** The pins this run took from the upstream: the only ones it writes back. */
+const taken = {};
+if (KEEP_PINS) {
+  const kept = readPinsFile(PINS_FILE);
+  if (kept) Object.assign(pins, kept);
+  else console.error(`rpc-counting-proxy: ${PINS_FILE} is unreadable; taking new pins and leaving the file alone`);
+}
 
 function savePins() {
   if (!WRITES_PINS) return;
   try {
-    writePinsFile(PINS_FILE, pins);
+    if (writePinsFile(PINS_FILE, taken) === "unreadable")
+      console.error(`rpc-counting-proxy: ${PINS_FILE} is unreadable; this run's pins were not written`);
   } catch {
     /* a cache that cannot be written is a cold run, nothing worse */
   }
@@ -246,6 +254,7 @@ async function pinFor(lane, tag = "latest") {
         }
         if (latest && parseInt(hex, 16) > parseInt(latest, 16)) hex = latest;
         pins[key] = hex;
+        taken[key] = hex;
         savePins();
         if (!QUIET) console.log(`· ${chain} ${tag} pinned at ${hex} (${parseInt(hex, 16)})`);
         return hex;

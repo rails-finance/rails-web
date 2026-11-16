@@ -51,6 +51,7 @@ import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { resolveErc20Meta, scaleRaw, assertDecimalsRead } from "./erc20-meta";
 import { DOLOMITE_ADDRESSES, DOLOMITE_BASE, SECONDS_PER_YEAR } from "@/lib/dolomite/asset-catalog";
+import { rethrowAtBuild } from "@/lib/sources/api/route-gate";
 
 const ZERO = BigInt(0);
 const BASE = BigInt("1000000000000000000"); // 1e18 (viem targets ES2017 — no BigInt literals)
@@ -357,6 +358,7 @@ export async function loadDolomiteMarkets(): Promise<DolomiteMarketsResponse> {
       chainStale: false,
     };
   } catch (error) {
+    rethrowAtBuild(error);
     console.error("Dolomite markets chain read failed:", error);
     return empty();
   }

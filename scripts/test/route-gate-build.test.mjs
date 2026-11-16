@@ -21,7 +21,7 @@ register("data:text/javascript," + encodeURIComponent(hook));
 
 const API = "https://api.example";
 process.env.RAILS_API_URL = API;
-const { routeGate } = await import(ROOT + "lib/sources/api/route-gate.ts");
+const { routeGate, rethrowAtBuild, RouteDownAtBuild } = await import(ROOT + "lib/sources/api/route-gate.ts");
 
 const FAILURES = {
   "a refused connection": async () => {
@@ -73,7 +73,7 @@ test("at build, a 404 is still an answer", async () => {
   assert.deepEqual(await routeGate().answer("k", `${API}/x`, {}), { status: 404 });
 });
 
-test("at build, the caller's own abort returns null", async () => {
+test("at build, the caller's abort returns null", async () => {
   process.env.NEXT_PHASE = "phase-production-build";
   const ctl = new AbortController();
   test.mock.method(globalThis, "fetch", async () => {
@@ -81,4 +81,31 @@ test("at build, the caller's own abort returns null", async () => {
     throw new DOMException("aborted", "AbortError");
   });
   assert.equal(await routeGate().json("k", `${API}/x`, {}, { signal: ctl.signal }), null);
+});
+
+test("rethrowAtBuild rethrows the build's route failure and returns on any other error", () => {
+  const down = new RouteDownAtBuild("k", "status 503");
+  assert.throws(
+    () => rethrowAtBuild(down),
+    (e) => e === down,
+  );
+  assert.equal(rethrowAtBuild(new Error("execution reverted")), undefined);
+  assert.equal(rethrowAtBuild(null), undefined);
+});
+
+test("a loader's catch with rethrowAtBuild fails at build and stubs at run time", async () => {
+  const gate = routeGate();
+  const loader = async () => {
+    try {
+      return await gate.json("k", `${API}/x`, {}, { timeoutMs: 50 });
+    } catch (err) {
+      rethrowAtBuild(err);
+      return "stub";
+    }
+  };
+  test.mock.method(globalThis, "fetch", async () => new Response("{}", { status: 503 }));
+  process.env.NEXT_PHASE = "phase-production-build";
+  await assert.rejects(loader(), { name: "RouteDownAtBuild" });
+  delete process.env.NEXT_PHASE;
+  assert.equal(await loader(), null);
 });
