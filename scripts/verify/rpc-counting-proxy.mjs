@@ -50,7 +50,8 @@
 // then start the server with the four variables pointed at it:
 //   ALCHEMY_URL=http://127.0.0.1:8899/ethereum BASE_RPC_URL=http://127.0.0.1:8899/base \
 //   ENS_RPC_URL=http://127.0.0.1:8899/ens SEPOLIA_RPC_URL=http://127.0.0.1:8899/sepolia \
-//   ETHEREUM_LOGS_RPC_URL=http://127.0.0.1:8899/ethereum-logs BASE_BACKFILL_RPC_URL=http://127.0.0.1:8899/base-logs npx next dev
+//   ETHEREUM_LOGS_RPC_URL=http://127.0.0.1:8899/ethereum-logs BASE_BACKFILL_RPC_URL=http://127.0.0.1:8899/base-logs \
+//   ARBITRUM_RPC_URL=http://127.0.0.1:8899/arbitrum npx next dev
 //
 // GET /__count — the counters; GET /__reset — zero them; GET /__pins — the pins.
 // Not a verifier; run-all lists it as a SKIP.
@@ -97,6 +98,7 @@ if (process.env.ETHEREUM_LOGS_RPC_URL)
   LANES["ethereum-logs"] = { upstream: process.env.ETHEREUM_LOGS_RPC_URL, chain: "ethereum" };
 if (process.env.BASE_BACKFILL_RPC_URL)
   LANES["base-logs"] = { upstream: process.env.BASE_BACKFILL_RPC_URL, chain: "base" };
+if (process.env.ARBITRUM_RPC_URL) LANES.arbitrum = { upstream: process.env.ARBITRUM_RPC_URL, chain: "arbitrum" };
 
 if (!Object.keys(LANES).length) {
   console.error(

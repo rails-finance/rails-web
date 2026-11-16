@@ -32,6 +32,13 @@ export class RouteDownAtBuild extends Error {
 
 const atBuild = () => process.env.NEXT_PHASE === "phase-production-build";
 
+/** For an api-first client that asks without a gate: during `next build`, its route
+ *  failing (`why`, or the error it threw) throws `RouteDownAtBuild`; otherwise nothing. */
+export function throwAtBuild(key: string, why: unknown): void {
+  if (why instanceof RouteDownAtBuild) throw why;
+  if (atBuild()) throw new RouteDownAtBuild(key, why instanceof Error ? why.message : String(why));
+}
+
 /** How long to wait, and a signal that ends the wait sooner. */
 export interface AskOpts {
   timeoutMs?: number;
