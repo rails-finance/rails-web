@@ -62,7 +62,7 @@ import {
   type Allowance,
   type HeadMiss,
   type CensusRunStatus,
-  CENSUS_STUCK_STOPS,
+  censusStuckVault,
   CENSUS_WRITER,
   CENSUS_LABEL,
   censusScopeOf,
@@ -235,13 +235,13 @@ function censusLine(r: CensusRunStatus, lastWriteAt: string | null, subject = "T
   const endedAt = Date.parse(r.endedAt) / 1000;
   const write = lastWriteAt ? Date.parse(lastWriteAt) / 1000 : null;
   const ended = write != null && Math.abs(endedAt - write) < 60 ? "" : ` at ${utcTime(endedAt)}`;
-  const stuck =
-    r.stuckStopsInARow >= CENSUS_STUCK_STOPS
-      ? ` It has stopped in the same vault ${r.stuckStopsInARow} runs in a row with nothing written.`
-      : "";
+  const sv = censusStuckVault(r);
+  const stuck = sv
+    ? ` It has stopped in vault ${shortAddress(sv.vault)} with nothing written in ${sv.stopsInLast5} of the last 5 runs.`
+    : "";
   switch (r.outcome) {
     case "completed":
-      return null;
+      return stuck ? `${subject} completed${ended}.${stuck}` : null;
     case "stopped-share": {
       const left =
         r.remainingMb != null && r.floorMb != null

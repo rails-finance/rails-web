@@ -412,6 +412,9 @@ export interface CensusRunStatus {
   error: string | null;
   shareStopsInARow: number;
   stuckStopsInARow: number;
+  /** A vault that stopped 2 of the scope's last 5 runs with nothing saved;
+   *  absent from an api that predates it, read as null. */
+  stuckVault?: { vault: string; stopsInLast5: number } | null;
   /** The census's next scheduled run, from its crontab; absent from an api
    *  that predates it. */
   nextRunAt?: string | null;
@@ -438,9 +441,14 @@ export function censusScopeOf(w: StatusWriter, protocol: string): string | null 
   const named = w.censusFamilies?.find((f) => f in CENSUS_LABEL);
   return w.censusScope ?? named ?? CENSUS_FAMILY[protocol] ?? null;
 }
-/** Stops in the same vault with nothing written that read as an alarm (the
- *  census wrapper's exit 3). */
-export const CENSUS_STUCK_STOPS = 3;
+/** The vault a census is stuck on (2 of its last 5 runs stopped there with
+ *  nothing saved), per the api's `stuckVault`; null when none or the api
+ *  omits the field. */
+export function censusStuckVault(
+  run: CensusRunStatus | null | undefined,
+): { vault: string; stopsInLast5: number } | null {
+  return run?.stuckVault ?? null;
+}
 
 /** How long past its due time a census may take to record its next run
  *  before it reads late: the slots fall up to about 70 min after a gateway
@@ -720,11 +728,10 @@ export function writerState(w: StatusWriter, now: Secs, e?: StatusEntry): Heartb
   // A census stops by design at its gateway share or its deadline: held
   // until its next run is due (with CENSUS_DUE_GRACE), late after, stalled
   // three schedules past it; an alarm
-  // once it has stopped in the same vault with nothing written
-  // CENSUS_STUCK_STOPS times.
+  // while the api names a stuck vault (2 of the last 5 runs).
   const run = w.censusRun;
   if (run) {
-    if (run.stuckStopsInARow >= CENSUS_STUCK_STOPS) return "stalled";
+    if (censusStuckVault(run)) return "stalled";
     const due = censusDue(w);
     if (due) return now <= due.at + CENSUS_DUE_GRACE ? "paused" : now - due.at > 3 * every ? "stalled" : "late";
   }

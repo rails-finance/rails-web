@@ -246,9 +246,15 @@ test("the next run comes from nextRunAt, else after the reset, else a schedule a
   assert.equal(censusDue(w(censusRun({ outcome: "completed" }))), null);
 });
 
-test("three stops in the same vault are stalled; a failed run is late", () => {
-  const stuck = censusStatus(censusRun({ stuckStopsInARow: 3 }));
+test("a stuck vault is stalled, and only while the api names one; a failed run is late", () => {
+  const stuck = censusStatus(
+    censusRun({ stuckVault: { vault: "0x1234567890abcdef1234567890abcdef12345678", stopsInLast5: 2 } }),
+  );
   assert.equal(writerState(stuck.entries[0].live.writers[0], now, stuck.entries[0]), "stalled");
+  for (const over of [{ stuckVault: null }, {}, { stuckStopsInARow: 5 }]) {
+    const off = censusStatus(censusRun(over));
+    assert.notEqual(writerState(off.entries[0].live.writers[0], now, off.entries[0]), "stalled");
+  }
   const failed = censusStatus(censusRun({ outcome: "failed", error: "boom" }), censusWriter(2 * 3600, false));
   assert.equal(writerState(failed.entries[0].live.writers[0], now, failed.entries[0]), "late");
 });
