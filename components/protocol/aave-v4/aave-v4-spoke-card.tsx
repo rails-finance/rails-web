@@ -15,6 +15,8 @@
 // cost, the liquidation threshold, the risk premium and the liquidation read.
 // A closed spoke shows its highest recorded balances and the Outcome.
 
+import { positionName } from "@/lib/shared/position-name";
+import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { useState, type ReactNode } from "react";
 import { Link2 } from "lucide-react";
 import { formatDate } from "@/lib/date";
@@ -287,6 +289,8 @@ export interface AaveV4SpokeCardProps {
   /** A wallet pill beside the spoke name, for a selector whose page does not
    *  name the wallet above the card. */
   wallet?: string;
+  /** The wallet the position's name carries where no pill draws it. */
+  owner?: string;
   ensName?: string | null;
   /** Who executed this spoke position's events, reduced over the page's
    *  spoke-scoped history: the explanation's operator bullet. */
@@ -311,6 +315,7 @@ export function useAaveV4SpokeCardSlots({
   spoke,
   showInfo,
   wallet,
+  owner = wallet,
   ensName,
   externalActivity,
   closedFactors,
@@ -334,6 +339,8 @@ export function useAaveV4SpokeCardSlots({
       <SpokeIdentity name={spoke.name} hub={spoke.hub} debtHubs={spoke.debtHubs} />
     </span>
   );
+  // The position's name: the spoke and the wallet (lib/shared/position-name.ts).
+  const name = owner ? positionName({ market: spoke.name, noun: POSITION_NOUN[session], id: owner }) : undefined;
   // The owner transaction count, the liquidation triangle, then the time
   // since the last event, as every detail card orders them; the closed card's
   // tip also gives the events behind them.
@@ -390,6 +397,7 @@ export function useAaveV4SpokeCardSlots({
       heads,
       identity,
       counters,
+      name,
       explainer,
       learnMore,
       menu,
@@ -605,6 +613,7 @@ export function useAaveV4SpokeCardSlots({
     heads,
     identity,
     counters,
+    name,
     explainer,
     learnMore,
     menu,

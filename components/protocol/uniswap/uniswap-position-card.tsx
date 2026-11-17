@@ -7,15 +7,19 @@
 // On the shared detail card (its ⋮, read stamp and (i)); the figures are
 // plain and the chain stays in each figure's receipt (decision 0059 point 1).
 
+import { PositionNameId } from "@/components/shared/position-name-id";
+import { marketPair, positionName } from "@/lib/shared/position-name";
+import { POSITION_NOUN } from "@/lib/shared/protocols";
+import type { SessionProtocol } from "@/lib/shared/sessions";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { PositionCard, type PositionCardHead, type PositionCardSlots } from "@/components/shared/position-card";
 import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups";
 import { Segs, UniswapReadStamp } from "@/components/protocol/uniswap/uniswap-readout";
 import { poolPosition } from "@/lib/uniswap/position";
 import { cardProv } from "@/lib/uniswap/provenance";
-import type { UniProtocol } from "@/lib/uniswap/deployments";
+import { uniExplorerId, type UniProtocol } from "@/lib/uniswap/deployments";
 import type { UniPositionRead } from "@/lib/uniswap/types";
-import { CARD_WORDS, cardExplainer, cardStatus, isClosed, num, positionNumber, shown } from "@/lib/uniswap/words";
+import { CARD_WORDS, cardExplainer, cardStatus, isClosed, num, shown } from "@/lib/uniswap/words";
 
 /** The range against the price, on a log scale padded around both. Uniswap's and Aerodrome's cards
  *  share it: `s` is the prices as shown (lib/uniswap/words.ts `shown`). */
@@ -135,13 +139,20 @@ function slots(r: UniPositionRead, protocol: UniProtocol): PositionCardSlots {
       : []),
   ];
   const status = cardStatus(p);
+  // The position's name: the pair and the NFT id (lib/shared/position-name.ts).
+  const name = positionName({
+    market: marketPair(p.base.symbol, p.quote.symbol),
+    noun: POSITION_NOUN[uniExplorerId(p.protocol, p.chainId, p.version) as SessionProtocol],
+    id: p.id,
+  });
   return {
     surface: "detail",
     heading: CARD_WORDS.heading,
     status: status ? { word: status.word, tone: "muted", tip: status.tip } : null,
+    name,
     identity: (
       <span className="text-xs text-rb-500">
-        {positionNumber(p.id)}
+        <PositionNameId name={name} />
         {/* PancakeSwap: whether the farm holds it. */}
         {p.staked !== undefined && (
           <>

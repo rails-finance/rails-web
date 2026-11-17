@@ -3,7 +3,7 @@
 
 import type { Metadata } from "next";
 import { positionMetadata } from "@/lib/shared/page-metadata";
-import { AerodromePositionPage } from "@/components/protocol/aerodrome/aerodrome-position-page";
+import { AerodromePositionPage, aerodromeTabMarket } from "@/components/protocol/aerodrome/aerodrome-position-page";
 
 interface Props {
   params: Promise<{ deployment: string; id: string }>;
@@ -16,6 +16,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return positionMetadata({
     session: "aerodrome",
     subject: id,
+    // The pair off the read the page makes (the same `cache()` entry).
+    market: await aerodromeTabMarket(deployment, id),
     canonicalPath: `/base/aerodrome/position/${deployment}/${id}`,
   });
 }

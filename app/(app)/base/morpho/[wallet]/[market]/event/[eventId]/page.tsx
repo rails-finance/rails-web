@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { morphoEventPageDescription, morphoEventPageTitle } from "@/lib/morpho/explorer";
-import { loadMorphoBaseTail, morphoBaseTailMarket } from "@/lib/morpho-base/position-page-data";
+import { loadMorphoBaseTail } from "@/lib/morpho-base/position-page-data";
+import { slotReadMarket } from "@/lib/morpho/asset-catalog";
 import { isMorphoBaseMarketSegment } from "@/lib/morpho-base/routes";
 import { rehydrateChainTimelineWire } from "@/lib/shared/timeline-wire";
 import { isMorphoEvent } from "@/lib/shared/types/event-shape";
@@ -26,7 +27,7 @@ export const dynamic = "force-dynamic";
  *  this market's own group. */
 async function findMorphoBaseEvent(wallet: string, market: string, decodedId: string) {
   const tail = await loadMorphoBaseTail(wallet);
-  const pair = morphoBaseTailMarket(tail.head, market);
+  const pair = slotReadMarket(tail.head, market);
   if (!tail.timeline) return { event: null, pair };
   const rehydrated = rehydrateChainTimelineWire(tail.timeline) as MorphoChainTimelineResponse;
   const pos = rehydrated.positions?.find((p) => p.marketId.toLowerCase() === market);

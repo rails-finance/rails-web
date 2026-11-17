@@ -35,6 +35,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return eventMetadata({
     session: "llamalend",
     subject: rawUser,
+    market: tail?.position?.marketLabel,
     canonicalPath: `/ethereum/llamalend/${rawController}/${rawUser}/event/${encodeURIComponent(decoded)}`,
     event: event
       ? { actionLabel: llamalendEventHeading(event, marks?.get(event.id)), timestamp: event.timestamp }

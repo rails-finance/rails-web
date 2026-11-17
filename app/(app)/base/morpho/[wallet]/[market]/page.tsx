@@ -7,11 +7,8 @@ import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
 import { isMorphoBaseMarketSegment } from "@/lib/morpho-base/routes";
 import { servedFoldersFromParam } from "@/lib/shared/timeline-folder";
-import {
-  loadMorphoBaseGroupedTail,
-  loadMorphoBaseTail,
-  morphoBaseTailMarket,
-} from "@/lib/morpho-base/position-page-data";
+import { loadMorphoBaseGroupedTail, loadMorphoBaseTail } from "@/lib/morpho-base/position-page-data";
+import { slotReadMarket } from "@/lib/morpho/asset-catalog";
 import { morphoBaseVaultOwnerNote } from "@/lib/morpho-base/vault-owner-note";
 import MorphoBasePositionView from "./position-view";
 
@@ -42,7 +39,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   return positionMetadata({
     session: "morpho-base",
     subject: rawWallet,
-    market: (tail && m ? morphoBaseTailMarket(tail.head, m) : undefined) ?? `${market.slice(0, 10)}…`,
+    market: (tail && m ? slotReadMarket(tail.head, m) : undefined) ?? `${market.slice(0, 10)}…`,
     canonicalPath: `/base/morpho/${wallet}/${market}`,
     // This route carries its own opengraph-image.tsx, rendering this
     // position's live card — the static per-explorer PNG stays only its

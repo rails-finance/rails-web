@@ -72,7 +72,7 @@ export function accountDataProv(
     kind: "chain",
     pclass: "state",
     verify: STATE_VERIFY,
-    summary: `${what} — the figure the Pool gives for this wallet when it is asked for the account's state at the latest block. The Pool values every reserve at the price its oracle reports and weighs each one by that value, which is the arithmetic it liquidates by.${scale ? ` ${scale}` : ""}`,
+    summary: `${what} — the figure the Pool gives for this wallet when it is asked for the position's state at the latest block. The Pool values every reserve at the price its oracle reports and weighs each one by that value, which is the arithmetic it liquidates by.${scale ? ` ${scale}` : ""}`,
     contract: poolContractFor(pool),
     via,
   };

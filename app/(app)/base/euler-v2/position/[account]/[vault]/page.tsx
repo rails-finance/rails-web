@@ -3,7 +3,7 @@
 
 import type { Metadata } from "next";
 import { positionMetadata } from "@/lib/shared/page-metadata";
-import { EulerPositionPage } from "@/components/protocol/euler/euler-position-page";
+import { EulerPositionPage, eulerTabMarket } from "@/components/protocol/euler/euler-position-page";
 
 interface Props {
   params: Promise<{ account: string; vault: string }>;
@@ -15,7 +15,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { account, vault } = await params;
   return positionMetadata({
     session: "euler-v2-base",
-    subject: account,
+    subject: account.toLowerCase(),
+    // The vault off the read the page makes (the same `cache()` entry).
+    market: await eulerTabMarket(8453, account, vault),
     canonicalPath: `/base/euler-v2/position/${account}/${vault}`,
   });
 }

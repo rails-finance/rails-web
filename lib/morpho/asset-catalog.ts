@@ -83,3 +83,17 @@ export function shortMarketId(marketId: string): string {
 export function marketLabel(loanSymbol: string, collateralSymbol: string, isIdle: boolean): string {
   return isIdle ? `${loanSymbol} (idle)` : `${loanSymbol} / ${collateralSymbol}`;
 }
+
+/** The market's pair off a wallet's slot read, as the card's name gives it
+ *  ("USDC / cbBTC"), for a position's tab title (lib/shared/position-name.ts);
+ *  undefined when the read holds no position in that market. `market` is the
+ *  lowercase id. */
+export function slotReadMarket(
+  head: {
+    positions: { marketId: string; loanSymbol: string; collateralSymbol: string; lltv: number }[];
+  } | null,
+  market: string,
+): string | undefined {
+  const p = head?.positions.find((x) => x.marketId.toLowerCase() === market);
+  return p ? marketLabel(p.loanSymbol, p.collateralSymbol, p.lltv === 0) : undefined;
+}

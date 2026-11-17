@@ -107,19 +107,19 @@ export interface SparkPositionView {
 const LIQ_FEE_ROW_NOTE = "a liquidation's fee to the Spark treasury is a row of its own";
 
 const COLLATERAL_TIP =
-  "What the account supplies that backs its borrowing, valued at SparkLend's oracle prices (the price feed SparkLend liquidates with). A supply is held as spTokens, SparkLend's receipt token, whose balance grows as interest accrues.";
+  "What the position supplies that backs its borrowing, valued at SparkLend's oracle prices (the price feed SparkLend liquidates with). A supply is held as spTokens, SparkLend's receipt token, whose balance grows as interest accrues.";
 
 const DEBT_TIP =
-  "What the account owes SparkLend, valued at SparkLend's oracle prices, including the interest accrued at each asset's borrow APY. A borrow is held as variable debt tokens, whose balance grows as interest accrues.";
+  "What the position owes SparkLend, valued at SparkLend's oracle prices, including the interest accrued at each asset's borrow APY. A borrow is held as variable debt tokens, whose balance grows as interest accrues.";
 
 const NOT_COLLATERAL_TIP =
   "Supplied and earning the supply APY, but backing no borrowing: its collateral switch is off, or SparkLend gives it a liquidation threshold of 0 (USDC, USDT, USDS and PYUSD).";
 
 const PEAK_NOT_COLLATERAL_TIP =
-  "Supplied and earning the supply APY, but never backing borrowing: the account never turned its collateral switch on (SparkLend gives USDC, USDT, USDS and PYUSD a liquidation threshold of 0).";
+  "Supplied and earning the supply APY, but never backing borrowing: the wallet never turned its collateral switch on (SparkLend gives USDC, USDT, USDS and PYUSD a liquidation threshold of 0).";
 
 const HF_TIP =
-  "The collateral, each asset counted up to its liquidation threshold, divided by the debt, at SparkLend's oracle prices. Below 1, anyone can liquidate the account.";
+  "The collateral, each asset counted up to its liquidation threshold, divided by the debt, at SparkLend's oracle prices. Below 1, anyone can liquidate the position.";
 
 const SPARK_TERMS = AAVE_FAMILY_TERMS.spark;
 
@@ -748,7 +748,7 @@ export function useSparkCardSlots({
           {formatCompactUsd(chain.availableBorrowsUsd)}
         </Prov>
       ),
-      tip: "How much more, in USD, the account can borrow before it reaches its Max LTV, from the Pool's account read.",
+      tip: "How much more, in USD, the position can borrow before it reaches its Max LTV, from the Pool's account read.",
     });
   }
   // The liquidation read, from the live health factor: one supplied reserve

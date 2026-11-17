@@ -2,7 +2,10 @@
 
 import type { Metadata } from "next";
 import { positionMetadata, readAtHeadDescription } from "@/lib/shared/page-metadata";
-import { MorphoAtBlockPositionPage } from "@/components/protocol/morpho-at-block/morpho-at-block-position-page";
+import {
+  MorphoAtBlockPositionPage,
+  morphoAtBlockTabMarket,
+} from "@/components/protocol/morpho-at-block/morpho-at-block-position-page";
 import { MORPHO_ARC } from "@/lib/morpho-at-block/types";
 
 interface Props {
@@ -17,7 +20,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     session: "morpho-arc",
     description: readAtHeadDescription,
     subject: wallet,
-    market: `${market.slice(0, 10)}…`,
+    // The pair off the read the page makes (the same `cache()` entry).
+    market: await morphoAtBlockTabMarket(MORPHO_ARC, market, wallet),
     canonicalPath: `/arc/morpho/${wallet}/${market}`,
   });
 }

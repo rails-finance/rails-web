@@ -35,7 +35,7 @@ export function PendlePositionView({ data, market }: { data: PendleWalletPositio
             tools={false}
             fallbackHref={pendleWalletHref(data.wallet)}
           />
-          <PendlePositionCard p={p} block={data.block} timestamp={data.timestamp} rows={rows} />
+          <PendlePositionCard p={p} wallet={data.wallet} block={data.block} timestamp={data.timestamp} rows={rows} />
           <PendleFlows p={p} meta={data.tokens} />
           <PendleTimeline
             rows={rows}

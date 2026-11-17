@@ -703,8 +703,8 @@ export function AaveV3PoolPositionView({
                 <p className="mb-1">Nothing is supplied or borrowed on this Pool.</p>
                 <p className="text-sm">
                   {timelineState === "overBudget"
-                    ? `Whether this account ever held a position is a question only its history answers, and this reader has asked for more histories than Rails’ store answers in a minute. The page asks again ${retryWhen(overBudget.retryIn)}.`
-                    : "Whether this account ever held a position is a question only its history answers, and that read failed. Reload to try again."}
+                    ? `Whether this wallet ever held a position is a question only its history answers, and this reader has asked for more histories than Rails’ store answers in a minute. The page asks again ${retryWhen(overBudget.retryIn)}.`
+                    : "Whether this wallet ever held a position is a question only its history answers, and that read failed. Reload to try again."}
                 </p>
               </div>
             ) : untouched ? (

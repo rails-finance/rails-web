@@ -8,6 +8,8 @@
 // the marks name their source (Pendle's oracle or RouterStatic) in their
 // receipts. A market the wallet has left is a closed card.
 
+import { positionName } from "@/lib/shared/position-name";
+import { POSITION_NOUN } from "@/lib/shared/protocols";
 import Link from "next/link";
 import { Store } from "lucide-react";
 import { PositionCard, type PositionCardHead, type PositionCardSlots } from "@/components/shared/position-card";
@@ -90,11 +92,13 @@ export function UnderlyingLabel({ p }: { p: Pick<PendlePosition, "tokens"> }) {
 
 export function PendlePositionCard({
   p,
+  wallet,
   block,
   timestamp,
   rows,
 }: {
   p: PendlePosition;
+  wallet: string;
   block: number;
   timestamp: number;
   /** The wallet's router events in this market, oldest first. */
@@ -378,6 +382,8 @@ export function PendlePositionCard({
   );
 
   const counters = { lastActivityAt: last?.timestamp ?? null, eventCount: rows.length, eventCountNoun: "router event" };
+  // The position's name: the market and the wallet (lib/shared/position-name.ts).
+  const name = positionName({ market: marketName(t), noun: POSITION_NOUN.pendle, id: wallet });
 
   const slots: PositionCardSlots = closed
     ? {
@@ -394,6 +400,7 @@ export function PendlePositionCard({
           tip: "This wallet holds no PT, YT or LP in the market and has no yield or rewards to claim at this block.",
         },
         counters,
+        name,
         heading: "position explanation",
         explainer: { body: explanation },
         learnMore: null,
@@ -411,6 +418,7 @@ export function PendlePositionCard({
         identity,
         heads,
         counters,
+        name,
         heading: "position explanation",
         explainer: { body: explanation },
         learnMore: null,

@@ -1004,11 +1004,11 @@ export function aaveV3RiskCells(
   ];
   const missing =
     sources.settings == null && sources.market == null
-      ? `Collateral on/off, ${aaveFamilyTermsOfPool(coords.pool).emode}, prices and reserve settings at this block aren’t available, so USD and the account figures are not shown.`
+      ? `Collateral on/off, ${aaveFamilyTermsOfPool(coords.pool).emode}, prices and reserve settings at this block aren’t available, so USD and the position's figures are not shown.`
       : sources.settings == null
-        ? `Collateral on/off and ${aaveFamilyTermsOfPool(coords.pool).emode} at this block aren’t available, so the account figures are not shown.`
+        ? `Collateral on/off and ${aaveFamilyTermsOfPool(coords.pool).emode} at this block aren’t available, so the position's figures are not shown.`
         : sources.market == null
-          ? "Prices and reserve settings at this block aren’t available, so USD and the account figures are not shown."
+          ? "Prices and reserve settings at this block aren’t available, so USD and the position's figures are not shown."
           : null;
   const clamped = state.notes.some((n) => n.startsWith("negative_scaled_sum:"));
   const notes =

@@ -793,6 +793,7 @@ function AaveV4SpokePageInner({
             spokes={[activeCard]}
             selected={spokeName}
             onSelect={() => {}}
+            owner={wallet}
             externalActivity={externalActivity}
             closedFactors={closedFactors}
             riskPremium={parseRiskPremiumFraction(chainPosition?.riskPremiumRaw ?? null)}

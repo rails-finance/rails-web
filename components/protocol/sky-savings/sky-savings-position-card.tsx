@@ -10,6 +10,8 @@
 // worth and the interest earned in USDS (exact decimals in the tooltip), and
 // the Savings Rate and the share price are those in force at that block.
 
+import { positionName } from "@/lib/shared/position-name";
+import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { useState, type ReactNode } from "react";
 import { Hash, Link2 } from "lucide-react";
 import { Icon } from "@/components/icons/icon";
@@ -169,6 +171,8 @@ export function skySavingsCardSlots({
     status,
     heads,
     counters,
+    // The position's name: the holder (lib/shared/position-name.ts).
+    name: positionName({ noun: POSITION_NOUN["sky-savings"], id: p.holder }),
     panel: [
       [
         {

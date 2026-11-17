@@ -26,6 +26,16 @@ export const loadEulerPosition = cache((chain: EulerChainId, account: string, va
   fetchEulerPosition(chain, account, vault),
 );
 
+/** The vault's symbol for the tab title, as the card's name gives it
+ *  (lib/shared/position-name.ts), off the read the page makes; undefined where
+ *  the read did not answer. */
+export async function eulerTabMarket(chain: EulerChainId, account: string, vault: string): Promise<string | undefined> {
+  if (!isWallet(account) || !isWallet(vault)) return undefined;
+  const answer = await loadEulerPosition(chain, account, vault).catch(() => null);
+  if (answer?.kind !== "ok") return undefined;
+  return eulerPosition(answer.data).vaultSymbol;
+}
+
 export async function EulerPositionPage({
   chain,
   account,

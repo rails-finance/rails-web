@@ -6,6 +6,9 @@
 // unstaked, its uncollected fees, or, staked, the AERO to claim and the wallet
 // that staked it; then the range drawn against the price.
 
+import { PositionNameId } from "@/components/shared/position-name-id";
+import { marketPair, positionName } from "@/lib/shared/position-name";
+import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCard, type PositionCardHead, type PositionCardSlots } from "@/components/shared/position-card";
 import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups";
@@ -15,7 +18,7 @@ import { aeroPosition } from "@/lib/aerodrome/position";
 import { cardProv, readContracts, type AeroReceiptContext } from "@/lib/aerodrome/provenance";
 import type { AeroPositionRead } from "@/lib/aerodrome/types";
 import { aeroStatus, cardExplainer, cardWords } from "@/lib/aerodrome/words";
-import { num, positionNumber, short, shown } from "@/lib/uniswap/words";
+import { num, short, shown } from "@/lib/uniswap/words";
 
 /** Every figure's read stamp on an Aerodrome page. */
 export function AerodromeReadStamp({ c, what }: { c: AeroReceiptContext; what: string }) {
@@ -110,13 +113,16 @@ function slots(r: AeroPositionRead): PositionCardSlots {
     });
   }
   const status = aeroStatus(p);
+  // The position's name: the pair and the NFT id (lib/shared/position-name.ts).
+  const name = positionName({ market: marketPair(B, Q), noun: POSITION_NOUN[p.site.id], id: p.id });
   return {
     surface: "detail",
     heading: CARD_WORDS.heading,
     status: status ? { word: status.word, tone: "muted", tip: status.tip } : null,
+    name,
     identity: (
       <span className="text-xs text-rb-500">
-        {positionNumber(p.id)} · {p.staked ? CARD_WORDS.stakedBadge : CARD_WORDS.unstakedBadge}
+        <PositionNameId name={name} /> · {p.staked ? CARD_WORDS.stakedBadge : CARD_WORDS.unstakedBadge}
       </span>
     ),
     heads,
