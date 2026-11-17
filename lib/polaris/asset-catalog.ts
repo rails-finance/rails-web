@@ -59,6 +59,26 @@ export const PETH: PolarisTokenMeta = {
   decimals: 18,
 };
 
+/** fpETH — the floor part of pETH, the reserve loans' collateral. Its price in
+ *  WETH is the bonding curve's `floorPrice()`. */
+export const FPETH: PolarisTokenMeta = {
+  symbol: "fpETH",
+  address: "0x94220c1c340336527c719bcf06067ca7769ac185",
+  decimals: 18,
+};
+
+/** WETH — the reserve token, what a reserve loan borrows and repays. */
+export const POLARIS_WETH: PolarisTokenMeta = {
+  symbol: "WETH",
+  address: "0xf430240a61e0a5bd7a3637d616e0dab5632fbe89",
+  decimals: 18,
+};
+
+/** The deployment these addresses belong to: the `polaris_deployments` id the
+ *  deposit and loan proxies pass as `deployment`, so the pages keep naming it
+ *  once a redeploy adds a second row. */
+export const POLARIS_DEPLOYMENT_ID = "sepolia-2026-08";
+
 export interface PolarisMarketConfig {
   key: PolarisMarket;
   /** The market's name in prose — "USDp market". */
@@ -76,6 +96,9 @@ export interface PolarisMarketConfig {
    *  ETH/USD for USDp; GOLDp additionally divides by XAU/USD (below). */
   ethUsdMedianiser: string;
   xauUsdMedianiser: string | null;
+  /** The savings vault that holds this market's deposit NFT #2 (sUSDp,
+   *  sGOLDp). Its share holders stay off the explorer (decision 0014). */
+  vault: { symbol: string; address: string };
 }
 
 /** The shared core contracts (both markets read them). */
@@ -84,7 +107,8 @@ export const POLARIS_CORE = {
   bondingCurve: "0x07ea2ff889e6228cded329a09f66e370f12c705e",
   feeRouter: "0x133e695512bf7b11ad5f7c2739971e99ea5b0965",
   shareSystem: "0x5543ca71ed8c88daf217488b1808994e080d925b",
-  /** Reserve loans — captured raw by the backend, not rendered day one. */
+  /** Reserve loans: `loans(id)`, `getLoanDebt(id)`, `debtPerShare()`; the
+   *  loan NFT numbers them. */
   reserveLoansManager: "0xcaa0757808a96f9f4ee76c04256536d6c17e6e27",
   reserveLoansNft: "0xa1382064bbd50a3740b03cc9c512385e60e03b2f",
   interestController: "0xe1f008948215e6328cf99a32ef4fdf03138dd7ea",
@@ -108,6 +132,7 @@ export const POLARIS_MARKET_CONFIG: Record<PolarisMarket, PolarisMarketConfig> =
     psm: "0xa03798ad2d5a51e23d3221e18ce89aacedd9fad1",
     ethUsdMedianiser: POLARIS_CORE.ethUsdMedianiser,
     xauUsdMedianiser: null,
+    vault: { symbol: "sUSDp", address: "0x63d01003f67d8807799fdfbdeefb583d3c8f7f73" },
   },
   goldp: {
     key: "goldp",
@@ -121,6 +146,7 @@ export const POLARIS_MARKET_CONFIG: Record<PolarisMarket, PolarisMarketConfig> =
     psm: "0x90b0fcf35dd2ff2b43c6eb08e598f9f725f93b65",
     ethUsdMedianiser: POLARIS_CORE.ethUsdMedianiser,
     xauUsdMedianiser: POLARIS_CORE.xauUsdMedianiser,
+    vault: { symbol: "sGOLDp", address: "0xf5777e2a039887aa9362cb3b71bdd5287505e717" },
   },
 };
 
