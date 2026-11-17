@@ -36,6 +36,7 @@ import { useState, type ReactNode } from "react";
 import { AlertTriangle, Check, Copy, Image as ImageIcon, Link2 } from "lucide-react";
 import { AssetPopover } from "@/components/shared/asset-popover";
 import { RevealTip } from "@/components/shared/reveal-tip";
+import { HeadingTip } from "@/components/shared/tip-label";
 import {
   PositionCard,
   type PositionCardExports,
@@ -189,6 +190,10 @@ const pct = (f: number): string => `${(f * 100).toFixed(1)}%`;
 const pct2 = (f: number): string => `${(f * 100).toFixed(2)}%`;
 /** A floor at the grain it is set in: "115%", "112.5%". */
 const pctShort = (f: number): string => `${Number((f * 100).toFixed(1))}%`;
+
+/** The read-more on "defensive mode" in the ratio headline's floor line. */
+const DEFENSIVE_MODE_TIP =
+  "The market's reserve is thin against its debt, so the minimum ratio stands at its higher floor until the reserve recovers.";
 
 /** What the Debt label says on a CDP that owes nothing. */
 const COLLATERAL_ONLY_TIP = "Owes nothing at this block. A Polaris position can hold collateral with no debt.";
@@ -637,11 +642,25 @@ export function polarisCardSlots({
             </span>
           ) : null,
         pending: v.icr == null && v.pricePending && v.debt > 0,
+        // The floor in force, and in defensive mode the mode that raised it,
+        // each with its receipt.
         sub:
           mcrInForce != null ? (
-            <Prov info={liveMcrProv(v.defensiveMode, v.market, index)} value={pct(mcrInForce)}>
-              <span>Minimum ratio {pctShort(mcrInForce)}</span>
-            </Prov>
+            <span>
+              <Prov info={liveMcrProv(v.defensiveMode, v.market, index)} value={pct(mcrInForce)}>
+                <span>Minimum ratio {pctShort(mcrInForce)}</span>
+              </Prov>
+              {v.defensiveMode && (
+                <>
+                  {" · "}
+                  <Prov info={liveModeProv(v.market, index)} value="defensive">
+                    <span data-figure="defensive-mode">
+                      <HeadingTip text="defensive mode" tip={DEFENSIVE_MODE_TIP} />
+                    </span>
+                  </Prov>
+                </>
+              )}
+            </span>
           ) : undefined,
       },
     ];
@@ -732,20 +751,6 @@ export function polarisCardSlots({
     });
   }
   if (holding) left.push(holding);
-  if (v.mcr != null) {
-    if (v.defensiveMode) {
-      left.push({
-        id: "defensive-mode",
-        label: "Defensive mode",
-        tip: "The market's reserve is thin against its debt, so the minimum ratio stands at its higher floor until the reserve recovers.",
-        value: (
-          <Prov info={liveModeProv(v.market, index)}>
-            <span>On</span>
-          </Prov>
-        ),
-      });
-    }
-  }
   const annualCost =
     v.basis === "chain" && v.recordedDebt != null && v.recordedDebt > 0 && v.interestRate != null
       ? v.recordedDebt * v.interestRate
