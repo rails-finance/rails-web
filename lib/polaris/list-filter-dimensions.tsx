@@ -119,7 +119,7 @@ const WITH_MARKET: SortOption[] = [
 /** Debt / Collateral / Ratio sorts appear once a market is chosen; without
  *  one the size sorts are in USD (see the header). */
 export function polarisSortOptions(f: PolarisListFilters): SortOption[] {
-  return normalizeMarket(f.market[0]) ? WITH_MARKET : RECENT_ONLY;
+  return parsePolarisSearch(f.q).market || normalizeMarket(f.market[0]) ? WITH_MARKET : RECENT_ONLY;
 }
 
 /** The bare options — the SSR decode path's default. The client toolbar
@@ -153,7 +153,12 @@ export function polarisListDimensions(
       cardinality: "single",
       param: "market",
       options: marketOptions,
-      get: (f) => f.market,
+      // A search that names a market ("usdp:34") scopes the fetch to it over
+      // the facet, so the chip reads that market.
+      get: (f) => {
+        const named = parsePolarisSearch(f.q).market;
+        return named ? [named] : f.market;
+      },
       set: (f, v) => ({ ...f, market: v }),
     },
     // Status is a multi-select over the three lifecycle buckets. All three
