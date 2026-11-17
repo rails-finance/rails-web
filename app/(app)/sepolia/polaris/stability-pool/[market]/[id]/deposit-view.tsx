@@ -211,8 +211,11 @@ export default function DepositView({
     });
   }, [olderCount, total, listed.length, tl.sortedEvents, lifePending]);
   // An event older than the first read's rows waits for the whole life before
-  // the timeline says it is not found.
-  const pinnedWaits = rawEventId != null && lifePending && !rowById.has(decodeEventId(rawEventId));
+  // the timeline says it is not found; where that read failed, the page says
+  // so in place of the timeline.
+  const pinnedMissing = rawEventId != null && !rowById.has(decodeEventId(rawEventId));
+  const pinnedWaits = pinnedMissing && lifePending;
+  const pinnedUnread = pinnedMissing && lifeRead === "failed";
 
   // pETH in the market's stablecoin at the feed, the price the head row values
   // the pending pETH at.
@@ -299,10 +302,12 @@ export default function DepositView({
               />
             </>
           )}
-          {failed && <p className="text-sm text-rb-500">The operations could not be read just now.</p>}
+          {(failed || pinnedUnread) && (
+            <p className="text-sm text-rb-500">The operations could not be read just now.</p>
+          )}
           {pinnedWaits ? (
             <DetailBodySkeleton />
-          ) : (
+          ) : pinnedUnread ? null : (
             <ChainTruthTimeline
               persistKeyPrefix="polaris-sp"
               closed={!open}

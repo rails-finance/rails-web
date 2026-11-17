@@ -2436,8 +2436,8 @@ export interface FrankencoinContext {
 // Rails' name from the chain (the cdpManager is unverified): a touch the
 // holder sends, its `_collChange` and `_debtChange` zero, that writes the
 // pending legs and nothing else; where they take the debt below zero it mints
-// the difference to the holder and leaves `_newDebt` 0. It reads as an adjust
-// that moved neither (rails-ops reference/official-docs/polaris.md, section 3).
+// the difference to the holder and leaves `_newDebt` 0. Drawn as an adjust
+// (rails-ops reference/official-docs/polaris.md, section 3).
 // A liquidation row is joined with the same tx's `Liquidation`
 // (+ `LiquidationGasComp`) legs.
 //

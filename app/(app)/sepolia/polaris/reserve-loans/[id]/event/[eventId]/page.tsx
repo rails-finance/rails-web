@@ -14,7 +14,7 @@ interface Props {
 // Restated: the parent route renders per request over a `no-store` read.
 export const dynamic = "force-dynamic";
 
-// The event's own metadata, from the timeline the parent page reads in the
+// The event's metadata, from the timeline the parent page reads in the
 // same request (`loadPolarisLoan`, cached).
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id: rawId, eventId } = await params;

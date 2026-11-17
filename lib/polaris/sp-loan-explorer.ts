@@ -18,6 +18,7 @@ import type { PolarisDepositEventRow, PolarisLoanEventRow } from "@/lib/sources/
 const WORDS = {
   timeline_link: "See the whole history in the timeline.",
   pool: "Pool",
+  market: "Market",
   deposit: "Deposit",
   copy_deposit: "Copy the deposit's number",
   loan: "Loan",
@@ -156,7 +157,7 @@ export function polarisLoanEventPage({
     heading: row ? loanEventLabel(row) : event.actionLabel,
     title: row ? loanEventTitle(event, row) : makeEventTitle(event, event.actionLabel, []),
     facts: [
-      { key: "pool", label: WORDS.pool, value: WORDS.reserve },
+      { key: "market", label: WORDS.market, value: WORDS.reserve },
       { key: "loan", label: WORDS.loan, value: loanId, mono: true, copy: WORDS.copy_loan },
       ...holderFact(holder, POLARIS_LOANS_PATH),
     ],
