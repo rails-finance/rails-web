@@ -100,7 +100,7 @@ export function cardExplainer(p: OpPositionFigures): { title: string; bullets: s
     title: "Interest over 30 days",
     bullets: [
       "The Pool holds each balance as a scaled amount that grows into tokens through the reserve's index. Where the scaled amount is the same at both dates, the interest is the balance now less the balance 30 days back.",
-      "Where the wallet supplied, withdrew, borrowed or repaid inside the 30 days, the figure is withheld.",
+      "Where the balance changed inside the 30 days, the figure is withheld.",
     ],
   });
   return groups;

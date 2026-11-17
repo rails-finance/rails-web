@@ -188,10 +188,10 @@ export function aaveV3PositionToMarkdown(args: AaveV3PositionMarkdownArgs): stri
       lines.push(
         lastType === "liquidation"
           ? `- **Liquidated** — the record ends with the seizure; the final liquidation call emptied the position.`
-          : `- **Liquidated** — liquidation seizures are in the record, but the wallet closed it by its own transactions afterwards.`,
+          : `- **Liquidated** — liquidation seizures are in the record, but it was closed afterwards with no further liquidation.`,
       );
     } else {
-      lines.push(`- **Closed** — the wallet closed it by its own transactions; no liquidation is in the record.`);
+      lines.push(`- **Closed** — closed with no liquidation in the record.`);
     }
     lines.push("");
     lines.push("## Highest recorded balances (per reserve)");
