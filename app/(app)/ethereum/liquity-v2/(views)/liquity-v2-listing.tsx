@@ -43,11 +43,19 @@ import {
 export interface LiquityV2ListingProps {
   initialItems?: TroveSummary[];
   initialTotal?: number;
+  /** Of `initialTotal`, the Troves the searched wallet passed on (ui-jobs 705). */
+  initialPassedOn?: number;
   initialKey?: string;
   initialSearch?: string;
 }
 
-export function LiquityV2Listing({ initialItems, initialTotal, initialKey, initialSearch }: LiquityV2ListingProps) {
+export function LiquityV2Listing({
+  initialItems,
+  initialTotal,
+  initialPassedOn = 0,
+  initialKey,
+  initialSearch,
+}: LiquityV2ListingProps) {
   // Oracle prices — a one-time side-fetch (USD on the open cards is an interpreted
   // layer). When it lands the config re-renders and renderCard closes over the new
   // value; it's outside the driver's fetch lifecycle, so it never triggers a
@@ -88,6 +96,9 @@ export function LiquityV2Listing({ initialItems, initialTotal, initialKey, initi
   // re-fires onFilters with the same q) doesn't re-dispatch or re-resolve.
   const { setWallets } = useWalletContext();
   const lastIdentityRef = useRef<string | null>(null);
+  // The last answer's count of Troves the searched wallet passed on: the
+  // holder strip leaves them out of the wallet's total (ui-jobs 705).
+  const passedOn = useRef(initialPassedOn);
   const onFilters = useCallback(
     (f: LiquityV2ListFilters) => {
       const { ownerAddress, ownerEns } = parseTroveSearch(f.q);
@@ -134,10 +145,10 @@ export function LiquityV2Listing({ initialItems, initialTotal, initialKey, initi
         dimensions: liquityV2ListDimensions(collateralOptions),
         itemsPerPage: LIQUITY_V2_ITEMS_PER_PAGE,
         fetchPage: (filters, page) =>
-          fetchTroves(liquityV2FiltersToFetchParams(filters, page)).then((r) => ({
-            data: r.data,
-            total: r.pagination.total,
-          })),
+          fetchTroves(liquityV2FiltersToFetchParams(filters, page)).then((r) => {
+            passedOn.current = r.pagination.passedOn ?? 0;
+            return { data: r.data, total: r.pagination.total };
+          }),
       })}
       onFilters={onFilters}
       renderAbove={({ items, total, filters }) =>
@@ -156,7 +167,7 @@ export function LiquityV2Listing({ initialItems, initialTotal, initialKey, initi
         !filters.batchOnly &&
         !filters.individualOnly &&
         prices ? (
-          <HolderStrip {...liquityV2HolderStrip(items, total, prices, LIQUITY_V2_ITEMS_PER_PAGE)} />
+          <HolderStrip {...liquityV2HolderStrip(items, total, prices, LIQUITY_V2_ITEMS_PER_PAGE, passedOn.current)} />
         ) : null
       }
       initialItems={initialItems}

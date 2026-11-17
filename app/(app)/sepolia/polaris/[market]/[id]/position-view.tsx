@@ -43,6 +43,7 @@ import {
 import { PolarisPositionExplanation } from "@/components/protocol/polaris/polaris-position-explanation";
 import { polarisLifetime } from "@/lib/polaris/economics";
 import { polarisSinceLastTouch } from "@/lib/polaris/since-last-touch";
+import { isAgainstHoldingNone, polarisAgainstHolding } from "@/lib/polaris/against-holding";
 import { polarisPsmGapNotes } from "@/lib/polaris/psm-gap";
 import { polarisHoldersAt, polarisTouchRuns } from "@/lib/polaris/touch-runs";
 import { PolarisSinceLastTouchRow } from "@/components/protocol/polaris/polaris-since-last-touch";
@@ -228,6 +229,19 @@ export default function PolarisPositionView({
     [chain, polarisEvents],
   );
 
+  // "Against holding pETH": the index's lifetime legs with the head read's
+  // figures and feed (lib/polaris/against-holding.ts); pending while either
+  // read is in flight, and no row where the index did not answer.
+  const againstHolding = useMemo(
+    () =>
+      tailFailed
+        ? null
+        : !chainSettled || indexPending
+          ? ("pending" as const)
+          : polarisAgainstHolding(polarisEvents, chain),
+    [chain, chainSettled, indexPending, tailFailed, polarisEvents],
+  );
+
   // The holder at each event, and the touch runs that read it (ui-jobs 404).
   const ownerAtOpen = summary?.ownerAtOpen;
   const holders = useMemo(() => polarisHoldersAt(polarisEvents, ownerAtOpen), [polarisEvents, ownerAtOpen]);
@@ -364,6 +378,7 @@ export default function PolarisPositionView({
     ? polarisExports({
         view,
         chain,
+        livePending: !chainSettled,
         events: polarisEvents,
         notes,
         liveNotes,
@@ -407,6 +422,7 @@ export default function PolarisPositionView({
                 <PolarisPositionCard
                   v={view}
                   lifetime={lifetime}
+                  againstHolding={againstHolding}
                   viewHref={tl.viewHref}
                   exports={exports ?? undefined}
                   explanationDefaultOpen={explanationOpen}
@@ -419,6 +435,11 @@ export default function PolarisPositionView({
                         terminal={summary && summary.status !== "open" ? summary.status : null}
                         lifetime={lifetime}
                         transferCount={summary?.transferCount}
+                        againstHolding={
+                          againstHolding && againstHolding !== "pending" && !isAgainstHoldingNone(againstHolding)
+                            ? againstHolding
+                            : null
+                        }
                       />
                     ) : undefined
                   }

@@ -19,6 +19,8 @@
 // asserted at this depth.
 
 import { ListingTag } from "@/components/shared/listing-tag";
+import { positionName } from "@/lib/shared/position-name";
+import { POSITION_NOUN } from "@/lib/shared/protocols";
 import type { ReactNode } from "react";
 import {
   PositionCard,
@@ -230,13 +232,15 @@ export function fluidCardSlots({
 }: FluidPositionCardProps): PositionCardSlots {
   const detail = surface === "detail";
   const pairText = fluidPairText(v, chain);
+  // The position's name (ui-jobs 703): the pair and the NFT id.
+  const name = positionName({ market: pairText, noun: POSITION_NOUN.fluid, id: v.nftId });
   // The position type and the share pair are labels the figures do not carry
-  // (ui-jobs 270 item 6): the pair, the NFT and the vault kind.
+  // (ui-jobs 270 item 6): the pair, the position's name and the vault kind.
   const typeLabel = (
     <span className="text-xs font-semibold text-rb-500">
-      {pairText}
+      {name.market}
       <span className="ml-2 font-normal tabular-nums text-rb-400">
-        #{v.nftId} · {v.vaultKindLabel}
+        {name.noun} {name.id} · {v.vaultKindLabel}
       </span>
     </span>
   );
@@ -267,7 +271,7 @@ export function fluidCardSlots({
       ? { word: "Liquidated", tone: "danger" }
       : { word: "Closed", tone: "muted" }
     : null;
-  const common = { status, identity, counters };
+  const common = { status, identity, counters, name };
 
   if (closed) {
     // The settled figures have gone to zero, so the headline is what each leg

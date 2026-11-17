@@ -25,6 +25,9 @@
 // USD keys by MARKET ID (Dolomite's own key — symbols collide on this
 // roster), priced by the core's own getMarketPrice.
 
+import { PositionNameId } from "@/components/shared/position-name-id";
+import { positionName, type PositionName } from "@/lib/shared/position-name";
+import { POSITION_NOUN } from "@/lib/shared/protocols";
 import type { ServerRead } from "@/lib/shared/server-head-read";
 import { ListingTag } from "@/components/shared/listing-tag";
 import {
@@ -64,7 +67,7 @@ import type {
 import type { DolomiteChainResponse } from "@/lib/api/fetch-dolomite-position";
 import { ExactSpan } from "@/components/shared/amount-text";
 import { RevealTip } from "@/components/shared/reveal-tip";
-import { accountLabelTip } from "@/lib/dolomite/asset-catalog";
+import { accountLabelTip, accountNumberId } from "@/lib/dolomite/asset-catalog";
 import { splitDust, useDustLines } from "@/components/shared/dust-reserves";
 import { DolomiteMenuRows } from "@/components/protocol/dolomite/dolomite-menu-rows";
 import {
@@ -231,7 +234,7 @@ export function DolomiteAccountLabel({ text, accountNumber }: { text: string; ac
  *  this is, in Dolomite's own vocabulary. On the detail page the label
  *  explains itself on hover or tap (the listing card sits inside a link), and
  *  the owner is on the page's wallet row above the card (ui-jobs 228). */
-function AccountIdentity({ v, tip }: { v: DolomitePositionView; tip?: boolean }) {
+function AccountIdentity({ v, tip, name }: { v: DolomitePositionView; tip?: boolean; name: PositionName }) {
   // The listing keeps the wallet alone on the left; the account's name is the
   // card's right-end `tag`.
   if (!tip) {
@@ -240,8 +243,11 @@ function AccountIdentity({ v, tip }: { v: DolomitePositionView; tip?: boolean })
   return (
     <span className="flex items-center gap-2">
       <span className="text-xs text-rb-500">
-        {tip ? <DolomiteAccountLabel text={v.accountLabel} accountNumber={v.accountNumber} /> : v.accountLabel}
+        {/* The account's kind ("Dolomite Balance", "Borrow Position"); its
+            number follows in the position's name (ui-jobs 703). */}
+        <DolomiteAccountLabel text={v.accountLabel.replace(/ #\S+$/, "")} accountNumber={v.accountNumber} />
       </span>
+      <PositionNameId name={name} />
     </span>
   );
 }
@@ -305,11 +311,18 @@ export function useDolomiteCardSlots({
     // The foot strip reads transactions, warnings, then the age (ui-jobs 270).
     ...(detail ? { order: "age-last" as const } : {}),
   };
-  const common = { status, identity: <AccountIdentity v={v} tip={detail} />, counters };
-  const borrowId = /^Borrow Position #(.+)$/.exec(v.accountLabel)?.[1];
   // The WLFI frontend's shared account reads by its frontend alone.
-  const tagMarket = /\(WLFI frontend account\)/.test(v.accountLabel) ? "WLFI" : v.accountLabel;
-  const tag = borrowId ? <ListingTag id={borrowId} /> : <ListingTag market={tagMarket} />;
+  const wlfi = /\(WLFI frontend account\)/.test(v.accountLabel);
+  // The position's name (ui-jobs 703): the account number, and the WLFI
+  // frontend as the market of its shared account.
+  const name = positionName({
+    market: wlfi ? "WLFI" : undefined,
+    noun: POSITION_NOUN.dolomite,
+    id: accountNumberId(v.accountNumber),
+  });
+  const common = { status, identity: <AccountIdentity v={v} tip={detail} name={name} />, counters, name };
+  const borrowId = /^Borrow Position #(.+)$/.test(v.accountLabel) ? accountNumberId(v.accountNumber) : undefined;
+  const tag = borrowId ? <ListingTag id={borrowId} /> : <ListingTag market={wlfi ? "WLFI" : v.accountLabel} />;
 
   // Closed / liquidated: every par is back at zero, so the heads are what each
   // market lane held at its height, the highest recorded par. The LIQUIDATED

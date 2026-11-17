@@ -41,7 +41,12 @@ const PILL =
 
 function Holding({ p, address }: { p: WalletSummaryProtocol; address: string }) {
   const chain = chainOf(p.chain);
-  const counts = [p.open > 0 ? `${p.open} open` : null, p.closed > 0 ? `${p.closed} closed` : null]
+  const moved = p.moved ?? 0;
+  const counts = [
+    p.open > 0 ? `${p.open} open` : null,
+    p.closed > 0 ? `${p.closed} closed` : null,
+    moved > 0 ? `${moved} moved` : null,
+  ]
     .filter(Boolean)
     .join(" · ");
   const label = `${p.name}${chain ? ` on ${chain.name}` : ""}: ${counts}`;

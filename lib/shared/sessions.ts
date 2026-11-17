@@ -616,6 +616,16 @@ export function updateSavedEnded(key: string, ended: SavedLink["ended"]): void {
   saveSessions(sessions);
 }
 
+/** A saved position's default name, brought up to date when its page draws a
+ *  new one (ui-jobs 703). A rename is `customName` and is left as it is. */
+export function updateSavedName(key: string, name: string): void {
+  const sessions = loadSessions();
+  const row = sessions.find((r): r is SavedLink => r.kind === "position" && r.key === key);
+  if (!row || row.name === name) return;
+  row.name = name;
+  saveSessions(sessions);
+}
+
 // ── Backup: export and import ───────────────────────────────────────────────
 //
 // localStorage is per-origin and per-browser: clearing site data drops every

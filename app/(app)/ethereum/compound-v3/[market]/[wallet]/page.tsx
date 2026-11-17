@@ -38,7 +38,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return positionMetadata({
     session: "compound",
     subject: wallet,
-    market: marketOf(market).baseSymbol,
+    market: marketOf(market).label,
     canonicalPath: `/ethereum/compound-v3/${market}/${wallet}`,
     // This route carries its own opengraph-image.tsx, rendering this
     // account's live card — the static per-explorer PNG stays only its

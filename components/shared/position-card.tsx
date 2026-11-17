@@ -88,7 +88,8 @@ import { StatDash, StatValue } from "@/components/shared/stat-value";
 import { ToolsMenu } from "@/components/shared/tools-menu";
 import { ExportMenu, type ExportMenuProps } from "@/components/shared/export-menu";
 import { POSITION_TAG_TONE } from "@/lib/shared/ui-grammar";
-import { SavePositionRow, useSavedEndedRefresh } from "@/components/shared/saved-items";
+import { SavePositionRow, useSavedEndedRefresh, useSavedNameRefresh } from "@/components/shared/saved-items";
+import type { PositionName } from "@/lib/shared/position-name";
 import type { SavedLink } from "@/lib/shared/sessions";
 import { formatDate } from "@/lib/date";
 
@@ -222,6 +223,10 @@ interface PositionCardSlotsCommon {
    *  which marks a position, and no C20.1. A detail card keeps the chain's
    *  glyph at the heading row's right end at every width (C20.2). */
   sidebar?: false;
+  /** The position's name, "<market> · <Noun> <id>" (lib/shared/position-name.ts,
+   *  ui-jobs 703): a saved position's default name, kept current on each
+   *  visit. Absent, the saved name is read off C5 and the tab title. */
+  name?: PositionName;
 }
 
 interface PositionCardDetailCommon extends PositionCardSlotsCommon {
@@ -760,19 +765,22 @@ function identityTextOf(header: HTMLElement | null): string {
 function DetailMenu({
   menu,
   identityText,
+  name,
   ended,
 }: {
   menu: PositionCardMenu;
   identityText: () => string;
+  name?: string;
   ended?: SavedLink["ended"];
 }) {
   useSavedEndedRefresh(ended);
+  useSavedNameRefresh(name);
   // "Save position" after the family's identity rows, before the exports
   // (ui-jobs 530).
   const leading = (close: () => void) => (
     <>
       {menu.leading?.(close)}
-      <SavePositionRow identityText={identityText} ended={ended} noun={menu.noun} />
+      <SavePositionRow identityText={identityText} name={name} ended={ended} noun={menu.noun} />
     </>
   );
   return menu.exports ? (
@@ -826,6 +834,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
         <DetailMenu
           menu={slots.menu}
           identityText={() => identityTextOf(headerRef.current)}
+          name={slots.name?.text}
           ended={
             slots.outcome
               ? { word: slots.status?.word ?? slots.outcome.word, tone: slots.status?.tone ?? "muted" }

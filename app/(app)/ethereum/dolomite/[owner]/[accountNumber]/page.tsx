@@ -4,7 +4,7 @@ import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
-import { normalizeAccountNumber } from "@/lib/dolomite/asset-catalog";
+import { accountNumberId, normalizeAccountNumber } from "@/lib/dolomite/asset-catalog";
 import { loadDolomitePositionTail } from "@/lib/dolomite/position-page-data";
 import DolomitePositionView from "./position-view";
 
@@ -23,19 +23,15 @@ export const dynamic = "force-dynamic";
 const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 
 // Moved down from the layout: the page is the segment that fetches, so it is the
-// segment that can describe what it fetched. Output is unchanged — the subject
-// is a composite (owner + account number), so the helper's address-truncation
-// does not fire and both halves are truncated here: "Dolomite Account
-// 0x1a2b…c4d5 #0".
+// segment that can describe what it fetched. The id is the account number
+// (ui-jobs 703): "Dolomite · Account #0", "Dolomite · Account 0xd010…e722".
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { owner, accountNumber } = await params;
-  const shortOwner = ADDRESS.test(owner) ? `${owner.slice(0, 6)}…${owner.slice(-4)}` : owner;
-  const acct = accountNumber.length > 12 ? `${accountNumber.slice(0, 8)}…` : accountNumber;
   // This route carries its own opengraph-image.tsx, rendering this account's
   // live card — the static per-explorer PNG stays only its fallback.
   return positionMetadata({
     session: "dolomite",
-    subject: `${shortOwner} #${acct}`,
+    subject: accountNumberId(accountNumber),
     canonicalPath: `/ethereum/dolomite/${owner}/${accountNumber}`,
     image: "dynamic",
   });

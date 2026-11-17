@@ -18,6 +18,7 @@
 import type { Provenance, ProvVerify } from "@/components/shared/provenance";
 import { POLARIS_CORE, POLARIS_MARKET_CONFIG, type PolarisMarket } from "./asset-catalog";
 import { formatExact } from "@/lib/utils/format";
+import type { PolarisAgainstHolding } from "./against-holding";
 
 const LANE_VIA = "GET /api/chain/polaris/position";
 const BOARD_VIA = "GET /api/chain/polaris/markets";
@@ -637,4 +638,149 @@ export function holderDebtValueProv(): Provenance {
 /** The wallet's open pETH valued at the protocol's own two legs. */
 export function holderCollUsdProv(): Provenance {
   return liveUsdValueProv("The wallet's collateral", true);
+}
+
+/** "Against holding pETH" (ui-jobs 695): the position's quantities now and
+ *  over its life, against the pETH it deposited, its debt side converted at
+ *  the feed now. Each term is an operand row with its source. */
+export function againstHoldingProv(r: PolarisAgainstHolding, market: PolarisMarket): Provenance {
+  const stable = stableOf(market);
+  const at = `at block ${r.feed.block.toLocaleString("en-US")}`;
+  const lifetime = (what: string, leg: string): string =>
+    `${what}, the holder's ${leg} summed over the position's ${r.touches} ${r.touches === 1 ? "touch" : "touches"}`;
+  const surplusRows = [
+    ...(r.surplusClaimed > 0
+      ? [
+          {
+            label: "surplus claimed",
+            value: formatExact(r.surplusClaimed),
+            kind: "chain" as const,
+            pclass: "indexed" as const,
+            note: "a liquidation's collateral surplus the owner has claimed from the CollSurplusPool",
+          },
+        ]
+      : []),
+    ...(r.surplusOwed > 0
+      ? [
+          {
+            label: "surplus to claim",
+            value: formatExact(r.surplusOwed),
+            kind: "chain" as const,
+            pclass: "indexed" as const,
+            note: "a liquidation's collateral surplus still in the CollSurplusPool, owed to the owner and counted as held",
+          },
+        ]
+      : []),
+  ];
+  return {
+    kind: "derived",
+    pclass: "oracle",
+    summary:
+      `Against holding pETH. What the position comes to in pETH, set against keeping the pETH it deposited: the pETH ` +
+      `it holds now, withdrew and was left as surplus, less any gas compensation escrow a liquidation paid to the ` +
+      `liquidator and the pETH deposited, plus the ${stable} it borrowed or was paid to settle a debt below zero, less ` +
+      `the ${stable} it repaid and owes now, converted to pETH at the market's price feed ${at}. Interest, stability ` +
+      `gains, reward pETH and PSM shares are in the collateral and debt now. A debt below zero counts as the ${stable} ` +
+      `the next touch mints to the holder, as the chain shows on USDp position 2736 at block 11,706,332; the docs ` +
+      `say the pAsset is minted to settle it and do not name who receives it.`,
+    formula:
+      "(coll now + withdrawn + surplus − escrow lost − deposited) + (borrowed + settled − repaid − debt now) ÷ feed",
+    contract: feed(market),
+    inputs: [
+      {
+        label: "collateral now",
+        value: formatExact(r.collNow),
+        kind: "chain",
+        pclass: "state",
+        note: r.closed ? "the position is closed, so it holds none" : `getCDPEntireColl(id) ${at}`,
+      },
+      {
+        label: "pETH withdrawn",
+        value: formatExact(r.withdrawn),
+        kind: "chain",
+        pclass: "indexed",
+        note: lifetime("CDPUpdated", "negative collChange"),
+      },
+      ...surplusRows,
+      ...(r.escrowLost > 0
+        ? [
+            {
+              label: "gas compensation escrow lost",
+              value: formatExact(r.escrowLost),
+              kind: "chain" as const,
+              pclass: "indexed" as const,
+              note: "the LiquidationGasComp log's _flatComp: the escrow held since the open, paid to the liquidator",
+            },
+          ]
+        : []),
+      {
+        label: "pETH deposited",
+        value: formatExact(r.deposited),
+        kind: "chain",
+        pclass: "indexed",
+        note: lifetime("CDPUpdated", "positive collChange"),
+      },
+      {
+        label: `${stable} borrowed`,
+        value: formatExact(r.borrowed),
+        kind: "chain",
+        pclass: "indexed",
+        note: lifetime("CDPUpdated", "positive debtChange"),
+      },
+      {
+        label: `${stable} repaid`,
+        value: formatExact(r.repaid),
+        kind: "chain",
+        pclass: "indexed",
+        note: lifetime("CDPUpdated", "negative debtChange"),
+      },
+      ...(r.settled > 0
+        ? [
+            {
+              label: `${stable} settled to the holder`,
+              value: formatExact(r.settled),
+              kind: "chain" as const,
+              pclass: "indexed" as const,
+              note: lifetime("CDPUpdated", "_stablesMintedToEnsureZeroDebt"),
+            },
+          ]
+        : []),
+      {
+        label: "debt now",
+        value: formatExact(r.debtNow),
+        kind: "chain",
+        pclass: "state",
+        note: r.closed
+          ? "the position is closed, so it owes none"
+          : r.debtNow < 0
+            ? `getCDPEntireDebt(id) ${at}, below zero: the ${stable} the next touch mints to the holder`
+            : `getCDPEntireDebt(id) ${at}`,
+      },
+      {
+        label: `pETH in ${stable} now`,
+        value: formatExact(r.feed.pethInDebt),
+        kind: "chain",
+        pclass: "oracle",
+        note: `the market's price feed, previewPrice() ${at}`,
+        contract: feed(market),
+      },
+    ],
+    source: { block: r.feed.block },
+  };
+}
+
+/** The figure as a share of the pETH deposited. */
+export function againstHoldingShareProv(r: PolarisAgainstHolding): Provenance {
+  return {
+    kind: "derived",
+    pclass: "oracle",
+    summary:
+      "Share of pETH deposited. The gain against holding pETH divided by the pETH the holder deposited over the position's life.",
+    formula: "gain against holding pETH ÷ pETH deposited",
+    inputs: [
+      { label: "gain against holding pETH", value: formatExact(r.gain), kind: "derived" },
+      { label: "pETH deposited", value: formatExact(r.deposited), kind: "chain", pclass: "indexed" },
+    ],
+    source: { block: r.feed.block },
+  };
 }

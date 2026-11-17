@@ -17,6 +17,8 @@
 // borrow-shares slot equals the replayed one exactly, which is the proof the
 // sweep read every row; otherwise the interest split is gated with its reason.
 
+import { positionName } from "@/lib/shared/position-name";
+import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { useCallback, useMemo } from "react";
 
 import { morphoExplorer } from "@/lib/morpho/explorer";
@@ -439,6 +441,11 @@ export function MorphoLenderOpenCard({
           status: null,
           heads,
           identity,
+          name: positionName({
+            market: marketLabel(p.loanSymbol, p.collateralSymbol, p.lltv === 0),
+            noun: POSITION_NOUN[deployment.session],
+            id: p.user,
+          }),
           counters: null,
           explainer: { body: null },
           learnMore: null,
@@ -497,6 +504,7 @@ export function LenderClosedCard({
 }) {
   const detail = surface === "detail";
   const common = {
+    name: positionName({ market: pos.marketLabel, noun: POSITION_NOUN[deployment.session], id: wallet }),
     status: { word: "Closed", tone: "muted" as const },
     heads: [{ id: "peak-supply", label: CARD_VOCAB.peakSupply, value: null, sub: notRecordedNote("wallet") }],
     identity: morphoCardIdentity({

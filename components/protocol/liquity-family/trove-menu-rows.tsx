@@ -7,6 +7,7 @@
 import { useState } from "react";
 import { Image as ImageIcon, Link2 } from "lucide-react";
 import { Icon } from "@/components/icons/icon";
+import { shortPositionId } from "@/lib/shared/position-name";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
 
 function useCopied(): [string | null, (key: string, value: string) => void] {
@@ -24,21 +25,19 @@ export function TroveMenuRows({
   troveId,
   nftUrl,
   pagePath,
-  shortId = (id: string) => `${id.slice(0, 6)}…${id.slice(-4)}`,
 }: {
   troveId: string;
   /** The Trove NFT's marketplace page, when the family knows its contract. */
   nftUrl: string | null;
   /** The Trove page's path, copied as a full link. */
   pagePath: string;
-  shortId?: (id: string) => string;
 }) {
   const [copied, copy] = useCopied();
   return (
     <>
       <ToolsMenuItem
         icon={<Icon name={copied === "id" ? "check" : "trove-id"} size={16} />}
-        title={`Trove ${shortId(troveId)}`}
+        title={`Trove ${shortPositionId(troveId)}`}
         subtitle={copied === "id" ? "Copied" : "Copy the Trove ID"}
         onClick={() => copy("id", troveId)}
       />

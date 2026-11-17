@@ -39,6 +39,7 @@ import type { OraclePricesData, OraclePricesResponse } from "@/types/api/oracle"
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { WalletPosition } from "@/lib/wallet/types";
 import { amountText, historyBase, opt, plural, storeStamp } from "@/lib/wallet/summary-row";
+import { formerHoldOf, movedHistory } from "@/lib/wallet/moved-row";
 import type { FamilyModule, HeadResult } from "./module";
 
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
@@ -364,6 +365,9 @@ export const liquityV2: FamilyModule = {
         headRead: "none",
         ...storeStamp(r),
       };
+      // A Trove this wallet held and passed on (lib/wallet/moved-row.ts).
+      const moved = formerHoldOf(r.card);
+      if (moved) return { ...base, status: "moved", history: movedHistory(moved) };
       if (r.status === "open") return base;
       const parts = [
         t.collateral.peakAmount > 0 ? amountText(t.collateral.peakAmount, t.collateral.symbol) : null,

@@ -60,14 +60,20 @@ export function isDolomiteBalanceNumber(accountNumber: string): boolean {
   return normalizeAccountNumber(accountNumber) === "0";
 }
 
-/** Short display form: small numbers verbatim, hash-derived ones as 0xabcd…ef12. */
-export function shortAccountNumber(accountNumber: string): string {
+/** The account number as a position's id: small numbers in decimal, a
+ *  hash-derived one as its full 64-digit hex, which the shared shortener
+ *  (lib/shared/position-name.ts) cuts to 0xabcd…ef12. */
+export function accountNumberId(accountNumber: string): string {
   const norm = normalizeAccountNumber(accountNumber);
   if (norm == null) return accountNumber;
   const v = BigInt(norm);
-  if (v < BigInt(1_000_000)) return norm;
-  const hex = `0x${v.toString(16).padStart(64, "0")}`;
-  return `${hex.slice(0, 6)}…${hex.slice(-4)}`;
+  return v < BigInt(1_000_000) ? norm : `0x${v.toString(16).padStart(64, "0")}`;
+}
+
+/** Short display form: small numbers verbatim, hash-derived ones as 0xabcd…ef12. */
+export function shortAccountNumber(accountNumber: string): string {
+  const id = accountNumberId(accountNumber);
+  return id.startsWith("0x") ? `${id.slice(0, 6)}…${id.slice(-4)}` : id;
 }
 
 /**

@@ -8,8 +8,8 @@
 // the right end.
 //
 // On a position page (`PositionWalletHeading`) the h1 is the address menu's
-// trigger, the address kind sits beside it, and the line under it is what
-// else Rails holds for the wallet (H13.2). The protocol is named by the
+// trigger, the address kind sits beside it, and under it the menu of the
+// wallet's positions on Rails (H13.2). The protocol is named by the
 // card's sidebar (decision 0052 point 2). Tools takes the right end where the
 // page passes it; on a page that draws no detail card the price strip and
 // the recency stamp stand before it (ui-jobs 430), and below sm the strip
@@ -25,7 +25,7 @@ import { Facehash } from "@/components/shared/facehash";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { WalletMenu } from "@/components/shared/wallet-menu";
-import { WalletElsewhereLine } from "@/components/shared/wallet-elsewhere-line";
+import { WalletPositionsMenu } from "@/components/shared/wallet-positions-menu";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { protocolForSession } from "@/lib/shared/protocols";
 import { CHAINS, type ChainId } from "@/lib/shared/chains";
@@ -298,7 +298,7 @@ export function PositionWalletHeading({
           {owner.extra}
         </>
       }
-      lines={owner.wallet && <WalletElsewhereLine wallet={owner.wallet} />}
+      lines={owner.wallet && <WalletPositionsMenu wallet={owner.wallet} />}
       end={
         <>
           {strip && (

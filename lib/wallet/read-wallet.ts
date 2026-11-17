@@ -7,6 +7,7 @@
 // (allSettled): a family whose head read does not answer keeps its store
 // figures and says `headRead: "failed"`. Answers are kept 60 s per address.
 
+import { walletRowStatus } from "@/lib/wallet/moved-row";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { walletApiWait, type HeadResult, type FamilyModule } from "@/lib/wallet/families/module";
 import { aaveV3Base, aaveV3Ethereum, spark } from "@/lib/wallet/families/aave";
@@ -71,7 +72,7 @@ async function readSummary(address: string, signal: AbortSignal, readerIp?: stri
   let first: WalletSummaryAnswer | null = null;
   const rows: WalletSummaryRow[] = [];
   for (let offset = 0; offset < MAX_ROWS; offset += PAGE) {
-    const res = await fetch(`${base}/api/wallet/${address}/positions?limit=${PAGE}&offset=${offset}`, {
+    const res = await fetch(`${base}/api/wallet/${address}/positions?limit=${PAGE}&offset=${offset}&former=1`, {
       ...createAuthFetchOptions({ signal }, readerIp),
       cache: "no-store",
     });
@@ -222,7 +223,7 @@ export function readWalletCounts(address: string, readerIp?: string): Promise<Wa
   if (hit && Date.now() - hit.at < WALLET_CACHE_MS) return hit.read;
   const read = (async (): Promise<WalletCounts> => {
     const t0 = Date.now();
-    const empty = { address: key, positions: [], families: [], total: 0, open: 0, closed: 0, chains: [] };
+    const empty = { address: key, positions: [], families: [], total: 0, open: 0, closed: 0, moved: 0, chains: [] };
     let summary: WalletSummaryAnswer;
     try {
       summary = await withBudget(WALLET_BUDGET_MS, (signal) => readSummary(key, signal, readerIp));
@@ -253,25 +254,34 @@ export function readWalletCounts(address: string, readerIp?: string): Promise<Wa
     }
     for (const r of summary.rows) {
       if (!taken.has(r))
-        positions.push({ chain: r.chain, family: r.family, positionId: r.positionId, status: r.status, href: r.href });
+        positions.push({
+          chain: r.chain,
+          family: r.family,
+          positionId: r.positionId,
+          status: walletRowStatus(r),
+          href: r.href,
+        });
     }
     const families = new Map<string, WalletCountsFamily>();
     for (const p of positions) {
       const k = `${p.chain}:${p.family}`;
-      const fam = families.get(k) ?? { chain: p.chain, family: p.family, positions: 0, open: 0, closed: 0 };
+      const fam = families.get(k) ?? { chain: p.chain, family: p.family, positions: 0, open: 0, closed: 0, moved: 0 };
       fam.positions += 1;
       if (p.status === "open") fam.open += 1;
+      else if (p.status === "moved") fam.moved += 1;
       else fam.closed += 1;
       families.set(k, fam);
     }
     const open = positions.filter((p) => p.status === "open").length;
+    const moved = positions.filter((p) => p.status === "moved").length;
     return {
       address: key,
       positions,
       families: [...families.values()],
       total: positions.length,
       open,
-      closed: positions.length - open,
+      closed: positions.length - open - moved,
+      moved,
       chains: [...new Set(positions.map((p) => p.chain))],
       readAt: Math.floor(Date.now() / 1000),
       ms: Date.now() - t0,

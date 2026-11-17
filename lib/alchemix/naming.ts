@@ -22,6 +22,9 @@
 // Titles and share cards compose `<market> <noun> <id>` through the house
 // helpers, which capitalise the noun; `alchemixMarketWord` is the market
 // segment those take, so the two forms can never disagree about the words.
+// The card heading, the ⋮'s id row and a saved position's name take the
+// app-wide form, "alUSD · Position #1221" (lib/shared/position-name.ts,
+// ui-jobs 703); `alchemixPositionName` stays the form a sentence uses.
 
 export type AlchemixPositionKind = "alchemist" | "transmuter" | "v2";
 

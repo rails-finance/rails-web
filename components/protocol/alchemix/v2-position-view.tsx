@@ -18,6 +18,8 @@
 // 3. THE SWEPT COLLATERAL IS A SENTENCE. It left for the DAO Safe that day, in
 //    one transaction per line, and appears in no figure.
 
+import { positionName } from "@/lib/shared/position-name";
+import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { useEffect, useMemo } from "react";
 import Link from "next/link";
 import { FOOT_LINK } from "@/lib/shared/ui-grammar";
@@ -34,7 +36,7 @@ import { useWalletContext } from "@/components/nav/wallet-context";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { formatUnitsExact } from "@/lib/utils/format";
 import { isAlchemixV2Event, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
-import { alchemixMarketWord, alchemixV2AccountLabel, alchemixV2PositionName } from "@/lib/alchemix/naming";
+import { alchemixMarketWord, alchemixV2AccountLabel } from "@/lib/alchemix/naming";
 import { alchemixExplorer } from "@/lib/alchemix/explorer";
 import { v2PositionPath, v3PositionPath, type AlchemixDeployment } from "@/lib/alchemix/lines";
 import { v2FrozenDebtProv, v2SharesProv, v2UnderlyingProv, type AlchemixV2Coords } from "@/lib/alchemix/v2-provenance";
@@ -206,15 +208,17 @@ export function AlchemixV2PositionView({
       )}
     </div>
   );
+  // The position's name (ui-jobs 703): the synthetic's V2 and the account.
+  const name = positionName({
+    market: alchemixMarketWord(p.syntheticSymbol, "v2"),
+    noun: POSITION_NOUN.alchemix,
+    id: p.account,
+  });
   const cardSlots: PositionCardSlots = {
     surface: "detail",
     status: V2_STATUS,
-    identity: (
-      <AlchemixIdentity
-        name={alchemixV2PositionName(p.syntheticSymbol, p.account)}
-        chain={p.chainName ?? `chain ${p.chainId}`}
-      />
-    ),
+    identity: <AlchemixIdentity name={name.text} chain={p.chainName ?? `chain ${p.chainId}`} />,
+    name,
     heads: [v2DebtHead(p, debtProv), v2CollateralHead(p, underlyingProvAt)],
     outcome: v2Outcome(p, v3SuccessorLinks(p, successorHref)),
     counters: null,
