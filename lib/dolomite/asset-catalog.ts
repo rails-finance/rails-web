@@ -70,6 +70,16 @@ export function accountNumberId(accountNumber: string): string {
   return v < BigInt(1_000_000) ? norm : `0x${v.toString(16).padStart(64, "0")}`;
 }
 
+/** The pieces of a Dolomite position's name, shared by the card's `name` slot
+ *  and the tab title: account 0 stays "Account #0"; every other account is a
+ *  "Borrow position" (the WLFI frontend's shared account under market "WLFI"). */
+export function dolomiteNameParts(accountNumber: string): { market?: string; noun?: string } {
+  const norm = normalizeAccountNumber(accountNumber) ?? accountNumber;
+  if (norm === "0") return {};
+  if (norm === WLFI_FRONTEND_ACCOUNT_NUMBER.toString()) return { market: "WLFI", noun: "Borrow position" };
+  return { noun: "Borrow position" };
+}
+
 /** Short display form: small numbers verbatim, hash-derived ones as 0xabcd…ef12. */
 export function shortAccountNumber(accountNumber: string): string {
   const id = accountNumberId(accountNumber);

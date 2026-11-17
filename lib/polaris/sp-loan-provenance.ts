@@ -22,7 +22,7 @@ const ask = (method: string): ProvVerify => ({
 });
 
 const SP_GETTER: Record<
-  "compounded" | "stableGain" | "pendingPeth" | "owner",
+  "compounded" | "stableGain" | "pendingPeth" | "bcGain" | "owner",
   { method: string; summary: (s: string) => string }
 > = {
   compounded: {
@@ -39,6 +39,11 @@ const SP_GETTER: Record<
     method: "getDepositorBcTokenGain(id) + stashedBcTokens(id)",
     summary: () =>
       "pETH pending — the pool's getDepositorBcTokenGain(id), the pETH liquidations have paid the deposit since its last touch, plus stashedBcTokens(id), the pETH earlier touches left unclaimed, both at the latest block.",
+  },
+  bcGain: {
+    method: "getDepositorBcTokenGain(id)",
+    summary: () =>
+      "pETH paid in since last touch — the pool's getDepositorBcTokenGain(id) at the latest block: the pETH liquidations have paid the deposit since its last touch, which the next touch writes.",
   },
   owner: {
     method: "ownerOf(id)",

@@ -4,7 +4,7 @@ import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
-import { accountNumberId, normalizeAccountNumber } from "@/lib/dolomite/asset-catalog";
+import { accountNumberId, dolomiteNameParts, normalizeAccountNumber } from "@/lib/dolomite/asset-catalog";
 import { loadDolomitePositionTail } from "@/lib/dolomite/position-page-data";
 import DolomitePositionView from "./position-view";
 
@@ -24,7 +24,7 @@ const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 
 // Moved down from the layout: the page is the segment that fetches, so it is the
 // segment that can describe what it fetched. The id is the account number
-// (ui-jobs 703): "Dolomite · Account #0", "Dolomite · Account 0xd010…e722".
+// "Dolomite · Account #0", "Dolomite · Borrow position #12".
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { owner, accountNumber } = await params;
   // This route carries its own opengraph-image.tsx, rendering this account's
@@ -32,6 +32,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return positionMetadata({
     session: "dolomite",
     subject: accountNumberId(accountNumber),
+    ...dolomiteNameParts(accountNumber),
     canonicalPath: `/ethereum/dolomite/${owner}/${accountNumber}`,
     image: "dynamic",
   });
