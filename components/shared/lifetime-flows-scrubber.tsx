@@ -93,7 +93,7 @@ import {
   TrackEnds,
   type FlowsTotalsData,
 } from "@/components/shared/lifetime-flows-busy";
-import { CombinedFlows, FLOW_TICK, LINE_HUE } from "@/components/shared/lifetime-flows-combined";
+import { CombinedFlows, FLOW_TICK } from "@/components/shared/lifetime-flows-combined";
 import {
   binInputFromTimeline,
   binSeries,
@@ -143,7 +143,7 @@ export type FlowsKeyItems = {
   items: { side: FlowSide; s: FlowSegment }[];
   outline: string | null;
   /** The line's two sides, and the bars' window where it is shaded. */
-  lines?: { label: string; color: string }[];
+  lines?: { label: string; side: FlowSide }[];
   shade?: string | null;
   /** The Explanation's Chart bullets: what the bars and the line cover. */
   chart?: string[];
@@ -531,9 +531,11 @@ export function FlowsKey({ items, outline, lines, shade }: FlowsKeyItems) {
             {outline}
           </li>
         )}
-        {lines?.map(({ label, color }) => (
+        {/* From the page's hues: the Key draws in a portal, outside any
+            element that sets --flow-debt. */}
+        {lines?.map(({ label, side }) => (
           <li key={label} className="inline-flex items-center gap-1.5" data-flow-key-line="">
-            <i aria-hidden className="inline-block h-0.5 w-4 shrink-0" style={{ background: color }} />
+            <i aria-hidden className="inline-block h-0.5 w-4 shrink-0" style={{ background: hues[side].solid }} />
             {label}
           </li>
         ))}
@@ -761,7 +763,7 @@ function panelWords(
   lined: boolean,
 ): {
   chart: string[];
-  lines: { label: string; color: string }[];
+  lines: { label: string; side: FlowSide }[];
   /** The Key's name for the dashed outline, where there is more than one stop. */
   outline: string | null;
 } {
@@ -785,8 +787,8 @@ function panelWords(
     chart,
     outline: model.liveStop > 0 ? (closed ? "Length at close" : "Today's length") : null,
     lines: [
-      { label: model.labels.collateral, color: LINE_HUE.collateral },
-      ...(hasDebt ? [{ label: model.labels.debt, color: LINE_HUE.debt }] : []),
+      { label: model.labels.collateral, side: "collateral" as const },
+      ...(hasDebt ? [{ label: model.labels.debt, side: "debt" as const }] : []),
     ],
   };
 }

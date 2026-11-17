@@ -42,7 +42,13 @@ import {
   type FlowEventsHelp,
 } from "@/lib/shared/learn-more-content";
 import { FlowBarsHeadsContext, Headline, Rescaled, useWidth } from "@/components/shared/lifetime-flows-busy";
-import { FlowCursorContext, KEEP_PANEL, SegmentTipContext, useFlowHues } from "@/components/shared/lifetime-flows-tip";
+import {
+  DEFAULT_HUES,
+  FlowCursorContext,
+  KEEP_PANEL,
+  SegmentTipContext,
+  useFlowHues,
+} from "@/components/shared/lifetime-flows-tip";
 import { useFlowFocus, useFlowFocusState } from "@/components/shared/flow-focus-context";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { formatPrice, pricePieces, levelAt, priceReadout, type FlowPriceSeries } from "@/lib/shared/flows-price";
@@ -792,6 +798,18 @@ export function CombinedFlows({
   );
   // Each side's headline, on its own line over its bar, the bars' "?" at the
   // first one's right end.
+  // The bars' how-to-read names the second bar's hue where a page set one.
+  const hues = useFlowHues();
+  const barsHelp = useMemo(
+    () =>
+      hues.debt.name === DEFAULT_HUES.debt.name
+        ? BARS_HELP
+        : lifetimeFlowsBarsContent({
+            collateral: { hue: hues.collateral.name, label: model.labels.collateral },
+            debt: { hue: hues.debt.name, label: model.labels.debt },
+          }),
+    [hues, model.labels],
+  );
   const bareHeadline = (side: "collateral" | "debt") => (
     <Headline
       side={side}
@@ -807,14 +825,14 @@ export function CombinedFlows({
     collateral: (
       <div className="mb-1.5 flex items-center justify-between gap-3" data-flow-headline-row="collateral">
         {bareHeadline("collateral")}
-        <SectionHelp content={BARS_HELP} name="the bars" anatomy="F16" extra={flowsKey} />
+        <SectionHelp content={barsHelp} name="the bars" anatomy="F16" extra={flowsKey} />
       </div>
     ),
     ...(hasDebt ? { debt: <div className="mb-1.5 mt-4">{bareHeadline("debt")}</div> } : {}),
   };
   // The protocol's changes inside the life, a marker a day (ruling 10).
   const changeDays = useMemo(() => changesByDay(model.changes, startDay, today), [model.changes, startDay, today]);
-  const debtHue = useFlowHues().debt.name === "Violet" ? "Violet" : "Green";
+  const debtHue = hues.debt.name === "Violet" ? "Violet" : "Green";
   const marks = useMemo(() => eventsHelp(model, hasDebt, changeDays, debtHue), [model, hasDebt, changeDays, debtHue]);
   const priceBrief = priced
     ? {

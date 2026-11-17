@@ -12,11 +12,18 @@ import { indefiniteArticle, viewWord } from "@/lib/utils/format";
  *  "?", and the events row with whatever charts stand over it behind the
  *  "?" on the events heading, so the modal reads only what is on screen.
  *  One text on every explorer (ui-jobs §264). */
-export function lifetimeFlowsBarsContent(): LearnMoreContent {
+export function lifetimeFlowsBarsContent(
+  /** Each bar's hue and name, where the second bar is not a debt in green
+   *  (a Polaris deposit's pETH paid in, in violet). */
+  sides?: { collateral: { hue: string; label: string }; debt: { hue: string; label: string } },
+): LearnMoreContent {
+  const lc = (w: string) => w.charAt(0).toLowerCase() + w.slice(1);
+  const which = sides
+    ? `${sides.collateral.hue} is the ${lc(sides.collateral.label)}, ${lc(sides.debt.hue)} the ${lc(sides.debt.label)}.`
+    : "Blue is the collateral, green the debt.";
   return {
     title: "How to read the bars",
-    intro:
-      "Blue is the collateral, green the debt. The solid part is what is held or owed on the cursor's day; the hatched parts are what left. Tap a part for its name, value and share.",
+    intro: `${which} The solid part is what is held or owed on the cursor's day; the hatched parts are what left. Tap a part for its name, value and share.`,
   };
 }
 

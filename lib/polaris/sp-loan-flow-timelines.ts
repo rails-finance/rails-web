@@ -15,7 +15,8 @@
 // curve's floor (deposited, less returned, each at the floor in force at its
 // touch; the floor's rise since is the bar's balancing item), and the debt
 // (borrowed, with the fees each touch's index charged, less repaid). The
-// index records the floor only at the loan's touches; today is the chain's.
+// floor is read at each day's close; where that read fails, the touches'
+// floors are carried; today is the chain's.
 // Today the fees accrued since the last touch join the fees line, where the
 // chain's loans(id) agrees with the last touch.
 //
@@ -26,6 +27,7 @@
 
 import type { FocusEvent } from "@/lib/shared/flow-focus";
 import type { FlowBucket, FlowDayRow, FlowEvent, FlowTimeline } from "@/lib/shared/flows-timeline";
+import type { DayObs } from "@/lib/shared/price-series";
 import { daysFromEvents, unitScaleFor } from "@/lib/shared/flows-timeline";
 import type {
   PolarisDepositDay,
@@ -43,12 +45,15 @@ const B = "b";
 
 type Grains = { collateral: number; debt: number };
 
-function sidePrices(firstDay: number, endDay: number, G: Grains) {
-  const a: [number, number][] = [];
-  const b: [number, number][] = [];
+/** Each side's "price", its grain, every day; a day the page read from a
+ *  day row carries that row's last block, so its receipt names the block. */
+function sidePrices(firstDay: number, endDay: number, G: Grains, blocks?: Map<number, number>) {
+  const a: DayObs[] = [];
+  const b: DayObs[] = [];
   for (let d = firstDay; d <= endDay; d++) {
-    a.push([d, G.collateral]);
-    b.push([d, G.debt]);
+    const block = blocks?.get(d);
+    a.push(block != null ? [d, G.collateral, block] : [d, G.collateral]);
+    b.push(block != null ? [d, G.debt, block] : [d, G.debt]);
   }
   return { [A]: a, [B]: b };
 }
@@ -206,7 +211,15 @@ function depositTimeline(
   market: PolarisMarket,
   buckets: FlowBucket[],
   days: FlowDayRow[],
-  at: { firstDay: number; lastDay: number; last: { deposit: bigint; stash: bigint }; scale: Grains; G: Grains },
+  at: {
+    firstDay: number;
+    lastDay: number;
+    last: { deposit: bigint; stash: bigint };
+    scale: Grains;
+    G: Grains;
+    /** The block of each day row's last operation, where the page read day rows. */
+    blocks?: Map<number, number>;
+  },
   o: { open: boolean; now: DepositNow | null; nowSec: number },
 ): FlowTimeline {
   const s = POLARIS_MARKET_CONFIG[market].stable.symbol;
@@ -244,7 +257,7 @@ function depositTimeline(
       ...(pending.length ? { pending } : {}),
     },
     todayPrices: { [A]: G.collateral, [B]: G.debt },
-    dailyPrices: sidePrices(firstDay, endDay, G),
+    dailyPrices: sidePrices(firstDay, endDay, G, at.blocks),
     seriesCarry: true,
     today: o.open ? today : endDay,
     labels: { collateral: `${s} deposit`, debt: "pETH paid in" },
@@ -292,10 +305,17 @@ export function depositFlowsFromDays(
   const G: Grains = { collateral: 10 ** scale.collateral, debt: 10 ** scale.debt };
   let events = 0;
   let txs = 0;
+  let prev: PolarisDepositDay | null = null;
   const days: FlowDayRow[] = rows.map((r) => {
     events += r.events;
     txs += r.txs;
-    const movedA = r.did_deposit || r.did_withdraw || r.did_burn || r.did_claim;
+    // Each side moved where its running sums did since the day before, as
+    // the event-built rows judge a side by its legs.
+    const moved = (keys: (keyof PolarisDepositDay)[]) =>
+      keys.some((k) => big(String(r[k])) !== (prev ? big(String(prev[k])) : ZERO));
+    const movedA = moved(["deposited", "withdrawn", "burned", "yield_in", "yield_claimed"]);
+    const movedB = moved(["peth_in", "peth_claimed"]);
+    prev = r;
     const ts = Number(r.last_timestamp);
     const cum = {
       [D.deposited]: v(r.deposited) * G.collateral,
@@ -317,7 +337,7 @@ export function depositFlowsFromDays(
       cumAsset,
       events,
       txs,
-      tick: movedA && r.did_pay_peth ? "both" : r.did_pay_peth ? "debt" : "collateral",
+      tick: movedA && movedB ? "both" : movedB ? "debt" : "collateral",
       cum,
       balances: [
         { asset: A, symbol: s, side: "collateral", amount: v(r.deposit) },
@@ -339,6 +359,7 @@ export function depositFlowsFromDays(
       last: { deposit: big(lastRow.deposit), stash: big(lastRow.stash) },
       scale,
       G,
+      blocks: new Map(rows.map((r) => [r.day, Number(r.last_block)])),
     },
     o,
   );
@@ -384,7 +405,7 @@ export function loanFlows(
     nowSec: number;
     /** The floor at each day's last FeesAccrued (/reserve-loans/floor/daily),
      *  or null where it was not read: the touches' floors are carried. */
-    floorDays?: { day: number; floor_price_raw: string }[] | null;
+    floorDays?: { day: number; floor_price_raw: string; block_number: string }[] | null;
   },
 ): SpLoanFlows | null {
   const touches = rowsAsc.filter((r) => r.event_type !== "transfer");
@@ -470,10 +491,13 @@ export function loanFlows(
 
   // The floor is recorded on the days the loan was touched, and today; a day
   // between keeps the last (`seriesCarry`), drawn dotted (`carriedWhy`).
-  const floorObs = new Map<number, number>();
+  const floorObs = new Map<number, DayObs>();
   // A touch with no floor of its own records none: its day carries, dotted.
   events.forEach((e, i) => {
-    if (!book.carried[i] || i < firstOwn) floorObs.set(Math.floor(e.ts / DAY_S), floors[i] * G);
+    if (!book.carried[i] || i < firstOwn) {
+      const d = Math.floor(e.ts / DAY_S);
+      floorObs.set(d, [d, floors[i] * G, e.block]);
+    }
   });
   // The daily floor, where it was read, for every day of the life.
   const daily = o.floorDays && o.floorDays.length > 0;
@@ -481,13 +505,10 @@ export function loanFlows(
     for (const f of o.floorDays!) {
       if (f.day < firstDay || f.day > endDay) continue;
       const v = units(BigInt(f.floor_price_raw));
-      if (v > 0) floorObs.set(f.day, v * G);
+      if (v > 0) floorObs.set(f.day, [f.day, v * G, Number(f.block_number)]);
     }
-    // The day before the life opens, so its first day has a floor at its close.
-    const before = o.floorDays!.filter((f) => f.day < firstDay).pop();
-    if (before && !floorObs.has(firstDay)) floorObs.set(firstDay, units(BigInt(before.floor_price_raw)) * G);
   }
-  if (o.open && o.chain) floorObs.set(today, floorNow * G);
+  if (o.open && o.chain) floorObs.set(today, [today, floorNow * G]);
   const wethObs: [number, number][] = [];
   for (let d = firstDay; d <= endDay; d++) wethObs.push([d, G]);
 
@@ -511,7 +532,7 @@ export function loanFlows(
         : {}),
     },
     todayPrices: { [A]: floorNow * G, [B]: G },
-    dailyPrices: { [A]: [...floorObs.entries()].sort((x, y) => x[0] - y[0]), [B]: wethObs },
+    dailyPrices: { [A]: [...floorObs.values()].sort((x, y) => x[0] - y[0]), [B]: wethObs },
     seriesCarry: true,
     ...(daily
       ? { priceSource: "the bonding curve's floor, the last FeesAccrued of each day" }
@@ -534,7 +555,7 @@ export function loanFlows(
       },
       heldBasis: {
         collateral: daily
-          ? `the ${FPETH.symbol} the loan held after its last touch, at the floor at the day's last FeesAccrued, the chain's floor today.`
+          ? `the ${FPETH.symbol} the loan held after its last touch, at the day's closing floor, and today at the chain's floor.`
           : `the ${FPETH.symbol} the loan held after its last touch, at the floor: the floor in force at the loan's last touch on the days between, the chain's floor today.`,
         debt: `the ${POLARIS_WETH.symbol} owed after the loan's last touch, at the fee index in force there.`,
       },

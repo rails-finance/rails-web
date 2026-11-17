@@ -91,7 +91,8 @@ export const DEFAULT_HUES: FlowHues = {
 export const PAID_IN_HUES: FlowHues = {
   collateral: BLUE,
   debt: {
-    solid: "#a78bfa",
+    // The token, with its value where Tailwind has not emitted it.
+    solid: "var(--color-violet-400, #a78bfa)",
     line: "rgba(167, 139, 250, 0.9)",
     hatch: "rgba(167, 139, 250, 0.75)",
     swatch: "rgba(167, 139, 250, 0.35)",

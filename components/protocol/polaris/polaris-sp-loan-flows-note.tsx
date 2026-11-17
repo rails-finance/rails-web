@@ -70,7 +70,7 @@ export function PolarisLoanFlowsNote({
         fpETH flow is valued at the floor in force at its touch; the floor only rises, and its rise since is the
         collateral&apos;s Floor rise.
         {dailyFloor
-          ? " Between touches the line takes each day's floor, the last the loans manager logged that day; today is the chain's floor."
+          ? " Between touches the line takes each day's closing floor; today is the chain's floor."
           : " The floor was read only at the loan's touches, so a day between keeps the last touch's floor, drawn dotted; today is the chain's floor."}
       </p>
       <p>

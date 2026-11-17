@@ -330,7 +330,10 @@ const NO_FOCUS: never[] = [];
 /** The second side's hue for the parts drawn from CSS (the chart, the events
  *  row, the line's label): violet-400, violet-700 for the label on the light
  *  surface. */
-const PAID_IN_VARS = { "--flow-debt": PAID_IN_HUES.debt.solid, "--flow-debt-label": "#6d28d9" } as CSSProperties;
+const PAID_IN_VARS = {
+  "--flow-debt": PAID_IN_HUES.debt.solid,
+  "--flow-debt-label": "var(--color-violet-700)",
+} as CSSProperties;
 
 /** The timeline's head slot (L5, decision 0022 §4): what the pool has done to
  *  the deposit since its last touch, the holder having done nothing, with the
