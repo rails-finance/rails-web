@@ -38,7 +38,7 @@ export function configCallProv(
         kind: "recompute",
         text: `To check: ask any ${chainMeta(c.chainId).name} archive node for the vault's ${call} at block ${n(c.block)}.`,
       },
-      summary: `${label} — the vault's \`${call}\` at block ${n(c.block)}: ${answer}. ${what}`,
+      summary: `${label} — ${answer}, as the vault answered at block ${n(c.block)}. ${what}`,
       contract: vaultContract(c),
       via: `chain · ${call} @ the pinned block`,
     },
@@ -57,7 +57,7 @@ export function configFeeProv(c: ConfigCoords, raw: string, shown: string): Prov
         kind: "recompute",
         text: `To check: ask any ${chainMeta(c.chainId).name} archive node for the vault's fee() at block ${n(c.block)}.`,
       },
-      summary: `Performance fee — the vault's \`fee()\` at block ${n(c.block)}: ${shown} of the interest it earns, paid to the fee recipient as new shares.`,
+      summary: `Performance fee — ${shown} of the interest the vault earns, as it answered at block ${n(c.block)}, paid to the fee recipient as new shares.`,
       contract: vaultContract(c),
       via: "chain · fee() @ the pinned block",
       scaling: {
@@ -103,7 +103,7 @@ export function configReleaseProv(k: VaultCreation): Provenance {
       href: explorerUrl(k.chainId, "block", k.block),
       text: `Block ${n(k.block)} on ${chainMeta(k.chainId).explorerName}`,
     },
-    summary: `Version — ${k.release}: the ${k.release} factory${k.factory ? ` ${k.factory}` : ""} emitted the \`${k.log}\` log naming ${k.vault} at block ${n(k.block)}, as Rails's roster of each factory's creation logs records it.`,
+    summary: `Version — ${k.release}: the ${k.release} factory${k.factory ? ` ${k.factory}` : ""} created ${k.vault} at block ${n(k.block)}.`,
     contract: factoryContract(k),
     via: `${k.log} log on the factory · the Rails roster`,
   };
@@ -120,9 +120,9 @@ export function configCreatedProv(k: VaultCreation): Provenance {
       href: explorerUrl(k.chainId, "block", k.block),
       text: `Block ${n(k.block)} on ${chainMeta(k.chainId).explorerName}`,
     },
-    summary: `Created — block ${n(k.block)}${k.at != null ? `, ${formatDate(new Date(k.at * 1000))}` : ""}: the block of the factory's \`${k.log}\` log naming the vault${k.at != null ? "; the date is that block's timestamp" : ""}.`,
+    summary: `Created — block ${n(k.block)}${k.at != null ? `, ${formatDate(new Date(k.at * 1000))}` : ""}: the block in which the factory created the vault${k.at != null ? "; the date is that block's timestamp" : ""}.`,
     contract: factoryContract(k),
-    via: `${k.log} log · eth_getBlockByNumber(creation block).timestamp`,
+    via: `${k.log} log · the creation block's timestamp`,
     inputs: [
       { label: "creation block", value: n(k.block), kind: "chain", pclass: "emitted" },
       ...(k.at != null
@@ -143,7 +143,7 @@ export function configVaultProv(k: VaultCreation): Provenance {
       href: explorerUrl(k.chainId, "address", k.vault),
       text: `The vault on ${chainMeta(k.chainId).explorerName}`,
     },
-    summary: `Vault — ${k.vault}, ${k.vaultName}: the contract the ${k.release} factory's \`${k.log}\` log names at block ${n(k.block)}, and the address every figure on this page is read from.`,
+    summary: `Vault — ${k.vault}, ${k.vaultName}: the contract the ${k.release} factory created at block ${n(k.block)}, and the address every figure on this page is read from.`,
     contract: factoryContract(k),
     via: `${k.log} log on the factory · the Rails roster`,
   };
@@ -163,7 +163,7 @@ export function configWrapsProv(
       href: explorerUrl(chainId, "address", asset.address),
       text: `${asset.symbol} on ${chainMeta(chainId).explorerName}`,
     },
-    summary: `What the asset wraps — ${asset.symbol}'s \`asset()\`: ${wraps.symbol} ${wraps.address}, whose \`decimals()\` is ${wraps.decimals}.`,
+    summary: `What the asset wraps — ${asset.symbol} wraps ${wraps.symbol} ${wraps.address}, which has ${wraps.decimals} decimal places.`,
     contract: { name: asset.symbol, address: asset.address },
     via: "chain · asset(), then decimals() and symbol() on what it names @ head",
   };

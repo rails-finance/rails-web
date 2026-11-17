@@ -40,7 +40,7 @@ const holdingFractionProv_ = (c: HoldingCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
-  summary: `Share of the vault. This address's \`balanceOf()\` over the vault's \`totalSupply()\`, both read at block ${n(c.blockNumber)}. Two integers in one unit, so no price enters it.`,
+  summary: `Share of the vault. The shares this address holds over all shares issued, both at block ${n(c.blockNumber)}.`,
   contract: vaultContract(c),
   via: `${lane(c)} · balanceOf(holder) ÷ totalSupply() @ the pinned block`,
   formula: "balanceOf(holder) ÷ totalSupply()",
@@ -52,7 +52,7 @@ const holdingClaimProv_ = (c: HoldingCoords, label = "Claim"): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("convertToAssets(the holder's shares)", c),
-  summary: `Claim. \`convertToAssets()\` asked with this address's exact balance at block ${n(c.blockNumber)}, in ${c.assetSymbol}. The vault's conversion at one block; what a redemption returns is \`maxWithdraw()\`.`,
+  summary: `Claim. What this address's shares convert to at block ${n(c.blockNumber)}, in ${c.assetSymbol}, as the vault answers. It is the vault's conversion at one block; what a redemption can take out is the vault's separate maximum-withdrawal answer.`,
   contract: vaultContract(c),
   via: `${lane(c)} · convertToAssets(balanceOf(holder)) @ the pinned block`,
 });
@@ -65,11 +65,11 @@ const holdingFirstSeenProv_ = (c: HoldingCoords, block: number): Provenance => (
   source: { block },
   verify: {
     kind: "recompute",
-    text: `Sweep this vault's Transfer logs naming this address to block ${n(c.blockNumber)} and take the lowest block`,
+    text: `To check: ask any ${chainWord(c)} archive node for this vault's Transfer logs that name this address, up to block ${n(c.blockNumber)}, and take the lowest block.`,
   },
-  summary: `First seen. Block ${n(block)}, the lowest block of any \`Transfer\` of this vault naming this address, out of this page's sweep to block ${n(c.blockNumber)}. The date is that block's \`timestamp\`.`,
+  summary: `First seen. Block ${n(block)}, the lowest block of any transfer of this vault that names this address, read up to block ${n(c.blockNumber)}. The date is that block's time.`,
   contract: vaultContract(c),
-  via: `${lane(c)} · eth_getLogs(Transfer) to the pinned block`,
+  via: `${lane(c)} · Transfer logs to the pinned block`,
 });
 
 const KIND_WORD: Record<string, string> = {
@@ -115,9 +115,9 @@ function holdingEarnedProv_(c: HoldingCoords, e: EarnedOk, label = "Earned"): Pr
     source: { block: c.blockNumber },
     verify: {
       kind: "recompute",
-      text: `Sum the legs below and add convertToAssets(balanceOf) at block ${n(c.blockNumber)}`,
+      text: `To check: ask any ${chainWord(c)} archive node for the vault's convertToAssets(balanceOf(the holder)) at block ${n(c.blockNumber)}, add the legs below that left, and take away those that came in.`,
     },
-    summary: `${label}. The claim at block ${n(c.blockNumber)} (${units(e.claimRaw)} ${c.assetSymbol}) plus every asset amount that left (${units(e.outRaw)}) minus every amount that came in (${units(e.inRaw)}), in ${c.assetSymbol}. Rendered because the replay of this address's transfers equals its \`balanceOf\` to the wei and every read leg's share price was read at that leg's block.`,
+    summary: `${label}. The claim at block ${n(c.blockNumber)} (${units(e.claimRaw)} ${c.assetSymbol}) plus every asset amount that left (${units(e.outRaw)}) minus every amount that came in (${units(e.inRaw)}), in ${c.assetSymbol}. Shown because the replay of this address's transfers equals the shares it holds to the wei, and every leg's share price was read at that leg's block.`,
     contract: vaultContract(c),
     via: `${lane(c)} · the Lifetime flows replay + convertToAssets(balanceOf(holder)) @ the pinned block`,
     formula: "claim now + Σ out − Σ in",
@@ -141,9 +141,9 @@ function holdingFlowSideProv_(c: HoldingCoords, e: EarnedOk, dir: "in" | "out"):
     source: { block: c.blockNumber },
     verify: {
       kind: "recompute",
-      text: `Sum this address's ${dir === "in" ? "Deposit events and Transfers in" : "Withdraw events and Transfers out"} of the vault to block ${n(c.blockNumber)}`,
+      text: `To check: ask any ${chainWord(c)} archive node for this address's ${dir === "in" ? "Deposit logs and incoming Transfer logs" : "Withdraw logs and outgoing Transfer logs"} on the vault up to block ${n(c.blockNumber)}, and add them up, valuing each transfer at convertToAssets at its block.`,
     },
-    summary: `${label}. ${unitsText(c, total)} ${c.assetSymbol}: every amount that ${dir === "in" ? "came into" : "left"} the vault ${dir === "in" ? "from" : "to"} this address to block ${n(c.blockNumber)}. A ${dir === "in" ? "deposit" : "withdrawal"} is the assets word of its ERC-4626 event; shares ${dir === "in" ? "received" : "sent"} by transfer are valued at the share price read at that block.`,
+    summary: `${label}. ${unitsText(c, total)} ${c.assetSymbol}: every amount that ${dir === "in" ? "came into" : "left"} the vault ${dir === "in" ? "from" : "to"} this address to block ${n(c.blockNumber)}. A ${dir === "in" ? "deposit" : "withdrawal"} is the asset amount of its ERC-4626 event; shares ${dir === "in" ? "received" : "sent"} by transfer are valued at the share price read at that block.`,
     contract: vaultContract(c),
     via: `${lane(c)} · the Lifetime flows replay to the pinned block`,
     formula:
@@ -178,11 +178,11 @@ const holdingProfitPctProv_ = (c: HoldingCoords, e: EarnedOk): Provenance => ({
 
 const NO_SUM: Record<Exclude<VaultEarned["status"], "ok">, (block: number) => string> = {
   carried: (b) =>
-    `The share price at block ${n(b)}, a transfer leg's own block, did not answer, and a carried price would make the sum an estimate (decision 0048 point 2).`,
+    `The share price at block ${n(b)}, a transfer leg's block, did not answer, and a carried price would make the sum an estimate.`,
   unreplayed: (b) =>
-    `The replay of this address's transfers did not equal its \`balanceOf()\` at block ${n(b)} to the wei, so no leg sum is stated (decision 0048 point 2).`,
+    `The replay of this address's transfers did not equal the shares it holds at block ${n(b)} to the wei, so no leg sum is stated.`,
   unread: (b) =>
-    `\`convertToAssets()\` of this address's balance did not answer at block ${n(b)}, so the sum has no end point.`,
+    `The vault did not answer what this address's shares convert to at block ${n(b)}, so the sum has no end point.`,
 };
 
 /** Why Profit or loss has no figure, with the block that did not answer. */
@@ -210,12 +210,12 @@ const holdingWorthLineProv_ = (
     source: { block: c.blockNumber },
     verify: {
       kind: "recompute",
-      text: `For any day, ask an archive node for balanceOf(the holder) and convertToAssets(1 share) at the stored block, and multiply`,
+      text: `To check: for any day, ask any ${chainWord(c)} archive node for the vault's balanceOf(the holder) and convertToAssets(1 share) at that day's block, and multiply.`,
     },
-    summary: `Its worth, one read a day. ${n(w.points.length)} points from ${day(first.day)} to ${day(last.day)}: this address's balance at each stored day's block, from the replay of its transfers, times the vault's share price stored for that day in the daily store's \`${w.key}\` series, in ${c.assetSymbol}. The last point is the claim at block ${n(c.blockNumber)}. A day the store has no row for is a gap.`,
+    summary: `Its worth, one read a day. ${n(w.points.length)} points from ${day(first.day)} to ${day(last.day)}: this address's balance at each day's block, from the replay of its transfers, times the vault's share price read for that day, in ${c.assetSymbol}. The last point is the claim at block ${n(c.blockNumber)}. A day with no read is a gap.`,
     contract: vaultContract(c),
-    via: `the daily store (${w.key}) + the Lifetime flows replay`,
-    formula: "replayed balanceOf at the day's block × convertToAssets(1 share) stored that day",
+    via: `daily share-price reads · the Lifetime flows replay × the share price read that day`,
+    formula: "replayed balanceOf at the day's block × convertToAssets(1 share) read that day",
     inputs: [first, last].map((p, i) => ({
       label: `${i === 0 ? "First" : "Last"} point · block ${n(p.block)}`,
       value: `${unitsText(c, p.raw)} ${c.assetSymbol}`,

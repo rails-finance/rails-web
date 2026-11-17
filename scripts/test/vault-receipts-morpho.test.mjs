@@ -236,3 +236,9 @@ test("LLTV is the docs' Liquidation Loan-To-Value, not 'the one risk parameter' 
   assert.doesNotMatch(s, /one risk parameter/);
   assert.match(s, /Liquidation Loan-To-Value/);
 });
+
+test("Unaccrued interest says that on a V1.1 vault the difference carries lost assets (ui-jobs 688)", () => {
+  const s = V.vaultGapProv(c).summary;
+  assert.match(s, /V1\.1 vault it also carries the vault's lost assets/);
+  assert.doesNotMatch(s, /Two readings of the same holdings/);
+});

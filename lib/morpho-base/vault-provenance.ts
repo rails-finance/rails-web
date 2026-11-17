@@ -272,7 +272,7 @@ const vaultGapProv_ = (c: MorphoVaultCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
-  summary: `Unaccrued interest — total assets minus the sum of the stored Morpho Blue legs${atBlock(c)}. Two readings of the same holdings at the same block: MetaMorpho extrapolates each market's interest to this block's timestamp, and Morpho Blue holds what each market last settled. The difference also carries any asset the vault holds outside its Morpho Blue positions.`,
+  summary: `Unaccrued interest — total assets minus the sum of the stored Morpho Blue legs${atBlock(c)}. MetaMorpho extrapolates each market's interest to this block's timestamp, and Morpho Blue holds what each market last settled; the difference is that interest, and any asset the vault holds outside its Morpho Blue positions. On a MetaMorpho V1.1 vault it also carries the vault's lost assets, which total assets keeps and no market holds.`,
   contract: vaultContract(c),
   via: `${lane(c)} · MetaMorpho.totalAssets() − Σ legs @ the pinned block`,
   formula: "totalAssets − Σ leg assets",

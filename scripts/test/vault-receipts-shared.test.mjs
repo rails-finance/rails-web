@@ -111,3 +111,92 @@ test("Holders on Yearn V3 leaves out the vault's address as well", () => {
   assert.match(p.verify.text, /other than the zero address and the vault's address/);
   assert.match(p.summary, /other than the zero address and the vault's address/);
 });
+
+// The steward, configuration, roster and holder-card receipts (ui-jobs 683,
+// the four files the 617 scope left unassigned).
+const C = await import("../../lib/vaults/card-provenance.ts");
+// config-provenance.ts imports a value from a .tsx component, which this
+// runner cannot load; check:receipts reads its summaries instead.
+const O = await import("../../lib/vaults/roster-provenance.ts");
+const D = await import("../../lib/vaults/holding-provenance.ts");
+
+const others = () => {
+  const v = { ...summary(), readAt: { block: 24_000_000 } };
+  const hc = {
+    chainId: 8453,
+    blockNumber: 24_000_000,
+    vault: v.address,
+    vaultName: "Steakhouse USDC",
+    shareSymbol: "steakUSDC",
+    shareDecimals: 18,
+    assetSymbol: "USDC",
+    assetDecimals: 6,
+    holder: "0x0000000000000000000000000000000000000def",
+  };
+  const leg = (kind, dir, basis) => ({ kind, dir, basis, block: 23_000_000, raw: "1000000" });
+  const earned = {
+    status: "ok",
+    earnedRaw: "50000",
+    claimRaw: "1050000",
+    inRaw: "2000000",
+    outRaw: "1000000",
+    legs: [leg("deposit", "in", "stated"), leg("transfer-out", "out", "read")],
+    legsOmitted: 3,
+  };
+  return [
+    ...["curator", "owner", "roleManager", "poolDelegate"].map((role) => [
+      `steward ${role}`,
+      C.vaultStewardProv(v, { role, address: "0x0000000000000000000000000000000000000aaa" }),
+    ]),
+    ["roster shown", O.vaultRosterShownProv(12, 40, ["holders ≥ 10"])],
+    ["roster read", O.rosterReadProv([{ label: "Morpho on Base", block: 24_000_000, at: 1_700_000_000 }])],
+    [
+      "index read",
+      O.rosterReadProv([
+        { label: "Morpho on Base", block: 24_000_000, at: 1_700_000_000 },
+        { label: "Aave on Ethereum", block: 21_000_000, at: null },
+      ]),
+    ],
+    ["holding share", D.holdingFractionProv(hc)],
+    ["holding claim", D.holdingClaimProv(hc)],
+    ["first seen", D.holdingFirstSeenProv(hc, 23_000_000)],
+    ["earned", D.holdingEarnedProv(hc, earned)],
+    ["put in", D.holdingFlowSideProv(hc, earned, "in")],
+    ["taken out", D.holdingFlowSideProv(hc, earned, "out")],
+    ...["carried", "unreplayed", "unread"].map((status) => [
+      `no sum ${status}`,
+      D.holdingNoSumProv(hc, { status, block: 23_000_000 }),
+    ]),
+    [
+      "worth line",
+      D.holdingWorthLineProv(hc, {
+        key: KEY,
+        points: [
+          { day: 20_000, block: 23_000_000, raw: "1000000" },
+          { day: 20_030, block: 24_000_000, raw: "1050000" },
+        ],
+      }),
+    ],
+  ];
+};
+
+test('steward, configuration, roster and holder-card receipts: in words, no store key, check lines open "To check:"', () => {
+  for (const [name, p] of others()) {
+    assert.ok(p.summary, `${name}: has a summary`);
+    assert.ok(!p.summary.includes("`"), `${name}: no backtick — ${p.summary}`);
+    assert.ok(!/\(\)/.test(p.summary), `${name}: no call name in the summary — ${p.summary}`);
+    assert.ok(!/daily store|decision 0048/.test(p.summary), `${name}: no store or decision number — ${p.summary}`);
+    assert.ok(!p.summary.includes(KEY), `${name}: no store key — ${p.summary}`);
+    for (const t of [p.summary, p.verify?.text ?? "", p.via ?? ""])
+      assert.ok(!/eth_|daily store/.test(t), `${name}: ${t}`);
+    if (p.verify?.kind === "recompute")
+      assert.ok(p.verify.text.startsWith("To check:"), `${name}: check line opens "To check:" — ${p.verify.text}`);
+  }
+});
+
+test("the steward and holder-card check lines name the vault's chain", () => {
+  const v = { ...summary(), readAt: { block: 1 } };
+  assert.match(C.vaultStewardProv(v, { role: "curator", address: "0xa" }).verify.text, /any Base archive node/);
+  const eth = { ...v, chainId: 1 };
+  assert.match(C.vaultStewardProv(eth, { role: "curator", address: "0xa" }).verify.text, /any Ethereum archive node/);
+});

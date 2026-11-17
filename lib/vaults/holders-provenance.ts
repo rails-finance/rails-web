@@ -55,6 +55,6 @@ export const otherHoldersCountProv = (c: HoldersCoords, live: number, rest: numb
 export const otherHoldersShareProv = (c: HoldersCoords, rest: number, restPpm: number, named: number): Provenance => ({
   ...base(c),
   kind: "chain-derived",
-  summary: `The other holders' share at the census — ${n(rest)} addresses held ${ppmPct(restPpm)} of ${c.shareSymbol}: the whole supply less the ${n(named)} named above, from the census at block ${n(c.censusBlock)}, where every balance summed to totalSupply().`,
+  summary: `The other holders' share at the census — ${n(rest)} addresses held ${ppmPct(restPpm)} of ${c.shareSymbol}: the whole supply less the ${n(named)} named above, from the census at block ${n(c.censusBlock)}, where the balances added up to the shares issued.`,
   via: "vault census · 1 − Σ balanceOf(top holders) / totalSupply() @ the census block",
 });
