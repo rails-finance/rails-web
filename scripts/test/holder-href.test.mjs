@@ -17,6 +17,8 @@ const listing = (session, address) =>
 test("Liquity V2 and MakerDAO holders open the wallet page, lowercased", () => {
   assert.equal(holderHref("liquity-v2", MIXED, listing), `/wallet/${LOWER}`);
   assert.equal(holderHref("makerdao", MIXED, listing), `/wallet/${LOWER}`);
+  for (const fork of ["ebisu", "asymmetry", "basedollar"])
+    assert.equal(holderHref(fork, MIXED, listing), `/wallet/${LOWER}`);
 });
 
 test("the wallet page link carries the page it was opened from", () => {

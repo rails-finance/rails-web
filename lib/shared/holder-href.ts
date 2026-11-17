@@ -9,7 +9,13 @@
 // wallet; null leaves the block explorer.
 
 /** The families the wallet page (/wallet/<address>) reads a holder's position for. */
-export const WALLET_PAGE_SESSIONS: ReadonlySet<string> = new Set(["liquity-v2", "makerdao"]);
+export const WALLET_PAGE_SESSIONS: ReadonlySet<string> = new Set([
+  "liquity-v2",
+  "makerdao",
+  "ebisu",
+  "asymmetry",
+  "basedollar",
+]);
 
 export function holderHref<S extends string>(
   session: S,

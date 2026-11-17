@@ -123,10 +123,15 @@ import {
 } from "@/components/protocol/liquity-fork/liquity-fork-state-stats";
 import { getForkBatchManagerName } from "@/lib/shared/fork-batch-managers";
 import { AmountText } from "@/components/shared/amount-text";
+import { LinkedAddress } from "@/components/shared/linked-address";
+import type { SessionProtocol } from "@/lib/shared/sessions";
 import { familyRatioPct, fmtLtv, type LiquityFamilyTerms } from "@/lib/liquity/ltv";
 import type { RedemptionPath } from "@/lib/liquity-fork/shutdown";
 
 const shortAddress = (a: string): string => `${a.slice(0, 6)}…${a.slice(-4)}`;
+
+/** The fork's session key, for a holder's link into its wallet page. */
+const forkSession = (protocolName: string): SessionProtocol => protocolName.toLowerCase() as SessionProtocol;
 
 /** The two fork contexts are structural twins; either drives the explainer. */
 export type LiquityForkEventContext = EbisuContext | AsymmetryContext | BasedollarContext;
@@ -1255,7 +1260,9 @@ function eventSlots(
           clause(
             tr ? (
               <>
-                The Trove NFT moved from {shortAddress(tr.fromAddress)} to {shortAddress(tr.toAddress)}.
+                The Trove NFT moved from{" "}
+                <LinkedAddress address={tr.fromAddress} holderOf={forkSession(fork.protocolName)} /> to{" "}
+                <LinkedAddress address={tr.toAddress} holderOf={forkSession(fork.protocolName)} />.
               </>
             ) : (
               <>The {coll} Trove&rsquo;s ownership was transferred.</>
