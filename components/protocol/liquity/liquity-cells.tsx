@@ -170,10 +170,11 @@ export function useLiquityCells({
   const collDeltaEcho =
     collCp && Math.abs(Math.abs(l2.coll.after - beforeColl) - Math.abs(collCp.change)) < 0.00005 ? collCp : undefined;
 
-  // A transfer row's balances are the trove's state at its previous event,
-  // and no log of this transaction states them, so the receipt names the
-  // previous event's log and links no transaction.
-  const carried = ctx.operation === "transferTrove";
+  // A wallet-to-wallet transfer row's balances are the trove's state at its
+  // previous event, and no log of this transaction states them, so the
+  // receipt names the previous event's log and links no transaction. A mint
+  // or a burn rides the open's or the close's transaction, whose logs do.
+  const carried = ctx.operation === "transferTrove" && ctx.transfer?.transferType === "transfer";
   const carriedProv = (what: string, field: string, asset: string): Provenance => ({
     kind: "chain",
     pclass: "indexed",
