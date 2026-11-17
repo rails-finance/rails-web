@@ -1210,7 +1210,7 @@ const f1Page = await pageRead(browser, pageUrl(F_B1));
 check(
   "T3f the page states the split under the timeline heading",
   f1Page.historySource === "stored+head" &&
-    /from Rails's store of chain readings/.test(f1Page.historyText) &&
+    /rows at or below block [\d,]+ were kept/.test(f1Page.historyText) &&
     /read now/.test(f1Page.historyText) &&
     /reconciled at block/.test(f1Page.historyText),
   f1Page.historyText.replace(/\s+/g, " ").slice(0, 160),
@@ -1412,10 +1412,10 @@ if (t6.coverage.logCountIsLowerBound === false) {
     `withheldAbove ${t6.coverage.withheldAbove}, reconcile ${JSON.stringify(t6.reconcile)}, ${t6.events.length} rows`,
   );
   check(
-    "T6b the page states that count without 'at least', draws no rows, and says it reconciles",
+    "T6b the page states that count without 'at least', draws no rows, and says the count is exact",
     !/at least/.test(p6.horizonText) &&
       p6.horizonText.includes(n(t6.coverage.withheldAbove)) &&
-      /reconcil/i.test(p6.horizonText) &&
+      /The count is exact/.test(p6.horizonText) &&
       p6.paintedEvents === 0 &&
       !p6.towerPresent,
     `"${p6.horizonText.replace(/\s+/g, " ").slice(0, 170)}"`,
@@ -1430,7 +1430,7 @@ if (t6.coverage.logCountIsLowerBound === false) {
     "T6b the page says 'at least' that count and states NO count as a fact",
     /at least/.test(p6.horizonText) &&
       p6.horizonText.includes(n(t6.coverage.withheldAbove)) &&
-      /a floor rather than a census/.test(p6.horizonText) &&
+      /above the 5,000 rows a page can draw/.test(p6.horizonText) &&
       p6.paintedEvents === 0 &&
       !p6.towerPresent &&
       !p6.reconciledText,

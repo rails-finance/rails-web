@@ -229,23 +229,7 @@ export interface PsmGapNote extends MarketNoteBase {
 export function mergePsmGaps(notes: readonly MarketNote[]): MarketNote[] {
   const gaps = notes.filter((n): n is PsmGapNote => n.kind === "psm-gap");
   if (gaps.length < 2) return notes as MarketNote[];
-  const asc = [...gaps].sort((a, b) => a.to.block - b.to.block);
-  const first = asc[0];
-  const last = asc[asc.length - 1];
-  const trades = asc.every((g) => g.trades != null) ? asc.reduce((n, g) => n + (g.trades ?? 0), 0) : null;
-  const merged: PsmGapNote = {
-    ...last,
-    id: `psm-gap:${last.market}:${first.from.block}-${last.to.block}:run`,
-    from: first.from,
-    trades,
-    ordinals: first.ordinals && last.ordinals ? [first.ordinals[0], last.ordinals[1]] : null,
-    collShare: asc.reduce((n, g) => n + g.collShare, 0),
-    debtShare: asc.reduce((n, g) => n + g.debtShare, 0),
-    collShareRaw: undefined,
-    debtShareRaw: undefined,
-    priceAtTouch: null,
-    members: asc,
-  };
+  const merged = mergePsmGapRun([...gaps].sort((a, b) => a.to.block - b.to.block));
   const out: MarketNote[] = [];
   let placed = false;
   for (const n of notes) {
@@ -256,6 +240,55 @@ export function mergePsmGaps(notes: readonly MarketNote[]): MarketNote[] {
     }
   }
   return out;
+}
+
+/** The export's merge (ui-jobs 692): gaps that meet end to end — each one
+ *  opening at the touch that closed the one before — stand as one note over
+ *  their whole block range, in the place of the first. A touch that wrote no
+ *  share ends a range, so every merged note's trade count covers its range
+ *  whole. Every other note is left as it is. */
+export function mergePsmGapRanges(notes: readonly MarketNote[]): MarketNote[] {
+  const gaps = notes.filter((n): n is PsmGapNote => n.kind === "psm-gap").sort((a, b) => a.to.block - b.to.block);
+  if (gaps.length < 2) return notes as MarketNote[];
+  const meets = (prev: PsmGapNote, next: PsmGapNote) =>
+    prev.to.eventId && next.from.eventId ? prev.to.eventId === next.from.eventId : prev.to.block === next.from.block;
+  const ranges: PsmGapNote[][] = [];
+  for (const g of gaps) {
+    const open = ranges[ranges.length - 1];
+    if (open && meets(open[open.length - 1], g)) open.push(g);
+    else ranges.push([g]);
+  }
+  const byFirst = new Map(ranges.map((r) => [r[0].id, r.length > 1 ? mergePsmGapRun(r) : r[0]]));
+  const out: MarketNote[] = [];
+  for (const n of notes) {
+    if (n.kind !== "psm-gap") out.push(n);
+    else {
+      const merged = byFirst.get(n.id);
+      if (merged) out.push(merged);
+    }
+  }
+  return out;
+}
+
+/** Gaps (oldest first, two or more) as one note: shares and trades summed,
+ *  from the first gap's start to the last's end. */
+function mergePsmGapRun(asc: readonly PsmGapNote[]): PsmGapNote {
+  const first = asc[0];
+  const last = asc[asc.length - 1];
+  const trades = asc.every((g) => g.trades != null) ? asc.reduce((n, g) => n + (g.trades ?? 0), 0) : null;
+  return {
+    ...last,
+    id: `psm-gap:${last.market}:${first.from.block}-${last.to.block}:run`,
+    from: first.from,
+    trades,
+    ordinals: first.ordinals && last.ordinals ? [first.ordinals[0], last.ordinals[1]] : null,
+    collShare: asc.reduce((n, g) => n + g.collShare, 0),
+    debtShare: asc.reduce((n, g) => n + g.debtShare, 0),
+    collShareRaw: undefined,
+    debtShareRaw: undefined,
+    priceAtTouch: null,
+    members: [...asc],
+  };
 }
 
 export type MarketNote = RateStepNote | VaultTermsNote | PsmGapNote;
@@ -1219,10 +1252,14 @@ export function psmGapSentence(note: PsmGapNote): string {
     note.trades != null
       ? `${note.trades.toLocaleString("en-US")} PSM mints and redemptions`
       : "PSM mints and redemptions";
+  const share = `${signedShare(note.collShare, 4)} pETH to the collateral and ${signedShare(note.debtShare, 2)} ${stable} to the debt`;
+  const writers =
+    note.members && note.members.length > 1
+      ? `${note.members.length.toLocaleString("en-US")} of this position's touches wrote its share, ${share} in all`
+      : `the touch at block ${formatBlock(note.to.block)} wrote this position's share, ${share}`;
   return (
     `Between blocks ${formatBlock(note.from.block)} and ${formatBlock(note.to.block)}, ${trades} moved the market; ` +
-    `the touch at block ${formatBlock(note.to.block)} wrote this position's share, ${signedShare(note.collShare, 4)} pETH ` +
-    `to the collateral and ${signedShare(note.debtShare, 2)} ${stable} to the debt`
+    writers
   );
 }
 
@@ -1348,7 +1385,12 @@ export function marketNoteRowAnnotation(note: MarketNote): string {
   // rows must not print a "between blocks" annotation for a note that runs
   // to the chain head instead.
   if (note.kind === "vault-terms") return `vault note: ${note.statement}, at block ${formatBlock(note.to.block)}`;
-  if (note.kind === "psm-gap") return `PSM note: ${psmGapSentence(note)}`;
+  // The row's PSM share cells state the figures and "Market notes" the
+  // sentence, so the row points there.
+  if (note.kind === "psm-gap")
+    return note.trades != null
+      ? `PSM note: ${note.trades.toLocaleString("en-US")} PSM mints and redemptions since the previous touch (see Market notes)`
+      : "PSM note: see Market notes";
   const f = rateStepFigures(note);
   if (note.protocol === "makerdao") {
     const ilk = makerMarketName(note);
@@ -1401,9 +1443,28 @@ const groupedClause = (note: RateStepNote): string => {
   );
 };
 
+/** A PSM gap's receipt: the CDPUpdated log of each touch that wrote a share,
+ *  with its two fields raw, and where the trade count was read. */
+function psmGapReceiptLine(note: PsmGapNote): string {
+  const raw = (g: PsmGapNote) =>
+    `\`_mintRedeemCollGain\` ${g.collShareRaw ?? g.collShare}, \`_mintRedeemDebtGain\` ${g.debtShareRaw ?? g.debtShare}`;
+  const count = note.ordinals
+    ? ` Trades counted from the market's PrimaryRateSet count at each end, ${note.ordinals[0].toLocaleString("en-US")} → ${note.ordinals[1].toLocaleString("en-US")}.`
+    : "";
+  const members = note.members && note.members.length > 1 ? note.members : null;
+  if (!members)
+    return (
+      `- Receipt: this position's CDPUpdated at block ${formatBlock(note.to.block)}` +
+      `${note.to.txHash ? `, tx ${note.to.txHash}` : ""}; raw: ${raw(note)}.${count}`
+    );
+  const touches = members
+    .map((g) => `block ${formatBlock(g.to.block)}${g.to.txHash ? `, tx ${g.to.txHash}` : ""}: ${raw(g)}`)
+    .join("; ");
+  return `- Receipt: this position's CDPUpdated at each touch that wrote a share, raw — ${touches}.${count}`;
+}
+
 export function marketNoteReceiptLine(note: MarketNote): string {
-  if (note.kind === "psm-gap")
-    return `${psmGapSentence(note)} (CDPUpdated at block ${formatBlock(note.to.block)}, _mintRedeemCollGain and _mintRedeemDebtGain)`;
+  if (note.kind === "psm-gap") return psmGapReceiptLine(note);
   if (note.kind === "vault-terms")
     return (
       `- Receipt: the vault's own \`${note.termsKind}\` configuration log at block ` +

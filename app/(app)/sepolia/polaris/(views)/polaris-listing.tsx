@@ -158,7 +158,7 @@ export function PolarisListing({ initialItems, initialTotal, initialKey, initial
       basePath={POLARIS_BASE_PATH}
       defaults={POLARIS_LIST_DEFAULTS}
       sortOptions={polarisSortOptions}
-      searchPlaceholder="Address, ENS, or position number"
+      searchPlaceholder="Address, ENS, or position number (usdp:34)"
       renderCard={(p) => <PolarisPositionCard v={viewFromSummary(p, markets, !marketsSettled)} surface="listing" />}
       hrefFor={(p) => polarisPositionHref(p.market, p.cdpId)}
       keyFor={(p) => `${p.market}:${p.cdpId}`}

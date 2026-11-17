@@ -34,11 +34,18 @@ export function eventPriceTitle(collType: string): string {
   return troveWords("event_price_title", { coll_type: collType });
 }
 
-/** The word before a closed Trove's last owner in the sub-nav. */
-export function LastOwnerPrefix() {
+/** The word before the last holder of a closed Trove that changed hands, in
+ *  the sub-nav (ui-jobs 702). */
+export function LastHolderPrefix() {
   return (
-    <span className="shrink-0 whitespace-nowrap text-rb-400" title={troveWords("last_owner_hint")}>
-      {troveWords("last_owner")}
+    <span className="shrink-0 whitespace-nowrap text-rb-400" title={troveWords("last_holder_hint")}>
+      {troveWords("last_holder_prefix")}
     </span>
   );
+}
+
+/** A listing row's words for a Trove the wallet searched for held and moved
+ *  on: the word before the receiving wallet, and its tip (ui-jobs 705). */
+export function movedToWords(day: string): { prefix: string; hint: string } {
+  return { prefix: troveWords("moved_to_prefix"), hint: troveWords("moved_to_hint", { day }) };
 }

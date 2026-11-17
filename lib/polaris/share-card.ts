@@ -39,7 +39,8 @@ const STATUS_WORD: Record<PolarisPositionStatus, string> = {
  *  equity onto a second row), and a second three would run off the canvas.
  *  The stamp is the head block's time, the time the figures are valued at.
  *  Where it is null (a closed CDP, a stale read, the index behind the chain)
- *  the card carries the indexed summary as before. */
+ *  the card carries the indexed summary as before, its collateral and debt
+ *  marked ≈ because they stand as of the last touch (ui-jobs 690). */
 export function polarisShareCardModel(
   position: PolarisPositionSummary | null,
   markets?: PolarisMarketsChainResponse | null,
@@ -55,9 +56,10 @@ export function polarisShareCardModel(
       { label: "Change in equity at the feed", value: signedFigure(liveWindow.total, stable) },
     );
   } else if (position.status === "open") {
-    if (position.coll > 0) stats.push({ label: CARD_VOCAB.collateral, value: `${formatCompact(position.coll)} pETH` });
+    if (position.coll > 0)
+      stats.push({ label: CARD_VOCAB.collateral, value: `≈ ${formatCompact(position.coll)} pETH` });
     if (position.debt > 0)
-      stats.push({ label: CARD_VOCAB.debt, value: `${formatCompact(position.debt)} ${position.stableSymbol}` });
+      stats.push({ label: CARD_VOCAB.debt, value: `≈ ${formatCompact(position.debt)} ${position.stableSymbol}` });
     const board =
       markets && !markets.chainStale ? markets.markets.find((m) => m.market === position.market) : undefined;
     if (board && position.coll > 0 && position.debt > 0) {

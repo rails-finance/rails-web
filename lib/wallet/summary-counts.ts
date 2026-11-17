@@ -1,8 +1,8 @@
 // What /api/chain/wallet/<address>/summary answers: the wallet's positions as
 // counts and ids, from rails-server's summary rows alone, with no head read
 // (rails-ops decisions/0050-one-wallet-across-protocols-and-chains.md point
-// 10; decision 0051 step 3). The line under every explorer's wallet row
-// (`components/shared/wallet-elsewhere-line.tsx`) reads it. Client-safe: the
+// 10; decision 0051 step 3). The positions menu under every explorer's
+// wallet heading (`components/shared/wallet-positions-menu.tsx`) reads it. Client-safe: the
 // read is `readWalletCounts` in lib/wallet/read-wallet.ts.
 
 export type WalletCountsChain = "ethereum" | "base" | "arbitrum";
@@ -14,7 +14,8 @@ export interface WalletCountsPosition {
   chain: WalletCountsChain;
   family: string;
   positionId: string;
-  status: "open" | "closed" | "liquidated" | "redeemed";
+  /** `moved`: a position the wallet held and passed on (ui-jobs 705). */
+  status: "open" | "closed" | "liquidated" | "redeemed" | "moved";
   href: string;
 }
 
@@ -25,6 +26,8 @@ export interface WalletCountsFamily {
   open: number;
   /** Closed, liquidated or redeemed. */
   closed: number;
+  /** Held and passed to another wallet (ui-jobs 705). */
+  moved: number;
 }
 
 export interface WalletCounts {
@@ -34,6 +37,8 @@ export interface WalletCounts {
   total: number;
   open: number;
   closed: number;
+  /** Held and passed to another wallet (ui-jobs 705). */
+  moved: number;
   /** The chains the positions are on. */
   chains: WalletCountsChain[];
   readAt: number;
@@ -73,52 +78,97 @@ export function rowIsPage(href: string, pathname: string, search: string): boole
   return (new URLSearchParams(search).get("market") ?? "core").toLowerCase() === market.toLowerCase();
 }
 
+/** The wallet view's counter's tip (W1): the counts cover the mainnet wallet
+ *  families only (`WALLET_FAMILIES`), not Polaris on Sepolia (ui-jobs 691). */
+export const WALLET_COUNTS_SCOPE = "Counts mainnet positions; the Sepolia testnet is not counted.";
+
 const count = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 
-/** At most this many protocols are named; past it the line counts them. */
-const NAMED_MAX = 3;
+/** The menu's footer: the counts are mainnet only. */
+export const MENU_TESTNETS = "Testnets not included";
 
-const listed = (names: string[]) =>
-  names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+/** A position's protocol on its chain, as the roster names it: its name, its
+ *  place in the roster, and its listing searched by the wallet (null where
+ *  the listing takes no wallet). */
+export interface MenuProtocol {
+  name: string;
+  order: number;
+  listing: string | null;
+}
 
-/** The line's words for the wallet's positions, in the wallet view's words
- *  (W1: "2 positions · 1 open · 1 closed"; Miles, 6 Nov 2026), the chains
- *  named only when there are more than one, after the scope: "On Rails:" when
- *  the page's position is among those counted, "Also on Rails:" when it is
- *  not (a Read on visit page; Miles 12 Nov 2026, ui-jobs 613). The protocols
- *  counted are named, most positions first, so a reader on a page whose
- *  family is not counted does not take the count for it (Miles 13 Nov 2026,
- *  ui-jobs 639): "Also on Rails: 1 Aave V3 position · closed", "3 positions
- *  in Aave V3 and Liquity V2 · 1 open · 2 closed", past three "in 4
- *  protocols". `nameOf` gives a position's protocol name; where it has none
- *  for some position the line names none. Null when there is nothing. */
-export function walletLineText(
-  positions: WalletCountsPosition[],
-  pageCounted: boolean,
-  nameOf: (p: WalletCountsPosition) => string | undefined = () => undefined,
-): string | null {
-  const n = positions.length;
-  if (n === 0) return null;
-  const chains = new Set(positions.map((p) => p.chain)).size;
-  const open = positions.filter((p) => p.status === "open").length;
-  const where = chains > 1 ? ` on ${chains} chains` : "";
-  const scope = pageCounted ? "On Rails" : "Also on Rails";
-  const tally = new Map<string, number>();
+export interface WalletProtocolRow<P extends WalletCountsPosition> {
+  /** `<chain>:<family>`. */
+  key: string;
+  name: string;
+  /** Any one of its positions, for its chain and family. */
+  first: P;
+  open: number;
+  closed: number;
+  /** Passed to another wallet (ui-jobs 705); never open or closed. */
+  moved: number;
+  /** "1 open", "2 closed", "1 open · 2 closed", "1 open · 1 moved". */
+  counts: string;
+  /** The one position's page; past one, the listing searched by the wallet,
+   *  else the wallet view. */
+  href: string;
+  /** The page's position is one of the row's. */
+  page: boolean;
+  /** The row's href is the page: the row is not a link. */
+  current: boolean;
+}
+
+/** The positions menu under the wallet heading (H13.2; Miles 17 Nov 2026,
+ *  ui-jobs 701): one row per protocol and chain the wallet holds positions
+ *  in, those with an open position first, each group in roster order; closed
+ *  counts closed, liquidated and redeemed, as the counts do, and moved (a
+ *  position passed to another wallet, ui-jobs 705) is counted apart. Null when the
+ *  wallet holds nothing besides the page's position. */
+export function walletProtocolMenu<P extends WalletCountsPosition>(
+  positions: P[],
+  isPage: (p: P) => boolean,
+  protocolOf: (p: P) => MenuProtocol | undefined,
+  dashboard: string,
+): { trigger: string; rows: WalletProtocolRow<P>[]; pageCounted: boolean } | null {
+  const page = positions.filter(isPage);
+  if (positions.length === page.length) return null;
+  const groups = new Map<string, { protocol: MenuProtocol | undefined; positions: P[] }>();
   for (const p of positions) {
-    const name = nameOf(p);
-    if (!name) {
-      tally.clear();
-      break;
-    }
-    tally.set(name, (tally.get(name) ?? 0) + 1);
+    const key = `${p.chain}:${p.family}`;
+    const g = groups.get(key) ?? { protocol: protocolOf(p), positions: [] };
+    g.positions.push(p);
+    groups.set(key, g);
   }
-  const names = [...tally.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([k]) => k);
-  const states = ` · ${open.toLocaleString("en-US")} open · ${(n - open).toLocaleString("en-US")} closed`;
-  if (names.length === 1) {
-    if (n === 1) return `${scope}: 1 ${names[0]} position · ${open === 1 ? "open" : "closed"}`;
-    return `${scope}: ${count(n, `${names[0]} position`)}${where}${states}`;
-  }
-  const within =
-    names.length === 0 ? "" : names.length <= NAMED_MAX ? ` in ${listed(names)}` : ` in ${names.length} protocols`;
-  return `${scope}: ${count(n, "position")}${within}${where}${states}`;
+  const order = (key: string) => groups.get(key)?.protocol?.order ?? Number.MAX_SAFE_INTEGER;
+  const rows = [...groups.entries()].map(([key, g]): WalletProtocolRow<P> => {
+    const open = g.positions.filter((p) => p.status === "open").length;
+    const moved = g.positions.filter((p) => p.status === "moved").length;
+    const closed = g.positions.length - open - moved;
+    const one = g.positions.length === 1;
+    const onPage = g.positions.some(isPage);
+    const parts = [
+      open > 0 && `${open.toLocaleString("en-US")} open`,
+      closed > 0 && `${closed.toLocaleString("en-US")} closed`,
+      moved > 0 && `${moved.toLocaleString("en-US")} moved`,
+    ];
+    return {
+      key,
+      name: g.protocol?.name ?? g.positions[0].family,
+      first: g.positions[0],
+      open,
+      closed,
+      moved,
+      counts: parts.filter(Boolean).join(" · "),
+      href: one ? g.positions[0].href : (g.protocol?.listing ?? dashboard),
+      page: onPage,
+      current: one && onPage,
+    };
+  });
+  rows.sort(
+    (a, b) => Number(b.open > 0) - Number(a.open > 0) || order(a.key) - order(b.key) || a.key.localeCompare(b.key),
+  );
+  return {
+    trigger: count(positions.length, "position"),
+    rows,
+    pageCounted: page.length > 0,
+  };
 }

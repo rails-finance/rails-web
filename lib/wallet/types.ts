@@ -28,7 +28,9 @@ import type { CometCard } from "@/lib/compound-arbitrum/comet-cards";
 /** "redeemed" is in the type for the families that end a position by
  *  redemption; no store states it as an ending yet (a fully redeemed Liquity
  *  V2 Trove reads as closed or as a zombie). */
-export type WalletPositionStatus = "open" | "closed" | "liquidated" | "redeemed";
+/** `moved`: a position the wallet held and passed to another wallet (a
+ *  Liquity V2 Trove whose NFT it sent on; ui-jobs 705). */
+export type WalletPositionStatus = "open" | "closed" | "liquidated" | "redeemed" | "moved";
 
 /** The family's listing row, which its listing component turns into slots. */
 export type WalletCard =
@@ -62,6 +64,8 @@ export interface WalletHistoryRow {
   result?: string;
   resultNote?: string;
   txCount?: number;
+  /** A moved position: the wallet it went to. */
+  movedTo?: string;
 }
 
 /** How the route came by an open position's head figures. */

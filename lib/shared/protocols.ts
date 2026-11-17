@@ -1298,7 +1298,7 @@ export function chainLaunchedIn(roster: readonly Pick<ProtocolEntry, "chainId" |
 }
 
 /** The singular noun each protocol's positions go by, for per-position page
- *  titles ("MakerDAO Vault 31245", "Spark Position 0x1a2b…c4d5"). Lives in the
+ *  titles ("MakerDAO · ETH-A · Vault #31245", "Spark · Position 0x1a2b…c4d5"). Lives in the
  *  roster module so a new explorer declares its noun here, not scattered across
  *  a title helper. Keyed on `SessionProtocol` (a closed union), so the `Record`
  *  makes a missing protocol a compile error. PWN carries "Loans" (plural): its
@@ -1383,6 +1383,15 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   "balancer-v3": "Position",
   "balancer-v3-arbitrum": "Position",
 };
+
+/** One position where POSITION_NOUN names a page's list: a PWN page lists a
+ *  wallet's "Loans", and one of them is a "Loan" (ui-jobs 703). */
+const POSITION_NOUN_ONE: Partial<Record<SessionProtocol, string>> = { pwn: "Loan" };
+
+/** The noun for one position, in its name ("Loan #60", "Vault #21264"). */
+export function positionNounOne(session: SessionProtocol): string {
+  return POSITION_NOUN_ONE[session] ?? POSITION_NOUN[session];
+}
 
 /** The listing-tab vocabulary: the position noun pluralised ("Troves",
  *  "Vaults", "Accounts"). PWN's noun is already the plural "Loans" (its

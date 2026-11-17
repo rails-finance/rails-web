@@ -15,7 +15,7 @@
 import { IndexNotice } from "@/components/shared/index-notice";
 import Link from "next/link";
 import { Suspense, use, type ReactNode } from "react";
-import { TipLabel } from "@/components/shared/tip-label";
+import { HeadingTip, TipLabel } from "@/components/shared/tip-label";
 import { DetailBackButton } from "@/components/shared/detail-back-row";
 import { WalletHeading } from "@/components/shared/wallet-heading";
 import { PROFILE_CLEARANCE } from "@/lib/shared/ui-grammar";
@@ -46,6 +46,7 @@ import { ARBITRUM_CHAIN_ID, chainMeta, type ChainId } from "@/lib/shared/chains"
 import { walletCountProv, walletTradeAtProv } from "@/lib/cow/trade";
 import type { CowWalletEntry } from "@/lib/cow/types";
 import type { WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
+import { WALLET_COUNTS_SCOPE } from "@/lib/wallet/summary-counts";
 import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
 import { useAssetScope } from "@/lib/shared/asset-scope";
 import { walletPositionAssetKeys } from "@/lib/wallet/aim-assets";
@@ -160,6 +161,7 @@ const OUTCOME_TONE: Record<string, string> = {
   liquidated: "bg-red-500/20 text-red-500",
   redeemed: "bg-caution-500/20 text-tone-caution",
   closed: "bg-rb-300 text-foreground/70 dark:bg-rb-700",
+  moved: "bg-rb-300 text-foreground/70 dark:bg-rb-700",
 };
 
 function lifetime(from?: number, to?: number): string | null {
@@ -187,7 +189,7 @@ function TxCount({ n }: { n: number }) {
 
 function History({ closed }: { closed: WalletPosition[] }) {
   const rows = [...closed].sort((a, b) => (b.history?.closedAt ?? 0) - (a.history?.closedAt ?? 0));
-  const counts = (["liquidated", "redeemed", "closed"] as const)
+  const counts = (["liquidated", "redeemed", "closed", "moved"] as const)
     .map((s) => ({ s, n: rows.filter((p) => p.status === s).length }))
     .filter((c) => c.n > 0)
     .map((c) =>
@@ -195,7 +197,9 @@ function History({ closed }: { closed: WalletPosition[] }) {
         ? plural(c.n, "liquidation")
         : c.s === "redeemed"
           ? plural(c.n, "redemption")
-          : `${c.n} closed`,
+          : c.s === "moved"
+            ? `${c.n} moved`
+            : `${c.n} closed`,
     );
   return (
     <section aria-labelledby="wallet-history" data-wallet-history={rows.length} data-anatomy="W4" data-prov-exempt="">
@@ -232,7 +236,10 @@ function History({ closed }: { closed: WalletPosition[] }) {
                 data-family={p.family}
               >
                 <DataTableLeadCell protocol={protocolId(p)} protocolName={p.familyName} chain={p.chain} />
-                <DataTableCell label="Closed" className="whitespace-nowrap text-foreground/80">
+                <DataTableCell
+                  label={p.status === "moved" ? "Moved" : "Closed"}
+                  className="whitespace-nowrap text-foreground/80"
+                >
                   {h.closedAt != null ? formatDate(h.closedAt) : "—"}
                 </DataTableCell>
                 {/* First on a card, where the row header spans the card. */}
@@ -265,7 +272,23 @@ function History({ closed }: { closed: WalletPosition[] }) {
                     </span>
                   )}
                 </DataTableCell>
-                <DataTableCell label={h.result ? "Result" : undefined} className="sm:max-w-[14rem]">
+                <DataTableCell label={h.result || h.movedTo ? "Result" : undefined} className="sm:max-w-[14rem]">
+                  {/* A moved position names the wallet it went to, which opens
+                      that wallet's page (ui-jobs 705). */}
+                  {h.movedTo && (
+                    <span className="flex min-w-0 flex-col">
+                      <span className="truncate">
+                        to{" "}
+                        <Link
+                          href={`/wallet/${h.movedTo}`}
+                          className="font-mono text-xs text-blue-600 hover:underline dark:text-[var(--text-link)]"
+                          data-moved-to={h.movedTo}
+                        >
+                          {`${h.movedTo.slice(0, 6)}…${h.movedTo.slice(-4)}`}
+                        </Link>
+                      </span>
+                    </span>
+                  )}
                   {h.result && (
                     <span className="flex min-w-0 flex-col">
                       <span className="truncate">{h.result}</span>
@@ -385,6 +408,8 @@ export function WalletView({
   const notRead = openAll.filter((p) => p.notRead);
   const open = [...ranked, ...dust, ...notRead];
   const closed = all.filter((p) => p.status !== "open");
+  // Passed to another wallet (ui-jobs 705): counted apart from closed.
+  const movedN = closed.filter((p) => p.status === "moved").length;
   const scope = useAssetScope();
   // Under Focus, only the families on a chain in focus.
   const unread = read.families.filter((r) => r.headRead === "failed" && (!filtered || scope.chainOk(r.chain)));
@@ -448,7 +473,10 @@ export function WalletView({
                 ) : (
                   read.total > 0 && (
                     <div className="text-xs text-rb-500" data-wallet-count={read.total}>
-                      {plural(read.total, "position")} · {openAll.length} open · {closed.length} closed
+                      <HeadingTip
+                        text={`${plural(read.total, "position")} · ${openAll.length} open · ${closed.length - movedN} closed${movedN > 0 ? ` · ${movedN} moved` : ""}`}
+                        tip={WALLET_COUNTS_SCOPE}
+                      />
                     </div>
                   )
                 )}

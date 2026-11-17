@@ -7,7 +7,8 @@ import { useState } from "react";
 import { Hash, Link2 } from "lucide-react";
 import { Icon } from "@/components/icons/icon";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
-import { shortAccountNumber } from "@/lib/dolomite/asset-catalog";
+import { accountNumberId } from "@/lib/dolomite/asset-catalog";
+import { shortPositionId } from "@/lib/shared/position-name";
 
 export function DolomiteMenuRows({
   accountNumber,
@@ -29,7 +30,7 @@ export function DolomiteMenuRows({
     <>
       <ToolsMenuItem
         icon={copied === "id" ? <Icon name="check" size={16} /> : <Hash size={16} />}
-        title={`Account ${shortAccountNumber(accountNumber)}`}
+        title={`Account ${shortPositionId(accountNumberId(accountNumber))}`}
         subtitle={copied === "id" ? "Copied" : "Copy the account number"}
         onClick={() => copy("id", accountNumber)}
       />

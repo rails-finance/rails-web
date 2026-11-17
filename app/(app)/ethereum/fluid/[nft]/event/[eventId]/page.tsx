@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { loadFluidPositionTail } from "@/lib/fluid/position-page-data";
+import { fluidTailPair } from "@/lib/fluid/share-card";
 import { pairLabel } from "@/lib/fluid/asset-catalog";
 import { fluidEventHeading, fluidEventPageDescription } from "@/lib/fluid/explorer";
 import FluidPositionPage from "../../page";
@@ -26,7 +27,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const event = tail.events?.find((e) => e.id === decoded) ?? null;
   return eventMetadata({
     session: "fluid",
-    subject: `#${nft}`,
+    subject: nft,
+    market: tail.position ? fluidTailPair(tail.position) : undefined,
     canonicalPath: `/ethereum/fluid/${nft}/event/${encodeURIComponent(decoded)}`,
     event: event ? { actionLabel: fluidEventHeading(event), timestamp: event.timestamp } : null,
     description: event

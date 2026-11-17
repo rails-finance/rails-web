@@ -21,6 +21,8 @@
 // find a position, and risk is read live on the position page — whose Pool
 // getUserAccountData read is the only HF this card ever shows.
 
+import { positionName } from "@/lib/shared/position-name";
+import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { ListingTag } from "@/components/shared/listing-tag";
 import { useState, type ReactNode } from "react";
 import { Link2 } from "lucide-react";
@@ -359,6 +361,8 @@ export function useAaveV3CardSlots({
     <WalletPill wallet={v.wallet} ensName={null} filterProtocol={dep.session} bookmark />
   );
   const tag = detail || !marketLabel ? undefined : <ListingTag market={marketLabel} />;
+  // The position's name (ui-jobs 703): the market and the account's wallet.
+  const name = positionName({ market: marketLabel, noun: POSITION_NOUN[dep.session], id: v.wallet });
 
   const counters = {
     lastActivityAt: v.lastActivityAt,
@@ -477,6 +481,7 @@ export function useAaveV3CardSlots({
             },
           ];
     const common = {
+      name,
       status,
       heads: [supplyHead, peakHead("peak-debt", CARD_VOCAB.peakDebt, v.peakBorrows, dep.peakDebt)],
       identity,
@@ -642,7 +647,7 @@ export function useAaveV3CardSlots({
     </div>
   ) : undefined;
 
-  const common = { status, heads, identity, counters, notice };
+  const common = { status, heads, identity, counters, notice, name };
   if (!detail) return { ...common, surface: "listing", menu: null, tag };
 
   // ── Each side's reserve rows, and the panel: the supplied side's values

@@ -34,6 +34,12 @@
 // truth-preserving delta replay.
 
 import type { Provenance } from "@/components/shared/provenance";
+import {
+  refetchWords,
+  withheldBoundWords,
+  withheldCountWords,
+  withheldReasonWords,
+} from "@/lib/shared/vault-withheld-words";
 import type {
   VaultHolderEvent,
   VaultHolderReconcile,
@@ -81,7 +87,7 @@ export const yearnVaultTimelineGateProv = (c: VaultTimelineCoords, r: VaultHolde
     kind: "recompute",
     text: `To check: ask any Ethereum archive node for the vault's Transfer logs that name this address as sender and as receiver, blocks ${r.fromBlock} to ${r.toBlock}, add the values with their signs, and compare the sum with balanceOf(${c.holder ?? "the address"}) at block ${r.toBlock}.`,
   },
-  summary: `The history check — every transfer this address sent or received on this vault, replayed into a balance and compared with the vault's balance for it at block ${r.toBlock.toLocaleString("en-US")}. Over blocks ${r.fromBlock.toLocaleString("en-US")} to ${r.toBlock.toLocaleString("en-US")} the vault recorded ${r.logsOut} transfers from this address and ${r.logsIn} to it; the range starts at the block the vault was created in, since it recorded nothing before. Their signed sum is ${r.replayed} and the vault's balance reads ${r.onChain}. ${r.reconciled ? "The two agree to the wei, which is why the rows below are drawn." : "The two do not agree, so no history is drawn: a node has been seen on this chain answering part of a question with a success status, and nothing in the answer tells that apart from an empty history."}${r.refetched ? ` The logs were asked for again after a pause, and ${r.refetchDiffered ? "the second answer held a different number of logs from the first, so the node answered one question two ways" : "no second answer came back with a different number of logs"}.` : ""}`,
+  summary: `The history check — every transfer this address sent or received on this vault, replayed into a balance and compared with the vault's balance for it at block ${r.toBlock.toLocaleString("en-US")}. Over blocks ${r.fromBlock.toLocaleString("en-US")} to ${r.toBlock.toLocaleString("en-US")} the vault recorded ${r.logsOut} transfers from this address and ${r.logsIn} to it; the range starts at the block the vault was created in, since it recorded nothing before. Their signed sum is ${r.replayed} and the vault's balance reads ${r.onChain}. ${r.reconciled ? "The two agree to the wei, which is why the rows below are drawn." : "The two do not agree, so no history is drawn: a node has been seen on this chain answering part of a question with a success status, and nothing in the answer tells that apart from an empty history."}${r.refetched ? ` ${refetchWords(r.refetchDiffered)}` : ""}`,
   contract: vaultContract(c),
   via: `${LANE} · Transfer logs, sent and received + balanceOf(holder) @ the pinned block`,
   formula: "Σ (value where to == holder) − Σ (value where from == holder) == balanceOf(holder)",
@@ -100,13 +106,7 @@ export const yearnVaultTimelineHorizonProv = (
   kind: "chain-derived",
   pclass: "emitted",
   source: { block: c.blockNumber },
-  summary: `Rows withheld — this address has ${basis === "floor" ? "at least " : ""}${count.toLocaleString("en-US")} transfers on this vault${basis === "unchecked" ? "" : `, above the ${ceiling.toLocaleString("en-US")} rows a page can draw`}. No rows are drawn: the history check sums every row, so a page of them could not be reconciled. ${
-    basis === "unchecked"
-      ? "The balance check did not run: the query for this address's transfers failed, so the range was counted in chunks from the vault's creation block, every chunk answering. The count covers the whole range, but no check confirmed it, and no rows are drawn without one."
-      : basis === "floor"
-        ? `The count is a floor: the node refused to return the whole range at once because the answer was too large, so the range was counted in chunks from the vault's creation block, and the count stopped once it passed ${ceiling.toLocaleString("en-US")}. Because the logs were never handed over whole, the balance check could not be run on this address.`
-        : "The count is exact: both queries returned, and the balance check ran and agreed."
-  }`,
+  summary: `Rows withheld — this address has ${withheldCountWords(basis, count)} transfers on this vault${withheldBoundWords(basis, count, ceiling)} No rows are drawn: the history check sums every row, so a page of them could not be reconciled. ${withheldReasonWords(basis, "the vault's creation block")}`,
   contract: vaultContract(c),
   via: `${LANE} · Transfer logs, sent and received @ the pinned block`,
 });

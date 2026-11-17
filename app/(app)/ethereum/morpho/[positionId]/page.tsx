@@ -30,15 +30,20 @@ export const dynamic = "force-dynamic";
 const POSITION_ID = /^(0x)?[a-fA-F0-9]{64}-0x[a-fA-F0-9]{40}$/;
 
 // Moved down from the layout: the page is the segment that fetches, so it is the
-// segment that can describe what it fetched. Output is unchanged — the title
-// names the user half (the helper truncates the address); the market is not
-// named, there being no static marketId → symbol map on the metadata path.
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+// segment that can describe what it fetched. The title names the user half;
+// the market is the pair off the tail the page body reads (the same `cache()`
+// entry, chosen by the same test).
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { positionId } = await params;
   const user = positionId.slice(positionId.indexOf("-") + 1);
+  const grouped = servedFoldersFromParam((await searchParams).folders);
+  const tail = POSITION_ID.test(positionId)
+    ? await loadMorphoPositionTail(positionId, grouped).catch(() => null)
+    : null;
   return positionMetadata({
     session: "morpho",
     subject: user,
+    market: tail?.position?.marketLabel,
     canonicalPath: `/ethereum/morpho/${positionId}`,
     // This route carries its own opengraph-image.tsx, rendering this
     // position's live card — the static per-explorer PNG stays only its

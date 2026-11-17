@@ -30,6 +30,15 @@ import { toGroupedTimelineWire } from "@/lib/shared/timeline-wire";
 import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 import type { MorphoWalletChainResponse } from "@/lib/api/fetch-morpho-wallet";
 import { morphoBaseGroupedBody, readGroupedMorphoBase } from "@/lib/morpho-base/timeline-folders";
+import { marketLabel } from "@/lib/morpho/asset-catalog";
+
+/** The market's pair off the slot read a tail already carries, as the card's
+ *  name gives it ("USDC / cbBTC"); undefined when the read holds no position in
+ *  that market. For the tab title (ui-jobs 703). */
+export function morphoBaseTailMarket(head: MorphoWalletChainResponse | null, market: string): string | undefined {
+  const p = head?.positions.find((x) => x.marketId.toLowerCase() === market);
+  return p ? marketLabel(p.loanSymbol, p.collateralSymbol, p.lltv === 0) : undefined;
+}
 
 export const loadMorphoBaseTail = sweptPositionLoader<MorphoWalletChainResponse>({
   label: "morpho-base",

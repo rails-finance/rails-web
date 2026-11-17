@@ -21,6 +21,8 @@ import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups"
 import { PoolReadStamp } from "@/components/protocol/uniswap/uniswap-readout";
 import { pct } from "@/components/shared/ratio-bar";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
+import { positionName } from "@/lib/shared/position-name";
+import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { fluidBasePosition, type FluidBasePosition } from "@/lib/fluid-base/position";
 import { fluidBaseProv, readContracts, type FluidBaseReceiptContext } from "@/lib/fluid-base/provenance";
 import type { FluidBasePositionRead } from "@/lib/fluid-base/types";
@@ -140,16 +142,21 @@ function slots(r: FluidBasePositionRead): PositionCardSlots {
     value: <Prov info={fluidBaseProv("threshold", c)}>{pct(p.liquidationThreshold)}</Prov>,
   });
   const left = [interestRow(c, "collateral"), ...(p.hasDebt ? [interestRow(c, "debt")] : [])];
+  // The position's name (ui-jobs 703): the pair and the position id.
+  const name = positionName({ market: `${p.colUnit} / ${p.debtUnit}`, noun: POSITION_NOUN["fluid-base"], id: p.id });
   return {
     surface: "detail",
     heading: CARD_WORDS.heading,
     status: p.isLiquidated ? { word: "Liquidated", tone: "danger" } : null,
     identity: (
       <span className="text-xs font-semibold text-rb-500">
-        {p.colUnit} / {p.debtUnit}
-        <span className="ml-2 font-normal tabular-nums text-rb-400">#{p.id}</span>
+        {name.market}
+        <span className="ml-2 font-normal tabular-nums text-rb-400">
+          {name.noun} {name.id}
+        </span>
       </span>
     ),
+    name,
     heads,
     counters: null,
     menu: { exports: null },

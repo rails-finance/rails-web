@@ -525,12 +525,8 @@ export default function BasedollarTroveDetail({
           owner={{
             wallet: view?.owner ?? view?.lastOwner ?? null,
             chain: BASE_CHAIN_ID,
-            prefix:
-              !view?.owner && view?.lastOwner ? (
-                <span className="text-rb-400" title="Last owner (trove closed)">
-                  last owner
-                </span>
-              ) : undefined,
+            // No "last holder" prefix: this family's timeline carries no TroveNFT
+            // transfer rows, so a change of hands cannot be read (ui-jobs 702).
           }}
           assets={stripAssets}
           closed={view != null && view.status !== "open"}

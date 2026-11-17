@@ -18,6 +18,7 @@
 import type { Provenance, ProvVerify } from "@/components/shared/provenance";
 import { POLARIS_CORE, POLARIS_MARKET_CONFIG, type PolarisMarket } from "./asset-catalog";
 import { formatExact } from "@/lib/utils/format";
+import type { PolarisAgainstHolding } from "./against-holding";
 
 const LANE_VIA = "GET /api/chain/polaris/position";
 const BOARD_VIA = "GET /api/chain/polaris/markets";
@@ -542,14 +543,16 @@ export function listingIcrProv(market: PolarisMarket): Provenance {
 
 // ── the holder strip's derived figures ───────────────────────────────────────
 // A wallet search states its own positions at a glance above the cards. Two of
-// those figures are sums over the wallet's OPEN CDPs — one exact (pETH is one
-// token across both markets), one that had to be priced to be summed at all
-// (USDp and GOLDp are different units). Both are summed from the rows the page
-// is showing, and both carry the same caveat the listing's ratio does: the
-// interest each CDP has accrued since its last touch, and the PSM's pending
-// share, settle only at that CDP's next touch and are in none of it.
+// those figures are sums over the wallet's OPEN CDPs — one in a single token
+// (pETH is the collateral in both markets), one that had to be priced to be
+// summed at all where the wallet borrows in both markets (USDp and GOLDp are
+// different units). Both are summed from the rows the page is showing, and both
+// carry the same caveat the listing's ratio does: what each CDP has built up
+// since its last touch settles only at its next touch and is in none of it, so
+// the strip marks both ≈ (ui-jobs 690).
 
-/** Σ last emitted coll over the wallet's open CDPs — pETH, one token, exact. */
+/** Σ last emitted coll over the wallet's open CDPs — pETH, one token, as of
+ *  each CDP's last touch. */
 export function holderCollProv(): Provenance {
   return {
     kind: "chain",
@@ -559,7 +562,7 @@ export function holderCollProv(): Provenance {
       text: "Add the last emitted collateral of each open position the wallet holds — every one of them is on the page under this strip.",
     },
     summary:
-      "All the pETH the wallet's open positions hold — the sum of each position's last emitted collateral, from the index. pETH is the collateral in both markets, so the legs are one token and the sum is a quantity of it. Reward pETH accrued since each position's last touch is not in it; it lands on the position at its next touch.",
+      "All the pETH the wallet's open positions hold — the sum of each position's last emitted collateral, from the index. pETH is the collateral in both markets, so the legs are one token and the sum is a quantity of it. The reward pETH and PSM shares built up since each position's last touch are not in it; they land on the position at its next touch.",
     via: "GET /api/polaris/positions?wallet=… · Σ last emitted coll over the open rows",
     formula: "Σ coll over the wallet's open positions",
     inputs: [
@@ -584,7 +587,7 @@ export function holderDebtSumProv(market: PolarisMarket): Provenance {
       kind: "recompute",
       text: `Add the last emitted debt of each open position the wallet holds in the ${stable} market — every one of them is on the page under this strip.`,
     },
-    summary: `${stable} the wallet's open positions owe — the sum of each position's last emitted debt, from the index. The wallet borrows in this market only, so the sum is a quantity of one token and nothing was converted to reach it. Interest since each position's last touch and any pending PSM share are not in it; both settle at that position's next touch.`,
+    summary: `${stable} the wallet's open positions owe — the sum of each position's last emitted debt, from the index. The wallet borrows in this market only, so the sum is a quantity of one token and nothing was converted to reach it. The interest, stability gains and PSM shares built up since each position's last touch are not in it; they settle at that position's next touch.`,
     contract: manager(market),
     via: "GET /api/polaris/positions?wallet=… · Σ last emitted debt over the open rows",
     formula: `Σ debt over the wallet's open ${stable} positions`,
@@ -610,7 +613,7 @@ export function holderDebtValueProv(): Provenance {
       text: "Add the last emitted debt of each open position the wallet holds, market by market; take USDp at one dollar and GOLDp at the XAU/USD medianiser's price at the stamped block.",
     },
     summary:
-      "What the wallet's open positions owe, in dollars — each position's last emitted debt in its own market's unit, USDp at one dollar and GOLDp at the gold price the protocol's own feed stated at the latest read. An estimate for two reasons: the two markets' debts are different tokens and a sum of them exists only at a price, and interest since each position's last touch and any pending PSM share settle at the next touch rather than here. A Sepolia testnet figure — a test dollar, not a real one.",
+      "What the wallet's open positions owe, in dollars — each position's last emitted debt in its own market's unit, USDp at one dollar and GOLDp at the gold price the protocol's feed stated at the latest read. An estimate for two reasons: the two markets' debts are different tokens and a sum of them exists only at a price, and interest since each position's last touch and any pending PSM share settle at the next touch rather than here. A Sepolia testnet figure — a test dollar, not a real one.",
     contract: { name: "Polaris XAU/USD Medianiser", address: POLARIS_CORE.xauUsdMedianiser },
     via: `${BOARD_VIA} · Σ last emitted debt × the market's own unit price @ head`,
     formula: "Σ debt × the market's unit in USD",
@@ -635,4 +638,149 @@ export function holderDebtValueProv(): Provenance {
 /** The wallet's open pETH valued at the protocol's own two legs. */
 export function holderCollUsdProv(): Provenance {
   return liveUsdValueProv("The wallet's collateral", true);
+}
+
+/** "Against holding pETH" (ui-jobs 695): the position's quantities now and
+ *  over its life, against the pETH it deposited, its debt side converted at
+ *  the feed now. Each term is an operand row with its source. */
+export function againstHoldingProv(r: PolarisAgainstHolding, market: PolarisMarket): Provenance {
+  const stable = stableOf(market);
+  const at = `at block ${r.feed.block.toLocaleString("en-US")}`;
+  const lifetime = (what: string, leg: string): string =>
+    `${what}, the holder's ${leg} summed over the position's ${r.touches} ${r.touches === 1 ? "touch" : "touches"}`;
+  const surplusRows = [
+    ...(r.surplusClaimed > 0
+      ? [
+          {
+            label: "surplus claimed",
+            value: formatExact(r.surplusClaimed),
+            kind: "chain" as const,
+            pclass: "indexed" as const,
+            note: "a liquidation's collateral surplus the owner has claimed from the CollSurplusPool",
+          },
+        ]
+      : []),
+    ...(r.surplusOwed > 0
+      ? [
+          {
+            label: "surplus to claim",
+            value: formatExact(r.surplusOwed),
+            kind: "chain" as const,
+            pclass: "indexed" as const,
+            note: "a liquidation's collateral surplus still in the CollSurplusPool, owed to the owner and counted as held",
+          },
+        ]
+      : []),
+  ];
+  return {
+    kind: "derived",
+    pclass: "oracle",
+    summary:
+      `Against holding pETH. What the position comes to in pETH, set against keeping the pETH it deposited: the pETH ` +
+      `it holds now, withdrew and was left as surplus, less any gas compensation escrow a liquidation paid to the ` +
+      `liquidator and the pETH deposited, plus the ${stable} it borrowed or was paid to settle a debt below zero, less ` +
+      `the ${stable} it repaid and owes now, converted to pETH at the market's price feed ${at}. Interest, stability ` +
+      `gains, reward pETH and PSM shares are in the collateral and debt now. A debt below zero counts as the ${stable} ` +
+      `the next touch mints to the holder, as the chain shows on USDp position 2736 at block 11,706,332; the docs ` +
+      `say the pAsset is minted to settle it and do not name who receives it.`,
+    formula:
+      "(coll now + withdrawn + surplus − escrow lost − deposited) + (borrowed + settled − repaid − debt now) ÷ feed",
+    contract: feed(market),
+    inputs: [
+      {
+        label: "collateral now",
+        value: formatExact(r.collNow),
+        kind: "chain",
+        pclass: "state",
+        note: r.closed ? "the position is closed, so it holds none" : `getCDPEntireColl(id) ${at}`,
+      },
+      {
+        label: "pETH withdrawn",
+        value: formatExact(r.withdrawn),
+        kind: "chain",
+        pclass: "indexed",
+        note: lifetime("CDPUpdated", "negative collChange"),
+      },
+      ...surplusRows,
+      ...(r.escrowLost > 0
+        ? [
+            {
+              label: "gas compensation escrow lost",
+              value: formatExact(r.escrowLost),
+              kind: "chain" as const,
+              pclass: "indexed" as const,
+              note: "the LiquidationGasComp log's _flatComp: the escrow held since the open, paid to the liquidator",
+            },
+          ]
+        : []),
+      {
+        label: "pETH deposited",
+        value: formatExact(r.deposited),
+        kind: "chain",
+        pclass: "indexed",
+        note: lifetime("CDPUpdated", "positive collChange"),
+      },
+      {
+        label: `${stable} borrowed`,
+        value: formatExact(r.borrowed),
+        kind: "chain",
+        pclass: "indexed",
+        note: lifetime("CDPUpdated", "positive debtChange"),
+      },
+      {
+        label: `${stable} repaid`,
+        value: formatExact(r.repaid),
+        kind: "chain",
+        pclass: "indexed",
+        note: lifetime("CDPUpdated", "negative debtChange"),
+      },
+      ...(r.settled > 0
+        ? [
+            {
+              label: `${stable} settled to the holder`,
+              value: formatExact(r.settled),
+              kind: "chain" as const,
+              pclass: "indexed" as const,
+              note: lifetime("CDPUpdated", "_stablesMintedToEnsureZeroDebt"),
+            },
+          ]
+        : []),
+      {
+        label: "debt now",
+        value: formatExact(r.debtNow),
+        kind: "chain",
+        pclass: "state",
+        note: r.closed
+          ? "the position is closed, so it owes none"
+          : r.debtNow < 0
+            ? `getCDPEntireDebt(id) ${at}, below zero: the ${stable} the next touch mints to the holder`
+            : `getCDPEntireDebt(id) ${at}`,
+      },
+      {
+        label: `pETH in ${stable} now`,
+        value: formatExact(r.feed.pethInDebt),
+        kind: "chain",
+        pclass: "oracle",
+        note: `the market's price feed, previewPrice() ${at}`,
+        contract: feed(market),
+      },
+    ],
+    source: { block: r.feed.block },
+  };
+}
+
+/** The figure as a share of the pETH deposited. */
+export function againstHoldingShareProv(r: PolarisAgainstHolding): Provenance {
+  return {
+    kind: "derived",
+    pclass: "oracle",
+    summary:
+      "Share of pETH deposited. The gain against holding pETH divided by the pETH the holder deposited over the position's life.",
+    formula: "gain against holding pETH ÷ pETH deposited",
+    inputs: [
+      { label: "gain against holding pETH", value: formatExact(r.gain), kind: "derived" },
+      { label: "pETH deposited", value: formatExact(r.deposited), kind: "chain", pclass: "indexed" },
+    ],
+    source: { block: r.feed.block },
+  };
 }

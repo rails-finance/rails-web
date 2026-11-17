@@ -17,12 +17,13 @@
 // position: a wallet holding one CDP at 118% and one at 400% has no single
 // ratio, and an average of the two reads as safety it does not have.
 //
-// EVERY VALUED FIGURE WEARS THE ≈ and carries its own receipt. A leg summed
+// EVERY ESTIMATED FIGURE WEARS THE ≈ and carries its own receipt. A leg summed
 // across different tokens has to be priced to be summed at all, and the price
-// is the feed's at one read; the interest each position has accrued since its
-// last touch is in none of it. The ≈, its tooltip and the receipt each say so.
-// An exact leg (one token, summed in its own unit) wears no ≈ and says so by
-// not wearing one.
+// is the feed's at one read. A leg summed from each position's last-touch
+// figures leaves out what built up since (interest, redistributions, a
+// protocol's pending shares), so it wears the ≈ even in one token (ui-jobs
+// 690). The ≈, its tooltip and the receipt each say so. Only a leg read live
+// in one token goes unmarked.
 //
 // TOTALS ONLY WHILE THE WALLET FITS ONE PAGE. The legs are summed from the rows
 // the page is showing; beyond one page those rows are a slice, and a total
@@ -50,7 +51,8 @@ export interface HolderLeg {
   /** The figure, formatted by the adapter in its own units (the ≈ is drawn
    *  here, from `approx`, so the string never carries one). */
   value: string;
-  /** True when the figure had to be priced to be summed — draws the ≈. */
+  /** True when the figure had to be priced to be summed, or is summed from
+   *  last-touch figures — draws the ≈. */
   approx: boolean;
   /** What the ≈ means, in one sentence. Required on an approximate leg. */
   tip?: string;

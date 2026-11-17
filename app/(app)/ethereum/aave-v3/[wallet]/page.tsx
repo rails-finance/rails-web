@@ -4,7 +4,7 @@ import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
-import { asV3Market } from "@/lib/aave-v3/asset-catalog";
+import { asV3Market, MARKET_NAME } from "@/lib/aave-v3/asset-catalog";
 import { loadAaveV3PositionTail } from "@/lib/aave-v3/position-page-data";
 import { servedFoldersFromParam } from "@/lib/shared/timeline-folder";
 import AaveV3PositionDetail from "./position-view";
@@ -28,13 +28,16 @@ const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 
 // Moved down from the layout: the page is the segment that fetches, so it is the
 // segment that can describe what it fetched. Output is unchanged.
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { wallet } = await params;
+  const sp = await searchParams;
+  const market = asV3Market((Array.isArray(sp.market) ? sp.market[0] : sp.market) ?? null);
   // This route carries its own opengraph-image.tsx, rendering this account's
   // live card — the static per-explorer PNG stays only its fallback.
   return positionMetadata({
     session: "aave-v3",
     subject: wallet,
+    market: MARKET_NAME[market],
     canonicalPath: `/ethereum/aave-v3/${wallet}`,
     image: "dynamic",
   });

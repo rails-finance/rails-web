@@ -70,6 +70,8 @@ async function LiquityV2ListingPage({ searchParams }: { searchParams: Promise<Ra
   const sp = toURLSearchParams(await searchParams);
   const { filters, page } = ssrDecode(dims, sp, LIQUITY_V2_LIST_DEFAULTS);
 
+  // Of the answer's total, the Troves the searched wallet passed on (ui-jobs 705).
+  let passedOn = 0;
   const initial = await ssrInitial({
     dims,
     defaults: LIQUITY_V2_LIST_DEFAULTS,
@@ -77,13 +79,13 @@ async function LiquityV2ListingPage({ searchParams }: { searchParams: Promise<Ra
     page,
     label: "Liquity V2",
     fetchPage: (baseUrl, signal, headers) =>
-      fetchTroves({ ...liquityV2FiltersToFetchParams(filters, page), baseUrl, signal, headers }).then((r) => ({
-        data: r.data,
-        total: r.pagination.total,
-      })),
+      fetchTroves({ ...liquityV2FiltersToFetchParams(filters, page), baseUrl, signal, headers }).then((r) => {
+        passedOn = r.pagination.passedOn;
+        return { data: r.data, total: r.pagination.total };
+      }),
   });
 
-  return <LiquityV2Listing {...initial} initialSearch={sp.toString()} />;
+  return <LiquityV2Listing {...initial} initialPassedOn={passedOn} initialSearch={sp.toString()} />;
 }
 
 export default LiquityV2ListingPage;

@@ -27,6 +27,8 @@ import {
   polarisSinceLastTouch,
   polarisSinceLastTouchSentence,
 } from "@/lib/polaris/since-last-touch";
+import { polarisAgainstHolding, againstHoldingText, isAgainstHoldingNone } from "@/lib/polaris/against-holding";
+import { formatPeth } from "@/lib/polaris/figure-format";
 import { num, amt, usd, fmtUtc, txCell } from "@/lib/shared/position-markdown";
 import {
   anchorMarketNotes,
@@ -34,6 +36,9 @@ import {
   marketNoteReceiptLine,
   marketNoteRowAnnotation,
   marketNoteSentence,
+  formatRatePercent,
+  mergePsmGapRanges,
+  RATE_STEP_MIN_PP,
   type MarketNote,
 } from "@/lib/shared/market-note";
 
@@ -56,6 +61,9 @@ export interface PolarisPositionMarkdownArgs {
    *  block) and never in the timeline table; listed alongside the historical
    *  notes in the "Market notes" section only. */
   liveNotes?: MarketNote[];
+  /** The head read is still in flight: the page offers the export as soon as
+   *  the index answers, before the live read lands. */
+  livePending?: boolean;
   /** When the snapshot was taken (copy time) — passed in so the serializer
    *  stays pure. */
   generatedAt: Date;
@@ -95,7 +103,7 @@ export function polarisPositionToMarkdown(args: PolarisPositionMarkdownArgs): st
   const allNotes = [...noteList, ...(args.liveNotes ?? [])];
 
   lines.push(`- **Market:** ${stable}`);
-  lines.push(`- **Position id:** ${view.cdpId}`);
+  lines.push(`- **Position id:** ${stable} #${view.cdpId}`);
   if (view.owner) lines.push(`- **Holder:** ${view.owner}`);
   lines.push(`- **Status:** ${view.status[0].toUpperCase() + view.status.slice(1)}`);
   // The PSM's trades between touches (ui-jobs 402) are counted on their own
@@ -192,6 +200,8 @@ export function polarisPositionToMarkdown(args: PolarisPositionMarkdownArgs): st
     lines.push("");
   }
 
+  lines.push(...againstHoldingSection(events, chain, stable, args.livePending === true));
+
   const lifetime = events.length > 0 ? polarisLifetime(events) : null;
   if (lifetime && lifetime.rows > 0) {
     lines.push("## Lifetime (summed from the position's own touches)");
@@ -232,10 +242,69 @@ export function polarisPositionToMarkdown(args: PolarisPositionMarkdownArgs): st
   lines.push(`- **Events:** ${events.length}`);
   lines.push("");
 
-  lines.push(...marketNotesSection(allNotes));
+  lines.push(
+    ...marketNotesSection(
+      allNotes,
+      missingRateNotes(events, chain, view.status === "open", args.notes ?? [], args.liveNotes ?? []),
+    ),
+  );
   lines.push(...liquidationForensicsSection(events, view.market, stable));
   lines.push(...timelineTable(events, stable, anchoredNotes));
   return lines.join("\n");
+}
+
+/** "Against holding pETH" (ui-jobs 695): the page's figure, its terms, and
+ *  the feed and block it was valued at; where it is not stated, why. */
+function againstHoldingSection(
+  events: BaseActivityEvent[],
+  chain: PolarisChainResponse | null,
+  stable: string,
+  livePending: boolean,
+): string[] {
+  const r = polarisAgainstHolding(events, chain);
+  if (r == null) return [];
+  const out = ["## Against holding pETH", ""];
+  if (isAgainstHoldingNone(r)) {
+    out.push(
+      r.none === "live-read"
+        ? livePending
+          ? "The live read was still loading, so this snapshot carries no figure against holding pETH."
+          : "The live read was unavailable, so this snapshot carries no figure against holding pETH."
+        : "The index has not reached the position's latest touch, so this snapshot carries no figure against holding pETH.",
+      "",
+    );
+    return out;
+  }
+  const surplus = r.surplusClaimed + r.surplusOwed;
+  out.push(
+    `- **Against holding pETH:** ${againstHoldingText(r, formatPeth)}`,
+    `- **Formula:** (collateral now + withdrawn + surplus − escrow lost − deposited) + (borrowed + settled − repaid − debt now) ÷ feed`,
+    `- **Collateral now:** ${amt(r.collNow)} pETH${r.closed ? " (closed)" : ` (getCDPEntireColl at block ${r.feed.block})`}`,
+    `- **Withdrawn / deposited:** ${amt(r.withdrawn)} / ${amt(r.deposited)} pETH`,
+  );
+  if (surplus > 0)
+    out.push(
+      `- **Liquidation surplus:** ${amt(surplus)} pETH${r.surplusOwed > 0 ? ` (${amt(r.surplusOwed)} still to claim, counted as held)` : " (claimed)"}`,
+    );
+  if (r.escrowLost > 0)
+    out.push(
+      `- **Gas compensation escrow lost:** ${amt(r.escrowLost)} pETH (paid to the liquidator, the LiquidationGasComp log's _flatComp)`,
+    );
+  out.push(
+    `- **Borrowed / repaid:** ${amt(r.borrowed)} / ${amt(r.repaid)} ${stable}`,
+    ...(r.settled > 0
+      ? [`- **Settled to the holder:** ${amt(r.settled)} ${stable} minted to the holder where a debt went below zero`]
+      : []),
+    `- **Debt now:** ${amt(r.debtNow)} ${stable}${r.closed ? " (closed)" : ` (getCDPEntireDebt at block ${r.feed.block}${r.debtNow < 0 ? ", below zero: the next touch mints it to the holder" : ""})`}`,
+    `- **Feed:** ${amt(r.feed.pethInDebt)} ${stable} per pETH (previewPrice() at block ${r.feed.block})`,
+    `- **Terms:** ${sAmt(r.collTerm)} pETH on the collateral side, ${sAmt(r.debtTerm)} ${stable} on the debt side (${sAmt(r.debtTermPeth)} pETH at the feed)`,
+    "",
+    "Interest, stability gains, reward pETH and PSM shares are in the collateral and debt now. The gas compensation " +
+      "escrow is held outside the collateral: a close returns it, and a liquidation pays it to the liquidator, so it " +
+      "counts only on a liquidated position.",
+    "",
+  );
+  return out;
 }
 
 /** The valued breakdown of every liquidation on this CDP — the same legs,
@@ -296,9 +365,10 @@ function marketNotesLine(notes: MarketNote[]): string | null {
 /** The notes' own section: one paragraph each, with the two touches (and, when
  *  observed, the PrimaryRateSet log) the fact was read from. Placed before the
  *  timeline table. */
-function marketNotesSection(notes: MarketNote[]): string[] {
-  if (notes.length === 0) return [];
+function marketNotesSection(notes: MarketNote[], missing: string[]): string[] {
+  if (notes.length === 0 && missing.length === 0) return [];
   const out: string[] = ["## Market notes", ""];
+  if (notes.length === 0) return [...out, ...missing.flatMap((l) => [l, ""])];
   out.push(
     "Each note is a receipted fact about the market this position borrows in, observed between two of the position's own " +
       "touches and stated between them, or between its last touch and the chain head for a live note. A note is " +
@@ -309,15 +379,60 @@ function marketNotesSection(notes: MarketNote[]): string[] {
       "only the rate, so the later one is what that debt came to cost. A note " +
       "leads with the rate at its later end — what the market charged by then — and consecutive stretches that " +
       "moved the rate the same way are stated as one note, from the first touch to the last, with each step it " +
-      "took in named on its receipt.",
+      "took in named on its receipt. PSM gaps that meet end to end are stated as one note the same way, with each " +
+      "touch's share on its receipt.",
   );
   out.push("");
-  for (const n of notes) {
+  // PSM gaps that meet end to end are stated once over their whole range
+  // (ui-jobs 692), so a busy position's trades read as a few paragraphs.
+  for (const n of mergePsmGapRanges(notes)) {
     out.push(marketNoteSentence(n));
     out.push("");
     out.push(marketNoteReceiptLine(n));
     out.push("");
   }
+  for (const l of missing) out.push(l, "");
+  return out;
+}
+
+/** Why a rate note the section could hold is not in it (ui-jobs 693): no
+ *  touch carries the market's primary rate, the rate never moved enough
+ *  between touches, or the live read did not answer or saw no move. The
+ *  section states each instead of dropping out. */
+function missingRateNotes(
+  events: BaseActivityEvent[],
+  chain: PolarisChainResponse | null,
+  open: boolean,
+  notes: readonly MarketNote[],
+  liveNotes: readonly MarketNote[],
+): string[] {
+  const touches = events.filter(isPolarisEvent).filter((e) => e.context.data.eventType !== "transfer");
+  const rated = touches.filter((e) => e.context.data.primaryRate != null);
+  const out: string[] = [];
+  if (touches.length > 0 && rated.length === 0)
+    out.push(
+      touches.length === 1
+        ? "This position opened before the market set its first primary rate, so there is no rate at open."
+        : "Every touch on this position came before the market set its first primary rate, so no touch carries a rate to compare.",
+    );
+  else if (rated.length === 1)
+    out.push(
+      "Only one of this position's touches carries the market's primary rate, so no two touches can be compared.",
+    );
+  else if (rated.length > 1 && !notes.some((n) => n.kind === "rate-step"))
+    out.push(
+      `Between this position's touches the market's primary rate never moved by ${RATE_STEP_MIN_PP} percentage point or more.`,
+    );
+  if (!open) return out;
+  // The page's live-note gate (position-view.tsx): a fresh head read of an
+  // open position, with a price.
+  const answered = chain != null && !chain.chainStale && chain.isOpen && chain.price != null;
+  if (!answered) out.push("The live read was unavailable, so this snapshot carries no live rate note.");
+  else if (rated.length > 0 && !liveNotes.some((n) => n.kind === "rate-step"))
+    out.push(
+      `At the latest block ${chain.blockNumber.toLocaleString("en-US")} the market's primary rate is ` +
+        `${formatRatePercent(chain.primaryRate)} per year, unchanged to two places since this position's last touch.`,
+    );
   return out;
 }
 

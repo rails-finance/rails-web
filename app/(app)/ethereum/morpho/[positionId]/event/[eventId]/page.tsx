@@ -40,6 +40,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   return eventMetadata({
     session: "morpho",
     subject: user,
+    market: tail?.position?.marketLabel,
     canonicalPath: `/ethereum/morpho/${positionId}/event/${encodeURIComponent(decoded)}`,
     event: event ? { actionLabel: morphoEventPageTitle(event), timestamp: event.timestamp } : null,
     description: event ? morphoEventPageDescription("ethereum", user, event.timestamp) : undefined,

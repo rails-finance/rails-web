@@ -1,5 +1,8 @@
 "use client";
 
+import { troveWords } from "@/lib/liquity/event-templates";
+import { formatDate } from "@/lib/date";
+import { movedToWords } from "@/lib/liquity/trove-page-words";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { useState } from "react";
 import { Image as ImageIcon, Link2 } from "lucide-react";
@@ -33,6 +36,8 @@ export function TroveIdentityRow({
   showNftLink = true,
   showOwner = true,
   inert = false,
+  changedHands = false,
+  formerHold = null,
 }: {
   protocol: LiquityFamilyId;
   troveId?: string;
@@ -62,22 +67,42 @@ export function TroveIdentityRow({
    *  as every family's listing draws it (Miles, 17 Oct 2026); no Trove ID copy
    *  or NFT link, the ID being the card's right-end tag. */
   inert?: boolean;
+  /** The Trove's NFT passed between two wallets. "last holder" is drawn only
+   *  then; a listing row has no transfer history, so it never draws it
+   *  (ui-jobs 702). */
+  changedHands?: boolean;
+  /** A listing filtered to a wallet that held this Trove and moved it on:
+   *  the row names the wallet it went to (ui-jobs 705). */
+  formerHold?: { movedTo: string; movedAt: number } | null;
 }) {
   const [copiedTrove, setCopiedTrove] = useState(false);
   const troveLabel = troveId ? shortId(troveId) : null;
 
-  // Current owner when open; the preserved last owner once closed/liquidated.
+  // Current owner when open; the preserved last holder once closed/liquidated.
   const ownerAddress = showOwner ? (owner ?? lastOwner ?? null) : null;
-  const isLastOwner = !owner && !!lastOwner;
+  const closedOwner = !owner && !!lastOwner;
+  const isLastHolder = closedOwner && changedHands;
 
   if (!troveLabel && !nftUrl && !ownerAddress) return null;
+
+  const moved = formerHold ? movedToWords(formatDate(formerHold.movedAt)) : null;
+  if (inert && formerHold && moved) {
+    return (
+      <span className="inline-flex min-w-0 items-center gap-1.5 text-xs text-rb-500" data-moved-to={formerHold.movedTo}>
+        <RevealTip tip={moved.hint} focusable className="text-rb-400 focus-ring rounded-sm">
+          {moved.prefix}
+        </RevealTip>
+        <WalletPill wallet={formerHold.movedTo} ensName={null} filterProtocol={protocol} bookmark={showBookmark} />
+      </span>
+    );
+  }
 
   if (inert) {
     // The Trove ID sits at the card's right end (the listing `tag`).
     if (!ownerAddress) return null;
     return (
       <span className="inline-flex min-w-0 items-center gap-1.5 text-xs text-rb-500">
-        {isLastOwner && <span className="text-rb-400">last owner</span>}
+        {isLastHolder && <span className="text-rb-400">{troveWords("last_holder_prefix")}</span>}
         <WalletPill
           wallet={ownerAddress}
           ensName={ownerEns ?? null}
@@ -101,10 +126,10 @@ export function TroveIdentityRow({
         // copy button and (via bookmark) bookmark star — the same
         // identity chrome every other explorer's cards use. Routing to the
         // owner-filtered listing is its `filterProtocol` link.
-        <span className={`inline-flex items-center gap-1 ${isLastOwner ? "opacity-70" : ""}`}>
-          {isLastOwner && (
-            <RevealTip tip="Last owner (trove closed)" focusable className="text-rb-400 focus-ring rounded-sm">
-              last owner
+        <span className={`inline-flex items-center gap-1 ${closedOwner ? "opacity-70" : ""}`}>
+          {isLastHolder && (
+            <RevealTip tip={troveWords("last_holder_hint")} focusable className="text-rb-400 focus-ring rounded-sm">
+              {troveWords("last_holder_prefix")}
             </RevealTip>
           )}
           <WalletPill

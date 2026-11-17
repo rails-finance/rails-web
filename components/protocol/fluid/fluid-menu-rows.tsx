@@ -7,6 +7,7 @@
 import { useState } from "react";
 import { Hash, Link2 } from "lucide-react";
 import { Icon } from "@/components/icons/icon";
+import { shortPositionId } from "@/lib/shared/position-name";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
 
 export function FluidMenuRows({ nftId, pagePath }: { nftId: string; pagePath: string }) {
@@ -21,7 +22,7 @@ export function FluidMenuRows({ nftId, pagePath }: { nftId: string; pagePath: st
     <>
       <ToolsMenuItem
         icon={copied === "id" ? <Icon name="check" size={16} /> : <Hash size={16} />}
-        title={`Position NFT #${nftId}`}
+        title={`Position ${shortPositionId(nftId)}`}
         subtitle={copied === "id" ? "Copied" : "Copy the NFT id"}
         onClick={() => copy("id", nftId)}
       />

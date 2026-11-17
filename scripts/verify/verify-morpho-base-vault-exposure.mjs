@@ -323,6 +323,7 @@ const VAULT_ABI = parseAbi([
   "function asset() view returns (address)",
   "function totalAssets() view returns (uint256)",
   "function totalSupply() view returns (uint256)",
+  "function lostAssets() view returns (uint256)",
   "function withdrawQueueLength() view returns (uint256)",
   "function withdrawQueue(uint256) view returns (bytes32)",
   "function balanceOf(address) view returns (uint256)",
@@ -507,6 +508,9 @@ async function readVaultAt(blockNumber) {
     legs.push({ id, assets });
   }
   const allocated = legs.reduce((s, l) => s + l.assets, BigInt(0));
+  // V1.1's stored lost assets come off Unaccrued interest where above zero
+  // (ui-jobs 688); a V1.0 vault reverts on the call and keeps no such ledger.
+  const lostAssets = await read("lostAssets", [], blockNumber).catch(() => null);
   return {
     name,
     symbol,
@@ -516,7 +520,7 @@ async function readVaultAt(blockNumber) {
     totalSupply,
     legs,
     allocated,
-    gap: totalAssets - allocated,
+    gap: totalAssets - allocated - (lostAssets != null && lostAssets > BigInt(0) ? lostAssets : BigInt(0)),
   };
 }
 
@@ -711,7 +715,7 @@ for (const leg of own.legs) {
     j.legs.map((l, i) => `${l.assets.raw}/${raw.legs[i]?.assets}`).join(" "),
   );
   check(
-    "3d the served read's gap is wei-exact against totalAssets − Σ legs",
+    "3d the served read's gap is wei-exact against totalAssets − Σ legs − stored lostAssets",
     j.gap.raw === raw.gap.toString(),
     `served ${j.gap.raw} vs own ${raw.gap}`,
   );
@@ -719,7 +723,7 @@ for (const leg of own.legs) {
 
 const pageGap = await figure("gap");
 check(
-  "4  the gap card equals totalAssets − Σ legs",
+  "4  the gap card equals totalAssets − Σ legs − stored lostAssets",
   pageGap === assetText(own.gap, own.assetDecimals),
   `page ${pageGap} vs own ${assetText(own.gap, own.assetDecimals)}`,
 );

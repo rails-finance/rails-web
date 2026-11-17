@@ -1,9 +1,11 @@
-// The Lifetime flows panel's Explanation lines and "?" for a Polaris CDP
+// The Lifetime flows panel's Explanation bullets and "?" for a Polaris CDP
 // (lib/polaris/flows.ts; rails-ops reference/lifetime-flows-scrubber.md,
-// "Polaris").
+// "Polaris"). Brief bullets (explanation-copy-charter §4): one group, the
+// replay's mechanics behind "More about the sums".
 
 import type { ReactNode } from "react";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
+import { ExplainBullet, ExplainGroup, ExplainMore, Fig } from "@/components/shared/explain-groups";
 import type { PolarisFlowFacts } from "@/lib/polaris/flows";
 import { POLARIS_DOC_LINKS } from "@/lib/polaris/docs-links";
 import { POLARIS_LIQ_CONSTANTS } from "./polaris-liquidation-forensics";
@@ -14,61 +16,63 @@ export interface PolarisFlowsNoteProps {
   stable: string;
 }
 
-const n = (k: number, one: string, many: string) => (k === 1 ? one : `${k.toLocaleString("en-US")} ${many}`);
+const events = (k: number) => (
+  <>
+    <Fig>{k.toLocaleString("en-US")}</Fig> event{k === 1 ? "" : "s"}
+  </>
+);
 
 export function PolarisFlowsNote({ facts, stable }: PolarisFlowsNoteProps): ReactNode {
   const p = facts?.pricing;
+  const unpriced = p ? p.nearest + p.today : 0;
   return (
-    <div className="space-y-2" data-polaris-flows-note="" data-anatomy="F14">
-      <p>
-        Every figure is in {stable}, the market&apos;s stablecoin: this is a testnet, and nothing on it has a market
-        price. Each pETH flow is converted at the market&apos;s price feed at its block, the price the protocol holds
-        the debt against, so on the collateral side the last line, Market move and pETH built up since the last event,
-        is the change in that price since each flow, with the pETH built up since the position&apos;s last event.
-      </p>
-      <p>
-        Each event states the position&apos;s collateral and debt after it and every part that changed them, so each
-        part has a line of its own and the lines meet the recorded figures at every event. Interest (dashed) is charged
-        on the recorded debt at the market&apos;s rate and written in at each event. The other parts also build up
-        between events and are written in at the next one: Reward pETH (dashed), the position&apos;s net share of every
-        direct mint and redemption through the PSM since the last event (Net PSM shares added, taken or cleared, each
-        side split by its sign), Stability gains (vertical lines), and Settled to zero, the {stable} the protocol mints
-        where the shares took the debt below zero. Between two events each side&apos;s line runs straight from what the
-        first stated to what the second wrote in before the holder&apos;s act, and after the last to the live
-        read&apos;s entire figures. Each part&apos;s line moves on the event that wrote it in, so on the days between,
-        what built up sits in each side&apos;s last line.
-        {facts && facts.psmRows > 0 && ` ${n(facts.psmRows, "One event", "events")} wrote PSM shares in.`}
-        {facts && facts.settledRows > 0 && ` ${n(facts.settledRows, "One event", "events")} settled the debt to zero.`}
-      </p>
-      <p>
-        The gas compensation escrow, a fixed {POLARIS_LIQ_CONSTANTS.gasComp.label} every open sends with the collateral,
-        is held apart from the collateral and has no line here: each card&apos;s Collateral ledger states it under its
-        rows, sent at the open and returned at the close or paid to the liquidator.
-      </p>
-      {facts?.liquidated && (
-        <p>
-          The liquidation took the whole position: its collateral less the surplus is Liquidated (with the
-          liquidator&apos;s compensation inside it), the surplus left for the owner is Surplus to claim, and the debt it
-          cleared is Liquidated on the debt side.
-        </p>
-      )}
-      {facts?.pendingToday && (
-        <p>
-          Today&apos;s figures are the live read: the parts built up since the last event are added to their lines at
-          today, as the next event would write them in.
-        </p>
-      )}
-      {p && (
-        <p>
-          {p.nearest + p.today > 0
-            ? `${n(p.nearest + p.today, "One event takes", "events take")} the nearest recorded price in time, with no feed price read at ${p.nearest + p.today === 1 ? "its block" : "their blocks"}. `
-            : ""}
-          {facts?.between === "store"
-            ? "On each day between events the collateral is valued at the market's feed price at the close of that day, from the daily price store, "
-            : "The daily price store did not answer, so between events the collateral keeps the price of its latest event, "}
-          and the last stop takes the feed&apos;s price at the latest block, the one the position card values it at.
-        </p>
-      )}
+    <div data-polaris-flows-note="" data-anatomy="F14">
+      <ExplainGroup title="How it counts">
+        <ExplainBullet>In {stable} at the market&apos;s feed price: a testnet has no market price</ExplainBullet>
+        <ExplainBullet>Interest is written into the debt at each event</ExplainBullet>
+        <ExplainBullet>
+          PSM shares{facts && facts.psmRows > 0 ? <>, at {events(facts.psmRows)}</> : null}: each mint and redemption
+          moves every position pro rata
+        </ExplainBullet>
+        <ExplainBullet>
+          Escrow <Fig>{POLARIS_LIQ_CONSTANTS.gasComp.label}</Fig> held apart, on no line; each card&apos;s ledger states
+          it
+        </ExplainBullet>
+        {facts && facts.settledRows > 0 && (
+          <ExplainBullet>Settled to zero at {events(facts.settledRows)}</ExplainBullet>
+        )}
+        {facts?.liquidated && (
+          <ExplainBullet>
+            Liquidated took the whole position; Surplus to claim is the owner&apos;s remainder
+          </ExplainBullet>
+        )}
+        {unpriced > 0 && (
+          <ExplainBullet>{events(unpriced)} without a feed price take the nearest recorded one</ExplainBullet>
+        )}
+      </ExplainGroup>
+      <ExplainMore title="More about the sums">
+        <ul className="space-y-1">
+          <ExplainBullet>
+            Each event states collateral and debt; every part&apos;s line meets those figures
+          </ExplainBullet>
+          <ExplainBullet>Interest, reward pETH, PSM shares and stability gains build up between events</ExplainBullet>
+          <ExplainBullet>Each side runs straight from one event to what the next wrote in</ExplainBullet>
+          {facts?.pendingToday && (
+            <ExplainBullet>Today adds what built up since the last event, as the next would</ExplainBullet>
+          )}
+          <ExplainBullet>
+            {facts?.between === "carried"
+              ? "Between events, pETH keeps its latest event's price: the daily store did not answer"
+              : "Between events, pETH takes the feed's price at each day's close"}
+          </ExplainBullet>
+          <ExplainBullet>Today&apos;s pETH takes the feed price at the latest block, as the card does</ExplainBullet>
+          {facts?.liquidated && (
+            <ExplainBullet>
+              The liquidator&apos;s compensation is inside Liquidated on the collateral side
+            </ExplainBullet>
+          )}
+        </ul>
+      </ExplainMore>
     </div>
   );
 }
@@ -76,33 +80,24 @@ export function PolarisFlowsNote({ facts, stable }: PolarisFlowsNoteProps): Reac
 export function polarisFlowsContent(stable: string): LearnMoreContent {
   return {
     title: "About the lifetime flows",
-    intro: `The bars add up every change Polaris has made to this position, in ${stable}, and the line under them draws what it held and owed at the end of each day.`,
+    intro: `The bars add up every change Polaris made to the position, in ${stable}; the line draws what it held and owed each day.`,
     stepsHeading: "How it's built:",
     steps: [
-      "Collateral: deposited, plus reward pETH and the net PSM shares that added pETH, less withdrawn, less the net PSM shares that took pETH and what a liquidation took, each at the feed's price when it happened, plus the change in that price since (Market move), is what the position holds.",
-      "Debt: borrowed, plus interest, the net PSM shares that added debt and any settlement to zero, less repaid, less stability gains, the net PSM shares that cleared debt and what a liquidation cleared, is what the position owes.",
+      "Collateral = deposited + reward pETH + PSM shares added − withdrawn − PSM shares taken − liquidated, plus Market move.",
+      "Debt = borrowed + interest + PSM shares added + settled to zero − repaid − stability gains − PSM shares cleared − liquidated.",
     ],
     detailsHeading: "Key concepts:",
     details: [
-      {
-        bold: `${stable} units`,
-        text: "a testnet token has no market price, so the collateral is converted at the market's price feed and every figure is in the market's stablecoin.",
-      },
-      {
-        bold: "Interest at each event",
-        text: "interest accrues continuously at the market's algorithmic rate and is written into the debt whenever the position is touched.",
-      },
+      { bold: "Interest", text: "accrues continuously at the market's algorithmic rate." },
+      { bold: "Reward pETH", text: "the position's share of the bonding curve's rewards." },
       {
         bold: "PSM shares",
-        text: "when the market's PSM mints or redeems, every position takes a pro-rata share of the collateral and debt that moved. An event writes in the net of every mint and redemption since the last one, so its two sides can move in opposite directions; each side is split by its sign.",
+        text: "an event writes in the net since the last one, so its two sides can move opposite ways.",
       },
-      {
-        bold: "Gas compensation escrow",
-        text: `a fixed ${POLARIS_LIQ_CONSTANTS.gasComp.label} sent with the collateral at the open and held apart from it, so it is on no line. It returns at the close, or goes to the liquidator.`,
-      },
+      { bold: "Gas compensation escrow", text: "returns at the close, or goes to the liquidator." },
       {
         bold: "Settled to zero",
-        text: "when a net PSM share clears more debt than the position owes, the protocol adds the difference back so the debt lands on zero.",
+        text: `where gains and PSM shares clear more than is owed, the protocol adds ${stable} so the debt lands on zero.`,
       },
     ],
     links: [POLARIS_DOC_LINKS.interestRates, POLARIS_DOC_LINKS.pegDefence, POLARIS_DOC_LINKS.liquidations],

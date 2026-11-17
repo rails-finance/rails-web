@@ -4,6 +4,7 @@
 
 import type { FluidBasePosition } from "@/lib/fluid-base/position";
 import type { FluidBasePositionsRead } from "@/lib/fluid-base/types";
+import { positionName } from "@/lib/shared/position-name";
 
 export const LABEL = "Fluid";
 
@@ -27,7 +28,9 @@ export const FRONT_DOOR = {
 };
 
 export const POSITION_PAGE = {
-  title: (p: FluidBasePosition) => `${p.colUnit} / ${p.debtUnit} · Fluid · position #${p.id}`,
+  /** The position's name (ui-jobs 703): "wstETH / USDC · Position #12". */
+  title: (p: FluidBasePosition) =>
+    positionName({ market: `${p.colUnit} / ${p.debtUnit}`, noun: "Position", id: p.id }).text,
   sub: (p: FluidBasePosition, vaultId: number) => `Vault ${vaultId} · Base`,
   unanswered: "The read of this position did not answer. Try again in a minute.",
 };

@@ -37,7 +37,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   return eventMetadata({
     session: "compound",
     subject: wallet,
-    market: marketOf(market).baseSymbol,
+    market: marketOf(market).label,
     canonicalPath: `/ethereum/compound-v3/${market}/${wallet}/event/${encodeURIComponent(decoded)}`,
     event: event
       ? { actionLabel: compoundEventTabWords(event, "ethereum", tail.events ?? []), timestamp: event.timestamp }

@@ -84,6 +84,16 @@ export interface TroveBatch {
 }
 
 // Main trove summary data
+/** A wallet's part in a Trove it passed on: its latest transfer out. */
+export interface TroveFormerHold {
+  holder: string;
+  movedTo: string;
+  /** Unix seconds. */
+  movedAt: number;
+  movedBlock: number;
+  movedTx: string;
+}
+
 export interface TroveSummary {
   // Identifiers
   id: string; // Trove NFT ID
@@ -106,6 +116,10 @@ export interface TroveSummary {
   metrics: TroveMetrics; // Performance metrics
   activity: TroveActivity; // Activity tracking
   batch: TroveBatch; // Batch membership
+  /** Set where the wallet the read is about held this Trove and moved its
+   *  NFT to another wallet (rails-server mig 474, and /api/troves with
+   *  ?ownerAddress=; ui-jobs 705). */
+  formerHold?: TroveFormerHold;
 
   // Economics (optional - may be provided by backend or calculated client-side)
   economics?: TroveEconomics;
@@ -119,6 +133,9 @@ export interface TrovesResponse {
     total: number;
     page: number;
     limit: number;
+    /** With ?former=1: how many of `total` are Troves the wallet passed on
+     *  (rails-server liquity-v2-former-hold.ts; ui-jobs 705). */
+    passedOn?: number;
   };
   error?: string;
 }

@@ -6,6 +6,7 @@
 import type { Provenance } from "@/components/shared/provenance";
 import type { VaultSteward, VaultSummary } from "@/lib/vaults/summary";
 import { stampServerRead, type ServerRead } from "@/lib/shared/server-head-read";
+import { chainMeta, type ChainId } from "@/lib/shared/chains";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -14,6 +15,14 @@ const CALL: Record<VaultSteward["role"], string> = {
   owner: "owner()",
   roleManager: "role_manager()",
   poolDelegate: "poolDelegate() on the PoolManager",
+};
+
+/** The role in words, for the summary; the call stays on the via and check lines. */
+const ROLE_WORD: Record<VaultSteward["role"], string> = {
+  curator: "curator",
+  owner: "owner",
+  roleManager: "role manager",
+  poolDelegate: "pool delegate",
 };
 
 const contractOf = (v: VaultSummary) => ({ name: v.name ?? v.catalogName ?? v.symbol ?? "vault", address: v.address });
@@ -25,8 +34,11 @@ export const vaultStewardProv = (v: VaultSummary, s: VaultSteward, readBy?: Serv
       kind: "chain",
       pclass: "state",
       source: { block: v.readAt.block },
-      verify: { kind: "recompute", text: `Call ${CALL[s.role]} on ${v.address} at block ${n(v.readAt.block)}` },
-      summary: `Steward — the vault's \`${CALL[s.role]}\` at block ${n(v.readAt.block)}: ${s.address}. An address: who holds it is stated nowhere on chain.`,
+      verify: {
+        kind: "recompute",
+        text: `To check: ask any ${chainMeta(v.chainId as ChainId).name} archive node for ${CALL[s.role]} on ${v.address} at block ${n(v.readAt.block)}.`,
+      },
+      summary: `Steward — the vault's ${ROLE_WORD[s.role]} at block ${n(v.readAt.block)} is ${s.address}. The chain does not say who holds the address.`,
       contract: contractOf(v),
       via: `chain · ${CALL[s.role]} @ the pinned block`,
     },
