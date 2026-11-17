@@ -232,7 +232,7 @@ export function CowTradeCard({
           <li>
             A solver sent the settlement transaction
             {others > 0
-              ? `, which settled ${others.toLocaleString("en-US")} other ${others === 1 ? "trade" : "trades"} with this one`
+              ? `; this trade is one of ${trade.settlementTrades.toLocaleString("en-US")} trades in this settlement`
               : ""}
             .
           </li>
