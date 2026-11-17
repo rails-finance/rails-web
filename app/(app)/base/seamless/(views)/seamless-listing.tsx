@@ -29,7 +29,7 @@ import { AAVE_V3_ITEMS_PER_PAGE, type AaveV3ListFilters } from "@/lib/aave-v3/li
 const LISTING_COUNT_RULE =
   "Pool calls only. aToken transfers, withdrawals as ETH through the WETH gateway among them, count on the position page";
 const LIQUIDATION_RULE =
-  "Each time a liquidator repaid part of the account's debt and took collateral in return. An account that is still open can be liquidated again";
+  "Each time a liquidator repaid part of the position's debt and took collateral in return. A position that is still open can be liquidated again";
 
 export interface SeamlessListingProps {
   initialItems?: AaveV3PositionRow[];

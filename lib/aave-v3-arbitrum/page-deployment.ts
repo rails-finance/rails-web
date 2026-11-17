@@ -56,7 +56,7 @@ export const AAVE_V3_ARBITRUM_PAGE: AaveV3PoolPageDeployment = {
       `This reader has asked for more histories than Rails’ store answers in a minute, so the timeline and the lifetime economics wait. The page asks again ${when}. The position above is read live from the Pool and is unaffected.`,
     emptyNotWholeState: {
       title: "Nothing is supplied or borrowed on this Pool.",
-      body: "The history read so far holds no events for this wallet, and it is not yet confirmed against the chain, so Rails does not yet say whether this account was ever opened.",
+      body: "The history read so far holds no events for this wallet, and it is not yet confirmed against the chain, so Rails does not yet say whether this position was ever opened.",
     },
   },
 };

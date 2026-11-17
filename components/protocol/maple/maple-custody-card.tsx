@@ -13,6 +13,8 @@
 // lib/sources/chain/maple-custody.ts): the direct share balance, its value at
 // the pool's exit price, and the escrow's fraction of the pool supply.
 
+import { positionName } from "@/lib/shared/position-name";
+import { POSITION_NOUN } from "@/lib/shared/protocols";
 import {
   PositionCard,
   type PositionCardHead,
@@ -202,6 +204,8 @@ export function MapleCustodyCard({
       </span>
     ),
     counters: null,
+    // The saved name, as the tab names the address (lib/shared/position-name.ts).
+    name: positionName({ noun: POSITION_NOUN.maple, id: wallet }),
     explainer: { body: <CustodyExplanation infra={infra} holdings={live} />, viewHref },
     learnMore: null,
     menu: {

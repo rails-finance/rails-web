@@ -649,8 +649,8 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
               <div className="py-12 text-center text-rb-500">
                 <p className="mb-1">Nothing is supplied or borrowed on this Pool.</p>
                 <p className="text-sm">
-                  Whether this account ever held a position is a question only its history answers, and that read
-                  failed. Reload to try again.
+                  Whether this wallet ever held a position is a question only its history answers, and that read failed.
+                  Reload to try again.
                 </p>
               </div>
             ) : untouched ? (

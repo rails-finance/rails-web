@@ -90,21 +90,21 @@ const TIPS = {
     `The ${sym} ${side === "collateral" ? "supplied" : "owed"} after this transaction, as the event's row states it, at the oracle's ${sym} price at this block.`,
   rowTotal:
     "The side's total in dollars needs the position read at this block, which this row does not make: it states the reserve it moved.",
-  repaid: "The assets this account once borrowed and owes none of after this event.",
+  repaid: "The assets this position once borrowed and owes none of after this event.",
   total: (side: FlowSide) =>
     `The ${side === "collateral" ? "collateral" : "debt"}'s total in dollars after this transaction, read from the Pool at the oracle's prices at this block; where the side holds one reserve, its amount beside the dollars.`,
   health:
-    "The Pool's health factor for the account after this transaction: the collateral times the weighted liquidation threshold, divided by the debt; below 1 the position can be liquidated.",
+    "The Pool's health factor for the position after this transaction: the collateral times the weighted liquidation threshold, divided by the debt; below 1 the position can be liquidated.",
   fall: "How far the collateral's total value can fall, the debt's value held, before the health factor reaches 1: one less one over the health factor.",
   ltv: "The debt's dollar value as a share of the collateral's after this transaction, at the oracle's prices at this block.",
   borrowable:
-    "What the account can still borrow in dollars before it reaches its max LTV: the max LTV times the collateral, less the debt.",
+    "What the position can still borrow in dollars before it reaches its max LTV: the max LTV times the collateral, less the debt.",
   max_ltv:
-    "The share of the collateral the account can borrow against, each reserve's LTV weighted by its dollar value, from the Pool's configuration at this block.",
+    "The share of the collateral the position can borrow against, each reserve's LTV weighted by its dollar value, from the Pool's configuration at this block.",
   threshold:
     "The share of the collateral above which the debt makes the position liquidatable, each reserve's threshold weighted by its dollar value, from the Pool's configuration at this block.",
   emode: (t: AaveFamilyTerms) =>
-    `The ${t.emode} category the account had chosen; a reserve in it is borrowed against at the category's LTV and liquidation threshold.`,
+    `The ${t.emode} category the wallet had chosen; a reserve in it is borrowed against at the category's LTV and liquidation threshold.`,
 };
 
 type Leg = "supply" | "debt";

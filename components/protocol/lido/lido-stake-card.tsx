@@ -6,6 +6,8 @@
 // The (i) tells this wallet's stake in words; the ? (C4) is "How Lido staking
 // works", the same on every wallet.
 
+import { positionName } from "@/lib/shared/position-name";
+import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCard, type PositionCardHead, type PositionCardSlots } from "@/components/shared/position-card";
 import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups";
@@ -75,6 +77,8 @@ function slots(r: LidoStakeRead): PositionCardSlots {
     status: s.now.shares === 0 ? { word: CARD_WORDS.closed, tone: "muted", tip: CARD_WORDS.none } : null,
     heads,
     counters: null,
+    // The stake's name: the wallet (lib/shared/position-name.ts).
+    name: positionName({ noun: POSITION_NOUN.lido, id: r.wallet }),
     menu: { exports: null },
     stamp: <LidoReadStamp c={c} what="Every figure on this card" />,
     explainer: {

@@ -20,6 +20,8 @@
 // detail page's live Comptroller read — the listing card still asserts no
 // health column (the listing snapshot carries none).
 
+import { positionName } from "@/lib/shared/position-name";
+import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { isEnteredIn, linesUsd, suppliedUsd } from "@/lib/moonwell/supply-totals";
 import { headReadOf, serverReadOf, stampServerRead, type ServerRead } from "@/lib/shared/server-head-read";
 import { TitleTip } from "@/components/shared/reveal-tip";
@@ -338,7 +340,9 @@ export function useMoonwellCardSlots({
   const identity = detail ? undefined : (
     <WalletPill wallet={v.wallet} ensName={null} filterProtocol={session} bookmark />
   );
-  const common = { status, identity, counters };
+  // The position's name: the account's wallet (lib/shared/position-name.ts).
+  const name = positionName({ noun: POSITION_NOUN[session], id: v.wallet });
+  const common = { status, identity, counters, name };
 
   let heads: PositionCardHead[];
   let outcome: PositionCardOutcome | undefined;

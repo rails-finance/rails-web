@@ -16,6 +16,8 @@
 // shares. Amounts stay in the pool's asset; Rails never pins a stablecoin
 // to $1, so no headline carries a USD line.
 
+import { positionName } from "@/lib/shared/position-name";
+import { POSITION_NOUN } from "@/lib/shared/protocols";
 import type { ReactNode } from "react";
 import {
   PositionCard,
@@ -354,7 +356,9 @@ export function mapleCardSlots({
           tip: "Some of the wallet's shares wait in the withdrawal queue to be paid out; they earn interest until then.",
         }
       : null;
-  const common = { status, identity, counters };
+  // The position's name: the wallet (lib/shared/position-name.ts).
+  const name = positionName({ noun: POSITION_NOUN.maple, id: v.wallet });
+  const common = { status, identity, counters, name };
 
   const menuLeading = () => (
     <MapleMenuRows address={v.wallet} pagePath={`/ethereum/maple/${v.wallet}`} noun="position" idLabel="Wallet" />

@@ -58,7 +58,7 @@ function switchProv(
   return {
     kind: "chain",
     pclass: "emitted",
-    summary: `The account's ${em} category changed from ${name(s.fromId, s.fromLabel)} to ${name(s.toId, s.toLabel)} in this transaction.${s.toId !== 0 && s.ltvBps != null && s.liquidationThresholdBps != null ? ` At this block the category lent up to ${bpsPct(s.ltvBps)} of the collateral it covers and liquidated at ${bpsPct(s.liquidationThresholdBps)}.` : ""}`,
+    summary: `The position's ${em} category changed from ${name(s.fromId, s.fromLabel)} to ${name(s.toId, s.toLabel)} in this transaction.${s.toId !== 0 && s.ltvBps != null && s.liquidationThresholdBps != null ? ` At this block the category lent up to ${bpsPct(s.ltvBps)} of the collateral it covers and liquidated at ${bpsPct(s.liquidationThresholdBps)}.` : ""}`,
     contract: { name: pool.name, address: pool.address },
     source: { block: coords.blockNumber, txHash: coords.txHash },
     via: `Pool UserEModeSet log (categoryId ${s.toId}) in tx ${coords.txHash.slice(0, 10)}… at block ${coords.blockNumber}${s.toId !== 0 ? " · the category's figures read from the Pool at the block" : ""}`,
@@ -215,11 +215,11 @@ export function AaveFamilyEmodeSwitchCard({
     notes:
       read.status === "loading" ? (
         <div className="px-5 pb-2 text-xs text-rb-500" data-spark-account-state="loading">
-          Reading the account before and after this transaction…
+          Reading the position before and after this transaction…
         </div>
       ) : read.status === "unavailable" && !read.lasting ? (
         <div className="px-5 pb-2 text-xs text-rb-500" data-spark-account-state="unread">
-          The account before and after this transaction was not read. Reload to try again.
+          The position before and after this transaction was not read. Reload to try again.
         </div>
       ) : undefined,
     explainer: {
@@ -227,16 +227,16 @@ export function AaveFamilyEmodeSwitchCard({
         <p className="text-sm leading-relaxed">
           {entering ? (
             <>
-              The account chose the {name(s.toId, s.toLabel)} {em} category. Collateral the category covers now counts
-              at the category&rsquo;s limits
+              The wallet chose the {name(s.toId, s.toLabel)} {em} category. Collateral the category covers now counts at
+              the category&rsquo;s limits
               {s.ltvBps != null && s.liquidationThresholdBps != null
                 ? ` (borrow up to ${bpsPct(s.ltvBps)}, liquidation at ${bpsPct(s.liquidationThresholdBps)})`
                 : ""}{" "}
-              in place of each asset&rsquo;s own, and the account may borrow only assets in the category.
+              in place of each asset&rsquo;s own, and the position may borrow only assets in the category.
             </>
           ) : (
             <>
-              The account left the {name(s.fromId, s.fromLabel)} {em} category: each asset counts at its own limits
+              The wallet left the {name(s.fromId, s.fromLabel)} {em} category: each asset counts at its own limits
               again.
             </>
           )}

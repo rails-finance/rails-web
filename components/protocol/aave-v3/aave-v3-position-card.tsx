@@ -198,18 +198,18 @@ function scaleRaw(raw: string | null | undefined, decimals: number): number {
 /** The headlines' read-mores on a detail card. */
 const SIDE_TIP = {
   supply:
-    "What the account supplies to the Pool, in dollars at the Pool's oracle prices, earning each asset's supply rate. The assets enabled as collateral back its borrowing.",
-  debt: "What the account owes the Pool, in dollars at the Pool's oracle prices, including the interest accrued at each asset's variable borrow rate.",
+    "What the position supplies to the Pool, in dollars at the Pool's oracle prices, earning each asset's supply rate. The assets enabled as collateral back its borrowing.",
+  debt: "What the position owes the Pool, in dollars at the Pool's oracle prices, including the interest accrued at each asset's variable borrow rate.",
 } as const;
 const HF_TIP =
-  "The collateral, each asset counted up to its liquidation threshold, divided by the debt. Below 1 the account can be liquidated.";
+  "The collateral, each asset counted up to its liquidation threshold, divided by the debt. Below 1 the position can be liquidated.";
 /** The Collateral headline's read-more where the supplies are split. */
 const COLLATERAL_TIP =
-  "What the account supplies that backs its borrowing, in dollars at the Pool's oracle prices, earning each asset's supply rate.";
+  "What the position supplies that backs its borrowing, in dollars at the Pool's oracle prices, earning each asset's supply rate.";
 const NOT_COLLATERAL_TIP =
   "Supplied and earning the supply rate, but backing no borrowing: its collateral switch is off, or the Pool gives it a liquidation threshold of 0.";
 const PEAK_NOT_COLLATERAL_TIP =
-  "Supplied and earning the supply rate, but never backing borrowing: the account never turned its collateral switch on.";
+  "Supplied and earning the supply rate, but never backing borrowing: the wallet never turned its collateral switch on.";
 
 /** A side's oracle-USD total as a compact headline figure, its cents on
  *  hover. */
@@ -750,7 +750,7 @@ export function useAaveV3CardSlots({
       ? {
           id: "borrow-room",
           label: "Room to borrow",
-          tip: "How much more the account can borrow, in dollars, before it reaches its Max LTV, as the Pool gives it at the latest block.",
+          tip: "How much more the position can borrow, in dollars, before it reaches its Max LTV, as the Pool gives it at the latest block.",
           value: (
             <Prov info={accountDataProv("Available to borrow", "availableBorrowsBase", chainPool, v.readBy)}>
               {formatCompactUsd(chain.availableBorrowsUsd)}
@@ -769,7 +769,7 @@ export function useAaveV3CardSlots({
       ? {
           id: "liquidation",
           label: "Liquidation",
-          tip: "One token is supplied and borrowed, so its price stands on both sides of the health factor and cancels; only the interest gap can bring the account to liquidation.",
+          tip: "One token is supplied and borrowed, so its price stands on both sides of the health factor and cancels; only the interest gap can bring the position to liquidation.",
           value: (
             <span className="inline-flex items-center gap-1">
               <TokenChipIcon symbol={liq.sameAsset.symbol} size={14} filterable={false} />
@@ -781,7 +781,7 @@ export function useAaveV3CardSlots({
         ? {
             id: "liquidates-at",
             label: "Liquidates at",
-            tip: `The ${liq.single.symbol} price at which the health factor reaches 1 and the account can be liquidated: the price the Pool's oracle reports, divided by the health factor.`,
+            tip: `The ${liq.single.symbol} price at which the health factor reaches 1 and the position can be liquidated: the price the Pool's oracle reports, divided by the health factor.`,
             value: (
               <span className="inline-flex items-center gap-1">
                 <TokenChipIcon symbol={liq.single.symbol} size={14} filterable={false} />
@@ -793,7 +793,7 @@ export function useAaveV3CardSlots({
           ? {
               id: "liquidation-drop",
               label: "Liquidates on a drop of",
-              tip: "How far the dollar value of all the collateral can fall, the debt standing still, before the health factor reaches 1 and the account can be liquidated: 1 − 1 ÷ health factor.",
+              tip: "How far the dollar value of all the collateral can fall, the debt standing still, before the health factor reaches 1 and the position can be liquidated: 1 − 1 ÷ health factor.",
               value: <Prov info={dep.liqDrop(v.market)}>{liq.dropPct.toFixed(0)}%</Prov>,
             }
           : null;

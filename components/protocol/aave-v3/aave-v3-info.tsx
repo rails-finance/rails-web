@@ -46,7 +46,7 @@ const POSITION_PAGE: InfoView = {
         The top card shows what the wallet supplied, what it owes and its health factor, read now from the market&apos;s
         pool contract, the smart contract that holds its supplied assets.
       </li>
-      <li>The timeline lists the account&apos;s events, newest first.</li>
+      <li>The timeline lists the position&apos;s events, newest first.</li>
     </ul>
   ),
 };
@@ -131,8 +131,8 @@ export function AaveV3InfoPage({ deployment }: { deployment: AaveV3InfoDeploymen
       tracks={
         <>
           {base
-            ? "The Rails Aave V3 explorer shows every account on Aave V3's Base market, whether still open or closed, and the full history of each one. It also shows the reserves of "
-            : "The Rails Aave V3 explorer shows the accounts on Arbitrum that Rails has read, with the full history of each one, and a wallet appears once someone opens it. It also shows the reserves of "}
+            ? "The Rails Aave V3 explorer shows every position on Aave V3's Base market, whether still open or closed, and the full history of each one. It also shows the reserves of "
+            : "The Rails Aave V3 explorer shows the positions on Arbitrum that Rails has read, with the full history of each one, and a wallet appears once someone opens it. It also shows the reserves of "}
           <Link href={base ? "/base/aave-v3/markets" : "/arbitrum/aave-v3/markets"} className={INLINE_LINK}>
             the {chain} market
           </Link>

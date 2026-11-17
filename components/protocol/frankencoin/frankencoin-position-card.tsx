@@ -26,6 +26,8 @@
 // the latest MintingUpdate absolutes) or `viewFromChain` (the live overlay,
 // the position's slots at head, the primary truth on the detail page).
 
+import { positionName } from "@/lib/shared/position-name";
+import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { ListingTag } from "@/components/shared/listing-tag";
 import { TokenFigure } from "@/components/shared/token-figure";
 import { useState, type ReactNode } from "react";
@@ -507,7 +509,9 @@ export function useFrankencoinCardSlots({
     ];
   }
 
-  const common = { status, heads, identity, notice, counters, outcome };
+  // The position's name: its contract (lib/shared/position-name.ts).
+  const name = positionName({ noun: POSITION_NOUN.frankencoin, id: v.position });
+  const common = { status, heads, identity, notice, counters, outcome, name };
   if (!detail) return { ...common, surface: "listing", menu: null, tag };
 
   const menu: PositionCardMenu = {

@@ -26,12 +26,28 @@ import type { SlipstreamDeployment } from "@/lib/aerodrome/types";
 import { POSITION_PAGE } from "@/lib/aerodrome/words";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { explorerHref } from "@/lib/shared/protocols";
+import { marketPair } from "@/lib/shared/position-name";
 
 /** One read per request: the metadata and the page share it. */
 export const loadAerodromePosition = cache(
   (deployment: SlipstreamDeployment, id: string, site: SlipstreamSite = AERODROME) =>
     fetchAerodromePosition(deployment, id, site),
 );
+
+/** The position's pair for its tab title, as its card's name gives it
+ *  (lib/shared/position-name.ts), off the read the page makes; undefined where
+ *  the read did not answer, and the tab names the id alone. */
+export async function aerodromeTabMarket(
+  deployment: string,
+  id: string,
+  site: SlipstreamSite = AERODROME,
+): Promise<string | undefined> {
+  if (!isSiteDeployment(site, deployment) || !isPositionId(id)) return undefined;
+  const answer = await loadAerodromePosition(deployment, id, site).catch(() => null);
+  if (answer?.kind !== "ok") return undefined;
+  const p = aeroPosition(answer.data);
+  return marketPair(p.base.symbol, p.quote.symbol);
+}
 
 export async function AerodromePositionPage({
   deployment,

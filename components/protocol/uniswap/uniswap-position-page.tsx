@@ -21,6 +21,7 @@ import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { uniExplorer, type UniChainId, type UniProtocol } from "@/lib/uniswap/deployments";
 import { poolPosition } from "@/lib/uniswap/position";
+import { marketPair } from "@/lib/shared/position-name";
 import { cardProv } from "@/lib/uniswap/provenance";
 import type { Provenance } from "@/components/shared/provenance";
 import { UnansweredLine } from "@/components/shared/unanswered-line";
@@ -34,6 +35,22 @@ export const loadUniswapPosition = cache(
 );
 
 export const isPositionId = (id: string): boolean => /^\d{1,78}$/.test(id);
+
+/** The position's pair for its tab title, as its card's name gives it
+ *  (lib/shared/position-name.ts), off the read the page makes; undefined where
+ *  the read did not answer, and the tab names the id alone. */
+export async function uniswapTabMarket(
+  version: UniswapVersion,
+  id: string,
+  protocol: UniProtocol = "uniswap",
+  chainId: UniChainId = 1,
+): Promise<string | undefined> {
+  if (!isPositionId(id)) return undefined;
+  const answer = await loadUniswapPosition(version, id, protocol, chainId).catch(() => null);
+  if (answer?.kind !== "ok") return undefined;
+  const p = poolPosition(answer.data, protocol);
+  return marketPair(p.base.symbol, p.quote.symbol);
+}
 
 /** The top row's price strip for a pool position: its worth first, then the pool's price, quote per
  *  base, flipped where that reads below 0.001. Aerodrome's page draws it too. */
