@@ -45,15 +45,14 @@ const B = "b";
 
 type Grains = { collateral: number; debt: number };
 
-/** Each side's "price", its grain, every day; a day the page read from a
- *  day row carries that row's last block, so its receipt names the block. */
-function sidePrices(firstDay: number, endDay: number, G: Grains, blocks?: Map<number, number>) {
+/** Each side's "price", its grain, every day: a unit factor, so it names
+ *  no block. */
+function sidePrices(firstDay: number, endDay: number, G: Grains) {
   const a: DayObs[] = [];
   const b: DayObs[] = [];
   for (let d = firstDay; d <= endDay; d++) {
-    const block = blocks?.get(d);
-    a.push(block != null ? [d, G.collateral, block] : [d, G.collateral]);
-    b.push(block != null ? [d, G.debt, block] : [d, G.debt]);
+    a.push([d, G.collateral]);
+    b.push([d, G.debt]);
   }
   return { [A]: a, [B]: b };
 }
@@ -217,8 +216,6 @@ function depositTimeline(
     last: { deposit: bigint; stash: bigint };
     scale: Grains;
     G: Grains;
-    /** The block of each day row's last operation, where the page read day rows. */
-    blocks?: Map<number, number>;
   },
   o: { open: boolean; now: DepositNow | null; nowSec: number },
 ): FlowTimeline {
@@ -257,7 +254,7 @@ function depositTimeline(
       ...(pending.length ? { pending } : {}),
     },
     todayPrices: { [A]: G.collateral, [B]: G.debt },
-    dailyPrices: sidePrices(firstDay, endDay, G, at.blocks),
+    dailyPrices: sidePrices(firstDay, endDay, G),
     seriesCarry: true,
     today: o.open ? today : endDay,
     labels: { collateral: `${s} deposit`, debt: "pETH paid in" },
@@ -359,7 +356,6 @@ export function depositFlowsFromDays(
       last: { deposit: big(lastRow.deposit), stash: big(lastRow.stash) },
       scale,
       G,
-      blocks: new Map(rows.map((r) => [r.day, Number(r.last_block)])),
     },
     o,
   );

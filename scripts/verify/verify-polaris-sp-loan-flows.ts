@@ -30,6 +30,7 @@ import type {
   PolarisLoanEventRow,
 } from "@/lib/sources/api/polaris-sp-loans";
 import { DEFAULT_HUES, fillStyle, sumSwatch } from "@/components/shared/lifetime-flows-tip";
+import { lifetimeFlowsBarsContent } from "@/lib/shared/learn-more-content";
 
 const FIX = join(process.cwd(), "scripts/verify/fixtures");
 const deposit = JSON.parse(readFileSync(join(FIX, "polaris-sp-deposit-35.json"), "utf8")) as {
@@ -170,4 +171,16 @@ test("the default hues draw a debt's green as the literals did", () => {
   );
   assert.deepEqual(fillStyle("collateral", { fill: "held" }), { background: "var(--color-blue-500)" });
   assert.deepEqual(sumSwatch("debt")({ fill: "out" } as never), fillStyle("debt", { fill: "out" }, DEFAULT_HUES));
+});
+
+test("the bars' how-to-read names each bar by its hue and its own label", () => {
+  const t = depositFlows("usdp", deposit.rows, { open: false, now: null, nowSec: 20_774 * 86_400 })!.timeline;
+  const words = lifetimeFlowsBarsContent({
+    collateral: { hue: "Blue", label: t.labels!.collateral },
+    debt: { hue: "Violet", label: t.labels!.debt },
+  });
+  assert.ok(words.intro!.startsWith("Blue is the USDp deposit, violet the pETH paid in. "), words.intro);
+  assert.ok(lifetimeFlowsBarsContent().intro!.startsWith("Blue is the collateral, green the debt. "));
+  // A grain is a unit factor: no block on the deposit's series.
+  assert.ok(t.dailyPrices!.a.every((o) => o.length === 2));
 });

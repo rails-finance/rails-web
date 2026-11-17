@@ -17,9 +17,9 @@ export function lifetimeFlowsBarsContent(
    *  (a Polaris deposit's pETH paid in, in violet). */
   sides?: { collateral: { hue: string; label: string }; debt: { hue: string; label: string } },
 ): LearnMoreContent {
-  const lc = (w: string) => w.charAt(0).toLowerCase() + w.slice(1);
+  // The hue words are cased; the labels are the bars' own ("USDp deposit").
   const which = sides
-    ? `${sides.collateral.hue} is the ${lc(sides.collateral.label)}, ${lc(sides.debt.hue)} the ${lc(sides.debt.label)}.`
+    ? `${sides.collateral.hue} is the ${sides.collateral.label}, ${sides.debt.hue.toLowerCase()} the ${sides.debt.label}.`
     : "Blue is the collateral, green the debt.";
   return {
     title: "How to read the bars",
