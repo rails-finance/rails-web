@@ -4,6 +4,7 @@
 // 236): the branch, the Trove id and its holder linked to the deployment's
 // listing, then the shared rows.
 
+import { liquityForkHolder } from "@/lib/liquity/trove-holder";
 import type { EventPageSlot, ExplorerAdapter } from "@/lib/shared/explorer-adapter";
 import { listingHrefForWallet } from "@/lib/shared/protocols";
 import { formatDateLong } from "@/lib/date";
@@ -27,7 +28,7 @@ const NAMES: Record<LiquityForkDeployment, string> = {
   ebisu: "Ebisu",
 };
 
-const BURN = "0x0000000000000000000000000000000000000000";
+export { liquityForkHolder };
 
 const WORDS = {
   timeline_link: "See the whole history in the timeline.",
@@ -43,16 +44,6 @@ const WORDS = {
 };
 
 const short = (hex: string) => (hex.length > 12 ? `${hex.slice(0, 6)}…${hex.slice(-4)}` : hex);
-
-/** The Trove's holder: the owner, or the last owner once the Trove is closed
- *  (a closed Trove's owner is null or the burn address). */
-export function liquityForkHolder(trove: { owner?: string | null; lastOwner?: string | null } | null): {
-  address: string | null;
-  last: boolean;
-} {
-  if (trove?.owner && trove.owner.toLowerCase() !== BURN) return { address: trove.owner, last: false };
-  return { address: trove?.lastOwner ?? null, last: true };
-}
 
 export interface LiquityForkEventPageInput extends EventPageSlot {
   deployment: LiquityForkDeployment;

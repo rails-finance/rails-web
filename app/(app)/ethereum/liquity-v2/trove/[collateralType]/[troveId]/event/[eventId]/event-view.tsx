@@ -20,13 +20,13 @@ import { liquityDailyBranch, useLiquityDailyPrices } from "@/hooks/useLiquityDai
 import { useLiquityCollSurplus } from "@/hooks/useLiquityCollSurplus";
 import { useBranchShutdown } from "@/hooks/useBranchShutdown";
 import { useWalletContext } from "@/components/nav/wallet-context";
-import { eventPagePlace, troveHolder } from "@/lib/liquity/event-page";
+import { eventPagePlace, troveChangedHands, troveHolder } from "@/lib/liquity/event-page";
 import { liquityV2Explorer } from "@/lib/liquity/explorer";
 import { LiquityEventCard } from "@/components/protocol/liquity/liquity-event-card";
 import { LiquityEventTitle } from "@/components/protocol/liquity/liquity-head";
 import { LiquityTroveMetaContext } from "@/components/protocol/liquity/event-prose-render";
 import { CollSurplusCtx } from "@/components/protocol/liquity-family/coll-surplus-context";
-import { collateralPriceInfo, closingPriceInfo, LastOwnerPrefix } from "@/lib/liquity/trove-page-words";
+import { collateralPriceInfo, closingPriceInfo, LastHolderPrefix } from "@/lib/liquity/trove-page-words";
 import { troveWords } from "@/lib/liquity/event-templates";
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
@@ -67,7 +67,7 @@ export default function EventView({
   const trovePath = `/ethereum/liquity-v2/trove/${collateralType}/${troveId}`;
   const eventPath = (id: string) => `${trovePath}/event/${encodeURIComponent(id)}`;
 
-  const holder = troveHolder(trove);
+  const holder = troveHolder(trove, troveChangedHands(events ?? []));
   const owner = holder.address ?? undefined;
   const { setWallets } = useWalletContext();
   useEffect(() => {
@@ -178,7 +178,7 @@ export default function EventView({
           owner={{
             wallet: owner,
             ensName: trove.ownerEns ?? null,
-            prefix: owner && owner !== trove.owner ? <LastOwnerPrefix /> : undefined,
+            prefix: owner && holder.last ? <LastHolderPrefix /> : undefined,
           }}
           assets={stripAssets}
           closed={!open}
