@@ -444,6 +444,8 @@ export function useAaveV3EventBody({
   };
   // The rows behind a swap, and the netted leg: lines under the grid.
   const extras: ChainTruthStat[] = [];
+  // A CoW swap's surplus and fee lines: their own block under the grid (T2.3).
+  const cowLines: ChainTruthStat[] = [];
   const sym = ctx.reserveSymbol ?? "—";
 
   if (ctx.eventType === "liquidation") {
@@ -556,7 +558,7 @@ export function useAaveV3EventBody({
     // A supply from a swap lists what it sold before the balance it supplied (D2).
     for (const leg of s.kind === "supply_from_swap" ? [received, given] : [given, received]) push(leg);
     // A CoW settlement's surplus and fees (server mig 481): two lines, never added together.
-    if (blockNumber != null && txHash) for (const line of cowSwapLines(s, { block: blockNumber, txHash })) push(line);
+    if (blockNumber != null && txHash) cowLines.push(...cowSwapLines(s, { block: blockNumber, txHash }));
     // Where a leftover nets into a leg (§15 D4), every row behind the figures
     // above is listed with its own amount.
     // A collateral leg netted by a leftover states the net beside its rows:
@@ -897,6 +899,7 @@ export function useAaveV3EventBody({
   const notes = (
     <>
       {shownLines.length > 0 && <EventRowLines rows={shownLines} />}
+      {cowLines.length > 0 && <EventRowLines rows={cowLines} anatomy="T2.3" />}
       {state?.status === "unavailable" && (
         <div
           className="px-5 pb-2 text-sm text-rb-500"
@@ -982,9 +985,9 @@ function cowSwapLines(s: AaveV3SwapDetail, coords: CowCoords): ChainTruthStat[] 
 
 /** The amounts behind an event that are not a balance (a swap's bought token,
  *  the rows a swap merged): one line each, the figure with its receipt. */
-function EventRowLines({ rows }: { rows: ChainTruthStat[] }) {
+function EventRowLines({ rows, anatomy }: { rows: ChainTruthStat[]; anatomy?: string }) {
   return (
-    <div className="space-y-1 px-5 pb-2 text-sm" data-event-row-lines="">
+    <div className="space-y-1 px-5 pb-2 text-sm" data-event-row-lines="" data-anatomy={anatomy}>
       {rows.map((r, i) => (
         <div key={i} className="text-rb-500" data-event-row-line="" {...r.rowData}>
           {r.label}{" "}

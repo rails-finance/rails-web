@@ -34,7 +34,7 @@ export function CowSurplusLines({
   const exact = view.token.decimals == null ? view.surplus : shiftRaw(view.surplus, view.token.decimals);
   const text = view.token.decimals == null ? `${view.surplus} (raw)` : fmtPositionAmount(Number(exact));
   return (
-    <div className="space-y-1 px-5 pb-2 text-sm" data-event-row-lines="">
+    <div className="space-y-1 px-5 pb-2 text-sm" data-event-row-lines="" data-anatomy="T2.3">
       {!feeOnly && (
         <div className="text-rb-500" data-event-row-line="" data-cow-surplus={view.kind}>
           {cowSurplusLabel(view.kind, view.route)}{" "}
