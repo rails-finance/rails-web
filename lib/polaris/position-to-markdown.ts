@@ -34,7 +34,9 @@ import {
   marketNoteReceiptLine,
   marketNoteRowAnnotation,
   marketNoteSentence,
+  formatRatePercent,
   mergePsmGapRanges,
+  RATE_STEP_MIN_PP,
   type MarketNote,
 } from "@/lib/shared/market-note";
 
@@ -233,7 +235,12 @@ export function polarisPositionToMarkdown(args: PolarisPositionMarkdownArgs): st
   lines.push(`- **Events:** ${events.length}`);
   lines.push("");
 
-  lines.push(...marketNotesSection(allNotes));
+  lines.push(
+    ...marketNotesSection(
+      allNotes,
+      missingRateNotes(events, chain, view.status === "open", args.notes ?? [], args.liveNotes ?? []),
+    ),
+  );
   lines.push(...liquidationForensicsSection(events, view.market, stable));
   lines.push(...timelineTable(events, stable, anchoredNotes));
   return lines.join("\n");
@@ -297,9 +304,10 @@ function marketNotesLine(notes: MarketNote[]): string | null {
 /** The notes' own section: one paragraph each, with the two touches (and, when
  *  observed, the PrimaryRateSet log) the fact was read from. Placed before the
  *  timeline table. */
-function marketNotesSection(notes: MarketNote[]): string[] {
-  if (notes.length === 0) return [];
+function marketNotesSection(notes: MarketNote[], missing: string[]): string[] {
+  if (notes.length === 0 && missing.length === 0) return [];
   const out: string[] = ["## Market notes", ""];
+  if (notes.length === 0) return [...out, ...missing.flatMap((l) => [l, ""])];
   out.push(
     "Each note is a receipted fact about the market this position borrows in, observed between two of the position's own " +
       "touches and stated between them, or between its last touch and the chain head for a live note. A note is " +
@@ -322,6 +330,48 @@ function marketNotesSection(notes: MarketNote[]): string[] {
     out.push(marketNoteReceiptLine(n));
     out.push("");
   }
+  for (const l of missing) out.push(l, "");
+  return out;
+}
+
+/** Why a rate note the section could hold is not in it (ui-jobs 693): no
+ *  touch carries the market's primary rate, the rate never moved enough
+ *  between touches, or the live read did not answer or saw no move. The
+ *  section states each instead of dropping out. */
+function missingRateNotes(
+  events: BaseActivityEvent[],
+  chain: PolarisChainResponse | null,
+  open: boolean,
+  notes: readonly MarketNote[],
+  liveNotes: readonly MarketNote[],
+): string[] {
+  const touches = events.filter(isPolarisEvent).filter((e) => e.context.data.eventType !== "transfer");
+  const rated = touches.filter((e) => e.context.data.primaryRate != null);
+  const out: string[] = [];
+  if (touches.length > 0 && rated.length === 0)
+    out.push(
+      touches.length === 1
+        ? "This position opened before the market set its first primary rate, so there is no rate at open to compare."
+        : "Every touch on this position came before the market set its first primary rate, so no touch carries a rate to compare.",
+    );
+  else if (rated.length === 1)
+    out.push(
+      "Only one of this position's touches carries the market's primary rate, so no two touches can be compared.",
+    );
+  else if (rated.length > 1 && !notes.some((n) => n.kind === "rate-step"))
+    out.push(
+      `Between this position's touches the market's primary rate never moved by ${RATE_STEP_MIN_PP} percentage point or more.`,
+    );
+  if (!open) return out;
+  // The page's live-note gate (position-view.tsx): a fresh head read of an
+  // open position, with a price.
+  const answered = chain != null && !chain.chainStale && chain.isOpen && chain.price != null;
+  if (!answered) out.push("The live read was unavailable, so this snapshot carries no live rate note.");
+  else if (rated.length > 0 && !liveNotes.some((n) => n.kind === "rate-step"))
+    out.push(
+      `At the latest block ${chain.blockNumber.toLocaleString("en-US")} the market's primary rate is ` +
+        `${formatRatePercent(chain.primaryRate)} per year, unchanged to two places since this position's last touch.`,
+    );
   return out;
 }
 

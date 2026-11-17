@@ -1,7 +1,8 @@
 // lib/polaris/position-to-markdown.ts — the Polaris "Copy for LLM" export:
 // each PSM gap is stated once, gaps that meet end to end merge into one note
 // over their block range, and the id line names the market (rails-ops
-// ui-jobs 692).
+// ui-jobs 692); the Market notes section says why a rate note is missing
+// instead of dropping out (ui-jobs 693).
 // Run: npm test
 //
 // The exporter imports through `@/`, so this file resolves `@/` and
@@ -163,4 +164,85 @@ test("the timeline row points at the section instead of restating the note", () 
 test("the id line names the market", () => {
   const md = exportOf(EVENTS);
   assert.ok(md.includes("- **Position id:** GOLDp #20\n"));
+});
+
+// ── ui-jobs 693 ──────────────────────────────────────────────────────────────
+
+const OPEN_VIEW = {
+  ...VIEW,
+  status: "open",
+  coll: 10,
+  debt: 1000,
+  collUsd: null,
+  recordedDebt: 1000,
+  icr: null,
+  mcr: 1.15,
+};
+
+/** A head read of an open CDP with a price, at block 900. */
+const CHAIN = {
+  market: "goldp",
+  cdpId: "20",
+  blockNumber: 900,
+  blockTimestamp: 1_760_100_000,
+  owner: VIEW.owner,
+  isOpen: true,
+  recordedColl: 10,
+  recordedDebt: 1000,
+  entireColl: 10,
+  entireDebt: 1000,
+  accruedInterest: 0,
+  accruedStables: 0,
+  bcTokenGain: 0,
+  mintRedeemCollChange: 0,
+  mintRedeemDebtChange: 0,
+  icr: 2,
+  lastTouchTime: 0,
+  interestRate: 0.06,
+  primaryRate: 0.05,
+  secondaryRate: 0.01,
+  defensiveMode: false,
+  reserveToDebtRatio: 1,
+  mcr: 1.15,
+  defensiveMcr: 1.5,
+  price: { curve: 1, ethUsd: 3000, xauUsd: 2500, pethInDebt: 1.2, pethUsd: 3000 },
+  chainStale: false,
+};
+
+/** The Market notes section, or null when the export has none. */
+const notesSection = (md) => {
+  const m = /## Market notes\n([\s\S]*?)\n## /.exec(md);
+  return m ? m[1] : null;
+};
+
+test("a position that predates the market's first rate says so", () => {
+  const md = exportOf([touch(1, 100, { type: "open", rate: null })]);
+  assert.equal(
+    notesSection(md)?.trim(),
+    "This position opened before the market set its first primary rate, so there is no rate at open to compare.",
+  );
+});
+
+test("an open position whose live read did not answer says the live read was unavailable", () => {
+  const unrated = [touch(1, 100, { type: "open", rate: null })];
+  for (const chain of [null, { ...CHAIN, chainStale: true }, { ...CHAIN, price: null }]) {
+    const section = notesSection(exportOf(unrated, { view: OPEN_VIEW, chain }));
+    assert.match(section, /opened before the market set its first primary rate/);
+    assert.match(section, /The live read was unavailable, so this snapshot carries no live rate note\./);
+  }
+  const rated = [touch(1, 100, { type: "open" }), touch(2, 200)];
+  const section = notesSection(exportOf(rated, { view: OPEN_VIEW, chain: null }));
+  assert.match(section, /never moved by 1 percentage point or more\./);
+  assert.match(section, /The live read was unavailable/);
+});
+
+test("a live read with no move states the rate at the head", () => {
+  const rated = [touch(1, 100, { type: "open" })];
+  const section = notesSection(exportOf(rated, { view: OPEN_VIEW, chain: CHAIN, liveNotes: [] }));
+  assert.match(section, /Only one of this position's touches carries the market's primary rate/);
+  assert.match(
+    section,
+    /At the latest block 900 the market's primary rate is 5\.00% per year, unchanged to two places/,
+  );
+  assert.doesNotMatch(section, /live read was unavailable/);
 });
