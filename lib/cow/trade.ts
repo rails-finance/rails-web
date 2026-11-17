@@ -179,12 +179,11 @@ export function checkpointProv(asOf: { block: number }): Provenance {
   };
 }
 
-/** The settlement's other trades, in words. */
+/** The settlement's size, in words: the count matches the settlement panel's. */
 export function settlementWords(t: CowTrade): string {
-  const others = t.settlementTrades - 1;
-  return others <= 0
+  return t.settlementTrades < 2
     ? "Settled alone"
-    : `Settled with ${others.toLocaleString("en-US")} other ${others === 1 ? "trade" : "trades"}`;
+    : `One of ${t.settlementTrades.toLocaleString("en-US")} trades in this settlement`;
 }
 
 /** A count over the wallet's `Trade` logs at the checkpoint block: its trades,
