@@ -279,11 +279,23 @@ placeholders:
   left:
     rounding: spoke_amount
     means: |-
-      What the position withdrew or borrowed beyond what the Trade sold: the flash-loan fee and the refund to the wallet together.
+      What the position withdrew or borrowed beyond what the Trade sold.
   left_symbol:
     rounding: text
     means: |-
       The symbol of what the position withdrew or borrowed.
+  returned:
+    rounding: spoke_amount
+    means: |-
+      A buy order's surplus: what the order did not spend of the sell amount it signed, sent back to the wallet.
+  flash_fee:
+    rounding: spoke_amount
+    means: |-
+      The premium in the lender's FlashLoan log: the flash-loan fee.
+  lender:
+    rounding: text
+    means: |-
+      The flash loan's lender, by name ("Aave V3") or short address.
   supplies:
     rounding: text
     means: |-
@@ -996,9 +1008,19 @@ templates:
           A CoW Protocol settlement sold the {sold_symbol} for {bought} {bought_symbol}; the other {topup} {bought_symbol} came from the owner's wallet.
       swap.gap:
         when: |-
-          the position withdrew or borrowed more than the order sold, by over 0.1%
+          the position withdrew or borrowed more than the order sold, by over 0.1%, and Rails has read no refund of it
         text: |-
-          Of the {left} {left_symbol} the order left unsold, Aave V3 took a flash-loan fee and the wallet got the rest.
+          The order left {left} {left_symbol} unsold.
+      swap.gap_refund:
+        when: |-
+          a buy order (debt_swap, repay_with_collateral or leverage) whose settlement Rails has read, with no flash-loan fee read; in place of swap.gap
+        text: |-
+          The order left {left} {left_symbol} unsold; {returned} of it came back to the wallet as a refund.
+      swap.gap_split:
+        when: |-
+          as swap.gap_refund, where the receipt's flash loan carried a premium (read from the lender's FlashLoan log)
+        text: |-
+          Of the {left_symbol} left unsold, {returned} returned to the wallet and {flash_fee} paid {lender}'s flash-loan fee.
       swap.supplies:
         when: |-
           collateral_swap
@@ -1020,6 +1042,8 @@ templates:
         swap.route,
         swap.route_topped,
         swap.gap,
+        swap.gap_refund,
+        swap.gap_split,
         swap.supplies,
         swap.owes,
         hf.cleared,
@@ -1028,11 +1052,12 @@ templates:
       ]
     groups:
       happened: [swap.collateral, swap.debt, swap.repay, swap.leverage, swap.collateral_topped, swap.leverage_topped]
-      adds_up: [swap.route, swap.route_topped, swap.gap]
+      adds_up: [swap.route, swap.route_topped, swap.gap, swap.gap_refund, swap.gap_split]
       leaves: [swap.supplies, swap.owes, hf.cleared, hf.at_line, hf.close]
     alternates:
       - [swap.collateral, swap.debt, swap.repay, swap.leverage, swap.collateral_topped, swap.leverage_topped]
       - [swap.route, swap.route_topped]
+      - [swap.gap, swap.gap_refund, swap.gap_split]
       - [swap.supplies, swap.owes, hf.cleared]
       - [hf.at_line, hf.close]
 

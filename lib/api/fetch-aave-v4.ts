@@ -102,11 +102,16 @@ export async function fetchAaveV4Timeline({
     done(false);
     throw new Error(`fetchAaveV4Timeline failed: ${res.status} ${res.statusText}`);
   }
-  const json = (await res.json()) as FetchAaveV4TimelineResult;
+  let json = (await res.json()) as FetchAaveV4TimelineResult;
   done(true);
   if (process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_AAVE_V4_SWAPS_FIXTURE === "1") {
     const { applyDevSwapsFixture } = await import("@/lib/aave-v4/dev-swaps-fixture");
-    return applyDevSwapsFixture(wallet, json);
+    json = applyDevSwapsFixture(wallet, json);
+  }
+  // DEV ONLY: the CoW surplus figures of ten fixture swaps (lib/cow/dev-surplus-fixture.ts).
+  if (process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_COW_SURPLUS_FIXTURES === "1") {
+    const { applyDevCowToV4 } = await import("@/lib/cow/dev-surplus-fixture");
+    json = applyDevCowToV4(json);
   }
   return json;
 }

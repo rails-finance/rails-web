@@ -67,7 +67,7 @@ import { notTheirs, type TxEntry } from "@/lib/shared/tx-entry";
 import { fetchAddressKind } from "@/lib/api/fetch-address-kind";
 import type { ChainId } from "@/lib/shared/chains";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
-import { barSubjectProv, type BarAccountKind } from "@/lib/shared/bar-provenance";
+import { barSubjectProv, type BarAccountKind, type CowTradeEvidence } from "@/lib/shared/bar-provenance";
 
 type Declared = TimelineEntryDeclaration & { wallet: string };
 
@@ -79,6 +79,10 @@ export interface TimelineEntryDeclaration {
   entry?: TxEntry;
   wallet?: string;
   txHash?: string;
+  /** A swap paired on a CoW Trade log (Aave V3 routes cow_permit and cow_adapter, every Aave V4 swap): the row
+   *  declares CoW's settlement as its subject, whatever contract the transaction entered, and the receipt names
+   *  the Trade log. */
+  cowTrade?: CowTradeEvidence;
 }
 
 type DeclareEntry = (eventId: string, d: Declared) => () => void;
@@ -93,10 +97,13 @@ export function useTimelineEntry(eventId: string | undefined, d: TimelineEntryDe
   const { to, contract, account, from } = d.entry ?? {};
   const wallet = d.wallet?.toLowerCase();
   const txHash = d.txHash;
+  const orderUid = d.cowTrade?.orderUid;
+  const owner = d.cowTrade?.owner;
   useEffect(() => {
     if (!declare || !eventId || !wallet || (!address && !from && !txHash)) return;
     return declare(eventId, {
       wallet,
+      ...(orderUid ? { cowTrade: { orderUid, ...(owner ? { owner } : {}) } } : {}),
       ...(address ? { address } : {}),
       ...(txHash ? { txHash } : {}),
       ...(to
@@ -110,7 +117,7 @@ export function useTimelineEntry(eventId: string | undefined, d: TimelineEntryDe
           }
         : {}),
     });
-  }, [declare, eventId, address, to, contract, account, from, wallet, txHash]);
+  }, [declare, eventId, address, to, contract, account, from, wallet, txHash, orderUid, owner]);
 }
 
 /** The bar subject a row's declaration names on a chain, or undefined (the
@@ -311,6 +318,7 @@ function SubjectStretches({
                 txHash: d.txHash,
                 chainId,
                 accountKind,
+                cowTrade: d.cowTrade,
               })
             : null;
         if (!info) return null;
