@@ -30,7 +30,7 @@ import {
 } from "@/lib/shared/protocols";
 import { CHAINS, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { RAILS_X_AT } from "@/lib/shared/social";
-import { shortPositionId, spacePair } from "@/lib/shared/position-name";
+import { positionTitle } from "@/lib/shared/position-name";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 
 // Canonical base URL. NEXT_PUBLIC_SITE_URL wins (set per Vercel project);
@@ -191,16 +191,17 @@ const isAddress = (s: string) => /^0x[a-fA-F0-9]{40}$/.test(s);
 
 /** Truncate an address-shaped subject to 6+4 with a Unicode ellipsis; anything
  *  else passes through. The share cards (lib/share/) and wallet titles use it;
- *  a position's tab title goes through `shortPositionId`
- *  (lib/shared/position-name.ts), which writes an address the same way and also
- *  cuts a long numeric id. */
+ *  a position's tab title goes through `positionTitle`
+ *  (lib/shared/position-name.ts), whose shortener writes an address the same
+ *  way and also cuts a long numeric id. */
 export function shortSubject(s: string): string {
   return isAddress(s) ? `${s.slice(0, 6)}…${s.slice(-4)}` : s;
 }
 
-/** Per-position page title — "Rails | <protocol> <noun> <subject>". `market` is an optional
- *  segment between the protocol and its noun ("USDC" → "Compound V3 USDC
- *  Position 0x…"). `canonicalPath` is this route's path (e.g. "/ethereum/makerdao/31245").
+/** Per-position page title — "Rails | <explorer> · <market> · <Noun> <id>", the
+ *  position's name with the explorer in front (`positionTitle`, ui-jobs 703):
+ *  "Rails | Compound V3 · cUSDCv3 · Account 0xd51c…519c"; with no `market`,
+ *  "Rails | Aave V3 on Arbitrum · Position 0x2012…98db". `canonicalPath` is this route's path (e.g. "/ethereum/makerdao/31245").
  *  MUST be called from a server `layout.tsx` (position `page.tsx` files are
  *  "use client" and cannot export metadata). */
 export function positionMetadata(opts: {
@@ -220,9 +221,7 @@ export function positionMetadata(opts: {
   // words ("Aave V3 on Base Position 0x…"); Ethereum stays unsaid.
   const label = entry ? explorerName(entry) : "Rails";
   const noun = POSITION_NOUN[opts.session];
-  const title = [label, opts.market && spacePair(opts.market), noun.toLowerCase(), shortPositionId(opts.subject)]
-    .filter(Boolean)
-    .join(" ");
+  const title = positionTitle(label, { market: opts.market, noun, id: opts.subject });
   // The description leads with Rails for the same reason the title carries
   // the prefix: a preview that shows only title + description must say whose
   // page this is, and "every event of this Moonwell position…" on its own
@@ -312,7 +311,7 @@ export function decodeEventId(raw: string): string {
   }
 }
 
-/** Per-EVENT page title — "<explorer> <noun> <subject> · <verb>", beside
+/** Per-EVENT page title — "<explorer> · <market> · <Noun> <id> · <verb>", beside
  *  `positionMetadata`. `event` is what the caller's server loader found for
  *  this id (already decoded, already looked up in the tail the page itself
  *  awaits) — `null`/`undefined` when it could not be read in time (an older
@@ -345,9 +344,7 @@ export function eventMetadata(opts: {
   const entry = protocolForSession(opts.session);
   const label = entry ? explorerName(entry) : "Rails";
   const noun = POSITION_NOUN[opts.session];
-  const base = [label, opts.market && spacePair(opts.market), noun.toLowerCase(), shortPositionId(opts.subject)]
-    .filter(Boolean)
-    .join(" ");
+  const base = positionTitle(label, { market: opts.market, noun, id: opts.subject });
   const title = opts.event ? `${base} · ${opts.event.actionLabel}` : base;
   const description = opts.description
     ? opts.description

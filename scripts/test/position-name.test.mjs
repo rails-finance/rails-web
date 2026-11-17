@@ -4,7 +4,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const { shortPositionId, listingTagId, marketPair, spacePair, positionName } = await import(
+const { shortPositionId, listingTagId, marketPair, spacePair, positionName, positionTitle } = await import(
   "../../lib/shared/position-name.ts"
 );
 
@@ -65,4 +65,23 @@ test("the joined name", () => {
     "Position 0x3df8…67da",
   );
   assert.equal(positionName({ market: "", noun: "Account", id: "5" }).market, undefined);
+});
+
+test("the tab title is the explorer, then the name", () => {
+  const t1 = positionTitle("MakerDAO", { market: "LRC-A", noun: "Vault", id: "21264" });
+  const t2 = positionTitle("Compound V3", {
+    market: "cUSDCv3",
+    noun: "Account",
+    id: "0xd51c5283b8727206bf9be2b2db4e5673efaf519c",
+  });
+  const t3 = positionTitle("Aave V3 on Arbitrum", {
+    noun: "Position",
+    id: "0x2012395e71a4af2e621d522b175f6c29232398db",
+  });
+  console.log(`# titles: ${t1} | ${t2} | ${t3}`);
+  assert.equal(t1, "MakerDAO · LRC-A · Vault #21264");
+  assert.equal(t2, "Compound V3 · cUSDCv3 · Account 0xd51c…519c");
+  // No market, no empty piece.
+  assert.equal(t3, "Aave V3 on Arbitrum · Position 0x2012…98db");
+  assert.equal(positionTitle("Fluid", { market: "", noun: "Position", id: 7682 }), "Fluid · Position #7682");
 });

@@ -109,18 +109,15 @@ export function useSavedNameRefresh(name: string | undefined) {
   }, [pathname, name]);
 }
 
-/** The position's noun and short ID, from the page title the position's
- *  layout writes ("Rails | Aave V3 on Base position 0xfe28…5820" gives
- *  "Position 0xfe28…5820"; lib/shared/page-metadata.ts `positionMetadata`).
- *  The card's identity rarely carries the ID; the title always does. */
-function positionSubject(protocol: string | undefined): string {
-  let t = document.title.replace(/^Rails \| /, "");
-  if (protocol && t.startsWith(protocol))
-    t = t
-      .slice(protocol.length)
-      .replace(/^ on \S+/, "")
-      .trim();
-  return t ? t[0].toUpperCase() + t.slice(1) : "";
+/** The position's name from the page title the position's page writes,
+ *  "<explorer> · <market> · <Noun> <id>" (lib/shared/page-metadata.ts
+ *  `positionMetadata`): the explorer piece is dropped, the rest kept ("Rails |
+ *  Aave V3 on Base · Position 0xfe28…5820" gives "Position 0xfe28…5820"). For a
+ *  card with no `name` slot; the card's identity rarely carries the ID, the
+ *  title always does. */
+function positionSubject(): string {
+  const pieces = document.title.replace(/^Rails \| /, "").split(" · ");
+  return pieces.length > 1 ? pieces.slice(1).join(" · ") : "";
 }
 
 /** C17's "Save position" row (ui-jobs 530), after the family's identity rows.
@@ -154,11 +151,7 @@ export function SavePositionRow({
       item="save-position"
       onClick={() => {
         const place = placeOf(window.location.pathname);
-        const name =
-          familyName ??
-          [identityText(), positionSubject(protocolForPathname(window.location.pathname)?.label)]
-            .filter(Boolean)
-            .join(" · ");
+        const name = familyName ?? [identityText(), positionSubject()].filter(Boolean).join(" · ");
         toggleSavedLink({
           kind: "position",
           key,

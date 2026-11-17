@@ -64,3 +64,14 @@ export function positionName(parts: {
   const head = `${parts.noun} ${id}`;
   return { ...(market ? { market } : {}), noun: parts.noun, id, text: market ? `${market} · ${head}` : head };
 }
+
+/** A position's tab title (Miles, 17 Nov 2026, "tab as menu"): the explorer in
+ *  words, then the position's name, joined by " · ": "MakerDAO · LRC-A · Vault
+ *  #21264", "Aave V3 on Arbitrum · Position 0x2012…98db". The root template
+ *  adds "Rails | ". */
+export function positionTitle(
+  explorer: string,
+  parts: { market?: string | null; noun: string; id: string | number | bigint },
+): string {
+  return `${explorer} · ${positionName(parts).text}`;
+}

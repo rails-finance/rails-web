@@ -1298,7 +1298,7 @@ export function chainLaunchedIn(roster: readonly Pick<ProtocolEntry, "chainId" |
 }
 
 /** The singular noun each protocol's positions go by, for per-position page
- *  titles ("MakerDAO Vault 31245", "Spark Position 0x1a2b…c4d5"). Lives in the
+ *  titles ("MakerDAO · ETH-A · Vault #31245", "Spark · Position 0x1a2b…c4d5"). Lives in the
  *  roster module so a new explorer declares its noun here, not scattered across
  *  a title helper. Keyed on `SessionProtocol` (a closed union), so the `Record`
  *  makes a missing protocol a compile error. PWN carries "Loans" (plural): its
