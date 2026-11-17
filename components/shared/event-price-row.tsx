@@ -159,7 +159,10 @@ const GAS_UNIT_WORD: Record<GasUnit, string> = { usd: "USD", eth: "ETH" };
 
 /** The gas the owner paid: a fuel-pump icon and one figure, in USD or ETH. A
  *  press switches the unit, kept in the preferences so every card follows
- *  (ui-jobs 289). A cost with no USD figure reads in ETH. */
+ *  (ui-jobs 289). A cost with no USD figure reads in ETH alone and is plain
+ *  text: there is nothing to switch to. Where it is a button, the glyph and
+ *  figure hover as one; with the inspector armed the figure is a receipt
+ *  pick and the rest of the button keeps the press, as in ThenTodayChip. */
 export function EventGasButton({ gas }: { gas: EventGas }) {
   const { prefs, update } = usePreferences();
   const units = GAS_UNITS.filter((u) => u !== "usd" || gas.usd > 0);
@@ -172,11 +175,26 @@ export function EventGasButton({ gas }: { gas: EventGas }) {
         : `$${gas.usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
       : `${gas.eth < 0.001 ? gas.eth.toFixed(6) : gas.eth.toFixed(4)} ETH`;
   const line = gas.run != null ? `Gas across ${gas.run} transactions ${figure(unit)}` : `Gas ${figure(unit)}`;
-  const label = units.length > 1 ? `${line}, in ${GAS_UNIT_WORD[unit]}. Press for ${GAS_UNIT_WORD[next]}` : line;
+  const content = (
+    <>
+      <Fuel size={14} aria-hidden className="shrink-0" />
+      <span>
+        <Prov info={gas.info ?? gasReceipt(gas)}>{figure(unit)}</Prov>
+      </span>
+    </>
+  );
+  const base = "inline-flex min-h-6 items-center gap-1 rounded-md text-xs tabular-nums text-rb-500";
+  if (units.length < 2)
+    return (
+      <span role="group" className={base} aria-label={line} title={line} data-gas="" data-gas-unit={unit}>
+        {content}
+      </span>
+    );
+  const label = `${line}, in ${GAS_UNIT_WORD[unit]}. Press for ${GAS_UNIT_WORD[next]}`;
   return (
     <button
       type="button"
-      className="inline-flex min-h-6 cursor-pointer items-center gap-1 rounded-md text-xs tabular-nums text-rb-500 transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-blue-500"
+      className={`${base} cursor-pointer transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-blue-500`}
       aria-label={label}
       title={label}
       data-gas=""
@@ -187,10 +205,7 @@ export function EventGasButton({ gas }: { gas: EventGas }) {
       }}
       onKeyDown={(e) => e.stopPropagation()}
     >
-      <Fuel size={14} aria-hidden className="shrink-0" />
-      <span>
-        <Prov info={gas.info ?? gasReceipt(gas)}>{figure(unit)}</Prov>
-      </span>
+      {content}
     </button>
   );
 }
