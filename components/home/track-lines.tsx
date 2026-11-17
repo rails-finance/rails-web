@@ -11,12 +11,11 @@ const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffec
  * so it can stand on its own (on the home page, right under the hero).
  *
  * The draw-on animation is gated by its own `data-tracks-seen` flag on <html>,
- * SESSION-scoped (sessionStorage) unlike the hero's once-per-browser
- * localStorage gate: it plays on the first load of each visit, then stays
- * static across reloads and soft navigations within that session. The inline
- * blocking script in app/layout.tsx flips the attribute before paint on hard
- * loads; the layout effect below replays the gate on soft navigations and
- * stores the flag after the genuine first play.
+ * once per browser (localStorage, as the hero's): it plays on the first visit,
+ * then stays static on every later load. The inline blocking script in
+ * app/layout.tsx flips the attribute before paint on hard loads; the layout
+ * effect below replays the gate on soft navigations. The flag is stored when
+ * the draw starts, so a visitor who never scrolls down to it still gets it.
  *
  * The draw-on starts when the graphic scrolls into view: the lines are paused
  * in CSS until the wrapper carries `data-playing`, which an IntersectionObserver
@@ -37,14 +36,22 @@ export function TrackLines() {
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
-    if (typeof IntersectionObserver === "undefined") {
+    const play = () => {
       el.dataset.playing = "1";
+      try {
+        localStorage.setItem("rails-tracks-seen", "1");
+      } catch {
+        /* ignore */
+      }
+    };
+    if (typeof IntersectionObserver === "undefined") {
+      play();
       return;
     }
     const io = new IntersectionObserver(
       (entries) => {
         if (entries.some((e) => e.isIntersecting)) {
-          el.dataset.playing = "1";
+          play();
           io.disconnect();
         }
       },
@@ -56,10 +63,8 @@ export function TrackLines() {
 
   useIsomorphicLayoutEffect(() => {
     try {
-      if (sessionStorage.getItem("rails-tracks-seen")) {
+      if (localStorage.getItem("rails-tracks-seen")) {
         document.documentElement.dataset.tracksSeen = "1";
-      } else {
-        sessionStorage.setItem("rails-tracks-seen", "1");
       }
     } catch {
       /* ignore */
