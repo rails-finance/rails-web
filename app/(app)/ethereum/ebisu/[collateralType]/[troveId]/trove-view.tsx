@@ -520,13 +520,9 @@ export default function EbisuTroveDetail({
           session="ebisu"
           wallet={view?.owner ?? view?.lastOwner ?? null}
           owner={{
+            // No "last holder" prefix: this family's timeline carries no TroveNFT
+            // transfer rows, so a change of hands cannot be read (ui-jobs 702).
             wallet: view?.owner ?? view?.lastOwner ?? null,
-            prefix:
-              !view?.owner && view?.lastOwner ? (
-                <span className="text-rb-400" title="Last owner (trove closed)">
-                  last owner
-                </span>
-              ) : undefined,
           }}
           assets={stripAssets}
           closed={view != null && view.status !== "open"}

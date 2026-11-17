@@ -12,6 +12,7 @@ import {
   eventHeadingWords,
   eventPageDescription,
   holderName,
+  troveChangedHands,
   troveHolder,
   type EventPagePlace,
 } from "@/lib/liquity/event-page";
@@ -31,7 +32,7 @@ export interface LiquityEventPageInput {
 
 export const liquityV2Explorer: ExplorerAdapter<LiquityEventPageInput> = {
   eventPage: ({ collateralType, troveId, trove, place, currentPrice }) => {
-    const holder = troveHolder(trove);
+    const holder = troveHolder(trove, troveChangedHands(place.events));
     const ownerEns = trove.ownerEns ?? null;
     const path = (id: string) => liquityEventPath(collateralType, troveId, id);
     const timelineHref = `/ethereum/liquity-v2/trove/${collateralType}/${troveId}?at=${encodeURIComponent(place.event.id)}`;

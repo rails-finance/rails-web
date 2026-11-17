@@ -5,12 +5,13 @@
 // (content/liquity-v2/event-prose.yaml).
 
 import type { BaseActivityEvent } from "@/lib/shared/types/activity";
+import { troveChangedHands, troveHolder } from "@/lib/liquity/trove-holder";
 import { liquityTroveHistory } from "@/lib/liquity/event-prose-position";
 import { fillText, liquityEventProse } from "@/lib/liquity/event-prose";
 import { CONTEXT_WORDS, PAGE_WORDS } from "@/lib/liquity/event-templates";
 import { formatDateLong } from "@/lib/date";
 
-const BURN = "0x0000000000000000000000000000000000000000";
+export { troveChangedHands, troveHolder };
 
 type LiquityEvent = ReturnType<typeof liquityTroveHistory>[number];
 
@@ -47,16 +48,6 @@ export function eventPagePlace(
     n: offset + at + 1,
     total: totalEvents ?? events.length,
   };
-}
-
-/** The Trove's owner; a closed Trove's owner is the burn address, and its
- *  wallet is `lastOwner`. */
-export function troveHolder(trove: { owner?: string | null; lastOwner?: string | null } | null): {
-  address: string | null;
-  last: boolean;
-} {
-  if (trove?.owner && trove.owner.toLowerCase() !== BURN) return { address: trove.owner, last: false };
-  return { address: trove?.lastOwner ?? null, last: true };
 }
 
 const short = (hex: string) => (hex.length > 12 ? `${hex.slice(0, 6)}…${hex.slice(-4)}` : hex);
