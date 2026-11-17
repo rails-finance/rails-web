@@ -26,6 +26,10 @@ import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { PolarisLoanCard, type PolarisLoanNow } from "@/components/protocol/polaris/polaris-loan-card";
 import { PolarisLoanEventCard } from "@/components/protocol/polaris/polaris-sp-loan-event-cards";
 import {
+  PolarisLoanSinceTouchRow,
+  polarisLoanWindowStands,
+} from "@/components/protocol/polaris/polaris-sp-loan-since-touch";
+import {
   PolarisLoanFlowsNote,
   polarisLoanFlowsContent,
 } from "@/components/protocol/polaris/polaris-sp-loan-flows-note";
@@ -150,6 +154,8 @@ export default function LoanView({ loanId, initial }: { loanId: string; initial:
     return m;
   }, [touches]);
   const holder = chain?.owner ?? row?.holder ?? null;
+  // The newest touch: a transfer is none.
+  const lastTouch = useMemo(() => touches.findLast((r) => r.event_type !== "transfer") ?? null, [touches]);
 
   if (!data && !failed) return <DetailBodySkeleton />;
   if (!row)
@@ -222,6 +228,11 @@ export default function LoanView({ loanId, initial }: { loanId: string; initial:
           displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
           emptyLabel="No operations recorded for this loan"
           toolbarLeading={<TimelineActivityHeader events={events} closed={!open} />}
+          liveWindow={
+            open && chain && polarisLoanWindowStands(lastTouch, chain)
+              ? () => <PolarisLoanSinceTouchRow last={lastTouch} chain={chain} />
+              : undefined
+          }
           eventPage={(slot) => polarisLoanEventPage({ ...slot, loanId, holder, row: rowById.get(slot.event.id) })}
           renderCard={(event, meta) => {
             const r = rowById.get(event.id);
