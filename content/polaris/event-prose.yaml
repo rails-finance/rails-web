@@ -572,9 +572,9 @@ position_words:
   equity: |-
     Less the debt, equity is {equity} {stable}: a valuation at this block that says nothing of profit.
   holding_ahead: |-
-    Against holding the pETH deposited, the position is {holding_gain} pETH ahead ({holding_share}), its {stable} legs at today's feed price.
+    Compared with holding the pETH deposited, this position is {holding_gain} pETH better off ({holding_share}), its net {stable} at today's price.
   holding_behind: |-
-    Against holding the pETH deposited, the position is {holding_gain} pETH behind ({holding_share}), its {stable} legs at today's feed price.
+    Compared with holding the pETH deposited, this position is {holding_gain} pETH worse off ({holding_share}), its net {stable} at today's price.
   debt_sum: |-
     The debt is {recorded} {stable} recorded at the last touch{legs} pending since.
   debt_touch: |-

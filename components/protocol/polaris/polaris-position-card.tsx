@@ -414,8 +414,8 @@ function againstHoldingRow(
   stable: string,
 ): PositionPanelRow {
   const tip =
-    `The pETH the position holds now, withdrew and was left as surplus, less the pETH deposited, plus the ${stable} ` +
-    `borrowed less the ${stable} repaid and owed now, converted to pETH at today's feed price.`;
+    `Compared with holding the pETH deposited: the pETH this position holds, withdrew and was left as surplus, ` +
+    `plus its net ${stable} (borrowed, less repaid and still owed) valued at today's price, less the pETH deposited.`;
   let value: ReactNode;
   if (r === "pending") value = <div className="h-6 w-24 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />;
   else if (isAgainstHoldingNone(r))
