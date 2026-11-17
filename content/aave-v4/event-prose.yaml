@@ -1005,9 +1005,14 @@ templates:
           Of the {left} {left_symbol} the order left unsold, Aave V3 took a flash-loan fee and the wallet got the rest.
       swap.gap_returned:
         when: |-
-          a buy order (debt_swap, repay_with_collateral or leverage) whose settlement Rails has read; in place of swap.gap
+          a buy order (debt_swap, repay_with_collateral or leverage) whose settlement Rails has read, all of the gap refunded; in place of swap.gap
         text: |-
-          Aave V3 took a flash-loan fee from the {left} {left_symbol} unsold; {returned} returned to the wallet from the unused limit.
+          All {left} {left_symbol} the order left unsold returned to the wallet from the unused limit.
+      swap.gap_returned_fee:
+        when: |-
+          as swap.gap_returned, with a flash-loan fee taken from the gap
+        text: |-
+          Of the {left} {left_symbol} unsold, {returned} returned to the wallet from the unused limit; the rest paid the flash-loan fee.
       swap.supplies:
         when: |-
           collateral_swap
@@ -1030,6 +1035,7 @@ templates:
         swap.route_topped,
         swap.gap,
         swap.gap_returned,
+        swap.gap_returned_fee,
         swap.supplies,
         swap.owes,
         hf.cleared,
@@ -1038,12 +1044,12 @@ templates:
       ]
     groups:
       happened: [swap.collateral, swap.debt, swap.repay, swap.leverage, swap.collateral_topped, swap.leverage_topped]
-      adds_up: [swap.route, swap.route_topped, swap.gap, swap.gap_returned]
+      adds_up: [swap.route, swap.route_topped, swap.gap, swap.gap_returned, swap.gap_returned_fee]
       leaves: [swap.supplies, swap.owes, hf.cleared, hf.at_line, hf.close]
     alternates:
       - [swap.collateral, swap.debt, swap.repay, swap.leverage, swap.collateral_topped, swap.leverage_topped]
       - [swap.route, swap.route_topped]
-      - [swap.gap, swap.gap_returned]
+      - [swap.gap, swap.gap_returned, swap.gap_returned_fee]
       - [swap.supplies, swap.owes, hf.cleared]
       - [hf.at_line, hf.close]
 

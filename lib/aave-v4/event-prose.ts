@@ -407,16 +407,20 @@ export function aaveV4EventProse(input: AaveV4ProseInput): AaveV4EventProse {
         // event, so only the gap is stated, and only above 0.1%, where it is
         // more than the fee. On a buy order whose settlement Rails has read, the
         // refund is the order's surplus, the unused part of the limit it signed
-        // (lib/cow/surplus.ts): one amount, said once, with its receipt.
+        // (lib/cow/surplus.ts): one amount, said once, with its receipt; the
+        // rest of the gap, in the same integers, is the flash-loan fee.
         const taken = variant === "debt_swap" ? num(rec?.amount) : num(ctx.amount);
+        const takenRaw = variant === "debt_swap" ? rec?.raw?.amount : ctx.raw?.amount;
         const cow = s.cow?.kind === "buy" ? aaveV4CowView(s) : null;
-        const returned =
-          cow && cow.view.token.decimals != null ? num(shiftRaw(cow.view.surplus, cow.view.token.decimals)) : null;
-        if (taken != null && returned != null && taken - sold > 0) {
-          v.left = taken - sold;
+        const dec = cow?.view.token.decimals;
+        const gapRaw = takenRaw != null && /^\d+$/.test(takenRaw) ? BigInt(takenRaw) - BigInt(s.sell.raw) : null;
+        const feeRaw = cow && gapRaw != null ? gapRaw - BigInt(cow.view.surplus) : null;
+        if (cow && dec != null && gapRaw != null && feeRaw != null && feeRaw >= BigInt(0)) {
+          v.left = num(shiftRaw(gapRaw.toString(), dec)) ?? 0;
           v.left_symbol = v.sold_symbol;
-          v.returned = returned;
-          sp.say("swap.gap_returned", { returned: "returned" });
+          v.returned = num(shiftRaw(cow.view.surplus, dec)) ?? 0;
+          if (feeRaw === BigInt(0)) sp.say("swap.gap_returned", { left: "returned" });
+          else sp.say("swap.gap_returned_fee", { returned: "returned" });
         } else if (taken != null && taken - sold > taken * 0.001) {
           v.left = taken - sold;
           v.left_symbol = v.sold_symbol;
