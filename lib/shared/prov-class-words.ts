@@ -58,9 +58,9 @@ export const SPLIT_LINE = "above: checkable on the chain · below: needs Rails";
 /** How the head's dots read for a computed figure (grammar §2). */
 export const COMPUTED_LINE = `A figure worked out from others is computed. Its head shows one dot for each ${KIND_OF_FIGURE} among its inputs, and it is as checkable as its furthest input.`;
 
-/** The definition leaf (grammar §2; ui-jobs 669, 674). */
+/** The rows with no dot: the definition leaf and the step leaf (grammar §2; ui-jobs 669, 674). */
 export const DEFINITION_LINE =
-  "A constant the protocol defines, such as a stablecoin’s $1 face, is not a read and has no dot.";
+  "A constant the protocol defines, such as a stablecoin’s $1 face, is not a read and has no dot. A row worked out from the receipt’s other rows has none either.";
 
 /** "Kinds of figure" as a heading. */
 export const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);

@@ -38,10 +38,10 @@ test("one line per class, in the grammar's order", () => {
   for (const c of CLASS_LINES) assert.ok(c.line.length > 0, c.cls);
 });
 
-test("the definition-leaf sentence is present", () => {
+test("the dotless-row sentences are present: a definition and a step", () => {
   assert.equal(
     DEFINITION_LINE,
-    "A constant the protocol defines, such as a stablecoin’s $1 face, is not a read and has no dot.",
+    "A constant the protocol defines, such as a stablecoin’s $1 face, is not a read and has no dot. A row worked out from the receipt’s other rows has none either.",
   );
 });
 
