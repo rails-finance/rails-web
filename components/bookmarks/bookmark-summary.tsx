@@ -24,6 +24,7 @@ import {
   type WalletSummaryProtocol,
 } from "@/lib/wallet/wallet-summary";
 import { INPLACE_TEXT } from "@/lib/shared/ui-grammar";
+import { WALLET_COUNTS_SCOPE } from "@/lib/wallet/summary-counts";
 
 type State = { kind: "waiting" } | { kind: "failed" } | { kind: "read"; summary: WalletSummary };
 
@@ -126,7 +127,13 @@ export function BookmarkSummary({ address }: { address: string }) {
           </button>
         </span>
       )}
-      {state.kind === "read" && protocols.length === 0 && <span className="text-rb-500">No positions found</span>}
+      {state.kind === "read" && protocols.length === 0 && (
+        // The counts read the mainnet families; a wallet held only on the
+        // Sepolia testnet (Polaris) is none here.
+        <span className="text-rb-500" title={WALLET_COUNTS_SCOPE}>
+          No mainnet positions found
+        </span>
+      )}
       {protocols.map((p) => (
         <Holding key={`${p.chain}/${p.family}`} p={p} address={key} />
       ))}
