@@ -2432,8 +2432,14 @@ export interface FrankencoinContext {
 //   newDebt = prevDebt + _debtChange + _accruedInterest + _mintRedeemDebtGain
 //             − _stableGain + _stablesMintedToEnsureZeroDebt
 //   newColl = prevColl + _collChange + _mintRedeemCollGain + _bcTokenGain
-// `_operation`: 0 open, 1 adjust, 2 close, 3 liquidate. A liquidation row is
-// joined with the same tx's `Liquidation` (+ `LiquidationGasComp`) legs.
+// `_operation`: 0 open, 1 adjust, 2 close, 3 liquidate, 4 settle. Settle is
+// Rails' name from the chain (the cdpManager is unverified): a touch the
+// holder sends, its `_collChange` and `_debtChange` zero, that writes the
+// pending legs and nothing else; where they take the debt below zero it mints
+// the difference to the holder and leaves `_newDebt` 0. It reads as an adjust
+// that moved neither (rails-ops reference/official-docs/polaris.md, section 3).
+// A liquidation row is joined with the same tx's `Liquidation`
+// (+ `LiquidationGasComp`) legs.
 //
 // Units are native: pETH for collateral, the market's stablecoin for debt. All
 // three tokens are 18 decimals. USD exists only where the overlay reads the
@@ -2504,8 +2510,9 @@ export interface PolarisContext {
   cdpId: string;
   /** "USDp" | "GOLDp" — the market's debt unit. */
   stableSymbol: string;
-  /** CDPUpdated `_operation` (0 open · 1 adjust · 2 close · 3 liquidate);
-   *  absent on a transfer row. */
+  /** CDPUpdated `_operation` (0 open · 1 adjust · 2 close · 3 liquidate ·
+   *  4 settle, drawn as an adjust that moved neither); absent on a transfer
+   *  row. */
   operation?: number;
   // ── CDPUpdated (human decimal strings, 18dp) — absent on transfer rows ──
   newColl?: string;
