@@ -13,6 +13,7 @@
 
 import type { LearnMoreContent, LearnMoreLink } from "@/components/shared/learn-more-modal";
 import { ROUNDING, num, type FmtEnv } from "./roundings";
+import { addressTone } from "@/lib/shared/holder-href";
 import type {
   EventProseCore,
   EventTemplate,
@@ -123,9 +124,10 @@ export function eventProseEngine<K extends string, E extends string = string>(
       if (rounding === "ratio_pair")
         seg.pair = { cr: ROUNDING.ratio(v, name, env), ltv: `${(10000 / num(v)).toFixed(2)}%` };
       if (rounding === "tx_hash") seg.tx = String(v);
-      if (rounding === "manager" || rounding === "address" || rounding === "wallet") {
+      const tone = addressTone(rounding);
+      if (tone) {
         seg.address = String(v);
-        seg.tone = rounding;
+        seg.tone = tone;
       }
       segs.push(seg);
       if (!uses.includes(name)) uses.push(name);

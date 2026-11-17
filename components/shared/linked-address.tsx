@@ -1,22 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useChainId } from "@/lib/shared/chain-context";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
+import { holderHref } from "@/lib/shared/holder-href";
 import { listingHrefForWallet } from "@/lib/shared/protocols";
 import type { SessionProtocol } from "@/lib/shared/sessions";
-
-/** The families the wallet page (/wallet/<address>) reads a holder's position
- *  for. A holder of any other family opens that family's wallet-filtered
- *  listing (ui-jobs 704). */
-const WALLET_PAGE_SESSIONS: ReadonlySet<SessionProtocol> = new Set(["liquity-v2", "makerdao"]);
-
-/** Where a position holder's address opens inside Rails: the wallet page, or
- *  the family's listing filtered to the wallet. Null leaves the explorer link. */
-export function holderHref(session: SessionProtocol, address: string): string | null {
-  if (WALLET_PAGE_SESSIONS.has(session)) return `/wallet/${address.toLowerCase()}`;
-  return listingHrefForWallet(session, address);
-}
 
 interface LinkedAddressProps {
   address: string;
@@ -39,12 +29,16 @@ interface LinkedAddressProps {
  */
 export function LinkedAddress({ address, label, className = "", chainId, holderOf }: LinkedAddressProps) {
   const ctxChain = useChainId();
+  const pathname = usePathname();
   const short = `${address.slice(0, 6)}…${address.slice(-4)}`;
-  const inside = holderOf ? holderHref(holderOf, address) : null;
+  const inside = holderOf ? holderHref(holderOf, address, listingHrefForWallet, pathname) : null;
   if (inside)
     return (
+      // No prefetch: the wallet page is dynamic and reads the API and the
+      // chain, a cost a link merely seen should not pay.
       <Link
         href={inside}
+        prefetch={false}
         onClick={(e) => e.stopPropagation()}
         className={`text-blue-600 dark:text-[var(--text-link)] hover:underline font-mono text-xs ${className}`}
       >
