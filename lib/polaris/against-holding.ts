@@ -31,10 +31,8 @@
 // no term: each is in the collateral and debt now (or, once closed, in the
 // close's legs).
 //
-// On a position touched once with a debt at or above zero, gain × feed now
-// equals the since-open window's protocol term: the window's total less its
-// feed term. Below zero the window counts the debt as zero and this figure
-// counts the stables owed.
+// On a position touched once, gain × feed now equals the since-open window's
+// protocol term: the window's total less its feed term.
 
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isPolarisEvent } from "@/lib/shared/types/event-shape";

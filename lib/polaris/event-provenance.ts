@@ -125,7 +125,7 @@ function ledgerSummary(field: PolarisLedgerField, stable: string): string {
     case "stableGain":
       return `${stable} credited against the debt at this touch — the CDPUpdated log's own \`_stableGain\` field: the position's share of the market revenue the stability pool distributes, applied as a debt reduction.`;
     case "stablesMintedToEnsureZeroDebt":
-      return `${stable} added to settle the debt to zero — the CDPUpdated log's own \`_stablesMintedToEnsureZeroDebt\` field: on a touch whose net PSM share and gains clear more than the debt owed, the manager adds the difference to the debt so it lands on zero rather than below.`;
+      return `${stable} minted to the holder — the CDPUpdated log's \`_stablesMintedToEnsureZeroDebt\` field. Where the gains and the net PSM share since the previous touch cleared more than the debt, the debt went below zero; this touch mints the difference to the holder of the position's NFT and writes the debt at zero. The same transaction carries a ${stable} Transfer from 0x0 of this amount to the holder.`;
     case "bcTokenGain":
       return `Reward pETH added to the collateral at this touch — the CDPUpdated log's own \`_bcTokenGain\` field: the position's share of bonding-curve token rewards, settled into the collateral here.`;
   }
@@ -673,7 +673,7 @@ export type PolarisLifetimeLeg =
   | "stability gains"
   | "debt from PSM mints"
   | "debt cleared by PSM redemptions"
-  | "minted to settle";
+  | "minted to the holder";
 
 /** The lifetime legs the position explanation names, by the word the code
  *  uses for each (the receipts' labels are the values). */
@@ -701,7 +701,7 @@ const LEG_VIA: Record<PolarisLifetimeLeg, string> = {
   "stability gains": "Σ _stableGain",
   "debt from PSM mints": "Σ max(_mintRedeemDebtGain, 0)",
   "debt cleared by PSM redemptions": "Σ max(−_mintRedeemDebtGain, 0)",
-  "minted to settle": "Σ _stablesMintedToEnsureZeroDebt",
+  "minted to the holder": "Σ _stablesMintedToEnsureZeroDebt",
 };
 
 // A reader who opens one PSM leg's own receipt has no reason to know it is

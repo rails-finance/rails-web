@@ -15,7 +15,7 @@
 
 import type { ReactNode } from "react";
 import type { PolarisChainResponse } from "@/lib/api/fetch-polaris-position";
-import type { PolarisLifetime } from "@/lib/polaris/economics";
+import { polarisEquityAtFeed, type PolarisLifetime } from "@/lib/polaris/economics";
 import { LIFETIME_LEGS, lifetimeLegProv, type PolarisLifetimeLeg } from "@/lib/polaris/event-provenance";
 import {
   liveEntireProv,
@@ -118,11 +118,21 @@ export function PolarisPositionExplanation({
           ),
           stable: stableSymbol,
         })
-      : hasColl && chain.recordedDebt > 0
-        ? positionNodes("lead_settles", { coll: collNode })
-        : hasColl
-          ? positionNodes("lead_no_debt", { coll: collNode })
-          : null;
+      : hasColl && chain.entireDebt < 0
+        ? positionNodes("lead_owed", {
+            coll: collNode,
+            owed: echoDebt(
+              <H>
+                <AmountText value={-chain.entireDebt} />
+              </H>,
+            ),
+            stable: stableSymbol,
+          })
+        : hasColl && chain.recordedDebt > 0
+          ? positionNodes("lead_settles", { coll: collNode })
+          : hasColl
+            ? positionNodes("lead_no_debt", { coll: collNode })
+            : null;
 
   const bullets: Bullet[] = [];
   const add = (group: Group, key: string, node: ReactNode) =>
@@ -131,8 +141,8 @@ export function PolarisPositionExplanation({
   if (chain.isOpen && chain.price && hasColl) {
     const pethInDebt = chain.price.pethInDebt;
     const collWorth = chain.entireColl * pethInDebt;
-    // An entire debt at or below zero owes nothing: it never adds to equity.
-    const equity = collWorth - Math.max(0, chain.entireDebt);
+    // A debt below zero is owed to the holder: it adds to the equity.
+    const equity = polarisEquityAtFeed(chain.entireColl, chain.entireDebt, pethInDebt);
     add(
       "holdings",
       "worth",
@@ -155,7 +165,7 @@ export function PolarisPositionExplanation({
     add(
       "holdings",
       "equity",
-      positionNodes("equity", {
+      positionNodes(chain.entireDebt < 0 ? "equity_owed" : "equity", {
         equity: (
           <Prov
             echo

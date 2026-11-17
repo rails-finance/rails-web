@@ -20,7 +20,13 @@ import {
 } from "@/components/protocol/polaris/polaris-liquidation-forensics";
 import { crPct2, polarisCrAtEvent } from "@/lib/polaris/cr-at-event";
 import { formatPolarisRatio } from "@/lib/polaris/ratio-format";
-import { polarisLifetime, polarisPendingAtFeed, polarisPsmShareValue } from "@/lib/polaris/economics";
+import {
+  polarisDebtOwed,
+  polarisEquityAtFeed,
+  polarisLifetime,
+  polarisPendingAtFeed,
+  polarisPsmShareValue,
+} from "@/lib/polaris/economics";
 import { polarisPsmOutcomeSentence } from "@/lib/polaris/economics-explanation";
 import {
   polarisSinceLabel,
@@ -130,7 +136,9 @@ export function polarisPositionToMarkdown(args: PolarisPositionMarkdownArgs): st
     lines.push(
       view.debt > 0
         ? `- **Debt:** ${amt(view.debt)} ${stable}`
-        : `- **Debt:** none${view.recordedDebt != null && view.recordedDebt > 0 ? ` (the pending legs exceed the ${amt(view.recordedDebt)} ${stable} recorded at the last touch; the next touch settles it to zero)` : ""}`,
+        : polarisDebtOwed(view.debt) > 0
+          ? `- **Debt:** Owed ${amt(polarisDebtOwed(view.debt))} ${stable} (below zero: the next touch mints it to the holder)`
+          : `- **Debt:** none${view.recordedDebt != null && view.recordedDebt > 0 ? ` (the pending legs clear the ${amt(view.recordedDebt)} ${stable} recorded at the last touch)` : ""}`,
     );
     if (view.icr != null)
       lines.push(
@@ -180,9 +188,9 @@ export function polarisPositionToMarkdown(args: PolarisPositionMarkdownArgs): st
         `- **pETH price (protocol feed):** ${amt(live.price.pethInDebt)} ${stable} — bonding curve ${num(live.price.curve, 4)} ETH per pETH × ETH/USD ${usd(live.price.ethUsd)}${live.price.xauUsd != null ? ` ÷ XAU/USD ${usd(live.price.xauUsd)}` : ""}`,
       );
       if (live.entireColl > 0) {
-        const equity = live.entireColl * live.price.pethInDebt - Math.max(0, live.entireDebt);
+        const equity = polarisEquityAtFeed(live.entireColl, live.entireDebt, live.price.pethInDebt);
         lines.push(
-          `- **Equity at the feed:** ${amt(equity)} ${stable} (collateral × feed − debt; a valuation at block ${live.blockNumber}, not a profit)`,
+          `- **Equity at the feed:** ${amt(equity)} ${stable} (collateral × feed − debt; a debt below zero is owed to the holder and adds to it; a valuation at block ${live.blockNumber}, not a profit)`,
         );
       }
     }
@@ -216,7 +224,7 @@ export function polarisPositionToMarkdown(args: PolarisPositionMarkdownArgs): st
     );
     if (lifetime.mintedToSettle > 0)
       lines.push(
-        `- **Settled to zero:** ${amt(lifetime.mintedToSettle)} ${stable} added to the debt where a net PSM share cleared more than was owed`,
+        `- **Minted to the holder:** ${amt(lifetime.mintedToSettle)} ${stable}, where the debt had gone below zero (Σ \`_stablesMintedToEnsureZeroDebt\`)`,
       );
     if (lifetime.collLiquidated > 0 || lifetime.debtLiquidated > 0)
       lines.push(
@@ -292,9 +300,7 @@ function againstHoldingSection(
     );
   out.push(
     `- **Borrowed / repaid:** ${amt(r.borrowed)} / ${amt(r.repaid)} ${stable}`,
-    ...(r.settled > 0
-      ? [`- **Settled to the holder:** ${amt(r.settled)} ${stable} minted to the holder where a debt went below zero`]
-      : []),
+    ...(r.settled > 0 ? [`- **Minted to the holder:** ${amt(r.settled)} ${stable}, where a debt went below zero`] : []),
     `- **Debt now:** ${amt(r.debtNow)} ${stable}${r.closed ? " (closed)" : ` (getCDPEntireDebt at block ${r.feed.block}${r.debtNow < 0 ? ", below zero: the next touch mints it to the holder" : ""})`}`,
     `- **Feed:** ${amt(r.feed.pethInDebt)} ${stable} per pETH (previewPrice() at block ${r.feed.block})`,
     `- **Terms:** ${sAmt(r.collTerm)} pETH on the collateral side, ${sAmt(r.debtTerm)} ${stable} on the debt side (${sAmt(r.debtTermPeth)} pETH at the feed)`,
@@ -453,10 +459,10 @@ function timelineTable(
     return out;
   }
   out.push(
-    `| # | Date | Action | Collateral after (pETH) | Debt after (${stable}) | Interest charged | PSM share (pETH / ${stable}) | PSM share at block price (${stable}) | pETH price at block (${stable}) | Collateral ratio at block | Transaction |`,
+    `| # | Date | Action | Collateral after (pETH) | Debt after (${stable}) | Interest charged | PSM share (pETH / ${stable}) | PSM share at block price (${stable}) | Minted to the holder (${stable}) | pETH price at block (${stable}) | Collateral ratio at block | Transaction |`,
   );
   out.push(
-    "|---|------|--------|-------------------------|------------------------|------------------|-------------------------------|------------------------------------|----------------------------------|---------------------------|-------------|",
+    "|---|------|--------|-------------------------|------------------------|------------------|-------------------------------|------------------------------------|----------------------|----------------------------------|---------------------------|-------------|",
   );
   events.forEach((e, i) => {
     if (!isPolarisEvent(e)) return;
@@ -479,6 +485,10 @@ function timelineTable(
     // The oracle-at-block lane's feed price at this touch's own block — the
     // feed at the END of the block (§1 of the build plan), "—" unfilled.
     const priceAtBlock = d.priceAtBlock != null ? amt(d.priceAtBlock.pethInDebt) : "—";
+    // The stables this touch minted to the holder (a debt below zero), "—"
+    // where it minted none.
+    const mintedN = d.stablesMintedToEnsureZeroDebt != null ? parseFloat(d.stablesMintedToEnsureZeroDebt) : 0;
+    const minted = mintedN > 0 ? amt(mintedN) : "—";
     // The CDP's collateral ratio at this row: the resulting figures at that
     // same price, or the ratio at fire on a liquidation (the same figure the
     // Liquidation section states), "—" where the lane has no price or the
@@ -487,12 +497,12 @@ function timelineTable(
     const ratioAtBlock = cr ? crPct2(cr.pct) : "—";
     const noted = (anchoredNotes.get(e.id) ?? []).map(marketNoteRowAnnotation).join("; ");
     out.push(
-      `| ${i + 1} | ${fmtUtc(e.timestamp)} | ${e.actionLabel} | ${coll} | ${debt} | ${interest} | ${psm} | ${psmNet} | ${priceAtBlock} | ${ratioAtBlock} | ${txCell(e)}${noted ? ` — ${noted}` : ""} |`,
+      `| ${i + 1} | ${fmtUtc(e.timestamp)} | ${e.actionLabel} | ${coll} | ${debt} | ${interest} | ${psm} | ${psmNet} | ${minted} | ${priceAtBlock} | ${ratioAtBlock} | ${txCell(e)}${noted ? ` — ${noted}` : ""} |`,
     );
   });
   out.push("");
   out.push(
-    "_Collateral after / Debt after are the position's resulting figures on each touch, as the cdpManager emitted them. A transfer row moves custody only. A liquidation row's debt and collateral went to the stability pool or were redistributed. pETH price at block is the market's own price feed at the END of that block, from the oracle-at-block lane — not necessarily the price the row's own transaction saw. PSM share at block price is the pETH leg at that price less the debt leg, the one figure the row's face states. Collateral ratio at block is the resulting collateral at that price over the resulting debt; on a liquidation row it is the ratio at the moment the liquidation fired, the entire seized collateral over the debt cleared; a row without a price, or without debt after it, carries none._",
+    "_Collateral after / Debt after are the position's resulting figures on each touch, as the cdpManager emitted them. A transfer row moves custody only. A liquidation row's debt and collateral went to the stability pool or were redistributed. pETH price at block is the market's own price feed at the END of that block, from the oracle-at-block lane — not necessarily the price the row's own transaction saw. PSM share at block price is the pETH leg at that price less the debt leg, the one figure the row's face states. Minted to the holder is the CDPUpdated log's \`_stablesMintedToEnsureZeroDebt\`: where the debt had gone below zero, the touch minted the difference to the holder (a Transfer from 0x0 in the same transaction) and wrote the debt at zero. Collateral ratio at block is the resulting collateral at that price over the resulting debt; on a liquidation row it is the ratio at the moment the liquidation fired, the entire seized collateral over the debt cleared; a row without a price, or without debt after it, carries none._",
   );
   out.push("");
   return out;

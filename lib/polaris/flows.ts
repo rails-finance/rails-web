@@ -21,8 +21,8 @@
 // The holder's act is `collChange` / `debtChange` (a liquidation's are the
 // seizure and the debt cleared); the rest built up since the CDP's last touch
 // and is written in at this one: interest, stability gains, reward pETH, the
-// PSM's net shares, and the stables minted to settle a debt the shares took
-// below zero.
+// PSM's net shares, and the stables minted to the holder where the shares
+// took the debt below zero.
 //
 // Redistribution (none on Sepolia by 2 Oct 2026). A liquidation's part the
 // pool does not absorb (`_collRedistributed`, `_debtRedistributed`) takes
@@ -190,7 +190,7 @@ const ALL_BUCKETS: FlowBucket[] = [
     hatch: "checker",
     link: "polaris-psm-added",
   },
-  { key: PF.settled, label: "Settled to zero", event: "", side: "debt", dir: "in", hatch: "grid" },
+  { key: PF.settled, label: "Minted to the holder", event: "", side: "debt", dir: "in", hatch: "grid" },
   {
     key: PF.debtRedistIn,
     label: "Redistributed debt",
@@ -521,7 +521,7 @@ export function replayPolaris(rows: PolarisFlowRow[], live: PolarisLive | null, 
 
 /** The live read's legs not yet written into the CDP, as positive amounts by
  *  bucket: collateral in pETH, debt in the stablecoin. An entire debt below
- *  zero is settled to zero at the next touch. */
+ *  zero is the stables the next touch mints to the holder. */
 export function polarisPendingLegs(live: PolarisLive): { bucket: string; amount: number }[] {
   const out: { bucket: string; amount: number }[] = [];
   const add = (bucket: string, v: number) => {
