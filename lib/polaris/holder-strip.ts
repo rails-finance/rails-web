@@ -7,12 +7,19 @@
 // read every card's approximate ratio comes from). It fetches nothing.
 //
 // THE UNITS DECIDE THE GRAMMAR. Collateral is pETH in both markets, so the
-// wallet's collateral is a quantity and is stated exactly, with its value at the
-// protocol's own feed beneath it. Debt is USDp in one market and GOLDp — a troy
-// ounce of gold — in the other, so a wallet borrowing in both has no debt figure
-// that isn't a valuation: that headline is stated in dollars, marked ≈, with the
-// two legs named beneath. A wallet borrowing in one market only gets its debt
-// exactly, in that market's own token, because there is nothing to convert.
+// wallet's collateral is a quantity of pETH, with its value at the protocol's
+// own feed beneath it. Debt is USDp in one market and GOLDp — a troy ounce of
+// gold — in the other, so a wallet borrowing in both has no debt figure that
+// isn't a valuation: that headline is stated in dollars, with the two legs
+// named beneath. A wallet borrowing in one market only gets its debt in that
+// market's own token.
+//
+// EVERY LEG WEARS THE ≈ (ui-jobs 690). The rows are each CDP's last emitted
+// figures: reward pETH and PSM shares move the collateral, and interest,
+// stability gains and PSM shares the debt, between touches, and land only at
+// the next one. On a CDP untouched for months the gap is large, so a sum of
+// last-touch figures is an estimate even in one token. Live per-row reads are
+// a later item.
 //
 // THE COUNTS ARE THE WHOLE WALLET; THE TOTALS ARE THE PAGE. While the wallet's
 // `pagination.total` fits one page the two are the same set, and the strip sums
@@ -34,10 +41,13 @@ import {
   holderDebtValueProv,
 } from "@/lib/polaris/live-provenance";
 
-/** The ≈ on the wallet's debt, in one sentence — the same gesture the listing
- *  card's ratio wears, saying what the figure is and what is not in it. */
-const DEBT_TIP =
-  "An estimate: the wallet's open positions' last stated debts, USDp at one dollar and GOLDp at the gold price the protocol's own feed stated at the latest read. Interest since each position's last touch and any PSM share are not in it.";
+/** What each leg's ≈ means, in a sentence or two. */
+const LEG_TIP = {
+  collateral: "As of each open position's last touch. The reward pETH and PSM shares built up since are left out.",
+  debt: "As of each open position's last touch. The interest, stability gains and PSM shares built up since are left out.",
+  debtValued:
+    "An estimate: the open positions' debts as of each one's last touch, USDp at one dollar and GOLDp at the gold price the protocol's feed stated at the latest read. The interest, stability gains and PSM shares built up since are left out.",
+} as const;
 
 const plural = (n: number, one: string, many: string): string => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 
@@ -111,7 +121,8 @@ export function polarisHolderStrip(
       id: "collateral",
       label: "Total collateral",
       value: `${formatNumber(coll)} pETH`,
-      approx: false,
+      approx: true,
+      tip: LEG_TIP.collateral,
       prov: holderCollProv(),
       footnote:
         pethUsd != null
@@ -129,14 +140,15 @@ export function polarisHolderStrip(
     if (r.debt > 0) debtByMarket.set(r.market, (debtByMarket.get(r.market) ?? 0) + r.debt);
   }
   if (debtByMarket.size === 1) {
-    // One market: the sum is a quantity of that market's own token. Nothing to
-    // convert, so nothing to approximate.
+    // One market: the sum is a quantity of that market's own token, as of
+    // each position's last touch.
     const [market, amount] = [...debtByMarket][0];
     legs.push({
       id: "debt",
       label: "Total debt",
       value: `${formatNumber(amount)} ${POLARIS_MARKET_CONFIG[market].stable.symbol}`,
-      approx: false,
+      approx: true,
+      tip: LEG_TIP.debt,
       prov: holderDebtSumProv(market),
     });
   } else if (debtByMarket.size > 1) {
@@ -157,7 +169,7 @@ export function polarisHolderStrip(
       label: "Total debt",
       value: formatUsdValue(usd),
       approx: true,
-      tip: DEBT_TIP,
+      tip: LEG_TIP.debtValued,
       prov: holderDebtValueProv(),
       footnote: { text: parts.join(" · ") },
     });

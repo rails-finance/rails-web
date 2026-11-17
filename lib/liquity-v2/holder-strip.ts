@@ -7,11 +7,16 @@
 // card's USD and collateral ratio come from). It fetches nothing.
 //
 // V2 IS POLARIS'S MIRROR, and the units say why. Every trove owes BOLD, so the
-// wallet's debt is a quantity of one token and is stated exactly. Collateral is
-// WETH on one branch, wstETH on another and rETH on a third, so a wallet across
-// branches has no collateral figure that isn't a valuation: that headline is
-// stated in dollars at the branch feeds, marked ≈, with the per-token amounts
-// named beneath. A wallet on one branch gets its collateral exactly.
+// wallet's debt is a quantity of one token. Collateral is WETH on one branch,
+// wstETH on another and rETH on a third, so a wallet across branches has no
+// collateral figure that isn't a valuation: that headline is stated in dollars
+// at the branch feeds, with the per-token amounts named beneath. A wallet on one
+// branch gets its collateral in that token.
+//
+// EVERY LEG WEARS THE ≈ (ui-jobs 690). The rows are each trove's figures as of
+// its last change: interest accrues on the debt, and redistributions from
+// liquidated troves move collateral and debt onto it, between changes, so a sum
+// of them is an estimate even in one token.
 //
 // A ZOMBIE TROVE IS AN OPEN ONE — redeemed below the minimum debt, still on
 // chain, still the holder's, just unredeemable until it is topped back up. It is
@@ -24,9 +29,13 @@ import type { OraclePricesData } from "@/types/api/oracle";
 import { TROVE_MANAGER } from "@/lib/liquity/event-provenance";
 import { formatNumber, formatUsdValue } from "@/lib/utils/format";
 
-/** The ≈ on the wallet's collateral, in one sentence. */
-const COLL_TIP =
-  "An estimate: the troves' latest stated collateral on each branch, valued at that branch's own PriceFeed as of the latest read. It is a valuation at one moment, not an amount of any one token.";
+/** What each leg's ≈ means, in a sentence or two. */
+const LEG_TIP = {
+  collateral: "As of each open trove's last change. Redistribution gains since then are left out.",
+  collateralValued:
+    "An estimate: the open troves' collateral as of each one's last change, valued at each branch's PriceFeed as of the latest read. Redistribution gains since then are left out.",
+  debt: "As of each open trove's last change. The interest and redistributed debt built up since are left out.",
+} as const;
 
 const plural = (n: number, one: string, many: string): string => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 
@@ -45,7 +54,7 @@ function holderDebtProv(): Provenance {
       text: "Add the entire debt of each open trove the wallet holds — every one of them is on the page under this strip.",
     },
     summary:
-      "All the BOLD the wallet's open troves owe — the sum of each trove's entire debt (recorded principal plus the interest accrued to its last indexed state), from the index. Exact: every branch borrows the same token, so the sum is a quantity of it. Interest accrued since each trove's last indexed state is not in it.",
+      "All the BOLD the wallet's open troves owe — the sum of each trove's entire debt (recorded principal plus the interest accrued to its last indexed state), from the index. Every branch borrows the same token, so the sum is a quantity of it. The interest and redistributed debt built up since each trove's last indexed state are not in it.",
     via: "GET /api/troves?ownerAddress=… · Σ entire debt over the open rows",
     formula: "Σ debt over the wallet's open troves",
     inputs: [
@@ -63,7 +72,7 @@ function holderCollValueProv(branches: string[]): Provenance {
       kind: "recompute",
       text: "Re-run each branch's PriceFeed at the stamped block and multiply the wallet's collateral on that branch by its own price.",
     },
-    summary: `What the wallet's open troves hold as collateral, in USD — each branch's collateral (${branches.join(", ")}) at that branch's own on-chain PriceFeed, read once when the listing loaded. An estimate for two reasons: the branches hold different tokens and a sum of them exists only at a price, and each price is one oracle read that moves every block. It is a valuation at that moment, never an amount of anything.`,
+    summary: `What the wallet's open troves hold as collateral, in USD — each branch's collateral (${branches.join(", ")}) at that branch's own on-chain PriceFeed, read once when the listing loaded. An estimate for two reasons: the branches hold different tokens and a sum of them exists only at a price, and each price is one oracle read that moves every block. It is a valuation at that moment, never an amount of anything. Redistribution gains since each trove's last change are not in it.`,
     via: "GET /api/oracle/liquity-v2 · Σ branch collateral × the branch's own price",
     formula: "Σ collateral × the branch's price",
     inputs: [
@@ -146,11 +155,12 @@ export function liquityV2HolderStrip(
       id: "collateral",
       label: "Total collateral",
       value: `${formatNumber(amount)} ${collateralType}`,
-      approx: false,
+      approx: true,
+      tip: LEG_TIP.collateral,
       prov: {
         kind: "chain",
         pclass: "indexed",
-        summary: `All the ${collateralType} the wallet's open troves hold — the sum of each trove's collateral, from the index. The wallet holds on this branch only, so the sum is a quantity of one token and nothing was converted to reach it.`,
+        summary: `All the ${collateralType} the wallet's open troves hold — the sum of each trove's collateral, from the index. The wallet holds on this branch only, so the sum is a quantity of one token and nothing was converted to reach it. Redistribution gains since each trove's last change are not in it.`,
         contract: tmContract(collateralType),
         via: "GET /api/troves?ownerAddress=… · Σ collateral over the open rows",
       },
@@ -169,7 +179,7 @@ export function liquityV2HolderStrip(
       label: "Total collateral",
       value: formatUsdValue(usd),
       approx: true,
-      tip: COLL_TIP,
+      tip: LEG_TIP.collateralValued,
       prov: holderCollValueProv(branchLegs.map(([c]) => c)),
       footnote: { text: parts.join(" · ") },
     });
@@ -182,7 +192,8 @@ export function liquityV2HolderStrip(
       id: "debt",
       label: "Total debt",
       value: `${formatNumber(debt)} BOLD`,
-      approx: false,
+      approx: true,
+      tip: LEG_TIP.debt,
       prov: holderDebtProv(),
     });
   }
