@@ -77,6 +77,7 @@ function echoFor(key: AaveV4EchoKey, ctx: AaveV4Context, coord: EventProvDetail)
           value: shiftRaw(cow.view.surplus, cow.view.token.decimals),
           symbol: cow.view.token.symbol ?? undefined,
           primary: true,
+          data: { "data-cow-surplus": cow.view.kind },
         };
       const loan = cow.view.flashLoan;
       if (!loan) return null;

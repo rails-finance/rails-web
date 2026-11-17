@@ -66,3 +66,24 @@ export function aaveV4CowView(
     trade: { sell: swap.sell.raw, buy: swap.buy.raw, fee: swap.feeRaw },
   };
 }
+
+/** A buy order's refund as the explanation states it: the order's gap (the withdrawn or borrowed leg less what the
+ *  Trade sold, in its integers) and the surplus, where both are read. The card's line under the grid drops the
+ *  surplus exactly where this answers, so the refund is on the card once, every time. */
+export function aaveV4StatedRefund(
+  ctx: AaveV4Context,
+): { gapRaw: bigint; decimals: number; cow: NonNullable<ReturnType<typeof aaveV4CowView>> } | null {
+  const swap = ctx.swap;
+  if (!swap || swap.cow?.kind !== "buy") return null;
+  // The explanation states the Trade, and the gap after it, only where both sides are named and priced.
+  if (!swap.sell.symbol || !swap.buy.symbol || !(Number(swap.sell.amount) > 0) || !(Number(swap.buy.amount) > 0))
+    return null;
+  const cow = aaveV4CowView(swap);
+  const decimals = cow?.view.token.decimals;
+  const rec = swap.received.context?.data as AaveV4Context | undefined;
+  const takenRaw = swap.kind === "debt_swap" ? rec?.raw?.amount : ctx.raw?.amount;
+  if (!cow || decimals == null || takenRaw == null || !/^\d+$/.test(takenRaw) || !/^\d+$/.test(swap.sell.raw))
+    return null;
+  const gapRaw = BigInt(takenRaw) - BigInt(swap.sell.raw);
+  return gapRaw > BigInt(0) ? { gapRaw, decimals, cow } : null;
+}

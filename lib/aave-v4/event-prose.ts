@@ -26,7 +26,7 @@ import { getSpokeMeta } from "@/lib/aave-v4/spoke-meta";
 import { debtHubsOf, HUB_TIER_LABEL } from "@/components/protocol/aave-v4/aave-v4-spoke-constants";
 import { aaveV4Modal, PROSE, V4_WORDS, type AaveV4L5Key } from "@/lib/aave-v4/event-templates";
 import { aaveV4ManagerKind, type AaveV4ManagerKind } from "@/lib/aave-v4/position-managers";
-import { aaveV4CowView } from "@/lib/aave-v4/swaps";
+import { aaveV4StatedRefund } from "@/lib/aave-v4/swaps";
 import { shiftRaw } from "@/lib/cow/surplus";
 import { flashLenderName } from "@/lib/cow/surplus-provenance";
 
@@ -410,13 +410,11 @@ export function aaveV4EventProse(input: AaveV4ProseInput): AaveV4EventProse {
         // once, with its receipt; a flash-loan fee only where the receipt's
         // FlashLoan log carried a premium. Otherwise the gap alone, above 0.1%.
         const taken = variant === "debt_swap" ? num(rec?.amount) : num(ctx.amount);
-        const takenRaw = variant === "debt_swap" ? rec?.raw?.amount : ctx.raw?.amount;
-        const cow = s.cow?.kind === "buy" ? aaveV4CowView(s) : null;
-        const dec = cow?.view.token.decimals;
-        const gapRaw = takenRaw != null && /^\d+$/.test(takenRaw) ? BigInt(takenRaw) - BigInt(s.sell.raw) : null;
-        const loan = cow?.view.flashLoan;
-        const premium = loan && BigInt(loan.premium) > BigInt(0) ? loan : null;
-        if (cow && dec != null && gapRaw != null && gapRaw > BigInt(0)) {
+        const stated = aaveV4StatedRefund(ctx);
+        if (stated) {
+          const { gapRaw, decimals: dec, cow } = stated;
+          const loan = cow.view.flashLoan;
+          const premium = loan && BigInt(loan.premium) > BigInt(0) ? loan : null;
           v.left = num(shiftRaw(gapRaw.toString(), dec)) ?? 0;
           v.left_symbol = v.sold_symbol;
           v.returned = num(shiftRaw(cow.view.surplus, dec)) ?? 0;

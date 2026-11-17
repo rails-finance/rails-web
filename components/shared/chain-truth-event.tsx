@@ -1071,7 +1071,16 @@ export function HeadSurplusChip({ surplus }: { surplus: NonNullable<ChainTruthRo
  *  the timeline's bar names draws the bar's mark as a 40 px tile
  *  (`BarSubjectTile`, rails-ops TO-DO-ui-jobs 438); any other party keeps the
  *  chip's own mark. */
-export function PartyChip({ party, tile }: { party: NonNullable<ChainTruthRowSpec["party"]>; tile?: boolean }) {
+export function PartyChip({
+  party,
+  tile,
+  markOnly,
+}: {
+  party: NonNullable<ChainTruthRowSpec["party"]>;
+  tile?: boolean;
+  /** The mark alone, its words kept for screen readers: where the text beside it already names the party. */
+  markOnly?: boolean;
+}) {
   const ens = useEnsName(party.ens ? party.address : null);
   const chainId = useChainId();
   const subject = tile && party.name ? barSubjectOf(party.address, chainId) : undefined;
@@ -1085,7 +1094,12 @@ export function PartyChip({ party, tile }: { party: NonNullable<ChainTruthRowSpe
       value={party.name ?? ens ?? party.address}
       className={`inline-flex items-center text-sm ${subject ? "gap-2" : "gap-1"}`}
     >
-      <span className="text-rb-500" data-party-chip={chipId} data-prov-hidden="">
+      <span
+        className={markOnly ? "sr-only" : "text-rb-500"}
+        data-party-chip={chipId}
+        data-prov-hidden=""
+        {...(markOnly ? { "data-party-mark-only": "" } : {})}
+      >
         {party.prefix}
       </span>
       {subject ? (
@@ -1111,7 +1125,11 @@ export function PartyChip({ party, tile }: { party: NonNullable<ChainTruthRowSpe
         )
       )}
       <span
-        className={`font-medium ${party.tone === "party" ? "text-pink-600 dark:text-pink-400" : "text-foreground"}`}
+        className={
+          markOnly
+            ? "sr-only"
+            : `font-medium ${party.tone === "party" ? "text-pink-600 dark:text-pink-400" : "text-foreground"}`
+        }
       >
         {shown}
       </span>

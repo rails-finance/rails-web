@@ -279,7 +279,7 @@ placeholders:
   left:
     rounding: spoke_amount
     means: |-
-      What the position withdrew or borrowed beyond what the Trade sold: the flash-loan fee and the refund to the wallet together.
+      What the position withdrew or borrowed beyond what the Trade sold.
   left_symbol:
     rounding: text
     means: |-

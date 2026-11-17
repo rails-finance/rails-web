@@ -22,9 +22,10 @@ export interface CowSwapFigures {
   feeGap: string;
   /** The signed fee (the Trade log's feeAmount) in the surplus token: part of feeGap. */
   signedFee: string;
-  /** Aave V4 swaps: the Aave V3 Pool's flash loan of the sold token, read from the receipt; null where the receipt
-   *  holds none or was not read (`flashRead`). */
-  flashLoan: { lender: string; asset: string; amount: string; premium: string } | null;
+  /** Aave V4 swaps: the trade's flash loan, the Aave V3 Pool's FlashLoan log of the sold token to the order's borrower
+   *  (its contract or the adapter factory), read from the receipt; null where none matched or it was not read
+   *  (`flashRead`). */
+  flashLoan: { lender: string; borrower: string; asset: string; amount: string; premium: string } | null;
   flashRead: boolean;
   /** The order as signed; `amount` is the limit pro rata on the executed part, in the surplus token. */
   limit: { sell: string; buy: string; fee: string; amount: string };

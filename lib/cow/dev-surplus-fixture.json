@@ -256,6 +256,7 @@
       "flashRead": true,
       "flashLoan": {
         "lender": "0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2",
+        "borrower": "0x0c6f0d008b5ee6cdfbb8bf1cfb0148052e96ac14",
         "asset": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
         "amount": "362598992",
         "premium": "0"
@@ -301,6 +302,7 @@
       "flashRead": true,
       "flashLoan": {
         "lender": "0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2",
+        "borrower": "0x0c6f0d008b5ee6cdfbb8bf1cfb0148052e96ac14",
         "asset": "0xdac17f958d2ee523a2206206994597c13d831ec7",
         "amount": "142933802",
         "premium": "0"
@@ -346,6 +348,7 @@
       "flashRead": true,
       "flashLoan": {
         "lender": "0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2",
+        "borrower": "0x0c6f0d008b5ee6cdfbb8bf1cfb0148052e96ac14",
         "asset": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
         "amount": "710678580",
         "premium": "355340"
@@ -391,6 +394,7 @@
       "flashRead": true,
       "flashLoan": {
         "lender": "0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2",
+        "borrower": "0x0c6f0d008b5ee6cdfbb8bf1cfb0148052e96ac14",
         "asset": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
         "amount": "1261237",
         "premium": "0"

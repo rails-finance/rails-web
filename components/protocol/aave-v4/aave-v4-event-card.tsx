@@ -24,7 +24,7 @@ import { useAaveV4Cells } from "./aave-v4-event-detail";
 import { AaveV4EventExplainer, AaveV4PageSentence, aaveV4LearnMoreContent } from "./aave-v4-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import type { AaveV4Event } from "@/lib/aave-v4/event-prose";
-import { aaveV4CowView } from "@/lib/aave-v4/swaps";
+import { aaveV4CowView, aaveV4StatedRefund } from "@/lib/aave-v4/swaps";
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import { CowSurplusLines } from "@/components/protocol/cow/cow-surplus-lines";
 import { useTimelineEntry } from "@/components/shared/section-sidebar";
@@ -227,7 +227,7 @@ export function AaveV4EventCard({
         trade={cow.trade}
         coords={{ block: event.blockNumber, txHash: event.txHash }}
         symbol={cow.view.token.symbol ? aaveV4DisplaySymbol(cow.view.token.symbol) : undefined}
-        feeOnly={cow.view.kind === "buy"}
+        feeOnly={aaveV4StatedRefund(ctx) != null}
       />
     ) : undefined,
     // The explanation reads the position state the card opens with, so the
