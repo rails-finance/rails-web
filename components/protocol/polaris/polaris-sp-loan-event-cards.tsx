@@ -1,10 +1,11 @@
 "use client";
 
 // One timeline row of a Polaris stability-pool deposit or reserve loan, on
-// the shared event-card shell (components/shared/event-card.tsx), as CoW's
-// trade card draws one: T1 the label with the moved amounts on the spine, T2
-// the row's figures with their logs as receipts, T3 the row in words
-// (lib/polaris/sp-event-prose.ts, lib/polaris/loan-event-prose.ts).
+// the shared event-card shell (components/shared/event-card.tsx): T1 the label
+// with the moved amounts on the spine, T2 the balance sheet
+// (polaris-sp-loan-sheet.ts; a transfer keeps its cells) and the price row,
+// T3 the row in words (lib/polaris/sp-event-prose.ts,
+// lib/polaris/loan-event-prose.ts).
 
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import type { EventCellSpec } from "@/components/shared/event-cells";
@@ -20,6 +21,8 @@ import { spEventLabel, spEventSentences } from "@/lib/polaris/sp-event-prose";
 import { loanEventLabel, loanEventSentences } from "@/lib/polaris/loan-event-prose";
 import type { PolarisDepositEventRow, PolarisLoanEventRow } from "@/lib/sources/api/polaris-sp-loans";
 import type { Provenance } from "@/components/shared/provenance";
+import type { EventCardPrice, EventGas } from "@/components/shared/event-price-row";
+import { polarisDepositSheet, polarisLoanSheet } from "./polaris-sp-loan-sheet";
 
 const ZERO = BigInt(0);
 const short = (h: string) => `${h.slice(0, 6)}…${h.slice(-4)}`;
@@ -73,6 +76,18 @@ function amountCell(
       iconAddress: address,
     },
   };
+}
+
+/** The transaction's gas, where the position's holder sent it: the receipt's
+ *  gas used times its gas price, in ETH (the rows carry no ETH price). */
+function holderGas(
+  r: { tx_from: string | null; tx_gas_used: string | null; tx_gas_price: string | null },
+  holder: string | null,
+): EventGas | undefined {
+  if (!holder || !r.tx_from || r.tx_from.toLowerCase() !== holder.toLowerCase()) return undefined;
+  if (!r.tx_gas_used || !r.tx_gas_price) return undefined;
+  const eth = units(big(r.tx_gas_used) * big(r.tx_gas_price));
+  return eth > 0 ? { eth, usd: 0, gasUsed: Number(r.tx_gas_used) } : undefined;
 }
 
 const bullets = (lines: string[]) => (
@@ -206,11 +221,37 @@ export function PolarisDepositEventCard({
     head: { label, deltas: [] },
     caption: label,
     cells,
-    ledgers: { none: "A deposit's balance is the Deposit after cell." },
+    sheet: polarisDepositSheet(row),
+    ledgers: { none: "A deposit's balance is the Deposit side's total." },
+    price: { gas: row.event_type === "transfer" ? undefined : holderGas(row, holder), prices: [] },
     explainer: { body: bullets(spEventSentences(row, s, holder, vaultHeld ? cfg.vault.symbol : null)) },
     learnMore: null,
   };
   return <EventCard slots={slots} avatar={null} />;
+}
+
+/** fpETH at the floor in WETH at this touch, for the price row. */
+function floorChip(row: PolarisLoanEventRow): EventCardPrice["prices"] {
+  if (!row.floor_price || row.event_type === "transfer") return [];
+  const floor = big(row.floor_price);
+  return [
+    {
+      symbol: FPETH.symbol,
+      address: FPETH.address,
+      usd: units(floor),
+      value: exactUnits(floor),
+      info: {
+        ...loanIndexProv(row.debt_per_share_tx_hash, row.debt_per_share_block),
+        summary:
+          "Floor price — fpETH at the floor in WETH, which the loans manager logged with the debt per share in force at this touch.",
+        via: "FeesAccrued floor price",
+      },
+      unit: {
+        format: (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 4 }),
+      },
+      named: { note: "floor in WETH" },
+    },
+  ];
 }
 
 export function PolarisLoanEventCard({
@@ -325,7 +366,9 @@ export function PolarisLoanEventCard({
     head: { label, deltas: [] },
     caption: label,
     cells,
-    ledgers: { none: "A loan's balances are the Collateral after and Debt after cells." },
+    sheet: polarisLoanSheet(row, previous),
+    ledgers: { none: "A loan's balances are the Collateral and Debt totals." },
+    price: { gas: row.event_type === "transfer" ? undefined : holderGas(row, holder), prices: floorChip(row) },
     explainer: { body: bullets(loanEventSentences(row, previous, holder)) },
     learnMore: null,
   };
