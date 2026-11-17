@@ -277,10 +277,10 @@ export function MorphoBaseVaultPage({
     {
       id: "unaccrued",
       label: "Unaccrued interest",
-      tip: "Total assets minus the allocated sum: interest the vault counts that the markets have not settled yet.",
+      tip: "Total assets minus the allocated sum, and minus any lost assets the vault has stored: interest the vault counts that the markets have not settled yet.",
       sub: withheldSub,
       value: withheld ? (
-        withheldValue("gap", vaultGapProv(coords, data.lostAssets != null))
+        withheldValue("gap", vaultGapProv(coords, data.gapLost))
       ) : (
         <span data-figure="gap">
           <InAssetFigure
@@ -288,7 +288,7 @@ export function MorphoBaseVaultPage({
             full={<StatAmount amount={data.gap} decimals={ad} symbol={unit} />}
             exact={statText(data.gap, assetText(data.gap, ad))}
             asset={assetMark}
-            prov={vaultGapProv(coords, data.lostAssets != null)}
+            prov={vaultGapProv(coords, data.gapLost)}
           />
         </span>
       ),

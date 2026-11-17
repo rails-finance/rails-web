@@ -75,8 +75,7 @@ const receipts = (chainId) => {
     ["leg share", V.vaultLegShareProv(c)],
     ["leg LLTV", V.vaultLegLltvProv(c)],
     ["allocated", V.vaultAllocatedProv(c)],
-    ["unaccrued interest, V1.1", V.vaultGapProv(c, true)],
-    ["unaccrued interest, V1.0", V.vaultGapProv(c, false)],
+    ...["subtracted", "zero", "unread", "no-ledger"].map((l) => [`unaccrued interest, ${l}`, V.vaultGapProv(c, l)]),
     ["census", V.vaultDirectoryCensusProv(c, { catalogSize: 505, censusBlock: 23_990_000 })],
     ["directory name", V.vaultDirectoryNameProv(c)],
     ["directory total assets", V.vaultDirectoryTotalAssetsProv(c)],
@@ -238,13 +237,39 @@ test("LLTV is the docs' Liquidation Loan-To-Value, not 'the one risk parameter' 
   assert.match(s, /Liquidation Loan-To-Value/);
 });
 
-test("Unaccrued interest names lost assets on a V1.1 vault only, and no asset outside the queue (ui-jobs 688)", () => {
-  const v11 = V.vaultGapProv(c, true).summary;
-  assert.match(v11, /On this V1\.1 vault it also carries the vault's lost assets/);
-  const v10 = V.vaultGapProv(c, false).summary;
-  assert.doesNotMatch(v10, /lost assets|V1\.1/);
-  for (const s of [v11, v10])
-    assert.doesNotMatch(s, /Two readings of the same holdings|outside its Morpho Blue positions/);
+test("Unaccrued interest: the stored lost assets are subtracted on V1.1, and the receipt says so and its limit (ui-jobs 688)", () => {
+  const sub = V.vaultGapProv(c, "subtracted");
+  assert.match(
+    sub.summary,
+    /the lost assets the vault last stored are subtracted too, so a loss since its last interaction stays in this figure until the next one/,
+  );
+  assert.equal(sub.formula, "totalAssets − Σ leg assets − lostAssets");
+  assert.ok(sub.inputs.some((i) => i.label === "lostAssets" && i.kind === "chain" && i.pclass === "state"));
+  assert.match(sub.via, /MetaMorpho\.lostAssets\(\)/);
+  assert.match(
+    sub.verify.text,
+    /totalAssets\(\) and lostAssets\(\).*subtract the allocation table's total and then the lost assets/,
+  );
+
+  const zero = V.vaultGapProv(c, "zero");
+  assert.match(
+    zero.summary,
+    /has stored no lost assets; a loss since its last interaction would show here until the next one/,
+  );
+  assert.equal(zero.formula, "totalAssets − Σ leg assets");
+  assert.ok(!zero.inputs.some((i) => i.label === "lostAssets"));
+
+  assert.match(V.vaultGapProv(c, "unread").summary, /did not answer at this block, so none are subtracted/);
+
+  const v10 = V.vaultGapProv(c, "no-ledger");
+  assert.doesNotMatch(v10.summary, /lost assets|V1\.1/);
+  assert.equal(v10.formula, "totalAssets − Σ leg assets");
+  assert.doesNotMatch(v10.verify.text, /lostAssets/);
+
+  for (const l of ["subtracted", "zero", "unread", "no-ledger"]) {
+    const s = V.vaultGapProv(c, l).summary;
+    assert.doesNotMatch(s, /`|\(\)|Two readings of the same holdings|outside its Morpho Blue positions|also carries/);
+  }
 });
 
 test("total assets walks the withdraw queue; Held attributes the last holders' loss to Morpho's docs", () => {

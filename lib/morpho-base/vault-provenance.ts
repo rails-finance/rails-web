@@ -43,6 +43,7 @@
 import { withServerRead, type ServerRead } from "@/lib/shared/server-head-read";
 import type { Provenance } from "@/components/shared/provenance";
 import { MORPHO_BASE_BLUE } from "@/lib/morpho-base/asset-catalog";
+import type { VaultGapLost } from "@/lib/morpho-base/vault-gap";
 
 /** The chain a receipt's reads were on: Base unless the coordinates say Ethereum. */
 const chainWord = (c: MorphoVaultCoords) => (c.chainId === 1 ? "Ethereum" : "Base");
@@ -105,7 +106,7 @@ const vaultTotalAssetsProv_ = (c: MorphoVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("totalAssets()", c),
-  summary: `Total assets — what the vault holds${atBlock(c)}, in ${asset(c)}. MetaMorpho computes it by walking its withdraw queue and extrapolating each market's interest to this block's timestamp, so it stands ahead of the stored market totals the allocation table sums. Both figures are on the page, and the difference between them is stated as a number.`,
+  summary: `Total assets — what the vault holds${atBlock(c)}, in ${asset(c)}. MetaMorpho computes it by walking its withdraw queue and extrapolating each market's interest to this block's timestamp, so it stands ahead of the stored market totals the allocation table sums. Both figures are on the page.`,
   contract: vaultContract(c),
   via: `${lane(c)} · MetaMorpho.totalAssets() @ the pinned block`,
 });
@@ -266,32 +267,64 @@ const vaultAllocatedProv_ = (c: MorphoVaultCoords): Provenance => ({
   ],
 });
 
-/** totalAssets − Σ legs. Interest the vault has extrapolated and the markets have
- *  not yet settled, plus whatever the vault carries outside its Blue positions. */
-/** `lostLedger`: the vault answered `lostAssets()` (V1.1); a V1.0 vault has no such ledger. */
-const vaultGapProv_ = (c: MorphoVaultCoords, lostLedger: boolean): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  summary: `Unaccrued interest — total assets minus the sum of the stored Morpho Blue legs${atBlock(c)}. MetaMorpho extrapolates each market's interest to this block's timestamp, and Morpho Blue holds what each market last settled; the difference is that interest.${lostLedger ? " On this V1.1 vault it also carries the vault's lost assets, which total assets keeps and no market holds." : ""}`,
-  contract: vaultContract(c),
-  via: `${lane(c)} · MetaMorpho.totalAssets() − Σ legs @ the pinned block`,
-  formula: "totalAssets − Σ leg assets",
-  inputs: [
-    {
-      label: "totalAssets",
-      kind: "chain",
-      pclass: "state",
-      note: "MetaMorpho.totalAssets(), extrapolated to the block",
+/** Unaccrued interest: totalAssets − Σ legs, less the stored lostAssets where a
+ *  V1.1 vault has stored any (ui-jobs 688). Interest the vault has extrapolated
+ *  and the markets have not yet settled. */
+/** `lost`: what the figure did with lost assets (lib/morpho-base/vault-gap.ts). */
+const GAP_LOST_SENTENCE: Record<VaultGapLost, string> = {
+  subtracted:
+    " On this V1.1 vault the lost assets the vault last stored are subtracted too, so a loss since its last interaction stays in this figure until the next one.",
+  zero: " This V1.1 vault has stored no lost assets; a loss since its last interaction would show here until the next one.",
+  unread:
+    " This V1.1 vault's stored lost assets did not answer at this block, so none are subtracted and any loss is in this figure.",
+  "no-ledger": "",
+};
+
+const vaultGapProv_ = (c: MorphoVaultCoords, lost: VaultGapLost): Provenance => {
+  const sub = lost === "subtracted";
+  const block = c.blockNumber != null ? ` at block ${c.blockNumber}` : "";
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    source: { block: c.blockNumber },
+    verify: {
+      kind: "recompute",
+      text: sub
+        ? `To check: ask any ${chainWord(c)} archive node for the vault's totalAssets() and lostAssets()${block}, and subtract the allocation table's total and then the lost assets from the total assets.`
+        : `To check: ask any ${chainWord(c)} archive node for the vault's totalAssets()${block}, and subtract the allocation table's total.`,
     },
-    {
-      label: "Σ leg assets",
-      kind: "chain-derived",
-      pclass: "state",
-      note: "the allocation table's total, stored state",
-    },
-  ],
-});
+    summary: `Unaccrued interest — total assets minus the sum of the stored Morpho Blue legs${atBlock(c)}. MetaMorpho extrapolates each market's interest to this block's timestamp, and Morpho Blue holds what each market last settled; the difference is that interest.${GAP_LOST_SENTENCE[lost] ?? ""}`,
+    contract: vaultContract(c),
+    via: sub
+      ? `${lane(c)} · MetaMorpho.totalAssets() − Σ legs − MetaMorpho.lostAssets() @ the pinned block`
+      : `${lane(c)} · MetaMorpho.totalAssets() − Σ legs @ the pinned block`,
+    formula: sub ? "totalAssets − Σ leg assets − lostAssets" : "totalAssets − Σ leg assets",
+    inputs: [
+      {
+        label: "totalAssets",
+        kind: "chain",
+        pclass: "state",
+        note: "MetaMorpho.totalAssets(), extrapolated to the block",
+      },
+      {
+        label: "Σ leg assets",
+        kind: "chain-derived",
+        pclass: "state",
+        note: "the allocation table's total, stored state",
+      },
+      ...(sub
+        ? [
+            {
+              label: "lostAssets",
+              kind: "chain" as const,
+              pclass: "state" as const,
+              note: "MetaMorpho.lostAssets(), as the vault last stored it",
+            },
+          ]
+        : []),
+    ],
+  };
+};
 
 // ── one holder ───────────────────────────────────────────────────────────────
 
