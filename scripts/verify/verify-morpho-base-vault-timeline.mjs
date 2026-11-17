@@ -1230,11 +1230,11 @@ if (frRoute.status !== 200) {
     `page drew ${t.events.length} rows, withheldAbove ${t.coverage.withheldAbove}, reconcile ${JSON.stringify(t.reconcile)}`,
   );
   check(
-    "1h and its face states that count without 'at least', draws no rows, and says the history reconciled",
+    "1h and its face states that count without 'at least', draws no rows, and says the count is exact",
     !(frPage.horizonText ?? "").includes("at least") &&
       (frPage.horizonText ?? "").includes(t.coverage.withheldAbove.toLocaleString("en-US")) &&
       frPage.domRows === 0 &&
-      /reconcil/i.test(frPage.horizonText ?? ""),
+      /The count is exact/.test(frPage.horizonText ?? ""),
     frPage.horizonText
       ? `"${frPage.horizonText.slice(0, 150)}…" · ${frPage.domRows} rows drawn`
       : "no horizon statement on the page",

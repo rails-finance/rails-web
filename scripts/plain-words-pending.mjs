@@ -37,8 +37,6 @@ export const PLAIN_WORDS_PENDING = [
   "lib/moonwell/event-provenance.ts",
   "lib/moonwell/position-provenance.ts",
   "lib/moonwell/swept-card-provenance.ts",
-  "lib/morpho-base/vault-provenance.ts",
-  "lib/morpho-base/vault-timeline-provenance.ts",
   "lib/polaris/book-provenance.ts",
   "lib/polaris/economics-explanation.tsx",
   "lib/polaris/event-provenance.ts",

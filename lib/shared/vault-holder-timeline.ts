@@ -485,8 +485,8 @@ export interface VaultHolderTimeline {
      *  "N" are different claims and only one of them is true here. */
     logCountIsLowerBound: boolean;
     /** What stands behind `withheldAbove`, set wherever a loader withholds
-     *  (`VaultWithheldBasis`). Absent on a loader that does not set it yet
-     *  (MetaMorpho on Base); `withheldBasisOf` then reads the older flag. */
+     *  (`VaultWithheldBasis`). Where it is absent, `withheldBasisOf` reads the
+     *  older flag. */
     withheldBasis?: VaultWithheldBasis;
     /** THE RENDER WINDOW, when the life is longer than the client is handed.
      *  `rows` of `of` were serialised into `events`, newest first; the rest of

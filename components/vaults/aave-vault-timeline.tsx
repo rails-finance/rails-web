@@ -66,6 +66,7 @@ import { Fragment, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { Prov } from "@/components/shared/provenance";
+import { refetchWords, withheldCountWords, withheldPaneWords } from "@/lib/shared/vault-withheld-words";
 import { shareText } from "@/components/protocol/morpho-base/vault-exposure-parts";
 import { VaultTimelineRow, rawAmount as raw, type VaultTimelineProvKit } from "@/components/vaults/vault-timeline-row";
 import { utcInstant } from "@/components/vaults/aave-vault-format";
@@ -146,6 +147,7 @@ export function AaveVaultTimeline({ timeline, family, vaultName, shareSymbol, as
   const shareDecimals = timeline.events[0]?.shareDecimals ?? 18;
   const assetDecimals = timeline.events[0]?.assetDecimals ?? 18;
   const withheld = timeline.coverage.withheldAbove;
+  const basis = withheldBasisOf(timeline.coverage);
   const building = timeline.history?.building;
   // The outer window, when the life was longer than the client is handed.
   const window = timeline.coverage.drawn;
@@ -196,7 +198,7 @@ export function AaveVaultTimeline({ timeline, family, vaultName, shareSymbol, as
   return (
     <section className="mb-6" data-skel-section="vault-timeline" data-vault-timeline={timeline.holder}>
       {!onEventPage && (
-        <h2 className="text-sm font-semibold text-foreground">This address&rsquo;s own events in the vault</h2>
+        <h2 className="text-sm font-semibold text-foreground">This address&rsquo;s events in the vault</h2>
       )}
 
       {/* Where the rows came from. A row at or below the lane's own `finalized`
@@ -209,73 +211,43 @@ export function AaveVaultTimeline({ timeline, family, vaultName, shareSymbol, as
       {timeline.unread ? (
         <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-figure="timeline-unread">
           The history of this address in this vault could not be read just now, so none is drawn. The figures above are
-          unaffected: they are calls at block {n(timeline.blockNumber)} and were answered.
+          unaffected: they were read at block {n(timeline.blockNumber)}.
         </p>
       ) : withheld != null ? (
         // BEFORE the gate, because on the lower-bound path there is no gate to
         // report: the logs were never handed over, so there was nothing to
         // replay. Both shapes withhold every row.
         <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-figure="timeline-horizon">
-          <Prov
-            info={vaultTimelineHorizonProv(
-              coords,
-              withheld,
-              tailMaxRows(MAINNET_CHAIN_ID),
-              withheldBasisOf(timeline.coverage),
-            )}
-          >
-            This address has {timeline.coverage.logCountIsLowerBound ? "at least " : ""}
-            {n(withheld)} of its own share transfers on this vault
+          <Prov info={vaultTimelineHorizonProv(coords, withheld, tailMaxRows(MAINNET_CHAIN_ID), basis)}>
+            This address has {withheldCountWords(basis, withheld)} share transfers on this vault
           </Prov>
-          {withheldBasisOf(timeline.coverage) === "unchecked" ? (
-            <>
-              . The balance check did not run: the query for this address&rsquo;s transfers failed, so the count was
-              made in chunks and nothing confirmed it.{" "}
-            </>
-          ) : (
-            <>
-              , more than Rails keeps a stored history for.{" "}
-              {timeline.coverage.logCountIsLowerBound ? (
-                <>
-                  The count is a floor: the node would not return this address&rsquo;s whole history at once, so the
-                  range was counted a piece at a time, and the count stopped once it passed what this page draws.
-                  Because the logs were never read whole, the balance check could not be run on this address.
-                </>
-              ) : (
-                <>
-                  The whole history was read and it reconciles against the vault&rsquo;s own <code>balanceOf</code>;
-                  what is withheld is the drawing of it.
-                </>
-              )}{" "}
-            </>
-          )}
-          The newest rows are not shown in place of the rest.
+          {withheldPaneWords(basis, withheld, tailMaxRows(MAINNET_CHAIN_ID))}
         </p>
       ) : !reconcile ? null : !reconcile.reconciled ? (
         <GateFailure coords={coords} timeline={timeline} shareUnit={shareUnit} shareDecimals={shareDecimals} />
       ) : building ? (
-        /* A READING IN PROGRESS, stated as one. Each row costs an archive call
+        /* A READING IN PROGRESS, stated as one. Each distinct row block costs an archive call
            at its own block, so a life this long is built into Rails's store a
            chunk of blocks at a time and drawn once it is whole. No rows here:
            a prefix of a life is not a life, and the check above sums every
            one of them. */
         <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-figure="timeline-building">
           <Prov info={vaultTimelineBuildingProv(coords, building)}>
-            Rails is storing this history now: {n(building.keptRows)} of {n(building.totalRows)} rows kept at or below
-            block {n(building.keptCut)}
+            This history is still loading: {n(building.keptRows)} of {n(building.totalRows)} rows kept, up to block{" "}
+            {n(building.keptCut)}
           </Prov>
-          . The rows and the flows are drawn once the whole life is stored, on a later visit. Every figure above this is
-          unaffected: they are calls answered at block {n(timeline.blockNumber)}.
+          . The rows and the flows are drawn once the whole history is kept, on a later visit. The figures above are
+          unaffected: they were read at block {n(timeline.blockNumber)}.
         </p>
       ) : onEventPage ? null : (
         <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-figure="timeline-reconciled">
           Every share transfer this address sent or received, newest first, replayed.{" "}
           <Prov info={vaultTimelineGateProv(coords, reconcile)}>
-            The replay gives {shareText(raw(reconcile.replayed, shareDecimals), shareDecimals)} {shareUnit} and{" "}
-            <code>balanceOf</code> at block {n(reconcile.toBlock)} gives{" "}
+            The replay gives {shareText(raw(reconcile.replayed, shareDecimals), shareDecimals)} {shareUnit} and the
+            vault&rsquo;s balance at block {n(reconcile.toBlock)} gives{" "}
             {shareText(raw(reconcile.onChain, shareDecimals), shareDecimals)}
           </Prov>
-          , so the rows are drawn. Each states its own share price at its own block; no line joins two of them.
+          , so the rows are drawn. Each states its share price at its block; no line joins two of them.
         </p>
       )}
 
@@ -357,7 +329,7 @@ export function AaveVaultTimeline({ timeline, family, vaultName, shareSymbol, as
               ? "The vault's accrual is not a row here."
               : family === "stata"
                 ? "This vault emits no accrual event at all."
-                : "This token's assets are a stored counter rather than a balance read."}
+                : "This token's assets are a stored counter."}
           </Prov>{" "}
           A row is something this address did.
         </p>
@@ -387,8 +359,8 @@ function HistoryLine({ coords, timeline }: { coords: VaultTimelineCoords; timeli
     >
       <Prov info={prov}>
         {h.source === "stored+head"
-          ? `${n(h.tailRows)} rows at or below block ${n(h.cut ?? 0)} from Rails's store of chain readings, ${n(h.headRows)} rows above it read now`
-          : `Every row read on this request`}
+          ? `${n(h.tailRows)} rows at or below block ${n(h.cut ?? 0)} were kept, ${n(h.headRows)} rows above it were read now`
+          : `Every row was read on this request`}
       </Prov>
       ; reconciled at block {n(timeline.blockNumber)}.
     </p>
@@ -413,15 +385,11 @@ function GateFailure({
       <Prov info={vaultTimelineGateProv(coords, r)}>
         This address&rsquo;s history in this vault could not be reconciled. Replaying every share transfer it sent or
         received gives {shareText(raw(r.replayed, shareDecimals), shareDecimals)} {shareUnit} at block {n(r.toBlock)};
-        the vault&rsquo;s own <code>balanceOf</code> at that block gives{" "}
-        {shareText(raw(r.onChain, shareDecimals), shareDecimals)}
+        the vault&rsquo;s balance at that block gives {shareText(raw(r.onChain, shareDecimals), shareDecimals)}
       </Prov>
       . The two do not agree, so no history is drawn.
-      {r.refetched &&
-        (r.refetchDiffered
-          ? " Both sweeps were run a second time and returned a different number of logs from the first, which is direct evidence of the lane answering one question two ways."
-          : " Both sweeps were run a second time and returned the same number of logs.")}{" "}
-      The figures above this are unaffected: they are calls at block {n(timeline.blockNumber)}.
+      {r.refetched && ` ${refetchWords(r.refetchDiffered)}`} The figures above are unaffected: they were read at block{" "}
+      {n(timeline.blockNumber)}.
     </p>
   );
 }
