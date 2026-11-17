@@ -1457,7 +1457,9 @@ function psmGapReceiptLine(note: PsmGapNote): string {
       `- Receipt: this position's CDPUpdated at block ${formatBlock(note.to.block)}` +
       `${note.to.txHash ? `, tx ${note.to.txHash}` : ""}; raw: ${raw(note)}.${count}`
     );
-  const touches = members.map((g) => `block ${formatBlock(g.to.block)}: ${raw(g)}`).join("; ");
+  const touches = members
+    .map((g) => `block ${formatBlock(g.to.block)}${g.to.txHash ? `, tx ${g.to.txHash}` : ""}: ${raw(g)}`)
+    .join("; ");
   return `- Receipt: this position's CDPUpdated at each touch that wrote a share, raw — ${touches}.${count}`;
 }
 
