@@ -92,7 +92,7 @@ export function FilterPill({
   if (pinned) {
     return (
       <div className="relative shrink-0" {...hooks}>
-        <div className={`${PILL_BASE} ${PILL_SET} gap-1.5 px-3.5 text-foreground`} aria-label={spoken}>
+        <div className={`${PILL_BASE} ${PILL_SET_TONE} gap-1.5 px-3.5 text-foreground`}>
           {label && <span className={`shrink-0 ${LABEL}`}>{label}</span>}
           <span className="min-w-0 truncate font-semibold">{value}</span>
         </div>

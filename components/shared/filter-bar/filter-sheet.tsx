@@ -457,7 +457,20 @@ function Sheet<F>({
             <ul className="px-4">
               {dims.map((dim) => (
                 <li key={dim.id} className="border-b border-rb-200 dark:border-rb-800">
-                  {isToggle(dim) ? (
+                  {dim.pinned?.(filters) ? (
+                    // Fixed from outside (a search naming a market): its choice
+                    // as plain text, with nothing to pick.
+                    <div
+                      className="flex w-full min-h-14 items-center gap-3 py-3"
+                      data-filter-sheet-row={dim.id}
+                      data-filter-sheet-pinned=""
+                    >
+                      <span className="text-sm">{dim.label}</span>
+                      <span className="ml-auto truncate text-sm font-medium text-foreground">
+                        {currentChoice(dim, filters)}
+                      </span>
+                    </div>
+                  ) : isToggle(dim) ? (
                     <ToggleRow dim={dim} filters={filters} onChange={onChange} />
                   ) : isSegmented(dim) ? (
                     <SegmentRow dim={dim} filters={filters} onChange={onChange} />
