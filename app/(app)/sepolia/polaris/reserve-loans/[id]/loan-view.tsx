@@ -21,7 +21,7 @@ import { PolarisLoanEventCard } from "@/components/protocol/polaris/polaris-sp-l
 import { fetchPolarisLoanChain, type PolarisLoanChain } from "@/lib/api/fetch-polaris-sp-loans-chain";
 import { FPETH } from "@/lib/polaris/asset-catalog";
 import { POLARIS_LOANS_PATH } from "@/lib/polaris/routes";
-import { atFloor, big, loanLifetime, pendingFee, units } from "@/lib/polaris/sp-loan-math";
+import { atFloor, big, loanLifetime, max0, pendingFee, units } from "@/lib/polaris/sp-loan-math";
 import { polarisLoanTower } from "@/lib/polaris/loan-flows";
 import { loanLiveProv } from "@/lib/polaris/sp-loan-provenance";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
@@ -79,7 +79,7 @@ export default function LoanView({ loanId, initial }: { loanId: string; initial:
     return {
       coll: big(chain.collRaw),
       debt,
-      cost: debt - lifetime.netBorrowed,
+      cost: max0(debt - lifetime.netBorrowed),
       atFloor: atFloor(chain.collRaw, chain.floorPriceRaw),
     };
   }, [chain, lifetime, open]);

@@ -47,7 +47,7 @@ export const exactUnits = (v: bigint): string => {
   return `${neg ? "-" : ""}${(a / E18).toString()}${frac ? `.${frac}` : ""}`;
 };
 
-const max0 = (v: bigint): bigint => (v > ZERO ? v : ZERO);
+export const max0 = (v: bigint): bigint => (v > ZERO ? v : ZERO);
 
 /** floor(recorded × P ÷ snapshot P): the deposit now on the index's figures. */
 export function compounded(recordedRaw: string, snapshotP: string, p: string): bigint {
