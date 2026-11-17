@@ -11,8 +11,7 @@ export function PolarisDepositFlowsNote({ stable }: { stable: string }): ReactNo
   return (
     <div className="space-y-2" data-polaris-deposit-flows-note="" data-anatomy="F14">
       <p>
-        The bars are the deposit&apos;s two tokens, each on its own scale. Nothing on this page prices pETH in {stable},
-        so the two lengths do not compare.
+        The bars are the deposit&apos;s two tokens, each on its own scale. Nothing on this page prices pETH in {stable}.
       </p>
       <p>
         The {stable} bar: deposited, with the {stable} yield the touches paid in, less withdrawn, burned by liquidations
@@ -60,8 +59,10 @@ export function PolarisLoanFlowsNote({ accrued }: { accrued: boolean }): ReactNo
   return (
     <div className="space-y-2" data-polaris-loan-flows-note="" data-anatomy="F14">
       <p>
-        The bars are the loan&apos;s two sides: the fpETH it holds and the WETH it owes, each on its own scale. The
-        floor prices fpETH in WETH; the bars do not use it, so the two lengths do not compare.
+        Both bars are in WETH: the fpETH the loan holds at the bonding curve&apos;s floor, and the WETH it owes. Each
+        fpETH flow is valued at the floor in force at its touch; the floor only rises, and its rise since is the
+        collateral&apos;s Floor rise. The index records the floor only at the loan&apos;s touches, so a day between
+        keeps the last touch&apos;s floor, drawn dotted; today is the chain&apos;s floor.
       </p>
       <p>
         The debt: borrowed, with the fees (dashed), less repaid, is what the loan owes. Each touch charges the fees the
@@ -76,10 +77,10 @@ export function polarisLoanFlowsContent(): LearnMoreContent {
   return {
     title: "About the lifetime flows",
     intro:
-      "The bars add up the loan's touches, the collateral in fpETH and the debt in WETH, and the line under them draws each at the end of each day.",
+      "The bars add up the loan's touches in WETH, the collateral at the bonding curve's floor, and the line under them draws each at the end of each day.",
     stepsHeading: "How it's built:",
     steps: [
-      "Collateral: deposited, less returned, is the fpETH the loan holds.",
+      "Collateral: deposited, less returned, each at the floor at its touch, with the floor's rise since, is the fpETH the loan holds at the floor.",
       "Debt: borrowed, plus the fees, less repaid, is the WETH the loan owes.",
     ],
     detailsHeading: "Key concepts:",

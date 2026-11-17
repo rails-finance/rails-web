@@ -278,6 +278,8 @@ export interface LoanFlowTouch {
   debt_change: string | null;
   coll_after: string | null;
   debt_after: string | null;
+  /** The floor in force at the touch, WETH per fpETH (1e18). */
+  floor_price: string | null;
 }
 
 /** One touch's legs on the two bars of the Lifetime flows. */
@@ -291,6 +293,8 @@ export interface LoanLegs {
   fee: bigint;
   coll: bigint;
   debt: bigint;
+  /** The floor at the touch, or null where the row has none. */
+  floor: bigint | null;
 }
 
 /** Each touch's legs, oldest first. Each debt is ceil(shares × index), so a
@@ -316,6 +320,7 @@ export function loanLegs(touches: LoanFlowTouch[]): LoanLegs[] {
       fee: max0(raw),
       coll: big(t.coll_after),
       debt: after,
+      floor: t.floor_price ? big(t.floor_price) : null,
     };
   });
 }

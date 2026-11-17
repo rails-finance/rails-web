@@ -11,10 +11,13 @@
 // each bar adds what the pool has done since the last touch to the line it
 // belongs to (`live.pending`): the burn, the yield and the pETH pending.
 //
-// LOAN. fpETH on one bar (deposited, less returned), WETH on the other
-// (borrowed, with the fees each touch's index charged, less repaid, holds the
-// debt after the last touch); today the fees accrued since then join the
-// fees line, where the chain's loans(id) agrees with the last touch.
+// LOAN. Both bars in WETH, so their lengths compare: the fpETH at the bonding
+// curve's floor (deposited, less returned, each at the floor in force at its
+// touch; the floor's rise since is the bar's balancing item), and the debt
+// (borrowed, with the fees each touch's index charged, less repaid). The
+// index records the floor only at the loan's touches; today is the chain's.
+// Today the fees accrued since the last touch join the fees line, where the
+// chain's loans(id) agrees with the last touch.
 //
 // The panel draws each day's markers by side: on its second bar an inflow is
 // marked as leaving the position, which fits a debt and not the pETH a
@@ -265,35 +268,56 @@ function loanBuckets(): FlowBucket[] {
   ];
 }
 
-/** A loan's touches, oldest first, as the panel's timeline and focus events. */
+/** The chain's read of a loan, as the page passes it. */
+export interface LoanChainNow {
+  collRaw: string;
+  sharesRaw: string;
+  debtRaw: string;
+  floorPriceRaw: string;
+}
+
+/** A loan's touches, oldest first, as the panel's timeline and focus events:
+ *  both bars in WETH, the fpETH at the floor in force at each touch, and
+ *  today at the chain's floor. */
 export function loanFlows(
   rowsAsc: PolarisLoanEventRow[],
-  o: { open: boolean; chain: { collRaw: string; sharesRaw: string; debtRaw: string } | null; nowSec: number },
+  o: { open: boolean; chain: LoanChainNow | null; nowSec: number },
 ): SpLoanFlows | null {
   const touches = rowsAsc.filter((r) => r.event_type !== "transfer");
   if (touches.length === 0) return null;
-  const lastRow = touches[touches.length - 1];
-  // The chain's read only where it agrees with the index's last touch.
-  const chain = o.open && o.chain && loanChainAgrees(o.chain, lastRow, touches.length) ? o.chain : null;
   const legsOf = loanLegs(touches);
-  let peakA = 0;
-  let peakB = 0;
+  // Each touch's floor, carried from the touch before where a row has none.
+  const floors: number[] = [];
+  let carried: number | null = null;
   for (const g of legsOf) {
-    peakA = Math.max(peakA, units(g.coll));
-    peakB = Math.max(peakB, units(g.debt));
+    if (g.floor != null && g.floor > ZERO) carried = units(g.floor);
+    floors.push(carried ?? 0);
   }
-  const debtNow = chain ? BigInt(chain.debtRaw) : null;
-  if (debtNow != null) peakB = Math.max(peakB, units(debtNow));
-  const scale = { collateral: unitScaleFor(peakA * 2), debt: unitScaleFor(peakB * 2) };
-  const G: Grains = { collateral: 10 ** scale.collateral, debt: 10 ** scale.debt };
+  if (carried == null) return null;
+  const lastRow = touches[touches.length - 1];
+  const last = legsOf[legsOf.length - 1];
+  // The floor is the protocol's, read whether or not the loan agrees; the
+  // loan's own figures only where loans(id) agrees with the last touch.
+  const floorNow = o.chain && BigInt(o.chain.floorPriceRaw) > ZERO ? units(BigInt(o.chain.floorPriceRaw)) : carried;
+  const agrees = o.open && o.chain != null && loanChainAgrees(o.chain, lastRow, touches.length);
+  const debtNow = agrees && o.chain ? BigInt(o.chain.debtRaw) : null;
+
+  let peak = 0;
+  legsOf.forEach((g, i) => {
+    peak = Math.max(peak, units(g.coll) * floors[i], units(g.debt));
+  });
+  peak = Math.max(peak, units(last.coll) * floorNow, debtNow != null ? units(debtNow) : 0);
+  const scale = unitScaleFor(peak * 2);
+  const G = 10 ** scale;
 
   const events: FlowEvent[] = touches.map((r, i) => {
     const g = legsOf[i];
+    const f = floors[i];
     const legs: FlowEvent["legs"] = [];
     const a = (bucket: string, v: bigint) =>
-      v > ZERO && legs.push({ bucket, usd: units(v) * G.collateral, symbol: FPETH.symbol });
+      v > ZERO && legs.push({ bucket, usd: units(v) * f * G, symbol: FPETH.symbol });
     const b = (bucket: string, v: bigint) =>
-      v > ZERO && legs.push({ bucket, usd: units(v) * G.debt, symbol: POLARIS_WETH.symbol });
+      v > ZERO && legs.push({ bucket, usd: units(v) * G, symbol: POLARIS_WETH.symbol });
     a(L.deposited, g.collIn);
     a(L.returned, g.collOut);
     b(L.borrowed, g.borrowed);
@@ -313,8 +337,8 @@ export function loanFlows(
         { asset: B, symbol: POLARIS_WETH.symbol, side: "debt", amount: units(g.debt) },
       ],
       prices: [
-        { asset: A, usd: G.collateral },
-        { asset: B, usd: G.debt },
+        { asset: A, usd: f * G },
+        { asset: B, usd: G },
       ],
     };
   });
@@ -327,49 +351,89 @@ export function loanFlows(
   const firstDay = Math.floor(events[0].ts / DAY_S);
   const lastDay = Math.floor(events[events.length - 1].ts / DAY_S);
   const endDay = o.open ? Math.max(today, lastDay + 1) : lastDay + 1;
-  const last = legsOf[legsOf.length - 1];
+
+  // The floor is recorded on the days the loan was touched, and today; a day
+  // between keeps the last (`seriesCarry`), drawn dotted (`carriedWhy`).
+  const floorObs = new Map<number, number>();
+  events.forEach((e, i) => floorObs.set(Math.floor(e.ts / DAY_S), floors[i] * G));
+  if (o.open && o.chain) floorObs.set(today, floorNow * G);
+  const wethObs: [number, number][] = [];
+  for (let d = firstDay; d <= endDay; d++) wethObs.push([d, G]);
+
   const heldA = o.open ? units(last.coll) : 0;
   const heldB = o.open ? units(debtNow ?? last.debt) : 0;
   const accrued = debtNow != null && debtNow > last.debt ? debtNow - last.debt : ZERO;
   const assets: NonNullable<FlowTimeline["live"]["assets"]> = [];
-  if (heldA > DUST) assets.push({ side: "collateral", symbol: FPETH.symbol, amount: heldA, usd: heldA * G.collateral });
-  if (heldB > DUST) assets.push({ side: "debt", symbol: POLARIS_WETH.symbol, amount: heldB, usd: heldB * G.debt });
+  if (heldA > DUST) assets.push({ side: "collateral", symbol: FPETH.symbol, amount: heldA, usd: heldA * floorNow * G });
+  if (heldB > DUST) assets.push({ side: "debt", symbol: POLARIS_WETH.symbol, amount: heldB, usd: heldB * G });
 
   const timeline: FlowTimeline = {
-    unit: { symbol: POLARIS_WETH.symbol, scale: scale.debt },
-    sideUnits: {
-      collateral: { symbol: FPETH.symbol, scale: scale.collateral },
-      debt: { symbol: POLARIS_WETH.symbol, scale: scale.debt },
-    },
+    unit: { symbol: POLARIS_WETH.symbol, scale },
     buckets,
     days,
     live: {
-      collateralUsd: heldA * G.collateral,
-      debtUsd: heldB * G.debt,
+      collateralUsd: heldA * floorNow * G,
+      debtUsd: heldB * G,
       assets,
       ...(accrued > ZERO
-        ? { pending: [{ bucket: L.fees, symbol: POLARIS_WETH.symbol, usd: units(accrued) * G.debt }] }
+        ? { pending: [{ bucket: L.fees, symbol: POLARIS_WETH.symbol, usd: units(accrued) * G }] }
         : {}),
     },
-    todayPrices: { [A]: G.collateral, [B]: G.debt },
-    dailyPrices: sidePrices(firstDay, endDay, G),
+    todayPrices: { [A]: floorNow * G, [B]: G },
+    dailyPrices: { [A]: [...floorObs.entries()].sort((x, y) => x[0] - y[0]), [B]: wethObs },
     seriesCarry: true,
+    carriedWhy: { [A]: "the index records the floor only at this loan's touches" },
+    priceSource: "the bonding curve's floor, at the loan's touches and today",
     today: o.open ? today : endDay,
-    labels: { collateral: "Collateral", debt: "Debt" },
+    labels: { collateral: "Collateral at the floor", debt: "Debt" },
     addresses: { [FPETH.symbol]: FPETH.address, [POLARIS_WETH.symbol]: POLARIS_WETH.address },
     words: {
-      restBySide: { debt: "Fees since the last touch" },
+      restBySide: { collateral: "Floor rise", debt: "Fees since the last touch" },
+      restNote: {
+        collateral: "the rise in the floor since each fpETH came in",
+        debt: "the fees the index built since the loan's last touch",
+      },
       basis: {
-        collateral: `Every figure is in ${FPETH.symbol}.`,
-        debt: `Every figure is in ${POLARIS_WETH.symbol}. The bars do not use the floor's price of ${FPETH.symbol}.`,
+        collateral: `Each ${FPETH.symbol} flow is valued in ${POLARIS_WETH.symbol} at the floor in force at its touch.`,
+        debt: `Every figure is in ${POLARIS_WETH.symbol}.`,
       },
       heldBasis: {
-        collateral: `the ${FPETH.symbol} the loan held after its last touch.`,
+        collateral: `the ${FPETH.symbol} the loan held after its last touch, at the floor: the floor in force at the loan's last touch on the days between, the chain's floor today.`,
         debt: `the ${POLARIS_WETH.symbol} owed after the loan's last touch, at the fee index in force there.`,
       },
-      linePrices: `with the collateral in ${FPETH.symbol} and the debt in ${POLARIS_WETH.symbol}, each on its own scale`,
-      moment: { tokensOnly: ["collateral", "debt"] },
+      linePrices: `in ${POLARIS_WETH.symbol}, the ${FPETH.symbol} at the floor`,
+      throughput: "each at the floor in force at its touch",
     },
   };
-  return { timeline, focus: focusEvents(events, buckets, G) };
+  return { timeline, focus: loanFocusEvents(events, buckets, floors, G) };
+}
+
+/** The touches as the event cards' sums read them, the collateral at each
+ *  touch's floor. */
+function loanFocusEvents(events: FlowEvent[], buckets: FlowBucket[], floors: number[], G: number): FocusEvent[] {
+  const out = new Set(buckets.filter((b) => b.dir === "out").map((b) => b.key));
+  const sideOf = new Map(buckets.map((b) => [b.key, b.side]));
+  return events.map((e, i) => {
+    const per = { collateral: floors[i] * G, debt: G };
+    const move = { collateral: 0, debt: 0 };
+    for (const l of e.legs) move[sideOf.get(l.bucket)!] += (out.has(l.bucket) ? -1 : 1) * l.usd;
+    const side = (k: "collateral" | "debt") => {
+      const bal = e.balances.find((b) => b.side === k)!;
+      const after = bal.amount * per[k];
+      return {
+        before: Math.max(0, after - move[k]),
+        after,
+        amount: move[k] / per[k],
+        symbol: bal.symbol,
+        held: bal.amount,
+      };
+    };
+    return {
+      id: e.id,
+      ts: e.ts,
+      ...(e.tx ? { tx: e.tx } : {}),
+      legs: e.legs.map((l) => ({ ...l, amount: l.usd / per[sideOf.get(l.bucket)!] })),
+      sides: { collateral: side("collateral"), debt: side("debt") },
+    };
+  });
 }

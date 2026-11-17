@@ -112,7 +112,13 @@ const LOAN_63 = [
   ["200000000000000000", "0", "1200000000000000000", "1260301649662357011"],
   ["0", "277454050151666939", "1200000000000000000", "1537861195175130827"],
   ["0", "-25000000000000000", "1200000000000000000", "1514224488545736950"],
-].map(([coll_change, debt_change, coll_after, debt_after]) => ({ coll_change, debt_change, coll_after, debt_after }));
+].map(([coll_change, debt_change, coll_after, debt_after], i) => ({
+  coll_change,
+  debt_change,
+  coll_after,
+  debt_after,
+  floor_price: ["1260301649662357012", "1260301649662357012", "1281550995979275691", "1529932509366656592"][i],
+}));
 
 test("each touch's fee is the debt after it, less the debt before and its change", () => {
   const legs = loanLegs(LOAN_63);
@@ -123,14 +129,15 @@ test("each touch's fee is the debt after it, less the debt before and its change
   const sum = (k) => legs.reduce((a, g) => a + g[k], ZERO);
   assert.equal(sum("borrowed") + sum("fee") - sum("repaid"), legs[3].debt);
   assert.equal(sum("collIn") - sum("collOut"), legs[3].coll);
+  assert.equal(legs[3].floor, B("1529932509366656592"));
 });
 
 test("a touch a wei under the debt before books no fee, and the next fee pays the wei back", () => {
   const touches = [
-    { coll_change: "10", debt_change: "1000", coll_after: "10", debt_after: "1000" },
+    { coll_change: "10", debt_change: "1000", coll_after: "10", debt_after: "1000", floor_price: null },
     // ceil(shares × index) after a repay of 100 lands a wei under 900.
-    { coll_change: "0", debt_change: "-100", coll_after: "10", debt_after: "899" },
-    { coll_change: "0", debt_change: "0", coll_after: "10", debt_after: "905" },
+    { coll_change: "0", debt_change: "-100", coll_after: "10", debt_after: "899", floor_price: null },
+    { coll_change: "0", debt_change: "0", coll_after: "10", debt_after: "905", floor_price: null },
   ];
   const legs = loanLegs(touches);
   assert.deepEqual(
