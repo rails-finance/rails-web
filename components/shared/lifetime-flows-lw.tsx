@@ -110,8 +110,8 @@ const ZOOM_PER_NOTCH = 0.1;
 const COLORS = {
   collateral: ["var(--color-blue-500)"],
   collateralFill: ["var(--color-blue-500)", 0.14],
-  debt: ["var(--color-green-400)"],
-  debtFill: ["var(--color-green-400)", 0.12],
+  debt: ["var(--flow-debt, var(--color-green-400))"],
+  debtFill: ["var(--flow-debt, var(--color-green-400))", 0.12],
   liq: ["var(--color-red-500)"],
   warn: ["var(--color-amber-500)"],
   band: ["var(--color-amber-500)", 0.16],
@@ -1401,7 +1401,7 @@ export function LifetimeFlowsLw({
           <span
             key={k}
             aria-hidden
-            className={`pointer-events-none absolute left-1 text-[10px] font-semibold leading-none ${k === "collateral" ? "text-blue-600 dark:text-[var(--text-link)]" : "text-green-700 dark:text-green-400"}`}
+            className={`pointer-events-none absolute left-1 text-[10px] font-semibold leading-none ${k === "collateral" ? "text-blue-600 dark:text-[var(--text-link)]" : "text-[var(--flow-debt-label,var(--color-green-700))] dark:text-[var(--flow-debt,var(--color-green-400))]"}`}
             style={{ top: sideTop(i) + 3 }}
             data-flow-line-side-top={k}
           >

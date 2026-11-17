@@ -31,7 +31,7 @@ import {
 } from "react";
 import { DiscChevron } from "@/components/shared/expand-chevron";
 import { Prov, ProvDetached, type Provenance } from "@/components/shared/provenance";
-import { HUE, INFLOW_SWATCH, fillStyle } from "@/components/shared/lifetime-flows-tip";
+import { fillStyle, useFlowHues, type FlowHues } from "@/components/shared/lifetime-flows-tip";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { QuietTipsContext, RevealTip } from "@/components/shared/reveal-tip";
 import { StatCard, TransitionArrow } from "@/components/shared/state-transition";
@@ -57,7 +57,7 @@ import {
 /** Each side's hue, as the bars draw it. */
 export const SIDE_HUE: Record<FlowSide, string> = {
   collateral: "var(--color-blue-500)",
-  debt: "var(--color-green-400)",
+  debt: "var(--flow-debt, var(--color-green-400))",
 };
 export const dayStamp = ledgerDayStamp;
 export const SIDE_NAME: Record<FlowSide, string> = { collateral: "Collateral", debt: "Debt" };
@@ -458,22 +458,23 @@ function ClosedUsd({ before, after, off }: ClosedUsdFigures & { off: OffPar | nu
 
 /** An asset's interest: what grew the balance, in the side's faded inflow
  *  hue, outlined in dashes because no flow moved it. */
-const INTEREST_SWATCH: Record<FlowSide, CSSProperties> = {
-  collateral: { background: INFLOW_SWATCH.collateral, borderColor: HUE.collateral.line },
-  debt: { background: INFLOW_SWATCH.debt, borderColor: HUE.debt.line },
-};
+const interestSwatch = (hues: FlowHues, side: FlowSide): CSSProperties => ({
+  background: hues[side].swatch,
+  borderColor: hues[side].line,
+});
 
 /** A row's swatch: the bar's fill for its line; an asset's interest the
  *  side's faded hue in a dashed outline of the side's line colour, apart from
  *  every flow's fill; the price's effect a grey dashed box
  *  (lifetime-flows-tip.tsx `fillStyle`). */
 function Swatch({ side, row }: { side: FlowSide; row: Pick<LedgerRow, "seg" | "role"> | null }) {
+  const hues = useFlowHues();
   if (row && !row.seg && row.role === "interest")
     return (
       <i
         aria-hidden
         className="inline-block size-3 rounded-[2px] border border-dashed"
-        style={INTEREST_SWATCH[side]}
+        style={interestSwatch(hues, side)}
         data-ledger-swatch="interest"
       />
     );
@@ -489,7 +490,7 @@ function Swatch({ side, row }: { side: FlowSide; row: Pick<LedgerRow, "seg" | "r
     <i
       aria-hidden
       className="inline-block size-3 rounded-[2px]"
-      style={row?.seg ? fillStyle(side, row.seg) : { background: SIDE_HUE[side] }}
+      style={row?.seg ? fillStyle(side, row.seg, hues) : { background: SIDE_HUE[side] }}
     />
   );
 }

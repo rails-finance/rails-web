@@ -55,14 +55,23 @@ export function polarisDepositFlowsContent(stable: string): LearnMoreContent {
   };
 }
 
-export function PolarisLoanFlowsNote({ accrued }: { accrued: boolean }): ReactNode {
+export function PolarisLoanFlowsNote({
+  accrued,
+  dailyFloor,
+}: {
+  accrued: boolean;
+  /** The floor was read for every day (/reserve-loans/floor/daily). */
+  dailyFloor: boolean;
+}): ReactNode {
   return (
     <div className="space-y-2" data-polaris-loan-flows-note="" data-anatomy="F14">
       <p>
         Both bars are in WETH: the fpETH the loan holds at the bonding curve&apos;s floor, and the WETH it owes. Each
         fpETH flow is valued at the floor in force at its touch; the floor only rises, and its rise since is the
-        collateral&apos;s Floor rise. The index records the floor only at the loan&apos;s touches, so a day between
-        keeps the last touch&apos;s floor, drawn dotted; today is the chain&apos;s floor.
+        collateral&apos;s Floor rise.
+        {dailyFloor
+          ? " Between touches the line takes each day's closing floor; today is the chain's floor."
+          : " The floor was read only at the loan's touches, so a day between keeps the last touch's floor, drawn dotted; today is the chain's floor."}
       </p>
       <p>
         The debt: borrowed, with the fees (dashed), less repaid, is what the loan owes. Each touch charges the fees the

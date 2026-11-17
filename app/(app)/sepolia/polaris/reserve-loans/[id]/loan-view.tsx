@@ -35,6 +35,7 @@ import { loanTimelineEvent } from "@/lib/polaris/sp-loan-timeline-events";
 import { loanLiveProv } from "@/lib/polaris/sp-loan-provenance";
 import {
   readPolarisSpLoans,
+  type PolarisFloorDaysResponse,
   type PolarisLoanEventRow,
   type PolarisLoanTimelineResponse,
 } from "@/lib/sources/api/polaris-sp-loans";
@@ -89,10 +90,22 @@ export default function LoanView({ loanId, initial }: { loanId: string; initial:
   // Set on mount, so the server's render and the first client render agree.
   const [nowSec, setNowSec] = useState<number | null>(null);
   useEffect(() => setNowSec(Math.floor(Date.now() / 1000)), []);
-  const flowsReady = data != null && chainSettled && nowSec != null;
+  // The floor at each day's close, read once; a failed read leaves the
+  // touches' floors, carried.
+  const [floorDays, setFloorDays] = useState<PolarisFloorDaysResponse["days"] | null | undefined>(undefined);
+  useEffect(() => {
+    let cancelled = false;
+    readPolarisSpLoans<PolarisFloorDaysResponse>("reserve-loans/floor/daily", {})
+      .then((d) => !cancelled && setFloorDays(d.days))
+      .catch(() => !cancelled && setFloorDays(null));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const flowsReady = data != null && chainSettled && nowSec != null && floorDays !== undefined;
   const flows = useMemo(
-    () => (flowsReady && nowSec != null ? loanFlows(touches, { open, chain, nowSec }) : null),
-    [flowsReady, touches, open, chain, nowSec],
+    () => (flowsReady && nowSec != null ? loanFlows(touches, { open, chain, nowSec, floorDays }) : null),
+    [flowsReady, touches, open, chain, nowSec, floorDays],
   );
   const flowFocus = useFlowFocusValue(useFlowFocusRoot(flows?.focus ?? NO_FOCUS), flows?.timeline ?? null);
   const accrued = flows?.timeline.live.pending?.length ? true : false;
@@ -186,7 +199,7 @@ export default function LoanView({ loanId, initial }: { loanId: string; initial:
           read={flowsReady ? "done" : failed ? "failed" : "reading"}
           explanation={
             <div className="space-y-2 text-sm text-rb-500">
-              <PolarisLoanFlowsNote accrued={accrued} />
+              <PolarisLoanFlowsNote accrued={accrued} dailyFloor={floorDays != null && floorDays.length > 0} />
             </div>
           }
           learnMore={polarisLoanFlowsContent()}

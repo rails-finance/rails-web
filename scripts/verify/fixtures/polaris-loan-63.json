@@ -1,0 +1,596 @@
+{
+"note": "Reserve loan 63's touches and the deployment's daily floor, read from /api/polaris/reserve-loans/timeline and /reserve-loans/floor/daily on 17 Nov 2026",
+"rows": [
+{
+"deployment_id": "sepolia-2026-08",
+"event_key": "loan_opened:0xa2afa49551dd904b790add51896870c7f7be9fe41de00ead729b8e081793042a:88",
+"loan_id": "63",
+"event_type": "opened",
+"borrower": "0x4cc14d2a595dcff34b243a3b714b7a50630256b3",
+"block_number": "11528814",
+"tx_index": 73,
+"log_index": 88,
+"tx_hash": "0xa2afa49551dd904b790add51896870c7f7be9fe41de00ead729b8e081793042a",
+"block_timestamp": "1787225880",
+"tx_from": "0x4cc14d2a595dcff34b243a3b714b7a50630256b3",
+"tx_gas_used": "318081",
+"tx_gas_price": "1171984524",
+"coll_change": "1000000000000000000",
+"debt_change": "1260301649662357011",
+"debt_per_share": "1001177499566133510544067735",
+"debt_per_share_block": "11528814",
+"debt_per_share_log_index": 84,
+"debt_per_share_tx_hash": "0xa2afa49551dd904b790add51896870c7f7be9fe41de00ead729b8e081793042a",
+"floor_price": "1260301649662357012",
+"shares_change": "1258819390376348410.508269561978931162",
+"coll_before": "0",
+"coll_after": "1000000000000000000",
+"shares_before": "0",
+"shares_after": "1258819390376348410.508269561978931162",
+"net_borrowed_to_here": "1260301649662357011",
+"debt_after": "1260301649662357011",
+"from_addr": null,
+"to_addr": null
+},
+{
+"deployment_id": "sepolia-2026-08",
+"event_key": "loan_adjusted:0x691f5e3d3f40269168128031f2cafe9e33ef07d64c9443c689253c6fdca95a48:37",
+"loan_id": "63",
+"event_type": "adjusted",
+"borrower": "0x4cc14d2a595dcff34b243a3b714b7a50630256b3",
+"block_number": "11528817",
+"tx_index": 46,
+"log_index": 37,
+"tx_hash": "0x691f5e3d3f40269168128031f2cafe9e33ef07d64c9443c689253c6fdca95a48",
+"block_timestamp": "1787225916",
+"tx_from": "0x4cc14d2a595dcff34b243a3b714b7a50630256b3",
+"tx_gas_used": "89040",
+"tx_gas_price": "1306824997",
+"coll_change": "200000000000000000",
+"debt_change": "0",
+"debt_per_share": "1001177499566133510544067735",
+"debt_per_share_block": "11528814",
+"debt_per_share_log_index": 84,
+"debt_per_share_tx_hash": "0xa2afa49551dd904b790add51896870c7f7be9fe41de00ead729b8e081793042a",
+"floor_price": "1260301649662357012",
+"shares_change": "0",
+"coll_before": "1000000000000000000",
+"coll_after": "1200000000000000000",
+"shares_before": "1258819390376348410.508269561978931162",
+"shares_after": "1258819390376348410.508269561978931162",
+"net_borrowed_to_here": "1260301649662357011",
+"debt_after": "1260301649662357011",
+"from_addr": null,
+"to_addr": null
+},
+{
+"deployment_id": "sepolia-2026-08",
+"event_key": "loan_adjusted:0xc285a121958c7e6a3fb049167417cfb56a2c28d7346bfbd4e22939491d8c0052:56",
+"loan_id": "63",
+"event_type": "adjusted",
+"borrower": "0x4cc14d2a595dcff34b243a3b714b7a50630256b3",
+"block_number": "11537070",
+"tx_index": 79,
+"log_index": 56,
+"tx_hash": "0xc285a121958c7e6a3fb049167417cfb56a2c28d7346bfbd4e22939491d8c0052",
+"block_timestamp": "1787328276",
+"tx_from": "0x4cc14d2a595dcff34b243a3b714b7a50630256b3",
+"tx_gas_used": "102497",
+"tx_gas_price": "1177979260",
+"coll_change": "0",
+"debt_change": "277454050151666939",
+"debt_per_share": "1001261304567798869891661277",
+"debt_per_share_block": "11537061",
+"debt_per_share_log_index": 105,
+"debt_per_share_tx_hash": "0xc42bbc017dc9d250302cdc5c1ab5d18d269b64b59a03606d8e3b2ea3672dfc1b",
+"floor_price": "1281550995979275691",
+"shares_change": "277104536933474956.390925106855834767",
+"coll_before": "1200000000000000000",
+"coll_after": "1200000000000000000",
+"shares_before": "1258819390376348410.508269561978931162",
+"shares_after": "1535923927309823366.899194668834765929",
+"net_borrowed_to_here": "1537755699814023950",
+"debt_after": "1537861195175130827",
+"from_addr": null,
+"to_addr": null
+},
+{
+"deployment_id": "sepolia-2026-08",
+"event_key": "loan_adjusted:0xd3a1e377241bdb079fc8cefeb4fa0ba2b447faa8ad144ac8812c604bda75b3e3:361",
+"loan_id": "63",
+"event_type": "adjusted",
+"borrower": "0x4cc14d2a595dcff34b243a3b714b7a50630256b3",
+"block_number": "11680709",
+"tx_index": 36,
+"log_index": 361,
+"tx_hash": "0xd3a1e377241bdb079fc8cefeb4fa0ba2b447faa8ad144ac8812c604bda75b3e3",
+"block_timestamp": "1789114752",
+"tx_from": "0x4cc14d2a595dcff34b243a3b714b7a50630256b3",
+"tx_gas_used": "124227",
+"tx_gas_price": "1631273875",
+"coll_change": "0",
+"debt_change": "-25000000000000000",
+"debt_per_share": "1002148909315902466474433846",
+"debt_per_share_block": "11680709",
+"debt_per_share_log_index": 359,
+"debt_per_share_tx_hash": "0xd3a1e377241bdb079fc8cefeb4fa0ba2b447faa8ad144ac8812c604bda75b3e3",
+"floor_price": "1529932509366656592",
+"shares_change": "-24946392464834158.783402575193913499",
+"coll_before": "1200000000000000000",
+"coll_after": "1200000000000000000",
+"shares_before": "1535923927309823366.899194668834765929",
+"shares_after": "1510977534844989208.11579209364085243",
+"net_borrowed_to_here": "1512755699814023950",
+"debt_after": "1514224488545736950",
+"from_addr": null,
+"to_addr": null
+}
+],
+"floorDays": [
+{
+"day": 20682,
+"floor_price_raw": "1029494776877822609",
+"block_number": "11510980"
+},
+{
+"day": 20683,
+"floor_price_raw": "1241292010277382484",
+"block_number": "11517637"
+},
+{
+"day": 20684,
+"floor_price_raw": "1251712066585020133",
+"block_number": "11525381"
+},
+{
+"day": 20685,
+"floor_price_raw": "1277636370394170270",
+"block_number": "11532153"
+},
+{
+"day": 20686,
+"floor_price_raw": "1282981075898750760",
+"block_number": "11539259"
+},
+{
+"day": 20687,
+"floor_price_raw": "1284641592375255975",
+"block_number": "11544530"
+},
+{
+"day": 20688,
+"floor_price_raw": "1286560993268451779",
+"block_number": "11552981"
+},
+{
+"day": 20689,
+"floor_price_raw": "1297120995161538926",
+"block_number": "11560342"
+},
+{
+"day": 20690,
+"floor_price_raw": "1298841546851610345",
+"block_number": "11567149"
+},
+{
+"day": 20691,
+"floor_price_raw": "1300371855571453729",
+"block_number": "11573823"
+},
+{
+"day": 20692,
+"floor_price_raw": "1302674845553743219",
+"block_number": "11580911"
+},
+{
+"day": 20693,
+"floor_price_raw": "1302919531292670480",
+"block_number": "11587084"
+},
+{
+"day": 20694,
+"floor_price_raw": "1304201559357348874",
+"block_number": "11592720"
+},
+{
+"day": 20695,
+"floor_price_raw": "1304421788289332702",
+"block_number": "11600334"
+},
+{
+"day": 20696,
+"floor_price_raw": "1304638231025481112",
+"block_number": "11608416"
+},
+{
+"day": 20697,
+"floor_price_raw": "1305176025589061436",
+"block_number": "11614373"
+},
+{
+"day": 20698,
+"floor_price_raw": "1305186818160084278",
+"block_number": "11618823"
+},
+{
+"day": 20699,
+"floor_price_raw": "1305333986538792449",
+"block_number": "11628630"
+},
+{
+"day": 20700,
+"floor_price_raw": "1306018969072936491",
+"block_number": "11636650"
+},
+{
+"day": 20701,
+"floor_price_raw": "1335565480499770764",
+"block_number": "11643648"
+},
+{
+"day": 20702,
+"floor_price_raw": "1351037342571939924",
+"block_number": "11650489"
+},
+{
+"day": 20703,
+"floor_price_raw": "1381409444860679027",
+"block_number": "11657391"
+},
+{
+"day": 20704,
+"floor_price_raw": "1439409621191889137",
+"block_number": "11664342"
+},
+{
+"day": 20705,
+"floor_price_raw": "1489215681433773663",
+"block_number": "11671231"
+},
+{
+"day": 20706,
+"floor_price_raw": "1521192908773932433",
+"block_number": "11678288"
+},
+{
+"day": 20707,
+"floor_price_raw": "1551247516163222662",
+"block_number": "11685263"
+},
+{
+"day": 20708,
+"floor_price_raw": "1571475172991244491",
+"block_number": "11692254"
+},
+{
+"day": 20709,
+"floor_price_raw": "1595748582404653108",
+"block_number": "11699239"
+},
+{
+"day": 20710,
+"floor_price_raw": "1617487180083958426",
+"block_number": "11706192"
+},
+{
+"day": 20711,
+"floor_price_raw": "1636783268769522524",
+"block_number": "11713181"
+},
+{
+"day": 20712,
+"floor_price_raw": "1655227202361557909",
+"block_number": "11720092"
+},
+{
+"day": 20713,
+"floor_price_raw": "1675602137430752118",
+"block_number": "11727071"
+},
+{
+"day": 20714,
+"floor_price_raw": "1683786689054010751",
+"block_number": "11734049"
+},
+{
+"day": 20715,
+"floor_price_raw": "1687577037431446872",
+"block_number": "11740843"
+},
+{
+"day": 20716,
+"floor_price_raw": "1691639383339731157",
+"block_number": "11747426"
+},
+{
+"day": 20717,
+"floor_price_raw": "1694010637768454866",
+"block_number": "11754261"
+},
+{
+"day": 20718,
+"floor_price_raw": "1696166641375515504",
+"block_number": "11761230"
+},
+{
+"day": 20719,
+"floor_price_raw": "1698170663671610329",
+"block_number": "11768267"
+},
+{
+"day": 20720,
+"floor_price_raw": "1708588300009866855",
+"block_number": "11775479"
+},
+{
+"day": 20721,
+"floor_price_raw": "1711052079366315065",
+"block_number": "11782549"
+},
+{
+"day": 20722,
+"floor_price_raw": "1717652238087593983",
+"block_number": "11789565"
+},
+{
+"day": 20723,
+"floor_price_raw": "1719134933453658585",
+"block_number": "11796738"
+},
+{
+"day": 20724,
+"floor_price_raw": "1722984862118638696",
+"block_number": "11803954"
+},
+{
+"day": 20725,
+"floor_price_raw": "1727137584676228058",
+"block_number": "11810973"
+},
+{
+"day": 20726,
+"floor_price_raw": "1732404159095796387",
+"block_number": "11818109"
+},
+{
+"day": 20727,
+"floor_price_raw": "1736209379247177639",
+"block_number": "11825255"
+},
+{
+"day": 20728,
+"floor_price_raw": "1737393209525970879",
+"block_number": "11832265"
+},
+{
+"day": 20729,
+"floor_price_raw": "1738031068045788493",
+"block_number": "11838813"
+},
+{
+"day": 20730,
+"floor_price_raw": "1746339639335697111",
+"block_number": "11845355"
+},
+{
+"day": 20731,
+"floor_price_raw": "1747866488057393153",
+"block_number": "11852177"
+},
+{
+"day": 20732,
+"floor_price_raw": "1751274924815366446",
+"block_number": "11859116"
+},
+{
+"day": 20733,
+"floor_price_raw": "1756743321504240296",
+"block_number": "11866384"
+},
+{
+"day": 20734,
+"floor_price_raw": "1762700957816602389",
+"block_number": "11873610"
+},
+{
+"day": 20735,
+"floor_price_raw": "1769631642342382973",
+"block_number": "11880776"
+},
+{
+"day": 20736,
+"floor_price_raw": "1775809636697052241",
+"block_number": "11887979"
+},
+{
+"day": 20737,
+"floor_price_raw": "1779875884596692451",
+"block_number": "11895158"
+},
+{
+"day": 20738,
+"floor_price_raw": "1785351320232089907",
+"block_number": "11902341"
+},
+{
+"day": 20739,
+"floor_price_raw": "1791570093677679775",
+"block_number": "11909520"
+},
+{
+"day": 20740,
+"floor_price_raw": "1798412448393474194",
+"block_number": "11916686"
+},
+{
+"day": 20741,
+"floor_price_raw": "1804281303422590735",
+"block_number": "11923798"
+},
+{
+"day": 20742,
+"floor_price_raw": "1812055309745846094",
+"block_number": "11930605"
+},
+{
+"day": 20743,
+"floor_price_raw": "1817083445028494484",
+"block_number": "11937374"
+},
+{
+"day": 20744,
+"floor_price_raw": "1823358095578099797",
+"block_number": "11944486"
+},
+{
+"day": 20745,
+"floor_price_raw": "1829511008066646466",
+"block_number": "11951568"
+},
+{
+"day": 20746,
+"floor_price_raw": "1837157065420046530",
+"block_number": "11958717"
+},
+{
+"day": 20747,
+"floor_price_raw": "1844750455095548899",
+"block_number": "11965825"
+},
+{
+"day": 20748,
+"floor_price_raw": "1850671388487119172",
+"block_number": "11972969"
+},
+{
+"day": 20749,
+"floor_price_raw": "1857605654759135569",
+"block_number": "11980111"
+},
+{
+"day": 20750,
+"floor_price_raw": "1864209301333535357",
+"block_number": "11987186"
+},
+{
+"day": 20751,
+"floor_price_raw": "1870012278476958962",
+"block_number": "11994251"
+},
+{
+"day": 20752,
+"floor_price_raw": "1877025319995684721",
+"block_number": "12001417"
+},
+{
+"day": 20753,
+"floor_price_raw": "1884483503925566679",
+"block_number": "12008573"
+},
+{
+"day": 20754,
+"floor_price_raw": "1890707199717833486",
+"block_number": "12015760"
+},
+{
+"day": 20755,
+"floor_price_raw": "1898296518632482250",
+"block_number": "12022953"
+},
+{
+"day": 20756,
+"floor_price_raw": "1904600167283579592",
+"block_number": "12030108"
+},
+{
+"day": 20757,
+"floor_price_raw": "1910869630764346147",
+"block_number": "12037257"
+},
+{
+"day": 20758,
+"floor_price_raw": "1917916964396299425",
+"block_number": "12044441"
+},
+{
+"day": 20759,
+"floor_price_raw": "1924378750933716637",
+"block_number": "12051575"
+},
+{
+"day": 20760,
+"floor_price_raw": "1930364617931934310",
+"block_number": "12058705"
+},
+{
+"day": 20761,
+"floor_price_raw": "1937626549227160740",
+"block_number": "12065828"
+},
+{
+"day": 20762,
+"floor_price_raw": "1946443883635564179",
+"block_number": "12072870"
+},
+{
+"day": 20763,
+"floor_price_raw": "1951353673977731744",
+"block_number": "12079955"
+},
+{
+"day": 20764,
+"floor_price_raw": "1958644354438486038",
+"block_number": "12087079"
+},
+{
+"day": 20765,
+"floor_price_raw": "1964364346957609876",
+"block_number": "12093820"
+},
+{
+"day": 20766,
+"floor_price_raw": "1971379073949876060",
+"block_number": "12100810"
+},
+{
+"day": 20767,
+"floor_price_raw": "1978717356573652848",
+"block_number": "12108046"
+},
+{
+"day": 20768,
+"floor_price_raw": "1987615209327953425",
+"block_number": "12115123"
+},
+{
+"day": 20769,
+"floor_price_raw": "1994498089509991126",
+"block_number": "12122254"
+},
+{
+"day": 20770,
+"floor_price_raw": "2000142622803846926",
+"block_number": "12129300"
+},
+{
+"day": 20771,
+"floor_price_raw": "2007123997351493685",
+"block_number": "12136487"
+},
+{
+"day": 20772,
+"floor_price_raw": "2015148694528527913",
+"block_number": "12143608"
+},
+{
+"day": 20773,
+"floor_price_raw": "2018518723562547584",
+"block_number": "12150706"
+},
+{
+"day": 20774,
+"floor_price_raw": "2018524693111308377",
+"block_number": "12156114"
+}
+]
+}
