@@ -1,124 +1,126 @@
 // The wallet heading's positions menu (H13.2; Miles 17 Nov 2026, rails-ops ui-jobs 701):
-// lib/wallet/summary-counts.ts walletPositionsMenu (the trigger, the open rows, "+N more", the
-// closed count) and lib/wallet/position-label.ts positionLabel (each row's name, less the
-// protocol).
+// lib/wallet/summary-counts.ts walletProtocolMenu, one row per protocol and chain with its counts,
+// linking to its one position or to the listing searched by the wallet.
 // Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import {
-  MENU_OPEN_MAX,
-  MENU_TESTNETS,
-  WALLET_COUNTS_SCOPE,
-  rowIsPage,
-  walletPositionsMenu,
-} from "../../lib/wallet/summary-counts.ts";
-import { positionLabel } from "../../lib/wallet/position-label.ts";
+import { MENU_TESTNETS, WALLET_COUNTS_SCOPE, rowIsPage, walletProtocolMenu } from "../../lib/wallet/summary-counts.ts";
 
-const row = (status, i, family = "aave-v3", chain = "ethereum") => ({
+const W = "0x3df83ec9d2b62bb9bb83eba1218a202564bb67da";
+const DASHBOARD = `/wallet/${W}`;
+const pos = (family, status, id, chain = "ethereum") => ({
   chain,
   family,
-  positionId: String(i),
+  positionId: String(id),
   status,
-  href: `/${chain}/${family}/${i}`,
+  href: `/${chain}/${family}/${id}`,
 });
-const onPage = (path) => (p) => rowIsPage(p.href, path, "");
+// The roster stand-in: name, order, and the listing searched by the wallet
+// (null for a listing that takes no wallet).
+const ROSTER = {
+  "aave-v3": ["Aave V3", 0],
+  "liquity-v2": ["Liquity V2", 1],
+  "compound-v3": ["Compound V3", 2],
+  morpho: ["Morpho Blue", 3],
+};
+const protocolOf = (p) => {
+  const [name, order] = ROSTER[p.family] ?? [];
+  if (!name) return undefined;
+  return {
+    name,
+    order: order + (p.chain === "ethereum" ? 0 : 0.5),
+    listing: p.family === "morpho" ? null : `/${p.chain}/${p.family}?q=${W}`,
+  };
+};
+const menu = (positions, path) =>
+  walletProtocolMenu(positions, (p) => rowIsPage(p.href, path, ""), protocolOf, DASHBOARD);
 
 test("the trigger counts every position, singular at one", () => {
-  const rows = [row("open", 1), row("closed", 2), row("liquidated", 3)];
-  assert.equal(walletPositionsMenu(rows, onPage("/ethereum/aave-v3/1")).trigger, "3 positions");
-  assert.equal(walletPositionsMenu([row("closed", 2)], onPage("/elsewhere")).trigger, "1 position");
+  const rows = [pos("aave-v3", "open", 1), pos("aave-v3", "closed", 2), pos("liquity-v2", "liquidated", 3)];
+  assert.equal(menu(rows, "/ethereum/aave-v3/1").trigger, "3 positions");
+  assert.equal(menu([pos("aave-v3", "closed", 2)], "/elsewhere").trigger, "1 position");
 });
 
 test("nothing besides the page's position draws nothing", () => {
-  assert.equal(walletPositionsMenu([], onPage("/x")), null);
-  assert.equal(walletPositionsMenu([row("open", 1)], onPage("/ethereum/aave-v3/1")), null);
+  assert.equal(menu([], "/x"), null);
+  assert.equal(menu([pos("aave-v3", "open", 1)], "/ethereum/aave-v3/1"), null);
 });
 
-test("the open rows: the page's own first and marked", () => {
-  const rows = [row("open", 1), row("open", 2, "liquity-v2"), row("closed", 3)];
-  const m = walletPositionsMenu(rows, onPage("/ethereum/liquity-v2/2"));
-  assert.equal(m.openHeading, "Open positions (2)");
-  assert.deepEqual(
-    m.open.map((r) => [r.position.positionId, r.page]),
+test("one row per protocol and chain, with its counts", () => {
+  const m = menu(
     [
-      ["2", true],
-      ["1", false],
+      pos("aave-v3", "open", 1),
+      pos("aave-v3", "closed", 2),
+      pos("aave-v3", "liquidated", 3),
+      pos("aave-v3", "open", 4, "base"),
+      pos("liquity-v2", "redeemed", 5),
+      pos("compound-v3", "open", 6),
+    ],
+    "/x",
+  );
+  assert.deepEqual(
+    m.rows.map((r) => [r.key, r.name, r.counts]),
+    [
+      ["ethereum:aave-v3", "Aave V3", "1 open · 2 closed"],
+      ["base:aave-v3", "Aave V3", "1 open"],
+      ["ethereum:compound-v3", "Compound V3", "1 open"],
+      ["ethereum:liquity-v2", "Liquity V2", "1 closed"],
     ],
   );
-  assert.equal(m.pageCounted, true);
-  assert.equal(walletPositionsMenu(rows, onPage("/sepolia/polaris/20")).pageCounted, false);
 });
 
-test("past six open positions: six and +N more", () => {
-  const rows = Array.from({ length: 9 }, (_, i) => row("open", i));
-  const m = walletPositionsMenu(rows, onPage("/sepolia/polaris/20"));
-  assert.equal(MENU_OPEN_MAX, 6);
-  assert.equal(m.open.length, 6);
-  assert.equal(m.more, "+3 more on wallet dashboard");
-  assert.equal(walletPositionsMenu(rows.slice(0, 6), onPage("/x")).more, null);
+test("open rows first, each group in roster order", () => {
+  const m = menu(
+    [
+      pos("morpho", "closed", 1),
+      pos("liquity-v2", "closed", 2),
+      pos("compound-v3", "open", 3),
+      pos("aave-v3", "open", 4),
+    ],
+    "/x",
+  );
+  assert.deepEqual(
+    m.rows.map((r) => r.name),
+    ["Aave V3", "Compound V3", "Liquity V2", "Morpho Blue"],
+  );
 });
 
-test("the closed line counts closed, liquidated and redeemed; omitted at none", () => {
-  const rows = [row("open", 1), row("closed", 2), row("liquidated", 3), row("redeemed", 4)];
-  assert.equal(walletPositionsMenu(rows, onPage("/x")).closed, "3 closed positions on wallet dashboard");
-  assert.equal(walletPositionsMenu(rows.slice(0, 2), onPage("/x")).closed, "1 closed position on wallet dashboard");
-  assert.equal(walletPositionsMenu([row("open", 1), row("open", 2)], onPage("/x")).closed, null);
+test("one position links to it; several to the listing searched by the wallet; else the wallet view", () => {
+  const m = menu(
+    [
+      pos("aave-v3", "open", 1),
+      pos("liquity-v2", "open", 2),
+      pos("liquity-v2", "closed", 3),
+      pos("morpho", "open", 4),
+      pos("morpho", "open", 5),
+    ],
+    "/x",
+  );
+  const href = Object.fromEntries(m.rows.map((r) => [r.name, r.href]));
+  assert.equal(href["Aave V3"], "/ethereum/aave-v3/1");
+  assert.equal(href["Liquity V2"], `/ethereum/liquity-v2?q=${W}`);
+  assert.equal(href["Morpho Blue"], DASHBOARD);
+});
+
+test("this page: the page's row marked; not a link where the row is the page", () => {
+  const alone = menu([pos("aave-v3", "open", 1), pos("liquity-v2", "closed", 2)], "/ethereum/aave-v3/1");
+  const aave = alone.rows.find((r) => r.name === "Aave V3");
+  assert.deepEqual([aave.page, aave.current], [true, true]);
+  assert.equal(alone.pageCounted, true);
+  const shared = menu([pos("aave-v3", "open", 1), pos("aave-v3", "closed", 2)], "/ethereum/aave-v3/1");
+  assert.deepEqual(
+    [shared.rows[0].page, shared.rows[0].current, shared.rows[0].href],
+    [true, false, `/ethereum/aave-v3?q=${W}`],
+  );
+  assert.equal(menu([pos("aave-v3", "open", 1)], "/sepolia/polaris/goldp/20").pageCounted, false);
+});
+
+test("a position on no roster entry is named by its family", () => {
+  const m = menu([pos("unknown", "open", 1)], "/x");
+  assert.deepEqual([m.rows[0].name, m.rows[0].href], ["unknown", "/ethereum/unknown/1"]);
 });
 
 test("the footer and the wallet view's tip", () => {
   assert.equal(MENU_TESTNETS, "Testnets not included");
   assert.equal(WALLET_COUNTS_SCOPE, "Counts mainnet positions; the Sepolia testnet is not counted.");
-});
-
-test("labels: a Trove is its branch and short id", () => {
-  assert.equal(
-    positionLabel({
-      family: "liquity-v2",
-      positionId: "WETH:16571955497228114735373687436766714226146657997938228625903174546598933916943",
-      market: "WETH",
-    }),
-    "WETH #165719…6943",
-  );
-  assert.equal(positionLabel({ family: "ebisu", positionId: "sUSDe:42" }), "sUSDe #42");
-});
-
-test("labels: a market by its page's name", () => {
-  assert.equal(positionLabel({ family: "aave-v3", positionId: "0xabc:core", market: "Core" }), "Core");
-  assert.equal(positionLabel({ family: "compound-v3", positionId: "usdc:0xabc", market: "cUSDCv3" }), "cUSDCv3");
-});
-
-test("labels: Morpho's pair where the row carries it, else the market's id", () => {
-  assert.equal(
-    positionLabel({ family: "morpho", positionId: "x", market: "x", collateral: "WBTC", debt: "USDC" }),
-    "WBTC/USDC",
-  );
-  assert.equal(
-    positionLabel({
-      family: "morpho",
-      positionId: "3a85e619751152991742810df6ec69ce473daef99e28a64ab2340d7b7ccfee49-0xc5cd",
-      market: "3a85e619751152991742810df6ec69ce473daef99e28a64ab2340d7b7ccfee49",
-    }),
-    "Market 0x3a85…ee49",
-  );
-});
-
-test("labels: a Fluid NFT and a Maker vault carry their ids", () => {
-  assert.equal(positionLabel({ family: "fluid", positionId: "19526", market: "USDC / ETH" }), "USDC / ETH #19526");
-  assert.equal(positionLabel({ family: "makerdao", positionId: "2028", market: "ETH-A" }), "ETH-A #2028");
-  assert.equal(
-    positionLabel({
-      family: "makerdao",
-      positionId: "0x3d25235b7c414cb67bf09561a33fd6ce62c11dcf",
-      market: "LSEV2-SKY-A",
-    }),
-    "LSEV2-SKY-A 0x3d25…1dcf",
-  );
-});
-
-test("labels: a row naming nothing but the wallet reads Account", () => {
-  assert.equal(
-    positionLabel({ family: "aave-v3", positionId: "0x3df83ec9d2b62bb9bb83eba1218a202564bb67da" }),
-    "Account",
-  );
-  assert.equal(positionLabel({ family: "spark", positionId: "0xabc" }), "Account");
 });

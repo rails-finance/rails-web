@@ -2,19 +2,21 @@
 
 // The positions menu under the wallet heading (H13.2; rails-ops decisions/0050
 // point 10, decisions/0051 step 3; Miles 17 Nov 2026, ui-jobs 701): "3
-// positions ⌄", opening the wallet's open positions, each its protocol's and
-// its chain's icon and a short label (lib/wallet/position-label.ts), linking to
-// its page; the page's own row marked and not a link; past six "+N more on
-// wallet dashboard"; then the closed count and "Testnets not included". Read
-// after mount from /api/chain/wallet/<address>/summary, so the page's render
-// does not wait on it; nothing is drawn while it loads, when it fails, or when
-// the page's position is the wallet's only one. The popover is the address
-// menu's (C7, wallet-menu.tsx): a dropdown on desktop, a sheet below sm,
-// closed by an outside press and Escape; the rows take the Tools menu's keys.
+// positions ⌄", opening one row per protocol and chain the wallet holds
+// positions in: the protocol's and the chain's icons, the protocol's name and
+// its counts ("1 open · 2 closed"). A row links to its one position, or past
+// one to the protocol's listing searched by the wallet; the row holding the
+// page's position reads "this page" (not a link where it is the page). Then
+// "Wallet dashboard" and "Testnets not included". Read after mount from
+// /api/chain/wallet/<address>/summary, so the page's render does not wait on
+// it; nothing is drawn while it loads, when it fails, or when the page's
+// position is the wallet's only one. The popover is the address menu's (C7,
+// wallet-menu.tsx): a dropdown on desktop, a sheet below sm, closed by an
+// outside press and Escape; the rows take the Tools menu's keys.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { ChainGlyph } from "@/components/icons/chain-glyphs";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
@@ -22,13 +24,13 @@ import { MobileSheet } from "@/components/shared/mobile-sheet";
 import { moveFocus } from "@/components/shared/tools-menu";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID, chainMeta, type ChainId } from "@/lib/shared/chains";
-import { protocolForPathname } from "@/lib/shared/protocols";
+import { PROTOCOLS, listingHrefForWallet, protocolForPathname } from "@/lib/shared/protocols";
 import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
-import { positionLabel } from "@/lib/wallet/position-label";
 import {
   MENU_TESTNETS,
   rowIsPage,
-  walletPositionsMenu,
+  walletProtocolMenu,
+  type MenuProtocol,
   type WalletCounts,
   type WalletCountsChain,
   type WalletCountsPosition,
@@ -59,23 +61,31 @@ function readCounts(address: string): Promise<WalletCounts | null> {
   return read;
 }
 
-type Menu = NonNullable<ReturnType<typeof walletPositionsMenu<WalletCountsPosition>>>;
+type Menu = NonNullable<ReturnType<typeof walletProtocolMenu<WalletCountsPosition>>>;
+
+/** A position's explorer on the roster: its name, its place, and its listing
+ *  searched by the wallet (every wallet family's listing reads `q`). */
+function protocolOf(p: WalletCountsPosition, address: string): MenuProtocol | undefined {
+  const entry = protocolForPathname(p.href.split("?")[0]);
+  if (!entry) return undefined;
+  return { name: entry.label, order: PROTOCOLS.indexOf(entry), listing: listingHrefForWallet(entry.session, address) };
+}
 
 const ROW = "mx-1 my-0.5 flex min-h-9 items-center gap-2 rounded-lg px-3 py-1.5 text-left";
 const ROW_LINK = `${ROW} transition-colors hover:bg-[var(--surface-hover)] focus-visible:bg-[var(--surface-hover)] dark:hover:bg-[rgba(196,205,217,0.08)] dark:focus-visible:bg-[rgba(196,205,217,0.08)]`;
 const DIVIDER = <div role="separator" className="mx-3 my-1 border-t border-rb-300 dark:border-rb-700" />;
 
 /** The protocol's and the chain's icons, each named for screen readers and on hover. */
-function PositionIcons({ p }: { p: WalletCountsPosition }) {
+function ProtocolIcons({ p }: { p: WalletCountsPosition }) {
   const entry = protocolForPathname(p.href.split("?")[0]);
   const protocol = entry?.label ?? p.family;
   const chain = chainMeta(CHAIN_ID[p.chain]).name;
   return (
     <span className="flex shrink-0 items-center gap-1">
-      <span role="img" aria-label={protocol} title={protocol} className="flex" data-wallet-position-protocol={protocol}>
+      <span role="img" aria-label={protocol} title={protocol} className="flex" data-wallet-protocol-name={protocol}>
         <ProtocolIcon id={entry?.id ?? p.family} className="size-4 shrink-0" />
       </span>
-      <span role="img" aria-label={chain} title={chain} className="flex text-rb-500" data-wallet-position-chain={chain}>
+      <span role="img" aria-label={chain} title={chain} className="flex text-rb-500" data-wallet-protocol-chain={chain}>
         <ChainGlyph id={CHAIN_ID[p.chain]} className="size-3.5 shrink-0" />
       </span>
     </span>
@@ -91,7 +101,6 @@ export function WalletPositionsMenu({ wallet }: { wallet: string }) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const isPhone = useMediaQuery(PHONE_QUERY);
-  const headingId = useId();
   const close = () => setOpen(false);
   // Escape and the sheet's close hand focus back to the trigger.
   const closeToTrigger = () => {
@@ -107,7 +116,14 @@ export function WalletPositionsMenu({ wallet }: { wallet: string }) {
     readCounts(address).then((c) => {
       if (!live || !c || c.error) return;
       const search = window.location.search;
-      setMenu(walletPositionsMenu(c.positions, (p) => rowIsPage(p.href, pathname, search)));
+      setMenu(
+        walletProtocolMenu(
+          c.positions,
+          (p) => rowIsPage(p.href, pathname, search),
+          (p) => protocolOf(p, address),
+          `/wallet/${address}`,
+        ),
+      );
     });
     return () => {
       live = false;
@@ -151,74 +167,55 @@ export function WalletPositionsMenu({ wallet }: { wallet: string }) {
 
   const rows = (
     <>
-      {menu.open.length > 0 && (
-        <div role="group" aria-labelledby={headingId} data-wallet-positions-open={menu.open.length}>
-          <div id={headingId} className="px-4 pb-1 pt-2 text-xs font-semibold text-rb-500">
-            {menu.openHeading}
+      {menu.rows.map((r) => {
+        const hook = { "data-wallet-protocol-row": r.key, "data-family": r.first.family };
+        const body = (
+          <>
+            <ProtocolIcons p={r.first} />
+            <span className="min-w-0 truncate">{r.name}</span>
+            <span className="ml-auto flex shrink-0 items-baseline gap-2 pl-3 text-xs text-rb-500 tabular-nums">
+              {r.page && <span data-wallet-protocol-page="">this page ·</span>}
+              <span data-wallet-protocol-counts="">{r.counts}</span>
+            </span>
+          </>
+        );
+        return r.current ? (
+          <div
+            key={r.key}
+            role="menuitem"
+            aria-disabled="true"
+            aria-current="page"
+            tabIndex={-1}
+            className={`${ROW} text-sm text-foreground`}
+            {...hook}
+          >
+            {body}
           </div>
-          {menu.open.map(({ position: p, page }) => {
-            const label = positionLabel(p);
-            const hook = { "data-wallet-position-row": p.positionId, "data-family": p.family };
-            return page ? (
-              <div
-                key={`${p.chain}:${p.family}:${p.positionId}`}
-                role="menuitem"
-                aria-disabled="true"
-                aria-current="page"
-                tabIndex={-1}
-                className={`${ROW} text-sm text-foreground`}
-                data-wallet-position-page=""
-                {...hook}
-              >
-                <PositionIcons p={p} />
-                <span className="min-w-0 truncate">{label}</span>
-                <span className="ml-auto shrink-0 pl-2 text-xs text-rb-500">this page</span>
-              </div>
-            ) : (
-              <Link
-                key={`${p.chain}:${p.family}:${p.positionId}`}
-                href={p.href}
-                prefetch={false}
-                role="menuitem"
-                className={`${ROW_LINK} text-sm text-foreground`}
-                onClick={close}
-                {...hook}
-              >
-                <PositionIcons p={p} />
-                <span className="min-w-0 truncate">{label}</span>
-              </Link>
-            );
-          })}
-          {menu.more && (
-            <Link
-              href={dashboard}
-              prefetch={false}
-              role="menuitem"
-              className={`${ROW_LINK} text-xs text-[var(--text-link)]`}
-              onClick={close}
-              data-wallet-positions-more=""
-            >
-              {menu.more}
-            </Link>
-          )}
-        </div>
-      )}
-      {menu.closed && (
-        <>
-          {menu.open.length > 0 && DIVIDER}
+        ) : (
           <Link
-            href={dashboard}
+            key={r.key}
+            href={r.href}
             prefetch={false}
             role="menuitem"
-            className={`${ROW_LINK} text-xs text-[var(--text-link)]`}
+            className={`${ROW_LINK} text-sm text-foreground`}
             onClick={close}
-            data-wallet-positions-closed=""
+            {...hook}
           >
-            {menu.closed}
+            {body}
           </Link>
-        </>
-      )}
+        );
+      })}
       {DIVIDER}
+      <Link
+        href={dashboard}
+        prefetch={false}
+        role="menuitem"
+        className={`${ROW_LINK} text-sm text-[var(--text-link)]`}
+        onClick={close}
+        data-wallet-positions-dashboard=""
+      >
+        Wallet dashboard
+      </Link>
       <div className="px-4 pb-1.5 pt-1 text-xs text-rb-500" data-wallet-positions-testnets="">
         {MENU_TESTNETS}
       </div>

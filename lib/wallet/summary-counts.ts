@@ -16,13 +16,6 @@ export interface WalletCountsPosition {
   positionId: string;
   status: "open" | "closed" | "liquidated" | "redeemed";
   href: string;
-  /** The row's market or branch as stored ("core", "usdc", a Morpho market
-   *  id), or the wallet view's name for it where the family is shaped here
-   *  (an Arbitrum Comet's "cUSDCv3"). */
-  market?: string;
-  /** The collateral's and the debt's symbols, where the row stores them. */
-  collateral?: string;
-  debt?: string;
 }
 
 export interface WalletCountsFamily {
@@ -86,44 +79,85 @@ export const WALLET_COUNTS_SCOPE = "Counts mainnet positions; the Sepolia testne
 
 const count = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 
-/** The positions menu's open rows shown before "+N more" (H13.2; ui-jobs 701). */
-export const MENU_OPEN_MAX = 6;
-
 /** The menu's footer: the counts are mainnet only. */
 export const MENU_TESTNETS = "Testnets not included";
 
+/** A position's protocol on its chain, as the roster names it: its name, its
+ *  place in the roster, and its listing searched by the wallet (null where
+ *  the listing takes no wallet). */
+export interface MenuProtocol {
+  name: string;
+  order: number;
+  listing: string | null;
+}
+
+export interface WalletProtocolRow<P extends WalletCountsPosition> {
+  /** `<chain>:<family>`. */
+  key: string;
+  name: string;
+  /** Any one of its positions, for its chain and family. */
+  first: P;
+  open: number;
+  closed: number;
+  /** "1 open", "2 closed", "1 open · 2 closed". */
+  counts: string;
+  /** The one position's page; past one, the listing searched by the wallet,
+   *  else the wallet view. */
+  href: string;
+  /** The page's position is one of the row's. */
+  page: boolean;
+  /** The row's href is the page: the row is not a link. */
+  current: boolean;
+}
+
 /** The positions menu under the wallet heading (H13.2; Miles 17 Nov 2026,
- *  ui-jobs 701): the trigger's count, the open positions (the page's own
- *  first, so it is always among those shown) up to `MENU_OPEN_MAX`, how many
- *  more are open, and the closed count (closed, liquidated and redeemed, as
- *  the counts treat them). Null when the wallet holds nothing besides the
- *  page's position. */
-export function walletPositionsMenu<P extends WalletCountsPosition>(
+ *  ui-jobs 701): one row per protocol and chain the wallet holds positions
+ *  in, those with an open position first, each group in roster order; closed
+ *  counts closed, liquidated and redeemed, as the counts do. Null when the
+ *  wallet holds nothing besides the page's position. */
+export function walletProtocolMenu<P extends WalletCountsPosition>(
   positions: P[],
   isPage: (p: P) => boolean,
-): {
-  trigger: string;
-  openHeading: string;
-  open: { position: P; page: boolean }[];
-  more: string | null;
-  closed: string | null;
-  /** Whether the page's position is among those counted. */
-  pageCounted: boolean;
-} | null {
+  protocolOf: (p: P) => MenuProtocol | undefined,
+  dashboard: string,
+): { trigger: string; rows: WalletProtocolRow<P>[]; pageCounted: boolean } | null {
   const page = positions.filter(isPage);
   if (positions.length === page.length) return null;
-  const open = positions
-    .filter((p) => p.status === "open")
-    .map((position) => ({ position, page: isPage(position) }))
-    .sort((a, b) => Number(b.page) - Number(a.page));
-  const closed = positions.length - open.length;
-  const rest = open.length - MENU_OPEN_MAX;
+  const groups = new Map<string, { protocol: MenuProtocol | undefined; positions: P[] }>();
+  for (const p of positions) {
+    const key = `${p.chain}:${p.family}`;
+    const g = groups.get(key) ?? { protocol: protocolOf(p), positions: [] };
+    g.positions.push(p);
+    groups.set(key, g);
+  }
+  const order = (key: string) => groups.get(key)?.protocol?.order ?? Number.MAX_SAFE_INTEGER;
+  const rows = [...groups.entries()].map(([key, g]): WalletProtocolRow<P> => {
+    const open = g.positions.filter((p) => p.status === "open").length;
+    const closed = g.positions.length - open;
+    const one = g.positions.length === 1;
+    const onPage = g.positions.some(isPage);
+    const parts = [
+      open > 0 && `${open.toLocaleString("en-US")} open`,
+      closed > 0 && `${closed.toLocaleString("en-US")} closed`,
+    ];
+    return {
+      key,
+      name: g.protocol?.name ?? g.positions[0].family,
+      first: g.positions[0],
+      open,
+      closed,
+      counts: parts.filter(Boolean).join(" · "),
+      href: one ? g.positions[0].href : (g.protocol?.listing ?? dashboard),
+      page: onPage,
+      current: one && onPage,
+    };
+  });
+  rows.sort(
+    (a, b) => Number(b.open > 0) - Number(a.open > 0) || order(a.key) - order(b.key) || a.key.localeCompare(b.key),
+  );
   return {
     trigger: count(positions.length, "position"),
-    openHeading: `Open positions (${open.length.toLocaleString("en-US")})`,
-    open: open.slice(0, MENU_OPEN_MAX),
-    more: rest > 0 ? `+${rest.toLocaleString("en-US")} more on wallet dashboard` : null,
-    closed: closed > 0 ? `${count(closed, "closed position")} on wallet dashboard` : null,
+    rows,
     pageCounted: page.length > 0,
   };
 }

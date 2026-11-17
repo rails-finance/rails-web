@@ -18,9 +18,6 @@ import { withBudget, type WalletSummaryAnswer, type WalletSummaryRow } from "@/l
 import type { HeadRead, WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
 import type { WalletCounts, WalletCountsFamily, WalletCountsPosition } from "@/lib/wallet/summary-counts";
 import { publicErrorMessage } from "@/lib/api/public-error";
-import { MARKET_NAME } from "@/lib/aave-v3/asset-catalog";
-import { COMPOUND_DEPLOYMENT } from "@/lib/compound/asset-catalog";
-import { COMPOUND_BASE_DEPLOYMENT } from "@/lib/compound-base/asset-catalog";
 
 /** The whole read's budget, the summary route's time included. */
 export const WALLET_BUDGET_MS = 8000;
@@ -217,35 +214,6 @@ export function readWallet(address: string, readerIp?: string): Promise<WalletRe
 // figures are stored (no `head`, the Arbitrum lane) is shaped as the wallet
 // view shapes it, which makes no read and splits a Compound V3 row into one
 // position per Comet; every other row is one position. Kept 60 s per address.
-/** A stored market key as its page names it, from the catalogs: an Aave V3
- *  Ethereum market ("core" → "Core"), a Comet ("usdc" → "cUSDCv3"). */
-function marketName(r: WalletSummaryRow): string | null {
-  if (!r.market) return null;
-  if (r.family === "aave-v3" && r.chain === "ethereum") return MARKET_NAME[r.market] ?? r.market;
-  if (r.family === "compound-v3") {
-    const deployment = r.chain === "base" ? COMPOUND_BASE_DEPLOYMENT : COMPOUND_DEPLOYMENT;
-    return deployment.markets.find((m) => m.key === r.market)?.label ?? r.market;
-  }
-  return r.market;
-}
-
-/** A summary row as a counted position: its ids, and the market and the
- *  symbols the row stores, which name it in the positions menu
- *  (lib/wallet/position-label.ts). */
-function countsRow(r: WalletSummaryRow): WalletCountsPosition {
-  const market = marketName(r);
-  return {
-    chain: r.chain,
-    family: r.family,
-    positionId: r.positionId,
-    status: r.status,
-    href: r.href,
-    ...(market ? { market } : {}),
-    ...(r.collateral?.symbol ? { collateral: r.collateral.symbol } : {}),
-    ...(r.debt?.symbol ? { debt: r.debt.symbol } : {}),
-  };
-}
-
 const countsCache = new Map<string, { at: number; read: Promise<WalletCounts> }>();
 
 export function readWalletCounts(address: string, readerIp?: string): Promise<WalletCounts> {
@@ -276,7 +244,6 @@ export function readWalletCounts(address: string, readerIp?: string): Promise<Wa
             positionId: p.positionId,
             status: p.status,
             href: p.href,
-            ...(p.market ? { market: p.market } : {}),
           });
         }
         rows.forEach((r) => taken.add(r));
@@ -285,7 +252,8 @@ export function readWalletCounts(address: string, readerIp?: string): Promise<Wa
       }
     }
     for (const r of summary.rows) {
-      if (!taken.has(r)) positions.push(countsRow(r));
+      if (!taken.has(r))
+        positions.push({ chain: r.chain, family: r.family, positionId: r.positionId, status: r.status, href: r.href });
     }
     const families = new Map<string, WalletCountsFamily>();
     for (const p of positions) {
