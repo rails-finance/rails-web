@@ -185,7 +185,7 @@ export default function AsymmetryTroveDetail({
         // timeline read, in the shape the URL asked for.
         const asked = servedFoldersEnabled();
         const [pData, flat, grouped] = await Promise.all([
-          fetchAsymmetryTroves({ troveId, collateralTypes: [collateralType], limit: 1 }),
+          fetchAsymmetryTroves({ troveId, collateralTypes: [collateralType], limit: 1, former: true }),
           asked ? null : fetchAsymmetryTimeline(collateralType, troveId, { recent: TIMELINE_WINDOW_ROWS }),
           asked ? fetchAsymmetryGroupedTimeline(collateralType, troveId) : null,
         ]);

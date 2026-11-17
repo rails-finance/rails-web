@@ -87,6 +87,8 @@ export function forkTroveTailLoader<Summary, Grouped extends ForkGroupedTimeline
     troveId: string;
     collateralTypes: string[];
     limit: number;
+    /** The read says whether the NFT changed hands (ui-jobs 715). */
+    former: boolean;
     baseUrl: string;
     headers: Record<string, string>;
   }) => Promise<{ data: Summary[] }>;
@@ -148,7 +150,14 @@ export function forkTroveTailLoader<Summary, Grouped extends ForkGroupedTimeline
     // first of them.
     const [troves, timeline] = await Promise.allSettled([
       withTimeout(
-        opts.fetchTroves({ troveId, collateralTypes: [collateralType], limit: 1, baseUrl: origin, headers }),
+        opts.fetchTroves({
+          troveId,
+          collateralTypes: [collateralType],
+          limit: 1,
+          former: true,
+          baseUrl: origin,
+          headers,
+        }),
         `${opts.label} troves`,
       ),
       withTimeout<{ events: BaseActivityEvent[]; cutoffBlock?: number | null } | Grouped>(

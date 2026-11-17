@@ -185,7 +185,7 @@ export default function BasedollarTroveDetail({
         // timeline read, in the shape the URL asked for.
         const asked = servedFoldersEnabled();
         const [pData, flat, grouped] = await Promise.all([
-          fetchBasedollarTroves({ troveId, collateralTypes: [collateralType], limit: 1 }),
+          fetchBasedollarTroves({ troveId, collateralTypes: [collateralType], limit: 1, former: true }),
           asked ? null : fetchBasedollarTimeline(collateralType, troveId, { recent: TIMELINE_WINDOW_ROWS }),
           asked ? fetchBasedollarGroupedTimeline(collateralType, troveId) : null,
         ]);

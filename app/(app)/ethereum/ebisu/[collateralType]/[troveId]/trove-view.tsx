@@ -183,7 +183,7 @@ export default function EbisuTroveDetail({
         // timeline read, in the shape the URL asked for.
         const asked = servedFoldersEnabled();
         const [pData, flat, grouped] = await Promise.all([
-          fetchEbisuTroves({ troveId, collateralTypes: [collateralType], limit: 1 }),
+          fetchEbisuTroves({ troveId, collateralTypes: [collateralType], limit: 1, former: true }),
           asked ? null : fetchEbisuTimeline(collateralType, troveId, { recent: TIMELINE_WINDOW_ROWS }),
           asked ? fetchEbisuGroupedTimeline(collateralType, troveId) : null,
         ]);
