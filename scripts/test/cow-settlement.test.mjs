@@ -86,7 +86,7 @@ test("2022: two trades at one price", () => {
   );
 });
 
-test("a trade alone on its pair counts the batch's other pairs", () => {
+test("a trade alone on its pair counts the settlement's other pairs", () => {
   const s = FIX["0xb722"];
   const v = pairView(s, byOwner(s, "0xf9d7ad"));
   assert.equal(v.pair.length, 1);
