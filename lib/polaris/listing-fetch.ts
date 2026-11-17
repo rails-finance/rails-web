@@ -23,14 +23,15 @@ export async function fetchPolarisListingPage(
   baseUrl?: string,
   signal?: AbortSignal,
   headers?: HeadersInit,
-): Promise<{ data: PolarisPositionSummary[]; total: number }> {
+): Promise<{ data: PolarisPositionSummary[]; total: number; passedOn: number }> {
   const params = polarisFiltersToFetchParams(filters, page);
   const { ownerEns } = parsePolarisSearch(filters.q);
   if (ownerEns) {
     const address = await resolveEnsViaApi(ownerEns, baseUrl, signal);
-    if (!address) return { data: [], total: 0 };
+    if (!address) return { data: [], total: 0, passedOn: 0 };
     params.wallet = address;
   }
-  const r = await fetchPolarisPositions({ ...params, baseUrl, signal, headers });
-  return { data: r.data, total: r.pagination.total };
+  // A wallet search also lists the CDPs the wallet held and sent on (ui-jobs 715).
+  const r = await fetchPolarisPositions({ ...params, former: Boolean(params.wallet), baseUrl, signal, headers });
+  return { data: r.data, total: r.pagination.total, passedOn: r.pagination.passedOn ?? 0 };
 }

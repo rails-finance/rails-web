@@ -61,6 +61,9 @@ export interface LiquityTroveView {
   /** The listing is filtered to a wallet that held this Trove and moved its
    *  NFT on (Liquity V2's /api/troves?ownerAddress=; ui-jobs 705). */
   formerHold?: { movedTo: string; movedAt: number } | null;
+  /** A fork Trove's one-Trove read: its NFT passed between two wallets, so a
+   *  closed Trove's holder reads "last holder" (ui-jobs 715). */
+  changedHands?: boolean;
   /** Marketplace link for the trove NFT (OpenSea) when the explorer knows the
    *  NFT contract. Omitted → no NFT link on the card. */
   nftUrl?: string | null;

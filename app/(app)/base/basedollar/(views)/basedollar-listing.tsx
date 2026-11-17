@@ -1,5 +1,8 @@
 "use client";
 
+import { useState } from "react";
+import { formerHoldFor } from "@/lib/liquity-fork/former-holders";
+
 // Basedollar Trove listing — client half. One row per Trove (across 5 collateral branches),
 // replayed straight from the Basedollar TroveUpdated events — chain-direct values only
 // (branch collateral + BD debt, user-set interest rate, status). There is no
@@ -27,6 +30,9 @@ export interface BasedollarListingProps {
 }
 
 export function BasedollarListing({ initialItems, initialTotal, initialKey, initialSearch }: BasedollarListingProps) {
+  // The search, so a Trove the searched wallet passed on reads "moved to"
+  // (lib/liquity-fork/former-holders.ts).
+  const [q, setQ] = useState(() => new URLSearchParams(initialSearch ?? "").get("q") ?? "");
   return (
     <ChainTruthListingPage<BasedollarTroveSummary, BasedollarListFilters>
       title="Basedollar Troves"
@@ -35,11 +41,15 @@ export function BasedollarListing({ initialItems, initialTotal, initialKey, init
       defaults={BASEDOLLAR_LIST_DEFAULTS}
       sortOptions={BASEDOLLAR_SORT_OPTIONS}
       searchPlaceholder="Search trove id or collateral"
-      renderCard={(t) => <BasedollarPositionCard v={viewFromSummary(t)} compact />}
+      renderCard={(t) => (
+        <BasedollarPositionCard v={{ ...viewFromSummary(t), formerHold: formerHoldFor(t, q) }} compact />
+      )}
+      onFilters={(filters) => setQ(filters.q ?? "")}
       hrefFor={(t) => `/base/basedollar/${t.collateralType}/${t.id}`}
       keyFor={(t) => `${t.collateralType}-${t.id}`}
       strategy={memoryStrategy<BasedollarTroveSummary, BasedollarListFilters>({
-        fetchAll: () => fetchBasedollarTroves({ sortBy: "debt", sortOrder: "desc", limit: 500 }).then((r) => r.data),
+        fetchAll: () =>
+          fetchBasedollarTroves({ sortBy: "debt", sortOrder: "desc", limit: 500, former: true }).then((r) => r.data),
         dimensions: basedollarListDimensions,
         apply: BASEDOLLAR_APPLY,
       })}

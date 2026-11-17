@@ -491,6 +491,7 @@ interface LiquityForkTroveSummaryLike {
   owner: string | null;
   lastOwner: string | null;
   ownerEns: string | null;
+  changedHands?: boolean;
   priceUsd: number | null;
   priceStale: boolean;
   collateralUsd: number | null;
@@ -518,6 +519,7 @@ export function viewFromForkSummary(protocol: ForkProtocol, s: LiquityForkTroveS
     owner: s.owner,
     lastOwner: s.lastOwner,
     ownerEns: s.ownerEns,
+    changedHands: s.changedHands ?? false,
     // Every fork now records its per-branch TroveNFT addresses in its own
     // catalog, so all three link the Trove's NFT.
     nftUrl: FORK_TROVE_NFT_URL[protocol](s.collateralType, s.id),

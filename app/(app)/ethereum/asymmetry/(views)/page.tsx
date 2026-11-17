@@ -32,7 +32,15 @@ async function AsymmetryListingPage({ searchParams }: { searchParams: Promise<Ra
     page,
     label: "Asymmetry",
     fetchPage: (baseUrl, signal, headers) =>
-      fetchAsymmetryTroves({ sortBy: "debt", sortOrder: "desc", limit: 500, baseUrl, signal, headers }).then((r) => ({
+      fetchAsymmetryTroves({
+        sortBy: "debt",
+        sortOrder: "desc",
+        limit: 500,
+        former: true,
+        baseUrl,
+        signal,
+        headers,
+      }).then((r) => ({
         data: r.data,
         total: r.data.length,
       })),

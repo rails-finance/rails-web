@@ -26,6 +26,7 @@
 // empty (a backend blip) `initialTrove` is null and this component fetches
 // the tail itself, exactly as it did before the route had a server half.
 
+import { LastHolderPrefix } from "@/lib/liquity/trove-page-words";
 import { useReportPositionRead } from "@/components/shared/position-read";
 import { readOfHeadAnswer } from "@/lib/shared/position-read";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -182,7 +183,7 @@ export default function EbisuTroveDetail({
         // timeline read, in the shape the URL asked for.
         const asked = servedFoldersEnabled();
         const [pData, flat, grouped] = await Promise.all([
-          fetchEbisuTroves({ troveId, collateralTypes: [collateralType], limit: 1 }),
+          fetchEbisuTroves({ troveId, collateralTypes: [collateralType], limit: 1, former: true }),
           asked ? null : fetchEbisuTimeline(collateralType, troveId, { recent: TIMELINE_WINDOW_ROWS }),
           asked ? fetchEbisuGroupedTimeline(collateralType, troveId) : null,
         ]);
@@ -520,8 +521,9 @@ export default function EbisuTroveDetail({
           session="ebisu"
           wallet={view?.owner ?? view?.lastOwner ?? null}
           owner={{
-            // No "last holder" prefix: this family's timeline carries no TroveNFT
-            // transfer rows, so a change of hands cannot be read (ui-jobs 702).
+            // "last holder" on a closed Trove whose NFT changed hands: the
+            // one-Trove read says so (ui-jobs 715).
+            prefix: !view?.owner && view?.lastOwner && view.changedHands ? <LastHolderPrefix /> : undefined,
             wallet: view?.owner ?? view?.lastOwner ?? null,
           }}
           assets={stripAssets}
@@ -631,6 +633,7 @@ export default function EbisuTroveDetail({
                     owner: view?.owner ?? null,
                     lastOwner: view?.lastOwner ?? null,
                     ownerEns: view?.ownerEns ?? null,
+                    changedHands: view?.changedHands,
                   })
                 }
                 closed={view ? view.status !== "open" : undefined}

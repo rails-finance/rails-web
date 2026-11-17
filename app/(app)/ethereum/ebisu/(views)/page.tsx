@@ -32,10 +32,12 @@ async function EbisuListingPage({ searchParams }: { searchParams: Promise<RawSea
     page,
     label: "Ebisu",
     fetchPage: (baseUrl, signal, headers) =>
-      fetchEbisuTroves({ sortBy: "debt", sortOrder: "desc", limit: 500, baseUrl, signal, headers }).then((r) => ({
-        data: r.data,
-        total: r.data.length,
-      })),
+      fetchEbisuTroves({ sortBy: "debt", sortOrder: "desc", limit: 500, former: true, baseUrl, signal, headers }).then(
+        (r) => ({
+          data: r.data,
+          total: r.data.length,
+        }),
+      ),
   });
 
   return <EbisuListing {...initial} initialSearch={sp.toString()} />;
