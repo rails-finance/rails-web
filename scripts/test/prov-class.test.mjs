@@ -31,6 +31,17 @@ test("a leaf without the marker still counts, so an unmarked receipt reads as be
   assert.deepEqual(C.involvedClasses(leaves), ["emitted", "indexed"]);
 });
 
+test("an input leaf sits after oracle and before indexed on the ladder", () => {
+  const leaves = [
+    { label: "bought", kind: "chain", pclass: "emitted" },
+    { label: "clearing price", kind: "chain", pclass: "input" },
+    { label: "price", kind: "chain-derived", pclass: "oracle" },
+  ];
+  assert.equal(C.weakestClass(leaves), "input");
+  assert.deepEqual(C.involvedClasses(leaves), ["emitted", "oracle", "input"]);
+  assert.equal(C.weakestClass([...leaves, { label: "replayed", kind: "derived" }]), "indexed");
+});
+
 test("a receipt of definitions alone has no read class", () => {
   assert.equal(C.weakestClass([{ label: "face", kind: "derived", definition: true }]), null);
   assert.deepEqual(C.involvedClasses([{ label: "face", kind: "derived", definition: true }]), []);

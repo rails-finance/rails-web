@@ -8,7 +8,14 @@
 
 import type { ProvClass, ProvInput, ProvKind } from "@/components/shared/provenance";
 
-const CLASS_RANK: Record<ProvClass, number> = { emitted: 0, state: 1, oracle: 2, indexed: 3, offchain: 4 };
+const CLASS_RANK: Record<ProvClass, number> = {
+  emitted: 0,
+  state: 1,
+  oracle: 2,
+  input: 3,
+  indexed: 4,
+  offchain: 5,
+};
 
 /** Map a 4-kind gate value to a distance class when the vocabulary hasn't named
  *  one precisely. Best-effort — a vocabulary overrides it with `pclass` (e.g. a

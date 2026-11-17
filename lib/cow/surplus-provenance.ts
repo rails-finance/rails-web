@@ -2,7 +2,7 @@
 // cards (lib/cow/surplus.ts). Rules: rails-ops
 // standards/provenance-receipts-grammar.md §3–§5. The order's signed limits and
 // the clearing prices are read from the settlement transaction's input: kind
-// "chain" with the transaction-input note until the "input" class exists.
+// "chain", class "input".
 // Surplus is cited to docs.cow.fi Definitions and CoW Explorer's "Order
 // surplus"; fees to docs.cow.fi Fees.
 
@@ -43,14 +43,14 @@ function inputNote(c: CowSwapView): string {
       : c.call === "inline"
         ? " The transaction's own function takes settle()'s arguments as its first four parameters; Etherscan decodes them under that function's name."
         : "";
-  return `Transaction input, not a log field: the settle() call's argument, which the settlement contract checked against the order's signature.${where}`;
+  return `The settle() call's argument, which the settlement contract checked against the order's signature.${where}`;
 }
 
 const inputLeaf = (c: CowSwapView, label: string, value: string): ProvInput => ({
   label,
   value,
   kind: "chain",
-  pclass: "emitted",
+  pclass: "input",
   note: inputNote(c),
 });
 
@@ -79,7 +79,7 @@ export function cowSurplusProv(c: CowSwapView, trade: CowTradeRaw, coords: CowCo
   const docs = `CoW Protocol's docs call it surplus, "The price improvement on a user's limit price".`;
   return {
     kind: "derived",
-    pclass: "emitted",
+    pclass: "input",
     summary: sell
       ? `${label} — the ${sym} this sell order received above the least it would accept: the buy amount the order signed,${part} taken from what the order bought. ${docs}`
       : c.route === "cow_permit"
@@ -138,7 +138,7 @@ export function cowFeeProv(c: CowSwapView, trade: CowTradeRaw, coords: CowCoords
     : "";
   return {
     kind: "derived",
-    pclass: "emitted",
+    pclass: "input",
     summary: `${COW_FEE_LABEL} — what this trade gave up against the settlement's clearing price, in ${sym}, and that in basis points (0.01%) of the amount at the clearing price. CoW charges fees in the price, in the surplus token, not as transfers. The settlement contract priced the trade on clearingPrices entries [${o.sellIndex}, ${o.buyIndex}]; each token's first entry, [${u.sellIndex}, ${u.buyIndex}], is the clearing price.${signed ? ` The figure includes the order's signed fee, the Trade log's feeAmount${sell ? ", taken into the bought token at the clearing price" : ""}.` : ""} The gap holds the network cost as well as protocol and partner fees; Rails does not split them.`,
     formula: sell
       ? `at the clearing price = ⌊${net} × clearingPrices[${u.sellIndex}] ÷ clearingPrices[${u.buyIndex}]⌋; (at the clearing price − bought${signedTerm}) ÷ at the clearing price × 10,000`

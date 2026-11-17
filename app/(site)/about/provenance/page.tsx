@@ -135,7 +135,7 @@ export default function ProvenancePage() {
       <Section title={capitalise(KINDS_OF_FIGURE)}>
         <p className="body-text">
           The dots in a receipt&rsquo;s head name the {KIND_OF_FIGURE}. Pressing them opens {`“${LADDER_TITLE}”`}, which
-          ranks the {KINDS_OF_FIGURE} by their distance from the chain. The first three can be checked on the chain
+          ranks the {KINDS_OF_FIGURE} by their distance from the chain. The first four can be checked on the chain
           without Rails.
         </p>
         <dl className="space-y-3">

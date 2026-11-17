@@ -60,13 +60,15 @@ const DEV = process.env.NODE_ENV !== "production";
 
 export type ProvKind = "chain" | "chain-derived" | "derived" | "offchain";
 
-/** The five DISTANCE classes the spine renders — a display refinement layered
- *  OVER the 4-kind gate, not a replacement for it (chain-truth-charter). Ordered
- *  by distance from chain-state: emitted (a field in the event's own log) ·
- *  state (a contract slot read at a block) · oracle (an on-chain price feed) —
- *  all three on-chain and third-party verifiable — then indexed (materialized by
- *  our backend, no third-party proof) · offchain (no on-chain anchor at all). */
-export type ProvClass = "emitted" | "state" | "oracle" | "indexed" | "offchain";
+/** The six DISTANCE classes the spine renders — a display refinement layered
+ *  OVER the 4-kind gate (chain-truth-charter). Ordered by distance from
+ *  chain-state: emitted (a field in the event's own log) · state (a contract
+ *  slot read at a block) · oracle (an on-chain price feed) · input (a value in
+ *  the transaction's input data, which the contract checks only where its logic
+ *  reads it) — all four on-chain and third-party verifiable — then indexed
+ *  (materialized by our backend, no third-party proof) · offchain (no on-chain
+ *  anchor at all). */
+export type ProvClass = "emitted" | "state" | "oracle" | "input" | "indexed" | "offchain";
 
 /** How a user confirms a value WITHOUT trusting Rails — a link OUT to a neutral
  *  third party, never a live read on our side (zero-RPC by construction).
@@ -438,7 +440,7 @@ function CopyBtn({ text, title = "Copy" }: { text: string; title?: string }) {
 // A clicked value renders as ONE pane — no steps, no selection. A derivation is
 // an expression, so the layout is the equation: the summary, then the formula,
 // one row per operand leaf (each dotted with its distance class), then the
-// source coordinates the flow was recorded at. The five distance classes layer
+// source coordinates the flow was recorded at. The six distance classes layer
 // over the shipped 4-kind gate.
 
 export const CLASS_META: Record<ProvClass, string> = CLASS_NAMES;
@@ -446,6 +448,7 @@ export const CLASS_CSS: Record<ProvClass, string> = {
   emitted: "prov-cls-emitted",
   state: "prov-cls-state",
   oracle: "prov-cls-oracle",
+  input: "prov-cls-input",
   indexed: "prov-cls-indexed",
   offchain: "prov-cls-offchain",
 };

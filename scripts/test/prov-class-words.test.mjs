@@ -32,9 +32,9 @@ test("the modal's title", () => {
 test("one line per class, in the grammar's order", () => {
   assert.deepEqual(
     CLASS_LINES.map((c) => c.cls),
-    ["emitted", "state", "oracle", "indexed", "offchain"],
+    ["emitted", "state", "oracle", "input", "indexed", "offchain"],
   );
-  assert.deepEqual(Object.keys(CLASS_NAMES), ["emitted", "state", "oracle", "indexed", "offchain"]);
+  assert.deepEqual(Object.keys(CLASS_NAMES), ["emitted", "state", "oracle", "input", "indexed", "offchain"]);
   for (const c of CLASS_LINES) assert.ok(c.line.length > 0, c.cls);
 });
 
