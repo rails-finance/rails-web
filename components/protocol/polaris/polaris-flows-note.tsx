@@ -16,9 +16,9 @@ export interface PolarisFlowsNoteProps {
   stable: string;
 }
 
-const events = (k: number) => (
+const touches = (k: number) => (
   <>
-    <Fig>{k.toLocaleString("en-US")}</Fig> event{k === 1 ? "" : "s"}
+    <Fig>{k.toLocaleString("en-US")}</Fig> touch{k === 1 ? "" : "es"}
   </>
 );
 
@@ -29,9 +29,9 @@ export function PolarisFlowsNote({ facts, stable }: PolarisFlowsNoteProps): Reac
     <div data-polaris-flows-note="" data-anatomy="F14">
       <ExplainGroup title="How it counts">
         <ExplainBullet>In {stable} at the market&apos;s feed price: a testnet has no market price</ExplainBullet>
-        <ExplainBullet>Interest is written into the debt at each event</ExplainBullet>
+        <ExplainBullet>Interest is written into the debt at each touch</ExplainBullet>
         <ExplainBullet>
-          PSM shares{facts && facts.psmRows > 0 ? <>, at {events(facts.psmRows)}</> : null}: each mint and redemption
+          PSM shares{facts && facts.psmRows > 0 ? <>, at {touches(facts.psmRows)}</> : null}: each mint and redemption
           moves every position pro rata
         </ExplainBullet>
         <ExplainBullet>
@@ -39,7 +39,7 @@ export function PolarisFlowsNote({ facts, stable }: PolarisFlowsNoteProps): Reac
           it
         </ExplainBullet>
         {facts && facts.settledRows > 0 && (
-          <ExplainBullet>Settled to zero at {events(facts.settledRows)}</ExplainBullet>
+          <ExplainBullet>Minted to the holder at {touches(facts.settledRows)}</ExplainBullet>
         )}
         {facts?.liquidated && (
           <ExplainBullet>
@@ -47,23 +47,23 @@ export function PolarisFlowsNote({ facts, stable }: PolarisFlowsNoteProps): Reac
           </ExplainBullet>
         )}
         {unpriced > 0 && (
-          <ExplainBullet>{events(unpriced)} without a feed price take the nearest recorded one</ExplainBullet>
+          <ExplainBullet>{touches(unpriced)} without a feed price take the nearest recorded one</ExplainBullet>
         )}
       </ExplainGroup>
       <ExplainMore title="More about the sums">
         <ul className="space-y-1">
           <ExplainBullet>
-            Each event states collateral and debt; every part&apos;s line meets those figures
+            Each touch states collateral and debt; every part&apos;s line meets those figures
           </ExplainBullet>
-          <ExplainBullet>Interest, reward pETH, PSM shares and stability gains build up between events</ExplainBullet>
-          <ExplainBullet>Each side runs straight from one event to what the next wrote in</ExplainBullet>
+          <ExplainBullet>Interest, reward pETH, PSM shares and stability gains build up between touches</ExplainBullet>
+          <ExplainBullet>Each side runs straight from one touch to what the next wrote in</ExplainBullet>
           {facts?.pendingToday && (
-            <ExplainBullet>Today adds what built up since the last event, as the next would</ExplainBullet>
+            <ExplainBullet>Today adds what built up since the last touch, as the next would</ExplainBullet>
           )}
           <ExplainBullet>
             {facts?.between === "carried"
-              ? "Between events, pETH keeps its latest event's price: the daily store did not answer"
-              : "Between events, pETH takes the feed's price at each day's close"}
+              ? "Between touches, pETH keeps its latest touch's price: the daily store did not answer"
+              : "Between touches, pETH takes the feed's price at each day's close"}
           </ExplainBullet>
           <ExplainBullet>Today&apos;s pETH takes the feed price at the latest block, as the card does</ExplainBullet>
           {facts?.liquidated && (
@@ -84,7 +84,7 @@ export function polarisFlowsContent(stable: string): LearnMoreContent {
     stepsHeading: "How it's built:",
     steps: [
       "Collateral = deposited + reward pETH + PSM shares added − withdrawn − PSM shares taken − liquidated, plus Market move.",
-      "Debt = borrowed + interest + PSM shares added + settled to zero − repaid − stability gains − PSM shares cleared − liquidated.",
+      "Debt = borrowed + interest + PSM shares added − repaid − stability gains − PSM shares cleared − liquidated; where that falls below zero, Minted to the holder brings it to zero.",
     ],
     detailsHeading: "Key concepts:",
     details: [
@@ -92,12 +92,12 @@ export function polarisFlowsContent(stable: string): LearnMoreContent {
       { bold: "Reward pETH", text: "the position's share of the bonding curve's rewards." },
       {
         bold: "PSM shares",
-        text: "an event writes in the net since the last one, so its two sides can move opposite ways.",
+        text: "a touch writes in the net since the last one, so its two sides can move opposite ways.",
       },
       { bold: "Gas compensation escrow", text: "returns at the close, or goes to the liquidator." },
       {
-        bold: "Settled to zero",
-        text: `where gains and PSM shares clear more than is owed, the protocol adds ${stable} so the debt lands on zero.`,
+        bold: "Minted to the holder",
+        text: "where gains and a net PSM share take the debt below zero, the touch mints the difference to the holder.",
       },
     ],
     links: [POLARIS_DOC_LINKS.interestRates, POLARIS_DOC_LINKS.pegDefence, POLARIS_DOC_LINKS.liquidations],

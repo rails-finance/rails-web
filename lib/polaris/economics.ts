@@ -5,7 +5,7 @@
 //               · PSM mint shares in, PSM redemption shares out · reward pETH
 //   debt:       borrowed (holder) · repaid (holder) · liquidated (op 3)
 //               · interest charged · stability gains · PSM mint shares in,
-//               PSM redemption shares out · minted to settle a residual
+//               PSM redemption shares out · minted to the holder
 //
 // The card's Explanation, the PSM outcome strip on the Lifetime flows panel
 // and the markdown export read them. The panel's own replay is

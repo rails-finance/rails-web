@@ -673,7 +673,7 @@ export type PolarisLifetimeLeg =
   | "stability gains"
   | "debt from PSM mints"
   | "debt cleared by PSM redemptions"
-  | "minted to settle";
+  | "minted to the holder";
 
 /** The lifetime legs the position explanation names, by the word the code
  *  uses for each (the receipts' labels are the values). */
@@ -701,7 +701,7 @@ const LEG_VIA: Record<PolarisLifetimeLeg, string> = {
   "stability gains": "Σ _stableGain",
   "debt from PSM mints": "Σ max(_mintRedeemDebtGain, 0)",
   "debt cleared by PSM redemptions": "Σ max(−_mintRedeemDebtGain, 0)",
-  "minted to settle": "Σ _stablesMintedToEnsureZeroDebt",
+  "minted to the holder": "Σ _stablesMintedToEnsureZeroDebt",
 };
 
 // A reader who opens one PSM leg's own receipt has no reason to know it is
