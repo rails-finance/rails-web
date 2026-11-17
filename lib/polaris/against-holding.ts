@@ -4,36 +4,45 @@
 // open, so it is stated only on a position touched once. This figure needs only
 // the feed now, so it is stated on every position:
 //
-//   gain (pETH) = (collateral now + withdrawn + surplus − deposited)
-//                 + (borrowed − repaid − debt now) ÷ feed now
+//   gain (pETH) = (collateral now + withdrawn + surplus − escrow lost − deposited)
+//                 + (borrowed + settled − repaid − debt now) ÷ feed now
 //
 // in pETH, against the pETH deposited. Every term but the feed is a quantity:
 //
 //   collateral now  getCDPEntireColl(id) at the head block; 0 once closed
-//   debt now        getCDPEntireDebt(id), counted as zero at or below zero, as
-//                   the card's equity counts it; 0 once closed
-//   deposited …     the holder's own legs (`collChange`, `debtChange`) summed
-//                   over every touch (polarisLifetime). A liquidation's seizure
-//                   and cleared debt are not the holder's, so they are left out.
+//   debt now        getCDPEntireDebt(id), signed; 0 once closed
+//   deposited …     the holder's legs (`collChange`, `debtChange`) summed over
+//                   every touch (polarisLifetime). A liquidation's seizure and
+//                   cleared debt are not the holder's, so they are left out.
 //   surplus         a liquidation's `_collSurplus`: paid to the owner when
 //                   claimed, and owed to the owner until then, so it counts
 //                   claimed or not.
+//   escrow lost     a liquidation's `_flatComp`: the gas compensation escrow
+//                   paid to the liquidator. A close returns it, and an open
+//                   position holds it outside the collateral, so it counts only
+//                   on a liquidated position.
+//   settled         `_stablesMintedToEnsureZeroDebt`: where a PSM share took
+//                   the debt below zero, the touch mints the difference to the
+//                   holder (usdp/2736, block 11,706,332: 78.0065 USDp minted to
+//                   the transaction's sender, the holder). So a debt below zero
+//                   now counts as the stables the next touch pays out.
 //
 // Interest, stability gains, reward pETH, PSM shares and redistributions need
 // no term: each is in the collateral and debt now (or, once closed, in the
-// close's own legs). A debt a PSM share took below zero is settled to zero by
-// the next touch, so the stables minted for it are not counted either.
+// close's legs).
 //
-// The 0.0375 pETH gas compensation escrow sits outside the CDP's collateral
-// (`getCDP(id).gasCompDeposit`), so no leg carries it and the figure leaves it
-// out, as the since-open window does.
-//
-// On a position touched once, gain × feed now equals the since-open window's
-// protocol term: the window's total less its feed term.
+// On a position touched once with a debt at or above zero, gain × feed now
+// equals the since-open window's protocol term: the window's total less its
+// feed term. Below zero the window counts the debt as zero and this figure
+// counts the stables owed.
 
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isPolarisEvent } from "@/lib/shared/types/event-shape";
 import { polarisLifetime } from "@/lib/polaris/economics";
+
+/** The protocol's fixedGasComp, for a liquidation row that does not carry
+ *  `_flatComp`. */
+const FIXED_GAS_COMP = 0.0375;
 
 /** The head read's fields this needs: a structural subset of
  *  PolarisChainResponse, so the export and the tests pass a plain object. */
@@ -56,19 +65,24 @@ export interface PolarisAgainstHolding {
   /** The index's last touch closed or liquidated the position. */
   closed: boolean;
   collNow: number;
-  /** getCDPEntireDebt(id) as read, and as counted (zero at or below zero). */
-  debtNowRead: number;
+  /** getCDPEntireDebt(id), signed: below zero, the stables the next touch
+   *  mints to the holder. */
   debtNow: number;
   deposited: number;
   withdrawn: number;
   /** Liquidation surplus, split by what became of it. */
   surplusClaimed: number;
   surplusOwed: number;
+  /** A liquidation's gas compensation escrow, paid to the liquidator. */
+  escrowLost: number;
   borrowed: number;
+  /** Stables minted to the holder to settle a debt below zero, summed over
+   *  the touches. */
+  settled: number;
   repaid: number;
-  /** collNow + withdrawn + surplus − deposited, in pETH. */
+  /** collNow + withdrawn + surplus − escrowLost − deposited, in pETH. */
   collTerm: number;
-  /** borrowed − repaid − debtNow, in the stablecoin. */
+  /** borrowed + settled − repaid − debtNow, in the stablecoin. */
   debtTerm: number;
   /** debtTerm ÷ feed, in pETH. */
   debtTermPeth: number;
@@ -122,9 +136,12 @@ export function polarisAgainstHolding(
   const l = polarisLifetime(touches);
   let surplusClaimed = 0;
   let surplusOwed = 0;
+  let escrowLost = 0;
   for (const e of touches) {
     if (!isPolarisEvent(e) || e.context.data.eventType !== "liquidate") continue;
     const c = e.context.data;
+    const flat = c.flatComp != null ? Number(c.flatComp) : NaN;
+    escrowLost += Number.isFinite(flat) && flat >= 0 ? flat : FIXED_GAS_COMP;
     const amount = Number(c.collSurplus ?? 0) || 0;
     if (amount <= 0) continue;
     if (c.surplus?.claim) surplusClaimed += amount;
@@ -132,23 +149,23 @@ export function polarisAgainstHolding(
   }
 
   const collNow = closed ? 0 : live.entireColl;
-  const debtNowRead = closed ? 0 : live.entireDebt;
-  const debtNow = Math.max(0, debtNowRead);
-  const collTerm = collNow + l.withdrawn + surplusClaimed + surplusOwed - l.deposited;
-  const debtTerm = l.borrowed - l.repaid - debtNow;
+  const debtNow = closed ? 0 : live.entireDebt;
+  const collTerm = collNow + l.withdrawn + surplusClaimed + surplusOwed - escrowLost - l.deposited;
+  const debtTerm = l.borrowed + l.mintedToSettle - l.repaid - debtNow;
   const debtTermPeth = debtTerm / feed;
   const gain = collTerm + debtTermPeth;
   return {
     feed: { pethInDebt: feed, block: live.blockNumber, timestamp: live.blockTimestamp },
     closed,
     collNow,
-    debtNowRead,
     debtNow,
     deposited: l.deposited,
     withdrawn: l.withdrawn,
     surplusClaimed,
     surplusOwed,
+    escrowLost,
     borrowed: l.borrowed,
+    settled: l.mintedToSettle,
     repaid: l.repaid,
     collTerm,
     debtTerm,

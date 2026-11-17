@@ -677,11 +677,14 @@ export function againstHoldingProv(r: PolarisAgainstHolding, market: PolarisMark
     pclass: "oracle",
     summary:
       `Against holding pETH. What the position comes to in pETH, set against keeping the pETH it deposited: the pETH ` +
-      `it holds now, withdrew and was left as surplus, less the pETH deposited, plus the ${stable} it borrowed less the ` +
-      `${stable} it repaid and owes now, converted to pETH at the market's price feed ${at}. Interest, stability gains, ` +
-      `reward pETH and PSM shares are in the collateral and debt now. The 0.0375 pETH gas compensation escrow is held ` +
-      `outside the collateral and is left out.`,
-    formula: "(coll now + withdrawn + surplus − deposited) + (borrowed − repaid − debt now) ÷ feed",
+      `it holds now, withdrew and was left as surplus, less any gas compensation escrow a liquidation paid to the ` +
+      `liquidator and the pETH deposited, plus the ${stable} it borrowed or was paid to settle a debt below zero, less ` +
+      `the ${stable} it repaid and owes now, converted to pETH at the market's price feed ${at}. Interest, stability ` +
+      `gains, reward pETH and PSM shares are in the collateral and debt now. A debt below zero counts as the ${stable} ` +
+      `the next touch mints to the holder, as the chain shows on USDp position 2736 at block 11,706,332; the docs ` +
+      `say the pAsset is minted to settle it and do not name who receives it.`,
+    formula:
+      "(coll now + withdrawn + surplus − escrow lost − deposited) + (borrowed + settled − repaid − debt now) ÷ feed",
     contract: feed(market),
     inputs: [
       {
@@ -699,6 +702,17 @@ export function againstHoldingProv(r: PolarisAgainstHolding, market: PolarisMark
         note: lifetime("CDPUpdated", "negative collChange"),
       },
       ...surplusRows,
+      ...(r.escrowLost > 0
+        ? [
+            {
+              label: "gas compensation escrow lost",
+              value: formatExact(r.escrowLost),
+              kind: "chain" as const,
+              pclass: "indexed" as const,
+              note: "the LiquidationGasComp log's _flatComp: the escrow held since the open, paid to the liquidator",
+            },
+          ]
+        : []),
       {
         label: "pETH deposited",
         value: formatExact(r.deposited),
@@ -720,6 +734,17 @@ export function againstHoldingProv(r: PolarisAgainstHolding, market: PolarisMark
         pclass: "indexed",
         note: lifetime("CDPUpdated", "negative debtChange"),
       },
+      ...(r.settled > 0
+        ? [
+            {
+              label: `${stable} settled to the holder`,
+              value: formatExact(r.settled),
+              kind: "chain" as const,
+              pclass: "indexed" as const,
+              note: lifetime("CDPUpdated", "_stablesMintedToEnsureZeroDebt"),
+            },
+          ]
+        : []),
       {
         label: "debt now",
         value: formatExact(r.debtNow),
@@ -727,7 +752,9 @@ export function againstHoldingProv(r: PolarisAgainstHolding, market: PolarisMark
         pclass: "state",
         note: r.closed
           ? "the position is closed, so it owes none"
-          : `getCDPEntireDebt(id) ${at}, counted as zero at or below zero`,
+          : r.debtNow < 0
+            ? `getCDPEntireDebt(id) ${at}, below zero: the ${stable} the next touch mints to the holder`
+            : `getCDPEntireDebt(id) ${at}`,
       },
       {
         label: `pETH in ${stable} now`,

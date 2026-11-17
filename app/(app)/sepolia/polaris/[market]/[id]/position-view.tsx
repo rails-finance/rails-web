@@ -378,6 +378,7 @@ export default function PolarisPositionView({
     ? polarisExports({
         view,
         chain,
+        livePending: !chainSettled,
         events: polarisEvents,
         notes,
         liveNotes,

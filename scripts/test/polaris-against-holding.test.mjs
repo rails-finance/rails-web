@@ -1,7 +1,9 @@
 // lib/polaris/against-holding.ts — "Against holding pETH" (rails-ops
-// ui-jobs 695): the formula, a liquidation's surplus counted as withdrawn,
-// a closed position, a missing live read, the market's own feed, the protocol
-// legs carried by the figures now, and agreement with the since-open window.
+// ui-jobs 695): the formula, a liquidation's surplus counted as withdrawn and
+// its escrow as lost, a closed position, a missing or loading live read, each
+// market's feed, a debt at and below zero, the protocol legs carried by the
+// figures now, and agreement with the since-open window; and the ratio
+// headline's floor line in defensive mode, on the card and the listing row.
 // Run: npm test
 //
 // The modules import through `@/`, so this file resolves `@/` as
@@ -71,10 +73,11 @@ function row(i, type, o = {}) {
         accruedInterest: s(o.interest),
         stableGain: s(o.stableGain),
         bcTokenGain: s(o.bcGain),
-        stablesMintedToEnsureZeroDebt: "0",
+        stablesMintedToEnsureZeroDebt: s(o.settled),
         ...(o.price != null ? { priceAtBlock: { pethInDebt: o.price } } : {}),
         ...(o.collSurplus != null ? { collSurplus: s(o.collSurplus) } : {}),
         ...(o.surplus ? { surplus: o.surplus } : {}),
+        ...(o.flatComp != null ? { flatComp: s(o.flatComp) } : {}),
       },
     },
   };
@@ -142,9 +145,12 @@ test("a liquidation's surplus counts as withdrawn, claimed or still to claim", (
   const owed = polarisAgainstHolding(evs(null), chain);
   close(claimed.surplusClaimed, 0.5);
   close(owed.surplusOwed, 0.5);
-  // 0.5 − 10 + 15000 ÷ 2000: the seizure and the cleared debt are not the holder's.
-  close(claimed.gain, -2);
-  close(owed.gain, -2);
+  // 0.5 − 0.0375 − 10 + 15000 ÷ 2000: the seizure and the cleared debt are not
+  // the holder's; the escrow went to the liquidator (fixedGasComp where the
+  // row carries no _flatComp).
+  close(claimed.escrowLost, 0.0375);
+  close(claimed.gain, -2.0375);
+  close(owed.gain, -2.0375);
   assert.equal(claimed.closed, true);
 });
 
@@ -191,7 +197,7 @@ test("a missing, stale or unpriced live read states no figure; so does an index 
   );
 });
 
-test("each market's debt side converts at its own feed: pETH in USDp, pETH in GOLDp", () => {
+test("each market's debt side converts at its feed: pETH in USDp, pETH in GOLDp", () => {
   const usdp = [row(1, "open", { collChange: 10, debtChange: 10000, newColl: 10, newDebt: 10000 })];
   const goldp = [row(1, "open", { market: "goldp", collChange: 10, debtChange: 4, newColl: 10, newDebt: 4 })];
   const u = polarisAgainstHolding(usdp, head(usdp[0], { entireDebt: 10200 }));
@@ -267,4 +273,79 @@ test("on a position touched once it agrees with the since-open window at the sam
   // this figure converted at the feed now.
   close(r.gain * 2000, w.total - w.feed);
   close(r.gain * 2000, w.protocol);
+});
+
+test("a liquidation pays the gas compensation escrow to the liquidator: the holder loses it", () => {
+  const evs = [
+    row(1, "open", { collChange: 1, newColl: 1, newDebt: 0 }),
+    row(2, "liquidate", { collChange: -1, collSurplus: 0.1, flatComp: 0.0375 }),
+  ];
+  const r = polarisAgainstHolding(evs, head(evs[0], { isOpen: false, entireColl: 0, entireDebt: 0 }));
+  // 0.1 surplus − 0.0375 escrow − 1 deposited, nothing borrowed.
+  close(r.escrowLost, 0.0375);
+  close(r.gain, -0.9375);
+  // A close returns the escrow: nothing lost.
+  const closed = [row(1, "open", { collChange: 1, newColl: 1 }), row(2, "close", { collChange: -1 })];
+  const c = polarisAgainstHolding(closed, head(closed[0], { isOpen: false, entireColl: 0, entireDebt: 0 }));
+  close(c.escrowLost, 0);
+  close(c.gain, 0);
+});
+
+test("a debt at zero adds nothing; a debt below zero counts as the stables the next touch pays the holder", () => {
+  const evs = [row(1, "open", { collChange: 10, debtChange: 1000, newColl: 10, newDebt: 1000 })];
+  const zero = polarisAgainstHolding(evs, head(evs[0], { entireDebt: 0 }));
+  close(zero.debtTerm, 1000);
+  close(zero.gain, 1000 / 2000);
+  const below = polarisAgainstHolding(evs, head(evs[0], { entireDebt: -40 }));
+  close(below.debtNow, -40);
+  close(below.debtTerm, 1040);
+  close(below.gain, 1040 / 2000);
+  // Once a touch has settled it, the stables minted to the holder count as received.
+  const settled = [
+    row(1, "open", { collChange: 10, debtChange: 1000, newColl: 10, newDebt: 1000 }),
+    row(2, "adjust", { mrColl: -0.5, mrDebt: -1040, settled: 40, newColl: 9.5, newDebt: 0 }),
+  ];
+  const s = polarisAgainstHolding(settled, head(settled[1], { entireDebt: 0 }));
+  close(s.settled, 40);
+  close(s.debtTerm, 1040);
+  close(s.gain, -0.5 + 1040 / 2000);
+});
+
+test("an export taken while the head read is in flight says it was loading", () => {
+  const evs = [row(1, "open", { collChange: 10, debtChange: 10000, newColl: 10, newDebt: 10000 })];
+  const md = (livePending) =>
+    polarisPositionToMarkdown({
+      view: {
+        market: "usdp",
+        cdpId: "8",
+        stableSymbol: "USDp",
+        status: "open",
+        coll: 10,
+        debt: 10000,
+        collUsd: null,
+        icr: null,
+      },
+      chain: null,
+      livePending,
+      events: evs,
+      generatedAt: new Date(Date.UTC(2026, 10, 17)),
+    });
+  assert.match(md(true), /The live read was still loading, so this snapshot carries no figure against holding pETH\./);
+  assert.match(md(false), /The live read was unavailable, so this snapshot carries no figure against holding pETH\./);
+});
+
+test("the ratio headline's floor line names defensive mode, on the card and on the listing row", async () => {
+  const { polarisFloorLine, polarisFloorWords } = await import(ROOT + "lib/polaris/ratio-format.ts");
+  // The card draws it from the view's floor in force and mode.
+  assert.equal(polarisFloorWords(1.5, true).text, "Minimum ratio 150% · defensive mode");
+  assert.equal(polarisFloorWords(1.15, false).text, "Minimum ratio 115%");
+  assert.equal(polarisFloorWords(1.15, false).mode, null);
+  // The listing row's view takes its floor from the market board through the
+  // same line, so a board in defensive mode reads the same there.
+  const board = { defensiveMode: true, mcr: 1.15, defensiveMcr: 1.5 };
+  const line = polarisFloorLine(board);
+  assert.equal(line.mcr, 1.5);
+  assert.equal(line.text, "Minimum ratio 150% · defensive mode");
+  assert.equal(polarisFloorLine({ ...board, defensiveMode: false }).text, "Minimum ratio 115%");
+  assert.equal(polarisFloorLine(null), null);
 });
