@@ -199,7 +199,15 @@ function surplusContextFor(wire: PolarisSurplusWire | null | undefined, tx: stri
   };
 }
 
-const OPERATION_TYPE: Record<number, PolarisEventType> = { 0: "open", 1: "adjust", 2: "close", 3: "liquidate" };
+// 4 is the settle touch (lib/shared/types/event-shape.ts, the Polaris header):
+// an adjust that moved neither collateral nor debt.
+const OPERATION_TYPE: Record<number, PolarisEventType> = {
+  0: "open",
+  1: "adjust",
+  2: "close",
+  3: "liquidate",
+  4: "adjust",
+};
 
 /** Per-axis verbs for an adjust — the classifier's label is "Adjust", and the
  *  header carries each axis's own verb; the row label names the axes moved so
