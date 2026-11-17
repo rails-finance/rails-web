@@ -96,8 +96,8 @@ export function cowSurplusProv(c: CowSwapView, trade: CowTradeRaw, coords: CowCo
       logLeaf("sold (Trade log sellAmount)", trade.sell),
       ...(trade.fee !== "0" ? [logLeaf("fee (Trade log feeAmount)", trade.fee)] : []),
       logLeaf("bought (Trade log buyAmount)", trade.buy),
-      { label: `the limit, in ${sym}`, value: c.limit.amount, kind: "derived" },
-      { label: `surplus, in ${sym}`, value: c.surplus, kind: "derived" },
+      { label: `the limit, in ${sym}`, value: c.limit.amount, kind: "derived", step: true },
+      { label: `surplus, in ${sym}`, value: c.surplus, kind: "derived", step: true },
       {
         label: "surplus",
         value: "docs.cow.fi Definitions",
@@ -151,8 +151,10 @@ export function cowFeeProv(c: CowSwapView, trade: CowTradeRaw, coords: CowCoords
       logLeaf("sold (Trade log sellAmount)", trade.sell),
       ...(trade.fee !== "0" ? [logLeaf("fee (Trade log feeAmount)", trade.fee)] : []),
       logLeaf("bought (Trade log buyAmount)", trade.buy),
-      ...(signed ? [{ label: `the signed fee, in ${sym}`, value: c.signedFee, kind: "derived" as const }] : []),
-      { label: `the gap, in ${sym}`, value: c.feeGap, kind: "derived" },
+      ...(signed
+        ? [{ label: `the signed fee, in ${sym}`, value: c.signedFee, kind: "derived" as const, step: true as const }]
+        : []),
+      { label: `the gap, in ${sym}`, value: c.feeGap, kind: "derived", step: true },
       {
         label: "fees in the surplus token",
         value: "docs.cow.fi Fees",

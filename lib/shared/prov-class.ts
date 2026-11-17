@@ -3,8 +3,9 @@
 // inspector's head lists ("Computed from: …"). A leaf marked `definition` is a
 // constant the protocol defines (a stablecoin's $1 face, the year a rate
 // formula compounds over), not a read, so it carries no class and neither rule
-// counts it (ui-jobs 669, 671). Pure, so a unit test runs the
-// same rule.
+// counts it (ui-jobs 669, 671). A leaf marked `step` is an intermediate result
+// the receipt works out from its other leaves; it is skipped the same way.
+// Pure, so a unit test runs the same rule.
 
 import type { ProvClass, ProvInput, ProvKind } from "@/components/shared/provenance";
 
@@ -35,11 +36,11 @@ export function resolveClass(kind: ProvKind, pclass?: ProvClass): ProvClass {
   }
 }
 
-type ClassedLeaf = Pick<ProvInput, "kind" | "pclass" | "definition">;
+type ClassedLeaf = Pick<ProvInput, "kind" | "pclass" | "definition" | "step">;
 
-/** The leaves that were read: every leaf but a definition. */
+/** The leaves that were read: every leaf but a definition or an intermediate step. */
 export function classedLeaves<T extends ClassedLeaf>(leaves: readonly T[]): T[] {
-  return leaves.filter((l) => !l.definition);
+  return leaves.filter((l) => !l.definition && !l.step);
 }
 
 /** The furthest class among the read leaves (the weakest link); null when

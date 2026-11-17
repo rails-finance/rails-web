@@ -43,7 +43,7 @@ export const CLASS_LINES: readonly { cls: ProvClass; line: string; modalNote?: s
   { cls: "oracle", line: "A price from a feed on the chain. The feed’s log for that round holds it." },
   {
     cls: "input",
-    line: "A value the transaction sent to the contract, which any block explorer shows and the contract checks only where its code uses it.",
+    line: "A value the transaction sent to the contract. Any block explorer shows it; the contract checks it only where its code uses it.",
   },
   { cls: "indexed", line: "Built by Rails’s index from the events it recorded. No third party holds it." },
   {

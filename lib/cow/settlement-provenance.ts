@@ -201,7 +201,7 @@ export function gapProv(s: CowSettlement, t: CowSettlementTrade): Provenance {
       { label: "bought", value: t.buyAmount, kind: "chain", pclass: "emitted" },
       { label: "clearing price, sold token", value: t.settled?.uniform.sellPrice, kind: "chain", pclass: "input" },
       { label: "clearing price, bought token", value: t.settled?.uniform.buyPrice, kind: "chain", pclass: "input" },
-      ...(g != null ? [{ label: "gap (bp)", value: g.toFixed(4), kind: "derived" as const }] : []),
+      ...(g != null ? [{ label: "gap (bp)", value: g.toFixed(4), kind: "derived" as const, step: true as const }] : []),
     ],
     contract: SETTLEMENT,
     source: coords(s),

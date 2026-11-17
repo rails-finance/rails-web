@@ -64,8 +64,8 @@ export type ProvKind = "chain" | "chain-derived" | "derived" | "offchain";
  *  OVER the 4-kind gate (chain-truth-charter). Ordered by distance from
  *  chain-state: emitted (a field in the event's own log) · state (a contract
  *  slot read at a block) · oracle (an on-chain price feed) · input (a value in
- *  the transaction's input data, which the contract checks only where its logic
- *  reads it) — all four on-chain and third-party verifiable — then indexed
+ *  the transaction's input data, which the contract checks only where its code
+ *  uses it) — all four on-chain and third-party verifiable — then indexed
  *  (materialized by our backend, no third-party proof) · offchain (no on-chain
  *  anchor at all). */
 export type ProvClass = "emitted" | "state" | "oracle" | "input" | "indexed" | "offchain";
@@ -98,6 +98,10 @@ export interface ProvInput {
    *  leaf carries no class dot and the value's class skips it
    *  (lib/shared/prov-class.ts). */
   definition?: true;
+  /** An intermediate result the receipt works out from its other leaves (the
+   *  limit in the surplus token, a gap), not a read: like a definition, it
+   *  carries no class dot and the value's class skips it. */
+  step?: true;
 }
 export interface Provenance {
   kind: ProvKind;
@@ -819,7 +823,7 @@ export function ProvReceipt({
                 const cls = resolveClass(inp.kind, inp.pclass);
                 return (
                   <Fragment key={i}>
-                    {inp.definition ? (
+                    {inp.definition || inp.step ? (
                       <span aria-hidden />
                     ) : (
                       <span className={`prov-row-dot ${CLASS_CSS[cls]}`} title={CLASS_META[cls]} />
