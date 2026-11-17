@@ -36,13 +36,21 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { Box, Check, CircleHelp, Copy, ExternalLink, TriangleAlert, X } from "lucide-react";
-import { TokenChipIcon } from "./token-chip-icon";
 import { ProvCoverageBounds } from "./prov-coverage-tripwire";
 import { formatExact } from "@/lib/utils/format";
 import { BlockRef } from "@/components/shared/block-ref";
 import { untracedInputs } from "@/lib/shared/prov-untraced";
 import { resolveClass, weakestClass } from "@/lib/shared/prov-class";
 import { entrySig } from "@/lib/shared/prov-signature";
+import {
+  CLASS_LINES,
+  CLASS_NAMES,
+  COMPUTED_LINE,
+  DEFINITION_LINE,
+  LADDER_INTRO,
+  LADDER_TITLE,
+  SPLIT_LINE,
+} from "@/lib/shared/prov-class-words";
 
 export { resolveClass };
 
@@ -428,19 +436,12 @@ function CopyBtn({ text, title = "Copy" }: { text: string; title?: string }) {
 
 // ── The receipt ──────────────────────────────────────────────────────────────
 // A clicked value renders as ONE pane — no steps, no selection. A derivation is
-// an expression, not a sequence, so the layout is the equation itself: the
-// displayed value on the left (weakest-link class chip + summary), and on the
-// right the formula, one row per operand leaf (each dotted with its own
-// distance class), then the source coordinates the flow was recorded at. The
-// five distance classes layer over the shipped 4-kind gate.
+// an expression, so the layout is the equation: the summary, then the formula,
+// one row per operand leaf (each dotted with its distance class), then the
+// source coordinates the flow was recorded at. The five distance classes layer
+// over the shipped 4-kind gate.
 
-export const CLASS_META: Record<ProvClass, string> = {
-  emitted: "Emitted",
-  state: "State",
-  oracle: "Oracle",
-  indexed: "Indexed",
-  offchain: "Off-chain",
-};
+export const CLASS_META: Record<ProvClass, string> = CLASS_NAMES;
 export const CLASS_CSS: Record<ProvClass, string> = {
   emitted: "prov-cls-emitted",
   state: "prov-cls-state",
@@ -463,9 +464,9 @@ export function classifyValue(info: Provenance): { vcls: ProvClass; isComputed: 
   return { vcls, isComputed, leaves };
 }
 
-// No per-class default proof line: the generic how-to-verify prose lives in the
-// distance-ladder modal (the "?" beside the class chip), so the receipt only
-// carries a verify row when the vocabulary states one (or a tx link exists).
+// No per-class default proof line: what each class means for checking lives in
+// the class modal the head's dots open, so the receipt only carries a verify
+// row when the vocabulary states one (or a tx link exists).
 
 function VerifyRow({ v }: { v: ProvVerify }) {
   if ((v.kind === "etherscan" || v.kind === "link") && v.href)
@@ -615,78 +616,56 @@ function NotationModal({ display, exact, onClose }: { display: string; exact: st
   );
 }
 
-/** Opened by the class dots in the inspector popover's head (prov-inspector.tsx). */
+/** Opened by the class dots in the inspector popover's head
+ *  (prov-inspector.tsx). Its words are lib/shared/prov-class-words.ts. */
 export function LadderModal({ onClose }: { onClose: () => void }) {
   return (
-    <ProvModal ariaLabel="Distance ladder" onClose={onClose}>
-      <h2 className="text-lg font-bold mb-4">The distance ladder</h2>
-      <LadderRung cls="emitted" name="Emitted">
-        A field in the event&rsquo;s log. <b>Proof:</b> the tx event logs on any explorer.
-      </LadderRung>
-      <LadderRung cls="state" name="State">
-        Read from a contract slot at a block. <b>Proof:</b> re-run the eth_call at that block against any node.
-        Explorers only show the current head.
-      </LadderRung>
-      <LadderRung cls="oracle" name="Oracle">
-        An on-chain price feed. <b>Proof:</b> the AnswerUpdated log for that round.
-      </LadderRung>
-      <div className="prov-split">
-        <span className="prov-bar" />
-        <span>on-chain, third-party verifiable · below needs Rails</span>
-        <span className="prov-bar" />
+    <ProvModal ariaLabel={LADDER_TITLE} onClose={onClose}>
+      <h2 className="text-lg font-bold mb-4">{LADDER_TITLE}</h2>
+      <p className="text-sm text-rb-500 mb-2">{LADDER_INTRO}</p>
+      {CLASS_LINES.map(({ cls, line, modalNote }) => (
+        <Fragment key={cls}>
+          {cls === "indexed" && (
+            <div className="prov-split">
+              <span className="prov-bar" />
+              <span>{SPLIT_LINE}</span>
+              <span className="prov-bar" />
+            </div>
+          )}
+          <LadderRung cls={cls} name={CLASS_META[cls]}>
+            {modalNote ? `${line} ${modalNote}` : line}
+          </LadderRung>
+        </Fragment>
+      ))}
+      <div className="prov-prose">
+        <p>{COMPUTED_LINE}</p>
+        <p className="mt-2">{DEFINITION_LINE}</p>
       </div>
-      <LadderRung cls="indexed" name="Indexed">
-        Materialized by our backend. <b>No third-party proof</b>: you trust the indexer&rsquo;s replay. Bottoms out
-        here.
-      </LadderRung>
-      <LadderRung cls="offchain" name="Off-chain">
-        No on-chain anchor at all: an API price, an approximation. Nothing to verify against.
-      </LadderRung>
-      <p className="prov-prose">
-        <b>Computed</b> isn&rsquo;t a rung: it&rsquo;s the operator between them, and it inherits the furthest class of
-        its inputs. The result&rsquo;s badge is that <b>weakest link</b>. Temperature carries the split:{" "}
-        <b>cool = on-chain</b>, <b>warm = trust required</b>. A categorical ladder.
-      </p>
-      <p className="prov-prose">
-        <b>Delivery is not verification.</b> How Rails fetched a number, replayed by our indexer or read live from a
-        node, is a freshness question, and both routes are still us. Verification points at a neutral third party (the
-        tx logs, the oracle round) so the proof never passes through Rails at all.
-      </p>
     </ProvModal>
   );
 }
 
-/** The receipt — the whole derivation in one static pane. Left: the displayed
- *  value (weakest-link class chip, `?` → distance ladder, summary, delivery
- *  `via`). Right: the equation — the formula, one row per operand leaf (its own
- *  distance-class dot + value + copy + contract), and the source coordinates
- *  (block / tx / contract) the flow was recorded at. Plain chain reads with no
- *  formula collapse gracefully to value + coordinates. */
+/** The receipt body inside the inspector's popover (prov-inspector.tsx, the one
+ *  caller): nothing the popover's head carries — the head owns the name, the
+ *  value and the class dots, so the exact figure renders only when the head
+ *  shows a compact form, and the summary sheds its leading name clause. Then
+ *  the scaling sentence, the check line, the via, and the equation: the
+ *  formula, one row per operand leaf (its class dot + value + contract), and
+ *  the source coordinates (block / tx / contract). */
 export function ProvReceipt({
   info,
   value,
   display,
-  symbol,
   source,
-  embedded,
 }: {
   info: Provenance;
   value: string;
   /** The value as it reads on the card (e.g. compact "3.27K") when that differs
-   *  from the exact figure; the headline shows this, the exact value beneath. */
+   *  from the exact figure; the exact value renders beneath the head's. */
   display?: string | null;
-  /** Token ticker riding beside the value on the card — headline icon. */
-  symbol?: string | null;
   source: ProvSource | null;
-  /** Inside the inspector's popover (prov-inspector.tsx, the one caller):
-   *  single-column layout on the normal (non-inverted) surface, and nothing the
-   *  popover's head already carries — the head owns the name and the value, so
-   *  the headline block is dropped (the exact figure stays when the head shows
-   *  a compact form), and the summary sheds its leading name clause. */
-  embedded?: boolean;
 }) {
   const chainId = useChainId();
-  const [ladderOpen, setLadderOpen] = useState(false);
   const [notationOpen, setNotationOpen] = useState(false);
 
   const byLabel = (l: string) => info.inputs?.find((i) => i.label.toLowerCase() === l);
@@ -702,7 +681,7 @@ export function ProvReceipt({
   // The value's class (weakest link for computed values) and its operand
   // leaves — the inputs, minus the block/tx chips that feed the coordinates
   // footer. Shared with the inspector's head via classifyValue.
-  const { vcls, isComputed, leaves } = classifyValue(info);
+  const { vcls, leaves } = classifyValue(info);
   const hasSource = block != null || Boolean(txHash) || Boolean(info.contract);
 
   // Self-audit (lib/shared/prov-untraced.ts): a formula's operand with no input
@@ -724,13 +703,10 @@ export function ProvReceipt({
   // address shown short is no figure, and its receipt's leaves say where the
   // name comes from.
   const figure = compacted && isFigure(value);
-  // Headline token icon: the captured ticker, else the vocabulary's "asset" leaf.
-  const sym = symbol ?? byLabel("asset")?.value ?? null;
-  // Embedded dedup: the popover's head already carries the name, the value and
+  // Dedup: the popover's head already carries the name, the value and
   // the ticker, so the summary sheds its leading name clause (the head's label),
   // and an "asset" leaf that just echoes the head's ticker drops.
   const note = (() => {
-    if (!embedded) return info.summary;
     // The SAME cut the head's label takes (splitSummary) — the body is the
     // tail of that cut, so it can never restate the header. An empty tail
     // renders no paragraph at all.
@@ -740,19 +716,19 @@ export function ProvReceipt({
   })();
   // The head's label already names the asset, so an embedded receipt never
   // restates it as an operand row.
-  const shownLeaves = embedded ? leaves.filter((l) => l.label.toLowerCase() !== "asset") : leaves;
-  // Embedded, an etherscan verify link rides the via line instead of its own
+  const shownLeaves = leaves.filter((l) => l.label.toLowerCase() !== "asset");
+  // An etherscan verify link rides the via line instead of its own
   // full-width row: the via segment naming the log becomes the link (the last
   // "log"/"logs" segment — nearest the field), so the check stays one click
   // away without a call-to-action above the prose. No matching segment →
   // a quiet trailing "verify" segment.
-  const viaVerify = embedded && info.verify?.kind === "etherscan" && info.verify.href ? info.verify : null;
+  const viaVerify = info.verify?.kind === "etherscan" && info.verify.href ? info.verify : null;
   const viaNode = (() => {
     let parts = info.via ? info.via.split(" · ") : [];
     // The receipt reads origin-only: the leading custody segment (the index /
     // stream name the vocabularies put first) drops whenever something more
-    // specific follows it. The dock keeps the full via.
-    if (embedded && parts.length > 1) parts = parts.slice(1);
+    // specific follows it.
+    if (parts.length > 1) parts = parts.slice(1);
     if (!viaVerify) return parts.length > 0 ? parts.join(" · ") : null;
     let linkIdx = -1;
     parts.forEach((s, i) => {
@@ -780,61 +756,12 @@ export function ProvReceipt({
   })();
 
   return (
-    <div className={`prov-receipt ${embedded ? "prov-receipt-embed " : ""}${CLASS_CSS[vcls]}`}>
+    <div className={`prov-receipt prov-receipt-embed ${CLASS_CSS[vcls]}`}>
       <div className="prov-ins-main">
-        {!embedded && (
-          <div className="prov-ins-head">
-            <span className="prov-ins-label">displayed value</span>
-            <span
-              className={`prov-chip ${CLASS_CSS[vcls]}`}
-              title={
-                isComputed
-                  ? `Computed value: the class is its furthest input's (the weakest link): ${CLASS_META[vcls]}`
-                  : undefined
-              }
-            >
-              <span className="prov-chip-dot" />
-              {isComputed ? `Computed · ${CLASS_META[vcls]}` : CLASS_META[vcls]}
-            </span>
-            <button
-              type="button"
-              onClick={() => setLadderOpen(true)}
-              title="Distance ladder"
-              className="prov-laddertoggle"
-            >
-              <CircleHelp aria-hidden />
-            </button>
-          </div>
-        )}
-        {/* Headline = the value as it reads on the card, with the card's token
-            icon. Compact forms get a "?" (the notation modal) and the exact
-            from-the-block figure in small text directly beneath. Embedded, the
-            accordion bar IS the headline, so only the exact figure renders (the
-            bar shows the compact form). */}
-        {!embedded && (
-          <div className="prov-ins-value">
-            {compacted ? display : value}
-            {sym && (
-              <span className="prov-ins-token">
-                <TokenChipIcon symbol={sym} size={20} filterable={false} />
-              </span>
-            )}
-            {figure && (
-              <button
-                type="button"
-                className="prov-fmt-help"
-                title="Compact notation"
-                onClick={() => setNotationOpen(true)}
-              >
-                <CircleHelp aria-hidden />
-              </button>
-            )}
-          </div>
-        )}
         {compacted && (
           <div className="prov-ins-exact">
             {value}
-            {embedded && figure && (
+            {figure && (
               <button
                 type="button"
                 className="prov-fmt-help"
@@ -940,7 +867,6 @@ export function ProvReceipt({
         </div>
       )}
 
-      {ladderOpen && <LadderModal onClose={() => setLadderOpen(false)} />}
       {notationOpen && display && (
         <NotationModal display={display} exact={value} onClose={() => setNotationOpen(false)} />
       )}

@@ -32,6 +32,7 @@
 import { parseAbi } from "viem";
 import { chainClient } from "./rpc";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
+import { throwAtBuild } from "@/lib/sources/api/route-gate";
 import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 
 /** The server's market key per AaveOracle, as its AAVE_V3_POSITION_MARKETS names them. */
@@ -64,11 +65,16 @@ async function serverPrices(oracle: string, assets: string[]): Promise<Map<strin
         cache: "no-store",
         signal: AbortSignal.timeout(SERVER_TIMEOUT_MS),
       });
-      if (!res.ok) return null;
+      if (!res.ok) {
+        if (res.status >= 500 || res.status === 429) throwAtBuild("aave-v3/oracle-prices", `status ${res.status}`);
+        return null;
+      }
       const body = (await res.json()) as { prices?: Record<string, string> };
       for (const [a, v] of Object.entries(body.prices ?? {})) out.set(a.toLowerCase(), BigInt(v));
     }
-  } catch {
+  } catch (err) {
+    // During the build a failed route fails the page (route-gate.ts, ui-jobs 686).
+    throwAtBuild("aave-v3/oracle-prices", err);
     return null;
   }
   return out;

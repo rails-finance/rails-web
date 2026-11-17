@@ -199,8 +199,22 @@ check(
 check(title.text === "Liquity V2", `the protocol title reads as written, not shouted (${title.text})`);
 check(title.icon[0] === 32 && title.icon[1] === 32, `the protocol glyph is 32px square (${title.icon.join("x")})`);
 check(title.chooserOnRow, "the chain's label sits on the protocol title row");
-const rowButtons = await page.locator("[data-anatomy='H3'] button[aria-haspopup='menu']").count();
-check(rowButtons === 0, `the title row draws no chooser; the rail carries it (${rowButtons})`);
+// The row's one menu button is the explorer's sections trigger (ui-jobs 680,
+// H5 in rail-header.tsx, `data-sections-trigger`); any other menu button, or
+// the chooser's own hooks, would be a chooser drawn on the row.
+const rowMenus = await page.evaluate(() => {
+  const row = document.querySelector("[data-anatomy='H3']");
+  const menus = [...(row?.querySelectorAll("button[aria-haspopup='menu']") ?? [])];
+  return {
+    sections: menus.filter((b) => b.hasAttribute("data-sections-trigger")).length,
+    other: menus.filter((b) => !b.hasAttribute("data-sections-trigger")).length,
+    chooser: row?.querySelectorAll("[data-chooser-trigger], [data-explorer-chooser]").length ?? 0,
+  };
+});
+check(
+  rowMenus.other === 0 && rowMenus.chooser === 0,
+  `the title row draws no chooser; the rail carries it (${JSON.stringify(rowMenus)})`,
+);
 
 // ── The control cluster stays hard right where the bar exists ──
 // The bar is drawn below md only, on every page (ui-jobs 68, 498).

@@ -206,9 +206,14 @@ const skip = (name, why) => {
 // share-price rule (two to six places, whatever the asset's decimals). Both
 // rules restated here from their definitions (lib/shared/format-compact.ts,
 // lib/shared/vault-amount-text.ts `sharePriceText`), for figures of 0.01 and up.
+// The ladder runs to T and Q since `d33574cf` (ui-jobs 605's mock round eight);
+// past a thousand Q the figure stays in Q ("2,008.1Q", BRZ Lending's share
+// price, a real convertToAssets answer that 13a holds wei-exact).
 const expectedCompactText = (raw, decimals) => {
   const v = Number(raw) / Math.pow(10, decimals);
   const units = [
+    [1e15, "Q"],
+    [1e12, "T"],
     [1e9, "B"],
     [1e6, "M"],
     [1e3, "K"],
@@ -583,7 +588,15 @@ const priceAssetDecimals = new Map(
 const sixDecRow = funded.find((r) => priceAssetDecimals.get(r.asset) === 6);
 const eighteenDecRow = funded.find((r) => priceAssetDecimals.get(r.asset) === 18 && r.address !== sixDecRow?.address);
 const thirdRow = funded.find((r) => r.address !== sixDecRow?.address && r.address !== eighteenDecRow?.address);
-const priceSample = [sixDecRow, eighteenDecRow, thirdRow].filter(Boolean);
+// The row with the largest share price, where it prints compact (a million
+// and up): the T and Q steps of the compact rule get read whenever the
+// roster holds such a vault (BRZ Lending 0xb817…1831, "2,008.1Q", pass 17).
+const compactRow = funded
+  .filter((r) => r.sharePriceRaw)
+  .map((r) => ({ r, v: Number(r.sharePriceRaw) / Math.pow(10, priceAssetDecimals.get(r.asset) ?? 18) }))
+  .filter((x) => x.v >= 1e6)
+  .sort((a, b) => b.v - a.v)[0]?.r;
+const priceSample = [...new Set([sixDecRow, eighteenDecRow, thirdRow, compactRow].filter(Boolean))];
 const ownPrice = await client.multicall({
   contracts: priceSample.map((r) => ({
     address: r.address,
@@ -624,7 +637,8 @@ priceSample.forEach((r) => {
 check(
   "13b the printed share price follows the share-price rule — two to six places, never a fixed two",
   priceTextBad.length === 0,
-  priceTextBad.join("; ") || `${priceSample.length} sampled`,
+  priceTextBad.join("; ") ||
+    `${priceSample.length} sampled${compactRow ? `, the compact one ${compactRow.address}: "${compactRow.sharePriceText}"` : ", none compact"}`,
 );
 
 // ── 17: the last 30 days (V5, ui-jobs 413) on Gauntlet USDC Prime's page ─────────────

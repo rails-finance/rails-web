@@ -34,7 +34,8 @@
 // into the known-faults file's pass line (ui-jobs 432). A server this runner
 // did not start reads the chain on whatever URLs it was started with; the
 // count then covers nothing, and the table says so. RPC_PROXY=0 runs without
-// it; RPC_PIN=keep reuses the last run's pins so a rerun costs nothing upstream.
+// it; RPC_PIN=keep reuses the pins in the cache's pins.json so a rerun costs
+// nothing upstream, and only such a run adds a pin to that file.
 //
 // The `.ts` verifiers run through `tsx` (`tsx --test` for the node:test ones).
 // A script longer than the cap is run in parts (SPLIT below), each under it.
@@ -46,7 +47,7 @@
 //   ONLY=llamalend,prov node scripts/verify/run-all.mjs   (substring filter)
 //   JOBS=1 node scripts/verify/run-all.mjs                (default 2 — see below)
 //   RPC_PROXY=0 node scripts/verify/run-all.mjs           (no proxy, the key pays whole)
-//   RPC_PIN=keep node scripts/verify/run-all.mjs          (yesterday's pins, nothing upstream)
+//   RPC_PIN=keep node scripts/verify/run-all.mjs          (the kept pins, nothing upstream)
 //   SERVER_MAX_OLD_SPACE_MB=6144 node scripts/verify/run-all.mjs
 //        (off unless set: the server this runner starts gets
 //         NODE_OPTIONS=--max-old-space-size=6144, so a leak ends in a restart at a
@@ -199,6 +200,76 @@ const SPLIT = {
       ["maple", "pwn", "aave-v4", "alchemix-v3"],
       ["alchemix-v2", "alchemix-transmuter", "sky-savings", "morpho-base-vaults"],
       ["yearn-vaults", "aave-vaults", "dolomite", "asymmetry", "basedollar"],
+    ],
+  },
+  // verify-section-scopes reads 53 pages at about 30 s each: pass 17 (14 Nov
+  // 2026) reached the cap 30 pages in, twice, and the hand-run parts took 59 s
+  // for two pages and 558 s for eighteen. Four parts in its page order, 13 or
+  // 14 pages (about 7 min) apiece. A page added to its list joins a part here.
+  "verify-section-scopes.mjs": {
+    env: "PAGES",
+    parts: [
+      [
+        "/base/morpho/vaults/0xbeefe94c8ad530842bfe7d8b397938ffc1cb83b2",
+        "/ethereum/morpho/vaults/0xbeef01735c132ada46aa9aa4c54623caa92a64cb",
+        "/ethereum/aave/vaults/0xe1753f2e00940cc31213dd92013cf019dfe4ca1d",
+        "/ethereum/aave/vaults/0xd4fa2d31b7968e448877f69a96de69f5de8cd23e",
+        "/ethereum/aave/vaults/0x6bf183243fdd1e306ad2c4450bc7dcf6f0bf8aa6",
+        "/ethereum/yearn/vaults/0x310b7ea7475a0b449cfd73be81522f1b88efafaa",
+        "/base/morpho/vaults",
+        "/ethereum/morpho/vaults",
+        "/ethereum/aave/vaults",
+        "/ethereum/yearn/vaults",
+        "/ethereum/aave-v3/markets",
+        "/ethereum/aave-v3/markets?market=core",
+        "/base/aave-v3/markets",
+        "/arbitrum/aave-v3/markets",
+      ],
+      [
+        "/ethereum/spark/markets",
+        "/base/seamless/markets",
+        "/ethereum/aave-v3/markets/0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+        "/base/aave-v3/markets/0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf",
+        "/arbitrum/aave-v3/markets/0x82af49447d8a07e3bd95bd0d56f35241523fbab1",
+        "/ethereum/spark/markets/0x6b175474e89094c44da98b954eedeac495271d0f",
+        "/ethereum/dolomite/markets",
+        "/ethereum/fx/pools",
+        "/ethereum/fx/pools/wsteth",
+        "/ethereum/compound-v3/markets",
+        "/ethereum/compound-v3/markets/usdc",
+        "/base/compound-v3/markets",
+        "/base/compound-v3/markets/weth",
+      ],
+      [
+        "/arbitrum/compound-v3/markets",
+        "/arbitrum/compound-v3/markets/usdc",
+        "/ethereum/compound-v2/markets",
+        "/ethereum/compound-v2/markets/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+        "/ethereum/moonwell/markets",
+        "/ethereum/moonwell/markets/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+        "/base/moonwell/markets",
+        "/base/moonwell/markets/0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+        "/ethereum/maple/pools",
+        "/ethereum/maple/pools/syrupusdc",
+        "/ethereum/aave-v3/markets/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+        "/base/morpho/markets/0x833589fcd6edb6e08f4c7c32d4f71b54bda02913/0x9103c3b4e834476c9a62ea009ba2c884ee42e94e6e314a26f04d312434191836",
+        "/ethereum/morpho/markets/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48/0xb323495f7e4148be5643a4ea4a8221eef163e4bccfdedc2a6f4696baacbc86cc",
+      ],
+      [
+        "/arbitrum/morpho/markets/0xaf88d065e77c8cc2239327c5edb3a432268e5831/0x5dd281933e74e576825deda2f28764f1ad3818faa485cbefc808bef0fc1518e5",
+        "/ethereum/morpho/markets",
+        "/base/morpho/markets",
+        "/arbitrum/morpho/markets",
+        "/ethereum/morpho/markets/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+        "/base/morpho/markets/0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf",
+        "/arbitrum/morpho/markets/0xaf88d065e77c8cc2239327c5edb3a432268e5831",
+        "/ethereum/llamalend/markets",
+        "/ethereum/llamalend/markets/0x23f5a668a9590130940ef55964ead9787976f2cc",
+        "/ethereum/fluid/vaults",
+        "/ethereum/fluid/vaults/11",
+        "/ethereum/pendle/markets",
+        "/ethereum/pendle/markets/0x34280882267ffa6383b363e278b027be083bbe3b",
+      ],
     ],
   },
 };

@@ -1,5 +1,5 @@
 // verify-ladder-dots — the class dots in the inspector popover's head open the
-// distance ladder (TO-DO-ui-jobs §33).
+// class modal (TO-DO-ui-jobs §33; its name is LADDER_TITLE, ui-jobs 617).
 //
 // The ladder's only trigger once sat in the receipt head the popover never
 // renders, so no surface could open it. The dots are now a labelled button.
@@ -12,11 +12,18 @@
 // Against the deployed preview (dev.rails.finance), the bypass header rides
 // the browser context — see lib/host.mjs.
 
+import { readFileSync } from "node:fs";
 import { chromium } from "playwright";
 import { ARMED, armInspector } from "./lib/prov-inspector.mjs";
 import { BASE, bypassHeaders } from "./lib/host.mjs";
 
 const PATH = "/ethereum/liquity-v2/branches";
+// The modal's name, read from its one constant (plain node cannot import the
+// .ts module).
+const TITLE = readFileSync(new URL("../../lib/shared/prov-class-words.ts", import.meta.url), "utf8").match(
+  /export const LADDER_TITLE = "([^"]+)"/,
+)?.[1];
+if (!TITLE) throw new Error("LADDER_TITLE not found in lib/shared/prov-class-words.ts");
 
 const fails = [];
 function check(name, cond, detail = "") {
@@ -30,7 +37,7 @@ await page.goto(BASE + PATH, { waitUntil: "domcontentloaded", timeout: 180000 })
 
 await armInspector(page);
 const pop = page.locator(".prov-inspect-pop");
-const ladder = page.locator('[role="dialog"][aria-label="Distance ladder"]');
+const ladder = page.locator(`[role="dialog"][aria-label="${TITLE}"]`);
 // The inspector indicator beside the profile control stands while armed: the mode's state.
 const armed = async () => (await page.locator(ARMED).count()) > 0;
 
@@ -56,15 +63,19 @@ const dots = pop.locator(".prov-inspect-head .prov-rrow-dots");
 const tag = await dots.evaluate((el) => el.tagName).catch(() => null);
 const label = await dots.getAttribute("aria-label").catch(() => null);
 check("the head's dots are a button", tag === "BUTTON", String(tag));
-check("the button is labelled for what it opens", /what the colours mean/i.test(label ?? ""), label ?? "no label");
+check("the button is labelled for what it opens", (label ?? "").endsWith(`. ${TITLE}`), label ?? "no label");
 
 // Keyboard: focus the dots and press Enter.
 await dots.focus().catch(() => {});
 await page.keyboard.press("Enter");
 await page.waitForTimeout(250);
 check(
-  "Enter on the dots opens the distance ladder",
-  (await ladder.count()) === 1 && /The distance ladder/.test(await ladder.innerText().catch(() => "")),
+  "Enter on the dots opens the class modal",
+  (await ladder.count()) === 1 &&
+    (await ladder
+      .locator("h2")
+      .innerText()
+      .catch(() => "")) === TITLE,
 );
 check("the popover stays open under the ladder", (await pop.count()) === 1);
 

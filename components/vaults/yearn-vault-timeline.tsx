@@ -51,7 +51,10 @@ import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { boundaryFromVaultDrawn } from "@/lib/shared/timeline-boundary";
 import { AAVE_VAULT_TIMELINE_KEY, aaveVaultTimelineRuns, vaultEventToActivity } from "@/lib/aave-vaults/timeline-runs";
 import { MAINNET_CHAIN_ID as YEARN_CHAIN_ID } from "@/lib/shared/chains";
-import { VAULT_TIMELINE_HORIZON as YEARN_VAULT_TIMELINE_CEILING } from "@/lib/shared/vault-holder-timeline";
+import {
+  VAULT_TIMELINE_HORIZON as YEARN_VAULT_TIMELINE_CEILING,
+  withheldBasisOf,
+} from "@/lib/shared/vault-holder-timeline";
 import {
   yearnVaultTimelineAccrualProv,
   yearnVaultTimelineAssetsProv,
@@ -152,25 +155,34 @@ export function YearnVaultTimeline({ timeline, vaultName, shareSymbol, assetSymb
               coords,
               withheld,
               YEARN_VAULT_TIMELINE_CEILING,
-              timeline.coverage.logCountIsLowerBound,
+              withheldBasisOf(timeline.coverage),
             )}
           >
             This address has {timeline.coverage.logCountIsLowerBound ? "at least " : ""}
             {n(withheld)} of its own share transfers on this vault
           </Prov>
-          , more than this lane builds in one request.{" "}
-          {timeline.coverage.logCountIsLowerBound ? (
+          {withheldBasisOf(timeline.coverage) === "unchecked" ? (
             <>
-              The count is a floor rather than a census: the endpoint would not answer this address&rsquo;s whole sweep
-              at once, so the range was walked in chunks and the walk stopped as soon as it passed what this page draws.
-              Because the logs were never read whole, the balance check could not be run on this address at all.
+              . The balance check did not run: the query for this address&rsquo;s transfers failed, so the count was
+              made in chunks and nothing confirmed it.{" "}
             </>
           ) : (
             <>
-              The whole history was read and it reconciles against the vault&rsquo;s own <code>balanceOf</code>; what is
-              withheld is the drawing of it.
+              , more than this lane builds in one request.{" "}
+              {timeline.coverage.logCountIsLowerBound ? (
+                <>
+                  The count is a floor: the node would not return this address&rsquo;s whole history at once, so the
+                  range was counted a piece at a time, and the count stopped once it passed what this page draws.
+                  Because the logs were never read whole, the balance check could not be run on this address.
+                </>
+              ) : (
+                <>
+                  The whole history was read and it reconciles against the vault&rsquo;s own <code>balanceOf</code>;
+                  what is withheld is the drawing of it.
+                </>
+              )}{" "}
             </>
-          )}{" "}
+          )}
           The newest rows are not shown in place of the rest.
         </p>
       ) : !reconcile ? null : !reconcile.reconciled ? (

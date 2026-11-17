@@ -35,6 +35,7 @@ import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
 import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { LIQUITY_V1_ADDRESSES, LIQUITY_V1_MCR, LIQUITY_V1_CCR } from "@/lib/liquity-v1/asset-catalog";
+import { rethrowAtBuild } from "@/lib/sources/api/route-gate";
 
 const TROVE_MANAGER = getAddress(LIQUITY_V1_ADDRESSES.TROVE_MANAGER);
 const PRICE_FEED = getAddress(LIQUITY_V1_ADDRESSES.PRICE_FEED);
@@ -190,7 +191,10 @@ export async function loadLiquityV1SystemFromChain(): Promise<LiquityV1SystemCha
       client.getBlockNumber().then(Number),
       client
         .readContract({ address: PRICE_FEED, abi: PF_ABI, functionName: "fetchPrice" })
-        .catch(() => null as bigint | null),
+        .catch((err): bigint | null => {
+          rethrowAtBuild(err);
+          return null;
+        }),
       client.readContract({ address: PRICE_FEED, abi: PF_ABI, functionName: "lastGoodPrice" }),
       client.readContract({ address: TROVE_MANAGER, abi: TM_ABI, functionName: "getEntireSystemColl" }),
       client.readContract({ address: TROVE_MANAGER, abi: TM_ABI, functionName: "getEntireSystemDebt" }),
@@ -275,7 +279,8 @@ export async function loadLiquityV1SystemFromChain(): Promise<LiquityV1SystemCha
       queueDebtTotal: Number(running) / E18,
       chainStale: false,
     };
-  } catch {
+  } catch (err) {
+    rethrowAtBuild(err);
     return stub();
   }
 }
@@ -300,7 +305,8 @@ async function sweepSortedTroves(client: ReturnType<typeof alchemyClient>, size:
     const all: SweepEntry[] = [];
     for (const page of pages) for (const t of page) all.push({ owner: t.owner, debt: t.debt, coll: t.coll });
     return all;
-  } catch {
+  } catch (err) {
+    rethrowAtBuild(err);
     return null; // the queue section stays off; the system read still stands
   }
 }

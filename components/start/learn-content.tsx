@@ -34,7 +34,7 @@ const SECTIONS: { id: string; heading: string; body: string[] }[] = [
     heading: "How Rails reads it",
     body: [
       "Every number on a Rails page is read from the chain: from the protocol's contracts and the events they recorded.",
-      "Click a figure to see where it came from. Rails only reads: there is nothing to sign and no wallet to connect.",
+      "Turn on Inspector in the profile menu, under Advanced, then click a figure to see where it comes from. Rails only reads: there is nothing to sign and no wallet to connect.",
     ],
   },
 ];

@@ -31,6 +31,7 @@ import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { MAPLE_POOLS } from "@/lib/maple/asset-catalog";
+import { rethrowAtBuild } from "@/lib/sources/api/route-gate";
 
 const POOL_ABI = parseAbi([
   "function totalAssets() view returns (uint256)",
@@ -242,7 +243,8 @@ export async function resolveMaplePoolState(): Promise<MaplePoolStateMap> {
         },
       });
     });
-  } catch {
+  } catch (err) {
+    rethrowAtBuild(err);
     return out;
   }
 

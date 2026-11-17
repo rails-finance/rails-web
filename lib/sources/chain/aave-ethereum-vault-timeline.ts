@@ -535,6 +535,9 @@ export async function loadAaveEthereumVaultTimelineWithTail(
             logCount: counted.count,
             withheldAbove: counted.count,
             logCountIsLowerBound: !counted.exact,
+            // A recount that covered the whole range is a whole count the
+            // balance check never saw: the logs were not handed over.
+            withheldBasis: counted.exact ? "unchecked" : "floor",
           },
         },
         store: null,
@@ -673,7 +676,7 @@ export async function loadAaveEthereumVaultTimelineWithTail(
     // stored: a tail Rails cannot hold whole is not a tail.
     if (heavy && (wholeCount > tailMaxRows(MAINNET_CHAIN_ID) || !storable))
       return {
-        timeline: { ...base, coverage: { ...base.coverage, withheldAbove: wholeCount } },
+        timeline: { ...base, coverage: { ...base.coverage, withheldAbove: wholeCount, withheldBasis: "checked" } },
         store: null,
         allEvents: [],
         continueBuild: null,

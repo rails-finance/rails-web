@@ -7,6 +7,16 @@ import { HOME_SHARE_IMAGE, SITE_URL, twitterCard } from "@/lib/shared/page-metad
 import { DetailBackButton } from "@/components/shared/detail-back-row";
 import { ProvenanceExample } from "@/components/about/provenance-example";
 import { EXAMPLE } from "@/lib/about/provenance-example";
+import {
+  CLASS_LINES,
+  CLASS_NAMES,
+  COMPUTED_LINE,
+  DEFINITION_LINE,
+  KIND_OF_FIGURE,
+  KINDS_OF_FIGURE,
+  LADDER_TITLE,
+  capitalise,
+} from "@/lib/shared/prov-class-words";
 
 const SHARE = {
   title: "Receipts and the provenance inspector | Rails",
@@ -103,7 +113,7 @@ export default function ProvenancePage() {
         </div>
         <dl className="space-y-3">
           <Term name="Head">
-            Coloured dots for the kind of figure, then its name and its value as the page shows it.
+            Coloured dots for the {KIND_OF_FIGURE}, then its name and its value as the page shows it.
           </Term>
           <Term name="Summary">What the figure means on the chain, in plain words.</Term>
           <Term name="Whole number">The integer the chain stores, and how it becomes the figure shown.</Term>
@@ -122,23 +132,21 @@ export default function ProvenancePage() {
         </p>
       </Section>
 
-      <Section title="Kinds of figure">
+      <Section title={capitalise(KINDS_OF_FIGURE)}>
         <p className="body-text">
-          The dots in a receipt&rsquo;s head name the kind of figure. Pressing them opens the distance ladder, which
-          ranks the kinds by their distance from the chain. The first three can be checked on the chain without Rails.
+          The dots in a receipt&rsquo;s head name the {KIND_OF_FIGURE}. Pressing them opens {`“${LADDER_TITLE}”`}, which
+          ranks the {KINDS_OF_FIGURE} by their distance from the chain. The first three can be checked on the chain
+          without Rails.
         </p>
         <dl className="space-y-3">
-          <Term name="Emitted">A field in a transaction&rsquo;s event log. Any block explorer shows it.</Term>
-          <Term name="State">A value a contract returned at a stated block. Any archive node returns it again.</Term>
-          <Term name="Oracle">A price from a feed on the chain. The feed&rsquo;s log for that round holds it.</Term>
-          <Term name="Indexed">Built by Rails&rsquo;s index from the events it recorded. No third party holds it.</Term>
-          <Term name="Off-chain">
-            No anchor on the chain, such as a price from an outside service. Nothing on the chain confirms it.
-          </Term>
+          {CLASS_LINES.map(({ cls, line }) => (
+            <Term key={cls} name={CLASS_NAMES[cls]}>
+              {line}
+            </Term>
+          ))}
         </dl>
         <p className="body-text">
-          A figure worked out from others is computed. Its head shows one dot for each kind among its inputs, and it is
-          as checkable as its furthest input.
+          {COMPUTED_LINE} {DEFINITION_LINE}
         </p>
       </Section>
 

@@ -19,6 +19,7 @@ import { parseAbi, type Address } from "viem";
 import type { ChainId } from "@/lib/shared/chains";
 import { vaultHeadClient } from "@/lib/sources/api/head-reads-client";
 import { impliedDecimals, type AssetScale } from "@/lib/vaults/asset-scale-words";
+import { rethrowAtBuild } from "@/lib/sources/api/route-gate";
 
 export type { AssetScale };
 
@@ -84,6 +85,7 @@ async function readScales(chainId: ChainId, assets: string[]): Promise<Record<st
 export const loadAssetScales = unstable_cache(
   (chainId: ChainId, assets: string[]) =>
     readScales(chainId, assets).catch((error) => {
+      rethrowAtBuild(error);
       console.error(`The asset scale read did not answer (chain ${chainId}):`, error);
       return {} as Record<string, AssetScale>;
     }),

@@ -72,6 +72,7 @@ import {
   type MetaMorphoChainId,
   type MetaMorphoVaultRoster,
 } from "@/lib/metamorpho/vault-roster";
+import { rethrowAtBuild } from "@/lib/sources/api/route-gate";
 
 const ZERO = BigInt(0);
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
@@ -284,6 +285,7 @@ async function readDirectory(chainId: MetaMorphoChainId): Promise<MorphoBaseVaul
         if (queues.has(key)) r.queue = queues.get(key)!;
       }
     } catch (error) {
+      rethrowAtBuild(error);
       console.error(`Morpho vault directory: the illiquid read failed (chain ${chainId}):`, error);
     }
 
@@ -298,6 +300,7 @@ async function readDirectory(chainId: MetaMorphoChainId): Promise<MorphoBaseVaul
       rows,
     };
   } catch (error) {
+    rethrowAtBuild(error);
     console.error(`Morpho vault directory chain read failed (chain ${chainId}):`, error);
     return empty(served);
   }

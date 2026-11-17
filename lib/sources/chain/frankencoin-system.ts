@@ -36,6 +36,13 @@ import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
 import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { FRANKENCOIN_ADDRESSES } from "@/lib/frankencoin/asset-catalog";
+import { rethrowAtBuild } from "@/lib/sources/api/route-gate";
+
+/** A per-field read's null, except the build's route failure, which fails the page. */
+const nullUnlessBuild = (err: unknown): null => {
+  rethrowAtBuild(err);
+  return null;
+};
 
 const ZCHF = getAddress(FRANKENCOIN_ADDRESSES.ZCHF);
 const HUB_V2 = getAddress(FRANKENCOIN_ADDRESSES.HUB_V2);
@@ -126,8 +133,8 @@ export async function loadFrankencoinSystemFromChain(): Promise<FrankencoinSyste
       client.readContract({ address: ZCHF, abi: FC_ABI, functionName: "equity" }),
       client.readContract({ address: ZCHF, abi: FC_ABI, functionName: "minterReserve" }),
       client.readContract({ address: ZCHF, abi: FC_ABI, functionName: "reserve" }),
-      client.readContract({ address: HUB_V2, abi: HUB_ABI, functionName: "rate" }).catch(() => null),
-      client.readContract({ address: HUB_V2, abi: HUB_ABI, functionName: "OPENING_FEE" }).catch(() => null),
+      client.readContract({ address: HUB_V2, abi: HUB_ABI, functionName: "rate" }).catch(nullUnlessBuild),
+      client.readContract({ address: HUB_V2, abi: HUB_ABI, functionName: "OPENING_FEE" }).catch(nullUnlessBuild),
     ]);
 
     // Phase 2 — the discovered contracts' own slots. Each read is optional
@@ -175,7 +182,8 @@ export async function loadFrankencoinSystemFromChain(): Promise<FrankencoinSyste
       openingFeeZchf: openingFee != null ? Number(openingFee) / E18 : null,
       chainStale: false,
     };
-  } catch {
+  } catch (err) {
+    rethrowAtBuild(err);
     return stub();
   }
 }

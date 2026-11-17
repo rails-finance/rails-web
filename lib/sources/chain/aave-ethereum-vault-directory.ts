@@ -82,6 +82,7 @@ import {
   AAVE_ETHEREUM_BOOK_VAULTS,
   type AaveVaultFamily,
 } from "@/lib/aave-vaults/vault-catalog";
+import { rethrowAtBuild } from "@/lib/sources/api/route-gate";
 
 const ZERO = BigInt(0);
 
@@ -394,6 +395,7 @@ async function readDirectory(): Promise<AaveEthereumVaultDirectoryResponse> {
       rows,
     };
   } catch (error) {
+    rethrowAtBuild(error);
     console.error("Aave Ethereum vault directory chain read failed:", error);
     return empty();
   }
