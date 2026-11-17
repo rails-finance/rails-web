@@ -33,6 +33,7 @@ export function TroveIdentityRow({
   showNftLink = true,
   showOwner = true,
   inert = false,
+  changedHands = false,
 }: {
   protocol: LiquityFamilyId;
   troveId?: string;
@@ -62,13 +63,18 @@ export function TroveIdentityRow({
    *  as every family's listing draws it (Miles, 17 Oct 2026); no Trove ID copy
    *  or NFT link, the ID being the card's right-end tag. */
   inert?: boolean;
+  /** The Trove's NFT passed between two wallets. "last owner" is drawn only
+   *  then; a listing row has no transfer history, so it never draws it
+   *  (ui-jobs 702). */
+  changedHands?: boolean;
 }) {
   const [copiedTrove, setCopiedTrove] = useState(false);
   const troveLabel = troveId ? shortId(troveId) : null;
 
   // Current owner when open; the preserved last owner once closed/liquidated.
   const ownerAddress = showOwner ? (owner ?? lastOwner ?? null) : null;
-  const isLastOwner = !owner && !!lastOwner;
+  const closedOwner = !owner && !!lastOwner;
+  const isLastOwner = closedOwner && changedHands;
 
   if (!troveLabel && !nftUrl && !ownerAddress) return null;
 
@@ -101,9 +107,13 @@ export function TroveIdentityRow({
         // copy button and (via bookmark) bookmark star — the same
         // identity chrome every other explorer's cards use. Routing to the
         // owner-filtered listing is its `filterProtocol` link.
-        <span className={`inline-flex items-center gap-1 ${isLastOwner ? "opacity-70" : ""}`}>
+        <span className={`inline-flex items-center gap-1 ${closedOwner ? "opacity-70" : ""}`}>
           {isLastOwner && (
-            <RevealTip tip="Last owner (trove closed)" focusable className="text-rb-400 focus-ring rounded-sm">
+            <RevealTip
+              tip="The Trove changed hands; this wallet held it when it closed"
+              focusable
+              className="text-rb-400 focus-ring rounded-sm"
+            >
               last owner
             </RevealTip>
           )}

@@ -4,7 +4,7 @@
 // The words are the strings file's `page_words`
 // (content/liquity-v2/event-prose.yaml).
 
-import type { BaseActivityEvent } from "@/lib/shared/types/activity";
+import { isLiquityEvent, type BaseActivityEvent } from "@/lib/shared/types/activity";
 import { liquityTroveHistory } from "@/lib/liquity/event-prose-position";
 import { fillText, liquityEventProse } from "@/lib/liquity/event-prose";
 import { CONTEXT_WORDS, PAGE_WORDS } from "@/lib/liquity/event-templates";
@@ -49,14 +49,29 @@ export function eventPagePlace(
   };
 }
 
+/** True when the history holds a TroveNFT transfer between two wallets. The
+ *  mint and the burn ride the open and the close, so a Trove held by one
+ *  wallet throughout has none (ui-jobs 702). */
+export function troveChangedHands(events: readonly BaseActivityEvent[]): boolean {
+  return events.some((e) => {
+    if (!isLiquityEvent(e)) return false;
+    const t = e.context.data.transfer;
+    return t?.transferType === "transfer" && t.fromAddress.toLowerCase() !== t.toAddress.toLowerCase();
+  });
+}
+
 /** The Trove's owner; a closed Trove's owner is the burn address, and its
- *  wallet is `lastOwner`. */
-export function troveHolder(trove: { owner?: string | null; lastOwner?: string | null } | null): {
+ *  wallet is `lastOwner`. `last` (the "last owner" wording) is set only on a
+ *  closed Trove that changed hands (`troveChangedHands`). */
+export function troveHolder(
+  trove: { owner?: string | null; lastOwner?: string | null } | null,
+  changedHands = false,
+): {
   address: string | null;
   last: boolean;
 } {
   if (trove?.owner && trove.owner.toLowerCase() !== BURN) return { address: trove.owner, last: false };
-  return { address: trove?.lastOwner ?? null, last: true };
+  return { address: trove?.lastOwner ?? null, last: changedHands };
 }
 
 const short = (hex: string) => (hex.length > 12 ? `${hex.slice(0, 6)}…${hex.slice(-4)}` : hex);

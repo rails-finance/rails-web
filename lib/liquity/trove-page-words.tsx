@@ -34,7 +34,8 @@ export function eventPriceTitle(collType: string): string {
   return troveWords("event_price_title", { coll_type: collType });
 }
 
-/** The word before a closed Trove's last owner in the sub-nav. */
+/** The word before the last owner of a closed Trove that changed hands, in
+ *  the sub-nav (ui-jobs 702). */
 export function LastOwnerPrefix() {
   return (
     <span className="shrink-0 whitespace-nowrap text-rb-400" title={troveWords("last_owner_hint")}>

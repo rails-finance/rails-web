@@ -203,6 +203,12 @@ export default function PolarisPositionView({
     POLARIS_TESTNET_CLOSED.state === "closed" && chainSettled && chain == null && view?.status === "open";
 
   const polarisEvents = useMemo(() => events.filter(isPolarisEvent), [events]);
+  // A transfer row is a cdp NFT Transfer between two wallets; the mint and
+  // burn ride the open and close (ui-jobs 702).
+  const polarisChangedHands = useMemo(
+    () => polarisEvents.some((e) => e.context.data.eventType === "transfer"),
+    [polarisEvents],
+  );
   // Each card's previous event, a transfer passed over: it moves no figure.
   const previousById = useMemo(
     () => previousEventById(polarisEvents, (e) => e.context.data.eventType !== "transfer"),
@@ -470,7 +476,7 @@ export default function PolarisPositionView({
                     market,
                     cdpId,
                     holder: summary?.owner ?? view.owner,
-                    closed: view.status !== "open",
+                    lastHolder: view.status !== "open" && polarisChangedHands,
                   })
                 }
                 displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}

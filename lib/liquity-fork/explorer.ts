@@ -45,13 +45,15 @@ const WORDS = {
 const short = (hex: string) => (hex.length > 12 ? `${hex.slice(0, 6)}…${hex.slice(-4)}` : hex);
 
 /** The Trove's holder: the owner, or the last owner once the Trove is closed
- *  (a closed Trove's owner is null or the burn address). */
+ *  (a closed Trove's owner is null or the burn address). `last` (the "last
+ *  holder" wording) needs a change of hands, and the fork timelines carry no
+ *  TroveNFT transfer rows, so it stays false until they do (ui-jobs 702). */
 export function liquityForkHolder(trove: { owner?: string | null; lastOwner?: string | null } | null): {
   address: string | null;
   last: boolean;
 } {
   if (trove?.owner && trove.owner.toLowerCase() !== BURN) return { address: trove.owner, last: false };
-  return { address: trove?.lastOwner ?? null, last: true };
+  return { address: trove?.lastOwner ?? null, last: false };
 }
 
 export interface LiquityForkEventPageInput extends EventPageSlot {
