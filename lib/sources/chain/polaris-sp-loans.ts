@@ -19,6 +19,7 @@ import { getAddress, parseAbi } from "viem";
 import { chainClient } from "./rpc";
 import { POLARIS_CHAIN_ID, POLARIS_CORE, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
 import type { PolarisDepositChain, PolarisLoanChain } from "@/lib/api/fetch-polaris-sp-loans-chain";
+import { depositHeadFigures, loanHeadFigures, type ChainResult } from "@/lib/polaris/sp-loan-chain-read";
 
 const POOL_ABI = parseAbi([
   "function getCompoundedStableTokenDeposit(uint256) view returns (uint256)",
@@ -39,9 +40,7 @@ const MANAGER_ABI = parseAbi([
 const NFT_ABI = parseAbi(["function ownerOf(uint256) view returns (address)"]);
 const CURVE_ABI = parseAbi(["function floorPrice() view returns (uint256)"]);
 
-type Res = { status: string; result?: unknown };
-const ok = <T>(r: Res | undefined): T | null => (r?.status === "success" && r.result != null ? (r.result as T) : null);
-const s = (v: bigint | null): string => (v == null ? "0" : v.toString());
+type Res = ChainResult;
 
 export async function loadPolarisDepositFromChain(
   market: PolarisMarket,
@@ -87,25 +86,9 @@ export async function loadPolarisDepositFromChain(
         { address: getAddress(cfg.priceFeed), abi: FEED_ABI, functionName: "previewPrice" },
       ] as const,
     })) as Res[];
-    const compounded = ok<bigint>(res[0]);
-    if (compounded == null) return stub;
-    const snaps = ok<readonly bigint[]>(res[2]);
-    const price = ok<bigint>(res[8]);
-    return {
-      market,
-      tokenId,
-      blockNumber: Number(head.number),
-      blockTimestamp: Number(head.timestamp),
-      compoundedRaw: s(compounded),
-      recordedRaw: s(ok<bigint>(res[1])),
-      snapshotP: snaps ? snaps[1].toString() : "0",
-      stableGainRaw: s(ok<bigint>(res[3])),
-      bcGainRaw: s(ok<bigint>(res[4])),
-      stashedRaw: s(ok<bigint>(res[5])),
-      owner: ok<string>(res[6])?.toLowerCase() ?? null,
-      p: s(ok<bigint>(res[7])),
-      pethInStableRaw: price == null ? null : price.toString(),
-    };
+    const figures = depositHeadFigures(res);
+    if (figures == null) return stub;
+    return { market, tokenId, blockNumber: Number(head.number), blockTimestamp: Number(head.timestamp), ...figures };
   } catch (err) {
     console.error("Polaris deposit chain read failed:", err);
     return stub;
@@ -141,19 +124,9 @@ export async function loadPolarisLoanFromChain(loanId: string): Promise<PolarisL
         { address: getAddress(POLARIS_CORE.bondingCurve), abi: CURVE_ABI, functionName: "floorPrice" },
       ] as const,
     })) as Res[];
-    const loan = ok<readonly bigint[]>(res[0]);
-    if (loan == null) return stub;
-    return {
-      loanId,
-      blockNumber: Number(head.number),
-      blockTimestamp: Number(head.timestamp),
-      collRaw: loan[0].toString(),
-      sharesRaw: loan[1].toString(),
-      debtRaw: s(ok<bigint>(res[1])),
-      debtPerShareRaw: s(ok<bigint>(res[2])),
-      floorPriceRaw: s(ok<bigint>(res[4])),
-      owner: ok<string>(res[3])?.toLowerCase() ?? null,
-    };
+    const figures = loanHeadFigures(res);
+    if (figures == null) return stub;
+    return { loanId, blockNumber: Number(head.number), blockTimestamp: Number(head.timestamp), ...figures };
   } catch (err) {
     console.error("Polaris loan chain read failed:", err);
     return stub;

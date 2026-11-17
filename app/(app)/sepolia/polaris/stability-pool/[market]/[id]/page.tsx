@@ -7,7 +7,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AimGate } from "@/components/shared/aim-gate";
-import { boxHop } from "@/lib/shared/listing-ssr";
+import { boxHop, SSR_FETCH_TIMEOUT_MS } from "@/lib/shared/listing-ssr";
 import { normalizeCdpId, normalizeMarket, POLARIS_CHAIN_ID, POLARIS_MARKET_CONFIG } from "@/lib/polaris/asset-catalog";
 import { polarisMarketKeys } from "@/lib/polaris/focus-keys";
 import { polarisDepositHref } from "@/lib/polaris/routes";
@@ -32,7 +32,7 @@ async function load(market: string, id: string): Promise<PolarisDepositTimelineR
     return await readPolarisSpLoans<PolarisDepositTimelineResponse>(
       "stability-pool/timeline",
       { market, id, order: "desc", limit: String(DEPOSIT_PAGE) },
-      hop,
+      { ...hop, signal: AbortSignal.timeout(SSR_FETCH_TIMEOUT_MS) },
     );
   } catch (err) {
     if (err instanceof PolarisSpLoanHttpError && err.status === 404) return "missing";

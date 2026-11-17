@@ -1,5 +1,5 @@
 // Polaris Stability Pool deposits (/sepolia/polaris/stability-pool) — server
-// half: decodes the URL, reads the first page through this deployment's own
+// half: decodes the URL, reads the first page through this deployment's
 // proxy, and hands it to the client half (sp-listing.tsx) as first paint.
 
 import { SpListing } from "./sp-listing";

@@ -14,11 +14,12 @@ import {
   depositLifetime,
   depositNow,
   exactUnits,
-  feeAtLeg,
+  feeAtTouch,
   loanLifetime,
   pendingFee,
   units,
 } from "../../lib/polaris/sp-loan-math.ts";
+import { depositHeadFigures, loanHeadFigures } from "../../lib/polaris/sp-loan-chain-read.ts";
 
 const DEPOSIT_40 = {
   deposit_raw: "1375704987560019637555",
@@ -124,31 +125,83 @@ const LOAN_63 = [
   debt_after,
 }));
 
-test("a loan's legs sum to borrowed, repaid and the fees charged at them", () => {
+test("a loan's touches sum to borrowed, repaid and the fees charged at them", () => {
   const l = loanLifetime(LOAN_63);
   assert.equal(exactUnits(l.collDeposited), "1.2");
   assert.equal(l.borrowed.toString(), "1537755699814023950");
   assert.equal(l.repaid.toString(), "25000000000000000");
-  assert.equal(l.borrowed - l.repaid + l.feesAtLegs, l.debtAtLastLeg);
-  assert.equal(l.feesAtLegs.toString(), "1468788731713000");
+  assert.equal(l.borrowed - l.repaid + l.feesAtTouches, l.debtAtLastTouch);
+  assert.equal(l.feesAtTouches.toString(), "1468788731713000");
 });
 
-test("each leg's fee is the index's growth on the shares before it", () => {
-  assert.equal(feeAtLeg(LOAN_63[0], null), null);
-  assert.equal(feeAtLeg(LOAN_63[1], LOAN_63[0]), BigInt(0));
-  const third = feeAtLeg(LOAN_63[2], LOAN_63[1]);
-  const fourth = feeAtLeg(LOAN_63[3], LOAN_63[2]);
-  // The legs' fees add to the fees at the last leg, within a wei a leg.
+test("each touch's fee is the index's growth on the shares before it", () => {
+  assert.equal(feeAtTouch(LOAN_63[0], null), null);
+  assert.equal(feeAtTouch(LOAN_63[1], LOAN_63[0]), BigInt(0));
+  const third = feeAtTouch(LOAN_63[2], LOAN_63[1]);
+  const fourth = feeAtTouch(LOAN_63[3], LOAN_63[2]);
+  // The touches' fees add to the fees at the last touch, within a wei a touch.
   const sum = third + fourth;
-  const diff = sum - loanLifetime(LOAN_63).feesAtLegs;
+  const diff = sum - loanLifetime(LOAN_63).feesAtTouches;
   assert.ok(diff >= BigInt(-3) && diff <= BigInt(3), `diff ${diff}`);
 });
 
-test("the debt at an index, the floor, and the fee since the last leg", () => {
+test("the debt at an index, the floor, and the fee since the last touch", () => {
   assert.equal(debtAt("1510977534844989209", "1003538845387309120785603758").toString(), "1516324650724503106");
   assert.equal(atFloor("1200000000000000000", "2018522686813542707").toString(), "2422227224176251248");
   const l = loanLifetime(LOAN_63);
   assert.equal(pendingFee("1516324653726002190", l).toString(), "2100165180265240");
   assert.equal(pendingFee("1", l), BigInt(0));
   assert.equal(units(BigInt("1500000000000000000")), 1.5);
+});
+
+const okr = (result) => ({ status: "success", result });
+const fail = { status: "failure" };
+const B = (v) => BigInt(v);
+
+test("a deposit head read with any stated getter failed is stale, never zero", () => {
+  const good = [
+    okr(B("1150142195097597313956")),
+    okr(B("1375704987560019637555")),
+    okr([B(1), B("998705853990692680623183527233301613"), B(2), B(0)]),
+    okr(B("20645213179334719810")),
+    okr(B("32311722894610895")),
+    okr(B(0)),
+    okr("0x4CC14D2A595DCFF34B243A3B714B7A50630256B3"),
+    okr(B("834956443098278739762110399177963293")),
+    okr(B("5818000000000000000000")),
+  ];
+  const f = depositHeadFigures(good);
+  assert.equal(f.bcGainRaw, "32311722894610895");
+  assert.equal(f.owner, "0x4cc14d2a595dcff34b243a3b714b7a50630256b3");
+  for (const i of [0, 1, 2, 3, 4, 5, 7]) {
+    const r = [...good];
+    r[i] = fail;
+    assert.equal(depositHeadFigures(r), null, `getter ${i}`);
+  }
+  // ownerOf and the feed may fail: the holder falls back, the window drops its value.
+  const r = [...good];
+  r[6] = fail;
+  r[8] = fail;
+  const g = depositHeadFigures(r);
+  assert.equal(g.owner, null);
+  assert.equal(g.pethInStableRaw, null);
+});
+
+test("a loan head read with a failed debt or floor is stale, never zero", () => {
+  const good = [
+    okr([B("1200000000000000000"), B("1510977534844989209")]),
+    okr(B("1516324653726002190")),
+    okr(B("1003538847373770874626813476")),
+    okr("0x4cc14d2a595dcff34b243a3b714b7a50630256b3"),
+    okr(B("2018523485929292955")),
+  ];
+  assert.equal(loanHeadFigures(good).debtRaw, "1516324653726002190");
+  for (const i of [0, 1, 2, 4]) {
+    const r = [...good];
+    r[i] = fail;
+    assert.equal(loanHeadFigures(r), null, `getter ${i}`);
+  }
+  const closed = [...good];
+  closed[3] = fail;
+  assert.equal(loanHeadFigures(closed).owner, null);
 });

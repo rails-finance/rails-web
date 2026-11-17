@@ -14,8 +14,8 @@ import { Prov } from "@/components/shared/provenance";
 import { explorerUrl } from "@/lib/shared/chains";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { FPETH, PETH, POLARIS_CHAIN_ID, POLARIS_MARKET_CONFIG, POLARIS_WETH } from "@/lib/polaris/asset-catalog";
-import { big, exactUnits, feeAtLeg, units } from "@/lib/polaris/sp-loan-math";
-import { legProv, loanIndexProv } from "@/lib/polaris/sp-loan-provenance";
+import { big, exactUnits, feeAtTouch, units } from "@/lib/polaris/sp-loan-math";
+import { touchProv, loanIndexProv } from "@/lib/polaris/sp-loan-provenance";
 import { spEventLabel, spEventSentences } from "@/lib/polaris/sp-event-prose";
 import { loanEventLabel, loanEventSentences } from "@/lib/polaris/loan-event-prose";
 import type { PolarisDepositEventRow, PolarisLoanEventRow } from "@/lib/sources/api/polaris-sp-loans";
@@ -83,10 +83,20 @@ const bullets = (lines: string[]) => (
   </ul>
 );
 
-export function PolarisDepositEventCard({ row, isLast }: { row: PolarisDepositEventRow; isLast: boolean }) {
+export function PolarisDepositEventCard({
+  row,
+  isLast,
+  holder,
+  vaultHeld,
+}: {
+  row: PolarisDepositEventRow;
+  isLast: boolean;
+  holder: string | null;
+  vaultHeld: boolean;
+}) {
   const cfg = POLARIS_MARKET_CONFIG[row.market];
   const s = cfg.stable.symbol;
-  const coord = (summary: string) => legProv(summary, row.tx_hash, row.block_number, "pool", row.market);
+  const coord = (summary: string) => touchProv(summary, row.tx_hash, row.block_number, "pool", row.market);
   const change = big(row.top_up_or_withdrawal);
   const bcClaimed = big(row.bc_gain_claimed);
   const gainClaimed = big(row.stable_gain_claimed);
@@ -193,7 +203,7 @@ export function PolarisDepositEventCard({ row, isLast }: { row: PolarisDepositEv
     caption: label,
     cells,
     ledgers: { none: "A deposit's balance is the Deposit after cell." },
-    explainer: { body: bullets(spEventSentences(row, s)) },
+    explainer: { body: bullets(spEventSentences(row, s, holder, vaultHeld ? cfg.vault.symbol : null)) },
     learnMore: null,
   };
   return <EventCard slots={slots} avatar={null} />;
@@ -203,12 +213,14 @@ export function PolarisLoanEventCard({
   row,
   previous,
   isLast,
+  holder,
 }: {
   row: PolarisLoanEventRow;
   previous: PolarisLoanEventRow | null;
   isLast: boolean;
+  holder: string | null;
 }) {
-  const coord = (summary: string) => legProv(summary, row.tx_hash, row.block_number, "loans");
+  const coord = (summary: string) => touchProv(summary, row.tx_hash, row.block_number, "loans");
   const c = big(row.coll_change);
   const d = big(row.debt_change);
   const tokens: SpineTokenRow[] = [];
@@ -232,7 +244,7 @@ export function PolarisLoanEventCard({
     });
   if (tokens.length === 0) tokens.push({ symbol: FPETH.symbol, address: FPETH.address });
 
-  const fee = feeAtLeg(row, previous);
+  const fee = feeAtTouch(row, previous);
   const dps = row.debt_per_share;
   const cells: EventCellSpec[] =
     row.event_type === "transfer"
@@ -244,7 +256,7 @@ export function PolarisLoanEventCard({
             big(row.coll_after),
             FPETH.symbol,
             FPETH.address,
-            coord("Collateral after — the collateral before this leg plus its signed fpETH change."),
+            coord("Collateral after — the collateral before this touch plus its signed fpETH change."),
             c !== ZERO,
           ),
           amountCell(
@@ -253,18 +265,18 @@ export function PolarisLoanEventCard({
             big(row.debt_after),
             POLARIS_WETH.symbol,
             POLARIS_WETH.address,
-            coord("Debt after — the loan's shares after this leg at the debt per share in force, rounded up."),
+            coord("Debt after — the loan's shares after this touch at the debt per share in force, rounded up."),
           ),
           ...(fee != null && fee > ZERO
             ? [
                 amountCell(
                   "fee",
-                  "Fees since previous leg",
+                  "Fees since previous touch",
                   fee,
                   POLARIS_WETH.symbol,
                   POLARIS_WETH.address,
                   coord(
-                    "Fees since previous leg — the shares before this leg at its index, less the debt after the previous leg.",
+                    "Fees since previous touch — the shares before this touch at its index, less the debt after the previous touch.",
                   ),
                 ),
               ]
@@ -289,7 +301,7 @@ export function PolarisLoanEventCard({
                 },
               ]
             : []),
-          txCell(row.tx_hash, row.block_number, coord("Block — the block this leg was logged in.")),
+          txCell(row.tx_hash, row.block_number, coord("Block — the block this touch was logged in.")),
         ];
 
   const label = loanEventLabel(row);
@@ -306,7 +318,7 @@ export function PolarisLoanEventCard({
     caption: label,
     cells,
     ledgers: { none: "A loan's balances are the Collateral after and Debt after cells." },
-    explainer: { body: bullets(loanEventSentences(row, previous)) },
+    explainer: { body: bullets(loanEventSentences(row, previous, holder)) },
     learnMore: null,
   };
   return <EventCard slots={slots} avatar={null} />;

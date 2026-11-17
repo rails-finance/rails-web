@@ -13,12 +13,12 @@
 // last touch. pETH a touch did not claim is stashed; the pETH gained since
 // the last touch is the pool's getDepositorBcTokenGain.
 //
-// LOAN. Each leg is signed (+ deposited / borrowed, − returned / repaid). The
-// debt after a leg is ceil(shares × debt per share ÷ 1e27) at the FeesAccrued
-// index in force, so the fees a loan has been charged up to its last leg are
+// LOAN. Each touch is signed (+ deposited / borrowed, − returned / repaid). The
+// debt after a touch is ceil(shares × debt per share ÷ 1e27) at the FeesAccrued
+// index in force, so the fees a loan has been charged up to its last touch are
 // that debt less the net borrowed; the chain's getLoanDebt runs ahead of it
 // (the index grows at every FeesAccrued, and past the stored index between
-// them), and the difference is the fee accrued since the last leg.
+// them), and the difference is the fee accrued since the last touch.
 
 const E18 = BigInt("1000000000000000000");
 const E27 = BigInt("1000000000000000000000000000");
@@ -155,7 +155,7 @@ export function depositNowFromChain(chain: {
   };
 }
 
-export interface LoanLeg {
+export interface LoanTouch {
   event_type: string;
   coll_change: string | null;
   debt_change: string | null;
@@ -170,21 +170,21 @@ export interface LoanLifetime {
   collReturned: bigint;
   borrowed: bigint;
   repaid: bigint;
-  /** Fees charged up to the last leg: the debt after it less the net borrowed. */
-  feesAtLegs: bigint;
-  /** The debt after the last leg, at the index in force there. */
-  debtAtLastLeg: bigint;
+  /** Fees charged up to the last touch: the debt after it less the net borrowed. */
+  feesAtTouches: bigint;
+  /** The debt after the last touch, at the index in force there. */
+  debtAtLastTouch: bigint;
   netBorrowed: bigint;
 }
 
-/** The loan's legs summed, oldest first. */
-export function loanLifetime(legs: LoanLeg[]): LoanLifetime {
+/** The loan's touches summed, oldest first. */
+export function loanLifetime(touches: LoanTouch[]): LoanLifetime {
   let collDeposited = ZERO;
   let collReturned = ZERO;
   let borrowed = ZERO;
   let repaid = ZERO;
-  let last: LoanLeg | null = null;
-  for (const l of legs) {
+  let last: LoanTouch | null = null;
+  for (const l of touches) {
     if (l.event_type === "transfer") continue;
     const c = big(l.coll_change);
     const d = big(l.debt_change);
@@ -194,27 +194,27 @@ export function loanLifetime(legs: LoanLeg[]): LoanLifetime {
     else repaid -= d;
     last = l;
   }
-  const debtAtLastLeg = last ? big(last.debt_after) : ZERO;
+  const debtAtLastTouch = last ? big(last.debt_after) : ZERO;
   const netBorrowed = last ? big(last.net_borrowed_to_here) : ZERO;
   return {
     collDeposited,
     collReturned,
     borrowed,
     repaid,
-    feesAtLegs: debtAtLastLeg - netBorrowed,
-    debtAtLastLeg,
+    feesAtTouches: debtAtLastTouch - netBorrowed,
+    debtAtLastTouch,
     netBorrowed,
   };
 }
 
-/** The fees one leg's index charged on the shares held before it: the debt
- *  just before the leg at its index, less the debt after the previous leg.
- *  Null for the first leg. */
-export function feeAtLeg(leg: LoanLeg, previous: LoanLeg | null): bigint | null {
-  if (!previous || leg.debt_per_share == null) return null;
-  const sharesBefore = big(leg.shares_before);
+/** The fees one touch's index charged on the shares held before it: the debt
+ *  just before the touch at its index, less the debt after the previous touch.
+ *  Null for the first touch. */
+export function feeAtTouch(touch: LoanTouch, previous: LoanTouch | null): bigint | null {
+  if (!previous || touch.debt_per_share == null) return null;
+  const sharesBefore = big(touch.shares_before);
   if (sharesBefore === ZERO) return ZERO;
-  const before = ceilDiv(sharesBefore * big(leg.debt_per_share), E27);
+  const before = ceilDiv(sharesBefore * big(touch.debt_per_share), E27);
   return max0(before - big(previous.debt_after));
 }
 
@@ -226,6 +226,6 @@ export const debtAt = (sharesRaw: string, dpsRaw: string): bigint => ceilDiv(big
 /** The collateral at the floor, in WETH: coll × floor ÷ 1e18. */
 export const atFloor = (collRaw: string, floorRaw: string): bigint => (big(collRaw) * big(floorRaw)) / E18;
 
-/** The fee accrued since the last leg: the debt now less the debt after it,
- *  never below zero (the replayed shares drift by a wei a leg). */
-export const pendingFee = (debtNowRaw: string, l: LoanLifetime): bigint => max0(big(debtNowRaw) - l.debtAtLastLeg);
+/** The fee accrued since the last touch: the debt now less the debt after it,
+ *  never below zero (the replayed shares drift by a wei a touch). */
+export const pendingFee = (debtNowRaw: string, l: LoanLifetime): bigint => max0(big(debtNowRaw) - l.debtAtLastTouch);

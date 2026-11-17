@@ -2,7 +2,7 @@
 
 // The small parts the deposit and reserve-loan cards share: a compact figure
 // with its exact amount in the tip, and a token icon that opens the asset's
-// panel. The CDP card keeps its own copies (polaris-position-card.tsx).
+// panel. The CDP card keeps copies of them (polaris-position-card.tsx).
 
 import type { ReactNode } from "react";
 import { RevealTip } from "@/components/shared/reveal-tip";

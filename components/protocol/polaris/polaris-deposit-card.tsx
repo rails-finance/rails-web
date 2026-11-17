@@ -31,7 +31,7 @@ import { PositionNameId } from "@/components/shared/position-name-id";
 import { HeadingTip } from "@/components/shared/tip-label";
 import { positionName, shortPositionId } from "@/lib/shared/position-name";
 import { PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
-import { polarisDepositHref, polarisDepositNftUrl } from "@/lib/polaris/routes";
+import { polarisDepositHref, polarisDepositNftUrl, POLARIS_SP_PATH } from "@/lib/polaris/routes";
 import { big, type DepositLifetime, type DepositNow } from "@/lib/polaris/sp-loan-math";
 import { spLiveProv, spPendingLossProv, spSumProv } from "@/lib/polaris/sp-loan-provenance";
 import type { PolarisDepositRow } from "@/lib/sources/api/polaris-sp-loans";
@@ -148,7 +148,9 @@ export function polarisDepositSlots({
       heads,
       identity:
         vault ??
-        (row.holder ? <WalletPill wallet={row.holder} ensName={null} filterProtocol="polaris" bookmark /> : null),
+        (row.holder ? (
+          <WalletPill wallet={row.holder} ensName={null} href={`${POLARIS_SP_PATH}?q=${row.holder}`} bookmark />
+        ) : null),
       counters,
       name,
       menu: null,
@@ -235,7 +237,7 @@ export function polarisDepositSlots({
     {
       id: "pending-stable",
       label: `Pending ${s} gain`,
-      labelTip: `The yield the deposit has earned since its last touch. The next touch pays it; what that touch does not claim stays in the deposit.`,
+      labelTip: `The yield the deposit has earned since its last touch. The next touch pays it.`,
       value: now ? (
         <Prov info={spLiveProv("stableGain", m)}>
           <RawFigure raw={now.pendingStable} symbol={s} />

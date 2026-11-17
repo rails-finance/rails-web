@@ -168,9 +168,12 @@ const LOAN_SUM: Record<string, string> = {
   collReturned: `${FPETH.symbol} returned — the sum of the loan's negative LoanAdjusted collChange and its LoanClosed fpCollateralReturned.`,
   borrowed: "WETH borrowed — the sum of the loan's LoanOpened reserveBorrowed and positive LoanAdjusted debtChange.",
   repaid: "WETH repaid — the sum of the loan's negative LoanAdjusted debtChange and its LoanClosed reserveRepaid.",
-  fees: "Fees at each leg — the debt after the loan's last leg, its shares at the FeesAccrued index in force there, less the WETH borrowed net of repayments.",
+  collHeld: `${FPETH.symbol} collateral — the loan's ${FPETH.symbol} deposited less returned, summed from its LoanOpened, LoanAdjusted and LoanClosed logs.`,
+  debtAtLastTouch:
+    "Debt at the last touch — the loan's shares after its last touch at the FeesAccrued index in force there, rounded up.",
+  fees: "Fees at each touch — the debt after the loan's last touch, its shares at the FeesAccrued index in force there, less the WETH borrowed net of repayments.",
   pendingFee:
-    "Fees since the last leg — getLoanDebt(id) at the latest block less the debt after the loan's last leg: the index's growth on its shares since.",
+    "Fees since the last touch — getLoanDebt(id) at the latest block less the debt after the loan's last touch: the index's growth on its shares since.",
 };
 
 export function loanSumProv(what: keyof typeof LOAN_SUM): Provenance {
@@ -183,21 +186,21 @@ export function loanSumProv(what: keyof typeof LOAN_SUM): Provenance {
   };
 }
 
-/** A leg's index: the FeesAccrued log in force when it was written. */
+/** A touch's index: the FeesAccrued log in force when it was written. */
 export function loanIndexProv(txHash: string | null, block: string | null): Provenance {
   return {
     kind: "chain",
     pclass: "emitted",
     summary:
-      "Debt per share at this leg — the newDebtPerShare of the last FeesAccrued at or before the leg, which the manager logs before the leg in the same transaction.",
+      "Debt per share at this touch — the newDebtPerShare of the last FeesAccrued at or before the touch, which the manager logs before the touch in the same transaction.",
     contract: manager,
     ...(txHash || block ? { source: { ...(block ? { block } : {}), ...(txHash ? { txHash } : {}) } } : {}),
     via: "FeesAccrued.newDebtPerShare",
   };
 }
 
-/** One leg's field, from its log. */
-export function legProv(
+/** One touch's field, from its log. */
+export function touchProv(
   summary: string,
   txHash: string,
   block: string,

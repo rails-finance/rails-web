@@ -26,7 +26,7 @@ import { ListingTag } from "@/components/shared/listing-tag";
 import { PositionNameId } from "@/components/shared/position-name-id";
 import { positionName, shortPositionId } from "@/lib/shared/position-name";
 import { FPETH, POLARIS_WETH } from "@/lib/polaris/asset-catalog";
-import { polarisLoanHref, polarisLoanNftUrl } from "@/lib/polaris/routes";
+import { polarisLoanHref, polarisLoanNftUrl, POLARIS_LOANS_PATH } from "@/lib/polaris/routes";
 import { big, type LoanLifetime } from "@/lib/polaris/sp-loan-math";
 import { loanAtFloorProv, loanCostProv, loanLiveProv, loanSumProv } from "@/lib/polaris/sp-loan-provenance";
 import type { PolarisLoanRow } from "@/lib/sources/api/polaris-sp-loans";
@@ -128,7 +128,7 @@ export function polarisLoanSlots({
           {
             id: "debt",
             label: "Debt",
-            labelTip: "At the last fee index. The fees accrued since are left out.",
+            labelTip: "As of the last touch. Fees accrued since are left out.",
             labelTipOnListing: true,
             value: <RawFigure raw={debt} symbol={W.symbol} approx />,
             assets: tokenIcon(W.symbol, W.address, debt),
@@ -144,7 +144,9 @@ export function polarisLoanSlots({
       surface: "listing",
       status,
       heads,
-      identity: row.holder ? <WalletPill wallet={row.holder} ensName={null} filterProtocol="polaris" bookmark /> : null,
+      identity: row.holder ? (
+        <WalletPill wallet={row.holder} ensName={null} href={`${POLARIS_LOANS_PATH}?q=${row.holder}`} bookmark />
+      ) : null,
       counters,
       name,
       menu: null,
@@ -205,7 +207,7 @@ export function polarisLoanSlots({
               label: "Cost",
               value: (
                 <Prov info={loanSumProv("fees")}>
-                  <RawFigure raw={l.feesAtLegs} symbol={W.symbol} />
+                  <RawFigure raw={l.feesAtTouches} symbol={W.symbol} />
                 </Prov>
               ),
             }
@@ -240,8 +242,7 @@ export function polarisLoanSlots({
     {
       id: "cost",
       label: "Cost so far",
-      labelTip:
-        "The fees the loan has been charged since it opened: the debt less the WETH borrowed net of repayments.",
+      labelTip: "The fees the loan has been charged since it opened.",
       value: now ? (
         <Prov info={loanCostProv()}>
           <RawFigure raw={now.cost} symbol={W.symbol} />
@@ -258,7 +259,7 @@ export function polarisLoanSlots({
       id: "at-floor",
       label: "Collateral at the floor",
       asset: { symbol: W.symbol, address: W.address },
-      tip: `The ${F.symbol} valued at the bonding curve's floor price, which the protocol only raises. The loans manager has no liquidation.`,
+      tip: `The ${F.symbol} valued at the bonding curve's floor price.`,
       value: (
         <span data-anatomy="C23·polaris" data-floor-line="">
           <PanelFigure>

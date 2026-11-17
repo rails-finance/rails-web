@@ -1,8 +1,8 @@
 // The Lifetime flows tower of a Polaris reserve loan, in token units: fpETH
 // collateral on the left (deposited, less returned, holds the collateral),
-// WETH debt on the right (borrowed, with the fees each leg's index charged on
-// the shares before it, less repaid, holds the debt after the last leg; the
-// fees accrued since that leg sit on the eventless segment as "Accrued fees").
+// WETH debt on the right (borrowed, with the fees each touch's index charged on
+// the shares before it, less repaid, holds the debt after the last touch; the
+// fees accrued since that touch sit on the eventless segment as "Accrued fees").
 // The right side reconciles to getLoanDebt(id), the left to loans(id).
 
 import type { ChainTruthTowerData, TowerLine } from "@/lib/shared/chain-truth-economics";
@@ -33,18 +33,20 @@ export function polarisLoanTower(l: LoanLifetime, pendingFee: bigint | null): Ch
   return {
     valued: false,
     collateral: {
-      current: nonzero(line("coll", FPETH, coll, loanSumProv("collDeposited"))),
+      current: nonzero(line("coll", FPETH, coll, loanSumProv("collHeld"))),
       lifetimeInflow: units(l.collDeposited),
       exited: nonzero(line("returned", FPETH, l.collReturned, loanSumProv("collReturned"), { flowLabel: "Returned" })),
       liquidated: [],
     },
     debt: {
       current: nonzero(
-        line("debt-last-leg", POLARIS_WETH, l.debtAtLastLeg, loanSumProv("fees"), { heldLabel: "At the last leg" }),
+        line("debt-last-touch", POLARIS_WETH, l.debtAtLastTouch, loanSumProv("debtAtLastTouch"), {
+          heldLabel: "At the last touch",
+        }),
       ),
       lifetimeInflow: units(l.borrowed),
       received: nonzero(
-        line("fees", POLARIS_WETH, l.feesAtLegs, loanSumProv("fees"), { flowLabel: "Fees at each leg" }),
+        line("fees", POLARIS_WETH, l.feesAtTouches, loanSumProv("fees"), { flowLabel: "Fees at each touch" }),
       ),
       exited: nonzero(line("repaid", POLARIS_WETH, l.repaid, loanSumProv("repaid"), { flowLabel: "Repaid" })),
       liquidated: [],
@@ -53,7 +55,7 @@ export function polarisLoanTower(l: LoanLifetime, pendingFee: bigint | null): Ch
     collateralUnit: FPETH.symbol,
     debtUnit: POLARIS_WETH.symbol,
     interestLabel: "Accrued fees",
-    interestNote: "The fees since the last leg need the live read.",
+    interestNote: "The fees since the last touch need the live read.",
     wrapFlowLabels: true,
     fullTokenAmounts: true,
     unitOnEveryRow: true,

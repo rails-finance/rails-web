@@ -1,6 +1,6 @@
 // The words of a Polaris stability-pool deposit's timeline row: the label of
 // one DepositOperation (or one transfer of the deposit NFT) and the sentences
-// its Explanation states, from the row's own legs.
+// its Explanation states, from the row's fields.
 
 import { exactUnits, big } from "./sp-loan-math";
 import type { PolarisDepositEventRow } from "@/lib/sources/api/polaris-sp-loans";
@@ -20,15 +20,28 @@ export function spEventLabel(r: PolarisDepositEventRow): string {
 
 const amt = (v: bigint, symbol: string) => `${exactUnits(v)} ${symbol}`;
 
-/** The row's sentences, each one fact. */
-export function spEventSentences(r: PolarisDepositEventRow, stable: string): string[] {
+const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
+
+/** The row's sentences, each one fact. `holder` is the deposit NFT's holder
+ *  (no deposit NFT has changed hands, so it held it at every touch); a vault
+ *  holder names the vault, and a sender other than the holder is named. */
+export function spEventSentences(
+  r: PolarisDepositEventRow,
+  stable: string,
+  holder: string | null,
+  vaultSymbol: string | null,
+): string[] {
   if (r.event_type === "transfer") {
     return [`The deposit NFT moved from ${r.from_addr ?? "an unknown holder"} to ${r.to_addr ?? "an unknown holder"}.`];
   }
   const out: string[] = [];
+  const whoLower = vaultSymbol ? `the ${vaultSymbol} vault` : "the holder";
+  const who = whoLower.charAt(0).toUpperCase() + whoLower.slice(1);
   const change = big(r.top_up_or_withdrawal);
-  if (change > ZERO) out.push(`The holder deposited ${amt(change, stable)}.`);
-  if (change < ZERO) out.push(`The holder withdrew ${amt(-change, stable)}.`);
+  if (change > ZERO) out.push(`${who} deposited ${amt(change, stable)}.`);
+  if (change < ZERO) out.push(`${who} withdrew ${amt(-change, stable)}.`);
+  if (r.tx_from && holder && r.tx_from.toLowerCase() !== holder.toLowerCase())
+    out.push(`${short(r.tx_from)} sent the transaction.`);
   const loss = big(r.deposit_loss);
   if (loss > ZERO)
     out.push(
@@ -49,9 +62,8 @@ export function spEventSentences(r: PolarisDepositEventRow, stable: string): str
   if (bc > ZERO || bcClaimed > ZERO)
     out.push(
       bcClaimed > ZERO
-        ? `It paid ${amt(bc, "pETH")} from liquidations and the holder claimed ${amt(bcClaimed, "pETH")}.`
+        ? `It paid ${amt(bc, "pETH")} from liquidations and ${whoLower} claimed ${amt(bcClaimed, "pETH")}.`
         : `It paid ${amt(bc, "pETH")} from liquidations, stashed for a later claim.`,
     );
-  out.push(`The deposit after it: ${amt(big(r.new_deposit), stable)}.`);
   return out;
 }

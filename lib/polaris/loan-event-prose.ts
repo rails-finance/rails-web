@@ -1,9 +1,9 @@
 // The words of a Polaris reserve loan's timeline row: the label of one
 // LoanOpened, LoanAdjusted or LoanClosed (or a loan-NFT transfer) and the
-// sentences its Explanation states, from the row's own legs and the
+// sentences its Explanation states, from the row's figures and the
 // FeesAccrued index in force at it.
 
-import { big, exactUnits, feeAtLeg } from "./sp-loan-math";
+import { big, exactUnits, feeAtTouch } from "./sp-loan-math";
 import type { PolarisLoanEventRow } from "@/lib/sources/api/polaris-sp-loans";
 
 const ZERO = BigInt(0);
@@ -22,7 +22,15 @@ export function loanEventLabel(r: PolarisLoanEventRow): string {
   return "Adjusted";
 }
 
-export function loanEventSentences(r: PolarisLoanEventRow, previous: PolarisLoanEventRow | null): string[] {
+const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
+
+/** The row's sentences, each one fact; a sender other than the loan's holder
+ *  (no loan NFT has changed hands) is named. */
+export function loanEventSentences(
+  r: PolarisLoanEventRow,
+  previous: PolarisLoanEventRow | null,
+  holder: string | null,
+): string[] {
   if (r.event_type === "transfer")
     return [`The loan NFT moved from ${r.from_addr ?? "an unknown holder"} to ${r.to_addr ?? "an unknown holder"}.`];
   const out: string[] = [];
@@ -36,11 +44,9 @@ export function loanEventSentences(r: PolarisLoanEventRow, previous: PolarisLoan
     if (d > ZERO) out.push(`The holder borrowed ${amt(d, "WETH")}.`);
     if (d < ZERO) out.push(`The holder repaid ${amt(-d, "WETH")}.`);
   }
-  const fee = feeAtLeg(r, previous);
-  if (fee != null && fee > ZERO) out.push(`Fees since the previous leg added ${amt(fee, "WETH")} to the debt.`);
-  if (r.event_type !== "closed")
-    out.push(
-      `After it the loan held ${amt(big(r.coll_after), "fpETH")} against ${amt(big(r.debt_after), "WETH")} of debt.`,
-    );
+  if (r.tx_from && holder && r.tx_from.toLowerCase() !== holder.toLowerCase())
+    out.push(`${short(r.tx_from)} sent the transaction.`);
+  const fee = feeAtTouch(r, previous);
+  if (fee != null && fee > ZERO) out.push(`Fees since the previous touch added ${amt(fee, "WETH")} to the debt.`);
   return out;
 }

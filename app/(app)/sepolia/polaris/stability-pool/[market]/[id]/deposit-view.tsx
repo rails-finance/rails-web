@@ -22,6 +22,7 @@ import { PolarisDepositEventCard } from "@/components/protocol/polaris/polaris-s
 import { RawFigure } from "@/components/protocol/polaris/polaris-sp-loan-parts";
 import { fetchPolarisDepositChain, type PolarisDepositChain } from "@/lib/api/fetch-polaris-sp-loans-chain";
 import { PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
+import { POLARIS_SP_PATH } from "@/lib/polaris/routes";
 import { big, depositLifetime, depositNow, depositNowFromChain, units } from "@/lib/polaris/sp-loan-math";
 import { DEPOSIT_PAGE, polarisDepositTower } from "@/lib/polaris/sp-flows";
 import { spFeedProv, spLiveProv, spPendingLossProv } from "@/lib/polaris/sp-loan-provenance";
@@ -130,7 +131,12 @@ export default function DepositView({
         limit: String(DEPOSIT_PAGE),
         offset: String(rows.length),
       });
-      setRows((r) => [...r, ...d.rows]);
+      // The deposit can take operations between two reads, which shifts the
+      // offset: a row already held is not drawn twice.
+      setRows((r) => {
+        const held = new Set(r.map((x) => x.event_key));
+        return [...r, ...d.rows.filter((x) => !held.has(x.event_key))];
+      });
     } catch {
       setFailed(true);
     } finally {
@@ -139,6 +145,7 @@ export default function DepositView({
   };
 
   const registry = useReceiptRegistry();
+  const holder = chain?.owner ?? row?.holder ?? null;
 
   if (!data && !failed) return <DetailBodySkeleton />;
   if (!row)
@@ -152,8 +159,19 @@ export default function DepositView({
     <div className="py-8 space-y-6">
       <DetailTopRow
         session="polaris"
-        wallet={chain?.owner ?? row.holder}
-        owner={{ wallet: chain?.owner ?? row.holder }}
+        wallet={holder}
+        owner={{
+          wallet: holder,
+          href: holder ? `${POLARIS_SP_PATH}?q=${holder}` : undefined,
+          wrap: chain?.owner
+            ? (pill) => (
+                <Prov info={spLiveProv("owner", market)} value={chain.owner ?? undefined}>
+                  {pill}
+                </Prov>
+              )
+            : undefined,
+        }}
+        fallbackHref={POLARIS_SP_PATH}
         assets={stripAssets}
         closed={!open}
         tools={false}
@@ -170,8 +188,8 @@ export default function DepositView({
               burns a share of every deposit and pays pETH in its place.
             </li>
             <li>
-              The pool writes what changed only when the holder touches the deposit, so between touches the deposit now
-              and the pending gains are read from the pool at the latest block.
+              The pool records a deposit only when it is touched. The deposit now and the pending gains are the
+              pool&rsquo;s current figures.
             </li>
             <li>The deposit also earns {stable.symbol} yield; what a touch does not claim stays in the deposit.</li>
           </ul>
@@ -207,7 +225,12 @@ export default function DepositView({
               >
                 <SpineTipContext.Provider value={i === 0 ? "above" : null}>
                   <div id={`event-${r.event_key}`} data-event-id={r.event_key} data-row-at={r.block_timestamp}>
-                    <PolarisDepositEventCard row={r} isLast={i === rows.length - 1 && rows.length >= total} />
+                    <PolarisDepositEventCard
+                      row={r}
+                      isLast={i === rows.length - 1 && rows.length >= total}
+                      holder={row.holder}
+                      vaultHeld={row.vault_held}
+                    />
                   </div>
                 </SpineTipContext.Provider>
               </EventDateContext.Provider>
@@ -272,14 +295,14 @@ function SinceLastTouch({
       </summary>
       <ul className="mt-2 space-y-1 text-rb-500">
         <li data-since-row="burned">
-          Burned by liquidations:{" "}
+          Burned since last touch:{" "}
           <Prov info={spPendingLossProv(market)}>
             <RawFigure raw={burned} symbol={s} />
           </Prov>{" "}
           {s}
         </li>
         <li data-since-row="peth">
-          pETH paid in:{" "}
+          Pending pETH:{" "}
           <Prov info={spLiveProv("pendingPeth", market)}>
             <RawFigure raw={peth} symbol={PETH.symbol} />
           </Prov>{" "}
@@ -289,7 +312,7 @@ function SinceLastTouch({
             : ""}
         </li>
         <li data-since-row="gain">
-          {s} gain:{" "}
+          Pending {s} gain:{" "}
           <Prov info={spLiveProv("stableGain", market)}>
             <RawFigure raw={gain} symbol={s} />
           </Prov>{" "}

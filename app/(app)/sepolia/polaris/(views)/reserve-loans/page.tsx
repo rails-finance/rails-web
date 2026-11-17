@@ -1,5 +1,5 @@
 // Polaris reserve loans (/sepolia/polaris/reserve-loans) — server half:
-// decodes the URL, reads the first page through this deployment's own proxy,
+// decodes the URL, reads the first page through this deployment's proxy,
 // and hands it to the client half (loan-listing.tsx) as first paint.
 
 import { LoanListing } from "./loan-listing";

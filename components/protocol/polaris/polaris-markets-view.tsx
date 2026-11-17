@@ -357,8 +357,7 @@ export function PolarisMarketsView({ chain, book }: { chain: PolarisMarketsChain
           <Link href={POLARIS_LOANS_PATH} className={INLINE_LINK}>
             Reserve loans
           </Link>
-          . fpETH is the floor part of pETH: the component whose price in ETH the protocol guarantees can only rise,
-          which is why a loan against it cannot be liquidated.
+          . fpETH is the floor part of pETH. Its price in WETH only rises, so a loan against it cannot be liquidated.
         </p>
       </section>
       <ProvenanceInfoTabs className="mt-6" />

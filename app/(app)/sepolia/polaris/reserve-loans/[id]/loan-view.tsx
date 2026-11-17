@@ -4,7 +4,7 @@
 // (rails-ops standards/detail-page-anatomy.md): the card, the Lifetime flows
 // tower (lib/polaris/loan-flows.ts), the timeline. The loans manager's
 // getters at head (/api/chain/polaris/reserve-loan) are the card's figures
-// and the tower's accrued fees; the index holds the legs. The price strip
+// and the tower's accrued fees; the index holds the touches. The price strip
 // quotes fpETH at the floor, in WETH, the debt's unit.
 
 import { useEffect, useMemo, useState } from "react";
@@ -13,13 +13,14 @@ import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { EventDateContext } from "@/components/shared/event-time";
 import { SpineTipContext } from "@/components/shared/spine-column";
-import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
+import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import { PolarisLoanCard, type PolarisLoanNow } from "@/components/protocol/polaris/polaris-loan-card";
 import { PolarisLoanEventCard } from "@/components/protocol/polaris/polaris-sp-loan-event-cards";
 import { fetchPolarisLoanChain, type PolarisLoanChain } from "@/lib/api/fetch-polaris-sp-loans-chain";
 import { FPETH } from "@/lib/polaris/asset-catalog";
+import { POLARIS_LOANS_PATH } from "@/lib/polaris/routes";
 import { atFloor, big, loanLifetime, pendingFee, units } from "@/lib/polaris/sp-loan-math";
 import { polarisLoanTower } from "@/lib/polaris/loan-flows";
 import { loanLiveProv } from "@/lib/polaris/sp-loan-provenance";
@@ -69,8 +70,8 @@ export default function LoanView({ loanId, initial }: { loanId: string; initial:
 
   const row = data?.position ?? null;
   const open = row?.status === "open";
-  const legs = useMemo(() => data?.rows ?? [], [data]);
-  const lifetime = useMemo(() => (legs.length ? loanLifetime(legs) : null), [legs]);
+  const touches = useMemo(() => data?.rows ?? [], [data]);
+  const lifetime = useMemo(() => (touches.length ? loanLifetime(touches) : null), [touches]);
 
   const now = useMemo<PolarisLoanNow | null>(() => {
     if (!chain || !lifetime || !open) return null;
@@ -104,17 +105,18 @@ export default function LoanView({ loanId, initial }: { loanId: string; initial:
         ]
       : [];
 
-  const newestFirst = useMemo(() => [...legs].reverse(), [legs]);
+  const newestFirst = useMemo(() => [...touches].reverse(), [touches]);
   const previousOf = useMemo(() => {
     const m = new Map<string, PolarisLoanEventRow | null>();
     let prev: PolarisLoanEventRow | null = null;
-    for (const l of legs) {
+    for (const l of touches) {
       m.set(l.event_key, prev);
       if (l.event_type !== "transfer") prev = l;
     }
     return m;
-  }, [legs]);
+  }, [touches]);
   const registry = useReceiptRegistry();
+  const holder = chain?.owner ?? row?.holder ?? null;
 
   if (!data && !failed) return <DetailBodySkeleton />;
   if (!row)
@@ -124,14 +126,25 @@ export default function LoanView({ loanId, initial }: { loanId: string; initial:
       </div>
     );
 
-  const total = data?.totalEvents ?? legs.length;
+  const total = data?.totalEvents ?? touches.length;
   const visible = newestFirst.slice(0, shown);
   return (
     <div className="py-8 space-y-6">
       <DetailTopRow
         session="polaris"
-        wallet={chain?.owner ?? row.holder}
-        owner={{ wallet: chain?.owner ?? row.holder }}
+        wallet={holder}
+        owner={{
+          wallet: holder,
+          href: holder ? `${POLARIS_LOANS_PATH}?q=${holder}` : undefined,
+          wrap: chain?.owner
+            ? (pill) => (
+                <Prov info={loanLiveProv("owner")} value={chain.owner ?? undefined}>
+                  {pill}
+                </Prov>
+              )
+            : undefined,
+        }}
+        fallbackHref={POLARIS_LOANS_PATH}
         assets={stripAssets}
         closed={!open}
         tools={false}
@@ -161,7 +174,7 @@ export default function LoanView({ loanId, initial }: { loanId: string; initial:
         <div className={`flex flex-wrap items-baseline justify-between gap-2 ${CARD_INSET_START}`}>
           <h2 className={SECTION_HEADING}>Activity</h2>
           <span className="text-xs tabular-nums text-rb-500" data-loan-count="">
-            {total.toLocaleString("en-US")} {total === 1 ? "leg" : "legs"}
+            {total.toLocaleString("en-US")} {total === 1 ? "operation" : "operations"}
           </span>
         </div>
         <ProvReceiptsScope registry={registry}>
@@ -176,6 +189,7 @@ export default function LoanView({ loanId, initial }: { loanId: string; initial:
                     <PolarisLoanEventCard
                       row={r}
                       previous={previousOf.get(r.event_key) ?? null}
+                      holder={row.holder}
                       isLast={i === visible.length - 1 && visible.length === newestFirst.length}
                     />
                   </div>
@@ -184,7 +198,7 @@ export default function LoanView({ loanId, initial }: { loanId: string; initial:
             ))}
           </div>
         </ProvReceiptsScope>
-        {failed && <p className="text-sm text-rb-500">The legs could not be read just now.</p>}
+        {failed && <p className="text-sm text-rb-500">The operations could not be read just now.</p>}
         {shown < newestFirst.length && (
           <div className={CARD_INSET_START}>
             <button
