@@ -170,21 +170,35 @@ export function useLiquityCells({
   const collDeltaEcho =
     collCp && Math.abs(Math.abs(l2.coll.after - beforeColl) - Math.abs(collCp.change)) < 0.00005 ? collCp : undefined;
 
-  const collAfterProv: Provenance = {
+  // A transfer row's balances are the trove's state at its previous event,
+  // and no log of this transaction states them, so the receipt names the
+  // previous event's log and links no transaction.
+  const carried = ctx.operation === "transferTrove";
+  const carriedProv = (what: string, field: string, asset: string): Provenance => ({
     kind: "chain",
-    pclass: "emitted",
-    verify: txVerify,
-    summary: `Collateral (${collSym}) held by the trove after this event. Every time a trove changes, the TroveManager contract writes the trove's full ${collSym} balance into its log. This is that balance as it stood after this event.`,
+    pclass: "indexed",
+    summary: `${what} the trove held at its previous event, carried to this row. The TroveNFT's Transfer log in this transaction moves the trove and none of its balances.`,
     contract: tmContract,
-    via: `${streamVia()} · ${originSeg(stateAfter.origin?.coll, {
-      event: "TroveUpdated",
-      param: "_coll",
-      scale: 18,
-      raw: stateAfter.raw?.coll,
-    })}`,
-    scaling: scalingOf(stateAfter.origin?.coll, { scale: 18, raw: stateAfter.raw?.coll }, { token: collSym }),
-    inputs: eventInputs({ ...coords, asset: collSym }),
-  };
+    via: `${streamVia()} · the trove's previous event · TroveUpdated log · ${field}`,
+    inputs: eventInputs({ ...coords, asset }),
+  });
+  const collAfterProv: Provenance = carried
+    ? carriedProv(`The ${collSym} collateral`, "_coll", collSym)
+    : {
+        kind: "chain",
+        pclass: "emitted",
+        verify: txVerify,
+        summary: `Collateral (${collSym}) held by the trove after this event. Every time a trove changes, the TroveManager contract writes the trove's full ${collSym} balance into its log. This is that balance as it stood after this event.`,
+        contract: tmContract,
+        via: `${streamVia()} · ${originSeg(stateAfter.origin?.coll, {
+          event: "TroveUpdated",
+          param: "_coll",
+          scale: 18,
+          raw: stateAfter.raw?.coll,
+        })}`,
+        scaling: scalingOf(stateAfter.origin?.coll, { scale: 18, raw: stateAfter.raw?.coll }, { token: collSym }),
+        inputs: eventInputs({ ...coords, asset: collSym }),
+      };
   // A batched trove's debt is NOT one emitted field: it is shares/total × the
   // batch's recorded debt. The backend's origin{} says so by omission (an
   // envelope section with no debt entry); pre-envelope responses fall back to
@@ -196,31 +210,33 @@ export function useLiquityCells({
   // its debt share-derived. No origin at all (first event / pre-083 response)
   // keeps the plain-TroveUpdated fallback.
   const batchedDebtBefore = stateBefore.origin != null && !stateBefore.origin.debt;
-  const debtAfterProv: Provenance = batchedDebt
-    ? {
-        kind: "chain-derived",
-        pclass: "indexed",
-        verify: txVerify,
-        summary: `Trove debt (${debtSym}) after this event. This trove is in a delegate's batch, so the contract logs the trove's share of the batch and the batch's total debt. The trove's debt is that share of the total, including interest and any upfront fee.`,
-        contract: tmContract,
-        via: `${streamVia()} · BatchedTroveUpdated + BatchUpdated logs · _batchDebtShares ∕ total shares × batch debt · ÷10^18`,
-        inputs: eventInputs({ ...coords, asset: debtSym }),
-      }
-    : {
-        kind: "chain",
-        pclass: "emitted",
-        verify: txVerify,
-        summary: `Trove debt (${debtSym}) after this event. Every time a trove changes, the TroveManager contract writes the trove's full debt into its log. This is that figure after this event, including the interest built up since the last change and any upfront fee.`,
-        contract: tmContract,
-        via: `${streamVia()} · ${originSeg(stateAfter.origin?.debt, {
-          event: "TroveUpdated",
-          param: "_debt",
-          scale: 18,
-          raw: stateAfter.raw?.debt,
-        })}`,
-        scaling: scalingOf(stateAfter.origin?.debt, { scale: 18, raw: stateAfter.raw?.debt }, { token: debtSym }),
-        inputs: eventInputs({ ...coords, asset: debtSym }),
-      };
+  const debtAfterProv: Provenance = carried
+    ? carriedProv(`The ${debtSym} debt`, "_debt", debtSym)
+    : batchedDebt
+      ? {
+          kind: "chain-derived",
+          pclass: "indexed",
+          verify: txVerify,
+          summary: `Trove debt (${debtSym}) after this event. This trove is in a delegate's batch, so the contract logs the trove's share of the batch and the batch's total debt. The trove's debt is that share of the total, including interest and any upfront fee.`,
+          contract: tmContract,
+          via: `${streamVia()} · BatchedTroveUpdated + BatchUpdated logs · _batchDebtShares ∕ total shares × batch debt · ÷10^18`,
+          inputs: eventInputs({ ...coords, asset: debtSym }),
+        }
+      : {
+          kind: "chain",
+          pclass: "emitted",
+          verify: txVerify,
+          summary: `Trove debt (${debtSym}) after this event. Every time a trove changes, the TroveManager contract writes the trove's full debt into its log. This is that figure after this event, including the interest built up since the last change and any upfront fee.`,
+          contract: tmContract,
+          via: `${streamVia()} · ${originSeg(stateAfter.origin?.debt, {
+            event: "TroveUpdated",
+            param: "_debt",
+            scale: 18,
+            raw: stateAfter.raw?.debt,
+          })}`,
+          scaling: scalingOf(stateAfter.origin?.debt, { scale: 18, raw: stateAfter.raw?.debt }, { token: debtSym }),
+          inputs: eventInputs({ ...coords, asset: debtSym }),
+        };
   // The after-rate, upfront-fee and historic-price receipts come from the
   // shared builders (event-provenance.ts): the header's rate pills echo the
   // rate receipt, so the identity must be built in one place.

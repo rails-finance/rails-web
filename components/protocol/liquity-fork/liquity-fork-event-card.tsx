@@ -144,6 +144,7 @@ export function LiquityForkEventCard({ event, isLast, eventNumber, fork }: Liqui
     blockNumber: event.blockNumber,
     collateralType: ctx.collateralSymbol,
     isBatched: ctx.isBatched,
+    ...(ctx.eventType === "transferTrove" ? { carried: true } : {}),
   };
 
   // direction "right" = token moves toward the protocol (collateral deposit /

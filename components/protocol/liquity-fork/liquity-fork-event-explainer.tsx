@@ -99,6 +99,7 @@ export function LiquityForkEventExplainer({
     blockNumber,
     collateralType: ctx.collateralSymbol,
     isBatched: ctx.isBatched,
+    ...(ctx.eventType === "transferTrove" ? { carried: true } : {}),
   };
   const figures = useCollFigures();
   const clauses = figures(() => eventClauses(liquityForkEventSlots(ctx, coords, fork, builders, facts)));

@@ -1267,8 +1267,7 @@ function eventSlots(
             ? [
                 clause(
                   <>
-                    The new holder takes over {debtAfterFig()} of debt against {collAfterFig()} of collateral, unchanged
-                    by the transfer.
+                    The new holder takes over {debtAfterFig()} of debt against {collAfterFig()} of collateral.
                   </>,
                 ),
               ]
