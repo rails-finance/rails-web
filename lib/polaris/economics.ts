@@ -79,6 +79,14 @@ export function polarisPsmOutcomeAtFeed(
   return { netColl, netDebt, value: polarisPsmShareValue(netColl, netDebt, pethInDebt) };
 }
 
+/** The position's equity at the feed: entire collateral at the feed less the
+ *  entire debt, signed. A debt below zero is the stables the next touch mints
+ *  to the holder, so it adds to the equity. The card's stat, the
+ *  Explanation's bullet, the export and the "Since its open" window all state
+ *  this figure. */
+export const polarisEquityAtFeed = (entireColl: number, entireDebt: number, pethInDebt: number): number =>
+  entireColl * pethInDebt - entireDebt;
+
 /** The live read's pending legs, the subset of PolarisChainResponse they need. */
 export interface PolarisPendingRead {
   accruedInterest: number;

@@ -59,6 +59,7 @@ import { Prov } from "@/components/shared/provenance";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { latestStateProv, lifetimeLegProv, peakProv } from "@/lib/polaris/event-provenance";
 import {
+  polarisEquityAtFeed,
   polarisPendingAtFeed,
   polarisPsmOutcomeAtFeed,
   type PolarisLifetime,
@@ -136,9 +137,9 @@ export interface PolarisPositionView {
    *  same read. */
   debtUsd: number | null;
   /** Chain lane only — entireColl × the feed's pETH-in-debt-unit price, minus
-   *  the debt owed. A valuation at the block, not a profit — may be negative.
-   *  An entire debt at or below zero owes nothing (the next touch settles it
-   *  to zero), so it never adds to the equity. */
+   *  the debt owed (polarisEquityAtFeed). A valuation at the block, not a
+   *  profit — may be negative. An entire debt below zero is the stables the
+   *  next touch mints to the holder, so it adds to the equity. */
   equity: number | null;
   /** Chain lane only — the debt as recorded at the last touch, the base the
    *  entire debt's pending legs are added to. */
@@ -925,7 +926,7 @@ export function viewFromChain(c: PolarisChainResponse): PolarisPositionView {
     debtRaw: c.entireDebtRaw,
     collUsd: c.price ? c.entireColl * c.price.pethUsd : null,
     debtUsd: c.price && c.entireDebt > 0 ? debtInUsd(c.market, c.entireDebt, c.price.xauUsd) : null,
-    equity: c.price ? c.entireColl * c.price.pethInDebt - Math.max(0, c.entireDebt) : null,
+    equity: c.price ? polarisEquityAtFeed(c.entireColl, c.entireDebt, c.price.pethInDebt) : null,
     recordedDebt: c.recordedDebt,
     icr: c.icr,
     mcr: c.defensiveMode ? c.defensiveMcr : c.mcr,

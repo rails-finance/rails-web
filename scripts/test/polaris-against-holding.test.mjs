@@ -47,6 +47,7 @@ const { polarisAgainstHolding, isAgainstHoldingNone, againstHoldingText } = awai
 );
 const { polarisSinceLastTouch } = await import(ROOT + "lib/polaris/since-last-touch.ts");
 const { polarisPositionToMarkdown } = await import(ROOT + "lib/polaris/position-to-markdown.ts");
+const { polarisEquityAtFeed } = await import(ROOT + "lib/polaris/economics.ts");
 
 const T0 = 1_760_000_000;
 /** A CDPUpdated row; amounts as decimal strings' numbers. */
@@ -273,6 +274,73 @@ test("on a position touched once it agrees with the since-open window at the sam
   // this figure converted at the feed now.
   close(r.gain * 2000, w.total - w.feed);
   close(r.gain * 2000, w.protocol);
+});
+
+test("equity at the feed counts a debt below zero as stables owed to the holder", () => {
+  close(polarisEquityAtFeed(10, 15000, 2000), 5000);
+  close(polarisEquityAtFeed(10, 0, 2000), 20000);
+  // usdp/2736 before its touch: 78.0065 USDp owed adds to the collateral's worth.
+  close(polarisEquityAtFeed(10, -78.0065, 2000), 20078.0065);
+});
+
+test("the since-open window counts a debt below zero as owed, the same as against holding", () => {
+  const evs = [row(1, "open", { collChange: 10, debtChange: 1000, newColl: 10, newDebt: 1000, price: 1800 })];
+  const chain = head(evs[0], {
+    entireColl: 10.5,
+    entireDebt: -40,
+    accruedInterest: 5,
+    accruedStables: 15,
+    bcTokenGain: 0,
+    mintRedeemCollChange: 0.5,
+    mintRedeemDebtChange: -1030,
+  });
+  const w = polarisSinceLastTouch(chain, evs);
+  assert.ok(w && w.sinceOpen);
+  // 10.5 × 2000 + 40 owed, against 10 × 1800 − 1000 at the open.
+  close(w.equityNow, 21040);
+  close(w.total, 21040 - 17000);
+  assert.equal("settle" in w.legs, false);
+  const r = polarisAgainstHolding(evs, chain);
+  close(r.gain * 2000, w.protocol);
+});
+
+test("stables a touch minted to the holder count as received: the window from that touch agrees with against holding", () => {
+  // The mint is in the touch's written debt (it lands on zero), so the window
+  // that opens there starts from the stables already received.
+  const evs = [row(1, "open", { collChange: 10, debtChange: 0, newColl: 10, newDebt: 40, settled: 40, price: 1800 })];
+  const chain = head(evs[0], { entireColl: 10, entireDebt: 40 });
+  const w = polarisSinceLastTouch(chain, evs);
+  assert.ok(w && w.sinceOpen);
+  const r = polarisAgainstHolding(evs, chain);
+  close(r.settled, 40);
+  close(r.gain * 2000, w.protocol);
+});
+
+test("the export's timeline states the stables each touch minted to the holder", async () => {
+  const evs = [
+    row(1, "open", { collChange: 10, debtChange: 1000, newColl: 10, newDebt: 1000 }),
+    row(2, "close", { collChange: -9.5, debtChange: 0, mrColl: -0.5, mrDebt: -1040, settled: 40 }),
+  ];
+  for (const e of evs) e.actionLabel = e.context.data.eventType;
+  const md = polarisPositionToMarkdown({
+    view: {
+      market: "usdp",
+      cdpId: "8",
+      stableSymbol: "USDp",
+      status: "closed",
+      coll: 0,
+      debt: 0,
+      collUsd: null,
+      icr: null,
+    },
+    chain: null,
+    events: evs,
+    generatedAt: new Date(Date.UTC(2026, 10, 17)),
+  });
+  assert.match(md, /\| Minted to the holder \(USDp\) \|/);
+  const closeRow = md.split("\n").find((l) => l.startsWith("| 2 |"));
+  assert.match(closeRow, /\| 40(\.00)? \|/);
+  assert.match(md, /- \*\*Minted to the holder:\*\* 40(\.00)? USDp/);
 });
 
 test("a liquidation pays the gas compensation escrow to the liquidator: the holder loses it", () => {

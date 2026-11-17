@@ -133,7 +133,6 @@ async function windowFor(market, id) {
     reward: chain.bcTokenGain * priceNow,
     interest: -chain.accruedInterest,
     stabilityGain: chain.accruedStables,
-    settle: Math.min(0, chain.entireDebt),
   };
   return {
     sinceOpen: rows.length === 1,

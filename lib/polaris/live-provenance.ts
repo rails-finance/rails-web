@@ -52,7 +52,7 @@ export function liveEntireProv(what: "coll" | "debt", market: PolarisMarket): Pr
     summary:
       what === "coll"
         ? "pETH the position holds NOW — the cdpManager's own getCDPEntireColl(id) at the latest block: the recorded collateral plus every pending leg (the PSM share and reward pETH accrued since the last touch). The identity the contract keeps, and the verifier asserts: entireColl = coll + mintRedeemCollChange + bcTokenGain."
-        : `${stable} the position owes NOW — the cdpManager's own getCDPEntireDebt(id) at the latest block: the recorded debt with interest accrued since the last touch, the pending PSM share, and the pending stability gain netted off. The identity the contract keeps: entireDebt = debt + accruedInterest + mintRedeemDebtChange − accruedStables. The getter is signed: when the pending legs clear more than the recorded debt it answers zero or below, the position owes nothing, and its next touch mints the difference so the debt lands on zero.`,
+        : `${stable} the position owes NOW — the cdpManager's own getCDPEntireDebt(id) at the latest block: the recorded debt with interest accrued since the last touch, the pending PSM share, and the pending stability gain netted off. The identity the contract keeps: entireDebt = debt + accruedInterest + mintRedeemDebtChange − accruedStables. The getter is signed: when the pending legs clear more than the recorded debt it answers below zero, and the position is owed the difference. Its next touch mints that difference in ${stable} to the holder of the position's NFT and writes the debt at zero.`,
     contract: manager(market),
     via: `${LANE_VIA} · ${what === "coll" ? "getCDPEntireColl" : "getCDPEntireDebt"}(id) @ head`,
   };
@@ -195,10 +195,10 @@ export function liveEquityProv(market: PolarisMarket): Provenance {
     kind: "chain",
     pclass: "oracle",
     verify: recompute("getCDPEntireColl(id) × priceFeed.previewPrice() − getCDPEntireDebt(id)"),
-    summary: `The position's equity at the feed — entire collateral (getCDPEntireColl(id)) times the market's own price for pETH in ${stable} (the PriceFeed's previewPrice()), minus entire debt (getCDPEntireDebt(id)), all three read at the latest block. An entire debt at or below zero counts as zero: the position owes nothing, and its next touch settles the debt to zero rather than paying the difference out. A valuation at this block, not a profit: it moves with the feed's price and with the interest and PSM share still pending, and it can be negative when the debt is worth more than the collateral. Turning it into a realised profit or loss needs a price for each of the holder's own deposits — a decision about basis, not a fact of the chain.`,
+    summary: `The position's equity at the feed — entire collateral (getCDPEntireColl(id)) times the market's own price for pETH in ${stable} (the PriceFeed's previewPrice()), minus entire debt (getCDPEntireDebt(id)), all three read at the latest block. An entire debt below zero adds to the equity: it is the ${stable} the position's next touch mints to the holder of its NFT. A valuation at this block, not a profit: it moves with the feed's price and with the interest and PSM share still pending, and it can be negative when the debt is worth more than the collateral. Turning it into a realised profit or loss needs a price for each of the holder's own deposits — a decision about basis, not a fact of the chain.`,
     contract: manager(market),
     via: `${LANE_VIA} · getCDPEntireColl(id) × previewPrice() − getCDPEntireDebt(id) @ head`,
-    formula: "entireColl × pethInDebt − max(0, entireDebt)",
+    formula: "entireColl × pethInDebt − entireDebt",
     inputs: [
       { label: "entire collateral", kind: "chain", pclass: "state", note: "getCDPEntireColl(id)" },
       { label: "pETH price", kind: "chain", pclass: "oracle", note: "the market's PriceFeed — pETH in the debt unit" },
@@ -206,7 +206,7 @@ export function liveEquityProv(market: PolarisMarket): Provenance {
         label: "entire debt",
         kind: "chain",
         pclass: "state",
-        note: "getCDPEntireDebt(id), counted as zero at or below zero",
+        note: "getCDPEntireDebt(id), signed: below zero, the stables owed to the holder",
       },
     ],
   };
