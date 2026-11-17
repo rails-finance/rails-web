@@ -120,7 +120,7 @@ export interface PolarisPositionView {
   owner: string | null;
   /** A listing searched by a wallet that held this CDP and sent its NFT on:
    *  where it went and when (ui-jobs 715). */
-  formerHold?: { movedTo: string; movedAt: number } | null;
+  formerHold?: { movedTo: string; movedAt: number | null } | null;
   status: PolarisPositionStatus;
   liquidated: boolean;
   /** Collateral (pETH) — the entire figure on the chain lane, the last
@@ -330,8 +330,10 @@ function assetIcon(symbol: string, address: string, figure: string): ReactNode {
 
 /** The "moved to" tip on a listing row searched by a wallet that held the
  *  CDP and sent its NFT on (ui-jobs 715). */
-function movedToTip(movedAt: number): string {
-  return `This wallet held the position until ${formatDate(movedAt)}, then sent its NFT to the wallet shown.`;
+function movedToTip(movedAt: number | null): string {
+  return movedAt != null
+    ? `This wallet held the position until ${formatDate(movedAt)}, then sent its NFT to the wallet shown.`
+    : "This wallet held the position, then sent its NFT to the wallet shown.";
 }
 
 /** The CDP-grain identity on a listing row: the market and the CDP id. Its copy

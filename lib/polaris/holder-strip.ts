@@ -89,26 +89,29 @@ export function polarisHolderStrip(
   /** The answer's count of CDPs the wallet passed on, every page (ui-jobs 715). */
   passedOn = 0,
 ): HolderStripProps {
-  // A CDP the wallet passed on is not its holding.
+  // A CDP the wallet passed on is not its holding: left out of the counts,
+  // the sums and the count it holds. Whether the page is the whole answer is
+  // read on the answer's total, moved ones in.
+  const answerTruncated = total > perPage;
+  const held = total - passedOn;
   rows = rows.filter((r) => !r.formerHold);
-  total -= passedOn;
   const counts = {
     open: rows.filter((r) => r.status === "open").length,
     closed: rows.filter((r) => r.status === "closed").length,
     liquidated: rows.filter((r) => r.status === "liquidated").length,
   };
-  const truncated = total > perPage;
+  const truncated = answerTruncated;
 
   if (truncated) {
     // The rows are a slice of the wallet, so neither the per-status counts nor
     // any sum over them is a statement about the wallet. State the one figure
     // that is — how many it holds — and say why the rest is absent.
     return {
-      countsLine: `This wallet holds ${plural(total, "position", "positions")}.`,
+      countsLine: `This wallet holds ${plural(held, "position", "positions")}.`,
       counts: { open: 0, closed: 0, liquidated: 0 },
       legs: [],
       truncated: true,
-      note: `Totals are stated for wallets holding up to ${perPage.toLocaleString("en-US")} positions; this one holds ${total.toLocaleString("en-US")}.`,
+      note: `Totals are stated for wallets holding up to ${perPage.toLocaleString("en-US")} positions; this one holds ${held.toLocaleString("en-US")}.`,
     };
   }
 

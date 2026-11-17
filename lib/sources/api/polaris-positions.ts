@@ -51,7 +51,7 @@ export interface PolarisPositionSummary {
   owner: string;
   /** With ?former=1 on a wallet filter: the wallet held this CDP and sent its
    *  NFT on; where it went and when (rails-server, ui-jobs 715). */
-  formerHold?: { movedTo: string; movedAt: number };
+  formerHold?: { movedTo: string; movedAt: number | null };
   ownerAtOpen: string;
   status: PolarisPositionStatus;
   liquidated: boolean;
@@ -224,7 +224,12 @@ export function buildPolarisPositionRows(raw: RawPolarisPositionRow[]): PolarisP
       liqCount: intOf(r.liq_count),
       ...(r.tx_count != null ? { txCount: intOf(r.tx_count) } : {}),
       ...(r.former_moved_to
-        ? { formerHold: { movedTo: r.former_moved_to.toLowerCase(), movedAt: Number(r.former_moved_at) } }
+        ? {
+            formerHold: {
+              movedTo: r.former_moved_to.toLowerCase(),
+              movedAt: r.former_moved_at != null ? Number(r.former_moved_at) : null,
+            },
+          }
         : {}),
       lastPrimaryRate: r.last_primary_rate != null ? scale18(r.last_primary_rate) : null,
     });
