@@ -9,6 +9,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
+import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
+import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
+import { loanFlowTimeline } from "@/lib/polaris/sp-loan-flow-timelines";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { EventDateContext } from "@/components/shared/event-time";
@@ -89,6 +92,19 @@ export default function LoanView({ loanId, initial }: { loanId: string; initial:
     [lifetime, chain, open],
   );
 
+  const flowTimeline = useMemo(
+    () =>
+      touches.length && chainSettled
+        ? loanFlowTimeline(touches, {
+            open,
+            collNowRaw: chain?.collRaw ?? null,
+            debtNowRaw: chain?.debtRaw ?? null,
+            nowSec: Math.floor(Date.now() / 1000),
+          })
+        : null,
+    [touches, chainSettled, open, chain],
+  );
+
   const floor = chain ? units(big(chain.floorPriceRaw)) : null;
   const stripAssets: LatestPriceAsset[] =
     floor != null && floor > 0
@@ -167,6 +183,10 @@ export default function LoanView({ loanId, initial }: { loanId: string; initial:
             <li>The loans manager has no liquidation.</li>
           </ul>
         }
+      />
+      <LifetimeFlowsPanel
+        scrubber={flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} /> : null}
+        read={flowTimeline ? "done" : "reading"}
       />
       {tower && <ChainTruthTower data={tower} />}
 

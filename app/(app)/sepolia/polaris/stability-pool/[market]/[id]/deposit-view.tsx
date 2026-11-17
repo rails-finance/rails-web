@@ -10,6 +10,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
+import { LifetimeFlowsPanel, type FlowsRead } from "@/components/shared/lifetime-flows-panel";
+import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
+import { depositFlowTimeline } from "@/lib/polaris/sp-loan-flow-timelines";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { EventDateContext } from "@/components/shared/event-time";
@@ -101,6 +104,42 @@ export default function DepositView({
   const now = useMemo(() => (lifetime && chain && open ? depositNow(lifetime, chain) : null), [lifetime, chain, open]);
   const cardNow = useMemo(() => (chain && open ? depositNowFromChain(chain) : null), [chain, open]);
   const tower = useMemo(() => (lifetime ? polarisDepositTower(market, lifetime, now) : null), [market, lifetime, now]);
+
+  // The whole life, oldest first, for the Lifetime flows panel. A life past
+  // one read's ceiling is withheld (the vault-held deposits).
+  const [flowRows, setFlowRows] = useState<PolarisDepositEventRow[] | null>(null);
+  const [flowsRead, setFlowsRead] = useState<FlowsRead>("reading");
+  const lifeTotal = data?.totalEvents ?? null;
+  useEffect(() => {
+    if (lifeTotal == null) return;
+    if (lifeTotal > 5000) {
+      setFlowsRead("withheld");
+      return;
+    }
+    let cancelled = false;
+    readPolarisSpLoans<PolarisDepositTimelineResponse>("stability-pool/timeline", {
+      market,
+      id: tokenId,
+      order: "asc",
+      limit: "5000",
+    })
+      .then((d) => {
+        if (cancelled) return;
+        setFlowRows(d.rows);
+        setFlowsRead("done");
+      })
+      .catch(() => !cancelled && setFlowsRead("failed"));
+    return () => {
+      cancelled = true;
+    };
+  }, [lifeTotal, market, tokenId]);
+  const flowTimeline = useMemo(
+    () =>
+      flowRows && (!open || chainSettled)
+        ? depositFlowTimeline(market, flowRows, { open, now, nowSec: Math.floor(Date.now() / 1000) })
+        : null,
+    [flowRows, open, chainSettled, market, now],
+  );
 
   // pETH in the market's stablecoin at the feed, the price the head row values
   // the pending pETH at.
@@ -194,6 +233,10 @@ export default function DepositView({
             <li>The deposit also earns {stable.symbol} yield; what a touch does not claim stays in the deposit.</li>
           </ul>
         }
+      />
+      <LifetimeFlowsPanel
+        scrubber={flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} /> : null}
+        read={flowTimeline ? "done" : flowsRead === "done" ? "reading" : flowsRead}
       />
       {tower && <ChainTruthTower data={tower} />}
 
