@@ -40,7 +40,7 @@ export async function GET(
   if (!cutoffBlock) return NextResponse.json({ error: "cutoffBlock is required" }, { status: 400 });
 
   try {
-    const url = `${RAILS_API_URL}/api/basedollar/${encodeURIComponent(collateralType)}/${encodeURIComponent(troveId)}/timeline/summary?cutoffBlock=${encodeURIComponent(cutoffBlock)}`;
+    const url = `${RAILS_API_URL}/api/basedollar/${encodeURIComponent(collateralType)}/${encodeURIComponent(troveId)}/timeline/summary?cutoffBlock=${encodeURIComponent(cutoffBlock)}&transfers=1`;
     const response = await fetch(url, createAuthFetchOptions(undefined, readerIp));
     if (!response.ok) {
       console.error(`Backend API error: ${response.status} ${response.statusText}`);

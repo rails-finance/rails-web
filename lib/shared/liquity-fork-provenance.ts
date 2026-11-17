@@ -40,6 +40,9 @@ export interface LiquityForkCoords {
   collateralType?: string;
   troveId?: string;
   isBatched?: boolean;
+  /** A transferTrove row: the balances are the Trove's state at its previous
+   *  event, which no log of this transaction states. */
+  carried?: boolean;
 }
 
 /** Operand values for the delta reconstructions — pass the emitted after and
@@ -336,7 +339,23 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
 
   // ── Detail: after-values ────────────────────────────────────────────────────
 
-  const collAfterProv = (coords: LiquityForkCoords, origin?: OriginEnvelope | null): Provenance => ({
+  /** A transfer row's balance: the previous event's figure, carried. No log of
+   *  this transaction states it, so the receipt links none. */
+  const carriedAfterProv = (coords: LiquityForkCoords, what: string, field: string): Provenance => ({
+    kind: "chain",
+    pclass: "indexed",
+    summary: `${what} the Trove held at its previous event, carried to this row. The TroveNFT's Transfer log in this transaction moves the Trove and none of its balances.`,
+    contract: troveManagerContract(coords),
+    via: `${streamVia()} · the Trove's previous event · TroveUpdated log · ${field}`,
+    inputs: eventInputs(coords),
+  });
+
+  const collAfterProv = (coords: LiquityForkCoords, origin?: OriginEnvelope | null): Provenance =>
+    coords.carried
+      ? carriedAfterProv(coords, `The ${collSym(coords)} collateral`, "coll")
+      : collAfterEventProv(coords, origin);
+
+  const collAfterEventProv = (coords: LiquityForkCoords, origin?: OriginEnvelope | null): Provenance => ({
     kind: "chain",
     pclass: "emitted",
     verify: txVerify(coords),
@@ -347,7 +366,12 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     inputs: eventInputs(coords),
   });
 
-  const debtAfterProv = (coords: LiquityForkCoords, origin?: OriginEnvelope | null): Provenance => ({
+  const debtAfterProv = (coords: LiquityForkCoords, origin?: OriginEnvelope | null): Provenance =>
+    coords.carried
+      ? carriedAfterProv(coords, `The ${cfg.stablecoin} debt`, "debt")
+      : debtAfterEventProv(coords, origin);
+
+  const debtAfterEventProv = (coords: LiquityForkCoords, origin?: OriginEnvelope | null): Provenance => ({
     kind: coords.isBatched ? "chain-derived" : "chain",
     pclass: coords.isBatched ? "indexed" : "emitted",
     verify: txVerify(coords),
@@ -1110,9 +1134,24 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     ],
   });
 
+  // ── A transfer row's counterparty: the TroveNFT's Transfer log ────────────
+  const transferPartyProv = (dir: "to" | "from", coords?: LiquityForkCoords): Provenance => ({
+    kind: "chain",
+    pclass: "emitted",
+    verify: txVerify(coords),
+    summary:
+      dir === "to"
+        ? `The account the Trove passed to, named as the receiver in the TroveNFT's Transfer log. Holding the NFT is holding the Trove; no collateral or ${cfg.stablecoin} moved.`
+        : `The account the Trove came from, named as the sender in the TroveNFT's Transfer log. Holding the NFT is holding the Trove; no collateral or ${cfg.stablecoin} moved.`,
+    contract: { name: "TroveNFT" },
+    via: `captured ${cfg.protocolName} TroveNFT transfers (${cfg.tablePrefix}_trove_nft_transfer_*) · Transfer.${dir}`,
+    inputs: eventInputs(coords),
+  });
+
   return {
     collDeltaProv,
     debtDeltaProv,
+    transferPartyProv,
     collAfterProv,
     debtAfterProv,
     collBeforeProv,

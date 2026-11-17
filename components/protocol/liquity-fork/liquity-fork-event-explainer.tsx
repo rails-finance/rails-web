@@ -18,6 +18,7 @@ import {
   liquityForkRedemptionContent,
   liquityForkLiquidationContent,
   liquityForkBatchContent,
+  liquityForkTransferContent,
   liquityForkEventFallbackContent,
   type LiquityForkLearnMoreParams,
 } from "@/lib/shared/learn-more-content";
@@ -77,6 +78,8 @@ export function liquityForkLearnMoreContent(
     case "setBatchManagerAnnualInterestRate":
     case "lowerBatchManagerAnnualFee":
       return liquityForkBatchContent(fork);
+    case "transferTrove":
+      return liquityForkTransferContent(fork);
     default:
       return liquityForkEventFallbackContent(fork);
   }
@@ -96,6 +99,7 @@ export function LiquityForkEventExplainer({
     blockNumber,
     collateralType: ctx.collateralSymbol,
     isBatched: ctx.isBatched,
+    ...(ctx.eventType === "transferTrove" ? { carried: true } : {}),
   };
   const figures = useCollFigures();
   const clauses = figures(() => eventClauses(liquityForkEventSlots(ctx, coords, fork, builders, facts)));

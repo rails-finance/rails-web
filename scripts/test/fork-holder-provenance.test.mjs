@@ -1,4 +1,4 @@
-// The receipt on a fork Trove page's "last holder" (ui-jobs 717, interim):
+// The receipt on a fork Trove page's "last holder":
 // the TroveNFT's wallet-to-wallet transfers. The builder imports through `@/`,
 // resolved here as compound-arbitrum-holder-strip.test.mjs does.
 // Run: npm test

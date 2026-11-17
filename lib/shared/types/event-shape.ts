@@ -1343,7 +1343,10 @@ export type EbisuEventType =
   | "setInterestBatchManager"
   | "removeFromBatch"
   | "setBatchManagerAnnualInterestRate"
-  | "lowerBatchManagerAnnualFee";
+  | "lowerBatchManagerAnnualFee"
+  /** The TroveNFT moved between two wallets (rails-server's ?transfers=1
+   *  rows): the Trove's state stands unchanged on both sides. */
+  | "transferTrove";
 
 export interface EbisuContext {
   eventType: EbisuEventType;
@@ -1416,6 +1419,11 @@ export interface EbisuContext {
   /** setBatchManagerAnnualInterestRate / lowerBatchManagerAnnualFee rows only —
    *  the batch manager's change this Trove carried (server mig 342). */
   batchRate?: LiquityForkBatchRateFacts;
+  /** A transferTrove row's wallets, off the TroveNFT's Transfer log
+   *  (rails-server mig 485's <fork>_trove_nft_transfers); always
+   *  `transferType: "transfer"`, since the mint and the burn ride the open and
+   *  the close. */
+  transfer?: TransferDetail;
   /** Rows that carry a redistribution (`operation.debtFromRedist` or
    *  `collFromRedist` above zero) — the liquidations on this branch whose
    *  redistribution this touch applied: every one with a redistributed leg
@@ -1448,7 +1456,10 @@ export type AsymmetryEventType =
   | "setInterestBatchManager"
   | "removeFromBatch"
   | "setBatchManagerAnnualInterestRate"
-  | "lowerBatchManagerAnnualFee";
+  | "lowerBatchManagerAnnualFee"
+  /** The TroveNFT moved between two wallets (rails-server's ?transfers=1
+   *  rows): the Trove's state stands unchanged on both sides. */
+  | "transferTrove";
 
 export interface AsymmetryContext {
   eventType: AsymmetryEventType;
@@ -1521,6 +1532,11 @@ export interface AsymmetryContext {
   /** setBatchManagerAnnualInterestRate / lowerBatchManagerAnnualFee rows only —
    *  the batch manager's change this Trove carried (server mig 342). */
   batchRate?: LiquityForkBatchRateFacts;
+  /** A transferTrove row's wallets, off the TroveNFT's Transfer log
+   *  (rails-server mig 485's <fork>_trove_nft_transfers); always
+   *  `transferType: "transfer"`, since the mint and the burn ride the open and
+   *  the close. */
+  transfer?: TransferDetail;
   /** Rows that carry a redistribution (`operation.debtFromRedist` or
    *  `collFromRedist` above zero) — the liquidations on this branch whose
    *  redistribution this touch applied: every one with a redistributed leg
@@ -1555,7 +1571,10 @@ export type BasedollarEventType =
   | "setInterestBatchManager"
   | "removeFromBatch"
   | "setBatchManagerAnnualInterestRate"
-  | "lowerBatchManagerAnnualFee";
+  | "lowerBatchManagerAnnualFee"
+  /** The TroveNFT moved between two wallets (rails-server's ?transfers=1
+   *  rows): the Trove's state stands unchanged on both sides. */
+  | "transferTrove";
 
 export interface BasedollarContext {
   eventType: BasedollarEventType;
@@ -1627,6 +1646,11 @@ export interface BasedollarContext {
   /** setBatchManagerAnnualInterestRate / lowerBatchManagerAnnualFee rows only —
    *  the batch manager's change this Trove carried (server mig 342). */
   batchRate?: LiquityForkBatchRateFacts;
+  /** A transferTrove row's wallets, off the TroveNFT's Transfer log
+   *  (rails-server mig 485's <fork>_trove_nft_transfers); always
+   *  `transferType: "transfer"`, since the mint and the burn ride the open and
+   *  the close. */
+  transfer?: TransferDetail;
   /** Rows that carry a redistribution (`operation.debtFromRedist` or
    *  `collFromRedist` above zero) — the liquidations on this branch whose
    *  redistribution this touch applied: every one with a redistributed leg

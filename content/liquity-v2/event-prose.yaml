@@ -2002,7 +2002,7 @@ templates:
         when: |-
           variant transfer, the trove holds something
         text: |-
-          The new holder takes over {debt_after} {debt_symbol} of debt against {coll_after} {coll_symbol} of collateral, unchanged by the transfer.
+          The new holder takes over {debt_after} {debt_symbol} of debt against {coll_after} {coll_symbol} of collateral.
     order:
       - transfer.no_detail
       - transfer.mint

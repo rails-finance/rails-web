@@ -1232,6 +1232,28 @@ export function liquityForkBatchContent(p: LiquityForkLearnMoreParams): LearnMor
   };
 }
 
+/** A Trove transfer: Liquity V2's modal (content/liquity-v2/event-prose.yaml,
+ *  `transfer`) in the fork's names. */
+export function liquityForkTransferContent(p: LiquityForkLearnMoreParams): LearnMoreContent {
+  return {
+    title: "How Trove transfers work",
+    intro: `A ${p.protocolName} Trove is an ERC-721 NFT, so its ownership can be transferred to another wallet like any other token.`,
+    detailsHeading: "Key concepts:",
+    details: [
+      {
+        bold: "Trove NFT",
+        text: "ownership of the position is a transferable NFT; whoever holds it controls the Trove.",
+      },
+      {
+        bold: "Transfer effects",
+        text: "transferring the NFT hands full control of the collateral and debt to the new holder.",
+      },
+      { bold: "Multiple Troves", text: "one address can hold many Troves, each a separate NFT and position." },
+    ],
+    links: forkLinks(p, "trove"),
+  };
+}
+
 export function liquityForkEventFallbackContent(p: LiquityForkLearnMoreParams): LearnMoreContent {
   return {
     title: `How ${p.protocolName} Troves work`,
