@@ -27,11 +27,18 @@ const URN_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 
 // Moved down from the layout: the page is the segment that fetches, so it is the
 // segment that can describe what it fetched.
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { vault } = await params;
+  // The ilk names the market, as the card's listing tag does. The same
+  // `cache()`-wrapped read the page body makes, so it costs no second request.
+  const valid = CDP_ID.test(vault) || URN_ADDRESS.test(vault);
+  const tail = valid
+    ? await loadMakerVaultTail(vault, servedFoldersFromParam((await searchParams).folders)).catch(() => null)
+    : null;
   return positionMetadata({
     session: "makerdao",
     subject: vault,
+    market: tail?.chain?.ilk ?? tail?.summary?.ilk,
     canonicalPath: `/ethereum/makerdao/${vault}`,
     // This route carries its own opengraph-image.tsx, rendering this vault's
     // live card — the static per-explorer PNG stays only its fallback.

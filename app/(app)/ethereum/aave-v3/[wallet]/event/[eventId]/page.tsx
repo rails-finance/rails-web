@@ -44,6 +44,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   return eventMetadata({
     session: "aave-v3",
     subject: wallet,
+    market: MARKET_NAME[market],
     canonicalPath: `/ethereum/aave-v3/${wallet}/event/${encodeURIComponent(decoded)}`,
     event: event
       ? {

@@ -6,6 +6,7 @@
 import { useState } from "react";
 import { Hash, Link2 } from "lucide-react";
 import { Icon } from "@/components/icons/icon";
+import { shortPositionId } from "@/lib/shared/position-name";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
 
 export function PwnMenuRows({ loanId, pagePath }: { loanId: string; pagePath: string }) {
@@ -20,7 +21,7 @@ export function PwnMenuRows({ loanId, pagePath }: { loanId: string; pagePath: st
     <>
       <ToolsMenuItem
         icon={copied === "id" ? <Icon name="check" size={16} /> : <Hash size={16} />}
-        title={`Loan #${loanId}`}
+        title={`Loan ${shortPositionId(loanId)}`}
         subtitle={copied === "id" ? "Copied" : "Copy the loan ID"}
         onClick={() => copy("id", loanId)}
       />

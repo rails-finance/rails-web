@@ -35,6 +35,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   return eventMetadata({
     session: "makerdao",
     subject: vault,
+    market: tail.chain?.ilk ?? tail.summary?.ilk,
     canonicalPath: `/ethereum/makerdao/${vault}/event/${encodeURIComponent(decoded)}`,
     event: event ? { actionLabel: makerdaoEventPageTitle(event), timestamp: event.timestamp } : null,
     description:

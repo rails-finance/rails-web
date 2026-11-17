@@ -6,7 +6,7 @@
 
 import type { FluidPositionSummary } from "@/lib/sources/api/fluid-positions";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
-import { poolShareLabel } from "@/lib/fluid/asset-catalog";
+import { pairLabel, poolShareLabel } from "@/lib/fluid/asset-catalog";
 import type { PositionCardModel } from "@/lib/share/position-card";
 import { formatCompact } from "@/lib/shared/format-compact";
 
@@ -15,6 +15,11 @@ import { formatCompact } from "@/lib/shared/format-compact";
  *  Mirrors `fluidLegName` with no chain arm (this route has none). */
 function legName(symbol: string | null, poolPair: [string, string] | null): string {
   return symbol ?? poolShareLabel(poolPair) ?? "DEX shares";
+}
+
+/** The pair off the tail alone, "wstETH / USDC": the market a tab title names. */
+export function fluidTailPair(position: FluidPositionSummary): string {
+  return pairLabel(position.supplySymbol, position.borrowSymbol, position.supplyPoolPair, position.borrowPoolPair);
 }
 
 /** A leg's headline figure: the worker's settled overlay when it has landed,

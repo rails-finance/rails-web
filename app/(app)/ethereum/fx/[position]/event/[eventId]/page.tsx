@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
-import { parseFxPositionSlug } from "@/lib/fx/asset-catalog";
+import { FX_POOLS, parseFxPositionSlug } from "@/lib/fx/asset-catalog";
 import { loadFxPositionTail } from "@/lib/fx/position-page-data";
 import { fxEventHeading, fxEventPageDescription } from "@/lib/fx/explorer";
 import FxPositionPage from "../../page";
@@ -27,7 +27,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const event = tail?.events?.find((e) => e.id === decoded) ?? null;
   return eventMetadata({
     session: "fx",
-    subject: slug,
+    subject: parsed?.positionId ?? slug,
+    market: parsed ? FX_POOLS[parsed.pool].tokenSymbol : undefined,
     canonicalPath: `/ethereum/fx/${slug}/event/${encodeURIComponent(decoded)}`,
     event: event ? { actionLabel: fxEventHeading(event), timestamp: event.timestamp } : null,
     description: event && parsed ? fxEventPageDescription(parsed.pool, parsed.positionId, event.timestamp) : undefined,

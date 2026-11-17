@@ -7,7 +7,11 @@ import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
 import { isMorphoBaseMarketSegment } from "@/lib/morpho-base/routes";
 import { servedFoldersFromParam } from "@/lib/shared/timeline-folder";
-import { loadMorphoBaseGroupedTail, loadMorphoBaseTail } from "@/lib/morpho-base/position-page-data";
+import {
+  loadMorphoBaseGroupedTail,
+  loadMorphoBaseTail,
+  morphoBaseTailMarket,
+} from "@/lib/morpho-base/position-page-data";
 import { morphoBaseVaultOwnerNote } from "@/lib/morpho-base/vault-owner-note";
 import MorphoBasePositionView from "./position-view";
 
@@ -23,15 +27,22 @@ export const dynamic = "force-dynamic";
 const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 
 // Moved down from the layout: the page is the segment that fetches, so it is the
-// segment that can describe what it fetched. Output is unchanged — the wallet
-// titles the page (the helper truncates an address) and the market is named by
-// its id's first bytes, there being no static id → symbol map here.
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { wallet, market } = await params;
+// segment that can describe what it fetched. The market is the pair off the
+// slot read the page body makes (the same `cache()` entry, chosen by the same
+// test); its id's first bytes where that read holds no position there.
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
+  const { wallet: rawWallet, market } = await params;
+  const wallet = rawWallet.toLowerCase();
+  const m = market?.toLowerCase();
+  const valid = ADDRESS.test(rawWallet) && isMorphoBaseMarketSegment(m);
+  const grouped = servedFoldersFromParam((await searchParams).folders);
+  const tail = valid
+    ? await (grouped ? loadMorphoBaseGroupedTail(`${wallet}|${m}`) : loadMorphoBaseTail(wallet)).catch(() => null)
+    : null;
   return positionMetadata({
     session: "morpho-base",
-    subject: wallet,
-    market: `${market.slice(0, 10)}…`,
+    subject: rawWallet,
+    market: (tail && m ? morphoBaseTailMarket(tail.head, m) : undefined) ?? `${market.slice(0, 10)}…`,
     canonicalPath: `/base/morpho/${wallet}/${market}`,
     // This route carries its own opengraph-image.tsx, rendering this
     // position's live card — the static per-explorer PNG stays only its

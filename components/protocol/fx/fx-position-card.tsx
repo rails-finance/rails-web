@@ -23,6 +23,8 @@
 // hidden: wsteth-285 shows implied 25,178 fxUSD against settled 0. They are
 // panel rows on an open card and on a closed one.
 
+import { positionName } from "@/lib/shared/position-name";
+import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { ListingTag } from "@/components/shared/listing-tag";
 import type { ReactNode } from "react";
 import Link from "next/link";
@@ -705,10 +707,14 @@ export function useFxCardSlots({
 
   // The detail page draws the owner on the wallet row above the card
   // (ui-jobs 228); the listing card keeps it.
+  // The position's name (ui-jobs 703): the pool's token and the position id.
+  const name = positionName({ market: poolMeta.tokenSymbol, noun: POSITION_NOUN.fx, id: v.positionId });
   const poolLabel = (
     <span>
-      {poolMeta.tokenSymbol} pool
-      <span className="ml-2 font-normal tabular-nums text-rb-400">Position #{v.positionId}</span>
+      {name.market}
+      <span className="ml-2 font-normal tabular-nums text-rb-400">
+        {name.noun} {name.id}
+      </span>
     </span>
   );
   const tag = detail ? undefined : <ListingTag market={poolMeta.tokenSymbol} id={v.positionId} />;
@@ -730,7 +736,7 @@ export function useFxCardSlots({
     liquidationCount: v.liquidationCount,
     ...(detail ? { liquidationRule: FX_LIQUIDATION_RULE, order: "age-last" as const } : {}),
   };
-  const common = { status, identity, counters };
+  const common = { status, identity, counters, name };
 
   // Settled getPosition read: NORMALIZED units, labeled with the normalized
   // symbol (stETH-equivalent on the wstETH pool), never the deposit token's.

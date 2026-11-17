@@ -19,6 +19,9 @@
 // parked USD.)
 
 import { ListingTag } from "@/components/shared/listing-tag";
+import { PositionNameId } from "@/components/shared/position-name-id";
+import { listingTagId, positionName, type PositionName } from "@/lib/shared/position-name";
+import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { type ReactNode, useState } from "react";
 import { Check, Copy, Link2 } from "lucide-react";
 import {
@@ -132,12 +135,17 @@ const capTip = (v: MakerVaultView): string =>
     ? `; the oracle reads ${v.collateralSymbol} at ${usdPrice(v.priceCap!.oracleUsd)}, so the vault is valued at the cap.`
     : ".");
 
-/** The vault's number-or-address identity: CdpManager vaults have the friendly
- *  cdp id; LockStake urns and direct-Vat urns have only their urn address
+/** The vault's name (ui-jobs 703): the ilk, and the cdp id where the CdpManager
+ *  gave one; LockStake urns and direct-Vat urns have only their urn address
  *  (there is no global LSE ordinal — Open.index is owner-scoped). */
+function vaultName(v: MakerVaultView): PositionName {
+  return positionName({ market: v.ilk, noun: POSITION_NOUN.makerdao, id: v.cdpId ?? v.urn });
+}
+
+/** "Vault #31245", "Vault 0x3df8…67da". */
 function vaultIdentityLabel(v: MakerVaultView): string {
-  if (v.cdpId != null) return `Vault #${v.cdpId}`;
-  return `Urn ${v.urn.slice(0, 6)}…${v.urn.slice(-4)}`;
+  const name = vaultName(v);
+  return `${name.noun} ${name.id}`;
 }
 
 /** The debt's dollar value at Maker's $1 par. */
@@ -260,11 +268,13 @@ export function makerVaultCardSlots({
   };
 
   // The vault's kind labels the card. The listing adds the owner and the
-  // vault's number; the detail page names the owner in its wallet row and the
-  // number in the ⋮.
+  // vault's number; the detail page names the owner in its wallet row, and
+  // its heading the ilk and the vault's number or urn.
+  const name = vaultName(v);
   const identity = detail ? (
     <span className="flex items-center gap-2 text-xs font-semibold text-rb-500">
       {v.ilk}
+      <PositionNameId name={name} />
       <VaultKindChips v={v} />
     </span>
   ) : (
@@ -284,9 +294,7 @@ export function makerVaultCardSlots({
       id={
         v.cdpId == null ? (
           <RevealTip tip={URN_TIP} label={`${vaultIdentityLabel(v)}: ${URN_TIP}`} focusable>
-            <span className="tip-underline">
-              {v.urn.slice(0, 6)}…{v.urn.slice(-4)}
-            </span>
+            <span className="tip-underline">{listingTagId(v.urn)}</span>
           </RevealTip>
         ) : (
           v.cdpId
@@ -295,7 +303,7 @@ export function makerVaultCardSlots({
     />
   );
 
-  const common = { status, identity, counters };
+  const common = { status, identity, counters, name };
   const menu: PositionCardMenu = {
     leading: () => <MakerMenuRows v={v} />,
     exports: exports ?? null,
