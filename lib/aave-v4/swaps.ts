@@ -68,11 +68,14 @@ export function aaveV4CowView(
 }
 
 /** A buy order's refund as the explanation states it: the order's gap (the withdrawn or borrowed leg less what the
- *  Trade sold, in its integers) and the surplus, where both are read. The card's line under the grid drops the
- *  surplus exactly where this answers, so the refund is on the card once, every time. */
+ *  Trade sold, in its integers) and the surplus, where both are read and the event's block and transaction are
+ *  known for the figure's receipt. The card's line under the grid drops the surplus where this answers, so the
+ *  refund is on the card once, every time. */
 export function aaveV4StatedRefund(
   ctx: AaveV4Context,
+  coords: { blockNumber?: number; txHash?: string } | undefined,
 ): { gapRaw: bigint; decimals: number; cow: NonNullable<ReturnType<typeof aaveV4CowView>> } | null {
+  if (coords?.blockNumber == null || !coords.txHash) return null;
   const swap = ctx.swap;
   if (!swap || swap.cow?.kind !== "buy") return null;
   // The explanation states the Trade, and the gap after it, only where both sides are named and priced.

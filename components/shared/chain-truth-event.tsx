@@ -1078,7 +1078,8 @@ export function PartyChip({
 }: {
   party: NonNullable<ChainTruthRowSpec["party"]>;
   tile?: boolean;
-  /** The mark alone, its words kept for screen readers: where the text beside it already names the party. */
+  /** The mark alone, no words: where the sentence beside it already names the party. The caller hides it from
+   *  screen readers, which read the party in the sentence. */
   markOnly?: boolean;
 }) {
   const ens = useEnsName(party.ens ? party.address : null);
@@ -1094,14 +1095,13 @@ export function PartyChip({
       value={party.name ?? ens ?? party.address}
       className={`inline-flex items-center text-sm ${subject ? "gap-2" : "gap-1"}`}
     >
-      <span
-        className={markOnly ? "sr-only" : "text-rb-500"}
-        data-party-chip={chipId}
-        data-prov-hidden=""
-        {...(markOnly ? { "data-party-mark-only": "" } : {})}
-      >
-        {party.prefix}
-      </span>
+      {markOnly ? (
+        <span data-party-chip={chipId} data-party-mark-only="" data-prov-hidden="" />
+      ) : (
+        <span className="text-rb-500" data-party-chip={chipId} data-prov-hidden="">
+          {party.prefix}
+        </span>
+      )}
       {subject ? (
         <span className="inline-flex" data-party-icon={`bar:${subject.icon}`} data-prov-hidden="">
           <BarSubjectTile subject={subject} />
@@ -1124,15 +1124,13 @@ export function PartyChip({
           />
         )
       )}
-      <span
-        className={
-          markOnly
-            ? "sr-only"
-            : `font-medium ${party.tone === "party" ? "text-pink-600 dark:text-pink-400" : "text-foreground"}`
-        }
-      >
-        {shown}
-      </span>
+      {!markOnly && (
+        <span
+          className={`font-medium ${party.tone === "party" ? "text-pink-600 dark:text-pink-400" : "text-foreground"}`}
+        >
+          {shown}
+        </span>
+      )}
     </Prov>
   );
 }

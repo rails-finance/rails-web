@@ -568,8 +568,8 @@ export type AaveV3EventType =
 /** Provenance of an Aave V3 historic price (mirror of aave-v3.ts). */
 export type AaveV3PriceSource = "iaave-oracle";
 
-/** The kinds of position swap the Aave app places, by its own names. */
-/** `supply_from_swap` is the one kind the Aave app does not place: an order the
+/** The kinds of position swap, by the names Aave's app gives them; any front end may place the orders. */
+/** `supply_from_swap` is the one kind Aave's app has no name for: an order the
  *  owner signed that bought aTokens into the position (§15 D6). */
 export type AaveV3SwapKind =
   | "collateral_swap"

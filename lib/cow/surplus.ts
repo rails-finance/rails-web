@@ -4,8 +4,8 @@
 // reference/cow-surplus-measure-2026-11-17.md. Two figures, never added
 // together: a sell order's surplus is received beyond the limit signed, in the
 // bought token; a buy order's is returned to the wallet from the unused limit,
-// in the sold token (the Aave app's slippage allowance, which the adapter
-// refunds). Imports nothing through `@/`, so scripts/test reads it directly.
+// in the sold token (the slippage allowance the front end sets, which the
+// adapter refunds). Imports nothing through `@/`, so scripts/test reads it directly.
 
 /** The server's `cow` object: null until the settlement is read, or where
  *  settle() did not match its Trade logs. Amounts are base-unit integers. */

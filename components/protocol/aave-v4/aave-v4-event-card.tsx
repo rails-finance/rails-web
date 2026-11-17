@@ -23,7 +23,7 @@ import { aaveV4Label, aaveV4T1Kind } from "@/lib/aave-v4/event-label";
 import { useAaveV4Cells } from "./aave-v4-event-detail";
 import { AaveV4EventExplainer, AaveV4PageSentence, aaveV4LearnMoreContent } from "./aave-v4-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
-import type { AaveV4Event } from "@/lib/aave-v4/event-prose";
+import { aaveV4EventProse, type AaveV4Event } from "@/lib/aave-v4/event-prose";
 import { aaveV4CowView, aaveV4StatedRefund } from "@/lib/aave-v4/swaps";
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import { CowSurplusLines } from "@/components/protocol/cow/cow-surplus-lines";
@@ -227,7 +227,7 @@ export function AaveV4EventCard({
         trade={cow.trade}
         coords={{ block: event.blockNumber, txHash: event.txHash }}
         symbol={cow.view.token.symbol ? aaveV4DisplaySymbol(cow.view.token.symbol) : undefined}
-        feeOnly={aaveV4StatedRefund(ctx) != null}
+        feeOnly={aaveV4StatedRefund(ctx, { blockNumber: event.blockNumber, txHash: event.txHash }) != null}
       />
     ) : undefined,
     // The explanation reads the position state the card opens with, so the
@@ -236,6 +236,12 @@ export function AaveV4EventCard({
     // it out (`AaveV4EventExplainer`).
     explainer: {
       first: page ? <AaveV4PageSentence ctx={ctx} event={event} siblings={siblings ?? [event]} /> : undefined,
+      // Its words, for the party chip beside the h1 (the chip draws its mark alone where they name the party).
+      firstText: page
+        ? aaveV4EventProse({ ctx, siblings: siblings ?? [event], self: event })
+            .L4[0]?.segs.map((g) => g.text ?? "")
+            .join("")
+        : undefined,
       grouped: page || undefined,
       body: (
         <AaveV4EventExplainer

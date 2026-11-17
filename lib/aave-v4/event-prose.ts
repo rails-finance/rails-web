@@ -410,7 +410,7 @@ export function aaveV4EventProse(input: AaveV4ProseInput): AaveV4EventProse {
         // once, with its receipt; a flash-loan fee only where the receipt's
         // FlashLoan log carried a premium. Otherwise the gap alone, above 0.1%.
         const taken = variant === "debt_swap" ? num(rec?.amount) : num(ctx.amount);
-        const stated = aaveV4StatedRefund(ctx);
+        const stated = aaveV4StatedRefund(ctx, self && { blockNumber: self.blockNumber, txHash: self.txHash });
         if (stated) {
           const { gapRaw, decimals: dec, cow } = stated;
           const loan = cow.view.flashLoan;

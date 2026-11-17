@@ -122,7 +122,7 @@ export function cowSurplusProv(c: CowSwapView, trade: CowTradeRaw, coords: CowCo
   };
 }
 
-/** The fee line: the gap between the trade's own clearingPrices entries and
+/** The fee line: the gap between the trade's clearingPrices entries and
  *  the settlement's uniform price, in bp. */
 export function cowFeeProv(c: CowSwapView, trade: CowTradeRaw, coords: CowCoords): Provenance {
   const sym = tokenName(c);
@@ -139,7 +139,7 @@ export function cowFeeProv(c: CowSwapView, trade: CowTradeRaw, coords: CowCoords
   return {
     kind: "derived",
     pclass: "emitted",
-    summary: `${COW_FEE_LABEL} — what this trade gave up against the settlement's clearing price, in ${sym}, and that in basis points (0.01%) of the amount at the clearing price. CoW Protocol charges fees in the price, in the surplus token, not as transfers. The settlement contract priced the trade on clearingPrices entries [${o.sellIndex}, ${o.buyIndex}]; each token's first entry, [${u.sellIndex}, ${u.buyIndex}], is the clearing price.${signed ? ` The figure includes the order's signed fee, the Trade log's feeAmount${sell ? ", taken into the bought token at the clearing price" : ""}.` : ""} The gap holds the network cost as well as protocol and partner fees; Rails does not split them.`,
+    summary: `${COW_FEE_LABEL} — what this trade gave up against the settlement's clearing price, in ${sym}, and that in basis points (0.01%) of the amount at the clearing price. CoW charges fees in the price, in the surplus token, not as transfers. The settlement contract priced the trade on clearingPrices entries [${o.sellIndex}, ${o.buyIndex}]; each token's first entry, [${u.sellIndex}, ${u.buyIndex}], is the clearing price.${signed ? ` The figure includes the order's signed fee, the Trade log's feeAmount${sell ? ", taken into the bought token at the clearing price" : ""}.` : ""} The gap holds the network cost as well as protocol and partner fees; Rails does not split them.`,
     formula: sell
       ? `at the clearing price = ⌊${net} × clearingPrices[${u.sellIndex}] ÷ clearingPrices[${u.buyIndex}]⌋; (at the clearing price − bought${signedTerm}) ÷ at the clearing price × 10,000`
       : `at the clearing price = ⌈bought × clearingPrices[${u.buyIndex}] ÷ clearingPrices[${u.sellIndex}]⌉; (${net} − at the clearing price${signedTerm}) ÷ at the clearing price × 10,000`,
