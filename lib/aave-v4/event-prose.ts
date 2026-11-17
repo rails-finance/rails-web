@@ -26,11 +26,14 @@ import { getSpokeMeta } from "@/lib/aave-v4/spoke-meta";
 import { debtHubsOf, HUB_TIER_LABEL } from "@/components/protocol/aave-v4/aave-v4-spoke-constants";
 import { aaveV4Modal, PROSE, V4_WORDS, type AaveV4L5Key } from "@/lib/aave-v4/event-templates";
 import { aaveV4ManagerKind, type AaveV4ManagerKind } from "@/lib/aave-v4/position-managers";
+import { aaveV4StatedRefund } from "@/lib/aave-v4/swaps";
+import { shiftRaw } from "@/lib/cow/surplus";
+import { flashLenderName } from "@/lib/cow/surplus-provenance";
 
 export type AaveV4Event = BaseActivityEvent & { context: { protocol: "aave-v4"; data: AaveV4Context } };
 
 /** The receipt a figure echoes on the card. */
-export type AaveV4EchoKey = "amount" | "seized" | "cleared";
+export type AaveV4EchoKey = "amount" | "seized" | "cleared" | "returned" | "flash_fee";
 
 export type AaveV4EventProse = EventProseCore<AaveV4L5Key, AaveV4EchoKey>;
 
@@ -399,13 +402,28 @@ export function aaveV4EventProse(input: AaveV4ProseInput): AaveV4EventProse {
           v.price_base = up ? v.sold_symbol : v.bought_symbol;
           sp.say("swap.route");
         }
-        // The withdrawn or borrowed leg (the received one on a debt swap) is a
-        // flash loan the order's contract repays with a fee; what it did not
-        // sell goes back to the owner's wallet. Neither transfer is a spoke
-        // event, so only the gap is stated, and only above 0.1%, where it is
-        // more than the fee.
+        // The withdrawn or borrowed leg (the received one on a debt swap) is
+        // more than the order sold; neither the refund nor a flash-loan fee is
+        // a spoke event. Only figures that are read are stated: on a buy order
+        // whose settlement Rails has read, the refund is the order's surplus,
+        // the unused part of the limit it signed (lib/cow/surplus.ts), said
+        // once, with its receipt; a flash-loan fee only where the receipt's
+        // FlashLoan log carried a premium. Otherwise the gap alone, above 0.1%.
         const taken = variant === "debt_swap" ? num(rec?.amount) : num(ctx.amount);
-        if (taken != null && taken - sold > taken * 0.001) {
+        const stated = aaveV4StatedRefund(ctx, self && { blockNumber: self.blockNumber, txHash: self.txHash });
+        if (stated) {
+          const { gapRaw, decimals: dec, cow } = stated;
+          const loan = cow.view.flashLoan;
+          const premium = loan && BigInt(loan.premium) > BigInt(0) ? loan : null;
+          v.left = num(shiftRaw(gapRaw.toString(), dec)) ?? 0;
+          v.left_symbol = v.sold_symbol;
+          v.returned = num(shiftRaw(cow.view.surplus, dec)) ?? 0;
+          if (premium) {
+            v.flash_fee = num(shiftRaw(premium.premium, dec)) ?? 0;
+            v.lender = flashLenderName(premium.lender);
+            sp.say("swap.gap_split", { returned: "returned", flash_fee: "flash_fee" });
+          } else sp.say("swap.gap_refund", { returned: "returned" });
+        } else if (taken != null && taken - sold > taken * 0.001) {
           v.left = taken - sold;
           v.left_symbol = v.sold_symbol;
           sp.say("swap.gap");

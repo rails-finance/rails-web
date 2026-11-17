@@ -412,6 +412,9 @@ export interface ChainTruthStat {
   /** The accessible name states the value in the site's number format
    *  rather than the exact decimal (see ChainTruthDelta.readableLabel). */
   readableLabel?: boolean;
+  /** Data attributes on the stat's line where a card draws it as a line under the grid (a verifier's hook:
+   *  `data-cow-surplus`, `data-cow-fee`). */
+  rowData?: Record<string, string>;
   /** Whether this event changed the value (the T2 change-colour rule: changed
    *  renders foreground, unchanged muted text — no opacity, no before→after).
    *  Defaults to true (foreground); set `false` for a side this event didn't
@@ -1068,7 +1071,17 @@ export function HeadSurplusChip({ surplus }: { surplus: NonNullable<ChainTruthRo
  *  the timeline's bar names draws the bar's mark as a 40 px tile
  *  (`BarSubjectTile`, rails-ops TO-DO-ui-jobs 438); any other party keeps the
  *  chip's own mark. */
-export function PartyChip({ party, tile }: { party: NonNullable<ChainTruthRowSpec["party"]>; tile?: boolean }) {
+export function PartyChip({
+  party,
+  tile,
+  markOnly,
+}: {
+  party: NonNullable<ChainTruthRowSpec["party"]>;
+  tile?: boolean;
+  /** The mark alone, no words, the mark hidden from screen readers: where the sentence beside it already names the
+   *  party. The Prov stays reachable (a button while the inspector is armed, named for its receipt). */
+  markOnly?: boolean;
+}) {
   const ens = useEnsName(party.ens ? party.address : null);
   const chainId = useChainId();
   const subject = tile && party.name ? barSubjectOf(party.address, chainId) : undefined;
@@ -1082,15 +1095,29 @@ export function PartyChip({ party, tile }: { party: NonNullable<ChainTruthRowSpe
       value={party.name ?? ens ?? party.address}
       className={`inline-flex items-center text-sm ${subject ? "gap-2" : "gap-1"}`}
     >
-      <span className="text-rb-500" data-party-chip={chipId} data-prov-hidden="">
-        {party.prefix}
-      </span>
+      {markOnly ? (
+        <span data-party-chip={chipId} data-party-mark-only="" data-prov-hidden="" aria-hidden />
+      ) : (
+        <span className="text-rb-500" data-party-chip={chipId} data-prov-hidden="">
+          {party.prefix}
+        </span>
+      )}
       {subject ? (
-        <span className="inline-flex" data-party-icon={`bar:${subject.icon}`} data-prov-hidden="">
+        <span
+          className="inline-flex"
+          data-party-icon={`bar:${subject.icon}`}
+          data-prov-hidden=""
+          {...(markOnly ? { "aria-hidden": true } : {})}
+        >
           <BarSubjectTile subject={subject} />
         </span>
       ) : party.name && party.glyph ? (
-        <span className="inline-flex shrink-0" data-party-icon={`glyph:${party.glyph}`} data-prov-hidden="">
+        <span
+          className="inline-flex shrink-0"
+          data-party-icon={`glyph:${party.glyph}`}
+          data-prov-hidden=""
+          {...(markOnly ? { "aria-hidden": true } : {})}
+        >
           <ProtocolGlyph id={party.glyph} className="size-3.5 text-foreground" />
         </span>
       ) : (
@@ -1099,6 +1126,7 @@ export function PartyChip({ party, tile }: { party: NonNullable<ChainTruthRowSpe
           <img
             src={party.icon}
             alt=""
+            {...(markOnly ? { "aria-hidden": true } : {})}
             width={14}
             height={14}
             className="size-3.5 shrink-0 rounded-full"
@@ -1107,11 +1135,13 @@ export function PartyChip({ party, tile }: { party: NonNullable<ChainTruthRowSpe
           />
         )
       )}
-      <span
-        className={`font-medium ${party.tone === "party" ? "text-pink-600 dark:text-pink-400" : "text-foreground"}`}
-      >
-        {shown}
-      </span>
+      {!markOnly && (
+        <span
+          className={`font-medium ${party.tone === "party" ? "text-pink-600 dark:text-pink-400" : "text-foreground"}`}
+        >
+          {shown}
+        </span>
+      )}
     </Prov>
   );
 }
