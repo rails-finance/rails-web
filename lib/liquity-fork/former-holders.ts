@@ -13,6 +13,17 @@ export interface ForkFormerHolder {
   movedTx: string;
 }
 
+/** One TroveNFT transfer between two wallets (a fork's one-Trove read). */
+export interface ForkNftTransfer {
+  block: number;
+  /** Unix seconds; null where the index holds no time. */
+  at: number | null;
+  logIndex: number;
+  from: string;
+  to: string;
+  tx: string;
+}
+
 interface Holdable {
   owner: string | null;
   lastOwner: string | null;

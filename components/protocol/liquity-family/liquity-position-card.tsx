@@ -31,6 +31,7 @@
 // of that table on purpose: the `protocol` prop selects both the config row
 // and the OPS lookup below.
 
+import type { ForkNftTransfer } from "@/lib/liquity-fork/former-holders";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import type { ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
@@ -492,6 +493,7 @@ interface LiquityForkTroveSummaryLike {
   lastOwner: string | null;
   ownerEns: string | null;
   changedHands?: boolean;
+  nftTransfers?: ForkNftTransfer[];
   priceUsd: number | null;
   priceStale: boolean;
   collateralUsd: number | null;
@@ -520,6 +522,7 @@ export function viewFromForkSummary(protocol: ForkProtocol, s: LiquityForkTroveS
     lastOwner: s.lastOwner,
     ownerEns: s.ownerEns,
     changedHands: s.changedHands ?? false,
+    nftTransfers: s.nftTransfers,
     // Every fork now records its per-branch TroveNFT addresses in its own
     // catalog, so all three link the Trove's NFT.
     nftUrl: FORK_TROVE_NFT_URL[protocol](s.collateralType, s.id),
