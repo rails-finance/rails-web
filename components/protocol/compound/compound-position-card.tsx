@@ -22,6 +22,7 @@
 //   closed  the highest recorded supply and debt, and the Outcome.
 
 import { POSITION_NOUN } from "@/lib/shared/protocols";
+import { positionName } from "@/lib/shared/position-name";
 import { ListingTag } from "@/components/shared/listing-tag";
 import { useState, type ReactNode } from "react";
 import { Link2 } from "lucide-react";
@@ -642,7 +643,9 @@ export function useCompoundCardSlots({
     h.labelTip || !(h.label === CARD_VOCAB.collateral || h.label === BORROW_BALANCE)
       ? h
       : { ...h, labelTip: h.id === "debt" ? HEAD_TIP.debt : HEAD_TIP.collateral };
-  const common = { status, heads: detail ? heads.map(tipped) : heads, identity, counters, outcome };
+  // The position's name (ui-jobs 703): the market and the account.
+  const name = positionName({ market: v.marketLabel, noun: POSITION_NOUN[session], id: v.account });
+  const common = { status, heads: detail ? heads.map(tipped) : heads, identity, counters, outcome, name };
   if (!detail) return { ...common, surface: "listing", menu: null, tag };
 
   const menu: PositionCardMenu = {

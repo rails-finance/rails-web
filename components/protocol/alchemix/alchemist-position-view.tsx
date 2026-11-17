@@ -50,6 +50,8 @@
 // `PositionCard`, drawn from the slots this view builds, with no frame, type
 // scale or palette of the family's.
 
+import { positionName } from "@/lib/shared/position-name";
+import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -138,7 +140,7 @@ import {
   type AlchemixCoords,
 } from "@/lib/alchemix/event-provenance";
 import type { AlchemixDeployment } from "@/lib/alchemix/lines";
-import { alchemixPositionName, alchemixV2PositionName } from "@/lib/alchemix/naming";
+import { alchemixMarketWord, alchemixV2PositionName } from "@/lib/alchemix/naming";
 import { alchemixExplorer } from "@/lib/alchemix/explorer";
 import type {
   AlchemixHealth,
@@ -828,12 +830,13 @@ export function AlchemistPositionView({
           : []),
       ]
     : [];
+  // The position's name (ui-jobs 703): the synthetic and the NFT id.
+  const name = positionName({ market: alchemixMarketWord(sym), noun: POSITION_NOUN.alchemix, id: tokenId });
   const cardSlots: PositionCardSlots = {
     surface: "detail",
     status: alchemixStatus(position.status),
-    identity: (
-      <AlchemixIdentity name={alchemixPositionName(sym, tokenId)} chain={position.chainName ?? `chain ${chainId}`} />
-    ),
+    identity: <AlchemixIdentity name={name.text} chain={position.chainName ?? `chain ${chainId}`} />,
+    name,
     heads,
     notice:
       position.refusedReason || (!live && !livePending) ? (
@@ -860,7 +863,7 @@ export function AlchemistPositionView({
     menu: {
       leading: () => (
         <AlchemixMenuRows
-          idTitle={`Position #${tokenId}`}
+          idTitle={`${name.noun} ${name.id}`}
           idValue={tokenId}
           idSubtitle="Copy the position ID"
           pagePath={v3PositionPath(deployment, lineKey, tokenId)}

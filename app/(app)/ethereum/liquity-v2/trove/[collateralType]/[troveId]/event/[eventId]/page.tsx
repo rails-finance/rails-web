@@ -4,7 +4,6 @@ import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { loadTroveHistory } from "@/lib/liquity/trove-page-data";
 import { eventPagePlace } from "@/lib/liquity/event-page";
 import { liquityV2Explorer } from "@/lib/liquity/explorer";
-import { truncateTroveId } from "@/lib/liquity/share-card";
 import type { OraclePricesData } from "@/types/api/oracle";
 import { FocusSourceGate } from "@/components/shared/aim-gate";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
@@ -27,7 +26,6 @@ export const dynamic = "force-dynamic";
 // `eventHeadingWords`) and the description (`page_words.description`).
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { collateralType, troveId, eventId } = await params;
-  const collateralDisplay = collateralType === "WETH" ? "ETH" : collateralType;
   const decoded = decodeEventId(eventId);
   const history = await loadTroveHistory(collateralType, troveId);
   const event = history.events?.find((e) => e.id === decoded) ?? null;
@@ -45,8 +43,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       : null;
   return eventMetadata({
     session: "liquity-v2",
-    subject: truncateTroveId(troveId),
-    market: `${collateralDisplay}/BOLD`,
+    subject: troveId,
+    market: collateralType,
     canonicalPath: `/ethereum/liquity-v2/trove/${collateralType}/${troveId}/event/${encodeURIComponent(decoded)}`,
     event: event ? { actionLabel: contract?.heading ?? event.actionLabel, timestamp: event.timestamp } : null,
     description: contract?.description,

@@ -123,6 +123,9 @@ import {
   DEBT_ADDRESS as BASEDOLLAR_DEBT_ADDRESS,
 } from "@/lib/basedollar/asset-catalog";
 import { TroveIdentityRow } from "./trove-identity-row";
+import { POSITION_NOUN } from "@/lib/shared/protocols";
+import { PositionNameId } from "@/components/shared/position-name-id";
+import { positionName } from "@/lib/shared/position-name";
 import { ListingTag } from "@/components/shared/listing-tag";
 import { TroveMenuRows } from "./trove-menu-rows";
 import {
@@ -705,8 +708,13 @@ export function useLiquityCardSlots({
             ? { word: terms.dormant, tone: "muted" }
             : null;
 
-  // The listing names the owner; the delegate shows under Interest rate.
-  const identity = detail ? undefined : (
+  // The position's name (ui-jobs 703): the branch's collateral and the Trove id.
+  const name = positionName({ market: ct, noun: POSITION_NOUN[protocol], id: v.id });
+  // The listing names the owner; the delegate shows under Interest rate. The
+  // page's wallet row names the owner, so the detail heading carries the id.
+  const identity = detail ? (
+    <PositionNameId name={name} />
+  ) : (
     <TroveIdentityRow
       protocol={protocol}
       troveId={v.id}
@@ -940,14 +948,14 @@ export function useLiquityCardSlots({
     ];
   }
 
-  const common = { status, heads, identity, notice: deprecationBanner || undefined, counters, outcome };
+  const common = { status, heads, identity, notice: deprecationBanner || undefined, counters, outcome, name };
   // The listing's right end: the branch and the Trove ID.
   if (!detail)
     return {
       ...common,
       surface: "listing",
       menu: null,
-      tag: <ListingTag id={ops.shortId(v.id)} />,
+      tag: <ListingTag id={v.id} />,
     };
 
   const menu: PositionCardMenu | null =
@@ -955,12 +963,7 @@ export function useLiquityCardSlots({
       ? null
       : {
           leading: () => (
-            <TroveMenuRows
-              troveId={v.id}
-              nftUrl={v.nftUrl ?? null}
-              pagePath={`${cfg.trovePath}/${ct}/${v.id}`}
-              shortId={ops.shortId}
-            />
+            <TroveMenuRows troveId={v.id} nftUrl={v.nftUrl ?? null} pagePath={`${cfg.trovePath}/${ct}/${v.id}`} />
           ),
           exports,
         };

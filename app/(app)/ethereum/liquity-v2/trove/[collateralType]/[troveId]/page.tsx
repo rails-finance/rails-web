@@ -18,8 +18,8 @@ interface Props {
 // may render as current — not a side effect of this change.
 export const dynamic = "force-dynamic";
 
-// The troveId is a full uint256 — pre-truncate to its first 8 characters (the
-// form the page itself shows); the collateral branch names the market segment.
+// The market is the branch's collateral as the card names it ("WETH"); the
+// trove id goes through the shared shortener (lib/shared/position-name.ts).
 // `positionMetadata` also points the share card at Liquity V2's own, the same
 // way every other trove explorer (Ebisu, Asymmetry, Basedollar) does.
 //
@@ -28,12 +28,10 @@ export const dynamic = "force-dynamic";
 // layout above keeps only the shell mark.
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { collateralType, troveId } = await params;
-  const collateralDisplay = collateralType === "WETH" ? "ETH" : collateralType;
-  const truncatedTroveId = troveId.length > 8 ? `${troveId.substring(0, 8)}…` : troveId;
   return positionMetadata({
     session: "liquity-v2",
-    subject: truncatedTroveId,
-    market: `${collateralDisplay}/BOLD`,
+    subject: troveId,
+    market: collateralType,
     canonicalPath: `/ethereum/liquity-v2/trove/${collateralType}/${troveId}`,
     // This route carries its own opengraph-image.tsx, rendering this trove's
     // live card — the static per-explorer PNG stays only its fallback.

@@ -30,6 +30,9 @@
 // overlay — the cdpManager's own entire figures at head, the primary truth on
 // the detail page).
 
+import { POSITION_NOUN } from "@/lib/shared/protocols";
+import { PositionNameId } from "@/components/shared/position-name-id";
+import { positionName, shortPositionId } from "@/lib/shared/position-name";
 import { ListingTag } from "@/components/shared/listing-tag";
 import { TokenFigure } from "@/components/shared/token-figure";
 import { useState, type ReactNode } from "react";
@@ -332,7 +335,7 @@ function CdpMenuRows({ v }: { v: PolarisPositionView }) {
     <>
       <ToolsMenuItem
         icon={copied === "id" ? <Check size={16} /> : <Copy size={16} />}
-        title={`Position #${v.cdpId}`}
+        title={`${POSITION_NOUN.polaris} ${shortPositionId(v.cdpId)}`}
         subtitle={copied === "id" ? "Copied" : "Copy the position number"}
         onClick={() => copy("id", v.cdpId)}
       />
@@ -419,11 +422,16 @@ export function polarisCardSlots({
     ...(detail ? { order: "age-last" as const } : {}),
   };
 
+  // The position's name (ui-jobs 703): the market's stable and the CDP id.
+  const name = positionName({ market: stable, noun: POSITION_NOUN.polaris, id: v.cdpId });
   // The listing names the holder and the CDP; the detail page's wallet row
-  // names the holder, the card's ⋮ the CDP and the page heading the testnet,
-  // so the card states the market.
+  // names the holder and the page heading the testnet, so the card states the
+  // market and the position.
   const identity = detail ? (
-    <span className="text-xs text-rb-500">{stable} market</span>
+    <span className="flex items-center gap-2">
+      <span className="text-xs text-rb-500">{stable} market</span>
+      <PositionNameId name={name} />
+    </span>
   ) : (
     v.owner && <WalletPill wallet={v.owner} ensName={null} filterProtocol="polaris" bookmark />
   );
@@ -627,7 +635,7 @@ export function polarisCardSlots({
       </div>
     ) : undefined;
 
-  const common = { status, heads, identity, notice, counters };
+  const common = { status, heads, identity, notice, counters, name };
   if (!detail)
     return { ...common, notice: undefined, surface: "listing", menu: null, tag: <CdpIdentity v={v} />, outcome };
 

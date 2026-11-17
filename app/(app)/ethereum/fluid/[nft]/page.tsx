@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
 import { loadFluidPositionTail } from "@/lib/fluid/position-page-data";
+import { fluidTailPair } from "@/lib/fluid/share-card";
 import FluidPositionView from "./position-view";
 
 interface Props {
@@ -25,11 +26,15 @@ const NFT_ID = /^\d{1,20}$/;
 // segment that can describe what it fetched.
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { nft } = await params;
+  // The pair names the market, as the listing tag does; the same `cache()`
+  // read the page body makes.
+  const tail = NFT_ID.test(nft) ? await loadFluidPositionTail(nft).catch(() => null) : null;
   // This route carries its own opengraph-image.tsx, rendering this position's
   // live card — the static per-explorer PNG stays only its fallback.
   return positionMetadata({
     session: "fluid",
-    subject: `#${nft}`,
+    subject: nft,
+    market: tail?.position ? fluidTailPair(tail.position) : undefined,
     canonicalPath: `/ethereum/fluid/${nft}`,
     image: "dynamic",
   });

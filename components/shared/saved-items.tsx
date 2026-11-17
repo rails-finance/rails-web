@@ -18,6 +18,7 @@ import {
   SESSIONS_CHANGED_EVENT,
   toggleSavedLink,
   updateSavedEnded,
+  updateSavedName,
   type SavedLink,
 } from "@/lib/shared/sessions";
 
@@ -97,6 +98,17 @@ export function useSavedEndedRefresh(ended: SavedLink["ended"]) {
   }, [pathname, word]);
 }
 
+/** Bring a saved position's default name up to date as its card draws
+ *  (ui-jobs 703). It writes `name` only: a reader's rename lives in
+ *  `customName`, which `savedName` prefers, so a renamed entry keeps its name. */
+export function useSavedNameRefresh(name: string | undefined) {
+  const pathname = usePathname();
+  useEffect(() => {
+    if (name) updateSavedName(currentPageKey(), name);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, name]);
+}
+
 /** The position's noun and short ID, from the page title the position's
  *  layout writes ("Rails | Aave V3 on Base position 0xfe28…5820" gives
  *  "Position 0xfe28…5820"; lib/shared/page-metadata.ts `positionMetadata`).
@@ -112,14 +124,18 @@ function positionSubject(protocol: string | undefined): string {
 }
 
 /** C17's "Save position" row (ui-jobs 530), after the family's identity rows.
- *  The default name is the card's identity (C5) as it reads. `ended` is the
- *  card's closed tag, kept on the entry so a saved row shows it. */
+ *  The default name is the family's position name (`name`, ui-jobs 703); a
+ *  card without one falls back to its identity (C5) as it reads and the tab
+ *  title's noun and id. `ended` is the card's closed tag, kept on the entry so
+ *  a saved row shows it. */
 export function SavePositionRow({
   identityText,
+  name: familyName,
   ended,
   noun = "position",
 }: {
   identityText: () => string;
+  name?: string;
   ended?: SavedLink["ended"];
   /** The family's unit ("Save position", Compound V3's "Save account"); lower case. */
   noun?: string;
@@ -138,9 +154,11 @@ export function SavePositionRow({
       item="save-position"
       onClick={() => {
         const place = placeOf(window.location.pathname);
-        const name = [identityText(), positionSubject(protocolForPathname(window.location.pathname)?.label)]
-          .filter(Boolean)
-          .join(" · ");
+        const name =
+          familyName ??
+          [identityText(), positionSubject(protocolForPathname(window.location.pathname)?.label)]
+            .filter(Boolean)
+            .join(" · ");
         toggleSavedLink({
           kind: "position",
           key,

@@ -30,6 +30,7 @@ import {
 } from "@/lib/shared/protocols";
 import { CHAINS, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { RAILS_X_AT } from "@/lib/shared/social";
+import { shortPositionId, spacePair } from "@/lib/shared/position-name";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 
 // Canonical base URL. NEXT_PUBLIC_SITE_URL wins (set per Vercel project);
@@ -188,12 +189,11 @@ const FOUNDATION = "read from the chain, with a receipt on every number.";
 
 const isAddress = (s: string) => /^0x[a-fA-F0-9]{40}$/.test(s);
 
-/** Truncate an address-shaped subject to 6+4 with a Unicode ellipsis — the form
- *  the 13 asset-catalog `shortAddress` copies produce, so a tab matches the page
- *  body it names. Non-address subjects (numeric ids, "#1234", "0x… #0") pass
- *  through untouched. Exported so a dynamic share card (lib/share/) states the
- *  same shortened subject the tab title does, off the same rule rather than a
- *  second copy of it. */
+/** Truncate an address-shaped subject to 6+4 with a Unicode ellipsis; anything
+ *  else passes through. The share cards (lib/share/) and wallet titles use it;
+ *  a position's tab title goes through `shortPositionId`
+ *  (lib/shared/position-name.ts), which writes an address the same way and also
+ *  cuts a long numeric id. */
 export function shortSubject(s: string): string {
   return isAddress(s) ? `${s.slice(0, 6)}…${s.slice(-4)}` : s;
 }
@@ -220,7 +220,9 @@ export function positionMetadata(opts: {
   // words ("Aave V3 on Base Position 0x…"); Ethereum stays unsaid.
   const label = entry ? explorerName(entry) : "Rails";
   const noun = POSITION_NOUN[opts.session];
-  const title = [label, opts.market, noun.toLowerCase(), shortSubject(opts.subject)].filter(Boolean).join(" ");
+  const title = [label, opts.market && spacePair(opts.market), noun.toLowerCase(), shortPositionId(opts.subject)]
+    .filter(Boolean)
+    .join(" ");
   // The description leads with Rails for the same reason the title carries
   // the prefix: a preview that shows only title + description must say whose
   // page this is, and "every event of this Moonwell position…" on its own
@@ -343,7 +345,9 @@ export function eventMetadata(opts: {
   const entry = protocolForSession(opts.session);
   const label = entry ? explorerName(entry) : "Rails";
   const noun = POSITION_NOUN[opts.session];
-  const base = [label, opts.market, noun.toLowerCase(), shortSubject(opts.subject)].filter(Boolean).join(" ");
+  const base = [label, opts.market && spacePair(opts.market), noun.toLowerCase(), shortPositionId(opts.subject)]
+    .filter(Boolean)
+    .join(" ");
   const title = opts.event ? `${base} · ${opts.event.actionLabel}` : base;
   const description = opts.description
     ? opts.description

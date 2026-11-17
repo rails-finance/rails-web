@@ -19,6 +19,8 @@
 //    the holder shown is the holder now, and after the claim the page names
 //    who claimed rather than a holder.
 
+import { positionName } from "@/lib/shared/position-name";
+import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useMountedNow } from "@/hooks/useMountedNow";
@@ -35,7 +37,7 @@ import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { useWalletContext } from "@/components/nav/wallet-context";
 import { isTransmuterEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
-import { alchemixPositionName } from "@/lib/alchemix/naming";
+import { alchemixMarketWord } from "@/lib/alchemix/naming";
 import { alchemixExplorer } from "@/lib/alchemix/explorer";
 import { linesForChain, transmuterPositionPath, type AlchemixDeployment } from "@/lib/alchemix/lines";
 import type { AlchemixCoords } from "@/lib/alchemix/event-provenance";
@@ -177,7 +179,12 @@ export function TransmuterPositionView({
     [p, stakeCoords, claimCoords],
   );
 
-  const name = alchemixPositionName(p.syntheticSymbol, p.nftId, "transmuter");
+  // The position's name (ui-jobs 703): the synthetic's Transmuter and the NFT id.
+  const name = positionName({
+    market: alchemixMarketWord(p.syntheticSymbol, "transmuter"),
+    noun: POSITION_NOUN.alchemix,
+    id: p.nftId,
+  });
 
   // The card's slots (rails-ops TO-DO-position-card 322, 323): Deposited and
   // Matures at as the heads; the panel while outstanding, the outcome once
@@ -262,7 +269,8 @@ export function TransmuterPositionView({
   const common = {
     surface: "detail" as const,
     status: transmuterStatus(p),
-    identity: <AlchemixIdentity name={name} chain={p.chainName ?? `chain ${p.chainId}`} />,
+    identity: <AlchemixIdentity name={name.text} chain={p.chainName ?? `chain ${p.chainId}`} />,
+    name,
     heads: transmuterHeads(p, maturity, provs),
     counters: null,
     explainer: { body: explanation, viewHref: tl.viewHref },
@@ -270,7 +278,7 @@ export function TransmuterPositionView({
     menu: {
       leading: () => (
         <AlchemixMenuRows
-          idTitle={`Position #${p.nftId}`}
+          idTitle={`${name.noun} ${name.id}`}
           idValue={p.nftId}
           idSubtitle="Copy the position ID"
           outside={

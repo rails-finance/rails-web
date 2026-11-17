@@ -6,6 +6,7 @@
 import { useState } from "react";
 import { Hash, Image as ImageIcon, Link2 } from "lucide-react";
 import { Icon } from "@/components/icons/icon";
+import { shortPositionId } from "@/lib/shared/position-name";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
 
 export function FxMenuRows({
@@ -31,7 +32,7 @@ export function FxMenuRows({
     <>
       <ToolsMenuItem
         icon={copied === "id" ? <Icon name="check" size={16} /> : <Hash size={16} />}
-        title={`Position #${positionId}`}
+        title={`Position ${shortPositionId(positionId)}`}
         subtitle={copied === "id" ? "Copied" : "Copy the position ID"}
         onClick={() => copy("id", positionId)}
       />

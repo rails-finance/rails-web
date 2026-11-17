@@ -4,7 +4,7 @@ import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
-import { parseFxPositionSlug } from "@/lib/fx/asset-catalog";
+import { FX_POOLS, parseFxPositionSlug } from "@/lib/fx/asset-catalog";
 import { loadFxPositionTail } from "@/lib/fx/position-page-data";
 import FxPositionView from "./position-view";
 
@@ -22,11 +22,13 @@ export const dynamic = "force-dynamic";
 // helper passes non-address subjects through untouched.
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { position } = await params;
+  const parsed = parseFxPositionSlug(position ?? "");
   // This route carries its own opengraph-image.tsx, rendering this position's
   // live card — the static per-explorer PNG stays only its fallback.
   return positionMetadata({
     session: "fx",
-    subject: position,
+    subject: parsed?.positionId ?? position,
+    market: parsed ? FX_POOLS[parsed.pool].tokenSymbol : undefined,
     canonicalPath: `/ethereum/fx/${position}`,
     image: "dynamic",
   });

@@ -19,6 +19,8 @@
 // at the oracle in the loan token, and Debt, already in the loan token,
 // carries no line.
 
+import { positionName } from "@/lib/shared/position-name";
+import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { serverReadOf } from "@/lib/shared/server-head-read";
 import { ListingTag } from "@/components/shared/listing-tag";
 import { useState, type ReactNode } from "react";
@@ -647,7 +649,9 @@ export function useMorphoCardSlots({
     h.labelTip || !(h.label === CARD_VOCAB.collateral || h.label === CARD_VOCAB.debt)
       ? h
       : { ...h, labelTip: h.id === "debt" ? HEAD_TIP.debt : HEAD_TIP.collateral };
-  const common = { status, heads: detail ? heads.map(tipped) : heads, identity, counters, outcome };
+  // The position's name (ui-jobs 703): the market pair and the owner.
+  const name = positionName({ market: v.marketLabel, noun: POSITION_NOUN[session], id: v.owner });
+  const common = { status, heads: detail ? heads.map(tipped) : heads, identity, counters, outcome, name };
   if (!detail) return { ...common, surface: "listing", menu: null, tag: morphoCardTag(marketPair) };
 
   const menu: PositionCardMenu = {

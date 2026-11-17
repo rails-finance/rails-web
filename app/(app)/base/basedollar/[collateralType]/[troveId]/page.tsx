@@ -5,7 +5,6 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
 import { servedFoldersFromParam } from "@/lib/shared/timeline-folder";
-import { shortId } from "@/lib/basedollar/asset-catalog";
 import { loadBasedollarTroveTail } from "@/lib/basedollar/trove-page-data";
 import BasedollarTroveDetail from "./trove-view";
 
@@ -23,8 +22,8 @@ export const dynamic = "force-dynamic";
 
 // Moved down from the layout: the page is the segment that fetches, so it is the
 // segment that can describe what it fetched. Output is unchanged.
-// The troveId is a full uint256 — pre-truncate with the protocol's own shortId
-// (the same form the card uses); the collateral branch names the market segment.
+// The trove id goes through the shared shortener (lib/shared/position-name.ts);
+// the collateral branch names the market segment.
 export async function generateMetadata({
   params,
 }: {
@@ -33,7 +32,7 @@ export async function generateMetadata({
   const { collateralType, troveId } = await params;
   return positionMetadata({
     session: "basedollar",
-    subject: shortId(troveId),
+    subject: troveId,
     market: collateralType,
     canonicalPath: `/base/basedollar/${collateralType}/${troveId}`,
     // This route carries its own opengraph-image.tsx, rendering this trove's

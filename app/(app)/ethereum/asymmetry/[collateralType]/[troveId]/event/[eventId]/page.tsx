@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { servedFoldersFromParam } from "@/lib/shared/timeline-folder";
 import { liquityForkEventHeading, liquityForkEventPageDescription } from "@/lib/liquity-fork/explorer";
-import { shortId } from "@/lib/asymmetry/asset-catalog";
 import { loadAsymmetryTroveTail } from "@/lib/asymmetry/trove-page-data";
 import AsymmetryTrovePage from "../../page";
 
@@ -34,7 +33,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const event = tail.events?.find((e) => e.id === decoded) ?? null;
   return eventMetadata({
     session: "asymmetry",
-    subject: shortId(troveId),
+    subject: troveId,
     // Matches the page's own `generateMetadata` exactly — the branch symbol
     // alone, not paired with the debt symbol.
     market: collateralType,

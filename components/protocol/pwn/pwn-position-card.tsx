@@ -13,6 +13,9 @@
 // captured on-chain. There is no health factor, no USD, no liquidation price — a
 // fixed-term loan has none; they'd be interpreted figures, absent from this baseline.
 
+import { POSITION_NOUN } from "@/lib/shared/protocols";
+import { PositionNameId } from "@/components/shared/position-name-id";
+import { positionName } from "@/lib/shared/position-name";
 import type { ReactNode } from "react";
 import {
   PositionCard,
@@ -516,11 +519,15 @@ export function pwnCardSlots({
   // listing the whole card is already a <Link>, so it keeps compact text (a
   // nested anchor is invalid HTML) with the standalone star, after the loan's
   // number.
+  // The loan's name (ui-jobs 703). POSITION_NOUN's "Loans" names the page's
+  // list; one loan is a "Loan".
+  const name = positionName({ noun: POSITION_NOUN.pwn.replace(/s$/, ""), id: v.loanId });
   const showLender = v.lender != null && !(side === "lender");
   const showBorrower = v.borrower != null && !(side === "borrower");
   const identity = detail ? (
     v.lender || v.borrower ? (
       <span className="flex flex-wrap items-center gap-1.5 text-xs text-rb-500">
+        <PositionNameId name={name} />
         {showLender && v.lender && (
           <>
             {role("Lender")}
@@ -559,10 +566,12 @@ export function pwnCardSlots({
           </span>
         )}
       </span>
-    ) : undefined
+    ) : (
+      <PositionNameId name={name} />
+    )
   ) : (
     <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-rb-500 tabular-nums">
-      <span className="font-semibold">Loan #{v.loanId}</span>
+      <span className="font-semibold">{name.text}</span>
       <span className="text-foreground/80">{parties}</span>
       {favWallet && <BookmarkToggle wallet={favWallet} ensName={null} />}
     </span>
@@ -580,7 +589,7 @@ export function pwnCardSlots({
     <AssetValue asset={v.collateral} prov={positionCollateralProv(v.collateral.symbol, v.version)} />
   ) : null;
 
-  const common = { identity, counters: loanCounters(v, detail) };
+  const common = { identity, counters: loanCounters(v, detail), name };
   const menu = {
     leading: () => (
       <PwnMenuRows

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
-import { normalizeAccountNumber } from "@/lib/dolomite/asset-catalog";
+import { accountNumberId, normalizeAccountNumber } from "@/lib/dolomite/asset-catalog";
 import { loadDolomitePositionTail } from "@/lib/dolomite/position-page-data";
 import { dolomiteEventHeading, dolomiteEventPageDescription } from "@/lib/dolomite/explorer";
 import DolomitePositionPage from "../../page";
@@ -23,8 +23,6 @@ const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { owner: rawOwner, accountNumber: rawAccount, eventId } = await params;
-  const shortOwner = ADDRESS.test(rawOwner) ? `${rawOwner.slice(0, 6)}…${rawOwner.slice(-4)}` : rawOwner;
-  const acct = rawAccount.length > 12 ? `${rawAccount.slice(0, 8)}…` : rawAccount;
   const decoded = decodeEventId(eventId);
   const accountNumber = normalizeAccountNumber(rawAccount);
   const owner = rawOwner.toLowerCase();
@@ -33,7 +31,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const event = tail?.events?.find((e) => e.id === decoded) ?? null;
   return eventMetadata({
     session: "dolomite",
-    subject: `${shortOwner} #${acct}`,
+    subject: accountNumberId(rawAccount),
     canonicalPath: `/ethereum/dolomite/${rawOwner}/${rawAccount}/event/${encodeURIComponent(decoded)}`,
     event: event ? { actionLabel: dolomiteEventHeading(event), timestamp: event.timestamp } : null,
     description: event ? dolomiteEventPageDescription(owner, accountNumber ?? rawAccount, event.timestamp) : undefined,
