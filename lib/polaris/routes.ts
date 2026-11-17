@@ -3,11 +3,24 @@
 // it because the grain is (market, cdpId) — the same id exists in both
 // markets, so a bare id names nothing.
 
-import { POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
+import { POLARIS_CORE, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
 import { explorerUrl, SEPOLIA_CHAIN_ID } from "@/lib/shared/chains";
 
 export const POLARIS_BASE_PATH = "/sepolia/polaris";
 export const POLARIS_MARKETS_PATH = `${POLARIS_BASE_PATH}/markets`;
+/** The two sub-pages beside the CDPs: the stability-pool deposits and the
+ *  reserve loans (the roster's `subPages`). A deposit is (market, token id),
+ *  as a CDP is; a loan's id is the loan NFT's, one series for the deployment. */
+export const POLARIS_SP_PATH = `${POLARIS_BASE_PATH}/stability-pool`;
+export const POLARIS_LOANS_PATH = `${POLARIS_BASE_PATH}/reserve-loans`;
+
+export function polarisDepositHref(market: PolarisMarket, tokenId: string): string {
+  return `${POLARIS_SP_PATH}/${market}/${tokenId}`;
+}
+
+export function polarisLoanHref(loanId: string): string {
+  return `${POLARIS_LOANS_PATH}/${loanId}`;
+}
 
 export function polarisPositionHref(market: PolarisMarket, cdpId: string): string {
   return `${POLARIS_BASE_PATH}/${market}/${cdpId}`;
@@ -31,4 +44,14 @@ export function polarisPositionHref(market: PolarisMarket, cdpId: string): strin
  */
 export function polarisCdpNftUrl(market: PolarisMarket, cdpId: string): string {
   return `${explorerUrl(SEPOLIA_CHAIN_ID, "token", POLARIS_MARKET_CONFIG[market].cdpNft)}?a=${cdpId}`;
+}
+
+/** The same page for a deposit NFT: the stability pool is its ERC-721. */
+export function polarisDepositNftUrl(market: PolarisMarket, tokenId: string): string {
+  return `${explorerUrl(SEPOLIA_CHAIN_ID, "token", POLARIS_MARKET_CONFIG[market].stabilityPool)}?a=${tokenId}`;
+}
+
+/** And for a loan NFT. */
+export function polarisLoanNftUrl(loanId: string): string {
+  return `${explorerUrl(SEPOLIA_CHAIN_ID, "token", POLARIS_CORE.reserveLoansNft)}?a=${loanId}`;
 }

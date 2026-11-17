@@ -29,7 +29,7 @@ import {
   liveTotalProv,
   liveUsdValueProv,
 } from "@/lib/polaris/live-provenance";
-import { POLARIS_BASE_PATH } from "@/lib/polaris/routes";
+import { POLARIS_BASE_PATH, POLARIS_LOANS_PATH, POLARIS_SP_PATH } from "@/lib/polaris/routes";
 import { bookCountProv, openBookProv } from "@/lib/polaris/book-provenance";
 import { POLARIS_MARKET_CONFIG, POLARIS_MARKETS, type PolarisMarket } from "@/lib/polaris/asset-catalog";
 import { formatExact, formatUsdValue } from "@/lib/utils/format";
@@ -45,7 +45,7 @@ import type { PolarisBook } from "@/lib/sources/api/polaris-book";
 import type { PolarisMarketBook } from "@/lib/sources/api/polaris-positions";
 import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
-import { FOOT_LINK } from "@/lib/shared/ui-grammar";
+import { FOOT_LINK, INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
 import { polarisMarketKeys } from "@/lib/polaris/focus-keys";
 
@@ -349,9 +349,15 @@ export function PolarisMarketsView({ chain, book }: { chain: PolarisMarketsChain
           medianiser takes the median of the oracles it reads. The rate is a primary rate, which moves with the
           PSM&rsquo;s mints and redemptions, plus a secondary rate that rises with the market&rsquo;s debt-to-reserve
           ratio. A market whose reserve-to-debt ratio falls below 1.10 enters defensive mode and its minimum rises to
-          150%. The stability pool is what absorbs a liquidation&rsquo;s debt. Reserve loans, which lend ETH against
-          fpETH, are captured by the index but not shown here. fpETH is the floor part of pETH: the component whose
-          price in ETH the protocol guarantees can only rise, which is why a loan against it cannot be liquidated.
+          150%. The stability pool is what absorbs a liquidation&rsquo;s debt; each deposit in it is listed under{" "}
+          <Link href={POLARIS_SP_PATH} className={INLINE_LINK}>
+            Stability Pool
+          </Link>
+          . Reserve loans lend WETH against fpETH and are listed under{" "}
+          <Link href={POLARIS_LOANS_PATH} className={INLINE_LINK}>
+            Reserve loans
+          </Link>
+          . fpETH is the floor part of pETH. Its price in WETH only rises, so a loan against it cannot be liquidated.
         </p>
       </section>
       <ProvenanceInfoTabs className="mt-6" />

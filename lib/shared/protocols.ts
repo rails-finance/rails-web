@@ -952,7 +952,11 @@ const SPECS: ProtocolSpec[] = [
     // POLARIS_TESTNET_CLOSED; ui-jobs 621).
     desc: "Polaris on the Sepolia testnet, closed on 16 Nov 2026: USDp and GOLDp minted against pETH, every position from the market's events, liquidations absorbed by stability pools",
     lifecycle: POLARIS_TESTNET_CLOSED,
-    subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
+    subPages: [
+      { segment: "markets", label: "Markets overview", tab: "Markets" },
+      { segment: "stability-pool", label: "Stability Pool deposits", tab: "Stability Pool" },
+      { segment: "reserve-loans", label: "Reserve loans", tab: "Reserve loans" },
+    ],
   },
   {
     id: "pwn",
