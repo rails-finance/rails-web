@@ -9,7 +9,7 @@ const tools = readFileSync(new URL("../../components/shared/tools-menu.tsx", imp
 const positions = readFileSync(new URL("../../components/shared/wallet-positions-menu.tsx", import.meta.url), "utf8");
 
 test("moveFocus leaves out disabled and aria-disabled rows", () => {
-  const body = tools.slice(tools.indexOf("export function moveFocus"), tools.indexOf("export function ToolsMenu"));
+  const body = tools.slice(tools.indexOf("export function moveFocus"), tools.indexOf("export function ToolsMenu("));
   const selector = body.match(/querySelectorAll<HTMLElement>\(\s*'([^']+)'/)?.[1];
   assert.ok(selector, "selector found");
   for (const role of ["menuitem", "menuitemcheckbox"]) {
