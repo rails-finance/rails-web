@@ -14,7 +14,8 @@ export interface WalletCountsPosition {
   chain: WalletCountsChain;
   family: string;
   positionId: string;
-  status: "open" | "closed" | "liquidated" | "redeemed";
+  /** `moved`: a position the wallet held and passed on (ui-jobs 705). */
+  status: "open" | "closed" | "liquidated" | "redeemed" | "moved";
   href: string;
 }
 
@@ -23,7 +24,7 @@ export interface WalletCountsFamily {
   family: string;
   positions: number;
   open: number;
-  /** Closed, liquidated or redeemed. */
+  /** Closed, liquidated, redeemed or moved on. */
   closed: number;
 }
 

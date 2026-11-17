@@ -364,6 +364,26 @@ export const liquityV2: FamilyModule = {
         headRead: "none",
         ...storeStamp(r),
       };
+      // A Trove this wallet held and passed on: a History row ending on the
+      // day it moved, whatever the Trove's status under its new holder.
+      const moved = t.formerHold;
+      if (moved) {
+        const peaks = [
+          t.collateral.peakAmount > 0 ? amountText(t.collateral.peakAmount, t.collateral.symbol) : null,
+          t.debt.peak > 0 ? amountText(t.debt.peak, t.assetType) : null,
+        ].filter(Boolean);
+        return {
+          ...base,
+          status: "moved",
+          history: {
+            openedAt: opt(r.openedAt),
+            closedAt: moved.movedAt,
+            size: peaks.length ? peaks.join(" / ") : undefined,
+            sizeNote: peaks.length ? "highest recorded" : undefined,
+            movedTo: moved.movedTo,
+          },
+        };
+      }
       if (r.status === "open") return base;
       const parts = [
         t.collateral.peakAmount > 0 ? amountText(t.collateral.peakAmount, t.collateral.symbol) : null,

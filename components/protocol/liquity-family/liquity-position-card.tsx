@@ -713,6 +713,7 @@ export function useLiquityCardSlots({
       owner={v.owner}
       lastOwner={v.lastOwner}
       ownerEns={ownerEns}
+      formerHold={v.formerHold ?? null}
       shortId={ops.shortId}
       inert
     />

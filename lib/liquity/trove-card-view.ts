@@ -49,6 +49,7 @@ export function viewFromTroveSummary(t: TroveSummary, prices?: OraclePricesData 
     redemptionCount: t.activity.redemptionCount,
     owner: t.owner,
     lastOwner: t.lastOwner,
+    formerHold: t.formerHold ? { movedTo: t.formerHold.movedTo, movedAt: t.formerHold.movedAt } : null,
     ownerEns: t.ownerEns,
     nftUrl: getTroveNftUrl(t.collateralType, t.id),
     priceUsd: price,
