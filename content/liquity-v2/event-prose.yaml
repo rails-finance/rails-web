@@ -66,6 +66,8 @@ roundings:
     the delegate's name and short address (ARM (0xe507…b60a)), linked to the explorer
   address: |-
     a short address (0xf060…45f8), linked to the explorer
+  wallet: |-
+    a position holder's address, shortened and linked to the holder's wallet in Rails
   text: |-
     a word or name as given
 
@@ -376,11 +378,11 @@ placeholders:
     means: |-
       this event's place among them (1 of 2)
   from_address:
-    rounding: address
+    rounding: wallet
     means: |-
       the NFT's previous holder
   to_address:
-    rounding: address
+    rounding: wallet
     means: |-
       the NFT's new holder
   operation:
