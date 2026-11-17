@@ -660,7 +660,7 @@ export function LifetimeFlowsScrubber({
   }, [reportLife, life]);
   const priceBasis =
     priceUnit != null
-      ? `Price: each held asset's price in ${priceUnit}, a point per day at the last price recorded that day, dotted where a day has none and the price before it is carried.`
+      ? `Price: in ${priceUnit}, each day's last price; dotted where an earlier day's is carried`
       : undefined;
   const totals = useMemo(
     () => (bars && model ? flowsTotals(bars, from > 0 ? dayStamp(dayStart(bars, 0)) : null) : null),
