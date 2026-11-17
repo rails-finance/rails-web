@@ -84,7 +84,7 @@ export function polarisFlowsContent(stable: string): LearnMoreContent {
     stepsHeading: "How it's built:",
     steps: [
       "Collateral = deposited + reward pETH + PSM shares added − withdrawn − PSM shares taken − liquidated, plus Market move.",
-      "Debt = borrowed + interest + PSM shares added − repaid − stability gains − PSM shares cleared − liquidated; where that falls below zero, Minted to the holder brings it to zero.",
+      "Debt = borrowed + interest + PSM shares added − repaid − stability gains − PSM shares cleared − liquidated; where that falls below zero, the stables minted to the holder bring it to zero.",
     ],
     detailsHeading: "Key concepts:",
     details: [

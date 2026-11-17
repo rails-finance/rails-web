@@ -297,9 +297,7 @@ function againstHoldingSection(
     );
   out.push(
     `- **Borrowed / repaid:** ${amt(r.borrowed)} / ${amt(r.repaid)} ${stable}`,
-    ...(r.settled > 0
-      ? [`- **Settled to the holder:** ${amt(r.settled)} ${stable} minted to the holder where a debt went below zero`]
-      : []),
+    ...(r.settled > 0 ? [`- **Minted to the holder:** ${amt(r.settled)} ${stable}, where a debt went below zero`] : []),
     `- **Debt now:** ${amt(r.debtNow)} ${stable}${r.closed ? " (closed)" : ` (getCDPEntireDebt at block ${r.feed.block}${r.debtNow < 0 ? ", below zero: the next touch mints it to the holder" : ""})`}`,
     `- **Feed:** ${amt(r.feed.pethInDebt)} ${stable} per pETH (previewPrice() at block ${r.feed.block})`,
     `- **Terms:** ${sAmt(r.collTerm)} pETH on the collateral side, ${sAmt(r.debtTerm)} ${stable} on the debt side (${sAmt(r.debtTermPeth)} pETH at the feed)`,
