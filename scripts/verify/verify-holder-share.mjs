@@ -478,7 +478,7 @@ if (!check("D1. the card-model probe runs", Boolean(probeLine), probeLine ? "" :
     `"${got.v2?.headline}" / "${got.v2?.status}" vs restated "${vStatus}"`,
   );
   check(
-    "E2. Liquity V2: Total debt is the restated Σ BOLD over the open troves, wearing the ≈ (last-change figures)",
+    "E2. Liquity V2: Total debt is the restated Σ BOLD over the open troves, wearing the ≈ (last-touch figures)",
     stat(got.v2, "Total debt")?.value === `≈ ${fmtNum(vDebt)} BOLD`,
     `"${stat(got.v2, "Total debt")?.value}" vs restated "${fmtNum(vDebt)} BOLD"`,
   );

@@ -623,7 +623,7 @@ if (!probeLine) {
   // Restated from the stub: 100 × 2000 + 50 × 2200 = $310,000; debt 150,000
   // BOLD.
   check(
-    "G2a. Liquity V2: the debt leg is the BOLD sum, marked ≈ with a last-change tip, on a chain receipt",
+    "G2a. Liquity V2: the debt leg is the BOLD sum, marked ≈ with a last-touch tip, on a chain receipt",
     leg(got.v2, "debt").value === "150,000 BOLD" &&
       leg(got.v2, "debt").approx === true &&
       /last touch/.test(leg(got.v2, "debt").tip ?? "") &&

@@ -15,7 +15,7 @@
 //
 // EVERY LEG WEARS THE ≈ (ui-jobs 690). The rows are each trove's figures as of
 // its last touch: interest accrues on the debt, and redistributions from
-// liquidated troves move collateral and debt onto it, between changes, so a sum
+// liquidated troves move collateral and debt onto it, between touches, so a sum
 // of them is an estimate even in one token.
 //
 // A ZOMBIE TROVE IS AN OPEN ONE — redeemed below the minimum debt, still on
@@ -54,7 +54,7 @@ function holderDebtProv(): Provenance {
       text: "Add the entire debt of each open trove the wallet holds — every one of them is on the page under this strip.",
     },
     summary:
-      "All the BOLD the wallet's open troves owe — the sum of each trove's entire debt (recorded principal plus the interest accrued to its last indexed state), from the index. Every branch borrows the same token, so the sum is a quantity of it. The interest and redistributed debt built up since each trove's last indexed state are not in it.",
+      "All the BOLD the wallet's open troves owe — the sum of each trove's entire debt (recorded principal plus the interest accrued to its last touch), from the index. Every branch borrows the same token, so the sum is a quantity of it. The interest and redistributed debt built up since each trove's last touch are not in it.",
     via: "GET /api/troves?ownerAddress=… · Σ entire debt over the open rows",
     formula: "Σ debt over the wallet's open troves",
     inputs: [
@@ -72,7 +72,7 @@ function holderCollValueProv(branches: string[]): Provenance {
       kind: "recompute",
       text: "Re-run each branch's PriceFeed at the stamped block and multiply the wallet's collateral on that branch by its own price.",
     },
-    summary: `What the wallet's open troves hold as collateral, in USD — each branch's collateral (${branches.join(", ")}) at that branch's own on-chain PriceFeed, read once when the listing loaded. An estimate for two reasons: the branches hold different tokens and a sum of them exists only at a price, and each price is one oracle read that moves every block. It is a valuation at that moment, never an amount of anything. Redistribution gains since each trove's last touch are not in it.`,
+    summary: `What the wallet's open troves hold as collateral, in USD — each branch's collateral (${branches.join(", ")}) at that branch's on-chain PriceFeed, read once when the listing loaded. An estimate for two reasons: the branches hold different tokens and a sum of them exists only at a price, and each price is one oracle read that moves every block. Redistribution gains since each trove's last touch are not in it.`,
     via: "GET /api/oracle/liquity-v2 · Σ branch collateral × the branch's own price",
     formula: "Σ collateral × the branch's price",
     inputs: [

@@ -612,7 +612,7 @@ export function holderDebtValueProv(): Provenance {
       text: "Add the last emitted debt of each open position the wallet holds, market by market; take USDp at one dollar and GOLDp at the XAU/USD medianiser's price at the stamped block.",
     },
     summary:
-      "What the wallet's open positions owe, in dollars — each position's last emitted debt in its own market's unit, USDp at one dollar and GOLDp at the gold price the protocol's own feed stated at the latest read. An estimate for two reasons: the two markets' debts are different tokens and a sum of them exists only at a price, and interest since each position's last touch and any pending PSM share settle at the next touch rather than here. A Sepolia testnet figure — a test dollar, not a real one.",
+      "What the wallet's open positions owe, in dollars — each position's last emitted debt in its own market's unit, USDp at one dollar and GOLDp at the gold price the protocol's feed stated at the latest read. An estimate for two reasons: the two markets' debts are different tokens and a sum of them exists only at a price, and interest since each position's last touch and any pending PSM share settle at the next touch rather than here. A Sepolia testnet figure — a test dollar, not a real one.",
     contract: { name: "Polaris XAU/USD Medianiser", address: POLARIS_CORE.xauUsdMedianiser },
     via: `${BOARD_VIA} · Σ last emitted debt × the market's own unit price @ head`,
     formula: "Σ debt × the market's unit in USD",

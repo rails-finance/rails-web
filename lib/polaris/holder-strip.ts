@@ -12,7 +12,7 @@
 // gold — in the other, so a wallet borrowing in both has no debt figure that
 // isn't a valuation: that headline is stated in dollars, with the two legs
 // named beneath. A wallet borrowing in one market only gets its debt in that
-// market's own token.
+// market's token.
 //
 // EVERY LEG WEARS THE ≈ (ui-jobs 690). The rows are each CDP's last emitted
 // figures: reward pETH and PSM shares move the collateral, and interest,
@@ -140,7 +140,7 @@ export function polarisHolderStrip(
     if (r.debt > 0) debtByMarket.set(r.market, (debtByMarket.get(r.market) ?? 0) + r.debt);
   }
   if (debtByMarket.size === 1) {
-    // One market: the sum is a quantity of that market's own token, as of
+    // One market: the sum is a quantity of that market's token, as of
     // each position's last touch.
     const [market, amount] = [...debtByMarket][0];
     legs.push({
