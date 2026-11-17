@@ -1412,10 +1412,10 @@ if (t6.coverage.logCountIsLowerBound === false) {
     `withheldAbove ${t6.coverage.withheldAbove}, reconcile ${JSON.stringify(t6.reconcile)}, ${t6.events.length} rows`,
   );
   check(
-    "T6b the page states that count without 'at least', draws no rows, and says the balance check ran and agreed",
+    "T6b the page states that count without 'at least', draws no rows, and says the count is exact",
     !/at least/.test(p6.horizonText) &&
       p6.horizonText.includes(n(t6.coverage.withheldAbove)) &&
-      /balance check ran and agreed/.test(p6.horizonText) &&
+      /The count is exact/.test(p6.horizonText) &&
       p6.paintedEvents === 0 &&
       !p6.towerPresent,
     `"${p6.horizonText.replace(/\s+/g, " ").slice(0, 170)}"`,
@@ -1430,7 +1430,7 @@ if (t6.coverage.logCountIsLowerBound === false) {
     "T6b the page says 'at least' that count and states NO count as a fact",
     /at least/.test(p6.horizonText) &&
       p6.horizonText.includes(n(t6.coverage.withheldAbove)) &&
-      /The count is a floor/.test(p6.horizonText) &&
+      /above the 5,000 rows a page can draw/.test(p6.horizonText) &&
       p6.paintedEvents === 0 &&
       !p6.towerPresent &&
       !p6.reconciledText,

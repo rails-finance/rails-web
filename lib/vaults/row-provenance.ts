@@ -18,6 +18,9 @@ const chainWord = (v: VaultSummary) => (v.chainId === 8453 ? "Base" : "Ethereum"
  *  Yearn V3 vault the vault's address. */
 const leftOut = (v: VaultSummary) =>
   v.family === "yearn-v3" ? "the zero address and the vault's address" : "the zero address";
+/** On a Yearn V3 vault the census's sum check counts the vault's locked profit
+ *  shares, which it leaves out of Holders. */
+const locked = (v: VaultSummary) => (v.family === "yearn-v3" ? ", with the vault's locked shares," : "");
 
 type Measured = Extract<VaultYield, { yearly: number }>;
 
@@ -62,7 +65,7 @@ export const vaultHoldersProv = (v: VaultSummary, c: NonNullable<VaultSummary["c
     kind: "recompute",
     text: `To check: ask any ${chainWord(v)} archive node for this vault's Transfer logs from its creation to block ${n(c.atBlock)} and count the distinct addresses that sent or received shares, other than ${leftOut(v)} (0x…dEaD counts): the count matches the ${n(c.holders)} that have held a share.`,
   },
-  summary: `Holders — ${n(c.holders)} address${c.holders === 1 ? " has" : "es have"} held a share of this vault, ${n(c.live)} holding one at census block ${n(c.atBlock)}: every address that sent or received shares, other than ${leftOut(v)}. A floor: an address is often a wrapper or a contract holding for others. ${c.sumMatches ? "The balances of all these addresses added up to the shares issued at that block, so the set is whole." : "The balances of all these addresses did not add up to the shares issued at that block, so the set is not stated as whole."}`,
+  summary: `Holders — ${n(c.holders)} address${c.holders === 1 ? " has" : "es have"} held a share of this vault, ${n(c.live)} holding one at census block ${n(c.atBlock)}: every address that sent or received shares, other than ${leftOut(v)}. A floor: an address is often a wrapper or a contract holding for others. ${c.sumMatches ? `The balances of all these addresses${locked(v)} added up to the shares issued at that block, so the set is whole.` : `The balances of all these addresses${locked(v)} did not add up to the shares issued at that block, so the set is not stated as whole.`}`,
   contract: { name: v.name ?? v.catalogName ?? v.symbol ?? "vault", address: v.address },
   via: "vault census · Transfer logs + balanceOf(holder) @ the census block",
 });

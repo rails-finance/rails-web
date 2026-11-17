@@ -44,12 +44,7 @@ import { useMemo } from "react";
 import { useParams } from "next/navigation";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { Prov } from "@/components/shared/provenance";
-import {
-  refetchWords,
-  withheldBoundWords,
-  withheldCountWords,
-  withheldReasonWords,
-} from "@/lib/shared/vault-withheld-words";
+import { refetchWords, withheldCountWords, withheldPaneWords } from "@/lib/shared/vault-withheld-words";
 import { shareText } from "@/components/protocol/morpho-base/vault-exposure-parts";
 import { VaultTimelineRow, rawAmount as raw, type VaultTimelineProvKit } from "@/components/vaults/vault-timeline-row";
 import { vaultExplorer } from "@/lib/vaults/explorer";
@@ -144,7 +139,7 @@ export function YearnVaultTimeline({ timeline, vaultName, shareSymbol, assetSymb
   return (
     <section className="mb-6" data-skel-section="vault-timeline" data-vault-timeline={timeline.holder}>
       {!onEventPage && (
-        <h2 className="text-sm font-semibold text-foreground">This address&rsquo;s own events in the vault</h2>
+        <h2 className="text-sm font-semibold text-foreground">This address&rsquo;s events in the vault</h2>
       )}
 
       {timeline.unread ? (
@@ -160,8 +155,7 @@ export function YearnVaultTimeline({ timeline, vaultName, shareSymbol, assetSymb
           <Prov info={yearnVaultTimelineHorizonProv(coords, withheld, YEARN_VAULT_TIMELINE_CEILING, basis)}>
             This address has {withheldCountWords(basis, withheld)} share transfers on this vault
           </Prov>
-          {withheldBoundWords(basis, withheld, YEARN_VAULT_TIMELINE_CEILING)}{" "}
-          {withheldReasonWords(basis, "the vault's creation block")} The newest rows are not shown in place of the rest.
+          {withheldPaneWords(basis, withheld, YEARN_VAULT_TIMELINE_CEILING)}
         </p>
       ) : !reconcile ? null : !reconcile.reconciled ? (
         <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-figure="timeline-unreconciled">

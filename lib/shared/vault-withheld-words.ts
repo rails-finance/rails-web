@@ -41,3 +41,14 @@ export const refetchWords = (differed: boolean): string =>
       ? "the second answer held a different number of logs from the first, so the node answered one question two ways"
       : "no second answer came back with a different number of logs"
   }.`;
+
+/** The pane's shorter line after "This address has N share transfers on this
+ *  vault": the bound and what follows for the rows, without the receipt's
+ *  account of the query and the recount. On a floor the count passed
+ *  `VAULT_TIMELINE_HORIZON`, so the bound is that. */
+export const withheldPaneWords = (basis: VaultWithheldBasis, count: number, ceiling: number): string =>
+  basis === "floor"
+    ? `, above the ${n(VAULT_TIMELINE_HORIZON)} rows a page can draw. No rows are drawn.`
+    : basis === "unchecked"
+      ? ". The balance check did not run, so no rows are drawn."
+      : `${withheldBoundWords(basis, count, ceiling)} The count is exact.`;

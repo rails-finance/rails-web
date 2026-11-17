@@ -10,7 +10,7 @@
 //
 // ── EACH BAND IS A PHOTOGRAPH, AND THE ROW OF THEM IS NOT A FILM ─────────────
 // The band on a row is a read at that row's own block and at no other. Between
-// two rows the curator fired reallocations — thousands of them on this vault —
+// two rows the vault was reallocated, thousands of times on this vault,
 // and this page read none of them, so nothing is drawn across the gap: no line,
 // no transition, no interpolation, and the space between two rows is the
 // timeline's ordinary vertical gap and means nothing. The page says this in
@@ -258,8 +258,8 @@ export function VaultAllocationBand({ event, coords, assetSymbol, first, withhel
             <Prov info={morphoVaultAllocationGrainProv(coords)}>
               Each band is a read at that row&rsquo;s own block, and nothing is drawn between two of them
             </Prov>
-            . The vault&rsquo;s asset moved between these blocks at the curator&rsquo;s own reallocations, which are not
-            rows here and are not read at all; the space between two rows is this timeline&rsquo;s ordinary gap and says
+            . The vault&rsquo;s asset moved between these blocks at the vault&rsquo;s reallocations, which are not rows
+            here and are not read at all; the space between two rows is this timeline&rsquo;s ordinary gap and says
             nothing. A segment is proportional and not a trace of anyone&rsquo;s money: it is this address&rsquo;s
             shares over the whole supply, applied to what the vault supplied in that market, so two addresses holding
             equal shares hold equal segments whatever either deposited or when.

@@ -110,6 +110,9 @@ test("Holders on Yearn V3 leaves out the vault's address as well", () => {
   const p = R.vaultHoldersProv(y, y.census);
   assert.match(p.verify.text, /other than the zero address and the vault's address/);
   assert.match(p.summary, /other than the zero address and the vault's address/);
+  assert.match(p.summary, /The balances of all these addresses, with the vault's locked shares, added up/);
+  const m = R.vaultHoldersProv(summary(), summary().census).summary;
+  assert.doesNotMatch(m, /locked shares/);
 });
 
 // The steward, configuration, roster and holder-card receipts (ui-jobs 683,

@@ -105,7 +105,7 @@ const vaultTotalAssetsProv_ = (c: MorphoVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("totalAssets()", c),
-  summary: `Total assets — what the vault holds${atBlock(c)}, in ${asset(c)}. MetaMorpho computes it by walking its supply queue and extrapolating each market's interest to this block's timestamp, so it stands ahead of the stored market totals the allocation table sums. Both figures are on the page, and the difference between them is stated as a number.`,
+  summary: `Total assets — what the vault holds${atBlock(c)}, in ${asset(c)}. MetaMorpho computes it by walking its withdraw queue and extrapolating each market's interest to this block's timestamp, so it stands ahead of the stored market totals the allocation table sums. Both figures are on the page, and the difference between them is stated as a number.`,
   contract: vaultContract(c),
   via: `${lane(c)} · MetaMorpho.totalAssets() @ the pinned block`,
 });
@@ -145,7 +145,7 @@ const vaultLostAssetsProv_ = (c: MorphoVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("lostAssets()", c),
-  summary: `Lost assets — the part of the vault's stated total that no market holds${atBlock(c)}, in ${asset(c)}. When a market loses asset (bad debt, or a market removed by force), a V1.1 vault does not lower its share price; it keeps total assets where they stood and records the shortfall here. So this much of total assets, and of the share price, is not backed by anything the vault holds. A V1.0 vault has no such ledger, and the figure is absent for it.`,
+  summary: `Lost assets — the part of the vault's stated total that no market holds${atBlock(c)}, in ${asset(c)}. When a market loses assets (bad debt, or a market removed by force), a V1.1 vault does not lower its share price; it keeps total assets where they stood and records the shortfall here. So this much of total assets, and of the share price, is not backed by anything the vault holds. A V1.0 vault has no such ledger, and the figure is absent for it.`,
   contract: vaultContract(c),
   via: `${lane(c)} · MetaMorpho.lostAssets() @ the pinned block`,
 });
@@ -160,7 +160,7 @@ const vaultHeldAssetsProv_ = (c: MorphoVaultCoords, r: { totalAssets: string; lo
     kind: "recompute",
     text: `To check: ask any ${chainWord(c)} archive node for the vault's totalAssets() and lostAssets()${c.blockNumber != null ? ` at block ${c.blockNumber}` : ""} and subtract the second from the first.`,
   },
-  summary: `Held — total assets minus lost assets${atBlock(c)}, in ${asset(c)}: what the vault's markets hold. Total assets and the share price include the loss; the holders who withdraw last carry it.`,
+  summary: `Held — total assets minus lost assets${atBlock(c)}, in ${asset(c)}: what the vault's markets hold. Total assets and the share price include the loss; by Morpho's docs, the last holders to withdraw carry it.`,
   contract: vaultContract(c),
   via: `${lane(c)} · MetaMorpho.totalAssets() − MetaMorpho.lostAssets() @ the pinned block`,
   formula: "totalAssets − lostAssets",
@@ -268,11 +268,12 @@ const vaultAllocatedProv_ = (c: MorphoVaultCoords): Provenance => ({
 
 /** totalAssets − Σ legs. Interest the vault has extrapolated and the markets have
  *  not yet settled, plus whatever the vault carries outside its Blue positions. */
-const vaultGapProv_ = (c: MorphoVaultCoords): Provenance => ({
+/** `lostLedger`: the vault answered `lostAssets()` (V1.1); a V1.0 vault has no such ledger. */
+const vaultGapProv_ = (c: MorphoVaultCoords, lostLedger: boolean): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
-  summary: `Unaccrued interest — total assets minus the sum of the stored Morpho Blue legs${atBlock(c)}. MetaMorpho extrapolates each market's interest to this block's timestamp, and Morpho Blue holds what each market last settled; the difference is that interest, and any asset the vault holds outside its Morpho Blue positions. On a MetaMorpho V1.1 vault it also carries the vault's lost assets, which total assets keeps and no market holds.`,
+  summary: `Unaccrued interest — total assets minus the sum of the stored Morpho Blue legs${atBlock(c)}. MetaMorpho extrapolates each market's interest to this block's timestamp, and Morpho Blue holds what each market last settled; the difference is that interest.${lostLedger ? " On this V1.1 vault it also carries the vault's lost assets, which total assets keeps and no market holds." : ""}`,
   contract: vaultContract(c),
   via: `${lane(c)} · MetaMorpho.totalAssets() − Σ legs @ the pinned block`,
   formula: "totalAssets − Σ leg assets",
@@ -347,7 +348,7 @@ const vaultDirectoryTotalAssetsProv_ = (c: MorphoVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("totalAssets()", c),
-  summary: `Total assets — what the vault holds${atBlock(c)}, in ${asset(c)}. MetaMorpho computes it by walking its supply queue and extrapolating each market's interest to this block's timestamp. The directory groups vaults by asset and compares only within a group, since a comparison across assets needs a price this page does not read. A zero means the vault holds nothing at this block.`,
+  summary: `Total assets — what the vault holds${atBlock(c)}, in ${asset(c)}. MetaMorpho computes it by walking its withdraw queue and extrapolating each market's interest to this block's timestamp. The directory groups vaults by asset and compares only within a group, since a comparison across assets needs a price this page does not read. A zero means the vault holds nothing at this block.`,
   contract: vaultContract(c),
   via: `${lane(c)} · MetaMorpho.totalAssets() @ the pinned block`,
 });

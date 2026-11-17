@@ -43,6 +43,26 @@ test("the reasons: the floor states 5,000 and what the node did, without the siz
   for (const b of BASES) assert.doesNotMatch(W.withheldReasonWords(b, "block 0"), INTERNALS, b);
 });
 
+test("the pane's short line: the bound and the rows, without the receipt's account of the query", () => {
+  assert.equal(
+    W.withheldPaneWords("floor", 5_970, 11_000),
+    ", above the 5,000 rows a page can draw. No rows are drawn.",
+  );
+  assert.equal(
+    W.withheldPaneWords("unchecked", 1_200, 11_000),
+    ". The balance check did not run, so no rows are drawn.",
+  );
+  assert.equal(
+    W.withheldPaneWords("checked", 15_000, 14_000),
+    ", above the 14,000 rows a page can draw. The count is exact.",
+  );
+  assert.match(
+    W.withheldPaneWords("checked", 6_000, 11_000),
+    /without a stored history, and none could be kept on this request\. The count is exact\.$/,
+  );
+  for (const b of BASES) assert.doesNotMatch(W.withheldPaneWords(b, 6_000, 11_000), /chunk|node|query|newest rows/, b);
+});
+
 test("the re-fetch sentence never claims a second answer that did not come back", () => {
   assert.match(W.refetchWords(true), /second answer held a different number of logs/);
   const same = W.refetchWords(false);

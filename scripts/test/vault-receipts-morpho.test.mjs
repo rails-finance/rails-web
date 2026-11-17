@@ -75,7 +75,8 @@ const receipts = (chainId) => {
     ["leg share", V.vaultLegShareProv(c)],
     ["leg LLTV", V.vaultLegLltvProv(c)],
     ["allocated", V.vaultAllocatedProv(c)],
-    ["unaccrued interest", V.vaultGapProv(c)],
+    ["unaccrued interest, V1.1", V.vaultGapProv(c, true)],
+    ["unaccrued interest, V1.0", V.vaultGapProv(c, false)],
     ["census", V.vaultDirectoryCensusProv(c, { catalogSize: 505, censusBlock: 23_990_000 })],
     ["directory name", V.vaultDirectoryNameProv(c)],
     ["directory total assets", V.vaultDirectoryTotalAssetsProv(c)],
@@ -237,8 +238,28 @@ test("LLTV is the docs' Liquidation Loan-To-Value, not 'the one risk parameter' 
   assert.match(s, /Liquidation Loan-To-Value/);
 });
 
-test("Unaccrued interest says that on a V1.1 vault the difference carries lost assets (ui-jobs 688)", () => {
-  const s = V.vaultGapProv(c).summary;
-  assert.match(s, /V1\.1 vault it also carries the vault's lost assets/);
-  assert.doesNotMatch(s, /Two readings of the same holdings/);
+test("Unaccrued interest names lost assets on a V1.1 vault only, and no asset outside the queue (ui-jobs 688)", () => {
+  const v11 = V.vaultGapProv(c, true).summary;
+  assert.match(v11, /On this V1\.1 vault it also carries the vault's lost assets/);
+  const v10 = V.vaultGapProv(c, false).summary;
+  assert.doesNotMatch(v10, /lost assets|V1\.1/);
+  for (const s of [v11, v10])
+    assert.doesNotMatch(s, /Two readings of the same holdings|outside its Morpho Blue positions/);
+});
+
+test("total assets walks the withdraw queue; Held attributes the last holders' loss to Morpho's docs", () => {
+  for (const p of [V.vaultTotalAssetsProv(c), V.vaultDirectoryTotalAssetsProv(c)]) {
+    assert.match(p.summary, /walking its withdraw queue/);
+    assert.doesNotMatch(p.summary, /supply queue/);
+  }
+  assert.match(
+    V.vaultHeldAssetsProv(c, { totalAssets: "1", lostAssets: "0" }).summary,
+    /by Morpho's docs, the last holders/,
+  );
+  assert.match(V.vaultLostAssetsProv(c).summary, /loses assets/);
+});
+
+test("reallocations are the vault's, not the curator's", () => {
+  for (const p of [T.morphoVaultTimelineAccrualProv(row), T.morphoVaultAllocationGrainProv(row)])
+    assert.doesNotMatch(p.summary, /curator/);
 });

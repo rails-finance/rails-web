@@ -13,7 +13,7 @@
 // Each row carries an allocation band: the markets the vault's asset sat in at
 // THAT ROW's block, divided by this address's proportional slice of each. It is
 // a read at the row's block and at no other — nothing is drawn between two
-// rows, the curator's reallocations are read nowhere, and the page says both in
+// rows, the vault's reallocations are read nowhere, and the page says both in
 // words once, under the first band. `components/protocol/morpho-base/
 // vault-allocation-band.tsx` holds it and states the rules it keeps. The band
 // is never stored: it is re-read on every request over the newest rows of the
@@ -68,12 +68,7 @@ import { useParams } from "next/navigation";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { VaultAllocationBand, VaultAllocationDetail } from "@/components/protocol/morpho-base/vault-allocation-band";
 import { Prov } from "@/components/shared/provenance";
-import {
-  refetchWords,
-  withheldBoundWords,
-  withheldCountWords,
-  withheldReasonWords,
-} from "@/lib/shared/vault-withheld-words";
+import { refetchWords, withheldCountWords, withheldPaneWords } from "@/lib/shared/vault-withheld-words";
 import { pctText, shareText } from "@/components/protocol/morpho-base/vault-exposure-parts";
 import { VaultTimelineRow, rawAmount as raw, type VaultTimelineProvKit } from "@/components/vaults/vault-timeline-row";
 import { vaultExplorer } from "@/lib/vaults/explorer";
@@ -224,7 +219,7 @@ export function MorphoBaseVaultTimeline({
   return (
     <section className="mb-6" data-skel-section="vault-timeline" data-vault-timeline={timeline.holder}>
       {!onEventPage && (
-        <h2 className="text-sm font-semibold text-foreground">This address&rsquo;s own events in the vault</h2>
+        <h2 className="text-sm font-semibold text-foreground">This address&rsquo;s events in the vault</h2>
       )}
 
       {/* Where the rows came from. A row at or below the lane's own `finalized`
@@ -247,8 +242,7 @@ export function MorphoBaseVaultTimeline({
           <Prov info={morphoVaultTimelineHorizonProv(coords, withheld, tailMaxRows(chainId), basis)}>
             This address has {withheldCountWords(basis, withheld)} share transfers on this vault
           </Prov>
-          {withheldBoundWords(basis, withheld, tailMaxRows(chainId))}{" "}
-          {withheldReasonWords(basis, "the vault's creation block")} The newest rows are not shown in place of the rest.
+          {withheldPaneWords(basis, withheld, tailMaxRows(chainId))}
         </p>
       ) : !reconcile ? null : !reconcile.reconciled ? (
         <GateFailure coords={coords} timeline={timeline} shareUnit={shareUnit} shareDecimals={shareDecimals} />
@@ -281,13 +275,8 @@ export function MorphoBaseVaultTimeline({
           <Prov info={morphoVaultTimelineExponentProv(coords, shareDecimals, assetDecimals, decimalsOffset)}>
             Every share price below is what 10^{shareDecimals} shares convert to, {shareDecimals} being the
             vault&rsquo;s decimals
-            {decimalsOffset != null ? (
-              <>
-                : its asset&rsquo;s {assetDecimals} plus a decimals offset of {decimalsOffset}
-              </>
-            ) : null}
           </Prov>
-          . {decimalsOffset != null ? "Both are" : "It is"} read at block {n(timeline.blockNumber)}.
+          .
         </p>
       )}
 
@@ -389,7 +378,7 @@ export function MorphoBaseVaultTimeline({
       {drawn && !onEventPage && (
         <p className="mt-3 max-w-3xl text-[11px] leading-relaxed text-rb-500" data-figure="timeline-accrual">
           <Prov info={morphoVaultTimelineAccrualProv(coords)}>
-            The vault&rsquo;s interest accrual and the curator&rsquo;s reallocations are not rows here.
+            The vault&rsquo;s interest accrual and its reallocations are not rows here.
           </Prov>{" "}
           A row is something this address did. What accrual did to the share price shows in each row&rsquo;s share
           price. A transaction that carried this address&rsquo;s leg very likely moved other shares too; only this

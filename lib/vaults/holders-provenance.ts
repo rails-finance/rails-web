@@ -25,7 +25,7 @@ const base = (c: HoldersCoords) => ({
 export const holderShareProv = (c: HoldersCoords, holder: string, ppm: number): Provenance => ({
   ...base(c),
   kind: "chain",
-  summary: `Share of the vault's shares at the census — ${shortAddress(holder)} held ${ppmPct(ppm)} of ${c.shareSymbol} at census block ${n(c.censusBlock)}: the shares it held over all shares issued.`,
+  summary: `Share of the vault at the census — ${shortAddress(holder)} held ${ppmPct(ppm)} of ${c.shareSymbol} at census block ${n(c.censusBlock)}: the shares it held over all shares issued.`,
   via: "vault census · balanceOf(holder) / totalSupply() @ the census block",
 });
 

@@ -52,7 +52,7 @@ const holdingClaimProv_ = (c: HoldingCoords, label = "Claim"): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("convertToAssets(the holder's shares)", c),
-  summary: `Claim. What this address's shares convert to at block ${n(c.blockNumber)}, in ${c.assetSymbol}, as the vault answers. It is the vault's conversion at one block; what a redemption can take out is the vault's separate maximum-withdrawal answer.`,
+  summary: `Claim. What this address's shares convert to at block ${n(c.blockNumber)}, in ${c.assetSymbol}, as the vault answers. Redeemable now is the vault's separate answer.`,
   contract: vaultContract(c),
   via: `${lane(c)} · convertToAssets(balanceOf(holder)) @ the pinned block`,
 });

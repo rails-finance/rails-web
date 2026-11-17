@@ -66,12 +66,7 @@ import { Fragment, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { Prov } from "@/components/shared/provenance";
-import {
-  refetchWords,
-  withheldBoundWords,
-  withheldCountWords,
-  withheldReasonWords,
-} from "@/lib/shared/vault-withheld-words";
+import { refetchWords, withheldCountWords, withheldPaneWords } from "@/lib/shared/vault-withheld-words";
 import { shareText } from "@/components/protocol/morpho-base/vault-exposure-parts";
 import { VaultTimelineRow, rawAmount as raw, type VaultTimelineProvKit } from "@/components/vaults/vault-timeline-row";
 import { utcInstant } from "@/components/vaults/aave-vault-format";
@@ -203,7 +198,7 @@ export function AaveVaultTimeline({ timeline, family, vaultName, shareSymbol, as
   return (
     <section className="mb-6" data-skel-section="vault-timeline" data-vault-timeline={timeline.holder}>
       {!onEventPage && (
-        <h2 className="text-sm font-semibold text-foreground">This address&rsquo;s own events in the vault</h2>
+        <h2 className="text-sm font-semibold text-foreground">This address&rsquo;s events in the vault</h2>
       )}
 
       {/* Where the rows came from. A row at or below the lane's own `finalized`
@@ -226,8 +221,7 @@ export function AaveVaultTimeline({ timeline, family, vaultName, shareSymbol, as
           <Prov info={vaultTimelineHorizonProv(coords, withheld, tailMaxRows(MAINNET_CHAIN_ID), basis)}>
             This address has {withheldCountWords(basis, withheld)} share transfers on this vault
           </Prov>
-          {withheldBoundWords(basis, withheld, tailMaxRows(MAINNET_CHAIN_ID))} {withheldReasonWords(basis, "block 0")}{" "}
-          The newest rows are not shown in place of the rest.
+          {withheldPaneWords(basis, withheld, tailMaxRows(MAINNET_CHAIN_ID))}
         </p>
       ) : !reconcile ? null : !reconcile.reconciled ? (
         <GateFailure coords={coords} timeline={timeline} shareUnit={shareUnit} shareDecimals={shareDecimals} />
