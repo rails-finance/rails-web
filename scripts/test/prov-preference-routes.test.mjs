@@ -59,4 +59,13 @@ test("the allow-list reads", () => {
   assert.ok(provPreferenceAllows("/ethereum/aave-v3/0xabc/event/0x1_2", { wallet: "0xabc", eventId: "0x1_2" }));
   assert.ok(provPreferenceAllows("/ethereum/spark/info", {}));
   assert.ok(provPreferenceAllows("/optimism/aave-v3/markets", {}));
+  // Polaris's deposit and reserve-loan pages, beside its CDP pages.
+  assert.ok(
+    provPreferenceAllows("/sepolia/polaris/stability-pool/usdp/7704/event/sp_op%3A0x1%3A8", {
+      market: "usdp",
+      id: "7704",
+      eventId: "sp_op:0x1:8",
+    }),
+  );
+  assert.ok(provPreferenceAllows("/sepolia/polaris/reserve-loans/12", { id: "12" }));
 });
