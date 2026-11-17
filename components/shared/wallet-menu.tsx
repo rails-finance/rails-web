@@ -18,6 +18,7 @@ import { MobileSheet } from "@/components/shared/mobile-sheet";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { useEnsName } from "@/lib/ens/use-ens-names";
+import { PICKABLE_SELECTOR } from "@/lib/shared/tip-yields";
 import { walletHref } from "@/components/shared/front-door-search";
 import { isBookmarked, toggleBookmark, SESSIONS_CHANGED_EVENT } from "@/lib/shared/sessions";
 import { OVERLAY_HEADING, WALLET_HEADING_NAME } from "@/lib/shared/ui-grammar";
@@ -126,7 +127,13 @@ export function WalletMenu({
   const trigger = (
     <button
       type="button"
-      onClick={() => setOpen((v) => !v)}
+      onClick={(e) => {
+        // Inside a value the armed inspector can pick (Polaris wraps its
+        // holder in a receipt), the press belongs to the trace: it pins the
+        // receipt and opens nothing (decision 0062 point 4).
+        if (e.currentTarget.closest(PICKABLE_SELECTOR)) return;
+        setOpen((v) => !v);
+      }}
       aria-expanded={open}
       aria-haspopup="menu"
       aria-label={`${name ? `${name} · ` : ""}${wallet}${fav ? ", saved" : ""}: open the address menu`}
