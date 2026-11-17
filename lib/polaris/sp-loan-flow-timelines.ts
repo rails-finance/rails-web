@@ -297,20 +297,28 @@ export function depositFlowsFromDays(
     txs += r.txs;
     const movedA = r.did_deposit || r.did_withdraw || r.did_burn || r.did_claim;
     const ts = Number(r.last_timestamp);
+    const cum = {
+      [D.deposited]: v(r.deposited) * G.collateral,
+      [D.yieldIn]: v(r.yield_in) * G.collateral,
+      [D.withdrawn]: v(r.withdrawn) * G.collateral,
+      [D.burned]: v(r.burned) * G.collateral,
+      [D.yieldClaimed]: v(r.yield_claimed) * G.collateral,
+      [D.pethIn]: v(r.peth_in) * G.debt,
+      [D.pethClaimed]: v(r.peth_claimed) * G.debt,
+    };
+    // Each line's running figure by asset, as the event-built rows state it.
+    const cumAsset = Object.entries(cum).map(([bucket, usd]) => ({
+      bucket,
+      symbol: bucket === D.pethIn || bucket === D.pethClaimed ? PETH.symbol : s,
+      usd,
+    }));
     return {
       day: r.day,
+      cumAsset,
       events,
       txs,
       tick: movedA && r.did_pay_peth ? "both" : r.did_pay_peth ? "debt" : "collateral",
-      cum: {
-        [D.deposited]: v(r.deposited) * G.collateral,
-        [D.yieldIn]: v(r.yield_in) * G.collateral,
-        [D.withdrawn]: v(r.withdrawn) * G.collateral,
-        [D.burned]: v(r.burned) * G.collateral,
-        [D.yieldClaimed]: v(r.yield_claimed) * G.collateral,
-        [D.pethIn]: v(r.peth_in) * G.debt,
-        [D.pethClaimed]: v(r.peth_claimed) * G.debt,
-      },
+      cum,
       balances: [
         { asset: A, symbol: s, side: "collateral", amount: v(r.deposit) },
         { asset: B, symbol: PETH.symbol, side: "debt", amount: v(r.stash) },

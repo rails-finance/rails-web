@@ -49,6 +49,7 @@ import {
   FlowSideUnitsContext,
   useFlowUnit,
   sumSwatch,
+  useFlowHues,
   KEEP_PANEL,
   SegmentTipContext,
   SegmentTipBody,
@@ -296,6 +297,7 @@ function Strip({
    *  (`panel` draws it) with no outline on the segment. */
   focus?: boolean;
 }) {
+  const hues = useFlowHues();
   const shown = segments.filter((s) => s.width > 0);
   const unit = useFlowUnit(side);
   const [trackRef, trackPx, settled] = useTrackWidth();
@@ -342,7 +344,7 @@ function Strip({
           <span
             key={s.key}
             className={`absolute inset-y-0 block ${anim}`}
-            style={{ ...place(i), ...fillStyle(side, s) }}
+            style={{ ...place(i), ...fillStyle(side, s, hues) }}
           />
         ))}
       </div>
@@ -431,6 +433,7 @@ function SideBlock({
    *  false on a closed position: its receipts read as the close's). */
   atLive: boolean;
 }) {
+  const hues = useFlowHues();
   const coll = side === "collateral";
   const word = coll ? model.labels.collateral : model.labels.debt;
   const outs = st.bar.filter((s) => s.fill === "out");
@@ -493,7 +496,7 @@ function SideBlock({
               when={when}
               isLive={isLive}
               daily={model.daily}
-              swatch={sumSwatch(side)}
+              swatch={sumSwatch(side, hues)}
               words={{ rest }}
             />
           )
@@ -510,6 +513,7 @@ function SideBlock({
  *  The segments' tips carry the figures. Where the position has other stops,
  *  the dashed outline too: where each bar ends at the last stop. */
 export function FlowsKey({ items, outline, lines, shade }: FlowsKeyItems) {
+  const hues = useFlowHues();
   if (items.length === 0 && !outline && !lines?.length && !shade) return null;
   return (
     <div className="mt-3 first:mt-0" data-flow-key="" data-anatomy="F10">
@@ -517,7 +521,7 @@ export function FlowsKey({ items, outline, lines, shade }: FlowsKeyItems) {
       <ul className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-rb-500" aria-label="Key">
         {items.map(({ side, s }) => (
           <li key={`${side}:${s.key}`} className="inline-flex items-center gap-1.5">
-            <i aria-hidden className="inline-block h-3 w-4 shrink-0 rounded-[2px]" style={fillStyle(side, s)} />
+            <i aria-hidden className="inline-block h-3 w-4 shrink-0 rounded-[2px]" style={fillStyle(side, s, hues)} />
             {s.label}
           </li>
         ))}

@@ -58,18 +58,51 @@ import type {
 
 // The position axes' hues (color-grammar §6): blue the supplied side, green
 // the debt. Each outflow kind takes its own hatch (standards/lexicon.md).
-export const HUE: Record<FlowSide, { solid: string; line: string; hatch: string }> = {
-  collateral: {
-    solid: "var(--color-blue-500)",
-    line: "rgba(96, 165, 250, 0.9)",
-    hatch: "rgba(96, 165, 250, 0.75)",
-  },
+export interface SideHue {
+  solid: string;
+  line: string;
+  hatch: string;
+  /** An inflow's faded fill. */
+  swatch: string;
+  /** The hue's name in the how-to-read ("Green"). */
+  name: string;
+}
+export type FlowHues = Record<FlowSide, SideHue>;
+const BLUE: SideHue = {
+  solid: "var(--color-blue-500)",
+  line: "rgba(96, 165, 250, 0.9)",
+  hatch: "rgba(96, 165, 250, 0.75)",
+  swatch: "rgba(96, 165, 250, 0.35)",
+  name: "Blue",
+};
+export const DEFAULT_HUES: FlowHues = {
+  collateral: BLUE,
   debt: {
     solid: "var(--color-green-400)",
     line: "rgba(74, 222, 128, 0.9)",
     hatch: "rgba(74, 222, 128, 0.7)",
+    swatch: "rgba(74, 222, 128, 0.35)",
+    name: "Green",
   },
 };
+/** A second bar that is paid in to the position, not owed (a Polaris
+ *  stability-pool deposit's pETH): violet-400, apart from the blue beside it
+ *  and from the party pink the events row uses. */
+export const PAID_IN_HUES: FlowHues = {
+  collateral: BLUE,
+  debt: {
+    solid: "#a78bfa",
+    line: "rgba(167, 139, 250, 0.9)",
+    hatch: "rgba(167, 139, 250, 0.75)",
+    swatch: "rgba(167, 139, 250, 0.35)",
+    name: "Violet",
+  },
+};
+/** The hues a page's flows draw in: the panel's, the event cards' sums. A
+ *  page sets the second side's solid as `--flow-debt` on its root too, for
+ *  the parts drawn from CSS (the chart, the events row). */
+export const FlowHuesContext = createContext<FlowHues>(DEFAULT_HUES);
+export const useFlowHues = (): FlowHues => useContext(FlowHuesContext);
 // A liquidation in the critical red; a redemption in the caution orange
 // (caution-400 / caution-500, color-grammar.md §5).
 const TONE_HATCH = { liquidation: "rgba(248, 113, 113, 0.75)", redemption: "rgba(251, 146, 60, 0.75)" };
@@ -108,9 +141,13 @@ function hatchImage(hatch: FlowHatch, color: string): CSSProperties {
  *  faded hue with a texture of its line, or none for the side's first inflow
  *  (Deposited, Borrowed). No two lines of a side share a fill, and the bar,
  *  the Key, the filter menu and the event card's sum draw a line alike. */
-export function fillStyle(side: FlowSide, s: Pick<FlowSegment, "fill" | "hatch" | "tone">): CSSProperties {
-  const h = HUE[side];
-  if (s.fill === "in") return inflowStyle(side, s.hatch);
+export function fillStyle(
+  side: FlowSide,
+  s: Pick<FlowSegment, "fill" | "hatch" | "tone">,
+  hues: FlowHues = DEFAULT_HUES,
+): CSSProperties {
+  const h = hues[side];
+  if (s.fill === "in") return inflowStyle(h, s.hatch);
   if (s.fill !== "out") return { background: h.solid };
   const hatch = s.hatch ?? (s.tone && s.tone !== "exit" ? "forward" : "reverse");
   if (s.tone === "liquidation" || s.tone === "redemption")
@@ -120,21 +157,17 @@ export function fillStyle(side: FlowSide, s: Pick<FlowSegment, "fill" | "hatch" 
 
 /** The inflow swatch: the side's hue, faded, as the towers' key drew what
  *  came in, with the line's texture over it. */
-export const INFLOW_SWATCH: Record<FlowSide, string> = {
-  collateral: "rgba(96, 165, 250, 0.35)",
-  debt: "rgba(74, 222, 128, 0.35)",
-};
-function inflowStyle(side: FlowSide, hatch?: FlowHatch): CSSProperties {
-  if (!hatch) return { background: INFLOW_SWATCH[side] };
-  return { ...hatchImage(hatch, HUE[side].line), backgroundColor: INFLOW_SWATCH[side] };
+function inflowStyle(h: SideHue, hatch?: FlowHatch): CSSProperties {
+  if (!hatch) return { background: h.swatch };
+  return { ...hatchImage(hatch, h.line), backgroundColor: h.swatch };
 }
 
 /** A line's swatch in a side's sum: its segment's fill on the bar; an inflow,
  *  which the bar does not draw, its faded, textured fill. */
 export const sumSwatch =
-  (side: FlowSide) =>
+  (side: FlowSide, hues: FlowHues = DEFAULT_HUES) =>
   (s: FlowSegment): CSSProperties | null =>
-    s.fill === "estimate" ? null : fillStyle(side, s);
+    s.fill === "estimate" ? null : fillStyle(side, s, hues);
 
 /** What the panels read of the cursor: the date in words, and the steps. The
  *  view that owns the cursor provides it (Combined, the busy bars, the
@@ -375,6 +408,7 @@ export function SegmentTipBody({
   /** False on a busy bar, drawn at the scale of what is held. */
   share?: boolean;
 }) {
+  const hues = useFlowHues();
   const cursor = useContext(FlowCursorContext);
   const unit = useFlowUnit(side);
   const share = withShare && st.total > 0 ? (seg.value / st.total) * 100 : null;
@@ -388,7 +422,7 @@ export function SegmentTipBody({
         </p>
       )}
       <div className="flex items-center gap-2 pr-6 text-sm font-semibold">
-        <span aria-hidden className="inline-block h-3 w-4 shrink-0 rounded-[2px]" style={fillStyle(side, seg)} />
+        <span aria-hidden className="inline-block h-3 w-4 shrink-0 rounded-[2px]" style={fillStyle(side, seg, hues)} />
         <span>{seg.label}</span>
         <span className="ml-auto tabular-nums">
           <Prov info={flowSegmentProv(seg, side, when, isLive, daily)}>{wholeUsd(seg.value, unit)}</Prov>

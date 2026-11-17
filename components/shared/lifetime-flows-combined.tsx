@@ -42,7 +42,7 @@ import {
   type FlowEventsHelp,
 } from "@/lib/shared/learn-more-content";
 import { FlowBarsHeadsContext, Headline, Rescaled, useWidth } from "@/components/shared/lifetime-flows-busy";
-import { FlowCursorContext, KEEP_PANEL, SegmentTipContext } from "@/components/shared/lifetime-flows-tip";
+import { FlowCursorContext, KEEP_PANEL, SegmentTipContext, useFlowHues } from "@/components/shared/lifetime-flows-tip";
 import { useFlowFocus, useFlowFocusState } from "@/components/shared/flow-focus-context";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { formatPrice, pricePieces, levelAt, priceReadout, type FlowPriceSeries } from "@/lib/shared/flows-price";
@@ -95,13 +95,13 @@ import {
  *  delegate's rate change in the party pink, the owner's in the debt hue. */
 export const FLOW_TICK: Record<FlowTick, string> = {
   collateral: "var(--color-blue-500)",
-  debt: "var(--color-green-400)",
-  both: "linear-gradient(to bottom, var(--color-blue-500) 50%, var(--color-green-400) 50%)",
+  debt: "var(--flow-debt, var(--color-green-400))",
+  both: "linear-gradient(to bottom, var(--color-blue-500) 50%, var(--flow-debt, var(--color-green-400)) 50%)",
   liquidation: "var(--color-red-500)",
   redemption: "var(--caution)",
   caution: "var(--caution)",
   "rate-delegate": "var(--color-pink-500)",
-  "rate-owner": "var(--color-green-400)",
+  "rate-owner": "var(--flow-debt, var(--color-green-400))",
 };
 
 /** The price tip and the date under the row share one width, so the two
@@ -374,7 +374,7 @@ const ProtocolActivityChart = dynamic(
 const LW_LOADING_H = 250;
 
 /** The line's hues; the panel's Key draws the same. */
-export const LINE_HUE = { collateral: "var(--color-blue-500)", debt: "var(--color-green-400)" };
+export const LINE_HUE = { collateral: "var(--color-blue-500)", debt: "var(--flow-debt, var(--color-green-400))" };
 
 /** The bars' and the events' how-to-read; the price chart's names its
  *  series. */
@@ -384,7 +384,12 @@ const BARS_HELP = lifetimeFlowsBarsContent();
  *  events by the family's names for them (its buckets' events), and the
  *  marks the family draws (the warning tones its buckets carry, the marks it
  *  names, the ticks the position has). */
-function eventsHelp(model: FlowModel, hasDebt: boolean, changeDays: { changes: FlowChange[] }[]): FlowEventsHelp {
+function eventsHelp(
+  model: FlowModel,
+  hasDebt: boolean,
+  changeDays: { changes: FlowChange[] }[],
+  debtHue: "Green" | "Violet" = "Green",
+): FlowEventsHelp {
   const has = new Set(model.ticks.map((t) => t.tick));
   const wordsOf = (side: "collateral" | "debt") => [
     ...new Set(
@@ -404,7 +409,7 @@ function eventsHelp(model: FlowModel, hasDebt: boolean, changeDays: { changes: F
   return {
     sides: [
       { hue: "Blue", label: model.labels.collateral, events: wordsOf("collateral") },
-      ...(hasDebt ? [{ hue: "Green" as const, label: model.labels.debt, events: wordsOf("debt") }] : []),
+      ...(hasDebt ? [{ hue: debtHue, label: model.labels.debt, events: wordsOf("debt") }] : []),
     ],
     both: has.has("both"),
     liquidation: liq,
@@ -809,7 +814,8 @@ export function CombinedFlows({
   };
   // The protocol's changes inside the life, a marker a day (ruling 10).
   const changeDays = useMemo(() => changesByDay(model.changes, startDay, today), [model.changes, startDay, today]);
-  const marks = useMemo(() => eventsHelp(model, hasDebt, changeDays), [model, hasDebt, changeDays]);
+  const debtHue = useFlowHues().debt.name === "Violet" ? "Violet" : "Green";
+  const marks = useMemo(() => eventsHelp(model, hasDebt, changeDays, debtHue), [model, hasDebt, changeDays, debtHue]);
   const priceBrief = priced
     ? {
         health: !!priced.health,

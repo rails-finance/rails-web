@@ -24,7 +24,7 @@ export function lifetimeFlowsBarsContent(): LearnMoreContent {
  *  side's events by the names its timeline gives them, and the marks the
  *  family draws. */
 export interface FlowEventsHelp {
-  sides: { hue: "Blue" | "Green"; label: string; events: string[] }[];
+  sides: { hue: "Blue" | "Green" | "Violet"; label: string; events: string[] }[];
   /** Both sides' hues, half and half, where the position has both. */
   both: boolean;
   /** The family's names for its warning marks, where it draws them. */
