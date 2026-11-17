@@ -1,0 +1,136 @@
+{
+  "chainId": 1,
+  "asOf": {
+    "block": 24026564,
+    "source": "sieve-checkpoint"
+  },
+  "blockNumber": 24026564,
+  "timestamp": null,
+  "txHash": "0xa10dc0eff7177c6756249fd4493a4277d2b9ec4a4b816efc160bfb344a242197",
+  "txIndex": null,
+  "txFrom": "0x67c9cc4af1bd9ec25d004d5c94d360009fab163c",
+  "trades": [
+    {
+      "logIndex": 96,
+      "owner": "0x0ed0ea598e89765471e86a060bd91f4bb2dc1fb0",
+      "sellToken": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "buyToken": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+      "sellAmount": "70000000000000000000",
+      "buyAmount": "206290726788",
+      "feeAmount": "0",
+      "orderUid": "0xf26e8fc9ca5d9dab88636fb544b5bbfa10a6ceb69ed62f685ea74ee1a90c6eb10ed0ea598e89765471e86a060bd91f4bb2dc1fb0694198f7",
+      "validTo": 1765906679,
+      "settled": {
+        "order": {
+          "sellToken": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+          "buyToken": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+          "receiver": "0x0ed0ea598e89765471e86a060bd91f4bb2dc1fb0",
+          "sellAmount": "70000000000000000000",
+          "buyAmount": "205397908527",
+          "validTo": 1765906679,
+          "appData": "0xb4a8138bdcd9ebcd319d29f3b938942729b8612da180ae44dd055f628d63dc26",
+          "feeAmount": "0",
+          "flags": "0",
+          "executedAmount": "70000000000000000000",
+          "kind": "sell",
+          "partiallyFillable": false,
+          "sellTokenBalance": "erc20",
+          "buyTokenBalance": "erc20",
+          "signingScheme": "eip712"
+        },
+        "own": {
+          "sellIndex": 2,
+          "buyIndex": 3,
+          "sellPrice": "206290726788",
+          "buyPrice": "70000000000000000000"
+        },
+        "uniform": {
+          "sellIndex": 0,
+          "buyIndex": 1,
+          "sellPrice": "1000000000000000000",
+          "buyPrice": "339256400487218460954733499"
+        },
+        "ownEntries": true
+      }
+    },
+    {
+      "logIndex": 97,
+      "owner": "0x0ed0ea598e89765471e86a060bd91f4bb2dc1fb0",
+      "sellToken": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "buyToken": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+      "sellAmount": "70000000000000000000",
+      "buyAmount": "206290726820",
+      "feeAmount": "0",
+      "orderUid": "0xc598b809aa2ff53ee9669e4f2414189570e659d544364c9c8e7db872330954500ed0ea598e89765471e86a060bd91f4bb2dc1fb0694198dc",
+      "validTo": 1765906652,
+      "settled": {
+        "order": {
+          "sellToken": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+          "buyToken": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+          "receiver": "0x0ed0ea598e89765471e86a060bd91f4bb2dc1fb0",
+          "sellAmount": "70000000000000000000",
+          "buyAmount": "205521649356",
+          "validTo": 1765906652,
+          "appData": "0xb4a8138bdcd9ebcd319d29f3b938942729b8612da180ae44dd055f628d63dc26",
+          "feeAmount": "0",
+          "flags": "0",
+          "executedAmount": "70000000000000000000",
+          "kind": "sell",
+          "partiallyFillable": false,
+          "sellTokenBalance": "erc20",
+          "buyTokenBalance": "erc20",
+          "signingScheme": "eip712"
+        },
+        "own": {
+          "sellIndex": 4,
+          "buyIndex": 5,
+          "sellPrice": "206290726820",
+          "buyPrice": "70000000000000000000"
+        },
+        "uniform": {
+          "sellIndex": 0,
+          "buyIndex": 1,
+          "sellPrice": "1000000000000000000",
+          "buyPrice": "339256400487218460954733499"
+        },
+        "ownEntries": true
+      }
+    }
+  ],
+  "settle": {
+    "status": "decoded",
+    "call": "wrapped",
+    "offset": 0,
+    "to": "0xa9d635ef85bc37eb9ff9d6165481ea230ed32392",
+    "tokens": [
+      "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "0xdac17f958d2ee523a2206206994597c13d831ec7",
+      "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "0xdac17f958d2ee523a2206206994597c13d831ec7",
+      "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "0xdac17f958d2ee523a2206206994597c13d831ec7"
+    ],
+    "clearingPrices": [
+      "1000000000000000000",
+      "339256400487218460954733499",
+      "206290726788",
+      "70000000000000000000",
+      "206290726820",
+      "70000000000000000000"
+    ],
+    "uniform": {
+      "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": "1000000000000000000",
+      "0xdac17f958d2ee523a2206206994597c13d831ec7": "339256400487218460954733499"
+    }
+  },
+  "tokens": {
+    "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+      "symbol": "WETH",
+      "decimals": 18
+    },
+    "0xdac17f958d2ee523a2206206994597c13d831ec7": {
+      "symbol": "USDT",
+      "decimals": 6
+    }
+  }
+}

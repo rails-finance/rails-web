@@ -1,0 +1,421 @@
+{
+  "chainId": 1,
+  "asOf": {
+    "block": 13796830,
+    "source": "sieve-checkpoint"
+  },
+  "blockNumber": 13796830,
+  "timestamp": null,
+  "txHash": "0xdb1245e3e227568f4167b7358040b840099768daa52433edd03b87f4f0081650",
+  "txIndex": null,
+  "txFrom": "0x340185114f9d2617dc4c16088d0375d09fee9186",
+  "trades": [
+    {
+      "logIndex": 35,
+      "owner": "0xcdcb2bb177b8008cf88ffbc274b5326bcdec7769",
+      "sellToken": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "buyToken": "0x111111111117dc0aa78b770fa6a738034120c302",
+      "sellAmount": "20679833277212684",
+      "buyAmount": "30055319416176950041",
+      "feeAmount": "1502179962919606",
+      "orderUid": "0xe77c09493bb4721506dbcd623824460122f93619ac325c574c91310760aff3a4cdcb2bb177b8008cf88ffbc274b5326bcdec776961b7424f",
+      "validTo": 1639400015,
+      "settled": {
+        "order": {
+          "sellToken": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+          "buyToken": "0x111111111117dc0aa78b770fa6a738034120c302",
+          "receiver": "0xcdcb2bb177b8008cf88ffbc274b5326bcdec7769",
+          "sellAmount": "19177653314293078",
+          "buyAmount": "29905790463857661732",
+          "validTo": 1639400015,
+          "appData": "0x487b02c558d729abaf3ecf17881a4181e5bc2446429a0995142297e897b6eb37",
+          "feeAmount": "1502179962919606",
+          "flags": "0",
+          "executedAmount": "19177653314293078",
+          "kind": "sell",
+          "partiallyFillable": false,
+          "sellTokenBalance": "erc20",
+          "buyTokenBalance": "erc20",
+          "signingScheme": "eip712"
+        },
+        "own": {
+          "sellIndex": 4,
+          "buyIndex": 0,
+          "sellPrice": "30055319416176950041",
+          "buyPrice": "19177653314293078"
+        },
+        "uniform": {
+          "sellIndex": 4,
+          "buyIndex": 0,
+          "sellPrice": "30055319416176950041",
+          "buyPrice": "19177653314293078"
+        },
+        "ownEntries": false
+      }
+    },
+    {
+      "logIndex": 36,
+      "owner": "0xffc9ae9c6a6bf72da80566225d00fee90bba02b2",
+      "sellToken": "0x6810e776880c02933d47db1b9fc05908e5386b96",
+      "buyToken": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "sellAmount": "270593921146619260",
+      "buyAmount": "27063352080019299",
+      "feeAmount": "15208638228646232",
+      "orderUid": "0x29b8f6ea99a77c205bc23b6069cd4bd655e1d418efd57f8cb3700497c9eba591ffc9ae9c6a6bf72da80566225d00fee90bba02b261b7430d",
+      "validTo": 1639400205,
+      "settled": {
+        "order": {
+          "sellToken": "0x6810e776880c02933d47db1b9fc05908e5386b96",
+          "buyToken": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+          "receiver": "0xffc9ae9c6a6bf72da80566225d00fee90bba02b2",
+          "sellAmount": "255385282917973028",
+          "buyAmount": "26928708537332635",
+          "validTo": 1639400205,
+          "appData": "0x487b02c558d729abaf3ecf17881a4181e5bc2446429a0995142297e897b6eb37",
+          "feeAmount": "15208638228646232",
+          "flags": "0",
+          "executedAmount": "255385282917973028",
+          "kind": "sell",
+          "partiallyFillable": false,
+          "sellTokenBalance": "erc20",
+          "buyTokenBalance": "erc20",
+          "signingScheme": "eip712"
+        },
+        "own": {
+          "sellIndex": 2,
+          "buyIndex": 4,
+          "sellPrice": "3184982634644187251",
+          "buyPrice": "30055319416176950041"
+        },
+        "uniform": {
+          "sellIndex": 2,
+          "buyIndex": 4,
+          "sellPrice": "3184982634644187251",
+          "buyPrice": "30055319416176950041"
+        },
+        "ownEntries": false
+      }
+    },
+    {
+      "logIndex": 37,
+      "owner": "0x70650b31f1c4208fad8f86dc6413c8086f5f9b24",
+      "sellToken": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+      "buyToken": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "sellAmount": "1945473316",
+      "buyAmount": "482933547329765498",
+      "feeAmount": "3555047",
+      "orderUid": "0x8b7c6f4e2cc189763430e17c67aa2a17fdb343a09681054c4460d2249e2c90e370650b31f1c4208fad8f86dc6413c8086f5f9b2461b7421b",
+      "validTo": 1639399963,
+      "settled": {
+        "order": {
+          "sellToken": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+          "buyToken": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "receiver": "0x70650b31f1c4208fad8f86dc6413c8086f5f9b24",
+          "sellAmount": "1941918269",
+          "buyAmount": "481632451164091196",
+          "validTo": 1639399963,
+          "appData": "0x487b02c558d729abaf3ecf17881a4181e5bc2446429a0995142297e897b6eb37",
+          "feeAmount": "3555047",
+          "flags": "0",
+          "executedAmount": "1941918269",
+          "kind": "sell",
+          "partiallyFillable": false,
+          "sellTokenBalance": "erc20",
+          "buyTokenBalance": "erc20",
+          "signingScheme": "eip712"
+        },
+        "own": {
+          "sellIndex": 5,
+          "buyIndex": 6,
+          "sellPrice": "7474424775486527459908554204",
+          "buyPrice": "30055319416176950041"
+        },
+        "uniform": {
+          "sellIndex": 5,
+          "buyIndex": 6,
+          "sellPrice": "7474424775486527459908554204",
+          "buyPrice": "30055319416176950041"
+        },
+        "ownEntries": false
+      }
+    },
+    {
+      "logIndex": 38,
+      "owner": "0x5a15d797ff77244ac40d4bf497035ff9672e7242",
+      "sellToken": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "buyToken": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "sellAmount": "5465923293183853",
+      "buyAmount": "18717184",
+      "feeAmount": "781195665664496",
+      "orderUid": "0x4bbfeee577ce2e6759d25c64d1a626f290ca5e1db1a9695282c693262ad3df245a15d797ff77244ac40d4bf497035ff9672e724261b742a2",
+      "validTo": 1639400098,
+      "settled": {
+        "order": {
+          "sellToken": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+          "buyToken": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+          "receiver": "0x5a15d797ff77244ac40d4bf497035ff9672e7242",
+          "sellAmount": "4684727627519357",
+          "buyAmount": "18621351",
+          "validTo": 1639400098,
+          "appData": "0x487b02c558d729abaf3ecf17881a4181e5bc2446429a0995142297e897b6eb37",
+          "feeAmount": "781195665664496",
+          "flags": "0",
+          "executedAmount": "4684727627519357",
+          "kind": "sell",
+          "partiallyFillable": false,
+          "sellTokenBalance": "erc20",
+          "buyTokenBalance": "erc20",
+          "signingScheme": "eip712"
+        },
+        "own": {
+          "sellIndex": 4,
+          "buyIndex": 3,
+          "sellPrice": "30055319416176950041",
+          "buyPrice": "7522551890104741739675576271"
+        },
+        "uniform": {
+          "sellIndex": 4,
+          "buyIndex": 3,
+          "sellPrice": "30055319416176950041",
+          "buyPrice": "7522551890104741739675576271"
+        },
+        "ownEntries": false
+      }
+    },
+    {
+      "logIndex": 39,
+      "owner": "0xb4a70a23fbefee596e2f2e054ac4a84e7c38f849",
+      "sellToken": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "buyToken": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "sellAmount": "1013146406",
+      "buyAmount": "252098083317461787",
+      "feeAmount": "5923255",
+      "orderUid": "0xdac2b66b2ab1ad093d7bacc239f595820f0750458582b6258f1d1f0f4ef8c489b4a70a23fbefee596e2f2e054ac4a84e7c38f84961b742d9",
+      "validTo": 1639400153,
+      "settled": {
+        "order": {
+          "sellToken": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+          "buyToken": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "receiver": "0xb4a70a23fbefee596e2f2e054ac4a84e7c38f849",
+          "sellAmount": "1007223151",
+          "buyAmount": "249562510684583879",
+          "validTo": 1639400153,
+          "appData": "0x487b02c558d729abaf3ecf17881a4181e5bc2446429a0995142297e897b6eb37",
+          "feeAmount": "5923255",
+          "flags": "0",
+          "executedAmount": "1007223151",
+          "kind": "sell",
+          "partiallyFillable": false,
+          "sellTokenBalance": "erc20",
+          "buyTokenBalance": "erc20",
+          "signingScheme": "eip712"
+        },
+        "own": {
+          "sellIndex": 3,
+          "buyIndex": 6,
+          "sellPrice": "7522551890104741739675576271",
+          "buyPrice": "30055319416176950041"
+        },
+        "uniform": {
+          "sellIndex": 3,
+          "buyIndex": 6,
+          "sellPrice": "7522551890104741739675576271",
+          "buyPrice": "30055319416176950041"
+        },
+        "ownEntries": false
+      }
+    },
+    {
+      "logIndex": 40,
+      "owner": "0x435a0328eda1b607de6606122c1e9a88814ffb28",
+      "sellToken": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "buyToken": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "sellAmount": "474701647830211812",
+      "buyAmount": "1886841141",
+      "feeAmount": "2443802503752842",
+      "orderUid": "0xa52058c8bb6ec911b525dc42e110cf277c2bd489b4d8b32e29c84e6b93b4bb3c435a0328eda1b607de6606122c1e9a88814ffb2861b74327",
+      "validTo": 1639400231,
+      "settled": {
+        "order": {
+          "sellToken": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+          "buyToken": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+          "receiver": "0x435a0328eda1b607de6606122c1e9a88814ffb28",
+          "sellAmount": "472257845326458970",
+          "buyAmount": "1885701152",
+          "validTo": 1639400231,
+          "appData": "0xe9e5980c22b098557a2acf24cb6546353a144314008f8dad4fe4f1f131e3cabf",
+          "feeAmount": "2443802503752842",
+          "flags": "0",
+          "executedAmount": "472257845326458970",
+          "kind": "sell",
+          "partiallyFillable": false,
+          "sellTokenBalance": "erc20",
+          "buyTokenBalance": "erc20",
+          "signingScheme": "eip712"
+        },
+        "own": {
+          "sellIndex": 4,
+          "buyIndex": 3,
+          "sellPrice": "30055319416176950041",
+          "buyPrice": "7522551890104741739675576271"
+        },
+        "uniform": {
+          "sellIndex": 4,
+          "buyIndex": 3,
+          "sellPrice": "30055319416176950041",
+          "buyPrice": "7522551890104741739675576271"
+        },
+        "ownEntries": false
+      }
+    },
+    {
+      "logIndex": 41,
+      "owner": "0xa17b91bddce741528fddf8e5738a767b3053ac18",
+      "sellToken": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "buyToken": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+      "sellAmount": "3110245396929134025",
+      "buyAmount": "25384484",
+      "feeAmount": "5214387468588208",
+      "orderUid": "0xbabf06b7e268a92418e01f79edcdd73e07824a5b549db7688c7e96b13e5c409da17b91bddce741528fddf8e5738a767b3053ac1861b74224",
+      "validTo": 1639399972,
+      "settled": {
+        "order": {
+          "sellToken": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+          "buyToken": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+          "receiver": "0xa17b91bddce741528fddf8e5738a767b3053ac18",
+          "sellAmount": "3105031009460545817",
+          "buyAmount": "25222734",
+          "validTo": 1639399972,
+          "appData": "0xfc428072ee603f98ac3878185d329a1b5e312fcdaa9bdcee0aa4163796a4f8a9",
+          "feeAmount": "5214387468588208",
+          "flags": "0",
+          "executedAmount": "3105031009460545817",
+          "kind": "sell",
+          "partiallyFillable": false,
+          "sellTokenBalance": "erc20",
+          "buyTokenBalance": "erc20",
+          "signingScheme": "eip712"
+        },
+        "own": {
+          "sellIndex": 4,
+          "buyIndex": 1,
+          "sellPrice": "30055319416176950041",
+          "buyPrice": "3676367775908080393689537087297"
+        },
+        "uniform": {
+          "sellIndex": 4,
+          "buyIndex": 1,
+          "sellPrice": "30055319416176950041",
+          "buyPrice": "3676367775908080393689537087297"
+        },
+        "ownEntries": false
+      }
+    },
+    {
+      "logIndex": 42,
+      "owner": "0x6a81c50289f16a7e556385d6bab17707e2ea23c5",
+      "sellToken": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "buyToken": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+      "sellAmount": "2516750571794137026",
+      "buyAmount": "20515559",
+      "feeAmount": "7286756395091568",
+      "orderUid": "0x5e75a51bf8de05d65f125f813c1070f436c7475091d0f474a1c3bce8e303002d6a81c50289f16a7e556385d6bab17707e2ea23c561b7433d",
+      "validTo": 1639400253,
+      "settled": {
+        "order": {
+          "sellToken": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+          "buyToken": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+          "receiver": "0x6a81c50289f16a7e556385d6bab17707e2ea23c5",
+          "sellAmount": "2509463815399045458",
+          "buyAmount": "20486680",
+          "validTo": 1639400253,
+          "appData": "0x487b02c558d729abaf3ecf17881a4181e5bc2446429a0995142297e897b6eb37",
+          "feeAmount": "7286756395091568",
+          "flags": "0",
+          "executedAmount": "2509463815399045458",
+          "kind": "sell",
+          "partiallyFillable": false,
+          "sellTokenBalance": "erc20",
+          "buyTokenBalance": "erc20",
+          "signingScheme": "eip712"
+        },
+        "own": {
+          "sellIndex": 4,
+          "buyIndex": 1,
+          "sellPrice": "30055319416176950041",
+          "buyPrice": "3676367775908080393689537087297"
+        },
+        "uniform": {
+          "sellIndex": 4,
+          "buyIndex": 1,
+          "sellPrice": "30055319416176950041",
+          "buyPrice": "3676367775908080393689537087297"
+        },
+        "ownEntries": false
+      }
+    }
+  ],
+  "settle": {
+    "status": "decoded",
+    "call": "direct",
+    "offset": 0,
+    "to": "0x9008d19f58aabd9ed0d60971565aa8510560ab41",
+    "tokens": [
+      "0x111111111117dc0aa78b770fa6a738034120c302",
+      "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+      "0x6810e776880c02933d47db1b9fc05908e5386b96",
+      "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "0xdac17f958d2ee523a2206206994597c13d831ec7",
+      "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    ],
+    "clearingPrices": [
+      "19177653314293078",
+      "3676367775908080393689537087297",
+      "3184982634644187251",
+      "7522551890104741739675576271",
+      "30055319416176950041",
+      "7474424775486527459908554204",
+      "30055319416176950041"
+    ],
+    "uniform": {
+      "0x111111111117dc0aa78b770fa6a738034120c302": "19177653314293078",
+      "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599": "3676367775908080393689537087297",
+      "0x6810e776880c02933d47db1b9fc05908e5386b96": "3184982634644187251",
+      "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48": "7522551890104741739675576271",
+      "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": "30055319416176950041",
+      "0xdac17f958d2ee523a2206206994597c13d831ec7": "7474424775486527459908554204",
+      "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee": "30055319416176950041"
+    }
+  },
+  "tokens": {
+    "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+      "symbol": "WETH",
+      "decimals": 18
+    },
+    "0x111111111117dc0aa78b770fa6a738034120c302": {
+      "symbol": "1INCH",
+      "decimals": 18
+    },
+    "0x6810e776880c02933d47db1b9fc05908e5386b96": {
+      "symbol": "GNO",
+      "decimals": 18
+    },
+    "0xdac17f958d2ee523a2206206994597c13d831ec7": {
+      "symbol": "USDT",
+      "decimals": 6
+    },
+    "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee": {
+      "symbol": "ETH",
+      "decimals": 18
+    },
+    "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48": {
+      "symbol": "USDC",
+      "decimals": 6
+    },
+    "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599": {
+      "symbol": "WBTC",
+      "decimals": 8
+    }
+  }
+}
