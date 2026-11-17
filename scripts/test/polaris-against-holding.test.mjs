@@ -304,19 +304,39 @@ test("the since-open window counts a debt below zero as owed, the same as agains
   close(r.gain * 2000, w.protocol);
 });
 
-test("stables a touch minted to the holder count as received: the window from that touch agrees with against holding", () => {
-  // The mint is in the touch's written debt (it lands on zero), so the window
-  // that opens there starts from the stables already received.
-  const evs = [row(1, "open", { collChange: 10, debtChange: 0, newColl: 10, newDebt: 40, settled: 40, price: 1800 })];
-  const chain = head(evs[0], { entireColl: 10, entireDebt: 40 });
+test("stables a touch minted to the holder count as received: the window opens after the mint and agrees with against holding", () => {
+  // The second touch's PSM share takes the debt to −40; it mints 40 USDp to
+  // the holder and writes the debt at zero.
+  const evs = [
+    row(1, "open", { collChange: 10, debtChange: 1000, newColl: 10, newDebt: 1000, price: 1800 }),
+    row(2, "adjust", { mrColl: -0.5, mrDebt: -1040, settled: 40, newColl: 9.5, newDebt: 0, price: 1900 }),
+  ];
+  const chain = head(evs[1], { entireDebt: 5, accruedInterest: 5 });
   const w = polarisSinceLastTouch(chain, evs);
-  assert.ok(w && w.sinceOpen);
+  assert.ok(w && !w.sinceOpen);
+  // The window opens at the touch's written figures: the debt at zero.
+  close(w.debtAtTouch, 0);
+  close(w.equityAtTouch, 9.5 * 1900);
+  close(w.protocol, -5);
+  // Against holding counts the 40 minted as received at that touch. Its
+  // figure at the touch's written state, at the same feed, differs from the
+  // figure now by the window's protocol term.
   const r = polarisAgainstHolding(evs, chain);
+  const atTouch = polarisAgainstHolding(evs, head(evs[1]));
   close(r.settled, 40);
-  close(r.gain * 2000, w.protocol);
+  close(atTouch.debtTerm, 1000 + 40 - 0);
+  close((r.gain - atTouch.gain) * 2000, w.protocol);
 });
 
-test("the export's timeline states the stables each touch minted to the holder", async () => {
+/** One `## ` section of an export, from its heading to the next. */
+const section = (md, heading) => {
+  const start = md.indexOf(`\n## ${heading}`);
+  assert.ok(start >= 0, `no section ${heading}`);
+  const end = md.indexOf("\n## ", start + 1);
+  return md.slice(start, end < 0 ? undefined : end);
+};
+
+test("the export's timeline and lifetime state the stables each touch minted to the holder", async () => {
   const evs = [
     row(1, "open", { collChange: 10, debtChange: 1000, newColl: 10, newDebt: 1000 }),
     row(2, "close", { collChange: -9.5, debtChange: 0, mrColl: -0.5, mrDebt: -1040, settled: 40 }),
@@ -337,10 +357,50 @@ test("the export's timeline states the stables each touch minted to the holder",
     events: evs,
     generatedAt: new Date(Date.UTC(2026, 10, 17)),
   });
-  assert.match(md, /\| Minted to the holder \(USDp\) \|/);
-  const closeRow = md.split("\n").find((l) => l.startsWith("| 2 |"));
-  assert.match(closeRow, /\| 40(\.00)? \|/);
-  assert.match(md, /- \*\*Minted to the holder:\*\* 40(\.00)? USDp/);
+  const timeline = section(md, "Timeline");
+  assert.match(timeline, /\| Minted to the holder \(USDp\) \|/);
+  const closeRow = timeline.split("\n").find((l) => l.startsWith("| 2 |"));
+  assert.match(closeRow, /\| 40 \|/);
+  const lifetime = section(md, "Lifetime");
+  assert.match(
+    lifetime,
+    /^- \*\*Minted to the holder:\*\* 40 USDp, where the debt had gone below zero \(Σ `_stablesMintedToEnsureZeroDebt`\)$/m,
+  );
+  assert.equal(lifetime.match(/^- \*\*Minted to the holder:\*\*/gm)?.length, 1);
+});
+
+test("the export's against-holding section states the stables minted to the holder", () => {
+  const evs = [
+    row(1, "open", { collChange: 10, debtChange: 1000, newColl: 10, newDebt: 1000 }),
+    row(2, "close", { collChange: -9.5, debtChange: 0, mrColl: -0.5, mrDebt: -1040, settled: 40 }),
+  ];
+  for (const e of evs) e.actionLabel = e.context.data.eventType;
+  const md = polarisPositionToMarkdown({
+    view: {
+      market: "usdp",
+      cdpId: "8",
+      stableSymbol: "USDp",
+      status: "closed",
+      coll: 0,
+      debt: 0,
+      collUsd: null,
+      icr: null,
+    },
+    chain: {
+      ...head(evs[1], { isOpen: false, recordedColl: 0, recordedDebt: 0, entireColl: 0, entireDebt: 0 }),
+      price: { pethInDebt: 2000, curve: 1, ethUsd: 2000, xauUsd: null },
+      interestRate: 0,
+      primaryRate: 0,
+      secondaryRate: 0,
+      reserveToDebtRatio: 1,
+      defensiveMode: false,
+    },
+    events: evs,
+    generatedAt: new Date(Date.UTC(2026, 10, 17)),
+  });
+  const holding = section(md, "Against holding pETH");
+  assert.match(holding, /^- \*\*Minted to the holder:\*\* 40 USDp, where a debt went below zero$/m);
+  assert.equal(holding.match(/^- \*\*Minted to the holder:\*\*/gm)?.length, 1);
 });
 
 test("a debt below zero is owed to the holder: the Debt line says Owed and the amount", () => {

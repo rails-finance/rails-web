@@ -678,7 +678,7 @@ export function againstHoldingProv(r: PolarisAgainstHolding, market: PolarisMark
     summary:
       `Against holding pETH. What the position comes to in pETH, set against keeping the pETH it deposited: the pETH ` +
       `it holds now, withdrew and was left as surplus, less any gas compensation escrow a liquidation paid to the ` +
-      `liquidator and the pETH deposited, plus the ${stable} it borrowed or was paid to settle a debt below zero, less ` +
+      `liquidator and the pETH deposited, plus the ${stable} it borrowed and the ${stable} minted to the holder where a debt went below zero, less ` +
       `the ${stable} it repaid and owes now, converted to pETH at the market's price feed ${at}. Interest, stability ` +
       `gains, reward pETH and PSM shares are in the collateral and debt now. A debt below zero counts as the ${stable} ` +
       `the next touch mints to the holder, as the chain shows on USDp position 2736 at block 11,706,332; the docs ` +
@@ -737,7 +737,7 @@ export function againstHoldingProv(r: PolarisAgainstHolding, market: PolarisMark
       ...(r.settled > 0
         ? [
             {
-              label: `${stable} settled to the holder`,
+              label: `${stable} minted to the holder`,
               value: formatExact(r.settled),
               kind: "chain" as const,
               pclass: "indexed" as const,

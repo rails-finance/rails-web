@@ -138,7 +138,7 @@ export function polarisPositionToMarkdown(args: PolarisPositionMarkdownArgs): st
         ? `- **Debt:** ${amt(view.debt)} ${stable}`
         : polarisDebtOwed(view.debt) > 0
           ? `- **Debt:** Owed ${amt(polarisDebtOwed(view.debt))} ${stable} (below zero: the next touch mints it to the holder)`
-          : `- **Debt:** none${view.recordedDebt != null && view.recordedDebt > 0 ? ` (the pending legs exceed the ${amt(view.recordedDebt)} ${stable} recorded at the last touch; the next touch settles it to zero)` : ""}`,
+          : `- **Debt:** none${view.recordedDebt != null && view.recordedDebt > 0 ? ` (the pending legs clear the ${amt(view.recordedDebt)} ${stable} recorded at the last touch)` : ""}`,
     );
     if (view.icr != null)
       lines.push(

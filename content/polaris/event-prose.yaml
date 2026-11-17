@@ -565,7 +565,7 @@ position_words:
   lead_holds: |-
     This position holds {coll} pETH of collateral and owes {debt} {stable}:
   lead_settles: |-
-    This position holds {coll} pETH of collateral and owes nothing at this block; its next touch settles the debt to zero:
+    This position holds {coll} pETH of collateral and owes nothing at this block; its pending legs clear the recorded debt:
   lead_owed: |-
     This position holds {coll} pETH of collateral and is owed {owed} {stable}, which its next touch mints to the holder:
   lead_no_debt: |-
