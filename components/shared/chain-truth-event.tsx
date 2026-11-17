@@ -1078,8 +1078,8 @@ export function PartyChip({
 }: {
   party: NonNullable<ChainTruthRowSpec["party"]>;
   tile?: boolean;
-  /** The mark alone, no words: where the sentence beside it already names the party. The caller hides it from
-   *  screen readers, which read the party in the sentence. */
+  /** The mark alone, no words, the mark hidden from screen readers: where the sentence beside it already names the
+   *  party. The Prov stays reachable (a button while the inspector is armed, named for its receipt). */
   markOnly?: boolean;
 }) {
   const ens = useEnsName(party.ens ? party.address : null);
@@ -1096,18 +1096,28 @@ export function PartyChip({
       className={`inline-flex items-center text-sm ${subject ? "gap-2" : "gap-1"}`}
     >
       {markOnly ? (
-        <span data-party-chip={chipId} data-party-mark-only="" data-prov-hidden="" />
+        <span data-party-chip={chipId} data-party-mark-only="" data-prov-hidden="" aria-hidden />
       ) : (
         <span className="text-rb-500" data-party-chip={chipId} data-prov-hidden="">
           {party.prefix}
         </span>
       )}
       {subject ? (
-        <span className="inline-flex" data-party-icon={`bar:${subject.icon}`} data-prov-hidden="">
+        <span
+          className="inline-flex"
+          data-party-icon={`bar:${subject.icon}`}
+          data-prov-hidden=""
+          {...(markOnly ? { "aria-hidden": true } : {})}
+        >
           <BarSubjectTile subject={subject} />
         </span>
       ) : party.name && party.glyph ? (
-        <span className="inline-flex shrink-0" data-party-icon={`glyph:${party.glyph}`} data-prov-hidden="">
+        <span
+          className="inline-flex shrink-0"
+          data-party-icon={`glyph:${party.glyph}`}
+          data-prov-hidden=""
+          {...(markOnly ? { "aria-hidden": true } : {})}
+        >
           <ProtocolGlyph id={party.glyph} className="size-3.5 text-foreground" />
         </span>
       ) : (
@@ -1116,6 +1126,7 @@ export function PartyChip({
           <img
             src={party.icon}
             alt=""
+            {...(markOnly ? { "aria-hidden": true } : {})}
             width={14}
             height={14}
             className="size-3.5 shrink-0 rounded-full"

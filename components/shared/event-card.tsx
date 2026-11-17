@@ -136,7 +136,8 @@ export interface EventCardExplainer {
   body: ReactNode;
   first?: ReactNode;
   /** `first`'s first sentence as plain text, where `first` is a component that draws its own words: the event page
-   *  reads it to tell whether the h1 names the head's party. */
+   *  reads it to tell whether the h1 names the head's party. A family whose sentence names the party inside a
+   *  component (a Prov) must pass it, or the full tile draws beside a sentence that already names the party. */
   firstText?: string;
   grouped?: boolean;
 }
@@ -1095,8 +1096,9 @@ function plainText(node: ReactNode): string {
 }
 
 /** The head's party beside the event page's h1: the full tile, or, where the sentence names the party (from the
- *  sentence's text, so the server's render already has it), its mark alone and hidden from screen readers, which
- *  read the party in the sentence. */
+ *  sentence's text, so the server's render already has it), its mark alone, the mark hidden from screen readers,
+ *  which read the party in the sentence. The chip's receipt stays reachable: no aria-hidden on this wrapper, which
+ *  holds a Prov that is a focusable button while the inspector is armed. */
 function SentenceParty({
   party,
   sentence,
@@ -1106,11 +1108,7 @@ function SentenceParty({
 }) {
   const named = sentenceNamesParty(sentence, party.name);
   return (
-    <span
-      className="inline-flex"
-      data-event-page-party-beside={named ? "mark" : "tile"}
-      {...(named ? { "aria-hidden": true } : {})}
-    >
+    <span className="inline-flex" data-event-page-party-beside={named ? "mark" : "tile"}>
       <PartyChip party={party} tile markOnly={named} />
     </span>
   );
