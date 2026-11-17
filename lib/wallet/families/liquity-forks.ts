@@ -6,6 +6,7 @@
 // price read: one multicall of the fork's branch PriceFeeds for every Trove
 // at once, which values the collateral and gives the collateral ratio.
 
+import { formerHoldOf, movedHistory } from "@/lib/wallet/moved-row";
 import { buildEbisuTroveRows, type EbisuTroveSummary, type RawEbisuTroveRow } from "@/lib/sources/api/ebisu-troves";
 import {
   buildAsymmetryTroveRows,
@@ -67,6 +68,9 @@ function forkModule<R, S extends ForkSummary>(spec: ForkSpec<R, S>): FamilyModul
           headRead: "none",
           ...storeStamp(r),
         };
+        // A Trove this wallet held and passed on (lib/wallet/moved-row.ts).
+        const moved = formerHoldOf(r.card);
+        if (moved) return { ...base, status: "moved", history: movedHistory(moved) };
         if (r.status === "open") return base;
         const parts = [
           s.peakCollateral > 0 ? amountText(s.peakCollateral, s.collateralType) : null,

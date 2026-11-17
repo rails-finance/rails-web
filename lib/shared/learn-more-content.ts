@@ -12,11 +12,18 @@ import { indefiniteArticle, viewWord } from "@/lib/utils/format";
  *  "?", and the events row with whatever charts stand over it behind the
  *  "?" on the events heading, so the modal reads only what is on screen.
  *  One text on every explorer (ui-jobs §264). */
-export function lifetimeFlowsBarsContent(): LearnMoreContent {
+export function lifetimeFlowsBarsContent(
+  /** Each bar's hue and name, where the second bar is not a debt in green
+   *  (a Polaris deposit's pETH paid in, in violet). */
+  sides?: { collateral: { hue: string; label: string }; debt: { hue: string; label: string } },
+): LearnMoreContent {
+  // The hue words are cased; the labels are the bars' own ("USDp deposit").
+  const which = sides
+    ? `${sides.collateral.hue} is the ${sides.collateral.label}, ${sides.debt.hue.toLowerCase()} the ${sides.debt.label}.`
+    : "Blue is the collateral, green the debt.";
   return {
     title: "How to read the bars",
-    intro:
-      "Blue is the collateral, green the debt. The solid part is what is held or owed on the cursor's day; the hatched parts are what left. Tap a part for its name, value and share.",
+    intro: `${which} The solid part is what is held or owed on the cursor's day; the hatched parts are what left. Tap a part for its name, value and share.`,
   };
 }
 
@@ -24,7 +31,7 @@ export function lifetimeFlowsBarsContent(): LearnMoreContent {
  *  side's events by the names its timeline gives them, and the marks the
  *  family draws. */
 export interface FlowEventsHelp {
-  sides: { hue: "Blue" | "Green"; label: string; events: string[] }[];
+  sides: { hue: "Blue" | "Green" | "Violet"; label: string; events: string[] }[];
   /** Both sides' hues, half and half, where the position has both. */
   both: boolean;
   /** The family's names for its warning marks, where it draws them. */
@@ -1222,6 +1229,28 @@ export function liquityForkBatchContent(p: LiquityForkLearnMoreParams): LearnMor
       "Leaving the batch returns the rate to self-management.",
     ],
     links: forkLinks(p, "batch"),
+  };
+}
+
+/** A Trove transfer: Liquity V2's modal (content/liquity-v2/event-prose.yaml,
+ *  `transfer`) in the fork's names. */
+export function liquityForkTransferContent(p: LiquityForkLearnMoreParams): LearnMoreContent {
+  return {
+    title: "How Trove transfers work",
+    intro: `A ${p.protocolName} Trove is an ERC-721 NFT, so its ownership can be transferred to another wallet like any other token.`,
+    detailsHeading: "Key concepts:",
+    details: [
+      {
+        bold: "Trove NFT",
+        text: "ownership of the position is a transferable NFT; whoever holds it controls the Trove.",
+      },
+      {
+        bold: "Transfer effects",
+        text: "transferring the NFT hands full control of the collateral and debt to the new holder.",
+      },
+      { bold: "Multiple Troves", text: "one address can hold many Troves, each a separate NFT and position." },
+    ],
+    links: forkLinks(p, "trove"),
   };
 }
 

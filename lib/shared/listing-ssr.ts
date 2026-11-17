@@ -150,7 +150,7 @@ export interface SsrInitial<T> {
 // the preview site (2026-09-21), and a fallback re-issues the same query from
 // the browser, so a ceiling inside the normal range doubles the load it exists
 // to shed. Every listing page pins `maxDuration = 30` (s) above this.
-const SSR_FETCH_TIMEOUT_MS = 8000;
+export const SSR_FETCH_TIMEOUT_MS = 8000;
 
 /** Settle with `p`, or reject when `signal` aborts — whichever comes first. A
  *  fetchPage that drops the signal still has its wait bounded. */

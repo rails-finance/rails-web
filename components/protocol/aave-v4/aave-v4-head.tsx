@@ -23,16 +23,22 @@ import type { AaveV4Context } from "@/lib/shared/types/protocols/aave-v4";
 import { AAVE_V4_LABELS, aaveV4Label, aaveV4T1Kind } from "@/lib/aave-v4/event-label";
 import type { Provenance } from "@/components/shared/provenance";
 import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
-import {
-  eventLogProv,
-  heldDebtRateProv,
-  externalActorProv,
-  GPV2_SETTLEMENT,
-  swapRouteProv,
-} from "@/lib/aave-v4/position-provenance";
-import { getProtocolContract } from "@/lib/shared/known-infrastructure";
+import { eventLogProv, heldDebtRateProv, externalActorProv } from "@/lib/aave-v4/position-provenance";
+import { cowVenueParty, cowVenueProv } from "@/lib/aave-v3/event-provenance";
 import { protocolIconSrc } from "@/lib/shared/protocols";
 import { chainIdForSpokeAddress } from "@/lib/aave-v4/spoke-meta";
+
+/** How a V4 swap's spoke legs bound the Trade's amounts (rails-ops reference/aave-v4-position-swaps.md, "Pairing"). */
+const V4_SWAP_AMOUNTS: Record<NonNullable<AaveV4Context["swap"]>["kind"], string> = {
+  collateral_swap:
+    "the withdraw is no less than the Trade's sell amount and the supply no less than its buy amount, each to within 2 wei",
+  debt_swap:
+    "the borrow is no less than the Trade's sell amount and the repay no more than its buy amount, each to within 2 wei",
+  repay_with_collateral:
+    "the withdraw is no less than the Trade's sell amount and the repay no more than its buy amount, each to within 2 wei",
+  leverage:
+    "the borrow is no less than the Trade's sell amount and the supply no less than its buy amount, each to within 2 wei",
+};
 
 /** 1-based position + total within a shared tx_hash. `count > 1` draws the
  *  "X of Y" chip at the head's start. */
@@ -239,19 +245,31 @@ export function useAaveV4HeadSpec({
           ),
         }
       : undefined;
-  // A swap names its route: the CoW settlement.
+  // A swap names its route, "via CoW", as the Aave V3 swap card does (cowVenueParty, cowVenueProv).
   const chainId = chainIdForSpokeAddress(ctx.spokeAddress);
-  const cow = swap ? getProtocolContract(GPV2_SETTLEMENT, chainId) : undefined;
-  const party = swap
-    ? {
-        prefix: "via",
-        address: GPV2_SETTLEMENT,
-        name: cow?.name ?? "CoW Protocol",
-        icon: cow?.protocolIcon ? protocolIconSrc(cow.protocolIcon) : undefined,
-        glyph: cow?.protocolGlyph ?? "cow",
-        prov: swapRouteProv(swap, { ...coord, asset: ctx.reserveSymbol }),
-      }
-    : undefined;
+  const cow = swap ? cowVenueParty(chainId) : undefined;
+  const party =
+    swap && cow
+      ? {
+          prefix: "via",
+          address: cow.address,
+          name: cow.name,
+          icon: cow.protocolIcon ? protocolIconSrc(cow.protocolIcon) : undefined,
+          glyph: cow.protocolGlyph,
+          prov: cowVenueProv(
+            { txHash: coord.txHash, blockNumber: coord.blockNumber, chainId },
+            {
+              rows: "two rows are",
+              owner: `the owner is a one-order contract created for the order, which called Aave's Giver and Taker position managers for this position in the same transaction`,
+              amounts: `${V4_SWAP_AMOUNTS[swap.kind]}${swap.exact ? " (here, both to the wei)" : ""}`,
+              orderUid: swap.orderUid,
+              ownerAddress: swap.clone,
+              sellAmount: swap.sell.raw,
+              buyAmount: swap.buy.raw,
+            },
+          ),
+        }
+      : undefined;
   const sameBlock =
     txGroup && txGroup.count > 1
       ? {

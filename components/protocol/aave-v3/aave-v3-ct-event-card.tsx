@@ -34,6 +34,7 @@ import { feeLiquidation, liquidationFee } from "@/lib/aave-v3/liquidation-fee";
 import type { AaveV3Neighbours, AaveV3TimelineEvent } from "@/lib/aave-v3/event-neighbours";
 import { useRouterSale } from "@/hooks/useRouterSale";
 import { useTimelineEntry } from "@/components/shared/section-sidebar";
+import { GPV2_SETTLEMENT } from "@/lib/aave-v3/event-provenance";
 import { entryAddress } from "@/lib/shared/tx-entry";
 
 export interface AaveV3CtEventCardProps {
@@ -105,8 +106,17 @@ export function AaveV3CtEventCard({
   // The contract the transaction entered names the row's stretch of the
   // timeline's side bar: the server's entry contract or `to`, else the sale
   // read's receipt `to` (anatomy P3.1.1).
-  const entryTo = entryAddress(indexed.entry) ?? to;
-  useTimelineEntry(event.id, { address: entryTo, entry: indexed.entry, wallet: event.wallet, txHash: event.txHash });
+  // A swap paired on a CoW Trade log names CoW's settlement, whatever contract the transaction entered (a
+  // flash-loan router, a solver contract): the Trade log is the evidence.
+  const cowSwap = indexed.swap && indexed.swap.route !== "paraswap" && indexed.swap.orderUid ? indexed.swap : undefined;
+  const entryTo = cowSwap ? GPV2_SETTLEMENT : (entryAddress(indexed.entry) ?? to);
+  useTimelineEntry(event.id, {
+    address: entryTo,
+    entry: indexed.entry,
+    wallet: event.wallet,
+    txHash: event.txHash,
+    cowTrade: cowSwap ? { orderUid: cowSwap.orderUid!, owner: cowSwap.tradeOwner } : undefined,
+  });
   const ctx: AaveV3Context = sale ? { ...indexed, sale } : indexed;
   // Pointer-over or focus of the row starts the position reads the open card
   // makes (this transaction's and the previous one's), so the state is

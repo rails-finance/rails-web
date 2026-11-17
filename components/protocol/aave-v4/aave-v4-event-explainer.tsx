@@ -24,6 +24,9 @@ import {
 import type { EventProvDetail } from "@/lib/aave-v4/position-provenance";
 import { useHealthFactorAround, hfOf } from "@/lib/aave-v4/use-health-factor-around";
 import { amountProv, repaidProv, seizedProv } from "./aave-v4-head";
+import { aaveV4CowView } from "@/lib/aave-v4/swaps";
+import { shiftRaw } from "@/lib/cow/surplus";
+import { cowSurplusProv, flashFeeProv } from "@/lib/cow/surplus-provenance";
 
 export interface AaveV4EventExplainerProps {
   ctx: AaveV4Context;
@@ -61,6 +64,30 @@ function echoFor(key: AaveV4EchoKey, ctx: AaveV4Context, coord: EventProvDetail)
         value: formatExact(Number(ctx.debtToCover)),
         symbol: ctx.reserveSymbol,
       };
+    case "returned":
+    case "flash_fee": {
+      // A buy order's refund and the flash-loan fee: the sentence is their only place on the card, so it carries
+      // the receipt (the fee line under the grid stands alone).
+      const cow = ctx.swap ? aaveV4CowView(ctx.swap) : null;
+      if (!cow || cow.view.token.decimals == null || coord.blockNumber == null || !coord.txHash) return null;
+      const coords = { block: coord.blockNumber, txHash: coord.txHash };
+      if (key === "returned")
+        return {
+          info: cowSurplusProv(cow.view, cow.trade, coords),
+          value: shiftRaw(cow.view.surplus, cow.view.token.decimals),
+          symbol: cow.view.token.symbol ?? undefined,
+          primary: true,
+          data: { "data-cow-surplus": cow.view.kind },
+        };
+      const loan = cow.view.flashLoan;
+      if (!loan) return null;
+      return {
+        info: flashFeeProv(loan, cow.view.token, coords),
+        value: shiftRaw(loan.premium, cow.view.token.decimals),
+        symbol: cow.view.token.symbol ?? undefined,
+        primary: true,
+      };
+    }
   }
 }
 

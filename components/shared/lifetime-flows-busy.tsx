@@ -32,6 +32,7 @@ import {
   SegmentTipBody,
   SegmentPanelBody,
   sumSwatch,
+  useFlowHues,
   useFlowUnit,
 } from "@/components/shared/lifetime-flows-tip";
 import { flowSegmentProv } from "@/lib/shared/flows-timeline-provenance";
@@ -65,7 +66,10 @@ import { flowBins, throughput, type FlowBin } from "@/lib/shared/flows-busy";
 export const FlowBarsHeadsContext = createContext<Partial<Record<FlowSide, ReactNode>> | null>(null);
 
 const PLAY_MS = 220;
-const HUE: Record<FlowSide, string> = { collateral: "var(--color-blue-500)", debt: "var(--color-green-400)" };
+const HUE: Record<FlowSide, string> = {
+  collateral: "var(--color-blue-500)",
+  debt: "var(--flow-debt, var(--color-green-400))",
+};
 const dayStamp = (tsSec: number) => `${shortDate(tsSec)} ${shortDateYear(tsSec)}`;
 const count = (n: number) => n.toLocaleString("en-US");
 /** The density strip's inset each side, matching the slider thumb's travel. */
@@ -442,6 +446,7 @@ export function Rescaled({
    *  plain bars do (Combined; the Flows view's busy bars draw none). */
   outline?: boolean;
 }) {
+  const hues = useFlowHues();
   // Fixed per position: the most either side has held or owed at any stop.
   const sharedAxis = useMemo(() => {
     let peak = Math.max(model.live.collateralUsd, model.live.debtUsd);
@@ -565,7 +570,7 @@ export function Rescaled({
                       when={when}
                       isLive={isLive}
                       daily={model.daily}
-                      swatch={sumSwatch(side)}
+                      swatch={sumSwatch(side, hues)}
                       words={{
                         rest: st.sources.find((x) => x.fill === "estimate")?.label ?? "Market move and interest",
                       }}

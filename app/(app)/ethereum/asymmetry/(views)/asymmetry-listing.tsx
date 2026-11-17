@@ -1,5 +1,8 @@
 "use client";
 
+import { useState } from "react";
+import { formerHoldFor } from "@/lib/liquity-fork/former-holders";
+
 // Asymmetry Trove listing — client half. One row per Trove (across 5 collateral branches),
 // replayed straight from the Asymmetry TroveUpdated events — chain-direct values only
 // (branch collateral + USDaf debt, user-set interest rate, status). There is no
@@ -27,6 +30,9 @@ export interface AsymmetryListingProps {
 }
 
 export function AsymmetryListing({ initialItems, initialTotal, initialKey, initialSearch }: AsymmetryListingProps) {
+  // The search, so a Trove the searched wallet passed on reads "moved to"
+  // (lib/liquity-fork/former-holders.ts).
+  const [q, setQ] = useState(() => new URLSearchParams(initialSearch ?? "").get("q") ?? "");
   return (
     <ChainTruthListingPage<AsymmetryTroveSummary, AsymmetryListFilters>
       title="Asymmetry Troves"
@@ -35,11 +41,15 @@ export function AsymmetryListing({ initialItems, initialTotal, initialKey, initi
       defaults={ASYMMETRY_LIST_DEFAULTS}
       sortOptions={ASYMMETRY_SORT_OPTIONS}
       searchPlaceholder="Search trove id or collateral"
-      renderCard={(t) => <AsymmetryPositionCard v={viewFromSummary(t)} compact />}
+      renderCard={(t) => (
+        <AsymmetryPositionCard v={{ ...viewFromSummary(t), formerHold: formerHoldFor(t, q) }} compact />
+      )}
+      onFilters={(filters) => setQ(filters.q ?? "")}
       hrefFor={(t) => `/ethereum/asymmetry/${t.collateralType}/${t.id}`}
       keyFor={(t) => `${t.collateralType}-${t.id}`}
       strategy={memoryStrategy<AsymmetryTroveSummary, AsymmetryListFilters>({
-        fetchAll: () => fetchAsymmetryTroves({ sortBy: "debt", sortOrder: "desc", limit: 500 }).then((r) => r.data),
+        fetchAll: () =>
+          fetchAsymmetryTroves({ sortBy: "debt", sortOrder: "desc", limit: 500, former: true }).then((r) => r.data),
         dimensions: asymmetryListDimensions,
         apply: ASYMMETRY_APPLY,
       })}

@@ -7,7 +7,7 @@
 import Link from "next/link";
 import { ProtocolInfoShell } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
-import { POLARIS_MARKETS_PATH } from "@/lib/polaris/routes";
+import { POLARIS_LOANS_PATH, POLARIS_MARKETS_PATH, POLARIS_SP_PATH } from "@/lib/polaris/routes";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("polaris");
@@ -19,8 +19,8 @@ const intro = (
   <>
     <p>
       Every Polaris position on Sepolia, with its history. A position is a loan: pETH locked as collateral, a stablecoin
-      borrowed against it. All numbers are test numbers, not money. Reserve loans and Stability Pool deposits are not
-      shown yet.
+      borrowed against it. All numbers are test numbers, not money. Stability Pool deposits and reserve loans have pages
+      of their own.
     </p>
 
     <h2 className={H}>How it works</h2>
@@ -87,13 +87,46 @@ const intro = (
       <li>Tokens are test tokens, and ETH and gold prices come from the protocol&apos;s testnet medianisers.</li>
     </ul>
 
-    <h2 className={H}>Not shown yet</h2>
+    <h2 className={H}>Stability Pool deposits</h2>
     <ul className={UL}>
       <li>
-        Reserve loans lend ETH against fpETH, the floor part of pETH. Its price in ETH is guaranteed only to rise, so a
-        loan against it can&apos;t be liquidated. The index records these loans, but no page shows them.
+        Each market has a stability pool that repays the debt of liquidated positions. A deposit in it is an NFT, named
+        by its market and number. Each liquidation burns a share of every deposit and pays pETH in its place, and the
+        deposit also earns the market&apos;s stablecoin as yield.
       </li>
-      <li>Stability-pool deposits are positions of their own kind, and they aren&apos;t shown either.</li>
+      <li>
+        The pool writes what changed only when the holder touches the deposit. A deposit&apos;s page reads the rest from
+        the pool at the latest block: the deposit now, and the pETH and yield the next touch would pay.{" "}
+        <Link href={POLARIS_SP_PATH} className={INLINE_LINK}>
+          See the deposits
+        </Link>
+        .
+      </li>
+      <li>Deposit #2 in each pool is held by the market&apos;s savings vault (sUSDp, sGOLDp).</li>
+    </ul>
+
+    <h2 className={H}>Reserve loans</h2>
+    <ul className={UL}>
+      <li>
+        A reserve loan borrows WETH from the protocol&apos;s reserve against fpETH, the floor part of pETH. Its price in
+        WETH only rises, so a loan against it can&apos;t be liquidated.
+      </li>
+      <li>
+        The debt is a number of shares, and each fee the reserve charges raises the debt per share. A loan&apos;s page
+        states its debt, its cost so far, and its collateral at the floor price beside the debt.{" "}
+        <Link href={POLARIS_LOANS_PATH} className={INLINE_LINK}>
+          See the loans
+        </Link>
+        .
+      </li>
+    </ul>
+
+    <h2 className={H}>How Rails reads it</h2>
+    <ul className={UL}>
+      <li>The USDp and GOLDp stability pools: every deposit operation and its getters at the latest block.</li>
+      <li>The reserve loans manager: every loan opened, adjusted and closed, and the debt per share.</li>
+      <li>The loan NFT: who holds each loan.</li>
+      <li>The bonding curve&apos;s floorPrice(): fpETH in WETH.</li>
     </ul>
   </>
 );

@@ -70,6 +70,9 @@ export async function GET(
       if (v) qs.set(k, v);
     }
     if (sp.get("group") === "1") qs.set(SHAPE_RUNS_PARAM, "1");
+    // The TroveNFT's wallet-to-wallet transfers as rows of their own; an index
+    // that predates them ignores the flag.
+    qs.set("transfers", "1");
     const q = qs.toString();
     const url = `${RAILS_API_URL}/api/basedollar/${encodeURIComponent(collateralType)}/${encodeURIComponent(troveId)}/timeline${q ? `?${q}` : ""}`;
     const response = await fetch(url, createAuthFetchOptions(undefined, readerIp));

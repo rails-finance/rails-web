@@ -5,7 +5,8 @@
 // bought for the order; the Trade log names no receiver) with the amounts on their flanks; every token
 // icon on the card opens the asset's panel (AssetPopover); T2 Sold, Bought, the
 // executed price, the fee where the log carries one, the settlement
-// transaction and its block; T3 the trade in words. No USD: phase 1 reads no
+// transaction and its block, and, once the card opens on a settlement with
+// other trades, the settlement panel (cow-settlement-panel.tsx); T3 the trade in words. No USD: phase 1 reads no
 // oracle at a trade's block, so the slot stays empty (rails-ops chain-truth
 // charter §3).
 
@@ -35,6 +36,7 @@ import {
 } from "@/lib/cow/trade";
 import { COW_TERMS, cowFeeSentence } from "@/lib/cow/terms";
 import { executedPriceNone } from "@/lib/cow/price";
+import { useCowSettlementOpened } from "@/components/protocol/cow/cow-settlement-panel";
 
 /** A token's icon that opens its panel (AssetPopover): the contract, and the
  *  asset page's row and link where Rails has a page for it. */
@@ -230,7 +232,7 @@ export function CowTradeCard({
           <li>
             A solver sent the settlement transaction
             {others > 0
-              ? `, which settled ${others.toLocaleString("en-US")} other ${others === 1 ? "trade" : "trades"} with this one`
+              ? `; this trade is one of ${trade.settlementTrades.toLocaleString("en-US")} trades in this settlement`
               : ""}
             .
           </li>
@@ -238,6 +240,8 @@ export function CowTradeCard({
       ),
     },
     learnMore: null,
+    // The settlement panel (ui-jobs 711): read when the card opens, where the settlement carried other trades.
+    ...(others > 0 ? { useOpened: () => useCowSettlementOpened(trade, sell, buy) } : {}),
   };
   return <EventCard slots={slots} avatar={null} />;
 }

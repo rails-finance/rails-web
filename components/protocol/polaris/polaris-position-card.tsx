@@ -59,6 +59,8 @@ import { Prov } from "@/components/shared/provenance";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { latestStateProv, lifetimeLegProv, peakProv } from "@/lib/polaris/event-provenance";
 import {
+  polarisDebtOwed,
+  polarisEquityAtFeed,
   polarisPendingAtFeed,
   polarisPsmOutcomeAtFeed,
   type PolarisLifetime,
@@ -99,6 +101,7 @@ import {
 } from "@/lib/polaris/surplus-claim";
 import { LinkedTx } from "@/components/shared/linked-tx";
 import { dateTimeText } from "@/lib/frankencoin/figures";
+import { formatDate } from "@/lib/date";
 import type { PolarisSurplusContext } from "@/lib/shared/types/event-shape";
 import { SEPOLIA_CHAIN_ID } from "@/lib/shared/chains";
 import type { Provenance } from "@/components/shared/provenance";
@@ -117,6 +120,9 @@ export interface PolarisPositionView {
   /** The current holder — null once the NFT is burned and no index row names
    *  the last one. */
   owner: string | null;
+  /** A listing searched by a wallet that held this CDP and sent its NFT on:
+   *  where it went and when (ui-jobs 715). */
+  formerHold?: { movedTo: string; movedAt: number | null } | null;
   status: PolarisPositionStatus;
   liquidated: boolean;
   /** Collateral (pETH) — the entire figure on the chain lane, the last
@@ -132,9 +138,9 @@ export interface PolarisPositionView {
    *  same read. */
   debtUsd: number | null;
   /** Chain lane only — entireColl × the feed's pETH-in-debt-unit price, minus
-   *  the debt owed. A valuation at the block, not a profit — may be negative.
-   *  An entire debt at or below zero owes nothing (the next touch settles it
-   *  to zero), so it never adds to the equity. */
+   *  the debt owed (polarisEquityAtFeed). A valuation at the block, not a
+   *  profit — may be negative. An entire debt below zero is the stables the
+   *  next touch mints to the holder, so it adds to the equity. */
   equity: number | null;
   /** Chain lane only — the debt as recorded at the last touch, the base the
    *  entire debt's pending legs are added to. */
@@ -194,6 +200,9 @@ const DEFENSIVE_MODE_TIP =
 
 /** What the Debt label says on a CDP that owes nothing. */
 const COLLATERAL_ONLY_TIP = "Owes nothing at this block. A Polaris position can hold collateral with no debt.";
+
+/** What the Debt label says on a CDP whose entire debt is below zero. */
+const OWED_TIP = "The debt is below zero. The position's next touch mints this amount to the holder.";
 
 /** A pETH price in the market's own stablecoin, at a readable grain: three
  *  decimals under 1, two under 100, whole numbers above (USDp's feed runs in
@@ -322,6 +331,14 @@ function assetIcon(symbol: string, address: string, figure: string): ReactNode {
       <TokenChipIcon symbol={symbol} address={address} size={28} filterable={false} untitled />
     </AssetPopover>
   );
+}
+
+/** The "moved to" tip on a listing row searched by a wallet that held the
+ *  CDP and sent its NFT on (ui-jobs 715). */
+function movedToTip(movedAt: number | null): string {
+  return movedAt != null
+    ? `This wallet held the position until ${formatDate(movedAt)}, then sent its NFT to the wallet shown.`
+    : "This wallet held the position, then sent its NFT to the wallet shown.";
 }
 
 /** The CDP-grain identity on a listing row: the market and the CDP id. Its copy
@@ -481,6 +498,14 @@ export function polarisCardSlots({
       <span className="text-xs text-rb-500">{stable} market</span>
       <PositionNameId name={name} />
     </span>
+  ) : v.formerHold ? (
+    // The searched wallet held this CDP and sent its NFT on (ui-jobs 715).
+    <span className="inline-flex min-w-0 items-center gap-1.5 text-xs text-rb-500" data-moved-to={v.formerHold.movedTo}>
+      <RevealTip tip={movedToTip(v.formerHold.movedAt)} focusable className="text-rb-400 focus-ring rounded-sm">
+        moved to
+      </RevealTip>
+      <WalletPill wallet={v.formerHold.movedTo} ensName={null} filterProtocol="polaris" bookmark />
+    </span>
   ) : (
     v.owner && <WalletPill wallet={v.owner} ensName={null} filterProtocol="polaris" bookmark />
   );
@@ -533,6 +558,8 @@ export function polarisCardSlots({
     };
   } else {
     const mcrInForce = v.mcr;
+    // The live read's entire debt below zero: owed to the holder.
+    const owed = v.basis === "chain" ? polarisDebtOwed(v.debt) : 0;
     const floorWords =
       mcrInForce != null ? { mcr: mcrInForce, ...polarisFloorWords(mcrInForce, v.defensiveMode) } : null;
     const belowMin = v.icr != null && mcrInForce != null && v.icr < mcrInForce;
@@ -572,7 +599,7 @@ export function polarisCardSlots({
       {
         id: "debt",
         label: CARD_VOCAB.debt,
-        labelTip: v.debt <= 0 && v.coll > 0 ? COLLATERAL_ONLY_TIP : undefined,
+        labelTip: owed > 0 ? OWED_TIP : v.debt <= 0 && v.coll > 0 ? COLLATERAL_ONLY_TIP : undefined,
         value:
           v.debt > 0 ? (
             <Prov info={debtProv(v)}>
@@ -580,6 +607,17 @@ export function polarisCardSlots({
                 value={v.debt}
                 symbol={stable}
                 exact={v.debtRaw != null ? formatUnitsExact(v.debtRaw, 18) : undefined}
+              />
+            </Prov>
+          ) : owed > 0 ? (
+            // A live entire debt below zero: the stables the next touch mints
+            // to the holder, receipted as the debt is.
+            <Prov info={debtProv(v)}>
+              <span className="text-rb-500">Owed </span>
+              <CardFigure
+                value={owed}
+                symbol={stable}
+                exact={v.debtRaw != null ? formatUnitsExact(v.debtRaw.replace(/^-/, ""), 18) : undefined}
               />
             </Prov>
           ) : v.coll > 0 ? (
@@ -594,7 +632,13 @@ export function polarisCardSlots({
                 stableAddress,
                 v.debtRaw != null ? formatUnitsExact(v.debtRaw, 18) : formatExact(v.debt),
               )
-            : undefined,
+            : owed > 0
+              ? assetIcon(
+                  stable,
+                  stableAddress,
+                  v.debtRaw != null ? formatUnitsExact(v.debtRaw.replace(/^-/, ""), 18) : formatExact(owed),
+                )
+              : undefined,
         usd:
           v.debtUsd != null && v.debtUsd > 0 ? (
             <Prov info={liveDebtUsdProv(v.market, index)} value={formatUsdValue(v.debtUsd)}>
@@ -854,6 +898,7 @@ export function viewFromSummary(
     // A timeline-derived summary of a never-transferred, burned CDP has no
     // holder to name — null, never an empty pill.
     owner: s.owner || null,
+    formerHold: s.formerHold ?? null,
     status: s.status,
     liquidated: s.liquidated,
     coll: s.coll,
@@ -904,7 +949,7 @@ export function viewFromChain(c: PolarisChainResponse): PolarisPositionView {
     debtRaw: c.entireDebtRaw,
     collUsd: c.price ? c.entireColl * c.price.pethUsd : null,
     debtUsd: c.price && c.entireDebt > 0 ? debtInUsd(c.market, c.entireDebt, c.price.xauUsd) : null,
-    equity: c.price ? c.entireColl * c.price.pethInDebt - Math.max(0, c.entireDebt) : null,
+    equity: c.price ? polarisEquityAtFeed(c.entireColl, c.entireDebt, c.price.pethInDebt) : null,
     recordedDebt: c.recordedDebt,
     icr: c.icr,
     mcr: c.defensiveMode ? c.defensiveMcr : c.mcr,

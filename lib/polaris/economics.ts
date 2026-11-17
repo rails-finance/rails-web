@@ -5,7 +5,7 @@
 //               · PSM mint shares in, PSM redemption shares out · reward pETH
 //   debt:       borrowed (holder) · repaid (holder) · liquidated (op 3)
 //               · interest charged · stability gains · PSM mint shares in,
-//               PSM redemption shares out · minted to settle a residual
+//               PSM redemption shares out · minted to the holder
 //
 // The card's Explanation, the PSM outcome strip on the Lifetime flows panel
 // and the markdown export read them. The panel's own replay is
@@ -78,6 +78,19 @@ export function polarisPsmOutcomeAtFeed(
   const netDebt = lifetime.debtFromPsm - lifetime.debtToPsm;
   return { netColl, netDebt, value: polarisPsmShareValue(netColl, netDebt, pethInDebt) };
 }
+
+/** The position's equity at the feed: entire collateral at the feed less the
+ *  entire debt, signed. A debt below zero is the stables the next touch mints
+ *  to the holder, so it adds to the equity. The card's stat, the
+ *  Explanation's bullet, the export and the "Since its open" window all state
+ *  this figure. */
+export const polarisEquityAtFeed = (entireColl: number, entireDebt: number, pethInDebt: number): number =>
+  entireColl * pethInDebt - entireDebt;
+
+/** The stables owed to the holder: an entire debt below zero, as a positive
+ *  amount the next touch mints to the holder; zero on any other debt. The
+ *  card's Debt stat and the export state it as "Owed". */
+export const polarisDebtOwed = (entireDebt: number): number => (entireDebt < 0 ? -entireDebt : 0);
 
 /** The live read's pending legs, the subset of PolarisChainResponse they need. */
 export interface PolarisPendingRead {

@@ -623,11 +623,11 @@ const swapSoldProv = (sym: string, coords: V3Coords, raw?: string | null): Prove
  *  kind (server migs 243, 245). */
 const SWAP_OWNER: Record<AaveV3SwapDetail["kind"], string> = {
   collateral_swap:
-    "the owner is a one-order contract the Aave app created, which took this position's aTokens and supplied what it bought back to the position",
+    "the owner is a one-order contract created for the order, which took this position's aTokens and supplied what it bought back to the position",
   debt_swap:
-    "the owner is a one-order contract the Aave app created, which borrowed on this position's behalf and repaid its other debt with what it bought",
+    "the owner is a one-order contract created for the order, which borrowed on this position's behalf and repaid its other debt with what it bought",
   repay_with_collateral:
-    "the owner is a one-order contract the Aave app created, which took this position's aTokens and repaid its debt with what it bought",
+    "the owner is a one-order contract created for the order, which took this position's aTokens and repaid its debt with what it bought",
   withdraw_and_swap: "the owner is this position's account, which signed the order",
   supply_from_swap: "the owner is this position's account, which signed the order",
 };
@@ -653,6 +653,13 @@ export const swapVenueParty = (
 ): { address: string; name: string; protocolIcon?: string; protocolGlyph?: string } => {
   if (swap.route === "paraswap" && swap.adapter)
     return { address: swap.adapter, name: "ParaSwap", protocolIcon: "paraswap" };
+  return cowVenueParty(chainId);
+};
+
+/** CoW's settlement as a swap's venue party ("via CoW"): the Aave V3 and V4 swap cards' chip. */
+export const cowVenueParty = (
+  chainId: ChainId,
+): { address: string; name: string; protocolIcon?: string; protocolGlyph?: string } => {
   const named = getProtocolContract(GPV2_SETTLEMENT, chainId);
   return {
     address: GPV2_SETTLEMENT,
@@ -712,6 +719,37 @@ const paraswapVenueProv = (coords: V3Coords, swap: AaveV3SwapDetail, adapter: st
  *  adapter route is described, never named. */
 export const swapVenueProv = (coords: V3Coords, swap: AaveV3SwapDetail): Provenance => {
   if (swap.route === "paraswap" && swap.adapter) return paraswapVenueProv(coords, swap, swap.adapter);
+  return cowVenueProv(coords, {
+    rows: swap.kind === "withdraw_and_swap" || swap.kind === "supply_from_swap" ? "row is" : "two rows are",
+    owner:
+      swap.route === "cow_adapter"
+        ? SWAP_OWNER[swap.kind]
+        : "the owner is this position's account, which signed the order",
+    amounts: swapAmountRule(swap),
+    orderUid: swap.orderUid,
+    sellAmount: swap.raw.tradeSellAmount,
+    buyAmount: swap.raw.tradeBuyAmount,
+  });
+};
+
+/** The "via CoW" chip's receipt, for any family's swap paired to a CoW Trade log: the log names the order's owner,
+ *  the tokens and both amounts, and the position's rows are paired to it by `owner` and `amounts`. */
+export const cowVenueProv = (
+  coords: V3Coords,
+  pairing: {
+    /** "row is" or "two rows are". */
+    rows: string;
+    /** Who the Trade's owner is, as a clause ("the owner is …"). */
+    owner: string;
+    /** How the legs' amounts match the Trade's, as a clause. */
+    amounts: string;
+    orderUid?: string;
+    /** The Trade's owner, where the card states it as a leaf (an order's one-order contract is never the chip). */
+    ownerAddress?: string;
+    sellAmount?: string;
+    buyAmount?: string;
+  },
+): Provenance => {
   const chainId = coords.chainId ?? MAINNET_CHAIN_ID;
   const named = getProtocolContract(GPV2_SETTLEMENT, chainId);
   const trade = (label: string, value: string | undefined, param: string): ProvInput[] =>
@@ -720,17 +758,14 @@ export const swapVenueProv = (coords: V3Coords, swap: AaveV3SwapDetail): Provena
     kind: "chain",
     pclass: "emitted",
     verify: txVerify(coords),
-    summary: `The CoW settlement that carried this swap — the settlement's trade log names the order's owner, the tokens sold and bought and both amounts, and this position's ${swap.kind === "withdraw_and_swap" || swap.kind === "supply_from_swap" ? "row is" : "two rows are"} paired to that log: ${
-      swap.route === "cow_adapter"
-        ? SWAP_OWNER[swap.kind]
-        : "the owner is this position's account, which signed the order"
-    }, and ${swapAmountRule(swap)}. A shared transaction alone does not make the pairing.`,
+    summary: `The CoW settlement that carried this swap — the settlement's trade log names the order's owner, the tokens sold and bought and both amounts, and this position's ${pairing.rows} paired to that log: ${pairing.owner}, and ${pairing.amounts}. A shared transaction alone does not make the pairing.`,
     contract: { name: named?.name ?? "GPv2Settlement", address: GPV2_SETTLEMENT },
     via: "rails-server index of GPv2Settlement Trade logs · paired to the position's rows by owner, tokens and amounts",
     inputs: eventInputs(coords, [
-      ...trade("orderUid", swap.orderUid, "orderUid"),
-      ...trade("sellAmount", swap.raw.tradeSellAmount, "sellAmount"),
-      ...trade("buyAmount", swap.raw.tradeBuyAmount, "buyAmount"),
+      ...trade("orderUid", pairing.orderUid, "orderUid"),
+      ...trade("order owner", pairing.ownerAddress, "owner"),
+      ...trade("sellAmount", pairing.sellAmount, "sellAmount"),
+      ...trade("buyAmount", pairing.buyAmount, "buyAmount"),
       ...(named ? counterpartyNameInputs(named, explorerUrl(chainId, "address", GPV2_SETTLEMENT)) : []),
     ]),
   };

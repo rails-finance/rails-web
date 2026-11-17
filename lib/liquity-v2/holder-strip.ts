@@ -119,9 +119,11 @@ export function liquityV2HolderStrip(
   passedOn = 0,
 ): HolderStripProps {
   // A Trove the wallet passed on (formerHold, ui-jobs 705) is not its
-  // holding: left out of the counts, the sums and the total.
+  // holding: left out of the counts, the sums and the count it holds. Whether
+  // the page is the whole answer is read on the answer's total, moved ones in.
+  const truncated = total > perPage;
+  const held = total - passedOn;
   rows = rows.filter((t) => !t.formerHold);
-  total -= passedOn;
   const open = rows.filter((t) => t.status === "open");
   const counts = {
     open: open.length,
@@ -130,16 +132,16 @@ export function liquityV2HolderStrip(
     zombie: open.filter((t) => t.isZombie).length,
   };
 
-  if (total > perPage) {
+  if (truncated) {
     // The rows are a slice of the wallet: neither the per-status counts nor any
     // sum over them is a statement about the wallet. State the count it does
     // hold, and say why the rest is absent.
     return {
-      countsLine: `This wallet holds ${plural(total, "trove", "troves")}.`,
+      countsLine: `This wallet holds ${plural(held, "trove", "troves")}.`,
       counts: { open: 0, closed: 0, liquidated: 0 },
       legs: [],
       truncated: true,
-      note: `Totals are stated for wallets holding up to ${perPage.toLocaleString("en-US")} positions; this one holds ${total.toLocaleString("en-US")}.`,
+      note: `Totals are stated for wallets holding up to ${perPage.toLocaleString("en-US")} positions; this one holds ${held.toLocaleString("en-US")}.`,
     };
   }
 

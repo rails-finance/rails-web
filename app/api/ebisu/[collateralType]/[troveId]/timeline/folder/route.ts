@@ -44,6 +44,9 @@ export async function GET(
       if (v) qs.set(k, v);
     }
     qs.set(SHAPE_RUNS_PARAM, "1");
+    // The folders the timeline served with the transfer rows: rails-server
+    // keys them by the flag, so the open names it too.
+    qs.set("transfers", "1");
     const response = await fetch(
       `${RAILS_API_URL}/api/ebisu/${encodeURIComponent(collateralType)}/${encodeURIComponent(troveId)}/timeline/folder?${qs.toString()}`,
       createAuthFetchOptions(undefined, readerIp),

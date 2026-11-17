@@ -41,6 +41,7 @@ export const {
   peakDebtProv,
   rateAtEventProv,
   batchManagerProv,
+  transferPartyProv,
   lifetimeFlowProv,
   collUsdProv,
   collRatioProv,

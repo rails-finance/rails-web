@@ -1069,6 +1069,9 @@ export function liquityForkFlowEvents(
   for (const e of sorted) {
     if (!is(e)) continue;
     const c = (e.context as { data: ForkCtx }).data;
+    // A transfer row moves nothing and carries no price of its own; left in,
+    // a fully priced Trove would read as having an unpriced event.
+    if (c.eventType === "transferTrove") continue;
     const op = c.operation;
     if (c.batchRate) fee = num(c.batchRate.managementFee);
     if (!c.isBatched) fee = 0;

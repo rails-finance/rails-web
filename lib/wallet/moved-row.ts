@@ -13,6 +13,11 @@ interface FormerHoldLike {
   movedAt: number;
 }
 
+/** The families whose passed-on rows the wallet read asks for (rails-server
+ *  GET /api/wallet/:address/positions?former=<families>): each one's shape
+ *  draws them as moved (ui-jobs 705, 715). */
+export const WALLET_FORMER_FAMILIES = "liquity-v2,ebisu,asymmetry,basedollar";
+
 /** The card's formerHold, where the row is a passed-on position. */
 export function formerHoldOf(card: unknown): FormerHoldLike | null {
   const f = (card as { formerHold?: FormerHoldLike } | null | undefined)?.formerHold;

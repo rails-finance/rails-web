@@ -27,6 +27,7 @@ import {
   EventPageSteps,
 } from "@/components/shared/event-page-aside";
 import { EVENT_PAGE_WORDS } from "@/lib/shared/event-page-words";
+import { sentenceNamesParty } from "@/lib/shared/party-in-sentence";
 import { CardSidebarFrame } from "@/components/shared/position-card";
 import { SheetCollectContext, type CollectedCard, type GroupLane } from "@/components/shared/group-sheet";
 import { disclosureProps } from "@/components/shared/disclosure";
@@ -134,6 +135,10 @@ export type EventCardLedgers = { provider: (children: ReactNode) => ReactNode } 
 export interface EventCardExplainer {
   body: ReactNode;
   first?: ReactNode;
+  /** `first`'s first sentence as plain text, where `first` is a component that draws its own words: the event page
+   *  reads it to tell whether the h1 names the head's party. A family whose sentence names the party inside a
+   *  component (a Prov) must pass it, or the full tile draws beside a sentence that already names the party. */
+  firstText?: string;
   grouped?: boolean;
 }
 
@@ -611,6 +616,10 @@ function EventCardView(props: EventCardProps) {
   const pageLead = pageMode && !unread && props.slots.explainer.first != null ? props.slots.explainer.first : undefined;
   const pageSplit = pageLead != null ? splitFirstSentence(pageLead) : null;
   const pageSentence = pageSplit?.head;
+  // The h1's words as text, for the party beside it: the card's own (`explainer.firstText`), else the sentence's
+  // strings.
+  const pageSentenceText =
+    pageSentence != null ? (props.slots.explainer.firstText ?? plainText(pageSentence)) : undefined;
   const explainerTeaser = pageSplit ? (pageSplit.tail ?? undefined) : teaser;
   const head = props.slots.event ? props.slots.head : undefined;
 
@@ -994,7 +1003,16 @@ function EventCardView(props: EventCardProps) {
                   <EventPageAside
                     page={page}
                     sentence={pageSentence}
-                    beside={pageSentence && head?.surplus ? <HeadSurplusChip surplus={head.surplus} /> : undefined}
+                    beside={
+                      pageSentence && (head?.surplus || head?.party?.name) ? (
+                        // The h1 states the event; the head's chips stand beside it: the surplus, and the protocol
+                        // the event went through ("via CoW").
+                        <span className="flex flex-wrap items-center gap-x-3 gap-y-1" data-event-page-beside="">
+                          {head?.surplus && <HeadSurplusChip surplus={head.surplus} />}
+                          {head?.party?.name && <SentenceParty party={head.party} sentence={pageSentenceText} />}
+                        </span>
+                      ) : undefined
+                    }
                     party={head?.party?.name ? <PartyChip party={head.party} tile /> : undefined}
                     learnMore={learnMore}
                   />
@@ -1064,4 +1082,34 @@ function EventCardView(props: EventCardProps) {
     </SpineLegsContext.Provider>
   );
   return ledgers && "provider" in ledgers ? ledgers.provider(card) : card;
+}
+
+/** The text a sentence node holds, where it is strings and elements' children (a card's teaser); components that
+ *  draw their own text give none, and the card passes `explainer.firstText` for them. */
+function plainText(node: ReactNode): string {
+  if (node == null || typeof node === "boolean") return "";
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(plainText).join("");
+  if (isValidElement<{ children?: ReactNode }>(node) && typeof node.type !== "function")
+    return plainText(node.props.children);
+  return "";
+}
+
+/** The head's party beside the event page's h1: the full tile, or, where the sentence names the party (from the
+ *  sentence's text, so the server's render already has it), its mark alone, the mark hidden from screen readers,
+ *  which read the party in the sentence. The chip's receipt stays reachable: no aria-hidden on this wrapper, which
+ *  holds a Prov that is a focusable button while the inspector is armed. */
+function SentenceParty({
+  party,
+  sentence,
+}: {
+  party: NonNullable<ChainTruthRowSpec["party"]>;
+  sentence: string | undefined;
+}) {
+  const named = sentenceNamesParty(sentence, party.name);
+  return (
+    <span className="inline-flex" data-event-page-party-beside={named ? "mark" : "tile"}>
+      <PartyChip party={party} tile markOnly={named} />
+    </span>
+  );
 }

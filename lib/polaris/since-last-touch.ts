@@ -36,7 +36,7 @@
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isPolarisEvent } from "@/lib/shared/types/event-shape";
 import { flowsReconcile } from "@/lib/shared/chain-truth-economics";
-import { polarisPendingAtFeed } from "@/lib/polaris/economics";
+import { polarisEquityAtFeed, polarisPendingAtFeed } from "@/lib/polaris/economics";
 import { formatCompact } from "@/lib/shared/format-compact";
 
 /** The overlay fields this needs — a structural subset of PolarisChainResponse
@@ -106,12 +106,6 @@ export interface PolarisSinceLastTouch {
     stabilityGain: number;
     reward: number;
     psm: number;
-    /** Where the pending legs clear more than the debt (an entire debt below
-     *  zero), the part the next touch adds back so the debt lands on zero —
-     *  zero or negative, and zero on every other CDP. The card's equity counts
-     *  that debt as zero, so this leg keeps the window's sum on the card's
-     *  figure. */
-    settle: number;
   };
   raw: {
     psmColl: number;
@@ -179,9 +173,11 @@ export function polarisSinceLastTouch(
   if (!(priceAtTouch != null && priceAtTouch > 0)) return null;
   const priceNow = chain.price.pethInDebt;
 
-  const equityAtTouch = collAtTouch * priceAtTouch - debtAtTouch;
-  // The card's equity: an entire debt at or below zero owes nothing.
-  const equityNow = chain.entireColl * priceNow - Math.max(0, chain.entireDebt);
+  // Stables a touch minted to the holder are in `debtAtTouch` (the touch wrote
+  // the debt at zero), and a debt below zero now is owed to the holder: both
+  // ends count the debt signed, as the card's equity does.
+  const equityAtTouch = polarisEquityAtFeed(collAtTouch, debtAtTouch, priceAtTouch);
+  const equityNow = polarisEquityAtFeed(chain.entireColl, chain.entireDebt, priceNow);
   const feed = collAtTouch * (priceNow - priceAtTouch);
   const pending = polarisPendingAtFeed(chain, priceNow);
   const legs = {
@@ -189,9 +185,8 @@ export function polarisSinceLastTouch(
     stabilityGain: pending.stabilityGain,
     reward: pending.reward,
     psm: pending.psm,
-    settle: Math.min(0, chain.entireDebt),
   };
-  const protocol = legs.interest + legs.stabilityGain + legs.reward + legs.psm + legs.settle;
+  const protocol = legs.interest + legs.stabilityGain + legs.reward + legs.psm;
   const total = feed + protocol;
 
   // The gate is the identity itself: if the two terms do not add up to the
@@ -261,7 +256,7 @@ export const signedFigure = (n: number, unit: string): string =>
 export const polarisSinceLabel = (w: PolarisSinceLastTouch): string =>
   w.sinceOpen ? "Since its open" : "Since its last touch";
 
-export type PolarisProtocolLegKey = "psm" | "settle" | "reward" | "interest" | "stabilityGain";
+export type PolarisProtocolLegKey = "psm" | "reward" | "interest" | "stabilityGain";
 
 export interface PolarisProtocolLeg {
   key: PolarisProtocolLegKey;
@@ -277,7 +272,6 @@ export function polarisProtocolLegs(w: PolarisSinceLastTouch): PolarisProtocolLe
     // The share is the net of every mint and redemption since the touch, so
     // it is named as a net, never after one of the two trades.
     { key: "psm", name: "the net PSM share", value: w.legs.psm },
-    { key: "settle", name: "the debt below zero the next touch settles", value: w.legs.settle },
     { key: "reward", name: "the pETH reward", value: w.legs.reward },
     { key: "interest", name: "interest charged", value: w.legs.interest },
     { key: "stabilityGain", name: "the stability gain", value: w.legs.stabilityGain },

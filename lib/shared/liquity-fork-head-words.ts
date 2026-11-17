@@ -13,12 +13,14 @@ import type { AsymmetryContext, BasedollarContext, EbisuContext } from "@/lib/sh
 type ForkContext = EbisuContext | AsymmetryContext | BasedollarContext;
 
 /** A clause after the kind: words (`zombie` carries the zombie tip, `cleared`
- *  where the debt reached zero), the delegate named after `lead`, or a
- *  liquidation's surplus. */
+ *  where the debt reached zero), the delegate named after `lead`, a
+ *  liquidation's surplus, or a transfer's counterparty after `lead`, as
+ *  Liquity V2's head names it. */
 export type LiquityForkT1Clause =
   | { text: string; zombie?: boolean; cleared?: boolean }
   | { lead: string; delegate: string; address: string }
-  | { surplus: number; symbol: string; word: string; claimedAt?: number | null };
+  | { surplus: number; symbol: string; word: string; claimedAt?: number | null }
+  | { lead: string; address: string; dir: "to" | "from" };
 
 export interface LiquityForkT1Words {
   /** Empty where the clause carries the act (a join reads "Rate to …"). */
@@ -116,6 +118,13 @@ export function liquityForkT1Words(
               { text: L1_WORDS.t1_debt_below_min, zombie: true, cleared: debtAfter < FORK_DEBT_DUST_FLOAT },
             ]
           : [{ text: L1_WORDS.t1_coll_debt_reduced }],
+      };
+    }
+    case "transferTrove": {
+      const t = ctx.transfer;
+      return {
+        kind: L1_WORDS.t1_transferred,
+        clauses: t ? [{ lead: L1_WORDS.t1_to, address: t.toAddress, dir: "to" }] : [],
       };
     }
     default:

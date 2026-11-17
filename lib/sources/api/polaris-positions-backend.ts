@@ -39,6 +39,8 @@ interface PositionsRawResponse {
   total: number;
   limit: number;
   offset: number;
+  /** ?former=1 on a wallet filter: of total, the CDPs it passed on. */
+  passedOn?: number;
   markets?: RawPolarisMarketRow[];
   usd?: RawPolarisUsdValuation;
 }
@@ -77,6 +79,7 @@ export function parsePolarisPositionsQuery(sp: URLSearchParams): FetchPolarisPos
     market: market === "usdp" || market === "goldp" ? market : undefined,
     cdpId: sp.get("id") || undefined,
     wallet: sp.get("wallet") || undefined,
+    former: sp.get("former") === "1" || undefined,
     status: status.length > 0 ? status : undefined,
     // hasDebt=1 → the last state carries debt; hasDebt=0 → collateral only.
     // (No `liquidated` param: on Polaris "ever liquidated" is the status
@@ -117,6 +120,7 @@ export async function readPolarisPositionsFromBackend(
   if (p.market) qs.set("market", p.market);
   if (p.cdpId) qs.set("id", p.cdpId);
   if (p.wallet) qs.set("wallet", p.wallet);
+  if (p.wallet && p.former) qs.set("former", "1");
   if (p.status && p.status.length > 0) qs.set("status", p.status.join(","));
   if (p.hasDebt != null) qs.set("hasDebt", p.hasDebt ? "1" : "0");
   if (p.minTx != null) qs.set("minTx", String(p.minTx));
@@ -142,7 +146,12 @@ export async function readPolarisPositionsFromBackend(
     upstream: response,
     result: {
       data: buildPolarisPositionRows(raw.rows),
-      pagination: { total: raw.total, limit: raw.limit, offset: raw.offset },
+      pagination: {
+        total: raw.total,
+        limit: raw.limit,
+        offset: raw.offset,
+        ...(raw.passedOn != null ? { passedOn: raw.passedOn } : {}),
+      },
       markets: buildPolarisMarketBooks(raw.markets),
       ...(raw.usd ? { usd: buildPolarisUsdValuation(raw.usd) } : {}),
     },

@@ -19,6 +19,7 @@ import type {
   LiquityForkRedemptionFacts,
   LiquityForkLiquidationFacts,
   LiquityForkBatchRateFacts,
+  TransferDetail,
 } from "@/lib/shared/types/event-shape";
 import type { TimelineRowCeiling } from "@/lib/shared/timeline-row-ceiling";
 import { resolveBranch, DEBT_SYMBOL, DEBT_ADDRESS, DEBT_DECIMALS, EBISU_BRANCHES } from "@/lib/ebisu/asset-catalog";
@@ -135,6 +136,10 @@ export interface MvRow {
   liq_coll_redistributed?: string | null;
   liq_coll_surplus?: string | null;
   liq_coll_gas_compensation?: string | null;
+  /** A transferTrove row's wallets (rails-server's ?transfers=1, from mig
+   *  485's TroveNFT transfers view); absent on every other row. */
+  transfer_from?: string | null;
+  transfer_to?: string | null;
 }
 
 const LABELS: Record<EbisuEventType, string> = {
@@ -150,6 +155,7 @@ const LABELS: Record<EbisuEventType, string> = {
   removeFromBatch: "Remove From Batch",
   setBatchManagerAnnualInterestRate: "Batch Rate Change",
   lowerBatchManagerAnnualFee: "Batch Fee Cut",
+  transferTrove: "Transfer",
 };
 
 const BATCH_RATE_KINDS = new Set<string>(["setBatchManagerAnnualInterestRate", "lowerBatchManagerAnnualFee"]);
@@ -367,6 +373,10 @@ export function buildEbisuTimeline(rows: MvRow[], collateralType: string, troveI
           : null;
     const rateBefore = prevRate != null ? fmtUnits(bigintOf(prevRate), RATE_DECIMALS) : undefined;
 
+    const transfer: TransferDetail | undefined =
+      kind === "transferTrove" && r.transfer_from && r.transfer_to
+        ? { transferType: "transfer", fromAddress: r.transfer_from, toAddress: r.transfer_to }
+        : undefined;
     const ctx: EbisuContext = {
       eventType: kind,
       collateralSymbol: branch.symbol,
@@ -449,6 +459,10 @@ export function buildEbisuTimeline(rows: MvRow[], collateralType: string, troveI
                 debt: originVal("TroveUpdated", "_debt", DEBT_DECIMALS, r.debt_before),
                 coll: originVal("TroveUpdated", "_coll", collDec, r.coll_before),
               },
+      // The TroveNFT moved between wallets: the row carries the Trove's state
+      // from its previous event, so no log of this transaction states it and
+      // the balances take no envelope.
+      ...(transfer ? { transfer, origin: undefined, originBefore: undefined } : {}),
     };
 
     // Zero-delta adjust: automated managers re-try operations the protocol
@@ -500,7 +514,7 @@ export function buildEbisuTimeline(rows: MvRow[], collateralType: string, troveI
       txHash: tx,
       blockNumber: block,
       timestamp: ts,
-      wallet: r.tx_from ?? "",
+      wallet: r.tx_from ?? transfer?.fromAddress ?? "",
       etherscanUrl: explorerUrl(MAINNET_CHAIN_ID, "tx-logs", tx),
       actionType: isNoChange ? "adjustTrove_noChange" : kind,
       actionLabel,

@@ -26,6 +26,9 @@
 // empty (a backend blip) `initialTrove` is null and this component fetches
 // the tail itself, exactly as it did before the route had a server half.
 
+import { forkLastHolderProv } from "@/lib/liquity-fork/holder-provenance";
+import { Prov } from "@/components/shared/provenance";
+import { LastHolderPrefix } from "@/lib/liquity/trove-page-words";
 import { useReportPositionRead } from "@/components/shared/position-read";
 import { readOfHeadAnswer } from "@/lib/shared/position-read";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -184,7 +187,7 @@ export default function BasedollarTroveDetail({
         // timeline read, in the shape the URL asked for.
         const asked = servedFoldersEnabled();
         const [pData, flat, grouped] = await Promise.all([
-          fetchBasedollarTroves({ troveId, collateralTypes: [collateralType], limit: 1 }),
+          fetchBasedollarTroves({ troveId, collateralTypes: [collateralType], limit: 1, former: true }),
           asked ? null : fetchBasedollarTimeline(collateralType, troveId, { recent: TIMELINE_WINDOW_ROWS }),
           asked ? fetchBasedollarGroupedTimeline(collateralType, troveId) : null,
         ]);
@@ -525,8 +528,22 @@ export default function BasedollarTroveDetail({
           owner={{
             wallet: view?.owner ?? view?.lastOwner ?? null,
             chain: BASE_CHAIN_ID,
-            // No "last holder" prefix: this family's timeline carries no TroveNFT
-            // transfer rows, so a change of hands cannot be read (ui-jobs 702).
+            // "last holder" on a closed Trove whose NFT changed hands: the
+            // one-Trove read says so (ui-jobs 715).
+            // Its receipt lists the TroveNFT's transfers (ui-jobs 717, interim).
+            prefix:
+              !view?.owner && view?.lastOwner && view.changedHands ? (
+                view.nftTransfers?.length ? (
+                  <Prov
+                    info={forkLastHolderProv("basedollar", BASE_CHAIN_ID, view.nftTransfers)}
+                    value={view.lastOwner}
+                  >
+                    <LastHolderPrefix />
+                  </Prov>
+                ) : (
+                  <LastHolderPrefix />
+                )
+              ) : undefined,
           }}
           assets={stripAssets}
           closed={view != null && view.status !== "open"}
@@ -637,6 +654,7 @@ export default function BasedollarTroveDetail({
                     owner: view?.owner ?? null,
                     lastOwner: view?.lastOwner ?? null,
                     ownerEns: view?.ownerEns ?? null,
+                    changedHands: view?.changedHands,
                   })
                 }
                 tl={tl}

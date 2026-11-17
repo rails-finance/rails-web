@@ -17,6 +17,8 @@ export interface FetchEbisuTrovesParams {
   sortBy?: EbisuTroveSort;
   sortOrder?: "asc" | "desc";
   limit?: number;
+  /** Each row's former holders (ui-jobs 715). */
+  former?: boolean;
   offset?: number;
   baseUrl?: string;
   /** Cancels the request — the listing SSR passes its timeout here. */
@@ -38,6 +40,7 @@ export async function fetchEbisuTroves(p: FetchEbisuTrovesParams): Promise<Ebisu
   if (p.sortBy) qs.set("sortBy", p.sortBy);
   if (p.sortOrder) qs.set("sortOrder", p.sortOrder);
   if (p.limit != null) qs.set("limit", String(p.limit));
+  if (p.former) qs.set("former", "1");
   if (p.offset != null) qs.set("offset", String(p.offset));
 
   const url = `${p.baseUrl ?? ""}/api/ebisu/troves?${qs.toString()}`;

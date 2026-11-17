@@ -33,7 +33,15 @@ async function BasedollarListingPage({ searchParams }: { searchParams: Promise<R
     page,
     label: "Basedollar",
     fetchPage: (baseUrl, signal, headers) =>
-      fetchBasedollarTroves({ sortBy: "debt", sortOrder: "desc", limit: 500, baseUrl, signal, headers }).then((r) => ({
+      fetchBasedollarTroves({
+        sortBy: "debt",
+        sortOrder: "desc",
+        limit: 500,
+        former: true,
+        baseUrl,
+        signal,
+        headers,
+      }).then((r) => ({
         data: r.data,
         total: r.data.length,
       })),

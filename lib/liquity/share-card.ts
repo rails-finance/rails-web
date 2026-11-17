@@ -96,14 +96,14 @@ export function liquityV2HolderCardModel(
   /** The answer's count of Troves the wallet passed on (ui-jobs 705). */
   passedOn = 0,
 ): PositionCardModel | null {
-  // A Trove the wallet passed on is not its holding.
-  rows = rows.filter((t) => !t.formerHold);
-  total -= passedOn;
-  if (rows.length === 0 || !prices) return null;
-  return holderCardModel(liquityV2HolderStrip(rows, total, prices, perPage), {
+  // A Trove the wallet passed on is not its holding; the strip reads the
+  // answer's total for truncation and leaves them out of the rest.
+  const held = rows.filter((t) => !t.formerHold);
+  if (held.length === 0 || !prices) return null;
+  return holderCardModel(liquityV2HolderStrip(rows, total, prices, perPage, passedOn), {
     session: "liquity-v2",
     subject,
-    total,
+    total: total - passedOn,
     plural: positionNounPlural("liquity-v2"),
   });
 }

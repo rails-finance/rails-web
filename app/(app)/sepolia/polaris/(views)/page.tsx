@@ -63,16 +63,22 @@ async function PolarisListingPage({ searchParams }: { searchParams: Promise<RawS
   const sp = toURLSearchParams(await searchParams);
   const { filters, page } = ssrDecode(dims, sp, POLARIS_LIST_DEFAULTS);
 
+  // Of the answer's total, the CDPs the searched wallet passed on (ui-jobs 715).
+  let passedOn = 0;
   const initial = await ssrInitial({
     dims,
     defaults: POLARIS_LIST_DEFAULTS,
     filters,
     page,
     label: "Polaris",
-    fetchPage: (baseUrl, signal, headers) => fetchPolarisListingPage(filters, page, baseUrl, signal, headers),
+    fetchPage: (baseUrl, signal, headers) =>
+      fetchPolarisListingPage(filters, page, baseUrl, signal, headers).then((r) => {
+        passedOn = r.passedOn;
+        return r;
+      }),
   });
 
-  return <PolarisListing {...initial} initialSearch={sp.toString()} />;
+  return <PolarisListing {...initial} initialPassedOn={passedOn} initialSearch={sp.toString()} />;
 }
 
 export default PolarisListingPage;

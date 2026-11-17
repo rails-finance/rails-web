@@ -157,13 +157,13 @@ export function polarisEventBody(
               {ctx.fromAddr ? (
                 <>
                   {" "}
-                  from <LinkedAddress address={ctx.fromAddr} />
+                  from <LinkedAddress address={ctx.fromAddr} holderOf="polaris" />
                 </>
               ) : null}
               {ctx.toAddr ? (
                 <>
                   {" "}
-                  to <LinkedAddress address={ctx.toAddr} />
+                  to <LinkedAddress address={ctx.toAddr} holderOf="polaris" />
                 </>
               ) : null}
               : the position&rsquo;s collateral and debt did not change.
@@ -303,13 +303,14 @@ export function polarisEventBody(
     }
   }
 
-  // The protocol's legs at this touch — grouped: interest · gains · PSM · settle.
+  // The protocol's legs at this touch — grouped: interest · gains · PSM · the
+  // stables minted to the holder.
   leg("accruedInterest", "Interest charged · debt", stable, stableAddr);
   leg("stableGain", "Stability gain · debt", stable, stableAddr, true);
   leg("bcTokenGain", "Reward pETH · collateral", PETH.symbol, PETH.address);
   leg("mintRedeemCollGain", "Net PSM share · collateral", PETH.symbol, PETH.address);
   leg("mintRedeemDebtGain", "Net PSM share · debt", stable, stableAddr);
-  leg("stablesMintedToEnsureZeroDebt", "Settled to zero · debt", stable, stableAddr);
+  leg("stablesMintedToEnsureZeroDebt", "Minted to the holder", stable, stableAddr);
 
   // The gas compensation escrow, a leg of its own held apart from the
   // collateral: sent with it at the open, returned with it at the close (a

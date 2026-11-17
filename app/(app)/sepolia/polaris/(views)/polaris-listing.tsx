@@ -55,11 +55,22 @@ import { POLARIS_BASE_PATH, polarisPositionHref } from "@/lib/polaris/routes";
 export interface PolarisListingProps {
   initialItems?: PolarisPositionSummary[];
   initialTotal?: number;
+  /** Of `initialTotal`, the CDPs the searched wallet passed on (ui-jobs 715). */
+  initialPassedOn?: number;
   initialKey?: string;
   initialSearch?: string;
 }
 
-export function PolarisListing({ initialItems, initialTotal, initialKey, initialSearch }: PolarisListingProps) {
+export function PolarisListing({
+  initialItems,
+  initialTotal,
+  initialPassedOn = 0,
+  initialKey,
+  initialSearch,
+}: PolarisListingProps) {
+  // The last answer's count of CDPs the searched wallet passed on: the holder
+  // strip leaves them out of the wallet's total.
+  const passedOn = useRef(initialPassedOn);
   const [markets, setMarkets] = useState<PolarisMarketsChainResponse | null>(null);
   const [marketsSettled, setMarketsSettled] = useState(false);
   useEffect(() => {
@@ -168,7 +179,11 @@ export function PolarisListing({ initialItems, initialTotal, initialKey, initial
         dimensions: (_f, u) => polarisListDimensions(marketOptions, polarisUsdSourceNote(u)),
         useExternalState: () => usd,
         itemsPerPage: POLARIS_ITEMS_PER_PAGE,
-        fetchPage: (filters, page) => fetchPolarisListingPage(filters, page),
+        fetchPage: (filters, page) =>
+          fetchPolarisListingPage(filters, page).then((r) => {
+            passedOn.current = r.passedOn;
+            return r;
+          }),
       })}
       onFilters={onFilters}
       renderAbove={({ items, total, filters }) => {
@@ -189,7 +204,7 @@ export function PolarisListing({ initialItems, initialTotal, initialKey, initial
           filters.coll.length === 0 &&
           filters.tx.length === 0 &&
           markets ? (
-            <HolderStrip {...polarisHolderStrip(items, total, markets, POLARIS_ITEMS_PER_PAGE)} />
+            <HolderStrip {...polarisHolderStrip(items, total, markets, POLARIS_ITEMS_PER_PAGE, passedOn.current)} />
           ) : null;
         return strip;
       }}

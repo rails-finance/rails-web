@@ -42,7 +42,13 @@ import {
   type FlowEventsHelp,
 } from "@/lib/shared/learn-more-content";
 import { FlowBarsHeadsContext, Headline, Rescaled, useWidth } from "@/components/shared/lifetime-flows-busy";
-import { FlowCursorContext, KEEP_PANEL, SegmentTipContext } from "@/components/shared/lifetime-flows-tip";
+import {
+  DEFAULT_HUES,
+  FlowCursorContext,
+  KEEP_PANEL,
+  SegmentTipContext,
+  useFlowHues,
+} from "@/components/shared/lifetime-flows-tip";
 import { useFlowFocus, useFlowFocusState } from "@/components/shared/flow-focus-context";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { formatPrice, pricePieces, levelAt, priceReadout, type FlowPriceSeries } from "@/lib/shared/flows-price";
@@ -95,13 +101,13 @@ import {
  *  delegate's rate change in the party pink, the owner's in the debt hue. */
 export const FLOW_TICK: Record<FlowTick, string> = {
   collateral: "var(--color-blue-500)",
-  debt: "var(--color-green-400)",
-  both: "linear-gradient(to bottom, var(--color-blue-500) 50%, var(--color-green-400) 50%)",
+  debt: "var(--flow-debt, var(--color-green-400))",
+  both: "linear-gradient(to bottom, var(--color-blue-500) 50%, var(--flow-debt, var(--color-green-400)) 50%)",
   liquidation: "var(--color-red-500)",
   redemption: "var(--caution)",
   caution: "var(--caution)",
   "rate-delegate": "var(--color-pink-500)",
-  "rate-owner": "var(--color-green-400)",
+  "rate-owner": "var(--flow-debt, var(--color-green-400))",
 };
 
 /** The price tip and the date under the row share one width, so the two
@@ -374,7 +380,7 @@ const ProtocolActivityChart = dynamic(
 const LW_LOADING_H = 250;
 
 /** The line's hues; the panel's Key draws the same. */
-export const LINE_HUE = { collateral: "var(--color-blue-500)", debt: "var(--color-green-400)" };
+export const LINE_HUE = { collateral: "var(--color-blue-500)", debt: "var(--flow-debt, var(--color-green-400))" };
 
 /** The bars' and the events' how-to-read; the price chart's names its
  *  series. */
@@ -384,7 +390,12 @@ const BARS_HELP = lifetimeFlowsBarsContent();
  *  events by the family's names for them (its buckets' events), and the
  *  marks the family draws (the warning tones its buckets carry, the marks it
  *  names, the ticks the position has). */
-function eventsHelp(model: FlowModel, hasDebt: boolean, changeDays: { changes: FlowChange[] }[]): FlowEventsHelp {
+function eventsHelp(
+  model: FlowModel,
+  hasDebt: boolean,
+  changeDays: { changes: FlowChange[] }[],
+  debtHue: "Green" | "Violet" = "Green",
+): FlowEventsHelp {
   const has = new Set(model.ticks.map((t) => t.tick));
   const wordsOf = (side: "collateral" | "debt") => [
     ...new Set(
@@ -404,7 +415,7 @@ function eventsHelp(model: FlowModel, hasDebt: boolean, changeDays: { changes: F
   return {
     sides: [
       { hue: "Blue", label: model.labels.collateral, events: wordsOf("collateral") },
-      ...(hasDebt ? [{ hue: "Green" as const, label: model.labels.debt, events: wordsOf("debt") }] : []),
+      ...(hasDebt ? [{ hue: debtHue, label: model.labels.debt, events: wordsOf("debt") }] : []),
     ],
     both: has.has("both"),
     liquidation: liq,
@@ -787,6 +798,18 @@ export function CombinedFlows({
   );
   // Each side's headline, on its own line over its bar, the bars' "?" at the
   // first one's right end.
+  // The bars' how-to-read names the second bar's hue where a page set one.
+  const hues = useFlowHues();
+  const barsHelp = useMemo(
+    () =>
+      hues.debt.name === DEFAULT_HUES.debt.name
+        ? BARS_HELP
+        : lifetimeFlowsBarsContent({
+            collateral: { hue: hues.collateral.name, label: model.labels.collateral },
+            debt: { hue: hues.debt.name, label: model.labels.debt },
+          }),
+    [hues, model.labels],
+  );
   const bareHeadline = (side: "collateral" | "debt") => (
     <Headline
       side={side}
@@ -802,14 +825,15 @@ export function CombinedFlows({
     collateral: (
       <div className="mb-1.5 flex items-center justify-between gap-3" data-flow-headline-row="collateral">
         {bareHeadline("collateral")}
-        <SectionHelp content={BARS_HELP} name="the bars" anatomy="F16" extra={flowsKey} />
+        <SectionHelp content={barsHelp} name="the bars" anatomy="F16" extra={flowsKey} />
       </div>
     ),
     ...(hasDebt ? { debt: <div className="mb-1.5 mt-4">{bareHeadline("debt")}</div> } : {}),
   };
   // The protocol's changes inside the life, a marker a day (ruling 10).
   const changeDays = useMemo(() => changesByDay(model.changes, startDay, today), [model.changes, startDay, today]);
-  const marks = useMemo(() => eventsHelp(model, hasDebt, changeDays), [model, hasDebt, changeDays]);
+  const debtHue = hues.debt.name === "Violet" ? "Violet" : "Green";
+  const marks = useMemo(() => eventsHelp(model, hasDebt, changeDays, debtHue), [model, hasDebt, changeDays, debtHue]);
   const priceBrief = priced
     ? {
         health: !!priced.health,
@@ -861,6 +885,13 @@ export function CombinedFlows({
             renderBars(barStop, when, liveReceipts, cur.live)
           )}
         </FlowBarsHeadsContext.Provider>
+        {/* Bars in two tokens that nothing prices in each other (Frankencoin,
+            PWN, a Polaris deposit): each fills to its own largest figure. */}
+        {model.sideUnits && (
+          <p className="mt-2 text-xs text-rb-500" data-flow-own-tokens="">
+            Each bar is in its own token; the lengths do not compare.
+          </p>
+        )}
       </div>
       {outside && (
         <p

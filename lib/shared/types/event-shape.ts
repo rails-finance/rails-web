@@ -36,6 +36,7 @@
 
 import type { RouterSale } from "@/lib/shared/tx-legs";
 import type { TxEntry } from "@/lib/shared/tx-entry";
+import type { CowSwapFigures, CowSwapView } from "@/lib/cow/surplus";
 
 // ───────────────────────── Base primitives ─────────────────────────
 
@@ -489,6 +490,9 @@ export interface AaveV4Swap {
   sell: AaveV4SwapSide;
   buy: AaveV4SwapSide;
   feeRaw: string;
+  /** The settlement's surplus and fees (server mig 481, lib/cow/surplus.ts); null until the
+   *  settlement is read or where settle() did not match. Absent from a server before 712. */
+  cow?: CowSwapFigures | null;
   /** The received leg's event, as the timeline serves it without `?swaps=1`. */
   received: BaseActivityEvent;
 }
@@ -564,8 +568,8 @@ export type AaveV3EventType =
 /** Provenance of an Aave V3 historic price (mirror of aave-v3.ts). */
 export type AaveV3PriceSource = "iaave-oracle";
 
-/** The kinds of position swap the Aave app places, by its own names. */
-/** `supply_from_swap` is the one kind the Aave app does not place: an order the
+/** The kinds of position swap, by the names Aave's app gives them; any front end may place the orders. */
+/** `supply_from_swap` is the one kind Aave's app has no name for: an order the
  *  owner signed that bought aTokens into the position (§15 D6). */
 export type AaveV3SwapKind =
   | "collateral_swap"
@@ -637,6 +641,9 @@ export interface AaveV3SwapDetail {
    *  leg (server mig 248, §15 D4). A netted leg's figure is then the net change
    *  in its reserve, not one row's amount. */
   events?: AaveV3SwapPoolEvent[];
+  /** On the CoW routes: the settlement's surplus and fees (server mig 481, lib/cow/surplus.ts), the
+   *  surplus token named; null until the settlement is read or where settle() did not match. */
+  cow?: CowSwapView | null;
   raw: {
     receivedAmount?: string;
     receivedSupplyBefore?: string;
@@ -1336,7 +1343,10 @@ export type EbisuEventType =
   | "setInterestBatchManager"
   | "removeFromBatch"
   | "setBatchManagerAnnualInterestRate"
-  | "lowerBatchManagerAnnualFee";
+  | "lowerBatchManagerAnnualFee"
+  /** The TroveNFT moved between two wallets (rails-server's ?transfers=1
+   *  rows): the Trove's state stands unchanged on both sides. */
+  | "transferTrove";
 
 export interface EbisuContext {
   eventType: EbisuEventType;
@@ -1409,6 +1419,11 @@ export interface EbisuContext {
   /** setBatchManagerAnnualInterestRate / lowerBatchManagerAnnualFee rows only —
    *  the batch manager's change this Trove carried (server mig 342). */
   batchRate?: LiquityForkBatchRateFacts;
+  /** A transferTrove row's wallets, off the TroveNFT's Transfer log
+   *  (rails-server mig 485's <fork>_trove_nft_transfers); always
+   *  `transferType: "transfer"`, since the mint and the burn ride the open and
+   *  the close. */
+  transfer?: TransferDetail;
   /** Rows that carry a redistribution (`operation.debtFromRedist` or
    *  `collFromRedist` above zero) — the liquidations on this branch whose
    *  redistribution this touch applied: every one with a redistributed leg
@@ -1441,7 +1456,10 @@ export type AsymmetryEventType =
   | "setInterestBatchManager"
   | "removeFromBatch"
   | "setBatchManagerAnnualInterestRate"
-  | "lowerBatchManagerAnnualFee";
+  | "lowerBatchManagerAnnualFee"
+  /** The TroveNFT moved between two wallets (rails-server's ?transfers=1
+   *  rows): the Trove's state stands unchanged on both sides. */
+  | "transferTrove";
 
 export interface AsymmetryContext {
   eventType: AsymmetryEventType;
@@ -1514,6 +1532,11 @@ export interface AsymmetryContext {
   /** setBatchManagerAnnualInterestRate / lowerBatchManagerAnnualFee rows only —
    *  the batch manager's change this Trove carried (server mig 342). */
   batchRate?: LiquityForkBatchRateFacts;
+  /** A transferTrove row's wallets, off the TroveNFT's Transfer log
+   *  (rails-server mig 485's <fork>_trove_nft_transfers); always
+   *  `transferType: "transfer"`, since the mint and the burn ride the open and
+   *  the close. */
+  transfer?: TransferDetail;
   /** Rows that carry a redistribution (`operation.debtFromRedist` or
    *  `collFromRedist` above zero) — the liquidations on this branch whose
    *  redistribution this touch applied: every one with a redistributed leg
@@ -1548,7 +1571,10 @@ export type BasedollarEventType =
   | "setInterestBatchManager"
   | "removeFromBatch"
   | "setBatchManagerAnnualInterestRate"
-  | "lowerBatchManagerAnnualFee";
+  | "lowerBatchManagerAnnualFee"
+  /** The TroveNFT moved between two wallets (rails-server's ?transfers=1
+   *  rows): the Trove's state stands unchanged on both sides. */
+  | "transferTrove";
 
 export interface BasedollarContext {
   eventType: BasedollarEventType;
@@ -1620,6 +1646,11 @@ export interface BasedollarContext {
   /** setBatchManagerAnnualInterestRate / lowerBatchManagerAnnualFee rows only —
    *  the batch manager's change this Trove carried (server mig 342). */
   batchRate?: LiquityForkBatchRateFacts;
+  /** A transferTrove row's wallets, off the TroveNFT's Transfer log
+   *  (rails-server mig 485's <fork>_trove_nft_transfers); always
+   *  `transferType: "transfer"`, since the mint and the burn ride the open and
+   *  the close. */
+  transfer?: TransferDetail;
   /** Rows that carry a redistribution (`operation.debtFromRedist` or
    *  `collFromRedist` above zero) — the liquidations on this branch whose
    *  redistribution this touch applied: every one with a redistributed leg

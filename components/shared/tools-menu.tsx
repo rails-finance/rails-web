@@ -111,7 +111,7 @@ export function moveFocus(e: React.KeyboardEvent<HTMLElement>) {
   if (!keys.includes(e.key)) return;
   const items = [
     ...e.currentTarget.querySelectorAll<HTMLElement>(
-      '[role="menuitem"]:not([disabled]), [role="menuitemcheckbox"]:not([disabled])',
+      '[role="menuitem"]:not([disabled]):not([aria-disabled="true"]), [role="menuitemcheckbox"]:not([disabled]):not([aria-disabled="true"])',
     ),
   ];
   if (items.length === 0) return;

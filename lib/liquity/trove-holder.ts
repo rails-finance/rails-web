@@ -37,12 +37,15 @@ export function troveHolder(
   return { address: trove?.lastOwner ?? null, last: changedHands };
 }
 
-/** The Liquity forks' holder. Their timelines carry no TroveNFT transfer rows,
- *  so `last` stays false until they do. */
-export function liquityForkHolder(trove: { owner?: string | null; lastOwner?: string | null } | null): {
+/** The Liquity forks' holder. The fork's one-Trove read says whether the NFT
+ *  changed hands (rails-server mig 485, `changedHands`), and `last` follows it
+ *  on a closed Trove. */
+export function liquityForkHolder(
+  trove: { owner?: string | null; lastOwner?: string | null; changedHands?: boolean } | null,
+): {
   address: string | null;
   last: boolean;
 } {
   if (trove?.owner && trove.owner.toLowerCase() !== BURN) return { address: trove.owner, last: false };
-  return { address: trove?.lastOwner ?? null, last: false };
+  return { address: trove?.lastOwner ?? null, last: trove?.changedHands === true };
 }
