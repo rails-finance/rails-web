@@ -1,8 +1,8 @@
 // What /api/chain/wallet/<address>/summary answers: the wallet's positions as
 // counts and ids, from rails-server's summary rows alone, with no head read
 // (rails-ops decisions/0050-one-wallet-across-protocols-and-chains.md point
-// 10; decision 0051 step 3). The line under every explorer's wallet row
-// (`components/shared/wallet-elsewhere-line.tsx`) reads it. Client-safe: the
+// 10; decision 0051 step 3). The positions menu under every explorer's
+// wallet heading (`components/shared/wallet-positions-menu.tsx`) reads it. Client-safe: the
 // read is `readWalletCounts` in lib/wallet/read-wallet.ts.
 
 export type WalletCountsChain = "ethereum" | "base" | "arbitrum";
@@ -16,6 +16,13 @@ export interface WalletCountsPosition {
   positionId: string;
   status: "open" | "closed" | "liquidated" | "redeemed";
   href: string;
+  /** The row's market or branch as stored ("core", "usdc", a Morpho market
+   *  id), or the wallet view's name for it where the family is shaped here
+   *  (an Arbitrum Comet's "cUSDCv3"). */
+  market?: string;
+  /** The collateral's and the debt's symbols, where the row stores them. */
+  collateral?: string;
+  debt?: string;
 }
 
 export interface WalletCountsFamily {
@@ -73,69 +80,50 @@ export function rowIsPage(href: string, pathname: string, search: string): boole
   return (new URLSearchParams(search).get("market") ?? "core").toLowerCase() === market.toLowerCase();
 }
 
-/** The counter's tip, wherever it draws (H13.2, W1): the counts cover the
- *  mainnet wallet families only (`WALLET_FAMILIES`), not Polaris on Sepolia
- *  (ui-jobs 691). */
+/** The wallet view's counter's tip (W1): the counts cover the mainnet wallet
+ *  families only (`WALLET_FAMILIES`), not Polaris on Sepolia (ui-jobs 691). */
 export const WALLET_COUNTS_SCOPE = "Counts mainnet positions; the Sepolia testnet is not counted.";
 
 const count = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 
-/** At most this many protocols are named; past it the line counts them. */
-const NAMED_MAX = 3;
+/** The positions menu's open rows shown before "+N more" (H13.2; ui-jobs 701). */
+export const MENU_OPEN_MAX = 6;
 
-const listed = (names: string[]) =>
-  names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+/** The menu's footer: the counts are mainnet only. */
+export const MENU_TESTNETS = "Testnets not included";
 
-/** The line's words for the wallet's positions, in the wallet view's words
- *  (W1: "2 positions · 1 open · 1 closed"; Miles, 6 Nov 2026), the chains
- *  named only when there are more than one, after the scope: "On Rails:" when
- *  the page's position is among those counted, "Also on Rails:" when it is
- *  not (a Read on visit page; Miles 12 Nov 2026, ui-jobs 613). The protocols
- *  counted are named, most positions first, so a reader on a page whose
- *  family is not counted does not take the count for it (Miles 13 Nov 2026,
- *  ui-jobs 639): "Also on Rails: 1 Aave V3 position · closed", "3 positions
- *  in Aave V3 and Liquity V2 · 1 open · 2 closed", past three "in 4
- *  protocols". `nameOf` gives a position's protocol name; where it has none
- *  for some position the line names none. Null when there is nothing. */
-export function walletLineText(
-  positions: WalletCountsPosition[],
-  pageCounted: boolean,
-  nameOf: (p: WalletCountsPosition) => string | undefined = () => undefined,
-): string | null {
-  const parts = walletLineParts(positions, pageCounted, nameOf);
-  return parts && `${parts.scope}: ${parts.rest}`;
-}
-
-/** The line in two parts: its scope ("On Rails", "Also on Rails"), which
- *  carries the counter's tip, and the counts after the colon, which link to
- *  the wallet view. */
-export function walletLineParts(
-  positions: WalletCountsPosition[],
-  pageCounted: boolean,
-  nameOf: (p: WalletCountsPosition) => string | undefined = () => undefined,
-): { scope: string; rest: string } | null {
-  const n = positions.length;
-  if (n === 0) return null;
-  const chains = new Set(positions.map((p) => p.chain)).size;
-  const open = positions.filter((p) => p.status === "open").length;
-  const where = chains > 1 ? ` on ${chains} chains` : "";
-  const scope = pageCounted ? "On Rails" : "Also on Rails";
-  const tally = new Map<string, number>();
-  for (const p of positions) {
-    const name = nameOf(p);
-    if (!name) {
-      tally.clear();
-      break;
-    }
-    tally.set(name, (tally.get(name) ?? 0) + 1);
-  }
-  const names = [...tally.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([k]) => k);
-  const states = ` · ${open.toLocaleString("en-US")} open · ${(n - open).toLocaleString("en-US")} closed`;
-  if (names.length === 1) {
-    if (n === 1) return { scope, rest: `1 ${names[0]} position · ${open === 1 ? "open" : "closed"}` };
-    return { scope, rest: `${count(n, `${names[0]} position`)}${where}${states}` };
-  }
-  const within =
-    names.length === 0 ? "" : names.length <= NAMED_MAX ? ` in ${listed(names)}` : ` in ${names.length} protocols`;
-  return { scope, rest: `${count(n, "position")}${within}${where}${states}` };
+/** The positions menu under the wallet heading (H13.2; Miles 17 Nov 2026,
+ *  ui-jobs 701): the trigger's count, the open positions (the page's own
+ *  first, so it is always among those shown) up to `MENU_OPEN_MAX`, how many
+ *  more are open, and the closed count (closed, liquidated and redeemed, as
+ *  the counts treat them). Null when the wallet holds nothing besides the
+ *  page's position. */
+export function walletPositionsMenu<P extends WalletCountsPosition>(
+  positions: P[],
+  isPage: (p: P) => boolean,
+): {
+  trigger: string;
+  openHeading: string;
+  open: { position: P; page: boolean }[];
+  more: string | null;
+  closed: string | null;
+  /** Whether the page's position is among those counted. */
+  pageCounted: boolean;
+} | null {
+  const page = positions.filter(isPage);
+  if (positions.length === page.length) return null;
+  const open = positions
+    .filter((p) => p.status === "open")
+    .map((position) => ({ position, page: isPage(position) }))
+    .sort((a, b) => Number(b.page) - Number(a.page));
+  const closed = positions.length - open.length;
+  const rest = open.length - MENU_OPEN_MAX;
+  return {
+    trigger: count(positions.length, "position"),
+    openHeading: `Open positions (${open.length.toLocaleString("en-US")})`,
+    open: open.slice(0, MENU_OPEN_MAX),
+    more: rest > 0 ? `+${rest.toLocaleString("en-US")} more on wallet dashboard` : null,
+    closed: closed > 0 ? `${count(closed, "closed position")} on wallet dashboard` : null,
+    pageCounted: page.length > 0,
+  };
 }

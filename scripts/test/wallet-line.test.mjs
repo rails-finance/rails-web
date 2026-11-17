@@ -1,93 +1,124 @@
-// lib/wallet/summary-counts.ts walletLineText: the wallet heading's count line (H13.2) names its
-// scope, "On Rails:" where the page's position is among those counted and "Also on Rails:" where it
-// is not (Miles 12 Nov 2026, rails-ops ui-jobs 613), and names the protocols counted (Miles 13 Nov
-// 2026, ui-jobs 639).
+// The wallet heading's positions menu (H13.2; Miles 17 Nov 2026, rails-ops ui-jobs 701):
+// lib/wallet/summary-counts.ts walletPositionsMenu (the trigger, the open rows, "+N more", the
+// closed count) and lib/wallet/position-label.ts positionLabel (each row's name, less the
+// protocol).
 // Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { WALLET_COUNTS_SCOPE, walletLineParts, walletLineText } from "../../lib/wallet/summary-counts.ts";
+import {
+  MENU_OPEN_MAX,
+  MENU_TESTNETS,
+  WALLET_COUNTS_SCOPE,
+  rowIsPage,
+  walletPositionsMenu,
+} from "../../lib/wallet/summary-counts.ts";
+import { positionLabel } from "../../lib/wallet/position-label.ts";
 
-const row = (chain, status, i) => ({
+const row = (status, i, family = "aave-v3", chain = "ethereum") => ({
   chain,
-  family: "aave-v3",
+  family,
   positionId: String(i),
   status,
-  href: `/${chain}/aave-v3/${i}`,
+  href: `/${chain}/${family}/${i}`,
+});
+const onPage = (path) => (p) => rowIsPage(p.href, path, "");
+
+test("the trigger counts every position, singular at one", () => {
+  const rows = [row("open", 1), row("closed", 2), row("liquidated", 3)];
+  assert.equal(walletPositionsMenu(rows, onPage("/ethereum/aave-v3/1")).trigger, "3 positions");
+  assert.equal(walletPositionsMenu([row("closed", 2)], onPage("/elsewhere")).trigger, "1 position");
 });
 
-const FIVE = [
-  row("ethereum", "open", 1),
-  row("ethereum", "open", 2),
-  row("ethereum", "closed", 3),
-  row("base", "liquidated", 4),
-  row("base", "closed", 5),
-];
-
-test("the page's position counted: On Rails", () => {
-  assert.equal(walletLineText(FIVE, true), "On Rails: 5 positions on 2 chains · 2 open · 3 closed");
+test("nothing besides the page's position draws nothing", () => {
+  assert.equal(walletPositionsMenu([], onPage("/x")), null);
+  assert.equal(walletPositionsMenu([row("open", 1)], onPage("/ethereum/aave-v3/1")), null);
 });
 
-test("the page's position not counted: Also on Rails", () => {
-  assert.equal(walletLineText(FIVE.slice(2), false), "Also on Rails: 3 positions on 2 chains · 0 open · 3 closed");
-});
-
-test("one chain is not named", () => {
-  assert.equal(walletLineText(FIVE.slice(0, 2), true), "On Rails: 2 positions · 2 open · 0 closed");
-});
-
-test("nothing counted draws nothing", () => {
-  assert.equal(walletLineText([], false), null);
-});
-
-const NAMES = {
-  "aave-v3": "Aave V3",
-  "liquity-v2": "Liquity V2",
-  morpho: "Morpho Blue",
-  spark: "SparkLend",
-  fluid: "Fluid",
-};
-const nameOf = (p) => NAMES[p.family];
-const fam = (family, status, i, chain = "ethereum") => ({ ...row(chain, status, i), family });
-
-test("one position names its protocol and state", () => {
-  assert.equal(
-    walletLineText([row("ethereum", "closed", 1)], false, nameOf),
-    "Also on Rails: 1 Aave V3 position · closed",
+test("the open rows: the page's own first and marked", () => {
+  const rows = [row("open", 1), row("open", 2, "liquity-v2"), row("closed", 3)];
+  const m = walletPositionsMenu(rows, onPage("/ethereum/liquity-v2/2"));
+  assert.equal(m.openHeading, "Open positions (2)");
+  assert.deepEqual(
+    m.open.map((r) => [r.position.positionId, r.page]),
+    [
+      ["2", true],
+      ["1", false],
+    ],
   );
-  assert.equal(walletLineText([row("ethereum", "open", 1)], true, nameOf), "On Rails: 1 Aave V3 position · open");
+  assert.equal(m.pageCounted, true);
+  assert.equal(walletPositionsMenu(rows, onPage("/sepolia/polaris/20")).pageCounted, false);
 });
 
-test("one protocol, several positions", () => {
-  assert.equal(walletLineText(FIVE, true, nameOf), "On Rails: 5 Aave V3 positions on 2 chains · 2 open · 3 closed");
+test("past six open positions: six and +N more", () => {
+  const rows = Array.from({ length: 9 }, (_, i) => row("open", i));
+  const m = walletPositionsMenu(rows, onPage("/sepolia/polaris/20"));
+  assert.equal(MENU_OPEN_MAX, 6);
+  assert.equal(m.open.length, 6);
+  assert.equal(m.more, "+3 more on wallet dashboard");
+  assert.equal(walletPositionsMenu(rows.slice(0, 6), onPage("/x")).more, null);
 });
 
-test("two or three protocols are named, most positions first", () => {
-  const rows = [fam("liquity-v2", "open", 1), fam("aave-v3", "closed", 2), fam("aave-v3", "closed", 3)];
-  assert.equal(
-    walletLineText(rows, false, nameOf),
-    "Also on Rails: 3 positions in Aave V3 and Liquity V2 · 1 open · 2 closed",
-  );
-  assert.equal(
-    walletLineText([...rows, fam("morpho", "open", 4, "arbitrum")], false, nameOf),
-    "Also on Rails: 4 positions in Aave V3, Liquity V2 and Morpho Blue on 2 chains · 2 open · 2 closed",
-  );
+test("the closed line counts closed, liquidated and redeemed; omitted at none", () => {
+  const rows = [row("open", 1), row("closed", 2), row("liquidated", 3), row("redeemed", 4)];
+  assert.equal(walletPositionsMenu(rows, onPage("/x")).closed, "3 closed positions on wallet dashboard");
+  assert.equal(walletPositionsMenu(rows.slice(0, 2), onPage("/x")).closed, "1 closed position on wallet dashboard");
+  assert.equal(walletPositionsMenu([row("open", 1), row("open", 2)], onPage("/x")).closed, null);
 });
 
-test("past three protocols the line counts them", () => {
-  const rows = ["aave-v3", "liquity-v2", "morpho", "spark"].map((f, i) => fam(f, "open", i));
-  assert.equal(walletLineText(rows, true, nameOf), "On Rails: 4 positions in 4 protocols · 4 open · 0 closed");
-});
-
-test("a position with no name leaves the line unnamed", () => {
-  const rows = [row("ethereum", "open", 1), fam("unknown", "closed", 2)];
-  assert.equal(walletLineText(rows, false, nameOf), "Also on Rails: 2 positions · 1 open · 1 closed");
-});
-
-test("the scope and the counts come apart for the tip and the link (ui-jobs 691)", () => {
-  assert.deepEqual(walletLineParts(FIVE.slice(2), false), {
-    scope: "Also on Rails",
-    rest: "3 positions on 2 chains · 0 open · 3 closed",
-  });
-  assert.equal(walletLineParts([], true), null);
+test("the footer and the wallet view's tip", () => {
+  assert.equal(MENU_TESTNETS, "Testnets not included");
   assert.equal(WALLET_COUNTS_SCOPE, "Counts mainnet positions; the Sepolia testnet is not counted.");
+});
+
+test("labels: a Trove is its branch and short id", () => {
+  assert.equal(
+    positionLabel({
+      family: "liquity-v2",
+      positionId: "WETH:16571955497228114735373687436766714226146657997938228625903174546598933916943",
+      market: "WETH",
+    }),
+    "WETH #165719…6943",
+  );
+  assert.equal(positionLabel({ family: "ebisu", positionId: "sUSDe:42" }), "sUSDe #42");
+});
+
+test("labels: a market by its page's name", () => {
+  assert.equal(positionLabel({ family: "aave-v3", positionId: "0xabc:core", market: "Core" }), "Core");
+  assert.equal(positionLabel({ family: "compound-v3", positionId: "usdc:0xabc", market: "cUSDCv3" }), "cUSDCv3");
+});
+
+test("labels: Morpho's pair where the row carries it, else the market's id", () => {
+  assert.equal(
+    positionLabel({ family: "morpho", positionId: "x", market: "x", collateral: "WBTC", debt: "USDC" }),
+    "WBTC/USDC",
+  );
+  assert.equal(
+    positionLabel({
+      family: "morpho",
+      positionId: "3a85e619751152991742810df6ec69ce473daef99e28a64ab2340d7b7ccfee49-0xc5cd",
+      market: "3a85e619751152991742810df6ec69ce473daef99e28a64ab2340d7b7ccfee49",
+    }),
+    "Market 0x3a85…ee49",
+  );
+});
+
+test("labels: a Fluid NFT and a Maker vault carry their ids", () => {
+  assert.equal(positionLabel({ family: "fluid", positionId: "19526", market: "USDC / ETH" }), "USDC / ETH #19526");
+  assert.equal(positionLabel({ family: "makerdao", positionId: "2028", market: "ETH-A" }), "ETH-A #2028");
+  assert.equal(
+    positionLabel({
+      family: "makerdao",
+      positionId: "0x3d25235b7c414cb67bf09561a33fd6ce62c11dcf",
+      market: "LSEV2-SKY-A",
+    }),
+    "LSEV2-SKY-A 0x3d25…1dcf",
+  );
+});
+
+test("labels: a row naming nothing but the wallet reads Account", () => {
+  assert.equal(
+    positionLabel({ family: "aave-v3", positionId: "0x3df83ec9d2b62bb9bb83eba1218a202564bb67da" }),
+    "Account",
+  );
+  assert.equal(positionLabel({ family: "spark", positionId: "0xabc" }), "Account");
 });
