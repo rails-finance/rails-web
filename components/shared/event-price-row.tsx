@@ -186,8 +186,12 @@ export function EventGasButton({ gas }: { gas: EventGas }) {
   const base = "inline-flex min-h-6 items-center gap-1 rounded-md text-xs tabular-nums text-rb-500";
   if (units.length < 2)
     return (
-      <span role="group" className={base} aria-label={line} title={line} data-gas="" data-gas-unit={unit}>
-        {content}
+      <span className={base} title={line} data-gas="" data-gas-unit={unit}>
+        <Fuel size={14} aria-hidden className="shrink-0" />
+        <span>
+          <span className="sr-only">{gas.run != null ? `Gas across ${gas.run} transactions ` : "Gas "}</span>
+          <Prov info={gas.info ?? gasReceipt(gas)}>{figure(unit)}</Prov>
+        </span>
       </span>
     );
   const label = `${line}, in ${GAS_UNIT_WORD[unit]}. Press for ${GAS_UNIT_WORD[next]}`;
