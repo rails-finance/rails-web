@@ -281,6 +281,7 @@ function History({ closed }: { closed: WalletPosition[] }) {
                         to{" "}
                         <Link
                           href={`/wallet/${h.movedTo}`}
+                          prefetch={false}
                           className="font-mono text-xs text-blue-600 hover:underline dark:text-[var(--text-link)]"
                           data-moved-to={h.movedTo}
                         >
