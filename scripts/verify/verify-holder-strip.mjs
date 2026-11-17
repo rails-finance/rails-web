@@ -434,7 +434,7 @@ info(
     );
 
     // The debt: one token on every branch, marked ≈ because each row is its
-    // last change's figure.
+    // last touch's figure.
     check(
       "V4. the total debt is the restated Σ debt over the open troves, wearing the ≈",
       strip.legs.debt?.value === `≈ ${fmtNum(vDebt)} BOLD`,
@@ -626,7 +626,7 @@ if (!probeLine) {
     "G2a. Liquity V2: the debt leg is the BOLD sum, marked ≈ with a last-change tip, on a chain receipt",
     leg(got.v2, "debt").value === "150,000 BOLD" &&
       leg(got.v2, "debt").approx === true &&
-      /last change/.test(leg(got.v2, "debt").tip ?? "") &&
+      /last touch/.test(leg(got.v2, "debt").tip ?? "") &&
       leg(got.v2, "debt").kind === "chain",
     JSON.stringify(leg(got.v2, "debt")).slice(0, 200),
   );

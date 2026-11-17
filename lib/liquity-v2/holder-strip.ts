@@ -14,7 +14,7 @@
 // branch gets its collateral in that token.
 //
 // EVERY LEG WEARS THE ≈ (ui-jobs 690). The rows are each trove's figures as of
-// its last change: interest accrues on the debt, and redistributions from
+// its last touch: interest accrues on the debt, and redistributions from
 // liquidated troves move collateral and debt onto it, between changes, so a sum
 // of them is an estimate even in one token.
 //
@@ -31,10 +31,10 @@ import { formatNumber, formatUsdValue } from "@/lib/utils/format";
 
 /** What each leg's ≈ means, in a sentence or two. */
 const LEG_TIP = {
-  collateral: "As of each open trove's last change. Redistribution gains since then are left out.",
+  collateral: "As of each open trove's last touch. Redistribution gains since then are left out.",
   collateralValued:
-    "An estimate: the open troves' collateral as of each one's last change, valued at each branch's PriceFeed as of the latest read. Redistribution gains since then are left out.",
-  debt: "As of each open trove's last change. The interest and redistributed debt built up since are left out.",
+    "An estimate: the open troves' collateral as of each one's last touch, valued at each branch's PriceFeed as of the latest read. Redistribution gains since then are left out.",
+  debt: "As of each open trove's last touch. The interest and redistributed debt built up since are left out.",
 } as const;
 
 const plural = (n: number, one: string, many: string): string => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
@@ -72,7 +72,7 @@ function holderCollValueProv(branches: string[]): Provenance {
       kind: "recompute",
       text: "Re-run each branch's PriceFeed at the stamped block and multiply the wallet's collateral on that branch by its own price.",
     },
-    summary: `What the wallet's open troves hold as collateral, in USD — each branch's collateral (${branches.join(", ")}) at that branch's own on-chain PriceFeed, read once when the listing loaded. An estimate for two reasons: the branches hold different tokens and a sum of them exists only at a price, and each price is one oracle read that moves every block. It is a valuation at that moment, never an amount of anything. Redistribution gains since each trove's last change are not in it.`,
+    summary: `What the wallet's open troves hold as collateral, in USD — each branch's collateral (${branches.join(", ")}) at that branch's own on-chain PriceFeed, read once when the listing loaded. An estimate for two reasons: the branches hold different tokens and a sum of them exists only at a price, and each price is one oracle read that moves every block. It is a valuation at that moment, never an amount of anything. Redistribution gains since each trove's last touch are not in it.`,
     via: "GET /api/oracle/liquity-v2 · Σ branch collateral × the branch's own price",
     formula: "Σ collateral × the branch's price",
     inputs: [
@@ -160,7 +160,7 @@ export function liquityV2HolderStrip(
       prov: {
         kind: "chain",
         pclass: "indexed",
-        summary: `All the ${collateralType} the wallet's open troves hold — the sum of each trove's collateral, from the index. The wallet holds on this branch only, so the sum is a quantity of one token and nothing was converted to reach it. Redistribution gains since each trove's last change are not in it.`,
+        summary: `All the ${collateralType} the wallet's open troves hold — the sum of each trove's collateral, from the index. The wallet holds on this branch only, so the sum is a quantity of one token and nothing was converted to reach it. Redistribution gains since each trove's last touch are not in it.`,
         contract: tmContract(collateralType),
         via: "GET /api/troves?ownerAddress=… · Σ collateral over the open rows",
       },
