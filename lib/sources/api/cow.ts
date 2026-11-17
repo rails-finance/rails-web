@@ -4,6 +4,7 @@
 
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import type { CowTradesPage, CowWalletEntry, CowWalletTokens } from "@/lib/cow/types";
+import type { CowSettlement } from "@/lib/cow/settlement";
 
 export class CowReadError extends Error {
   constructor(
@@ -17,10 +18,15 @@ export class CowReadError extends Error {
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const CURSOR = /^\d+-\d+-\d+$/;
 
-async function read<T>(path: string, readerIp?: string, signal?: AbortSignal): Promise<T> {
+async function read<T>(
+  path: string,
+  readerIp?: string,
+  signal?: AbortSignal,
+  root = "/api/cow/ethereum/wallet",
+): Promise<T> {
   const base = process.env.RAILS_API_URL;
   if (!base) throw new Error("RAILS_API_URL environment variable is not set");
-  const res = await fetch(`${base}/api/cow/ethereum/wallet${path}`, {
+  const res = await fetch(`${base}${root}${path}`, {
     ...createAuthFetchOptions({ signal }, readerIp),
     cache: "no-store",
   });
@@ -86,4 +92,36 @@ export async function readCowWalletEntry(wallet: string, readerIp?: string): Pro
   } catch {
     return null;
   }
+}
+
+const TX_HASH = /^0x[0-9a-f]{64}$/;
+
+/** A settlement's trades with the clearing prices its settle() call gave them
+ *  (rails-server GET /api/cow/ethereum/settlement/:block/:tx). Outside
+ *  production, `COW_SETTLEMENT_FIXTURES=1` answers from the settlements read
+ *  on chain for ui-jobs 711 (scripts/fixtures/cow-settlement/<tx>.json), a 404
+ *  for any other, so the panel can be read before the route is deployed. */
+export async function readCowSettlement(
+  block: number,
+  txHash: string,
+  readerIp?: string,
+  signal?: AbortSignal,
+): Promise<CowSettlement> {
+  const tx = txHash.toLowerCase();
+  if (!Number.isSafeInteger(block) || block < 0 || !TX_HASH.test(tx))
+    throw new CowReadError(400, "malformed block or hash");
+  if (process.env.NODE_ENV !== "production" && process.env.COW_SETTLEMENT_FIXTURES === "1") {
+    const { readFile } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    try {
+      const body = JSON.parse(
+        await readFile(join(process.cwd(), "scripts/fixtures/cow-settlement", `${tx}.json`), "utf8"),
+      ) as CowSettlement;
+      if (body.blockNumber !== block) throw new CowReadError(404, "no such settlement in the fixtures");
+      return body;
+    } catch (err) {
+      throw err instanceof CowReadError ? err : new CowReadError(404, "no such settlement in the fixtures");
+    }
+  }
+  return read<CowSettlement>(`/${block}/${tx}`, readerIp, signal, "/api/cow/ethereum/settlement");
 }
