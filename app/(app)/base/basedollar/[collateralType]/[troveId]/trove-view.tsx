@@ -26,6 +26,8 @@
 // empty (a backend blip) `initialTrove` is null and this component fetches
 // the tail itself, exactly as it did before the route had a server half.
 
+import { forkLastHolderProv } from "@/lib/liquity-fork/holder-provenance";
+import { Prov } from "@/components/shared/provenance";
 import { LastHolderPrefix } from "@/lib/liquity/trove-page-words";
 import { useReportPositionRead } from "@/components/shared/position-read";
 import { readOfHeadAnswer } from "@/lib/shared/position-read";
@@ -528,7 +530,20 @@ export default function BasedollarTroveDetail({
             chain: BASE_CHAIN_ID,
             // "last holder" on a closed Trove whose NFT changed hands: the
             // one-Trove read says so (ui-jobs 715).
-            prefix: !view?.owner && view?.lastOwner && view.changedHands ? <LastHolderPrefix /> : undefined,
+            // Its receipt lists the TroveNFT's transfers (ui-jobs 717, interim).
+            prefix:
+              !view?.owner && view?.lastOwner && view.changedHands ? (
+                view.nftTransfers?.length ? (
+                  <Prov
+                    info={forkLastHolderProv("basedollar", BASE_CHAIN_ID, view.nftTransfers)}
+                    value={view.lastOwner}
+                  >
+                    <LastHolderPrefix />
+                  </Prov>
+                ) : (
+                  <LastHolderPrefix />
+                )
+              ) : undefined,
           }}
           assets={stripAssets}
           closed={view != null && view.status !== "open"}

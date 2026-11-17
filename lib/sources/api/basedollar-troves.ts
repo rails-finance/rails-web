@@ -11,7 +11,7 @@
 // $1 redemption face on the debt, and the collateral ratio. An unpriced branch
 // (RPC down) degrades those fields to null — amounts-only, never a $0.
 
-import type { ForkFormerHolder } from "@/lib/liquity-fork/former-holders";
+import type { ForkFormerHolder, ForkNftTransfer } from "@/lib/liquity-fork/former-holders";
 import { resolveBranch } from "@/lib/basedollar/asset-catalog";
 import type { LiquityForkPriceMap } from "@/lib/sources/chain/liquity-fork-prices";
 import { forkExactAmount } from "@/lib/shared/liquity-fork-ops";
@@ -71,6 +71,8 @@ export interface BasedollarTroveSummary {
   formerHolders?: ForkFormerHolder[];
   /** One Trove's read (?troveId=): its NFT passed between two wallets. */
   changedHands?: boolean;
+  /** With `changedHands`: the TroveNFT's wallet-to-wallet transfers, oldest first. */
+  nftTransfers?: ForkNftTransfer[];
 }
 
 /** One backend TroveSummary row, in the subset this builder reads. The rails route
@@ -95,6 +97,7 @@ export interface RawBasedollarTroveRow {
   batch: { isMember: boolean };
   formerHolders?: ForkFormerHolder[];
   changedHands?: boolean;
+  nftTransfers?: ForkNftTransfer[];
 }
 
 /** Shape the listing rows from the rails route's page slice. Filtering, sorting and
@@ -136,6 +139,7 @@ export function buildBasedollarTroveRows(
       ownerEns: r.ownerEns ?? null,
       ...(r.formerHolders ? { formerHolders: r.formerHolders } : {}),
       ...(r.changedHands != null ? { changedHands: r.changedHands } : {}),
+      ...(r.nftTransfers ? { nftTransfers: r.nftTransfers } : {}),
     };
   });
 }

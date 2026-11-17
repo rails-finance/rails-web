@@ -8,6 +8,7 @@
 // trove card carried it. A fork whose lane lacks a datum leaves the optional
 // field unset and the card simply omits that slot — it never fakes a value.
 
+import type { ForkNftTransfer } from "@/lib/liquity-fork/former-holders";
 import type { CollSurplusClaim } from "@/lib/sources/chain/liquity-coll-surplus";
 
 export type LiquityFamilyId = "liquity-v2" | "asymmetry" | "ebisu" | "basedollar";
@@ -64,6 +65,9 @@ export interface LiquityTroveView {
   /** A fork Trove's one-Trove read: its NFT passed between two wallets, so a
    *  closed Trove's holder reads "last holder" (ui-jobs 715). */
   changedHands?: boolean;
+  /** With `changedHands`: the TroveNFT's wallet-to-wallet transfers, oldest
+   *  first, the receipt behind "last holder" (ui-jobs 717). */
+  nftTransfers?: ForkNftTransfer[];
   /** Marketplace link for the trove NFT (OpenSea) when the explorer knows the
    *  NFT contract. Omitted → no NFT link on the card. */
   nftUrl?: string | null;
