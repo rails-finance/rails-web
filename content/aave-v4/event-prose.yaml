@@ -284,6 +284,10 @@ placeholders:
     rounding: text
     means: |-
       The symbol of what the position withdrew or borrowed.
+  returned:
+    rounding: spoke_amount
+    means: |-
+      A buy order's surplus: what the order did not spend of the sell amount it signed, sent back to the wallet.
   supplies:
     rounding: text
     means: |-
@@ -999,6 +1003,11 @@ templates:
           the position withdrew or borrowed more than the order sold, by over 0.1%
         text: |-
           Of the {left} {left_symbol} the order left unsold, Aave V3 took a flash-loan fee and the wallet got the rest.
+      swap.gap_returned:
+        when: |-
+          a buy order (debt_swap, repay_with_collateral or leverage) whose settlement Rails has read; in place of swap.gap
+        text: |-
+          Aave V3 took a flash-loan fee from the {left} {left_symbol} unsold; {returned} returned to the wallet from the unused limit.
       swap.supplies:
         when: |-
           collateral_swap
@@ -1020,6 +1029,7 @@ templates:
         swap.route,
         swap.route_topped,
         swap.gap,
+        swap.gap_returned,
         swap.supplies,
         swap.owes,
         hf.cleared,
@@ -1028,11 +1038,12 @@ templates:
       ]
     groups:
       happened: [swap.collateral, swap.debt, swap.repay, swap.leverage, swap.collateral_topped, swap.leverage_topped]
-      adds_up: [swap.route, swap.route_topped, swap.gap]
+      adds_up: [swap.route, swap.route_topped, swap.gap, swap.gap_returned]
       leaves: [swap.supplies, swap.owes, hf.cleared, hf.at_line, hf.close]
     alternates:
       - [swap.collateral, swap.debt, swap.repay, swap.leverage, swap.collateral_topped, swap.leverage_topped]
       - [swap.route, swap.route_topped]
+      - [swap.gap, swap.gap_returned]
       - [swap.supplies, swap.owes, hf.cleared]
       - [hf.at_line, hf.close]
 

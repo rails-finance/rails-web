@@ -22,6 +22,7 @@ import type {
   AaveV3SwapRoute,
 } from "@/lib/shared/types/event-shape";
 import { AAVE_V3_SWAP_LABELS } from "@/lib/aave-v3/swap-kinds";
+import type { CowSwapFigures, CowSwapView } from "@/lib/cow/surplus";
 import { resolveV3Tokens, scaleV3, flowV3, type V3TokenMeta } from "@/lib/sources/chain/aave-v3-tokens";
 
 import type { TimelineRowCeiling } from "@/lib/shared/timeline-row-ceiling";
@@ -127,6 +128,8 @@ export interface MvSwapLeg {
   trade_fee_amount: string | null;
   /** The ParaSwap adapter that made the Pool calls (server mig 248). */
   adapter?: string | null;
+  /** On the CoW routes (server mig 481): the settlement's surplus and fees. */
+  cow?: CowSwapFigures | null;
   /** On the given leg: the received leg's own columns. The server merged its row
    *  into this one, so the swap arrives — and counts — as one event. */
   received?: MvSwapReceived | null;
@@ -327,7 +330,27 @@ export function aaveV3RowTokens(r: MvRow): string[] {
  * Transform raw mv_aave_v3_events rows → the shared { wallet, events, totalEvents }
  * shape. The replay lives in the MV; the presentation (symbols, basket) lives here.
  */
+/** The surplus token named from the swap's legs: a sell order's is the bought
+ *  token (the received leg, or the aTokens a supply from a swap took in), a buy
+ *  order's the sold token (a debt swap's new borrow, or the collateral a repay
+ *  with collateral gave). The token may be the leg reserve's aToken: same
+ *  decimals, named by its reserve. */
+function cowView(
+  cow: CowSwapFigures,
+  kind: AaveV3SwapKind,
+  gMeta: V3TokenMeta | undefined,
+  xMeta: V3TokenMeta | undefined,
+): CowSwapView {
+  const m = cow.kind === "sell" ? (kind === "supply_from_swap" ? gMeta : xMeta) : kind === "debt_swap" ? xMeta : gMeta;
+  return { ...cow, token: { address: cow.surplusToken, symbol: m?.symbol ?? null, decimals: m?.decimals ?? null } };
+}
+
 export async function buildAaveV3Timeline(rows: MvRow[], walletRaw: string): Promise<AaveV3TimelineResult> {
+  // DEV ONLY: the CoW surplus figures of ten fixture swaps (lib/cow/dev-surplus-fixture.ts).
+  if (process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_COW_SURPLUS_FIXTURES === "1") {
+    const { applyDevCowToV3Rows } = await import("@/lib/cow/dev-surplus-fixture");
+    applyDevCowToV3Rows(rows);
+  }
   // Resolve symbol/decimals for every reserve referenced (primary / collateral /
   // debt) in one batched ERC20 multicall.
   const addrs = new Set<string>();
@@ -425,6 +448,7 @@ export function aaveV3RowsToEvents(
       exact: leg.exact,
       adapter: leg.adapter?.toLowerCase() ?? undefined,
       ...(events ? { events } : {}),
+      ...(leg.cow !== undefined ? { cow: leg.cow && cowView(leg.cow, kind, gMeta, xMeta) } : {}),
       raw: {
         receivedAmount: rawVal(x.amount),
         ...(receivedTrade

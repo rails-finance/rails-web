@@ -24,6 +24,9 @@ import { useAaveV4Cells } from "./aave-v4-event-detail";
 import { AaveV4EventExplainer, AaveV4PageSentence, aaveV4LearnMoreContent } from "./aave-v4-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import type { AaveV4Event } from "@/lib/aave-v4/event-prose";
+import { aaveV4CowView } from "@/lib/aave-v4/swaps";
+import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
+import { CowSurplusLines } from "@/components/protocol/cow/cow-surplus-lines";
 
 export interface AaveV4EventCardProps {
   event: AaveV4Event;
@@ -189,6 +192,7 @@ export function AaveV4EventCard({
     active: opened || collected,
   });
 
+  const cow = ctx.swap ? aaveV4CowView(ctx.swap) : null;
   const slots: EventCardSlots = {
     event: {
       id: event.id,
@@ -206,6 +210,15 @@ export function AaveV4EventCard({
     sheet,
     ledgers: { none: "no flows panel on Aave V4 yet" },
     price: { gas: eventGas(event.gas), prices },
+    // A CoW swap's surplus and fees, once its settlement is read (server mig 481).
+    notes: cow ? (
+      <CowSurplusLines
+        view={cow.view}
+        trade={cow.trade}
+        coords={{ block: event.blockNumber, txHash: event.txHash }}
+        symbol={cow.view.token.symbol ? aaveV4DisplaySymbol(cow.view.token.symbol) : undefined}
+      />
+    ) : undefined,
     // The explanation reads the position state the card opens with, so the
     // timeline's pane is the body alone, with no teaser. The event page's
     // title is the first sentence, which reads no state: the pane then leaves

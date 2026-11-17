@@ -36,6 +36,7 @@
 
 import type { RouterSale } from "@/lib/shared/tx-legs";
 import type { TxEntry } from "@/lib/shared/tx-entry";
+import type { CowSwapFigures, CowSwapView } from "@/lib/cow/surplus";
 
 // ───────────────────────── Base primitives ─────────────────────────
 
@@ -489,6 +490,9 @@ export interface AaveV4Swap {
   sell: AaveV4SwapSide;
   buy: AaveV4SwapSide;
   feeRaw: string;
+  /** The settlement's surplus and fees (server mig 481, lib/cow/surplus.ts); null until the
+   *  settlement is read or where settle() did not match. Absent from a server before 712. */
+  cow?: CowSwapFigures | null;
   /** The received leg's event, as the timeline serves it without `?swaps=1`. */
   received: BaseActivityEvent;
 }
@@ -637,6 +641,9 @@ export interface AaveV3SwapDetail {
    *  leg (server mig 248, §15 D4). A netted leg's figure is then the net change
    *  in its reserve, not one row's amount. */
   events?: AaveV3SwapPoolEvent[];
+  /** On the CoW routes: the settlement's surplus and fees (server mig 481, lib/cow/surplus.ts), the
+   *  surplus token named; null until the settlement is read or where settle() did not match. */
+  cow?: CowSwapView | null;
   raw: {
     receivedAmount?: string;
     receivedSupplyBefore?: string;

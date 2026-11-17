@@ -1,0 +1,372 @@
+{
+  "0x17b8f2765c296e9f8b53a4a941168f3392d5bdbcd7047357bb82d40f1d1d4ca43ea2c6671085d77ab5645409c5cb60ec9b5c12956ae29e91": {
+    "protocol": "aave-v3",
+    "kind": "collateral_swap",
+    "wallet": "0x3ea2c6671085d77ab5645409c5cb60ec9b5c1295",
+    "tx": "0x2a41be3bf44a94fd36e9b3bf4ed433ef5ef0a0dd3032c2da4a3e2b8378f38430",
+    "cow": {
+      "kind": "sell",
+      "surplus": "91375479376780733",
+      "surplusToken": "0xa700b4eb416be35b2911fd5dee80678ff64ff6c9",
+      "feeBp": 32.277,
+      "settleOffset": 0,
+      "call": "direct",
+      "feeGap": "24156102934791687",
+      "limit": {
+        "sell": "1000000000",
+        "buy": "7368244633654891450",
+        "fee": "0",
+        "amount": "7368244633654891450"
+      },
+      "partiallyFillable": false,
+      "executedAmount": "1000000000",
+      "prices": {
+        "own": {
+          "sellIndex": 2,
+          "buyIndex": 3,
+          "sell": "7459620113031672183",
+          "buy": "1000000000"
+        },
+        "uniform": {
+          "sellIndex": 0,
+          "buyIndex": 1,
+          "sell": "7482820186006202803",
+          "buy": "999872253"
+        }
+      }
+    }
+  },
+  "0x1b4cdd3a7a6e833a210b271667c2f89d6f66193efa621fb926cff46ddc3a6383fb632268c37856c6efd48738ef60a74680c4fb626b0662f2": {
+    "protocol": "aave-v3",
+    "kind": "supply_from_swap",
+    "wallet": "0xfb632268c37856c6efd48738ef60a74680c4fb62",
+    "tx": "0x3317c69dd465a78f4a92876c266be62274959ff65a51e418caa5483aa54c7781",
+    "cow": {
+      "kind": "sell",
+      "surplus": "2493",
+      "surplusToken": "0x23878914efe38d27c4d67ab83ed1b93a74d4086a",
+      "feeBp": 4.247,
+      "settleOffset": 0,
+      "call": "direct",
+      "feeGap": "42585",
+      "limit": {
+        "sell": "10000000000000000000000000",
+        "buy": "10002500625156",
+        "fee": "0",
+        "amount": "100213094"
+      },
+      "partiallyFillable": true,
+      "executedAmount": "100188040371739782152",
+      "prices": {
+        "own": {
+          "sellIndex": 5,
+          "buyIndex": 6,
+          "sell": "100215587",
+          "buy": "100188040371739782152"
+        },
+        "uniform": {
+          "sellIndex": 0,
+          "buyIndex": 1,
+          "sell": "1000000000000000000",
+          "buy": "999300489657239932042646857754"
+        }
+      }
+    }
+  },
+  "0x528b0c94c885e702ea71388be039415a243568b049211564ec350065f91aba0ce7136a139a73208673fab61963f0e334abcb1ac66a483a51": {
+    "protocol": "aave-v3",
+    "kind": "withdraw_and_swap",
+    "wallet": "0xe7136a139a73208673fab61963f0e334abcb1ac6",
+    "tx": "0x1865c8fb3df080d7f84a62a0ca95b5ac799e0c59a0a1f7912e2c7b83f41bea0d",
+    "cow": {
+      "kind": "sell",
+      "surplus": "6469037920172206",
+      "surplusToken": "0x6b175474e89094c44da98b954eedeac495271d0f",
+      "feeBp": 94.783,
+      "settleOffset": 0,
+      "call": "wrapped",
+      "feeGap": "414117461345029217",
+      "limit": {
+        "sell": "3458551539",
+        "buy": "3459243249307800000000",
+        "fee": "0",
+        "amount": "43270453360200000000"
+      },
+      "partiallyFillable": true,
+      "executedAmount": "43261801",
+      "prices": {
+        "own": {
+          "sellIndex": 2,
+          "buyIndex": 3,
+          "sell": "43276922398120172206",
+          "buy": "43261801"
+        },
+        "uniform": {
+          "sellIndex": 1,
+          "buyIndex": 0,
+          "sell": "645007801153758706556202041",
+          "buy": "638670977544068"
+        }
+      }
+    }
+  },
+  "0x1de7e3cb9c654be030535e354bbb685b713a4301a6ef7b9a87665e93ce3f0989639154c3e10dd46010199f9f4c352bcb703018a96adbdba9": {
+    "protocol": "aave-v3",
+    "kind": "debt_swap",
+    "wallet": "0xd88ba48e8b4d6ec3ae4cd7e483c8c7adc79f2f53",
+    "tx": "0xd039a4922e62a83bb655ffe9a0827161f11a13e7189c5a529bd4cf1efeb49fdd",
+    "cow": {
+      "kind": "buy",
+      "surplus": "631829750864786007",
+      "surplusToken": "0xc139190f447e929f090edeb554d95abb8b18ac1c",
+      "feeBp": 2.191,
+      "settleOffset": 260,
+      "call": "wrapped",
+      "feeGap": "698953675345399271",
+      "limit": {
+        "sell": "3190898151248738664510",
+        "buy": "3188828640",
+        "fee": "0",
+        "amount": "3190898151248738664510"
+      },
+      "partiallyFillable": false,
+      "executedAmount": "3188828640",
+      "prices": {
+        "own": {
+          "sellIndex": 2,
+          "buyIndex": 3,
+          "sell": "3188828640",
+          "buy": "3190266321497873878503"
+        },
+        "uniform": {
+          "sellIndex": 0,
+          "buyIndex": 1,
+          "sell": "3188828640",
+          "buy": "3189567367822528479232"
+        }
+      }
+    }
+  },
+  "0x8b0d85678a18347a5826583a028d7836a8632e4c5739dab9110bb9a5dc759f6a2d078066e1ac3083b7ff2aa964baadd6aade77df6a1d107b": {
+    "protocol": "aave-v3",
+    "kind": "repay_with_collateral",
+    "wallet": "0x7baecee44f3f1af9a9d8a0535be0f47b58a7383d",
+    "tx": "0xa3eff66cad180ece7be24e6aa5d12e536991fefbe40b269a972fb4fe7ea7d0fa",
+    "cow": {
+      "kind": "buy",
+      "surplus": "67490510",
+      "surplusToken": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "feeBp": 27.509,
+      "settleOffset": 392,
+      "call": "wrapped",
+      "feeGap": "38485410",
+      "limit": {
+        "sell": "14096020962",
+        "buy": "7002100000000000000",
+        "fee": "0",
+        "amount": "14096020962"
+      },
+      "partiallyFillable": false,
+      "executedAmount": "7002100000000000000",
+      "prices": {
+        "own": {
+          "sellIndex": 2,
+          "buyIndex": 3,
+          "sell": "7002100000000000000",
+          "buy": "14028530452"
+        },
+        "uniform": {
+          "sellIndex": 0,
+          "buyIndex": 1,
+          "sell": "7002100000000000000",
+          "buy": "13990045042"
+        }
+      }
+    }
+  },
+  "0x3353fd1bb84f7f73434f7afcbcc1514089c576aa0efe7337243e65fbc661b4751a43f0003f196f8e57efea6d4f69fa52f8a9f85e6a38681a": {
+    "protocol": "aave-v3",
+    "kind": "collateral_swap",
+    "wallet": "0xc2dc142198c1767815bd1e32603742605b28e16a",
+    "tx": "0xb6edc7a8bee45b94b3a02652128c07f16ce8a7b50461aa5683c4e3b6e57b72a4",
+    "cow": {
+      "kind": "sell",
+      "surplus": "45992817",
+      "surplusToken": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "feeBp": 28.823,
+      "settleOffset": 0,
+      "call": "inline",
+      "feeGap": "40444278",
+      "limit": {
+        "sell": "8190000000000000000",
+        "buy": "13945270637",
+        "fee": "0",
+        "amount": "13945270637"
+      },
+      "partiallyFillable": false,
+      "executedAmount": "8190000000000000000",
+      "prices": {
+        "own": {
+          "sellIndex": 3,
+          "buyIndex": 4,
+          "sell": "13991263454",
+          "buy": "8190000000000000000"
+        },
+        "uniform": {
+          "sellIndex": 1,
+          "buyIndex": 0,
+          "sell": "1713273227405206172030992384",
+          "buy": "1000000000000000000000000000000000000"
+        }
+      }
+    }
+  },
+  "0x8ee311e7a2ab063d8f499c290a7b84623c1ca3e797b0fcfec373a44c1f84c421e6d2b294708d301ee1d94574d7dcee0f27364eae6af8e45d": {
+    "protocol": "aave-v4",
+    "kind": "debt_swap",
+    "wallet": "0xf23cba78095635acce7c111ed7a93a9170ffbb4d",
+    "tx": "0x2b95868c5fab3aab8e13311e3631569f4e185384f2b81f9b452525c3586ddaae",
+    "cow": {
+      "kind": "buy",
+      "surplus": "8224945",
+      "surplusToken": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "feeBp": 103.194,
+      "settleOffset": 280,
+      "call": "wrapped",
+      "feeGap": "3619592",
+      "limit": {
+        "sell": "362598992",
+        "buy": "200000000000000000",
+        "fee": "0",
+        "amount": "362598992"
+      },
+      "partiallyFillable": false,
+      "executedAmount": "200000000000000000",
+      "prices": {
+        "own": {
+          "sellIndex": 2,
+          "buyIndex": 3,
+          "sell": "200000000000000000",
+          "buy": "354374047"
+        },
+        "uniform": {
+          "sellIndex": 0,
+          "buyIndex": 1,
+          "sell": "200000000000000000",
+          "buy": "350754455"
+        }
+      }
+    }
+  },
+  "0x3ddc276aabea36defb50f3a5be47b41fdc983903841c8f2b3c2f593eb3e95991ebfca60c1fa295224e553abe38d7b95b6c704dd96afbb664": {
+    "protocol": "aave-v4",
+    "kind": "leverage",
+    "wallet": "0x3310e70cb5124e06b124694183fd21c04a151fd5",
+    "tx": "0xa12d4338ae0416dfa0434d5dd9fd35c3e632ac1fe7c2366ab8ec8d268dc31df5",
+    "cow": {
+      "kind": "buy",
+      "surplus": "1539445",
+      "surplusToken": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+      "feeBp": 34.464,
+      "settleOffset": 392,
+      "call": "wrapped",
+      "feeGap": "485630",
+      "limit": {
+        "sell": "142933802",
+        "buy": "77502456846772759",
+        "fee": "0",
+        "amount": "142933802"
+      },
+      "partiallyFillable": false,
+      "executedAmount": "77502456846772759",
+      "prices": {
+        "own": {
+          "sellIndex": 2,
+          "buyIndex": 3,
+          "sell": "77502456846772759",
+          "buy": "141394357"
+        },
+        "uniform": {
+          "sellIndex": 1,
+          "buyIndex": 0,
+          "sell": "77502456846772759",
+          "buy": "140908727"
+        }
+      }
+    }
+  },
+  "0x2d5b05e5248d78d8a8ad7e4d675e9b3a0aa42ca93071e1dec0be03a10e739e143f1811197898164722d98b39b625a436b9ba77496aeb8127": {
+    "protocol": "aave-v4",
+    "kind": "repay_with_collateral",
+    "wallet": "0xf7589b198599f2879bde4fa022f32b4f02b51c80",
+    "tx": "0x908dc11c5716ffcc30ee28bab4c3210262f4e82401b349668870ee6b735b8e2b",
+    "cow": {
+      "kind": "buy",
+      "surplus": "6744272",
+      "surplusToken": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "feeBp": 15.094,
+      "settleOffset": 260,
+      "call": "wrapped",
+      "feeGap": "1060408",
+      "limit": {
+        "sell": "710323240",
+        "buy": "702405403",
+        "fee": "0",
+        "amount": "710323240"
+      },
+      "partiallyFillable": false,
+      "executedAmount": "702405403",
+      "prices": {
+        "own": {
+          "sellIndex": 2,
+          "buyIndex": 3,
+          "sell": "702405403",
+          "buy": "703578968"
+        },
+        "uniform": {
+          "sellIndex": 0,
+          "buyIndex": 1,
+          "sell": "702405403",
+          "buy": "702518560"
+        }
+      }
+    }
+  },
+  "0x33f51453f66a14daa019fbdd51f42c1b8c312e3b3520af1101250c314ac9464728eadbbf0e54ed5a1006229cb9c77591016016876afc69eb": {
+    "protocol": "aave-v4",
+    "kind": "collateral_swap",
+    "wallet": "0xe3b7192937941224143f96fb2618f744838d025e",
+    "tx": "0xd3e4a6dfb012333473ba5de41071451c92f48b1bb685f025af7a25ee0efeb6ae",
+    "cow": {
+      "kind": "sell",
+      "surplus": "4356050669675801",
+      "surplusToken": "0x7f39c581f595b53c5cb19bd0b3f8da6c935e2ca0",
+      "feeBp": 28.963,
+      "settleOffset": 260,
+      "call": "wrapped",
+      "feeGap": "1042766391995486",
+      "limit": {
+        "sell": "1261237",
+        "buy": "354627341148351112",
+        "fee": "0",
+        "amount": "354627341148351112"
+      },
+      "partiallyFillable": false,
+      "executedAmount": "1261237",
+      "prices": {
+        "own": {
+          "sellIndex": 2,
+          "buyIndex": 3,
+          "sell": "358983391818026913",
+          "buy": "1261237"
+        },
+        "uniform": {
+          "sellIndex": 0,
+          "buyIndex": 1,
+          "sell": "360026158210022399",
+          "buy": "1261237"
+        }
+      }
+    }
+  }
+}

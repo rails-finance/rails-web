@@ -30,7 +30,7 @@
 
 import type { ReactNode } from "react";
 import type { AaveV3Context } from "@/lib/shared/types/protocols/aave-v3";
-import type { AaveV3SwapLegAction, AaveV3SwapPoolEvent } from "@/lib/shared/types/event-shape";
+import type { AaveV3SwapDetail, AaveV3SwapLegAction, AaveV3SwapPoolEvent } from "@/lib/shared/types/event-shape";
 import type { Provenance } from "@/components/shared/provenance";
 import {
   chainTruthDeltaValue,
@@ -106,6 +106,8 @@ import {
 import { AmountText, ExactTip } from "@/components/shared/amount-text";
 import { fmtPositionAmount } from "@/components/shared/position-row";
 import { fmt2 } from "@/lib/aave-v3/liquidation-fee";
+import { COW_FEE_LABEL, COW_SURPLUS_LABEL, feeBpText, shiftRaw } from "@/lib/cow/surplus";
+import { cowFeeProv, cowSurplusProv, type CowCoords } from "@/lib/cow/surplus-provenance";
 import { formatCompact } from "@/lib/shared/format-compact";
 
 export interface AaveV3CtEventDetailProps {
@@ -553,6 +555,8 @@ export function useAaveV3EventBody({
           );
     // A supply from a swap lists what it sold before the balance it supplied (D2).
     for (const leg of s.kind === "supply_from_swap" ? [received, given] : [given, received]) push(leg);
+    // A CoW settlement's surplus and fees (server mig 481): two lines, never added together.
+    if (blockNumber != null && txHash) for (const line of cowSwapLines(s, { block: blockNumber, txHash })) push(line);
     // Where a leftover nets into a leg (§15 D4), every row behind the figures
     // above is listed with its own amount.
     // A collateral leg netted by a leftover states the net beside its rows:
@@ -945,6 +949,33 @@ export function useAaveV3EventBody({
     state: ready,
     stateCoords,
   };
+}
+
+/** A CoW swap's surplus line (received beyond the limit signed on a sell order,
+ *  returned to the wallet from the unused limit on a buy order) and its fee
+ *  line, each with its receipt; none until the settlement is read. */
+function cowSwapLines(s: AaveV3SwapDetail, coords: CowCoords): ChainTruthStat[] {
+  const c = s.cow;
+  if (!c || !s.raw.tradeSellAmount || !s.raw.tradeBuyAmount) return [];
+  const trade = { sell: s.raw.tradeSellAmount, buy: s.raw.tradeBuyAmount, fee: s.raw.tradeFeeAmount ?? "0" };
+  const exact = c.token.decimals == null ? c.surplus : shiftRaw(c.surplus, c.token.decimals);
+  return [
+    {
+      label: COW_SURPLUS_LABEL[c.kind],
+      value: exact,
+      display: c.token.decimals == null ? `${c.surplus} (raw)` : fmtPositionAmount(Number(exact)),
+      symbol: c.token.symbol ?? "",
+      address: c.token.address,
+      prov: cowSurplusProv(c, trade, coords),
+    },
+    {
+      label: COW_FEE_LABEL,
+      value: String(c.feeBp),
+      display: feeBpText(c.feeBp),
+      symbol: "",
+      prov: cowFeeProv(c, trade, coords),
+    },
+  ];
 }
 
 /** The amounts behind an event that are not a balance (a swap's bought token,

@@ -10,6 +10,7 @@
 
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { AaveV4Context, AaveV4Swap } from "@/lib/shared/types/protocols/aave-v4";
+import { decimalsOf, type CowSwapView } from "@/lib/cow/surplus";
 
 type V4Event = BaseActivityEvent & { context: { protocol: "aave-v4"; data: AaveV4Context } };
 
@@ -45,4 +46,22 @@ export function aaveV4SwapByReceivedId(
   id: string,
 ): BaseActivityEvent | null {
   return (events ?? []).find((e) => aaveV4SwapOf(e)?.receivedEventId === id) ?? null;
+}
+
+/** The swap's CoW figures with the surplus token named (lib/cow/surplus.ts): a
+ *  sell order's surplus is in the token it bought, a buy order's in the token it
+ *  sold. Null until the settlement is read. */
+export function aaveV4CowView(
+  swap: AaveV4Swap,
+): { view: CowSwapView; trade: { sell: string; buy: string; fee: string } } | null {
+  const c = swap.cow;
+  if (!c) return null;
+  const side = c.kind === "sell" ? swap.buy : swap.sell;
+  return {
+    view: {
+      ...c,
+      token: { address: c.surplusToken, symbol: side.symbol, decimals: decimalsOf(side.raw, side.amount) },
+    },
+    trade: { sell: swap.sell.raw, buy: swap.buy.raw, fee: swap.feeRaw },
+  };
 }
