@@ -26,6 +26,7 @@
 import { parseAbi } from "viem";
 import { chainClient } from "./rpc";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
+import { throwAtBuild } from "@/lib/sources/api/route-gate";
 import { erc20NameOf, resolveErc20Meta } from "./erc20-meta";
 import { EIP1167_RE, EIP7702_RE, SAFE_SINGLETONS, SLOT_ZERO } from "./aave-ethereum-vault";
 import type { ChainId } from "@/lib/shared/chains";
@@ -224,6 +225,7 @@ async function readStoredKind(address: string, chainId: ChainId): Promise<Stored
     );
     if (!res.ok) {
       void res.body?.cancel().catch(() => undefined);
+      if (res.status >= 500 || res.status === 429) throwAtBuild("reference/address-kind", `status ${res.status}`);
       return null;
     }
     const body = (await res.json()) as {
@@ -235,7 +237,9 @@ async function readStoredKind(address: string, chainId: ChainId): Promise<Stored
     if (!body.found || !body.kind || !KINDS.has(body.kind) || !body.shape || !Number.isSafeInteger(body.readAtBlock))
       return null;
     return { shape: { ...body.shape, kind: body.kind } as KindShape, block: body.readAtBlock as number };
-  } catch {
+  } catch (err) {
+    // During the build a failed route fails the page (route-gate.ts, ui-jobs 686).
+    throwAtBuild("reference/address-kind", err);
     return null;
   }
 }

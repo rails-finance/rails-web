@@ -28,6 +28,8 @@
 // refusal or timeout the chain is read for 30 s without asking
 // (`route-gate.ts`). The head waits 3 s so that a slow api leaves a server
 // render's 8 s budget (`position-tail-page-data.ts`) time for the chain read.
+// During `next build` a failed head or round throws to every reader waiting on
+// it instead (route-gate.ts), so a prerender fails.
 //
 // A build or an ISR render asks each round with `wait: 6000`: rails-server's
 // keyless gate holds the round up to 6 s for a slot before the paid leg, so a
@@ -134,15 +136,22 @@ function serverHead(chainId: number, finalized = false): Promise<HeadAnswer | nu
     `block?chain=${chainId}${finalized ? "&finalized=1" : ""}`,
     undefined,
     HEAD_TIMEOUT_MS,
-  ).then((h) => {
-    if (!h || typeof h.blockNumber !== "number" || typeof h.blockTimestamp !== "number") {
+  ).then(
+    (h) => {
+      if (!h || typeof h.blockNumber !== "number" || typeof h.blockTimestamp !== "number") {
+        heads.delete(key);
+        return null;
+      }
+      remember(chainId, BigInt(h.blockNumber));
+      noteServerHead(chainId, h.blockNumber, h.head);
+      return h;
+    },
+    (err: unknown) => {
+      // The build's route failure (route-gate.ts): the next read asks again.
       heads.delete(key);
-      return null;
-    }
-    remember(chainId, BigInt(h.blockNumber));
-    noteServerHead(chainId, h.blockNumber, h.head);
-    return h;
-  });
+      throw err;
+    },
+  );
   heads.set(key, { at: Date.now(), p });
   return p;
 }
@@ -158,19 +167,20 @@ interface Served {
 interface Pending {
   reads: RawRead[];
   resolve: (served: Served | null) => void;
+  reject: (err: unknown) => void;
 }
 
 const queues = new Map<string, Pending[]>();
 
 function serverReads(chainId: number, block: bigint, reads: RawRead[]): Promise<Served | null> {
   const key = `${chainId}:${block}`;
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     let q = queues.get(key);
     if (!q) {
       queues.set(key, (q = []));
       setTimeout(() => void flush(chainId, block, key), 0);
     }
-    q.push({ reads, resolve });
+    q.push({ reads, resolve, reject });
   });
 }
 
@@ -207,12 +217,15 @@ async function flush(chainId: number, block: bigint, key: string) {
 
 async function askRound(chainId: number, block: bigint, q: Pending[]) {
   const reads = q.flatMap((p) => p.reads);
-  const r = await ask<{ blockNumber?: unknown; answers?: unknown; round?: unknown }>(chainId, "reads", {
-    chain: chainId,
-    block: Number(block),
-    reads,
-    ...renderWait(),
-  });
+  type RoundAnswer = { blockNumber?: unknown; answers?: unknown; round?: unknown };
+  let r: RoundAnswer | null;
+  try {
+    r = await ask<RoundAnswer>(chainId, "reads", { chain: chainId, block: Number(block), reads, ...renderWait() });
+  } catch (err) {
+    // The build's route failure (route-gate.ts) reaches every reader in the round.
+    for (const p of q) p.reject(err);
+    return;
+  }
   const ok =
     r != null &&
     r.blockNumber === Number(block) &&

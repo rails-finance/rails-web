@@ -7,6 +7,7 @@
 // compose `DetailTopRow` (or `DetailBackButton` alone in loading / notice
 // branches) instead of re-rolling the row.
 
+import { LifecycleLine } from "@/components/shared/lifecycle-line";
 import type { ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { startNavigationProgress } from "@/components/nav/navigation-progress";
@@ -167,6 +168,8 @@ export function DetailTopRow({
   children?: ReactNode;
 }) {
   const eventPage = useParams<{ eventId?: string }>()?.eventId != null;
+  const entry = protocolForSession(session);
+  const lifecycleId = entry?.lifecycle ? entry.id : null;
   // The event page's facts table leaves out a row repeating this address.
   usePublishHeadingWallet(eventPage ? (owner?.wallet ?? null) : null);
   const closingPriced = closing != null && closing.assets.some((a) => typeof a.price === "number" && a.price > 0);
@@ -245,6 +248,8 @@ export function DetailTopRow({
                 ) : undefined
               }
             />
+            {/* A closing or closed explorer's state under the heading (H24.1; ui-jobs 621). */}
+            {lifecycleId && <LifecycleLine id={lifecycleId} className="mt-2" />}
           </ProvReceiptsScope>
         </div>
       )}

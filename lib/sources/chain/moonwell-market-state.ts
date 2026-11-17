@@ -40,6 +40,7 @@ import {
   MTOKEN_DECIMALS,
   type MoonwellDeployment,
 } from "@/lib/moonwell/asset-catalog";
+import { rethrowAtBuild } from "@/lib/sources/api/route-gate";
 
 const MTOKEN_ABI = parseAbi([
   "function exchangeRateStored() view returns (uint256)",
@@ -105,7 +106,8 @@ export async function resolveMoonwellMarketState(): Promise<MoonwellMarketStateM
       };
     } else delete value.read;
     return value;
-  } catch {
+  } catch (err) {
+    rethrowAtBuild(err);
     return new Map(); // No read and no snapshot (or ALCHEMY_URL unset): amounts-only.
   }
 }
@@ -137,7 +139,8 @@ async function readMarketState(client: PublicClient): Promise<MoonwellMarketStat
       status: string;
       result?: unknown;
     }[];
-  } catch {
+  } catch (err) {
+    rethrowAtBuild(err);
     return out;
   }
 
@@ -429,6 +432,7 @@ export async function loadMoonwellMarkets(
     const head = serverHeadStampAt(deployment.chainId, value.blockNumber);
     return head ? { ...value, head } : value;
   } catch (error) {
+    rethrowAtBuild(error);
     console.error("Moonwell markets chain read failed:", error);
     return emptyMarkets();
   }

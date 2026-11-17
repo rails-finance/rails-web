@@ -36,10 +36,10 @@ import {
   morphoFlowReplay,
   morphoFlowTimeline,
   morphoFocusEvents,
-  morphoPriceBlocks,
   type MorphoFlowEvent,
   type MorphoFlowOptions,
 } from "@/lib/morpho/flows";
+import { morphoPriceDayBlocks } from "@/lib/morpho/price-days";
 import { buildFlowModel, formatFlowUsd, stateAt, type FlowModel } from "@/lib/shared/flows-timeline";
 import { sideSumRows, wholeUsd } from "@/lib/shared/flows-sum";
 import { binInputFromTimeline, binSeries, seriesRouteBinFor } from "@/lib/shared/flows-series";
@@ -185,7 +185,7 @@ test("a liquidation that leaves collateral writes nothing off", () => {
   // Every collateral flow priced at its block.
   for (const r of rp.replayed)
     if (r.legs.some((l) => l.bucket === MO.collIn || l.bucket === MO.collOut)) assert.ok(r.ownPrice, r.ev.id);
-  assert.equal(morphoPriceBlocks(rows(f)).length, 0, "nothing left to read");
+  assert.equal(morphoPriceDayBlocks(rows(f)).length, 0, "nothing left to read");
 });
 
 for (const name of NAMES) {

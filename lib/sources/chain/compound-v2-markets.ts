@@ -71,6 +71,7 @@ import {
 import { jumpRateModel, whitePaperModel, type ComptrollerRateModel } from "@/lib/comptroller/rate-model";
 import { COMPOUND_V2_BLOCKS_PER_YEAR } from "@/lib/compound-v2/rate-year";
 import { compoundV2Apy } from "@/lib/comptroller/apy";
+import { rethrowAtBuild } from "@/lib/sources/api/route-gate";
 
 const ZERO = BigInt(0);
 
@@ -289,6 +290,7 @@ export async function loadCompoundV2Markets(): Promise<CompoundV2MarketsResponse
     const head = serverHeadStampAt(MAINNET_CHAIN_ID, value.blockNumber);
     return head ? { ...value, head } : value;
   } catch (error) {
+    rethrowAtBuild(error);
     console.error("Compound V2 markets chain read failed:", error);
     return empty();
   }

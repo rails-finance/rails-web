@@ -59,6 +59,7 @@ import {
   isUserVaultIlk,
   type MakerIlkGroup,
 } from "@/lib/makerdao/asset-catalog";
+import { rethrowAtBuild } from "@/lib/sources/api/route-gate";
 
 const REGISTRY = getAddress(MAKER_ADDRESSES.ILK_REGISTRY);
 const VAT = getAddress(MAKER_ADDRESSES.VAT);
@@ -491,6 +492,7 @@ export async function loadMakerSystemFromChain(): Promise<MakerSystemChainRespon
       chainStale: false,
     };
   } catch (err) {
+    rethrowAtBuild(err);
     // Log before stubbing. The page's whole posture is "no cached fallback —
     // rather than show stale figures, show nothing", so a swallowed failure
     // leaves an operator with a blank page and no cause. The commonest one here

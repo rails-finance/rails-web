@@ -122,3 +122,22 @@ test("a chain token_meta does not hold is not asked of the api", async () => {
   await resolveErc20Meta([addr(0x3001)], 10);
   assert.equal(asked.length, 0);
 });
+
+test("during the build, an api that does not answer throws and nothing goes to the chain", async () => {
+  process.env.NEXT_PHASE = "phase-production-build";
+  try {
+    const a = addr(0x4001);
+    stubApi({}, 503);
+    await assert.rejects(resolveErc20Meta([a], 1), { name: "RouteDownAtBuild" });
+    test.mock.restoreAll();
+    test.mock.method(globalThis, "fetch", async () => {
+      throw new TypeError("fetch failed");
+    });
+    await assert.rejects(resolveErc20Meta([a], 1), { name: "RouteDownAtBuild" });
+    // A 4xx is an answer refusing the request: the chain path as before.
+    stubApi({}, 400);
+    assert.equal((await resolveErc20Meta([a], 1)).get(a).named, false);
+  } finally {
+    delete process.env.NEXT_PHASE;
+  }
+});

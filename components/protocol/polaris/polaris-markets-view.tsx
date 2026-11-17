@@ -34,7 +34,11 @@ import { bookCountProv, openBookProv } from "@/lib/polaris/book-provenance";
 import { POLARIS_MARKET_CONFIG, POLARIS_MARKETS, type PolarisMarket } from "@/lib/polaris/asset-catalog";
 import { formatExact, formatUsdValue } from "@/lib/utils/format";
 import { explorerUrl } from "@/lib/shared/chains";
-import { POLARIS_CHAIN_ID } from "@/lib/polaris/asset-catalog";
+import { POLARIS_CHAIN_ID, POLARIS_TESTNET_CLOSED } from "@/lib/polaris/asset-catalog";
+
+/** The deployment is closed (ui-jobs 621): a failed head read is expected,
+ *  and the card points at the index's last state instead. */
+const closed = POLARIS_TESTNET_CLOSED.state === "closed";
 import { Stat } from "@/components/shared/stat";
 import type { PolarisMarketsChainResponse, PolarisMarketChainState } from "@/lib/sources/chain/polaris-position";
 import type { PolarisBook } from "@/lib/sources/api/polaris-book";
@@ -200,8 +204,25 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
           </div>
         </>
       ) : (
-        <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
-          The chain did not answer on this read, so the market&rsquo;s figures are withheld rather than estimated.
+        <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500" data-chain-unanswered="">
+          {closed ? (
+            <>
+              The chain did not answer on this read, so the market&rsquo;s figures are withheld.
+              {book ? (
+                <>
+                  {" "}
+                  The book below is the index&rsquo;s last state{" "}
+                  <span className="text-rb-400">
+                    · <BlockRef block={book.lastScannedBlock || book.lastEventBlock} chainId={POLARIS_CHAIN_ID} />
+                  </span>
+                </>
+              ) : null}
+            </>
+          ) : (
+            <>
+              The chain did not answer on this read, so the market&rsquo;s figures are withheld rather than estimated.
+            </>
+          )}
         </p>
       )}
 
@@ -300,7 +321,9 @@ export function PolarisMarketsView({ chain, book }: { chain: PolarisMarketsChain
       <div className="py-12 text-center text-rb-500">
         <p className="mb-1">Couldn&apos;t read Polaris&apos;s markets from Sepolia, and the index did not answer.</p>
         <p className="text-sm">
-          This view is a live contract read with no cached fallback. It shows nothing. Try again shortly.
+          {closed
+            ? "The index holds this testnet's last state and shows it once it answers. Try again shortly."
+            : "This view is a live contract read with no cached fallback. It shows nothing. Try again shortly."}
         </p>
       </div>
     );

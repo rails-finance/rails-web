@@ -256,10 +256,10 @@ export function BusyFlows({ model, onLedgerNote }: BusyFlowsProps) {
 
 // ── The lifetime's totals, as the Explanation's bullets ─────────────────────
 
-const throughputProv = (what: string, figure: string): Provenance => ({
+const throughputProv = (what: string, figure: string, priced: string, formula: string): Provenance => ({
   kind: "chain-derived",
-  summary: `${what} over the position's life. Every such flow its events record, each at the oracle price at its block, added up (${figure}).`,
-  formula: "Σ amount × price at block",
+  summary: `${what} over the position's life. Every such flow its events record, ${priced}, added up (${figure}).`,
+  formula,
 });
 
 /** What the scrubber reports for the panel's Totals: the throughput over the
@@ -273,6 +273,10 @@ export type FlowsTotalsData = {
   turnover: number | null;
   /** The bars' window's first day, where the window is cut. */
   since: string | null;
+  /** How each flow is priced, and the receipt's formula
+   *  (`FlowWords.throughput`, `throughputFormula`). */
+  priced: string;
+  formula: string;
 };
 
 export function flowsTotals(model: FlowModel, since: string | null): FlowsTotalsData {
@@ -285,6 +289,8 @@ export function flowsTotals(model: FlowModel, since: string | null): FlowsTotals
     unit: t.unit,
     turnover: t.turnover,
     since,
+    priced: model.words.throughput ?? "each at the oracle price at its block",
+    formula: model.words.throughputFormula ?? "Σ amount × price at block",
   };
 }
 
@@ -292,7 +298,7 @@ export function flowsTotals(model: FlowModel, since: string | null): FlowsTotals
  *  "Turned over about 4 times". */
 export function FlowsTotalsBullets({ t }: { t: FlowsTotalsData }) {
   const fig = (v: string, what: string) => (
-    <Prov info={throughputProv(what, v)}>
+    <Prov info={throughputProv(what, v, t.priced, t.formula)}>
       <span className="font-medium tabular-nums">{v}</span>
     </Prov>
   );

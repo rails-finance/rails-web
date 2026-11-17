@@ -35,6 +35,7 @@ import {
   type MorphoRosterData,
   type MorphoRosterMarks,
 } from "@/lib/morpho/markets-shape";
+import { rethrowAtBuild } from "@/lib/sources/api/route-gate";
 
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
 /** Multicall3, at one address on every chain Rails reads. */
@@ -63,6 +64,7 @@ export async function readVaultLentMarkets(chainId: ChainId): Promise<Set<string
     for (const r of dir.rows) for (const id of r.queue ?? []) ids.add(id.toLowerCase());
     return ids.size > 0 ? ids : null;
   } catch (error) {
+    rethrowAtBuild(error);
     console.error(`Morpho roster: the vault directory failed (chain ${chainId}):`, error);
     return null;
   }
@@ -172,6 +174,7 @@ export async function readRosterMarks(
       marks.priceSources[m.id.toLowerCase()] = src;
     }
   } catch (error) {
+    rethrowAtBuild(error);
     console.error(`Morpho roster: the marks read failed (chain ${chainId}):`, error);
   }
   return marks;

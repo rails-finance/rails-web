@@ -9,7 +9,8 @@
 // The read order (rails-ops ui-jobs 444): rails-server's `token_meta` first,
 // through POST /api/reference/erc20, for Ethereum, Base, Arbitrum and Sepolia; the chain multicall
 // only for the addresses that answer lists as `missing`, or for all of them when
-// the api does not answer. The table holds what each token's symbol(), decimals()
+// the api does not answer (during `next build` a refused, slow or 5xx/429 answer throws
+// instead: route-gate.ts `throwAtBuild`). The table holds what each token's symbol(), decimals()
 // and name() answered at one block, a revert stored as null, so a row maps onto
 // the same `named` / `unresolved` flags the chain path sets.
 //
@@ -24,6 +25,7 @@ import { parseAbi } from "viem";
 import { chainClient } from "./rpc";
 import { scaleRaw } from "@/lib/shared/scale-raw";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
+import { throwAtBuild } from "@/lib/sources/api/route-gate";
 import {
   ARBITRUM_CHAIN_ID,
   BASE_CHAIN_ID,
@@ -147,6 +149,7 @@ async function readStored(
       );
       if (!res.ok) {
         void res.body?.cancel().catch(() => undefined);
+        if (res.status >= 500 || res.status === 429) throwAtBuild("reference/erc20", `status ${res.status}`);
         return null;
       }
       const body = (await res.json()) as { tokens?: Record<string, StoredRow>; missing?: string[] };
@@ -159,7 +162,9 @@ async function readStored(
         } else missing.push(addr);
       }
     }
-  } catch {
+  } catch (err) {
+    // During the build a failed route fails the page (route-gate.ts, ui-jobs 686).
+    throwAtBuild("reference/erc20", err);
     return null;
   }
   return { metas, missing };
