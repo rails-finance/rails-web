@@ -34,6 +34,7 @@ import {
   marketNoteReceiptLine,
   marketNoteRowAnnotation,
   marketNoteSentence,
+  mergePsmGapRanges,
   type MarketNote,
 } from "@/lib/shared/market-note";
 
@@ -95,7 +96,7 @@ export function polarisPositionToMarkdown(args: PolarisPositionMarkdownArgs): st
   const allNotes = [...noteList, ...(args.liveNotes ?? [])];
 
   lines.push(`- **Market:** ${stable}`);
-  lines.push(`- **Position id:** ${view.cdpId}`);
+  lines.push(`- **Position id:** ${stable} #${view.cdpId}`);
   if (view.owner) lines.push(`- **Holder:** ${view.owner}`);
   lines.push(`- **Status:** ${view.status[0].toUpperCase() + view.status.slice(1)}`);
   // The PSM's trades between touches (ui-jobs 402) are counted on their own
@@ -309,10 +310,13 @@ function marketNotesSection(notes: MarketNote[]): string[] {
       "only the rate, so the later one is what that debt came to cost. A note " +
       "leads with the rate at its later end — what the market charged by then — and consecutive stretches that " +
       "moved the rate the same way are stated as one note, from the first touch to the last, with each step it " +
-      "took in named on its receipt.",
+      "took in named on its receipt. PSM gaps that meet end to end are stated as one note the same way, with each " +
+      "touch's share on its receipt.",
   );
   out.push("");
-  for (const n of notes) {
+  // PSM gaps that meet end to end are stated once over their whole range
+  // (ui-jobs 692), so a busy position's trades read as a few paragraphs.
+  for (const n of mergePsmGapRanges(notes)) {
     out.push(marketNoteSentence(n));
     out.push("");
     out.push(marketNoteReceiptLine(n));
