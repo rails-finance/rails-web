@@ -10,6 +10,7 @@
 
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { AaveV4Context, AaveV4Swap } from "@/lib/shared/types/protocols/aave-v4";
+import { decimalsOf, type CowSwapView } from "@/lib/cow/surplus";
 
 type V4Event = BaseActivityEvent & { context: { protocol: "aave-v4"; data: AaveV4Context } };
 
@@ -45,4 +46,47 @@ export function aaveV4SwapByReceivedId(
   id: string,
 ): BaseActivityEvent | null {
   return (events ?? []).find((e) => aaveV4SwapOf(e)?.receivedEventId === id) ?? null;
+}
+
+/** The swap's CoW figures with the surplus token named (lib/cow/surplus.ts): a
+ *  sell order's surplus is in the token it bought, a buy order's in the token it
+ *  sold. Null until the settlement is read. */
+export function aaveV4CowView(
+  swap: AaveV4Swap,
+): { view: CowSwapView; trade: { sell: string; buy: string; fee: string } } | null {
+  const c = swap.cow;
+  if (!c) return null;
+  const side = c.kind === "sell" ? swap.buy : swap.sell;
+  return {
+    view: {
+      ...c,
+      token: { address: c.surplusToken, symbol: side.symbol, decimals: decimalsOf(side.raw, side.amount) },
+      route: "cow_adapter",
+    },
+    trade: { sell: swap.sell.raw, buy: swap.buy.raw, fee: swap.feeRaw },
+  };
+}
+
+/** A buy order's refund as the explanation states it: the order's gap (the withdrawn or borrowed leg less what the
+ *  Trade sold, in its integers) and the surplus, where both are read and the event's block and transaction are
+ *  known for the figure's receipt. The card's line under the grid drops the surplus where this answers, so the
+ *  refund is on the card once, every time. */
+export function aaveV4StatedRefund(
+  ctx: AaveV4Context,
+  coords: { blockNumber?: number; txHash?: string } | undefined,
+): { gapRaw: bigint; decimals: number; cow: NonNullable<ReturnType<typeof aaveV4CowView>> } | null {
+  if (coords?.blockNumber == null || !coords.txHash) return null;
+  const swap = ctx.swap;
+  if (!swap || swap.cow?.kind !== "buy") return null;
+  // The explanation states the Trade, and the gap after it, only where both sides are named and priced.
+  if (!swap.sell.symbol || !swap.buy.symbol || !(Number(swap.sell.amount) > 0) || !(Number(swap.buy.amount) > 0))
+    return null;
+  const cow = aaveV4CowView(swap);
+  const decimals = cow?.view.token.decimals;
+  const rec = swap.received.context?.data as AaveV4Context | undefined;
+  const takenRaw = swap.kind === "debt_swap" ? rec?.raw?.amount : ctx.raw?.amount;
+  if (!cow || decimals == null || takenRaw == null || !/^\d+$/.test(takenRaw) || !/^\d+$/.test(swap.sell.raw))
+    return null;
+  const gapRaw = BigInt(takenRaw) - BigInt(swap.sell.raw);
+  return gapRaw > BigInt(0) ? { gapRaw, decimals, cow } : null;
 }

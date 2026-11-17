@@ -18,6 +18,10 @@ export interface ProseEcho {
   info: Provenance;
   value?: string;
   symbol?: string;
+  /** The sentence is the figure's only place on the card: its receipt registers here, not as an echo. */
+  primary?: boolean;
+  /** Data attributes on the figure (a verifier's hook, `data-cow-surplus`). */
+  data?: Record<string, string>;
 }
 
 const Bold = ({ children }: { children: ReactNode }) => (
@@ -47,10 +51,17 @@ export function ProseSentenceText<E extends string>({
         if (seg.emph === "bold") return <Bold key={i}>{seg.text}</Bold>;
         const prov = echo(seg.emph);
         if (!prov) return <Bold key={i}>{seg.text}</Bold>;
-        return (
-          <Prov key={i} echo info={prov.info} value={prov.value} symbol={prov.symbol}>
+        const figure = (
+          <Prov key={i} echo={!prov.primary} info={prov.info} value={prov.value} symbol={prov.symbol}>
             <Bold>{seg.text}</Bold>
           </Prov>
+        );
+        return prov.data ? (
+          <span key={i} {...prov.data}>
+            {figure}
+          </span>
+        ) : (
+          figure
         );
       })}
     </>
