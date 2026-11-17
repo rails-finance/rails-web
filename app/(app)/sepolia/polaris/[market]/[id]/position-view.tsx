@@ -43,7 +43,7 @@ import {
 import { PolarisPositionExplanation } from "@/components/protocol/polaris/polaris-position-explanation";
 import { polarisLifetime } from "@/lib/polaris/economics";
 import { polarisSinceLastTouch } from "@/lib/polaris/since-last-touch";
-import { polarisAgainstHolding } from "@/lib/polaris/against-holding";
+import { isAgainstHoldingNone, polarisAgainstHolding } from "@/lib/polaris/against-holding";
 import { polarisPsmGapNotes } from "@/lib/polaris/psm-gap";
 import { polarisHoldersAt, polarisTouchRuns } from "@/lib/polaris/touch-runs";
 import { PolarisSinceLastTouchRow } from "@/components/protocol/polaris/polaris-since-last-touch";
@@ -428,6 +428,11 @@ export default function PolarisPositionView({
                         terminal={summary && summary.status !== "open" ? summary.status : null}
                         lifetime={lifetime}
                         transferCount={summary?.transferCount}
+                        againstHolding={
+                          againstHolding && againstHolding !== "pending" && !isAgainstHoldingNone(againstHolding)
+                            ? againstHolding
+                            : null
+                        }
                       />
                     ) : undefined
                   }

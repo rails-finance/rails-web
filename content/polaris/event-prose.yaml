@@ -130,6 +130,14 @@ placeholders:
     rounding: number
     means: |-
       the collateral at the feed's price less the debt
+  holding_gain:
+    rounding: units4
+    means: |-
+      the pETH the position is ahead of or behind holding the pETH deposited, the stablecoin legs at the feed
+  holding_share:
+    rounding: number
+    means: |-
+      that gain as a share of the pETH deposited
   drop:
     rounding: pct_whole
     means: |-
@@ -563,6 +571,10 @@ position_words:
     At the feed's price of {price} {stable} per pETH, the collateral is worth {worth} {stable}.
   equity: |-
     Less the debt, equity is {equity} {stable}: a valuation at this block that says nothing of profit.
+  holding_ahead: |-
+    Against holding the pETH deposited, the position is {holding_gain} pETH ahead ({holding_share}), its {stable} legs at today's feed price.
+  holding_behind: |-
+    Against holding the pETH deposited, the position is {holding_gain} pETH behind ({holding_share}), its {stable} legs at today's feed price.
   debt_sum: |-
     The debt is {recorded} {stable} recorded at the last touch{legs} pending since.
   debt_touch: |-
