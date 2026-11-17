@@ -171,7 +171,7 @@ export function feeChargeProv(s: CowSettlement, t: CowSettlementTrade, token: Co
   return {
     kind: "offchain",
     pclass: "offchain",
-    summary: `Fees — ${COW_TERMS.name}'s docs: "All protocol fees are charged in the surplus token", the token received on a sell order and the token paid on a buy order; this is a ${kind} order, so ${tokenText(token)}. Rails reads a trade's gap as its fees where the trade is priced worse than the clearing price on clearingPrices entries listed for it alone, from block ${COW_OWN_PRICE_FEES_FROM.toLocaleString("en-US")}: the first block where Rails' sample of Ethereum history (17 Nov 2026, 24 windows of 2,000 blocks) found every trade of a settlement priced that way.`,
+    summary: `Fees — ${COW_TERMS.name}'s docs: "All protocol fees are charged in the surplus token", the token received on a sell order and the token paid on a buy order; this is a ${kind} order, so ${tokenText(token)}. Rails reads a trade's gap as its fees where the trade is priced worse than the clearing price on entries listed for it alone, from block ${COW_OWN_PRICE_FEES_FROM.toLocaleString("en-US")}, the first block where the sample (17 Nov 2026, 24 windows of 2,000 blocks) found every trade of a settlement priced that way.`,
     inputs: [
       { label: "order kind (settle() input, flags)", value: kind, kind: "chain", pclass: "emitted" },
       {
@@ -208,7 +208,7 @@ export function gapProv(s: CowSettlement, t: CowSettlementTrade): Provenance {
   };
 }
 
-/** The other pairs in the batch: a count over the settlement's Trade logs. */
+/** The other pairs in the settlement: a count over the settlement's Trade logs. */
 export function otherPairsProv(s: CowSettlement, n: number): Provenance {
   return {
     kind: "chain-derived",

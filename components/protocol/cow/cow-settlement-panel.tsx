@@ -4,7 +4,7 @@
 // opened card whose settlement carried other trades: the trades on the card's
 // directed pair with their prices, the settlement's clearing price and each
 // trade's distance from it where settle()'s calldata was decoded, then the
-// batch's other pairs as a count. Read when the card opens
+// settlement's other pairs as a count. Read when the card opens
 // (`useCowSettlementOpened`), through the settlement proxy.
 
 import { useEffect, useState } from "react";
@@ -83,7 +83,7 @@ export function CowSettlementPanel({
         <Prov info={otherPairsProv(s, view.otherPairs)} value={String(view.otherPairs)}>
           <span>{plural(view.otherPairs, "other pair", "other pairs")}</span>
         </Prov>{" "}
-        in the batch.
+        in this settlement.
       </>
     ) : null;
   const priceTag = (n: number | null) =>

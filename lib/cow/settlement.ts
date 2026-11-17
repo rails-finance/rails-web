@@ -149,7 +149,7 @@ export interface CowPairView {
   self: CowSettlementTrade;
   /** Every trade on the card's directed pair, the card's own first, then by log. */
   pair: CowSettlementTrade[];
-  /** The other directed pairs in the batch. */
+  /** The other directed pairs in the settlement. */
   otherPairs: number;
   /** Every price on the pair equal within rounding (two trades or more). */
   onePrice: boolean;
