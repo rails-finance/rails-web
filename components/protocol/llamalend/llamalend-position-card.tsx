@@ -31,6 +31,8 @@
 // names only a CLOSED position; an OPEN survivor stays an OPEN card with the
 // counters' count.
 
+import { positionName } from "@/lib/shared/position-name";
+import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { ListingTag } from "@/components/shared/listing-tag";
 import {
   PositionCard,
@@ -255,7 +257,14 @@ export function useLlamalendCardSlots({
     liquidationCount: v.liquidationCount,
     ...(detail ? { order: "age-last" as const } : {}),
   };
-  const common = { status, identity: <PositionIdentity v={v} wallet={!detail} listing={!detail} />, counters };
+  // The position's name: the market and the user (lib/shared/position-name.ts).
+  const name = positionName({ market: v.marketLabel, noun: POSITION_NOUN.llamalend, id: v.user });
+  const common = {
+    status,
+    identity: <PositionIdentity v={v} wallet={!detail} listing={!detail} />,
+    counters,
+    name,
+  };
   const tag = <ListingTag market={v.marketLabel} />;
 
   // Closed / liquidated: the last emitted absolutes are back at zero, so the

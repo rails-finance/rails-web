@@ -29,6 +29,8 @@
 // $14.4263): their lines carry the flag, and any USD headline they contribute
 // to says so in its receipt.
 
+import { positionName } from "@/lib/shared/position-name";
+import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { headReadOf, serverReadOf, stampServerRead, type ServerRead } from "@/lib/shared/server-head-read";
 import { TitleTip } from "@/components/shared/reveal-tip";
 import { type ReactNode, useState } from "react";
@@ -382,7 +384,9 @@ export function useCompoundV2CardSlots({
   );
 
   const ended = v.status === "closed" || v.status === "liquidated";
-  const common = { status, identity, counters };
+  // The position's name: the wallet (lib/shared/position-name.ts).
+  const name = positionName({ noun: POSITION_NOUN["compound-v2"], id: v.wallet });
+  const common = { status, identity, counters, name };
   const menu: PositionCardMenu = {
     leading: () => <CompoundV2MenuRows wallet={v.wallet} />,
     exports: exports ?? null,

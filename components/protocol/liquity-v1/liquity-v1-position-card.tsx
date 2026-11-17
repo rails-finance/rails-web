@@ -13,6 +13,8 @@
 // liquidation price and the room to borrow are live contract reads from the
 // detail page (`chain`); a listing card has two headlines.
 
+import { positionName } from "@/lib/shared/position-name";
+import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { useState, type ReactNode } from "react";
 import { Link2 } from "lucide-react";
 import { Icon } from "@/components/icons/icon";
@@ -312,7 +314,10 @@ export function liquityV1CardSlots({
     }
   }
 
-  const common = { status, heads, identity, counters, outcome };
+  // The Trove's name: its owner, the key Liquity V1 holds a Trove by
+  // (lib/shared/position-name.ts).
+  const name = positionName({ noun: POSITION_NOUN["liquity-v1"], id: v.wallet });
+  const common = { status, heads, identity, counters, outcome, name };
   if (!detail) return { ...common, surface: "listing", menu: null };
 
   const pagePath = `/ethereum/liquity-v1/${v.wallet}${v.epoch != null ? `?epoch=${v.epoch}` : ""}`;

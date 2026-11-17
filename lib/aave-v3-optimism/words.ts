@@ -33,7 +33,7 @@ export const FRONT_DOOR = {
 export const POSITION_PAGE = {
   title: "Aave V3 account",
   sub: "Pool · Optimism",
-  unanswered: "The read of this account did not answer. Try again in a minute.",
+  unanswered: "The read of this position did not answer. Try again in a minute.",
   empty: "This address supplies and borrows nothing on Aave V3 on Optimism.",
 };
 
@@ -72,7 +72,7 @@ export const CARD_WORDS = {
 export function cardExplainer(p: OpPositionFigures): { title: string; bullets: string[] }[] {
   const groups: { title: string; bullets: string[] }[] = [
     {
-      title: "What this account holds",
+      title: "What this position holds",
       bullets: [
         p.supplied.length
           ? `It supplies ${p.supplied.map((x) => `${amount(x.supplied, x.symbol)}${x.isCollateral ? " as collateral" : ""}`).join(", ")}.`

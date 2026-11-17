@@ -6,6 +6,8 @@
 // pool's gauge, and when it first added. Every
 // figure in the pool's tokens, each with its receipt.
 
+import { positionName } from "@/lib/shared/position-name";
+import { POSITION_NOUN } from "@/lib/shared/protocols";
 import Link from "next/link";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCard, type PositionCardHead, type PositionCardSlots } from "@/components/shared/position-card";
@@ -127,6 +129,8 @@ function slots(r: BalPositionRead): PositionCardSlots {
     status: !open ? { word: CARD_WORDS.closed, tone: "muted", tip: CARD_WORDS.none } : null,
     heads,
     counters: null,
+    // The position's name: the pool and the wallet (lib/shared/position-name.ts).
+    name: positionName({ market: p.symbol, noun: POSITION_NOUN[balChain(r.chainId).session], id: r.wallet }),
     menu: { exports: null },
     stamp: <BalancerReadStamp c={c} what="Every figure on this card" />,
     explainer: {

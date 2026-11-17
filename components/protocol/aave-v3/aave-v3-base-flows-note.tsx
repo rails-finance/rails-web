@@ -90,9 +90,9 @@ export function AaveV3BaseFlowsNote({
       )}
       {facts?.source === "route" && (
         <p data-aave-base-flows-source="route">
-          This account has {count(facts.events, "event")}, more than this page holds, so the bars and the line come from
-          Rails&apos; server: it replays every event from its index of {pool}, by the rules this page uses on a history
-          it holds whole. The cards on the timeline state the newest events&apos; flows from the same replay.
+          This position has {count(facts.events, "event")}, more than this page holds, so the bars and the line come
+          from Rails&apos; server: it replays every event from its index of {pool}, by the rules this page uses on a
+          history it holds whole. The cards on the timeline state the newest events&apos; flows from the same replay.
         </p>
       )}
       {p && (
@@ -110,7 +110,7 @@ export function AaveV3BaseFlowsNote({
 export function aaveV3BaseFlowsContent(brand: string): LearnMoreContent {
   return {
     title: "About the lifetime flows",
-    intro: `The bars add up every event of this account on the Pool, each at ${brand}'s oracle price at its block, and the line under them draws what it held and owed at the end of each day.`,
+    intro: `The bars add up every event of this position on the Pool, each at ${brand}'s oracle price at its block, and the line under them draws what it held and owed at the end of each day.`,
     stepsHeading: "How it's built:",
     steps: [
       "Collateral: supplied, received by transfer and the interest earned, less withdrawn, sent and liquidated, is what the account holds: its aTokens.",

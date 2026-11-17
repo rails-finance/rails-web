@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { morphoEventPageDescription, morphoEventPageTitle } from "@/lib/morpho/explorer";
 import { loadMorphoArbitrumTail } from "@/lib/morpho-arbitrum/position-page-data";
+import { slotReadMarket } from "@/lib/morpho/asset-catalog";
 import { isMorphoArbitrumMarketSegment } from "@/lib/morpho-arbitrum/routes";
 import { rehydrateChainTimelineWire } from "@/lib/shared/timeline-wire";
 import { isMorphoEvent } from "@/lib/shared/types/event-shape";
@@ -19,10 +20,11 @@ export const dynamic = "force-dynamic";
  *  title. */
 async function findEvent(wallet: string, market: string, decodedId: string) {
   const tail = await loadMorphoArbitrumTail(wallet);
-  if (!tail.timeline) return null;
+  const pair = slotReadMarket(tail.head, market);
+  if (!tail.timeline) return { event: null, pair };
   const rehydrated = rehydrateChainTimelineWire(tail.timeline) as MorphoChainTimelineResponse;
   const pos = rehydrated.positions?.find((p) => p.marketId.toLowerCase() === market);
-  return pos?.events.filter(isMorphoEvent).find((e) => e.id === decodedId) ?? null;
+  return { event: pos?.events.filter(isMorphoEvent).find((e) => e.id === decodedId) ?? null, pair };
 }
 
 const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
@@ -32,12 +34,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const wallet = rawWallet.toLowerCase();
   const market = rawMarket?.toLowerCase();
   const decoded = decodeEventId(eventId);
-  const event =
+  const found =
     ADDRESS.test(rawWallet) && isMorphoArbitrumMarketSegment(market) ? await findEvent(wallet, market, decoded) : null;
+  const event = found?.event ?? null;
   return eventMetadata({
     session: "morpho-arbitrum",
     subject: wallet,
-    market: `${(market ?? rawMarket).slice(0, 10)}…`,
+    market: found?.pair ?? `${(market ?? rawMarket).slice(0, 10)}…`,
     canonicalPath: `/arbitrum/morpho/${wallet}/${market ?? rawMarket}/event/${encodeURIComponent(decoded)}`,
     event: event ? { actionLabel: morphoEventPageTitle(event), timestamp: event.timestamp } : null,
     description: event ? morphoEventPageDescription("arbitrum", wallet, event.timestamp) : undefined,

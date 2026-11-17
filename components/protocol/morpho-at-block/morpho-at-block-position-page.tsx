@@ -15,7 +15,8 @@ import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { UnansweredLine } from "@/components/shared/unanswered-line";
 import { MorphoAtBlockPositionCard } from "@/components/protocol/morpho-at-block/morpho-at-block-position-card";
 import { fetchMorphoAtBlockPosition } from "@/lib/api/fetch-morpho-at-block";
-import { morphoAtBlockFigures } from "@/lib/morpho-at-block/position";
+import { morphoAtBlockFigures, tokenFacts } from "@/lib/morpho-at-block/position";
+import { marketLabel } from "@/lib/morpho/asset-catalog";
 import {
   isMorphoMarketId,
   isMorphoWallet,
@@ -32,6 +33,24 @@ import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 export const loadMorphoAtBlockPosition = cache((api: MorphoAtBlockDeployment["api"], id: string, wallet: string) =>
   fetchMorphoAtBlockPosition(api === MORPHO_OPTIMISM.api ? MORPHO_OPTIMISM : MORPHO_ARC, id, wallet),
 );
+
+/** The position's market for its tab title, the pair as Morpho's other tabs
+ *  write it (lib/morpho/asset-catalog.ts `marketLabel`), off the read the page
+ *  makes; the id's first bytes where the read did not answer. */
+export async function morphoAtBlockTabMarket(
+  dep: MorphoAtBlockDeployment,
+  rawId: string,
+  raw: string,
+): Promise<string> {
+  const fallback = `${rawId.slice(0, 10)}…`;
+  if (!isMorphoWallet(raw) || !isMorphoMarketId(rawId)) return fallback;
+  const answer = await loadMorphoAtBlockPosition(dep.api, rawId.toLowerCase(), raw.toLowerCase()).catch(() => null);
+  if (answer?.kind !== "ok") return fallback;
+  const m = answer.data.market;
+  const idle = /^0x0{40}$/.test(m.collateralToken);
+  const loan = tokenFacts(m.loanToken, answer.data.tokens).symbol;
+  return marketLabel(loan, idle ? "" : tokenFacts(m.collateralToken, answer.data.tokens).symbol, idle);
+}
 
 export async function MorphoAtBlockPositionPage({
   dep,

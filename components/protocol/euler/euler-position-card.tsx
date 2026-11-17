@@ -6,13 +6,15 @@
 // the health score, and the interest over 30 days, with each collateral and its
 // borrow and liquidation LTVs on a row of the band under it (J1.1). Dollars only where the vault's unit of account is USD.
 
+import { positionName } from "@/lib/shared/position-name";
+import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { PositionCard, type PositionCardHead, type PositionCardSlots } from "@/components/shared/position-card";
 import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups";
 import { PoolReadStamp, Segs } from "@/components/protocol/uniswap/uniswap-readout";
 import { eulerPosition } from "@/lib/euler/position";
 import { cardProv, collateralProv, readContracts, vaultProv, type EulerReceiptContext } from "@/lib/euler/provenance";
-import type { EulerPositionRead } from "@/lib/euler/types";
+import { EULER_SESSION, type EulerPositionRead } from "@/lib/euler/types";
 import { CARD_WORDS, cardExplainer, healthText, inUnit, num, rate, short } from "@/lib/euler/words";
 
 /** Every figure's read stamp on an Euler page. */
@@ -197,6 +199,8 @@ function slots(r: EulerPositionRead): PositionCardSlots {
     ),
     heads,
     counters: null,
+    // The position's name: the vault and the account (lib/shared/position-name.ts).
+    name: positionName({ market: p.vaultSymbol, noun: POSITION_NOUN[EULER_SESSION[r.chainId]], id: p.account }),
     menu: { exports: null },
     stamp: <EulerReadStamp c={c} what="Every figure on this card" />,
     explainer: {

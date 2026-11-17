@@ -17,16 +17,20 @@ interface Props {
 export const dynamic = "force-dynamic";
 
 // Moved down from the layout: the page is the segment that fetches, so it is the
-// segment that can describe what it fetched. Output is unchanged — titled on the
-// user (an address, so the helper truncates it); the controller is not named,
-// there being no static controller → symbol map on the metadata path.
+// segment that can describe what it fetched. Titled on the user (an address, so
+// the helper truncates it) in its market, the pair off the index row the page
+// body reads (the same `cache()` entry); no market where the index holds none.
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { controller, user } = await params;
+  const c = normalizeAddressParam(controller ?? "");
+  const u = normalizeAddressParam(user ?? "");
+  const tail = c && u ? await loadLlamalendPositionTail(c, u).catch(() => null) : null;
   // This route carries its own opengraph-image.tsx, rendering this account's
   // live card — the static per-explorer PNG stays only its fallback.
   return positionMetadata({
     session: "llamalend",
     subject: user,
+    market: tail?.position?.marketLabel,
     canonicalPath: `/ethereum/llamalend/${controller}/${user}`,
     image: "dynamic",
   });

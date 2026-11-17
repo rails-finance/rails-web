@@ -90,7 +90,7 @@ const TIPS = {
     `The ${sym} ${side === "collateral" ? "supplied" : "owed"} after this transaction, as the event's row states it, at the oracle's ${sym} price at this block.`,
   rowTotal:
     "The side's total in dollars needs the position read at this block, which this row does not make: it states the reserve it moved.",
-  repaid: "The assets this account once borrowed and owes none of after this event.",
+  repaid: "The assets this position once borrowed and owes none of after this event.",
   total: (side: FlowSide) =>
     `The ${side === "collateral" ? "collateral" : "debt"}'s total in dollars after this transaction, read from the Pool at the oracle's prices at this block; where the side holds one reserve, its amount beside the dollars.`,
   health:

@@ -8,6 +8,7 @@ import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
 import { isMorphoArbitrumMarketSegment } from "@/lib/morpho-arbitrum/routes";
 import { loadMorphoArbitrumTail } from "@/lib/morpho-arbitrum/position-page-data";
+import { slotReadMarket } from "@/lib/morpho/asset-catalog";
 import { recordMorphoArbitrumVisit } from "@/lib/morpho-arbitrum/record-visit";
 import MorphoArbitrumPositionView from "./position-view";
 
@@ -20,12 +21,20 @@ export const dynamic = "force-dynamic";
 
 const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 
+// The market is the pair off the slot read the page body makes (the same
+// `cache()` entry); its id's first bytes where that read holds no position
+// there.
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { wallet, market } = await params;
+  const m = market?.toLowerCase();
+  const tail =
+    ADDRESS.test(wallet) && isMorphoArbitrumMarketSegment(m)
+      ? await loadMorphoArbitrumTail(wallet.toLowerCase()).catch(() => null)
+      : null;
   return positionMetadata({
     session: "morpho-arbitrum",
     subject: wallet,
-    market: `${market.slice(0, 10)}…`,
+    market: (tail && m ? slotReadMarket(tail.head, m) : undefined) ?? `${market.slice(0, 10)}…`,
     canonicalPath: `/arbitrum/morpho/${wallet}/${market}`,
     image: "dynamic",
   });

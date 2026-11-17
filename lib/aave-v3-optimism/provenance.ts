@@ -115,7 +115,7 @@ export function opReserveProv(key: OpReserveFigure, c: OpReceiptContext, x: OpRe
         contract: poolC(r),
         summary:
           x.ltSource === "emode"
-            ? `${x.symbol} liquidation threshold. The share of its value that counts toward the health factor, from the ${c.p.emode?.label ?? "E-Mode"} category this account is in, read at ${at(r.head)}.`
+            ? `${x.symbol} liquidation threshold. The share of its value that counts toward the health factor, from the ${c.p.emode?.label ?? "E-Mode"} category this position is in, read at ${at(r.head)}.`
             : `${x.symbol} liquidation threshold. The share of its value that counts toward the health factor, from the reserve's configuration, read at ${at(r.head)}.`,
         via:
           x.ltSource === "emode"

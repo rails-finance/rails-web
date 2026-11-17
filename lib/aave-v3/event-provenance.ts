@@ -256,7 +256,7 @@ export const writtenOffDebtProv = (
   kind: "chain",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `Debt (${sym}) the Pool wrote off as bad debt — the part of this account's debt that no collateral was left to cover, as the Pool wrote it into the log. Nobody repaid it: the debt tokens were burned and the amount stands as the reserve's deficit.`,
+  summary: `Debt (${sym}) the Pool wrote off as bad debt — the part of this position's debt that no collateral was left to cover, as the Pool wrote it into the log. Nobody repaid it: the debt tokens were burned and the amount stands as the reserve's deficit.`,
   contract: poolOf(coords),
   via: `${captureVia(coords)} · ${originSeg(origin, `DeficitCreated log · ${fieldSeg("amountCreated", raw)}`)}`,
   scaling: scalingOf(origin, sym),
@@ -507,7 +507,7 @@ const swapWithdrawnProv = (sym: string, coords: V3Coords, paraswap: boolean): Pr
   summary: `The ${sym} this withdraw and swap took out of the position — the aToken's transfer log carries a scaled figure and the reserve's liquidity index at that moment; the two multiplied are the ${sym} the aTokens stood for. ${
     paraswap
       ? `The aTokens went to ParaSwap's withdraw swap adapter, which drew the ${sym} out of the Pool under its name and sold it through ParaSwap.`
-      : `The aTokens went to CoW's settlement under the order this account signed, and the settlement drew the ${sym} out of the Pool under its name and sold it.`
+      : `The aTokens went to CoW's settlement under the order this position's wallet signed, and the settlement drew the ${sym} out of the Pool under its name and sold it.`
   }`,
   contract: poolOf(coords),
   via: `${captureVia(coords)} · BalanceTransfer log · value × index`,
@@ -553,7 +553,7 @@ const swapParaswapBoughtProv = (sym: string, coords: V3Coords, raw?: string | nu
     kind: "chain",
     pclass: "emitted",
     verify: txVerify(coords),
-    summary: `The ${sym} the swap bought — the amount ParaSwap's withdraw swap adapter wrote into the log it keeps as received. The adapter sent it to this account's wallet, so no balance in this position moved by it.`,
+    summary: `The ${sym} the swap bought — the amount ParaSwap's withdraw swap adapter wrote into the log it keeps as received. The adapter sent it to this position's wallet, so no balance in this position moved by it.`,
     contract: { name: named?.name ?? "ParaSwap adapter", address: adapter ?? "" },
     via: `rails-server index of the adapter's Swapped logs · Swapped log · ${fieldSeg("receivedAmount", raw)}`,
     inputs: eventInputs(
@@ -579,7 +579,7 @@ const swapSuppliedProv = (sym: string, coords: V3Coords): Provenance => ({
   kind: "chain-derived",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `The ${sym} this supply from a swap put into the position — the aToken's transfer log carries a scaled figure and the reserve's liquidity index at that moment; the two multiplied are the ${sym} the aTokens stood for. CoW's settlement bought the aTokens under the order this account signed and sent them here.`,
+  summary: `The ${sym} this supply from a swap put into the position — the aToken's transfer log carries a scaled figure and the reserve's liquidity index at that moment; the two multiplied are the ${sym} the aTokens stood for. CoW's settlement bought the aTokens under the order this position's wallet signed and sent them here.`,
   contract: poolOf(coords),
   via: `${captureVia(coords)} · BalanceTransfer log · value × index`,
   formula: "scaled value × index at transfer",
@@ -598,7 +598,7 @@ const swapSoldProv = (sym: string, coords: V3Coords, raw?: string | null): Prove
     kind: "chain-derived",
     pclass: "emitted",
     verify: txVerify(coords),
-    summary: `The ${sym} the order sold — the amount CoW's settlement wrote into its trade log as sold, which includes CoW's fee. It came out of this account's wallet, so no balance in this position moved by it.`,
+    summary: `The ${sym} the order sold — the amount CoW's settlement wrote into its trade log as sold, which includes CoW's fee. It came out of this position's wallet, so no balance in this position moved by it.`,
     contract: { name: named?.name ?? "GPv2Settlement", address: GPV2_SETTLEMENT },
     via: `rails-server index of GPv2Settlement Trade logs · Trade log · sellAmount${raw ? ` = ${raw}` : ""}`,
     formula: "sellAmount (feeAmount inside it)",
@@ -696,7 +696,7 @@ const paraswapVenueProv = (coords: V3Coords, swap: AaveV3SwapDetail, adapter: st
       kind: "chain",
       pclass: "emitted",
       verify: txVerify(coords),
-      summary: `The ParaSwap adapter that carried this swap — the adapter's log names the token it swapped, the token it bought and both amounts, and this position's row is paired to that log: the aTokens this account sent the adapter are the token the log names as swapped, and match the amount it names to within two wei${swap.exact ? " (here, to the wei)" : ""}, in the same transaction. A shared transaction alone does not make the pairing.`,
+      summary: `The ParaSwap adapter that carried this swap — the adapter's log names the token it swapped, the token it bought and both amounts, and this position's row is paired to that log: the aTokens this position sent the adapter are the token the log names as swapped, and match the amount it names to within two wei${swap.exact ? " (here, to the wei)" : ""}, in the same transaction. A shared transaction alone does not make the pairing.`,
       contract: { name: named?.name ?? "ParaSwap adapter", address: adapter },
       via: "rails-server index of the adapter's Swapped logs · paired to the position's row by transaction, token and amount",
       inputs: eventInputs(coords, nameInput),
@@ -706,7 +706,7 @@ const paraswapVenueProv = (coords: V3Coords, swap: AaveV3SwapDetail, adapter: st
     kind: "chain",
     pclass: "emitted",
     verify: txVerify(coords),
-    summary: `The ParaSwap adapter that carried this swap — the adapter writes no trade log, so this position's rows are paired by what the adapter did: ${PARASWAP_SHAPE[swap.kind]}, for this account in one transaction, and made no other call for it there.${leftover ? ` ${leftover}` : ""} A shared transaction alone does not make the pairing.`,
+    summary: `The ParaSwap adapter that carried this swap — the adapter writes no trade log, so this position's rows are paired by what the adapter did: ${PARASWAP_SHAPE[swap.kind]}, for this position in one transaction, and made no other call for it there.${leftover ? ` ${leftover}` : ""} A shared transaction alone does not make the pairing.`,
     contract: { name: named?.name ?? "ParaSwap adapter", address: adapter },
     via: `${captureVia(coords)} · paired by the adapter that made every leg's call`,
     inputs: eventInputs(coords, named ? counterpartyNameInputs(named, explorerUrl(chainId, "address", adapter)) : []),
@@ -1446,7 +1446,7 @@ export const positionDebtProv = (sym: string, atBlockNum?: number): Provenance =
 export const aaveV3PeakSupplyProv = (sym: string): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `The highest supplied ${sym} balance this account recorded — ${SCALED_ROSTER.supply} The divided amounts are added up in order and the largest running total is multiplied back by the reserve's liquidity index as it stood at that event. It is the balance the aToken reported then, interest to that moment included. The index kept climbing between events, so the true high-water mark can sit a little above a figure read at event boundaries.`,
+  summary: `The highest supplied ${sym} balance this position recorded — ${SCALED_ROSTER.supply} The divided amounts are added up in order and the largest running total is multiplied back by the reserve's liquidity index as it stood at that event. It is the balance the aToken reported then, interest to that moment included. The index kept climbing between events, so the true high-water mark can sit a little above a figure read at event boundaries.`,
   contract: POOL,
   via: `${V3_INDEX_VIA} · max running Σ scaled deltas × liquidity index accrued to the peak event`,
 });
@@ -1460,7 +1460,7 @@ export const aaveV3PeakSupplyProv = (sym: string): Provenance => ({
 export const aaveV3PeakBorrowProv = (sym: string): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `The highest borrowed ${sym} balance this account recorded — ${SCALED_ROSTER.debt} The divided amounts are added up in order and the largest running total is multiplied back by the reserve's variable borrow index as it stood at that event. It is the debt the variableDebtToken reported then, interest to that moment included. The index kept climbing between events, so the debt just before a repayment can sit a little above a figure read at event boundaries.`,
+  summary: `The highest borrowed ${sym} balance this position recorded — ${SCALED_ROSTER.debt} The divided amounts are added up in order and the largest running total is multiplied back by the reserve's variable borrow index as it stood at that event. It is the debt the variableDebtToken reported then, interest to that moment included. The index kept climbing between events, so the debt just before a repayment can sit a little above a figure read at event boundaries.`,
   contract: POOL,
   via: `${V3_INDEX_VIA} · max running Σ scaled deltas × variable borrow index accrued to the peak event`,
 });

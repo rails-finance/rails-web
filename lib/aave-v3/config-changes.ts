@@ -162,7 +162,7 @@ export function aaveConfigChanges(
       const inCat = user > 0 && member(asset, user);
       const summary = `${h.symbol}'s liquidation threshold (reserve ${short(asset)}), set to ${pct(l.lt)} by the PoolConfigurator's CollateralConfigurationChanged at block ${blockWords}. Before it, ${pct(before)}. It counts from that block for every account holding ${h.symbol} as collateral outside an ${em} category that covers it.${
         inCat
-          ? ` This account was in ${catName(user)}, whose ${pct(cats.get(user)?.lt ?? 0)} applies to ${h.symbol}, so the change does not move its line.`
+          ? ` This position was in ${catName(user)}, whose ${pct(cats.get(user)?.lt ?? 0)} applies to ${h.symbol}, so the change does not move its line.`
           : ""
       }`;
       push(l, `${h.symbol} liquidation threshold`, before, l.lt, [h.asset], !inCat, summary);
@@ -182,7 +182,7 @@ export function aaveConfigChanges(
         l.lt,
         assets.map(([, h]) => h.asset),
         true,
-        `The liquidation threshold of ${name}, set to ${pct(l.lt)} by the PoolConfigurator's EModeCategoryAdded at block ${blockWords}. Before it, ${pct(before.lt)}. This account was in the category, so it applies to its ${assets.map(([, h]) => h.symbol).join(", ")} collateral from that block.`,
+        `The liquidation threshold of ${name}, set to ${pct(l.lt)} by the PoolConfigurator's EModeCategoryAdded at block ${blockWords}. Before it, ${pct(before.lt)}. This position was in the category, so it applies to its ${assets.map(([, h]) => h.symbol).join(", ")} collateral from that block.`,
       );
       continue;
     }
@@ -215,7 +215,7 @@ export function aaveConfigChanges(
       after,
       [h.asset],
       true,
-      `${h.symbol} ${isMember ? "became" : "stopped being"} collateral in ${name} by the PoolConfigurator's ${event} at block ${blockWords}, so this account, in the category, takes ${isMember ? "the category's" : `${h.symbol}'s own`} liquidation threshold on it from that block: ${pct(after)}. Before it, ${pct(before)}.`,
+      `${h.symbol} ${isMember ? "became" : "stopped being"} collateral in ${name} by the PoolConfigurator's ${event} at block ${blockWords}, so this position, in the category, takes ${isMember ? "the category's" : `${h.symbol}'s own`} liquidation threshold on it from that block: ${pct(after)}. Before it, ${pct(before)}.`,
     );
   }
   return netOfBlock(out);
