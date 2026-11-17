@@ -206,7 +206,45 @@ export interface PolarisLoanTimelineResponse {
   position: PolarisLoanRow | null;
 }
 
-/** The four routes, each with the params its proxy forwards. */
+/** A deposit's day: the running sums after its last operation (each a raw
+ *  1e18 integer) and what the day's operations did. */
+export interface PolarisDepositDay {
+  day: number;
+  events: number;
+  txs: number;
+  did_deposit: boolean;
+  did_withdraw: boolean;
+  did_burn: boolean;
+  did_pay_peth: boolean;
+  did_claim: boolean;
+  last_block: string;
+  last_timestamp: string;
+  deposited: string;
+  withdrawn: string;
+  burned: string;
+  yield_in: string;
+  yield_claimed: string;
+  peth_in: string;
+  peth_claimed: string;
+  deposit: string;
+  stash: string;
+}
+
+export interface PolarisDepositDaysResponse {
+  deployment_id: string;
+  market: "usdp" | "goldp";
+  token_id: string;
+  served_thru_block: string | null;
+  days: PolarisDepositDay[];
+}
+
+/** The floor at each day's last FeesAccrued (WETH per fpETH, 1e18). */
+export interface PolarisFloorDaysResponse {
+  deployment_id: string;
+  days: { day: number; floor_price_raw: string; block_number: string }[];
+}
+
+/** The routes, each with the params its proxy forwards. */
 export const POLARIS_SP_LOAN_ROUTES = {
   "stability-pool": [
     "market",
@@ -222,8 +260,10 @@ export const POLARIS_SP_LOAN_ROUTES = {
     "offset",
   ],
   "stability-pool/timeline": ["market", "id", "limit", "offset", "order"],
+  "stability-pool/flows/daily": ["market", "id"],
   "reserve-loans": ["wallet", "id", "status", "minTx", "maxTx", "sortBy", "sortOrder", "limit", "offset"],
   "reserve-loans/timeline": ["id", "limit", "offset", "order"],
+  "reserve-loans/floor/daily": [],
 } as const;
 
 export type PolarisSpLoanRoute = keyof typeof POLARIS_SP_LOAN_ROUTES;

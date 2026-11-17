@@ -7,8 +7,8 @@
 // getters at head (/api/chain/polaris/stability-pool) are the card's figures
 // and the flows' pending legs; the index holds the history and the sums. The
 // vault-held deposits carry about 185,000 rows each: the timeline draws the
-// newest DEPOSIT_FIRST_READ with a boundary card for the rest, and the flows,
-// which need the whole life, are withheld past one read.
+// newest DEPOSIT_FIRST_READ with a boundary card for the rest, and the flows
+// read the life's day rows (/stability-pool/flows/daily).
 
 import { useEffect, useMemo, useState } from "react";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
@@ -33,7 +33,7 @@ import { fetchPolarisDepositChain, type PolarisDepositChain } from "@/lib/api/fe
 import { PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
 import { POLARIS_SP_PATH } from "@/lib/polaris/routes";
 import { big, depositLifetime, depositNow, depositNowFromChain, units } from "@/lib/polaris/sp-loan-math";
-import { depositFlows } from "@/lib/polaris/sp-loan-flow-timelines";
+import { depositFlows, depositFlowsFromDays } from "@/lib/polaris/sp-loan-flow-timelines";
 import { DEPOSIT_FIRST_READ, depositTimelineEvent, WHOLE_LIFE_READ } from "@/lib/polaris/sp-loan-timeline-events";
 import { spFeedProv, spLiveProv, spPendingLossProv } from "@/lib/polaris/sp-loan-provenance";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
@@ -41,6 +41,8 @@ import { boundaryFromLimit } from "@/lib/shared/timeline-boundary";
 import { CARD_INSET_START } from "@/lib/shared/ui-grammar";
 import {
   readPolarisSpLoans,
+  type PolarisDepositDay,
+  type PolarisDepositDaysResponse,
   type PolarisDepositEventRow,
   type PolarisDepositTimelineResponse,
 } from "@/lib/sources/api/polaris-sp-loans";
@@ -98,16 +100,27 @@ export default function DepositView({
   }, [open, market, tokenId]);
 
   // The whole life, oldest first: the first read where it held every row,
-  // else one read of up to WHOLE_LIFE_READ; past that the flows are withheld.
+  // else one read of up to WHOLE_LIFE_READ; past that, the day rows.
   const firstRows = data?.rows;
   const firstWhole = firstRows != null && firstRows.length >= total;
   const [lifeRows, setLifeRows] = useState<PolarisDepositEventRow[] | null>(null);
   const [lifeRead, setLifeRead] = useState<FlowsRead>("reading");
+  // Past one read, the life's day rows (the vault-held deposits).
+  const [lifeDays, setLifeDays] = useState<PolarisDepositDay[] | null>(null);
   useEffect(() => {
     if (firstRows == null || firstWhole) return;
     if (total > WHOLE_LIFE_READ) {
-      setLifeRead("withheld");
-      return;
+      let cancelled = false;
+      readPolarisSpLoans<PolarisDepositDaysResponse>("stability-pool/flows/daily", { market, id: tokenId })
+        .then((d) => {
+          if (cancelled) return;
+          setLifeDays(d.days);
+          setLifeRead("done");
+        })
+        .catch(() => !cancelled && setLifeRead("failed"));
+      return () => {
+        cancelled = true;
+      };
     }
     let cancelled = false;
     readPolarisSpLoans<PolarisDepositTimelineResponse>("stability-pool/timeline", {
@@ -146,10 +159,17 @@ export default function DepositView({
   // Set on mount, so the server's render and the first client render agree.
   const [nowSec, setNowSec] = useState<number | null>(null);
   useEffect(() => setNowSec(Math.floor(Date.now() / 1000)), []);
-  const flowsReady = wholeAsc != null && nowSec != null && (!open || chainSettled);
+  const flowsReady = (wholeAsc != null || lifeDays != null) && nowSec != null && (!open || chainSettled);
   const flows = useMemo(
-    () => (flowsReady && wholeAsc && nowSec != null ? depositFlows(market, wholeAsc, { open, now, nowSec }) : null),
-    [flowsReady, wholeAsc, nowSec, open, market, now],
+    () =>
+      !flowsReady || nowSec == null
+        ? null
+        : wholeAsc
+          ? depositFlows(market, wholeAsc, { open, now, nowSec })
+          : lifeDays
+            ? depositFlowsFromDays(market, lifeDays, { open, now, nowSec })
+            : null,
+    [flowsReady, wholeAsc, lifeDays, nowSec, open, market, now],
   );
   const flowFocus = useFlowFocusValue(useFlowFocusRoot(flows?.focus ?? NO_FOCUS), flows?.timeline ?? null);
   // With the rows in hand the read is done, drawn or not (a life with no
