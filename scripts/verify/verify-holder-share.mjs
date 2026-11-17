@@ -450,8 +450,8 @@ if (!check("D1. the card-model probe runs", Boolean(probeLine), probeLine ? "" :
     `"${got.polaris?.headline}" / "${got.polaris?.status}" vs restated "${pStatus}"`,
   );
   check(
-    "D3. Polaris: Total collateral is the restated Σ coll over the open rows, exact and unmarked",
-    stat(got.polaris, "Total collateral")?.value === `${fmtNum(pColl)} pETH`,
+    "D3. Polaris: Total collateral is the restated Σ coll over the open rows, wearing the ≈ (last-touch figures)",
+    stat(got.polaris, "Total collateral")?.value === `≈ ${fmtNum(pColl)} pETH`,
     `"${stat(got.polaris, "Total collateral")?.value}" vs restated "${fmtNum(pColl)} pETH"`,
   );
   check(
@@ -478,8 +478,8 @@ if (!check("D1. the card-model probe runs", Boolean(probeLine), probeLine ? "" :
     `"${got.v2?.headline}" / "${got.v2?.status}" vs restated "${vStatus}"`,
   );
   check(
-    "E2. Liquity V2: Total debt is the restated Σ BOLD over the open troves, exact and unmarked",
-    stat(got.v2, "Total debt")?.value === `${fmtNum(vDebt)} BOLD`,
+    "E2. Liquity V2: Total debt is the restated Σ BOLD over the open troves, wearing the ≈ (last-touch figures)",
+    stat(got.v2, "Total debt")?.value === `≈ ${fmtNum(vDebt)} BOLD`,
     `"${stat(got.v2, "Total debt")?.value}" vs restated "${fmtNum(vDebt)} BOLD"`,
   );
   check(

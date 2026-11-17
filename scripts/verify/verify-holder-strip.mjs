@@ -8,9 +8,10 @@
 //   a  the bare directory draws NO strip — it is not about a wallet;
 //   b  a position-id search draws no strip either — one position is a card;
 //   c  the wallet view: the counts line's own numbers equal the API's statuses;
-//      the exact leg (Polaris pETH, V2 BOLD) matches the RESTATED sum to the
-//      character; the priced leg matches the restated Σ legs × feed within $1
-//      and wears the ≈;
+//      the one-token leg (Polaris pETH, V2 BOLD) matches the RESTATED sum to the
+//      character and wears the ≈ (a sum of last-touch figures, ui-jobs 690);
+//      the priced leg matches the restated Σ legs × feed within $1 and wears
+//      the ≈;
 //   d  clicking an ≈ figure reveals a sentence;
 //   e  a wallet holding more than one page states the count only — no legs, and
 //      a footnote saying why (proved by rewriting the
@@ -280,11 +281,12 @@ info(
       JSON.stringify(strip.attrs),
     );
 
-    // The collateral: one token, so exact — character for character.
+    // The collateral: one token, character for character, marked ≈ because each
+    // row is its last touch's figure.
     check(
-      "P4a. the total collateral is the restated Σ coll over the open rows, exact and unmarked",
-      strip.legs.collateral?.value === `${fmtNum(pColl)} pETH`,
-      `shown "${strip.legs.collateral?.value}" vs restated "${fmtNum(pColl)} pETH"`,
+      "P4a. the total collateral is the restated Σ coll over the open rows, wearing the ≈",
+      strip.legs.collateral?.value === `≈ ${fmtNum(pColl)} pETH`,
+      `shown "${strip.legs.collateral?.value}" vs restated "≈ ${fmtNum(pColl)} pETH"`,
     );
     const collUsdShown = parseNum(/\$[\d,.]+/.exec(strip.legs.collateral?.footnote ?? "")?.[0]);
     check(
@@ -431,11 +433,12 @@ info(
       `"${strip.counts}" vs API ${vCounts.open}/${vCounts.closed}/${vCounts.liquidated}`,
     );
 
-    // The debt: one token on every branch, so exact.
+    // The debt: one token on every branch, marked ≈ because each row is its
+    // last touch's figure.
     check(
-      "V4. the total debt is the restated Σ debt over the open troves, exact and unmarked",
-      strip.legs.debt?.value === `${fmtNum(vDebt)} BOLD`,
-      `shown "${strip.legs.debt?.value}" vs restated "${fmtNum(vDebt)} BOLD"`,
+      "V4. the total debt is the restated Σ debt over the open troves, wearing the ≈",
+      strip.legs.debt?.value === `≈ ${fmtNum(vDebt)} BOLD`,
+      `shown "${strip.legs.debt?.value}" vs restated "≈ ${fmtNum(vDebt)} BOLD"`,
     );
 
     // The collateral: three tokens, so a valuation — marked ≈.
@@ -584,9 +587,10 @@ if (!probeLine) {
   // Restated from the stub: 10 + 2 = 12 pETH; 30,000 USDp at $1 plus 5 GOLDp at
   // $4,000 = $50,000.
   check(
-    "G1a. Polaris: the exact collateral leg is the emitted sum, unmarked, and its receipt is a chain fact",
+    "G1a. Polaris: the collateral leg is the emitted sum, marked ≈ with a last-touch tip, and its receipt is a chain fact",
     leg(got.polaris, "collateral").value === "12 pETH" &&
-      leg(got.polaris, "collateral").approx === false &&
+      leg(got.polaris, "collateral").approx === true &&
+      /last touch/.test(leg(got.polaris, "collateral").tip ?? "") &&
       leg(got.polaris, "collateral").kind === "chain" &&
       leg(got.polaris, "collateral").pclass === "emitted",
     JSON.stringify(leg(got.polaris, "collateral")),
@@ -619,9 +623,10 @@ if (!probeLine) {
   // Restated from the stub: 100 × 2000 + 50 × 2200 = $310,000; debt 150,000
   // BOLD.
   check(
-    "G2a. Liquity V2: the exact debt leg is the BOLD sum, unmarked, on a chain receipt",
+    "G2a. Liquity V2: the debt leg is the BOLD sum, marked ≈ with a last-touch tip, on a chain receipt",
     leg(got.v2, "debt").value === "150,000 BOLD" &&
-      leg(got.v2, "debt").approx === false &&
+      leg(got.v2, "debt").approx === true &&
+      /last touch/.test(leg(got.v2, "debt").tip ?? "") &&
       leg(got.v2, "debt").kind === "chain",
     JSON.stringify(leg(got.v2, "debt")).slice(0, 200),
   );

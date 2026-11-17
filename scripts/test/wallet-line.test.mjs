@@ -5,7 +5,7 @@
 // Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { walletLineText } from "../../lib/wallet/summary-counts.ts";
+import { WALLET_COUNTS_SCOPE, walletLineParts, walletLineText } from "../../lib/wallet/summary-counts.ts";
 
 const row = (chain, status, i) => ({
   chain,
@@ -81,4 +81,13 @@ test("past three protocols the line counts them", () => {
 test("a position with no name leaves the line unnamed", () => {
   const rows = [row("ethereum", "open", 1), fam("unknown", "closed", 2)];
   assert.equal(walletLineText(rows, false, nameOf), "Also on Rails: 2 positions · 1 open · 1 closed");
+});
+
+test("the scope and the counts come apart for the tip and the link (ui-jobs 691)", () => {
+  assert.deepEqual(walletLineParts(FIVE.slice(2), false), {
+    scope: "Also on Rails",
+    rest: "3 positions on 2 chains · 0 open · 3 closed",
+  });
+  assert.equal(walletLineParts([], true), null);
+  assert.equal(WALLET_COUNTS_SCOPE, "Counts mainnet positions; the Sepolia testnet is not counted.");
 });

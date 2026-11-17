@@ -8,13 +8,22 @@
 // counts every position Rails holds for the address, in the wallet view's
 // words (W1), so the two read alike (Miles, 6 Nov 2026), and names that scope:
 // "On Rails:" where the page's position is counted, "Also on Rails:" where it
-// is not (ui-jobs 613), and names the protocols it counts (ui-jobs 639).
+// is not (ui-jobs 613), and names the protocols it counts (ui-jobs 639). The
+// scope word carries the counter's tip, which says the counts are mainnet only
+// (ui-jobs 691); the counts after it are the link.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { HeadingTip } from "@/components/shared/tip-label";
 import { protocolForPathname } from "@/lib/shared/protocols";
-import { rowIsPage, walletLineText, type WalletCounts, type WalletCountsPosition } from "@/lib/wallet/summary-counts";
+import {
+  WALLET_COUNTS_SCOPE,
+  rowIsPage,
+  walletLineParts,
+  type WalletCounts,
+  type WalletCountsPosition,
+} from "@/lib/wallet/summary-counts";
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 
@@ -41,7 +50,7 @@ function readCounts(address: string): Promise<WalletCounts | null> {
 export function WalletElsewhereLine({ wallet }: { wallet: string }) {
   const pathname = usePathname();
   const address = wallet.toLowerCase();
-  const [line, setLine] = useState<{ text: string; matched: boolean } | null>(null);
+  const [line, setLine] = useState<{ scope: string; rest: string; matched: boolean } | null>(null);
   useEffect(() => {
     let live = true;
     setLine(null);
@@ -53,8 +62,8 @@ export function WalletElsewhereLine({ wallet }: { wallet: string }) {
       const matched = rest.length < c.positions.length;
       // Nothing else to open: the page's position is the wallet's only one.
       if (rest.length === 0) return;
-      const text = walletLineText(c.positions, matched, nameOf);
-      setLine(text ? { text, matched } : null);
+      const parts = walletLineParts(c.positions, matched, nameOf);
+      setLine(parts ? { ...parts, matched } : null);
     });
     return () => {
       live = false;
@@ -63,12 +72,14 @@ export function WalletElsewhereLine({ wallet }: { wallet: string }) {
   if (!line) return null;
   return (
     <p className="text-xs text-rb-500" data-anatomy="H13.2" data-wallet-elsewhere={line.matched ? "others" : "all"}>
+      <HeadingTip text={line.scope} tip={WALLET_COUNTS_SCOPE} />
+      {": "}
       <Link
         href={`/wallet/${address}`}
         prefetch={false}
         className="rounded-sm transition-colors hover:text-blue-600 focus-visible:text-blue-600 focus-ring dark:hover:text-[var(--text-link)] dark:focus-visible:text-[var(--text-link)]"
       >
-        {line.text}
+        {line.rest}
       </Link>
     </p>
   );
