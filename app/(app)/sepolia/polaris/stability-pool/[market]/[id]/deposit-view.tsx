@@ -8,9 +8,13 @@
 // and the flows' pending legs; the index holds the history and the sums. The
 // vault-held deposits carry about 185,000 rows each: the timeline draws the
 // newest DEPOSIT_FIRST_READ with a boundary card for the rest, and the flows
-// read the life's day rows (/stability-pool/flows/daily).
+// read the life's day rows (/stability-pool/flows/daily). Under `event/<id>`
+// the page draws one operation on the shared event page (P4): the timeline
+// alone, in its pinned mode, as the CDP page does; an operation older than the
+// rows the page holds is not found there.
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useParams } from "next/navigation";
 import { FlowHuesContext, PAID_IN_HUES } from "@/components/shared/lifetime-flows-tip";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
@@ -37,8 +41,10 @@ import { big, depositLifetime, depositNow, depositNowFromChain, units } from "@/
 import { depositFlows, depositFlowsFromDays } from "@/lib/polaris/sp-loan-flow-timelines";
 import { DEPOSIT_FIRST_READ, depositTimelineEvent, WHOLE_LIFE_READ } from "@/lib/polaris/sp-loan-timeline-events";
 import { spFeedProv, spLiveProv, spPendingLossProv } from "@/lib/polaris/sp-loan-provenance";
+import { polarisDepositEventPage } from "@/lib/polaris/sp-loan-explorer";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { boundaryFromLimit } from "@/lib/shared/timeline-boundary";
+import { decodeEventId } from "@/lib/shared/page-metadata";
 import { CARD_INSET_START } from "@/lib/shared/ui-grammar";
 import {
   readPolarisSpLoans,
@@ -62,6 +68,9 @@ export default function DepositView({
   const [failed, setFailed] = useState(false);
   const [chain, setChain] = useState<PolarisDepositChain | null>(null);
   const [chainSettled, setChainSettled] = useState(false);
+  // The event route draws the timeline alone, its card in page mode.
+  const rawEventId = useParams<{ eventId?: string }>()?.eventId;
+  const onEventPage = rawEventId != null;
 
   // The index lane, where the server's read did not answer.
   useEffect(() => {
@@ -201,6 +210,9 @@ export default function DepositView({
       state: null,
     });
   }, [olderCount, total, listed.length, tl.sortedEvents, lifePending]);
+  // An event older than the first read's rows waits for the whole life before
+  // the timeline says it is not found.
+  const pinnedWaits = rawEventId != null && lifePending && !rowById.has(decodeEventId(rawEventId));
 
   // pETH in the market's stablecoin at the feed, the price the head row values
   // the pending pETH at.
@@ -255,69 +267,88 @@ export default function DepositView({
             closed={!open}
             tools={false}
           />
-          <PolarisDepositCard
-            row={row}
-            lifetime={lifetime}
-            now={cardNow}
-            pending={open && !chainSettled}
-            explanation={
-              <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed text-rb-500">
-                <li>
-                  A deposit in the {stable.symbol} Stability Pool repays the debt of liquidated positions. Each
-                  liquidation burns a share of every deposit and pays pETH in its place.
-                </li>
-                <li>The deposit now and the pending gains are the pool&rsquo;s current figures.</li>
-                <li>The deposit also earns {stable.symbol} yield; what a touch does not claim stays in the deposit.</li>
-              </ul>
-            }
-          />
-          <LifetimeFlowsPanel
-            scrubber={flows ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
-            read={flowsRead}
-            explanation={
-              <div className="space-y-2 text-sm text-rb-500">
-                <PolarisDepositFlowsNote stable={stable.symbol} />
-              </div>
-            }
-            learnMore={polarisDepositFlowsContent(stable.symbol)}
-          />
-          {failed && <p className="text-sm text-rb-500">The operations could not be read just now.</p>}
-          <ChainTruthTimeline
-            persistKeyPrefix="polaris-sp"
-            closed={!open}
-            tl={tl}
-            boundary={boundary}
-            displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
-            emptyLabel="No operations recorded for this deposit"
-            toolbarLeading={
-              <TimelineActivityHeader
-                events={events}
-                closed={!open}
-                firstAt={Number(row.first_timestamp)}
-                tenurePending={false}
+          {!onEventPage && (
+            <>
+              <PolarisDepositCard
+                row={row}
+                lifetime={lifetime}
+                now={cardNow}
+                pending={open && !chainSettled}
+                explanation={
+                  <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed text-rb-500">
+                    <li>
+                      A deposit in the {stable.symbol} Stability Pool repays the debt of liquidated positions. Each
+                      liquidation burns a share of every deposit and pays pETH in its place.
+                    </li>
+                    <li>The deposit now and the pending gains are the pool&rsquo;s current figures.</li>
+                    <li>
+                      The deposit also earns {stable.symbol} yield; what a touch does not claim stays in the deposit.
+                    </li>
+                  </ul>
+                }
               />
-            }
-            liveWindow={
-              now && lifetime
-                ? () => (
-                    <SinceLastTouch
-                      market={market}
-                      lastTimestamp={Number(row.last_timestamp)}
-                      burned={now.pendingLoss}
-                      peth={now.bcSinceTouch}
-                      gain={now.pendingStable}
-                      feed={feed}
-                    />
-                  )
-                : undefined
-            }
-            renderCard={(event, meta) => {
-              const r = rowById.get(event.id);
-              return r ? (
-                <PolarisDepositEventCard row={r} isLast={meta.isLast} holder={row.holder} vaultHeld={row.vault_held} />
-              ) : null;
-            }}
-          />
+              <LifetimeFlowsPanel
+                scrubber={flows ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
+                read={flowsRead}
+                explanation={
+                  <div className="space-y-2 text-sm text-rb-500">
+                    <PolarisDepositFlowsNote stable={stable.symbol} />
+                  </div>
+                }
+                learnMore={polarisDepositFlowsContent(stable.symbol)}
+              />
+            </>
+          )}
+          {failed && <p className="text-sm text-rb-500">The operations could not be read just now.</p>}
+          {pinnedWaits ? (
+            <DetailBodySkeleton />
+          ) : (
+            <ChainTruthTimeline
+              persistKeyPrefix="polaris-sp"
+              closed={!open}
+              tl={tl}
+              boundary={boundary}
+              displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
+              emptyLabel="No operations recorded for this deposit"
+              toolbarLeading={
+                <TimelineActivityHeader
+                  events={events}
+                  closed={!open}
+                  firstAt={Number(row.first_timestamp)}
+                  tenurePending={false}
+                />
+              }
+              liveWindow={
+                now && lifetime
+                  ? () => (
+                      <SinceLastTouch
+                        market={market}
+                        lastTimestamp={Number(row.last_timestamp)}
+                        burned={now.pendingLoss}
+                        peth={now.bcSinceTouch}
+                        gain={now.pendingStable}
+                        feed={feed}
+                      />
+                    )
+                  : undefined
+              }
+              eventPage={(slot) =>
+                polarisDepositEventPage({ ...slot, market, tokenId, holder, row: rowById.get(slot.event.id) })
+              }
+              renderCard={(event, meta) => {
+                const r = rowById.get(event.id);
+                return r ? (
+                  <PolarisDepositEventCard
+                    row={r}
+                    isLast={meta.isLast}
+                    eventNumber={meta.eventNumber}
+                    holder={row.holder}
+                    vaultHeld={row.vault_held}
+                  />
+                ) : null;
+              }}
+            />
+          )}
           <ProvInspectorLayer />
         </div>
       </FlowHuesContext.Provider>

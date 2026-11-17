@@ -6,9 +6,12 @@
 // shared timeline. The loans manager's getters at head
 // (/api/chain/polaris/reserve-loan) are the card's figures and the fees
 // accrued since the last touch; the index holds the touches. The price strip
-// quotes fpETH at the floor, in WETH, the debt's unit.
+// quotes fpETH at the floor, in WETH, the debt's unit. Under `event/<id>` the
+// page draws one touch on the shared event page (P4): the timeline alone, in
+// its pinned mode, as the CDP page does.
 
 import { useEffect, useMemo, useState } from "react";
+import { useParams } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
@@ -32,6 +35,7 @@ import { POLARIS_LOANS_PATH } from "@/lib/polaris/routes";
 import { atFloor, big, loanLifetime, max0, units } from "@/lib/polaris/sp-loan-math";
 import { loanFlows } from "@/lib/polaris/sp-loan-flow-timelines";
 import { loanTimelineEvent } from "@/lib/polaris/sp-loan-timeline-events";
+import { polarisLoanEventPage } from "@/lib/polaris/sp-loan-explorer";
 import { loanLiveProv } from "@/lib/polaris/sp-loan-provenance";
 import {
   readPolarisSpLoans,
@@ -47,6 +51,8 @@ export default function LoanView({ loanId, initial }: { loanId: string; initial:
   const [failed, setFailed] = useState(false);
   const [chain, setChain] = useState<PolarisLoanChain | null>(null);
   const [chainSettled, setChainSettled] = useState(false);
+  // The event route draws the timeline alone, its card in page mode.
+  const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
 
   useEffect(() => {
     if (initial) return;
@@ -175,35 +181,39 @@ export default function LoanView({ loanId, initial }: { loanId: string; initial:
           closed={!open}
           tools={false}
         />
-        <PolarisLoanCard
-          row={row}
-          lifetime={lifetime}
-          now={now}
-          pending={open && !chainSettled}
-          explanation={
-            <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed text-rb-500">
-              <li>
-                A reserve loan borrows WETH from Polaris&rsquo;s reserve against {FPETH.symbol}, the floor part of pETH,
-                whose price in WETH the protocol only raises.
-              </li>
-              <li>
-                The debt is a number of shares in the reserve&rsquo;s debt. Each fee the reserve charges raises the debt
-                per share, so the debt grows with no action on the loan.
-              </li>
-              <li>The loans manager has no liquidation.</li>
-            </ul>
-          }
-        />
-        <LifetimeFlowsPanel
-          scrubber={flows ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
-          read={flowsReady ? "done" : failed ? "failed" : "reading"}
-          explanation={
-            <div className="space-y-2 text-sm text-rb-500">
-              <PolarisLoanFlowsNote accrued={accrued} dailyFloor={floorDays != null && floorDays.length > 0} />
-            </div>
-          }
-          learnMore={polarisLoanFlowsContent()}
-        />
+        {!onEventPage && (
+          <>
+            <PolarisLoanCard
+              row={row}
+              lifetime={lifetime}
+              now={now}
+              pending={open && !chainSettled}
+              explanation={
+                <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed text-rb-500">
+                  <li>
+                    A reserve loan borrows WETH from Polaris&rsquo;s reserve against {FPETH.symbol}, the floor part of
+                    pETH, whose price in WETH the protocol only raises.
+                  </li>
+                  <li>
+                    The debt is a number of shares in the reserve&rsquo;s debt. Each fee the reserve charges raises the
+                    debt per share, so the debt grows with no action on the loan.
+                  </li>
+                  <li>The loans manager has no liquidation.</li>
+                </ul>
+              }
+            />
+            <LifetimeFlowsPanel
+              scrubber={flows ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
+              read={flowsReady ? "done" : failed ? "failed" : "reading"}
+              explanation={
+                <div className="space-y-2 text-sm text-rb-500">
+                  <PolarisLoanFlowsNote accrued={accrued} dailyFloor={floorDays != null && floorDays.length > 0} />
+                </div>
+              }
+              learnMore={polarisLoanFlowsContent()}
+            />
+          </>
+        )}
         {failed && <p className="text-sm text-rb-500">The operations could not be read just now.</p>}
         <ChainTruthTimeline
           persistKeyPrefix="polaris-loan"
@@ -212,6 +222,7 @@ export default function LoanView({ loanId, initial }: { loanId: string; initial:
           displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
           emptyLabel="No operations recorded for this loan"
           toolbarLeading={<TimelineActivityHeader events={events} closed={!open} />}
+          eventPage={(slot) => polarisLoanEventPage({ ...slot, loanId, holder, row: rowById.get(slot.event.id) })}
           renderCard={(event, meta) => {
             const r = rowById.get(event.id);
             return r ? (
@@ -220,6 +231,7 @@ export default function LoanView({ loanId, initial }: { loanId: string; initial:
                 previous={previousOf.get(r.event_key) ?? null}
                 holder={row.holder}
                 isLast={meta.isLast}
+                eventNumber={meta.eventNumber}
               />
             ) : null;
           }}

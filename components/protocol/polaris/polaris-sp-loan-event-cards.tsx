@@ -86,11 +86,14 @@ const bullets = (lines: string[]) => (
 export function PolarisDepositEventCard({
   row,
   isLast,
+  eventNumber,
   holder,
   vaultHeld,
 }: {
   row: PolarisDepositEventRow;
   isLast: boolean;
+  /** The timeline's number: the pill links the event's page (P4). */
+  eventNumber?: number;
   holder: string | null;
   vaultHeld: boolean;
 }) {
@@ -197,6 +200,7 @@ export function PolarisDepositEventCard({
       txHash: row.tx_hash,
       blockNumber: Number(row.block_number),
       timestamp: Number(row.block_timestamp),
+      number: eventNumber,
     },
     spine,
     head: { label, deltas: [] },
@@ -213,11 +217,14 @@ export function PolarisLoanEventCard({
   row,
   previous,
   isLast,
+  eventNumber,
   holder,
 }: {
   row: PolarisLoanEventRow;
   previous: PolarisLoanEventRow | null;
   isLast: boolean;
+  /** The timeline's number: the pill links the event's page (P4). */
+  eventNumber?: number;
   holder: string | null;
 }) {
   const coord = (summary: string) => touchProv(summary, row.tx_hash, row.block_number, "loans");
@@ -312,6 +319,7 @@ export function PolarisLoanEventCard({
       txHash: row.tx_hash,
       blockNumber: Number(row.block_number),
       timestamp: Number(row.block_timestamp),
+      number: eventNumber,
     },
     spine: { tokens, isLast },
     head: { label, deltas: [] },
