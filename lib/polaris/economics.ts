@@ -87,6 +87,11 @@ export function polarisPsmOutcomeAtFeed(
 export const polarisEquityAtFeed = (entireColl: number, entireDebt: number, pethInDebt: number): number =>
   entireColl * pethInDebt - entireDebt;
 
+/** The stables owed to the holder: an entire debt below zero, as a positive
+ *  amount the next touch mints to the holder; zero on any other debt. The
+ *  card's Debt stat and the export state it as "Owed". */
+export const polarisDebtOwed = (entireDebt: number): number => (entireDebt < 0 ? -entireDebt : 0);
+
 /** The live read's pending legs, the subset of PolarisChainResponse they need. */
 export interface PolarisPendingRead {
   accruedInterest: number;

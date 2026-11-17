@@ -47,7 +47,7 @@ const { polarisAgainstHolding, isAgainstHoldingNone, againstHoldingText } = awai
 );
 const { polarisSinceLastTouch } = await import(ROOT + "lib/polaris/since-last-touch.ts");
 const { polarisPositionToMarkdown } = await import(ROOT + "lib/polaris/position-to-markdown.ts");
-const { polarisEquityAtFeed } = await import(ROOT + "lib/polaris/economics.ts");
+const { polarisEquityAtFeed, polarisDebtOwed } = await import(ROOT + "lib/polaris/economics.ts");
 
 const T0 = 1_760_000_000;
 /** A CDPUpdated row; amounts as decimal strings' numbers. */
@@ -341,6 +341,31 @@ test("the export's timeline states the stables each touch minted to the holder",
   const closeRow = md.split("\n").find((l) => l.startsWith("| 2 |"));
   assert.match(closeRow, /\| 40(\.00)? \|/);
   assert.match(md, /- \*\*Minted to the holder:\*\* 40(\.00)? USDp/);
+});
+
+test("a debt below zero is owed to the holder: the Debt line says Owed and the amount", () => {
+  close(polarisDebtOwed(-0.7109305751935578), 0.7109305751935578);
+  assert.equal(polarisDebtOwed(0), 0);
+  assert.equal(polarisDebtOwed(27.38), 0);
+  const evs = [row(1, "open", { collChange: 0.0025, debtChange: 0.0000867, newColl: 0.0025, newDebt: 0.0000867 })];
+  const md = polarisPositionToMarkdown({
+    view: {
+      market: "usdp",
+      cdpId: "34812",
+      stableSymbol: "USDp",
+      status: "open",
+      coll: 0.0024,
+      debt: -0.7109,
+      recordedDebt: 0.0000867,
+      collUsd: null,
+      icr: null,
+    },
+    chain: null,
+    events: evs,
+    generatedAt: new Date(Date.UTC(2026, 10, 17)),
+  });
+  assert.match(md, /- \*\*Debt:\*\* Owed 0\.7109 USDp \(below zero: the next touch mints it to the holder\)/);
+  assert.doesNotMatch(md, /- \*\*Debt:\*\* none/);
 });
 
 test("a liquidation pays the gas compensation escrow to the liquidator: the holder loses it", () => {

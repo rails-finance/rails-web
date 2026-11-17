@@ -21,6 +21,7 @@ import {
 import { crPct2, polarisCrAtEvent } from "@/lib/polaris/cr-at-event";
 import { formatPolarisRatio } from "@/lib/polaris/ratio-format";
 import {
+  polarisDebtOwed,
   polarisEquityAtFeed,
   polarisLifetime,
   polarisPendingAtFeed,
@@ -135,7 +136,9 @@ export function polarisPositionToMarkdown(args: PolarisPositionMarkdownArgs): st
     lines.push(
       view.debt > 0
         ? `- **Debt:** ${amt(view.debt)} ${stable}`
-        : `- **Debt:** none${view.recordedDebt != null && view.recordedDebt > 0 ? ` (the pending legs exceed the ${amt(view.recordedDebt)} ${stable} recorded at the last touch; the next touch settles it to zero)` : ""}`,
+        : polarisDebtOwed(view.debt) > 0
+          ? `- **Debt:** Owed ${amt(polarisDebtOwed(view.debt))} ${stable} (below zero: the next touch mints it to the holder)`
+          : `- **Debt:** none${view.recordedDebt != null && view.recordedDebt > 0 ? ` (the pending legs exceed the ${amt(view.recordedDebt)} ${stable} recorded at the last touch; the next touch settles it to zero)` : ""}`,
     );
     if (view.icr != null)
       lines.push(
