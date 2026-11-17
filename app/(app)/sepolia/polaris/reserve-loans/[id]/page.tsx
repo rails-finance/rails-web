@@ -5,6 +5,7 @@
 // (loan-view.tsx). A loan id the index has no row for is a 404.
 
 import type { Metadata } from "next";
+import { positionMetadata } from "@/lib/shared/page-metadata";
 import { notFound } from "next/navigation";
 import { AimGate } from "@/components/shared/aim-gate";
 import { assetKey } from "@/lib/shared/asset-family";
@@ -22,11 +23,14 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id: rawId } = await params;
   const id = normalizeCdpId(rawId);
-  return {
-    title: `Polaris · Reserve loan #${id ?? rawId}`,
-    description: `A Rails replay of this Polaris reserve loan on Sepolia: every touch from the loans manager's events, with a receipt on every number. Test tokens only.`,
-    alternates: { canonical: id ? polarisLoanHref(id) : undefined },
-  };
+  return positionMetadata({
+    session: "polaris",
+    subject: `#${id ?? rawId}`,
+    noun: "Reserve loan",
+    canonicalPath: id ? polarisLoanHref(id) : `/sepolia/polaris/reserve-loans/${rawId}`,
+    description: () =>
+      `A Rails replay of this Polaris reserve loan on Sepolia: every touch from the loans manager's events, with a receipt on every number. Test tokens only.`,
+  });
 }
 
 const KEYS = [assetKey(POLARIS_CHAIN_ID, FPETH.address), assetKey(POLARIS_CHAIN_ID, POLARIS_WETH.address)];

@@ -368,8 +368,10 @@ for (const f of FIXTURES) {
 // ── 3. the gas clause on the holder's own open ─────────────────────────────
 
 // Since ui-jobs 309 step 3 the gas stands in the card's price row (the fuel
-// button, `data-gas`), and the T3 sentence is gone; a press switches USD and
-// ETH, so the figure is read in ETH.
+// glyph and the figure, `data-gas`), and the T3 sentence is gone. Polaris
+// rows carry no USD figure, so the line is plain text in ETH, read from its
+// text ("Gas " is screen-reader text before the figure); where a row has
+// both units it is a button that switches them, read from its aria-label.
 const wantGas = `${fmtGasEth((GAS_FIXTURE.gasUsed * GAS_FIXTURE.gasPrice) / 1e18)} ETH`;
 const pageGas = await open(context, polarisUrl(GAS_FIXTURE.market, GAS_FIXTURE.id));
 await expandRow(pageGas, GAS_FIXTURE.eventKey);
@@ -379,7 +381,10 @@ if ((await gasButton.count()) && (await gasButton.getAttribute("data-gas-unit"))
   await gasButton.click();
   await pageGas.waitForTimeout(300);
 }
-const gasLabel = (await gasButton.count()) ? ((await gasButton.getAttribute("aria-label")) ?? "") : null;
+const gasLabel = (await gasButton.count())
+  ? ((await gasButton.getAttribute("aria-label")) ??
+    ((await gasButton.textContent()) ?? "").replace(/\s+/g, " ").trim())
+  : null;
 check(
   `3. usdp/166's open row's price row states gas ${wantGas} (${GAS_FIXTURE.gasUsed} gas × ${GAS_FIXTURE.gasPrice} wei)`,
   gasLabel != null && gasLabel.startsWith(`Gas ${wantGas}`),

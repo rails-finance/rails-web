@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { decodeEventId } from "@/lib/shared/page-metadata";
+import { decodeEventId, eventMetadata, positionMetadata } from "@/lib/shared/page-metadata";
 import { normalizeCdpId, normalizeMarket, POLARIS_MARKET_CONFIG } from "@/lib/polaris/asset-catalog";
 import { polarisDepositHref } from "@/lib/polaris/routes";
 import { loadPolarisDeposit } from "@/lib/polaris/sp-loan-page-data";
@@ -22,18 +22,27 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const market = normalizeMarket(rawMarket);
   const id = normalizeCdpId(rawId);
   const stable = market ? POLARIS_MARKET_CONFIG[market].stable.symbol : rawMarket;
-  const base = `Polaris · ${stable} Stability Pool · Deposit #${id ?? rawId}`;
-  if (!market || !id) return { title: base };
+  const named = {
+    session: "polaris",
+    subject: `#${id ?? rawId}`,
+    market: `${stable} Stability Pool`,
+    noun: "Deposit",
+  } as const;
+  if (!market || !id) {
+    return positionMetadata({ ...named, canonicalPath: `/sepolia/polaris/stability-pool/${rawMarket}/${rawId}` });
+  }
   const decoded = decodeEventId(eventId);
   const data = await loadPolarisDeposit(market, id);
   const row = data && data !== "missing" ? data.rows.find((r) => r.event_key === decoded) : undefined;
-  return {
-    title: row ? `${base} · ${spEventLabel(row)}` : base,
+  return eventMetadata({
+    ...named,
+    canonicalPath: `${polarisDepositHref(market, id)}/event/${encodeURIComponent(decoded)}`,
+    event: row ? { actionLabel: spEventLabel(row), timestamp: Number(row.block_timestamp) } : null,
     description: row
       ? depositEventPageDescription(market, id, Number(row.block_timestamp))
       : `A Rails replay of this Polaris stability-pool deposit on Sepolia: every operation from the pool's events, with a receipt on every number. Test tokens only.`,
-    alternates: { canonical: `${polarisDepositHref(market, id)}/event/${encodeURIComponent(decoded)}` },
-  };
+    image: "explorer",
+  });
 }
 
 // The parent deposit page, same params: the view reads `eventId` from the
