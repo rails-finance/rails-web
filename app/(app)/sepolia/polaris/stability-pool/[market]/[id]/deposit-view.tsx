@@ -33,19 +33,17 @@ import {
   PolarisDepositFlowsNote,
   polarisDepositFlowsContent,
 } from "@/components/protocol/polaris/polaris-sp-loan-flows-note";
-import { RawFigure } from "@/components/protocol/polaris/polaris-sp-loan-parts";
+import { PolarisDepositSinceTouchRow } from "@/components/protocol/polaris/polaris-sp-loan-since-touch";
 import { fetchPolarisDepositChain, type PolarisDepositChain } from "@/lib/api/fetch-polaris-sp-loans-chain";
 import { PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
 import { POLARIS_SP_PATH } from "@/lib/polaris/routes";
 import { big, depositLifetime, depositNow, depositNowFromChain, units } from "@/lib/polaris/sp-loan-math";
 import { depositFlows, depositFlowsFromDays } from "@/lib/polaris/sp-loan-flow-timelines";
 import { DEPOSIT_FIRST_READ, depositTimelineEvent, WHOLE_LIFE_READ } from "@/lib/polaris/sp-loan-timeline-events";
-import { spFeedProv, spLiveProv, spPendingLossProv } from "@/lib/polaris/sp-loan-provenance";
+import { spFeedProv, spLiveProv } from "@/lib/polaris/sp-loan-provenance";
 import { polarisDepositEventPage } from "@/lib/polaris/sp-loan-explorer";
-import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { boundaryFromLimit } from "@/lib/shared/timeline-boundary";
 import { decodeEventId } from "@/lib/shared/page-metadata";
-import { CARD_INSET_START } from "@/lib/shared/ui-grammar";
 import {
   readPolarisSpLoans,
   type PolarisDepositDay,
@@ -159,6 +157,8 @@ export default function DepositView({
   const rowById = useMemo(() => new Map(listed.map((r) => [r.event_key, r])), [listed]);
   const events = useMemo(() => listed.map(depositTimelineEvent), [listed]);
   const olderCount = Math.max(0, total - listed.length);
+  // The newest operation the page holds: a transfer is no touch.
+  const lastTouch = useMemo(() => listed.findLast((r) => r.event_type !== "transfer") ?? null, [listed]);
 
   const lifetime = useMemo(() => (row ? depositLifetime(row) : null), [row]);
   // The flows and the head row lay the chain over the index only where the
@@ -324,15 +324,21 @@ export default function DepositView({
                 />
               }
               liveWindow={
-                now && lifetime
+                now && lifetime && chain
                   ? () => (
-                      <SinceLastTouch
+                      <PolarisDepositSinceTouchRow
                         market={market}
-                        lastTimestamp={Number(row.last_timestamp)}
+                        recorded={lifetime.recorded}
                         burned={now.pendingLoss}
-                        peth={now.bcSinceTouch}
+                        now={now.now}
                         gain={now.pendingStable}
+                        stashed={lifetime.stashed}
+                        paidIn={now.bcSinceTouch}
                         feed={feed}
+                        fromBlock={Number(lastTouch?.block_number ?? row.last_block)}
+                        fromAt={Number(lastTouch?.block_timestamp ?? row.last_timestamp)}
+                        toAt={chain.blockTimestamp}
+                        headBlock={chain.blockNumber}
                       />
                     )
                   : undefined
@@ -370,69 +376,3 @@ const PAID_IN_VARS = {
   "--flow-debt": PAID_IN_HUES.debt.solid,
   "--flow-debt-label": "var(--color-violet-700)",
 } as CSSProperties;
-
-/** The timeline's head slot (L5, decision 0022 §4): what the pool has done to
- *  the deposit since its last touch, the holder having done nothing, with the
- *  pending pETH valued at the feed now. */
-function SinceLastTouch({
-  market,
-  lastTimestamp,
-  burned,
-  peth,
-  gain,
-  feed,
-}: {
-  market: PolarisMarket;
-  lastTimestamp: number;
-  burned: bigint;
-  peth: bigint;
-  gain: bigint;
-  feed: number | null;
-}) {
-  const s = POLARIS_MARKET_CONFIG[market].stable.symbol;
-  const pethValue = feed != null ? units(peth) * feed : null;
-  const net = pethValue != null ? pethValue + units(gain) - units(burned) : null;
-  const fmt = (n: number) =>
-    `${n < 0 ? "−" : "+"}${Math.abs(n).toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })} ${s}`;
-  return (
-    <details
-      className={`mb-3 rounded-2xl bg-raised px-5 py-3 text-sm ${CARD_INSET_START}`}
-      data-anatomy="L5"
-      data-live-window="polaris-sp-since-touch"
-    >
-      <summary className="cursor-pointer select-none font-semibold">
-        Since its last touch{" "}
-        <span className="font-normal text-rb-500">
-          on {shortDate(lastTimestamp)} {shortDateYear(lastTimestamp)}
-          {net != null ? `: ${fmt(net)} at the feed` : ""}
-        </span>
-      </summary>
-      <ul className="mt-2 space-y-1 text-rb-500">
-        <li data-since-row="burned">
-          Burned since last touch:{" "}
-          <Prov info={spPendingLossProv(market)}>
-            <RawFigure raw={burned} symbol={s} />
-          </Prov>{" "}
-          {s}
-        </li>
-        <li data-since-row="peth">
-          Pending pETH:{" "}
-          <Prov info={spLiveProv("pendingPeth", market)}>
-            <RawFigure raw={peth} symbol={PETH.symbol} />
-          </Prov>{" "}
-          pETH
-          {pethValue != null
-            ? `, ${pethValue.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })} ${s} at the feed`
-            : ""}
-        </li>
-        <li data-since-row="gain">
-          Pending {s} gain:{" "}
-          <Prov info={spLiveProv("stableGain", market)}>
-            <RawFigure raw={gain} symbol={s} />
-          </Prov>{" "}
-          {s}
-        </li>
-      </ul>
-    </details>
-  );
-}
