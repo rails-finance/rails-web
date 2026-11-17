@@ -267,28 +267,72 @@ export function LiquityForkEventCard({ event, isLast, eventNumber, fork }: Liqui
       });
     return legs;
   })();
+  // A Trove transfer, drawn as Liquity V2 draws it: the NFT changed hands, so
+  // the Trove's collateral and debt went with it. Each wears the custody
+  // badge, its figure on the flank the holder's side moved by (rails-ops
+  // decision 0045, "Ruled since"). An empty Trove keeps the custody disc.
+  const isTransfer = et === "transferTrove";
+  const transferRows = ((): SpineTokenRow[] | undefined => {
+    if (!isTransfer || !ctx.transfer) return undefined;
+    const coll = Number(ctx.collAfter) || 0;
+    const debt = Number(ctx.debtAfter) || 0;
+    const sent = ctx.transfer.toAddress.toLowerCase() !== event.wallet?.toLowerCase();
+    const direction = sent ? ("left" as const) : ("right" as const);
+    const verb = sent ? "transferred out" : "transferred in";
+    const rows: SpineTokenRow[] = [
+      ...(coll > 0
+        ? [
+            {
+              symbol: ctx.collateralSymbol,
+              address: soleFlowAddress(event.flows, ctx.collateralSymbol),
+              badge: "send" as const,
+              direction,
+              value: coll,
+              verb,
+            },
+          ]
+        : []),
+      ...(debt >= FORK_DEBT_DUST_FLOAT
+        ? [
+            {
+              symbol: debtSymbol,
+              address: soleFlowAddress(event.flows, debtSymbol),
+              badge: "send" as const,
+              direction,
+              value: debt,
+              verb,
+            },
+          ]
+        : []),
+    ];
+    return rows.length > 0 ? rows : undefined;
+  })();
   const spine: SpineColumnProps = isWarning
     ? { icon: "warning", warningTone: isLiq ? "critical" : "caution", warningLegs, isLast: !!isLast }
-    : isPendingDebt
-      ? { icon: "warning", warningTone: "caution", warningLegs: pendingLegs, isLast: !!isLast }
-      : isNoChange
-        ? { icon: "no-change", isLast: !!isLast }
-        : isDelegate
-          ? {
-              icon: "delegate",
-              iconDirection: et === "setInterestBatchManager" ? "up" : "down",
-              ...rateFlank,
-              isLast: !!isLast,
-            }
-          : isRateChange
+    : isTransfer
+      ? transferRows
+        ? { tokens: transferRows, isLast: !!isLast }
+        : { icon: "custody", isLast: !!isLast }
+      : isPendingDebt
+        ? { icon: "warning", warningTone: "caution", warningLegs: pendingLegs, isLast: !!isLast }
+        : isNoChange
+          ? { icon: "no-change", isLast: !!isLast }
+          : isDelegate
             ? {
-                icon: "rate-change",
-                iconDirection:
-                  rateSpan && rateSpan[1] !== rateSpan[0] ? (rateSpan[1] > rateSpan[0] ? "up" : "down") : undefined,
+                icon: "delegate",
+                iconDirection: et === "setInterestBatchManager" ? "up" : "down",
                 ...rateFlank,
                 isLast: !!isLast,
               }
-            : { tokens: tokens.length > 0 ? tokens : undefined, ...(isOpenEvent ? rateFlank : {}), isLast: !!isLast };
+            : isRateChange
+              ? {
+                  icon: "rate-change",
+                  iconDirection:
+                    rateSpan && rateSpan[1] !== rateSpan[0] ? (rateSpan[1] > rateSpan[0] ? "up" : "down") : undefined,
+                  ...rateFlank,
+                  isLast: !!isLast,
+                }
+              : { tokens: tokens.length > 0 ? tokens : undefined, ...(isOpenEvent ? rateFlank : {}), isLast: !!isLast };
 
   // ── T2 ──
   const terms = fork.words.terms;
@@ -380,9 +424,12 @@ export function LiquityForkEventCard({ event, isLast, eventNumber, fork }: Liqui
     head,
     caption,
     // A batch manager moved the rate, or the protocol applied pending debt:
-    // not the owner's act.
+    // not the owner's act. A transfer states its counterparty in the head's
+    // words; one received runs dotted, as on Liquity V2.
     actor:
-      ctx.eventType === "setBatchManagerAnnualInterestRate" || ctx.eventType === "applyPendingDebt"
+      ctx.eventType === "setBatchManagerAnnualInterestRate" ||
+      ctx.eventType === "applyPendingDebt" ||
+      (isTransfer && ctx.transfer?.toAddress.toLowerCase() === event.wallet?.toLowerCase())
         ? { byOwner: false }
         : undefined,
     sheet,

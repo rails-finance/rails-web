@@ -1,9 +1,8 @@
-// The receipt on a fork Trove page's "last holder" (ui-jobs 717, interim):
-// the TroveNFT's wallet-to-wallet transfers, oldest first, from the one-Trove
-// read (rails-server /api/<fork>/troves?troveId=&former=1, mig 485's
-// <fork>_trove_nft_transfers over the branch TroveNFT's Transfer logs). Until
-// the fork timelines carry transfer rows, this is where the change of hands
-// the prefix states can be checked.
+// The receipt on a fork Trove page's "last holder": the TroveNFT's
+// wallet-to-wallet transfers, oldest first, from the one-Trove read
+// (rails-server /api/<fork>/troves?troveId=&former=1, mig 485's
+// <fork>_trove_nft_transfers over the branch TroveNFT's Transfer logs). The
+// timeline draws each of them as a "Transferred" row.
 
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import { CHAINS, explorerUrl, type ChainId } from "@/lib/shared/chains";

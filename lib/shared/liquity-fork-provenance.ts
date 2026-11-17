@@ -1110,9 +1110,24 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     ],
   });
 
+  // ── A transfer row's counterparty: the TroveNFT's Transfer log ────────────
+  const transferPartyProv = (dir: "to" | "from", coords?: LiquityForkCoords): Provenance => ({
+    kind: "chain",
+    pclass: "emitted",
+    verify: txVerify(coords),
+    summary:
+      dir === "to"
+        ? `The account the Trove passed to, named as the receiver in the TroveNFT's Transfer log. Holding the NFT is holding the Trove; no collateral or ${cfg.stablecoin} moved.`
+        : `The account the Trove came from, named as the sender in the TroveNFT's Transfer log. Holding the NFT is holding the Trove; no collateral or ${cfg.stablecoin} moved.`,
+    contract: { name: "TroveNFT" },
+    via: `captured ${cfg.protocolName} TroveNFT transfers (${cfg.tablePrefix}_trove_nft_transfer_*) · Transfer.${dir}`,
+    inputs: eventInputs(coords),
+  });
+
   return {
     collDeltaProv,
     debtDeltaProv,
+    transferPartyProv,
     collAfterProv,
     debtAfterProv,
     collBeforeProv,

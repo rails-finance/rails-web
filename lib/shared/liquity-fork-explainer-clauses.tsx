@@ -1245,6 +1245,37 @@ function eventSlots(
       return { happened: [clause(happened), ownerIdle && clause(ownerIdle)], changed, meansNow };
     }
 
+    case "transferTrove": {
+      // Liquity V2's transfer sentences (content/liquity-v2/event-prose.yaml,
+      // liquity2.transfer): the move, then what the new holder takes over.
+      const tr = ctx.transfer;
+      const holds = hasDebtAfter || collAfter > 0;
+      return {
+        happened: [
+          clause(
+            tr ? (
+              <>
+                The Trove NFT moved from {shortAddress(tr.fromAddress)} to {shortAddress(tr.toAddress)}.
+              </>
+            ) : (
+              <>The {coll} Trove&rsquo;s ownership was transferred.</>
+            ),
+          ),
+        ],
+        changed:
+          tr && holds
+            ? [
+                clause(
+                  <>
+                    The new holder takes over {debtAfterFig()} of debt against {collAfterFig()} of collateral, unchanged
+                    by the transfer.
+                  </>,
+                ),
+              ]
+            : [],
+      };
+    }
+
     default:
       return {
         happened: [

@@ -12,7 +12,7 @@
 // redistribution's arrival as words.
 
 import type { EbisuContext, AsymmetryContext, BasedollarContext, OriginEnvelope } from "@/lib/shared/types/event-shape";
-import type { ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
+import { PartyChip, type ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import type { LiquityForkCoords, DeltaOps, LiquityForkLiquidationLeg } from "@/lib/shared/liquity-fork-provenance";
@@ -45,6 +45,8 @@ export interface LiquityForkHeaderBuilders {
     coords: LiquityForkCoords,
     vals: { fee?: string; batchFee: string; shares?: string; totalShares: string },
   ) => Provenance;
+  /** A transfer row's counterparty, off the TroveNFT's Transfer log. */
+  transferPartyProv: (dir: "to" | "from", coords?: LiquityForkCoords) => Provenance;
   /** A Liquidation log's leg; the head reads the surplus. */
   liquidationLegProv?: (
     coords: LiquityForkCoords,
@@ -84,6 +86,18 @@ function clauseNode(
           <span className="font-bold text-pink-500">{c.delegate}</span>
         </Prov>
       </span>
+    );
+  // A transfer's counterparty, as Liquity V2's head names it.
+  if ("dir" in c)
+    return (
+      <PartyChip
+        party={{
+          prefix: c.lead,
+          address: c.address,
+          prov: builders.transferPartyProv(c.dir, coords),
+          ens: true,
+        }}
+      />
     );
   // The one figure the head states: the collateral the holder can claim.
   const amount = ctx.liquidation?.collSurplus ?? String(c.surplus);
