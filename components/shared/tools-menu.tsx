@@ -104,9 +104,9 @@ export function ToolsMenuItem({
   );
 }
 
-/** The menu's keys (C17 and the event card's ⋮): the arrows, Home and End move
- *  between the rows. */
-function moveFocus(e: React.KeyboardEvent<HTMLElement>) {
+/** The menu's keys (C17, the event card's ⋮ and the wallet heading's positions
+ *  menu): the arrows, Home and End move between the rows. */
+export function moveFocus(e: React.KeyboardEvent<HTMLElement>) {
   const keys = ["ArrowDown", "ArrowUp", "Home", "End"];
   if (!keys.includes(e.key)) return;
   const items = [
