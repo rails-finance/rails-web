@@ -199,6 +199,9 @@ interface LiquityFamilyCardOps {
   positionContent: (v: LiquityTroveView, o?: { shutDown?: boolean }) => LearnMoreContent;
   /** The branch's collateral token, for the headline icon's popover. */
   collateralAddress: (collateralType: string) => string | undefined;
+  /** The branch's collateral symbol, the position name's market ("WETH" for a
+   *  "weth" URL key); the key itself where no branch resolves. */
+  collateralSymbol: (collateralType: string) => string;
   /** The deployment's stablecoin. */
   debtAddress: string | undefined;
 }
@@ -214,6 +217,7 @@ const v2Ops: LiquityFamilyCardOps = {
   peakCollateralProv: () => trovePeakCollProv,
   peakDebtProv: () => trovePeakDebtProv,
   collateralAddress: (ct) => LIQUITY_V2_BRANCHES[ct.toLowerCase()]?.collateralAddr,
+  collateralSymbol: (ct) => LIQUITY_V2_BRANCHES[ct.toLowerCase()]?.symbol ?? ct,
   debtAddress: getTokenAddress("BOLD") ?? undefined,
   positionContent: (v) =>
     liquityPositionContent({ collateralType: v.collateralType, status: v.status, isBatched: v.isBatched }),
@@ -226,7 +230,9 @@ interface ForkCardDeps {
   shortId: (id: string) => string;
   resolveBranch: (
     collateralType: string | undefined | null,
-  ) => { priceFeed: string; collateralAddr: string; mcr: number; mcrBefore?: readonly ForkMcrStep[] } | undefined;
+  ) =>
+    | { symbol: string; priceFeed: string; collateralAddr: string; mcr: number; mcrBefore?: readonly ForkMcrStep[] }
+    | undefined;
   /** The deployment's stablecoin. */
   debtAddress: string;
   /** Fallback PriceFeed address for the receipt's contract identity when the
@@ -292,6 +298,7 @@ function makeForkCardOps(protocol: ForkProtocol, deps: ForkCardDeps): LiquityFam
   return {
     shortId: deps.shortId,
     collateralAddress: (ct) => deps.resolveBranch(ct)?.collateralAddr,
+    collateralSymbol: (ct) => deps.resolveBranch(ct)?.symbol ?? ct,
     debtAddress: deps.debtAddress,
     mcrPct: (ct) => {
       const mcr = deps.resolveBranch(ct)?.mcr;
@@ -709,7 +716,7 @@ export function useLiquityCardSlots({
             : null;
 
   // The position's name (ui-jobs 703): the branch's collateral and the Trove id.
-  const name = positionName({ market: ct, noun: POSITION_NOUN[protocol], id: v.id });
+  const name = positionName({ market: ops.collateralSymbol(ct), noun: POSITION_NOUN[protocol], id: v.id });
   // The listing names the owner; the delegate shows under Interest rate. The
   // page's wallet row names the owner, so the detail heading carries the id.
   const identity = detail ? (

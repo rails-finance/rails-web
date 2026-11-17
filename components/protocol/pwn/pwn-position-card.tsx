@@ -13,7 +13,7 @@
 // captured on-chain. There is no health factor, no USD, no liquidation price — a
 // fixed-term loan has none; they'd be interpreted figures, absent from this baseline.
 
-import { POSITION_NOUN } from "@/lib/shared/protocols";
+import { positionNounOne } from "@/lib/shared/protocols";
 import { PositionNameId } from "@/components/shared/position-name-id";
 import { positionName } from "@/lib/shared/position-name";
 import type { ReactNode } from "react";
@@ -519,9 +519,8 @@ export function pwnCardSlots({
   // listing the whole card is already a <Link>, so it keeps compact text (a
   // nested anchor is invalid HTML) with the standalone star, after the loan's
   // number.
-  // The loan's name (ui-jobs 703). POSITION_NOUN's "Loans" names the page's
-  // list; one loan is a "Loan".
-  const name = positionName({ noun: POSITION_NOUN.pwn.replace(/s$/, ""), id: v.loanId });
+  // The loan's name (ui-jobs 703).
+  const name = positionName({ noun: positionNounOne("pwn"), id: v.loanId });
   const showLender = v.lender != null && !(side === "lender");
   const showBorrower = v.borrower != null && !(side === "borrower");
   const identity = detail ? (

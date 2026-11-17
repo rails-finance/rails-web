@@ -8,6 +8,7 @@ import type { OraclePricesData } from "@/types/api/oracle";
 import { FocusSourceGate } from "@/components/shared/aim-gate";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import EventView from "./event-view";
+import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
 
 interface Props {
   params: Promise<{ collateralType: string; troveId: string; eventId: string }>;
@@ -44,7 +45,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return eventMetadata({
     session: "liquity-v2",
     subject: troveId,
-    market: collateralType,
+    market: LIQUITY_V2_BRANCHES[collateralType.toLowerCase()]?.symbol ?? collateralType,
     canonicalPath: `/ethereum/liquity-v2/trove/${collateralType}/${troveId}/event/${encodeURIComponent(decoded)}`,
     event: event ? { actionLabel: contract?.heading ?? event.actionLabel, timestamp: event.timestamp } : null,
     description: contract?.description,

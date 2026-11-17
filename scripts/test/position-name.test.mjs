@@ -8,15 +8,18 @@ const { shortPositionId, listingTagId, marketPair, spacePair, positionName, posi
   "../../lib/shared/position-name.ts"
 );
 
-test("a decimal id of up to six digits reads #n", () => {
+test("a decimal id of up to ten digits reads #n", () => {
   assert.equal(shortPositionId("31245"), "#31245");
   assert.equal(shortPositionId(7), "#7");
   assert.equal(shortPositionId("999999"), "#999999");
+  // A Uniswap V3 NFT id: cutting it 6…4 would make it longer.
+  assert.equal(shortPositionId("1052345"), "#1052345");
+  assert.equal(shortPositionId("9999999999"), "#9999999999");
   assert.equal(shortPositionId("#1234"), "#1234");
 });
 
-test("a decimal id above six digits keeps its first six and last four", () => {
-  assert.equal(shortPositionId("1000000"), "100000…0000");
+test("a decimal id above ten digits keeps its first six and last four", () => {
+  assert.equal(shortPositionId("10000000000"), "100000…0000");
   assert.equal(shortPositionId("16571820918265732190897651302456713289076543216784323211234566943"), "165718…6943");
   assert.equal(shortPositionId(BigInt("12345678901")), "123456…8901");
 });

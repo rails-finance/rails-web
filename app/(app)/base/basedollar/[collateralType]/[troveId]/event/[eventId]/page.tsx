@@ -4,6 +4,7 @@ import { servedFoldersFromParam } from "@/lib/shared/timeline-folder";
 import { liquityForkEventHeading, liquityForkEventPageDescription } from "@/lib/liquity-fork/explorer";
 import { loadBasedollarTroveTail } from "@/lib/basedollar/trove-page-data";
 import BasedollarTrovePage from "../../page";
+import { resolveBranch } from "@/lib/basedollar/asset-catalog";
 
 interface Props {
   params: Promise<{ collateralType: string; troveId: string; eventId: string }>;
@@ -36,7 +37,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
     subject: troveId,
     // Matches the page's own `generateMetadata` exactly — the branch symbol
     // alone, not paired with the debt symbol.
-    market: collateralType,
+    market: resolveBranch(collateralType)?.symbol ?? collateralType,
     canonicalPath: `/base/basedollar/${collateralType}/${troveId}/event/${encodeURIComponent(decoded)}`,
     event: event ? { actionLabel: liquityForkEventHeading(event, "basedollar"), timestamp: event.timestamp } : null,
     description: event

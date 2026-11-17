@@ -7,6 +7,7 @@ import { positionMetadata } from "@/lib/shared/page-metadata";
 import { servedFoldersFromParam } from "@/lib/shared/timeline-folder";
 import { loadAsymmetryTroveTail } from "@/lib/asymmetry/trove-page-data";
 import AsymmetryTroveDetail from "./trove-view";
+import { resolveBranch } from "@/lib/asymmetry/asset-catalog";
 
 interface Props {
   params: Promise<{ collateralType: string; troveId: string }>;
@@ -33,7 +34,7 @@ export async function generateMetadata({
   return positionMetadata({
     session: "asymmetry",
     subject: troveId,
-    market: collateralType,
+    market: resolveBranch(collateralType)?.symbol ?? collateralType,
     canonicalPath: `/ethereum/asymmetry/${collateralType}/${troveId}`,
     // This route carries its own opengraph-image.tsx, rendering this trove's
     // live card — the static per-explorer PNG stays only its fallback.

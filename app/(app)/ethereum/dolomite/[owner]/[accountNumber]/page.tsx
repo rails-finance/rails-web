@@ -24,7 +24,7 @@ const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 
 // Moved down from the layout: the page is the segment that fetches, so it is the
 // segment that can describe what it fetched. The id is the account number
-// (ui-jobs 703): "Dolomite account #0", "Dolomite account 0xd010…e722".
+// (ui-jobs 703): "Dolomite · Account #0", "Dolomite · Account 0xd010…e722".
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { owner, accountNumber } = await params;
   // This route carries its own opengraph-image.tsx, rendering this account's

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { morphoEventPageDescription, morphoEventPageTitle } from "@/lib/morpho/explorer";
-import { loadMorphoBaseTail } from "@/lib/morpho-base/position-page-data";
+import { loadMorphoBaseTail, morphoBaseTailMarket } from "@/lib/morpho-base/position-page-data";
 import { isMorphoBaseMarketSegment } from "@/lib/morpho-base/routes";
 import { rehydrateChainTimelineWire } from "@/lib/shared/timeline-wire";
 import { isMorphoEvent } from "@/lib/shared/types/event-shape";
@@ -26,11 +26,12 @@ export const dynamic = "force-dynamic";
  *  this market's own group. */
 async function findMorphoBaseEvent(wallet: string, market: string, decodedId: string) {
   const tail = await loadMorphoBaseTail(wallet);
-  if (!tail.timeline) return null;
+  const pair = morphoBaseTailMarket(tail.head, market);
+  if (!tail.timeline) return { event: null, pair };
   const rehydrated = rehydrateChainTimelineWire(tail.timeline) as MorphoChainTimelineResponse;
   const pos = rehydrated.positions?.find((p) => p.marketId.toLowerCase() === market);
-  if (!pos) return null;
-  return pos.events.filter(isMorphoEvent).find((e) => e.id === decodedId) ?? null;
+  if (!pos) return { event: null, pair };
+  return { event: pos.events.filter(isMorphoEvent).find((e) => e.id === decodedId) ?? null, pair };
 }
 
 const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
@@ -42,14 +43,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const wallet = rawWallet.toLowerCase();
   const market = rawMarket?.toLowerCase();
   const decoded = decodeEventId(eventId);
-  const event =
+  const found =
     ADDRESS.test(rawWallet) && isMorphoBaseMarketSegment(market)
       ? await findMorphoBaseEvent(wallet, market, decoded)
       : null;
+  const event = found?.event ?? null;
   return eventMetadata({
     session: "morpho-base",
     subject: wallet,
-    market: `${(market ?? rawMarket).slice(0, 10)}…`,
+    market: found?.pair ?? `${(market ?? rawMarket).slice(0, 10)}…`,
     canonicalPath: `/base/morpho/${wallet}/${market ?? rawMarket}/event/${encodeURIComponent(decoded)}`,
     event: event ? { actionLabel: morphoEventPageTitle(event), timestamp: event.timestamp } : null,
     description: event ? morphoEventPageDescription("base", wallet, event.timestamp) : undefined,

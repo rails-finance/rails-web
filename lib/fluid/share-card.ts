@@ -6,8 +6,7 @@
 
 import type { FluidPositionSummary } from "@/lib/sources/api/fluid-positions";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
-import { poolShareLabel } from "@/lib/fluid/asset-catalog";
-import { marketPair } from "@/lib/shared/position-name";
+import { pairLabel, poolShareLabel } from "@/lib/fluid/asset-catalog";
 import type { PositionCardModel } from "@/lib/share/position-card";
 import { formatCompact } from "@/lib/shared/format-compact";
 
@@ -20,10 +19,7 @@ function legName(symbol: string | null, poolPair: [string, string] | null): stri
 
 /** The pair off the tail alone, "wstETH / USDC": the market a tab title names. */
 export function fluidTailPair(position: FluidPositionSummary): string {
-  return marketPair(
-    legName(position.supplySymbol, position.supplyPoolPair),
-    legName(position.borrowSymbol, position.borrowPoolPair),
-  );
+  return pairLabel(position.supplySymbol, position.borrowSymbol, position.supplyPoolPair, position.borrowPoolPair);
 }
 
 /** A leg's headline figure: the worker's settled overlay when it has landed,

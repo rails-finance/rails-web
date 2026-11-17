@@ -18,12 +18,13 @@ export interface PositionName {
   text: string;
 }
 
-/** The longest decimal id written whole, after "#". */
-const WHOLE_DIGITS = 6;
+/** The longest id written whole: a decimal of up to ten digits after "#"; a
+ *  cut 6…4 is no shorter than that. */
+const WHOLE_DIGITS = 10;
 
 const cut = (s: string) => `${s.slice(0, 6)}…${s.slice(-4)}`;
 
-/** A position's id as every surface shows it. A decimal of up to six digits
+/** A position's id as every surface shows it. A decimal of up to ten digits
  *  reads "#31245"; a longer decimal and any hex id or address keep their first
  *  six and last four characters ("165712…6943", "0x3df8…67da"). Anything else
  *  (an ENS name, an id already cut) passes through. A leading "#" on the input
@@ -31,7 +32,7 @@ const cut = (s: string) => `${s.slice(0, 6)}…${s.slice(-4)}`;
 export function shortPositionId(raw: string | number | bigint): string {
   const s = String(raw).trim().replace(/^#/, "");
   if (/^\d+$/.test(s)) return s.length <= WHOLE_DIGITS ? `#${s}` : cut(s);
-  if (/^0x[0-9a-fA-F]+$/.test(s) && s.length > 10) return cut(s);
+  if (/^0x[0-9a-fA-F]+$/.test(s) && s.length > WHOLE_DIGITS) return cut(s);
   return s;
 }
 

@@ -1384,6 +1384,15 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   "balancer-v3-arbitrum": "Position",
 };
 
+/** One position where POSITION_NOUN names a page's list: a PWN page lists a
+ *  wallet's "Loans", and one of them is a "Loan" (ui-jobs 703). */
+const POSITION_NOUN_ONE: Partial<Record<SessionProtocol, string>> = { pwn: "Loan" };
+
+/** The noun for one position, in its name ("Loan #60", "Vault #21264"). */
+export function positionNounOne(session: SessionProtocol): string {
+  return POSITION_NOUN_ONE[session] ?? POSITION_NOUN[session];
+}
+
 /** The listing-tab vocabulary: the position noun pluralised ("Troves",
  *  "Vaults", "Accounts"). PWN's noun is already the plural "Loans" (its
  *  per-wallet page lists many discrete loans), so a noun ending in "s" is
