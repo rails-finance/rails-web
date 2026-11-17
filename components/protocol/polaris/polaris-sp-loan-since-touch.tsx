@@ -42,7 +42,10 @@ import {
 import type { PolarisLoanEventRow } from "@/lib/sources/api/polaris-sp-loans";
 
 const ZERO = BigInt(0);
-const SINCE = "Since its last touch";
+/** The head's words, the CDP's (lib/polaris/since-last-touch.ts): where the
+ *  last touch is the open, the window is the whole life. */
+const sinceLabel = (sinceOpen: boolean) => (sinceOpen ? "Since its open" : "Since its last touch");
+const sinceWords = (sinceOpen: boolean) => (sinceOpen ? "since its open" : "since the last touch");
 const NEXT = "Before the next touch";
 
 const Signed = ({ value, unit }: { value: number; unit: string }) => (
@@ -76,9 +79,12 @@ function SinceTouchRow({
   fromBlock,
   fromAt,
   toAt,
+  sinceOpen,
   sheet,
 }: {
   marker: string;
+  /** The last touch is the open. */
+  sinceOpen: boolean;
   /** What the figure is: a bare number read as nothing. */
   caption: string;
   figure: number | null;
@@ -92,14 +98,15 @@ function SinceTouchRow({
   sheet: EventSheet;
 }) {
   const elapsed = formatDuration(fromAt, toAt);
+  const since = sinceLabel(sinceOpen);
   return (
     <NoteRowShell
       icon="live-window"
-      label={figure != null ? `${SINCE}: ${signedNum(figure)} ${unit} ${caption}` : SINCE}
+      label={figure != null ? `${since}: ${signedNum(figure)} ${unit} ${caption}` : since}
       marker={{ attr: "data-live-window", value: marker }}
       header={
         <>
-          <span className="text-sm text-foreground">{SINCE}</span>
+          <span className="text-sm text-foreground">{since}</span>
           {figure != null && figureInfo && (
             <>
               <span className="text-xs text-rb-500">{caption}</span>
@@ -140,6 +147,7 @@ export function PolarisDepositSinceTouchRow({
   fromAt,
   toAt,
   headBlock,
+  sinceOpen,
 }: {
   market: PolarisMarket;
   /** deposits(id): the deposit the last touch recorded. */
@@ -160,6 +168,8 @@ export function PolarisDepositSinceTouchRow({
   fromAt: number;
   toAt: number;
   headBlock: number;
+  /** The deposit's one operation is its open. */
+  sinceOpen: boolean;
 }) {
   const stable = POLARIS_MARKET_CONFIG[market].stable;
   const s = stable.symbol;
@@ -202,7 +212,7 @@ export function PolarisDepositSinceTouchRow({
     kind: "chain-derived",
     pclass: "state",
     summary: `Deposit before the next touch — the deposit now, getCompoundedStableTokenDeposit(id), plus the ${s} gain pending, getDepositorStableTokenGainWithPending(id), ${atHead}: what the next touch starts from before it claims or moves anything.`,
-    formula: "deposit at the last touch − burned + gain",
+    formula: "getCompoundedStableTokenDeposit(id) + gain",
     inputs: [
       { label: "deposit now", value: exactUnits(now), kind: "chain", pclass: "state" },
       { label: `${s} gain since last touch`, value: exactUnits(gain), kind: "chain", pclass: "state" },
@@ -298,20 +308,21 @@ export function PolarisDepositSinceTouchRow({
               <Prov info={spFeedProv(market)} value={String(feed)}>
                 {formatNumber(feed)}
               </Prov>{" "}
-              {s}: the pETH paid in since the last touch is{" "}
+              {s}, so the pETH paid in is{" "}
               <Prov info={pethValueProv} value={String(pethValue)}>
                 {formatNumber(pethValue)}
               </Prov>{" "}
-              {s}. With the gain, less the burn,
+              {s}.
             </>
           ) : (
-            <>No liquidation has paid the deposit pETH since its last touch. With the gain, less the burn,</>
+            <>No liquidation has paid the deposit pETH.</>
           )}{" "}
-          the deposit has moved{" "}
+          With the gain, less the burn, the deposit has moved{" "}
           <Prov info={netProv} value={String(net)}>
             {signedNum(net)}
           </Prov>{" "}
-          {s} at the feed since its last touch. The next touch writes these figures.
+          {s}
+          {paidIn > ZERO ? " at the feed" : ""} {sinceWords(sinceOpen)}. The next touch writes these figures.
         </>
       ) : (
         "The next touch writes these figures."
@@ -326,6 +337,7 @@ export function PolarisDepositSinceTouchRow({
       figureInfo={netProv}
       figureValue={String(net)}
       unit={s}
+      sinceOpen={sinceOpen}
       fromBlock={fromBlock}
       fromAt={fromAt}
       toAt={toAt}
@@ -407,6 +419,16 @@ export function PolarisLoanSinceTouchRow({ last, chain }: { last: PolarisLoanEve
     ],
   };
 
+  const floorMoveProv: Provenance = {
+    kind: "chain-derived",
+    pclass: "oracle",
+    summary: `Floor's move since the last touch — the bonding curve's floorPrice() ${atHead}, less the floor price the last touch logged with its FeesAccrued index.`,
+    formula: "floorPrice() now − floor at the last touch",
+    inputs: [
+      { label: "floor now", value: exactUnits(floorNow), kind: "chain", pclass: "oracle" },
+      { label: "floor at the last touch", value: exactUnits(floorThen), kind: "chain", pclass: "emitted" },
+    ],
+  };
   const floorText = (raw: bigint) =>
     units(raw).toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 4 });
   const floorMoved = floorText(floorNow) !== floorText(floorThen);
@@ -421,6 +443,8 @@ export function PolarisLoanSinceTouchRow({ last, chain }: { last: PolarisLoanEve
       },
       change: floorMoved
         ? {
+            info: floorMoveProv,
+            value: exactUnits(floorNow - floorThen),
             text: `${floorNow > floorThen ? "+" : "−"}${floorText(floorNow > floorThen ? floorNow - floorThen : floorThen - floorNow)} WETH`,
           }
         : null,
@@ -430,7 +454,7 @@ export function PolarisLoanSinceTouchRow({ last, chain }: { last: PolarisLoanEve
       key: "at-floor",
       label: "Collateral at the floor",
       value: { text: `${fmt(atFloorNow)} WETH`, info: loanAtFloorProv(), value: exactUnits(atFloorNow) },
-      change: move !== ZERO ? { text: `${signedText(move)} WETH`, info: moveProv } : null,
+      change: move !== ZERO ? { text: `${signedText(move)} WETH`, info: moveProv, value: exactUnits(move) } : null,
       tip: `The loan's ${FPETH.symbol} at the floor price now, beside its move since the last touch.`,
     },
   ];
@@ -491,7 +515,7 @@ export function PolarisLoanSinceTouchRow({ last, chain }: { last: PolarisLoanEve
         <Prov info={changeProv} value={exactUnits(change)}>
           {signedText(change)}
         </Prov>{" "}
-        WETH since the last touch. The next touch writes the debt.
+        WETH {sinceWords(last.event_type === "opened")}. The next touch writes the debt.
       </>
     ),
   };
@@ -503,6 +527,7 @@ export function PolarisLoanSinceTouchRow({ last, chain }: { last: PolarisLoanEve
       figure={units(change)}
       figureInfo={changeProv}
       figureValue={exactUnits(change)}
+      sinceOpen={last.event_type === "opened"}
       unit={W.symbol}
       fromBlock={Number(last.block_number)}
       fromAt={Number(last.block_timestamp)}

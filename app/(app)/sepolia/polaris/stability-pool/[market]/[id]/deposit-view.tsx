@@ -159,6 +159,11 @@ export default function DepositView({
   const olderCount = Math.max(0, total - listed.length);
   // The newest operation the page holds: a transfer is no touch.
   const lastTouch = useMemo(() => listed.findLast((r) => r.event_type !== "transfer") ?? null, [listed]);
+  // The deposit's one operation is its open: the window is its whole life.
+  const sinceOpen = useMemo(
+    () => olderCount === 0 && listed.filter((r) => r.event_type !== "transfer").length === 1,
+    [olderCount, listed],
+  );
 
   const lifetime = useMemo(() => (row ? depositLifetime(row) : null), [row]);
   // The flows and the head row lay the chain over the index only where the
@@ -339,6 +344,7 @@ export default function DepositView({
                         fromAt={Number(lastTouch?.block_timestamp ?? row.last_timestamp)}
                         toAt={chain.blockTimestamp}
                         headBlock={chain.blockNumber}
+                        sinceOpen={sinceOpen}
                       />
                     )
                   : undefined
