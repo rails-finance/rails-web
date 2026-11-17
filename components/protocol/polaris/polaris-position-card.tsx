@@ -75,7 +75,18 @@ import {
   liveUsdValueProv,
   liveDebtUsdProv,
   polarisAnnualCostProv,
+  againstHoldingProv,
+  againstHoldingShareProv,
 } from "@/lib/polaris/live-provenance";
+import {
+  AGAINST_HOLDING_NONE,
+  againstHoldingShareText,
+  isAgainstHoldingNone,
+  type PolarisAgainstHolding,
+  type PolarisAgainstHoldingNone,
+} from "@/lib/polaris/against-holding";
+import { PanelFigure } from "@/components/shared/position-card-panel";
+import { formatPeth } from "@/lib/polaris/figure-format";
 import { PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
 import { POLARIS_WORDS, polarisPositionModal } from "@/lib/polaris/event-templates";
 import { polarisCdpNftUrl, polarisPositionHref } from "@/lib/polaris/routes";
@@ -384,6 +395,58 @@ export interface PolarisPositionCardProps {
   /** The CDP's summed ledger (lib/polaris/economics.ts), for the stats that
    *  sum its touches. Absent on the listing. */
   lifetime?: PolarisLifetime | null;
+  /** "Against holding pETH" (lib/polaris/against-holding.ts): the figure, why
+   *  it is not stated, or "pending" while the head read is in flight. Absent
+   *  on the listing. */
+  againstHolding?: PolarisAgainstHolding | PolarisAgainstHoldingNone | "pending" | null;
+}
+
+/** The "Against holding pETH" stat: the figure in pETH and its share of the
+ *  pETH deposited, each with its receipt; the reason where it is not stated. */
+function againstHoldingRow(
+  r: PolarisAgainstHolding | PolarisAgainstHoldingNone | "pending",
+  market: PolarisMarket,
+  stable: string,
+): PositionPanelRow {
+  const tip =
+    `The pETH the position holds now, withdrew and was left as surplus, less the pETH deposited, plus the ${stable} ` +
+    `borrowed less the ${stable} repaid and owed now, converted to pETH at today's feed price.`;
+  let value: ReactNode;
+  if (r === "pending") value = <div className="h-6 w-24 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />;
+  else if (isAgainstHoldingNone(r))
+    value = (
+      <span className="text-sm font-normal text-rb-500" data-figure="against-holding-none">
+        {AGAINST_HOLDING_NONE[r.none]}
+      </span>
+    );
+  else {
+    const sign = r.gain >= 0 ? "+" : "−";
+    value = (
+      <span data-figure="against-holding">
+        <PanelFigure>
+          <Prov info={againstHoldingProv(r, market)} value={formatExact(r.gain)} symbol={PETH.symbol}>
+            <span>
+              {sign}
+              {formatPeth(Math.abs(r.gain))}
+            </span>
+          </Prov>
+        </PanelFigure>{" "}
+        pETH
+        {r.share != null && (
+          <>
+            {" ("}
+            <PanelFigure>
+              <Prov info={againstHoldingShareProv(r)} value={formatExact(r.share * 100)}>
+                <span>{againstHoldingShareText(r.share)}</span>
+              </Prov>
+            </PanelFigure>{" "}
+            of pETH deposited)
+          </>
+        )}
+      </span>
+    );
+  }
+  return { id: "against-holding", label: "Against holding pETH", tip, value };
 }
 
 /** The Polaris slots for the shared position card: the headlines, the panel,
@@ -397,6 +460,7 @@ export function polarisCardSlots({
   viewHref,
   exports,
   lifetime,
+  againstHolding,
 }: PolarisPositionCardProps): PositionCardSlots {
   const detail = surface === "detail";
   const cfg = POLARIS_MARKET_CONFIG[v.market];
@@ -644,7 +708,8 @@ export function polarisCardSlots({
     learnMore: polarisPositionModal(v.status),
     menu,
   };
-  if (outcome) return { ...detailCommon, outcome };
+  const holding = againstHolding ? againstHoldingRow(againstHolding, v.market, stable) : null;
+  if (outcome) return { ...detailCommon, outcome, ...(holding ? { panel: [[holding], []] } : {}) };
 
   // The panel: the CDP's valuation and the market's mode on the left, what
   // the debt costs and what is pending on the right.
@@ -666,6 +731,7 @@ export function polarisCardSlots({
       ),
     });
   }
+  if (holding) left.push(holding);
   if (v.mcr != null) {
     if (v.defensiveMode) {
       left.push({

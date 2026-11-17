@@ -27,6 +27,8 @@ import {
   polarisSinceLastTouch,
   polarisSinceLastTouchSentence,
 } from "@/lib/polaris/since-last-touch";
+import { polarisAgainstHolding, againstHoldingText, isAgainstHoldingNone } from "@/lib/polaris/against-holding";
+import { formatPeth } from "@/lib/polaris/figure-format";
 import { num, amt, usd, fmtUtc, txCell } from "@/lib/shared/position-markdown";
 import {
   anchorMarketNotes,
@@ -195,6 +197,8 @@ export function polarisPositionToMarkdown(args: PolarisPositionMarkdownArgs): st
     lines.push("");
   }
 
+  lines.push(...againstHoldingSection(events, chain, stable));
+
   const lifetime = events.length > 0 ? polarisLifetime(events) : null;
   if (lifetime && lifetime.rows > 0) {
     lines.push("## Lifetime (summed from the position's own touches)");
@@ -244,6 +248,49 @@ export function polarisPositionToMarkdown(args: PolarisPositionMarkdownArgs): st
   lines.push(...liquidationForensicsSection(events, view.market, stable));
   lines.push(...timelineTable(events, stable, anchoredNotes));
   return lines.join("\n");
+}
+
+/** "Against holding pETH" (ui-jobs 695): the page's figure, its terms, and
+ *  the feed and block it was valued at; where it is not stated, why. */
+function againstHoldingSection(
+  events: BaseActivityEvent[],
+  chain: PolarisChainResponse | null,
+  stable: string,
+): string[] {
+  const r = polarisAgainstHolding(events, chain);
+  if (r == null) return [];
+  const out = ["## Against holding pETH", ""];
+  if (isAgainstHoldingNone(r)) {
+    out.push(
+      r.none === "live-read"
+        ? "The live read was unavailable, so this snapshot carries no figure against holding pETH."
+        : "The index has not reached the position's latest touch, so this snapshot carries no figure against holding pETH.",
+      "",
+    );
+    return out;
+  }
+  const surplus = r.surplusClaimed + r.surplusOwed;
+  out.push(
+    `- **Against holding pETH:** ${againstHoldingText(r, formatPeth)}`,
+    `- **Formula:** (collateral now + withdrawn + surplus − deposited) + (borrowed − repaid − debt now) ÷ feed`,
+    `- **Collateral now:** ${amt(r.collNow)} pETH${r.closed ? " (closed)" : ` (getCDPEntireColl at block ${r.feed.block})`}`,
+    `- **Withdrawn / deposited:** ${amt(r.withdrawn)} / ${amt(r.deposited)} pETH`,
+  );
+  if (surplus > 0)
+    out.push(
+      `- **Liquidation surplus:** ${amt(surplus)} pETH${r.surplusOwed > 0 ? ` (${amt(r.surplusOwed)} still to claim, counted as held)` : " (claimed)"}`,
+    );
+  out.push(
+    `- **Borrowed / repaid:** ${amt(r.borrowed)} / ${amt(r.repaid)} ${stable}`,
+    `- **Debt now:** ${amt(r.debtNow)} ${stable}${r.closed ? " (closed)" : ` (getCDPEntireDebt at block ${r.feed.block}, counted as zero at or below zero)`}`,
+    `- **Feed:** ${amt(r.feed.pethInDebt)} ${stable} per pETH (previewPrice() at block ${r.feed.block})`,
+    `- **Terms:** ${sAmt(r.collTerm)} pETH on the collateral side, ${sAmt(r.debtTerm)} ${stable} on the debt side (${sAmt(r.debtTermPeth)} pETH at the feed)`,
+    "",
+    "Interest, stability gains, reward pETH and PSM shares are in the collateral and debt now. The 0.0375 pETH gas " +
+      "compensation escrow is held outside the collateral and is left out.",
+    "",
+  );
+  return out;
 }
 
 /** The valued breakdown of every liquidation on this CDP — the same legs,
