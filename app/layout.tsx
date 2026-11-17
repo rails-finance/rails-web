@@ -178,14 +178,12 @@ export default function RootLayout({
         <ThemeScript />
         {/* "Already-seen" animation flags — flipped before first paint so CSS
             in globals.css can disable the entrance animations on subsequent
-            visits without a hydration flicker. The hero flag persists across
-            tabs/sessions via localStorage (plays once per browser); the track
-            lines flag is sessionStorage (replays on the first load of each
-            visit, static within the session). */}
+            visits without a hydration flicker. Both flags persist in
+            localStorage: each animation plays once per browser. */}
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "(function(){try{var d=document.documentElement.dataset;if(localStorage.getItem('rails-hero-seen'))d.heroSeen='1';if(sessionStorage.getItem('rails-tracks-seen'))d.tracksSeen='1'}catch(e){}})()",
+              "(function(){try{var d=document.documentElement.dataset;if(localStorage.getItem('rails-hero-seen'))d.heroSeen='1';if(localStorage.getItem('rails-tracks-seen'))d.tracksSeen='1'}catch(e){}})()",
           }}
         />
         {/* The asset preference (ui-jobs 557): marks <html data-asset-scope>

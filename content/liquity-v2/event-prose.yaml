@@ -673,8 +673,8 @@ copy_words:
 # The Trove's words in the shared column (components/shared/event-page-aside.tsx):
 # the facts rows above the shared ones (event, time, block, transaction). The
 # metadata description, whose last words are `timeline_link`, is
-# `description`; {holder} is held_by or last_held_by (a closed Trove's owner is
-# its last one).
+# `description`; {holder} is held_by, or last_held_by for a closed Trove that
+# changed hands.
 page_words:
   description: |-
     One transaction from the {coll_symbol} Trove {trove}, {holder}: event {n|count} of {total|count}, on {day}. The figures are the Trove's state after it.
@@ -786,10 +786,10 @@ trove_words:
     This Trove’s history could not be read.
   history_empty: |-
     No transaction history available
-  last_owner: |-
-    last owner
-  last_owner_hint: |-
-    Last owner (trove closed)
+  last_holder_prefix: |-
+    last holder
+  last_holder_hint: |-
+    The Trove changed hands; this wallet held it when it closed
   price_now_summary: |-
     {coll_type}’s price — Liquity’s on-chain oracle, read now.
   price_now_via: |-

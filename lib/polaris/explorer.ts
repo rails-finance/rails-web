@@ -30,7 +30,9 @@ export interface PolarisEventPageInput extends EventPageSlot {
   /** The NFT's holder now, or the last holder once the CDP is closed; null
    *  while neither read has answered. */
   holder: string | null;
-  closed: boolean;
+  /** The CDP is closed and its NFT passed between two wallets: the holder
+   *  reads "Last holder" only then (ui-jobs 702). */
+  lastHolder: boolean;
 }
 
 /** The event's title: T1's word and the amounts its head states (an
@@ -94,7 +96,7 @@ export function polarisEventPageDescription(market: PolarisMarket, cdpId: string
 }
 
 export const polarisExplorer: ExplorerAdapter<PolarisEventPageInput> = {
-  eventPage: ({ market, cdpId, holder, closed, event, ...slot }) => ({
+  eventPage: ({ market, cdpId, holder, lastHolder, event, ...slot }) => ({
     heading: polarisEventHeading(event),
     title: polarisEventTitle(event),
     facts: [
@@ -104,7 +106,7 @@ export const polarisExplorer: ExplorerAdapter<PolarisEventPageInput> = {
         ? [
             {
               key: "holder",
-              label: closed ? WORDS.last_holder : WORDS.holder,
+              label: lastHolder ? WORDS.last_holder : WORDS.holder,
               value: shortAddress(holder),
               full: holder,
               mono: true,

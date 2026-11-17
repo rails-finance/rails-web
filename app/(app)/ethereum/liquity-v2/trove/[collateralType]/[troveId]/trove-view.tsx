@@ -17,9 +17,10 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import {
   collateralPriceInfo as collateralPriceReceipt,
   closingPriceInfo,
-  LastOwnerPrefix,
+  LastHolderPrefix,
 } from "@/lib/liquity/trove-page-words";
 import { troveWords } from "@/lib/liquity/event-templates";
+import { troveChangedHands } from "@/lib/liquity/event-page";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { TroveSummary, TrovesResponse } from "@/types/api/trove";
 import { TroveBody, useTroveFlows } from "@/components/trove/TroveBody";
@@ -263,6 +264,8 @@ export default function TroveView({
   // (lib/shared/event-order.ts: the block's position, then the log inside one
   // transaction).
   const liquityEvents = useMemo(() => events.filter(isLiquityEvent).sort(compareEventsInOrder), [events]);
+  // "last holder" only on a closed Trove that changed hands (ui-jobs 702).
+  const changedHands = useMemo(() => troveChangedHands(events), [events]);
 
   // A liquidated trove's surplus: claimable or claimed, read at the head
   // (the index records the credit, never the claim).
@@ -504,7 +507,10 @@ export default function TroveView({
             owner={{
               wallet: effectiveOwner,
               ensName: troveData?.ownerEns ?? null,
-              prefix: effectiveOwner && effectiveOwner !== troveData?.owner ? <LastOwnerPrefix /> : undefined,
+              prefix:
+                effectiveOwner && effectiveOwner !== troveData?.owner && changedHands ? (
+                  <LastHolderPrefix />
+                ) : undefined,
             }}
             assets={stripAssets}
             closed={troveData.status !== "open"}
