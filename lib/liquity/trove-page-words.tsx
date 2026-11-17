@@ -43,3 +43,9 @@ export function LastHolderPrefix() {
     </span>
   );
 }
+
+/** A listing row's words for a Trove the wallet searched for held and moved
+ *  on: the word before the receiving wallet, and its tip (ui-jobs 705). */
+export function movedToWords(day: string): { prefix: string; hint: string } {
+  return { prefix: troveWords("moved_to_prefix"), hint: troveWords("moved_to_hint", { day }) };
+}

@@ -790,6 +790,10 @@ trove_words:
     last holder
   last_holder_hint: |-
     The Trove changed hands; this wallet held it when it closed
+  moved_to_prefix: |-
+    moved to
+  moved_to_hint: |-
+    This wallet held the Trove until {day}, then sent its TroveNFT to the wallet shown.
   price_now_summary: |-
     {coll_type}’s price — Liquity’s on-chain oracle, read now.
   price_now_via: |-

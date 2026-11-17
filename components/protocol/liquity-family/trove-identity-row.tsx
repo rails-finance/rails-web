@@ -1,6 +1,8 @@
 "use client";
 
 import { troveWords } from "@/lib/liquity/event-templates";
+import { formatDate } from "@/lib/date";
+import { movedToWords } from "@/lib/liquity/trove-page-words";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { useState } from "react";
 import { Image as ImageIcon, Link2 } from "lucide-react";
@@ -35,6 +37,7 @@ export function TroveIdentityRow({
   showOwner = true,
   inert = false,
   changedHands = false,
+  formerHold = null,
 }: {
   protocol: LiquityFamilyId;
   troveId?: string;
@@ -68,6 +71,9 @@ export function TroveIdentityRow({
    *  then; a listing row has no transfer history, so it never draws it
    *  (ui-jobs 702). */
   changedHands?: boolean;
+  /** A listing filtered to a wallet that held this Trove and moved it on:
+   *  the row names the wallet it went to (ui-jobs 705). */
+  formerHold?: { movedTo: string; movedAt: number } | null;
 }) {
   const [copiedTrove, setCopiedTrove] = useState(false);
   const troveLabel = troveId ? shortId(troveId) : null;
@@ -78,6 +84,18 @@ export function TroveIdentityRow({
   const isLastHolder = closedOwner && changedHands;
 
   if (!troveLabel && !nftUrl && !ownerAddress) return null;
+
+  const moved = formerHold ? movedToWords(formatDate(formerHold.movedAt)) : null;
+  if (inert && formerHold && moved) {
+    return (
+      <span className="inline-flex min-w-0 items-center gap-1.5 text-xs text-rb-500" data-moved-to={formerHold.movedTo}>
+        <RevealTip tip={moved.hint} focusable className="text-rb-400 focus-ring rounded-sm">
+          {moved.prefix}
+        </RevealTip>
+        <WalletPill wallet={formerHold.movedTo} ensName={null} filterProtocol={protocol} bookmark={showBookmark} />
+      </span>
+    );
+  }
 
   if (inert) {
     // The Trove ID sits at the card's right end (the listing `tag`).

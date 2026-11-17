@@ -93,7 +93,12 @@ export function liquityV2HolderCardModel(
   prices: OraclePricesData | null,
   perPage: number,
   subject: string,
+  /** The answer's count of Troves the wallet passed on (ui-jobs 705). */
+  passedOn = 0,
 ): PositionCardModel | null {
+  // A Trove the wallet passed on is not its holding.
+  rows = rows.filter((t) => !t.formerHold);
+  total -= passedOn;
   if (rows.length === 0 || !prices) return null;
   return holderCardModel(liquityV2HolderStrip(rows, total, prices, perPage), {
     session: "liquity-v2",

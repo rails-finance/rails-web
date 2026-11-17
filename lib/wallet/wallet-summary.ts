@@ -21,6 +21,9 @@ export interface WalletSummaryProtocol {
   open: number;
   /** Closed, liquidated or redeemed. */
   closed: number;
+  /** Held and passed to another wallet (ui-jobs 705); absent in a summary
+   *  kept before it was counted. */
+  moved?: number;
   /** The position's page when the protocol holds one position; otherwise absent. */
   href?: string;
 }
@@ -55,6 +58,7 @@ function fromCounts(c: WalletCounts, readAt: number): WalletSummary {
       name: entry?.label ?? f.family,
       open: f.open,
       closed: f.closed,
+      moved: f.moved,
       ...(held.length === 1 ? { href: held[0].href } : {}),
     };
   }

@@ -124,3 +124,25 @@ test("the footer and the wallet view's tip", () => {
   assert.equal(MENU_TESTNETS, "Testnets not included");
   assert.equal(WALLET_COUNTS_SCOPE, "Counts mainnet positions; the Sepolia testnet is not counted.");
 });
+
+test("a position passed to another wallet counts as moved, never open or closed (ui-jobs 705)", () => {
+  const m = menu(
+    [
+      pos("liquity-v2", "open", 1),
+      pos("liquity-v2", "moved", 2),
+      pos("aave-v3", "closed", 3),
+      pos("aave-v3", "moved", 4),
+    ],
+    "/x",
+  );
+  const liquity = m.rows.find((r) => r.key === "ethereum:liquity-v2");
+  assert.deepEqual([liquity.open, liquity.closed, liquity.moved, liquity.counts], [1, 0, 1, "1 open · 1 moved"]);
+  const aave = m.rows.find((r) => r.key === "ethereum:aave-v3");
+  assert.deepEqual([aave.open, aave.closed, aave.moved, aave.counts], [0, 1, 1, "1 closed · 1 moved"]);
+  // A row of moved positions alone sorts with the rows that hold nothing open.
+  const onlyMoved = menu([pos("aave-v3", "open", 1), pos("liquity-v2", "moved", 2)], "/x");
+  assert.deepEqual(
+    onlyMoved.rows.map((r) => r.counts),
+    ["1 open", "1 moved"],
+  );
+});

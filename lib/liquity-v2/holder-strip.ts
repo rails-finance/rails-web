@@ -115,7 +115,13 @@ export function liquityV2HolderStrip(
   total: number,
   prices: OraclePricesData,
   perPage: number,
+  /** The answer's count of Troves the wallet passed on, all pages. */
+  passedOn = 0,
 ): HolderStripProps {
+  // A Trove the wallet passed on (formerHold, ui-jobs 705) is not its
+  // holding: left out of the counts, the sums and the total.
+  rows = rows.filter((t) => !t.formerHold);
+  total -= passedOn;
   const open = rows.filter((t) => t.status === "open");
   const counts = {
     open: open.length,

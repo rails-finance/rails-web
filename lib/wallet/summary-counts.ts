@@ -14,7 +14,8 @@ export interface WalletCountsPosition {
   chain: WalletCountsChain;
   family: string;
   positionId: string;
-  status: "open" | "closed" | "liquidated" | "redeemed";
+  /** `moved`: a position the wallet held and passed on (ui-jobs 705). */
+  status: "open" | "closed" | "liquidated" | "redeemed" | "moved";
   href: string;
 }
 
@@ -25,6 +26,8 @@ export interface WalletCountsFamily {
   open: number;
   /** Closed, liquidated or redeemed. */
   closed: number;
+  /** Held and passed to another wallet (ui-jobs 705). */
+  moved: number;
 }
 
 export interface WalletCounts {
@@ -34,6 +37,8 @@ export interface WalletCounts {
   total: number;
   open: number;
   closed: number;
+  /** Held and passed to another wallet (ui-jobs 705). */
+  moved: number;
   /** The chains the positions are on. */
   chains: WalletCountsChain[];
   readAt: number;
@@ -99,7 +104,9 @@ export interface WalletProtocolRow<P extends WalletCountsPosition> {
   first: P;
   open: number;
   closed: number;
-  /** "1 open", "2 closed", "1 open · 2 closed". */
+  /** Passed to another wallet (ui-jobs 705); never open or closed. */
+  moved: number;
+  /** "1 open", "2 closed", "1 open · 2 closed", "1 open · 1 moved". */
   counts: string;
   /** The one position's page; past one, the listing searched by the wallet,
    *  else the wallet view. */
@@ -113,7 +120,8 @@ export interface WalletProtocolRow<P extends WalletCountsPosition> {
 /** The positions menu under the wallet heading (H13.2; Miles 17 Nov 2026,
  *  ui-jobs 701): one row per protocol and chain the wallet holds positions
  *  in, those with an open position first, each group in roster order; closed
- *  counts closed, liquidated and redeemed, as the counts do. Null when the
+ *  counts closed, liquidated and redeemed, as the counts do, and moved (a
+ *  position passed to another wallet, ui-jobs 705) is counted apart. Null when the
  *  wallet holds nothing besides the page's position. */
 export function walletProtocolMenu<P extends WalletCountsPosition>(
   positions: P[],
@@ -133,12 +141,14 @@ export function walletProtocolMenu<P extends WalletCountsPosition>(
   const order = (key: string) => groups.get(key)?.protocol?.order ?? Number.MAX_SAFE_INTEGER;
   const rows = [...groups.entries()].map(([key, g]): WalletProtocolRow<P> => {
     const open = g.positions.filter((p) => p.status === "open").length;
-    const closed = g.positions.length - open;
+    const moved = g.positions.filter((p) => p.status === "moved").length;
+    const closed = g.positions.length - open - moved;
     const one = g.positions.length === 1;
     const onPage = g.positions.some(isPage);
     const parts = [
       open > 0 && `${open.toLocaleString("en-US")} open`,
       closed > 0 && `${closed.toLocaleString("en-US")} closed`,
+      moved > 0 && `${moved.toLocaleString("en-US")} moved`,
     ];
     return {
       key,
@@ -146,6 +156,7 @@ export function walletProtocolMenu<P extends WalletCountsPosition>(
       first: g.positions[0],
       open,
       closed,
+      moved,
       counts: parts.filter(Boolean).join(" · "),
       href: one ? g.positions[0].href : (g.protocol?.listing ?? dashboard),
       page: onPage,
