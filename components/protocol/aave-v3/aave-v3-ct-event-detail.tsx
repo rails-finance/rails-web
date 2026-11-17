@@ -106,7 +106,7 @@ import {
 import { AmountText, ExactTip } from "@/components/shared/amount-text";
 import { fmtPositionAmount } from "@/components/shared/position-row";
 import { fmt2 } from "@/lib/aave-v3/liquidation-fee";
-import { COW_FEE_LABEL, COW_SURPLUS_LABEL, feeBpText, shiftRaw } from "@/lib/cow/surplus";
+import { COW_FEE_LABEL, cowSurplusLabel, feeBpText, shiftRaw } from "@/lib/cow/surplus";
 import { cowFeeProv, cowSurplusProv, type CowCoords } from "@/lib/cow/surplus-provenance";
 import { formatCompact } from "@/lib/shared/format-compact";
 
@@ -961,12 +961,13 @@ function cowSwapLines(s: AaveV3SwapDetail, coords: CowCoords): ChainTruthStat[] 
   const exact = c.token.decimals == null ? c.surplus : shiftRaw(c.surplus, c.token.decimals);
   return [
     {
-      label: COW_SURPLUS_LABEL[c.kind],
+      label: cowSurplusLabel(c.kind, c.route),
       value: exact,
       display: c.token.decimals == null ? `${c.surplus} (raw)` : fmtPositionAmount(Number(exact)),
       symbol: c.token.symbol ?? "",
       address: c.token.address,
       prov: cowSurplusProv(c, trade, coords),
+      rowData: { "data-cow-surplus": c.kind },
     },
     {
       label: COW_FEE_LABEL,
@@ -974,6 +975,7 @@ function cowSwapLines(s: AaveV3SwapDetail, coords: CowCoords): ChainTruthStat[] 
       display: feeBpText(c.feeBp),
       symbol: "",
       prov: cowFeeProv(c, trade, coords),
+      rowData: { "data-cow-fee": "" },
     },
   ];
 }
@@ -984,7 +986,7 @@ function EventRowLines({ rows }: { rows: ChainTruthStat[] }) {
   return (
     <div className="space-y-1 px-5 pb-2 text-sm" data-event-row-lines="">
       {rows.map((r, i) => (
-        <div key={i} className="text-rb-500" data-event-row-line="">
+        <div key={i} className="text-rb-500" data-event-row-line="" {...r.rowData}>
           {r.label}{" "}
           <Prov
             info={r.prov}

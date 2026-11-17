@@ -16,6 +16,13 @@ import type { TxEntry } from "@/lib/shared/tx-entry";
  *  this Safe". */
 export type BarAccountKind = "safe" | "account";
 
+/** A swap paired on a CoW Trade log: the evidence a row names CoW's settlement by, whatever its `to`. */
+export interface CowTradeEvidence {
+  orderUid: string;
+  /** The Trade log's owner. */
+  owner?: string;
+}
+
 export function barSubjectProv(args: {
   address: string;
   entry?: TxEntry;
@@ -23,8 +30,10 @@ export function barSubjectProv(args: {
   txHash?: string;
   chainId: ChainId;
   accountKind?: BarAccountKind;
+  cowTrade?: CowTradeEvidence;
 }): Provenance | null {
-  const { address, entry, wallet, txHash, chainId, accountKind } = args;
+  const { address, entry, wallet, txHash, chainId, accountKind, cowTrade } = args;
+  if (cowTrade) return cowTradeBarProv({ address, entry, txHash, chainId, cowTrade });
   const a = address.toLowerCase();
   const registry = getProtocolContract(a, chainId);
   const owner = barOwnerOf(a, chainId);
@@ -122,6 +131,69 @@ export function barSubjectProv(args: {
         }
       : {}),
     inputs: [...chainLeaves, ...nameLeaves],
+  };
+}
+
+/** The bar's receipt for a swap paired on a CoW Trade log: the log, and the transaction's `to` where it is known.
+ *  The transaction may enter a flash-loan router or a solver contract; the Trade log is what names CoW. */
+function cowTradeBarProv(args: {
+  address: string;
+  entry?: TxEntry;
+  txHash?: string;
+  chainId: ChainId;
+  cowTrade: CowTradeEvidence;
+}): Provenance | null {
+  const a = args.address.toLowerCase();
+  const registry = getProtocolContract(a, args.chainId);
+  const subject = registry?.bar;
+  if (!subject) return null;
+  const toSentence = args.entry?.to
+    ? args.entry.to.toLowerCase() === a
+      ? " The transaction was sent to the settlement contract."
+      : " The transaction was sent to another contract, which called the settlement contract."
+    : "";
+  return {
+    kind: "chain",
+    pclass: "emitted",
+    summary: `The swap's order went through ${subject.name}. A Trade log of ${subject.name}'s settlement contract in this transaction names the order's owner, and the row is paired to that log.${toSentence} ${subject.name} settles signed orders in batches; a solver sent this transaction.`,
+    contract: { name: registry.name, address: a },
+    via: "Trade log · orderUid and owner",
+    ...(args.txHash
+      ? {
+          verify: {
+            kind: "etherscan" as const,
+            href: explorerUrl(args.chainId, "tx-logs", args.txHash),
+            text: "Confirm in the transaction's logs",
+          },
+          source: { txHash: args.txHash },
+        }
+      : {}),
+    inputs: [
+      { label: "orderUid", value: args.cowTrade.orderUid, kind: "chain", pclass: "emitted", note: "Trade `orderUid`" },
+      ...(args.cowTrade.owner
+        ? [
+            {
+              label: "order owner",
+              value: args.cowTrade.owner,
+              kind: "chain" as const,
+              pclass: "emitted" as const,
+              note: "Trade `owner`",
+            },
+          ]
+        : []),
+      ...(args.entry
+        ? [
+            {
+              label: "to",
+              value: args.entry.to,
+              kind: "chain" as const,
+              pclass: "indexed" as const,
+              note: "The transaction's `to`",
+            },
+          ]
+        : []),
+      ...counterpartyNameInputs(registry, explorerUrl(args.chainId, "address", a)),
+    ],
   };
 }
 

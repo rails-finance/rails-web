@@ -18,8 +18,14 @@ export interface CowSwapFigures {
   /** The byte offset of settle()'s selector in the transaction's input (0 for a direct or inline call). */
   settleOffset: number;
   call: "direct" | "wrapped" | "inline";
-  /** The fees in the trade's price, in base units of the surplus token. */
+  /** The fees in the trade's price, the signed fee included, in base units of the surplus token. */
   feeGap: string;
+  /** The signed fee (the Trade log's feeAmount) in the surplus token: part of feeGap. */
+  signedFee: string;
+  /** Aave V4 swaps: the Aave V3 Pool's flash loan of the sold token, read from the receipt; null where the receipt
+   *  holds none or was not read (`flashRead`). */
+  flashLoan: { lender: string; asset: string; amount: string; premium: string } | null;
+  flashRead: boolean;
   /** The order as signed; `amount` is the limit pro rata on the executed part, in the surplus token. */
   limit: { sell: string; buy: string; fee: string; amount: string };
   partiallyFillable: boolean;
@@ -40,12 +46,16 @@ export interface CowSurplusToken {
 /** The figures with the surplus token named, as a swap card reads them. */
 export interface CowSwapView extends CowSwapFigures {
   token: CowSurplusToken;
+  /** cow_permit: the wallet's own order; cow_adapter: an order an Aave adapter's one-order contract owns. */
+  route: "cow_permit" | "cow_adapter";
 }
 
-export const COW_SURPLUS_LABEL: Record<CowSwapFigures["kind"], string> = {
-  sell: "Received beyond the limit signed",
-  buy: "Returned to the wallet from the unused limit",
-};
+/** The surplus line's words: a sell order received more than its limit; a buy order through an Aave adapter got
+ *  the unused limit back as a refund; the wallet's own buy order paid less than its limit. */
+export function cowSurplusLabel(kind: CowSwapFigures["kind"], route: CowSwapView["route"]): string {
+  if (kind === "sell") return "Received beyond the limit signed";
+  return route === "cow_permit" ? "Paid less than the limit signed" : "Returned to the wallet from the unused limit";
+}
 
 export const COW_FEE_LABEL = "Fees in the trade's price";
 

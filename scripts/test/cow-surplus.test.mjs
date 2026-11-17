@@ -7,7 +7,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const { shiftRaw, decimalsOf, feeBpText, COW_SURPLUS_LABEL, COW_FEE_LABEL } = await import("../../lib/cow/surplus.ts");
+const { shiftRaw, decimalsOf, feeBpText, cowSurplusLabel, COW_FEE_LABEL } = await import("../../lib/cow/surplus.ts");
 const FIX = JSON.parse(readFileSync(new URL("../../lib/cow/dev-surplus-fixture.json", import.meta.url), "utf8"));
 
 test("shiftRaw places the decimal point exactly", () => {
@@ -26,9 +26,11 @@ test("decimalsOf reads a V4 Trade side's decimals from its raw and decimal amoun
   assert.equal(decimalsOf("123", null), null);
 });
 
-test("the two figures have their ruled words, by order kind", () => {
-  assert.equal(COW_SURPLUS_LABEL.sell, "Received beyond the limit signed");
-  assert.equal(COW_SURPLUS_LABEL.buy, "Returned to the wallet from the unused limit");
+test("the figures have their ruled words, by order kind and route", () => {
+  assert.equal(cowSurplusLabel("sell", "cow_permit"), "Received beyond the limit signed");
+  assert.equal(cowSurplusLabel("sell", "cow_adapter"), "Received beyond the limit signed");
+  assert.equal(cowSurplusLabel("buy", "cow_adapter"), "Returned to the wallet from the unused limit");
+  assert.equal(cowSurplusLabel("buy", "cow_permit"), "Paid less than the limit signed");
   assert.equal(COW_FEE_LABEL, "Fees in the trade's price");
   assert.equal(feeBpText(27.509), "27.51 bp");
   assert.equal(feeBpText(103.194), "103.19 bp");
@@ -44,6 +46,18 @@ test("the fixture: buy orders on the adapters' debt, repay and leverage swaps, s
   assert.equal(
     byKind["aave-v3 collateral_swap"].every((k) => k === "sell"),
     true,
+  );
+  // V4 swaps carry the flash loan read from the receipt; V3 swaps do not read it.
+  const v4 = Object.values(FIX).filter((v) => v.protocol === "aave-v4");
+  assert.ok(v4.every((v) => v.cow.flashRead && v.cow.flashLoan));
+  assert.deepEqual(
+    v4.filter((v) => v.cow.flashLoan.premium !== "0").map((v) => v.tx.slice(0, 10)),
+    ["0x908dc11c"],
+  );
+  assert.ok(
+    Object.values(FIX)
+      .filter((v) => v.protocol === "aave-v3")
+      .every((v) => !v.cow.flashRead && v.cow.flashLoan === null),
   );
   for (const v of Object.values(FIX)) {
     assert.ok(BigInt(v.cow.surplus) > 0n, `${v.tx} surplus`);

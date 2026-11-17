@@ -412,6 +412,9 @@ export interface ChainTruthStat {
   /** The accessible name states the value in the site's number format
    *  rather than the exact decimal (see ChainTruthDelta.readableLabel). */
   readableLabel?: boolean;
+  /** Data attributes on the stat's line where a card draws it as a line under the grid (a verifier's hook:
+   *  `data-cow-surplus`, `data-cow-fee`). */
+  rowData?: Record<string, string>;
   /** Whether this event changed the value (the T2 change-colour rule: changed
    *  renders foreground, unchanged muted text — no opacity, no before→after).
    *  Defaults to true (foreground); set `false` for a side this event didn't

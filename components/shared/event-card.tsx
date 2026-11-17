@@ -994,7 +994,16 @@ function EventCardView(props: EventCardProps) {
                   <EventPageAside
                     page={page}
                     sentence={pageSentence}
-                    beside={pageSentence && head?.surplus ? <HeadSurplusChip surplus={head.surplus} /> : undefined}
+                    beside={
+                      pageSentence && (head?.surplus || head?.party?.name) ? (
+                        // The h1 states the event; the head's chips stand beside it: the surplus, and the protocol
+                        // the event went through ("via CoW").
+                        <span className="flex flex-wrap items-center gap-x-3 gap-y-1" data-event-page-beside="">
+                          {head?.surplus && <HeadSurplusChip surplus={head.surplus} />}
+                          {head?.party?.name && <PartyChip party={head.party} tile />}
+                        </span>
+                      ) : undefined
+                    }
                     party={head?.party?.name ? <PartyChip party={head.party} tile /> : undefined}
                     learnMore={learnMore}
                   />

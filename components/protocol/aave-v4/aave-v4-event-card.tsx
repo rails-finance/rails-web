@@ -27,6 +27,8 @@ import type { AaveV4Event } from "@/lib/aave-v4/event-prose";
 import { aaveV4CowView } from "@/lib/aave-v4/swaps";
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import { CowSurplusLines } from "@/components/protocol/cow/cow-surplus-lines";
+import { useTimelineEntry } from "@/components/shared/section-sidebar";
+import { GPV2_SETTLEMENT } from "@/lib/aave-v3/event-provenance";
 
 export interface AaveV4EventCardProps {
   event: AaveV4Event;
@@ -193,6 +195,14 @@ export function AaveV4EventCard({
   });
 
   const cow = ctx.swap ? aaveV4CowView(ctx.swap) : null;
+  // A swap row names CoW's settlement on the timeline's side bar, its Trade log the evidence (anatomy P3.1.1).
+  // Other V4 rows declare no entry: the V4 timeline serves none.
+  useTimelineEntry(ctx.swap ? event.id : undefined, {
+    address: GPV2_SETTLEMENT,
+    wallet: event.wallet,
+    txHash: event.txHash,
+    cowTrade: ctx.swap ? { orderUid: ctx.swap.orderUid, owner: ctx.swap.clone } : undefined,
+  });
   const slots: EventCardSlots = {
     event: {
       id: event.id,
@@ -217,6 +227,7 @@ export function AaveV4EventCard({
         trade={cow.trade}
         coords={{ block: event.blockNumber, txHash: event.txHash }}
         symbol={cow.view.token.symbol ? aaveV4DisplaySymbol(cow.view.token.symbol) : undefined}
+        feeOnly={cow.view.kind === "buy"}
       />
     ) : undefined,
     // The explanation reads the position state the card opens with, so the

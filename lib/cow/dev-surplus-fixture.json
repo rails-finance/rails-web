@@ -12,6 +12,9 @@
       "settleOffset": 0,
       "call": "direct",
       "feeGap": "24156102934791687",
+      "signedFee": "0",
+      "flashRead": false,
+      "flashLoan": null,
       "limit": {
         "sell": "1000000000",
         "buy": "7368244633654891450",
@@ -49,6 +52,9 @@
       "settleOffset": 0,
       "call": "direct",
       "feeGap": "42585",
+      "signedFee": "0",
+      "flashRead": false,
+      "flashLoan": null,
       "limit": {
         "sell": "10000000000000000000000000",
         "buy": "10002500625156",
@@ -86,6 +92,9 @@
       "settleOffset": 0,
       "call": "wrapped",
       "feeGap": "414117461345029217",
+      "signedFee": "0",
+      "flashRead": false,
+      "flashLoan": null,
       "limit": {
         "sell": "3458551539",
         "buy": "3459243249307800000000",
@@ -123,6 +132,9 @@
       "settleOffset": 260,
       "call": "wrapped",
       "feeGap": "698953675345399271",
+      "signedFee": "0",
+      "flashRead": false,
+      "flashLoan": null,
       "limit": {
         "sell": "3190898151248738664510",
         "buy": "3188828640",
@@ -160,6 +172,9 @@
       "settleOffset": 392,
       "call": "wrapped",
       "feeGap": "38485410",
+      "signedFee": "0",
+      "flashRead": false,
+      "flashLoan": null,
       "limit": {
         "sell": "14096020962",
         "buy": "7002100000000000000",
@@ -197,6 +212,9 @@
       "settleOffset": 0,
       "call": "inline",
       "feeGap": "40444278",
+      "signedFee": "0",
+      "flashRead": false,
+      "flashLoan": null,
       "limit": {
         "sell": "8190000000000000000",
         "buy": "13945270637",
@@ -234,6 +252,14 @@
       "settleOffset": 280,
       "call": "wrapped",
       "feeGap": "3619592",
+      "signedFee": "0",
+      "flashRead": true,
+      "flashLoan": {
+        "lender": "0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2",
+        "asset": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+        "amount": "362598992",
+        "premium": "0"
+      },
       "limit": {
         "sell": "362598992",
         "buy": "200000000000000000",
@@ -271,6 +297,14 @@
       "settleOffset": 392,
       "call": "wrapped",
       "feeGap": "485630",
+      "signedFee": "0",
+      "flashRead": true,
+      "flashLoan": {
+        "lender": "0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2",
+        "asset": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+        "amount": "142933802",
+        "premium": "0"
+      },
       "limit": {
         "sell": "142933802",
         "buy": "77502456846772759",
@@ -308,6 +342,14 @@
       "settleOffset": 260,
       "call": "wrapped",
       "feeGap": "1060408",
+      "signedFee": "0",
+      "flashRead": true,
+      "flashLoan": {
+        "lender": "0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2",
+        "asset": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+        "amount": "710678580",
+        "premium": "355340"
+      },
       "limit": {
         "sell": "710323240",
         "buy": "702405403",
@@ -345,6 +387,14 @@
       "settleOffset": 260,
       "call": "wrapped",
       "feeGap": "1042766391995486",
+      "signedFee": "0",
+      "flashRead": true,
+      "flashLoan": {
+        "lender": "0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2",
+        "asset": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+        "amount": "1261237",
+        "premium": "0"
+      },
       "limit": {
         "sell": "1261237",
         "buy": "354627341148351112",

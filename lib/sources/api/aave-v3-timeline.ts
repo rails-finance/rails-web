@@ -338,11 +338,16 @@ export function aaveV3RowTokens(r: MvRow): string[] {
 function cowView(
   cow: CowSwapFigures,
   kind: AaveV3SwapKind,
+  route: CowSwapView["route"],
   gMeta: V3TokenMeta | undefined,
   xMeta: V3TokenMeta | undefined,
 ): CowSwapView {
   const m = cow.kind === "sell" ? (kind === "supply_from_swap" ? gMeta : xMeta) : kind === "debt_swap" ? xMeta : gMeta;
-  return { ...cow, token: { address: cow.surplusToken, symbol: m?.symbol ?? null, decimals: m?.decimals ?? null } };
+  return {
+    ...cow,
+    route,
+    token: { address: cow.surplusToken, symbol: m?.symbol ?? null, decimals: m?.decimals ?? null },
+  };
 }
 
 export async function buildAaveV3Timeline(rows: MvRow[], walletRaw: string): Promise<AaveV3TimelineResult> {
@@ -448,7 +453,13 @@ export function aaveV3RowsToEvents(
       exact: leg.exact,
       adapter: leg.adapter?.toLowerCase() ?? undefined,
       ...(events ? { events } : {}),
-      ...(leg.cow !== undefined ? { cow: leg.cow && cowView(leg.cow, kind, gMeta, xMeta) } : {}),
+      ...(leg.cow !== undefined
+        ? {
+            cow:
+              leg.cow &&
+              cowView(leg.cow, kind, leg.route === "cow_permit" ? "cow_permit" : "cow_adapter", gMeta, xMeta),
+          }
+        : {}),
       raw: {
         receivedAmount: rawVal(x.amount),
         ...(receivedTrade

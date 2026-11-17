@@ -403,6 +403,20 @@ const COW: ProtocolContract = {
   bar: COW_BAR,
   brandNoun: "settlement contract",
 };
+// CoW's flash-loan router: solvers call its flashLoanAndSettle() in place of settle() when an order takes a flash
+// loan, and it calls the settlement. docs.cow.fi (cow-protocol/tutorials/solvers/flashloans_support, read
+// 17 Nov 2026): "the flashloan router (deterministically deployed at 0x9da8b48441583a2b93e2ef8213aad0ec0b392c69";
+// cowprotocol/flash-loan-router `networks.json` lists FlashLoanRouter at that address on chain 1, and
+// `src/FlashLoanRouter.sol` declares `contract FlashLoanRouter` ("Solver contract for CoW Protocol").
+const COW_FLASH_LOAN_ROUTER: ProtocolContract = {
+  name: "CoW",
+  kind: "router",
+  contractName: "FlashLoanRouter",
+  protocolGlyph: "cow",
+  role: "CoW’s flash-loan router, which takes out an order's flash loans and then calls CoW’s settlement contract",
+  bar: COW_BAR,
+  brandNoun: "flash-loan router",
+};
 const WETH_GATEWAY: ProtocolContract = {
   name: "WETH gateway",
   kind: "gateway",
@@ -1250,6 +1264,7 @@ const ENTRIES: [ChainId, string, KnownInfrastructure][] = [
   [MAINNET_CHAIN_ID, "0x20b79d39bd44deee4f89b1e9d0e3b945fde06491", escrow("syrupUSDC")],
   [MAINNET_CHAIN_ID, "0xde76a096c5eadddf97af3fe15ee49d32aeda9822", escrow("syrupUSDT")],
   [MAINNET_CHAIN_ID, "0x9008d19f58aabd9ed0d60971565aa8510560ab41", COW],
+  [MAINNET_CHAIN_ID, "0x9da8b48441583a2b93e2ef8213aad0ec0b392c69", COW_FLASH_LOAN_ROUTER],
   [MAINNET_CHAIN_ID, "0xd01607c3c5ecaba394d8be377a08590149325722", WETH_GATEWAY],
   [MAINNET_CHAIN_ID, "0x893411580e590d62ddbca8a703d61cc4a8c7b2b9", WETH_GATEWAY],
   [MAINNET_CHAIN_ID, "0xa434d495249abe33e031fe71a969b81f3c07950d", WETH_GATEWAY],

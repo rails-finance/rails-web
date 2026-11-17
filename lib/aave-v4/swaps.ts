@@ -61,6 +61,7 @@ export function aaveV4CowView(
     view: {
       ...c,
       token: { address: c.surplusToken, symbol: side.symbol, decimals: decimalsOf(side.raw, side.amount) },
+      route: "cow_adapter",
     },
     trade: { sell: swap.sell.raw, buy: swap.buy.raw, fee: swap.feeRaw },
   };
