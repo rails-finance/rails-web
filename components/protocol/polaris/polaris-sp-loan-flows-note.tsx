@@ -16,16 +16,16 @@ export function PolarisDepositFlowsNote({ stable }: { stable: string }): ReactNo
       </p>
       <p>
         The {stable} bar: deposited, with the {stable} yield the touches paid in, less withdrawn, burned by liquidations
-        and the yield claimed, is the deposit. Yield a touch does not claim stays in the deposit.
+        and the yield claimed, is the deposit.
       </p>
       <p>
-        The pETH bar: the pETH the pool paid in for the burned {stable}, less claimed, is the pETH a touch would pay out
-        now.
+        The pETH bar: the pETH the pool paid in for the burned {stable}, less claimed, is the pETH the next touch pays
+        out.
       </p>
       <p>
         The pool writes a deposit only when it is touched, and a liquidation reaches it at the next touch. Between
-        touches each figure stands as the last touch left it. At today each bar adds what the pool has done since then:
-        the {stable} burned, the yield and the pETH pending.
+        touches each figure stands as the last touch left it. Today each bar adds what the pool has done since then: the{" "}
+        {stable} burned, the yield and the pETH pending.
       </p>
     </div>
   );
@@ -34,11 +34,11 @@ export function PolarisDepositFlowsNote({ stable }: { stable: string }): ReactNo
 export function polarisDepositFlowsContent(stable: string): LearnMoreContent {
   return {
     title: "About the lifetime flows",
-    intro: `The bars add up the deposit's operations, the deposit in ${stable} and the pETH paid in, and the line under them draws each at the end of each day.`,
+    intro: `The bars add up the deposit's touches, the deposit in ${stable} and the pETH paid in, and the line under them draws each at the end of each day.`,
     stepsHeading: "How it's built:",
     steps: [
       `${stable}: deposited, plus the yield paid in, less withdrawn, burned by liquidations and the yield claimed, is the deposit.`,
-      "pETH: paid in by liquidations, less claimed, is the pETH waiting to be claimed.",
+      "pETH: paid in by liquidations, less claimed, is the pETH the next touch pays out.",
     ],
     detailsHeading: "Key concepts:",
     details: [
@@ -65,8 +65,8 @@ export function PolarisLoanFlowsNote({ accrued }: { accrued: boolean }): ReactNo
       </p>
       <p>
         The debt: borrowed, with the fees (dashed), less repaid, is what the loan owes. Each touch charges the fees the
-        loans manager&apos;s index built on the debt since the touch before.
-        {accrued ? " At today the fees accrued since the last touch join the Fees line." : ""}
+        index built on the debt since the touch before.
+        {accrued ? " Today the fees accrued since the last touch join the Fees line." : ""}
       </p>
     </div>
   );
@@ -91,7 +91,7 @@ export function polarisLoanFlowsContent(): LearnMoreContent {
       },
       {
         bold: "Fees",
-        text: "the loans manager's index grows the debt per share; a touch writes the debt at the index in force.",
+        text: "the index grows the debt per share; a touch writes the debt at the index in force.",
       },
     ],
     links: [{ label: "Polaris docs", url: DOCS }],

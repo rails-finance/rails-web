@@ -229,3 +229,107 @@ export const atFloor = (collRaw: string, floorRaw: string): bigint => (big(collR
 /** The fee accrued since the last touch: the debt now less the debt after it,
  *  never below zero (the replayed shares drift by a wei a touch). */
 export const pendingFee = (debtNowRaw: string, l: LoanLifetime): bigint => max0(big(debtNowRaw) - l.debtAtLastTouch);
+
+/** The figures of one deposit operation that the Lifetime flows read. */
+export interface DepositOp {
+  top_up_or_withdrawal: string | null;
+  deposit_loss: string | null;
+  stable_gain_since: string | null;
+  stable_gain_claimed: string | null;
+  bc_gain_since: string | null;
+  bc_gain_claimed: string | null;
+  new_deposit: string | null;
+  stashed_bc_tokens: string | null;
+}
+
+/** One operation's legs on the two bars of the Lifetime flows. The stablecoin:
+ *  deposit before + deposited + yield in − withdrawn − burned − yield claimed
+ *  = deposit after. pETH: stash before + paid in − claimed = stash after. */
+export interface DepositLegs {
+  deposited: bigint;
+  withdrawn: bigint;
+  burned: bigint;
+  yieldIn: bigint;
+  yieldClaimed: bigint;
+  pethIn: bigint;
+  pethClaimed: bigint;
+  deposit: bigint;
+  stash: bigint;
+}
+
+export function depositLegs(r: DepositOp): DepositLegs {
+  const ch = big(r.top_up_or_withdrawal);
+  return {
+    deposited: max0(ch),
+    withdrawn: max0(-ch),
+    burned: big(r.deposit_loss),
+    yieldIn: big(r.stable_gain_since),
+    yieldClaimed: big(r.stable_gain_claimed),
+    pethIn: big(r.bc_gain_since),
+    pethClaimed: big(r.bc_gain_claimed),
+    deposit: big(r.new_deposit),
+    stash: big(r.stashed_bc_tokens),
+  };
+}
+
+/** The figures of one loan touch that the Lifetime flows read. */
+export interface LoanFlowTouch {
+  coll_change: string | null;
+  debt_change: string | null;
+  coll_after: string | null;
+  debt_after: string | null;
+}
+
+/** One touch's legs on the two bars of the Lifetime flows. */
+export interface LoanLegs {
+  collIn: bigint;
+  collOut: bigint;
+  borrowed: bigint;
+  repaid: bigint;
+  /** The fee the index charged since the touch before: the debt after this
+   *  touch, less the debt after the one before, less this touch's change. */
+  fee: bigint;
+  coll: bigint;
+  debt: bigint;
+}
+
+/** Each touch's legs, oldest first. Each debt is ceil(shares × index), so a
+ *  touch can come out a wei under the one before plus its change: that touch
+ *  books no fee, and the shortfall is taken from the next touch's fee, so
+ *  borrowed + fees − repaid stays the debt after the last touch (within the
+ *  wei the last touch may still carry). */
+export function loanLegs(touches: LoanFlowTouch[]): LoanLegs[] {
+  let before = ZERO;
+  let carry = ZERO;
+  return touches.map((t) => {
+    const c = big(t.coll_change);
+    const d = big(t.debt_change);
+    const after = big(t.debt_after);
+    const raw = after - before - d + carry;
+    before = after;
+    carry = raw < ZERO ? raw : ZERO;
+    return {
+      collIn: max0(c),
+      collOut: max0(-c),
+      borrowed: max0(d),
+      repaid: max0(-d),
+      fee: max0(raw),
+      coll: big(t.coll_after),
+      debt: after,
+    };
+  });
+}
+
+/** Whether the chain's loans(id) read agrees with the index's last touch: the
+ *  same collateral, and shares within a wei a touch (the index replays the
+ *  shares with their decimals; the chain stores them rounded). */
+export function loanChainAgrees(
+  chain: { collRaw: string; sharesRaw: string },
+  last: { coll_after: string | null; shares_after: string | null },
+  touches: number,
+): boolean {
+  if (big(chain.collRaw) !== big(last.coll_after)) return false;
+  const diff = big(chain.sharesRaw) - big(last.shares_after);
+  const tol = BigInt(Math.max(1, touches));
+  return diff <= tol && diff >= -tol;
+}

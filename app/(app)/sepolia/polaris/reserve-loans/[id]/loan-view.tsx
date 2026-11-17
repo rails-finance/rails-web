@@ -89,17 +89,10 @@ export default function LoanView({ loanId, initial }: { loanId: string; initial:
   // Set on mount, so the server's render and the first client render agree.
   const [nowSec, setNowSec] = useState<number | null>(null);
   useEffect(() => setNowSec(Math.floor(Date.now() / 1000)), []);
+  const flowsReady = data != null && chainSettled && nowSec != null;
   const flows = useMemo(
-    () =>
-      touches.length && chainSettled && nowSec != null
-        ? loanFlows(touches, {
-            open,
-            collNowRaw: chain?.collRaw ?? null,
-            debtNowRaw: chain?.debtRaw ?? null,
-            nowSec,
-          })
-        : null,
-    [touches, chainSettled, open, chain, nowSec],
+    () => (flowsReady && nowSec != null ? loanFlows(touches, { open, chain, nowSec }) : null),
+    [flowsReady, touches, open, chain, nowSec],
   );
   const flowFocus = useFlowFocusValue(useFlowFocusRoot(flows?.focus ?? NO_FOCUS), flows?.timeline ?? null);
   const accrued = flows?.timeline.live.pending?.length ? true : false;
@@ -190,7 +183,7 @@ export default function LoanView({ loanId, initial }: { loanId: string; initial:
         />
         <LifetimeFlowsPanel
           scrubber={flows ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
-          read={flows ? "done" : "reading"}
+          read={flowsReady ? "done" : failed ? "failed" : "reading"}
           explanation={
             <div className="space-y-2 text-sm text-rb-500">
               <PolarisLoanFlowsNote accrued={accrued} />

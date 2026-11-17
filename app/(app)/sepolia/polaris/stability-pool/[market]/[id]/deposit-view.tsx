@@ -146,15 +146,21 @@ export default function DepositView({
   // Set on mount, so the server's render and the first client render agree.
   const [nowSec, setNowSec] = useState<number | null>(null);
   useEffect(() => setNowSec(Math.floor(Date.now() / 1000)), []);
+  const flowsReady = wholeAsc != null && nowSec != null && (!open || chainSettled);
   const flows = useMemo(
-    () =>
-      wholeAsc && nowSec != null && (!open || chainSettled)
-        ? depositFlows(market, wholeAsc, { open, now, nowSec })
-        : null,
-    [wholeAsc, nowSec, open, chainSettled, market, now],
+    () => (flowsReady && wholeAsc && nowSec != null ? depositFlows(market, wholeAsc, { open, now, nowSec }) : null),
+    [flowsReady, wholeAsc, nowSec, open, market, now],
   );
   const flowFocus = useFlowFocusValue(useFlowFocusRoot(flows?.focus ?? NO_FOCUS), flows?.timeline ?? null);
-  const flowsRead: FlowsRead = flows ? "done" : firstWhole ? "reading" : lifeRead === "done" ? "reading" : lifeRead;
+  // With the rows in hand the read is done, drawn or not (a life with no
+  // operation draws nothing).
+  const flowsRead: FlowsRead = flowsReady
+    ? "done"
+    : lifeRead === "withheld" || lifeRead === "failed"
+      ? lifeRead
+      : "reading";
+  // The whole life is still being read: no boundary card for rows about to land.
+  const lifePending = !firstWhole && total <= WHOLE_LIFE_READ && lifeRows == null && lifeRead === "reading";
 
   const tl = useTimelineEvents(events, {
     storageKey: `polaris-sp-${market}-${tokenId}`,
@@ -165,7 +171,7 @@ export default function DepositView({
   });
   const boundary = useMemo(() => {
     const oldest = tl.sortedEvents[0];
-    if (olderCount === 0 || !oldest) return null;
+    if (olderCount === 0 || !oldest || lifePending) return null;
     return boundaryFromLimit({
       total,
       listed: listed.length,
@@ -173,7 +179,7 @@ export default function DepositView({
       cutAt: oldest.timestamp,
       state: null,
     });
-  }, [olderCount, total, listed.length, tl.sortedEvents]);
+  }, [olderCount, total, listed.length, tl.sortedEvents, lifePending]);
 
   // pETH in the market's stablecoin at the feed, the price the head row values
   // the pending pETH at.
@@ -236,10 +242,7 @@ export default function DepositView({
                 A deposit in the {stable.symbol} Stability Pool repays the debt of liquidated positions. Each
                 liquidation burns a share of every deposit and pays pETH in its place.
               </li>
-              <li>
-                The pool records a deposit only when it is touched. The deposit now and the pending gains are the
-                pool&rsquo;s current figures.
-              </li>
+              <li>The deposit now and the pending gains are the pool&rsquo;s current figures.</li>
               <li>The deposit also earns {stable.symbol} yield; what a touch does not claim stays in the deposit.</li>
             </ul>
           }

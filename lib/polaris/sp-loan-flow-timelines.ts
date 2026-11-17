@@ -7,21 +7,26 @@
 // DEPOSIT. The deposit's bar is the pool's stablecoin: deposited and the
 // stable yield the touches paid in, less withdrawn, burned by liquidations and
 // the yield claimed, holds the deposit recorded at the last touch. The second
-// bar is pETH: paid in at touches, less claimed, holds the stash. At today
+// bar is pETH: paid in at touches, less claimed, holds the stash. Today
 // each bar adds what the pool has done since the last touch to the line it
 // belongs to (`live.pending`): the burn, the yield and the pETH pending.
 //
 // LOAN. fpETH on one bar (deposited, less returned), WETH on the other
 // (borrowed, with the fees each touch's index charged, less repaid, holds the
-// debt after the last touch); at today the fees accrued since then join the
-// fees line.
+// debt after the last touch); today the fees accrued since then join the
+// fees line, where the chain's loans(id) agrees with the last touch.
+//
+// The panel draws each day's markers by side: on its second bar an inflow is
+// marked as leaving the position, which fits a debt and not the pETH a
+// deposit is paid. The pETH lines name no event, so they draw no marker; the
+// tick and the deposit's own lines still mark the day.
 
 import type { FocusEvent } from "@/lib/shared/flow-focus";
 import type { FlowBucket, FlowDayRow, FlowEvent, FlowTimeline } from "@/lib/shared/flows-timeline";
 import { daysFromEvents, unitScaleFor } from "@/lib/shared/flows-timeline";
 import type { PolarisDepositEventRow, PolarisLoanEventRow } from "@/lib/sources/api/polaris-sp-loans";
 import { FPETH, PETH, POLARIS_MARKET_CONFIG, POLARIS_WETH, type PolarisMarket } from "./asset-catalog";
-import { big, units, type DepositNow } from "./sp-loan-math";
+import { depositLegs, loanChainAgrees, loanLegs, units, type DepositNow } from "./sp-loan-math";
 
 const DAY_S = 86_400;
 const DUST = 1e-12;
@@ -112,7 +117,7 @@ function depositBuckets(stable: string): FlowBucket[] {
       hatch: "vertical",
     },
     { key: D.pethIn, label: "pETH paid in", event: "", side: "debt", dir: "in" },
-    { key: D.pethClaimed, label: "pETH claimed", event: "Claim", side: "debt", dir: "out" },
+    { key: D.pethClaimed, label: "pETH claimed", event: "", side: "debt", dir: "out" },
   ];
 }
 
@@ -130,10 +135,10 @@ export function depositFlows(
   let peakB = 0;
   let inA = 0;
   let inB = 0;
-  for (const r of ops) {
-    const ch = units(big(r.top_up_or_withdrawal));
-    inA += Math.max(0, ch) + units(big(r.stable_gain_since));
-    inB += units(big(r.bc_gain_since));
+  const legsOf = ops.map(depositLegs);
+  for (const g of legsOf) {
+    inA += units(g.deposited) + units(g.yieldIn);
+    inB += units(g.pethIn);
     peakA = Math.max(peakA, inA);
     peakB = Math.max(peakB, inB);
   }
@@ -144,19 +149,19 @@ export function depositFlows(
   const scale = { collateral: unitScaleFor(peakA), debt: unitScaleFor(peakB) };
   const G: Grains = { collateral: 10 ** scale.collateral, debt: 10 ** scale.debt };
 
-  const events: FlowEvent[] = ops.map((r) => {
-    const ch = big(r.top_up_or_withdrawal);
+  const events: FlowEvent[] = ops.map((r, i) => {
+    const g = legsOf[i];
     const legs: FlowEvent["legs"] = [];
     const a = (bucket: string, v: bigint) => v > ZERO && legs.push({ bucket, usd: units(v) * G.collateral, symbol: s });
     const b = (bucket: string, v: bigint) =>
       v > ZERO && legs.push({ bucket, usd: units(v) * G.debt, symbol: PETH.symbol });
-    a(D.deposited, ch > ZERO ? ch : ZERO);
-    a(D.withdrawn, ch < ZERO ? -ch : ZERO);
-    a(D.burned, big(r.deposit_loss));
-    a(D.yieldIn, big(r.stable_gain_since));
-    a(D.yieldClaimed, big(r.stable_gain_claimed));
-    b(D.pethIn, big(r.bc_gain_since));
-    b(D.pethClaimed, big(r.bc_gain_claimed));
+    a(D.deposited, g.deposited);
+    a(D.withdrawn, g.withdrawn);
+    a(D.burned, g.burned);
+    a(D.yieldIn, g.yieldIn);
+    a(D.yieldClaimed, g.yieldClaimed);
+    b(D.pethIn, g.pethIn);
+    b(D.pethClaimed, g.pethClaimed);
     const movedA = legs.some((l) => l.symbol === s);
     const movedB = legs.some((l) => l.symbol === PETH.symbol);
     return {
@@ -167,8 +172,8 @@ export function depositFlows(
       legs,
       tx: r.tx_hash,
       balances: [
-        { asset: A, symbol: s, side: "collateral", amount: units(big(r.new_deposit)) },
-        { asset: B, symbol: PETH.symbol, side: "debt", amount: units(big(r.stashed_bc_tokens)) },
+        { asset: A, symbol: s, side: "collateral", amount: units(g.deposit) },
+        { asset: B, symbol: PETH.symbol, side: "debt", amount: units(g.stash) },
       ],
       prices: [
         { asset: A, usd: G.collateral },
@@ -186,10 +191,10 @@ export function depositFlows(
   const lastDay = Math.floor(events[events.length - 1].ts / DAY_S);
   const endDay = o.open ? Math.max(today, lastDay + 1) : lastDay + 1;
 
-  const last = ops[ops.length - 1];
+  const last = legsOf[legsOf.length - 1];
   const n = o.now;
-  const heldA = o.open ? (n ? units(n.now) + units(n.pendingStable) : units(big(last.new_deposit))) : 0;
-  const heldB = o.open ? units(big(last.stashed_bc_tokens)) + (n ? units(n.bcSinceTouch) : 0) : 0;
+  const heldA = o.open ? (n ? units(n.now) + units(n.pendingStable) : units(last.deposit)) : 0;
+  const heldB = o.open ? units(last.stash) + (n ? units(n.bcSinceTouch) : 0) : 0;
   const pending: NonNullable<FlowTimeline["live"]["pending"]> = [];
   if (n) {
     if (n.pendingLoss > ZERO) pending.push({ bucket: D.burned, symbol: s, usd: units(n.pendingLoss) * G.collateral });
@@ -234,12 +239,7 @@ export function depositFlows(
         debt: `the pETH stashed at the last touch.`,
       },
       linePrices: `with the deposit in ${s} and the pETH in pETH, each on its own scale`,
-      moment: {
-        tokensOnly: ["collateral", "debt"],
-        notes: [
-          `The pool records a deposit only at its touches: between them each figure stands as the last touch left it.`,
-        ],
-      },
+      moment: { tokensOnly: ["collateral", "debt"] },
     },
   };
   return { timeline, focus: focusEvents(events, buckets, G) };
@@ -268,40 +268,39 @@ function loanBuckets(): FlowBucket[] {
 /** A loan's touches, oldest first, as the panel's timeline and focus events. */
 export function loanFlows(
   rowsAsc: PolarisLoanEventRow[],
-  o: { open: boolean; collNowRaw: string | null; debtNowRaw: string | null; nowSec: number },
+  o: { open: boolean; chain: { collRaw: string; sharesRaw: string; debtRaw: string } | null; nowSec: number },
 ): SpLoanFlows | null {
   const touches = rowsAsc.filter((r) => r.event_type !== "transfer");
   if (touches.length === 0) return null;
+  const lastRow = touches[touches.length - 1];
+  // The chain's read only where it agrees with the index's last touch.
+  const chain = o.open && o.chain && loanChainAgrees(o.chain, lastRow, touches.length) ? o.chain : null;
+  const legsOf = loanLegs(touches);
   let peakA = 0;
   let peakB = 0;
-  for (const r of touches) {
-    peakA = Math.max(peakA, units(big(r.coll_after)));
-    peakB = Math.max(peakB, units(big(r.debt_after)));
+  for (const g of legsOf) {
+    peakA = Math.max(peakA, units(g.coll));
+    peakB = Math.max(peakB, units(g.debt));
   }
-  if (o.debtNowRaw) peakB = Math.max(peakB, units(big(o.debtNowRaw)));
+  const debtNow = chain ? BigInt(chain.debtRaw) : null;
+  if (debtNow != null) peakB = Math.max(peakB, units(debtNow));
   const scale = { collateral: unitScaleFor(peakA * 2), debt: unitScaleFor(peakB * 2) };
   const G: Grains = { collateral: 10 ** scale.collateral, debt: 10 ** scale.debt };
 
-  let debtBefore = ZERO;
-  const events: FlowEvent[] = touches.map((r) => {
-    const c = big(r.coll_change);
-    const d = big(r.debt_change);
-    const after = big(r.debt_after);
-    // The fee the index charged on the shares before this touch.
-    const fee = after - debtBefore - d;
-    debtBefore = after;
+  const events: FlowEvent[] = touches.map((r, i) => {
+    const g = legsOf[i];
     const legs: FlowEvent["legs"] = [];
     const a = (bucket: string, v: bigint) =>
       v > ZERO && legs.push({ bucket, usd: units(v) * G.collateral, symbol: FPETH.symbol });
     const b = (bucket: string, v: bigint) =>
       v > ZERO && legs.push({ bucket, usd: units(v) * G.debt, symbol: POLARIS_WETH.symbol });
-    a(L.deposited, c > ZERO ? c : ZERO);
-    a(L.returned, c < ZERO ? -c : ZERO);
-    b(L.borrowed, d > ZERO ? d : ZERO);
-    b(L.repaid, d < ZERO ? -d : ZERO);
-    b(L.fees, fee);
-    const movedA = c !== ZERO;
-    const movedB = d !== ZERO;
+    a(L.deposited, g.collIn);
+    a(L.returned, g.collOut);
+    b(L.borrowed, g.borrowed);
+    b(L.repaid, g.repaid);
+    b(L.fees, g.fee);
+    const movedA = g.collIn > ZERO || g.collOut > ZERO;
+    const movedB = g.borrowed > ZERO || g.repaid > ZERO;
     return {
       id: r.event_key,
       ts: Number(r.block_timestamp),
@@ -310,8 +309,8 @@ export function loanFlows(
       legs,
       tx: r.tx_hash,
       balances: [
-        { asset: A, symbol: FPETH.symbol, side: "collateral", amount: units(big(r.coll_after)) },
-        { asset: B, symbol: POLARIS_WETH.symbol, side: "debt", amount: units(after) },
+        { asset: A, symbol: FPETH.symbol, side: "collateral", amount: units(g.coll) },
+        { asset: B, symbol: POLARIS_WETH.symbol, side: "debt", amount: units(g.debt) },
       ],
       prices: [
         { asset: A, usd: G.collateral },
@@ -328,10 +327,10 @@ export function loanFlows(
   const firstDay = Math.floor(events[0].ts / DAY_S);
   const lastDay = Math.floor(events[events.length - 1].ts / DAY_S);
   const endDay = o.open ? Math.max(today, lastDay + 1) : lastDay + 1;
-  const last = touches[touches.length - 1];
-  const heldA = o.open ? units(big(o.collNowRaw ?? last.coll_after)) : 0;
-  const heldB = o.open ? units(big(o.debtNowRaw ?? last.debt_after)) : 0;
-  const accrued = o.open && o.debtNowRaw ? big(o.debtNowRaw) - big(last.debt_after) : ZERO;
+  const last = legsOf[legsOf.length - 1];
+  const heldA = o.open ? units(last.coll) : 0;
+  const heldB = o.open ? units(debtNow ?? last.debt) : 0;
+  const accrued = debtNow != null && debtNow > last.debt ? debtNow - last.debt : ZERO;
   const assets: NonNullable<FlowTimeline["live"]["assets"]> = [];
   if (heldA > DUST) assets.push({ side: "collateral", symbol: FPETH.symbol, amount: heldA, usd: heldA * G.collateral });
   if (heldB > DUST) assets.push({ side: "debt", symbol: POLARIS_WETH.symbol, amount: heldB, usd: heldB * G.debt });
@@ -362,7 +361,7 @@ export function loanFlows(
       restBySide: { debt: "Fees since the last touch" },
       basis: {
         collateral: `Every figure is in ${FPETH.symbol}.`,
-        debt: `Every figure is in ${POLARIS_WETH.symbol}. The floor prices ${FPETH.symbol} in ${POLARIS_WETH.symbol}; the bars are drawn apart.`,
+        debt: `Every figure is in ${POLARIS_WETH.symbol}. The bars do not use the floor's price of ${FPETH.symbol}.`,
       },
       heldBasis: {
         collateral: `the ${FPETH.symbol} the loan held after its last touch.`,
