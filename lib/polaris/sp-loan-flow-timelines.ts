@@ -16,6 +16,7 @@
 // debt after the last touch); at today the fees accrued since then join the
 // fees line.
 
+import type { FocusEvent } from "@/lib/shared/flow-focus";
 import type { FlowBucket, FlowDayRow, FlowEvent, FlowTimeline } from "@/lib/shared/flows-timeline";
 import { daysFromEvents, unitScaleFor } from "@/lib/shared/flows-timeline";
 import type { PolarisDepositEventRow, PolarisLoanEventRow } from "@/lib/sources/api/polaris-sp-loans";
@@ -38,6 +39,42 @@ function sidePrices(firstDay: number, endDay: number, G: Grains) {
     b.push([d, G.debt]);
   }
   return { [A]: a, [B]: b };
+}
+
+/** The page's flows: the panel's timeline and the rows as the event cards'
+ *  sums read them (lib/shared/flow-focus.ts). */
+export interface SpLoanFlows {
+  timeline: FlowTimeline;
+  focus: FocusEvent[];
+}
+
+/** Each row's legs in the model's figures and in tokens, and each side just
+ *  before and once the row had run. */
+function focusEvents(events: FlowEvent[], buckets: FlowBucket[], G: Grains): FocusEvent[] {
+  const out = new Set(buckets.filter((b) => b.dir === "out").map((b) => b.key));
+  const sideOf = new Map(buckets.map((b) => [b.key, b.side]));
+  return events.map((e) => {
+    const move = { collateral: 0, debt: 0 };
+    for (const l of e.legs) move[sideOf.get(l.bucket)!] += (out.has(l.bucket) ? -1 : 1) * l.usd;
+    const side = (k: "collateral" | "debt") => {
+      const bal = e.balances.find((b) => b.side === k)!;
+      const after = bal.amount * G[k];
+      return {
+        before: Math.max(0, after - move[k]),
+        after,
+        amount: move[k] / G[k],
+        symbol: bal.symbol,
+        held: bal.amount,
+      };
+    };
+    return {
+      id: e.id,
+      ts: e.ts,
+      ...(e.tx ? { tx: e.tx } : {}),
+      legs: e.legs.map((l) => ({ ...l, amount: l.usd / G[sideOf.get(l.bucket)!] })),
+      sides: { collateral: side("collateral"), debt: side("debt") },
+    };
+  });
 }
 
 // ── Deposit ────────────────────────────────────────────────────────────────
@@ -79,13 +116,13 @@ function depositBuckets(stable: string): FlowBucket[] {
   ];
 }
 
-/** A deposit's rows, oldest first, as the panel's timeline. Null without a
+/** A deposit's rows, oldest first, as the panel's timeline and focus events. Null without a
  *  deposit operation. */
-export function depositFlowTimeline(
+export function depositFlows(
   market: PolarisMarket,
   rowsAsc: PolarisDepositEventRow[],
   o: { open: boolean; now: DepositNow | null; nowSec: number },
-): FlowTimeline | null {
+): SpLoanFlows | null {
   const ops = rowsAsc.filter((r) => r.event_type === "deposit_operation");
   if (ops.length === 0) return null;
   const s = POLARIS_MARKET_CONFIG[market].stable.symbol;
@@ -165,7 +202,7 @@ export function depositFlowTimeline(
   if (heldA > DUST) assets.push({ side: "collateral", symbol: s, amount: heldA, usd: heldA * G.collateral });
   if (heldB > DUST) assets.push({ side: "debt", symbol: PETH.symbol, amount: heldB, usd: heldB * G.debt });
 
-  return {
+  const timeline: FlowTimeline = {
     unit: { symbol: s, scale: scale.collateral },
     sideUnits: {
       collateral: { symbol: s, scale: scale.collateral },
@@ -205,6 +242,7 @@ export function depositFlowTimeline(
       },
     },
   };
+  return { timeline, focus: focusEvents(events, buckets, G) };
 }
 
 // ── Loan ───────────────────────────────────────────────────────────────────
@@ -227,11 +265,11 @@ function loanBuckets(): FlowBucket[] {
   ];
 }
 
-/** A loan's touches, oldest first, as the panel's timeline. */
-export function loanFlowTimeline(
+/** A loan's touches, oldest first, as the panel's timeline and focus events. */
+export function loanFlows(
   rowsAsc: PolarisLoanEventRow[],
   o: { open: boolean; collNowRaw: string | null; debtNowRaw: string | null; nowSec: number },
-): FlowTimeline | null {
+): SpLoanFlows | null {
   const touches = rowsAsc.filter((r) => r.event_type !== "transfer");
   if (touches.length === 0) return null;
   let peakA = 0;
@@ -298,7 +336,7 @@ export function loanFlowTimeline(
   if (heldA > DUST) assets.push({ side: "collateral", symbol: FPETH.symbol, amount: heldA, usd: heldA * G.collateral });
   if (heldB > DUST) assets.push({ side: "debt", symbol: POLARIS_WETH.symbol, amount: heldB, usd: heldB * G.debt });
 
-  return {
+  const timeline: FlowTimeline = {
     unit: { symbol: POLARIS_WETH.symbol, scale: scale.debt },
     sideUnits: {
       collateral: { symbol: FPETH.symbol, scale: scale.collateral },
@@ -334,4 +372,5 @@ export function loanFlowTimeline(
       moment: { tokensOnly: ["collateral", "debt"] },
     },
   };
+  return { timeline, focus: focusEvents(events, buckets, G) };
 }

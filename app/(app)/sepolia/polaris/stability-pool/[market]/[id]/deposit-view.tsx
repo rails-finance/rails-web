@@ -1,45 +1,49 @@
 "use client";
 
 // A Polaris stability-pool deposit's page, in the three sections
-// (rails-ops standards/detail-page-anatomy.md): the card, the Lifetime flows
-// tower (decision 0022, lib/polaris/sp-flows.ts), the timeline. The pool's
+// (rails-ops standards/detail-page-anatomy.md) on the CDP page's shell: the
+// card, the Lifetime flows panel (lib/polaris/sp-loan-flow-timelines.ts,
+// decision 0022 as amended 17 Nov 2026), the shared timeline. The pool's
 // getters at head (/api/chain/polaris/stability-pool) are the card's figures
-// and the tower's pending segments; the index holds the history and the sums.
-// The vault-held deposits carry about 185,000 rows each, so the timeline
-// reads its rows newest first, a page at a time, as CoW's trade list does.
+// and the flows' pending legs; the index holds the history and the sums. The
+// vault-held deposits carry about 185,000 rows each: the timeline draws the
+// newest DEPOSIT_FIRST_READ with a boundary card for the rest, and the flows,
+// which need the whole life, are withheld past one read.
 
 import { useEffect, useMemo, useState } from "react";
-import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
-import { LifetimeFlowsPanel, type FlowsRead } from "@/components/shared/lifetime-flows-panel";
-import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
-import { depositFlowTimeline } from "@/lib/polaris/sp-loan-flow-timelines";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
-import { EventDateContext } from "@/components/shared/event-time";
-import { SpineTipContext } from "@/components/shared/spine-column";
-import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
+import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
+import { LifetimeFlowsPanel, type FlowsRead } from "@/components/shared/lifetime-flows-panel";
+import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
+import { FlowFocusContext, useFlowFocusRoot, useFlowFocusValue } from "@/components/shared/flow-focus-context";
+import { CHAIN_TRUTH_DISPLAY_ITEMS, TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
+import { Prov } from "@/components/shared/provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
+import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { PolarisDepositCard } from "@/components/protocol/polaris/polaris-deposit-card";
 import { PolarisDepositEventCard } from "@/components/protocol/polaris/polaris-sp-loan-event-cards";
+import {
+  PolarisDepositFlowsNote,
+  polarisDepositFlowsContent,
+} from "@/components/protocol/polaris/polaris-sp-loan-flows-note";
 import { RawFigure } from "@/components/protocol/polaris/polaris-sp-loan-parts";
 import { fetchPolarisDepositChain, type PolarisDepositChain } from "@/lib/api/fetch-polaris-sp-loans-chain";
 import { PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
 import { POLARIS_SP_PATH } from "@/lib/polaris/routes";
 import { big, depositLifetime, depositNow, depositNowFromChain, units } from "@/lib/polaris/sp-loan-math";
-import { DEPOSIT_PAGE, polarisDepositTower } from "@/lib/polaris/sp-flows";
+import { depositFlows } from "@/lib/polaris/sp-loan-flow-timelines";
+import { DEPOSIT_FIRST_READ, depositTimelineEvent, WHOLE_LIFE_READ } from "@/lib/polaris/sp-loan-timeline-events";
 import { spFeedProv, spLiveProv, spPendingLossProv } from "@/lib/polaris/sp-loan-provenance";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
-import { CARD_INSET_START, SECTION_HEADING } from "@/lib/shared/ui-grammar";
+import { boundaryFromLimit } from "@/lib/shared/timeline-boundary";
+import { CARD_INSET_START } from "@/lib/shared/ui-grammar";
 import {
   readPolarisSpLoans,
   type PolarisDepositEventRow,
   type PolarisDepositTimelineResponse,
 } from "@/lib/sources/api/polaris-sp-loans";
-
-const utcDay = (ts: number) => Math.floor(ts / 86_400);
-const datePrefix = (ts: number, aboveTs: number | null): string | null =>
-  aboveTs != null && utcDay(aboveTs) === utcDay(ts) ? null : `${shortDate(ts)} ${shortDateYear(ts)}`;
 
 export default function DepositView({
   market,
@@ -52,9 +56,7 @@ export default function DepositView({
 }) {
   const stable = POLARIS_MARKET_CONFIG[market].stable;
   const [data, setData] = useState(initial);
-  const [rows, setRows] = useState<PolarisDepositEventRow[]>(initial?.rows ?? []);
   const [failed, setFailed] = useState(false);
-  const [more, setMore] = useState(false);
   const [chain, setChain] = useState<PolarisDepositChain | null>(null);
   const [chainSettled, setChainSettled] = useState(false);
 
@@ -66,13 +68,9 @@ export default function DepositView({
       market,
       id: tokenId,
       order: "desc",
-      limit: String(DEPOSIT_PAGE),
+      limit: String(DEPOSIT_FIRST_READ),
     })
-      .then((d) => {
-        if (cancelled) return;
-        setData(d);
-        setRows(d.rows);
-      })
+      .then((d) => !cancelled && setData(d))
       .catch(() => !cancelled && setFailed(true));
     return () => {
       cancelled = true;
@@ -81,6 +79,7 @@ export default function DepositView({
 
   const row = data?.position ?? null;
   const open = row?.status === "open";
+  const total = data?.totalEvents ?? 0;
 
   // The chain lane: the pool's getters at head, for an open deposit.
   useEffect(() => {
@@ -98,22 +97,16 @@ export default function DepositView({
     };
   }, [open, market, tokenId]);
 
-  const lifetime = useMemo(() => (row ? depositLifetime(row) : null), [row]);
-  // The tower and the head row lay the chain over the index only where the two
-  // agree on the last touch; the card's headlines are the chain's alone.
-  const now = useMemo(() => (lifetime && chain && open ? depositNow(lifetime, chain) : null), [lifetime, chain, open]);
-  const cardNow = useMemo(() => (chain && open ? depositNowFromChain(chain) : null), [chain, open]);
-  const tower = useMemo(() => (lifetime ? polarisDepositTower(market, lifetime, now) : null), [market, lifetime, now]);
-
-  // The whole life, oldest first, for the Lifetime flows panel. A life past
-  // one read's ceiling is withheld (the vault-held deposits).
-  const [flowRows, setFlowRows] = useState<PolarisDepositEventRow[] | null>(null);
-  const [flowsRead, setFlowsRead] = useState<FlowsRead>("reading");
-  const lifeTotal = data?.totalEvents ?? null;
+  // The whole life, oldest first: the first read where it held every row,
+  // else one read of up to WHOLE_LIFE_READ; past that the flows are withheld.
+  const firstRows = data?.rows;
+  const firstWhole = firstRows != null && firstRows.length >= total;
+  const [lifeRows, setLifeRows] = useState<PolarisDepositEventRow[] | null>(null);
+  const [lifeRead, setLifeRead] = useState<FlowsRead>("reading");
   useEffect(() => {
-    if (lifeTotal == null) return;
-    if (lifeTotal > 5000) {
-      setFlowsRead("withheld");
+    if (firstRows == null || firstWhole) return;
+    if (total > WHOLE_LIFE_READ) {
+      setLifeRead("withheld");
       return;
     }
     let cancelled = false;
@@ -121,25 +114,66 @@ export default function DepositView({
       market,
       id: tokenId,
       order: "asc",
-      limit: "5000",
+      limit: String(WHOLE_LIFE_READ),
     })
       .then((d) => {
         if (cancelled) return;
-        setFlowRows(d.rows);
-        setFlowsRead("done");
+        setLifeRows(d.rows);
+        setLifeRead("done");
       })
-      .catch(() => !cancelled && setFlowsRead("failed"));
+      .catch(() => !cancelled && setLifeRead("failed"));
     return () => {
       cancelled = true;
     };
-  }, [lifeTotal, market, tokenId]);
-  const flowTimeline = useMemo(
-    () =>
-      flowRows && (!open || chainSettled)
-        ? depositFlowTimeline(market, flowRows, { open, now, nowSec: Math.floor(Date.now() / 1000) })
-        : null,
-    [flowRows, open, chainSettled, market, now],
+  }, [firstRows, firstWhole, total, market, tokenId]);
+  const wholeAsc = useMemo(
+    () => (firstWhole && firstRows ? [...firstRows].reverse() : lifeRows),
+    [firstWhole, firstRows, lifeRows],
   );
+  // The timeline's rows: the whole life where the page holds it, else the
+  // newest the first read brought.
+  const listed = useMemo(() => wholeAsc ?? (firstRows ? [...firstRows].reverse() : []), [wholeAsc, firstRows]);
+  const rowById = useMemo(() => new Map(listed.map((r) => [r.event_key, r])), [listed]);
+  const events = useMemo(() => listed.map(depositTimelineEvent), [listed]);
+  const olderCount = Math.max(0, total - listed.length);
+
+  const lifetime = useMemo(() => (row ? depositLifetime(row) : null), [row]);
+  // The flows and the head row lay the chain over the index only where the
+  // two agree on the last touch; the card's headlines are the chain's alone.
+  const now = useMemo(() => (lifetime && chain && open ? depositNow(lifetime, chain) : null), [lifetime, chain, open]);
+  const cardNow = useMemo(() => (chain && open ? depositNowFromChain(chain) : null), [chain, open]);
+
+  // Set on mount, so the server's render and the first client render agree.
+  const [nowSec, setNowSec] = useState<number | null>(null);
+  useEffect(() => setNowSec(Math.floor(Date.now() / 1000)), []);
+  const flows = useMemo(
+    () =>
+      wholeAsc && nowSec != null && (!open || chainSettled)
+        ? depositFlows(market, wholeAsc, { open, now, nowSec })
+        : null,
+    [wholeAsc, nowSec, open, chainSettled, market, now],
+  );
+  const flowFocus = useFlowFocusValue(useFlowFocusRoot(flows?.focus ?? NO_FOCUS), flows?.timeline ?? null);
+  const flowsRead: FlowsRead = flows ? "done" : firstWhole ? "reading" : lifeRead === "done" ? "reading" : lifeRead;
+
+  const tl = useTimelineEvents(events, {
+    storageKey: `polaris-sp-${market}-${tokenId}`,
+    protocolKey: "polaris-sp",
+    olderCount,
+    // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
+    dates: false,
+  });
+  const boundary = useMemo(() => {
+    const oldest = tl.sortedEvents[0];
+    if (olderCount === 0 || !oldest) return null;
+    return boundaryFromLimit({
+      total,
+      listed: listed.length,
+      cutBlock: oldest.blockNumber,
+      cutAt: oldest.timestamp,
+      state: null,
+    });
+  }, [olderCount, total, listed.length, tl.sortedEvents]);
 
   // pETH in the market's stablecoin at the feed, the price the head row values
   // the pending pETH at.
@@ -159,31 +193,6 @@ export default function DepositView({
         ]
       : [];
 
-  const total = data?.totalEvents ?? 0;
-  const loadMore = async () => {
-    setMore(true);
-    try {
-      const d = await readPolarisSpLoans<PolarisDepositTimelineResponse>("stability-pool/timeline", {
-        market,
-        id: tokenId,
-        order: "desc",
-        limit: String(DEPOSIT_PAGE),
-        offset: String(rows.length),
-      });
-      // The deposit can take operations between two reads, which shifts the
-      // offset: a row already held is not drawn twice.
-      setRows((r) => {
-        const held = new Set(r.map((x) => x.event_key));
-        return [...r, ...d.rows.filter((x) => !held.has(x.event_key))];
-      });
-    } catch {
-      setFailed(true);
-    } finally {
-      setMore(false);
-    }
-  };
-
-  const registry = useReceiptRegistry();
   const holder = chain?.owner ?? row?.holder ?? null;
 
   if (!data && !failed) return <DetailBodySkeleton />;
@@ -195,110 +204,100 @@ export default function DepositView({
     );
 
   return (
-    <div className="py-8 space-y-6">
-      <DetailTopRow
-        session="polaris"
-        wallet={holder}
-        owner={{
-          wallet: holder,
-          href: holder ? `${POLARIS_SP_PATH}?q=${holder}` : undefined,
-          wrap: chain?.owner
-            ? (pill) => (
-                <Prov info={spLiveProv("owner", market)} value={chain.owner ?? undefined}>
-                  {pill}
-                </Prov>
-              )
-            : undefined,
-        }}
-        fallbackHref={POLARIS_SP_PATH}
-        assets={stripAssets}
-        closed={!open}
-        tools={false}
-      />
-      <PolarisDepositCard
-        row={row}
-        lifetime={lifetime}
-        now={cardNow}
-        pending={open && !chainSettled}
-        explanation={
-          <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed text-rb-500">
-            <li>
-              A deposit in the {stable.symbol} Stability Pool repays the debt of liquidated positions. Each liquidation
-              burns a share of every deposit and pays pETH in its place.
-            </li>
-            <li>
-              The pool records a deposit only when it is touched. The deposit now and the pending gains are the
-              pool&rsquo;s current figures.
-            </li>
-            <li>The deposit also earns {stable.symbol} yield; what a touch does not claim stays in the deposit.</li>
-          </ul>
-        }
-      />
-      <LifetimeFlowsPanel
-        scrubber={flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} /> : null}
-        read={flowTimeline ? "done" : flowsRead === "done" ? "reading" : flowsRead}
-      />
-      {tower && <ChainTruthTower data={tower} />}
-
-      <section className="space-y-4" data-anatomy="P3" aria-label="Activity">
-        <div className={`flex flex-wrap items-baseline justify-between gap-2 ${CARD_INSET_START}`}>
-          <h2 className={SECTION_HEADING}>Activity</h2>
-          <span className="text-xs tabular-nums text-rb-500" data-deposit-count="">
-            {rows.length < total
-              ? `Newest ${rows.length.toLocaleString("en-US")} of ${total.toLocaleString("en-US")} operations`
-              : `${total.toLocaleString("en-US")} ${total === 1 ? "operation" : "operations"}`}
-          </span>
-        </div>
-        <ProvReceiptsScope registry={registry}>
-          {now && lifetime && (
-            <SinceLastTouch
-              market={market}
-              lastTimestamp={Number(row.last_timestamp)}
-              burned={now.pendingLoss}
-              peth={now.bcSinceTouch}
-              gain={now.pendingStable}
-              feed={feed}
-            />
-          )}
-          <div data-deposit-rows="">
-            {rows.map((r, i) => (
-              <EventDateContext.Provider
-                key={r.event_key}
-                value={datePrefix(Number(r.block_timestamp), i > 0 ? Number(rows[i - 1].block_timestamp) : null)}
-              >
-                <SpineTipContext.Provider value={i === 0 ? "above" : null}>
-                  <div id={`event-${r.event_key}`} data-event-id={r.event_key} data-row-at={r.block_timestamp}>
-                    <PolarisDepositEventCard
-                      row={r}
-                      isLast={i === rows.length - 1 && rows.length >= total}
-                      holder={row.holder}
-                      vaultHeld={row.vault_held}
-                    />
-                  </div>
-                </SpineTipContext.Provider>
-              </EventDateContext.Provider>
-            ))}
-          </div>
-        </ProvReceiptsScope>
+    <FlowFocusContext.Provider value={flows ? flowFocus : null}>
+      <div className="py-8 space-y-6">
+        <DetailTopRow
+          session="polaris"
+          wallet={holder}
+          owner={{
+            wallet: holder,
+            href: holder ? `${POLARIS_SP_PATH}?q=${holder}` : undefined,
+            wrap: chain?.owner
+              ? (pill) => (
+                  <Prov info={spLiveProv("owner", market)} value={chain.owner ?? undefined}>
+                    {pill}
+                  </Prov>
+                )
+              : undefined,
+          }}
+          fallbackHref={POLARIS_SP_PATH}
+          assets={stripAssets}
+          closed={!open}
+          tools={false}
+        />
+        <PolarisDepositCard
+          row={row}
+          lifetime={lifetime}
+          now={cardNow}
+          pending={open && !chainSettled}
+          explanation={
+            <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed text-rb-500">
+              <li>
+                A deposit in the {stable.symbol} Stability Pool repays the debt of liquidated positions. Each
+                liquidation burns a share of every deposit and pays pETH in its place.
+              </li>
+              <li>
+                The pool records a deposit only when it is touched. The deposit now and the pending gains are the
+                pool&rsquo;s current figures.
+              </li>
+              <li>The deposit also earns {stable.symbol} yield; what a touch does not claim stays in the deposit.</li>
+            </ul>
+          }
+        />
+        <LifetimeFlowsPanel
+          scrubber={flows ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
+          read={flowsRead}
+          explanation={
+            <div className="space-y-2 text-sm text-rb-500">
+              <PolarisDepositFlowsNote stable={stable.symbol} />
+            </div>
+          }
+          learnMore={polarisDepositFlowsContent(stable.symbol)}
+        />
         {failed && <p className="text-sm text-rb-500">The operations could not be read just now.</p>}
-        {rows.length < total && (
-          <div className={CARD_INSET_START}>
-            <button
-              type="button"
-              onClick={() => void loadMore()}
-              disabled={more}
-              className="inline-flex h-8 items-center rounded-full border border-teal-500/60 px-3 text-xs font-semibold text-teal-600 transition-colors hover:bg-teal-500/10 disabled:opacity-50 dark:text-teal-400"
-              data-deposit-more=""
-            >
-              {more ? "Reading…" : `Show ${DEPOSIT_PAGE} more`}
-            </button>
-          </div>
-        )}
-      </section>
-      <ProvInspectorLayer />
-    </div>
+        <ChainTruthTimeline
+          persistKeyPrefix="polaris-sp"
+          closed={!open}
+          tl={tl}
+          boundary={boundary}
+          displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
+          emptyLabel="No operations recorded for this deposit"
+          toolbarLeading={
+            <TimelineActivityHeader
+              events={events}
+              closed={!open}
+              firstAt={Number(row.first_timestamp)}
+              tenurePending={false}
+            />
+          }
+          liveWindow={
+            now && lifetime
+              ? () => (
+                  <SinceLastTouch
+                    market={market}
+                    lastTimestamp={Number(row.last_timestamp)}
+                    burned={now.pendingLoss}
+                    peth={now.bcSinceTouch}
+                    gain={now.pendingStable}
+                    feed={feed}
+                  />
+                )
+              : undefined
+          }
+          renderCard={(event, meta) => {
+            const r = rowById.get(event.id);
+            return r ? (
+              <PolarisDepositEventCard row={r} isLast={meta.isLast} holder={row.holder} vaultHeld={row.vault_held} />
+            ) : null;
+          }}
+        />
+        <ProvInspectorLayer />
+      </div>
+    </FlowFocusContext.Provider>
   );
 }
+
+const NO_FOCUS: never[] = [];
 
 /** The timeline's head slot (L5, decision 0022 §4): what the pool has done to
  *  the deposit since its last touch, the holder having done nothing, with the
