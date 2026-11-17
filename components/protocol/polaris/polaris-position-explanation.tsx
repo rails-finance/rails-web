@@ -24,7 +24,10 @@ import {
   livePethInDebtProv,
   liveRecordedDebtProv,
   polarisAnnualCostProv,
+  againstHoldingProv,
+  againstHoldingShareProv,
 } from "@/lib/polaris/live-provenance";
+import type { PolarisAgainstHolding } from "@/lib/polaris/against-holding";
 import { PETH } from "@/lib/polaris/asset-catalog";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { formatCompact } from "@/lib/shared/format-compact";
@@ -58,6 +61,7 @@ export function PolarisPositionExplanation({
   terminal,
   lifetime,
   transferCount,
+  againstHolding,
 }: {
   chain: PolarisChainResponse;
   stableSymbol: string;
@@ -68,6 +72,9 @@ export function PolarisPositionExplanation({
    *  CDP the lifetime bullets have no use for. */
   lifetime?: PolarisLifetime | null;
   transferCount?: number;
+  /** The card's "Against holding pETH" figure (ui-jobs 695), echoed as a
+   *  bullet; null where the card states none. */
+  againstHolding?: PolarisAgainstHolding | null;
 }) {
   const hasColl = chain.entireColl > 0;
   const hasDebt = chain.entireDebt > 0;
@@ -163,6 +170,38 @@ export function PolarisPositionExplanation({
       }),
     );
   }
+
+  // The card's "Against holding pETH" stat, echoed: under Holdings on an open
+  // CDP, after the lifetime bullets under History on a closed one.
+  const holding = againstHolding && againstHolding.share != null ? againstHolding : null;
+  const addHolding = (group: Group) => {
+    if (!holding || holding.share == null) return;
+    add(
+      group,
+      "against_holding",
+      positionNodes(holding.gain >= 0 ? "holding_ahead" : "holding_behind", {
+        holding_gain: (
+          <Prov
+            echo
+            info={againstHoldingProv(holding, chain.market)}
+            value={formatExact(holding.gain)}
+            symbol={PETH.symbol}
+          >
+            <H>
+              <AmountText value={Math.abs(holding.gain)} />
+            </H>
+          </Prov>
+        ),
+        holding_share: (
+          <Prov echo info={againstHoldingShareProv(holding)}>
+            <H>{`${(Math.abs(holding.share) * 100).toFixed(1)}%`}</H>
+          </Prov>
+        ),
+        stable: stableSymbol,
+      }),
+    );
+  };
+  if (chain.isOpen) addHolding("holdings");
 
   // The debt as a sum: the figure the last touch recorded, then each leg
   // pending since, which the next touch writes in.
@@ -355,6 +394,8 @@ export function PolarisPositionExplanation({
         }),
       );
   }
+
+  if (!chain.isOpen) addHolding("history");
 
   if (lead == null && bullets.length === 0) return null;
 

@@ -27,6 +27,8 @@ import {
   polarisSinceLastTouch,
   polarisSinceLastTouchSentence,
 } from "@/lib/polaris/since-last-touch";
+import { polarisAgainstHolding, againstHoldingText, isAgainstHoldingNone } from "@/lib/polaris/against-holding";
+import { formatPeth } from "@/lib/polaris/figure-format";
 import { num, amt, usd, fmtUtc, txCell } from "@/lib/shared/position-markdown";
 import {
   anchorMarketNotes,
@@ -59,6 +61,9 @@ export interface PolarisPositionMarkdownArgs {
    *  block) and never in the timeline table; listed alongside the historical
    *  notes in the "Market notes" section only. */
   liveNotes?: MarketNote[];
+  /** The head read is still in flight: the page offers the export as soon as
+   *  the index answers, before the live read lands. */
+  livePending?: boolean;
   /** When the snapshot was taken (copy time) — passed in so the serializer
    *  stays pure. */
   generatedAt: Date;
@@ -195,6 +200,8 @@ export function polarisPositionToMarkdown(args: PolarisPositionMarkdownArgs): st
     lines.push("");
   }
 
+  lines.push(...againstHoldingSection(events, chain, stable, args.livePending === true));
+
   const lifetime = events.length > 0 ? polarisLifetime(events) : null;
   if (lifetime && lifetime.rows > 0) {
     lines.push("## Lifetime (summed from the position's own touches)");
@@ -244,6 +251,60 @@ export function polarisPositionToMarkdown(args: PolarisPositionMarkdownArgs): st
   lines.push(...liquidationForensicsSection(events, view.market, stable));
   lines.push(...timelineTable(events, stable, anchoredNotes));
   return lines.join("\n");
+}
+
+/** "Against holding pETH" (ui-jobs 695): the page's figure, its terms, and
+ *  the feed and block it was valued at; where it is not stated, why. */
+function againstHoldingSection(
+  events: BaseActivityEvent[],
+  chain: PolarisChainResponse | null,
+  stable: string,
+  livePending: boolean,
+): string[] {
+  const r = polarisAgainstHolding(events, chain);
+  if (r == null) return [];
+  const out = ["## Against holding pETH", ""];
+  if (isAgainstHoldingNone(r)) {
+    out.push(
+      r.none === "live-read"
+        ? livePending
+          ? "The live read was still loading, so this snapshot carries no figure against holding pETH."
+          : "The live read was unavailable, so this snapshot carries no figure against holding pETH."
+        : "The index has not reached the position's latest touch, so this snapshot carries no figure against holding pETH.",
+      "",
+    );
+    return out;
+  }
+  const surplus = r.surplusClaimed + r.surplusOwed;
+  out.push(
+    `- **Against holding pETH:** ${againstHoldingText(r, formatPeth)}`,
+    `- **Formula:** (collateral now + withdrawn + surplus − escrow lost − deposited) + (borrowed + settled − repaid − debt now) ÷ feed`,
+    `- **Collateral now:** ${amt(r.collNow)} pETH${r.closed ? " (closed)" : ` (getCDPEntireColl at block ${r.feed.block})`}`,
+    `- **Withdrawn / deposited:** ${amt(r.withdrawn)} / ${amt(r.deposited)} pETH`,
+  );
+  if (surplus > 0)
+    out.push(
+      `- **Liquidation surplus:** ${amt(surplus)} pETH${r.surplusOwed > 0 ? ` (${amt(r.surplusOwed)} still to claim, counted as held)` : " (claimed)"}`,
+    );
+  if (r.escrowLost > 0)
+    out.push(
+      `- **Gas compensation escrow lost:** ${amt(r.escrowLost)} pETH (paid to the liquidator, the LiquidationGasComp log's _flatComp)`,
+    );
+  out.push(
+    `- **Borrowed / repaid:** ${amt(r.borrowed)} / ${amt(r.repaid)} ${stable}`,
+    ...(r.settled > 0
+      ? [`- **Settled to the holder:** ${amt(r.settled)} ${stable} minted to the holder where a debt went below zero`]
+      : []),
+    `- **Debt now:** ${amt(r.debtNow)} ${stable}${r.closed ? " (closed)" : ` (getCDPEntireDebt at block ${r.feed.block}${r.debtNow < 0 ? ", below zero: the next touch mints it to the holder" : ""})`}`,
+    `- **Feed:** ${amt(r.feed.pethInDebt)} ${stable} per pETH (previewPrice() at block ${r.feed.block})`,
+    `- **Terms:** ${sAmt(r.collTerm)} pETH on the collateral side, ${sAmt(r.debtTerm)} ${stable} on the debt side (${sAmt(r.debtTermPeth)} pETH at the feed)`,
+    "",
+    "Interest, stability gains, reward pETH and PSM shares are in the collateral and debt now. The gas compensation " +
+      "escrow is held outside the collateral: a close returns it, and a liquidation pays it to the liquidator, so it " +
+      "counts only on a liquidated position.",
+    "",
+  );
+  return out;
 }
 
 /** The valued breakdown of every liquidation on this CDP — the same legs,

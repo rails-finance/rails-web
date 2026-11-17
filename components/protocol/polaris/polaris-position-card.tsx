@@ -39,6 +39,7 @@ import { useState, type ReactNode } from "react";
 import { AlertTriangle, Check, Copy, Image as ImageIcon, Link2 } from "lucide-react";
 import { AssetPopover } from "@/components/shared/asset-popover";
 import { RevealTip } from "@/components/shared/reveal-tip";
+import { HeadingTip } from "@/components/shared/tip-label";
 import {
   PositionCard,
   type PositionCardExports,
@@ -78,7 +79,14 @@ import {
   liveUsdValueProv,
   liveDebtUsdProv,
   polarisAnnualCostProv,
+  againstHoldingProv,
 } from "@/lib/polaris/live-provenance";
+import {
+  AGAINST_HOLDING_NONE,
+  isAgainstHoldingNone,
+  type PolarisAgainstHolding,
+  type PolarisAgainstHoldingNone,
+} from "@/lib/polaris/against-holding";
 import { PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
 import { POLARIS_WORDS, polarisPositionModal } from "@/lib/polaris/event-templates";
 import { polarisCdpNftUrl, polarisPositionHref } from "@/lib/polaris/routes";
@@ -99,7 +107,7 @@ import type { PolarisChainResponse } from "@/lib/api/fetch-polaris-position";
 // Type-only — lib/sources/chain/* is server-only, and an `import type` is
 // erased before the client bundle is built (the markets view does the same).
 import type { PolarisMarketsChainResponse } from "@/lib/sources/chain/polaris-position";
-import { formatPolarisRatio } from "@/lib/polaris/ratio-format";
+import { formatPolarisRatio, polarisFloorLine, polarisFloorWords } from "@/lib/polaris/ratio-format";
 import { formatCompact } from "@/lib/shared/format-compact";
 
 export interface PolarisPositionView {
@@ -179,8 +187,10 @@ const debtProv = (v: PolarisPositionView): Provenance =>
 
 const pct = (f: number): string => `${(f * 100).toFixed(1)}%`;
 const pct2 = (f: number): string => `${(f * 100).toFixed(2)}%`;
-/** A floor at the grain it is set in: "115%", "112.5%". */
-const pctShort = (f: number): string => `${Number((f * 100).toFixed(1))}%`;
+
+/** The read-more on "defensive mode" in the ratio headline's floor line. */
+const DEFENSIVE_MODE_TIP =
+  "The market's reserve is thin against its debt, so the minimum ratio stands at its higher floor until the reserve recovers.";
 
 /** What the Debt label says on a CDP that owes nothing. */
 const COLLATERAL_ONLY_TIP = "Owes nothing at this block. A Polaris position can hold collateral with no debt.";
@@ -387,6 +397,44 @@ export interface PolarisPositionCardProps {
   /** The CDP's summed ledger (lib/polaris/economics.ts), for the stats that
    *  sum its touches. Absent on the listing. */
   lifetime?: PolarisLifetime | null;
+  /** "Against holding pETH" (lib/polaris/against-holding.ts): the figure, why
+   *  it is not stated, or "pending" while the head read is in flight. Absent
+   *  on the listing. */
+  againstHolding?: PolarisAgainstHolding | PolarisAgainstHoldingNone | "pending" | null;
+}
+
+/** The "Against holding pETH" stat: the figure in pETH and its share of the
+ *  pETH deposited, each with its receipt; the reason where it is not stated. */
+function againstHoldingRow(
+  r: PolarisAgainstHolding | PolarisAgainstHoldingNone | "pending",
+  market: PolarisMarket,
+  stable: string,
+): PositionPanelRow {
+  const tip =
+    `Compared with holding the pETH deposited: the pETH this position holds, withdrew and was left as surplus, ` +
+    `plus its net ${stable} (borrowed, less repaid and still owed) valued at today's price, less the pETH deposited.`;
+  let value: ReactNode;
+  if (r === "pending") value = <div className="h-6 w-24 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />;
+  else if (isAgainstHoldingNone(r))
+    value = (
+      <span className="text-sm font-normal text-rb-500" data-figure="against-holding-none">
+        {AGAINST_HOLDING_NONE[r.none]}
+      </span>
+    );
+  else {
+    value = (
+      <span data-figure="against-holding">
+        <TokenFigure symbol={PETH.symbol} address={PETH.address}>
+          <Prov info={againstHoldingProv(r, market)} value={formatExact(r.gain)} symbol={PETH.symbol}>
+            <span>
+              <CardFigure value={r.gain} symbol={PETH.symbol} plus />
+            </span>
+          </Prov>
+        </TokenFigure>
+      </span>
+    );
+  }
+  return { id: "against-holding", label: "Against holding pETH", tip, value };
 }
 
 /** The Polaris slots for the shared position card: the headlines, the panel,
@@ -400,6 +448,7 @@ export function polarisCardSlots({
   viewHref,
   exports,
   lifetime,
+  againstHolding,
 }: PolarisPositionCardProps): PositionCardSlots {
   const detail = surface === "detail";
   const cfg = POLARIS_MARKET_CONFIG[v.market];
@@ -484,6 +533,8 @@ export function polarisCardSlots({
     };
   } else {
     const mcrInForce = v.mcr;
+    const floorWords =
+      mcrInForce != null ? { mcr: mcrInForce, ...polarisFloorWords(mcrInForce, v.defensiveMode) } : null;
     const belowMin = v.icr != null && mcrInForce != null && v.icr < mcrInForce;
     heads = [
       {
@@ -581,12 +632,25 @@ export function polarisCardSlots({
             </span>
           ) : null,
         pending: v.icr == null && v.pricePending && v.debt > 0,
-        sub:
-          mcrInForce != null ? (
-            <Prov info={liveMcrProv(v.defensiveMode, v.market, index)} value={pct(mcrInForce)}>
-              <span>Minimum ratio {pctShort(mcrInForce)}</span>
+        // The floor in force, and in defensive mode the mode that raised it,
+        // each with its receipt.
+        sub: floorWords ? (
+          <span>
+            <Prov info={liveMcrProv(v.defensiveMode, v.market, index)} value={pct(floorWords.mcr)}>
+              <span>{floorWords.floor}</span>
             </Prov>
-          ) : undefined,
+            {floorWords.mode && (
+              <>
+                {" · "}
+                <Prov info={liveModeProv(v.market, index)} value="defensive">
+                  <span data-figure="defensive-mode">
+                    <HeadingTip text={floorWords.mode} tip={DEFENSIVE_MODE_TIP} />
+                  </span>
+                </Prov>
+              </>
+            )}
+          </span>
+        ) : undefined,
       },
     ];
     // A listing row whose recorded debt is none has no ratio to estimate.
@@ -652,7 +716,8 @@ export function polarisCardSlots({
     learnMore: polarisPositionModal(v.status),
     menu,
   };
-  if (outcome) return { ...detailCommon, outcome };
+  const holding = againstHolding ? againstHoldingRow(againstHolding, v.market, stable) : null;
+  if (outcome) return { ...detailCommon, outcome, ...(holding ? { panel: [[holding], []] } : {}) };
 
   // The panel: the CDP's valuation and the market's mode on the left, what
   // the debt costs and what is pending on the right.
@@ -674,20 +739,7 @@ export function polarisCardSlots({
       ),
     });
   }
-  if (v.mcr != null) {
-    if (v.defensiveMode) {
-      left.push({
-        id: "defensive-mode",
-        label: "Defensive mode",
-        tip: "The market's reserve is thin against its debt, so the minimum ratio stands at its higher floor until the reserve recovers.",
-        value: (
-          <Prov info={liveModeProv(v.market, index)}>
-            <span>On</span>
-          </Prov>
-        ),
-      });
-    }
-  }
+  if (holding) left.push(holding);
   const annualCost =
     v.basis === "chain" && v.recordedDebt != null && v.recordedDebt > 0 && v.interestRate != null
       ? v.recordedDebt * v.interestRate
@@ -793,7 +845,7 @@ export function viewFromSummary(
   pending = false,
 ): PolarisPositionView {
   const board = markets && !markets.chainStale ? markets.markets.find((m) => m.market === s.market) : undefined;
-  const mcrInForce = board ? (board.defensiveMode ? board.defensiveMcr : board.mcr) : null;
+  const mcrInForce = polarisFloorLine(board)?.mcr ?? null;
   const priced = board != null && s.coll > 0 && s.debt > 0;
   return {
     market: s.market,
