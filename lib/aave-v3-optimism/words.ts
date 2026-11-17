@@ -26,12 +26,12 @@ export const pctText = (x: number, digits = 2) => `${(x * 100).toFixed(digits)}%
 export const hfText = (x: number) => x.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 });
 
 export const FRONT_DOOR = {
-  line: "A wallet's Aave V3 account on Optimism: what it supplies and borrows in dollars at Aave's oracle, its health factor and its interest over the last 30 days.",
+  line: "A wallet's Aave V3 position on Optimism: what it supplies and borrows in dollars at Aave's oracle, its health factor and its interest over the last 30 days.",
   links: { markets: "Market overview" },
 };
 
 export const POSITION_PAGE = {
-  title: "Aave V3 account",
+  title: "Aave V3 position",
   sub: "Pool · Optimism",
   unanswered: "The read of this position did not answer. Try again in a minute.",
   empty: "This address supplies and borrows nothing on Aave V3 on Optimism.",
@@ -40,15 +40,15 @@ export const POSITION_PAGE = {
 export const CARD_WORDS = {
   heading: "Position summary",
   supplied: "Supplied",
-  suppliedTip: "What the account has supplied to the Pool, in dollars at Aave's oracle.",
+  suppliedTip: "What the position has supplied to the Pool, in dollars at Aave's oracle.",
   debt: "Debt",
-  debtTip: "What the account owes the Pool, with interest, in dollars at Aave's oracle.",
+  debtTip: "What the position owes the Pool, with interest, in dollars at Aave's oracle.",
   health: "Health factor",
   healthTip:
-    "Collateral counted at each asset's liquidation threshold, divided by debt, both at Aave's oracle. Below 1 the account can be liquidated.",
+    "Collateral counted at each asset's liquidation threshold, divided by debt, both at Aave's oracle. Below 1 the position can be liquidated.",
   noDebt: "no debt",
   room: "Room to borrow",
-  roomTip: "How much more the account can borrow in dollars before its collateral's loan-to-value is used up.",
+  roomTip: "How much more the position can borrow in dollars before its collateral's loan-to-value is used up.",
   supplyRow: (sym: string) => `${sym} supplied`,
   debtRow: (sym: string) => `${sym} borrowed`,
   collateralFlag: "collateral",
@@ -100,7 +100,7 @@ export function cardExplainer(p: OpPositionFigures): { title: string; bullets: s
     title: "Interest over 30 days",
     bullets: [
       "The Pool holds each balance as a scaled amount that grows into tokens through the reserve's index. Where the scaled amount is the same at both dates, the interest is the balance now less the balance 30 days back.",
-      "Where the account supplied, withdrew, borrowed or repaid inside the 30 days, the figure is withheld.",
+      "Where the wallet supplied, withdrew, borrowed or repaid inside the 30 days, the figure is withheld.",
     ],
   });
   return groups;

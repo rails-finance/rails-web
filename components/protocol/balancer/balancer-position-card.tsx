@@ -130,7 +130,11 @@ function slots(r: BalPositionRead): PositionCardSlots {
     heads,
     counters: null,
     // The position's name: the pool and the wallet (lib/shared/position-name.ts).
-    name: positionName({ market: p.symbol, noun: POSITION_NOUN[balChain(r.chainId).session], id: r.wallet }),
+    name: positionName({
+      market: p.symbol,
+      noun: POSITION_NOUN[balChain(r.chainId).session],
+      id: r.wallet.toLowerCase(),
+    }),
     menu: { exports: null },
     stamp: <BalancerReadStamp c={c} what="Every figure on this card" />,
     explainer: {

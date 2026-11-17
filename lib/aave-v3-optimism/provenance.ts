@@ -36,12 +36,12 @@ export function readContracts(r: OpPositionRead) {
     {
       name: "Aave V3 Optimism Pool",
       address: r.pool,
-      reads: "the account's totals and health factor, and each reserve's terms and indexes at both blocks",
+      reads: "the position's totals and health factor, and each reserve's terms and indexes at both blocks",
     },
     {
       name: "Aave UiPoolDataProvider",
       address: r.uiPoolDataProvider,
-      reads: "the account's scaled balances, collateral switches and E-Mode category at both blocks",
+      reads: "the position's scaled balances, collateral switches and E-Mode category at both blocks",
     },
     { name: "Aave V3 Optimism IAaveOracle", address: r.oracle, reads: "each reserve's USD price at the head" },
   ];
@@ -87,7 +87,7 @@ export function opReserveProv(key: OpReserveFigure, c: OpReceiptContext, x: OpRe
         pclass: "state",
         source: head,
         contract: uiC(r),
-        summary: `${x.symbol} ${sup ? "supplied" : "owed"}. The account's scaled ${sup ? "supply" : "debt"} grown by the reserve's index, read at ${at(r.head)}.`,
+        summary: `${x.symbol} ${sup ? "supplied" : "owed"}. The position's scaled ${sup ? "supply" : "debt"} grown by the reserve's index, read at ${at(r.head)}.`,
         via: `${via(`block ${n(r.head.block)}`)} · UiPoolDataProvider getUserReservesData(provider, wallet).${scaledName} × Pool ${indexFn}(${x.symbol}) ÷ 10^27, ${rounding}, ÷ 10^${x.decimals}`,
         formula: "scaled × index",
         inputs: [chain(scaledName, scaledNow, "getUserReservesData"), chain(indexFn, indexNow, "a ray")],

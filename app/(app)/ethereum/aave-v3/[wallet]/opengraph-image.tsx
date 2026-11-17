@@ -1,4 +1,4 @@
-// This account's live share card — a second consumer of
+// This position's live share card — a second consumer of
 // `loadAaveV3PositionTail`, the exact same server read the page itself awaits
 // (see `page.tsx` beside this file). No new read path.
 
@@ -11,7 +11,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
-export const alt = "This account's live Aave V3 position card";
+export const alt = "This position's live Aave V3 card";
 
 const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 

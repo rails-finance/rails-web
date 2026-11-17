@@ -28,6 +28,20 @@ export const loadBalancerPosition = cache((chainId: BalChainId, pool: string, wa
   fetchBalancerPosition(chainId, pool, wallet),
 );
 
+/** The tab's name for a pool share, as its card's name gives it
+ *  (lib/shared/position-name.ts): the pool's symbol and the wallet, off the
+ *  read the page makes; null where the read did not answer. */
+export async function balancerTabName(
+  chainId: BalChainId,
+  pool: string,
+  wallet: string,
+): Promise<{ market: string; subject: string } | null> {
+  if (!isWallet(pool) || !isWallet(wallet)) return null;
+  const answer = await loadBalancerPosition(chainId, pool.toLowerCase(), wallet.toLowerCase()).catch(() => null);
+  if (answer?.kind !== "ok") return null;
+  return { market: balPosition(answer.data).symbol, subject: wallet.toLowerCase() };
+}
+
 export async function BalancerPositionPage({
   chainId,
   pool,

@@ -120,7 +120,7 @@ export function sparkPositionToMarkdown(args: SparkPositionMarkdownArgs): string
   lines.push(
     terminal
       ? `> Snapshot generated ${fmtUtc(generatedAt.getTime() / 1000)}. ` +
-          `The account is ${view.status} — no open balances remain. Balances below are each reserve's ` +
+          `The position is ${view.status} — no open balances remain. Balances below are each reserve's ` +
           `HIGHEST recorded balance (largest running scaled claim over every captured flow, spToken transfers ` +
           `included, valued at the index of the moment it stood — interest to then included). Not financial advice.`
       : `> Point-in-time snapshot generated ${fmtUtc(generatedAt.getTime() / 1000)}. ` +
@@ -159,11 +159,11 @@ export function sparkPositionToMarkdown(args: SparkPositionMarkdownArgs): string
     if (view.status === "liquidated") {
       lines.push(
         lastType === "liquidation"
-          ? `- **Liquidated** — the record ends with the seizure; the final liquidation call emptied the account.`
-          : `- **Liquidated** — liquidation seizures are in the record, but the account exited by its own transactions afterwards.`,
+          ? `- **Liquidated** — the record ends with the seizure; the final liquidation call emptied the position.`
+          : `- **Liquidated** — liquidation seizures are in the record, but the wallet closed it by its own transactions afterwards.`,
       );
     } else {
-      lines.push(`- **Closed** — the account exited by its own transactions; no liquidation is in the record.`);
+      lines.push(`- **Closed** — the wallet closed it by its own transactions; no liquidation is in the record.`);
     }
     lines.push("");
     lines.push("## Highest recorded balances (per reserve)");

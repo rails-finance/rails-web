@@ -437,7 +437,7 @@ export const sparkLiqDropProv = (): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   summary:
-    "Drop to liquidation — how far the collateral's value at SparkLend's oracle prices can fall, the debt standing still, before the health factor reaches 1 and the account can be liquidated.",
+    "Drop to liquidation — how far the collateral's value at SparkLend's oracle prices can fall, the debt standing still, before the health factor reaches 1 and the position can be liquidated.",
   contract: SPARK,
   via: "1 − 1 ÷ Pool getUserAccountData health factor",
   formula: "1 − 1 ÷ health factor",

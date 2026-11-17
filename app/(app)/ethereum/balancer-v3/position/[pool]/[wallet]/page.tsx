@@ -3,7 +3,7 @@
 
 import type { Metadata } from "next";
 import { positionMetadata } from "@/lib/shared/page-metadata";
-import { BalancerPositionPage } from "@/components/protocol/balancer/balancer-position-page";
+import { BalancerPositionPage, balancerTabName } from "@/components/protocol/balancer/balancer-position-page";
 
 interface Props {
   params: Promise<{ pool: string; wallet: string }>;
@@ -13,9 +13,13 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { pool, wallet } = await params;
+  // The pool's symbol and the wallet, as the card names the share, off the read
+  // the page makes (the same `cache()` entry); the pool alone where it did not answer.
+  const named = await balancerTabName(1, pool, wallet);
   return positionMetadata({
     session: "balancer-v3",
-    subject: pool,
+    subject: named?.subject ?? pool,
+    market: named?.market,
     canonicalPath: `/ethereum/balancer-v3/position/${pool}/${wallet}`,
   });
 }

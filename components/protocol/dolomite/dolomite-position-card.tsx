@@ -241,7 +241,7 @@ function AccountIdentity({ v, tip, name }: { v: DolomitePositionView; tip?: bool
     return <WalletPill wallet={v.owner} ensName={null} filterProtocol="dolomite" bookmark />;
   }
   // A borrow position is numbered by its account, so it reads as one name,
-  // "Borrow position #12", in the noun of Dolomite's own vocabulary.
+  // "Borrow position #12", in Dolomite's noun.
   if (/^Borrow Position #/.test(v.accountLabel)) {
     return (
       <span className="text-xs tabular-nums text-rb-400" data-position-name-id="">
@@ -252,9 +252,12 @@ function AccountIdentity({ v, tip, name }: { v: DolomitePositionView; tip?: bool
   return (
     <span className="flex items-center gap-2">
       <span className="text-xs text-rb-500">
-        {/* The account's kind ("Dolomite Balance", the WLFI frontend's
-            account); its number follows in the position's name. */}
-        <DolomiteAccountLabel text={v.accountLabel.replace(/ #\S+$/, "")} accountNumber={v.accountNumber} />
+        {/* The account's kind ("Dolomite Balance", "Borrow position (WLFI
+            frontend account)"); its number follows in the position's name. */}
+        <DolomiteAccountLabel
+          text={v.accountLabel.replace(/ #\S+$/, "").replace(/^Borrow Position\b/, "Borrow position")}
+          accountNumber={v.accountNumber}
+        />
       </span>
       <PositionNameId name={name} />
     </span>

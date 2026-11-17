@@ -138,7 +138,7 @@ export function aaveV3PositionToMarkdown(args: AaveV3PositionMarkdownArgs): stri
   lines.push(
     terminal
       ? `> Snapshot generated ${fmtUtc(generatedAt.getTime() / 1000)}. ` +
-          `The account is ${view.status} — no open balances remain. Balances below are each reserve's ` +
+          `The position is ${view.status} — no open balances remain. Balances below are each reserve's ` +
           (swept
             ? `HIGHEST recorded principal (the largest running balance replayed from the wallet's own Pool events, ` +
               (stored
@@ -187,11 +187,11 @@ export function aaveV3PositionToMarkdown(args: AaveV3PositionMarkdownArgs): stri
     if (view.status === "liquidated") {
       lines.push(
         lastType === "liquidation"
-          ? `- **Liquidated** — the record ends with the seizure; the final liquidation call emptied the account.`
-          : `- **Liquidated** — liquidation seizures are in the record, but the account exited by its own transactions afterwards.`,
+          ? `- **Liquidated** — the record ends with the seizure; the final liquidation call emptied the position.`
+          : `- **Liquidated** — liquidation seizures are in the record, but the wallet closed it by its own transactions afterwards.`,
       );
     } else {
-      lines.push(`- **Closed** — the account exited by its own transactions; no liquidation is in the record.`);
+      lines.push(`- **Closed** — the wallet closed it by its own transactions; no liquidation is in the record.`);
     }
     lines.push("");
     lines.push("## Highest recorded balances (per reserve)");

@@ -200,7 +200,11 @@ function slots(r: EulerPositionRead): PositionCardSlots {
     heads,
     counters: null,
     // The position's name: the vault and the account (lib/shared/position-name.ts).
-    name: positionName({ market: p.vaultSymbol, noun: POSITION_NOUN[EULER_SESSION[r.chainId]], id: p.account }),
+    name: positionName({
+      market: p.vaultSymbol,
+      noun: POSITION_NOUN[EULER_SESSION[r.chainId]],
+      id: p.account.toLowerCase(),
+    }),
     menu: { exports: null },
     stamp: <EulerReadStamp c={c} what="Every figure on this card" />,
     explainer: {

@@ -73,8 +73,10 @@ export default function InfoPage() {
           heading: "Account page",
           body: (
             <ul className={UL}>
-              <li>The top card shows the account&apos;s collateral, debt and health factor, read from the Pool now.</li>
-              <li>The timeline lists each event of the account, and each event opens its own page.</li>
+              <li>
+                The top card shows the position&apos;s collateral, debt and health factor, read from the Pool now.
+              </li>
+              <li>The timeline lists each event of the position, and each event opens its own page.</li>
             </ul>
           ),
         },

@@ -931,7 +931,7 @@ export function useAaveV3EventBody({
       )}
       {feeOf && (
         <div className="px-5 pb-2 text-xs text-rb-500">
-          Paid out of the liquidation in the same transaction; the account&rsquo;s figures for that transaction are on
+          Paid out of the liquidation in the same transaction; the position&rsquo;s figures for that transaction are on
           the liquidation&rsquo;s card.
         </div>
       )}

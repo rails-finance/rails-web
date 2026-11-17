@@ -7,6 +7,7 @@ import {
   UniswapPositionPage,
   isPositionId,
   loadUniswapPosition,
+  uniswapTabMarket,
 } from "@/components/protocol/uniswap/uniswap-position-page";
 
 interface Props {
@@ -20,6 +21,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return positionMetadata({
     session: "uniswap-v4-arc",
     subject: id,
+    // The pair off the read the page makes (the same `cache()` entry).
+    market: await uniswapTabMarket("v4", id, "uniswap", 5042),
     canonicalPath: `/arc/uniswap-v4/position/${id}`,
   });
 }

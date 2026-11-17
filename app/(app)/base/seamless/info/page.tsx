@@ -104,7 +104,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
         <li>
           The top card shows what the wallet supplied, what it owes and its health factor, read now from the Pool.
         </li>
-        <li>The timeline lists the account&apos;s events, newest first.</li>
+        <li>The timeline lists the position&apos;s events, newest first.</li>
       </ul>
     ),
   },
