@@ -77,17 +77,13 @@ import {
   liveDebtUsdProv,
   polarisAnnualCostProv,
   againstHoldingProv,
-  againstHoldingShareProv,
 } from "@/lib/polaris/live-provenance";
 import {
   AGAINST_HOLDING_NONE,
-  againstHoldingShareText,
   isAgainstHoldingNone,
   type PolarisAgainstHolding,
   type PolarisAgainstHoldingNone,
 } from "@/lib/polaris/against-holding";
-import { PanelFigure } from "@/components/shared/position-card-panel";
-import { formatPeth } from "@/lib/polaris/figure-format";
 import { PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
 import { POLARIS_WORDS, polarisPositionModal } from "@/lib/polaris/event-templates";
 import { polarisCdpNftUrl, polarisPositionHref } from "@/lib/polaris/routes";
@@ -425,29 +421,15 @@ function againstHoldingRow(
       </span>
     );
   else {
-    const sign = r.gain >= 0 ? "+" : "−";
     value = (
       <span data-figure="against-holding">
-        <PanelFigure>
+        <TokenFigure symbol={PETH.symbol} address={PETH.address}>
           <Prov info={againstHoldingProv(r, market)} value={formatExact(r.gain)} symbol={PETH.symbol}>
             <span>
-              {sign}
-              {formatPeth(Math.abs(r.gain))}
+              <CardFigure value={r.gain} symbol={PETH.symbol} plus />
             </span>
           </Prov>
-        </PanelFigure>{" "}
-        pETH
-        {r.share != null && (
-          <>
-            {" ("}
-            <PanelFigure>
-              <Prov info={againstHoldingShareProv(r)} value={formatExact(r.share * 100)}>
-                <span>{againstHoldingShareText(r.share)}</span>
-              </Prov>
-            </PanelFigure>{" "}
-            of pETH deposited)
-          </>
-        )}
+        </TokenFigure>
       </span>
     );
   }

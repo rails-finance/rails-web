@@ -29,7 +29,6 @@ import {
 } from "@/lib/polaris/live-provenance";
 import type { PolarisAgainstHolding } from "@/lib/polaris/against-holding";
 import { PETH } from "@/lib/polaris/asset-catalog";
-import { formatPeth } from "@/lib/polaris/figure-format";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { formatExact, formatNumber, formatUnitsExact, withRealMinus } from "@/lib/utils/format";
@@ -188,7 +187,9 @@ export function PolarisPositionExplanation({
             value={formatExact(holding.gain)}
             symbol={PETH.symbol}
           >
-            <H>{formatPeth(Math.abs(holding.gain))}</H>
+            <H>
+              <AmountText value={Math.abs(holding.gain)} />
+            </H>
           </Prov>
         ),
         holding_share: (
