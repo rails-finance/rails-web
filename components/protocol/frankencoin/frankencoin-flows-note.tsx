@@ -24,8 +24,8 @@ export function FrankencoinFlowsNote({ facts, collSymbol, clone }: FrankencoinFl
     <div className="space-y-2" data-frankencoin-flows-note="" data-anatomy="F14">
       <p>
         Frankencoin has no price oracle, so nothing states what the {collSymbol} is worth in ZCHF: the collateral bar is
-        in {collSymbol} and the debt bar in ZCHF, each on its own scale, and the two lengths do not compare. The line
-        draws each side on its own scale too, its top labelled in its token.
+        in {collSymbol} and the debt bar in ZCHF, each on its own scale. The line draws each side on its own scale too,
+        its top labelled in its token.
       </p>
       <p>
         Every ledger row (the position&apos;s MintingUpdate) states its collateral and its debt after it, so each line

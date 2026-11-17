@@ -19,6 +19,7 @@ import {
   type PositionPanelRow,
 } from "@/components/shared/position-card";
 import { PanelFigure } from "@/components/shared/position-card-panel";
+import { TokenFigure } from "@/components/shared/token-figure";
 import { Prov } from "@/components/shared/provenance";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { WalletPill } from "@/components/shared/wallet-pill";
@@ -258,22 +259,31 @@ export function polarisLoanSlots({
     left.push({
       id: "at-floor",
       label: "Collateral at the floor",
-      asset: { symbol: W.symbol, address: W.address },
       tip: `The ${F.symbol} valued at the bonding curve's floor price.`,
+      // Each figure carries its icon and keeps its word, so a narrow card
+      // breaks the line between the two figures.
       value: (
-        <span data-anatomy="C23·polaris" data-floor-line="">
-          <PanelFigure>
-            <Prov info={loanAtFloorProv()}>
-              <RawFigure raw={now.atFloor} symbol={W.symbol} />
-            </Prov>
-          </PanelFigure>{" "}
-          against{" "}
-          <PanelFigure>
-            <Prov info={loanLiveProv("debt")} echo>
-              <RawFigure raw={now.debt} symbol={W.symbol} />
-            </Prov>
-          </PanelFigure>{" "}
-          debt
+        <span className="flex flex-wrap items-center gap-x-1.5" data-anatomy="C23·polaris" data-floor-line="">
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+            <TokenFigure symbol={W.symbol} address={W.address}>
+              <PanelFigure>
+                <Prov info={loanAtFloorProv()}>
+                  <RawFigure raw={now.atFloor} symbol={W.symbol} />
+                </Prov>
+              </PanelFigure>
+            </TokenFigure>
+            against
+          </span>
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+            <TokenFigure symbol={W.symbol} address={W.address}>
+              <PanelFigure>
+                <Prov info={loanLiveProv("debt")} echo>
+                  <RawFigure raw={now.debt} symbol={W.symbol} />
+                </Prov>
+              </PanelFigure>
+            </TokenFigure>
+            debt
+          </span>
         </span>
       ),
     });

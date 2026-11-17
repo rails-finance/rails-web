@@ -34,8 +34,8 @@ export function PwnFlowsNote({ facts, collSymbol, collLabel, creditSymbol, apr, 
             ? " This wallet is the borrower: the debt is what it owes."
             : ""}{" "}
         PWN has no price oracle, so nothing states what the {collSymbol} is worth in {creditSymbol}: the collateral bar
-        is in {collSymbol} and the debt bar in {creditSymbol}, each on its own scale, and the two lengths do not
-        compare. The line draws each side on its own scale too.
+        is in {collSymbol} and the debt bar in {creditSymbol}, each on its own scale. The line draws each side on its
+        own scale too.
       </p>
       <p>
         Only three rows move a token: the creation locks the collateral and pays out the principal, and the loan ends

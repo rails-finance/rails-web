@@ -17,7 +17,7 @@ import {
   type PolarisDepositTimelineResponse,
 } from "@/lib/sources/api/polaris-sp-loans";
 import DepositView from "./deposit-view";
-import { DEPOSIT_PAGE } from "@/lib/polaris/sp-flows";
+import { DEPOSIT_FIRST_READ } from "@/lib/polaris/sp-loan-timeline-events";
 
 interface Props {
   params: Promise<{ market: string; id: string }>;
@@ -31,7 +31,7 @@ async function load(market: string, id: string): Promise<PolarisDepositTimelineR
     if (!hop) return null;
     return await readPolarisSpLoans<PolarisDepositTimelineResponse>(
       "stability-pool/timeline",
-      { market, id, order: "desc", limit: String(DEPOSIT_PAGE) },
+      { market, id, order: "desc", limit: String(DEPOSIT_FIRST_READ) },
       { ...hop, signal: AbortSignal.timeout(SSR_FETCH_TIMEOUT_MS) },
     );
   } catch (err) {

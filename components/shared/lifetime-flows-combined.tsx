@@ -861,6 +861,13 @@ export function CombinedFlows({
             renderBars(barStop, when, liveReceipts, cur.live)
           )}
         </FlowBarsHeadsContext.Provider>
+        {/* Bars in two tokens that nothing prices in each other (Frankencoin,
+            PWN, a Polaris deposit): each fills to its own largest figure. */}
+        {model.sideUnits && (
+          <p className="mt-2 text-xs text-rb-500" data-flow-own-tokens="">
+            Each bar is in its own token; the lengths do not compare.
+          </p>
+        )}
       </div>
       {outside && (
         <p
