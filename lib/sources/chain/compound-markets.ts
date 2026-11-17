@@ -64,6 +64,7 @@ import type { StoredHeadRead } from "@/lib/shared/server-head-read";
 import { BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { COMPOUND_DEPLOYMENT, type CometDeployment } from "@/lib/compound/asset-catalog";
 import { resolveErc20Meta } from "./erc20-meta";
+import { rethrowAtBuild } from "@/lib/sources/api/route-gate";
 
 const COMET_ABI = parseAbi([
   "function totalSupply() view returns (uint256)",
@@ -241,6 +242,7 @@ export async function loadCompoundV3Markets(
     const head = serverHeadStampAt(deployment.chainId, value.blockNumber);
     return head ? { ...value, head } : value;
   } catch (error) {
+    rethrowAtBuild(error);
     console.error("Compound V3 markets chain read failed:", error);
     return empty();
   }

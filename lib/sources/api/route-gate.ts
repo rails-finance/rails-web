@@ -9,12 +9,41 @@
 // (a 400 or 409 refusing the request, a 404 that is the answer "none") marks
 // nothing, and `answer` hands its status to a caller that reads one.
 //
+// During `next build` the same failures throw `RouteDownAtBuild` instead and
+// mark nothing: a prerender whose route cannot answer fails (Next retries it,
+// `staticGenerationRetryCount` in next.config.ts) rather than reading the chain
+// (rails-ops TO-DO-ui-jobs.md item 686). A caller that catches errors around a
+// gate call rethrows this one.
+//
 // SERVER-ONLY.
 
 /** How long a client waits for the route before reading the chain. */
 export const ROUTE_WAIT_MS = 3_000;
 /** After the route fails, how long the chain is read without asking it. */
 const DOWN_MS = 30_000;
+
+/** A route failure during `next build`, where no caller may read the chain in its place. */
+export class RouteDownAtBuild extends Error {
+  constructor(key: string, why: string) {
+    super(`rails-server route ${key} cannot answer during the build: ${why}`);
+    this.name = "RouteDownAtBuild";
+  }
+}
+
+const atBuild = () => process.env.NEXT_PHASE === "phase-production-build";
+
+/** First in a catch between a gate client and a prerender: rethrows the build's route
+ *  failure, so the page fails instead of caching its stub; any other error returns. */
+export function rethrowAtBuild(err: unknown): void {
+  if (err instanceof RouteDownAtBuild) throw err;
+}
+
+/** For an api-first client that asks without a gate: during `next build`, its route
+ *  failing (`why`, or the error it threw) throws `RouteDownAtBuild`; otherwise nothing. */
+export function throwAtBuild(key: string, why: unknown): void {
+  if (why instanceof RouteDownAtBuild) throw why;
+  if (atBuild()) throw new RouteDownAtBuild(key, why instanceof Error ? why.message : String(why));
+}
 
 /** How long to wait, and a signal that ends the wait sooner. */
 export interface AskOpts {
@@ -47,15 +76,19 @@ export function routeGate() {
       if (!res.ok) {
         void res.body?.cancel().catch(() => undefined);
         if (res.status >= 500 || res.status === 429) {
+          if (atBuild()) throw new RouteDownAtBuild(key, `status ${res.status}`);
           markDown(key);
           return null;
         }
         return { status: res.status };
       }
       return { body: (await res.json()) as T };
-    } catch {
+    } catch (err) {
       // The caller's own abort (the wallet page's budget) is not the route failing.
-      if (!opts.signal?.aborted) markDown(key);
+      if (opts.signal?.aborted) return null;
+      if (err instanceof RouteDownAtBuild) throw err;
+      if (atBuild()) throw new RouteDownAtBuild(key, (err as Error)?.message ?? String(err));
+      markDown(key);
       return null;
     }
   }

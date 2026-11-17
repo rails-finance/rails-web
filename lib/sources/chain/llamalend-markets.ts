@@ -50,6 +50,7 @@ import {
   type LlamalendVersion,
 } from "@/lib/llamalend/asset-catalog";
 import { scale1e18 } from "@/lib/llamalend/band-math";
+import { rethrowAtBuild } from "@/lib/sources/api/route-gate";
 
 const ZERO = BigInt(0);
 
@@ -265,7 +266,10 @@ export async function discoverLlamalendMarkets(): Promise<LlamalendMarketMap> {
             data: `${marketsSel}${BigInt(i).toString(16).padStart(64, "0")}` as `0x${string}`,
           })
           .then((r) => addressWords(r.data))
-          .catch(() => [] as string[]),
+          .catch((err): string[] => {
+            rethrowAtBuild(err);
+            return [];
+          }),
       ),
     );
     const candidates = [...new Set(rawStructs.flat())];
@@ -595,6 +599,7 @@ export async function loadLlamalendMarkets(): Promise<LlamalendMarketsResponse> 
       chainStale: false,
     };
   } catch (error) {
+    rethrowAtBuild(error);
     console.error("LlamaLend markets chain read failed:", error);
     return empty();
   }
@@ -643,7 +648,10 @@ export async function loadLlamalendMarket(controller: string): Promise<Llamalend
           ? { address: ONEWAY, abi: VAULT_ABI, functionName: "vaults", args: [BigInt(market.index)], blockNumber: at }
           : { address: market.controller as `0x${string}`, abi: VAULT_ABI, functionName: "vault", blockNumber: at },
       )
-      .catch(() => null);
+      .catch((err) => {
+        rethrowAtBuild(err);
+        return null;
+      });
     vault = v ? getAddress(v).toLowerCase() : null;
   }
   const [lendRead, rateRead] = (await client.multicall({
@@ -710,6 +718,7 @@ export async function resolveLlamalendMarketState(): Promise<{
     });
     return { state, blockNumber, head: serverHeadStampAt(MAINNET_CHAIN_ID, blockNumber) };
   } catch (error) {
+    rethrowAtBuild(error);
     console.error("LlamaLend market-state read failed:", error);
     return { state, blockNumber: 0 };
   }

@@ -52,6 +52,7 @@ import { loadVaultYields } from "@/lib/vaults/yield-read";
 import type { VaultYield } from "@/lib/vaults/yield";
 import { vaultIndexKey, type VaultIndexRoster } from "@/lib/vaults/index-rosters";
 import type { VaultCensusFamily } from "@/lib/vaults/families";
+import { rethrowAtBuild } from "@/lib/sources/api/route-gate";
 
 export interface VaultIndexRead {
   vaults: VaultSummary[];
@@ -67,6 +68,7 @@ export interface VaultIndexRead {
 /** A roster whose loader threw: no rows, every figure unread. */
 function unread<T>(what: string, stale: T): (error: unknown) => T {
   return (error) => {
+    rethrowAtBuild(error);
     console.error(`${what} did not answer for the vault index:`, error);
     return stale;
   };
@@ -138,6 +140,7 @@ async function readVaultIndex(): Promise<VaultIndexRead> {
       unread<YearnVaultDirectoryResponse | null>("Yearn's vault directory", null),
     ),
     loadMaplePools().catch((error) => {
+      rethrowAtBuild(error);
       console.error("Maple's pools did not answer for the vault index:", error);
       return { states: [] as MaplePoolState[], readAt: new Date().toISOString() };
     }),

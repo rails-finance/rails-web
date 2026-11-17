@@ -49,6 +49,7 @@ import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import type { RawAmount } from "./morpho-base-vault";
 import { YEARN_REGISTRY } from "@/lib/yearn/vault-catalog";
 import { loadYearnVaultRoster, type YearnVaultRoster } from "@/lib/yearn/vault-roster";
+import { rethrowAtBuild } from "@/lib/sources/api/route-gate";
 
 /** Yearn V3 is deployed on Ethereum mainnet; this loader reads no other chain. */
 export const YEARN_CHAIN_ID = 1;
@@ -234,6 +235,7 @@ async function readDirectory(): Promise<YearnVaultDirectoryResponse> {
       rows,
     };
   } catch (error) {
+    rethrowAtBuild(error);
     console.error("Yearn vault roster chain read failed:", error);
     return empty(served);
   }

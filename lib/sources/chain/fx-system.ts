@@ -48,6 +48,7 @@ import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
 import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { FX_ADDRESSES, FX_POOLS, FX_POOL_KEYS, type FxPoolKey } from "@/lib/fx/asset-catalog";
+import { rethrowAtBuild } from "@/lib/sources/api/route-gate";
 
 const POOL_ABI = parseAbi([
   "function getTopTick() view returns (int16)",
@@ -446,6 +447,7 @@ export async function loadFxSystemFromChain(): Promise<FxSystemChainResponse> {
       chainStale: false,
     };
   } catch (error) {
+    rethrowAtBuild(error);
     console.error("f(x) system chain read failed:", error);
     return empty();
   }
