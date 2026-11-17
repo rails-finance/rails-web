@@ -50,8 +50,9 @@ test("a closed Trove is last only when it changed hands", () => {
   assert.deepEqual(troveHolder({ owner: ZERO, lastOwner: B }), { address: B, last: false });
 });
 
-test("the fork holder is never last", () => {
+test("the fork holder is last only on a closed Trove whose read says it changed hands", () => {
   assert.deepEqual(liquityForkHolder({ owner: null, lastOwner: B }), { address: B, last: false });
-  assert.deepEqual(liquityForkHolder({ owner: ZERO, lastOwner: B }), { address: B, last: false });
-  assert.deepEqual(liquityForkHolder({ owner: A, lastOwner: A }), { address: A, last: false });
+  assert.deepEqual(liquityForkHolder({ owner: ZERO, lastOwner: B, changedHands: false }), { address: B, last: false });
+  assert.deepEqual(liquityForkHolder({ owner: null, lastOwner: B, changedHands: true }), { address: B, last: true });
+  assert.deepEqual(liquityForkHolder({ owner: A, lastOwner: A, changedHands: true }), { address: A, last: false });
 });

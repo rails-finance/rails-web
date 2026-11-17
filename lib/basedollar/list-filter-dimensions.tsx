@@ -12,6 +12,7 @@
 // Transactions is a range over the row's txCount
 // (lib/shared/transactions-dimension.ts).
 
+import { matchesFormerHolder } from "@/lib/liquity-fork/former-holders";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { DEBT_SYMBOL, indexZombie } from "@/lib/basedollar/asset-catalog";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
@@ -145,7 +146,9 @@ export const BASEDOLLAR_APPLY: ApplyConfig<BasedollarTroveSummary> = {
     row.collateralType.toLowerCase().includes(q) ||
     (row.owner?.toLowerCase().includes(q) ?? false) ||
     (row.lastOwner?.toLowerCase().includes(q) ?? false) ||
-    (row.ownerEns?.toLowerCase().includes(q) ?? false),
+    (row.ownerEns?.toLowerCase().includes(q) ?? false) ||
+    // A wallet that held the Trove and moved it on (ui-jobs 715).
+    matchesFormerHolder(row, q),
   sort: {
     recent: (r) => r.lastActivityAt,
     collateral: (r) => r.collateral,

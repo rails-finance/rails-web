@@ -7,6 +7,7 @@
 // (allSettled): a family whose head read does not answer keeps its store
 // figures and says `headRead: "failed"`. Answers are kept 60 s per address.
 
+import { WALLET_FORMER_FAMILIES } from "@/lib/wallet/moved-row";
 import { walletRowStatus } from "@/lib/wallet/moved-row";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { walletApiWait, type HeadResult, type FamilyModule } from "@/lib/wallet/families/module";
@@ -72,10 +73,13 @@ async function readSummary(address: string, signal: AbortSignal, readerIp?: stri
   let first: WalletSummaryAnswer | null = null;
   const rows: WalletSummaryRow[] = [];
   for (let offset = 0; offset < MAX_ROWS; offset += PAGE) {
-    const res = await fetch(`${base}/api/wallet/${address}/positions?limit=${PAGE}&offset=${offset}&former=1`, {
-      ...createAuthFetchOptions({ signal }, readerIp),
-      cache: "no-store",
-    });
+    const res = await fetch(
+      `${base}/api/wallet/${address}/positions?limit=${PAGE}&offset=${offset}&former=${WALLET_FORMER_FAMILIES}`,
+      {
+        ...createAuthFetchOptions({ signal }, readerIp),
+        cache: "no-store",
+      },
+    );
     if (!res.ok) throw new Error(`/api/wallet/${address}/positions answered ${res.status}`);
     const page = (await res.json()) as WalletSummaryAnswer;
     first ??= page;

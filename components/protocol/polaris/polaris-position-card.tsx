@@ -99,6 +99,7 @@ import {
 } from "@/lib/polaris/surplus-claim";
 import { LinkedTx } from "@/components/shared/linked-tx";
 import { dateTimeText } from "@/lib/frankencoin/figures";
+import { formatDate } from "@/lib/date";
 import type { PolarisSurplusContext } from "@/lib/shared/types/event-shape";
 import { SEPOLIA_CHAIN_ID } from "@/lib/shared/chains";
 import type { Provenance } from "@/components/shared/provenance";
@@ -117,6 +118,9 @@ export interface PolarisPositionView {
   /** The current holder — null once the NFT is burned and no index row names
    *  the last one. */
   owner: string | null;
+  /** A listing searched by a wallet that held this CDP and sent its NFT on:
+   *  where it went and when (ui-jobs 715). */
+  formerHold?: { movedTo: string; movedAt: number | null } | null;
   status: PolarisPositionStatus;
   liquidated: boolean;
   /** Collateral (pETH) — the entire figure on the chain lane, the last
@@ -324,6 +328,14 @@ function assetIcon(symbol: string, address: string, figure: string): ReactNode {
   );
 }
 
+/** The "moved to" tip on a listing row searched by a wallet that held the
+ *  CDP and sent its NFT on (ui-jobs 715). */
+function movedToTip(movedAt: number | null): string {
+  return movedAt != null
+    ? `This wallet held the position until ${formatDate(movedAt)}, then sent its NFT to the wallet shown.`
+    : "This wallet held the position, then sent its NFT to the wallet shown.";
+}
+
 /** The CDP-grain identity on a listing row: the market and the CDP id. Its copy
  *  and NFT actions live in the CDP page's ⋮; the listing card is one link. */
 function CdpIdentity({ v }: { v: PolarisPositionView }) {
@@ -480,6 +492,14 @@ export function polarisCardSlots({
     <span className="flex items-center gap-2">
       <span className="text-xs text-rb-500">{stable} market</span>
       <PositionNameId name={name} />
+    </span>
+  ) : v.formerHold ? (
+    // The searched wallet held this CDP and sent its NFT on (ui-jobs 715).
+    <span className="inline-flex min-w-0 items-center gap-1.5 text-xs text-rb-500" data-moved-to={v.formerHold.movedTo}>
+      <RevealTip tip={movedToTip(v.formerHold.movedAt)} focusable className="text-rb-400 focus-ring rounded-sm">
+        moved to
+      </RevealTip>
+      <WalletPill wallet={v.formerHold.movedTo} ensName={null} filterProtocol="polaris" bookmark />
     </span>
   ) : (
     v.owner && <WalletPill wallet={v.owner} ensName={null} filterProtocol="polaris" bookmark />
@@ -854,6 +874,7 @@ export function viewFromSummary(
     // A timeline-derived summary of a never-transferred, burned CDP has no
     // holder to name — null, never an empty pill.
     owner: s.owner || null,
+    formerHold: s.formerHold ?? null,
     status: s.status,
     liquidated: s.liquidated,
     coll: s.coll,

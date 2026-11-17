@@ -44,6 +44,8 @@ roundings:
     a whole number, grouped (1,204)
   address: |-
     a shortened address linked to the explorer
+  wallet: |-
+    a position holder's address, shortened and linked to the holder's wallet in Rails
   tx_hash: |-
     a shortened transaction hash linked to the explorer
   date_time: |-
@@ -86,11 +88,11 @@ placeholders:
     means: |-
       the liquidation penalty the protocol applied on this path
   from_addr:
-    rounding: address
+    rounding: wallet
     means: |-
       the address that held the position before a transfer
   to_addr:
-    rounding: address
+    rounding: wallet
     means: |-
       the address that holds it after
   event_type:

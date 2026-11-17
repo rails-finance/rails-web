@@ -121,7 +121,7 @@ export function ProseSentenceText({ s, ctx, coords }: { s: ProseSentence; ctx: L
               {seg.text}
             </a>
           ) : (
-            <LinkedAddress key={i} address={seg.address} />
+            <LinkedAddress key={i} address={seg.address} holderOf={seg.tone === "wallet" ? "liquity-v2" : undefined} />
           );
         if (!seg.emph) return <span key={i}>{seg.text}</span>;
         if (seg.emph === "bold") return <Bold key={i}>{seg.text}</Bold>;

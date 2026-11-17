@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
     qs.set("sortOrder", sp.get("sortOrder") === "asc" ? "asc" : "desc");
     if (sp.get("limit") != null) qs.set("limit", sp.get("limit")!);
     if (sp.get("offset") != null) qs.set("offset", sp.get("offset")!);
+    if (sp.get("former") === "1") qs.set("former", "1");
 
     const url = `${RAILS_API_URL}/api/asymmetry/troves?${qs.toString()}`;
     const [response, prices] = await Promise.all([

@@ -50,6 +50,8 @@ roundings:
     a number as the card prints it
   address: |-
     an address, shortened and linked
+  wallet: |-
+    a position holder's address, shortened and linked to the holder's wallet in Rails
   text: |-
     a word or name as given
 
@@ -244,7 +246,7 @@ placeholders:
     means: |-
       how many handovers the creation made
   final:
-    rounding: address
+    rounding: wallet
     means: |-
       the owner the creation's last handover reached
   event_type:

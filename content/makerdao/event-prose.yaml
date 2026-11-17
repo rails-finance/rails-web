@@ -44,6 +44,8 @@ roundings:
     a whole number, grouped (1,204)
   address: |-
     an address, shortened and linked (0x3ee4…7675)
+  wallet: |-
+    a position holder's address, shortened and linked to the holder's wallet in Rails
   text: |-
     a word or name as given
 
@@ -211,7 +213,7 @@ placeholders:
     means: |-
       how many the most active address executed
   owner:
-    rounding: address
+    rounding: wallet
     means: |-
       the account that owns the vault now, behind its DSProxy where it has one
   since:

@@ -33,6 +33,8 @@ export type Rounding =
   | "span"
   | "manager"
   | "address"
+  /** A position holder's address: linked inside Rails (ui-jobs 704). */
+  | "wallet"
   | "tx_hash"
   | "text"
   | "units4"
@@ -72,7 +74,7 @@ export interface ProseSeg<E extends string = string> {
   address?: string;
   /** A transaction hash the page links to the explorer. */
   tx?: string;
-  tone?: "manager" | "address";
+  tone?: "manager" | "address" | "wallet";
 }
 
 export interface ProseSentence<E extends string = string> {
