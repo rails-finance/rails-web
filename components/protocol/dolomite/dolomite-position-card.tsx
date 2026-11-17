@@ -67,7 +67,7 @@ import type {
 import type { DolomiteChainResponse } from "@/lib/api/fetch-dolomite-position";
 import { ExactSpan } from "@/components/shared/amount-text";
 import { RevealTip } from "@/components/shared/reveal-tip";
-import { accountLabelTip, accountNumberId } from "@/lib/dolomite/asset-catalog";
+import { accountLabelTip, accountNumberId, dolomiteNameParts } from "@/lib/dolomite/asset-catalog";
 import { splitDust, useDustLines } from "@/components/shared/dust-reserves";
 import { DolomiteMenuRows } from "@/components/protocol/dolomite/dolomite-menu-rows";
 import {
@@ -325,11 +325,12 @@ export function useDolomiteCardSlots({
   };
   // The WLFI frontend's shared account reads by its frontend alone.
   const wlfi = /\(WLFI frontend account\)/.test(v.accountLabel);
-  // The position's name (ui-jobs 703): the account number, and the WLFI
-  // frontend as the market of its shared account.
+  // The position's name: "Account #0", or a "Borrow position" (the WLFI
+  // frontend under market WLFI). The tab title reads the same parts.
+  const nameParts = dolomiteNameParts(v.accountNumber);
   const name = positionName({
-    market: wlfi ? "WLFI" : undefined,
-    noun: POSITION_NOUN.dolomite,
+    market: nameParts.market,
+    noun: nameParts.noun ?? POSITION_NOUN.dolomite,
     id: accountNumberId(v.accountNumber),
   });
   const common = { status, identity: <AccountIdentity v={v} tip={detail} name={name} />, counters, name };

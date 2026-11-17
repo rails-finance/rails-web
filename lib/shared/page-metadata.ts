@@ -208,6 +208,9 @@ export function positionMetadata(opts: {
   session: SessionProtocol;
   subject: string;
   market?: string;
+  /** Overrides the session's noun where a family names one kind of position
+   *  differently (Dolomite's "Borrow position"). */
+  noun?: string;
   canonicalPath: string;
   /** `"dynamic"` for a route that carries its own `opengraph-image.tsx` —
    *  the position's own live card, not this explorer's generic one. */
@@ -220,7 +223,7 @@ export function positionMetadata(opts: {
   // Text cannot carry the chain mark, so a Base explorer's title says it in
   // words ("Aave V3 on Base Position 0x…"); Ethereum stays unsaid.
   const label = entry ? explorerName(entry) : "Rails";
-  const noun = POSITION_NOUN[opts.session];
+  const noun = opts.noun ?? POSITION_NOUN[opts.session];
   const title = positionTitle(label, { market: opts.market, noun, id: opts.subject });
   // The description leads with Rails for the same reason the title carries
   // the prefix: a preview that shows only title + description must say whose
