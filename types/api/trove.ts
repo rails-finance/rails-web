@@ -133,6 +133,9 @@ export interface TrovesResponse {
     total: number;
     page: number;
     limit: number;
+    /** With ?former=1: how many of `total` are Troves the wallet passed on
+     *  (rails-server liquity-v2-former-hold.ts; ui-jobs 705). */
+    passedOn?: number;
   };
   error?: string;
 }

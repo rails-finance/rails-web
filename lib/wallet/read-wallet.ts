@@ -223,7 +223,7 @@ export function readWalletCounts(address: string, readerIp?: string): Promise<Wa
   if (hit && Date.now() - hit.at < WALLET_CACHE_MS) return hit.read;
   const read = (async (): Promise<WalletCounts> => {
     const t0 = Date.now();
-    const empty = { address: key, positions: [], families: [], total: 0, open: 0, closed: 0, chains: [] };
+    const empty = { address: key, positions: [], families: [], total: 0, open: 0, closed: 0, moved: 0, chains: [] };
     let summary: WalletSummaryAnswer;
     try {
       summary = await withBudget(WALLET_BUDGET_MS, (signal) => readSummary(key, signal, readerIp));
@@ -265,20 +265,23 @@ export function readWalletCounts(address: string, readerIp?: string): Promise<Wa
     const families = new Map<string, WalletCountsFamily>();
     for (const p of positions) {
       const k = `${p.chain}:${p.family}`;
-      const fam = families.get(k) ?? { chain: p.chain, family: p.family, positions: 0, open: 0, closed: 0 };
+      const fam = families.get(k) ?? { chain: p.chain, family: p.family, positions: 0, open: 0, closed: 0, moved: 0 };
       fam.positions += 1;
       if (p.status === "open") fam.open += 1;
+      else if (p.status === "moved") fam.moved += 1;
       else fam.closed += 1;
       families.set(k, fam);
     }
     const open = positions.filter((p) => p.status === "open").length;
+    const moved = positions.filter((p) => p.status === "moved").length;
     return {
       address: key,
       positions,
       families: [...families.values()],
       total: positions.length,
       open,
-      closed: positions.length - open,
+      closed: positions.length - open - moved,
+      moved,
       chains: [...new Set(positions.map((p) => p.chain))],
       readAt: Math.floor(Date.now() / 1000),
       ms: Date.now() - t0,

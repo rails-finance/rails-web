@@ -45,7 +45,9 @@ export interface FetchTrovesParams {
 
 export interface TrovesResult {
   data: TroveSummary[];
-  pagination: { total: number; limit: number; offset: number };
+  /** `passedOn`: of `total`, the Troves the filtered wallet passed on
+   *  (ui-jobs 705); 0 where the answer names none. */
+  pagination: { total: number; limit: number; offset: number; passedOn: number };
 }
 
 /** The typed params as the /api/troves proxy reads them. One mapping: the
@@ -82,7 +84,7 @@ export async function fetchTroves(p: FetchTrovesParams): Promise<TrovesResult> {
   if (!res.ok) throw new Error(`fetchTroves failed: ${res.status} ${res.statusText}`);
   const json = (await res.json()) as {
     data?: TroveSummary[];
-    pagination?: { total?: number; limit?: number; offset?: number };
+    pagination?: { total?: number; limit?: number; offset?: number; passedOn?: number };
   };
   return {
     data: json.data ?? [],
@@ -90,6 +92,7 @@ export async function fetchTroves(p: FetchTrovesParams): Promise<TrovesResult> {
       total: json.pagination?.total ?? json.data?.length ?? 0,
       limit: json.pagination?.limit ?? p.limit ?? 20,
       offset: json.pagination?.offset ?? p.offset ?? 0,
+      passedOn: json.pagination?.passedOn ?? 0,
     },
   };
 }

@@ -91,3 +91,12 @@ test("the scope and the counts come apart for the tip and the link (ui-jobs 691)
   assert.equal(walletLineParts([], true), null);
   assert.equal(WALLET_COUNTS_SCOPE, "Counts mainnet positions; the Sepolia testnet is not counted.");
 });
+
+test("a position passed to another wallet counts as moved, never closed (ui-jobs 705)", () => {
+  const rows = [row("ethereum", "open", 1), row("ethereum", "closed", 2), row("ethereum", "moved", 3)];
+  assert.equal(walletLineText(rows, true), "On Rails: 3 positions · 1 open · 1 closed · 1 moved");
+  assert.equal(
+    walletLineText([row("ethereum", "moved", 3)], true, () => "Liquity V2"),
+    "On Rails: 1 Liquity V2 position · moved",
+  );
+});

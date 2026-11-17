@@ -63,6 +63,7 @@ export async function GET(req: Request) {
         prices,
         LIQUITY_V2_ITEMS_PER_PAGE,
         ownerEns ?? shortSubject(ownerAddress ?? ""),
+        troves.data.pagination?.passedOn ?? 0,
       );
     },
   });

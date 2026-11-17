@@ -24,8 +24,10 @@ export interface WalletCountsFamily {
   family: string;
   positions: number;
   open: number;
-  /** Closed, liquidated, redeemed or moved on. */
+  /** Closed, liquidated or redeemed. */
   closed: number;
+  /** Held and passed to another wallet (ui-jobs 705). */
+  moved: number;
 }
 
 export interface WalletCounts {
@@ -35,6 +37,8 @@ export interface WalletCounts {
   total: number;
   open: number;
   closed: number;
+  /** Held and passed to another wallet (ui-jobs 705). */
+  moved: number;
   /** The chains the positions are on. */
   chains: WalletCountsChain[];
   readAt: number;
@@ -119,6 +123,8 @@ export function walletLineParts(
   if (n === 0) return null;
   const chains = new Set(positions.map((p) => p.chain)).size;
   const open = positions.filter((p) => p.status === "open").length;
+  // Passed to another wallet (ui-jobs 705): counted apart, the wallet view's word.
+  const moved = positions.filter((p) => p.status === "moved").length;
   const where = chains > 1 ? ` on ${chains} chains` : "";
   const scope = pageCounted ? "On Rails" : "Also on Rails";
   const tally = new Map<string, number>();
@@ -131,9 +137,13 @@ export function walletLineParts(
     tally.set(name, (tally.get(name) ?? 0) + 1);
   }
   const names = [...tally.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([k]) => k);
-  const states = ` · ${open.toLocaleString("en-US")} open · ${(n - open).toLocaleString("en-US")} closed`;
+  const closed = n - open - moved;
+  const states =
+    ` · ${open.toLocaleString("en-US")} open · ${closed.toLocaleString("en-US")} closed` +
+    (moved > 0 ? ` · ${moved.toLocaleString("en-US")} moved` : "");
   if (names.length === 1) {
-    if (n === 1) return { scope, rest: `1 ${names[0]} position · ${open === 1 ? "open" : "closed"}` };
+    if (n === 1)
+      return { scope, rest: `1 ${names[0]} position · ${open === 1 ? "open" : moved === 1 ? "moved" : "closed"}` };
     return { scope, rest: `${count(n, `${names[0]} position`)}${where}${states}` };
   }
   const within =
