@@ -49,7 +49,7 @@ test("a wrapped 2026 settlement: one clearing price, four prices, the fee read w
   assert.equal(v.decoded, true);
   assert.equal(v.onePrice, false, "the log prices differ");
   const gaps = v.pair.map((t) => gapText(gapBp(t)));
-  assert.deepEqual(gaps, ["+89.7 bp", "<0.1 bp", "<0.1 bp", "<0.1 bp"]);
+  assert.deepEqual(gaps, ["89.7 bp worse", "<0.1 bp", "<0.1 bp", "<0.1 bp"]);
   assert.equal(feeExplains(v.pair[0], s.blockNumber), true, "89.7 bp on own entries, in the fee era");
   assert.equal(feeExplains(v.pair[1], s.blockNumber), false, "under what the panel prints");
   assert.equal(feeToken(v.pair[0]), USDC, "a sell order's fees are in the token received");
@@ -109,10 +109,47 @@ test("a buy order's fees are in the token paid; a better price is never a fee", 
   );
 });
 
-test("gap text: 0.1 bp steps, a sign, <0.1 bp below", () => {
+test("gap text: 0.1 bp steps in words from the owner's side, <0.1 bp below", () => {
   assert.equal(gapText(0.06), "<0.1 bp");
   assert.equal(gapText(-0.06), "<0.1 bp");
-  assert.equal(gapText(0.1), "+0.1 bp");
-  assert.equal(gapText(-0.44), "−0.4 bp");
-  assert.equal(gapText(10509.18), "+10,509.2 bp");
+  assert.equal(gapText(0.1), "0.1 bp worse");
+  assert.equal(gapText(-0.44), "0.4 bp better");
+  assert.equal(gapText(10509.18), "10,509.2 bp worse");
+});
+
+// The card states a price per unit of the dearer token: on USDT→USDC that is
+// sold per unit bought ("1 USDC = 1.0098 USDT", a higher figure is worse), on
+// WETH→USDC bought per unit sold ("1 WETH = 1,592 USDC", a lower figure is
+// worse). The gap's word must follow the owner, not the figure.
+const soldPerBought = (t) => Number(BigInt(t.sellAmount) - BigInt(t.feeAmount)) / Number(t.buyAmount);
+
+test("worse follows the owner when the price is stated as sold per unit bought", () => {
+  const s = FIX["0x1fc4"];
+  const v = pairView(s, byOwner(s, "0x854dea"));
+  const [a, b] = [v.pair[0], v.pair[1]];
+  assert.ok(soldPerBought(a) > soldPerBought(b), "the card's trade paid more USDT per USDC");
+  assert.match(gapText(gapBp(a)), /worse$/, "and reads worse");
+});
+
+test("worse follows the owner when the price is stated as bought per unit sold", () => {
+  const s = FIX["0xb722"];
+  const pair = s.trades.filter(
+    (t) => t.sellToken === "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2" && t.buyToken === USDC,
+  );
+  assert.equal(pair.length, 2, "two WETH→USDC trades");
+  const [lo, hi] = [...pair].sort((x, y) => 1 / soldPerBought(x) - 1 / soldPerBought(y));
+  assert.ok(gapBp(lo) > gapBp(hi), "fewer USDC per WETH is the larger gap");
+  assert.match(gapText(gapBp(lo)), /worse$/, "the lower USDC-per-WETH figure reads worse");
+});
+
+test("both order kinds: paying more per unit bought is worse, paying less is better", () => {
+  const s = FIX["0x1fc4"];
+  const t = s.trades[0];
+  for (const kind of ["sell", "buy"]) {
+    const k = { ...t, settled: { ...t.settled, order: { ...t.settled.order, kind } } };
+    const dearer = { ...k, sellAmount: (BigInt(k.sellAmount) * 2n).toString() };
+    const cheaper = { ...k, buyAmount: (BigInt(k.buyAmount) * 2n).toString() };
+    assert.match(gapText(gapBp(dearer)), /worse$/, `${kind} order paying twice the sold amount`);
+    assert.match(gapText(gapBp(cheaper)), /better$/, `${kind} order receiving twice the bought amount`);
+  }
 });

@@ -66,7 +66,8 @@ export interface CowSettlement {
   blockNumber: number;
   txHash: string;
   trades: CowSettlementTrade[];
-  settle: { status: CowSettleStatus; call?: "direct" | "wrapped"; to?: string | null };
+  /** `offset`: the byte in the transaction's input where the settle() call starts (0 on a direct call). */
+  settle: { status: CowSettleStatus; call?: "direct" | "wrapped"; offset?: number; to?: string | null };
   tokens: Record<string, CowTokenScale>;
 }
 
@@ -106,11 +107,12 @@ export function gapBp(t: CowSettlementTrade): number | null {
   return (Number(((num - den) * scale) / den) / 1e9) * 1e4;
 }
 
-/** The gap as the panel prints it: 0.1 bp steps, "<0.1 bp" below that. */
+/** The gap as the panel prints it, from the owner's side whichever way round
+ *  the price is stated: "1.5 bp worse", "0.4 bp better", "<0.1 bp" below 0.1 bp. */
 export function gapText(bp: number): string {
   if (Math.abs(bp) < 0.1) return "<0.1 bp";
-  const r = Math.round(bp * 10) / 10;
-  return `${r > 0 ? "+" : "−"}${Math.abs(r).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} bp`;
+  const r = Math.abs(Math.round(bp * 10) / 10);
+  return `${r.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} bp ${bp > 0 ? "worse" : "better"}`;
 }
 
 /** Two log prices equal within the integer rounding of computeTradeExecution. */

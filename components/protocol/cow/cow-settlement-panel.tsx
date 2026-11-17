@@ -26,6 +26,7 @@ import {
 import {
   clearingPrice,
   clearingPriceProv,
+  feeChargeProv,
   gapProv,
   otherPairsProv,
   pairCountProv,
@@ -128,9 +129,9 @@ export function CowSettlementPanel({
           </p>
           {view.decoded && pricing && (
             <p>
-              Clearing price:{" "}
+              Solver&rsquo;s clearing price:{" "}
               <Prov
-                info={clearingPriceProv(s, view.self, pricing)}
+                info={clearingPriceProv(s, view.self, pricing, sell)}
                 value={String(clearingPrice(view.self, pricing, sell, buy))}
               >
                 <span className="text-foreground">{priceTag(clearingPrice(view.self, pricing, sell, buy))}</span>
@@ -142,14 +143,19 @@ export function CowSettlementPanel({
               <tr className="text-rb-400">
                 <th className="font-normal py-0.5">Owner</th>
                 <th className="font-normal py-0.5">Price</th>
-                {view.decoded && <th className="font-normal py-0.5 text-right">From clearing price</th>}
+                {view.decoded && (
+                  <th className="font-normal py-0.5 text-right">
+                    <span className="sm:hidden">Gap</span>
+                    <span className="max-sm:hidden">From clearing price</span>
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
               {view.pair.map((t) => {
                 const g = gapBp(t);
                 const fee = feeExplains(t, s.blockNumber) ? feeToken(t) : null;
-                const feeLabel = fee ? tokenText(fee === sell.address.toLowerCase() ? sell : buy) : null;
+                const feeTok = fee ? (fee === sell.address.toLowerCase() ? sell : buy) : null;
                 const p = pricing ? tradePrice(t, pricing, sell, buy) : null;
                 return (
                   <tr
@@ -157,7 +163,7 @@ export function CowSettlementPanel({
                     className="align-top"
                     data-cow-settlement-trade={t === view.self ? "self" : "other"}
                   >
-                    <td className="py-0.5 pr-3">
+                    <td className="py-0.5 pr-3 whitespace-nowrap">
                       {t === view.self ? (
                         <span className="text-foreground">This trade</span>
                       ) : (
@@ -174,7 +180,15 @@ export function CowSettlementPanel({
                       ) : (
                         "—"
                       )}
-                      {feeLabel && <div>The gap is the order&rsquo;s fees, charged in {feeLabel}.</div>}
+                      {feeTok && (
+                        <div>
+                          <Prov info={feeChargeProv(s, t, feeTok)} value={tokenText(feeTok)}>
+                            <span>
+                              CoW charges an order&rsquo;s fees through its own price, in {tokenText(feeTok)}.
+                            </span>
+                          </Prov>
+                        </div>
+                      )}
                     </td>
                     {view.decoded && (
                       <td className="py-0.5 text-right">
