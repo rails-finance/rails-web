@@ -94,6 +94,10 @@ export function liquityV2HolderCardModel(
   perPage: number,
   subject: string,
 ): PositionCardModel | null {
+  // A Trove the wallet passed on is not its holding (ui-jobs 705).
+  const held = rows.filter((t) => !t.formerHold);
+  total -= rows.length - held.length;
+  rows = held;
   if (rows.length === 0 || !prices) return null;
   return holderCardModel(liquityV2HolderStrip(rows, total, prices, perPage), {
     session: "liquity-v2",

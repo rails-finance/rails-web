@@ -7,6 +7,7 @@
 // (allSettled): a family whose head read does not answer keeps its store
 // figures and says `headRead: "failed"`. Answers are kept 60 s per address.
 
+import { walletRowStatus } from "@/lib/wallet/moved-row";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { walletApiWait, type HeadResult, type FamilyModule } from "@/lib/wallet/families/module";
 import { aaveV3Base, aaveV3Ethereum, spark } from "@/lib/wallet/families/aave";
@@ -71,7 +72,7 @@ async function readSummary(address: string, signal: AbortSignal, readerIp?: stri
   let first: WalletSummaryAnswer | null = null;
   const rows: WalletSummaryRow[] = [];
   for (let offset = 0; offset < MAX_ROWS; offset += PAGE) {
-    const res = await fetch(`${base}/api/wallet/${address}/positions?limit=${PAGE}&offset=${offset}`, {
+    const res = await fetch(`${base}/api/wallet/${address}/positions?limit=${PAGE}&offset=${offset}&former=1`, {
       ...createAuthFetchOptions({ signal }, readerIp),
       cache: "no-store",
     });
@@ -253,7 +254,13 @@ export function readWalletCounts(address: string, readerIp?: string): Promise<Wa
     }
     for (const r of summary.rows) {
       if (!taken.has(r))
-        positions.push({ chain: r.chain, family: r.family, positionId: r.positionId, status: r.status, href: r.href });
+        positions.push({
+          chain: r.chain,
+          family: r.family,
+          positionId: r.positionId,
+          status: walletRowStatus(r),
+          href: r.href,
+        });
     }
     const families = new Map<string, WalletCountsFamily>();
     for (const p of positions) {

@@ -94,6 +94,15 @@ export async function readTrovesFromBackend(
     if (resolved) backendParams.set("ownerAddress", resolved);
     else backendParams.set("ownerEns", ownerEns);
   }
+  // A wallet filter also lists the Troves the wallet held and moved on
+  // (rails-server ?former=1; ui-jobs 705). They answer the `moved` status
+  // bucket only, so a filtered listing asks for it beside its own buckets.
+  if (backendParams.has("ownerAddress")) {
+    backendParams.set("former", "1");
+    const buckets = backendParams.get("status")?.split(",") ?? [];
+    if (buckets.length > 0 && !buckets.includes("all") && !buckets.includes("moved"))
+      backendParams.set("status", [...buckets, "moved"].join(","));
+  }
   if (activeWithin) backendParams.set("activeWithin", activeWithin);
   if (createdWithin) backendParams.set("createdWithin", createdWithin);
   if (batchOnly) backendParams.set("batchOnly", "true");

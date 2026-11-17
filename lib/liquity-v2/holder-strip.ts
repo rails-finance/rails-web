@@ -116,6 +116,11 @@ export function liquityV2HolderStrip(
   prices: OraclePricesData,
   perPage: number,
 ): HolderStripProps {
+  // A Trove the wallet passed on (formerHold, ui-jobs 705) is not its
+  // holding: left out of the counts, the sums and the total.
+  const held = rows.filter((t) => !t.formerHold);
+  total -= rows.length - held.length;
+  rows = held;
   const open = rows.filter((t) => t.status === "open");
   const counts = {
     open: open.length,

@@ -198,7 +198,7 @@ function History({ closed }: { closed: WalletPosition[] }) {
         : c.s === "redeemed"
           ? plural(c.n, "redemption")
           : c.s === "moved"
-            ? `${c.n} moved on`
+            ? `${c.n} moved`
             : `${c.n} closed`,
     );
   return (
@@ -408,6 +408,8 @@ export function WalletView({
   const notRead = openAll.filter((p) => p.notRead);
   const open = [...ranked, ...dust, ...notRead];
   const closed = all.filter((p) => p.status !== "open");
+  // Passed to another wallet (ui-jobs 705): counted apart from closed.
+  const movedN = closed.filter((p) => p.status === "moved").length;
   const scope = useAssetScope();
   // Under Focus, only the families on a chain in focus.
   const unread = read.families.filter((r) => r.headRead === "failed" && (!filtered || scope.chainOk(r.chain)));
@@ -472,7 +474,7 @@ export function WalletView({
                   read.total > 0 && (
                     <div className="text-xs text-rb-500" data-wallet-count={read.total}>
                       <HeadingTip
-                        text={`${plural(read.total, "position")} · ${openAll.length} open · ${closed.length} closed`}
+                        text={`${plural(read.total, "position")} · ${openAll.length} open · ${closed.length - movedN} closed${movedN > 0 ? ` · ${movedN} moved` : ""}`}
                         tip={WALLET_COUNTS_SCOPE}
                       />
                     </div>
