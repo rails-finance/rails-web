@@ -58,6 +58,10 @@ export interface FilterDimension<F> {
    *  dimension widened to an explicit selection of every option. Reset then
    *  returns to the resting default. */
   clearDefault?: (f: F) => F;
+  /** True where something outside the dimension fixes its choice (a search
+   *  that names a market): the pill draws its default chip as plain text,
+   *  with no editor and no ×. */
+  pinned?: (f: F) => boolean;
   /** Chip text for an active selection. Default: `${label}: a, b (+N)`. */
   chipLabel?: (values: string[], options: FilterOptionDef[]) => string;
   /** Optional grouping header in the + Filter menu (insertion order preserved). */

@@ -40,6 +40,8 @@ export interface FilterPillProps {
   name: string;
   state: PillState;
   locked: boolean;
+  /** Fixed from outside: plain text, no editor, no ×. */
+  pinned?: boolean;
   label: string;
   value: string;
   /** The pill's accessible name: "Status Open", "Add Market filter". */
@@ -56,6 +58,7 @@ export function FilterPill({
   name,
   state,
   locked,
+  pinned = false,
   label,
   value,
   spoken,
@@ -83,6 +86,16 @@ export function FilterPill({
           {name}
         </button>
         {children}
+      </div>
+    );
+  }
+  if (pinned) {
+    return (
+      <div className="relative shrink-0" {...hooks}>
+        <div className={`${PILL_BASE} ${PILL_SET_TONE} gap-1.5 px-3.5 text-foreground`}>
+          {label && <span className={`shrink-0 ${LABEL}`}>{label}</span>}
+          <span className="min-w-0 truncate font-semibold">{value}</span>
+        </div>
       </div>
     );
   }
