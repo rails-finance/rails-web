@@ -22,6 +22,8 @@ export interface FetchPolarisPositionsParams {
   cdpId?: string;
   /** Restrict to one holder's CDPs. */
   wallet?: string;
+  /** With `wallet`: the CDPs it held and sent on too (ui-jobs 715). */
+  former?: boolean;
   status?: PolarisPositionStatus[];
   /** Only CDPs whose last state carries debt. */
   /** true → the last state carries debt; false → collateral only (pETH
@@ -51,7 +53,8 @@ export interface FetchPolarisPositionsParams {
 
 export interface PolarisPositionsResult {
   data: PolarisPositionSummary[];
-  pagination: { total: number; limit: number; offset: number };
+  /** `passedOn`: of `total`, the CDPs the filtered wallet passed on. */
+  pagination: { total: number; limit: number; offset: number; passedOn?: number };
   /** The replayed book per market, as the index states it beside the page. */
   markets: PolarisMarketBook[];
   /** Present when a USD bound, a USD sort or `withUsd` was asked for. */
@@ -63,6 +66,7 @@ export async function fetchPolarisPositions(p: FetchPolarisPositionsParams): Pro
   if (p.market) qs.set("market", p.market);
   if (p.cdpId) qs.set("id", p.cdpId);
   if (p.wallet) qs.set("wallet", p.wallet);
+  if (p.former) qs.set("former", "1");
   if (p.status && p.status.length > 0) qs.set("status", p.status.join(","));
   if (p.hasDebt != null) qs.set("hasDebt", p.hasDebt ? "1" : "0");
   if (p.minTx != null) qs.set("minTx", String(p.minTx));

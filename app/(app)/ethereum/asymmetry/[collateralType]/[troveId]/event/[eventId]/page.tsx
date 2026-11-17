@@ -48,6 +48,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
           owner: tail.trove?.owner ?? null,
           lastOwner: tail.trove?.lastOwner ?? null,
           ownerEns: tail.trove?.ownerEns ?? null,
+          changedHands: tail.trove?.changedHands,
           timestamp: event.timestamp,
         })
       : undefined,

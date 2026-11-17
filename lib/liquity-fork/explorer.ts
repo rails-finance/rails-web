@@ -53,6 +53,8 @@ export interface LiquityForkEventPageInput extends EventPageSlot {
   owner: string | null;
   lastOwner: string | null;
   ownerEns?: string | null;
+  /** The one-Trove read's change of hands (rails-server mig 485). */
+  changedHands?: boolean;
 }
 
 const DEBT_SYMBOL_OF: Record<LiquityForkDeployment, string> = {
@@ -116,6 +118,7 @@ export function liquityForkEventPageDescription(o: {
   owner: string | null;
   lastOwner: string | null;
   ownerEns?: string | null;
+  changedHands?: boolean;
   timestamp: number;
 }): string {
   const holder = liquityForkHolder(o);
@@ -125,8 +128,8 @@ export function liquityForkEventPageDescription(o: {
 }
 
 export const liquityForkExplorer: ExplorerAdapter<LiquityForkEventPageInput> = {
-  eventPage: ({ deployment, collateralType, troveId, owner, lastOwner, ownerEns, event, ...slot }) => {
-    const holder = liquityForkHolder({ owner, lastOwner });
+  eventPage: ({ deployment, collateralType, troveId, owner, lastOwner, ownerEns, changedHands, event, ...slot }) => {
+    const holder = liquityForkHolder({ owner, lastOwner, changedHands });
     return {
       heading: liquityForkEventHeading(event, deployment),
       title: liquityForkEventTitle(event, deployment),
@@ -152,6 +155,7 @@ export const liquityForkExplorer: ExplorerAdapter<LiquityForkEventPageInput> = {
         owner,
         lastOwner,
         ownerEns,
+        changedHands,
         timestamp: event.timestamp,
       }),
     };

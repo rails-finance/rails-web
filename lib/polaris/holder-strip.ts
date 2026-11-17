@@ -86,7 +86,12 @@ export function polarisHolderStrip(
   total: number,
   markets: PolarisMarketsChainResponse,
   perPage: number,
+  /** The answer's count of CDPs the wallet passed on, every page (ui-jobs 715). */
+  passedOn = 0,
 ): HolderStripProps {
+  // A CDP the wallet passed on is not its holding.
+  rows = rows.filter((r) => !r.formerHold);
+  total -= passedOn;
   const counts = {
     open: rows.filter((r) => r.status === "open").length,
     closed: rows.filter((r) => r.status === "closed").length,
