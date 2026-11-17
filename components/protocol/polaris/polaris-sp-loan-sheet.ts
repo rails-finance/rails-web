@@ -4,10 +4,10 @@
 // from the index; no row carries a dollar price, so every side states its
 // total in its asset (SHEET_NO_USD), as Maple's and Morpho's do.
 //
-// DEPOSIT. The index's identity, deposit before + change − burned + yield
-// paid − yield claimed = deposit after (lib/polaris/sp-loan-math.ts), is the
-// Deposit side: the burn and the yield are the carry layer, the change and the
-// claim the event's rows. The pETH liquidations paid is the second side: stash
+// DEPOSIT. The index's identity, deposit before + change − burned + gain
+// paid − gain claimed = deposit after (lib/polaris/sp-loan-math.ts), is the
+// Deposit side: the burn and the gain are the carry layer, the change and the
+// claim the event's rows. The pETH paid in is the second side: stash
 // before + paid − claimed = stash after. No Risk or Limits panel: a deposit
 // has no liquidation and no limit.
 //
@@ -33,13 +33,14 @@ const ZERO = BigInt(0);
 
 const WORDS = {
   deposit: "Deposit",
-  pethGains: "pETH from liquidations",
-  burned: "Burned by liquidations",
-  yieldPaid: "Yield since last event",
+  pethGains: "pETH paid in",
+  burned: "Burned since last touch",
+  yieldPaid: (stable: string) => `${stable} gain since last touch`,
   deposited: "Deposited",
   withdrawn: "Withdrawn",
-  yieldClaimed: "Yield claimed",
-  pethPaid: "Paid since last event",
+  returned: "Returned",
+  yieldClaimed: (stable: string) => `${stable} gain claimed`,
+  pethPaid: "Paid in since last touch",
   claimed: "Claimed",
   fees: "Fees since last event",
   borrowed: "Borrowed",
@@ -53,15 +54,15 @@ const TIPS = {
   deposit:
     "The deposit's stablecoin in the pool: what this operation moved, then the deposit it recorded, from the pool's logs.",
   pethGains:
-    "The pETH liquidations paid the deposit: what this operation paid and claimed, then what stays stashed for a later claim.",
-  depositLast: "The deposit the previous operation recorded, from this operation's DepositOperation log.",
+    "The pETH liquidations paid in to the deposit: what this operation paid in and claimed, then what stays stashed for a later claim.",
+  depositLast: "The deposit the previous operation recorded: the previous operation's DepositUpdated newDeposit.",
   burned:
     "The deposit liquidations used since the previous operation, written by this one: the DepositOperation's depositLossSinceLastOperation.",
   yieldPaid:
-    "The stablecoin yield paid to the deposit since the previous operation: the DepositOperation's stableTokenGainSinceLastOperation.",
-  depositBefore: "The deposit just before this operation's change: the last event's, less the burn, plus the yield.",
+    "The stablecoin gain paid to the deposit since the previous operation: the DepositOperation's stableTokenGainSinceLastOperation.",
+  depositBefore: "The deposit just before this operation's change: the last event's, less the burn, plus the gain.",
   change: "The stablecoin this operation moved, from the DepositOperation's topUpOrWithdrawal.",
-  yieldClaimed: "The yield this operation paid out to the holder; the rest stays in the deposit.",
+  yieldClaimed: "The stablecoin gain this operation paid out to the holder; the rest stays in the deposit.",
   depositTotal: "The deposit after this operation, from the DepositUpdated's newDeposit.",
   stashLast:
     "The pETH earlier operations left unclaimed: the stash after this one, less what it paid, plus what it claimed.",
@@ -70,7 +71,7 @@ const TIPS = {
   stashBefore: "The pETH stashed before this operation's claim: the last event's stash plus what liquidations paid.",
   pethClaimed: "The pETH this operation paid out to the holder.",
   stashTotal: "The pETH left stashed for a later claim, from the DepositUpdated's stashedBcTokens.",
-  collLast: "The loan's fpETH the previous touch left.",
+  collLast: "The loan's fpETH the previous touch left: the collateral before that touch plus its signed change.",
   coll: "The fpETH this touch moved, from the loans manager's log.",
   collTotal: "The loan's fpETH after this touch: the collateral before it plus the signed change.",
   debtLast: "The debt the previous touch left: its shares at the debt per share then in force, rounded up.",
@@ -86,7 +87,7 @@ const TIPS = {
 /** Each receipt's name, the head of its summary. */
 const RECEIPT: Partial<Record<keyof typeof TIPS, string>> = {
   atFloor: "Collateral at the floor",
-  burned: "Burned by liquidations",
+  burned: "Burned since last touch",
   change: "Deposited or withdrawn",
   coll: "Collateral moved",
   collLast: "Collateral at the last event",
@@ -102,12 +103,12 @@ const RECEIPT: Partial<Record<keyof typeof TIPS, string>> = {
   floor: "Floor price",
   index: "Debt per share",
   pethClaimed: "pETH claimed",
-  pethPaid: "pETH paid since last event",
-  stashBefore: "pETH stashed before this event",
+  pethPaid: "pETH paid in since last touch",
+  stashBefore: "pETH paid in, before this event",
   stashLast: "pETH stashed at the last event",
   stashTotal: "pETH stashed after",
-  yieldClaimed: "Yield claimed",
-  yieldPaid: "Yield since last event",
+  yieldClaimed: "Gain claimed",
+  yieldPaid: "Gain since last touch",
 };
 
 /** A receipt's summary: its name, then the tip. */
@@ -117,6 +118,9 @@ const said = (key: keyof typeof TIPS): string => {
 };
 
 const fmt = (raw: bigint) => formatNumber(units(raw < ZERO ? -raw : raw));
+/** The floor at four places; a change that rounds to nothing there is not drawn. */
+const floorText = (raw: bigint) =>
+  units(raw).toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 4 });
 const signedText = (raw: bigint) => `${raw < ZERO ? "−" : "+"}${fmt(raw)}`;
 const derived = (summary: string, formula: string): Provenance => ({
   kind: "derived",
@@ -155,7 +159,7 @@ export function polarisDepositSheet(row: PolarisDepositEventRow): EventSheet | u
     depositCarry.push({
       key: "last",
       label: SHEET_WORDS.last,
-      amount: s(last, fmt(last), log(said("depositLast"))),
+      amount: s(last, fmt(last), derived(said("depositLast"), "previous operation's DepositUpdated.newDeposit")),
       tip: TIPS.depositLast,
     });
     if (burned > ZERO)
@@ -168,7 +172,7 @@ export function polarisDepositSheet(row: PolarisDepositEventRow): EventSheet | u
     if (yieldPaid > ZERO)
       depositCarry.push({
         key: "yield",
-        label: WORDS.yieldPaid,
+        label: WORDS.yieldPaid(stable.symbol),
         amount: s(yieldPaid, `+${fmt(yieldPaid)}`, log(said("yieldPaid"))),
         tip: TIPS.yieldPaid,
       });
@@ -184,7 +188,7 @@ export function polarisDepositSheet(row: PolarisDepositEventRow): EventSheet | u
   if (yieldClaimed > ZERO)
     depositRows.push({
       key: "yield-claimed",
-      label: WORDS.yieldClaimed,
+      label: WORDS.yieldClaimed(stable.symbol),
       amount: s(-yieldClaimed, `−${fmt(yieldClaimed)}`, log(said("yieldClaimed"))),
       tip: TIPS.yieldClaimed,
     });
@@ -235,7 +239,7 @@ export function polarisDepositSheet(row: PolarisDepositEventRow): EventSheet | u
             ? {
                 key: "before",
                 label: SHEET_WORDS.before,
-                amount: s(before, fmt(before), derived(said("depositBefore"), "last event − burned + yield")),
+                amount: s(before, fmt(before), derived(said("depositBefore"), "last event − burned + gain")),
                 tip: TIPS.depositBefore,
               }
             : undefined,
@@ -290,7 +294,11 @@ export function polarisLoanSheet(
           {
             key: "last",
             label: SHEET_WORDS.last,
-            amount: c(collBefore, fmt(collBefore), log(said("collLast"))),
+            amount: c(
+              collBefore,
+              fmt(collBefore),
+              derived(said("collLast"), "previous touch's collateral before + its signed change"),
+            ),
             tip: TIPS.collLast,
           },
         ]
@@ -300,7 +308,7 @@ export function polarisLoanSheet(
       ? [
           {
             key: "coll",
-            label: collChange > ZERO ? WORDS.deposited : WORDS.withdrawn,
+            label: collChange > ZERO ? WORDS.deposited : WORDS.returned,
             amount: c(collChange, signedText(collChange), log(said("coll"))),
             tip: TIPS.coll,
           },
@@ -317,7 +325,11 @@ export function polarisLoanSheet(
     debtCarry.push({
       key: "last",
       label: SHEET_WORDS.last,
-      amount: w(last, fmt(last), touchProv(said("debtLast"), previous.tx_hash, previous.block_number, "loans")),
+      amount: w(
+        last,
+        fmt(last),
+        derived(said("debtLast"), "ceil(shares × debt per share ÷ 1e27), at the previous touch"),
+      ),
       tip: TIPS.debtLast,
     });
     if (fee != null && fee > ZERO) {
@@ -361,11 +373,11 @@ export function polarisLoanSheet(
     limits.push({
       key: "floor",
       label: WORDS.floor,
-      value: { text: `${units(floor).toFixed(4)} WETH per fpETH`, info: floorInfo, value: exactUnits(floor) },
+      value: { text: `${floorText(floor)} WETH per fpETH`, info: floorInfo, value: exactUnits(floor) },
       change:
-        prevFloor != null && prevFloor !== floor
+        prevFloor != null && floorText(floor) !== floorText(prevFloor)
           ? {
-              text: `${floor > prevFloor ? "+" : "−"}${units(floor > prevFloor ? floor - prevFloor : prevFloor - floor).toFixed(4)} WETH`,
+              text: `${floor > prevFloor ? "+" : "−"}${floorText(floor > prevFloor ? floor - prevFloor : prevFloor - floor)} WETH`,
             }
           : null,
       tip: TIPS.floor,
@@ -405,7 +417,7 @@ export function polarisLoanSheet(
         carry: collCarry,
         rows: collRows,
         total: SHEET_NO_USD,
-        totalAmount: c(collAfter, fmt(collAfter), log(said("collTotal"))),
+        totalAmount: c(collAfter, fmt(collAfter), derived(said("collTotal"), "collateral before + signed change")),
         totalTip: TIPS.collTotal,
       },
       {
@@ -415,7 +427,7 @@ export function polarisLoanSheet(
         before: debtBefore,
         rows: debtRows,
         total: SHEET_NO_USD,
-        totalAmount: w(debtAfter, fmt(debtAfter), log(said("debtTotal"))),
+        totalAmount: w(debtAfter, fmt(debtAfter), derived(said("debtTotal"), "ceil(shares × debt per share ÷ 1e27)")),
         totalTip: TIPS.debtTotal,
       },
     ],
