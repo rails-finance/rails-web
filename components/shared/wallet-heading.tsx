@@ -232,7 +232,7 @@ export interface PositionOwner {
   vault?: { name: string; href: string } | null;
   href?: string;
   hrefLabel?: string;
-  /** Drawn before the address ("last owner" on a closed Trove). */
+  /** Drawn before the address ("last holder" on a closed Trove that changed hands). */
   prefix?: ReactNode;
   /** Wraps the address, for a page whose holder carries a receipt (Polaris). */
   wrap?: (pill: ReactNode) => ReactNode;

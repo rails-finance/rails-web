@@ -26,7 +26,7 @@ import { LiquityEventCard } from "@/components/protocol/liquity/liquity-event-ca
 import { LiquityEventTitle } from "@/components/protocol/liquity/liquity-head";
 import { LiquityTroveMetaContext } from "@/components/protocol/liquity/event-prose-render";
 import { CollSurplusCtx } from "@/components/protocol/liquity-family/coll-surplus-context";
-import { collateralPriceInfo, closingPriceInfo, LastOwnerPrefix } from "@/lib/liquity/trove-page-words";
+import { collateralPriceInfo, closingPriceInfo, LastHolderPrefix } from "@/lib/liquity/trove-page-words";
 import { troveWords } from "@/lib/liquity/event-templates";
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
@@ -178,7 +178,7 @@ export default function EventView({
           owner={{
             wallet: owner,
             ensName: trove.ownerEns ?? null,
-            prefix: owner && holder.last ? <LastOwnerPrefix /> : undefined,
+            prefix: owner && holder.last ? <LastHolderPrefix /> : undefined,
           }}
           assets={stripAssets}
           closed={!open}

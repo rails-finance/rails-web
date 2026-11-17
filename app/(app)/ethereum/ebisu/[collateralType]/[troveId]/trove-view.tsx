@@ -520,7 +520,7 @@ export default function EbisuTroveDetail({
           session="ebisu"
           wallet={view?.owner ?? view?.lastOwner ?? null}
           owner={{
-            // No \"last owner\" prefix: this family's timeline carries no TroveNFT
+            // No "last holder" prefix: this family's timeline carries no TroveNFT
             // transfer rows, so a change of hands cannot be read (ui-jobs 702).
             wallet: view?.owner ?? view?.lastOwner ?? null,
           }}

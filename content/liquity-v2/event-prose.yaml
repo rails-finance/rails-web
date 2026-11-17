@@ -786,9 +786,9 @@ trove_words:
     This Trove’s history could not be read.
   history_empty: |-
     No transaction history available
-  last_owner: |-
-    last owner
-  last_owner_hint: |-
+  last_holder_prefix: |-
+    last holder
+  last_holder_hint: |-
     The Trove changed hands; this wallet held it when it closed
   price_now_summary: |-
     {coll_type}’s price — Liquity’s on-chain oracle, read now.

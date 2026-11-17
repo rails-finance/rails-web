@@ -525,7 +525,7 @@ export default function BasedollarTroveDetail({
           owner={{
             wallet: view?.owner ?? view?.lastOwner ?? null,
             chain: BASE_CHAIN_ID,
-            // No "last owner" prefix: this family's timeline carries no TroveNFT
+            // No "last holder" prefix: this family's timeline carries no TroveNFT
             // transfer rows, so a change of hands cannot be read (ui-jobs 702).
           }}
           assets={stripAssets}
