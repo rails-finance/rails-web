@@ -29,7 +29,7 @@ import type { FlowBucket, FlowDayRow, FlowEvent, FlowTimeline } from "@/lib/shar
 import { daysFromEvents, unitScaleFor } from "@/lib/shared/flows-timeline";
 import type { PolarisDepositEventRow, PolarisLoanEventRow } from "@/lib/sources/api/polaris-sp-loans";
 import { FPETH, PETH, POLARIS_MARKET_CONFIG, POLARIS_WETH, type PolarisMarket } from "./asset-catalog";
-import { depositLegs, loanChainAgrees, loanLegs, units, type DepositNow } from "./sp-loan-math";
+import { depositLegs, loanChainAgrees, loanFloorBook, loanLegs, units, type DepositNow } from "./sp-loan-math";
 
 const DAY_S = 86_400;
 const DUST = 1e-12;
@@ -286,19 +286,19 @@ export function loanFlows(
   const touches = rowsAsc.filter((r) => r.event_type !== "transfer");
   if (touches.length === 0) return null;
   const legsOf = loanLegs(touches);
-  // Each touch's floor, carried from the touch before where a row has none.
-  const floors: number[] = [];
-  let carried: number | null = null;
-  for (const g of legsOf) {
-    if (g.floor != null && g.floor > ZERO) carried = units(g.floor);
-    floors.push(carried ?? 0);
-  }
-  if (carried == null) return null;
+  // Each touch's floor (lib/polaris/sp-loan-math.ts, loanFloorBook): a row
+  // with none takes the one before, leading rows the first known.
+  const floorNowRaw = o.chain && BigInt(o.chain.floorPriceRaw) > ZERO ? BigInt(o.chain.floorPriceRaw) : null;
+  const book = loanFloorBook(legsOf, floorNowRaw);
+  if (book == null) return null;
+  const floors = book.floors.map(units);
+  const lastFloor = floors[floors.length - 1];
+  const firstOwn = book.carried.indexOf(false);
   const lastRow = touches[touches.length - 1];
   const last = legsOf[legsOf.length - 1];
   // The floor is the protocol's, read whether or not the loan agrees; the
   // loan's own figures only where loans(id) agrees with the last touch.
-  const floorNow = o.chain && BigInt(o.chain.floorPriceRaw) > ZERO ? units(BigInt(o.chain.floorPriceRaw)) : carried;
+  const floorNow = o.chain && BigInt(o.chain.floorPriceRaw) > ZERO ? units(floorNowRaw ?? BigInt(0)) : lastFloor;
   const agrees = o.open && o.chain != null && loanChainAgrees(o.chain, lastRow, touches.length);
   const debtNow = agrees && o.chain ? BigInt(o.chain.debtRaw) : null;
 
@@ -340,6 +340,18 @@ export function loanFlows(
         { asset: A, usd: f * G },
         { asset: B, usd: G },
       ],
+      // A touch before the first that states a floor takes that later floor.
+      ...(i < firstOwn
+        ? {
+            unsure: [
+              {
+                side: "collateral" as const,
+                why: "is valued at the first floor the loan's touches record, as this touch records none",
+                held: true,
+              },
+            ],
+          }
+        : {}),
     };
   });
   const buckets = loanBuckets();
@@ -355,7 +367,10 @@ export function loanFlows(
   // The floor is recorded on the days the loan was touched, and today; a day
   // between keeps the last (`seriesCarry`), drawn dotted (`carriedWhy`).
   const floorObs = new Map<number, number>();
-  events.forEach((e, i) => floorObs.set(Math.floor(e.ts / DAY_S), floors[i] * G));
+  // A touch with no floor of its own records none: its day carries, dotted.
+  events.forEach((e, i) => {
+    if (!book.carried[i] || i < firstOwn) floorObs.set(Math.floor(e.ts / DAY_S), floors[i] * G);
+  });
   if (o.open && o.chain) floorObs.set(today, floorNow * G);
   const wethObs: [number, number][] = [];
   for (let d = firstDay; d <= endDay; d++) wethObs.push([d, G]);

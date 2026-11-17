@@ -338,3 +338,58 @@ export function loanChainAgrees(
   const tol = BigInt(Math.max(1, touches));
   return diff <= tol && diff >= -tol;
 }
+
+/** A loan's collateral in WETH at the floor (1e18 integers), touch by touch.
+ *  `floors[i]`: the floor at touch i, a touch whose row has none taking the
+ *  one before it, and leading touches the first one known (`carried` marks
+ *  both). Each flow is valued at its touch's floor; the floor's rise is what
+ *  the collateral held between two touches gained as the floor moved, to
+ *  `floorNow` after the last. In − out + rise = the collateral now × floorNow,
+ *  within a wei a touch. Null where no touch states a floor. */
+export interface LoanFloorBook {
+  floors: bigint[];
+  carried: boolean[];
+  valuedIn: bigint;
+  valuedOut: bigint;
+  rise: bigint;
+  /** The collateral after each touch at that touch's floor. */
+  after: bigint[];
+  /** The collateral after the last touch at `floorNow`. */
+  now: bigint;
+}
+
+export function loanFloorBook(legs: LoanLegs[], floorNow: bigint | null): LoanFloorBook | null {
+  const first = legs.find((g) => g.floor != null && g.floor > ZERO)?.floor ?? null;
+  if (first == null) return null;
+  const floors: bigint[] = [];
+  const carried: boolean[] = [];
+  let f = first;
+  for (const g of legs) {
+    const own = g.floor != null && g.floor > ZERO;
+    if (own) f = g.floor as bigint;
+    floors.push(f);
+    carried.push(!own);
+  }
+  const at = (v: bigint, fl: bigint) => (v * fl) / E18;
+  let valuedIn = ZERO;
+  let valuedOut = ZERO;
+  let rise = ZERO;
+  const after: bigint[] = [];
+  legs.forEach((g, i) => {
+    valuedIn += at(g.collIn, floors[i]);
+    valuedOut += at(g.collOut, floors[i]);
+    after.push(at(g.coll, floors[i]));
+    const next = i + 1 < legs.length ? floors[i + 1] : (floorNow ?? floors[i]);
+    rise += at(g.coll, next) - at(g.coll, floors[i]);
+  });
+  const last = legs[legs.length - 1];
+  return {
+    floors,
+    carried,
+    valuedIn,
+    valuedOut,
+    rise,
+    after,
+    now: at(last.coll, floorNow ?? floors[floors.length - 1]),
+  };
+}

@@ -6,7 +6,7 @@
 // Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { depositLegs, loanChainAgrees, loanLegs } from "../../lib/polaris/sp-loan-math.ts";
+import { depositLegs, loanChainAgrees, loanFloorBook, loanLegs } from "../../lib/polaris/sp-loan-math.ts";
 
 const ZERO = BigInt(0);
 const B = (v) => BigInt(v);
@@ -153,4 +153,41 @@ test("the chain's loan read is laid over the index only where it agrees with the
   assert.ok(loanChainAgrees({ collRaw: "1200000000000000000", sharesRaw: "1510977534844989209" }, last, 4));
   assert.ok(!loanChainAgrees({ collRaw: "1300000000000000000", sharesRaw: "1510977534844989209" }, last, 4));
   assert.ok(!loanChainAgrees({ collRaw: "1200000000000000000", sharesRaw: "1500000000000000000" }, last, 4));
+});
+
+// The floor today on loan 63 (floorPrice() at the page's read, 17 Nov 2026).
+const FLOOR_NOW = B("2018524449911335826");
+const E18 = B("1000000000000000000");
+const near = (a, b, wei, what) => {
+  const d = a - b;
+  assert.ok(d >= -wei && d <= wei, `${what}: ${a} vs ${b}`);
+};
+
+test("loan 63's collateral at the floor: the flows plus the floor's rise are the collateral now", () => {
+  const legs = loanLegs(LOAN_63);
+  const book = loanFloorBook(legs, FLOOR_NOW);
+  // Now: 1.2 fpETH at today's floor, the panel's live collateral.
+  assert.equal(book.now, (B("1200000000000000000") * FLOOR_NOW) / E18);
+  assert.equal(book.now.toString(), "2422229339893602991");
+  // Each flow at its touch's floor, and the rise between touches, add to it.
+  near(book.valuedIn - book.valuedOut + book.rise, book.now, B(legs.length), "in − out + rise");
+  // The collateral after each touch, at that touch's floor.
+  legs.forEach((g, i) => assert.equal(book.after[i], (g.coll * book.floors[i]) / E18));
+  assert.ok(book.rise > B(0));
+  assert.deepEqual(book.carried, [false, false, false, false]);
+});
+
+test("a touch before any floor takes the first one recorded, and nothing values at zero", () => {
+  const touches = LOAN_63.map((t, i) => (i < 2 ? { ...t, floor_price: null } : t));
+  const book = loanFloorBook(loanLegs(touches), FLOOR_NOW);
+  assert.deepEqual(book.carried, [true, true, false, false]);
+  assert.equal(book.floors[0], B("1281550995979275691"));
+  assert.ok(book.floors.every((f) => f > B(0)));
+  assert.ok(book.after.every((v) => v > B(0)));
+  near(book.valuedIn - book.valuedOut + book.rise, book.now, B(touches.length), "in − out + rise");
+  // A middle touch with none keeps the floor before it.
+  const mid = LOAN_63.map((t, i) => (i === 2 ? { ...t, floor_price: null } : t));
+  const m = loanFloorBook(loanLegs(mid), FLOOR_NOW);
+  assert.equal(m.floors[2], m.floors[1]);
+  assert.equal(loanFloorBook(loanLegs(LOAN_63.map((t) => ({ ...t, floor_price: null }))), FLOOR_NOW), null);
 });
