@@ -34,6 +34,8 @@ export interface PillModel<F> extends PillGroup<F> {
   /** True where the group rests on a constraining default; such a pill never
    *  shows a ×, whatever its state. */
   locked: boolean;
+  /** A dimension in the group is fixed from outside: the pill is plain text. */
+  pinned: boolean;
   /** The bold value after the label ("Open", "≥ 100", "USDC +2"); for a
    *  boolean, the whole text ("Liquidated before") with `label` empty. */
   value: string;
@@ -125,7 +127,8 @@ export function pillFor<F>(group: PillGroup<F>, f: F): PillModel<F> {
       .join(", ");
   }
   const spoken = state === "unset" ? `Add ${group.name} filter` : [label, value].filter(Boolean).join(" ");
-  return { ...group, state, locked, label, value, spoken };
+  const pinned = group.dims.some((d) => d.pinned?.(f));
+  return { ...group, state, locked, pinned, label, value, spoken };
 }
 
 /** Every dimension in the group back to its default. */

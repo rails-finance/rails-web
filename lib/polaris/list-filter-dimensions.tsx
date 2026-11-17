@@ -154,12 +154,16 @@ export function polarisListDimensions(
       param: "market",
       options: marketOptions,
       // A search that names a market ("usdp:34") scopes the fetch to it over
-      // the facet, so the chip reads that market.
-      get: (f) => {
+      // the facet: the pill reads that market as plain text, and the facet's
+      // own choice rests empty while the search names one, so clearing the
+      // search returns to every market and the URL carries no `market`.
+      get: (f) => (parsePolarisSearch(f.q).market ? [] : f.market),
+      set: (f, v) => ({ ...f, market: parsePolarisSearch(f.q).market ? [] : v }),
+      pinned: (f) => parsePolarisSearch(f.q).market != null,
+      defaultChip: (f) => {
         const named = parsePolarisSearch(f.q).market;
-        return named ? [named] : f.market;
+        return named ? `Market: ${MARKET_OPTIONS.find((o) => o.value === named)?.label ?? named}` : null;
       },
-      set: (f, v) => ({ ...f, market: v }),
     },
     // Status is a multi-select over the three lifecycle buckets. All three
     // selected = "show everything" (no server filter). Empty = the contextual
