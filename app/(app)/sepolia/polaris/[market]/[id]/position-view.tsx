@@ -52,7 +52,8 @@ import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubb
 import { FlowFocusContext } from "@/components/shared/flow-focus-context";
 import { PolarisFlowsNote, polarisFlowsContent } from "@/components/protocol/polaris/polaris-flows-note";
 import { usePolarisFlows } from "@/hooks/usePolarisFlows";
-import { PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
+import { PETH, POLARIS_MARKET_CONFIG, POLARIS_TESTNET_CLOSED, type PolarisMarket } from "@/lib/polaris/asset-catalog";
+import { formatDate } from "@/lib/date";
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import { TimelineActivityHeader, CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
@@ -196,6 +197,10 @@ export default function PolarisPositionView({
     // the overlay never answers.
     return summary ? withLiquidationPeaks(viewFromSummary(summary, undefined, !chainSettled), events) : null;
   }, [chain, summary, chainSettled, events]);
+
+  // An open CDP on the closed testnet whose head read did not answer.
+  const headUnanswered =
+    POLARIS_TESTNET_CLOSED.state === "closed" && chainSettled && chain == null && view?.status === "open";
 
   const polarisEvents = useMemo(() => events.filter(isPolarisEvent), [events]);
   // Each card's previous event, a transfer passed over: it moves no figure.
@@ -383,6 +388,14 @@ export default function PolarisPositionView({
           </div>
         ) : (
           <>
+            {/* The closed testnet (ui-jobs 621): a head read that failed is
+                expected, and the card stands on the index's last state. */}
+            {!onEventPage && headUnanswered && view.lastActivityAt != null && (
+              <p className="text-[13px] leading-relaxed text-rb-500" data-chain-unanswered="">
+                The chain did not answer on this read, so the card shows the position as last indexed, at its last
+                transaction on {formatDate(view.lastActivityAt)}.
+              </p>
+            )}
             {!onEventPage && (
               <>
                 <PolarisPositionCard

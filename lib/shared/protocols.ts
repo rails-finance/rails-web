@@ -17,6 +17,8 @@
 
 import { CHAINS, MAINNET_CHAIN_ID, type ChainId, type ChainMeta } from "@/lib/shared/chains";
 import type { SessionProtocol } from "@/lib/shared/sessions";
+import type { ProtocolLifecycle } from "@/lib/shared/lifecycle";
+import { POLARIS_TESTNET_CLOSED } from "@/lib/polaris/asset-catalog";
 
 /** A roster entry as it is written down. `href` is NOT here: it is derived from
  *  `(chainId, slug)` below, so the path text exists in exactly one place. */
@@ -131,6 +133,11 @@ type ProtocolSpec = {
    *  the listing. Omitted means it has one, or it is not indexed (`history:
    *  "none"`), which the caveat words on its own. */
   listing?: false;
+  /** Closing or closed on this chain (rails-ops TO-DO-ui-jobs 612), with its
+   *  date and receipt (lib/shared/lifecycle.ts). The explorer stays where it
+   *  is; its header, its position heads and its home tile state the state.
+   *  Omitted means live. */
+  lifecycle?: ProtocolLifecycle;
   /** This explorer's protocol-level sub-pages, in tab order. The first is the
    *  overview beside the position listing — the branch roster, market roster,
    *  system state, hub comparison or loan book — and every explorer carries
@@ -941,7 +948,10 @@ const SPECS: ProtocolSpec[] = [
     slug: "polaris",
     brand: 211.5,
     tags: ["CDP", "Stablecoin"],
-    desc: "Polaris on the Sepolia testnet: USDp and GOLDp minted against pETH, every position from the market's events, liquidations absorbed by stability pools",
+    // The closing's date is the catalog's record (lib/polaris/asset-catalog.ts,
+    // POLARIS_TESTNET_CLOSED; ui-jobs 621).
+    desc: "Polaris on the Sepolia testnet, closed on 16 Nov 2026: USDp and GOLDp minted against pETH, every position from the market's events, liquidations absorbed by stability pools",
+    lifecycle: POLARIS_TESTNET_CLOSED,
     subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
   },
   {
