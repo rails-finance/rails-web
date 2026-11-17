@@ -70,7 +70,7 @@ placeholders:
   zero_mint:
     rounding: token
     means: |-
-      the debt the protocol added so the debt settled at zero
+      the stablecoin minted to the holder where the debt had gone below zero
   escrow:
     rounding: units4
     means: |-
@@ -120,6 +120,10 @@ placeholders:
     rounding: token
     means: |-
       the debt the position owes now
+  owed:
+    rounding: token
+    means: |-
+      a debt below zero: the stablecoin the next touch mints to the holder
   price:
     rounding: token
     means: |-
@@ -131,7 +135,7 @@ placeholders:
   equity:
     rounding: number
     means: |-
-      the collateral at the feed's price less the debt
+      the collateral at the feed's price less the debt, plus any stablecoin owed to the holder
   holding_gain:
     rounding: units4
     means: |-
@@ -345,7 +349,7 @@ words:
   sheet_stability_gain: |-
     Stability gain
   sheet_settled: |-
-    Settled to zero
+    Minted to the holder
   sheet_liquidated_coll: |-
     Taken by the liquidation
   sheet_liquidated_debt: |-
@@ -422,7 +426,7 @@ words:
   tip_debt_psm: |-
     This touch wrote the position's share of the debt the market's PSM moved since the previous event, from the CDPManager's log; the row beneath it sets out the gap.
   tip_debt_settled: |-
-    The stablecoin added so the debt lands on zero when the gains and the PSM share clear more than was owed, from the CDPManager's log.
+    The stablecoin minted to the holder where the gains and the PSM share took the debt below zero, from the CDPManager's log.
   tip_debt_total: |-
     The position's debt after this event, from the CDPManager's log, in dollars at the stablecoin's price at this block.
   tip_cr: |-
@@ -561,7 +565,9 @@ position_words:
   lead_holds: |-
     This position holds {coll} pETH of collateral and owes {debt} {stable}:
   lead_settles: |-
-    This position holds {coll} pETH of collateral and owes nothing at this block; its next touch settles the debt to zero:
+    This position holds {coll} pETH of collateral and owes nothing at this block; its pending legs clear the recorded debt:
+  lead_owed: |-
+    This position holds {coll} pETH of collateral and is owed {owed} {stable}, which its next touch mints to the holder:
   lead_no_debt: |-
     This position holds {coll} pETH of collateral and has no debt:
   lead_closed: |-
@@ -573,6 +579,8 @@ position_words:
     At the feed's price of {price} {stable} per pETH, the collateral is worth {worth} {stable}.
   equity: |-
     Less the debt, equity is {equity} {stable}: a valuation at this block that says nothing of profit.
+  equity_owed: |-
+    Plus the {stable} owed, equity is {equity} {stable}: a valuation at this block that says nothing of profit.
   holding_ahead: |-
     Compared with holding the pETH deposited, this position is {holding_gain} pETH better off ({holding_share}), its net {stable} at today's price.
   holding_behind: |-
@@ -653,9 +661,9 @@ shared_sentences:
       PSM trades, the market's peg defence, moved {psm_coll} pETH and {psm_debt} {stable} through this position since the previous touch.
   zero.settled:
     when: |-
-      the protocol added debt so it settled at zero
+      the debt had gone below zero and this touch minted the difference to the holder
     text: |-
-      The protocol added {zero_mint} {stable} to the debt so it settled at zero.
+      The debt had gone below zero, so this touch minted the {zero_mint} {stable} owed to the holder.
 
 # ── Templates: one per kind of event ──
 #   id          the template's id
@@ -1115,9 +1123,9 @@ L5:
         text: |-
           the market's peg defence: a buy above the target upsizes the market, so every open position takes the new collateral, debt and fee pro rata.
       - bold: |-
-          Settled to zero
+          Minted to the holder
         text: |-
-          when a net PSM share clears more debt than a position owes, the protocol adds the difference so the debt lands on zero.
+          where gains and a net PSM share take the debt below zero, the touch mints the difference to the holder.
     links:
       - label: |-
           Adaptive Peg Defense and position effects
@@ -1142,9 +1150,9 @@ L5:
         text: |-
           interest accrued since the last touch is written into the debt at the close, so the amount repaid includes it.
       - bold: |-
-          Settled to zero
+          Minted to the holder
         text: |-
-          when a net PSM share clears more debt than the position owes, the protocol adds the difference so the debt lands on zero.
+          where gains and a net PSM share take the debt below zero, the touch mints the difference to the holder.
       - bold: |-
           Defensive mode
         text: |-
@@ -1311,9 +1319,9 @@ L5:
         text: |-
           traders' PSM mints and redemptions add or remove collateral and debt from every open position at a touch (the peg-defence fees, in the docs).
       - bold: |-
-          Settled to zero
+          Minted to the holder
         text: |-
-          when a net PSM share clears more debt than the position owes, the protocol adds the difference so the close lands on zero.
+          where gains and a net PSM share take the debt below zero, the touch mints the difference to the holder.
     links:
       - label: |-
           The Peg Stability Rate

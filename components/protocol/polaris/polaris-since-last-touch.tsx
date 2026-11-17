@@ -238,23 +238,6 @@ export function PolarisSinceLastTouchRow({
             },
           ],
         };
-      case "settle":
-        return {
-          kind: "derived",
-          summary:
-            `The debt below zero. The pending legs clear more than the debt, and the next touch settles the debt to ` +
-            `zero, so this part is taken back out.`,
-          formula: "min(0, entireDebt)",
-          inputs: [
-            {
-              label: "entire debt",
-              value: formatExact(w.legs.settle),
-              kind: "chain",
-              pclass: "state",
-              note: `getCDPEntireDebt(id), in ${stable}, a view call at the head block ${w.to.block.toLocaleString("en-US")}`,
-            },
-          ],
-        };
     }
   };
 
@@ -264,7 +247,7 @@ export function PolarisSinceLastTouchRow({
       `The whole change in this position's equity at the feed since its ${w.sinceOpen ? "open" : "last touch"}. The feed's ` +
       `effect plus the protocol's legs. The holder did nothing inside this window, so no other cause exists. Equity ` +
       `here is a valuation at a block.`,
-    formula: "(entireColl × price now − max(0, entireDebt)) − (coll × price at the touch − debt)",
+    formula: "(entireColl × price now − entireDebt) − (coll × price at the touch − debt)",
     inputs: [
       {
         label: "equity at the touch",
@@ -277,7 +260,7 @@ export function PolarisSinceLastTouchRow({
         value: formatExact(w.equityNow),
         kind: "chain-derived",
         pclass: "state",
-        note: "getCDPEntireColl × previewPrice − getCDPEntireDebt (zero at or below zero) at the head block",
+        note: "getCDPEntireColl × previewPrice − getCDPEntireDebt at the head block; a debt below zero is owed to the holder",
       },
     ],
   };

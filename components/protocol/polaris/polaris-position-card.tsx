@@ -59,6 +59,8 @@ import { Prov } from "@/components/shared/provenance";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { latestStateProv, lifetimeLegProv, peakProv } from "@/lib/polaris/event-provenance";
 import {
+  polarisDebtOwed,
+  polarisEquityAtFeed,
   polarisPendingAtFeed,
   polarisPsmOutcomeAtFeed,
   type PolarisLifetime,
@@ -136,9 +138,9 @@ export interface PolarisPositionView {
    *  same read. */
   debtUsd: number | null;
   /** Chain lane only — entireColl × the feed's pETH-in-debt-unit price, minus
-   *  the debt owed. A valuation at the block, not a profit — may be negative.
-   *  An entire debt at or below zero owes nothing (the next touch settles it
-   *  to zero), so it never adds to the equity. */
+   *  the debt owed (polarisEquityAtFeed). A valuation at the block, not a
+   *  profit — may be negative. An entire debt below zero is the stables the
+   *  next touch mints to the holder, so it adds to the equity. */
   equity: number | null;
   /** Chain lane only — the debt as recorded at the last touch, the base the
    *  entire debt's pending legs are added to. */
@@ -198,6 +200,9 @@ const DEFENSIVE_MODE_TIP =
 
 /** What the Debt label says on a CDP that owes nothing. */
 const COLLATERAL_ONLY_TIP = "Owes nothing at this block. A Polaris position can hold collateral with no debt.";
+
+/** What the Debt label says on a CDP whose entire debt is below zero. */
+const OWED_TIP = "The debt is below zero. The position's next touch mints this amount to the holder.";
 
 /** A pETH price in the market's own stablecoin, at a readable grain: three
  *  decimals under 1, two under 100, whole numbers above (USDp's feed runs in
@@ -553,6 +558,8 @@ export function polarisCardSlots({
     };
   } else {
     const mcrInForce = v.mcr;
+    // The live read's entire debt below zero: owed to the holder.
+    const owed = v.basis === "chain" ? polarisDebtOwed(v.debt) : 0;
     const floorWords =
       mcrInForce != null ? { mcr: mcrInForce, ...polarisFloorWords(mcrInForce, v.defensiveMode) } : null;
     const belowMin = v.icr != null && mcrInForce != null && v.icr < mcrInForce;
@@ -592,7 +599,7 @@ export function polarisCardSlots({
       {
         id: "debt",
         label: CARD_VOCAB.debt,
-        labelTip: v.debt <= 0 && v.coll > 0 ? COLLATERAL_ONLY_TIP : undefined,
+        labelTip: owed > 0 ? OWED_TIP : v.debt <= 0 && v.coll > 0 ? COLLATERAL_ONLY_TIP : undefined,
         value:
           v.debt > 0 ? (
             <Prov info={debtProv(v)}>
@@ -600,6 +607,17 @@ export function polarisCardSlots({
                 value={v.debt}
                 symbol={stable}
                 exact={v.debtRaw != null ? formatUnitsExact(v.debtRaw, 18) : undefined}
+              />
+            </Prov>
+          ) : owed > 0 ? (
+            // A live entire debt below zero: the stables the next touch mints
+            // to the holder, receipted as the debt is.
+            <Prov info={debtProv(v)}>
+              <span className="text-rb-500">Owed </span>
+              <CardFigure
+                value={owed}
+                symbol={stable}
+                exact={v.debtRaw != null ? formatUnitsExact(v.debtRaw.replace(/^-/, ""), 18) : undefined}
               />
             </Prov>
           ) : v.coll > 0 ? (
@@ -614,7 +632,13 @@ export function polarisCardSlots({
                 stableAddress,
                 v.debtRaw != null ? formatUnitsExact(v.debtRaw, 18) : formatExact(v.debt),
               )
-            : undefined,
+            : owed > 0
+              ? assetIcon(
+                  stable,
+                  stableAddress,
+                  v.debtRaw != null ? formatUnitsExact(v.debtRaw.replace(/^-/, ""), 18) : formatExact(owed),
+                )
+              : undefined,
         usd:
           v.debtUsd != null && v.debtUsd > 0 ? (
             <Prov info={liveDebtUsdProv(v.market, index)} value={formatUsdValue(v.debtUsd)}>
@@ -925,7 +949,7 @@ export function viewFromChain(c: PolarisChainResponse): PolarisPositionView {
     debtRaw: c.entireDebtRaw,
     collUsd: c.price ? c.entireColl * c.price.pethUsd : null,
     debtUsd: c.price && c.entireDebt > 0 ? debtInUsd(c.market, c.entireDebt, c.price.xauUsd) : null,
-    equity: c.price ? c.entireColl * c.price.pethInDebt - Math.max(0, c.entireDebt) : null,
+    equity: c.price ? polarisEquityAtFeed(c.entireColl, c.entireDebt, c.price.pethInDebt) : null,
     recordedDebt: c.recordedDebt,
     icr: c.icr,
     mcr: c.defensiveMode ? c.defensiveMcr : c.mcr,
