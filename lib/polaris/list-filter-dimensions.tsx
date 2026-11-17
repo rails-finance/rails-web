@@ -201,13 +201,16 @@ export function polarisListDimensions(
  *  holder address as `wallet`. An `id` needs NO market — measured 2026-09-10,
  *  the index answers a bare `id` with that number in BOTH markets (usdp/27 +
  *  goldp/27, total 2), so the search fans out server-side and the web makes one
- *  call; a chosen Market facet narrows it as any other filter does. An ENS name
+ *  call; a chosen Market facet narrows it as any other filter does, and a
+ *  market named in the search ("goldp #34") narrows it the same way. An ENS name
  *  resolves to an address one step earlier (listing-fetch.ts) — this route does
  *  not resolve names, and a non-address `wallet` is a 400 — so it leaves
  *  `wallet` unset here. Free text that names no identity filters nothing. */
 export function polarisFiltersToFetchParams(filters: PolarisListFilters, page: number): FetchPolarisPositionsParams {
-  const market = normalizeMarket(filters.market[0]);
-  const { cdpId, ownerAddress } = parsePolarisSearch(filters.q);
+  const { market: searchMarket, cdpId, ownerAddress } = parsePolarisSearch(filters.q);
+  // A search that names a market ("usdp:34") scopes the fetch to it, over the
+  // Market facet: it names one position.
+  const market = searchMarket ?? normalizeMarket(filters.market[0]);
   const sortBy = (
     filters.sortBy === "debt" || filters.sortBy === "coll" || filters.sortBy === "ratio"
       ? market
