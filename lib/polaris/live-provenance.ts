@@ -543,14 +543,16 @@ export function listingIcrProv(market: PolarisMarket): Provenance {
 
 // ── the holder strip's derived figures ───────────────────────────────────────
 // A wallet search states its own positions at a glance above the cards. Two of
-// those figures are sums over the wallet's OPEN CDPs — one exact (pETH is one
-// token across both markets), one that had to be priced to be summed at all
-// (USDp and GOLDp are different units). Both are summed from the rows the page
-// is showing, and both carry the same caveat the listing's ratio does: the
-// interest each CDP has accrued since its last touch, and the PSM's pending
-// share, settle only at that CDP's next touch and are in none of it.
+// those figures are sums over the wallet's OPEN CDPs — one in a single token
+// (pETH is the collateral in both markets), one that had to be priced to be
+// summed at all where the wallet borrows in both markets (USDp and GOLDp are
+// different units). Both are summed from the rows the page is showing, and both
+// carry the same caveat the listing's ratio does: what each CDP has built up
+// since its last touch settles only at its next touch and is in none of it, so
+// the strip marks both ≈ (ui-jobs 690).
 
-/** Σ last emitted coll over the wallet's open CDPs — pETH, one token, exact. */
+/** Σ last emitted coll over the wallet's open CDPs — pETH, one token, as of
+ *  each CDP's last touch. */
 export function holderCollProv(): Provenance {
   return {
     kind: "chain",
@@ -560,7 +562,7 @@ export function holderCollProv(): Provenance {
       text: "Add the last emitted collateral of each open position the wallet holds — every one of them is on the page under this strip.",
     },
     summary:
-      "All the pETH the wallet's open positions hold — the sum of each position's last emitted collateral, from the index. pETH is the collateral in both markets, so the legs are one token and the sum is a quantity of it. Reward pETH accrued since each position's last touch is not in it; it lands on the position at its next touch.",
+      "All the pETH the wallet's open positions hold — the sum of each position's last emitted collateral, from the index. pETH is the collateral in both markets, so the legs are one token and the sum is a quantity of it. The reward pETH and PSM shares built up since each position's last touch are not in it; they land on the position at its next touch.",
     via: "GET /api/polaris/positions?wallet=… · Σ last emitted coll over the open rows",
     formula: "Σ coll over the wallet's open positions",
     inputs: [
@@ -585,7 +587,7 @@ export function holderDebtSumProv(market: PolarisMarket): Provenance {
       kind: "recompute",
       text: `Add the last emitted debt of each open position the wallet holds in the ${stable} market — every one of them is on the page under this strip.`,
     },
-    summary: `${stable} the wallet's open positions owe — the sum of each position's last emitted debt, from the index. The wallet borrows in this market only, so the sum is a quantity of one token and nothing was converted to reach it. Interest since each position's last touch and any pending PSM share are not in it; both settle at that position's next touch.`,
+    summary: `${stable} the wallet's open positions owe — the sum of each position's last emitted debt, from the index. The wallet borrows in this market only, so the sum is a quantity of one token and nothing was converted to reach it. The interest, stability gains and PSM shares built up since each position's last touch are not in it; they settle at that position's next touch.`,
     contract: manager(market),
     via: "GET /api/polaris/positions?wallet=… · Σ last emitted debt over the open rows",
     formula: `Σ debt over the wallet's open ${stable} positions`,
@@ -611,7 +613,7 @@ export function holderDebtValueProv(): Provenance {
       text: "Add the last emitted debt of each open position the wallet holds, market by market; take USDp at one dollar and GOLDp at the XAU/USD medianiser's price at the stamped block.",
     },
     summary:
-      "What the wallet's open positions owe, in dollars — each position's last emitted debt in its own market's unit, USDp at one dollar and GOLDp at the gold price the protocol's own feed stated at the latest read. An estimate for two reasons: the two markets' debts are different tokens and a sum of them exists only at a price, and interest since each position's last touch and any pending PSM share settle at the next touch rather than here. A Sepolia testnet figure — a test dollar, not a real one.",
+      "What the wallet's open positions owe, in dollars — each position's last emitted debt in its own market's unit, USDp at one dollar and GOLDp at the gold price the protocol's feed stated at the latest read. An estimate for two reasons: the two markets' debts are different tokens and a sum of them exists only at a price, and interest since each position's last touch and any pending PSM share settle at the next touch rather than here. A Sepolia testnet figure — a test dollar, not a real one.",
     contract: { name: "Polaris XAU/USD Medianiser", address: POLARIS_CORE.xauUsdMedianiser },
     via: `${BOARD_VIA} · Σ last emitted debt × the market's own unit price @ head`,
     formula: "Σ debt × the market's unit in USD",
