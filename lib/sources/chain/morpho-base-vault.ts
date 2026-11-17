@@ -43,6 +43,7 @@
 // not dropped: it is where the unallocated asset sits.
 
 import { parseAbi } from "viem";
+import { vaultGap, type VaultGapLost } from "@/lib/morpho-base/vault-gap";
 import { chainBatchClient } from "./rpc";
 import { vaultHeadClient } from "@/lib/sources/api/head-reads-client";
 import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
@@ -313,10 +314,13 @@ export interface MorphoBaseVaultResponse {
   sharePrice: RawAmount;
   /** Σ over the legs of each leg's stored assets. */
   allocated: RawAmount;
-  /** totalAssets − Σ legs. Unaccrued interest (plus `lostAssets`, where the
-   *  vault keeps one): the vault's own total extrapolates to the block, the legs
-   *  are Blue's last settled state. Signed — it can be negative. */
+  /** "Unaccrued interest": totalAssets − Σ legs, less the stored `lostAssets`
+   *  where a V1.1 vault has stored any (lib/morpho-base/vault-gap.ts, ui-jobs
+   *  688). The vault's total extrapolates to the block, the legs are Blue's last
+   *  settled state. Signed — it can be negative by a few raw units. */
   gap: RawAmount;
+  /** What `gap` did with lost assets (`VaultGapLost`). */
+  gapLost: VaultGapLost;
 
   legs: MorphoBaseVaultLeg[];
   /** What can leave the vault at `blockNumber`, and the illiquid test's caught
@@ -356,6 +360,7 @@ function empty(vaultAddress: string, roster: MetaMorphoVaultRoster): MorphoBaseV
     sharePrice: zero,
     allocated: zero,
     gap: zero,
+    gapLost: "no-ledger",
     legs: [],
     holder: null,
   };
@@ -776,6 +781,10 @@ export async function loadMorphoBaseVault(
     }
 
     const allocatedRaw = raw.reduce((s, r) => s + r.assetsRaw, ZERO);
+    // Unaccrued interest, from the one function that computes it. The release is
+    // the roster's; a vault it does not hold gets none, so a failed read there is
+    // not called a V1.1 one.
+    const gap = vaultGap(totalAssetsRaw, allocatedRaw, lostAssetsRaw ?? null, row?.factory ?? null);
     const shares = holderShares ?? ZERO;
     const legs: MorphoBaseVaultLeg[] = raw.map(({ leg, assetsRaw }) => ({
       ...leg,
@@ -838,7 +847,8 @@ export async function loadMorphoBaseVault(
       totalSupply: amount(totalSupplyRaw, shareDecimals),
       sharePrice: amount(sharePriceRaw, assetDecimals),
       allocated: amount(allocatedRaw, assetDecimals),
-      gap: amount(totalAssetsRaw - allocatedRaw, assetDecimals),
+      gap: amount(gap.raw, assetDecimals),
+      gapLost: gap.lost,
       legs,
       ...(liquidity ? { liquidity } : {}),
       holder:

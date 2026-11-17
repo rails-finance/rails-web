@@ -1060,7 +1060,7 @@ const f2Page = await pageText(browser, pageUrl(F2));
 check(
   "T3g the page states the split under the timeline heading",
   f2Page.historySource === "stored+head" &&
-    /from Rails's store of chain readings/.test(f2Page.historyText) &&
+    /rows at or below block [\d,]+ were kept/.test(f2Page.historyText) &&
     /read now/.test(f2Page.historyText) &&
     /reconciled at block/.test(f2Page.historyText),
   f2Page.historyText.replace(/\s+/g, " ").slice(0, 150),
@@ -1543,7 +1543,7 @@ check(
 const ceilingPage = await pageText(browser, pageUrl(CEILING_LIFE));
 check(
   "T7i a withheld life draws NO tower — the flows are a whole-life claim",
-  !ceilingPage.towerPresent && /more than Rails keeps a stored history for/.test(ceilingPage.horizonText),
+  !ceilingPage.towerPresent && /above the 14,000 rows a page can draw/.test(ceilingPage.horizonText),
   `tower present ${ceilingPage.towerPresent}; horizon words "${ceilingPage.horizonText.replace(/\s+/g, " ").slice(0, 90)}"`,
 );
 check(

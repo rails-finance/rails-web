@@ -48,3 +48,41 @@ test("the caution's words", () => {
     "Includes 819,089 USDS of lost assets. The vault holds 884.77 USDS; the share price has not been lowered for the loss, so the holders who withdraw last carry it.",
   );
 });
+
+// Unaccrued interest less the stored lost assets (ui-jobs 688, owner's ruling:
+// subtract). One function computes it: lib/morpho-base/vault-gap.ts.
+const { vaultGap } = await import("../../lib/morpho-base/vault-gap.ts");
+const B = (v) => BigInt(v);
+
+test("V1.0 (no ledger) and V1.1 with nothing stored: total assets less the legs, unchanged", () => {
+  assert.deepEqual(vaultGap(B("21150000000000"), B("21149998750000"), null, "v1.0"), {
+    raw: B(1_250_000),
+    lost: "no-ledger",
+  });
+  assert.deepEqual(vaultGap(B("21150000000000"), B("21149998750000"), null, null), {
+    raw: B(1_250_000),
+    lost: "no-ledger",
+  });
+  assert.deepEqual(vaultGap(B("21150000000000"), B("21149998750000"), B(0), "v1.1"), {
+    raw: B(1_250_000),
+    lost: "zero",
+  });
+});
+
+test("V1.1 with stored lost assets: they are subtracted (gtusdcf, Ethereum block 26,409,305)", () => {
+  const all = B("1911711494734");
+  assert.deepEqual(vaultGap(all, B(0), all, "v1.1"), { raw: B(0), lost: "subtracted" });
+  // Interest and a loss together: 1,000 USDC total, 900 in the legs, 60 lost → 40 of interest.
+  assert.deepEqual(vaultGap(B(1_000_000_000), B(900_000_000), B(60_000_000), "v1.1"), {
+    raw: B(40_000_000),
+    lost: "subtracted",
+  });
+});
+
+test("a V1.1 vault whose lost assets did not answer is said to be unread, and nothing is subtracted", () => {
+  assert.deepEqual(vaultGap(B(1_000), B(900), null, "v1.1"), { raw: B(100), lost: "unread" });
+});
+
+test("the figure stays signed: a few raw units below zero print as they fall", () => {
+  assert.equal(vaultGap(B(1_000), B(1_002), B(0), "v1.1").raw, B(-2));
+});

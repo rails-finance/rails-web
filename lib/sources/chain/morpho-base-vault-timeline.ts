@@ -590,6 +590,9 @@ export async function loadMorphoBaseVaultTimelineWithTail(
             logCount: counted.count,
             withheldAbove: counted.count,
             logCountIsLowerBound: !counted.exact,
+            // A recount that covered the whole range is a whole count the
+            // balance check never saw: the logs were not handed over.
+            withheldBasis: counted.exact ? "unchecked" : "floor",
           },
         },
         store: null,
@@ -700,7 +703,12 @@ export async function loadMorphoBaseVaultTimelineWithTail(
     // all: it returns its own withholding, because a floor may not be built on.
     if (heavy && (wholeCount > tailMaxRows(chainId) || !storable))
       return {
-        timeline: { ...answered, coverage: { ...answered.coverage, withheldAbove: wholeCount } },
+        // The gate ran and agreed above (a mismatch returned at the line before
+        // `wholeCount`), so the count is exact.
+        timeline: {
+          ...answered,
+          coverage: { ...answered.coverage, withheldAbove: wholeCount, withheldBasis: "checked" },
+        },
         store: null,
         allEvents: [],
         continueBuild: null,

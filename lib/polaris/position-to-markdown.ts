@@ -398,7 +398,7 @@ function missingRateNotes(
   if (touches.length > 0 && rated.length === 0)
     out.push(
       touches.length === 1
-        ? "This position opened before the market set its first primary rate, so there is no rate at open to compare."
+        ? "This position opened before the market set its first primary rate, so there is no rate at open."
         : "Every touch on this position came before the market set its first primary rate, so no touch carries a rate to compare.",
     );
   else if (rated.length === 1)

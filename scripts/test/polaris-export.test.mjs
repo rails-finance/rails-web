@@ -144,7 +144,7 @@ test("each PSM note's receipt names the logs and raw fields, not the sentence", 
   assert.equal(receipts.length, 2);
   assert.match(
     receipts[0],
-    /CDPUpdated at each touch that wrote a share, raw — block 200: `_mintRedeemCollGain` 0\.5e18, `_mintRedeemDebtGain` -12e18; block 300: /,
+    /CDPUpdated at each touch that wrote a share, raw — block 200, tx 0x[0-9a-f]+: `_mintRedeemCollGain` 0\.5e18, `_mintRedeemDebtGain` -12e18; block 300, tx 0x[0-9a-f]+: /,
   );
   assert.match(receipts[0], /PrimaryRateSet count at each end, 10 → 16\./);
   assert.match(
@@ -219,7 +219,7 @@ test("a position that predates the market's first rate says so", () => {
   const md = exportOf([touch(1, 100, { type: "open", rate: null })]);
   assert.equal(
     notesSection(md)?.trim(),
-    "This position opened before the market set its first primary rate, so there is no rate at open to compare.",
+    "This position opened before the market set its first primary rate, so there is no rate at open.",
   );
 });
 
