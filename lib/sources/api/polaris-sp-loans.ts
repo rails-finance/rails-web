@@ -9,8 +9,8 @@
 //
 // Amounts are raw decimal strings in 1e18 units, as the routes serialize them;
 // P is 1e36, a debt per share 1e27, and a loan's shares carry up to 18
-// decimals. Nothing here scales them: lib/polaris/sp-flows.ts and
-// lib/polaris/loan-flows.ts do, from the raw strings.
+// decimals. Nothing here scales them: lib/polaris/sp-loan-math.ts and
+// lib/polaris/sp-loan-flow-timelines.ts do, from the raw strings.
 
 import { POLARIS_DEPLOYMENT_ID } from "@/lib/polaris/asset-catalog";
 

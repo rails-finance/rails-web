@@ -229,3 +229,167 @@ export const atFloor = (collRaw: string, floorRaw: string): bigint => (big(collR
 /** The fee accrued since the last touch: the debt now less the debt after it,
  *  never below zero (the replayed shares drift by a wei a touch). */
 export const pendingFee = (debtNowRaw: string, l: LoanLifetime): bigint => max0(big(debtNowRaw) - l.debtAtLastTouch);
+
+/** The figures of one deposit operation that the Lifetime flows read. */
+export interface DepositOp {
+  top_up_or_withdrawal: string | null;
+  deposit_loss: string | null;
+  stable_gain_since: string | null;
+  stable_gain_claimed: string | null;
+  bc_gain_since: string | null;
+  bc_gain_claimed: string | null;
+  new_deposit: string | null;
+  stashed_bc_tokens: string | null;
+}
+
+/** One operation's legs on the two bars of the Lifetime flows. The stablecoin:
+ *  deposit before + deposited + yield in − withdrawn − burned − yield claimed
+ *  = deposit after. pETH: stash before + paid in − claimed = stash after. */
+export interface DepositLegs {
+  deposited: bigint;
+  withdrawn: bigint;
+  burned: bigint;
+  yieldIn: bigint;
+  yieldClaimed: bigint;
+  pethIn: bigint;
+  pethClaimed: bigint;
+  deposit: bigint;
+  stash: bigint;
+}
+
+export function depositLegs(r: DepositOp): DepositLegs {
+  const ch = big(r.top_up_or_withdrawal);
+  return {
+    deposited: max0(ch),
+    withdrawn: max0(-ch),
+    burned: big(r.deposit_loss),
+    yieldIn: big(r.stable_gain_since),
+    yieldClaimed: big(r.stable_gain_claimed),
+    pethIn: big(r.bc_gain_since),
+    pethClaimed: big(r.bc_gain_claimed),
+    deposit: big(r.new_deposit),
+    stash: big(r.stashed_bc_tokens),
+  };
+}
+
+/** The figures of one loan touch that the Lifetime flows read. */
+export interface LoanFlowTouch {
+  coll_change: string | null;
+  debt_change: string | null;
+  coll_after: string | null;
+  debt_after: string | null;
+  /** The floor in force at the touch, WETH per fpETH (1e18). */
+  floor_price: string | null;
+}
+
+/** One touch's legs on the two bars of the Lifetime flows. */
+export interface LoanLegs {
+  collIn: bigint;
+  collOut: bigint;
+  borrowed: bigint;
+  repaid: bigint;
+  /** The fee the index charged since the touch before: the debt after this
+   *  touch, less the debt after the one before, less this touch's change. */
+  fee: bigint;
+  coll: bigint;
+  debt: bigint;
+  /** The floor at the touch, or null where the row has none. */
+  floor: bigint | null;
+}
+
+/** Each touch's legs, oldest first. Each debt is ceil(shares × index), so a
+ *  touch can come out a wei under the one before plus its change: that touch
+ *  books no fee, and the shortfall is taken from the next touch's fee, so
+ *  borrowed + fees − repaid stays the debt after the last touch (within the
+ *  wei the last touch may still carry). */
+export function loanLegs(touches: LoanFlowTouch[]): LoanLegs[] {
+  let before = ZERO;
+  let carry = ZERO;
+  return touches.map((t) => {
+    const c = big(t.coll_change);
+    const d = big(t.debt_change);
+    const after = big(t.debt_after);
+    const raw = after - before - d + carry;
+    before = after;
+    carry = raw < ZERO ? raw : ZERO;
+    return {
+      collIn: max0(c),
+      collOut: max0(-c),
+      borrowed: max0(d),
+      repaid: max0(-d),
+      fee: max0(raw),
+      coll: big(t.coll_after),
+      debt: after,
+      floor: t.floor_price ? big(t.floor_price) : null,
+    };
+  });
+}
+
+/** Whether the chain's loans(id) read agrees with the index's last touch: the
+ *  same collateral, and shares within a wei a touch (the index replays the
+ *  shares with their decimals; the chain stores them rounded). */
+export function loanChainAgrees(
+  chain: { collRaw: string; sharesRaw: string },
+  last: { coll_after: string | null; shares_after: string | null },
+  touches: number,
+): boolean {
+  if (big(chain.collRaw) !== big(last.coll_after)) return false;
+  const diff = big(chain.sharesRaw) - big(last.shares_after);
+  const tol = BigInt(Math.max(1, touches));
+  return diff <= tol && diff >= -tol;
+}
+
+/** A loan's collateral in WETH at the floor (1e18 integers), touch by touch.
+ *  `floors[i]`: the floor at touch i, a touch whose row has none taking the
+ *  one before it, and leading touches the first one known (`carried` marks
+ *  both). Each flow is valued at its touch's floor; the floor's rise is what
+ *  the collateral held between two touches gained as the floor moved, to
+ *  `floorNow` after the last. In − out + rise = the collateral now × floorNow,
+ *  within a wei a touch. Null where no touch states a floor. */
+export interface LoanFloorBook {
+  floors: bigint[];
+  carried: boolean[];
+  valuedIn: bigint;
+  valuedOut: bigint;
+  rise: bigint;
+  /** The collateral after each touch at that touch's floor. */
+  after: bigint[];
+  /** The collateral after the last touch at `floorNow`. */
+  now: bigint;
+}
+
+export function loanFloorBook(legs: LoanLegs[], floorNow: bigint | null): LoanFloorBook | null {
+  const first = legs.find((g) => g.floor != null && g.floor > ZERO)?.floor ?? null;
+  if (first == null) return null;
+  const floors: bigint[] = [];
+  const carried: boolean[] = [];
+  let f = first;
+  for (const g of legs) {
+    const own = g.floor != null && g.floor > ZERO;
+    if (own) f = g.floor as bigint;
+    floors.push(f);
+    carried.push(!own);
+  }
+  const at = (v: bigint, fl: bigint) => (v * fl) / E18;
+  let valuedIn = ZERO;
+  let valuedOut = ZERO;
+  let rise = ZERO;
+  const after: bigint[] = [];
+  legs.forEach((g, i) => {
+    valuedIn += at(g.collIn, floors[i]);
+    valuedOut += at(g.collOut, floors[i]);
+    after.push(at(g.coll, floors[i]));
+    const next = i + 1 < legs.length ? floors[i + 1] : (floorNow ?? floors[i]);
+    rise += at(g.coll, next) - at(g.coll, floors[i]);
+  });
+  const last = legs[legs.length - 1];
+  return {
+    floors,
+    carried,
+    valuedIn,
+    valuedOut,
+    rise,
+    after,
+    now: at(last.coll, floorNow ?? floors[floors.length - 1]),
+  };
+}
