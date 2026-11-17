@@ -1,6 +1,7 @@
 // The settlement panel's figures and their receipts (ui-jobs 711): each
 // trade's price on the card's pair, from its Trade log; the settlement's
-// clearing price, from settle()'s calldata; each trade's distance from it.
+// clearing price, from settle()'s calldata (the "input" class); each trade's
+// distance from it.
 // Rules: rails-ops standards/provenance-receipts-grammar.md §3–§5.
 
 import type { Provenance } from "@/components/shared/provenance";
@@ -126,7 +127,7 @@ export function clearingPriceProv(
   const perSell = p.base.address === sell.address;
   const wrapped = s.settle.call === "wrapped";
   const note = [
-    `Transaction input, not a log field. Each token's first clearingPrices entry is CoW's uniform price by convention; the contract priced this trade on entries [${own.sellIndex}, ${own.buyIndex}].`,
+    `Each token's first clearingPrices entry is CoW's uniform price by convention; the contract priced this trade on entries [${own.sellIndex}, ${own.buyIndex}].`,
     wrapped && s.settle.offset != null
       ? `The settle() call sits inside the solver contract's input, from byte ${s.settle.offset.toLocaleString("en-US")}; Etherscan does not decode it there.`
       : null,
@@ -136,7 +137,7 @@ export function clearingPriceProv(
     .join(" ");
   return {
     kind: "chain",
-    pclass: "emitted",
+    pclass: "input",
     summary: `Clearing price — ${tokenText(p.base)} in ${tokenText(p.quote)} as the solver's settlement states it: each token's first entry in the settle() call's clearingPrices, scaled by decimals.`,
     formula: perSell
       ? `clearingPrices[${u.sellIndex}] ÷ clearingPrices[${u.buyIndex}] = bought per unit sold`
@@ -146,14 +147,14 @@ export function clearingPriceProv(
         label: `clearingPrices[${u.sellIndex}] (sold token)`,
         value: u.sellPrice,
         kind: "chain",
-        pclass: "emitted",
+        pclass: "input",
         note,
       },
       {
         label: `clearingPrices[${u.buyIndex}] (bought token)`,
         value: u.buyPrice,
         kind: "chain",
-        pclass: "emitted",
+        pclass: "input",
         note,
       },
     ],
@@ -173,12 +174,12 @@ export function feeChargeProv(s: CowSettlement, t: CowSettlementTrade, token: Co
     pclass: "offchain",
     summary: `Fees — ${COW_TERMS.name}'s docs: "All protocol fees are charged in the surplus token", the token received on a sell order and the token paid on a buy order; this is a ${kind} order, so ${tokenText(token)}. Rails reads a trade's gap as its fees where the trade is priced worse than the clearing price on entries listed for it alone, from block ${COW_OWN_PRICE_FEES_FROM.toLocaleString("en-US")}, the first block where the sample (17 Nov 2026, 24 windows of 2,000 blocks) found every trade of a settlement priced that way.`,
     inputs: [
-      { label: "order kind (settle() input, flags)", value: kind, kind: "chain", pclass: "emitted" },
+      { label: "order kind (settle() input, flags)", value: kind, kind: "chain", pclass: "input" },
       {
         label: "the trade's clearingPrices entries",
         value: `[${own.sellIndex}, ${own.buyIndex}]`,
         kind: "chain",
-        pclass: "emitted",
+        pclass: "input",
       },
       { label: "block", value: String(s.blockNumber), kind: "chain", pclass: "emitted" },
     ],
@@ -192,15 +193,15 @@ export function gapProv(s: CowSettlement, t: CowSettlementTrade): Provenance {
   const g = gapBp(t);
   return {
     kind: "derived",
-    pclass: "emitted",
+    pclass: "input",
     summary: `From the clearing price — how far the trade of ${shortAddress(t.owner)} sits from the solver's clearing price, in basis points (0.01%), from the owner's side: worse where the owner paid more of the sold token per unit bought than at the clearing price, better where less.${t.settled?.ownEntries ? " The trade's settle() indices point past the tokens' first entries." : " The trade was settled on the tokens' first entries."}`,
     formula: "(trade price ÷ clearing price − 1) × 10,000, both as sold per unit bought",
     inputs: [
       { label: "sold − fee", value: soldLessFee(t.sellAmount, t.feeAmount) ?? "0", kind: "chain", pclass: "emitted" },
       { label: "bought", value: t.buyAmount, kind: "chain", pclass: "emitted" },
-      { label: "clearing price, sold token", value: t.settled?.uniform.sellPrice, kind: "chain", pclass: "emitted" },
-      { label: "clearing price, bought token", value: t.settled?.uniform.buyPrice, kind: "chain", pclass: "emitted" },
-      ...(g != null ? [{ label: "gap (bp)", value: g.toFixed(4), kind: "derived" as const }] : []),
+      { label: "clearing price, sold token", value: t.settled?.uniform.sellPrice, kind: "chain", pclass: "input" },
+      { label: "clearing price, bought token", value: t.settled?.uniform.buyPrice, kind: "chain", pclass: "input" },
+      ...(g != null ? [{ label: "gap (bp)", value: g.toFixed(4), kind: "derived" as const, step: true as const }] : []),
     ],
     contract: SETTLEMENT,
     source: coords(s),

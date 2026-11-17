@@ -1,4 +1,4 @@
-// The reader's words for the five provenance classes: the modal the receipt
+// The reader's words for the six provenance classes: the modal the receipt
 // head's class dots open (`LadderModal`, components/shared/provenance.tsx) and
 // the "Kinds of figure" section of /about/provenance read them from here, so
 // the two cannot drift. Each class's line follows the receipt grammar's §2
@@ -11,7 +11,7 @@ import type { ProvClass } from "@/components/shared/provenance";
  *  accessible name (ui-jobs 617, call C1). verify-ladder-dots.mjs reads it. */
 export const LADDER_TITLE = "What the dots mean";
 
-/** The reader's word for one of the five classes (ui-jobs 617, call C4). Code
+/** The reader's word for one of the six classes (ui-jobs 617, call C4). Code
  *  keeps `pclass`; the lexicon keeps "kind" for the four-way gate in docs. */
 export const KIND_OF_FIGURE = "kind of figure";
 export const KINDS_OF_FIGURE = "kinds of figure";
@@ -22,6 +22,7 @@ export const CLASS_NAMES: Record<ProvClass, string> = {
   emitted: "Emitted",
   state: "State",
   oracle: "Oracle",
+  input: "Input",
   indexed: "Indexed",
   offchain: "Off-chain",
 };
@@ -40,6 +41,10 @@ export const CLASS_LINES: readonly { cls: ProvClass; line: string; modalNote?: s
     modalNote: "A block explorer shows only the current state.",
   },
   { cls: "oracle", line: "A price from a feed on the chain. The feed’s log for that round holds it." },
+  {
+    cls: "input",
+    line: "A value the transaction sent to the contract. Any block explorer shows it; the contract checks it only where its code uses it.",
+  },
   { cls: "indexed", line: "Built by Rails’s index from the events it recorded. No third party holds it." },
   {
     cls: "offchain",
@@ -53,9 +58,9 @@ export const SPLIT_LINE = "above: checkable on the chain · below: needs Rails";
 /** How the head's dots read for a computed figure (grammar §2). */
 export const COMPUTED_LINE = `A figure worked out from others is computed. Its head shows one dot for each ${KIND_OF_FIGURE} among its inputs, and it is as checkable as its furthest input.`;
 
-/** The definition leaf (grammar §2; ui-jobs 669, 674). */
+/** The rows with no dot: the definition leaf and the step leaf (grammar §2; ui-jobs 669, 674). */
 export const DEFINITION_LINE =
-  "A constant the protocol defines, such as a stablecoin’s $1 face, is not a read and has no dot.";
+  "A constant the protocol defines, such as a stablecoin’s $1 face, is not a read and has no dot. A row worked out from the receipt’s other rows has none either.";
 
 /** "Kinds of figure" as a heading. */
 export const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);

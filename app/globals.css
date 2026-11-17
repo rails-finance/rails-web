@@ -1547,15 +1547,17 @@ label[for] {
    IS the equation. Receipt chrome carries `data-prov-chrome`, which the
    provenance coverage tripwire skips (chrome is never a traced value).
 
-   Five DISPLAY classes (a distance refinement layered over the 4-kind gate):
-   emitted · state · oracle (all on-chain, third-party verifiable) → indexed ·
-   offchain (need Rails). Temperature: cool = on-chain, warm = trust required.
+   Six DISPLAY classes (a distance refinement layered over the 4-kind gate):
+   emitted · state · oracle · input (all on-chain, third-party verifiable) →
+   indexed · offchain (need Rails). Temperature: cool = on-chain, warm = trust
+   required; input, the sender's figure, takes the last cool step (purple).
    Dim set = light surfaces, bright set = dark surfaces (receipts render on the
    normal card surface — the inverted page dock retired 2026-07-09). */
 :root {
   --pc-emitted: #0f766e;
   --pc-state: #0369a1;
   --pc-oracle: #4338ca;
+  --pc-input: #9333ea;
   --pc-indexed: #b45309;
   --pc-offchain: #c2410c;
   --pc-rail: oklch(0.8859 calc(0.0171 * var(--paper-chroma)) var(--paper-hue)); /* = rb-300 */
@@ -1565,6 +1567,7 @@ label[for] {
   --pc-emitted: #2dd4bf;
   --pc-state: #38bdf8;
   --pc-oracle: #818cf8;
+  --pc-input: #c084fc;
   --pc-indexed: #fbbf24;
   --pc-offchain: #fb923c;
   --pc-rail: rgb(30 33 46); /* rb-600 */
@@ -1578,6 +1581,9 @@ label[for] {
 }
 .prov-cls-oracle {
   --pc-d: var(--pc-oracle);
+}
+.prov-cls-input {
+  --pc-d: var(--pc-input);
 }
 .prov-cls-indexed {
   --pc-d: var(--pc-indexed);
