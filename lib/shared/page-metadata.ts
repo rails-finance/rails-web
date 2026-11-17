@@ -330,6 +330,8 @@ export function eventMetadata(opts: {
   session: SessionProtocol;
   subject: string;
   market?: string;
+  /** Overrides the session's noun, as `positionMetadata`'s does. */
+  noun?: string;
   canonicalPath: string;
   event?: { actionLabel: string; timestamp: number } | null;
   /** `"explorer"` for an event route with NO `opengraph-image.tsx` beside it,
@@ -346,7 +348,7 @@ export function eventMetadata(opts: {
 }): Metadata {
   const entry = protocolForSession(opts.session);
   const label = entry ? explorerName(entry) : "Rails";
-  const noun = POSITION_NOUN[opts.session];
+  const noun = opts.noun ?? POSITION_NOUN[opts.session];
   const base = positionTitle(label, { market: opts.market, noun, id: opts.subject });
   const title = opts.event ? `${base} · ${opts.event.actionLabel}` : base;
   const description = opts.description

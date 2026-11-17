@@ -5,6 +5,7 @@
 // the index has no row for is a 404.
 
 import type { Metadata } from "next";
+import { positionMetadata } from "@/lib/shared/page-metadata";
 import { notFound } from "next/navigation";
 import { AimGate } from "@/components/shared/aim-gate";
 import { normalizeCdpId, normalizeMarket, POLARIS_CHAIN_ID, POLARIS_MARKET_CONFIG } from "@/lib/polaris/asset-catalog";
@@ -24,11 +25,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const market = normalizeMarket(rawMarket);
   const id = normalizeCdpId(rawId);
   const stable = market ? POLARIS_MARKET_CONFIG[market].stable.symbol : rawMarket;
-  return {
-    title: `Polaris · ${stable} Stability Pool · Deposit #${id ?? rawId}`,
-    description: `A Rails replay of this Polaris stability-pool deposit on Sepolia: every operation from the pool's events, with a receipt on every number. Test tokens only.`,
-    alternates: { canonical: market && id ? polarisDepositHref(market, id) : undefined },
-  };
+  return positionMetadata({
+    session: "polaris",
+    subject: `#${id ?? rawId}`,
+    market: `${stable} Stability Pool`,
+    noun: "Deposit",
+    canonicalPath:
+      market && id ? polarisDepositHref(market, id) : `/sepolia/polaris/stability-pool/${rawMarket}/${rawId}`,
+    description: () =>
+      `A Rails replay of this Polaris stability-pool deposit on Sepolia: every operation from the pool's events, with a receipt on every number. Test tokens only.`,
+  });
 }
 
 export default async function PolarisDepositPage({ params }: Props) {
