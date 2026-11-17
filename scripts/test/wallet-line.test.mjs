@@ -1,11 +1,11 @@
 // lib/wallet/summary-counts.ts walletLineText: the wallet heading's count line (H13.2) names its
 // scope, "On Rails:" where the page's position is among those counted and "Also on Rails:" where it
 // is not (Miles 12 Nov 2026, rails-ops ui-jobs 613), and names the protocols counted (Miles 13 Nov
-// 2026, ui-jobs 639), and ends on its scope: the counts leave out Polaris on Sepolia (ui-jobs 691).
+// 2026, ui-jobs 639).
 // Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { walletLineText } from "../../lib/wallet/summary-counts.ts";
+import { WALLET_COUNTS_SCOPE, walletLineParts, walletLineText } from "../../lib/wallet/summary-counts.ts";
 
 const row = (chain, status, i) => ({
   chain,
@@ -24,24 +24,15 @@ const FIVE = [
 ];
 
 test("the page's position counted: On Rails", () => {
-  assert.equal(
-    walletLineText(FIVE, true),
-    "On Rails: 5 positions on 2 chains · 2 open · 3 closed · Sepolia testnet not counted",
-  );
+  assert.equal(walletLineText(FIVE, true), "On Rails: 5 positions on 2 chains · 2 open · 3 closed");
 });
 
 test("the page's position not counted: Also on Rails", () => {
-  assert.equal(
-    walletLineText(FIVE.slice(2), false),
-    "Also on Rails: 3 positions on 2 chains · 0 open · 3 closed · Sepolia testnet not counted",
-  );
+  assert.equal(walletLineText(FIVE.slice(2), false), "Also on Rails: 3 positions on 2 chains · 0 open · 3 closed");
 });
 
 test("one chain is not named", () => {
-  assert.equal(
-    walletLineText(FIVE.slice(0, 2), true),
-    "On Rails: 2 positions · 2 open · 0 closed · Sepolia testnet not counted",
-  );
+  assert.equal(walletLineText(FIVE.slice(0, 2), true), "On Rails: 2 positions · 2 open · 0 closed");
 });
 
 test("nothing counted draws nothing", () => {
@@ -61,45 +52,42 @@ const fam = (family, status, i, chain = "ethereum") => ({ ...row(chain, status, 
 test("one position names its protocol and state", () => {
   assert.equal(
     walletLineText([row("ethereum", "closed", 1)], false, nameOf),
-    "Also on Rails: 1 Aave V3 position · closed · Sepolia testnet not counted",
+    "Also on Rails: 1 Aave V3 position · closed",
   );
-  assert.equal(
-    walletLineText([row("ethereum", "open", 1)], true, nameOf),
-    "On Rails: 1 Aave V3 position · open · Sepolia testnet not counted",
-  );
+  assert.equal(walletLineText([row("ethereum", "open", 1)], true, nameOf), "On Rails: 1 Aave V3 position · open");
 });
 
 test("one protocol, several positions", () => {
-  assert.equal(
-    walletLineText(FIVE, true, nameOf),
-    "On Rails: 5 Aave V3 positions on 2 chains · 2 open · 3 closed · Sepolia testnet not counted",
-  );
+  assert.equal(walletLineText(FIVE, true, nameOf), "On Rails: 5 Aave V3 positions on 2 chains · 2 open · 3 closed");
 });
 
 test("two or three protocols are named, most positions first", () => {
   const rows = [fam("liquity-v2", "open", 1), fam("aave-v3", "closed", 2), fam("aave-v3", "closed", 3)];
   assert.equal(
     walletLineText(rows, false, nameOf),
-    "Also on Rails: 3 positions in Aave V3 and Liquity V2 · 1 open · 2 closed · Sepolia testnet not counted",
+    "Also on Rails: 3 positions in Aave V3 and Liquity V2 · 1 open · 2 closed",
   );
   assert.equal(
     walletLineText([...rows, fam("morpho", "open", 4, "arbitrum")], false, nameOf),
-    "Also on Rails: 4 positions in Aave V3, Liquity V2 and Morpho Blue on 2 chains · 2 open · 2 closed · Sepolia testnet not counted",
+    "Also on Rails: 4 positions in Aave V3, Liquity V2 and Morpho Blue on 2 chains · 2 open · 2 closed",
   );
 });
 
 test("past three protocols the line counts them", () => {
   const rows = ["aave-v3", "liquity-v2", "morpho", "spark"].map((f, i) => fam(f, "open", i));
-  assert.equal(
-    walletLineText(rows, true, nameOf),
-    "On Rails: 4 positions in 4 protocols · 4 open · 0 closed · Sepolia testnet not counted",
-  );
+  assert.equal(walletLineText(rows, true, nameOf), "On Rails: 4 positions in 4 protocols · 4 open · 0 closed");
 });
 
 test("a position with no name leaves the line unnamed", () => {
   const rows = [row("ethereum", "open", 1), fam("unknown", "closed", 2)];
-  assert.equal(
-    walletLineText(rows, false, nameOf),
-    "Also on Rails: 2 positions · 1 open · 1 closed · Sepolia testnet not counted",
-  );
+  assert.equal(walletLineText(rows, false, nameOf), "Also on Rails: 2 positions · 1 open · 1 closed");
+});
+
+test("the scope and the counts come apart for the tip and the link (ui-jobs 691)", () => {
+  assert.deepEqual(walletLineParts(FIVE.slice(2), false), {
+    scope: "Also on Rails",
+    rest: "3 positions on 2 chains · 0 open · 3 closed",
+  });
+  assert.equal(walletLineParts([], true), null);
+  assert.equal(WALLET_COUNTS_SCOPE, "Counts mainnet positions; the Sepolia testnet is not counted.");
 });

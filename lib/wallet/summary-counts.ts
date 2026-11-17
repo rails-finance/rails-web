@@ -73,10 +73,10 @@ export function rowIsPage(href: string, pathname: string, search: string): boole
   return (new URLSearchParams(search).get("market") ?? "core").toLowerCase() === market.toLowerCase();
 }
 
-/** The counts cover the mainnet families only (`WALLET_FAMILIES`); Polaris on
- *  Sepolia is not among them, so every line that states them names that scope
- *  at its end (ui-jobs 691). */
-export const WALLET_COUNTS_SCOPE = "Sepolia testnet not counted";
+/** The counter's tip, wherever it draws (H13.2, W1): the counts cover the
+ *  mainnet wallet families only (`WALLET_FAMILIES`), not Polaris on Sepolia
+ *  (ui-jobs 691). */
+export const WALLET_COUNTS_SCOPE = "Counts mainnet positions; the Sepolia testnet is not counted.";
 
 const count = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 
@@ -96,13 +96,24 @@ const listed = (names: string[]) =>
  *  ui-jobs 639): "Also on Rails: 1 Aave V3 position · closed", "3 positions
  *  in Aave V3 and Liquity V2 · 1 open · 2 closed", past three "in 4
  *  protocols". `nameOf` gives a position's protocol name; where it has none
- *  for some position the line names none. The line ends on its scope,
- *  "· Sepolia testnet not counted" (ui-jobs 691). Null when there is nothing. */
+ *  for some position the line names none. Null when there is nothing. */
 export function walletLineText(
   positions: WalletCountsPosition[],
   pageCounted: boolean,
   nameOf: (p: WalletCountsPosition) => string | undefined = () => undefined,
 ): string | null {
+  const parts = walletLineParts(positions, pageCounted, nameOf);
+  return parts && `${parts.scope}: ${parts.rest}`;
+}
+
+/** The line in two parts: its scope ("On Rails", "Also on Rails"), which
+ *  carries the counter's tip, and the counts after the colon, which link to
+ *  the wallet view. */
+export function walletLineParts(
+  positions: WalletCountsPosition[],
+  pageCounted: boolean,
+  nameOf: (p: WalletCountsPosition) => string | undefined = () => undefined,
+): { scope: string; rest: string } | null {
   const n = positions.length;
   if (n === 0) return null;
   const chains = new Set(positions.map((p) => p.chain)).size;
@@ -120,12 +131,11 @@ export function walletLineText(
   }
   const names = [...tally.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([k]) => k);
   const states = ` · ${open.toLocaleString("en-US")} open · ${(n - open).toLocaleString("en-US")} closed`;
-  const tail = ` · ${WALLET_COUNTS_SCOPE}`;
   if (names.length === 1) {
-    if (n === 1) return `${scope}: 1 ${names[0]} position · ${open === 1 ? "open" : "closed"}${tail}`;
-    return `${scope}: ${count(n, `${names[0]} position`)}${where}${states}${tail}`;
+    if (n === 1) return { scope, rest: `1 ${names[0]} position · ${open === 1 ? "open" : "closed"}` };
+    return { scope, rest: `${count(n, `${names[0]} position`)}${where}${states}` };
   }
   const within =
     names.length === 0 ? "" : names.length <= NAMED_MAX ? ` in ${listed(names)}` : ` in ${names.length} protocols`;
-  return `${scope}: ${count(n, "position")}${within}${where}${states}${tail}`;
+  return { scope, rest: `${count(n, "position")}${within}${where}${states}` };
 }

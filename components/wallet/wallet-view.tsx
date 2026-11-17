@@ -15,7 +15,7 @@
 import { IndexNotice } from "@/components/shared/index-notice";
 import Link from "next/link";
 import { Suspense, use, type ReactNode } from "react";
-import { TipLabel } from "@/components/shared/tip-label";
+import { HeadingTip, TipLabel } from "@/components/shared/tip-label";
 import { DetailBackButton } from "@/components/shared/detail-back-row";
 import { WalletHeading } from "@/components/shared/wallet-heading";
 import { PROFILE_CLEARANCE } from "@/lib/shared/ui-grammar";
@@ -449,8 +449,10 @@ export function WalletView({
                 ) : (
                   read.total > 0 && (
                     <div className="text-xs text-rb-500" data-wallet-count={read.total}>
-                      {plural(read.total, "position")} · {openAll.length} open · {closed.length} closed ·{" "}
-                      {WALLET_COUNTS_SCOPE}
+                      <HeadingTip
+                        text={`${plural(read.total, "position")} · ${openAll.length} open · ${closed.length} closed`}
+                        tip={WALLET_COUNTS_SCOPE}
+                      />
                     </div>
                   )
                 )}
