@@ -54,7 +54,12 @@ const T = [
 
 test("the receipt lists each wallet-to-wallet transfer with its transaction", () => {
   const p = forkLastHolderProv("ebisu", 1, T);
-  assert.match(p.summary, /passed between wallets 2 times/);
+  assert.equal(
+    p.summary,
+    "The TroveNFT passed between wallets 2 times. The wallet named here held it when the Trove closed. The inputs list its Transfer logs, mint and burn left out.",
+  );
+  assert.equal(p.inputs[0].verify.text, "The transaction on Etherscan");
+  assert.equal(p.verify.text, "Each transfer links its transaction on Etherscan.");
   assert.match(p.via, /\/api\/ebisu\/troves\?troveId=…&former=1 · ebisu_trove_nft_transfers/);
   assert.equal(p.inputs.length, 2);
   assert.equal(p.inputs[0].label, "Transfer, block 23,125,542 (12 Aug 2025)");
@@ -68,4 +73,5 @@ test("one transfer reads once; Basedollar's links go to the Base explorer", () =
   const p = forkLastHolderProv("basedollar", 8453, T.slice(0, 1));
   assert.match(p.summary, /passed between wallets once/);
   assert.match(p.inputs[0].verify.href, /basescan\.org\/tx\/0x5f98$/);
+  assert.equal(p.inputs[0].verify.text, "The transaction on Basescan");
 });

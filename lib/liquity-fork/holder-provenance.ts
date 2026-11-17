@@ -6,7 +6,7 @@
 // the prefix states can be checked.
 
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
-import { explorerUrl, type ChainId } from "@/lib/shared/chains";
+import { CHAINS, explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { formatDate } from "@/lib/date";
 import type { ForkNftTransfer } from "@/lib/liquity-fork/former-holders";
 
@@ -20,6 +20,7 @@ export function forkLastHolderProv(
   transfers: ForkNftTransfer[],
 ): Provenance {
   const n = transfers.length;
+  const explorer = CHAINS[chainId].explorerName;
   const inputs: ProvInput[] = transfers.map((t) => ({
     label: `Transfer, block ${t.block.toLocaleString("en-US")}${t.at != null ? ` (${formatDate(t.at)})` : ""}`,
     value: `${short(t.from)} → ${short(t.to)}`,
@@ -27,15 +28,15 @@ export function forkLastHolderProv(
     pclass: "emitted",
     note: `The TroveNFT's Transfer log: from ${t.from} to ${t.to}.`,
     contract: { name: "TroveNFT" },
-    verify: { kind: "etherscan", href: explorerUrl(chainId, "tx", t.tx), text: "The transaction on the explorer" },
+    verify: { kind: "etherscan", href: explorerUrl(chainId, "tx", t.tx), text: `The transaction on ${explorer}` },
   }));
   return {
     kind: "chain-derived",
     pclass: "indexed",
-    summary: `The Trove's NFT passed between wallets ${n === 1 ? "once" : `${n} times`}; the wallet named here held it when the Trove closed. Each transfer below is the TroveNFT's Transfer log, mint and burn left out.`,
+    summary: `The TroveNFT passed between wallets ${n === 1 ? "once" : `${n} times`}. The wallet named here held it when the Trove closed. The inputs list its Transfer logs, mint and burn left out.`,
     contract: { name: "TroveNFT" },
     via: `GET /api/${deployment}/troves?troveId=…&former=1 · ${deployment}_trove_nft_transfers (the ${NAMES[deployment]} branch TroveNFT's Transfer logs)`,
-    verify: { kind: "rollup", text: "Each transfer links its transaction on the explorer." },
+    verify: { kind: "rollup", text: `Each transfer links its transaction on ${explorer}.` },
     inputs,
   };
 }
