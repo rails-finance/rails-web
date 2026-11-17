@@ -201,7 +201,7 @@ function useFrankencoinProse({ ctx, txHash, blockNumber, timestamp, eventId }: F
 export function FrankencoinExplainerLead(props: FrankencoinEventExplainerProps) {
   const { runs, echo } = useFrankencoinProse(props);
   const lead = runs[0]?.sentences[0];
-  return lead ? <ProseSentenceText s={lead} echo={echo} /> : null;
+  return lead ? <ProseSentenceText s={lead} echo={echo} holderOf="frankencoin" /> : null;
 }
 
 export function FrankencoinEventExplainer(props: FrankencoinEventExplainerProps) {
@@ -209,7 +209,7 @@ export function FrankencoinEventExplainer(props: FrankencoinEventExplainerProps)
   const items = runs.flatMap((run, r) =>
     run.sentences.flatMap((s, i) => {
       if (props.leadOnTitle && r === 0 && i === 0) return [];
-      const node = <ProseSentenceText key={s.sentence_id} s={s} echo={echo} />;
+      const node = <ProseSentenceText key={s.sentence_id} s={s} echo={echo} holderOf="frankencoin" />;
       return [run.heading ? { group: run.heading, node } : node];
     }),
   );

@@ -157,13 +157,13 @@ export function polarisEventBody(
               {ctx.fromAddr ? (
                 <>
                   {" "}
-                  from <LinkedAddress address={ctx.fromAddr} />
+                  from <LinkedAddress address={ctx.fromAddr} holderOf="polaris" />
                 </>
               ) : null}
               {ctx.toAddr ? (
                 <>
                   {" "}
-                  to <LinkedAddress address={ctx.toAddr} />
+                  to <LinkedAddress address={ctx.toAddr} holderOf="polaris" />
                 </>
               ) : null}
               : the position&rsquo;s collateral and debt did not change.

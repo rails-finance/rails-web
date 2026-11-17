@@ -106,7 +106,9 @@ export function MakerExplainerLead({ ctx, eventId, txHash, blockNumber }: MakerD
   const coords: MakerCoords = { txHash, blockNumber, urn: ctx.urn, ilk: ctx.ilk };
   const extras = useMakerRowExtras(ctx, eventId, txHash, blockNumber);
   const lead = makerExplanationRuns(makerEventProse({ ctx, extras }))[0]?.sentences[0];
-  return lead ? <ProseSentenceText s={lead} echo={(key: MakerEchoKey) => echoFor(key, ctx, coords)} /> : null;
+  return lead ? (
+    <ProseSentenceText s={lead} echo={(key: MakerEchoKey) => echoFor(key, ctx, coords)} holderOf="makerdao" />
+  ) : null;
 }
 
 export function MakerDAOEventExplainer({
@@ -123,7 +125,7 @@ export function MakerDAOEventExplainer({
   const items = makerExplanationRuns(prose).flatMap((run, r) =>
     run.sentences.flatMap((s, i) => {
       if (leadOnTitle && r === 0 && i === 0) return [];
-      const node = <ProseSentenceText key={s.sentence_id} s={s} echo={echo} />;
+      const node = <ProseSentenceText key={s.sentence_id} s={s} echo={echo} holderOf="makerdao" />;
       return [run.heading ? { group: run.heading, node } : node];
     }),
   );

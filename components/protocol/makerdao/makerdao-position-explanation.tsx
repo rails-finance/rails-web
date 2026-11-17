@@ -71,7 +71,10 @@ function ownerBullets(history: MakerVaultHistory, owner: string | null | undefin
   const owners = history.owners;
   if (owners.length < 2) {
     if (!owner || history.ownership.size > 0) return;
-    add({ group: "history", node: positionNodes("owner_one", { owner: <LinkedAddress address={owner} /> }) });
+    add({
+      group: "history",
+      node: positionNodes("owner_one", { owner: <LinkedAddress address={owner} holderOf="makerdao" /> }),
+    });
     return;
   }
   // The current owner's stretch reaches back over any transaction-long
@@ -85,7 +88,7 @@ function ownerBullets(history: MakerVaultHistory, owner: string | null | undefin
     add({
       group: "history",
       node: positionNodes("owner_since", {
-        owner: <LinkedAddress address={current} />,
+        owner: <LinkedAddress address={current} holderOf="makerdao" />,
         since: <H>{formatDate(owners[start].since)}</H>,
       }),
     });

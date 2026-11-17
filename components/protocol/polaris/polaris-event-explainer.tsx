@@ -124,14 +124,16 @@ export function PolarisExplainerTeaser({
   echo: (key: PolarisEchoKey) => ProseEcho | null;
 }) {
   const lead = prose.L4[0];
-  return lead ? <ProseSentenceText s={lead} echo={echo} /> : null;
+  return lead ? <ProseSentenceText s={lead} echo={echo} holderOf="polaris" /> : null;
 }
 
 export function PolarisEventExplainer({ ctx, txHash, blockNumber, sentByOther }: PolarisEventExplainerProps) {
   const prose = polarisEventProse({ ctx, sentByOther });
   const coords = polarisEchoCoords(ctx, txHash, blockNumber);
   const echo = (key: PolarisEchoKey) => polarisEchoFor(key, ctx, coords);
-  const sentence = (s: PolarisEventProse["L4"][number]) => <ProseSentenceText key={s.sentence_id} s={s} echo={echo} />;
+  const sentence = (s: PolarisEventProse["L4"][number]) => (
+    <ProseSentenceText key={s.sentence_id} s={s} echo={echo} holderOf="polaris" />
+  );
 
   if (isGroupedExplanation(prose))
     return (
