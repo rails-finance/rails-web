@@ -32,3 +32,33 @@ export function formatPolarisRatioPct(pct: number, decimals = 1, minPct?: number
 /** The same, for a ratio given as a fraction (1.1495 means 114.95%). */
 export const formatPolarisRatio = (fraction: number, decimals = 1, minFraction?: number): string =>
   formatPolarisRatioPct(fraction * 100, decimals, minFraction != null ? minFraction * 100 : undefined);
+
+/** The market's mode and floors as one read states them: the head read on a
+ *  position page, the market board on a listing. */
+export interface PolarisFloorRead {
+  defensiveMode: boolean;
+  mcr: number;
+  defensiveMcr: number;
+}
+
+/** The ratio headline's floor line, one for the card and the listing row:
+ *  the minimum in force at the grain the floor is set in ("Minimum ratio
+ *  115%"), and in defensive mode the words that say why it stands higher,
+ *  drawn after a middle dot ("Minimum ratio 150% · defensive mode"). */
+export function polarisFloorWords(
+  mcrInForce: number,
+  defensive: boolean,
+): { floor: string; mode: string | null; text: string } {
+  const floor = `Minimum ratio ${Number((mcrInForce * 100).toFixed(1))}%`;
+  const mode = defensive ? "defensive mode" : null;
+  return { floor, mode, text: mode ? `${floor} · ${mode}` : floor };
+}
+
+/** The floor in force from a read, and its line. Null without a read. */
+export function polarisFloorLine(
+  read: PolarisFloorRead | null | undefined,
+): { mcr: number; defensive: boolean; floor: string; mode: string | null; text: string } | null {
+  if (!read) return null;
+  const mcr = read.defensiveMode ? read.defensiveMcr : read.mcr;
+  return { mcr, defensive: read.defensiveMode, ...polarisFloorWords(mcr, read.defensiveMode) };
+}

@@ -104,7 +104,7 @@ import type { PolarisChainResponse } from "@/lib/api/fetch-polaris-position";
 // Type-only — lib/sources/chain/* is server-only, and an `import type` is
 // erased before the client bundle is built (the markets view does the same).
 import type { PolarisMarketsChainResponse } from "@/lib/sources/chain/polaris-position";
-import { formatPolarisRatio } from "@/lib/polaris/ratio-format";
+import { formatPolarisRatio, polarisFloorLine, polarisFloorWords } from "@/lib/polaris/ratio-format";
 import { formatCompact } from "@/lib/shared/format-compact";
 
 export interface PolarisPositionView {
@@ -184,8 +184,6 @@ const debtProv = (v: PolarisPositionView): Provenance =>
 
 const pct = (f: number): string => `${(f * 100).toFixed(1)}%`;
 const pct2 = (f: number): string => `${(f * 100).toFixed(2)}%`;
-/** A floor at the grain it is set in: "115%", "112.5%". */
-const pctShort = (f: number): string => `${Number((f * 100).toFixed(1))}%`;
 
 /** The read-more on "defensive mode" in the ratio headline's floor line. */
 const DEFENSIVE_MODE_TIP =
@@ -527,6 +525,8 @@ export function polarisCardSlots({
     };
   } else {
     const mcrInForce = v.mcr;
+    const floorWords =
+      mcrInForce != null ? { mcr: mcrInForce, ...polarisFloorWords(mcrInForce, v.defensiveMode) } : null;
     const belowMin = v.icr != null && mcrInForce != null && v.icr < mcrInForce;
     heads = [
       {
@@ -626,24 +626,23 @@ export function polarisCardSlots({
         pending: v.icr == null && v.pricePending && v.debt > 0,
         // The floor in force, and in defensive mode the mode that raised it,
         // each with its receipt.
-        sub:
-          mcrInForce != null ? (
-            <span>
-              <Prov info={liveMcrProv(v.defensiveMode, v.market, index)} value={pct(mcrInForce)}>
-                <span>Minimum ratio {pctShort(mcrInForce)}</span>
-              </Prov>
-              {v.defensiveMode && (
-                <>
-                  {" · "}
-                  <Prov info={liveModeProv(v.market, index)} value="defensive">
-                    <span data-figure="defensive-mode">
-                      <HeadingTip text="defensive mode" tip={DEFENSIVE_MODE_TIP} />
-                    </span>
-                  </Prov>
-                </>
-              )}
-            </span>
-          ) : undefined,
+        sub: floorWords ? (
+          <span>
+            <Prov info={liveMcrProv(v.defensiveMode, v.market, index)} value={pct(floorWords.mcr)}>
+              <span>{floorWords.floor}</span>
+            </Prov>
+            {floorWords.mode && (
+              <>
+                {" · "}
+                <Prov info={liveModeProv(v.market, index)} value="defensive">
+                  <span data-figure="defensive-mode">
+                    <HeadingTip text={floorWords.mode} tip={DEFENSIVE_MODE_TIP} />
+                  </span>
+                </Prov>
+              </>
+            )}
+          </span>
+        ) : undefined,
       },
     ];
     // A listing row whose recorded debt is none has no ratio to estimate.
@@ -838,7 +837,7 @@ export function viewFromSummary(
   pending = false,
 ): PolarisPositionView {
   const board = markets && !markets.chainStale ? markets.markets.find((m) => m.market === s.market) : undefined;
-  const mcrInForce = board ? (board.defensiveMode ? board.defensiveMcr : board.mcr) : null;
+  const mcrInForce = polarisFloorLine(board)?.mcr ?? null;
   const priced = board != null && s.coll > 0 && s.debt > 0;
   return {
     market: s.market,
