@@ -568,7 +568,7 @@ export function useAaveV4Cells({
         after: {
           text: (
             <span
-              className="inline-block h-[1em] w-24 rounded-md bg-skeleton animate-pulse align-middle"
+              className="inline-block h-[1em] w-24 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse align-middle"
               aria-hidden="true"
             />
           ),

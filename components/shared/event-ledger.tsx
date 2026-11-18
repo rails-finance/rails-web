@@ -105,14 +105,14 @@ const OWN_TAP = "button, a, input, select, textarea, [role=button], [data-prov-p
  *  cell like a click on the name; on touch the first tap opens the tip. */
 const USD_TIP_HOST = "data-closed-usd-tip";
 
-/** A pending figure: one pulsing bar where a value will stand. The bar is
- *  `bg-skeleton`, which the T2 panel's surface does not show, so it sits
- *  inside a cell (`bg-background`). It holds still under reduced motion. */
+/** A pending figure: one pulsing bar where a value will stand, in the
+ *  sheet skeleton's tone (rb-200 / dark rb-700), which shows on a cell of
+ *  either ground. It holds still under reduced motion. */
 export function PendingBar({ className = "w-24" }: { className?: string }) {
   return (
     <span
       aria-hidden
-      className={`inline-block h-4 rounded-md bg-skeleton animate-pulse ${className}`}
+      className={`inline-block h-4 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse ${className}`}
       data-pending-bar=""
     />
   );

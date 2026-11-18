@@ -78,11 +78,11 @@
 
      SETTLED 2026-07-26: hue 0 at 0.6 chroma, a soft rosy grey — canvas #eee7e9,
      ink #1b1718. The cream read too brown, so the cast moved off yellow and came
-     down to ~60% strength. Two things do NOT follow these knobs and need a hand
-     edit if the tone moves again: the `viewport.themeColor` light value plus its
-     <meta> twin in app/layout.tsx (both literal #eee7e9, measured from the canvas
-     — a stale value shows as a seam in mobile browser chrome), and the ~12
-     `bg-white` call sites, which are pure white at every hue.
+     down to ~60% strength. The canvas no longer follows these knobs: it is the
+     literal rgb(250 250 250) (ui-jobs 730), and the `viewport.themeColor`
+     values plus their <meta> twins in app/layout.tsx are its literals
+     (#fafafa, dark #171b24; a stale value shows as a seam in mobile browser
+     chrome). The ~12 `bg-white` call sites are pure white at every hue.
 
      `html.dark` pins its own cool blue-grey literals, so these knobs do not
      reach dark mode. The LIGHTNESS ladder stays hand-authored per token — it
@@ -138,7 +138,7 @@
      near-white panels read as elevated sheets on it. Surface overlays darken
      on hover (warm-black alphas) because the panels they ride are near-white —
      a white-alpha lift would be invisible on a white panel. */
-  --background: rgb(250 250 250); /* off-white: the panels sit white on it (Miles, 18 Nov 2026) */
+  --background: rgb(250 250 250); /* off-white: the panels sit white on it */
 
   /* Tinted with the paper hue (at low chroma) rather than pure black, so
      hover/active fills on the panels read as deeper paper, not neutral grey —
@@ -158,10 +158,10 @@
   --surface-raised: rgb(255 255 255); /* cards, panels, inputs, active in-place control */
   --surface-sunken: var(--color-rb-200); /* segmented tracks, inset chips, recessed wells */
   --edge-row-line: var(--color-rb-200); /* the hairline between the house table's rows (D1) */
-  --edge-raised: rgb(
-    236 236 236
-  ); /* a hairline on a raised ground: the card's rule, a cell's rules (Miles, 18 Nov 2026) */
-  --surface-row-hover: var(--color-rb-100); /* the house table's hovered row, a rounded block (D1) */
+  --edge-raised: rgb(236 236 236); /* a hairline on a raised ground: the card's rule, a cell's rules */
+  --surface-row-hover: rgb(
+    241 241 241
+  ); /* the house table's hovered row, a rounded block (D1); a step off the canvas */
   --surface-marker: var(--color-rb-200); /* small inline tags: badges, count pills, token chips */
   --surface-skeleton: rgb(255 255 255); /* loading shimmer — matched to --surface-raised */
   --surface-selected: var(--color-rb-300); /* pressed/active segment in a toggle group */
@@ -291,8 +291,6 @@
      (TO-DO-position-card 427): a 15° step then reads on the panel. */
   --brand-zone-blue-l: -0.04;
   --brand-zone-blue-c: 0.017;
-  --brand-edge-l: 0.8;
-  --brand-edge-c: 0.08;
   --brand-zone-text: color-mix(in oklch, var(--foreground) 25%, transparent);
   --brand-zone-mark: oklch(0.36 0.012 var(--paper-hue));
 }
@@ -308,8 +306,6 @@
   --brand-zone-c: 0.075;
   --brand-zone-blue-l: 0;
   --brand-zone-blue-c: 0.03;
-  --brand-edge-l: 0.45;
-  --brand-edge-c: 0.1;
   --brand-zone-text: color-mix(in oklch, var(--foreground) 25%, transparent);
   --brand-zone-mark: oklch(0.9 0.01 260);
 
@@ -334,7 +330,7 @@
   --background: rgb(20 22 30); /* rb-800 */
 
   /* rb-500 at low alpha: a lift in the palette's blue-grey that shows on any
-     dark ground, the near-black menus included (Miles, 18 Nov 2026). */
+     dark ground, the near-black menus included. */
   --surface-hover: rgb(104 119 144 / 0.12);
   --surface-active: rgb(104 119 144 / 0.18);
   --surface-inset: rgb(104 119 144 / 0.08);
@@ -487,9 +483,6 @@ html.dark {
       calc((var(--brand-zone-c) + var(--brand-zone-blue-c) * var(--brand-blue)) * var(--brand-strength, 1))
       var(--brand-hue, 0)
   );
-}
-@utility bg-brand-edge {
-  background-color: oklch(var(--brand-edge-l) calc(var(--brand-edge-c) * var(--brand-strength, 1)) var(--brand-hue, 0));
 }
 @utility text-brand-zone {
   color: var(--brand-zone-text);

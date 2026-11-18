@@ -239,8 +239,8 @@ const SUB = "col-span-full grid grid-cols-subgrid";
  *  none. */
 const USD_RULE =
   "border-l border-edge-raised pl-4 group-data-[sheet-usd=none]/side:border-l-0 group-data-[sheet-usd=none]/side:pl-0";
-/** The breakdown's tint. */
-const TINT = "bg-raised";
+/** The breakdown's tint: the event card's ground. */
+const TINT = "bg-[var(--event-ground,var(--surface-raised))]";
 
 type Tone = "event" | "plain" | "muted" | "sub";
 const TONE: Record<Tone, string> = {

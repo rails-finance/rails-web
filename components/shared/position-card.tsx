@@ -370,7 +370,7 @@ function SidebarName({ name, id, href }: { name: string; id: string; href?: stri
 
 /** The lozenge below md (C20): 12px wide, bare, its mark and name in the
  *  heading row (C20.1, C20.2). Needs a frame that sets `--brand-hue`. */
-export const NARROW_LOZENGE = "w-3 shrink-0 rounded-full bg-brand-zone";
+const NARROW_LOZENGE = "w-3 shrink-0 rounded-full bg-brand-zone";
 function NarrowLozenge() {
   return <span aria-hidden="true" className={`${NARROW_LOZENGE} md:hidden`} />;
 }

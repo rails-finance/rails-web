@@ -44,8 +44,8 @@
 // transaction came in through the position's own account.
 //
 // Colour: a product has no roster entry, so its hue is the registry's
-// `bar.hue` (read off its mark), drawn through the same `--brand-zone-*` and
-// `--brand-edge-*` tokens as a protocol's, at the same weight; a product whose
+// `bar.hue` (read off its mark), drawn through the same `--brand-zone-*`
+// tokens as a protocol's, at the same weight; a product whose
 // mark is monochrome (`hue: null`) draws grey. A route's subject without its
 // glyph yet draws the `route` glyph.
 
@@ -263,8 +263,10 @@ function SubjectStretches({
   // The box's padding leaves the protocol's bar a short run past the first and
   // last rows; a run shorter than `MIN_RUN` would draw as a dot, so the stretch
   // beside it reaches the bar's end instead.
+  // The mark and its receipt keep the head row's measured top.
   const stretches = measured.map((s, i) => ({
     ...s,
+    markTop: s.top + 12,
     top: i === 0 && s.top - BREAK < MIN_RUN ? 0 : s.top,
     bottom: i === measured.length - 1 && height - s.bottom - BREAK < MIN_RUN ? height : s.bottom,
   }));
@@ -310,7 +312,9 @@ function SubjectStretches({
               data-anatomy="P3.1.1"
               data-bar-subject={s.subject.name}
             >
-              <BarSubjectMark subject={s.subject} className="absolute left-3 top-3 hidden md:block" />
+              <span className="absolute left-3 hidden md:block" style={{ top: s.markTop - s.top }}>
+                <BarSubjectMark subject={s.subject} className="block" />
+              </span>
             </span>
           </span>
         ))}
@@ -349,7 +353,7 @@ function SubjectStretches({
                 armed. */}
             <span
               className="absolute left-3 hidden h-4 w-4 rounded-sm md:block"
-              style={{ top: s.top + 12 }}
+              style={{ top: s.markTop }}
               data-bar-receipt={s.subject.name}
             >
               <Prov info={info} value={s.subject.name} className="block h-4 w-4">
@@ -365,7 +369,7 @@ function SubjectStretches({
 
 export type SectionSidebarKind = "flows" | "timeline" | "challenges";
 
-const ANATOMY: Partial<Record<SectionSidebarKind, string>> = { flows: "P2.1", timeline: "P3.1" };
+const ANATOMY: Record<SectionSidebarKind, string> = { flows: "P2.1", timeline: "P3.1", challenges: "P2.1" };
 
 export function SectionSidebar({
   section,

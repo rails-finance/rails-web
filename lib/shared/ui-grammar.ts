@@ -69,7 +69,7 @@ export const START_CTA =
 export const CTRL_GHOST = "inline-flex items-center justify-center transition-colors cursor-pointer";
 
 /** Idle in-place control: muted, gains a soft fill + foreground on hover. */
-export const CTRL_OFF = "text-rb-500 hover:bg-rb-100 dark:hover:bg-rb-800 hover:text-foreground";
+export const CTRL_OFF = "text-rb-500 hover:bg-[var(--surface-row-hover)] dark:hover:bg-rb-800 hover:text-foreground";
 
 /** Engaged/open in-place control: holds the same soft fill CTRL_OFF shows on
  * hover, so an open control simply looks "hovered" for as long as it's engaged. */

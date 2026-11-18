@@ -82,15 +82,7 @@ import { flowMoment } from "@/lib/shared/flow-moment";
 import { FlowMomentCard, type MomentNeighbour } from "@/components/shared/flow-moment-card";
 import { Link2, List, Lock, X } from "lucide-react";
 import { BlockTransactionsContext, blockTransactionsOf } from "@/components/shared/chain-truth-event";
-import {
-  CARD_PAD_X,
-  CTRL_GHOST,
-  CTRL_OFF,
-  CTRL_ON,
-  CTRL_ON_ACCENT,
-  CTRL_ON_HOVER,
-  FOOT_LINK,
-} from "@/lib/shared/ui-grammar";
+import { CTRL_GHOST, CTRL_OFF, CTRL_ON, CTRL_ON_ACCENT, CTRL_ON_HOVER, FOOT_LINK } from "@/lib/shared/ui-grammar";
 import { usePositionCardIdentity } from "@/components/shared/position-card-edge";
 import { unreadTokensIn } from "@/lib/shared/decimals-unread";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
@@ -191,12 +183,12 @@ const SUBJECT_PARAMS = ["market", "epoch", "loan"] as const;
  *  the only mechanism available for a `?at=` landing at all: that card is
  *  already mounted by the time the landing runs, so writing `card-open-store`
  *  after the fact can't retroactively flip a mount effect that already ran.
- *  `.rounded-b-xl.bg-raised` is the detail panel's own wrapper class
- *  (`EventCard`) — present exactly while the panel is open. */
+ *  `[data-anatomy="T2"]` is the detail panel (`EventCard`), mounted exactly
+ *  while it is open. */
 function clickToOpenIfClosed(id: string): void {
   if (typeof document === "undefined") return;
   const wrapper = document.getElementById(`event-${id}`);
-  if (!wrapper || wrapper.querySelector(".rounded-b-xl.bg-raised")) return;
+  if (!wrapper || wrapper.querySelector('[data-anatomy="T2"]')) return;
   // The row's controls: the phone segment's button, then the header. Either
   // opens the card at the viewport's width.
   const toggle = wrapper.querySelector('[data-spine-toggle], [role="button"]');
@@ -777,9 +769,9 @@ function ChainTruthTimelineBody({
 }: ChainTruthTimelineProps) {
   const { showMarketNotes } = useTimelineDisplay();
   // Beside the card's lozenge the timeline stands in a rounded box, as the
-  // card's body and Lifetime flows do. Inside it the grounds alternate (ui-jobs
-  // 730): an open or hovered event, and a note row at rest, on the page's
-  // ground; the cells inside them raised; the spine's halos on the box's.
+  // card's body and Lifetime flows do (ui-jobs 730). An open or hovered event
+  // and a note row at rest take the page's ground, their cells the raised one,
+  // and the spine's halos the box's.
   const boxed = usePositionCardIdentity() != null;
   const activeRuns = runs;
   // The cut (lib/shared/flow-focus.ts): once the Lifetime flows chart's
@@ -2094,7 +2086,7 @@ function ChainTruthTimelineBody({
         registry names one (P3.1.1, ui-jobs 439); the rule is in the sidebar. */}
       <SectionSidebar section="timeline">
         <div
-          className={boxed ? `space-y-3 rounded-2xl bg-raised ${CARD_PAD_X} py-4` : "space-y-3"}
+          className={boxed ? "space-y-3 rounded-2xl bg-raised px-3 py-4 md:px-5" : "space-y-3"}
           style={
             boxed
               ? ({
@@ -2102,7 +2094,6 @@ function ChainTruthTimelineBody({
                   "--event-ground": "var(--background)",
                   "--event-cell": "var(--surface-raised)",
                   "--color-note": "var(--background)",
-                  "--explain-rule": "var(--edge-raised)",
                 } as CSSProperties)
               : undefined
           }
