@@ -26,10 +26,9 @@ import type {
   AtBlockUsdFeed,
 } from "./types";
 
-// The zero address inline; scripts/test/morpho-at-block.test.mjs loads this module under node's
-// type stripping, with a hook that resolves `@/`.
-import { shownUsd } from "@/lib/shared/holder-usd-receipt";
-import { morphoComposedPrice } from "@/lib/morpho/usd-receipt";
+// Relative imports, nothing through `@/`, and the zero address inline: scripts/test/morpho-at-block.test.mjs
+// loads this module under node's type stripping (its hook adds the `.ts`).
+import { shownUsd, shownComposedPrice } from "../shared/shown-usd";
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const B = (v: string | number) => BigInt(v);
 const WAD = B("1000000000000000000");
@@ -214,7 +213,7 @@ export function morphoAtBlockFigures(
     debtUsd: usd ? shownUsd(debt, usd.price) : null,
     collateralUsd:
       usd && oraclePrice != null && oraclePrice > 0 && coll
-        ? shownUsd(collateral, morphoComposedPrice(oraclePrice, usd.price))
+        ? shownUsd(collateral, shownComposedPrice(oraclePrice, usd.price))
         : null,
     totals,
     lastUpdate: m.state ? Number(m.state.lastUpdate) : 0,

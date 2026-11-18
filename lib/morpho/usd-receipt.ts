@@ -2,30 +2,38 @@
 // × its price as the rows show them, each product to the cent, the figure
 // their sum (lib/shared/holder-usd-receipt.ts). A collateral's price is one
 // composed row, the market oracle's price in the loan token × the loan
-// token's dollar price, each factor as shown. Callers draw no figure where a
-// price is missing. Pure, so scripts/test/morpho-usd-receipt.test.mjs asserts
-// the arithmetic.
+// token's dollar price, each factor as shown (shownComposedPrice), after a row
+// of the oracle's raw price() and its scale. Callers draw no figure where a
+// price is missing. scripts/test/morpho-usd-receipt.test.mjs asserts the
+// arithmetic.
 
-import type { Provenance } from "@/components/shared/provenance";
-import { holderUsdReceipt, shownPrice, priceText, type UsdLeg } from "@/lib/shared/holder-usd-receipt";
+import type { Provenance, ProvInput } from "@/components/shared/provenance";
+import { holderUsdReceipt, shownComposedPrice, priceText, type UsdLeg } from "@/lib/shared/holder-usd-receipt";
 import { morphoCollateralPriceNote, MORPHO_FACE_NOTE, type MorphoFace } from "./price-notes";
 
-/** One collateral token in dollars, composed from the two prices as shown:
- *  it multiplies out from the two factors its row prints. */
-export const morphoComposedPrice = (oraclePrice: number, loanUsd: number): number =>
-  shownPrice(shownPrice(oraclePrice) * shownPrice(loanUsd));
-
-/** The composed collateral price and its row's note. */
+/** The composed collateral price, its row's note and the raw oracle row
+ *  ahead of it. */
 export function morphoCollateralPrice(o: {
   collateral: string;
   loan: string;
+  /** One whole collateral token in whole loan tokens. */
   oraclePrice: number;
+  /** The oracle's price() as read, and the market oracle's address. */
+  oracleRaw?: string | null;
+  oracle?: string;
+  loanDecimals?: number;
+  collateralDecimals?: number;
   oracleBlock: number | null | undefined;
   loanUsd: number;
   loanNote: string;
-}): { price: number; note: string } {
+}): { price: number; note: string; before: ProvInput[] } {
+  const at = o.oracleBlock != null ? ` at block ${o.oracleBlock.toLocaleString("en-US")}` : "";
+  const scale =
+    o.loanDecimals != null && o.collateralDecimals != null
+      ? `10^(36 + ${o.loanDecimals} − ${o.collateralDecimals})`
+      : "10^(36 + loan decimals − collateral decimals)";
   return {
-    price: morphoComposedPrice(o.oraclePrice, o.loanUsd),
+    price: shownComposedPrice(o.oraclePrice, o.loanUsd),
     note: morphoCollateralPriceNote({
       collateral: o.collateral,
       loan: o.loan,
@@ -35,6 +43,16 @@ export function morphoCollateralPrice(o: {
       loanText: priceText(o.loanUsd),
       loanNote: o.loanNote,
     }),
+    before: [
+      {
+        label: `${o.collateral} in ${o.loan}`,
+        value: o.oracleRaw ?? "—",
+        kind: "chain",
+        pclass: "oracle",
+        note: `the market oracle's price()${at}, ÷ ${scale} = ${priceText(o.oraclePrice).slice(1)} ${o.loan} per ${o.collateral}`,
+        ...(o.oracle ? { contract: { name: "Market oracle", address: o.oracle } } : {}),
+      },
+    ],
   };
 }
 

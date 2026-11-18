@@ -19,7 +19,7 @@ import {
   type BlockRef,
 } from "@/lib/morpho-at-block/types";
 import { pairName } from "@/lib/morpho-at-block/words";
-import { shownUsd } from "@/lib/shared/holder-usd-receipt";
+import { shownUsd, priceText } from "@/lib/shared/holder-usd-receipt";
 import { morphoCollateralPrice, morphoUsdReceipt } from "@/lib/morpho/usd-receipt";
 import { morphoAaveOraclePriceNote, morphoChainlinkPriceNote } from "@/lib/morpho/price-notes";
 import { MORPHO_APY_FORMULA } from "@/lib/morpho/terms";
@@ -102,10 +102,8 @@ const usdInput = (c: MorphoAtBlockReceiptContext): ProvInput =>
   c.f.usd
     ? oracleIn(
         `${c.f.loan.symbol} / USD`,
-        `$${fig(c.f.usd.price)}`,
-        viaAave(c.f.usd)
-          ? `AaveOracle getAssetPrice(${c.f.loan.symbol}) at ${at(c.head)}, 8 decimals; ${c.f.loan.symbol} has no Chainlink feed in Aave's address book for ${c.dep.chain}`
-          : `Chainlink ${c.f.usd.feed.description ?? ""} latestRoundData at ${at(c.head)}, ${c.f.usd.feed.decimals} decimals; feed from Aave's address book (${c.f.usd.feed.name})`,
+        priceText(c.f.usd.price),
+        loanPriceNote(c, c.f.usd),
         usdContract(c.f.usd, c.dep),
       )
     : oracleIn(
@@ -318,12 +316,16 @@ function usdReceipt(key: UsdKey, c: MorphoAtBlockReceiptContext): Provenance {
               collateral: C,
               loan: L,
               oraclePrice: f.oraclePrice,
+              oracleRaw: c.m.price,
+              oracle: c.m.oracle,
+              loanDecimals: f.loan.decimals,
+              collateralDecimals: f.collateralToken?.decimals,
               oracleBlock: head.block,
               loanUsd: u.price,
               loanNote: loanPriceNote(c, u),
             })
           : null
-        : { price: u.price, note: loanPriceNote(c, u) }
+        : { price: u.price, note: loanPriceNote(c, u), before: [] }
       : null;
   const r =
     u && price && amount != null
@@ -332,9 +334,13 @@ function usdReceipt(key: UsdKey, c: MorphoAtBlockReceiptContext): Provenance {
           legs: [
             {
               token: coll ? C : L,
+              // A 30-day interest is a difference of two valuations: its
+              // reads come first, and its amount is worked out.
+              before: interest ? interestRows(c, key === "usd-interest-supply") : price.before,
+              ...(interest ? { amountKind: { kind: "derived" as const } } : {}),
               amount,
               amountNote: coll
-                ? `position(id, wallet).collateral in the ${pair} market at ${at(head)}`
+                ? `position(id, wallet).collateral in the ${pair} market at block ${n(head.block)}`
                 : interest
                   ? `the same shares at the market's totals 30 days back and at ${at(head)}`
                   : `the wallet's ${key === "usd-debt" ? "borrow" : "supply"} shares at the ${pair} market's totals at ${at(head)}`,
@@ -347,9 +353,6 @@ function usdReceipt(key: UsdKey, c: MorphoAtBlockReceiptContext): Provenance {
           via: `${via(`block ${n(head.block)}`)} · ${coll ? "oracle price() × " : ""}${viaAave(u) ? "AaveOracle getAssetPrice" : "feed latestRoundData"}`,
           face: shownUsd(amount, price.price) >= 100 ? "dollars" : "cents",
           contract: usdContract(u, dep),
-          caveat: coll
-            ? `The collateral's price is the market oracle's price in ${L} times ${L}'s USD price.`
-            : undefined,
         })
       : null;
   if (r) return { ...r.prov, source: { block: head.block } };
@@ -363,15 +366,14 @@ function usdReceipt(key: UsdKey, c: MorphoAtBlockReceiptContext): Provenance {
   };
 }
 
-function interestProv(key: MorphoAtBlockFigure, c: MorphoAtBlockReceiptContext): Provenance {
-  const { f, m, head, r, pf, dep } = c;
-  const sup = key.includes("supply");
-  const i: AtBlockInterest | null | undefined = sup ? pf?.supplyInterest : pf?.debtInterest;
+/** The reads a 30-day interest is worked out from: the shares, the market's
+ *  totals at both blocks and the rate. */
+function interestRows(c: MorphoAtBlockReceiptContext, sup: boolean): ProvInput[] {
+  const { m, head, r } = c;
   const then = r?.then ?? head;
   const past = r?.past;
   const shares = sup ? c.p.supplyShares : c.p.borrowShares;
-  const L = f.loan.symbol;
-  const base: ProvInput[] = [
+  return [
     chain(`position · ${sup ? "supplyShares" : "borrowShares"}, both dates`, shares, "the same at both reads"),
     chain(
       `market · total${sup ? "Supply" : "Borrow"}Assets now`,
@@ -385,6 +387,14 @@ function interestProv(key: MorphoAtBlockFigure, c: MorphoAtBlockReceiptContext):
     ),
     chain("borrowRateView, both dates", `${m.borrowRate ?? "—"} and ${past?.borrowRate ?? "—"}`, "per second, WAD"),
   ];
+}
+
+function interestProv(key: MorphoAtBlockFigure, c: MorphoAtBlockReceiptContext): Provenance {
+  const { f, head, r, pf, dep } = c;
+  const sup = key.includes("supply");
+  const i: AtBlockInterest | null | undefined = sup ? pf?.supplyInterest : pf?.debtInterest;
+  const then = r?.then ?? head;
+  const L = f.loan.symbol;
   return {
     kind: "derived",
     pclass: "state",
@@ -393,6 +403,6 @@ function interestProv(key: MorphoAtBlockFigure, c: MorphoAtBlockReceiptContext):
     summary: `${sup ? "Interest earned, 30 days" : "Interest on the debt, 30 days"}. The same shares valued at the market's totals at ${at(then)} and ${at(head)}.${i?.state === "ok" ? ` ${fig(i.amount)} ${L}.` : ""}`,
     via: via(`blocks ${n(then.block)} and ${n(head.block)}`),
     formula: "shares at the totals now − shares at the totals 30 days back",
-    inputs: base,
+    inputs: interestRows(c, sup),
   };
 }

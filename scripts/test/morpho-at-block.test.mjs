@@ -37,7 +37,7 @@ const { accrue, morphoAtBlockPosition, morphoAtBlockWalletPositions, toAssetsUp,
   ROOT + "lib/morpho-at-block/position.ts"
 );
 const { shownUsd } = await import(ROOT + "lib/shared/holder-usd-receipt.ts");
-const { morphoComposedPrice } = await import(ROOT + "lib/morpho/usd-receipt.ts");
+const { shownComposedPrice: morphoComposedPrice } = await import(ROOT + "lib/shared/shown-usd.ts");
 
 const READ = {
   chainId: 5042,
@@ -384,20 +384,80 @@ test("the card's foot names the read that priced the loan token", () => {
 // ui-jobs 743: the dollar receipts' rows rebuild the figures the card draws.
 const { morphoAtBlockProv } = await import(ROOT + "lib/morpho-at-block/provenance.ts");
 const numOf = (t) => Number(String(t).replace(/[^0-9.]/g, ""));
-test("Arc: each dollar receipt's amount × price is the card's figure, the collateral at the composed row", () => {
-  const f = morphoAtBlockPosition(READ);
-  const c = { dep: MORPHO_ARC, f, m: READ.market, p: READ.position, head: READ.head, r: READ, pf: f };
+const rowOf = (prov, suffix) => prov.inputs.find((i) => i.label.endsWith(suffix));
+/** The amount row × the price row, to the cent. */
+const rebuilt = (prov) =>
+  Math.round(numOf(rowOf(prov, " amount").value) * numOf(rowOf(prov, " price").value) * 100) / 100;
+const ctx = (read, f, dep) => ({ dep, f, m: read.market, p: read.position, head: read.head, r: read, pf: f });
+
+// The Arc read with supply too: the same shares at both reads, so the 30-day supply interest stands.
+const SUPPLYING = {
+  ...READ,
+  position: { ...READ.position, supplyShares: "5000000000000000" },
+  past: { ...READ.past, position: { ...READ.past.position, supplyShares: "5000000000000000" } },
+};
+
+test("Arc: debt, supplied and collateral receipts rebuild the card's figures", () => {
+  const f = morphoAtBlockPosition(SUPPLYING);
+  const c = ctx(SUPPLYING, f, MORPHO_ARC);
   for (const [key, figure] of [
     ["usd-debt", f.debtUsd],
+    ["usd-supplied", f.suppliedUsd],
     ["usd-collateral", f.collateralUsd],
   ]) {
-    const prov = morphoAtBlockProv(key, c);
-    const [amount, price] = prov.inputs.map((i) => numOf(i.value));
-    assert.equal(Math.round(amount * price * 100) / 100, figure, key);
+    assert.ok(figure > 0, `${key} is drawn`);
+    assert.equal(rebuilt(morphoAtBlockProv(key, c)), figure, key);
   }
-  const row = morphoAtBlockProv("usd-collateral", c).inputs[1];
-  assert.match(row.note, /→ USD = the market oracle's price in USDC × USDC's USD price/);
+  const coll = morphoAtBlockProv("usd-collateral", c);
+  // The raw price() and its scale come first, from the market oracle.
+  assert.equal(coll.inputs[0].value, READ.market.price);
+  assert.match(coll.inputs[0].note, /÷ 10\^\(36 \+ 6 − 8\)/);
+  assert.equal(coll.inputs[0].contract.address, READ.market.oracle);
+  const row = rowOf(coll, " price");
+  assert.match(row.note, /→ USD = the market oracle's price in USDC × USDC's USD price, each to six decimals/);
   assert.match(row.note, /latestRoundData at block 30,679,130/);
   const none = morphoAtBlockPosition({ ...READ, usdFeeds: [] });
   assert.equal(none.collateralUsd, null, "no price, no dollars");
+});
+
+test("Arc: both 30-day interest receipts keep their reads ahead of a worked-out amount", () => {
+  const f = morphoAtBlockPosition(SUPPLYING);
+  const c = ctx(SUPPLYING, f, MORPHO_ARC);
+  for (const [key, side] of [
+    ["usd-interest-supply", f.supplyInterest],
+    ["usd-interest-debt", f.debtInterest],
+  ]) {
+    assert.equal(side.state, "ok", key);
+    const prov = morphoAtBlockProv(key, c);
+    assert.equal(rebuilt(prov), side.usd, key);
+    const labels = prov.inputs.map((i) => i.label);
+    const amountAt = labels.findIndex((l) => l.endsWith(" amount"));
+    assert.ok(
+      labels.slice(0, amountAt).some((l) => /Shares, both dates/.test(l)),
+      `${key}: the shares come first`,
+    );
+    assert.ok(
+      labels.slice(0, amountAt).some((l) => /borrowRateView/.test(l)),
+      `${key}: the rate comes first`,
+    );
+    assert.equal(prov.inputs[amountAt].kind, "derived", `${key}: the amount is worked out`);
+  }
+});
+
+test("Optimism: the AaveOracle path names getAssetPrice on the receipt's rows", () => {
+  const read = {
+    ...OP_READ,
+    usdFeeds: [
+      { ...OP_READ.usdFeeds[0], feed: MORPHO_OPTIMISM.aaveOracle.address, source: "aave-oracle", decimals: 8 },
+    ],
+  };
+  const f = morphoAtBlockPosition(read);
+  const c = ctx(read, f, MORPHO_OPTIMISM);
+  const debt = morphoAtBlockProv("usd-debt", c);
+  assert.equal(rebuilt(debt), f.debtUsd);
+  assert.match(rowOf(debt, " price").note, /getAssetPrice\(USDC\) at block [0-9,]+, USD with 8 decimals/);
+  assert.equal(rowOf(debt, " price").contract.address, MORPHO_OPTIMISM.aaveOracle.address);
+  const coll = morphoAtBlockProv("usd-collateral", c);
+  assert.equal(rebuilt(coll), f.collateralUsd);
+  assert.match(rowOf(coll, " price").note, /getAssetPrice\(USDC\)/);
 });

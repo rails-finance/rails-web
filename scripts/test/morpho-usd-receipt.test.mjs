@@ -36,7 +36,7 @@ export async function resolve(spec, ctx, next) {
 register("data:text/javascript," + encodeURIComponent(hook));
 
 const { morphoArbitrumUsd, morphoArbitrumSideReceipt } = await import(ROOT + "lib/morpho-arbitrum/usd.ts");
-const { morphoComposedPrice } = await import(ROOT + "lib/morpho/usd-receipt.ts");
+const { shownComposedPrice: morphoComposedPrice } = await import(ROOT + "lib/shared/shown-usd.ts");
 const { shownPrice } = await import(ROOT + "lib/shared/holder-usd-receipt.ts");
 
 const num = (t) => Number(String(t).replace(/[^0-9.]/g, ""));
@@ -61,6 +61,11 @@ const WBTC = "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f";
 const EURC = "0x0000000000000000000000000000000000000e0c";
 const market = (id, over) => ({
   marketId: id,
+  lltv: 0.86,
+  oracle: "0x00000000000000000000000000000000000000aa",
+  oraclePriceRaw: "1",
+  loanDecimals: 6,
+  collateralDecimals: 18,
   loanToken: USDC,
   loanSymbol: "USDC",
   collateralSymbol: "WETH",
@@ -114,11 +119,30 @@ test("one unpriced market: no total, the priced market keeps its dollars, the un
     market("0x05", { loanToken: EURC, loanSymbol: "EURC", collateralSymbol: "WETH", currentSupply: 10 }),
   ];
   const u = morphoArbitrumUsd({ positions, loanUsd: READ.loanUsd });
-  assert.equal(u.unpriced, 1);
-  assert.deepEqual(u.unpricedPairs, ["EURC / WETH"]);
+  assert.deepEqual(u.unpriced, [{ id: "0x05", name: "EURC / WETH" }]);
+  assert.deepEqual(u.totals, { supplyUsd: null, collateralUsd: null, debtUsd: null }, "the visit sends no totals");
   assert.equal(morphoArbitrumSideReceipt(READ, positions, "supply"), null, "no total");
-  const one = morphoArbitrumSideReceipt(READ, [positions[0]], "supply");
+  const one = morphoArbitrumSideReceipt(READ, [positions[0]], "supply", positions);
   assert.ok(one && one.usd > 0, "the priced market's dollars stand");
+});
+
+test("two markets on one pair, one priced and one not: told apart by id and LLTV", () => {
+  const priced = market("0x07", { lltv: 0.86, collateral: 2, oraclePrice: 3000, currentDebt: 1000 });
+  const unpriced = market("0x08", { lltv: 0.915, collateral: 1, oraclePrice: 0 });
+  const positions = [priced, unpriced];
+  const u = morphoArbitrumUsd({ positions, loanUsd: READ.loanUsd });
+  assert.deepEqual(u.unpriced, [{ id: "0x08", name: "USDC / WETH 91.5%" }]);
+  assert.ok(u.byMarket.get("0x07").collateralUsd > 0, "the priced market keeps its dollars");
+  const coll = morphoArbitrumSideReceipt(READ, [priced], "collateral", positions);
+  assert.ok(coll);
+  assert.match(coll.prov.inputs.find((i) => i.label.endsWith(" amount")).note, /USDC \/ WETH 86% market/);
+  // Two priced markets on one pair name their rows apart.
+  const twin = market("0x09", { lltv: 0.77, collateral: 3, oraclePrice: 3001 });
+  const both = morphoArbitrumSideReceipt(READ, [priced, twin], "collateral");
+  const labels = both.prov.inputs.map((i) => i.label);
+  assert.equal(new Set(labels).size, labels.length, labels.join(" | "));
+  assert.ok(labels.includes("USDC / WETH 86% amount") && labels.includes("USDC / WETH 77% amount"));
+  assert.equal(rebuild(both.prov), both.usd);
 });
 
 test("a missing price draws no figure", () => {
@@ -126,5 +150,5 @@ test("a missing price draws no figure", () => {
   assert.equal(morphoArbitrumSideReceipt({ ...READ, loanUsd: undefined }, POSITIONS, "debt"), null);
   const noOracle = market("0x06", { collateral: 2, oraclePrice: 0 });
   assert.equal(morphoArbitrumSideReceipt(READ, [noOracle], "collateral"), null, "collateral with no oracle price");
-  assert.equal(morphoArbitrumUsd({ positions: [noOracle], loanUsd: READ.loanUsd }).unpriced, 1);
+  assert.equal(morphoArbitrumUsd({ positions: [noOracle], loanUsd: READ.loanUsd }).unpriced.length, 1);
 });

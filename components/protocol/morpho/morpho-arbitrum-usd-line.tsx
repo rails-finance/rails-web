@@ -13,7 +13,7 @@ import type { ReactNode } from "react";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import type { MorphoWalletChainResponse } from "@/lib/api/fetch-morpho-wallet";
 import {
-  morphoArbitrumPair,
+  morphoArbitrumMarketName,
   morphoArbitrumSideReceipt,
   morphoArbitrumUsd,
   type MorphoArbitrumSide,
@@ -31,9 +31,9 @@ const SIDES: { side: MorphoArbitrumSide; label: string }[] = [
 type Positions = MorphoWalletChainResponse["positions"];
 
 /** The sides held across `positions`, each its dollars with its receipt. */
-function sideFigures(data: MorphoWalletChainResponse, positions: Positions): ReactNode[] {
+function sideFigures(data: MorphoWalletChainResponse, positions: Positions, all: Positions): ReactNode[] {
   return SIDES.flatMap(({ side, label }) => {
-    const r = morphoArbitrumSideReceipt(data, positions, side);
+    const r = morphoArbitrumSideReceipt(data, positions, side, all);
     if (!r || !(r.usd > 0)) return [];
     return [
       <span key={side}>
@@ -62,27 +62,29 @@ export function MorphoArbitrumUsdLine({ data, market }: { data: MorphoWalletChai
   if (!data || data.chainStale) return null;
   const positions = market ? data.positions.filter((p) => p.marketId.toLowerCase() === market) : data.positions;
   if (positions.length === 0) return null;
-  const { unpriced, unpricedPairs } = morphoArbitrumUsd({ positions, loanUsd: data.loanUsd });
+  const { unpriced } = morphoArbitrumUsd({ positions, loanUsd: data.loanUsd });
   const block = data.blockNumber;
   const live = positions.filter((p) => !p.chainStale);
-  const pricedMarkets = live.filter((p) => !unpricedPairs.includes(morphoArbitrumPair(p)));
+  // Markets by id: several share a pair.
+  const gapIds = new Set(unpriced.map((u) => u.id));
+  const pricedMarkets = live.filter((p) => !gapIds.has(p.marketId.toLowerCase()));
   const body: ReactNode[] =
-    unpriced === 0
-      ? sideFigures(data, live)
+    unpriced.length === 0
+      ? sideFigures(data, live, live)
       : pricedMarkets.flatMap((p) => {
-          const parts = sideFigures(data, [p]);
+          const parts = sideFigures(data, [p], live);
           return parts.length === 0
             ? []
             : [
                 <span key={p.marketId}>
-                  {morphoArbitrumPair(p)}: {joined(parts, ", ")}
+                  {morphoArbitrumMarketName(p, live)}: {joined(parts, ", ")}
                 </span>,
               ];
         });
-  if (body.length === 0 && unpriced === 0) return null;
+  if (body.length === 0 && unpriced.length === 0) return null;
   const gap =
-    unpriced > 0
-      ? `no dollar figure for ${list(unpricedPairs)}: the Aave V3 Arbitrum oracle does not price the loan asset, or the market's oracle gives the collateral no price`
+    unpriced.length > 0
+      ? `no dollar figure for ${list(unpriced.map((u) => u.name))}: the loan asset or the collateral has no oracle price`
       : "";
   if (body.length === 0)
     return (
@@ -93,8 +95,8 @@ export function MorphoArbitrumUsdLine({ data, market }: { data: MorphoWalletChai
   return (
     <ProvReceiptsScope registry={registry}>
       <p className="text-[12px] text-rb-500" data-anatomy="H13.1" data-morpho-arbitrum-usd={block}>
-        {joined(body, unpriced === 0 ? " · " : "; ")} at block {block.toLocaleString("en-US")}, in dollars at the Aave
-        V3 Arbitrum oracle&rsquo;s price{gap && `; ${gap}`}.
+        {joined(body, unpriced.length === 0 ? " · " : "; ")} at block {block.toLocaleString("en-US")}, in dollars at the
+        Aave V3 Arbitrum oracle&rsquo;s price{gap && `; ${gap}`}.
       </p>
     </ProvReceiptsScope>
   );
