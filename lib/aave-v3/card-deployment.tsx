@@ -64,7 +64,7 @@ export interface AaveV3CardDeployment {
   /** The "incl. $X interest" caption — present on a deployment whose card
    *  carries the caption (a position page); a listing card has none. `rows`
    *  carry each reserve's interest in tokens. */
-  interestCaption?: (side: Side, rows: AaveV3UsdRows) => UsdReceipt | null;
+  interestCaption?: (side: Side, rows: AaveV3UsdRows, market?: string) => UsdReceipt | null;
 }
 
 type Side = "supply" | "debt";
@@ -88,6 +88,12 @@ const INTEREST_WHAT: Record<Side, string> = {
   supply: "Supply interest inside the collateral balance above",
   debt: "Borrow interest inside the debt balance above",
 };
+/** Where each side's interest starts, and what it leaves to the Lifetime flows panel. */
+const INTEREST_CAVEAT: Record<Side, string> = {
+  supply:
+    "Per reserve, the interest since the balance last started from zero; a balance under a cent counts as zero. Interest from before that start left with earlier withdrawals; the Lifetime flows panel counts all of it.",
+  debt: "Per reserve, the interest since the debt last started from zero; a debt under a cent counts as zero. Interest from before that start was repaid; the Lifetime flows panel counts all of it.",
+};
 
 /** The dollar receipts every deployment shares: what changes is the oracle,
  *  the Pool and where each balance comes from. */
@@ -100,20 +106,21 @@ function usdReceipts(o: {
   return {
     usd: (what, side, rows, market) =>
       aaveV3UsdReceipt({
-        what: `${what} valued in US dollars`,
+        what: `${what} in USD`,
         rows,
         oracle: o.oracleOf(market),
         amountNote: (sym) => o.amountNote(side, sym, rows.balanceBlock),
         via: o.via,
       }),
     liqPrice: (read, market) => aaveV3LiqPriceReceipt({ ...read, oracle: o.oracleOf(market), pool: o.poolOf(market) }),
-    interestCaption: (side, rows) =>
+    interestCaption: (side, rows, market) =>
       aaveV3UsdReceipt({
         what: INTEREST_WHAT[side],
         rows,
-        oracle: o.oracleOf(),
+        oracle: o.oracleOf(market),
         amountNote: INTEREST_NOTE[side],
-        via: "Σ (row before − previous row after) + (balance now − last row after) × IAaveOracle getAssetPrice, per reserve",
+        note: INTEREST_CAVEAT[side],
+        via: "(Σ (row before − previous row after) + (balance now − last row after)) × IAaveOracle getAssetPrice, per reserve",
       }),
   };
 }
@@ -131,8 +138,8 @@ export const ETHEREUM_CARD_DEPLOYMENT: AaveV3CardDeployment = {
   ...usdReceipts({
     oracleOf: v3Oracle,
     poolOf: (market) => ({ name: "Aave V3 Pool", address: (market && POOL_BY_MARKET[market]) || AAVE_V3_POOL }),
-    amountNote: (side, sym) =>
-      `the index's ${sym} ${side === "supply" ? "balance" : "debt"}, carried to the latest Aave V3 event on record`,
+    amountNote: (side, sym, block) =>
+      `the index's ${sym} ${side === "supply" ? "balance" : "debt"}, carried to the latest Aave V3 event on record${block != null ? `, at block ${block.toLocaleString("en-US")}` : ""}`,
     via: "indexed balance × IAaveOracle getAssetPrice",
   }),
   liqDrop: (market) =>

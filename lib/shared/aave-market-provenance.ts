@@ -195,7 +195,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
     address: coords.oracle ?? "0x0000000000000000000000000000000000000000",
   });
   const atBlock = (coords: AaveMarketCoords): string =>
-    coords.blockNumber != null ? ` at block ${coords.blockNumber}` : "";
+    coords.blockNumber != null ? ` at block ${coords.blockNumber.toLocaleString("en-US")}` : "";
   const automatorContract = (coords: AaveMarketCoords): Provenance["contract"] => ({
     name: "SparkLend CapAutomator",
     address: coords.capAutomator ?? "0x0000000000000000000000000000000000000000",
@@ -204,7 +204,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
     kind: "recompute",
     text:
       coords.blockNumber != null
-        ? `Re-run the ${call} eth_call at block ${coords.blockNumber} against any node`
+        ? `Re-run the ${call} eth_call at block ${coords.blockNumber.toLocaleString("en-US")} against any node`
         : `Re-run the ${call} eth_call against any node`,
   });
 
@@ -215,7 +215,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
       kind: "chain-derived",
       pclass: "oracle",
       source: { block: coords.blockNumber },
-      summary: `Market ${side}. Σ over every reserve on the Pool of its ${side} value in USD${atBlock(coords)}; each reserve's ${side === "supplied" ? "aToken totalSupply" : "variable-debt totalSupply"} × the market's own IAaveOracle price. Every leg read at that block; the sum is ours.`,
+      summary: `Market ${side}. Σ over every reserve on the Pool of its ${side} value in USD${atBlock(coords)}; each reserve's ${side === "supplied" ? "aToken totalSupply" : "variable-debt totalSupply"} × the market's IAaveOracle price, each leg read at that block.`,
       contract: poolContract(coords),
       via: `${cfg.lane} · Σ per-reserve ${side} × oracle price @ head`,
       formula: `Σ (reserve ${side} × oracle price)`,
@@ -427,7 +427,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
         kind: "chain-derived",
         pclass: "state",
         source: { block: coords.blockNumber },
-        summary: `${symbol} ${side} cap used. ${coords.blockNumber != null ? `at block ${coords.blockNumber}, ` : ""}${counted}, divided by ${ceiling}.`,
+        summary: `${symbol} ${side} cap used. ${coords.blockNumber != null ? `at block ${coords.blockNumber.toLocaleString("en-US")}, ` : ""}${counted}, divided by ${ceiling}.`,
         contract: c.basis === "automator" ? automatorContract(coords) : poolContract(coords),
         via:
           c.basis === "automator"

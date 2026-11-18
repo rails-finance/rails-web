@@ -20,6 +20,8 @@ export async function aaveOraclePricesResponse(
   oracle: string,
   chainId: ChainId | undefined,
   name: string,
+  /** The reader; a test passes a stub. */
+  resolve: typeof resolveAaveOraclePrices = resolveAaveOraclePrices,
 ): Promise<NextResponse> {
   const params = request.nextUrl.searchParams;
   const assets = (params.get("assets") ?? "")
@@ -31,7 +33,7 @@ export async function aaveOraclePricesResponse(
   const block = Number.isInteger(blockParam) && blockParam > 0 ? blockParam : undefined;
   if (assets.length === 0) return NextResponse.json({ prices: {}, block: null });
   try {
-    const map = await resolveAaveOraclePrices([{ oracle, assets }], chainId, block);
+    const map = await resolve([{ oracle, assets }], chainId, block);
     const prices: Record<string, number> = {};
     for (const a of assets) {
       const p = aaveOraclePriceOf(map, oracle, a);

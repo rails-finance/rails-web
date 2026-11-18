@@ -13,10 +13,12 @@ export const aaveV3PriceNote = (oracle: string, symbol: string, block: number | 
 
 /** Where a receipt's balances and prices stand at two blocks (a listing row:
  *  the balances at the row's block, the prices at the latest when it was
- *  served). Empty where they share one, or where either is unstated. */
+ *  served; Ethereum's card: the index's balances at the latest event, the
+ *  prices at the Pool read). Empty where they share one, or where either is
+ *  unstated. */
 export const aaveV3BlocksNote = (balanceBlock: number | null | undefined, priceBlock: number | null | undefined) =>
   balanceBlock != null && priceBlock != null && balanceBlock !== priceBlock
-    ? `The balances are read at block ${balanceBlock.toLocaleString("en-US")} and the prices at block ${priceBlock.toLocaleString("en-US")}.`
+    ? `The balances stand at block ${balanceBlock.toLocaleString("en-US")} and the prices at block ${priceBlock.toLocaleString("en-US")}.`
     : "";
 
 /** How the face shows a figure the rows rebuild to the cent. */

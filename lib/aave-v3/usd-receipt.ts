@@ -44,6 +44,8 @@ export function aaveV3UsdReceipt(o: {
   oracle: { name: string; address?: string };
   /** Where each amount comes from, in a phrase. */
   amountNote: (symbol: string) => string;
+  /** One more sentence for the summary, before the blocks and the face. */
+  note?: string;
   via: string;
 }): { prov: Provenance; usd: number } | null {
   const { rows } = o;
@@ -62,7 +64,7 @@ export function aaveV3UsdReceipt(o: {
       priceContract: o.oracle,
     });
   }
-  const caveat = [aaveV3BlocksNote(rows.balanceBlock, rows.priceBlock), AAVE_V3_FACE_NOTE[rows.face]]
+  const caveat = [o.note, aaveV3BlocksNote(rows.balanceBlock, rows.priceBlock), AAVE_V3_FACE_NOTE[rows.face]]
     .filter(Boolean)
     .join(" ");
   const { prov, usd } = holderUsdReceipt({
@@ -95,7 +97,8 @@ export function aaveV3LiqPriceReceipt(o: {
   pool: { name: string; address?: string };
 }): { prov: Provenance; liqPrice: number } {
   const liqPrice = shownPrice(o.price) / shownHf(o.hf);
-  const hfAt = o.hfBlock != null ? ` at block ${o.hfBlock.toLocaleString("en-US")}` : "";
+  const hfAt =
+    o.hfBlock != null ? ` at block ${o.hfBlock.toLocaleString("en-US")}` : " at the latest read, which states no block";
   return {
     liqPrice,
     prov: {

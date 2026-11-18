@@ -70,7 +70,10 @@ async function serverPrices(
   try {
     for (let i = 0; i < assets.length; i += SERVER_MAX_ASSETS) {
       const qs = new URLSearchParams({ market, assets: assets.slice(i, i + SERVER_MAX_ASSETS).join(",") });
-      if (block != null) qs.set("block", String(block));
+      // Every chunk after the first is asked at the first's block, so a
+      // set of more than SERVER_MAX_ASSETS stands on one block.
+      const at = block ?? readAt;
+      if (at != null) qs.set("block", String(at));
       const res = await fetch(`${api}/api/at-block/aave-v3/oracle-prices?${qs.toString()}`, {
         ...createAuthFetchOptions(),
         cache: "no-store",
@@ -83,9 +86,8 @@ async function serverPrices(
       const body = (await res.json()) as { prices?: Record<string, string>; block?: number | string };
       for (const [a, v] of Object.entries(body.prices ?? {})) out.set(a.toLowerCase(), BigInt(v));
       const b = Number(body.block);
-      // Chunks asked at the head can land on different blocks: the receipt
-      // names one block per oracle, so a second block refuses the answer and
-      // the multicall reads every asset at one pinned block instead.
+      // The receipt names one block per oracle: an answer at another block
+      // refuses the set, and the multicall reads it at one pinned block.
       if (Number.isInteger(b) && b > 0) {
         if (readAt != null && readAt !== b) return null;
         readAt = b;
@@ -231,17 +233,18 @@ export async function resolveAaveOraclePrices(
     return out;
   }
 
-  // The multicall pins its block first, so its prices name it.
-  let pinned: bigint;
+  // The multicall pins its block first, so its prices name it. Where the
+  // block number cannot be read, it reads at the head and names no block.
+  let pinned: bigint | null;
   try {
     pinned = block != null ? BigInt(block) : await client.getBlockNumber();
   } catch {
-    return out;
+    pinned = null;
   }
   let results: unknown[] = [];
   try {
     results = (await client.multicall({
-      blockNumber: pinned,
+      ...(pinned != null ? { blockNumber: pinned } : {}),
       allowFailure: true,
       contracts: chainPairs.map(
         (p) =>
@@ -263,7 +266,7 @@ export async function resolveAaveOraclePrices(
     const usd = Number(res.result as bigint) / PRICE_SCALE;
     if (usd > 0) {
       out.set(priceKey(p.oracle, p.asset), usd);
-      out.blocks.set(p.oracle, Number(pinned));
+      if (pinned != null) out.blocks.set(p.oracle, Number(pinned));
     }
   });
 

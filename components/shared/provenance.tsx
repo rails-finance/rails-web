@@ -833,7 +833,12 @@ export function ProvReceipt({
                 const toggle =
                   i === firstDust ? (
                     <span className="prov-dust-toggle">
-                      <DustToggle count={dustParts || 1} open={dustOpen} onToggle={() => setDustOpen((o) => !o)} />
+                      <DustToggle
+                        count={dustParts || 1}
+                        open={dustOpen}
+                        onToggle={() => setDustOpen((o) => !o)}
+                        title="Reserves worth under a cent at the oracle price, still counted in the sum."
+                      />
                     </span>
                   ) : null;
                 if (inp.dust && !dustOpen) return <Fragment key={i}>{toggle}</Fragment>;

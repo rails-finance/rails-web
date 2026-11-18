@@ -17,6 +17,9 @@ import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 const ROOT = ${JSON.stringify(ROOT)};
 export async function resolve(spec, ctx, next) {
+  // next build resolves \`server-only\` to its own guard; under plain node it is a no-op.
+  if (spec === "server-only") return { url: "data:text/javascript,", shortCircuit: true };
+  if (spec === "next/server") return next("next/server.js", ctx);
   let url = null;
   if (spec.startsWith("@/")) url = ROOT + spec.slice(2);
   else if (spec.startsWith("./") || spec.startsWith("../")) url = new URL(spec, ctx.parentURL).href;
@@ -35,6 +38,11 @@ register("data:text/javascript," + encodeURIComponent(hook));
 
 const { aaveV3UsdReceipt, aaveV3UsdOf, aaveV3LiqPriceReceipt } = await import(ROOT + "lib/aave-v3/usd-receipt.ts");
 const { aaveMarketVocab, aaveMarketUsd } = await import(ROOT + "lib/shared/aave-market-provenance.ts");
+const { aaveV3LiquidationRead } = await import(ROOT + "lib/aave-v3/chain-truth-tower.ts");
+const { aaveOraclePricesResponse } = await import(ROOT + "lib/sources/api/aave-oracle-prices-route.ts");
+const { resolveAaveOraclePrices, aaveOraclePriceBlockOf } = await import(
+  ROOT + "lib/sources/chain/aave-oracle-prices.ts"
+);
 
 const num = (t) => Number(String(t).replace(/[^0-9.]/g, ""));
 const cents = (x) => Math.round(x * 100);
@@ -94,7 +102,7 @@ test("a listing's receipt names the balance's block and the price's", () => {
     { [WETH.address]: 3000 },
     { balanceBlock: 30_000_100, priceBlock: 30_000_250 },
   );
-  assert.match(r.prov.summary, /balances are read at block 30,000,100 and the prices at block 30,000,250/);
+  assert.match(r.prov.summary, /balances stand at block 30,000,100 and the prices at block 30,000,250/);
 });
 
 test("a missing price or unread decimals draws no dollar figure", () => {
@@ -143,4 +151,99 @@ test("a market total lists every reserve by value, dust behind the toggle, and i
   assert.ok(prov.inputs.filter((i) => i.label.startsWith("DUST")).every((i) => i.dust));
   assert.ok(prov.inputs.filter((i) => !i.label.startsWith("DUST")).every((i) => !i.dust));
   assert.match(prov.summary, /no price for one reserve/);
+});
+
+test("the card's liquidation price is its receipt's", () => {
+  const view = {
+    wallet: "0x1",
+    market: "core",
+    status: "open",
+    supplies: [{ ...WETH, decimals: 18, amount: 10.123456789, amountRaw: "10123456789000000000" }],
+    borrows: [{ ...USDC, decimals: 6, amount: 12_000, amountRaw: "12000000000" }],
+    peakSupplies: [],
+    peakBorrows: [],
+    liquidationCount: 0,
+    txCount: 1,
+    lastActivityAt: 0,
+    priceByAddress: { [WETH.address]: 3456.789123456, [USDC.address]: 0.99987654 },
+    healthFactor: 2.345678912345,
+    chainHfStale: false,
+  };
+  const read = aaveV3LiquidationRead(view);
+  assert.ok(read.single);
+  const { liqPrice } = aaveV3LiqPriceReceipt({
+    symbol: "WETH",
+    price: read.single.price,
+    hf: view.healthFactor,
+    oracle: ORACLE,
+    pool: { name: "Pool" },
+  });
+  assert.equal(read.single.liqPrice, liqPrice);
+});
+
+// A NextRequest's shape as the route body reads it.
+const request = (qs) => ({ nextUrl: new URL(`http://x/api/chain/aave-v3/oracle-prices?${qs}`) });
+const stubMap = (prices, block) =>
+  Object.assign(new Map(prices), { blocks: new Map(block ? [[ORACLE.address, block]] : []) });
+
+test("the oracle-prices route: ?block= is passed when valid, the answer is { prices, block }", async () => {
+  const asked = [];
+  const resolve = async (reqs, _chain, block) => {
+    asked.push(block);
+    return stubMap([[`${ORACLE.address}:${WETH.address}`, 3000]], block ?? 99);
+  };
+  const ok = await (
+    await aaveOraclePricesResponse(request(`assets=${WETH.address}&block=123`), ORACLE.address, 1, "t", resolve)
+  ).json();
+  assert.deepEqual(ok, { prices: { [WETH.address]: 3000 }, block: 123 });
+  for (const bad of ["block=abc", "block=-4", "block=1.5", "block=0", ""]) {
+    const r = await (
+      await aaveOraclePricesResponse(request(`assets=${WETH.address}&${bad}`), ORACLE.address, 1, "t", resolve)
+    ).json();
+    assert.equal(r.block, 99, `${bad || "no block"} reads at the latest, named`);
+  }
+  assert.deepEqual(asked, [123, undefined, undefined, undefined, undefined, undefined]);
+});
+
+test("the oracle-prices route: no assets, or a failed read, answers empty with a null block", async () => {
+  const never = async () => assert.fail("no read without assets");
+  const empty = await (await aaveOraclePricesResponse(request("assets=nope"), ORACLE.address, 1, "t", never)).json();
+  assert.deepEqual(empty, { prices: {}, block: null });
+  const fail = async () => {
+    throw new Error("down");
+  };
+  const err = console.error;
+  console.error = () => {};
+  const failed = await (
+    await aaveOraclePricesResponse(request(`assets=${WETH.address}`), ORACLE.address, 1, "t", fail)
+  ).json();
+  console.error = err;
+  assert.deepEqual(failed, { prices: {}, block: null });
+});
+
+test("more than 40 assets: every chunk after the first is read at the first's block", async () => {
+  const assets = Array.from({ length: 45 }, (_, i) => `0x${(i + 1).toString(16).padStart(40, "0")}`);
+  const urls = [];
+  const realFetch = globalThis.fetch;
+  const realApi = process.env.RAILS_API_URL;
+  process.env.RAILS_API_URL = "http://api.test";
+  globalThis.fetch = async (url) => {
+    const u = new URL(String(url));
+    urls.push(u);
+    const asked = u.searchParams.get("assets").split(",");
+    const block = Number(u.searchParams.get("block") ?? 500);
+    return new Response(JSON.stringify({ block, prices: Object.fromEntries(asked.map((a) => [a, "100000000"])) }));
+  };
+  try {
+    const map = await resolveAaveOraclePrices([{ oracle: ORACLE.address, assets }]);
+    assert.equal(urls.length, 2);
+    assert.equal(urls[0].searchParams.get("block"), null, "the first chunk reads the latest");
+    assert.equal(urls[1].searchParams.get("block"), "500", "the second reads at the first's block");
+    assert.equal(map.size, 45);
+    assert.equal(aaveOraclePriceBlockOf(map, ORACLE.address), 500);
+  } finally {
+    globalThis.fetch = realFetch;
+    if (realApi == null) delete process.env.RAILS_API_URL;
+    else process.env.RAILS_API_URL = realApi;
+  }
 });

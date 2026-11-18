@@ -731,6 +731,9 @@ export default function AaveV3PositionDetail({
         : liveView,
     [liveView, cardPriced, cardPrices],
   );
+  // What the export and the Explanation state: the card's figures once its
+  // prices land, the live view while it prices.
+  const statedView = cardPriced ? pricedView : liveView;
   // The card's stamp follows the Pool read once the figures stand on it (ui-jobs 512).
   const liveRead = useMemo(() => (view && chain ? readOfHeadAnswer(chain) : null), [view, chain]);
   useReportPositionRead(liveRead);
@@ -739,8 +742,8 @@ export default function AaveV3PositionDetail({
   // interest split; the live Pool read feeds the rate and streams in when it
   // lands. Computed once: the card and the LLM export share the object so they
   // agree number-for-number.
-  const captions = pricedView
-    ? computeAaveV3CardCaptions(pricedView, lifetimeEvents, chain, precomputedLifetime, aaveEvents, servedFolders)
+  const captions = statedView
+    ? computeAaveV3CardCaptions(statedView, lifetimeEvents, chain, precomputedLifetime, aaveEvents, servedFolders)
     : null;
 
   // The supplies that back no borrowing, which the card states apart
@@ -818,7 +821,7 @@ export default function AaveV3PositionDetail({
         configLog,
         wallet,
         marketName: MARKET_NAME[market] ?? "Core",
-        view: liveView ?? view,
+        view: statedView ?? view,
         chain,
         captions,
         events: aaveEvents,
@@ -882,7 +885,7 @@ export default function AaveV3PositionDetail({
                       <AaveV3PositionExplanation
                         chain={chain}
                         captions={captions}
-                        view={liveView}
+                        view={statedView}
                         externalActivity={externalActivity}
                       />
                     )

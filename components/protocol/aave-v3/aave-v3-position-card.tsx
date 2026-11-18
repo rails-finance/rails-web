@@ -122,6 +122,10 @@ export interface AaveV3PositionView {
   /** The block `priceByAddress` was read at, where the read named one: the
    *  card's block on a position page, the latest when a listing was served. */
   priceBlock?: number | null;
+  /** The block the card's balances stand at, where it differs from
+   *  `atBlock`: Ethereum's index balances, carried to the account's latest
+   *  Aave V3 event. The dollar receipts name it beside the price's block. */
+  balanceBlock?: number;
   atBlock?: number;
   /** rails-server's head read and the block it read at, where it answered the page's read. */
   readBy?: PositionHeadStamp & { block: number };
@@ -149,7 +153,7 @@ const usdRows = (v: AaveV3PositionView, reserves: AaveV3ReserveAmount[], face: A
   reserves,
   prices: v.priceByAddress,
   priceBlock: v.priceBlock,
-  balanceBlock: v.atBlock,
+  balanceBlock: v.balanceBlock ?? v.atBlock,
   face,
 });
 
@@ -716,13 +720,17 @@ export function useAaveV3CardSlots({
     // The figure is the sum of the products its receipt shows.
     const receipt =
       legs && dep.interestCaption
-        ? dep.interestCaption(side, {
-            reserves: legs,
-            prices: v.priceByAddress,
-            priceBlock: v.priceBlock,
-            balanceBlock: v.atBlock,
-            face: "compact",
-          })
+        ? dep.interestCaption(
+            side,
+            {
+              reserves: legs,
+              prices: v.priceByAddress,
+              priceBlock: v.priceBlock,
+              balanceBlock: v.balanceBlock ?? v.atBlock,
+              face: "compact",
+            },
+            v.market,
+          )
         : null;
     const usd = receipt?.usd;
     if (!receipt || usd == null || usd < 0.01) return null;
@@ -1034,6 +1042,9 @@ export function viewFromSummary(row: AaveV3PositionRow): AaveV3PositionView {
     lastActivityAt: row.lastActivityAt,
     priceByAddress: row.priceByAddress,
     priceBlock: row.priceBlock ?? null,
+    // Ethereum's index balances stand at the account's latest event; a Base
+    // lender's at the row's chain read (`atBlock`).
+    balanceBlock: row.chainBlock == null && row.lastBlockNumber ? row.lastBlockNumber : undefined,
     // A Base lender's row names the block its chain figures were read at.
     atBlock: row.chainBlock ?? undefined,
     // A listing view never carries a health factor (0018): the row's snapshot
