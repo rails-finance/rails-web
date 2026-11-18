@@ -234,7 +234,7 @@ export const spLiqProv = {
       `${b} gained, in BOLD — the ${b} this liquidation paid the deposit, valued at the liquidation's block price.`,
       at,
       {
-        formula: `${b} gained × _price ÷ 1e18, rounded down`,
+        formula: `${b} gained × _price, rounded down to 18 decimals`,
         inputs: [
           { label: `${b} gained`, value: coll, kind: "derived", pclass: "indexed" },
           { label: `_price, BOLD per ${b}`, value: price, kind: "chain", pclass: "emitted" },
@@ -250,14 +250,42 @@ export const spLiqProv = {
       ],
     }),
   /** A stretch's sum of one column. */
-  sum: (b: SpBranch, head: string, column: string, count: number) =>
-    replay(b, `${head} — the sum of the ${count} liquidations' ${column} in this stretch.`, null, {
-      formula: `Σ ${column}`,
-    }),
+  /** A column's sum over the period: between the two touches, or since the
+   *  last touch for the open period. `column` is plural, `one` singular. */
+  sum: (b: SpBranch, head: string, column: string, one: string, count: number, open = false) =>
+    replay(
+      b,
+      `${head} — ${count === 1 ? `the 1 liquidation's ${one}` : `the sum of the ${count} liquidations' ${column}`} ${open ? "since the last touch" : "between the two touches"}.`,
+      null,
+      { formula: `Σ ${one}` },
+    ),
+  /** The open period's end: the newest block the index has read the pool to. */
+  servedThru: (b: SpBranch, block: string) =>
+    replay(
+      b,
+      "Latest block the index has read — the newest block the index has read the branch pool's touches and liquidations to: the route's served_thru_block.",
+      null,
+      { source: { block } },
+    ),
+  /** A compounding touch's deposit change, where a loss landed with it. */
+  depositChange: (b: SpBranch, txHash: string, block: string, before: string, after: string) => ({
+    kind: "derived" as const,
+    pclass: "indexed" as const,
+    summary:
+      "Deposit change — the deposit after this touch less the deposit before it: the yield the touch kept less the loss since the last touch.",
+    formula: "deposit after − deposit before",
+    inputs: [
+      { label: "deposit before", value: before, kind: "derived" as const, pclass: "indexed" as const },
+      { label: "deposit after", value: after, kind: "derived" as const, pclass: "indexed" as const },
+    ],
+    contract: pool(b),
+    source: { block, txHash },
+    via: "GET /api/liquity-v2/stability-pool/timeline",
+  }),
 };
 
 /** A closed stretch's net, for a line that lists the note. */
 export function spLiquidationsNoteProv(note: SpLiquidationsNote): Provenance {
   const b = note.branch as SpBranch;
-  return spLiqProv.sum(b, "Net in the stretch", "nets in BOLD", note.stretch.liquidations.length);
+  return spLiqProv.sum(b, "Net between the touches", "nets in BOLD", "net in BOLD", note.stretch.liquidations.length);
 }
