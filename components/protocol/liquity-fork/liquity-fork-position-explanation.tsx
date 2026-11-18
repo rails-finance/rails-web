@@ -461,8 +461,8 @@ export function LiquityForkPositionExplanation({
           The {chain.symbol} branch&rsquo;s Total Collateral Ratio (TCR) is <H>{(chain.branchTcr * 100).toFixed(0)}%</H>
           {chain.branchTcr < chain.ccr ? (
             <>
-              : below its {(chain.ccr * 100).toFixed(0)}% Critical Collateral Ratio (CCR), so borrowing reverts unless
-              the branch ends at or above it
+              : below its {(chain.ccr * 100).toFixed(0)}% Critical Collateral Ratio (CCR), so new borrowing is paused
+              until it recovers
             </>
           ) : null}
           .
@@ -473,8 +473,7 @@ export function LiquityForkPositionExplanation({
           {chain.branchTcr < chain.ccr ? (
             <>
               {" "}
-              : below its {(chain.ccr * 100).toFixed(0)}% critical ratio, so borrowing reverts unless the branch ends at
-              or above it
+              : below its {(chain.ccr * 100).toFixed(0)}% critical ratio, so new borrowing is paused until it recovers
             </>
           ) : null}
           .

@@ -217,8 +217,8 @@ export function liquityForkTroveToMarkdown(args: LiquityForkTroveMarkdownArgs): 
       } else if (live.branchTcr != null)
         lines.push(
           t.ltv
-            ? `- **Branch:** Total Collateral Ratio (TCR) ${pct(live.branchTcr, 0)} (${amt(live.branchDebt ?? 0)} ${debtSymbol} total debt); below the ${pct(live.ccr, 0)} Critical Collateral Ratio (CCR), borrowing reverts unless the branch ends at or above it; shutdown possible below ${pct(live.scr, 0)}`
-            : `- **Branch:** ${pct(live.branchTcr, 0)} collateralised overall (${amt(live.branchDebt ?? 0)} ${debtSymbol} total debt); below ${pct(live.ccr, 0)} (CCR), borrowing reverts unless the branch ends at or above it; shutdown possible below ${pct(live.scr, 0)} (SCR)`,
+            ? `- **Branch:** Total Collateral Ratio (TCR) ${pct(live.branchTcr, 0)} (${amt(live.branchDebt ?? 0)} ${debtSymbol} total debt); new borrowing gates below the ${pct(live.ccr, 0)} Critical Collateral Ratio (CCR), shutdown possible below ${pct(live.scr, 0)}`
+            : `- **Branch:** ${pct(live.branchTcr, 0)} collateralised overall (${amt(live.branchDebt ?? 0)} ${debtSymbol} total debt); new borrowing gates below ${pct(live.ccr, 0)} (CCR), shutdown possible below ${pct(live.scr, 0)} (SCR)`,
         );
       else if (live.branchDebt != null && live.branchDebt < 1)
         lines.push(

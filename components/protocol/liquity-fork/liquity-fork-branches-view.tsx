@@ -157,7 +157,7 @@ function BranchCard({
   // against the line that gates new borrowing on it. Fill is the TCR as a
   // fraction of CCR (capped at 1 — above the gate the bar is simply full),
   // and the SCR tick marks the shutdown line below it. Neither tick is red:
-  // below CCR a borrow reverts unless the branch ends at or above it, and below SCR the branch can be shut down —
+  // a branch below CCR gates borrowing and below SCR can be wound down —
   // neither liquidates anyone, so neither earns the liquidation colour.
   const ccrFill = branch.tcr != null ? Math.min(1, branch.tcr / branch.ccr) : null;
   const ticks: RatioBarTick[] =
@@ -353,7 +353,9 @@ function BranchCard({
               per trove.
             </>
           )}{" "}
-          Below CCR, borrowing reverts unless the branch ends at or above it; below{" "}
+          {data.protocol === "liquity-v2"
+            ? "Below CCR, borrowing reverts unless the branch ends at or above it; below "
+            : "Below CCR the branch stops new borrowing; below "}
           <Prov info={vocab.branchConstantProv("Shutdown collateral ratio", "SCR", sym)}>{ratio(branch.scr)}</Prov> it
           can be shut down. Each branch sets its own.
         </p>

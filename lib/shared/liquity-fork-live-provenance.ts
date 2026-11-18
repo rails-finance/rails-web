@@ -212,6 +212,16 @@ interface ForkLiveConfig {
 
 function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
   const LANE_VIA = `GET /api/chain/${cfg.protocolId}/position`;
+  // Below CCR, as read in liquity/bold's BorrowerOperations (ui-jobs 747); the
+  // forks keep their earlier sentence until their source is read.
+  const belowCcr =
+    cfg.protocolId === "liquity-v2"
+      ? "Below CCR, borrowing reverts unless the branch ends at or above it;"
+      : "Below CCR the branch gates new borrowing;";
+  const rosterCcr =
+    cfg.protocolId === "liquity-v2"
+      ? "below its CCR, borrowing on it reverts unless the branch ends at or above it, and below its SCR only it can be shut down."
+      : "its TCR gates only its own borrowing (below CCR) and only it can be shut down (below SCR).";
   // The deployment's documented terms for a Trove's ratio (decision 0065).
   const terms = liquityFamilyTerms(cfg.protocolId);
   const ROSTER_VIA = `GET /api/chain/${cfg.protocolId}/branches`;
@@ -353,7 +363,7 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
       kind: "chain-derived",
       pclass: "state",
       verify: recompute("TroveManager", "getEntireBranchColl / getEntireBranchDebt"),
-      summary: `The ${sym} branch's total collateral ratio. Entire branch collateral × the branch's own oracle price ÷ entire branch debt, every input read at the same block. Below CCR, borrowing reverts unless the branch ends at or above it; below SCR it can be shut down.`,
+      summary: `The ${sym} branch's total collateral ratio. Entire branch collateral × the branch's own oracle price ÷ entire branch debt, every input read at the same block. ${belowCcr} below SCR it can be shut down.`,
       contract: tmContract(sym),
       via: `${LANE_VIA} · derived ratio`,
       formula: "branch coll × price ÷ branch debt",
@@ -456,7 +466,7 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
       kind: "chain-derived",
       pclass: "state",
       verify: recompute("TroveManager", "getEntireBranchColl / getEntireBranchDebt"),
-      summary: `The ${sym} branch's total collateral ratio. Entire branch collateral × the branch's own oracle price ÷ entire branch debt, every input read at the same block. Each branch stands alone in this family: below its CCR, borrowing on it reverts unless the branch ends at or above it, and below its SCR only it can be shut down.`,
+      summary: `The ${sym} branch's total collateral ratio. Entire branch collateral × the branch's own oracle price ÷ entire branch debt, every input read at the same block. Each branch stands alone in this family: ${rosterCcr}`,
       contract: tmContract(sym),
       via: `${ROSTER_VIA} · derived ratio`,
       formula: "branch coll × price ÷ branch debt",

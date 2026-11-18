@@ -82,8 +82,10 @@ export function LiquityV2Listing({
   }, []);
 
   // The branches against their CCR (ui-jobs 747): a branch the listing is
-  // narrowed to draws its Safety Mode notice above the rows.
-  const branchCcr = useLiquityV2BranchCcr();
+  // narrowed to draws its Safety Mode notice above the rows. The read runs
+  // once a Collateral facet is selected (set from onFilters below).
+  const [collateralFacet, setCollateralFacet] = useState(false);
+  const branchCcr = useLiquityV2BranchCcr(collateralFacet);
 
   // Collateral facet options carry the token-icon chip (matches the position view).
   const collateralOptions = useMemo<FilterOptionDef[]>(
@@ -108,6 +110,7 @@ export function LiquityV2Listing({
   const passedOn = useRef(initialPassedOn);
   const onFilters = useCallback(
     (f: LiquityV2ListFilters) => {
+      setCollateralFacet((f.collateralTypes?.length ?? 0) > 0);
       const { ownerAddress, ownerEns } = parseTroveSearch(f.q);
       const key = (ownerAddress ?? ownerEns ?? "").toLowerCase();
       if (lastIdentityRef.current === key) return;

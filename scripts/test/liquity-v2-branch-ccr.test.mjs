@@ -1,11 +1,17 @@
 // A Liquity V2 branch against its CCR (ui-jobs 747): the TCR on the contract's
 // integers, the comparison with the CCR, the price at which the TCR meets the
 // SCR, and the notice drawn only below the CCR on a branch not shut down.
-// Figures: the WETH branch's collateral and debt at block 26,444,638, priced at $1,748.45.
+// Figures: the WETH branch at block 26,444,500, priced at $1,748.45.
 // Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ccrNoticeShown, ccrPinBlock, settleAllBranchCcr, settleBranchCcr } from "../../lib/liquity-v2/branch-ccr.ts";
+import {
+  ccrNoticeShown,
+  ccrPinBlock,
+  settleAllBranchCcr,
+  settleBranchCcr,
+  tcrPercentText,
+} from "../../lib/liquity-v2/branch-ccr.ts";
 
 const at = { blockNumber: 26_444_500, blockTimestamp: 1_795_381_187 };
 const weth = {
@@ -14,7 +20,7 @@ const weth = {
   borrowerOperations: "0x372abd1810eaf23cb9d941bbe7596dfb2c46bc65",
   priceFeed: "0xcc5f8102eb670c89a4a3c567c13851260303c24f",
   collRaw: "9576655322507670081162",
-  debtRaw: "11172825298152770474189081",
+  debtRaw: "11172799336964550809556471",
   priceRaw: "1748450000000000000000",
   priceCall: "fetchPrice",
   ccrRaw: "1500000000000000000",
@@ -59,4 +65,14 @@ test("LIQUITY_V2_CCR_AT_BLOCK pins the read in development only", () => {
   assert.equal(ccrPinBlock(undefined, "26444500"), null);
   assert.equal(ccrPinBlock("development", undefined), null);
   assert.equal(ccrPinBlock("development", "abc"), null);
+});
+
+test("the TCR prints floored to hundredths of a percent", () => {
+  assert.equal(tcrPercentText("1499960000000000000"), "149.99%");
+  assert.equal(tcrPercentText("1499999999999999999"), "149.99%");
+  assert.equal(tcrPercentText("1500000000000000000"), "150.00%");
+  assert.equal(tcrPercentText("1498666000000000000"), "149.86%");
+  assert.equal(tcrPercentText("24467554292130450000"), "2,446.75%");
+  const s = settleBranchCcr(weth, at);
+  assert.equal(tcrPercentText(s.tcrRaw), "149.86%");
 });

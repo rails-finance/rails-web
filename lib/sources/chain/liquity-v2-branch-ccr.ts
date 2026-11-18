@@ -46,15 +46,22 @@ const emptyBranches = () =>
     LiquityV2BranchCcrRead | null
   >;
 
-/** Every branch at the head. A branch whose reads failed is null; a failed
- *  read of the block leaves every branch null at block 0. */
-export async function loadLiquityV2BranchCcr(): Promise<LiquityV2BranchCcrResponse> {
-  // Development only: pin the read to a past block to see the notice drawn. The
-  // literal NODE_ENV test lets a production build drop the branch.
-  const pin =
-    process.env.NODE_ENV === "development"
-      ? ccrPinBlock(process.env.NODE_ENV, process.env.LIQUITY_V2_CCR_AT_BLOCK)
-      : null;
+/** The block LIQUITY_V2_CCR_AT_BLOCK pins the reads to on a development
+ *  server, so a past Safety Mode can be drawn; null in production. The literal
+ *  NODE_ENV test lets a production build drop the branch. */
+export function liquityV2CcrDevPin(): number | null {
+  return process.env.NODE_ENV === "development"
+    ? ccrPinBlock(process.env.NODE_ENV, process.env.LIQUITY_V2_CCR_AT_BLOCK)
+    : null;
+}
+
+/** Every branch at the head, or at `atBlock` where a server page names the
+ *  block of a read it shows beside this one (the branches page's roster). A
+ *  branch whose reads failed is null; a failed read of the block leaves every
+ *  branch null at block 0. The route passes no block. */
+export async function loadLiquityV2BranchCcr(atBlock?: number): Promise<LiquityV2BranchCcrResponse> {
+  if (atBlock != null && atBlock > 0) return read(atBlock);
+  const pin = liquityV2CcrDevPin();
   if (pin != null) return read(pin);
   if (cached && Date.now() - cached.at < TTL_MS) return cached.value;
   if (!inflight) {

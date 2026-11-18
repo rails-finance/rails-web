@@ -119,6 +119,16 @@ export function ccrNoticeShown(s: LiquityV2BranchCcr | null | undefined): s is L
   return s != null && s.belowCcr && s.shutDown === false;
 }
 
+/** A TCR as the notice prints it, from the contract's integer (1e18 = 100%),
+ *  floored to hundredths of a percent so a ratio just under the CCR never
+ *  prints as the CCR: 1.49996e18 reads "149.99%". */
+export function tcrPercentText(tcrRaw: string): string {
+  const hundredths = BigInt(tcrRaw) / BigInt("100000000000000");
+  const whole = hundredths / BigInt(100);
+  const frac = (hundredths % BigInt(100)).toString().padStart(2, "0");
+  return `${whole.toLocaleString("en-US")}.${frac}%`;
+}
+
 /** The block a development server pins the read to (LIQUITY_V2_CCR_AT_BLOCK),
  *  so a past Safety Mode can be drawn; null in any other NODE_ENV, and the
  *  route takes no block from the request. */
