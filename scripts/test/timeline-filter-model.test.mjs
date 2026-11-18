@@ -30,7 +30,7 @@ const { groupDimensions, pillFor } = await import("../../components/shared/filte
 
 /** A stand-in for useTimelineEvents' state: the type and asset axes over
  *  `hidden`, and a log of the writes the model makes. */
-function state({ types, assets = [], hidden = [], stale = [] }) {
+function state({ types, assets = [], hidden = [], stale = [], sizeDims = [], sizeRanges = {} }) {
   const log = [];
   const opts = (keys) => keys.map((k) => ({ key: k, label: k[0].toUpperCase() + k.slice(1) }));
   const visible = (keys) => new Set(keys.filter((k) => !hidden.includes(k)));
@@ -59,6 +59,9 @@ function state({ types, assets = [], hidden = [], stale = [] }) {
       visibleCounterpartyKeys: new Set(),
       toggleHiddenCounterparty: () => {},
       resetHiddenCounterparties: () => {},
+      sizeDims,
+      sizeRanges,
+      setSizeRange: (side, values) => log.push(["size", side, values]),
     },
   };
 }

@@ -47,6 +47,8 @@ import { isLiquityEvent } from "@/lib/shared/types/event-shape";
 import { collSurplusClaimEvent } from "@/lib/shared/liquity-coll-surplus-claim";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
+import { liquityV2TroveSizeDims } from "@/lib/liquity-v2/timeline-size";
+import type { TimelineLoadOlder } from "@/lib/shared/timeline-size";
 import { boundaryFromLimit } from "@/lib/shared/timeline-boundary";
 import { TIMELINE_WINDOW_ROWS } from "@/lib/shared/timeline-opening-balance";
 import { boundaryStateFromOldestRow } from "@/lib/shared/timeline-boundary-state";
@@ -335,9 +337,12 @@ export default function TroveView({
     events: null,
     read: "reading",
   });
+  // A retry of that read, from the timeline's cut-page notice.
+  const [flowRetry, setFlowRetry] = useState(0);
   useEffect(() => {
     if (totalEvents == null) return;
     let cancelled = false;
+    setFlowHistory({ events: null, read: "reading" });
     (async () => {
       const seen = new Map<string, BaseActivityEvent>();
       try {
@@ -358,7 +363,27 @@ export default function TroveView({
     return () => {
       cancelled = true;
     };
-  }, [totalEvents, collateralType, troveId]);
+  }, [totalEvents, collateralType, troveId, flowRetry]);
+  // The timeline's older events come off the same read (ui-jobs 752): on the
+  // reader's press, once it is done, the page holds the whole history and the
+  // filters search all of it.
+  const [olderAsked, setOlderAsked] = useState(false);
+  useEffect(() => {
+    if (!olderAsked || flowHistory.read !== "done" || !flowHistory.events) return;
+    setEvents(flowHistory.events);
+    setTotalEvents(null);
+    setOlderAsked(false);
+  }, [olderAsked, flowHistory]);
+  const loadOlder = useMemo<TimelineLoadOlder | undefined>(() => {
+    if (totalEvents == null) return undefined;
+    if (!olderAsked) return { state: "idle", load: () => setOlderAsked(true) };
+    if (flowHistory.read === "failed")
+      return {
+        state: "failed",
+        load: () => setFlowRetry((n) => n + 1),
+      };
+    return { state: "loading", load: () => {} };
+  }, [totalEvents, olderAsked, flowHistory.read]);
   const flowEvents = useMemo(
     () => liquityV2FlowEvents(totalEvents == null ? liquityEvents : (flowHistory.events ?? [])),
     [totalEvents, liquityEvents, flowHistory.events],
@@ -410,10 +435,12 @@ export default function TroveView({
   );
 
   const olderCount = totalEvents != null ? Math.max(0, totalEvents - liquityEvents.length) : 0;
+  const sizeDims = useMemo(() => liquityV2TroveSizeDims(collateralType), [collateralType]);
   const tl = useTimelineEvents(timelineEvents, {
     storageKey: `liquity-v2-${troveKey}`,
     protocolKey: "liquity-v2-troves",
     olderCount,
+    size: sizeDims,
     // Navigated by the Lifetime flows chart's Apply: no Dates.
     dates: false,
   });
@@ -561,6 +588,7 @@ export default function TroveView({
         liquityEvents={liquityEvents}
         tl={tl}
         boundary={boundary}
+        loadOlder={loadOlder}
         economicsEvents={tl.sortedEvents}
         flowEvents={flowEvents}
         flowTimeline={flowTimeline}

@@ -16,6 +16,12 @@
 //   ?hideAddresses=0xab…,0xcd…  hidden counterparties
 //   ?hideVersions=V2            hidden protocol versions
 //   ?from=2025-01-01&to=2025-03-31   date range, UTC calendar days inclusive
+//   ?debt=10000-&coll=-50       Size, on a page that offers it (ui-jobs 752)
+//
+// SIZE is the one axis written as what is KEPT: a range over what each event
+// moved, in the asset's unit, on the listings' params and values
+// (lib/shared/timeline-size.ts). It has its own state beside the date range,
+// and like it never rides localStorage.
 //
 // A page tied to its Lifetime flows chart passes `dates: false`: it has no
 // date range, and `?to=` there is the chart's cut, which the flow-focus store
@@ -110,6 +116,16 @@ import type { ServedFolder, ServedTimelineRow } from "@/lib/shared/timeline-fold
 import { folderDays as foldersByDay } from "@/lib/shared/timeline-folder-reductions";
 import { folderAdmits, folderMatchCount, type FolderFilterAxes } from "@/lib/shared/timeline-folder-filter";
 import { compareWithinBlock } from "@/lib/shared/event-order";
+import {
+  NO_SIZE,
+  readSizeParams,
+  sizeActive,
+  sizePasses,
+  writeSizeParams,
+  type SizeRanges,
+  type SizeSide,
+  type TimelineSizeDim,
+} from "@/lib/shared/timeline-size";
 
 /** One row of a SERVED timeline in display order: an event (with its index in
  *  `displayedEvents`, for the date prefix and the spine flags) or a folder the
@@ -234,6 +250,13 @@ export interface TimelineEventsState {
 
   dateRange: [number, number] | null;
   setDateRange: (next: [number, number] | null) => void;
+  /** The Size ranges the page offers (none on most families), each side's
+   *  selection, and the write. */
+  sizeDims: readonly TimelineSizeDim[];
+  sizeRanges: SizeRanges;
+  setSizeRange: (side: SizeSide, values: string[]) => void;
+  /** A Type or Size filter is on: what the cut-page notice reads. */
+  narrowed: boolean;
   /** False on a page that navigates by its Lifetime flows chart: no date
    *  range, and the toolbar draws no Date pill. */
   datesAxis: boolean;
@@ -285,16 +308,19 @@ export interface TimelineEventsState {
   };
 }
 
-/** The four hidden sets, as one view of the axes. */
+/** The four hidden sets and the Size ranges, as one view of the axes. */
 export interface TimelineAxesView {
   hiddenActions: Set<string>;
   hiddenAssets: Set<string>;
   hiddenCounterparties: Set<string>;
   hiddenVersions: Set<string>;
+  /** Absent where the page offers no Size. */
+  size?: { dims: readonly TimelineSizeDim[]; ranges: SizeRanges };
 }
 
-/** Does one event pass the four axes? An event with no key on an axis
- *  passes it, and one with several passes while any of them is shown. */
+/** Does one event pass the axes? An event with no key on a hide axis passes
+ *  it, and one with several passes while any of them is shown; on Size it
+ *  passes while its figure sits inside every bounded side. */
 export function eventPassesAxes(e: BaseActivityEvent, v: TimelineAxesView): boolean {
   if (actionHidden(e, v.hiddenActions)) return false;
   const some = (keys: string[], hidden: Set<string>) =>
@@ -302,7 +328,8 @@ export function eventPassesAxes(e: BaseActivityEvent, v: TimelineAxesView): bool
   return (
     some(getEventAssetKeys(e), v.hiddenAssets) &&
     some(getEventCounterpartyKeys(e), v.hiddenCounterparties) &&
-    some(getEventVersionKeys(e), v.hiddenVersions)
+    some(getEventVersionKeys(e), v.hiddenVersions) &&
+    (!v.size || sizePasses(e, v.size.dims, v.size.ranges))
   );
 }
 
@@ -326,6 +353,7 @@ interface ViewParams {
   hiddenCounterparties: string[];
   hiddenVersions: string[];
   dateRange: [number, number] | null;
+  sizeRanges: SizeRanges;
 }
 
 const SECONDS_PER_DAY = 86_400;
@@ -349,7 +377,12 @@ const splitList = (s: string | null): string[] | null => (s === null ? null : s.
  *  axis is at its default so an untouched view keeps a clean URL. The ONE
  *  place the grammar is written — the address-bar mirror and `viewHref()`
  *  both go through it, so a copied link and a written-back one never differ. */
-function writeViewParams(sp: URLSearchParams, view: ViewParams, datesAxis: boolean): void {
+function writeViewParams(
+  sp: URLSearchParams,
+  view: ViewParams,
+  datesAxis: boolean,
+  sizeSides: readonly SizeSide[],
+): void {
   const list = (key: string, values: string[]) => {
     if (values.length > 0) sp.set(key, values.join(","));
     else sp.delete(key);
@@ -362,6 +395,7 @@ function writeViewParams(sp: URLSearchParams, view: ViewParams, datesAxis: boole
   list("hideAssets", view.hiddenAssets);
   list("hideAddresses", view.hiddenCounterparties);
   list("hideVersions", view.hiddenVersions);
+  writeSizeParams(sp, sizeSides, view.sizeRanges);
   if (!datesAxis) return;
   if (view.dateRange) {
     sp.set("from", formatUtcDay(view.dateRange[0]));
@@ -376,7 +410,7 @@ function writeViewParams(sp: URLSearchParams, view: ViewParams, datesAxis: boole
  *  absent — the caller keeps whatever it restored from storage for that axis —
  *  and a malformed date pair (one side missing, not a day, from after to) is
  *  ignored the same way rather than half-applied. */
-function readViewParams(sp: URLSearchParams): Partial<ViewParams> {
+function readViewParams(sp: URLSearchParams, sizeSides: readonly SizeSide[]): Partial<ViewParams> {
   const view: Partial<ViewParams> = {};
   const hide = splitList(sp.get("hide"));
   if (hide) view.hiddenActions = hide;
@@ -389,6 +423,8 @@ function readViewParams(sp: URLSearchParams): Partial<ViewParams> {
   const from = parseUtcDay(sp.get("from"));
   const to = parseUtcDay(sp.get("to"));
   if (from !== null && to !== null && from <= to) view.dateRange = [from, to + SECONDS_PER_DAY - 1];
+  const size = readSizeParams(sp, sizeSides);
+  if (sizeActive(size)) view.sizeRanges = size;
   return view;
 }
 
@@ -403,7 +439,11 @@ export function useTimelineEvents(
     servedRows,
     eventsServed,
     dates = true,
+    size,
   }: {
+    /** The Size ranges this history offers (ui-jobs 752): Liquity V2's Trove
+     *  and Stability Pool deposit. Omitted, the page has no Size. */
+    size?: readonly TimelineSizeDim[];
     /** False on a page tied to its Lifetime flows chart (see the header). */
     dates?: boolean;
     storageKey?: string;
@@ -449,6 +489,12 @@ export function useTimelineEvents(
   const [hiddenCounterparties, setHiddenCounterparties] = useState<string[]>([]);
   const [hiddenVersions, setHiddenVersions] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<[number, number] | null>(null);
+  const [sizeRanges, setSizeRanges] = useState<SizeRanges>(NO_SIZE);
+  const sizeDims = useMemo(() => size ?? [], [size]);
+  // The sides as one string, so the restore below re-runs on a change of the
+  // sides offered and never on a new array of the same ones.
+  const sizeSidesKey = sizeDims.map((d) => d.side).join(",");
+  const sizeSides = useMemo(() => (sizeSidesKey ? (sizeSidesKey.split(",") as SizeSide[]) : []), [sizeSidesKey]);
   const [heatmapOpen, setHeatmapOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   // Flips true on the visitor's first live toggle of any view axis — the
@@ -470,6 +516,7 @@ export function useTimelineEvents(
     setHiddenCounterparties([]);
     setHiddenVersions([]);
     setDateRange(null);
+    setSizeRanges(NO_SIZE);
     if (!storageKey) {
       setHydrated(true);
       return;
@@ -487,18 +534,19 @@ export function useTimelineEvents(
       /* corrupt entry — fall back to defaults */
     } finally {
       try {
-        const view = readViewParams(new URLSearchParams(window.location.search));
+        const view = readViewParams(new URLSearchParams(window.location.search), sizeSides);
         if (view.hiddenActions) setHiddenActions(view.hiddenActions);
         if (view.hiddenAssets) setHiddenAssets(view.hiddenAssets);
         if (view.hiddenCounterparties) setHiddenCounterparties(view.hiddenCounterparties);
         if (view.hiddenVersions) setHiddenVersions(view.hiddenVersions);
         if (view.dateRange && dates) setDateRange(view.dateRange);
+        if (view.sizeRanges) setSizeRanges(view.sizeRanges);
       } catch {
         /* malformed query string — keep the storage-derived state */
       }
       setHydrated(true);
     }
-  }, [storageKey, defaultHidden, dates]);
+  }, [storageKey, defaultHidden, dates, sizeSides]);
 
   // Persist after hydration.
   useEffect(() => {
@@ -536,8 +584,10 @@ export function useTimelineEvents(
           hiddenCounterparties,
           hiddenVersions,
           dateRange,
+          sizeRanges,
         },
         dates,
+        sizeSides,
       );
       const next = `${url.pathname}${url.search}${url.hash}`;
       const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
@@ -545,7 +595,17 @@ export function useTimelineEvents(
     } catch {
       /* non-fatal — the view still works, it just won't be shareable */
     }
-  }, [hydrated, hiddenActions, hiddenAssets, hiddenCounterparties, hiddenVersions, dateRange, dates]);
+  }, [
+    hydrated,
+    hiddenActions,
+    hiddenAssets,
+    hiddenCounterparties,
+    hiddenVersions,
+    dateRange,
+    sizeRanges,
+    dates,
+    sizeSides,
+  ]);
 
   // The same grammar, composed on demand for the copy-link control.
   const viewHref = useCallback(() => {
@@ -558,11 +618,13 @@ export function useTimelineEvents(
         hiddenCounterparties,
         hiddenVersions,
         dateRange,
+        sizeRanges,
       },
       dates,
+      sizeSides,
     );
     return url.toString();
-  }, [hiddenActions, hiddenAssets, hiddenCounterparties, hiddenVersions, dateRange, dates]);
+  }, [hiddenActions, hiddenAssets, hiddenCounterparties, hiddenVersions, dateRange, sizeRanges, dates, sizeSides]);
 
   const hiddenSet = useMemo(() => new Set(hiddenActions), [hiddenActions]);
   const hiddenAssetSet = useMemo(() => new Set(hiddenAssets), [hiddenAssets]);
@@ -661,6 +723,11 @@ export function useTimelineEvents(
   // The three pre-date axes as ONE predicate, because a folder's members are
   // judged by it too once they are read (`memberPasses` below) — a member and
   // a loose event must never answer the same filter differently.
+  // Size joins them: a keep-range, judged member by member like the rest.
+  const sizeView = useMemo(
+    () => (sizeDims.length > 0 && sizeActive(sizeRanges) ? { dims: sizeDims, ranges: sizeRanges } : undefined),
+    [sizeDims, sizeRanges],
+  );
   const passesAxes = useCallback(
     (e: BaseActivityEvent) =>
       eventPassesAxes(e, {
@@ -668,8 +735,9 @@ export function useTimelineEvents(
         hiddenAssets: hiddenAssetSet,
         hiddenCounterparties: hiddenCounterpartySet,
         hiddenVersions: hiddenVersionSet,
+        size: sizeView,
       }),
-    [actionHiddenSet, hiddenAssetSet, hiddenCounterpartySet, hiddenVersionSet],
+    [actionHiddenSet, hiddenAssetSet, hiddenCounterpartySet, hiddenVersionSet, sizeView],
   );
   const visibleEvents = useMemo(() => sortedEvents.filter(passesAxes), [sortedEvents, passesAxes]);
 
@@ -685,8 +753,9 @@ export function useTimelineEvents(
       hiddenAssets: hiddenAssetSet,
       hiddenCounterparties: hiddenCounterpartySet,
       dateRange,
+      sizeActive: sizeView != null,
     }),
-    [actionHiddenSet, hiddenAssetSet, hiddenCounterpartySet, dateRange],
+    [actionHiddenSet, hiddenAssetSet, hiddenCounterpartySet, dateRange, sizeView],
   );
 
   // A view the reader has not applied yet, judged by the same predicate and
@@ -699,7 +768,11 @@ export function useTimelineEvents(
         eventPassesAxes(e, view) && (!dateRange || (e.timestamp >= dateRange[0] && e.timestamp <= dateRange[1]));
       let loose = 0;
       for (const e of sortedEvents) if (passes(e)) loose++;
-      const axes: FolderFilterAxes = { ...view, dateRange };
+      const axes: FolderFilterAxes = {
+        ...view,
+        dateRange,
+        sizeActive: !!view.size && sizeActive(view.size.ranges),
+      };
       const folders = (servedRows ?? []).flatMap((row) =>
         row.kind === "folder" && folderAdmits(row.folder, axes)
           ? [{ folder: row.folder, matched: folderMatchCount(row.folder, axes) }]
@@ -983,15 +1056,18 @@ export function useTimelineEvents(
       const needsCounterparties = counterpartyKeys.some((k) => hiddenCounterparties.includes(k));
       const needsVersions = versionKeys.some((k) => hiddenVersions.includes(k));
       const needsDateClear = dateRange !== null;
-      if (!needsAction && !needsAssets && !needsCounterparties && !needsVersions && !needsDateClear) return;
+      const needsSizeClear = sizeView != null && !sizePasses(event, sizeView.dims, sizeView.ranges);
+      if (!needsAction && !needsAssets && !needsCounterparties && !needsVersions && !needsDateClear && !needsSizeClear)
+        return;
       suppressNextPersistRef.current = true;
       if (needsAction) setHiddenActions((prev) => prev.filter((k) => !actionKeys.includes(k)));
       if (needsAssets) setHiddenAssets((prev) => prev.filter((k) => !assetKeys.includes(k)));
       if (needsCounterparties) setHiddenCounterparties((prev) => prev.filter((k) => !counterpartyKeys.includes(k)));
       if (needsVersions) setHiddenVersions((prev) => prev.filter((k) => !versionKeys.includes(k)));
       if (needsDateClear) setDateRange(null);
+      if (needsSizeClear) setSizeRanges(NO_SIZE);
     },
-    [actionHiddenSet, hiddenAssets, hiddenCounterparties, hiddenVersions, dateRange],
+    [actionHiddenSet, hiddenAssets, hiddenCounterparties, hiddenVersions, dateRange, sizeView],
   );
   // The one setter handed out raw: selecting a range in the heatmap is a live
   // toggle like any other, so it opens the address-bar mirror too.
@@ -999,13 +1075,23 @@ export function useTimelineEvents(
     interactedRef.current = true;
     setDateRange(next);
   }, []);
+  const setSizeRange = useCallback((side: SizeSide, values: string[]) => {
+    interactedRef.current = true;
+    setSizeRanges((prev) => {
+      const next = { ...prev };
+      if (values.length > 0) next[side] = values;
+      else delete next[side];
+      return next;
+    });
+  }, []);
 
   const isFiltered =
     actionHiddenSet.size > 0 ||
     hiddenAssetSet.size > 0 ||
     hiddenCounterpartySet.size > 0 ||
     hiddenVersionSet.size > 0 ||
-    dateRange !== null;
+    dateRange !== null ||
+    sizeView != null;
 
   return {
     sortedEvents,
@@ -1035,6 +1121,10 @@ export function useTimelineEvents(
     resetHiddenVersions,
     dateRange,
     setDateRange: setDateRangeLive,
+    sizeDims,
+    sizeRanges,
+    setSizeRange,
+    narrowed: actionHiddenSet.size > 0 || sizeView != null,
     datesAxis: dates,
     heatmapOpen,
     toggleHeatmap,
