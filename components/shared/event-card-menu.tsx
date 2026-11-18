@@ -3,7 +3,7 @@
 // The event card's ⋮ (rails-ops TO-DO-ui-jobs 281, 308, 535), at the T1 row's
 // right end (ui-jobs 295), the same on every family. On a timeline: Open event
 // page, Copy transaction hash, inside a group Group {n} events, and Hide the
-// row's type of event, the Types of event filter's untick; a closed group's
+// row's type of event, the Type filter's untick; a closed group's
 // row holds Show {n} grouped events. On the event page it stands at the
 // card's top right: View in timeline (`timelineHref`), Copy transaction hash, then
 // the page's rows (`pageRows`: copy link, the explorer, the Markdown and Copy
@@ -23,7 +23,7 @@ const WORDS = {
   heading: "Event",
   view_page: "Open event page",
   view_page_hint: "Open this event's page",
-  hide_type_hint: "Tick it in Types of event to bring them back",
+  hide_type_hint: "Tick it in the Type filter to bring them back",
 };
 
 /** The clipboard write for a text that arrives later (a fetch): a
@@ -65,7 +65,7 @@ export function eventMarkdownHref(shareHref: string): string {
 export const GroupHideContext = createContext<{ title: string; subtitle: string; hide: () => void } | null>(null);
 
 /** A timeline row's type, for its ⋮ ("Hide “Redeemed” events"): the same
- *  as unticking the type in the Types of event filter (the timeline
+ *  as unticking the type in the Type filter (the timeline
  *  provides it per row; a group's row takes its members' type). */
 export const EventTypeHideContext = createContext<{ title: ReactNode; subtitle: string; hide: () => void } | null>(
   null,

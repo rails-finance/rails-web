@@ -18,7 +18,7 @@
 // as ?token=0x…). An option with a `chain` is keyed `chain:address` (the asset
 // preference's chooser, ui-jobs 557, offers one token on several chains); CoW's
 // options carry none and are keyed by address. Tried on CoW first (rails-ops decisions/0058); its use for
-// the timeline's Assets filter and the roster's Token facet is Miles's call.
+// the timeline's Asset filter and the roster's Token facet is Miles's call.
 
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Check, Plus, X } from "lucide-react";

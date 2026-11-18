@@ -19,11 +19,18 @@ export interface FilterOptionDef {
   label: string;
   /** Optional leading glyph (e.g. a token chip for asset dimensions). */
   icon?: ReactNode;
+  /** A glyph after the label that tells two like-named options apart (the
+   *  delegate's person on a delegate-set "Interest rate"). */
+  suffix?: ReactNode;
   /** Optional trailing figure shown muted at the end of the option row — how
    *  many rows the option would reach (Morpho's per-market position count).
    *  Panel-only: it is not part of the chip text, and the panel's type-to-filter
    *  box matches `label` alone, so a count can never be searched by accident. */
   meta?: string;
+  /** The umbrella this option is a leg of (an event type's legs, ui-jobs
+   *  735): the editors nest the legs under a row that ticks them all. The
+   *  umbrella is a heading, never an option. */
+  parent?: { value: string; label: string; meta?: string };
 }
 
 export interface FilterDimension<F> {
@@ -70,6 +77,11 @@ export interface FilterDimension<F> {
    *  multi-dimension group panel (e.g. a "compare" link beside the Hub title).
    *  Only shown when the group holds more than one dimension. */
   labelAction?: ReactNode;
+  /** A two-option property of the row ("Redeemed / Never redeemed"): where a
+   *  listing has two or more, they share one "Properties" pill whose editor
+   *  stacks them (ui-jobs 735); a lone one keeps its pill. Each keeps its
+   *  param. */
+  property?: boolean;
   /** Hide from the + Filter menu when false (e.g. Borrowing while Supply-only). */
   available?: (f: F) => boolean;
   /** One short line at the foot of the dimension's group panel (the price

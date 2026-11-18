@@ -2,14 +2,14 @@
 
 // ListToolbar — the shared listing-page filter strip (N1): the search, one
 // editable pill per filter group (N1.10, ui-jobs 681), the sort pill (N1.3),
-// the ⋮ (N1.7), and under them the count (N1.6) with Clear all. From sm one
-// wrapping row: [search] [set pills] [unset pills] [spacer] [sort] [⋮], and a
-// thin row under it, Clear all at the left (two or more filters set) and the
-// count at the right. Below sm: the search alone; one pill row that scrolls
-// sideways and never wraps, led by the Filters button (N1.8.1); then the count
-// and Reset at the left and the sort at the right. A page passes its dimension
-// registry and param object; the toolbar holds no filter state beyond which
-// editor is open and the order the pills were set in.
+// the ⋮ (N1.7), and the count (N1.6) with Clear all. From sm one wrapping
+// row: [search] [set pills] [unset pills] [Clear all (two or more set)] and,
+// right-aligned as one group that wraps together, [count] [sort] [⋮]. Below
+// sm: the search alone; one pill row that scrolls sideways and never wraps,
+// led by the Filters button (N1.8.1); then Reset at the left and the count,
+// sort and ⋮ at the right. A page passes its dimension registry and param
+// object; the toolbar holds no filter state beyond which editor is open and
+// the order the pills were set in.
 
 import {
   useEffect,
@@ -134,12 +134,16 @@ export function ListToolbar<F extends BaseListFilters>({
   const editorCount = count ?? sheetCount;
   const countLine =
     countNode != null ? (
-      <span className={`text-sm tabular-nums ${PILL_MUTED}`} data-anatomy="N1.6" data-prov-exempt="">
+      <span
+        className={`min-w-0 text-sm tabular-nums sm:whitespace-nowrap ${PILL_MUTED}`}
+        data-anatomy="N1.6"
+        data-prov-exempt=""
+      >
         {countNode}
       </span>
     ) : count ? (
       <span
-        className={`text-sm tabular-nums ${PILL_MUTED}`}
+        className={`min-w-0 text-sm tabular-nums sm:whitespace-nowrap ${PILL_MUTED}`}
         data-anatomy="N1.6"
         data-result-count={count.total}
         data-prov-exempt=""
@@ -204,25 +208,29 @@ export function ListToolbar<F extends BaseListFilters>({
             aria-hidden="true"
           />
         </div>
-        {/* The count and Clear all: below sm at the left of the sort's row;
-            from sm a row of their own under the pills. */}
-        <div className="order-1 flex min-h-11 flex-1 items-center gap-3 sm:order-2 sm:min-h-8 sm:basis-full">
-          {countLine && <span className="sm:order-2 sm:ml-auto">{countLine}</span>}
-          {active > 0 && (
+        {/* Clear all (two or more set) after the pills; below sm, Reset at the
+            left of the count's line. */}
+        {active > 0 && (
+          <div className={`order-1 flex min-h-11 items-center sm:min-h-10 ${active < 2 ? "sm:hidden" : ""}`}>
             <button
               type="button"
               onClick={() => onChange(resetAll(groups, filters))}
-              className={`text-sm font-medium ${INPLACE_TEXT} rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:order-1 ${active < 2 ? "sm:hidden" : ""}`}
+              className={`text-sm font-medium ${INPLACE_TEXT} rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500`}
               data-pill-clear=""
               data-anatomy="N1.13"
             >
               <span className="sm:hidden">Reset</span>
               <span className="max-sm:hidden">Clear all</span>
             </button>
-          )}
-        </div>
-        {/* The sort and the ⋮ wrap together, at the right end of their line. */}
-        <div className="order-1 flex shrink-0 items-center gap-1 sm:ml-auto">
+          </div>
+        )}
+        {/* The count, the sort and the ⋮: one group at the right that wraps
+            together (Miles, 18 Nov 2026, ui-jobs 735). */}
+        {/* Below sm the count gives way first: it wraps under its figure
+            beside the sort, where a 343px row cannot hold all three on one
+            line. */}
+        <div className="order-1 ml-auto flex min-h-11 min-w-0 items-center gap-3 sm:min-h-10 sm:shrink-0">
+          {countLine}
           {sortOptions.length > 0 && (
             <SortPill
               options={sortOptions}

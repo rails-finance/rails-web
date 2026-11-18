@@ -13,6 +13,7 @@
 // `view` menus draw the same trigger for an event card, a section and a
 // listing. Below sm these open as a sheet with each row full width.
 
+import { PILL_NEUTRAL } from "@/components/shared/filter-bar/filter-pill";
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Check, ChevronDown, EllipsisVertical, Wrench } from "lucide-react";
@@ -247,7 +248,13 @@ export function ToolsMenu({
           aria-label={copied ? "Copied" : ariaLabel ? `${name}: ${ariaLabel}` : name}
           // A 28px glyph with a 44px press area: the after: box reaches past
           // the button without moving the strip.
-          className={`${CTRL_GHOST} ${open ? CTRL_ON : CTRL_OFF} relative h-7 w-7 justify-center rounded-md after:absolute after:-inset-2 after:content-['']`}
+          className={
+            variant === "view"
+              ? // The listing's ⋮ as a neutral pill button, beside the sort
+                // (ui-jobs 735).
+                `${PILL_NEUTRAL} inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:size-10`
+              : `${CTRL_GHOST} ${open ? CTRL_ON : CTRL_OFF} relative h-7 w-7 justify-center rounded-md after:absolute after:-inset-2 after:content-['']`
+          }
         >
           {copied ? (
             <Check className="h-4 w-4" aria-hidden="true" />

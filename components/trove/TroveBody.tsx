@@ -227,7 +227,7 @@ export function TroveBody({
 
   // Delegate-set rate shares the "Interest rate" label with the owner's own
   // rate change; the person glyph marks it as the delegate's action in the
-  // "Types of event" filter — a decoration `useTimelineEvents`'s generic
+  // Type filter — a decoration `useTimelineEvents`'s generic
   // eventOptions builder has no slot for, so it's layered on here.
   const tlWithGlyph = {
     ...tl,

@@ -39,6 +39,7 @@
 // Run:
 //   BASE=http://localhost:3100 node scripts/verify/verify-timeline-view-link.mjs
 
+import { axisOptions, closeAxis, hideOption, openAxis } from "./lib/timeline-pills.mjs";
 import { chromium } from "playwright";
 import { BASE, bypassHeaders } from "./lib/host.mjs";
 
@@ -86,9 +87,9 @@ async function open(width, url) {
   // reads "Showing 0 of …" on an empty view — it is present whatever the
   // filter, so it can carry the wait. The digit is what says the data is in
   // hand rather than the shell being painted.
-  await page.waitForSelector("span.text-xs.text-rb-500.tabular-nums", { timeout: 120000 });
+  await page.waitForSelector('[data-anatomy~="L1.2"]', { timeout: 120000 });
   await page.waitForFunction(
-    () => /\d/.test(document.querySelector("span.text-xs.text-rb-500.tabular-nums")?.textContent ?? ""),
+    () => /\d/.test(document.querySelector('[data-anatomy~="L1.2"]')?.textContent ?? ""),
     null,
     { timeout: 120000 },
   );
@@ -116,14 +117,17 @@ async function openExplanation(page) {
 
 const search = (page) => page.evaluate(() => window.location.search);
 const params = (page) => page.evaluate(() => Object.fromEntries(new URLSearchParams(window.location.search)));
-const countLine = (page) => page.locator("span.text-xs.text-rb-500.tabular-nums").first().innerText();
-// ⚠️ THE TITLES MOVED UNDER THIS CHECK. The Date button read "Filter by date
-// range" / "Hide activity heatmap" until `9852b387` (the navigator, which
-// turned the inline heatmap into a panel and the day filter into a span);
-// this file kept the old pair and the locator simply timed out. Both of the
-// current titles are listed, because the button states the panel's state.
-const dateButton = (page) =>
-  page.locator('button[title="Filter by a span of dates"], button[title="Hide the date span"]').first();
+const countLine = (page) => page.locator('[data-anatomy~="L1.2"]').first().innerText();
+// The Date pill (ui-jobs 735) keeps the old button's `data-date-control` on
+// its main button; titles and words are not hooks.
+const dateButton = (page) => page.locator("[data-date-control]").first();
+/** The Date pill's words: its range once set, "Dates" while unset (the old
+ *  button's rest label, so the checks below read as they did). */
+const dateLabel = async (page) => {
+  const pill = page.locator('[data-filter-pill="Date"]').first();
+  if ((await pill.getAttribute("data-pill-state")) === "unset") return "Dates";
+  return (await pill.locator("span.font-semibold").first().innerText()).trim();
+};
 
 async function copyLink(page) {
   await openExplanation(page);
@@ -134,20 +138,10 @@ async function copyLink(page) {
   return text;
 }
 
-/** Toggle the first option of the menu whose trigger is labelled `label`;
- *  returns the option's label, or null when the wallet has no such control. */
-async function hideFirstOption(page, label) {
-  const trigger = page.locator(`button[aria-label="${label}"]`);
-  if ((await trigger.count()) === 0) return null;
-  await trigger.click();
-  const option = page.locator("button.overlay-item").first();
-  await option.waitFor({ timeout: 5000 });
-  const text = (await option.locator("span.flex-1").innerText()).trim();
-  await option.click();
-  await page.keyboard.press("Escape");
-  await page.waitForTimeout(150);
-  return text;
-}
+/** Hide the first option of the axis pill named by `label` (its old menu
+ *  name, scripts/verify/lib/timeline-pills.mjs); returns the option's label, or null
+ *  when the wallet has no such pill. */
+const hideFirstOption = (page, label) => hideOption(page, label, 0);
 
 // ── 1. Clean load, clean link ────────────────────────────────────────────
 {
@@ -198,7 +192,7 @@ async function hideFirstOption(page, label) {
     /^\d{4}-\d{2}-01$/.test(p.from ?? "") && /^\d{4}-\d{2}-\d{2}$/.test(p.to ?? ""),
     `from=${p.from} to=${p.to}`,
   );
-  const dateLabelSender = await dateButton(page).innerText();
+  const dateLabelSender = await dateLabel(page);
   check("Date button carries the range", dateLabelSender !== "Dates", dateLabelSender);
 
   // ── 3. The link carries the whole view and round-trips ────────────────
@@ -224,18 +218,16 @@ async function hideFirstOption(page, label) {
   const fresh = await open(1280, link2);
   const recvCount = await countLine(fresh.page);
   check("fresh context: same count line", recvCount === senderCount, `${senderCount} vs ${recvCount}`);
-  check(
-    "fresh context: same date label",
-    (await dateButton(fresh.page).innerText()) === dateLabelSender,
-    dateLabelSender,
-  );
+  check("fresh context: same date label", (await dateLabel(fresh.page)) === dateLabelSender, dateLabelSender);
   if (asset !== null) {
-    await fresh.page.click('button[aria-label="Assets"]');
-    const first = fresh.page.locator("button.overlay-item").first();
-    const label = (await first.locator("span.flex-1").innerText()).trim();
-    const ticked = (await first.locator("svg").count()) > 0;
-    check("fresh context: the hidden asset is unticked", label === asset && !ticked, `${label} ticked=${ticked}`);
-    await fresh.page.keyboard.press("Escape");
+    await openAxis(fresh.page, "Assets");
+    const [first] = await axisOptions(fresh.page);
+    check(
+      "fresh context: the hidden asset is unticked",
+      first?.label === asset && !first?.checked,
+      `${first?.label} ticked=${first?.checked}`,
+    );
+    await closeAxis(fresh.page, "Assets");
   }
   check(
     "fresh context: the recipient's own address bar keeps the link's params",
@@ -249,17 +241,13 @@ async function hideFirstOption(page, label) {
 // ── 4. Malformed dates are ignored ──────────────────────────────────────
 {
   const { ctx, page } = await open(1280, `${BASE}${PAGE}?from=2025-02-30&to=2025-03-01`);
-  check("impossible day → no range", (await dateButton(page).innerText()) === "Dates");
+  check("impossible day → no range", (await dateLabel(page)) === "Dates");
   await ctx.close();
   const b = await open(1280, `${BASE}${PAGE}?from=2025-03-01&to=2025-01-01`);
-  check("from after to → no range", (await dateButton(b.page).innerText()) === "Dates");
+  check("from after to → no range", (await dateLabel(b.page)) === "Dates");
   await b.ctx.close();
   const c = await open(1280, `${BASE}${PAGE}?from=2025-01-01&to=2025-01-31`);
-  check(
-    "valid pair → range applied",
-    (await dateButton(c.page).innerText()) === "Jan 2025",
-    await dateButton(c.page).innerText(),
-  );
+  check("valid pair → range applied", (await dateLabel(c.page)) === "Jan 2025", await dateLabel(c.page));
   await c.ctx.close();
 }
 
