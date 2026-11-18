@@ -184,8 +184,7 @@ export function LiquityV2DepositEventCard({
     sheet: spDepositSheet(row),
     ledgers: { none: "A deposit's balance is the Deposit side's total." },
     price: { gas: depositorGas(row), prices: [] },
-    // What a touch is, under the event's own sentences: the labels and the
-    // sentences name it, and the sheet's labels carry their own tips.
+    // What a touch is, closing the Explanation under the event's sentences.
     explainer: {
       body: (
         <>

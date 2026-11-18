@@ -31,6 +31,7 @@ import { liquityV2DepositHref, LIQUITY_V2_SP_PATH } from "@/lib/liquity-v2/sp-ro
 import { big, exactUnits, poolShare, type DepositLifetime, type DepositNow } from "@/lib/liquity-v2/sp-math";
 import { spLiveProv, spPendingLossProv, spPoolShareProv, spSumProv } from "@/lib/liquity-v2/sp-provenance";
 import { pctText } from "@/lib/shared/vault-amount-text";
+import { TINY_AMOUNT_FLOOR_TEXT } from "@/lib/utils/format";
 import type { LiquityV2DepositRow } from "@/lib/sources/api/liquity-v2-sp";
 import { RawFigure, tokenIcon } from "./sp-parts";
 
@@ -270,15 +271,16 @@ export function liquityV2DepositSlots({
         ),
       });
   }
-  const share = now && pool ? poolShare(now.now, pool.totalRaw) : null;
+  // A deposit of 0 has no share; one too small to print reads as the floor.
+  const share = now && pool && now.now > ZERO ? poolShare(now.now, pool.totalRaw) : null;
   if (now && pool && share != null)
     right.push({
       id: "pool-share",
       label: "Share of the pool",
-      tip: `The deposit's part of all the BOLD in the ${b} Stability Pool. Each liquidation the pool absorbs takes its debt from every deposit in proportion, so the deposit repays this share of the next one and receives this share of its ${b}.`,
+      tip: `The deposit's part of all the BOLD in the ${b} Stability Pool. The deposit burns this share of the BOLD the pool spends on each liquidation and receives this share of the ${b} paid for it.`,
       value: (
         <Prov info={spPoolShareProv(b, exactUnits(now.now), exactUnits(pool.totalRaw), pool.block)}>
-          {pctText(share)}
+          {share > 0 ? pctText(share) : `${TINY_AMOUNT_FLOOR_TEXT}%`}
         </Prov>
       ),
     });

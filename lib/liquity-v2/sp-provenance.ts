@@ -79,14 +79,15 @@ export function spPoolShareProv(branch: SpBranch, deposit: string, total: string
     kind: "chain-derived",
     pclass: "state",
     verify: ask("getCompoundedBoldDeposit(depositor) and getTotalBoldDeposits()"),
-    summary: `Share of the pool — the deposit now, the pool's getCompoundedBoldDeposit(depositor), over all the BOLD deposited in the ${branch} Stability Pool, its getTotalBoldDeposits(), both at block ${block.toLocaleString("en-US")}.`,
+    summary: `Share of the pool — the deposit now over all the BOLD in the ${branch} Stability Pool, both at the stamped block.`,
     contract: pool(branch),
+    source: { block },
     formula: "getCompoundedBoldDeposit(depositor) ÷ getTotalBoldDeposits()",
     inputs: [
       { label: "Deposit now, BOLD", value: deposit, kind: "chain", pclass: "state" },
       { label: "All deposits, BOLD", value: total, kind: "chain", pclass: "state" },
     ],
-    via: `${VIA} · getTotalBoldDeposits() @ head`,
+    via: `${VIA} · getCompoundedBoldDeposit(depositor) ÷ getTotalBoldDeposits() @ head`,
   };
 }
 

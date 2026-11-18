@@ -168,6 +168,17 @@ test("the head read: a failed getter voids it, a failed fetchPrice falls back to
   assert.equal(totalled.totalDepositsRaw, E(64000));
   assert.equal(poolShare(BigInt(E(1280)), BigInt(E(64000))), 0.02);
   assert.equal(poolShare(BigInt(E(1280)), BigInt(0)), null);
+  assert.equal(poolShare(BigInt(E(1280)), -BigInt(E(64000))), null);
+  assert.equal(poolShare(BigInt(0), BigInt(E(64000))), 0);
+  assert.equal(poolShare(BigInt(E(64000)), BigInt(E(64000))), 1);
+  // Below 1e-12 the integer division reads 0; the card prints the floor.
+  assert.equal(poolShare(BigInt(1), BigInt(E(64000))), 0);
+  // The total failing alone leaves every other figure standing.
+  const noTotal = spHeadFigures([...pool, ok([BigInt(E(3100)), false]), ok(BigInt(E(3050))), fail]);
+  assert.equal(noTotal.totalDepositsRaw, null);
+  assert.equal(noTotal.compoundedRaw, E(1280));
+  assert.equal(noTotal.yieldGainRaw, E(0.75));
+  assert.equal(noTotal.priceRaw, E(3100));
   assert.equal(spHeadFigures([pool[0], fail, ...pool.slice(2), fail, fail]), null);
 });
 
