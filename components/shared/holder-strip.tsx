@@ -61,7 +61,13 @@ export interface HolderLeg {
   /** Beneath the value: the per-token legs behind a priced headline, or the
    *  headline's own grammar ("by the protocol's feed · testnet"). `prov` when
    *  the footnote itself states a figure rather than naming the sum's parts. */
-  footnote?: { text: string; prov?: Provenance };
+  footnote?: {
+    text: string;
+    prov?: Provenance;
+    /** The per-token amounts the text lists, each drawn with its token's
+     *  small icon (ui-jobs 738). */
+    parts?: { text: string; symbol: string; address?: string }[];
+  };
   /** Where the figure came from. */
   prov: Provenance;
   /** The position card's figure (ui-jobs 737): the compact amount with its
@@ -226,6 +232,17 @@ export function HolderStrip({
                       <Prov info={leg.footnote.prov} value={leg.footnote.text}>
                         <span>{leg.footnote.text}</span>
                       </Prov>
+                    ) : leg.footnote.parts ? (
+                      // The amounts are the rows of the total's receipt.
+                      <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5" data-prov-exempt="">
+                        {leg.footnote.parts.map((pt, i) => (
+                          <span key={pt.symbol} className="inline-flex items-center gap-1" data-holder-part={pt.symbol}>
+                            {i > 0 && <span aria-hidden="true">·</span>}
+                            <TokenChipIcon symbol={pt.symbol} address={pt.address} size={14} filterable={false} />
+                            {pt.text}
+                          </span>
+                        ))}
+                      </span>
                     ) : (
                       <span>{leg.footnote.text}</span>
                     )}

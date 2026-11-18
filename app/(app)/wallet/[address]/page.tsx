@@ -9,14 +9,21 @@
 // back to that explorer's listing.
 // `?protocol=<slug>` reads that protocol alone (ui-jobs 738); Liquity V2's is
 // its Trove listing with the wallet in place of the search. `?kind=` is the
-// Kind pill's selection.
+// Kind pill's selection,
+// `?status=` the Status pill's.
 
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { WalletView } from "@/components/wallet/wallet-view";
 import { readWallet, readWalletCounts, walletFamiliesLine } from "@/lib/wallet/read-wallet";
 import { WalletProtocolListing } from "@/components/wallet/wallet-protocol-listing";
-import { LISTED_ON_WALLET, parseKinds, walletProtocol, WALLET_PROTOCOLS } from "@/lib/wallet/wallet-filters";
+import {
+  LISTED_ON_WALLET,
+  parseKinds,
+  parseStatus,
+  walletProtocol,
+  WALLET_PROTOCOLS,
+} from "@/lib/wallet/wallet-filters";
 import {
   walletLiquityV2Dimensions,
   walletLiquityV2FetchParams,
@@ -132,6 +139,7 @@ export default async function WalletPage({ params, searchParams }: Props) {
       reads={walletFamiliesLine()}
       back={back}
       kinds={parseKinds(sp.get("kind") ?? undefined)}
+      status={parseStatus(sp.get("status") ?? undefined)}
     />
   );
 }

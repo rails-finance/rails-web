@@ -79,6 +79,20 @@ export function kindOfRow(row: WalletSummaryRow): WalletKind {
   return owed ? "loans" : "deposits";
 }
 
+/** The Status pill: open positions, or those that ended (closed, liquidated,
+ *  redeemed, or passed to another wallet). */
+export type WalletStatus = "open" | "closed";
+export const WALLET_STATUSES: { value: WalletStatus; label: string }[] = [
+  { value: "open", label: "Open" },
+  { value: "closed", label: "Closed" },
+];
+
+/** `?status=` as the page reads it: one status, or none for both. */
+export function parseStatus(raw: string | string[] | undefined): WalletStatus | undefined {
+  const s = Array.isArray(raw) ? raw[0] : raw;
+  return s === "open" || s === "closed" ? s : undefined;
+}
+
 /** `?kind=` as the page reads it: known kinds only. */
 export function parseKinds(raw: string | string[] | undefined): WalletKind[] {
   const s = Array.isArray(raw) ? raw.join(",") : (raw ?? "");
@@ -88,12 +102,19 @@ export function parseKinds(raw: string | string[] | undefined): WalletKind[] {
 
 /** The URL of the wallet page for a protocol and kinds; a kind the protocol
  *  does not hold, or the one kind a protocol holds, is left out. */
-export function walletHref(address: string, protocol: string | undefined, kinds: WalletKind[] = []): string {
+export function walletHref(
+  address: string,
+  protocol: string | undefined,
+  kinds: WalletKind[] = [],
+  status?: WalletStatus,
+): string {
   const p = walletProtocol(protocol);
   const keep = p ? (p.kinds.length > 1 ? kinds.filter((k) => p.kinds.includes(k)) : []) : kinds;
   const sp = new URLSearchParams();
   if (p) sp.set("protocol", p.slug);
   if (keep.length) sp.set("kind", keep.join(","));
+  // A protocol listed on the page reads its own Status pill.
+  if (status && !(p && LISTED_ON_WALLET.has(p.slug))) sp.set("status", status);
   const s = sp.toString().replace(/%2C/gi, ",");
   return `/wallet/${address}${s ? `?${s}` : ""}`;
 }
@@ -102,6 +123,7 @@ export function walletHref(address: string, protocol: string | undefined, kinds:
 export interface WalletPillFilters extends BaseListFilters {
   protocol?: string;
   kinds: string[];
+  status?: string;
 }
 
 /** One protocol the wallet holds, for the Protocol pill. */
@@ -139,5 +161,18 @@ export function kindDimension<F extends WalletPillFilters>(kinds: WalletKind[]):
     options: WALLET_KINDS.filter((k) => kinds.includes(k.value)),
     get: (f) => f.kinds,
     set: (f, values) => ({ ...f, kinds: values }),
+  };
+}
+
+export function statusDimension<F extends WalletPillFilters>(): SerializableDimension<F> {
+  return {
+    id: "status",
+    label: "Status",
+    group: "Status",
+    cardinality: "single",
+    param: "status",
+    options: WALLET_STATUSES,
+    get: (f) => (f.status ? [f.status] : []),
+    set: (f, values) => ({ ...f, status: values[0] }),
   };
 }

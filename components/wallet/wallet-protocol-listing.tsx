@@ -8,7 +8,7 @@
 // the listing's holder band (N7) with its receipts open in the page's
 // inspector. Clearing or changing the Protocol pill opens that view.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain-truth-listing-page";
 import { LiquityPositionCard } from "@/components/protocol/liquity-family/liquity-position-card";
@@ -74,6 +74,8 @@ export function WalletProtocolListing({
   initialSearch?: string;
 }) {
   const router = useRouter();
+  // A protocol change reads the page again: the page stays and dims meanwhile.
+  const [reading, startReading] = useTransition();
   const registry = useReceiptRegistry();
 
   // The branch prices, the listing's one side-fetch.
@@ -111,7 +113,13 @@ export function WalletProtocolListing({
 
   return (
     <ProvReceiptsScope registry={registry}>
-      <div data-wallet-view={address} data-wallet-protocol={PROTOCOL}>
+      <div
+        data-wallet-view={address}
+        data-wallet-protocol={PROTOCOL}
+        aria-busy={reading || undefined}
+        data-wallet-reading={reading ? "" : undefined}
+        className={`transition-opacity ${reading ? "pointer-events-none opacity-50" : ""}`}
+      >
         <ChainTruthListingPage<TroveSummary, WalletLiquityV2Filters>
           title={`Liquity V2 Troves of ${ensName ?? address}`}
           titleHidden
@@ -150,7 +158,8 @@ export function WalletProtocolListing({
           onFilters={(f) => {
             // The Protocol pill changed: the page for that protocol, or for
             // every protocol, which reads differently.
-            if (f.protocol !== PROTOCOL) router.replace(walletHref(address, f.protocol), { scroll: false });
+            if (f.protocol !== PROTOCOL)
+              startReading(() => router.replace(walletHref(address, f.protocol), { scroll: false }));
           }}
           renderAbove={({ items, total, filters }) =>
             // The band states the wallet's whole set: no pill narrowing it.
