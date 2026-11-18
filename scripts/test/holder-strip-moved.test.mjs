@@ -115,3 +115,29 @@ test("Liquity V2: the same truncation on the answer's total", () => {
   assert.equal(whole.truncated, false);
   assert.equal(whole.counts.open, 1);
 });
+
+// ── ui-jobs 737: the band's receipts and its link ─────────────────────────
+test("Polaris's dollar receipts say they are a testnet figure, at the board's block", () => {
+  const s = polarisHolderStrip([row("1", "open"), row("2", "open")], 2, board, 20, 0, "0xabc");
+  const coll = s.legs.find((l) => l.id === "collateral");
+  assert.match(coll.figure.usdProv.summary, /A Sepolia testnet figure: a test dollar\./);
+  assert.match(coll.figure.usdProv.summary, /at block 1/);
+  // USDp's debt is a face alone: no read named, no block.
+  const debt = s.legs.find((l) => l.id === "debt");
+  assert.doesNotMatch(debt.figure.usdProv.summary, /read|block/);
+  assert.match(debt.figure.usdProv.summary, /1 USDp is counted as \$1/);
+  // The link takes the searched wallet, not a row's owner.
+  assert.equal(s.wallet, "0xabc");
+});
+
+test("the link stands where every row on the page was passed on", () => {
+  const s = liquityV2HolderStrip(
+    [trove("a", true), trove("b", true)],
+    4,
+    { weth: 2000, wsteth: 2400, reth: 2200 },
+    20,
+    2,
+    "name.eth",
+  );
+  assert.equal(s.wallet, "name.eth");
+});

@@ -17,13 +17,9 @@
 // position: a wallet holding one CDP at 118% and one at 400% has no single
 // ratio, and an average of the two reads as safety it does not have.
 //
-// EVERY ESTIMATED FIGURE WEARS THE ≈ and carries its own receipt. A leg summed
-// across different tokens has to be priced to be summed at all, and the price
-// is the feed's at one read. A leg summed from each position's last-touch
-// figures leaves out what built up since (interest, redistributions, a
-// protocol's pending shares), so it wears the ≈ even in one token (ui-jobs
-// 690). The ≈, its tooltip and the receipt each say so. Only a leg read live
-// in one token goes unmarked.
+// Each leg draws the card's figure with no ≈, as the cards below draw theirs;
+// the tip and the receipt say what built up since (ui-jobs 737). An adapter
+// may still mark a leg `approx` where its cards do (Compound V3's overview).
 //
 // TOTALS ONLY WHILE THE WALLET FITS ONE PAGE. The legs are summed from the rows
 // the page is showing; beyond one page those rows are a slice, and a total
@@ -188,6 +184,7 @@ export function HolderStrip({ countsLine, counts, legs, truncated, note, wallet,
     <ProvUnscoped>
       <div
         data-holder-strip=""
+        data-anatomy="N7"
         data-holder-open={counts.open}
         data-holder-closed={counts.closed}
         data-holder-liquidated={counts.liquidated}
@@ -199,7 +196,7 @@ export function HolderStrip({ countsLine, counts, legs, truncated, note, wallet,
         {totals && (
           <div className={`mt-2 grid grid-cols-2 gap-4 ${legs.length > 2 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
             {legs.map((leg) => (
-              <div key={leg.id} data-holder-leg={leg.id}>
+              <div key={leg.id} data-holder-leg={leg.id} data-anatomy="N7.1">
                 <div className="text-rb-500 text-xs font-semibold">{leg.label}</div>
                 {leg.figure ? (
                   <LegFigure leg={leg} />
@@ -231,7 +228,12 @@ export function HolderStrip({ countsLine, counts, legs, truncated, note, wallet,
         {/* The listing search is the wallet within this protocol; the wallet
             page is the wallet everywhere. */}
         {wallet && (
-          <Link href={`/wallet/${wallet}`} className={`mt-2 text-sm ${FOOT_LINK}`} data-holder-wallet-link="">
+          <Link
+            href={`/wallet/${wallet}`}
+            className={`mt-2 text-sm ${FOOT_LINK}`}
+            data-holder-wallet-link=""
+            data-anatomy="N7.2"
+          >
             Everything this wallet holds
           </Link>
         )}

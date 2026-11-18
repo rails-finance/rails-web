@@ -333,8 +333,8 @@ info(
       .innerText()
       .catch(() => "");
     check(
-      "P7. clicking the debt figure reveals a sentence saying what it is not",
-      tip.replace(/\s+/g, " ").length > 40 && /not in it|estimate/i.test(tip),
+      "P7. clicking the debt figure reveals a sentence saying what it leaves out",
+      tip.replace(/\s+/g, " ").length > 40 && /left out/i.test(tip),
       tip.replace(/\s+/g, " ").slice(0, 120),
     );
     await page.close();
@@ -472,6 +472,67 @@ info(
     );
     await page.close();
   }
+}
+
+/** Rewrite a wallet response's rows on the wire with `edit(rows)`, the total
+ *  following them: the wallet shapes ui-jobs 737 reads (one trove; one open
+ *  and one closed) without needing such a wallet to exist. */
+const rewriteRows = (matcher, edit) => ({
+  url: matcher,
+  handler: async (route) => {
+    const res = await route.fetch();
+    const json = await res.json().catch(() => null);
+    if (!json?.pagination || !Array.isArray(json.data)) return route.fulfill({ response: res });
+    json.data = edit(json.data);
+    json.pagination.total = json.data.length;
+    return route.fulfill({ response: res, body: JSON.stringify(json) });
+  },
+});
+const linkOf = (page) =>
+  page
+    .locator("[data-holder-strip] [data-holder-wallet-link]")
+    .first()
+    .getAttribute("href")
+    .catch(() => null);
+
+// ── ui-jobs 737: from two positions, totals from two open, the wallet link ──
+{
+  const page = await openListing(context, `${BASE}/ethereum/liquity-v2`, {
+    route: rewriteRows("**/api/troves**", (rows) => rows.filter((t) => t.status === "open").slice(0, 1)),
+  });
+  await searchWallet(page, "Address, ENS, or ID", V2_WALLET);
+  check("V10. a wallet holding one trove draws no band (its card says it all)", (await readStrip(page)) === null);
+  await page.close();
+}
+{
+  const page = await openListing(context, `${BASE}/ethereum/liquity-v2`, {
+    route: rewriteRows("**/api/troves**", (rows) => {
+      const open = rows.filter((t) => t.status === "open");
+      return [
+        open[0],
+        {
+          ...open[1],
+          status: "closed",
+          collateral: { ...open[1].collateral, amount: 0 },
+          debt: { ...open[1].debt, current: 0 },
+        },
+      ];
+    }),
+  });
+  await searchWallet(page, "Address, ENS, or ID", V2_WALLET);
+  const strip = await readStrip(page);
+  check(
+    "V11. one open trove and one closed: the counts and the link, no totals",
+    strip != null && Object.keys(strip.legs).length === 0 && /1 open trove and has closed 1/.test(strip.counts),
+    JSON.stringify(strip),
+  );
+  const href = await linkOf(page);
+  check(
+    'V12. the band links the wallet page as the search names it, "Everything this wallet holds"',
+    href === `/wallet/${V2_WALLET}`,
+    String(href),
+  );
+  await page.close();
 }
 
 // ── e + f ──────────────────────────────────────────────────────────────────

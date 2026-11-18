@@ -26,7 +26,7 @@ const { holderUsdReceipt } = await import("../../lib/shared/holder-usd-receipt.t
 const rows = (p) => p.inputs.map((i) => `${i.label}=${i.value}`);
 
 test("one token: amount × price, the price an oracle read at its block", () => {
-  const p = holderUsdReceipt({
+  const { prov: p } = holderUsdReceipt({
     what: "The wallet's collateral in USD",
     legs: [{ token: "pETH", amount: 2, amountNote: "Σ", price: 1500, priceNote: "curve × ETH/USD" }],
     block: 123,
@@ -41,7 +41,7 @@ test("one token: amount × price, the price an oracle read at its block", () => 
 });
 
 test("several tokens: each leg worked out, then the sum", () => {
-  const p = holderUsdReceipt({
+  const { prov: p } = holderUsdReceipt({
     what: "The wallet's collateral in USD",
     legs: [
       { token: "WETH", amount: 100, amountNote: "Σ", price: 2000, priceNote: "feed" },
@@ -61,11 +61,11 @@ test("several tokens: each leg worked out, then the sum", () => {
   ]);
   // A read that states no block says so.
   assert.equal(p.source, undefined);
-  assert.match(p.summary, /states no block/);
+  assert.match(p.summary, /the prices at the latest read, which states no block/);
 });
 
 test("a $1 face is a definition, said plainly", () => {
-  const p = holderUsdReceipt({
+  const { prov: p } = holderUsdReceipt({
     what: "The wallet's debt in USD",
     legs: [{ token: "BOLD", amount: 5, amountNote: "Σ", price: 1, face: true, priceNote: "face" }],
     via: "GET /x",
@@ -73,4 +73,31 @@ test("a $1 face is a definition, said plainly", () => {
   assert.equal(p.kind, "derived");
   assert.equal(p.inputs[1].definition, true);
   assert.match(p.summary, /1 BOLD is counted as \$1/);
+  // Nothing was read, so the summary names no read and no block.
+  assert.doesNotMatch(p.summary, /read|block/);
+});
+
+test("the rows rebuild the figure, with awkward numbers", () => {
+  const { prov, usd } = holderUsdReceipt({
+    what: "x",
+    legs: [
+      { token: "WETH", amount: 12.34567, amountNote: "Σ", price: 3456.789, priceNote: "feed" },
+      { token: "pETH", amount: 0.1234567, amountNote: "Σ", price: 0.98765432, priceNote: "feed" },
+    ],
+    via: "GET /x",
+  });
+  const val = (label) => prov.inputs.find((i) => i.label === label).value;
+  const num = (t) => Number(t.replace(/[^0-9.]/g, ""));
+  // Each product is the shown amount × the shown price, to the cent.
+  for (const t of ["WETH", "pETH"]) {
+    const product = Math.round(num(val(`${t} amount`)) * num(val(`${t} price`)) * 100) / 100;
+    assert.equal(num(val(`${t} amount × price`)), product, t);
+  }
+  // The sum is the sum of the shown products, and the figure is the sum.
+  const sum = Math.round((num(val("WETH amount × price")) + num(val("pETH amount × price"))) * 100) / 100;
+  assert.equal(num(val("sum")), sum);
+  assert.equal(usd, sum);
+  assert.equal(val("WETH amount"), "12.34567 WETH");
+  assert.equal(val("WETH price"), "$3,456.79");
+  assert.equal(val("pETH price"), "$0.987654");
 });
