@@ -67,32 +67,69 @@ test("sections run by their riskiest open position, closed-only last", () => {
   );
 });
 
-test("a total sums the section figures to the cent and names the sections left out", () => {
+test("a total sums the section figures to the cent", () => {
   const s = walletSections(
     [
       pos("aave-v3", { collateralUsd: 100.004, debtUsd: 10.006 }),
       pos("aave-v3", { collateralUsd: 0.333, debtUsd: 0 }),
       pos("spark", { collateralUsd: 50.5, debtUsd: 20 }),
-      pos("morpho", { usdOwnOracle: false, collateralUsd: 7, debtUsd: 1 }),
     ],
     { bands: true },
   );
   const coll = walletTotal(s, "collateral");
-  assert.equal(coll.usd, 150.83);
-  assert.equal(coll.counted, 2);
-  assert.equal(coll.of, 3);
-  assert.deepEqual(coll.left, ["Morpho Blue"]);
+  assert.equal(coll.figure.usd, 150.83);
+  assert.equal(coll.of, 2);
+  assert.equal(coll.gap, undefined);
   // The receipt's rows are the section figures, and their sum is the figure.
-  const rows = coll.prov.inputs.filter((i) => i.label !== "sum").map((i) => Number(i.value.replace(/[$,]/g, "")));
-  assert.equal(Math.round(rows.reduce((a, b) => a + b, 0) * 100) / 100, coll.usd);
+  const rows = coll.figure.prov.inputs
+    .filter((i) => i.label !== "sum")
+    .map((i) => Number(i.value.replace(/[$,]/g, "")));
+  assert.equal(Math.round(rows.reduce((a, b) => a + b, 0) * 100) / 100, coll.figure.usd);
   const debt = walletTotal(s, "debt");
-  assert.equal(debt.usd, 30.01);
+  assert.equal(debt.figure.usd, 30.01);
   assert.equal(walletNet(coll, debt).usd, 120.82);
 });
 
-test("no net where collateral and debt cover different protocols", () => {
-  const s = walletSections([pos("aave-v3", { collateralUsd: 10, debtUsd: 1 }), pos("spark", { collateralUsd: 5 })], {
-    bands: true,
-  });
-  assert.equal(walletNet(walletTotal(s, "collateral"), walletTotal(s, "debt")), null);
+test("no wallet total while a held protocol states no dollars; its section keeps its own", () => {
+  const s = walletSections(
+    [
+      pos("aave-v3", { collateralUsd: 100, debtUsd: 10 }),
+      pos("morpho", { usdOwnOracle: false, collateralUsd: 7, debtUsd: 1 }),
+      pos("fluid", { usdOwnOracle: false }),
+    ],
+    { bands: true },
+  );
+  const coll = walletTotal(s, "collateral");
+  const debt = walletTotal(s, "debt");
+  assert.equal(coll.figure, undefined);
+  assert.equal(coll.gap, "No wallet total: Morpho Blue and Fluid state no dollars");
+  assert.equal(debt.figure, undefined);
+  assert.equal(walletNet(coll, debt), null);
+  assert.equal(s.find((x) => x.slug === "aave-v3").collateral.usd, 100);
+});
+
+test("a section with an open position not read at head states no figure, and the wallet none", () => {
+  const s = walletSections(
+    [
+      pos("aave-v3", { collateralUsd: 3000, debtUsd: 100 }),
+      pos("aave-v3", { collateralUsd: 5000, debtUsd: 200, headRead: "failed" }),
+      pos("spark", { collateralUsd: 50, debtUsd: 20 }),
+    ],
+    { bands: true },
+  );
+  const aave = s.find((x) => x.slug === "aave-v3");
+  assert.equal(aave.collateral, undefined);
+  assert.equal(aave.band.legs.length, 0);
+  assert.match(aave.band.note, /1 of the 2 open positions was not read at the chain head/);
+  const coll = walletTotal(s, "collateral");
+  assert.equal(coll.of, 2);
+  assert.equal(coll.gap, "No wallet total: Aave V3 was not read at the chain head");
+});
+
+test("a deposit with no debt figure owes nothing", () => {
+  const s = walletSections(
+    [pos("aave-v3", { collateralUsd: 10, debtUsd: 4 }), pos("aave-v3", { collateralUsd: 5, kind: "deposits" })],
+    { bands: true },
+  );
+  assert.equal(walletTotal(s, "debt").figure.usd, 4);
 });

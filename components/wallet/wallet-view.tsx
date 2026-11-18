@@ -49,6 +49,7 @@ import { WALLET_COUNTS_SCOPE } from "@/lib/wallet/summary-counts";
 import {
   byRisk,
   DUST_USD,
+  unreadAtHead,
   walletNet,
   walletSections,
   walletTotal,
@@ -91,13 +92,8 @@ function Figure({ f }: { f: { usd: number; prov: Provenance } | null }) {
   );
 }
 
-/** "across 3 protocols", or "across 2 of 3 protocols · Morpho Blue states no dollars". */
-function across(t: WalletTotal | null, holding: number): string | undefined {
-  if (!t) return holding > 0 ? "no protocol here states dollars at its own oracle" : undefined;
-  if (t.counted === t.of) return `across ${plural(t.of, "protocol")}`;
-  const verb = t.left.length === 1 ? "states" : "state";
-  return `across ${t.counted} of ${plural(t.of, "protocol")} · ${t.left.join(", ")} ${verb} no dollars`;
-}
+/** "across 3 protocols"; nothing where there is no wallet total. */
+const across = (t: WalletTotal | null) => (t?.figure ? `across ${plural(t.of, "protocol")}` : undefined);
 
 /** The wallet's totals (W2): each figure the sum of the protocol sections'
  *  figures below it, with its receipt. */
@@ -105,8 +101,11 @@ function Totals({ sections, filtered }: { sections: WalletSection[]; filtered: b
   const coll = walletTotal(sections, "collateral");
   const debt = walletTotal(sections, "debt");
   const net = walletNet(coll, debt);
-  const holding = sections.filter((s) => s.open.some((p) => !p.notRead)).length;
-  const owing = sections.flatMap((s) => s.open).filter((p) => p.usdOwnOracle && !p.notRead && (p.debtUsd ?? 0) > 0);
+  // Each reason a total is absent, said once under the row.
+  const gaps = [...new Set([coll?.gap, debt?.gap].filter((g): g is string => g != null))];
+  const owing = sections
+    .flatMap((s) => s.open)
+    .filter((p) => p.usdOwnOracle && !unreadAtHead(p) && (p.debtUsd ?? 0) > 0);
   const rated = owing.filter((p) => p.debtRate != null);
   const ratedUsd = rated.reduce((s, p) => s + p.debtUsd!, 0);
   const rate = ratedUsd > 0 ? rated.reduce((s, p) => s + p.debtUsd! * p.debtRate!, 0) / ratedUsd : null;
@@ -117,15 +116,15 @@ function Totals({ sections, filtered }: { sections: WalletSection[]; filtered: b
   return (
     <section aria-label="Totals" data-wallet-tiles="" data-anatomy="W2">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Tile anatomy="collateral" label="Collateral" value={<Figure f={coll} />} sub={across(coll, holding)} />
+        <Tile anatomy="collateral" label="Collateral" value={<Figure f={coll?.figure ?? null} />} sub={across(coll)} />
         <Tile
           anatomy="debt"
           label="Debt"
-          value={<Figure f={debt} />}
+          value={<Figure f={debt?.figure ?? null} />}
           sub={
-            debt && debt.usd === 0 ? (
+            debt?.figure?.usd === 0 ? (
               "no debt"
-            ) : rate == null ? undefined : (
+            ) : rate == null || !debt?.figure ? undefined : (
               <>
                 <TipLabel text="simple yearly rate" tip={RATE_TIP} /> {pct(rate)}
                 {rated.length < owing.length && ` on ${rated.length} of ${owing.length} with debt`}
@@ -145,9 +144,17 @@ function Totals({ sections, filtered }: { sections: WalletSection[]; filtered: b
           }
         />
       </div>
-      <p className="mt-2 text-xs text-rb-500">
-        {filtered ? "The positions shown" : "Each protocol’s total below"}, summed in dollars at its own oracle.
-      </p>
+      {gaps.length > 0 ? (
+        gaps.map((g) => (
+          <p key={g} className="mt-2 text-xs text-rb-500" data-wallet-total-gap="">
+            {g}
+          </p>
+        ))
+      ) : (
+        <p className="mt-2 text-xs text-rb-500">
+          {filtered ? "The positions shown" : "Each protocol’s total below"}, summed in dollars at its own oracle.
+        </p>
+      )}
     </section>
   );
 }

@@ -58,6 +58,9 @@ export interface WalletSection {
   closed: WalletPosition[];
   /** Open positions under the dust floor. */
   dust: number;
+  /** Open positions not read at head (`unreadAtHead`): while any, the
+   *  section states no figure. */
+  unread: number;
   band: HolderStripProps;
   /** Absent where the section holds no open position, or one of them states
    *  no dollars at the protocol's oracle. */
@@ -66,6 +69,16 @@ export interface WalletSection {
 }
 
 const closedAt = (p: WalletPosition) => p.history?.closedAt ?? 0;
+
+/** An open position whose figures were not read at head this visit: an
+ *  account the chain has not been read for, or a head read that did not
+ *  answer (its card keeps the stored figures). A section holding one states
+ *  no total, so no stored figure is summed with head-read ones (rule 743). */
+export const unreadAtHead = (p: WalletPosition) => p.notRead === true || p.headRead === "failed";
+
+/** A position's dollars in one field; a deposit owes nothing. */
+const dollarsOf = (p: WalletPosition, field: "collateralUsd" | "debtUsd") =>
+  p[field] ?? (field === "debtUsd" && p.kind === "deposits" ? 0 : undefined);
 
 /** The label a receipt row gives one position: its market, or its id. */
 const positionLabel = (p: WalletPosition) =>
@@ -83,16 +96,16 @@ function sumOfCards(
   field: "collateralUsd" | "debtUsd",
 ): SectionFigure | undefined {
   if (open.length === 0) return undefined;
-  if (!open.every((p) => p.usdOwnOracle && p[field] != null)) return undefined;
+  if (!open.every((p) => p.usdOwnOracle && dollarsOf(p, field) != null)) return undefined;
   const word = field === "collateralUsd" ? "collateral" : "debt";
   const rows: ProvInput[] = open.map((p) => ({
     label: `${positionLabel(p)} ${word}`,
-    value: formatUsdValue(cents(p[field]!)),
+    value: formatUsdValue(cents(dollarsOf(p, field)!)),
     kind: "chain-derived",
     pclass: "oracle",
     note: `the position's ${word} in dollars at ${p.usdSource ?? `${name}'s oracle`}`,
   }));
-  const usd = cents(open.reduce((s, p) => s + cents(p[field]!), 0));
+  const usd = cents(open.reduce((s, p) => s + cents(dollarsOf(p, field)!), 0));
   const many = open.length > 1;
   return {
     usd,
@@ -174,7 +187,7 @@ export function walletSections(positions: WalletPosition[], opts: { bands: boole
     const notRead = openAll.filter((p) => p.notRead);
     const open = [...ranked, ...dust, ...notRead];
     const closed = mine.filter((p) => p.status !== "open").sort((a, b) => closedAt(b) - closedAt(a));
-    const readable = open.filter((p) => !p.notRead);
+    const unread = open.filter(unreadAtHead).length;
     const liquity = slug === "liquity-v2" ? liquityV2Section(mine) : null;
     let band: HolderStripProps;
     let collateral: SectionFigure | undefined;
@@ -182,8 +195,8 @@ export function walletSections(positions: WalletPosition[], opts: { bands: boole
     if (liquity) {
       ({ band, collateral, debt } = liquity);
     } else {
-      collateral = sumOfCards(name, readable, "collateralUsd");
-      debt = sumOfCards(name, readable, "debtUsd");
+      collateral = sumOfCards(name, open, "collateralUsd");
+      debt = sumOfCards(name, open, "debtUsd");
       const st = (s: string) => closed.filter((p) => p.status === s).length;
       const legs: HolderLeg[] = [];
       if (collateral) legs.push(usdLeg("collateral", "Total collateral", collateral));
@@ -199,6 +212,15 @@ export function walletSections(positions: WalletPosition[], opts: { bands: boole
     // The section's heading and cards state the counts; the band carries
     // no sentence repeating them (Miles, 18 Nov 2026).
     band = { ...band, countsLine: "" };
+    if (unread > 0) {
+      collateral = undefined;
+      debt = undefined;
+      band = {
+        ...band,
+        legs: [],
+        note: `${unread === open.length ? (unread === 1 ? "The open position was" : `None of the ${open.length} open positions were`) : `${unread} of the ${open.length} open positions ${unread === 1 ? "was" : "were"}`} not read at the chain head, so the section states no total.`,
+      };
+    }
     if (!opts.bands) band = { ...band, positions: 0 };
     sections.push({
       slug,
@@ -208,6 +230,7 @@ export function walletSections(positions: WalletPosition[], opts: { bands: boole
       ranked,
       closed,
       dust: dust.length,
+      unread,
       band,
       collateral,
       debt,
@@ -223,57 +246,68 @@ export function walletSections(positions: WalletPosition[], opts: { bands: boole
   });
 }
 
+/** "A", "A and B", "A, B and C". */
+const andList = (xs: string[]) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
+
 /** One total over the sections: each section's figure as its band states it,
- *  summed to the cent, with the sections that state none named. */
+ *  summed to the cent. A wallet total covers every protocol the wallet holds
+ *  open, or there is none (Miles, 18 Nov 2026): while any section states no
+ *  figure, `gap` says which and why, and each section keeps its own. */
 export interface WalletTotal {
-  usd: number;
-  prov: Provenance;
-  /** Sections counted, and sections holding an open position. */
-  counted: number;
+  /** Absent while any section holding an open position states no figure. */
+  figure?: SectionFigure;
+  /** The sections holding an open position, all of them summed. */
   of: number;
-  /** The sections with an open position that state no dollars. */
-  left: string[];
+  /** "No wallet total: Morpho Blue states no dollars". */
+  gap?: string;
 }
 
 export function walletTotal(sections: WalletSection[], which: "collateral" | "debt"): WalletTotal | null {
-  const holding = sections.filter((s) => s.open.some((p) => !p.notRead));
-  const counted = holding.filter((s) => s[which] != null);
-  if (counted.length === 0) return null;
-  const usd = cents(counted.reduce((s, x) => s + x[which]!.usd, 0));
-  const left = holding.filter((s) => s[which] == null).map((s) => s.name);
-  const many = counted.length > 1;
-  const rows: ProvInput[] = counted.map((s) => ({
+  const holding = sections.filter((s) => s.open.length > 0);
+  if (holding.length === 0) return null;
+  const missing = holding.filter((s) => s[which] == null);
+  if (missing.length > 0) {
+    const unread = missing.filter((s) => s.unread > 0).map((s) => s.name);
+    const priced = missing.filter((s) => s.unread === 0).map((s) => s.name);
+    const why = [
+      priced.length ? `${andList(priced)} ${priced.length === 1 ? "states" : "state"} no dollars` : null,
+      unread.length ? `${andList(unread)} ${unread.length === 1 ? "was" : "were"} not read at the chain head` : null,
+    ].filter(Boolean);
+    return { of: holding.length, gap: `No wallet total: ${why.join(" and ")}` };
+  }
+  const usd = cents(holding.reduce((s, x) => s + x[which]!.usd, 0));
+  const many = holding.length > 1;
+  const rows: ProvInput[] = holding.map((s) => ({
     label: `${s.name} ${which}`,
     value: formatUsdValue(s[which]!.usd),
     kind: "chain-derived",
     pclass: "oracle",
     note: `the ${s.name} section's ${which}, worked out on its receipt`,
   }));
-  const leftOut = left.length
-    ? ` ${left.join(" and ")} ${left.length === 1 ? "states" : "state"} no dollars at ${left.length === 1 ? "its" : "their"} oracle and ${left.length === 1 ? "is" : "are"} left out.`
-    : "";
   return {
-    usd,
-    counted: counted.length,
     of: holding.length,
-    left,
-    prov: {
-      kind: "chain-derived",
-      pclass: "oracle",
-      summary: `The wallet's ${which} in USD — ${
-        many ? `the sum of each protocol's ${which} below` : `the ${counted[0].name} ${which} below`
-      }, each at that protocol's oracle.${leftOut}`,
-      via: "GET /api/chain/wallet/<address> · Σ over the protocols below",
-      formula: many ? `Σ ${which} over the protocols` : which,
-      inputs: many ? [...rows, { label: "sum", value: formatUsdValue(usd), kind: "derived", step: true }] : rows,
+    figure: {
+      usd,
+      prov: {
+        kind: "chain-derived",
+        pclass: "oracle",
+        summary: `The wallet's ${which} in USD — ${
+          many ? `the sum of each protocol's ${which} below` : `the ${holding[0].name} ${which} below`
+        }, each at that protocol's oracle.`,
+        via: "GET /api/chain/wallet/<address> · Σ over the protocols below",
+        formula: many ? `Σ ${which} over the protocols` : which,
+        inputs: many ? [...rows, { label: "sum", value: formatUsdValue(usd), kind: "derived", step: true }] : rows,
+      },
     },
   };
 }
 
-/** Collateral less debt, where both totals cover the same protocols. */
+/** Collateral less debt, where both totals stand. */
 export function walletNet(coll: WalletTotal | null, debt: WalletTotal | null): SectionFigure | null {
-  if (!coll || !debt || coll.counted !== debt.counted || coll.left.join() !== debt.left.join()) return null;
-  const usd = cents(coll.usd - debt.usd);
+  if (!coll?.figure || !debt?.figure) return null;
+  const c = coll.figure.usd;
+  const d = debt.figure.usd;
+  const usd = cents(c - d);
   return {
     usd,
     prov: {
@@ -282,8 +316,8 @@ export function walletNet(coll: WalletTotal | null, debt: WalletTotal | null): S
       via: "the Collateral and Debt totals",
       formula: "collateral − debt",
       inputs: [
-        { label: "collateral", value: formatUsdValue(coll.usd), kind: "derived", step: true },
-        { label: "debt", value: formatUsdValue(debt.usd), kind: "derived", step: true },
+        { label: "collateral", value: formatUsdValue(c), kind: "derived", step: true },
+        { label: "debt", value: formatUsdValue(d), kind: "derived", step: true },
         { label: "net", value: formatUsdValue(usd), kind: "derived", step: true },
       ],
     },

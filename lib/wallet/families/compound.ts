@@ -114,7 +114,8 @@ function lane(name: "ethereum" | "base"): FamilyModule {
           // A Comet the sweep found empty: the account holds nothing there at head.
           const borrowed = live ? scaled(live.borrowBalanceRaw, live.baseDecimals) : 0;
           const basePrice = priceOf(s, s.base.address);
-          const debtUsd = basePrice != null ? borrowed * basePrice : undefined;
+          // Nothing borrowed is no debt, priced or not.
+          const debtUsd = borrowed === 0 ? 0 : basePrice != null ? borrowed * basePrice : undefined;
           const hf = live?.healthFactor ?? null;
           return {
             ...p,
