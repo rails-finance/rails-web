@@ -23,6 +23,7 @@
 // with a DefiLlama fallback only for assets the oracle registry omits), so the
 // live position reads chain-true throughout, not just the headline totals.
 
+import { SectionSidebar } from "@/components/shared/section-sidebar";
 import { useReportPositionRead } from "@/components/shared/position-read";
 import { readOfHeadAnswer } from "@/lib/shared/position-read";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -1066,166 +1067,169 @@ function AaveV4SpokeTowerBlock({
           title rides the chart's toolbar row instead of a row of its own.
           data-skel-section feeds the skeleton memory layer, as on
           ChainTruthTower. */}
-      <div data-skel-section="detail-economics" className="rounded-2xl bg-raised px-5 py-4">
-        <div className="space-y-3">
-          {flowTimeline != null && (
-            <div hidden={!scrubbed || undefined}>
-              <div className="flex min-h-[28px] items-center">{title}</div>
-              <div className="mt-2">
-                <FlowsLedgerNoteContext.Provider value={setLedgerNote}>
-                  <FlowsKeyContext.Provider value={setFlowsKey}>
-                    <FlowsLifeContext.Provider value={setLife}>
-                      <LifetimeFlowsScrubber
-                        timeline={flowTimeline}
-                        series={{ path: "/api/aave-v4/flows/series", params: { wallet, spoke: spokeName } }}
-                      />
-                    </FlowsLifeContext.Provider>
-                  </FlowsKeyContext.Provider>
-                </FlowsLedgerNoteContext.Provider>
+      <SectionSidebar section="flows">
+        <div data-skel-section="detail-economics" className="rounded-2xl bg-raised px-5 py-4">
+          <div className="space-y-3">
+            {flowTimeline != null && (
+              <div hidden={!scrubbed || undefined}>
+                <div className="flex min-h-[28px] items-center">{title}</div>
+                <div className="mt-2">
+                  <FlowsLedgerNoteContext.Provider value={setLedgerNote}>
+                    <FlowsKeyContext.Provider value={setFlowsKey}>
+                      <FlowsLifeContext.Provider value={setLife}>
+                        <LifetimeFlowsScrubber
+                          timeline={flowTimeline}
+                          series={{ path: "/api/aave-v4/flows/series", params: { wallet, spoke: spokeName } }}
+                        />
+                      </FlowsLifeContext.Provider>
+                    </FlowsKeyContext.Provider>
+                  </FlowsLedgerNoteContext.Provider>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setLedgerOpen((v) => !v)}
+                    aria-expanded={ledgerOpen}
+                    aria-controls="aave-v4-flows-ledger"
+                    className={`${CTRL_GHOST} -mx-1 gap-1 rounded-md px-1 text-xs font-semibold text-foreground`}
+                  >
+                    Full breakdown
+                    <ChevronDown size={14} aria-hidden className={ledgerOpen ? "rotate-180" : ""} />
+                  </button>
+                  {ledgerNote && (
+                    <span className="text-xs text-rb-500" data-flow-ledger-note="">
+                      {ledgerNote}
+                    </span>
+                  )}
+                </div>
               </div>
-              <div className="mt-3 flex flex-wrap items-center gap-x-2">
-                <button
-                  type="button"
-                  onClick={() => setLedgerOpen((v) => !v)}
-                  aria-expanded={ledgerOpen}
-                  aria-controls="aave-v4-flows-ledger"
-                  className={`${CTRL_GHOST} -mx-1 gap-1 rounded-md px-1 text-xs font-semibold text-foreground`}
-                >
-                  Full breakdown
-                  <ChevronDown size={14} aria-hidden className={ledgerOpen ? "rotate-180" : ""} />
-                </button>
-                {ledgerNote && (
-                  <span className="text-xs text-rb-500" data-flow-ledger-note="">
-                    {ledgerNote}
-                  </span>
-                )}
+            )}
+            {flowsPending && (
+              <div data-flows-read="pending">
+                <div className="flex min-h-[28px] items-center">{title}</div>
+                <LifetimeFlowsSkeleton viewToggle={false} />
               </div>
+            )}
+            <div id="aave-v4-flows-ledger" hidden={!ledgerShown}>
+              <AaveV4TowerChart
+                reserves={reserves}
+                prices={prices}
+                oraclePrices={oraclePrices}
+                surplusSymbols={surplusSymbols}
+                hideSurplus={hideSurplus}
+                onToggleHideSurplus={() => setHideSurplus((v) => !v)}
+                title={!scrubbed ? title : undefined}
+                historyComplete={historyComplete}
+              />
             </div>
-          )}
-          {flowsPending && (
-            <div data-flows-read="pending">
-              <div className="flex min-h-[28px] items-center">{title}</div>
-              <LifetimeFlowsSkeleton viewToggle={false} />
-            </div>
-          )}
-          <div id="aave-v4-flows-ledger" hidden={!ledgerShown}>
-            <AaveV4TowerChart
-              reserves={reserves}
-              prices={prices}
-              oraclePrices={oraclePrices}
-              surplusSymbols={surplusSymbols}
-              hideSurplus={hideSurplus}
-              onToggleHideSurplus={() => setHideSurplus((v) => !v)}
-              title={!scrubbed ? title : undefined}
-              historyComplete={historyComplete}
-            />
-          </div>
 
-          {/* The panel's info area: (i) Explanation — the tower legend narrated
+            {/* The panel's info area: (i) Explanation — the tower legend narrated
               with its figures — beside route-icon Provenance, the receipts list
               for the breakdown figures. */}
-          <ProvenanceInfoTabs
-            label="Lifetime flows explanation"
-            explanation={
-              <div className="space-y-2 text-sm text-rb-500">
-                {/* Value-bearing narration of the tower legend — a one-line lead
+            <ProvenanceInfoTabs
+              label="Lifetime flows explanation"
+              explanation={
+                <div className="space-y-2 text-sm text-rb-500">
+                  {/* Value-bearing narration of the tower legend — a one-line lead
               (charter §4: a status lead over the enumeration), then figures
               that mirror the breakdown rows render foreground-bold (the same
               grammar the Liquity economics footnote uses). Two bullets: the
               collateral story, then the debt story when this position ever
               held debt. */}
-                <p className="leading-relaxed">
-                  These figures add up every event on this spoke. What left the position (withdrawals, repayments,
-                  liquidations) is valued at its price when it left, and what is still held at the latest block&apos;s
-                  price. Supplied and Borrowed are set so each side balances, so a price change while a token was held
-                  shows in them.
-                  {totals.unpricedSymbols.length > 0 && (
-                    <>
-                      {" "}
-                      They are partial: no price source covers {listSymbols(totals.unpricedSymbols)}, so that balance
-                      shows in its asset&apos;s units in the breakdown and is in none of the dollar figures here.
-                    </>
-                  )}
-                </p>
-                <div className="flex items-start gap-2 leading-relaxed">
-                  <span className="select-none text-rb-500">•</span>
-                  <span>
-                    {fig(totals.depositedUsd)} of collateral supplied over the position&apos;s life
-                    {totals.supplyInterestUsd > 0.01 && <> and {fig(totals.supplyInterestUsd)} earned in interest</>}
-                    {totals.withdrawnUsd > 0.01 && <>, then {fig(totals.withdrawnUsd)} withdrawn</>}
-                    {totals.liquidatedCollUsd > 0.01 && (
+                  <p className="leading-relaxed">
+                    These figures add up every event on this spoke. What left the position (withdrawals, repayments,
+                    liquidations) is valued at its price when it left, and what is still held at the latest block&apos;s
+                    price. Supplied and Borrowed are set so each side balances, so a price change while a token was held
+                    shows in them.
+                    {totals.unpricedSymbols.length > 0 && (
                       <>
-                        {totals.withdrawnUsd > 0.01 ? " and " : ", then "}
-                        {fig(totals.liquidatedCollUsd)} liquidated
+                        {" "}
+                        They are partial: no price source covers {listSymbols(totals.unpricedSymbols)}, so that balance
+                        shows in its asset&apos;s units in the breakdown and is in none of the dollar figures here.
                       </>
                     )}
-                    , leaving {fig(totals.inProtocolUsd)} in protocol today.
-                  </span>
-                </div>
-                {totals.hasDebtHistory && (
+                  </p>
                   <div className="flex items-start gap-2 leading-relaxed">
                     <span className="select-none text-rb-500">•</span>
                     <span>
-                      {fig(totals.borrowedUsd)} borrowed over the position&apos;s life
-                      {totals.debtInterestUsd > 0.01 && (
-                        <> and {fig(totals.debtInterestUsd)} of interest accrued on it</>
-                      )}
-                      {totals.repaidUsd > 0.01 && <>, then {fig(totals.repaidUsd)} repaid</>}
-                      {totals.liquidatedDebtUsd > 0.01 && (
+                      {fig(totals.depositedUsd)} of collateral supplied over the position&apos;s life
+                      {totals.supplyInterestUsd > 0.01 && <> and {fig(totals.supplyInterestUsd)} earned in interest</>}
+                      {totals.withdrawnUsd > 0.01 && <>, then {fig(totals.withdrawnUsd)} withdrawn</>}
+                      {totals.liquidatedCollUsd > 0.01 && (
                         <>
-                          {totals.repaidUsd > 0.01 ? " and " : ", then "}
-                          {fig(totals.liquidatedDebtUsd)} cleared by liquidation
+                          {totals.withdrawnUsd > 0.01 ? " and " : ", then "}
+                          {fig(totals.liquidatedCollUsd)} liquidated
                         </>
                       )}
-                      , leaving {fig(totals.outstandingUsd)} owed today.
+                      , leaving {fig(totals.inProtocolUsd)} in protocol today.
                     </span>
                   </div>
-                )}
-                {liqNet && (
-                  <div className="flex items-start gap-2 leading-relaxed">
-                    <span className="select-none text-rb-500">•</span>
-                    <span>
-                      Liquidations took {liqNet.seized} of collateral to clear {liqNet.cleared} of debt:{" "}
-                      {fig(totals.liquidatedCollUsd)} against {fig(totals.liquidatedDebtUsd)} at the prices of the day,
-                      a net {fmtSignedUsd(liqNet.atTimeUsd).display} to the borrower, the bonus the liquidators kept
-                      {liqNet.todayUsd != null && (
-                        <> ({fmtSignedUsd(liqNet.todayUsd).display} at the latest block&apos;s prices)</>
-                      )}
-                      .
-                    </span>
-                  </div>
-                )}
-                {gasEth > 0 && (
-                  <div className="flex items-start gap-2 leading-relaxed">
-                    <span className="select-none text-rb-500">•</span>
-                    <span>
-                      A total of {gasEth.toFixed(4)} ETH (${gasUsd.toFixed(2)}) has been spent on gas fees across these
-                      transactions. Each event&apos;s own gas is in its footnote below.
-                    </span>
-                  </div>
-                )}
-                {flowTimeline != null && flowsKey?.basis && (
-                  <div className="flex items-start gap-2 leading-relaxed" data-flow-basis="">
-                    <span className="select-none text-rb-500">•</span>
-                    <span>{flowsKey.basis}</span>
-                  </div>
-                )}
-                <LearnMore
-                  extra={
-                    flowTimeline != null && flowsKey?.lines?.length ? (
-                      <FlowsKey items={[]} outline={null} lines={flowsKey.lines} />
-                    ) : undefined
-                  }
-                  content={aaveV4EconomicsContent({
-                    supplyInterest: totals.supplyInterestUsd > 0.01,
-                    liquidations: totals.liquidatedCollUsd > 0.01 || totals.liquidatedDebtUsd > 0.01,
-                  })}
-                />
-              </div>
-            }
-          />
+                  {totals.hasDebtHistory && (
+                    <div className="flex items-start gap-2 leading-relaxed">
+                      <span className="select-none text-rb-500">•</span>
+                      <span>
+                        {fig(totals.borrowedUsd)} borrowed over the position&apos;s life
+                        {totals.debtInterestUsd > 0.01 && (
+                          <> and {fig(totals.debtInterestUsd)} of interest accrued on it</>
+                        )}
+                        {totals.repaidUsd > 0.01 && <>, then {fig(totals.repaidUsd)} repaid</>}
+                        {totals.liquidatedDebtUsd > 0.01 && (
+                          <>
+                            {totals.repaidUsd > 0.01 ? " and " : ", then "}
+                            {fig(totals.liquidatedDebtUsd)} cleared by liquidation
+                          </>
+                        )}
+                        , leaving {fig(totals.outstandingUsd)} owed today.
+                      </span>
+                    </div>
+                  )}
+                  {liqNet && (
+                    <div className="flex items-start gap-2 leading-relaxed">
+                      <span className="select-none text-rb-500">•</span>
+                      <span>
+                        Liquidations took {liqNet.seized} of collateral to clear {liqNet.cleared} of debt:{" "}
+                        {fig(totals.liquidatedCollUsd)} against {fig(totals.liquidatedDebtUsd)} at the prices of the
+                        day, a net {fmtSignedUsd(liqNet.atTimeUsd).display} to the borrower, the bonus the liquidators
+                        kept
+                        {liqNet.todayUsd != null && (
+                          <> ({fmtSignedUsd(liqNet.todayUsd).display} at the latest block&apos;s prices)</>
+                        )}
+                        .
+                      </span>
+                    </div>
+                  )}
+                  {gasEth > 0 && (
+                    <div className="flex items-start gap-2 leading-relaxed">
+                      <span className="select-none text-rb-500">•</span>
+                      <span>
+                        A total of {gasEth.toFixed(4)} ETH (${gasUsd.toFixed(2)}) has been spent on gas fees across
+                        these transactions. Each event&apos;s own gas is in its footnote below.
+                      </span>
+                    </div>
+                  )}
+                  {flowTimeline != null && flowsKey?.basis && (
+                    <div className="flex items-start gap-2 leading-relaxed" data-flow-basis="">
+                      <span className="select-none text-rb-500">•</span>
+                      <span>{flowsKey.basis}</span>
+                    </div>
+                  )}
+                  <LearnMore
+                    extra={
+                      flowTimeline != null && flowsKey?.lines?.length ? (
+                        <FlowsKey items={[]} outline={null} lines={flowsKey.lines} />
+                      ) : undefined
+                    }
+                    content={aaveV4EconomicsContent({
+                      supplyInterest: totals.supplyInterestUsd > 0.01,
+                      liquidations: totals.liquidatedCollUsd > 0.01 || totals.liquidatedDebtUsd > 0.01,
+                    })}
+                  />
+                </div>
+              }
+            />
+          </div>
         </div>
-      </div>
+      </SectionSidebar>
     </ProvReceiptsScope>
   );
 }
