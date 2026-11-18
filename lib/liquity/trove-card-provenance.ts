@@ -149,3 +149,37 @@ export function troveAnnualCostProv(recordedDebt: number, ratePct: number, live:
     ],
   };
 }
+
+/** The reads the timeline's projection row runs on (ui-jobs 733): the debt at
+ *  the trove's last change and its annual rate, as "Costs per year" reads
+ *  them, and the figure's receipt summary. */
+export function troveProjectionProv(
+  collateralType: string,
+  live: boolean,
+  days: number,
+): { base: Provenance; rate: Provenance; summary: string; terms: { base: string; rate: string } } {
+  const contract = { name: "TroveManager", address: TROVE_MANAGER[collateralType.toLowerCase()] };
+  const pclass = live ? ("state" as const) : ("indexed" as const);
+  return {
+    base: {
+      kind: "chain",
+      pclass,
+      summary: live
+        ? "Recorded debt — the debt at the trove's last change, as the TroveManager contract reports it now. Interest accrues on it until the next change."
+        : "Recorded debt — the debt the contract logged at the trove's most recent change. Interest accrues on it until the next change.",
+      contract,
+      via: stateOriginVia(live, "recorded debt"),
+    },
+    rate: {
+      kind: "chain",
+      pclass,
+      summary: live
+        ? "Annual interest rate — the yearly rate the trove pays on its debt, as the TroveManager contract reports it now. The owner sets it, or the delegate when the trove is in a batch."
+        : "Annual interest rate — the yearly rate the contract logged at the trove's most recent change. The owner sets it, or the delegate when the trove is in a batch.",
+      contract,
+      via: stateOriginVia(live, "annual interest rate"),
+    },
+    terms: { base: "recorded debt", rate: "rate" },
+    summary: `Projected interest — the recorded debt times the annual interest rate, over ${days} days of a 365-day year: what the debt would gain in ${days} days if the rate and the debt hold.`,
+  };
+}

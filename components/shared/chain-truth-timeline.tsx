@@ -451,6 +451,14 @@ export interface ChainTruthTimelineProps {
    *  Omit it wherever the window is not a fact — a closed position, a read that
    *  has not landed — and the slot draws nothing. */
   liveWindow?: () => ReactNode;
+  /** THE PROJECTION — what the position's rate would add over the days ahead
+   *  if nothing changes (components/shared/projection-row.tsx, ui-jobs 733),
+   *  drawn above the live window: it starts at now and runs forward. It is no
+   *  event and no note, so it keeps every exclusion the live window keeps, and
+   *  two more: a rewound list (the cut) and a `?at=` landing draw none.
+   *  Omit it wherever the rate does not run (a closed position, a zero rate
+   *  or balance, a branch that stopped interest). */
+  projection?: () => ReactNode;
   /** Rendered beneath the last event, once the whole list is on screen.
    *
    *  For the statement a SWEPT timeline owes its reader: where the history
@@ -755,6 +763,7 @@ function ChainTruthTimelineBody({
   liveNotes,
   liveNotesPending,
   liveWindow,
+  projection,
   footer,
   footerWhileMore,
   notice,
@@ -908,6 +917,8 @@ function ChainTruthTimelineBody({
   // must not re-trigger the landing off a stale `at=` the hook already
   // dropped from the address bar.
   const appliedAtRef = useRef(false);
+  /** The page was opened on a `?at=` link: the projection stays off it. */
+  const [atLanding, setAtLanding] = useState(false);
   // The `at` id read off the URL, until it is either found among the served
   // events (→ `pendingLandingId`) or given up on (→ `landingNotFoundId`).
   const [landingWantedId, setLandingWantedId] = useState<string | null>(null);
@@ -921,6 +932,7 @@ function ChainTruthTimelineBody({
     }
     if (!raw) return;
     appliedAtRef.current = true;
+    setAtLanding(true);
     setLandingWantedId(decodeEventId(raw));
   }, [pinnedId]);
 
@@ -1177,6 +1189,7 @@ function ChainTruthTimelineBody({
    *  leaves it standing (see the prop). It draws above the live notes, so when
    *  both are there this is the row the spine's lead-in dot belongs to. */
   const liveWindowAtTop = !!liveWindow && cut == null;
+  const projectionAtTop = !!projection && cut == null && !atLanding;
 
   // The boundary card. A page that trims its own list passes one; the window
   // arm's is derived from the opening balance here, with the position at the
@@ -2218,6 +2231,11 @@ function ChainTruthTimelineBody({
                 {/* The live window is the head row: it ends at now, so it stands
                 above the live notes and takes the lead-in dot. The notes
                 toggle does not reach it — it is not a note (see `liveWindow`). */}
+                {/* The projection runs forward from now, so it stands above the
+                live window; the tip's dot stays with the row that ends at now. */}
+                {projectionAtTop && projection && (
+                  <SpineTipContext.Provider value={null}>{projection()}</SpineTipContext.Provider>
+                )}
                 {liveWindowAtTop && liveWindow && (
                   <SpineTipContext.Provider value={tipSide}>{liveWindow()}</SpineTipContext.Provider>
                 )}

@@ -4,6 +4,7 @@ import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
 import { createContext, useContext, useLayoutEffect, useState, type ReactNode } from "react";
 import {
   ArrowRightToLine,
+  CalendarPlus,
   ChartLine,
   ChartPie,
   CircleEqual,
@@ -65,6 +66,7 @@ export type SpineIcon =
   | "market" // A market note — a receipted fact about the MARKET between two of the account's events (components/shared/market-note-row.tsx): the glyph `noteGlyph` names (a rate's `chart-line`, a vault's terms `scroll-text`, a PSM share `chart-pie`), thin neutral ink, never a party colour
   | "protocol-change" // A protocol change in the event history (components/shared/protocol-change-row.tsx, ui-jobs 448): a setting the protocol moved for every position, the pink diamond of the Lifetime flows events row. Lucide `sliders-horizontal` in neutral ink, the governance badge in its corner. A reserve's change log (components/shared/config-change-timeline.tsx, M3.6) names the setting's family with `changeGlyph`: caps `gauge`, rates and fees the rate-change % mark, collateral terms `shield`, liquidation settings `shield-alert`, a freeze `snowflake`, a pause `pause` (`play` on unpause), a switch `plug` / `unplug`, the price source `radio-tower`, a listing `list-plus`, eMode membership `layers`; the default `sliders-horizontal` for anything else. Caps, rates and fees, and collateral terms moved one way take `iconDirection`'s arrow on the right; a freeze, a pause, a line off or halted and borrowing off draw the glyph in `changeTone`, the node alone
   | "live-window" // The live window between ONE position's last touch and now, pinned in the timeline's head slot (components/protocol/polaris/polaris-since-last-touch.tsx). Its own class, not a market note: lucide `timer` (the time since the last touch) in the notes' thin neutral ink — the holder did nothing inside the window, which is what lets its causes be stated as facts
+  | "projection" // What a rate would add if nothing changes, pinned above the head slot's live window (components/shared/projection-row.tsx, ui-jobs 733). No act and no record: lucide `calendar-plus` in the notes' thin neutral ink, the stretch below it dotted
   | "none" // No node of its own: a group whose members moved no asset (a run of rate changes), or the boundary, draws no node
   | "moment" // The state card (components/shared/flow-moment-card.tsx) — the position at a moment between its events, where "Sync to chart" cut the timeline: lucide `clock`, neutral ink, not an event
   | "boundary"; // The boundary card (components/shared/timeline-boundary-card.tsx) — a stack of transactions, the events before the oldest drawn row; neutral ink, the last node on the spine
@@ -1030,7 +1032,15 @@ export function SpineColumn({
   // party with nothing to draw is the mark already, a delegation's node keeps
   // its join/leave badge, and the boundary, the state card and the live
   // window are no one's act.
-  const NO_BADGE: (SpineIcon | undefined)[] = ["external", "delegate", "live-window", "moment", "boundary", "none"];
+  const NO_BADGE: (SpineIcon | undefined)[] = [
+    "external",
+    "delegate",
+    "live-window",
+    "projection",
+    "moment",
+    "boundary",
+    "none",
+  ];
   const badged = !NO_BADGE.includes(effectiveIcon);
   const shownActor: SpineActor = badged ? actor : "owner";
   /** A glyph with the actor's badge in its corner. */
@@ -1043,7 +1053,8 @@ export function SpineColumn({
         <ActorBadge size={scale.tokenSize} actor={shownActor} />
       </div>
     );
-  const isDotted = byParty || !!undrawn || effectiveIcon === "warning";
+  // A projection is no act: the stretch below it runs dotted in neutral ink.
+  const isDotted = byParty || !!undrawn || effectiveIcon === "warning" || effectiveIcon === "projection";
   const lineInk: SpineInk = effectiveIcon === "warning" ? warningTone : byParty ? "party" : "default";
   const spineRgb = SPINE_COLORS[isDotted ? lineInk : "default"];
   const dotClass = DOT_COLORS[effectiveColor];
@@ -1230,6 +1241,17 @@ export function SpineColumn({
         // nothing here), its own glyph.
         return nodeRow(
           <Timer size={T} strokeWidth={1.25} absoluteStrokeWidth color={SPINE_COLORS.default} aria-hidden="true" />,
+        );
+      case "projection":
+        // The projection's node: the notes' register, its own glyph.
+        return nodeRow(
+          <CalendarPlus
+            size={T}
+            strokeWidth={1.25}
+            absoluteStrokeWidth
+            color={SPINE_COLORS.default}
+            aria-hidden="true"
+          />,
         );
       case "close":
         return nodeRow(

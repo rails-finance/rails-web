@@ -3,12 +3,14 @@
 // The shell a PINNED ROW is drawn in: a header panel on the spine that opens
 // to a body panel beneath it.
 // ----------------------------------------------------------------------------
-// Two row classes stand in it, and they are not the same kind of fact. A market
-// note states something that happened to the MARKET while the account did
-// nothing (components/shared/market-note-row.tsx). A live window states what
-// moved ONE position between its own last touch and now
-// (components/protocol/polaris/polaris-since-last-touch.tsx). Neither is an
-// event, and neither is counted as one; what they share is the geometry.
+// Three row classes stand in it, and they are not the same kind of fact. A
+// market note states something that happened to the MARKET while the account
+// did nothing (components/shared/market-note-row.tsx). A live window states
+// what moved ONE position between its own last touch and now
+// (components/protocol/polaris/polaris-since-last-touch.tsx). A projection
+// states what the position's rate would add ahead if nothing changes
+// (components/shared/projection-row.tsx), on a ground of its own. None is an
+// event, and none is counted as one; what they share is the geometry.
 //
 // That geometry is EventCard's outer geometry, deliberately: the same
 // `--card-pad`, the same `.spine-row` shell and spine cell, the same header-
@@ -61,7 +63,23 @@ export interface NoteRowShellProps {
    *  row that moved a share into the position (ui-jobs 402); who acted, for
    *  the node's badge (the protocol where unset, ui-jobs 408). */
   spine?: Pick<SpineColumnProps, "rateSpan" | "rateMoves" | "rateTone" | "rateProv" | "tokens" | "actor" | "noteGlyph">;
+  /** The row's ground. `note` (the default) is the `bg-note` block; a
+   *  projection (components/shared/projection-row.tsx) draws no block, a
+   *  dashed outline round the page's ground. */
+  ground?: "note" | "projection";
+  /** The row's anatomy code; a market note's (`L7`) unless given. */
+  anatomy?: string;
 }
+
+/** The header and body panels' surfaces, by ground. */
+const GROUND = {
+  note: { panel: "bg-note", head: "", body: "bg-note" },
+  projection: {
+    panel: "border border-dashed border-rb-400 dark:border-rb-500/60",
+    head: " border-b-0",
+    body: "border border-t-0 border-dashed border-rb-400 dark:border-rb-500/60",
+  },
+} as const;
 
 export function NoteRowShell({
   icon,
@@ -72,7 +90,10 @@ export function NoteRowShell({
   children,
   meta,
   spine,
+  ground = "note",
+  anatomy = "L7",
 }: NoteRowShellProps) {
+  const g = GROUND[ground];
   const scale = useTimelineScale();
   const registry = useReceiptRegistry();
   const [open, setOpen] = useState(false);
@@ -89,7 +110,7 @@ export function NoteRowShell({
     <ProvReceiptsScope registry={registry}>
       <div
         {...{ [marker.attr]: marker.value, [`${marker.attr}-open`]: open ? "" : undefined }}
-        data-anatomy="L7"
+        data-anatomy={anatomy}
         className={`spine-row${seg ? " spine-seg" : ""} relative cursor-pointer ${scale.cardRounded}`}
         // The whole row opens and closes the note, as an event card's does.
         {...rowClick}
@@ -100,7 +121,7 @@ export function NoteRowShell({
         <div className="spine-content">
           {/* ── Header panel — what the row states at rest ──────────────── */}
           <div
-            className={`overflow-visible rounded-xl bg-note ${open ? "rounded-b-none" : ""}${seg ? " spine-t1 max-sm:bg-transparent" : ""}`}
+            className={`overflow-visible rounded-xl ${g.panel} ${open ? `rounded-b-none${g.head}` : ""}${seg ? " spine-t1 max-sm:bg-transparent" : ""}`}
           >
             <div
               className={`group/evt cursor-pointer rounded-xl focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-teal-500${seg ? " disc-row disc-row-slow pointer-events-auto" : ""}`}
@@ -147,7 +168,7 @@ export function NoteRowShell({
           {open && (
             <div
               id={panelId}
-              className={`cursor-auto rounded-b-xl bg-note${seg ? " spine-body max-sm:mt-2 max-sm:rounded-t-xl" : ""}`}
+              className={`cursor-auto rounded-b-xl ${g.body}${seg ? " spine-body max-sm:mt-2 max-sm:rounded-t-xl" : ""}`}
               data-row-body=""
             >
               {children}

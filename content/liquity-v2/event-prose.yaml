@@ -764,6 +764,22 @@ trove_words:
     The debt divided by the collateral's dollar value.
   card_tip_rate_shutdown: |-
     The annual rate the Trove carried when its branch shut down. Interest stopped accruing then.
+  # ── The timeline's projection row (ui-jobs 733): what 30 more days of
+  # interest add to the debt if nothing changes ──
+  projection_label: |-
+    Projection
+  projection_assumption: |-
+    at the current rate of {rate}, held {days} days
+  projection_figure: |-
+    interest
+  projection_row_base: |-
+    Recorded debt
+  projection_row_rate: |-
+    Annual interest rate
+  projection_row_result: |-
+    Interest added
+  projection_batch_fee: |-
+    The delegate's annual fee of {fee} is charged on top of the rate.
   # ── The Trove listing: its heading, noun and search box ──
   listing_title: |-
     Liquity V2 Troves

@@ -52,6 +52,41 @@ import { LIQUITY_TIMELINE_RUNS } from "@/lib/liquity/timeline-runs";
 import { PreviousEventContext } from "@/components/protocol/liquity/delegate-run-sheet";
 import type { SpineKey } from "@/components/shared/mobile-spine";
 import { TimelineActivityHeader, CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
+import { ProjectionRow, projectionRateText, type ProjectionContract } from "@/components/shared/projection-row";
+import { troveProjectionProv } from "@/lib/liquity/trove-card-provenance";
+import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
+
+/** How many days ahead the timeline's projection row looks. */
+const PROJECTION_DAYS = 30;
+
+/** The projection row's contract (ui-jobs 733): the recorded debt and the
+ *  annual rate "Costs per year" reads (TroveDetailsBand), simple interest
+ *  over the days. Null on a closed Trove, a shut-down branch (interest
+ *  stopped) or a zero debt or rate. */
+function troveProjection(
+  trove: TroveSummary,
+  liveState: TroveStateData | undefined,
+  shutDown: boolean,
+): { contract: ProjectionContract; summary: string } | null {
+  if (trove.status !== "open" || shutDown) return null;
+  const base = liveState?.debt.recorded ?? trove.debt.current;
+  const ratePct = liveState?.rates.annualInterestRate ?? trove.metrics.interestRate;
+  if (!(base > 0) || !(ratePct > 0)) return null;
+  const reads = troveProjectionProv(trove.collateralType, liveState != null, PROJECTION_DAYS);
+  return {
+    contract: {
+      family: "liquity-v2-trove",
+      ratePct,
+      base,
+      asset: { symbol: "BOLD", address: TOKEN_ADDRESSES.BOLD },
+      days: PROJECTION_DAYS,
+      baseProv: reads.base,
+      rateProv: reads.rate,
+      terms: reads.terms,
+    },
+    summary: reads.summary,
+  };
+}
 
 /** The phone spine view's key row. */
 const LIQUITY_SPINE_KEY: SpineKey = {
@@ -258,6 +293,7 @@ export function TroveBody({
   // One clock for the debt, interest and cost figures: a shut-down branch's
   // accrual stops at the shutdown (ui-jobs 626).
   const accrualNow = liquityAccrualNow(now, shutdown?.at);
+  const projection = troveProjection(trove, liveState, shutdown != null);
   const economics = computeLiquityEconomics(economicsEvents, {
     currentPrice,
     collateralType: trove.collateralType,
@@ -330,6 +366,36 @@ export function TroveBody({
                 spineKey={LIQUITY_SPINE_KEY}
                 emptyLabel={historyNotice ?? troveWords("history_empty")}
                 still={still}
+                projection={
+                  projection
+                    ? () => (
+                        <ProjectionRow
+                          contract={projection.contract}
+                          words={{
+                            label: troveWords("projection_label"),
+                            assumption: troveWords("projection_assumption", {
+                              rate: projectionRateText(projection.contract.ratePct),
+                              days: PROJECTION_DAYS,
+                            }),
+                            figure: troveWords("projection_figure"),
+                            summary: projection.summary,
+                            rows: {
+                              base: troveWords("projection_row_base"),
+                              rate: troveWords("projection_row_rate"),
+                              result: troveWords("projection_row_result"),
+                            },
+                            ...(trove.batch.isMember && trove.batch.managementFee > 0
+                              ? {
+                                  note: troveWords("projection_batch_fee", {
+                                    fee: projectionRateText(trove.batch.managementFee),
+                                  }),
+                                }
+                              : {}),
+                          }}
+                        />
+                      )
+                    : undefined
+                }
                 toolbarLeading={
                   <TimelineActivityHeader events={liquityEvents} closed={closed} firstAt={trove.activity?.createdAt} />
                 }
