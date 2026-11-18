@@ -30,8 +30,10 @@ import type { SpBranch } from "@/lib/liquity-v2/sp-routes";
 import type { LiquityV2DepositLiquidation, LiquityV2DepositStretch } from "@/lib/sources/api/liquity-v2-sp";
 
 const ZERO = BigInt(0);
-/** Rows drawn before "Show all". */
-const FIRST_ROWS = 8;
+/** A negative net: red, with its minus (Miles, 18 Nov 2026). */
+const NEG = "text-red-600 dark:text-red-400";
+/** Rows drawn before "Show all" (Miles, 18 Nov 2026). */
+const FIRST_ROWS = 5;
 
 const WORDS = {
   head: "Liquidations",
@@ -85,7 +87,7 @@ type Cell = { text: string; prov: Provenance; value: string; symbol?: string; to
 function Fig({ cell }: { cell: Cell }) {
   return (
     <Prov info={cell.prov} value={cell.value} symbol={cell.symbol}>
-      <span className={cell.tone === "neg" ? "text-red-600 dark:text-red-400" : undefined}>{cell.text}</span>
+      <span className={cell.tone === "neg" ? NEG : undefined}>{cell.text}</span>
     </Prov>
   );
 }
@@ -329,7 +331,8 @@ export function LiquityV2DepositLiquidationsRow({ note }: { note: SpLiquidations
         >
           <span className="min-w-0 truncate">{WORDS.head}</span>
           <CountChip count={n} />
-          <span className="tabular-nums text-foreground">
+          {/* The net alone at rest; the opened table holds the rest. */}
+          <span className={`tabular-nums ${net < ZERO ? NEG : "text-foreground"}`} data-sp-liquidations-net="">
             <Prov echo info={tot.net.prov} value={tot.net.value} symbol="BOLD">
               {signedAmt(net)} BOLD
             </Prov>
