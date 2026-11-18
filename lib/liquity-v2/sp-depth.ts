@@ -133,3 +133,13 @@ export function spTotalProv(what: "deposits" | "debt", block: number): Provenanc
     source: { block },
   };
 }
+
+/** The three pools over the three branches' debt. */
+export function spTotalShareProv(block: number): Provenance {
+  return {
+    kind: "derived",
+    summary: `All pools ÷ all debt — the three pools' getTotalBoldDeposits() over the three branches' getEntireBranchDebt() at block ${at(block)}.`,
+    formula: "Σ getTotalBoldDeposits() ÷ Σ getEntireBranchDebt()",
+    source: { block },
+  };
+}

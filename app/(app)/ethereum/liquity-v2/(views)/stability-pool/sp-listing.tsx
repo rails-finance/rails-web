@@ -55,7 +55,7 @@ export function SpListing({
       basePath={LIQUITY_V2_SP_PATH}
       identity={<RailHeader session="liquity-v2" venue="subPage" stamp />}
       titleHidden
-      headerExtra={depth !== undefined ? <SpDepthStrip depth={depth} /> : undefined}
+      headerExtra={depth !== undefined ? <SpDepthStrip depth={depth} className="mb-6" /> : undefined}
       defaults={SP_LIST_DEFAULTS}
       sortOptions={spSortOptions}
       searchPlaceholder="Depositor address or ENS"
