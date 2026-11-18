@@ -355,7 +355,7 @@ export function PendlePositionCard({
       {zero ? (
         <p data-pendle-sy-zero-note="">
           Every figure is read at block {block.toLocaleString("en-US")}. The SY&rsquo;s exchangeRate() reads 0 there, so
-          each leg and the unclaimed yield are worth 0 {asset}, and the market&rsquo;s implied APY is not shown.
+          each leg and the unclaimed yield are worth 0 {asset}.
         </p>
       ) : (
         <p>

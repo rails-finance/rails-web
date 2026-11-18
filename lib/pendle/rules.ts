@@ -7,16 +7,13 @@ import type { PendleLegValues, PendleMarks, PendlePosition } from "./types";
  * The SY's exchangeRate() read 0 at the block (rails-ops ui-jobs 750). Every
  * PT, YT and LP is priced in SY and every SY is then worth 0 of the asset, so
  * each figure in the asset is 0 whatever its mark in SY, matured or not, and
- * the market's implied APY is withheld. A rate that did not read (null) is not
- * this.
+ * the market's implied APY is withheld. A rate that did not read (null, or
+ * anything but digits) is not this.
  */
 export function syRateZero(marks: Pick<PendleMarks, "syToAsset">): boolean {
-  if (marks.syToAsset == null) return false;
-  try {
-    return BigInt(marks.syToAsset) === BigInt(0);
-  } catch {
-    return false;
-  }
+  // BigInt("") and BigInt(" ") are 0n: only a string of digits is a read.
+  if (marks.syToAsset == null || !/^\d+$/.test(marks.syToAsset)) return false;
+  return BigInt(marks.syToAsset) === BigInt(0);
 }
 
 /**

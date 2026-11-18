@@ -51,6 +51,13 @@ test("an SY rate of 0 reads as zero; an unread or positive rate does not", () =>
   assert.equal(syRateZero({ syToAsset: "not a number" }), false);
 });
 
+test("an empty or blank SY rate is unread, though BigInt reads it as 0", () => {
+  assert.equal(syRateZero({ syToAsset: "" }), false);
+  assert.equal(syRateZero({ syToAsset: " " }), false);
+  assert.equal(syRateZero({ syToAsset: "-0" }), false);
+  assert.equal(syRateZero({ syToAsset: "00" }), true);
+});
+
 test("with the SY at 0, every leg read is worth 0 and so is the total", () => {
   const p = {
     marks: { syToAsset: "0" },
