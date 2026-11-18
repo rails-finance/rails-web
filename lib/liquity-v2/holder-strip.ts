@@ -205,23 +205,27 @@ export function liquityV2HolderStrip(
         priceNote: liquityV2PriceNote(collateralType),
       });
     }
-    const receipt = holderUsdReceipt({
-      what: "The wallet's collateral in USD, across branches",
-      legs: usdLegs,
-      via: ORACLE_VIA,
-      caveat: "The branches hold different tokens, so their sum exists only at a price.",
-    });
-    legs.push({
-      id: "collateral",
-      label: "Total collateral",
-      value: formatUsdValue(receipt.usd),
-      approx: false,
-      tip: LEG_TIP.collateralValued,
-      prov: receipt.prov,
-      footnote: { text: parts.join(" · ") },
-      // The icons of the branches the total counts.
-      figure: { tokens: usdLegs.map((l) => collToken(l.token)), usd: receipt.usd },
-    });
+    // A sum across tokens stands only where every token is priced: a total
+    // of the priced ones alone would read as the whole (ui-jobs 740).
+    if (usdLegs.length === branchLegs.length) {
+      const receipt = holderUsdReceipt({
+        what: "The wallet's collateral in USD, across branches",
+        legs: usdLegs,
+        via: ORACLE_VIA,
+        caveat: "The branches hold different tokens, so their sum exists only at a price.",
+      });
+      legs.push({
+        id: "collateral",
+        label: "Total collateral",
+        value: formatUsdValue(receipt.usd),
+        approx: false,
+        tip: LEG_TIP.collateralValued,
+        prov: receipt.prov,
+        footnote: { text: parts.join(" · ") },
+        // The icons of the branches the total counts.
+        figure: { tokens: usdLegs.map((l) => collToken(l.token)), usd: receipt.usd },
+      });
+    }
   }
 
   // ── the debt: BOLD on every branch, so a quantity ─────────────────────────

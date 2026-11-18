@@ -14,6 +14,7 @@
 // detail page (`chain`); a listing card has two headlines.
 
 import { positionName } from "@/lib/shared/position-name";
+import { shownUsd } from "@/lib/shared/holder-usd-receipt";
 import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { useState, type ReactNode } from "react";
 import { Link2 } from "lucide-react";
@@ -278,7 +279,7 @@ export function liquityV1CardSlots({
         usd:
           collPrice != null && v.collateral > 0 ? (
             <Prov info={stampServerRead(collateralUsdProv(v.collateral, collPrice), v.readBy)}>
-              <span className="font-bold text-green-400">{formatUsdValue(v.collateral * collPrice)}</span>
+              <span className="font-bold text-green-400">{formatUsdValue(shownUsd(v.collateral, collPrice))}</span>
             </Prov>
           ) : null,
       },

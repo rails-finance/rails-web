@@ -4,6 +4,10 @@
 // one; a stablecoin's $1 face is a definition, said as one) and the
 // arithmetic: amount × price, and across tokens the sum of those legs.
 //
+// The shown-values arithmetic (shownUsd, amountText, priceText) is shared with
+// every dollar figure whose receipt shows its rows: the Liquity-family
+// position cards' collateral USD (ui-jobs 740).
+//
 // THE ROWS REBUILD THE FIGURE. Each amount is shown to six decimal places and
 // each price to six significant figures, each product is worked out from the
 // two values as shown and rounded to the cent, and the sum is the sum of those
@@ -35,9 +39,15 @@ export const shownAmount = (v: number): number => Math.round(v * 1e6) / 1e6;
 // exponent-safe: toPrecision's string goes straight back to a Number; priceText prints it.
 export const shownPrice = (v: number): number => (v === 0 ? 0 : Number(v.toPrecision(6)));
 const cents = (v: number): number => Math.round(v * 100) / 100;
+/** A dollar figure from an amount and a price as a receipt shows them: the
+ *  product of the shown values, to the cent. Every figure whose receipt shows
+ *  its rows is drawn from this (ui-jobs 740). */
+export const shownUsd = (amount: number, price: number): number => cents(shownAmount(amount) * shownPrice(price));
 
-const amountText = (v: number) => shownAmount(v).toLocaleString("en-US", { maximumFractionDigits: 6 });
-const priceText = (v: number) => {
+/** An amount as a receipt row prints it. */
+export const amountText = (v: number) => shownAmount(v).toLocaleString("en-US", { maximumFractionDigits: 6 });
+/** A price as a receipt row prints it. */
+export const priceText = (v: number) => {
   const p = shownPrice(v);
   if (p < 1) return `$${p.toLocaleString("en-US", { maximumSignificantDigits: 6 })}`;
   // Six significant figures, and at least the cents.
@@ -58,7 +68,7 @@ export function holderUsdReceipt(opts: {
   caveat?: string;
 }): { prov: Provenance; usd: number } {
   const { legs } = opts;
-  const products = legs.map((l) => cents(shownAmount(l.amount) * shownPrice(l.price)));
+  const products = legs.map((l) => shownUsd(l.amount, l.price));
   const usd = cents(products.reduce((s, p) => s + p, 0));
   const many = legs.length > 1;
   const inputs: ProvInput[] = legs.flatMap((l, i) => {

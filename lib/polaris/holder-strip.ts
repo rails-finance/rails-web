@@ -237,27 +237,31 @@ export function polarisHolderStrip(
       usdLegs.push(leg);
       parts.push(`${formatNumber(amount)} ${symbol}`);
     }
-    const receipt = holderUsdReceipt({
-      what: "The wallet's debt in USD, across both markets",
-      legs: usdLegs,
-      block: markets.blockNumber,
-      via: BOARD_VIA,
-      caveat: `The two markets' debts are different tokens, so their sum exists only at a price. ${TESTNET}`,
-    });
-    legs.push({
-      id: "debt",
-      label: "Total debt",
-      value: formatUsdValue(receipt.usd),
-      approx: false,
-      tip: LEG_TIP.debtValued,
-      prov: receipt.prov,
-      footnote: { text: parts.join(" · ") },
-      // The icons of the markets the total counts.
-      figure: {
-        tokens: usdLegs.map((l) => ({ symbol: l.token })),
-        usd: receipt.usd,
-      },
-    });
+    // A sum across tokens stands only where every token is priced: a total
+    // of the priced ones alone would read as the whole (ui-jobs 740).
+    if (usdLegs.length === debtByMarket.size) {
+      const receipt = holderUsdReceipt({
+        what: "The wallet's debt in USD, across both markets",
+        legs: usdLegs,
+        block: markets.blockNumber,
+        via: BOARD_VIA,
+        caveat: `The two markets' debts are different tokens, so their sum exists only at a price. ${TESTNET}`,
+      });
+      legs.push({
+        id: "debt",
+        label: "Total debt",
+        value: formatUsdValue(receipt.usd),
+        approx: false,
+        tip: LEG_TIP.debtValued,
+        prov: receipt.prov,
+        footnote: { text: parts.join(" · ") },
+        // The icons of the markets the total counts.
+        figure: {
+          tokens: usdLegs.map((l) => ({ symbol: l.token })),
+          usd: receipt.usd,
+        },
+      });
+    }
   }
 
   return {

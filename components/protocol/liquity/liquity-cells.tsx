@@ -5,6 +5,7 @@
 // (components/shared/event-cells.tsx). The figures are the generator's
 // (lib/liquity/event-prose.ts `liquityL2`); the receipts are built here.
 
+import { amountText, priceText } from "@/lib/shared/holder-usd-receipt";
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import { accrualNoun } from "@/lib/liquity/accrual";
 import { fillText, liquityL1Label, wordsAround, type LiquityEventProse } from "@/lib/liquity/event-prose";
@@ -371,16 +372,16 @@ export function useLiquityCells({
     collPrice > 0
       ? {
           kind: "chain-derived",
-          summary: `Collateral value (after) in USD. The collateral after this event, multiplied by Liquity's price for ${collSym} at this block.`,
+          summary: `Collateral value (after) in USD. The collateral after this event times Liquity's price for ${collSym} at this block, as the rows show them, to the cent.`,
           formula: "collateral × price",
           inputs: [
             {
               label: "collateral",
-              value: `${toLocaleStringHelper(stateAfter.coll)} ${collSym}`,
+              value: `${amountText(l2.coll.after)} ${collSym}`,
               kind: "chain",
               note: "after",
             },
-            ...priceInput,
+            ...priceInput.map((p) => ({ ...p, value: priceText(collPrice) })),
           ],
         }
       : undefined;
@@ -388,16 +389,20 @@ export function useLiquityCells({
     collPrice > 0
       ? {
           kind: "chain-derived",
-          summary: `Collateral value (before) in USD. The collateral before this event, multiplied by Liquity's price for ${collSym} at this block.`,
+          summary: `Collateral value (before) in USD. The collateral before this event times Liquity's price for ${collSym} at this block, as the rows show them, to the cent.`,
           formula: "collateral × price",
           inputs: [
             {
               label: "collateral",
-              value: `${toLocaleStringHelper(beforeColl)} ${collSym}`,
+              value: `${amountText(l2.coll.before)} ${collSym}`,
               kind: "chain",
               note: "before",
             },
-            ...priceInput,
+            ...priceInput.map((p) => ({
+              ...p,
+              value: priceText(l2.coll.beforePrice),
+              note: l2.coll.beforePrice !== collPrice ? "the liquidation's own price" : p.note,
+            })),
           ],
         }
       : undefined;

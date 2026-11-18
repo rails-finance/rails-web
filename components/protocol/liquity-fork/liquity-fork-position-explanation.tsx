@@ -15,6 +15,7 @@
 // plain words: a figure that includes pending interest, a price that didn't
 // refresh this load.
 
+import { shownUsd } from "@/lib/shared/holder-usd-receipt";
 import { formatExact } from "@/lib/utils/format";
 import { SurplusBullet } from "@/components/protocol/liquity-family/surplus-bullet";
 import type { LiquityTroveSurplus } from "@/components/protocol/liquity-family/types";
@@ -272,8 +273,8 @@ export function LiquityForkPositionExplanation({
     bullets.push(
       <span key="worth">
         At the branch&rsquo;s price, that collateral is worth{" "}
-        <Prov info={vocab.forkUsdProv("Collateral", sym)}>
-          <H>{formatUsd(chain.entireColl * chain.priceUsd)}</H>
+        <Prov info={vocab.forkUsdProv("Collateral", sym, { amount: chain.entireColl, price: chain.priceUsd })}>
+          <H>{formatUsd(shownUsd(chain.entireColl, chain.priceUsd))}</H>
         </Prov>
         .
       </span>,

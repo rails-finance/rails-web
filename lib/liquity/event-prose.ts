@@ -16,6 +16,7 @@
 // Pure TypeScript with no React, so the export script loads it with type
 // stripping (scripts/exports-liquity-v2.mjs).
 
+import { shownUsd } from "@/lib/shared/holder-usd-receipt";
 import { redemptionPath } from "@/lib/liquity-fork/shutdown";
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import type { BaseActivityEvent, GasCost } from "@/lib/shared/types/activity";
@@ -71,7 +72,10 @@ export interface LiquityL2 {
   isRedemption: boolean;
   isLiquidation: boolean;
   price: number;
-  coll: { before: number; after: number; beforeUsd: number; afterUsd: number };
+  /** USD values are the product of the amount and the price as the cells'
+   *  receipts show them, to the cent (ui-jobs 740); `beforePrice` is the price
+   *  the before value takes (a liquidation's own). */
+  coll: { before: number; after: number; beforeUsd: number; afterUsd: number; beforePrice: number };
   /** `before`: the debt recorded at the previous event, as the Debt ledger's
    *  closing line states it. `accrued`: the accrual since then comes to a
    *  printed figure; `accrualMove`: it is the whole move ("+8,580.12
@@ -894,12 +898,13 @@ export function liquityL2(input: LiquityProseInput, accrual: LiquityAccrual): Li
       beforeCr = ((beforeColl * price) / beforeDebt) * 100;
   }
   const collAfter = exactCollAfter(ctx);
-  const afterUsd = collAfter * price;
+  const afterUsd = price > 0 ? shownUsd(collAfter, price) : 0;
   // The cells' befores are the balances the previous event recorded, as the
   // ledgers' closing lines state them (the replay's, where the page has it).
   const ledgerColl = input.ledger?.sides?.collateral;
   const collBefore = ledgerColl ? Math.max(0, ledgerColl.held - ledgerColl.amount) : beforeColl;
-  const beforeUsd = isLiquidation && liquidation ? collBefore * liquidation.price : collBefore * price;
+  const beforePrice = isLiquidation && liquidation ? liquidation.price : price;
+  const beforeUsd = beforePrice > 0 ? shownUsd(collBefore, beforePrice) : 0;
   let afterCr = stateAfter.collateralRatio;
   if (afterCr === 0 && price > 0 && stateAfter.debt > 0) afterCr = (afterUsd / stateAfter.debt) * 100;
 
@@ -957,7 +962,7 @@ export function liquityL2(input: LiquityProseInput, accrual: LiquityAccrual): Li
     isRedemption,
     isLiquidation,
     price,
-    coll: { before: collBefore, after: collAfter, beforeUsd, afterUsd },
+    coll: { before: collBefore, after: collAfter, beforeUsd, afterUsd, beforePrice },
     debt: {
       before: recordedBefore,
       after: debtAfter,

@@ -3,9 +3,10 @@
 // CollSurplusPool, read at the head (lib/sources/chain/liquity-coll-surplus.ts).
 // Shared by every Liquity-family explorer.
 
+import { amountText, priceText } from "@/lib/shared/holder-usd-receipt";
 import type { Provenance } from "@/components/shared/provenance";
 import type { LiquityTroveSurplus } from "@/components/protocol/liquity-family/types";
-import { formatNum, formatUsd } from "@/lib/shared/format-event";
+import { formatNum } from "@/lib/shared/format-event";
 import { formatExact, formatUnitsExact } from "@/lib/utils/format";
 import type { CollSurplusClaimContext } from "@/lib/shared/types/event-shape";
 
@@ -36,11 +37,11 @@ export function collSurplusUsdProv(s: LiquityTroveSurplus, symbol: string, price
   return {
     kind: "chain-derived",
     pclass: "oracle",
-    summary: `Claimable collateral in USD. The ${symbol} still claimable, valued at the branch's oracle price.`,
+    summary: `Claimable collateral in USD. The ${symbol} still claimable times the branch's oracle price, as the rows show them, to the cent.`,
     formula: "claimable collateral × oracle price",
     inputs: [
-      { label: "claimable", value: `${formatNum(s.claimable, 4)} ${symbol}`, kind: "chain", pclass: "state" },
-      { label: "oracle price", value: formatUsd(priceUsd), kind: "chain", pclass: "oracle" },
+      { label: "claimable", value: `${amountText(s.claimable)} ${symbol}`, kind: "chain", pclass: "state" },
+      { label: "oracle price", value: priceText(priceUsd), kind: "chain", pclass: "oracle" },
     ],
   };
 }

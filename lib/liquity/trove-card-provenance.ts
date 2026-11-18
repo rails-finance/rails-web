@@ -5,6 +5,7 @@
 // is the one that is true of the value on the face.
 
 import { liquityV2PriceNote } from "@/lib/liquity-v2/price-notes";
+import { amountText, priceText } from "@/lib/shared/holder-usd-receipt";
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import type { LiquityFaceProvContext } from "@/components/protocol/liquity-family/types";
 import { formatNum, formatUsd } from "@/lib/shared/format-event";
@@ -112,11 +113,18 @@ export function liquityTroveFaceProv(ctx: LiquityFaceProvContext): LiquityFacePr
         },
       ]
     : [];
+  // The USD line's rows rebuild it: the collateral at six decimals, the
+  // price at six significant figures, their product to the cent (ui-jobs 740,
+  // lib/shared/holder-usd-receipt.ts).
   const collUsdProv: Provenance = {
     kind: "chain-derived",
-    summary: `Collateral value in USD — the collateral multiplied by Liquity's current price for ${sym}.`,
+    pclass: "oracle",
+    summary: `Collateral value in USD — the collateral times the ${sym} price, as the rows show them, to the cent.`,
     formula: "collateral × price",
-    inputs: [collLeaf, ...priceLeaf],
+    inputs: [
+      { ...collLeaf, value: `${amountText(coll)} ${sym}` },
+      ...priceLeaf.map((p) => ({ ...p, value: priceText(priceUsd!) })),
+    ],
   };
   // Liquity V2's docs state the ratio as LTV, debt over collateral value
   // (decision 0065): the `cr` slot carries the LTV's receipt.

@@ -797,9 +797,7 @@ trove_words:
   moved_to_hint: |-
     This wallet held the Trove until {day}, then sent its TroveNFT to the wallet shown.
   price_now_summary: |-
-    {coll_type}’s price — Liquity’s on-chain oracle, read now.
-  price_now_via: |-
-    Liquity’s on-chain oracle (Chainlink feed + LST canonical rate, the MIN/MAX rule)
+    {coll_type}’s price — {price_note}, at the latest read, which states no block.
   price_closing_summary: |-
     {coll_type}’s price at the Trove’s closing row — the collateral price Liquity’s oracle gave that transaction.
   price_closing_via: |-
