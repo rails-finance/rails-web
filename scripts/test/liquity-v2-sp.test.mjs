@@ -15,6 +15,7 @@ import {
   depositNow,
   depositNowFromChain,
   exactUnits,
+  poolShare,
   priceUnits,
   sheetFigures,
   stashGap,
@@ -161,6 +162,12 @@ test("the head read: a failed getter voids it, a failed fetchPrice falls back to
   assert.equal(fallback.priceStale, true);
   const unpriced = spHeadFigures([...pool, fail, fail]);
   assert.equal(unpriced.priceRaw, null);
+  // The pool's total is apart: where it fails the page states no share.
+  assert.equal(live.totalDepositsRaw, null);
+  const totalled = spHeadFigures([...pool, fail, fail, ok(BigInt(E(64000)))]);
+  assert.equal(totalled.totalDepositsRaw, E(64000));
+  assert.equal(poolShare(BigInt(E(1280)), BigInt(E(64000))), 0.02);
+  assert.equal(poolShare(BigInt(E(1280)), BigInt(0)), null);
   assert.equal(spHeadFigures([pool[0], fail, ...pool.slice(2), fail, fail]), null);
 });
 

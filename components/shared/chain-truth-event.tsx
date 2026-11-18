@@ -55,7 +55,7 @@ import {
   formatUsdValue,
 } from "@/lib/utils/format";
 import { ExactTip } from "@/components/shared/amount-text";
-import { TipLabel } from "@/components/shared/tip-label";
+import { HeadingTip, TipLabel } from "@/components/shared/tip-label";
 import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
 import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
 import { usePublishSpineLegs, WARNING_TONE_TEXT, type SpineWarningLeg } from "@/components/shared/spine-column";
@@ -183,6 +183,9 @@ function readableExact(exact: string, symbol: string): string | undefined {
 export interface ChainTruthRowSpec {
   /** Action label, e.g. "Add Collateral" / "Open Vault". */
   label: string;
+  /** The plain label's read-more: a dotted underline that opens it on a
+   *  press (HeadingTip). A label in a pill or a warning tone takes none. */
+  labelTip?: string;
   /** Critical events (liquidation / grab): the label reads in red-500, and
    *  the deltas are the spine's legs (see `labelOnSpine`). */
   critical?: boolean;
@@ -754,7 +757,9 @@ export function ChainTruthRow({
               {word}
             </span>
           ) : (
-            <span className="text-sm text-rb-500">{word}</span>
+            <span className="text-sm text-rb-500">
+              <HeadingTip text={word} tip={spec.labelTip} />
+            </span>
           )}
           {meta}
         </div>
@@ -788,7 +793,7 @@ export function ChainTruthRow({
     <span
       className={`max-w-full shrink-0 ${sz.txt} ${spec.labelTone === "delegate" ? "text-pink-600 dark:text-pink-400" : "text-rb-500"}`}
     >
-      {spec.label}
+      <HeadingTip text={spec.label} tip={spec.labelTip} />
     </span>
   ) : // A combined adjust omits the row label — the per-axis delta labels carry
   // the verbs (V2's grammar) — and a custody row drops it: the spine's plane

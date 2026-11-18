@@ -28,8 +28,9 @@ import { positionName } from "@/lib/shared/position-name";
 import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
 import { liquityV2DepositHref, LIQUITY_V2_SP_PATH } from "@/lib/liquity-v2/sp-routes";
-import { big, type DepositLifetime, type DepositNow } from "@/lib/liquity-v2/sp-math";
-import { spLiveProv, spPendingLossProv, spSumProv } from "@/lib/liquity-v2/sp-provenance";
+import { big, exactUnits, poolShare, type DepositLifetime, type DepositNow } from "@/lib/liquity-v2/sp-math";
+import { spLiveProv, spPendingLossProv, spPoolShareProv, spSumProv } from "@/lib/liquity-v2/sp-provenance";
+import { pctText } from "@/lib/shared/vault-amount-text";
 import type { LiquityV2DepositRow } from "@/lib/sources/api/liquity-v2-sp";
 import { RawFigure, tokenIcon } from "./sp-parts";
 
@@ -45,6 +46,8 @@ export interface LiquityV2DepositCardProps {
   now?: DepositNow | null;
   /** The chain read is in flight. */
   pending?: boolean;
+  /** The pool's getTotalBoldDeposits() and the block of the read `now` came from. */
+  pool?: { totalRaw: bigint; block: number } | null;
   explanation?: ReactNode;
 }
 
@@ -82,6 +85,7 @@ export function liquityV2DepositSlots({
   lifetime,
   now,
   pending = false,
+  pool,
   explanation,
 }: LiquityV2DepositCardProps): PositionCardSlots {
   const detail = surface === "detail";
@@ -266,6 +270,18 @@ export function liquityV2DepositSlots({
         ),
       });
   }
+  const share = now && pool ? poolShare(now.now, pool.totalRaw) : null;
+  if (now && pool && share != null)
+    right.push({
+      id: "pool-share",
+      label: "Share of the pool",
+      tip: `The deposit's part of all the BOLD in the ${b} Stability Pool. Each liquidation the pool absorbs takes its debt from every deposit in proportion, so the deposit repays this share of the next one and receives this share of its ${b}.`,
+      value: (
+        <Prov info={spPoolShareProv(b, exactUnits(now.now), exactUnits(pool.totalRaw), pool.block)}>
+          {pctText(share)}
+        </Prov>
+      ),
+    });
   if (now)
     right.push({
       id: "burned-since",

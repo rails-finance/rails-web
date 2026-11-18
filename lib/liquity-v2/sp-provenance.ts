@@ -73,6 +73,23 @@ export function spPendingLossProv(branch: SpBranch): Provenance {
   };
 }
 
+/** The deposit's share of its pool: the two getters and the division. */
+export function spPoolShareProv(branch: SpBranch, deposit: string, total: string, block: number): Provenance {
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    verify: ask("getCompoundedBoldDeposit(depositor) and getTotalBoldDeposits()"),
+    summary: `Share of the pool — the deposit now, the pool's getCompoundedBoldDeposit(depositor), over all the BOLD deposited in the ${branch} Stability Pool, its getTotalBoldDeposits(), both at block ${block.toLocaleString("en-US")}.`,
+    contract: pool(branch),
+    formula: "getCompoundedBoldDeposit(depositor) ÷ getTotalBoldDeposits()",
+    inputs: [
+      { label: "Deposit now, BOLD", value: deposit, kind: "chain", pclass: "state" },
+      { label: "All deposits, BOLD", value: total, kind: "chain", pclass: "state" },
+    ],
+    via: `${VIA} · getTotalBoldDeposits() @ head`,
+  };
+}
+
 const SUM: Record<string, (c: string) => string> = {
   deposited: () => "BOLD deposited — the sum of every DepositOperation's positive topUpOrWithdrawal on this deposit.",
   withdrawn: () => "BOLD withdrawn — the sum of every DepositOperation's negative topUpOrWithdrawal on this deposit.",
