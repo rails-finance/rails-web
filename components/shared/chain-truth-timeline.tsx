@@ -93,7 +93,7 @@ import {
 } from "@/lib/shared/ui-grammar";
 import { usePositionCardIdentity } from "@/components/shared/position-card-edge";
 import { unreadTokensIn } from "@/lib/shared/decimals-unread";
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useParams, usePathname } from "next/navigation";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { SingleWalletProvider, useTimelineScale } from "@/components/shared/activity-timeline";
@@ -2093,6 +2093,7 @@ function ChainTruthTimelineBody({
       <SectionSidebar section="timeline">
         <div
           className={boxed ? `space-y-3 rounded-2xl bg-raised ${CARD_PAD_X} py-4` : "space-y-3"}
+          style={boxed ? ({ "--spine-ground": "var(--surface-raised)" } as CSSProperties) : undefined}
           data-anatomy="P3"
           data-timeline-rows-drawn={Math.min(windowSize, rows.length)}
           data-timeline-rows-loaded={rows.length}

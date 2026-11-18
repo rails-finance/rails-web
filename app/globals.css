@@ -138,9 +138,7 @@
      near-white panels read as elevated sheets on it. Surface overlays darken
      on hover (warm-black alphas) because the panels they ride are near-white —
      a white-alpha lift would be invisible on a white panel. */
-  --background: oklch(
-    1 0 0
-  ); /* #ffffff: the canvas is white and the panels sit a shade below it (Miles, 22 Oct 2026) */
+  --background: rgb(245 245 245); /* whitesmoke: the panels sit white on it (Miles, 18 Nov 2026) */
 
   /* Tinted with the paper hue (at low chroma) rather than pure black, so
      hover/active fills on the panels read as deeper paper, not neutral grey —
@@ -157,12 +155,12 @@
      (`bg-raised`, `bg-sunken`, …) instead of a raw `bg-rb-100 dark:bg-rb-800`
      pair — see the `@utility` block below. Light values here; dark overrides in
      `html.dark`. canvas = `--background`, overlay = `--surface-overlay`. */
-  --surface-raised: var(--color-rb-100); /* cards, panels, inputs, active in-place control */
+  --surface-raised: rgb(255 255 255); /* cards, panels, inputs, active in-place control */
   --surface-sunken: var(--color-rb-200); /* segmented tracks, inset chips, recessed wells */
   --edge-row-line: var(--color-rb-200); /* the hairline between the house table's rows (D1) */
   --surface-row-hover: var(--color-rb-100); /* the house table's hovered row, a rounded block (D1) */
   --surface-marker: var(--color-rb-200); /* small inline tags: badges, count pills, token chips */
-  --surface-skeleton: var(--color-rb-100); /* loading shimmer — matched to --surface-raised */
+  --surface-skeleton: rgb(255 255 255); /* loading shimmer — matched to --surface-raised */
   --surface-selected: var(--color-rb-300); /* pressed/active segment in a toggle group */
   --edge-row-hover: var(--color-rb-400); /* a neutral outline on a floating tip */
   --surface-field: oklch(

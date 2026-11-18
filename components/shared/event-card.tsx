@@ -895,7 +895,7 @@ function EventCardView(props: EventCardProps) {
             ref={captionRef}
             aria-hidden={phoneMark ? undefined : true}
             className={`${phoneMark ? "flex flex-wrap items-center justify-center gap-x-1" : "block"} max-w-full px-2 text-center text-xs leading-5 ${showDetail ? "text-foreground" : "text-rb-500"}`}
-            style={{ backgroundColor: "var(--background)" }}
+            style={{ backgroundColor: "var(--spine-ground, var(--background))" }}
           >
             {captionText}
           </span>
