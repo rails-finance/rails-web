@@ -5,6 +5,7 @@
 // inside aave-v4-price-runway.tsx and trove-price-axis.tsx so both runways and
 // the bottom price strip render prices the same way.
 
+import { OFF_PAR_BAND } from "@/components/shared/usd-figure";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 
 /** Compact USD formatter shared across the price-display surfaces. */
@@ -51,6 +52,9 @@ export interface PricePillProps {
   /** The figure as the view's own card writes it, drawn in place of the
    *  pill's formatting so the two agree on precision. */
   figure?: string;
+  /** A dollar stablecoin beyond DEPEG_BAND off $1 (`offPar`): the figure takes
+   *  the caution orange. */
+  band?: boolean;
 }
 
 export function PricePill({
@@ -63,6 +67,7 @@ export function PricePill({
   title,
   bare = false,
   figure,
+  band = false,
 }: PricePillProps) {
   return (
     <span
@@ -71,7 +76,12 @@ export function PricePill({
     >
       <TokenChipIcon symbol={symbol} address={address} size={14} filterable={filterable} />
       {showSymbol && <span className="font-medium text-rb-500">{symbol}</span>}
-      <span className="font-bold text-green-400">{figure ?? (unit ? fmtNative(price, unit) : fmtPrice(price))}</span>
+      <span
+        className={`font-bold ${band ? OFF_PAR_BAND : "text-green-400"}`}
+        data-usd-off-par={band ? "band" : undefined}
+      >
+        {figure ?? (unit ? fmtNative(price, unit) : fmtPrice(price))}
+      </span>
     </span>
   );
 }

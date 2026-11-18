@@ -43,14 +43,25 @@ export function useDustOpen(): { open: boolean; toggle: () => void } {
 }
 
 /** The dotted-underline "Show dust" / "Hide dust" control. */
-export function DustToggle({ count, open, onToggle }: { count: number; open: boolean; onToggle: () => void }) {
+export function DustToggle({
+  count,
+  open,
+  onToggle,
+  title = "Dust: a balance worth under a cent at the oracle price, usually the last units a withdrawal or repayment left behind. Open to see it.",
+}: {
+  count: number;
+  open: boolean;
+  onToggle: () => void;
+  /** What the dust is, on hover; a receipt's rows say it their way. */
+  title?: string;
+}) {
   if (count === 0) return null;
   return (
     <button
       type="button"
       className="text-left text-xs text-rb-500 underline decoration-dotted underline-offset-2 hover:text-rb-700 dark:hover:text-rb-300"
       data-dust-hidden={count}
-      title="Dust: a balance worth under a cent at the oracle price, usually the last units a withdrawal or repayment left behind. Open to see it."
+      title={title}
       aria-expanded={open}
       onClick={onToggle}
     >

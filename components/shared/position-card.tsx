@@ -111,6 +111,9 @@ export interface PositionCardStatus {
   /** A sub-code the tag also carries where the state has its own key row
    *  (rails-ops reference/app-anatomy.md): "C6.1", a shut-down Trove. */
   anatomy?: string;
+  /** The word's receipt, where the state is a fact read from a source
+   *  (a Trove opened and closed in one transaction, ui-jobs 747). */
+  prov?: Provenance;
 }
 
 /** One headline figure. */
@@ -461,7 +464,7 @@ function StatusTag({ status }: { status: PositionCardStatus }) {
         className={`rounded-xs px-1.5 py-0.5 text-[11px] font-semibold ${POSITION_TAG_TONE[status.tone]}`}
         data-anatomy={status.anatomy ? `C6 ${status.anatomy}` : "C6"}
       >
-        {status.word}
+        {status.prov ? <Prov info={status.prov}>{status.word}</Prov> : status.word}
       </span>
       {status.tip && <RowHelp tip={status.tip} name={status.word} />}
     </span>
@@ -490,7 +493,13 @@ function ListingPill({ status }: { status: PositionCardStatus | null }) {
       className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${status ? POSITION_TAG_TONE[status.tone] : OPEN_PILL}`}
       data-anatomy={status?.anatomy ? `C6 ${status.anatomy}` : "C6"}
     >
-      {status ? status.word.toUpperCase() : "OPEN"}
+      {status?.prov ? (
+        <Prov info={status.prov}>{status.word.toUpperCase()}</Prov>
+      ) : status ? (
+        status.word.toUpperCase()
+      ) : (
+        "OPEN"
+      )}
     </span>
   );
 }

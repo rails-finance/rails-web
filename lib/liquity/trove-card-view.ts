@@ -10,6 +10,7 @@ import type { OraclePricesData } from "@/types/api/oracle";
 import type { LiquityTroveLive, LiquityTroveView } from "@/components/protocol/liquity-family/types";
 import { getBatchManagerByAddress, getBatchManagerDeprecation } from "@/lib/services/batch-manager-service";
 import { getTroveNftUrl } from "@/lib/utils/nft-utils";
+import { closedInOneTransaction } from "@/lib/liquity-v2/same-tx-close";
 
 function priceFor(collateralType: string, prices?: OraclePricesData | null): number | null {
   if (!prices) return null;
@@ -45,6 +46,7 @@ export function viewFromTroveSummary(t: TroveSummary, prices?: OraclePricesData 
     // actions against the trove, not the owner's, so they're excluded here
     // (V2's long-standing rule; the redemption count rides its own slot).
     txCount: t.activity.transactionCount - t.activity.redemptionCount,
+    closedInOneTx: closedInOneTransaction(t),
     liquidationCount: 0,
     redemptionCount: t.activity.redemptionCount,
     owner: t.owner,

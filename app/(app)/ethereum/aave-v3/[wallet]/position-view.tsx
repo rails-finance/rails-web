@@ -480,7 +480,7 @@ export default function AaveV3PositionDetail({
     // Not cancelled when the lifetime changes under it (the route's answer
     // landing): the prices still belong to this wallet's view.
     fetchAaveV3OraclePrices(missing, market)
-      .then((prices) => {
+      .then(({ prices }) => {
         if (Object.keys(prices).length === 0) return;
         setView((v) =>
           v && v.wallet.toLowerCase() === wallet.toLowerCase()
@@ -689,6 +689,51 @@ export default function AaveV3PositionDetail({
     () => (view && chain ? v3ViewWithLiveRead(view, chain) : view),
     [view, chain],
   );
+
+  // The card's prices: the market's oracle at the card's block (the Pool
+  // read's), so the dollars, the health factor and the liquidation price
+  // stand on one block. Without a Pool read, the latest, named. A failed read
+  // leaves the card without dollars; it never borrows the listing's.
+  const [cardPrices, setCardPrices] = useState<{
+    key: string;
+    prices: Record<string, number>;
+    block: number | null;
+  } | null>(null);
+  const heldKey = useMemo(() => {
+    if (!view || view.status !== "open" || !chainSettled) return null;
+    const held = [...new Set([...view.supplies, ...view.borrows].map((r) => r.address.toLowerCase()))].sort();
+    return held.length > 0 ? `${wallet}:${market}:${chain?.blockNumber ?? "head"}:${held.join(",")}` : null;
+  }, [view, chain, chainSettled, wallet, market]);
+  useEffect(() => {
+    if (!heldKey) return;
+    let cancelled = false;
+    const [, , at, held] = heldKey.split(":");
+    fetchAaveV3OraclePrices(held.split(","), market, at === "head" ? undefined : Number(at))
+      .then((r) => {
+        if (!cancelled) setCardPrices({ key: heldKey, ...r });
+      })
+      .catch(() => {
+        if (!cancelled) setCardPrices({ key: heldKey, prices: {}, block: null });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [heldKey, market]);
+  const cardPriced = cardPrices != null && cardPrices.key === heldKey;
+  const pricedView = useMemo<AaveV3PositionView | null>(
+    () =>
+      liveView && liveView.status === "open"
+        ? {
+            ...liveView,
+            priceByAddress: cardPriced ? cardPrices.prices : {},
+            priceBlock: cardPriced ? cardPrices.block : null,
+          }
+        : liveView,
+    [liveView, cardPriced, cardPrices],
+  );
+  // What the export and the Explanation state: the card's figures, so they
+  // go without dollars while the card does and never take the listing's prices.
+  const statedView = pricedView;
   // The card's stamp follows the Pool read once the figures stand on it (ui-jobs 512).
   const liveRead = useMemo(() => (view && chain ? readOfHeadAnswer(chain) : null), [view, chain]);
   useReportPositionRead(liveRead);
@@ -697,8 +742,8 @@ export default function AaveV3PositionDetail({
   // interest split; the live Pool read feeds the rate and streams in when it
   // lands. Computed once: the card and the LLM export share the object so they
   // agree number-for-number.
-  const captions = liveView
-    ? computeAaveV3CardCaptions(liveView, lifetimeEvents, chain, precomputedLifetime, aaveEvents, servedFolders)
+  const captions = statedView
+    ? computeAaveV3CardCaptions(statedView, lifetimeEvents, chain, precomputedLifetime, aaveEvents, servedFolders)
     : null;
 
   // The supplies that back no borrowing, which the card states apart
@@ -733,29 +778,29 @@ export default function AaveV3PositionDetail({
   const flowFocus = useFlowFocusValue(focusRoot, flowTimeline);
   // The card's count counts transactions; its tip gives the events too.
   const cardView = useMemo(
-    () => (liveView && flowSeries ? { ...liveView, eventTotal: flowSeries.totalEvents } : liveView),
-    [liveView, flowSeries],
+    () => (pricedView && flowSeries ? { ...pricedView, eventTotal: flowSeries.totalEvents } : pricedView),
+    [pricedView, flowSeries],
   );
 
   // The top row's price dropdown: the on-chain oracle
   // price of each reserve the account currently holds.
   const stripAssets = useMemo<LatestPriceAsset[]>(() => {
-    if (!liveView || liveView.status !== "open") return [];
-    // Each price is the oracle's read at the overlay's head block; the
+    if (!pricedView || pricedView.status !== "open") return [];
+    // Each price is the card's: the oracle's read at the block it names; the
     // trigger's leading figure carries that receipt.
-    const vocab = aaveMarketVocab("aave-v3", { blockNumber: chain?.blockNumber ?? liveView.atBlock });
+    const vocab = aaveMarketVocab("aave-v3", { blockNumber: pricedView.priceBlock ?? undefined });
     const seen = new Set<string>();
     const out: LatestPriceAsset[] = [];
-    for (const r of [...liveView.supplies, ...liveView.borrows]) {
+    for (const r of [...pricedView.supplies, ...pricedView.borrows]) {
       const a = r.address.toLowerCase();
       if (seen.has(a)) continue;
       seen.add(a);
-      const p = liveView.priceByAddress?.[a];
+      const p = pricedView.priceByAddress?.[a];
       if (typeof p === "number" && p > 0)
         out.push({ symbol: r.symbol, address: r.address, price: p, info: vocab.reservePriceProv(r.symbol) });
     }
     return out;
-  }, [liveView, chain]);
+  }, [pricedView]);
 
   // Which Pool the receipts name. Core, Prime and EtherFi are three separate
   // contracts and the market is a query parameter, so before this the cards on
@@ -776,7 +821,7 @@ export default function AaveV3PositionDetail({
         configLog,
         wallet,
         marketName: MARKET_NAME[market] ?? "Core",
-        view: liveView ?? view,
+        view: statedView ?? view,
         chain,
         captions,
         events: aaveEvents,
@@ -823,6 +868,7 @@ export default function AaveV3PositionDetail({
                   // until the read answers.
                   chain={chain}
                   hfPending={!chainSettled}
+                  pricesPending={heldKey == null ? !chainSettled : !cardPriced}
                   notCollateral={notCollateral}
                   exports={exports}
                   // The Explanation is now pure layman prose about those same face
@@ -839,7 +885,7 @@ export default function AaveV3PositionDetail({
                       <AaveV3PositionExplanation
                         chain={chain}
                         captions={captions}
-                        view={liveView}
+                        view={statedView}
                         externalActivity={externalActivity}
                       />
                     )

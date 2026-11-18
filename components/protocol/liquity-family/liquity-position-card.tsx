@@ -145,6 +145,7 @@ import type {
 import { formatCompact } from "@/lib/shared/format-compact";
 import { branchShutdownState, type BranchShutdownState } from "@/lib/liquity-fork/shutdown";
 import { recordedShutdown } from "@/lib/shared/liquity-family-shutdown";
+import { SAME_TX_CLOSE_WORD, sameTxCloseProv } from "@/lib/liquity-v2/same-tx-close";
 
 // The shared card renders inside Link-wrapped rows on
 // listing/umbrella pages, so an inner <a> would nest anchors (invalid HTML,
@@ -596,6 +597,9 @@ export interface LiquityPositionCardProps {
   /** The branch's shutdown (ui-jobs 612), from the page's `useBranchShutdown`.
    *  Absent (a listing row), the catalog's record stands alone. */
   shutdown?: BranchShutdownState | null;
+  /** A notice about the Trove's branch at the card's head (Liquity V2's
+   *  Safety Mode, ui-jobs 747), under the delegate's. */
+  branchNotice?: ReactNode;
 }
 
 /** The Liquity family's slots for the shared position card: the four
@@ -616,6 +620,7 @@ export function useLiquityCardSlots({
   exports,
   foot,
   shutdown,
+  branchNotice,
 }: LiquityPositionCardProps): PositionCardSlots {
   const cfg = LIQUITY_FORK_CARD_CONFIGS[protocol];
   const ops = OPS[protocol];
@@ -728,7 +733,9 @@ export function useLiquityCardSlots({
     v.status === "liquidated"
       ? { word: "Liquidated", tone: "danger" }
       : v.status === "closed"
-        ? { word: "Closed", tone: "muted" }
+        ? v.closedInOneTx
+          ? { word: SAME_TX_CLOSE_WORD, tone: "muted", anatomy: "C6.2·liquity", prov: sameTxCloseProv(ct, v.id) }
+          : { word: "Closed", tone: "muted" }
         : shut
           ? { word: "Shut down", tone: "caution", anatomy: "C6.1" }
           : zombie
@@ -988,7 +995,21 @@ export function useLiquityCardSlots({
     ];
   }
 
-  const common = { status, heads, identity, notice: deprecationBanner || undefined, counters, outcome, name };
+  const common = {
+    status,
+    heads,
+    identity,
+    notice:
+      deprecationBanner || branchNotice ? (
+        <>
+          {deprecationBanner || null}
+          {branchNotice}
+        </>
+      ) : undefined,
+    counters,
+    outcome,
+    name,
+  };
   // The listing's right end: the branch and the Trove ID.
   if (!detail)
     return {

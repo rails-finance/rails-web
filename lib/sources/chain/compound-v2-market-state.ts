@@ -81,6 +81,9 @@ export interface CompoundV2MarketState {
  *  live (`head`), its stored snapshot (`stored`), or neither (the chain). */
 export interface CompoundV2MarketRead {
   blockNumber: number;
+  /** The oracle Comptroller.oracle() named at that block: the contract each
+   *  price was read from. Absent on a snapshot stored before it was kept. */
+  oracle?: string;
   head?: PositionHeadStamp;
   stored?: StoredHeadRead;
 }
@@ -106,6 +109,7 @@ export async function resolveCompoundV2MarketState(): Promise<CompoundV2MarketSt
       const head = stored ? undefined : serverHeadStampAt(MAINNET_CHAIN_ID, block);
       value.read = {
         blockNumber: stored?.blockNumber ?? block,
+        ...(value.read?.oracle ? { oracle: value.read.oracle } : {}),
         ...(head ? { head } : {}),
         ...(stored ? { stored } : {}),
       };
@@ -215,6 +219,6 @@ async function readMarketState(client: PublicClient): Promise<CompoundV2MarketSt
     });
   });
 
-  if (out.size > 0) out.read = { blockNumber: Number(blockNumber) };
+  if (out.size > 0) out.read = { blockNumber: Number(blockNumber), oracle: oracle.toLowerCase() };
   return out;
 }

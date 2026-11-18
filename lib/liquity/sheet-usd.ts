@@ -4,7 +4,7 @@
 // price, and the event's row what takes Before to the Total. Pure, so
 // scripts/test/card-usd-receipt.test.mjs asserts the two identities.
 
-import { shownUsd } from "@/lib/shared/holder-usd-receipt";
+import { shownUsd } from "@/lib/shared/shown-usd";
 
 const toCents = (x: number): number => Math.round(x * 100) / 100;
 
