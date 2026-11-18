@@ -19,6 +19,7 @@
 // the data boundary.
 
 import type { AaveV4UsdResult } from "@/lib/aave-v4/usd-receipt";
+import { aaveV4SpokeSideUsd } from "@/lib/aave-v4/spoke-usd";
 import { aaveV4NoPriceLine } from "@/lib/aave-v4/price-notes";
 import { shownUsd } from "@/lib/shared/shown-usd";
 import { formatExact } from "@/lib/utils/format";
@@ -183,9 +184,9 @@ function openHeadlines(args: AaveV4SpokeMarkdownArgs): string[] {
   // "Collateral" = full deposit).
   // The card's figures: the sums of the shown products its receipts list, or
   // the assets with no on-chain price (ui-jobs 743).
-  const side = (r: AaveV4UsdResult | null | undefined, fallback: number) =>
+  const side = (r: AaveV4UsdResult | null, fallback: number) =>
     r == null ? usd(fallback) : r.prov == null ? aaveV4NoPriceLine(r.missing) : usd(r.usd);
-  let collLine = `- **Collateral:** ${side(card.onchainUsd?.supply, card.totalSupplyUsd)} supplied`;
+  let collLine = `- **Collateral:** ${side(aaveV4SpokeSideUsd(card, "supply"), card.totalSupplyUsd)} supplied`;
   if (card.weightedCollateralUsd > 0) {
     collLine += ` (${usd(card.weightedCollateralUsd)} counts at the collateral factor`;
     collLine += card.blendedLt != null ? `, ~${num(card.blendedLt * 100, 0)}% blended)` : ")";
@@ -196,7 +197,7 @@ function openHeadlines(args: AaveV4SpokeMarkdownArgs): string[] {
   }
 
   // Debt + what's borrowed.
-  out.push(`- **Debt:** ${side(card.onchainUsd?.debt, card.totalDebtUsd)}`);
+  out.push(`- **Debt:** ${side(aaveV4SpokeSideUsd(card, "debt"), card.totalDebtUsd)}`);
   if (card.borrowingSymbols.length) {
     out.push(`- **Borrowing:** ${card.borrowingSymbols.join(", ")}`);
   }

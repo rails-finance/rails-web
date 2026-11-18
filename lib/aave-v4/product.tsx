@@ -23,12 +23,10 @@ import { CLASS_ORDER } from "@/components/shared/aave-reserve-parts";
 import { MarketPage } from "@/components/shared/product/market-page";
 import { MarketRoster } from "@/components/shared/product/market-roster";
 import { positionEntry } from "@/components/shared/product/position-entry";
-import { PricesProvider, usePrices, useRequestPrices } from "@/lib/shared/prices-context";
-import { listSymbols, NO_PRICE_HINT } from "@/lib/aave-v4/unpriced";
 import { fetchAaveV4Hubs } from "@/lib/api/fetch-aave-v4-hubs";
 import { getV4Read, useV4Heads, type V4Read, type V4ReserveHead } from "@/lib/api/fetch-aave-v4-reserve";
 import { shownUsd } from "@/lib/shared/shown-usd";
-import { aaveV4NoPriceLine } from "@/lib/aave-v4/price-notes";
+import { aaveV4AssetName, aaveV4NoPriceLine } from "@/lib/aave-v4/price-notes";
 import { isReadCeiling, READ_CEILING_CODE } from "@/lib/shared/read-ceiling";
 import { AAVE_V4_ARC_API_ROOT, AAVE_V4_BASE_API_ROOT, AAVE_V4_ORACLE_ROUTE } from "@/lib/aave-v4/deployment-routes";
 import type { ArcMarketsRead } from "@/lib/aave-v4-arc/types";
@@ -219,24 +217,27 @@ export function useV4PriceBook(s: V4Stored | null): V4PriceBook | null {
   }, [eth]);
   const held = oracle && oracle !== "failed" ? oracle : null;
   // The lines the map leaves out, one reserve read each: its spoke oracle's getReservePrice.
+  // A failed oracle read fans out no reserve reads: the book then has no
+  // Ethereum prices, and every figure names its assets.
   const missing = useMemo(() => {
-    if (!s || !eth || !oracle) return [];
+    if (!s || !eth || !held) return [];
     const seen = new Set<string>();
     return s.lines.filter((l) => {
       if (held?.prices[l.underlying] || l.base || l.held || seen.has(l.underlying)) return false;
       seen.add(l.underlying);
       return true;
     });
-  }, [s, eth, oracle, held]);
-  const [reserves, setReserves] = useState<V4ReservePrices | null>(null);
+  }, [s, eth, held]);
+  // The reserve reads, keyed by the question they answered: an answer to an
+  // older question is loading, so no figure shows before its own read lands.
+  const [reserves, setReserves] = useState<{ key: string; prices: V4ReservePrices } | null>(null);
   const missingKey = missing.map((l) => `${l.spokeKey}:${l.underlying}:${l.hub}`).join("|");
   useEffect(() => {
     if (missing.length === 0) {
-      setReserves({});
+      setReserves({ key: missingKey, prices: {} });
       return;
     }
     const ac = new AbortController();
-    setReserves(null);
     Promise.all(
       missing.map(async (l) => {
         const r = await getV4Read<V4ReserveHead>(
@@ -252,17 +253,21 @@ export function useV4PriceBook(s: V4Stored | null): V4PriceBook | null {
       }),
     ).then((got) => {
       if (ac.signal.aborted) return;
-      setReserves(Object.fromEntries(got.filter((g): g is NonNullable<typeof g> => g != null)));
+      setReserves({
+        key: missingKey,
+        prices: Object.fromEntries(got.filter((g): g is NonNullable<typeof g> => g != null)),
+      });
     });
     return () => ac.abort();
     // `missingKey` is the question.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [missingKey]);
+  const answered = reserves != null && reserves.key === missingKey ? reserves.prices : null;
   return useMemo(() => {
     if (!s) return null;
-    if (eth && (oracle == null || reserves == null)) return null;
-    return priceBook(s, held, reserves ?? {});
-  }, [s, eth, oracle, held, reserves]);
+    if (eth && (oracle == null || answered == null)) return null;
+    return priceBook(s, held, answered ?? {});
+  }, [s, eth, oracle, held, answered]);
 }
 
 /** A total as the export prints it: the dollars, or the assets it lacks a price for. */
@@ -399,13 +404,13 @@ function rosterHead(s: V4Stored, r: RosterSpoke): ProductHead {
     {
       slot: "sizeIn",
       label: "Supplied",
-      tip: sup.title,
+      tip: r.supplied.usd != null ? sup.title : undefined,
       value: <PricedTotal sum={r.supplied} info={storedValueProv("supplied", sp.name, c, r.supplied)} />,
     },
     {
       slot: "sizeOut",
       label: "Borrowed",
-      tip: bor.title,
+      tip: r.borrowed.usd != null ? bor.title : undefined,
       value: <PricedTotal sum={r.borrowed} info={storedValueProv("borrowed", sp.name, c, r.borrowed)} />,
     },
     ...(sp.positions != null
@@ -499,11 +504,7 @@ const EMPTY_TABLE: ReserveTableModel = {
 
 /** The markets roster: every spoke on the deployment. */
 export function AaveV4Markets({ d }: { d: V4Deployment }) {
-  return (
-    <PricesProvider>
-      <RosterBody d={d} />
-    </PricesProvider>
-  );
+  return <RosterBody d={d} />;
 }
 
 // ── One spoke (A2) ───────────────────────────────────────────────────────────
@@ -835,9 +836,23 @@ function DrawsFrom({ d, sp, rows }: { d: V4Deployment; sp: V4Spoke; rows: V4Row[
       .filter((r) => r.line.hub === h)
       .reduce((a, r) => a + (r.price ? shownUsd(rowTokens(r, "borrowed"), r.price.usd) : 0), 0);
   const total = sp.hubs.reduce((a, h) => a + owed(h), 0);
+  // A borrowed reserve with no on-chain price leaves the shares unmeasured:
+  // none is shown, and the assets are named (ui-jobs 743).
+  const unpriced = [
+    ...new Set(
+      rows
+        .filter((r) => !r.price && rowTokens(r, "borrowed") > 0)
+        .map((r) => aaveV4AssetName(r.line.symbol, r.line.underlying)),
+    ),
+  ];
   return (
     <div data-prov-exempt="">
       <div className="mb-1.5 text-[11px] uppercase tracking-wider text-rb-500">Draws from</div>
+      {unpriced.length > 0 && (
+        <p className="mb-1 text-[11px] text-rb-500" data-draws-unpriced="">
+          No shares: {aaveV4NoPriceLine(unpriced).replace(/^no dollar figure: /, "")}
+        </p>
+      )}
       <ul className="space-y-1 text-[13px]">
         {sp.hubs.map((h) => (
           <li key={h} className="flex items-baseline justify-between gap-3" data-draws-from={h}>
@@ -845,7 +860,11 @@ function DrawsFrom({ d, sp, rows }: { d: V4Deployment; sp: V4Spoke; rows: V4Row[
               {V4_HUB_LABEL[h]}
             </Link>
             <span className="tabular-nums text-rb-500" title="Share of this spoke's borrowing drawn from the hub">
-              {total > 0 ? `${Math.round((owed(h) / total) * 100)}% of borrowing` : "no borrowing"}
+              {unpriced.length > 0
+                ? ""
+                : total > 0
+                  ? `${Math.round((owed(h) / total) * 100)}% of borrowing`
+                  : "no borrowing"}
             </span>
           </li>
         ))}
@@ -927,7 +946,7 @@ function spokeHead(d: V4Deployment, s: V4Stored, sp: V4Spoke, rows: V4Row[]): Pr
     {
       slot: "sizeIn",
       label: "Supplied",
-      tip: sup.title,
+      tip: supSum.usd != null ? sup.title : undefined,
       value: (
         <PricedTotal sum={supSum} info={spokeValueProv(sp.name, "supplied", block, read.length, supSum, d.chainId)} />
       ),
@@ -935,7 +954,7 @@ function spokeHead(d: V4Deployment, s: V4Stored, sp: V4Spoke, rows: V4Row[]): Pr
     {
       slot: "sizeOut",
       label: "Borrowed",
-      tip: bor.title,
+      tip: borSum.usd != null ? bor.title : undefined,
       value: (
         <PricedTotal sum={borSum} info={spokeValueProv(sp.name, "borrowed", block, read.length, borSum, d.chainId)} />
       ),
@@ -1048,11 +1067,7 @@ export function useSpokeRows(sp: V4Spoke | null, book: V4PriceBook | null, d?: V
 
 /** The spoke page: its head, then its reserves. */
 export function AaveV4SpokePage({ d, slug }: { d: V4Deployment; slug: string }) {
-  return (
-    <PricesProvider>
-      <SpokeBody d={d} slug={slug} />
-    </PricesProvider>
-  );
+  return <SpokeBody d={d} slug={slug} />;
 }
 
 function SpokeBody({ d, slug }: { d: V4Deployment; slug: string }) {

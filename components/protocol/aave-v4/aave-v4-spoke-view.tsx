@@ -116,7 +116,6 @@ import { fetchFlowSeries, type FlowSeries } from "@/lib/api/fetch-aave-v3-flow-s
 import { shortAddr } from "@/lib/shared/format-event";
 import { useWalletContext } from "@/components/nav/wallet-context";
 import { useAaveV4UiState } from "@/hooks/useAaveV4UiState";
-import { PricesProvider } from "@/lib/shared/prices-context";
 import { useAaveV4OracleRead, type OraclePriceMap } from "@/lib/aave-v4/use-oracle-prices";
 import { listSymbols } from "@/lib/aave-v4/unpriced";
 import { computeOnchainUsd } from "@/lib/aave-v4/onchain-usd";
@@ -150,19 +149,10 @@ export interface AaveV4SpokeViewProps {
    *  windowed read that seeded `initialEvents`. Null when the read answered
    *  the whole history (the events are the count) or did not answer at all. */
   initialSpokeTotalEvents?: number | null;
-  /** Address→USD, read on the server beside the tail. Seeds PricesProvider so
-   *  the card's collateral / supplied figure renders into the HTML rather than
-   *  as a skeleton the client fills after hydration. Empty when the read
-   *  failed — the provider then fetches on mount as it always did. */
-  initialPrices?: Record<string, number>;
 }
 
 export default function AaveV4SpokeView(props: AaveV4SpokeViewProps) {
-  return (
-    <PricesProvider initialPrices={props.initialPrices}>
-      <AaveV4SpokePageInner {...props} />
-    </PricesProvider>
-  );
+  return <AaveV4SpokePageInner {...props} />;
 }
 
 function AaveV4SpokePageInner({
@@ -338,7 +328,8 @@ function AaveV4SpokePageInner({
           reserves: resolveFallbackCollateral(eventActiveGroup.result.reserves),
         },
       };
-      return buildSpokeCards([hardenedGroup], prices)[0] ?? eventActiveCard;
+      const built = buildSpokeCards([hardenedGroup], prices)[0] ?? eventActiveCard;
+      return { ...built, oracleRead };
     }
     const patched = patchSpokeCardWithChain(eventActiveCard, chainPosition, chainTruthPrices);
     // Interest carry needs both legs together: chain-state current balances and
@@ -361,6 +352,7 @@ function AaveV4SpokePageInner({
       // balances at Aave's own oracle price — lets On-chain-values show these
       // as chain-derived instead of middotting the DefiLlama figure.
       onchainUsd: computeOnchainUsd(chainPosition, oracleRead),
+      oracleRead,
     };
   }, [eventActiveCard, eventActiveGroup, chainPosition, prices, chainTruthPrices, oracleRead, sortedEvents, spokeName]);
   const activeGroup = useMemo(() => {

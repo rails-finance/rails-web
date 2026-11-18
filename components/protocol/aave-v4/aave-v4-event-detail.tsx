@@ -6,15 +6,13 @@ import type { EventCellSpec } from "@/components/shared/event-cells";
 import type { EventPriceChip } from "@/components/shared/event-price-row";
 import type { AaveV4Context, AaveV4PriceSource } from "@/lib/shared/types/protocols/aave-v4";
 import type { AaveV4SnapshotItem } from "@/lib/shared/types/event-shape";
-import { NO_PRICE_HINT, UNPRICED_DUST_TOKENS, noPriceRatioProv, pricesHaveLoaded } from "@/lib/aave-v4/unpriced";
+import { NO_PRICE_HINT, UNPRICED_DUST_TOKENS, noPriceRatioProv } from "@/lib/aave-v4/unpriced";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { usePreferences } from "@/lib/shared/preferences-context";
 import { formatRatio, ratioLabel, ratioColorClass } from "@/lib/shared/ratio-format";
 import { StatSubline } from "@/components/shared/state-transition";
 import { hfLabelV4, fmtV4Amount, fmtUnitPrice } from "@/lib/aave-v4/format";
 import { PositionRow } from "@/components/shared/position-row";
-import { resolvePrice } from "@/lib/aave/prices";
-import { usePrices } from "@/lib/shared/prices-context";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import { borrowRatesByDebt } from "@/lib/aave-v4/borrow-rate";
@@ -237,7 +235,6 @@ export function useAaveV4Cells({
 } {
   const { prefs } = usePreferences();
   const ratioMode = prefs.ratioMode;
-  const prices = usePrices();
   // Concrete coordinates threaded into each row's balance / rate provenance.
   const coord: EventProvDetail = {
     spokeName: ctx.spokeName,
@@ -355,21 +352,18 @@ export function useAaveV4Cells({
 
   // RULE: Rails never invents a price (lib/aave-v4/unpriced.ts). The ratio
   // values each leg at the price the row above it shows — the row's own
-  // historic price, else the event's primary price, else the live map — and a
-  // leg none of these covers is left out and named, never counted as zero.
-  // Until the live map has answered, a leg with no historic price is pending
-  // rather than unpriced, and the card waits.
-  const mapAnswered = pricesHaveLoaded(prices);
+  // on-chain stored price, else the event's — and a leg neither covers is
+  // named, and the ratio is absent (ui-jobs 743).
   const sumLegs = (rows: AaveV4SnapshotItem[]) => {
     let usd = 0;
     const excluded: string[] = [];
-    let pending = false;
+    const pending = false;
     for (const r of rows) {
       const amt = parseFloat(r.amount);
       if (!(amt > 0)) continue;
-      const price = onChain(r.price)?.usd ?? rowPrice(r.symbol)?.usd ?? resolvePrice(r.symbol, prices);
+      // The row's stored on-chain price, else the event's; nothing off chain (ui-jobs 743).
+      const price = onChain(r.price)?.usd ?? rowPrice(r.symbol)?.usd ?? null;
       if (price != null) usd += shownUsd(amt, price);
-      else if (!mapAnswered) pending = true;
       else if (amt > UNPRICED_DUST_TOKENS) excluded.push(r.symbol);
     }
     return { usd, excluded, pending };
@@ -433,7 +427,8 @@ export function useAaveV4Cells({
           // the changed row so older clients / payloads without per-row prices
           // still render.
           const priceUsd =
-            s.price?.usd ?? (!isThisChanged ? undefined : isLiq ? ctx.collateralPrice?.usd : leg.price?.usd);
+            onChain(s.price)?.usd ??
+            (!isThisChanged ? undefined : isLiq ? onChain(ctx.collateralPrice)?.usd : onChain(leg.price)?.usd);
           return (
             <V4PositionRow
               key={s.symbol}
@@ -473,7 +468,9 @@ export function useAaveV4Cells({
         lines: debts.map((d) => {
           const leg = legOn(d.symbol, "debt") ?? ctx;
           const isThisChanged = legOn(d.symbol, "debt") != null;
-          const priceUsd = d.price?.usd ?? (!isThisChanged ? undefined : isLiq ? ctx.debtPrice?.usd : leg.price?.usd);
+          const priceUsd =
+            onChain(d.price)?.usd ??
+            (!isThisChanged ? undefined : isLiq ? onChain(ctx.debtPrice)?.usd : onChain(leg.price)?.usd);
           return (
             <V4PositionRow
               key={d.symbol}

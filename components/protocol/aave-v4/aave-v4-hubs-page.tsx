@@ -34,7 +34,6 @@ import {
   DataTableHeader,
   DataTableRow,
 } from "@/components/shared/data-table/data-table";
-import { PricesProvider } from "@/lib/shared/prices-context";
 import { aaveV4Modal } from "@/lib/aave-v4/event-templates";
 import { fmtUsd } from "@/lib/aave-v4/format";
 import { formatCompact } from "@/lib/shared/format-compact";
@@ -125,13 +124,13 @@ function hubHead(s: V4Stored, h: V4Hub, prices: Prices): ProductHead {
     {
       slot: "sizeIn",
       label: own ? "Hub supplied" : "Supplied",
-      tip: sup.title,
+      tip: supplied != null ? sup.title : undefined,
       value: <PricedTotal sum={supSum} info={storedValueProv("supplied", `The ${h.label} hub`, c, supSum, own)} />,
     },
     {
       slot: "sizeOut",
       label: own ? "Hub borrowed" : "Borrowed",
-      tip: bor.title,
+      tip: borrowed != null ? bor.title : undefined,
       value: <PricedTotal sum={borSum} info={storedValueProv("borrowed", `The ${h.label} hub`, c, borSum, own)} />,
     },
     ...(supplied != null && borrowed != null && supplied > 0
@@ -588,9 +587,5 @@ function HubsBody({ d }: { d: V4Deployment }) {
 
 /** The Hubs page of one deployment. */
 export function AaveV4HubsPage({ d }: { d: V4Deployment }) {
-  return (
-    <PricesProvider>
-      <HubsBody d={d} />
-    </PricesProvider>
-  );
+  return <HubsBody d={d} />;
 }

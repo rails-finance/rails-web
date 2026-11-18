@@ -67,9 +67,10 @@ import {
   YEARLY_COST_PROV,
 } from "@/lib/aave-v4/position-provenance";
 import { partialSumProv } from "@/lib/aave-v4/unpriced";
-import { aaveV4PeakReceipt, aaveV4UsdReceipt, type AaveV4UsdResult } from "@/lib/aave-v4/usd-receipt";
+import { aaveV4PeakReceipt, type AaveV4UsdResult } from "@/lib/aave-v4/usd-receipt";
+import { aaveV4SpokeSideUsd } from "@/lib/aave-v4/spoke-usd";
 import type { AaveV4Peak } from "@/lib/aave-v4/spoke-cards";
-import { aaveV4NoPriceLine } from "@/lib/aave-v4/price-notes";
+import { aaveV4NoPriceLine, AAVE_V4_PEAK_WHAT } from "@/lib/aave-v4/price-notes";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { useAaveV4Deployment } from "@/lib/aave-v4/deployment";
 import { PanelFigure } from "@/components/shared/position-card-panel";
@@ -80,31 +81,6 @@ export type { AaveSpokeCardInfo };
 // The interest figures are added since each balance last started from zero.
 const supplyInterestProv = () => interestSinceZeroProv("Earned interest inside the collateral");
 const borrowInterestProv = () => interestSinceZeroProv("Accrued interest inside the debt");
-
-/** A side's dollars and their receipt (ui-jobs 743): the chain read × the
- *  oracle read where both have landed (`spoke.onchainUsd`), else the side's
- *  legs at the oracle map's prices; where an asset on the side has no on-chain
- *  price, no figure and the asset named. Null where the side holds nothing. */
-function sideReceipt(
-  onc: AaveV4UsdResult | null | undefined,
-  legs: readonly { symbol: string; amount: number; price: number }[],
-  unpriced: readonly string[],
-  what: string,
-): AaveV4UsdResult | null {
-  if (onc !== undefined) return onc;
-  if (unpriced.length > 0) return { prov: null, usd: null, missing: [...unpriced] };
-  return aaveV4UsdReceipt({
-    what,
-    rows: legs.map((l) => ({
-      symbol: l.symbol,
-      amount: l.amount,
-      amountNote: "the position's balance from its events",
-      price: { usd: l.price },
-    })),
-    face: legs.length === 1 ? "cents" : "compact",
-    via: "event balances × the oracle map (/api/oracle/aave-v4)",
-  });
-}
 
 /** What stands where a side's figure cannot: the assets it has no on-chain price for. */
 function NoPriceLine({ missing }: { missing: string[] }) {
@@ -159,6 +135,18 @@ function oneAssetHead(
 /** A peak's receipt from its rows; the plain receipt where the walk kept none. */
 const peakInfo = (peak: AaveV4Peak | undefined, what: string, plain: Provenance): Provenance =>
   (peak ? aaveV4PeakReceipt(what, peak)?.prov : null) ?? plain;
+
+/** A peak's figure, or where no instant could be priced, the reserves it lacks a price for. */
+function peakValue(
+  usd: number,
+  peak: AaveV4Peak | undefined,
+  unpriced: string[] | undefined,
+  what: string,
+  plain: Provenance,
+): ReactNode {
+  if (!peak && unpriced && unpriced.length > 0) return <NoPriceLine missing={unpriced} />;
+  return <PeakUsd usd={usd} info={peakInfo(peak, what, plain)} />;
+}
 
 /** A closed card's peak, muted as a historic figure. */
 function PeakUsd({ usd, info }: { usd: number; info: Provenance }) {
@@ -344,7 +332,11 @@ export function useAaveV4SpokeCardSlots({
   // position ever carried real debt (peak debt under $1); an open card counts
   // any live debt, so a sub-dollar leftover borrow keeps its Debt and Health
   // factor heads.
-  const supplyOnly = isClosed ? spoke.peakDebtUsd < 1 : spoke.totalDebtUsd <= 0;
+  // A debt peak with no figure (its reserves unpriced) still means the
+  // position carried debt.
+  const supplyOnly = isClosed
+    ? spoke.peakDebtUsd < 1 && (spoke.peakDebtUnpriced ?? []).length === 0
+    : spoke.totalDebtUsd <= 0;
 
   const identity = (
     <span className="flex items-center gap-2">
@@ -392,8 +384,12 @@ export function useAaveV4SpokeCardSlots({
       {
         id: "peak-collateral",
         label: supplyOnly ? CARD_VOCAB.peakSupply : CARD_VOCAB.peakCollateral,
-        value: (
-          <PeakUsd usd={spoke.peakSupplyUsd} info={peakInfo(spoke.peakSupply, "The peak collateral", PEAK_COLL_PROV)} />
+        value: peakValue(
+          spoke.peakSupplyUsd,
+          spoke.peakSupply,
+          spoke.peakSupplyUnpriced,
+          AAVE_V4_PEAK_WHAT.supply,
+          PEAK_COLL_PROV,
         ),
       },
       ...(supplyOnly
@@ -402,8 +398,12 @@ export function useAaveV4SpokeCardSlots({
             {
               id: "peak-debt",
               label: CARD_VOCAB.peakDebt,
-              value: (
-                <PeakUsd usd={spoke.peakDebtUsd} info={peakInfo(spoke.peakDebt, "The peak debt", PEAK_DEBT_PROV)} />
+              value: peakValue(
+                spoke.peakDebtUsd,
+                spoke.peakDebt,
+                spoke.peakDebtUnpriced,
+                AAVE_V4_PEAK_WHAT.debt,
+                PEAK_DEBT_PROV,
               ),
             },
           ]),
@@ -444,29 +444,11 @@ export function useAaveV4SpokeCardSlots({
   const oneSupply = single(supplyLegs, spoke.supplyingSymbols);
   const oneColl = single(collLegs, spoke.supplyBreakdown.collateralSymbols);
   const oneDebt = single(debtLegs, spoke.borrowingSymbols);
-  // Each side's dollars and receipt (ui-jobs 743).
-  const unpricedOf = (legs: { symbol: string }[], symbols: string[]) =>
-    spoke.unpricedSymbols.filter((u) => symbols.includes(u) || legs.some((l) => l.symbol === u));
-  const supplyR = sideReceipt(
-    onc?.supply,
-    supplyLegs,
-    unpricedOf(supplyLegs, spoke.supplyingSymbols),
-    "Currently supplied in USD",
-  );
-  const collR = sideReceipt(
-    onc?.collateral,
-    collLegs,
-    unpricedOf(collLegs, spoke.supplyBreakdown.collateralSymbols),
-    "Current collateral in USD",
-  );
-  const debtR = sideReceipt(onc?.debt, debtLegs, unpricedOf(debtLegs, spoke.borrowingSymbols), "Current debt in USD");
-  const nonCollLegs = supplyLegs.filter((l) => !l.collateralEnabled);
-  const nonCollR = sideReceipt(
-    onc?.nonCollateral,
-    nonCollLegs,
-    unpricedOf(nonCollLegs, []),
-    "Supplied, not collateral, in USD",
-  );
+  // Each side's dollars and receipt (ui-jobs 743; lib/aave-v4/spoke-usd.ts).
+  const supplyR = aaveV4SpokeSideUsd(spoke, "supply");
+  const collR = aaveV4SpokeSideUsd(spoke, "collateral");
+  const debtR = aaveV4SpokeSideUsd(spoke, "debt");
+  const nonCollR = aaveV4SpokeSideUsd(spoke, "nonCollateral");
   // Supplies not enabled as collateral: they cannot be seized and do not move
   // the health factor; a line under the Collateral headline (TO-DO-position-card 341).
   const nonCollSub: ReactNode =

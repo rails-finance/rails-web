@@ -10,8 +10,9 @@
 // the figures (the collateral factor, the health factor, the risk premium,
 // the spoke) are the card's "?" (`L5.position` in the same file).
 
-import type { AaveV4UsdResult } from "@/lib/aave-v4/usd-receipt";
-import { aaveV4NoPriceLine } from "@/lib/aave-v4/price-notes";
+import { aaveV4PeakReceipt, type AaveV4UsdResult } from "@/lib/aave-v4/usd-receipt";
+import { aaveV4SpokeSideUsd } from "@/lib/aave-v4/spoke-usd";
+import { aaveV4NoPriceLine, AAVE_V4_PEAK_WHAT } from "@/lib/aave-v4/price-notes";
 import { v4Apy } from "@/lib/aave-v4/rates";
 import type { ReactNode } from "react";
 import {
@@ -119,12 +120,22 @@ function peaksBullet(spoke: AaveSpokeCardInfo, open: boolean): ReactNode | null 
   const debtAbove = spoke.peakDebtUsd > 1 && (!open || spoke.peakDebtUsd > spoke.totalDebtUsd * 1.01);
   const peak_supply = (
     <H>
-      <Prov info={PEAK_COLL_PROV}>{usd(spoke.peakSupplyUsd)}</Prov>
+      <Prov
+        info={
+          (spoke.peakSupply && aaveV4PeakReceipt(AAVE_V4_PEAK_WHAT.supply, spoke.peakSupply)?.prov) || PEAK_COLL_PROV
+        }
+      >
+        {usd(spoke.peakSupplyUsd)}
+      </Prov>
     </H>
   );
   const peak_debt = (
     <H>
-      <Prov info={PEAK_DEBT_PROV}>{usd(spoke.peakDebtUsd)}</Prov>
+      <Prov
+        info={(spoke.peakDebt && aaveV4PeakReceipt(AAVE_V4_PEAK_WHAT.debt, spoke.peakDebt)?.prov) || PEAK_DEBT_PROV}
+      >
+        {usd(spoke.peakDebtUsd)}
+      </Prov>
     </H>
   );
   if (supplyAbove && debtAbove) return positionNodes("peaks_both", { peak_supply, peak_debt });
@@ -145,8 +156,8 @@ function openBullets(spoke: AaveSpokeCardInfo): { lead: ReactNode; bullets: Bull
   const supplyOnly = spoke.totalDebtUsd <= 0;
   const supplyStr = joinSymbols(spoke.supplyingSymbols);
   const borrowStr = joinSymbols(spoke.borrowingSymbols);
-  const supply_usd = <H>{explainUsd(spoke.onchainUsd?.supply, spoke.totalSupplyUsd, SUPPLY_USD_PROV)}</H>;
-  const debt_usd = <H>{explainUsd(spoke.onchainUsd?.debt, spoke.totalDebtUsd, DEBT_USD_PROV)}</H>;
+  const supply_usd = <H>{explainUsd(aaveV4SpokeSideUsd(spoke, "supply"), spoke.totalSupplyUsd, SUPPLY_USD_PROV)}</H>;
+  const debt_usd = <H>{explainUsd(aaveV4SpokeSideUsd(spoke, "debt"), spoke.totalDebtUsd, DEBT_USD_PROV)}</H>;
   const name = (s: string) => <span className="text-foreground/90 font-medium">{s}</span>;
 
   let lead: ReactNode;
@@ -166,7 +177,7 @@ function openBullets(spoke: AaveSpokeCardInfo): { lead: ReactNode; bullets: Bull
   // The card's Collateral cell: the supplies enabled as collateral.
   const collStr = joinSymbols(spoke.supplyBreakdown.collateralSymbols);
   const coll_usd = (
-    <H>{explainUsd(spoke.onchainUsd?.collateral, spoke.supplyBreakdown.collateralUsd, COLL_USD_PROV)}</H>
+    <H>{explainUsd(aaveV4SpokeSideUsd(spoke, "collateral"), spoke.supplyBreakdown.collateralUsd, COLL_USD_PROV)}</H>
   );
   lead =
     collStr && borrowStr
@@ -391,7 +402,8 @@ export function AaveV4ClosedExplanation({
    *  names today's factors and says so. */
   factorsThen?: ClosedCollateralFactors;
 }) {
-  const supplyOnly = spoke.peakDebtUsd < 1;
+  // A debt peak with no figure (its reserves unpriced) still means debt was carried.
+  const supplyOnly = spoke.peakDebtUsd < 1 && (spoke.peakDebtUnpriced ?? []).length === 0;
   const cfsNow = useSpokeCollateralFactors(spoke.name);
   const then =
     factorsThen?.status === "ok" ? new Map([...factorsThen.factors].map(([sym, f]) => [sym, f.factor] as const)) : null;

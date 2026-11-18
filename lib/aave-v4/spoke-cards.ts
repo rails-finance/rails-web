@@ -9,6 +9,7 @@
 // carry (computeAaveV4InterestPnl) additionally consumes chain-state balances.
 
 import type { OnchainUsdTotals } from "@/lib/aave-v4/onchain-usd";
+import type { OracleRead } from "@/lib/aave-v4/use-oracle-prices";
 import { shownUsd } from "@/lib/shared/shown-usd";
 import { v4Apy } from "@/lib/aave-v4/rates";
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
@@ -121,6 +122,10 @@ export interface AaveEconomicsResult {
    *  oracle's at that reserve's last event (ui-jobs 743). */
   peakSupply?: AaveV4Peak;
   peakDebt?: AaveV4Peak;
+  /** Where no instant survived, the reserves with no on-chain price that kept
+   *  each out: the peak draws no figure and names them. */
+  peakSupplyUnpriced?: string[];
+  peakDebtUnpriced?: string[];
 }
 
 /** A peak as its receipt reads it: the block it stood at, and each reserve's
@@ -182,6 +187,8 @@ export interface AaveSpokeCardInfo {
   /** The peaks' rows (`AaveEconomicsResult.peakSupply`). */
   peakSupply?: AaveV4Peak;
   peakDebt?: AaveV4Peak;
+  peakSupplyUnpriced?: string[];
+  peakDebtUnpriced?: string[];
   collRatio: number | null;
   isClosed: boolean;
   eventCount: number;
@@ -269,6 +276,10 @@ export interface AaveSpokeCardInfo {
    *  asserted as read from the chain, so it middots via the DefiLlama figure). The
    *  whole object is absent when no chain-state balances / oracle prices are
    *  available (the derived DefiLlama view is unaffected). */
+  /** The holdings with no on-chain price, by side (`unpricedHoldingsOf`). */
+  unpricedHoldings?: { symbol: string; side: "supply" | "debt"; collateralEnabled: boolean }[];
+  /** The oracle read the card's prices come from: each fallback row names its source and block. */
+  oracleRead?: OracleRead | null;
   /** The headline dollars and their receipts from the chain read × the
    *  oracle read (lib/aave-v4/onchain-usd.ts). */
   onchainUsd?: OnchainUsdTotals;
@@ -532,6 +543,9 @@ export function calculateAaveEconomics(
   const reservePriceBlock = new Map<string, number>();
   let peakSupply: AaveV4Peak | undefined;
   let peakDebt: AaveV4Peak | undefined;
+  // The reserves an instant was passed over for, having no on-chain price yet.
+  const peakSupplyUnpriced = new Set<string>();
+  const peakDebtUnpriced = new Set<string>();
   // Portfolio-wide high-water marks: the largest the SUMMED running balances
   // (priced at the time — see reservePrice) ever reached at a single moment.
   // Tracked across the whole timeline rather than per-reserve so two assets that
@@ -672,8 +686,7 @@ export function calculateAaveEconomics(
         }
 
         stats.liquidatedDebt += debtCovered;
-        stats.liquidatedDebtUsd +=
-          debtCovered * (ctx.debtPrice?.usd != null && ctx.debtPrice.usd > 0 ? ctx.debtPrice.usd : priceNow);
+        stats.liquidatedDebtUsd += shownUsd(debtCovered, debtPx ?? priceNow);
         stats.liquidationCount++;
         runningDebt.set(symbol, (runningDebt.get(symbol) ?? 0) - debtCovered);
         if (debtCovered > 0)
@@ -726,11 +739,7 @@ export function calculateAaveEconomics(
             reservePriceBlock.set(collStats.symbol, ctx.collateralPrice?.block ?? event.blockNumber);
           }
           collStats.liquidatedCollateral += collSeized;
-          collStats.liquidatedCollateralUsd +=
-            collSeized *
-            (ctx.collateralPrice?.usd != null && ctx.collateralPrice.usd > 0
-              ? ctx.collateralPrice.usd
-              : (reservePrice.get(collStats.symbol) ?? 0));
+          collStats.liquidatedCollateralUsd += shownUsd(collSeized, collPx ?? reservePrice.get(collStats.symbol) ?? 0);
           runningSupply.set(collStats.symbol, Math.max(0, (runningSupply.get(collStats.symbol) ?? 0) - collSeized));
           collStats.flowEvents.push({
             timestamp: event.timestamp,
@@ -768,25 +777,30 @@ export function calculateAaveEconomics(
     // Each instant is the sum of its shown products (lib/shared/shown-usd.ts),
     // and an instant holding a reserve with no on-chain price yet is no
     // candidate: a peak is never a partial sum (ui-jobs 743).
-    const instant = (running: Map<string, number>): (AaveV4Peak & { usd: number }) | null => {
+    const instant = (running: Map<string, number>, unpriced: Set<string>): (AaveV4Peak & { usd: number }) | null => {
       const legs: AaveV4Peak["legs"] = [];
       let usd = 0;
       for (const [sym, bal] of running) {
         const amount = Math.max(0, bal);
-        if (amount <= UNPRICED_DUST_TOKENS) continue;
+        if (amount <= 0) continue;
         const price = reservePrice.get(sym);
-        if (price == null) return null;
+        if (price == null) {
+          // The token floor judges only an unpriced leg; a priced one counts.
+          if (amount <= UNPRICED_DUST_TOKENS) continue;
+          unpriced.add(sym);
+          return null;
+        }
         legs.push({ symbol: sym, amount, price, priceBlock: reservePriceBlock.get(sym) ?? event.blockNumber });
         usd += shownUsd(amount, price);
       }
       return { block: event.blockNumber, legs, usd: Math.round(usd * 100) / 100 };
     };
-    const sNow = instant(runningSupply);
+    const sNow = instant(runningSupply, peakSupplyUnpriced);
     if (sNow && sNow.usd > peakSupplyUsd) {
       peakSupplyUsd = sNow.usd;
       peakSupply = { block: sNow.block, legs: sNow.legs };
     }
-    const dNow = instant(runningDebt);
+    const dNow = instant(runningDebt, peakDebtUnpriced);
     if (dNow && dNow.usd > peakDebtUsd) {
       peakDebtUsd = dNow.usd;
       peakDebt = { block: dNow.block, legs: dNow.legs };
@@ -806,6 +820,9 @@ export function calculateAaveEconomics(
     peakDebtUsd,
     peakSupply,
     peakDebt,
+    // Named only where no instant survived: the peak then has no figure.
+    peakSupplyUnpriced: peakSupply ? [] : [...peakSupplyUnpriced],
+    peakDebtUnpriced: peakDebt ? [] : [...peakDebtUnpriced],
   };
 }
 
@@ -912,6 +929,24 @@ function heldSymbols(
     .filter((r) => (r.usd == null ? r.amount > UNPRICED_DUST_TOKENS : r.usd > SPOKE_ICON_USD_MIN))
     .sort((a, b) => (b.usd ?? -1) - (a.usd ?? -1))
     .map((r) => r.symbol);
+}
+
+/** The holdings with no on-chain price, by side, for the totals that must
+ *  name them (lib/aave-v4/spoke-usd.ts). */
+function unpricedHoldingsOf(
+  reserves: ReserveStats[],
+  prices?: Record<string, PriceEntry | number>,
+): AaveSpokeCardInfo["unpricedHoldings"] {
+  if (!pricesHaveLoaded(prices)) return [];
+  return reserves.flatMap((r) => {
+    if (resolvePrice(r.symbol, prices) != null) return [];
+    const out: NonNullable<AaveSpokeCardInfo["unpricedHoldings"]> = [];
+    if (Math.max(0, r.supplied - r.withdrawn) > UNPRICED_DUST_TOKENS)
+      out.push({ symbol: r.symbol, side: "supply", collateralEnabled: r.collateralEnabled ?? true });
+    if (Math.max(0, r.borrowed - r.repaid) > UNPRICED_DUST_TOKENS)
+      out.push({ symbol: r.symbol, side: "debt", collateralEnabled: false });
+    return out;
+  });
 }
 
 export function buildSpokeCards(
@@ -1029,6 +1064,7 @@ export function buildSpokeCards(
       debtHubs: [],
       totalSupplyUsd: g.totalSupplyUsd,
       unpricedSymbols: g.unpricedSymbols,
+      unpricedHoldings: unpricedHoldingsOf(g.result.reserves, prices),
       weightedCollateralUsd: calcResult.weightedCollateralUsd,
       blendedLt,
       totalDebtUsd: g.totalDebtUsd,
@@ -1036,6 +1072,8 @@ export function buildSpokeCards(
       peakDebtUsd,
       peakSupply: g.result.peakSupply,
       peakDebt: g.result.peakDebt,
+      peakSupplyUnpriced: g.result.peakSupplyUnpriced,
+      peakDebtUnpriced: g.result.peakDebtUnpriced,
       collRatio: g.collRatio,
       isClosed: g.isClosed,
       eventCount: g.eventCount,

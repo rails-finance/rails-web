@@ -105,6 +105,21 @@ const list = (xs: string[]) =>
 
 const usdText = (x: number) => `$${x.toLocaleString("en-US", { maximumFractionDigits: 6 })}`;
 
+/** The read a price comes from, as a via line names it. */
+const priceRead = (source: V4Price["source"]): string =>
+  source === "chainlink"
+    ? "Chainlink X/USD"
+    : source === "chainlink-eth-derived"
+      ? "Chainlink X/ETH × ETH/USD"
+      : source === "pendle-twap"
+        ? "Pendle PT TWAP"
+        : "spoke oracle getReservePrice";
+/** The reads a sum's prices come from, each named once. */
+const priceReads = (sum: PricedSum): string => {
+  const reads = [...new Set(sum.rows.map((r) => priceRead(r.price.source)))];
+  return reads.length > 0 ? reads.join(", ") : "spoke oracle getReservePrice";
+};
+
 /** A sum's rows as the receipt reads them: one per asset, its tokens and its on-chain price. */
 const sumRows = (sum: PricedSum, amountNote: string): AaveV4UsdRow[] =>
   sum.rows.map((r) => ({
@@ -167,7 +182,7 @@ export function storedValueProv(
     {
       source: { block: c.block ?? undefined },
       summary: `${scope} ${side}. ${words}, from the hub's line for each spoke and asset${atStored(c)}, each asset's amount valued at its on-chain price, then added up.`,
-      via: `${storedLane(c)} · hub ${getter}(assetId, spoke) per line · × spoke oracle getReservePrice · summed`,
+      via: `${storedLane(c)} · hub ${getter}(assetId, spoke) per line · × ${priceReads(sum)} · summed`,
     },
     sum,
     `the hub's ${getter}, ${onVisit(c) ? "read at the head" : "stored"}, over its lines`,
@@ -181,7 +196,7 @@ function hubValueProv(side: "supplied" | "borrowed", scope: string, c: StoredCoo
     {
       source: { block: c.block ?? undefined },
       summary: `${scope} ${side}, the hub's total. Each asset's ${side === "supplied" ? "added assets" : "total owed"} over every spoke the hub lends to${atStored(c)}, its tokenization and treasury spokes included, valued at its on-chain price, then added up.`,
-      via: `${storedLane(c)} · hub ${getter}(assetId) per asset · × spoke oracle getReservePrice · summed`,
+      via: `${storedLane(c)} · hub ${getter}(assetId) per asset · × ${priceReads(sum)} · summed`,
     },
     sum,
     `the hub's ${getter}, read at the head`,
@@ -222,7 +237,7 @@ export function pricedAmountProv(
     kind: "chain-derived",
     pclass: "oracle",
     summary: `${head}, in USD. ${body} Valued at its on-chain price, to the cent.`,
-    via: `${amount.via} · × spoke oracle getReservePrice`,
+    via: `${amount.via} · × ${priceRead(p.source)}`,
     formula: r?.prov?.formula ?? "amount × price",
     ...(inputs ? { inputs } : {}),
   };
@@ -577,7 +592,7 @@ export function spokeValueProv(
     {
       source: { block },
       summary: `${spoke} ${what}. Each of its ${count} reserves' ${what === "supplied" ? "added assets" : "owed, drawn and premium,"} on the hub it draws from, read near block ${n(block)} and valued at its on-chain price, then added up.`,
-      via: `${chainId === 5042 ? HEAD_ARC : HEAD} per reserve · hub ${call}(assetId, spoke) × oracle getReservePrice · summed`,
+      via: `${chainId === 5042 ? HEAD_ARC : HEAD} per reserve · hub ${call}(assetId, spoke) × ${priceReads(sum)} · summed`,
     },
     sum,
     `the hub's ${call}(assetId, spoke), read near block ${n(block)}`,

@@ -191,3 +191,51 @@ test("a peak row names its price's block and the peak's", () => {
   );
   assert.equal(r.prov.inputs.find((i) => i.label === "WETH price").pclass, "oracle");
 });
+
+const { calculateAaveEconomics } = await import(ROOT + "lib/aave-v4/spoke-cards.ts");
+const ev = (n, eventType, reserveSymbol, amount, price) => ({
+  id: `e${n}`,
+  txHash: `0x${n}`,
+  blockNumber: 1000 + n,
+  timestamp: 1_700_000_000 + n,
+  context: { protocol: "aave-v4", data: { eventType, reserveSymbol, amount: String(amount), price } },
+});
+
+test("the peak walk: on-chain stored prices, shown products, the blocks named, unpriced instants passed over", () => {
+  const r = calculateAaveEconomics(
+    [
+      ev(1, "supply", "WETH", 2.1234567, { usd: 3000.123456, source: "iaave-oracle", block: 1001 }),
+      ev(2, "supply", "WBTC", 0.5, { usd: 90_000.5, source: "iaave-oracle", block: 1002 }),
+      // A DefiLlama price is no price: the instant holding XAUt is passed over.
+      ev(3, "supply", "XAUt", 1, { usd: 2400, source: "defillama", block: 1003 }),
+      ev(4, "borrow", "USDC", 1000, { usd: 0.9999, source: "iaave-oracle", block: 1004 }),
+    ],
+    undefined,
+    undefined,
+  );
+  // The supply peak is the instant before XAUt arrived: WETH and WBTC.
+  assert.deepEqual(
+    r.peakSupply.legs.map((l) => [l.symbol, l.priceBlock]),
+    [
+      ["WETH", 1001],
+      ["WBTC", 1002],
+    ],
+  );
+  assert.equal(r.peakSupply.block, 1002);
+  const receipt = aaveV4PeakReceipt("The peak collateral", r.peakSupply);
+  assert.equal(receipt.usd, r.peakSupplyUsd, "the figure is the receipt's sum");
+  assert.equal(rebuild(receipt.prov), r.peakSupplyUsd);
+  assert.deepEqual(r.peakSupplyUnpriced, [], "an instant survived");
+  assert.equal(r.peakDebt.legs[0].symbol, "USDC");
+});
+
+test("the peak walk: no instant priced draws no peak and names the reserve", () => {
+  const r = calculateAaveEconomics(
+    [ev(1, "borrow", "XAUt", 3, { usd: 2400, source: "stablecoin", block: 1001 })],
+    undefined,
+    undefined,
+  );
+  assert.equal(r.peakDebt, undefined);
+  assert.equal(r.peakDebtUsd, 0);
+  assert.deepEqual(r.peakDebtUnpriced, ["XAUt"]);
+});
