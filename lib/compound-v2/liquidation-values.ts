@@ -7,6 +7,7 @@
 
 import type { CompoundV2Context } from "@/lib/shared/types/event-shape";
 import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
+import { shownEth, shownUsd } from "@/lib/shared/shown-usd";
 
 /** Exact-ish raw → float: a BigInt whole/frac split, so a 1e24-scale seized
  *  underlying or a 1e28-scale oracle price survives without Number overflow. */
@@ -22,9 +23,10 @@ export interface CompoundV2LiquidationValues {
   repaid: number;
   collPrice: number;
   debtPrice: number;
-  /** seizedUnderlying × collPrice, in `numeraire`. */
+  /** seizedUnderlying × collPrice as the receipt shows them, in `numeraire`:
+   *  to the cent in USD, to six decimals in ETH. */
   seizedValue: number;
-  /** repaid × debtPrice, in `numeraire`. */
+  /** repaid × debtPrice, the same way. */
   clearedValue: number;
   /** The liquidation incentive at the block, as a fraction (0.08 = 8%). */
   incPct: number;
@@ -65,8 +67,11 @@ export function compoundV2LiquidationValues(ctx: CompoundV2Context): CompoundV2L
   } catch {
     return undefined;
   }
-  const seizedValue = seizedUnderlying * collPrice;
-  const clearedValue = repaid * debtPrice;
+  // The products of the values as the receipts show them, so the rows
+  // rebuild each leg and the premium is worked out from the two shown legs.
+  const product = numeraire === "ETH" ? shownEth : shownUsd;
+  const seizedValue = product(seizedUnderlying, collPrice);
+  const clearedValue = product(repaid, debtPrice);
   if (!Number.isFinite(seizedValue) || !Number.isFinite(clearedValue) || seizedValue <= 0 || clearedValue <= 0)
     return undefined;
   return { numeraire, seizedUnderlying, repaid, collPrice, debtPrice, seizedValue, clearedValue, incPct };

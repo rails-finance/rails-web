@@ -15,7 +15,7 @@ import path from "node:path";
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const ROOT = pathToFileURL(REPO + "/").href;
 const hook = `
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 const ROOT = ${JSON.stringify(ROOT)};
 export async function resolve(spec, ctx, next) {
@@ -23,7 +23,8 @@ export async function resolve(spec, ctx, next) {
   if (spec.startsWith("@/")) url = ROOT + spec.slice(2);
   else if (spec.startsWith("./") || spec.startsWith("../")) url = new URL(spec, ctx.parentURL).href;
   if (url) {
-    if (!existsSync(fileURLToPath(url))) {
+    // A directory resolves to a same-named .ts beside it, then its index.ts.
+    if (!existsSync(fileURLToPath(url)) || statSync(fileURLToPath(url)).isDirectory()) {
       for (const ext of [".ts", ".tsx", "/index.ts"]) {
         if (existsSync(fileURLToPath(url + ext))) { url += ext; break; }
       }
@@ -151,4 +152,13 @@ test("a missing price draws no figure", () => {
   const noOracle = market("0x06", { collateral: 2, oraclePrice: 0 });
   assert.equal(morphoArbitrumSideReceipt(READ, [noOracle], "collateral"), null, "collateral with no oracle price");
   assert.equal(morphoArbitrumUsd({ positions: [noOracle], loanUsd: READ.loanUsd }).unpriced.length, 1);
+});
+
+test("two markets on one pair and one LLTV: each named with its short id", () => {
+  const a = market("0x1234aaaa", { lltv: 0.86, collateral: 2, oraclePrice: 3000 });
+  const b = market("0x5678bbbb", { lltv: 0.86, collateral: 1, oraclePrice: 3001 });
+  const r = morphoArbitrumSideReceipt(READ, [a, b], "collateral");
+  const labels = r.prov.inputs.filter((i) => i.label.endsWith(" amount")).map((i) => i.label);
+  assert.deepEqual(labels, ["USDC / WETH 86% 0x1234… amount", "USDC / WETH 86% 0x5678… amount"]);
+  assert.equal(rebuild(r.prov), r.usd);
 });

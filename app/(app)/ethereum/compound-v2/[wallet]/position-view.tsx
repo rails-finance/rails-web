@@ -402,7 +402,15 @@ export default function CompoundV2PositionView({
   // before and after it (interest included), where the page holds every row.
   const cardView = useMemo<CompoundV2PositionView | null>(() => {
     if (!liveView) return liveView;
-    const counted = { ...liveView, eventTotal: lifetimeKnown ? tl.totalCount : undefined };
+    // Each market's last borrow, repay or liquidation row: the block its
+    // emitted debt stands at, named where the live read has not reached it.
+    const debtBlockByMarket: Record<string, number> = {};
+    for (const e of v2Events) {
+      const d = e.context.data;
+      if (d.side !== "debt" || d.debtAfter == null) continue;
+      debtBlockByMarket[d.market] = Math.max(debtBlockByMarket[d.market] ?? 0, e.blockNumber);
+    }
+    const counted = { ...liveView, eventTotal: lifetimeKnown ? tl.totalCount : undefined, debtBlockByMarket };
     if (!wholeRows) return counted;
     const liquidations = liquidationStories(
       v2Events.map((e) => {
@@ -463,7 +471,11 @@ export default function CompoundV2PositionView({
           symbol: r.symbol,
           address,
           price: p,
-          info: compoundV2PriceProv(r.symbol, view.priceFixedByMarket?.[r.market] === true),
+          info: compoundV2PriceProv(r.symbol, view.priceFixedByMarket?.[r.market] === true, {
+            cSymbol: r.cSymbol,
+            price: p,
+            read: view.marketRead,
+          }),
         });
     }
     return out;

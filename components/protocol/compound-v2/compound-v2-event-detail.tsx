@@ -111,7 +111,11 @@ function buildCompoundV2LiqForensics(
 
   const collSym = ctx.collateralSymbol ?? collM.symbol;
   const debtSym = ctx.marketSymbol;
-  const fmtValue = numeraire === "ETH" ? (n: number) => `${formatNumber(n)} ETH` : formatUsdValue;
+  // An ETH-era leg's product runs to six decimals, as its receipt rows show it.
+  const fmtValue =
+    numeraire === "ETH"
+      ? (n: number) => `${n.toLocaleString("en-US", { maximumFractionDigits: 6 })} ETH`
+      : formatUsdValue;
   const fmtPrice = numeraire === "ETH" ? (n: number) => `${formatNumber(n)} ETH` : formatPrice;
 
   return {
@@ -119,16 +123,18 @@ function buildCompoundV2LiqForensics(
       symbol: collSym,
       usd: seizedValue,
       usdProv: liqSeizedValueProv(collSym, numeraire, coords, {
-        amount: `${formatNumber(seizedUnderlying)} ${collSym}`,
-        price: formatNumber(collPrice),
+        amount: seizedUnderlying,
+        price: collPrice,
+        cSymbol: collM.cSymbol,
       }),
     },
     cleared: {
       symbol: debtSym,
       usd: clearedValue,
       usdProv: liqClearedValueProv(debtSym, numeraire, coords, {
-        amount: `${formatNumber(repaid)} ${debtSym}`,
-        price: formatNumber(debtPrice),
+        amount: repaid,
+        price: debtPrice,
+        cSymbol: COMPOUND_V2_MARKET_BY_KEY[ctx.market]?.cSymbol ?? debtSym,
       }),
     },
     premium: seizedValue / clearedValue - 1,
