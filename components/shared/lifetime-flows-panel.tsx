@@ -51,7 +51,6 @@ import { useFlowFocusState } from "@/components/shared/flow-focus-context";
 import { LearnMoreButton, LearnMoreModal, type LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { lifetimeFlowsBarsContent } from "@/lib/shared/learn-more-content";
 import { SectionSidebar } from "@/components/shared/section-sidebar";
-import { usePositionCardIdentity } from "@/components/shared/position-card-edge";
 import { CARD_PAD_X, CTRL_GHOST, CTRL_OFF, SECTION_HEADING } from "@/lib/shared/ui-grammar";
 import {
   COLLAPSE_KEY_ATTR,
@@ -193,8 +192,6 @@ export function LifetimeFlowsPanel({
       {label}
     </button>
   );
-  // Below md the sidebar's border takes the box's left 6px.
-  const sidebar = usePositionCardIdentity() != null;
   if (scrubber == null && (read === "done" || read === "withheld")) return null;
   const loading = scrubber == null && read !== "failed";
   const none = scrubber != null && life === "none";
@@ -215,7 +212,7 @@ export function LifetimeFlowsPanel({
           {...(collapseKey ? { [COLLAPSE_KEY_ATTR]: collapseKey } : {})}
           {...(collapseKey && settled ? { [COLLAPSED_ATTR]: collapsed ? "1" : "0" } : {})}
           suppressHydrationWarning
-          className={`rounded-2xl bg-raised ${CARD_PAD_X} py-4 ${sidebar ? "max-md:pl-[26px]" : ""}`}
+          className={`rounded-2xl bg-raised ${CARD_PAD_X} py-4`}
           style={loading && remembered["detail-economics"] ? { minHeight: remembered["detail-economics"] } : undefined}
         >
           {collapseKey && <script dangerouslySetInnerHTML={{ __html: collapseScript() }} suppressHydrationWarning />}

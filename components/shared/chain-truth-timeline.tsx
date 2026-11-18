@@ -82,7 +82,16 @@ import { flowMoment } from "@/lib/shared/flow-moment";
 import { FlowMomentCard, type MomentNeighbour } from "@/components/shared/flow-moment-card";
 import { Link2, List, Lock, X } from "lucide-react";
 import { BlockTransactionsContext, blockTransactionsOf } from "@/components/shared/chain-truth-event";
-import { CTRL_GHOST, CTRL_OFF, CTRL_ON, CTRL_ON_ACCENT, CTRL_ON_HOVER, FOOT_LINK } from "@/lib/shared/ui-grammar";
+import {
+  CARD_PAD_X,
+  CTRL_GHOST,
+  CTRL_OFF,
+  CTRL_ON,
+  CTRL_ON_ACCENT,
+  CTRL_ON_HOVER,
+  FOOT_LINK,
+} from "@/lib/shared/ui-grammar";
+import { usePositionCardIdentity } from "@/components/shared/position-card-edge";
 import { unreadTokensIn } from "@/lib/shared/decimals-unread";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useParams, usePathname } from "next/navigation";
@@ -767,6 +776,9 @@ function ChainTruthTimelineBody({
   still,
 }: ChainTruthTimelineProps) {
   const { showMarketNotes } = useTimelineDisplay();
+  // Beside the card's lozenge the timeline stands in a rounded box, as the
+  // card's body and Lifetime flows do.
+  const boxed = usePositionCardIdentity() != null;
   const activeRuns = runs;
   // The cut (lib/shared/flow-focus.ts): once the Lifetime flows chart's
   // "Sync to chart" is pressed, the list holds every event up to that
@@ -2080,7 +2092,7 @@ function ChainTruthTimelineBody({
         registry names one (P3.1.1, ui-jobs 439); the rule is in the sidebar. */}
       <SectionSidebar section="timeline">
         <div
-          className="space-y-3"
+          className={boxed ? `space-y-3 rounded-2xl bg-raised ${CARD_PAD_X} py-4` : "space-y-3"}
           data-anatomy="P3"
           data-timeline-rows-drawn={Math.min(windowSize, rows.length)}
           data-timeline-rows-loaded={rows.length}

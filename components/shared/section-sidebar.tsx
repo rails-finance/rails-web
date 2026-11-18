@@ -4,10 +4,11 @@
 // TO-DO-position-card 427; anatomy P2.1, P3.1): from md a lozenge the card's
 // width (40px), round at both ends, in the protocol's brand hue at the
 // section's left, bare (no mark, name or glyph), with the section 8px from it
-// as the card's body is (ui-jobs 729); below md the 6px border the card takes.
-// The section keeps its box and content, and below md the bare
-// timeline steps 6px in beside its border as the boxes' content does. Off the explorers (no roster
-// entry for the page) it draws nothing and adds no wrapper.
+// as the card's body is (ui-jobs 729); below md the card's 12px lozenge, 6px
+// from the section.
+// Each section keeps its box (the timeline's is drawn in chain-truth-timeline.tsx)
+// and content. Off the explorers (no roster entry for the page) it draws
+// nothing and adds no wrapper.
 //
 // The timeline's bar (`data-card-sidebar="timeline"`) is a positioned element
 // spanning the section's height, with the section's rows inside the same
@@ -27,15 +28,14 @@
 // Every other row, and every row whose entry is unknown, stands beside the
 // protocol's bar. Adjacent rows with the same subject join into one stretch;
 // on each side of a stretch the page's background shows for `BREAK` (8px, a
-// row gap), so the bar reads as broken there, and from md every segment of
-// the bar, stretches and the protocol's bar between them, is a lozenge, all
-// four corners rounded at 20px (half the bar's width). The protocol's bar is
+// row gap), so the bar reads as broken there, and every segment of the bar,
+// stretches and the protocol's bar between them, is a lozenge, all four
+// corners rounded at half the bar's width (20px from md, 6px below). The protocol's bar is
 // one span, so its cut ends are carved by
 // inverted-corner strips in the background colour, skipped between two
 // adjacent stretches. Each stretch is
 // measured against this frame: the row's box (`data-event-id`) from its top to
-// its bottom. Below md the stretch is the 6px edge in the product's hue, with
-// the same breaks, square corners and no mark.
+// its bottom. Below md the stretch carries no mark.
 //
 // "Not yours" (P3.1.2): a row whose transaction the person did not send takes
 // a small pink dot on the bar level with its head, whatever the stretch. The
@@ -134,19 +134,23 @@ const JOIN_GAP = 16;
 /** The background between a stretch and the bar beside it. */
 const BREAK = 8;
 
-/** Half the bar's width: round ends. */
+/** The shortest run of the protocol's bar drawn at the bar's top or foot. */
+const MIN_RUN = 24;
+
+/** Half the bar's width, from md (40px) and below it (12px): round ends. */
 const RADIUS = 20;
+const RADIUS_NARROW = 6;
 
 /** Strips carving the two rounded corners into the protocol's bar at a cut
  *  end: in each, the quarter circle centred toward the bar's middle keeps the
  *  bar's colour, the rest is background, with a one-pixel ramp at the arc,
  *  matching the stretch's anti-aliased corner. `edge` is the cut end's side. */
-function cornerStrips(key: string, top: number, r: number, edge: "top" | "bottom") {
+function cornerStrips(key: string, top: number, r: number, edge: "top" | "bottom", show: string) {
   const y = edge === "top" ? "100%" : "0";
   return (["left", "right"] as const).map((side) => (
     <span
       key={`${key}:${side}`}
-      className={`absolute ${side === "left" ? "left-0" : "right-0"} hidden md:block`}
+      className={`absolute ${side === "left" ? "left-0" : "right-0"} ${show}`}
       style={{
         top,
         width: r,
@@ -183,7 +187,7 @@ function SubjectStretches({
   accountKind: BarAccountKind | undefined;
 }) {
   const registry = useReceiptRegistry();
-  const [stretches, setStretches] = useState<Stretch[]>([]);
+  const [measured, setStretches] = useState<Stretch[]>([]);
   const [marks, setMarks] = useState<number[]>([]);
   const [height, setHeight] = useState(0);
   useLayoutEffect(() => {
@@ -255,7 +259,15 @@ function SubjectStretches({
       mutate.disconnect();
     };
   }, [frameRef, subjects, marked]);
-  if (stretches.length === 0 && marks.length === 0) return null;
+  if (measured.length === 0 && marks.length === 0) return null;
+  // The box's padding leaves the protocol's bar a short run past the first and
+  // last rows; a run shorter than `MIN_RUN` would draw as a dot, so the stretch
+  // beside it reaches the bar's end instead.
+  const stretches = measured.map((s, i) => ({
+    ...s,
+    top: i === 0 && s.top - BREAK < MIN_RUN ? 0 : s.top,
+    bottom: i === measured.length - 1 && height - s.bottom - BREAK < MIN_RUN ? height : s.bottom,
+  }));
   // The protocol's bar between and around the stretches: each cut end takes
   // rounded corners, kept inside its segment (at most half a short segment) so a
   // strip never reaches a stretch. The bar's own top and bottom are rounded by
@@ -269,13 +281,18 @@ function SubjectStretches({
     const bottom = below ? below.top - BREAK : height;
     const len = bottom - top;
     if (len <= 0) continue;
-    const r = Math.min(RADIUS, above && below ? len / 2 : len);
-    if (above) strips.push(...cornerStrips(`a:${top}`, top, r, "top"));
-    if (below) strips.push(...cornerStrips(`b:${bottom}`, bottom - r, r, "bottom"));
+    for (const [radius, show] of [
+      [RADIUS, "hidden md:block"],
+      [RADIUS_NARROW, "md:hidden"],
+    ] as const) {
+      const r = Math.min(radius, above && below ? len / 2 : len);
+      if (above) strips.push(...cornerStrips(`a:${top}:${radius}`, top, r, "top", show));
+      if (below) strips.push(...cornerStrips(`b:${bottom}:${radius}`, bottom - r, r, "bottom", show));
+    }
   }
   return (
     <>
-      <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-1.5 overflow-hidden md:w-10">
+      <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-3 overflow-hidden md:w-10">
         {/* The breaks first, so no cutout paints over a neighbouring stretch. */}
         {stretches.map((s) => (
           <span
@@ -288,7 +305,7 @@ function SubjectStretches({
         {stretches.map((s) => (
           <span key={`${s.top}:${s.subject.name}`}>
             <span
-              className="absolute inset-x-0 bg-brand-edge md:rounded-[20px] md:bg-brand-zone"
+              className="absolute inset-x-0 rounded-[6px] bg-brand-zone md:rounded-[20px]"
               style={{ top: s.top, height: s.bottom - s.top, ...barSubjectHue(s.subject) }}
               data-anatomy="P3.1.1"
               data-bar-subject={s.subject.name}
@@ -302,7 +319,7 @@ function SubjectStretches({
         {marks.map((top, i) => (
           <span
             key={i}
-            className="absolute left-0 h-1.5 w-1.5 rounded-full bg-[var(--color-pink-500)] md:left-[30px]"
+            className="absolute left-[3px] h-1.5 w-1.5 rounded-full bg-[var(--color-pink-500)] md:left-[30px]"
             style={{ top: top + 17 }}
             data-anatomy="P3.1.2"
             data-bar-not-yours=""
@@ -350,16 +367,13 @@ export type SectionSidebarKind = "flows" | "timeline";
 
 const ANATOMY: Record<SectionSidebarKind, string> = { flows: "P2.1", timeline: "P3.1" };
 
-/** The 6px border below md: the section's rounded shape clipped to its left edge. */
-const EDGE = "rounded-2xl bg-brand-edge [clip-path:inset(0_calc(100%_-_6px)_0_0)]";
-
 export function SectionSidebar({
   section,
   hidden,
   children,
 }: {
-  /** `flows` wraps a boxed section; `timeline` wraps the bare timeline, whose
-   *  bar carries the subject stretches. */
+  /** `flows` wraps Lifetime flows; `timeline` wraps the timeline, whose bar
+   *  carries the subject stretches. */
   section: SectionSidebarKind;
   hidden?: boolean;
   children: ReactNode;
@@ -437,7 +451,7 @@ export function SectionSidebar({
   return (
     <div
       ref={frameRef}
-      className={`relative md:pl-12 ${boxed ? "" : "max-md:pl-1.5"}`}
+      className="relative pl-[18px] md:pl-12"
       style={style}
       data-card-sidebar-frame={section}
       hidden={hidden}
@@ -446,19 +460,17 @@ export function SectionSidebar({
         <>
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute inset-y-0 left-0 hidden w-10 rounded-full bg-brand-zone md:block"
+            className="pointer-events-none absolute inset-y-0 left-0 w-3 rounded-full bg-brand-zone md:w-10"
             data-anatomy={ANATOMY[section]}
             data-card-sidebar={section}
           />
           {children}
-          {/* Below md over the box's left edge, as the card's border. */}
-          <span aria-hidden="true" className={`pointer-events-none absolute inset-0 md:hidden ${EDGE}`} />
         </>
       ) : (
         <>
           <span
             aria-hidden="true"
-            className={`pointer-events-none absolute inset-y-0 left-0 w-full ${EDGE} md:w-10 md:rounded-[20px] md:bg-brand-zone md:[clip-path:none]`}
+            className="pointer-events-none absolute inset-y-0 left-0 w-3 rounded-[6px] bg-brand-zone md:w-10 md:rounded-[20px]"
             data-anatomy={ANATOMY[section]}
             data-card-sidebar={section}
           />
