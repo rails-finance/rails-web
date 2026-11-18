@@ -82,6 +82,9 @@ export function vaultIndexProtocol(v: VaultSummary): VaultIndexProtocol {
       return "yearn";
     case "maple-pool":
       return "maple";
+    // The index holds no sBOLD row (ui-jobs 749): its one page is under Liquity V2.
+    case "sbold":
+      throw new Error("sBOLD has no vault index roster");
   }
 }
 
