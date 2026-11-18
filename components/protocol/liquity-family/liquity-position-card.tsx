@@ -779,7 +779,6 @@ export function useLiquityCardSlots({
       {
         id: "peak-collateral",
         label: CARD_VOCAB.peakCollateral,
-        labelIcon: collIcon(v.peakCollateral, claimableUsd != null),
         value:
           v.peakCollateral > 0 ? (
             <Prov info={ops.peakCollateralProv(v)}>
@@ -790,15 +789,17 @@ export function useLiquityCardSlots({
                 variant="card"
                 className="text-rb-500"
               >
-                {formatPrice(v.peakCollateral)}
+                {formatCompact(v.peakCollateral)}
               </HighlightableValue>
             </Prov>
           ) : null,
+        // The asset sits after the figure, as on the open card; tier stays
+        // "amount" without a USD line, since a peak is not priced.
+        assets: collIcon(v.peakCollateral, claimableUsd != null),
       },
       {
         id: "peak-debt",
         label: CARD_VOCAB.peakDebt,
-        labelIcon: debtIcon(v.peakDebt),
         value:
           v.peakDebt > 0 ? (
             <Prov info={ops.peakDebtProv(v)}>
@@ -813,6 +814,7 @@ export function useLiquityCardSlots({
               </HighlightableValue>
             </Prov>
           ) : null,
+        assets: debtIcon(v.peakDebt),
       },
     ];
     outcome = {
