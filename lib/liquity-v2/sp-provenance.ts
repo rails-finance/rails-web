@@ -73,6 +73,29 @@ export function spPendingLossProv(branch: SpBranch): Provenance {
   };
 }
 
+/** The deposit's share of its pool: the two getters and the division. */
+export function spPoolShareProv(branch: SpBranch, deposit: string, total: string, block: number): Provenance {
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    verify: ask("getCompoundedBoldDeposit(depositor) and getTotalBoldDeposits()"),
+    summary: `Share of the pool — the deposit now over all the BOLD in the ${branch} Stability Pool, both at the stamped block.`,
+    contract: pool(branch),
+    source: { block },
+    formula: "getCompoundedBoldDeposit(depositor) ÷ getTotalBoldDeposits()",
+    inputs: [
+      {
+        label: "Deposit now, getCompoundedBoldDeposit(depositor), BOLD",
+        value: deposit,
+        kind: "chain",
+        pclass: "state",
+      },
+      { label: "All deposits, getTotalBoldDeposits(), BOLD", value: total, kind: "chain", pclass: "state" },
+    ],
+    via: `${VIA} · getCompoundedBoldDeposit(depositor) ÷ getTotalBoldDeposits() @ head`,
+  };
+}
+
 const SUM: Record<string, (c: string) => string> = {
   deposited: () => "BOLD deposited — the sum of every DepositOperation's positive topUpOrWithdrawal on this deposit.",
   withdrawn: () => "BOLD withdrawn — the sum of every DepositOperation's negative topUpOrWithdrawal on this deposit.",
@@ -81,14 +104,14 @@ const SUM: Record<string, (c: string) => string> = {
   kept: () =>
     "Yield kept — the sum of every DepositOperation's yieldGainSinceLastOperation less its yieldGainClaimed: the BOLD yield the touches added to the deposit.",
   recorded: () =>
-    "Deposit at the last touch — the deposit before each operation, less its loss, plus its top-up or withdrawal and its yield kept, replayed from the first operation: the pool's deposits(depositor) after the newest one.",
+    "Deposit at the last touch — the deposit before each operation, less its loss, plus its top-up or withdrawal and its yield kept, replayed from the first operation: the pool's deposits(depositor) after the latest one.",
   yieldGain: () => "BOLD yield paid at touches — the sum of every DepositOperation's yieldGainSinceLastOperation.",
   yieldClaimed: () => "BOLD yield claimed — the sum of every DepositOperation's yieldGainClaimed.",
   collGain: (c) => `${c} paid in at touches — the sum of every DepositOperation's ethGainSinceLastOperation.`,
   collClaimed: (c) =>
     `${c} claimed — the sum of every DepositOperation's ethGainClaimed, which includes the stash from earlier touches.`,
   stash: (c) =>
-    `${c} stashed — the ${c} paid in at touches less what they sent, replayed from the first operation: the pool's stashedColl(depositor) after the newest one.`,
+    `${c} stashed — the ${c} paid in at touches less what they sent, replayed from the first operation: the pool's stashedColl(depositor) after the latest one.`,
 };
 
 export function spSumProv(what: keyof typeof SUM, branch: SpBranch): Provenance {

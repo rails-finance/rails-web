@@ -259,6 +259,11 @@ export default function DepositView({
                 lifetime={lifetime}
                 now={cardNow}
                 pending={open && !chainSettled}
+                pool={
+                  chain?.totalDepositsRaw != null
+                    ? { totalRaw: BigInt(chain.totalDepositsRaw), block: chain.blockNumber }
+                    : null
+                }
                 explanation={
                   <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed text-rb-500">
                     <li>

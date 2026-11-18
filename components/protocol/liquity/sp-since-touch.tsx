@@ -14,6 +14,7 @@
 // Where the feed did not answer, the row names the window and values nothing.
 
 import { NoteRowShell } from "@/components/shared/note-row-shell";
+import { DepositTouchTip } from "./touch-tip";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { EventSheetView, SHEET_NO_USD, type EventSheet } from "@/components/shared/event-sheet";
 import { AmountText } from "@/components/shared/amount-text";
@@ -153,7 +154,7 @@ export function LiquityV2DepositSinceTouchRow({
             key: "last",
             label: "At the last touch",
             amount: bo(recorded, fmt(recorded), spSumProv("recorded", c)),
-            tip: "The BOLD the deposit held after its newest operation.",
+            tip: "The BOLD the deposit held after its latest operation.",
           },
           ...(burned > ZERO
             ? [
@@ -255,7 +256,15 @@ export function LiquityV2DepositSinceTouchRow({
       marker={{ attr: "data-live-window", value: "liquity-v2-sp-since-touch" }}
       header={
         <>
-          <span className="text-sm text-foreground">{since}</span>
+          <span className="text-sm text-foreground">
+            {sinceOpen ? (
+              since
+            ) : (
+              <>
+                Since its last <DepositTouchTip />
+              </>
+            )}
+          </span>
           {net != null && netProv && (
             <>
               <span className="text-xs text-rb-500">change in USD</span>

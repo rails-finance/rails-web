@@ -18,6 +18,7 @@ import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
 import { big, exactUnits, units } from "@/lib/liquity-v2/sp-math";
 import { spTouchProv } from "@/lib/liquity-v2/sp-provenance";
+import { DEPOSIT_TOUCH_TIP } from "@/lib/liquity-v2/touch-words";
 import { spEventLabel, spEventSentences } from "@/lib/liquity-v2/sp-event-prose";
 import type { LiquityV2DepositEventRow } from "@/lib/sources/api/liquity-v2-sp";
 import { DEPOSIT_AFTER_FORMULA, spDepositSheet } from "./sp-sheet";
@@ -177,13 +178,23 @@ export function LiquityV2DepositEventCard({
       number: eventNumber,
     },
     spine: { tokens, isLast },
-    head: { label, deltas: [] },
+    head: { label, labelTip: label === "Touched" ? DEPOSIT_TOUCH_TIP : undefined, deltas: [] },
     caption: label,
     cells,
     sheet: spDepositSheet(row),
     ledgers: { none: "A deposit's balance is the Deposit side's total." },
     price: { gas: depositorGas(row), prices: [] },
-    explainer: { body: bullets(spEventSentences(row, c)) },
+    // What a touch is, closing the Explanation under the event's sentences.
+    explainer: {
+      body: (
+        <>
+          {bullets(spEventSentences(row, c))}
+          <p className="mt-2 text-sm leading-relaxed text-rb-500" data-touch-note="">
+            {DEPOSIT_TOUCH_TIP}
+          </p>
+        </>
+      ),
+    },
     learnMore: null,
   };
   return <EventCard slots={slots} avatar={null} />;
