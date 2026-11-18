@@ -736,7 +736,10 @@ const SPECS: ProtocolSpec[] = [
     brand: 279,
     tags: ["Borrow"],
     desc: "Borrow the BOLD stablecoin with user-set interest rates",
-    subPages: [{ segment: "branches", label: "Branches", tab: "Branches" }],
+    subPages: [
+      { segment: "branches", label: "Branches", tab: "Branches" },
+      { segment: "stability-pool", label: "Stability Pool deposits", tab: "Stability Pool" },
+    ],
   },
   {
     id: "llamalend",
