@@ -54,7 +54,7 @@ import { fmtUsd } from "@/lib/aave-v4/format";
 import { formatCompact, formatCompactTitled } from "@/lib/shared/format-compact";
 import { ratePercentText } from "@/lib/shared/rate-percent";
 import { borrowRoomShows, deficitShows, type MarketReserveRow } from "@/lib/shared/aave-market-view";
-import type { AaveMarketVocab } from "@/lib/shared/aave-market-provenance";
+import { aaveMarketUsd, type AaveMarketVocab } from "@/lib/shared/aave-market-provenance";
 import type { Loadable, ProductHead, ProductSection, RateCurveModel, Missing } from "@/lib/shared/product/model";
 import type { SectionMenuLink } from "@/components/shared/section-menu";
 import { contractLinks, sentenceName, rateTip, readAtOf, vocabOf } from "@/lib/aave-family/product";
@@ -62,6 +62,11 @@ import { aaveFamilyTerms, familyRate, type AaveFamilyTerms } from "@/lib/aave-fa
 
 const NOTE = "text-[13px] text-rb-500";
 const RAY = 1e27;
+
+/** A reserve's tokens in dollars: the tokens × the price as the receipt
+ *  shows them, to the cent. */
+const usdOf = (r: MarketReserveRow, tokens: number): number =>
+  aaveMarketUsd([{ symbol: r.symbol, tokens, price: r.priceUsd }]);
 
 /** Available, with the lines that qualify it under it. */
 function AvailableVital({
@@ -74,20 +79,37 @@ function AvailableVital({
   available: ReactNode;
 }) {
   const usd = (tokens: number) =>
-    r.priceUsd != null ? fmtUsd(tokens * r.priceUsd).display : `${formatCompact(tokens)} ${r.symbol}`;
+    r.priceUsd != null ? fmtUsd(usdOf(r, tokens)).display : `${formatCompact(tokens)} ${r.symbol}`;
   const c = r.borrowCapState;
   return (
     <>
       {available}
       {deficitShows(r) && (
         <span className="block text-[11px] font-normal text-rb-500" data-reserve-deficit="">
-          deficit <Prov info={vocab.reserveDeficitProv(r.symbol, r.priceUsd != null)}>{usd(r.deficit ?? 0)}</Prov>
+          deficit{" "}
+          <Prov
+            info={vocab.reserveDeficitProv(r.symbol, r.priceUsd != null, {
+              symbol: r.symbol,
+              tokens: r.deficit ?? 0,
+              price: r.priceUsd,
+            })}
+          >
+            {usd(r.deficit ?? 0)}
+          </Prov>
         </span>
       )}
       {borrowRoomShows(r) && c.state === "used" && (
         <span className="block text-[11px] font-normal text-rb-500" data-reserve-capacity="">
           borrow capacity{" "}
-          <Prov info={vocab.reserveBorrowRoomProv(r.symbol, c.cap)}>{usd(Math.max(0, c.cap - r.borrowed))}</Prov>
+          <Prov
+            info={vocab.reserveBorrowRoomProv(r.symbol, c.cap, {
+              symbol: r.symbol,
+              tokens: Math.max(0, c.cap - r.borrowed),
+              price: r.priceUsd,
+            })}
+          >
+            {usd(Math.max(0, c.cap - r.borrowed))}
+          </Prov>
         </span>
       )}
     </>
@@ -170,7 +192,7 @@ function curveOf(r: MarketReserveRow, vocab: AaveMarketVocab): RateCurveModel | 
 /** The reserve head's (i). */
 function ReserveExplainer({ r, label, vocab }: { r: MarketReserveRow; label: string; vocab: AaveMarketVocab }) {
   const usd = (tokens: number) =>
-    r.priceUsd != null ? fmtUsd(tokens * r.priceUsd).display : `${formatCompact(tokens)} ${r.symbol}`;
+    r.priceUsd != null ? fmtUsd(usdOf(r, tokens)).display : `${formatCompact(tokens)} ${r.symbol}`;
   const avail = r.virtualBalance ?? Math.max(0, r.supplied - r.borrowed);
   const u = r.utilization != null && r.supplied > 0 ? r.utilization : null;
   const ltv = r.bps?.ltv ?? Math.round((r.ltv ?? 0) * 1e4);
@@ -198,7 +220,15 @@ function ReserveExplainer({ r, label, vocab }: { r: MarketReserveRow; label: str
                 <>
                   <ExplainBullet data-explain-deficit="">
                     Deficit{" "}
-                    <Prov info={deficitFigureProv(vocab.reserveDeficitProv(r.symbol, r.priceUsd != null))}>
+                    <Prov
+                      info={deficitFigureProv(
+                        vocab.reserveDeficitProv(r.symbol, r.priceUsd != null, {
+                          symbol: r.symbol,
+                          tokens: r.deficit ?? 0,
+                          price: r.priceUsd,
+                        }),
+                      )}
+                    >
                       <Fig bold>{usd(r.deficit ?? 0)}</Fig>
                     </Prov>{" "}
                     is debt that liquidations wrote off when they left a borrower no collateral.
@@ -261,7 +291,7 @@ function ReserveExplainer({ r, label, vocab }: { r: MarketReserveRow; label: str
 
 function reserveMarkdown(m: AaveMarketConfig, r: MarketReserveRow, block: number): string {
   const t = aaveFamilyTerms(m.key);
-  const usd = (t: number) => (r.priceUsd != null ? fmtUsd(t * r.priceUsd).display : `${formatCompact(t)} ${r.symbol}`);
+  const usd = (t: number) => (r.priceUsd != null ? fmtUsd(usdOf(r, t)).display : `${formatCompact(t)} ${r.symbol}`);
   return [
     `# ${r.symbol}, a reserve of ${m.marketLabel}`,
     "",

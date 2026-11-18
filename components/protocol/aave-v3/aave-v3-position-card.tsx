@@ -73,6 +73,9 @@ import { aaveV3PositionModal, type AaveV3Deployment } from "@/lib/aave-v3/event-
 import type { AaveV3PositionRow, AaveV3ReserveSummary } from "@/lib/api/fetch-aave-v3-positions";
 import type { AaveV3PositionChainResponse, PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
+import { shownUsd } from "@/lib/shared/holder-usd-receipt";
+import { aaveV3PriceOf, aaveV3UsdOf, type AaveV3UsdRows } from "@/lib/aave-v3/usd-receipt";
+import type { AaveV3Face } from "@/lib/aave-v3/price-notes";
 
 /** One reserve the wallet holds on a given side, scaled to display units. The
  *  `amountRaw` integer wei string backs the exact reveal (the raw chain figure). */
@@ -116,6 +119,9 @@ export interface AaveV3PositionView {
    *  lowercased token address. Feeds the card's USD figures; a reserve the
    *  oracle didn't price is simply absent (the total then omits). */
   priceByAddress?: Record<string, number>;
+  /** The block `priceByAddress` was read at, where the read named one: the
+   *  card's block on a position page, the latest when a listing was served. */
+  priceBlock?: number | null;
   atBlock?: number;
   /** rails-server's head read and the block it read at, where it answered the page's read. */
   readBy?: PositionHeadStamp & { block: number };
@@ -130,27 +136,29 @@ export interface AaveV3PositionView {
   chainHfStale?: boolean;
 }
 
-/** On-chain oracle USD for one reserve; null when this market didn't price it. */
+/** On-chain oracle USD for one reserve, the amount × the price as its receipt
+ *  shows them (lib/aave-v3/usd-receipt.ts); null when this market didn't
+ *  price it. */
 function reserveUsd(v: AaveV3PositionView, address: string, amount: number): number | null {
-  const p = v.priceByAddress?.[address.toLowerCase()];
-  return typeof p === "number" && p > 0 ? amount * p : null;
+  const p = aaveV3PriceOf(v.priceByAddress, address);
+  return p != null ? shownUsd(amount, p) : null;
 }
 
-/** Total USD across a set of reserves, with the STRICT guard from Aave's on-chain
- *  USD: null the moment any contributing reserve is unpriced, so a partial total is
- *  never asserted (the side then shows its token amounts). */
+/** The rows a side's dollar receipt is built from. */
+const usdRows = (v: AaveV3PositionView, reserves: AaveV3ReserveAmount[], face: AaveV3Face): AaveV3UsdRows => ({
+  reserves,
+  prices: v.priceByAddress,
+  priceBlock: v.priceBlock,
+  balanceBlock: v.atBlock,
+  face,
+});
+
+/** Total USD across a set of reserves, the sum of the products its receipt
+ *  shows, with the STRICT guard from Aave's on-chain USD: null the moment any
+ *  contributing reserve is unpriced, so a partial total is never asserted (the
+ *  side then shows its token amounts). */
 function totalUsd(v: AaveV3PositionView, reserves: AaveV3ReserveAmount[]): number | null {
-  let sum = 0;
-  let any = false;
-  for (const r of reserves) {
-    if (r.decimalsUnread) return null;
-    if (r.amount <= 0) continue;
-    const u = reserveUsd(v, r.address, r.amount);
-    if (u == null) return null;
-    sum += u;
-    any = true;
-  }
-  return any ? sum : null;
+  return aaveV3UsdOf(usdRows(v, reserves, "cents"));
 }
 
 /** Reserves sorted by oracle-USD value, largest first — so the capped icon
@@ -537,6 +545,8 @@ export function useAaveV3CardSlots({
     // One reserve: its amount with its icon, the dollars beneath (the
     // Liquity V2 headline).
     const one = reserves.length === 1 && !reserves[0].decimalsUnread ? reserves[0] : null;
+    // The receipt that rebuilds the side's dollars from its rows.
+    const usdInfo = dep.usd(usdWhat, side, usdRows(v, reserves, one ? "cents" : "compact"), v.market)?.prov;
     if (one)
       return {
         id,
@@ -560,8 +570,8 @@ export function useAaveV3CardSlots({
         ),
         pending: false,
         usd:
-          usd != null ? (
-            <Prov info={dep.usd(usdWhat, v.market)}>
+          usd != null && usdInfo ? (
+            <Prov info={usdInfo}>
               <span className="font-bold text-green-400">{formatUsdValue(usd)}</span>
             </Prov>
           ) : pending ? (
@@ -573,8 +583,8 @@ export function useAaveV3CardSlots({
       label,
       labelTip: detail ? sideTip(side) : undefined,
       value:
-        reserves.length === 0 ? null : usd != null ? (
-          <UsdFigure usd={usd} info={dep.usd(usdWhat, v.market)} />
+        reserves.length === 0 ? null : usd != null && usdInfo ? (
+          <UsdFigure usd={usd} info={usdInfo} />
         ) : (
           // A partial USD total is never asserted: an unpriced side shows its
           // token amounts.
@@ -586,7 +596,7 @@ export function useAaveV3CardSlots({
           />
         ),
       pending: reserves.length > 0 && pending,
-      total: usd != null ? { usd, info: dep.usd(usdWhat, v.market) } : undefined,
+      total: usd != null && usdInfo ? { usd, info: usdInfo } : undefined,
       assets: reserves.length > 0 && usd != null ? <InlineAssetCluster assets={loadedMarks(shown)} /> : undefined,
     };
   };
@@ -679,12 +689,18 @@ export function useAaveV3CardSlots({
               </ExactSpan>
             </Prov>
           ),
-          usdText:
-            usd != null ? (
-              <Prov info={dep.usd(`${side === "supply" ? "Supplied" : "Borrowed"} ${r.symbol}`, v.market)}>
-                {formatUsd(usd)}
-              </Prov>
-            ) : undefined,
+          usdText: (() => {
+            const info =
+              usd != null
+                ? dep.usd(
+                    `${side === "supply" ? "Supplied" : "Borrowed"} ${r.symbol}`,
+                    side,
+                    usdRows(v, [r], "dollars"),
+                    v.market,
+                  )?.prov
+                : undefined;
+            return usd != null && info ? <Prov info={info}>{formatUsd(usd)}</Prov> : undefined;
+          })(),
         };
       }),
       dust:
@@ -695,9 +711,25 @@ export function useAaveV3CardSlots({
   };
 
   const interestRow = (side: "supply" | "debt"): PositionPanelRow | null => {
-    const usd = side === "supply" ? captions?.supplyInterestUsd : captions?.debtInterestUsd;
     const since = side === "supply" ? captions?.supplyInterestSince : captions?.debtInterestSince;
-    if (usd == null || usd < 0.01 || !dep.interestCaption) return null;
+    const legs = side === "supply" ? captions?.supplyInterestLegs : captions?.debtInterestLegs;
+    // The figure is the sum of the products its receipt shows.
+    const receipt =
+      legs && dep.interestCaption
+        ? dep.interestCaption(
+            side,
+            {
+              reserves: legs,
+              prices: v.priceByAddress,
+              priceBlock: v.priceBlock,
+              balanceBlock: v.atBlock,
+              face: "compact",
+            },
+            v.market,
+          )
+        : null;
+    const usd = receipt?.usd;
+    if (!receipt || usd == null || usd < 0.01) return null;
     return {
       id: `${side}-interest`,
       label: side === "supply" ? "Interest earned" : "Interest charged",
@@ -706,7 +738,7 @@ export function useAaveV3CardSlots({
           ? "The interest inside the supplied balance, in dollars: what the balance holds beyond its deposits and withdrawals since it last started from zero."
           : "The interest inside the debt, in dollars: what the debt holds beyond its draws and repayments since it last started from zero.",
       sub: since != null ? `since ${formatDate(since)}` : undefined,
-      value: <Prov info={dep.interestCaption(side)}>{formatCompactUsd(usd)}</Prov>,
+      value: <Prov info={receipt.prov}>{formatCompactUsd(usd)}</Prov>,
     };
   };
 
@@ -785,7 +817,22 @@ export function useAaveV3CardSlots({
             value: (
               <span className="inline-flex items-center gap-1">
                 <TokenChipIcon symbol={liq.single.symbol} size={14} filterable={false} />
-                <Prov info={dep.liqPrice(liq.single.symbol, v.market)}>{fmtLiqPrice(liq.single.liqPrice)}</Prov>
+                <Prov
+                  info={
+                    dep.liqPrice(
+                      {
+                        symbol: liq.single.symbol,
+                        price: liq.single.price,
+                        priceBlock: v.priceBlock,
+                        hf: v.healthFactor as number,
+                        hfBlock: v.readBy?.block ?? v.atBlock,
+                      },
+                      v.market,
+                    ).prov
+                  }
+                >
+                  {fmtLiqPrice(liq.single.liqPrice)}
+                </Prov>
               </span>
             ),
           }
@@ -815,18 +862,22 @@ export function useAaveV3CardSlots({
 
   // The supplies that back no borrowing: many and priced, their total and
   // icons open the breakdown (C19); otherwise each line under the total.
+  const otherInfo =
+    otherUsd != null
+      ? dep.usd("Supplied, not collateral", "supply", usdRows(v, otherSupplies, "compact"), v.market)?.prov
+      : undefined;
   const notCollRow: PositionPanelRow | null =
     otherSupplies.length === 0
       ? null
-      : otherSupplies.length > 1 && otherUsd != null
+      : otherSupplies.length > 1 && otherUsd != null && otherInfo
         ? {
             id: "not-collateral",
             label: "Supplied, not collateral",
             tip: NOT_COLLATERAL_TIP,
-            value: <Prov info={dep.usd("Supplied, not collateral", v.market)}>{formatCompactUsd(otherUsd)}</Prov>,
+            value: <Prov info={otherInfo}>{formatCompactUsd(otherUsd)}</Prov>,
             breakdown: {
               assets: loadedMarks(othersSplit.shown),
-              total: { usd: otherUsd, info: dep.usd("Supplied, not collateral", v.market) },
+              total: { usd: otherUsd, info: otherInfo },
               panel: (
                 <AssetBreakdownPanel
                   id="aave-v3-not-collateral-breakdown"
@@ -843,8 +894,8 @@ export function useAaveV3CardSlots({
             tip: NOT_COLLATERAL_TIP,
             value: (
               <span className="flex flex-col gap-0.5">
-                {otherUsd != null && (
-                  <Prov info={dep.usd("Supplied, not collateral", v.market)}>
+                {otherUsd != null && otherInfo && (
+                  <Prov info={otherInfo}>
                     <PanelFigure>{formatCompactUsd(otherUsd)}</PanelFigure>
                   </Prov>
                 )}
@@ -997,6 +1048,7 @@ export function viewFromSummary(row: AaveV3PositionRow): AaveV3PositionView {
     txCount: row.txCount,
     lastActivityAt: row.lastActivityAt,
     priceByAddress: row.priceByAddress,
+    priceBlock: row.priceBlock ?? null,
     // A Base lender's row names the block its chain figures were read at.
     atBlock: row.chainBlock ?? undefined,
     // A listing view never carries a health factor (0018): the row's snapshot

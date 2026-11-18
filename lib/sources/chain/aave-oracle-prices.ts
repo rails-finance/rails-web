@@ -19,12 +19,14 @@
 // travel together.
 //
 // The answer comes from rails-server's `/api/at-block/aave-v3/oracle-prices`
-// (rails-ops decisions/0056). Asked with no block, as here, it answers
-// getAssetPrice at the chain's latest block, read on a keyless gateway first
-// and kept 30 s in the api per oracle and asset set; asked at a block, from
-// Sieve's stored rounds and the at-block store. The multicall below answers
-// only when that route cannot (no RAILS_API_URL, an oracle it does not serve,
-// a failed request, 3 s without an answer).
+// (rails-ops decisions/0056). Asked with no block, it answers getAssetPrice at
+// the chain's latest block, read on a keyless gateway first and kept 30 s in
+// the api per oracle and asset set; asked at a block (a position page's card
+// block), from Sieve's stored rounds and the at-block store. Either way it
+// names the block, and the map keeps it (`blocks`) so each receipt names the
+// price with its block. The multicall below answers only when that route
+// cannot (no RAILS_API_URL, an oracle it does not serve, a failed request, 3 s
+// without an answer), at a block it pins first.
 //
 // SERVER-ONLY — imported from /api/* route handlers only (it calls the chain via
 // lib/sources/chain/rpc). Mirrors the batched-multicall shape of compound-prices.
@@ -51,15 +53,27 @@ const SERVER_TIMEOUT_MS = 3_000;
 /** The server route's limit on assets a request. */
 const SERVER_MAX_ASSETS = 40;
 
-/** One oracle's prices from the server route, raw (8 decimals) by asset; null when the route cannot answer. */
-async function serverPrices(oracle: string, assets: string[]): Promise<Map<string, bigint> | null> {
+/** One oracle's prices from the server route, raw (8 decimals) by asset, and
+ *  the block the route read them at; null when the route cannot answer. Asked
+ *  at `block`, the route answers at that block; asked with none, at the
+ *  latest, and it names that block. */
+async function serverPrices(
+  oracle: string,
+  assets: string[],
+  block?: number,
+): Promise<{ prices: Map<string, bigint>; block: number | null } | null> {
   const market = SERVER_MARKET[oracle];
   const api = process.env.RAILS_API_URL;
   if (!market || !api) return null;
   const out = new Map<string, bigint>();
+  let readAt: number | null = null;
   try {
     for (let i = 0; i < assets.length; i += SERVER_MAX_ASSETS) {
       const qs = new URLSearchParams({ market, assets: assets.slice(i, i + SERVER_MAX_ASSETS).join(",") });
+      // Every chunk after the first is asked at the first's block, so a
+      // set of more than SERVER_MAX_ASSETS stands on one block.
+      const at = block ?? readAt;
+      if (at != null) qs.set("block", String(at));
       const res = await fetch(`${api}/api/at-block/aave-v3/oracle-prices?${qs.toString()}`, {
         ...createAuthFetchOptions(),
         cache: "no-store",
@@ -69,15 +83,26 @@ async function serverPrices(oracle: string, assets: string[]): Promise<Map<strin
         if (res.status >= 500 || res.status === 429) throwAtBuild("aave-v3/oracle-prices", `status ${res.status}`);
         return null;
       }
-      const body = (await res.json()) as { prices?: Record<string, string> };
+      const body = (await res.json()) as { prices?: Record<string, string>; block?: number | string };
       for (const [a, v] of Object.entries(body.prices ?? {})) out.set(a.toLowerCase(), BigInt(v));
+      const b = Number(body.block);
+      // The receipt names one block per oracle: an answer at another block
+      // refuses the set, and the multicall reads it at one pinned block.
+      if (Number.isInteger(b) && b > 0) {
+        if (readAt != null && readAt !== b) return null;
+        readAt = b;
+      } else if (block == null && readAt == null && assets.length > SERVER_MAX_ASSETS) {
+        // A first chunk that names no block leaves the rest nothing to stand
+        // on: the set is refused, and the multicall reads it at a pinned block.
+        return null;
+      }
     }
   } catch (err) {
     // During the build a failed route fails the page (route-gate.ts, ui-jobs 686).
     throwAtBuild("aave-v3/oracle-prices", err);
     return null;
   }
-  return out;
+  return { prices: out, block: readAt ?? block ?? null };
 }
 
 /** The Aave V3 market whose oracle prices a chain's tokens at a past block. */
@@ -136,14 +161,22 @@ export interface AaveOraclePriceRequest {
 }
 
 /** Keyed by `${oracle}:${asset}` (both lowercased) → USD price per whole token.
- *  Keyed per-oracle because each market prices through its own oracle. */
-export type AaveOraclePriceMap = Map<string, number>;
+ *  Keyed per-oracle because each market prices through its own oracle.
+ *  `blocks` holds the block each oracle's prices were read at, where the read
+ *  names one: a receipt names the price with its block. */
+export type AaveOraclePriceMap = Map<string, number> & { blocks: Map<string, number> };
 
 const priceKey = (oracle: string, asset: string) => `${oracle.toLowerCase()}:${asset.toLowerCase()}`;
+const emptyPriceMap = (): AaveOraclePriceMap => Object.assign(new Map<string, number>(), { blocks: new Map() });
 
 /** Look up a resolved price for one (oracle, asset). */
 export function aaveOraclePriceOf(map: AaveOraclePriceMap, oracle: string, asset: string): number | undefined {
   return map.get(priceKey(oracle, asset));
+}
+
+/** The block one oracle's prices were read at; undefined where no read named one. */
+export function aaveOraclePriceBlockOf(map: AaveOraclePriceMap, oracle: string): number | undefined {
+  return map.blocks.get(oracle.toLowerCase());
 }
 
 /** Resolve on-chain oracle USD prices for every (oracle, asset) across the page,
@@ -153,8 +186,10 @@ export function aaveOraclePriceOf(map: AaveOraclePriceMap, oracle: string, asset
 export async function resolveAaveOraclePrices(
   reqs: AaveOraclePriceRequest[],
   chainId: ChainId = MAINNET_CHAIN_ID,
+  /** Read every price at this block; absent, at the latest block, named. */
+  block?: number,
 ): Promise<AaveOraclePriceMap> {
-  const out: AaveOraclePriceMap = new Map();
+  const out = emptyPriceMap();
   if (reqs.length === 0) return out;
 
   // The distinct (oracle, asset) pairs we need a price for.
@@ -180,11 +215,12 @@ export async function resolveAaveOraclePrices(
   const answered = new Set<string>();
   await Promise.all(
     [...byOracle].map(async ([oracle, assets]) => {
-      const got = await serverPrices(oracle, assets);
+      const got = await serverPrices(oracle, assets, block);
       if (!got) return;
       answered.add(oracle);
+      if (got.block != null) out.blocks.set(oracle, got.block);
       for (const a of assets) {
-        const v = got.get(a);
+        const v = got.prices.get(a);
         if (v != null && v > BigInt(0)) out.set(priceKey(oracle, a), Number(v) / PRICE_SCALE);
       }
     }),
@@ -201,9 +237,18 @@ export async function resolveAaveOraclePrices(
     return out;
   }
 
+  // The multicall pins its block first, so its prices name it. Where the
+  // block number cannot be read, it reads at the head and names no block.
+  let pinned: bigint | null;
+  try {
+    pinned = block != null ? BigInt(block) : await client.getBlockNumber();
+  } catch {
+    pinned = null;
+  }
   let results: unknown[] = [];
   try {
     results = (await client.multicall({
+      ...(pinned != null ? { blockNumber: pinned } : {}),
       allowFailure: true,
       contracts: chainPairs.map(
         (p) =>
@@ -223,7 +268,10 @@ export async function resolveAaveOraclePrices(
     const res = results[i] as { status: string; result?: unknown } | undefined;
     if (res?.status !== "success" || res.result == null) return;
     const usd = Number(res.result as bigint) / PRICE_SCALE;
-    if (usd > 0) out.set(priceKey(p.oracle, p.asset), usd);
+    if (usd > 0) {
+      out.set(priceKey(p.oracle, p.asset), usd);
+      if (pinned != null) out.blocks.set(p.oracle, Number(pinned));
+    }
   });
 
   return out;

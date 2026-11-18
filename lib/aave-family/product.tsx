@@ -312,13 +312,31 @@ function marketHead(m: AaveMarketConfig, read: AaveMarketRead, view: AaveMarketV
       {
         slot: "sizeIn" as const,
         label: "Supplied",
-        value: <Prov info={vocab.marketTotalProv("supplied")}>{supplied.display}</Prov>,
+        value: (
+          <Prov
+            info={vocab.marketTotalProv(
+              "supplied",
+              view.rows.map((r) => ({ symbol: r.symbol, tokens: r.supplied, price: r.priceUsd })),
+            )}
+          >
+            {supplied.display}
+          </Prov>
+        ),
         tip: supplied.title,
       },
       {
         slot: "sizeOut" as const,
         label: "Borrowed",
-        value: <Prov info={vocab.marketTotalProv("borrowed")}>{borrowed.display}</Prov>,
+        value: (
+          <Prov
+            info={vocab.marketTotalProv(
+              "borrowed",
+              view.rows.map((r) => ({ symbol: r.symbol, tokens: r.borrowed, price: r.priceUsd })),
+            )}
+          >
+            {borrowed.display}
+          </Prov>
+        ),
         tip: borrowed.title,
       },
       ...(usage != null

@@ -51,6 +51,15 @@ import type {
 } from "@/lib/shared/flows-timeline";
 import { daysFromEvents } from "@/lib/shared/flows-timeline";
 import { indexAt, type IndexKnot } from "@/lib/shared/ctoken-index";
+import { shownUsd } from "@/lib/shared/shown-usd";
+
+/** A row valued at another row's price, both blocks named. */
+const nearestPriceNote = (priceBlock: number, rowBlock: number): string =>
+  `price at block ${priceBlock.toLocaleString("en-US")}, the nearest read on this market; this row is at block ${rowBlock.toLocaleString("en-US")}`;
+const cents = (v: number): number => Math.round(v * 100) / 100;
+/** A leg's dollars as shown, its sign kept. */
+const signedShownUsd = (amount: number, price: number): number =>
+  amount < 0 ? -shownUsd(-amount, price) : shownUsd(amount, price);
 
 const DAY_S = 86_400;
 const DUST = 1e-12;
@@ -211,6 +220,9 @@ export interface CTokenReplayed {
    *  (else the nearest priced row's on the market, else today's). */
   price: number;
   ownPrice: boolean;
+  /** The block of the row whose price this row takes, where it is another
+   *  row's (the nearest read on its market); null for its own or today's. */
+  priceBlock: number | null;
   legs: { bucket: string; amount: number }[];
   /** The market's supply and debt after the row. */
   supply: number;
@@ -234,23 +246,23 @@ function ordered(rows: CTokenFlowRow[]): CTokenFlowRow[] {
 function pricesFor(
   rows: CTokenFlowRow[],
   todayPrice: (market: string) => number | null,
-): { price: number; own: boolean }[] {
-  const priced = new Map<string, { ts: number; price: number }[]>();
+): { price: number; own: boolean; block: number | null }[] {
+  const priced = new Map<string, { ts: number; price: number; block: number }[]>();
   for (const r of rows)
     if (r.price != null && r.price > 0) {
       const list = priced.get(r.market) ?? [];
-      list.push({ ts: r.ts, price: r.price });
+      list.push({ ts: r.ts, price: r.price, block: r.block });
       priced.set(r.market, list);
     }
   return rows.map((r) => {
-    if (r.price != null && r.price > 0) return { price: r.price, own: true };
+    if (r.price != null && r.price > 0) return { price: r.price, own: true, block: null };
     const list = priced.get(r.market);
     if (list && list.length > 0) {
       let best = list[0];
       for (const p of list) if (Math.abs(p.ts - r.ts) < Math.abs(best.ts - r.ts)) best = p;
-      return { price: best.price, own: false };
+      return { price: best.price, own: false, block: best.block };
     }
-    return { price: todayPrice(r.market) ?? 0, own: false };
+    return { price: todayPrice(r.market) ?? 0, own: false, block: null };
   });
 }
 
@@ -312,6 +324,7 @@ export function replayCToken(
       ev,
       price: prices[i].price,
       ownPrice: prices[i].own,
+      priceBlock: prices[i].block,
       legs,
       supply: supply.get(m) ?? 0,
       debt: debt.get(m) ?? 0,
@@ -474,7 +487,9 @@ export function ctokenFlowTimeline(rows: CTokenFlowRow[], o: CTokenFlowOptions):
     // on its market, else today's: its figures that day rest on that price.
     const why = r.ownPrice
       ? null
-      : "priced at the nearest price read on its market, else the latest block's price: no price is read at this block.";
+      : r.priceBlock != null
+        ? `${nearestPriceNote(r.priceBlock, r.ev.block)}: no price is read at this block.`
+        : "priced at the latest block's price: no price is read at this block, nor at any row on its market.";
     const unsure =
       why && r.legs.length > 0 ? balances.map((b) => ({ side: b.side, why, symbol: r.ev.symbol, held: true })) : [];
     return {
@@ -483,7 +498,8 @@ export function ctokenFlowTimeline(rows: CTokenFlowRow[], o: CTokenFlowOptions):
       ts: r.ev.ts,
       block: r.ev.block,
       tick: liq ? "liquidation" : moved.coll && moved.debt ? "both" : moved.debt ? "debt" : "collateral",
-      legs: r.legs.map((l) => ({ bucket: l.bucket, usd: l.amount * r.price, symbol: r.ev.symbol })),
+      // Each leg the amount × the price as shown, to the cent.
+      legs: r.legs.map((l) => ({ bucket: l.bucket, usd: signedShownUsd(l.amount, r.price), symbol: r.ev.symbol })),
       tx: r.ev.tx,
       countsTx: !liq && r.ev.byOwner !== false,
       ...(!liq && r.ev.byOwner === false ? { byOther: true } : {}),
@@ -561,12 +577,16 @@ export function ctokenFlowTimeline(rows: CTokenFlowRow[], o: CTokenFlowOptions):
   for (const h of held) {
     const p = todayPrice(h.market) ?? dailyPrices[h.market]?.at(-1)?.[1] ?? 0;
     if (h.supply > DUST) {
-      assets.push({ side: "collateral", symbol: h.symbol, amount: h.supply, usd: h.supply * p });
-      collateralUsd += h.supply * p;
+      // The amount × the price as shown, to the cent, so "Still supplied"
+      // agrees with the panel's rows.
+      const usd = shownUsd(h.supply, p);
+      assets.push({ side: "collateral", symbol: h.symbol, amount: h.supply, usd });
+      collateralUsd += usd;
     }
     if (h.debt > DUST) {
-      assets.push({ side: "debt", symbol: h.symbol, amount: h.debt, usd: h.debt * p });
-      debtUsd += h.debt * p;
+      const usd = shownUsd(h.debt, p);
+      assets.push({ side: "debt", symbol: h.symbol, amount: h.debt, usd });
+      debtUsd += usd;
     }
   }
   // Each asset's underlying by symbol, for the icons.
@@ -581,7 +601,7 @@ export function ctokenFlowTimeline(rows: CTokenFlowRow[], o: CTokenFlowOptions):
   return {
     buckets,
     days,
-    live: { collateralUsd, debtUsd, assets },
+    live: { collateralUsd: cents(collateralUsd), debtUsd: cents(debtUsd), assets },
     todayPrices,
     dailyPrices,
     seriesCarry: true,
@@ -641,7 +661,7 @@ export function ctokenFocusEvents(rp: CTokenFlowReplay): FocusEvent[] {
     ...(r.ev.tx ? { tx: r.ev.tx } : {}),
     legs: r.legs.map((l) => ({
       bucket: l.bucket,
-      usd: l.amount * r.price,
+      usd: signedShownUsd(l.amount, r.price),
       amount: l.amount,
       symbol: r.ev.symbol,
       ...(ACCRUAL_KEYS.has(l.bucket) ? { accrual: true } : {}),
@@ -748,7 +768,7 @@ export function ctokenEventStates(
         bySym[side].set(c.symbol, b);
         const add = (into: Record<FlowSide, number | null>, v: number) => {
           if (v <= DUST) return;
-          into[side] = p == null || into[side] == null ? null : (into[side] as number) + v * p;
+          into[side] = p == null || into[side] == null ? null : cents((into[side] as number) + shownUsd(v, p));
         };
         add(usd, after);
         add(usdBefore, prior);
