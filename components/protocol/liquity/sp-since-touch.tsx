@@ -6,9 +6,9 @@
 // uses (components/protocol/polaris/polaris-sp-loan-since-touch.tsx).
 //
 // The frame is <NoteRowShell>'s with the live-window glyph. Closed, the row
-// states the window's change in one figure, in USD at the branch PriceFeed:
+// states the window's change in one figure, in USD at the branch price feed:
 // the collateral paid in valued there, plus the BOLD yield pending, less the
-// BOLD burned, a BOLD counted at one dollar. Opened, it is the event sheet's
+// BOLD burned, BOLD counted at $1. Opened, it is the event sheet's
 // shape (sp-sheet.ts): the figures the last touch wrote, what the window
 // added, and the total the next touch starts from, every figure receipted.
 // Where the feed did not answer, the row names the window and values nothing.
@@ -74,7 +74,7 @@ export function LiquityV2DepositSinceTouchRow({
   stash: bigint;
   /** getDepositorCollGain(depositor): collateral paid in since the last touch. */
   paidIn: bigint;
-  /** USD per collateral token at the branch PriceFeed now, or null. */
+  /** USD per collateral token at the branch price feed now, or null. */
   price: number | null;
   priceStale: boolean;
   fromBlock: number;
@@ -99,7 +99,7 @@ export function LiquityV2DepositSinceTouchRow({
       ? {
           kind: "chain-derived",
           pclass: "oracle",
-          summary: `${c} paid in, in USD — the ${c} liquidations have paid the deposit since its last touch, times the branch PriceFeed's price for ${c} ${atHead}.`,
+          summary: `${c} paid in, in USD — the ${c} liquidations have paid the deposit since its last touch, times the branch price feed's price for ${c} ${atHead}.`,
           formula: "getDepositorCollGain(depositor) × price",
           inputs: [
             { label: `${c} paid in since last touch`, value: exactUnits(paidIn), kind: "chain", pclass: "state" },
@@ -112,7 +112,7 @@ export function LiquityV2DepositSinceTouchRow({
       ? {
           kind: "chain-derived",
           pclass: "oracle",
-          summary: `Change in USD since the last touch — the ${c} paid in since the last touch at the branch PriceFeed, plus the BOLD yield pending, less the BOLD burned, a BOLD counted at one dollar, ${atHead}. The depositor did nothing inside this window.`,
+          summary: `Change in USD since the last touch — the ${c} paid in since the last touch at the branch price feed, plus the BOLD yield pending, less the BOLD burned, BOLD counted at $1, ${atHead}. The depositor did nothing inside this window.`,
           formula: `${c} paid in × price + yield − burned`,
           inputs: [
             { label: `${c} paid in, in USD`, value: String(collValue), kind: "chain-derived", pclass: "oracle" },
@@ -224,7 +224,7 @@ export function LiquityV2DepositSinceTouchRow({
         <>
           {paidIn > ZERO ? (
             <>
-              At the branch PriceFeed, {c} is{" "}
+              At the branch price feed, {c} is{" "}
               <Prov info={spFeedProv(c, priceStale)} value={String(price)}>
                 {usd(price)}
               </Prov>
@@ -237,7 +237,7 @@ export function LiquityV2DepositSinceTouchRow({
           ) : (
             <>No liquidation has paid the deposit {c}.</>
           )}{" "}
-          With the yield, less the burn, a BOLD counted at one dollar, the deposit has moved{" "}
+          With the yield, less the burn, BOLD counted at $1, the deposit has moved{" "}
           <Prov info={netProv} value={String(net)}>
             {signedUsd(net)}
           </Prov>{" "}
@@ -268,8 +268,7 @@ export function LiquityV2DepositSinceTouchRow({
               </Prov>
             </>
           )}
-          {/* The block is a link to the touch's block on the chain's explorer,
-              chrome rather than a figure of this row. */}
+          {/* The block is a link to the touch's block on the chain's explorer. */}
           <span className="ml-auto text-xs text-rb-500" data-prov-exempt="">
             from block <BlockRef block={fromBlock} chainId={MAINNET_CHAIN_ID} /> · {elapsed} ago
           </span>

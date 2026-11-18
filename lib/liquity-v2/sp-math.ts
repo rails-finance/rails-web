@@ -188,3 +188,59 @@ export const priceUnits = (raw: string | null | undefined): number | null => {
   const v = big(raw);
   return v > ZERO ? units(v) : null;
 };
+
+/** One operation's figures as its balance sheet states them: the deposit
+ *  side (last − burned + yield since = before; before + change − yield
+ *  claimed = after) and the collateral side (stash last + paid in = before
+ *  the claim; − claimed = stash after). `after` and `stash` are the index's
+ *  replay (mig 491); the event emits neither. */
+export interface SheetFigures {
+  last: bigint;
+  burned: bigint;
+  yieldPaid: bigint;
+  before: bigint;
+  change: bigint;
+  yieldClaimed: bigint;
+  after: bigint;
+  stashLast: bigint;
+  paid: bigint;
+  stashBefore: bigint;
+  claimed: bigint;
+  stash: bigint;
+}
+
+export function sheetFigures(
+  r: DepositOp & { deposit_before: string | null; stash_before: string | null },
+): SheetFigures {
+  const g = depositLegs(r);
+  const last = big(r.deposit_before);
+  const stashLast = big(r.stash_before);
+  return {
+    last,
+    burned: g.burned,
+    yieldPaid: g.yieldIn,
+    before: last - g.burned + g.yieldIn,
+    change: g.deposited - g.withdrawn,
+    yieldClaimed: g.yieldClaimed,
+    after: g.deposit,
+    stashLast,
+    paid: g.collIn,
+    stashBefore: stashLast + g.collIn,
+    claimed: g.collClaimed,
+    stash: g.stash,
+  };
+}
+
+/** The two bars' totals from the legs alone, oldest first: BOLD deposited +
+ *  yield in − withdrawn − burned − yield claimed, and collateral paid in −
+ *  claimed. On a whole life they equal the last row's deposit_after and
+ *  stash_after (the identities the Lifetime flows rest on). */
+export function barTotals(legs: DepositLegs[]): { deposit: bigint; stash: bigint } {
+  let deposit = ZERO;
+  let stash = ZERO;
+  for (const g of legs) {
+    deposit += g.deposited + g.yieldIn - g.withdrawn - g.burned - g.yieldClaimed;
+    stash += g.collIn - g.collClaimed;
+  }
+  return { deposit, stash };
+}

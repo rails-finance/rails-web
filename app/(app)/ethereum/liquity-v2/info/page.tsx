@@ -8,6 +8,7 @@ import { GlossaryLink, ProtocolInfoPage, type InfoTerm, type InfoView } from "@/
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { fmtMaxLtv } from "@/lib/liquity/ltv";
+import { LIQUITY_V2_SP_PATH } from "@/lib/liquity-v2/sp-routes";
 
 export const metadata = infoMetadata("liquity-v2");
 
@@ -194,6 +195,27 @@ const views: readonly [InfoView, ...InfoView[]] = [
       </p>
     ),
   },
+  {
+    heading: "Stability Pool deposits",
+    body: (
+      <ul className={UL}>
+        <li>
+          Each branch has a Stability Pool of BOLD that repays the debt of liquidated Troves on that branch. A deposit
+          is one address&apos;s BOLD in one branch&apos;s pool. Each liquidation burns a share of every deposit and pays
+          the branch&apos;s collateral in its place, and the branch&apos;s interest pays the deposit a BOLD yield.
+        </li>
+        <li>
+          The pool writes what changed only when the depositor touches the deposit. A touch either claims both gains or
+          neither: unclaimed yield joins the deposit and unclaimed collateral is stashed. A deposit&apos;s page also
+          shows the deposit now, and the collateral and yield the next touch would pay.{" "}
+          <Link href={LIQUITY_V2_SP_PATH} className={INLINE_LINK}>
+            See the deposits
+          </Link>
+          .
+        </li>
+      </ul>
+    ),
+  },
 ];
 
 export default function InfoPage() {
@@ -207,10 +229,13 @@ export default function InfoPage() {
           <Link href="/ethereum/liquity-v2/branches" className={INLINE_LINK}>
             the branches
           </Link>
-          , with their debt, their collateral and their shutdown status.
+          , with their debt, their collateral and their shutdown status, and every{" "}
+          <Link href={LIQUITY_V2_SP_PATH} className={INLINE_LINK}>
+            Stability Pool deposit
+          </Link>
+          .
         </>
       }
-      notCovered="Stability Pool deposits aren't covered here."
       glossary={glossary}
       howItWorks={[
         <>

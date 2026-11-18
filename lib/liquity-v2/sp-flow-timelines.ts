@@ -240,7 +240,7 @@ function depositTimeline(
       restBySide: { collateral: "Burned since the last touch", debt: "Paid in since the last touch" },
       basis: {
         collateral: "Every figure is in BOLD.",
-        debt: `Every figure is in ${c}. Nothing prices ${c} in BOLD here.`,
+        debt: `Every figure is in ${c}; the bar does not price ${c} in BOLD.`,
       },
       heldBasis: {
         collateral: "the deposit recorded at its last touch; the pool records a deposit only when it is touched.",

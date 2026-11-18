@@ -45,15 +45,16 @@ export function spEventLabel(r: SpProseRow): string {
   if (change > ZERO) return "Deposited";
   if (change < ZERO) return "Withdrew";
   if (big(r.yield_gain_claimed) > ZERO || big(r.coll_gain_claimed) > ZERO) return "Claimed";
-  return "Compounded";
+  if (big(r.yield_gain_since) - big(r.yield_gain_claimed) > ZERO) return "Compounded";
+  return "Touched";
 }
 
-/** The row's sentences, each one fact. `coll` is the branch's collateral. */
+/** The row's sentences, each one fact, never none. `coll` is the branch's collateral. */
 export function spEventSentences(r: SpProseRow, coll: string): string[] {
   const out: string[] = [];
   const change = big(r.top_up_or_withdrawal);
-  if (change > ZERO) out.push(`The depositor provided ${amt(change, "BOLD")} to the ${coll} Stability Pool.`);
-  if (change < ZERO) out.push(`The depositor withdrew ${amt(-change, "BOLD")} from the deposit.`);
+  if (change > ZERO) out.push(`The depositor deposited ${amt(change, "BOLD")}.`);
+  if (change < ZERO) out.push(`The depositor withdrew ${amt(-change, "BOLD")}.`);
   if (r.tx_from && r.tx_from.toLowerCase() !== r.depositor.toLowerCase())
     out.push(`${short(r.tx_from)} sent the transaction.`);
   const loss = big(r.deposit_loss);
@@ -66,10 +67,10 @@ export function spEventSentences(r: SpProseRow, coll: string): string[] {
   if (gain > ZERO)
     out.push(
       claimed === gain
-        ? `The branch's interest had paid ${amt(gain, "BOLD")} of yield since the previous touch, all sent to the depositor.`
+        ? `The branch's interest paid ${amt(gain, "BOLD")} of yield, all claimed.`
         : claimed > ZERO
-          ? `The branch's interest had paid ${amt(gain, "BOLD")} of yield since the previous touch; ${amt(claimed, "BOLD")} was sent to the depositor and the rest joined the deposit.`
-          : `The branch's interest had paid ${amt(gain, "BOLD")} of yield since the previous touch, added to the deposit.`,
+          ? `The branch's interest paid ${amt(gain, "BOLD")} of yield and ${amt(claimed, "BOLD")} was claimed; the rest stays in the deposit.`
+          : `The branch's interest paid ${amt(gain, "BOLD")} of yield, kept in the deposit.`,
     );
   const collIn = big(r.coll_gain_since);
   const collOut = big(r.coll_gain_claimed);
@@ -77,7 +78,7 @@ export function spEventSentences(r: SpProseRow, coll: string): string[] {
   if (r.operation === 2) {
     out.push(
       collOut > ZERO
-        ? `The depositor claimed the collateral stash: ${amt(collOut, coll)} sent.`
+        ? `The depositor claimed the collateral stash and was sent ${amt(collOut, coll)}.`
         : `The depositor claimed the collateral stash, which was empty.`,
     );
     return out;
@@ -85,8 +86,8 @@ export function spEventSentences(r: SpProseRow, coll: string): string[] {
   if (collIn > ZERO)
     out.push(
       collOut > ZERO
-        ? `Liquidations had paid ${amt(collIn, coll)} in since the previous touch.`
-        : `Liquidations had paid ${amt(collIn, coll)} in since the previous touch, stashed for a later claim.`,
+        ? `Liquidations paid ${amt(collIn, coll)} in.`
+        : `Liquidations paid ${amt(collIn, coll)} in, stashed for a later claim.`,
     );
   if (collOut > ZERO)
     out.push(
@@ -94,5 +95,7 @@ export function spEventSentences(r: SpProseRow, coll: string): string[] {
         ? `The touch sent ${amt(collOut, coll)} to the depositor, the ${amt(stashBefore, coll)} stashed at earlier touches included.`
         : `The touch sent ${amt(collOut, coll)} to the depositor.`,
     );
+  if (change === ZERO && loss === ZERO && gain === ZERO && collIn === ZERO && collOut === ZERO)
+    out.push("The touch moved nothing.");
   return out;
 }

@@ -10,9 +10,7 @@ const DOCS = "https://docs.liquity.org";
 export function LiquityV2DepositFlowsNote({ coll }: { coll: string }): ReactNode {
   return (
     <div className="space-y-2" data-liquity-v2-deposit-flows-note="" data-anatomy="F14">
-      <p>
-        The bars are the deposit&apos;s two tokens, each on its own scale. Nothing on this page prices {coll} in BOLD.
-      </p>
+      <p>The bars are the deposit&apos;s two tokens, each on its own scale; neither bar prices {coll} in BOLD.</p>
       <p>
         The BOLD bar: deposited, with the BOLD yield the branch&apos;s interest paid in, less withdrawn, burned by
         liquidations and the yield claimed, is the deposit.

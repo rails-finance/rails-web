@@ -8,6 +8,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  barTotals,
   depositGap,
   depositLegs,
   depositLifetime,
@@ -15,6 +16,7 @@ import {
   depositNowFromChain,
   exactUnits,
   priceUnits,
+  sheetFigures,
   stashGap,
 } from "../../lib/liquity-v2/sp-math.ts";
 import { spHeadFigures } from "../../lib/liquity-v2/sp-chain-read.ts";
@@ -191,13 +193,14 @@ test("each row's label says what the operation did", () => {
 
 test("the sentences read V2's fields: the yield is BOLD, the claim includes the stash", () => {
   const s2 = spEventSentences(ROWS[1], "WETH");
-  assert.ok(s2.includes("The depositor provided 500 BOLD to the WETH Stability Pool."));
-  assert.ok(s2.some((l) => l.includes("2 BOLD of yield") && l.endsWith("added to the deposit.")));
-  assert.ok(s2.some((l) => l.includes("0.005 WETH") && l.includes("stashed for a later claim")));
+  assert.ok(s2.includes("The depositor deposited 500 BOLD."));
+  assert.ok(s2.includes("The branch's interest paid 2 BOLD of yield, kept in the deposit."));
+  assert.ok(s2.includes("Liquidations paid 0.005 WETH in, stashed for a later claim."));
   const s3 = spEventSentences(ROWS[2], "WETH");
-  assert.ok(s3.includes("The depositor withdrew 200 BOLD from the deposit."));
+  assert.ok(s3.includes("The depositor withdrew 200 BOLD."));
   assert.ok(s3.some((l) => l.includes("burned 4 BOLD")));
-  assert.ok(s3.some((l) => l.includes("1.5 BOLD of yield") && l.includes("all sent to the depositor")));
+  assert.ok(s3.includes("The branch's interest paid 1.5 BOLD of yield, all claimed."));
+  assert.ok(s3.includes("Liquidations paid 0.002 WETH in."));
   assert.ok(
     s3.includes("The touch sent 0.007 WETH to the depositor, the 0.005 WETH stashed at earlier touches included."),
   );
@@ -211,4 +214,51 @@ test("routes: a branch in any case, a depositor lowercased", () => {
   assert.equal(normalizeDepositor(WALLET.toUpperCase().replace("0X", "0x")), WALLET);
   assert.equal(normalizeDepositor("0x12"), null);
   assert.equal(liquityV2DepositHref("rETH", WALLET), `/ethereum/liquity-v2/stability-pool/rETH/${WALLET}`);
+});
+
+test("a touch that moves BOLD, yield and collateral by nothing is Touched, and says so", () => {
+  const nothing = row({ operation: 1, deposit_before: E(5), deposit_after: E(5) });
+  assert.equal(spEventLabel(nothing), "Touched");
+  assert.deepEqual(spEventSentences(nothing, "WETH"), ["The touch moved nothing."]);
+  // Yield earned and kept is Compounded; earned and all claimed is Claimed.
+  const kept = row({ operation: 1, yield_gain_since: E(1), deposit_before: E(5), deposit_after: E(6) });
+  assert.equal(spEventLabel(kept), "Compounded");
+  assert.deepEqual(spEventSentences(kept, "WETH"), [
+    "The branch's interest paid 1 BOLD of yield, kept in the deposit.",
+  ]);
+  const partly = row({
+    operation: 1,
+    yield_gain_since: E(2),
+    yield_gain_claimed: E(0.5),
+    deposit_before: E(5),
+    deposit_after: E(6.5),
+  });
+  assert.ok(
+    spEventSentences(partly, "WETH").includes(
+      "The branch's interest paid 2 BOLD of yield and 0.5 BOLD was claimed; the rest stays in the deposit.",
+    ),
+  );
+  const stash = row({
+    operation: 2,
+    coll_gain_claimed: E(0.1),
+    stash_before: E(0.1),
+    deposit_before: "0",
+    deposit_after: "0",
+  });
+  assert.ok(
+    spEventSentences(stash, "WETH").includes("The depositor claimed the collateral stash and was sent 0.1 WETH."),
+  );
+});
+
+test("the bars' totals from the legs alone equal the last row's deposit_after and stash_after", () => {
+  const t = barTotals(ROWS.map(depositLegs));
+  assert.equal(t.deposit.toString(), ROWS[2].deposit_after);
+  assert.equal(t.stash.toString(), ROWS[2].stash_after);
+  // Each row's sheet adds up: last − burned + yield = before; before + change − claimed = after.
+  for (const r of ROWS) {
+    const f = sheetFigures(r);
+    assert.equal(f.before, f.last - f.burned + f.yieldPaid, r.event_key);
+    assert.equal(f.after, f.before + f.change - f.yieldClaimed, r.event_key);
+    assert.equal(f.stash, f.stashBefore - f.claimed, r.event_key);
+  }
 });

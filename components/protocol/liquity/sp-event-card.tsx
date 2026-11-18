@@ -20,7 +20,7 @@ import { big, exactUnits, units } from "@/lib/liquity-v2/sp-math";
 import { spTouchProv } from "@/lib/liquity-v2/sp-provenance";
 import { spEventLabel, spEventSentences } from "@/lib/liquity-v2/sp-event-prose";
 import type { LiquityV2DepositEventRow } from "@/lib/sources/api/liquity-v2-sp";
-import { spDepositSheet } from "./sp-sheet";
+import { DEPOSIT_AFTER_FORMULA, spDepositSheet } from "./sp-sheet";
 
 const ZERO = BigInt(0);
 const short = (h: string) => `${h.slice(0, 6)}…${h.slice(-4)}`;
@@ -140,14 +140,14 @@ export function LiquityV2DepositEventCard({
   if (tokens.length === 0) tokens.push({ symbol: "BOLD", address: TOKEN_ADDRESSES.BOLD });
 
   const cells: EventCellSpec[] = [
-    amountCell(
-      "deposit-after",
-      "Deposit after",
-      big(row.deposit_after),
-      "BOLD",
-      TOKEN_ADDRESSES.BOLD,
-      coord("Deposit after — the pool's deposits(depositor) once this operation had run."),
-    ),
+    amountCell("deposit-after", "Deposit after", big(row.deposit_after), "BOLD", TOKEN_ADDRESSES.BOLD, {
+      kind: "derived",
+      pclass: "indexed",
+      summary:
+        "Deposit after — the deposit after this operation, replayed from the operations: the deposit before it, less the loss, plus the change and the yield, less the yield claimed.",
+      formula: DEPOSIT_AFTER_FORMULA,
+      via: "GET /api/liquity-v2/stability-pool/timeline",
+    }),
     ...(big(row.coll_gain_since) > ZERO
       ? [
           {

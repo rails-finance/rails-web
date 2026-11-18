@@ -16,7 +16,7 @@ import type { Provenance } from "@/components/shared/provenance";
 import { formatNumber } from "@/lib/utils/format";
 import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
-import { big, exactUnits, units } from "@/lib/liquity-v2/sp-math";
+import { exactUnits, sheetFigures, units } from "@/lib/liquity-v2/sp-math";
 import { spTouchProv } from "@/lib/liquity-v2/sp-provenance";
 import type { LiquityV2DepositEventRow } from "@/lib/sources/api/liquity-v2-sp";
 
@@ -36,7 +36,7 @@ const WORDS = {
 
 const TIPS = {
   deposit:
-    "The deposit's BOLD in the pool: what this operation moved, then the deposit it recorded, from the pool's log.",
+    "The deposit's BOLD in the pool: what this operation moved, from the pool's log, then the deposit after it, replayed from the operations.",
   collPaid:
     "The collateral liquidations paid in to the deposit: what this operation paid in and claimed, then what stays stashed for a later claim.",
   depositLast: "The deposit the previous operation recorded.",
@@ -47,7 +47,8 @@ const TIPS = {
   depositBefore: "The deposit just before this operation's change: the last event's, less the burn, plus the yield.",
   change: "The BOLD this operation moved, from the DepositOperation's topUpOrWithdrawal.",
   yieldClaimed: "The BOLD yield this operation sent to the depositor; what it did not send joined the deposit.",
-  depositTotal: "The deposit after this operation: the pool's deposits(depositor) once it had run.",
+  depositTotal:
+    "The deposit after this operation, replayed from the operations: the deposit before it, less the loss, plus the change and the yield, less the yield claimed.",
   stashLast: "The collateral earlier operations left stashed.",
   collPaidIn:
     "The collateral liquidations paid the deposit since the previous operation: the DepositOperation's ethGainSinceLastOperation.",
@@ -55,7 +56,8 @@ const TIPS = {
     "The collateral stashed before this operation's claim: the last event's stash plus what liquidations paid.",
   collClaimed:
     "The collateral this operation sent to the depositor, the stash included: the DepositOperation's ethGainClaimed.",
-  stashTotal: "The collateral left stashed for a later claim: the pool's stashedColl(depositor) once it had run.",
+  stashTotal:
+    "The collateral left stashed for a later claim, replayed from the operations: the stash before this operation, plus what it paid in, less what it claimed.",
 };
 
 /** Each receipt's name, the head of its summary. */
@@ -84,6 +86,17 @@ const said = (key: keyof typeof TIPS): string => {
 const fmt = (raw: bigint) => formatNumber(units(raw < ZERO ? -raw : raw));
 const signedText = (raw: bigint) => `${raw < ZERO ? "−" : "+"}${fmt(raw)}`;
 const derived = (summary: string, formula: string): Provenance => ({ kind: "derived", summary, formula, via: formula });
+/** A figure the index replays (rails-server mig 491); the event emits none. */
+const replayed = (summary: string, formula: string): Provenance => ({
+  kind: "derived",
+  pclass: "indexed",
+  summary,
+  formula,
+  via: "GET /api/liquity-v2/stability-pool/timeline",
+});
+
+export const DEPOSIT_AFTER_FORMULA = "deposit before − loss + change + yield − claimed";
+export const STASH_AFTER_FORMULA = "stash before + paid in − claimed";
 
 type Figure = NonNullable<SheetRow["amount"]>;
 const figure = (raw: bigint, text: string, symbol: string, address: string, info: Provenance): Figure => ({
@@ -101,13 +114,8 @@ export function spDepositSheet(row: LiquityV2DepositEventRow): EventSheet {
   const b = (raw: bigint, text: string, info: Provenance) => figure(raw, text, "BOLD", TOKEN_ADDRESSES.BOLD, info);
   const k = (raw: bigint, text: string, info: Provenance) => figure(raw, text, c, branch.collateralAddr, info);
 
-  const last = big(row.deposit_before);
-  const burned = big(row.deposit_loss);
-  const yieldPaid = big(row.yield_gain_since);
-  const yieldClaimed = big(row.yield_gain_claimed);
-  const change = big(row.top_up_or_withdrawal);
-  const after = big(row.deposit_after);
-  const before = last - burned + yieldPaid;
+  const { last, burned, yieldPaid, yieldClaimed, change, after, before, stashLast, paid, claimed, stash, stashBefore } =
+    sheetFigures(row);
 
   const depositCarry: SheetRow[] = [];
   if (last > ZERO) {
@@ -148,10 +156,6 @@ export function spDepositSheet(row: LiquityV2DepositEventRow): EventSheet {
       tip: TIPS.yieldClaimed,
     });
 
-  const stashLast = big(row.stash_before);
-  const paid = big(row.coll_gain_since);
-  const claimed = big(row.coll_gain_claimed);
-  const stash = big(row.stash_after);
   const collCarry: SheetRow[] = [];
   if (stashLast > ZERO || paid > ZERO) {
     collCarry.push({
@@ -200,7 +204,7 @@ export function spDepositSheet(row: LiquityV2DepositEventRow): EventSheet {
             : undefined,
         rows: depositRows,
         total: SHEET_NO_USD,
-        totalAmount: b(after, fmt(after), log(said("depositTotal"))),
+        totalAmount: b(after, fmt(after), replayed(said("depositTotal"), DEPOSIT_AFTER_FORMULA)),
         totalTip: TIPS.depositTotal,
       },
       {
@@ -215,17 +219,13 @@ export function spDepositSheet(row: LiquityV2DepositEventRow): EventSheet {
             ? {
                 key: "before",
                 label: SHEET_WORDS.before,
-                amount: k(
-                  stashLast + paid,
-                  fmt(stashLast + paid),
-                  derived(said("stashBefore"), "last event + paid in"),
-                ),
+                amount: k(stashBefore, fmt(stashBefore), derived(said("stashBefore"), "last event + paid in")),
                 tip: TIPS.stashBefore,
               }
             : undefined,
         rows: collRows,
         total: SHEET_NO_USD,
-        totalAmount: k(stash, fmt(stash), log(said("stashTotal"))),
+        totalAmount: k(stash, fmt(stash), replayed(said("stashTotal"), STASH_AFTER_FORMULA)),
         totalTip: TIPS.stashTotal,
       },
     ],

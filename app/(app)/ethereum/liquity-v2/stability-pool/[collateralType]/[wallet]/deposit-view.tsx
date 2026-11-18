@@ -210,7 +210,7 @@ export default function DepositView({
   const pinnedWaits = pinnedMissing && lifePending;
   const pinnedUnread = pinnedMissing && lifeRead === "failed";
 
-  // The branch collateral at its PriceFeed, the price the head row values the
+  // The branch collateral at its price feed, the price the head row values the
   // collateral paid in at; BOLD as the Trove page lists it.
   const price = chain ? priceUnits(chain.priceRaw) : null;
   const stripAssets: LatestPriceAsset[] = [
@@ -239,8 +239,8 @@ export default function DepositView({
 
   return (
     <FlowFocusContext.Provider value={flows ? flowFocus : null}>
-      {/* The collateral bar is paid in, not owed: violet, apart from a debt's
-          green, as on Polaris's deposit (Miles, 17 Nov 2026). */}
+      {/* The collateral bar is paid in: violet, as on Polaris's deposit
+          (Miles, 17 Nov 2026). */}
       <FlowHuesContext.Provider value={PAID_IN_HUES}>
         <div className="py-8 space-y-6" style={PAID_IN_VARS}>
           <DetailTopRow
