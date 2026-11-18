@@ -363,17 +363,22 @@ function SubjectStretches({
   );
 }
 
-export type SectionSidebarKind = "flows" | "timeline";
+export type SectionSidebarKind = "flows" | "timeline" | "challenges";
 
-const ANATOMY: Record<SectionSidebarKind, string> = { flows: "P2.1", timeline: "P3.1" };
+const ANATOMY: Record<SectionSidebarKind, string | undefined> = {
+  flows: "P2.1",
+  timeline: "P3.1",
+  challenges: undefined,
+};
 
 export function SectionSidebar({
   section,
   hidden,
   children,
 }: {
-  /** `flows` wraps Lifetime flows; `timeline` wraps the timeline, whose bar
-   *  carries the subject stretches. */
+  /** `flows` wraps Lifetime flows and `challenges` Frankencoin's challenge
+   *  history, each a box; `timeline` wraps the timeline, whose bar carries the
+   *  subject stretches. */
   section: SectionSidebarKind;
   hidden?: boolean;
   children: ReactNode;
@@ -447,7 +452,7 @@ export function SectionSidebar({
     "--brand-hue": identity.hue ?? 0,
     ...(identity.hue == null ? { "--brand-strength": 0 } : {}),
   } as CSSProperties;
-  const boxed = section === "flows";
+  const boxed = section !== "timeline";
   return (
     <div
       ref={frameRef}
