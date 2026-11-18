@@ -41,6 +41,7 @@ import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
 import { formatUsdValue } from "@/lib/utils/format";
 import { FOOT_LINK } from "@/lib/shared/ui-grammar";
 import Link from "next/link";
+import { Fragment } from "react";
 
 /** One summed unit the wallet holds — a collateral, a debt. */
 export interface HolderLeg {
@@ -168,8 +169,22 @@ function HouseFigure({ leg, figure }: { leg: HolderLeg; figure: NonNullable<Hold
   );
 }
 
-export function HolderStrip({ countsLine, counts, legs, truncated, note, wallet, positions }: HolderStripProps) {
+export function HolderStrip({
+  countsLine,
+  counts,
+  legs,
+  truncated,
+  note,
+  wallet,
+  positions,
+  scoped = false,
+}: HolderStripProps & {
+  /** Drawn inside a page's receipts scope (the wallet page, ui-jobs 738):
+   *  its receipts open in that page's inspector. */
+  scoped?: boolean;
+}) {
   if (positions != null && positions < 2) return null;
+  const Scope = scoped ? Fragment : ProvUnscoped;
   const totals = !truncated && legs.length > 0 && (positions == null || counts.open >= 2);
   return (
     // A BAND, not a card: the raised rounded surface belongs to a position, and
@@ -181,7 +196,7 @@ export function HolderStrip({ countsLine, counts, legs, truncated, note, wallet,
     // dock is a detail-page surface), so every <Prov> here is inert content —
     // exactly as the listing cards' own figures are. Declaring it keeps the dev
     // unscoped-<Prov> tripwire quiet here while it stays loud everywhere else.
-    <ProvUnscoped>
+    <Scope>
       <div
         data-holder-strip=""
         data-anatomy="N7"
@@ -238,6 +253,6 @@ export function HolderStrip({ countsLine, counts, legs, truncated, note, wallet,
           </Link>
         )}
       </div>
-    </ProvUnscoped>
+    </Scope>
   );
 }

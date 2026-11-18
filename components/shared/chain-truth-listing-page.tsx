@@ -120,6 +120,9 @@ export interface ChainTruthListingPageProps<T, F extends BaseListFilters, Ext = 
    *  once the loan-token facet has narrowed to one address). */
   sortOptions: SortOption[] | ((f: F) => SortOption[]);
   searchPlaceholder?: string;
+  /** False: no search box, for a page that names its subject (the wallet
+   *  page's protocol listing, ui-jobs 738). */
+  search?: boolean;
   renderCard: (item: T) => ReactNode;
   hrefFor: (item: T) => string;
   keyFor: (item: T) => string;
@@ -209,6 +212,7 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
   defaults,
   sortOptions,
   searchPlaceholder,
+  search,
   renderCard,
   hrefFor,
   keyFor,
@@ -574,6 +578,7 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
           onChange,
           sortOptions: typeof sortOptions === "function" ? sortOptions(filters) : sortOptions,
           searchPlaceholder,
+          search,
           // Every chain-truth listing can be saved as a view (N1.7, ui-jobs 521).
           viewMenu: true,
           countFor,
