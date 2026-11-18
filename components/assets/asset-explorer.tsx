@@ -20,6 +20,7 @@
 // from all assets") shows every asset until "Done" (Miles, 10 Nov 2026).
 
 import Link from "next/link";
+import { Prov, type Provenance } from "@/components/shared/provenance";
 import { useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { BoldCardPrice, BoldReadContext, holdsBold } from "@/components/assets/bold-live-price";
 import type { BoldPriceRead } from "@/lib/liquity-v2/bold-price";
@@ -756,7 +757,7 @@ function AssetRowMenu({
 }
 
 /** A card without a price's figure (A5.11); the asset page (A1.3) draws it too. */
-export function FigureRow({ figure: f }: { figure: CardFigure }) {
+export function FigureRow({ figure: f, info }: { figure: CardFigure; info?: Provenance }) {
   const v = formatCompactTitled(f.amount);
   const title = `${f.title}${f.asOf ? `, ${asOfWords(f.asOf)}` : ""}: ${v.title} ${f.unit}`;
   return (
@@ -767,9 +768,17 @@ export function FigureRow({ figure: f }: { figure: CardFigure }) {
       data-anatomy="A5.11"
     >
       <span className="text-xs text-rb-500">{f.label}</span>
-      <span className="font-semibold text-foreground">
-        {v.display} {f.unit}
-      </span>
+      {info ? (
+        <Prov info={info} value={String(f.amount)} symbol={f.unit}>
+          <span className="font-semibold text-foreground">
+            {v.display} {f.unit}
+          </span>
+        </Prov>
+      ) : (
+        <span className="font-semibold text-foreground">
+          {v.display} {f.unit}
+        </span>
+      )}
       {f.asOf && (
         <span className="text-[11px] text-rb-500" data-asset-card-figure-as-of={f.asOf.block}>
           {asOfMark(f.asOf)}

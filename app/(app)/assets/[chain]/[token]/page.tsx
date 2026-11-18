@@ -83,7 +83,7 @@ export default async function AssetPage({ params, searchParams }: { params: Para
             relations={[]}
             back={back}
             note={null}
-            livePrice={bold ? <BoldLivePrice read={boldRead ?? null} /> : undefined}
+            livePrice={bold ? <BoldLivePrice read={boldRead ?? null} figure={unpriced.figure} /> : undefined}
           />
         </div>
       </div>

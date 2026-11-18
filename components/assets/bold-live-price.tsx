@@ -9,7 +9,9 @@
 // asset popover draw the same read.
 
 import { createContext } from "react";
-import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
+import { Prov, ProvReceiptsScope, useReceiptRegistry, type Provenance } from "@/components/shared/provenance";
+import { FigureRow } from "@/components/assets/asset-explorer";
+import type { CardFigure } from "@/lib/shared/asset-explorer";
 import { asOfMark } from "@/components/assets/asset-price-row";
 import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
 import type { BoldPriceState } from "@/lib/liquity-v2/use-bold-price";
@@ -26,20 +28,36 @@ import {
   type BoldPriceRead,
 } from "@/lib/liquity-v2/bold-price";
 
-export function BoldLivePrice({ read }: { read: BoldPriceRead | null }) {
+/** The card's figure on BOLD's page (A5.11, its Trove debt) with a receipt,
+ *  since the page arms the inspector: the figure's own sentence and where it
+ *  is read. */
+function figureProv(f: CardFigure): Provenance {
+  return {
+    kind: "derived",
+    pclass: "indexed",
+    summary: `${f.unit} ${f.label.toLowerCase()} — ${f.title.charAt(0).toLowerCase()}${f.title.slice(1)}: each open Trove's current debt summed, at the index's latest read, which states no block.`,
+    formula: "Σ current debt over the open Troves",
+  };
+}
+
+export function BoldLivePrice({ read, figure }: { read: BoldPriceRead | null; figure: CardFigure | null }) {
   const registry = useReceiptRegistry();
   const price = read ? boldUsdFromCurve(read.lastPriceRaw) : null;
   const info = read ? boldPriceProv(read) : undefined;
   if (!read || price == null || !info) {
     return (
-      <p className="mt-1 text-sm text-rb-500" data-asset-bold-price="failed" data-anatomy="A1.7">
-        {BOLD_PRICE_UNAVAILABLE}
-      </p>
+      <>
+        {figure && <FigureRow figure={figure} />}
+        <p className="mt-1 text-sm text-rb-500" data-asset-bold-price="failed" data-anatomy="A1.7">
+          {BOLD_PRICE_UNAVAILABLE}
+        </p>
+      </>
     );
   }
   const band = offPar(price, "BOLD")?.band === true;
   return (
     <ProvReceiptsScope registry={registry}>
+      {figure && <FigureRow figure={figure} info={figureProv(figure)} />}
       <div data-asset-bold-price={read.blockNumber} data-anatomy="A1.7">
         <p className="flex items-baseline gap-1.5 text-sm tabular-nums">
           <span className="text-xs text-rb-500">Price</span>
