@@ -182,6 +182,7 @@ export async function loadLiquityV1PositionFromChain(walletRaw: string): Promise
       pendingEthReward: Number(pendingEthRaw) / E18,
       pendingLusdReward: Number(pendingLusdRaw) / E18,
       price: Number(priceRaw) / E18,
+      priceStale: !(priceFetched != null && priceFetched > ZERO),
       icr: isActive && entireDebtRaw > ZERO && icrRaw > ZERO && icrRaw < ICR_CEILING ? Number(icrRaw) / E18 : null,
       mcr: LIQUITY_V1_MCR,
       ccr: LIQUITY_V1_CCR,

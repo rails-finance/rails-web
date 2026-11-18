@@ -103,6 +103,9 @@ export interface LiquityTroveLive {
    *  lane; Liquity V2 reads its branch catalog). */
   collDecimals?: number;
   priceUsd: number | null;
+  /** True where the read's fetchPrice failed and the price is the feed's
+   *  lastGoodPrice (the forks' lane). */
+  priceStale?: boolean;
   /** The live collateral ratio as a PERCENT (the contract's own getCurrentICR
    *  × 100 on the forks; entire figures × oracle price on V2). Null when the
    *  trove has no live debt or no price. */
