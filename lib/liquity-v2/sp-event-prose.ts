@@ -36,6 +36,10 @@ const exact = (v: bigint): string => {
 const amt = (v: bigint, symbol: string) => `${exact(v)} ${symbol}`;
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
+/** The bullet naming a sender other than the depositor; the card links the
+ *  address to its wallet page (ui-jobs 751). */
+export const spSenderSentence = (txFrom: string) => `${short(txFrom)} sent the transaction.`;
+
 /** The row's label: what the operation did. */
 export function spEventLabel(r: SpProseRow): string {
   const change = big(r.top_up_or_withdrawal);
@@ -55,8 +59,7 @@ export function spEventSentences(r: SpProseRow, coll: string): string[] {
   const change = big(r.top_up_or_withdrawal);
   if (change > ZERO) out.push(`The depositor deposited ${amt(change, "BOLD")}.`);
   if (change < ZERO) out.push(`The depositor withdrew ${amt(-change, "BOLD")}.`);
-  if (r.tx_from && r.tx_from.toLowerCase() !== r.depositor.toLowerCase())
-    out.push(`${short(r.tx_from)} sent the transaction.`);
+  if (r.tx_from && r.tx_from.toLowerCase() !== r.depositor.toLowerCase()) out.push(spSenderSentence(r.tx_from));
   const loss = big(r.deposit_loss);
   if (loss > ZERO)
     out.push(
