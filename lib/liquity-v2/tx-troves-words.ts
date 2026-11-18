@@ -6,8 +6,8 @@
 // RULE: facts only. Each Trove is named once, in the order of its first
 // log index, with its operations in log order as past-tense
 // verbs; Troves with the same verbs share a clause. At most TX_TROVES_CAP
-// Troves are named, then "and N more Troves" ("and more Troves" where the
-// server cut the rows). No rows, no line. Pure: no imports, so
+// Troves are named, then "and N more Troves"; where the server cut the rows,
+// "and more Troves" when the line is full, else "and more operations". No rows, no line. Pure: no imports, so
 // scripts/test/liquity-v2-tx-troves.test.mjs loads it directly.
 
 /** One TroveOperation log, as the route serves it. */
@@ -38,17 +38,27 @@ export const TX_TROVES_CAP = 5;
 /** A transaction hash: 0x and 64 hex digits. */
 export const TX_HASH = /^0x[0-9a-fA-F]{64}$/;
 
+// Every TroveOperation the TroveManager logs (types/api/troveHistory.ts
+// TroveOperationType; rails-server's trove_operations holds these ten), in
+// the app's words for them (LIQUITY_OP_LABELS).
 const VERB: Record<string, string> = {
   openTrove: "opened",
+  openTroveAndJoinBatch: "opened",
   closeTrove: "closed",
   adjustTrove: "adjusted",
-  adjustTroveInterestRate: "rate changed",
+  adjustTroveInterestRate: "interest rate changed",
+  applyPendingDebt: "had pending debt applied",
   liquidate: "liquidated",
-  redeemCollateral: "redeemed against",
+  redeemCollateral: "redeemed",
+  setInterestBatchManager: "joined a delegate",
+  removeFromBatch: "left a delegate",
 };
 
-/** An operation's past-tense verb; an operation without one reads as stored. */
-export const troveOpVerb = (operation: string): string => VERB[operation] ?? operation;
+/** An operation's past-tense verb; one the app has no word for reads "acted on". */
+export const troveOpVerb = (operation: string): string => VERB[operation] ?? "acted on";
+
+/** The operations the verbs cover, for the test that holds them to the enum. */
+export const TROVE_OP_VERBS: Readonly<Record<string, string>> = VERB;
 
 /** "a", "a and b", "a, b and c". */
 export function joinWords(items: string[]): string {
@@ -102,8 +112,10 @@ export interface TxTrovesLine {
   clauses: { troves: TxTrove[]; verbs: string }[];
   /** Troves past the cap. */
   more: number;
-  /** The server cut the rows: more Troves than the line can count. */
+  /** The server cut the rows: more operations than the line can count. */
   truncated: boolean;
+  /** The line names as many Troves as the cap allows. */
+  full: boolean;
 }
 
 /** The line for a read, or null where there is nothing to say. */
@@ -119,12 +131,19 @@ export function txTrovesLine(
     if (last && last.verbs === t.verbs) last.troves.push(t);
     else clauses.push({ troves: [t], verbs: t.verbs });
   }
-  return { clauses, more: Math.max(0, troves.length - cap), truncated: res.truncated };
+  return {
+    clauses,
+    more: Math.max(0, troves.length - cap),
+    truncated: res.truncated,
+    full: troves.length >= cap,
+  };
 }
 
 /** The line's closing words after the clauses, or null. */
 export function txTrovesTail(line: TxTrovesLine): string | null {
-  if (line.truncated) return "and more Troves";
+  // A cut answer may hold more Troves only where the line is full; else every
+  // Trove is named and the cut left out operations.
+  if (line.truncated) return line.full ? "and more Troves" : "and more operations";
   if (line.more > 0) return `and ${line.more} more Trove${line.more === 1 ? "" : "s"}`;
   return null;
 }

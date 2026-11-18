@@ -4,11 +4,13 @@
 // for tx 0x1948935c…fb33a (block 26441966), given out of log order.
 // Run: npm test
 import test from "node:test";
+import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import {
   groupTxTroves,
   joinWords,
   troveOpVerb,
+  TROVE_OP_VERBS,
   TX_HASH,
   txTrovesLine,
   txTrovesText,
@@ -39,13 +41,25 @@ const ROWS = [
 ];
 const name = (t) => `Trove ${t.troveId.slice(0, 4)}…${t.troveId.slice(-4)} (${t.collateralType})`;
 
-test("verbs: the mapped ones, others as stored", () => {
+test('verbs: each operation in the app\'s words; an unknown one reads "acted on"', () => {
   assert.equal(troveOpVerb("openTrove"), "opened");
-  assert.equal(troveOpVerb("adjustTroveInterestRate"), "rate changed");
-  assert.equal(troveOpVerb("redeemCollateral"), "redeemed against");
-  assert.equal(troveOpVerb("applyPendingDebt"), "applyPendingDebt");
+  assert.equal(troveOpVerb("adjustTroveInterestRate"), "interest rate changed");
+  assert.equal(troveOpVerb("redeemCollateral"), "redeemed");
+  assert.equal(troveOpVerb("applyPendingDebt"), "had pending debt applied");
+  assert.equal(troveOpVerb("openTroveAndJoinBatch"), "opened");
+  assert.equal(troveOpVerb("setInterestBatchManager"), "joined a delegate");
+  assert.equal(troveOpVerb("removeFromBatch"), "left a delegate");
+  assert.equal(troveOpVerb("somethingNew"), "acted on");
   assert.equal(joinWords(["a"]), "a");
   assert.equal(joinWords(["a", "b", "c"]), "a, b and c");
+});
+
+test("every TroveOperationType member has a verb", () => {
+  const src = readFileSync(new URL("../../types/api/troveHistory.ts", import.meta.url), "utf8");
+  const block = src.match(/export type TroveOperationType =([^;]+);/)[1];
+  const members = [...block.matchAll(/"([A-Za-z]+)"/g)].map((m) => m[1]);
+  assert.equal(members.length, 10);
+  for (const m of members) assert.ok(m in TROVE_OP_VERBS, m);
 });
 
 test("rows group per Trove in first-log order, operations in log order", () => {
@@ -54,9 +68,9 @@ test("rows group per Trove in first-log order, operations in log order", () => {
     g.map((t) => [t.collateralType, t.troveId, t.verbs]),
     [
       ["wstETH", A, "opened and closed"],
-      ["WETH", B, "redeemed against"],
-      ["wstETH", C, "redeemed against"],
-      ["rETH", D, "redeemed against"],
+      ["WETH", B, "redeemed"],
+      ["wstETH", C, "redeemed"],
+      ["rETH", D, "redeemed"],
     ],
   );
   assert.deepEqual(
@@ -69,7 +83,7 @@ test("the 0x1948…b33a line", () => {
   const line = txTrovesLine({ rows: ROWS, truncated: false });
   assert.equal(
     txTrovesText(line, name),
-    "In this transaction: Trove 7109…7687 (wstETH) opened and closed; Trove 6675…4739 (WETH), Trove 6639…4531 (wstETH) and Trove 5384…4385 (rETH) redeemed against.",
+    "In this transaction: Trove 7109…7687 (wstETH) opened and closed; Trove 6675…4739 (WETH), Trove 6639…4531 (wstETH) and Trove 5384…4385 (rETH) redeemed.",
   );
 });
 
@@ -84,7 +98,7 @@ test("a repeated operation is counted", () => {
   );
 });
 
-test("cap at five Troves, then the count; truncated says more", () => {
+test("cap at five Troves, then the count; a cut answer says more Troves when full, more operations when not", () => {
   const rows = Array.from({ length: 8 }, (_, i) => row("WETH", String(i + 1), "liquidate", 5, i));
   const line = txTrovesLine({ rows, truncated: false });
   assert.equal(line.more, 3);
@@ -95,6 +109,17 @@ test("cap at five Troves, then the count; truncated says more", () => {
   const cut = txTrovesLine({ rows, truncated: true });
   assert.match(
     txTrovesText(cut, (t) => t.troveId),
+    /; and more Troves\.$/,
+  );
+  // Cut, with every Trove named: the cut left out operations.
+  const few = txTrovesLine({ rows: rows.slice(0, 3), truncated: true });
+  assert.match(
+    txTrovesText(few, (t) => t.troveId),
+    /liquidated; and more operations\.$/,
+  );
+  const five = txTrovesLine({ rows: rows.slice(0, 5), truncated: true });
+  assert.match(
+    txTrovesText(five, (t) => t.troveId),
     /; and more Troves\.$/,
   );
   const six = txTrovesLine({ rows: rows.slice(0, 6), truncated: false });
