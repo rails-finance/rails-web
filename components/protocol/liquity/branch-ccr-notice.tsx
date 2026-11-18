@@ -18,7 +18,9 @@
 //   inside the 7-day cooldown (adjustTroveInterestRate, removeFromBatch,
 //   setBatchManagerAnnualInterestRate's own check) and on every
 //   setInterestBatchManager, so joining or switching a batch manager;
-// - setInterestIndividualDelegate makes no TCR check.
+// - setInterestIndividualDelegate makes no TCR check of its own; on a batched
+//   Trove it calls removeFromBatch, so a new rate inside the cooldown goes
+//   through _applyUpfrontFee as a rate change does.
 // Liquidation stays at ICR < MCR (TroveManager._batchLiquidateTroves).
 
 import { useId, useState } from "react";
@@ -87,7 +89,8 @@ function Notice({ s, anatomy, compact }: { s: LiquityV2BranchCcr; anatomy: Anato
               collateral needs a repayment of at least its value in the same adjustment. A Trove is liquidated only
               below the {whole(s.mcr)} Minimum Collateral Ratio (MCR). Adding collateral and repaying remain open, as
               long as the Trove ends at or above its MCR (MCR plus BCR for a batched Trove). Setting an individual
-              delegate stays open.
+              delegate stays open for a Trove outside a batch; on a batched Trove it leaves the batch, which counts as a
+              rate change.
             </p>
             <p>
               The branch reaches its Shutdown Collateral Ratio (SCR) of {whole(s.scr)} at a {s.branch} price of{" "}

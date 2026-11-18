@@ -3,13 +3,15 @@
 // TroveManager.getEntireBranchColl / getEntireBranchDebt, the PriceFeed's
 // fetchPrice (simulated, lastGoodPrice where it fails) and BorrowerOperations'
 // CCR / SCR / MCR / hasBeenShutDown. Settled in lib/liquity-v2/branch-ccr.ts.
-// Kept 30 s, one read in flight for concurrent callers.
+// The head read is kept 30 s; a read at a named block is kept by block
+// (lib/liquity-v2/block-keyed-cache.ts); one read in flight per key.
 //
 // SERVER-ONLY.
 
 import { getAddress, parseAbi } from "viem";
 import { chainClient } from "./rpc";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { blockKeyedCache } from "@/lib/liquity-v2/block-keyed-cache";
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
 import {
   ccrPinBlock,
@@ -39,6 +41,12 @@ const CALLS_PER_BRANCH = 8;
 const TTL_MS = 30_000;
 let cached: { at: number; value: LiquityV2BranchCcrResponse } | null = null;
 let inflight: Promise<LiquityV2BranchCcrResponse> | null = null;
+/** Reads at a named block, the last 8 blocks kept, one read per block in flight. */
+const atBlockRead = blockKeyedCache(
+  8,
+  (block: number) => read(block),
+  (v) => v.blockNumber > 0,
+);
 
 const emptyBranches = () =>
   Object.fromEntries(LIQUITY_V2_CCR_BRANCHES.map((b) => [b, null])) as Record<
@@ -60,9 +68,9 @@ export function liquityV2CcrDevPin(): number | null {
  *  branch whose reads failed is null; a failed read of the block leaves every
  *  branch null at block 0. The route passes no block. */
 export async function loadLiquityV2BranchCcr(atBlock?: number): Promise<LiquityV2BranchCcrResponse> {
-  if (atBlock != null && atBlock > 0) return read(atBlock);
+  if (atBlock != null && atBlock > 0) return atBlockRead(atBlock);
   const pin = liquityV2CcrDevPin();
-  if (pin != null) return read(pin);
+  if (pin != null) return atBlockRead(pin);
   if (cached && Date.now() - cached.at < TTL_MS) return cached.value;
   if (!inflight) {
     inflight = read()
