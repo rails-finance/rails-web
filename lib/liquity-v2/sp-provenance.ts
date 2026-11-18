@@ -8,6 +8,7 @@ import type { SpLiquidationsNote } from "@/lib/shared/market-note";
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
 import { LIQUITY_V2_SP_POOLS } from "./sp-catalog";
 import type { SpBranch } from "./sp-routes";
+import type { TxTrove } from "./tx-troves-words";
 
 const VIA = "GET /api/chain/liquity-v2/stability-pool";
 
@@ -308,4 +309,25 @@ export function spLiquidationsNoteProv(note: SpLiquidationsNote): Provenance {
   const to = note.stretch.to;
   if (n === 0 && to) return spLiqProv.touchLoss(b, to.tx_hash, to.block_number);
   return spLiqProv.sum(b, "Net between the touches", "nets in BOLD", "net in BOLD", n);
+}
+
+/** A Trove the deposit's transaction acted on (ui-jobs 751): the branch
+ *  TroveManager's TroveOperation logs for it in that transaction, each with
+ *  its operation and its log index as stored. */
+export function spTxTroveProv(t: TxTrove, idText: string, txHash: string): Provenance {
+  const ops = t.ops.map((o) => `${o.operation} (${o.operation_enum}) at log index ${o.log_index}`).join(", ");
+  return {
+    kind: "chain",
+    pclass: "emitted",
+    summary: `Trove ${idText} (${t.collateralType}) — the ${t.collateralType} TroveManager's TroveOperation ${t.ops.length === 1 ? "log" : "logs"} for this Trove in this transaction, by _operation: ${ops}.`,
+    inputs: t.ops.map((o) => ({
+      label: `TroveOperation _operation, log index ${o.log_index}`,
+      value: `${o.operation} (${o.operation_enum})`,
+      kind: "chain" as const,
+      pclass: "emitted" as const,
+    })),
+    contract: { name: `Liquity V2 ${t.collateralType} TroveManager`, address: t.ops[0].contract_address },
+    source: { block: t.ops[0].block_number, txHash },
+    via: "GET /api/liquity-v2/tx/:hash/troves",
+  };
 }
