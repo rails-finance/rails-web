@@ -57,6 +57,7 @@ import { useEnsName } from "@/lib/ens/use-ens-names";
 import { formatMonthDayYear } from "@/lib/date";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import { troveCardTips } from "@/lib/liquity/trove-card-tips";
+import { SkeletonBar } from "@/components/shared/skeleton-card";
 import type { PositionPanelRow } from "@/components/shared/position-card-panel";
 import { formatExactFromString, formatPrice, formatUnitsExact, formatUsdValue } from "@/lib/utils/format";
 import { getTokenAddress } from "@/lib/shared/token-addresses";
@@ -592,8 +593,10 @@ export interface LiquityPositionCardProps {
   /** The ⋮'s export shapes. `null`: the ⋮ holds the Trove's rows and the
    *  provenance row alone. Absent: no ⋮ (the home hero's inert embed). */
   exports?: PositionCardExports | null;
-  /** A line at the foot (V2's snapshot and loading status). */
+  /** A line at the foot. */
   foot?: ReactNode;
+  /** V2's snapshot and loading status, on one line in the (i) row. */
+  status?: ReactNode;
   /** The branch's shutdown (ui-jobs 612), from the page's `useBranchShutdown`.
    *  Absent (a listing row), the catalog's record stands alone. */
   shutdown?: BranchShutdownState | null;
@@ -619,6 +622,7 @@ export function useLiquityCardSlots({
   panel,
   exports,
   foot,
+  status: readStatus,
   shutdown,
   branchNotice,
 }: LiquityPositionCardProps): PositionCardSlots {
@@ -684,7 +688,10 @@ export function useLiquityCardSlots({
   const mcrPct = ops.mcrPct(ct);
   const liqPrice = debt > 0 && coll > 0 && mcrPct != null ? (debt * (mcrPct / 100)) / coll : null;
   const animate = detail; // FadeNumber animateOnMount
-  const pending = detail && !!v.pricePending; // skeleton slots while a detail-page price is expected
+  // While a detail-page price is expected its figures hold placeholder bars;
+  // once the read has failed they say so (TO-DO-position-card 313).
+  const priceFailed = detail && !!v.priceUnavailable;
+  const pending = detail && !!v.pricePending && !priceFailed;
 
   const fp = ops.faceProv({ v, live: lv, coll, debt, rate, priceUsd, collUsd, crPct, liqPrice, mcrPct });
   // An open Trove on a shut-down branch (ui-jobs 612): the page's state, else
@@ -905,7 +912,9 @@ export function useLiquityCardSlots({
               </HighlightableValue>
             </Prov>
           ) : pending && coll > 0 ? (
-            <span className="inline-block h-3 w-16 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />
+            <SkeletonBar width={64} />
+          ) : priceFailed && coll > 0 ? (
+            <span className="text-rb-500">price unavailable</span>
           ) : null,
       },
       {
@@ -946,6 +955,7 @@ export function useLiquityCardSlots({
                 <span data-ltv-none="no-debt">—</span>
               ) : null,
             pending: ltvPct(crPct) == null && pending && debt > 0,
+            unavailable: ltvPct(crPct) == null && priceFailed && debt > 0 ? true : undefined,
           }
         : {
             id: "collateral-ratio",
@@ -964,6 +974,7 @@ export function useLiquityCardSlots({
                 </Prov>
               ) : null,
             pending: !(crPct != null && crPct > 0) && pending && debt > 0,
+            unavailable: !(crPct != null && crPct > 0) && priceFailed && debt > 0 ? true : undefined,
           },
       {
         id: "interest-rate",
@@ -1040,6 +1051,7 @@ export function useLiquityCardSlots({
     learnMore,
     menu,
     foot,
+    readStatus,
   };
   if (outcome) return { ...detailCommon, outcome };
 
@@ -1051,7 +1063,7 @@ export function useLiquityCardSlots({
         <Prov info={fp.liq}>{formatLiquidationPrice(liqPrice)}</Prov>
       </span>
     ) : pending && debt > 0 && coll > 0 ? (
-      <span className="inline-block h-3 w-20 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />
+      <SkeletonBar width={80} />
     ) : zombie && debt <= 0 ? (
       // A redemption that took the whole debt leaves an open zombie holding
       // collateral and no debt: there is nothing to liquidate until the owner
@@ -1081,7 +1093,11 @@ export function useLiquityCardSlots({
       (panel?.[0] ?? []).map(tipRow),
       [
         ...(panel?.[1] ?? []),
-        ...(liqValue ? [{ id: "liquidates-at", label: terms.liquidationPrice, value: liqValue }] : []),
+        ...(liqValue
+          ? [{ id: "liquidates-at", label: terms.liquidationPrice, value: liqValue }]
+          : priceFailed && debt > 0 && coll > 0
+            ? [{ id: "liquidates-at", label: terms.liquidationPrice, value: null, unavailable: true as const }]
+            : []),
       ].map(tipRow),
     ],
   };

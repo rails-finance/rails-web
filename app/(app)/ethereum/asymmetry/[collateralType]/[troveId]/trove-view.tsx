@@ -536,6 +536,7 @@ export default function AsymmetryTroveDetail({
                 )
               ) : undefined,
             wallet: view?.owner ?? view?.lastOwner ?? null,
+            pending: loading,
           }}
           assets={stripAssets}
           closed={view != null && view.status !== "open"}

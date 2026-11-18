@@ -12,15 +12,15 @@
 // will show — the same grammar as DetailBodySkeleton, minus the card the page
 // has already drawn live above it.
 //
-// Blocks are solid and borderless (skeleton-card.tsx), flush with the real
-// toolbar's own left edge (no inset — the header row carries none), heights
-// come from the measured section defaults refined per route
-// (useSkeletonSizes), and the pulse sits on the container. The caption is the
+// Placeholders follow the loading grammar (skeleton-card.tsx): framed rows
+// with coarse bars, flush with the real toolbar's own left edge, heights from
+// the measured section defaults refined per route (useSkeletonSizes). The caption is the
 // page's own sentence — each explorer names its own source (the Pool, the
 // Comets, the singleton…).
 
 import type { ReactNode } from "react";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
+import { EVENT_BARS } from "@/components/shared/detail-body-skeleton";
 import { useSkeletonSizes } from "@/hooks/useSkeletonSizes";
 
 const SPINE_DECAY = [1, 0.75, 0.5, 0.3];
@@ -53,11 +53,11 @@ export function SweepInFlight({ children }: { children: ReactNode }) {
   return (
     <div className="space-y-6" role="status" aria-live="polite">
       <p className="text-center text-sm text-rb-500">{children}</p>
-      <div className="animate-pulse space-y-3" aria-hidden="true">
-        <SkeletonBlock height={sizes["detail-timeline-header"]} className="rounded-md" />
+      <div className="space-y-3" aria-hidden="true">
+        <SkeletonBlock height={sizes["detail-timeline-header"]} frame={false} bars={null} />
         {SPINE_DECAY.map((opacity, i) => (
           <div key={i} style={{ opacity }}>
-            <SkeletonBlock height={sizes["detail-event"]} />
+            <SkeletonBlock height={sizes["detail-event"]} bars={EVENT_BARS} className="!py-0" />
           </div>
         ))}
       </div>

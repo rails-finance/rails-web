@@ -303,7 +303,7 @@ for (const f of process.env.V4_ONLY ? [] : FIXTURES) {
     .waitForFunction(
       () =>
         !document.querySelector(
-          '[data-anatomy~="M3.4"] .animate-pulse, [data-anatomy~="M3.6"] .animate-pulse, [data-anatomy~="M3.7"] .animate-pulse',
+          '[data-anatomy~="M3.4"] [data-skel-bar], [data-anatomy~="M3.6"] [data-skel-bar], [data-anatomy~="M3.7"] [data-skel-bar]',
         ),
       null,
       { timeout: WAIT },

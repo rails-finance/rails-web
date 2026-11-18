@@ -30,7 +30,9 @@ export interface FlowsBuilding {
   rows: number;
 }
 
-const BLOCK = "rounded-md bg-rb-300/70 dark:bg-rb-700/60";
+// The loading grammar's bars (skeleton-card.tsx): the hairline's colour, no
+// pulse; the container appears at 150 ms (`.skel-wait`).
+const BLOCK = "rounded-full bg-[var(--edge-raised)]";
 
 /** The cue's words: the scale of the read where the count is known. */
 export function flowsWaitingLine(count: LifeCount | null): string {
@@ -97,14 +99,14 @@ export function LifetimeFlowsSkeleton({
   viewToggle?: boolean;
 }) {
   return (
-    <div className="mt-2 animate-pulse" aria-hidden data-flows-skeleton={compact ? "compact" : ""}>
+    <div className="skel-wait mt-2" aria-hidden data-flows-skeleton={compact ? "compact" : ""}>
       {switchRow && <div className={`${BLOCK} mb-3 h-8 w-36`} />}
       {/* The old-price line, then each side's headline over its bar. */}
       <div className="h-5" />
       {Array.from({ length: sides }, (_, i) => (
         <div key={i} className={i > 0 ? "mt-4" : undefined}>
           <div className="mb-1.5 flex h-7 items-center">
-            <div className={`${BLOCK} h-6 w-32`} />
+            <div className={`${BLOCK} h-3.5 w-32`} />
           </div>
           <div className={`${BLOCK} h-8`} />
         </div>
@@ -119,7 +121,7 @@ export function LifetimeFlowsSkeleton({
         }`}
       >
         <div className="flex h-8 items-center gap-3 pointer-coarse:h-11">
-          <div className={`${BLOCK} h-4 w-14`} />
+          <div className={`${BLOCK} h-2 w-14`} />
           {compact && viewToggle && <div className={`${BLOCK} h-8 w-36 pointer-coarse:h-11`} />}
         </div>
         <div className={`${BLOCK} size-7 rounded-full`} />
@@ -131,7 +133,7 @@ export function LifetimeFlowsSkeleton({
             <div className="mb-1.5 flex h-5 gap-1 pointer-coarse:h-9">
               <div className={`${BLOCK} h-5 w-24 pointer-coarse:h-9`} />
             </div>
-            <div className={`${BLOCK} h-[250px] opacity-60`} />
+            <div className="h-[250px] rounded-2xl bg-[var(--edge-raised)] opacity-60" />
             <div className="h-6" />
           </>
         )}

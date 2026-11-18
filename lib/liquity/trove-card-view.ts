@@ -12,7 +12,9 @@ import { getBatchManagerByAddress, getBatchManagerDeprecation } from "@/lib/serv
 import { getTroveNftUrl } from "@/lib/utils/nft-utils";
 import { closedInOneTransaction } from "@/lib/liquity-v2/same-tx-close";
 
-function priceFor(collateralType: string, prices?: OraclePricesData | null): number | null {
+/** The branch's collateral price from an oracle response; null when the
+ *  response is missing or lacks this branch's feed. */
+export function priceFor(collateralType: string, prices?: OraclePricesData | null): number | null {
   if (!prices) return null;
   return prices[collateralType.toLowerCase() as keyof OraclePricesData] ?? null;
 }

@@ -51,6 +51,7 @@ import { boundaryFromLimit } from "@/lib/shared/timeline-boundary";
 import { TIMELINE_WINDOW_ROWS } from "@/lib/shared/timeline-opening-balance";
 import { boundaryStateFromOldestRow } from "@/lib/shared/timeline-boundary-state";
 import { troveExports } from "@/components/trove/TroveExportMenu";
+import { priceFor } from "@/lib/liquity/trove-card-view";
 import { closingPricesAt, DetailBackButton, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import type { Provenance } from "@/components/shared/provenance";
@@ -520,6 +521,7 @@ export default function TroveView({
             wallet={effectiveOwner}
             owner={{
               wallet: effectiveOwner,
+              pending: loading,
               ensName: troveData?.ownerEns ?? null,
               prefix:
                 effectiveOwner && effectiveOwner !== troveData?.owner && changedHands ? (
@@ -554,6 +556,8 @@ export default function TroveView({
           csvFilename: `liquity-v2-${collateralType}-trove-${troveId.slice(0, 12)}-activity.csv`,
         })}
         loadingMessage={getEnhancementStatus()}
+        // The server's read (seeded) or the client's (loadData) has run.
+        priceFailed={!loading && priceFor(collateralType, prices) == null}
         liquityEvents={liquityEvents}
         tl={tl}
         boundary={boundary}
