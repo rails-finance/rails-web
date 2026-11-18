@@ -92,6 +92,8 @@ import { SavePositionRow, useSavedEndedRefresh, useSavedNameRefresh } from "@/co
 import type { PositionName } from "@/lib/shared/position-name";
 import type { SavedLink } from "@/lib/shared/sessions";
 import { formatDate } from "@/lib/date";
+import { SkeletonBar } from "@/components/shared/skeleton-card";
+import { unavailableWords } from "@/components/shared/position-card-panel";
 
 export type { PositionPanelRow, PositionPanelColumns } from "@/components/shared/position-card-panel";
 
@@ -111,6 +113,9 @@ export interface PositionCardStatus {
   /** A sub-code the tag also carries where the state has its own key row
    *  (rails-ops reference/app-anatomy.md): "C6.1", a shut-down Trove. */
   anatomy?: string;
+  /** The word's receipt, where the state is a fact read from a source
+   *  (a Trove opened and closed in one transaction, ui-jobs 747). */
+  prov?: Provenance;
 }
 
 /** One headline figure. */
@@ -139,8 +144,13 @@ export interface PositionCardHead {
    *  `Prov`, `FadeNumber` and `HighlightableValue` inside it. `null` draws a
    *  dash. */
   value: ReactNode | null;
-  /** The figure waits on a live read: a pulsing bar stands where it lands. */
+  /** The figure waits on a read: a placeholder bar stands where it lands
+   *  (the loading grammar, skeleton-card.tsx), at the figure's line height. */
   pending?: boolean;
+  /** The read the figure needs has failed: the cell says so in a few words
+   *  (`true`: "price unavailable") and is never left empty (TO-DO-position-card
+   *  313). */
+  unavailable?: true | string;
   /** The asset icon cluster beside the figure (its `AssetPopover`). */
   assets?: ReactNode;
   /** The line beneath the figure: its USD value, green for a live position and
@@ -247,6 +257,10 @@ interface PositionCardDetailCommon extends PositionCardSlotsCommon {
   /** The read stamp at the right of the heading row, before the ⋮ (a vault
    *  card's "Read 10:12 UTC", `SectionReadStamp`). */
   stamp?: ReactNode;
+  /** A passing read status ("Loading current state…"), on one line in the
+   *  (i) row before the counters: the row is there whether or not it is, so
+   *  the card keeps its height as the status comes and goes. */
+  readStatus?: ReactNode;
 }
 
 /** An open position on its page: the panel is required (empty columns draw
@@ -461,7 +475,7 @@ function StatusTag({ status }: { status: PositionCardStatus }) {
         className={`rounded-xs px-1.5 py-0.5 text-[11px] font-semibold ${POSITION_TAG_TONE[status.tone]}`}
         data-anatomy={status.anatomy ? `C6 ${status.anatomy}` : "C6"}
       >
-        {status.word}
+        {status.prov ? <Prov info={status.prov}>{status.word}</Prov> : status.word}
       </span>
       {status.tip && <RowHelp tip={status.tip} name={status.word} />}
     </span>
@@ -490,7 +504,13 @@ function ListingPill({ status }: { status: PositionCardStatus | null }) {
       className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${status ? POSITION_TAG_TONE[status.tone] : OPEN_PILL}`}
       data-anatomy={status?.anatomy ? `C6 ${status.anatomy}` : "C6"}
     >
-      {status ? status.word.toUpperCase() : "OPEN"}
+      {status?.prov ? (
+        <Prov info={status.prov}>{status.word.toUpperCase()}</Prov>
+      ) : status ? (
+        status.word.toUpperCase()
+      ) : (
+        "OPEN"
+      )}
     </span>
   );
 }
@@ -555,7 +575,13 @@ function HeadBody({
   return (
     <>
       {head.pending ? (
-        <div className="h-9 w-20 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse mt-2" />
+        <div className="mt-2 flex h-8 items-center lg:h-9" data-card-pending="">
+          <SkeletonBar width={measure ? 64 : 96} figure />
+        </div>
+      ) : head.unavailable ? (
+        <div className="mt-2 flex h-8 items-center text-sm text-rb-500 lg:h-9" data-card-unavailable="">
+          {unavailableWords(head.unavailable)}
+        </div>
       ) : head.value == null ? (
         <StatDash />
       ) : (
@@ -1042,7 +1068,18 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
             <SectionExplainer
               slot={slots.explainer}
               rowExtra={
-                counters ? <span className="ml-auto flex items-center gap-2 self-center">{counters}</span> : undefined
+                slots.readStatus || counters ? (
+                  <span className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-3 self-center">
+                    {slots.readStatus && (
+                      // Below sm the status wraps, so its last words stay
+                      // readable; from sm it holds one line.
+                      <span className="min-w-0 text-right text-xs text-rb-500 sm:truncate" data-card-status-line="">
+                        {slots.readStatus}
+                      </span>
+                    )}
+                    {counters && <span className="flex shrink-0 items-center gap-2">{counters}</span>}
+                  </span>
+                ) : undefined
               }
               // The (i) pane restates the live figures in words; a closed
               // card's are final, so search may quote them.

@@ -4,6 +4,7 @@
 // first paint.
 
 import { SpListing } from "./sp-listing";
+import { loadLiquityV2SpDepth } from "@/lib/sources/chain/liquity-v2-sp-depth";
 import { fetchSpPage, spListDimensions, SP_LIST_DEFAULTS } from "@/lib/liquity-v2/sp-listing";
 import { LIQUITY_V2_SP_PATH } from "@/lib/liquity-v2/sp-routes";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
@@ -23,13 +24,17 @@ export default async function LiquityV2SpListingPage({ searchParams }: { searchP
   const dims = spListDimensions();
   const sp = toURLSearchParams(await searchParams);
   const { filters, page } = ssrDecode(dims, sp, SP_LIST_DEFAULTS);
-  const initial = await ssrInitial({
-    dims,
-    defaults: SP_LIST_DEFAULTS,
-    filters,
-    page,
-    label: "Liquity V2 deposits",
-    fetchPage: (baseUrl, signal, headers) => fetchSpPage(filters, page, { baseUrl, signal, headers }),
-  });
-  return <SpListing {...initial} initialSearch={sp.toString()} />;
+  const [initial, depth] = await Promise.all([
+    ssrInitial({
+      dims,
+      defaults: SP_LIST_DEFAULTS,
+      filters,
+      page,
+      label: "Liquity V2 deposits",
+      fetchPage: (baseUrl, signal, headers) => fetchSpPage(filters, page, { baseUrl, signal, headers }),
+    }),
+    // The pools' depth per branch beside the debt it backs (ui-jobs 748).
+    loadLiquityV2SpDepth(),
+  ]);
+  return <SpListing {...initial} depth={depth} initialSearch={sp.toString()} />;
 }

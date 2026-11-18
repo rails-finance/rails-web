@@ -215,6 +215,33 @@ export const yearnVaultAssetsContent = (): LearnMoreContent => ({
   ],
 });
 
+export const sboldVaultCardContent = (): LearnMoreContent => ({
+  title: "How the sBOLD vault works",
+  intro:
+    "sBOLD is an ERC-4626 vault on BOLD. It deposits BOLD into Liquity V2's three Stability Pools, and a holder owns shares that convertToAssets turns into BOLD.",
+  detailsHeading: "Key concepts:",
+  details: [
+    { bold: "Total assets", text: "the BOLD the vault's totalAssets() reports." },
+    { bold: "Shares issued", text: "the vault's totalSupply()." },
+    { bold: "Share price", text: "convertToAssets of one whole share, in BOLD." },
+  ],
+});
+
+export const sboldVaultAssetsContent = (): LearnMoreContent => ({
+  title: "Where the sBOLD vault's BOLD is",
+  intro:
+    "The vault's deposit in each of Liquity V2's three Stability Pools, as each pool answers it, and the BOLD the vault holds, with their sum against total assets.",
+  detailsHeading: "Key concepts:",
+  details: [
+    {
+      bold: "Amount",
+      text: "the pool's getCompoundedBoldDeposit for the vault: the deposit after the liquidations the pool has absorbed.",
+    },
+    { bold: "Idle BOLD", text: "the BOLD token's balanceOf for the vault." },
+    { bold: "Share of this vault", text: "a row's amount over the vault's total assets." },
+  ],
+});
+
 const MAPLE_DOCS = { label: "docs.maple.finance: Lenders", url: "https://docs.maple.finance" };
 
 /** The Steward's tip on a Maple pool: its pool delegate. */

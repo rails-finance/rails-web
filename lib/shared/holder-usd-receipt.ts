@@ -16,7 +16,7 @@
 
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import { formatUsdValue } from "@/lib/utils/format";
-import { shownUsd, amountText, priceText } from "@/lib/shared/shown-usd";
+import { shownUsd, shownEth, amountText, priceText } from "@/lib/shared/shown-usd";
 
 export interface UsdLeg {
   /** The token's symbol ("WETH", "BOLD"). */
@@ -62,12 +62,22 @@ export function holderUsdReceipt(opts: {
   /** List the legs largest product first, those under a cent behind the
    *  receipt's closed dust control (a market's every reserve). */
   byValue?: boolean;
+  /** The unit the prices and products are in: dollars by default, or ETH
+   *  (a Compound V2 liquidation before the oracle's dollar years), whose
+   *  products run to six decimals. `usd` is then that figure in ETH. */
+  numeraire?: "USD" | "ETH";
 }): { prov: Provenance; usd: number } {
+  const eth = opts.numeraire === "ETH";
+  const product = eth ? shownEth : shownUsd;
+  const valueText = (v: number) =>
+    eth ? `${v.toLocaleString("en-US", { maximumFractionDigits: 6 })} ETH` : formatUsdValue(v);
+  const priceOf = (p: number) => (eth ? `${priceText(p).slice(1)} ETH` : priceText(p));
   const legs = opts.byValue
-    ? [...opts.legs].sort((a, b) => shownUsd(b.amount, b.price) - shownUsd(a.amount, a.price))
+    ? [...opts.legs].sort((a, b) => product(b.amount, b.price) - product(a.amount, a.price))
     : opts.legs;
-  const products = legs.map((l) => shownUsd(l.amount, l.price));
-  const usd = cents(products.reduce((s, p) => s + p, 0));
+  const products = legs.map((l) => product(l.amount, l.price));
+  const total = products.reduce((s, p) => s + p, 0);
+  const usd = eth ? Math.round(total * 1e6) / 1e6 : cents(total);
   const many = legs.length > 1;
   const inputs: ProvInput[] = legs.flatMap((l, i) => {
     const rows: ProvInput[] = [
@@ -82,14 +92,14 @@ export function holderUsdReceipt(opts: {
       l.face
         ? {
             label: `${l.label ?? l.token} price`,
-            value: priceText(l.price),
+            value: priceOf(l.price),
             kind: "derived",
             definition: true,
             note: l.priceNote,
           }
         : {
             label: `${l.label ?? l.token} price`,
-            value: priceText(l.price),
+            value: priceOf(l.price),
             kind: "chain-derived",
             pclass: "oracle",
             note: l.priceNote,
@@ -99,7 +109,7 @@ export function holderUsdReceipt(opts: {
     if (many)
       rows.push({
         label: `${l.label ?? l.token} amount × price`,
-        value: formatUsdValue(products[i]),
+        value: valueText(products[i]),
         kind: "derived",
         step: true,
       });
@@ -130,7 +140,7 @@ export function holderUsdReceipt(opts: {
       formula: many ? "Σ amount × price" : "amount × price",
       inputs: [
         ...inputs,
-        ...(many ? [{ label: "sum", value: formatUsdValue(usd), kind: "derived" as const, step: true as const }] : []),
+        ...(many ? [{ label: "sum", value: valueText(usd), kind: "derived" as const, step: true as const }] : []),
       ],
       source: opts.block != null && !allFaces ? { block: opts.block } : undefined,
     },

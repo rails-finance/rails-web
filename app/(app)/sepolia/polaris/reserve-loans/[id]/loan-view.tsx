@@ -173,6 +173,7 @@ export default function LoanView({ loanId, initial }: { loanId: string; initial:
           wallet={holder}
           owner={{
             wallet: holder,
+            pending: !chainSettled,
             href: holder ? `${POLARIS_LOANS_PATH}?q=${holder}` : undefined,
             wrap: chain?.owner
               ? (pill) => (

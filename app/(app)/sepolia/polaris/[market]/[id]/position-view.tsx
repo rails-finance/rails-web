@@ -393,7 +393,7 @@ export default function PolarisPositionView({
         <DetailTopRow
           session="polaris"
           wallet={view?.owner ?? null}
-          owner={{ wallet: view?.owner ?? null, wrap: view ? polarisOwnerWrap(view) : undefined }}
+          owner={{ wallet: view?.owner ?? null, pending: loading, wrap: view ? polarisOwnerWrap(view) : undefined }}
           assets={stripAssets}
           closed={view != null && view.status !== "open"}
           closing={closing}

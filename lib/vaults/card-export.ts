@@ -101,6 +101,18 @@ export function vaultAssetsCsv(v: VaultSummary, m: VaultExportModel): string {
   return rows.map((r) => r.map(cell).join(",")).join("\n");
 }
 
+/** A daily-lines section's points, one row per point and getter (the sBOLD
+ *  strip, ui-jobs 749): block, UTC time, getter, raw answer, value in words. */
+export function vaultPointsCsv(
+  rows: readonly { block: number; time: number; getter: string; raw: string; value: string }[],
+): string {
+  const out: string[][] = [
+    ["block", "utc_time", "getter", "raw", "value"],
+    ...rows.map((r) => [String(r.block), new Date(r.time * 1000).toISOString(), r.getter, r.raw, r.value]),
+  ];
+  return out.map((r) => r.map(cell).join(",")).join("\n");
+}
+
 /** The section ⋮'s exports for "Where the assets are". */
 export const vaultAssetsExports = (v: VaultSummary, m: VaultExportModel) => ({
   markdown: { build: () => vaultAssetsMarkdown(v, m), copySubtitle: "The table as Markdown, for an LLM" },

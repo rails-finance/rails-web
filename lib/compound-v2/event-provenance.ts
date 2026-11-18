@@ -30,6 +30,13 @@ import {
   COMPOUND_V2_YEAR_SOURCE,
 } from "@/lib/compound-v2/rate-year";
 import { COMPOUND_V2_APY_FORMULA, COMPOUND_V2_BLOCKS_PER_DAY, COMPOUND_V2_DAYS_PER_YEAR } from "@/lib/comptroller/apy";
+import {
+  compoundV2OracleContract,
+  compoundV2PriceRowNote,
+  type CompoundV2PriceRead,
+} from "@/lib/compound-v2/usd-receipt";
+import { holderUsdReceipt, priceText } from "@/lib/shared/holder-usd-receipt";
+import { compoundV2EthPriceNote, compoundV2PriceNote } from "@/lib/compound-v2/price-notes";
 
 // Custody, not origin — the via line's leading segment only (the embedded
 // receipt renderer drops it; provenance-receipts-grammar §3). Summaries state
@@ -52,6 +59,13 @@ const ctokenContract = (coords?: CompoundV2Coords) => ({
   name: coords?.marketLabel ? `cToken (${coords.marketLabel})` : "cToken",
   address: coords?.ctoken ?? "0x0000000000000000000000000000000000000000",
 });
+
+/** A market's cToken by its catalog address; the name alone where the
+ *  caller has none. */
+const cTokenOf = (cSym?: string, ctoken?: string) =>
+  ctoken
+    ? { name: cSym ? `cToken (${cSym})` : "cToken", address: ctoken }
+    : { name: cSym ? `cToken (${cSym})` : "cToken" };
 
 const atBlock = (coords?: CompoundV2Coords): string =>
   coords?.blockNumber != null ? ` at block ${coords.blockNumber}` : "";
@@ -310,7 +324,7 @@ export const liqAtBlockPriceProv = (sym: string, numeraire: "ETH" | "USD", coord
         : "Re-run comptroller.oracle() then that oracle's getUnderlyingPrice for this market",
   },
   summary: `${sym} priced in ${numeraire} at the liquidation's own block — Compound's oracle \`getUnderlyingPrice\`, read from whichever oracle \`comptroller.oracle()\` had registered at that block (governance swapped it ~6× over the protocol's life, so it is resolved per block, never pinned to head). This is the SAME price the Comptroller used for the seizure math in this very transaction. Before block 10,678,764 the oracle speaks ETH (getUnderlyingPrice(cETH) == 1.0); after it, USD — this leg is ${numeraire}.`,
-  contract: { name: "Compound Open Price Feed (Comptroller oracle)", address: "" },
+  contract: compoundV2OracleContract(),
   via: `comptroller.oracle() · getUnderlyingPrice${atBlock(coords)}`,
   inputs: eventInputs(coords),
 });
@@ -330,70 +344,75 @@ export const priceAtBlockProv = (sym: string, coords: CompoundV2Coords): Provena
         : "Re-run comptroller.oracle() then that oracle's getUnderlyingPrice for this market",
   },
   summary: `${sym} price in USD at this event's block — Compound's oracle \`getUnderlyingPrice\` for this market, read from whichever oracle \`comptroller.oracle()\` had registered at that block. Before block 10,678,764 the oracle speaks ETH, and the dollar figure is that price over the oracle's USDC price at the same block.`,
-  contract: { name: "Compound Open Price Feed (Comptroller oracle)", address: "" },
+  contract: compoundV2OracleContract(),
   via: `comptroller.oracle() · getUnderlyingPrice${atBlock(coords)}`,
   inputs: eventInputs(coords),
 });
 
+/** A liquidation leg's rows: the amount × the oracle-at-block price as
+ *  shown, the product to the cent in USD (six decimals in the oracle's ETH
+ *  years), from the shared helper. */
+function liqLegRows(
+  sym: string,
+  numeraire: "ETH" | "USD",
+  coords: CompoundV2Coords,
+  vals: { amount: number; price: number; cSymbol: string; amountNote: string },
+): Pick<Provenance, "formula" | "inputs"> {
+  const { prov } = holderUsdReceipt({
+    what: "",
+    legs: [
+      {
+        token: sym,
+        amount: vals.amount,
+        amountNote: vals.amountNote,
+        price: vals.price,
+        priceNote:
+          numeraire === "ETH"
+            ? compoundV2EthPriceNote(vals.cSymbol, coords.blockNumber)
+            : compoundV2PriceNote(vals.cSymbol, coords.blockNumber),
+        priceContract: compoundV2OracleContract(),
+      },
+    ],
+    block: coords.blockNumber ?? null,
+    via: "",
+    numeraire,
+  });
+  return { formula: prov.formula, inputs: eventInputs(coords, prov.inputs) };
+}
+
 /** Seized-collateral leg value — seizeTokens × the collateral cToken's
  *  exchangeRateStored(at block) → underlying, valued at that market's
- *  oracle-at-block price. */
+ *  oracle-at-block price, as the rows show them. */
 export const liqSeizedValueProv = (
   collSym: string,
   numeraire: "ETH" | "USD",
   coords: CompoundV2Coords,
-  vals: { amount: string; price: string },
+  vals: { amount: number; price: number; cSymbol: string },
 ): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
   verify: txVerify(coords),
-  summary: `What the seized ${collSym} collateral was worth in ${numeraire} at the liquidation's block — the emitted seizeTokens (8-dp cTokens) converted to underlying by the collateral cToken's \`exchangeRateStored\` read at the block, then valued at that market's oracle \`getUnderlyingPrice\` at the same block. Every leg is a chain read from the block the liquidation fired; today's price never enters.`,
-  contract: { name: "Compound Open Price Feed (Comptroller oracle)", address: "" },
+  summary: `What the seized ${collSym} collateral was worth in ${numeraire} at the liquidation's block — the emitted seizeTokens (8-dp cTokens) converted to underlying by the collateral cToken's \`exchangeRateStored\` read at the block, then valued at that market's oracle \`getUnderlyingPrice\` at the same block, ${numeraire === "ETH" ? "to six decimals" : "to the cent"} from the rows as shown. Every leg is a chain read from the block the liquidation fired; today's price never enters.`,
+  contract: compoundV2OracleContract(),
   via: "seizeTokens × exchangeRateStored → underlying × oracle price (all at block)",
-  formula: "underlying × oracle price",
-  inputs: eventInputs(coords, [
-    {
-      label: "seized",
-      value: vals.amount,
-      kind: "chain-derived",
-      pclass: "state",
-      note: "seizeTokens × exchangeRateStored → underlying",
-    },
-    {
-      label: "price",
-      value: `${vals.price} ${numeraire}`,
-      kind: "chain",
-      pclass: "oracle",
-      note: "collateral getUnderlyingPrice at block",
-    },
-  ]),
+  ...liqLegRows(collSym, numeraire, coords, { ...vals, amountNote: "seizeTokens × exchangeRateStored → underlying" }),
 });
 
 /** Cleared-debt leg value — the covered repayAmount valued at the debt market's
- *  oracle-at-block price. */
+ *  oracle-at-block price, as the rows show them. */
 export const liqClearedValueProv = (
   debtSym: string,
   numeraire: "ETH" | "USD",
   coords: CompoundV2Coords,
-  vals: { amount: string; price: string },
+  vals: { amount: number; price: number; cSymbol: string },
 ): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
   verify: txVerify(coords),
-  summary: `What the cleared ${debtSym} debt was worth in ${numeraire} at the liquidation's block — the \`repayAmount\` the liquidator covered (the LiquidateBorrow log's own field), valued at the debt market's oracle \`getUnderlyingPrice\` read at the same block. Capped by the close factor (≤50% of one borrowed market per liquidation), so this is the covered slice, not the whole debt.`,
-  contract: { name: "Compound Open Price Feed (Comptroller oracle)", address: "" },
+  summary: `What the cleared ${debtSym} debt was worth in ${numeraire} at the liquidation's block — the \`repayAmount\` the liquidator covered (the LiquidateBorrow log's own field), valued at the debt market's oracle \`getUnderlyingPrice\` read at the same block, ${numeraire === "ETH" ? "to six decimals" : "to the cent"} from the rows as shown. Capped by the close factor (≤50% of one borrowed market per liquidation), so this is the covered slice.`,
+  contract: compoundV2OracleContract(),
   via: "repayAmount × oracle price (both at block)",
-  formula: "repaid × oracle price",
-  inputs: eventInputs(coords, [
-    { label: "repaid", value: vals.amount, kind: "chain", pclass: "emitted", note: "LiquidateBorrow repayAmount" },
-    {
-      label: "price",
-      value: `${vals.price} ${numeraire}`,
-      kind: "chain",
-      pclass: "oracle",
-      note: "debt getUnderlyingPrice at block",
-    },
-  ]),
+  ...liqLegRows(debtSym, numeraire, coords, { ...vals, amountNote: "LiquidateBorrow repayAmount" }),
 });
 
 /** The realized premium = seized ÷ cleared − 1 — the ratio that should
@@ -405,12 +424,24 @@ export const liqPremiumProv = (
   kind: "chain-derived",
   pclass: "oracle",
   summary: `The premium the seizure realized — the seized collateral value (${vals.seized}) over the cleared debt value (${vals.cleared}), minus one. Both legs are valued in ${vals.numeraire} at the SAME block, so the ratio is numeraire-invariant: it lands on the liquidation incentive the Comptroller enforced at that block (shown beneath it) whether the era priced in ETH or USD. This is the whole self-audit — a well-sized seizure reproduces the incentive exactly; one small enough for the settled legs to quantize visibly does not.`,
-  contract: { name: "Compound Open Price Feed (Comptroller oracle)", address: "" },
+  contract: compoundV2OracleContract(),
   via: "seized value ÷ cleared value − 1 (both at block)",
   formula: "seized ÷ cleared − 1",
   inputs: eventInputs(coords, [
-    { label: "seized", value: vals.seized, kind: "chain-derived", pclass: "oracle", note: "collateral value at block" },
-    { label: "cleared", value: vals.cleared, kind: "chain-derived", pclass: "oracle", note: "debt value at block" },
+    {
+      label: "seized",
+      value: vals.seized,
+      kind: "chain-derived",
+      pclass: "oracle",
+      note: "the seized leg's product as its receipt shows it",
+    },
+    {
+      label: "cleared",
+      value: vals.cleared,
+      kind: "chain-derived",
+      pclass: "oracle",
+      note: "the cleared leg's product as its receipt shows it",
+    },
   ]),
 });
 
@@ -566,7 +597,7 @@ export const externalActorProv = (
 
 /** Position-card CURRENT supply value — cTokens × exchangeRateStored: the
  *  underlying claim including accrued interest, a slot-read product. */
-export const positionSupplyCurrentProv = (sym: string, cSym: string): Provenance => ({
+export const positionSupplyCurrentProv = (sym: string, cSym: string, ctoken?: string): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   verify: {
@@ -574,7 +605,7 @@ export const positionSupplyCurrentProv = (sym: string, cSym: string): Provenance
     text: `Re-run the cToken's balanceOf and exchangeRateStored eth_calls and multiply — or call balanceOfUnderlying directly; both reproduce this figure`,
   },
   summary: `${sym} the position's supply is worth NOW — the exact ${cSym} balance (slot-verified Transfer replay) × the cToken's \`exchangeRateStored\` read at head. The exchange rate grows as the market accrues interest, so this figure INCLUDES the interest earned since deposit — it is what \`balanceOfUnderlying\` returns. Both legs are chain reads, so the product is chain-derived.`,
-  contract: { name: `cToken (${cSym})`, address: "" },
+  contract: cTokenOf(cSym, ctoken),
   via: "cToken balance × exchangeRateStored (eth_call at head)",
   formula: "cTokens × exchange rate",
   inputs: [
@@ -584,98 +615,105 @@ export const positionSupplyCurrentProv = (sym: string, cSym: string): Provenance
 });
 
 /** Position-card supply PRINCIPAL — the indexed lane (no slot holds it). */
-export const positionSupplyPrincipalProv = (sym: string): Provenance => ({
+export const positionSupplyPrincipalProv = (sym: string, ctoken?: string): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
   summary: `${sym} supply PRINCIPAL — Σ(mint − redeem) of the position's own captured events, complete from the market's deploy block. No on-chain slot holds deposited principal (the chain stores cTokens); this is the index's replay, clamped at zero. Interest earned since deposit is NOT in this figure — the current-value reading (cTokens × exchange rate) carries it. A position received by transfer or seizure can show zero principal while holding real cTokens: the cToken lane is the exact one.`,
-  contract: { name: "cToken", address: "" },
+  contract: cTokenOf(undefined, ctoken),
   via: `${COMPOUND_V2_VIA} · Σ ±amount across Mint/Redeem logs · deploy → head`,
 });
 
 /** Position-card debt — the last event's emitted accountBorrows. */
-export const positionDebtProv = (sym: string, atBlockNum?: number): Provenance => ({
+export const positionDebtProv = (sym: string, atBlockNum?: number, ctoken?: string): Provenance => ({
   kind: "chain",
   pclass: "emitted",
   summary: `${sym} debt the position owed at its LAST borrow/repay/liquidation event${atBlockNum ? ` (as of block ${atBlockNum})` : ""} — the \`accountBorrows\` field that event emitted verbatim, interest accrued to that moment included (per-block accrual). A liquidation counts: its merged repay leg re-states the debt, so an account liquidated since its last voluntary repay is NOT stale here. Interest accrued SINCE that event is not in this figure — the live \`borrowBalanceStored\` read carries it when the detail page's chain lane lands.`,
-  contract: { name: "cToken", address: "" },
+  contract: cTokenOf(undefined, ctoken),
   via: `${COMPOUND_V2_VIA} · latest Borrow/RepayBorrow/liquidation log · accountBorrows`,
 });
 
 /** Closed-card peak supply — the highest supply balance at a row. */
-export const peakSupplyProv = (sym: string): Provenance => ({
+export const peakSupplyProv = (sym: string, ctoken?: string): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   summary: `The highest ${sym} supply this wallet held at any of its events — the maximum over its supply rows of the cToken balance after the event × the market's exchangeRateStored at that block, interest included. Between events the balance kept earning, so the true high can sit a little above the highest row.`,
-  contract: { name: "cToken", address: "" },
+  contract: cTokenOf(undefined, ctoken),
   via: `${COMPOUND_V2_VIA} · max(cTokens after × exchangeRateStored at the row's block)`,
 });
 
 /** Closed-card peak debt — the highest emitted accountBorrows. */
-export const peakDebtProv = (sym: string): Provenance => ({
+export const peakDebtProv = (sym: string, ctoken?: string): Provenance => ({
   kind: "chain",
   pclass: "emitted",
   summary: `The highest ${sym} debt this wallet ever recorded — the maximum of the emitted \`accountBorrows\` (the contract's own debt-after, carried verbatim on every borrow, repay and liquidation event) across its whole history. Interest is included to each event's own moment; debt accrues between events unrecorded, so the true peak between two events can sit slightly above the largest emitted figure.`,
-  contract: { name: "cToken", address: "" },
+  contract: cTokenOf(undefined, ctoken),
   via: `${COMPOUND_V2_VIA} · max(accountBorrows) across Borrow/RepayBorrow/liquidation logs`,
 });
 
-/** On-chain-oracle USD for a card/tower total. Both legs are on-chain — the
- *  replayed token balance and Compound's own oracle price (getUnderlyingPrice,
- *  the SAME price the Comptroller reads for liquidity and liquidation math) —
- *  so the product is chain-derived. `includesFixed` when any contributing
- *  market's price is a stored constant with no feed behind it. */
-export const compoundV2UsdProvOnchain = (what: string, includesFixed?: boolean): Provenance => ({
-  kind: "chain-derived",
-  // Both legs on-chain; the oracle price is the furthest class, so it leads.
-  pclass: "oracle",
-  summary: `${what} valued in USD from Compound's own on-chain oracle — the replayed token balance multiplied by the same price the Comptroller reads for liquidity and liquidation math (\`getUnderlyingPrice\`).${
-    includesFixed
-      ? " ⚠ At least one contributing market is priced by a CONSTANT stored in the oracle with no price feed behind it (read from the oracle's own getConfig — cSAI's constant is $14.4263 on a token that targets $1). The figure is the one the protocol itself would use, but nothing updates that leg."
-      : ""
-  }`,
-  contract: { name: "Compound Open Price Feed (Comptroller oracle)", address: "" },
-  via: "chain balance × on-chain oracle price",
-  formula: "balance × oracle price",
-  inputs: [
-    { label: "balance", kind: "chain", note: "replayed position balance" },
-    {
-      label: "oracle price",
-      kind: "chain",
-      pclass: "oracle",
-      note: includesFixed
-        ? "oracle getUnderlyingPrice (a stored constant on the no-feed markets)"
-        : "oracle getUnderlyingPrice",
-    },
-  ],
-});
-
-/** One line's oracle price where the oracle's own config says NO feed stands
- *  behind it — a stored constant nothing updates. */
-export const fixedPriceLineProv = (sym: string): Provenance => ({
+/** One line's oracle price where the oracle's own config says NO feed
+ *  stands behind it: a stored constant nothing updates, named with its value
+ *  and the getConfig read at the market-state block. */
+export const fixedPriceLineProv = (
+  sym: string,
+  m?: { cSymbol: string; price?: number | null; read?: CompoundV2PriceRead | null },
+): Provenance => ({
   kind: "chain",
   pclass: "oracle",
   verify: {
     kind: "recompute",
-    text: "Re-run the oracle's getConfig eth_call for this market — priceFeed is the zero address and fixedPrice is the constant",
+    text: "Re-run the oracle's getConfig eth_call for this market: priceFeed is the zero address and fixedPrice is the constant",
   },
-  summary: `${sym} is priced by a constant stored in the oracle, with no price feed behind it — read from the oracle's own getConfig (priceFeed == 0), not inferred from the value. The number is the one the Comptroller itself would use, but nothing updates it. On cSAI the constant is $14.4263 for a token that targets $1.`,
-  contract: { name: "Compound Open Price Feed (Comptroller oracle)", address: "" },
+  summary: `${sym} is priced by a constant stored in the oracle, with no price feed behind it — read from the oracle's getConfig (priceFeed == 0). The Comptroller uses this number, and nothing updates it.`,
+  contract: compoundV2OracleContract(m?.read),
   via: "oracle getConfig · fixedPrice (priceFeed == 0)",
+  ...(m?.price != null
+    ? {
+        source: m.read?.blockNumber != null ? { block: m.read.blockNumber } : undefined,
+        inputs: [
+          {
+            label: `${sym} price`,
+            value: priceText(m.price),
+            kind: "chain" as const,
+            pclass: "oracle" as const,
+            note: compoundV2PriceRowNote(m.cSymbol, m.price, true, m.read?.blockNumber),
+          },
+        ],
+      }
+    : {}),
 });
 
 /** One market's price on the position page's price list: the Comptroller
- *  oracle's getUnderlyingPrice, the price its liquidity math reads. A no-feed
- *  market's is the stored constant (`fixedPriceLineProv`). */
-export const compoundV2PriceProv = (sym: string, fixed: boolean): Provenance =>
+ *  oracle's getUnderlyingPrice at the market-state read's block, as shown. A
+ *  no-feed market's is the stored constant (`fixedPriceLineProv`). */
+export const compoundV2PriceProv = (
+  sym: string,
+  fixed: boolean,
+  m?: { cSymbol: string; price: number; read?: CompoundV2PriceRead | null },
+): Provenance =>
   fixed
-    ? fixedPriceLineProv(sym)
+    ? fixedPriceLineProv(sym, m)
     : {
         kind: "chain",
         pclass: "oracle",
         verify: { kind: "recompute", text: "Re-run the oracle's getUnderlyingPrice eth_call for this market" },
         summary: `${sym} price in USD — the Comptroller oracle's getUnderlyingPrice for the ${sym} market, the price the Comptroller's liquidity math reads.`,
-        contract: { name: "Compound Open Price Feed (Comptroller oracle)", address: "" },
+        contract: compoundV2OracleContract(m?.read),
         via: "oracle getUnderlyingPrice(cToken), scaled by 10^(36 − underlying decimals)",
+        ...(m
+          ? {
+              source: m.read?.blockNumber != null ? { block: m.read.blockNumber } : undefined,
+              inputs: [
+                {
+                  label: `${sym} price`,
+                  value: priceText(m.price),
+                  kind: "chain" as const,
+                  pclass: "oracle" as const,
+                  note: compoundV2PriceRowNote(m.cSymbol, m.price, false, m.read?.blockNumber),
+                  contract: compoundV2OracleContract(m.read),
+                },
+              ],
+            }
+          : {}),
       };
 
 /** The model's `blocksPerYear()` as the constant behind its per-block curve. */
@@ -703,7 +741,7 @@ const docsDailyInput: ProvInput = {
  *  formula (lib/comptroller/apy.ts). */
 export const borrowRateProv = (
   sym?: string,
-  read?: { perBlockRaw?: string | null; modelBlocksPerYear?: number | null },
+  read?: { perBlockRaw?: string | null; modelBlocksPerYear?: number | null; ctoken?: string },
 ): Provenance => {
   const simple =
     read?.perBlockRaw != null
@@ -717,7 +755,7 @@ export const borrowRateProv = (
       text: `To check: ask any Ethereum node for the cToken's borrowRatePerBlock() and compute ${COMPOUND_V2_APY_FORMULA}.`,
     },
     summary: `The current variable borrow APY${sym ? ` on the ${sym} market` : ""} — the cToken's \`borrowRatePerBlock\` read at head, by Compound's docs' APY formula: ${COMPOUND_V2_APY_FORMULA}, 7,200 blocks a day compounded daily.${simple} ${modelYearSentence(read?.modelBlocksPerYear)}`,
-    contract: { name: "cToken", address: "" },
+    contract: cTokenOf(undefined, read?.ctoken),
     via: "cToken borrowRatePerBlock (eth_call at head) → APY",
     formula: COMPOUND_V2_APY_FORMULA,
     inputs: [
@@ -738,7 +776,6 @@ export const avgBorrowRateProv = (): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   summary: `Debt-weighted average of the markets' current borrow APYs — averaged across the markets this position borrows: each market's borrowRatePerBlock as an APY by Compound's docs' formula (${COMPOUND_V2_APY_FORMULA}), weighted by that debt's USD value at Compound's oracle price. All legs are chain reads at head.`,
-  contract: { name: "cToken", address: "" },
   via: "Σ (APY × debt USD) ÷ Σ debt USD, per borrowed market",
   formula: "Σ (APY × weight) ÷ Σ weight",
   inputs: [

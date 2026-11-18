@@ -53,6 +53,8 @@ export interface LiquityTroveView {
   lastActivityAt: number;
   /** The trove's OWN transactions (redemptions + liquidations excluded). */
   txCount: number;
+  /** Closed in the transaction that opened it (Liquity V2's row, ui-jobs 747). */
+  closedInOneTx?: boolean;
   liquidationCount: number;
   redemptionCount: number;
   /** TroveNFT owner; `owner` is null once burned, `lastOwner` survives it. */
@@ -80,6 +82,9 @@ export interface LiquityTroveView {
    *  before /api/oracle lands): the detail card draws skeletons in the USD,
    *  ratio and liquidation slots instead of leaving them empty. */
   pricePending?: boolean;
+  /** The price read has ended without a price (V2's detail page): the slots
+   *  that need it say "price unavailable" (TO-DO-position-card 313). */
+  priceUnavailable?: boolean;
   collateralUsd?: number | null;
   /** Collateral ratio as a PERCENT (187.4), never a ratio. */
   collateralRatioPct?: number | null;

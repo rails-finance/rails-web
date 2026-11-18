@@ -398,7 +398,7 @@ export function AssetChooser({
             autoFocus={!isPhone}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKey}
-            className="h-8 w-full rounded-md border border-rb-300 bg-transparent px-2 text-base text-foreground placeholder:text-rb-500 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-xs dark:border-rb-700"
+            className="h-12 w-full rounded-xl bg-rb-100 px-4 text-base text-foreground placeholder:text-rb-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 sm:h-11 sm:text-sm dark:bg-rb-800"
           />
         </div>
         {showTop && (

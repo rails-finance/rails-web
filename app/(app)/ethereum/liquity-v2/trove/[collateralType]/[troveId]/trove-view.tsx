@@ -14,6 +14,7 @@
 // tail itself, exactly as it did before the route had a server half.
 
 import { useState, useEffect, useMemo, useRef } from "react";
+import { boldPriceReason, boldStripAsset, closedAtBlock, useBoldPrice } from "@/lib/liquity-v2/use-bold-price";
 import {
   collateralPriceInfo as collateralPriceReceipt,
   closingPriceInfo,
@@ -35,6 +36,9 @@ import { OraclePricesData, OraclePricesResponse } from "@/types/api/oracle";
 import { useDebtInFront } from "@/hooks/useDebtInFront";
 import { useLiquityCollSurplus } from "@/hooks/useLiquityCollSurplus";
 import { useBranchShutdown } from "@/hooks/useBranchShutdown";
+import { useLiquityV2BranchCcr } from "@/hooks/useLiquityV2BranchCcr";
+import { BranchCcrNotice } from "@/components/protocol/liquity/branch-ccr-notice";
+import { normalizeCcrBranch } from "@/lib/liquity-v2/branch-ccr";
 import { useWalletContext } from "@/components/nav/wallet-context";
 
 import { fetchTroveTimeline } from "@/lib/api/fetch-timeline";
@@ -47,6 +51,7 @@ import { boundaryFromLimit } from "@/lib/shared/timeline-boundary";
 import { TIMELINE_WINDOW_ROWS } from "@/lib/shared/timeline-opening-balance";
 import { boundaryStateFromOldestRow } from "@/lib/shared/timeline-boundary-state";
 import { troveExports } from "@/components/trove/TroveExportMenu";
+import { priceFor } from "@/lib/liquity/trove-card-view";
 import { closingPricesAt, DetailBackButton, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import type { Provenance } from "@/components/shared/provenance";
@@ -264,6 +269,10 @@ export default function TroveView({
   // (lib/shared/event-order.ts: the block's position, then the log inside one
   // transaction).
   const liquityEvents = useMemo(() => events.filter(isLiquityEvent).sort(compareEventsInOrder), [events]);
+  // BOLD's price from the Curve BOLD/USDC pool (ui-jobs 746): at head while
+  // the Trove is open, at its closing row's block once closed.
+  const boldPrice = useBoldPrice(troveData?.status === "open" ? undefined : null);
+  const boldAtClosing = useBoldPrice(closedAtBlock(troveData?.status, liquityEvents));
   // "last holder" only on a closed Trove that changed hands (ui-jobs 702).
   const changedHands = useMemo(() => troveChangedHands(events), [events]);
 
@@ -285,6 +294,13 @@ export default function TroveView({
   // only, as a closed Trove keeps its recorded state and accrues nothing.
   const branchShutdown = useBranchShutdown("liquity-v2", collateralType, troveData != null);
   const shutdown = troveData?.status === "open" ? branchShutdown : null;
+  // The branch below its CCR (ui-jobs 747), on an open Trove of a branch not shut down.
+  const branchCcr = useLiquityV2BranchCcr(troveData?.status === "open");
+  const ccrBranch = normalizeCcrBranch(collateralType);
+  const branchNotice =
+    troveData?.status === "open" && shutdown == null && ccrBranch ? (
+      <BranchCcrNotice state={branchCcr[ccrBranch]} anatomy="C23·liquity" />
+    ) : null;
 
   // The claim that paid the surplus out, as its own row (the index has none).
   const claimEvent = useMemo(
@@ -466,8 +482,7 @@ export default function TroveView({
 
   // Assets relevant to the position in view, for the top row's price dropdown:
   // the trove's collateral (priced from the Liquity oracle) plus BOLD, the
-  // debt asset — hard-pegged to $1 by the protocol's redemption mechanism, so
-  // there's no separate price source for it.
+  // debt asset, at the Curve BOLD/USDC pool's last trade.
   const collateralPrice = prices?.[troveData.collateralType.toLowerCase() as keyof OraclePricesData];
   const collateralPriceInfo: Provenance | undefined = collateralPrice
     ? collateralPriceReceipt(troveData.collateralType)
@@ -476,7 +491,7 @@ export default function TroveView({
     ...(collateralPrice
       ? [{ symbol: troveData.collateralType, price: collateralPrice, info: collateralPriceInfo }]
       : []),
-    { symbol: "BOLD", price: 1 },
+    boldStripAsset(boldPrice),
   ];
   // A closed trove's prices: the collateral price its closing row carries.
   const closing =
@@ -490,7 +505,7 @@ export default function TroveView({
                   price,
                   info: closingPriceInfo(troveData.collateralType),
                 },
-                { symbol: "BOLD", price: 1 },
+                boldStripAsset(boldAtClosing),
               ]
             : undefined;
         })
@@ -506,6 +521,7 @@ export default function TroveView({
             wallet={effectiveOwner}
             owner={{
               wallet: effectiveOwner,
+              pending: loading,
               ensName: troveData?.ownerEns ?? null,
               prefix:
                 effectiveOwner && effectiveOwner !== troveData?.owner && changedHands ? (
@@ -513,6 +529,7 @@ export default function TroveView({
                 ) : undefined,
             }}
             assets={stripAssets}
+            priceReason={boldPriceReason(troveData.status !== "open" ? boldAtClosing : boldPrice)}
             closed={troveData.status !== "open"}
             closing={closing}
             tools={false}
@@ -528,6 +545,7 @@ export default function TroveView({
         debtInFrontLoading={debtInFrontLoading}
         surplus={surplus}
         shutdown={shutdown}
+        branchNotice={branchNotice}
         exports={troveExports({
           trove: troveData,
           liveState,
@@ -538,6 +556,8 @@ export default function TroveView({
           csvFilename: `liquity-v2-${collateralType}-trove-${troveId.slice(0, 12)}-activity.csv`,
         })}
         loadingMessage={getEnhancementStatus()}
+        // The server's read (seeded) or the client's (loadData) has run.
+        priceFailed={!loading && priceFor(collateralType, prices) == null}
         liquityEvents={liquityEvents}
         tl={tl}
         boundary={boundary}

@@ -152,11 +152,15 @@ export interface TroveBodyProps {
   surplus?: LiquityTroveSurplus | null;
   /** The branch's shutdown (ui-jobs 612); none on the home page. */
   shutdown?: BranchShutdownState | null;
+  /** The branch's Safety Mode notice (ui-jobs 747); none on the home page. */
+  branchNotice?: ReactNode;
   /** The card ⋮'s export shapes; null draws the ⋮ with the identity rows and
    *  the provenance row only. */
   exports: PositionCardExports | null;
   /** The position card's foot line while the head read is in flight. */
   loadingMessage: string | null;
+  /** The price read has ended without a price (TroveSummaryStack). */
+  priceFailed?: boolean;
   /** The row above the card (DetailTopRow); none on the home page. */
   topRow?: ReactNode;
   /** The loaded Liquity events, oldest first: the timeline heading's tenure. */
@@ -201,8 +205,10 @@ export function TroveBody({
   debtInFrontLoading,
   surplus,
   shutdown,
+  branchNotice,
   exports,
   loadingMessage,
+  priceFailed,
   topRow,
   liquityEvents,
   tl,
@@ -278,10 +284,13 @@ export function TroveBody({
           queueDebtTotal={queueDebtTotal}
           redeemedFirst={redeemedFirst}
           debtInFrontLoading={debtInFrontLoading}
+          priceFailed={priceFailed}
           viewHref={tl.viewHref}
           surplus={surplus}
           shutdown={shutdown}
+          branchNotice={branchNotice}
           exports={exports}
+          still={still}
           loadingStatus={{ message: loadingMessage, snapshotDate: lastEventTs ?? undefined }}
         />
 

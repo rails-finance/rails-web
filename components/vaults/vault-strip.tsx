@@ -11,6 +11,7 @@
 // each sentence's receipt; the section's ⋮ downloads the days as CSV
 // (components/shared/section-menu.tsx).
 
+import type { ReactNode } from "react";
 import { Prov } from "@/components/shared/provenance";
 import { ProvSection, SectionHeading, SectionMenu } from "@/components/shared/section-menu";
 import { formatDate } from "@/lib/date";
@@ -39,18 +40,29 @@ const VIEW_W = 300;
 const VIEW_H = 40;
 const PAD = 4;
 
-/** The stored days as runs of consecutive days: a missing day ends a run. */
+/** The stored days as runs of consecutive days: a missing day ends a run. A
+ *  `day` may carry a fraction (a read placed at its block time, ui-jobs 749). */
 function runsOf(points: readonly VaultYieldRead[]): VaultYieldRead[][] {
   const runs: VaultYieldRead[][] = [];
   for (const p of points) {
     const run = runs[runs.length - 1];
-    if (run && p.day === run[run.length - 1].day + 1) run.push(p);
+    if (run && p.day - run[run.length - 1].day < 1.5) run.push(p);
     else runs.push([p]);
   }
   return runs;
 }
 
-function Sparkline({ points, label }: { points: readonly VaultYieldRead[]; label: string }) {
+/** The strip's line. `dot` draws a mark over each point (its receipt), placed
+ *  in HTML over the line. */
+export function Sparkline({
+  points,
+  label,
+  dot,
+}: {
+  points: readonly VaultYieldRead[];
+  label: string;
+  dot?: (p: VaultYieldRead) => ReactNode;
+}) {
   if (points.length === 0) return null;
   const first = points[0].day;
   const span = Math.max(1, points[points.length - 1].day - first);
@@ -61,7 +73,7 @@ function Sparkline({ points, label }: { points: readonly VaultYieldRead[]; label
   // A flat series is a flat line through the middle.
   const y = (v: number) => (hi === lo ? VIEW_H / 2 : PAD + (1 - (v - lo) / (hi - lo)) * (VIEW_H - 2 * PAD));
   const runs = runsOf(points);
-  return (
+  const line = (
     <svg
       viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
       preserveAspectRatio="none"
@@ -90,6 +102,24 @@ function Sparkline({ points, label }: { points: readonly VaultYieldRead[]; label
         />
       ))}
     </svg>
+  );
+  if (!dot) return line;
+  return (
+    <div className="relative">
+      {line}
+      {points.map((p) => (
+        <span
+          key={`${p.day}:${p.block}`}
+          className="absolute -translate-x-1/2 -translate-y-1/2"
+          style={{
+            left: `${(x(p.day) / VIEW_W) * 100}%`,
+            top: `calc(0.5rem + ${(y(Number(p.raw)) / VIEW_H) * 2.5}rem)`,
+          }}
+        >
+          {dot(p)}
+        </span>
+      ))}
+    </div>
   );
 }
 

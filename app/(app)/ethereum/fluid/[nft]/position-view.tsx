@@ -509,7 +509,7 @@ export default function FluidPositionView({
       <div className="py-8 space-y-6">
         <DetailTopRow
           session="fluid"
-          owner={{ wallet: view?.owner }}
+          owner={{ wallet: view?.owner, pending: loading }}
           assets={stripAssets}
           priceReason={ORACLE_USD_REASON.fluid}
           closed={view != null && view.status !== "open"}

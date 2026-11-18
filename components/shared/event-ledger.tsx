@@ -30,6 +30,7 @@ import {
   type ReactNode,
 } from "react";
 import { DiscChevron } from "@/components/shared/expand-chevron";
+import { SkeletonBar } from "@/components/shared/skeleton-card";
 import { Prov, ProvDetached, type Provenance } from "@/components/shared/provenance";
 import { fillStyle, useFlowHues, type FlowHues } from "@/components/shared/lifetime-flows-tip";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
@@ -105,16 +106,14 @@ const OWN_TAP = "button, a, input, select, textarea, [role=button], [data-prov-p
  *  cell like a click on the name; on touch the first tap opens the tip. */
 const USD_TIP_HOST = "data-closed-usd-tip";
 
-/** A pending figure: one pulsing bar where a value will stand, in the
- *  sheet skeleton's tone (rb-200 / dark rb-700), which shows on a cell of
- *  either ground. It holds still under reduced motion. */
+/** A pending figure: one still bar where a value will stand (the loading
+ *  grammar, skeleton-card.tsx), in a 16px slot that keeps the loaded line's
+ *  height. */
 export function PendingBar({ className = "w-24" }: { className?: string }) {
   return (
-    <span
-      aria-hidden
-      className={`inline-block h-4 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse ${className}`}
-      data-pending-bar=""
-    />
+    <span aria-hidden className={`inline-flex h-4 items-center align-middle ${className}`} data-pending-bar="">
+      <SkeletonBar width="100%" />
+    </span>
   );
 }
 

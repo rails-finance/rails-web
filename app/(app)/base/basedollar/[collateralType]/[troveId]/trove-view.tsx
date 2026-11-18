@@ -527,6 +527,7 @@ export default function BasedollarTroveDetail({
           wallet={view?.owner ?? view?.lastOwner ?? null}
           owner={{
             wallet: view?.owner ?? view?.lastOwner ?? null,
+            pending: loading,
             chain: BASE_CHAIN_ID,
             // "last holder" on a closed Trove whose NFT changed hands: the
             // one-Trove read says so (ui-jobs 715).

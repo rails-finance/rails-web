@@ -624,11 +624,17 @@ export function aaveV3SameAssetOfView(view: AaveV3PositionView): { symbol: strin
   return { symbol: s[0].symbol, address: s[0].address.toLowerCase() };
 }
 
-export function aaveV3LiquidationRead(view: AaveV3PositionView): AaveV3LiquidationRead {
-  const hf = view.healthFactor;
-  if (hf == null || hf <= 1 || hf >= 100) return { dropPct: null, single: null, sameAsset: null };
-  const same = aaveV3SameAssetOfView(view);
-  if (same) return { dropPct: null, single: null, sameAsset: { symbol: same.symbol } };
+/** The share of the oracle-priced collateral one supplied reserve must carry
+ *  to anchor a single-asset liquidation price. */
+export const AAVE_V3_SINGLE_COLLATERAL_SHARE = 0.995;
+
+/** The supplied reserve that anchors a single-asset liquidation price: the
+ *  one carrying at least AAVE_V3_SINGLE_COLLATERAL_SHARE of the priced
+ *  collateral. `undefined` while a supplied reserve has no oracle price (the
+ *  rule cannot run), null where no reserve carries that share. */
+export function aaveV3SingleCollateral(
+  view: AaveV3PositionView,
+): { reserve: AaveV3PositionView["supplies"][number]; price: number } | null | undefined {
   const prices = view.priceByAddress;
   const priced = view.supplies
     .filter((r) => r.amount > 0)
@@ -636,21 +642,28 @@ export function aaveV3LiquidationRead(view: AaveV3PositionView): AaveV3Liquidati
       const p = prices?.[r.address.toLowerCase()];
       return { r, price: typeof p === "number" && p > 0 ? p : null };
     });
-  let single: AaveV3LiquidationRead["single"] = null;
-  if (priced.length > 0 && priced.every((p) => p.price != null)) {
-    const valued = priced.map((p) => ({ ...p, usd: (p.price as number) * p.r.amount }));
-    const total = valued.reduce((s, p) => s + p.usd, 0);
-    const top = valued.reduce((a, b) => (b.usd > a.usd ? b : a));
-    if (total > 0 && top.usd / total >= 0.995) {
-      // The price and the factor as the receipt shows them, so its rows rebuild it.
-      single = {
-        symbol: top.r.symbol,
-        address: top.r.address,
-        price: top.price as number,
-        liqPrice: shownPrice(top.price as number) / shownHf(hf),
-      };
-    }
-  }
+  if (priced.length === 0 || priced.some((p) => p.price == null)) return undefined;
+  const valued = priced.map((p) => ({ r: p.r, price: p.price as number, usd: (p.price as number) * p.r.amount }));
+  const total = valued.reduce((s, p) => s + p.usd, 0);
+  const top = valued.reduce((a, b) => (b.usd > a.usd ? b : a));
+  return total > 0 && top.usd / total >= AAVE_V3_SINGLE_COLLATERAL_SHARE ? { reserve: top.r, price: top.price } : null;
+}
+
+export function aaveV3LiquidationRead(view: AaveV3PositionView): AaveV3LiquidationRead {
+  const hf = view.healthFactor;
+  if (hf == null || hf <= 1 || hf >= 100) return { dropPct: null, single: null, sameAsset: null };
+  const same = aaveV3SameAssetOfView(view);
+  if (same) return { dropPct: null, single: null, sameAsset: { symbol: same.symbol } };
+  const top = aaveV3SingleCollateral(view);
+  // The price and the factor as the receipt shows them, so its rows rebuild it.
+  const single: AaveV3LiquidationRead["single"] = top
+    ? {
+        symbol: top.reserve.symbol,
+        address: top.reserve.address,
+        price: top.price,
+        liqPrice: shownPrice(top.price) / shownHf(hf),
+      }
+    : null;
   return { dropPct: (1 - 1 / hf) * 100, single, sameAsset: null };
 }
 

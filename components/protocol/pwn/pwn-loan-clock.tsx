@@ -28,6 +28,7 @@ import { PILL_META } from "@/lib/shared/ui-grammar";
 import { formatDate, formatDuration } from "@/lib/date";
 import { bookDueProv, bookPastDueProv, extendedDeadlineProv } from "@/lib/pwn/event-provenance";
 import type { PwnLoanState } from "@/lib/pwn/economics";
+import { FigureSlot } from "@/components/shared/skeleton-card";
 
 /** "2024-01-01 16:58 UTC" — a moment to the minute. */
 export const utcMinuteText = (unix: number): string =>
@@ -90,7 +91,7 @@ export function PwnLoanTenure({
           title={`Open since ${formatDate(createdAt)}: the collateral stays in escrow until the lender claims it`}
         >
           {openDays == null ? (
-            <span className="invisible">open 0,000 days</span>
+            <FigureSlot ch={15} />
           ) : (
             <>
               open {openDays.toLocaleString("en-US")} {openDays === 1 ? "day" : "days"}
@@ -171,8 +172,7 @@ export function PwnDeadlinePassedRow({
               <span title={utcMinuteText(deadline)}>
                 <Prov info={prov}>{formatDate(deadline)}</Prov>
               </span>{" "}
-              · {now == null ? <span className="invisible">0,000 days ago</span> : daysAgoText(deadline, now)} · from
-              the clock, no event
+              · {now == null ? <FigureSlot ch={14} /> : daysAgoText(deadline, now)} · from the clock, no event
             </span>
           </>
         }

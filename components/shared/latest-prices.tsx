@@ -31,6 +31,8 @@ import { useAssetPageHref } from "@/components/shared/asset-popover";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { CTRL_GHOST, CTRL_OFF, CTRL_ON, OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import { formatDate } from "@/lib/date";
+import { offPar } from "@/lib/shared/usd-display";
+import { OFF_PAR_BAND } from "@/components/shared/usd-figure";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 
 /** A dropdown row. `price` absent means the protocol states none for this
@@ -124,6 +126,10 @@ export function LatestPrices({
   const first = assets[0];
   const more = assets.length - 1;
   const priced = (a: LatestPriceAsset) => typeof a.price === "number" && a.price > 0;
+  // A dollar stablecoin beyond DEPEG_BAND off $1 takes the caution orange,
+  // as its USD figures do on the cards (ui-jobs 746).
+  const inBand = (a: LatestPriceAsset) => !a.unit && priced(a) && offPar(a.price, a.symbol)?.band === true;
+  const figureTone = (a: LatestPriceAsset) => (inBand(a) ? OFF_PAR_BAND : "text-green-400");
   // The reason answers "why is there no dollar figure here", so it belongs
   // under any list that is not wholly USD — a row with no price at all, and a
   // row quoted in the protocol's own unit alike — and in place of the generic
@@ -164,14 +170,18 @@ export function LatestPrices({
                 be, so the trigger still names what the position holds. */}
             {priced(first) && first.info ? (
               <Prov info={first.info} value={String(first.price)} symbol={first.symbol}>
-                <span className="tabular-nums font-bold text-green-400">
+                <span
+                  className={`tabular-nums font-bold ${figureTone(first)}`}
+                  data-usd-off-par={inBand(first) ? "band" : undefined}
+                >
                   {first.figure ??
                     (first.unit ? fmtNative(first.price as number, first.unit) : fmtPrice(first.price as number))}
                 </span>
               </Prov>
             ) : (
               <span
-                className={`tabular-nums ${priced(first) ? "font-bold text-green-400" : "font-medium text-rb-500"}`}
+                className={`tabular-nums ${priced(first) ? `font-bold ${figureTone(first)}` : "font-medium text-rb-500"}`}
+                data-usd-off-par={inBand(first) ? "band" : undefined}
               >
                 {priced(first)
                   ? first.figure
@@ -245,6 +255,7 @@ export function LatestPrices({
                         showSymbol
                         bare
                         figure={a.figure}
+                        band={inBand(a)}
                       />
                     </AssetPageLink>
                   </li>
