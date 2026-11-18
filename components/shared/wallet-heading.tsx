@@ -26,6 +26,7 @@ import { RevealTip } from "@/components/shared/reveal-tip";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { WalletMenu } from "@/components/shared/wallet-menu";
 import { WalletPositionsMenu } from "@/components/shared/wallet-positions-menu";
+import { SkeletonBar } from "@/components/shared/skeleton-card";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { protocolForSession } from "@/lib/shared/protocols";
 import { CHAINS, type ChainId } from "@/lib/shared/chains";
@@ -219,6 +220,9 @@ function AddressKindLabel({
 export interface PositionOwner {
   /** The wallet; null or undefined while the page has not read it. */
   wallet: string | null | undefined;
+  /** True while a page that reads its owner on the client waits for that
+   *  read: the positions line shows a bar until it settles. */
+  pending?: boolean;
   /** The page's chain, which a contract's tip names ("a program on Base"); the tip says Ethereum
    *  where omitted. */
   chain?: ChainId;
@@ -298,7 +302,19 @@ export function PositionWalletHeading({
           {owner.extra}
         </>
       }
-      lines={owner.wallet && <WalletPositionsMenu wallet={owner.wallet} />}
+      // The positions line is held whether or not the wallet is read yet, so
+      // the heading keeps one height (the loading grammar, skeleton-card.tsx).
+      // It shows a bar only while the owner read is pending; settled with no
+      // wallet, it stays empty.
+      lines={
+        owner.wallet ? (
+          <WalletPositionsMenu wallet={owner.wallet} />
+        ) : (
+          <div className="flex h-5 items-center" data-wallet-positions-held="">
+            {owner.pending && <SkeletonBar width={72} />}
+          </div>
+        )
+      }
       end={
         <>
           {strip && (

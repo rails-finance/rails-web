@@ -41,6 +41,7 @@ import {
   timelineFilterModel,
 } from "@/components/shared/timeline-filter-bar";
 import type { TimelineAxesView, TimelineEventsState } from "@/hooks/useTimelineEvents";
+import { FigureSlot } from "@/components/shared/skeleton-card";
 
 /** The muted text after a middle dot on the heading line, so only the filters
  *  below read as controls (rails-ops ui-jobs 227). */
@@ -166,7 +167,7 @@ export function TimelineActivityHeader({
   const now = clock ?? last;
   // A duration that reads the clock: the placeholder holds the width.
   const dur = (from: number, to: number | null) =>
-    to == null && clock == null ? <span className="invisible">00 days</span> : formatDuration(from, to ?? now);
+    to == null && clock == null ? <FigureSlot ch={7} /> : formatDuration(from, to ?? now);
   if (!tenurePending && lives && lives.length > 1) {
     // Past three, the first and the last are named and the rest counted; the
     // tip lists every one.

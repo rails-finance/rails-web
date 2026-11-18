@@ -90,8 +90,11 @@ export async function loadLiquityV2SpDepthAt(blockNumber?: number): Promise<Outc
   return read;
 }
 
-/** For the pages: the depth, or null where there is none to show. */
+/** For the pages: the depth, or null where there is none to show. A block
+ *  this node has not reached yet (the roster's, read through another node)
+ *  is tried once more at head. */
 export async function loadLiquityV2SpDepth(blockNumber?: number): Promise<SpDepth | null> {
-  const r = await loadLiquityV2SpDepthAt(blockNumber);
+  let r = await loadLiquityV2SpDepthAt(blockNumber);
+  if (r === PAST_HEAD) r = await loadLiquityV2SpDepthAt();
   return r != null && typeof r === "object" ? r : null;
 }

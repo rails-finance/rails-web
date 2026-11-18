@@ -20,6 +20,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "block must be a whole number" }, { status: 400 });
   }
   const block = raw == null ? undefined : Number(raw);
+  // Digits past the largest safe integer name no block this chain will reach soon.
+  if (block != null && !Number.isSafeInteger(block)) {
+    return NextResponse.json(
+      { error: "this block is past the chain's head" },
+      { status: 404, headers: { "Cache-Control": "no-store" } },
+    );
+  }
   const depth = await loadLiquityV2SpDepthAt(block);
   if (depth === BEFORE_DEPLOY) {
     return NextResponse.json(

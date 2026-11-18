@@ -22,7 +22,7 @@
 // listing makes per page load (never one read per row). Interest since the
 // last touch and the PSM's pending share settle only at the next touch, so
 // the two can differ — the ≈, the tooltip and the receipt all say so. Without
-// the board read the column stays a dash (a pulse while the fetch is in
+// the board read the column stays a dash (a bar while the fetch is in
 // flight); it never states a ratio it cannot price.
 //
 // The card view builds from EITHER lane: `viewFromSummary` (the index row —
@@ -32,6 +32,7 @@
 
 import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { PositionNameId } from "@/components/shared/position-name-id";
+import { SkeletonBar } from "@/components/shared/skeleton-card";
 import { positionName, shortPositionId } from "@/lib/shared/position-name";
 import { ListingTag } from "@/components/shared/listing-tag";
 import { TokenFigure } from "@/components/shared/token-figure";
@@ -153,7 +154,7 @@ export interface PolarisPositionView {
   mcr: number | null;
   defensiveMode: boolean;
   /** The market-board read the ratio needs has not answered yet — the ratio
-   *  slot holds a pulse rather than a dash. Never true once it has settled,
+   *  slot holds a bar rather than a dash. Never true once it has settled,
    *  answered or not. */
   pricePending: boolean;
   /** Chain lane only — the legs pending since the last touch, native units. */
@@ -431,7 +432,7 @@ function againstHoldingRow(
     `Compared with holding the pETH deposited: the pETH this position holds, withdrew and was left as surplus, ` +
     `plus its net ${stable} (borrowed, less repaid and still owed) valued at today's price, less the pETH deposited.`;
   let value: ReactNode;
-  if (r === "pending") value = <div className="h-6 w-24 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />;
+  if (r === "pending") value = <SkeletonBar width={96} figure height={24} />;
   else if (isAgainstHoldingNone(r))
     value = (
       <span className="text-sm font-normal text-rb-500" data-figure="against-holding-none">
@@ -592,8 +593,8 @@ export function polarisCardSlots({
             </Prov>
           ) : v.pricePending && v.coll > 0 ? (
             // The USD value needs the same price read the ratio does, so it
-            // holds a pulse while that is in flight.
-            <span className="inline-block h-3 w-16 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />
+            // holds a bar while that is in flight.
+            <SkeletonBar width={64} height={12} />
           ) : null,
       },
       {
@@ -645,7 +646,7 @@ export function polarisCardSlots({
               <span className="font-bold text-green-400">{formatUsdValue(v.debtUsd)}</span>
             </Prov>
           ) : v.pricePending && v.debt > 0 ? (
-            <span className="inline-block h-3 w-16 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />
+            <SkeletonBar width={64} height={12} />
           ) : null,
       },
       {
@@ -882,7 +883,7 @@ function debtInUsd(market: PolarisMarket, debt: number, xauUsd: number | null): 
  *  reached at, the rate the market charges and the collateral's value — all
  *  on the row's own last emitted figures, so all approximate, and the card
  *  marks the ratio as such. `pending` says the read is still in flight, which
- *  is a pulse rather than a dash. */
+ *  is a bar rather than a dash. */
 export function viewFromSummary(
   s: PolarisPositionSummary,
   markets?: PolarisMarketsChainResponse | null,

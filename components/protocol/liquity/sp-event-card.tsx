@@ -4,7 +4,8 @@
 // event-card shell (components/shared/event-card.tsx), as Polaris's deposit
 // row draws it: T1 the label with the moved amounts on the spine, T2 the
 // balance sheet (sp-sheet.ts) and the price row (the depositor's gas), T3 the
-// row in words (lib/liquity-v2/sp-event-prose.ts).
+// row in words (lib/liquity-v2/sp-event-prose.ts), then the Troves its
+// transaction acted on (sp-tx-troves.tsx, ui-jobs 751).
 
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import type { EventCellSpec } from "@/components/shared/event-cells";
@@ -20,9 +21,11 @@ import { big, exactUnits, units } from "@/lib/liquity-v2/sp-math";
 import { spCompoundProv, spLiqProv, spTouchProv } from "@/lib/liquity-v2/sp-provenance";
 import type { ChainTruthDelta } from "@/components/shared/chain-truth-event";
 import { DEPOSIT_TOUCH_TIP } from "@/lib/liquity-v2/touch-words";
-import { spEventLabel, spEventSentences } from "@/lib/liquity-v2/sp-event-prose";
+import { spEventLabel, spEventSentences, spSenderSentence } from "@/lib/liquity-v2/sp-event-prose";
+import { LinkedAddress } from "@/components/shared/linked-address";
 import type { LiquityV2DepositEventRow } from "@/lib/sources/api/liquity-v2-sp";
 import { DEPOSIT_AFTER_FORMULA, spDepositSheet } from "./sp-sheet";
+import { SpTxTroves } from "./sp-tx-troves";
 
 const ZERO = BigInt(0);
 /** A kept amount as the row states it: the compact form from 0.01, two
@@ -97,13 +100,25 @@ function depositorGas(r: LiquityV2DepositEventRow): EventGas | undefined {
   return eth > 0 ? { eth, usd: 0, gasUsed: Number(r.gas_used) } : undefined;
 }
 
-const bullets = (lines: string[]) => (
-  <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed">
-    {lines.map((l) => (
-      <li key={l}>{l}</li>
-    ))}
-  </ul>
-);
+/** The row's sentences, the sender's linked to its wallet page, then the
+ *  Troves its transaction acted on (ui-jobs 751). */
+function Bullets({ row, coll }: { row: LiquityV2DepositEventRow; coll: string }) {
+  const sender = row.tx_from ? spSenderSentence(row.tx_from) : null;
+  return (
+    <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed">
+      {spEventSentences(row, coll).map((l) =>
+        l === sender && row.tx_from ? (
+          <li key={l}>
+            <LinkedAddress address={row.tx_from} holderOf="liquity-v2" /> sent the transaction.
+          </li>
+        ) : (
+          <li key={l}>{l}</li>
+        ),
+      )}
+      <SpTxTroves txHash={row.tx_hash} />
+    </ul>
+  );
+}
 
 export function LiquityV2DepositEventCard({
   row,
@@ -273,7 +288,7 @@ export function LiquityV2DepositEventCard({
     sheet: spDepositSheet(row),
     ledgers: { none: "A deposit's balance is the Deposit side's total." },
     price: { gas: depositorGas(row), prices: [] },
-    explainer: { body: bullets(spEventSentences(row, c)) },
+    explainer: { body: <Bullets row={row} coll={c} /> },
     learnMore: null,
   };
   return <EventCard slots={slots} avatar={null} />;

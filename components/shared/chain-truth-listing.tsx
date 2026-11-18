@@ -10,7 +10,7 @@
 // The richer listings (Liquity V2 / Aave V4 / V3) keep their own page bodies —
 // filters, pagination, motion — this tier is deliberately the minimal one.
 
-import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import Link from "next/link";
 import { ListToolbar } from "@/components/shared/filter-bar/list-toolbar";
 import { PaginationControls } from "@/components/shared/pagination-controls";
@@ -23,20 +23,11 @@ import type { ProtocolEntry } from "@/lib/shared/protocols";
 import { RailHeader } from "@/components/shared/rail-header";
 import { IndexNotice } from "@/components/shared/index-notice";
 
-// Entrance cascade — a staggered fade + rise for the row column, done in CSS
-// (see `.ct-row` in globals.css), NOT framer-motion. This tier (unlike the
-// paginated flagships) can render the whole set — hundreds of rows — and driving
-// that many per-node JS animations choked the main thread on mount: rows sat
-// mid-fade with hover/clicks unresponsive for seconds. A compositor-driven CSS
-// animation costs the main thread nothing, so rows are interactive immediately
-// while they settle. Two properties preserved from the old framer version:
-//   • No exit animation. The column is re-keyed by `viewKey`, so React swaps it
-//     outright on a facet/sort/page change and the fresh mount replays the
-//     entrance — nothing to hang or stack.
-//   • Capped stagger. A per-row 0.045s step over 500 rows would cascade for 20s+;
-//     the per-row `--ct-i` index is clamped to STAGGER_CAP so only the top rows
-//     visibly stagger and the tail settles together.
-const STAGGER_CAP = 12;
+// Row entrance: the rows enter as one 120 ms opacity fade (`.ct-row` in
+// globals.css, the loading grammar's `.reveal-in`), in CSS so the hundreds of
+// rows this tier can render cost the main thread nothing on mount. No exit
+// animation: the column is re-keyed by `viewKey`, so React swaps it outright on
+// a facet/sort/page change and the fresh mount replays the fade.
 
 /** First-class filter surface: pass the protocol's dimension registry + the
  *  URL-backed param object and the shell renders the shared <ListToolbar> itself.
@@ -96,7 +87,7 @@ export interface ChainTruthListingProps<T, F extends BaseListFilters = BaseListF
    *  focus and the list doesn't flash. Only meaningful on the server-driven path. */
   refreshing?: boolean;
   /** Identity of the displayed result set. When it changes the column re-mounts
-   *  and replays the entrance cascade — so a facet/sort/page change animates.
+   *  and replays the entrance fade, so a facet/sort/page change animates.
    *  Excludes live search text so typing filters in place. */
   viewKey?: string;
   /** Server-side pagination. Omit for the in-memory tier (renders every item). */
@@ -130,7 +121,7 @@ export interface ChainTruthListingProps<T, F extends BaseListFilters = BaseListF
    *  inside the dimmed column, because it states figures summed from the rows
    *  under it and must dim with them while a refetch is in flight; and
    *  OUTSIDE the `viewKey`-keyed rows div, so a page / sort / facet change
-   *  re-staggers the cards without re-staggering a band that did not change.
+   *  replays the cards' fade without replaying it on a band that did not change.
    *  Drawn only when there are rows — a summary of nothing is nothing. */
   above?: ReactNode;
   /** Opt-in line under the empty state, for a listing whose search can name
@@ -180,15 +171,15 @@ export function ChainTruthListing<T, F extends BaseListFilters = BaseListFilters
   titleHidden = false,
   titleAs: Title = "h1",
 }: ChainTruthListingProps<T, F>) {
-  // Entrance cascade plays on a view CHANGE (filter/sort/page) — never on the
+  // The entrance fade plays on a view CHANGE (filter/sort/page) — never on the
   // first paint. The initial rows arrive from SSR and must be visible + clickable
   // immediately, with no dependency on the compositor actually advancing an
   // animation: a listing opened in a background tab holds `.ct-row`'s opening
   // `opacity: 0` (fill-mode: both) until focused, so gating first paint on it
   // would render invisible rows. A view change only happens while the user is
-  // looking at the tab, so the cascade there is safe — and reads as feedback that
+  // looking at the tab, so the fade there is safe — and reads as feedback that
   // the list changed. `prevViewKey` is undefined on first render (→ no animation);
-  // once the key changes, the re-keyed column remounts with the cascade applied.
+  // once the key changes, the re-keyed column remounts with the fade applied.
   const prevViewKeyRef = useRef<string | undefined>(undefined);
   const animateEntrance = prevViewKeyRef.current !== undefined && prevViewKeyRef.current !== viewKey;
   useEffect(() => {
@@ -273,20 +264,16 @@ export function ChainTruthListing<T, F extends BaseListFilters = BaseListFilters
                 for the whole round trip. `aria-busy` carries the state for AT. */}
           <div className={`transition-opacity ${refreshing ? "opacity-60" : ""}`} aria-busy={refreshing || undefined}>
             {/* The band about the rows — inside the dimmed column with them,
-                outside the keyed div below so it does not re-stagger. */}
+                outside the keyed div below so it does not replay the fade. */}
             {items.length > 0 && above}
             {items.length > 0 ? (
               // Keyed by `viewKey`: a facet/sort/page change swaps the key, React
               // re-mounts the column, and the fresh mount replays the CSS entrance
-              // cascade (`.ct-row`). Search text is excluded from the key upstream,
-              // so typing filters in place without re-staggering.
+              // fade (`.ct-row`). Search text is excluded from the key upstream,
+              // so typing filters in place without replaying it.
               <div key={viewKey ?? "list"} className="flex flex-col gap-3">
-                {items.map((item, i) => (
-                  <div
-                    key={keyFor(item)}
-                    className={animateEntrance ? "ct-row" : undefined}
-                    style={animateEntrance ? ({ "--ct-i": Math.min(i, STAGGER_CAP) } as CSSProperties) : undefined}
-                  >
+                {items.map((item) => (
+                  <div key={keyFor(item)} className={animateEntrance ? "ct-row" : undefined}>
                     {/* prefetch={true}: the detail segments are dynamic routes with
                           no loading.tsx boundary, and on Next 15.5 the default prefetch
                           skips those entirely — no RSC payload, no route chunks. That

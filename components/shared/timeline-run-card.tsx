@@ -618,7 +618,7 @@ export function TimelineRunCard({
       // open on a cold position pays for the whole grouping pass.
       body = readingLine ? (
         <div key="reading" className="relative" aria-busy="true">
-          <SkeletonBlock height={MEMBERS_SKELETON_HEIGHT} />
+          <SkeletonBlock height={MEMBERS_SKELETON_HEIGHT} bars={null} />
           <p className="absolute inset-x-0 top-5 px-5 text-center text-xs text-rb-500" role="status">
             Reading {count.toLocaleString("en-US")} {count === 1 ? memberNoun : memberPlural}&hellip;
           </p>

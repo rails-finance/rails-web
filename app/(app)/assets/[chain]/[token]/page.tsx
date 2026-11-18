@@ -23,6 +23,10 @@ import { backLink, viaExplorer } from "@/lib/shared/asset-via-links";
 import { unpricedPage } from "@/lib/api/asset-explorer-chips";
 import { assetCategory } from "@/lib/shared/asset-categories";
 import type { AssetCard } from "@/lib/shared/asset-explorer";
+import { BoldLivePrice } from "@/components/assets/bold-live-price";
+import { loadBoldPriceWithin } from "@/lib/sources/chain/liquity-v2-bold-price";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
 
 export const dynamic = "force-dynamic";
 
@@ -55,9 +59,13 @@ export default async function AssetPage({ params, searchParams }: { params: Para
   const [answer, readerIp] = await Promise.all([fetchAssetRosterServer(token), readerIpFromHeaders()]);
   const opened = answer ? assetPage(answer, explorer?.chain ?? chain) : null;
   if (!opened) {
-    const [unpriced, head] = await Promise.all([
+    // BOLD on Ethereum reads its price live from the Curve BOLD/USDC pool
+    // (ui-jobs 746b); every other unpriced token keeps the no-price line.
+    const bold = chain === MAINNET_CHAIN_ID && token.toLowerCase() === TOKEN_ADDRESSES.BOLD;
+    const [unpriced, head, boldRead] = await Promise.all([
       unpricedPage(chain, token),
       fetchAssetHeadServer(chain, token, null, readerIp).catch(() => null),
+      bold ? loadBoldPriceWithin() : undefined,
     ]);
     if (!unpriced) notFound();
     return (
@@ -75,6 +83,7 @@ export default async function AssetPage({ params, searchParams }: { params: Para
             relations={[]}
             back={back}
             note={null}
+            livePrice={bold ? <BoldLivePrice read={boldRead ?? null} figure={unpriced.figure} /> : undefined}
           />
         </div>
       </div>

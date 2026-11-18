@@ -10,7 +10,7 @@
 //     driver's onFilters seam, resolving ENS the same way the old body did.
 //
 // Graduated from the old bespoke TrovesPageContent (decision 0009): the framer
-// cascade, hand-rolled URL encode/decode, manual pagination and direct
+// entrance, hand-rolled URL encode/decode, manual pagination and direct
 // next/navigation useSearchParams (the hidden-dup hydration source) are all gone —
 // the shared driver + useUrlSearchParams replace them, and this now SSR-first-paints
 // like the rest of the tier.
