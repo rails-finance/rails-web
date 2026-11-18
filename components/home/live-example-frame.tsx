@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { OraclePricesData } from "@/types/api/oracle";
+import { boldPriceReason, boldStripAsset, useBoldPrice } from "@/lib/liquity-v2/use-bold-price";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { TroveBody, useTroveFlows } from "@/components/trove/TroveBody";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
@@ -73,15 +74,16 @@ const EXAMPLE_URL = `rails.finance${LIVE_EXAMPLE_TROVE_PATH.replace(
 function HeroStrip({ data }: { data: LiveExampleData }) {
   const collSymbol = data.trove.collateralType;
   const price = data.prices?.[collSymbol.toLowerCase() as keyof OraclePricesData];
+  const boldPrice = useBoldPrice();
   const assets: LatestPriceAsset[] = [
     ...(price ? [{ symbol: collSymbol, price, info: collateralPriceInfo(collSymbol) }] : []),
-    { symbol: "BOLD", price: 1 },
+    boldStripAsset(boldPrice),
   ];
   const open = data.trove.status === "open";
   usePublishPositionCardStrip(
     <>
       {open && <RecencyStamp />}
-      <LatestPrices assets={assets} bare />
+      <LatestPrices assets={assets} reason={boldPriceReason(boldPrice)} bare />
     </>,
   );
   return null;

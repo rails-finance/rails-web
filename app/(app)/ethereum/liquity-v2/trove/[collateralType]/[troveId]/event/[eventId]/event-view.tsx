@@ -9,6 +9,7 @@
 // its levels and Copy for LLM are the timeline's.
 
 import { useEffect, useMemo, useState } from "react";
+import { boldStripAsset, closedAtBlock, useBoldPrice } from "@/lib/liquity-v2/use-bold-price";
 import { useRouter } from "next/navigation";
 import type { TroveSummary } from "@/types/api/trove";
 import type { OraclePricesData } from "@/types/api/oracle";
@@ -109,6 +110,10 @@ export default function EventView({
   const daily = useLiquityDailyPrices(liquityDailyBranch(collSymbol));
   const surplusClaimed = surplus?.claimed != null;
   const open = trove?.status === "open";
+  // BOLD's price from the Curve BOLD/USDC pool (ui-jobs 746), as the Trove
+  // page reads it: the cards' "today" side reads the head one.
+  const boldPrice = useBoldPrice();
+  const boldAtClosing = useBoldPrice(closedAtBlock(trove?.status, liquityEvents));
   // The branch's shutdown, as the trove page reads it (ui-jobs 612, 626): the
   // prose takes it on any Trove (an urgent redemption, ui-jobs 619), the
   // replay's accrual on an open one only.
@@ -151,7 +156,7 @@ export default function EventView({
   const priceInfo: Provenance | undefined = currentPrice ? collateralPriceInfo(trove.collateralType) : undefined;
   const stripAssets: LatestPriceAsset[] = [
     ...(currentPrice ? [{ symbol: trove.collateralType, price: currentPrice, info: priceInfo }] : []),
-    { symbol: "BOLD", price: 1 },
+    boldStripAsset(boldPrice),
   ];
   const closing = !open
     ? closingPricesAt(liquityEvents, (row) => {
@@ -163,7 +168,7 @@ export default function EventView({
                 price,
                 info: closingPriceInfo(trove.collateralType),
               },
-              { symbol: "BOLD", price: 1 },
+              boldStripAsset(boldAtClosing),
             ]
           : undefined;
       })

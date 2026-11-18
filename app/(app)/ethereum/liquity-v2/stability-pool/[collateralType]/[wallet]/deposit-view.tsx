@@ -27,6 +27,7 @@ import { FlowFocusContext, useFlowFocusRoot, useFlowFocusValue } from "@/compone
 import { CHAIN_TRUTH_DISPLAY_ITEMS, TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
+import { boldPriceReason, boldStripAsset, useBoldPrice } from "@/lib/liquity-v2/use-bold-price";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { LiquityV2DepositCard } from "@/components/protocol/liquity/sp-deposit-card";
 import { LiquityV2DepositEventCard } from "@/components/protocol/liquity/sp-event-card";
@@ -68,6 +69,7 @@ export default function DepositView({
   const [failed, setFailed] = useState(false);
   const [chain, setChain] = useState<LiquityV2DepositChain | null>(null);
   const [chainSettled, setChainSettled] = useState(false);
+  const boldPrice = useBoldPrice();
   // The event route draws the timeline alone, its card in page mode.
   const rawEventId = useParams<{ eventId?: string }>()?.eventId;
   const onEventPage = rawEventId != null;
@@ -248,7 +250,8 @@ export default function DepositView({
   const pinnedUnread = pinnedMissing && lifeRead === "failed";
 
   // The branch collateral at its price feed, the price the head row values the
-  // collateral paid in at; BOLD as the Trove page lists it.
+  // collateral paid in at; BOLD as the Trove page lists it, from the Curve
+  // BOLD/USDC pool (ui-jobs 746).
   const price = chain ? priceUnits(chain.priceRaw) : null;
   const stripAssets: LatestPriceAsset[] = [
     ...(price != null && chain
@@ -263,7 +266,7 @@ export default function DepositView({
           },
         ]
       : []),
-    { symbol: "BOLD", price: 1 },
+    boldStripAsset(boldPrice),
   ];
 
   if (!data && !failed) return <DetailBodySkeleton />;
@@ -286,6 +289,7 @@ export default function DepositView({
             owner={{ wallet: depositor, href: `${LIQUITY_V2_SP_PATH}?q=${depositor}` }}
             fallbackHref={LIQUITY_V2_SP_PATH}
             assets={stripAssets}
+            priceReason={boldPriceReason(boldPrice)}
             closed={!open}
             tools={false}
           />

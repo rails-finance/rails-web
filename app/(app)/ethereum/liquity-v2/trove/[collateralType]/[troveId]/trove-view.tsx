@@ -14,6 +14,7 @@
 // tail itself, exactly as it did before the route had a server half.
 
 import { useState, useEffect, useMemo, useRef } from "react";
+import { boldPriceReason, boldStripAsset, closedAtBlock, useBoldPrice } from "@/lib/liquity-v2/use-bold-price";
 import {
   collateralPriceInfo as collateralPriceReceipt,
   closingPriceInfo,
@@ -264,6 +265,10 @@ export default function TroveView({
   // (lib/shared/event-order.ts: the block's position, then the log inside one
   // transaction).
   const liquityEvents = useMemo(() => events.filter(isLiquityEvent).sort(compareEventsInOrder), [events]);
+  // BOLD's price from the Curve BOLD/USDC pool (ui-jobs 746): at head, and
+  // for a closed Trove at its closing row's block as well.
+  const boldPrice = useBoldPrice();
+  const boldAtClosing = useBoldPrice(closedAtBlock(troveData?.status, liquityEvents));
   // "last holder" only on a closed Trove that changed hands (ui-jobs 702).
   const changedHands = useMemo(() => troveChangedHands(events), [events]);
 
@@ -466,8 +471,7 @@ export default function TroveView({
 
   // Assets relevant to the position in view, for the top row's price dropdown:
   // the trove's collateral (priced from the Liquity oracle) plus BOLD, the
-  // debt asset — hard-pegged to $1 by the protocol's redemption mechanism, so
-  // there's no separate price source for it.
+  // debt asset, at the Curve BOLD/USDC pool's last trade.
   const collateralPrice = prices?.[troveData.collateralType.toLowerCase() as keyof OraclePricesData];
   const collateralPriceInfo: Provenance | undefined = collateralPrice
     ? collateralPriceReceipt(troveData.collateralType)
@@ -476,7 +480,7 @@ export default function TroveView({
     ...(collateralPrice
       ? [{ symbol: troveData.collateralType, price: collateralPrice, info: collateralPriceInfo }]
       : []),
-    { symbol: "BOLD", price: 1 },
+    boldStripAsset(boldPrice),
   ];
   // A closed trove's prices: the collateral price its closing row carries.
   const closing =
@@ -490,7 +494,7 @@ export default function TroveView({
                   price,
                   info: closingPriceInfo(troveData.collateralType),
                 },
-                { symbol: "BOLD", price: 1 },
+                boldStripAsset(boldAtClosing),
               ]
             : undefined;
         })
@@ -513,6 +517,7 @@ export default function TroveView({
                 ) : undefined,
             }}
             assets={stripAssets}
+            priceReason={boldPriceReason(troveData.status !== "open" ? boldAtClosing : boldPrice)}
             closed={troveData.status !== "open"}
             closing={closing}
             tools={false}
