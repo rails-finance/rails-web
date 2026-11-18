@@ -37,10 +37,13 @@ import {
 } from "@/lib/wallet/liquity-v2-on-wallet";
 import { walletHref, type WalletProtocolCount } from "@/lib/wallet/wallet-filters";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { PROTOCOLS } from "@/lib/shared/protocols";
 import type { TroveSummary } from "@/types/api/trove";
 import type { OraclePricesData, OraclePricesResponse } from "@/types/api/oracle";
 
 const PROTOCOL = "liquity-v2";
+/** The roster id, the glyph key. */
+const ROSTER_ID = PROTOCOLS.find((e) => e.chainId === MAINNET_CHAIN_ID && e.slug === PROTOCOL)?.id ?? PROTOCOL;
 
 /** Past the branch's minimum collateral ratio at the listing's price read. */
 function troveAtRisk(t: TroveSummary, prices: OraclePricesData | null): boolean {
@@ -101,20 +104,20 @@ export function WalletProtocolListing({
 
   const edge = (t: TroveSummary): PositionCardEdge => ({
     surface: "wallet",
-    protocol: { id: PROTOCOL, name: "Liquity V2" },
+    protocol: { id: ROSTER_ID, name: "Liquity V2" },
     chain: { id: MAINNET_CHAIN_ID, name: "Ethereum" },
     atRisk: troveAtRisk(t, prices),
   });
 
   return (
     <ProvReceiptsScope registry={registry}>
-      <div className="py-8" data-wallet-view={address} data-wallet-protocol={PROTOCOL}>
+      <div data-wallet-view={address} data-wallet-protocol={PROTOCOL}>
         <ChainTruthListingPage<TroveSummary, WalletLiquityV2Filters>
           title={`Liquity V2 Troves of ${ensName ?? address}`}
           titleHidden
           titleAs="h2"
           identity={
-            <div className="mb-7">
+            <div className="mb-1">
               <WalletHeader address={address} ensName={ensName} />
             </div>
           }

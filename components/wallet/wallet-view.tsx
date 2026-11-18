@@ -409,6 +409,12 @@ export function WalletView({
   const filtered = focused || byKind;
   const all = byKind ? scoped.rows.filter((p) => p.kind != null && kinds.includes(p.kind)) : scoped.rows;
   const chosen = walletProtocol(read.protocol);
+  // The heading counts the wallet's positions whatever the Kind pill holds.
+  const wallet = {
+    open: scoped.rows.filter((p) => p.status === "open").length,
+    moved: scoped.rows.filter((p) => p.status === "moved").length,
+    closed: scoped.rows.filter((p) => p.status !== "open" && p.status !== "moved").length,
+  };
   const openAll = all.filter((p) => p.status === "open");
   // The sorted set, then the dust under the floor, then the accounts not read.
   const ranked = openAll.filter((p) => !p.notRead && !isDust(p)).sort(byRisk);
@@ -416,8 +422,6 @@ export function WalletView({
   const notRead = openAll.filter((p) => p.notRead);
   const open = [...ranked, ...dust, ...notRead];
   const closed = all.filter((p) => p.status !== "open");
-  // Passed to another wallet (ui-jobs 705): counted apart from closed.
-  const movedN = closed.filter((p) => p.status === "moved").length;
   const scope = useAssetScope();
   // Under Focus, only the families on a chain in focus.
   const unread = read.families.filter((r) => r.headRead === "failed" && (!focused || scope.chainOk(r.chain)));
@@ -425,7 +429,8 @@ export function WalletView({
   const oldest = stamps.length ? Math.min(...stamps) : undefined;
   const atRiskCount = open.filter(atRisk).length;
   const registry = useReceiptRegistry();
-  const trades = cow && (
+  // The trades are no position: drawn with no Kind chosen.
+  const trades = cow && !byKind && (
     <Suspense fallback={null}>
       <Trades address={address} cow={cow} />
     </Suspense>
@@ -482,7 +487,7 @@ export function WalletView({
                 read.total > 0 && (
                   <div className="text-xs text-rb-500" data-wallet-count={read.total}>
                     <HeadingTip
-                      text={`${plural(read.total, "position")} · ${openAll.length} open · ${closed.length - movedN} closed${movedN > 0 ? ` · ${movedN} moved` : ""}`}
+                      text={`${plural(read.total, "position")} · ${wallet.open} open · ${wallet.closed} closed${wallet.moved > 0 ? ` · ${wallet.moved} moved` : ""}`}
                       tip={WALLET_COUNTS_SCOPE}
                     />
                   </div>

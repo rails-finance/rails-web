@@ -49,14 +49,34 @@ export const walletProtocol = (slug: string | null | undefined): WalletProtocol 
 /** The protocols whose wallet view is their listing, with its pills. */
 export const LISTED_ON_WALLET = new Set(["liquity-v2"]);
 
-const amountOver0 = (a: { amount: string } | null | undefined) => a != null && Number(a.amount) > 0;
+/** Fields that name a market's figures or a count, never the account's debt. */
+const NOT_THE_ACCOUNTS = /total|bad_?debt|rate|count|symbol|address|apy|index|share|cap/i;
+const DEBT_KEY = /debt|borr/i;
+const positive = (v: unknown) => (typeof v === "number" || typeof v === "string") && Number(v) > 0;
+
+/** Whether a family's stored listing row shows the account owing, now or at
+ *  its peak: a positive figure under a debt or borrow key (`peak_borr_raw`,
+ *  `peakReserves[].peakDebtRaw`, `borrows[].amount`, `borrowedBase`). */
+function owedIn(v: unknown, underDebt = false, depth = 0): boolean {
+  if (depth > 4 || v == null || typeof v !== "object") return false;
+  for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
+    if (NOT_THE_ACCOUNTS.test(k)) continue;
+    const debt = underDebt || DEBT_KEY.test(k);
+    if (debt && positive(x)) return true;
+    if (typeof x === "object" && owedIn(x, debt, depth + 1)) return true;
+  }
+  return false;
+}
 
 /** A summary row's kind: a lending account is a loan where it owes or ever
- *  owed (its peak debt), a deposit where it never borrowed. */
+ *  owed, a deposit where it never borrowed. The row's own debt fields are
+ *  read first; the lending families leave them empty, so their listing row
+ *  (`card`) is read next. */
 export function kindOfRow(row: WalletSummaryRow): WalletKind {
   const kinds = walletProtocol(row.family)?.kinds ?? ["loans"];
   if (kinds.length === 1) return kinds[0];
-  return amountOver0(row.debt) || Number(row.peakDebt ?? 0) > 0 || (row.debtUsd ?? 0) > 0 ? "loans" : "deposits";
+  const owed = positive(row.debt?.amount) || positive(row.peakDebt) || positive(row.debtUsd) || owedIn(row.card);
+  return owed ? "loans" : "deposits";
 }
 
 /** `?kind=` as the page reads it: known kinds only. */

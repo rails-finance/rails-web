@@ -46,7 +46,7 @@ export function WalletFilterBar({
   ];
   const filters: WalletPillFilters = { q: "", sortBy: "risk", sortOrder: "asc", protocol, kinds };
   return (
-    <div data-wallet-filters="" data-anatomy="W8" className="-mb-1">
+    <div data-wallet-filters="" data-anatomy="W8" data-prov-exempt="" className="-mb-6">
       <ListToolbar<WalletPillFilters>
         dimensions={dims}
         filters={filters}
