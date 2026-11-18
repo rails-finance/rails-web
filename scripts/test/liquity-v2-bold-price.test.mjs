@@ -11,6 +11,11 @@ const hooks = `
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 export async function resolve(specifier, context, next) {
+  // lib/shared/usd-display.ts reaches lib/aave-v4/asset-class.ts through "@/", a pure module.
+  if (specifier.startsWith("@/")) {
+    const url = new URL(specifier.slice(2) + ".ts", "${new URL("../../", import.meta.url).href}").href;
+    if (existsSync(fileURLToPath(url))) return { url, shortCircuit: true };
+  }
   if (specifier.startsWith(".") && !/\\.[cm]?[jt]sx?$/.test(specifier) && context.parentURL) {
     const url = new URL(specifier + ".ts", context.parentURL).href;
     if (existsSync(fileURLToPath(url))) return { url, shortCircuit: true };
@@ -20,6 +25,7 @@ export async function resolve(specifier, context, next) {
 register(`data:text/javascript,${encodeURIComponent(hooks)}`);
 
 const { boldUsdFromCurve, boldPriceProv, BOLD_USDC_POOL } = await import("../../lib/liquity-v2/bold-price.ts");
+const { offPar } = await import("../../lib/shared/usd-display.ts");
 
 const READ = {
   blockNumber: 26444554,
@@ -53,4 +59,15 @@ test("the receipt names the pool, the call and the block", () => {
   assert.match(prov.summary, /price_oracle\(0\), puts BOLD at \$0\.998351/);
   assert.equal(boldPriceProv({ ...READ, lastPriceRaw: "0" }), undefined);
   assert.equal(boldPriceProv({ ...READ, emaRaw: null }).inputs.length, 1);
+});
+
+test("a BOLD beyond DEPEG_BAND carries the band in the chip", () => {
+  // 1.0526… BOLD per USDC: BOLD at $0.95.
+  const low = boldUsdFromCurve("1052631578947368421");
+  assert.equal(low.toFixed(3), "0.950");
+  assert.deepEqual(offPar(low, "BOLD"), { text: "at $0.950", band: true });
+  // At block 26,444,554, $0.998: off par, inside the band.
+  const near = offPar(boldUsdFromCurve(READ.lastPriceRaw), "BOLD");
+  assert.equal(near.band, false);
+  assert.equal(near.text, "at $0.998");
 });

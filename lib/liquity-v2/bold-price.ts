@@ -8,17 +8,21 @@
 // 26,444,554 it read 1.001670796804945482 (BOLD $0.998332), with
 // get_dy(0, 1, 1e18) paying 0.997922 USDC for one BOLD after the pool's fee.
 // price_oracle(0), the pool's EMA of that price (about 866 s), goes beside it
-// in the receipt. Debt stays at its $1 face (ui-jobs 741): this price feeds
-// the Prices chip and, through it, offPar.
+// in the receipt. Debt stays at its $1 face (ui-jobs 741): this price is the
+// Prices chip's, whose figure takes offPar's caution orange beyond DEPEG_BAND
+// (components/shared/latest-prices.tsx), and the cards' "today" USD figures
+// read it from there.
 //
 // Dependency-free apart from relative imports, so the unit test loads it.
 
 import type { Provenance } from "../../components/shared/provenance";
 import { priceText } from "../shared/shown-usd";
-import { liquityV2PriceNote } from "./price-notes";
+import { liquityV2BoldPriceNote } from "./price-notes";
 
 export const BOLD_USDC_POOL = "0xefc6516323fbd28e80b85a497b65a86243a54b3e";
 export const BOLD_USDC_POOL_NAME = "Curve BOLD/USDC (Stableswap-NG)";
+/** The first block with the pool's code; a read before it has no pool. */
+export const BOLD_USDC_POOL_FROM_BLOCK = 22_512_006;
 
 /** The pool's two prices at one block, as the route returns them. */
 export interface BoldPriceRead {
@@ -54,7 +58,7 @@ export function boldPriceProv(read: BoldPriceRead): Provenance | undefined {
     pclass: "state",
     summary:
       `BOLD in USD — 1 ÷ the ${BOLD_USDC_POOL_NAME} pool's last_price(0) at block ${block}, ` +
-      `the BOLD one USDC fetched at the pool's last trade, with USDC at $1: ${priceText(price)}.` +
+      `the BOLD one USDC bought at the pool's last trade, with USDC at $1: ${priceText(price)}.` +
       (ema != null ? ` The pool's EMA, price_oracle(0), puts BOLD at ${priceText(ema)}.` : ""),
     formula: "1 ÷ (last_price(0) ÷ 10¹⁸)",
     inputs: [
@@ -63,7 +67,7 @@ export function boldPriceProv(read: BoldPriceRead): Provenance | undefined {
         value: read.lastPriceRaw,
         kind: "chain",
         pclass: "state",
-        note: liquityV2PriceNote("BOLD"),
+        note: liquityV2BoldPriceNote(read.blockNumber),
       },
       ...(read.emaRaw != null
         ? [{ label: "price_oracle(0)", value: read.emaRaw, kind: "chain" as const, pclass: "state" as const }]
@@ -80,5 +84,11 @@ export function boldPriceProv(read: BoldPriceRead): Provenance | undefined {
 }
 
 /** The row's words where the read failed: the chip names BOLD with no figure. */
-export const BOLD_PRICE_UNAVAILABLE =
-  "BOLD's price is unavailable: the Curve BOLD/USDC pool did not answer. Reload the page to try again.";
+export const BOLD_PRICE_UNAVAILABLE = "BOLD's price is unavailable: the read of the Curve BOLD/USDC pool failed.";
+
+/** Where the block predates the pool. */
+export const BOLD_PRICE_NO_POOL = "BOLD's price is unavailable: the Curve BOLD/USDC pool did not exist at this block.";
+
+/** How old a head read may grow, after later reads fail, before the chip
+ *  stops showing it. */
+export const BOLD_PRICE_MAX_AGE_S = 120;

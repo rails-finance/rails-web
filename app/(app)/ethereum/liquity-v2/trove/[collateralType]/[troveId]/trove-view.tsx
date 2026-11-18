@@ -265,9 +265,9 @@ export default function TroveView({
   // (lib/shared/event-order.ts: the block's position, then the log inside one
   // transaction).
   const liquityEvents = useMemo(() => events.filter(isLiquityEvent).sort(compareEventsInOrder), [events]);
-  // BOLD's price from the Curve BOLD/USDC pool (ui-jobs 746): at head, and
-  // for a closed Trove at its closing row's block as well.
-  const boldPrice = useBoldPrice();
+  // BOLD's price from the Curve BOLD/USDC pool (ui-jobs 746): at head while
+  // the Trove is open, at its closing row's block once closed.
+  const boldPrice = useBoldPrice(troveData?.status === "open" ? undefined : null);
   const boldAtClosing = useBoldPrice(closedAtBlock(troveData?.status, liquityEvents));
   // "last holder" only on a closed Trove that changed hands (ui-jobs 702).
   const changedHands = useMemo(() => troveChangedHands(events), [events]);

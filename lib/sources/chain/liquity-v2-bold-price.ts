@@ -4,13 +4,17 @@
 // One block and one multicall at it: last_price(0), price_oracle(0) and
 // get_dy(0, 1, 1e18) (lib/liquity-v2/bold-price.ts says what each is). At head
 // the read is cached for 30 s, the block kept with it; a read at a named block
-// is cached for the life of the process. A failed read returns null and is not
-// cached.
+// is cached for the life of the process. A block before the pool's
+// deployment (BOLD_USDC_POOL_FROM_BLOCK) answers NO_POOL without a read. A
+// failed read returns null and is not cached.
 
 import { getAddress, parseAbi } from "viem";
 import { chainClient } from "./rpc";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
-import { BOLD_USDC_POOL, type BoldPriceRead } from "@/lib/liquity-v2/bold-price";
+import { BOLD_USDC_POOL, BOLD_USDC_POOL_FROM_BLOCK, type BoldPriceRead } from "@/lib/liquity-v2/bold-price";
+
+/** The block predates the pool. */
+export const NO_POOL = "no-pool" as const;
 
 const POOL_ABI = parseAbi([
   "function last_price(uint256) view returns (uint256)",
@@ -57,9 +61,11 @@ async function readAt(blockNumber?: bigint): Promise<BoldPriceRead | null> {
   }
 }
 
-/** The pool at head (cached 30 s), or at `blockNumber`. Null where it failed. */
-export async function loadBoldPrice(blockNumber?: number): Promise<BoldPriceRead | null> {
+/** The pool at head (cached 30 s), or at `blockNumber`; NO_POOL before the
+ *  pool existed, null where the read failed. */
+export async function loadBoldPrice(blockNumber?: number): Promise<BoldPriceRead | typeof NO_POOL | null> {
   if (blockNumber != null) {
+    if (blockNumber < BOLD_USDC_POOL_FROM_BLOCK) return NO_POOL;
     const kept = atBlock.get(blockNumber);
     if (kept) return kept;
     const read = await readAt(BigInt(blockNumber));
