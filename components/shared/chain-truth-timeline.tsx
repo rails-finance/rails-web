@@ -110,6 +110,11 @@ import { NoteGap, noteRowHeight, type GapItem } from "@/components/shared/note-g
 import { protocolChangeNotes, statingNote, type ProtocolChangeNote } from "@/lib/shared/protocol-change-note";
 import { lifeChanges } from "@/lib/shared/flows-combined";
 import { SpineLine } from "@/components/shared/spine-line";
+import {
+  ProjectionToggle,
+  useProjectionShown,
+  type ProjectionToggleWords,
+} from "@/components/shared/projection-toggle";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import {
   anchorMarketNotes,
@@ -456,9 +461,12 @@ export interface ChainTruthTimelineProps {
    *  drawn above the live window: it starts at now and runs forward. It is no
    *  event and no note, so it keeps every exclusion the live window keeps, and
    *  two more: a rewound list (the cut) and a `?at=` landing draw none.
-   *  Omit it wherever the rate does not run (a closed position, a zero rate
-   *  or balance, a branch that stopped interest). */
-  projection?: () => ReactNode;
+   *  Off by default: its toggle (components/shared/projection-toggle.tsx)
+   *  stands at the toolbar's right end, its choice held in this browser and in
+   *  no filter state. Omit it wherever the rate does not run (a closed
+   *  position, a zero rate or balance, a branch that stopped interest), and
+   *  neither the row nor the toggle draws. */
+  projection?: { row: () => ReactNode; words: ProjectionToggleWords };
   /** Rendered beneath the last event, once the whole list is on screen.
    *
    *  For the statement a SWEPT timeline owes its reader: where the history
@@ -1189,7 +1197,8 @@ function ChainTruthTimelineBody({
    *  leaves it standing (see the prop). It draws above the live notes, so when
    *  both are there this is the row the spine's lead-in dot belongs to. */
   const liveWindowAtTop = !!liveWindow && cut == null;
-  const projectionAtTop = !!projection && cut == null && !atLanding;
+  const [projectionShown, setProjectionShown] = useProjectionShown();
+  const projectionAtTop = !!projection && projectionShown && cut == null && !atLanding;
 
   // The boundary card. A page that trims its own list passes one; the window
   // arm's is derived from the opening balance here, with the position at the
@@ -2125,6 +2134,11 @@ function ChainTruthTimelineBody({
               displayItems={items}
               leading={toolbarLeading}
               beforeDisplay={followToggle}
+              afterDisplay={
+                projection ? (
+                  <ProjectionToggle pressed={projectionShown} onChange={setProjectionShown} words={projection.words} />
+                ) : undefined
+              }
               countTooltip={countTooltip}
               countDetail={countDetail}
               still={still}
@@ -2234,7 +2248,7 @@ function ChainTruthTimelineBody({
                 {/* The projection runs forward from now, so it stands above the
                 live window; the tip's dot stays with the row that ends at now. */}
                 {projectionAtTop && projection && (
-                  <SpineTipContext.Provider value={null}>{projection()}</SpineTipContext.Provider>
+                  <SpineTipContext.Provider value={null}>{projection.row()}</SpineTipContext.Provider>
                 )}
                 {liveWindowAtTop && liveWindow && (
                   <SpineTipContext.Provider value={tipSide}>{liveWindow()}</SpineTipContext.Provider>

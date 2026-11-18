@@ -368,32 +368,38 @@ export function TroveBody({
                 still={still}
                 projection={
                   projection
-                    ? () => (
-                        <ProjectionRow
-                          contract={projection.contract}
-                          words={{
-                            label: troveWords("projection_label"),
-                            assumption: troveWords("projection_assumption", {
-                              rate: projectionRateText(projection.contract.ratePct),
-                              days: PROJECTION_DAYS,
-                            }),
-                            figure: troveWords("projection_figure"),
-                            summary: projection.summary,
-                            rows: {
-                              base: troveWords("projection_row_base"),
-                              rate: troveWords("projection_row_rate"),
-                              result: troveWords("projection_row_result"),
-                            },
-                            ...(trove.batch.isMember && trove.batch.managementFee > 0
-                              ? {
-                                  note: troveWords("projection_batch_fee", {
-                                    fee: projectionRateText(trove.batch.managementFee),
-                                  }),
-                                }
-                              : {}),
-                          }}
-                        />
-                      )
+                    ? {
+                        words: {
+                          label: troveWords("projection_toggle_label"),
+                          ariaLabel: troveWords("projection_toggle_aria", { days: PROJECTION_DAYS }),
+                        },
+                        row: () => (
+                          <ProjectionRow
+                            contract={projection.contract}
+                            words={{
+                              label: troveWords("projection_label"),
+                              assumption: troveWords("projection_assumption", {
+                                rate: projectionRateText(projection.contract.ratePct),
+                                days: PROJECTION_DAYS,
+                              }),
+                              figure: troveWords("projection_figure"),
+                              summary: projection.summary,
+                              rows: {
+                                base: troveWords("projection_row_base"),
+                                rate: troveWords("projection_row_rate"),
+                                result: troveWords("projection_row_result"),
+                              },
+                              ...(trove.batch.isMember && trove.batch.managementFee > 0
+                                ? {
+                                    note: troveWords("projection_batch_fee", {
+                                      fee: projectionRateText(trove.batch.managementFee),
+                                    }),
+                                  }
+                                : {}),
+                            }}
+                          />
+                        ),
+                      }
                     : undefined
                 }
                 toolbarLeading={

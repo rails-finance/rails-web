@@ -334,6 +334,9 @@ export interface TimelineToolbarProps {
   leading?: React.ReactNode;
   /** A control beside Display, before it (the "Sync to chart" button). */
   beforeDisplay?: React.ReactNode;
+  /** A control after Display, at the strip's right end (the projection
+   *  toggle). */
+  afterDisplay?: React.ReactNode;
   /** A title on the count line, for a family whose count is a true but
    *  surprising number (see ChainTruthTimelineProps.countTooltip). Unset
    *  renders identically to today. */
@@ -727,6 +730,7 @@ export function TimelineToolbar({
   displayItems,
   leading,
   beforeDisplay,
+  afterDisplay,
   countTooltip,
   countDetail,
   monthReach,
@@ -987,6 +991,7 @@ export function TimelineToolbar({
           )}
           {!still && beforeDisplay}
           {!still && displayItems.length > 0 && <TimelineDisplayMenu items={displayItems} />}
+          {!still && afterDisplay}
         </div>
       </div>
 

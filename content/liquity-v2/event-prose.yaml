@@ -780,6 +780,10 @@ trove_words:
     Interest added
   projection_batch_fee: |-
     The delegate's annual fee of {fee} is charged on top of the rate.
+  projection_toggle_label: |-
+    Projection
+  projection_toggle_aria: |-
+    Show what {days} more days of interest add to the debt
   # ── The Trove listing: its heading, noun and search box ──
   listing_title: |-
     Liquity V2 Troves
