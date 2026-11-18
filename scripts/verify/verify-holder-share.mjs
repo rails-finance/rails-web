@@ -450,14 +450,14 @@ if (!check("D1. the card-model probe runs", Boolean(probeLine), probeLine ? "" :
     `"${got.polaris?.headline}" / "${got.polaris?.status}" vs restated "${pStatus}"`,
   );
   check(
-    "D3. Polaris: Total collateral is the restated Σ coll over the open rows, wearing the ≈ (last-touch figures)",
-    stat(got.polaris, "Total collateral")?.value === `≈ ${fmtNum(pColl)} pETH`,
+    "D3. Polaris: Total collateral is the restated Σ coll over the open rows, with no ≈ (ui-jobs 737)",
+    stat(got.polaris, "Total collateral")?.value === `${fmtNum(pColl)} pETH`,
     `"${stat(got.polaris, "Total collateral")?.value}" vs restated "${fmtNum(pColl)} pETH"`,
   );
   check(
-    "D4. Polaris: Total debt is the restated Σ legs at the markets' own units, within $1, and wears the ≈",
-    /^≈ /.test(stat(got.polaris, "Total debt")?.value ?? "") &&
-      Math.abs(parseNum((stat(got.polaris, "Total debt")?.value ?? "").replace("≈ ", "")) - pDebtUsd) <= 1,
+    "D4. Polaris: Total debt is the restated Σ legs at the markets' units, within $1, with no ≈",
+    !/≈/.test(stat(got.polaris, "Total debt")?.value ?? "") &&
+      Math.abs(parseNum(stat(got.polaris, "Total debt")?.value ?? "") - pDebtUsd) <= 1,
     `"${stat(got.polaris, "Total debt")?.value}" vs restated ${fmtUsd(pDebtUsd)}`,
   );
   check(
@@ -478,14 +478,14 @@ if (!check("D1. the card-model probe runs", Boolean(probeLine), probeLine ? "" :
     `"${got.v2?.headline}" / "${got.v2?.status}" vs restated "${vStatus}"`,
   );
   check(
-    "E2. Liquity V2: Total debt is the restated Σ BOLD over the open troves, wearing the ≈ (last-touch figures)",
-    stat(got.v2, "Total debt")?.value === `≈ ${fmtNum(vDebt)} BOLD`,
+    "E2. Liquity V2: Total debt is the restated Σ BOLD over the open troves, with no ≈ (ui-jobs 737)",
+    stat(got.v2, "Total debt")?.value === `${fmtNum(vDebt)} BOLD`,
     `"${stat(got.v2, "Total debt")?.value}" vs restated "${fmtNum(vDebt)} BOLD"`,
   );
   check(
-    "E3. Liquity V2: Total collateral is the restated Σ branch × its own feed, within $1, and wears the ≈",
-    /^≈ /.test(stat(got.v2, "Total collateral")?.value ?? "") &&
-      Math.abs(parseNum((stat(got.v2, "Total collateral")?.value ?? "").replace("≈ ", "")) - vCollUsd) <= 1,
+    "E3. Liquity V2: Total collateral is the restated Σ branch × its price, within $1, with no ≈",
+    !/≈/.test(stat(got.v2, "Total collateral")?.value ?? "") &&
+      Math.abs(parseNum(stat(got.v2, "Total collateral")?.value ?? "") - vCollUsd) <= 1,
     `"${stat(got.v2, "Total collateral")?.value}" vs restated ${fmtUsd(vCollUsd)}`,
   );
   check(

@@ -136,7 +136,7 @@ function HouseFigure({ leg, figure }: { leg: HolderLeg; figure: NonNullable<Hold
         ? formatCompactUsd(figure.usd)
         : leg.value;
   const shown = (
-    <span>
+    <span data-holder-value={leg.approx ? `≈ ${leg.value}` : leg.value}>
       {leg.approx && <>{"≈"}&nbsp;</>}
       {headline}
     </span>
@@ -209,7 +209,7 @@ export function HolderStrip({ countsLine, counts, legs, truncated, note, wallet,
                   </StatValue>
                 )}
                 {leg.footnote && (
-                  <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
+                  <div className="text-xs mt-0.5 text-rb-500 tabular-nums" data-holder-footnote="">
                     {leg.footnote.prov ? (
                       <Prov info={leg.footnote.prov} value={leg.footnote.text}>
                         <span>{leg.footnote.text}</span>

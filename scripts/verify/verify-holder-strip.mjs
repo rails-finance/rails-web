@@ -9,17 +9,17 @@
 //   b  a position-id search draws no strip either — one position is a card;
 //   c  the wallet view: the counts line's own numbers equal the API's statuses;
 //      the one-token leg (Polaris pETH, V2 BOLD) matches the RESTATED sum to the
-//      character and wears the ≈ (a sum of last-touch figures, ui-jobs 690);
-//      the priced leg matches the restated Σ legs × feed within $1 and wears
-//      the ≈;
-//   d  clicking an ≈ figure reveals a sentence;
+//      character; the priced leg matches the restated Σ legs × feed within $1;
+//      neither wears a ≈, as the cards below wear none (ui-jobs 737);
+//   d  clicking a figure reveals a sentence;
 //   e  a wallet holding more than one page states the count only — no legs, and
 //      a footnote saying why (proved by rewriting the
 //      wallet response's `pagination.total` to 21 on the wire);
 //   f  a wallet holding nothing draws no strip at all;
 //   g  the receipts: the adapters are called directly in a node child with
-//      stubbed inputs, and each leg's kind / class / summary is asserted
-//      against arithmetic this script restates from the stub.
+//      stubbed inputs, and each leg's kind / class / worked rows (amount,
+//      price, amount × price, sum) are asserted against arithmetic this script
+//      restates from the stub.
 //
 // THE EXPECTED VALUES ARE RESTATED HERE, never imported and never read off the
 // page: Σ coll over the wallet's open rows, Σ debt × the market's own unit
@@ -136,7 +136,10 @@ async function readStrip(page) {
       legs[l.getAttribute("data-holder-leg")] = {
         label: norm(kids[0]?.textContent),
         value: norm(l.querySelector('[data-figure^="holder-"]')?.textContent),
-        footnote: norm(kids[2]?.textContent),
+        // The figure in full (the headline is the card's compact one).
+        exact: l.querySelector("[data-holder-value]")?.getAttribute("data-holder-value") ?? null,
+        usd: norm(l.querySelector("[data-holder-usd]")?.textContent),
+        footnote: norm(l.querySelector("[data-holder-footnote]")?.textContent),
       };
     }
     const noteEl = el.querySelector("[data-holder-note]");
@@ -284,25 +287,24 @@ info(
     // The collateral: one token, character for character, marked ≈ because each
     // row is its last touch's figure.
     check(
-      "P4a. the total collateral is the restated Σ coll over the open rows, wearing the ≈",
-      strip.legs.collateral?.value === `≈ ${fmtNum(pColl)} pETH`,
-      `shown "${strip.legs.collateral?.value}" vs restated "≈ ${fmtNum(pColl)} pETH"`,
+      "P4a. the total collateral is the restated Σ coll over the open rows, with no ≈ (the cards wear none, ui-jobs 737)",
+      strip.legs.collateral?.exact === `${fmtNum(pColl)} pETH` && !/≈/.test(strip.legs.collateral?.value ?? ""),
+      `shown "${strip.legs.collateral?.exact}" vs restated "${fmtNum(pColl)} pETH"`,
     );
-    const collUsdShown = parseNum(/\$[\d,.]+/.exec(strip.legs.collateral?.footnote ?? "")?.[0]);
+    const collUsdShown = parseNum(strip.legs.collateral?.usd);
     check(
-      "P4b. …with its value at the protocol's own feed beneath it, in the card's own words",
-      [boardBefore, boardAfter].some((b) => Math.abs(collUsdShown - pCollUsd(b)) <= 1) &&
-        /by the protocol's feed · testnet/.test(strip.legs.collateral?.footnote ?? ""),
-      `"${strip.legs.collateral?.footnote}" vs restated ${fmtUsd(pCollUsd(boardBefore))}`,
+      "P4b. …with its value at the protocol's feed on the USD line beneath it, as the card draws it",
+      [boardBefore, boardAfter].some((b) => Math.abs(collUsdShown - pCollUsd(b)) <= 1),
+      `"${strip.legs.collateral?.usd}" vs restated ${fmtUsd(pCollUsd(boardBefore))}`,
     );
 
     // The debt: two units, so a valuation — marked ≈, legs named beneath.
-    const debtShown = parseNum(/\$[\d,.]+/.exec(strip.legs.debt?.value ?? "")?.[0]);
+    const debtShown = parseNum(strip.legs.debt?.exact);
     check(
-      "P5a. the total debt is the restated Σ legs at the markets' own units, within $1, and wears the ≈",
-      /≈/.test(strip.legs.debt?.value ?? "") &&
+      "P5a. the total debt is the restated Σ legs at the markets' own units, within $1, with no ≈",
+      !/≈/.test(strip.legs.debt?.value ?? "") &&
         [boardBefore, boardAfter].some((b) => Math.abs(debtShown - pDebtUsd(b)) <= 1),
-      `shown "${strip.legs.debt?.value}" vs restated ${fmtUsd(pDebtUsd(boardBefore))}`,
+      `shown "${strip.legs.debt?.exact}" vs restated ${fmtUsd(pDebtUsd(boardBefore))}`,
     );
     const wantLegs = [...pDebtByMarket].map(
       ([m, amt]) => `${fmtNum(amt)} ${pOpen.find((r) => r.market === m).stableSymbol}`,
@@ -318,12 +320,12 @@ info(
       !/wallet.{0,40}(collateral ratio|ratio of [\d.]+)/i.test(strip.counts + " " + JSON.stringify(strip.legs)),
     );
 
-    // d. the ≈ opens a sentence.
+    // d. the figure opens a sentence.
     // The press goes to the inline figure: the stat column is full-width and
     // its centre lands beside the value, where RevealTip never fires (the
     // listing-ratio verifier learned this first). Tips open on a click since
     // `aa0ea5e`.
-    await page.locator('[data-figure="holder-debt"]').getByText(/≈/).first().click();
+    await page.locator('[data-figure="holder-debt"] [data-holder-value]').first().click();
     await page.waitForTimeout(500);
     const tip = await page
       .locator('[role="tooltip"]')
@@ -331,7 +333,7 @@ info(
       .innerText()
       .catch(() => "");
     check(
-      "P7. clicking the ≈ debt figure reveals a sentence saying what it is not",
+      "P7. clicking the debt figure reveals a sentence saying what it is not",
       tip.replace(/\s+/g, " ").length > 40 && /not in it|estimate/i.test(tip),
       tip.replace(/\s+/g, " ").slice(0, 120),
     );
@@ -436,18 +438,18 @@ info(
     // The debt: one token on every branch, marked ≈ because each row is its
     // last touch's figure.
     check(
-      "V4. the total debt is the restated Σ debt over the open troves, wearing the ≈",
-      strip.legs.debt?.value === `≈ ${fmtNum(vDebt)} BOLD`,
-      `shown "${strip.legs.debt?.value}" vs restated "≈ ${fmtNum(vDebt)} BOLD"`,
+      "V4. the total debt is the restated Σ debt over the open troves, with no ≈",
+      strip.legs.debt?.exact === `${fmtNum(vDebt)} BOLD` && !/≈/.test(strip.legs.debt?.value ?? ""),
+      `shown "${strip.legs.debt?.exact}" vs restated "${fmtNum(vDebt)} BOLD"`,
     );
 
     // The collateral: three tokens, so a valuation — marked ≈.
-    const collShown = parseNum(/\$[\d,.]+/.exec(strip.legs.collateral?.value ?? "")?.[0]);
+    const collShown = parseNum(strip.legs.collateral?.exact);
     check(
-      "V5a. the total collateral is the restated Σ branch × its own feed, within $1, and wears the ≈",
-      /≈/.test(strip.legs.collateral?.value ?? "") &&
+      "V5a. the total collateral is the restated Σ branch × its price, within $1, with no ≈",
+      !/≈/.test(strip.legs.collateral?.value ?? "") &&
         [oracleBefore, oracleAfter].some((o) => Math.abs(collShown - vCollUsd(o)) <= 1),
-      `shown "${strip.legs.collateral?.value}" vs restated ${fmtUsd(vCollUsd(oracleBefore))}`,
+      `shown "${strip.legs.collateral?.exact}" vs restated ${fmtUsd(vCollUsd(oracleBefore))}`,
     );
     const wantBranches = [...vByBranch].map(([ct, amt]) => `${fmtNum(amt)} ${ct}`);
     check(
@@ -456,7 +458,7 @@ info(
       `"${strip.legs.collateral?.footnote}" wanted ${wantBranches.join(" + ")}`,
     );
 
-    await page.locator('[data-figure="holder-collateral"]').getByText(/≈/).first().click();
+    await page.locator('[data-figure="holder-collateral"] [data-holder-value]').first().click();
     await page.waitForTimeout(500);
     const tip = await page
       .locator('[role="tooltip"]')
@@ -464,8 +466,8 @@ info(
       .innerText()
       .catch(() => "");
     check(
-      "V7. clicking the ≈ collateral figure reveals a sentence saying what it is",
-      tip.replace(/\s+/g, " ").length > 40 && /estimate|valuation/i.test(tip),
+      "V7. clicking the collateral figure reveals a sentence saying what it is",
+      tip.replace(/\s+/g, " ").length > 40 && /price/i.test(tip),
       tip.replace(/\s+/g, " ").slice(0, 120),
     );
     await page.close();
@@ -566,8 +568,14 @@ const v2 = liquityV2HolderStrip([trove("0xaaaabbbbcccc", "WETH", 100, 100000), t
 
 const shape = (s) => ({
   countsLine: s.countsLine, counts: s.counts, truncated: s.truncated, note: s.note ?? null,
+  positions: s.positions ?? null, wallet: s.wallet ?? null,
   legs: s.legs.map((l) => ({ id: l.id, value: l.value, approx: l.approx, tip: l.tip ?? null,
-    footnote: l.footnote?.text ?? null, kind: l.prov.kind, pclass: l.prov.pclass, summary: l.prov.summary })),
+    footnote: l.footnote?.text ?? null, kind: l.prov.kind, pclass: l.prov.pclass, summary: l.prov.summary,
+    inputs: (l.prov.inputs ?? []).map((i) => i.label + "=" + (i.value ?? "")), block: l.prov.source?.block ?? null,
+    usd: l.figure?.usd ?? null,
+    usdSummary: l.figure?.usdProv?.summary ?? null,
+    usdInputs: (l.figure?.usdProv?.inputs ?? []).map((i) => i.label + "=" + (i.value ?? "")),
+    usdBlock: l.figure?.usdProv?.source?.block ?? null })),
 });
 console.log("RESULT " + JSON.stringify({ polaris: shape(polaris), polarisTruncated: shape(polarisTruncated), v2: shape(v2) }));
 `;
@@ -587,23 +595,31 @@ if (!probeLine) {
   // Restated from the stub: 10 + 2 = 12 pETH; 30,000 USDp at $1 plus 5 GOLDp at
   // $4,000 = $50,000.
   check(
-    "G1a. Polaris: the collateral leg is the emitted sum, marked ≈ with a last-touch tip, and its receipt is a chain fact",
+    "G1a. Polaris: the collateral leg is the emitted sum, no ≈, a last-touch tip, and its receipt is a chain fact",
     leg(got.polaris, "collateral").value === "12 pETH" &&
-      leg(got.polaris, "collateral").approx === true &&
+      leg(got.polaris, "collateral").approx === false &&
       /last touch/.test(leg(got.polaris, "collateral").tip ?? "") &&
       leg(got.polaris, "collateral").kind === "chain" &&
       leg(got.polaris, "collateral").pclass === "emitted",
     JSON.stringify(leg(got.polaris, "collateral")),
   );
   check(
-    "G1b. Polaris: the priced debt leg is the restated $50,000, marked ≈, on an oracle receipt naming both units",
+    "G1b. Polaris: the priced debt leg is the restated $50,000, no ≈, on an oracle receipt working out both units at the board's block",
     leg(got.polaris, "debt").value === "$50,000.00" &&
-      leg(got.polaris, "debt").approx === true &&
+      leg(got.polaris, "debt").approx === false &&
       leg(got.polaris, "debt").kind === "chain-derived" &&
       leg(got.polaris, "debt").pclass === "oracle" &&
-      /USDp/.test(leg(got.polaris, "debt").summary) &&
-      /GOLDp|gold/.test(leg(got.polaris, "debt").summary) &&
-      /feed|price/.test(leg(got.polaris, "debt").summary),
+      leg(got.polaris, "debt").block === 1 &&
+      [
+        "USDp amount=30,000 USDp",
+        "USDp price=$1.00",
+        "USDp amount × price=$30,000.00",
+        "GOLDp amount=5 GOLDp",
+        "GOLDp price=$4,000.00",
+        "GOLDp amount × price=$20,000.00",
+        "sum=$50,000.00",
+      ].every((r) => leg(got.polaris, "debt").inputs.includes(r)) &&
+      /1 USDp is counted as \$1/.test(leg(got.polaris, "debt").summary),
     JSON.stringify(leg(got.polaris, "debt")).slice(0, 260),
   );
   check(
@@ -623,26 +639,42 @@ if (!probeLine) {
   // Restated from the stub: 100 × 2000 + 50 × 2200 = $310,000; debt 150,000
   // BOLD.
   check(
-    "G2a. Liquity V2: the debt leg is the BOLD sum, marked ≈ with a last-touch tip, on a chain receipt",
+    "G2a. Liquity V2: the debt leg is the BOLD sum, no ≈, a last-touch tip, on a chain receipt; its USD line says 1 BOLD is counted as $1",
     leg(got.v2, "debt").value === "150,000 BOLD" &&
-      leg(got.v2, "debt").approx === true &&
+      leg(got.v2, "debt").approx === false &&
+      leg(got.v2, "debt").usd === 150000 &&
+      /1 BOLD is counted as \$1/.test(leg(got.v2, "debt").usdSummary ?? "") &&
       /last touch/.test(leg(got.v2, "debt").tip ?? "") &&
       leg(got.v2, "debt").kind === "chain",
     JSON.stringify(leg(got.v2, "debt")).slice(0, 200),
   );
   check(
-    "G2b. Liquity V2: the priced collateral leg is the restated $310,000, marked ≈, on an oracle receipt naming the branch feeds",
+    "G2b. Liquity V2: the priced collateral leg is the restated $310,000, no ≈, each branch's amount × price worked out and summed",
     leg(got.v2, "collateral").value === "$310,000.00" &&
-      leg(got.v2, "collateral").approx === true &&
+      leg(got.v2, "collateral").approx === false &&
       leg(got.v2, "collateral").kind === "chain-derived" &&
       leg(got.v2, "collateral").pclass === "oracle" &&
-      /PriceFeed/.test(leg(got.v2, "collateral").summary),
+      [
+        "WETH amount=100 WETH",
+        "WETH price=$2,000.00",
+        "WETH amount × price=$200,000.00",
+        "rETH amount=50 rETH",
+        "rETH price=$2,200.00",
+        "rETH amount × price=$110,000.00",
+        "sum=$310,000.00",
+      ].every((r) => leg(got.v2, "collateral").inputs.includes(r)) &&
+      /states no block/.test(leg(got.v2, "collateral").summary),
     JSON.stringify(leg(got.v2, "collateral")).slice(0, 260),
   );
   check(
     "G2d. Liquity V2: the branch legs are named largest first",
     leg(got.v2, "collateral").footnote === "100 WETH · 50 rETH",
     leg(got.v2, "collateral").footnote,
+  );
+  check(
+    "G3. the band knows the positions it is about and the wallet it links (ui-jobs 737)",
+    got.v2.positions === 2 && got.v2.wallet === "0x1" && got.polaris.positions === 3 && got.polaris.wallet === "0x1",
+    JSON.stringify({ v2: [got.v2.positions, got.v2.wallet], polaris: [got.polaris.positions, got.polaris.wallet] }),
   );
 }
 

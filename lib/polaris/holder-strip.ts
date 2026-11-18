@@ -33,14 +33,13 @@ import type { PolarisPositionSummary } from "@/lib/sources/api/polaris-positions
 // Type-only — lib/sources/chain/* is server-only, and an `import type` is
 // erased before the client bundle is built (the position card does the same).
 import type { PolarisMarketsChainResponse } from "@/lib/sources/chain/polaris-position";
-import { POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
+import { POLARIS_CORE, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
+import { holderUsdReceipt, type UsdLeg } from "@/lib/shared/holder-usd-receipt";
 import { formatNumber, formatUsdValue } from "@/lib/utils/format";
-import {
-  holderCollProv,
-  holderCollUsdProv,
-  holderDebtSumProv,
-  holderDebtValueProv,
-} from "@/lib/polaris/live-provenance";
+import { holderCollProv, holderDebtSumProv } from "@/lib/polaris/live-provenance";
+
+const BOARD_VIA = "GET /api/chain/polaris/markets";
+const TESTNET = "A Sepolia testnet figure: a test dollar.";
 
 /** What each leg's ≈ means, in a sentence or two. */
 const LEG_TIP = {
@@ -124,6 +123,29 @@ export function polarisHolderStrip(
   // USDp is a dollar by construction; GOLDp is a troy ounce of gold, at the
   // gold price the market's own feed carries.
   const unitUsdOf = (m: PolarisMarket): number | null => (m === "usdp" ? 1 : (boardFor(m)?.price.xauUsd ?? null));
+  const debtLeg = (m: PolarisMarket, amount: number): UsdLeg | null => {
+    const price = unitUsdOf(m);
+    if (price == null) return null;
+    const token = POLARIS_MARKET_CONFIG[m].stable.symbol;
+    const amountNote = `Σ last emitted debt of the wallet's open positions in the ${token} market, from the index`;
+    return m === "usdp"
+      ? {
+          token,
+          amount,
+          amountNote,
+          price,
+          face: true,
+          priceNote: "USDp's $1 face: one USDp is one dollar by the protocol's definition",
+        }
+      : {
+          token,
+          amount,
+          amountNote,
+          price,
+          priceNote: "GOLDp / USD: a troy ounce of gold at the XAU/USD medianiser's previewExternalPrice()",
+          priceContract: { name: "Polaris XAU/USD Medianiser", address: POLARIS_CORE.xauUsdMedianiser },
+        };
+  };
 
   // ── the collateral: pETH in both markets, so a quantity ──────────────────
   const coll = open.reduce((sum, r) => sum + r.coll, 0);
@@ -143,7 +165,26 @@ export function polarisHolderStrip(
         amount: coll,
         tokens: [{ symbol: "pETH" }],
         usd: pethUsd != null ? coll * pethUsd : null,
-        usdProv: holderCollUsdProv(),
+        usdProv:
+          pethUsd != null
+            ? holderUsdReceipt({
+                what: "The wallet's collateral in USD",
+                legs: [
+                  {
+                    token: "pETH",
+                    amount: coll,
+                    amountNote: "Σ last emitted collateral of the wallet's open positions, from the index",
+                    price: pethUsd,
+                    priceNote:
+                      "pETH / USD: the bonding curve's currentPrice() × the ETH/USD medianiser's previewExternalPrice()",
+                    priceContract: { name: "Polaris bonding curve", address: POLARIS_CORE.bondingCurve },
+                  },
+                ],
+                block: markets.blockNumber,
+                via: BOARD_VIA,
+                caveat: TESTNET,
+              })
+            : undefined,
       },
     });
   }
@@ -164,21 +205,35 @@ export function polarisHolderStrip(
       approx: false,
       tip: LEG_TIP.debt,
       prov: holderDebtSumProv(market),
-      figure: {
-        amount,
-        tokens: [{ symbol: POLARIS_MARKET_CONFIG[market].stable.symbol }],
-        usd: unitUsdOf(market) != null ? amount * unitUsdOf(market)! : null,
-      },
+      figure: (() => {
+        const leg = debtLeg(market, amount);
+        return {
+          amount,
+          tokens: [{ symbol: POLARIS_MARKET_CONFIG[market].stable.symbol }],
+          usd: leg ? amount * leg.price : null,
+          usdProv: leg
+            ? holderUsdReceipt({
+                what: "The wallet's debt in USD",
+                legs: [leg],
+                block: leg.face ? null : markets.blockNumber,
+                via: BOARD_VIA,
+                caveat: TESTNET,
+              })
+            : undefined,
+        };
+      })(),
     });
   } else if (debtByMarket.size > 1) {
     // Two markets, two units: the only sum that exists is a valued one.
     let usd = 0;
     const parts: string[] = [];
+    const usdLegs: UsdLeg[] = [];
     for (const [market, amount] of debtByMarket) {
       const symbol = POLARIS_MARKET_CONFIG[market].stable.symbol;
-      const unitUsd = unitUsdOf(market);
-      if (unitUsd == null) continue;
-      usd += amount * unitUsd;
+      const leg = debtLeg(market, amount);
+      if (!leg) continue;
+      usd += amount * leg.price;
+      usdLegs.push(leg);
       parts.push(`${formatNumber(amount)} ${symbol}`);
     }
     legs.push({
@@ -187,7 +242,13 @@ export function polarisHolderStrip(
       value: formatUsdValue(usd),
       approx: false,
       tip: LEG_TIP.debtValued,
-      prov: holderDebtValueProv(),
+      prov: holderUsdReceipt({
+        what: "The wallet's debt in USD, across both markets",
+        legs: usdLegs,
+        block: markets.blockNumber,
+        via: BOARD_VIA,
+        caveat: `The two markets' debts are different tokens, so their sum exists only at a price. ${TESTNET}`,
+      }),
       footnote: { text: parts.join(" · ") },
       figure: {
         tokens: [...debtByMarket.keys()].map((m) => ({ symbol: POLARIS_MARKET_CONFIG[m].stable.symbol })),
