@@ -359,7 +359,9 @@ function RowCover({ href }: { href: string }) {
 }
 
 /** A body cell. `rowHeader` draws `<th scope="row">`; `sticky` pins it on
- *  the page's ground (`max-sm:sticky max-sm:left-0`). `pad={false}` drops the padding. */
+ *  the page's ground (`max-sm:sticky max-sm:left-0`). `pad={false}` drops the padding.
+ *  The cell is `relative` at every width, so where the pin is off its hover
+ *  block stays inside it rather than spreading over the frame. */
 export function DataTableCell({
   rowHeader = false,
   align = "left",
@@ -389,7 +391,7 @@ export function DataTableCell({
   const stacked = useContext(Stacked);
   const height = useContext(RowHeight);
   const named = stacked && label ? <span className="dt-cell-label">{label}</span> : null;
-  const cls = `${valign === "middle" || height ? "align-middle" : "align-top"} ${height} ${wide ? "dt-cell-wide" : ""} ${sticky ? "bg-background" : "relative"} ${pad ? DATA_TABLE_PAD : ""} ${align === "right" ? "text-right" : "text-left"} ${
+  const cls = `${valign === "middle" || height ? "align-middle" : "align-top"} ${height} ${wide ? "dt-cell-wide" : ""} relative ${sticky ? "bg-background" : ""} ${pad ? DATA_TABLE_PAD : ""} ${align === "right" ? "text-right" : "text-left"} ${
     sticky ? `${sticky} z-10` : ""
   } ${className}`;
   const cover = href ? <RowCover href={href} /> : null;

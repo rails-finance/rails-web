@@ -42,9 +42,14 @@ export function useBoldPrice(block?: number | null): BoldPriceState {
         const res = await fetch(`/api/chain/liquity-v2/bold-price${block != null ? `?block=${block}` : ""}`, {
           cache: "no-store",
         });
-        if (res.status === 404) {
-          if (live) setS({ state: "no-pool" });
-          return;
+        // Only the route's own answer for a block before the pool says so; a
+        // 404 from routing, or on a head read, is a failed read.
+        if (res.status === 404 && block != null) {
+          const body = (await res.json().catch(() => null)) as { noPool?: boolean } | null;
+          if (body?.noPool) {
+            if (live) setS({ state: "no-pool" });
+            return;
+          }
         }
         if (!res.ok) throw new Error(String(res.status));
         const read = (await res.json()) as BoldPriceRead;
