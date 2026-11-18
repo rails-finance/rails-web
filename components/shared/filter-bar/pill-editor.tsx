@@ -654,7 +654,7 @@ function CountInput({
     onCommit(v);
   };
   return (
-    <label className="flex h-12 sm:h-11 w-full min-w-0 items-center gap-3 rounded-xl bg-rb-100 px-4 text-sm text-rb-500 dark:text-rb-400/75 focus-within:ring-2 focus-within:ring-inset focus-within:ring-blue-500 dark:bg-rb-900">
+    <label className="flex h-12 sm:h-11 w-full min-w-0 items-center gap-3 rounded-xl bg-rb-100 px-4 text-sm text-rb-500 dark:text-rb-400/75 focus-within:ring-2 focus-within:ring-inset focus-within:ring-blue-500 dark:bg-rb-800">
       {prefix && <span aria-hidden="true">{prefix}</span>}
       <input
         type="text"

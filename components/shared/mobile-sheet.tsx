@@ -293,8 +293,9 @@ export function MobileSheet({
         // it, a dark sheet over a dark page has nothing else to mark where
         // the list ends and the menu begins. In dark mode the sheet wears the
         // desktop dropdown's near-black (.overlay-panel) so it lifts off the
-        // rb-800 cards beneath it.
-        className={`absolute inset-x-0 bottom-0 flex flex-col rounded-t-2xl bg-raised dark:bg-rb-900 p-6 shadow-xl transition-transform duration-300 focus:outline-none ${
+        // rb-800 cards beneath it. A sticky search row inside wears the sheet's
+        // surface: `.overlay-search` is drawn for the desktop popover's.
+        className={`absolute inset-x-0 bottom-0 flex flex-col rounded-t-2xl bg-raised dark:bg-rb-900 [&_.overlay-search]:bg-raised! dark:[&_.overlay-search]:bg-rb-900! p-6 shadow-xl transition-transform duration-300 focus:outline-none ${
           live ? "max-h-[50vh] border-t border-rb-300 dark:border-rb-700" : "max-h-[75vh]"
         } ${visible ? "translate-y-0" : "translate-y-full"} ${dismiss ? "pt-2" : ""}`}
         style={{
