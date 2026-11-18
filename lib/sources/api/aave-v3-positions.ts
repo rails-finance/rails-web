@@ -16,7 +16,11 @@
 // balance, interest included, `balanceOf` at the indexed head.
 
 import { resolveV3Tokens, scaleV3 } from "@/lib/sources/chain/aave-v3-tokens";
-import { resolveAaveOraclePrices, aaveOraclePriceOf } from "@/lib/sources/chain/aave-oracle-prices";
+import {
+  resolveAaveOraclePrices,
+  aaveOraclePriceOf,
+  aaveOraclePriceBlockOf,
+} from "@/lib/sources/chain/aave-oracle-prices";
 import { sanityCheckAaveBalances } from "@/lib/sources/chain/aave-family-balances";
 import { readAaveV3NotCollateral } from "@/lib/sources/chain/aave-v3-position";
 import { AAVE_V3_ORACLE, ORACLE_BY_MARKET, POOL_BY_MARKET, AAVE_V3_POOL } from "@/lib/aave-v3/asset-catalog";
@@ -316,6 +320,9 @@ export async function buildAaveV3PositionRows(
           .map((r) => [r.address.toLowerCase(), priceOf(r.address)] as const)
           .filter((e): e is readonly [string, number] => e[1] != null),
       ),
+      // The block the market's oracle was read at: the latest when the row
+      // was served, which the receipts name beside the balance's block.
+      priceBlock: aaveOraclePriceBlockOf(oraclePrices, oracle) ?? null,
       ...(split ? { notCollateral: [...split] } : {}),
     };
   });

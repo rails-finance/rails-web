@@ -11,8 +11,10 @@
 //
 // Dollars (decision 0047): the loan token at the price rails-server read at the
 // same block (its Chainlink feed, or on Optimism Aave V3's oracle where there is
-// no feed); collateral at the market's oracle price into the loan token, then at
-// that price. A market whose loan token has neither has none.
+// no feed); collateral at the composed price, the market's oracle price into the
+// loan token × that price. Each is the amount × the price as its receipt shows
+// them, to the cent (lib/morpho/usd-receipt.ts, ui-jobs 743). A market whose
+// loan token has neither has none.
 
 import type {
   MorphoAtBlockMarket,
@@ -24,8 +26,9 @@ import type {
   AtBlockUsdFeed,
 } from "./types";
 
-// Relative imports and the zero address inline: scripts/test/morpho-arc.test.mjs loads this
-// module under node's type stripping, which resolves no `@/` path.
+// Relative imports, nothing through `@/`, and the zero address inline: scripts/test/morpho-at-block.test.mjs
+// loads this module under node's type stripping (its hook adds the `.ts`).
+import { shownUsd, shownComposedPrice } from "../shared/shown-usd";
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const B = (v: string | number) => BigInt(v);
 const WAD = B("1000000000000000000");
@@ -206,9 +209,12 @@ export function morphoAtBlockFigures(
     supplyApr,
     utilization,
     usd,
-    suppliedUsd: usd ? supplied * usd.price : null,
-    debtUsd: usd ? debt * usd.price : null,
-    collateralUsd: usd && collateralInLoan != null ? collateralInLoan * usd.price : null,
+    suppliedUsd: usd ? shownUsd(supplied, usd.price) : null,
+    debtUsd: usd ? shownUsd(debt, usd.price) : null,
+    collateralUsd:
+      usd && oraclePrice != null && oraclePrice > 0 && coll
+        ? shownUsd(collateral, shownComposedPrice(oraclePrice, usd.price))
+        : null,
     totals,
     lastUpdate: m.state ? Number(m.state.lastUpdate) : 0,
   };
@@ -241,7 +247,7 @@ export function morphoAtBlockPosition(r: MorphoAtBlockPositionRead): MorphoAtBlo
       : toAssetsUp(now, f.totals.borrowAssets, f.totals.borrowShares) -
         toAssetsUp(now, pastTotals.borrowAssets, pastTotals.borrowShares);
     const amount = scale(a, f.loan.decimals);
-    return { state: "ok", amount, raw: a, usd: f.usd ? amount * f.usd.price : null };
+    return { state: "ok", amount, raw: a, usd: f.usd ? shownUsd(amount, f.usd.price) : null };
   };
   return { ...f, supplyInterest: side("supplyShares"), debtInterest: side("borrowShares"), pastTotals };
 }

@@ -11,6 +11,7 @@
 
 import type { ReactNode } from "react";
 import type { LiquityV1PositionChainResponse } from "@/lib/api/fetch-liquity-v1-position";
+import { shownUsd } from "@/lib/shared/holder-usd-receipt";
 import type { LiquityV1PositionView } from "@/components/protocol/liquity-v1/liquity-v1-position-card";
 import { Prov } from "@/components/shared/provenance";
 import { peakCollateralProv, peakDebtProv, surplusClaimableProv } from "@/lib/liquity-v1/event-provenance";
@@ -57,7 +58,8 @@ export function LiquityV1PositionExplanation({
   if (!chain || chain.chainStale || chain.troveStatus !== "active") return null;
 
   const hasDebt = chain.debt > 0;
-  const collUsd = chain.coll * chain.price;
+  // The card's worth, as its receipt rebuilds it (lib/shared/holder-usd-receipt.ts).
+  const collUsd = shownUsd(chain.coll, chain.price);
   const liqPrice = hasDebt && chain.coll > 0 ? (chain.debt * chain.mcr) / chain.coll : null;
   const dropPct = liqPrice != null && chain.price > 0 ? Math.round((1 - liqPrice / chain.price) * 100) : null;
 

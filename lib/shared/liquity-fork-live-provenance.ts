@@ -32,6 +32,7 @@
 import type { Provenance, ProvInput, ProvScaling, ProvVerify } from "@/components/shared/provenance";
 import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { scalingOf } from "@/lib/liquity/event-provenance";
+import { amountText, priceText } from "@/lib/shared/holder-usd-receipt";
 import { EBISU_BRANCHES, DEBT_SYMBOL as EBISU_DEBT } from "@/lib/ebisu/asset-catalog";
 import { ASYMMETRY_BRANCHES, DEBT_SYMBOL as ASYMMETRY_DEBT } from "@/lib/asymmetry/asset-catalog";
 import { BASEDOLLAR_BRANCHES, DEBT_SYMBOL as BASEDOLLAR_DEBT } from "@/lib/basedollar/asset-catalog";
@@ -174,7 +175,13 @@ export interface LiquityForkLiveVocab {
   debtInFrontProv: (branchSymbol: string) => Provenance;
   trovesAheadProv: (branchSymbol: string) => Provenance;
   queueShareProv: (branchSymbol: string) => Provenance;
-  forkUsdProv: (what: string, branchSymbol: string) => Provenance;
+  /** `vals`: the balance and the price the figure was drawn from, so the
+   *  rows rebuild it; `stale` where only lastGoodPrice answered. */
+  forkUsdProv: (
+    what: string,
+    branchSymbol: string,
+    vals?: { amount: number; price: number; stale?: boolean },
+  ) => Provenance;
   debtFaceUsdProv: (what: string) => Provenance;
   // ── The branch-roster (protocol view) lane — /api/chain/<fork>/branches ──
   branchAggregateProv: (what: string, getter: string, branchSymbol: string) => Provenance;
@@ -390,20 +397,34 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
         { label: "branch debt", kind: "chain", pclass: "state", note: "getEntireBranchDebt @ head" },
       ],
     }),
-    forkUsdProv: (what, sym) => ({
+    forkUsdProv: (what, sym, vals) => ({
       kind: "chain-derived",
       pclass: pricePclass(sym),
-      summary: `${what} valued in USD from the branch's own PriceFeed. The chain balance multiplied by the same price the branch liquidates and redeems with (fetchPrice simulated at head).`,
+      summary: vals
+        ? `${what} valued in USD from the branch's PriceFeed. The balance times the price the branch liquidates and redeems with, as the rows show them, to the cent. ${
+            vals.stale
+              ? "The price is the feed's lastGoodPrice @ head, since the fetchPrice simulation failed."
+              : "The price is fetchPrice simulated @ head."
+          }`
+        : `${what} valued in USD from the branch's PriceFeed. The chain balance times the same price the branch liquidates and redeems with (fetchPrice simulated at head).`,
       contract: pfContract(sym),
       via: "chain balance × branch PriceFeed price",
       formula: "balance × oracle price",
       inputs: [
-        { label: "balance", kind: "chain", note: "branch contract read" },
+        {
+          label: "balance",
+          value: vals ? `${amountText(vals.amount)} ${sym}` : undefined,
+          kind: "chain",
+          note: "branch contract read",
+        },
         {
           label: "oracle price",
+          value: vals ? priceText(vals.price) : undefined,
           kind: "chain",
           pclass: pricePclass(sym),
-          note: priceNote(sym, "PriceFeed.fetchPrice (simulated)"),
+          note: vals?.stale
+            ? `PriceFeed.lastGoodPrice, the last fetchPrice result${grade(sym) ? ` (${grade(sym)!.formula})` : ""}`
+            : priceNote(sym, "PriceFeed.fetchPrice (simulated)"),
           contract: pfContract(sym),
         },
       ],

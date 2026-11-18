@@ -32,7 +32,7 @@ import { fmtUsd } from "@/lib/aave-v4/format";
 import { type AssetClass, ASSET_CLASS_COLOR } from "@/lib/aave-v4/asset-class";
 import { capShows, type AaveMarketView, type CapState, type MarketReserveRow } from "@/lib/shared/aave-market-view";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import type { AaveMarketVocab } from "@/lib/shared/aave-market-provenance";
+import { aaveMarketUsd, type AaveMarketVocab } from "@/lib/shared/aave-market-provenance";
 import type { AaveFamilyTerms } from "@/lib/aave-family/terms";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { ratePercentText } from "@/lib/shared/rate-percent";
@@ -300,21 +300,53 @@ export function reserveFigures({ r, vocab, assetHref }: RowProps) {
       <Prov info={vocab.reserveTokensProv(r.symbol)}>{inTokens(r.supplied)}</Prov>
     ) : supplyLink ? (
       <Link href={supplyLink} className={INLINE_LINK}>
-        <Prov info={vocab.reserveValueProv("supplied", r.symbol)}>{sUsd.display}</Prov>
+        <Prov
+          info={vocab.reserveValueProv("supplied", r.symbol, {
+            symbol: r.symbol,
+            tokens: r.supplied,
+            price: r.priceUsd,
+          })}
+        >
+          {sUsd.display}
+        </Prov>
       </Link>
     ) : (
       <span className={r.suppliedUsd > 0 ? "text-foreground/80" : "text-rb-500"}>
-        <Prov info={vocab.reserveValueProv("supplied", r.symbol)}>{sUsd.display}</Prov>
+        <Prov
+          info={vocab.reserveValueProv("supplied", r.symbol, {
+            symbol: r.symbol,
+            tokens: r.supplied,
+            price: r.priceUsd,
+          })}
+        >
+          {sUsd.display}
+        </Prov>
       </span>
     );
   const borrowed = hasBorrow ? (
     borrowLink ? (
       <Link href={borrowLink} className={INLINE_LINK}>
-        <Prov info={vocab.reserveValueProv("borrowed", r.symbol)}>{bUsd.display}</Prov>
+        <Prov
+          info={vocab.reserveValueProv("borrowed", r.symbol, {
+            symbol: r.symbol,
+            tokens: r.borrowed,
+            price: r.priceUsd,
+          })}
+        >
+          {bUsd.display}
+        </Prov>
       </Link>
     ) : (
       <span className="text-foreground/80">
-        <Prov info={vocab.reserveValueProv("borrowed", r.symbol)}>{bUsd.display}</Prov>
+        <Prov
+          info={vocab.reserveValueProv("borrowed", r.symbol, {
+            symbol: r.symbol,
+            tokens: r.borrowed,
+            price: r.priceUsd,
+          })}
+        >
+          {bUsd.display}
+        </Prov>
       </span>
     )
   ) : null;
@@ -322,7 +354,8 @@ export function reserveFigures({ r, vocab, assetHref }: RowProps) {
   // supplied less borrowed, in the unit the row's sizes are in.
   const availTokens = availableTokens(r);
   const basis = r.virtualBalance != null ? "virtual" : "difference";
-  const availUsd = r.priceUsd != null ? availTokens * r.priceUsd : 0;
+  const availRow = { symbol: r.symbol, tokens: availTokens, price: r.priceUsd };
+  const availUsd = aaveMarketUsd([availRow]);
   const available =
     fixed && r.supplied > 0 ? (
       <span data-available-basis={basis}>
@@ -332,7 +365,7 @@ export function reserveFigures({ r, vocab, assetHref }: RowProps) {
       </span>
     ) : (
       <span className={availUsd > 0 ? "text-foreground/80" : "text-rb-500"} data-available-basis={basis}>
-        <Prov info={vocab.reserveAvailableProv(r.symbol, { priced: true, basis, deficit: r.deficit })}>
+        <Prov info={vocab.reserveAvailableProv(r.symbol, { priced: true, basis, deficit: r.deficit, row: availRow })}>
           {fmtUsd(availUsd).display}
         </Prov>
       </span>
@@ -405,9 +438,22 @@ export function reserveFigures({ r, vocab, assetHref }: RowProps) {
       figure
     );
   };
-  const suppliedInfo = vocab.reserveValueProv("supplied", r.symbol);
-  const borrowedInfo = vocab.reserveValueProv("borrowed", r.symbol);
-  const availableInfo = vocab.reserveAvailableProv(r.symbol, { priced: true, basis, deficit: r.deficit });
+  const suppliedInfo = vocab.reserveValueProv("supplied", r.symbol, {
+    symbol: r.symbol,
+    tokens: r.supplied,
+    price: r.priceUsd,
+  });
+  const borrowedInfo = vocab.reserveValueProv("borrowed", r.symbol, {
+    symbol: r.symbol,
+    tokens: r.borrowed,
+    price: r.priceUsd,
+  });
+  const availableInfo = vocab.reserveAvailableProv(r.symbol, {
+    priced: true,
+    basis,
+    deficit: r.deficit,
+    row: availRow,
+  });
   const priced = !fixed && r.priceUsd != null;
   const amounts = {
     supplied:

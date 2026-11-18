@@ -64,7 +64,6 @@ import {
   positionSupplyCurrentProv,
   positionSupplyPrincipalProv,
   positionDebtProv,
-  compoundV2UsdProvOnchain,
   fixedPriceLineProv,
   borrowRateProv,
   avgBorrowRateProv,
@@ -91,6 +90,9 @@ import type { LiquidationStory } from "@/lib/shared/ctoken-liquidation-story";
 import { splitDust, useDustLines } from "@/components/shared/dust-reserves";
 import { compoundV2LineRows, compoundV2RiskHead } from "./compound-v2-risk-slot";
 import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
+import { shownUsd } from "@/lib/shared/holder-usd-receipt";
+import { compoundV2DebtDollars, compoundV2UsdReceipt } from "@/lib/compound-v2/usd-receipt";
+import { compoundV2LastEventDebtNote, type CompoundV2Face } from "@/lib/compound-v2/price-notes";
 
 export interface CompoundV2PositionView {
   wallet: string;
@@ -123,6 +125,9 @@ export interface CompoundV2PositionView {
   liquidations?: LiquidationStory[];
   /** Every row of the history, beside the transaction count (the detail page). */
   eventTotal?: number;
+  /** The block of each market's last borrow, repay or liquidation event,
+   *  where the page holds its rows: the block an emitted debt stands at. */
+  debtBlockByMarket?: Record<string, number>;
 }
 
 /** The figure a supply line asserts: the current value (interest included)
@@ -138,10 +143,12 @@ const markOf = (r: { market: string; symbol: string }): AssetMark => ({
   address: underlyingOf(r.market) ?? null,
 });
 
-/** On-chain oracle USD for one line; null when Compound didn't price it. */
+/** On-chain oracle USD for one line, the amount × the price as its receipt
+ *  shows them (lib/compound-v2/usd-receipt.ts); null when Compound didn't
+ *  price it. */
 function lineUsd(v: CompoundV2PositionView, market: string, amount: number): number | null {
   const p = v.priceByMarket?.[market];
-  return typeof p === "number" && p > 0 ? amount * p : null;
+  return typeof p === "number" && p > 0 ? shownUsd(amount, p) : null;
 }
 
 /** Each line's oracle USD for the dust rule (components/shared/dust-reserves);
@@ -155,26 +162,38 @@ function isFixed(v: CompoundV2PositionView, market: string): boolean {
   return v.priceFixedByMarket?.[market] === true;
 }
 
-/** Total USD across one side, with the STRICT guard: null the moment any
- *  contributing market is unpriced, so a partial total is never asserted (it
- *  degrades to no headline). `fixed` says whether any contributing leg is a
- *  frozen oracle constant — the receipt must say so. */
-function totalUsd(
+/** One side's lines as the dollar receipt reads them. */
+type UsdLine = { market: string; symbol: string; cSymbol: string; amount: number; amountNote: string };
+const supplyNote = (r: CompoundV2SupplyAmount) =>
+  r.current != null
+    ? `${r.cSymbol} balance × exchangeRateStored at the market-state read`
+    : `Σ(mint − redeem) of the account's ${r.symbol} events`;
+const debtNote = (v: CompoundV2PositionView, r: CompoundV2BorrowAmount) =>
+  r.live
+    ? `borrowBalanceStored(account) on ${r.cSymbol}, the live read`
+    : compoundV2LastEventDebtNote(v.debtBlockByMarket?.[r.market]);
+
+/** A side's dollars and the receipt that rebuilds them, with the STRICT
+ *  guard: null the moment any contributing market is unpriced, so a partial
+ *  total is never asserted (it degrades to no headline). A frozen oracle
+ *  constant says so on its price row. */
+function sideUsd(
   v: CompoundV2PositionView,
-  lines: { market: string; amount: number }[],
-): { usd: number; fixed: boolean } | null {
-  let sum = 0;
-  let any = false;
-  let fixed = false;
-  for (const l of lines) {
-    if (l.amount <= 0) continue;
-    const u = lineUsd(v, l.market, l.amount);
-    if (u == null) return null;
-    sum += u;
-    any = true;
-    if (isFixed(v, l.market)) fixed = true;
-  }
-  return any ? { usd: sum, fixed } : null;
+  what: string,
+  lines: UsdLine[],
+  face: CompoundV2Face,
+  marketBy: ServerRead | undefined,
+): { usd: number; info: Provenance } | null {
+  const r = compoundV2UsdReceipt({
+    what,
+    lines,
+    prices: v.priceByMarket,
+    fixed: v.priceFixedByMarket,
+    read: v.marketRead,
+    face,
+    via: "chain balance × Comptroller oracle getUnderlyingPrice",
+  });
+  return r ? { usd: r.usd, info: stampServerRead(r.prov, marketBy) } : null;
 }
 
 /** rails-server's read (live or stored) of the market state a view's
@@ -183,43 +202,55 @@ function totalUsd(
 const marketReadBy = (v: CompoundV2PositionView): ServerRead | undefined =>
   v.marketRead ? headReadOf(v.marketRead.head, v.marketRead.blockNumber, v.marketRead.stored) : undefined;
 
+const ctokenOf = (market: string) => COMPOUND_V2_MARKET_BY_KEY[market]?.ctoken;
 const supplyProv = (r: CompoundV2SupplyAmount, marketBy?: ServerRead) =>
   r.current != null
-    ? stampServerRead(positionSupplyCurrentProv(r.symbol, r.cSymbol), marketBy)
-    : positionSupplyPrincipalProv(r.symbol);
-
-/** A USD figure's receipt, its oracle price stamped with the market read. */
-const usdProv = (marketBy: ServerRead | undefined, what: string, includesFixed?: boolean) =>
-  stampServerRead(compoundV2UsdProvOnchain(what, includesFixed), marketBy);
+    ? stampServerRead(positionSupplyCurrentProv(r.symbol, r.cSymbol, ctokenOf(r.market)), marketBy)
+    : positionSupplyPrincipalProv(r.symbol, ctokenOf(r.market));
 
 /** Debt-line provenance: the live borrowBalanceStored lane when the detail
  *  page's chain read upgraded this row, the emitted-accountBorrows lane
  *  otherwise. */
-const borrowProv = (r: CompoundV2BorrowAmount, readBy?: ServerRead) => {
+const borrowProv = (r: CompoundV2BorrowAmount, readBy?: ServerRead, debtBlock?: number) => {
   const m = COMPOUND_V2_MARKET_BY_KEY[r.market];
-  return r.live ? compoundV2LiveDebtProv(r.symbol, r.cSymbol, m?.ctoken, readBy) : positionDebtProv(r.symbol);
+  return r.live
+    ? compoundV2LiveDebtProv(r.symbol, r.cSymbol, m?.ctoken, readBy)
+    : positionDebtProv(r.symbol, debtBlock, m?.ctoken);
 };
 
 /** "price fixed, no feed" — the inline flag on a line whose oracle price is a
  *  stored constant (the markets view's wording, carried across surfaces). */
-function FixedPriceFlag({ symbol, marketBy }: { symbol: string; marketBy?: ServerRead }) {
+function FixedPriceFlag({
+  v,
+  r,
+  marketBy,
+}: {
+  v: CompoundV2PositionView;
+  r: { market: string; symbol: string; cSymbol: string };
+  marketBy?: ServerRead;
+}) {
+  const info = fixedPriceLineProv(r.symbol, {
+    cSymbol: r.cSymbol,
+    price: v.priceByMarket?.[r.market],
+    read: v.marketRead,
+  });
   return (
     <span className="ml-1">
-      · <Prov info={stampServerRead(fixedPriceLineProv(symbol), marketBy)}>fixed price set by governance</Prov>
+      · <Prov info={stampServerRead(info, marketBy)}>fixed price set by governance</Prov>
     </span>
   );
 }
 
 /** A debt line read from the last borrow, repay or liquidation event's
  *  accountBorrows, without the interest since. */
-function StaleDebtNote() {
+function StaleDebtNote({ block }: { block?: number }) {
   return (
     <span
       className="text-[10px] text-rb-500"
       title="The accountBorrows the market emitted at this account's last borrow, repay or liquidation event. Interest since then is not included."
     >
       {" "}
-      at the last event
+      at the last event{block != null ? `, block ${block.toLocaleString("en-US")}` : ""}
     </span>
   );
 }
@@ -273,7 +304,13 @@ function peakValue(lines: CompoundV2PeakAmount[], side: "supply" | "debt"): Reac
     <div className="flex flex-col gap-1">
       {lines.map((r) => (
         <div key={r.market}>
-          <Prov info={side === "supply" ? peakSupplyProv(r.symbol) : peakDebtProv(r.symbol)}>
+          <Prov
+            info={
+              side === "supply"
+                ? peakSupplyProv(r.symbol, ctokenOf(r.market))
+                : peakDebtProv(r.symbol, ctokenOf(r.market))
+            }
+          >
             <AssetAmount
               value={r.amount}
               symbol={r.symbol}
@@ -346,20 +383,49 @@ export function useCompoundV2CardSlots({
 }: CompoundV2PositionCardProps): PositionCardSlots {
   const detail = surface === "detail";
   const marketBy = marketReadBy(v);
-  const collUsd = totalUsd(
-    v,
-    v.supplies.map((r) => ({ market: r.market, amount: supplyAmount(r) })),
-  );
-  const debtUsd = totalUsd(
-    v,
-    v.borrows.map((r) => ({ market: r.market, amount: r.amount })),
-  );
+  const supplyLine = (r: CompoundV2SupplyAmount): UsdLine => ({
+    market: r.market,
+    symbol: r.symbol,
+    cSymbol: r.cSymbol,
+    amount: supplyAmount(r),
+    amountNote: supplyNote(r),
+  });
+  const borrowLine = (r: CompoundV2BorrowAmount): UsdLine => ({
+    market: r.market,
+    symbol: r.symbol,
+    cSymbol: r.cSymbol,
+    amount: r.amount,
+    amountNote: debtNote(v, r),
+  });
+  const oneOrMany = (n: number): CompoundV2Face => (n === 1 ? "cents" : "compact");
+  const collUsd = sideUsd(v, "Supplied in USD", v.supplies.map(supplyLine), oneOrMany(v.supplies.length), marketBy);
+  // The position page states debt dollars only on the live read: without it a
+  // debt stands at its last event, interest since then left out, and the
+  // token amount says so. The listing reads no live debt and names that block.
+  const debtUnread = !compoundV2DebtDollars(detail, v.borrows);
+  // The live debt is priced at the live read's own oracle prices, so its
+  // amount and its price stand on one block (chain.blockNumber).
+  const debtView: CompoundV2PositionView =
+    detail && chain
+      ? {
+          ...v,
+          priceByMarket: Object.fromEntries(
+            chain.markets.filter((m) => m.priceUsd != null).map((m) => [m.market, m.priceUsd as number]),
+          ),
+          priceFixedByMarket: Object.fromEntries(chain.markets.map((m) => [m.market, !m.priceHasFeed])),
+          marketRead: { blockNumber: chain.blockNumber, ...(chain.oracle ? { oracle: chain.oracle } : {}) },
+        }
+      : v;
+  const debtBy = detail && chain ? serverReadOf(chain) : marketBy;
+  const debtUsd = debtUnread
+    ? null
+    : sideUsd(debtView, "Borrowed in USD", v.borrows.map(borrowLine), oneOrMany(v.borrows.length), debtBy);
   // Dust lines (under a cent) leave the icon cluster and the panel's list; the
   // panel puts them behind the "N dust reserves hidden" control.
   const suppliesShown = splitDust(v.supplies, supplyLineUsd(v)).shown;
-  const borrowsShown = splitDust(v.borrows, borrowLineUsd(v)).shown;
+  const borrowsShown = splitDust(v.borrows, borrowLineUsd(debtView)).shown;
   const supplyLines = useDustLines(v.supplies, supplyLineUsd(v));
-  const borrowLines = useDustLines(v.borrows, borrowLineUsd(v));
+  const borrowLines = useDustLines(v.borrows, borrowLineUsd(debtView));
 
   const status: PositionCardStatus | null =
     v.status === "liquidated"
@@ -431,7 +497,7 @@ export function useCompoundV2CardSlots({
   );
   const borrowUnit = (r: CompoundV2BorrowAmount) => (
     <div key={r.market}>
-      <Prov info={borrowProv(r, serverReadOf(chain))}>
+      <Prov info={borrowProv(r, serverReadOf(chain), v.debtBlockByMarket?.[r.market])}>
         <AssetAmount
           value={r.amount}
           symbol={r.symbol}
@@ -452,11 +518,11 @@ export function useCompoundV2CardSlots({
       label: SUPPLIED,
       value:
         v.supplies.length === 0 ? null : collUsd != null ? (
-          <UsdFigure usd={collUsd.usd} info={usdProv(marketBy, "Supplied", collUsd.fixed)} form="compact" />
+          <UsdFigure usd={collUsd.usd} info={collUsd.info} form="compact" />
         ) : (
           <TokenStack lines={suppliesShown.map(supplyUnit)} />
         ),
-      total: collUsd != null ? { usd: collUsd.usd, info: usdProv(marketBy, "Supplied", collUsd.fixed) } : undefined,
+      total: collUsd != null ? { usd: collUsd.usd, info: collUsd.info } : undefined,
       assets: v.supplies.length > 0 ? <InlineAssetCluster assets={suppliesShown.map(markOf)} /> : undefined,
     },
     {
@@ -464,11 +530,11 @@ export function useCompoundV2CardSlots({
       label: CARD_VOCAB.debt,
       value:
         v.borrows.length === 0 ? null : debtUsd != null ? (
-          <UsdFigure usd={debtUsd.usd} info={usdProv(marketBy, "Borrowed", debtUsd.fixed)} form="compact" />
+          <UsdFigure usd={debtUsd.usd} info={debtUsd.info} form="compact" />
         ) : (
           <TokenStack lines={borrowsShown.map(borrowUnit)} />
         ),
-      total: debtUsd != null ? { usd: debtUsd.usd, info: usdProv(marketBy, "Borrowed", debtUsd.fixed) } : undefined,
+      total: debtUsd != null ? { usd: debtUsd.usd, info: debtUsd.info } : undefined,
       assets: v.borrows.length > 0 ? <InlineAssetCluster assets={borrowsShown.map(markOf)} /> : undefined,
     },
   ];
@@ -493,7 +559,7 @@ export function useCompoundV2CardSlots({
       usd:
         collUsd != null ? (
           <span className="font-bold text-green-400">
-            <Prov info={usdProv(marketBy, "Supplied", collUsd.fixed)}>{formatUsdValue(collUsd.usd)}</Prov>
+            <Prov info={collUsd.info}>{formatUsdValue(collUsd.usd)}</Prov>
           </span>
         ) : null,
     };
@@ -503,7 +569,7 @@ export function useCompoundV2CardSlots({
     heads[1] = {
       ...heads[1],
       value: (
-        <Prov info={borrowProv(r, serverReadOf(chain))}>
+        <Prov info={borrowProv(r, serverReadOf(chain), v.debtBlockByMarket?.[r.market])}>
           <AssetAmount
             value={r.amount}
             symbol={r.symbol}
@@ -516,7 +582,7 @@ export function useCompoundV2CardSlots({
       usd:
         debtUsd != null ? (
           <span className="font-bold text-green-400">
-            <Prov info={usdProv(marketBy, "Borrowed", debtUsd.fixed)}>{formatUsdValue(debtUsd.usd)}</Prov>
+            <Prov info={debtUsd.info}>{formatUsdValue(debtUsd.usd)}</Prov>
           </span>
         ) : null,
     };
@@ -547,8 +613,10 @@ export function useCompoundV2CardSlots({
   // Each side's market rows, and the panel: the liquidation line on the left;
   // the rate, the room to borrow and the drop on the right.
   const lineRows = compoundV2LineRows(chain);
-  const usdCell = (usd: number | null, what: string, fixed: boolean) =>
-    usd != null ? <UsdFigure usd={usd} info={usdProv(marketBy, what, fixed)} form="whole" /> : undefined;
+  const usdCell = (line: UsdLine, what: string, debt = false) => {
+    const r = debt ? sideUsd(debtView, what, [line], "dollars", debtBy) : sideUsd(v, what, [line], "dollars", marketBy);
+    return r ? <UsdFigure usd={r.usd} info={r.info} form="whole" /> : undefined;
+  };
   const supplyBreakdown: AssetBreakdown = {
     assets: supplyLines.lines.map((r) => {
       const usd = lineUsd(v, r.market, supplyAmount(r));
@@ -566,33 +634,34 @@ export function useCompoundV2CardSlots({
                 {formatCompact(supplyAmount(r))}
               </ExactSpan>
             </Prov>
-            {isFixed(v, r.market) && <FixedPriceFlag symbol={r.symbol} marketBy={marketBy} />}
+            {isFixed(v, r.market) && <FixedPriceFlag v={v} r={r} marketBy={marketBy} />}
           </>
         ),
-        usdText: usdCell(usd, `${r.symbol} supplied`, isFixed(v, r.market)),
+        usdText: usdCell(supplyLine(r), `${r.symbol} supplied in USD`),
       };
     }),
     dust: supplyLines.control ?? undefined,
   };
   const borrowBreakdown: AssetBreakdown = {
     assets: borrowLines.lines.map((r) => {
-      const usd = lineUsd(v, r.market, r.amount);
+      // No dollars on the position page for a debt the live read has not reached.
+      const usd = detail && !r.live ? null : lineUsd(debtView, r.market, r.amount);
       return {
         id: `borrow-${r.market}`,
         ...markOf(r),
         usd,
         amount: (
           <>
-            <Prov info={borrowProv(r, serverReadOf(chain))}>
+            <Prov info={borrowProv(r, serverReadOf(chain), v.debtBlockByMarket?.[r.market])}>
               <ExactSpan exact={formatUnitsExact(r.amountRaw, r.decimals)} symbol={r.symbol}>
                 {formatCompact(r.amount)}
               </ExactSpan>
             </Prov>
-            {!r.live && <StaleDebtNote />}
-            {isFixed(v, r.market) && <FixedPriceFlag symbol={r.symbol} marketBy={marketBy} />}
+            {!r.live && <StaleDebtNote block={v.debtBlockByMarket?.[r.market]} />}
+            {isFixed(debtView, r.market) && <FixedPriceFlag v={debtView} r={r} marketBy={debtBy} />}
           </>
         ),
-        usdText: usdCell(usd, `${r.symbol} borrowed`, isFixed(v, r.market)),
+        usdText: detail && !r.live ? undefined : usdCell(borrowLine(r), `${r.symbol} borrowed in USD`, true),
       };
     }),
     dust: borrowLines.control ?? undefined,
@@ -604,7 +673,17 @@ export function useCompoundV2CardSlots({
           id: "borrow-rate",
           label: rate.avg ? "Average borrow APY" : "Borrow APY",
           value: (
-            <Prov info={stampServerRead(rate.avg ? avgBorrowRateProv() : borrowRateProv(rate.symbol, rate), marketBy)}>
+            <Prov
+              info={stampServerRead(
+                rate.avg
+                  ? avgBorrowRateProv()
+                  : borrowRateProv(rate.symbol, {
+                      ...rate,
+                      ctoken: ctokenOf(v.borrows.find((b) => b.symbol === rate.symbol)?.market ?? ""),
+                    }),
+                marketBy,
+              )}
+            >
               {rate.pct.toFixed(2)}%
             </Prov>
           ),
