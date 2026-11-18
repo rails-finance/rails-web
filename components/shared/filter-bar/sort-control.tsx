@@ -95,7 +95,7 @@ export function SortPill({ options, sortBy, sortOrder, onChange }: SortPillProps
           <div
             role="radiogroup"
             aria-label="Order"
-            className="mt-3 grid grid-cols-2 gap-1 rounded-xl bg-rb-100 p-1 dark:bg-rb-900"
+            className="mt-3 grid grid-cols-2 gap-1 rounded-xl bg-rb-100 p-1 dark:bg-rb-800"
           >
             {(["asc", "desc"] as const).map((dir) => (
               <button
@@ -106,7 +106,7 @@ export function SortPill({ options, sortBy, sortOrder, onChange }: SortPillProps
                 onClick={() => (isPhone ? pickThenClose(() => onChange(sortBy, dir)) : onChange(sortBy, dir))}
                 className={`h-10 sm:h-9 rounded-lg text-sm transition-colors ${FOCUS} ${
                   dir === sortOrder
-                    ? "bg-background font-semibold text-foreground shadow-sm dark:bg-rb-700"
+                    ? "bg-background font-semibold text-foreground shadow-sm dark:bg-rb-600"
                     : "text-rb-500 dark:text-rb-400/75 hover:text-foreground"
                 }`}
                 data-sort-order={dir}

@@ -539,7 +539,7 @@ function ThresholdEditor<F>({
       <div
         role="radiogroup"
         aria-label={`${dim.label} comparison`}
-        className="grid grid-cols-3 gap-1 rounded-xl bg-rb-100 p-1 dark:bg-rb-900"
+        className="grid grid-cols-3 gap-1 rounded-xl bg-rb-100 p-1 dark:bg-rb-800"
         onKeyDown={(e) => {
           const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
           if (!step) return;
@@ -562,7 +562,7 @@ function ThresholdEditor<F>({
             onClick={() => pickMode(s.mode)}
             className={`h-10 sm:h-9 rounded-lg text-sm transition-colors ${FOCUS} ${
               s.mode === mode
-                ? "bg-background font-semibold text-foreground shadow-sm dark:bg-rb-700"
+                ? "bg-background font-semibold text-foreground shadow-sm dark:bg-rb-600"
                 : "text-rb-500 dark:text-rb-400/75 hover:text-foreground"
             }`}
             data-threshold-mode={s.mode}
