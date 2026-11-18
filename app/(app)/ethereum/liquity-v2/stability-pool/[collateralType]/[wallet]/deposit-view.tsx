@@ -33,7 +33,7 @@ import { LiquityV2DepositEventCard } from "@/components/protocol/liquity/sp-even
 import { LiquityV2DepositFlowsNote, liquityV2DepositFlowsContent } from "@/components/protocol/liquity/sp-flows-note";
 import { LiquityV2DepositSinceTouchRow } from "@/components/protocol/liquity/sp-since-touch";
 import { SpOpenStretchLiquidations } from "@/components/protocol/liquity/sp-liquidations";
-import { spBranchCheck, spLiquidationNotes } from "@/lib/liquity-v2/sp-liquidations";
+import { spBranchCheck, spLiquidationNotes, spNotesOnRows } from "@/lib/liquity-v2/sp-liquidations";
 import { LIQUITY_V2_SP_POOLS } from "@/lib/liquity-v2/sp-catalog";
 import { fetchLiquityV2DepositChain, type LiquityV2DepositChain } from "@/lib/api/fetch-liquity-v2-sp-chain";
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
@@ -183,6 +183,9 @@ export default function DepositView({
   // newest the first read brought.
   const listed = useMemo(() => wholeAsc ?? (firstRows ? [...firstRows].reverse() : []), [wholeAsc, firstRows]);
   const rowById = useMemo(() => new Map(listed.map((r) => [r.event_key, r])), [listed]);
+  // Each liquidations note between two touches the page holds, under its
+  // closing touch.
+  const liqNotesShown = useMemo(() => spNotesOnRows(liqNotes, (k) => rowById.has(k)), [liqNotes, rowById]);
   const events = useMemo(() => listed.map(spTimelineEvent), [listed]);
   const olderCount = Math.max(0, total - listed.length);
   const lastTouch = listed.length > 0 ? listed[listed.length - 1] : null;
@@ -337,7 +340,7 @@ export default function DepositView({
               boundary={boundary}
               displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
               emptyLabel="No operations recorded for this deposit"
-              notes={liqNotes}
+              notes={liqNotesShown}
               toolbarLeading={
                 <TimelineActivityHeader
                   events={events}

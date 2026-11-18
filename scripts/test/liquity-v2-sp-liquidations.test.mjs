@@ -6,7 +6,7 @@
 // Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { spBranchCheck, spLiquidationNotes } from "../../lib/liquity-v2/sp-liquidations.ts";
+import { spBranchCheck, spLiquidationNotes, spNotesOnRows } from "../../lib/liquity-v2/sp-liquidations.ts";
 import { anchorMarketNotes, spLiquidationsSentence } from "../../lib/shared/market-note.ts";
 
 const POOL = "0xd442e41019b7f5c4dd78f50dc03726c446148695";
@@ -69,23 +69,56 @@ const read = {
   ],
 };
 
-test("one note per closed stretch that holds a liquidation, its ends the two touches", () => {
+test("one note per closed stretch that holds a liquidation or does not reconcile, its ends the two touches", () => {
   const notes = spLiquidationNotes("rETH", POOL, read);
-  assert.equal(notes.length, 1);
+  assert.equal(notes.length, 2);
+  assert.equal(notes[1].stretch.liquidations.length, 0);
+  assert.equal(notes[1].stretch.reconciles, false);
+  assert.equal(notes[1].anchorTo, "sp_op:0x25000000_3");
   const n = notes[0];
   assert.equal(n.kind, "sp-liquidations");
   assert.equal(n.id, "sp-liquidations:rETH:23006130-24947289");
   assert.equal(n.from.eventId, "sp_op:0x23006130_3");
   assert.equal(n.to.eventId, "sp_op:0x24947289_3");
   assert.equal(n.to.block, 24947289);
+  assert.equal(n.anchorTo, "sp_op:0x24947289_3");
   assert.deepEqual(n.branchCheck, { unreconciled: 0, closedStretches: 57 });
 });
 
 test("the note anchors on the touch that closed its stretch", () => {
   const notes = spLiquidationNotes("rETH", POOL, read);
   const events = [23006130, 24947289].map((b) => ({ id: `sp_op:0x${b}_3`, blockNumber: b, timestamp: 0, flows: [] }));
-  const anchored = anchorMarketNotes(notes, events, "desc");
+  const anchored = anchorMarketNotes(notes.slice(0, 1), events, "desc");
   assert.deepEqual([...anchored.keys()], ["sp_op:0x24947289_3"]);
+});
+
+test("two touches in one block: the note sits under its own closing touch", () => {
+  const [n] = spLiquidationNotes("rETH", POOL, read);
+  // A second touch earlier in the closing touch's block: the block rule would pick it.
+  const events = [
+    { id: "sp_op:0x23006130_3", blockNumber: 23006130, timestamp: 0, flows: [] },
+    { id: "sp_op:0xother_1", blockNumber: 24947289, timestamp: 0, flows: [] },
+    { id: "sp_op:0x24947289_3", blockNumber: 24947289, timestamp: 0, flows: [] },
+  ];
+  const anchored = anchorMarketNotes([n], events, "asc");
+  assert.deepEqual([...anchored.keys()], ["sp_op:0x24947289_3"]);
+});
+
+test("a note shows only where both its touches are among the loaded rows", () => {
+  const notes = spLiquidationNotes("rETH", POOL, read);
+  const loaded = new Set(["sp_op:0x24947289_3", "sp_op:0x25000000_3"]);
+  assert.deepEqual(
+    spNotesOnRows(notes, (k) => loaded.has(k)).map((x) => x.id),
+    ["sp-liquidations:rETH:24947289-25000000"],
+  );
+});
+
+test("a reported loss with no liquidation has its own sentence", () => {
+  const notes = spLiquidationNotes("rETH", POOL, read);
+  assert.equal(
+    spLiquidationsSentence(notes[1]),
+    "Between blocks 24,947,289 and 25,000,000, the closing touch wrote 0.000000000000000001 BOLD burned and 0 rETH paid in, and no liquidation between the two touches accounts for it",
+  );
 });
 
 test("the sentence states the sums and the block price", () => {

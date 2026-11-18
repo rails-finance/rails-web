@@ -34,8 +34,10 @@ export function spBranchCheck(read: LiquityV2DepositLiquidationsResponse): SpLiq
   return { unreconciled: Number(c.unreconciled), closedStretches: Number(c.closed_stretches) };
 }
 
-/** One note per closed stretch that holds a liquidation; `pool` the
- *  branch's StabilityPool (LIQUITY_V2_SP_POOLS). */
+/** One note per closed stretch that holds a liquidation, or whose touch
+ *  reported a loss or a gain the liquidations do not account for; `pool` the
+ *  branch's StabilityPool (LIQUITY_V2_SP_POOLS). Each note anchors on its
+ *  closing touch by event key (`anchorTo`). */
 export function spLiquidationNotes(
   branch: SpBranch,
   pool: string,
@@ -45,7 +47,7 @@ export function spLiquidationNotes(
   return read.stretches
     .filter(
       (s): s is LiquityV2DepositStretch & { to: NonNullable<LiquityV2DepositStretch["to"]> } =>
-        s.to != null && s.liquidations.length > 0,
+        s.to != null && (s.liquidations.length > 0 || s.reconciles === false),
     )
     .map((s) => ({
       kind: "sp-liquidations",
@@ -56,10 +58,20 @@ export function spLiquidationNotes(
       protocol: "liquity-v2",
       from: end(s.from),
       to: end(s.to),
+      anchorTo: s.to.event_key,
       branch,
       stretch: s,
       branchCheck,
     }));
+}
+
+/** The notes whose two touches are both among the rows the page holds: a
+ *  note whose closing touch is not loaded has no row to sit under, and one
+ *  whose opening touch is not loaded would sit against the boundary card. */
+export function spNotesOnRows(notes: readonly SpLiquidationsNote[], has: (eventKey: string) => boolean) {
+  return notes.filter(
+    (n) => n.from.eventId != null && n.to.eventId != null && has(n.from.eventId) && has(n.to.eventId),
+  );
 }
 
 export const isSpLiquidationsNote = (x: unknown): x is SpLiquidationsNote =>

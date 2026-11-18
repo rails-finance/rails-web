@@ -98,6 +98,11 @@ export interface MarketNoteBase {
   unitLabel: string;
   from: MarketNotePoint;
   to: MarketNotePoint;
+  /** The event this note must sit under, by id, where the builder knows it
+   *  (a Liquity V2 deposit's closing touch): exact where several of the
+   *  account's events share a block. Where that event is filtered out, the
+   *  block rule below places it. */
+  anchorTo?: string;
   /** The anchor: the first account event (ascending) with
    *  `blockNumber ≥ to.block`. Set by `anchorMarketNotes`. Never set on a
    *  live note — it has no anchor and renders in the timeline's head slot
@@ -605,7 +610,9 @@ export function anchorMarketNotes<N extends AnchoredNote = MarketNote>(
   const out = new Map<string, N[]>();
   const anchored: N[] = [];
   for (const note of notes) {
-    const anchor = ascending.find((e) => e.blockNumber >= note.to.block);
+    const anchor =
+      (note.anchorTo != null ? ascending.find((e) => e.id === note.anchorTo) : undefined) ??
+      ascending.find((e) => e.blockNumber >= note.to.block);
     if (!anchor) continue;
     anchored.push({ ...note, anchorEventId: anchor.id });
   }
@@ -629,6 +636,8 @@ const EMPTY_ANCHORS: ReadonlyMap<string, AnchoredNote[]> = new Map();
 export interface AnchoredNote {
   id: string;
   to: { block: number };
+  /** The event's id to sit under, where the builder names it. */
+  anchorTo?: string;
   anchorEventId?: string;
 }
 
@@ -1297,6 +1306,13 @@ const tokenAmount = (n: number): string =>
 export function spLiquidationsSentence(note: SpLiquidationsNote): string {
   const t = note.stretch.totals;
   const n = note.stretch.liquidations.length;
+  const to = note.stretch.to;
+  if (n === 0 && to)
+    return (
+      `Between blocks ${formatBlock(note.from.block)} and ${formatBlock(note.to.block)}, the closing touch wrote ` +
+      `${tokenAmount(e18(to.deposit_loss))} BOLD burned and ${tokenAmount(e18(to.coll_gain_since))} ${note.branch} paid in, ` +
+      `and no liquidation between the two touches accounts for it`
+    );
   const net = e18(t.net);
   return (
     `Between blocks ${formatBlock(note.from.block)} and ${formatBlock(note.to.block)}, ` +
