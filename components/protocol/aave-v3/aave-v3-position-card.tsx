@@ -942,16 +942,30 @@ export function useAaveV3CardSlots({
   // (aaveV3SingleCollateral) once every supplied reserve is priced, and before
   // that the one supplied reserve that passes it whatever its price. Once the
   // reads settle, a liquidation row the read leaves empty keeps its cell with
-  // words in it, so the row does not vanish.
+  // words in it, so the row does not vanish: "liquidatable now" at a health
+  // factor of 1 or under, "no liquidation price" at 100 or over, "health
+  // factor unavailable" when the Pool read is missing. A Pool read of no debt
+  // drops the row, and the notice above the card says why.
   const readPending = detail && hfPending && v.borrows.length > 0;
   const pricePending = detail && pricesPending && v.borrows.length > 0;
   const sameAsset = aaveV3SameAssetOfView(v) != null;
   const anchor = aaveV3SingleCollateral(v);
   const anchored = anchor === undefined ? v.supplies.filter((r) => r.amount > 0).length === 1 : anchor != null;
-  const liqHoldsCell = detail && v.borrows.length > 0;
+  const liqHoldsCell = detail && v.borrows.length > 0 && !noDebtRead;
   const hfNow = hfRead ? v.healthFactor : null;
-  const liqUnavailable: true | string =
-    hfNow != null && hfNow <= 1 ? "liquidatable now" : hfNow != null && hfNow >= 100 ? "out of reach" : true;
+  const liqSettled = (id: string, label: string): PositionPanelRow =>
+    hfNow != null && hfNow <= 1
+      ? { id, label, value: "liquidatable now" }
+      : {
+          id,
+          label,
+          value: null,
+          unavailable: !hfRead
+            ? "health factor unavailable"
+            : hfNow != null && hfNow >= 100
+              ? "no liquidation price"
+              : true,
+        };
   const heldOf: [id: string, label: string, hold: boolean][] = [
     [
       "borrow-rate",
@@ -968,7 +982,7 @@ export function useAaveV3CardSlots({
   const [rateHeld, roomHeld, liqHeld] = [rateRow, roomRow, liqRow].map((row, i): PositionPanelRow | null => {
     const [id, label, hold] = heldOf[i];
     if (hold) return { id, label, value: null, pending: true };
-    if (row == null && i === 2 && liqHoldsCell) return { id, label, value: null, unavailable: liqUnavailable };
+    if (row == null && i === 2 && liqHoldsCell) return liqSettled(id, label);
     return row;
   });
 

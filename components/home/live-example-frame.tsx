@@ -143,6 +143,7 @@ function HeroTroveComposition({ wire }: { wire: WireLiveExample }) {
             trove={trove}
             liveState={liveState}
             prices={prices}
+            priceFailed={prices == null}
             debtInFront={debtInFront}
             trovesAhead={trovesAhead}
             debtInFrontLoading={false}
