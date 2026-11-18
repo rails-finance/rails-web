@@ -35,10 +35,10 @@
 //
 // The sidebar (C20, rails-ops TO-DO-position-card 427): on every surface the
 // frame draws the card's protocol and chain in a zone tinted with the
-// protocol's brand hue. From md, a 40px bar at the left (the mark, the name
-// reading upward, the chain's glyph at its foot) with the body beside it as its
-// own rounded box; a detail page's sections carry the bar on
-// (`SectionSidebar`); below md, a border at the left,
+// protocol's brand hue. From md, a 40px lozenge at the left, round at both
+// ends (the mark, the name reading upward, the chain's glyph at its foot), and
+// 8px from it the body as its own rounded box (ui-jobs 729); a detail page's
+// sections carry the lozenge on (`SectionSidebar`); below md, a border at the left,
 // the mark and name leading the heading row and the chain glyph at its right
 // end. The zone carries no text, control or figure in the hue. On a detail
 // card the name links to the explorer's entry route (ui-jobs 430); a listing
@@ -300,11 +300,9 @@ const OPEN_GRID = "grid grid-cols-2 lg:grid-cols-4 gap-4";
 // a stack line up.
 const CLOSED_GRID = "grid grid-cols-2 sm:grid-cols-4 gap-4";
 
-/** The bar's width from md (C20), and how far its tint runs on under the
- *  body's rounded corners. The page's sections draw theirs at the same width
- *  (`SectionSidebar`). */
+/** The lozenge's width from md (C20). The page's sections draw theirs at the
+ *  same width and gap (`SectionSidebar`). */
 export const SIDEBAR_BAR_W = "md:w-10";
-const SIDEBAR_TINT_CLIP = "md:[clip-path:inset(0_calc(100%_-_56px)_0_0)]";
 
 /** The name's short form where the bar is too short for the whole name: the
  *  version alone for a protocol that has one ("Aave V3" → "V3"), else the
@@ -370,25 +368,24 @@ function SidebarName({ name, id, href }: { name: string; id: string; href?: stri
   );
 }
 
-/** The zone's tint (C20): the frame's shape clipped to its left edge, a border
- *  below md and the bar's backdrop from md (with the body's rounded corners
- *  over it). Inside a frame that sets `--brand-hue`. */
+/** The zone's border below md (C20): the frame's shape clipped to its left
+ *  edge. From md the lozenge draws the tint. Needs a frame that sets
+ *  `--brand-hue`. */
 function SidebarTint({ rounded = "rounded-[15px]" }: { rounded?: string }) {
   return (
     <span
       aria-hidden="true"
-      className={`pointer-events-none absolute inset-0 ${rounded} bg-brand-edge [clip-path:inset(0_calc(100%_-_6px)_0_0)] md:bg-brand-zone ${SIDEBAR_TINT_CLIP}`}
+      className={`pointer-events-none absolute inset-0 ${rounded} bg-brand-edge [clip-path:inset(0_calc(100%_-_6px)_0_0)] md:hidden`}
     />
   );
 }
 
-/** The sidebar's bar from md (C20): the protocol's mark at the top, its name
- *  reading upward, the chain's glyph at the foot. Its tint is the frame's
- *  backdrop. */
+/** The sidebar's lozenge from md (C20): the protocol's mark at the top, its
+ *  name reading upward, the chain's glyph at the foot. */
 function SidebarPanel({ identity, link }: { identity: PositionCardIdentity; link: boolean }) {
   return (
     <div
-      className={`relative hidden shrink-0 flex-col items-center py-3 ${SIDEBAR_BAR_W} md:flex`}
+      className={`relative hidden shrink-0 flex-col items-center rounded-full bg-brand-zone py-3 ${SIDEBAR_BAR_W} md:flex`}
       data-anatomy="C20"
       data-card-sidebar={identity.protocol.id}
     >
@@ -1023,7 +1020,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
       data-anatomy={detail ? "P1 C1" : (slots.anatomy ?? "C1")}
       data-prov-scope={detail ? "position-card" : undefined}
       data-card-over-cap={over ?? undefined}
-      className={barred ? `${POSITION_CARD_FRAME_BOX} relative flex` : POSITION_CARD_FRAME}
+      className={barred ? `${POSITION_CARD_FRAME_BOX} ${LOZENGE_FRAME}` : POSITION_CARD_FRAME}
       style={
         barred
           ? ({
@@ -1035,9 +1032,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
     >
       {barred && (
         <>
-          {/* The zone's tint: the card's shape clipped to its left edge, a
-              border below md and the panel (with the body's rounded corners
-              over it) from md. */}
+          {/* The border below md; the lozenge from md. */}
           <SidebarTint />
           <SidebarPanel identity={identity} link={detail} />
         </>
@@ -1045,7 +1040,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
       <div
         className={
           barred
-            ? `relative min-w-0 flex-1 md:rounded-[15px] md:bg-raised ${POSITION_CARD_PAD} max-md:pl-[26px]`
+            ? `relative min-w-0 flex-1 ${LOZENGE_BODY} md:bg-raised ${POSITION_CARD_PAD} max-md:pl-[26px]`
             : "contents"
         }
       >
@@ -1084,8 +1079,14 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
 
 const CARD_ANATOMY = { explanation: "C3", learnMore: "C4" };
 
+/** From md the frame draws no box; the body takes its border and hover, 8px
+ *  from the lozenge. */
+const LOZENGE_FRAME = "relative flex md:gap-2 md:rounded-none md:border-0 md:bg-transparent";
+const LOZENGE_BODY =
+  "md:rounded-2xl md:border md:border-rb-300/40 md:dark:border-rb-700/40 md:group-hover/listing-row:border-blue-500 md:transition-colors";
+
 /** The card's sidebar (C20) around another surface: the event page's left
- *  column (P4) names its protocol with the position card's bar, its mark,
+ *  column (P4) names its protocol with the position card's lozenge, its mark,
  *  name and chain glyph from md and the 6px border below. `narrow` adds,
  *  below md, a row naming the protocol and its chain above the content.
  *  Off the explorers (no roster entry) the content stands alone. */
@@ -1102,7 +1103,7 @@ export function CardSidebarFrame({
   if (!identity) return <>{children}</>;
   return (
     <div
-      className={`relative flex rounded-xl bg-background ${className}`}
+      className={`relative flex rounded-xl bg-background md:gap-2 ${className}`}
       style={
         {
           "--brand-hue": identity.hue ?? 0,
