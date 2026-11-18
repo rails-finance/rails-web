@@ -33,7 +33,7 @@ export const morphoCollateralPriceNote = (o: {
   loanText: string;
   loanNote: string;
 }): string =>
-  `${o.collateral} → USD = the market oracle's price in ${o.loan} × ${o.loan}'s USD price, each to six decimals: ${o.oracleText} ${o.loan} (the market oracle's price() ${blockText(o.oracleBlock)}) × ${o.loanText} (${o.loanNote})`;
+  `${o.collateral} → USD = the market oracle's price in ${o.loan} × ${o.loan}'s USD price, each as shown: ${o.oracleText} ${o.loan} (the market oracle's price() ${blockText(o.oracleBlock)}) × ${o.loanText} (${o.loanNote})`;
 
 /** How the face shows a figure the rows rebuild to the cent. */
 export const MORPHO_FACE_NOTE = {

@@ -414,7 +414,7 @@ test("Arc: debt, supplied and collateral receipts rebuild the card's figures", (
   assert.match(coll.inputs[0].note, /÷ 10\^\(36 \+ 6 − 8\)/);
   assert.equal(coll.inputs[0].contract.address, READ.market.oracle);
   const row = rowOf(coll, " price");
-  assert.match(row.note, /→ USD = the market oracle's price in USDC × USDC's USD price, each to six decimals/);
+  assert.match(row.note, /→ USD = the market oracle's price in USDC × USDC's USD price, each as shown:/);
   assert.match(row.note, /latestRoundData at block 30,679,130/);
   const none = morphoAtBlockPosition({ ...READ, usdFeeds: [] });
   assert.equal(none.collateralUsd, null, "no price, no dollars");
