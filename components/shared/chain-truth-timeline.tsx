@@ -2102,6 +2102,7 @@ function ChainTruthTimelineBody({
                   "--event-ground": "var(--background)",
                   "--event-cell": "var(--surface-raised)",
                   "--color-note": "var(--background)",
+                  "--explain-rule": "var(--edge-raised)",
                 } as CSSProperties)
               : undefined
           }
