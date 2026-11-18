@@ -13,10 +13,13 @@
 // at the branch feeds, with the per-token amounts named beneath. A wallet on one
 // branch gets its collateral in that token.
 //
-// EVERY LEG WEARS THE ≈ (ui-jobs 690). The rows are each trove's figures as of
-// its last touch: interest accrues on the debt, and redistributions from
-// liquidated troves move collateral and debt onto it, between touches, so a sum
-// of them is an estimate even in one token.
+// THE CARD'S FIGURE, AND THE CARD'S MARKS (ui-jobs 737). Each leg draws the
+// position card's figure: compact, the token's icon, the USD line. The rows are
+// each trove's figures as of its last touch, as the cards below are, so the
+// legs wear no ≈ where the cards wear none; the tip and the receipt say what
+// built up since. `positions` lets the listing's band draw from two troves and
+// its totals from two open ones (components/shared/holder-strip.tsx); the
+// share card reads the same model whole.
 //
 // A ZOMBIE TROVE IS AN OPEN ONE — redeemed below the minimum debt, still on
 // chain, still the holder's, just unredeemable until it is topped back up. It is
@@ -28,12 +31,20 @@ import type { TroveSummary } from "@/types/api/trove";
 import type { OraclePricesData } from "@/types/api/oracle";
 import { TROVE_MANAGER } from "@/lib/liquity/event-provenance";
 import { formatNumber, formatUsdValue } from "@/lib/utils/format";
+import { holderUsdReceipt } from "@/lib/shared/holder-usd-receipt";
+import { liquityV2PriceNote } from "@/lib/liquity-v2/price-notes";
+import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
 
-/** What each leg's ≈ means, in a sentence or two. */
+const collToken = (collateralType: string) => ({
+  symbol: collateralType,
+  address: LIQUITY_V2_BRANCHES[collateralType.toLowerCase()]?.collateralAddr,
+});
+
+/** What each leg leaves out, in a sentence or two. */
 const LEG_TIP = {
   collateral: "As of each open trove's last touch. Redistribution gains since then are left out.",
   collateralValued:
-    "An estimate: the open troves' collateral as of each one's last touch, valued at each branch's PriceFeed as of the latest read. Redistribution gains since then are left out.",
+    "The open troves' collateral as of each one's last touch, each branch's amount at that branch's price, summed. Redistribution gains since then are left out.",
   debt: "As of each open trove's last touch. The interest and redistributed debt built up since are left out.",
 } as const;
 
@@ -63,29 +74,9 @@ function holderDebtProv(): Provenance {
   };
 }
 
-/** Σ (branch collateral × that branch's feed) — the only sum three tokens have. */
-function holderCollValueProv(branches: string[]): Provenance {
-  return {
-    kind: "chain-derived",
-    pclass: "oracle",
-    verify: {
-      kind: "recompute",
-      text: "Re-run each branch's PriceFeed at the stamped block and multiply the wallet's collateral on that branch by its own price.",
-    },
-    summary: `What the wallet's open troves hold as collateral, in USD — each branch's collateral (${branches.join(", ")}) at that branch's on-chain PriceFeed, read once when the listing loaded. An estimate for two reasons: the branches hold different tokens and a sum of them exists only at a price, and each price is one oracle read that moves every block. Redistribution gains since each trove's last touch are not in it.`,
-    via: "GET /api/oracle/liquity-v2 · Σ branch collateral × the branch's own price",
-    formula: "Σ collateral × the branch's price",
-    inputs: [
-      { label: "collateral", kind: "chain", pclass: "indexed", note: "each open trove's collateral, from the index" },
-      {
-        label: "price",
-        kind: "chain-derived",
-        pclass: "oracle",
-        note: "the branch's own PriceFeed — the token in USD",
-      },
-    ],
-  };
-}
+const ORACLE_VIA = "GET /api/oracle/liquity-v2";
+const collAmountNote = (ct: string) =>
+  `Σ collateral of the wallet's open troves on the ${ct} branch, each as of its last touch`;
 
 const priceFor = (collateralType: string, prices: OraclePricesData): number | null =>
   prices[collateralType.toLowerCase() as keyof OraclePricesData] ?? null;
@@ -117,6 +108,8 @@ export function liquityV2HolderStrip(
   perPage: number,
   /** The answer's count of Troves the wallet passed on, all pages. */
   passedOn = 0,
+  /** The wallet the search names (an address or an ENS name), for the link. */
+  wallet?: string,
 ): HolderStripProps {
   // A Trove the wallet passed on (formerHold, ui-jobs 705) is not its
   // holding: left out of the counts, the sums and the count it holds. Whether
@@ -141,12 +134,13 @@ export function liquityV2HolderStrip(
       counts: { open: 0, closed: 0, liquidated: 0 },
       legs: [],
       truncated: true,
+      positions: held,
+      wallet,
       note: `Totals are stated for wallets holding up to ${perPage.toLocaleString("en-US")} positions; this one holds ${held.toLocaleString("en-US")}.`,
     };
   }
 
   const legs: HolderLeg[] = [];
-
   // ── the collateral: one branch or several, and the grammar follows ────────
   const byBranch = new Map<string, number>();
   for (const t of open) {
@@ -159,12 +153,35 @@ export function liquityV2HolderStrip(
   );
   if (branchLegs.length === 1) {
     const [collateralType, amount] = branchLegs[0];
+    const price = priceFor(collateralType, prices);
+    const receipt =
+      price != null
+        ? holderUsdReceipt({
+            what: "The wallet's collateral in USD",
+            legs: [
+              {
+                token: collateralType,
+                amount,
+                amountNote: collAmountNote(collateralType),
+                price,
+                priceNote: liquityV2PriceNote(collateralType),
+              },
+            ],
+            via: ORACLE_VIA,
+          })
+        : null;
     legs.push({
       id: "collateral",
       label: "Total collateral",
       value: `${formatNumber(amount)} ${collateralType}`,
-      approx: true,
+      approx: false,
       tip: LEG_TIP.collateral,
+      figure: {
+        amount,
+        tokens: [collToken(collateralType)],
+        usd: receipt?.usd ?? null,
+        usdProv: receipt?.prov,
+      },
       prov: {
         kind: "chain",
         pclass: "indexed",
@@ -174,35 +191,71 @@ export function liquityV2HolderStrip(
       },
     });
   } else if (branchLegs.length > 1) {
-    let usd = 0;
     const parts: string[] = [];
+    const usdLegs = [];
     for (const [collateralType, amount] of branchLegs) {
       const price = priceFor(collateralType, prices);
       if (price == null) continue;
-      usd += amount * price;
       parts.push(`${formatNumber(amount)} ${collateralType}`);
+      usdLegs.push({
+        token: collateralType,
+        amount,
+        amountNote: collAmountNote(collateralType),
+        price,
+        priceNote: liquityV2PriceNote(collateralType),
+      });
     }
+    const receipt = holderUsdReceipt({
+      what: "The wallet's collateral in USD, across branches",
+      legs: usdLegs,
+      via: ORACLE_VIA,
+      caveat: "The branches hold different tokens, so their sum exists only at a price.",
+    });
     legs.push({
       id: "collateral",
       label: "Total collateral",
-      value: formatUsdValue(usd),
-      approx: true,
+      value: formatUsdValue(receipt.usd),
+      approx: false,
       tip: LEG_TIP.collateralValued,
-      prov: holderCollValueProv(branchLegs.map(([c]) => c)),
+      prov: receipt.prov,
       footnote: { text: parts.join(" · ") },
+      // The icons of the branches the total counts.
+      figure: { tokens: usdLegs.map((l) => collToken(l.token)), usd: receipt.usd },
     });
   }
 
   // ── the debt: BOLD on every branch, so a quantity ─────────────────────────
   const debt = open.reduce((sum, t) => sum + t.debt.current, 0);
   if (debt > 0) {
+    const debtReceipt = holderUsdReceipt({
+      what: "The wallet's debt in USD",
+      legs: [
+        {
+          token: "BOLD",
+          amount: debt,
+          amountNote: "Σ entire debt of the wallet's open troves, each as of its last touch",
+          price: 1,
+          face: true,
+          priceNote: "BOLD's $1 face: the protocol redeems 1 BOLD for $1 of collateral",
+        },
+      ],
+      via: "GET /api/troves?ownerAddress=…",
+    });
     legs.push({
       id: "debt",
       label: "Total debt",
       value: `${formatNumber(debt)} BOLD`,
-      approx: true,
+      approx: false,
       tip: LEG_TIP.debt,
       prov: holderDebtProv(),
+      // At its $1 face, as the card's debt line reads it. The icon resolves
+      // BOLD by its symbol.
+      figure: {
+        amount: debt,
+        tokens: [{ symbol: "BOLD" }],
+        usd: debtReceipt.usd,
+        usdProv: debtReceipt.prov,
+      },
     });
   }
 
@@ -211,5 +264,7 @@ export function liquityV2HolderStrip(
     counts: { open: counts.open, closed: counts.closed, liquidated: counts.liquidated, zombie: counts.zombie },
     legs,
     truncated: false,
+    positions: held,
+    wallet,
   };
 }

@@ -602,44 +602,6 @@ export function holderDebtSumProv(market: PolarisMarket): Provenance {
   };
 }
 
-/** Σ (leg × its market's feed) over the wallet's open CDPs — the debt in one
- *  unit, because USDp and GOLDp are not the same one. */
-export function holderDebtValueProv(): Provenance {
-  return {
-    kind: "chain-derived",
-    pclass: "oracle",
-    verify: {
-      kind: "recompute",
-      text: "Add the last emitted debt of each open position the wallet holds, market by market; take USDp at one dollar and GOLDp at the XAU/USD medianiser's price at the stamped block.",
-    },
-    summary:
-      "What the wallet's open positions owe, in dollars — each position's last emitted debt in its own market's unit, USDp at one dollar and GOLDp at the gold price the protocol's feed stated at the latest read. An estimate for two reasons: the two markets' debts are different tokens and a sum of them exists only at a price, and interest since each position's last touch and any pending PSM share settle at the next touch rather than here. A Sepolia testnet figure — a test dollar, not a real one.",
-    contract: { name: "Polaris XAU/USD Medianiser", address: POLARIS_CORE.xauUsdMedianiser },
-    via: `${BOARD_VIA} · Σ last emitted debt × the market's own unit price @ head`,
-    formula: "Σ debt × the market's unit in USD",
-    inputs: [
-      {
-        label: "USDp debt",
-        kind: "chain",
-        pclass: "emitted",
-        note: "Σ last emitted debt in the USDp market — one USDp is one dollar",
-      },
-      {
-        label: "GOLDp debt",
-        kind: "chain",
-        pclass: "emitted",
-        note: "Σ last emitted debt in the GOLDp market — a troy ounce of gold each",
-      },
-      { label: "XAU/USD", kind: "chain", pclass: "oracle", note: "the XAU/USD medianiser's previewExternalPrice()" },
-    ],
-  };
-}
-
-/** The wallet's open pETH valued at the protocol's own two legs. */
-export function holderCollUsdProv(): Provenance {
-  return liveUsdValueProv("The wallet's collateral", true);
-}
-
 /** "Against holding pETH" (ui-jobs 695): the position's quantities now and
  *  over its life, against the pETH it deposited, its debt side converted at
  *  the feed now. Each term is an operand row with its source. */

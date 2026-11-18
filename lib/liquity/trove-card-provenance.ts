@@ -4,6 +4,7 @@
 // landed, the trove's last logged state otherwise), so each receipt's sentence
 // is the one that is true of the value on the face.
 
+import { liquityV2PriceNote } from "@/lib/liquity-v2/price-notes";
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import type { LiquityFaceProvContext } from "@/components/protocol/liquity-family/types";
 import { formatNum, formatUsd } from "@/lib/shared/format-event";
@@ -95,9 +96,9 @@ export function liquityTroveFaceProv(ctx: LiquityFaceProvContext): LiquityFacePr
     pclass: stateClass,
     contract: tmContract,
   };
-  // The collateral's USD price from Liquity's on-chain oracle — an oracle read,
-  // one step of external trust beyond the trove's own state (the weakest link
-  // any USD-priced value inherits).
+  // The collateral's USD price: Chainlink feeds composed as the branch's
+  // PriceFeed composes them, from the app's oracle read (lib/liquity-v2/
+  // price-notes.ts) — one step of external trust beyond the trove's own state.
   const priceLeaf: ProvInput[] = priceUsd
     ? [
         {
@@ -107,7 +108,7 @@ export function liquityTroveFaceProv(ctx: LiquityFaceProvContext): LiquityFacePr
           value: formatUsd(priceUsd),
           kind: "chain-derived",
           pclass: "oracle",
-          note: `${v.collateralType} / USD — Liquity on-chain oracle (PriceFeed)`,
+          note: `${liquityV2PriceNote(v.collateralType)}, at the latest read, which states no block`,
         },
       ]
     : [];
