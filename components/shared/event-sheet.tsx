@@ -35,6 +35,7 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { HeadingTip } from "@/components/shared/tip-label";
+import { SkeletonBar } from "@/components/shared/skeleton-card";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { AssetPopover } from "@/components/shared/asset-popover";
@@ -554,37 +555,37 @@ function Footnote({ n }: { n: SheetFootnote }) {
  *  total alone) and its Risk and Limits pair, each line at the loaded line's
  *  height with a bar where its figure will stand, so the swap moves nothing. */
 export function SheetSkeleton({ sides = 2, panels = 2 }: { sides?: number; panels?: number }) {
-  const bar = (w: string) => <span className={`block h-3 rounded bg-rb-200 dark:bg-rb-700 ${w}`} />;
+  const bar = (w: string) => <SkeletonBar width={w} wait={false} />;
   return (
-    <div className="animate-pulse px-5 py-2" aria-busy="true" data-sheet-skeleton="">
+    <div className="skel-wait px-5 py-2" aria-busy="true" data-sheet-skeleton="">
       <div className="mb-2 flex justify-end">
         <span className="block size-7 rounded-md bg-sunken" />
       </div>
       <div className="flex flex-col gap-2.5">
         {Array.from({ length: sides }, (_, i) => (
           <div key={i} className="rounded-xl bg-[var(--event-cell,var(--background))] px-4 pb-2 pt-3 text-sm">
-            <div className="mb-2 flex h-5 items-center">{bar("w-20")}</div>
+            <div className="mb-2 flex h-5 items-center">{bar("5rem")}</div>
             {i === 0 && (
               <>
                 <div className="flex h-9 items-center justify-between">
-                  {bar("w-28")}
-                  {bar("w-16")}
+                  {bar("7rem")}
+                  {bar("4rem")}
                 </div>
                 <div className="mt-1 border-t border-edge-raised" />
               </>
             )}
-            <div className="flex h-10 items-center justify-end">{bar("w-20")}</div>
+            <div className="flex h-10 items-center justify-end">{bar("5rem")}</div>
           </div>
         ))}
         {panels > 0 && (
           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
             {Array.from({ length: panels }, (_, i) => (
               <div key={i} className="rounded-xl bg-[var(--event-cell,var(--background))] px-4 py-3 text-sm">
-                <div className="mb-1 flex h-5 items-center">{bar("w-14")}</div>
+                <div className="mb-1 flex h-5 items-center">{bar("3.5rem")}</div>
                 {[0, 1].map((r) => (
                   <div key={r} className="flex h-8 items-center justify-between">
-                    {bar("w-24")}
-                    {bar("w-12")}
+                    {bar("6rem")}
+                    {bar("3rem")}
                   </div>
                 ))}
               </div>

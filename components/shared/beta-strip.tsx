@@ -11,20 +11,24 @@
 // renders nothing there — a reader sees one strip at a time, and the louder
 // one wins.
 //
-// DISMISSIBLE, and the dismissal is remembered per browser in localStorage.
-// The stored state is read after mount and the strip draws nothing until it
-// has been, so a reader who dismissed it never sees it flash in on load. With
-// storage unavailable the strip shows and the close still hides it for the
-// session.
+// DISMISSIBLE, and the dismissal is remembered per browser in a cookie
+// (`rails-beta-strip-dismissed=1`). The server renders the strip on every
+// explorer route; a script in the root layout's head reads the cookie before
+// first paint and marks <html data-beta-dismissed>, which hides it
+// (app/globals.css), so the strip neither flashes in for a reader who
+// dismissed it nor pushes the page down after hydration for one who has not.
+// The layout stays static: reading the cookie with `cookies()` there would
+// make every route dynamic. The same script moves the older localStorage flag
+// into the cookie once.
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { MessageSquarePlus, X } from "lucide-react";
 
 import { FeedbackModal } from "@/components/shared/feedback-modal";
 import { unlaunchedSubject } from "@/components/shared/work-in-progress-strip";
 
-const STORAGE_KEY = "rails-beta-strip-dismissed";
+import { BETA_STRIP_COOKIE as COOKIE } from "@/lib/shared/beta-strip-script";
 
 /** The explorers live under app/(app) at /ethereum, /base and /sepolia, which
  *  is where BrandRail is mounted. Everything else is marketing, and gets no strip. */
@@ -34,37 +38,23 @@ function isExplorerRoute(pathname: string | null): boolean {
 
 export function BetaStrip() {
   const pathname = usePathname();
-  // null until the stored state has been read on the client.
-  const [dismissed, setDismissed] = useState<boolean | null>(null);
+  const [dismissed, setDismissed] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
-
-  useEffect(() => {
-    let stored = false;
-    try {
-      stored = localStorage.getItem(STORAGE_KEY) === "1";
-    } catch {
-      // Storage blocked: show the strip.
-    }
-    setDismissed(stored);
-  }, []);
 
   const dismiss = () => {
     setDismissed(true);
-    try {
-      localStorage.setItem(STORAGE_KEY, "1");
-    } catch {
-      // Storage blocked: hidden for this session only.
-    }
+    document.documentElement.dataset.betaDismissed = "1";
+    document.cookie = `${COOKIE}=1; path=/; max-age=31536000; samesite=lax`;
   };
 
-  if (dismissed !== false || !isExplorerRoute(pathname) || unlaunchedSubject(pathname)) return null;
+  if (dismissed || !isExplorerRoute(pathname) || unlaunchedSubject(pathname)) return null;
 
   return (
     // Spans the viewport, so on an explorer it reserves the rail's 56px the
     // way WorkInProgressStrip does. bg-sunken is the dark recessed tone
     // (--surface-sunken); no rule under it, and no caution colour: this is
     // information.
-    <div data-anatomy="H14" className="bg-sunken md:pl-14">
+    <div data-anatomy="H14" data-beta-strip="" className="bg-sunken md:pl-14">
       <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-2 text-sm leading-5 text-foreground md:px-6">
         <p className="flex min-w-0 flex-1 items-center justify-between gap-3 leading-5">
           <span className="font-semibold">Rails is in beta.</span>

@@ -9,8 +9,10 @@
 // page's position reads "this page" (not a link where it is the page). Then
 // "Wallet dashboard" and "Testnets not included". Read after mount from
 // /api/chain/wallet/<address>/summary, so the page's render does not wait on
-// it; nothing is drawn while it loads, when it fails, or when the page's
-// position is the wallet's only one. The popover is the address menu's (C7,
+// it. Its line is held from first paint (the loading grammar,
+// skeleton-card.tsx): a placeholder bar while the read is out, and the line
+// left empty when it fails or when the page's position is the wallet's only
+// one, so the heading never changes height. The popover is the address menu's (C7,
 // wallet-menu.tsx): a dropdown on desktop, a sheet below sm, closed by an
 // outside press and Escape; the rows take the Tools menu's keys.
 
@@ -18,6 +20,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { SkeletonBar } from "@/components/shared/skeleton-card";
 import { ChainGlyph } from "@/components/icons/chain-glyphs";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { MobileSheet } from "@/components/shared/mobile-sheet";
@@ -96,6 +99,8 @@ export function WalletPositionsMenu({ wallet }: { wallet: string }) {
   const pathname = usePathname();
   const address = wallet.toLowerCase();
   const [menu, setMenu] = useState<Menu | null>(null);
+  // The summary read has answered (or failed): the placeholder goes.
+  const [settled, setSettled] = useState(false);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -111,10 +116,16 @@ export function WalletPositionsMenu({ wallet }: { wallet: string }) {
   useEffect(() => {
     let live = true;
     setMenu(null);
+    setSettled(false);
     setOpen(false);
-    if (!ADDRESS.test(address)) return;
+    if (!ADDRESS.test(address)) {
+      setSettled(true);
+      return;
+    }
     readCounts(address).then((c) => {
-      if (!live || !c || c.error) return;
+      if (!live) return;
+      setSettled(true);
+      if (!c || c.error) return;
       const search = window.location.search;
       setMenu(
         walletProtocolMenu(
@@ -162,7 +173,12 @@ export function WalletPositionsMenu({ wallet }: { wallet: string }) {
     return () => window.clearTimeout(t);
   }, [open, isPhone]);
 
-  if (!menu) return null;
+  if (!menu)
+    return (
+      <div className="flex h-5 items-center" data-wallet-positions-pending={settled ? undefined : ""}>
+        {!settled && <SkeletonBar width={72} />}
+      </div>
+    );
   const dashboard = `/wallet/${address}`;
 
   const rows = (
@@ -225,7 +241,7 @@ export function WalletPositionsMenu({ wallet }: { wallet: string }) {
   return (
     <div
       ref={ref}
-      className="relative flex min-w-0"
+      className="reveal-in relative flex min-w-0"
       data-anatomy="H13.2"
       data-wallet-positions-menu=""
       data-wallet-elsewhere={menu.pageCounted ? "others" : "all"}

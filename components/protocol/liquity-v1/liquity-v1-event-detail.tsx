@@ -19,6 +19,7 @@
 import type { ReactNode } from "react";
 import type { GasCost, LiquityV1Context } from "@/lib/shared/types/event-shape";
 import { eventGas, type EventCardPrice } from "@/components/shared/event-price-row";
+import { SkeletonBar } from "@/components/shared/skeleton-card";
 import type { EventCardOpened } from "@/components/shared/event-card";
 import type { EventCellHead, EventCellSpec, EventFigure } from "@/components/shared/event-cells";
 import { Prov, type Provenance } from "@/components/shared/provenance";
@@ -498,7 +499,7 @@ function LiquidationRoutePending() {
       <div className="mb-1 text-xs font-semibold text-rb-500">Where it went</div>
       {["Stability Pool", "Liquidator", "Owner"].map((label) => (
         <Row key={label} label={label}>
-          <span className="inline-block h-3 w-28 animate-pulse rounded bg-rb-500/20 align-middle" />
+          <SkeletonBar width={112} height={12} />
         </Row>
       ))}
     </div>

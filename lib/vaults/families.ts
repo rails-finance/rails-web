@@ -15,8 +15,9 @@
 /** One vault product. MetaMorpho on Base and Ethereum; savings GHO, static aTokens and
  *  Umbrella stake tokens on Ethereum (Aave); Yearn V3 on Ethereum; Maple's
  *  syrup pools on Ethereum, which keep their own pools page and join only the
- *  cross-protocol index (ui-jobs 39; survey 2026-10-20 §7.6). */
-export type VaultFamily = "metamorpho" | "sgho" | "stata" | "umbrella-stake" | "yearn-v3" | "maple-pool";
+ *  cross-protocol index (ui-jobs 39; survey 2026-10-20 §7.6); sBOLD on
+ *  Ethereum, which has its page under Liquity V2 and no venue mark (ui-jobs 749). */
+export type VaultFamily = "metamorpho" | "sgho" | "stata" | "umbrella-stake" | "yearn-v3" | "maple-pool" | "sbold";
 
 /** The explorer a vault sits under (decision 0028), which is also the session
  *  key its listing is filed under. MetaMorpho's is chain-keyed: `morpho-base`
@@ -31,9 +32,10 @@ export interface VaultFamilyEntry {
   /** Maple's explorer is a lender explorer with no vault holder pages, so it
    *  is outside `VaultExplorer`. MetaMorpho's is Base's here; on Ethereum it
    *  is `morpho`. */
-  explorer: VaultExplorer | "maple";
-  /** The `ProtocolIcon` id of the venue that deployed it. */
-  venue: "morpho" | "aave-v3" | "yearn" | "maple";
+  explorer: VaultExplorer | "maple" | "liquity-v2";
+  /** The `ProtocolIcon` id of the venue that deployed it; for sBOLD, the
+   *  explorer its page sits under. */
+  venue: "morpho" | "aave-v3" | "yearn" | "maple" | "liquity";
   /** The family as a heading or a facet names it. */
   label: string;
   /** The same, for one vault. */
@@ -118,6 +120,15 @@ export const VAULT_FAMILIES: Record<VaultFamily, VaultFamilyEntry> = {
     label: "Maple pools",
     singular: "Maple pool",
     kind: "Credit pool",
+    census: null,
+    served: null,
+  },
+  sbold: {
+    explorer: "liquity-v2",
+    venue: "liquity",
+    label: "sBOLD",
+    singular: "ERC-4626 vault",
+    kind: "ERC-4626 vault",
     census: null,
     served: null,
   },

@@ -68,6 +68,7 @@ import { splitDust, useDustLines } from "@/components/shared/dust-reserves";
 import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
 import { TokenFigure } from "@/components/shared/token-figure";
 import { PanelFigure } from "@/components/shared/position-card-panel";
+import { FigureSlot } from "@/components/shared/skeleton-card";
 
 export interface SparkPositionView {
   wallet: string;
@@ -142,7 +143,7 @@ function LivesLines({ lives }: { lives: readonly SparkLife[] }) {
           <div key={l.from}>
             {i === 1 && lives.length > 3 && <div>{lives.length - 2} more between</div>}
             <span className="text-sm font-semibold text-foreground" data-prov-exempt="">
-              {end == null ? <span className="invisible">000 days</span> : formatDuration(l.from, end)}
+              {end == null ? <FigureSlot ch={8} /> : formatDuration(l.from, end)}
             </span>{" "}
             {when}
           </div>

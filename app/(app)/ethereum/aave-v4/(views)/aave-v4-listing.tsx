@@ -15,7 +15,7 @@
 //     seam, resolving ENS the same way the old body did).
 //
 // Graduated from the old bespoke AaveV4ListingClient (decision 0009): the framer
-// cascade, hand-rolled URL encode/decode + list-query, manual pagination and the
+// entrance, hand-rolled URL encode/decode + list-query, manual pagination and the
 // inline asset-universe/prune effects are all gone — the shared driver + the two
 // seams replace them.
 

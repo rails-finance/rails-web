@@ -19,6 +19,8 @@ import {
   LiquityForkBranchesStamp,
 } from "@/components/protocol/liquity-fork/liquity-fork-branches-view";
 import { ProvSource } from "@/components/shared/provenance";
+import { SpDepthStrip } from "@/components/protocol/liquity/sp-depth-strip";
+import { loadLiquityV2SpDepth } from "@/lib/sources/chain/liquity-v2-sp-depth";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { loadLiquityForkBranchesFromChain } from "@/lib/sources/chain/liquity-fork-branches";
 import { branchesPageTitle } from "@/lib/liquity-fork/shutdown";
@@ -54,9 +56,15 @@ export default async function LiquityV2BranchesPage() {
   // /api/chain/liquity-v2/branches route — same code, one less hop on the server.
   // A development server pinned by LIQUITY_V2_CCR_AT_BLOCK reads the roster at that block too.
   const data = await loadLiquityForkBranchesFromChain(CFG, liquityV2CcrDevPin() ?? undefined);
-  // The branches against their CCR (ui-jobs 747), read at the roster's block, so
-  // the notice and the TCR bar state one block's figures.
-  const ccr = data.blockNumber > 0 ? settleAllBranchCcr(await loadLiquityV2BranchCcr(data.blockNumber)) : undefined;
+  // At the roster's block, so the page states one block's figures: the
+  // branches against their CCR (ui-jobs 747) and the Stability Pools' depth
+  // (ui-jobs 748).
+  const at = data.blockNumber > 0 ? data.blockNumber : undefined;
+  const [ccrRead, depth] = await Promise.all([
+    at != null ? loadLiquityV2BranchCcr(at) : undefined,
+    loadLiquityV2SpDepth(at),
+  ]);
+  const ccr = ccrRead !== undefined ? settleAllBranchCcr(ccrRead) : undefined;
 
   return (
     <div className="min-h-screen">
@@ -68,9 +76,12 @@ export default async function LiquityV2BranchesPage() {
         />
 
         {/* Every value inside registers its receipt against this one head block —
-            the same block the stamp above names. */}
+            the same block the stamp above names. The depth strip may stand at a
+            later block, which it states: where its node had not reached the
+            roster's block, it reads once more at head. */}
         <div data-skel-section="page-table">
           <ProvSource source={{ block: data.blockNumber }}>
+            <SpDepthStrip depth={depth} className="mb-6" />
             <LiquityForkBranchesView
               scopeKeys={branchScopeKeys(1, LIQUITY_V2_BRANCHES, TOKEN_ADDRESSES.BOLD)}
               ccr={ccr}

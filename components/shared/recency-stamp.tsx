@@ -8,7 +8,9 @@
 // "index", ui-jobs 444), so a stalled capture reads as an old stamp; on
 // Arbitrum and Sepolia it is the chain's latest. The age ticks client-side
 // off the block timestamp; the head only re-pulls on focus / reload.
-// Fail-soft: renders nothing when the chain head is unavailable.
+// While the head is read the stamp's place holds a placeholder bar (the
+// loading grammar, skeleton-card.tsx); once the read has failed it renders
+// nothing.
 //
 // Three readings, stepped by a press on the stamp: the age ("3 min", behind
 // the block-and-clock icon), the block number ("11,932,361", behind the
@@ -22,7 +24,8 @@
 import { useEffect, useState } from "react";
 import { Box, CalendarClock } from "lucide-react";
 import { BlockClockIcon } from "@/components/icons/block-clock-icon";
-import { useChainHead } from "@/hooks/useChainHead";
+import { useChainHeadRead } from "@/hooks/useChainHead";
+import { SkeletonBar } from "@/components/shared/skeleton-card";
 import { CTRL_GHOST, CTRL_OFF } from "@/lib/shared/ui-grammar";
 import { nextReading, stampTime, storedReading, storeReading, type Reading } from "@/lib/shared/recency-reading";
 import { readTimeText } from "@/lib/shared/position-read";
@@ -45,7 +48,7 @@ function formatCompactAge(elapsedMs: number): string {
  *  carries back, this stamp, the labelled prices trigger and Tools across
  *  390px. */
 export function RecencyStamp({ className, compact = false }: { className?: string; compact?: boolean }) {
-  const head = useChainHead();
+  const { head, failed } = useChainHeadRead();
   // Re-render every 30s so the age stays current without re-fetching.
   const [, tick] = useState(0);
   useEffect(() => {
@@ -61,7 +64,12 @@ export function RecencyStamp({ className, compact = false }: { className?: strin
     storeReading(next);
   };
 
-  if (!head) return null;
+  if (!head)
+    return failed ? null : (
+      <span className="inline-flex h-7 w-16 items-center justify-end px-1.5" data-recency-pending="">
+        <SkeletonBar width={44} />
+      </span>
+    );
   const age = formatCompactAge(Date.now() - head.blockTimestamp * 1000);
   const block = head.blockNumber.toLocaleString("en-US");
 
@@ -81,7 +89,7 @@ export function RecencyStamp({ className, compact = false }: { className?: strin
       aria-label={`${head.source === "index" ? `Indexed to block ${block}, minted ${age} ago` : `Chain head minted ${age} ago, block ${block}`}, ${readTimeText(head.blockTimestamp)}. Press to show the ${nextName}.`}
       // The control grammar: the stamp reads as pressable. Same height and
       // radius as the price trigger beside it, one type size down.
-      className={className ?? `${CTRL_GHOST} ${CTRL_OFF} h-7 gap-1.5 rounded-md px-1.5 text-[11px] tabular-nums`}
+      className={`${className ?? `${CTRL_GHOST} ${CTRL_OFF} h-7 gap-1.5 rounded-md px-1.5 text-[11px] tabular-nums`} reveal-in`}
     >
       <Icon size={12} aria-hidden className={compact ? "hidden sm:block" : undefined} />
       <span aria-hidden>{text}</span>

@@ -82,6 +82,9 @@ export interface LiquityTroveView {
    *  before /api/oracle lands): the detail card draws skeletons in the USD,
    *  ratio and liquidation slots instead of leaving them empty. */
   pricePending?: boolean;
+  /** The price read has ended without a price (V2's detail page): the slots
+   *  that need it say "price unavailable" (TO-DO-position-card 313). */
+  priceUnavailable?: boolean;
   collateralUsd?: number | null;
   /** Collateral ratio as a PERCENT (187.4), never a ratio. */
   collateralRatioPct?: number | null;

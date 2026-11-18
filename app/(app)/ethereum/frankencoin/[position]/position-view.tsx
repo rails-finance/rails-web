@@ -400,7 +400,7 @@ export default function FrankencoinPositionView({
       <div className="py-8 space-y-6">
         <DetailTopRow
           session="frankencoin"
-          owner={{ wallet: view?.owner }}
+          owner={{ wallet: view?.owner, pending: loading }}
           assets={stripAssets}
           priceReason={ORACLE_USD_REASON.frankencoin}
           closed={view != null && view.status !== "open"}

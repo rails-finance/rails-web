@@ -17,19 +17,24 @@ export type SkeletonSection =
   | "page-header"
   | "page-table";
 
-// Measured lg-bucket (1440×900) values, 2026-07-25 (see header comment for
-// route provenance). Whole px. `page-table` measured 2022px on
+// Measured lg-bucket (1440×900) values. The listing and detail sections were
+// re-read on 18 Nov 2026 against settled pages (the Liquity V2 listing, a
+// Liquity V2 Trove, an Aave V3 position): the toolbar 40 and a row 168 on
+// the listing; the card 277 (Trove) and 257 to 293 (Aave V3), taken at 270;
+// the two-sided Lifetime flows panel 426, the timeline header 92 and an
+// event row 60. `page-header` and `page-table` keep the 2026-07-25 reads
+// (see header comment). Whole px. `page-table` measured 2022px on
 // /compound/markets — past the memory layer's 16–900 sanity band and past any
 // viewport — so it holds the 900 ceiling instead: below the first ~900px the
 // two paint identically, and default and memory stay on one scale.
 export const DEFAULT_SKELETON_SIZES: Record<SkeletonSection, number> = {
   "listing-header-extra": 24,
-  "listing-toolbar": 68,
-  "listing-row": 150,
-  "detail-card": 220,
-  "detail-economics": 232,
-  "detail-timeline-header": 28,
-  "detail-event": 56,
+  "listing-toolbar": 40,
+  "listing-row": 168,
+  "detail-card": 270,
+  "detail-economics": 426,
+  "detail-timeline-header": 92,
+  "detail-event": 60,
   "page-header": 376,
   "page-table": 900,
 };

@@ -412,7 +412,7 @@ function Sheet<F>({
         role="dialog"
         aria-modal="true"
         aria-labelledby="filter-sheet-title"
-        className="relative flex max-h-[88vh] flex-col rounded-t-2xl bg-raised text-foreground shadow-xl dark:bg-rb-900"
+        className="relative flex max-h-[88vh] flex-col rounded-t-2xl bg-raised text-foreground shadow-xl dark:bg-rb-900 [&_.overlay-search]:bg-raised! dark:[&_.overlay-search]:bg-rb-900!"
         data-filter-sheet=""
         data-anatomy="N1.8"
       >

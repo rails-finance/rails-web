@@ -11,7 +11,7 @@
 //       own stable, on both markets — recomputed HERE from the verifier's own
 //       chain read, never read off the page's own arithmetic. A closed CDP
 //       shows none. The LLM export carries the same figure.
-//   (d) The three slots the chain overlay fills pulse while it is in flight
+//   (d) The three slots the chain overlay fills hold placeholder bars while it is in flight
 //       and settle to their absent state when it never answers.
 //   (e) The Explanation pane is remembered per CDP, in localStorage.
 //   (f) A never-minted CDP is a real 404; a malformed URL still is; a burned
@@ -112,7 +112,7 @@ async function open(context, url) {
 
 const card = (page) => page.locator('[data-skel-section="detail-card"]').first();
 
-console.log("Polaris — the CDP page's identity row, cost line, pulses, remembered pane and 404\n");
+console.log("Polaris — the CDP page's identity row, cost line, placeholders, remembered pane and 404\n");
 console.log(`BASE ${BASE}\n`);
 
 const browser = await chromium.launch();
@@ -333,10 +333,10 @@ for (const [market, id] of [
   await page.close();
 }
 
-// ── (d) the detail page's pending pulses ───────────────────────────────────
+// ── (d) the detail page's pending placeholders ───────────────────────────────────
 // The chain overlay is the only source of the ratio, the collateral's USD and
-// the rate line. Held back, all three must pulse; refused, all three must
-// settle to their absent state with nothing left pulsing.
+// the rate line. Held back, all three must show a placeholder bar; refused, all three must
+// settle to their absent state with no bar left.
 {
   const page = await context.newPage();
   await page.route("**/api/chain/polaris/position**", async (route) => {
@@ -345,16 +345,20 @@ for (const [market, id] of [
   });
   await page.goto(polarisUrl("usdp", "8"), { waitUntil: "domcontentloaded", timeout: 180000 });
   await page.waitForTimeout(1000);
-  const pulsingEarly = await card(page).locator(".animate-pulse").count();
+  const pulsingEarly = await card(page).locator("[data-skel-bar]").count();
   check(
-    "d1. with the chain read held 4 s, the card's chain-fed slots pulse",
+    "d1. with the chain read held 4 s, the card's chain-fed slots hold placeholder bars",
     pulsingEarly >= 3,
-    `${pulsingEarly} pulsing`,
+    `${pulsingEarly} placeholder bars`,
   );
   await page.waitForTimeout(6000);
-  const pulsingLate = await card(page).locator(".animate-pulse").count();
+  const pulsingLate = await card(page).locator("[data-skel-bar]").count();
   const settled = (await card(page).innerText()).replace(/\s+/g, " ");
-  check("d2. once it lands, nothing on the card pulses", pulsingLate === 0, `${pulsingLate} pulsing`);
+  check(
+    "d2. once it lands, no placeholder bar is left on the card",
+    pulsingLate === 0,
+    `${pulsingLate} placeholder bars`,
+  );
   check(
     "d3. and the slots carry their values (the rate with its primary and safety parts)",
     /\d%/.test(settled) && /[\d.]+% primary \+ [\d.]+% safety/.test(settled),
@@ -367,11 +371,11 @@ for (const [market, id] of [
   await page.route("**/api/chain/polaris/position**", (route) => route.abort());
   await page.goto(polarisUrl("usdp", "8"), { waitUntil: "domcontentloaded", timeout: 180000 });
   await page.waitForTimeout(4000);
-  const pulsing = await card(page).locator(".animate-pulse").count();
+  const pulsing = await card(page).locator("[data-skel-bar]").count();
   check(
-    "d4. with the chain read refused, the pulses settle rather than spinning forever",
+    "d4. with the chain read refused, the placeholder bars settle rather than staying forever",
     pulsing === 0,
-    `${pulsing} pulsing`,
+    `${pulsing} placeholder bars`,
   );
   await page.close();
 }
@@ -632,6 +636,6 @@ const fixturesNote = hFixtures.length ? ` [h fixtures ${hFixtures.join(", ")}]` 
 console.log(
   failures
     ? `\n${failures} CHECK(S) FAILED of ${checked}${fixturesNote}`
-    : `\nALL ${checked} CHECKS PASS${fixturesNote} — the Polaris CDP page's identity row, cost line, pulses, remembered pane and 404 hold`,
+    : `\nALL ${checked} CHECKS PASS${fixturesNote} — the Polaris CDP page's identity row, cost line, placeholders, remembered pane and 404 hold`,
 );
 process.exit(failures ? 1 : 0);

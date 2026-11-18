@@ -57,7 +57,7 @@ export const STANDING_WORD: Record<VaultStanding, string> = {
   "decimals-disagree": "decimals disagree",
 };
 
-const VENUE: Record<VaultFamily, VaultVenue> = {
+const VENUE: Record<Exclude<VaultFamily, "sbold">, VaultVenue> = {
   metamorpho: "morpho",
   sgho: "sgho",
   stata: "stata",
@@ -87,16 +87,18 @@ export const VAULT_HEAD_TIPS = {
 
 /** The asset's icon with the venue mark at its corner. */
 export function VaultLead({ vault: v, size = 28 }: { vault: VaultSummary; size?: number }) {
-  // Yearn's mark is earned by the Registry's endorsement (decision 0027 call 1).
+  // Yearn's mark is earned by the Registry's endorsement (decision 0027 call 1);
+  // sBOLD carries none (ui-jobs 749).
+  const venue = v.family === "sbold" ? null : VENUE[v.family];
   const marked = v.family !== "yearn-v3" || v.standing.includes("endorsed");
   return (
     // The icon is decoration (the name beside it says which vault): a fallback
     // glyph's letters and digits are no figure, so the tripwire skips it.
     <span className="relative inline-flex shrink-0 items-center" data-vault-asset={v.asset.address} data-prov-exempt>
       <TokenChipIcon symbol={v.asset.symbol} address={v.asset.address} size={size} filterable={false} untitled />
-      {marked && (
+      {marked && venue != null && (
         <span className="absolute -bottom-0.5 -right-1.5 inline-flex rounded-full bg-raised p-px" data-venue-mark>
-          <VaultVenueMark family={VENUE[v.family]} />
+          <VaultVenueMark family={venue} />
         </span>
       )}
     </span>

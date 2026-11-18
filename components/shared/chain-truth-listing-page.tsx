@@ -164,7 +164,7 @@ export interface ChainTruthListingPageProps<T, F extends BaseListFilters, Ext = 
    *  whether this view is a holder's whole set at all; return null for every
    *  other view. The shell draws it inside the dimmed column (it states
    *  figures summed from the rows) and outside their `viewKey` re-mount (a
-   *  page or sort change must not re-stagger a band that did not change).
+   *  page or sort change must not replay the fade on a band that did not change).
    *  Every other listing passes nothing. */
   renderAbove?: (ctx: { items: T[]; total: number; filters: F }) => ReactNode;
   /** A section listing's identity line (mark + word) above the h1 — for a
@@ -261,11 +261,11 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
   const retry = useCallback(() => setRetryTick((t) => t + 1), []);
 
   // Identity of the currently-DISPLAYED result set, keyed to drive the shell's
-  // entrance cascade (it re-plays whenever this changes). The memory tier re-keys
+  // entrance fade (it replays whenever this changes). The memory tier re-keys
   // synchronously off the selection (data is already in the browser); the server
-  // tier re-keys only once its fetch lands, so the cascade tracks real rows and
+  // tier re-keys only once its fetch lands, so the fade tracks real rows and
   // not the in-flight click. Search text is excluded so live typing filters in
-  // place rather than re-staggering the whole column each keystroke.
+  // place rather than replaying the fade on every keystroke.
   const [serverViewKey, setServerViewKey] = useState<string>(initialKey ?? "");
 
   // First-mount skips: the SSR data already covers this URL, so don't re-fetch it.
@@ -407,7 +407,7 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
       // useSearchParams to pushState) while staying entirely on the client, so a
       // facet click registers immediately. Dim the server tier the instant it's
       // clicked (its rows re-fetch); the memory tier needs no dim — it re-filters
-      // and re-cascades synchronously.
+      // and replays the fade synchronously.
       if (strategyRef.current.kind === "server") setRefreshing(true);
       window.history.pushState(null, "", url);
       // pushState doesn't fire popstate; nudge useUrlSearchParams to re-read.

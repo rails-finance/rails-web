@@ -25,17 +25,17 @@
 // the SSR'd trove page), and the RSC payload an in-app navigation fetches is
 // untouched — the flight stream flushes regardless of a loading boundary.
 //
-// One solid block per real section — header, toolbar, then the row column —
-// in the real <ChainTruthListing> order (search → facets → sort all live
-// INSIDE the one toolbar block, so the strip can't mis-order what it doesn't
-// draw). The header-extra band (a stats strip some listings mount between
+// One placeholder per real section, in the loading grammar (skeleton-card.tsx)
+// — header, toolbar, then the row column — in the real <ChainTruthListing>
+// order (search → facets → sort all live INSIDE the one toolbar row, so the
+// strip can't mis-order what it doesn't draw). The header-extra band (a stats strip some listings mount between
 // header and toolbar) renders ONLY when the memory layer remembered one for
 // this route — a default would conjure a section most listings lack.
 
 import { usePathname } from "next/navigation";
 import { protocolForPathname, subPageForPathname } from "@/lib/shared/protocols";
 import { RailHeader } from "@/components/shared/rail-header";
-import { SkeletonBlock } from "@/components/shared/skeleton-card";
+import { SkeletonBar, SkeletonBlock } from "@/components/shared/skeleton-card";
 import { ChainTruthListLoadingSkeleton } from "@/components/shared/chain-truth-list-loading-skeleton";
 import { useSkeletonSizes } from "@/hooks/useSkeletonSizes";
 
@@ -45,8 +45,8 @@ export function ListingRouteLoading() {
   // so the REAL one renders here rather than a blank block — the title row
   // and its sections menu holding steady through a navigation instead of
   // vanishing into the skeleton. The pathname is already the destination while
-  // this boundary shows, so the menu names the section being opened. Outside the pulse wrapper:
-  // it is content, not a placeholder.
+  // this boundary shows, so the menu names the section being opened. It
+  // is content, not a placeholder.
   const pathname = usePathname();
   const entry = protocolForPathname(pathname);
   const venue = !entry
@@ -63,11 +63,23 @@ export function ListingRouteLoading() {
           <RailHeader session={entry.session} venue={venue} stamp={venue === "listing"} />
         </div>
       )}
-      <div className="animate-pulse">
+      <div aria-busy="true">
         {remembered["listing-header-extra"] != null && (
           <SkeletonBlock height={remembered["listing-header-extra"]} className="mb-6" />
         )}
-        <SkeletonBlock height={sizes["listing-toolbar"]} className="mb-6 rounded-md" />
+        {/* The toolbar: a bare row of bars where its controls stand. */}
+        <SkeletonBlock
+          height={sizes["listing-toolbar"]}
+          frame={false}
+          className="mb-6"
+          bars={
+            <div className="flex h-full items-center gap-3">
+              <SkeletonBar width={180} wait={false} />
+              <SkeletonBar width={72} wait={false} />
+              <SkeletonBar width={72} wait={false} />
+            </div>
+          }
+        />
         <ChainTruthListLoadingSkeleton />
       </div>
     </div>
