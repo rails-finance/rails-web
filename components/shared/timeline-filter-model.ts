@@ -23,6 +23,8 @@ interface AxisSpec {
   name: string;
   options: FilterOption[];
   visible: Set<string>;
+  /** The keys the hook holds hidden on this axis, offered or not. */
+  hiddenRaw: string[];
   toggle: (key: string) => void;
   reset: () => void;
   /** Option labels are names (symbols, versions, addresses), kept as written. */
@@ -40,6 +42,7 @@ function axesOf(tl: TimelineEventsState, assetIcon?: (symbol: string) => ReactNo
   const all: AxisSpec[] = [
     {
       axis: "type",
+      hiddenRaw: tl.hiddenKeys.action,
       name: "Type",
       options: tl.eventOptions,
       visible: tl.visibleActionKeys,
@@ -48,6 +51,7 @@ function axesOf(tl: TimelineEventsState, assetIcon?: (symbol: string) => ReactNo
     },
     {
       axis: "asset",
+      hiddenRaw: tl.hiddenKeys.asset,
       name: "Asset",
       options: tl.assetOptions,
       visible: tl.visibleAssetKeys,
@@ -57,6 +61,7 @@ function axesOf(tl: TimelineEventsState, assetIcon?: (symbol: string) => ReactNo
     },
     {
       axis: "version",
+      hiddenRaw: tl.hiddenKeys.version,
       name: "Version",
       options: tl.versionOptions,
       visible: tl.visibleVersionKeys,
@@ -65,6 +70,7 @@ function axesOf(tl: TimelineEventsState, assetIcon?: (symbol: string) => ReactNo
     },
     {
       axis: "address",
+      hiddenRaw: tl.hiddenKeys.counterparty,
       name: "Address",
       options: tl.counterpartyOptions,
       visible: tl.visibleCounterpartyKeys,
@@ -160,11 +166,11 @@ export function timelineFilterModel(
   const onChange = (next: TimelineFilters) => {
     for (const a of axes) {
       const want = next[a.axis];
-      // Against what the hook hides now, so a view no selection names (every
-      // key hidden) is still undone.
+      // Against the keys the hook holds, so a view no selection names (every
+      // key hidden, a key no option offers) is still undone.
       const hide = hiddenBy(a, want);
-      const hiddenNow = a.options.filter((o) => !a.visible.has(o.key));
-      if (hide.size === hiddenNow.length && hiddenNow.every((o) => hide.has(o.key))) continue;
+      const held = new Set(a.hiddenRaw);
+      if (hide.size === held.size && [...hide].every((k) => held.has(k))) continue;
       // Back to every key shown, then hide what the selection leaves out (the
       // hook's toggles queue on its state, so the run lands as one view).
       a.reset();

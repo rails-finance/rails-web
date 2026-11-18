@@ -1,8 +1,8 @@
 // components/shared/timeline-filter-model.ts: the timeline's axes as the
 // listings' filter model (rails-ops ui-jobs 735). An axis that hides every
 // key it offers is a set pill ("Type None"), a one-option axis hidden by a
-// link keeps a pill, and a write is judged against what the hook hides now,
-// so removing the pill or Clear all undoes either. Run: npm test
+// link keeps a pill, and a write is judged against the keys the hook holds,
+// so removing the pill or Clear all undoes either, and a key no option offers. Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
 import { register } from "node:module";
@@ -30,13 +30,19 @@ const { groupDimensions, pillFor } = await import("../../components/shared/filte
 
 /** A stand-in for useTimelineEvents' state: the type and asset axes over
  *  `hidden`, and a log of the writes the model makes. */
-function state({ types, assets = [], hidden = [] }) {
+function state({ types, assets = [], hidden = [], stale = [] }) {
   const log = [];
   const opts = (keys) => keys.map((k) => ({ key: k, label: k[0].toUpperCase() + k.slice(1) }));
   const visible = (keys) => new Set(keys.filter((k) => !hidden.includes(k)));
   return {
     log,
     tl: {
+      hiddenKeys: {
+        action: [...hidden.filter((k) => types.includes(k)), ...stale],
+        asset: hidden.filter((k) => assets.includes(k)),
+        counterparty: [],
+        version: [],
+      },
       eventOptions: opts(types),
       visibleActionKeys: visible(types),
       toggleHiddenAction: (k) => log.push(["hide", k]),
@@ -109,4 +115,13 @@ test("ticking a type on a None pill keeps that type alone", () => {
     ["reset", "type"],
     ["hide", "supply"],
   ]);
+});
+
+test("Clear all clears a hidden key no option offers", () => {
+  // A leg key from a link, on a page that offers its umbrella whole.
+  const { tl, log } = state({ types: ["adjustTrove", "openTrove"], stale: ["adjustTrove.repay"] });
+  const m = timelineFilterModel(tl);
+  assert.equal(typePill(m).state, "unset");
+  clearTimelineFilters(m);
+  assert.deepEqual(log, [["reset", "type"]]);
 });

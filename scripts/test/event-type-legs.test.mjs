@@ -81,3 +81,18 @@ test("an adjust with no leg shows only while every leg is kept", () => {
   assert.equal(actionHidden(none, settleActionHidden(new Set(), offered)), false);
   assert.equal(actionHidden(none, settleActionHidden(new Set(["adjustTrove.addColl"]), offered)), true);
 });
+
+test("an umbrella offered whole reads its legs whole", () => {
+  const none = new Map();
+  // Some legs (a link from a page that offered them): dropped.
+  const some = settleActionHidden(new Set(["adjustTrove.repay"]), none);
+  assert.ok(!some.has("adjustTrove.repay") && !some.has("adjustTrove"));
+  assert.equal(actionHidden(adjust(0, -300), some), false);
+  // Every leg: the umbrella is hidden.
+  const every = settleActionHidden(
+    new Set(["adjustTrove.addColl", "adjustTrove.withdrawColl", "adjustTrove.borrow", "adjustTrove.repay"]),
+    none,
+  );
+  assert.ok(every.has("adjustTrove"));
+  assert.equal(actionHidden(adjust(0, -300), every), true);
+});

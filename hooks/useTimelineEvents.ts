@@ -192,6 +192,10 @@ export interface TimelineEventsState {
    *  opening balance's action keys with the same table the filter menu uses. */
   protocolKey: string;
 
+  /** The keys each axis hides, as stored (the URL, a stored view, the
+   *  toggles): a key no option offers can stand here, and a write that
+   *  clears the axis reads this to clear it too. */
+  hiddenKeys: { action: string[]; asset: string[]; counterparty: string[]; version: string[] };
   /** Action-type buckets for the FilterDropdown (demoted sorted to bottom). */
   eventOptions: FilterOption[];
   /** Keys currently shown (FilterDropdown `selected` for multi mode). */
@@ -997,7 +1001,7 @@ export function useTimelineEvents(
   }, []);
 
   const isFiltered =
-    hiddenSet.size > 0 ||
+    actionHiddenSet.size > 0 ||
     hiddenAssetSet.size > 0 ||
     hiddenCounterpartySet.size > 0 ||
     hiddenVersionSet.size > 0 ||
@@ -1048,6 +1052,12 @@ export function useTimelineEvents(
     // lib/shared/timeline-opening-balance.ts), so it is stated beside this
     // figure rather than added to it.
     filteredCount: dateFilteredEvents.length,
+    hiddenKeys: {
+      action: hiddenActions,
+      asset: hiddenAssets,
+      counterparty: hiddenCounterparties,
+      version: hiddenVersions,
+    },
     draftView,
     filteredCountIsFloor: false,
     isFiltered,

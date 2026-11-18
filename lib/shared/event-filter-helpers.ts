@@ -127,13 +127,22 @@ export const LEGLESS = ".none";
 /** The hidden action keys with the umbrellas settled against the legs a page
  *  offers (`offered`, umbrella → its legs on the page): an umbrella hidden
  *  hides each leg; any leg hidden hides the leg-less events; every leg hidden
- *  hides the umbrella. Loose events, folder headers and a draft's count all
+ *  hides the umbrella; an umbrella offered whole keeps none of its legs. Loose events, folder headers and a draft's count all
  *  read this one set. */
 export function settleActionHidden(
   hidden: ReadonlySet<string>,
   offered: ReadonlyMap<string, readonly string[]>,
 ): Set<string> {
   const out = new Set(hidden);
+  // An umbrella the page offers as one option (members below the cut or in a
+  // folder, or none loaded yet) reads its legs whole: every leg hidden hides
+  // it, and some legs alone, which no option could show, hide nothing.
+  for (const [parent, all] of Object.entries(ACTION_LEGS)) {
+    if (offered.has(parent)) continue;
+    const keys = all.map((l) => l.key);
+    if (keys.every((k) => hidden.has(k))) out.add(parent);
+    for (const k of keys) out.delete(k);
+  }
   for (const [parent, legs] of offered) {
     if (hidden.has(parent)) {
       for (const l of legs) out.add(l);
