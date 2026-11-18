@@ -777,7 +777,9 @@ function ChainTruthTimelineBody({
 }: ChainTruthTimelineProps) {
   const { showMarketNotes } = useTimelineDisplay();
   // Beside the card's lozenge the timeline stands in a rounded box, as the
-  // card's body and Lifetime flows do.
+  // card's body and Lifetime flows do. Inside it the grounds alternate (ui-jobs
+  // 730): an open or hovered event, and a note row at rest, on the page's
+  // ground; the cells inside them raised; the spine's halos on the box's.
   const boxed = usePositionCardIdentity() != null;
   const activeRuns = runs;
   // The cut (lib/shared/flow-focus.ts): once the Lifetime flows chart's
@@ -2099,6 +2101,7 @@ function ChainTruthTimelineBody({
                   "--spine-ground": "var(--surface-raised)",
                   "--event-ground": "var(--background)",
                   "--event-cell": "var(--surface-raised)",
+                  "--color-note": "var(--background)",
                 } as CSSProperties)
               : undefined
           }
