@@ -17,3 +17,10 @@ test("a ratio near one, and above a thousand (whole digits kept)", () => {
 test("no figure over a zero supply", () => {
   assert.equal(perShareText("5", "0", 18, 18), null);
 });
+
+test("a share count past twelve digits reads as a mantissa and a power of ten", async () => {
+  const { engineeringParts } = await import("../../lib/liquity-v2/sbold-per-share.ts");
+  assert.deepEqual(engineeringParts("43719935839791186313206357993620281274", 18), { mantissa: "43.72", exponent: 18 });
+  assert.deepEqual(engineeringParts("3130000000000000000000000000000", 18), { mantissa: "3.13", exponent: 12 });
+  assert.equal(engineeringParts("3130000000000000000000000", 18), null);
+});

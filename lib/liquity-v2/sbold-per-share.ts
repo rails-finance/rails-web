@@ -29,3 +29,23 @@ export function perShareText(
   const wn = w.length > 3 ? BigInt(w).toLocaleString("en-US") : w;
   return f ? `${wn}.${f}` : wn;
 }
+
+/** A raw amount as whole units: null where the integer has at most
+ *  `maxDigits` digits, else a mantissa rounded to four significant digits and a power
+ *  of ten that is a multiple of three ("43.72", 18). */
+export function engineeringParts(
+  raw: string,
+  decimals: number,
+  maxDigits = 12,
+): { mantissa: string; exponent: number } | null {
+  const whole = (BigInt(raw) / BigInt(10) ** BigInt(decimals)).toString();
+  if (whole.length <= maxDigits) return null;
+  const exponent = Math.floor((whole.length - 1) / 3) * 3;
+  const lead = whole.length - exponent;
+  const value = Number(whole.slice(0, 7)) / Math.pow(10, Math.min(7, whole.length) - lead);
+  // Rounded to four significant digits; a carry to 1000 moves up a power.
+  const text = value.toFixed(Math.max(0, 4 - lead));
+  if (Number(text) >= 1000) return { mantissa: "1", exponent: exponent + 3 };
+  const mantissa = text.includes(".") ? text.replace(/\.?0+$/, "") : text;
+  return { mantissa, exponent };
+}

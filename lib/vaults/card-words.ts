@@ -229,13 +229,15 @@ export const sboldVaultCardContent = (): LearnMoreContent => ({
 
 export const sboldVaultAssetsContent = (): LearnMoreContent => ({
   title: "Where the sBOLD vault's BOLD is",
-  intro: "The vault's deposit in each of Liquity V2's three Stability Pools, as each pool answers it.",
+  intro:
+    "The vault's deposit in each of Liquity V2's three Stability Pools, as each pool answers it, and the BOLD the vault holds, with their sum against total assets.",
   detailsHeading: "Key concepts:",
   details: [
     {
       bold: "Amount",
       text: "the pool's getCompoundedBoldDeposit for the vault: the deposit after the liquidations the pool has absorbed.",
     },
+    { bold: "Idle BOLD", text: "the BOLD token's balanceOf for the vault." },
     { bold: "Share of this vault", text: "a row's amount over the vault's total assets." },
   ],
 });

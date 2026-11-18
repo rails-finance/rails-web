@@ -4,7 +4,7 @@
 // One Multicall3 round at the block the page states: the vault's totalAssets(),
 // totalSupply(), convertToAssets(10 ** 18), asset(), name(), symbol() and
 // decimals(), and each Liquity V2 Stability Pool's
-// getCompoundedBoldDeposit(sBOLD).
+// getCompoundedBoldDeposit(sBOLD), and BOLD.balanceOf(sBOLD).
 //
 // RULE: a figure is the getter's answer. A getter that fails states no figure
 // (lib/liquity-v2/sp-chain-read.ts); a failed getter never becomes a zero.
@@ -32,6 +32,7 @@ const VAULT_ABI = parseAbi([
   "function decimals() view returns (uint8)",
 ]);
 const SP_ABI = parseAbi(["function getCompoundedBoldDeposit(address) view returns (uint256)"]);
+const ERC20_ABI = parseAbi(["function balanceOf(address) view returns (uint256)"]);
 
 type Call = { status: string; result?: unknown };
 const ok = <T>(r: Call | undefined): T | null => (r?.status === "success" && r.result != null ? (r.result as T) : null);
@@ -71,6 +72,8 @@ export interface SboldVaultResponse {
   };
   /** One per branch, in SP_BRANCHES order. */
   deposits: SboldDeposit[];
+  /** `BOLD.balanceOf(sBOLD)`; null where the getter failed. */
+  idle: RawAmount | null;
 }
 
 const VAULT_CALLS = ["totalAssets", "totalSupply", "asset", "name", "symbol", "decimals", "convertToAssets"] as const;
@@ -104,6 +107,7 @@ export async function loadSboldVault(): Promise<SboldVaultResponse> {
         functionName: "getCompoundedBoldDeposit",
         args: [vault],
       })),
+      { address: SBOLD_ASSET.address as `0x${string}`, abi: ERC20_ABI, functionName: "balanceOf", args: [vault] },
     ];
     const reads = (await client.multicall({ contracts, allowFailure: true, blockNumber })) as Call[];
     const at = <T>(name: (typeof VAULT_CALLS)[number]) => ok<T>(reads[VAULT_CALLS.indexOf(name)]);
@@ -116,6 +120,7 @@ export async function loadSboldVault(): Promise<SboldVaultResponse> {
     const totalAssets = at<bigint>("totalAssets");
     const totalSupply = at<bigint>("totalSupply");
     const sharePrice = at<bigint>("convertToAssets");
+    const idleRaw = ok<bigint>(reads[VAULT_CALLS.length + pools.length]);
 
     return {
       blockNumber: Number(blockNumber),
@@ -135,6 +140,7 @@ export async function loadSboldVault(): Promise<SboldVaultResponse> {
         const raw = ok<bigint>(reads[VAULT_CALLS.length + i]);
         return { branch, pool, compounded: raw == null ? null : amount(raw, d) };
       }),
+      idle: idleRaw == null ? null : amount(idleRaw, d),
     };
   } catch (error) {
     console.error("sBOLD vault chain read failed:", error);
@@ -143,6 +149,7 @@ export async function loadSboldVault(): Promise<SboldVaultResponse> {
       chainStale: true,
       vault: EMPTY_VAULT,
       deposits: pools.map(({ branch, pool }) => ({ branch, pool, compounded: null })),
+      idle: null,
     };
   }
 }

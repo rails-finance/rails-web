@@ -2,7 +2,8 @@
 // ----------------------------------------------------------------------------
 // The Yearn vault page's shell (app/(app)/ethereum/yearn/vaults/[vault]) for
 // one ERC-4626 vault on BOLD, drawn by components/vaults/sbold-vault-page.tsx
-// from one block's read (lib/sources/chain/sbold-vault.ts). Chain facts only.
+// from one block's read (lib/sources/chain/sbold-vault.ts) and the daily
+// lines (lib/sources/chain/sbold-daily.ts). Chain facts only.
 
 import type { Metadata } from "next";
 
@@ -12,6 +13,7 @@ import { SboldVaultPage } from "@/components/vaults/sbold-vault-page";
 import { FocusSourceGate } from "@/components/shared/aim-gate";
 import { listingMetadata } from "@/lib/shared/page-metadata";
 import { loadSboldVault } from "@/lib/sources/chain/sbold-vault";
+import { loadSboldSeries } from "@/lib/sources/chain/sbold-daily";
 import { SBOLD_ASSET, SBOLD_PAGE_PATH } from "@/lib/liquity-v2/sbold";
 
 // Every figure is a getter's answer at the head.
@@ -26,6 +28,7 @@ export const metadata: Metadata = listingMetadata({
 
 export default async function SboldVaultRoute() {
   const data = await loadSboldVault();
+  const series = data.chainStale ? null : await loadSboldSeries(data);
   return (
     <FocusSourceGate source={{ asset: SBOLD_ASSET }} chain={1} what="This vault">
       <div className="min-h-screen">
@@ -39,7 +42,7 @@ export default async function SboldVaultRoute() {
               This vault could not be read from chain just now, so no figure is stated for it.
             </p>
           ) : (
-            <SboldVaultPage data={data} />
+            <SboldVaultPage data={data} series={series} />
           )}
 
           {/* The inspector, armed from the profile menu's switch. */}

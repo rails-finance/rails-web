@@ -12,9 +12,8 @@ export const SBOLD_ASSET = { address: "0x6440f144b7e50d6a8439336510312d2f54beb01
 /** The block the vault's code first appears in. */
 export const SBOLD_CREATED_BLOCK = 22_639_160;
 
-/** The vault's page. */
+/** The vault's page, where a search for sBOLD lands. */
 export const SBOLD_PAGE_PATH = `${LIQUITY_V2_BASE_PATH}/sbold`;
 
-/** Where a search for sBOLD lands: the vault's deposits in the Stability Pool
- *  listing, one row per branch. */
-export const SBOLD_HREF = `${LIQUITY_V2_SP_PATH}?q=${SBOLD_VAULT}`;
+/** The vault's deposits in the Stability Pool listing, one row per branch. */
+export const SBOLD_DEPOSITS_HREF = `${LIQUITY_V2_SP_PATH}?q=${SBOLD_VAULT}`;
