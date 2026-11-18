@@ -129,7 +129,7 @@ export interface DepositNow {
 }
 
 /** The pending figures from the chain read alone: the card's headlines, which
- *  stand whether or not the index has served the deposit's newest touch. */
+ *  stand whether or not the index has served the deposit's last touch. */
 export function depositNowFromChain(chain: DepositChainFigures): DepositNow {
   const now = big(chain.compoundedRaw);
   const coll = big(chain.collGainRaw);

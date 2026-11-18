@@ -136,7 +136,7 @@ export function depositNow(
 }
 
 /** The same figures from the chain read alone: the card's headlines, which
- *  stand whether or not the index has served the deposit's newest touch. */
+ *  stand whether or not the index has served the deposit's last touch. */
 export function depositNowFromChain(chain: {
   compoundedRaw: string;
   recordedRaw: string;

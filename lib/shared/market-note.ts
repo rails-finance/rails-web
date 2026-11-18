@@ -957,7 +957,7 @@ function mergeRateStepRun(run: readonly RateStepNote[]): RateStepNote {
 }
 
 /**
- * A LIVE Polaris rate step: this CDP's own NEWEST touch that carries a rate
+ * A LIVE Polaris rate step: this CDP's own LAST touch that carries a rate
  * against the market's own primary rate read live at the chain head.
  * Not held to `rateStepNotesFor`'s `RATE_STEP_MIN_PP` gate on a historical
  * stretch; a move that rounds to 0.00 points draws no note (`liveNoteStated`).
