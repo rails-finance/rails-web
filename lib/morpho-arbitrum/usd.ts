@@ -126,7 +126,8 @@ export function morphoArbitrumSideReceipt(
     const px = priceOf(read, p);
     if (px == null) return null;
     const token = tokenOf(p);
-    const label = twice(p) ? `${morphoArbitrumPair(p)} ${token}` : undefined;
+    // Two markets in one token: each leg is named by its market.
+    const label = twice(p) ? morphoArbitrumPair(p) : undefined;
     if (side === "collateral") {
       if (!(p.oraclePrice > 0)) return null;
       const c = morphoCollateralPrice(collateralArgs(p, px, block));
