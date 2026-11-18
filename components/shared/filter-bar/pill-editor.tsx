@@ -572,7 +572,7 @@ function ThresholdEditor<F>({
         ))}
       </div>
       {mode === "between" ? (
-        <div className="flex items-center gap-2">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
           <CountInput
             label={`Minimum ${noun}`}
             placeholder="Min"
@@ -654,7 +654,7 @@ function CountInput({
     onCommit(v);
   };
   return (
-    <label className="flex h-12 sm:h-10 flex-1 items-center gap-3 rounded-lg bg-rb-100 px-3 text-sm text-rb-500 dark:text-rb-400/75 focus-within:ring-2 focus-within:ring-blue-500 dark:bg-rb-900">
+    <label className="flex h-12 sm:h-11 w-full min-w-0 items-center gap-3 rounded-xl bg-rb-100 px-4 text-sm text-rb-500 dark:text-rb-400/75 focus-within:ring-2 focus-within:ring-inset focus-within:ring-blue-500 dark:bg-rb-900">
       {prefix && <span aria-hidden="true">{prefix}</span>}
       <input
         type="text"
