@@ -20,7 +20,10 @@
 // from all assets") shows every asset until "Done" (Miles, 10 Nov 2026).
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { BoldCardPrice, BoldReadContext, holdsBold } from "@/components/assets/bold-live-price";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import type { BoldPriceRead } from "@/lib/liquity-v2/bold-price";
 import { asOfMark, asOfWords, flagWords, fmtRowPrice } from "@/components/assets/asset-price-row";
 import { PriceUnitMark } from "@/components/assets/price-unit-mark";
 import { fmtChange, PriceSparkline } from "@/components/assets/price-sparkline";
@@ -102,12 +105,16 @@ export function AssetExplorer({
   initial,
   initialSearch,
   about,
+  boldRead,
 }: {
   cards: AssetCard[];
   initial: ExplorerState;
   initialSearch: string;
   /** The (i) drawer's body: what the list is and the day its prices read. */
   about: ReactNode;
+  /** BOLD's Curve BOLD/USDC read for its row (A5.12, ui-jobs 746b); null
+   *  where it failed. */
+  boldRead?: BoldPriceRead | null;
 }) {
   const scope = useAssetScope();
   const [introOpen, setIntroOpen] = useState(false);
@@ -359,136 +366,139 @@ export function AssetExplorer({
   );
 
   return (
-    <div>
-      <header className="mb-4" data-anatomy="A5">
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-semibold text-foreground">Assets</h1>
-          <InfoDisclosureTrigger
-            open={introOpen}
-            onToggle={() => setIntroOpen((o) => !o)}
-            label="about this list"
-            ariaControls="asset-explorer-intro"
-          />
-        </div>
-        <div
-          id="asset-explorer-intro"
-          data-intro-drawer
-          hidden={!introOpen}
-          className="mt-2 max-w-3xl rounded-xl bg-raised px-3 py-3 text-[12px] leading-relaxed text-rb-500"
-        >
-          {about}
-        </div>
-      </header>
+    <BoldReadContext.Provider value={boldRead}>
+      <div>
+        <header className="mb-4" data-anatomy="A5">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold text-foreground">Assets</h1>
+            <InfoDisclosureTrigger
+              open={introOpen}
+              onToggle={() => setIntroOpen((o) => !o)}
+              label="about this list"
+              ariaControls="asset-explorer-intro"
+            />
+          </div>
+          <div
+            id="asset-explorer-intro"
+            data-intro-drawer
+            hidden={!introOpen}
+            className="mt-2 max-w-3xl rounded-xl bg-raised px-3 py-3 text-[12px] leading-relaxed text-rb-500"
+          >
+            {about}
+          </div>
+        </header>
 
-      {scope.on && (
-        <p className="mb-3 text-xs text-rb-500" data-asset-focus-line={manage ? "manage" : "focus"}>
-          {manage ? (
-            <>
-              Showing all assets to add to your focus ·{" "}
-              <button
-                type="button"
-                onClick={() => setManage(false)}
-                className={`inline-flex min-h-11 items-center font-semibold sm:min-h-0 ${INPLACE_TEXT}`}
-                data-asset-manage-done=""
-              >
-                Done
-              </button>
-            </>
-          ) : (
-            <>
-              Showing {n(scoped.rows.length)} of {n(allCards.length)} {allCards.length === 1 ? "asset" : "assets"} in
-              your focus ·{" "}
-              <button
-                type="button"
-                onClick={() => setManage(true)}
-                className={`inline-flex min-h-11 items-center font-semibold sm:min-h-0 ${INPLACE_TEXT}`}
-                data-asset-manage=""
-              >
-                Add assets
-              </button>
-            </>
-          )}
-        </p>
-      )}
-
-      <div {...scoped.listProps}>
-        <ListToolbar
-          dimensions={dimensions}
-          filters={state}
-          onChange={onToolbar}
-          sortOptions={[]}
-          mobileSort={{
-            options: [...CARD_SORTS],
-            sortBy: filters.sortBy,
-            sortOrder: filters.sortOrder,
-            onChange: (key, order) => {
-              const k = key as CardSort;
-              const first = Object.values(HEAD_SORT).find((h) => h?.sort === k)?.first ?? "desc";
-              setSort(k, k === filters.sortBy ? order : first);
-            },
-          }}
-          searchPlaceholder="Symbol, address or category"
-          countNode={countNode}
-          sheetCount={{ total: shown.length, noun: "assets" }}
-          countFor={(draft) => cards.filter(passesFor(draft)).length}
-          skel="asset-explorer-toolbar"
-        />
-
-        {filtering && shown.length > 0 && (
-          <p className="-mt-3 mb-4 text-xs text-rb-500" data-asset-focus-on={shown.length}>
-            {shown.length <= FOCUS_ON_MAX ? (
-              <button
-                type="button"
-                onClick={focusOnShown}
-                className={`inline-flex min-h-11 items-center font-semibold sm:min-h-0 ${INPLACE_TEXT}`}
-                data-asset-focus-on-press=""
-              >
-                Focus on {shown.length === 1 ? "this asset" : `these ${n(shown.length)}`}
-              </button>
+        {scope.on && (
+          <p className="mb-3 text-xs text-rb-500" data-asset-focus-line={manage ? "manage" : "focus"}>
+            {manage ? (
+              <>
+                Showing all assets to add to your focus ·{" "}
+                <button
+                  type="button"
+                  onClick={() => setManage(false)}
+                  className={`inline-flex min-h-11 items-center font-semibold sm:min-h-0 ${INPLACE_TEXT}`}
+                  data-asset-manage-done=""
+                >
+                  Done
+                </button>
+              </>
             ) : (
-              <>Narrow to {FOCUS_ON_MAX} or fewer to focus on them</>
+              <>
+                Showing {n(scoped.rows.length)} of {n(allCards.length)} {allCards.length === 1 ? "asset" : "assets"} in
+                your focus ·{" "}
+                <button
+                  type="button"
+                  onClick={() => setManage(true)}
+                  className={`inline-flex min-h-11 items-center font-semibold sm:min-h-0 ${INPLACE_TEXT}`}
+                  data-asset-manage=""
+                >
+                  Add assets
+                </button>
+              </>
             )}
           </p>
         )}
 
-        {shown.length === 0 ? (
-          <p className="text-[13px] text-rb-500">No asset matches.</p>
-        ) : (
-          <DataTable
-            caption="Assets, with their price at the day's close and the Rails explorers that list them"
-            tableClassName="min-w-[860px] text-sm"
-            stacked
-            rowHeight="one"
-            data-asset-table=""
-          >
-            <DataTableHead>
-              {headerFor("Asset")}
-              {headerFor("Category")}
-              {headerFor("Chains")}
-              {headerFor("Price", "right")}
-              {headerFor("30 days", "right")}
-              {headerFor("Change", "right")}
-              {headerFor("Listed by")}
-              <DataTableHeader label={<span className="sr-only">Actions</span>} data-col-head="menu" />
-            </DataTableHead>
-            <DataTableBody>
-              {shown.map((c) => (
-                <AssetRow
-                  key={c.id}
-                  card={c}
-                  focusOn={scope.on}
-                  marked={manage}
-                  inFocus={inFocus(c)}
-                  picked={picked(c).length > 0}
-                  onAdd={() => add(c)}
-                  onRemove={() => remove(c)}
-                />
-              ))}
-            </DataTableBody>
-          </DataTable>
-        )}
+        <div {...scoped.listProps}>
+          <ListToolbar
+            dimensions={dimensions}
+            filters={state}
+            onChange={onToolbar}
+            sortOptions={[]}
+            mobileSort={{
+              options: [...CARD_SORTS],
+              sortBy: filters.sortBy,
+              sortOrder: filters.sortOrder,
+              onChange: (key, order) => {
+                const k = key as CardSort;
+                const first = Object.values(HEAD_SORT).find((h) => h?.sort === k)?.first ?? "desc";
+                setSort(k, k === filters.sortBy ? order : first);
+              },
+            }}
+            searchPlaceholder="Symbol, address or category"
+            countNode={countNode}
+            sheetCount={{ total: shown.length, noun: "assets" }}
+            countFor={(draft) => cards.filter(passesFor(draft)).length}
+            skel="asset-explorer-toolbar"
+          />
+
+          {filtering && shown.length > 0 && (
+            <p className="-mt-3 mb-4 text-xs text-rb-500" data-asset-focus-on={shown.length}>
+              {shown.length <= FOCUS_ON_MAX ? (
+                <button
+                  type="button"
+                  onClick={focusOnShown}
+                  className={`inline-flex min-h-11 items-center font-semibold sm:min-h-0 ${INPLACE_TEXT}`}
+                  data-asset-focus-on-press=""
+                >
+                  Focus on {shown.length === 1 ? "this asset" : `these ${n(shown.length)}`}
+                </button>
+              ) : (
+                <>Narrow to {FOCUS_ON_MAX} or fewer to focus on them</>
+              )}
+            </p>
+          )}
+
+          {shown.length === 0 ? (
+            <p className="text-[13px] text-rb-500">No asset matches.</p>
+          ) : (
+            <DataTable
+              caption="Assets, with their price at the day's close and the Rails explorers that list them"
+              tableClassName="min-w-[860px] text-sm"
+              stacked
+              rowHeight="one"
+              data-asset-table=""
+            >
+              <DataTableHead>
+                {headerFor("Asset")}
+                {headerFor("Category")}
+                {headerFor("Chains")}
+                {headerFor("Price", "right")}
+                {headerFor("30 days", "right")}
+                {headerFor("Change", "right")}
+                {headerFor("Listed by")}
+                <DataTableHeader label={<span className="sr-only">Actions</span>} data-col-head="menu" />
+              </DataTableHead>
+              <DataTableBody>
+                {shown.map((c) => (
+                  <AssetRow
+                    key={c.id}
+                    card={c}
+                    focusOn={scope.on}
+                    marked={manage}
+                    inFocus={inFocus(c)}
+                    picked={picked(c).length > 0}
+                    onAdd={() => add(c)}
+                    onRemove={() => remove(c)}
+                  />
+                ))}
+              </DataTableBody>
+            </DataTable>
+          )}
+        </div>
       </div>
-    </div>
+      {boldRead !== undefined && <ProvInspectorLayer />}
+    </BoldReadContext.Provider>
   );
 }
 
@@ -515,6 +525,7 @@ function AssetRow({
   const href = c.row?.href ?? c.chains.find((x) => x.href)?.href ?? null;
   const row = c.row;
   const flag = row?.flag ? flagWords(row.flag) : null;
+  const boldRead = useContext(BoldReadContext);
   const token = c.chains[0]?.token ?? "";
   const name = (
     <span className="min-w-0 truncate text-sm font-semibold" title={c.symbol}>
@@ -621,6 +632,8 @@ function AssetRow({
               </span>
             )}
           </span>
+        ) : boldRead !== undefined && holdsBold(c.chains) ? (
+          <BoldCardPrice read={boldRead} />
         ) : c.figure ? (
           <FigureRow figure={c.figure} />
         ) : (

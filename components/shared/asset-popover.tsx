@@ -36,7 +36,10 @@ import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { useChainId } from "@/lib/shared/chain-context";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
-import { getTokenAddress } from "@/lib/shared/token-addresses";
+import { getTokenAddress, TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { useBoldPrice } from "@/lib/liquity-v2/use-bold-price";
+import { BoldPopoverPrice } from "@/components/assets/bold-live-price";
 import Link from "next/link";
 import { FOOT_LINK } from "@/lib/shared/ui-grammar";
 import { usePathname } from "next/navigation";
@@ -267,6 +270,9 @@ function AssetPageRow({ chain, contract, symbol }: { chain: ChainId; contract: s
   const [row, setRow] = useState<ReturnType<typeof rowFor>>(null);
   const [unpriced, setUnpriced] = useState(false);
   const [listed, setListed] = useState(false);
+  // BOLD on Ethereum states its Curve BOLD/USDC price (ui-jobs 746b).
+  const bold = chain === MAINNET_CHAIN_ID && contract.toLowerCase() === TOKEN_ADDRESSES.BOLD;
+  const boldPrice = useBoldPrice(bold ? undefined : null);
   useEffect(() => {
     let live = true;
     loadAssetPrices().then((list) => {
@@ -286,9 +292,13 @@ function AssetPageRow({ chain, contract, symbol }: { chain: ChainId; contract: s
         className="flex flex-col gap-1.5 border-t border-[var(--rb-tooltip-border)] pt-2"
         data-asset-popover-line="page"
       >
-        <p className="text-[11px] text-rb-500" data-asset-popover-priceless="">
-          {PRICELESS_WHY}
-        </p>
+        {bold ? (
+          <BoldPopoverPrice s={boldPrice} />
+        ) : (
+          <p className="text-[11px] text-rb-500" data-asset-popover-priceless="">
+            {PRICELESS_WHY}
+          </p>
+        )}
         <Link href={open} className={`self-start font-medium ${FOOT_LINK}`} data-asset-popover-open={open}>
           {WORDS.open(symbol)}
         </Link>

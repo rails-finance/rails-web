@@ -7,6 +7,7 @@ import { explorerState } from "@/lib/shared/asset-explorer";
 import { fetchAssetExplorerServer } from "@/lib/api/fetch-asset-explorer-server";
 import { readerIpFromHeaders } from "@/lib/api/reader-ip-server";
 import { formatDate } from "@/lib/date";
+import { loadBoldPrice } from "@/lib/sources/chain/liquity-v2-bold-price";
 
 export const dynamic = "force-dynamic";
 
@@ -24,9 +25,11 @@ export default async function AssetsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [data, sp] = await Promise.all([
+  const [data, sp, boldRead] = await Promise.all([
     fetchAssetExplorerServer(await readerIpFromHeaders()).catch(() => null),
     searchParams,
+    // BOLD's row reads its price from the Curve BOLD/USDC pool (ui-jobs 746b).
+    loadBoldPrice(),
   ]);
   const initialSearch = new URLSearchParams(
     Object.entries(sp).flatMap(([k, v]) => (v == null ? [] : (Array.isArray(v) ? v : [v]).map((x) => [k, x]))),
@@ -45,7 +48,13 @@ export default async function AssetsPage({
     <div className="min-h-screen">
       <div className="py-8">
         {data ? (
-          <AssetExplorer cards={data.cards} initial={explorerState(sp)} initialSearch={initialSearch} about={about} />
+          <AssetExplorer
+            cards={data.cards}
+            initial={explorerState(sp)}
+            initialSearch={initialSearch}
+            about={about}
+            boldRead={boldRead && typeof boldRead === "object" ? boldRead : null}
+          />
         ) : (
           <>
             <h1 className="mb-4 text-2xl font-semibold text-foreground" data-anatomy="A5">
