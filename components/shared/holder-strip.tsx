@@ -151,13 +151,17 @@ function HouseFigure({ leg, figure }: { leg: HolderLeg; figure: NonNullable<Hold
           <Prov info={leg.prov} value={leg.approx ? `≈ ${leg.value}` : leg.value}>
             {leg.tip ? <RevealTip tip={<span className={TIP_PROSE}>{leg.tip}</span>}>{shown}</RevealTip> : shown}
           </Prov>
-          <span className="inline-flex shrink-0 items-center" data-holder-tokens="">
-            {figure.tokens.map((t, i) => (
-              <span key={t.symbol} className={i > 0 ? "-ml-2" : undefined}>
-                <TokenChipIcon symbol={t.symbol} address={t.address} size={28} filterable={false} />
-              </span>
-            ))}
-          </span>
+          {/* A token's icon follows an amount in it; a figure in dollars
+              carries none, its tokens named beneath (ui-jobs 738). */}
+          {figure.amount != null && (
+            <span className="inline-flex shrink-0 items-center" data-holder-tokens="">
+              {figure.tokens.map((t, i) => (
+                <span key={t.symbol} className={i > 0 ? "-ml-2" : undefined}>
+                  <TokenChipIcon symbol={t.symbol} address={t.address} size={28} filterable={false} />
+                </span>
+              ))}
+            </span>
+          )}
         </span>
       </StatValue>
       {figure.amount != null && figure.usd != null && figure.usd > 0 && (
@@ -192,6 +196,8 @@ export function HolderStrip({
   if (positions != null && positions < 2) return null;
   const Scope = scoped ? Fragment : ProvUnscoped;
   const totals = !truncated && legs.length > 0 && (positions == null || counts.open >= 2);
+  // The wallet page's sections pass no counts sentence: their cards are under it.
+  if (!countsLine && !totals && !note && !wallet) return null;
   return (
     // A BAND, not a card: the raised rounded surface belongs to a position, and
     // this states something about several of them. A rule under it separates it
@@ -211,11 +217,15 @@ export function HolderStrip({
         data-holder-liquidated={counts.liquidated}
         className="mb-5 border-b border-rb-300/60 dark:border-rb-700/60 pb-4"
       >
-        <p data-holder-counts="" className="text-sm text-foreground/80">
-          {countsLine}
-        </p>
+        {countsLine && (
+          <p data-holder-counts="" className="text-sm text-foreground/80">
+            {countsLine}
+          </p>
+        )}
         {totals && (
-          <div className={`mt-2 grid grid-cols-2 gap-4 ${legs.length > 2 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+          <div
+            className={`${countsLine ? "mt-2 " : ""}grid grid-cols-2 gap-4 ${legs.length > 2 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}
+          >
             {legs.map((leg) => (
               <div key={leg.id} data-holder-leg={leg.id} data-anatomy="N7.1">
                 <div className="text-rb-500 text-xs font-semibold">{leg.label}</div>

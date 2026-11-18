@@ -175,7 +175,7 @@ function Section({ s }: { s: WalletSection }) {
         </h2>
         {s.open.length > 1 && (
           <span className="text-xs text-rb-500">
-            Open by risk{atRiskCount > 0 ? ` · ${atRiskCount} at risk` : ""}
+            Riskiest first{atRiskCount > 0 ? ` · ${atRiskCount} at risk` : ""}
             {s.dust > 0 ? ` · ${plural(s.dust, "position")} under $${DUST_USD} last` : ""}
           </span>
         )}

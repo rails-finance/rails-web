@@ -67,32 +67,6 @@ export interface WalletSection {
 
 const closedAt = (p: WalletPosition) => p.history?.closedAt ?? 0;
 
-/** "trove", "vault" or "position": the protocol's noun for one holding. */
-function nounOf(slug: string): [string, string] {
-  const kinds = walletProtocol(slug)?.kinds ?? [];
-  if (kinds.length === 1 && kinds[0] === "troves") return ["trove", "troves"];
-  if (kinds.length === 1 && kinds[0] === "vaults") return ["vault", "vaults"];
-  return ["position", "positions"];
-}
-
-const count = (n: number, [one, many]: [string, string]) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
-
-/** The band's counts sentence for a protocol without an adapter, in the
- *  Liquity V2 band's form. */
-function countsLine(slug: string, open: number, closed: number, liquidated: number, moved: number): string {
-  const noun = nounOf(slug);
-  const head =
-    open > 0
-      ? `This wallet holds ${count(open, [`open ${noun[0]}`, `open ${noun[1]}`])}`
-      : `This wallet holds no open ${noun[1]}`;
-  const tail = [
-    closed > 0 ? ` and has closed ${closed.toLocaleString("en-US")}` : "",
-    liquidated > 0 ? `; ${liquidated.toLocaleString("en-US")} ${liquidated === 1 ? "was" : "were"} liquidated` : "",
-    moved > 0 ? `; ${moved.toLocaleString("en-US")} passed to another wallet` : "",
-  ].join("");
-  return `${head}${tail}.`;
-}
-
 /** The label a receipt row gives one position: its market, or its id. */
 const positionLabel = (p: WalletPosition) =>
   p.market
@@ -215,13 +189,16 @@ export function walletSections(positions: WalletPosition[], opts: { bands: boole
       if (collateral) legs.push(usdLeg("collateral", "Total collateral", collateral));
       if (debt && debt.usd > 0) legs.push(usdLeg("debt", "Total debt", debt));
       band = {
-        countsLine: countsLine(slug, open.length, st("closed") + st("redeemed"), st("liquidated"), st("moved")),
+        countsLine: "",
         counts: { open: open.length, closed: st("closed") + st("redeemed"), liquidated: st("liquidated") },
         legs,
         truncated: false,
         positions: mine.filter((p) => p.status !== "moved").length,
       };
     }
+    // The section's heading and cards state the counts; the band carries
+    // no sentence repeating them (Miles, 18 Nov 2026).
+    band = { ...band, countsLine: "" };
     if (!opts.bands) band = { ...band, positions: 0 };
     sections.push({
       slug,
