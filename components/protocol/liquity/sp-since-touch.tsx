@@ -1,7 +1,7 @@
 "use client";
 
 // Liquity V2 — "Since its last touch" on a stability-pool deposit's timeline:
-// the window from the deposit's newest touch to the head block, pinned in the
+// the window from the deposit's last touch to the head block, pinned in the
 // timeline's head slot (decision 0022 §4), on the frame Polaris's deposit row
 // uses (components/protocol/polaris/polaris-sp-loan-since-touch.tsx).
 //
@@ -159,7 +159,7 @@ export function LiquityV2DepositSinceTouchRow({
             key: "last",
             label: "At the last touch",
             amount: bo(recorded, fmt(recorded), spSumProv("recorded", c)),
-            tip: "The BOLD the deposit held after its latest operation.",
+            tip: "The BOLD the deposit held after its last touch.",
           },
           ...(burned > ZERO
             ? [

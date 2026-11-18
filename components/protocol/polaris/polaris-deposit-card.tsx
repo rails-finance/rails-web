@@ -254,7 +254,7 @@ export function polarisDepositSlots({
     left.push({
       id: "recorded",
       label: "At the last touch",
-      tip: `The ${s} the deposit held after its newest operation.`,
+      tip: `The ${s} the deposit held after its last touch.`,
       asset: { symbol: s, address: stable.address },
       value: (
         <Prov info={spSumProv("recorded", m)}>

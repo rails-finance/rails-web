@@ -105,14 +105,14 @@ const SUM: Record<string, (c: string) => string> = {
   kept: () =>
     "Yield kept — the sum of every DepositOperation's yieldGainSinceLastOperation less its yieldGainClaimed: the BOLD yield the touches added to the deposit.",
   recorded: () =>
-    "Deposit at the last touch — the deposit before each operation, less its loss, plus its top-up or withdrawal and its yield kept, replayed from the first operation: the pool's deposits(depositor) after the latest one.",
+    "Deposit at the last touch — the deposit before each operation, less its loss, plus its top-up or withdrawal and its yield kept, replayed from the first operation: the pool's deposits(depositor) after the last touch.",
   yieldGain: () => "BOLD yield paid at touches — the sum of every DepositOperation's yieldGainSinceLastOperation.",
   yieldClaimed: () => "BOLD yield claimed — the sum of every DepositOperation's yieldGainClaimed.",
   collGain: (c) => `${c} paid in at touches — the sum of every DepositOperation's ethGainSinceLastOperation.`,
   collClaimed: (c) =>
     `${c} claimed — the sum of every DepositOperation's ethGainClaimed, which includes the stash from earlier touches.`,
   stash: (c) =>
-    `${c} stashed — the ${c} paid in at touches less what they sent, replayed from the first operation: the pool's stashedColl(depositor) after the latest one.`,
+    `${c} stashed — the ${c} paid in at touches less what they sent, replayed from the first operation: the pool's stashedColl(depositor) after the last touch.`,
 };
 
 export function spSumProv(what: keyof typeof SUM, branch: SpBranch): Provenance {

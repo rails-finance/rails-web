@@ -157,7 +157,7 @@ export default function DepositView({
   const rowById = useMemo(() => new Map(listed.map((r) => [r.event_key, r])), [listed]);
   const events = useMemo(() => listed.map(depositTimelineEvent), [listed]);
   const olderCount = Math.max(0, total - listed.length);
-  // The newest operation the page holds: a transfer is no touch.
+  // The last touch the page holds: a transfer is no touch.
   const lastTouch = useMemo(() => listed.findLast((r) => r.event_type !== "transfer") ?? null, [listed]);
   // The deposit's one operation is its open: the window is its whole life.
   const sinceOpen = useMemo(
