@@ -497,7 +497,7 @@ export function useCompoundV2CardSlots({
   );
   const borrowUnit = (r: CompoundV2BorrowAmount) => (
     <div key={r.market}>
-      <Prov info={borrowProv(r, serverReadOf(chain))}>
+      <Prov info={borrowProv(r, serverReadOf(chain), v.debtBlockByMarket?.[r.market])}>
         <AssetAmount
           value={r.amount}
           symbol={r.symbol}
@@ -658,7 +658,7 @@ export function useCompoundV2CardSlots({
               </ExactSpan>
             </Prov>
             {!r.live && <StaleDebtNote block={v.debtBlockByMarket?.[r.market]} />}
-            {isFixed(v, r.market) && <FixedPriceFlag v={v} r={r} marketBy={marketBy} />}
+            {isFixed(debtView, r.market) && <FixedPriceFlag v={debtView} r={r} marketBy={debtBy} />}
           </>
         ),
         usdText: detail && !r.live ? undefined : usdCell(borrowLine(r), `${r.symbol} borrowed in USD`, true),
