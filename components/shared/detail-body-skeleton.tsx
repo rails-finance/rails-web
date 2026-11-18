@@ -27,7 +27,7 @@ const SPINE_ROWS = 4;
 export function LozengeRow({ children }: { children: ReactNode }) {
   return (
     <div className="flex gap-1.5 md:gap-2">
-      <div aria-hidden className="skel-wait w-3 shrink-0 rounded-full border border-edge-raised bg-raised md:w-10" />
+      <div aria-hidden className="skel-wait w-3 shrink-0 rounded-full bg-raised md:w-10" />
       <div className="min-w-0 flex-1">{children}</div>
     </div>
   );
@@ -46,7 +46,7 @@ const CARD_BARS = (
         </div>
       ))}
     </div>
-    <div className="grid grid-cols-3 gap-4 border-t border-edge-raised pt-6 lg:grid-cols-6">
+    <div className="grid grid-cols-3 gap-4 pt-6 lg:grid-cols-6">
       {[0, 1, 2].map((i) => (
         <div key={i} className="flex flex-col gap-3">
           <SkeletonBar width={64} wait={false} />

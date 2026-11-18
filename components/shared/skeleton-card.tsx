@@ -4,10 +4,10 @@
 //    frame takes the section's measured height (lib/shared/skeleton-sizes
 //    defaults, refined per route by the localStorage memory layer via
 //    useSkeletonSizes), so nothing beneath it moves when the data arrives.
-// 2. The frame is the real card's frame (bg-raised, the edge-raised hairline,
-//    the card's radius). Inside it stand a few coarse bars, one per line where
-//    the main lines and figures go: rounded pills about text x-height, in the
-//    hairline's colour, deliberately approximate. The frame holds the size and
+// 2. The frame is the real card's surface and radius (bg-raised, no border).
+//    Inside it stand a few coarse bars, one per line where the main lines and
+//    figures go: rounded pills about text x-height, in the edge-raised colour,
+//    deliberately approximate. The frame holds the size and
 //    the bars are coarse, so the inner anatomy cannot drift.
 // 3. No pulse and no shimmer. A placeholder takes its space at once and
 //    appears at 150 ms (`.skel-wait`, app/globals.css); the unit that replaces
@@ -82,9 +82,7 @@ export function SkeletonBlock({
       aria-hidden
       data-skel-placeholder=""
       style={{ height, ...style }}
-      className={`skel-wait overflow-hidden ${
-        frame ? "rounded-2xl border border-edge-raised bg-raised px-5 py-4" : ""
-      } ${className}`}
+      className={`skel-wait overflow-hidden ${frame ? "rounded-2xl bg-raised px-5 py-4" : ""} ${className}`}
     >
       {bars}
     </div>
