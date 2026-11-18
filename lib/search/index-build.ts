@@ -30,7 +30,7 @@ import {
   maplePoolsHref,
   yearnVaultRosterHref,
 } from "@/lib/vaults/routes";
-import { SBOLD_HREF, SBOLD_VAULT } from "@/lib/liquity-v2/sbold";
+import { SBOLD_PAGE_PATH, SBOLD_VAULT } from "@/lib/liquity-v2/sbold";
 import type { SearchIndexWire, WireRoster, WireVault } from "@/lib/search/suggest";
 
 const chainName = (id: number) => CHAINS[id as ChainId]?.name ?? String(id);
@@ -99,7 +99,7 @@ export async function buildSearchIndex(): Promise<SearchIndexWire> {
     ["Aave", eth, `${ethereumVaultRosterHref()}/`, 1],
     ["Yearn", eth, `${yearnVaultRosterHref()}/`, 1],
     ["Maple", eth, maplePoolsHref(), 0],
-    ["Liquity V2", eth, SBOLD_HREF, 0],
+    ["Liquity V2", eth, SBOLD_PAGE_PATH, 0],
   ];
   const [MORPHO, AAVE, YEARN, MAPLE, SBOLD] = [0, 1, 2, 3, 4];
   const row = (name: string, symbol: string, asset: string, roster: number, address: string): WireVault => [

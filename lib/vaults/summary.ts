@@ -14,6 +14,7 @@
 import type { MorphoBaseVaultResponse, RawAmount } from "@/lib/sources/chain/morpho-base-vault";
 import type { AaveEthereumVaultResponse } from "@/lib/sources/chain/aave-ethereum-vault";
 import type { YearnVaultResponse } from "@/lib/sources/chain/yearn-ethereum-vault";
+import type { SboldVaultResponse } from "@/lib/sources/chain/sbold-vault";
 import type {
   MorphoBaseVaultDirectoryResponse,
   MorphoBaseVaultDirectoryRow,
@@ -414,6 +415,36 @@ export function yearnVaultPageSummary(d: YearnVaultResponse, census: VaultCensus
     standing,
     createdBlock: v.createdBlock,
     census: censusOf(census ?? undefined),
+    readAt: { block: d.blockNumber, timestamp: "" },
+  };
+}
+
+/** The sBOLD vault's page read (ui-jobs 749). No census and no steward read. */
+export function sboldVaultPageSummary(
+  d: SboldVaultResponse,
+  asset: { address: string; symbol: string; decimals: number },
+  createdBlock: number,
+): VaultSummary {
+  const v = d.vault;
+  return {
+    chainId: 1,
+    address: v.address.toLowerCase(),
+    family: "sbold",
+    release: null,
+    releaseLabel: releaseLabel("sbold", null),
+    name: v.name,
+    catalogName: "sBOLD",
+    symbol: v.symbol,
+    asset: { ...asset, named: true },
+    shareDecimals: v.shareDecimals,
+    totalAssets: v.totalAssets,
+    totalSupply: v.totalSupply,
+    sharePrice: v.sharePrice,
+    lostAssets: null,
+    steward: null,
+    standing: [],
+    createdBlock,
+    census: null,
     readAt: { block: d.blockNumber, timestamp: "" },
   };
 }
