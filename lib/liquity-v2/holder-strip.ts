@@ -13,10 +13,13 @@
 // at the branch feeds, with the per-token amounts named beneath. A wallet on one
 // branch gets its collateral in that token.
 //
-// EVERY LEG WEARS THE ≈ (ui-jobs 690). The rows are each trove's figures as of
-// its last touch: interest accrues on the debt, and redistributions from
-// liquidated troves move collateral and debt onto it, between touches, so a sum
-// of them is an estimate even in one token.
+// THE CARD'S FIGURE, AND THE CARD'S MARKS (ui-jobs 737). Each leg draws the
+// position card's figure: compact, the token's icon, the USD line. The rows are
+// each trove's figures as of its last touch, as the cards below are, so the
+// legs wear no ≈ where the cards wear none; the tip and the receipt say what
+// built up since. `positions` lets the listing's band draw from two troves and
+// its totals from two open ones (components/shared/holder-strip.tsx); the
+// share card reads the same model whole.
 //
 // A ZOMBIE TROVE IS AN OPEN ONE — redeemed below the minimum debt, still on
 // chain, still the holder's, just unredeemable until it is topped back up. It is
@@ -28,6 +31,13 @@ import type { TroveSummary } from "@/types/api/trove";
 import type { OraclePricesData } from "@/types/api/oracle";
 import { TROVE_MANAGER } from "@/lib/liquity/event-provenance";
 import { formatNumber, formatUsdValue } from "@/lib/utils/format";
+import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
+import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
+
+const collToken = (collateralType: string) => ({
+  symbol: collateralType,
+  address: LIQUITY_V2_BRANCHES[collateralType.toLowerCase()]?.collateralAddr,
+});
 
 /** What each leg's ≈ means, in a sentence or two. */
 const LEG_TIP = {
@@ -132,6 +142,7 @@ export function liquityV2HolderStrip(
     zombie: open.filter((t) => t.isZombie).length,
   };
 
+  const wallet = rows.map((t) => t.owner ?? t.lastOwner).find(Boolean) ?? undefined;
   if (truncated) {
     // The rows are a slice of the wallet: neither the per-status counts nor any
     // sum over them is a statement about the wallet. State the count it does
@@ -141,12 +152,13 @@ export function liquityV2HolderStrip(
       counts: { open: 0, closed: 0, liquidated: 0 },
       legs: [],
       truncated: true,
+      positions: held,
+      wallet,
       note: `Totals are stated for wallets holding up to ${perPage.toLocaleString("en-US")} positions; this one holds ${held.toLocaleString("en-US")}.`,
     };
   }
 
   const legs: HolderLeg[] = [];
-
   // ── the collateral: one branch or several, and the grammar follows ────────
   const byBranch = new Map<string, number>();
   for (const t of open) {
@@ -163,8 +175,14 @@ export function liquityV2HolderStrip(
       id: "collateral",
       label: "Total collateral",
       value: `${formatNumber(amount)} ${collateralType}`,
-      approx: true,
+      approx: false,
       tip: LEG_TIP.collateral,
+      figure: {
+        amount,
+        tokens: [collToken(collateralType)],
+        usd: priceFor(collateralType, prices) != null ? amount * priceFor(collateralType, prices)! : null,
+        usdProv: holderCollValueProv([collateralType]),
+      },
       prov: {
         kind: "chain",
         pclass: "indexed",
@@ -186,10 +204,11 @@ export function liquityV2HolderStrip(
       id: "collateral",
       label: "Total collateral",
       value: formatUsdValue(usd),
-      approx: true,
+      approx: false,
       tip: LEG_TIP.collateralValued,
       prov: holderCollValueProv(branchLegs.map(([c]) => c)),
       footnote: { text: parts.join(" · ") },
+      figure: { tokens: branchLegs.map(([c]) => collToken(c)), usd },
     });
   }
 
@@ -200,9 +219,11 @@ export function liquityV2HolderStrip(
       id: "debt",
       label: "Total debt",
       value: `${formatNumber(debt)} BOLD`,
-      approx: true,
+      approx: false,
       tip: LEG_TIP.debt,
       prov: holderDebtProv(),
+      // At its $1 face, as the card's debt line reads it.
+      figure: { amount: debt, tokens: [{ symbol: "BOLD", address: TOKEN_ADDRESSES.BOLD }], usd: debt },
     });
   }
 
@@ -211,5 +232,7 @@ export function liquityV2HolderStrip(
     counts: { open: counts.open, closed: counts.closed, liquidated: counts.liquidated, zombie: counts.zombie },
     legs,
     truncated: false,
+    positions: held,
+    wallet,
   };
 }
