@@ -30,12 +30,11 @@ type ServerRead = PositionHeadStamp & { block: number };
 import {
   positionSupplyProv,
   positionDebtProv,
-  aaveV3UsdProvOnchain,
-  aaveV3LiqPriceProv,
   aaveV3PeakSupplyProv,
   aaveV3PeakBorrowProv,
-  aaveV3InterestCaptionProv,
+  v3Oracle,
 } from "./event-provenance";
+import { aaveV3UsdReceipt, aaveV3LiqPriceReceipt, type AaveV3UsdRows } from "./usd-receipt";
 
 export interface AaveV3CardDeployment {
   /** The session the wallet pill filters and bookmarks under. */
@@ -50,9 +49,11 @@ export interface AaveV3CardDeployment {
    *  position page's, where the HF is the page's own live Pool read. A
    *  listing deployment has none: a listing card carries no HF (0018). */
   healthFactor?: (market: string, atBlock?: number, readBy?: ServerRead) => Provenance;
-  /** `market`: the row's market, whose oracle prices it. */
-  usd: (what: string, market?: string) => Provenance;
-  liqPrice: (symbol: string, market?: string) => Provenance;
+  /** A side's dollars and the receipt that rebuilds them from its rows;
+   *  null where a reserve is unpriced. `market`: the row's market, whose
+   *  oracle prices it. */
+  usd: (what: string, side: Side, rows: AaveV3UsdRows, market?: string) => UsdReceipt | null;
+  liqPrice: (read: LiqRead, market?: string) => { prov: Provenance; liqPrice: number };
   /** "Liquidates on a drop of": 1 − 1 ÷ the health factor the Pool reports. */
   liqDrop: (market?: string) => Provenance;
   /** A closed account's "highest recorded" figures — where the maximum came
@@ -61,8 +62,60 @@ export interface AaveV3CardDeployment {
   peakSupply: (symbol: string) => Provenance;
   peakDebt: (symbol: string) => Provenance;
   /** The "incl. $X interest" caption — present on a deployment whose card
-   *  carries the caption (a position page); a listing card has none. */
-  interestCaption?: (side: "supply" | "debt") => Provenance;
+   *  carries the caption (a position page); a listing card has none. `rows`
+   *  carry each reserve's interest in tokens. */
+  interestCaption?: (side: Side, rows: AaveV3UsdRows) => UsdReceipt | null;
+}
+
+type Side = "supply" | "debt";
+type UsdReceipt = { prov: Provenance; usd: number };
+/** The liquidation price's two reads. */
+export interface LiqRead {
+  symbol: string;
+  price: number;
+  priceBlock?: number | null;
+  hf: number;
+  hfBlock?: number | null;
+}
+
+const INTEREST_NOTE: Record<Side, (symbol: string) => string> = {
+  supply: (s) =>
+    `interest inside the ${s} balance since it last started from zero, from the rows' balances before and after`,
+  debt: (s) =>
+    `interest inside the ${s} debt since it last started from zero, from the rows' balances before and after`,
+};
+const INTEREST_WHAT: Record<Side, string> = {
+  supply: "Supply interest inside the collateral balance above",
+  debt: "Borrow interest inside the debt balance above",
+};
+
+/** The dollar receipts every deployment shares: what changes is the oracle,
+ *  the Pool and where each balance comes from. */
+function usdReceipts(o: {
+  oracleOf: (market?: string) => { name: string; address: string };
+  poolOf: (market?: string) => { name: string; address: string };
+  amountNote: (side: Side, symbol: string, block: number | null | undefined) => string;
+  via: string;
+}): Pick<AaveV3CardDeployment, "usd" | "liqPrice" | "interestCaption"> {
+  return {
+    usd: (what, side, rows, market) =>
+      aaveV3UsdReceipt({
+        what: `${what} valued in US dollars`,
+        rows,
+        oracle: o.oracleOf(market),
+        amountNote: (sym) => o.amountNote(side, sym, rows.balanceBlock),
+        via: o.via,
+      }),
+    liqPrice: (read, market) => aaveV3LiqPriceReceipt({ ...read, oracle: o.oracleOf(market), pool: o.poolOf(market) }),
+    interestCaption: (side, rows) =>
+      aaveV3UsdReceipt({
+        what: INTEREST_WHAT[side],
+        rows,
+        oracle: o.oracleOf(),
+        amountNote: INTEREST_NOTE[side],
+        via: "Σ (row before − previous row after) + (balance now − last row after) × IAaveOracle getAssetPrice, per reserve",
+      }),
+  };
 }
 
 export const ETHEREUM_CARD_DEPLOYMENT: AaveV3CardDeployment = {
@@ -75,13 +128,17 @@ export const ETHEREUM_CARD_DEPLOYMENT: AaveV3CardDeployment = {
   // Pool), not a snapshot.
   healthFactor: (market, _atBlock, readBy) =>
     accountDataProv("Health factor", "healthFactor", POOL_BY_MARKET[market] ?? AAVE_V3_POOL, readBy),
-  usd: aaveV3UsdProvOnchain,
-  liqPrice: aaveV3LiqPriceProv,
+  ...usdReceipts({
+    oracleOf: v3Oracle,
+    poolOf: (market) => ({ name: "Aave V3 Pool", address: (market && POOL_BY_MARKET[market]) || AAVE_V3_POOL }),
+    amountNote: (side, sym) =>
+      `the index's ${sym} ${side === "supply" ? "balance" : "debt"}, carried to the latest Aave V3 event on record`,
+    via: "indexed balance × IAaveOracle getAssetPrice",
+  }),
   liqDrop: (market) =>
     liqDropProv({ name: "Aave V3 Pool", address: (market && POOL_BY_MARKET[market]) || AAVE_V3_POOL }),
   peakSupply: aaveV3PeakSupplyProv,
   peakDebt: aaveV3PeakBorrowProv,
-  interestCaption: aaveV3InterestCaptionProv,
 };
 
 const Ctx = createContext<AaveV3CardDeployment>(ETHEREUM_CARD_DEPLOYMENT);
@@ -113,6 +170,11 @@ const liqDropProv = (pool: { name: string; address: string }): Provenance => ({
   formula: "1 − 1 ÷ health factor",
   inputs: [{ label: "health factor", kind: "chain", pclass: "state", note: "Pool getUserAccountData" }],
 });
+
+/** A Base or Arbitrum lender's balance row: the reserve token's balanceOf at
+ *  the card's block. */
+const balanceOfNote = (side: Side, sym: string, block: number | null | undefined) =>
+  `${sym} ${side === "supply" ? "aToken" : "variableDebtToken"} balanceOf${at(block ?? undefined)}`;
 
 const RECOMPUTE = { kind: "recompute" as const, text: "To check: make the same call to the contract on any node." };
 
@@ -159,31 +221,15 @@ export function makeSweptCardDeployment(id: {
       contract: pool,
       via: `GET ${id.positionsRoute} · variableDebtToken balanceOf at the row's block`,
     }),
-    usd: (what) => ({
-      kind: "chain-derived",
-      pclass: "oracle",
-      summary: `${what} valued in US dollars — the balance at the block this row names, times the price the Pool's oracle reports for that token. It is the price the Pool values collateral at, and the oracle gives it in US dollars with 8 decimal places.`,
-      contract: oracle,
-      via: "balanceOf at the row's block × oracle price",
-      formula: "balance × oracle price",
-      inputs: [
-        { label: "balance", kind: "chain", pclass: "state", note: "balanceOf at the row's block" },
-        { label: "oracle price", kind: "chain", note: "IAaveOracle getAssetPrice" },
-      ],
+    ...usdReceipts({
+      oracleOf: () => oracle,
+      poolOf: () => pool,
+      amountNote: balanceOfNote,
+      via: "balanceOf at the row's block × IAaveOracle getAssetPrice",
     }),
+    // A listing card carries no interest caption.
+    interestCaption: undefined,
     liqDrop: () => liqDropProv(pool),
-    liqPrice: (symbol) => ({
-      kind: "chain-derived",
-      pclass: "state",
-      summary: `Liquidation price for the ${symbol} collateral — the ${symbol} price at which this position becomes liquidatable: the price the Pool's oracle reports now, divided by the health factor the Pool gave at the block this row names. ${symbol} carries at least 99.5% of the priced collateral, so it anchors the read, and the figure holds while the debt's dollar value stands still.`,
-      contract: oracle,
-      via: "IAaveOracle getAssetPrice ÷ Pool getUserAccountData health factor",
-      formula: "oracle price ÷ HF",
-      inputs: [
-        { label: "oracle price", kind: "chain", note: "IAaveOracle getAssetPrice" },
-        { label: "health factor", kind: "chain", pclass: "state", note: "Pool getUserAccountData" },
-      ],
-    }),
   };
 }
 
@@ -239,27 +285,6 @@ export function makeLivePoolCardDeployment(id: {
     session: id.session,
     marketLabel: () => "",
     ...sweptPeakReceipts(pool),
-    interestCaption: (side) => ({
-      kind: "chain-derived",
-      pclass: "state",
-      summary:
-        side === "supply"
-          ? "Accrued supply interest inside the collateral balance above — per reserve, the balance the aToken reports for this page, less what its events account for: every deposit, less every withdrawal and the collateral a liquidation seized. The difference is valued at the price the Pool's oracle reports. Interest grew the collateral, so it is part of the headline figure."
-          : "Accrued borrow interest inside the debt balance above — per reserve, the balance the variableDebtToken reports for this page, less what its events account for: every draw, less every repayment, the debt a liquidation covered and the debt the Pool wrote off. The difference is valued at the price the Pool's oracle reports. Interest grew the debt, so it is part of the headline figure.",
-      contract: pool,
-      via: `(balanceOf − Σ net event principal) × getAssetPrice, per reserve`,
-      formula: "(current − net principal) × oracle price",
-      inputs: [
-        { label: "current", kind: "chain", pclass: "state", note: "balanceOf at the card's block" },
-        {
-          label: "net principal",
-          kind: "chain-derived",
-          pclass: "state",
-          note: "Σ signed Pool event amounts",
-        },
-        { label: "oracle price", kind: "chain", note: `${oracle.name} getAssetPrice` },
-      ],
-    }),
     supply: (symbol, block, readBy) => ({
       kind: "chain",
       pclass: "state",
@@ -284,30 +309,12 @@ export function makeLivePoolCardDeployment(id: {
       contract: pool,
       via: `GET ${route} · Pool.getUserAccountData${at(block)}${serverReadVia(readBy)} · healthFactor ÷10^18`,
     }),
-    usd: (what) => ({
-      kind: "chain-derived",
-      pclass: "oracle",
-      summary: `${what} valued in US dollars — the balance at the card's block, times the price the Pool's oracle reports for that token. It is the price the Pool values collateral at, and the oracle gives it in US dollars with 8 decimal places.`,
-      contract: oracle,
-      via: "balanceOf at the card's block × oracle price",
-      formula: "balance × oracle price",
-      inputs: [
-        { label: "balance", kind: "chain", pclass: "state", note: "balanceOf at the card's block" },
-        { label: "oracle price", kind: "chain", note: "IAaveOracle getAssetPrice" },
-      ],
+    ...usdReceipts({
+      oracleOf: () => oracle,
+      poolOf: () => pool,
+      amountNote: balanceOfNote,
+      via: `${route} · balanceOf × IAaveOracle getAssetPrice, both at the card's block`,
     }),
     liqDrop: () => liqDropProv(pool),
-    liqPrice: (symbol) => ({
-      kind: "chain-derived",
-      pclass: "state",
-      summary: `Liquidation price for the ${symbol} collateral — the ${symbol} price at which this position becomes liquidatable: the price the Pool's oracle reports now, divided by the health factor the Pool gave at the card's block. ${symbol} carries at least 99.5% of the priced collateral, so it anchors the read, and the figure holds while the debt's dollar value stands still.`,
-      contract: oracle,
-      via: "IAaveOracle getAssetPrice ÷ Pool getUserAccountData health factor",
-      formula: "oracle price ÷ HF",
-      inputs: [
-        { label: "oracle price", kind: "chain", note: "IAaveOracle getAssetPrice" },
-        { label: "health factor", kind: "chain", pclass: "state", note: "Pool getUserAccountData" },
-      ],
-    }),
   };
 }

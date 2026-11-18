@@ -1467,27 +1467,9 @@ export const aaveV3PeakBorrowProv = (sym: string): Provenance => ({
 
 /** The market's IAaveOracle — the oracle its Pool reads to price collateral and
  *  compute health factors (Core's when no market is named). */
-const v3Oracle = (market?: string) => ({
+export const v3Oracle = (market?: string) => ({
   name: "Aave V3 IAaveOracle",
   address: (market && ORACLE_BY_MARKET[market]) || AAVE_V3_ORACLE,
-});
-
-/** On-chain-oracle USD for a card/tower total. Both legs are on-chain — the
- *  chain-state token balance and Aave's own oracle price (getAssetPrice) — so the
- *  product is chain-derived and stays in the chain-state view (unlike a DefiLlama
- *  market cache). Mirrors Compound's `compoundUsdProvOnchain`. */
-export const aaveV3UsdProvOnchain = (what: string, market?: string): Provenance => ({
-  kind: "chain-derived",
-  // Both legs on-chain; the oracle price is the furthest class, so it leads.
-  pclass: "oracle",
-  summary: `${what} valued in US dollars — the token balance times the price the Pool's oracle reports for that token, which is the price the Pool values collateral at. The oracle gives it in US dollars with 8 decimal places.`,
-  contract: v3Oracle(market),
-  via: "chain balance × on-chain oracle price",
-  formula: "balance × oracle price",
-  inputs: [
-    { label: "balance", kind: "chain", note: "replayed position balance" },
-    { label: "oracle price", kind: "chain", note: "IAaveOracle getAssetPrice" },
-  ],
 });
 
 /** Lifetime gross flow on one reserve — Σ every amount the position's own Pool
@@ -1552,51 +1534,6 @@ export const aaveV3DebtPrincipalProv = (sym: string): Provenance => ({
   summary: `Borrowed ${sym} principal — every draw, less every repayment, the debt a liquidation covered and the debt the Pool wrote off, across the whole history on record for this position. The interest charged on top of it is the segment above this one.`,
   contract: POOL,
   via: `${V3_INDEX_VIA} · Σ (borrow − repay − liquidation cover − written off) · the history on record`,
-});
-
-/** The card's "incl. $X interest since <date>" stat caption — the interest
- *  inside one side's balance, valued in USD: per reserve, the interest added
- *  since the balance last started from zero (lib/shared/interest-since-zero),
- *  × Aave's own oracle price, summed. Gated by the caller (a reserve whose
- *  start is not among the rows nulls the caption — computeAaveV3CardCaptions). */
-export const aaveV3InterestCaptionProv = (side: "supply" | "debt"): Provenance => ({
-  kind: "chain-derived",
-  pclass: "indexed",
-  summary:
-    side === "supply"
-      ? "Supply interest inside the collateral balance above. Per reserve, the interest added since the balance last started from zero (a balance under a cent counts as zero). Each row states the balance before and after it, so each row's before less the previous row's after is the interest between them, and the balance now less the last row's after is the interest since. Valued at the price the Pool's oracle reports now. Interest from before that start left with earlier withdrawals; the Lifetime flows panel counts all of it."
-      : "Borrow interest inside the debt balance above. Per reserve, the interest added since the debt last started from zero. Each row states the debt before and after it, so each row's before less the previous row's after is the interest between them, and the debt now less the last row's after is the interest since. Valued at the price the Pool's oracle reports now. Interest from before that start was repaid; the Lifetime flows panel counts all of it.",
-  contract: POOL,
-  via: "Σ (row before − previous row after) + (balance now − last row after), since the balance last started from zero, × IAaveOracle getAssetPrice, per reserve",
-  formula: "interest since the balance started from zero × oracle price",
-  inputs: [
-    {
-      label: "balances",
-      kind: "chain-derived",
-      pclass: "indexed",
-      note: "each row's balance before and after, and the balance now",
-    },
-    { label: "oracle price", kind: "chain", note: "IAaveOracle getAssetPrice" },
-  ],
-});
-
-/** Single-collateral liquidation price for the health-factor caption — the
- *  oracle price at which the position becomes liquidatable: current on-chain
- *  oracle price ÷ health factor. Both legs on-chain (IAaveOracle price, Pool
- *  getUserAccountData HF), so chain-derived. Anchored on the one reserve
- *  carrying ≥99.5% of the priced collateral (dust doesn't block the anchor);
- *  holds while the debt's USD value stands still. */
-export const aaveV3LiqPriceProv = (sym: string, market?: string): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  summary: `Liquidation price for the ${sym} collateral — the ${sym} price at which this position becomes liquidatable: the price the Pool's oracle reports now, divided by the health factor the Pool gives now. ${sym} carries at least 99.5% of the priced collateral, so it anchors the read, and the figure holds while the debt's dollar value stands still.`,
-  contract: v3Oracle(market),
-  via: "IAaveOracle getAssetPrice ÷ Pool getUserAccountData health factor",
-  formula: "oracle price ÷ HF",
-  inputs: [
-    { label: "oracle price", kind: "chain", note: "IAaveOracle getAssetPrice" },
-    { label: "health factor", kind: "chain", pclass: "state", note: "Pool getUserAccountData" },
-  ],
 });
 
 /** Accrued interest on the debt leg — the current rebased debt (scaled-balance

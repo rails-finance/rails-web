@@ -69,8 +69,13 @@ export function holderUsdReceipt(opts: {
   via: string;
   /** One more sentence for the summary (what the amounts leave out). */
   caveat?: string;
+  /** List the legs largest product first, those under a cent behind the
+   *  receipt's closed dust control (a market's every reserve). */
+  byValue?: boolean;
 }): { prov: Provenance; usd: number } {
-  const { legs } = opts;
+  const legs = opts.byValue
+    ? [...opts.legs].sort((a, b) => shownUsd(b.amount, b.price) - shownUsd(a.amount, a.price))
+    : opts.legs;
   const products = legs.map((l) => shownUsd(l.amount, l.price));
   const usd = cents(products.reduce((s, p) => s + p, 0));
   const many = legs.length > 1;
@@ -107,7 +112,7 @@ export function holderUsdReceipt(opts: {
         kind: "derived",
         step: true,
       });
-    return rows;
+    return opts.byValue && products[i] < 0.01 ? rows.map((r) => ({ ...r, dust: true as const })) : rows;
   });
   const allFaces = legs.every((l) => l.face);
   const read = legs.filter((l) => !l.face).length;

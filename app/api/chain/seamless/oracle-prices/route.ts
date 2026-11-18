@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
-import { resolveAaveOraclePrices, aaveOraclePriceOf } from "@/lib/sources/chain/aave-oracle-prices";
+import type { NextRequest } from "next/server";
+import { aaveOraclePricesResponse } from "@/lib/sources/api/aave-oracle-prices-route";
 import { SEAMLESS_CHAIN_ID, SEAMLESS_ORACLE } from "@/lib/seamless/asset-catalog";
 
 // On-chain USD for arbitrary Seamless reserve addresses — this market's OWN
@@ -15,25 +15,6 @@ import { SEAMLESS_CHAIN_ID, SEAMLESS_ORACLE } from "@/lib/seamless/asset-catalog
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MAX_ASSETS = 40;
-
 export async function GET(request: NextRequest) {
-  const assets = (request.nextUrl.searchParams.get("assets") ?? "")
-    .split(",")
-    .map((a) => a.trim().toLowerCase())
-    .filter((a) => /^0x[0-9a-f]{40}$/.test(a))
-    .slice(0, MAX_ASSETS);
-  if (assets.length === 0) return NextResponse.json({ prices: {} });
-  try {
-    const map = await resolveAaveOraclePrices([{ oracle: SEAMLESS_ORACLE, assets }], SEAMLESS_CHAIN_ID);
-    const prices: Record<string, number> = {};
-    for (const a of assets) {
-      const p = aaveOraclePriceOf(map, SEAMLESS_ORACLE, a);
-      if (p != null && p > 0) prices[a] = p;
-    }
-    return NextResponse.json({ prices });
-  } catch (error) {
-    console.error("Error reading Seamless oracle prices:", error);
-    return NextResponse.json({ prices: {} });
-  }
+  return aaveOraclePricesResponse(request, SEAMLESS_ORACLE, SEAMLESS_CHAIN_ID, "Seamless");
 }

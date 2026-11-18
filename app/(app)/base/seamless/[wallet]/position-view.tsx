@@ -161,12 +161,17 @@ function seamlessCountSplit(events: BaseActivityEvent[], txCount: number): strin
   return `The ${txCount.toLocaleString("en-US")} are ${joined}; the listing counts Pool calls only`;
 }
 
-async function fetchSeamlessPrices(assets: string[]): Promise<Record<string, number>> {
-  if (assets.length === 0) return {};
-  const res = await fetch(`${PRICES_ROUTE}?assets=${assets.join(",")}`, { cache: "no-store" });
-  if (!res.ok) return {};
-  const data = (await res.json()) as { prices?: Record<string, number> };
-  return data.prices ?? {};
+/** The oracle's prices at `block` (the card's), and the block the route read
+ *  them at; empty when the read fails, so the card draws no dollars. */
+async function fetchSeamlessPrices(
+  assets: string[],
+  block: number,
+): Promise<{ prices: Record<string, number>; block: number | null }> {
+  if (assets.length === 0) return { prices: {}, block: null };
+  const res = await fetch(`${PRICES_ROUTE}?assets=${assets.join(",")}&block=${block}`, { cache: "no-store" });
+  if (!res.ok) return { prices: {}, block: null };
+  const data = (await res.json()) as { prices?: Record<string, number>; block?: number | null };
+  return { prices: data.prices ?? {}, block: data.block ?? null };
 }
 
 interface SeamlessPositionViewProps {
@@ -210,6 +215,8 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
     timelineSeeded ? "ready" : "loading",
   );
   const [prices, setPrices] = useState<Record<string, number>>({});
+  // The block the prices were read at: the card's, where the read answered.
+  const [priceBlock, setPriceBlock] = useState<number | null>(null);
 
   // Only when the server could not answer. A seeded view has the card's
   // figures in its first paint and never asks again.
@@ -386,9 +393,13 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
     if (wanted.size === 0) return;
     pricedRef.current = wallet;
     let cancelled = false;
-    fetchSeamlessPrices([...wanted])
-      .then((p) => {
-        if (!cancelled && Object.keys(p).length > 0) setPrices(p);
+    // Priced at the card's block, so each dollar's price and balance share it.
+    fetchSeamlessPrices([...wanted], data.blockNumber)
+      .then(({ prices: p, block }) => {
+        if (!cancelled && Object.keys(p).length > 0) {
+          setPrices(p);
+          setPriceBlock(block);
+        }
       })
       .catch(() => {
         // A reserve without a price today keeps its last recorded one.
@@ -408,6 +419,7 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
     const liqs = base.liquidationCount;
     const v: typeof base = {
       ...base,
+      priceBlock,
       eventTotal: timeline?.totalEvents ?? null,
       countRule: (wholeRows ? seamlessCountSplit(aaveEvents, base.txCount) : null) ?? COUNT_RULE,
       ...(liqs > 0
@@ -420,7 +432,7 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
         : {}),
     };
     return v;
-  }, [data, prices, events, history, timeline, wholeRows, aaveEvents]);
+  }, [data, prices, priceBlock, events, history, timeline, wholeRows, aaveEvents]);
 
   // The month read (hooks/useTimelineSegment.ts): a month the preload does
   // not hold is sliced from the route's replay (`&from=&to=`), whose running
@@ -517,8 +529,8 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
 
   const stripAssets = useMemo<LatestPriceAsset[]>(() => {
     if (!view) return [];
-    // The oracle receipt for each price, read at the head (the price route states no block).
-    const vocab = aaveMarketVocab("seamless", {});
+    // The oracle receipt for each price, read at the card's block.
+    const vocab = aaveMarketVocab("seamless", { blockNumber: priceBlock ?? undefined });
     const seen = new Set<string>();
     const out: LatestPriceAsset[] = [];
     for (const r of [...view.supplies, ...view.borrows]) {
@@ -530,7 +542,7 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
         out.push({ symbol: r.symbol, address: r.address, price: p, info: vocab.reservePriceProv(r.symbol) });
     }
     return out;
-  }, [view, prices]);
+  }, [view, prices, priceBlock]);
 
   // Silence is only evidence of absence when someone actually listened: a sweep
   // that could not read the chain also comes back with no events.

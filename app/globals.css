@@ -1730,6 +1730,9 @@ label[for] {
   gap: 8px 12px;
   align-items: start;
 }
+.prov-dust-toggle {
+  grid-column: 1 / -1;
+}
 .prov-row-dot {
   width: 9px;
   height: 9px;
