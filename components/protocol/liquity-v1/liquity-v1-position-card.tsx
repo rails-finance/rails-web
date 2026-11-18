@@ -14,7 +14,7 @@
 // detail page (`chain`); a listing card has two headlines.
 
 import { positionName } from "@/lib/shared/position-name";
-import { shownUsd } from "@/lib/shared/holder-usd-receipt";
+import { priceText, shownUsd } from "@/lib/shared/holder-usd-receipt";
 import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { useState, type ReactNode } from "react";
 import { Link2 } from "lucide-react";
@@ -232,7 +232,7 @@ export function liquityV1CardSlots({
     // Unclaimed ETH takes a line under Outcome while there is something to
     // claim; once claimed it goes, and the claim stays on the timeline.
     const claimable = surplus && surplus.claimable > 1e-9 ? surplus : null;
-    const claimableUsd = claimable && priceUsd != null && priceUsd > 0 ? claimable.claimable * priceUsd : null;
+    const claimableUsd = claimable && priceUsd != null && priceUsd > 0 ? shownUsd(claimable.claimable, priceUsd) : null;
     outcome = {
       word: redeemed ? "Fully redeemed" : v.status === "liquidated" ? "Liquidated" : "Closed",
       dates: v.lastActivityAt ? [{ at: v.lastActivityAt }] : undefined,
@@ -272,13 +272,15 @@ export function liquityV1CardSlots({
             ? assetIcon(
                 COLLATERAL_SYMBOL,
                 fmtEth(v.collateral),
-                collPrice != null ? formatUsdValue(collPrice) : undefined,
+                collPrice != null ? priceText(collPrice) : undefined,
                 collPrice != null ? "The protocol's PriceFeed" : undefined,
               )
             : undefined,
         usd:
           collPrice != null && v.collateral > 0 ? (
-            <Prov info={stampServerRead(collateralUsdProv(v.collateral, collPrice), v.readBy)}>
+            <Prov
+              info={stampServerRead(collateralUsdProv(v.collateral, collPrice, chain?.priceStale ?? false), v.readBy)}
+            >
               <span className="font-bold text-green-400">{formatUsdValue(shownUsd(v.collateral, collPrice))}</span>
             </Prov>
           ) : null,

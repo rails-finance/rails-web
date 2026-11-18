@@ -34,6 +34,7 @@ register("data:text/javascript," + encodeURIComponent(hook));
 
 const { forkLiveVocab } = await import(ROOT + "lib/shared/liquity-fork-live-provenance.ts");
 const { shownUsd, amountText, priceText } = await import(ROOT + "lib/shared/holder-usd-receipt.ts");
+const { collSheetUsd } = await import(ROOT + "lib/liquity/sheet-usd.ts");
 
 const num = (t) => Number(String(t).replace(/[^0-9.]/g, ""));
 const rebuilds = (prov, figure) => {
@@ -51,9 +52,40 @@ test("Liquity V2's card: the rows as printed rebuild the figure", () => {
   const priceUsd = 3456.789123;
   const figure = shownUsd(coll, priceUsd);
   const rows = [`${amountText(coll)} WETH`, priceText(priceUsd)];
-  assert.deepEqual(rows, ["12.345679 WETH", "$3,456.79"]);
+  assert.deepEqual(rows, ["12.345679 WETH", "$3,456.789123"]);
   assert.equal(Math.round(num(rows[0]) * num(rows[1]) * 100) / 100, figure);
-  assert.equal(figure, 42676.42);
+  assert.equal(figure, 42676.41);
+});
+
+test("a BTC price keeps the precision its product needs: under a cent from the chain's", () => {
+  const amount = 1234.57;
+  const price = 98765.4321;
+  const figure = shownUsd(amount, price);
+  assert.equal(priceText(price), "$98,765.4321");
+  assert.ok(Math.abs(figure - amount * price) < 0.01, `${figure} vs ${amount * price}`);
+  // Two decimals at least, trailing zeros trimmed.
+  assert.equal(priceText(104568), "$104,568.00");
+  assert.equal(priceText(0.98765432), "$0.987654");
+});
+
+test("the event sheet's dollars add up to the cent", () => {
+  for (const c of [
+    {
+      beforeColl: 12.345678912,
+      collAfter: 15.111111111,
+      redistColl: 0.123456789,
+      priceNow: 3456.789123,
+      prevPrice: 3401.123456,
+    },
+    { beforeColl: 0.987654321, collAfter: 0.5, redistColl: 0, priceNow: 98765.4321, prevPrice: 101234.5678 },
+  ]) {
+    const before = shownUsd(c.beforeColl, c.priceNow);
+    const total = shownUsd(c.collAfter, c.priceNow);
+    const s = collSheetUsd({ ...c, before, total });
+    const cents = (x) => Math.round(x * 100);
+    assert.equal(cents(s.last) + cents(s.market), cents(s.before), "Last + market = Before");
+    assert.equal(cents(s.before) + cents(s.redistribution) + cents(s.event), cents(s.total), "Before + rows = Total");
+  }
 });
 
 test("a fork's card: the rows rebuild the figure, under a dollar too", () => {
@@ -68,4 +100,5 @@ test("a fork's card: the rows rebuild the figure, under a dollar too", () => {
   }
   const stale = vocab.forkUsdProv("Collateral", "WBTC", { amount: 1, price: 2, stale: true });
   assert.match(stale.summary, /lastGoodPrice/);
+  assert.match(stale.inputs[1].note, /^PriceFeed\.lastGoodPrice, the last fetchPrice result/);
 });

@@ -15,6 +15,7 @@
 
 import type { Provenance, ProvInput, ProvVerify } from "@/components/shared/provenance";
 import { formatExact } from "@/lib/utils/format";
+import { amountText, priceText } from "@/lib/shared/holder-usd-receipt";
 import { LIQUITY_V1_ADDRESSES } from "./asset-catalog";
 import { ratioConstantProv } from "./position-provenance";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
@@ -627,11 +628,12 @@ export const surplusClaimableProv = (s: {
 export const surplusUsdProv = (claimable: number, priceUsd: number): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
-  summary: "Claimable collateral in USD — the ETH still claimable, valued at the PriceFeed price now.",
+  summary:
+    "Claimable collateral in USD — the ETH still claimable times the PriceFeed price now, as the rows show them, to the cent.",
   formula: "claimable ETH × price",
   inputs: [
-    { label: "claimable", value: `${formatExact(claimable)} ETH`, kind: "chain", pclass: "state" },
-    { label: "price", value: formatExact(priceUsd), kind: "chain", pclass: "oracle" },
+    { label: "claimable", value: `${amountText(claimable)} ETH`, kind: "chain", pclass: "state" },
+    { label: "price", value: priceText(priceUsd), kind: "chain", pclass: "oracle" },
   ],
 });
 

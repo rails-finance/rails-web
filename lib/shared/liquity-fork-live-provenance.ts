@@ -176,7 +176,7 @@ export interface LiquityForkLiveVocab {
   trovesAheadProv: (branchSymbol: string) => Provenance;
   queueShareProv: (branchSymbol: string) => Provenance;
   /** `vals`: the balance and the price the figure was drawn from, so the
-   *  rows rebuild it (ui-jobs 740); `stale` where only lastGoodPrice answered. */
+   *  rows rebuild it; `stale` where only lastGoodPrice answered. */
   forkUsdProv: (
     what: string,
     branchSymbol: string,
@@ -406,7 +406,7 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
               ? "The price is the feed's lastGoodPrice @ head, since the fetchPrice simulation failed."
               : "The price is fetchPrice simulated @ head."
           }`
-        : `${what} valued in USD from the branch's PriceFeed. The chain balance multiplied by the same price the branch liquidates and redeems with (fetchPrice simulated at head).`,
+        : `${what} valued in USD from the branch's PriceFeed. The chain balance times the same price the branch liquidates and redeems with (fetchPrice simulated at head).`,
       contract: pfContract(sym),
       via: "chain balance × branch PriceFeed price",
       formula: "balance × oracle price",
@@ -422,7 +422,9 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
           value: vals ? priceText(vals.price) : undefined,
           kind: "chain",
           pclass: pricePclass(sym),
-          note: priceNote(sym, vals?.stale ? "PriceFeed.lastGoodPrice" : "PriceFeed.fetchPrice (simulated)"),
+          note: vals?.stale
+            ? `PriceFeed.lastGoodPrice, the last fetchPrice result${grade(sym) ? ` (${grade(sym)!.formula})` : ""}`
+            : priceNote(sym, "PriceFeed.fetchPrice (simulated)"),
           contract: pfContract(sym),
         },
       ],

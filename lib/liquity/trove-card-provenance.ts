@@ -114,12 +114,12 @@ export function liquityTroveFaceProv(ctx: LiquityFaceProvContext): LiquityFacePr
       ]
     : [];
   // The USD line's rows rebuild it: the collateral at six decimals, the
-  // price at six significant figures, their product to the cent (ui-jobs 740,
+  // price at six significant figures, their product to the cent (
   // lib/shared/holder-usd-receipt.ts).
   const collUsdProv: Provenance = {
     kind: "chain-derived",
     pclass: "oracle",
-    summary: `Collateral value in USD — the collateral times the ${sym} price, as the rows show them, to the cent.`,
+    summary: `Collateral value in USD — the collateral times Liquity's price for ${sym}, as the rows show them, to the cent.`,
     formula: "collateral × price",
     inputs: [
       { ...collLeaf, value: `${amountText(coll)} ${sym}` },

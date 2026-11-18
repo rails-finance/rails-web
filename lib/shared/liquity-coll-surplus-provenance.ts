@@ -33,11 +33,18 @@ export function collSurplusClaimableProv(s: LiquityTroveSurplus, symbol: string)
   };
 }
 
-export function collSurplusUsdProv(s: LiquityTroveSurplus, symbol: string, priceUsd: number): Provenance {
+export function collSurplusUsdProv(
+  s: LiquityTroveSurplus,
+  symbol: string,
+  priceUsd: number,
+  /** The price's name in its family's words: Liquity V2 "Liquity's price for
+   *  WETH", a fork "the branch's PriceFeed price". */
+  priceName = `Liquity's price for ${symbol}`,
+): Provenance {
   return {
     kind: "chain-derived",
     pclass: "oracle",
-    summary: `Claimable collateral in USD. The ${symbol} still claimable times the branch's oracle price, as the rows show them, to the cent.`,
+    summary: `Claimable collateral in USD. The ${symbol} still claimable times ${priceName}, as the rows show them, to the cent.`,
     formula: "claimable collateral × oracle price",
     inputs: [
       { label: "claimable", value: `${amountText(s.claimable)} ${symbol}`, kind: "chain", pclass: "state" },

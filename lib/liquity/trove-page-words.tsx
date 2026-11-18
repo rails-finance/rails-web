@@ -3,13 +3,12 @@ import { troveWords } from "@/lib/liquity/event-templates";
 import { liquityV2PriceNote } from "@/lib/liquity-v2/price-notes";
 
 /** The sub-nav price dropdown's receipt for the collateral's price now, in
- *  the words the card and the wallet band use (lib/liquity-v2/price-notes.ts,
- *  ui-jobs 740). */
+ *  the words the card and the wallet band use (lib/liquity-v2/price-notes.ts). */
 export function collateralPriceInfo(collType: string): Provenance {
   return {
     kind: "chain-derived",
     pclass: "oracle",
-    summary: troveWords("price_now_summary", { coll_type: collType, price_note: liquityV2PriceNote(collType) }),
+    summary: troveWords("price_now_summary", { price_note: liquityV2PriceNote(collType) }),
     via: "GET /api/oracle/liquity-v2",
   };
 }

@@ -16,10 +16,9 @@
 // refresh this load.
 
 import { shownUsd } from "@/lib/shared/holder-usd-receipt";
-import { formatExact } from "@/lib/utils/format";
+import { formatExact, formatUsdValue } from "@/lib/utils/format";
 import { SurplusBullet } from "@/components/protocol/liquity-family/surplus-bullet";
 import type { LiquityTroveSurplus } from "@/components/protocol/liquity-family/types";
-import { formatUsd } from "@/lib/shared/format-event";
 // The position card's own formatter for this figure, so a $1.18 line reads
 // $1.18 in both places.
 import { formatLiquidationPrice } from "@/lib/utils/liquidation-utils";
@@ -273,8 +272,14 @@ export function LiquityForkPositionExplanation({
     bullets.push(
       <span key="worth">
         At the branch&rsquo;s price, that collateral is worth{" "}
-        <Prov info={vocab.forkUsdProv("Collateral", sym, { amount: chain.entireColl, price: chain.priceUsd })}>
-          <H>{formatUsd(shownUsd(chain.entireColl, chain.priceUsd))}</H>
+        <Prov
+          info={vocab.forkUsdProv("Collateral", sym, {
+            amount: chain.entireColl,
+            price: chain.priceUsd,
+            stale: chain.priceStale,
+          })}
+        >
+          <H>{formatUsdValue(shownUsd(chain.entireColl, chain.priceUsd))}</H>
         </Prov>
         .
       </span>,

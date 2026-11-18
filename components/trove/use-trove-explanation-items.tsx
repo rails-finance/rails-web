@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
+import { priceText, shownUsd } from "@/lib/shared/holder-usd-receipt";
 import { Link2 } from "lucide-react";
 import { TroveSummary } from "@/types/api/trove";
 import { TroveStateData } from "@/types/api/troveState";
@@ -333,7 +334,9 @@ function buildOpenItems({
   const hasLiveData = liveState && prices;
   const collateralTokenKey = trove.collateralType.toLowerCase() as keyof OraclePricesData;
   const currentPrice = hasLiveData ? prices[collateralTokenKey] : null;
-  const collateralUsd = hasLiveData && currentPrice ? displayCollateral * currentPrice : null;
+  // The worth its receipt rebuilds: the collateral and the price as the rows
+  // print them, to the cent (lib/shared/holder-usd-receipt.ts).
+  const collateralUsd = hasLiveData && currentPrice ? shownUsd(displayCollateral, currentPrice) : null;
   const collateralRatio = hasLiveData && collateralUsd && displayDebt > 0 ? (collateralUsd / displayDebt) * 100 : null;
   const mcr = liquityV2Mcr(trove.collateralType);
 
@@ -457,7 +460,7 @@ function buildOpenItems({
           price: (
             <Prov info={priceProv}>
               <HighlightableValue type="currentPrice" state="after" value={currentPrice}>
-                {formatUsdValue(currentPrice)}
+                {priceText(currentPrice)}
               </HighlightableValue>
             </Prov>
           ),

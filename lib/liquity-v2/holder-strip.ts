@@ -206,7 +206,7 @@ export function liquityV2HolderStrip(
       });
     }
     // A sum across tokens stands only where every token is priced: a total
-    // of the priced ones alone would read as the whole (ui-jobs 740).
+    // of the priced ones alone would read as the whole.
     if (usdLegs.length === branchLegs.length) {
       const receipt = holderUsdReceipt({
         what: "The wallet's collateral in USD, across branches",
@@ -224,6 +224,22 @@ export function liquityV2HolderStrip(
         footnote: { text: parts.join(" · ") },
         // The icons of the branches the total counts.
         figure: { tokens: usdLegs.map((l) => collToken(l.token)), usd: receipt.usd },
+      });
+    } else {
+      // A branch unpriced: each branch's quantity stands, with no total.
+      legs.push({
+        id: "collateral",
+        label: "Total collateral",
+        value: branchLegs.map(([c, amount]) => `${formatNumber(amount)} ${c}`).join(" · "),
+        approx: false,
+        tip: LEG_TIP.collateral,
+        prov: {
+          kind: "chain",
+          pclass: "indexed",
+          summary:
+            "The wallet's open troves' collateral, branch by branch — the sum of each trove's collateral on its branch, from the index. A branch's price is missing, so the branches carry no total in dollars. Redistribution gains since each trove's last touch are not in it.",
+          via: "GET /api/troves?ownerAddress=… · Σ collateral over the open rows, per branch",
+        },
       });
     }
   }

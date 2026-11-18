@@ -98,6 +98,6 @@ test("the rows rebuild the figure, with awkward numbers", () => {
   assert.equal(num(val("sum")), sum);
   assert.equal(usd, sum);
   assert.equal(val("WETH amount"), "12.34567 WETH");
-  assert.equal(val("WETH price"), "$3,456.79");
+  assert.equal(val("WETH price"), "$3,456.789");
   assert.equal(val("pETH price"), "$0.987654");
 });

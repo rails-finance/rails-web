@@ -238,7 +238,7 @@ export function polarisHolderStrip(
       parts.push(`${formatNumber(amount)} ${symbol}`);
     }
     // A sum across tokens stands only where every token is priced: a total
-    // of the priced ones alone would read as the whole (ui-jobs 740).
+    // of the priced ones alone would read as the whole.
     if (usdLegs.length === debtByMarket.size) {
       const receipt = holderUsdReceipt({
         what: "The wallet's debt in USD, across both markets",
@@ -259,6 +259,24 @@ export function polarisHolderStrip(
         figure: {
           tokens: usdLegs.map((l) => ({ symbol: l.token })),
           usd: receipt.usd,
+        },
+      });
+    } else {
+      // A market's price missing: each market's debt stands, with no total.
+      legs.push({
+        id: "debt",
+        label: "Total debt",
+        value: [...debtByMarket]
+          .map(([m, amount]) => `${formatNumber(amount)} ${POLARIS_MARKET_CONFIG[m].stable.symbol}`)
+          .join(" · "),
+        approx: false,
+        tip: LEG_TIP.debt,
+        prov: {
+          kind: "chain",
+          pclass: "emitted",
+          summary:
+            "The wallet's open positions' debt, market by market — the sum of each position's last emitted debt in its market's unit. A market's price is missing, so the two carry no total in dollars.",
+          via: `${BOARD_VIA} · Σ last emitted debt, per market`,
         },
       });
     }

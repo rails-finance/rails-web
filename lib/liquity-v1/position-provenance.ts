@@ -245,15 +245,17 @@ export function trovesAheadProv(): Provenance {
 }
 
 /** The collateral's worth in USD at the protocol's price. */
-export function collateralUsdProv(coll: number, price: number): Provenance {
+export function collateralUsdProv(coll: number, price: number, stale = false): Provenance {
+  const read = stale ? "PriceFeed.lastGoodPrice" : "PriceFeed.fetchPrice";
   return {
     kind: "chain-derived",
     pclass: "state",
     verify: STATE_VERIFY,
-    summary:
-      "Collateral value in USD — the Trove's entire ETH collateral times the PriceFeed price that liquidation and redemption use at the latest block, as the rows show them, to the cent.",
+    summary: stale
+      ? "Collateral value in USD — the Trove's entire ETH collateral times the PriceFeed's lastGoodPrice (the fetchPrice simulation failed) at the latest block, as the rows show them, to the cent."
+      : "Collateral value in USD — the Trove's entire ETH collateral times the PriceFeed price that liquidation and redemption use at the latest block, as the rows show them, to the cent.",
     contract: PRICE_FEED,
-    via: `${CHAIN_VIA} · getEntireDebtAndColl × PriceFeed.fetchPrice @ head`,
+    via: `${CHAIN_VIA} · getEntireDebtAndColl × ${read} @ head`,
     formula: "entire collateral × ETH price",
     inputs: [
       {
@@ -268,7 +270,7 @@ export function collateralUsdProv(coll: number, price: number): Provenance {
         value: priceText(price),
         kind: "chain",
         pclass: "oracle",
-        note: "PriceFeed.fetchPrice @ head",
+        note: stale ? "PriceFeed.lastGoodPrice, the last fetchPrice result @ head" : "PriceFeed.fetchPrice @ head",
       },
     ],
   };

@@ -73,7 +73,7 @@ export interface LiquityL2 {
   isLiquidation: boolean;
   price: number;
   /** USD values are the product of the amount and the price as the cells'
-   *  receipts show them, to the cent (ui-jobs 740); `beforePrice` is the price
+   *  receipts show them, to the cent; `beforePrice` is the price
    *  the before value takes (a liquidation's own). */
   coll: { before: number; after: number; beforeUsd: number; afterUsd: number; beforePrice: number };
   /** `before`: the debt recorded at the previous event, as the Debt ledger's

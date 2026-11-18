@@ -31,7 +31,7 @@
 // of that table on purpose: the `protocol` prop selects both the config row
 // and the OPS lookup below.
 
-import { shownUsd } from "@/lib/shared/holder-usd-receipt";
+import { priceText, shownUsd } from "@/lib/shared/holder-usd-receipt";
 import type { ForkNftTransfer } from "@/lib/liquity-fork/former-holders";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import type { ReactNode } from "react";
@@ -294,10 +294,14 @@ function listingCrProv(
 }
 
 /** The balance and the price a fork card's USD line was drawn from, for its
- *  receipt's rows (ui-jobs 740). */
+ *  receipt's rows. */
 const priceVals = (ctx: LiquityFaceProvContext) =>
   ctx.priceUsd != null
-    ? { amount: ctx.coll, price: ctx.priceUsd, stale: ctx.live ? false : (ctx.v.priceStale ?? false) }
+    ? {
+        amount: ctx.coll,
+        price: ctx.priceUsd,
+        stale: ctx.live ? (ctx.live.priceStale ?? false) : (ctx.v.priceStale ?? false),
+      }
     : undefined;
 
 function makeForkCardOps(protocol: ForkProtocol, deps: ForkCardDeps): LiquityFamilyCardOps {
@@ -555,6 +559,7 @@ export function liveFromForkChain(c: LiquityForkTroveChainResponse): LiquityTrov
     annualInterestRateRaw: c.annualInterestRateRaw,
     collDecimals: c.collDecimals,
     priceUsd: c.priceUsd,
+    priceStale: c.priceStale,
     icrPct: c.icr != null ? c.icr * 100 : null,
     status: c.status,
     branchColl: c.branchColl,
@@ -630,7 +635,7 @@ export function useLiquityCardSlots({
   const debt = lv?.entireDebt ?? v.debt;
   const rate = lv?.annualInterestRatePct ?? v.interestRate;
   const priceUsd = lv ? lv.priceUsd : (v.priceUsd ?? null);
-  // The USD line is the product its receipt shows (ui-jobs 740): the
+  // The USD line is the product its receipt shows: the
   // collateral and the price as the rows print them, to the cent.
   const collUsd = priceUsd != null ? shownUsd(coll, priceUsd) : lv ? null : (v.collateralUsd ?? null);
   const crPct = lv ? lv.icrPct : (v.collateralRatioPct ?? null);
@@ -656,7 +661,7 @@ export function useLiquityCardSlots({
       symbol={ct}
       address={collAddress}
       figure={`${exactOf(value, raw, collDecimals)} ${ct}`}
-      price={withPrice && collPrice != null ? formatUsdValue(collPrice) : undefined}
+      price={withPrice && collPrice != null ? priceText(collPrice) : undefined}
       priceSource={withPrice && collPrice != null ? `The ${ct} branch's PriceFeed` : undefined}
     >
       <TokenChipIcon symbol={ct} address={collAddress} size={28} filterable={false} untitled />
@@ -822,7 +827,18 @@ export function useLiquityCardSlots({
           {claimableUsd != null && (
             <>
               {" "}
-              (<Prov info={collSurplusUsdProv(claimable, ct, priceUsd as number)}>{formatUsdValue(claimableUsd)}</Prov>)
+              (
+              <Prov
+                info={collSurplusUsdProv(
+                  claimable,
+                  ct,
+                  priceUsd as number,
+                  protocol === "liquity-v2" ? undefined : "the branch's PriceFeed price",
+                )}
+              >
+                {formatUsdValue(claimableUsd)}
+              </Prov>
+              )
             </>
           )}{" "}
           {CLAIMABLE_BY_OWNER}
