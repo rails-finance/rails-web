@@ -731,9 +731,9 @@ export default function AaveV3PositionDetail({
         : liveView,
     [liveView, cardPriced, cardPrices],
   );
-  // What the export and the Explanation state: the card's figures once its
-  // prices land, the live view while it prices.
-  const statedView = cardPriced ? pricedView : liveView;
+  // What the export and the Explanation state: the card's figures, so they
+  // go without dollars while the card does and never take the listing's prices.
+  const statedView = pricedView;
   // The card's stamp follows the Pool read once the figures stand on it (ui-jobs 512).
   const liveRead = useMemo(() => (view && chain ? readOfHeadAnswer(chain) : null), [view, chain]);
   useReportPositionRead(liveRead);

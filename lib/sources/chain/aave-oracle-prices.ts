@@ -91,6 +91,10 @@ async function serverPrices(
       if (Number.isInteger(b) && b > 0) {
         if (readAt != null && readAt !== b) return null;
         readAt = b;
+      } else if (block == null && readAt == null && assets.length > SERVER_MAX_ASSETS) {
+        // A first chunk that names no block leaves the rest nothing to stand
+        // on: the set is refused, and the multicall reads it at a pinned block.
+        return null;
       }
     }
   } catch (err) {

@@ -1,8 +1,10 @@
 // The body of every Aave V3-family /oracle-prices route: one oracle's
 // getAssetPrice for up to 40 reserves, at `?block=` where the page names one
 // (the block its card's balances were read at), else at the latest block, with
-// the block the prices were read at. An asset the oracle does not price is
-// absent; every asset is absent, with a null block, when the read fails.
+// the block the prices were read at. A ?block= that is not a whole number
+// above 0 reads at the latest block, and the answer names that block. An
+// asset the oracle does not price is absent; every asset is absent, with a
+// null block, when the read fails.
 // SERVER-ONLY.
 
 import { NextResponse, type NextRequest } from "next/server";

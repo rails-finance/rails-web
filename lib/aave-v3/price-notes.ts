@@ -11,11 +11,14 @@ const blockText = (block: number | null | undefined): string =>
 export const aaveV3PriceNote = (oracle: string, symbol: string, block: number | null | undefined): string =>
   `${oracle} getAssetPrice(${symbol}) ${blockText(block)}, USD with 8 decimals`;
 
+/** Ethereum's balance row: the index's balance, interest accrued to the
+ *  latest block it has indexed, which the listing does not name. */
+export const aaveV3IndexBalanceNote = (symbol: string, side: "supply" | "debt"): string =>
+  `the index's ${symbol} ${side === "supply" ? "balance" : "debt"}, interest accrued to the index's latest read, which states no block`;
+
 /** Where a receipt's balances and prices stand at two blocks (a listing row:
  *  the balances at the row's block, the prices at the latest when it was
- *  served; Ethereum's card: the index's balances at the latest event, the
- *  prices at the Pool read). Empty where they share one, or where either is
- *  unstated. */
+ *  served). Empty where they share one, or where either is unstated. */
 export const aaveV3BlocksNote = (balanceBlock: number | null | undefined, priceBlock: number | null | undefined) =>
   balanceBlock != null && priceBlock != null && balanceBlock !== priceBlock
     ? `The balances stand at block ${balanceBlock.toLocaleString("en-US")} and the prices at block ${priceBlock.toLocaleString("en-US")}.`

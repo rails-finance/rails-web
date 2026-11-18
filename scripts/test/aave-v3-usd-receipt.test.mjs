@@ -247,3 +247,32 @@ test("more than 40 assets: every chunk after the first is read at the first's bl
     else process.env.RAILS_API_URL = realApi;
   }
 });
+
+test("more than 40 assets and a first chunk naming no block: the set is refused", async () => {
+  const assets = Array.from({ length: 45 }, (_, i) => `0x${(i + 1).toString(16).padStart(40, "0")}`);
+  let asked = 0;
+  const realFetch = globalThis.fetch;
+  const saved = { api: process.env.RAILS_API_URL, rpc: process.env.ALCHEMY_URL };
+  process.env.RAILS_API_URL = "http://api.test";
+  // No RPC: the multicall that takes a refused set answers nothing here.
+  delete process.env.ALCHEMY_URL;
+  globalThis.fetch = async (url) => {
+    asked++;
+    const a = new URL(String(url)).searchParams.get("assets").split(",");
+    return new Response(JSON.stringify({ prices: Object.fromEntries(a.map((x) => [x, "100000000"])) }));
+  };
+  try {
+    const map = await resolveAaveOraclePrices([{ oracle: ORACLE.address, assets }]);
+    assert.equal(asked, 1, "no chunk is asked after an unnamed first");
+    assert.equal(map.size, 0);
+    assert.equal(aaveOraclePriceBlockOf(map, ORACLE.address), undefined);
+  } finally {
+    globalThis.fetch = realFetch;
+    for (const [k, v] of [
+      ["RAILS_API_URL", saved.api],
+      ["ALCHEMY_URL", saved.rpc],
+    ])
+      if (v == null) delete process.env[k];
+      else process.env[k] = v;
+  }
+});

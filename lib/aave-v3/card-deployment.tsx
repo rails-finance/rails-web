@@ -35,6 +35,7 @@ import {
   v3Oracle,
 } from "./event-provenance";
 import { aaveV3UsdReceipt, aaveV3LiqPriceReceipt, type AaveV3UsdRows } from "./usd-receipt";
+import { aaveV3IndexBalanceNote } from "./price-notes";
 
 export interface AaveV3CardDeployment {
   /** The session the wallet pill filters and bookmarks under. */
@@ -138,8 +139,9 @@ export const ETHEREUM_CARD_DEPLOYMENT: AaveV3CardDeployment = {
   ...usdReceipts({
     oracleOf: v3Oracle,
     poolOf: (market) => ({ name: "Aave V3 Pool", address: (market && POOL_BY_MARKET[market]) || AAVE_V3_POOL }),
-    amountNote: (side, sym, block) =>
-      `the index's ${sym} ${side === "supply" ? "balance" : "debt"}, carried to the latest Aave V3 event on record${block != null ? `, at block ${block.toLocaleString("en-US")}` : ""}`,
+    // The index accrues each balance to its latest indexed block, which the
+    // listing does not state: the row names no block for it.
+    amountNote: (side, sym) => aaveV3IndexBalanceNote(sym, side),
     via: "indexed balance × IAaveOracle getAssetPrice",
   }),
   liqDrop: (market) =>
