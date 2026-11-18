@@ -369,7 +369,7 @@ function SidebarName({ name, id, href }: { name: string; id: string; href?: stri
 }
 
 /** The zone's border below md (C20): the frame's shape clipped to its left
- *  edge. From md the lozenge draws its own tint. Inside a frame that sets
+ *  edge. From md the lozenge draws the tint. Needs a frame that sets
  *  `--brand-hue`. */
 function SidebarTint({ rounded = "rounded-[15px]" }: { rounded?: string }) {
   return (
@@ -1079,8 +1079,8 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
 
 const CARD_ANATOMY = { explanation: "C3", learnMore: "C4" };
 
-/** From md the frame lets go of its box, so the lozenge and the body stand
- *  apart on the page; the body takes the frame's border and hover. */
+/** From md the frame draws no box; the body takes its border and hover, 8px
+ *  from the lozenge. */
 const LOZENGE_FRAME = "relative flex md:gap-2 md:rounded-none md:border-0 md:bg-transparent";
 const LOZENGE_BODY =
   "md:rounded-2xl md:border md:border-rb-300/40 md:dark:border-rb-700/40 md:group-hover/listing-row:border-blue-500 md:transition-colors";

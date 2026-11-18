@@ -6,8 +6,8 @@
  * `mono` draws the same face in one colour (the profile control, H20): in
  * dark the square filled with the current text colour and the eyes cut in the
  * page's background; in light the square outlined and the eyes in the text
- * colour (ui-jobs 509; `--facehash-fill`, `--facehash-eye`, globals.css). Its
- * eyes are always the round pair (ui-jobs 727).
+ * colour (ui-jobs 509; `--facehash-fill`, `--facehash-eye`, globals.css). The
+ * eyes are the round pair (ui-jobs 727).
  */
 "use client";
 
@@ -77,7 +77,7 @@ export function Facehash({ address, size = 20, isBot, mono = false }: FacehashPr
   const bg = mono ? "currentColor" : `hsl(${hue}, ${sat}%, ${lum}%)`;
 
   const eyeVariant = mono ? 0 : n[4] % 6;
-  const eyeY = 9 + (n[5] % 3);
+  const eyeY = mono ? 9 : 9 + (n[5] % 3);
 
   const leftX = 6.5;
   const rightX = 13.5;

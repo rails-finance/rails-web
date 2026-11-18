@@ -28,9 +28,9 @@
 // protocol's bar. Adjacent rows with the same subject join into one stretch;
 // on each side of a stretch the page's background shows for `BREAK` (8px, a
 // row gap), so the bar reads as broken there, and from md every segment of
-// the bar, stretches and the protocol's bar between them, is a lozenge of its
-// own, all four corners rounded at half the bar's width (20px). A stretch sets
-// its own; the protocol's bar is one span, so its cut ends are carved by
+// the bar, stretches and the protocol's bar between them, is a lozenge, all
+// four corners rounded at 20px (half the bar's width). The protocol's bar is
+// one span, so its cut ends are carved by
 // inverted-corner strips in the background colour, skipped between two
 // adjacent stretches. Each stretch is
 // measured against this frame: the row's box (`data-event-id`) from its top to
@@ -134,13 +134,13 @@ const JOIN_GAP = 16;
 /** The background between a stretch and the bar beside it. */
 const BREAK = 8;
 
-/** The bar's corner radius: half its 40px width, so its ends are round. */
+/** Half the bar's width: round ends. */
 const RADIUS = 20;
 
 /** Strips carving the two rounded corners into the protocol's bar at a cut
  *  end: in each, the quarter circle centred toward the bar's middle keeps the
- *  bar's colour, the rest is background, with a pixel's ramp at the arc to
- *  match the stretch's anti-aliased corner. `edge` is the cut end's side. */
+ *  bar's colour, the rest is background, with a one-pixel ramp at the arc,
+ *  matching the stretch's anti-aliased corner. `edge` is the cut end's side. */
 function cornerStrips(key: string, top: number, r: number, edge: "top" | "bottom") {
   const y = edge === "top" ? "100%" : "0";
   return (["left", "right"] as const).map((side) => (

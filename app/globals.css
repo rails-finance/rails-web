@@ -330,7 +330,7 @@
   --svg-inner-bg: #171b24;
 
   /* ── rails-explorer brand: dark mode ───────────────────────────────────── */
-  --background: rgb(21 25 33); /* rb-800 */
+  --background: rgb(20 22 30); /* rb-800 */
 
   --surface-hover: rgba(0, 0, 0, 0.15);
   --surface-active: rgba(0, 0, 0, 0.25);

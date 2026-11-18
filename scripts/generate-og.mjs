@@ -292,8 +292,8 @@ function trackLinesSvg(casing) {
 }
 
 // ── The card ─────────────────────────────────────────────────────────────────
-// Colours are the dark-theme literals from app/globals.css: the canvas is the
-// `--background` / rb-800 value the site's own dark theme paints, `--marketing`
+// Colours are dark-theme literals: the canvas is the dark canvas literal (rb-800
+// before ui-jobs 728), `--marketing`
 // is the single marketing accent hue, and rb-500 dark is the muted text set.
 const CANVAS = "rgb(20 22 30)";
 const MARKETING = "rgb(50 120 255)";
