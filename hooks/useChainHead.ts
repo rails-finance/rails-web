@@ -18,11 +18,14 @@ export interface ChainHead {
 // date itself by an Ethereum block, which is the same figure rendered against
 // a chain it says nothing about. The recency stamp derives "~X ago"
 // from blockTimestamp client-side, so the displayed age advances without any
-// further RPC — only a focus (or reload) pulls a fresh head. Fail-soft: stays
+// further RPC — only a focus (or reload) pulls a fresh head. Fail-soft: `head` stays
 // null when the head is unavailable, so callers render nothing.
-export function useChainHead(): ChainHead | null {
+/** The head and whether its read has ended without one, so a caller can hold
+ *  the stamp's place while the read is out and let it go once it has failed. */
+export function useChainHeadRead(): { head: ChainHead | null; failed: boolean } {
   const chainId = useChainId();
   const [head, setHead] = useState<ChainHead | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -30,9 +33,13 @@ export function useChainHead(): ChainHead | null {
       fetch(`/api/head?chain=${chainId}`)
         .then((r) => (r.ok ? r.json() : null))
         .then((d) => {
-          if (!cancelled && d && typeof d.blockNumber === "number") setHead(d as ChainHead);
+          if (cancelled) return;
+          if (d && typeof d.blockNumber === "number") setHead(d as ChainHead);
+          else setFailed(true);
         })
-        .catch(() => {});
+        .catch(() => {
+          if (!cancelled) setFailed(true);
+        });
     load();
     const onFocus = () => load();
     window.addEventListener("focus", onFocus);
@@ -42,5 +49,5 @@ export function useChainHead(): ChainHead | null {
     };
   }, [chainId]);
 
-  return head;
+  return { head, failed: failed && head == null };
 }

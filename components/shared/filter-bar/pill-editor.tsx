@@ -539,7 +539,7 @@ function ThresholdEditor<F>({
       <div
         role="radiogroup"
         aria-label={`${dim.label} comparison`}
-        className="grid grid-cols-3 gap-1 rounded-xl bg-rb-100 p-1 dark:bg-rb-900"
+        className="grid grid-cols-3 gap-1 rounded-xl bg-rb-100 p-1 dark:bg-rb-800"
         onKeyDown={(e) => {
           const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
           if (!step) return;
@@ -562,7 +562,7 @@ function ThresholdEditor<F>({
             onClick={() => pickMode(s.mode)}
             className={`h-10 sm:h-9 rounded-lg text-sm transition-colors ${FOCUS} ${
               s.mode === mode
-                ? "bg-background font-semibold text-foreground shadow-sm dark:bg-rb-700"
+                ? "bg-background font-semibold text-foreground shadow-sm dark:bg-rb-600"
                 : "text-rb-500 dark:text-rb-400/75 hover:text-foreground"
             }`}
             data-threshold-mode={s.mode}
@@ -572,7 +572,7 @@ function ThresholdEditor<F>({
         ))}
       </div>
       {mode === "between" ? (
-        <div className="flex items-center gap-2">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
           <CountInput
             label={`Minimum ${noun}`}
             placeholder="Min"
@@ -654,7 +654,7 @@ function CountInput({
     onCommit(v);
   };
   return (
-    <label className="flex h-12 sm:h-10 flex-1 items-center gap-3 rounded-lg bg-rb-100 px-3 text-sm text-rb-500 dark:text-rb-400/75 focus-within:ring-2 focus-within:ring-blue-500 dark:bg-rb-900">
+    <label className="flex h-12 sm:h-11 w-full min-w-0 items-center gap-3 rounded-xl bg-rb-100 px-4 text-sm text-rb-500 dark:text-rb-400/75 focus-within:ring-2 focus-within:ring-inset focus-within:ring-blue-500 dark:bg-rb-800">
       {prefix && <span aria-hidden="true">{prefix}</span>}
       <input
         type="text"

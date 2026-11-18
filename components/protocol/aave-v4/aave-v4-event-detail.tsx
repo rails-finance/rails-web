@@ -3,6 +3,7 @@
 import { shownUsd } from "@/lib/shared/shown-usd";
 import { v4Apy } from "@/lib/aave-v4/rates";
 import type { EventCellSpec } from "@/components/shared/event-cells";
+import { SkeletonBar } from "@/components/shared/skeleton-card";
 import type { EventPriceChip } from "@/components/shared/event-price-row";
 import type { AaveV4Context, AaveV4PriceSource } from "@/lib/shared/types/protocols/aave-v4";
 import type { AaveV4SnapshotItem } from "@/lib/shared/types/event-shape";
@@ -557,12 +558,7 @@ export function useAaveV4Cells({
       inputs: ["collateral", "debt"],
       value: {
         after: {
-          text: (
-            <span
-              className="inline-block h-[1em] w-24 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse align-middle"
-              aria-hidden="true"
-            />
-          ),
+          text: <SkeletonBar width={96} />,
         },
       },
     });

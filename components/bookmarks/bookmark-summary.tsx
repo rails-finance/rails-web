@@ -14,6 +14,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ChainGlyph } from "@/components/icons/chain-glyphs";
+import { SkeletonBar } from "@/components/shared/skeleton-card";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { walletHref } from "@/components/shared/front-door-search";
 import { CHAINS } from "@/lib/shared/chains";
@@ -112,9 +113,7 @@ export function BookmarkSummary({ address }: { address: string }) {
       data-anatomy="B2.1"
       data-bookmark-summary={state.kind === "read" ? (protocols.length > 0 ? "read" : "none") : state.kind}
     >
-      {state.kind === "waiting" && (
-        <span className="h-2.5 w-24 animate-pulse rounded-sm bg-rb-200 dark:bg-rb-800" aria-hidden="true" />
-      )}
+      {state.kind === "waiting" && <SkeletonBar width={96} />}
       {state.kind === "failed" && (
         <span className="text-rb-500">
           Positions couldn&apos;t be read.{" "}

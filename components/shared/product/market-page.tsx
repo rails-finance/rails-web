@@ -286,7 +286,7 @@ export function ReserveTableSection({ t }: { t: ReserveTableModel }) {
 export function ProductLoading({ height }: { height?: number }) {
   const { sizes } = useSkeletonSizes();
   return (
-    <div className="animate-pulse">
+    <div aria-busy="true">
       <SkeletonBlock height={height ?? sizes["page-table"]} />
     </div>
   );

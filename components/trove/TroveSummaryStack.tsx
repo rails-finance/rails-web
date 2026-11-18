@@ -5,7 +5,7 @@ import { TroveSummary } from "@/types/api/trove";
 import { TroveStateData } from "@/types/api/troveState";
 import { OraclePricesData } from "@/types/api/oracle";
 import { LiquityPositionCard } from "@/components/protocol/liquity-family/liquity-position-card";
-import { viewFromTroveSummary, liveFromTroveState } from "@/lib/liquity/trove-card-view";
+import { viewFromTroveSummary, liveFromTroveState, priceFor } from "@/lib/liquity/trove-card-view";
 import { TroveDetailsBand } from "@/components/trove/TroveDetailsBand";
 import type { PositionCardExports, PositionPanelColumns, PositionPanelRow } from "@/components/shared/position-card";
 import { useTroveExplanationItems } from "@/components/trove/use-trove-explanation-items";
@@ -32,12 +32,14 @@ export function TroveSummaryStack({
   queueDebtTotal = null,
   redeemedFirst = null,
   debtInFrontLoading,
+  priceFailed = false,
   loadingStatus,
   viewHref,
   surplus,
   exports,
   shutdown,
   branchNotice,
+  still = false,
 }: {
   trove: TroveSummary;
   liveState?: TroveStateData;
@@ -52,6 +54,9 @@ export function TroveSummaryStack({
    *  null where the pointer is unread. */
   redeemedFirst?: boolean | null;
   debtInFrontLoading: boolean;
+  /** The price read has ended without a price: the card says so in the
+   *  slots that need it. */
+  priceFailed?: boolean;
   loadingStatus: { message: string | null; snapshotDate?: number };
   /** Copy-this-view control, forwarded straight through to `LiquityPositionCard`
    *  — the trove page's `useTimelineEvents().viewHref`. Absent on the home
@@ -66,6 +71,8 @@ export function TroveSummaryStack({
   shutdown?: BranchShutdownState | null;
   /** The branch's Safety Mode notice (ui-jobs 747); absent on the home hero. */
   branchNotice?: ReactNode;
+  /** The home page's picture of the page (TroveBody's `still`). */
+  still?: boolean;
 }) {
   // The close's debt before it ran, from the page's replayed events (the
   // last one is the close); the home hero has no provider and keeps null.
@@ -89,7 +96,15 @@ export function TroveSummaryStack({
     shutdown,
   });
 
-  const view = viewFromTroveSummary(trove, prices);
+  // Unavailable once the read has ended, or once a response has come back
+  // without this branch's feed; pending only while no response has come.
+  const priceMissing = priceFor(trove.collateralType, prices) == null;
+  const priceUnavailable = priceMissing && (priceFailed || prices != null);
+  const view = {
+    ...viewFromTroveSummary(trove, prices),
+    pricePending: priceMissing && !priceUnavailable,
+    priceUnavailable,
+  };
   const live = liveFromTroveState(trove, liveState, prices);
 
   // The panel (TO-DO-position-card 322): the queue on the left, the yearly
@@ -116,16 +131,21 @@ export function TroveSummaryStack({
           id: "debt-in-front",
           label: "Debt in front",
           value: <TroveDetailsBand {...bandProps} part="queue" bare />,
+          pending: debtInFrontLoading,
         },
-        ...(trovesAhead != null
-          ? [
+        // Held from first paint: a bar while the queue is read, so the
+        // columns after it never move (the loading grammar). The home
+        // picture leaves out a count it has not read.
+        ...(still && trovesAhead == null
+          ? []
+          : [
               {
                 id: "troves-in-front",
                 label: "Troves in front",
                 value: <TroveDetailsBand {...bandProps} part="ahead" bare />,
+                pending: debtInFrontLoading,
               },
-            ]
-          : []),
+            ]),
       ];
   const panel: PositionPanelColumns | undefined =
     trove.status === "open"
@@ -135,13 +155,13 @@ export function TroveSummaryStack({
         ]
       : undefined;
 
-  const foot: ReactNode = loadingStatus?.message ? (
-    <div className="flex justify-end mt-3">
-      <div className="text-xs text-rb-500 text-right">
-        {loadingStatus.snapshotDate && <div>Snapshot from {formatDate(loadingStatus.snapshotDate)}.</div>}
-        <div className="italic">{loadingStatus.message}</div>
-      </div>
-    </div>
+  // The snapshot and loading status, on one line in the card's (i) row, which
+  // stands whether or not it does: the card keeps its height as it goes.
+  const status: ReactNode = loadingStatus?.message ? (
+    <>
+      {loadingStatus.snapshotDate && <>Snapshot from {formatDate(loadingStatus.snapshotDate)}. </>}
+      <span className="italic">{loadingStatus.message}</span>
+    </>
   ) : undefined;
 
   return (
@@ -155,7 +175,7 @@ export function TroveSummaryStack({
       surplus={surplus}
       panel={panel}
       exports={exports}
-      foot={foot}
+      status={status}
       shutdown={shutdown}
       branchNotice={branchNotice}
     />

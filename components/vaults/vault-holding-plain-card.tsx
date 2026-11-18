@@ -16,6 +16,7 @@ import Link from "next/link";
 import { Suspense, use, useState, type ReactNode } from "react";
 import { Link2 } from "lucide-react";
 import { Icon } from "@/components/icons/icon";
+import { SkeletonBar } from "@/components/shared/skeleton-card";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { PositionCard, type PositionCardHead, type PositionCardSlots } from "@/components/shared/position-card";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
@@ -97,7 +98,11 @@ export interface VaultHoldingPlainCardProps {
 /** The words a card prints where nothing is stated. */
 const Unread = ({ what }: { what: string }) => <span className="text-base font-normal text-rb-500">{what}</span>;
 
-const Pending = () => <div className="mt-2 h-9 w-20 animate-pulse rounded-md bg-rb-200 dark:bg-rb-700" />;
+const Pending = () => (
+  <div className="mt-2 flex h-9 w-20 items-center">
+    <SkeletonBar width="100%" figure />
+  </div>
+);
 
 function MenuRows({ href }: { href: string }) {
   const [copied, setCopied] = useState(false);

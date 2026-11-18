@@ -453,7 +453,7 @@ check(
 // What is still worth asserting — and what a page that had lost its SSR
 // seeding would fail — is that the fallback is followed by the real rows in
 // that same response, rather than being the answer.
-const skeletonAt = first.html.search(/data-skel-section="listing-skeleton"|animate-pulse/);
+const skeletonAt = first.html.search(/data-skel-section="listing-skeleton"|data-skel-placeholder/);
 const firstCardAt = first.html.indexOf("data-position-card");
 check(
   "L0c the skeleton in the first response is the boundary's fallback and the rows follow it in the same document",
