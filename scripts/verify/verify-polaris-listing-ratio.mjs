@@ -75,7 +75,7 @@ const expectedIcrPct = (row, m) => ((row.coll * m.price.pethInDebt) / row.debt) 
 const parseNum = (s) => Number(String(s).replace(/,/g, "").replace(/−/g, "-"));
 
 /** Read every listing card on the page: its (market, cdpId), the ratio slot's
- *  text, whether that slot is a pulse skeleton, and the ratio column's
+ *  text, whether that slot is a placeholder bar, and the ratio column's
  *  footnote text. */
 async function readCards(page) {
   return page.evaluate(() => {
@@ -92,7 +92,7 @@ async function readCards(page) {
       const valueEl = col?.querySelector('[data-figure="collateral-ratio"]') ?? null;
       const valueText = (valueEl?.textContent ?? "").replace(/\s+/g, " ").trim();
       const dash = col ? /—/.test(col.textContent ?? "") && valueEl == null : false;
-      const pulse = col ? col.querySelector(".animate-pulse") != null : false;
+      const pulse = col ? col.querySelector("[data-skel-bar]") != null : false;
       let footnote = "";
       if (col) {
         const parts = [];

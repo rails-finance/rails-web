@@ -930,11 +930,15 @@ export function useAaveV3CardSlots({
   // so the panel takes its settled height from first paint. The labels are the
   // likely ones; the bars carry no figure.
   const readPending = detail && hfPending && v.borrows.length > 0;
-  const held = (row: PositionPanelRow | null, id: string, label: string): PositionPanelRow | null =>
-    row ?? (readPending ? { id, label, value: null, pending: true } : null);
-  const rateHeld = held(rateRow, "borrow-rate", v.borrows.length > 1 ? "Average borrow rate" : "Borrow rate");
-  const roomHeld = held(roomRow, "borrow-room", "Room to borrow");
-  const liqHeld = held(liqRow, "liquidation", collSupplies.length === 1 ? "Liquidates at" : "Liquidates on a drop of");
+  const heldIds = [
+    ["borrow-rate", v.borrows.length > 1 ? "Average borrow rate" : "Borrow rate"],
+    ["borrow-room", "Room to borrow"],
+    ["liquidation", collSupplies.length === 1 ? "Liquidates at" : "Liquidates on a drop of"],
+  ];
+  const [rateHeld, roomHeld, liqHeld] = [rateRow, roomRow, liqRow].map(
+    (row, i): PositionPanelRow | null =>
+      row ?? (readPending ? { id: heldIds[i][0], label: heldIds[i][1], value: null, pending: true } : null),
+  );
 
   // Each side's reserves open under its headline (the chevron by the icons);
   // the panel keeps the additive values.
