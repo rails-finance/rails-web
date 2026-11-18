@@ -30,6 +30,9 @@ import { HolderStrip } from "@/components/shared/holder-strip";
 import { liquityV2HolderStrip } from "@/lib/liquity-v2/holder-strip";
 import { namesHolder, parseTroveSearch } from "@/lib/liquity-v2/search";
 import { isAllStatuses } from "@/lib/liquity-v2/listing-visibility";
+import { useLiquityV2BranchCcr } from "@/hooks/useLiquityV2BranchCcr";
+import { BranchCcrNotice } from "@/components/protocol/liquity/branch-ccr-notice";
+import { normalizeCcrBranch } from "@/lib/liquity-v2/branch-ccr";
 import {
   liquityV2ListDimensions,
   liquityV2FiltersToFetchParams,
@@ -77,6 +80,10 @@ export function LiquityV2Listing({
       cancelled = true;
     };
   }, []);
+
+  // The branches against their CCR (ui-jobs 747): a branch the listing is
+  // narrowed to draws its Safety Mode notice above the rows.
+  const branchCcr = useLiquityV2BranchCcr();
 
   // Collateral facet options carry the token-icon chip (matches the position view).
   const collateralOptions = useMemo<FilterOptionDef[]>(
@@ -128,6 +135,38 @@ export function LiquityV2Listing({
     [setWallets],
   );
 
+  // The wallet's strip above the rows.
+  const holderStrip = (items: TroveSummary[], total: number, filters: LiquityV2ListFilters) =>
+    // The strip is a statement about a WALLET, so it mounts only where the
+    // page IS that wallet's own set: the search names a holder, the status
+    // selection is the relaxed default a holder search rests on, and no
+    // facet has narrowed the rows further. Tick a facet and the page is a
+    // subset of the wallet — counts of the subset said as the wallet's — so
+    // the band goes rather than misstate what it is about. It also needs
+    // the oracle read: three branches hold three different tokens, and
+    // without a price there is no sum of them to state.
+    namesHolder(filters.q) &&
+    isAllStatuses(filters) &&
+    !filters.collateralTypes?.length &&
+    !filters.hasRedemptions &&
+    !filters.batchOnly &&
+    !filters.individualOnly &&
+    prices ? (
+      <HolderStrip
+        {...liquityV2HolderStrip(
+          items,
+          total,
+          prices,
+          LIQUITY_V2_ITEMS_PER_PAGE,
+          passedOn.current,
+          (() => {
+            const { ownerAddress, ownerEns } = parseTroveSearch(filters.q);
+            return ownerAddress ?? ownerEns;
+          })(),
+        )}
+      />
+    ) : null;
+
   return (
     <ChainTruthListingPage<TroveSummary, LiquityV2ListFilters>
       title={troveWords("listing_title")}
@@ -151,37 +190,15 @@ export function LiquityV2Listing({
           }),
       })}
       onFilters={onFilters}
-      renderAbove={({ items, total, filters }) =>
-        // The strip is a statement about a WALLET, so it mounts only where the
-        // page IS that wallet's own set: the search names a holder, the status
-        // selection is the relaxed default a holder search rests on, and no
-        // facet has narrowed the rows further. Tick a facet and the page is a
-        // subset of the wallet — counts of the subset said as the wallet's — so
-        // the band goes rather than misstate what it is about. It also needs
-        // the oracle read: three branches hold three different tokens, and
-        // without a price there is no sum of them to state.
-        namesHolder(filters.q) &&
-        isAllStatuses(filters) &&
-        !filters.collateralTypes?.length &&
-        !filters.hasRedemptions &&
-        !filters.batchOnly &&
-        !filters.individualOnly &&
-        prices ? (
-          <HolderStrip
-            {...liquityV2HolderStrip(
-              items,
-              total,
-              prices,
-              LIQUITY_V2_ITEMS_PER_PAGE,
-              passedOn.current,
-              (() => {
-                const { ownerAddress, ownerEns } = parseTroveSearch(filters.q);
-                return ownerAddress ?? ownerEns;
-              })(),
-            )}
-          />
-        ) : null
-      }
+      renderAbove={({ items, total, filters }) => (
+        <>
+          {(filters.collateralTypes ?? []).map((t) => {
+            const b = normalizeCcrBranch(t);
+            return b ? <BranchCcrNotice key={b} state={branchCcr[b]} anatomy="N8·liquity" /> : null;
+          })}
+          {holderStrip(items, total, filters)}
+        </>
+      )}
       initialItems={initialItems}
       initialTotal={initialTotal}
       initialKey={initialKey}

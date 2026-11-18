@@ -596,6 +596,9 @@ export interface LiquityPositionCardProps {
   /** The branch's shutdown (ui-jobs 612), from the page's `useBranchShutdown`.
    *  Absent (a listing row), the catalog's record stands alone. */
   shutdown?: BranchShutdownState | null;
+  /** A notice about the Trove's branch at the card's head (Liquity V2's
+   *  Safety Mode, ui-jobs 747), under the delegate's. */
+  branchNotice?: ReactNode;
 }
 
 /** The Liquity family's slots for the shared position card: the four
@@ -616,6 +619,7 @@ export function useLiquityCardSlots({
   exports,
   foot,
   shutdown,
+  branchNotice,
 }: LiquityPositionCardProps): PositionCardSlots {
   const cfg = LIQUITY_FORK_CARD_CONFIGS[protocol];
   const ops = OPS[protocol];
@@ -988,7 +992,21 @@ export function useLiquityCardSlots({
     ];
   }
 
-  const common = { status, heads, identity, notice: deprecationBanner || undefined, counters, outcome, name };
+  const common = {
+    status,
+    heads,
+    identity,
+    notice:
+      deprecationBanner || branchNotice ? (
+        <>
+          {deprecationBanner || null}
+          {branchNotice}
+        </>
+      ) : undefined,
+    counters,
+    outcome,
+    name,
+  };
   // The listing's right end: the branch and the Trove ID.
   if (!detail)
     return {

@@ -29,6 +29,8 @@ import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
 import { listingMetadata } from "@/lib/shared/page-metadata";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { loadLiquityV2BranchCcr } from "@/lib/sources/chain/liquity-v2-branch-ccr";
+import { settleAllBranchCcr } from "@/lib/liquity-v2/branch-ccr";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +52,11 @@ const PROTOCOL = protocolForHref("/ethereum/liquity-v2")!;
 export default async function LiquityV2BranchesPage() {
   // Read straight from the loader rather than through this deployment's own
   // /api/chain/liquity-v2/branches route — same code, one less hop on the server.
-  const data = await loadLiquityForkBranchesFromChain(CFG);
+  // The branches against their CCR (ui-jobs 747), read beside the roster at its own head.
+  const [data, ccr] = await Promise.all([
+    loadLiquityForkBranchesFromChain(CFG),
+    loadLiquityV2BranchCcr().then(settleAllBranchCcr),
+  ]);
 
   return (
     <div className="min-h-screen">
@@ -67,6 +73,7 @@ export default async function LiquityV2BranchesPage() {
           <ProvSource source={{ block: data.blockNumber }}>
             <LiquityForkBranchesView
               scopeKeys={branchScopeKeys(1, LIQUITY_V2_BRANCHES, TOKEN_ADDRESSES.BOLD)}
+              ccr={ccr}
               data={data}
               protocolName="Liquity V2"
               basePath="/ethereum/liquity-v2"

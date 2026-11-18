@@ -56,6 +56,8 @@ import { INPLACE_TEXT, FOOT_LINK } from "@/lib/shared/ui-grammar";
 import { liquityFamilyTerms } from "@/lib/liquity/ltv";
 import { shutdownDateProv, shutdownDay, withdrawalDateProv } from "@/lib/shared/liquity-family-shutdown";
 import { allBranchesShutDown } from "@/lib/liquity-fork/shutdown";
+import { BranchCcrNotice } from "@/components/protocol/liquity/branch-ccr-notice";
+import type { LiquityV2BranchCcr } from "@/lib/liquity-v2/branch-ccr";
 
 const ratePct = (x: number) => `${x.toFixed(2)}%`;
 const ratio = (x: number) => `${(x * 100).toFixed(1)}%`;
@@ -111,11 +113,14 @@ function BranchCard({
   data,
   hrefBase,
   wiring,
+  ccr,
 }: {
   branch: LiquityForkBranchState;
   data: LiquityForkBranchesResponse;
   hrefBase: string;
   wiring: Required<LiquityForkUrlWiring>;
+  /** Liquity V2's read against the CCR (ui-jobs 747). */
+  ccr?: LiquityV2BranchCcr;
 }) {
   const vocab = forkLiveVocab(data.protocol, forkReadBy(data));
   // The deployment's documented terms (decision 0065).
@@ -152,7 +157,7 @@ function BranchCard({
   // against the line that gates new borrowing on it. Fill is the TCR as a
   // fraction of CCR (capped at 1 — above the gate the bar is simply full),
   // and the SCR tick marks the shutdown line below it. Neither tick is red:
-  // a branch below CCR gates borrowing and below SCR can be wound down —
+  // below CCR a borrow reverts unless the branch ends at or above it, and below SCR the branch can be shut down —
   // neither liquidates anyone, so neither earns the liquidation colour.
   const ccrFill = branch.tcr != null ? Math.min(1, branch.tcr / branch.ccr) : null;
   const ticks: RatioBarTick[] =
@@ -182,6 +187,7 @@ function BranchCard({
         )}
       </div>
       {shutLine}
+      {!shut && <BranchCcrNotice state={ccr} anatomy="M6.2" compact />}
 
       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
         <div>
@@ -347,7 +353,7 @@ function BranchCard({
               per trove.
             </>
           )}{" "}
-          Below CCR the branch stops new borrowing; below{" "}
+          Below CCR, borrowing reverts unless the branch ends at or above it; below{" "}
           <Prov info={vocab.branchConstantProv("Shutdown collateral ratio", "SCR", sym)}>{ratio(branch.scr)}</Prov> it
           can be shut down. Each branch sets its own.
         </p>
@@ -426,6 +432,8 @@ export interface LiquityForkBranchesViewProps {
   /** The asset preference (ui-jobs 557): each branch's keys, its collateral
    *  and the stablecoin, by branch key (`branchScopeKeys`). */
   scopeKeys?: Record<string, string[]>;
+  /** Liquity V2's branches read against their CCR, by symbol (ui-jobs 747). */
+  ccr?: Partial<Record<string, LiquityV2BranchCcr>>;
 }
 
 export function LiquityForkBranchesView({
@@ -435,6 +443,7 @@ export function LiquityForkBranchesView({
   learnMore,
   urls,
   scopeKeys,
+  ccr,
 }: LiquityForkBranchesViewProps) {
   const registry = useReceiptRegistry();
   const wiring: Required<LiquityForkUrlWiring> = { ...DEFAULT_WIRING, ...urls };
@@ -494,7 +503,14 @@ export function LiquityForkBranchesView({
           <ScopeNote scoped={scoped} noun={["branch", "branches"]} className="mt-1" />
           <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3" {...scoped.listProps}>
             {shown.map((b) => (
-              <BranchCard key={b.key} branch={b} data={data} hrefBase={basePath} wiring={wiring} />
+              <BranchCard
+                key={b.key}
+                branch={b}
+                data={data}
+                hrefBase={basePath}
+                wiring={wiring}
+                ccr={ccr?.[b.symbol]}
+              />
             ))}
           </div>
         </section>

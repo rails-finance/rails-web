@@ -152,6 +152,8 @@ export interface TroveBodyProps {
   surplus?: LiquityTroveSurplus | null;
   /** The branch's shutdown (ui-jobs 612); none on the home page. */
   shutdown?: BranchShutdownState | null;
+  /** The branch's Safety Mode notice (ui-jobs 747); none on the home page. */
+  branchNotice?: ReactNode;
   /** The card ⋮'s export shapes; null draws the ⋮ with the identity rows and
    *  the provenance row only. */
   exports: PositionCardExports | null;
@@ -201,6 +203,7 @@ export function TroveBody({
   debtInFrontLoading,
   surplus,
   shutdown,
+  branchNotice,
   exports,
   loadingMessage,
   topRow,
@@ -281,6 +284,7 @@ export function TroveBody({
           viewHref={tl.viewHref}
           surplus={surplus}
           shutdown={shutdown}
+          branchNotice={branchNotice}
           exports={exports}
           loadingStatus={{ message: loadingMessage, snapshotDate: lastEventTs ?? undefined }}
         />
