@@ -6,10 +6,38 @@
 // Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
+import { register } from "node:module";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import path from "node:path";
+
+const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const ROOT = pathToFileURL(REPO + "/").href;
+const hook = `
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+const ROOT = ${JSON.stringify(ROOT)};
+export async function resolve(spec, ctx, next) {
+  let url = null;
+  if (spec.startsWith("@/")) url = ROOT + spec.slice(2);
+  else if (spec.startsWith("./") || spec.startsWith("../")) url = new URL(spec, ctx.parentURL).href;
+  if (url) {
+    if (!existsSync(fileURLToPath(url))) {
+      for (const ext of [".ts", ".tsx", "/index.ts"]) {
+        if (existsSync(fileURLToPath(url + ext))) { url += ext; break; }
+      }
+    }
+    return next(url, ctx);
+  }
+  return next(spec, ctx);
+}
+`;
+register("data:text/javascript," + encodeURIComponent(hook));
 
 const { accrue, morphoAtBlockPosition, morphoAtBlockWalletPositions, toAssetsUp, wTaylorCompounded } = await import(
-  "../../lib/morpho-at-block/position.ts"
+  ROOT + "lib/morpho-at-block/position.ts"
 );
+const { shownUsd } = await import(ROOT + "lib/shared/holder-usd-receipt.ts");
+const { morphoComposedPrice } = await import(ROOT + "lib/morpho/usd-receipt.ts");
 
 const READ = {
   chainId: 5042,
@@ -97,7 +125,7 @@ test("the position: debt, collateral through the oracle, LTV, room and dollars",
   near(f.ltv, 0.5922, 0.0005, "LTV");
   near(f.roomToBorrow, 13552.9 * 0.86 - 8025.9, 0.5, "room to borrow to the LLTV");
   near(f.liquidationDrop, 1 - 0.5922 / 0.86, 0.001, "the drop that liquidates");
-  near(f.debtUsd, f.debt * 0.99976679, 1e-6, "debt at the USDC/USD feed");
+  assert.equal(f.debtUsd, shownUsd(f.debt, 0.99976679), "debt at the USDC/USD feed, as the rows show it");
   near(f.borrowApr, (1157894426 / 1e18) * 31_536_000, 1e-12, "borrow rate a year");
 });
 
@@ -292,7 +320,7 @@ test("Optimism: the WBTC/USDC borrow, its dollars at the Chainlink USDC feed", (
   near(f.debt, (343252122114835888 / 364056602443360623) * 380152.91881, 1, "debt in USDC");
   near(f.ltv, f.debt / f.collateralInLoan, 1e-12, "LTV");
   assert.equal(f.usd.feed.source, "chainlink", "the price names its source");
-  near(f.debtUsd, f.debt * 0.99971629, 1e-6, "debt at the USDC/USD feed");
+  assert.equal(f.debtUsd, shownUsd(f.debt, 0.99971629), "debt at the USDC/USD feed, as the rows show it");
   assert.equal(f.debtInterest.state, "changed", "the shares moved inside the 30 days");
 });
 
@@ -312,7 +340,11 @@ test("Optimism: a loan token with no feed takes Aave V3's oracle price, 8 decima
   const f = morphoAtBlockPosition({ ...OP_READ, usdFeeds });
   near(f.usd.price, 1.0001, 1e-12, "getAssetPrice ÷ 10^8");
   assert.equal(f.usd.feed.source, "aave-oracle", "named as the AaveOracle's");
-  near(f.collateralUsd, f.collateralInLoan * 1.0001, 1e-6, "collateral at the oracle, then the Aave price");
+  assert.equal(
+    f.collateralUsd,
+    shownUsd(f.collateral, morphoComposedPrice(f.oraclePrice, 1.0001)),
+    "collateral at the composed price: the oracle's, then the Aave price",
+  );
 });
 
 const { dollarFoot } = await import("../../lib/morpho-at-block/words.ts");
@@ -347,4 +379,25 @@ test("the card's foot names the read that priced the loan token", () => {
     "neither source",
   );
   assert.equal(MORPHO_OPTIMISM.contracts.morpho, "0xce95afbb8ea029495c66020883f87aae8864af92", "Morpho on Optimism");
+});
+
+// ui-jobs 743: the dollar receipts' rows rebuild the figures the card draws.
+const { morphoAtBlockProv } = await import(ROOT + "lib/morpho-at-block/provenance.ts");
+const numOf = (t) => Number(String(t).replace(/[^0-9.]/g, ""));
+test("Arc: each dollar receipt's amount × price is the card's figure, the collateral at the composed row", () => {
+  const f = morphoAtBlockPosition(READ);
+  const c = { dep: MORPHO_ARC, f, m: READ.market, p: READ.position, head: READ.head, r: READ, pf: f };
+  for (const [key, figure] of [
+    ["usd-debt", f.debtUsd],
+    ["usd-collateral", f.collateralUsd],
+  ]) {
+    const prov = morphoAtBlockProv(key, c);
+    const [amount, price] = prov.inputs.map((i) => numOf(i.value));
+    assert.equal(Math.round(amount * price * 100) / 100, figure, key);
+  }
+  const row = morphoAtBlockProv("usd-collateral", c).inputs[1];
+  assert.match(row.note, /→ USD = the market oracle's price in USDC × USDC's USD price/);
+  assert.match(row.note, /latestRoundData at block 30,679,130/);
+  const none = morphoAtBlockPosition({ ...READ, usdFeeds: [] });
+  assert.equal(none.collateralUsd, null, "no price, no dollars");
 });

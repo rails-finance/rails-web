@@ -20,6 +20,9 @@ import { formatUsdValue } from "@/lib/utils/format";
 export interface UsdLeg {
   /** The token's symbol ("WETH", "BOLD"). */
   token: string;
+  /** The rows' name for the leg where the token alone does not tell two
+   *  legs apart (two Morpho markets lending USDC); the token by default. */
+  label?: string;
   amount: number;
   /** Where the amount comes from, in a phrase. */
   amountNote: string;
@@ -82,7 +85,7 @@ export function holderUsdReceipt(opts: {
   const inputs: ProvInput[] = legs.flatMap((l, i) => {
     const rows: ProvInput[] = [
       {
-        label: `${l.token} amount`,
+        label: `${l.label ?? l.token} amount`,
         value: `${amountText(l.amount)} ${l.token}`,
         kind: "chain",
         pclass: "indexed",
@@ -90,14 +93,14 @@ export function holderUsdReceipt(opts: {
       },
       l.face
         ? {
-            label: `${l.token} price`,
+            label: `${l.label ?? l.token} price`,
             value: priceText(l.price),
             kind: "derived",
             definition: true,
             note: l.priceNote,
           }
         : {
-            label: `${l.token} price`,
+            label: `${l.label ?? l.token} price`,
             value: priceText(l.price),
             kind: "chain-derived",
             pclass: "oracle",
@@ -107,7 +110,7 @@ export function holderUsdReceipt(opts: {
     ];
     if (many)
       rows.push({
-        label: `${l.token} amount × price`,
+        label: `${l.label ?? l.token} amount × price`,
         value: formatUsdValue(products[i]),
         kind: "derived",
         step: true,
