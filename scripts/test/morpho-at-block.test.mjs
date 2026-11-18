@@ -13,7 +13,7 @@ import path from "node:path";
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const ROOT = pathToFileURL(REPO + "/").href;
 const hook = `
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 const ROOT = ${JSON.stringify(ROOT)};
 export async function resolve(spec, ctx, next) {
@@ -21,7 +21,8 @@ export async function resolve(spec, ctx, next) {
   if (spec.startsWith("@/")) url = ROOT + spec.slice(2);
   else if (spec.startsWith("./") || spec.startsWith("../")) url = new URL(spec, ctx.parentURL).href;
   if (url) {
-    if (!existsSync(fileURLToPath(url))) {
+    // A directory resolves to a same-named .ts beside it, then its index.ts.
+    if (!existsSync(fileURLToPath(url)) || statSync(fileURLToPath(url)).isDirectory()) {
       for (const ext of [".ts", ".tsx", "/index.ts"]) {
         if (existsSync(fileURLToPath(url + ext))) { url += ext; break; }
       }

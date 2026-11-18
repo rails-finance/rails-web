@@ -18,6 +18,10 @@ const cents = (v: number): number => Math.round(v * 100) / 100;
  *  product of the shown values, to the cent. Every figure whose receipt shows
  *  its rows is drawn from this. */
 export const shownUsd = (amount: number, price: number): number => cents(shownAmount(amount) * shownPrice(price));
+/** The same product in a numeraire other than the dollar (a Compound V2
+ *  liquidation in the oracle's ETH years), to six decimal places. */
+export const shownEth = (amount: number, price: number): number =>
+  Math.round(shownAmount(amount) * shownPrice(price) * 1e6) / 1e6;
 /** A price composed of two as shown (a collateral's price in the loan token
  *  × the loan token's dollar price), itself as shown: its row multiplies out
  *  from the two factors it prints. */

@@ -48,10 +48,13 @@ const ORACLE = { name: "Aave V3 IAaveOracle (Arbitrum)", address: AAVE_V3_ARBITR
 const cents = (x: number) => Math.round(x * 100) / 100;
 const pairOf = (p: Position) => `${p.loanSymbol} / ${p.collateralSymbol}`;
 /** A market's name among `all`: its pair, with its LLTV where the pair repeats. */
-export const morphoArbitrumMarketName = (p: Position, all: readonly Position[]): string =>
-  all.filter((q) => pairOf(q) === pairOf(p)).length > 1
-    ? `${pairOf(p)} ${(p.lltv * 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}%`
-    : pairOf(p);
+export const morphoArbitrumMarketName = (p: Position, all: readonly Position[]): string => {
+  const pair = all.filter((q) => pairOf(q) === pairOf(p));
+  if (pair.length < 2) return pairOf(p);
+  const lltv = `${pairOf(p)} ${(p.lltv * 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}%`;
+  // Pair and LLTV both shared (another oracle): the market's id, short.
+  return pair.filter((q) => q.lltv === p.lltv).length > 1 ? `${lltv} ${p.marketId.slice(0, 6)}…` : lltv;
+};
 const priceOf = (read: Pick<MorphoWalletChainResponse, "loanUsd">, p: Position): number | null => {
   const px = read.loanUsd?.[p.loanToken.toLowerCase()];
   return px != null && px > 0 ? px : null;
