@@ -126,7 +126,7 @@ export function holderUsdReceipt(opts: {
       ? ", each price at the block its row names"
       : opts.block != null
         ? `, the ${read > 1 ? "prices" : "price"} at block ${opts.block.toLocaleString("en-US")}`
-      : `, the ${read > 1 ? "prices" : "price"} at the latest read, which states no block`;
+        : `, the ${read > 1 ? "prices" : "price"} at the latest read, which states no block`;
   const faces = legs.filter((l) => l.face).map((l) => `1 ${l.token} is counted as $1`);
   return {
     usd,
