@@ -15,8 +15,8 @@ import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
 import { rowAssetKeys } from "@/lib/shared/focus-row-keys";
 import { SECTION_HEADING, CARD_INSET_START } from "@/lib/shared/ui-grammar";
 import { PendleReadNotice } from "@/components/protocol/pendle/pendle-read-notice";
-import { UnderlyingLabel, positionClosed } from "@/components/protocol/pendle/pendle-position-card";
-import { ptHolding } from "@/lib/pendle/rules";
+import { SyZeroApy, UnderlyingLabel, positionClosed } from "@/components/protocol/pendle/pendle-position-card";
+import { assetValues, ptHolding, syRateZero } from "@/lib/pendle/rules";
 import {
   PENDLE_CHAIN_ID,
   amountText,
@@ -29,7 +29,14 @@ import {
   maturityWords,
   shortAddress,
 } from "@/lib/pendle/format";
-import { entryApyProv, impliedApyProv, maturityProv, pageBlockProv, valueProv } from "@/lib/pendle/provenance";
+import {
+  entryApyProv,
+  impliedApyProv,
+  maturityProv,
+  pageBlockProv,
+  syZeroProv,
+  valueProv,
+} from "@/lib/pendle/provenance";
 import { PENDLE_WORDS } from "@/lib/pendle/words";
 import { pendleWalletHref } from "@/lib/pendle/routes";
 import type { PendlePosition, PendleWalletPositions } from "@/lib/pendle/types";
@@ -45,6 +52,8 @@ function ListingCard({ p, w }: { p: PendlePosition; w: PendleWalletPositions }) 
   const expired = p.maturity.expired === true;
   const rows = w.timeline.filter((r) => r.market === t.market.address);
   const last = rows[rows.length - 1];
+  const zero = syRateZero(p.marks);
+  const total = assetValues(p).total;
   const slots: PositionCardSlots = {
     surface: "listing",
     status: closed ? { word: "Closed", tone: "muted" } : expired ? { word: "Matured", tone: "muted" } : null,
@@ -54,12 +63,12 @@ function ListingCard({ p, w }: { p: PendlePosition; w: PendleWalletPositions }) 
         label: "Value",
         tier: "amount",
         value:
-          p.value.asset.total == null ? null : (
+          total == null ? null : (
             <Prov
-              info={valueProv("total", t, w.block, p.maturity.expired)}
-              value={exact(p.value.asset.total, dec) ?? ""}
+              info={zero ? syZeroProv("total", t, w.block) : valueProv("total", t, w.block, p.maturity.expired)}
+              value={exact(total, dec) ?? ""}
             >
-              {amountText(p.value.asset.total, dec)}
+              {amountText(total, dec)}
             </Prov>
           ),
         sub: asset,
@@ -78,16 +87,17 @@ function ListingCard({ p, w }: { p: PendlePosition; w: PendleWalletPositions }) 
       {
         id: "implied-apy",
         label: "Implied APY now",
-        value:
-          p.apy.current == null ? (
-            expired ? (
-              "Matured"
-            ) : null
-          ) : (
-            <Prov info={impliedApyProv(t.market.address, w.block, null)} value={p.apy.current.toFixed(6)}>
-              {apyText(p.apy.current)}
-            </Prov>
-          ),
+        value: zero ? (
+          <SyZeroApy />
+        ) : p.apy.current == null ? (
+          expired ? (
+            "Matured"
+          ) : null
+        ) : (
+          <Prov info={impliedApyProv(t.market.address, w.block, null)} value={p.apy.current.toFixed(6)}>
+            {apyText(p.apy.current)}
+          </Prov>
+        ),
       },
       {
         id: "maturity",

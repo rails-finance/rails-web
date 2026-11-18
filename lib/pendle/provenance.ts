@@ -137,6 +137,47 @@ export function valueProv(
   };
 }
 
+/** A value or price in the asset where the SY's exchangeRate() reads 0
+ *  (lib/pendle/rules.ts syRateZero): whatever the SY amount, it is 0. */
+export function syZeroProv(
+  what: "PT" | "YT" | "LP" | "interest" | "total" | "PT price" | "YT price" | "LP price",
+  t: PendleMarketTokens,
+  block: number,
+): Provenance {
+  const asset = symbolOf(t.asset);
+  const sy = symbolOf(t.sy);
+  const head =
+    what === "total"
+      ? "Value. The PT, YT and LP legs and the unclaimed yield"
+      : what === "interest"
+        ? "Unclaimed yield. The yield this wallet's YT has earned and not claimed, in SY"
+        : what.endsWith("price")
+          ? `${what}. What one ${what.slice(0, 2)} is worth`
+          : `${what} value. The ${what} balance`;
+  return {
+    kind: "derived",
+    pclass: "state",
+    summary: `${head}, in ${asset}: 0. ${sy}'s exchangeRate() reads 0 at block ${n(block)}, and every PT, YT and LP is priced in SY, so each is worth 0 ${asset} whatever its rate in SY.`,
+    formula: what.endsWith("price")
+      ? "rate in SY × SY.exchangeRate() ÷ 10¹⁸ = 0"
+      : "SY amount × SY.exchangeRate() ÷ 10¹⁸ = 0",
+    inputs: [
+      {
+        label: "SY.exchangeRate()",
+        value: "0",
+        kind: "chain",
+        pclass: "state",
+        contract: { name: sy, address: t.sy.address },
+        note: `exchangeRate() at block ${n(block)}`,
+      },
+    ],
+    contract: { name: sy, address: t.sy.address },
+    via: "exchangeRate()",
+    source: { block },
+    verify: callCheck(`${sy} (${t.sy.address}) exchangeRate()`, block),
+  };
+}
+
 /** The market's implied APY from readState's lastLnImpliedRate. */
 export function impliedApyProv(market: string, block: number, lnRate: string | null): Provenance {
   return {

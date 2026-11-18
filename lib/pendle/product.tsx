@@ -33,7 +33,7 @@ import type { SectionMenuLink } from "@/components/shared/section-menu";
 import { PendleRosterTable } from "@/components/protocol/pendle/pendle-roster";
 import { PendleTokenStrip } from "@/components/protocol/pendle/pendle-token-strip";
 import { PendleMarketEvents } from "@/components/protocol/pendle/pendle-market-events";
-import { UnderlyingLabel } from "@/components/protocol/pendle/pendle-position-card";
+import { SyZeroApy, UnderlyingLabel } from "@/components/protocol/pendle/pendle-position-card";
 import { explorerUrl } from "@/lib/shared/chains";
 import { protocolForHref } from "@/lib/shared/protocols";
 import {
@@ -58,10 +58,11 @@ import {
   priceProv,
   rosterCountProv,
   syRateProv,
+  syZeroProv,
   tvlProv,
 } from "@/lib/pendle/provenance";
 import { LP_SYMBOL_NOTE, PENDLE_WORDS as W, marketTitleWithAsset } from "@/lib/pendle/words";
-import { emptyPool } from "@/lib/pendle/rules";
+import { emptyPool, syRateZero } from "@/lib/pendle/rules";
 import type { PendleMarketPage, PendleRoster, PendleTokenMeta } from "@/lib/pendle/types";
 import type { Loadable, MarketModel, ProductHead, ProductSection } from "@/lib/shared/product/model";
 
@@ -258,6 +259,8 @@ interface Ctx {
   spot: boolean;
   /** An empty pool (lib/pendle/rules.ts): no implied APY shown. */
   empty: boolean;
+  /** The SY's exchangeRate() reads 0 (lib/pendle/rules.ts): every price in the asset is 0, no implied APY. */
+  zero: boolean;
 }
 
 function ctxOf(m: PendleMarketPage): Ctx {
@@ -266,6 +269,7 @@ function ctxOf(m: PendleMarketPage): Ctx {
   const dec = assetDecimals(t);
   const marks = live.marks;
   const expired = live.expired === true;
+  const zero = syRateZero(marks);
   return {
     m,
     asset: assetSymbol(t),
@@ -273,12 +277,13 @@ function ctxOf(m: PendleMarketPage): Ctx {
     expired,
     tvl: live.tvl?.asset == null ? null : amountText(live.tvl.asset, dec),
     apy: live.impliedApy,
-    pt: expired ? 1 : unitRate(marks.ptToAsset, t.pt.decimals, dec),
-    yt: expired ? 0 : unitRate(marks.ytToAsset, t.yt.decimals, dec),
-    lp: unitRate(marks.lpToAsset, t.market.decimals, dec),
+    pt: zero ? 0 : expired ? 1 : unitRate(marks.ptToAsset, t.pt.decimals, dec),
+    yt: zero || expired ? 0 : unitRate(marks.ytToAsset, t.yt.decimals, dec),
+    lp: zero ? 0 : unitRate(marks.lpToAsset, t.market.decimals, dec),
     sy: unitRate(marks.syToAsset, t.sy.decimals, dec),
     spot: !expired && marks.source === "routerstatic-spot",
     empty: emptyPool(live.expired, live.tvl, t.sy.decimals),
+    zero,
   };
 }
 
@@ -343,9 +348,16 @@ function MarketExplainer({ x }: { x: Ctx }) {
             </ExplainBullet>
           )}
           <ExplainBullet>The implied APY ends at maturity, so the market prices no fixed rate.</ExplainBullet>
-          <ExplainBullet>
-            One PT redeems for up to <Fig bold>1 {a}</Fig>.
-          </ExplainBullet>
+          {x.zero && (
+            <ExplainBullet>
+              The SY&rsquo;s exchangeRate() reads <Fig bold>0</Fig>, so PT, YT and LP are worth 0 {a}.
+            </ExplainBullet>
+          )}
+          {!x.zero && (
+            <ExplainBullet>
+              One PT redeems for up to <Fig bold>1 {a}</Fig>.
+            </ExplainBullet>
+          )}
         </ExplainGroup>
         {tokens}
       </>
@@ -362,8 +374,14 @@ function MarketExplainer({ x }: { x: Ctx }) {
             of PT and SY.
           </ExplainBullet>
         )}
-        {x.empty && <ExplainBullet>The pool is empty, so it prices no implied APY.</ExplainBullet>}
-        {x.apy != null && !x.empty && (
+        {x.zero && (
+          <ExplainBullet>
+            The SY&rsquo;s exchangeRate() reads <Fig bold>0</Fig>, so PT, YT and LP are worth 0 {a} and the market
+            prices no implied APY.
+          </ExplainBullet>
+        )}
+        {x.empty && !x.zero && <ExplainBullet>The pool is empty, so it prices no implied APY.</ExplainBullet>}
+        {x.apy != null && !x.empty && !x.zero && (
           <ExplainBullet>
             The implied APY is <Fig bold>{apyText(x.apy)}</Fig>: by Pendle&rsquo;s docs, the market&rsquo;s consensus of
             the future APY of {yieldToken}.
@@ -401,7 +419,7 @@ function marketMarkdown(x: Ctx): string {
     `# ${marketName(t)}, a Pendle market on Ethereum`,
     "",
     ...(x.tvl != null ? [`- Liquidity: ${x.tvl} ${a}`] : []),
-    `- Implied APY: ${x.apy == null || x.empty ? "none" : apyText(x.apy)}`,
+    `- Implied APY: ${x.zero ? `none (${W.syZero})` : x.apy == null || x.empty ? "none" : apyText(x.apy)}`,
     ...(x.pt != null ? [`- PT price: ${priceText(x.pt)} ${a}`] : []),
     ...(x.yt != null ? [`- YT price: ${priceText(x.yt)} ${a}`] : []),
     ...(x.lp != null ? [`- LP price: ${priceText(x.lp)} ${a}`] : []),
@@ -428,7 +446,14 @@ function headOf(x: Ctx): ProductHead {
       NONE
     ) : (
       <InAsset symbol={a} address={x.assetAddress}>
-        <Prov info={priceProv(leg, marks.source, marks.twapSeconds, block, a, x.expired)} value={String(v)}>
+        <Prov
+          info={
+            x.zero
+              ? syZeroProv(`${leg} price`, t, block)
+              : priceProv(leg, marks.source, marks.twapSeconds, block, a, x.expired)
+          }
+          value={String(v)}
+        >
           {priceText(v)}
         </Prov>
       </InAsset>
@@ -503,7 +528,9 @@ function headOf(x: Ctx): ProductHead {
         tip: TIP.apy,
         value: (
           <span data-vital="implied-apy">
-            {x.empty ? (
+            {x.zero ? (
+              <SyZeroApy />
+            ) : x.empty ? (
               <RevealTip tip={TIP.empty} label={`${W.noLiquidity}: ${TIP.empty}`} focusable wrap>
                 <span className="text-rb-500">—</span>{" "}
                 <span className="tip-underline text-[11px] font-normal text-rb-500" data-pendle-empty="">
