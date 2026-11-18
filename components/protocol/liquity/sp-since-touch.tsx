@@ -154,7 +154,7 @@ export function LiquityV2DepositSinceTouchRow({
             key: "last",
             label: "At the last touch",
             amount: bo(recorded, fmt(recorded), spSumProv("recorded", c)),
-            tip: "The BOLD the deposit held after its newest operation.",
+            tip: "The BOLD the deposit held after its latest operation.",
           },
           ...(burned > ZERO
             ? [

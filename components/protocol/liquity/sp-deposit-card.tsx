@@ -249,7 +249,7 @@ export function liquityV2DepositSlots({
     left.push({
       id: "recorded",
       label: "At the last touch",
-      tip: "The BOLD the deposit held after its newest operation.",
+      tip: "The BOLD the deposit held after its latest operation.",
       asset: { symbol: BOLD, address: boldAddr },
       value: (
         <Prov info={spSumProv("recorded", b)}>
