@@ -85,3 +85,19 @@ export async function loadBoldPrice(blockNumber?: number): Promise<BoldPriceRead
   });
   return read;
 }
+
+/** For a page that waits on the read: the head read, or null where it has not
+ *  answered within `ms` (the page then states the price unavailable). The
+ *  read goes on and its own result is cached as above; the timeout is not. */
+export async function loadBoldPriceWithin(ms = 2_500): Promise<BoldPriceRead | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), ms);
+  });
+  try {
+    const r = await Promise.race([loadBoldPrice(), late]);
+    return r != null && typeof r === "object" ? r : null;
+  } finally {
+    clearTimeout(timer);
+  }
+}

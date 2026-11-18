@@ -38,6 +38,7 @@ export function AssetPageHead({
   relations,
   back,
   note,
+  livePrice,
 }: {
   /** The chain the page opens on: the h1's glyph and the first group of chips. */
   chain: number;
@@ -54,6 +55,10 @@ export function AssetPageHead({
   back: { href: string; label: string } | null;
   /** A1.2, with `via` on a chain the page has no chart on. */
   note: ReactNode;
+  /** On a page without a stored price, a price Rails reads live (BOLD's from
+   *  the Curve BOLD/USDC pool, A1.7), in the no-price line's place. It draws
+   *  the card's figure too, inside its receipts scope. */
+  livePrice?: ReactNode;
 }) {
   return (
     <header className="mb-2" data-skel-section="page-header" data-anatomy="A1">
@@ -83,12 +88,14 @@ export function AssetPageHead({
           {row ? (
             <AssetPriceRow row={row} as="div" onPage />
           ) : (
-            <>
-              {figure && <FigureRow figure={figure} />}
-              <p className="mt-1 text-sm text-rb-500" data-asset-priceless="" data-anatomy="A1.3">
-                {PRICELESS_WHY}
-              </p>
-            </>
+            (livePrice ?? (
+              <>
+                {figure && <FigureRow figure={figure} />}
+                <p className="mt-1 text-sm text-rb-500" data-asset-priceless="" data-anatomy="A1.3">
+                  {PRICELESS_WHY}
+                </p>
+              </>
+            ))
           )}
           {token.toLowerCase() !== NATIVE && <ContractLine chain={chain} token={token} />}
         </div>

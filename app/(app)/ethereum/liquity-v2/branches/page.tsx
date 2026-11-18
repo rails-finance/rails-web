@@ -76,7 +76,9 @@ export default async function LiquityV2BranchesPage() {
         />
 
         {/* Every value inside registers its receipt against this one head block —
-            the same block the stamp above names. */}
+            the same block the stamp above names. The depth strip may stand at a
+            later block, which it states: where its node had not reached the
+            roster's block, it reads once more at head. */}
         <div data-skel-section="page-table">
           <ProvSource source={{ block: data.blockNumber }}>
             <SpDepthStrip depth={depth} className="mb-6" />
