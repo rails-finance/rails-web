@@ -31,6 +31,8 @@ import { YIELD_WINDOW_DAYS } from "@/lib/vaults/yield";
 import type { SboldVaultResponse } from "./sbold-vault";
 
 const DAY_S = 86_400;
+/** Two epochs (64 slots of 12 s): a day ending closer to head than this is not cached. */
+const FINAL_S = 64 * 12;
 const SLOT_S = 12;
 /** Blocks read with the same three getters beside the days. */
 const SBOLD_MARKED_BLOCKS = [26_441_800, 26_442_100] as const;
@@ -157,7 +159,10 @@ type Cost = SboldSeries["cost"];
 async function readDay(day: number, head: () => Promise<Head>, cost: Cost): Promise<SboldPoint | null> {
   const client = chainBatchClient(MAINNET_CHAIN_ID);
   const T = (day + 1) * DAY_S;
-  const { found, headers } = await firstBlocksAt(client, await head(), [T]);
+  const h = await head();
+  // A day whose end is within two epochs of head is read again once final.
+  if (h.time - T < FINAL_S) throw new Error(`sBOLD: day ${day} is not final at block ${h.number}`);
+  const { found, headers } = await firstBlocksAt(client, h, [T]);
   cost.headers += headers;
   const f = found.get(T);
   if (f == null) throw new Error(`sBOLD: no last block found for day ${day}`);
@@ -209,24 +214,34 @@ function sharedFill(today: number) {
   return p;
 }
 
-const cachedMarked = unstable_cache(
-  async (): Promise<SboldPoint[]> => {
-    const client = chainBatchClient(MAINNET_CHAIN_ID);
-    const [times, reads] = await Promise.all([
-      blockTimestamps(MAINNET_CHAIN_ID, [...SBOLD_MARKED_BLOCKS]),
-      Promise.all(SBOLD_MARKED_BLOCKS.map((b) => readAt(client, b))),
-    ]);
-    const points: SboldPoint[] = [];
-    reads.forEach((r, i) => {
-      const time = times.get(SBOLD_MARKED_BLOCKS[i]);
-      if (r && time != null) points.push({ ...r, time });
-    });
-    if (points.length < SBOLD_MARKED_BLOCKS.length) throw new Error("sBOLD: a marked block's read failed");
-    return points;
-  },
-  ["sbold-marked-v1", SBOLD_VAULT],
-  { revalidate: false },
-);
+/** One marked block's point, cached once read; throws where a read failed. */
+const cachedMarkedPoint = (block: number) =>
+  unstable_cache(
+    async (): Promise<SboldPoint> => {
+      const [times, r] = await Promise.all([
+        blockTimestamps(MAINNET_CHAIN_ID, [block]),
+        readAt(chainBatchClient(MAINNET_CHAIN_ID), block),
+      ]);
+      const time = times.get(block);
+      if (r == null || time == null) throw new Error(`sBOLD: the read at marked block ${block} failed`);
+      return { ...r, time };
+    },
+    ["sbold-marked-v2", SBOLD_VAULT, String(block)],
+    { revalidate: false },
+  )();
+
+/** The marked blocks that answered; a failed one is absent and read again next render. */
+const markedPoints = async (): Promise<SboldPoint[]> =>
+  (
+    await Promise.all(
+      SBOLD_MARKED_BLOCKS.map((b) =>
+        cachedMarkedPoint(b).catch((e) => {
+          console.error("sBOLD marked block read failed:", e);
+          return null;
+        }),
+      ),
+    )
+  ).filter((p): p is SboldPoint => p != null);
 
 /** The days, the marked blocks inside the window and the page's head read, in
  *  block order, and the marked blocks apart. Null where nothing answered. */
@@ -241,10 +256,7 @@ export async function loadSboldSeries(data: SboldVaultResponse): Promise<SboldSe
   const windowStart = (today - YIELD_WINDOW_DAYS - 1) * DAY_S;
   const [days, marked, headTimes] = await Promise.all([
     sharedFill(today),
-    cachedMarked().catch((e) => {
-      console.error("sBOLD marked block read failed:", e);
-      return [] as SboldPoint[];
-    }),
+    markedPoints(),
     blockTimestamps(MAINNET_CHAIN_ID, [head.block]).catch(() => new Map<number, number>()),
   ]);
   const headTime = headTimes.get(head.block);

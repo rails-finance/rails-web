@@ -54,6 +54,11 @@ import type { RawAmount } from "@/lib/sources/chain/morpho-base-vault";
 
 const CHAIN_ID = 1;
 const n = (v: number) => v.toLocaleString("en-US");
+
+/** A line's accessible name: the days, then the block reads where there are any. */
+const markedLabel = (label: string, blocks: number[]) =>
+  `${label}, one read at each day's last block over the last 30 days` +
+  (blocks.length === 0 ? "" : `, then block${blocks.length === 1 ? "" : "s"} ${blocks.map(n).join(", ")}`);
 const eth = (kind: "address" | "block", v: string | number) => explorerUrl(CHAIN_ID, kind, v);
 const UNREAD = <NotLoaded className="text-base font-normal text-rb-500" />;
 
@@ -145,7 +150,7 @@ function SboldDailyLines({ series }: { series: SboldSeries | null }) {
                     csv: {
                       filename: `sBOLD-last-30-days-${csvRows[csvRows.length - 1].block}.csv`,
                       build: () => vaultPointsCsv(csvRows),
-                      subtitle: "One row per point and getter: block, UTC time, raw answer",
+                      subtitle: "One row per point and getter: block, UTC time, getter, raw, value",
                     },
                   }
                 : undefined
@@ -185,12 +190,10 @@ function SboldDailyLines({ series }: { series: SboldSeries | null }) {
                   </p>
                   <Sparkline
                     points={pts.map((p) => ({ day: p.time / DAY_S, block: p.block, raw: p.raw }))}
-                    label={`${t.label}, one read at each day's last block over the last 30 days, then block${
-                      pts.filter((p) => p.day == null).length === 1 ? "" : "s"
-                    } ${pts
-                      .filter((p) => p.day == null)
-                      .map((p) => n(p.block))
-                      .join(", ")}`}
+                    label={markedLabel(
+                      t.label,
+                      pts.filter((p) => p.day == null).map((p) => p.block),
+                    )}
                     dot={(r) => {
                       const p = pts.find((x) => x.block === r.block)!;
                       return (
