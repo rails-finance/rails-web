@@ -16,6 +16,7 @@
 //
 // Pure: the server builds the cards, the page's client island filters them.
 
+import type { ChipUse } from "@/lib/shared/asset-uses";
 import { assetHref, type LinkKind, type RosterLinkRef } from "@/lib/shared/asset-roster";
 import type { AssetPriceList, AssetPriceRow } from "@/lib/shared/asset-prices";
 import { ASSET_CATEGORY_ORDER, assetCategory, type AssetCategory } from "@/lib/shared/asset-categories";
@@ -38,6 +39,10 @@ export interface AssetChip {
   link: ChipLink;
   /** Where the chip came from: the price roster, the explorer's asset list, or both. */
   from: ("roster" | "catalog")[];
+  /** What the token is to the explorer, each with its page: BOLD's "Trove
+   *  debt", "Stability Pools" and "sBOLD" on Liquity V2, a Pendle market's PT
+   *  (lib/shared/asset-uses.ts). */
+  uses?: ChipUse[];
 }
 
 export interface CardChain {
