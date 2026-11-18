@@ -9,6 +9,7 @@
 //   the Umbrella stake tokens), with the five the address book names as the
 //   floor when the census does not answer.
 // - Maple: the two syrup pools in lib/maple/asset-catalog.ts.
+// - sBOLD (lib/liquity-v2/sbold.ts): one vault, opening its Liquity V2 deposits.
 //
 // The vaults go out in the order of their total assets at the census block,
 // in USD at the census's oracle price, where the census holds them (Morpho and
@@ -29,6 +30,7 @@ import {
   maplePoolsHref,
   yearnVaultRosterHref,
 } from "@/lib/vaults/routes";
+import { SBOLD_HREF, SBOLD_VAULT } from "@/lib/liquity-v2/sbold";
 import type { SearchIndexWire, WireRoster, WireVault } from "@/lib/search/suggest";
 
 const chainName = (id: number) => CHAINS[id as ChainId]?.name ?? String(id);
@@ -97,8 +99,9 @@ export async function buildSearchIndex(): Promise<SearchIndexWire> {
     ["Aave", eth, `${ethereumVaultRosterHref()}/`, 1],
     ["Yearn", eth, `${yearnVaultRosterHref()}/`, 1],
     ["Maple", eth, maplePoolsHref(), 0],
+    ["Liquity V2", eth, SBOLD_HREF, 0],
   ];
-  const [MORPHO, AAVE, YEARN, MAPLE] = [0, 1, 2, 3];
+  const [MORPHO, AAVE, YEARN, MAPLE, SBOLD] = [0, 1, 2, 3, 4];
   const row = (name: string, symbol: string, asset: string, roster: number, address: string): WireVault => [
     name,
     symbol === name ? "" : symbol,
@@ -129,6 +132,9 @@ export async function buildSearchIndex(): Promise<SearchIndexWire> {
     sized.push({ row: row(v.name, v.symbol, v.asset.symbol ?? "", YEARN, v.address), size: 0 });
 
   for (const p of MAPLE_POOLS) sized.push({ row: row(p.symbol, p.symbol, p.assetSymbol, MAPLE, p.pool), size: 0 });
+
+  // No asset: a BOLD token row would open the vault index, which does not list sBOLD.
+  sized.push({ row: row("sBOLD", "sBOLD", "", SBOLD, SBOLD_VAULT), size: 0 });
 
   // A stable sort: the unsized keep their roster order behind the sized, and
   // the vaults the census shows empty (size -1) go last.
