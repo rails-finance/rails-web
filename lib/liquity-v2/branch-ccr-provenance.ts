@@ -66,7 +66,7 @@ export function branchTcrProv(s: LiquityV2BranchCcr): Provenance {
     summary: `${s.branch} branch total collateral ratio — the branch's entire collateral × ${priceLabel(s)} ÷ its entire debt, all read at block ${blockOf(s.blockNumber)}. The contract compares this ratio with the CCR before each borrower operation, at the price fetchPrice returns.`,
     contract: tm(s),
     via: `${VIA} · block ${blockOf(s.blockNumber)}`,
-    formula: "branch collateral × price ÷ branch debt",
+    formula: "getEntireBranchColl × price ÷ getEntireBranchDebt",
     inputs: [collRow(s), priceRow(s), debtRow(s)],
     verify: {
       kind: "recompute",
@@ -102,7 +102,7 @@ export function branchShutdownPriceProv(s: LiquityV2BranchCcr): Provenance {
     summary: `${s.branch} price at the shutdown ratio — the ${s.branch} price at which the branch's TCR equals its SCR, at the collateral and debt read at block ${blockOf(s.blockNumber)}: SCR × debt ÷ collateral. Below the SCR, BorrowerOperations.shutdown() succeeds for any caller.`,
     contract: bo(s),
     via: `${VIA} · block ${blockOf(s.blockNumber)}`,
-    formula: "SCR × branch debt ÷ branch collateral",
+    formula: "SCR × getEntireBranchDebt ÷ getEntireBranchColl",
     inputs: [constRow(s, "SCR", s.scrRaw), debtRow(s), collRow(s)],
     verify: {
       kind: "recompute",

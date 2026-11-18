@@ -145,6 +145,7 @@ import type {
 import { formatCompact } from "@/lib/shared/format-compact";
 import { branchShutdownState, type BranchShutdownState } from "@/lib/liquity-fork/shutdown";
 import { recordedShutdown } from "@/lib/shared/liquity-family-shutdown";
+import { SAME_TX_CLOSE_WORD, sameTxCloseProv } from "@/lib/liquity-v2/same-tx-close";
 
 // The shared card renders inside Link-wrapped rows on
 // listing/umbrella pages, so an inner <a> would nest anchors (invalid HTML,
@@ -732,7 +733,9 @@ export function useLiquityCardSlots({
     v.status === "liquidated"
       ? { word: "Liquidated", tone: "danger" }
       : v.status === "closed"
-        ? { word: "Closed", tone: "muted" }
+        ? v.closedInOneTx
+          ? { word: SAME_TX_CLOSE_WORD, tone: "muted", anatomy: "C6.2·liquity", prov: sameTxCloseProv(ct, v.id) }
+          : { word: "Closed", tone: "muted" }
         : shut
           ? { word: "Shut down", tone: "caution", anatomy: "C6.1" }
           : zombie
