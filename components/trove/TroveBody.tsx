@@ -290,6 +290,7 @@ export function TroveBody({
           shutdown={shutdown}
           branchNotice={branchNotice}
           exports={exports}
+          still={still}
           loadingStatus={{ message: loadingMessage, snapshotDate: lastEventTs ?? undefined }}
         />
 

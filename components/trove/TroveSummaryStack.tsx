@@ -39,6 +39,7 @@ export function TroveSummaryStack({
   exports,
   shutdown,
   branchNotice,
+  still = false,
 }: {
   trove: TroveSummary;
   liveState?: TroveStateData;
@@ -70,6 +71,8 @@ export function TroveSummaryStack({
   shutdown?: BranchShutdownState | null;
   /** The branch's Safety Mode notice (ui-jobs 747); absent on the home hero. */
   branchNotice?: ReactNode;
+  /** The home page's picture of the page (TroveBody's `still`). */
+  still?: boolean;
 }) {
   // The close's debt before it ran, from the page's replayed events (the
   // last one is the close); the home hero has no provider and keeps null.
@@ -123,14 +126,18 @@ export function TroveSummaryStack({
           pending: debtInFrontLoading,
         },
         // Held from first paint: a bar while the queue is read, so the
-        // columns after it never move (the loading grammar).
-        {
-          id: "troves-in-front",
-          label: "Troves in front",
-          value: <TroveDetailsBand {...bandProps} part="ahead" bare />,
-          pending: debtInFrontLoading,
-          unavailable: !debtInFrontLoading && trovesAhead == null ? "unavailable" : undefined,
-        },
+        // columns after it never move (the loading grammar). The home
+        // picture leaves out a count it has not read.
+        ...(still && trovesAhead == null
+          ? []
+          : [
+              {
+                id: "troves-in-front",
+                label: "Troves in front",
+                value: <TroveDetailsBand {...bandProps} part="ahead" bare />,
+                pending: debtInFrontLoading,
+              },
+            ]),
       ];
   const panel: PositionPanelColumns | undefined =
     trove.status === "open"

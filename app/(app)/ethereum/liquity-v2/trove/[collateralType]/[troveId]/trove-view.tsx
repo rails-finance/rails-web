@@ -520,6 +520,7 @@ export default function TroveView({
             wallet={effectiveOwner}
             owner={{
               wallet: effectiveOwner,
+              pending: loading,
               ensName: troveData?.ownerEns ?? null,
               prefix:
                 effectiveOwner && effectiveOwner !== troveData?.owner && changedHands ? (

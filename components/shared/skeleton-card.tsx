@@ -22,26 +22,36 @@ import type { CSSProperties, ReactNode } from "react";
 
 /** One coarse bar. `figure` is a headline figure's line; the default is a
  *  text line. `wait` (default) delays it 150 ms; a bar inside a frame that
- *  already waits passes `false`. */
+ *  already waits passes `false`. `height` (px) holds a box of that height
+ *  around the bar, centred, where the slot's line must keep a taller size
+ *  than the bar. */
 export function SkeletonBar({
   width,
   figure = false,
   wait = true,
+  height,
   className = "",
 }: {
   /** CSS width: px number, or a string ("60%", "6rem"). */
   width: number | string;
   figure?: boolean;
   wait?: boolean;
+  height?: number;
   className?: string;
 }) {
-  return (
+  const bar = (
     <span
       aria-hidden
       data-skel-bar=""
-      className={`skel-bar ${figure ? "h-3.5" : "h-2"} ${wait ? "skel-wait" : ""} ${className}`}
+      className={`skel-bar ${figure ? "h-3.5" : "h-2"} ${wait ? "skel-wait" : ""} ${height == null ? className : ""}`}
       style={{ width }}
     />
+  );
+  if (height == null) return bar;
+  return (
+    <span aria-hidden className={`inline-flex items-center align-middle ${className}`} style={{ height }}>
+      {bar}
+    </span>
   );
 }
 

@@ -104,7 +104,7 @@ export function TroveDetailsBand({
     );
   }
   if (bare && part === "ahead") {
-    if (trovesAhead == null) return null;
+    if (trovesAhead == null) return <span className="font-normal text-rb-500/70">Unavailable</span>;
     return (
       <Prov info={trovesAheadProv} value={String(trovesAhead)}>
         {trovesAhead}

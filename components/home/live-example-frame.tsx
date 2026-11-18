@@ -6,6 +6,7 @@ import type { OraclePricesData } from "@/types/api/oracle";
 import { boldPriceReason, boldStripAsset, useBoldPrice } from "@/lib/liquity-v2/use-bold-price";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { TroveBody, useTroveFlows } from "@/components/trove/TroveBody";
+import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { PILL_CTA } from "@/lib/shared/ui-grammar";
 import { LIVE_EXAMPLE_TROVE_ID, LIVE_EXAMPLE_TROVE_PATH, type LiveExampleData } from "@/lib/home/live-example";
@@ -316,7 +317,7 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
             <div className={`relative overflow-hidden bg-background ${VISIBLE_H}`} aria-hidden="true" inert>
               {/* Skeleton stand-in until the client paints — the trove layout's
                 silhouette (position card, the Lifetime flows panel, the rows) in
-                the shared skeleton tone, fading out once the real components
+                the loading grammar (skeleton-card.tsx), fading out once the real components
                 are ready, then unmounting. */}
               {!skeletonGone && (
                 <div
@@ -324,9 +325,9 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
                     showTrove ? "opacity-0" : "opacity-100"
                   }`}
                 >
-                  <div className="animate-pulse h-44 bg-skeleton rounded-2xl" />
-                  <div className="animate-pulse h-72 bg-rb-100/60 dark:bg-rb-800/40 rounded-2xl" />
-                  <div className="animate-pulse h-24 bg-rb-100/30 dark:bg-rb-800/20 rounded-2xl" />
+                  <SkeletonBlock height={176} className="shrink-0" />
+                  <SkeletonBlock height={288} className="shrink-0" />
+                  <SkeletonBlock height={96} className="shrink-0" />
                 </div>
               )}
 

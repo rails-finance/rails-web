@@ -527,7 +527,7 @@ export default function FxPositionView({
       <div className="py-8 space-y-6">
         <DetailTopRow
           session="fx"
-          owner={{ wallet: view?.owner }}
+          owner={{ wallet: view?.owner, pending: loading }}
           assets={stripAssets}
           closed={view != null && view.status !== "open"}
           closing={closing}

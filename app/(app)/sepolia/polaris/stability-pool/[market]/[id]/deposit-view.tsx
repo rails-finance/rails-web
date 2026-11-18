@@ -261,6 +261,7 @@ export default function DepositView({
             wallet={holder}
             owner={{
               wallet: holder,
+              pending: !chainSettled,
               href: holder ? `${POLARIS_SP_PATH}?q=${holder}` : undefined,
               wrap: chain?.owner
                 ? (pill) => (

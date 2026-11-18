@@ -1071,7 +1071,9 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
                 slots.readStatus || counters ? (
                   <span className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-3 self-center">
                     {slots.readStatus && (
-                      <span className="min-w-0 truncate text-xs text-rb-500" data-card-status-line="">
+                      // Below sm the status wraps, so its last words stay
+                      // readable; from sm it holds one line.
+                      <span className="min-w-0 text-right text-xs text-rb-500 sm:truncate" data-card-status-line="">
                         {slots.readStatus}
                       </span>
                     )}
