@@ -15,6 +15,8 @@ export interface LiquityV2DepositChain extends DepositChainFigures {
   priceRaw: string | null;
   /** Only lastGoodPrice answered. */
   priceStale: boolean;
+  /** getTotalBoldDeposits(): the pool's BOLD, or null where it failed. */
+  totalDepositsRaw: string | null;
   chainStale?: boolean;
 }
 

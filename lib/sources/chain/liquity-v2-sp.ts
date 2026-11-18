@@ -6,7 +6,8 @@
 // getDepositorYieldGainWithPending for the depositor (rails-ops
 // reference/liquity-v2-stability-pool-deposits.md), and the branch PriceFeed's
 // fetchPrice (simulated, as lib/sources/chain/liquity-fork-prices.ts reads it)
-// with lastGoodPrice beside it, for the since-last-touch row's valuation.
+// with lastGoodPrice beside it, for the since-last-touch row's valuation, and
+// the pool's getTotalBoldDeposits for the deposit's share of the pool.
 
 import { getAddress, parseAbi } from "viem";
 import { chainClient } from "./rpc";
@@ -23,6 +24,7 @@ const POOL_ABI = parseAbi([
   "function getDepositorCollGain(address) view returns (uint256)",
   "function stashedColl(address) view returns (uint256)",
   "function getDepositorYieldGainWithPending(address) view returns (uint256)",
+  "function getTotalBoldDeposits() view returns (uint256)",
 ]);
 // fetchPrice mutates on chain; declared view so eth_call simulates it.
 const FEED_ABI = parseAbi([
@@ -49,6 +51,7 @@ export async function loadLiquityV2DepositFromChain(
     yieldGainRaw: "0",
     priceRaw: null,
     priceStale: false,
+    totalDepositsRaw: null,
     chainStale: true,
   };
   try {
@@ -68,6 +71,7 @@ export async function loadLiquityV2DepositFromChain(
         ...perDepositor.map((functionName) => ({ address: pool, abi: POOL_ABI, functionName, args: [who] })),
         { address: feed, abi: FEED_ABI, functionName: "fetchPrice" },
         { address: feed, abi: FEED_ABI, functionName: "lastGoodPrice" },
+        { address: pool, abi: POOL_ABI, functionName: "getTotalBoldDeposits" },
       ] as const,
     })) as ChainResult[];
     const figures = spHeadFigures(res);

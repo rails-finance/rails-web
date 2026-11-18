@@ -28,8 +28,10 @@ import { positionName } from "@/lib/shared/position-name";
 import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
 import { liquityV2DepositHref, LIQUITY_V2_SP_PATH } from "@/lib/liquity-v2/sp-routes";
-import { big, type DepositLifetime, type DepositNow } from "@/lib/liquity-v2/sp-math";
-import { spLiveProv, spPendingLossProv, spSumProv } from "@/lib/liquity-v2/sp-provenance";
+import { big, exactUnits, poolShare, type DepositLifetime, type DepositNow } from "@/lib/liquity-v2/sp-math";
+import { spLiveProv, spPendingLossProv, spPoolShareProv, spSumProv } from "@/lib/liquity-v2/sp-provenance";
+import { pctText } from "@/lib/shared/vault-amount-text";
+import { TINY_AMOUNT_FLOOR_TEXT } from "@/lib/utils/format";
 import type { LiquityV2DepositRow } from "@/lib/sources/api/liquity-v2-sp";
 import { RawFigure, tokenIcon } from "./sp-parts";
 
@@ -45,6 +47,8 @@ export interface LiquityV2DepositCardProps {
   now?: DepositNow | null;
   /** The chain read is in flight. */
   pending?: boolean;
+  /** The pool's getTotalBoldDeposits() and the block of the read `now` came from. */
+  pool?: { totalRaw: bigint; block: number } | null;
   explanation?: ReactNode;
 }
 
@@ -82,6 +86,7 @@ export function liquityV2DepositSlots({
   lifetime,
   now,
   pending = false,
+  pool,
   explanation,
 }: LiquityV2DepositCardProps): PositionCardSlots {
   const detail = surface === "detail";
@@ -245,7 +250,7 @@ export function liquityV2DepositSlots({
     left.push({
       id: "recorded",
       label: "At the last touch",
-      tip: "The BOLD the deposit held after its newest operation.",
+      tip: "The BOLD the deposit held after its latest operation.",
       asset: { symbol: BOLD, address: boldAddr },
       value: (
         <Prov info={spSumProv("recorded", b)}>
@@ -266,6 +271,19 @@ export function liquityV2DepositSlots({
         ),
       });
   }
+  // A deposit of 0 has no share; one too small to print reads as the floor.
+  const share = now && pool && now.now > ZERO ? poolShare(now.now, pool.totalRaw) : null;
+  if (now && pool && share != null)
+    right.push({
+      id: "pool-share",
+      label: "Share of the pool",
+      tip: `The deposit's part of all the BOLD in the ${b} Stability Pool. The deposit burns this share of the BOLD the pool spends on each liquidation and receives this share of the ${b} paid for it.`,
+      value: (
+        <Prov info={spPoolShareProv(b, exactUnits(now.now), exactUnits(pool.totalRaw), pool.block)}>
+          {share > 0 ? pctText(share) : `${TINY_AMOUNT_FLOOR_TEXT}%`}
+        </Prov>
+      ),
+    });
   if (now)
     right.push({
       id: "burned-since",
