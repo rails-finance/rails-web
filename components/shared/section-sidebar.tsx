@@ -365,11 +365,7 @@ function SubjectStretches({
 
 export type SectionSidebarKind = "flows" | "timeline" | "challenges";
 
-const ANATOMY: Record<SectionSidebarKind, string | undefined> = {
-  flows: "P2.1",
-  timeline: "P3.1",
-  challenges: undefined,
-};
+const ANATOMY: Partial<Record<SectionSidebarKind, string>> = { flows: "P2.1", timeline: "P3.1" };
 
 export function SectionSidebar({
   section,
