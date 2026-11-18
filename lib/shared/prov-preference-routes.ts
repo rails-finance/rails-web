@@ -21,6 +21,7 @@ export const PROV_PREFERENCE_ROUTES: readonly string[] = [
   "/",
   "/vaults",
   "/about/provenance",
+  "/assets/[chain]/[token]",
   "/arbitrum/aave-v3",
   "/arbitrum/aave-v3/[wallet]",
   "/arbitrum/aave-v3/[wallet]/event/[eventId]",
