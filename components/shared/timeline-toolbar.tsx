@@ -47,11 +47,13 @@ import { useHydrated } from "@/hooks/useHydrated";
 import { FilterPill, PILL_MUTED } from "@/components/shared/filter-bar/filter-pill";
 import {
   clearTimelineFilters,
+  draftAxesView,
   TimelineAxisPills,
+  type TimelineFilters,
   TimelineFilterSheet,
   timelineFilterModel,
 } from "@/components/shared/timeline-filter-bar";
-import type { TimelineEventsState } from "@/hooks/useTimelineEvents";
+import type { TimelineAxesView, TimelineEventsState } from "@/hooks/useTimelineEvents";
 
 /** The muted text after a middle dot on the heading line, so only the filters
  *  below read as controls (rails-ops ui-jobs 227). */
@@ -345,6 +347,9 @@ export interface TimelineToolbarProps {
   /** The 30-day projection's switch (ui-jobs 733), between beforeDisplay and
    *  Display: a display control, outside Clear all and the URL. */
   projection?: React.ReactNode;
+  /** The count an unapplied view would give (ChainTruthTimeline's
+   *  `countDraft`); the editors read "Apply" without it. */
+  countDraft?: (view: TimelineAxesView) => { count: number; floor: boolean };
   /** A title on the count line, for a family whose count is a true but
    *  surprising number (see ChainTruthTimelineProps.countTooltip). Unset
    *  renders identically to today. */
@@ -739,6 +744,7 @@ export function TimelineToolbar({
   leading,
   beforeDisplay,
   projection,
+  countDraft,
   countTooltip,
   countDetail,
   monthReach,
@@ -791,9 +797,19 @@ export function TimelineToolbar({
 
   // The axes as the listings' pills (ui-jobs 735); see timeline-filter-bar.tsx.
   const model = timelineFilterModel(tl);
-  // No count in the editors: `filteredCount` holds the loose events only
-  // (folder members join it in ChainTruthTimeline), so the editors read "Apply".
-  const sheetCount = undefined;
+  // The editors' "Show 12": the list's count until a draft changes, then the
+  // draft's by the applied count's rule (`countDraft`). "Apply" where a folder
+  // the view splits is unread, so the figure would be a floor.
+  const draftBase =
+    countDraft && !tl.filteredCountIsFloor
+      ? { total: tl.isFiltered ? tl.filteredCount : tl.servedEventCount, noun: "events" }
+      : undefined;
+  const countFor = countDraft
+    ? (draft: TimelineFilters) => {
+        const r = countDraft(draftAxesView(tl, draft));
+        return r.floor ? Promise.reject(new Error("floor")) : r.count;
+      }
+    : undefined;
   const clearDate = () => {
     tl.setDateRange(null);
     monthReach?.onReset?.();
@@ -879,74 +895,77 @@ export function TimelineToolbar({
     // the effect honest without re-arming on every render.
   }, [dropdownOpen, tl.toggleHeatmap]);
 
+  const displayControls = !still && (beforeDisplay != null || projection != null || displayItems.length > 0) && (
+    <div className="ml-auto flex shrink-0 items-center gap-2" data-anatomy="L1.11">
+      {beforeDisplay}
+      {/* The 30-day projection's switch (ui-jobs 733): outside Clear all and
+          the URL, so it sits with the display controls. */}
+      {projection}
+      {displayItems.length > 0 && <TimelineDisplayMenu items={displayItems} />}
+    </div>
+  );
+
   return (
     <div ref={stripRef} className="relative space-y-3" data-anatomy="L1" {...ctrlWaking(hydrated)}>
-      {leading != null && (
-        // Inset CARD_INSET_START from the page edge, on a line of its own.
-        <div className={`min-w-0 ${CARD_INSET_START}`} data-anatomy="L1.1">
-          {leading}
+      {/* The heading line (Miles, 18 Nov 2026): the leading words inset
+          CARD_INSET_START at the left, the display controls at the right. */}
+      {(leading != null || displayControls) && (
+        <div className="flex items-center gap-2">
+          <div className={`min-w-0 ${CARD_INSET_START}`} data-anatomy="L1.1">
+            {leading}
+          </div>
+          {displayControls}
         </div>
       )}
       {still ? (
         countNode
       ) : (
-        // The listings' strip (N1, ui-jobs 735). From sm one wrapping row:
-        // [axis pills] [Date] [spacer] [Sync to chart] [projection] [Display],
-        // and under it Clear all at the left (two or more set) and the count
-        // at the right. Below sm: one pill row that scrolls sideways, led by
-        // the Filters button; then the count, and Display at the right.
-        <div className="flex flex-col">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative max-sm:-mx-4 max-sm:min-w-0 max-sm:basis-[calc(100%+2rem)] sm:contents">
-              <div
-                className="flex items-center gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:contents [&::-webkit-scrollbar]:hidden"
-                data-pill-row=""
-                data-anatomy="L1.3"
-              >
-                <TimelineFilterSheet model={model} count={sheetCount} />
-                <TimelineAxisPills model={model} count={sheetCount} />
-                {tl.datesAxis && (
-                  <FilterPill
-                    name="Date"
-                    state={filterActive ? "set" : "unset"}
-                    locked={false}
-                    label="Date"
-                    value={dateLabel}
-                    spoken={filterActive ? `Date ${dateLabel}` : "Add Date filter"}
-                    expanded={datePanelOpen}
-                    onOpen={tl.toggleHeatmap}
-                    onRemove={clearDate}
-                  />
-                )}
-                <span className="w-6 shrink-0 sm:hidden" aria-hidden="true" />
-              </div>
-              <div
-                className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-background to-transparent sm:hidden"
-                aria-hidden="true"
-              />
-            </div>
-            <div className="order-1 flex min-h-11 flex-1 items-center gap-3 sm:order-2 sm:min-h-8 sm:basis-full">
-              <span className="sm:order-2 sm:ml-auto">{countNode}</span>
-              {setCount > 0 && (
-                <button
-                  type="button"
-                  onClick={clearAll}
-                  className={`text-sm font-medium ${INPLACE_TEXT} rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:order-1 ${setCount < 2 ? "sm:hidden" : ""}`}
-                  data-pill-clear=""
-                  data-anatomy="L1.9"
-                >
-                  <span className="sm:hidden">Reset</span>
-                  <span className="max-sm:hidden">Clear all</span>
-                </button>
+        // The listings' pill row (N1, ui-jobs 735): [axis pills] [Date]
+        // [Clear all] and the count at the right end. Below sm the pills
+        // scroll sideways behind the Filters button, and the count takes the
+        // line under them.
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <div className="relative max-sm:-mx-4 max-sm:min-w-0 max-sm:basis-[calc(100%+2rem)] sm:contents">
+            <div
+              className="flex items-center gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:contents [&::-webkit-scrollbar]:hidden"
+              data-pill-row=""
+              data-anatomy="L1.3"
+            >
+              <TimelineFilterSheet model={model} count={draftBase} countFor={countFor} />
+              <TimelineAxisPills model={model} count={draftBase} countFor={countFor} />
+              {tl.datesAxis && (
+                <FilterPill
+                  name="Date"
+                  state={filterActive ? "set" : "unset"}
+                  locked={false}
+                  label="Date"
+                  value={dateLabel}
+                  spoken={filterActive ? `Date ${dateLabel}` : "Add Date filter"}
+                  expanded={datePanelOpen}
+                  onOpen={tl.toggleHeatmap}
+                  onRemove={clearDate}
+                />
               )}
+              <span className="w-6 shrink-0 sm:hidden" aria-hidden="true" />
             </div>
-            <div className="order-1 flex shrink-0 items-center gap-2 sm:ml-auto">
-              {beforeDisplay}
-              {/* The 30-day projection's switch (ui-jobs 733): outside Clear all
-                  and the URL, so it sits with the display controls. */}
-              {projection}
-              {displayItems.length > 0 && <TimelineDisplayMenu items={displayItems} />}
-            </div>
+            <div
+              className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-background to-transparent sm:hidden"
+              aria-hidden="true"
+            />
+          </div>
+          <div className="flex min-h-11 min-w-0 flex-1 items-center gap-3 sm:min-h-10">
+            {setCount > 1 && (
+              <button
+                type="button"
+                onClick={clearAll}
+                className={`text-sm font-medium ${INPLACE_TEXT} shrink-0 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500`}
+                data-pill-clear=""
+                data-anatomy="L1.9"
+              >
+                Clear all
+              </button>
+            )}
+            <span className="ml-auto min-w-0">{countNode}</span>
           </div>
         </div>
       )}

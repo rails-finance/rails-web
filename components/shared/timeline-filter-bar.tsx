@@ -23,7 +23,7 @@ import type { FilterDimension, FilterOptionDef } from "@/components/shared/filte
 import type { FilterOption } from "@/components/shared/filter-dropdown";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import type { BaseListFilters } from "@/lib/shared/list-filter";
-import type { TimelineEventsState } from "@/hooks/useTimelineEvents";
+import type { TimelineAxesView, TimelineEventsState } from "@/hooks/useTimelineEvents";
 
 type Axis = "type" | "asset" | "version" | "address";
 export type TimelineFilters = BaseListFilters & Record<Axis, string[]>;
@@ -149,18 +149,41 @@ export function timelineFilterModel(tl: TimelineEventsState): TimelineFilterMode
   return { dimensions: axes.map(dimensionOf), filters, onChange };
 }
 
+/** A draft as the hook's four hidden sets: an offered axis hides what its
+ *  selection leaves out (nothing while it is []), an axis with no pill keeps
+ *  what it hides now. */
+export function draftAxesView(tl: TimelineEventsState, draft: TimelineFilters): TimelineAxesView {
+  const offered = new Map(axesOf(tl).map((a) => [a.axis, a]));
+  const hidden = (axis: Axis, options: FilterOption[], visible: Set<string>): Set<string> => {
+    const keep = offered.has(axis) ? draft[axis] : null;
+    if (keep == null) return new Set(options.filter((o) => !visible.has(o.key)).map((o) => o.key));
+    if (keep.length === 0) return new Set();
+    return new Set(options.filter((o) => !keep.includes(o.key)).map((o) => o.key));
+  };
+  return {
+    hiddenActions: hidden("type", tl.eventOptions, tl.visibleActionKeys),
+    hiddenAssets: hidden("asset", tl.assetOptions, tl.visibleAssetKeys),
+    hiddenVersions: hidden("version", tl.versionOptions, tl.visibleVersionKeys),
+    hiddenCounterparties: hidden("address", tl.counterpartyOptions, tl.visibleCounterpartyKeys),
+  };
+}
+
 /** Every axis back to showing all; the date is the caller's. */
 export function clearTimelineFilters(m: TimelineFilterModel): void {
   m.onChange(resetAll(groupDimensions(m.dimensions, m.filters), m.filters));
 }
 
 /** The pills of the axes, in registry order, each with its editor. */
+type DraftCount = (draft: TimelineFilters) => number | Promise<number>;
+
 export function TimelineAxisPills({
   model,
   count,
+  countFor,
 }: {
   model: TimelineFilterModel;
   count?: { total: number; noun: string };
+  countFor?: DraftCount;
 }) {
   const [open, setOpen] = useState<string | null>(null);
   const groups = groupDimensions(model.dimensions, model.filters);
@@ -176,6 +199,7 @@ export function TimelineAxisPills({
             setOpen={(o) => setOpen(o ? pill.name : null)}
             model={model}
             count={count}
+            countFor={countFor}
           />
         );
       })}
@@ -189,12 +213,14 @@ function AxisPill({
   setOpen,
   model,
   count,
+  countFor,
 }: {
   pill: PillModel<TimelineFilters>;
   open: boolean;
   setOpen: (o: boolean) => void;
   model: TimelineFilterModel;
   count?: { total: number; noun: string };
+  countFor?: DraftCount;
 }) {
   const anchorRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -227,6 +253,7 @@ function AxisPill({
             }}
             anchorRef={anchorRef}
             count={count}
+            countFor={countFor}
           />
         )}
       </FilterPill>
@@ -238,10 +265,20 @@ function AxisPill({
 export function TimelineFilterSheet({
   model,
   count,
+  countFor,
 }: {
   model: TimelineFilterModel;
   count?: { total: number; noun: string };
+  countFor?: DraftCount;
 }) {
   if (model.dimensions.length === 0) return null;
-  return <FilterSheet dimensions={model.dimensions} filters={model.filters} onChange={model.onChange} count={count} />;
+  return (
+    <FilterSheet
+      dimensions={model.dimensions}
+      filters={model.filters}
+      onChange={model.onChange}
+      count={count}
+      countFor={countFor}
+    />
+  );
 }

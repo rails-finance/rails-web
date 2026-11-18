@@ -122,9 +122,10 @@ import { TIMELINE_PAGE_ROWS } from "@/lib/shared/timeline-opening-balance";
 import { folderTerminus } from "@/lib/shared/run-folders";
 import { settleRunRows } from "@/lib/shared/timeline-chunks";
 import { MemberRevealContext } from "@/components/shared/group-frame";
-import type { DisplayedTimelineRow, TimelineEventsState } from "@/hooks/useTimelineEvents";
+import type { DisplayedTimelineRow, TimelineAxesView, TimelineEventsState } from "@/hooks/useTimelineEvents";
 import { FolderMembersProvider, useFolderMembers, type FolderMembersReader } from "@/lib/shared/folder-members";
 import { filteredEventCount } from "@/lib/shared/timeline-folder-filter";
+import { PILL_NEUTRAL, PILL_SET_TONE } from "@/components/shared/filter-bar/filter-pill";
 import {
   folderAggregates,
   type FolderResponseId,
@@ -852,6 +853,24 @@ function ChainTruthTimelineBody({
     );
     return { ...tl, filteredCount: count, filteredCountIsFloor: floor };
   }, [tl, servedRows, folders]);
+
+  // The pill editors' draft count: the applied count's own rule over an
+  // unapplied view (ui-jobs 735), a floor while a folder it splits is unread.
+  const countDraft = useCallback(
+    (view: TimelineAxesView) => {
+      const d = tl.draftView(view);
+      return filteredEventCount(
+        d.loose,
+        d.folders,
+        (folder) => {
+          const state = folders.stateOf(folder.responseId);
+          return state?.status === "ready" ? state.events : undefined;
+        },
+        d.passes,
+      );
+    },
+    [tl, folders],
+  );
 
   // ── Share: pinned event mode + `?at=` landing ──────────────────────────
   // Lives here (not in useTimelineEvents) because both need `usePathname`
@@ -2112,6 +2131,7 @@ function ChainTruthTimelineBody({
               displayItems={items}
               leading={toolbarLeading}
               beforeDisplay={followToggle}
+              countDraft={countDraft}
               countTooltip={countTooltip}
               countDetail={countDetail}
               still={still}
@@ -2466,7 +2486,15 @@ function SyncChartButton({ state, onPress }: { state: "off" | "synced" | "follow
             : "Cut the timeline at the chart's cursor"
       }
       onClick={onPress}
-      className={`${CTRL_GHOST} ${on ? CTRL_ON_ACCENT : state === "synced" ? `${CTRL_ON} ${CTRL_ON_HOVER}` : CTRL_OFF} h-7 gap-2 rounded-md px-1.5 text-xs sm:px-2.5`}
+      // The listings' pill buttons (ui-jobs 735): neutral at rest, its teal
+      // ground while it follows (a set filter's tone), teal words once synced.
+      className={`inline-flex h-11 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:h-10 ${
+        on
+          ? `${PILL_SET_TONE} text-foreground hover:bg-teal-500/10 dark:hover:bg-teal-400/15`
+          : state === "synced"
+            ? `${PILL_NEUTRAL} text-teal-700 dark:text-teal-300`
+            : PILL_NEUTRAL
+      }`}
       data-flow-follow={on ? "on" : "off"}
       data-flow-sync={state}
       data-anatomy="L1.10"

@@ -267,6 +267,35 @@ export interface TimelineEventsState {
    *  view state into the address bar. No-op when the event is already fully
    *  visible. */
   revealEvent: (event: BaseActivityEvent) => void;
+  /** An unapplied view of the axes at the applied date range: the loose events
+   *  it admits, each folder standing under it with its header's count, and
+   *  the predicate a read member answers (`filteredEventCount`). */
+  draftView: (view: TimelineAxesView) => {
+    loose: number;
+    folders: Array<{ folder: ServedFolder; matched: number | null }>;
+    passes: (e: BaseActivityEvent) => boolean;
+  };
+}
+
+/** The four hidden sets, as one view of the axes. */
+export interface TimelineAxesView {
+  hiddenActions: Set<string>;
+  hiddenAssets: Set<string>;
+  hiddenCounterparties: Set<string>;
+  hiddenVersions: Set<string>;
+}
+
+/** Does one event pass the four axes? An event with no key on an axis
+ *  passes it, and one with several passes while any of them is shown. */
+export function eventPassesAxes(e: BaseActivityEvent, v: TimelineAxesView): boolean {
+  if (v.hiddenActions.has(getEventActionKey(e))) return false;
+  const some = (keys: string[], hidden: Set<string>) =>
+    hidden.size === 0 || keys.length === 0 || keys.some((k) => !hidden.has(k));
+  return (
+    some(getEventAssetKeys(e), v.hiddenAssets) &&
+    some(getEventCounterpartyKeys(e), v.hiddenCounterparties) &&
+    some(getEventVersionKeys(e), v.hiddenVersions)
+  );
 }
 
 interface PersistedState {
@@ -599,22 +628,13 @@ export function useTimelineEvents(
   // judged by it too once they are read (`memberPasses` below) — a member and
   // a loose event must never answer the same filter differently.
   const passesAxes = useCallback(
-    (e: BaseActivityEvent) => {
-      if (hiddenSet.has(getEventActionKey(e))) return false;
-      if (hiddenAssetSet.size > 0) {
-        const assets = getEventAssetKeys(e);
-        if (assets.length > 0 && !assets.some((a) => !hiddenAssetSet.has(a))) return false;
-      }
-      if (hiddenCounterpartySet.size > 0) {
-        const counterparties = getEventCounterpartyKeys(e);
-        if (counterparties.length > 0 && !counterparties.some((c) => !hiddenCounterpartySet.has(c))) return false;
-      }
-      if (hiddenVersionSet.size > 0) {
-        const versions = getEventVersionKeys(e);
-        if (versions.length > 0 && !versions.some((v) => !hiddenVersionSet.has(v))) return false;
-      }
-      return true;
-    },
+    (e: BaseActivityEvent) =>
+      eventPassesAxes(e, {
+        hiddenActions: hiddenSet,
+        hiddenAssets: hiddenAssetSet,
+        hiddenCounterparties: hiddenCounterpartySet,
+        hiddenVersions: hiddenVersionSet,
+      }),
     [hiddenSet, hiddenAssetSet, hiddenCounterpartySet, hiddenVersionSet],
   );
   const visibleEvents = useMemo(() => sortedEvents.filter(passesAxes), [sortedEvents, passesAxes]);
@@ -633,6 +653,26 @@ export function useTimelineEvents(
       dateRange,
     }),
     [hiddenSet, hiddenAssetSet, hiddenCounterpartySet, dateRange],
+  );
+
+  // A view the reader has not applied yet, judged by the same predicate and
+  // the same folder headers as the applied one: the pill editors' "Show 12"
+  // (ui-jobs 735). Reads nothing new.
+  const draftView = useCallback(
+    (view: TimelineAxesView) => {
+      const passes = (e: BaseActivityEvent) =>
+        eventPassesAxes(e, view) && (!dateRange || (e.timestamp >= dateRange[0] && e.timestamp <= dateRange[1]));
+      let loose = 0;
+      for (const e of sortedEvents) if (passes(e)) loose++;
+      const axes: FolderFilterAxes = { ...view, dateRange };
+      const folders = (servedRows ?? []).flatMap((row) =>
+        row.kind === "folder" && folderAdmits(row.folder, axes)
+          ? [{ folder: row.folder, matched: folderMatchCount(row.folder, axes) }]
+          : [],
+      );
+      return { loose, folders, passes };
+    },
+    [sortedEvents, servedRows, dateRange],
   );
 
   const dateFilteredEvents = useMemo(() => {
@@ -956,6 +996,7 @@ export function useTimelineEvents(
     // lib/shared/timeline-opening-balance.ts), so it is stated beside this
     // figure rather than added to it.
     filteredCount: dateFilteredEvents.length,
+    draftView,
     filteredCountIsFloor: false,
     isFiltered,
     memberPasses,

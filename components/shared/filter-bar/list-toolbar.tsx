@@ -2,14 +2,14 @@
 
 // ListToolbar — the shared listing-page filter strip (N1): the search, one
 // editable pill per filter group (N1.10, ui-jobs 681), the sort pill (N1.3),
-// the ⋮ (N1.7), and under them the count (N1.6) with Clear all. From sm one
-// wrapping row: [search] [set pills] [unset pills] [spacer] [sort] [⋮], and a
-// thin row under it, Clear all at the left (two or more filters set) and the
-// count at the right. Below sm: the search alone; one pill row that scrolls
-// sideways and never wraps, led by the Filters button (N1.8.1); then the count
-// and Reset at the left and the sort at the right. A page passes its dimension
-// registry and param object; the toolbar holds no filter state beyond which
-// editor is open and the order the pills were set in.
+// the ⋮ (N1.7), and the count (N1.6) with Clear all. From sm one wrapping
+// row: [search] [set pills] [unset pills] [Clear all (two or more set)]
+// [count] [sort] [⋮], the count right-aligned before the sort. Below sm: the
+// search alone; one pill row that scrolls sideways and never wraps, led by the
+// Filters button (N1.8.1); then the count and Reset at the left and the sort
+// at the right. A page passes its dimension registry and param object; the
+// toolbar holds no filter state beyond which editor is open and the order the
+// pills were set in.
 
 import {
   useEffect,
@@ -205,8 +205,9 @@ export function ListToolbar<F extends BaseListFilters>({
           />
         </div>
         {/* The count and Clear all: below sm at the left of the sort's row;
-            from sm a row of their own under the pills. */}
-        <div className="order-1 flex min-h-11 flex-1 items-center gap-3 sm:order-2 sm:min-h-8 sm:basis-full">
+            from sm on the pill row, the count at its right end before the
+            sort (Miles, 18 Nov 2026, ui-jobs 735). */}
+        <div className="order-1 flex min-h-11 flex-1 items-center gap-3 sm:min-h-10">
           {countLine && <span className="sm:order-2 sm:ml-auto">{countLine}</span>}
           {active > 0 && (
             <button
