@@ -48,7 +48,7 @@ export interface MakerVaultMarkdownArgs {
    *  identical with and without them, and the CSV never carries one. */
   notes?: MarketNote[];
   /** This vault's live notes (`liveMakerRateStepNote`) — the Jug's own fee
-   *  read at the chain head, against this vault's own newest touch. Never
+   *  read at the chain head, against this vault's own last touch. Never
    *  anchored (the later end is past every touch's block) and never in the
    *  timeline table; listed alongside the historical notes in the "Market
    *  notes" section only. */

@@ -22,12 +22,16 @@ export interface SpHeadFigures {
   priceRaw: string | null;
   /** Only lastGoodPrice answered: the price the last operation fetched. */
   priceStale: boolean;
+  /** The pool's getTotalBoldDeposits(): every deposit's BOLD; null where it
+   *  failed, so the page states no share. */
+  totalDepositsRaw: string | null;
 }
 
 /** Results in the order the source reads them: getCompoundedBoldDeposit,
  *  deposits, getDepositorCollGain, stashedColl,
  *  getDepositorYieldGainWithPending, then the PriceFeed's fetchPrice and
- *  lastGoodPrice. Null when one of the pool's figures failed. */
+ *  lastGoodPrice, then the pool's getTotalBoldDeposits. Null when one of the
+ *  depositor's figures failed. */
 export function spHeadFigures(res: ChainResult[]): SpHeadFigures | null {
   const compounded = ok<bigint>(res[0]);
   const recorded = ok<bigint>(res[1]);
@@ -37,6 +41,7 @@ export function spHeadFigures(res: ChainResult[]): SpHeadFigures | null {
   if (compounded == null || recorded == null || collGain == null || stash == null || yieldGain == null) return null;
   const fetched = ok<readonly [bigint, boolean]>(res[5]);
   const lastGood = ok<bigint>(res[6]);
+  const total = ok<bigint>(res[7]);
   const live = fetched != null && fetched[0] > BigInt(0) ? fetched[0] : null;
   const price = live ?? (lastGood != null && lastGood > BigInt(0) ? lastGood : null);
   return {
@@ -47,5 +52,6 @@ export function spHeadFigures(res: ChainResult[]): SpHeadFigures | null {
     yieldGainRaw: yieldGain.toString(),
     priceRaw: price == null ? null : price.toString(),
     priceStale: live == null && price != null,
+    totalDepositsRaw: total == null ? null : total.toString(),
   };
 }

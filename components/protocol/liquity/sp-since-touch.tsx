@@ -1,7 +1,7 @@
 "use client";
 
 // Liquity V2 — "Since its last touch" on a stability-pool deposit's timeline:
-// the window from the deposit's newest touch to the head block, pinned in the
+// the window from the deposit's last touch to the head block, pinned in the
 // timeline's head slot (decision 0022 §4), on the frame Polaris's deposit row
 // uses (components/protocol/polaris/polaris-sp-loan-since-touch.tsx).
 //
@@ -13,7 +13,9 @@
 // added, and the total the next touch starts from, every figure receipted.
 // Where the feed did not answer, the row names the window and values nothing.
 
+import type { ReactNode } from "react";
 import { NoteRowShell } from "@/components/shared/note-row-shell";
+import { DepositTouchTip } from "./touch-tip";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { EventSheetView, SHEET_NO_USD, type EventSheet } from "@/components/shared/event-sheet";
 import { AmountText } from "@/components/shared/amount-text";
@@ -60,6 +62,7 @@ export function LiquityV2DepositSinceTouchRow({
   toAt,
   headBlock,
   sinceOpen,
+  liquidations,
 }: {
   branch: SpBranch;
   /** deposits(depositor): the deposit the last touch recorded. */
@@ -83,6 +86,9 @@ export function LiquityV2DepositSinceTouchRow({
   headBlock: number;
   /** The deposit's one operation is its open. */
   sinceOpen: boolean;
+  /** The liquidations since the last touch, one by one, under the sheet
+   *  (sp-liquidations.tsx); absent where the read did not answer. */
+  liquidations?: ReactNode;
 }) {
   const c = branch;
   const collAddr = LIQUITY_V2_BRANCHES[c.toLowerCase()].collateralAddr;
@@ -153,7 +159,7 @@ export function LiquityV2DepositSinceTouchRow({
             key: "last",
             label: "At the last touch",
             amount: bo(recorded, fmt(recorded), spSumProv("recorded", c)),
-            tip: "The BOLD the deposit held after its newest operation.",
+            tip: "The BOLD the deposit held after its last touch.",
           },
           ...(burned > ZERO
             ? [
@@ -255,7 +261,15 @@ export function LiquityV2DepositSinceTouchRow({
       marker={{ attr: "data-live-window", value: "liquity-v2-sp-since-touch" }}
       header={
         <>
-          <span className="text-sm text-foreground">{since}</span>
+          <span className="text-sm text-foreground">
+            {sinceOpen ? (
+              since
+            ) : (
+              <>
+                Since its last <DepositTouchTip />
+              </>
+            )}
+          </span>
           {net != null && netProv && (
             <>
               <span className="text-xs text-rb-500">change in USD</span>
@@ -276,6 +290,7 @@ export function LiquityV2DepositSinceTouchRow({
       }
     >
       <EventSheetView sheet={sheet} breakdown data={{ "data-live-sheet": "" }} />
+      {liquidations}
     </NoteRowShell>
   );
 }
