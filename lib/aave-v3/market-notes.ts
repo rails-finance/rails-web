@@ -485,7 +485,7 @@ export interface AaveFamilyLiveRead {
 
 /**
  * The LIVE notes: one per (reserve, side) the overlay says the account holds
- * NOW, against the newest touch at which it held that side.
+ * NOW, against the last touch at which it held that side.
  *
  * The later end is the Pool's own `getReserveData` at the overlay's block —
  * `supplyApr` / `borrowApr`, the same fractions the risk surfaces read — not
@@ -520,7 +520,7 @@ export function liveAaveFamilyRateStepNotes(
       const rate = inForm(opts, poolRate);
       if (side === "borrow" && stable.has(reserve)) continue;
 
-      // The newest touch at which this side was held. Not simply the newest
+      // The last touch at which this side was held. Not simply the last
       // touch: a balance can arrive by transfer after the position's own last
       // action, and the rate at a touch that did not hold it says nothing.
       let from: AaveFamilyTouch | null = null;

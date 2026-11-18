@@ -135,10 +135,10 @@ const DUST = 1e-9;
 /** Both ends' prices and the stated slots, or null where the window cannot be
  *  stated honestly. Null — never a partial or a dash — when: the CDP is closed
  *  or the overlay is stale (there is no live end); the collateral is zero (the
- *  feed term is meaningless); the index's newest touch is not the chain's
+ *  feed term is meaningless); the index's last touch is not the chain's
  *  (`lastTouchTime` disagrees, so the row's price is not this window's
  *  opening price); the newest row's resulting figures disagree with the
- *  chain's own slots (the index is behind a touch); the newest touch carries
+ *  chain's own slots (the index is behind a touch); the last touch carries
  *  no price yet (the oracle-at-block lane has not reached its block); or the
  *  identity does not close. A window nothing has happened in is also null:
  *  a CDP touched seconds ago has nothing to say. */

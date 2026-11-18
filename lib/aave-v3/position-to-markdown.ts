@@ -71,7 +71,7 @@ export interface AaveV3PositionMarkdownArgs {
    *  are identical with and without them, and the CSV never carries one. */
   notes?: MarketNote[];
   /** This position's live notes — each held reserve's own rate read at the
-   *  chain head against the newest touch at which the account held that side.
+   *  chain head against the last touch at which the account held that side.
    *  Never anchored (the later end is past every row's block) and never in the
    *  timeline table; listed alongside the historical notes in the "Market
    *  notes" section only. */
@@ -372,7 +372,7 @@ function marketNotesSection(notes: MarketNote[]): string[] {
   const out: string[] = ["## Market notes", ""];
   out.push(
     "Each note is a receipted fact about ONE reserve this position holds, on ONE side of it, observed between two " +
-      "of the position's own touches and stated between them — or between its newest touch and the chain head for " +
+      "of the position's own touches and stated between them — or between its last touch and the chain head for " +
       "a live note. A V3-family account is one cross-collateralised account holding several reserves at once, and " +
       "each reserve carries a supply rate the account earns and a variable borrow rate it pays, so a note is per " +
       "reserve and per side rather than per position. A note is not an event: this snapshot's totals leave it out, " +

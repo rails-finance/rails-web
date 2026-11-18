@@ -4,6 +4,7 @@
 // The field meanings are rails-ops reference/liquity-v2-stability-pool-deposits.md.
 
 import type { Provenance, ProvVerify } from "@/components/shared/provenance";
+import type { SpLiquidationsNote } from "@/lib/shared/market-note";
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
 import { LIQUITY_V2_SP_POOLS } from "./sp-catalog";
 import type { SpBranch } from "./sp-routes";
@@ -104,14 +105,14 @@ const SUM: Record<string, (c: string) => string> = {
   kept: () =>
     "Yield kept — the sum of every DepositOperation's yieldGainSinceLastOperation less its yieldGainClaimed: the BOLD yield the touches added to the deposit.",
   recorded: () =>
-    "Deposit at the last touch — the deposit before each operation, less its loss, plus its top-up or withdrawal and its yield kept, replayed from the first operation: the pool's deposits(depositor) after the latest one.",
+    "Deposit at the last touch — the deposit before each operation, less its loss, plus its top-up or withdrawal and its yield kept, replayed from the first operation: the pool's deposits(depositor) after the last touch.",
   yieldGain: () => "BOLD yield paid at touches — the sum of every DepositOperation's yieldGainSinceLastOperation.",
   yieldClaimed: () => "BOLD yield claimed — the sum of every DepositOperation's yieldGainClaimed.",
   collGain: (c) => `${c} paid in at touches — the sum of every DepositOperation's ethGainSinceLastOperation.`,
   collClaimed: (c) =>
     `${c} claimed — the sum of every DepositOperation's ethGainClaimed, which includes the stash from earlier touches.`,
   stash: (c) =>
-    `${c} stashed — the ${c} paid in at touches less what they sent, replayed from the first operation: the pool's stashedColl(depositor) after the latest one.`,
+    `${c} stashed — the ${c} paid in at touches less what they sent, replayed from the first operation: the pool's stashedColl(depositor) after the last touch.`,
 };
 
 export function spSumProv(what: keyof typeof SUM, branch: SpBranch): Provenance {
@@ -135,6 +136,37 @@ export function spTouchProv(summary: string, txHash: string, block: string, bran
   };
 }
 
+/** What a compounding touch kept: the BOLD yield it added to the deposit, or
+ *  the collateral it stashed, each its log's gain less its claim. */
+export function spCompoundProv(
+  what: "yield" | "stash",
+  txHash: string,
+  block: string,
+  branch: SpBranch,
+  inputs: { since: string; claimed: string },
+): Provenance {
+  const y = what === "yield";
+  return {
+    kind: "chain-derived",
+    pclass: "emitted",
+    summary: y
+      ? "BOLD yield added — the DepositOperation's yieldGainSinceLastOperation less its yieldGainClaimed: the yield this touch kept in the deposit."
+      : `${branch} stashed — the DepositOperation's ethGainSinceLastOperation less its ethGainClaimed: the ${branch} this touch left in the pool for a later claim.`,
+    formula: y ? "yieldGainSinceLastOperation − yieldGainClaimed" : "ethGainSinceLastOperation − ethGainClaimed",
+    inputs: [
+      {
+        label: y ? "yieldGainSinceLastOperation" : "ethGainSinceLastOperation",
+        value: inputs.since,
+        kind: "chain",
+        pclass: "emitted",
+      },
+      { label: y ? "yieldGainClaimed" : "ethGainClaimed", value: inputs.claimed, kind: "chain", pclass: "emitted" },
+    ],
+    contract: pool(branch),
+    source: { block, txHash },
+  };
+}
+
 /** The branch's collateral in USD at its PriceFeed, read with the deposit. */
 export function spFeedProv(branch: SpBranch, stale: boolean): Provenance {
   return {
@@ -147,4 +179,133 @@ export function spFeedProv(branch: SpBranch, stale: boolean): Provenance {
     contract: feed(branch),
     via: `${VIA} · ${stale ? "lastGoodPrice()" : "fetchPrice()"} @ head`,
   };
+}
+
+// ── What each liquidation did to the deposit (/stability-pool/liquidations):
+//    the branch pool's P, S and scale replayed over its Liquidation logs with
+//    StabilityPool.sol's integer arithmetic, from the deposit's last touch's
+//    snapshot. The collateral is valued at the Liquidation log's _price. ─────
+
+const LIQ_VIA = "GET /api/liquity-v2/stability-pool/liquidations";
+
+/** One liquidation: its block and transaction, for `source`. */
+export interface SpLiqCoords {
+  block: string;
+  txHash: string;
+}
+
+const replay = (branch: SpBranch, summary: string, at: SpLiqCoords | null, extra: Partial<Provenance> = {}) =>
+  ({
+    kind: "derived",
+    pclass: "indexed",
+    summary,
+    contract: pool(branch),
+    via: LIQ_VIA,
+    ...(at ? { source: { block: at.block, txHash: at.txHash } } : {}),
+    ...extra,
+  }) satisfies Provenance;
+
+export const spLiqProv = {
+  boldLost: (b: SpBranch, at: SpLiqCoords) =>
+    replay(
+      b,
+      "BOLD burned — the deposit's compounded BOLD before this liquidation less after it, replayed from the pool's P and scale at this Liquidation log.",
+      at,
+      { formula: "compounded before − compounded after" },
+    ),
+  collGained: (b: SpBranch, at: SpLiqCoords) =>
+    replay(
+      b,
+      `${b} gained — the deposit's ${b} gain after this liquidation less before it, replayed from the pool's S at this Liquidation log.`,
+      at,
+      { formula: "collateral gain after − collateral gain before" },
+    ),
+  price: (b: SpBranch, at: SpLiqCoords) => ({
+    kind: "chain" as const,
+    pclass: "emitted" as const,
+    summary: `${b} block price — the Liquidation log's _price: the BOLD per ${b} the branch liquidated at in this block.`,
+    contract: { name: `Liquity V2 ${b} TroveManager`, address: LIQUITY_V2_BRANCHES[b.toLowerCase()].troveManager },
+    source: { block: at.block, txHash: at.txHash },
+    via: LIQ_VIA,
+  }),
+  value: (b: SpBranch, at: SpLiqCoords, coll: string, price: string) =>
+    replay(
+      b,
+      `${b} gained, in BOLD — the ${b} this liquidation paid the deposit, valued at the liquidation's block price.`,
+      at,
+      {
+        formula: `${b} gained × _price, rounded down to 18 decimals`,
+        inputs: [
+          { label: `${b} gained`, value: coll, kind: "derived", pclass: "indexed" },
+          { label: `_price, BOLD per ${b}`, value: price, kind: "chain", pclass: "emitted" },
+        ],
+      },
+    ),
+  net: (b: SpBranch, at: SpLiqCoords, value: string, lost: string) =>
+    replay(b, `Net, in BOLD — the ${b} gained valued at the liquidation's block price, less the BOLD burned.`, at, {
+      formula: `${b} gained in BOLD − BOLD burned`,
+      inputs: [
+        { label: `${b} gained, in BOLD`, value, kind: "derived", pclass: "indexed" },
+        { label: "BOLD burned", value: lost, kind: "derived", pclass: "indexed" },
+      ],
+    }),
+  /** A stretch's sum of one column. */
+  /** A column's sum over the period: between the two touches, or since the
+   *  last touch for the open period. `column` is plural, `one` singular. */
+  sum: (b: SpBranch, head: string, column: string, one: string, count: number, open = false) =>
+    replay(
+      b,
+      `${head} — ${count === 1 ? `the 1 liquidation's ${one}` : `the sum of the ${count} liquidations' ${column}`} ${open ? "since the last touch" : "between the two touches"}.`,
+      null,
+      { formula: `Σ ${one}` },
+    ),
+  /** The closing touch's own figures, from its DepositOperation. */
+  touchLoss: (b: SpBranch, txHash: string, block: string) =>
+    spTouchProv(
+      "BOLD burned at the touch — the closing DepositOperation's depositLossSinceLastOperation: the deposit liquidations used since the touch before.",
+      txHash,
+      block,
+      b,
+    ),
+  touchGain: (b: SpBranch, txHash: string, block: string) =>
+    spTouchProv(
+      `${b} paid in at the touch — the closing DepositOperation's ethGainSinceLastOperation: the ${b} liquidations paid the deposit since the touch before.`,
+      txHash,
+      block,
+      b,
+    ),
+  /** The open period's end: the newest block the index has read the pool to. */
+  servedThru: (b: SpBranch, block: string) =>
+    replay(
+      b,
+      "Latest block the index has read — the newest block the index has read the branch pool's touches and liquidations to: the route's served_thru_block.",
+      null,
+      { source: { block } },
+    ),
+  /** A compounding touch's deposit change, where a loss landed with it. */
+  depositChange: (b: SpBranch, txHash: string, block: string, before: string, after: string) => ({
+    kind: "derived" as const,
+    pclass: "indexed" as const,
+    summary:
+      "Deposit change — the deposit after this touch less the deposit before it: the yield the touch kept less the loss since the last touch.",
+    formula: "deposit after − deposit before",
+    inputs: [
+      { label: "deposit before", value: before, kind: "derived" as const, pclass: "indexed" as const },
+      { label: "deposit after", value: after, kind: "derived" as const, pclass: "indexed" as const },
+    ],
+    contract: pool(b),
+    source: { block, txHash },
+    via: "GET /api/liquity-v2/stability-pool/timeline",
+  }),
+};
+
+/** A closed period's figure, for a line that lists the note: the net, or,
+ *  where no liquidation falls between the touches, the BOLD the closing touch
+ *  wrote as burned. */
+export function spLiquidationsNoteProv(note: SpLiquidationsNote): Provenance {
+  const b = note.branch as SpBranch;
+  const n = note.stretch.liquidations.length;
+  const to = note.stretch.to;
+  if (n === 0 && to) return spLiqProv.touchLoss(b, to.tx_hash, to.block_number);
+  return spLiqProv.sum(b, "Net between the touches", "nets in BOLD", "net in BOLD", n);
 }
