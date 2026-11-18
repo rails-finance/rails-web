@@ -154,7 +154,7 @@ export default function LoanView({ loanId, initial }: { loanId: string; initial:
     return m;
   }, [touches]);
   const holder = chain?.owner ?? row?.holder ?? null;
-  // The newest touch: a transfer is none.
+  // The last touch: a transfer is none.
   const lastTouch = useMemo(() => touches.findLast((r) => r.event_type !== "transfer") ?? null, [touches]);
 
   if (!data && !failed) return <DetailBodySkeleton />;

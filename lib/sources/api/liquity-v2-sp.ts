@@ -1,4 +1,4 @@
-// Liquity V2 stability-pool deposits — the wire rows of rails-server's three
+// Liquity V2 stability-pool deposits — the wire rows of rails-server's four
 // routes (api/src/routes/liquityV2StabilityPool.ts, migs 490 and 491), and the
 // one fetch both halves of a page read them with.
 //
@@ -130,11 +130,74 @@ export interface LiquityV2DepositDaysResponse {
   days: LiquityV2DepositDay[];
 }
 
+/** What one liquidation did to the deposit, from the pool's P/S replay
+ *  (rails-server services/liquity-v2-sp-liquidations.ts). `price` is the
+ *  Liquidation log's _price, BOLD per unit of the branch collateral; the
+ *  value and the net are BOLD. `net` can be negative. */
+export interface LiquityV2DepositLiquidation {
+  block_number: string;
+  block_timestamp: string;
+  tx_hash: string;
+  tx_index: number;
+  log_index: number;
+  price: string;
+  pool_bold_before: string;
+  pool_debt_offset: string;
+  pool_coll_sent: string;
+  deposit_before: string;
+  bold_lost: string;
+  coll_gained: string;
+  coll_gained_value: string;
+  net: string;
+}
+
+export interface LiquityV2DepositLiquidationTotals {
+  bold_lost: string;
+  coll_gained: string;
+  coll_gained_value: string;
+  net: string;
+}
+
+/** The deposit between two of its touches; `to` null on the open stretch,
+ *  which runs to served_thru_block. `event_key` matches the timeline rows. */
+export interface LiquityV2DepositStretch {
+  from: { event_key: string; block_number: string; block_timestamp: string; tx_hash: string; deposit: string };
+  to: {
+    event_key: string;
+    block_number: string;
+    block_timestamp: string;
+    tx_hash: string;
+    deposit_loss: string;
+    coll_gain_since: string;
+  } | null;
+  liquidations: LiquityV2DepositLiquidation[];
+  totals: LiquityV2DepositLiquidationTotals;
+  /** Closed stretches: the closing touch's figure less the liquidations' sum. */
+  residual: { bold_lost: string; coll_gained: string } | null;
+  reconciles: boolean | null;
+}
+
+export interface LiquityV2DepositLiquidationsResponse {
+  collateral_type: LiquityV2SpBranch;
+  depositor: string;
+  served_thru_block: string;
+  units: { bold: string; coll: string; price: string };
+  totals: LiquityV2DepositLiquidationTotals & { liquidations: number };
+  /** Null when the deposit is closed. */
+  since_last_touch: LiquityV2DepositStretch | null;
+  /** Closed stretches holding a liquidation or a reported loss, oldest first. */
+  stretches: LiquityV2DepositStretch[];
+  /** The replay against every closed stretch on the branch, decimal counts:
+   *  `unreconciled` stretches whose liquidations do not sum to their touch. */
+  branch_check?: { deposits: string; closed_stretches: string; unreconciled: string };
+}
+
 /** The routes, each with the params its proxy forwards. */
 export const LIQUITY_V2_SP_ROUTES = {
   "stability-pool": ["collateralType", "wallet", "status", "minTx", "maxTx", "sortBy", "sortOrder", "limit", "offset"],
   "stability-pool/timeline": ["collateralType", "wallet", "limit", "offset", "order"],
   "stability-pool/flows/daily": ["collateralType", "wallet"],
+  "stability-pool/liquidations": ["collateralType", "wallet"],
 } as const;
 
 export type LiquityV2SpRoute = keyof typeof LIQUITY_V2_SP_ROUTES;

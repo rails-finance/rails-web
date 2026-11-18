@@ -62,7 +62,7 @@ export interface PolarisPositionMarkdownArgs {
   notes?: MarketNote[];
   /** This CDP's live note (lib/shared/market-note.ts's `liveRateStepNote`) —
    *  the market's primary rate read at the chain head, against this CDP's own
-   *  newest touch that carries one.
+   *  last touch that carries one.
    *  Never anchored (the later end is the chain head, past every touch's
    *  block) and never in the timeline table; listed alongside the historical
    *  notes in the "Market notes" section only. */

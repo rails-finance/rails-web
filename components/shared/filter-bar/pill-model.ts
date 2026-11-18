@@ -27,7 +27,12 @@ export interface PillGroup<F> {
   /** The group's name: the pill's label and the editor's title. */
   name: string;
   dims: FilterDimension<F>[];
+  /** The Properties pill: the listing's two-option properties together. */
+  properties?: boolean;
 }
+
+/** The pill that gathers a listing's two-option properties. */
+export const PROPERTIES_GROUP = "Properties";
 
 export interface PillModel<F> extends PillGroup<F> {
   state: PillState;
@@ -63,7 +68,16 @@ export function groupDimensions<F>(dims: FilterDimension<F>[], filters: F): Pill
     }
     byName.get(name)!.push(d);
   }
-  return order.map((name) => ({ name, dims: byName.get(name)! }));
+  const groups: PillGroup<F>[] = order.map((name) => ({ name, dims: byName.get(name)! }));
+  // Two or more property groups become one Properties pill, where the first
+  // of them stood; a lone one keeps its pill.
+  const isProperty = (g: PillGroup<F>) => g.dims.length === 1 && g.dims[0].property === true;
+  const props = groups.filter(isProperty);
+  if (props.length < 2) return groups;
+  const at = groups.indexOf(props[0]);
+  const rest = groups.filter((g) => !isProperty(g));
+  rest.splice(at, 0, { name: PROPERTIES_GROUP, dims: props.flatMap((g) => g.dims), properties: true });
+  return rest;
 }
 
 /** A dimension whose resting default narrows the list ("Status: Open", a
@@ -109,7 +123,12 @@ export function pillFor<F>(group: PillGroup<F>, f: F): PillModel<F> {
   const state: PillState = active.length > 0 ? "set" : locked ? "default" : "unset";
   let label = group.name;
   let value = "";
-  if (state === "set") {
+  if (state === "set" && group.properties) {
+    // The choices name themselves: "Redeemed · Delegated", "Redeemed +2".
+    const words = active.map((d) => dimValue(d, f));
+    label = "";
+    value = words.length > 2 ? `${words[0]} +${words.length - 1}` : words.join(" · ");
+  } else if (state === "set") {
     if (active.length === 1 && isBoolean(active[0])) {
       label = "";
       value = dimValue(active[0], f);

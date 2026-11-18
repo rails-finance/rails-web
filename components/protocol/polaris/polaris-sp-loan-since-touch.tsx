@@ -1,7 +1,7 @@
 "use client";
 
 // Polaris — "Since its last touch" on a stability-pool deposit's and a reserve
-// loan's timeline: the window from the position's newest touch to the head
+// loan's timeline: the window from the position's last touch to the head
 // block, pinned in the head slot as the CDP's is
 // (polaris-since-last-touch.tsx, whose header carries the rule).
 //
@@ -233,7 +233,7 @@ export function PolarisDepositSinceTouchRow({
             key: "last",
             label: "At the last touch",
             amount: st(recorded, fmt(recorded), spSumProv("recorded", market)),
-            tip: `The ${s} the deposit held after its newest operation.`,
+            tip: `The ${s} the deposit held after its last touch.`,
           },
           ...(burned > ZERO
             ? [

@@ -304,21 +304,20 @@ async function main() {
     // can also be matched to a row by name, its own count is checked too.
     const largest = [...opening.byAction].sort((a, b) => b.count - a.count)[0];
     if (largest && largest.count > 0) {
-      const menu = page.locator('[aria-label="Types of event"], button[title="Types of event"]').first();
+      // The Type pill (ui-jobs 735). Its editor's rows are read on their
+      // own hook; a leg nested under an umbrella type is left out, the
+      // umbrella's row counting each of its events once.
+      const menu = page.locator('[data-filter-pill="Type"] [data-pill-open]').first();
       const opened = (await menu.count()) > 0;
-      assert(opened, "the type filter control is on the page", 'looked for the "Types of event" control');
+      assert(opened, "the type filter control is on the page", 'looked for the "Type" pill');
       if (opened) {
         await menu.click();
         await page.waitForTimeout(400);
-        // Scoped through the trigger's own container rather than a role or a
-        // class: the panel carries neither, and selecting on a presentational
-        // class is how verify-ens-pills.mjs once reported 0 of 94 on a correct
-        // page after a font change.
-        const menuRows = await page.evaluate(() => {
-          const btn = document.querySelector('[aria-label="Types of event"]');
-          if (!btn || !btn.parentElement) return [];
-          return [...btn.parentElement.querySelectorAll("button")].map((el) => el.textContent ?? "");
-        });
+        const menuRows = await page.evaluate(() =>
+          [...document.querySelectorAll("[data-pill-option]:not([data-pill-nested])")].map(
+            (el) => el.textContent ?? "",
+          ),
+        );
         const countOf = (t) => {
           const m = t.match(/([\d][\d,]*)\s*$/);
           return m ? Number(m[1].replace(/,/g, "")) : null;

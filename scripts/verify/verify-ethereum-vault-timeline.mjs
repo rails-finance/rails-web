@@ -736,7 +736,7 @@ async function readPage(vault, holder, { expandRows = false } = {}) {
   // was right. A regex that selects the shape it is about to assert cannot
   // tell a changed line from a missing one. The line has its own element.
   const countLineText = await text(
-    "[data-vault-timeline-rows] [data-skel-section='detail-timeline-header'] [data-prov-exempt] span.text-xs.tabular-nums",
+    "[data-vault-timeline-rows] [data-skel-section='detail-timeline-header'] [data-anatomy~='L1.2']",
   );
   // ⚠️ EVENT HEADERS ONLY. Since 2026-09-20 the vault's own notes sit AMONG
   // these rows (ChainTruthTimeline's `notes` prop), and a note's header panel
@@ -789,13 +789,14 @@ async function readPage(vault, holder, { expandRows = false } = {}) {
   // visible there.
   let filterOptionText = "";
   try {
-    const typeButton = page.locator("[data-vault-timeline-rows] button[aria-label='Types of event']");
+    // The Type pill (ui-jobs 735); its editor anchors inside the pill.
+    const typeButton = page.locator("[data-vault-timeline-rows] [data-filter-pill='Type'] [data-pill-open]");
     if (await typeButton.count()) {
       await typeButton.first().click({ force: true, timeout: 4000 });
       await page.waitForTimeout(200);
-      const panel = page.locator("[data-vault-timeline-rows] .overlay-panel");
+      const panel = page.locator("[data-vault-timeline-rows] [data-filter-pill='Type'] [data-anatomy~='N1.11']");
       filterOptionText = (await panel.count()) ? (await panel.first().innerText()).replace(/\s+/g, " ") : "";
-      // CLOSED AGAIN BY THE BUTTON, not by Escape. An open dropdown leaves its
+      // CLOSED AGAIN BY THE PILL, not by Escape. An open editor leaves its
       // per-option counts in the DOM, and the provenance tripwire reads those
       // as uncovered figures — a reading this capture would have manufactured.
       await typeButton.first().click({ force: true, timeout: 4000 });

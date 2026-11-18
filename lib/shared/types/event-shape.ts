@@ -1194,7 +1194,7 @@ export interface LiquityForkPriceAtBlock {
 
 /** A batch manager's rate or fee change, on a row of each member Trove (server
  *  mig 342: the batch's BatchUpdated with operation 1 or 2, attached to every
- *  Trove whose latest operation left it in that batch). Human-readable decimal
+ *  Trove whose last touch left it in that batch). Human-readable decimal
  *  strings; rates and fees in percent.
  *
  *  The Trove's own figures are the batch's times its shares over the batch's

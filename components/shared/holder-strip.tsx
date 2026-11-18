@@ -17,13 +17,9 @@
 // position: a wallet holding one CDP at 118% and one at 400% has no single
 // ratio, and an average of the two reads as safety it does not have.
 //
-// EVERY ESTIMATED FIGURE WEARS THE ≈ and carries its own receipt. A leg summed
-// across different tokens has to be priced to be summed at all, and the price
-// is the feed's at one read. A leg summed from each position's last-touch
-// figures leaves out what built up since (interest, redistributions, a
-// protocol's pending shares), so it wears the ≈ even in one token (ui-jobs
-// 690). The ≈, its tooltip and the receipt each say so. Only a leg read live
-// in one token goes unmarked.
+// Each leg draws the card's figure with no ≈, as the cards below draw theirs;
+// the tip and the receipt say what built up since (ui-jobs 737). An adapter
+// may still mark a leg `approx` where its cards do (Compound V3's overview).
 //
 // TOTALS ONLY WHILE THE WALLET FITS ONE PAGE. The legs are summed from the rows
 // the page is showing; beyond one page those rows are a slice, and a total
@@ -40,6 +36,11 @@
 import { Prov, ProvUnscoped, type Provenance } from "@/components/shared/provenance";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { StatValue } from "@/components/shared/stat-value";
+import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
+import { formatUsdValue } from "@/lib/utils/format";
+import { FOOT_LINK } from "@/lib/shared/ui-grammar";
+import Link from "next/link";
 
 /** One summed unit the wallet holds — a collateral, a debt. */
 export interface HolderLeg {
@@ -62,6 +63,17 @@ export interface HolderLeg {
   footnote?: { text: string; prov?: Provenance };
   /** Where the figure came from. */
   prov: Provenance;
+  /** The position card's figure (ui-jobs 737): the compact amount with its
+   *  token's icon and the USD line under it, or, summed across tokens, the
+   *  compact USD with each token's icon. Without it the leg draws `value`. */
+  figure?: {
+    /** The amount in one token; absent where the leg is a valuation. */
+    amount?: number;
+    tokens: { symbol: string; address?: string }[];
+    usd?: number | null;
+    /** The USD line's receipt, where it is a priced figure. */
+    usdProv?: Provenance;
+  };
 }
 
 export interface HolderStripProps {
@@ -80,6 +92,13 @@ export interface HolderStripProps {
   truncated: boolean;
   /** One sentence beneath, saying why the totals are absent. */
   note?: string;
+  /** On a listing searched by wallet, how many positions the wallet holds:
+   *  the band draws only from two (one would repeat its card) and its totals
+   *  only from two open ones (ui-jobs 737). Unset, it draws as given. */
+  positions?: number;
+  /** The wallet the search names: the band links its wallet page,
+   *  "Everything this wallet holds" (ui-jobs 737). */
+  wallet?: string;
 }
 
 /** RevealTip's bubble is sized for a number (nowrap, tabular figures); a
@@ -89,6 +108,7 @@ export interface HolderStripProps {
 const TIP_PROSE = "block w-64 whitespace-normal text-left font-normal normal-nums leading-snug";
 
 function LegFigure({ leg }: { leg: HolderLeg }) {
+  if (leg.figure) return <HouseFigure leg={leg} figure={leg.figure} />;
   const shown = leg.approx ? (
     <span>
       {"≈"}&nbsp;{leg.value}
@@ -103,7 +123,54 @@ function LegFigure({ leg }: { leg: HolderLeg }) {
   );
 }
 
-export function HolderStrip({ countsLine, counts, legs, truncated, note }: HolderStripProps) {
+/** The card's figure: compact, the token's icon, the USD line beneath. */
+function HouseFigure({ leg, figure }: { leg: HolderLeg; figure: NonNullable<HolderLeg["figure"]> }) {
+  const headline =
+    figure.amount != null
+      ? formatCompact(figure.amount)
+      : figure.usd != null
+        ? formatCompactUsd(figure.usd)
+        : leg.value;
+  const shown = (
+    <span data-holder-value={leg.approx ? `≈ ${leg.value}` : leg.value}>
+      {leg.approx && <>{"≈"}&nbsp;</>}
+      {headline}
+    </span>
+  );
+  return (
+    <>
+      <StatValue figure={`holder-${leg.id}`}>
+        <span className="flex min-w-0 flex-wrap items-center gap-x-1.5">
+          <Prov info={leg.prov} value={leg.approx ? `≈ ${leg.value}` : leg.value}>
+            {leg.tip ? <RevealTip tip={<span className={TIP_PROSE}>{leg.tip}</span>}>{shown}</RevealTip> : shown}
+          </Prov>
+          <span className="inline-flex shrink-0 items-center" data-holder-tokens="">
+            {figure.tokens.map((t, i) => (
+              <span key={t.symbol} className={i > 0 ? "-ml-2" : undefined}>
+                <TokenChipIcon symbol={t.symbol} address={t.address} size={28} filterable={false} />
+              </span>
+            ))}
+          </span>
+        </span>
+      </StatValue>
+      {figure.amount != null && figure.usd != null && figure.usd > 0 && (
+        <div className="text-xs mt-0.5 tabular-nums font-bold text-green-400" data-holder-usd="">
+          {figure.usdProv ? (
+            <Prov info={figure.usdProv} value={formatUsdValue(figure.usd)}>
+              <span>{formatUsdValue(figure.usd)}</span>
+            </Prov>
+          ) : (
+            formatUsdValue(figure.usd)
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+export function HolderStrip({ countsLine, counts, legs, truncated, note, wallet, positions }: HolderStripProps) {
+  if (positions != null && positions < 2) return null;
+  const totals = !truncated && legs.length > 0 && (positions == null || counts.open >= 2);
   return (
     // A BAND, not a card: the raised rounded surface belongs to a position, and
     // this states something about several of them. A rule under it separates it
@@ -117,6 +184,7 @@ export function HolderStrip({ countsLine, counts, legs, truncated, note }: Holde
     <ProvUnscoped>
       <div
         data-holder-strip=""
+        data-anatomy="N7"
         data-holder-open={counts.open}
         data-holder-closed={counts.closed}
         data-holder-liquidated={counts.liquidated}
@@ -125,16 +193,20 @@ export function HolderStrip({ countsLine, counts, legs, truncated, note }: Holde
         <p data-holder-counts="" className="text-sm text-foreground/80">
           {countsLine}
         </p>
-        {!truncated && legs.length > 0 && (
+        {totals && (
           <div className={`mt-2 grid grid-cols-2 gap-4 ${legs.length > 2 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
             {legs.map((leg) => (
-              <div key={leg.id} data-holder-leg={leg.id}>
+              <div key={leg.id} data-holder-leg={leg.id} data-anatomy="N7.1">
                 <div className="text-rb-500 text-xs font-semibold">{leg.label}</div>
-                <StatValue figure={`holder-${leg.id}`}>
+                {leg.figure ? (
                   <LegFigure leg={leg} />
-                </StatValue>
+                ) : (
+                  <StatValue figure={`holder-${leg.id}`}>
+                    <LegFigure leg={leg} />
+                  </StatValue>
+                )}
                 {leg.footnote && (
-                  <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
+                  <div className="text-xs mt-0.5 text-rb-500 tabular-nums" data-holder-footnote="">
                     {leg.footnote.prov ? (
                       <Prov info={leg.footnote.prov} value={leg.footnote.text}>
                         <span>{leg.footnote.text}</span>
@@ -152,6 +224,18 @@ export function HolderStrip({ countsLine, counts, legs, truncated, note }: Holde
           <p data-holder-note="" className="mt-2 text-xs text-rb-500">
             {note}
           </p>
+        )}
+        {/* The listing search is the wallet within this protocol; the wallet
+            page is the wallet everywhere. */}
+        {wallet && (
+          <Link
+            href={`/wallet/${wallet}`}
+            className={`mt-2 text-sm ${FOOT_LINK}`}
+            data-holder-wallet-link=""
+            data-anatomy="N7.2"
+          >
+            Everything this wallet holds
+          </Link>
         )}
       </div>
     </ProvUnscoped>

@@ -167,7 +167,19 @@ export function LiquityV2Listing({
         !filters.batchOnly &&
         !filters.individualOnly &&
         prices ? (
-          <HolderStrip {...liquityV2HolderStrip(items, total, prices, LIQUITY_V2_ITEMS_PER_PAGE, passedOn.current)} />
+          <HolderStrip
+            {...liquityV2HolderStrip(
+              items,
+              total,
+              prices,
+              LIQUITY_V2_ITEMS_PER_PAGE,
+              passedOn.current,
+              (() => {
+                const { ownerAddress, ownerEns } = parseTroveSearch(filters.q);
+                return ownerAddress ?? ownerEns;
+              })(),
+            )}
+          />
         ) : null
       }
       initialItems={initialItems}

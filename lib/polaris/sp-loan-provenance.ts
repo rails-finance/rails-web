@@ -85,7 +85,7 @@ const SP_SUM: Record<string, (s: string) => string> = {
   kept: (s) =>
     `Yield kept — the sum of every DepositOperation's stableTokenGainSinceLastOperation less its stableTokenGainClaimed: the ${s} gain the touches left in the deposit, where it compounds.`,
   recorded: (s) =>
-    `Deposit at the last touch — the last DepositUpdated's newDeposit on this deposit: the ${s} it held after its newest operation.`,
+    `Deposit at the last touch — the last DepositUpdated's newDeposit on this deposit: the ${s} it held after its last touch.`,
   stableGain: (s) =>
     `${s} gain paid at touches — the sum of every DepositOperation's stableTokenGainSinceLastOperation.`,
   stableClaimed: (s) => `${s} gain claimed — the sum of every DepositOperation's stableTokenGainClaimed.`,

@@ -42,6 +42,15 @@ export const exactUnits = (v: bigint): string => {
 
 export const max0 = (v: bigint): bigint => (v > ZERO ? v : ZERO);
 
+/** The deposit's fraction of its pool: getCompoundedBoldDeposit over
+ *  getTotalBoldDeposits, divided in integers to 1e-12 before it becomes a
+ *  number. Null for an empty pool. */
+export function poolShare(deposit: bigint, total: bigint): number | null {
+  if (total <= ZERO) return null;
+  const scale = BigInt("1000000000000");
+  return Number((deposit * scale) / total) / 1e12;
+}
+
 export interface DepositLifetime {
   deposited: bigint;
   withdrawn: bigint;
@@ -120,7 +129,7 @@ export interface DepositNow {
 }
 
 /** The pending figures from the chain read alone: the card's headlines, which
- *  stand whether or not the index has served the deposit's newest touch. */
+ *  stand whether or not the index has served the deposit's last touch. */
 export function depositNowFromChain(chain: DepositChainFigures): DepositNow {
   const now = big(chain.compoundedRaw);
   const coll = big(chain.collGainRaw);

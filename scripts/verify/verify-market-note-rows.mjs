@@ -18,6 +18,7 @@
 //
 // Run: BASE=http://localhost:3471 node scripts/verify/verify-market-note-rows.mjs
 
+import { axisOptions, closeAxis, openAxis } from "./lib/timeline-pills.mjs";
 import { chromium } from "playwright";
 import { BASE, bypassHeaders } from "./lib/host.mjs";
 import { marketNoteCount } from "./lib/market-notes.mjs";
@@ -142,15 +143,22 @@ console.log(`Market notes — against ${BASE}\n`);
   // Every event type filtered out: the notes share one gap, so each kind's
   // run is one group row that counts its changes.
   const countBefore = (await page.locator("[data-event-id]").count()) > 0;
-  await page.getByRole("button", { name: "Types of event", exact: true }).click();
-  const options = page.locator("button.overlay-item");
-  const k = await options.count();
-  for (let i = 0; i < k; i++) {
-    await options.nth(i).click();
-    await page.waitForTimeout(150);
-  }
-  await page.getByRole("button", { name: "Types of event", exact: true }).click();
-  await page.waitForTimeout(800);
+  // The Type pill's editor cannot hide every type (ticking none is "all",
+  // ui-jobs 735), so the view comes in through the URL the toolbar writes.
+  await openAxis(page, "Type");
+  const keys = [...new Set((await axisOptions(page)).map((o) => o.key))];
+  await closeAxis(page, "Type");
+  await page.goto(`${URL_A}?hide=${encodeURIComponent(keys.join(","))}`, {
+    waitUntil: "domcontentloaded",
+    timeout: 180000,
+  });
+  await page.locator("[data-timeline-rows-drawn]").first().waitFor({ state: "attached", timeout: 120000 });
+  await page
+    .locator("[data-market-note], [data-market-note-run]")
+    .first()
+    .waitFor({ state: "attached", timeout: 60000 })
+    .catch(() => {});
+  await page.waitForTimeout(1500);
   const left = await rowNotes(page);
   check(
     "6. with every event type filtered out, every note keeps its row",

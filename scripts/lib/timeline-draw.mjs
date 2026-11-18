@@ -107,7 +107,7 @@ export async function waitForCountSettled(page, { timeout = 30000 } = {}) {
 
 /** The count line's own element, inside the timeline toolbar. Scope it to the
  *  timeline you mean — a wallet on two Comets draws one toolbar per market. */
-export const COUNT_LINE_SEL = "[data-prov-exempt] span.text-xs.tabular-nums";
+export const COUNT_LINE_SEL = '[data-anatomy~="L1.2"]';
 
 /** The span the loaded rows cover, as `loadedSpanText` renders it: en-GB, UTC,
  *  one date where they sit inside a day. */

@@ -204,7 +204,19 @@ export function PolarisListing({
           filters.coll.length === 0 &&
           filters.tx.length === 0 &&
           markets ? (
-            <HolderStrip {...polarisHolderStrip(items, total, markets, POLARIS_ITEMS_PER_PAGE, passedOn.current)} />
+            <HolderStrip
+              {...polarisHolderStrip(
+                items,
+                total,
+                markets,
+                POLARIS_ITEMS_PER_PAGE,
+                passedOn.current,
+                (() => {
+                  const { ownerAddress, ownerEns } = parsePolarisSearch(filters.q);
+                  return ownerAddress ?? ownerEns;
+                })(),
+              )}
+            />
           ) : null;
         return strip;
       }}

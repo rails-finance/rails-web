@@ -7,7 +7,8 @@
 //
 // What a gap holds: a note, the head slot's live notes as one card, a run of
 // same-kind rate notes as one group row (`noteRuns`, lib/shared/market-note.ts),
-// or Polaris's PSM trades between two touches as one row (ui-jobs 402).
+// Polaris's PSM trades between two touches as one row (ui-jobs 402), or a
+// Liquity V2 deposit's liquidations between two touches as one row.
 // A note stays a note: these rows sit beside the event rows and are counted
 // in nothing. The "Market notes" switch in Display hides them all.
 //
@@ -28,6 +29,8 @@ import {
 } from "@/components/shared/market-note-row";
 import { PolarisPsmGapRow } from "@/components/protocol/polaris/polaris-psm-gap-row";
 import { isPsmGapNote } from "@/lib/polaris/psm-gap";
+import { LiquityV2DepositLiquidationsRow } from "@/components/protocol/liquity/sp-liquidations";
+import { isSpLiquidationsNote } from "@/lib/liquity-v2/sp-liquidations";
 import { ProtocolChangeRow } from "@/components/shared/protocol-change-row";
 import {
   isProtocolChangeGroup,
@@ -93,7 +96,7 @@ const SPINE_X = "calc(var(--card-pad) + (100% - 2 * var(--card-pad)) * 0.2)";
  *  so they take none. */
 function PhoneNode({ item }: { item: GapItem }) {
   if (isProtocolChangeNote(item) || isProtocolChangeGroup(item)) return null;
-  if (!isLiveNoteGroup(item) && (noteSpine(item) || isPsmGapNote(item))) return null;
+  if (!isLiveNoteGroup(item) && (noteSpine(item) || isPsmGapNote(item) || isSpLiquidationsNote(item))) return null;
   return (
     <div aria-hidden className="pb-1 pt-2 sm:hidden" data-note-phone-node="">
       <SpineColumn icon="market" isLast={false} tip={null} bare actor={noteActor(item)} noteGlyph={noteGlyphOf(item)} />
@@ -139,6 +142,8 @@ export function NoteGap({
             <NoteRunRow run={item} />
           ) : isPsmGapNote(item) ? (
             <PolarisPsmGapRow note={item} />
+          ) : isSpLiquidationsNote(item) ? (
+            <LiquityV2DepositLiquidationsRow note={item} />
           ) : (
             <MarketNoteRow note={item} datePrefix={datePrefixFor(item)} />
           )}

@@ -258,3 +258,75 @@ test("a count range opens in the mode its bounds say", () => {
   assert.equal(thresholdMode(10, 500), "between");
   assert.equal(thresholdMode(null, null), "min");
 });
+
+// ── The Properties pill (ui-jobs 735) ───────────────────────────────────────
+// A listing's two-option properties share one pill where there are two or
+// more; a lone one keeps its own. Each keeps its own field (its URL param).
+const propDim = (id, label, options) => ({
+  id,
+  label,
+  group: label,
+  cardinality: "single",
+  property: true,
+  options: options.map(([value, l]) => ({ value, label: l })),
+  get: (f) => (f[id] ? [f[id]] : []),
+  set: (f, v) => ({ ...f, [id]: v[0] }),
+});
+const redeemed = propDim("redemptions", "Redemptions", [
+  ["with", "Redeemed"],
+  ["without", "Never redeemed"],
+]);
+const delegated = propDim("delegation", "Delegation", [
+  ["delegated", "Delegated"],
+  ["individual", "Individual"],
+]);
+const plain = {
+  id: "market",
+  label: "Market",
+  cardinality: "multi",
+  options: [{ value: "a", label: "A" }],
+  get: (f) => f.market ?? [],
+  set: (f, v) => ({ ...f, market: v }),
+};
+
+test("two properties share one Properties pill where the first stood", () => {
+  const groups = groupDimensions([plain, redeemed, delegated], {});
+  assert.deepEqual(
+    groups.map((g) => g.name),
+    ["Market", "Properties"],
+  );
+  assert.deepEqual(
+    groups[1].dims.map((d) => d.id),
+    ["redemptions", "delegation"],
+  );
+  const unset = pillFor(groups[1], {});
+  assert.equal(unset.state, "unset");
+  assert.equal(unset.spoken, "Add Properties filter");
+});
+
+test("a lone property keeps its own pill", () => {
+  assert.deepEqual(
+    groupDimensions([plain, redeemed], {}).map((g) => g.name),
+    ["Market", "Redemptions"],
+  );
+});
+
+test("a set Properties pill reads its choices", () => {
+  const [, props] = groupDimensions([plain, redeemed, delegated], {});
+  const one = pillFor(props, { redemptions: "with" });
+  assert.equal(one.label, "");
+  assert.equal(one.value, "Redeemed");
+  const both = pillFor(props, { redemptions: "with", delegation: "delegated" });
+  assert.equal(both.value, "Redeemed · Delegated");
+  const third = propDim("x", "X", [
+    ["1", "One"],
+    ["2", "Two"],
+  ]);
+  const [, three] = groupDimensions([plain, redeemed, delegated, third], {});
+  assert.equal(pillFor(three, { redemptions: "with", delegation: "delegated", x: "1" }).value, "Redeemed +2");
+  // Removing it clears each property's own field.
+  assert.deepEqual(resetGroup(props, { redemptions: "with", delegation: "delegated" }), {
+    redemptions: undefined,
+    delegation: undefined,
+  });
+});

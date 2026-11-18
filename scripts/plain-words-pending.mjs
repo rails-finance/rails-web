@@ -26,7 +26,6 @@ export const PLAIN_WORDS_PENDING = [
   "lib/fx/system-provenance.ts",
   "lib/liquity-v1/event-provenance.ts",
   "lib/liquity-v1/position-provenance.ts",
-  "lib/liquity-v2/holder-strip.ts",
   "lib/llamalend/event-provenance.ts",
   "lib/llamalend/live-provenance.ts",
   "lib/llamalend/markets-provenance.ts",

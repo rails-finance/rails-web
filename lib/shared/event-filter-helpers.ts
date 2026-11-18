@@ -9,7 +9,7 @@
 
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { dolomiteBalanceAction, DOLOMITE_BALANCE_ACTION_LABELS } from "@/lib/dolomite/balance-action";
-import { isNoChangeAdjust } from "@/lib/liquity/trove-ops";
+import { isNoChangeAdjust, TROVE_DELTA_EPSILON } from "@/lib/liquity/trove-ops";
 import { polarisFilterKey } from "@/lib/polaris/row-kinds";
 import {
   isLiquityEvent,
@@ -27,7 +27,145 @@ import {
   isCompoundV2Event,
   isPwnEvent,
   isPolarisEvent,
+  isEbisuEvent,
+  isAsymmetryEvent,
+  isBasedollarEvent,
+  isFxEvent,
 } from "@/lib/shared/types/event-shape";
+import { FORK_DEBT_DUST_FLOAT, forkCollMove, forkDebtMove } from "@/lib/shared/liquity-fork-ops";
+
+// ── Legs of an umbrella type (ui-jobs 735) ─────────────────────────────────
+//
+// A type that stands for several acts ("Adjust": add or withdraw collateral,
+// borrow, repay) is offered in the Type filter as its legs, the row labels'
+// verbs, nested under it, where every one of its events is loaded (members
+// below the cut or in a folder are counted by type alone). An event passes
+// while any of its legs is shown, so one adjust that adds collateral and
+// borrows counts and shows once; one that moved nothing a leg names shows
+// only while every leg is kept. A hidden set may hold the umbrella key (a link
+// from before the legs): that hides every leg.
+
+/** Each umbrella key's legs, in the order the editor lists them. */
+export const ACTION_LEGS: Record<string, { key: string; label: string }[]> = {
+  adjustTrove: [
+    { key: "adjustTrove.addColl", label: "Added collateral" },
+    { key: "adjustTrove.withdrawColl", label: "Withdrew collateral" },
+    { key: "adjustTrove.borrow", label: "Borrowed" },
+    { key: "adjustTrove.repay", label: "Repaid" },
+  ],
+  adjustPosition: [
+    { key: "adjustPosition.addColl", label: "Added collateral" },
+    { key: "adjustPosition.withdrawColl", label: "Withdrew collateral" },
+    { key: "adjustPosition.borrow", label: "Borrowed" },
+    { key: "adjustPosition.repay", label: "Repaid" },
+  ],
+};
+
+const LEG_LABEL = new Map(Object.values(ACTION_LEGS).flatMap((legs) => legs.map((l) => [l.key, l.label] as const)));
+const LEG_PARENT = new Map(
+  Object.entries(ACTION_LEGS).flatMap(([parent, legs]) => legs.map((l) => [l.key, parent] as const)),
+);
+
+/** The umbrella a leg key belongs to, or null for a plain key. */
+export const actionLegParent = (key: string): string | null => LEG_PARENT.get(key) ?? null;
+
+/** An event's legs under its umbrella type, or null where its type has none
+ *  (or the event moved nothing a leg names). */
+export function getEventActionLegs(e: BaseActivityEvent): string[] | null {
+  if (isLiquityEvent(e)) {
+    const ctx = e.context.data;
+    if (ctx.operation !== "adjustTrove" || !ctx.troveOperation || isNoChangeAdjust(ctx)) return null;
+    const coll = ctx.troveOperation.collChangeFromOperation;
+    const debt = ctx.troveOperation.debtChangeFromOperation;
+    const legs: string[] = [];
+    if (coll > TROVE_DELTA_EPSILON) legs.push("adjustTrove.addColl");
+    else if (coll < -TROVE_DELTA_EPSILON) legs.push("adjustTrove.withdrawColl");
+    if (debt > TROVE_DELTA_EPSILON) legs.push("adjustTrove.borrow");
+    else if (debt < -TROVE_DELTA_EPSILON) legs.push("adjustTrove.repay");
+    return legs.length ? legs : null;
+  }
+  // Liquity V1: the row's verbs read the trove's net coll and debt deltas
+  // (lib/liquity-v1/explorer.ts).
+  if (isLiquityV1Event(e)) {
+    const ctx = e.context.data;
+    if (ctx.eventType !== "adjustTrove") return null;
+    return troveLegs(Number(ctx.collDelta) || 0, Number(ctx.debtDelta) || 0, 0);
+  }
+  // The Liquity V2 forks: the act's moves, as their head words read them
+  // (lib/shared/liquity-fork-head-words.ts).
+  if (isEbisuEvent(e) || isAsymmetryEvent(e) || isBasedollarEvent(e)) {
+    if (getEventActionKey(e) !== "adjustTrove") return null;
+    const ctx = e.context.data;
+    return troveLegs(forkCollMove(ctx), forkDebtMove(ctx).value, FORK_DEBT_DUST_FLOAT);
+  }
+  // f(x): an operate that neither opens nor closes, as its head words read
+  // it (lib/fx/head-words.ts).
+  if (isFxEvent(e)) {
+    if (getEventActionKey(e) !== "adjustPosition") return null;
+    const ctx = e.context.data;
+    if (ctx.eventType !== "operate") return null;
+    return troveLegs(Number(ctx.collDelta ?? "0") || 0, Number(ctx.debtDelta ?? "0") || 0, 0, "adjustPosition");
+  }
+  return null;
+}
+
+/** An adjust's legs from its collateral and debt moves, under `parent`; a
+ *  debt move under `debtDust` is none. */
+function troveLegs(coll: number, debt: number, debtDust: number, parent = "adjustTrove"): string[] | null {
+  const legs: string[] = [];
+  if (coll > 0) legs.push(`${parent}.addColl`);
+  else if (coll < 0) legs.push(`${parent}.withdrawColl`);
+  if (Math.abs(debt) > debtDust) legs.push(debt > 0 ? `${parent}.borrow` : `${parent}.repay`);
+  return legs.length ? legs : null;
+}
+
+/** The stand-in leg of an umbrella event that moved nothing a leg names (an
+ *  f(x) adjust with no deltas, a fork adjust under the dust): it matches no
+ *  leg, so it shows only while every leg is kept. */
+export const LEGLESS = ".none";
+
+/** The hidden action keys with the umbrellas settled against the legs a page
+ *  offers (`offered`, umbrella → its legs on the page): an umbrella hidden
+ *  hides each leg; any leg hidden hides the leg-less events; every leg hidden
+ *  hides the umbrella; an umbrella offered whole keeps none of its legs. Loose events, folder headers and a draft's count all
+ *  read this one set. */
+export function settleActionHidden(
+  hidden: ReadonlySet<string>,
+  offered: ReadonlyMap<string, readonly string[]>,
+): Set<string> {
+  const out = new Set(hidden);
+  // An umbrella the page offers as one option (members below the cut or in a
+  // folder, or none loaded yet) reads its legs whole: every leg hidden hides
+  // it, and some legs alone, which no option could show, hide nothing.
+  for (const [parent, all] of Object.entries(ACTION_LEGS)) {
+    if (offered.has(parent)) continue;
+    const keys = all.map((l) => l.key);
+    if (keys.every((k) => hidden.has(k))) out.add(parent);
+    for (const k of keys) out.delete(k);
+  }
+  for (const [parent, legs] of offered) {
+    if (hidden.has(parent)) {
+      for (const l of legs) out.add(l);
+      out.add(parent + LEGLESS);
+      continue;
+    }
+    const n = legs.filter((l) => hidden.has(l)).length;
+    if (n > 0) out.add(parent + LEGLESS);
+    if (n === legs.length) out.add(parent);
+  }
+  return out;
+}
+
+/** Does the action axis hide this event? Its type hidden, or, under an
+ *  umbrella type, every one of its legs (a settled set, `settleActionHidden`). */
+export function actionHidden(e: BaseActivityEvent, hidden: ReadonlySet<string>): boolean {
+  if (hidden.size === 0) return false;
+  const key = getEventActionKey(e);
+  if (hidden.has(key)) return true;
+  if (!ACTION_LEGS[key]) return false;
+  const legs = getEventActionLegs(e) ?? [key + LEGLESS];
+  return legs.every((l) => hidden.has(l));
+}
 
 /** Get the canonical action key for an event (used for type-level filtering) */
 export function getEventActionKey(e: BaseActivityEvent): string {
@@ -666,6 +804,8 @@ const PROTOCOL_OP_LABELS: Record<string, Record<string, string>> = {
  * behavior is unchanged from before this registry existed.
  */
 export function actionLabel(actionKey: string, protocolKey?: string): string {
+  const leg = LEG_LABEL.get(actionKey);
+  if (leg) return leg;
   const own = protocolKey ? PROTOCOL_OP_LABELS[protocolKey]?.[actionKey] : undefined;
   return (
     own ??

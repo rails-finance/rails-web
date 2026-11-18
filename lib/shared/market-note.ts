@@ -51,6 +51,7 @@
 
 import type { BaseActivityEvent, PolarisContext } from "@/lib/shared/types/event-shape";
 import type { Provenance } from "@/components/shared/provenance";
+import type { LiquityV2DepositStretch } from "@/lib/sources/api/liquity-v2-sp";
 
 /** The polaris context on an event, or null. The narrowing is spelled out
  *  rather than imported (`isPolarisEvent`) to keep this module's imports
@@ -97,6 +98,11 @@ export interface MarketNoteBase {
   unitLabel: string;
   from: MarketNotePoint;
   to: MarketNotePoint;
+  /** The event this note must sit under, by id, where the builder knows it
+   *  (a Liquity V2 deposit's closing touch): exact where several of the
+   *  account's events share a block. Where that event is filtered out, the
+   *  block rule below places it. */
+  anchorTo?: string;
   /** The anchor: the first account event (ascending) with
    *  `blockNumber ≥ to.block`. Set by `anchorMarketNotes`. Never set on a
    *  live note — it has no anchor and renders in the timeline's head slot
@@ -291,7 +297,25 @@ function mergePsmGapRun(asc: readonly PsmGapNote[]): PsmGapNote {
   };
 }
 
-export type MarketNote = RateStepNote | VaultTermsNote | PsmGapNote;
+/** The liquidations in one closed stretch between two of a Liquity V2
+ *  stability-pool deposit's touches, as one row: each burned a share of every
+ *  deposit and paid the branch collateral in its place, and the closing touch
+ *  wrote the stretch's sum. Both ends are the deposit's touches; the row
+ *  anchors on the closing one. Built by `spLiquidationNotes`
+ *  (lib/liquity-v2/sp-liquidations.ts) from the deposit's
+ *  /stability-pool/liquidations read. */
+export interface SpLiquidationsNote extends MarketNoteBase {
+  kind: "sp-liquidations";
+  /** The branch collateral's symbol. */
+  branch: string;
+  stretch: LiquityV2DepositStretch;
+  /** The branch's replay check: closed stretches whose liquidations do not
+   *  sum to their touch, of all closed stretches. Above zero, the figures
+   *  are not stated as settled. */
+  branchCheck: { unreconciled: number; closedStretches: number } | null;
+}
+
+export type MarketNote = RateStepNote | VaultTermsNote | PsmGapNote | SpLiquidationsNote;
 
 // ── A rate note as a T1 row, and a run of them as one group ────────────────
 // A note that states a rate from → to (every rate step; a vault's terms where
@@ -329,7 +353,7 @@ export const RATE_NOTE_T1 = {
  *  note that states no rate (a vault's fee, a name). */
 export function noteRateSpan(note: MarketNote): [number, number] | null {
   if (note.kind === "rate-step") return [note.from.value * 100, note.to.value * 100];
-  if (note.kind === "psm-gap") return null;
+  if (note.kind === "psm-gap" || note.kind === "sp-liquidations") return null;
   return note.rate ? [note.rate.from, note.rate.to] : null;
 }
 
@@ -345,7 +369,7 @@ export function noteRateMove(note: MarketNote): RateMove {
 /** The head's words for a rate note, or null on a note that states no rate. */
 export function noteT1Words(note: MarketNote): RateNoteWords | null {
   if (note.kind === "vault-terms") return note.rate?.t1 ?? null;
-  if (note.kind === "psm-gap") return null;
+  if (note.kind === "psm-gap" || note.kind === "sp-liquidations") return null;
   const noun =
     note.protocol === "makerdao"
       ? RATE_NOTE_T1.makerdao
@@ -586,7 +610,9 @@ export function anchorMarketNotes<N extends AnchoredNote = MarketNote>(
   const out = new Map<string, N[]>();
   const anchored: N[] = [];
   for (const note of notes) {
-    const anchor = ascending.find((e) => e.blockNumber >= note.to.block);
+    const anchor =
+      (note.anchorTo != null ? ascending.find((e) => e.id === note.anchorTo) : undefined) ??
+      ascending.find((e) => e.blockNumber >= note.to.block);
     if (!anchor) continue;
     anchored.push({ ...note, anchorEventId: anchor.id });
   }
@@ -610,6 +636,8 @@ const EMPTY_ANCHORS: ReadonlyMap<string, AnchoredNote[]> = new Map();
 export interface AnchoredNote {
   id: string;
   to: { block: number };
+  /** The event's id to sit under, where the builder names it. */
+  anchorTo?: string;
   anchorEventId?: string;
 }
 
@@ -938,7 +966,7 @@ function mergeRateStepRun(run: readonly RateStepNote[]): RateStepNote {
 }
 
 /**
- * A LIVE Polaris rate step: this CDP's own NEWEST touch that carries a rate
+ * A LIVE Polaris rate step: this CDP's own LAST touch that carries a rate
  * against the market's own primary rate read live at the chain head.
  * Not held to `rateStepNotesFor`'s `RATE_STEP_MIN_PP` gate on a historical
  * stretch; a move that rounds to 0.00 points draws no note (`liveNoteStated`).
@@ -1263,6 +1291,38 @@ export function psmGapSentence(note: PsmGapNote): string {
   );
 }
 
+const e18 = (raw: string): number => {
+  const neg = raw.startsWith("-");
+  const a = neg ? raw.slice(1) : raw;
+  const n = Number(a.length > 18 ? a.slice(0, -18) : "0") + Number(a.padStart(18, "0").slice(-18)) / 1e18;
+  return neg ? -n : n;
+};
+const tokenAmount = (n: number): string =>
+  Math.abs(n) >= 0.001 || n === 0
+    ? n.toLocaleString("en-US", { maximumFractionDigits: 3 })
+    : n.toLocaleString("en-US", { maximumSignificantDigits: 3 });
+
+/** A Liquity V2 deposit's liquidations between two touches, in one clause. */
+export function spLiquidationsSentence(note: SpLiquidationsNote): string {
+  const t = note.stretch.totals;
+  const n = note.stretch.liquidations.length;
+  const to = note.stretch.to;
+  if (n === 0 && to)
+    return (
+      `Between blocks ${formatBlock(note.from.block)} and ${formatBlock(note.to.block)}, the closing touch wrote ` +
+      `${tokenAmount(e18(to.deposit_loss))} BOLD burned and ${tokenAmount(e18(to.coll_gain_since))} ${note.branch} paid in, ` +
+      `and no liquidation between the two touches accounts for it`
+    );
+  const net = e18(t.net);
+  return (
+    `Between blocks ${formatBlock(note.from.block)} and ${formatBlock(note.to.block)}, ` +
+    `${n.toLocaleString("en-US")} ${n === 1 ? "liquidation" : "liquidations"} burned ${tokenAmount(e18(t.bold_lost))} BOLD ` +
+    `of this deposit and paid it ${tokenAmount(e18(t.coll_gained))} ${note.branch}, worth ` +
+    `${tokenAmount(e18(t.coll_gained_value))} BOLD at each liquidation's block price: ` +
+    `${net < 0 ? "−" : "+"}${tokenAmount(Math.abs(net))} BOLD net`
+  );
+}
+
 /** The note as one plain sentence — the markdown export's paragraph, and the
  *  wording the row renders figure by figure. */
 export function marketNoteSentence(note: MarketNote): string {
@@ -1273,6 +1333,7 @@ export function marketNoteSentence(note: MarketNote): string {
   // read.
   if (note.kind === "vault-terms") return `At block ${formatBlock(note.to.block)}, ${note.statement}.`;
   if (note.kind === "psm-gap") return `${psmGapSentence(note)}.`;
+  if (note.kind === "sp-liquidations") return `${spLiquidationsSentence(note)}.`;
   const f = rateStepFigures(note);
   if (note.protocol === "makerdao") {
     const ilk = makerMarketName(note);
@@ -1354,6 +1415,7 @@ export function marketNoteSentence(note: MarketNote): string {
 export function marketNoteHeadline(note: MarketNote): string {
   if (note.kind === "vault-terms") return `${note.statement}, at block ${formatBlock(note.to.block)}`;
   if (note.kind === "psm-gap") return psmGapSentence(note);
+  if (note.kind === "sp-liquidations") return spLiquidationsSentence(note);
   // The later rate leads, on the page and here alike (Miles, 2026-09-10):
   // the question a rate note answers is what the position pays now, and the
   // move is the qualifier rather than the figure.
@@ -1391,6 +1453,7 @@ export function marketNoteRowAnnotation(note: MarketNote): string {
     return note.trades != null
       ? `PSM note: ${note.trades.toLocaleString("en-US")} PSM mints and redemptions since the previous touch (see Market notes)`
       : "PSM note: see Market notes";
+  if (note.kind === "sp-liquidations") return `liquidations note: ${spLiquidationsSentence(note)}`;
   const f = rateStepFigures(note);
   if (note.protocol === "makerdao") {
     const ilk = makerMarketName(note);
@@ -1465,6 +1528,11 @@ function psmGapReceiptLine(note: PsmGapNote): string {
 
 export function marketNoteReceiptLine(note: MarketNote): string {
   if (note.kind === "psm-gap") return psmGapReceiptLine(note);
+  if (note.kind === "sp-liquidations")
+    return (
+      `- Receipt: the branch pool's P/S replay over its Liquidation logs, from GET /api/liquity-v2/stability-pool/liquidations; ` +
+      `the closing DepositOperation at block ${formatBlock(note.to.block)}${note.to.txHash ? `, tx ${note.to.txHash}` : ""}.`
+    );
   if (note.kind === "vault-terms")
     return (
       `- Receipt: the vault's own \`${note.termsKind}\` configuration log at block ` +

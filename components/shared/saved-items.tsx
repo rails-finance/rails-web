@@ -177,7 +177,7 @@ export function ListingViewMenu({ filterLabels }: { filterLabels: string[] }) {
   // draws its rows (each open), and on a change of path.
   useEffect(() => setKey(currentPageKey()), [pathname]);
   return (
-    <span className="flex h-8 items-center">
+    <span className="flex items-center">
       <ToolsMenu variant="view" label="View menu" heading="View" copied={copied}>
         {(close) => (
           <ViewRows

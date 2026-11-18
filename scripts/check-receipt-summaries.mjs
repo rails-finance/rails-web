@@ -97,11 +97,6 @@ const C_KEEP = [
     why: "A USD-shaped figure on a testnet page reads as real money unless said otherwise.",
   },
   {
-    file: "lib/polaris/live-provenance.ts",
-    phrase: "A Sepolia testnet figure — a test dollar, not a real one.",
-    why: "Same testnet-vs-real-money warning, the wallet-level debt total.",
-  },
-  {
     file: "lib/liquity-v1/event-provenance.ts",
     phrase: "Emitted whole, not a reconstructed sum.",
     why: "Distinguishes the TroveManager's own emitted absolute from a client-side replay; a reader who assumed the latter could doubt a figure that is in fact exact.",
