@@ -48,7 +48,9 @@ import {
   type CalcPositionInputs,
 } from "@/lib/aave-v4/utils/position-calculation";
 import { Prov } from "@/components/shared/provenance";
-import { usdProvOnchain, usdProv, isOnChainPriceSource } from "@/lib/aave-v4/position-provenance";
+import { isOnChainPriceSource } from "@/lib/aave-v4/position-provenance";
+import { aaveV4UsdReceipt, type AaveV4UsdResult } from "@/lib/aave-v4/usd-receipt";
+import { aaveV4NoPriceLine, type AaveV4PriceSource as AaveV4OnChainSource } from "@/lib/aave-v4/price-notes";
 
 export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow }) {
   // Build the calculation's inputs from the server's chain-state reserves[]. Same inputs the
@@ -60,7 +62,9 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
     const borrowingSymbols: string[] = [];
 
     for (const r of row.reserves) {
-      const price = r.usdPrice ?? 0;
+      // Only an on-chain price counts (ui-jobs 743): a DefiLlama or $1-face
+      // price leaves the reserve unpriced.
+      const price = isOnChainPriceSource(r.priceSource) ? (r.usdPrice ?? 0) : 0;
       const supply = scaleChainBalance(r.supplyBalanceRaw, r.decimals);
       const debt = scaleChainBalance(r.debtBalanceRaw, r.decimals);
       if (supply > 0) {
@@ -99,7 +103,7 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
   // Live view: ANY live debt counts as borrowing, no dust floor, so a
   // sub-dollar leftover borrow still shows its Debt and Health factor heads, as
   // on the detail card.
-  const supplyOnly = calc.totalDebtUsd <= 0;
+  const supplyOnly = calc.borrowingSymbols.length === 0;
   // Chain overlay failed for this row → balances are MV-indexed (potentially
   // drifted from on-chain). The card still renders; the indicator warns.
   const hfStale = hasDebt && row.chainHfStale;
@@ -144,51 +148,52 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
   // once closed).
   const peakSupplyOnly = (row.peakDebtUsd ?? 0) < 1;
 
-  // Per-total price provenance. The listing's USD is oracle-priced at the backend
-  // (chain-derived) with a DefiLlama fallback only for reserves the oracle
-  // registry omits. A total is chain-derived iff the balances are read from the chain
-  // (not the MV-indexed fallback) AND every reserve contributing to it was
-  // oracle-priced; if either fails, tag the DefiLlama-priced `usdProv` instead of
-  // over-asserting an on-chain figure — the same strictness the detail card uses.
+  // The balances are the chain read's where it answered, else the index's;
+  // the prices only on-chain ones (below).
   const chainBalances = !row.chainHfStale;
   const supplyReserves = row.reserves.filter((r) => scaleChainBalance(r.supplyBalanceRaw, r.decimals) > 0);
   const collateralReserves = supplyOnly ? supplyReserves : supplyReserves.filter((r) => r.isCollateral);
   const debtReserves = row.reserves.filter((r) => scaleChainBalance(r.debtBalanceRaw, r.decimals) > 0);
-  const collateralOnChain =
-    chainBalances &&
-    collateralReserves.length > 0 &&
-    collateralReserves.every((r) => isOnChainPriceSource(r.priceSource));
-  const debtOnChain =
-    chainBalances && debtReserves.length > 0 && debtReserves.every((r) => isOnChainPriceSource(r.priceSource));
-
-  const collateralValue = (() => {
-    // "Collateral" is the full (un-LT-weighted) value of the supplies enabled as
-    // collateral. Supply-only positions show the full deposited value. The LT
-    // weighting lives in HF and borrowing power.
-    const usd = supplyOnly ? calc.totalCollateralUsd : calc.breakdown.collateralUsd;
-    const v = fmtUsd(usd);
-    const label = supplyOnly ? "Supplied" : "Collateral";
-    const info = collateralOnChain
-      ? usdProvOnchain(label)
-      : usdProv(label, { amountLabel: "supply balance", amountKind: "chain" });
-    return (
-      <RevealTip tip={v.title}>
-        <Prov info={info}>{v.display}</Prov>
-      </RevealTip>
+  // Each side's dollars and receipt: each reserve's balance × its on-chain
+  // price as shown, to the cent, summed; where a reserve on the side has no
+  // on-chain price, no figure and the reserve named (ui-jobs 743).
+  const sideReceipt = (reserves: AaveV4SpokeReserveSummary[], side: "supply" | "debt", what: string) =>
+    aaveV4UsdReceipt({
+      what,
+      rows: reserves.map((r) => ({
+        symbol: r.symbol,
+        address: r.address,
+        amount: scaleChainBalance(side === "debt" ? r.debtBalanceRaw : r.supplyBalanceRaw, r.decimals),
+        amountNote: chainBalances
+          ? `the spoke's ${side === "debt" ? "getUserTotalDebt" : "getUserSuppliedAssets"}, read when the row was served`
+          : "the indexed balance, the live read having failed",
+        price:
+          isOnChainPriceSource(r.priceSource) && r.usdPrice != null && r.usdPrice > 0
+            ? { usd: r.usdPrice, source: r.priceSource as AaveV4OnChainSource }
+            : null,
+      })),
+      face: reserves.length === 1 ? "cents" : "compact",
+      via: "the listing's chain read × the oracle map, as served",
+    });
+  const collR = sideReceipt(collateralReserves, "supply", supplyOnly ? "Supplied in USD" : "Collateral in USD");
+  const debtR = sideReceipt(debtReserves, "debt", "Debt in USD");
+  const sideValue = (r: AaveV4UsdResult | null) =>
+    !r ? null : r.prov == null ? (
+      <span className="text-[11px] font-normal text-rb-500" data-prov-exempt="" data-total-unpriced="">
+        {aaveV4NoPriceLine(r.missing)}
+      </span>
+    ) : (
+      (() => {
+        const v = fmtUsd(r.usd);
+        return (
+          <RevealTip tip={v.title}>
+            <Prov info={r.prov}>{v.display}</Prov>
+          </RevealTip>
+        );
+      })()
     );
-  })();
-
-  const debtValue = (() => {
-    const v = fmtUsd(calc.totalDebtUsd);
-    const info = debtOnChain
-      ? usdProvOnchain("Debt")
-      : usdProv("Debt", { amountLabel: "debt balance", amountKind: "chain" });
-    return (
-      <RevealTip tip={v.title}>
-        <Prov info={info}>{v.display}</Prov>
-      </RevealTip>
-    );
-  })();
+  const collateralValue = sideValue(collR);
+  const debtValue = sideValue(debtR);
 
   // The wallet and its hubs after the lifecycle pill; the spoke (the market) at
   // the right end.
@@ -256,42 +261,36 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
   const oneAsset = (
     r: AaveV4SpokeReserveSummary,
     raw: string,
-    usd: number,
-    label: string,
-    onChain: boolean,
+    receipt: AaveV4UsdResult | null,
   ): Pick<PositionCardHead, "value" | "usd"> => {
     const amount = scaleChainBalance(raw, r.decimals);
-    const info = onChain
-      ? usdProvOnchain(label)
-      : usdProv(label, { amountLabel: `${label.toLowerCase()} balance`, amountKind: "chain" });
     return {
       value: (
         <AssetAmount value={amount} symbol={r.symbol} address={r.address} exact={formatUnitsExact(raw, r.decimals)} />
       ),
       usd:
-        r.usdPrice != null && r.usdPrice > 0 ? (
-          <Prov info={info}>
-            <span className="font-bold text-green-400">{formatUsdValue(usd)}</span>
+        receipt?.prov == null ? (
+          receipt ? (
+            <span className="text-[11px] font-normal text-rb-500" data-prov-exempt="" data-total-unpriced="">
+              {aaveV4NoPriceLine(receipt.missing)}
+            </span>
+          ) : null
+        ) : (
+          <Prov info={receipt.prov}>
+            <span className="font-bold text-green-400">{formatUsdValue(receipt.usd)}</span>
           </Prov>
-        ) : null,
+        ),
     };
   };
   const symbols = supplyOnly ? calc.supplyingSymbols : calc.breakdown.collateralSymbols;
   const oneColl = collateralReserves.length === 1 && symbols.length === 1 ? collateralReserves[0] : null;
   const oneDebt = debtReserves.length === 1 ? debtReserves[0] : null;
-  const collUsd = supplyOnly ? calc.totalCollateralUsd : calc.breakdown.collateralUsd;
   const heads: PositionCardHead[] = [
     {
       id: supplyOnly ? "supplied" : "collateral",
       label: supplyOnly ? "Supplied" : CARD_VOCAB.collateral,
       ...(oneColl
-        ? oneAsset(
-            oneColl,
-            oneColl.supplyBalanceRaw,
-            collUsd,
-            supplyOnly ? "Supplied" : "Collateral",
-            collateralOnChain,
-          )
+        ? oneAsset(oneColl, oneColl.supplyBalanceRaw, collR)
         : {
             assets: symbols.length > 0 ? <InlineAssetCluster assets={symbols.map(symbolOnly)} /> : undefined,
             value: collateralValue,
@@ -305,7 +304,7 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
             id: "debt",
             label: CARD_VOCAB.debt,
             ...(oneDebt
-              ? oneAsset(oneDebt, oneDebt.debtBalanceRaw, calc.totalDebtUsd, "Debt", debtOnChain)
+              ? oneAsset(oneDebt, oneDebt.debtBalanceRaw, debtR)
               : {
                   assets:
                     calc.borrowingSymbols.length > 0 ? (

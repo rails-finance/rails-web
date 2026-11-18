@@ -8,6 +8,7 @@
 // segments so the chart tells the lifetime story; the Display dropdown collapses
 // back to current-state-only.
 
+import { shownUsd } from "@/lib/shared/shown-usd";
 import { useState, type CSSProperties } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
@@ -31,7 +32,6 @@ import { oraclePriceSource, type OraclePriceMap } from "@/lib/aave-v4/use-oracle
 import {
   NO_PRICE_HINT,
   noPriceProv,
-  partialLabel,
   partialSumProv,
   pricesHaveLoaded,
   UNPRICED_DUST_TOKENS,
@@ -381,11 +381,12 @@ export function AaveV4TowerChart({
         supplyInterestUsd: life.supply.interestUsd,
         debtInterest: life.debt.interest,
         debtInterestUsd: life.debt.interestUsd,
-        heldDebtInterestUsd: price == null ? 0 : Math.min(netDebt, life.debt.interest) * price,
+        heldDebtInterestUsd: price == null ? 0 : shownUsd(Math.min(netDebt, life.debt.interest), price),
         price,
         priceSource: oraclePriceSource(r.symbol, oraclePrices),
-        netSupplyUsd: price == null ? null : netSupply * price,
-        netDebtUsd: price == null ? null : netDebt * price,
+        // Today's figures, each the amount × the price as shown, to the cent.
+        netSupplyUsd: price == null ? null : shownUsd(netSupply, price),
+        netDebtUsd: price == null ? null : shownUsd(netDebt, price),
         // An unpriced row can't be measured against a USD dust floor, so its
         // balances are judged in tokens.
         isClosed:
@@ -726,8 +727,9 @@ export function AaveV4TowerChart({
   // A total the unpriced holdings emptied has no figure to state: "< $0.01"
   // would read as a value it measured. An em dash says there is none, and the
   // "(partial)" label and the receipt say why.
-  const totalAmount = (usd: number, excluded: string[]) =>
-    excluded.length > 0 && usd < LIFETIME_DUST_USD ? "—" : fmtUsd(usd).display;
+  // A total including an asset with no on-chain price draws no figure (no
+  // partial totals, ui-jobs 743); its receipt names the asset.
+  const totalAmount = (usd: number, excluded: string[]) => (excluded.length > 0 ? "—" : fmtUsd(usd).display);
 
   // The unpriced holdings on a side: always per-asset (a sum can't absorb a row
   // that has no USD), no swatch (there is no segment for one to point at), and
@@ -765,7 +767,7 @@ export function AaveV4TowerChart({
       return [
         {
           sign: "",
-          label: partialLabel(mergedLabel, excluded),
+          label: mergedLabel,
           amount: totalAmount(total, excluded),
           swatchClass,
           prov: partialSumProv(prov, mergedLabel, excluded),
@@ -855,7 +857,7 @@ export function AaveV4TowerChart({
       ? [
           {
             sign: "",
-            label: partialLabel("Supplied (all time)", depositedExcluded),
+            label: "Supplied (all time)",
             amount: totalAmount(totalDepositedUsd, depositedExcluded),
             swatchStyle: { backgroundColor: COLLATERAL_FADED },
             icon: collSideSymbol ? <TokenChipIcon symbol={collSideSymbol} size={14} filterable={false} /> : undefined,
@@ -881,7 +883,7 @@ export function AaveV4TowerChart({
         // Parity with Liquity's "Current Collateral" total for borrow positions;
         // a never-borrowed wallet has nothing collateralised, so it reads as a
         // plain supply balance instead.
-        label: partialLabel(currentCollLabel, unpricedSupplySymbols),
+        label: currentCollLabel,
         amount: totalAmount(totalSupplyUsd, unpricedSupplySymbols),
         isResult: true,
         prov: partialSumProv(CURRENT_COLL_PROV, currentCollLabel, unpricedSupplySymbols),
@@ -894,7 +896,7 @@ export function AaveV4TowerChart({
       ? [
           {
             sign: "",
-            label: partialLabel("Borrowed (all time)", borrowedExcluded),
+            label: "Borrowed (all time)",
             amount: totalAmount(totalBorrowedUsd, borrowedExcluded),
             swatchStyle: { backgroundColor: DEBT_GREEN_FADED },
             icon: debtSideSymbol ? <TokenChipIcon symbol={debtSideSymbol} size={14} filterable={false} /> : undefined,
@@ -917,7 +919,7 @@ export function AaveV4TowerChart({
       ),
       {
         sign: "",
-        label: partialLabel("Current Debt", unpricedDebtSymbols),
+        label: "Current Debt",
         amount: totalAmount(totalDebtUsd, unpricedDebtSymbols),
         isResult: true,
         prov: partialSumProv(CURRENT_DEBT_PROV, "Current Debt", unpricedDebtSymbols),

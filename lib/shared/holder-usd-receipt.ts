@@ -66,6 +66,8 @@ export function holderUsdReceipt(opts: {
    *  (a Compound V2 liquidation before the oracle's dollar years), whose
    *  products run to six decimals. `usd` is then that figure in ETH. */
   numeraire?: "USD" | "ETH";
+  /** The prices stand at different blocks, each named on its row. */
+  blocksPerRow?: boolean;
 }): { prov: Provenance; usd: number } {
   const eth = opts.numeraire === "ETH";
   const product = eth ? shownEth : shownUsd;
@@ -120,8 +122,10 @@ export function holderUsdReceipt(opts: {
   // A face is no read: a receipt of faces alone names no read and no block.
   const at = allFaces
     ? ""
-    : opts.block != null
-      ? `, the ${read > 1 ? "prices" : "price"} at block ${opts.block.toLocaleString("en-US")}`
+    : opts.blocksPerRow
+      ? ", each price at the block its row names"
+      : opts.block != null
+        ? `, the ${read > 1 ? "prices" : "price"} at block ${opts.block.toLocaleString("en-US")}`
       : `, the ${read > 1 ? "prices" : "price"} at the latest read, which states no block`;
   const faces = legs.filter((l) => l.face).map((l) => `1 ${l.token} is counted as $1`);
   return {

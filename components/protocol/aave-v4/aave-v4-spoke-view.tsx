@@ -116,8 +116,8 @@ import { fetchFlowSeries, type FlowSeries } from "@/lib/api/fetch-aave-v3-flow-s
 import { shortAddr } from "@/lib/shared/format-event";
 import { useWalletContext } from "@/components/nav/wallet-context";
 import { useAaveV4UiState } from "@/hooks/useAaveV4UiState";
-import { PricesProvider, usePrices, useRequestPrices } from "@/lib/shared/prices-context";
-import { useAaveV4OraclePrices, type OraclePriceMap } from "@/lib/aave-v4/use-oracle-prices";
+import { PricesProvider } from "@/lib/shared/prices-context";
+import { useAaveV4OracleRead, type OraclePriceMap } from "@/lib/aave-v4/use-oracle-prices";
 import { listSymbols } from "@/lib/aave-v4/unpriced";
 import { computeOnchainUsd } from "@/lib/aave-v4/onchain-usd";
 import { priceKeyFor } from "@/lib/aave/prices";
@@ -301,27 +301,19 @@ function AaveV4SpokePageInner({
   const sortedEvents = useMemo(() => [...expandAaveV4Swaps(events)].sort(byTime), [events]);
   const sortedDisplayEvents = useMemo(() => [...events].sort(byTime), [events]);
 
-  const prices = usePrices();
-  const oraclePrices = useAaveV4OraclePrices();
-  // Oracle-first price map: Aave's own on-chain oracle price (chain-state — the
-  // same Chainlink feeds its risk engine reads) overrides the DefiLlama price
-  // per reserve, keyed by address; DefiLlama stays the fallback for any asset
-  // the oracle registry doesn't cover. Threaded into every CURRENT-STATE
-  // valuation (liq price, borrowing power, interest carry, runway, tower "today"
-  // figures, prices) so the whole live position reads chain-true, not just
-  // the headline totals. Until the oracle map loads it IS `prices`, so first
-  // paint is unchanged and the figures refine to oracle when it arrives. The
-  // event-derived history/peak seed (groupBySpoke / buildAaveV4SpokeCards) keeps
-  // the plain `prices` map — those are historic aggregates, overridden for
-  // current state by patchSpokeCardWithChain below.
+  // Every dollar on the page stands on an on-chain price (ui-jobs 743): the
+  // oracle map's (the spoke oracle's getReservePrice, or the Chainlink read or
+  // Pendle TWAP it names), keyed by address. No off-chain price enters; an
+  // asset the map does not carry has none, and every total including it draws
+  // nothing. Until the map loads the map is empty, and the figures wait.
+  const oracleRead = useAaveV4OracleRead();
+  const oraclePrices = oracleRead?.prices ?? null;
   const chainTruthPrices = useMemo<Record<string, PriceEntry | number>>(() => {
-    if (!oraclePrices) return prices;
-    const merged: Record<string, PriceEntry | number> = { ...prices };
-    for (const [addr, p] of Object.entries(oraclePrices)) {
-      merged[addr.toLowerCase()] = p.usd;
-    }
-    return merged;
-  }, [prices, oraclePrices]);
+    const out: Record<string, PriceEntry | number> = {};
+    for (const [addr, p] of Object.entries(oraclePrices ?? {})) out[addr.toLowerCase()] = p.usd;
+    return out;
+  }, [oraclePrices]);
+  const prices = chainTruthPrices;
   const spokeGroups = useMemo(() => groupBySpoke(sortedEvents, undefined, prices), [sortedEvents, prices]);
   const spokeCards = useMemo(() => buildAaveV4SpokeCards(sortedEvents, undefined, prices), [sortedEvents, prices]);
   // The one card we render (single-spoke breadcrumb). If the URL spoke doesn't
@@ -368,18 +360,9 @@ function AaveV4SpokePageInner({
       // On-chain-oracle valuation of the headline totals, from the same chain
       // balances at Aave's own oracle price — lets On-chain-values show these
       // as chain-derived instead of middotting the DefiLlama figure.
-      onchainUsd: computeOnchainUsd(chainPosition, oraclePrices),
+      onchainUsd: computeOnchainUsd(chainPosition, oracleRead),
     };
-  }, [
-    eventActiveCard,
-    eventActiveGroup,
-    chainPosition,
-    prices,
-    chainTruthPrices,
-    oraclePrices,
-    sortedEvents,
-    spokeName,
-  ]);
+  }, [eventActiveCard, eventActiveGroup, chainPosition, prices, chainTruthPrices, oracleRead, sortedEvents, spokeName]);
   const activeGroup = useMemo(() => {
     if (!eventActiveGroup) return undefined;
     if (!chainPosition || chainPosition.chainStale) {
@@ -650,40 +633,6 @@ function AaveV4SpokePageInner({
     // flows series (`flowSeriesEnabled` below), so no Show timeline button, and keeps Dates.
     dates: deployment.key === "base",
   });
-
-  const reserveAddresses = useMemo(() => {
-    const out = new Set<string>();
-    for (const p of positions) {
-      if (p.reserveAddress) out.add(p.reserveAddress.toLowerCase());
-      const fromSymbol = priceKeyFor(p.reserveSymbol);
-      if (fromSymbol) out.add(fromSymbol);
-    }
-    for (const e of sortedEvents) {
-      if (!isAaveV4Event(e)) continue;
-      const ctx = e.context.data;
-      const symbols = [
-        ctx.reserveSymbol,
-        ctx.collateralSymbol,
-        ...(ctx.allSupplies?.map((s) => s.symbol) ?? []),
-        ...(ctx.allDebts?.map((d) => d.symbol) ?? []),
-      ];
-      for (const s of symbols) {
-        if (!s) continue;
-        const addr = priceKeyFor(s);
-        if (addr) out.add(addr);
-      }
-    }
-    // Chain reserves win for the position card; make sure their prices are
-    // requested even if the indexer hasn't seen the asset yet.
-    if (chainPosition) {
-      for (const r of chainPosition.reserves) {
-        if (r.address) out.add(r.address.toLowerCase());
-      }
-    }
-    return [...out];
-  }, [positions, sortedEvents, chainPosition]);
-
-  useRequestPrices(reserveAddresses);
 
   if (loading) {
     // Real back button (so the nav chrome doesn't pop in) above the shared

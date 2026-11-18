@@ -10,6 +10,8 @@
 // the figures (the collateral factor, the health factor, the risk premium,
 // the spoke) are the card's "?" (`L5.position` in the same file).
 
+import type { AaveV4UsdResult } from "@/lib/aave-v4/usd-receipt";
+import { aaveV4NoPriceLine } from "@/lib/aave-v4/price-notes";
 import { v4Apy } from "@/lib/aave-v4/rates";
 import type { ReactNode } from "react";
 import {
@@ -23,7 +25,7 @@ import { formatCompact } from "@/lib/shared/format-compact";
 import { useSpokeCollateralFactors } from "@/lib/aave-v4/use-spoke-collateral-factors";
 import type { ClosedCollateralFactors } from "@/lib/aave-v4/use-closed-collateral-factors";
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
-import { Prov } from "@/components/shared/provenance";
+import { Prov, type Provenance } from "@/components/shared/provenance";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import type { ExternalActorSummary } from "@/lib/shared/external-actor";
@@ -143,16 +145,8 @@ function openBullets(spoke: AaveSpokeCardInfo): { lead: ReactNode; bullets: Bull
   const supplyOnly = spoke.totalDebtUsd <= 0;
   const supplyStr = joinSymbols(spoke.supplyingSymbols);
   const borrowStr = joinSymbols(spoke.borrowingSymbols);
-  const supply_usd = (
-    <H>
-      <Prov info={SUPPLY_USD_PROV}>{usd(spoke.totalSupplyUsd)}</Prov>
-    </H>
-  );
-  const debt_usd = (
-    <H>
-      <Prov info={DEBT_USD_PROV}>{usd(spoke.totalDebtUsd)}</Prov>
-    </H>
-  );
+  const supply_usd = <H>{explainUsd(spoke.onchainUsd?.supply, spoke.totalSupplyUsd, SUPPLY_USD_PROV)}</H>;
+  const debt_usd = <H>{explainUsd(spoke.onchainUsd?.debt, spoke.totalDebtUsd, DEBT_USD_PROV)}</H>;
   const name = (s: string) => <span className="text-foreground/90 font-medium">{s}</span>;
 
   let lead: ReactNode;
@@ -172,9 +166,7 @@ function openBullets(spoke: AaveSpokeCardInfo): { lead: ReactNode; bullets: Bull
   // The card's Collateral cell: the supplies enabled as collateral.
   const collStr = joinSymbols(spoke.supplyBreakdown.collateralSymbols);
   const coll_usd = (
-    <H>
-      <Prov info={COLL_USD_PROV}>{usd(spoke.supplyBreakdown.collateralUsd)}</Prov>
-    </H>
+    <H>{explainUsd(spoke.onchainUsd?.collateral, spoke.supplyBreakdown.collateralUsd, COLL_USD_PROV)}</H>
   );
   lead =
     collStr && borrowStr
@@ -319,6 +311,17 @@ function recordBullet(spoke: AaveSpokeCardInfo): ReactNode | null {
  * The open position's explanation panel. The spoke's mechanics (hub and
  * spoke, collateral factor, health factor, risk premium) are the "?" modal's.
  */
+
+/** A figure the Explanation quotes: the card's, from its receipt (the sum of
+ *  the shown products) where the chain and oracle reads have landed; the
+ *  events' figure at the oracle map's prices before then; no figure where an
+ *  asset has no on-chain price (ui-jobs 743). */
+function explainUsd(r: AaveV4UsdResult | null | undefined, fallback: number, plain: Provenance): ReactNode {
+  if (r == null) return <Prov info={plain}>{usd(fallback)}</Prov>;
+  if (r.prov == null) return <span data-prov-exempt="">{aaveV4NoPriceLine(r.missing)}</span>;
+  return <Prov info={r.prov}>{usd(r.usd)}</Prov>;
+}
+
 export function AaveV4PositionExplanation({
   spoke,
   embedded = false,

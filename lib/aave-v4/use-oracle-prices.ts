@@ -70,21 +70,6 @@ export function useAaveV4OracleRead(): OracleRead | null {
   return read;
 }
 
-/**
- * Fetch the live Aave V4 on-chain oracle price map from /api/oracle/aave-v4
- * (the V4 oracle's own price, what Aave's risk engine values at). Used only to value
- * collateral/debt as chain-derived in On-chain-values mode; the normal
- * (DefiLlama) prices still drive the default view. Fetched once per mount —
- * the backend serves a shared, block-cached map, so this is a cache hit.
- *
- * Returns null until loaded or on failure; callers fall back to DefiLlama (a
- * middot in On-chain-values), so a missing oracle read never blocks the page or
- * shows a wrong number.
- */
-export function useAaveV4OraclePrices(): OraclePriceMap | null {
-  return useAaveV4OracleRead()?.prices ?? null;
-}
-
 /** Which source priced this symbol at head, or `null` where the oracle map does
  *  not carry the asset (the page then reads the off-chain market feed for it).
  *  Lets a current-holding receipt name the feed behind the figure rather than
