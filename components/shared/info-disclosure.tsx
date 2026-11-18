@@ -317,7 +317,9 @@ export function InfoTabsDisclosure({
 }: InfoTabsDisclosureProps) {
   const open = tabs.find((t) => t.key === openTab) ?? null;
   const openIndex = open ? tabs.indexOf(open) : -1;
-  const pane = bare ? "" : `mt-1.5 rounded-xl bg-background ${openIndex === 0 ? "rounded-tl-none" : ""}`;
+  const pane = bare
+    ? ""
+    : `mt-1.5 rounded-xl bg-[var(--event-cell,var(--background))] ${openIndex === 0 ? "rounded-tl-none" : ""}`;
   // A bare pane's first bullet stands a margin below the heading row (ui-jobs 289).
   const paneBody = bare ? "pb-3 pt-5 text-sm" : "px-3 pb-3 pt-3 text-sm";
   // Escape closes the most recently opened pane and hands focus back to the

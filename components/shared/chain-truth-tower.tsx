@@ -38,6 +38,7 @@
 // side holding several tokens draws one bar per token (`bars`). All three are
 // opt-in; a feeder that sets none renders as before.
 
+import { SectionSidebar } from "@/components/shared/section-sidebar";
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
@@ -180,22 +181,24 @@ export function ChainTruthTower({
     // The tower is its own receipts scope: every traced line — breakdown rows,
     // the gated reserve lists — registers here, for the page-level inspector.
     <ProvReceiptsScope registry={registry}>
-      <section
-        // Padding matches the position card's px-5 py-4 (the V2 trove
-        // compaction), so the stacked panels read as one family.
-        // data-skel-section feeds the skeleton memory layer (skeleton-size-recorder).
-        data-skel-section="detail-economics"
-        {...(collapseKey ? { [COLLAPSE_KEY_ATTR]: collapseKey } : {})}
-        {...(collapseKey && settled ? { [COLLAPSED_ATTR]: collapsed ? "1" : "0" } : {})}
-        suppressHydrationWarning
-        className="rounded-2xl bg-raised px-5 py-4"
-      >
-        {/* Pre-paint: the stored state applied before the browser paints, so a
+      {/* The card's lozenge carried on, as beside Lifetime flows (P2.1). */}
+      <SectionSidebar section="flows">
+        <section
+          // Padding matches the position card's px-5 py-4 (the V2 trove
+          // compaction), so the stacked panels read as one family.
+          // data-skel-section feeds the skeleton memory layer (skeleton-size-recorder).
+          data-skel-section="detail-economics"
+          {...(collapseKey ? { [COLLAPSE_KEY_ATTR]: collapseKey } : {})}
+          {...(collapseKey && settled ? { [COLLAPSED_ATTR]: collapsed ? "1" : "0" } : {})}
+          suppressHydrationWarning
+          className="rounded-2xl bg-raised px-5 py-4"
+        >
+          {/* Pre-paint: the stored state applied before the browser paints, so a
             tower the reader put away does not flash open on the way to
             hydration. Reads its key off this section — see
             lib/shared/flows-collapse-store.ts. */}
-        {collapseKey && <script dangerouslySetInnerHTML={{ __html: collapseScript() }} suppressHydrationWarning />}
-        {/* Toolbar row: title left, legend + Lifetime-flows control right. The
+          {collapseKey && <script dangerouslySetInnerHTML={{ __html: collapseScript() }} suppressHydrationWarning />}
+          {/* Toolbar row: title left, legend + Lifetime-flows control right. The
           chart below pulls up underneath it (-mt-7 matching the row's min-h),
           so the towers' empty top band shares this line — title left, controls
           right, towers centered. The row stays hit-testable above the chart
@@ -209,52 +212,33 @@ export function ChainTruthTower({
           first row of the body under 63 and stays there, still right-aligned
           and still inside the towers' empty top band once the chart pulls up
           under it. */}
-        <div className="pointer-events-none relative z-10 flex min-h-[28px] items-center justify-between gap-2">
-          {collapseKey ? (
-            <button
-              type="button"
-              onClick={() => {
-                const next = !collapsed;
-                setCollapsed(next);
-                setSettled(true);
-                setFlowsCollapsed(collapseKey, next);
-              }}
-              aria-expanded={!collapsed}
-              aria-controls={bodyId}
-              aria-label={collapsed ? `Show ${title}` : `Hide ${title}`}
-              className={`${CTRL_GHOST} ${CTRL_OFF} pointer-events-auto -mx-2 h-7 w-full min-w-0 rounded-md px-2`}
-            >
-              <span className="flex w-full min-w-0 items-center justify-between gap-2">
-                <span className="flex min-w-0 items-center gap-1.5">
-                  <span className={`${SECTION_HEADING} truncate`}>{title}</span>
+          <div className="pointer-events-none relative z-10 flex min-h-[28px] items-center justify-between gap-2">
+            {collapseKey ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !collapsed;
+                  setCollapsed(next);
+                  setSettled(true);
+                  setFlowsCollapsed(collapseKey, next);
+                }}
+                aria-expanded={!collapsed}
+                aria-controls={bodyId}
+                aria-label={collapsed ? `Show ${title}` : `Hide ${title}`}
+                className={`${CTRL_GHOST} ${CTRL_OFF} pointer-events-auto -mx-2 h-7 w-full min-w-0 rounded-md px-2`}
+              >
+                <span className="flex w-full min-w-0 items-center justify-between gap-2">
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <span className={`${SECTION_HEADING} truncate`}>{title}</span>
+                  </span>
+                  <ChevronDown size={16} className={collapsed ? "" : "rotate-180"} aria-hidden />
                 </span>
-                <ChevronDown size={16} className={collapsed ? "" : "rotate-180"} aria-hidden />
-              </span>
-            </button>
-          ) : (
-            <>
-              <span className={`${SECTION_HEADING} pointer-events-auto min-w-0 text-rb-500`}>{title}</span>
-              {/* No corner color key — the flank-table swatches are the one legend
+              </button>
+            ) : (
+              <>
+                <span className={`${SECTION_HEADING} pointer-events-auto min-w-0 text-rb-500`}>{title}</span>
+                {/* No corner color key — the flank-table swatches are the one legend
                   (design-grammar rule; neither reference tower carries one). */}
-              <div className="pointer-events-auto flex items-center gap-3">
-                <TowerDisplayControls
-                  lifetimeAvailable={lifetimeAvailable}
-                  canGroup={canGroup}
-                  grouped={grouped}
-                  hideHistorical={hideHistorical}
-                  showBars={showBars}
-                  flowsNote={data.flowsNote}
-                  onGroup={() => setGroupOverride((v) => !(v ?? true))}
-                  onHideHistorical={() => setHideHistorical((v) => !v)}
-                />
-              </div>
-            </>
-          )}
-        </div>
-        <div id={bodyId} {...(collapseKey ? { "data-flows-body": "" } : {})}>
-          <div id={`${bodyId}-ledger`}>
-            {collapseKey && (
-              <div className="pointer-events-none relative z-10 flex min-h-[28px] items-center justify-end gap-3">
                 <div className="pointer-events-auto flex items-center gap-3">
                   <TowerDisplayControls
                     lifetimeAvailable={lifetimeAvailable}
@@ -267,35 +251,55 @@ export function ChainTruthTower({
                     onHideHistorical={() => setHideHistorical((v) => !v)}
                   />
                 </div>
-              </div>
-            )}
-            {/* Bars pull up under the toolbar row; the gated reserve LIST keeps its
-            own row (text would collide with the title). */}
-            {drawable && (
-              <div className={showBars ? "-mt-7" : "mt-3"}>
-                {showBars ? (
-                  <ChainTruthTowerChart data={chartData} hideHistorical={hideHistorical} />
-                ) : (
-                  <GatedEconomics data={data} />
-                )}
-              </div>
-            )}
-            {leftOut.length > 0 && (
-              <p className="mt-3 text-[11px] leading-snug text-rb-400" data-not-loaded="">
-                Leaves out {leftOut.map((t) => t.label).join(", ")}:{" "}
-                <NotLoaded inline className="text-rb-500" title={leftOutTitle(leftOut)} />
-              </p>
+              </>
             )}
           </div>
-          <ProvenanceInfoTabs
-            className="mt-3"
-            label={`${title} explanation`}
-            explanation={explanation}
-            learnMore={learnMore}
-            rowExtra={rowExtra}
-          />
-        </div>
-      </section>
+          <div id={bodyId} {...(collapseKey ? { "data-flows-body": "" } : {})}>
+            <div id={`${bodyId}-ledger`}>
+              {collapseKey && (
+                <div className="pointer-events-none relative z-10 flex min-h-[28px] items-center justify-end gap-3">
+                  <div className="pointer-events-auto flex items-center gap-3">
+                    <TowerDisplayControls
+                      lifetimeAvailable={lifetimeAvailable}
+                      canGroup={canGroup}
+                      grouped={grouped}
+                      hideHistorical={hideHistorical}
+                      showBars={showBars}
+                      flowsNote={data.flowsNote}
+                      onGroup={() => setGroupOverride((v) => !(v ?? true))}
+                      onHideHistorical={() => setHideHistorical((v) => !v)}
+                    />
+                  </div>
+                </div>
+              )}
+              {/* Bars pull up under the toolbar row; the gated reserve LIST keeps its
+            own row (text would collide with the title). */}
+              {drawable && (
+                <div className={showBars ? "-mt-7" : "mt-3"}>
+                  {showBars ? (
+                    <ChainTruthTowerChart data={chartData} hideHistorical={hideHistorical} />
+                  ) : (
+                    <GatedEconomics data={data} />
+                  )}
+                </div>
+              )}
+              {leftOut.length > 0 && (
+                <p className="mt-3 text-[11px] leading-snug text-rb-400" data-not-loaded="">
+                  Leaves out {leftOut.map((t) => t.label).join(", ")}:{" "}
+                  <NotLoaded inline className="text-rb-500" title={leftOutTitle(leftOut)} />
+                </p>
+              )}
+            </div>
+            <ProvenanceInfoTabs
+              className="mt-3"
+              label={`${title} explanation`}
+              explanation={explanation}
+              learnMore={learnMore}
+              rowExtra={rowExtra}
+            />
+          </div>
+        </section>
+      </SectionSidebar>
     </ProvReceiptsScope>
   );
 }

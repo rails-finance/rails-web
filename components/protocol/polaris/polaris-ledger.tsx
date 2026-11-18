@@ -88,12 +88,12 @@ function EscrowLines({ at }: { at: PolarisEscrowAt }) {
     </div>
   );
   return (
-    <div className="mt-3 border-t border-dashed border-rb-300 pt-2 dark:border-rb-600" data-ledger-escrow="">
+    <div className="mt-3 border-t border-dashed border-edge-raised pt-2" data-ledger-escrow="">
       <p className="text-sm text-rb-500">{ESCROW_WORDS.heading}</p>
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 text-sm tabular-nums">
         {line("sent", ESCROW_WORDS.sent, `+${formatPeth(amount)}`, gasCompEscrowProv(coords), String(amount))}
         {out && line("out", out.label, `−${formatPeth(out.n)}`, out.info, String(out.n))}
-        <div aria-hidden className="col-span-full mt-1 border-t border-rb-300 dark:border-rb-600" />
+        <div aria-hidden className="col-span-full mt-1 border-t border-edge-raised" />
         {line("held", ESCROW_WORDS.held, formatPeth(held), null, String(held), true)}
       </div>
     </div>

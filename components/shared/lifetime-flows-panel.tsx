@@ -51,7 +51,6 @@ import { useFlowFocusState } from "@/components/shared/flow-focus-context";
 import { LearnMoreButton, LearnMoreModal, type LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { lifetimeFlowsBarsContent } from "@/lib/shared/learn-more-content";
 import { SectionSidebar } from "@/components/shared/section-sidebar";
-import { usePositionCardIdentity } from "@/components/shared/position-card-edge";
 import { CARD_PAD_X, CTRL_GHOST, CTRL_OFF, SECTION_HEADING } from "@/lib/shared/ui-grammar";
 import {
   COLLAPSE_KEY_ATTR,
@@ -193,8 +192,6 @@ export function LifetimeFlowsPanel({
       {label}
     </button>
   );
-  // Below md the sidebar's border takes the box's left 6px.
-  const sidebar = usePositionCardIdentity() != null;
   if (scrubber == null && (read === "done" || read === "withheld")) return null;
   const loading = scrubber == null && read !== "failed";
   const none = scrubber != null && life === "none";
@@ -215,13 +212,15 @@ export function LifetimeFlowsPanel({
           {...(collapseKey ? { [COLLAPSE_KEY_ATTR]: collapseKey } : {})}
           {...(collapseKey && settled ? { [COLLAPSED_ATTR]: collapsed ? "1" : "0" } : {})}
           suppressHydrationWarning
-          className={`rounded-2xl bg-raised ${CARD_PAD_X} py-4 ${sidebar ? "max-md:pl-[26px]" : ""}`}
+          className={`rounded-2xl bg-raised ${CARD_PAD_X} py-4`}
           style={loading && remembered["detail-economics"] ? { minHeight: remembered["detail-economics"] } : undefined}
         >
           {collapseKey && <script dangerouslySetInnerHTML={{ __html: collapseScript() }} suppressHydrationWarning />}
-          {/* The chevron follows the heading. */}
+          {/* The chevron follows the heading. The button is the disclosure row,
+              so its words and chevron turn on the same hover, at the same
+              150ms ease, and it lights no ground (ui-jobs 730, Miles). */}
           <div
-            className="disc-row pointer-events-none relative z-10 flex min-h-[28px] items-center justify-between gap-2"
+            className="pointer-events-none relative z-10 flex min-h-[28px] items-center justify-between gap-2"
             data-anatomy="F1"
           >
             {collapseKey ? (
@@ -236,7 +235,7 @@ export function LifetimeFlowsPanel({
                 aria-expanded={!collapsed}
                 aria-controls={bodyId}
                 aria-label={collapsed ? `Show ${title}` : `Hide ${title}`}
-                className={`${CTRL_GHOST} ${CTRL_OFF} pointer-events-auto -ml-2 h-7 min-w-0 flex-1 justify-start rounded-md px-2`}
+                className="disc-row pointer-events-auto -ml-2 inline-flex h-7 min-w-0 flex-1 cursor-pointer items-center justify-start rounded-md px-2 text-rb-500 transition-colors duration-150 ease-[ease] hover:text-foreground focus-visible:text-foreground"
                 data-flows-toggle=""
               >
                 <span className="flex min-w-0 items-center gap-1.5">

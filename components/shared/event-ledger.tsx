@@ -105,14 +105,14 @@ const OWN_TAP = "button, a, input, select, textarea, [role=button], [data-prov-p
  *  cell like a click on the name; on touch the first tap opens the tip. */
 const USD_TIP_HOST = "data-closed-usd-tip";
 
-/** A pending figure: one pulsing bar where a value will stand. The bar is
- *  `bg-skeleton`, which the T2 panel's surface does not show, so it sits
- *  inside a cell (`bg-background`). It holds still under reduced motion. */
+/** A pending figure: one pulsing bar where a value will stand, in the
+ *  sheet skeleton's tone (rb-200 / dark rb-700), which shows on a cell of
+ *  either ground. It holds still under reduced motion. */
 export function PendingBar({ className = "w-24" }: { className?: string }) {
   return (
     <span
       aria-hidden
-      className={`inline-block h-4 rounded-md bg-skeleton animate-pulse ${className}`}
+      className={`inline-block h-4 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse ${className}`}
       data-pending-bar=""
     />
   );
@@ -255,7 +255,7 @@ export function LedgerCell({
   if (src?.pending && ledger === undefined && side)
     return (
       <div
-        className={`@container flex h-full min-w-0 flex-col rounded-xl bg-background px-4 py-3 col-span-full ${className}`}
+        className={`@container flex h-full min-w-0 flex-col rounded-xl bg-[var(--event-cell,var(--background))] px-4 py-3 col-span-full ${className}`}
         {...data}
         data-ledger-cell={side}
         data-ledger-span=""
@@ -269,7 +269,7 @@ export function LedgerCell({
     );
   return (
     <div
-      className={`@container relative flex h-full min-w-0 flex-col rounded-xl bg-background px-4 py-3 ${ledgerCard ? "col-span-full" : ""} ${className}`}
+      className={`@container relative flex h-full min-w-0 flex-col rounded-xl bg-[var(--event-cell,var(--background))] px-4 py-3 ${ledgerCard ? "col-span-full" : ""} ${className}`}
       {...data}
       {...(side ? { "data-ledger-cell": side } : {})}
       {...(ledgerCard ? { "data-ledger-span": "" } : {})}
@@ -442,7 +442,7 @@ export function ClosedTokens({ children, usd: given }: { children: ReactNode; us
 function ClosedUsd({ before, after, off }: ClosedUsdFigures & { off: OffPar | null }) {
   return (
     <span
-      className="ml-1 inline-flex items-center justify-end gap-1 whitespace-nowrap border-l border-rb-300 pl-2 text-sm tabular-nums text-rb-500 dark:border-rb-600 @max-xl:ml-0 @max-xl:basis-full @max-xl:border-l-0 @max-xl:pl-0"
+      className="ml-1 inline-flex items-center justify-end gap-1 whitespace-nowrap border-l border-edge-raised pl-2 text-sm tabular-nums text-rb-500 @max-xl:ml-0 @max-xl:basis-full @max-xl:border-l-0 @max-xl:pl-0"
       data-ledger-closed-usd=""
     >
       {before != null && (
@@ -562,8 +562,8 @@ export function LedgerIcon({ symbol, muted = false }: { symbol: string; muted?: 
   );
 }
 
-const USD_CELL = "border-l border-rb-300 pl-3 dark:border-rb-600 @max-md:border-l-0 @max-md:pl-0";
-const RULE = "col-span-full mt-1.5 mb-1 border-t border-rb-300 dark:border-rb-600";
+const USD_CELL = "border-l border-edge-raised pl-3 @max-md:border-l-0 @max-md:pl-0";
+const RULE = "col-span-full mt-1.5 mb-1 border-t border-edge-raised";
 
 function BeforeArrow({ children }: { children: ReactNode }) {
   return (

@@ -307,6 +307,7 @@ function PillSlot<F>({
         name={pill.name}
         state={pill.state}
         locked={pill.locked}
+        pinned={pill.pinned}
         label={pill.label}
         value={pill.value}
         spoken={pill.spoken}

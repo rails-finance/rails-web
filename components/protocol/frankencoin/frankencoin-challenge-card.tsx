@@ -26,6 +26,7 @@ import { fmtFcColl, fmtFcPct, fmtZchf, dateTimeText } from "@/lib/frankencoin/fi
 import { useFrankencoinEventRead } from "@/lib/frankencoin/use-event-read";
 import { shortAddress } from "@/lib/frankencoin/asset-catalog";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { SectionSidebar } from "@/components/shared/section-sidebar";
 
 type FrankEvent = BaseActivityEvent & { context: { protocol: "frankencoin"; data: FrankencoinContext } };
 
@@ -304,22 +305,25 @@ export function FrankencoinChallengeCard({
   const groups = groupChallenges(events);
   if (groups.length === 0) return null;
 
-  // A bare frame in the position card's look. It sits outside the position
-  // card's receipts scope, so its figures trace nothing.
+  // A bare frame in the position card's look, beside the card's lozenge
+  // (ui-jobs 730). It sits outside the position card's receipts scope, so its
+  // figures trace nothing.
   return (
     <ProvUnscoped>
-      <div className={`${POSITION_CARD_FRAME} space-y-3`}>
-        <div className="flex items-baseline justify-between gap-2">
-          <h3 className="text-sm font-semibold">Challenge history</h3>
-          <span className="text-xs text-rb-500">
-            {groups.length} challenge{groups.length === 1 ? "" : "s"} , Frankencoin&rsquo;s oracle-free enforcement:
-            auctions test the owner-declared price
-          </span>
+      <SectionSidebar section="challenges">
+        <div className={`${POSITION_CARD_FRAME} space-y-3`}>
+          <div className="flex items-baseline justify-between gap-2">
+            <h3 className="text-sm font-semibold">Challenge history</h3>
+            <span className="text-xs text-rb-500">
+              {groups.length} challenge{groups.length === 1 ? "" : "s"} , Frankencoin&rsquo;s oracle-free enforcement:
+              auctions test the owner-declared price
+            </span>
+          </div>
+          {groups.map((g) => (
+            <Group key={g.key} g={g} positionOpen={positionOpen} />
+          ))}
         </div>
-        {groups.map((g) => (
-          <Group key={g.key} g={g} positionOpen={positionOpen} />
-        ))}
-      </div>
+      </SectionSidebar>
     </ProvUnscoped>
   );
 }

@@ -358,7 +358,7 @@ export function BreakdownTable({ rows }: { rows: BreakdownRow[] }) {
               : "text-rb-500 font-bold";
           // Result rows pick up a top divider in rb-500 so the total reads as
           // the sum-line beneath the per-asset contributions.
-          const cellBorder = row.isResult ? "border-t border-rb-300 dark:border-rb-600" : "";
+          const cellBorder = row.isResult ? "border-t border-edge-raised" : "";
           return (
             <tr key={i} className={rowText}>
               <td className={`py-1 text-right pr-0.5 tabular-nums ${cellBorder}`}>{row.sign}</td>

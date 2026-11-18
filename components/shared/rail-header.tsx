@@ -276,8 +276,9 @@ export function RailHeader({
       </div>
       {/* A closing or closed explorer says so on every venue (H24.1; ui-jobs 612, 621). */}
       <LifecycleLine id={entry.id} />
+      {/* The stamp stands at the right, as it does on every page head (ui-jobs 730). */}
       {stamp && (
-        <div className="flex items-center">
+        <div className="flex items-center justify-end">
           <RecencyStamp />
         </div>
       )}

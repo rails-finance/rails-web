@@ -94,7 +94,10 @@ function ForkNotes({ stats, children }: { stats: ChainTruthStat[]; children?: Re
   return (
     <>
       {stats.length > 0 && (
-        <div className="mx-5 my-2 space-y-1 rounded-xl bg-background px-4 py-3" data-event-notes="">
+        <div
+          className="mx-5 my-2 space-y-1 rounded-xl bg-[var(--event-cell,var(--background))] px-4 py-3"
+          data-event-notes=""
+        >
           {stats.map((s) => (
             <div
               key={s.label}

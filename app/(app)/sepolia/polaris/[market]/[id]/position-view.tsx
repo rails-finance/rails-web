@@ -15,6 +15,7 @@
 // Units are native everywhere; the one dollar figure is the protocol's own
 // feed, and the header line says "Sepolia testnet" once.
 
+import { SectionSidebar } from "@/components/shared/section-sidebar";
 import { useReportPositionRead } from "@/components/shared/position-read";
 import { readOfHeadAnswer } from "@/lib/shared/position-read";
 import { useEffect, useMemo, useState } from "react";
@@ -465,10 +466,12 @@ export default function PolarisPositionView({
             {tailFailed && polarisEvents.length === 0 ? (
               <IndexNotice onRetry={() => setTailTry((n) => n + 1)} />
             ) : indexPending && polarisEvents.length === 0 ? (
-              <div className="rounded-2xl border border-rb-300/40 dark:border-rb-700/40 bg-raised px-5 py-4 text-sm text-rb-500">
-                Event history pending: the indexed backend for this explorer has not answered for this position.
-                Everything above is read from the market&rsquo;s contracts at the latest Sepolia block.
-              </div>
+              <SectionSidebar section="timeline">
+                <div className="rounded-2xl bg-raised px-5 py-4 text-sm text-rb-500">
+                  Event history pending: the indexed backend for this explorer has not answered for this position.
+                  Everything above is read from the market&rsquo;s contracts at the latest Sepolia block.
+                </div>
+              </SectionSidebar>
             ) : (
               // Runs: two or more touches in a row, one sender, as one row (ui-jobs 404).
               <ChainTruthTimeline

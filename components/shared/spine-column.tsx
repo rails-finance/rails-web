@@ -536,7 +536,12 @@ function SendBadge({ size }: { size: number }) {
   return (
     <div
       className="absolute bottom-0 right-0 rounded-full flex items-center justify-center text-white"
-      style={{ width: r, height: r, backgroundColor: "var(--color-rb-500)", boxShadow: "0 0 0 2px var(--background)" }}
+      style={{
+        width: r,
+        height: r,
+        backgroundColor: "var(--color-rb-500)",
+        boxShadow: "0 0 0 2px var(--spine-ground, var(--background))",
+      }}
     >
       <SendGlyph size={Math.round(r * 0.58)} />
     </div>
@@ -551,7 +556,12 @@ function SwapBadge({ size }: { size: number }) {
   return (
     <div
       className="absolute bottom-0 right-0 rounded-full flex items-center justify-center text-white"
-      style={{ width: r, height: r, backgroundColor: "var(--color-rb-500)", boxShadow: "0 0 0 2px var(--background)" }}
+      style={{
+        width: r,
+        height: r,
+        backgroundColor: "var(--color-rb-500)",
+        boxShadow: "0 0 0 2px var(--spine-ground, var(--background))",
+      }}
       role="img"
       aria-label="Swap"
       data-swap-mark="flow"
@@ -675,7 +685,7 @@ function ActorBadge({ size, actor }: { size: number; actor: SpineActor }) {
         width: r,
         height: r,
         backgroundColor: actor === "third-party" || actor === "governance" ? "#EC4899" : "var(--color-rb-500)",
-        boxShadow: "0 0 0 2px var(--background)",
+        boxShadow: "0 0 0 2px var(--spine-ground, var(--background))",
       }}
       data-spine-actor-badge={actor}
     >
@@ -737,7 +747,12 @@ function CheckBadge({ size }: { size: number }) {
   return (
     <div
       className="absolute bottom-0 right-0 rounded-full flex items-center justify-center"
-      style={{ width: r, height: r, backgroundColor: "#22C55E", boxShadow: "0 0 0 2px var(--background)" }}
+      style={{
+        width: r,
+        height: r,
+        backgroundColor: "#22C55E",
+        boxShadow: "0 0 0 2px var(--spine-ground, var(--background))",
+      }}
     >
       <svg width={r * 0.6} height={r * 0.6} viewBox="0 0 12 12" fill="none">
         <path d="M2.5 6.5L5 9L9.5 3.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -752,7 +767,12 @@ function CrossBadge({ size }: { size: number }) {
   return (
     <div
       className="absolute bottom-0 right-0 rounded-full flex items-center justify-center"
-      style={{ width: r, height: r, backgroundColor: "#EF4444", boxShadow: "0 0 0 2px var(--background)" }}
+      style={{
+        width: r,
+        height: r,
+        backgroundColor: "#EF4444",
+        boxShadow: "0 0 0 2px var(--spine-ground, var(--background))",
+      }}
     >
       <svg width={r * 0.55} height={r * 0.55} viewBox="0 0 12 12" fill="none">
         <path d="M3 3L9 9M9 3L3 9" stroke="white" strokeWidth="2" strokeLinecap="round" />
@@ -974,9 +994,10 @@ export function SpineColumn({
   // show. Only a row that is neither falls through to `no-change`.
   const effectiveIcon: SpineIcon | undefined =
     icon ?? (tokens?.length ? undefined : externalParty ? "external" : "no-change");
-  // The node's halo takes the page's ground: the list's line (spine-line.tsx)
-  // stops 4px short of every glyph.
-  const ground = "var(--background)";
+  // The node's halo takes the timeline's ground (`--spine-ground`, the raised
+  // box beside the card's lozenge, else the page's): the list's line
+  // (spine-line.tsx) stops 4px short of every glyph.
+  const ground = "var(--spine-ground, var(--background))";
 
   // The lead-in dot takes a warning event's tone. The line is the list's
   // (spine-line.tsx): solid neutral ink beside what the owner actioned, dotted

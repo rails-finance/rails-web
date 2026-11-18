@@ -35,10 +35,10 @@
 //
 // The sidebar (C20, rails-ops TO-DO-position-card 427): on every surface the
 // frame draws the card's protocol and chain in a zone tinted with the
-// protocol's brand hue. From md, a 40px bar at the left (the mark, the name
-// reading upward, the chain's glyph at its foot) with the body beside it as its
-// own rounded box; a detail page's sections carry the bar on
-// (`SectionSidebar`); below md, a border at the left,
+// protocol's brand hue. From md, a 40px lozenge at the left, round at both
+// ends (the mark, the name reading upward, the chain's glyph at its foot), and
+// 8px from it the body as its own rounded box (ui-jobs 729); a detail page's
+// sections carry the lozenge on (`SectionSidebar`); below md, a bare 12px lozenge 6px from the body,
 // the mark and name leading the heading row and the chain glyph at its right
 // end. The zone carries no text, control or figure in the hue. On a detail
 // card the name links to the explorer's entry route (ui-jobs 430); a listing
@@ -300,11 +300,9 @@ const OPEN_GRID = "grid grid-cols-2 lg:grid-cols-4 gap-4";
 // a stack line up.
 const CLOSED_GRID = "grid grid-cols-2 sm:grid-cols-4 gap-4";
 
-/** The bar's width from md (C20), and how far its tint runs on under the
- *  body's rounded corners. The page's sections draw theirs at the same width
- *  (`SectionSidebar`). */
+/** The lozenge's width from md (C20). The page's sections draw theirs at the
+ *  same width and gap (`SectionSidebar`). */
 export const SIDEBAR_BAR_W = "md:w-10";
-const SIDEBAR_TINT_CLIP = "md:[clip-path:inset(0_calc(100%_-_56px)_0_0)]";
 
 /** The name's short form where the bar is too short for the whole name: the
  *  version alone for a protocol that has one ("Aave V3" → "V3"), else the
@@ -370,25 +368,19 @@ function SidebarName({ name, id, href }: { name: string; id: string; href?: stri
   );
 }
 
-/** The zone's tint (C20): the frame's shape clipped to its left edge, a border
- *  below md and the bar's backdrop from md (with the body's rounded corners
- *  over it). Inside a frame that sets `--brand-hue`. */
-function SidebarTint({ rounded = "rounded-[15px]" }: { rounded?: string }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={`pointer-events-none absolute inset-0 ${rounded} bg-brand-edge [clip-path:inset(0_calc(100%_-_6px)_0_0)] md:bg-brand-zone ${SIDEBAR_TINT_CLIP}`}
-    />
-  );
+/** The lozenge below md (C20): 12px wide, bare, its mark and name in the
+ *  heading row (C20.1, C20.2). Needs a frame that sets `--brand-hue`. */
+const NARROW_LOZENGE = "w-3 shrink-0 rounded-full bg-brand-zone";
+function NarrowLozenge() {
+  return <span aria-hidden="true" className={`${NARROW_LOZENGE} md:hidden`} />;
 }
 
-/** The sidebar's bar from md (C20): the protocol's mark at the top, its name
- *  reading upward, the chain's glyph at the foot. Its tint is the frame's
- *  backdrop. */
+/** The sidebar's lozenge from md (C20): the protocol's mark at the top, its
+ *  name reading upward, the chain's glyph at the foot. */
 function SidebarPanel({ identity, link }: { identity: PositionCardIdentity; link: boolean }) {
   return (
     <div
-      className={`relative hidden shrink-0 flex-col items-center py-3 ${SIDEBAR_BAR_W} md:flex`}
+      className={`relative hidden shrink-0 flex-col items-center rounded-full bg-brand-zone py-3 ${SIDEBAR_BAR_W} md:flex`}
       data-anatomy="C20"
       data-card-sidebar={identity.protocol.id}
     >
@@ -1002,7 +994,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
           <PositionCardPanel columns={panel} />
         ) : (
           // A hairline between the headlines and the stats (decision 0066 point 5).
-          <div className="mt-6 border-t border-rb-500/50" data-nosnippet="" data-card-rule="">
+          <div className="mt-6 border-t border-edge-raised" data-nosnippet="" data-card-rule="">
             <PositionCardPanel columns={panel} />
           </div>
         ))}
@@ -1023,7 +1015,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
       data-anatomy={detail ? "P1 C1" : (slots.anatomy ?? "C1")}
       data-prov-scope={detail ? "position-card" : undefined}
       data-card-over-cap={over ?? undefined}
-      className={barred ? `${POSITION_CARD_FRAME_BOX} relative flex` : POSITION_CARD_FRAME}
+      className={barred ? LOZENGE_FRAME : POSITION_CARD_FRAME}
       style={
         barred
           ? ({
@@ -1035,20 +1027,12 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
     >
       {barred && (
         <>
-          {/* The zone's tint: the card's shape clipped to its left edge, a
-              border below md and the panel (with the body's rounded corners
-              over it) from md. */}
-          <SidebarTint />
+          {/* The bare lozenge below md; the full one from md. */}
+          <NarrowLozenge />
           <SidebarPanel identity={identity} link={detail} />
         </>
       )}
-      <div
-        className={
-          barred
-            ? `relative min-w-0 flex-1 md:rounded-[15px] md:bg-raised ${POSITION_CARD_PAD} max-md:pl-[26px]`
-            : "contents"
-        }
-      >
+      <div className={barred ? `relative min-w-0 flex-1 ${POSITION_CARD_FRAME_BOX} ${POSITION_CARD_PAD}` : "contents"}>
         {slots.notice}
         {body}
         {detail && (
@@ -1084,9 +1068,13 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
 
 const CARD_ANATOMY = { explanation: "C3", learnMore: "C4" };
 
+/** With a lozenge the frame draws no box; the body takes its border and
+ *  hover, 6px from the lozenge below md and 8px from md. */
+const LOZENGE_FRAME = "relative flex gap-1.5 md:gap-2";
+
 /** The card's sidebar (C20) around another surface: the event page's left
- *  column (P4) names its protocol with the position card's bar, its mark,
- *  name and chain glyph from md and the 6px border below. `narrow` adds,
+ *  column (P4) names its protocol with the position card's lozenge, its mark,
+ *  name and chain glyph from md and the bare 12px lozenge below. `narrow` adds,
  *  below md, a row naming the protocol and its chain above the content.
  *  Off the explorers (no roster entry) the content stands alone. */
 export function CardSidebarFrame({
@@ -1102,7 +1090,7 @@ export function CardSidebarFrame({
   if (!identity) return <>{children}</>;
   return (
     <div
-      className={`relative flex rounded-xl bg-background ${className}`}
+      className={`relative flex gap-1.5 rounded-xl bg-background md:gap-2 ${className}`}
       style={
         {
           "--brand-hue": identity.hue ?? 0,
@@ -1111,9 +1099,9 @@ export function CardSidebarFrame({
       }
       data-card-sidebar-frame="event"
     >
-      <SidebarTint rounded="rounded-xl" />
+      <NarrowLozenge />
       <SidebarPanel identity={identity} link />
-      <div className="relative flex min-w-0 flex-1 flex-col max-md:pl-1.5 md:rounded-xl md:bg-background">
+      <div className="relative flex min-w-0 flex-1 flex-col md:rounded-xl md:bg-background">
         {narrow && (
           <div className="flex items-center gap-2 px-5 pt-4 md:hidden" data-card-protocol={identity.protocol.id}>
             <ProtocolIcon id={identity.protocol.id} className="h-4 w-4 shrink-0 text-rb-500 [&:is(img)]:grayscale" />

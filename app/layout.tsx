@@ -32,11 +32,10 @@ const dmSans = DM_Sans({
 
 export const viewport: Viewport = {
   themeColor: [
-    // Light = the paper canvas (--background at the shipped --paper-* knobs),
-    // not white: mobile browser chrome sits directly against the page, so a
-    // white bar reads as a seam. Re-measure if the knobs move.
-    { media: "(prefers-color-scheme: light)", color: "#eee7e9" },
-    { media: "(prefers-color-scheme: dark)", color: "#12151E" },
+    // The canvas (--background) in each theme: mobile browser chrome sits
+    // directly against the page, so any other colour reads as a seam.
+    { media: "(prefers-color-scheme: light)", color: "#fafafa" },
+    { media: "(prefers-color-scheme: dark)", color: "#171b24" },
   ],
   width: "device-width",
   initialScale: 1,
@@ -172,8 +171,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <meta name="theme-color" content="#12151E" media="(prefers-color-scheme: dark)" />
-        <meta name="theme-color" content="#eee7e9" media="(prefers-color-scheme: light)" />
+        <meta name="theme-color" content="#171b24" media="(prefers-color-scheme: dark)" />
+        <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <ThemeScript />
         {/* "Already-seen" animation flags — flipped before first paint so CSS
