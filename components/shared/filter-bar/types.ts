@@ -19,6 +19,9 @@ export interface FilterOptionDef {
   label: string;
   /** Optional leading glyph (e.g. a token chip for asset dimensions). */
   icon?: ReactNode;
+  /** A glyph after the label that tells two like-named options apart (the
+   *  delegate's person on a delegate-set "Interest rate"). */
+  suffix?: ReactNode;
   /** Optional trailing figure shown muted at the end of the option row — how
    *  many rows the option would reach (Morpho's per-market position count).
    *  Panel-only: it is not part of the chip text, and the panel's type-to-filter

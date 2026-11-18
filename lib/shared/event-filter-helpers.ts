@@ -30,6 +30,7 @@ import {
   isEbisuEvent,
   isAsymmetryEvent,
   isBasedollarEvent,
+  isFxEvent,
 } from "@/lib/shared/types/event-shape";
 import { FORK_DEBT_DUST_FLOAT, forkCollMove, forkDebtMove } from "@/lib/shared/liquity-fork-ops";
 
@@ -49,6 +50,12 @@ export const ACTION_LEGS: Record<string, { key: string; label: string }[]> = {
     { key: "adjustTrove.withdrawColl", label: "Withdrew collateral" },
     { key: "adjustTrove.borrow", label: "Borrowed" },
     { key: "adjustTrove.repay", label: "Repaid" },
+  ],
+  adjustPosition: [
+    { key: "adjustPosition.addColl", label: "Added collateral" },
+    { key: "adjustPosition.withdrawColl", label: "Withdrew collateral" },
+    { key: "adjustPosition.borrow", label: "Borrowed" },
+    { key: "adjustPosition.repay", label: "Repaid" },
   ],
 };
 
@@ -89,16 +96,24 @@ export function getEventActionLegs(e: BaseActivityEvent): string[] | null {
     const ctx = e.context.data;
     return troveLegs(forkCollMove(ctx), forkDebtMove(ctx).value, FORK_DEBT_DUST_FLOAT);
   }
+  // f(x): an operate that neither opens nor closes, as its head words read
+  // it (lib/fx/head-words.ts).
+  if (isFxEvent(e)) {
+    if (getEventActionKey(e) !== "adjustPosition") return null;
+    const ctx = e.context.data;
+    if (ctx.eventType !== "operate") return null;
+    return troveLegs(Number(ctx.collDelta ?? "0") || 0, Number(ctx.debtDelta ?? "0") || 0, 0, "adjustPosition");
+  }
   return null;
 }
 
-/** A trove adjust's legs from its collateral and debt moves; a debt move
- *  under `debtDust` is none. */
-function troveLegs(coll: number, debt: number, debtDust: number): string[] | null {
+/** An adjust's legs from its collateral and debt moves, under `parent`; a
+ *  debt move under `debtDust` is none. */
+function troveLegs(coll: number, debt: number, debtDust: number, parent = "adjustTrove"): string[] | null {
   const legs: string[] = [];
-  if (coll > 0) legs.push("adjustTrove.addColl");
-  else if (coll < 0) legs.push("adjustTrove.withdrawColl");
-  if (Math.abs(debt) > debtDust) legs.push(debt > 0 ? "adjustTrove.borrow" : "adjustTrove.repay");
+  if (coll > 0) legs.push(`${parent}.addColl`);
+  else if (coll < 0) legs.push(`${parent}.withdrawColl`);
+  if (Math.abs(debt) > debtDust) legs.push(debt > 0 ? `${parent}.borrow` : `${parent}.repay`);
   return legs.length ? legs : null;
 }
 

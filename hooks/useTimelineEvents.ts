@@ -231,7 +231,7 @@ export interface TimelineEventsState {
   dateRange: [number, number] | null;
   setDateRange: (next: [number, number] | null) => void;
   /** False on a page that navigates by its Lifetime flows chart: no date
-   *  range, and the toolbar draws no Dates control. */
+   *  range, and the toolbar draws no Date pill. */
   datesAxis: boolean;
   heatmapOpen: boolean;
   toggleHeatmap: () => void;

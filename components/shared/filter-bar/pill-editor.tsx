@@ -403,6 +403,7 @@ function OptionList<F>({
             <Fragment key={opt.value}>
               <OptionRow
                 opt={{ value: parent.value, label: parent.label, meta: parent.meta }}
+                parentRow
                 multi
                 checked={on === legs.length}
                 mixed={on > 0 && on < legs.length}
@@ -431,6 +432,7 @@ export function OptionRow({
   onClick,
   mixed = false,
   nested = false,
+  parentRow = false,
 }: {
   opt: FilterOptionDef;
   multi: boolean;
@@ -440,6 +442,8 @@ export function OptionRow({
   mixed?: boolean;
   /** A leg, indented under its umbrella's row. */
   nested?: boolean;
+  /** The umbrella's own row (`data-pill-parent`). */
+  parentRow?: boolean;
 }) {
   return (
     <button
@@ -449,6 +453,8 @@ export function OptionRow({
       onClick={onClick}
       className={`flex w-full min-h-11 sm:min-h-9 items-center gap-3 rounded-md ${nested ? "pl-8 pr-1" : "px-1"} text-left text-sm hover:bg-rb-100 dark:hover:bg-rb-800 ${FOCUS}`}
       data-pill-option={opt.value}
+      data-pill-parent={parentRow ? "" : undefined}
+      data-pill-nested={nested ? "" : undefined}
     >
       {multi ? (
         <span
@@ -471,7 +477,10 @@ export function OptionRow({
         </span>
       )}
       {opt.icon && <span className="flex shrink-0 items-center">{opt.icon}</span>}
-      <span className="flex-1 truncate">{opt.label}</span>
+      <span className="flex-1 truncate">
+        {opt.label}
+        {opt.suffix && <span className="ml-1.5 inline-flex align-middle">{opt.suffix}</span>}
+      </span>
       {opt.meta && <span className="shrink-0 text-xs tabular-nums text-rb-500 dark:text-rb-400/75">{opt.meta}</span>}
     </button>
   );

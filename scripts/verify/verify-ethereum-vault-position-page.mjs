@@ -750,7 +750,7 @@ async function pageText(browser, url) {
       countLine:
         document
           .querySelector(
-            "[data-vault-timeline-rows] [data-skel-section='detail-timeline-header'] [data-prov-exempt] span.text-xs.tabular-nums",
+            "[data-vault-timeline-rows] [data-skel-section='detail-timeline-header'] [data-anatomy~='L1.2']",
           )
           ?.textContent?.trim() ?? null,
       unreconciledText: document.querySelector("[data-figure='timeline-unreconciled']")?.innerText ?? "",

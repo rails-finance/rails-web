@@ -53,6 +53,7 @@
 // Run:
 //   BASE=http://localhost:3111 node scripts/verify/verify-timeline-asset-axis.mjs
 
+import { axisOptions, keepOnly, openAxis } from "./lib/timeline-pills.mjs";
 import { chromium } from "playwright";
 import { COUNT_LINE_SEL, countLineText, parseCountLine, NAMES_THE_CAP } from "../lib/timeline-draw.mjs";
 
@@ -90,25 +91,15 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 const pageErrors = [];
 page.on("pageerror", (e) => pageErrors.push(String(e)));
 
-/** Open the toolbar dropdown whose panel heading is `heading`; null if none of
- *  them is it. Both multi menus render an identical "All" trigger, so the only
- *  way to tell them apart is to open one and read its heading. */
+/** Open the axis pill named by `heading` (its old menu name, see
+ *  ./lib/timeline-pills.mjs); the heading back as the menu's handle, or null
+ *  where the page draws no such pill. */
 async function openMenu(heading) {
-  const triggers = page.locator("button", { hasText: /^All$|^\d+$/ });
-  const n = await triggers.count();
-  for (let i = 0; i < n; i++) {
-    const t = triggers.nth(i);
-    if (!(await t.isVisible())) continue;
-    await t.click();
-    const panel = page.locator(".overlay-panel").filter({ has: page.locator(`span:text-is("${heading}")`) });
-    if ((await panel.count()) > 0) return panel.first();
-    await t.click(); // not this one — close it and try the next
-  }
-  return null;
+  return (await openAxis(page, heading)) ? heading : null;
 }
 
-/** Close whatever panel is open — FilterDropdown closes on Escape wherever focus
- *  sits. A click at (4, 4) was the dismissal until the rail (H1) took that
+/** Close whatever editor is open — the pill editor closes on Escape wherever
+ *  focus sits. A click at (4, 4) was the dismissal until the rail (H1) took that
  *  corner: a press there opens the wallet panel, whose scrim then takes the
  *  next click. */
 async function dismiss() {
@@ -203,18 +194,28 @@ async function settled() {
   return counts();
 }
 
-/** Toggle one row of a menu and read the settled line. */
+/** Show or hide one row of an axis (its label `key`) through the pill's
+ *  editor, and read the settled line. The editor keeps what is ticked, and
+ *  nothing ticked is everything shown. */
 async function toggle(heading, key) {
-  const menu = await openMenu(heading);
-  if (!menu) return null;
-  await menu.locator("button", { hasText: new RegExp(`^${key}\\d`) }).click();
-  await dismiss();
+  if (!(await openAxis(page, heading))) return null;
+  const opts = await axisOptions(page);
+  const shown = opts.some((o) => o.checked) ? opts.filter((o) => o.checked) : opts;
+  const target = opts.find((o) => o.label === key);
+  const keep = shown.includes(target) ? shown.filter((o) => o !== target) : [...shown, target];
+  await keepOnly(
+    page,
+    keep.map((o) => o.key),
+  );
   return settled();
 }
 
-/** A menu's rows as { key, count }, commonest first. */
-async function menuRows(menu) {
-  const rows = (await menu.locator("button").allTextContents()).map((r) => r.trim()).filter(Boolean);
+/** An open editor's rows as { key, count }, commonest first; a leg nested
+ *  under an umbrella type is left out, its umbrella's row counting it. */
+async function menuRows() {
+  const rows = (await page.locator("[data-pill-option]:not([data-pill-nested])").allTextContents())
+    .map((r) => r.trim())
+    .filter(Boolean);
   return rows.map((r) => {
     const m = r.match(/^(.+?)([\d,]+)$/);
     return m ? { key: m[1], count: +m[2].replace(/,/g, "") } : { key: r, count: NaN };
@@ -275,7 +276,7 @@ const assets = await openMenu("Assets");
 check("spark: the asset menu exists", assets !== null);
 
 if (assets) {
-  const parsed = (await menuRows(assets)).map((r) => ({ sym: r.key, count: r.count }));
+  const parsed = (await menuRows()).map((r) => ({ sym: r.key, count: r.count }));
   const rows = parsed.map((p) => `${p.sym}${p.count}`);
   check(
     "spark: one row per reserve, in count order, and no others",
@@ -366,7 +367,7 @@ check(
 async function exactArm(heading, id) {
   const menu = await openMenu(heading);
   if (!check(`all-folders: the "${heading}" menu exists`, menu !== null)) return;
-  const buckets = await menuRows(menu);
+  const buckets = await menuRows();
   await dismiss();
   const summed = buckets.reduce((n, b) => n + b.count, 0);
   const partition = check(

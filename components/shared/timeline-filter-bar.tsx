@@ -26,6 +26,8 @@ import type { BaseListFilters } from "@/lib/shared/list-filter";
 import type { TimelineAxesView, TimelineEventsState } from "@/hooks/useTimelineEvents";
 
 type Axis = "type" | "asset" | "version" | "address";
+/** Each axis pill's own code beside N1.10 (app-anatomy L1). */
+const AXIS_ANATOMY: Record<Axis, string> = { type: "L1.3", asset: "L1.4", version: "L1.5", address: "L1.6" };
 export type TimelineFilters = BaseListFilters & Record<Axis, string[]>;
 
 interface AxisSpec {
@@ -118,6 +120,7 @@ function dimensionOf(a: AxisSpec): FilterDimension<TimelineFilters> {
       value: o.key,
       label: o.label,
       icon: a.icon?.(o) ?? o.icon,
+      suffix: o.suffix,
       meta: o.count != null ? o.count.toLocaleString("en-US") : undefined,
       parent: o.parent && {
         value: o.parent.key,
@@ -245,6 +248,7 @@ function AxisPill({
     <div ref={anchorRef} className="contents" data-timeline-axis={pill.dims[0].id}>
       <FilterPill
         name={pill.name}
+        anatomy={AXIS_ANATOMY[pill.dims[0].id as Axis]}
         state={pill.state}
         locked={pill.locked}
         label={pill.label}

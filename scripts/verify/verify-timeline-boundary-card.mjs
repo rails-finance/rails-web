@@ -586,11 +586,11 @@ const INIT = `
  *  the list's own "Show N more" until it is gone. Returns the press count, or
  *  -1 when the cap was hit. */
 async function settle(page) {
-  await page.waitForSelector("[data-prov-exempt] span.text-xs.tabular-nums", { timeout: 300_000 });
+  await page.waitForSelector('[data-anatomy~="L1.2"]', { timeout: 300_000 });
   // The Base arms fetch client-side; give the sweep/index read its time.
   await page.waitForFunction(
     () => {
-      const t = document.querySelector("[data-prov-exempt] span.text-xs.tabular-nums")?.textContent ?? "";
+      const t = document.querySelector('[data-anatomy~="L1.2"]')?.textContent ?? "";
       return /\d/.test(t);
     },
     { timeout: 180_000 },
@@ -809,7 +809,7 @@ async function readPageTab(page) {
     // amendment landed (TO-DO-ui-jobs §58). This reader was already whole; the
     // two row grains beside it were not on the page at all until the amendment
     // moved them off the count line and onto the timeline root.
-    const line = root.querySelector("[data-prov-exempt] span.text-xs.tabular-nums")?.textContent ?? "";
+    const line = root.querySelector('[data-anatomy~="L1.2"]')?.textContent ?? "";
     // ⚠️ SCOPED BY CLIMBING, NOT BY FALLING BACK. The marker div wraps the
     // toolbar AND the rows (`chain-truth-timeline.tsx`), so it is an ANCESTOR
     // of the boundary, never a descendant — a `root.querySelector` finds

@@ -849,6 +849,7 @@ function DimensionView<F>({
             <Fragment key={opt.value}>
               <SheetOption
                 opt={{ value: parent.value, label: parent.label, meta: parent.meta }}
+                parentRow
                 multi
                 checked={on === legs.length}
                 mixed={on > 0 && on < legs.length}
@@ -877,6 +878,7 @@ function SheetOption({
   onClick,
   mixed = false,
   nested = false,
+  parentRow = false,
 }: {
   opt: FilterOptionDef;
   multi: boolean;
@@ -884,6 +886,7 @@ function SheetOption({
   onClick: () => void;
   mixed?: boolean;
   nested?: boolean;
+  parentRow?: boolean;
 }): ReactNode {
   return (
     <button
@@ -893,6 +896,8 @@ function SheetOption({
       onClick={onClick}
       className={`flex w-full min-h-12 items-center gap-3 border-b border-rb-200 dark:border-rb-800 py-2 ${nested ? "pl-7" : ""} text-left text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500`}
       data-filter-sheet-option={opt.value}
+      data-pill-parent={parentRow ? "" : undefined}
+      data-pill-nested={nested ? "" : undefined}
     >
       {multi ? (
         <span
@@ -915,7 +920,10 @@ function SheetOption({
         </span>
       )}
       {opt.icon && <span className="shrink-0 flex items-center">{opt.icon}</span>}
-      <span className="flex-1 truncate">{opt.label}</span>
+      <span className="flex-1 truncate">
+        {opt.label}
+        {opt.suffix && <span className="ml-1.5 inline-flex align-middle">{opt.suffix}</span>}
+      </span>
       {opt.meta && <span className="shrink-0 text-xs text-rb-500 tabular-nums">{opt.meta}</span>}
     </button>
   );

@@ -75,12 +75,6 @@ export const CTRL_OFF = "text-rb-500 hover:bg-[var(--surface-row-hover)] dark:ho
  * hover, so an open control simply looks "hovered" for as long as it's engaged. */
 export const CTRL_ON = "bg-rb-100 dark:bg-rb-800 text-foreground";
 
-/** Optional companion to CTRL_ON, for an open control that is also the thing
- *  that CLOSES the panel — one step deeper on hover, so the pointer still gets
- *  an answer. CTRL_ON alone is deliberately inert (it already looks hovered),
- *  which is right for a state a click cannot undo and wrong for a toggle. */
-export const CTRL_ON_HOVER = "hover:bg-rb-200 dark:hover:bg-rb-700";
-
 /** A text button that changes this view in place ("View all <n> explorers",
  *  "Show all ticks"), teal, the utility hue (color-grammar.md §4c), where link
  *  blue says "opens another page" (Miles, 5 Nov 2026). teal-700 in light (about

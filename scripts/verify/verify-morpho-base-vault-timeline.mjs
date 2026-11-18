@@ -757,7 +757,7 @@ async function readPage(vault, holder, { expandRows = false } = {}) {
   // tell a changed line from a missing one. The line has its own element.
   // Corrected on the Ethereum twin first (`6a41491`); this is the same fix.
   const countLineText = await text(
-    "[data-vault-timeline-rows] [data-skel-section='detail-timeline-header'] [data-prov-exempt] span.text-xs.tabular-nums",
+    "[data-vault-timeline-rows] [data-skel-section='detail-timeline-header'] [data-anatomy~='L1.2']",
   );
 
   // ── 2026-09-08 · THE ROWS RIDE `ChainTruthTimeline` AND COLLAPSE ─────────
@@ -858,13 +858,14 @@ async function readPage(vault, holder, { expandRows = false } = {}) {
   // visible there.
   let filterOptionText = "";
   try {
-    const typeButton = page.locator("[data-vault-timeline-rows] button[aria-label='Types of event']");
+    // The Type pill (ui-jobs 735); its editor anchors inside the pill.
+    const typeButton = page.locator("[data-vault-timeline-rows] [data-filter-pill='Type'] [data-pill-open]");
     if (await typeButton.count()) {
       await typeButton.first().click({ force: true, timeout: 4000 });
       await page.waitForTimeout(200);
-      const panel = page.locator("[data-vault-timeline-rows] .overlay-panel");
+      const panel = page.locator("[data-vault-timeline-rows] [data-filter-pill='Type'] [data-anatomy~='N1.11']");
       filterOptionText = (await panel.count()) ? (await panel.first().innerText()).replace(/\s+/g, " ") : "";
-      // CLOSED AGAIN BY THE BUTTON, not by Escape. An open dropdown leaves its
+      // CLOSED AGAIN BY THE PILL, not by Escape. An open editor leaves its
       // per-option counts in the DOM, and the provenance tripwire reads those
       // as uncovered figures — a reading this capture would have manufactured.
       await typeButton.first().click({ force: true, timeout: 4000 });

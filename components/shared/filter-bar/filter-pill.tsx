@@ -52,6 +52,12 @@ export interface FilterPillProps {
   buttonRef?: Ref<HTMLButtonElement>;
   /** The editor, drawn beside the pill (a popover anchors to the pill). */
   children?: ReactNode;
+  /** Codes after N1.10 where a surface names its own pills (the timeline's
+   *  L1.3–L1.7). */
+  anatomy?: string;
+  /** Data hooks on the pill's main button (the timeline's Date pill keeps
+   *  `data-date-control`). */
+  openData?: Record<string, string>;
 }
 
 export function FilterPill({
@@ -67,8 +73,14 @@ export function FilterPill({
   onRemove,
   buttonRef,
   children,
+  anatomy,
+  openData,
 }: FilterPillProps) {
-  const hooks = { "data-filter-pill": name, "data-pill-state": state, "data-anatomy": "N1.10" };
+  const hooks = {
+    "data-filter-pill": name,
+    "data-pill-state": state,
+    "data-anatomy": anatomy ? `N1.10 ${anatomy}` : "N1.10",
+  };
   if (state === "unset") {
     return (
       <div className="relative shrink-0" {...hooks}>
@@ -81,6 +93,7 @@ export function FilterPill({
           aria-expanded={expanded}
           aria-label={spoken}
           data-pill-open=""
+          {...openData}
         >
           <Plus className="size-3.5" aria-hidden="true" />
           {name}
@@ -112,6 +125,7 @@ export function FilterPill({
           aria-expanded={expanded}
           aria-label={spoken}
           data-pill-open=""
+          {...openData}
         >
           {label && <span className={`shrink-0 ${LABEL}`}>{label}</span>}
           <span className="min-w-0 truncate font-semibold">{value}</span>

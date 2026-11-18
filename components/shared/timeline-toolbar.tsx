@@ -1,25 +1,22 @@
 "use client";
 
-// TimelineToolbar — the shared control strip above a position timeline: an
-// event count, a chronological sort flip, an event-type show/hide filter, an
-// asset show/hide filter, a date-range (heatmap) toggle and the display "eye"
-// menu — plus the heatmap itself when open. A page tied to its Lifetime
-// flows chart has no date-range control (`tl.datesAxis`). The asset control appears only
-// where there is an asset axis to offer (a pooled lender's wallet touching
-// more than one reserve); see getEventAssetKeys. Driven entirely by a
-// useTimelineEvents() state object, so a page wires it in one line. Extracted
-// from the per-protocol copies the Liquity and Aave detail pages inline; the
-// chain-state tier (Morpho + MakerDAO) uses it directly. The copy-link
-// control that puts the current VIEW on the clipboard (`tl.viewHref`) lives
-// in the position card's Explanation pane now, not here — see `CopyViewLink`
-// in `provenance-info-tabs.tsx`.
+// TimelineToolbar — the shared strip above a position timeline, in the
+// listings' filter-bar style (ui-jobs 735): the heading line (the tenure, with
+// Sync to chart, the 30-day projection's switch and Display at its right), then
+// the pill row: one N1.10 pill per axis the history offers (Type, Asset,
+// Version, Address; timeline-filter-bar.tsx), the Date pill where the page has
+// a date axis (`tl.datesAxis`; a page tied to its Lifetime flows chart has
+// none), Clear all, and the count at the row's right end. Below sm the pills
+// scroll sideways behind the filter sheet's button and the count takes the line
+// under them. The Date pill opens the navigator panel (the month grid) under
+// the strip. Driven by a useTimelineEvents() state object, so a page wires it
+// in one line. The copy-link control that puts the current VIEW on the
+// clipboard (`tl.viewHref`) is in the position card's Explanation pane — see
+// `CopyViewLink` in `provenance-info-tabs.tsx`.
 
 import { RevealTip } from "@/components/shared/reveal-tip";
-import { Fragment, useEffect, useRef, useSyncExternalStore } from "react";
-import { CalendarRange, Coins, ListFilter, Wallet, X } from "lucide-react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { FilterDropdown, DisplaySettingsIcon, type FilterOption } from "@/components/shared/filter-dropdown";
-import { actionNoun } from "@/lib/shared/event-action-nouns";
-import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { MobileSheet, MobileSheetFilterHeader } from "@/components/shared/mobile-sheet";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { useMountedNow } from "@/hooks/useMountedNow";
@@ -28,17 +25,7 @@ import {
   type TimelineDisplayKey,
   type TimelineDisplayState,
 } from "@/components/shared/timeline-display-context";
-import {
-  CARD_INSET_START,
-  CTRL_GHOST,
-  CTRL_OFF,
-  CTRL_ON,
-  CTRL_ON_ACCENT,
-  CTRL_ON_HOVER,
-  ctrlWaking,
-  INPLACE_TEXT,
-  SECTION_HEADING,
-} from "@/lib/shared/ui-grammar";
+import { CARD_INSET_START, ctrlWaking, INPLACE_TEXT, SECTION_HEADING } from "@/lib/shared/ui-grammar";
 import { formatDate, formatDateRange, formatDateShortYear, formatDayMonth, formatDuration } from "@/lib/date";
 import { lifetimeFiguresKnown } from "@/lib/shared/timeline-opening-balance";
 import { loadedDaysStatement, segmentStatement } from "@/lib/shared/timeline-segments";
@@ -281,7 +268,7 @@ export interface TimelineDisplayItem {
 
 /** The market-note item, under a rule after the rest (rails-ops TO-DO-ui-jobs
  *  item 118). ChainTruthTimeline appends it on a page that has notes. Notes
- *  are not events, so they stay out of Types of event, the count and the
+ *  are not events, so they stay out of the Type filter, the count and the
  *  exports; this is their only switch. */
 export const MARKET_NOTE_ITEMS: TimelineDisplayItem[] = [
   { key: "showMarketNotes", label: "Market notes", separatorBefore: true },
@@ -546,198 +533,6 @@ export function dateRangeLabel(range: [number, number]): string {
     : `${formatDayMonth(range[0])} – ${formatDayMonth(range[1])}`;
 }
 
-// ── The narrowing row (L2) ──────────────────────────────────────────────────
-//
-// One pill under the toolbar per filter narrowing the list, each with a ×
-// that undoes that filter alone (the dropdown's own reset), beside the cut's
-// chip where a cut stands. Display settings get none: they change how events
-// read. ChainTruthTimeline draws the row (rails-ops detail-page-anatomy §3,
-// "The narrowing row").
-
-/** One filter pill: which axis, its words, and the reset it runs. */
-export interface TimelineFilterPillSpec {
-  axis: "action" | "asset" | "version" | "counterparty" | "date";
-  /** "Only" or "Hiding", then the names; null for the date range. */
-  verb: "Only" | "Hiding" | null;
-  /** The names drawn on the pill: every one up to three, past that the
-   *  first two, with `more` counting the rest. */
-  names: string[];
-  more: number;
-  /** Every name, for the tooltip. */
-  title: string;
-  /** Each name is a token symbol and wears its chip icon. */
-  chips?: boolean;
-  /** The ×'s accessible name. */
-  clearLabel: string;
-  clear: () => void;
-}
-
-/** A type's pill word with the menu's label beside it where they differ: the
- *  menu says "Received", the pill says "transfers in". A label that is the
- *  noun's own verb in as many words ("Supply", "supplies") adds nothing and is
- *  left out. */
-function actionTip(o: FilterOption, protocolKey: string): string {
-  const noun = actionNoun(o.key, protocolKey, o.label);
-  const label = o.label.toLowerCase();
-  const n = Math.min(4, label.length);
-  const sameWords = label.split(/\s+/).length === noun.split(/\s+/).length;
-  return sameWords && label.slice(0, n) === noun.slice(0, n) ? noun : `${noun} (${o.label})`;
-}
-
-/** Name the shorter side of one axis: "Only a, b" when fewer are kept than
- *  hidden, "Hiding a, b" otherwise. Hidden keys the menu does not offer (a
- *  saved filter from another history) are not named. Null when the axis
- *  hides nothing it offers. */
-function narrowing(
-  options: FilterOption[],
-  visible: Set<string>,
-  name: (o: FilterOption) => string,
-  /** The axis's plural, for a pill that hides every option ("Hiding all
-   *  assets"). */
-  noun: string,
-  /** One name as the tooltip states it, where that adds to the pill's word. */
-  tip: (o: FilterOption) => string = name,
-): (Pick<TimelineFilterPillSpec, "verb" | "names" | "more" | "title"> & { every: boolean }) | null {
-  const hidden = options.filter((o) => !visible.has(o.key));
-  if (hidden.length === 0) return null;
-  const kept = options.filter((o) => visible.has(o.key));
-  if (kept.length === 0)
-    return { verb: "Hiding", names: [`all ${noun}`], more: 0, title: `Hiding all ${noun}`, every: true };
-  const only = kept.length < hidden.length;
-  const shown = only ? kept : hidden;
-  // Two options that read as one name (a plain and a compound menu item) are
-  // named once; the tooltip lists every menu label under it.
-  const groups = new Map<string, FilterOption[]>();
-  for (const o of shown) {
-    const n = name(o);
-    groups.set(n, [...(groups.get(n) ?? []), o]);
-  }
-  const side = [...groups.keys()];
-  const verb = only ? "Only" : "Hiding";
-  const names = side.length > 3 ? side.slice(0, 2) : side;
-  const tips = [...groups].map(([n, os]) => {
-    if (os.length === 1) return tip(os[0]);
-    const labels = [...new Set(os.map((o) => o.label))].filter((l) => l !== n);
-    return labels.length ? `${n} (${labels.join(", ")})` : n;
-  });
-  return {
-    verb,
-    names,
-    more: side.length - names.length,
-    title: `${verb} ${tips.join(", ")}`,
-    every: false,
-  };
-}
-
-/** Every filter pill the toolbar's state calls for, in the toolbar's order. */
-export function timelineFilterPills(tl: TimelineEventsState): TimelineFilterPillSpec[] {
-  const pills: TimelineFilterPillSpec[] = [];
-  const action = narrowing(
-    tl.eventOptions,
-    tl.visibleActionKeys,
-    (o) => actionNoun(o.key, tl.protocolKey, o.label),
-    "types of event",
-    (o) => actionTip(o, tl.protocolKey),
-  );
-  if (action)
-    pills.push({
-      axis: "action",
-      ...action,
-      clearLabel: `Clear the filter: ${action.title}`,
-      clear: tl.resetHiddenActions,
-    });
-  const asset = narrowing(tl.assetOptions, tl.visibleAssetKeys, (o) => o.label, "assets");
-  if (asset)
-    pills.push({
-      axis: "asset",
-      ...asset,
-      chips: !asset.every,
-      clearLabel: "Show every asset",
-      clear: tl.resetHiddenAssets,
-    });
-  const version = narrowing(tl.versionOptions, tl.visibleVersionKeys, (o) => o.label, "versions");
-  if (version)
-    // The version pill names the version and drops the verb ("V2 ×"; Miles, 12 Nov 2026, ui-jobs 375);
-    // the tooltip keeps it, and hiding every version still says so.
-    pills.push({
-      axis: "version",
-      ...version,
-      verb: version.every ? version.verb : null,
-      clearLabel: "Show every version",
-      clear: tl.resetHiddenVersions,
-    });
-  const counterparty = narrowing(tl.counterpartyOptions, tl.visibleCounterpartyKeys, (o) => o.label, "addresses");
-  if (counterparty)
-    pills.push({
-      axis: "counterparty",
-      ...counterparty,
-      clearLabel: "Show every address",
-      clear: tl.resetHiddenCounterparties,
-    });
-  if (tl.datesAxis && tl.dateRange) {
-    const words = dateRangeLabel(tl.dateRange);
-    pills.push({
-      axis: "date",
-      verb: null,
-      names: [words],
-      more: 0,
-      title: `Events from ${formatDate(tl.dateRange[0])} to ${formatDate(tl.dateRange[1])}`,
-      clearLabel: "Show every date",
-      clear: () => tl.setDateRange(null),
-    });
-  }
-  return pills;
-}
-
-/** The pill's shell, shared with the cut's chip: neutral ground, its words
- *  first, its × last. */
-export const NARROWING_PILL = "inline-flex items-center rounded-full bg-rb-100 text-xs text-foreground dark:bg-rb-800";
-/** The ×: a 44px target on a phone, the pill's own height from `sm`. */
-export const NARROWING_PILL_X =
-  "inline-flex min-h-11 min-w-9 cursor-pointer items-center justify-center rounded-r-full pl-0.5 pr-1.5 text-rb-500 transition-colors hover:bg-rb-200/60 hover:text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 sm:min-h-0 sm:min-w-0 sm:py-1 dark:hover:bg-rb-700/60";
-
-const PILL_GLYPH: Record<TimelineFilterPillSpec["axis"], React.ReactNode> = {
-  // The same glyphs as the controls they undo, so a pill points at its menu.
-  action: <ListFilter size={12} aria-hidden />,
-  asset: <Coins size={12} aria-hidden />,
-  // The version pill names the version and carries no glyph.
-  version: null,
-  counterparty: <Wallet size={12} aria-hidden />,
-  date: <CalendarRange size={12} aria-hidden />,
-};
-
-export function TimelineFilterPill({ pill }: { pill: TimelineFilterPillSpec }) {
-  return (
-    <span className={NARROWING_PILL} data-anatomy="L2.2" data-filter-pill={pill.axis}>
-      <span
-        className="inline-flex min-h-11 items-center gap-1.5 py-1 pl-2.5 pr-1.5 sm:min-h-0"
-        title={pill.title}
-        data-filter-pill-words=""
-      >
-        {PILL_GLYPH[pill.axis] && <span className="text-rb-500">{PILL_GLYPH[pill.axis]}</span>}
-        <span className="whitespace-nowrap">
-          {pill.verb && `${pill.verb} `}
-          {pill.names.map((n, i) => (
-            <Fragment key={n}>
-              {i > 0 && ", "}
-              {pill.chips && (
-                <span className="mr-1 inline-flex align-[-2px]">
-                  <TokenChipIcon symbol={n} size={12} filterable={false} />
-                </span>
-              )}
-              {n}
-            </Fragment>
-          ))}
-          {pill.more > 0 && <span className="text-rb-500"> +{pill.more} more</span>}
-        </span>
-      </span>
-      <button type="button" onClick={pill.clear} aria-label={pill.clearLabel} className={NARROWING_PILL_X}>
-        <X className="size-3.5" aria-hidden />
-      </button>
-    </span>
-  );
-}
-
 export function TimelineToolbar({
   tl,
   displayItems,
@@ -750,15 +545,6 @@ export function TimelineToolbar({
   monthReach,
   still,
 }: TimelineToolbarProps) {
-  // One option is not an axis — a single-reserve wallet on a multi-asset roster
-  // would get a control whose every state shows the same list.
-  const assetOptions = tl.assetOptions.length > 1 ? tl.assetOptions : [];
-  // Same rule for counterparties — a wallet with one recipient never grows a
-  // control whose every state shows the same address.
-  const counterpartyOptions = tl.counterpartyOptions.length > 1 ? tl.counterpartyOptions : [];
-  // And for versions: a timeline of one version, which is every protocol but
-  // an Alchemix position carrying its V2 history, grows no control.
-  const versionOptions = tl.versionOptions.length > 1 ? tl.versionOptions : [];
   const dateActive = tl.dateRange !== null;
   // The second path (decision 0019, amendment 2026-09-25) sets no
   // `dateRange` at all — the page reads the month as its own segment
@@ -896,7 +682,7 @@ export function TimelineToolbar({
   }, [dropdownOpen, tl.toggleHeatmap]);
 
   const displayControls = !still && (beforeDisplay != null || projection != null || displayItems.length > 0) && (
-    <div className="ml-auto flex shrink-0 items-center gap-2" data-anatomy="L1.11">
+    <div className="ml-auto flex shrink-0 items-center gap-2">
       {beforeDisplay}
       {/* The 30-day projection's switch (ui-jobs 733): outside Clear all and
           the URL, so it sits with the display controls. */}
@@ -923,19 +709,21 @@ export function TimelineToolbar({
         // The listings' pill row (N1, ui-jobs 735): [axis pills] [Date]
         // [Clear all] and the count at the right end. Below sm the pills
         // scroll sideways behind the Filters button, and the count takes the
-        // line under them.
+        // line under them, at its left as the listings set it.
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <div className="relative max-sm:-mx-4 max-sm:min-w-0 max-sm:basis-[calc(100%+2rem)] sm:contents">
             <div
               className="flex items-center gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:contents [&::-webkit-scrollbar]:hidden"
               data-pill-row=""
-              data-anatomy="L1.3"
+              data-anatomy="N1.2"
             >
               <TimelineFilterSheet model={model} count={draftBase} countFor={countFor} />
               <TimelineAxisPills model={model} count={draftBase} countFor={countFor} />
               {tl.datesAxis && (
                 <FilterPill
                   name="Date"
+                  anatomy="L1.7"
+                  openData={{ "data-date-control": "" }}
                   state={filterActive ? "set" : "unset"}
                   locked={false}
                   label="Date"
@@ -960,12 +748,12 @@ export function TimelineToolbar({
                 onClick={clearAll}
                 className={`text-sm font-medium ${INPLACE_TEXT} shrink-0 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500`}
                 data-pill-clear=""
-                data-anatomy="L1.9"
+                data-anatomy="L1.12"
               >
                 Clear all
               </button>
             )}
-            <span className="ml-auto min-w-0">{countNode}</span>
+            <span className="min-w-0 sm:ml-auto">{countNode}</span>
           </div>
         </div>
       )}
