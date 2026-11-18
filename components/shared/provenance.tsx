@@ -832,7 +832,7 @@ export function ProvReceipt({
                 const cls = resolveClass(inp.kind, inp.pclass);
                 const toggle =
                   i === firstDust ? (
-                    <span className="prov-dust-toggle">
+                    <span className="prov-dust-toggle" data-anatomy="H7.6">
                       <DustToggle
                         count={dustParts || 1}
                         open={dustOpen}

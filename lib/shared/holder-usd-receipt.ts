@@ -16,10 +16,14 @@
 
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import { formatUsdValue } from "@/lib/utils/format";
+import { shownUsd, amountText, priceText } from "@/lib/shared/shown-usd";
 
 export interface UsdLeg {
   /** The token's symbol ("WETH", "BOLD"). */
   token: string;
+  /** The rows' name for the leg where the token alone does not tell two
+   *  legs apart (two Morpho markets lending USDC); the token by default. */
+  label?: string;
   amount: number;
   /** Where the amount comes from, in a phrase. */
   amountNote: string;
@@ -31,32 +35,18 @@ export interface UsdLeg {
   face?: boolean;
   /** The contract the price is read from. */
   priceContract?: { name: string; address?: string };
+  /** Rows ahead of the leg's amount: the reads it is worked out from (a
+   *  30-day interest's shares, totals and rate; a composed price's raw
+   *  oracle read). */
+  before?: ProvInput[];
+  /** The amount row's class where it is worked out rather than read (a
+   *  difference of two reads); a read by default. */
+  amountKind?: { kind: ProvInput["kind"]; pclass?: ProvInput["pclass"] };
 }
 
-/** An amount as the receipt shows it: six decimal places. */
-export const shownAmount = (v: number): number => Math.round(v * 1e6) / 1e6;
-/** A price as the receipt shows it: to six decimals from $1 up (so a BTC
- *  price keeps the precision its product needs), six significant figures
- *  below $1. */
-export const shownPrice = (v: number): number =>
-  // exponent-safe: toPrecision's string goes straight back to a Number; priceText prints it.
-  v === 0 ? 0 : Math.abs(v) >= 1 ? Math.round(v * 1e6) / 1e6 : Number(v.toPrecision(6));
+// The shown-values arithmetic lives in lib/shared/shown-usd.ts, dependency-free.
+export { shownPrice, shownUsd, shownComposedPrice, amountText, priceText } from "@/lib/shared/shown-usd";
 const cents = (v: number): number => Math.round(v * 100) / 100;
-/** A dollar figure from an amount and a price as a receipt shows them: the
- *  product of the shown values, to the cent. Every figure whose receipt shows
- *  its rows is drawn from this. */
-export const shownUsd = (amount: number, price: number): number => cents(shownAmount(amount) * shownPrice(price));
-
-/** An amount as a receipt row prints it. */
-export const amountText = (v: number) => shownAmount(v).toLocaleString("en-US", { maximumFractionDigits: 6 });
-/** A price as a receipt row (or the asset popover beside it) prints it: up
- *  to six decimals, trailing zeros trimmed, at least the cents; below $1, six
- *  significant figures. */
-export const priceText = (v: number) => {
-  const p = shownPrice(v);
-  if (p < 1) return `$${p.toLocaleString("en-US", { maximumSignificantDigits: 6 })}`;
-  return `$${p.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 6 })}`;
-};
 
 /** The receipt and the figure it rebuilds. */
 export function holderUsdReceipt(opts: {
@@ -81,23 +71,24 @@ export function holderUsdReceipt(opts: {
   const many = legs.length > 1;
   const inputs: ProvInput[] = legs.flatMap((l, i) => {
     const rows: ProvInput[] = [
+      ...(l.before ?? []),
       {
-        label: `${l.token} amount`,
+        label: `${l.label ?? l.token} amount`,
         value: `${amountText(l.amount)} ${l.token}`,
-        kind: "chain",
-        pclass: "indexed",
+        kind: l.amountKind?.kind ?? "chain",
+        pclass: l.amountKind ? l.amountKind.pclass : "indexed",
         note: l.amountNote,
       },
       l.face
         ? {
-            label: `${l.token} price`,
+            label: `${l.label ?? l.token} price`,
             value: priceText(l.price),
             kind: "derived",
             definition: true,
             note: l.priceNote,
           }
         : {
-            label: `${l.token} price`,
+            label: `${l.label ?? l.token} price`,
             value: priceText(l.price),
             kind: "chain-derived",
             pclass: "oracle",
@@ -107,7 +98,7 @@ export function holderUsdReceipt(opts: {
     ];
     if (many)
       rows.push({
-        label: `${l.token} amount × price`,
+        label: `${l.label ?? l.token} amount × price`,
         value: formatUsdValue(products[i]),
         kind: "derived",
         step: true,
