@@ -22,7 +22,6 @@
 import Link from "next/link";
 import { useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { BoldCardPrice, BoldReadContext, holdsBold } from "@/components/assets/bold-live-price";
-import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import type { BoldPriceRead } from "@/lib/liquity-v2/bold-price";
 import { asOfMark, asOfWords, flagWords, fmtRowPrice } from "@/components/assets/asset-price-row";
 import { PriceUnitMark } from "@/components/assets/price-unit-mark";
@@ -497,7 +496,6 @@ export function AssetExplorer({
           )}
         </div>
       </div>
-      {boldRead !== undefined && <ProvInspectorLayer />}
     </BoldReadContext.Provider>
   );
 }

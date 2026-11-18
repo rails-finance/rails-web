@@ -272,7 +272,8 @@ function AssetPageRow({ chain, contract, symbol }: { chain: ChainId; contract: s
   const [listed, setListed] = useState(false);
   // BOLD on Ethereum states its Curve BOLD/USDC price (ui-jobs 746b).
   const bold = chain === MAINNET_CHAIN_ID && contract.toLowerCase() === TOKEN_ADDRESSES.BOLD;
-  const boldPrice = useBoldPrice(bold ? undefined : null);
+  // Read only once the list says the token has no stored price.
+  const boldPrice = useBoldPrice(bold && listed && !row && unpriced ? undefined : null);
   useEffect(() => {
     let live = true;
     loadAssetPrices().then((list) => {

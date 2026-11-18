@@ -7,7 +7,7 @@ import { explorerState } from "@/lib/shared/asset-explorer";
 import { fetchAssetExplorerServer } from "@/lib/api/fetch-asset-explorer-server";
 import { readerIpFromHeaders } from "@/lib/api/reader-ip-server";
 import { formatDate } from "@/lib/date";
-import { loadBoldPrice } from "@/lib/sources/chain/liquity-v2-bold-price";
+import { loadBoldPriceWithin } from "@/lib/sources/chain/liquity-v2-bold-price";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +29,7 @@ export default async function AssetsPage({
     fetchAssetExplorerServer(await readerIpFromHeaders()).catch(() => null),
     searchParams,
     // BOLD's row reads its price from the Curve BOLD/USDC pool (ui-jobs 746b).
-    loadBoldPrice(),
+    loadBoldPriceWithin(),
   ]);
   const initialSearch = new URLSearchParams(
     Object.entries(sp).flatMap(([k, v]) => (v == null ? [] : (Array.isArray(v) ? v : [v]).map((x) => [k, x]))),
@@ -53,7 +53,7 @@ export default async function AssetsPage({
             initial={explorerState(sp)}
             initialSearch={initialSearch}
             about={about}
-            boldRead={boldRead && typeof boldRead === "object" ? boldRead : null}
+            boldRead={boldRead ?? null}
           />
         ) : (
           <>

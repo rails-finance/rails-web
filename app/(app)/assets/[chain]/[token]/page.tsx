@@ -24,7 +24,7 @@ import { unpricedPage } from "@/lib/api/asset-explorer-chips";
 import { assetCategory } from "@/lib/shared/asset-categories";
 import type { AssetCard } from "@/lib/shared/asset-explorer";
 import { BoldLivePrice } from "@/components/assets/bold-live-price";
-import { loadBoldPrice } from "@/lib/sources/chain/liquity-v2-bold-price";
+import { loadBoldPriceWithin } from "@/lib/sources/chain/liquity-v2-bold-price";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
 
@@ -65,7 +65,7 @@ export default async function AssetPage({ params, searchParams }: { params: Para
     const [unpriced, head, boldRead] = await Promise.all([
       unpricedPage(chain, token),
       fetchAssetHeadServer(chain, token, null, readerIp).catch(() => null),
-      bold ? loadBoldPrice() : undefined,
+      bold ? loadBoldPriceWithin() : undefined,
     ]);
     if (!unpriced) notFound();
     return (
@@ -83,9 +83,7 @@ export default async function AssetPage({ params, searchParams }: { params: Para
             relations={[]}
             back={back}
             note={null}
-            livePrice={
-              bold ? <BoldLivePrice read={boldRead && typeof boldRead === "object" ? boldRead : null} /> : undefined
-            }
+            livePrice={bold ? <BoldLivePrice read={boldRead ?? null} /> : undefined}
           />
         </div>
       </div>

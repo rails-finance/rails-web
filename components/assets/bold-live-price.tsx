@@ -96,7 +96,12 @@ export function BoldCardPrice({ read }: { read: BoldPriceRead | null }) {
         data-anatomy="A5.12"
       >
         <Prov info={info} value={String(price)} symbol="BOLD">
-          <span className={`font-semibold ${band ? OFF_PAR_BAND : "text-foreground"}`}>{priceText(price)}</span>
+          <span
+            className={`font-semibold ${band ? OFF_PAR_BAND : "text-foreground"}`}
+            data-usd-off-par={band ? "band" : undefined}
+          >
+            {priceText(price)}
+          </span>
         </Prov>
         <span
           className="ml-1 text-[11px] text-rb-500"
@@ -112,8 +117,10 @@ export function BoldCardPrice({ read }: { read: BoldPriceRead | null }) {
 /** The asset popover's line for BOLD: the price at head (useBoldPrice), the
  *  pool and the block; the unavailable line where the read failed. */
 export function BoldPopoverPrice({ s }: { s: BoldPriceState }) {
+  const registry = useReceiptRegistry();
   if (s.state === "loading") return null;
-  if (s.state !== "ok") {
+  const info = s.state === "ok" ? boldPriceProv(s.read) : undefined;
+  if (s.state !== "ok" || !info) {
     return (
       <p className="text-[11px] text-rb-500" data-asset-popover-bold-price="failed">
         {BOLD_PRICE_UNAVAILABLE}
@@ -122,9 +129,18 @@ export function BoldPopoverPrice({ s }: { s: BoldPriceState }) {
   }
   const band = offPar(s.price, "BOLD")?.band === true;
   return (
-    <p className="text-[11px] text-rb-500" data-asset-popover-bold-price={s.read.blockNumber}>
-      <span className={`text-xs font-semibold ${band ? OFF_PAR_BAND : "text-foreground"}`}>{priceText(s.price)}</span>{" "}
-      Curve BOLD/USDC last trade, USDC at $1, block {s.read.blockNumber.toLocaleString("en-US")}
-    </p>
+    <ProvReceiptsScope registry={registry} bounds={false}>
+      <p className="text-[11px] text-rb-500" data-asset-popover-bold-price={s.read.blockNumber}>
+        <Prov info={info} value={String(s.price)} symbol="BOLD">
+          <span
+            className={`text-xs font-semibold ${band ? OFF_PAR_BAND : "text-foreground"}`}
+            data-usd-off-par={band ? "band" : undefined}
+          >
+            {priceText(s.price)}
+          </span>
+        </Prov>{" "}
+        Curve BOLD/USDC last trade, USDC at $1, block {s.read.blockNumber.toLocaleString("en-US")}
+      </p>
+    </ProvReceiptsScope>
   );
 }
