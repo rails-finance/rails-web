@@ -11,6 +11,10 @@
 // menu, the hash link, a link in T1), inside the open body, outside the row's
 // DOM (a portal: the menu's sheet), after the pointer moved (a drag) or while
 // text inside the row is selected, so copying an amount does not toggle.
+//
+// A double click opens or closes the card once (ui-jobs 730): its second press
+// selects no word, and its second click does not toggle back. A drag still
+// selects text, and the open body keeps its double click.
 
 import { useRef, type MouseEvent, type PointerEvent } from "react";
 
@@ -25,6 +29,12 @@ export function useRowTarget(toggle: (() => void) | null) {
     onPointerDown: (e: PointerEvent<HTMLElement>) => {
       down.current = { x: e.clientX, y: e.clientY };
     },
+    onMouseDown: (e: MouseEvent<HTMLElement>) => {
+      if (!toggle || e.detail < 2) return;
+      const target = e.target as Element;
+      if (target.closest('[data-anatomy="T2"], [data-row-body], input, textarea, select')) return;
+      e.preventDefault();
+    },
     onClick: (e: MouseEvent<HTMLElement>) => {
       if (!toggle) return;
       const row = e.currentTarget;
@@ -34,6 +44,7 @@ export function useRowTarget(toggle: (() => void) | null) {
       if (hit && row.contains(hit) && !hit.hasAttribute("data-row-control")) return;
       if (hit && !row.contains(hit)) return;
       if (target.closest('[data-anatomy="T2"], [data-row-body]')) return;
+      if (e.detail > 1) return;
       const d = down.current;
       down.current = null;
       if (d && e.detail > 0 && Math.hypot(e.clientX - d.x, e.clientY - d.y) > DRAG_PX) return;
