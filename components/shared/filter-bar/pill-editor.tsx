@@ -17,8 +17,8 @@
  * without applying; focus goes in on open and back to the pill on close.
  */
 
-import { useEffect, useLayoutEffect, useRef, useState, type MutableRefObject, type ReactNode } from "react";
-import { Check } from "lucide-react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type MutableRefObject, type ReactNode } from "react";
+import { Check, Minus } from "lucide-react";
 import { PHONE_QUERY } from "@/hooks/useMediaQuery";
 import { MobileSheet } from "@/components/shared/mobile-sheet";
 import { OVERLAY_HEADING, OVERLAY_SUBHEADING } from "@/lib/shared/ui-grammar";
@@ -381,15 +381,40 @@ function OptionList<F>({
         </div>
       )}
       <div role="group" aria-label={dim.label} className="flex flex-col">
-        {rows.map((opt) => (
-          <OptionRow
-            key={opt.value}
-            opt={opt}
-            multi={multi}
-            checked={selected.has(opt.value)}
-            onClick={() => pick(opt.value)}
-          />
-        ))}
+        {rows.map((opt, i) => {
+          const row = (
+            <OptionRow
+              key={opt.value}
+              opt={opt}
+              multi={multi}
+              checked={selected.has(opt.value)}
+              onClick={() => pick(opt.value)}
+              nested={multi && opt.parent != null}
+            />
+          );
+          // The first leg of an umbrella type draws the umbrella's row above
+          // it (ui-jobs 735): ticked with every leg, mixed with some, and a
+          // press ticks or clears them all.
+          if (!multi || !opt.parent || rows[i - 1]?.parent?.value === opt.parent.value) return row;
+          const parent = opt.parent;
+          const legs = dim.options.filter((o) => o.parent?.value === parent.value).map((o) => o.value);
+          const on = legs.filter((v) => selected.has(v)).length;
+          return (
+            <Fragment key={opt.value}>
+              <OptionRow
+                opt={{ value: parent.value, label: parent.label, meta: parent.meta }}
+                multi
+                checked={on === legs.length}
+                mixed={on > 0 && on < legs.length}
+                onClick={() => {
+                  const cur = dim.get(filters).filter((v) => !legs.includes(v));
+                  onChange(dim.set(filters, on === legs.length ? cur : [...cur, ...legs]));
+                }}
+              />
+              {row}
+            </Fragment>
+          );
+        })}
       </div>
       {narrowed && rows.length === 0 && <OptionSearchNote>No options match.</OptionSearchNote>}
       {narrowed && narrowed.hiddenMatches > 0 && (
@@ -399,34 +424,41 @@ function OptionList<F>({
   );
 }
 
-function OptionRow({
+export function OptionRow({
   opt,
   multi,
   checked,
   onClick,
+  mixed = false,
+  nested = false,
 }: {
   opt: FilterOptionDef;
   multi: boolean;
   checked: boolean;
   onClick: () => void;
+  /** Some of its legs ticked (an umbrella type's row). */
+  mixed?: boolean;
+  /** A leg, indented under its umbrella's row. */
+  nested?: boolean;
 }) {
   return (
     <button
       type="button"
       role={multi ? "checkbox" : "radio"}
-      aria-checked={checked}
+      aria-checked={mixed ? "mixed" : checked}
       onClick={onClick}
-      className={`flex w-full min-h-11 sm:min-h-9 items-center gap-3 rounded-md px-1 text-left text-sm hover:bg-rb-100 dark:hover:bg-rb-800 ${FOCUS}`}
+      className={`flex w-full min-h-11 sm:min-h-9 items-center gap-3 rounded-md ${nested ? "pl-8 pr-1" : "px-1"} text-left text-sm hover:bg-rb-100 dark:hover:bg-rb-800 ${FOCUS}`}
       data-pill-option={opt.value}
     >
       {multi ? (
         <span
           className={`inline-flex size-5 shrink-0 items-center justify-center rounded-full transition-colors ${
-            checked ? "bg-rb-500" : "border-2 border-rb-400 dark:border-rb-600"
+            checked || mixed ? "bg-rb-500" : "border-2 border-rb-400 dark:border-rb-600"
           }`}
           aria-hidden="true"
         >
           {checked && <Check className="size-3 text-white" strokeWidth={3} />}
+          {mixed && <Minus className="size-3 text-white" strokeWidth={3} />}
         </span>
       ) : (
         <span

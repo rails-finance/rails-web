@@ -37,6 +37,7 @@
  */
 
 import {
+  Fragment,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -46,7 +47,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Minus, SlidersHorizontal } from "lucide-react";
 import { CTRL_GHOST, CTRL_OFF, RESET_LINK } from "@/lib/shared/ui-grammar";
 import { PILL_NEUTRAL } from "@/components/shared/filter-bar/filter-pill";
 import { PRIMARY_BUTTON } from "@/components/shared/filter-bar/pill-editor";
@@ -828,15 +829,38 @@ function DimensionView<F>({
     <div className="pt-2" data-filter-sheet-view={dim.id} data-anatomy="N1.8.7">
       {searchable && <OptionSearchInput value={query} onChange={setQuery} />}
       <div role="group" aria-label={dim.label} className="px-4">
-        {rows.map((opt) => (
-          <SheetOption
-            key={opt.value}
-            opt={opt}
-            multi={multi}
-            checked={selected.has(opt.value)}
-            onClick={() => pick(opt.value)}
-          />
-        ))}
+        {rows.map((opt, i) => {
+          const row = (
+            <SheetOption
+              key={opt.value}
+              opt={opt}
+              multi={multi}
+              checked={selected.has(opt.value)}
+              onClick={() => pick(opt.value)}
+              nested={multi && opt.parent != null}
+            />
+          );
+          // An umbrella type's row above its first leg, as in the pill editor.
+          if (!multi || !opt.parent || rows[i - 1]?.parent?.value === opt.parent.value) return row;
+          const parent = opt.parent;
+          const legs = dim.options.filter((o) => o.parent?.value === parent.value).map((o) => o.value);
+          const on = legs.filter((v) => selected.has(v)).length;
+          return (
+            <Fragment key={opt.value}>
+              <SheetOption
+                opt={{ value: parent.value, label: parent.label, meta: parent.meta }}
+                multi
+                checked={on === legs.length}
+                mixed={on > 0 && on < legs.length}
+                onClick={() => {
+                  const cur = dim.get(filters).filter((v) => !legs.includes(v));
+                  onChange(dim.set(filters, on === legs.length ? cur : [...cur, ...legs]));
+                }}
+              />
+              {row}
+            </Fragment>
+          );
+        })}
       </div>
       {narrowed && rows.length === 0 && <OptionSearchNote>No options match.</OptionSearchNote>}
       {narrowed && narrowed.hiddenMatches > 0 && (
@@ -851,29 +875,34 @@ function SheetOption({
   multi,
   checked,
   onClick,
+  mixed = false,
+  nested = false,
 }: {
   opt: FilterOptionDef;
   multi: boolean;
   checked: boolean;
   onClick: () => void;
+  mixed?: boolean;
+  nested?: boolean;
 }): ReactNode {
   return (
     <button
       type="button"
       role={multi ? "checkbox" : "radio"}
-      aria-checked={checked}
+      aria-checked={mixed ? "mixed" : checked}
       onClick={onClick}
-      className="flex w-full min-h-12 items-center gap-3 border-b border-rb-200 dark:border-rb-800 py-2 text-left text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+      className={`flex w-full min-h-12 items-center gap-3 border-b border-rb-200 dark:border-rb-800 py-2 ${nested ? "pl-7" : ""} text-left text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500`}
       data-filter-sheet-option={opt.value}
     >
       {multi ? (
         <span
           className={`inline-flex items-center justify-center w-5 h-5 rounded-full shrink-0 transition-colors ${
-            checked ? "bg-rb-500" : "border-2 border-rb-400 dark:border-rb-600"
+            checked || mixed ? "bg-rb-500" : "border-2 border-rb-400 dark:border-rb-600"
           }`}
           aria-hidden="true"
         >
           {checked && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+          {mixed && <Minus className="w-3 h-3 text-white" strokeWidth={3} />}
         </span>
       ) : (
         <span

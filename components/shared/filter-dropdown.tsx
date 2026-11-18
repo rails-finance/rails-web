@@ -88,6 +88,9 @@ export interface FilterOption {
   /** Draw a rule above this option, opening a group of its own (the Display
    *  menu's market-note items). */
   separatorBefore?: boolean;
+  /** The umbrella type this option is a leg of (ui-jobs 735): the pill
+   *  editors nest it under a row that ticks every leg at once. */
+  parent?: { key: string; label: string; count?: number };
 }
 
 interface FilterDropdownProps {

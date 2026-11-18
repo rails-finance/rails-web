@@ -144,7 +144,7 @@ import {
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { EventShareProvider } from "@/components/shared/event-share-context";
 import { EventTypeHideContext, hideTypeWords } from "@/components/shared/event-card-menu";
-import { getEventActionKey } from "@/lib/shared/event-filter-helpers";
+import { actionLabel, getEventActionKey } from "@/lib/shared/event-filter-helpers";
 import { EventPageContext, EventPageTitle } from "@/components/shared/event-page-aside";
 import type { EventPageContract, EventPageSlot } from "@/lib/shared/explorer-adapter";
 import { setCardOpen } from "@/lib/shared/card-open-store";
@@ -1886,7 +1886,13 @@ function ChainTruthTimelineBody({
   const hideTypeOf = (e: BaseActivityEvent) => {
     if (still || tl.eventOptions.length <= 1) return null;
     const key = getEventActionKey(e);
-    const option = tl.eventOptions.find((o) => o.key === key);
+    // An umbrella type offered as its legs (ui-jobs 735) hides whole, under
+    // its own name: "Hide adjusts".
+    const option =
+      tl.eventOptions.find((o) => o.key === key) ??
+      (tl.eventOptions.some((o) => o.parent?.key === key)
+        ? { key, label: actionLabel(key, tl.protocolKey), suffix: undefined }
+        : undefined);
     if (!option) return null;
     return { ...hideTypeWords(option.label, option.suffix), hide: () => tl.toggleHiddenAction(key) };
   };

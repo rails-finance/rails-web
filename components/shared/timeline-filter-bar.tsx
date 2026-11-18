@@ -91,8 +91,20 @@ const selectionOf = (a: AxisSpec): string[] => {
  *  the hidden ones; the first name and a count past it. */
 function axisWords(values: string[], options: FilterOptionDef[]): string {
   const kept = new Set(values);
-  const shown = options.filter((o) => kept.has(o.value)).map((o) => o.label);
-  const hidden = options.filter((o) => !kept.has(o.value)).map((o) => o.label);
+  // An umbrella whose legs all stand on one side reads as its own name there.
+  const names = (side: (o: FilterOptionDef) => boolean) => {
+    const out: string[] = [];
+    for (const o of options) {
+      if (!side(o)) continue;
+      const p = o.parent;
+      if (p && options.filter((x) => x.parent?.value === p.value).every(side)) {
+        if (!out.includes(p.label)) out.push(p.label);
+      } else out.push(o.label);
+    }
+    return out;
+  };
+  const shown = names((o) => kept.has(o.value));
+  const hidden = names((o) => !kept.has(o.value));
   const list = (names: string[]) => (names.length > 1 ? `${names[0]} +${names.length - 1}` : (names[0] ?? ""));
   return shown.length <= hidden.length ? list(shown) : `All but ${list(hidden)}`;
 }
@@ -107,6 +119,11 @@ function dimensionOf(a: AxisSpec): FilterDimension<TimelineFilters> {
       label: o.label,
       icon: a.icon?.(o) ?? o.icon,
       meta: o.count != null ? o.count.toLocaleString("en-US") : undefined,
+      parent: o.parent && {
+        value: o.parent.key,
+        label: o.parent.label,
+        meta: o.parent.count != null ? o.parent.count.toLocaleString("en-US") : undefined,
+      },
     })),
     get: (f) => f[a.axis],
     set: (f, values) => ({ ...f, [a.axis]: values.length === a.options.length ? [] : values }),

@@ -86,7 +86,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import {
+  ACTION_LEGS,
+  actionHidden,
+  actionLegParent,
   getEventActionKey,
+  getEventActionLegs,
   getEventAssetKeys,
   getEventCounterpartyKeys,
   getEventVersionKeys,
@@ -277,6 +281,21 @@ export interface TimelineEventsState {
   };
 }
 
+/** The action axis as a folder's header reads it: a header counts its
+ *  members by umbrella type, so an umbrella whose every leg is hidden reads as
+ *  hidden, and one only some of whose legs are hidden splits the folder
+ *  (ui-jobs 735). */
+export function folderActionAxes(hidden: Set<string>): Pick<FolderFilterAxes, "hiddenActions" | "splitActions"> {
+  const hiddenActions = new Set(hidden);
+  const splitActions = new Set<string>();
+  for (const [parent, legs] of Object.entries(ACTION_LEGS)) {
+    const n = legs.filter((l) => hidden.has(l.key)).length;
+    if (n === legs.length) hiddenActions.add(parent);
+    else if (n > 0 && !hidden.has(parent)) splitActions.add(parent);
+  }
+  return { hiddenActions, splitActions };
+}
+
 /** The four hidden sets, as one view of the axes. */
 export interface TimelineAxesView {
   hiddenActions: Set<string>;
@@ -288,7 +307,7 @@ export interface TimelineAxesView {
 /** Does one event pass the four axes? An event with no key on an axis
  *  passes it, and one with several passes while any of them is shown. */
 export function eventPassesAxes(e: BaseActivityEvent, v: TimelineAxesView): boolean {
-  if (v.hiddenActions.has(getEventActionKey(e))) return false;
+  if (actionHidden(e, v.hiddenActions)) return false;
   const some = (keys: string[], hidden: Set<string>) =>
     hidden.size === 0 || keys.length === 0 || keys.some((k) => !hidden.has(k));
   return (
@@ -647,7 +666,7 @@ export function useTimelineEvents(
 
   const folderAxes = useMemo<FolderFilterAxes>(
     () => ({
-      hiddenActions: hiddenSet,
+      ...folderActionAxes(hiddenSet),
       hiddenAssets: hiddenAssetSet,
       hiddenCounterparties: hiddenCounterpartySet,
       dateRange,
@@ -664,7 +683,7 @@ export function useTimelineEvents(
         eventPassesAxes(e, view) && (!dateRange || (e.timestamp >= dateRange[0] && e.timestamp <= dateRange[1]));
       let loose = 0;
       for (const e of sortedEvents) if (passes(e)) loose++;
-      const axes: FolderFilterAxes = { ...view, dateRange };
+      const axes: FolderFilterAxes = { ...view, ...folderActionAxes(view.hiddenActions), dateRange };
       const folders = (servedRows ?? []).flatMap((row) =>
         row.kind === "folder" && folderAdmits(row.folder, axes)
           ? [{ folder: row.folder, matched: folderMatchCount(row.folder, axes) }]
@@ -753,9 +772,13 @@ export function useTimelineEvents(
   // the window presented as a count of the position.
   const eventOptions = useMemo<FilterOption[]>(() => {
     const counts = seedCounts(win.opening?.byAction);
+    // An umbrella type counts under each leg an event has (ui-jobs 735); the
+    // umbrella keeps every event, for its own row.
+    const legCounts = new Map<string, number>();
     for (const e of sortedEvents) {
       const key = getEventActionKey(e);
       counts.set(key, (counts.get(key) ?? 0) + 1);
+      for (const leg of getEventActionLegs(e) ?? []) legCounts.set(leg, (legCounts.get(leg) ?? 0) + 1);
     }
     // A folder's members are not in `sortedEvents` — they are not on the page
     // at all until someone opens it — so the menu adds their own histogram
@@ -776,7 +799,20 @@ export function useTimelineEvents(
         if (aD !== bD) return aD - bD;
         return b[1] - a[1];
       })
-      .map(([key, count]) => ({ key, label: actionLabel(key, protocolKey), count, demoted: demoted.has(key) }));
+      .flatMap(([key, count]): FilterOption[] => {
+        const base = { key, label: actionLabel(key, protocolKey), count, demoted: demoted.has(key) };
+        // An umbrella with legs on the page is offered as those legs.
+        const legs = (ACTION_LEGS[key] ?? []).filter((l) => legCounts.has(l.key));
+        if (legs.length === 0) return [base];
+        const parent = { key, label: base.label, count };
+        return legs.map((l) => ({
+          key: l.key,
+          label: l.label,
+          count: legCounts.get(l.key),
+          demoted: base.demoted,
+          parent,
+        }));
+      });
   }, [sortedEvents, protocolKey, win.opening, servedRows]);
 
   // Commonest asset first — no demoted tier here: an asset is a fact about the
@@ -850,7 +886,10 @@ export function useTimelineEvents(
   );
 
   const visibleActionKeys = useMemo(
-    () => new Set(eventOptions.map((o) => o.key).filter((k) => !hiddenSet.has(k))),
+    () =>
+      new Set(
+        eventOptions.map((o) => o.key).filter((k) => !hiddenSet.has(k) && !hiddenSet.has(actionLegParent(k) ?? "")),
+      ),
     [eventOptions, hiddenSet],
   );
 
@@ -918,18 +957,19 @@ export function useTimelineEvents(
   // decide whether to arm `suppressNextPersistRef` here.
   const revealEvent = useCallback(
     (event: BaseActivityEvent) => {
-      const actionKey = getEventActionKey(event);
+      // The type and, under an umbrella type, its legs (ui-jobs 735).
+      const actionKeys = [getEventActionKey(event), ...(getEventActionLegs(event) ?? [])];
       const assetKeys = getEventAssetKeys(event);
       const counterpartyKeys = getEventCounterpartyKeys(event);
       const versionKeys = getEventVersionKeys(event);
-      const needsAction = hiddenActions.includes(actionKey);
+      const needsAction = actionKeys.some((k) => hiddenActions.includes(k));
       const needsAssets = assetKeys.some((k) => hiddenAssets.includes(k));
       const needsCounterparties = counterpartyKeys.some((k) => hiddenCounterparties.includes(k));
       const needsVersions = versionKeys.some((k) => hiddenVersions.includes(k));
       const needsDateClear = dateRange !== null;
       if (!needsAction && !needsAssets && !needsCounterparties && !needsVersions && !needsDateClear) return;
       suppressNextPersistRef.current = true;
-      if (needsAction) setHiddenActions((prev) => prev.filter((k) => k !== actionKey));
+      if (needsAction) setHiddenActions((prev) => prev.filter((k) => !actionKeys.includes(k)));
       if (needsAssets) setHiddenAssets((prev) => prev.filter((k) => !assetKeys.includes(k)));
       if (needsCounterparties) setHiddenCounterparties((prev) => prev.filter((k) => !counterpartyKeys.includes(k)));
       if (needsVersions) setHiddenVersions((prev) => prev.filter((k) => !versionKeys.includes(k)));

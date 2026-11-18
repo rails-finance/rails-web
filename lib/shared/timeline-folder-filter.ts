@@ -37,6 +37,10 @@ const DAY = 86_400;
 
 export interface FolderFilterAxes {
   hiddenActions: Set<string>;
+  /** Umbrella types only some of whose legs are hidden (ui-jobs 735): a
+   *  header counts by type, so a folder holding one can stand but cannot
+   *  say how many of its members pass. */
+  splitActions?: Set<string>;
   hiddenAssets: Set<string>;
   hiddenCounterparties: Set<string>;
   dateRange: [number, number] | null;
@@ -139,16 +143,18 @@ function cellsMatchCount(folder: ServedFolder, axes: FolderFilterAxes): number |
  * that is NULL too.
  */
 export function folderMatchCount(folder: ServedFolder, axes: FolderFilterAxes): number | null {
+  const split = axes.splitActions;
+  if (split && split.size > 0 && (folder.other > 0 || folder.counts.some((c) => split.has(c.key)))) return null;
   const fromCells = cellsMatchCount(folder, axes);
   if (fromCells !== null) return fromCells;
   if (axes.hiddenCounterparties.size > 0) return null;
-  const split = [
+  const splits = [
     actionVerdict(folder, axes.hiddenActions),
     assetVerdict(folder, axes.hiddenAssets),
     dateVerdict(folder, axes.dateRange),
   ].filter((v): v is { all: false; count: number | null } => !v.all);
-  if (split.length === 0) return folder.count;
-  if (split.length === 1) return split[0].count;
+  if (splits.length === 0) return folder.count;
+  if (splits.length === 1) return splits[0].count;
   return null;
 }
 

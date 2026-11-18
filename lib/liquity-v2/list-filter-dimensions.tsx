@@ -181,6 +181,7 @@ export function liquityV2ListDimensions(
     label: "Redemptions",
     group: "Redemptions",
     cardinality: "single",
+    property: true,
     param: "redemptions",
     options: [
       { value: "with", label: "Redeemed" },
@@ -201,6 +202,7 @@ export function liquityV2ListDimensions(
     label: "Delegation",
     group: "Delegation",
     cardinality: "single",
+    property: true,
     param: "delegation",
     options: [
       { value: "delegated", label: "Delegated" },

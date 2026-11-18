@@ -24,6 +24,10 @@ export interface FilterOptionDef {
    *  Panel-only: it is not part of the chip text, and the panel's type-to-filter
    *  box matches `label` alone, so a count can never be searched by accident. */
   meta?: string;
+  /** The umbrella this option is a leg of (an event type's legs, ui-jobs
+   *  735): the editors nest the legs under a row that ticks them all. The
+   *  umbrella is not an option of its own. */
+  parent?: { value: string; label: string; meta?: string };
 }
 
 export interface FilterDimension<F> {
@@ -70,6 +74,11 @@ export interface FilterDimension<F> {
    *  multi-dimension group panel (e.g. a "compare" link beside the Hub title).
    *  Only shown when the group holds more than one dimension. */
   labelAction?: ReactNode;
+  /** A two-option property of the row ("Redeemed / Never redeemed"): where a
+   *  listing has two or more, they share one "Properties" pill whose editor
+   *  stacks them (ui-jobs 735); a lone one keeps its own pill. Each keeps its
+   *  own param. */
+  property?: boolean;
   /** Hide from the + Filter menu when false (e.g. Borrowing while Supply-only). */
   available?: (f: F) => boolean;
   /** One short line at the foot of the dimension's group panel (the price
