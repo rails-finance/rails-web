@@ -275,7 +275,7 @@ export default function PolarisPositionView({
   );
 
   // The live note: the market's primary rate read at the chain head, against
-  // this CDP's newest touch that carries one. Open positions only, and
+  // this CDP's last touch that carries one. Open positions only, and
   // only once the chain overlay has answered (an index-only `view` while the
   // overlay is still settling is not enough).
   const positionOpen = view?.status === "open";
