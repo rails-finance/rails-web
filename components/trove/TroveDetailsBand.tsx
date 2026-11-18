@@ -1,5 +1,6 @@
 "use client";
 
+import { SkeletonBar } from "@/components/shared/skeleton-card";
 import { TokenFigure } from "@/components/shared/token-figure";
 import { Users } from "lucide-react";
 import { TroveSummary } from "@/types/api/trove";
@@ -111,8 +112,7 @@ export function TroveDetailsBand({
     );
   }
   if (bare && part === "queue") {
-    if (debtInFrontLoading)
-      return <span className="inline-block h-3 w-24 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />;
+    if (debtInFrontLoading) return <SkeletonBar width={96} />;
     if (debtInFront == null) return <span className="font-normal text-rb-500/70">Unavailable</span>;
     return (
       <span>
@@ -161,7 +161,7 @@ export function TroveDetailsBand({
 
       {/* Debt in front — its own band item, flowing on from costs. */}
       {!showQueue ? null : debtInFrontLoading ? (
-        <div className="h-3 w-48 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />
+        <SkeletonBar width={192} />
       ) : debtInFront !== null && debtInFront !== undefined ? (
         <div className={`${align} text-xs text-rb-500 leading-relaxed tabular-nums`}>
           Debt in front:{" "}

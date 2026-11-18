@@ -874,6 +874,17 @@ export function useAaveV3CardSlots({
   const present = (rows: (PositionPanelRow | null)[]): PositionPanelRow[] =>
     rows.filter((r): r is PositionPanelRow => r != null);
 
+  // While the live Pool read is out, a borrowing position's rows from it hold
+  // their cells with placeholder bars (the loading grammar, skeleton-card.tsx),
+  // so the panel takes its settled height from first paint. The labels are the
+  // likely ones; the bars carry no figure.
+  const readPending = detail && hfPending && v.borrows.length > 0;
+  const held = (row: PositionPanelRow | null, id: string, label: string): PositionPanelRow | null =>
+    row ?? (readPending ? { id, label, value: null, pending: true } : null);
+  const rateHeld = held(rateRow, "borrow-rate", v.borrows.length > 1 ? "Average borrow rate" : "Borrow rate");
+  const roomHeld = held(roomRow, "borrow-room", "Room to borrow");
+  const liqHeld = held(liqRow, "liquidation", collSupplies.length === 1 ? "Liquidates at" : "Liquidates on a drop of");
+
   // Each side's reserves open under its headline (the chevron by the icons);
   // the panel keeps the additive values.
   const withRows = heads.map((h) =>
@@ -891,7 +902,7 @@ export function useAaveV3CardSlots({
     explainer,
     learnMore,
     menu: menuSlot,
-    panel: [present([interestRow("supply"), notCollRow]), present([rateRow, interestRow("debt"), roomRow, liqRow])],
+    panel: [present([interestRow("supply"), notCollRow]), present([rateHeld, interestRow("debt"), roomHeld, liqHeld])],
   };
 }
 

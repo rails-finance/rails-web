@@ -157,6 +157,8 @@ export interface TroveBodyProps {
   exports: PositionCardExports | null;
   /** The position card's foot line while the head read is in flight. */
   loadingMessage: string | null;
+  /** The price read has ended without a price (TroveSummaryStack). */
+  priceFailed?: boolean;
   /** The row above the card (DetailTopRow); none on the home page. */
   topRow?: ReactNode;
   /** The loaded Liquity events, oldest first: the timeline heading's tenure. */
@@ -203,6 +205,7 @@ export function TroveBody({
   shutdown,
   exports,
   loadingMessage,
+  priceFailed,
   topRow,
   liquityEvents,
   tl,
@@ -278,6 +281,7 @@ export function TroveBody({
           queueDebtTotal={queueDebtTotal}
           redeemedFirst={redeemedFirst}
           debtInFrontLoading={debtInFrontLoading}
+          priceFailed={priceFailed}
           viewHref={tl.viewHref}
           surplus={surplus}
           shutdown={shutdown}

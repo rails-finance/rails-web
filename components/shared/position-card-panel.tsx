@@ -20,6 +20,7 @@ import type { ReactNode } from "react";
 import { HeadingTip } from "@/components/shared/tip-label";
 import { TokenFigure } from "@/components/shared/token-figure";
 import { StatBreakdown, type PanelRowBreakdown } from "@/components/shared/stat-breakdown";
+import { SkeletonBar } from "@/components/shared/skeleton-card";
 
 export interface PositionPanelRow {
   /** Stable key, and the row's `data-panel-row`. */
@@ -38,6 +39,18 @@ export interface PositionPanelRow {
   /** A stat of two or more assets: `value` and the assets' icons become one
    *  button (C19) that opens this breakdown over the card. */
   breakdown?: PanelRowBreakdown;
+  /** The value waits on a read: a placeholder bar holds the cell (the loading
+   *  grammar, skeleton-card.tsx). A row whose figure may come later stays in
+   *  the grid from first paint, so its neighbours never move. */
+  pending?: boolean;
+  /** The read the value needs has failed: a few words in the cell (`true`:
+   *  "price unavailable"), never an empty cell (TO-DO-position-card 313). */
+  unavailable?: true | string;
+}
+
+/** The words a cell shows after its read failed. */
+export function unavailableWords(u: true | string): string {
+  return u === true ? "price unavailable" : u;
 }
 
 /** A figure inside a stat value that words surround ("74.4% reached"): it
@@ -72,7 +85,15 @@ function Stat({ r }: { r: PositionPanelRow }) {
         {r.sub != null && <span className="block font-normal">{r.sub}</span>}
       </dt>
       <dd className={VALUE_TYPE}>
-        {r.breakdown ? (
+        {r.pending ? (
+          <span className="flex h-6 items-center" data-panel-pending="">
+            <SkeletonBar width={72} />
+          </span>
+        ) : r.unavailable ? (
+          <span className="text-sm font-normal text-rb-500" data-panel-unavailable="">
+            {unavailableWords(r.unavailable)}
+          </span>
+        ) : r.breakdown ? (
           <StatBreakdown id={r.id} label={r.label} figure={r.value} breakdown={r.breakdown} />
         ) : r.asset && r.value != null ? (
           <TokenFigure symbol={r.asset.symbol} address={r.asset.address} figure={r.asset.figure}>

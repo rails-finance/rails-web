@@ -538,6 +538,8 @@ export default function TroveView({
           csvFilename: `liquity-v2-${collateralType}-trove-${troveId.slice(0, 12)}-activity.csv`,
         })}
         loadingMessage={getEnhancementStatus()}
+        // The server's read (seeded) or the client's (loadData) has run.
+        priceFailed={!loading && prices == null}
         liquityEvents={liquityEvents}
         tl={tl}
         boundary={boundary}

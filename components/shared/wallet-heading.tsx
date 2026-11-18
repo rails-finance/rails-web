@@ -26,6 +26,7 @@ import { RevealTip } from "@/components/shared/reveal-tip";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { WalletMenu } from "@/components/shared/wallet-menu";
 import { WalletPositionsMenu } from "@/components/shared/wallet-positions-menu";
+import { SkeletonBar } from "@/components/shared/skeleton-card";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { protocolForSession } from "@/lib/shared/protocols";
 import { CHAINS, type ChainId } from "@/lib/shared/chains";
@@ -298,7 +299,17 @@ export function PositionWalletHeading({
           {owner.extra}
         </>
       }
-      lines={owner.wallet && <WalletPositionsMenu wallet={owner.wallet} />}
+      // The positions line is held whether or not the wallet is read yet, so
+      // the heading keeps one height (the loading grammar, skeleton-card.tsx).
+      lines={
+        owner.wallet ? (
+          <WalletPositionsMenu wallet={owner.wallet} />
+        ) : (
+          <div className="flex h-5 items-center">
+            <SkeletonBar width={72} />
+          </div>
+        )
+      }
       end={
         <>
           {strip && (
