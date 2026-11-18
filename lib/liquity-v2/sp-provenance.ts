@@ -84,8 +84,13 @@ export function spPoolShareProv(branch: SpBranch, deposit: string, total: string
     source: { block },
     formula: "getCompoundedBoldDeposit(depositor) ÷ getTotalBoldDeposits()",
     inputs: [
-      { label: "Deposit now, BOLD", value: deposit, kind: "chain", pclass: "state" },
-      { label: "All deposits, BOLD", value: total, kind: "chain", pclass: "state" },
+      {
+        label: "Deposit now, getCompoundedBoldDeposit(depositor), BOLD",
+        value: deposit,
+        kind: "chain",
+        pclass: "state",
+      },
+      { label: "All deposits, getTotalBoldDeposits(), BOLD", value: total, kind: "chain", pclass: "state" },
     ],
     via: `${VIA} · getCompoundedBoldDeposit(depositor) ÷ getTotalBoldDeposits() @ head`,
   };
