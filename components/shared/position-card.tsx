@@ -994,7 +994,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
           <PositionCardPanel columns={panel} />
         ) : (
           // A hairline between the headlines and the stats (decision 0066 point 5).
-          <div className="mt-6 border-t border-rb-500/50" data-nosnippet="" data-card-rule="">
+          <div className="mt-6 border-t border-edge-raised" data-nosnippet="" data-card-rule="">
             <PositionCardPanel columns={panel} />
           </div>
         ))}

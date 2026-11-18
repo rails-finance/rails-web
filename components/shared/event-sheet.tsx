@@ -238,7 +238,7 @@ const SUB = "col-span-full grid grid-cols-subgrid";
 /** The USD column's rule; a side with no dollar figure (`SHEET_NO_USD`) draws
  *  none. */
 const USD_RULE =
-  "border-l border-rb-300 pl-4 dark:border-rb-600 group-data-[sheet-usd=none]/side:border-l-0 group-data-[sheet-usd=none]/side:pl-0";
+  "border-l border-edge-raised pl-4 group-data-[sheet-usd=none]/side:border-l-0 group-data-[sheet-usd=none]/side:pl-0";
 /** The breakdown's tint. */
 const TINT = "bg-raised";
 
@@ -404,9 +404,7 @@ function SidePanel({ s, breakdown, col }: { s: SheetSide; breakdown: boolean; co
               ))}
             </div>
             {before && (
-              <div
-                className={`${SUB} ${TINT} -mx-2 rounded-b-md border-t border-dashed border-rb-300 px-2 dark:border-rb-600`}
-              >
+              <div className={`${SUB} ${TINT} -mx-2 rounded-b-md border-t border-dashed border-edge-raised px-2`}>
                 <Row r={before} tone="muted" col={col} pad="py-2" />
               </div>
             )}
@@ -441,9 +439,7 @@ function SidePanel({ s, breakdown, col }: { s: SheetSide; breakdown: boolean; co
             )}
           </div>
         )}
-        {(touched || listed) && (
-          <div aria-hidden className="col-span-full mt-1 border-t border-rb-300 dark:border-rb-600" />
-        )}
+        {(touched || listed) && <div aria-hidden className="col-span-full mt-1 border-t border-edge-raised" />}
         <div className="contents" data-sheet-row="total">
           <span className="min-w-0 self-center py-2 text-sm text-rb-500">
             {/* The total line's words open its read-more: "After this event"
@@ -574,7 +570,7 @@ export function SheetSkeleton({ sides = 2, panels = 2 }: { sides?: number; panel
                   {bar("w-28")}
                   {bar("w-16")}
                 </div>
-                <div className="mt-1 border-t border-rb-300 dark:border-rb-600" />
+                <div className="mt-1 border-t border-edge-raised" />
               </>
             )}
             <div className="flex h-10 items-center justify-end">{bar("w-20")}</div>

@@ -158,6 +158,9 @@
   --surface-raised: rgb(255 255 255); /* cards, panels, inputs, active in-place control */
   --surface-sunken: var(--color-rb-200); /* segmented tracks, inset chips, recessed wells */
   --edge-row-line: var(--color-rb-200); /* the hairline between the house table's rows (D1) */
+  --edge-raised: rgb(
+    236 236 236
+  ); /* a hairline on a raised ground: the card's rule, a cell's rules (Miles, 18 Nov 2026) */
   --surface-row-hover: var(--color-rb-100); /* the house table's hovered row, a rounded block (D1) */
   --surface-marker: var(--color-rb-200); /* small inline tags: badges, count pills, token chips */
   --surface-skeleton: rgb(255 255 255); /* loading shimmer — matched to --surface-raised */
@@ -443,6 +446,7 @@ html.dark {
   --surface-raised: rgb(21 25 33); /* = rb-800 (inlined) */
   --surface-sunken: rgb(15 16 23); /* = rb-900 (inlined) */
   --edge-row-line: rgb(41 46 60); /* a step lighter than the canvas */
+  --edge-raised: rgb(35 40 52);
   --surface-row-hover: rgb(31 36 48); /* lifted off the canvas */
   --surface-marker: rgb(21 25 33);
   --surface-skeleton: rgb(21 25 33);
@@ -467,6 +471,9 @@ html.dark {
 }
 @utility text-tone-critical {
   color: var(--tone-critical-text);
+}
+@utility border-edge-raised {
+  border-color: var(--edge-raised);
 }
 @utility bg-raised {
   background-color: var(--surface-raised);

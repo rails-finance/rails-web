@@ -442,7 +442,7 @@ export function ClosedTokens({ children, usd: given }: { children: ReactNode; us
 function ClosedUsd({ before, after, off }: ClosedUsdFigures & { off: OffPar | null }) {
   return (
     <span
-      className="ml-1 inline-flex items-center justify-end gap-1 whitespace-nowrap border-l border-rb-300 pl-2 text-sm tabular-nums text-rb-500 dark:border-rb-600 @max-xl:ml-0 @max-xl:basis-full @max-xl:border-l-0 @max-xl:pl-0"
+      className="ml-1 inline-flex items-center justify-end gap-1 whitespace-nowrap border-l border-edge-raised pl-2 text-sm tabular-nums text-rb-500 @max-xl:ml-0 @max-xl:basis-full @max-xl:border-l-0 @max-xl:pl-0"
       data-ledger-closed-usd=""
     >
       {before != null && (
@@ -562,8 +562,8 @@ export function LedgerIcon({ symbol, muted = false }: { symbol: string; muted?: 
   );
 }
 
-const USD_CELL = "border-l border-rb-300 pl-3 dark:border-rb-600 @max-md:border-l-0 @max-md:pl-0";
-const RULE = "col-span-full mt-1.5 mb-1 border-t border-rb-300 dark:border-rb-600";
+const USD_CELL = "border-l border-edge-raised pl-3 @max-md:border-l-0 @max-md:pl-0";
+const RULE = "col-span-full mt-1.5 mb-1 border-t border-edge-raised";
 
 function BeforeArrow({ children }: { children: ReactNode }) {
   return (
