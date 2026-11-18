@@ -1,197 +1,35 @@
 "use client";
 
 // The timeline's filters on the listings' pills (N1.10, ui-jobs 735): one pill
-// per axis the history offers (Type, Asset, Version, Address) and the Date
-// pill, the filter sheet below sm. The listings' pills read and write a param
-// object; the timeline keeps its view in useTimelineEvents (hidden sets,
-// localStorage and the URL), so this file is the adapter between the two: a
-// selection is the axis's VISIBLE keys, [] while every key shows, and a write
-// becomes the hook's resets and toggles.
+// per axis the history offers (Type, Asset, Version, Address), each with its
+// editor, and the filter sheet below sm, over the model in
+// timeline-filter-model.ts. The toolbar draws the Date pill.
 
 import { useRef, useState } from "react";
 import { FilterPill } from "@/components/shared/filter-bar/filter-pill";
 import { FilterSheet } from "@/components/shared/filter-bar/filter-sheet";
 import { GroupEditor } from "@/components/shared/filter-bar/pill-editor";
-import {
-  groupDimensions,
-  pillFor,
-  resetAll,
-  resetGroup,
-  type PillModel,
-} from "@/components/shared/filter-bar/pill-model";
-import type { FilterDimension, FilterOptionDef } from "@/components/shared/filter-bar/types";
-import type { FilterOption } from "@/components/shared/filter-dropdown";
+import { groupDimensions, pillFor, resetGroup, type PillModel } from "@/components/shared/filter-bar/pill-model";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import type { BaseListFilters } from "@/lib/shared/list-filter";
-import type { TimelineAxesView, TimelineEventsState } from "@/hooks/useTimelineEvents";
+import {
+  AXIS_ANATOMY,
+  timelineFilterModel as model,
+  type Axis,
+  type TimelineFilterModel,
+  type TimelineFilters,
+} from "@/components/shared/timeline-filter-model";
+import type { TimelineEventsState } from "@/hooks/useTimelineEvents";
 
-type Axis = "type" | "asset" | "version" | "address";
-/** Each axis pill's own code beside N1.10 (app-anatomy L1). */
-const AXIS_ANATOMY: Record<Axis, string> = { type: "L1.3", asset: "L1.4", version: "L1.5", address: "L1.6" };
-export type TimelineFilters = BaseListFilters & Record<Axis, string[]>;
+export {
+  clearTimelineFilters,
+  draftAxesView,
+  type TimelineFilterModel,
+  type TimelineFilters,
+} from "@/components/shared/timeline-filter-model";
 
-interface AxisSpec {
-  axis: Axis;
-  /** The pill's name. */
-  name: string;
-  options: FilterOption[];
-  visible: Set<string>;
-  toggle: (key: string) => void;
-  reset: () => void;
-  /** Option labels are names (symbols, versions, addresses), kept as written. */
-  icon?: (o: FilterOption) => React.ReactNode;
-}
-
-/** The axes this history offers. One option is not an axis: every state of
- *  its control would show the same list. */
-function axesOf(tl: TimelineEventsState): AxisSpec[] {
-  const all: AxisSpec[] = [
-    {
-      axis: "type",
-      name: "Type",
-      options: tl.eventOptions,
-      visible: tl.visibleActionKeys,
-      toggle: tl.toggleHiddenAction,
-      reset: tl.resetHiddenActions,
-    },
-    {
-      axis: "asset",
-      name: "Asset",
-      options: tl.assetOptions,
-      visible: tl.visibleAssetKeys,
-      toggle: tl.toggleHiddenAsset,
-      reset: tl.resetHiddenAssets,
-      icon: (o) => <TokenChipIcon symbol={o.key} size={16} filterable={false} />,
-    },
-    {
-      axis: "version",
-      name: "Version",
-      options: tl.versionOptions,
-      visible: tl.visibleVersionKeys,
-      toggle: tl.toggleHiddenVersion,
-      reset: tl.resetHiddenVersions,
-    },
-    {
-      axis: "address",
-      name: "Address",
-      options: tl.counterpartyOptions,
-      visible: tl.visibleCounterpartyKeys,
-      toggle: tl.toggleHiddenCounterparty,
-      reset: tl.resetHiddenCounterparties,
-    },
-  ];
-  return all.filter((a) => a.options.length > 1);
-}
-
-/** The axis's selection: the keys shown, or [] while every offered key shows. */
-const selectionOf = (a: AxisSpec): string[] => {
-  const shown = a.options.filter((o) => a.visible.has(o.key)).map((o) => o.key);
-  return shown.length === a.options.length ? [] : shown;
-};
-
-/** The pill's value: the kept names where they are the fewer, else "All but"
- *  the hidden ones; the first name and a count past it. */
-function axisWords(values: string[], options: FilterOptionDef[]): string {
-  const kept = new Set(values);
-  // An umbrella whose legs all stand on one side reads as its own name there.
-  const names = (side: (o: FilterOptionDef) => boolean) => {
-    const out: string[] = [];
-    for (const o of options) {
-      if (!side(o)) continue;
-      const p = o.parent;
-      if (p && options.filter((x) => x.parent?.value === p.value).every(side)) {
-        if (!out.includes(p.label)) out.push(p.label);
-      } else out.push(o.label);
-    }
-    return out;
-  };
-  const shown = names((o) => kept.has(o.value));
-  const hidden = names((o) => !kept.has(o.value));
-  const list = (names: string[]) => (names.length > 1 ? `${names[0]} +${names.length - 1}` : (names[0] ?? ""));
-  return shown.length <= hidden.length ? list(shown) : `All but ${list(hidden)}`;
-}
-
-function dimensionOf(a: AxisSpec): FilterDimension<TimelineFilters> {
-  return {
-    id: a.axis,
-    label: a.name,
-    cardinality: "multi",
-    options: a.options.map((o) => ({
-      value: o.key,
-      label: o.label,
-      icon: a.icon?.(o) ?? o.icon,
-      suffix: o.suffix,
-      meta: o.count != null ? o.count.toLocaleString("en-US") : undefined,
-      parent: o.parent && {
-        value: o.parent.key,
-        label: o.parent.label,
-        meta: o.parent.count != null ? o.parent.count.toLocaleString("en-US") : undefined,
-      },
-    })),
-    get: (f) => f[a.axis],
-    set: (f, values) => ({ ...f, [a.axis]: values.length === a.options.length ? [] : values }),
-    chipLabel: (values, options) => `${a.name}: ${axisWords(values, options)}`,
-  };
-}
-
-export interface TimelineFilterModel {
-  dimensions: FilterDimension<TimelineFilters>[];
-  filters: TimelineFilters;
-  onChange: (next: TimelineFilters) => void;
-}
-
-/** The timeline's state as the listings' param object, and the write back. */
-export function timelineFilterModel(tl: TimelineEventsState): TimelineFilterModel {
-  const axes = axesOf(tl);
-  const filters: TimelineFilters = {
-    q: "",
-    sortBy: "time",
-    sortOrder: "desc",
-    type: [],
-    asset: [],
-    version: [],
-    address: [],
-  };
-  for (const a of axes) filters[a.axis] = selectionOf(a);
-  const onChange = (next: TimelineFilters) => {
-    for (const a of axes) {
-      const want = next[a.axis];
-      const was = filters[a.axis];
-      if (want.length === was.length && want.every((k) => was.includes(k))) continue;
-      // Back to every key shown, then hide what the selection leaves out (the
-      // hook's toggles queue on its state, so the run lands as one view).
-      a.reset();
-      if (want.length === 0) continue;
-      const keep = new Set(want);
-      for (const o of a.options) if (!keep.has(o.key)) a.toggle(o.key);
-    }
-  };
-  return { dimensions: axes.map(dimensionOf), filters, onChange };
-}
-
-/** A draft as the hook's four hidden sets: an offered axis hides what its
- *  selection leaves out (nothing while it is []), an axis with no pill keeps
- *  what it hides now. */
-export function draftAxesView(tl: TimelineEventsState, draft: TimelineFilters): TimelineAxesView {
-  const offered = new Map(axesOf(tl).map((a) => [a.axis, a]));
-  const hidden = (axis: Axis, options: FilterOption[], visible: Set<string>): Set<string> => {
-    const keep = offered.has(axis) ? draft[axis] : null;
-    if (keep == null) return new Set(options.filter((o) => !visible.has(o.key)).map((o) => o.key));
-    if (keep.length === 0) return new Set();
-    return new Set(options.filter((o) => !keep.includes(o.key)).map((o) => o.key));
-  };
-  return {
-    hiddenActions: hidden("type", tl.eventOptions, tl.visibleActionKeys),
-    hiddenAssets: hidden("asset", tl.assetOptions, tl.visibleAssetKeys),
-    hiddenVersions: hidden("version", tl.versionOptions, tl.visibleVersionKeys),
-    hiddenCounterparties: hidden("address", tl.counterpartyOptions, tl.visibleCounterpartyKeys),
-  };
-}
-
-/** Every axis back to showing all; the date is the caller's. */
-export function clearTimelineFilters(m: TimelineFilterModel): void {
-  m.onChange(resetAll(groupDimensions(m.dimensions, m.filters), m.filters));
-}
+/** The model with the asset options' token chips. */
+export const timelineFilterModel = (tl: TimelineEventsState): TimelineFilterModel =>
+  model(tl, (symbol) => <TokenChipIcon symbol={symbol} size={16} filterable={false} />);
 
 /** The pills of the axes, in registry order, each with its editor. */
 type DraftCount = (draft: TimelineFilters) => number | Promise<number>;

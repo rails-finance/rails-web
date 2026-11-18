@@ -852,7 +852,7 @@ function ChainTruthTimelineBody({
     return { ...tl, filteredCount: count, filteredCountIsFloor: floor };
   }, [tl, servedRows, folders]);
 
-  // The pill editors' draft count: the applied count's own rule over an
+  // The pill editors' draft count: the applied count's rule over an
   // unapplied view (ui-jobs 735), a floor while a folder it splits is unread.
   const countDraft = useCallback(
     (view: TimelineAxesView) => {
@@ -1874,13 +1874,19 @@ function ChainTruthTimelineBody({
     if (still || tl.eventOptions.length <= 1) return null;
     const key = getEventActionKey(e);
     // An umbrella type offered as its legs (ui-jobs 735) hides whole, under
-    // its own name: "Hide adjusts".
+    // the umbrella's label (Hide "Adjust" events).
     const option =
       tl.eventOptions.find((o) => o.key === key) ??
       (tl.eventOptions.some((o) => o.parent?.key === key)
         ? { key, label: actionLabel(key, tl.protocolKey), suffix: undefined }
         : undefined);
     if (!option) return null;
+    // Never the last type shown: the list would empty with nothing on the row
+    // to bring it back.
+    const othersShown = tl.eventOptions.some(
+      (o) => o.key !== key && o.parent?.key !== key && tl.visibleActionKeys.has(o.key),
+    );
+    if (!othersShown) return null;
     return { ...hideTypeWords(option.label, option.suffix), hide: () => tl.toggleHiddenAction(key) };
   };
 

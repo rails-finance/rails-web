@@ -30,6 +30,7 @@
 //
 // Run with the dev server up: BASE=http://localhost:3711 node scripts/verify/verify-dolomite-trade-sides.mjs
 
+import { axisOptions, openAxis } from "./lib/timeline-pills.mjs";
 import { chromium } from "playwright";
 import { showCardTab } from "./lib/card-tabs.mjs";
 
@@ -132,10 +133,9 @@ check(
 );
 
 // ── §3 the asset filter cross-indexes the trade under BOTH markets ──────────
-const allButtons = page.locator("button", { hasText: "All" });
-await allButtons.nth(1).click();
-await page.waitForTimeout(300);
-const assetMenuText = (await page.locator('[role="menu"], [role="listbox"], .absolute').allTextContents()).join(" ");
+// The Asset pill's editor (ui-jobs 735): each option's symbol and count.
+await openAxis(page, "Asset");
+const assetMenuText = (await axisOptions(page)).map((o) => `${o.label} ${o.count ?? ""}`).join(" ");
 check(
   "asset filter lists both USD1 and WETH with count 3 (2 own + 1 cross-referenced each)",
   /USD1[^\d]*3/.test(assetMenuText) && /WETH[^\d]*3/.test(assetMenuText),

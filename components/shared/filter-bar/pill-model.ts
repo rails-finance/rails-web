@@ -70,7 +70,7 @@ export function groupDimensions<F>(dims: FilterDimension<F>[], filters: F): Pill
   }
   const groups: PillGroup<F>[] = order.map((name) => ({ name, dims: byName.get(name)! }));
   // Two or more property groups become one Properties pill, where the first
-  // of them stood; a lone one keeps its own.
+  // of them stood; a lone one keeps its pill.
   const isProperty = (g: PillGroup<F>) => g.dims.length === 1 && g.dims[0].property === true;
   const props = groups.filter(isProperty);
   if (props.length < 2) return groups;

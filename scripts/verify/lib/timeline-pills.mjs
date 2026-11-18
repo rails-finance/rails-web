@@ -20,10 +20,11 @@ export async function openAxis(page, label, scope = page) {
   return true;
 }
 
-/** The open editor's options, umbrella rows left out: key, label, count and
- *  whether it is ticked (kept). */
-export async function axisOptions(page) {
-  return page.locator("[data-pill-option]:not([data-pill-parent])").evaluateAll((els) =>
+/** Every row of the open editor: key, label, count, whether it is ticked
+ *  (kept), `parent` (the umbrella a leg sits under, else null) and `umbrella`
+ *  (the umbrella's own row, which ticks its legs). */
+export async function axisRows(page) {
+  return page.locator("[data-pill-option]").evaluateAll((els) =>
     els.map((el) => {
       const spans = el.querySelectorAll("span");
       const meta = spans[spans.length - 1]?.textContent ?? "";
@@ -32,9 +33,23 @@ export async function axisOptions(page) {
         label: (el.querySelector("span.flex-1")?.textContent ?? "").trim(),
         count: /^[\d,]+$/.test(meta.trim()) ? Number(meta.replace(/,/g, "")) : null,
         checked: el.getAttribute("aria-checked") === "true",
+        parent: el.getAttribute("data-pill-nested") || null,
+        umbrella: el.hasAttribute("data-pill-parent"),
       };
     }),
   );
+}
+
+/** The open editor's options, umbrella rows left out. */
+export async function axisOptions(page) {
+  return (await axisRows(page)).filter((r) => !r.umbrella);
+}
+
+/** The options a row label stands for: an umbrella's legs, or the one option. */
+export function optionsOf(rows, label) {
+  const row = rows.find((r) => r.label === label);
+  if (!row) return [];
+  return row.umbrella ? rows.filter((r) => r.parent === row.key) : [row];
 }
 
 /** Tick exactly `keys` in the open editor and apply. */

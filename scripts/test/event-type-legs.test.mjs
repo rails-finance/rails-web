@@ -1,8 +1,7 @@
 // lib/shared/event-filter-helpers.ts: an umbrella event type offered as its
 // legs (rails-ops ui-jobs 735). An adjust passes while any of its legs is
-// shown; a hidden umbrella key (a link from before the legs) hides them all;
-// a folder whose header counts the umbrella cannot say how many pass while
-// only some legs are hidden. Run: npm test
+// shown, one with no leg only while every leg is kept, and a hidden umbrella
+// key (a link from before the legs) hides them all. Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
 import { register } from "node:module";
@@ -23,10 +22,9 @@ export async function resolve(specifier, context, next) {
 }`;
 register(`data:text/javascript,${encodeURIComponent(hooks)}`);
 
-const { getEventActionLegs, actionHidden, actionLegParent, actionLabel } = await import(
+const { getEventActionLegs, actionHidden, actionLegParent, actionLabel, settleActionHidden, LEGLESS } = await import(
   "../../lib/shared/event-filter-helpers.ts"
 );
-const { folderMatchCount } = await import("../../lib/shared/timeline-folder-filter.ts");
 
 /** A Liquity V2 adjust moving `coll` and `debt` (pre-scaled, as the context carries them). */
 const adjust = (coll, debt) => ({
@@ -59,22 +57,27 @@ test("an adjust passes while any of its legs is shown, and once", () => {
   assert.equal(actionHidden(e, new Set(["adjustTrove"])), true);
 });
 
-test("a folder counting the umbrella cannot say how many pass while it is split", () => {
-  const folder = {
-    count: 10,
-    other: 0,
-    counts: [{ key: "adjustTrove", count: 10 }],
-    legs: [],
-    byDay: [],
-    firstAt: 0,
-    lastAt: 1,
-  };
-  const axes = {
-    hiddenActions: new Set(),
-    hiddenAssets: new Set(),
-    hiddenCounterparties: new Set(),
-    dateRange: null,
-  };
-  assert.equal(folderMatchCount(folder, axes), 10);
-  assert.equal(folderMatchCount(folder, { ...axes, splitActions: new Set(["adjustTrove"]) }), null);
+test("the hidden set settles against the legs a page offers", () => {
+  const offered = new Map([["adjustTrove", ["adjustTrove.addColl", "adjustTrove.repay"]]]);
+  // Some legs hidden: the leg-less adjusts go too, the umbrella stays.
+  const some = settleActionHidden(new Set(["adjustTrove.repay"]), offered);
+  assert.ok(some.has("adjustTrove" + LEGLESS));
+  assert.ok(!some.has("adjustTrove"));
+  // Every offered leg hidden: the umbrella is hidden, so a folder header
+  // keyed by it reads hidden as loose events do.
+  const all = settleActionHidden(new Set(["adjustTrove.addColl", "adjustTrove.repay"]), offered);
+  assert.ok(all.has("adjustTrove"));
+  // The umbrella from an older link hides each leg.
+  const link = settleActionHidden(new Set(["adjustTrove"]), offered);
+  assert.ok(link.has("adjustTrove.addColl") && link.has("adjustTrove.repay"));
+});
+
+test("an adjust with no leg shows only while every leg is kept", () => {
+  // An adjustTrove whose row carries no TroveOperation figures.
+  const none = { ...adjust(0, 0), context: { ...adjust(0, 0).context } };
+  none.context.data = { collateralType: "WETH", operation: "adjustTrove" };
+  assert.equal(getEventActionLegs(none), null);
+  const offered = new Map([["adjustTrove", ["adjustTrove.addColl", "adjustTrove.repay"]]]);
+  assert.equal(actionHidden(none, settleActionHidden(new Set(), offered)), false);
+  assert.equal(actionHidden(none, settleActionHidden(new Set(["adjustTrove.addColl"]), offered)), true);
 });

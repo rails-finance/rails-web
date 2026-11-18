@@ -134,12 +134,16 @@ export function ListToolbar<F extends BaseListFilters>({
   const editorCount = count ?? sheetCount;
   const countLine =
     countNode != null ? (
-      <span className={`whitespace-nowrap text-sm tabular-nums ${PILL_MUTED}`} data-anatomy="N1.6" data-prov-exempt="">
+      <span
+        className={`min-w-0 text-sm tabular-nums sm:whitespace-nowrap ${PILL_MUTED}`}
+        data-anatomy="N1.6"
+        data-prov-exempt=""
+      >
         {countNode}
       </span>
     ) : count ? (
       <span
-        className={`whitespace-nowrap text-sm tabular-nums ${PILL_MUTED}`}
+        className={`min-w-0 text-sm tabular-nums sm:whitespace-nowrap ${PILL_MUTED}`}
         data-anatomy="N1.6"
         data-result-count={count.total}
         data-prov-exempt=""
@@ -222,7 +226,10 @@ export function ListToolbar<F extends BaseListFilters>({
         )}
         {/* The count, the sort and the ⋮: one group at the right that wraps
             together (Miles, 18 Nov 2026, ui-jobs 735). */}
-        <div className="order-1 ml-auto flex min-h-11 shrink-0 items-center gap-3 sm:min-h-10">
+        {/* Below sm the count gives way first: it wraps under its figure
+            beside the sort, where a 343px row cannot hold all three on one
+            line. */}
+        <div className="order-1 ml-auto flex min-h-11 min-w-0 items-center gap-3 sm:min-h-10 sm:shrink-0">
           {countLine}
           {sortOptions.length > 0 && (
             <SortPill

@@ -442,7 +442,7 @@ export function OptionRow({
   mixed?: boolean;
   /** A leg, indented under its umbrella's row. */
   nested?: boolean;
-  /** The umbrella's own row (`data-pill-parent`). */
+  /** The umbrella's row (`data-pill-parent`). */
   parentRow?: boolean;
 }) {
   return (
@@ -454,7 +454,7 @@ export function OptionRow({
       className={`flex w-full min-h-11 sm:min-h-9 items-center gap-3 rounded-md ${nested ? "pl-8 pr-1" : "px-1"} text-left text-sm hover:bg-rb-100 dark:hover:bg-rb-800 ${FOCUS}`}
       data-pill-option={opt.value}
       data-pill-parent={parentRow ? "" : undefined}
-      data-pill-nested={nested ? "" : undefined}
+      data-pill-nested={nested ? (opt.parent?.value ?? "") : undefined}
     >
       {multi ? (
         <span

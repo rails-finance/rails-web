@@ -29,7 +29,7 @@ export interface FilterOptionDef {
   meta?: string;
   /** The umbrella this option is a leg of (an event type's legs, ui-jobs
    *  735): the editors nest the legs under a row that ticks them all. The
-   *  umbrella is not an option of its own. */
+   *  umbrella is a heading, never an option. */
   parent?: { value: string; label: string; meta?: string };
 }
 
@@ -79,8 +79,8 @@ export interface FilterDimension<F> {
   labelAction?: ReactNode;
   /** A two-option property of the row ("Redeemed / Never redeemed"): where a
    *  listing has two or more, they share one "Properties" pill whose editor
-   *  stacks them (ui-jobs 735); a lone one keeps its own pill. Each keeps its
-   *  own param. */
+   *  stacks them (ui-jobs 735); a lone one keeps its pill. Each keeps its
+   *  param. */
   property?: boolean;
   /** Hide from the + Filter menu when false (e.g. Borrowing while Supply-only). */
   available?: (f: F) => boolean;

@@ -53,7 +53,7 @@
 // Run:
 //   BASE=http://localhost:3111 node scripts/verify/verify-timeline-asset-axis.mjs
 
-import { axisOptions, keepOnly, openAxis } from "./lib/timeline-pills.mjs";
+import { axisRows, keepOnly, openAxis, optionsOf } from "./lib/timeline-pills.mjs";
 import { chromium } from "playwright";
 import { COUNT_LINE_SEL, countLineText, parseCountLine, NAMES_THE_CAP } from "../lib/timeline-draw.mjs";
 
@@ -199,10 +199,15 @@ async function settled() {
  *  nothing ticked is everything shown. */
 async function toggle(heading, key) {
   if (!(await openAxis(page, heading))) return null;
-  const opts = await axisOptions(page);
+  const rows = await axisRows(page);
+  const opts = rows.filter((r) => !r.umbrella);
   const shown = opts.some((o) => o.checked) ? opts.filter((o) => o.checked) : opts;
-  const target = opts.find((o) => o.label === key);
-  const keep = shown.includes(target) ? shown.filter((o) => o !== target) : [...shown, target];
+  // A row may be an umbrella type: it stands for its legs.
+  const target = optionsOf(rows, key).map((t) => t.key);
+  const on = target.every((k) => shown.some((o) => o.key === k));
+  const keep = on
+    ? shown.filter((o) => !target.includes(o.key))
+    : [...shown, ...opts.filter((o) => target.includes(o.key) && !shown.includes(o))];
   await keepOnly(
     page,
     keep.map((o) => o.key),

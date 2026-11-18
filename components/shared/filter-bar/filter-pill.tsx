@@ -52,7 +52,7 @@ export interface FilterPillProps {
   buttonRef?: Ref<HTMLButtonElement>;
   /** The editor, drawn beside the pill (a popover anchors to the pill). */
   children?: ReactNode;
-  /** Codes after N1.10 where a surface names its own pills (the timeline's
+  /** Codes after N1.10 where a surface names its pills (the timeline's
    *  L1.3–L1.7). */
   anatomy?: string;
   /** Data hooks on the pill's main button (the timeline's Date pill keeps

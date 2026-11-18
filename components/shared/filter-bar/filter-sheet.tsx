@@ -897,7 +897,7 @@ function SheetOption({
       className={`flex w-full min-h-12 items-center gap-3 border-b border-rb-200 dark:border-rb-800 py-2 ${nested ? "pl-7" : ""} text-left text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500`}
       data-filter-sheet-option={opt.value}
       data-pill-parent={parentRow ? "" : undefined}
-      data-pill-nested={nested ? "" : undefined}
+      data-pill-nested={nested ? (opt.parent?.value ?? "") : undefined}
     >
       {multi ? (
         <span

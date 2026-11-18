@@ -88,7 +88,7 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import {
   ACTION_LEGS,
   actionHidden,
-  actionLegParent,
+  settleActionHidden,
   getEventActionKey,
   getEventActionLegs,
   getEventAssetKeys,
@@ -279,21 +279,6 @@ export interface TimelineEventsState {
     folders: Array<{ folder: ServedFolder; matched: number | null }>;
     passes: (e: BaseActivityEvent) => boolean;
   };
-}
-
-/** The action axis as a folder's header reads it: a header counts its
- *  members by umbrella type, so an umbrella whose every leg is hidden reads as
- *  hidden, and one only some of whose legs are hidden splits the folder
- *  (ui-jobs 735). */
-export function folderActionAxes(hidden: Set<string>): Pick<FolderFilterAxes, "hiddenActions" | "splitActions"> {
-  const hiddenActions = new Set(hidden);
-  const splitActions = new Set<string>();
-  for (const [parent, legs] of Object.entries(ACTION_LEGS)) {
-    const n = legs.filter((l) => hidden.has(l.key)).length;
-    if (n === legs.length) hiddenActions.add(parent);
-    else if (n > 0 && !hidden.has(parent)) splitActions.add(parent);
-  }
-  return { hiddenActions, splitActions };
 }
 
 /** The four hidden sets, as one view of the axes. */
@@ -587,6 +572,32 @@ export function useTimelineEvents(
     [events],
   );
 
+  // The umbrella types this page offers as their legs (ui-jobs 735): each
+  // umbrella every one of whose events is loaded, with the legs those events
+  // carry. An umbrella with members below the cut or inside a folder is
+  // counted there by its type alone, so it stays one option.
+  const offeredLegs = useMemo(() => {
+    const unsplit = new Set<string>();
+    for (const b of win.opening?.byAction ?? []) if (b.count > 0) unsplit.add(b.key);
+    for (const row of servedRows ?? []) {
+      if (row.kind === "folder") for (const b of row.folder.counts) if (b.count > 0) unsplit.add(b.key);
+    }
+    const seen = new Map<string, Set<string>>();
+    for (const e of sortedEvents) {
+      const key = getEventActionKey(e);
+      if (!ACTION_LEGS[key] || unsplit.has(key)) continue;
+      for (const leg of getEventActionLegs(e) ?? []) {
+        if (!seen.has(key)) seen.set(key, new Set());
+        seen.get(key)!.add(leg);
+      }
+    }
+    return new Map(
+      [...seen].map(([key, legs]) => [key, ACTION_LEGS[key].map((l) => l.key).filter((k) => legs.has(k))] as const),
+    );
+  }, [sortedEvents, win.opening, servedRows]);
+  // The hidden types, settled against those legs: what every filter reads.
+  const actionHiddenSet = useMemo(() => settleActionHidden(hiddenSet, offeredLegs), [hiddenSet, offeredLegs]);
+
   // Events summarised below the cut. They are not in `events` and never will
   // be, so every number they contribute to is seeded from the opening balance
   // rather than counted.
@@ -649,12 +660,12 @@ export function useTimelineEvents(
   const passesAxes = useCallback(
     (e: BaseActivityEvent) =>
       eventPassesAxes(e, {
-        hiddenActions: hiddenSet,
+        hiddenActions: actionHiddenSet,
         hiddenAssets: hiddenAssetSet,
         hiddenCounterparties: hiddenCounterpartySet,
         hiddenVersions: hiddenVersionSet,
       }),
-    [hiddenSet, hiddenAssetSet, hiddenCounterpartySet, hiddenVersionSet],
+    [actionHiddenSet, hiddenAssetSet, hiddenCounterpartySet, hiddenVersionSet],
   );
   const visibleEvents = useMemo(() => sortedEvents.filter(passesAxes), [sortedEvents, passesAxes]);
 
@@ -666,24 +677,25 @@ export function useTimelineEvents(
 
   const folderAxes = useMemo<FolderFilterAxes>(
     () => ({
-      ...folderActionAxes(hiddenSet),
+      hiddenActions: actionHiddenSet,
       hiddenAssets: hiddenAssetSet,
       hiddenCounterparties: hiddenCounterpartySet,
       dateRange,
     }),
-    [hiddenSet, hiddenAssetSet, hiddenCounterpartySet, dateRange],
+    [actionHiddenSet, hiddenAssetSet, hiddenCounterpartySet, dateRange],
   );
 
   // A view the reader has not applied yet, judged by the same predicate and
   // the same folder headers as the applied one: the pill editors' "Show 12"
   // (ui-jobs 735). Reads nothing new.
   const draftView = useCallback(
-    (view: TimelineAxesView) => {
+    (draft: TimelineAxesView) => {
+      const view = { ...draft, hiddenActions: settleActionHidden(draft.hiddenActions, offeredLegs) };
       const passes = (e: BaseActivityEvent) =>
         eventPassesAxes(e, view) && (!dateRange || (e.timestamp >= dateRange[0] && e.timestamp <= dateRange[1]));
       let loose = 0;
       for (const e of sortedEvents) if (passes(e)) loose++;
-      const axes: FolderFilterAxes = { ...view, ...folderActionAxes(view.hiddenActions), dateRange };
+      const axes: FolderFilterAxes = { ...view, dateRange };
       const folders = (servedRows ?? []).flatMap((row) =>
         row.kind === "folder" && folderAdmits(row.folder, axes)
           ? [{ folder: row.folder, matched: folderMatchCount(row.folder, axes) }]
@@ -691,7 +703,7 @@ export function useTimelineEvents(
       );
       return { loose, folders, passes };
     },
-    [sortedEvents, servedRows, dateRange],
+    [sortedEvents, servedRows, dateRange, offeredLegs],
   );
 
   const dateFilteredEvents = useMemo(() => {
@@ -772,8 +784,9 @@ export function useTimelineEvents(
   // the window presented as a count of the position.
   const eventOptions = useMemo<FilterOption[]>(() => {
     const counts = seedCounts(win.opening?.byAction);
-    // An umbrella type counts under each leg an event has (ui-jobs 735); the
-    // umbrella keeps every event, for its own row.
+    // An umbrella offered as its legs counts each event under each leg it
+    // has; the umbrella's row counts each event once, from the same loaded
+    // events (`offeredLegs` holds no umbrella with members elsewhere).
     const legCounts = new Map<string, number>();
     for (const e of sortedEvents) {
       const key = getEventActionKey(e);
@@ -801,8 +814,8 @@ export function useTimelineEvents(
       })
       .flatMap(([key, count]): FilterOption[] => {
         const base = { key, label: actionLabel(key, protocolKey), count, demoted: demoted.has(key) };
-        // An umbrella with legs on the page is offered as those legs.
-        const legs = (ACTION_LEGS[key] ?? []).filter((l) => legCounts.has(l.key));
+        const offered = offeredLegs.get(key);
+        const legs = (ACTION_LEGS[key] ?? []).filter((l) => offered?.includes(l.key));
         if (legs.length === 0) return [base];
         const parent = { key, label: base.label, count };
         return legs.map((l) => ({
@@ -813,7 +826,7 @@ export function useTimelineEvents(
           parent,
         }));
       });
-  }, [sortedEvents, protocolKey, win.opening, servedRows]);
+  }, [sortedEvents, protocolKey, win.opening, servedRows, offeredLegs]);
 
   // Commonest asset first — no demoted tier here: an asset is a fact about the
   // position, never noise the way a bot's keep-alive touch is.
@@ -886,11 +899,8 @@ export function useTimelineEvents(
   );
 
   const visibleActionKeys = useMemo(
-    () =>
-      new Set(
-        eventOptions.map((o) => o.key).filter((k) => !hiddenSet.has(k) && !hiddenSet.has(actionLegParent(k) ?? "")),
-      ),
-    [eventOptions, hiddenSet],
+    () => new Set(eventOptions.map((o) => o.key).filter((k) => !actionHiddenSet.has(k))),
+    [eventOptions, actionHiddenSet],
   );
 
   const toggleHiddenAction = useCallback((key: string) => {
@@ -957,12 +967,14 @@ export function useTimelineEvents(
   // decide whether to arm `suppressNextPersistRef` here.
   const revealEvent = useCallback(
     (event: BaseActivityEvent) => {
-      // The type and, under an umbrella type, its legs (ui-jobs 735).
-      const actionKeys = [getEventActionKey(event), ...(getEventActionLegs(event) ?? [])];
+      // The type and, under an umbrella type, its legs, or every leg for an
+      // event that has none (it shows only while all are kept; ui-jobs 735).
+      const key = getEventActionKey(event);
+      const actionKeys = [key, ...(getEventActionLegs(event) ?? (ACTION_LEGS[key] ?? []).map((l) => l.key))];
       const assetKeys = getEventAssetKeys(event);
       const counterpartyKeys = getEventCounterpartyKeys(event);
       const versionKeys = getEventVersionKeys(event);
-      const needsAction = actionKeys.some((k) => hiddenActions.includes(k));
+      const needsAction = actionHidden(event, actionHiddenSet);
       const needsAssets = assetKeys.some((k) => hiddenAssets.includes(k));
       const needsCounterparties = counterpartyKeys.some((k) => hiddenCounterparties.includes(k));
       const needsVersions = versionKeys.some((k) => hiddenVersions.includes(k));
@@ -975,7 +987,7 @@ export function useTimelineEvents(
       if (needsVersions) setHiddenVersions((prev) => prev.filter((k) => !versionKeys.includes(k)));
       if (needsDateClear) setDateRange(null);
     },
-    [hiddenActions, hiddenAssets, hiddenCounterparties, hiddenVersions, dateRange],
+    [actionHiddenSet, hiddenAssets, hiddenCounterparties, hiddenVersions, dateRange],
   );
   // The one setter handed out raw: selecting a range in the heatmap is a live
   // toggle like any other, so it opens the address-bar mirror too.

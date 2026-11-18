@@ -610,7 +610,7 @@ export function TimelineToolbar({
   // "12 of 340 events"), the "event numbers" class, not a chain-state figure.
   // Stamped here so a timeline nested inside a page-level receipts scope (the
   // Vaults position page) is not asked for a receipt for how many rows it
-  // has. The data-timeline-* markers are the line's own state, for anything
+  // has. The data-timeline-* markers are the line's state, for anything
   // reading this page rather than looking at it (`eventCountState`).
   const countNode = (
     <span
@@ -708,8 +708,8 @@ export function TimelineToolbar({
       ) : (
         // The listings' pill row (N1, ui-jobs 735): [axis pills] [Date]
         // [Clear all] and the count at the right end. Below sm the pills
-        // scroll sideways behind the Filters button, and the count takes the
-        // line under them, at its left as the listings set it.
+        // scroll sideways behind the Filters button, and Reset and the count
+        // take the line under them, at its left as the listings set it.
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <div className="relative max-sm:-mx-4 max-sm:min-w-0 max-sm:basis-[calc(100%+2rem)] sm:contents">
             <div
@@ -742,15 +742,18 @@ export function TimelineToolbar({
             />
           </div>
           <div className="flex min-h-11 min-w-0 flex-1 items-center gap-3 sm:min-h-10">
-            {setCount > 1 && (
+            {/* As the listings draw it (N1.13): from sm "Clear all" once two
+                pills are set, below sm "Reset" once one is. */}
+            {setCount > 0 && (
               <button
                 type="button"
                 onClick={clearAll}
-                className={`text-sm font-medium ${INPLACE_TEXT} shrink-0 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500`}
+                className={`text-sm font-medium ${INPLACE_TEXT} shrink-0 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${setCount < 2 ? "sm:hidden" : ""}`}
                 data-pill-clear=""
                 data-anatomy="L1.12"
               >
-                Clear all
+                <span className="sm:hidden">Reset</span>
+                <span className="max-sm:hidden">Clear all</span>
               </button>
             )}
             <span className="min-w-0 sm:ml-auto">{countNode}</span>

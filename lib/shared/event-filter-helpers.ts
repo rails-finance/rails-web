@@ -38,10 +38,12 @@ import { FORK_DEBT_DUST_FLOAT, forkCollMove, forkDebtMove } from "@/lib/shared/l
 //
 // A type that stands for several acts ("Adjust": add or withdraw collateral,
 // borrow, repay) is offered in the Type filter as its legs, the row labels'
-// own verbs, nested under it. An event passes while any of its legs is shown,
-// so one adjust that adds collateral and borrows counts and shows once. A
-// hidden set may still hold the umbrella key itself (a link from before the
-// legs): that hides every leg.
+// verbs, nested under it, where every one of its events is loaded (members
+// below the cut or in a folder are counted by type alone). An event passes
+// while any of its legs is shown, so one adjust that adds collateral and
+// borrows counts and shows once; one that moved nothing a leg names shows
+// only while every leg is kept. A hidden set may hold the umbrella key (a link
+// from before the legs): that hides every leg.
 
 /** Each umbrella key's legs, in the order the editor lists them. */
 export const ACTION_LEGS: Record<string, { key: string; label: string }[]> = {
@@ -89,7 +91,7 @@ export function getEventActionLegs(e: BaseActivityEvent): string[] | null {
     if (ctx.eventType !== "adjustTrove") return null;
     return troveLegs(Number(ctx.collDelta) || 0, Number(ctx.debtDelta) || 0, 0);
   }
-  // The Liquity V2 forks: the act's own moves, as their head words read them
+  // The Liquity V2 forks: the act's moves, as their head words read them
   // (lib/shared/liquity-fork-head-words.ts).
   if (isEbisuEvent(e) || isAsymmetryEvent(e) || isBasedollarEvent(e)) {
     if (getEventActionKey(e) !== "adjustTrove") return null;
@@ -117,14 +119,43 @@ function troveLegs(coll: number, debt: number, debtDust: number, parent = "adjus
   return legs.length ? legs : null;
 }
 
-/** Does the action axis hide this event? Its type hidden, or every one of its
- *  legs. */
-export function actionHidden(e: BaseActivityEvent, hidden: Set<string>): boolean {
+/** The stand-in leg of an umbrella event that moved nothing a leg names (an
+ *  f(x) adjust with no deltas, a fork adjust under the dust): it matches no
+ *  leg, so it shows only while every leg is kept. */
+export const LEGLESS = ".none";
+
+/** The hidden action keys with the umbrellas settled against the legs a page
+ *  offers (`offered`, umbrella → its legs on the page): an umbrella hidden
+ *  hides each leg; any leg hidden hides the leg-less events; every leg hidden
+ *  hides the umbrella. Loose events, folder headers and a draft's count all
+ *  read this one set. */
+export function settleActionHidden(
+  hidden: ReadonlySet<string>,
+  offered: ReadonlyMap<string, readonly string[]>,
+): Set<string> {
+  const out = new Set(hidden);
+  for (const [parent, legs] of offered) {
+    if (hidden.has(parent)) {
+      for (const l of legs) out.add(l);
+      out.add(parent + LEGLESS);
+      continue;
+    }
+    const n = legs.filter((l) => hidden.has(l)).length;
+    if (n > 0) out.add(parent + LEGLESS);
+    if (n === legs.length) out.add(parent);
+  }
+  return out;
+}
+
+/** Does the action axis hide this event? Its type hidden, or, under an
+ *  umbrella type, every one of its legs (a settled set, `settleActionHidden`). */
+export function actionHidden(e: BaseActivityEvent, hidden: ReadonlySet<string>): boolean {
   if (hidden.size === 0) return false;
   const key = getEventActionKey(e);
   if (hidden.has(key)) return true;
-  const legs = getEventActionLegs(e);
-  return legs != null && legs.every((l) => hidden.has(l));
+  if (!ACTION_LEGS[key]) return false;
+  const legs = getEventActionLegs(e) ?? [key + LEGLESS];
+  return legs.every((l) => hidden.has(l));
 }
 
 /** Get the canonical action key for an event (used for type-level filtering) */
