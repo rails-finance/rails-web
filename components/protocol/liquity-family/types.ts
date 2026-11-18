@@ -53,6 +53,8 @@ export interface LiquityTroveView {
   lastActivityAt: number;
   /** The trove's OWN transactions (redemptions + liquidations excluded). */
   txCount: number;
+  /** Closed in the transaction that opened it (Liquity V2's row, ui-jobs 747). */
+  closedInOneTx?: boolean;
   liquidationCount: number;
   redemptionCount: number;
   /** TroveNFT owner; `owner` is null once burned, `lastOwner` survives it. */
