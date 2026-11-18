@@ -42,6 +42,9 @@ export interface LiquityV1PositionChainResponse {
   /** ETH:USD from the protocol's own PriceFeed (fetchPrice simulated at head;
    *  falls back to lastGoodPrice). */
   price: number;
+  /** True when the fetchPrice simulation failed and `price` is lastGoodPrice.
+   *  Absent on an answer that predates the flag. */
+  priceStale?: boolean;
   /** Current individual collateral ratio — TroveManager.getCurrentICR ÷ 1e18.
    *  Null when the Trove has no debt (the contract returns 2^256−1). */
   icr: number | null;

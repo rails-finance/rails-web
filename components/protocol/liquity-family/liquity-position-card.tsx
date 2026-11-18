@@ -31,6 +31,7 @@
 // of that table on purpose: the `protocol` prop selects both the config row
 // and the OPS lookup below.
 
+import { priceText, shownUsd } from "@/lib/shared/holder-usd-receipt";
 import type { ForkNftTransfer } from "@/lib/liquity-fork/former-holders";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import type { ReactNode } from "react";
@@ -292,6 +293,17 @@ function listingCrProv(
   };
 }
 
+/** The balance and the price a fork card's USD line was drawn from, for its
+ *  receipt's rows. */
+const priceVals = (ctx: LiquityFaceProvContext) =>
+  ctx.priceUsd != null
+    ? {
+        amount: ctx.coll,
+        price: ctx.priceUsd,
+        stale: ctx.live ? (ctx.live.priceStale ?? false) : (ctx.v.priceStale ?? false),
+      }
+    : undefined;
+
 function makeForkCardOps(protocol: ForkProtocol, deps: ForkCardDeps): LiquityFamilyCardOps {
   const vocab = forkLiveVocab(protocol);
   const cfg = LIQUITY_FORK_CARD_CONFIGS[protocol];
@@ -314,7 +326,7 @@ function makeForkCardOps(protocol: ForkProtocol, deps: ForkCardDeps): LiquityFam
           coll: vocab.troveStateProv("Collateral", "entire collateral", ct, sc.coll),
           debt: vocab.troveStateProv("Debt", "entire debt", ct, sc.debt),
           rate: vocab.liveRateProv(ct, v.isBatched, sc.rate),
-          collUsd: vocab.forkUsdProv("Collateral", ct),
+          collUsd: vocab.forkUsdProv("Collateral", ct, priceVals(ctx)),
           cr: vocab.contractIcrProv(ct),
           liq: vocab.liqPriceProv(ct),
         };
@@ -329,7 +341,7 @@ function makeForkCardOps(protocol: ForkProtocol, deps: ForkCardDeps): LiquityFam
         coll: deps.positionCollateralProv(coords),
         debt: deps.positionDebtProv(coords),
         rate: deps.positionRateProv(coords),
-        collUsd: vocab.forkUsdProv("Collateral", ct),
+        collUsd: vocab.forkUsdProv("Collateral", ct, priceVals(ctx)),
         cr: listingCrProv(cfg, deps, ct, v.priceStale ?? false, terms),
         liq: terms.ltv
           ? {
@@ -547,6 +559,7 @@ export function liveFromForkChain(c: LiquityForkTroveChainResponse): LiquityTrov
     annualInterestRateRaw: c.annualInterestRateRaw,
     collDecimals: c.collDecimals,
     priceUsd: c.priceUsd,
+    priceStale: c.priceStale,
     icrPct: c.icr != null ? c.icr * 100 : null,
     status: c.status,
     branchColl: c.branchColl,
@@ -622,7 +635,9 @@ export function useLiquityCardSlots({
   const debt = lv?.entireDebt ?? v.debt;
   const rate = lv?.annualInterestRatePct ?? v.interestRate;
   const priceUsd = lv ? lv.priceUsd : (v.priceUsd ?? null);
-  const collUsd = lv ? (lv.priceUsd != null ? lv.entireColl * lv.priceUsd : null) : (v.collateralUsd ?? null);
+  // The USD line is the product its receipt shows: the
+  // collateral and the price as the rows print them, to the cent.
+  const collUsd = priceUsd != null ? shownUsd(coll, priceUsd) : lv ? null : (v.collateralUsd ?? null);
   const crPct = lv ? lv.icrPct : (v.collateralRatioPct ?? null);
   // Each deployment states the ratio its docs' way (decision 0065): LTV, debt
   // ÷ collateral value, or a collateral ratio.
@@ -646,7 +661,7 @@ export function useLiquityCardSlots({
       symbol={ct}
       address={collAddress}
       figure={`${exactOf(value, raw, collDecimals)} ${ct}`}
-      price={withPrice && collPrice != null ? formatUsdValue(collPrice) : undefined}
+      price={withPrice && collPrice != null ? priceText(collPrice) : undefined}
       priceSource={withPrice && collPrice != null ? `The ${ct} branch's PriceFeed` : undefined}
     >
       <TokenChipIcon symbol={ct} address={collAddress} size={28} filterable={false} untitled />
@@ -759,7 +774,7 @@ export function useLiquityCardSlots({
     // view while there is something to claim; once claimed it goes, and the
     // claim stays on the timeline.
     const claimable = surplus && surplus.claimable > 1e-9 ? surplus : null;
-    const claimableUsd = claimable && priceUsd != null && priceUsd > 0 ? claimable.claimable * priceUsd : null;
+    const claimableUsd = claimable && priceUsd != null && priceUsd > 0 ? shownUsd(claimable.claimable, priceUsd) : null;
     heads = [
       {
         id: "peak-collateral",
@@ -812,7 +827,19 @@ export function useLiquityCardSlots({
           {claimableUsd != null && (
             <>
               {" "}
-              (<Prov info={collSurplusUsdProv(claimable, ct, priceUsd as number)}>{formatUsdValue(claimableUsd)}</Prov>)
+              (
+              <Prov
+                info={collSurplusUsdProv(
+                  claimable,
+                  ct,
+                  priceUsd as number,
+                  protocol === "liquity-v2" ? undefined : "the branch's PriceFeed price",
+                  lv ? (lv.priceStale ?? false) : (v.priceStale ?? false),
+                )}
+              >
+                {formatUsdValue(claimableUsd)}
+              </Prov>
+              )
             </>
           )}{" "}
           {CLAIMABLE_BY_OWNER}

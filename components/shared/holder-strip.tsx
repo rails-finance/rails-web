@@ -229,7 +229,7 @@ export function HolderStrip({ countsLine, counts, legs, truncated, note, wallet,
             page is the wallet everywhere. */}
         {wallet && (
           <Link
-            href={`/wallet/${wallet}`}
+            href={`/wallet/${encodeURIComponent(wallet)}`}
             className={`mt-2 text-sm ${FOOT_LINK}`}
             data-holder-wallet-link=""
             data-anatomy="N7.2"
