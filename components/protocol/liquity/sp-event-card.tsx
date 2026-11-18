@@ -17,13 +17,20 @@ import { formatCompact } from "@/lib/shared/format-compact";
 import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
 import { big, exactUnits, units } from "@/lib/liquity-v2/sp-math";
-import { spTouchProv } from "@/lib/liquity-v2/sp-provenance";
+import { spCompoundProv, spTouchProv } from "@/lib/liquity-v2/sp-provenance";
+import type { ChainTruthDelta } from "@/components/shared/chain-truth-event";
 import { DEPOSIT_TOUCH_TIP } from "@/lib/liquity-v2/touch-words";
 import { spEventLabel, spEventSentences } from "@/lib/liquity-v2/sp-event-prose";
 import type { LiquityV2DepositEventRow } from "@/lib/sources/api/liquity-v2-sp";
 import { DEPOSIT_AFTER_FORMULA, spDepositSheet } from "./sp-sheet";
 
 const ZERO = BigInt(0);
+/** A kept amount as the row states it: the compact form from 0.01, two
+ *  significant digits below it, so 0.000083 BOLD does not read as 0.0001. */
+const keptText = (raw: bigint): string => {
+  const n = units(raw);
+  return n >= 0.01 ? formatCompact(n) : n.toLocaleString("en-US", { maximumSignificantDigits: 2 });
+};
 const short = (h: string) => `${h.slice(0, 6)}…${h.slice(-4)}`;
 
 function txCell(txHash: string, block: string, info: Provenance): EventCellSpec {
@@ -138,6 +145,70 @@ export function LiquityV2DepositEventCard({
       value: units(yieldClaimed),
       verb: "claimed",
     });
+  // A compound (withdrawFromSP(0), no claim) moves no token: the yield it
+  // kept joins the deposit, and the collateral it did not claim is stashed.
+  // Both point into the deposit, as a top-up does; the loss since the last
+  // touch stays in the sheet, so the deposit moves by the yield less it.
+  const label = spEventLabel(row);
+  const deltas: ChainTruthDelta[] = [];
+  if (label === "Compounded") {
+    const yieldAdded = big(row.yield_gain_since) - yieldClaimed;
+    const stashed = big(row.coll_gain_since) - collClaimed;
+    const sinceAndClaimed = (since: string, claimed: string) => ({
+      since: exactUnits(big(since)),
+      claimed: exactUnits(big(claimed)),
+    });
+    if (yieldAdded > ZERO) {
+      tokens.push({
+        symbol: "BOLD",
+        address: TOKEN_ADDRESSES.BOLD,
+        direction: "right",
+        popover: true,
+        value: units(yieldAdded),
+        display: keptText(yieldAdded),
+        verb: "added to the deposit",
+      });
+      deltas.push({
+        value: units(yieldAdded),
+        symbol: "BOLD",
+        address: TOKEN_ADDRESSES.BOLD,
+        exact: exactUnits(yieldAdded),
+        display: keptText(yieldAdded),
+        prov: spCompoundProv(
+          "yield",
+          row.tx_hash,
+          row.block_number,
+          row.collateral_type,
+          sinceAndClaimed(row.yield_gain_since, row.yield_gain_claimed),
+        ),
+      });
+    }
+    if (stashed > ZERO) {
+      tokens.push({
+        symbol: c,
+        address: branch.collateralAddr,
+        direction: "right",
+        popover: true,
+        value: units(stashed),
+        display: keptText(stashed),
+        verb: "stashed",
+      });
+      deltas.push({
+        value: units(stashed),
+        symbol: c,
+        address: branch.collateralAddr,
+        exact: exactUnits(stashed),
+        display: keptText(stashed),
+        prov: spCompoundProv(
+          "stash",
+          row.tx_hash,
+          row.block_number,
+          row.collateral_type,
+          sinceAndClaimed(row.coll_gain_since, row.coll_gain_claimed),
+        ),
+      });
+    }
+  }
   if (tokens.length === 0) tokens.push({ symbol: "BOLD", address: TOKEN_ADDRESSES.BOLD });
 
   const cells: EventCellSpec[] = [
@@ -167,7 +238,6 @@ export function LiquityV2DepositEventCard({
     txCell(row.tx_hash, row.block_number, coord("Block — the block this DepositOperation was logged in.")),
   ];
 
-  const label = spEventLabel(row);
   const slots: EventCardSlots = {
     event: {
       id: row.event_key,
@@ -178,7 +248,7 @@ export function LiquityV2DepositEventCard({
       number: eventNumber,
     },
     spine: { tokens, isLast },
-    head: { label, labelTip: label === "Touched" ? DEPOSIT_TOUCH_TIP : undefined, deltas: [] },
+    head: { label, labelTip: label === "Touched" ? DEPOSIT_TOUCH_TIP : undefined, deltas },
     caption: label,
     cells,
     sheet: spDepositSheet(row),

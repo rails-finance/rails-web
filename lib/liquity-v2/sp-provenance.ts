@@ -136,6 +136,37 @@ export function spTouchProv(summary: string, txHash: string, block: string, bran
   };
 }
 
+/** What a compounding touch kept: the BOLD yield it added to the deposit, or
+ *  the collateral it stashed, each its log's gain less its claim. */
+export function spCompoundProv(
+  what: "yield" | "stash",
+  txHash: string,
+  block: string,
+  branch: SpBranch,
+  inputs: { since: string; claimed: string },
+): Provenance {
+  const y = what === "yield";
+  return {
+    kind: "chain-derived",
+    pclass: "emitted",
+    summary: y
+      ? "BOLD yield added — the DepositOperation's yieldGainSinceLastOperation less its yieldGainClaimed: the yield this touch kept in the deposit."
+      : `${branch} stashed — the DepositOperation's ethGainSinceLastOperation less its ethGainClaimed: the ${branch} this touch left in the pool for a later claim.`,
+    formula: y ? "yieldGainSinceLastOperation − yieldGainClaimed" : "ethGainSinceLastOperation − ethGainClaimed",
+    inputs: [
+      {
+        label: y ? "yieldGainSinceLastOperation" : "ethGainSinceLastOperation",
+        value: inputs.since,
+        kind: "chain",
+        pclass: "emitted",
+      },
+      { label: y ? "yieldGainClaimed" : "ethGainClaimed", value: inputs.claimed, kind: "chain", pclass: "emitted" },
+    ],
+    contract: pool(branch),
+    source: { block, txHash },
+  };
+}
+
 /** The branch's collateral in USD at its PriceFeed, read with the deposit. */
 export function spFeedProv(branch: SpBranch, stale: boolean): Provenance {
   return {
