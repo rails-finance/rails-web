@@ -1362,7 +1362,8 @@ label[for] {
    takes its space at once and stays invisible until 150 ms, then appears; a
    unit that replaces one enters with a 120 ms opacity fade and no transform.
    Both run on CSS delays, so they keep time on a busy main thread, as the
-   flows cue above does. Under reduced motion both land at their end state. */
+   flows cue above does. Under reduced motion the entrance lands at once and
+   the placeholder keeps its 150 ms wait as a step: waiting is not motion. */
 .skel-wait {
   animation: fade-in 120ms ease-out 150ms both;
 }
@@ -1382,7 +1383,9 @@ html[data-beta-dismissed] [data-beta-strip] {
   background-color: var(--edge-raised);
 }
 @media (prefers-reduced-motion: reduce) {
-  .skel-wait,
+  .skel-wait {
+    animation: fade-in 1ms linear 150ms both;
+  }
   .reveal-in {
     animation: none;
   }
@@ -2168,19 +2171,12 @@ html[data-beta-dismissed] [data-beta-strip] {
   }
 }
 
-/* Chain-truth listing entrance cascade — CSS, not framer-motion.
-   A staggered fade+rise for the row column in <ChainTruthListing>. Deliberately
-   CSS: the memory tier renders the whole set (hundreds of rows), and driving that
-   many per-node JS animations choked the main thread for seconds on mount (rows
-   sat mid-fade, hover/clicks unresponsive). A compositor-driven CSS animation
-   costs the main thread nothing, so the rows are interactive immediately while
-   they settle. The stagger index is capped at the call site (--ct-i clamped), so
-   only the top rows step in and the tail arrives together — no multi-second tail.
-   The column is re-keyed by viewKey on a facet/sort/page change, remounting these
-   nodes so the cascade replays as feedback (search is excluded from the key, so
-   live typing filters in place without re-staggering). */
-/* The listing's rows reveal as one unit, by the loading grammar's entrance
-   (.reveal-in): one opacity fade, no stagger, no transform. */
+/* The chain-truth listing's rows (<ChainTruthListing>) enter as one unit, by
+   the loading grammar's entrance (.reveal-in): one 120 ms opacity fade, no
+   transform. It is a CSS animation so the hundreds of rows the memory tier
+   renders cost the main thread nothing on mount. The column is re-keyed by
+   viewKey on a facet, sort or page change, so the fade replays; search is left
+   out of the key, so typing filters in place. */
 .ct-row {
   animation: fade-in 120ms ease-out both;
 }

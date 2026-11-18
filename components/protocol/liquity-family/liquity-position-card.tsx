@@ -1093,7 +1093,11 @@ export function useLiquityCardSlots({
       (panel?.[0] ?? []).map(tipRow),
       [
         ...(panel?.[1] ?? []),
-        ...(liqValue ? [{ id: "liquidates-at", label: terms.liquidationPrice, value: liqValue }] : []),
+        ...(liqValue
+          ? [{ id: "liquidates-at", label: terms.liquidationPrice, value: liqValue }]
+          : priceFailed && debt > 0 && coll > 0
+            ? [{ id: "liquidates-at", label: terms.liquidationPrice, value: null, unavailable: true as const }]
+            : []),
       ].map(tipRow),
     ],
   };

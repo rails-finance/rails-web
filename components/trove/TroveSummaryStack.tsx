@@ -5,7 +5,7 @@ import { TroveSummary } from "@/types/api/trove";
 import { TroveStateData } from "@/types/api/troveState";
 import { OraclePricesData } from "@/types/api/oracle";
 import { LiquityPositionCard } from "@/components/protocol/liquity-family/liquity-position-card";
-import { viewFromTroveSummary, liveFromTroveState } from "@/lib/liquity/trove-card-view";
+import { viewFromTroveSummary, liveFromTroveState, priceFor } from "@/lib/liquity/trove-card-view";
 import { TroveDetailsBand } from "@/components/trove/TroveDetailsBand";
 import type { PositionCardExports, PositionPanelColumns, PositionPanelRow } from "@/components/shared/position-card";
 import { useTroveExplanationItems } from "@/components/trove/use-trove-explanation-items";
@@ -96,7 +96,15 @@ export function TroveSummaryStack({
     shutdown,
   });
 
-  const view = { ...viewFromTroveSummary(trove, prices), priceUnavailable: priceFailed && prices == null };
+  // Unavailable once the read has ended, or once a response has come back
+  // without this branch's feed; pending only while no response has come.
+  const priceMissing = priceFor(trove.collateralType, prices) == null;
+  const priceUnavailable = priceMissing && (priceFailed || prices != null);
+  const view = {
+    ...viewFromTroveSummary(trove, prices),
+    pricePending: priceMissing && !priceUnavailable,
+    priceUnavailable,
+  };
   const live = liveFromTroveState(trove, liveState, prices);
 
   // The panel (TO-DO-position-card 322): the queue on the left, the yearly

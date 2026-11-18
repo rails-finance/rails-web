@@ -64,7 +64,12 @@ import {
 } from "@/lib/aave-v3/position-provenance";
 import { useV3Pool } from "@/lib/aave-v3/pool-context";
 import { hfLabelV3 } from "@/lib/aave-v3/position-state";
-import { aaveV3LiquidationRead, aaveV3SameAssetOfView, type AaveV3CardCaptions } from "@/lib/aave-v3/chain-truth-tower";
+import {
+  aaveV3LiquidationRead,
+  aaveV3SameAssetOfView,
+  aaveV3SingleCollateral,
+  type AaveV3CardCaptions,
+} from "@/lib/aave-v3/chain-truth-tower";
 import {
   AaveV3CardDeploymentProvider,
   useAaveV3CardDeployment,
@@ -792,9 +797,10 @@ export function useAaveV3CardSlots({
         }
       : null;
 
-  // The liquidation read, a pure function of the traced health factor: one
-  // supplied reserve carrying ≥99.5% of the priced collateral anchors a
-  // liquidation price; otherwise the drop the whole collateral can take.
+  // The liquidation read, a pure function of the traced health factor and the
+  // oracle prices: one supplied reserve carrying ≥99.5% of the priced
+  // collateral (aaveV3SingleCollateral) anchors a liquidation price; otherwise
+  // the drop the whole collateral can take.
   const liq = hfRead && !noDebtRead ? aaveV3LiquidationRead(v) : null;
   const liqRow: PositionPanelRow | null = !liq
     ? null
@@ -932,11 +938,20 @@ export function useAaveV3CardSlots({
   // figure. The oracle prices land after the Pool read: the average rate of
   // several borrows weighs by them, and they decide between a liquidation
   // price and a drop, so those rows stay held until the prices are in too.
-  // Each held label comes from the assets the position holds, so it does not
-  // change when the value lands.
+  // The held liquidation label follows the read's rule: the ≥99.5% share
+  // (aaveV3SingleCollateral) once every supplied reserve is priced, and before
+  // that the one supplied reserve that passes it whatever its price. Once the
+  // reads settle, a liquidation row the read leaves empty keeps its cell with
+  // words in it, so the row does not vanish.
   const readPending = detail && hfPending && v.borrows.length > 0;
   const pricePending = detail && pricesPending && v.borrows.length > 0;
   const sameAsset = aaveV3SameAssetOfView(v) != null;
+  const anchor = aaveV3SingleCollateral(v);
+  const anchored = anchor === undefined ? v.supplies.filter((r) => r.amount > 0).length === 1 : anchor != null;
+  const liqHoldsCell = detail && v.borrows.length > 0;
+  const hfNow = hfRead ? v.healthFactor : null;
+  const liqUnavailable: true | string =
+    hfNow != null && hfNow <= 1 ? "liquidatable now" : hfNow != null && hfNow >= 100 ? "out of reach" : true;
   const heldOf: [id: string, label: string, hold: boolean][] = [
     [
       "borrow-rate",
@@ -946,13 +961,15 @@ export function useAaveV3CardSlots({
     ["borrow-room", "Room to borrow", roomRow == null && readPending],
     sameAsset
       ? ["liquidation", "Liquidation", readPending]
-      : v.supplies.filter((r) => r.amount > 0).length === 1
+      : anchored
         ? ["liquidates-at", "Liquidates at", readPending || pricePending]
         : ["liquidation-drop", "Liquidates on a drop of", readPending || pricePending],
   ];
   const [rateHeld, roomHeld, liqHeld] = [rateRow, roomRow, liqRow].map((row, i): PositionPanelRow | null => {
     const [id, label, hold] = heldOf[i];
-    return hold ? { id, label, value: null, pending: true } : row;
+    if (hold) return { id, label, value: null, pending: true };
+    if (row == null && i === 2 && liqHoldsCell) return { id, label, value: null, unavailable: liqUnavailable };
+    return row;
   });
 
   // Each side's reserves open under its headline (the chevron by the icons);

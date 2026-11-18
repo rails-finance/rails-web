@@ -51,6 +51,7 @@ import { boundaryFromLimit } from "@/lib/shared/timeline-boundary";
 import { TIMELINE_WINDOW_ROWS } from "@/lib/shared/timeline-opening-balance";
 import { boundaryStateFromOldestRow } from "@/lib/shared/timeline-boundary-state";
 import { troveExports } from "@/components/trove/TroveExportMenu";
+import { priceFor } from "@/lib/liquity/trove-card-view";
 import { closingPricesAt, DetailBackButton, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import type { Provenance } from "@/components/shared/provenance";
@@ -556,7 +557,7 @@ export default function TroveView({
         })}
         loadingMessage={getEnhancementStatus()}
         // The server's read (seeded) or the client's (loadData) has run.
-        priceFailed={!loading && prices == null}
+        priceFailed={!loading && priceFor(collateralType, prices) == null}
         liquityEvents={liquityEvents}
         tl={tl}
         boundary={boundary}
