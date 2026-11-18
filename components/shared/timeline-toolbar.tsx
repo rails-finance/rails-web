@@ -36,6 +36,7 @@ import {
   CTRL_ON_ACCENT,
   CTRL_ON_HOVER,
   ctrlWaking,
+  INPLACE_TEXT,
   SECTION_HEADING,
 } from "@/lib/shared/ui-grammar";
 import { formatDate, formatDateRange, formatDateShortYear, formatDayMonth, formatDuration } from "@/lib/date";
@@ -43,6 +44,13 @@ import { lifetimeFiguresKnown } from "@/lib/shared/timeline-opening-balance";
 import { loadedDaysStatement, segmentStatement } from "@/lib/shared/timeline-segments";
 import { TimelineNavigatorPanel, type TimelineMonthReach } from "@/components/shared/timeline-navigator";
 import { useHydrated } from "@/hooks/useHydrated";
+import { FilterPill, PILL_MUTED } from "@/components/shared/filter-bar/filter-pill";
+import {
+  clearTimelineFilters,
+  TimelineAxisPills,
+  TimelineFilterSheet,
+  timelineFilterModel,
+} from "@/components/shared/timeline-filter-bar";
 import type { TimelineEventsState } from "@/hooks/useTimelineEvents";
 
 /** The muted text after a middle dot on the heading line, so only the filters
@@ -315,7 +323,7 @@ export function TimelineDisplayMenu({ items }: { items: TimelineDisplayItem[] })
       showLabel
       triggerTitle="Choose what each timeline row shows"
       align="right"
-      variant="button"
+      variant="pill"
       triggerIcon={<DisplaySettingsIcon size={16} />}
       onToggle={(key) => display.toggle(key as TimelineDisplayKey)}
     />
@@ -334,6 +342,9 @@ export interface TimelineToolbarProps {
   leading?: React.ReactNode;
   /** A control beside Display, before it (the "Sync to chart" button). */
   beforeDisplay?: React.ReactNode;
+  /** The 30-day projection's switch (ui-jobs 733), between beforeDisplay and
+   *  Display: a display control, outside Clear all and the URL. */
+  projection?: React.ReactNode;
   /** A title on the count line, for a family whose count is a true but
    *  surprising number (see ChainTruthTimelineProps.countTooltip). Unset
    *  renders identically to today. */
@@ -727,6 +738,7 @@ export function TimelineToolbar({
   displayItems,
   leading,
   beforeDisplay,
+  projection,
   countTooltip,
   countDetail,
   monthReach,
@@ -776,6 +788,46 @@ export function TimelineToolbar({
   // window on the site — it carries the most JS, so it is the last thing to come
   // alive (measured 1.8s at 4× CPU on slow 4G).
   const hydrated = useHydrated();
+
+  // The axes as the listings' pills (ui-jobs 735); see timeline-filter-bar.tsx.
+  const model = timelineFilterModel(tl);
+  // No count in the editors: `filteredCount` holds the loose events only
+  // (folder members join it in ChainTruthTimeline), so the editors read "Apply".
+  const sheetCount = undefined;
+  const clearDate = () => {
+    tl.setDateRange(null);
+    monthReach?.onReset?.();
+  };
+  const axesSet = model.dimensions.filter((d) => d.get(model.filters).length > 0).length;
+  const setCount = axesSet + (filterActive ? 1 : 0);
+  const clearAll = () => {
+    clearTimelineFilters(model);
+    if (filterActive) clearDate();
+  };
+  // data-prov-exempt: the count line is an index row count ("180 events",
+  // "12 of 340 events"), the "event numbers" class, not a chain-state figure.
+  // Stamped here so a timeline nested inside a page-level receipts scope (the
+  // Vaults position page) is not asked for a receipt for how many rows it
+  // has. The data-timeline-* markers are the line's own state, for anything
+  // reading this page rather than looking at it (`eventCountState`).
+  const countNode = (
+    <span
+      data-prov-exempt=""
+      data-timeline-total={countState.total}
+      data-timeline-unit={countState.unit}
+      data-timeline-shown={countState.shown}
+      data-anatomy="L1.2"
+      className={`inline-flex items-center gap-2 whitespace-nowrap ${still ? CARD_INSET_START : ""}`}
+    >
+      {countTooltip ? (
+        <RevealTip tip={countTooltip} className={`text-sm tabular-nums ${PILL_MUTED}`}>
+          {countLine}
+        </RevealTip>
+      ) : (
+        <span className={`text-sm tabular-nums ${PILL_MUTED}`}>{countLine}</span>
+      )}
+    </span>
+  );
 
   // ── The date control ─────────────────────────────────────────────────────
   //
@@ -829,166 +881,75 @@ export function TimelineToolbar({
 
   return (
     <div ref={stripRef} className="relative space-y-3" data-anatomy="L1" {...ctrlWaking(hydrated)}>
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        {/* Inset CARD_INSET_START from the page edge, on a line of
-            its own; the controls stay on the page edge. */}
-        <div className={`min-w-0 basis-full ${CARD_INSET_START}`} data-anatomy="L1.1">
+      {leading != null && (
+        // Inset CARD_INSET_START from the page edge, on a line of its own.
+        <div className={`min-w-0 ${CARD_INSET_START}`} data-anatomy="L1.1">
           {leading}
         </div>
-        {/* Below sm the count takes a row of its own above the controls — on a
-            phone it used to wrap mid-figure (Miles, 2026-09-02). From sm up it
-            is the first item of the one control row, as before. */}
-        <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
-          {/* data-prov-exempt: the count line is an index row count ("180
-              events", "Showing 1,000 of 3,942 events"), the "event numbers"
-              class, not a chain-state figure. Stamped here so a timeline nested inside a
-              page-level receipts scope (the Vaults position page) is not asked
-              for a receipt for how many rows it has. */}
-          {/* The line's own state, for anything reading this page rather than
-              looking at it: `pending` says the lifetime figures have not
-              landed and the prose can only state what is listed. See
-              `eventCountState`. */}
-          <span
-            data-prov-exempt=""
-            data-timeline-total={countState.total}
-            data-timeline-unit={countState.unit}
-            data-timeline-shown={countState.shown}
-            data-anatomy="L1.2"
-            className={`inline-flex items-center gap-2 basis-full sm:basis-auto whitespace-nowrap ${CARD_INSET_START} sm:pl-0`}
-          >
-            {countTooltip ? (
-              <RevealTip tip={countTooltip} className="text-xs text-rb-500 tabular-nums">
-                {countLine}
-              </RevealTip>
-            ) : (
-              <span className="text-xs text-rb-500 tabular-nums">{countLine}</span>
-            )}
-          </span>
-          {!still && tl.eventOptions.length > 1 && (
-            <FilterDropdown
-              label="Types of event"
-              anatomy="L1.3"
-              options={tl.eventOptions}
-              selected={tl.visibleActionKeys}
-              onSelect={() => tl.resetHiddenActions()}
-              multi
-              variant="button"
-              align="right"
-              // On a phone the sheet covers this strip, so the count that
-              // answers each tap rides inside it (Miles, 2026-09-02).
-              sheetStatus={countLine}
-              onToggle={(act) => tl.toggleHiddenAction(act)}
-            />
-          )}
-          {!still && assetOptions.length > 0 && (
-            <FilterDropdown
-              label="Assets"
-              anatomy="L1.4"
-              options={assetOptions.map((o) => ({
-                ...o,
-                icon: <TokenChipIcon symbol={o.key} size={16} filterable={false} />,
-              }))}
-              selected={tl.visibleAssetKeys}
-              onSelect={() => tl.resetHiddenAssets()}
-              multi
-              variant="button"
-              align="right"
-              // Symbols are names, not prose — wstETH must not read "Wsteth".
-              verbatimLabels
-              // A coin stack, not the shared list-filter glyph: at rest both
-              // this and the event-type control read "All", and with the same
-              // icon there would be nothing on the closed button to tell a
-              // reader which one narrows what.
-              triggerIcon={<Coins size={12} />}
-              sheetStatus={countLine}
-              onToggle={(sym) => tl.toggleHiddenAsset(sym)}
-            />
-          )}
-          {!still && versionOptions.length > 0 && (
-            <FilterDropdown
-              label="Versions"
-              anatomy="L1.5"
-              options={versionOptions}
-              selected={tl.visibleVersionKeys}
-              onSelect={() => tl.resetHiddenVersions()}
-              multi
-              variant="button"
-              align="right"
-              // "V2" is a name, not prose.
-              verbatimLabels
-              noTriggerIcon
-              restLabel={[...versionOptions]
-                .reverse()
-                .map((o) => o.label)
-                .join(" & ")}
-              sheetStatus={countLine}
-              onToggle={(v) => tl.toggleHiddenVersion(v)}
-            />
-          )}
-          {!still && counterpartyOptions.length > 0 && (
-            <FilterDropdown
-              label="Addresses"
-              anatomy="L1.6"
-              options={counterpartyOptions}
-              selected={tl.visibleCounterpartyKeys}
-              onSelect={() => tl.resetHiddenCounterparties()}
-              multi
-              variant="button"
-              align="right"
-              // Addresses are monospace-shortened, not prose — the same
-              // verbatim rule the asset control uses for symbols.
-              verbatimLabels
-              triggerIcon={<Wallet size={12} />}
-              sheetStatus={countLine}
-              onToggle={(addr) => tl.toggleHiddenCounterparty(addr)}
-            />
-          )}
-          {/* No Dates on a page tied to its Lifetime flows chart
-              (`tl.datesAxis`): the chart's scrubber and "Sync to chart"
-              navigate it by the day. */}
-          {!still && tl.datesAxis && (
-            <button
-              type="button"
-              data-date-control=""
-              data-anatomy="L1.7"
-              onClick={tl.toggleHeatmap}
-              aria-pressed={datePanelOpen}
-              // Sized and spaced exactly like the FilterDropdown triggers either
-              // side of it (`h-7 gap-2 px-2.5 rounded-md text-xs`) — it opens a
-              // panel the same way they do, so it is one of them, not a
-              // one-off.
-              className={`${CTRL_GHOST} h-7 gap-2 px-2.5 rounded-md text-xs ${
-                filterActive ? CTRL_ON_ACCENT : datePanelOpen ? `${CTRL_ON} ${CTRL_ON_HOVER}` : CTRL_OFF
-              }`}
-              title={datePanelOpen ? "Hide the date span" : "Filter by a span of dates"}
-            >
-              <CalendarRange size={12} aria-hidden />
-              {dateLabel}
-              {/* The same chevron the event-type, asset and address triggers
-                carry, turning over when the panel is open. Without it a button
-                reading "1 Oct – 31 Oct" is a label, and nothing on it says a
-                click opens anything. */}
-              <svg
-                data-date-chevron=""
-                aria-hidden
-                width={10}
-                height={10}
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className={`ml-auto transition-transform ${datePanelOpen ? "rotate-180" : ""}`}
+      )}
+      {still ? (
+        countNode
+      ) : (
+        // The listings' strip (N1, ui-jobs 735). From sm one wrapping row:
+        // [axis pills] [Date] [spacer] [Sync to chart] [projection] [Display],
+        // and under it Clear all at the left (two or more set) and the count
+        // at the right. Below sm: one pill row that scrolls sideways, led by
+        // the Filters button; then the count, and Display at the right.
+        <div className="flex flex-col">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative max-sm:-mx-4 max-sm:min-w-0 max-sm:basis-[calc(100%+2rem)] sm:contents">
+              <div
+                className="flex items-center gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:contents [&::-webkit-scrollbar]:hidden"
+                data-pill-row=""
+                data-anatomy="L1.3"
               >
-                <path d="M6 9l6 6 6-6" />
-              </svg>
-            </button>
-          )}
-          {!still && beforeDisplay}
-          {!still && displayItems.length > 0 && <TimelineDisplayMenu items={displayItems} />}
+                <TimelineFilterSheet model={model} count={sheetCount} />
+                <TimelineAxisPills model={model} count={sheetCount} />
+                {tl.datesAxis && (
+                  <FilterPill
+                    name="Date"
+                    state={filterActive ? "set" : "unset"}
+                    locked={false}
+                    label="Date"
+                    value={dateLabel}
+                    spoken={filterActive ? `Date ${dateLabel}` : "Add Date filter"}
+                    expanded={datePanelOpen}
+                    onOpen={tl.toggleHeatmap}
+                    onRemove={clearDate}
+                  />
+                )}
+                <span className="w-6 shrink-0 sm:hidden" aria-hidden="true" />
+              </div>
+              <div
+                className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-background to-transparent sm:hidden"
+                aria-hidden="true"
+              />
+            </div>
+            <div className="order-1 flex min-h-11 flex-1 items-center gap-3 sm:order-2 sm:min-h-8 sm:basis-full">
+              <span className="sm:order-2 sm:ml-auto">{countNode}</span>
+              {setCount > 0 && (
+                <button
+                  type="button"
+                  onClick={clearAll}
+                  className={`text-sm font-medium ${INPLACE_TEXT} rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:order-1 ${setCount < 2 ? "sm:hidden" : ""}`}
+                  data-pill-clear=""
+                  data-anatomy="L1.9"
+                >
+                  <span className="sm:hidden">Reset</span>
+                  <span className="max-sm:hidden">Clear all</span>
+                </button>
+              )}
+            </div>
+            <div className="order-1 flex shrink-0 items-center gap-2 sm:ml-auto">
+              {beforeDisplay}
+              {/* The 30-day projection's switch (ui-jobs 733): outside Clear all
+                  and the URL, so it sits with the display controls. */}
+              {projection}
+              {displayItems.length > 0 && <TimelineDisplayMenu items={displayItems} />}
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* THE NAVIGATOR PANEL — a dropdown, not a section. Absolutely
           positioned so it takes no height from the rows and `left-0 right-0`

@@ -2132,7 +2132,7 @@ function ChainTruthTimelineBody({
           {/* THE NARROWING ROW (L2): everything narrowing the list, one pill
             each — the cut's chip, then a pill per filter — and "Clear all"
             once two stand. No narrowing, no row. */}
-          {(rewind || following || filterPills.length > 0) && (
+          {(rewind || following) && (
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5" data-anatomy="L2" data-narrowing-row="">
               {(rewind || following) && (
                 // In the chart's teal: the cut is the Lifetime flows cursor's
@@ -2170,20 +2170,6 @@ function ChainTruthTimelineBody({
                     <X className="size-3.5" aria-hidden />
                   </button>
                 </span>
-              )}
-              {filterPills.map((pill) => (
-                <TimelineFilterPill key={pill.axis} pill={pill} />
-              ))}
-              {(rewind || following ? 1 : 0) + filterPills.length >= 2 && (
-                <button
-                  type="button"
-                  onClick={clearAllNarrowing}
-                  className="inline-flex min-h-11 cursor-pointer items-center px-1.5 text-xs text-rb-500 hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:min-h-0"
-                  data-anatomy="L2.3"
-                  data-narrowing-clear=""
-                >
-                  Clear all
-                </button>
               )}
               {rewind && rewindNote && (
                 <p className="text-xs text-rb-500" data-flow-reveal-note="">

@@ -5,6 +5,7 @@ import { Check } from "lucide-react";
 import { CTRL_GHOST, CTRL_OFF, CTRL_ON, COUNT_BADGE, RESET_LINK, OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { MobileSheet, MobileSheetFilterHeader } from "@/components/shared/mobile-sheet";
+import { PILL_NEUTRAL } from "@/components/shared/filter-bar/filter-pill";
 import {
   isOptionSearchable,
   narrowOptions,
@@ -120,7 +121,7 @@ interface FilterDropdownProps {
   /** Hover tooltip on the trigger. */
   triggerTitle?: string;
   /** Visual variant. `'ghost'` (default) is the compact text-only trigger. `'button'` is a larger trigger with a dark surface — for top-of-section toolbars. */
-  variant?: "ghost" | "button";
+  variant?: "ghost" | "button" | "pill";
   /** Render option labels exactly as given, skipping the per-word title-casing
    *  below. For a menu whose labels are TOKEN SYMBOLS: the casing rule keeps a
    *  fully-capitalised word (USDC, DAI) but rewrites every mixed-case one, and
@@ -260,9 +261,15 @@ export function FilterDropdown({
             aria-expanded={open}
             aria-haspopup="listbox"
             title={triggerTitle}
-            className={`${CTRL_GHOST} ${open || (!isAll && !minimal) ? CTRL_ON : CTRL_OFF} ${
-              variant === "button" ? "h-7 gap-2 px-2.5 rounded-md text-xs" : "gap-1.5 px-2 py-1 rounded text-xs"
-            }`}
+            className={
+              variant === "pill"
+                ? // The listings' neutral pill (N1.10's sort and Filters), for the
+                  // timeline's Display menu (ui-jobs 735).
+                  `${PILL_NEUTRAL} inline-flex shrink-0 cursor-pointer items-center h-11 sm:h-10 gap-1.5 px-3.5 rounded-full text-sm whitespace-nowrap transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500`
+                : `${CTRL_GHOST} ${open || (!isAll && !minimal) ? CTRL_ON : CTRL_OFF} ${
+                    variant === "button" ? "h-7 gap-2 px-2.5 rounded-md text-xs" : "gap-1.5 px-2 py-1 rounded text-xs"
+                  }`
+            }
           >
             {(minimal || multi) && !(multi && noTriggerIcon) && (triggerIcon ?? <ListFilterIcon size={12} />)}
             {/* A single pick at rest shows its glyph where it has one. */}
