@@ -835,10 +835,10 @@ function EventCardView(props: EventCardProps) {
       className={`relative overflow-visible rounded-xl ring-0 ring-teal-500/0 [transition:color_150ms,background-color_150ms,box-shadow_2000ms] has-[[data-flow-day-flash]]:ring-2 has-[[data-flow-day-flash]]:ring-teal-500/70 ${
         showDetail
           ? inTimeline
-            ? "sm:rounded-b-none sm:bg-raised"
+            ? "sm:rounded-b-none sm:bg-[var(--event-ground,var(--surface-raised))]"
             : "rounded-b-none bg-raised"
           : showChevron
-            ? `${inTimeline ? "sm:hover:bg-raised" : "hover:bg-raised"} evt-t1-lit`
+            ? `${inTimeline ? "sm:hover:bg-[var(--event-ground,var(--surface-raised))]" : "hover:bg-raised"} evt-t1-lit`
             : ""
       }${inTimeline ? " spine-t1" : ""}`}
     >
@@ -895,7 +895,7 @@ function EventCardView(props: EventCardProps) {
             ref={captionRef}
             aria-hidden={phoneMark ? undefined : true}
             className={`${phoneMark ? "flex flex-wrap items-center justify-center gap-x-1" : "block"} max-w-full px-2 text-center text-xs leading-5 ${showDetail ? "text-foreground" : "text-rb-500"}`}
-            style={{ backgroundColor: "var(--background)" }}
+            style={{ backgroundColor: "var(--spine-ground, var(--background))" }}
           >
             {captionText}
           </span>
@@ -927,7 +927,7 @@ function EventCardView(props: EventCardProps) {
       role={inTimeline ? "region" : undefined}
       aria-labelledby={inTimeline ? labelId : undefined}
       data-spine-card={inTimeline ? cardId : undefined}
-      className={`flow-root bg-raised ${pageMode ? "rounded-xl" : "rounded-b-xl"}${inTimeline ? " max-sm:rounded-t-xl" : ""}`}
+      className={`flow-root ${inTimeline ? "bg-[var(--event-ground,var(--surface-raised))]" : "bg-raised"} ${pageMode ? "rounded-xl" : "rounded-b-xl"}${inTimeline ? " max-sm:rounded-t-xl" : ""}`}
       data-anatomy="T2"
       data-card-tab-open={tabbed ? openTab : undefined}
     >

@@ -426,7 +426,7 @@ function RedemptionOutcome({
     currentPrice != null && currentPrice > 0 ? split.lusdRedeemed - split.ethToRedeemer * currentPrice : null;
   const legVals = { debt: String(split.lusdRedeemed), priceUsd: split.price, coll: ctx.collBefore };
   return (
-    <div className="mx-5 my-2 space-y-1 rounded-xl bg-background px-4 py-3">
+    <div className="mx-5 my-2 space-y-1 rounded-xl bg-[var(--event-cell,var(--background))] px-4 py-3">
       <Row label="ETH to the redeemer">
         <P info={redemptionLegProv(coords, "redeemer", legVals)}>
           {fmtEth(split.ethToRedeemer)} {COLLATERAL_SYMBOL}
@@ -494,7 +494,7 @@ function RedemptionOutcome({
  *  way: the heading and a placeholder for each row it will carry. */
 function LiquidationRoutePending() {
   return (
-    <div className="mx-5 my-2 space-y-1 rounded-xl bg-background px-4 py-3" aria-busy="true">
+    <div className="mx-5 my-2 space-y-1 rounded-xl bg-[var(--event-cell,var(--background))] px-4 py-3" aria-busy="true">
       <div className="mb-1 text-xs font-semibold text-rb-500">Where it went</div>
       {["Stability Pool", "Liquidator", "Owner"].map((label) => (
         <Row key={label} label={label}>
@@ -517,7 +517,7 @@ function LiquidationRoute({
   const l = read.liquidation!;
   const n = (s: string) => Number(s);
   return (
-    <div className="mx-5 my-2 space-y-1 rounded-xl bg-background px-4 py-3">
+    <div className="mx-5 my-2 space-y-1 rounded-xl bg-[var(--event-cell,var(--background))] px-4 py-3">
       <div className="mb-1 text-xs font-semibold text-rb-500">
         Where it went{l.recoveryMode ? " · Recovery Mode liquidation" : ""}
         {l.trovesInTx > 1

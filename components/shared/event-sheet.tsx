@@ -238,9 +238,9 @@ const SUB = "col-span-full grid grid-cols-subgrid";
 /** The USD column's rule; a side with no dollar figure (`SHEET_NO_USD`) draws
  *  none. */
 const USD_RULE =
-  "border-l border-rb-300 pl-4 dark:border-rb-600 group-data-[sheet-usd=none]/side:border-l-0 group-data-[sheet-usd=none]/side:pl-0";
-/** The breakdown's tint. */
-const TINT = "bg-raised";
+  "border-l border-edge-raised pl-4 group-data-[sheet-usd=none]/side:border-l-0 group-data-[sheet-usd=none]/side:pl-0";
+/** The breakdown's tint: the event card's ground. */
+const TINT = "bg-[var(--event-ground,var(--surface-raised))]";
 
 type Tone = "event" | "plain" | "muted" | "sub";
 const TONE: Record<Tone, string> = {
@@ -373,7 +373,7 @@ function SidePanel({ s, breakdown, col }: { s: SheetSide; breakdown: boolean; co
   const phoneAmount = totalAmount != null && (col === "tokens" || "none" in s.total);
   return (
     <section
-      className="min-w-0 rounded-xl bg-background px-4 pb-2 pt-3 text-sm"
+      className="min-w-0 rounded-xl bg-[var(--event-cell,var(--background))] px-4 pb-2 pt-3 text-sm"
       data-sheet-side={s.id ?? s.side}
       data-sheet-touched={touched ? "true" : "false"}
       aria-label={name}
@@ -404,9 +404,7 @@ function SidePanel({ s, breakdown, col }: { s: SheetSide; breakdown: boolean; co
               ))}
             </div>
             {before && (
-              <div
-                className={`${SUB} ${TINT} -mx-2 rounded-b-md border-t border-dashed border-rb-300 px-2 dark:border-rb-600`}
-              >
+              <div className={`${SUB} ${TINT} -mx-2 rounded-b-md border-t border-dashed border-edge-raised px-2`}>
                 <Row r={before} tone="muted" col={col} pad="py-2" />
               </div>
             )}
@@ -441,9 +439,7 @@ function SidePanel({ s, breakdown, col }: { s: SheetSide; breakdown: boolean; co
             )}
           </div>
         )}
-        {(touched || listed) && (
-          <div aria-hidden className="col-span-full mt-1 border-t border-rb-300 dark:border-rb-600" />
-        )}
+        {(touched || listed) && <div aria-hidden className="col-span-full mt-1 border-t border-edge-raised" />}
         <div className="contents" data-sheet-row="total">
           <span className="min-w-0 self-center py-2 text-sm text-rb-500">
             {/* The total line's words open its read-more: "After this event"
@@ -515,7 +511,7 @@ function StatPanel({ p, breakdown }: { p: SheetPanel; breakdown: boolean }) {
   const name = p.panel === "risk" ? WORDS.risk : WORDS.limits;
   return (
     <section
-      className="min-w-0 rounded-xl bg-background px-4 py-3 text-sm"
+      className="min-w-0 rounded-xl bg-[var(--event-cell,var(--background))] px-4 py-3 text-sm"
       data-sheet-panel={p.panel}
       aria-label={name}
     >
@@ -566,7 +562,7 @@ export function SheetSkeleton({ sides = 2, panels = 2 }: { sides?: number; panel
       </div>
       <div className="flex flex-col gap-2.5">
         {Array.from({ length: sides }, (_, i) => (
-          <div key={i} className="rounded-xl bg-background px-4 pb-2 pt-3 text-sm">
+          <div key={i} className="rounded-xl bg-[var(--event-cell,var(--background))] px-4 pb-2 pt-3 text-sm">
             <div className="mb-2 flex h-5 items-center">{bar("w-20")}</div>
             {i === 0 && (
               <>
@@ -574,7 +570,7 @@ export function SheetSkeleton({ sides = 2, panels = 2 }: { sides?: number; panel
                   {bar("w-28")}
                   {bar("w-16")}
                 </div>
-                <div className="mt-1 border-t border-rb-300 dark:border-rb-600" />
+                <div className="mt-1 border-t border-edge-raised" />
               </>
             )}
             <div className="flex h-10 items-center justify-end">{bar("w-20")}</div>
@@ -583,7 +579,7 @@ export function SheetSkeleton({ sides = 2, panels = 2 }: { sides?: number; panel
         {panels > 0 && (
           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
             {Array.from({ length: panels }, (_, i) => (
-              <div key={i} className="rounded-xl bg-background px-4 py-3 text-sm">
+              <div key={i} className="rounded-xl bg-[var(--event-cell,var(--background))] px-4 py-3 text-sm">
                 <div className="mb-1 flex h-5 items-center">{bar("w-14")}</div>
                 {[0, 1].map((r) => (
                   <div key={r} className="flex h-8 items-center justify-between">

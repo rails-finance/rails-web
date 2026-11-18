@@ -20,6 +20,7 @@
 // owner-declared liq. price + the expiration countdown + the cooldown. Units
 // are native everywhere; no dollar renders on this page.
 
+import { SectionSidebar } from "@/components/shared/section-sidebar";
 import { useReportPositionRead } from "@/components/shared/position-read";
 import { readOfHeadAnswer } from "@/lib/shared/position-read";
 import { serverReadOf } from "@/lib/shared/server-head-read";
@@ -484,10 +485,12 @@ export default function FrankencoinPositionView({
               {tailFailed && frankEvents.length === 0 ? (
                 <IndexNotice onRetry={() => setTailTry((n) => n + 1)} />
               ) : indexPending && frankEvents.length === 0 ? (
-                <div className="rounded-2xl border border-rb-300/40 dark:border-rb-700/40 bg-raised px-5 py-4 text-sm text-rb-500">
-                  Event history pending: the indexed backend for this explorer is still being built. Everything above is
-                  read live from the position contract at the latest block.
-                </div>
+                <SectionSidebar section="timeline">
+                  <div className="rounded-2xl bg-raised px-5 py-4 text-sm text-rb-500">
+                    Event history pending: the indexed backend for this explorer is still being built. Everything above
+                    is read live from the position contract at the latest block.
+                  </div>
+                </SectionSidebar>
               ) : (
                 <ChainTruthTimeline
                   csvExportCeiling={DRAINED_ROW_CEILING}

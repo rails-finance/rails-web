@@ -390,7 +390,7 @@ function firstCardState(page) {
             .map((b) => b.getAttribute("aria-label") ?? "?")
             .slice(0, 10)
         : null,
-      panelOpen: !!first?.querySelector(".rounded-b-xl.bg-raised"),
+      panelOpen: !!first?.querySelector('[data-anatomy="T2"]'),
       waking: !!document.querySelector("[data-ctrl-waking]"),
     };
   });
@@ -1424,7 +1424,7 @@ async function verifyFamilyOnce(
   check(`${name}: "at" dropped from location.search after landing`, !search.includes("at="), search);
   const { inView, box } = await waitForCardInViewport(viewPage, decodedId);
   check(`${name}: landed card's box intersects the viewport`, inView, JSON.stringify(box));
-  const landedPanel = viewPage.locator(`[data-event-id="${decodedId}"] .rounded-b-xl.bg-raised`);
+  const landedPanel = viewPage.locator(`[data-event-id="${decodedId}"] [data-anatomy="T2"]`);
   await landedPanel
     .first()
     .waitFor({ state: "attached", timeout: 5000 })

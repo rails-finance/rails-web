@@ -435,14 +435,17 @@ export function VaultRoster({
         // The index's read line names each roster's block, the anchor its rows'
         // receipts name.
         <div className="flex items-center gap-1 text-[11px] text-rb-500" data-prov-exempt>
-          {head.readAt}
           <InfoDisclosureTrigger
             open={introOpen}
             onToggle={() => setIntroOpen((o) => !o)}
             label="about these vaults"
             ariaControls="vault-roster-intro"
           />
-          {head.menu && <span className="ml-auto">{head.menu}</span>}
+          {/* The stamp stands at the right (ui-jobs 730). */}
+          <span className="ml-auto flex items-center gap-1">
+            {head.readAt}
+            {head.menu}
+          </span>
         </div>
       ) : (
         !chainStale && (
@@ -453,22 +456,24 @@ export function VaultRoster({
             data-directory-block={blockNumber}
             data-prov-exempt
           >
-            <RosterReadStamp
-              reads={[
-                {
-                  label: "this roster",
-                  block: blockNumber,
-                  at: readTime ?? isoSeconds(vaults.find((v) => v.readAt.block === blockNumber)?.readAt.timestamp),
-                },
-              ]}
-            />
             <InfoDisclosureTrigger
               open={introOpen}
               onToggle={() => setIntroOpen((o) => !o)}
               label="about these vaults"
               ariaControls="vault-roster-intro"
             />
-            {head.menu && <span className="ml-auto">{head.menu}</span>}
+            <span className="ml-auto flex items-center gap-1">
+              <RosterReadStamp
+                reads={[
+                  {
+                    label: "this roster",
+                    block: blockNumber,
+                    at: readTime ?? isoSeconds(vaults.find((v) => v.readAt.block === blockNumber)?.readAt.timestamp),
+                  },
+                ]}
+              />
+              {head.menu}
+            </span>
           </div>
         )
       )}

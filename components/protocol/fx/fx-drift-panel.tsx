@@ -131,10 +131,7 @@ export function FxDriftPanel({
                 </thead>
                 <tbody>
                   {moved.map((iv: FxDriftInterval) => (
-                    <tr
-                      key={`${iv.fromBlock}-${iv.toBlock}`}
-                      className="border-t border-rb-300/40 dark:border-rb-700/40"
-                    >
+                    <tr key={`${iv.fromBlock}-${iv.toBlock}`} className="border-t border-edge-raised">
                       <td className="py-1.5 pr-4 tabular-nums text-rb-500">
                         <Prov
                           info={driftIntervalProv(iv.fromBlock, iv.toBlock, iv.toHead)}
@@ -166,7 +163,7 @@ export function FxDriftPanel({
                     </tr>
                   ))}
                   {moved.length > 1 && complete ? (
-                    <tr className="border-t border-rb-300/40 dark:border-rb-700/40">
+                    <tr className="border-t border-edge-raised">
                       <td className="py-1.5 pr-4 text-rb-500">Total between the transactions</td>
                       <td className="py-1.5 pr-4">
                         <DriftCell

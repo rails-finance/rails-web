@@ -69,7 +69,7 @@ export const START_CTA =
 export const CTRL_GHOST = "inline-flex items-center justify-center transition-colors cursor-pointer";
 
 /** Idle in-place control: muted, gains a soft fill + foreground on hover. */
-export const CTRL_OFF = "text-rb-500 hover:bg-rb-100 dark:hover:bg-rb-800 hover:text-foreground";
+export const CTRL_OFF = "text-rb-500 hover:bg-[var(--surface-row-hover)] dark:hover:bg-rb-800 hover:text-foreground";
 
 /** Engaged/open in-place control: holds the same soft fill CTRL_OFF shows on
  * hover, so an open control simply looks "hovered" for as long as it's engaged. */
@@ -282,10 +282,10 @@ export const CARD_INSET_START = "pl-2";
  *  the address menu (Miles, 4 Nov 2026). */
 export const WALLET_HEADING_NAME = "text-xl font-semibold text-foreground";
 
-/** The position card's frame: the raised rounded box, with the listing row's
- *  blue hover border (the row <Link> declares the group). */
+/** The position card's frame: the raised rounded box, its border drawn only
+ *  in the listing row's blue on hover (the row <Link> declares the group). */
 export const POSITION_CARD_FRAME_BOX =
-  "rounded-2xl border border-rb-300/40 dark:border-rb-700/40 bg-raised transition-colors group-hover/listing-row:border-blue-500 dark:group-hover/listing-row:border-blue-500";
+  "rounded-2xl border border-transparent bg-raised transition-colors group-hover/listing-row:border-blue-500";
 /** The card's content inset inside the frame. */
 export const POSITION_CARD_PAD = `${CARD_PAD_X} py-4`;
 export const POSITION_CARD_FRAME = `${POSITION_CARD_FRAME_BOX} ${POSITION_CARD_PAD}`;

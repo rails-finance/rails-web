@@ -125,7 +125,7 @@ export function TimelineBoundaryRow({ kind, isLast }: { kind: "cut" | "tip" | "v
         <div className="spine-t1 flex justify-center px-7 pb-2.5 pt-1.5 sm:hidden" data-spine-caption="">
           <span
             className="block max-w-full truncate px-2 text-xs leading-5 text-rb-500"
-            style={{ backgroundColor: "var(--background)" }}
+            style={{ backgroundColor: "var(--spine-ground, var(--background))" }}
           >
             {BOUNDARY_CAPTION[kind]}
           </span>

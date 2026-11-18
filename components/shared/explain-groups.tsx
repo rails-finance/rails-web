@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 /** A headed group after another in the same pane draws a hairline above its
  *  heading, 12px either side: the first group has none. */
 export const EXPLAIN_GROUP_RULE =
-  "explain-group [.explain-group~&]:border-t [.explain-group~&]:border-rb-300 [.explain-group~&]:pt-3 dark:[.explain-group~&]:border-rb-700";
+  "explain-group [.explain-group~&]:border-t [.explain-group~&]:border-[var(--explain-rule,var(--color-rb-300))] [.explain-group~&]:pt-3 dark:[.explain-group~&]:border-[var(--explain-rule,var(--color-rb-700))]";
 
 export function ExplainGroup({
   title,
