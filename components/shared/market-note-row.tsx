@@ -796,12 +796,18 @@ function psmGapBody(note: PsmGapNote): NoteBody {
 
 function spLiquidationsBody(note: SpLiquidationsNote): NoteBody {
   const prov = spLiquidationsNoteProv(note);
-  const net = Number(exactUnits(big(note.stretch.totals.net)));
+  // With no liquidation between the touches there is no net: the line states
+  // the BOLD the closing touch wrote as burned, as the row does.
+  const none = note.stretch.liquidations.length === 0 && note.stretch.to != null;
+  const figure = Number(exactUnits(big(none ? note.stretch.to!.deposit_loss : note.stretch.totals.net)));
   return {
     label: `${note.branch} liquidations`,
     measure: { kind: "protocol", id: "liquity-v2" },
-    headline: { text: `${net < 0 ? "−" : "+"}${Math.abs(net).toFixed(2)}`, prov },
-    quantity: "BOLD net",
+    headline: {
+      text: none ? Math.abs(figure).toFixed(2) : `${figure < 0 ? "−" : "+"}${Math.abs(figure).toFixed(2)}`,
+      prov,
+    },
+    quantity: none ? "BOLD burned at the touch" : "BOLD net",
     direction: false,
     stats: [],
     learnMore: liquityV2DepositFlowsContent(note.branch),

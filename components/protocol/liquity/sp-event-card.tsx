@@ -171,7 +171,8 @@ export function LiquityV2DepositEventCard({
       tokens.push({
         symbol: "BOLD",
         address: TOKEN_ADDRESSES.BOLD,
-        direction: "right",
+        // A fall points out of the deposit, so the arrow reads with the "−".
+        direction: bold < ZERO ? "left" : "right",
         popover: true,
         value: units(mag),
         display: lossToo ? `${bold < ZERO ? "−" : "+"}${keptText(mag)}` : keptText(mag),

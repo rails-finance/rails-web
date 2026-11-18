@@ -28,6 +28,7 @@ import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
 import { big, exactUnits, units } from "@/lib/liquity-v2/sp-math";
 import { spLiqProv } from "@/lib/liquity-v2/sp-provenance";
 import type { SpBranch } from "@/lib/liquity-v2/sp-routes";
+import { spResidualClause } from "@/lib/liquity-v2/sp-liquidations";
 import type { LiquityV2DepositLiquidation, LiquityV2DepositStretch } from "@/lib/sources/api/liquity-v2-sp";
 
 const ZERO = BigInt(0);
@@ -302,20 +303,31 @@ function reconcileLine(note: SpLiquidationsNote): string {
     return `Together they are the BOLD burned and the ${c} paid in that the touch on ${touch} wrote, at ${at}.`;
   if (!s.to || !s.residual) return "";
   const wrote = `The touch on ${touch} wrote ${amt(big(s.to.deposit_loss))} BOLD burned and ${collAmt(big(s.to.coll_gain_since))} ${c} paid in`;
-  if (s.liquidations.length === 0) return `${wrote}, and no liquidation between the two touches accounts for it.`;
-  // The residual is what the touch wrote less the liquidations' sum: above
-  // zero the liquidations fall short of it, below zero they exceed it.
-  const parts = [
-    { v: big(s.residual.bold_lost), text: (v: bigint) => `${amt(v)} BOLD` },
-    { v: big(s.residual.coll_gained), text: (v: bigint) => `${collAmt(v)} ${c}` },
-  ];
-  const short = parts.filter((x) => x.v > ZERO).map((x) => x.text(x.v));
-  const over = parts.filter((x) => x.v < ZERO).map((x) => x.text(x.v));
-  const clauses = [
-    ...(short.length ? [`account for all but ${short.join(" and ")}`] : []),
-    ...(over.length ? [`exceed it by ${over.join(" and ")}`] : []),
-  ];
-  return `${wrote}; these liquidations ${clauses.join(" and ")}.`;
+  const clause = spResidualClause(s.residual, c, { bold: amt, coll: collAmt });
+  return clause ? `${wrote}; these liquidations ${clause}.` : `${wrote}.`;
+}
+
+/** A closing touch that reported a loss or a gain with no liquidation between
+ *  the two touches: its figures, each on the touch's log receipt. */
+function NoLiquidationLine({ note }: { note: SpLiquidationsNote }) {
+  const to = note.stretch.to;
+  if (!to) return null;
+  const c = note.branch as SpBranch;
+  const loss = big(to.deposit_loss);
+  const gain = big(to.coll_gain_since);
+  return (
+    <>
+      The touch on {day(note.to.timestamp)} wrote{" "}
+      <Prov info={spLiqProv.touchLoss(c, to.tx_hash, to.block_number)} value={exactUnits(loss)} symbol="BOLD">
+        {amt(loss)} BOLD
+      </Prov>{" "}
+      burned and{" "}
+      <Prov info={spLiqProv.touchGain(c, to.tx_hash, to.block_number)} value={exactUnits(gain)} symbol={c}>
+        {collAmt(gain)} {c}
+      </Prov>{" "}
+      paid in, and no liquidation between the two touches accounts for it.
+    </>
+  );
 }
 
 /** One closed stretch's liquidations, as a row between its two touches. */
@@ -392,7 +404,7 @@ export function LiquityV2DepositLiquidationsRow({ note }: { note: SpLiquidations
           // A touch that reported a loss or a gain with no liquidation between
           // the two touches: the sentence alone.
           <p className="text-xs leading-relaxed text-amber-700 dark:text-amber-400" data-sp-liquidations-residual="">
-            {reconcileLine(note)}
+            <NoLiquidationLine note={note} />
           </p>
         )}
       </div>

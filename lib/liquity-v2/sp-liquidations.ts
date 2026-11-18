@@ -74,5 +74,30 @@ export function spNotesOnRows(notes: readonly SpLiquidationsNote[], has: (eventK
   );
 }
 
+/** How a closed period's liquidations meet what its closing touch wrote,
+ *  from the residuals (the touch's figure less the liquidations' sum): above
+ *  zero they fall short, below zero they exceed it. Where the BOLD and the
+ *  collateral go opposite ways, each clause names its subject. Null where
+ *  both residuals are zero. */
+export function spResidualClause(
+  residual: { bold_lost: string; coll_gained: string },
+  coll: string,
+  fmt: { bold: (v: bigint) => string; coll: (v: bigint) => string },
+): string | null {
+  const zero = BigInt(0);
+  const rb = BigInt(residual.bold_lost);
+  const rc = BigInt(residual.coll_gained);
+  const mag = (v: bigint) => (v < zero ? -v : v);
+  const bold = `${fmt.bold(mag(rb))} BOLD`;
+  const col = `${fmt.coll(mag(rc))} ${coll}`;
+  if (rb === zero && rc === zero) return null;
+  if (rb > zero && rc < zero)
+    return `account for all but ${bold} of the burn, and exceed the ${coll} paid in by ${fmt.coll(mag(rc))}`;
+  if (rb < zero && rc > zero)
+    return `account for all but ${col} of the ${coll} paid in, and exceed the burn by ${fmt.bold(mag(rb))} BOLD`;
+  const items = [...(rb !== zero ? [bold] : []), ...(rc !== zero ? [col] : [])].join(" and ");
+  return rb > zero || rc > zero ? `account for all but ${items}` : `exceed it by ${items}`;
+}
+
 export const isSpLiquidationsNote = (x: unknown): x is SpLiquidationsNote =>
   (x as SpLiquidationsNote | null)?.kind === "sp-liquidations";

@@ -6,7 +6,12 @@
 // Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { spBranchCheck, spLiquidationNotes, spNotesOnRows } from "../../lib/liquity-v2/sp-liquidations.ts";
+import {
+  spBranchCheck,
+  spLiquidationNotes,
+  spNotesOnRows,
+  spResidualClause,
+} from "../../lib/liquity-v2/sp-liquidations.ts";
 import { anchorMarketNotes, spLiquidationsSentence } from "../../lib/shared/market-note.ts";
 
 const POOL = "0xd442e41019b7f5c4dd78f50dc03726c446148695";
@@ -133,4 +138,22 @@ test("a read without the branch check states none", () => {
   const { branch_check, ...rest } = read;
   assert.equal(branch_check.unreconciled, "0");
   assert.equal(spBranchCheck(rest), null);
+});
+
+test("the residual clause: short, over, and opposite ways with each subject named", () => {
+  const fmt = { bold: (v) => (Number(v) / 1e18).toString(), coll: (v) => (Number(v) / 1e18).toString() };
+  const r = (b, c) => spResidualClause({ bold_lost: b, coll_gained: c }, "rETH", fmt);
+  const E = 10n ** 17n;
+  assert.equal(r("0", "0"), null);
+  assert.equal(r(String(5n * E), "0"), "account for all but 0.5 BOLD");
+  assert.equal(r(String(5n * E), String(2n * E)), "account for all but 0.5 BOLD and 0.2 rETH");
+  assert.equal(r(String(-5n * E), String(-2n * E)), "exceed it by 0.5 BOLD and 0.2 rETH");
+  assert.equal(
+    r(String(5n * E), String(-2n * E)),
+    "account for all but 0.5 BOLD of the burn, and exceed the rETH paid in by 0.2",
+  );
+  assert.equal(
+    r(String(-5n * E), String(2n * E)),
+    "account for all but 0.2 rETH of the rETH paid in, and exceed the burn by 0.5 BOLD",
+  );
 });

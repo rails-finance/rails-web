@@ -259,6 +259,21 @@ export const spLiqProv = {
       null,
       { formula: `Σ ${one}` },
     ),
+  /** The closing touch's own figures, from its DepositOperation. */
+  touchLoss: (b: SpBranch, txHash: string, block: string) =>
+    spTouchProv(
+      "BOLD burned at the touch — the closing DepositOperation's depositLossSinceLastOperation: the deposit liquidations used since the touch before.",
+      txHash,
+      block,
+      b,
+    ),
+  touchGain: (b: SpBranch, txHash: string, block: string) =>
+    spTouchProv(
+      `${b} paid in at the touch — the closing DepositOperation's ethGainSinceLastOperation: the ${b} liquidations paid the deposit since the touch before.`,
+      txHash,
+      block,
+      b,
+    ),
   /** The open period's end: the newest block the index has read the pool to. */
   servedThru: (b: SpBranch, block: string) =>
     replay(
@@ -284,8 +299,13 @@ export const spLiqProv = {
   }),
 };
 
-/** A closed stretch's net, for a line that lists the note. */
+/** A closed period's figure, for a line that lists the note: the net, or,
+ *  where no liquidation falls between the touches, the BOLD the closing touch
+ *  wrote as burned. */
 export function spLiquidationsNoteProv(note: SpLiquidationsNote): Provenance {
   const b = note.branch as SpBranch;
-  return spLiqProv.sum(b, "Net between the touches", "nets in BOLD", "net in BOLD", note.stretch.liquidations.length);
+  const n = note.stretch.liquidations.length;
+  const to = note.stretch.to;
+  if (n === 0 && to) return spLiqProv.touchLoss(b, to.tx_hash, to.block_number);
+  return spLiqProv.sum(b, "Net between the touches", "nets in BOLD", "net in BOLD", n);
 }
