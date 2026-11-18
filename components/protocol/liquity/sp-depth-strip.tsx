@@ -66,7 +66,7 @@ export function SpDepthStrip({ depth, className = "" }: { depth: SpDepth | null;
   const registry = useReceiptRegistry();
   if (!depth) {
     return (
-      <p className={`text-xs text-rb-500 ${className}`} data-sp-depth="failed" data-anatomy="M6.2">
+      <p className={`text-xs text-rb-500 ${className}`} data-sp-depth="failed" data-anatomy="M6.3">
         The Stability Pool read failed.
       </p>
     );
@@ -98,7 +98,7 @@ export function SpDepthStrip({ depth, className = "" }: { depth: SpDepth | null;
   });
   return (
     <ProvReceiptsScope registry={registry}>
-      <section className={`w-full ${className}`} data-sp-depth={block} data-anatomy="M6.2">
+      <section className={`w-full ${className}`} data-sp-depth={block} data-anatomy="M6.3">
         <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3">
           <h2 className="text-sm font-semibold text-foreground">Stability Pool depth</h2>
           <p className="text-xs text-rb-500">
