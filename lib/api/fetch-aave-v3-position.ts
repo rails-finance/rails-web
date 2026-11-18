@@ -147,14 +147,16 @@ export async function fetchAaveV3Position(p: FetchAaveV3PositionParams): Promise
 export async function fetchAaveV3OraclePrices(
   assets: string[],
   market: string,
-  baseUrl?: string,
-): Promise<Record<string, number>> {
-  if (assets.length === 0) return {};
-  const url = `${baseUrl ?? ""}/api/chain/aave-v3/oracle-prices?market=${market}&assets=${assets.join(",")}`;
+  /** Read at this block (the card's); absent, at the latest, named. */
+  block?: number,
+): Promise<{ prices: Record<string, number>; block: number | null }> {
+  if (assets.length === 0) return { prices: {}, block: null };
+  const at = block != null ? `&block=${block}` : "";
+  const url = `/api/chain/aave-v3/oracle-prices?market=${market}&assets=${assets.join(",")}${at}`;
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`fetchAaveV3OraclePrices failed: ${res.status} ${res.statusText}`);
-  const data = (await res.json()) as { prices?: Record<string, number> };
-  return data.prices ?? {};
+  const data = (await res.json()) as { prices?: Record<string, number>; block?: number | null };
+  return { prices: data.prices ?? {}, block: data.block ?? null };
 }
 
 /** Scale a raw balance string by token decimals into a display Number (BigInt-safe,

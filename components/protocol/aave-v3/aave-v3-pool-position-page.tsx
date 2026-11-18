@@ -187,12 +187,18 @@ export interface AaveV3PoolPageDeployment {
   };
 }
 
-async function fetchBasePrices(route: string, assets: string[]): Promise<Record<string, number>> {
-  if (assets.length === 0) return {};
-  const res = await fetch(`${route}?assets=${assets.join(",")}`, { cache: "no-store" });
-  if (!res.ok) return {};
-  const data = (await res.json()) as { prices?: Record<string, number> };
-  return data.prices ?? {};
+/** The oracle's prices at `block` (the card's), and the block the route read
+ *  them at; empty when the read fails, so the card draws no dollars. */
+async function fetchBasePrices(
+  route: string,
+  assets: string[],
+  block: number,
+): Promise<{ prices: Record<string, number>; block: number | null }> {
+  if (assets.length === 0) return { prices: {}, block: null };
+  const res = await fetch(`${route}?assets=${assets.join(",")}&block=${block}`, { cache: "no-store" });
+  if (!res.ok) return { prices: {}, block: null };
+  const data = (await res.json()) as { prices?: Record<string, number>; block?: number | null };
+  return { prices: data.prices ?? {}, block: data.block ?? null };
 }
 
 export interface AaveV3PoolPositionViewProps {
@@ -244,6 +250,8 @@ export function AaveV3PoolPositionView({
   const overBudget = useOverBudgetRetry();
   const { asks: overBudgetAsks, wait: waitOverBudget } = overBudget;
   const [prices, setPrices] = useState<Record<string, number>>({});
+  // The block the prices were read at: the card's, where the read answered.
+  const [priceBlock, setPriceBlock] = useState<number | null>(null);
   // The card holds its USD headlines' space until the oracle has answered.
   const [pricesSettled, setPricesSettled] = useState(false);
 
@@ -429,13 +437,16 @@ export function AaveV3PoolPositionView({
     }
     // One read per set of reserves: the history arriving can name more, and
     // an answer that lands after it is still this wallet's, so it is kept.
-    const key = `${wallet}:${[...wanted].sort().join(",")}`;
+    // Priced at the card's block, so each dollar's price and balance share it.
+    const key = `${wallet}:${data.blockNumber}:${[...wanted].sort().join(",")}`;
     if (pricedRef.current === key) return;
     pricedRef.current = key;
-    fetchBasePrices(d.routes.prices, [...wanted])
-      .then((p) => {
-        if (pricedRef.current?.startsWith(`${wallet}:`) && Object.keys(p).length > 0)
+    fetchBasePrices(d.routes.prices, [...wanted], data.blockNumber)
+      .then(({ prices: p, block }) => {
+        if (pricedRef.current?.startsWith(`${wallet}:`) && Object.keys(p).length > 0) {
           setPrices((prev) => ({ ...prev, ...p }));
+          setPriceBlock(block);
+        }
       })
       .catch(() => {
         // A reserve without a price today keeps its last recorded one.
@@ -452,12 +463,12 @@ export function AaveV3PoolPositionView({
   }, [data, countWhole, timeline, servedFolders, aaveEvents]);
   const view = useMemo(() => {
     if (!data || data.chainStale) return null;
-    const v = v3ViewFromChain(data, d.marketKey, prices, events, history);
+    const v = { ...v3ViewFromChain(data, d.marketKey, prices, events, history), priceBlock };
     // The card's count counts transactions; its tip gives the events too.
     return countWhole && timeline && (servedFolders?.length ?? 0) === 0
       ? { ...v, eventTotal: timeline.totalEvents, countNote: countNote?.parts.join(", ") || undefined }
       : v;
-  }, [data, prices, events, history, countWhole, timeline, servedFolders, countNote, d]);
+  }, [data, prices, priceBlock, events, history, countWhole, timeline, servedFolders, countNote, d]);
 
   // Debt the Pool wrote off that this history does not show (DeficitCreated
   // is not among the logs Base reads). Stated only where it left a remainder.
@@ -637,8 +648,8 @@ export function AaveV3PoolPositionView({
 
   const stripAssets = useMemo<LatestPriceAsset[]>(() => {
     if (!view) return [];
-    // The oracle receipt for each price, read at the head (the price route states no block).
-    const vocab = aaveMarketVocab(d.key, {});
+    // The oracle receipt for each price, read at the card's block.
+    const vocab = aaveMarketVocab(d.key, { blockNumber: priceBlock ?? undefined });
     const seen = new Set<string>();
     const out: LatestPriceAsset[] = [];
     for (const r of [...view.supplies, ...view.borrows]) {
@@ -650,7 +661,7 @@ export function AaveV3PoolPositionView({
         out.push({ symbol: r.symbol, address: r.address, price: p, info: vocab.reservePriceProv(r.symbol) });
     }
     return out;
-  }, [view, prices, d.key]);
+  }, [view, prices, priceBlock, d.key]);
 
   // The export shapes: the card's ⋮, or the wallet row's Tools on the event route.
   // The configurator log the markdown export's "Protocol changes" section reads.

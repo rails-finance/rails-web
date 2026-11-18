@@ -35,6 +35,8 @@ import type { Provenance } from "@/components/shared/provenance";
 import { stampHeadRead, type ServerRead } from "@/lib/shared/server-head-read";
 import { aaveFamilyTerms, type AaveFamilyTerms } from "@/lib/aave-family/terms";
 import { APY_FORMULA } from "@/lib/aave-family/apy";
+import { holderUsdReceipt, shownUsd } from "@/lib/shared/holder-usd-receipt";
+import { aaveV3PriceNote, AAVE_V3_FACE_NOTE } from "@/lib/aave-v3/price-notes";
 
 /** The identity of a market-overview receipt: the block, and the two live
  *  contracts the surface read from (threaded from the payload). Reserve-level
@@ -53,12 +55,13 @@ export interface AaveMarketCoords {
 }
 
 export interface AaveMarketVocab {
-  /** Market total supplied / borrowed in USD — Σ over reserves. */
-  marketTotalProv: (side: "supplied" | "borrowed") => Provenance;
+  /** Market total supplied / borrowed in USD — Σ over reserves; `rows`
+   *  carry each reserve's tokens and price, so the receipt rebuilds it. */
+  marketTotalProv: (side: "supplied" | "borrowed", rows?: readonly PricedTokens[]) => Provenance;
   /** The reserve count — Pool.getReservesList length. */
   reserveCountProv: () => Provenance;
   /** One reserve's supplied / borrowed value in USD. */
-  reserveValueProv: (side: "supplied" | "borrowed", symbol: string) => Provenance;
+  reserveValueProv: (side: "supplied" | "borrowed", symbol: string, row?: PricedTokens) => Provenance;
   /** One reserve's supplied total in tokens, where the row states no dollars
    *  (a reserve with no market price). */
   reserveTokensProv: (symbol: string) => Provenance;
@@ -66,7 +69,7 @@ export interface AaveMarketVocab {
    *  has one (v3.3+), else supplied less borrowed. */
   reserveAvailableProv: (
     symbol: string,
-    a: { priced: boolean; basis: "virtual" | "difference"; deficit?: number | null },
+    a: { priced: boolean; basis: "virtual" | "difference"; deficit?: number | null; row?: PricedTokens },
   ) => Provenance;
   /** One reserve's liquidation threshold. */
   reserveLtProv: (symbol: string) => Provenance;
@@ -116,9 +119,9 @@ export interface AaveMarketVocab {
   /** The price source the market's oracle reads for this asset. */
   oracleSourceProv: (symbol: string, source: string) => Provenance;
   /** The reserve's outstanding deficit (Pool.getReserveDeficit). */
-  reserveDeficitProv: (symbol: string, priced: boolean) => Provenance;
+  reserveDeficitProv: (symbol: string, priced: boolean, row?: PricedTokens) => Provenance;
   /** A minted reserve's remaining borrow capacity: borrow cap less borrowed. */
-  reserveBorrowRoomProv: (symbol: string, cap: number) => Provenance;
+  reserveBorrowRoomProv: (symbol: string, cap: number, row?: PricedTokens) => Provenance;
   /** The borrow and supply rate curves, from the reserve's rate strategy. */
   reserveCurveProv: (
     symbol: string,
@@ -131,6 +134,26 @@ export interface AaveMarketVocab {
       slope2: string;
     },
   ) => Provenance;
+}
+
+/** One reserve's tokens and its oracle price (null where the oracle prices
+ *  none), for a dollar receipt whose rows rebuild its figure. */
+export interface PricedTokens {
+  symbol: string;
+  tokens: number;
+  price: number | null;
+}
+
+/** A dollar figure from reserve tokens as the market surface draws it: each
+ *  amount × its price as the rows show them, to the cent, summed
+ *  (lib/shared/holder-usd-receipt.ts). A reserve the oracle does not price
+ *  adds $0. */
+export function aaveMarketUsd(rows: readonly PricedTokens[]): number {
+  const sum = rows.reduce(
+    (s, r) => s + (r.price != null && r.price > 0 && r.tokens > 0 ? shownUsd(r.tokens, r.price) : 0),
+    0,
+  );
+  return Math.round(sum * 100) / 100;
 }
 
 /** What a cap-used receipt states: the amount counted, the ceiling, where the
@@ -172,7 +195,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
     address: coords.oracle ?? "0x0000000000000000000000000000000000000000",
   });
   const atBlock = (coords: AaveMarketCoords): string =>
-    coords.blockNumber != null ? ` at block ${coords.blockNumber}` : "";
+    coords.blockNumber != null ? ` at block ${coords.blockNumber.toLocaleString("en-US")}` : "";
   const automatorContract = (coords: AaveMarketCoords): Provenance["contract"] => ({
     name: "SparkLend CapAutomator",
     address: coords.capAutomator ?? "0x0000000000000000000000000000000000000000",
@@ -181,18 +204,18 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
     kind: "recompute",
     text:
       coords.blockNumber != null
-        ? `Re-run the ${call} eth_call at block ${coords.blockNumber} against any node`
+        ? `Re-run the ${call} eth_call at block ${coords.blockNumber.toLocaleString("en-US")} against any node`
         : `Re-run the ${call} eth_call against any node`,
   });
 
   const terms = aaveFamilyTerms(cfg.protocol);
-  return (coords: AaveMarketCoords): AaveMarketVocab => ({
+  const plain = (coords: AaveMarketCoords): AaveMarketVocab => ({
     terms,
     marketTotalProv: (side) => ({
       kind: "chain-derived",
       pclass: "oracle",
       source: { block: coords.blockNumber },
-      summary: `Market ${side}. Σ over every reserve on the Pool of its ${side} value in USD${atBlock(coords)}; each reserve's ${side === "supplied" ? "aToken totalSupply" : "variable-debt totalSupply"} × the market's own IAaveOracle price. Every leg read at that block; the sum is ours.`,
+      summary: `Market ${side}. Σ over every reserve on the Pool of its ${side} value in USD${atBlock(coords)}; each reserve's ${side === "supplied" ? "aToken totalSupply" : "variable-debt totalSupply"} × the market's IAaveOracle price, each leg read at that block.`,
       contract: poolContract(coords),
       via: `${cfg.lane} · Σ per-reserve ${side} × oracle price @ head`,
       formula: `Σ (reserve ${side} × oracle price)`,
@@ -404,7 +427,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
         kind: "chain-derived",
         pclass: "state",
         source: { block: coords.blockNumber },
-        summary: `${symbol} ${side} cap used. ${coords.blockNumber != null ? `at block ${coords.blockNumber}, ` : ""}${counted}, divided by ${ceiling}.`,
+        summary: `${symbol} ${side} cap used. ${coords.blockNumber != null ? `at block ${coords.blockNumber.toLocaleString("en-US")}, ` : ""}${counted}, divided by ${ceiling}.`,
         contract: c.basis === "automator" ? automatorContract(coords) : poolContract(coords),
         via:
           c.basis === "automator"
@@ -637,6 +660,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
         : {}),
     }),
   });
+  return (coords) => withUsdRows(cfg, coords, plain(coords));
 }
 
 const CONFIGS: Record<string, AaveMarketConfig> = {
@@ -689,6 +713,72 @@ const CONFIGS: Record<string, AaveMarketConfig> = {
     lane: "GET /api/chain/spark/market",
   },
 };
+
+/** The dollar receipts with their rows: where the caller hands the tokens
+ *  and prices, each receipt keeps its words and its rows become each
+ *  reserve's amount × price, to the cent, and their sum. */
+function withUsdRows(cfg: AaveMarketConfig, coords: AaveMarketCoords, v: AaveMarketVocab): AaveMarketVocab {
+  const oracle = { name: cfg.oracleName, address: coords.oracle ?? "0x0000000000000000000000000000000000000000" };
+  const rowsOf = (base: Provenance, legs: readonly PricedTokens[], amountNote: string, byValue = false): Provenance => {
+    const priced = legs.filter((l) => l.price != null && l.price > 0 && l.tokens > 0);
+    if (priced.length === 0) return base;
+    const unpriced = legs.filter((l) => (l.price == null || l.price <= 0) && l.tokens > 0).length;
+    const { prov } = holderUsdReceipt({
+      what: "",
+      legs: priced.map((l) => ({
+        token: l.symbol,
+        amount: l.tokens,
+        amountNote,
+        price: l.price as number,
+        priceNote: aaveV3PriceNote(cfg.oracleName, l.symbol, coords.blockNumber),
+        priceContract: oracle,
+      })),
+      block: coords.blockNumber ?? null,
+      via: "",
+      byValue,
+    });
+    const left =
+      unpriced > 0
+        ? `The oracle gives no price for ${unpriced === 1 ? "one reserve" : `${unpriced} reserves`}, so ${unpriced === 1 ? "it adds" : "they add"} $0.`
+        : "";
+    // The base receipt's words, then what the rows add.
+    const summary = [base.summary, left, AAVE_V3_FACE_NOTE.compact].filter(Boolean).join(" ");
+    return {
+      ...base,
+      summary,
+      formula: prov.formula,
+      inputs: prov.inputs,
+    };
+  };
+  const at = coords.blockNumber != null ? ` at block ${coords.blockNumber.toLocaleString("en-US")}` : "";
+  const supplyNote = (side: "supplied" | "borrowed") =>
+    `${side === "supplied" ? "aToken" : "variableDebtToken"} totalSupply${at}`;
+  return {
+    ...v,
+    marketTotalProv: (side, rows) =>
+      rows ? rowsOf(v.marketTotalProv(side), rows, supplyNote(side), true) : v.marketTotalProv(side),
+    reserveValueProv: (side, symbol, row) =>
+      row ? rowsOf(v.reserveValueProv(side, symbol), [row], supplyNote(side)) : v.reserveValueProv(side, symbol),
+    reserveAvailableProv: (symbol, a) =>
+      a.row && a.priced
+        ? rowsOf(
+            v.reserveAvailableProv(symbol, a),
+            [a.row],
+            a.basis === "virtual"
+              ? `Pool.getVirtualUnderlyingBalance(asset)${at}`
+              : `aToken totalSupply − variableDebtToken totalSupply${at}`,
+          )
+        : v.reserveAvailableProv(symbol, a),
+    reserveDeficitProv: (symbol, priced, row) =>
+      row && priced
+        ? rowsOf(v.reserveDeficitProv(symbol, priced), [row], `Pool.getReserveDeficit(asset)${at}`)
+        : v.reserveDeficitProv(symbol, priced),
+    reserveBorrowRoomProv: (symbol, cap, row) =>
+      row
+        ? rowsOf(v.reserveBorrowRoomProv(symbol, cap), [row], `borrow cap − variableDebtToken totalSupply${at}`)
+        : v.reserveBorrowRoomProv(symbol, cap),
+  };
+}
 
 const FACTORIES: Record<string, (coords: AaveMarketCoords) => AaveMarketVocab> = Object.fromEntries(
   Object.entries(CONFIGS).map(([k, c]) => [k, makeVocab(c)]),

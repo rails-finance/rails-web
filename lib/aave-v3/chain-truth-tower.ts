@@ -31,6 +31,8 @@ import { scaleV3ChainBalance } from "@/lib/api/fetch-aave-v3-position";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAaveV3Event } from "@/lib/shared/types/event-shape";
 import { interestSinceZero, numOrNull, type LaneRow } from "@/lib/shared/interest-since-zero";
+import { shownUsd, shownPrice } from "@/lib/shared/holder-usd-receipt";
+import { shownHf } from "./usd-receipt";
 import {
   positionSupplyProv,
   positionDebtProv,
@@ -605,7 +607,7 @@ export interface AaveV3LiquidationRead {
   /** How far the whole collateral basket can fall before HF 1.0 (percent). */
   dropPct: number | null;
   /** The single-collateral anchor, when one reserve dominates. */
-  single: { symbol: string; price: number; liqPrice: number } | null;
+  single: { symbol: string; address: string; price: number; liqPrice: number } | null;
   /** Every supplied and every borrowed reserve is this one token: one oracle
    *  price stands on both sides of the health factor and cancels, so no price
    *  can liquidate the account and the two figures above are null. */
@@ -640,7 +642,13 @@ export function aaveV3LiquidationRead(view: AaveV3PositionView): AaveV3Liquidati
     const total = valued.reduce((s, p) => s + p.usd, 0);
     const top = valued.reduce((a, b) => (b.usd > a.usd ? b : a));
     if (total > 0 && top.usd / total >= 0.995) {
-      single = { symbol: top.r.symbol, price: top.price as number, liqPrice: (top.price as number) / hf };
+      // The price and the factor as the receipt shows them, so its rows rebuild it.
+      single = {
+        symbol: top.r.symbol,
+        address: top.r.address,
+        price: top.price as number,
+        liqPrice: shownPrice(top.price as number) / shownHf(hf),
+      };
     }
   }
   return { dropPct: (1 - 1 / hf) * 100, single, sameAsset: null };
@@ -654,6 +662,10 @@ export interface AaveV3CardCaptions {
   supplyInterestUsd: number | null;
   /** The same for the debt. */
   debtInterestUsd: number | null;
+  /** Each reserve's interest in tokens behind the side's figure, for the
+   *  caption's receipt. Absent with the figure. */
+  supplyInterestLegs?: InterestLeg[];
+  debtInterestLegs?: InterestLeg[];
   /** Unix seconds each side's figure counts from: the earliest of its
    *  reserves' starts from zero. Null with the figure. */
   supplyInterestSince?: number | null;
@@ -729,6 +741,13 @@ export function sinceZeroInterest(
   return got;
 }
 
+/** One reserve's interest in tokens since its balance last started from zero. */
+export interface InterestLeg {
+  symbol: string;
+  address: string;
+  amount: number;
+}
+
 /** One side's since-zero interest in USD, summed over its live reserves, and
  *  the earliest start among them. STRICT: a reserve that cannot state it, or an
  *  unpriced one, nulls the side. A served folder that moved the reserve at or
@@ -740,12 +759,13 @@ function sideSinceZeroUsd(
   events: readonly BaseActivityEvent[] | undefined,
   usdOf: (address: string | undefined, amount: number) => number | null,
   folders?: readonly ServedFolder[] | null,
-): { usd: number; since: number } | null {
+): { usd: number; since: number; legs: InterestLeg[] } | null {
   if (!events || events.length === 0) return null;
   const live = (side === "supply" ? view.supplies : view.borrows).filter((r) => r.amount > 0 && !r.decimalsUnread);
   if (live.length === 0) return null;
   let usd = 0;
   let since = Infinity;
+  const legs: InterestLeg[] = [];
   for (const r of live) {
     const unit = usdOf(r.address, 1);
     if (unit == null || unit <= 0) return null;
@@ -754,10 +774,12 @@ function sideSinceZeroUsd(
     if (!got) return null;
     const addr = r.address.toLowerCase();
     if (folders?.some((f) => f.lastAt >= got.since && f.legs.some((l) => l.asset.toLowerCase() === addr))) return null;
-    usd += got.amount * unit;
+    // The product of the amount and the price as the receipt shows them.
+    usd += shownUsd(got.amount, unit);
+    legs.push({ symbol: r.symbol, address: r.address, amount: got.amount });
     since = Math.min(since, got.since);
   }
-  return Number.isFinite(since) ? { usd, since } : null;
+  return Number.isFinite(since) ? { usd: Math.round(usd * 100) / 100, since, legs } : null;
 }
 
 export function computeAaveV3CardCaptions(
@@ -813,6 +835,8 @@ export function computeAaveV3CardCaptions(
   return {
     supplyInterestUsd: supplyInterest?.usd ?? null,
     debtInterestUsd: debtInterest?.usd ?? null,
+    supplyInterestLegs: supplyInterest?.legs,
+    debtInterestLegs: debtInterest?.legs,
     supplyInterestSince: supplyInterest?.since ?? null,
     debtInterestSince: debtInterest?.since ?? null,
     borrowRate,

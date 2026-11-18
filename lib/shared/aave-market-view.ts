@@ -15,6 +15,7 @@ import type { ServerRead } from "@/lib/shared/server-head-read";
 import { assetClass, ASSET_CLASS_TITLE, type AssetClass } from "@/lib/aave-v4/asset-class";
 import type { AaveMarketKey } from "@/lib/shared/aave-market-configs";
 import { aaveFamilyTerms, familyRate } from "@/lib/aave-family/terms";
+import { aaveMarketUsd } from "@/lib/shared/aave-market-provenance";
 
 export interface MarketReserveRow extends AaveMarketReserve {
   cls: AssetClass;
@@ -189,8 +190,9 @@ export function buildAaveMarketView(
       ...r,
       cls,
       classLabel: ASSET_CLASS_TITLE[cls],
-      suppliedUsd: r.priceUsd != null ? r.supplied * r.priceUsd : 0,
-      borrowedUsd: r.priceUsd != null ? r.borrowed * r.priceUsd : 0,
+      // Each the tokens × the price as the receipt shows them, to the cent.
+      suppliedUsd: aaveMarketUsd([{ symbol: r.symbol, tokens: r.supplied, price: r.priceUsd }]),
+      borrowedUsd: aaveMarketUsd([{ symbol: r.symbol, tokens: r.borrowed, price: r.priceUsd }]),
       supplyCapState,
       borrowCapState,
       closed: closedRoutes(r, supplyCapState, borrowCapState),
@@ -202,8 +204,9 @@ export function buildAaveMarketView(
 
   rows.sort((a, b) => b.suppliedUsd - a.suppliedUsd || b.supplied - a.supplied);
 
-  const suppliedUsd = rows.reduce((s, r) => s + r.suppliedUsd, 0);
-  const borrowedUsd = rows.reduce((s, r) => s + r.borrowedUsd, 0);
+  // The sums of the rows' cents: the market total's receipt lists each.
+  const suppliedUsd = Math.round(rows.reduce((s, r) => s + r.suppliedUsd, 0) * 100) / 100;
+  const borrowedUsd = Math.round(rows.reduce((s, r) => s + r.borrowedUsd, 0) * 100) / 100;
 
   // Composition by class, weighted by supplied USD.
   const byClass = new Map<AssetClass, number>();

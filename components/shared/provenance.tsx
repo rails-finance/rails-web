@@ -39,6 +39,7 @@ import { Box, Check, CircleHelp, Copy, ExternalLink, TriangleAlert, X } from "lu
 import { ProvCoverageBounds } from "./prov-coverage-tripwire";
 import { formatExact } from "@/lib/utils/format";
 import { BlockRef } from "@/components/shared/block-ref";
+import { DustToggle } from "@/components/shared/dust-reserves";
 import { untracedInputs } from "@/lib/shared/prov-untraced";
 import { resolveClass, weakestClass } from "@/lib/shared/prov-class";
 import { entrySig } from "@/lib/shared/prov-signature";
@@ -102,6 +103,10 @@ export interface ProvInput {
    *  limit in the surplus token, a gap), not a read: like a definition, it
    *  carries no class dot and the value's class skips it. */
   step?: true;
+  /** A row of a part worth under a cent (lib/shared/holder-usd-receipt.ts):
+   *  it sits behind the receipt's closed "Show dust" control and still
+   *  counts in the sum. */
+  dust?: true;
 }
 export interface Provenance {
   kind: ProvKind;
@@ -724,6 +729,10 @@ export function ProvReceipt({
   // The head's label already names the asset, so an embedded receipt never
   // restates it as an operand row.
   const shownLeaves = leaves.filter((l) => l.label.toLowerCase() !== "asset");
+  // Rows of parts under a cent sit behind one control, at the first of them.
+  const [dustOpen, setDustOpen] = useState(false);
+  const firstDust = shownLeaves.findIndex((l) => l.dust);
+  const dustParts = new Set(shownLeaves.filter((l) => l.dust && l.step).map((l) => l.label)).size;
   // An etherscan verify link rides the via line instead of its own
   // full-width row: the via segment naming the log becomes the link (the last
   // "log"/"logs" segment — nearest the field), so the check stays one click
@@ -821,8 +830,21 @@ export function ProvReceipt({
             <div className="prov-operands">
               {shownLeaves.map((inp, i) => {
                 const cls = resolveClass(inp.kind, inp.pclass);
+                const toggle =
+                  i === firstDust ? (
+                    <span className="prov-dust-toggle">
+                      <DustToggle
+                        count={dustParts || 1}
+                        open={dustOpen}
+                        onToggle={() => setDustOpen((o) => !o)}
+                        title="Reserves worth under a cent at the oracle price, still counted in the sum."
+                      />
+                    </span>
+                  ) : null;
+                if (inp.dust && !dustOpen) return <Fragment key={i}>{toggle}</Fragment>;
                 return (
                   <Fragment key={i}>
+                    {toggle}
                     {inp.definition || inp.step ? (
                       <span aria-hidden />
                     ) : (
