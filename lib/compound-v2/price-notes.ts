@@ -19,13 +19,13 @@ export const compoundV2FixedPriceNote = (cSymbol: string, price: string, block: 
 
 /** A price in the oracle's ETH years (before block 10,678,764), in ETH. */
 export const compoundV2EthPriceNote = (cSymbol: string, block: number | null | undefined): string =>
-  `${compoundV2PriceNote(cSymbol, block)}, in ETH: before block 10,678,764 the oracle priced in ETH`;
+  `${compoundV2PriceNote(cSymbol, block)}, in ETH (the oracle priced in ETH before block 10,678,764)`;
 
 /** A debt line as the last borrow, repay or liquidation event emitted it. */
 export const compoundV2LastEventDebtNote = (block: number | null | undefined): string =>
   block != null
     ? `the accountBorrows the market emitted at the last borrow, repay or liquidation event, block ${n(block)}`
-    : "the accountBorrows the market emitted at the last borrow, repay or liquidation event, a block the listing does not name";
+    : "the accountBorrows the market emitted at the last borrow, repay or liquidation event, a block this read does not name";
 
 /** How the face shows a figure the rows rebuild to the cent. */
 export const COMPOUND_V2_FACE_NOTE = {

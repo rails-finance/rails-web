@@ -34,12 +34,12 @@ export async function resolve(spec, ctx, next) {
 }
 `;
 register("data:text/javascript," + encodeURIComponent(hook));
-register("data:text/javascript," + encodeURIComponent(hook));
 
 const { compoundV2UsdReceipt, compoundV2DebtDollars } = await import(ROOT + "lib/compound-v2/usd-receipt.ts");
 const { compoundV2LiquidationValues } = await import(ROOT + "lib/compound-v2/liquidation-values.ts");
 const { liqSeizedValueProv, liqClearedValueProv } = await import(ROOT + "lib/compound-v2/event-provenance.ts");
 const { ctokenFlowTimeline, replayCToken } = await import(ROOT + "lib/shared/ctoken-flows.ts");
+const { buildCompoundV2LiqForensics } = await import(ROOT + "lib/compound-v2/liquidation-forensics.ts");
 
 const num = (t) => Number(String(t).replace(/[^0-9.]/g, ""));
 const r6 = (x) => Math.round(x * 1e6);
@@ -140,6 +140,8 @@ test("the premium is worked out from the two shown legs, each rebuilt by its row
   assert.equal(rebuild(seized), v.seizedValue);
   assert.equal(rebuild(cleared), v.clearedValue);
   assert.equal(v.seizedValue / v.clearedValue - 1, rebuild(seized) / rebuild(cleared) - 1);
+  const f = buildCompoundV2LiqForensics(ctx, coords);
+  assert.equal(f.premium, rebuild(seized) / rebuild(cleared) - 1, "the card's premium is the shown legs'");
 });
 
 test("an ETH-era leg stays in ETH, its product to six decimals from the shown rows", () => {
@@ -159,7 +161,7 @@ test("an ETH-era leg stays in ETH, its product to six decimals from the shown ro
   });
   const price = cleared.inputs.find((i) => i.label === "USDC price");
   assert.match(price.value, / ETH$/);
-  assert.match(price.note, /in ETH: before block 10,678,764/);
+  assert.match(price.note, /at block 10,000,000, in ETH \(the oracle priced in ETH before block 10,678,764\)$/);
   assert.equal(rebuild(cleared, 1e6), v.clearedValue);
   assert.equal(r6(v.clearedValue), r6(1200 * 0.00251235), "1,200 USDC at 0.00251235 ETH");
 });

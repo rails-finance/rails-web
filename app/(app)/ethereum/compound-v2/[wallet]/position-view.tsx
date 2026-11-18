@@ -404,8 +404,10 @@ export default function CompoundV2PositionView({
     if (!liveView) return liveView;
     // Each market's last borrow, repay or liquidation row: the block its
     // emitted debt stands at, named where the live read has not reached it.
+    // Only where the page holds every row: a folder or a window can hide the
+    // row the debt comes from, and then no block is named.
     const debtBlockByMarket: Record<string, number> = {};
-    for (const e of v2Events) {
+    for (const e of wholeRows ? v2Events : []) {
       const d = e.context.data;
       if (d.side !== "debt" || d.debtAfter == null) continue;
       debtBlockByMarket[d.market] = Math.max(debtBlockByMarket[d.market] ?? 0, e.blockNumber);

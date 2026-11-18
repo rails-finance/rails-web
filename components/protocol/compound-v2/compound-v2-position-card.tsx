@@ -403,15 +403,29 @@ export function useCompoundV2CardSlots({
   // debt stands at its last event, interest since then left out, and the
   // token amount says so. The listing reads no live debt and names that block.
   const debtUnread = !compoundV2DebtDollars(detail, v.borrows);
+  // The live debt is priced at the live read's own oracle prices, so its
+  // amount and its price stand on one block (chain.blockNumber).
+  const debtView: CompoundV2PositionView =
+    detail && chain
+      ? {
+          ...v,
+          priceByMarket: Object.fromEntries(
+            chain.markets.filter((m) => m.priceUsd != null).map((m) => [m.market, m.priceUsd as number]),
+          ),
+          priceFixedByMarket: Object.fromEntries(chain.markets.map((m) => [m.market, !m.priceHasFeed])),
+          marketRead: { blockNumber: chain.blockNumber, ...(chain.oracle ? { oracle: chain.oracle } : {}) },
+        }
+      : v;
+  const debtBy = detail && chain ? serverReadOf(chain) : marketBy;
   const debtUsd = debtUnread
     ? null
-    : sideUsd(v, "Borrowed in USD", v.borrows.map(borrowLine), oneOrMany(v.borrows.length), marketBy);
+    : sideUsd(debtView, "Borrowed in USD", v.borrows.map(borrowLine), oneOrMany(v.borrows.length), debtBy);
   // Dust lines (under a cent) leave the icon cluster and the panel's list; the
   // panel puts them behind the "N dust reserves hidden" control.
   const suppliesShown = splitDust(v.supplies, supplyLineUsd(v)).shown;
-  const borrowsShown = splitDust(v.borrows, borrowLineUsd(v)).shown;
+  const borrowsShown = splitDust(v.borrows, borrowLineUsd(debtView)).shown;
   const supplyLines = useDustLines(v.supplies, supplyLineUsd(v));
-  const borrowLines = useDustLines(v.borrows, borrowLineUsd(v));
+  const borrowLines = useDustLines(v.borrows, borrowLineUsd(debtView));
 
   const status: PositionCardStatus | null =
     v.status === "liquidated"
@@ -599,8 +613,8 @@ export function useCompoundV2CardSlots({
   // Each side's market rows, and the panel: the liquidation line on the left;
   // the rate, the room to borrow and the drop on the right.
   const lineRows = compoundV2LineRows(chain);
-  const usdCell = (line: UsdLine, what: string) => {
-    const r = sideUsd(v, what, [line], "dollars", marketBy);
+  const usdCell = (line: UsdLine, what: string, debt = false) => {
+    const r = debt ? sideUsd(debtView, what, [line], "dollars", debtBy) : sideUsd(v, what, [line], "dollars", marketBy);
     return r ? <UsdFigure usd={r.usd} info={r.info} form="whole" /> : undefined;
   };
   const supplyBreakdown: AssetBreakdown = {
@@ -631,7 +645,7 @@ export function useCompoundV2CardSlots({
   const borrowBreakdown: AssetBreakdown = {
     assets: borrowLines.lines.map((r) => {
       // No dollars on the position page for a debt the live read has not reached.
-      const usd = detail && !r.live ? null : lineUsd(v, r.market, r.amount);
+      const usd = detail && !r.live ? null : lineUsd(debtView, r.market, r.amount);
       return {
         id: `borrow-${r.market}`,
         ...markOf(r),
@@ -647,7 +661,7 @@ export function useCompoundV2CardSlots({
             {isFixed(v, r.market) && <FixedPriceFlag v={v} r={r} marketBy={marketBy} />}
           </>
         ),
-        usdText: detail && !r.live ? undefined : usdCell(borrowLine(r), `${r.symbol} borrowed in USD`),
+        usdText: detail && !r.live ? undefined : usdCell(borrowLine(r), `${r.symbol} borrowed in USD`, true),
       };
     }),
     dust: borrowLines.control ?? undefined,

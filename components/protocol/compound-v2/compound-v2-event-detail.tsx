@@ -30,7 +30,7 @@ import { useStatCells } from "@/components/shared/chain-truth-stat-cell";
 import type { EventCardLedgers } from "@/components/shared/event-card";
 import type { EventCells } from "@/components/shared/event-cells";
 import type { EventPriceChip } from "@/components/shared/event-price-row";
-import { LiquidationForensics, type LiquidationForensicsProps } from "@/components/shared/liquidation-forensics";
+import { LiquidationForensics } from "@/components/shared/liquidation-forensics";
 import {
   assetsDeltaProv,
   cTokensDeltaProv,
@@ -46,11 +46,6 @@ import {
   supplyInterestSincePreviousProv,
   cTokensAfterProv,
   cTokensBeforeProv,
-  liqAtBlockPriceProv,
-  liqSeizedValueProv,
-  liqClearedValueProv,
-  liqPremiumProv,
-  liqIncentiveRefProv,
   priceAtBlockProv,
   type CompoundV2Coords,
 } from "@/lib/compound-v2/event-provenance";
@@ -68,7 +63,8 @@ import {
 } from "@/components/shared/ctoken-event-ledger";
 import { CTokenMembershipLine } from "@/components/shared/ctoken-membership-line";
 import { compoundV2LiquidationValues } from "@/lib/compound-v2/liquidation-values";
-import { formatExact, formatNumber, formatUsdValue, formatPrice } from "@/lib/utils/format";
+import { buildCompoundV2LiqForensics, oracleNote } from "@/lib/compound-v2/liquidation-forensics";
+import { formatExact, formatNumber, formatUsdValue } from "@/lib/utils/format";
 import { formatCompact } from "@/lib/shared/format-compact";
 
 export interface CompoundV2CellsInput {
@@ -82,90 +78,6 @@ export interface CompoundV2CellsInput {
 }
 
 const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Number(human)));
-
-/** "oracle at block 47,020,084": the price pill names the block it was read at. */
-const oracleNote = (block?: number) =>
-  block != null ? `oracle at block ${block.toLocaleString("en-US")}` : "oracle at block";
-
-/**
- * The valued two-leg liquidation breakdown, at Compound's OWN oracle price
- * captured at the event block (mig 151). NATIVE-ONLY: the legs are denominated
- * in ETH before the oracle migration (block 10,678,764) and USD after — the
- * exact numeraire the Comptroller computed the seizure in; `priceNumeraire`
- * says which, and the format seam renders each leg in it. The premium is a
- * ratio of two same-block legs, numeraire-invariant, and should reproduce the
- * liquidation incentive read at the same block (the self-audit beneath it).
- *
- * Undefined until the price walk has priced BOTH legs at this block — the card
- * stays token-only meanwhile (partial fill is a safe state, and a half-valued
- * breakdown would invite a cross-leg comparison the data can't support).
- */
-function buildCompoundV2LiqForensics(
-  ctx: CompoundV2Context,
-  coords: CompoundV2Coords,
-): LiquidationForensicsProps | undefined {
-  const v = compoundV2LiquidationValues(ctx);
-  if (!v) return undefined;
-  const { numeraire, seizedUnderlying, repaid, collPrice, debtPrice, seizedValue, clearedValue, incPct } = v;
-  const collM = COMPOUND_V2_MARKET_BY_KEY[ctx.collateralMarket!];
-
-  const collSym = ctx.collateralSymbol ?? collM.symbol;
-  const debtSym = ctx.marketSymbol;
-  // An ETH-era leg's product runs to six decimals, as its receipt rows show it.
-  const fmtValue =
-    numeraire === "ETH"
-      ? (n: number) => `${n.toLocaleString("en-US", { maximumFractionDigits: 6 })} ETH`
-      : formatUsdValue;
-  const fmtPrice = numeraire === "ETH" ? (n: number) => `${formatNumber(n)} ETH` : formatPrice;
-
-  return {
-    seized: {
-      symbol: collSym,
-      usd: seizedValue,
-      usdProv: liqSeizedValueProv(collSym, numeraire, coords, {
-        amount: seizedUnderlying,
-        price: collPrice,
-        cSymbol: collM.cSymbol,
-      }),
-    },
-    cleared: {
-      symbol: debtSym,
-      usd: clearedValue,
-      usdProv: liqClearedValueProv(debtSym, numeraire, coords, {
-        amount: repaid,
-        price: debtPrice,
-        cSymbol: COMPOUND_V2_MARKET_BY_KEY[ctx.market]?.cSymbol ?? debtSym,
-      }),
-    },
-    premium: seizedValue / clearedValue - 1,
-    premiumProv: liqPremiumProv(coords, {
-      seized: fmtValue(seizedValue),
-      cleared: fmtValue(clearedValue),
-      numeraire,
-    }),
-    premiumReference: {
-      label: "Liquidation incentive",
-      value: `${(1 + incPct).toFixed(2)}×`,
-      prov: liqIncentiveRefProv(coords),
-    },
-    pricePills: [
-      {
-        symbol: collSym,
-        priceUsd: collPrice,
-        priceProv: liqAtBlockPriceProv(collSym, numeraire, coords),
-        note: oracleNote(coords.blockNumber),
-      },
-      {
-        symbol: debtSym,
-        priceUsd: debtPrice,
-        priceProv: liqAtBlockPriceProv(debtSym, numeraire, coords),
-        note: oracleNote(coords.blockNumber),
-      },
-    ],
-    // ETH before the oracle migration, USD after — Compound's own numeraire.
-    format: { value: fmtValue, price: fmtPrice },
-  };
-}
 
 /** The supply balance stat on a supply-side row: after, the transition from
  *  the before at the same block's rate, and the interest since the previous

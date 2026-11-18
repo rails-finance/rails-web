@@ -56,6 +56,7 @@ import { shownUsd } from "@/lib/shared/shown-usd";
 /** A row valued at another row's price, both blocks named. */
 const nearestPriceNote = (priceBlock: number, rowBlock: number): string =>
   `price at block ${priceBlock.toLocaleString("en-US")}, the nearest read on this market; this row is at block ${rowBlock.toLocaleString("en-US")}`;
+const cents = (v: number): number => Math.round(v * 100) / 100;
 /** A leg's dollars as shown, its sign kept. */
 const signedShownUsd = (amount: number, price: number): number =>
   amount < 0 ? -shownUsd(-amount, price) : shownUsd(amount, price);
@@ -576,12 +577,16 @@ export function ctokenFlowTimeline(rows: CTokenFlowRow[], o: CTokenFlowOptions):
   for (const h of held) {
     const p = todayPrice(h.market) ?? dailyPrices[h.market]?.at(-1)?.[1] ?? 0;
     if (h.supply > DUST) {
-      assets.push({ side: "collateral", symbol: h.symbol, amount: h.supply, usd: h.supply * p });
-      collateralUsd += h.supply * p;
+      // The amount × the price as shown, to the cent, so "Still supplied"
+      // agrees with the panel's rows.
+      const usd = shownUsd(h.supply, p);
+      assets.push({ side: "collateral", symbol: h.symbol, amount: h.supply, usd });
+      collateralUsd += usd;
     }
     if (h.debt > DUST) {
-      assets.push({ side: "debt", symbol: h.symbol, amount: h.debt, usd: h.debt * p });
-      debtUsd += h.debt * p;
+      const usd = shownUsd(h.debt, p);
+      assets.push({ side: "debt", symbol: h.symbol, amount: h.debt, usd });
+      debtUsd += usd;
     }
   }
   // Each asset's underlying by symbol, for the icons.
@@ -596,7 +601,7 @@ export function ctokenFlowTimeline(rows: CTokenFlowRow[], o: CTokenFlowOptions):
   return {
     buckets,
     days,
-    live: { collateralUsd, debtUsd, assets },
+    live: { collateralUsd: cents(collateralUsd), debtUsd: cents(debtUsd), assets },
     todayPrices,
     dailyPrices,
     seriesCarry: true,
@@ -656,7 +661,7 @@ export function ctokenFocusEvents(rp: CTokenFlowReplay): FocusEvent[] {
     ...(r.ev.tx ? { tx: r.ev.tx } : {}),
     legs: r.legs.map((l) => ({
       bucket: l.bucket,
-      usd: l.amount * r.price,
+      usd: signedShownUsd(l.amount, r.price),
       amount: l.amount,
       symbol: r.ev.symbol,
       ...(ACCRUAL_KEYS.has(l.bucket) ? { accrual: true } : {}),
@@ -763,7 +768,7 @@ export function ctokenEventStates(
         bySym[side].set(c.symbol, b);
         const add = (into: Record<FlowSide, number | null>, v: number) => {
           if (v <= DUST) return;
-          into[side] = p == null || into[side] == null ? null : (into[side] as number) + v * p;
+          into[side] = p == null || into[side] == null ? null : cents((into[side] as number) + shownUsd(v, p));
         };
         add(usd, after);
         add(usdBefore, prior);
