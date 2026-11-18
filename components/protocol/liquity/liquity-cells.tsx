@@ -845,7 +845,13 @@ export function useLiquityCells({
         priceNow > 0
           ? {
               text: sheetUsd(eventUsd),
-              info: eventMoveUsdProv(collSym, afterCollInUsd, beforeCollAtEventUsd, redistUsd),
+              info: eventMoveUsdProv(
+                collSym,
+                afterCollInUsd,
+                beforeCollAtEventUsd,
+                redistUsd,
+                Boolean(isLiquidation && liquidation),
+              ),
             }
           : undefined,
       tip: TIP.collEvent,
@@ -1220,10 +1226,12 @@ function usdMoveProv(sym: string, amount: number, price: number): Provenance {
 
 /** The event's own row on the sheet: what takes the balance before to the
  *  balance after, in dollars, less any redistribution. */
-function eventMoveUsdProv(sym: string, total: number, before: number, redist: number): Provenance {
+function eventMoveUsdProv(sym: string, total: number, before: number, redist: number, liquidation = false): Provenance {
   return {
     kind: "derived",
-    summary: `${sym} this event moved, in US dollars. The balance after less the balance before and any redistribution, each at Liquity's price for ${sym} at this block, to the cent, shown to the dollar.`,
+    summary: liquidation
+      ? `${sym} this liquidation moved, in US dollars. The balance after at Liquity's price for ${sym} at this block, less the balance before and any redistribution at the price the liquidation used, to the cent, shown to the dollar.`
+      : `${sym} this event moved, in US dollars. The balance after less the balance before and any redistribution, each at Liquity's price for ${sym} at this block, to the cent, shown to the dollar.`,
     formula: redist !== 0 ? "total − before − redistribution" : "total − before",
     inputs: [
       { label: "total", value: formatUsdValue(total), kind: "derived", step: true },
@@ -1254,7 +1262,7 @@ function atPriceProv(sym: string, amount: number, price: number, when: string): 
 function marketMoveProv(sym: string, before: number, last: number): Provenance {
   return {
     kind: "derived",
-    summary: `Market move. The change in Liquity's price for ${sym} from the previous event to this one, on the ${sym} the Trove held between them. No ${sym} moved.`,
+    summary: `Market move. The change in Liquity's price for ${sym} from the previous event to this one, on the ${sym} the Trove held between them, to the cent, shown to the dollar. No ${sym} moved.`,
     formula: "before − last",
     inputs: [
       { label: "before", value: formatUsdValue(before), kind: "derived", step: true },

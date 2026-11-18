@@ -625,15 +625,22 @@ export const surplusClaimableProv = (s: {
   scaling: { raw: s.claimableRaw, from: "call", places: 18, why: "ETH has 18 decimals" },
 });
 
-export const surplusUsdProv = (claimable: number, priceUsd: number): Provenance => ({
+export const surplusUsdProv = (claimable: number, priceUsd: number, stale = false): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
-  summary:
-    "Claimable collateral in USD — the ETH still claimable times the PriceFeed price now, as the rows show them, to the cent.",
+  summary: stale
+    ? "Claimable collateral in USD — the ETH still claimable times the PriceFeed's lastGoodPrice (the fetchPrice simulation failed), as the rows show them, to the cent."
+    : "Claimable collateral in USD — the ETH still claimable times the PriceFeed price now, as the rows show them, to the cent.",
   formula: "claimable ETH × price",
   inputs: [
     { label: "claimable", value: `${amountText(claimable)} ETH`, kind: "chain", pclass: "state" },
-    { label: "price", value: priceText(priceUsd), kind: "chain", pclass: "oracle" },
+    {
+      label: "price",
+      value: priceText(priceUsd),
+      kind: "chain",
+      pclass: "oracle",
+      note: stale ? "PriceFeed.lastGoodPrice, the last fetchPrice result @ head" : "PriceFeed.fetchPrice @ head",
+    },
   ],
 });
 

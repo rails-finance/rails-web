@@ -246,7 +246,9 @@ export function liquityV1CardSlots({
             <>
               {" "}
               (
-              <Prov info={surplusUsdProv(claimable.claimable, priceUsd as number)}>{formatUsdValue(claimableUsd)}</Prov>
+              <Prov info={surplusUsdProv(claimable.claimable, priceUsd as number, chain?.priceStale ?? false)}>
+                {formatUsdValue(claimableUsd)}
+              </Prov>
               )
             </>
           )}{" "}

@@ -834,6 +834,7 @@ export function useLiquityCardSlots({
                   ct,
                   priceUsd as number,
                   protocol === "liquity-v2" ? undefined : "the branch's PriceFeed price",
+                  lv ? (lv.priceStale ?? false) : (v.priceStale ?? false),
                 )}
               >
                 {formatUsdValue(claimableUsd)}

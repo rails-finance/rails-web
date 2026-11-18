@@ -114,8 +114,8 @@ export function liquityTroveFaceProv(ctx: LiquityFaceProvContext): LiquityFacePr
       ]
     : [];
   // The USD line's rows rebuild it: the collateral at six decimals, the
-  // price at six significant figures, their product to the cent (
-  // lib/shared/holder-usd-receipt.ts).
+  // price to six decimals (six significant figures below $1), their product
+  // to the cent (lib/shared/holder-usd-receipt.ts).
   const collUsdProv: Provenance = {
     kind: "chain-derived",
     pclass: "oracle",

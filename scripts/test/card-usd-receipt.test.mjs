@@ -63,6 +63,14 @@ test("a BTC price keeps the precision its product needs: under a cent from the c
   const figure = shownUsd(amount, price);
   assert.equal(priceText(price), "$98,765.4321");
   assert.ok(Math.abs(figure - amount * price) < 0.01, `${figure} vs ${amount * price}`);
+  // An amount past six decimals rounds at the seventh: at a BTC price that is
+  // at most half a millionth of a coin, under five cents of the chain's.
+  const longAmount = 1234.5678915;
+  const btc = 98765;
+  assert.ok(
+    Math.abs(shownUsd(longAmount, btc) - longAmount * btc) < 0.05,
+    `${shownUsd(longAmount, btc)} vs ${longAmount * btc}`,
+  );
   // Two decimals at least, trailing zeros trimmed.
   assert.equal(priceText(104568), "$104,568.00");
   assert.equal(priceText(0.98765432), "$0.987654");

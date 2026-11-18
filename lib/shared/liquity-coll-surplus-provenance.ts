@@ -40,15 +40,25 @@ export function collSurplusUsdProv(
   /** The price's name in its family's words: Liquity V2 "Liquity's price for
    *  WETH", a fork "the branch's PriceFeed price". */
   priceName = `Liquity's price for ${symbol}`,
+  /** The price is the feed's lastGoodPrice: the fetchPrice simulation failed. */
+  stale = false,
 ): Provenance {
   return {
     kind: "chain-derived",
     pclass: "oracle",
-    summary: `Claimable collateral in USD. The ${symbol} still claimable times ${priceName}, as the rows show them, to the cent.`,
+    summary: stale
+      ? `Claimable collateral in USD. The ${symbol} still claimable times the branch's PriceFeed lastGoodPrice (the fetchPrice simulation failed), as the rows show them, to the cent.`
+      : `Claimable collateral in USD. The ${symbol} still claimable times ${priceName}, as the rows show them, to the cent.`,
     formula: "claimable collateral × oracle price",
     inputs: [
       { label: "claimable", value: `${amountText(s.claimable)} ${symbol}`, kind: "chain", pclass: "state" },
-      { label: "oracle price", value: priceText(priceUsd), kind: "chain", pclass: "oracle" },
+      {
+        label: "oracle price",
+        value: priceText(priceUsd),
+        kind: "chain",
+        pclass: "oracle",
+        note: stale ? "PriceFeed.lastGoodPrice, the last fetchPrice result @ head" : undefined,
+      },
     ],
   };
 }
