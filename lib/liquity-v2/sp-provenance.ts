@@ -4,6 +4,7 @@
 // The field meanings are rails-ops reference/liquity-v2-stability-pool-deposits.md.
 
 import type { Provenance, ProvVerify } from "@/components/shared/provenance";
+import type { SpLiquidationsNote } from "@/lib/shared/market-note";
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
 import { LIQUITY_V2_SP_POOLS } from "./sp-catalog";
 import type { SpBranch } from "./sp-routes";
@@ -124,4 +125,85 @@ export function spFeedProv(branch: SpBranch, stale: boolean): Provenance {
     contract: feed(branch),
     via: `${VIA} · ${stale ? "lastGoodPrice()" : "fetchPrice()"} @ head`,
   };
+}
+
+// ── What each liquidation did to the deposit (/stability-pool/liquidations):
+//    the branch pool's P, S and scale replayed over its Liquidation logs with
+//    StabilityPool.sol's integer arithmetic, from the deposit's last touch's
+//    snapshot. The collateral is valued at the Liquidation log's _price. ─────
+
+const LIQ_VIA = "GET /api/liquity-v2/stability-pool/liquidations";
+
+/** One liquidation: its block and transaction, for `source`. */
+export interface SpLiqCoords {
+  block: string;
+  txHash: string;
+}
+
+const replay = (branch: SpBranch, summary: string, at: SpLiqCoords | null, extra: Partial<Provenance> = {}) =>
+  ({
+    kind: "derived",
+    pclass: "indexed",
+    summary,
+    contract: pool(branch),
+    via: LIQ_VIA,
+    ...(at ? { source: { block: at.block, txHash: at.txHash } } : {}),
+    ...extra,
+  }) satisfies Provenance;
+
+export const spLiqProv = {
+  boldLost: (b: SpBranch, at: SpLiqCoords) =>
+    replay(
+      b,
+      "BOLD burned — the deposit's compounded BOLD before this liquidation less after it, replayed from the pool's P and scale at this Liquidation log.",
+      at,
+      { formula: "compounded before − compounded after" },
+    ),
+  collGained: (b: SpBranch, at: SpLiqCoords) =>
+    replay(
+      b,
+      `${b} gained — the deposit's ${b} gain after this liquidation less before it, replayed from the pool's S at this Liquidation log.`,
+      at,
+      { formula: "collateral gain after − collateral gain before" },
+    ),
+  price: (b: SpBranch, at: SpLiqCoords) => ({
+    kind: "chain" as const,
+    pclass: "emitted" as const,
+    summary: `${b} block price — the Liquidation log's _price: the BOLD per ${b} the branch liquidated at in this block.`,
+    contract: { name: `Liquity V2 ${b} TroveManager`, address: LIQUITY_V2_BRANCHES[b.toLowerCase()].troveManager },
+    source: { block: at.block, txHash: at.txHash },
+    via: LIQ_VIA,
+  }),
+  value: (b: SpBranch, at: SpLiqCoords, coll: string, price: string) =>
+    replay(
+      b,
+      `${b} gained, in BOLD — the ${b} this liquidation paid the deposit, valued at the liquidation's block price.`,
+      at,
+      {
+        formula: `${b} gained × _price ÷ 1e18, rounded down`,
+        inputs: [
+          { label: `${b} gained`, value: coll, kind: "derived", pclass: "indexed" },
+          { label: `_price, BOLD per ${b}`, value: price, kind: "chain", pclass: "emitted" },
+        ],
+      },
+    ),
+  net: (b: SpBranch, at: SpLiqCoords, value: string, lost: string) =>
+    replay(b, `Net, in BOLD — the ${b} gained valued at the liquidation's block price, less the BOLD burned.`, at, {
+      formula: `${b} gained in BOLD − BOLD burned`,
+      inputs: [
+        { label: `${b} gained, in BOLD`, value, kind: "derived", pclass: "indexed" },
+        { label: "BOLD burned", value: lost, kind: "derived", pclass: "indexed" },
+      ],
+    }),
+  /** A stretch's sum of one column. */
+  sum: (b: SpBranch, head: string, column: string, count: number) =>
+    replay(b, `${head} — the sum of the ${count} liquidations' ${column} in this stretch.`, null, {
+      formula: `Σ ${column}`,
+    }),
+};
+
+/** A closed stretch's net, for a line that lists the note. */
+export function spLiquidationsNoteProv(note: SpLiquidationsNote): Provenance {
+  const b = note.branch as SpBranch;
+  return spLiqProv.sum(b, "Net in the stretch", "nets in BOLD", note.stretch.liquidations.length);
 }

@@ -82,6 +82,9 @@ import { explorerUrl } from "@/lib/shared/chains";
 import { protocolIconSrc } from "@/lib/shared/protocols";
 import { marketNoteRateStepContent, marketNoteVaultTermsContent } from "@/lib/shared/learn-more-content";
 import { polarisModal } from "@/lib/polaris/event-templates";
+import { liquityV2DepositFlowsContent } from "@/components/protocol/liquity/sp-flows-note";
+import { spLiquidationsNoteProv } from "@/lib/liquity-v2/sp-provenance";
+import { big, exactUnits } from "@/lib/liquity-v2/sp-math";
 import { aaveFamilyRateStepInterestProv, aaveFamilyRateStepProv } from "@/lib/aave-v3/market-note-provenance";
 import { makerModal } from "@/lib/makerdao/event-templates";
 import { makerRateStepInterestProv, makerRateStepProv } from "@/lib/makerdao/market-note-provenance";
@@ -100,6 +103,7 @@ import {
   isLiveNoteGroup,
   noteRunReading,
   psmGapSentence,
+  spLiquidationsSentence,
   noteT1Words,
   RATE_NOTE_T1,
   type LiveNoteGroup,
@@ -107,6 +111,7 @@ import {
   type MarketNotePoint,
   type NoteRun,
   type PsmGapNote,
+  type SpLiquidationsNote,
   type RateNoteWords,
   type RateStepNote,
   type VaultTermsNote,
@@ -275,7 +280,7 @@ function rateSetter(note: MarketNote): "governance" | "formula" {
  *  a run or a live group the rate where every note states one. */
 export function noteGlyphOf(item: MarketNote | NoteRun | LiveNoteGroup): SpineNoteGlyph {
   const notes = isLiveNoteGroup(item) ? item.notes : isNoteRun(item) ? item.notes : [item];
-  if (notes.length > 0 && notes.every((n) => n.kind === "psm-gap")) return "share";
+  if (notes.length > 0 && notes.every((n) => n.kind === "psm-gap" || n.kind === "sp-liquidations")) return "share";
   return notes.every((n) => noteRateSpan(n)) ? "rate" : "terms";
 }
 
@@ -329,6 +334,7 @@ export function noteSpine(item: MarketNote | NoteRun): NoteSpine | undefined {
 function rateProvOf(note: MarketNote, end: "from" | "to"): Provenance {
   if (note.kind === "vault-terms") return end === "from" && note.rate ? note.rate.fromProv : note.prov;
   if (note.kind === "psm-gap") return psmGapNetProv(note);
+  if (note.kind === "sp-liquidations") return spLiquidationsNoteProv(note);
   if (note.protocol === "makerdao") return makerRateStepProv(note, "rate");
   if (note.protocol === "aave-v3" || note.protocol === "spark") return aaveFamilyRateStepProv(note, "rate");
   return rateStepProv(note, "rate");
@@ -473,7 +479,9 @@ function useNoteBody(note: MarketNote): NoteBody {
     ? rateStepBody(note, links)
     : note.kind === "psm-gap"
       ? psmGapBody(note)
-      : vaultTermsBody(note, links);
+      : note.kind === "sp-liquidations"
+        ? spLiquidationsBody(note)
+        : vaultTermsBody(note, links);
 }
 
 /** The header's figures: the marks, the direction, the headline and its
@@ -779,6 +787,25 @@ function psmGapBody(note: PsmGapNote): NoteBody {
     stats: [],
     learnMore: polarisModal("market"),
     derivation: <>{psmGapSentence(note)}.</>,
+  };
+}
+
+// ── A Liquity V2 deposit's liquidations between two touches: drawn by its own
+//    row (components/protocol/liquity/sp-liquidations.tsx); this body serves a
+//    line that lists one, with the sentence as its (i). ──────────────────────
+
+function spLiquidationsBody(note: SpLiquidationsNote): NoteBody {
+  const prov = spLiquidationsNoteProv(note);
+  const net = Number(exactUnits(big(note.stretch.totals.net)));
+  return {
+    label: `${note.branch} liquidations`,
+    measure: { kind: "protocol", id: "liquity-v2" },
+    headline: { text: `${net < 0 ? "−" : "+"}${Math.abs(net).toFixed(2)}`, prov },
+    quantity: "BOLD net",
+    direction: false,
+    stats: [],
+    learnMore: liquityV2DepositFlowsContent(note.branch),
+    derivation: <>{spLiquidationsSentence(note)}.</>,
   };
 }
 

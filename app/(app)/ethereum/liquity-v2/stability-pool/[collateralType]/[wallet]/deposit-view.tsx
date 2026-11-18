@@ -11,6 +11,9 @@
 // one read draws the newest SP_FIRST_READ rows with a boundary card, and the
 // flows read the life's day rows (/stability-pool/flows/daily). Under
 // `event/<id>` the page draws one operation on the shared event page (P4).
+// What each liquidation did to the deposit between its touches
+// (/stability-pool/liquidations) is a note row per closed stretch and a
+// section of the "Since its last touch" row (sp-liquidations.tsx).
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useParams } from "next/navigation";
@@ -29,6 +32,9 @@ import { LiquityV2DepositCard } from "@/components/protocol/liquity/sp-deposit-c
 import { LiquityV2DepositEventCard } from "@/components/protocol/liquity/sp-event-card";
 import { LiquityV2DepositFlowsNote, liquityV2DepositFlowsContent } from "@/components/protocol/liquity/sp-flows-note";
 import { LiquityV2DepositSinceTouchRow } from "@/components/protocol/liquity/sp-since-touch";
+import { SpOpenStretchLiquidations } from "@/components/protocol/liquity/sp-liquidations";
+import { spBranchCheck, spLiquidationNotes } from "@/lib/liquity-v2/sp-liquidations";
+import { LIQUITY_V2_SP_POOLS } from "@/lib/liquity-v2/sp-catalog";
 import { fetchLiquityV2DepositChain, type LiquityV2DepositChain } from "@/lib/api/fetch-liquity-v2-sp-chain";
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
 import { LIQUITY_V2_SP_PATH, type SpBranch } from "@/lib/liquity-v2/sp-routes";
@@ -44,6 +50,7 @@ import {
   type LiquityV2DepositDay,
   type LiquityV2DepositDaysResponse,
   type LiquityV2DepositEventRow,
+  type LiquityV2DepositLiquidationsResponse,
   type LiquityV2DepositTimelineResponse,
 } from "@/lib/sources/api/liquity-v2-sp";
 
@@ -101,6 +108,33 @@ export default function DepositView({
       cancelled = true;
     };
   }, [open, branch, depositor]);
+
+  // What each liquidation did to the deposit between its touches
+  // (/stability-pool/liquidations). Any answer but a 200 — the route absent
+  // on the api, a 503 before the capture has a tip or while the branch's
+  // replay does not hold — leaves the page as it is without it.
+  const [liqRead, setLiqRead] = useState<LiquityV2DepositLiquidationsResponse | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    readLiquityV2Sp<LiquityV2DepositLiquidationsResponse>("stability-pool/liquidations", {
+      collateralType: branch,
+      wallet: depositor,
+    })
+      .then((d) => !cancelled && Array.isArray(d?.stretches) && setLiqRead(d))
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [branch, depositor]);
+  const liqNotes = useMemo(
+    () => (liqRead ? spLiquidationNotes(branch, LIQUITY_V2_SP_POOLS[branch], liqRead) : NO_NOTES),
+    [liqRead, branch],
+  );
+  // The open stretch, where it starts at the touch the timeline holds as newest.
+  const openStretch =
+    liqRead?.since_last_touch && liqRead.since_last_touch.from.event_key === data?.rows?.[0]?.event_key
+      ? liqRead.since_last_touch
+      : null;
 
   // The whole life, oldest first: the first read where it held every row,
   // else one read of up to SP_WHOLE_LIFE_READ; past that, the day rows.
@@ -298,6 +332,7 @@ export default function DepositView({
               boundary={boundary}
               displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
               emptyLabel="No operations recorded for this deposit"
+              notes={liqNotes}
               toolbarLeading={
                 <TimelineActivityHeader
                   events={events}
@@ -324,6 +359,16 @@ export default function DepositView({
                         toAt={chain.blockTimestamp}
                         headBlock={chain.blockNumber}
                         sinceOpen={sinceOpen}
+                        liquidations={
+                          openStretch && liqRead ? (
+                            <SpOpenStretchLiquidations
+                              branch={branch}
+                              stretch={openStretch}
+                              servedThru={liqRead.served_thru_block}
+                              check={spBranchCheck(liqRead)}
+                            />
+                          ) : undefined
+                        }
                       />
                     )
                   : undefined
@@ -347,6 +392,7 @@ export default function DepositView({
 }
 
 const NO_FOCUS: never[] = [];
+const NO_NOTES: never[] = [];
 
 /** The second side's hue for the parts drawn from CSS (the chart, the events
  *  row, the line's label): violet-400, violet-700 for the label on the light

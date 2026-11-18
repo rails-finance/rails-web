@@ -13,6 +13,7 @@
 // added, and the total the next touch starts from, every figure receipted.
 // Where the feed did not answer, the row names the window and values nothing.
 
+import type { ReactNode } from "react";
 import { NoteRowShell } from "@/components/shared/note-row-shell";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { EventSheetView, SHEET_NO_USD, type EventSheet } from "@/components/shared/event-sheet";
@@ -60,6 +61,7 @@ export function LiquityV2DepositSinceTouchRow({
   toAt,
   headBlock,
   sinceOpen,
+  liquidations,
 }: {
   branch: SpBranch;
   /** deposits(depositor): the deposit the last touch recorded. */
@@ -83,6 +85,9 @@ export function LiquityV2DepositSinceTouchRow({
   headBlock: number;
   /** The deposit's one operation is its open. */
   sinceOpen: boolean;
+  /** The liquidations since the last touch, one by one, under the sheet
+   *  (sp-liquidations.tsx); absent where the read did not answer. */
+  liquidations?: ReactNode;
 }) {
   const c = branch;
   const collAddr = LIQUITY_V2_BRANCHES[c.toLowerCase()].collateralAddr;
@@ -276,6 +281,7 @@ export function LiquityV2DepositSinceTouchRow({
       }
     >
       <EventSheetView sheet={sheet} breakdown data={{ "data-live-sheet": "" }} />
+      {liquidations}
     </NoteRowShell>
   );
 }
