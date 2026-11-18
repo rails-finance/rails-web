@@ -11,7 +11,7 @@
 import { useState } from "react";
 import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
-import { Prov, type Provenance } from "@/components/shared/provenance";
+import { Prov, ProvReceiptsScope, useReceiptRegistry, type Provenance } from "@/components/shared/provenance";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import {
   DataTable,
@@ -62,10 +62,12 @@ function Share({ value, info }: { value: number | null; info: Provenance }) {
 
 export function SpDepthStrip({ depth, className = "" }: { depth: SpDepth | null; className?: string }) {
   const [sort, setSort] = useState<{ key: Key; dir: DataTableDir } | null>(null);
+  // The table's own receipts scope: neither page's other scopes reach it.
+  const registry = useReceiptRegistry();
   if (!depth) {
     return (
-      <p className={`text-xs text-rb-500 ${className}`} data-sp-depth="failed">
-        The Stability Pool read failed; the depth per branch is unavailable.
+      <p className={`text-xs text-rb-500 ${className}`} data-sp-depth="failed" data-anatomy="M6.2">
+        The Stability Pool read failed.
       </p>
     );
   }
@@ -95,65 +97,67 @@ export function SpDepthStrip({ depth, className = "" }: { depth: SpDepth | null;
     ariaLabel: `Sort by ${label}`,
   });
   return (
-    <section className={`w-full ${className}`} data-sp-depth={block}>
-      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3">
-        <h2 className="text-sm font-semibold text-foreground">Stability Pool depth</h2>
-        <p className="text-xs text-rb-500">
-          At <BlockRef block={block} chainId={MAINNET_CHAIN_ID} />
-        </p>
-      </div>
-      <DataTable
-        label="Stability Pool depth per branch"
-        rowHeight="one"
-        tableClassName="text-sm tabular-nums min-w-[520px]"
-      >
-        <DataTableHead>
-          <DataTableHeader label="Branch" sticky={PIN} />
-          <DataTableHeader label="In the pool" align="right" sort={header("deposits", "BOLD in the pool")} />
-          <DataTableHeader label="Branch debt" align="right" sort={header("debt", "branch debt")} />
-          <DataTableHeader label="Pool ÷ debt" align="right" sort={header("share", "pool ÷ debt")} />
-        </DataTableHead>
-        <DataTableBody>
-          {rows.map(({ b, deposits, debt, share }) => (
-            <DataTableRow key={b.symbol} data-sp-depth-branch={b.symbol}>
-              <DataTableCell rowHeader sticky={PIN} className="whitespace-nowrap font-medium text-foreground">
-                <span className="inline-flex items-center gap-2">
-                  <TokenChipIcon
-                    symbol={b.symbol}
-                    address={LIQUITY_V2_BRANCHES[b.symbol.toLowerCase()]?.collateralAddr}
-                    size={20}
-                    filterable={false}
-                  />
-                  {b.symbol}
-                </span>
+    <ProvReceiptsScope registry={registry}>
+      <section className={`w-full ${className}`} data-sp-depth={block} data-anatomy="M6.2">
+        <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3">
+          <h2 className="text-sm font-semibold text-foreground">Stability Pool depth</h2>
+          <p className="text-xs text-rb-500">
+            At <BlockRef block={block} chainId={MAINNET_CHAIN_ID} />
+          </p>
+        </div>
+        <DataTable
+          label="Stability Pool depth per branch"
+          rowHeight="one"
+          tableClassName="text-sm tabular-nums min-w-[520px]"
+        >
+          <DataTableHead>
+            <DataTableHeader label="Branch" sticky={PIN} />
+            <DataTableHeader label="In the pool" align="right" sort={header("deposits", "BOLD in the pool")} />
+            <DataTableHeader label="Branch debt" align="right" sort={header("debt", "branch debt")} />
+            <DataTableHeader label="Pool ÷ debt" align="right" sort={header("share", "pool ÷ debt")} />
+          </DataTableHead>
+          <DataTableBody>
+            {rows.map(({ b, deposits, debt, share }) => (
+              <DataTableRow key={b.symbol} data-sp-depth-branch={b.symbol}>
+                <DataTableCell rowHeader sticky={PIN} className="whitespace-nowrap font-medium text-foreground">
+                  <span className="inline-flex items-center gap-2">
+                    <TokenChipIcon
+                      symbol={b.symbol}
+                      address={LIQUITY_V2_BRANCHES[b.symbol.toLowerCase()]?.collateralAddr}
+                      size={20}
+                      filterable={false}
+                    />
+                    {b.symbol}
+                  </span>
+                </DataTableCell>
+                <DataTableCell align="right" className="whitespace-nowrap">
+                  <Bold value={deposits} info={spDepositsProv(b, block)} />
+                </DataTableCell>
+                <DataTableCell align="right" className="whitespace-nowrap">
+                  <Bold value={debt} info={spBranchDebtProv(b, block)} />
+                </DataTableCell>
+                <DataTableCell align="right" className="whitespace-nowrap">
+                  <Share value={share} info={spShareProv(b, block)} />
+                </DataTableCell>
+              </DataTableRow>
+            ))}
+            <DataTableRow data-sp-depth-branch="all">
+              <DataTableCell rowHeader sticky={PIN} className="whitespace-nowrap font-semibold text-foreground">
+                All
               </DataTableCell>
-              <DataTableCell align="right" className="whitespace-nowrap">
-                <Bold value={deposits} info={spDepositsProv(b, block)} />
+              <DataTableCell align="right" className="whitespace-nowrap font-semibold">
+                <Bold value={totalDeposits} info={spTotalProv("deposits", block)} />
               </DataTableCell>
-              <DataTableCell align="right" className="whitespace-nowrap">
-                <Bold value={debt} info={spBranchDebtProv(b, block)} />
+              <DataTableCell align="right" className="whitespace-nowrap font-semibold">
+                <Bold value={totalDebt} info={spTotalProv("debt", block)} />
               </DataTableCell>
-              <DataTableCell align="right" className="whitespace-nowrap">
-                <Share value={share} info={spShareProv(b, block)} />
+              <DataTableCell align="right" className="whitespace-nowrap font-semibold">
+                <Share value={totalShare} info={spTotalShareProv(block)} />
               </DataTableCell>
             </DataTableRow>
-          ))}
-          <DataTableRow data-sp-depth-branch="all">
-            <DataTableCell rowHeader sticky={PIN} className="whitespace-nowrap font-semibold text-foreground">
-              All
-            </DataTableCell>
-            <DataTableCell align="right" className="whitespace-nowrap font-semibold">
-              <Bold value={totalDeposits} info={spTotalProv("deposits", block)} />
-            </DataTableCell>
-            <DataTableCell align="right" className="whitespace-nowrap font-semibold">
-              <Bold value={totalDebt} info={spTotalProv("debt", block)} />
-            </DataTableCell>
-            <DataTableCell align="right" className="whitespace-nowrap font-semibold">
-              <Share value={totalShare} info={spTotalShareProv(block)} />
-            </DataTableCell>
-          </DataTableRow>
-        </DataTableBody>
-      </DataTable>
-    </section>
+          </DataTableBody>
+        </DataTable>
+      </section>
+    </ProvReceiptsScope>
   );
 }

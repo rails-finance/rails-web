@@ -28,6 +28,11 @@ export interface SpDepth {
 
 const VIA = "GET /api/chain/liquity-v2/sp-depth";
 
+/** The first block at which all three branch pools and TroveManagers have
+ *  code (the rETH StabilityPool, the last deployed); a read before it has
+ *  nothing to read. */
+export const LIQUITY_V2_SP_FROM_BLOCK = 22_516_119;
+
 /** A 1e18 raw as a number of BOLD; null for an absent or malformed raw. */
 export function boldUnits(raw: string | null | undefined): number | null {
   if (raw == null || !/^\d+$/.test(raw)) return null;
@@ -105,7 +110,7 @@ export function spShareProv(b: SpDepthBranch, block: number): Provenance {
   const debt = boldUnits(b.debtRaw);
   return {
     kind: "derived",
-    summary: `${b.symbol} pool ÷ debt — the Stability Pool's BOLD over the branch debt at block ${at(block)}: the share of the debt the pool could absorb in liquidations.`,
+    summary: `${b.symbol} pool ÷ debt — the Stability Pool's BOLD over the branch debt at block ${at(block)}.`,
     formula: "getTotalBoldDeposits() ÷ getEntireBranchDebt()",
     inputs: [
       { label: "getTotalBoldDeposits()", value: d == null ? undefined : String(d), kind: "chain", pclass: "state" },

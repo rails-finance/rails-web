@@ -216,6 +216,7 @@ export const PROV_PREFERENCE_ROUTES: readonly string[] = [
   "/ethereum/liquity-v1/system",
   "/ethereum/liquity-v2/branches",
   "/ethereum/liquity-v2/info",
+  "/ethereum/liquity-v2/stability-pool",
   "/ethereum/liquity-v2/stability-pool/[collateralType]/[wallet]",
   "/ethereum/liquity-v2/stability-pool/[collateralType]/[wallet]/event/[eventId]",
   "/ethereum/liquity-v2/trove/[collateralType]/[troveId]",
