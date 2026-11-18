@@ -992,7 +992,7 @@ body {
 }
 @media (min-width: 640px) {
   .evt-row-target:hover:not(:has([data-anatomy="T2"]:hover)) .evt-t1-lit {
-    background-color: var(--surface-raised);
+    background-color: var(--event-ground, var(--surface-raised));
   }
 }
 

@@ -2093,7 +2093,14 @@ function ChainTruthTimelineBody({
       <SectionSidebar section="timeline">
         <div
           className={boxed ? `space-y-3 rounded-2xl bg-raised ${CARD_PAD_X} py-4` : "space-y-3"}
-          style={boxed ? ({ "--spine-ground": "var(--surface-raised)" } as CSSProperties) : undefined}
+          style={
+            boxed
+              ? ({
+                  "--spine-ground": "var(--surface-raised)",
+                  "--event-ground": "var(--surface-sunken)",
+                } as CSSProperties)
+              : undefined
+          }
           data-anatomy="P3"
           data-timeline-rows-drawn={Math.min(windowSize, rows.length)}
           data-timeline-rows-loaded={rows.length}
