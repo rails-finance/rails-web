@@ -22,12 +22,19 @@ import {
   type SpListFilters,
 } from "@/lib/liquity-v2/sp-listing";
 import type { LiquityV2DepositRow } from "@/lib/sources/api/liquity-v2-sp";
+import { SpDepthStrip } from "@/components/protocol/liquity/sp-depth-strip";
+import type { SpDepth } from "@/lib/liquity-v2/sp-depth";
 
-export function SpListing(props: {
+export function SpListing({
+  depth,
+  ...props
+}: {
   initialItems?: LiquityV2DepositRow[];
   initialTotal?: number;
   initialKey?: string;
   initialSearch?: string;
+  /** The pools' depth per branch, read with the first page (ui-jobs 748). */
+  depth?: SpDepth | null;
 }) {
   const branchOptions = useMemo<FilterOptionDef[]>(
     () =>
@@ -48,6 +55,7 @@ export function SpListing(props: {
       basePath={LIQUITY_V2_SP_PATH}
       identity={<RailHeader session="liquity-v2" venue="subPage" stamp />}
       titleHidden
+      headerExtra={depth !== undefined ? <SpDepthStrip depth={depth} /> : undefined}
       defaults={SP_LIST_DEFAULTS}
       sortOptions={spSortOptions}
       searchPlaceholder="Depositor address or ENS"

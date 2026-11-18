@@ -19,6 +19,8 @@ import {
   LiquityForkBranchesStamp,
 } from "@/components/protocol/liquity-fork/liquity-fork-branches-view";
 import { ProvSource } from "@/components/shared/provenance";
+import { SpDepthStrip } from "@/components/protocol/liquity/sp-depth-strip";
+import { loadLiquityV2SpDepth } from "@/lib/sources/chain/liquity-v2-sp-depth";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { loadLiquityForkBranchesFromChain } from "@/lib/sources/chain/liquity-fork-branches";
 import { branchesPageTitle } from "@/lib/liquity-fork/shutdown";
@@ -51,6 +53,8 @@ export default async function LiquityV2BranchesPage() {
   // Read straight from the loader rather than through this deployment's own
   // /api/chain/liquity-v2/branches route — same code, one less hop on the server.
   const data = await loadLiquityForkBranchesFromChain(CFG);
+  // The Stability Pools' depth at the same block (ui-jobs 748).
+  const depth = await loadLiquityV2SpDepth(data.blockNumber > 0 ? data.blockNumber : undefined);
 
   return (
     <div className="min-h-screen">
@@ -65,6 +69,7 @@ export default async function LiquityV2BranchesPage() {
             the same block the stamp above names. */}
         <div data-skel-section="page-table">
           <ProvSource source={{ block: data.blockNumber }}>
+            <SpDepthStrip depth={depth} className="mb-6" />
             <LiquityForkBranchesView
               scopeKeys={branchScopeKeys(1, LIQUITY_V2_BRANCHES, TOKEN_ADDRESSES.BOLD)}
               data={data}
