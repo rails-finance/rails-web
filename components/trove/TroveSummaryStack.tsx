@@ -37,6 +37,7 @@ export function TroveSummaryStack({
   surplus,
   exports,
   shutdown,
+  branchNotice,
 }: {
   trove: TroveSummary;
   liveState?: TroveStateData;
@@ -63,6 +64,8 @@ export function TroveSummaryStack({
   exports?: PositionCardExports | null;
   /** The branch's shutdown (ui-jobs 612); absent on the home hero. */
   shutdown?: BranchShutdownState | null;
+  /** The branch's Safety Mode notice (ui-jobs 747); absent on the home hero. */
+  branchNotice?: ReactNode;
 }) {
   // The close's debt before it ran, from the page's replayed events (the
   // last one is the close); the home hero has no provider and keeps null.
@@ -154,6 +157,7 @@ export function TroveSummaryStack({
       exports={exports}
       foot={foot}
       shutdown={shutdown}
+      branchNotice={branchNotice}
     />
   );
 }

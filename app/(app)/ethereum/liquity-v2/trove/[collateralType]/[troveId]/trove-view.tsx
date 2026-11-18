@@ -36,6 +36,9 @@ import { OraclePricesData, OraclePricesResponse } from "@/types/api/oracle";
 import { useDebtInFront } from "@/hooks/useDebtInFront";
 import { useLiquityCollSurplus } from "@/hooks/useLiquityCollSurplus";
 import { useBranchShutdown } from "@/hooks/useBranchShutdown";
+import { useLiquityV2BranchCcr } from "@/hooks/useLiquityV2BranchCcr";
+import { BranchCcrNotice } from "@/components/protocol/liquity/branch-ccr-notice";
+import { normalizeCcrBranch } from "@/lib/liquity-v2/branch-ccr";
 import { useWalletContext } from "@/components/nav/wallet-context";
 
 import { fetchTroveTimeline } from "@/lib/api/fetch-timeline";
@@ -290,6 +293,13 @@ export default function TroveView({
   // only, as a closed Trove keeps its recorded state and accrues nothing.
   const branchShutdown = useBranchShutdown("liquity-v2", collateralType, troveData != null);
   const shutdown = troveData?.status === "open" ? branchShutdown : null;
+  // The branch below its CCR (ui-jobs 747), on an open Trove of a branch not shut down.
+  const branchCcr = useLiquityV2BranchCcr(troveData?.status === "open");
+  const ccrBranch = normalizeCcrBranch(collateralType);
+  const branchNotice =
+    troveData?.status === "open" && shutdown == null && ccrBranch ? (
+      <BranchCcrNotice state={branchCcr[ccrBranch]} anatomy="C23·liquity" />
+    ) : null;
 
   // The claim that paid the surplus out, as its own row (the index has none).
   const claimEvent = useMemo(
@@ -533,6 +543,7 @@ export default function TroveView({
         debtInFrontLoading={debtInFrontLoading}
         surplus={surplus}
         shutdown={shutdown}
+        branchNotice={branchNotice}
         exports={troveExports({
           trove: troveData,
           liveState,
