@@ -28,9 +28,9 @@ import { formatUnitsExact } from "@/lib/utils/format";
 import { assetText, pctText, sharePriceText, shareText, shortAddress } from "@/lib/shared/vault-amount-text";
 import { sboldVaultPageSummary } from "@/lib/vaults/summary";
 import { vaultVenueShareProv } from "@/lib/vaults/card-provenance";
-import { vaultAssetsExports, type VaultExportModel } from "@/lib/vaults/card-export";
+import { vaultAssetsExports, vaultPointsCsv, type VaultExportModel } from "@/lib/vaults/card-export";
 import { SHARES_ISSUED_TIP, sboldVaultAssetsContent, sboldVaultCardContent } from "@/lib/vaults/card-words";
-import { SBOLD_ASSET, SBOLD_CREATED_BLOCK, SBOLD_DEPOSITS_HREF } from "@/lib/liquity-v2/sbold";
+import { SBOLD_ASSET, SBOLD_CREATED_BLOCK, SBOLD_DEPOSITS_HREF, SBOLD_VAULT } from "@/lib/liquity-v2/sbold";
 import { engineeringParts, perShareText } from "@/lib/liquity-v2/sbold-per-share";
 import { liquityV2DepositHref } from "@/lib/liquity-v2/sp-routes";
 import {
@@ -93,10 +93,17 @@ const pointText = (key: SboldSeriesKey, raw: string): string =>
         })();
 
 const DAY_S = 86_400;
+/** A day's point: its date. A block's point: its date and UTC time. */
 const whenText = (p: { time: number; day?: number }) =>
   p.day != null
     ? formatDate(new Date(p.day * DAY_S * 1000))
-    : `${new Date(p.time * 1000).toISOString().slice(11, 16)} UTC`;
+    : `${formatDate(new Date(p.time * 1000))}, ${new Date(p.time * 1000).toISOString().slice(11, 16)} UTC`;
+
+const SERIES_CALL: Record<SboldSeriesKey, string> = {
+  totalAssets: "totalAssets()",
+  totalSupply: "totalSupply()",
+  sharePrice: "convertToAssets(10 ** 18)",
+};
 
 /** The last 30 days (V5), the strip's title and window (lib/vaults/yield.ts):
  *  one tile per getter, its line over the days' last blocks, blocks
@@ -108,16 +115,44 @@ function SboldDailyLines({ series }: { series: SboldSeries | null }) {
     { key: "totalSupply", tile: "total-supply", label: "Shares issued" },
     { key: "sharePrice", tile: "share-price", label: "Share price" },
   ];
+  const csvRows = (series?.points ?? []).flatMap((p) =>
+    tiles.flatMap((t) => {
+      const raw = p[t.key];
+      return raw == null
+        ? []
+        : [{ block: p.block, time: p.time, getter: SERIES_CALL[t.key], raw, value: pointText(t.key, raw) }];
+    }),
+  );
   return (
     <ProvSection
       scope={STRIP_SCOPE}
       className="mb-4"
       data-anatomy="V5"
+      data-vault-strip={SBOLD_VAULT}
       data-skel-section="vault-strip"
       data-series-headers={series?.cost.headers ?? ""}
       data-series-multicalls={series?.cost.multicalls ?? ""}
     >
-      <SectionHeading title="The last 30 days" menu={<SectionMenu scope={STRIP_SCOPE} title="The last 30 days" />} />
+      <SectionHeading
+        title="The last 30 days"
+        menu={
+          <SectionMenu
+            scope={STRIP_SCOPE}
+            title="The last 30 days"
+            exports={
+              csvRows.length > 0
+                ? {
+                    csv: {
+                      filename: `sBOLD-last-30-days-${csvRows[csvRows.length - 1].block}.csv`,
+                      build: () => vaultPointsCsv(csvRows),
+                      subtitle: "One row per point and getter: block, UTC time, raw answer",
+                    },
+                  }
+                : undefined
+            }
+          />
+        }
+      />
       <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
         {tiles.map((t) => {
           const pts = (series?.points ?? []).flatMap((p) => {
@@ -150,14 +185,19 @@ function SboldDailyLines({ series }: { series: SboldSeries | null }) {
                   </p>
                   <Sparkline
                     points={pts.map((p) => ({ day: p.time / DAY_S, block: p.block, raw: p.raw }))}
-                    label={`${t.label}, one read at each day's last block over the last 30 days, then blocks 26,441,800, 26,442,100 and ${n(last.block)}`}
+                    label={`${t.label}, one read at each day's last block over the last 30 days, then block${
+                      pts.filter((p) => p.day == null).length === 1 ? "" : "s"
+                    } ${pts
+                      .filter((p) => p.day == null)
+                      .map((p) => n(p.block))
+                      .join(", ")}`}
                     dot={(r) => {
                       const p = pts.find((x) => x.block === r.block)!;
                       return (
                         <Prov info={prov(p)} value={pointText(t.key, p.raw)}>
                           <span
                             className={`block rounded-full ${p.day == null ? "h-2 w-2 bg-foreground" : "h-1.5 w-1.5 bg-blue-500"}`}
-                            title={`Block ${n(p.block)}: ${pointText(t.key, p.raw)}`}
+                            title={`Block ${n(p.block)}, ${whenText(p)}: ${pointText(t.key, p.raw)}`}
                             data-strip-point={p.block}
                           />
                         </Prov>
@@ -209,7 +249,7 @@ export function SboldVaultPage({ data, series }: { data: SboldVaultResponse; ser
         "total-supply",
         y.totalSupply?.raw,
         y.totalSupply && y.shareDecimals != null ? (
-          <Prov info={sboldTotalSupplyProv(coords, y.totalSupply.raw)}>
+          <Prov info={sboldTotalSupplyProv(coords, y.totalSupply.raw, y.shareDecimals)}>
             <SharesFace raw={y.totalSupply.raw} decimals={y.shareDecimals} />
           </Prov>
         ) : (
@@ -374,6 +414,35 @@ export function SboldVaultPage({ data, series }: { data: SboldVaultResponse; ser
           </ExplainBullet>
         ))}
       </ExplainGroup>
+      {/* Blocks 26,441,800 and 26,442,100 stay here when the strip's window has passed them (ui-jobs 749). */}
+      {series && series.marked.length > 0 && (
+        <ExplainGroup title="Earlier reads">
+          {series.marked.map((p) => (
+            <ExplainBullet key={p.block} data-sbold-marked={p.block}>
+              At block <Fig>{n(p.block)}</Fig> ({whenText(p)}):{" "}
+              {(["totalAssets", "totalSupply", "sharePrice"] as const).map((k, i) => {
+                const raw = p[k];
+                const label =
+                  k === "totalAssets" ? "total assets" : k === "totalSupply" ? "shares issued" : "share price";
+                return (
+                  <span key={k}>
+                    {i > 0 ? "; " : ""}
+                    {label}{" "}
+                    {raw == null ? (
+                      "not read"
+                    ) : (
+                      <Prov info={sboldPointProv(k, { block: p.block, time: p.time, raw, text: pointText(k, raw) })}>
+                        <Fig>{pointText(k, raw)}</Fig>
+                      </Prov>
+                    )}
+                  </span>
+                );
+              })}
+              .
+            </ExplainBullet>
+          ))}
+        </ExplainGroup>
+      )}
     </div>
   );
 
@@ -502,7 +571,7 @@ export function SboldVaultPage({ data, series }: { data: SboldVaultResponse; ser
                 <>
                   The three deposits and the idle BOLD sum to{" "}
                   <Prov info={reconcile.prov}>{reconcile.text(reconcile.sum)}</Prov> {unit}; total assets are{" "}
-                  <Prov info={sboldTotalAssetsProv(coords)}>{reconcile.text(BigInt(y.totalAssets!.raw))}</Prov> {unit},{" "}
+                  <Prov info={sboldTotalAssetsProv(coords)}>{assetText(y.totalAssets!, ad)}</Prov> {unit},{" "}
                   <Prov info={reconcile.prov}>
                     {reconcile.text(reconcile.diff < BigInt(0) ? -reconcile.diff : reconcile.diff)}
                   </Prov>{" "}

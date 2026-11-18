@@ -48,11 +48,11 @@ const sboldTotalAssetsProv_ = (c: SboldCoords): Provenance =>
     `Total assets — the BOLD the vault reports holding${atBlock(c)}, as its ERC-4626 totalAssets() answers.`,
   );
 
-const sboldTotalSupplyProv_ = (c: SboldCoords, raw: string): Provenance =>
+const sboldTotalSupplyProv_ = (c: SboldCoords, raw: string, shareDecimals: number): Provenance =>
   vaultRead(
     c,
     "totalSupply()",
-    `Shares issued — every sBOLD share in existence${atBlock(c)}: ${raw} share units, 18 decimals.`,
+    `Shares issued — every sBOLD share in existence${atBlock(c)}: ${raw} share units, ${shareDecimals} decimals as decimals() answers.`,
   );
 
 const sboldSharePriceProv_ = (c: SboldCoords): Provenance =>
@@ -77,7 +77,7 @@ const sboldPerShareProv_ = (
     kind: "recompute",
     text: `To check: ask any Ethereum archive node for totalAssets() and totalSupply() on ${SBOLD_VAULT}${atBlock(c)}, and divide the first by the second.`,
   },
-  summary: `Total assets ÷ shares issued — ${r.assets} BOLD of totalAssets() over ${r.supply} shares of totalSupply(), both on the sBOLD vault${atBlock(c)}: ${r.ratio} BOLD per share, to four significant digits.`,
+  summary: `Total assets ÷ shares issued — ${r.assets} BOLD of totalAssets() over ${r.supply} shares of totalSupply(), both on the sBOLD vault${atBlock(c)}: ${r.ratio} BOLD per share, rounded half-up to four significant digits.`,
   contract: vaultContract,
   via: `${LANE} · sBOLD.totalAssets() ÷ sBOLD.totalSupply() @ the pinned block`,
   formula: "totalAssets() ÷ totalSupply()",

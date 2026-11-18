@@ -11,12 +11,15 @@
 // from a block with timestamp t < T, the block (T − t) / 12 later is at or
 // past T, since Ethereum's blocks are at least 12 seconds apart; from one at
 // or past T, the block (t − T) / 12 earlier bounds it from below. Waves of
-// header reads go out for every day at once, batched.
+// header reads go out for every missing day at once, batched.
 //
 // RULE: a failed day read leaves a gap, never a zero; a failed getter leaves
 // a gap in its line alone. Days whose last block is at or before the vault's
-// first code have no point. The series is cached for the UTC day; a series
-// with a gap is not cached, so the next render asks again.
+// first code have no point. Each completed day is cached on its own with no
+// expiry (key: vault and UTC day); a failed day is not cached, so the next
+// render reads that day alone. Concurrent renders share one fill per UTC day.
+// The marked blocks sit on the line only while their time is inside the
+// window; they are returned apart for the card.
 
 import { unstable_cache } from "next/cache";
 import { parseAbi, type PublicClient } from "viem";
@@ -51,8 +54,11 @@ export interface SboldPoint {
 }
 
 export interface SboldSeries {
+  /** The line's points: the days, the marked blocks inside the window, the head. */
   points: SboldPoint[];
-  /** The RPC calls the days' read made: header reads and Multicall3 calls. */
+  /** Blocks 26,441,800 and 26,442,100, wherever their time falls. */
+  marked: SboldPoint[];
+  /** The calls this render's fill made: block headers and Multicall3 calls. */
   cost: { headers: number; multicalls: number };
 }
 
@@ -60,12 +66,6 @@ type Head = { number: number; time: number };
 type Call = { status: string; result?: unknown };
 const okRaw = (r: Call | undefined): string | null =>
   r?.status === "success" && r.result != null ? String(r.result) : null;
-
-class GapError extends Error {
-  constructor(readonly series: SboldSeries) {
-    super("sBOLD daily series has a gap");
-  }
-}
 
 async function readAt(client: PublicClient, block: number): Promise<Omit<SboldPoint, "time" | "day"> | null> {
   const vault = SBOLD_VAULT as `0x${string}`;
@@ -150,40 +150,64 @@ async function firstBlocksAt(
   return { found, headers };
 }
 
-async function readDays(today: number): Promise<SboldSeries> {
+type Cost = SboldSeries["cost"];
+
+/** One completed UTC day's point, read on a cache miss. Throws where a read
+ *  failed, so nothing is cached; null for a day at or before the first code. */
+async function readDay(day: number, head: () => Promise<Head>, cost: Cost): Promise<SboldPoint | null> {
   const client = chainBatchClient(MAINNET_CHAIN_ID);
-  const latest = await client.getBlock({ blockTag: "latest" });
-  const head: Head = { number: Number(latest.number), time: Number(latest.timestamp) };
-  const days = Array.from({ length: YIELD_WINDOW_DAYS + 1 }, (_, i) => today - YIELD_WINDOW_DAYS - 1 + i);
-  const { found, headers } = await firstBlocksAt(
-    client,
-    head,
-    days.map((d) => (d + 1) * DAY_S),
-  );
-  // The day's last block is the one before the first block of the next day;
-  // the search read its header, so its time is known.
-  const lasts = days.flatMap((day) => {
-    const f = found.get((day + 1) * DAY_S);
-    return f && f.first - 1 > SBOLD_CREATED_BLOCK ? [{ day, block: f.first - 1, time: f.lastTime }] : [];
-  });
-  const reads = await Promise.all(lasts.map((x) => readAt(client, x.block)));
-  const points: SboldPoint[] = [];
-  lasts.forEach((x, i) => {
-    const r = reads[i];
-    if (r) points.push({ ...r, time: x.time, day: x.day });
-  });
-  const series = { points, cost: { headers: headers + 1, multicalls: lasts.length } };
-  // Every day after the vault's first code read: cache it. Else read again next render.
-  const expected = days.filter((d) => {
-    const f = found.get((d + 1) * DAY_S);
-    return f == null || f.first - 1 > SBOLD_CREATED_BLOCK;
-  }).length;
-  if (points.length < expected) throw new GapError(series);
-  return series;
+  const T = (day + 1) * DAY_S;
+  const { found, headers } = await firstBlocksAt(client, await head(), [T]);
+  cost.headers += headers;
+  const f = found.get(T);
+  if (f == null) throw new Error(`sBOLD: no last block found for day ${day}`);
+  const block = f.first - 1;
+  if (block <= SBOLD_CREATED_BLOCK) return null;
+  cost.multicalls += 1;
+  const r = await readAt(client, block);
+  if (r == null) throw new Error(`sBOLD: the read at block ${block} failed`);
+  return { ...r, time: f.lastTime, day };
 }
 
-const cachedDays = (today: number) =>
-  unstable_cache(() => readDays(today), ["sbold-daily-v1", String(today)], { revalidate: DAY_S })();
+const cachedDay = (day: number, head: () => Promise<Head>, cost: Cost) =>
+  unstable_cache(() => readDay(day, head, cost), ["sbold-day-v1", SBOLD_VAULT, String(day)], { revalidate: false })();
+
+/** The window's days, each from its cache or read; a failed day is absent. */
+async function fillDays(today: number): Promise<{ points: SboldPoint[]; cost: Cost }> {
+  const cost: Cost = { headers: 0, multicalls: 0 };
+  let headRead: Promise<Head> | null = null;
+  // The head anchors a missing day's search; read once, and only on a miss.
+  const head = () =>
+    (headRead ??= chainBatchClient(MAINNET_CHAIN_ID)
+      .getBlock({ blockTag: "latest" })
+      .then((b) => {
+        cost.headers += 1;
+        return { number: Number(b.number), time: Number(b.timestamp) };
+      }));
+  const days = Array.from({ length: YIELD_WINDOW_DAYS + 1 }, (_, i) => today - YIELD_WINDOW_DAYS - 1 + i);
+  const read = await Promise.all(
+    days.map((d) =>
+      cachedDay(d, head, cost).catch((e) => {
+        console.error("sBOLD daily read failed:", e);
+        return null;
+      }),
+    ),
+  );
+  return { points: read.filter((p): p is SboldPoint => p != null), cost };
+}
+
+/** One fill per UTC day for every concurrent render. */
+const filling = new Map<number, Promise<{ points: SboldPoint[]; cost: Cost }>>();
+
+function sharedFill(today: number) {
+  for (const k of filling.keys()) if (k < today) filling.delete(k);
+  let p = filling.get(today);
+  if (!p) {
+    p = fillDays(today).finally(() => filling.delete(today));
+    filling.set(today, p);
+  }
+  return p;
+}
 
 const cachedMarked = unstable_cache(
   async (): Promise<SboldPoint[]> => {
@@ -197,15 +221,15 @@ const cachedMarked = unstable_cache(
       const time = times.get(SBOLD_MARKED_BLOCKS[i]);
       if (r && time != null) points.push({ ...r, time });
     });
-    if (points.length < SBOLD_MARKED_BLOCKS.length) throw new GapError({ points, cost: { headers: 0, multicalls: 0 } });
+    if (points.length < SBOLD_MARKED_BLOCKS.length) throw new Error("sBOLD: a marked block's read failed");
     return points;
   },
-  ["sbold-marked-v1"],
+  ["sbold-marked-v1", SBOLD_VAULT],
   { revalidate: false },
 );
 
-/** The days, the marked blocks and the page's head read, in block order. Null
- *  where nothing answered. */
+/** The days, the marked blocks inside the window and the page's head read, in
+ *  block order, and the marked blocks apart. Null where nothing answered. */
 export async function loadSboldSeries(data: SboldVaultResponse): Promise<SboldSeries | null> {
   const head = {
     block: data.blockNumber,
@@ -214,23 +238,21 @@ export async function loadSboldSeries(data: SboldVaultResponse): Promise<SboldSe
     sharePrice: data.vault.sharePrice?.raw ?? null,
   };
   const today = Math.floor(Date.now() / 1000 / DAY_S);
-  const gapOk = <T>(p: Promise<T>, of: (s: SboldSeries) => T): Promise<T | null> =>
-    p.catch((e) => {
-      if (e instanceof GapError) return of(e.series);
-      console.error("sBOLD daily series read failed:", e);
-      return null;
-    });
+  const windowStart = (today - YIELD_WINDOW_DAYS - 1) * DAY_S;
   const [days, marked, headTimes] = await Promise.all([
-    gapOk(cachedDays(today), (s) => s),
-    gapOk(cachedMarked(), (s) => s.points),
+    sharedFill(today),
+    cachedMarked().catch((e) => {
+      console.error("sBOLD marked block read failed:", e);
+      return [] as SboldPoint[];
+    }),
     blockTimestamps(MAINNET_CHAIN_ID, [head.block]).catch(() => new Map<number, number>()),
   ]);
   const headTime = headTimes.get(head.block);
   const points = [
-    ...(days?.points ?? []),
-    ...(marked ?? []),
+    ...days.points,
+    ...marked.filter((p) => p.time >= windowStart),
     ...(headTime != null ? [{ ...head, time: headTime }] : []),
   ].sort((a, b) => a.block - b.block);
-  if (points.length === 0) return null;
-  return { points, cost: days?.cost ?? { headers: 0, multicalls: 0 } };
+  if (points.length === 0 && marked.length === 0) return null;
+  return { points, marked, cost: days.cost };
 }
