@@ -184,7 +184,18 @@ export function LiquityV2DepositEventCard({
     sheet: spDepositSheet(row),
     ledgers: { none: "A deposit's balance is the Deposit side's total." },
     price: { gas: depositorGas(row), prices: [] },
-    explainer: { body: bullets(spEventSentences(row, c)) },
+    // What a touch is, under the event's own sentences: the labels and the
+    // sentences name it, and the sheet's labels carry their own tips.
+    explainer: {
+      body: (
+        <>
+          {bullets(spEventSentences(row, c))}
+          <p className="mt-2 text-sm leading-relaxed text-rb-500" data-touch-note="">
+            {DEPOSIT_TOUCH_TIP}
+          </p>
+        </>
+      ),
+    },
     learnMore: null,
   };
   return <EventCard slots={slots} avatar={null} />;
