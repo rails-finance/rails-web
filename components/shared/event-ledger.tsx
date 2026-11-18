@@ -255,7 +255,7 @@ export function LedgerCell({
   if (src?.pending && ledger === undefined && side)
     return (
       <div
-        className={`@container flex h-full min-w-0 flex-col rounded-xl bg-background px-4 py-3 col-span-full ${className}`}
+        className={`@container flex h-full min-w-0 flex-col rounded-xl bg-[var(--event-cell,var(--background))] px-4 py-3 col-span-full ${className}`}
         {...data}
         data-ledger-cell={side}
         data-ledger-span=""
@@ -269,7 +269,7 @@ export function LedgerCell({
     );
   return (
     <div
-      className={`@container relative flex h-full min-w-0 flex-col rounded-xl bg-background px-4 py-3 ${ledgerCard ? "col-span-full" : ""} ${className}`}
+      className={`@container relative flex h-full min-w-0 flex-col rounded-xl bg-[var(--event-cell,var(--background))] px-4 py-3 ${ledgerCard ? "col-span-full" : ""} ${className}`}
       {...data}
       {...(side ? { "data-ledger-cell": side } : {})}
       {...(ledgerCard ? { "data-ledger-span": "" } : {})}

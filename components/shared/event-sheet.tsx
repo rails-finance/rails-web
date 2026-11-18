@@ -373,7 +373,7 @@ function SidePanel({ s, breakdown, col }: { s: SheetSide; breakdown: boolean; co
   const phoneAmount = totalAmount != null && (col === "tokens" || "none" in s.total);
   return (
     <section
-      className="min-w-0 rounded-xl bg-background px-4 pb-2 pt-3 text-sm"
+      className="min-w-0 rounded-xl bg-[var(--event-cell,var(--background))] px-4 pb-2 pt-3 text-sm"
       data-sheet-side={s.id ?? s.side}
       data-sheet-touched={touched ? "true" : "false"}
       aria-label={name}
@@ -515,7 +515,7 @@ function StatPanel({ p, breakdown }: { p: SheetPanel; breakdown: boolean }) {
   const name = p.panel === "risk" ? WORDS.risk : WORDS.limits;
   return (
     <section
-      className="min-w-0 rounded-xl bg-background px-4 py-3 text-sm"
+      className="min-w-0 rounded-xl bg-[var(--event-cell,var(--background))] px-4 py-3 text-sm"
       data-sheet-panel={p.panel}
       aria-label={name}
     >
@@ -566,7 +566,7 @@ export function SheetSkeleton({ sides = 2, panels = 2 }: { sides?: number; panel
       </div>
       <div className="flex flex-col gap-2.5">
         {Array.from({ length: sides }, (_, i) => (
-          <div key={i} className="rounded-xl bg-background px-4 pb-2 pt-3 text-sm">
+          <div key={i} className="rounded-xl bg-[var(--event-cell,var(--background))] px-4 pb-2 pt-3 text-sm">
             <div className="mb-2 flex h-5 items-center">{bar("w-20")}</div>
             {i === 0 && (
               <>
@@ -583,7 +583,7 @@ export function SheetSkeleton({ sides = 2, panels = 2 }: { sides?: number; panel
         {panels > 0 && (
           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
             {Array.from({ length: panels }, (_, i) => (
-              <div key={i} className="rounded-xl bg-background px-4 py-3 text-sm">
+              <div key={i} className="rounded-xl bg-[var(--event-cell,var(--background))] px-4 py-3 text-sm">
                 <div className="mb-1 flex h-5 items-center">{bar("w-14")}</div>
                 {[0, 1].map((r) => (
                   <div key={r} className="flex h-8 items-center justify-between">

@@ -125,7 +125,7 @@ export function StatCard({
   if (right)
     return (
       <div
-        className="flex h-full flex-wrap items-start gap-x-3 gap-y-1 rounded-xl bg-background px-4 py-3"
+        className="flex h-full flex-wrap items-start gap-x-3 gap-y-1 rounded-xl bg-[var(--event-cell,var(--background))] px-4 py-3"
         data-stat-row=""
         {...data}
       >
@@ -138,7 +138,7 @@ export function StatCard({
       </div>
     );
   return (
-    <div className="flex h-full flex-col rounded-xl bg-background px-4 py-3" {...data}>
+    <div className="flex h-full flex-col rounded-xl bg-[var(--event-cell,var(--background))] px-4 py-3" {...data}>
       <div className="mb-1.5 text-xs font-semibold text-rb-500">{label}</div>
       {children}
     </div>

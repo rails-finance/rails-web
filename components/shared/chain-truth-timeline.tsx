@@ -2097,7 +2097,8 @@ function ChainTruthTimelineBody({
             boxed
               ? ({
                   "--spine-ground": "var(--surface-raised)",
-                  "--event-ground": "var(--surface-sunken)",
+                  "--event-ground": "var(--background)",
+                  "--event-cell": "var(--surface-raised)",
                 } as CSSProperties)
               : undefined
           }
