@@ -20,6 +20,7 @@
 // under the anchor (rails-ops reference/official-docs/fx.md, "Docs and chain
 // disagree" 6), so the two differ by that move.
 
+import { shownUsd } from "@/lib/shared/shown-usd";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isFxEvent } from "@/lib/shared/types/event-shape";
 import type { FxStateAt } from "@/lib/sources/chain/fx-event-state";
@@ -53,7 +54,10 @@ export interface FxNoTxParts {
    *  block before each, less the debt they cleared. Null until the prices
    *  are in. */
   bonus: {
+    /** The sum of the legs' shown products (ui-jobs 743). */
     collUsd: number;
+    /** Each block's collateral taken, at the min leg of the block before it. */
+    legs: { amount: number; price: number; block: number }[];
     debt: number;
     coll: number;
     /** The pool's rebalance bounty over the debt each rebalance cleared, in
@@ -116,6 +120,7 @@ export function fxNoTxParts(
   }
   const parts: Record<Kind, FxNoTxPart | null> = { rebalance: null, redemption: null, poolLiquidation: null };
   let collUsd = 0;
+  const legs: { amount: number; price: number; block: number }[] = [];
   let bonusDebt = 0;
   let bonusColl = 0;
   let bounty: number | null = 0;
@@ -134,7 +139,11 @@ export function fxNoTxParts(
     if (kind !== "poolLiquidation") {
       const min = reads[String(block - 1)]?.minPrice;
       if (min == null) priced = false;
-      else collUsd += -c.coll * (Number(min) / WAD);
+      else {
+        const price = Number(min) / WAD;
+        legs.push({ amount: -c.coll, price, block: block - 1 });
+        collUsd = Math.round((collUsd + shownUsd(-c.coll, price)) * 100) / 100;
+      }
       bonusDebt += -c.debt;
       bonusColl += -c.coll;
       if (kind === "rebalance") {
@@ -160,6 +169,7 @@ export function fxNoTxParts(
       priced && bonusColl > 0
         ? {
             collUsd,
+            legs,
             debt: bonusDebt,
             coll: bonusColl,
             bounty,

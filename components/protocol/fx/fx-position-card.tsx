@@ -23,6 +23,7 @@
 // hidden: wsteth-285 shows implied 25,178 fxUSD against settled 0. They are
 // panel rows on an open card and on a closed one.
 
+import { fxPositionCollUsd } from "@/lib/fx/usd-receipt";
 import { positionName } from "@/lib/shared/position-name";
 import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { ListingTag } from "@/components/shared/listing-tag";
@@ -44,14 +45,12 @@ import {
   settledCollateralProv,
   settledDebtProv,
   settledDebtRatioProv,
-  fxPositionUsdProv,
   impliedDebtProv,
   socializedDebtProv,
   lifetimeCollateralDriftProv,
   poolLineProv,
   triggerPriceProv,
   oracleLegAtProv,
-  anchorUsdProv,
   minRatioProv,
   minTriggerPriceProv,
   rebalanceClearedProv,
@@ -628,16 +627,14 @@ function collateralUsd(
   px: { anchor: number; block: number } | null,
   listing?: FxListingPrice | null,
 ): ReactNode | null {
-  const cell = (usd: number, info: ReturnType<typeof anchorUsdProv>) => (
-    <Prov info={info}>
-      <span className="font-bold text-green-400">{formatUsdValue(usd)}</span>
+  // The shown product, its receipt naming the leg and its block (ui-jobs 743).
+  const r = fxPositionCollUsd(v, px, listing);
+  if (!r) return null;
+  return (
+    <Prov info={r.prov}>
+      <span className="font-bold text-green-400">{formatUsdValue(r.usd)}</span>
     </Prov>
   );
-  if (v.settled.colls == null) return null;
-  if (px) return cell(v.settled.colls * px.anchor, anchorUsdProv(v.normalizedSymbol, px.block));
-  if (listing) return cell(v.settled.colls * listing.anchor, anchorUsdProv(v.normalizedSymbol, listing.block));
-  if (v.settled.collUsd == null || v.oracle.priceUsd == null) return null;
-  return cell(v.settled.collUsd, fxPositionUsdProv(v.normalizedSymbol, v.oracle.priceBlock));
 }
 
 export interface FxPositionCardProps {

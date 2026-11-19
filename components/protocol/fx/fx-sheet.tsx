@@ -22,6 +22,9 @@
 // The read starts when the card opens (`active`); the sheet is null until it
 // lands, and undefined where the row has no balance to state (the cells stand).
 
+import { fxCollateralUsd } from "@/lib/fx/usd-receipt";
+import type { FxPoolKey } from "@/lib/fx/asset-catalog";
+import { shownUsd } from "@/lib/shared/shown-usd";
 import type { FxContext } from "@/lib/shared/types/event-shape";
 import type { Provenance } from "@/components/shared/provenance";
 import {
@@ -38,13 +41,11 @@ import {
   chainBeforeProv,
   chainChangeProv,
   debtSincePreviousProv,
-  fxPositionUsdProv,
   minTriggerPriceProv,
   poolLineProv,
   rowChangeProv,
   rowStateProv,
   chainAfterProv,
-  snapOraclePriceProv,
   type FxCoords,
 } from "@/lib/fx/event-provenance";
 import { FX_POOLS, FXUSD_META, isFxPoolKey } from "@/lib/fx/asset-catalog";
@@ -109,17 +110,31 @@ const faceProv = (what: string, coords: FxCoords): Provenance => ({
     coords.blockNumber != null ? [{ label: "block", value: String(coords.blockNumber), kind: "chain" }] : undefined,
 });
 
-/** A collateral amount at the oracle's price at the block. */
-const collUsdProv = (sym: string, amount: number, price: number, coords: FxCoords, at?: string): Provenance => ({
-  kind: "chain-derived",
-  pclass: "oracle",
-  summary: `${sym} in dollars. The amount times the pool oracle's price per ${sym}${at ? ` ${at}` : coords.blockNumber != null ? ` at block ${coords.blockNumber}` : ""}.`,
-  formula: "amount × price",
-  inputs: [
-    { label: "amount", value: `${formatNumber(Math.abs(amount))} ${sym}`, kind: "chain" },
-    { label: "price", value: sheetUsd(price), kind: "chain-derived", pclass: "oracle" },
-  ],
-});
+/** A collateral amount at the oracle's min leg at a block: the amount × the
+ *  price as shown, the product to the cent (ui-jobs 743). The event's stored
+ *  price is the one its PositionSnapshot carried, the min leg the pool acted on. */
+const collUsdAt = (
+  pool: FxPoolKey | undefined,
+  what: string,
+  amount: number,
+  price: number | null,
+  block: number | null | undefined,
+) =>
+  !pool
+    ? null
+    : fxCollateralUsd({
+        what,
+        pool,
+        colls: amount,
+        amountNote: `in the pool's normalized unit${block != null ? `, at block ${block.toLocaleString("en-US")}` : ""}`,
+        leg: "min",
+        price,
+        priceBlock: block ?? null,
+      });
+
+/** A sheet cell from a receipt, signed where the amount is. */
+const usdCell = (r: { prov: Provenance; usd: number } | null | undefined, sign = 1) =>
+  r ? { text: sheetUsd(sign < 0 ? -r.usd : r.usd), info: r.prov } : undefined;
 
 /** The collateral the previous event left, as its row read it. */
 const prevCollProv = (sym: string, amount: number, coords: FxCoords): Provenance => ({
@@ -151,6 +166,8 @@ export interface FxSheetArgs {
   active: boolean;
   /** The position's previous event with a read position. */
   prev?: FxContext;
+  /** That event's block, which its stored price was read at. */
+  prevBlock?: number;
 }
 
 /** The card's sheet: null while the position's read is on its way, undefined
@@ -164,12 +181,14 @@ export function useFxSheet({
   blockPeers,
   active,
   prev,
+  prevBlock,
 }: FxSheetArgs): EventSheet | null | undefined {
   const { value: state, settled } = useFxEventStateRead(ctx, active ? blockNumber : undefined, txHash);
   if (ctx.eventType === "transfer") return undefined;
   if (!active || !settled) return null;
   const { before, after } = fxBeforeAfter(state, blockNumber);
   const meta = isFxPoolKey(ctx.pool) ? FX_POOLS[ctx.pool] : undefined;
+  const pool = meta?.key;
   const coords: FxCoords = {
     txHash,
     blockNumber,
@@ -186,10 +205,6 @@ export function useFxSheet({
   if (collAfter == null || debtAfter == null || collBefore == null || debtBefore == null) return undefined;
   const read = after != null && (opened || before != null);
   const price = ctx.oraclePrice != null ? Number(ctx.oraclePrice) : (after?.minPrice ?? null);
-  const priceProv =
-    ctx.oraclePrice != null
-      ? snapOraclePriceProv(normalizedSymbol, coords, ctx.oraclePrice)
-      : fxPositionUsdProv(normalizedSymbol, blockNumber);
   const since = ctx.debtSincePrevious != null ? Number(ctx.debtSincePrevious) : null;
 
   const kind: "operate" | "liquidation" | "rebalance" | "redemption" =
@@ -267,17 +282,14 @@ export function useFxSheet({
           : chainChangeProv("coll", normalizedSymbol, coords),
         value: formatExact(collMove),
       },
-      usd:
-        price != null && price > 0
-          ? { text: sheetUsd(collMove * price), info: collUsdProv(normalizedSymbol, collMove, price, coords) }
-          : undefined,
+      usd: usdCell(collUsdAt(pool, "Collateral this event moved, in USD", collMove, price, blockNumber), collMove),
       tip: collTip,
     });
-  const collAfterUsd = price != null && price > 0 ? collAfter * price : null;
+  const collAfterR = collUsdAt(pool, "Collateral after this event, in USD", collAfter, price, blockNumber);
+  const collAfterUsd = collAfterR?.usd ?? null;
   // The carry layer from the previous event's position and price.
   const prevColl = !opened && prev?.collAfter != null ? Number(prev.collAfter) : null;
   const prevPrice = prev?.oraclePrice != null ? Number(prev.oraclePrice) : null;
-  const prevCoords: FxCoords = { ...coords, txHash: undefined, blockNumber: undefined };
   const collCarry: SheetSide["carry"] = [];
   if (prevColl != null && prevColl > DUST_COLL && prevPrice != null && prevPrice > 0) {
     collCarry.push({
@@ -290,10 +302,7 @@ export function useFxSheet({
         info: prevCollProv(normalizedSymbol, prevColl, coords),
         value: formatExact(prevColl),
       },
-      usd: {
-        text: sheetUsd(prevColl * prevPrice),
-        info: collUsdProv(normalizedSymbol, prevColl, prevPrice, prevCoords, "at the previous event"),
-      },
+      usd: usdCell(collUsdAt(pool, "Collateral at the previous event, in USD", prevColl, prevPrice, prevBlock)),
       tip: TIPS.collLast,
     });
     const movedColl = collBefore - prevColl;
@@ -314,11 +323,15 @@ export function useFxSheet({
           },
           value: formatExact(movedColl),
         },
-        usd: { text: sheetUsd(movedColl * price), info: collUsdProv(normalizedSymbol, movedColl, price, coords) },
+        usd: usdCell(
+          collUsdAt(pool, "Collateral the pool moved since the last event, in USD", movedColl, price, blockNumber),
+          movedColl,
+        ),
         tip: TIPS.collMoved,
       });
     if (price != null && price > 0) {
-      const mv = prevColl * (price - prevPrice);
+      // The difference of the two shown products.
+      const mv = shownUsd(prevColl, price) - shownUsd(prevColl, prevPrice);
       if (Math.abs(mv) >= 0.005)
         collCarry.push({
           key: "market",
@@ -364,17 +377,14 @@ export function useFxSheet({
                 : chainBeforeProv("coll", normalizedSymbol, coords, false),
               value: formatExact(collBefore),
             },
-            usd:
-              price != null && price > 0
-                ? { text: sheetUsd(collBefore * price), info: collUsdProv(normalizedSymbol, collBefore, price, coords) }
-                : undefined,
+            usd: usdCell(collUsdAt(pool, "Collateral just before this event, in USD", collBefore, price, blockNumber)),
             tip: TIPS.collBefore,
           }
         : undefined,
     rows: collRows,
     total:
       collAfterUsd != null
-        ? { text: collAfter > 0 ? sheetUsd(collAfterUsd) : "$0", info: priceProv }
+        ? { text: collAfter > 0 ? sheetUsd(collAfterUsd) : "$0", info: collAfterR!.prov }
         : { none: UNREAD },
     totalAmount: {
       text: formatNumber(collAfter),

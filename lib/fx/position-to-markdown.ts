@@ -31,6 +31,7 @@
 // forbids convenience pins), so it is never restated as USD. A PURE function
 // of the data already in scope on the detail page — no fetching.
 
+import { fxPositionCollUsd } from "@/lib/fx/usd-receipt";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isFxEvent } from "@/lib/shared/types/event-shape";
 import type { FxPositionView } from "@/components/protocol/fx/fx-position-card";
@@ -157,10 +158,11 @@ export function fxPositionToMarkdown(args: FxPositionMarkdownArgs): string {
       if (collDrift) lines.push(collDrift);
     } else {
       if (settled.colls != null) {
-        const valued =
-          settled.collUsd != null && view.oracle.priceUsd != null && settled.colls > 0
-            ? ` (worth ${usd(settled.collUsd)} at ${usd(view.oracle.priceUsd)} per ${colSym} — the pool oracle's MIN "liquidate" leg${view.oracle.priceBlock != null ? `, read at block ${view.oracle.priceBlock}` : ""})`
-            : "";
+        // The card's figure: the shown product at the min leg (ui-jobs 743).
+        const collUsd = settled.colls > 0 ? fxPositionCollUsd(view) : null;
+        const valued = collUsd
+          ? ` (worth ${usd(collUsd.usd)} at ${usd(collUsd.price)} per ${colSym} — the pool oracle's MIN "liquidate" leg${view.oracle.priceBlock != null ? `, read at block ${view.oracle.priceBlock}` : ""})`
+          : "";
         lines.push(
           `- **Collateral:** ${amt(settled.colls)} ${colSym}${valued} — ${rateDiffers ? `normalized units, not the ${tokenSym} deposited` : `normalized to 18dp (the ${tokenSym} deposited is ${pool.tokenDecimals}dp)`}`,
         );

@@ -10,6 +10,8 @@
 // (pre-sweep or fetch failure) so the listing never blocks on it.
 
 import { Stat } from "@/components/shared/stat";
+import { Prov } from "@/components/shared/provenance";
+import { fxCollateralUsd } from "@/lib/fx/usd-receipt";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { formatUsd } from "@/lib/shared/format-event";
 import type { FxPoolStatsSummary } from "@/lib/sources/api/fx-stats";
@@ -34,7 +36,20 @@ export function FxPoolStatsBand({
         const debt = p.totalDebts != null ? formatCompactTitled(p.totalDebts) : null;
         const a = anchors?.[p.pool];
         const price = a ? a.anchor : p.oraclePriceUsd;
-        const collUsd = a && p.totalColls != null ? p.totalColls * a.anchor : p.totalCollUsd;
+        // The pool's collateral × the anchor leg at its totals' block, the
+        // shown product; with no anchor read, no dollar figure (ui-jobs 743).
+        const collUsd = a
+          ? fxCollateralUsd({
+              what: `The ${p.poolSymbol} pool's collateral in USD`,
+              pool: p.pool,
+              colls: p.totalColls,
+              amountNote: `the pool's getTotalRawColls, in ${p.normalizedSymbol}${p.settledBlock != null ? ` at block ${Number(p.settledBlock).toLocaleString("en-US")}` : ""}`,
+              collsBlock: p.settledBlock != null ? Number(p.settledBlock) : null,
+              leg: "anchor",
+              price: a.anchor,
+              priceBlock: a.block,
+            })
+          : null;
         return (
           <div key={p.pool} className="rounded-xl bg-raised px-4 py-3">
             <div className="flex items-center gap-2">
@@ -65,7 +80,11 @@ export function FxPoolStatsBand({
               >
                 {p.positionsOpen ?? "—"}
               </Stat>
-              <Stat size="prominent" label="Collateral" note={collUsd != null ? formatUsd(collUsd) : undefined}>
+              <Stat
+                size="prominent"
+                label="Collateral"
+                note={collUsd != null ? <Prov info={collUsd.prov}>{formatUsd(collUsd.usd)}</Prov> : undefined}
+              >
                 {coll ? <span title={coll.title}>{`${coll.display} ${p.normalizedSymbol}`}</span> : "—"}
               </Stat>
               <Stat
