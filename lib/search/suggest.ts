@@ -24,6 +24,11 @@ export type SearchVault = [
 ];
 /** One token: its symbol and how many index vaults hold it. */
 export type SearchToken = [symbol: string, vaults: number];
+/** One vault a front publishes behind its product (ui-jobs 774): the front,
+ *  the row's name (a short address, else the vault family), why it matched,
+ *  its chain ("" where the front names none) and where it opens (the vault's
+ *  Rails page where Rails reads it, else the front's group on /vaults/fronts). */
+export type SearchFront = [front: string, name: string, why: string, chain: string, href: string];
 
 export interface SearchIndex {
   /** When the index was built, ISO-8601. */
@@ -34,6 +39,7 @@ export interface SearchIndex {
    *  follow every funded match, as the vault index's empty group does. */
   emptyFrom: number;
   tokens: SearchToken[];
+  fronts: SearchFront[];
 }
 
 /** One roster on the wire: its protocol, chain, and the vault page's path
@@ -52,6 +58,8 @@ export interface SearchIndexWire {
   vaults: WireVault[];
   emptyFrom: number;
   tokens: SearchToken[];
+  /** Absent from an index built before the fronts joined it. */
+  fronts?: SearchFront[];
 }
 
 export function expandIndex(w: SearchIndexWire): SearchIndex {
@@ -60,6 +68,7 @@ export function expandIndex(w: SearchIndexWire): SearchIndex {
     emptyFrom: w.emptyFrom,
     explorers: w.explorers,
     tokens: w.tokens,
+    fronts: w.fronts ?? [],
     vaults: w.vaults.map(([name, symbol, asset, r, address]) => {
       const [protocol, chain, href, perVault] = w.rosters[r];
       return [name, symbol || name, asset, protocol, chain, address, perVault ? href + address : href];
@@ -67,7 +76,7 @@ export function expandIndex(w: SearchIndexWire): SearchIndex {
   };
 }
 
-export type SuggestionKind = "Wallet" | "Bookmark" | "Chain" | "Explorer" | "Vault" | "Token";
+export type SuggestionKind = "Wallet" | "Bookmark" | "Chain" | "Explorer" | "Vault" | "Token" | "Front";
 
 export interface Suggestion {
   /** Stable within one list: the row's DOM id is formed from it. */
@@ -220,8 +229,9 @@ export function suggest(
     rows.push(m.via && m.via !== m.b.label ? { ...row, detail: m.via } : row);
   }
 
-  // 3. Names: explorers, tokens and vaults by match quality; ties keep the
-  //    explorers, then the tokens, then the vaults in their stored size order;
+  // 3. Names: explorers, fronts, tokens and vaults by match quality; ties keep
+  //    the explorers, then a front's vaults, then the tokens, then the vaults
+  //    in their stored size order;
   //    a vault the census shows empty follows every funded match.
   if (index && q.length >= 2) {
     const named: { row: Suggestion; tier: number; kind: number; order: number; empty?: boolean }[] = [];
@@ -266,6 +276,12 @@ export function suggest(
           kind: 1,
           order: i,
         });
+    });
+    // A front's name (ui-jobs 774): its vaults, together, after the explorers.
+    index.fronts.forEach(([front, name, why, chain, href], i) => {
+      const tier = matchTier(front, q);
+      if (tier >= 2 && (!scope || !chain || scope.chain(chain)))
+        named.push({ row: { key: `f:${i}`, kind: "Front", name, detail: why, href }, tier, kind: 0.5, order: i });
     });
     const addressPrefix = q.startsWith("0x") && q.length >= 6;
     index.vaults.forEach((v, i) => {
