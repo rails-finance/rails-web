@@ -85,6 +85,21 @@ const TREZOR: FrontSource = {
   readOn: READ,
 };
 
+const COINBASE_SOURCES: readonly FrontSource[] = [
+  { url: "https://www.coinbase.com/blog/earn-competitive-yields-by-lending-your-usdc", kind: "front", readOn: READ },
+  {
+    url: "https://help.coinbase.com/en/coinbase/trading-and-funding/loan/lending-intro",
+    kind: "front",
+    readOn: READ,
+  },
+  STEAKHOUSE_PARTNERSHIPS,
+];
+
+const COINBASE_POSITION =
+  "a smart contract wallet will be created by Coinbase to connect to the Morpho protocol via onchain vaults curated by Steakhouse Financial";
+
+const COINBASE_LIMITS = "in the U.S. (excluding NY State) and additional countries";
+
 const NOT_NAMED = "Not named";
 
 /** Sorted by front, then product. */
@@ -120,6 +135,38 @@ export const VAULT_FRONTS: readonly VaultFront[] = [
     positionQuote: null,
     limits: null,
     sources: [BITGET, STEAKHOUSE_PARTNERSHIPS],
+  },
+  {
+    front: "Coinbase",
+    slug: "coinbase",
+    product: "USDC lending, Core USDC Vault",
+    chainId: 8453,
+    chainLabel: "Base",
+    family: "Morpho",
+    familyBasis: "MetaMorpho V1, per Morpho's API",
+    vaultKind: "metamorpho",
+    vault: "0xbeeF010f9cb27031ad51e3333f9aF9C6B1228183",
+    vaultNamedBy: "curator",
+    positionSits: "user's wallet",
+    positionQuote: COINBASE_POSITION,
+    limits: COINBASE_LIMITS,
+    sources: COINBASE_SOURCES,
+  },
+  {
+    front: "Coinbase",
+    slug: "coinbase",
+    product: "USDC lending, High Yield USDC Vault",
+    chainId: 8453,
+    chainLabel: "Base",
+    family: "Morpho",
+    familyBasis: "Vault V2, by bytecode",
+    vaultKind: "morpho-vault-v2",
+    vault: "0xbeeff2490FEffa212faC2f6553682C219E6a8845",
+    vaultNamedBy: "curator",
+    positionSits: "user's wallet",
+    positionQuote: COINBASE_POSITION,
+    limits: COINBASE_LIMITS,
+    sources: COINBASE_SOURCES,
   },
   {
     front: "Kraken",
