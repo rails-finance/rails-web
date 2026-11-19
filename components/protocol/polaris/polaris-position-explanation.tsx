@@ -15,11 +15,11 @@
 
 import type { ReactNode } from "react";
 import type { PolarisChainResponse } from "@/lib/api/fetch-polaris-position";
-import { polarisEquityAtFeed, type PolarisLifetime } from "@/lib/polaris/economics";
+import { type PolarisLifetime } from "@/lib/polaris/economics";
+import { polarisEquity } from "@/lib/polaris/usd-receipt";
 import { LIFETIME_LEGS, lifetimeLegProv, type PolarisLifetimeLeg } from "@/lib/polaris/event-provenance";
 import {
   liveEntireProv,
-  liveEquityProv,
   livePendingProv,
   livePethInDebtProv,
   liveRecordedDebtProv,
@@ -138,26 +138,43 @@ export function PolarisPositionExplanation({
   const add = (group: Group, key: string, node: ReactNode) =>
     bullets.push({ group, node: <span key={key}>{node}</span> });
 
-  if (chain.isOpen && chain.price && hasColl) {
+  // The worth and the equity from the shown rows, the price at its block
+  // (ui-jobs 743); a debt below zero is owed to the holder and adds to it.
+  const eq =
+    chain.isOpen && chain.price && hasColl
+      ? polarisEquity({
+          market: chain.market,
+          coll: chain.entireColl,
+          debt: chain.entireDebt,
+          pethInDebt: chain.price.pethInDebt,
+          block: chain.blockNumber,
+        })
+      : null;
+  if (chain.isOpen && chain.price && hasColl && eq) {
     const pethInDebt = chain.price.pethInDebt;
-    const collWorth = chain.entireColl * pethInDebt;
-    // A debt below zero is owed to the holder: it adds to the equity.
-    const equity = polarisEquityAtFeed(chain.entireColl, chain.entireDebt, pethInDebt);
+    const collWorth = eq.worth;
+    const equity = eq.equity;
     add(
       "holdings",
       "worth",
       positionNodes("worth", {
         price: (
-          <Prov info={livePethInDebtProv(chain.market)} value={formatExact(pethInDebt)} symbol={stableSymbol}>
+          <Prov
+            info={livePethInDebtProv(chain.market, false, chain.blockNumber)}
+            value={formatExact(pethInDebt)}
+            symbol={stableSymbol}
+          >
             <H>
               <AmountText value={pethInDebt} />
             </H>
           </Prov>
         ),
         worth: (
-          <H>
-            <AmountText value={collWorth} />
-          </H>
+          <Prov info={eq.worthProv} value={formatExact(collWorth)} symbol={stableSymbol}>
+            <H>
+              <AmountText value={collWorth} />
+            </H>
+          </Prov>
         ),
         stable: stableSymbol,
       }),
@@ -167,12 +184,7 @@ export function PolarisPositionExplanation({
       "equity",
       positionNodes(chain.entireDebt < 0 ? "equity_owed" : "equity", {
         equity: (
-          <Prov
-            echo
-            info={liveEquityProv(chain.market)}
-            value={withRealMinus(formatExact(equity))}
-            symbol={stableSymbol}
-          >
+          <Prov echo info={eq.equityProv} value={withRealMinus(formatExact(equity))} symbol={stableSymbol}>
             <H>{equity < 0 ? `−${formatNumber(-equity)}` : formatNumber(equity)}</H>
           </Prov>
         ),

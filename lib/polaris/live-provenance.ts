@@ -18,9 +18,16 @@
 import type { Provenance, ProvVerify } from "@/components/shared/provenance";
 import { POLARIS_CORE, POLARIS_MARKET_CONFIG, type PolarisMarket } from "./asset-catalog";
 import { formatExact } from "@/lib/utils/format";
+import { priceText } from "@/lib/shared/shown-usd";
+import { polarisFeedPriceNote } from "./price-notes";
 import type { PolarisAgainstHolding } from "./against-holding";
 
 const LANE_VIA = "GET /api/chain/polaris/position";
+/** Where a read names its block: "at block N"; else "at the latest block". */
+const readAt = (block?: number | null): string =>
+  block != null && block > 0 ? `at block ${block.toLocaleString("en-US")}` : "at the latest block";
+const readVia = (block?: number | null): string =>
+  block != null && block > 0 ? `block ${block.toLocaleString("en-US")}` : "head";
 const BOARD_VIA = "GET /api/chain/polaris/markets";
 
 const stableOf = (market: PolarisMarket): string => POLARIS_MARKET_CONFIG[market].stable.symbol;
@@ -167,7 +174,11 @@ export function livePendingToSettleProv(
 }
 
 /** getICR(id) — the contract's own collateral ratio at its own price. */
-export function liveIcrProv(market: PolarisMarket): Provenance {
+export function liveIcrProv(
+  market: PolarisMarket,
+  /** The feed's price as read, and its block: the price row's value. */
+  price?: { pethInDebt: number; block: number | null } | null,
+): Provenance {
   return {
     kind: "chain",
     pclass: "state",
@@ -178,36 +189,16 @@ export function liveIcrProv(market: PolarisMarket): Provenance {
     formula: "entireColl × price ÷ entireDebt",
     inputs: [
       { label: "entire collateral", kind: "chain", pclass: "state", note: "getCDPEntireColl(id)" },
-      { label: "price", kind: "chain", pclass: "oracle", note: "the market's PriceFeed — pETH in the debt unit" },
-      { label: "entire debt", kind: "chain", pclass: "state", note: "getCDPEntireDebt(id)" },
-    ],
-  };
-}
-
-/** entireColl × pethInDebt − entireDebt — the CDP's equity at the feed. Not a
- *  contract getter: three of the manager's and the feed's own reads, combined
- *  client-side. A valuation at the block the three reads land at, never a
- *  profit — realising one needs a price for each of the holder's own flows,
- *  which is a decision about basis, not a further chain read. */
-export function liveEquityProv(market: PolarisMarket): Provenance {
-  const stable = stableOf(market);
-  return {
-    kind: "chain",
-    pclass: "oracle",
-    verify: recompute("getCDPEntireColl(id) × priceFeed.previewPrice() − getCDPEntireDebt(id)"),
-    summary: `The position's equity at the feed — entire collateral (getCDPEntireColl(id)) times the market's own price for pETH in ${stable} (the PriceFeed's previewPrice()), minus entire debt (getCDPEntireDebt(id)), all three read at the latest block. An entire debt below zero adds to the equity: it is the ${stable} the position's next touch mints to the holder of its NFT. A valuation at this block, not a profit: it moves with the feed's price and with the interest and PSM share still pending, and it can be negative when the debt is worth more than the collateral. Turning it into a realised profit or loss needs a price for each of the holder's own deposits — a decision about basis, not a fact of the chain.`,
-    contract: manager(market),
-    via: `${LANE_VIA} · getCDPEntireColl(id) × previewPrice() − getCDPEntireDebt(id) @ head`,
-    formula: "entireColl × pethInDebt − entireDebt",
-    inputs: [
-      { label: "entire collateral", kind: "chain", pclass: "state", note: "getCDPEntireColl(id)" },
-      { label: "pETH price", kind: "chain", pclass: "oracle", note: "the market's PriceFeed — pETH in the debt unit" },
       {
-        label: "entire debt",
+        label: "price",
+        ...(price ? { value: `${priceText(price.pethInDebt).slice(1)} ${stableOf(market)}` } : {}),
         kind: "chain",
-        pclass: "state",
-        note: "getCDPEntireDebt(id), signed: below zero, the stables owed to the holder",
+        pclass: "oracle",
+        note: price
+          ? polarisFeedPriceNote(stableOf(market), price.block)
+          : "the market's PriceFeed — pETH in the debt unit",
       },
+      { label: "entire debt", kind: "chain", pclass: "state", note: "getCDPEntireDebt(id)" },
     ],
   };
 }
@@ -378,7 +369,12 @@ export function liveSpPProv(market: PolarisMarket): Provenance {
 // ── the oracle legs ──────────────────────────────────────────────────────────
 
 /** priceFeed.previewPrice() — pETH in the market's debt unit. */
-export function livePethInDebtProv(market: PolarisMarket, board = false): Provenance {
+export function livePethInDebtProv(
+  market: PolarisMarket,
+  board = false,
+  /** The read's block, named on the receipt (ui-jobs 743). */
+  block?: number | null,
+): Provenance {
   const stable = stableOf(market);
   return {
     kind: "chain",
@@ -386,10 +382,10 @@ export function livePethInDebtProv(market: PolarisMarket, board = false): Proven
     verify: recompute("priceFeed.previewPrice()"),
     summary:
       market === "usdp"
-        ? `pETH's price in ${stable} — the market's own PriceFeed at the latest block (previewPrice(), the view twin of the getPrice() the manager calls): the bonding curve's pETH-in-ETH price × the ETH/USD medianiser. The price the ICR is judged at. A Sepolia testnet feed — the medianiser reads Sepolia oracles, and the figure is a test figure.`
-        : `pETH's price in ${stable} — the market's own PriceFeed at the latest block (previewPrice(), the view twin of the getPrice() the manager calls): the bonding curve's pETH-in-ETH price × ETH/USD ÷ XAU/USD, so the unit is troy ounces of gold. The price the ICR is judged at. A Sepolia testnet feed, and a test figure.`,
+        ? `pETH's price in ${stable} — the market's own PriceFeed ${readAt(block)} (previewPrice(), the view twin of the getPrice() the manager calls): the bonding curve's pETH-in-ETH price × the ETH/USD medianiser. The price the ICR is judged at. A Sepolia testnet feed — the medianiser reads Sepolia oracles, and the figure is a test figure.`
+        : `pETH's price in ${stable} — the market's own PriceFeed ${readAt(block)} (previewPrice(), the view twin of the getPrice() the manager calls): the bonding curve's pETH-in-ETH price × ETH/USD ÷ XAU/USD, so the unit is troy ounces of gold. The price the ICR is judged at. A Sepolia testnet feed, and a test figure.`,
     contract: feed(market),
-    via: `${board ? BOARD_VIA : LANE_VIA} · previewPrice() @ head (÷ 1e18)`,
+    via: `${board ? BOARD_VIA : LANE_VIA} · previewPrice() @ ${readVia(block)} (÷ 1e18)`,
     formula: market === "usdp" ? "currentPrice × ETH/USD" : "currentPrice × ETH/USD ÷ XAU/USD",
     inputs: [
       { label: "curve", kind: "chain", pclass: "oracle", note: "bondingCurve.currentPrice() — pETH in ETH" },
@@ -409,15 +405,14 @@ export function livePethInDebtProv(market: PolarisMarket, board = false): Proven
 }
 
 /** bondingCurve.currentPrice() — pETH in ETH. */
-export function liveCurvePriceProv(board = false): Provenance {
+export function liveCurvePriceProv(board = false, block?: number | null): Provenance {
   return {
     kind: "chain",
     pclass: "oracle",
     verify: recompute("bondingCurve.currentPrice()"),
-    summary:
-      "pETH's price in ETH — the bonding curve's own currentPrice() at the latest block. pETH is minted on the curve against ETH, and this is the curve's spot price for it (1e18 = 1 ETH); the first leg of every price the protocol values pETH at.",
+    summary: `pETH's price in ETH — the bonding curve's own currentPrice() ${readAt(block)}. pETH is minted on the curve against ETH, and this is the curve's spot price for it (1e18 = 1 ETH); the first leg of every price the protocol values pETH at.`,
     contract: { name: "Polaris BondingCurve", address: POLARIS_CORE.bondingCurve },
-    via: `${board ? BOARD_VIA : LANE_VIA} · currentPrice() @ head (÷ 1e18)`,
+    via: `${board ? BOARD_VIA : LANE_VIA} · currentPrice() @ ${readVia(block)} (÷ 1e18)`,
   };
 }
 
@@ -435,76 +430,20 @@ export function curvePriceAtBlockProv(block: number): Provenance {
 }
 
 /** A medianiser's previewExternalPrice() — ETH/USD or XAU/USD. */
-export function liveMedianiserProv(which: "eth" | "xau", board = false): Provenance {
+export function liveMedianiserProv(which: "eth" | "xau", board = false, block?: number | null): Provenance {
   return {
     kind: "chain",
     pclass: "oracle",
     verify: recompute("medianiser.previewExternalPrice()"),
     summary:
       which === "eth"
-        ? `ETH in USD — the ETH/USD medianiser's own previewExternalPrice() at the latest block (the view twin of getExternalPrice()), the median over its configured Sepolia oracles (Chainlink's Sepolia ETH/USD feed among them). A testnet price: a test figure, not the market.`
-        : `Gold in USD — the XAU/USD medianiser's own previewExternalPrice() at the latest block, the median over its configured Sepolia oracles. A testnet price: a test figure, not the market.`,
+        ? `ETH in USD — the ETH/USD medianiser's own previewExternalPrice() ${readAt(block)} (the view twin of getExternalPrice()), the median over its configured Sepolia oracles (Chainlink's Sepolia ETH/USD feed among them). A testnet price: a test figure, not the market.`
+        : `Gold in USD — the XAU/USD medianiser's own previewExternalPrice() ${readAt(block)}, the median over its configured Sepolia oracles. A testnet price: a test figure, not the market.`,
     contract:
       which === "eth"
         ? { name: "Polaris ETH/USD Medianiser", address: POLARIS_CORE.ethUsdMedianiser }
         : { name: "Polaris XAU/USD Medianiser", address: POLARIS_CORE.xauUsdMedianiser },
-    via: `${board ? BOARD_VIA : LANE_VIA} · previewExternalPrice() @ head (÷ 1e18)`,
-  };
-}
-
-/** A pETH amount in USD — amount × curve × ETH/USD, the protocol's own two legs. */
-export function liveUsdValueProv(what: string, board = false): Provenance {
-  return {
-    kind: "chain-derived",
-    pclass: "oracle",
-    verify: {
-      kind: "recompute",
-      text: "Re-run bondingCurve.currentPrice() and the ETH/USD medianiser's previewExternalPrice() at the stamped block; multiply the pETH amount by both.",
-    },
-    summary: `${what} in USD — the pETH amount × the bonding curve's pETH-in-ETH price × the ETH/USD medianiser, both read at the latest block. These are the protocol's own two legs (the USDp feed is exactly their product); no price API is involved. Sepolia testnet figures throughout: a test dollar, not a real one.`,
-    contract: { name: "Polaris BondingCurve", address: POLARIS_CORE.bondingCurve },
-    via: `${board ? BOARD_VIA : LANE_VIA} · amount × currentPrice() × ETH/USD @ head`,
-    formula: "amount × curve × ETH/USD",
-    inputs: [
-      { label: "amount", kind: "chain", pclass: "state", note: "the pETH figure valued" },
-      { label: "curve", kind: "chain", pclass: "oracle", note: "bondingCurve.currentPrice()" },
-      { label: "ETH/USD", kind: "chain", pclass: "oracle", note: "the ETH/USD medianiser's previewExternalPrice()" },
-    ],
-  };
-}
-
-/** A CDP's debt in USD — USDp at one dollar, GOLDp at the XAU/USD medianiser. */
-export function liveDebtUsdProv(market: PolarisMarket, board = false): Provenance {
-  const stable = stableOf(market);
-  const gold = market === "goldp";
-  return {
-    kind: gold ? "chain-derived" : "derived",
-    pclass: "oracle",
-    verify: {
-      kind: "recompute",
-      text: gold
-        ? "Re-run the XAU/USD medianiser's previewExternalPrice() at the stamped block; multiply the GOLDp debt by it."
-        : "Take the USDp debt at one dollar a token.",
-    },
-    summary: gold
-      ? `Debt in USD — the ${stable} amount × the XAU/USD medianiser, read at the latest block. One ${stable} is a troy ounce of gold, the unit the market's own feed prices in. Sepolia testnet figures throughout: a test dollar, not a real one.`
-      : `Debt in USD — the ${stable} amount at one dollar a token. The market's feed prices pETH in USDp as the bonding curve × the ETH/USD medianiser, so one USDp is one dollar by construction. Sepolia testnet figures throughout: a test dollar, not a real one.`,
-    ...(gold ? { contract: { name: "Polaris XAU/USD Medianiser", address: POLARIS_CORE.xauUsdMedianiser } } : {}),
-    via: `${board ? BOARD_VIA : LANE_VIA} · amount × ${gold ? "XAU/USD @ head" : "1"}`,
-    formula: gold ? "amount × XAU/USD" : "amount × 1",
-    inputs: [
-      { label: "amount", kind: "chain", pclass: "state", note: `the ${stable} debt valued` },
-      ...(gold
-        ? [
-            {
-              label: "XAU/USD",
-              kind: "chain" as const,
-              pclass: "oracle" as const,
-              note: "the XAU/USD medianiser's previewExternalPrice()",
-            },
-          ]
-        : []),
-    ],
+    via: `${board ? BOARD_VIA : LANE_VIA} · previewExternalPrice() @ ${readVia(block)} (÷ 1e18)`,
   };
 }
 

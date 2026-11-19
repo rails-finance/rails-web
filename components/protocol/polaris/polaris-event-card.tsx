@@ -160,7 +160,13 @@ export function PolarisEventCard({ event, isLast, eventNumber, previousEvent, ho
   const head = polarisHeadSpec(ctx, coords, onPage ? "title" : "row", holder);
   // The Collateral and Debt cells open into their ledgers where the page ties
   // its timeline to the Lifetime flows panel.
-  const body = polarisEventBody(ctx, coords, useFlowFocus() != null, previousEvent?.context.data);
+  const body = polarisEventBody(
+    ctx,
+    coords,
+    useFlowFocus() != null,
+    previousEvent?.context.data,
+    previousEvent?.blockNumber,
+  );
   const slots: EventCardSlots = {
     event: {
       id: event.id,

@@ -313,7 +313,7 @@ export default function PolarisPositionView({
         label: `${PETH.symbol}, bonding curve, native`,
         // "2.84 ETH" alone read as a gas price: the trigger names the token.
         triggerLabel: PETH.symbol,
-        info: liveCurvePriceProv(),
+        info: liveCurvePriceProv(false, chain.blockNumber),
       },
       { symbol: PETH.symbol, address: PETH.address, price: chain.price.pethUsd },
     ];
@@ -322,7 +322,7 @@ export default function PolarisPositionView({
         symbol: "ETH",
         price: chain.price.ethUsd,
         label: ETH_USD_LABEL,
-        info: liveMedianiserProv("eth"),
+        info: liveMedianiserProv("eth", false, chain.blockNumber),
       });
     const stableUsd = market === "usdp" ? 1 : chain.price.xauUsd;
     if (stableUsd != null) out.push({ symbol: stable, address: cfg.stable.address, price: stableUsd });
