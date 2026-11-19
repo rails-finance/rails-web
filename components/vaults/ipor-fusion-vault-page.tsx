@@ -3,8 +3,8 @@
 // One IPOR Fusion vault's factsheet (rails-ops TO-DO-ipor-scoping §6.3): the
 // vault card (V2), then the grid: the roles over the vault, its fuses with
 // their standing in the IPOR DAO's Fuse Whitelist, and its configuration
-// (V12). One block's read (lib/sources/chain/ipor-fusion-vault.ts). Where the
-// assets are, the markets table, is phase B.
+// (V12), after where the assets are (V3, components/vaults/ipor-fusion-vault-markets.tsx).
+// One block's read (lib/sources/chain/ipor-fusion-vault.ts).
 
 import { serverReadOf } from "@/lib/shared/server-head-read";
 import { ProvReceiptsScope, Prov, useReceiptRegistry } from "@/components/shared/provenance";
@@ -17,6 +17,8 @@ import { Tile } from "@/components/shared/tile-grid";
 import { VAULT_CARD_TILE, VAULT_GRID } from "@/components/vaults/vault-tiles";
 import { VaultConfiguration } from "@/components/vaults/vault-config";
 import { iporFusionConfigTile } from "@/components/vaults/vault-config-columns";
+import { IporFusionMarketsTile } from "@/components/vaults/ipor-fusion-vault-markets";
+import { ALLOCATION_SCOPE } from "@/components/vaults/vault-assets";
 import { ProvSection, SectionHeading } from "@/components/shared/section-menu";
 import { TipLabel } from "@/components/shared/tip-label";
 import {
@@ -57,7 +59,14 @@ const MAX_UINT = (BigInt(1) << BigInt(256)) - BigInt(1);
 const ROLES_SCOPE = "vault-roles";
 const FUSES_SCOPE = "vault-fuses";
 
-export function IporFusionVaultPage({ data }: { data: IporFusionVaultResponse }) {
+export function IporFusionVaultPage({
+  data,
+  childPages = {},
+}: {
+  data: IporFusionVaultResponse;
+  /** Rails's page for each child vault it catalogues, by lowercased address. */
+  childPages?: Record<string, string>;
+}) {
   const registry = useReceiptRegistry();
   const y = data.vault;
   const chainId = data.chainId as ChainId;
@@ -364,6 +373,9 @@ export function IporFusionVaultPage({ data }: { data: IporFusionVaultResponse })
       </Tile>
 
       <div className={VAULT_GRID} data-vault-grid="" data-anatomy="V13">
+        <Tile id="allocation" segScope={ALLOCATION_SCOPE} wide>
+          <IporFusionMarketsTile data={data} coords={coords} v={v} childPages={childPages} />
+        </Tile>
         <Tile id="roles" left>
           <IporFusionRoles data={data} holderAddress={holderAddress} />
         </Tile>

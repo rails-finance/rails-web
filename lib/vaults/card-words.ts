@@ -221,6 +221,32 @@ export const iporFusionVaultCardContent = (): LearnMoreContent => ({
   ],
 });
 
+export const iporFusionVaultAssetsContent = (): LearnMoreContent => ({
+  title: "Where an IPOR Fusion vault's assets are",
+  intro:
+    "The vault's balance is the asset it holds, plus each market's balance as its balance fuse last booked it, in the vault's asset. A market is one protocol, or one kind of holding, the vault may act in.",
+  detailsHeading: "Key concepts:",
+  details: [
+    {
+      bold: "Amount",
+      text: "the market's balance as the vault stored it when it last acted there or updated its balances, so it can trail the market.",
+    },
+    {
+      bold: "Grants",
+      text: "under each market, what the vault may use there: tokens, markets, pools or vaults, as the market's grants name them.",
+    },
+    {
+      bold: "Links",
+      text: "a row links to Rails only where its balance is above zero: to that protocol's explorer at this vault's address, or to the vault it holds shares of. Elsewhere it names the protocol, or says it is not covered by Rails.",
+    },
+    {
+      bold: "Routes",
+      text: "markets the vault acts through that hold no balance, such as swaps and flash loans, listed under the table.",
+    },
+    { bold: "Share of this vault", text: "a row's amount over the vault's total assets." },
+  ],
+});
+
 export const yearnVaultAssetsContent = (): LearnMoreContent => ({
   title: "Where a Yearn V3 vault's assets are",
   intro:

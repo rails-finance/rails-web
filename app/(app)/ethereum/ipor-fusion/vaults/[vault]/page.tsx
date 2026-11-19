@@ -12,7 +12,10 @@ import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { RailHeader } from "@/components/shared/rail-header";
 import { IporFusionVaultPage } from "@/components/vaults/ipor-fusion-vault-page";
 import { listingMetadata } from "@/lib/shared/page-metadata";
-import { iporFusionVaultHref } from "@/lib/vaults/routes";
+import { iporFusionVaultHref, metaMorphoVaultHref, yearnVaultHref } from "@/lib/vaults/routes";
+import { isYearnRosterVault } from "@/lib/yearn/vault-roster";
+import { metaMorphoRosterEntry } from "@/lib/metamorpho/vault-roster";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { iporFusionRosterEntry } from "@/lib/ipor-fusion/vault-roster";
 import { loadIporFusionVault } from "@/lib/sources/chain/ipor-fusion-vault";
 import { FocusSourceGate } from "@/components/shared/aim-gate";
@@ -44,6 +47,22 @@ export default async function IporFusionVaultRoute({ params }: Props) {
   const address = vault.toLowerCase();
   if (!iporFusionRosterEntry(CHAIN_ID, address)) notFound();
   const data = await load(address);
+  // The child vaults that have a Rails page: a Yearn V3 vault, a MetaMorpho
+  // vault on Ethereum, or another IPOR Fusion vault.
+  const childPages: Record<string, string> = {};
+  const children = new Set(
+    (data.markets?.rows ?? [])
+      .filter((r) => r.kind === "child")
+      .flatMap((r) => (r.substrates ?? []).flatMap((s) => (s.kind === "address" ? [s.address] : []))),
+  );
+  await Promise.all(
+    [...children].map(async (a) => {
+      if (await isYearnRosterVault(a)) childPages[a] = yearnVaultHref(a);
+      else if (await metaMorphoRosterEntry(MAINNET_CHAIN_ID, a))
+        childPages[a] = metaMorphoVaultHref(MAINNET_CHAIN_ID, a);
+      else if (iporFusionRosterEntry(CHAIN_ID, a)) childPages[a] = iporFusionVaultHref(CHAIN_ID, a)!;
+    }),
+  );
   return (
     <FocusSourceGate source={data.vault} chain={CHAIN_ID} what="This vault">
       <div className="min-h-screen">
@@ -56,7 +75,7 @@ export default async function IporFusionVaultRoute({ params }: Props) {
               This vault could not be read from chain just now, so no figure is stated for it.
             </p>
           ) : (
-            <IporFusionVaultPage data={data} />
+            <IporFusionVaultPage data={data} childPages={childPages} />
           )}
           <ProvInspectorLayer />
         </div>

@@ -186,7 +186,65 @@ const iporRoleNoneProv_ = (
   };
 };
 
+/** One market's booked balance, `totalAssetsInMarket(id)`. */
+const iporMarketBalanceProv_ = (c: IporFusionCoords, m: { id: string; constant: string | null }) =>
+  vaultCallProv_(c, {
+    label: m.constant ? `Market ${m.id} (${m.constant})` : `Market ${m.id}`,
+    call: `totalAssetsInMarket(${m.id})`,
+    what: `the vault's balance in this market${atBlock(c)}, in ${asset(c)}, as its balance fuse last booked it. The vault stores it when it acts in the market or updates its balances, so it can trail the market.`,
+  });
+
+/** One market's grants, `getMarketSubstrates(id)`, as the row decodes them. */
+const iporMarketSubstratesProv_ = (c: IporFusionCoords, m: { id: string; constant: string | null; decoder: string }) =>
+  vaultCallProv_(c, {
+    label: m.constant ? `Market ${m.id} (${m.constant})` : `Market ${m.id}`,
+    call: `getMarketSubstrates(${m.id})`,
+    what: `what the vault may use in this market${atBlock(c)}: each bytes32 grant ${m.decoder}.`,
+  });
+
+/** The asset in the vault, `asset.balanceOf(vault)`. */
+const iporInVaultProv_ = (c: IporFusionCoords, assetAddress: string): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  source: { block: c.blockNumber },
+  verify: recompute(c, `balanceOf(${c.vault ?? "the vault"})`, `the asset ${assetAddress}`),
+  summary: `In the vault — the ${asset(c)} the vault contract holds${atBlock(c)}, outside every market.`,
+  contract: { name: asset(c), address: assetAddress },
+  via: `${lane(c)} · ERC20.balanceOf(vault) @ the pinned block`,
+});
+
+/** The rewards claim manager's balance, which totalAssets() counts. */
+const iporRewardsProv_ = (c: IporFusionCoords, manager: string): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  source: { block: c.blockNumber },
+  verify: recompute(c, "balanceOf()", `the rewards claim manager ${manager}`),
+  summary: `Rewards manager — the ${asset(c)} the vault's rewards claim manager holds${atBlock(c)}, which the vault's totalAssets() counts.`,
+  contract: { name: "RewardsClaimManager", address: manager },
+  via: `${lane(c)} · PlasmaVault.getRewardsClaimManagerAddress() · RewardsClaimManager.balanceOf() @ the pinned block`,
+});
+
+/** The rows' sum against totalAssets(), where they differ. */
+const iporMarketsGapProv_ = (c: IporFusionCoords, f: { total: string; summed: string; gap: string }): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  source: { block: c.blockNumber },
+  verify: recompute(
+    c,
+    "totalAssets(), totalAssetsInMarket(id) for each active market, and the asset's balanceOf(vault)",
+  ),
+  summary: `Not in a row — totalAssets() answers ${f.total} ${asset(c)}${atBlock(c)} and the rows above sum to ${f.summed}, a difference of ${f.gap}. The rows are the asset in the vault, the rewards manager and each active market's booked balance; a balance fuse that values a market differently from its booked figure, or a market outside getActiveMarketsInBalanceFuses(), lands here.`,
+  contract: vaultContract(c),
+  via: `${lane(c)} · totalAssets() less the rows @ the pinned block`,
+  formula: "totalAssets() − (in the vault + rewards manager + Σ totalAssetsInMarket)",
+});
+
 export const iporRosterCensusProv = withServerRead(iporRosterCensusProv_);
+export const iporMarketBalanceProv = withServerRead(iporMarketBalanceProv_);
+export const iporMarketSubstratesProv = withServerRead(iporMarketSubstratesProv_);
+export const iporInVaultProv = withServerRead(iporInVaultProv_);
+export const iporRewardsProv = withServerRead(iporRewardsProv_);
+export const iporMarketsGapProv = withServerRead(iporMarketsGapProv_);
 export const iporRoleNoneProv = withServerRead(iporRoleNoneProv_);
 export const iporEmptyCountProv = withServerRead(iporEmptyCountProv_);
 export const iporVaultNameProv = withServerRead(iporVaultNameProv_);

@@ -29,6 +29,15 @@ import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import type { RawAmount } from "./morpho-base-vault";
 import { iporFusionRoster, iporFusionRosterEntry, type IporFusionChainId } from "@/lib/ipor-fusion/vault-roster";
 import { IPOR_FUSE_WHITELIST } from "@/lib/ipor-fusion/addresses";
+import {
+  decodeSubstrate,
+  marketInfo,
+  substrateAddresses,
+  type MarketInfo,
+  type Substrate,
+} from "@/lib/ipor-fusion/markets";
+import { MORPHO_MARKETS } from "@/lib/morpho/market-catalog";
+import { resolveErc20Meta } from "./erc20-meta";
 
 const VAULT_ABI = parseAbi([
   "function asset() view returns (address)",
@@ -45,6 +54,16 @@ const VAULT_ABI = parseAbi([
   "function getAccessManagerAddress() view returns (address)",
   "function getPriceOracleMiddleware() view returns (address)",
   "function getFuses() view returns (address[])",
+  "function getActiveMarketsInBalanceFuses() view returns (uint256[])",
+  "function getRewardsClaimManagerAddress() view returns (address)",
+  "function totalAssetsInMarket(uint256) view returns (uint256)",
+  "function getMarketSubstrates(uint256) view returns (bytes32[])",
+]);
+const SIDE_ABI = parseAbi([
+  "function balanceOf(address) view returns (uint256)",
+  "function balanceOf() view returns (uint256)",
+  "function asset() view returns (address)",
+  "function collToken() view returns (address)",
 ]);
 const WHITELIST_ABI = parseAbi([
   "function getFuseByAddress(address) view returns (uint16 fuseState, uint16 fuseType, address fuseAddress, uint32 timestamp)",
@@ -70,6 +89,8 @@ const CALLS = [
   "getAccessManagerAddress",
   "getPriceOracleMiddleware",
   "getFuses",
+  "getActiveMarketsInBalanceFuses",
+  "getRewardsClaimManagerAddress",
 ] as const;
 
 /** Each chain's lane for `eth_getLogs`, named: a receipt states the variable,
@@ -170,6 +191,144 @@ export interface IporFusionVaultResponse {
   /** Null where `getFuses()` did not answer. */
   fuses: IporFusionFuseRow[] | null;
   roles: IporFusionRoles;
+  /** Where the assets are; null where `getActiveMarketsInBalanceFuses()` did not answer. */
+  markets: IporFusionMarkets | null;
+}
+
+export interface IporFusionMarketRow extends MarketInfo {
+  id: string;
+  /** `totalAssetsInMarket(id)`, the balance fuse's booked figure in the
+   *  vault's asset; null where the call did not answer. */
+  balance: RawAmount | null;
+  /** `getMarketSubstrates(id)`, decoded; null where the call did not answer. */
+  substrates: Substrate[] | null;
+}
+
+export interface IporFusionMarkets {
+  rows: IporFusionMarketRow[];
+  /** The asset's `balanceOf(vault)`; null where unread. */
+  inVault: RawAmount | null;
+  /** The rewards claim manager and its `balanceOf()`, where the vault names one. */
+  rewards: { manager: string; balance: RawAmount | null } | null;
+  /** Names for every address the substrates name, a child vault's asset and a
+   *  Morpho market's tokens, lowercased. */
+  names: Record<string, { symbol: string; named: boolean }>;
+  /** A child vault's `asset()`, by child. */
+  childAssets: Record<string, string>;
+  /** A Liquity V2 registry's `collToken()`, by registry. */
+  registries: Record<string, string>;
+  /** A Morpho market id's params from Rails' catalog; null where the catalog lacks it. */
+  morpho: Record<string, { loanToken: string; collateralToken: string; lltv: string } | null>;
+}
+
+let morphoById: Map<string, (typeof MORPHO_MARKETS)[number]> | null = null;
+const morphoMarket = (id: string) => {
+  morphoById ??= new Map(MORPHO_MARKETS.map((m) => [m.id.toLowerCase(), m]));
+  return morphoById.get(id.toLowerCase()) ?? null;
+};
+
+/** Each active market's booked balance and substrates, the asset in the
+ *  vault, the rewards manager's balance, and the names the rows need: two
+ *  Multicall3 waves at the block, then the token-name resolver. */
+async function readMarkets(
+  client: PublicClient,
+  blockNumber: bigint,
+  chainId: IporFusionChainId,
+  vault: string,
+  asset: string,
+  assetDecimals: number,
+  ids: readonly bigint[],
+  rewardsManager: string | null,
+): Promise<IporFusionMarkets> {
+  const v = vault as `0x${string}`;
+  const a = (raw: unknown) => (typeof raw === "bigint" ? amount(raw, assetDecimals) : null);
+  const one = (await client.multicall({
+    contracts: [
+      { address: asset as `0x${string}`, abi: SIDE_ABI, functionName: "balanceOf", args: [v] },
+      ...(rewardsManager
+        ? [{ address: rewardsManager as `0x${string}`, abi: SIDE_ABI, functionName: "balanceOf" }]
+        : []),
+      ...ids.flatMap((id) => [
+        { address: v, abi: VAULT_ABI, functionName: "totalAssetsInMarket", args: [id] },
+        { address: v, abi: VAULT_ABI, functionName: "getMarketSubstrates", args: [id] },
+      ]),
+    ] as never,
+    allowFailure: true,
+    blockNumber,
+  })) as Call[];
+  const off = rewardsManager ? 2 : 1;
+  const rows: IporFusionMarketRow[] = ids.map((idRaw, i) => {
+    const id = idRaw.toString();
+    const info = marketInfo(id);
+    const subs = ok(one[off + 2 * i + 1]) as readonly string[] | undefined;
+    return {
+      ...info,
+      id,
+      balance: a(ok(one[off + 2 * i])),
+      substrates: subs ? subs.map((h) => decodeSubstrate(info.kind, h)) : null,
+    };
+  });
+
+  const children = new Set<string>();
+  const registries = new Set<string>();
+  const named = new Set<string>();
+  const morpho: IporFusionMarkets["morpho"] = {};
+  for (const r of rows) {
+    for (const ad of substrateAddresses(r.substrates ?? [])) named.add(ad);
+    for (const s of r.substrates ?? []) {
+      if (r.kind === "child" && s.kind === "address") children.add(s.address);
+      if (r.kind === "liquity" && (s.kind === "address" || s.kind === "typed")) registries.add(s.address);
+      if (s.kind === "morpho-market") {
+        const m = chainId === 1 ? morphoMarket(s.id) : null;
+        morpho[s.id] = m ? { loanToken: m.loanToken, collateralToken: m.collateralToken, lltv: m.lltv } : null;
+        if (m) {
+          named.add(m.loanToken);
+          if (m.collateralToken !== ZERO_ADDRESS) named.add(m.collateralToken);
+        }
+      }
+    }
+  }
+  const childList = [...children];
+  const registryList = [...registries];
+  const two =
+    childList.length + registryList.length > 0
+      ? ((await client.multicall({
+          contracts: [
+            ...childList.map((c) => ({ address: c as `0x${string}`, abi: SIDE_ABI, functionName: "asset" })),
+            ...registryList.map((r) => ({ address: r as `0x${string}`, abi: SIDE_ABI, functionName: "collToken" })),
+          ] as never,
+          allowFailure: true,
+          blockNumber,
+        })) as Call[])
+      : [];
+  const childAssets: Record<string, string> = {};
+  childList.forEach((c, i) => {
+    const r = ok(two[i]) as string | undefined;
+    if (r) {
+      childAssets[c] = r.toLowerCase();
+      named.add(r.toLowerCase());
+    }
+  });
+  const registryColl: Record<string, string> = {};
+  registryList.forEach((r, i) => {
+    const t = ok(two[childList.length + i]) as string | undefined;
+    if (t) {
+      registryColl[r] = t.toLowerCase();
+      named.add(t.toLowerCase());
+    }
+  });
+  const metas = await resolveErc20Meta([...named], chainId).catch(() => new Map());
+  const names: IporFusionMarkets["names"] = {};
+  for (const [addr, m] of metas) names[addr] = { symbol: m.symbol, named: m.named === true };
+  return {
+    rows,
+    inVault: a(ok(one[0])),
+    rewards: rewardsManager ? { manager: rewardsManager, balance: a(ok(one[1])) } : null,
+    names,
+    childAssets,
+    registries: registryColl,
+    morpho,
+  };
 }
 
 const laneClients = new Map<number, PublicClient>();
@@ -367,9 +526,26 @@ export async function loadIporFusionVault(
     const accessManager = ((at("getAccessManagerAddress") as string | undefined) ?? null)?.toLowerCase() ?? null;
     const fuseAddresses = ((at("getFuses") as string[] | undefined) ?? null)?.map((f) => f.toLowerCase()) ?? null;
 
-    const scan = accessManager
-      ? await roleScanAt(chainId, accessManager, entry.createdBlock, Number(blockNumber))
-      : null;
+    const marketIds = at("getActiveMarketsInBalanceFuses") as readonly bigint[] | undefined;
+    const rewardsManager = (at("getRewardsClaimManagerAddress") as string | undefined)?.toLowerCase() ?? null;
+    const [scan, markets] = await Promise.all([
+      accessManager ? roleScanAt(chainId, accessManager, entry.createdBlock, Number(blockNumber)) : null,
+      marketIds
+        ? readMarkets(
+            client,
+            blockNumber,
+            chainId,
+            vaultAddress,
+            ((at("asset") as string | undefined) ?? entry.asset.address).toLowerCase(),
+            ad,
+            marketIds,
+            rewardsManager && rewardsManager !== ZERO_ADDRESS ? rewardsManager : null,
+          ).catch((error) => {
+            console.error(`IPOR Fusion markets read on ${vaultAddress} failed:`, error);
+            return null;
+          })
+        : null,
+    ]);
     const pairs = scan && "pairs" in scan ? scan.pairs : [];
 
     const second = (await client.multicall({
@@ -468,6 +644,7 @@ export async function loadIporFusionVault(
       whitelist,
       fuses,
       roles,
+      markets,
     };
   } catch (error) {
     console.error(`IPOR Fusion vault ${vaultAddress} chain read failed on chain ${chainId}:`, error);
@@ -479,6 +656,7 @@ export async function loadIporFusionVault(
       whitelist,
       fuses: null,
       roles: { read: false, reason: ROLES_UNREAD.vault, lane },
+      markets: null,
     };
   }
 }
