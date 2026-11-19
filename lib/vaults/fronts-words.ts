@@ -4,12 +4,12 @@
 //
 // Pure: a type import only.
 
-import type { FrontPositionSits, VaultFront } from "./fronts";
+import type { FrontPositionSits } from "./fronts";
 
 export const FRONTS_TITLE = "Vault fronts";
 
 export const FRONTS_PAGE = {
-  lead: "Apps that put an on-chain vault behind their own product, one row per product and vault, each cited to the page the app publishes with the day it was read.",
+  lead: "Apps that put an on-chain vault behind their product. Each row is one product and vault, cited to the page the app publishes with the day it was read.",
   caption: (front: string) => `${front}: the vaults behind its products`,
   columns: {
     front: "Front",
@@ -21,16 +21,18 @@ export const FRONTS_PAGE = {
     source: "Source",
   },
   /** The /vaults line pointing here. */
-  indexLink: "Apps that put a vault behind their own product",
+  indexLink: "Apps that put a vault behind their product",
 };
 
 export const FRONT_VAULT = {
   noAddress: "Address not published",
-  namedByCurator: "Named by the curator",
+  namedByCurator: "Address from the curator",
   copy: "Copy the vault's address",
-  read: "Open on Rails",
+  copied: "Copied",
+  copyFailed: "Could not copy",
   notRead: "Rails does not read this vault yet",
-  unknown: "The vault index did not answer",
+  familyNotRead: (family: string) => `Rails does not read ${family} vaults yet`,
+  unnamed: "The vault is not named, so Rails cannot check it",
 };
 
 export const FRONT_POSITION: Record<FrontPositionSits, string> = {
@@ -44,7 +46,3 @@ export const FRONT_SOURCE = {
   read: (date: string) => `read ${date}`,
   curator: "curator's page",
 };
-
-/** A search row's reason it matched the front's name. */
-export const frontSearchWhy = (f: Pick<VaultFront, "front" | "product" | "several">) =>
-  `${f.front} publishes ${f.several ? "these vaults" : "this vault"} behind ${f.product}`;

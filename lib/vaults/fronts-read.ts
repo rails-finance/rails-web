@@ -1,39 +1,47 @@
-// Whether Rails reads each front's vault (rails-ops ui-jobs 774): a row with an
-// address and a chain is looked up in the vault index (lib/vaults/index-read.ts),
-// the union of every vault roster Rails serves. Found, the row links to the
-// vault's page under its protocol; not found, it says Rails does not read the
-// vault yet. Nothing here is hand-set.
+// Whether Rails reads each front's vault (rails-ops ui-jobs 774), decided from
+// the vault's kind and chain. Only a kind Rails reads is looked up, in that
+// kind's roster: MetaMorpho on Ethereum and Base (lib/metamorpho/vault-roster.ts).
+// Found, the row links to the vault's page under its protocol. Nothing here is
+// hand-set, and a row of a kind Rails does not read costs no read.
 //
-// SERVER-ONLY: the vault index's loaders read the chain and the bearer token.
+// SERVER-ONLY: the MetaMorpho roster reads RAILS_API_URL and the bearer token.
 
-import { loadVaultIndex } from "@/lib/vaults/index-read";
-import { vaultIndexHref } from "@/lib/vaults/index-rosters";
-import { VAULT_FRONTS, frontVaultKey, type VaultFront } from "@/lib/vaults/fronts";
+import { metaMorphoRosterEntry, type MetaMorphoChainId } from "@/lib/metamorpho/vault-roster";
+import { metaMorphoVaultHref } from "@/lib/vaults/routes";
+import { VAULT_FRONTS, type FrontVaultKind, type VaultFront } from "@/lib/vaults/fronts";
 
-/** Rails's reading of one row's vault. `unknown`: the index did not answer
- *  in full and the vault was not among what did. `unchecked`: the row lacks
- *  the address or the chain to look up. */
+/** Rails's reading of one row's vault. `family-not-read`: Rails reads no vault
+ *  of this kind (on this chain); `not-read`: a kind Rails reads, absent from
+ *  its roster; `unnamed`: no address and no kind, so nothing to check. */
 export type FrontRead =
   | { kind: "read"; href: string }
   | { kind: "not-read" }
-  | { kind: "unknown" }
-  | { kind: "unchecked" };
+  | { kind: "family-not-read"; family: string }
+  | { kind: "unnamed" };
 
 export interface FrontRow extends VaultFront {
   read: FrontRead;
 }
 
+/** Each kind's name in a "Rails does not read … vaults yet" line. */
+const KIND_LABEL: Record<FrontVaultKind, string> = {
+  metamorpho: "MetaMorpho",
+  "morpho-vault-v2": "Morpho Vault V2",
+  "veda-boringvault": "Veda BoringVault",
+};
+
+const isMetaMorphoChain = (id: number | null): id is MetaMorphoChainId => id === 1 || id === 8453;
+
+async function readOne(f: VaultFront): Promise<FrontRead> {
+  if (f.vaultKind == null) return { kind: "unnamed" };
+  if (f.vaultKind === "metamorpho" && isMetaMorphoChain(f.chainId)) {
+    if (f.vault == null) return { kind: "not-read" };
+    const hit = await metaMorphoRosterEntry(f.chainId, f.vault);
+    return hit ? { kind: "read", href: metaMorphoVaultHref(f.chainId, f.vault) } : { kind: "not-read" };
+  }
+  return { kind: "family-not-read", family: KIND_LABEL[f.vaultKind] };
+}
+
 export async function readFronts(): Promise<FrontRow[]> {
-  const { vaults, indexDown } = await loadVaultIndex();
-  const served = new Map(vaults.map((v) => [frontVaultKey(v.chainId, v.address), v]));
-  return VAULT_FRONTS.map((f) => {
-    if (f.vault == null || f.chainId == null) return { ...f, read: { kind: "unchecked" } };
-    const hit = served.get(frontVaultKey(f.chainId, f.vault));
-    const read: FrontRead = hit
-      ? { kind: "read", href: vaultIndexHref(hit) }
-      : indexDown
-        ? { kind: "unknown" }
-        : { kind: "not-read" };
-    return { ...f, read };
-  });
+  return Promise.all(VAULT_FRONTS.map(async (f) => ({ ...f, read: await readOne(f) })));
 }

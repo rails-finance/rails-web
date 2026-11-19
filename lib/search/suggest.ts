@@ -24,11 +24,12 @@ export type SearchVault = [
 ];
 /** One token: its symbol and how many index vaults hold it. */
 export type SearchToken = [symbol: string, vaults: number];
-/** One vault a front publishes behind its product (ui-jobs 774): the front,
- *  the row's name (a short address, else the vault family), why it matched,
- *  its chain ("" where the front names none) and where it opens (the vault's
- *  Rails page where Rails reads it, else the front's group on /vaults/fronts). */
-export type SearchFront = [front: string, name: string, why: string, chain: string, href: string];
+/** One vault an app (a front) puts behind its product (ui-jobs 774): the
+ *  app, the product, the row's detail (the vault's short address, else its
+ *  family), its chain ("" where the app names none) and where it opens (the
+ *  vault's Rails page where Rails reads it, else the app's group on
+ *  /vaults/fronts). */
+export type SearchFront = [front: string, product: string, detail: string, chain: string, href: string];
 
 export interface SearchIndex {
   /** When the index was built, ISO-8601. */
@@ -76,7 +77,7 @@ export function expandIndex(w: SearchIndexWire): SearchIndex {
   };
 }
 
-export type SuggestionKind = "Wallet" | "Bookmark" | "Chain" | "Explorer" | "Vault" | "Token" | "Front";
+export type SuggestionKind = "Wallet" | "Bookmark" | "Chain" | "Explorer" | "Vault" | "Token" | "Vault front";
 
 export interface Suggestion {
   /** Stable within one list: the row's DOM id is formed from it. */
@@ -277,11 +278,17 @@ export function suggest(
           order: i,
         });
     });
-    // A front's name (ui-jobs 774): its vaults, together, after the explorers.
-    index.fronts.forEach(([front, name, why, chain, href], i) => {
+    // An app's name (ui-jobs 774): its products' vaults, together, after the
+    // explorers; the name says which app and product matched.
+    index.fronts.forEach(([front, product, detail, chain, href], i) => {
       const tier = matchTier(front, q);
       if (tier >= 2 && (!scope || !chain || scope.chain(chain)))
-        named.push({ row: { key: `f:${i}`, kind: "Front", name, detail: why, href }, tier, kind: 0.5, order: i });
+        named.push({
+          row: { key: `f:${i}`, kind: "Vault front", name: `${front} · ${product}`, detail, href },
+          tier,
+          kind: 0.5,
+          order: i,
+        });
     });
     const addressPrefix = q.startsWith("0x") && q.length >= 6;
     index.vaults.forEach((v, i) => {

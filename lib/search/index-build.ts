@@ -10,8 +10,8 @@
 //   floor when the census does not answer.
 // - Maple: the two syrup pools in lib/maple/asset-catalog.ts.
 // - sBOLD (lib/liquity-v2/sbold.ts): one vault, opening its page under /ethereum/vaults.
-// - The vault fronts (lib/vaults/fronts.ts): each front's vaults, matched by
-//   the front's name.
+// - The vault fronts (lib/vaults/fronts.ts): each app's products and their
+//   vaults, matched by the app's name.
 //
 // The vaults go out in the order of their total assets at the census block,
 // in USD at the census's oracle price, where the census holds them (Morpho and
@@ -33,8 +33,8 @@ import {
   yearnVaultRosterHref,
 } from "@/lib/vaults/routes";
 import { SBOLD_PAGE_PATH, SBOLD_VAULT } from "@/lib/liquity-v2/sbold";
-import { VAULT_FRONTS, frontHref } from "@/lib/vaults/fronts";
-import { frontSearchWhy } from "@/lib/vaults/fronts-words";
+import { frontHref } from "@/lib/vaults/fronts";
+import { readFronts } from "@/lib/vaults/fronts-read";
 import { shortAddress } from "@/lib/shared/vault-amount-text";
 import type { SearchFront, SearchIndexWire, WireRoster, WireVault } from "@/lib/search/suggest";
 
@@ -150,21 +150,14 @@ export async function buildSearchIndex(): Promise<SearchIndexWire> {
   const tokenCounts = new Map<string, number>();
   for (const v of vaults) if (v[2]) tokenCounts.set(v[2], (tokenCounts.get(v[2]) ?? 0) + 1);
 
-  // The fronts (ui-jobs 774): a row opens its vault's page where this index
-  // holds the vault on that chain, else the front's group on /vaults/fronts.
-  const pageOf = new Map(
-    vaults.map(([, , , r, address]) => {
-      const [, chain, href, perVault] = rosters[r];
-      return [`${chain}:${address}`, perVault ? href + address : href];
-    }),
-  );
-  const fronts: SearchFront[] = VAULT_FRONTS.map((f) => [
+  // The fronts (ui-jobs 774): a row opens its vault's page where Rails reads
+  // it (lib/vaults/fronts-read.ts), else the front's group on /vaults/fronts.
+  const fronts: SearchFront[] = (await readFronts()).map((f) => [
     f.front,
+    f.product,
     f.vault ? shortAddress(f.vault) : f.family,
-    frontSearchWhy(f),
     f.chainId == null ? "" : f.chainLabel,
-    (f.vault && f.chainId != null && pageOf.get(`${chainName(f.chainId)}:${f.vault.toLowerCase()}`)) ||
-      frontHref(f.slug),
+    f.read.kind === "read" ? f.read.href : frontHref(f.slug),
   ]);
 
   return {

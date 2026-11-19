@@ -1,7 +1,7 @@
 // The vault fronts table (rails-ops ui-jobs 774; anatomy E5): one group per
 // front, anchored by its slug. From md a table, below md a card per row.
-// Every row cites the front's page with the day read (E5.2), a receipt of its
-// own kind: the rows quote published pages, so no <Prov> is drawn.
+// Every row cites the front's page with the day read (E5.2), a receipt apart
+// from <Prov>: the rows quote published pages.
 
 import Link from "next/link";
 import {
@@ -87,7 +87,7 @@ function Vault({ row }: { row: FrontRow }) {
               {shortAddress(row.vault)}
             </span>
           )}
-          <FrontCopy value={row.vault} label={FRONT_VAULT.copy} />
+          <FrontCopy value={row.vault} />
         </span>
       ) : (
         <span className="text-rb-500">{FRONT_VAULT.noAddress}</span>
@@ -95,10 +95,25 @@ function Vault({ row }: { row: FrontRow }) {
       {row.vault && row.vaultNamedBy === "curator" && (
         <span className={`block ${MUTED}`}>{FRONT_VAULT.namedByCurator}</span>
       )}
-      {(read.kind === "not-read" || read.kind === "unknown") && (
-        <span className={`block ${MUTED}`}>{read.kind === "not-read" ? FRONT_VAULT.notRead : FRONT_VAULT.unknown}</span>
+      {read.kind !== "read" && (
+        <span className={`block ${MUTED}`}>
+          {read.kind === "not-read"
+            ? FRONT_VAULT.notRead
+            : read.kind === "family-not-read"
+              ? FRONT_VAULT.familyNotRead(read.family)
+              : FRONT_VAULT.unnamed}
+        </span>
       )}
     </span>
+  );
+}
+
+function Family({ row }: { row: FrontRow }) {
+  return (
+    <>
+      <span className="block text-foreground">{row.family}</span>
+      {row.familyBasis && <span className={`mt-0.5 block ${MUTED}`}>{row.familyBasis}</span>}
+    </>
   );
 }
 
@@ -141,7 +156,9 @@ function FrontTable({ front, rows }: { front: string; rows: FrontRow[] }) {
             <DataTableCell className={r.chainId == null ? "text-rb-500" : "text-foreground"}>
               {r.chainLabel}
             </DataTableCell>
-            <DataTableCell className="text-foreground">{r.family}</DataTableCell>
+            <DataTableCell>
+              <Family row={r} />
+            </DataTableCell>
             <DataTableCell>
               <Vault row={r} />
             </DataTableCell>
@@ -175,12 +192,10 @@ function FrontCards({ rows }: { rows: FrontRow[] }) {
           data-anatomy="E5.1"
           data-front-row={r.slug}
         >
-          <div className="mb-1">
-            <Product row={r} />
-          </div>
           <dl>
+            {line(C.product, <Product row={r} />)}
             {line(C.chain, <span className={r.chainId == null ? "text-rb-500" : ""}>{r.chainLabel}</span>)}
-            {line(C.family, r.family)}
+            {line(C.family, <Family row={r} />)}
             {line(C.vault, <Vault row={r} />)}
             {line(C.position, <Position row={r} />)}
             {line(C.source, <Sources row={r} />)}

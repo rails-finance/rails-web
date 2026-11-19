@@ -1,10 +1,10 @@
 // The vault fronts: consumer apps (exchanges, wallets, fintechs) that put an
-// on-chain vault behind their own product (rails-ops ui-jobs 774; decision
+// on-chain vault behind their product (rails-ops ui-jobs 774; decision
 // 0017 point 5). Rendered at /vaults/fronts and carried into the search index.
 // ----------------------------------------------------------------------------
 // HAND-KEPT, AND ADMITTED ONLY ON THE FRONT'S PAGE. A row enters when the
-// front publishes the mapping on a page of its own (a help article, a product
-// page, its blog): decision 0017 point 5 lets a front's name render once the
+// front publishes the mapping on its page (a help article, a product page,
+// its blog): decision 0017 point 5 lets a front's name render once the
 // front publishes it, cited as theirs. A curator's page may support a row (the
 // vault address where the front names the protocol and curator but not the
 // address) and is cited beside the front's; it never admits one. Forums, news
@@ -13,13 +13,15 @@
 // The rows are re-checked against their sources on a cadence: a row whose
 // source page is gone comes out, and each source carries the date it was read.
 //
-// Whether Rails reads a row's vault is computed, never set here: the page asks
-// the vault index (lib/vaults/fronts-read.ts) and the search index asks its
-// own rows (lib/search/index-build.ts).
+// Whether Rails reads a row's vault is computed, never set here
+// (lib/vaults/fronts-read.ts): from the vault's kind and chain, and for a kind
+// Rails reads, from that roster.
 //
 // Pure: no imports, so the search's builder and the page both read it.
 
-export type FrontFamily = "Morpho Vault V2" | "Morpho" | "Veda BoringVault";
+/** What the vault is, where a page or a reading says: MetaMorpho V1.x, Morpho
+ *  Vault V2, Veda's BoringVault. Null where nothing says which. */
+export type FrontVaultKind = "metamorpho" | "morpho-vault-v2" | "veda-boringvault";
 
 /** Where the front's page says the position sits on chain. */
 export type FrontPositionSits = "user's wallet" | "front's pooled address" | "not stated";
@@ -43,7 +45,12 @@ export interface VaultFront {
   /** Null where the front's page names no chain. */
   chainId: number | null;
   chainLabel: string;
-  family: FrontFamily;
+  /** The family as the cited page names it. */
+  family: string;
+  /** A version inferred beyond the page, with its basis; null where none. */
+  familyBasis: string | null;
+  /** Null where no page or reading says which; such a row has no address. */
+  vaultKind: FrontVaultKind | null;
   /** Null where no page read publishes it. */
   vault: string | null;
   /** Who publishes the address: the front, or the curator's page. */
@@ -88,7 +95,9 @@ export const VAULT_FRONTS: readonly VaultFront[] = [
     product: "On-Chain Earn, USDC (Morpho x Arbitrum)",
     chainId: 42161,
     chainLabel: "Arbitrum",
-    family: "Morpho Vault V2",
+    family: "Morpho",
+    familyBasis: "Vault V2, by bytecode",
+    vaultKind: "morpho-vault-v2",
     vault: "0xbeeff1D5dE8F79ff37a151681100B039661da518",
     vaultNamedBy: "curator",
     positionSits: "not stated",
@@ -102,7 +111,9 @@ export const VAULT_FRONTS: readonly VaultFront[] = [
     product: "On-Chain Earn, USDT (Morpho x Arbitrum)",
     chainId: 42161,
     chainLabel: "Arbitrum",
-    family: "Morpho Vault V2",
+    family: "Morpho",
+    familyBasis: "Vault V2, by bytecode",
+    vaultKind: "morpho-vault-v2",
     vault: "0xbeeff77CE5C059445714E6A3490E273fE7F2492F",
     vaultNamedBy: "curator",
     positionSits: "not stated",
@@ -117,12 +128,14 @@ export const VAULT_FRONTS: readonly VaultFront[] = [
     chainId: null,
     chainLabel: NOT_NAMED,
     family: "Veda BoringVault",
+    familyBasis: null,
+    vaultKind: "veda-boringvault",
     vault: null,
     vaultNamedBy: "front",
     several: true,
     positionSits: "user's wallet",
     positionQuote: "DeFi Earn relies on embedded wallets, which are fully controlled by the user.",
-    limits: "Not currently available in certain jurisdictions, such as the UK, Australia and UAE.",
+    limits: "not currently available in certain jurisdictions, such as the UK, Australia and UAE.",
     sources: [
       { url: "https://support.kraken.com/in/articles/defi-earn-faq", kind: "front", readOn: READ },
       { url: "https://blog.kraken.com/product/defi-earn/simplified-defi-rewards", kind: "front", readOn: READ },
@@ -135,6 +148,8 @@ export const VAULT_FRONTS: readonly VaultFront[] = [
     chainId: 57073,
     chainLabel: "Ink",
     family: "Veda BoringVault",
+    familyBasis: null,
+    vaultKind: "veda-boringvault",
     vault: null,
     vaultNamedBy: "front",
     positionSits: "user's wallet",
@@ -149,12 +164,14 @@ export const VAULT_FRONTS: readonly VaultFront[] = [
     chainId: 57073,
     chainLabel: "Ink",
     family: "Veda BoringVault",
+    familyBasis: null,
+    vaultKind: "veda-boringvault",
     vault: null,
     vaultNamedBy: "front",
     several: true,
     positionSits: "user's wallet",
     positionQuote: "your assets are held in a self-custodial embedded wallet",
-    limits: "Not available in the UK, US, Canada, or Australia, or in sanctioned countries.",
+    limits: "not available in the UK, US, Canada, or Australia, or in sanctioned countries.",
     sources: [{ url: "https://support.kraken.com/articles/xstocks-vaults", kind: "front", readOn: READ }],
   },
   {
@@ -163,7 +180,9 @@ export const VAULT_FRONTS: readonly VaultFront[] = [
     product: "Earn (USDG lending)",
     chainId: null,
     chainLabel: NOT_NAMED,
-    family: "Morpho Vault V2",
+    family: "Morpho",
+    familyBasis: "Vault V2, per Morpho's API",
+    vaultKind: "morpho-vault-v2",
     vault: "0xBeEff033F34C046626B8D0A041844C5d1A5409dd",
     vaultNamedBy: "curator",
     positionSits: "user's wallet",
@@ -181,6 +200,8 @@ export const VAULT_FRONTS: readonly VaultFront[] = [
     chainId: 1,
     chainLabel: "Ethereum",
     family: "Morpho",
+    familyBasis: null,
+    vaultKind: null,
     vault: null,
     vaultNamedBy: "front",
     positionSits: "user's wallet",
@@ -195,6 +216,8 @@ export const VAULT_FRONTS: readonly VaultFront[] = [
     chainId: 1,
     chainLabel: "Ethereum",
     family: "Morpho",
+    familyBasis: null,
+    vaultKind: null,
     vault: null,
     vaultNamedBy: "front",
     positionSits: "user's wallet",
@@ -209,6 +232,8 @@ export const VAULT_FRONTS: readonly VaultFront[] = [
     chainId: 1,
     chainLabel: "Ethereum",
     family: "Morpho",
+    familyBasis: null,
+    vaultKind: null,
     vault: null,
     vaultNamedBy: "front",
     several: true,
@@ -223,6 +248,3 @@ export const FRONTS_HREF = "/vaults/fronts";
 
 /** A front's group on /vaults/fronts. */
 export const frontHref = (slug: string) => `${FRONTS_HREF}#${slug}`;
-
-/** The key a vault is matched on across chains. */
-export const frontVaultKey = (chainId: number, address: string) => `${chainId}:${address.toLowerCase()}`;

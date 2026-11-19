@@ -1,12 +1,12 @@
 // The vault fronts — /vaults/fronts (E5; rails-ops ui-jobs 774).
 // ----------------------------------------------------------------------------
-// The apps that put an on-chain vault behind their own product, each row cited
+// The apps that put an on-chain vault behind their product, each row cited
 // to the front's published page (decision 0017 point 5; the admission rule is
 // in lib/vaults/fronts.ts). Like the index it spans chains, so it sits under no
 // chain and no explorer rail. A row whose vault Rails reads links to the
 // vault's page (lib/vaults/fronts-read.ts).
 
-// focus: a list of apps cited to their own pages; each vault's page applies the focus.
+// focus: a list of apps cited to their pages; each vault's page applies the focus.
 
 import { VaultFronts } from "@/components/vaults/vault-fronts";
 import { FRONTS_HREF } from "@/lib/vaults/fronts";
@@ -22,8 +22,7 @@ const PROV_EXEMPT = "the rows cite the fronts' published pages, not chain reads 
 
 export const metadata = {
   title: FRONTS_TITLE,
-  description:
-    "Exchanges, wallets and fintechs that put an on-chain vault behind their own product, each cited to the page the app publishes.",
+  description: "Apps that put an on-chain vault behind their product, each cited to the page the app publishes.",
   alternates: { canonical: FRONTS_HREF },
   ...(vaultIndexLaunched() ? {} : { robots: { index: false, follow: false } }),
 };
