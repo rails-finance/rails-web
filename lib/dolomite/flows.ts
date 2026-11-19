@@ -52,6 +52,7 @@ import type {
   FlowWords,
 } from "@/lib/shared/flows-timeline";
 import { daysFromEvents, flowLeg } from "@/lib/shared/flows-timeline";
+import { centsOf, shownUsd } from "@/lib/shared/shown-usd";
 import { externalActor } from "@/lib/shared/external-actor";
 
 const DAY_S = 86_400;
@@ -351,7 +352,7 @@ export interface DolomiteFlowOptions {
 }
 
 /** How a row's price was found. */
-export type DolomitePriceBasis = "block" | "day" | "live" | "carried" | "nearest" | "none";
+export type DolomitePriceBasis = "block" | "day" | "live" | "carried" | "nearest" | "latest" | "none";
 
 /** A replayed row: its legs in tokens and the market's balances after it. */
 export interface DolomiteReplayed {
@@ -411,7 +412,9 @@ function pricesFor(rows: DolomiteFlowRow[], o: DolomiteFlowOptions): RowPrice[] 
       return { price: b.price, basis: "nearest" as const, priceBlock: b.block };
     }
     const live = o.live?.[r.market]?.price;
-    return live != null && live > 0 ? { price: live, basis: "live" as const } : { price: 0, basis: "none" as const };
+    // A past row with no stored price near it: the latest read's price, on
+    // another basis and not complete (ui-jobs 743).
+    return live != null && live > 0 ? { price: live, basis: "latest" as const } : { price: 0, basis: "none" as const };
   });
 }
 
@@ -427,7 +430,7 @@ function dolomiteLeg(r: DolomiteReplayed, l: { bucket: string; amount: number })
     price: r.basis === "none" ? null : r.price,
     block: r.basis === "block" ? r.ev.block : r.basis === "nearest" ? (r.priceBlock ?? null) : null,
     priceNote: dolomitePriceNote(r, r.ev.block),
-    ...(r.basis === "live" ? { basis: DOLOMITE_TODAY_BASIS } : {}),
+    ...(r.basis === "latest" ? { basis: DOLOMITE_TODAY_BASIS } : {}),
     ...(ACCRUAL_KEYS.has(l.bucket) ? { accrual: true } : {}),
   });
 }
@@ -460,9 +463,9 @@ const DOLOMITE_BLOCK_BASIS = "each row's price";
 
 /** Why a row's figures are not at its block's price, by how its price was found. */
 const UNSURE_WHY: Partial<Record<DolomitePriceBasis, string>> = {
-  day: "priced at the day's close: the price at this block is not stored yet.",
   carried: "priced at the last stored close before its day: no price is stored for the day.",
   nearest: "priced at the nearest priced row: no price is stored near its day.",
+  latest: "priced at the latest read's price: no price is stored for its block, its day or any row of its market.",
   none: "has no price stored: its flows have no figure.",
 };
 
@@ -682,7 +685,10 @@ export function dolomiteFlowTimeline(rows: DolomiteFlowRow[], o: DolomiteFlowOpt
         ? { byOther: true }
         : {}),
       balances,
-      prices: r.price > 0 && r.basis !== "nearest" && r.basis !== "none" ? [{ asset: m, usd: r.price }] : [],
+      prices:
+        r.price > 0 && r.basis !== "nearest" && r.basis !== "latest" && r.basis !== "none"
+          ? [{ asset: m, usd: r.price }]
+          : [],
       ...(unsure.length ? { unsure } : {}),
     };
   });
@@ -910,7 +916,7 @@ export function dolomiteEventStates(
         else moved.debt = true;
       }
       rec.set(r.ev.market, { symbol: r.ev.symbol, bal: r.ev.after, ts: r.ev.ts });
-      if (r.price > 0 && r.basis !== "nearest" && r.basis !== "none")
+      if (r.price > 0 && r.basis !== "nearest" && r.basis !== "latest" && r.basis !== "none")
         lastPrice.set(r.ev.market, { usd: r.price, day: Math.floor(r.ev.ts / DAY_S), r });
     }
     const ts = replayed[j].ev.ts;
@@ -941,11 +947,15 @@ export function dolomiteEventStates(
         };
         b.amount += a;
         b.before += b0;
-        if (b.price == null) b.price = p;
+        if (b.price == null && pr) {
+          b.price = pr.usd;
+          b.block = pr.block;
+          b.priceNote = pr.note;
+        }
         bySym[s].set(c.symbol, b);
         const addTo = (into: Record<FlowSide, number | null>, v: number) => {
           if (v <= DUST) return;
-          into[s] = p == null || into[s] == null ? null : (into[s] as number) + v * p;
+          into[s] = p == null || into[s] == null ? null : centsOf((into[s] as number) + shownUsd(v, p));
         };
         addTo(usd, a);
         addTo(usdBefore, b0);
@@ -965,7 +975,15 @@ export function dolomiteEventStates(
 
 /** How the rows with a flow were priced. */
 export function dolomitePricing(rp: DolomiteFlowReplay): Record<DolomitePriceBasis, number> {
-  const out: Record<DolomitePriceBasis, number> = { block: 0, day: 0, live: 0, carried: 0, nearest: 0, none: 0 };
+  const out: Record<DolomitePriceBasis, number> = {
+    block: 0,
+    day: 0,
+    live: 0,
+    carried: 0,
+    nearest: 0,
+    latest: 0,
+    none: 0,
+  };
   for (const r of rp.replayed) {
     if (!r.legs.some((l) => !ACCRUAL_KEYS.has(l.bucket))) continue;
     out[r.basis]++;

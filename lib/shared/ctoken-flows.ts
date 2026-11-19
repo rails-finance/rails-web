@@ -52,7 +52,7 @@ import type {
 } from "@/lib/shared/flows-timeline";
 import { daysFromEvents, flowLeg } from "@/lib/shared/flows-timeline";
 import { indexAt, type IndexKnot } from "@/lib/shared/ctoken-index";
-import { shownUsd } from "@/lib/shared/shown-usd";
+import { priceText, shownUsd } from "@/lib/shared/shown-usd";
 
 /** A row valued at another row's price, both blocks named. */
 const nearestPriceNote = (priceBlock: number, rowBlock: number): string =>
@@ -179,6 +179,9 @@ export interface CTokenFlowRow {
   amount: number | null;
   /** USD per underlying token at the row's block, where it was read. */
   price: number | null;
+  /** In Compound V2's ETH years, the two factors the price is composed from:
+   *  the market's price in ETH and USDC's, at the row's block. */
+  ethFactor?: { eth: number; usdcEth: number };
   /** Whether the account's owner made the transaction (false: a liquidator,
    *  the sender of a transfer). Default true. */
   byOwner?: boolean;
@@ -421,6 +424,12 @@ export function ctokenFlowReplay(rows: CTokenFlowRow[], o: CTokenFlowOptions): C
   };
 }
 
+/** A price in Compound's ETH years: the market's price in ETH ÷ USDC's,
+ *  both from the Comptroller's oracle, each as shown. */
+function ethYearsNote(symbol: string, f: { eth: number; usdcEth: number }): string {
+  return `${priceText(f.eth).slice(1)} ETH (the oracle's getUnderlyingPrice for ${symbol}, in ETH) ÷ ${priceText(f.usdcEth).slice(1)} ETH (its price for USDC): the oracle priced in ETH before block 10,678,764`;
+}
+
 /** The basis a leg at the latest read's price stands on, and the family's. */
 const CTOKEN_TODAY_BASIS = "the latest read's price";
 const CTOKEN_BLOCK_BASIS = "each block's price";
@@ -432,11 +441,16 @@ const CTOKEN_BLOCK_BASIS = "each block's price";
 function ctokenLeg(brand: string, r: CTokenReplayed, l: { bucket: string; amount: number }): FlowLeg {
   const oracle = `${brand}'s Comptroller oracle, getUnderlyingPrice for the ${r.ev.symbol} market`;
   const at = (b: number) => b.toLocaleString("en-US");
-  const priceNote = r.ownPrice
-    ? `${oracle} at block ${at(r.ev.block)}`
-    : r.priceBlock != null
-      ? `${oracle}, ${nearestPriceNote(r.priceBlock, r.ev.block)}`
-      : `${oracle}, price at the latest read, which names no block; this row is at block ${at(r.ev.block)}`;
+  const composed = r.ownPrice && r.ev.ethFactor ? ethYearsNote(r.ev.symbol, r.ev.ethFactor) : null;
+  const priceNote = !(r.price > 0)
+    ? `no price: the oracle answered none for the ${r.ev.symbol} market at block ${at(r.ev.block)} or near it`
+    : composed
+      ? `${composed} at block ${at(r.ev.block)}`
+      : r.ownPrice
+        ? `${oracle} at block ${at(r.ev.block)}`
+        : r.priceBlock != null
+          ? `${oracle}, ${nearestPriceNote(r.priceBlock, r.ev.block)}`
+          : `${oracle}, price at the latest read, which names no block; this row is at block ${at(r.ev.block)}`;
   return flowLeg({
     bucket: l.bucket,
     amount: l.amount,
@@ -713,11 +727,16 @@ export function ctokenEventStates(
   // Per market: the balance each side recorded last, its index then, and the
   // latest price read (and its day).
   const rec = new Map<string, { symbol: string; s: number; sIdx: number | null; d: number; dIdx: number }>();
-  const lastPrice = new Map<string, { usd: number; day: number; block: number }>();
-  const firstPrice = new Map<string, { usd: number; block: number | null }>();
+  type Read = { usd: number; block: number | null; factor?: { eth: number; usdcEth: number } };
+  const lastPrice = new Map<string, Read & { day: number }>();
+  const firstPrice = new Map<string, Read>();
   for (const r of replayed)
     if (r.price > 0 && !firstPrice.has(r.ev.market))
-      firstPrice.set(r.ev.market, { usd: r.price, block: r.ownPrice ? r.ev.block : r.priceBlock });
+      firstPrice.set(r.ev.market, {
+        usd: r.price,
+        block: r.ownPrice ? r.ev.block : r.priceBlock,
+        ...(r.ownPrice && r.ev.ethFactor ? { factor: r.ev.ethFactor } : {}),
+      });
   // A market the transaction left alone takes the newer of its latest row's
   // price and the daily store's for the event's day, as the bars do that day.
   const storeAt = (m: string, day: number): { usd: number; day: number } | null => {
@@ -756,8 +775,8 @@ export function ctokenEventStates(
         block: from.block,
         note:
           from.block === at
-            ? `${oracle(sym)} at block ${n(at)}`
-            : `${oracle(sym)}, ${from.block != null ? `price at block ${n(from.block)}` : "a price whose block the read does not name"}, the nearest read on this market; this event is at block ${n(at)}`,
+            ? `${from.factor ? ethYearsNote(sym, from.factor) : oracle(sym)} at block ${n(at)}`
+            : `${from.factor ? ethYearsNote(sym, from.factor) : oracle(sym)}, ${from.block != null ? `price at block ${n(from.block)}` : "a price whose block the read does not name"}, the nearest read on this market; this event is at block ${n(at)}`,
       };
     const today = o.live?.[m]?.price ?? o.todayPrices?.[m] ?? null;
     return today != null
@@ -799,7 +818,12 @@ export function ctokenEventStates(
       }
       rec.set(r.ev.market, cur);
       if (r.ownPrice && r.price > 0)
-        lastPrice.set(r.ev.market, { usd: r.price, day: Math.floor(r.ev.ts / DAY_S), block: r.ev.block });
+        lastPrice.set(r.ev.market, {
+          usd: r.price,
+          day: Math.floor(r.ev.ts / DAY_S),
+          block: r.ev.block,
+          ...(r.ev.ethFactor ? { factor: r.ev.ethFactor } : {}),
+        });
     }
     const ts = replayed[j].ev.ts;
     const day = Math.floor(ts / DAY_S);
@@ -828,7 +852,11 @@ export function ctokenEventStates(
         };
         b.amount += Math.max(0, after);
         b.before += Math.max(0, prior);
-        if (b.price == null) b.price = p;
+        if (b.price == null && pr) {
+          b.price = pr.usd;
+          b.block = pr.block;
+          b.priceNote = pr.note;
+        }
         bySym[side].set(c.symbol, b);
         const add = (into: Record<FlowSide, number | null>, v: number) => {
           if (v <= DUST) return;

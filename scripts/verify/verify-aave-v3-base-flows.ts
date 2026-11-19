@@ -46,6 +46,7 @@
 //
 //   npx tsx --test scripts/verify/verify-aave-v3-base-flows.ts
 import { test } from "node:test";
+import { centsOfLines } from "./lib/cents-lines";
 import { NO_FIGURE } from "@/lib/shared/flows-sum";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -287,7 +288,7 @@ for (const name of NAMES) {
           );
         } else if (r.total.cents != null)
           assert.equal(
-            Math.round(r.lines.reduce((a, l) => a + (l.cents ?? 0), 0) * 100) || 0,
+            centsOfLines(r.lines, "aave-v3-base"),
             Math.round(r.total.cents * 100) || 0,
             `${name} ${side} at stop ${stop}: lines add in cents`,
           );

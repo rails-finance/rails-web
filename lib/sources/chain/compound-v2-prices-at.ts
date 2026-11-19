@@ -90,6 +90,8 @@ export async function compoundV2PricesAt(pairs: string[]): Promise<Record<string
         cache.set(key, usd);
         if (usd != null) out[key] = usd;
       }
+      // An ETH-year price's two factors ride beside it (ui-jobs 743).
+      for (const [k, v] of usdByMarket) if (k.includes("#")) out[`${block}:${k}`] = v;
     }),
   );
   return out;

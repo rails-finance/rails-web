@@ -42,7 +42,9 @@
 //
 //   npx tsx --test scripts/verify/verify-compound-v2-flows.ts
 import { test } from "node:test";
-import { shownUsd } from "@/lib/shared/shown-usd";
+import { COMPOUND_V2_USD_ORACLE_BLOCK } from "@/lib/compound-v2/at-block-prices";
+import { centsOfLines } from "./lib/cents-lines";
+import { shownComposedPrice, shownUsd } from "@/lib/shared/shown-usd";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -99,8 +101,21 @@ const DAY = 86_400;
 const NAMES = ALL.map((f) => f.name);
 
 function rows(f: Fixture) {
-  const prices = new Map([...compoundV2RowPrices(f.events), ...Object.entries(f.prices)]);
+  const prices = new Map([...compoundV2RowPrices(f.events), ...archivePrices(f)]);
   return compoundV2FlowRows(f.events, prices);
+}
+/** The archive route's answer per pair. The fixture recorded it before an
+ *  ETH-year price was composed from its two factors as shown (ui-jobs 743);
+ *  the route now answers what the stored raw reads give through the same
+ *  composition, the factors beside it, so the ETH-year pairs take that,
+ *  checked against the recording to the composition's rounding. */
+function archivePrices(f: Fixture): Map<string, number> {
+  const stored = STORED.v2[f.name] ? storedV2Prices(STORED.v2[f.name]) : null;
+  const out = new Map(Object.entries(f.prices));
+  if (!stored) return out;
+  for (const [k, v] of stored)
+    if (Number(k.split(":")[0]) < COMPOUND_V2_USD_ORACLE_BLOCK && (out.has(k) || k.includes("#"))) out.set(k, v);
+  return out;
 }
 function live(f: Fixture): Record<string, CTokenLiveMarket> {
   const out: Record<string, CTokenLiveMarket> = {};
@@ -251,7 +266,7 @@ for (const name of NAMES) {
         // to the cent, each face its cents to the dollar.
         if (r.total.cents != null)
           assert.equal(
-            Math.round(r.lines.reduce((a, l) => a + (l.cents ?? 0), 0) * 100) || 0,
+            centsOfLines(r.lines, "compound-v2"),
             Math.round(r.total.cents * 100) || 0,
             `${name} ${side} at stop ${stop}: lines add in cents`,
           );
@@ -407,15 +422,24 @@ for (const name of NAMES) {
     assert.ok(stored, `${name}: stored answer`);
     assert.deepEqual(stored.missing, [], `${name}: every pair stored`);
     const usd = storedV2Prices(stored);
-    for (const [pair, archive] of Object.entries(f.prices)) assert.equal(usd.get(pair), archive, `${name} ${pair}`);
+    for (const [pair, archive] of Object.entries(f.prices)) {
+      const got = usd.get(pair) as number;
+      // An ETH-year price is composed from its two factors as shown. The
+      // tolerance covers only the 6 dp and 6-significant-figure rounding of
+      // those factors, against a recording made from their unrounded quotient.
+      if (Number(pair.split(":")[0]) < COMPOUND_V2_USD_ORACLE_BLOCK)
+        assert.ok(Math.abs(got - archive) <= 1e-5 * archive, `${name} ${pair}: ${got} vs ${archive}`);
+      else assert.equal(got, archive, `${name} ${pair}`);
+    }
   });
 
   test(`${name}: a panel read from the stored prices, the rest from the archive, is the archive panel`, () => {
     const f = fx(name);
-    const pairs = Object.keys(f.prices).sort();
+    const archive = archivePrices(f);
+    const pairs = [...archive.keys()].sort();
     const stored = storedV2Prices(STORED.v2[name]);
     // Every other pair as if not stored yet: those come from the archive.
-    const mixed = new Map(pairs.map((p, i) => [p, i % 2 === 1 ? f.prices[p] : stored.get(p)!] as [string, number]));
+    const mixed = new Map(pairs.map((p, i) => [p, i % 2 === 1 ? archive.get(p)! : stored.get(p)!] as [string, number]));
     const fromStore = ctokenFlowTimeline(
       compoundV2FlowRows(f.events, new Map([...compoundV2RowPrices(f.events), ...mixed])),
       opts(f),
@@ -512,3 +536,27 @@ for (const name of NAMES) {
     assert.ok(legs > 0);
   });
 }
+
+// An ETH-year row (before block 10,678,764) is priced at the market's ETH
+// price ÷ USDC's, both as shown, the two named on its leg (ui-jobs 743).
+test("eth-era-liquidated: an ETH-year leg names both factors and is their composed price", () => {
+  const f = fx("eth-era-liquidated");
+  const rp = ctokenFlowReplay(rows(f), opts(f));
+  let seen = 0;
+  for (const r of rp.replayed) {
+    if (!r.ownPrice || !r.ev.ethFactor) continue;
+    seen++;
+    assert.ok(r.ev.block < COMPOUND_V2_USD_ORACLE_BLOCK);
+    assert.equal(r.price, shownComposedPrice(r.ev.ethFactor.eth, r.ev.ethFactor.usdcEth, "÷"), r.ev.id);
+  }
+  assert.ok(seen > 0, "some 2019–2020 rows priced at their block");
+  const legs = ctokenFocusEvents(rp)
+    .flatMap((e) => e.legs)
+    .filter((l) => /÷/.test(l.priceNote ?? ""));
+  assert.ok(legs.length > 0);
+  for (const l of legs)
+    assert.match(
+      l.priceNote!,
+      /ETH \(the oracle's getUnderlyingPrice for .+, in ETH\) ÷ [\d.,]+ ETH \(its price for USDC\)/,
+    );
+});

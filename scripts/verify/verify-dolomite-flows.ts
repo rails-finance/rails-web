@@ -37,6 +37,7 @@
 //
 //   npx tsx --test scripts/verify/verify-dolomite-flows.ts
 import { test } from "node:test";
+import { centsOfLines } from "./lib/cents-lines";
 import { shownUsd } from "@/lib/shared/shown-usd";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -272,7 +273,7 @@ for (const name of NAMES) {
         // to the cent, each face its cents to the dollar.
         if (r.total.cents != null)
           assert.equal(
-            Math.round(r.lines.reduce((a, l) => a + (l.cents ?? 0), 0) * 100) || 0,
+            centsOfLines(r.lines, "dolomite"),
             Math.round(r.total.cents * 100) || 0,
             `${name} ${side} at stop ${stop}: lines add in cents`,
           );
@@ -469,9 +470,17 @@ test("a row the route prices at its block (oracle_price) is valued there, the st
   // The panel still adds up at every stop.
   const t = dolomiteFlowTimeline(r, opts(f))!;
   const m = buildFlowModel(t)!;
-  // A row at the day's close names it on its flows; a row at its block does not.
+  // A row at the day's close is the decided basis (ui-jobs 743): it is not
+  // marked, and its legs name the day's close beside the event's block.
   const fe = t.days.flatMap((d) => d.unsure ?? []);
-  assert.ok(fe.some((u) => /priced at the day's close: the price at this block is not stored yet/.test(u.why)));
+  assert.ok(!fe.some((u) => /day's close/.test(u.why)), "a day-close row is not marked");
+  const dayLegs = dolomiteFocusEvents(rp).flatMap((e) => e.legs.filter((l) => /the close of /.test(l.priceNote ?? "")));
+  assert.ok(dayLegs.length > 0, "some rows at the day's close");
+  for (const l of dayLegs)
+    assert.match(
+      l.priceNote!,
+      /the close of .+ in the daily store, a block its route does not state; this event is at block [\d,]+$/,
+    );
   const blockOnly = dolomiteFlowTimeline(
     dolomiteFlowRows(
       evs.map((e) => {
@@ -500,7 +509,7 @@ test("a row the route prices at its block (oracle_price) is valued there, the st
       // In cents where the legs carry their parts (ui-jobs 743).
       if (s.total.cents != null)
         assert.equal(
-          Math.round(s.lines.reduce((a, l) => a + (l.cents ?? 0), 0) * 100) || 0,
+          centsOfLines(s.lines, "dolomite"),
           Math.round(s.total.cents * 100) || 0,
           `stop ${stop} ${side}: lines add in cents`,
         );
@@ -535,3 +544,34 @@ for (const name of NAMES) {
     assert.ok(legs > 0);
   });
 }
+
+// A past row with no stored price near it takes the latest read's price: on
+// another basis, under "Not complete:", and out of the daily series (ui-jobs 743).
+test("a past row at the latest read's price is not complete and stays out of the series", () => {
+  const f = fx("open-liquidated");
+  const o = { ...opts(f), dailyPrices: {} };
+  const bare = dolomiteFlowRows(
+    eventsOf(f).map(
+      (e) => ({ ...e, context: { ...e.context, data: { ...dataOf(e), oraclePrice: undefined } } }) as BaseActivityEvent,
+    ),
+    f.owner,
+  )!;
+  const live = Object.fromEntries(
+    [...new Set(bare.map((r) => r.market))].map((m) => [
+      m,
+      { price: 1234.5, balance: 0, supplyIndex: null, borrowIndex: null, supplyApr: null, borrowApr: null },
+    ]),
+  );
+  const rp = dolomiteFlowReplay(bare, { ...o, live } as typeof o);
+  const latest = rp.replayed.filter((r) => r.basis === "latest");
+  assert.ok(latest.length > 0, "some past rows at the latest read");
+  const t = dolomiteFlowTimeline(bare, { ...o, live } as typeof o)!;
+  assert.ok(
+    t.days.flatMap((d) => d.unsure ?? []).some((u) => /latest read's price/.test(u.why)),
+    "under Not complete",
+  );
+  for (const l of dolomiteFocusEvents(rp)
+    .flatMap((e) => e.legs)
+    .filter((l) => l.basis))
+    assert.equal(l.basis, "the latest read's price");
+});

@@ -36,8 +36,10 @@ export const shownEth = (amount: number, price: number): number =>
   roundAway(scaled(shownAmount(amount) * shownPrice(price), 1e6)) / 1e6;
 /** A price composed of two as shown (a collateral's price in the loan token
  *  × the loan token's dollar price), itself as shown: its row multiplies out
- *  from the two factors it prints. */
-export const shownComposedPrice = (a: number, b: number): number => shownPrice(shownPrice(a) * shownPrice(b));
+ *  from the two factors it prints. `"÷"` divides instead (Compound V2's ETH
+ *  years: a market's price in ETH ÷ USDC's price in ETH). */
+export const shownComposedPrice = (a: number, b: number, op: "×" | "÷" = "×"): number =>
+  shownPrice(op === "÷" ? shownPrice(a) / shownPrice(b) : shownPrice(a) * shownPrice(b));
 
 /** An amount as a receipt row prints it. */
 export const amountText = (v: number) => shownAmount(v).toLocaleString("en-US", { maximumFractionDigits: 6 });

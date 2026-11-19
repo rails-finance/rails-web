@@ -45,6 +45,7 @@
 //
 //   npx tsx --test scripts/verify/verify-compound-v3-flows.ts
 import { test } from "node:test";
+import { centsOfLines } from "./lib/cents-lines";
 import { centsOf, shownUsd } from "@/lib/shared/shown-usd";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -295,7 +296,7 @@ for (const name of NAMES) {
         // In cents where the legs carry their parts (ui-jobs 743).
         if (r.total.cents != null && !r.lines.some((l) => l.cents == null))
           assert.equal(
-            Math.round(r.lines.reduce((a, l) => a + (l.cents ?? 0), 0) * 100) || 0,
+            centsOfLines(r.lines, "compound-v3"),
             Math.round(r.total.cents * 100) || 0,
             `${name} ${side} at stop ${stop}: lines add in cents`,
           );
@@ -336,7 +337,7 @@ for (const name of NAMES) {
         // In cents where the legs carry their parts: the lines add to the cent.
         if (usd.total.cents != null)
           assert.equal(
-            Math.round(usd.lines.reduce((a, l) => a + (l.cents ?? 0), 0) * 100) || 0,
+            centsOfLines(usd.lines, "compound-v3"),
             Math.round(usd.total.cents * 100) || 0,
             `${name} ${fe.id} ${side}: lines add in cents`,
           );

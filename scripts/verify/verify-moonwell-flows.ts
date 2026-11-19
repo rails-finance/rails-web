@@ -36,6 +36,7 @@
 //
 //   npx tsx --test scripts/verify/verify-moonwell-flows.ts
 import { test } from "node:test";
+import { centsOfLines } from "./lib/cents-lines";
 import { shownUsd } from "@/lib/shared/shown-usd";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -272,7 +273,7 @@ for (const name of NAMES) {
         // to the cent, each face its cents to the dollar.
         if (r.total.cents != null)
           assert.equal(
-            Math.round(r.lines.reduce((a, l) => a + (l.cents ?? 0), 0) * 100) || 0,
+            centsOfLines(r.lines, "moonwell"),
             Math.round(r.total.cents * 100) || 0,
             `${name} ${side} at stop ${stop}: lines add in cents`,
           );
