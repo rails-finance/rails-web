@@ -8,7 +8,7 @@
 
 import { Fuel } from "lucide-react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { PriceBasisPress, ThenTodayChip } from "@/components/shared/price-basis";
+import { PriceBasisPress, ThenTodayChip, todayChipTitle, useTodayBasisPrices } from "@/components/shared/price-basis";
 import { PriceChipShell } from "@/components/shared/state-transition";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { usePreferences } from "@/lib/shared/preferences-context";
@@ -220,6 +220,7 @@ export function EventGasButton({ gas }: { gas: EventGas }) {
 
 /** The row, and the outcome's line under it. */
 export function EventPriceRow({ price }: { price: EventCardPrice }) {
+  const todayOf = useTodayBasisPrices();
   if (!hasPriceRow(price)) return null;
   const { gas, prices, outcome } = price;
   const claimable = outcome?.claimable;
@@ -229,6 +230,8 @@ export function EventPriceRow({ price }: { price: EventCardPrice }) {
     const icon = <TokenChipIcon symbol={p.symbol} address={p.address} size={14} />;
     const format = p.unit?.format ?? p.format ?? usdWhole;
     const text = p.display ?? format(p.usd);
+    // A flipped chip's tip and note say the latest block.
+    const flipped = p.unit == null && todayOf(p.symbol) != null;
     const chip = (
       <ThenTodayChip
         symbol={p.symbol}
@@ -258,12 +261,12 @@ export function EventPriceRow({ price }: { price: EventCardPrice }) {
       />
     );
     return (
-      <PriceChipShell key={p.symbol} bare title={p.title} figure={p.figure}>
+      <PriceChipShell key={p.symbol} bare title={flipped ? todayChipTitle(p.symbol) : p.title} figure={p.figure}>
         {p.named ? (
           <span className="inline-flex items-center gap-1 font-normal tabular-nums text-rb-500">
             {icon}
             {p.symbol} {chip}
-            <span className="text-rb-400">· {p.named.note}</span>
+            <span className="text-rb-400">· {flipped ? "latest block" : p.named.note}</span>
           </span>
         ) : (
           chip

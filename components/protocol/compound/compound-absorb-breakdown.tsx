@@ -89,6 +89,7 @@ export function CompoundAbsorbBreakdown({
   marketKey,
   timestamp,
   previous,
+  footnote = true,
 }: {
   ctx: CompoundContext;
   coords: CompoundCoords;
@@ -96,6 +97,9 @@ export function CompoundAbsorbBreakdown({
   /** The absorb's time, unix seconds. */
   timestamp?: number;
   previous?: CompoundPreviousRow;
+  /** False where the card's price row carries the chips: one then/today
+   *  clock per card. */
+  footnote?: boolean;
 }) {
   const split = compoundAbsorbSplit(ctx);
   const legs = (ctx.absorbedCollateral ?? []).filter((l) => Number.isFinite(Number(l.usdValue)));
@@ -398,7 +402,7 @@ export function CompoundAbsorbBreakdown({
           ) : null}
         </p>
       )}
-      <AtBlockPriceFootnote pills={pills} format={absorbPrice} />
+      {footnote && <AtBlockPriceFootnote pills={pills} format={absorbPrice} />}
     </div>
   );
 }

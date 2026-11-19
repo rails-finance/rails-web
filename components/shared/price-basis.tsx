@@ -1,34 +1,50 @@
 "use client";
 
 // Then / today on the event card (rails-ops standards/detail-page-anatomy.md,
-// "USD values on the timeline"; anatomy T2; ui-jobs 283, 309, 761). T2's price
-// chips stand at the event's prices by default; a press on the clock icon
-// before them (PriceBasisPress) moves the chips and the card's USD figures
-// (its cells, the opened ledger's USD column, the closed cell's tooltip) to
-// the latest block's price. The
-// choice is the card's, held in its state and never stored.
+// "USD values on the timeline"; anatomy T2; ui-jobs 283, 309, 761). T2's
+// price chips stand at the event's prices by default; a press on the clock
+// icon before them (PriceBasisPress) moves the chips and the card's USD
+// figures (its cells, the opened ledger's USD column, the closed cell's
+// tooltip) to the latest block's price. The choice is the card's, held in
+// its state and never stored.
 //
-// Today's prices are the page's Prices chip (components/shared/latest-prices.tsx):
-// DetailTopRow publishes the assets it hands that chip, by symbol, and the
-// cards read them here, so the two never disagree.
+// Today's prices are the assets DetailTopRow hands the page's Prices chip
+// (components/shared/latest-prices.tsx), published by symbol with each one's
+// receipt; the cards read them here, so the two never disagree.
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
+import {
+  anyFlips,
+  pressState,
+  todayChipProv,
+  todayChipTitle,
+  type Flippable,
+  type PriceBasis,
+} from "@/lib/shared/price-basis-words";
 import { CTRL_GHOST, CTRL_OFF } from "@/lib/shared/ui-grammar";
+
+export { todayChipTitle, type Flippable, type PriceBasis };
 
 /** The latest block's prices in the live green (the price chart's figure at
  *  today, F19.2), on the press and on each chip it flipped. */
 const TODAY_TONE = "text-green-600 dark:text-green-400";
 
-export type PriceBasis = "event" | "today";
+/** A price at the latest block and the receipt of the read behind it. */
+interface TodayPrice {
+  price: number;
+  info?: Provenance;
+}
 
-type TodayPrices = Record<string, number>;
+type TodayPrices = Record<string, TodayPrice>;
 
 const TodayPricesContext = createContext<{ prices: TodayPrices; set: (p: TodayPrices) => void } | null>(null);
 
 const sameRecord = (a: TodayPrices, b: TodayPrices) => {
   const ka = Object.keys(a);
-  return ka.length === Object.keys(b).length && ka.every((k) => a[k] === b[k]);
+  return (
+    ka.length === Object.keys(b).length && ka.every((k) => a[k]?.price === b[k]?.price && a[k]?.info === b[k]?.info)
+  );
 };
 
 /** Holds the page's prices at the latest block, by lower-cased symbol. */
@@ -39,21 +55,21 @@ export function TodayPricesProvider({ children }: { children: ReactNode }) {
   return <TodayPricesContext.Provider value={value}>{children}</TodayPricesContext.Provider>;
 }
 
-/** DetailTopRow's half: the assets its Prices chip states. An asset quoted in
- *  another unit (`unit`) or with no price is left out. */
-export function usePublishTodayPrices(assets: { symbol: string; price?: number; unit?: string }[]) {
+/** DetailTopRow's half: the assets its Prices chip states, each with its
+ *  receipt. An asset quoted in another unit (`unit`) or with no price is left
+ *  out. */
+export function usePublishTodayPrices(assets: { symbol: string; price?: number; unit?: string; info?: Provenance }[]) {
   const set = useContext(TodayPricesContext)?.set;
-  const key = assets
-    .filter((a) => !a.unit && typeof a.price === "number" && a.price > 0)
-    .map((a) => `${a.symbol.toLowerCase()}=${a.price}`)
-    .join("|");
+  const priced = assets.filter((a) => !a.unit && typeof a.price === "number" && a.price > 0);
+  // The receipts change with their reads, which change the prices or the
+  // summaries the key carries.
+  const key = priced.map((a) => `${a.symbol.toLowerCase()}=${a.price}=${a.info?.summary ?? ""}`).join("|");
+  const latest = useRef(priced);
+  latest.current = priced;
   useEffect(() => {
     if (!set) return;
     const record: TodayPrices = {};
-    for (const part of key ? key.split("|") : []) {
-      const at = part.lastIndexOf("=");
-      record[part.slice(0, at)] = Number(part.slice(at + 1));
-    }
+    for (const a of latest.current) record[a.symbol.toLowerCase()] = { price: a.price!, info: a.info };
     set(record);
     return () => set({});
   }, [key, set]);
@@ -63,7 +79,12 @@ export function usePublishTodayPrices(assets: { symbol: string; price?: number; 
 export function useTodayPrice(symbol: string | null | undefined): number | null {
   const prices = useContext(TodayPricesContext)?.prices;
   if (!symbol || !prices) return null;
-  return prices[symbol.toLowerCase()] ?? null;
+  return prices[symbol.toLowerCase()]?.price ?? null;
+}
+
+/** The same with the read's receipt. */
+function useTodayPriceRead(symbol: string): TodayPrice | null {
+  return useContext(TodayPricesContext)?.prices[symbol.toLowerCase()] ?? null;
 }
 
 const BasisContext = createContext<{ basis: PriceBasis; setBasis: (b: PriceBasis) => void } | null>(null);
@@ -91,7 +112,7 @@ export function useTodayBasisPrice(symbol: string | null | undefined): number | 
 export function useTodayBasisPrices(): (symbol: string | null | undefined) => number | null {
   const basis = usePriceBasis();
   const prices = useContext(TodayPricesContext)?.prices;
-  return (symbol) => (basis === "today" && symbol && prices ? (prices[symbol.toLowerCase()] ?? null) : null);
+  return (symbol) => (basis === "today" && symbol && prices ? (prices[symbol.toLowerCase()]?.price ?? null) : null);
 }
 
 /** The words for a figure at today's price, in a sentence. */
@@ -106,18 +127,9 @@ export function todayUsdProv(what: string, symbol: string): Provenance {
   };
 }
 
-/** A chip's flip, as `PriceBasisPress` takes it: the symbol, and whether its
- *  figure is in another unit than the page's Prices chip. */
-export interface Flippable {
-  symbol: string;
-  noToday?: boolean;
-}
-
-/** Whether any of a row's chips can stand at the latest block's price. */
 function useAnyFlips(chips: Flippable[]): boolean {
   const prices = useContext(TodayPricesContext)?.prices;
-  const ctx = useContext(BasisContext);
-  return !!ctx && !!prices && chips.some((c) => !c.noToday && prices[c.symbol.toLowerCase()] != null);
+  return !!useContext(BasisContext) && anyFlips(chips, prices);
 }
 
 const CLOCK_PATHS = {
@@ -152,22 +164,21 @@ function ClockIcon({ basis, size }: { basis: PriceBasis; size: number }) {
 /** The row's then/today press: one clock icon before its price chips (Miles,
  *  19 Nov 2026; ui-jobs 761). Rotate-ccw-clock, muted, at the event's
  *  prices, the default; clock-check, in the live green, at the latest
- *  block's. A press flips every chip on
- *  the card; none is drawn where no chip can flip. */
+ *  block's. A press flips every chip on the card; none is drawn where no
+ *  chip can flip. A card draws one: where its price row carries the chips,
+ *  the forensics footnote states none. */
 export function PriceBasisPress({ chips }: { chips: Flippable[] }) {
   const ctx = useContext(BasisContext);
   const flips = useAnyFlips(chips);
   if (!ctx || !flips) return null;
   const isToday = ctx.basis === "today";
-  const label = isToday
-    ? "Prices at the latest block. Press for the prices at this event."
-    : "Prices at this event. Press for the prices at the latest block.";
+  const { label, pressed } = pressState(ctx.basis);
   return (
     <button
       type="button"
       title={label}
       aria-label={label}
-      aria-pressed={isToday}
+      aria-pressed={pressed}
       onClick={(e) => {
         e.stopPropagation();
         ctx.setBasis(isToday ? "event" : "today");
@@ -203,25 +214,23 @@ export function ThenTodayChip({
   icon?: ReactNode;
 }) {
   const ctx = useContext(BasisContext);
-  const today = useTodayPrice(symbol);
+  const today = useTodayPriceRead(symbol);
   if (!ctx || today == null || noToday) return <>{then}</>;
   const isToday = ctx.basis === "today";
   return (
     <span
       className={`inline-flex min-h-6 items-center gap-1${isToday ? ` ${TODAY_TONE}` : ""}`}
+      title={isToday ? todayChipTitle(symbol) : undefined}
       data-then-today=""
       data-price-basis={ctx.basis}
     >
       {isToday ? (
-        <Prov
-          info={{
-            kind: "chain-derived",
-            summary: `${symbol} price today. The oracle's price at the latest block, which the page's Prices chip states.`,
-          }}
-          icon={icon}
-        >
-          {format(today)}
-        </Prov>
+        <>
+          <Prov info={todayChipProv(symbol, today.info)} icon={icon}>
+            {format(today.price)}
+          </Prov>
+          <span className="sr-only">, at the latest block</span>
+        </>
       ) : (
         then
       )}
