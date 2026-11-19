@@ -31,7 +31,8 @@ export type VaultVenue = VaultPositionFamily | "yearn" | "maple";
  *  Yearn's only where the Registry endorses that vault at the block it read
  *  (rails-ops decision 0027 call 1). */
 const venueOf = (family: VaultVenue): string =>
-  VAULT_FAMILIES[family === "yearn" ? "yearn-v3" : family === "maple" ? "maple-pool" : familyOfCensus(family)].venue;
+  VAULT_FAMILIES[family === "yearn" ? "yearn-v3" : family === "maple" ? "maple-pool" : familyOfCensus(family)].venue ??
+  "";
 
 export function VaultVenueMark({ family, className = "" }: { family: VaultVenue; className?: string }) {
   return (

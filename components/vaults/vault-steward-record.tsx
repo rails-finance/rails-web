@@ -98,7 +98,9 @@ const rosterOf = (rosters: StewardRecordRoster[], v: VaultSummary) =>
 
 /** The lead zone's `protocols.ts` id, as the /vaults index draws it. */
 const leadOf = (v: VaultSummary) =>
-  protocolForPathname(vaultIndexRosterHref(vaultIndexProtocol(v), v.chainId))?.id ?? VAULT_FAMILIES[v.family].venue;
+  protocolForPathname(vaultIndexRosterHref(vaultIndexProtocol(v), v.chainId))?.id ??
+  VAULT_FAMILIES[v.family].venue ??
+  "";
 
 export function VaultStewardRecord({
   record,
@@ -437,7 +439,7 @@ function RanBefore({
 }
 
 const morphoLead = (chainId: number) =>
-  protocolForPathname(vaultIndexRosterHref("morpho", chainId))?.id ?? VAULT_FAMILIES.metamorpho.venue;
+  protocolForPathname(vaultIndexRosterHref("morpho", chainId))?.id ?? VAULT_FAMILIES.metamorpho.venue ?? "";
 
 function BeforeRow({
   b,

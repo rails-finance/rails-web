@@ -443,7 +443,7 @@ export function VaultIndexTable({
                   {leadOf && (
                     <DataTableLeadCell
                       plain
-                      protocol={leadOf(v) ?? VAULT_FAMILIES[v.family].venue}
+                      protocol={leadOf(v) ?? VAULT_FAMILIES[v.family].venue ?? ""}
                       protocolName={VAULT_INDEX_PROTOCOL_LABEL[vaultIndexProtocol(v)]}
                       chain={v.chainId as ChainId}
                     />
@@ -468,7 +468,7 @@ export function VaultIndexTable({
                       </span>
                       {leadOf && (
                         <DataTableLeadMark
-                          protocol={leadOf(v) ?? VAULT_FAMILIES[v.family].venue}
+                          protocol={leadOf(v) ?? VAULT_FAMILIES[v.family].venue ?? ""}
                           chain={v.chainId as ChainId}
                         />
                       )}
