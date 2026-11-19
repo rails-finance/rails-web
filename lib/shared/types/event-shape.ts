@@ -240,8 +240,8 @@ export interface TransferDetail {
 }
 
 /** A debt token's market price at an event's block, from a pool it trades in
- *  (rails-server mig 497, api/src/services/debt-token-prices.ts). A fact
- *  beside the $1 face: debt is not re-valued from it. */
+ *  (rails-server mig 497, api/src/services/debt-token-prices.ts). Debt stays
+ *  at its $1 face (ui-jobs 297). */
 export interface DebtTokenPrice {
   /** The token in USD from last_price(0), the pool's last trade, quote at $1. */
   usd: number;

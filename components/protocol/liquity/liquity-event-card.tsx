@@ -11,7 +11,7 @@ import { useLiquityHeadSpec } from "./liquity-head";
 import { liquityT1Caption, liquityT1Words } from "@/lib/liquity/event-prose";
 import { useSurplusClaimFor } from "@/components/protocol/liquity-family/coll-surplus-context";
 import { LiquityRedeemerNote, useLiquityCells } from "./liquity-cells";
-import { boldEventLine, boldEventProv } from "@/lib/liquity-v2/bold-event-price";
+import { boldPriceFigure } from "@/lib/liquity-v2/bold-event-price";
 import { isGroupedExplanation, LiquityEventExplainer, LiquityExplainerTeaser } from "./liquity-event-explainer";
 import { useLiquityEventMarkdown, useLiquityEventProse } from "./event-prose-render";
 import { EventMarkdownContext, EventPageContext } from "@/components/shared/event-page-aside";
@@ -349,10 +349,12 @@ export function LiquityEventCard({
   const l2 = ctx.stateBefore && ctx.stateAfter && prose.L2 && prose.L2.price > 0 ? prose.L2 : null;
   const priceP = l2 ? eventPriceProv(ctx, coords) : undefined;
   const redemption = l2?.redemption;
-  // A redemption states BOLD's market price at its block (ui-jobs 757), the
-  // line the debt's $1-face receipt carries; none where the row has no read.
-  const boldLine = isRedemption && ctx.boldPrice ? boldEventLine(ctx.boldPrice, event.blockNumber) : null;
-  const boldProv = boldLine && ctx.boldPrice ? boldEventProv(ctx.boldPrice, event.blockNumber) : undefined;
+  // BOLD's market price at the block (ui-jobs 757) as a figure on a
+  // redemption, and on a row with no Debt cell to carry it in its receipt.
+  const boldFig = boldPriceFigure(ctx.boldPrice, event.blockNumber, {
+    redemption: isRedemption,
+    debtCell: !!prose.L2?.showGrid,
+  });
   const price: EventCardPrice = {
     gas: prose.footer.gasCost
       ? {
@@ -375,18 +377,7 @@ export function LiquityEventCard({
           },
         ]
       : [],
-    figures: boldLine
-      ? [
-          {
-            key: "bold-price",
-            label: boldLine.lead,
-            text: boldLine.price,
-            unit: boldLine.rest,
-            info: boldProv,
-            value: ctx.boldPrice ? String(ctx.boldPrice.usd) : undefined,
-          },
-        ]
-      : undefined,
+    figures: boldFig ? [boldFig] : undefined,
     outcome: redemption
       ? {
           claimable:
