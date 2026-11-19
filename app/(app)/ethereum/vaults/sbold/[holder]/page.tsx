@@ -11,7 +11,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-import { SboldPageHeader } from "@/components/vaults/sbold-page-header";
+import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { FocusSourceGate } from "@/components/shared/aim-gate";
 import { SboldHoldingCard } from "@/components/vaults/sbold-holding-card";
 import { sectionPositionMetadata } from "@/lib/shared/page-metadata";
@@ -54,10 +54,17 @@ export default async function SboldHoldingRoute({ params }: Props) {
       <div className="min-h-screen">
         <div className="py-8">
           <header className="mb-5" data-skel-section="page-header">
-            <SboldPageHeader />
-            <h2 className="mt-6 text-2xl font-semibold text-foreground" data-vault-page="sbold">
-              <span className="font-mono">{subject}</span>
-              <span className="ml-2 text-base font-normal text-rb-500">in sBOLD</span>
+            {/* The Yearn holder page's head (ui-jobs 765): Back, then the wallet
+              heading with its address menu and bookmark; no explorer session,
+              so the chain is stated and the label links to no listing. */}
+            <DetailTopRow
+              fallbackHref={SBOLD_PAGE_PATH}
+              owner={{ wallet: lookup.address, chain: 1, filterProtocol: null }}
+              tools={false}
+            />
+            <h2 className="text-2xl font-semibold text-foreground" data-vault-page="sbold">
+              {!lookup.address && <span className="font-mono">{subject}</span>}
+              <span className={`${lookup.address ? "" : "ml-2 "}text-base font-normal text-rb-500`}>in sBOLD</span>
             </h2>
             {lookup.kind === "ens" && lookup.address && (
               <p className="mt-1 text-[11px] text-rb-500" data-holder-ens={lookup.typed}>

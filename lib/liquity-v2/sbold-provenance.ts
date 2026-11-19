@@ -113,7 +113,7 @@ const sboldYieldProv_ = (
     kind: "recompute",
     text: `To check: ask any Ethereum archive node${atBlock(c)} for getDepositorYieldGainWithPending(${SBOLD_VAULT}) on each of the three Stability Pools, and add them.`,
   },
-  summary: `BOLD yield pending — the BOLD yield each Stability Pool's getDepositorYieldGainWithPending(sBOLD) answers${atBlock(c)}, the interest not yet minted included, summed over the three pools: ${r.sumRaw} raw BOLD.`,
+  summary: `BOLD yield pending — the BOLD yield each Stability Pool's getDepositorYieldGainWithPending(sBOLD) answers${atBlock(c)}, summed over the three pools: ${r.sumRaw} raw BOLD.`,
   contract: vaultContract,
   via: `${LANE} · Σ StabilityPool.getDepositorYieldGainWithPending(sBOLD) @ the pinned block`,
   formula: "WETH pool + wstETH pool + rETH pool",
@@ -324,10 +324,32 @@ const sboldHolderClaimProv_ = (c: SboldCoords, h: { holder: string; sharesRaw: s
   ...vaultRead(
     c,
     `convertToAssets(${h.sharesRaw})`,
-    `convertToAssets(balance) — the BOLD the vault's convertToAssets answers${atBlock(c)} for the ${h.sharesRaw} share units ${h.holder} holds: ${h.raw} raw BOLD. The vault rounds this conversion down.`,
+    `convertToAssets(balance) — the BOLD the vault's convertToAssets answers${atBlock(c)} for the ${h.sharesRaw} share units ${h.holder} holds: ${h.raw} raw BOLD.`,
   ),
   inputs: [
     { label: `balanceOf(${h.holder})`, value: h.sharesRaw, kind: "chain", pclass: "state", contract: vaultContract },
+  ],
+});
+
+/** The pro-rata less convertToAssets(balance), both at the block (ui-jobs 765). */
+const sboldHolderDiffProv_ = (
+  c: SboldCoords,
+  h: { holder: string; proRataRaw: string; claimRaw: string; diffRaw: string },
+): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  source: { block: c.blockNumber },
+  verify: {
+    kind: "recompute",
+    text: `To check: ask any Ethereum archive node${atBlock(c)} for balanceOf(${h.holder}), totalAssets() and totalSupply() on ${SBOLD_VAULT}, and convertToAssets of that balance; take balance × totalAssets ÷ totalSupply, rounded down to the wei, less the conversion.`,
+  },
+  summary: `Pro-rata less convertToAssets(balance) — balance × totalAssets() ÷ totalSupply() for ${h.holder}${atBlock(c)}, ${h.proRataRaw} raw BOLD rounded down to the wei, less convertToAssets(balance), ${h.claimRaw} raw BOLD: ${h.diffRaw} raw BOLD.`,
+  contract: vaultContract,
+  via: `${LANE} · balanceOf × totalAssets ÷ totalSupply − convertToAssets(balance) @ the pinned block`,
+  formula: "floor(balanceOf × totalAssets ÷ totalSupply) − convertToAssets(balanceOf)",
+  inputs: [
+    { label: "pro-rata (wei)", value: h.proRataRaw, kind: "chain-derived", pclass: "state", step: true },
+    { label: "convertToAssets(balance)", value: h.claimRaw, kind: "chain", pclass: "state", contract: vaultContract },
   ],
 });
 
@@ -372,3 +394,4 @@ export const sboldFragmentsProv = withServerRead(sboldFragmentsProv_);
 export const sboldHolderSharesProv = withServerRead(sboldHolderSharesProv_);
 export const sboldHolderClaimProv = withServerRead(sboldHolderClaimProv_);
 export const sboldHolderProRataProv = withServerRead(sboldHolderProRataProv_);
+export const sboldHolderDiffProv = withServerRead(sboldHolderDiffProv_);
