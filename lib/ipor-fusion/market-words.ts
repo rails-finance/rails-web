@@ -11,6 +11,18 @@ export interface MarketNames {
 }
 
 const ZERO = "0x0000000000000000000000000000000000000000";
+
+/** Chain names for a cross-chain grant. 999 is HyperEVM in IPOR's own chain
+ *  table (IPOR-Labs/fusion-vault-launchpad, contexts/ipor-abi/mainnet-*-fusion.json;
+ *  rails-ops TO-DO-ipor-scoping §2.3). Any other id reads "chain N". */
+const CHAIN_NAMES: Record<number, string> = {
+  1: "Ethereum",
+  10: "Optimism",
+  8453: "Base",
+  42161: "Arbitrum",
+  999: "HyperEVM",
+};
+const chainWords = (id: number) => CHAIN_NAMES[id] ?? `chain ${id}`;
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
 /** A token or contract by the name its `symbol()` answers, else its short address. */
@@ -60,6 +72,10 @@ export function substrateWords(s: Substrate, n: MarketNames): string {
       return `${nameOf(n, s.address)} ${s.selector}`;
     case "setting":
       return `${s.type} ${s.value}`;
+    case "executor":
+      return `executor ${nameOf(n, s.address)}`;
+    case "remote-vault":
+      return `vault ${short(s.address)} on ${chainWords(s.chainId)}`;
     case "raw":
       return short(s.hex);
   }

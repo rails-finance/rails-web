@@ -910,6 +910,18 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
       why: "nobody in a vault holds a loan: there is no threshold to breach and nothing to seize, so there is no liquidation to trace",
     },
   }),
+  "ipor-fusion-arbitrum": explorerDepth({
+    views: true,
+    forensics: {
+      why: "nobody in a vault holds a loan: there is no threshold to breach and nothing to seize, so there is no liquidation to trace",
+    },
+  }),
+  "ipor-fusion-base": explorerDepth({
+    views: true,
+    forensics: {
+      why: "nobody in a vault holds a loan: there is no threshold to breach and nothing to seize, so there is no liquidation to trace",
+    },
+  }),
   yearn: explorerDepth({
     views: true,
     verification: true,
@@ -1763,6 +1775,10 @@ export const VIEW_NOTES: Record<string, string> = {
   "aave-v4-base": "The Equities hub, read live: the Mag7 spoke's eight reserves, sizes, caps and oracle prices.",
   "ipor-fusion":
     "Every vault the IPOR Fusion factory made, with its totals and share price read from the contracts at one block the page names, and a factsheet per vault: fees, supply cap, the roles over it and the fuses it acts through.",
+  "ipor-fusion-arbitrum":
+    "Every vault the IPOR Fusion factory made, with its totals and share price read from the contracts at one block the page names, and a factsheet per vault: fees, supply cap and the fuses it acts through.",
+  "ipor-fusion-base":
+    "Every vault the IPOR Fusion factory made, with its totals and share price read from the contracts at one block the page names, and a factsheet per vault: fees, supply cap and the fuses it acts through.",
   yearn:
     "Every vault the five V3 factories made, endorsed or not, grouped by the token each takes, with its totals, share price and endorsement read from the contracts at one block the page names.",
   "aave-vaults":
@@ -1850,6 +1866,10 @@ export const COVERAGE_NOTES: Record<string, string> = {
     "Each vault position's timeline replays that wallet's whole share-transfer history live from the vault's logs on every request, and checks it wei-exact against the vault's balance before drawing anything: a mismatch means no rows. The roster of holders comes from a daily sweep of every vault's whole history (Aave's enumerators for its vaults, the two MetaMorpho factories for those), proven complete against each vault's total supply; a sweep that can't prove complete isn't published. The page shows the flows and share prices as they happened, with no USD, APY or yield figure.",
   "ipor-fusion":
     "An IPOR Fusion vault takes one token and its curator moves it into other protocols through fuses; nobody in it borrows, so there is no threshold to breach and no liquidation to trace. The roster is every vault the factory made, found from its creation events and censused at a block the page names. It is a floor: a vault deployed by hand or by an earlier factory emits no creation event and appears on no list. Every figure stays in its vault's asset, with no USD. A vault's roles are found in its access manager's grant logs and each holder is confirmed at the page's block; a vault's positions in the protocols Rails covers are those explorers' rows, under the vault's address.",
+  "ipor-fusion-arbitrum":
+    "An IPOR Fusion vault takes one token and its curator moves it into other protocols through fuses; nobody in it borrows, so there is no threshold to breach and no liquidation to trace. The roster is every vault the factory made, found from its creation events and censused at a block the page names. It is a floor: a vault deployed by hand or by an earlier factory emits no creation event and appears on no list. Every figure stays in its vault's asset, with no USD. A vault's roles are found in its access manager's grant logs and each holder is confirmed at the page's block; on Arbitrum and Base roles are not yet read; a vault's positions in the protocols Rails covers are those explorers' rows, under the vault's address.",
+  "ipor-fusion-base":
+    "An IPOR Fusion vault takes one token and its curator moves it into other protocols through fuses; nobody in it borrows, so there is no threshold to breach and no liquidation to trace. The roster is every vault the factory made, found from its creation events and censused at a block the page names. It is a floor: a vault deployed by hand or by an earlier factory emits no creation event and appears on no list. Every figure stays in its vault's asset, with no USD. A vault's roles are found in its access manager's grant logs and each holder is confirmed at the page's block; on Arbitrum and Base roles are not yet read; a vault's positions in the protocols Rails covers are those explorers' rows, under the vault's address.",
   yearn:
     "A Yearn V3 vault takes one token and issues shares against it; nobody in it borrows, so there is no threshold to breach and no liquidation to trace. The roster is every vault the five V3 factories made, found from each factory's creation logs and censused at a block the page names. It is a floor: a vault deployed by hand, without a factory, emits no creation log and appears on no list. At the census block those vaults take 72 different tokens, with no per-asset feed to value them against, so every figure stays in its vault's asset and no two tokens are ever added together. A holder's timeline replays every share transfer the vault emitted about that address, swept from the vault's logs on every request, and checks it wei-exact against the balance the vault reports before drawing anything: a mismatch means no rows. The page shows the flows and share prices as they happened, with no USD, APY or yield figure.",
   "aave-v3-base":

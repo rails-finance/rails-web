@@ -209,7 +209,7 @@ function WalletPillInner({
         {bookmark && <BookmarkToggle wallet={wallet} ensName={name} size={heading ? 14 : 12} />}
       </span>
       {/* The position heading draws it beside the address kind. */}
-      {!heading && <HolderLabelTag wallet={wallet} chainId={chainId} />}
+      {!heading && <HolderLabelTag wallet={wallet} chainId={chainId} inCard />}
     </span>
   );
 }

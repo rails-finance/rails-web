@@ -182,6 +182,8 @@ const LEGACY_EXPLORER_PATHS: [string, string][] = [
   ["/yearn", "/ethereum/yearn"],
   // IPOR Fusion never had one either; Ethereum is its first chain.
   ["/ipor-fusion", "/ethereum/ipor-fusion"],
+  ["/ipor-fusion-arbitrum", "/arbitrum/ipor-fusion"],
+  ["/ipor-fusion-base", "/base/ipor-fusion"],
   // A roster segment moved to `markets` (rails-ops decision 0059 point 8): the
   // market page and its reserve pages, query strings kept (`?market=core`).
   ["/ethereum/aave-v3/market", "/ethereum/aave-v3/markets"],

@@ -1058,6 +1058,8 @@ for (const id of ["pancakeswap-v3-base", "pancakeswap-v3-arbitrum"]) GLYPHS[id] 
 GLYPHS["fluid-base"] = GLYPHS.fluid;
 // Balancer V3's other chains draw its mark.
 GLYPHS["balancer-v3-arbitrum"] = GLYPHS["balancer-v3"];
+GLYPHS["ipor-fusion-arbitrum"] = GLYPHS["ipor-fusion"];
+GLYPHS["ipor-fusion-base"] = GLYPHS["ipor-fusion"];
 
 export function hasProtocolGlyph(id: string): boolean {
   return id in GLYPHS;

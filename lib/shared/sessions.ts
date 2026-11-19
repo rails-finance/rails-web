@@ -100,6 +100,8 @@ export type SessionProtocol =
   // the Yearn shape (rails-ops TO-DO-ipor-scoping §6.3). Its vaults' positions
   // in other protocols show in those protocols' explorers (decision 0014).
   | "ipor-fusion"
+  | "ipor-fusion-arbitrum"
+  | "ipor-fusion-base"
   // Sky Savings, at `/ethereum/sky-savings`: sUSDS holders, a position being a
   // holder address. A roster explorer outside the home headline (rails-ops
   // TO-DO-sky-savings-scoping §6.1, decision 0027 call 2).
