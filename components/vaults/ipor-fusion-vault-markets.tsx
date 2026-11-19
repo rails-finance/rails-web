@@ -47,6 +47,7 @@ const DECODER: Record<MarketKind, string> = {
   "uniswap-v4": "is a Uniswap V4 pool id, or one of its tokens",
   midas: "is a type and an address, as IPOR's MidasSubstrateLib packs them",
   external: "is a type and its payload, as IPOR's ExternalStateSubstrateLib packs them",
+  crosschain: "is an executor, or a vault on another chain, as IPOR's CrosschainSubstrateLib packs them",
   route: "is a token address",
   raw: "is shown as the hex the vault answers, which this page does not decode",
 };
@@ -142,35 +143,34 @@ export function IporFusionMarketsTile({
   for (const r of sorted) {
     const railsHref = railsHrefOf(r, data.chainId, y.address);
     const grants = r.substrates ?? [];
-    // A child-vault market links where exactly one granted child has a Rails
-    // page; otherwise each grant says whether Rails covers it.
-    const childGrants = r.kind === "child" ? grants.filter((g) => g.kind === "address") : [];
-    const childWithPage = childGrants.filter((g) => g.kind === "address" && childPages[g.address]);
-    const childHref =
-      childWithPage.length === 1 && childWithPage[0].kind === "address"
-        ? childPages[childWithPage[0].address]
-        : undefined;
-    const href = isZero(r.balance) ? undefined : ((r.kind === "child" ? childHref : railsHref) ?? undefined);
+    // A child-vault market, and a cross-chain market's remote vaults, link
+    // where exactly one granted vault has a Rails page; otherwise each grant
+    // says whether Rails covers it. A remote vault is keyed by chain and
+    // address (childPagesOf).
+    const pageOf = (g: (typeof grants)[number]) =>
+      g.kind === "address"
+        ? childPages[g.address]
+        : g.kind === "remote-vault"
+          ? childPages[`${g.chainId}:${g.address}`]
+          : undefined;
+    const viaChild = r.kind === "child" || r.kind === "crosschain";
+    const childGrants = grants.filter((g) =>
+      r.kind === "child" ? g.kind === "address" : r.kind === "crosschain" ? g.kind === "remote-vault" : false,
+    );
+    const childWithPage = childGrants.filter((g) => pageOf(g));
+    const childHref = childWithPage.length === 1 ? pageOf(childWithPage[0]) : undefined;
+    const href = isZero(r.balance) ? undefined : ((viaChild ? childHref : railsHref) ?? undefined);
     const covered =
-      r.kind === "held"
-        ? "held"
-        : r.kind === "child"
-          ? childWithPage.length > 0
-            ? "yes"
-            : "no"
-          : railsHref
-            ? "yes"
-            : "no";
+      r.kind === "held" ? "held" : viaChild ? (childWithPage.length > 0 ? "yes" : "no") : railsHref ? "yes" : "no";
     const one = r.kind === "child" && grants.length === 1;
-    const words =
-      r.kind === "child" && grants.length > 1
-        ? grants
-            .map(
-              (g) =>
-                `${substrateWords(g, m)}${g.kind === "address" && !childPages[g.address] ? " (not covered by Rails)" : ""}`,
-            )
-            .join(", ")
-        : substratesLine(grants, m);
+    const perGrant = viaChild && childGrants.length > 1;
+    const words = perGrant
+      ? grants
+          .map(
+            (g) => `${substrateWords(g, m)}${childGrants.includes(g) && !pageOf(g) ? " (not covered by Rails)" : ""}`,
+          )
+          .join(", ")
+      : substratesLine(grants, m);
     drafts.push({
       key: r.id,
       venue: one ? substrateWords(grants[0], m) : r.venue,
@@ -184,7 +184,7 @@ export function IporFusionMarketsTile({
           ) : (
             "grants not read"
           )}
-          {covered === "no" && (r.kind !== "child" || grants.length <= 1) && " · not covered by Rails"}
+          {covered === "no" && !perGrant && " · not covered by Rails"}
         </>
       ),
       amount: r.balance,

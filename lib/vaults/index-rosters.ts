@@ -16,6 +16,8 @@ import {
   maplePoolsHref,
   yearnVaultHref,
   yearnVaultRosterHref,
+  iporFusionVaultHref,
+  iporFusionVaultRosterHref,
 } from "@/lib/vaults/routes";
 import { SBOLD_PAGE_PATH } from "@/lib/liquity-v2/sbold";
 
@@ -26,7 +28,14 @@ import { SBOLD_PAGE_PATH } from "@/lib/liquity-v2/sbold";
  *  chains (rails-ops TO-DO-ipor-scoping §6.3 phase C). */
 export type VaultIndexProtocol = "morpho" | "aave" | "yearn" | "maple" | "sbold" | "ipor-fusion";
 
-export const VAULT_INDEX_PROTOCOLS: readonly VaultIndexProtocol[] = ["morpho", "aave", "yearn", "maple", "sbold"];
+export const VAULT_INDEX_PROTOCOLS: readonly VaultIndexProtocol[] = [
+  "morpho",
+  "aave",
+  "yearn",
+  "maple",
+  "sbold",
+  "ipor-fusion",
+];
 
 export const VAULT_INDEX_PROTOCOL_LABEL: Record<VaultIndexProtocol, string> = {
   morpho: "Morpho",
@@ -46,7 +55,29 @@ export const VAULT_INDEX_ROSTERS: readonly { protocol: VaultIndexProtocol; chain
   { protocol: "yearn", chainId: 1 },
   { protocol: "maple", chainId: 1 },
   { protocol: "sbold", chainId: 1 },
+  { protocol: "ipor-fusion", chainId: 1 },
+  { protocol: "ipor-fusion", chainId: 42161 },
+  { protocol: "ipor-fusion", chainId: 8453 },
 ];
+
+/** Protocols whose rosters join the index only once launched, and never hold
+ *  its own launch back (rails-ops TO-DO-ipor-scoping §6.3 phase C): while a
+ *  roster of one is unlaunched the index neither reads nor lists its rows. */
+const LISTED_ONCE_LAUNCHED: readonly VaultIndexProtocol[] = ["ipor-fusion"];
+
+const gated = (r: { protocol: VaultIndexProtocol }) => LISTED_ONCE_LAUNCHED.includes(r.protocol);
+
+/** The rosters the index reads and lists, given which roster pages are
+ *  launched: every roster of an ungated protocol, and a gated one's where its
+ *  page is launched. */
+export function listedIndexRosters(
+  isLaunched: (rosterHref: string) => boolean,
+): readonly { protocol: VaultIndexProtocol; chainId: ChainId }[] {
+  return VAULT_INDEX_ROSTERS.filter((r) => !gated(r) || isLaunched(vaultIndexRosterHref(r.protocol, r.chainId)));
+}
+
+/** The rosters the index lists today. */
+export const VAULT_INDEX_LISTED = () => listedIndexRosters((href) => !isUnlaunchedPath(href));
 
 /** A roster's key: its protocol and chain. */
 export const vaultIndexRosterKey = (r: { protocol: VaultIndexProtocol; chainId: number }) =>
@@ -115,7 +146,9 @@ export function vaultIndexRosterHref(p: VaultIndexProtocol, chainId: number): st
         ? yearnVaultRosterHref()
         : p === "maple"
           ? maplePoolsHref()
-          : SBOLD_PAGE_PATH;
+          : p === "ipor-fusion"
+            ? (iporFusionVaultRosterHref(chainId) ?? SBOLD_PAGE_PATH)
+            : SBOLD_PAGE_PATH;
 }
 
 /** The vault's page under its protocol (decision 0028 point 8); a Maple
@@ -130,7 +163,9 @@ export function vaultIndexHref(v: VaultSummary): string {
         ? yearnVaultHref(v.address)
         : p === "maple"
           ? maplePoolHref(v.address)
-          : SBOLD_PAGE_PATH;
+          : p === "ipor-fusion"
+            ? (iporFusionVaultHref(v.chainId, v.address) ?? SBOLD_PAGE_PATH)
+            : SBOLD_PAGE_PATH;
 }
 
 /** The positions listing filtered to this vault, where its roster has one. */
@@ -147,5 +182,7 @@ export function vaultIndexHoldersHref(v: VaultSummary): string | null {
  *  roster it reads is: while one is flagged `unlaunched` the index serves at
  *  its URL and the rosters' heads link it, as an unlaunched roster does. */
 export function vaultIndexLaunched(): boolean {
-  return VAULT_INDEX_ROSTERS.every((r) => !isUnlaunchedPath(vaultIndexRosterHref(r.protocol, r.chainId)));
+  return VAULT_INDEX_ROSTERS.filter((r) => !gated(r)).every(
+    (r) => !isUnlaunchedPath(vaultIndexRosterHref(r.protocol, r.chainId)),
+  );
 }

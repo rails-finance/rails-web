@@ -1181,6 +1181,34 @@ const SPECS: ProtocolSpec[] = [
     unlaunched: true,
     subPages: [{ segment: "vaults", label: "Vaults overview", tab: "Vaults" }],
   },
+  {
+    // IPOR Fusion on Arbitrum: the Ethereum entry's shape, its own census (TO-DO-ipor-scoping §6.3 phase C).
+    id: "ipor-fusion-arbitrum",
+    session: "ipor-fusion-arbitrum",
+    label: "IPOR Fusion",
+    chainId: 42161,
+    slug: "ipor-fusion",
+    brand: 286,
+    tags: ["Vaults", "Yield"],
+    desc: "Every vault the IPOR Fusion factory made on Arbitrum, each one's totals, share price, fees and fuses read from chain at one block",
+    positionListing: false,
+    unlaunched: true,
+    subPages: [{ segment: "vaults", label: "Vaults overview", tab: "Vaults" }],
+  },
+  {
+    // IPOR Fusion on Base: the Ethereum entry's shape, its own census (TO-DO-ipor-scoping §6.3 phase C).
+    id: "ipor-fusion-base",
+    session: "ipor-fusion-base",
+    label: "IPOR Fusion",
+    chainId: 8453,
+    slug: "ipor-fusion",
+    brand: 286,
+    tags: ["Vaults", "Yield"],
+    desc: "Every vault the IPOR Fusion factory made on Base, each one's totals, share price, fees and fuses read from chain at one block",
+    positionListing: false,
+    unlaunched: true,
+    subPages: [{ segment: "vaults", label: "Vaults overview", tab: "Vaults" }],
+  },
 ];
 
 // A slug is unique WITHIN a chain, and a collision would make one explorer
@@ -1349,6 +1377,8 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   // way: the explorer draws no position tab and lists no positions.
   yearn: "Holding",
   "ipor-fusion": "Holding",
+  "ipor-fusion-arbitrum": "Holding",
+  "ipor-fusion-base": "Holding",
   seamless: "Position",
   makerdao: "Vault",
   maple: "Position",

@@ -19,6 +19,7 @@ export type MarketKind =
   | "uniswap-v4" // a pool id and its tokens
   | "midas" // MidasSubstrateLib type + address
   | "external" // ExternalStateSubstrateLib type + payload
+  | "crosschain" // CrosschainSubstrateLib type + chain id + address
   | "route" // a market that holds no balance: swappers, flash loans, the zero-balance market
   | "raw"; // a market with no decoder here
 
@@ -39,8 +40,14 @@ const T = (venue: string, kind: MarketKind, covered?: Partial<Record<number, str
 
 /** The ids this page names, from IporFusionMarkets.sol. */
 const MARKETS: Record<string, Omit<MarketInfo, "constant"> & { constant: string }> = {
-  "1": { constant: "AAVE_V3", ...T("Aave V3", "tokens", { 1: "aave-v3" }) },
-  "2": { constant: "COMPOUND_V3_USDC", ...T("Compound V3 USDC", "tokens", { 1: "compound" }) },
+  "1": {
+    constant: "AAVE_V3",
+    ...T("Aave V3", "tokens", { 1: "aave-v3", 42161: "aave-v3-arbitrum", 8453: "aave-v3-base" }),
+  },
+  "2": {
+    constant: "COMPOUND_V3_USDC",
+    ...T("Compound V3 USDC", "tokens", { 1: "compound", 42161: "compound-v3-arbitrum", 8453: "compound-base" }),
+  },
   "3": { constant: "GEARBOX_POOL_V3", ...T("Gearbox V3 pool", "address") },
   "4": { constant: "GEARBOX_FARM_DTOKEN_V3", ...T("Gearbox V3 farm", "address") },
   "5": { constant: "FLUID_INSTADAPP_POOL", ...T("Fluid lending", "address") },
@@ -49,32 +56,50 @@ const MARKETS: Record<string, Omit<MarketInfo, "constant"> & { constant: string 
   "8": { constant: "UNISWAP_SWAP_V3_POSITIONS", ...T("Uniswap V3 positions", "raw") },
   "9": { constant: "UNISWAP_SWAP_V2", ...T("Uniswap V2 swaps", "route") },
   "10": { constant: "UNISWAP_SWAP_V3", ...T("Uniswap V3 swaps", "route") },
-  "11": { constant: "EULER_V2", ...T("Euler V2", "euler") },
+  "11": { constant: "EULER_V2", ...T("Euler V2", "euler", { 42161: "euler-v2-arbitrum", 8453: "euler-v2-base" }) },
   "12": { constant: "UNIVERSAL_TOKEN_SWAPPER", ...T("Universal Token Swapper", "route") },
   "13": { constant: "COMPOUND_V3_USDT", ...T("Compound V3 USDT", "tokens", { 1: "compound" }) },
-  "14": { constant: "MORPHO", ...T("Morpho Blue", "morpho", { 1: "morpho" }) },
+  "14": {
+    constant: "MORPHO",
+    ...T("Morpho Blue", "morpho", { 1: "morpho", 42161: "morpho-arbitrum", 8453: "morpho-base" }),
+  },
   "15": { constant: "SPARK", ...T("Spark", "tokens") },
   "16": { constant: "CURVE_POOL", ...T("Curve pool", "address") },
   "17": { constant: "CURVE_LP_GAUGE", ...T("Curve gauge", "address") },
   "19": { constant: "MORPHO_FLASH_LOAN", ...T("Morpho flash loans", "route") },
+  "21": { constant: "MOONWELL", ...T("Moonwell", "tokens", { 8453: "moonwell-base" }) },
   "20": { constant: "AAVE_V3_LIDO", ...T("Aave V3 Lido market", "tokens", { 1: "aave-v3" }) },
+  "30": { constant: "AERODROME", ...T("Aerodrome", "address", { 8453: "aerodrome" }), walletPage: true },
+  "33": {
+    constant: "AREODROME_SLIPSTREAM",
+    ...T("Aerodrome Slipstream", "address", { 8453: "aerodrome" }),
+    walletPage: true,
+  },
+  "54": { constant: "CROSSCHAIN", ...T("Cross-chain", "crosschain") },
   "23": { constant: "PENDLE", ...T("Pendle", "address", { 1: "pendle" }), walletPage: true },
   "25": { constant: "CURVE_GAUGE_ERC4626", ...T("Curve gauge", "address") },
-  "26": { constant: "COMPOUND_V3_WETH", ...T("Compound V3 WETH", "tokens", { 1: "compound" }) },
+  "26": { constant: "COMPOUND_V3_WETH", ...T("Compound V3 WETH", "tokens", { 1: "compound", 8453: "compound-base" }) },
   "29": { constant: "LIQUITY_V2", ...T("Liquity V2", "liquity", { 1: "liquity-v2" }) },
   "34": { constant: "STAKE_DAO_V2", ...T("Stake DAO V2", "address") },
   "35": { constant: "SILO_V2", ...T("Silo V2", "address") },
   "38": { constant: "ENSO", ...T("Enso", "route") },
   "40": { constant: "ASYNC_ACTION", ...T("Async action", "raw") },
-  "41": { constant: "MORPHO_LIQUIDITY_IN_MARKETS", ...T("Morpho Blue liquidity", "morpho", { 1: "morpho" }) },
+  "41": {
+    constant: "MORPHO_LIQUIDITY_IN_MARKETS",
+    ...T("Morpho Blue liquidity", "morpho", { 1: "morpho", 42161: "morpho-arbitrum", 8453: "morpho-base" }),
+  },
   "42": { constant: "ODOS_SWAPPER", ...T("Odos swaps", "route") },
   "43": { constant: "VELORA_SWAPPER", ...T("Velora swaps", "route") },
   "44": { constant: "SPARK_LEND", ...T("SparkLend", "tokens", { 1: "spark" }) },
   "45": { constant: "MIDAS", ...T("Midas", "midas") },
   "46": { constant: "NAPIER", ...T("Napier", "raw") },
-  "49": { constant: "AAVE_V4", ...T("Aave V4", "aave-v4", { 1: "aave-v4" }) },
+  "49": { constant: "AAVE_V4", ...T("Aave V4", "aave-v4", { 1: "aave-v4", 8453: "aave-v4-base" }) },
   "50": { constant: "EXTERNAL_STATE", ...T("External state", "external") },
-  "53": { constant: "UNISWAP_V4", ...T("Uniswap V4", "uniswap-v4", { 1: "uniswap-v4" }), walletPage: true },
+  "53": {
+    constant: "UNISWAP_V4",
+    ...T("Uniswap V4", "uniswap-v4", { 1: "uniswap-v4", 42161: "uniswap-v4-arbitrum" }),
+    walletPage: true,
+  },
   "57": {
     constant: "COMPOUND_V3_INSTITUTIONAL_USDC",
     ...T("Compound V3 institutional USDC", "tokens"),
@@ -118,6 +143,8 @@ export type Substrate =
   | { kind: "typed"; type: string; address: string }
   | { kind: "target"; address: string; selector: string }
   | { kind: "setting"; type: string; value: string }
+  | { kind: "executor"; address: string }
+  | { kind: "remote-vault"; chainId: number; address: string }
   | { kind: "raw"; hex: string };
 
 const word = (hex: string) => BigInt(hex);
@@ -219,6 +246,15 @@ export function decodeSubstrate(kind: MarketKind, hexIn: string): Substrate {
       if (t === 1 || t === 3 || t === 4) return { kind: "typed", type, address: addr(w) };
       return { kind: "setting", type, value: (w & ((BigInt(1) << BigInt(248)) - BigInt(1))).toString() };
     }
+    case "crosschain": {
+      // CrosschainSubstrateLib: type 255..248 (1 executor, 2 remote vault),
+      // chainId 247..160 (zero for an executor), address in the low 160 bits.
+      const t = Number(w >> BigInt(248));
+      const chain = Number((w >> BigInt(160)) & ((BigInt(1) << BigInt(88)) - BigInt(1)));
+      if (t === 1) return { kind: "executor", address: addr(w) };
+      if (t === 2) return { kind: "remote-vault", chainId: chain, address: addr(w) };
+      return { kind: "raw", hex };
+    }
     case "raw":
       return { kind: "raw", hex };
   }
@@ -232,6 +268,7 @@ export function substrateAddresses(subs: readonly Substrate[]): string[] {
     if (s.kind === "address" || s.kind === "typed" || s.kind === "target") out.push(s.address);
     else if (s.kind === "euler-vault") out.push(s.vault);
     else if (s.kind === "euler-pool") out.push(s.pool);
+    else if (s.kind === "executor") out.push(s.address);
   }
   return out;
 }

@@ -22,7 +22,7 @@
 
 import { unstable_cache } from "next/cache";
 import { createPublicClient, http, parseAbi, parseAbiItem, type Chain, type PublicClient } from "viem";
-import { arbitrum, base, mainnet } from "viem/chains";
+import { mainnet } from "viem/chains";
 import { vaultHeadClient } from "@/lib/sources/api/head-reads-client";
 import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
 import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
@@ -37,6 +37,8 @@ import {
   type Substrate,
 } from "@/lib/ipor-fusion/markets";
 import { MORPHO_MARKETS } from "@/lib/morpho/market-catalog";
+import { MORPHO_MARKETS as MORPHO_BASE_MARKETS } from "@/lib/morpho-base/market-catalog";
+import { MORPHO_ARBITRUM_MARKETS } from "@/lib/morpho-arbitrum/market-catalog";
 import { resolveErc20Meta } from "./erc20-meta";
 
 const VAULT_ABI = parseAbi([
@@ -97,10 +99,12 @@ const CALLS = [
 
 /** Each chain's lane for `eth_getLogs`, named: a receipt states the variable,
  *  never the URL, which carries a key. Ethereum's is the keyless wide lane. */
-export const IPOR_ROLE_LOG_LANE: Record<IporFusionChainId, { env: string; chain: Chain }> = {
+export const IPOR_ROLE_LOG_LANE: Partial<Record<IporFusionChainId, { env: string; chain: Chain }>> = {
   1: { env: "ETHEREUM_LOGS_RPC_URL", chain: mainnet as Chain },
-  42161: { env: "ARBITRUM_LOGS_RPC_URL", chain: arbitrum as Chain },
-  8453: { env: "BASE_BACKFILL_RPC_URL", chain: base as Chain },
+  // Arbitrum and Base have no lane wide enough for a vault's history (no
+  // history key on the server; Base's backfill lane caps a range at 1,000
+  // blocks), and the scan never goes over Alchemy or a public RPC: their roles
+  // read "not configured" until one is named (TO-DO-ipor-scoping §6.3).
 };
 
 export const IPOR_ROLE_SCAN_REVALIDATE_SECONDS = 300;
@@ -227,10 +231,18 @@ export interface IporFusionMarkets {
   morpho: Record<string, { loanToken: string; collateralToken: string; lltv: string } | null>;
 }
 
-let morphoById: Map<string, (typeof MORPHO_MARKETS)[number]> | null = null;
-const morphoMarket = (id: string) => {
-  morphoById ??= new Map(MORPHO_MARKETS.map((m) => [m.id.toLowerCase(), m]));
-  return morphoById.get(id.toLowerCase()) ?? null;
+type MorphoParams = { id: string; loanToken: string; collateralToken: string; lltv: string };
+const MORPHO_CATALOG: Record<IporFusionChainId, readonly MorphoParams[]> = {
+  1: MORPHO_MARKETS,
+  42161: MORPHO_ARBITRUM_MARKETS,
+  8453: MORPHO_BASE_MARKETS,
+};
+const morphoById = new Map<IporFusionChainId, Map<string, MorphoParams>>();
+/** A Morpho Blue market's params from Rails' catalog for the chain; null where it lacks the id. */
+const morphoMarket = (chainId: IporFusionChainId, id: string) => {
+  let byId = morphoById.get(chainId);
+  if (!byId) morphoById.set(chainId, (byId = new Map(MORPHO_CATALOG[chainId].map((m) => [m.id.toLowerCase(), m]))));
+  return byId.get(id.toLowerCase()) ?? null;
 };
 
 /** Each active market's booked balance and substrates, the asset in the
@@ -285,7 +297,7 @@ async function readMarkets(
       if (r.kind === "child" && s.kind === "address") children.add(s.address);
       if (r.kind === "liquity" && (s.kind === "address" || s.kind === "typed")) registries.add(s.address);
       if (s.kind === "morpho-market") {
-        const m = chainId === 1 ? morphoMarket(s.id) : null;
+        const m = morphoMarket(chainId, s.id);
         morpho[s.id] = m ? { loanToken: m.loanToken, collateralToken: m.collateralToken, lltv: m.lltv } : null;
         if (m) {
           named.add(m.loanToken);
@@ -340,6 +352,7 @@ async function readMarkets(
 const laneClients = new Map<number, PublicClient>();
 function logsClient(chainId: IporFusionChainId): PublicClient | null {
   const lane = IPOR_ROLE_LOG_LANE[chainId];
+  if (!lane) return null;
   const url = process.env[lane.env]?.replace(/^"(.*)"$/, "$1");
   if (!url) return null;
   let client = laneClients.get(chainId);
@@ -476,7 +489,7 @@ export async function loadIporFusionVault(
   const vaultAddress = entry.address.toLowerCase();
   const whitelist = IPOR_FUSE_WHITELIST[chainId];
   const ad = entry.asset.decimals;
-  const lane = IPOR_ROLE_LOG_LANE[chainId].env;
+  const lane = IPOR_ROLE_LOG_LANE[chainId]?.env ?? "no logs lane";
 
   const shell = (): IporFusionVaultResponse["vault"] => ({
     address: vaultAddress,

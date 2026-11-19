@@ -17,7 +17,7 @@ test(`market 1 AAVE_V3, vault 0x888e…eb10 at block ${BLOCK}: token addresses`,
     constant: "AAVE_V3",
     venue: "Aave V3",
     kind: "tokens",
-    covered: { 1: "aave-v3" },
+    covered: { 1: "aave-v3", 42161: "aave-v3-arbitrum", 8453: "aave-v3-base" },
   });
   assert.deepEqual(decodeSubstrate("tokens", "0x000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"), {
     kind: "address",
@@ -211,4 +211,39 @@ test("a long grant list stops at four and counts the rest", () => {
     address: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
   }));
   assert.equal(substratesLine(subs, NAMES), "USDC, USDC, USDC, USDC +2 more");
+});
+
+test("market 54 CROSSCHAIN, vault 0x8bee…8fbf on Arbitrum at block 525,673,038: executor and remote vaults", () => {
+  const info = marketInfo("54");
+  assert.equal(info.constant, "CROSSCHAIN");
+  assert.equal(info.kind, "crosschain");
+  assert.deepEqual(
+    decodeSubstrate("crosschain", "0x010000000000000000000000cb83a78bd8e8c284d5704b62945ef2c454266db0"),
+    {
+      kind: "executor",
+      address: "0xcb83a78bd8e8c284d5704b62945ef2c454266db0",
+    },
+  );
+  assert.deepEqual(
+    decodeSubstrate("crosschain", "0x0200000000000000000003e7a342eba00bd725799828a34ea55d25a55958f643"),
+    {
+      kind: "remote-vault",
+      chainId: 999,
+      address: "0xa342eba00bd725799828a34ea55d25a55958f643",
+    },
+  );
+  assert.equal(
+    substrateWords(
+      decodeSubstrate("crosschain", "0x0200000000000000000003e7b8de01ca5ca57a14671e1c696337134a02b4a478"),
+      NAMES,
+    ),
+    "vault 0xb8de…a478 on chain 999",
+  );
+});
+
+test("the coverage map names each chain's explorer", () => {
+  assert.deepEqual(marketInfo("1").covered, { 1: "aave-v3", 42161: "aave-v3-arbitrum", 8453: "aave-v3-base" });
+  assert.deepEqual(marketInfo("11").covered, { 42161: "euler-v2-arbitrum", 8453: "euler-v2-base" });
+  assert.equal(marketInfo("33").walletPage, true);
+  assert.equal(marketInfo("13").covered[8453], undefined);
 });

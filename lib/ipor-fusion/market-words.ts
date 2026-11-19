@@ -60,6 +60,10 @@ export function substrateWords(s: Substrate, n: MarketNames): string {
       return `${nameOf(n, s.address)} ${s.selector}`;
     case "setting":
       return `${s.type} ${s.value}`;
+    case "executor":
+      return `executor ${nameOf(n, s.address)}`;
+    case "remote-vault":
+      return `vault ${short(s.address)} on chain ${s.chainId}`;
     case "raw":
       return short(s.hex);
   }
