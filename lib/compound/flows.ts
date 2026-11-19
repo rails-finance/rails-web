@@ -39,7 +39,7 @@
 
 import { actedByOther } from "@/lib/shared/external-actor";
 import type { FlowBucket, FlowDayRow, FlowEvent, FlowLeg, FlowSide, FlowTimeline } from "@/lib/shared/flows-timeline";
-import { daysFromEvents, flowLeg } from "@/lib/shared/flows-timeline";
+import { daysFromEvents, flowLeg, livePriced } from "@/lib/shared/flows-timeline";
 import type { DayObs } from "@/lib/shared/price-series";
 import { cometAbsorbValueNote, cometFlowPriceNote } from "@/lib/compound/comet-price-notes";
 import type { CometFactor } from "@/lib/compound/at-block-prices";
@@ -526,6 +526,8 @@ export interface CompoundLive {
   coll: Record<string, number>;
   /** Comet's price feed now, USD per token, by token address. */
   prices: Record<string, number>;
+  /** The block those prices were read at, where the read names one (ui-jobs 743). */
+  block?: number | null;
   /** The market's rates now, fractions a year. */
   supplyApr?: number | null;
   borrowApr?: number | null;
@@ -833,6 +835,16 @@ export function compoundFlowTimeline(events: CompoundFlowEvent[], o: CompoundFlo
 
   const assets: NonNullable<FlowTimeline["live"]["assets"]> = [];
   let collUsd = 0;
+  // Each live figure's price row (ui-jobs 743): the Comet's getPrice now at
+  // the read's block; else the last row's, its block named.
+  const liveRow = (t: string) => {
+    const p = o.live?.prices[t];
+    if (p != null && p > 0) return livePriced(p, o.live?.block, o.now, { source: `${rp.comet}'s getPrice now` });
+    const q = last.price[t];
+    return q != null && q > 0
+      ? { day: Math.floor(o.now / DAY_S), series: false, price: q, block: last.from[t]?.block ?? null }
+      : undefined;
+  };
   if (open) {
     for (const t of collTokens) {
       const a = nowColl(t);
@@ -844,7 +856,7 @@ export function compoundFlowTimeline(events: CompoundFlowEvent[], o: CompoundFlo
         symbol: rp.symbols.get(t) ?? t,
         amount: a,
         usd,
-        ...(priceNow(t) > 0 ? {} : { unpriced: true as const }),
+        ...(priceNow(t) > 0 && liveRow(t) ? { priced: liveRow(t)! } : { unpriced: true as const }),
       });
     }
     if (nowSupply > dust) {
@@ -855,7 +867,7 @@ export function compoundFlowTimeline(events: CompoundFlowEvent[], o: CompoundFlo
         symbol: o.baseSymbol,
         amount: nowSupply,
         usd,
-        ...(priceNow(base) > 0 ? {} : { unpriced: true as const }),
+        ...(priceNow(base) > 0 && liveRow(base) ? { priced: liveRow(base)! } : { unpriced: true as const }),
       });
     }
     if (nowDebt > dust)
@@ -864,7 +876,7 @@ export function compoundFlowTimeline(events: CompoundFlowEvent[], o: CompoundFlo
         symbol: o.baseSymbol,
         amount: nowDebt,
         usd: nowDebt * priceNow(base),
-        ...(priceNow(base) > 0 ? {} : { unpriced: true as const }),
+        ...(priceNow(base) > 0 && liveRow(base) ? { priced: liveRow(base)! } : { unpriced: true as const }),
       });
   }
   const todayPrices: Record<string, number> = {

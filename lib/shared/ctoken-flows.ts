@@ -50,7 +50,7 @@ import type {
   FlowTimeline,
   FlowWords,
 } from "@/lib/shared/flows-timeline";
-import { daysFromEvents, flowLeg } from "@/lib/shared/flows-timeline";
+import { daysFromEvents, flowLeg, livePriced } from "@/lib/shared/flows-timeline";
 import { indexAt, type IndexKnot } from "@/lib/shared/ctoken-index";
 import { priceText, shownUsd } from "@/lib/shared/shown-usd";
 
@@ -648,8 +648,21 @@ export function ctokenFlowTimeline(rows: CTokenFlowRow[], o: CTokenFlowOptions):
   const assets: NonNullable<FlowTimeline["live"]["assets"]> = [];
   let collateralUsd = 0;
   let debtUsd = 0;
+  // Each live figure's price row (ui-jobs 743): the live read's oracle price
+  // at its block; else today's price, whose read names no block; else the
+  // store's last close, its block named.
+  const liveRow = (m: string) => {
+    const lv = o.live?.[m];
+    if (lv?.price != null && lv.price > 0)
+      return livePriced(lv.price, lv.block, o.now, { source: `${o.vocab.brand}'s Comptroller oracle now` });
+    const t = o.todayPrices?.[m];
+    if (t != null && t > 0) return livePriced(t, null, o.now, { source: "today's price" });
+    const obs = dailyPrices[m]?.at(-1);
+    return obs ? { day: obs[0], series: true, price: obs[1], block: o.dailyBlocks?.[m]?.[obs[0]] ?? null } : undefined;
+  };
   for (const h of held) {
     const p = todayPrice(h.market) ?? dailyPrices[h.market]?.at(-1)?.[1] ?? 0;
+    const row = p > 0 ? liveRow(h.market) : undefined;
     if (h.supply > DUST) {
       // The amount × the price as shown, to the cent, so "Still supplied"
       // agrees with the panel's rows.
@@ -659,7 +672,7 @@ export function ctokenFlowTimeline(rows: CTokenFlowRow[], o: CTokenFlowOptions):
         symbol: h.symbol,
         amount: h.supply,
         usd,
-        ...(p > 0 ? {} : { unpriced: true as const }),
+        ...(row ? { priced: row } : { unpriced: true as const }),
       });
       collateralUsd += usd;
     }
@@ -670,7 +683,7 @@ export function ctokenFlowTimeline(rows: CTokenFlowRow[], o: CTokenFlowOptions):
         symbol: h.symbol,
         amount: h.debt,
         usd,
-        ...(p > 0 ? {} : { unpriced: true as const }),
+        ...(row ? { priced: row } : { unpriced: true as const }),
       });
       debtUsd += usd;
     }

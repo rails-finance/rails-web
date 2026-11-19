@@ -15,6 +15,7 @@ import type { AaveV4SnapshotItem, BaseActivityEvent } from "@/lib/shared/types/e
 import { isAaveV4Event } from "@/lib/shared/types/event-shape";
 import {
   daysFromEvents,
+  livePriced,
   type FlowAssetHeld,
   type FlowBucket,
   type FlowLive,
@@ -168,7 +169,10 @@ export function aaveV4FlowLive(
         symbol: r.symbol,
         amount: supplied,
         usd: p == null ? 0 : supplied * p,
-        ...(p == null ? { unpriced: true as const } : {}),
+        // The page's price now, whose read names no block (ui-jobs 743).
+        ...(p == null
+          ? { unpriced: true as const }
+          : { priced: livePriced(p, null, 0, { source: "the oracle's price now" }) }),
       });
     if (owed > 0)
       assets.push({
@@ -176,7 +180,10 @@ export function aaveV4FlowLive(
         symbol: r.symbol,
         amount: owed,
         usd: p == null ? 0 : owed * p,
-        ...(p == null ? { unpriced: true as const } : {}),
+        // The page's price now, whose read names no block (ui-jobs 743).
+        ...(p == null
+          ? { unpriced: true as const }
+          : { priced: livePriced(p, null, 0, { source: "the oracle's price now" }) }),
       });
   }
   return {

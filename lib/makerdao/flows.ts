@@ -38,7 +38,7 @@
 // Pure: tested offline in scripts/verify/verify-makerdao-flows.ts.
 
 import type { FlowBucket, FlowDayRow, FlowEvent, FlowLeg, FlowTimeline } from "@/lib/shared/flows-timeline";
-import { daysFromEvents, flowLeg } from "@/lib/shared/flows-timeline";
+import { daysFromEvents, flowLeg, livePriced } from "@/lib/shared/flows-timeline";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
 import type { BaseActivityEvent, MakerDAOEventType } from "@/lib/shared/types/event-shape";
 import { isMakerDAOEvent } from "@/lib/shared/types/event-shape";
@@ -671,12 +671,34 @@ export function makerFlowTimeline(events: MakerFlowEvent[], o: MakerFlowOptions)
                     symbol: o.collSymbol,
                     amount: nowColl,
                     usd: shownUsd(nowColl, priceNow),
-                    ...(priceNow > 0 ? {} : { unpriced: true as const }),
+                    // The live read's OSM price at its block; else the last
+                    // row's, its block named and not complete (ui-jobs 743).
+                    ...(priceNow > 0
+                      ? {
+                          priced:
+                            livePrice != null
+                              ? livePriced(livePrice, o.live?.block, o.now, { source: "the ilk's OSM price now" })
+                              : {
+                                  day: Math.floor(o.now / DAY_S),
+                                  series: false,
+                                  price: priceNow,
+                                  block: makerPriceBlock(last.priceAt),
+                                },
+                        }
+                      : { unpriced: true as const }),
                   },
                 ]
               : []),
             ...(nowDebt > DUST
-              ? [{ side: "debt" as const, symbol: o.debtSymbol, amount: nowDebt, usd: shownUsd(nowDebt, 1) }]
+              ? [
+                  {
+                    side: "debt" as const,
+                    symbol: o.debtSymbol,
+                    amount: nowDebt,
+                    usd: shownUsd(nowDebt, 1),
+                    priced: livePriced(1, null, o.now, { face: true }),
+                  },
+                ]
               : !Number.isFinite(nowDebt) && last.ev.debtAfter > DUST
                 ? // No rate to grow it by: the debt has no figure, never $0.
                   [

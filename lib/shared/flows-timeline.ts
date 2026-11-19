@@ -212,7 +212,9 @@ export interface FlowLive {
    *  `words.rest`: at the live stop that item states this figure. */
   collateralInterestUsd?: number | null;
   /** Each asset held and owed now, as the ledger values it, for the zoom
-   *  view; absent, the last day's balances at today's prices. */
+   *  view; absent, the last day's balances at today's prices. Each priced
+   *  asset carries `priced` (`livePriced`): a model in dollars states its
+   *  live total as these rows' shown products, to the cent (ui-jobs 743). */
   assets?: FlowAssetHeld[];
   /** Flows a live read states that no event has recorded yet, added to their
    *  buckets at the live stop only (a Liquity Trove's pending redistribution
@@ -245,6 +247,8 @@ export interface FlowAssetHeld {
     /** A face factor's note: where its rate comes from, in the family's
      *  words (`FlowTimeline.factorNotes`). */
     factorNote?: string;
+    /** The live stop's price (`livePriced`): its source and block in words. */
+    live?: string;
   };
   /** No price stands for the asset on that day: the side's figure has none. */
   unpriced?: true;
@@ -432,6 +436,8 @@ export interface FlowTimeline {
   live: FlowLive;
   /** Today's price per asset, for an asset held while no event has priced it. */
   todayPrices?: Record<string, number>;
+  /** The block today's prices were read at, where the read names one. */
+  todayBlock?: number | null;
   /** Per asset, the days a new daily price was recorded: [day, usd, block?]. The last
    *  oracle price recorded on or before each day's end, across every wallet.
    *  A day whose price is not a number has none, and the day before's does
@@ -670,6 +676,10 @@ export interface FlowModel {
   unsure: Map<number, { side: FlowSide; why: string; symbol?: string }[]>;
   /** The flows that rest on one: each reason's first stop. */
   unsureFlows: { stop: number; side: FlowSide; why: string; symbol?: string }[];
+  /** The live figures that rest on a read naming no block (ui-jobs 743). */
+  liveUnsure: { side: FlowSide; why: string; symbol?: string }[];
+  /** The sides whose live figure is its rows' shown products (ui-jobs 743). */
+  liveStated: FlowSide[];
   /** Whether held assets are valued at a daily price series. */
   daily: boolean;
   /** Days a price may age before the asset is on an old price. */
@@ -1257,10 +1267,28 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     collateralHigh[stop] = Math.max(collateralHigh[stop], high);
   });
 
+  // The live stop in rows: each asset's amount × its live price, shown.
+  const stated = liveFromRows(
+    t.live,
+    t.live.assets ??
+      liveHeldFromBalances(
+        held,
+        t.todayPrices,
+        heldAt[heldAt.length - 1] ?? [],
+        inDollars,
+        t.todayBlock,
+        startDay + liveStop,
+      ),
+    inDollars,
+  );
+  const live = stated.live;
+  const liveHeld = stated.rows;
+  const liveStated = stated.stated;
+  const liveUnsure = stated.unsure;
   const last = rows[rows.length - 1];
   const today = {
-    collateral: t.live.collateralUsd + outOf("collateral", last.cum),
-    debt: t.live.debtUsd + outOf("debt", last.cum),
+    collateral: live.collateralUsd + outOf("collateral", last.cum),
+    debt: live.debtUsd + outOf("debt", last.cum),
   };
   let peak = Math.max(today.collateral, today.debt);
   const sidePeak = { collateral: today.collateral, debt: today.debt };
@@ -1314,7 +1342,7 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     changes: t.changes ?? [],
     changesUnavailable: t.changesUnavailable === true,
     activity: t.activity ?? null,
-    live: t.live,
+    live,
     valued,
     collateralHigh,
     stale,
@@ -1329,7 +1357,9 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     ...(t.addresses ? { addresses: t.addresses } : {}),
     heldAt,
     heldUnpriced,
-    liveHeld: t.live.assets ?? liveHeldFromBalances(held, t.todayPrices, heldAt[heldAt.length - 1] ?? [], inDollars),
+    liveHeld,
+    liveStated,
+    liveUnsure,
     axis: axisFor(peak),
     today,
   };
@@ -1342,6 +1372,8 @@ function liveHeldFromBalances(
   todayPrices: Record<string, number> | undefined,
   last: FlowAssetHeld[],
   inDollars: boolean,
+  todayBlock: number | null | undefined,
+  todayDay: number,
 ): FlowAssetHeld[] {
   const out: FlowAssetHeld[] = [];
   for (const [key, h] of held) {
@@ -1354,9 +1386,103 @@ function liveHeldFromBalances(
     // No price today and none carried from the last stop: the asset has no
     // figure, and the line breaks at the live point (ui-jobs 743).
     const none = inDollars && !priced && (prev == null || prev.unpriced);
-    out.push({ side: h.side, symbol: h.symbol, amount: h.amount, usd, ...(none ? { unpriced: true as const } : {}) });
+    // The price row: today's, at its read's block where it names one.
+    const row = priced ? livePriced(p, todayBlock, todayDay * 86_400) : undefined;
+    out.push({
+      side: h.side,
+      symbol: h.symbol,
+      amount: h.amount,
+      usd,
+      ...(row ? { priced: row } : {}),
+      ...(none ? { unpriced: true as const } : {}),
+    });
   }
   return out;
+}
+
+/** A live asset's price row (ui-jobs 743): the price its live figure takes,
+ *  at the live read's block where the read names one; `face` for a $1-face
+ *  side counted at its current balance. */
+export function livePriced(
+  price: number,
+  block: number | null | undefined,
+  nowSec: number,
+  o: { face?: boolean; source?: string } = {},
+): NonNullable<FlowAssetHeld["priced"]> {
+  const src = o.source ?? "the live read's price";
+  return {
+    day: Math.floor(nowSec / 86_400),
+    series: false,
+    price: o.face ? 1 : price,
+    block: block ?? null,
+    live: block != null ? `${src}, block ${block.toLocaleString("en-US")}` : `${src}, which names no block`,
+    ...(o.face ? { face: true as const } : {}),
+  };
+}
+
+/** The live stop's figures from its rows (ui-jobs 743): a side in dollars
+ *  whose assets each carry a price row (`livePriced`) is the sum of their
+ *  shown products, to the cent; an asset held with no price leaves the side
+ *  with none ("—"); a price whose read names no block, or an earlier price,
+ *  is not complete. A side whose family states no price rows keeps its
+ *  figure and is not stated in rows; a unit side keeps the family's figure. */
+function liveFromRows(
+  live: FlowLive,
+  rows: FlowAssetHeld[],
+  inDollars: boolean,
+): {
+  live: FlowLive;
+  rows: FlowAssetHeld[];
+  stated: FlowSide[];
+  unsure: { side: FlowSide; why: string; symbol?: string }[];
+} {
+  if (!inDollars) return { live, rows, stated: [], unsure: [] };
+  const unsure: { side: FlowSide; why: string; symbol?: string }[] = [];
+  const held = (r: FlowAssetHeld) => (r.amount ?? 0) > 0 || Math.abs(r.usd) >= 0.005;
+  const stated = (side: FlowSide) =>
+    rows.every((r) => r.side !== side || !held(r) || r.unpriced || ((r.amount ?? 0) > 0 && r.priced?.price != null));
+  const sum = (side: FlowSide): number | null => {
+    if (!stated(side)) return null;
+    let c = 0;
+    for (const r of rows) {
+      if (r.side !== side || !held(r)) continue;
+      if (r.unpriced) return Number.NaN;
+      const p = r.priced!;
+      c = addCents(
+        c,
+        p.face
+          ? shownUsd(faceAmount(r.amount as number, p.price as number), 1)
+          : shownUsd(r.amount as number, p.price as number),
+      );
+      // A live price whose read names no block, or an earlier price carried
+      // to the live stop: not complete.
+      const why = p.face
+        ? null
+        : p.live == null
+          ? "at an earlier price: the live read has no price for it."
+          : p.block == null
+            ? "at the latest read's price, which names no block."
+            : null;
+      if (why && !unsure.some((u) => u.side === side && u.symbol === r.symbol))
+        unsure.push({ side, why, symbol: r.symbol });
+    }
+    return c;
+  };
+  const coll = sum("collateral");
+  const debt = sum("debt");
+  const ok = (v: number | null): v is number => v != null && !Number.isNaN(v);
+  return {
+    live: {
+      ...live,
+      collateralUsd: ok(coll) ? coll : live.collateralUsd,
+      debtUsd: ok(debt) ? debt : live.debtUsd,
+    },
+    rows,
+    // The sides stated in rows; a side its family gives no price rows for
+    // keeps the family's figure.
+    stated: (["collateral", "debt"] as const).filter((x) => (x === "collateral" ? coll : debt) != null),
+    unsure,
+  };
 }
 
 /** Each asset's part of the position at a stop: what is held and owed, and
@@ -1640,7 +1766,10 @@ export function stateAt(m: FlowModel, stop: number): FlowState {
     !isLive && stop >= 0 && m.heldAt[vi] && !unitOf(m, side)
       ? { rows: m.heldAt[vi], unpriced: m.heldUnpriced?.get(vi)?.[side] ?? [] }
       : isLive && !unitOf(m, side)
-        ? { rows: [], unpriced: m.liveHeld.filter((h) => h.side === side && h.unpriced).map((h) => h.symbol) }
+        ? {
+            rows: m.liveHeld.filter((h) => m.liveStated.includes(h.side)),
+            unpriced: m.liveHeld.filter((h) => h.side === side && h.unpriced).map((h) => h.symbol),
+          }
         : undefined;
   const collNow = isLive ? m.live.collateralUsd : (v?.collateral ?? 0);
   const debtNow = isLive ? m.live.debtUsd : (v?.debt ?? 0);
@@ -1697,7 +1826,9 @@ export function oldPriceAt(m: FlowModel, stop: number): { word: "Old price" | "R
  *  the live read's, and every reason the history has counts for the flows. */
 export function unsureAt(m: FlowModel, stop: number, side: FlowSide): { held: string[]; flows: string[] } {
   const live = stop >= m.liveStop;
-  const held = live ? [] : (m.unsure.get(stop) ?? []).filter((u) => u.side === side);
+  const held = live
+    ? m.liveUnsure.filter((u) => u.side === side)
+    : (m.unsure.get(stop) ?? []).filter((u) => u.side === side);
   const flows = m.unsureFlows.filter(
     (u) => u.side === side && (live || u.stop <= stop) && !held.some((h) => h.why === u.why && h.symbol === u.symbol),
   );

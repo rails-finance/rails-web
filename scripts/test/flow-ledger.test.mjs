@@ -34,7 +34,9 @@ export async function resolve(spec, ctx, next) {
 `;
 register("data:text/javascript," + encodeURIComponent(hook));
 
-const { flowLeg, daysFromEvents, buildFlowModel, stateAt } = await import(ROOT + "lib/shared/flows-timeline.ts");
+const { flowLeg, daysFromEvents, buildFlowModel, stateAt, livePriced, partialAt } = await import(
+  ROOT + "lib/shared/flows-timeline.ts"
+);
 const { sideSumRows, wholeUsd, noPriceWords } = await import(ROOT + "lib/shared/flows-sum.ts");
 const { eventCum, eventSideSum, eventTokenSum } = await import(ROOT + "lib/shared/flow-focus.ts");
 const { tokenLedger, dollarLedger, ledgerAdds, ledgerAtPrice } = await import(ROOT + "lib/shared/event-ledger.ts");
@@ -373,7 +375,25 @@ const { fmtUsdWhole } = await import(ROOT + "lib/liquity/figure-format.ts");
 
 /** One WBTC deposit and one WETH deposit, then a quiet day priced by the store. */
 function heldModel({ wethPrice = true } = {}) {
-  const events = [
+  const events = heldEvents();
+  return buildFlowModel({
+    buckets: BUCKETS,
+    days: daysFromEvents(
+      BUCKETS.map((b) => b.key),
+      events,
+    ),
+    live: { collateralUsd: 0, debtUsd: 0 },
+    today: 20_005,
+    dailyPrices: {
+      // The store's close of day 20,002 with its block; WETH's without one.
+      wbtc: [[20_002, 99_000.123456, 1_500_000]],
+      ...(wethPrice ? { weth: [[20_002, 3100.25]] } : {}),
+    },
+  });
+}
+
+function heldEvents() {
+  return [
     {
       id: "a",
       ts: T0 + 10,
@@ -393,20 +413,6 @@ function heldModel({ wethPrice = true } = {}) {
       prices: [],
     },
   ];
-  return buildFlowModel({
-    buckets: BUCKETS,
-    days: daysFromEvents(
-      BUCKETS.map((b) => b.key),
-      events,
-    ),
-    live: { collateralUsd: 0, debtUsd: 0 },
-    today: 20_005,
-    dailyPrices: {
-      // The store's close of day 20,002 with its block; WETH's without one.
-      wbtc: [[20_002, 99_000.123456, 1_500_000]],
-      ...(wethPrice ? { weth: [[20_002, 3100.25]] } : {}),
-    },
-  });
 }
 
 test("a past day's held figure is its rows to the cent, each naming the day's block", () => {
@@ -422,6 +428,64 @@ test("a past day's held figure is its rows to the cent, each naming the day's bl
   assert.ok(notes.some((n) => /the daily store's price at the close of .+, block 1,500,000$/.test(n)));
   // A store row with no block says so.
   assert.ok(notes.some((n) => /a block the daily store's route does not name$/.test(n)));
+});
+
+/** The held model with live assets: WBTC and WETH at `prices` (null: no
+ *  price), the read at `block`. */
+function liveModel(prices, block) {
+  const assets = [
+    ["WBTC", 1.2345678, prices.wbtc],
+    ["WETH", 2.5, prices.weth],
+  ].map(([symbol, amount, p]) => ({
+    side: "collateral",
+    symbol,
+    amount,
+    usd: p == null ? 0 : amount * p,
+    ...(p == null ? { unpriced: true } : { priced: livePriced(p, block, 20_005 * 86_400) }),
+  }));
+  return buildFlowModel({
+    buckets: BUCKETS,
+    days: daysFromEvents(
+      BUCKETS.map((b) => b.key),
+      heldEvents(),
+    ),
+    live: { collateralUsd: 1, debtUsd: 0, assets },
+    today: 20_005,
+    dailyPrices: { wbtc: [[20_002, 99_000.123456, 1_500_000]], weth: [[20_002, 3100.25]] },
+  });
+}
+
+test("the live total is its rows' shown products, to the cent (ui-jobs 743, A8)", () => {
+  const m = liveModel({ wbtc: 101_234.567891, weth: 3210.987654 }, 2_000_000);
+  const want = centsOf(shownUsd(1.2345678, 101_234.567891) + shownUsd(2.5, 3210.987654));
+  const st = stateAt(m, m.liveStop);
+  assert.equal(st.collateral.now, want, "the live figure is the rows' cents, not the family's");
+  assert.equal(sideSumRows(st.collateral).total.cents, want);
+  const prov = flowSegmentProv(st.collateral.bar[0], "collateral", "now", true, true);
+  assert.equal(rebuild(prov).cents, want, "the rows multiply out to the live total");
+  assert.ok(
+    prov.inputs.some((i) => /block 2,000,000$/.test(i.note ?? "")),
+    "the price names its block",
+  );
+  assert.deepEqual(partialAt(m, m.liveStop, "collateral"), [], "a block named: complete");
+});
+
+test("a live read naming no block sits under Not complete (ui-jobs 743, A8)", () => {
+  const m = liveModel({ wbtc: 101_234.567891, weth: 3210.987654 }, null);
+  const st = stateAt(m, m.liveStop);
+  const prov = flowSegmentProv(st.collateral.bar[0], "collateral", "now", true, true);
+  assert.ok(prov.inputs.some((i) => /which names no block$/.test(i.note ?? "")));
+  assert.deepEqual(partialAt(m, m.liveStop, "collateral"), [
+    "WBTC and WETH at the latest read's price, which names no block.",
+  ]);
+});
+
+test("a live asset with no price leaves the live total with none (ui-jobs 743, A8)", () => {
+  const m = liveModel({ wbtc: 101_234.567891, weth: null }, 2_000_000);
+  const st = stateAt(m, m.liveStop);
+  const rows = sideSumRows(st.collateral);
+  assert.equal(rows.total.amount, "—");
+  assert.match(rows.total.none, /WETH has no price at this block/);
 });
 
 test("a past day holding an asset with no price has no held figure and names the asset", () => {

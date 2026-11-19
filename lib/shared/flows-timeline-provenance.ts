@@ -201,10 +201,29 @@ export function heldDayProv(label: string, when: string, rows: readonly FlowAsse
       timeZone: "UTC",
     });
   return holderUsdReceipt({
-    what: `${label} at ${when}`,
+    what: when === "now" ? `${label} now` : `${label} at ${when}`,
     legs: priced.map((r) => {
       const p = r.priced!;
       const at = p.block != null ? `block ${p.block.toLocaleString("en-US")}` : null;
+      // The live stop's rows: the balance the live read states at its price
+      // (a $1 face at $1).
+      if (p.live != null)
+        return p.face
+          ? {
+              token: r.symbol,
+              amount: r.amount ?? 0,
+              amountNote: "the balance the live read states",
+              price: 1,
+              priceNote: `1 ${r.symbol} is counted as $1`,
+              face: true,
+            }
+          : {
+              token: r.symbol,
+              amount: r.amount ?? 0,
+              amountNote: "the balance the live read states",
+              price: p.price as number,
+              priceNote: p.live,
+            };
       // A side counted at its $1 face: the recorded debt with the interest
       // built on it since, at $1.
       // Three rows: the recorded debt, the factor its rate built on it to
@@ -307,8 +326,9 @@ export function flowSegmentProv(
         ? `${s.label} now. No dollar figure: ${noPriceWords([...s.unpriced])}.`
         : `${s.label} at ${when}. No dollar figure: ${noPriceWords([...s.unpriced])}.`,
     };
-  if (s.fill === "held" && !isLive && !unit && s.heldRows?.some((r) => r.priced?.price != null))
-    return heldDayProv(s.label, when, s.heldRows);
+  // A held figure in rows, the live stop's too (ui-jobs 743).
+  if (s.fill === "held" && !unit && s.heldRows?.some((r) => r.priced?.price != null))
+    return heldDayProv(s.label, isLive ? "now" : when, s.heldRows);
   if (s.fill === "held")
     return isLive
       ? {
@@ -390,10 +410,10 @@ export function flowAssetProv(
 ): Provenance {
   // A figure in cents states its rows: the asset's legs on a line, or its
   // balance × the day's price on a past day's held figure (ui-jobs 743).
-  if (s.fill === "held" && !isLive && !unit) {
+  if (s.fill === "held" && !unit) {
     const rows = s.heldRows?.filter((r) => r.symbol === symbol && (r.amount ?? 0) > 0);
     if (rows?.length && rows.every((r) => r.priced?.price != null))
-      return heldDayProv(`${symbol} ${side === "collateral" ? "held" : "owed"}`, when, rows);
+      return heldDayProv(`${symbol} ${side === "collateral" ? "held" : "owed"}`, isLive ? "now" : when, rows);
     if (rows?.some((r) => r.unpriced))
       return { kind: "derived", summary: `${symbol} at ${when}. No dollar figure: ${noPriceWords([symbol])}.` };
   }

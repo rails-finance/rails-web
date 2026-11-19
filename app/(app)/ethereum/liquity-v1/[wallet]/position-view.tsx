@@ -465,6 +465,7 @@ export default function LiquityV1TroveView({
             live: flowOpen
               ? {
                   price: priceNow,
+                  ...(priceNow != null && chain ? { block: chain.blockNumber } : {}),
                   ...(chainLive
                     ? {
                         coll: chainLive.coll,

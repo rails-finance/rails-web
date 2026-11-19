@@ -48,6 +48,7 @@ import type { AaveV3Context } from "@/lib/shared/types/protocols/aave-v3";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
 import {
   flowLeg,
+  livePriced,
   type FlowLeg,
   daysFromEvents,
   type FlowBucket,
@@ -930,15 +931,24 @@ export function aaveBaseTimelineFromSummary(s: AaveBaseSummary, o: AaveBaseFlowO
   const assets: NonNullable<FlowLive["assets"]> = [];
   let collateralUsd = 0;
   let debtUsd = 0;
+  // Each live figure's price row (ui-jobs 743): today's oracle price at the
+  // read's block; else the store's last close, its block named.
+  const liveRow = (a: string) => {
+    const t = todayPrice(a);
+    if (t != null) return livePriced(t, o.todayBlock, o.now, { source: "the AaveOracle's price now" });
+    const obs = dailyPrices[a]?.at(-1);
+    return obs ? { day: obs[0], series: true, price: obs[1], block: o.dailyBlocks?.[a]?.[obs[0]] ?? null } : undefined;
+  };
   for (const h of held) {
     const p = todayPrice(h.asset) ?? dailyPrices[h.asset]?.at(-1)?.[1] ?? 0;
+    const row = p > 0 ? liveRow(h.asset) : undefined;
     if (h.supply > DUST) {
       assets.push({
         side: "collateral",
         symbol: h.symbol,
         amount: h.supply,
         usd: h.supply * p,
-        ...(p > 0 ? {} : { unpriced: true as const }),
+        ...(row ? { priced: row } : { unpriced: true as const }),
       });
       collateralUsd += h.supply * p;
     }
@@ -948,7 +958,7 @@ export function aaveBaseTimelineFromSummary(s: AaveBaseSummary, o: AaveBaseFlowO
         symbol: h.symbol,
         amount: h.debt,
         usd: h.debt * p,
-        ...(p > 0 ? {} : { unpriced: true as const }),
+        ...(row ? { priced: row } : { unpriced: true as const }),
       });
       debtUsd += h.debt * p;
     }

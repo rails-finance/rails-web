@@ -29,7 +29,7 @@
 // Pure: tested offline in scripts/verify/verify-liquity-flows.ts.
 
 import type { FlowBucket, FlowDayRow, FlowEvent, FlowLeg, FlowTimeline } from "@/lib/shared/flows-timeline";
-import { daysFromEvents, flowLeg } from "@/lib/shared/flows-timeline";
+import { daysFromEvents, flowLeg, livePriced } from "@/lib/shared/flows-timeline";
 import { shownUsd } from "@/lib/shared/shown-usd";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
 import type { BaseActivityEvent, LiquityForkPriceAtBlock } from "@/lib/shared/types/event-shape";
@@ -245,6 +245,8 @@ export function liquityFlowBuckets(surplusClaimed: boolean, family: LiquityFamil
 export interface LiquityLive {
   /** The branch's price now. */
   price: number | null;
+  /** The block the live read stands at, where it names one (ui-jobs 743). */
+  block?: number | null;
   coll?: number;
   debt?: number;
   accruedInterest?: number;
@@ -679,7 +681,8 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
   const nowDebt = open
     ? (o.live?.debt ?? last.debtAfter * accrualFactor(last.rate, last.fee, last.ts, accrueTo(o.now)))
     : 0;
-  const pricedNow = livePrice ?? replayed[replayed.length - 1].price;
+  const lastRow = replayed[replayed.length - 1];
+  const pricedNow = livePrice ?? lastRow.price;
   const pending: NonNullable<FlowTimeline["live"]["pending"]> = [];
   if (open && o.live) {
     if ((o.live.redistColl ?? 0) > DUST)
@@ -695,13 +698,45 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
   return {
     buckets,
     days,
+    // Each held figure a shown product (ui-jobs 743): the collateral at the
+    // live price, at its read's block; with no live price, at the last
+    // event's, its block named and not complete; the debt at its $1 face.
     live: {
-      collateralUsd: nowColl * pricedNow,
-      debtUsd: nowDebt,
+      collateralUsd: shownUsd(nowColl, pricedNow),
+      debtUsd: shownUsd(nowDebt, 1),
       assets: open
         ? [
-            { side: "collateral", symbol: o.collSymbol, amount: nowColl, usd: nowColl * pricedNow },
-            { side: "debt", symbol: o.debtSymbol, amount: nowDebt, usd: nowDebt },
+            {
+              side: "collateral",
+              symbol: o.collSymbol,
+              amount: nowColl,
+              usd: shownUsd(nowColl, pricedNow),
+              ...(pricedNow > 0
+                ? {
+                    priced:
+                      livePrice != null
+                        ? livePriced(livePrice, o.live?.block, o.now, {
+                            source:
+                              family === "v1"
+                                ? "Liquity's PriceFeed lastGoodPrice now"
+                                : "the branch PriceFeed's price now",
+                          })
+                        : {
+                            day: Math.floor(o.now / DAY_S),
+                            series: false,
+                            price: pricedNow,
+                            block: lastRow.borrowedPrice ? lastRow.priceBlock : lastRow.ev.block,
+                          },
+                  }
+                : {}),
+            },
+            {
+              side: "debt",
+              symbol: o.debtSymbol,
+              amount: nowDebt,
+              usd: shownUsd(nowDebt, 1),
+              priced: livePriced(1, null, o.now, { face: true }),
+            },
           ]
         : [],
       ...(pending.length ? { pending } : {}),

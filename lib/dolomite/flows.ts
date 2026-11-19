@@ -51,7 +51,7 @@ import type {
   FlowTimeline,
   FlowWords,
 } from "@/lib/shared/flows-timeline";
-import { daysFromEvents, flowLeg } from "@/lib/shared/flows-timeline";
+import { daysFromEvents, flowLeg, livePriced } from "@/lib/shared/flows-timeline";
 import { centsOf, shownUsd } from "@/lib/shared/shown-usd";
 import { externalActor } from "@/lib/shared/external-actor";
 
@@ -789,15 +789,25 @@ export function dolomiteFlowTimeline(rows: DolomiteFlowRow[], o: DolomiteFlowOpt
   const assets: NonNullable<FlowTimeline["live"]["assets"]> = [];
   let collateralUsd = 0;
   let debtUsd = 0;
+  // Each live figure's price row (ui-jobs 743): the live read's oracle price
+  // at its block; else the store's last close, its block named.
+  const liveRow = (m: string) => {
+    const lv = o.live?.[m];
+    if (lv?.price != null && lv.price > 0)
+      return livePriced(lv.price, lv.block, o.now, { source: "Dolomite's oracle price now" });
+    const obs = dailyPrices[m]?.at(-1);
+    return obs ? { day: obs[0], series: true, price: obs[1], block: o.dailyBlocks?.[m]?.[obs[0]] ?? null } : undefined;
+  };
   for (const h of held) {
     const p = todayPrice(h.market) ?? dailyPrices[h.market]?.at(-1)?.[1] ?? 0;
+    const row = p > 0 ? liveRow(h.market) : undefined;
     if (h.supply > DUST) {
       assets.push({
         side: "collateral",
         symbol: h.symbol,
         amount: h.supply,
         usd: h.supply * p,
-        ...(p > 0 ? {} : { unpriced: true as const }),
+        ...(row ? { priced: row } : { unpriced: true as const }),
       });
       collateralUsd += h.supply * p;
     }
@@ -807,7 +817,7 @@ export function dolomiteFlowTimeline(rows: DolomiteFlowRow[], o: DolomiteFlowOpt
         symbol: h.symbol,
         amount: h.debt,
         usd: h.debt * p,
-        ...(p > 0 ? {} : { unpriced: true as const }),
+        ...(row ? { priced: row } : { unpriced: true as const }),
       });
       debtUsd += h.debt * p;
     }
