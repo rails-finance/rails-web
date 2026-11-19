@@ -174,8 +174,8 @@ export default async function EthereumVaultsInfoPage() {
           are then the same assets at two heights, so a reader must not add them together.
         </p>
         <p className="mt-2">
-          Nothing here sums them: Value · USD is per row. Each static aToken&rsquo;s page names the stake token that
-          holds it, and each stake token&rsquo;s page names its wrapper.
+          Nothing here sums them. Each static aToken&rsquo;s page names the stake token that holds it, and each stake
+          token&rsquo;s page names its wrapper.
         </p>
       </section>
 
@@ -256,8 +256,7 @@ export default async function EthereumVaultsInfoPage() {
         <h2 className={INFO_H2}>Search</h2>
         <p className="mt-1.5">
           The search matches an address, or part of one, against the holder. An address the census has never seen has no
-          row here. The listing records nothing about the search, because a list of what visitors typed would record who
-          looked at what.
+          row here. The listing records nothing about the search.
         </p>
       </section>
 

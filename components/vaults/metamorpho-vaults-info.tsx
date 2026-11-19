@@ -35,11 +35,18 @@ const n = (v: number) => v.toLocaleString("en-US");
 
 const MORPHO_VAULT_V2_DOCS = "https://docs.morpho.org/learn/concepts/vault-v2/";
 const MORPHO_VAULT_DOCS = "https://docs.morpho.org/curate/concepts/roles/#morpho-vaults-v1-roles";
+const MORPHO_MARKET_DOCS = "https://docs.morpho.org/learn/concepts/blue/#what-is-a-variable-rate-market";
 
 /** The chain's facts in the three-blocks section. */
 const FINALIZED: Record<MetaMorphoChainId, string> = {
-  8453: "on Base the tag steps in jumps, and sat between 643 and 795 blocks behind head across five samples.",
-  1: "on Ethereum the tag moves an epoch of 32 blocks at a time, about two epochs behind head.",
+  8453: "on Base the tag steps in jumps, 643 to 795 blocks behind head.",
+  1: "on Ethereum the tag moves 32 blocks at a time, about two epochs behind head.",
+};
+
+/** What the six-million-block window the sweep does not use spans on each chain. */
+const WINDOW: Record<MetaMorphoChainId, string> = {
+  8453: "139 days on Base",
+  1: "about 833 days on Ethereum",
 };
 
 export async function MetaMorphoVaultsInfo({ chainId }: { chainId: MetaMorphoChainId }) {
@@ -80,7 +87,11 @@ export async function MetaMorphoVaultsInfo({ chainId }: { chainId: MetaMorphoCha
             <a href={MORPHO_VAULT_DOCS} target="_blank" rel="noopener" className={`font-medium ${FOOT_LINK}`}>
               Morpho&rsquo;s docs
             </a>{" "}
-            explain the Vaults V1 roles in Morpho&rsquo;s terms.
+            explain the Vaults V1 roles in Morpho&rsquo;s terms, and{" "}
+            <a href={MORPHO_MARKET_DOCS} target="_blank" rel="noopener" className={`font-medium ${FOOT_LINK}`}>
+              the markets
+            </a>{" "}
+            a vault lends to.
           </li>
           {/* ui-jobs 664, VA9: the docs' V2, which this section does not list. */}
           <li data-intro-v2>
@@ -147,7 +158,8 @@ export async function MetaMorphoVaultsInfo({ chainId }: { chainId: MetaMorphoCha
         <ul className={INFO_UL}>
           <li>
             Membership comes only from the census: every address on either side of any <code>Transfer</code> a vault has
-            emitted, swept from the vault&rsquo;s creation block.
+            emitted. The sweep runs from the vault&rsquo;s creation block, rather than a fixed window of six million
+            blocks ({WINDOW[chainId]}).
           </li>
           <li>
             The sweep counts as complete when Σ <code>balanceOf</code> equals <code>totalSupply()</code> to the wei at
@@ -220,8 +232,7 @@ export async function MetaMorphoVaultsInfo({ chainId }: { chainId: MetaMorphoCha
         <h2 className={INFO_H2}>Search</h2>
         <p className="mt-1.5">
           The search matches an address, or part of one, against the holder. An address the census has never seen has no
-          row here. The listing records nothing about the search, because a list of what visitors typed would record who
-          looked at what.
+          row here. The listing records nothing about the search.
         </p>
       </section>
 
