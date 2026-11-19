@@ -13,6 +13,7 @@ registerAppResolver();
 const C = await import("../../lib/shared/prov-class.ts");
 const SP = await import("../../lib/cow/settlement-provenance.ts");
 const SU = await import("../../lib/cow/surplus-provenance.ts");
+const ST = await import("../../lib/cow/settlement.ts");
 
 const USDT = { address: "0xdac17f958d2ee523a2206206994597c13d831ec7", symbol: "USDT", decimals: 6 };
 const USDC = { address: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", symbol: "USDC", decimals: 6 };
@@ -35,7 +36,15 @@ const trade = {
   feeAmount: "0",
   orderUid: "0x01",
   settled: {
-    order: { kind: "sell", partiallyFillable: false, sellAmount: "1", buyAmount: "1", feeAmount: "0", receiver: "0x0" },
+    order: {
+      kind: "sell",
+      partiallyFillable: false,
+      sellAmount: "1",
+      buyAmount: "1",
+      feeAmount: "0",
+      receiver: "0x0",
+      executedAmount: "1",
+    },
     own: { sellIndex: 2, buyIndex: 3, sellPrice: "31992268613", buyPrice: "31966724548" },
     uniform: { sellIndex: 1, buyIndex: 0, sellPrice: "31966724548", buyPrice: "31992268613" },
     ownEntries: true,
@@ -58,11 +67,18 @@ test("the settlement panel: clearingPrices are input, Trade log amounts emitted"
   assert.equal(classOf(cp, /^clearingPrices\[0\]/), "input");
   assert.deepEqual(head(cp), ["input"]);
 
-  const gap = SP.gapProv(settlement, trade);
-  assert.equal(classOf(gap, /^sold − fee$/), "emitted");
-  assert.equal(classOf(gap, /^bought$/), "emitted");
-  assert.equal(classOf(gap, /^clearing price, sold token$/), "input");
-  assert.equal(classOf(gap, /^gap \(bp\)$/), null);
+  // The fee column: the swap lines' receipt, on the panel's trade.
+  const fv = ST.cowTradeView(settlement, trade, USDT, USDC);
+  assert.ok(fv);
+  const gap = SU.cowFeeProv(
+    fv,
+    { sell: trade.sellAmount, buy: trade.buyAmount, fee: trade.feeAmount },
+    { block: settlement.blockNumber, txHash: settlement.txHash },
+  );
+  assert.equal(classOf(gap, /^sold \(Trade log/), "emitted");
+  assert.equal(classOf(gap, /^bought \(Trade log/), "emitted");
+  assert.equal(classOf(gap, /sold token, first entry\)$/), "input");
+  assert.equal(classOf(gap, /^the gap, in/), null);
   assert.deepEqual(head(gap), ["emitted", "input"]);
 
   const fee = SP.feeChargeProv(settlement, trade, USDC);
@@ -124,4 +140,15 @@ test("the swap card's fee line: clearingPrices are input, the Trade log emitted"
   assert.equal(classOf(p, /^the signed fee, in/), null);
   assert.equal(classOf(p, /^the gap, in/), null);
   assert.deepEqual(head(p), ["emitted", "input"]);
+});
+
+test("the CoW card's fee line before block 19,815,319: the signed fee alone, its entries input", () => {
+  for (const signedFeeOnly of ["no-entries", "own-entries"]) {
+    const p = SU.cowFeeProv(view({ signedFeeOnly, route: "cow" }), raw, coords);
+    assert.equal(p.pclass, "input");
+    assert.equal(classOf(p, /sold token, first entry\)$/), "input");
+    assert.equal(classOf(p, /^fee \(Trade log/), "emitted");
+    assert.equal(classOf(p, /^the signed fee, in/), null);
+    assert.deepEqual(head(p), ["emitted", "input"], signedFeeOnly);
+  }
 });

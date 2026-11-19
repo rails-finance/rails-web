@@ -1,0 +1,255 @@
+{
+  "0x1fc438bb77a22c1d9200f55d52730975812364127ace1e9906af02553c8ac793": {
+    "40": {
+      "kind": "sell",
+      "surplus": "579167",
+      "surplusToken": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "limitAmount": "47996670",
+      "feeGap": "435749",
+      "signedFee": "0",
+      "feeBp": 88.907
+    },
+    "41": {
+      "kind": "sell",
+      "surplus": "20204",
+      "surplusToken": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "limitAmount": "11139077988",
+      "feeGap": "103072",
+      "signedFee": "0",
+      "feeBp": 0.092
+    },
+    "42": {
+      "kind": "sell",
+      "surplus": "11552",
+      "surplusToken": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "limitAmount": "7637418527",
+      "feeGap": "68369",
+      "signedFee": "0",
+      "feeBp": 0.089
+    },
+    "43": {
+      "kind": "sell",
+      "surplus": "16594",
+      "surplusToken": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "limitAmount": "13140882301",
+      "feeGap": "114354",
+      "signedFee": "0",
+      "feeBp": 0.087
+    }
+  },
+  "0x9da9e41580fd115c41baf4072da17da2e815be8f676cc8b01e6ea3a58c43c5a2": {
+    "29": {
+      "kind": "sell",
+      "surplus": "5556804691",
+      "surplusToken": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "limitAmount": "1517820557610",
+      "feeGap": "95439131",
+      "signedFee": "95439132",
+      "feeBp": 0.626
+    },
+    "30": {
+      "kind": "sell",
+      "surplus": "39315",
+      "surplusToken": "0x76bc677d444f1e9d57daf5187ee2b7dc852745ae",
+      "limitAmount": "504272403133632841570",
+      "feeGap": "8126030000727710144",
+      "signedFee": "8126030000727710145",
+      "feeBp": 161.143
+    },
+    "31": {
+      "kind": "sell",
+      "surplus": "4871830",
+      "surplusToken": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+      "limitAmount": "3631306140",
+      "feeGap": "15170968",
+      "signedFee": "0",
+      "feeBp": 41.548
+    },
+    "32": {
+      "kind": "sell",
+      "surplus": "0",
+      "surplusToken": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+      "limitAmount": "19047619047",
+      "feeGap": "13007572",
+      "signedFee": "0",
+      "feeBp": 6.824
+    }
+  },
+  "0xa10dc0eff7177c6756249fd4493a4277d2b9ec4a4b816efc160bfb344a242197": {
+    "96": {
+      "kind": "sell",
+      "surplus": "892818261",
+      "surplusToken": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+      "limitAmount": "205397908527",
+      "feeGap": "42889613",
+      "signedFee": "0",
+      "feeBp": 2.078
+    },
+    "97": {
+      "kind": "sell",
+      "surplus": "769077464",
+      "surplusToken": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+      "limitAmount": "205521649356",
+      "feeGap": "42889581",
+      "signedFee": "0",
+      "feeBp": 2.078
+    }
+  },
+  "0xb722a4ce15cee81c45451e7303a8336287bccd28e6614b2e3a35dc0df7f5e764": {
+    "723": {
+      "kind": "sell",
+      "surplus": "32173765692742801",
+      "surplusToken": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "limitAmount": "8430272857663283967",
+      "feeGap": "16177142524782583",
+      "signedFee": "0",
+      "feeBp": 19.079
+    },
+    "724": {
+      "kind": "sell",
+      "surplus": "52047575",
+      "surplusToken": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "limitAmount": "10177334543",
+      "feeGap": "1534934",
+      "signedFee": "0",
+      "feeBp": 1.5
+    },
+    "725": {
+      "kind": "sell",
+      "surplus": "10410073",
+      "surplusToken": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+      "limitAmount": "2710087235",
+      "feeGap": "8461867",
+      "signedFee": "0",
+      "feeBp": 31.007
+    },
+    "726": {
+      "kind": "sell",
+      "surplus": "10217242741234626",
+      "surplusToken": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "limitAmount": "258204859317463049",
+      "feeGap": "290760526858751",
+      "signedFee": "0",
+      "feeBp": 10.82
+    },
+    "727": {
+      "kind": "sell",
+      "surplus": "147503216025386916744912596",
+      "surplusToken": "0x06450dee7fd2fb8e39061434babcfc05599a6fb8",
+      "limitAmount": "35222940663544711554308130751",
+      "feeGap": "89385965621768637436151653",
+      "signedFee": "0",
+      "feeBp": 25.207
+    },
+    "728": {
+      "kind": "sell",
+      "surplus": "1518845849794321",
+      "surplusToken": "0xae7ab96520de3a18e5e111b5eaab095312d7fe84",
+      "limitAmount": "755781720378673729",
+      "feeGap": "1916444617708299",
+      "signedFee": "0",
+      "feeBp": 25.242
+    },
+    "729": {
+      "kind": "buy",
+      "surplus": "1465591615326166710",
+      "surplusToken": "0x9d39a5de30e57443bff2a8307a4256c8797a3497",
+      "limitAmount": "1026179178376520132353",
+      "feeGap": "1991060863824382028",
+      "signedFee": "0",
+      "feeBp": 19.468
+    },
+    "730": {
+      "kind": "sell",
+      "surplus": "38",
+      "surplusToken": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "limitAmount": "758061350727534835",
+      "feeGap": "36",
+      "signedFee": "0",
+      "feeBp": 0
+    },
+    "731": {
+      "kind": "sell",
+      "surplus": "1601710",
+      "surplusToken": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "limitAmount": "1191070488",
+      "feeGap": "-1",
+      "signedFee": "0",
+      "feeBp": 0
+    }
+  },
+  "0xdb1245e3e227568f4167b7358040b840099768daa52433edd03b87f4f0081650": {
+    "35": {
+      "kind": "sell",
+      "surplus": "149528952319288309",
+      "surplusToken": "0x111111111117dc0aa78b770fa6a738034120c302",
+      "limitAmount": "29905790463857661732",
+      "feeGap": "2354224360312139580",
+      "signedFee": "2354224360312139580",
+      "feeBp": 783.297
+    },
+    "36": {
+      "kind": "sell",
+      "surplus": "134643542686664",
+      "surplusToken": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "limitAmount": "26928708537332635",
+      "feeGap": "1611669734201928",
+      "signedFee": "1611669734201929",
+      "feeBp": 595.517
+    },
+    "37": {
+      "kind": "sell",
+      "surplus": "1301096165674302",
+      "surplusToken": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "limitAmount": "481632451164091196",
+      "feeGap": "884100781192063",
+      "signedFee": "884100781192064",
+      "feeBp": 18.306
+    },
+    "38": {
+      "kind": "sell",
+      "surplus": "95833",
+      "surplusToken": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "limitAmount": "18621351",
+      "feeGap": "3121158",
+      "signedFee": "3121159",
+      "feeBp": 1667.536
+    },
+    "39": {
+      "kind": "sell",
+      "surplus": "2535572632877908",
+      "surplusToken": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "limitAmount": "249562510684583879",
+      "feeGap": "1482532675125704",
+      "signedFee": "1482532675125705",
+      "feeBp": 58.807
+    },
+    "40": {
+      "kind": "sell",
+      "surplus": "1139989",
+      "surplusToken": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "limitAmount": "1885701152",
+      "feeGap": "9763875",
+      "signedFee": "9763876",
+      "feeBp": 51.747
+    },
+    "41": {
+      "kind": "sell",
+      "surplus": "161750",
+      "surplusToken": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+      "limitAmount": "25222734",
+      "feeGap": "42628",
+      "signedFee": "42629",
+      "feeBp": 16.792
+    },
+    "42": {
+      "kind": "sell",
+      "surplus": "28879",
+      "surplusToken": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+      "limitAmount": "20486680",
+      "feeGap": "59570",
+      "signedFee": "59571",
+      "feeBp": 29.036
+    }
+  }
+}

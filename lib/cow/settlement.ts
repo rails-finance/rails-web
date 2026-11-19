@@ -14,8 +14,16 @@
 //
 // Prices here are raw ratios, sold (less the fee) per unit bought; the
 // display scales them by decimals.
+//
+// A trade's surplus and the fees in its price (ui-jobs 712, the CoW trade
+// card's lines and the panel's fee column) are `tradeSurplus`, a copy of
+// rails-server api/src/services/cow-surplus.ts held to the server's figures by
+// scripts/test/cow-trade-surplus.test.mjs. Definitions: rails-ops
+// reference/cow-surplus-measure-2026-11-17.md.
 
 import type { CowTokenScale } from "./types";
+import type { CowTokenLabel } from "./trade";
+import type { CowSwapView } from "./surplus";
 import { soldLessFee } from "./price";
 
 /** The first block where the sample found every trade of a settlement priced
@@ -32,6 +40,8 @@ export interface CowSettledOrder {
   buyAmount: string;
   feeAmount: string;
   receiver: string;
+  /** settle()'s executedAmount: on a partially fillable order the part filled here. */
+  executedAmount: string;
 }
 
 export interface CowSettledEntries {
@@ -67,7 +77,7 @@ export interface CowSettlement {
   txHash: string;
   trades: CowSettlementTrade[];
   /** `offset`: the byte in the transaction's input where the settle() call starts (0 on a direct call). */
-  settle: { status: CowSettleStatus; call?: "direct" | "wrapped"; offset?: number; to?: string | null };
+  settle: { status: CowSettleStatus; call?: "direct" | "wrapped" | "inline"; offset?: number; to?: string | null };
   tokens: Record<string, CowTokenScale>;
 }
 
@@ -90,31 +100,6 @@ export function findTrade(
 const pairKey = (t: { sellToken: string; buyToken: string }) =>
   `${t.sellToken.toLowerCase()}>${t.buyToken.toLowerCase()}`;
 
-/** A trade's log price over the clearing price, less one, in basis points:
- *  above 0 the owner paid more of the sold token per unit bought than at the
- *  clearing price. Null with no decoded entries or an amount of 0. */
-export function gapBp(t: CowSettlementTrade): number | null {
-  if (!t.settled) return null;
-  const net = soldLessFee(t.sellAmount, t.feeAmount);
-  const buy = BigInt(t.buyAmount);
-  const uSell = BigInt(t.settled.uniform.sellPrice);
-  const uBuy = BigInt(t.settled.uniform.buyPrice);
-  if (net == null || buy === BigInt(0) || uSell === BigInt(0) || uBuy === BigInt(0)) return null;
-  // trade = net / buy; clearing = uBuy / uSell (sold per unit bought); trade / clearing = net·uSell / (buy·uBuy)
-  const num = BigInt(net) * uSell;
-  const den = buy * uBuy;
-  const scale = BigInt(1_000_000_000);
-  return (Number(((num - den) * scale) / den) / 1e9) * 1e4;
-}
-
-/** The gap as the panel prints it, from the owner's side whichever way round
- *  the price is stated: "1.5 bp worse", "0.4 bp better", "<0.1 bp" below 0.1 bp. */
-export function gapText(bp: number): string {
-  if (Math.abs(bp) < 0.1) return "<0.1 bp";
-  const r = Math.abs(Math.round(bp * 10) / 10);
-  return `${r.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} bp ${bp > 0 ? "worse" : "better"}`;
-}
-
 /** Two log prices equal within the integer rounding of computeTradeExecution. */
 function samePrice(a: CowSettlementTrade, b: CowSettlementTrade): boolean {
   const na = soldLessFee(a.sellAmount, a.feeAmount);
@@ -134,14 +119,6 @@ function samePrice(a: CowSettlementTrade, b: CowSettlementTrade): boolean {
 export function feeToken(t: CowSettlementTrade): string | null {
   if (!t.settled) return null;
   return t.settled.order.kind === "sell" ? t.buyToken.toLowerCase() : t.sellToken.toLowerCase();
-}
-
-/** The fee sentence applies: priced worse than the clearing price by at least
- *  what the panel prints, on the trade's own entries, from the block CoW
- *  charges fees that way. */
-export function feeExplains(t: CowSettlementTrade, block: number): boolean {
-  const g = gapBp(t);
-  return g != null && g >= 0.1 && !!t.settled?.ownEntries && block >= COW_OWN_PRICE_FEES_FROM;
 }
 
 export interface CowPairView {
@@ -174,4 +151,136 @@ export function pairView(
   const decoded = s.settle.status === "decoded" && pair.every((x) => x.settled != null);
   const onePrice = pair.length >= 2 && pair.every((x) => samePrice(self, x));
   return { self, pair, otherPairs, onePrice, decoded };
+}
+
+/** A trade's surplus beyond its signed limit and the fees in its price, in the surplus token's base units (the
+ *  bought token on a sell order, the sold token on a buy order). */
+export interface CowTradeSurplus {
+  kind: "sell" | "buy";
+  surplus: bigint;
+  surplusToken: string;
+  /** The signed limit, pro rata on the executed part, in the surplus token: the amount `surplus` is measured from. */
+  limitAmount: bigint;
+  /** The fees in the trade's price, the signed fee included. */
+  feeGap: bigint;
+  /** The signed fee (the Trade log's feeAmount) in the surplus token: part of feeGap. */
+  signedFee: bigint;
+  /** feeGap in basis points of `atUniform`, to 3 decimals. */
+  feeBp: number;
+  /** The trade at the settlement's uniform price, in the surplus token. */
+  atUniform: bigint;
+}
+
+const ZERO = BigInt(0);
+const ONE = BigInt(1);
+const ceilDiv = (a: bigint, b: bigint) => (a + b - ONE) / b;
+const bpOf = (part: bigint, of: bigint) => (of === ZERO ? 0 : Number((part * BigInt(10_000_000)) / of) / 1000);
+
+/** rails-server's `tradeSurplus`, to the wei:
+ *    surplus, sell order: bought − ⌈limitBuy × (sold − fee) ÷ limitSell⌉
+ *    surplus, buy order:  ⌊limitSell × bought ÷ limitBuy⌋ + ⌊limitFee × bought ÷ limitBuy⌋ − sold
+ *    fees, sell order:    ⌊(sold − fee) × uSell ÷ uBuy⌋ − bought + ⌊fee × uSell ÷ uBuy⌋
+ *    fees, buy order:     (sold − fee) − ⌈bought × uBuy ÷ uSell⌉ + fee
+ *  with u the tokens' first clearingPrices entries. Null without a decoded order or with a zero price or limit. */
+export function tradeSurplus(t: CowSettlementTrade): CowTradeSurplus | null {
+  if (!t.settled) return null;
+  const { order, uniform } = t.settled;
+  const sell = BigInt(t.sellAmount);
+  const buy = BigInt(t.buyAmount);
+  const fee = BigInt(t.feeAmount);
+  const net = sell - fee;
+  const limSell = BigInt(order.sellAmount);
+  const limBuy = BigInt(order.buyAmount);
+  const limFee = BigInt(order.feeAmount);
+  const us = BigInt(uniform.sellPrice);
+  const ub = BigInt(uniform.buyPrice);
+  if (us === ZERO || ub === ZERO) return null;
+  if (order.kind === "sell") {
+    if (limSell === ZERO) return null;
+    const limitAmount = ceilDiv(limBuy * net, limSell);
+    const atUniform = (net * us) / ub;
+    const signedFee = (fee * us) / ub;
+    const feeGap = atUniform - buy + signedFee;
+    return {
+      kind: "sell",
+      surplus: buy - limitAmount,
+      surplusToken: t.buyToken.toLowerCase(),
+      limitAmount,
+      feeGap,
+      signedFee,
+      feeBp: bpOf(feeGap, atUniform),
+      atUniform,
+    };
+  }
+  if (limBuy === ZERO) return null;
+  const limitAmount = (limSell * buy) / limBuy + (limFee * buy) / limBuy;
+  const atUniform = ceilDiv(buy * ub, us);
+  const feeGap = net - atUniform + fee;
+  return {
+    kind: "buy",
+    surplus: limitAmount - sell,
+    surplusToken: t.sellToken.toLowerCase(),
+    limitAmount,
+    feeGap,
+    signedFee: fee,
+    feeBp: bpOf(feeGap, atUniform),
+    atUniform,
+  };
+}
+
+/** The fees the card states: the gap to the uniform price from block COW_OWN_PRICE_FEES_FROM; before it, the signed
+ *  fee alone, on the same base (entries of a trade's own then priced market makers' orders at their limit). */
+export function cardFee(s: CowTradeSurplus, block: number): { feeGap: bigint; feeBp: number; signedOnly: boolean } {
+  if (block >= COW_OWN_PRICE_FEES_FROM) return { feeGap: s.feeGap, feeBp: s.feeBp, signedOnly: false };
+  return { feeGap: s.signedFee, feeBp: bpOf(s.signedFee, s.atUniform), signedOnly: true };
+}
+
+/** The fee sentence under a panel row applies: fees in the price of at least 0.1 bp on the trade's own entries,
+ *  from the block CoW charges fees that way. */
+export function feeExplains(t: CowSettlementTrade, block: number): boolean {
+  const s = tradeSurplus(t);
+  return s != null && !!t.settled?.ownEntries && block >= COW_OWN_PRICE_FEES_FROM && s.feeBp >= 0.1;
+}
+
+/** A trade of a decoded settlement as the CoW swap lines read it (lib/cow/surplus.ts), its tokens named by the
+ *  card's labels. Null where settle() is not decoded or the trade carries no order. */
+export function cowTradeView(
+  s: CowSettlement,
+  t: CowSettlementTrade,
+  sell: CowTokenLabel,
+  buy: CowTokenLabel,
+): CowSwapView | null {
+  if (s.settle.status !== "decoded" || !t.settled) return null;
+  const f = tradeSurplus(t);
+  if (!f) return null;
+  const fee = cardFee(f, s.blockNumber);
+  const { order, own, uniform, ownEntries } = t.settled;
+  const token = f.kind === "sell" ? buy : sell;
+  return {
+    kind: f.kind,
+    surplus: f.surplus.toString(),
+    surplusToken: f.surplusToken,
+    feeBp: fee.feeBp,
+    settleOffset: s.settle.offset ?? 0,
+    call: s.settle.call ?? "direct",
+    feeGap: fee.feeGap.toString(),
+    signedFee: f.signedFee.toString(),
+    flashLoan: null,
+    flashRead: false,
+    limit: { sell: order.sellAmount, buy: order.buyAmount, fee: order.feeAmount, amount: f.limitAmount.toString() },
+    partiallyFillable: order.partiallyFillable,
+    executedAmount: order.executedAmount,
+    prices: {
+      own: { sellIndex: own.sellIndex, buyIndex: own.buyIndex, sell: own.sellPrice, buy: own.buyPrice },
+      uniform: {
+        sellIndex: uniform.sellIndex,
+        buyIndex: uniform.buyIndex,
+        sell: uniform.sellPrice,
+        buy: uniform.buyPrice,
+      },
+    },
+    token: { address: token.address, symbol: token.symbol, decimals: token.decimals },
+    route: "cow",
+    ...(fee.signedOnly ? { signedFeeOnly: ownEntries ? ("own-entries" as const) : ("no-entries" as const) } : {}),
+  };
 }

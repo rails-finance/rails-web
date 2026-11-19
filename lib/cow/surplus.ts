@@ -47,15 +47,21 @@ export interface CowSurplusToken {
 /** The figures with the surplus token named, as a swap card reads them. */
 export interface CowSwapView extends CowSwapFigures {
   token: CowSurplusToken;
-  /** cow_permit: the wallet's own order; cow_adapter: an order an Aave adapter's one-order contract owns. */
-  route: "cow_permit" | "cow_adapter";
+  /** cow_permit: the wallet's own order; cow_adapter: an order an Aave adapter's one-order contract owns; cow: a
+   *  trade on the CoW trade card, the order of the wallet the page shows. */
+  route: "cow_permit" | "cow_adapter" | "cow";
+  /** The CoW trade card, before block 19,815,319 (lib/cow/settlement.ts `cardFee`): the fee figure is the signed fee
+   *  alone. "no-entries": the trade was priced on its tokens' first entries; "own-entries": on entries of its own,
+   *  then a market maker's limit price. */
+  signedFeeOnly?: "no-entries" | "own-entries";
 }
 
 /** The surplus line's words: a sell order received more than its limit; a buy order through an Aave adapter got
- *  the unused limit back as a refund; the wallet's own buy order paid less than its limit. */
+ *  the unused limit back as a refund; any other buy order (the wallet's own, and every buy order on the CoW trade
+ *  card, where an adapter's order is its contract's own) paid less than its limit. */
 export function cowSurplusLabel(kind: CowSwapFigures["kind"], route: CowSwapView["route"]): string {
   if (kind === "sell") return "Received beyond the limit signed";
-  return route === "cow_permit" ? "Paid less than the limit signed" : "Returned to the wallet from the unused limit";
+  return route === "cow_adapter" ? "Returned to the wallet from the unused limit" : "Paid less than the limit signed";
 }
 
 export const COW_FEE_LABEL = "Fees in the trade's price";
