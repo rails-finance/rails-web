@@ -1,14 +1,15 @@
 "use client";
 
 // The floating feedback button (H26, ui-jobs 769): teal, at the window's
-// bottom right on every page, opening the feedback form (H27). On hover or
+// bottom right on every page, opening the feedback form (H27). Its glyph is a
+// speech bubble with the facehash's round eyes, which blink now and then
+// (`.feedback-blink`, app/globals.css; still under reduced motion). On hover or
 // keyboard focus it widens to the left and shows Miles's face; a touch screen
 // has no hover, so there the face is in the form's header. Below 768px it
 // rises over the compare bar (E3) while that shows (app/globals.css).
 
 import { useState } from "react";
 import Image from "next/image";
-import { MessageSquarePlus } from "lucide-react";
 
 import { FeedbackModal } from "@/components/shared/feedback-modal";
 import { FEEDBACK_FACE } from "@/lib/shared/feedback-face";
@@ -39,10 +40,29 @@ export function FeedbackButton() {
           />
         </span>
         <span className="flex h-10 w-10 items-center justify-center" aria-hidden="true">
-          <MessageSquarePlus className="h-5 w-5" strokeWidth={2.25} />
+          <BubbleFace />
         </span>
       </button>
       {open && <FeedbackModal initialType="general" onClose={() => setOpen(false)} />}
     </>
+  );
+}
+
+/** A speech bubble, its tail at the lower left, with the profile facehash's
+ *  round eyes (H20, ui-jobs 727). */
+function BubbleFace() {
+  return (
+    <svg width={26} height={26} viewBox="0 0 24 24" fill="none" aria-hidden="true" data-feedback-face="">
+      <path
+        d="M6.5 4h11A3.5 3.5 0 0 1 21 7.5v6a3.5 3.5 0 0 1-3.5 3.5H9l-5 3.5.4-4.1A3.5 3.5 0 0 1 3 13.5v-6A3.5 3.5 0 0 1 6.5 4Z"
+        stroke="currentColor"
+        strokeWidth={1.75}
+        strokeLinejoin="round"
+      />
+      <g className="feedback-blink" fill="currentColor">
+        <circle cx={9.5} cy={10.5} r={1.5} />
+        <circle cx={14.5} cy={10.5} r={1.5} />
+      </g>
+    </svg>
   );
 }

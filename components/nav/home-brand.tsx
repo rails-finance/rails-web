@@ -1,8 +1,8 @@
 "use client";
 
 // The Rails mark and, to its right where the name "Rails" was, the beta pill
-// (H25), one link home, centred in the phone header bar (H2) on every page but
-// home (ui-jobs 514, 769).
+// (H25), one link home, centred in the phone header bar (H2) on every page
+// (ui-jobs 514, 769).
 
 import Link from "next/link";
 

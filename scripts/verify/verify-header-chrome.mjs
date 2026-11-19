@@ -368,15 +368,15 @@ check(
 const mPill = await mob.locator('header a[data-home-brand] [data-beta-pill="header"]:visible').count();
 check(mPill === 1, `mobile header's home link carries the beta pill (${mPill})`);
 // The phone header on home (ui-jobs 514): the toggle on the left, H20 on the
-// right, no brand (the hero carries it), no "Start here" (it is in H20's menu).
-// The panel's top row closes it from the toggle's place. The beta pill stands
-// alone at the centre (ui-jobs 769).
+// right, the mark and the beta pill centred, no "Start here" (it is in H20's menu).
+// The panel's top row closes it from the toggle's place. The mark and the beta
+// pill are at the centre, as on every page (ui-jobs 769).
 const mHomePage = await browser.newPage({ viewport: { width: 390, height: 800 } });
 await mHomePage.goto(BASE + "/", { waitUntil: "networkidle" });
 const mStart = await mHomePage.locator('header[data-anatomy="H2"] a[href="/start"]').count();
 check(mStart === 0, `home @390: the header carries no Start here (${mStart})`);
 const mHomeBrand = await mHomePage.locator("header [data-home-brand]").count();
-check(mHomeBrand === 0, `home @390: the header draws no brand, the hero carries it (${mHomeBrand})`);
+check(mHomeBrand === 1, `home @390: the header draws the mark and the beta pill (${mHomeBrand})`);
 const launcher = mHomePage.locator('header button[data-search-launcher="header"]');
 const lBox = await launcher.boundingBox();
 await launcher.click();
