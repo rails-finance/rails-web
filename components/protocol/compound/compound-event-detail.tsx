@@ -280,7 +280,8 @@ export function useCompoundCells({
     const held = side === "collateral" ? [collStat(), baseStat("collateral")] : [baseStat("debt")];
     const chain = held.filter((st): st is ChainTruthStat => st != null);
     stated.push(...chain);
-    if (sb && sb.balances.length > 1) {
+    if (sb && sb.balances.length > 1 && sb.held != null) {
+      const heldUsd = sb.held;
       // Several assets: the side's dollars before → after, behind their icons.
       const moved = sb.balances.some((b) => Math.abs(b.amount - b.before) > 1e-12);
       const usdText = (v: number) => (v < 0.005 ? "$0" : fmtPositionUsd(v));
@@ -293,10 +294,10 @@ export function useCompoundCells({
         value: {
           cluster: sb.balances.map((b) => b.symbol),
           before:
-            moved && Math.round(sb.heldBefore) !== Math.round(sb.held)
+            moved && sb.heldBefore != null && Math.round(sb.heldBefore) !== Math.round(heldUsd)
               ? { text: usdText(sb.heldBefore), info: replayHeldProv(side, true, coords) }
               : undefined,
-          after: { text: usdText(sb.held), info: replayHeldProv(side, false, coords) },
+          after: { text: usdText(heldUsd), info: replayHeldProv(side, false, coords) },
         },
         sub: chain.flatMap((st) =>
           st.interestSincePrevious ? [{ content: <InterestLine stat={st} />, changed: false }] : [],

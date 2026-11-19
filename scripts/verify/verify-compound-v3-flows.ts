@@ -45,6 +45,7 @@
 //
 //   npx tsx --test scripts/verify/verify-compound-v3-flows.ts
 import { test } from "node:test";
+import { shownUsd } from "@/lib/shared/shown-usd";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -280,11 +281,19 @@ for (const name of NAMES) {
       const st = stateAt(m, stop);
       for (const side of ["collateral", "debt"] as const) {
         const r = sideSumRows(st[side]);
-        assert.equal(
-          r.lines.reduce((a, l) => a + l.dollars, 0),
-          r.total.dollars,
-          `${name} ${side} at stop ${stop}: lines add`,
-        );
+        // In cents where the legs carry their parts (ui-jobs 743).
+        if (r.total.cents != null && !r.lines.some((l) => l.cents == null))
+          assert.equal(
+            Math.round(r.lines.reduce((a, l) => a + (l.cents ?? 0), 0) * 100) || 0,
+            Math.round(r.total.cents * 100) || 0,
+            `${name} ${side} at stop ${stop}: lines add in cents`,
+          );
+        else if (r.total.cents == null)
+          assert.equal(
+            r.lines.reduce((a, l) => a + l.dollars, 0),
+            r.total.dollars,
+            `${name} ${side} at stop ${stop}: lines add`,
+          );
         const src = st[side].sources.reduce((a, s) => a + s.value, 0);
         assert.ok(Math.abs(src - st[side].total) < 1e-6 * Math.max(1, st[side].total), `${name} ${side} ${stop}`);
       }
@@ -309,17 +318,28 @@ for (const name of NAMES) {
       for (const side of ["collateral", "debt"] as const) {
         const sb = compoundSideBalances(rp, fe.id, side)!;
         if (sb.balances.length === 0) continue;
-        const usd = eventSideSum(m, side, cum, sb.held);
-        assert.equal(
-          usd.lines.reduce((a, l) => a + l.dollars, 0),
-          usd.total.dollars,
-          `${name} ${fe.id} ${side}: lines add`,
-        );
+        // A held asset with no price leaves the side with no figure (ui-jobs 743).
+        if (sb.held == null) continue;
+        const held = sb.held;
+        const usd = eventSideSum(m, side, cum, held);
+        // In cents where the legs carry their parts: the lines add to the cent.
+        if (usd.total.cents != null)
+          assert.equal(
+            Math.round(usd.lines.reduce((a, l) => a + (l.cents ?? 0), 0) * 100) || 0,
+            Math.round(usd.total.cents * 100) || 0,
+            `${name} ${fe.id} ${side}: lines add in cents`,
+          );
+        else
+          assert.equal(
+            usd.lines.reduce((a, l) => a + l.dollars, 0),
+            usd.total.dollars,
+            `${name} ${fe.id} ${side}: lines add`,
+          );
         const bySum = eventAssetSum(m, focus, side, cum, fe.id, sb.balances);
         assert.ok(bySum, `${name} ${fe.id} ${side}: a sum by asset`);
         // Each asset's interest past its flows is the rounding at most.
         for (const i of bySum.interest)
-          assert.ok(Math.abs(i.amount) <= 1e-5 * Math.max(1, sb.held), `${name} ${fe.id}: ${i.symbol} ${i.amount}`);
+          assert.ok(Math.abs(i.amount) <= 1e-5 * Math.max(1, held), `${name} ${fe.id}: ${i.symbol} ${i.amount}`);
         const single = assetTokenSum(bySum);
         if (single) {
           const scale = 10 ** single.decimals;
@@ -332,13 +352,18 @@ for (const name of NAMES) {
             single.total.units,
             `${name} ${fe.id} ${side}: token lines add`,
           );
-          const dollars = eventSideSumByAsset(m, bySum, cum, sb.held);
+          const dollars = eventSideSumByAsset(m, bySum, cum, held);
           const l = tokenLedger({
             model: m,
             side,
             ev: fe,
             sum: single,
-            usd: { lines: dollars.lines, dollars: dollars.total.dollars, before: sb.heldBefore },
+            usd: {
+              lines: dollars.lines,
+              dollars: dollars.total.dollars,
+              before: sb.heldBefore,
+              ...(dollars.total.cents != null ? { cents: dollars.total.cents } : {}),
+            },
           });
           const adds = ledgerAdds(l);
           assert.ok(adds.tokens && adds.usd, `${name} ${fe.id} ${side}: the ledger adds`);
@@ -488,3 +513,27 @@ test("the daily store prices a quiet day; an event's day keeps the row's price",
   assert.ok(stored.words?.linePrices?.includes("end of the day"), "the words name the day's price");
   assert.ok(!carried.words?.linePrices?.includes("end of the day"), "and only with the store");
 });
+
+// The cards' legs carry their parts (ui-jobs 743): each the shown product of
+// its amount and its price, the price named at its block; a price from the
+// nearest read names both blocks; the legs rebuild their line to the cent.
+for (const name of NAMES) {
+  test(`${name}: each leg is its shown product, its price named at its block`, () => {
+    const f = fx(name);
+    const rp = compoundFlowReplay(rows(f), opts(f));
+    let legs = 0;
+    for (const fe of compoundFocusEvents(rp))
+      for (const l of fe.legs) {
+        if (l.price == null) {
+          assert.equal(l.usd, null, `${name}: an unpriced leg has no figure`);
+          continue;
+        }
+        legs++;
+        assert.equal(l.usd, shownUsd(l.amount!, l.price), `${name} ${fe.id}: the shown product`);
+        assert.match(l.priceNote!, /block [\d,]+/, `${name} ${fe.id}: the block named`);
+        if (l.priceNote!.includes("nearest read"))
+          assert.match(l.priceNote!, /price at block [\d,]+, the nearest read; this event is at block [\d,]+$/);
+      }
+    assert.ok(legs > 0);
+  });
+}

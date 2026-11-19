@@ -38,8 +38,10 @@
 // Pure: tested offline in scripts/verify/verify-compound-v3-flows.ts.
 
 import { actedByOther } from "@/lib/shared/external-actor";
-import type { FlowBucket, FlowDayRow, FlowEvent, FlowSide, FlowTimeline } from "@/lib/shared/flows-timeline";
-import { daysFromEvents } from "@/lib/shared/flows-timeline";
+import type { FlowBucket, FlowDayRow, FlowEvent, FlowLeg, FlowSide, FlowTimeline } from "@/lib/shared/flows-timeline";
+import { daysFromEvents, flowLeg } from "@/lib/shared/flows-timeline";
+import { cometFlowPriceNote } from "@/lib/compound/comet-price-notes";
+import { centsOf, shownUsd } from "@/lib/shared/shown-usd";
 import type { AssetBalance, FocusEvent } from "@/lib/shared/flow-focus";
 import type { BaseActivityEvent, CompoundEventType } from "@/lib/shared/types/event-shape";
 import { isCompoundEvent } from "@/lib/shared/types/event-shape";
@@ -221,6 +223,9 @@ export interface CompoundReplayed {
    *  read (or the row carried its own value) for it. */
   price: Record<string, number>;
   own: Set<string>;
+  /** Where each token's price came from: the block it was read at, and
+   *  whether it is a read or an absorb's own value (ui-jobs 743). */
+  from: Record<string, { block: number; kind: "read" | "absorb" }>;
   /** The base move since the previous row that no event states. */
   unlogged: number;
 }
@@ -332,6 +337,7 @@ export function replayCompound(
       base: tokens(after),
       coll: new Map(coll),
       price: {},
+      from: {},
       own: new Set(),
       unlogged: tokens(unlogged),
     });
@@ -351,23 +357,31 @@ function priceRows(rows: CompoundReplayed[], base: string) {
       if (p > 0 && tokens.has(t)) {
         r.price[t] = p;
         r.own.add(t);
+        r.from[t] = { block: r.ev.block, kind: "read" };
       }
     if (r.ev.usdValue != null && r.ev.usdValue > 0 && Math.abs(r.ev.delta) > DUST && !r.own.has(r.ev.token)) {
       r.price[r.ev.token] = r.ev.usdValue / Math.abs(r.ev.delta);
       r.own.add(r.ev.token);
+      r.from[r.ev.token] = { block: r.ev.block, kind: "absorb" };
     }
   }
   for (const t of tokens) {
-    let last: number | null = null;
+    let last: CompoundReplayed | null = null;
     for (const r of rows) {
-      if (r.own.has(t)) last = r.price[t];
-      else if (last != null) r.price[t] = last;
+      if (r.own.has(t)) last = r;
+      else if (last != null) {
+        r.price[t] = last.price[t];
+        r.from[t] = last.from[t];
+      }
     }
-    let next: number | null = null;
+    let next: CompoundReplayed | null = null;
     for (let i = rows.length - 1; i >= 0; i--) {
       const r = rows[i];
-      if (r.own.has(t)) next = r.price[t];
-      else if (r.price[t] == null && next != null) r.price[t] = next;
+      if (r.own.has(t)) next = r;
+      else if (r.price[t] == null && next != null) {
+        r.price[t] = next.price[t];
+        r.from[t] = next.from[t];
+      }
     }
   }
 }
@@ -527,6 +541,10 @@ export interface CompoundFlowOptions {
    *  day, USD] ascending, from the shared daily price store: each completed
    *  day no row priced takes it. */
   dailyPrices?: Record<string, [number, number][]>;
+  /** The Comet's name and the unit its getPrice quotes in, for the legs'
+   *  price notes. */
+  comet?: string;
+  quoteUnit?: "USD" | "ETH";
 }
 
 /** The replay with the rates between rows, for the timeline, the cards and
@@ -542,6 +560,9 @@ export interface CompoundFlowReplay {
   symbols: Map<string, string>;
   /** Two units of the base: Comet's principal rounding. */
   dust: number;
+  /** The Comet's name and quote unit, for the legs' price notes. */
+  comet: string;
+  quoteUnit: "USD" | "ETH";
 }
 
 export function compoundFlowReplay(events: CompoundFlowEvent[], o: CompoundFlowOptions): CompoundFlowReplay {
@@ -574,14 +595,41 @@ export function compoundFlowReplay(events: CompoundFlowEvent[], o: CompoundFlowO
     base: o.baseToken.toLowerCase(),
     symbols,
     dust: 2 * 10 ** -o.baseDecimals,
+    comet: o.comet ?? `Comet (${o.baseSymbol})`,
+    quoteUnit: o.quoteUnit ?? "USD",
   };
+}
+
+/** A row's leg with its parts (ui-jobs 743): the token at the row's price as
+ *  shown, its block and source named; a price from the nearest read names
+ *  both blocks; no price at all is unpriced. */
+function compoundLeg(
+  rp: Pick<CompoundFlowReplay, "comet" | "quoteUnit">,
+  r: CompoundReplayed,
+  l: CompoundReplayed["legs"][number],
+): FlowLeg {
+  const from = r.from[l.token];
+  return flowLeg({
+    bucket: l.bucket,
+    amount: l.amount,
+    symbol: l.symbol,
+    price: r.price[l.token],
+    block: from?.block ?? null,
+    priceNote: from
+      ? cometFlowPriceNote({
+          comet: rp.comet,
+          quoteUnit: rp.quoteUnit,
+          from: from.kind,
+          priceBlock: from.block,
+          eventBlock: r.ev.block,
+        })
+      : "no price read for this token",
+    ...(ACCRUAL_KEYS.has(l.bucket) ? { accrual: true } : {}),
+  });
 }
 
 /** The growth factor of a balance `dt` seconds after its row, at `rate`. */
 const grow = (rate: number, dt: number) => 1 + rate * (Math.max(0, dt) / ONE_YEAR_S);
-
-/** A leg's dollars: the token at the row's price. */
-const legUsd = (r: CompoundReplayed, l: CompoundReplayed["legs"][number]) => l.amount * (r.price[l.token] ?? 0);
 
 /** Whether the position still holds or owes anything after a row. */
 function holds(r: CompoundReplayed, dust: number): boolean {
@@ -664,7 +712,7 @@ export function compoundFlowTimeline(events: CompoundFlowEvent[], o: CompoundFlo
       ts: r.ev.ts,
       block: r.ev.block,
       tick: absorb ? "liquidation" : moved.coll && moved.debt ? "both" : moved.debt ? "debt" : "collateral",
-      legs: r.legs.map((l) => ({ bucket: l.bucket, usd: legUsd(r, l), symbol: l.symbol })),
+      legs: r.legs.map((l) => compoundLeg(rp, r, l)),
       tx: r.ev.tx,
       countsTx: !absorb && r.ev.kind !== "transfer_in" && r.ev.kind !== "transfer_collateral_in",
       ...(!absorb && r.ev.byOther ? { byOther: true } : {}),
@@ -870,20 +918,56 @@ export function compoundFlowWords(
 
 /** Each side's assets once a transaction had run, in tokens, with the
  *  prices at its last row, and their dollars. */
-function sideAt(
-  rp: CompoundFlowReplay,
-  r: CompoundReplayed | null,
-  side: FlowSide,
-): { symbol: string; amount: number; price: number }[] {
+function sideAt(rp: CompoundFlowReplay, r: CompoundReplayed | null, side: FlowSide): SideAsset[] {
   if (!r) return [];
-  const out: { symbol: string; amount: number; price: number }[] = [];
+  const out: SideAsset[] = [];
+  // A token the reads never priced has no price: never $0 (ui-jobs 743).
+  const asset = (t: string, amount: number): SideAsset => {
+    const from = r.from[t];
+    return {
+      symbol: rp.symbols.get(t) ?? t,
+      amount,
+      price: r.price[t] ?? null,
+      block: from?.block ?? null,
+      ...(from
+        ? {
+            priceNote: cometFlowPriceNote({
+              comet: rp.comet,
+              quoteUnit: rp.quoteUnit,
+              from: from.kind,
+              priceBlock: from.block,
+              eventBlock: r.ev.block,
+            }),
+          }
+        : {}),
+    };
+  };
   if (side === "collateral") {
-    for (const [t, a] of r.coll)
-      out.push({ symbol: rp.symbols.get(t) ?? t, amount: Math.max(0, a), price: r.price[t] ?? 0 });
-    out.push({ symbol: rp.symbols.get(rp.base) ?? "", amount: Math.max(0, r.base), price: r.price[rp.base] ?? 0 });
-  } else
-    out.push({ symbol: rp.symbols.get(rp.base) ?? "", amount: Math.max(0, -r.base), price: r.price[rp.base] ?? 0 });
+    for (const [t, a] of r.coll) out.push(asset(t, Math.max(0, a)));
+    out.push(asset(rp.base, Math.max(0, r.base)));
+  } else out.push(asset(rp.base, Math.max(0, -r.base)));
   return out;
+}
+
+/** One asset of a side at a row, its price where read and where from. */
+interface SideAsset {
+  symbol: string;
+  amount: number;
+  price: number | null;
+  block: number | null;
+  priceNote?: string;
+}
+
+/** A side's assets as shown, priced: their shown products summed, to the
+ *  cent; null where a held asset has no price. */
+function sideCents(assets: readonly { amount: number; price: number | null }[]): number | null {
+  let total = 0;
+  for (const x of assets) {
+    if (!(x.amount > 0)) continue;
+    if (x.price == null) return null;
+    total += shownUsd(x.amount, x.price);
+  }
+  return centsOf(total);
 }
 
 /** The rows as the event cards' sums read them (lib/shared/flow-focus.ts):
@@ -898,7 +982,7 @@ export function compoundFocusEvents(rp: CompoundFlowReplay): FocusEvent[] {
     const lastOf = tx[tx.length - 1];
     const firstIdx = replayed.indexOf(tx[0]);
     const prior = firstIdx > 0 ? replayed[firstIdx - 1] : null;
-    const usdOf = (assets: { amount: number; price: number }[]) => assets.reduce((a, x) => a + x.amount * x.price, 0);
+    const usdOf = (assets: { amount: number; price: number | null }[]) => sideCents(assets) ?? 0;
     const side = (s: FlowSide) => {
       const after = sideAt(rp, lastOf, s);
       // Before the transaction, at its prices.
@@ -916,13 +1000,7 @@ export function compoundFocusEvents(rp: CompoundFlowReplay): FocusEvent[] {
       id: r.ev.id,
       ts: r.ev.ts,
       ...(r.ev.tx ? { tx: r.ev.tx } : {}),
-      legs: r.legs.map((l) => ({
-        bucket: l.bucket,
-        usd: legUsd(r, l),
-        amount: l.amount,
-        symbol: l.symbol,
-        ...(ACCRUAL_KEYS.has(l.bucket) ? { accrual: true } : {}),
-      })),
+      legs: r.legs.map((l) => compoundLeg(rp, r, l)),
       sides: { collateral: side("collateral"), debt: side("debt") },
       rate: rate * 100,
     };
@@ -948,7 +1026,7 @@ export function compoundSideBalances(
   rp: CompoundFlowReplay,
   eventId: string,
   side: FlowSide,
-): { balances: AssetBalance[]; held: number; heldBefore: number } | null {
+): { balances: AssetBalance[]; held: number | null; heldBefore: number | null } | null {
   const at = rp.replayed.findIndex((r) => r.ev.id === eventId);
   if (at < 0) return null;
   const r = rp.replayed[at];
@@ -964,10 +1042,20 @@ export function compoundSideBalances(
     const a = after.find((x) => x.symbol === s);
     const b = before.find((x) => x.symbol === s);
     if (!((a?.amount ?? 0) > DUST) && !((b?.amount ?? 0) > DUST)) continue;
-    balances.push({ symbol: s, amount: a?.amount ?? 0, before: b?.amount ?? 0, price: a?.price ?? b?.price ?? null });
+    const p = a?.price != null ? a : (b ?? a);
+    balances.push({
+      symbol: s,
+      amount: a?.amount ?? 0,
+      before: b?.amount ?? 0,
+      price: p?.price ?? null,
+      block: p?.block ?? null,
+      ...(p?.priceNote ? { priceNote: p.priceNote } : {}),
+    });
   }
-  const held = balances.reduce((acc, x) => acc + x.amount * (x.price ?? 0), 0);
-  const heldBefore = balances.reduce((acc, x) => acc + x.before * (x.price ?? 0), 0);
+  // Each balance as shown times its price as shown, summed; no figure where
+  // a held balance has no price.
+  const held = sideCents(balances);
+  const heldBefore = sideCents(balances.map((x) => ({ amount: x.before, price: x.price })));
   return { balances, held, heldBefore };
 }
 

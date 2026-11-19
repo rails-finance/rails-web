@@ -261,12 +261,24 @@ export function useCompoundFlows(p: CompoundFlowsInput): {
             baseToken: market.baseToken,
             baseSymbol: market.baseSymbol,
             baseDecimals: market.baseDecimals,
+            comet: market.label,
+            quoteUnit: market.quoteUnit,
             now,
             live: p.open ? p.live : null,
             ...(dailyPrices ? { dailyPrices } : {}),
           }
         : null,
-    [now, market.baseToken, market.baseSymbol, market.baseDecimals, p.open, p.live, dailyPrices],
+    [
+      now,
+      market.baseToken,
+      market.baseSymbol,
+      market.baseDecimals,
+      market.label,
+      market.quoteUnit,
+      p.open,
+      p.live,
+      dailyPrices,
+    ],
   );
   const replay = useMemo(() => (rows && opts && rows.length > 0 ? compoundFlowReplay(rows, opts) : null), [rows, opts]);
   const replayed = useMemo(
