@@ -557,7 +557,15 @@ export function towerAssets(tower: ChainTruthTowerData, collateralInterest: bool
       if (at) {
         at.usd += l.usd ?? 0;
         at.amount = at.amount != null ? at.amount + l.amount : null;
-      } else out.push({ side, symbol: l.symbol, amount: l.amount, usd: l.usd ?? 0 });
+      } else
+        out.push({
+          side,
+          symbol: l.symbol,
+          amount: l.amount,
+          usd: l.usd ?? 0,
+          // A line the tower could not price has no figure (ui-jobs 743).
+          ...(l.usd == null && l.amount > 0 ? { unpriced: true as const } : {}),
+        });
     }
     if (!interest) return;
     // Interest on one asset joins it; interest summed across assets is its own line.

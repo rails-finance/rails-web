@@ -761,11 +761,23 @@ export function dolomiteFlowTimeline(rows: DolomiteFlowRow[], o: DolomiteFlowOpt
   for (const h of held) {
     const p = todayPrice(h.market) ?? dailyPrices[h.market]?.at(-1)?.[1] ?? 0;
     if (h.supply > DUST) {
-      assets.push({ side: "collateral", symbol: h.symbol, amount: h.supply, usd: h.supply * p });
+      assets.push({
+        side: "collateral",
+        symbol: h.symbol,
+        amount: h.supply,
+        usd: h.supply * p,
+        ...(p > 0 ? {} : { unpriced: true as const }),
+      });
       collateralUsd += h.supply * p;
     }
     if (h.debt > DUST) {
-      assets.push({ side: "debt", symbol: h.symbol, amount: h.debt, usd: h.debt * p });
+      assets.push({
+        side: "debt",
+        symbol: h.symbol,
+        amount: h.debt,
+        usd: h.debt * p,
+        ...(p > 0 ? {} : { unpriced: true as const }),
+      });
       debtUsd += h.debt * p;
     }
   }

@@ -633,12 +633,24 @@ export function ctokenFlowTimeline(rows: CTokenFlowRow[], o: CTokenFlowOptions):
       // The amount × the price as shown, to the cent, so "Still supplied"
       // agrees with the panel's rows.
       const usd = shownUsd(h.supply, p);
-      assets.push({ side: "collateral", symbol: h.symbol, amount: h.supply, usd });
+      assets.push({
+        side: "collateral",
+        symbol: h.symbol,
+        amount: h.supply,
+        usd,
+        ...(p > 0 ? {} : { unpriced: true as const }),
+      });
       collateralUsd += usd;
     }
     if (h.debt > DUST) {
       const usd = shownUsd(h.debt, p);
-      assets.push({ side: "debt", symbol: h.symbol, amount: h.debt, usd });
+      assets.push({
+        side: "debt",
+        symbol: h.symbol,
+        amount: h.debt,
+        usd,
+        ...(p > 0 ? {} : { unpriced: true as const }),
+      });
       debtUsd += usd;
     }
   }

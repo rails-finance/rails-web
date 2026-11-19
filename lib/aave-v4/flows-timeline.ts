@@ -163,8 +163,21 @@ export function aaveV4FlowLive(
     const supplied = r.currentSupplied ?? Math.max(0, r.supplied - r.withdrawn - r.liquidatedCollateral);
     const owed = r.currentBorrowed ?? Math.max(0, r.borrowed - r.repaid - r.liquidatedDebt);
     if (supplied > 0)
-      assets.push({ side: "collateral", symbol: r.symbol, amount: supplied, usd: p == null ? 0 : supplied * p });
-    if (owed > 0) assets.push({ side: "debt", symbol: r.symbol, amount: owed, usd: p == null ? 0 : owed * p });
+      assets.push({
+        side: "collateral",
+        symbol: r.symbol,
+        amount: supplied,
+        usd: p == null ? 0 : supplied * p,
+        ...(p == null ? { unpriced: true as const } : {}),
+      });
+    if (owed > 0)
+      assets.push({
+        side: "debt",
+        symbol: r.symbol,
+        amount: owed,
+        usd: p == null ? 0 : owed * p,
+        ...(p == null ? { unpriced: true as const } : {}),
+      });
   }
   return {
     collateralUsd: Math.max(0, totals.inProtocolUsd),

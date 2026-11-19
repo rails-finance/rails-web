@@ -41,6 +41,16 @@ export const shownEth = (amount: number, price: number): number =>
 export const shownComposedPrice = (a: number, b: number, op: "×" | "÷" = "×"): number =>
   shownPrice(op === "÷" ? shownPrice(a) / shownPrice(b) : shownPrice(a) * shownPrice(b));
 
+/** A growth factor as a receipt shows it (the interest a $1-face debt has
+ *  built since its event, 1 + …): twelve decimal places. */
+export const shownFactor = (v: number): number => roundAway(scaled(v, 1e12)) / 1e12;
+/** A $1-face debt grown by its factor, as its receipt rows multiply out: the
+ *  recorded debt as shown × the factor as shown, to six decimals. */
+export const faceAmount = (recorded: number, factor: number): number =>
+  shownAmount(shownAmount(recorded) * shownFactor(factor));
+/** A factor as a receipt row prints it. */
+export const factorText = (v: number) => shownFactor(v).toLocaleString("en-US", { maximumFractionDigits: 12 });
+
 /** An amount as a receipt row prints it. */
 export const amountText = (v: number) => shownAmount(v).toLocaleString("en-US", { maximumFractionDigits: 6 });
 /** A price as a receipt row (or the asset popover beside it) prints it: up

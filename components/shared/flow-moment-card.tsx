@@ -133,6 +133,7 @@ export function FlowMomentCard({
   flash: boolean;
 }) {
   const date = dayStamp(moment.day * DAY_S);
+  const compound = model.words.moment?.compound === true;
   const when = `the close of ${date}`;
   const lastStamp = dayStamp(moment.lastDay * DAY_S);
   // A face side whose interest is a contract's minute sum that stops at a
@@ -386,7 +387,9 @@ export function FlowMomentCard({
   const faceRateInterestProv = (a: MomentAsset): Provenance => ({
     kind: "chain-derived",
     summary: `${a.symbol} interest owed to ${when}. What the rate in force after the last event (${lastStamp}) builds on the debt that event recorded, to the end of the day.`,
-    formula: "recorded debt × annual rate × time ÷ 1 year",
+    formula: compound
+      ? "recorded debt × (e^(annual rate × time ÷ 1 year) − 1)"
+      : "recorded debt × annual rate × time ÷ 1 year",
     inputs: [
       { label: "recorded debt", value: `${fmtPositionAmount(a.recorded)} ${a.symbol}`, kind: "chain" },
       ...(moment.accrual
@@ -395,7 +398,9 @@ export function FlowMomentCard({
               label: "annual rate",
               value: `${moment.accrual.rate.toLocaleString("en-US", { maximumFractionDigits: 4 })}%`,
               kind: "chain" as const,
-              note: "in force after the last event, fees included",
+              note: compound
+                ? "in force after the last event, compounded each second"
+                : "in force after the last event, fees included",
             },
             {
               label: "time",
@@ -593,7 +598,7 @@ export function FlowMomentCard({
           ? `the debt the last event recorded, plus the interest the contract's sum built on the principal until the deadline on ${sumStop}, where it stopped: principal × APR × whole minutes from the start to the deadline ÷ 5,256,000,000.`
           : `the debt the last event recorded, plus the interest the contract's sum builds on the principal to the end of ${date}: principal × APR × whole minutes from the start ÷ 5,256,000,000.`
         : s.face && moment.accrual
-          ? `the debt the last event recorded, plus the interest at ${moment.accrual.rate.toLocaleString("en-US", { maximumFractionDigits: 2 })}% a year built on it to the end of ${date}.`
+          ? `the debt the last event recorded, plus the interest at ${moment.accrual.rate.toLocaleString("en-US", { maximumFractionDigits: 2 })}% a year${compound ? ", compounded each second," : ""} built on it to the end of ${date}.`
           : s.assets.some((a) => a.grown)
             ? `${grownWords(side)}${priced}`
             : `as the last event left it on ${lastStamp}; no event changed it by then.${priced}`;

@@ -3,10 +3,10 @@
 // date; a segment's tip lists its assets.
 
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
-import type { FlowAssetHeld, FlowLeg, FlowSegment, FlowSide, MarketMove } from "@/lib/shared/flows-timeline";
+import type { FlowAssetHeld, FlowLeg, FlowSegment, FlowSide, FlowUnit, MarketMove } from "@/lib/shared/flows-timeline";
 import { holderUsdReceipt } from "@/lib/shared/holder-usd-receipt";
 import { listWords, noPriceWords } from "@/lib/shared/flows-sum";
-import { amountText, centsOf } from "@/lib/shared/shown-usd";
+import { amountText, centsOf, faceAmount, factorText } from "@/lib/shared/shown-usd";
 import { formatUsdValue } from "@/lib/utils/format";
 
 // ── The rows behind a line (ui-jobs 743) ─────────────────────────────────────
@@ -207,11 +207,29 @@ export function heldDayProv(label: string, when: string, rows: readonly FlowAsse
       const at = p.block != null ? `block ${p.block.toLocaleString("en-US")}` : null;
       // A side counted at its $1 face: the recorded debt with the interest
       // built on it since, at $1.
+      // Three rows: the recorded debt, the factor its rate built on it to
+      // the day, and their product.
       if (p.face)
         return {
           token: r.symbol,
-          amount: (r.amount ?? 0) * (p.price as number),
-          amountNote: "the debt its last event recorded, with the interest its rate built on it to the day",
+          before: [
+            {
+              label: `${r.symbol} recorded debt`,
+              value: `${amountText(r.amount ?? 0)} ${r.symbol}`,
+              kind: "chain" as const,
+              pclass: "indexed" as const,
+              note: "the debt its last event recorded",
+            },
+            {
+              label: `${r.symbol} interest factor`,
+              value: factorText(p.price as number),
+              kind: "chain-derived" as const,
+              note: `the interest its rate built on the recorded debt to the close of ${day(p.day)}`,
+            },
+          ],
+          amount: faceAmount(r.amount ?? 0, p.price as number),
+          amountNote: "recorded debt × interest factor",
+          amountKind: { kind: "derived" as const, pclass: undefined },
           price: 1,
           priceNote: `1 ${r.symbol} is counted as $1`,
           face: true,
@@ -268,6 +286,8 @@ export function flowSegmentProv(
   when: string,
   isLive: boolean,
   daily = false,
+  /** The side's token on a unit model: its figures carry no dollar rows. */
+  unit?: FlowUnit,
 ): Provenance {
   const held = side === "collateral" ? "held" : "owed";
   if (s.legs && (s.fill === "in" || s.fill === "out"))
@@ -278,12 +298,14 @@ export function flowSegmentProv(
     return { kind: "derived", summary: `${s.label} up to ${when}. ${s.served}` };
   // A past day's held figure: each asset's balance × that day's price as
   // shown, at its block, summed; or no figure, naming the asset (ui-jobs 743).
-  if (s.fill === "held" && !isLive && s.unpriced?.length)
+  if (s.fill === "held" && s.unpriced?.length && !unit)
     return {
       kind: "derived",
-      summary: `${s.label} at ${when}. No figure: ${noPriceWords([...s.unpriced])} on this day.`,
+      summary: isLive
+        ? `${s.label} now. No figure: ${noPriceWords([...s.unpriced])}.`
+        : `${s.label} at ${when}. No figure: ${noPriceWords([...s.unpriced])} on this day.`,
     };
-  if (s.fill === "held" && !isLive && s.heldRows?.some((r) => r.priced?.price != null))
+  if (s.fill === "held" && !isLive && !unit && s.heldRows?.some((r) => r.priced?.price != null))
     return heldDayProv(s.label, when, s.heldRows);
   if (s.fill === "held")
     return isLive
@@ -361,17 +383,19 @@ export function flowAssetProv(
   when: string,
   isLive: boolean,
   daily = false,
+  /** The side's token on a unit model: its figures carry no dollar rows. */
+  unit?: FlowUnit,
 ): Provenance {
   // A figure in cents states its rows: the asset's legs on a line, or its
   // balance × the day's price on a past day's held figure (ui-jobs 743).
-  if (s.fill === "held" && !isLive) {
+  if (s.fill === "held" && !isLive && !unit) {
     const rows = s.heldRows?.filter((r) => r.symbol === symbol && (r.amount ?? 0) > 0);
     if (rows?.length && rows.every((r) => r.priced?.price != null))
       return heldDayProv(`${symbol} ${side === "collateral" ? "held" : "owed"}`, when, rows);
     if (rows?.some((r) => r.unpriced))
       return { kind: "derived", summary: `${symbol} at ${when}. No figure: ${noPriceWords([symbol])} on this day.` };
   }
-  if ((s.fill === "in" || s.fill === "out") && s.legs) {
+  if ((s.fill === "in" || s.fill === "out") && s.legs && !unit) {
     const legs = s.legs.filter((l) => l.symbol === symbol);
     if (legs.length)
       return legsProv(

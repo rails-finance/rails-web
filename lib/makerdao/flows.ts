@@ -431,9 +431,14 @@ export function replayMaker(events: MakerFlowEvent[], o: MakerFlowOptions): Make
   return out;
 }
 
-/** The fee's rate from each row to the next, simple, as a fraction a year:
- *  the next row's rate over this row's, spread over the time between them;
+/** The fee's rate from each row to the next, compounded each second as the
+ *  Vat's rate accumulator grows through Jug's rpow, as a continuous fraction
+ *  a year: ln(the next row's rate over this row's) over the time between
+ *  them, so a duty unchanged between the rows meets the next row's figure;
  *  after the last row, to the live read's rate now, else the fee now. */
+/** What a continuous annual `rate` grows a debt by over `seconds`. */
+export const makerGrowth = (rate: number, seconds: number): number => Math.exp(rate * (seconds / ONE_YEAR_S));
+
 export function makerFeeRates(replayed: MakerReplayed[], o: MakerFlowOptions): number[] {
   const out: number[] = [];
   for (let i = 0; i < replayed.length; i++) {
@@ -445,7 +450,7 @@ export function makerFeeRates(replayed: MakerReplayed[], o: MakerFlowOptions): n
         ? { rate: o.live.rate, ts: o.now }
         : null;
     const dt = to ? to.ts - a.ts : 0;
-    if (to && dt > 0 && a.rate > 0) out.push((to.rate / a.rate - 1) / (dt / ONE_YEAR_S));
+    if (to && dt > 0 && a.rate > 0) out.push(Math.log(to.rate / a.rate) / (dt / ONE_YEAR_S));
     else if (!b && o.live?.feeApr != null) out.push(Math.log(1 + o.live.feeApr));
     else out.push(out[i - 1] ?? 0);
   }
@@ -540,14 +545,14 @@ export function makerFlowTimeline(events: MakerFlowEvent[], o: MakerFlowOptions)
     const end = Math.min((d + 1) * DAY_S, o.now);
     while (ei + 1 < replayed.length && replayed[ei + 1].ev.ts <= end) ei++;
     const e = replayed[ei].ev;
-    debtObs.push([d, e.ts <= end ? 1 + rates[ei] * (Math.max(0, end - e.ts) / ONE_YEAR_S) : 1]);
+    debtObs.push([d, e.ts <= end ? makerGrowth(rates[ei], Math.max(0, end - e.ts)) : 1]);
   }
 
   // Now: the live read where the page has one, else the last row with the
   // fee grown since.
   const nowColl = open ? (o.live?.ink ?? last.ev.inkAfter) : 0;
   const nowDebt = open
-    ? (o.live?.debt ?? last.ev.debtAfter * (1 + rates[rates.length - 1] * ((o.now - last.ev.ts) / ONE_YEAR_S)))
+    ? (o.live?.debt ?? last.ev.debtAfter * makerGrowth(rates[rates.length - 1], o.now - last.ev.ts))
     : 0;
   const priceNow = livePrice ?? last.price;
 
@@ -566,6 +571,7 @@ export function makerFlowTimeline(events: MakerFlowEvent[], o: MakerFlowOptions)
                     symbol: o.collSymbol,
                     amount: nowColl,
                     usd: shownUsd(nowColl, priceNow),
+                    ...(priceNow > 0 ? {} : { unpriced: true as const }),
                   },
                 ]
               : []),
@@ -623,6 +629,7 @@ export function makerFlowWords(
       : `with the collateral at the price of the vault's latest event by then and the debt at $1 plus the stability fee built since`,
     moment: {
       face: ["debt"],
+      compound: true,
       noPrice: {
         collateral: `No Maker oracle price is recorded for this day, so the collateral is stated in ${collSymbol} only.`,
       },

@@ -546,3 +546,121 @@ test("the line breaks on each day an asset held there has no price, as the bars 
   const live = { ...m, liveHeld: [{ side: "collateral", symbol: "WBTC", amount: 1, usd: 0, unpriced: true }] };
   assert.equal(flowLinePoints(live, series).at(-1).collateral, null);
 });
+
+test("a live asset with no price breaks the line at the live point and draws no figure", async () => {
+  const { shownNow, formatFlowUsd } = await import(ROOT + "lib/shared/flows-timeline.ts");
+  const { aaveV4FlowLive } = await import(ROOT + "lib/aave-v4/flows-timeline.ts");
+  const m = buildFlowModel({
+    buckets: BUCKETS,
+    days: daysFromEvents(
+      BUCKETS.map((b) => b.key),
+      [
+        {
+          id: "a",
+          ts: T0 + 10,
+          block: 1001,
+          tick: "collateral",
+          legs: [leg("dep", 1, null, 1001)],
+          balances: [{ asset: "wbtc", symbol: "WBTC", side: "collateral", amount: 1 }],
+          prices: [],
+        },
+      ],
+    ),
+    live: { collateralUsd: 0, debtUsd: 0 },
+    today: 20_005,
+    dailyPrices: {},
+  });
+  assert.deepEqual(
+    m.liveHeld.map((h) => [h.symbol, h.unpriced]),
+    [["WBTC", true]],
+  );
+  const series = { points: [[20_004, 20_004, 5, 0]] };
+  assert.equal(flowLinePoints(m, series).at(-1).collateral, null, "the line breaks at the live point");
+  const live = stateAt(m, m.liveStop);
+  assert.equal(sideSumRows(live.collateral).total.amount, "—");
+  assert.equal(formatFlowUsd(shownNow(live.collateral)), "—", "the headline draws no figure, never $0");
+  // A family's live read with no price marks the asset (Aave V4).
+  const v4 = aaveV4FlowLive(
+    { inProtocolUsd: 0, outstandingUsd: 0 },
+    [{ symbol: "WBTC", supplied: 1, withdrawn: 0, liquidatedCollateral: 0, borrowed: 0, repaid: 0, liquidatedDebt: 0 }],
+    () => null,
+  );
+  assert.equal(v4.assets[0].unpriced, true);
+});
+
+test("a unit model's past-day rows carry no dollar price", () => {
+  const m = buildFlowModel({
+    buckets: BUCKETS,
+    unit: { symbol: "USDC", scale: 6 },
+    days: daysFromEvents(
+      BUCKETS.map((b) => b.key),
+      [
+        {
+          id: "a",
+          ts: T0 + 10,
+          block: 1001,
+          tick: "collateral",
+          legs: [{ bucket: "dep", usd: 5_000_000, symbol: "USDC" }],
+          balances: [{ asset: "usdc", symbol: "USDC", side: "collateral", amount: 5 }],
+          prices: [],
+        },
+      ],
+    ),
+    live: { collateralUsd: 5_000_000, debtUsd: 0 },
+    today: 20_005,
+    // A price in the token's grains: a million a token.
+    dailyPrices: { usdc: [[20_002, 1_000_000, 1_500_000]] },
+  });
+  const st = stateAt(m, 2);
+  assert.equal(m.heldAt[2][0].priced.price, undefined);
+  for (const unit of [m.unit, undefined]) {
+    const text = JSON.stringify(flowSegmentProv(st.collateral.bar[0], "collateral", "x", false, true, unit));
+    assert.ok(!text.includes("$"), text);
+  }
+});
+
+test("a $1-face receipt states the recorded debt, the factor and their product", () => {
+  const events = [
+    {
+      id: "a",
+      ts: T0 + 10,
+      block: 1001,
+      tick: "debt",
+      legs: [
+        flowLeg({
+          bucket: "bor",
+          amount: 1000.1234567,
+          symbol: "BOLD",
+          price: 1,
+          block: 1001,
+          priceNote: "face",
+          face: true,
+        }),
+      ],
+      balances: [{ asset: "bold", symbol: "BOLD", side: "debt", amount: 1000.1234567 }],
+      prices: [],
+    },
+  ];
+  const m = buildFlowModel({
+    buckets: BUCKETS,
+    days: daysFromEvents(
+      BUCKETS.map((b) => b.key),
+      events,
+    ),
+    live: { collateralUsd: 0, debtUsd: 0 },
+    today: 20_005,
+    dailyPrices: { bold: [[20_002, 1.0001234567891, 1_500_000]] },
+    words: { moment: { face: ["debt"] } },
+  });
+  const st = stateAt(m, 2);
+  const rows = flowSegmentProv(st.debt.bar[0], "debt", "the end of 2 Oct '24", false, true).inputs;
+  const v = (l) => rows.find((r) => r.label === l)?.value;
+  assert.equal(v("BOLD recorded debt"), "1,000.123457 BOLD");
+  assert.equal(v("BOLD interest factor"), "1.000123456789");
+  // 1,000.123457 × 1.000123456789 = 1,000.246929…, shown to six decimals.
+  assert.equal(v("BOLD amount"), "1,000.246929 BOLD");
+  assert.equal(v("BOLD price"), "$1.00");
+  assert.equal(st.debt.now, 1000.25);
+  const mo = flowMoment(m, [], (20_002 + 1) * DAY - 1);
+  assert.equal(mo.sides.debt.assets[0].tokens, 1000.246929, "the card's tokens to six decimals");
+});

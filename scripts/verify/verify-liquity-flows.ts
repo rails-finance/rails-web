@@ -35,7 +35,7 @@
 //   npx tsx --test scripts/verify/verify-liquity-flows.ts
 import { test } from "node:test";
 import { centsOfLines } from "./lib/cents-lines";
-import { shownUsd } from "@/lib/shared/shown-usd";
+import { faceAmount, shownUsd } from "@/lib/shared/shown-usd";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -696,11 +696,13 @@ for (const [name, events, symbols] of [
         assert.equal(debt.face, true);
         assert.equal(debt.priced, true);
         const tokens = debt.assets[0].tokens;
-        assert.ok(Math.abs(tokens - chart.debt.now) <= Math.max(1e-9, chart.debt.now * 1e-12), `debt at stop ${stop}`);
+        // The card's tokens to six decimals; the chart's figure is them at $1, to the cent (ui-jobs 743).
+        assert.equal(shownUsd(tokens, 1), chart.debt.now, `debt at stop ${stop}`);
         assert.ok(mo.accrual, "the rate in force");
         const owed = last.debtAfter * mo.accrual.factor;
-        // The debt with its interest at the $1 face, to the cent (ui-jobs 743).
-        assert.equal(tokens, shownUsd(owed, 1), `debt by the rate at stop ${stop}`);
+        // The recorded debt × the factor, as the receipt multiplies them out (ui-jobs 743).
+        assert.equal(tokens, faceAmount(last.debtAfter, mo.accrual.factor), `debt by the rate at stop ${stop}`);
+        assert.ok(Math.abs(tokens - owed) <= 1.1e-6 + owed * 1e-12, `debt by the rate at stop ${stop}`);
         assert.equal(mo.accrual.rate, last.rate + last.fee);
         // Its sum to that day adds up to what is owed.
         let ri = -1;
@@ -875,7 +877,7 @@ test("V1: between events the debt stays as recorded and the collateral takes ETH
     const mo = flowMoment(m, focus, close - 1);
     if (mo) {
       assert.equal(mo.accrual, null, "no interest built between events");
-      if (last.debtAfter > 0) assert.equal(mo.sides.debt.assets[0].tokens, shownUsd(last.debtAfter, 1));
+      if (last.debtAfter > 0) assert.equal(mo.sides.debt.assets[0].tokens, faceAmount(last.debtAfter, 1));
     }
   }
   assert.ok(checked > 100, `days priced by the daily close (${checked})`);

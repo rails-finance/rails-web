@@ -28,6 +28,7 @@
 //
 //   npx tsx --test scripts/verify/verify-alchemix-flows.ts
 import { test } from "node:test";
+import { assertUnitReceipts } from "./lib/unit-receipts";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -433,4 +434,10 @@ test("the card's LTV print: one place, and a dust debt below it", () => {
   assert.equal(ltvPrint(1 / 1.1104), "90.1%");
   assert.equal(ltvPrint(0.0004), "<0.1%");
   assert.equal(ltvPrint(1.05), "105.0%");
+});
+
+test("a unit model's past-day Held and Owed receipts stay in the underlying token (ui-jobs 743)", () => {
+  let read = 0;
+  for (const name of NAMES) read += assertUnitReceipts(buildFlowModel(timeline(fx(name)))!, name);
+  assert.ok(read > 0, "receipts read");
 });

@@ -823,15 +823,33 @@ export function compoundFlowTimeline(events: CompoundFlowEvent[], o: CompoundFlo
       if (!(a > DUST)) continue;
       const usd = a * priceNow(t);
       collUsd += usd;
-      assets.push({ side: "collateral", symbol: rp.symbols.get(t) ?? t, amount: a, usd });
+      assets.push({
+        side: "collateral",
+        symbol: rp.symbols.get(t) ?? t,
+        amount: a,
+        usd,
+        ...(priceNow(t) > 0 ? {} : { unpriced: true as const }),
+      });
     }
     if (nowSupply > dust) {
       const usd = nowSupply * priceNow(base);
       collUsd += usd;
-      assets.push({ side: "collateral", symbol: o.baseSymbol, amount: nowSupply, usd });
+      assets.push({
+        side: "collateral",
+        symbol: o.baseSymbol,
+        amount: nowSupply,
+        usd,
+        ...(priceNow(base) > 0 ? {} : { unpriced: true as const }),
+      });
     }
     if (nowDebt > dust)
-      assets.push({ side: "debt", symbol: o.baseSymbol, amount: nowDebt, usd: nowDebt * priceNow(base) });
+      assets.push({
+        side: "debt",
+        symbol: o.baseSymbol,
+        amount: nowDebt,
+        usd: nowDebt * priceNow(base),
+        ...(priceNow(base) > 0 ? {} : { unpriced: true as const }),
+      });
   }
   const todayPrices: Record<string, number> = {
     [SUPPLY_ASSET]: priceNow(base),

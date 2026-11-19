@@ -14,7 +14,7 @@
 //
 // Pure, tested offline (scripts/verify/verify-lifetime-flows-state.ts).
 
-import { centsOf, roundAway, shownUsd } from "@/lib/shared/shown-usd";
+import { centsOf, faceAmount, roundAway, shownUsd } from "@/lib/shared/shown-usd";
 import {
   differentBases,
   type FlowSegment,
@@ -211,7 +211,7 @@ function heldUnpricedRows(st: FlowSideState, held: FlowSegment): SideSumRows {
         label: seg.label,
         kind: seg.key.endsWith("-opening") ? "opening" : "in",
         seg,
-        dollars: roundAway(seg.value),
+        dollars: roundAway(toCents(seg.value)),
         sign: "",
         amount: "",
       });
@@ -222,7 +222,7 @@ function heldUnpricedRows(st: FlowSideState, held: FlowSegment): SideSumRows {
         label: seg.label,
         kind: "out",
         seg,
-        dollars: -roundAway(seg.value),
+        dollars: -roundAway(toCents(seg.value)),
         sign: "",
         amount: "",
       });
@@ -247,7 +247,7 @@ export function heldCents(held: FlowSegment, unit?: FlowUnit): number | null {
         a +
         ((r.amount ?? 0) > 0
           ? r.priced!.face
-            ? shownUsd((r.amount as number) * r.priced!.price!, 1)
+            ? shownUsd(faceAmount(r.amount as number, r.priced!.price!), 1)
             : shownUsd(r.amount as number, r.priced!.price!)
           : 0),
       0,

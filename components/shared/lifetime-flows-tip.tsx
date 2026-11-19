@@ -427,7 +427,7 @@ export function SegmentTipBody({
         <span aria-hidden className="inline-block h-3 w-4 shrink-0 rounded-[2px]" style={fillStyle(side, seg, hues)} />
         <span>{seg.label}</span>
         <span className="ml-auto tabular-nums">
-          <Prov info={flowSegmentProv(seg, side, when, isLive, daily)}>{wholeUsd(seg.value, unit)}</Prov>
+          <Prov info={flowSegmentProv(seg, side, when, isLive, daily, unit)}>{wholeUsd(seg.value, unit)}</Prov>
         </span>
       </div>
       {pct && (
@@ -489,7 +489,7 @@ export function SegmentPanelBody({
       <div className="flex items-baseline gap-2 pr-6 text-sm font-semibold">
         <span>{title}</span>
         <span className="ml-auto tabular-nums">
-          <Prov info={flowSegmentProv(seg, side, when, isLive, daily)}>{wholeUsd(seg.value, unit)}</Prov>
+          <Prov info={flowSegmentProv(seg, side, when, isLive, daily, unit)}>{wholeUsd(seg.value, unit)}</Prov>
         </span>
       </div>
       {shownParts.length > 0 && (
@@ -501,7 +501,7 @@ export function SegmentPanelBody({
               )}
               <span>{p.symbol}</span>
               <span className="ml-auto tabular-nums">
-                <Prov info={flowAssetProv(p.symbol, seg, side, when, isLive, daily)}>
+                <Prov info={flowAssetProv(p.symbol, seg, side, when, isLive, daily, unit)}>
                   {wholeUsd(partDollars[i], unit)}
                 </Prov>
               </span>
@@ -568,7 +568,7 @@ function SideSumTable({
       ? flowRemainderProv(seg.label, side, when, seg.note, seg.market)
       : kind === "opening"
         ? flowOpeningProv(seg.label, side)
-        : flowSegmentProv(seg, side, when, isLive, daily);
+        : flowSegmentProv(seg, side, when, isLive, daily, unit);
   return (
     <div className="mt-1.5 border-t pt-1.5" style={{ borderColor: "var(--rb-tooltip-border)" }}>
       <p className="mb-1 text-[11px] leading-snug text-rb-500" data-flow-panel-basis="">
@@ -598,7 +598,7 @@ function SideSumTable({
               className="whitespace-nowrap border-t py-0.5 text-right"
               style={{ borderColor: "var(--rb-tooltip-border)" }}
             >
-              <Prov info={flowSegmentProv(sum.total.seg, side, when, isLive, daily)}>{sum.total.amount}</Prov>
+              <Prov info={flowSegmentProv(sum.total.seg, side, when, isLive, daily, unit)}>{sum.total.amount}</Prov>
             </td>
           </tr>
           {heldAssets.map((h, i) => (
@@ -614,7 +614,7 @@ function SideSumTable({
                 </span>
               </td>
               <td className="whitespace-nowrap py-0.5 text-right">
-                <Prov info={flowAssetProv(h.symbol, sum.total.seg, side, when, isLive, daily)}>
+                <Prov info={flowAssetProv(h.symbol, sum.total.seg, side, when, isLive, daily, unit)}>
                   {!unit && h.unpriced ? NO_FIGURE : wholeUsd(heldDollars[i], unit)}
                 </Prov>
               </td>

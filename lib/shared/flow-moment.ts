@@ -29,7 +29,7 @@ import {
   type FlowUnit,
 } from "@/lib/shared/flows-timeline";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
-import { centsOf, shownUsd } from "@/lib/shared/shown-usd";
+import { centsOf, faceAmount, shownUsd } from "@/lib/shared/shown-usd";
 
 const DAY_S = 86_400;
 const ONE_YEAR_S = 31_557_600;
@@ -143,10 +143,14 @@ export function flowMoment(model: FlowModel, events: FocusEvent[], endTs: number
           symbol: h.symbol,
           recorded,
           // A token axis states the face side's tokens in grains (FlowUnit).
+          // A face side in dollars: the recorded debt × its factor, as its
+          // receipt multiplies them out, to six decimals.
           tokens: isFace
             ? unitOf(model, side)
               ? h.usd / 10 ** (unitOf(model, side) as FlowUnit).scale
-              : h.usd
+              : h.priced?.price != null
+                ? faceAmount(amount, h.priced.price)
+                : h.usd
             : amount,
           usd,
           price,
@@ -169,7 +173,8 @@ export function flowMoment(model: FlowModel, events: FocusEvent[], endTs: number
   if (face.size > 0 && last?.rate != null) {
     const seconds = Math.max(0, close - last.ts);
     const year = model.words.moment?.yearSeconds ?? ONE_YEAR_S;
-    accrual = { rate: last.rate, seconds, factor: 1 + (last.rate / 100) * (seconds / year) };
+    const t = (last.rate / 100) * (seconds / year);
+    accrual = { rate: last.rate, seconds, factor: model.words.moment?.compound ? Math.exp(t) : 1 + t };
     const sum = model.words.moment?.minuteSum;
     if (sum) {
       const past = sum.deadline != null && close > sum.deadline;

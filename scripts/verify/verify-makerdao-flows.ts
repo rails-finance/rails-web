@@ -28,7 +28,7 @@
 // store the rows take the nearest priced moment.
 //
 //   npx tsx --test scripts/verify/verify-makerdao-flows.ts
-import { shownUsd } from "@/lib/shared/shown-usd";
+import { faceAmount, shownUsd } from "@/lib/shared/shown-usd";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -38,6 +38,7 @@ import {
   MK,
   makerFeeRates,
   makerFlowEvents,
+  makerGrowth,
   makerFlowTimeline,
   makerFocusEvents,
   makerPricing,
@@ -393,12 +394,18 @@ test("between two rows the debt runs from what the first recorded to what the se
     const day = Math.floor(a.ev.ts / DAY) + 1;
     const owed = stateAt(m, day - startDay).debt.now;
     const before = b.ev.debtAfter - b.ev.debtChange;
-    assert.ok(owed >= a.ev.debtAfter && owed <= before, `owed ${owed} between ${a.ev.debtAfter} and ${before}`);
-    const expected = a.ev.debtAfter * (1 + rates[i] * (((day + 1) * DAY - a.ev.ts) / 31_557_600));
-    // The owed figure is that debt at its $1 par, to the cent (ui-jobs 743).
-    assert.equal(owed, shownUsd(expected, 1), `${owed} vs ${expected}`);
-    // At the next row's block the straight line reaches the debt the row found.
-    assert.ok(near(a.ev.debtAfter * (1 + rates[i] * ((b.ev.ts - a.ev.ts) / 31_557_600)), before, 1e-9));
+    // In cents (ui-jobs 743): the owed figure is a debt at its $1 par.
+    assert.ok(
+      owed >= shownUsd(a.ev.debtAfter, 1) && owed <= shownUsd(before, 1),
+      `owed ${owed} between ${a.ev.debtAfter} and ${before}`,
+    );
+    // The fee compounds each second, as the Vat's rate accumulator grows
+    // through Jug's rpow: the recorded debt × e^(rate × time), to the cent.
+    const factor = makerGrowth(rates[i], (day + 1) * DAY - a.ev.ts);
+    assert.ok(near(factor, Math.exp(rates[i] * (((day + 1) * DAY - a.ev.ts) / 31_557_600)), 1e-15));
+    assert.equal(owed, shownUsd(faceAmount(a.ev.debtAfter, factor), 1), `${owed} vs ${a.ev.debtAfter * factor}`);
+    // At the next row's block the compounding meets the debt the row found.
+    assert.ok(near(a.ev.debtAfter * makerGrowth(rates[i], b.ev.ts - a.ev.ts), before, 1e-9));
     checked++;
   }
   assert.ok(checked > 3, `${checked} stretches`);
@@ -421,9 +428,11 @@ test("the state card between events states the chart's figures", () => {
     checked++;
     assert.ok(mo.sides.debt.face);
     const chart = stateAt(m, stop).debt.now;
-    assert.ok(near(d.tokens, chart, 1e-9), `stop ${stop}: ${d.tokens} vs ${chart}`);
+    // The card's tokens to six decimals; the chart's figure is them at $1, to the cent.
+    assert.equal(shownUsd(d.tokens, 1), chart, `stop ${stop}: ${d.tokens} vs ${chart}`);
     assert.ok(mo.accrual, "the fee's accrual");
-    assert.equal(shownUsd(d.recorded * mo.accrual!.factor, 1), chart, `stop ${stop}: the card's factor, to the cent`);
+    assert.ok(near(mo.accrual!.factor, Math.exp((mo.accrual!.rate / 100) * (mo.accrual!.seconds / 31_557_600)), 1e-12));
+    assert.equal(d.tokens, faceAmount(d.recorded, mo.accrual!.factor), `stop ${stop}: the card's factor`);
   }
   assert.ok(checked > 10, `${checked}`);
 });

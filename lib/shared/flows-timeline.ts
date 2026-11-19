@@ -29,7 +29,7 @@
 import type { DayObs, PriceMarks, PriceSeries } from "@/lib/shared/price-series";
 import type { FlowChange } from "@/lib/shared/flows-changes";
 import type { ProtocolActivity } from "@/lib/shared/flows-pace";
-import { centsOf, shownPrice, shownUsd } from "@/lib/shared/shown-usd";
+import { centsOf, faceAmount, shownPrice, shownUsd } from "@/lib/shared/shown-usd";
 
 export type FlowSide = "collateral" | "debt";
 
@@ -565,6 +565,10 @@ export interface FlowMomentWords {
   /** The year, in seconds, a face side's rate builds over (365.25 days where
    *  unset; Liquity V2 and its forks: 365 days). */
   yearSeconds?: number;
+  /** The rate compounds each second (Maker's stability fee, through Jug's
+   *  rpow): the rate is continuous and the factor e^(rate × time); else
+   *  simple, 1 + rate × time. */
+  compound?: true;
 }
 
 /** A held asset whose price, at some date, is older than the gap allowed. */
@@ -1134,7 +1138,7 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
       const cents = inDollars && p != null;
       const usd = cents
         ? faceSides.has(h.side)
-          ? shownUsd(h.amount * usdPer, 1)
+          ? shownUsd(faceAmount(h.amount, usdPer), 1)
           : shownUsd(h.amount, usdPer)
         : h.amount * usdPer;
       if (inDollars && !p) unpricedHere[h.side].push(h.symbol);
@@ -1184,12 +1188,18 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
         usd,
         ...(p
           ? {
+              // The price and its block only on a model in dollars: a unit
+              // model's daily prices are in its token's grains.
               priced: {
                 day: utcDay(p.ts),
                 series: p.series,
-                price: p.usd,
-                block: p.block ?? null,
-                ...(faceSides.has(h.side) ? { face: true as const } : {}),
+                ...(inDollars
+                  ? {
+                      price: p.usd,
+                      block: p.block ?? null,
+                      ...(faceSides.has(h.side) ? { face: true as const } : {}),
+                    }
+                  : {}),
               },
             }
           : inDollars
@@ -1288,7 +1298,7 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     ...(t.addresses ? { addresses: t.addresses } : {}),
     heldAt,
     heldUnpriced,
-    liveHeld: t.live.assets ?? liveHeldFromBalances(held, t.todayPrices, heldAt[heldAt.length - 1] ?? []),
+    liveHeld: t.live.assets ?? liveHeldFromBalances(held, t.todayPrices, heldAt[heldAt.length - 1] ?? [], inDollars),
     axis: axisFor(peak),
     today,
   };
@@ -1300,6 +1310,7 @@ function liveHeldFromBalances(
   held: Map<string, { symbol: string; side: FlowSide; amount: number }>,
   todayPrices: Record<string, number> | undefined,
   last: FlowAssetHeld[],
+  inDollars: boolean,
 ): FlowAssetHeld[] {
   const out: FlowAssetHeld[] = [];
   for (const [key, h] of held) {
@@ -1307,8 +1318,12 @@ function liveHeldFromBalances(
     const asset = key.slice(key.indexOf(":") + 1);
     const p = todayPrices?.[asset];
     const prev = last.find((x) => x.side === h.side && x.symbol === h.symbol);
-    const usd = typeof p === "number" && p > 0 ? h.amount * p : (prev?.usd ?? 0);
-    out.push({ side: h.side, symbol: h.symbol, amount: h.amount, usd });
+    const priced = typeof p === "number" && p > 0;
+    const usd = priced ? h.amount * p : (prev?.usd ?? 0);
+    // No price today and none carried from the last stop: the asset has no
+    // figure, and the line breaks at the live point (ui-jobs 743).
+    const none = inDollars && !priced && (prev == null || prev.unpriced);
+    out.push({ side: h.side, symbol: h.symbol, amount: h.amount, usd, ...(none ? { unpriced: true as const } : {}) });
   }
   return out;
 }
@@ -1549,6 +1564,10 @@ function sideState(
   return { now: heldNow, total, out, bar, sources };
 }
 
+/** What a side's headline prints: what is held or owed, or not a number
+ *  where an asset held has no price (ui-jobs 743); the bar keeps `now`. */
+export const shownNow = (st: FlowSideState): number => (st.bar[0]?.unpriced?.length ? Number.NaN : st.now);
+
 /** One side's bar and sources for a set of running totals and what is held
  *  or owed, as `stateAt` builds each stop's: the event card's lifetime sum
  *  (lib/shared/flow-focus.ts) reads a side at one event with it. */
@@ -1584,10 +1603,14 @@ export function stateAt(m: FlowModel, stop: number): FlowState {
   const vi = Math.min(stop, m.valued.length - 1);
   const v = !isLive && stop >= 0 ? m.valued[vi] : undefined;
   // A past stop's held assets with their prices and blocks (ui-jobs 743).
+  // A unit model's figures are its token's: its held segment carries no
+  // dollar rows.
   const heldOn = (side: FlowSide) =>
-    !isLive && stop >= 0 && m.heldAt[vi]
+    !isLive && stop >= 0 && m.heldAt[vi] && !unitOf(m, side)
       ? { rows: m.heldAt[vi], unpriced: m.heldUnpriced?.get(vi)?.[side] ?? [] }
-      : undefined;
+      : isLive && !unitOf(m, side)
+        ? { rows: [], unpriced: m.liveHeld.filter((h) => h.side === side && h.unpriced).map((h) => h.symbol) }
+        : undefined;
   const collNow = isLive ? m.live.collateralUsd : (v?.collateral ?? 0);
   const debtNow = isLive ? m.live.debtUsd : (v?.debt ?? 0);
   return {
@@ -1781,6 +1804,8 @@ export const dayStart = (m: FlowModel, stop: number): number => (m.start + stop 
  *  dropped ("$1.0B", "$1.5B", "$1.89B"). */
 export function formatFlowUsd(v: number, unit?: FlowUnit): string {
   if (unit) return formatFlowToken(v, unit);
+  // A figure with no price (not a number) prints no figure (ui-jobs 743).
+  if (!Number.isFinite(v)) return "—";
   const a = Math.abs(v);
   const sign = v < 0 && a >= 0.5 ? "−" : "";
   let body: string;
@@ -1795,6 +1820,7 @@ export function formatFlowUsd(v: number, unit?: FlowUnit): string {
 /** "211 thousand dollars" — a figure for a screen reader. */
 export function spokenUsd(v: number, unit?: FlowUnit): string {
   if (unit) return spokenToken(v, unit);
+  if (!Number.isFinite(v)) return "no figure";
   const a = Math.abs(v);
   const sign = v < 0 ? "minus " : "";
   if (a >= 999_950_000) return `${sign}${(a / 1e9).toFixed(2).replace(/(\.\d)0$/, "$1")} billion dollars`;
