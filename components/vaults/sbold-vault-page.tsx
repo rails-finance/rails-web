@@ -39,6 +39,8 @@ import {
   sboldDepositProv,
   sboldIdleProv,
   sboldNameProv,
+  sboldPausedLogProv,
+  sboldPausedProv,
   sboldPerShareProv,
   sboldPointProv,
   sboldReconcileProv,
@@ -50,6 +52,7 @@ import {
 } from "@/lib/liquity-v2/sbold-provenance";
 import type { SboldVaultResponse } from "@/lib/sources/chain/sbold-vault";
 import type { SboldSeries } from "@/lib/sources/chain/sbold-daily";
+import type { SboldPausedLog } from "@/lib/sources/chain/sbold-paused";
 import type { RawAmount } from "@/lib/sources/chain/morpho-base-vault";
 
 const CHAIN_ID = 1;
@@ -59,7 +62,7 @@ const n = (v: number) => v.toLocaleString("en-US");
 const markedLabel = (label: string, blocks: number[]) =>
   `${label}, one read at each day's last block over the last 30 days` +
   (blocks.length === 0 ? "" : `, then block${blocks.length === 1 ? "" : "s"} ${blocks.map(n).join(", ")}`);
-const eth = (kind: "address" | "block", v: string | number) => explorerUrl(CHAIN_ID, kind, v);
+const eth = (kind: "address" | "block" | "tx", v: string | number) => explorerUrl(CHAIN_ID, kind, v);
 const UNREAD = <NotLoaded className="text-base font-normal text-rb-500" />;
 
 const fraction = (part: RawAmount | null, total: RawAmount | null): number | null =>
@@ -221,7 +224,16 @@ function SboldDailyLines({ series }: { series: SboldSeries | null }) {
   );
 }
 
-export function SboldVaultPage({ data, series }: { data: SboldVaultResponse; series: SboldSeries | null }) {
+export function SboldVaultPage({
+  data,
+  series,
+  pausedLog,
+}: {
+  data: SboldVaultResponse;
+  series: SboldSeries | null;
+  /** The latest Paused log, read where paused() answers true (ui-jobs 765). */
+  pausedLog: SboldPausedLog | null;
+}) {
   const registry = useReceiptRegistry();
   const y = data.vault;
   const v = sboldVaultPageSummary(data, SBOLD_ASSET, SBOLD_CREATED_BLOCK);
@@ -287,6 +299,34 @@ export function SboldVaultPage({ data, series }: { data: SboldVaultResponse; ser
         ),
       ),
     },
+    // Where paused() answers true and the Paused log was read: its block and time (ui-jobs 765).
+    ...(y.paused === true && pausedLog
+      ? [
+          {
+            id: "paused-log",
+            label: "Latest Paused log",
+            tip: "The block of the vault's latest Paused(address) log; no Unpaused log follows it.",
+            sub:
+              pausedLog.time == null ? undefined : (
+                <Prov info={sboldPausedLogProv(pausedLog, "time")}>{whenText({ time: pausedLog.time })}</Prov>
+              ),
+            value: fig(
+              "paused-log",
+              String(pausedLog.block),
+              <a
+                href={eth("block", pausedLog.block)}
+                target="_blank"
+                rel="noopener"
+                className="link-external"
+                data-paused-log-block={pausedLog.block}
+                data-paused-log-tx={pausedLog.txHash}
+              >
+                <Prov info={sboldPausedLogProv(pausedLog, "block")}>{n(pausedLog.block)}</Prov>
+              </a>,
+            ),
+          } satisfies PositionPanelRow,
+        ]
+      : []),
     {
       id: "asset",
       label: "Asset",
@@ -417,6 +457,48 @@ export function SboldVaultPage({ data, series }: { data: SboldVaultResponse; ser
           </ExplainBullet>
         ))}
       </ExplainGroup>
+      {y.paused === true && (
+        <ExplainGroup title="Paused">
+          <ExplainBullet data-sbold-paused="">
+            At block <Fig>{n(data.blockNumber)}</Fig> the vault&rsquo;s paused() answers{" "}
+            <Prov info={sboldPausedProv(coords)}>
+              <Fig>true</Fig>
+            </Prov>
+            .
+          </ExplainBullet>
+          {pausedLog && (
+            <ExplainBullet data-sbold-paused-log={pausedLog.block}>
+              Its latest Paused log is at block{" "}
+              <Prov info={sboldPausedLogProv(pausedLog, "block")}>
+                <Fig>{n(pausedLog.block)}</Fig>
+              </Prov>
+              {pausedLog.time != null && (
+                <>
+                  {" "}
+                  (
+                  <Prov info={sboldPausedLogProv(pausedLog, "time")}>
+                    <Fig>{whenText({ time: pausedLog.time })}</Fig>
+                  </Prov>
+                  )
+                </>
+              )}
+              , in transaction{" "}
+              <a href={eth("tx", pausedLog.txHash)} target="_blank" rel="noopener" className="link-external">
+                <Prov info={sboldPausedLogProv(pausedLog, "tx")}>
+                  <Fig>{shortAddress(pausedLog.txHash)}</Fig>
+                </Prov>
+              </a>
+              , account{" "}
+              <a href={eth("address", pausedLog.account)} target="_blank" rel="noopener" className="link-external">
+                <Prov info={sboldPausedLogProv(pausedLog, "account")}>
+                  <Fig>{shortAddress(pausedLog.account)}</Fig>
+                </Prov>
+              </a>
+              .
+            </ExplainBullet>
+          )}
+        </ExplainGroup>
+      )}
       {/* Blocks 26,441,800 and 26,442,100 stay here when the strip's window has passed them (ui-jobs 749). */}
       {series && series.marked.length > 0 && (
         <ExplainGroup title="Earlier reads">
@@ -455,6 +537,7 @@ export function SboldVaultPage({ data, series }: { data: SboldVaultResponse; ser
     name: sboldNameProv(coords),
     totalAssets: sboldTotalAssetsProv(coords),
     sharePrice: sboldSharePriceProv(coords),
+    standing: { paused: sboldPausedProv(coords) },
   };
   const heads: PositionCardHead[] = vaultHeads({ vault: v, holdersHref: null, receipts, detail: true })
     .filter((h) => h.id === "total-assets" || h.id === "share-price")
@@ -483,6 +566,15 @@ export function SboldVaultPage({ data, series }: { data: SboldVaultResponse; ser
         y.totalSupply && y.shareDecimals != null ? shareText(y.totalSupply, y.shareDecimals) : "not read",
       ],
       ["Total assets ÷ shares issued (BOLD per share)", perShare ?? "not read"],
+      ...(y.paused === true ? [["Paused", "true"] as [string, string]] : []),
+      ...(y.paused === true && pausedLog
+        ? [
+            ["Latest Paused log", `block ${pausedLog.block}, tx ${pausedLog.txHash}, account ${pausedLog.account}`] as [
+              string,
+              string,
+            ],
+          ]
+        : []),
       ["Asset", y.asset ?? "not read"],
       ["Block", String(data.blockNumber)],
     ],
@@ -502,7 +594,16 @@ export function SboldVaultPage({ data, series }: { data: SboldVaultResponse; ser
             holdersHref={null}
             receipts={receipts}
             heads={heads}
-            status={null}
+            status={
+              y.paused === true
+                ? {
+                    word: "Paused",
+                    tone: "muted",
+                    tip: "The vault's paused() answers true at this block.",
+                    prov: sboldPausedProv(coords),
+                  }
+                : null
+            }
             stats={stats}
             links={links}
             explanation={explanation}
@@ -524,7 +625,7 @@ export function SboldVaultPage({ data, series }: { data: SboldVaultResponse; ser
                         name: "sBOLD vault",
                         address: y.address,
                         reads:
-                          "totalAssets(), totalSupply(), convertToAssets(10 ** 18), asset(), name(), symbol(), decimals()",
+                          "totalAssets(), totalSupply(), convertToAssets(10 ** 18), asset(), name(), symbol(), decimals(), paused()",
                       },
                       { name: "BOLD", address: SBOLD_ASSET.address, reads: "balanceOf(sBOLD)" },
                       ...data.deposits.map((d) => ({

@@ -3,7 +3,7 @@
 // ----------------------------------------------------------------------------
 // One Multicall3 round at the block the page states: the vault's totalAssets(),
 // totalSupply(), convertToAssets(10 ** 18), asset(), name(), symbol() and
-// decimals(), and each Liquity V2 Stability Pool's
+// decimals(), paused(), and each Liquity V2 Stability Pool's
 // getCompoundedBoldDeposit(sBOLD), and BOLD.balanceOf(sBOLD).
 //
 // RULE: a figure is the getter's answer. A getter that fails states no figure
@@ -30,6 +30,7 @@ const VAULT_ABI = parseAbi([
   "function name() view returns (string)",
   "function symbol() view returns (string)",
   "function decimals() view returns (uint8)",
+  "function paused() view returns (bool)",
 ]);
 const SP_ABI = parseAbi(["function getCompoundedBoldDeposit(address) view returns (uint256)"]);
 const ERC20_ABI = parseAbi(["function balanceOf(address) view returns (uint256)"]);
@@ -69,6 +70,8 @@ export interface SboldVaultResponse {
     totalSupply: RawAmount | null;
     /** `convertToAssets(10 ** 18)` in BOLD. Zero is a reading. */
     sharePrice: RawAmount | null;
+    /** `paused()` (ui-jobs 765); null where it failed. */
+    paused: boolean | null;
   };
   /** One per branch, in SP_BRANCHES order. */
   deposits: SboldDeposit[];
@@ -76,7 +79,16 @@ export interface SboldVaultResponse {
   idle: RawAmount | null;
 }
 
-const VAULT_CALLS = ["totalAssets", "totalSupply", "asset", "name", "symbol", "decimals", "convertToAssets"] as const;
+const VAULT_CALLS = [
+  "totalAssets",
+  "totalSupply",
+  "asset",
+  "name",
+  "symbol",
+  "decimals",
+  "convertToAssets",
+  "paused",
+] as const;
 
 const EMPTY_VAULT: SboldVaultResponse["vault"] = {
   address: SBOLD_VAULT,
@@ -87,6 +99,7 @@ const EMPTY_VAULT: SboldVaultResponse["vault"] = {
   totalAssets: null,
   totalSupply: null,
   sharePrice: null,
+  paused: null,
 };
 
 export async function loadSboldVault(): Promise<SboldVaultResponse> {
@@ -135,6 +148,7 @@ export async function loadSboldVault(): Promise<SboldVaultResponse> {
         totalAssets: inBold && totalAssets != null ? amount(totalAssets, d) : null,
         totalSupply: shareDecimals != null && totalSupply != null ? amount(totalSupply, shareDecimals) : null,
         sharePrice: inBold && shareDecimals === 18 && sharePrice != null ? amount(sharePrice, d) : null,
+        paused: at<boolean>("paused"),
       },
       deposits: pools.map(({ branch, pool }, i) => {
         const raw = ok<bigint>(reads[VAULT_CALLS.length + i]);

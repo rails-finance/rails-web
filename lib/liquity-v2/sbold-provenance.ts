@@ -7,6 +7,7 @@ import { withServerRead, type ServerRead } from "@/lib/shared/server-head-read";
 import type { Provenance } from "@/components/shared/provenance";
 import { SBOLD_ASSET, SBOLD_VAULT } from "@/lib/liquity-v2/sbold";
 import type { SpBranch } from "@/lib/liquity-v2/sp-routes";
+import { explorerUrl } from "@/lib/shared/chains";
 
 const LANE = "live Ethereum chain reads (/ethereum/liquity-v2/sbold)";
 
@@ -181,6 +182,48 @@ const sboldDepositProv_ = (c: SboldCoords, branch: SpBranch, pool: string): Prov
   via: `${LANE} · StabilityPool.getCompoundedBoldDeposit(sBOLD) @ the pinned block`,
 });
 
+/** `paused()` on the vault (ui-jobs 765): the fact as the getter answers it. */
+const sboldPausedProv_ = (c: SboldCoords): Provenance =>
+  vaultRead(c, "paused()", `Paused — the sBOLD vault's paused() answers true${atBlock(c)}.`);
+
+/** The vault's latest Paused(address) log, from a sweep of its Paused and
+ *  Unpaused logs (ui-jobs 765). */
+export const sboldPausedLogProv = (
+  l: {
+    block: number;
+    time: number | null;
+    txHash: string;
+    logIndex: number;
+    account: string;
+    from: number;
+    to: number;
+  },
+  what: "block" | "time" | "tx" | "account",
+): Provenance => {
+  const when = l.time == null ? "" : ` (${new Date(l.time * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC)`;
+  const lead =
+    what === "block"
+      ? "Paused log block"
+      : what === "time"
+        ? "Paused log time — the block's timestamp"
+        : what === "tx"
+          ? "Paused log transaction"
+          : "Paused log account — the log's account field";
+  return {
+    kind: "chain",
+    pclass: "emitted",
+    source: { block: l.block, txHash: l.txHash },
+    summary: `${lead} — the sBOLD vault's latest Paused(address) log: block ${n(l.block)}${when}, transaction ${l.txHash}, log ${l.logIndex}, account ${l.account}. The vault's Paused and Unpaused logs from block ${n(l.from)} to block ${n(l.to)} were read; no Unpaused log follows it.`,
+    contract: vaultContract,
+    via: `${LANE} · eth_getLogs sBOLD Paused(address) / Unpaused(address), blocks ${n(l.from)}–${n(l.to)} · log ${l.logIndex}`,
+    verify: {
+      kind: "etherscan",
+      href: explorerUrl(1, "tx-logs", l.txHash),
+      text: "The transaction's logs on Etherscan",
+    },
+  };
+};
+
 // Receipts over a page's reads stamp rails-server's head read when the coordinates carry it.
 export const sboldNameProv = withServerRead(sboldNameProv_);
 export const sboldTotalAssetsProv = withServerRead(sboldTotalAssetsProv_);
@@ -192,3 +235,4 @@ export const sboldIdleProv = withServerRead(sboldIdleProv_);
 export const sboldReconcileProv = withServerRead(sboldReconcileProv_);
 export const sboldBlockProv = withServerRead(sboldBlockProv_);
 export const sboldDepositProv = withServerRead(sboldDepositProv_);
+export const sboldPausedProv = withServerRead(sboldPausedProv_);

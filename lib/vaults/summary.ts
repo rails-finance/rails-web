@@ -39,7 +39,7 @@ import { tooSmallToMeasure } from "@/lib/vaults/yield";
 
 /** What the chain or the venue states about a vault's standing, as a pill
  *  reads it. `endorsed`: Yearn's Registry endorses it. `shut-down`: the vault
- *  answers `isShutdown()` true. `paused`: the vault says deposits are paused.
+ *  answers `isShutdown()` true. `paused`: the vault's `paused()` answers true.
  *  `address-book`: Aave publishes the address in its own address book.
  *  `illiquid`: Rails's test over the chain's reads of a MetaMorpho vault's
  *  markets (lib/vaults/illiquid.ts, ui-jobs 540). `lost-assets`: a MetaMorpho
@@ -442,7 +442,8 @@ export function sboldVaultPageSummary(
     sharePrice: v.sharePrice,
     lostAssets: null,
     steward: null,
-    standing: [],
+    // paused() answering true is a standing (ui-jobs 765).
+    standing: v.paused === true ? ["paused"] : [],
     createdBlock,
     census: null,
     readAt: { block: d.blockNumber, timestamp: "" },
