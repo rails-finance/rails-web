@@ -51,6 +51,22 @@ const vaultCallProv_ = (c: IporFusionCoords, { label, call, what }: { label: str
     via: `${lane(c)} · PlasmaVault.${call} @ the pinned block`,
   }) satisfies Provenance;
 
+const iporRosterCensusProv_ = (
+  c: IporFusionCoords,
+  census: { catalogSize: number; censusBlock: number; factory: string },
+): Provenance => ({
+  kind: "chain-derived",
+  pclass: "emitted",
+  source: { block: census.censusBlock },
+  verify: {
+    kind: "recompute",
+    text: `To check: read the FusionInstanceCreated logs of the factory proxy ${census.factory} on ${chainName(c)} up to block ${n(census.censusBlock)}, decoding both of its event signatures, and count the vaults; getFusionFactoryIndex() at that block answers the same count.`,
+  },
+  summary: `Vaults catalogued — ${n(census.catalogSize)}: every vault the IPOR Fusion factory had made on ${chainName(c)} at block ${n(census.censusBlock)}, each named by its creation event. The factory is open to anyone, so a vault on this list is not one IPOR curates. The list is a floor: a vault deployed by hand, or by an earlier factory, emits no such event and is absent, and a vault made since that block joins when the census runs again.`,
+  via: `${lane(c)} · FusionInstanceCreated on the factory proxy, censused to block ${n(census.censusBlock)}`,
+  formula: "count of FusionInstanceCreated logs up to the census block",
+});
+
 const iporEmptyCountProv_ = (c: IporFusionCoords, count: number, total: number): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
@@ -203,32 +219,56 @@ const iporRewardsProv_ = (c: IporFusionCoords, manager: string): Provenance => (
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute(c, "balanceOf()", `the rewards claim manager ${manager}`),
-  summary: `Rewards manager — the ${asset(c)} the vault's rewards claim manager holds${atBlock(c)}, which the vault's totalAssets() counts.`,
-  contract: { name: "RewardsClaimManager", address: manager },
+  summary: `Rewards claim manager — the ${asset(c)} the vault's rewards claim manager holds${atBlock(c)}, which the vault's total assets count.`,
+  contract: { name: "Rewards claim manager", address: manager },
   via: `${lane(c)} · PlasmaVault.getRewardsClaimManagerAddress() · RewardsClaimManager.balanceOf() @ the pinned block`,
 });
 
-/** The rows' sum against totalAssets(), where they differ. */
-const iporMarketsGapProv_ = (c: IporFusionCoords, f: { total: string; summed: string; gap: string }): Provenance => ({
+/** The management fee accrued and not yet minted, which this vault's
+ *  totalAssets() deducts. */
+const iporFeeNotTakenProv_ = (c: IporFusionCoords, f: { fee: string }): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  source: { block: c.blockNumber },
+  verify: recompute(c, "getUnrealizedManagementFee()"),
+  summary: `Management fee not yet taken — ${f.fee} ${asset(c)}${atBlock(c)}: the management fee accrued since the vault last minted it. This vault's version answers totalAssets() as the rows above less this fee; IPOR's current code answers the rows above.`,
+  contract: vaultContract(c),
+  via: `${lane(c)} · PlasmaVault.getUnrealizedManagementFee() @ the pinned block`,
+});
+
+/** A row's share: its amount over the rows' sum, the vault's gross book. */
+const iporShareProv_ = (c: IporFusionCoords, f: { venue: string; book: string; feeDeducted: boolean }): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  source: { block: c.blockNumber },
+  summary: `Share of this vault — ${f.venue}'s amount over the rows' sum, ${f.book} ${asset(c)}${atBlock(c)}: the vault's gross book, so the shares total 100%. ${
+    f.feeDeducted
+      ? "This vault's totalAssets() is that sum less the management fee not yet taken."
+      : "This vault's totalAssets() is that sum."
+  } A ratio of two amounts in one token, so no price is asked.`,
+  contract: vaultContract(c),
+  via: `${lane(c)} · the row ÷ the rows' sum @ the pinned block`,
+  formula: "row ÷ (in the vault + rewards claim manager + Σ totalAssetsInMarket)",
+});
+
+/** What remains between the rows, the fee and totalAssets(), where anything does. */
+const iporMarketsGapProv_ = (
+  c: IporFusionCoords,
+  f: { total: string; summed: string; fee: string | null; gap: string },
+): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute(
     c,
-    "totalAssets(), totalAssetsInMarket(id) for each active market, and the asset's balanceOf(vault)",
+    "totalAssets(), getUnrealizedManagementFee(), totalAssetsInMarket(id) for each active market, and the asset's balanceOf(vault)",
   ),
-  summary: `Not in a row — totalAssets() answers ${f.total} ${asset(c)}${atBlock(c)} and the rows above sum to ${f.summed}, a difference of ${f.gap}. The rows are the asset in the vault, the rewards manager and each active market's booked balance; a balance fuse that values a market differently from its booked figure, or a market outside getActiveMarketsInBalanceFuses(), lands here.`,
+  summary: `Not in a row — totalAssets() answers ${f.total} ${asset(c)}${atBlock(c)} and the rows above sum to ${f.summed}${f.fee ? `, less the management fee not yet taken, ${f.fee}` : ""}: a difference of ${f.gap}.`,
   contract: vaultContract(c),
-  via: `${lane(c)} · totalAssets() less the rows @ the pinned block`,
-  formula: "totalAssets() − (in the vault + rewards manager + Σ totalAssetsInMarket)",
+  via: `${lane(c)} · totalAssets() against the rows @ the pinned block`,
+  formula: "totalAssets() − (rows − management fee not yet taken)",
 });
 
-export const iporMarketBalanceProv = withServerRead(iporMarketBalanceProv_);
-export const iporMarketSubstratesProv = withServerRead(iporMarketSubstratesProv_);
-export const iporInVaultProv = withServerRead(iporInVaultProv_);
-export const iporRewardsProv = withServerRead(iporRewardsProv_);
-export const iporMarketsGapProv = withServerRead(iporMarketsGapProv_);
-export const iporRoleNoneProv = withServerRead(iporRoleNoneProv_);
 export const iporEmptyCountProv = withServerRead(iporEmptyCountProv_);
 export const iporVaultNameProv = withServerRead(iporVaultNameProv_);
 export const iporVaultTotalAssetsProv = withServerRead(iporVaultTotalAssetsProv_);
@@ -239,3 +279,12 @@ export const iporVaultFeeProv = withServerRead(iporVaultFeeProv_);
 export const iporVaultAddressProv = withServerRead(iporVaultAddressProv_);
 export const iporFuseStateProv = withServerRead(iporFuseStateProv_);
 export const iporRoleProv = withServerRead(iporRoleProv_);
+export const iporMarketBalanceProv = withServerRead(iporMarketBalanceProv_);
+export const iporMarketSubstratesProv = withServerRead(iporMarketSubstratesProv_);
+export const iporInVaultProv = withServerRead(iporInVaultProv_);
+export const iporRewardsProv = withServerRead(iporRewardsProv_);
+export const iporMarketsGapProv = withServerRead(iporMarketsGapProv_);
+export const iporFeeNotTakenProv = withServerRead(iporFeeNotTakenProv_);
+export const iporShareProv = withServerRead(iporShareProv_);
+export const iporRoleNoneProv = withServerRead(iporRoleNoneProv_);
+export const iporRosterCensusProv = withServerRead(iporRosterCensusProv_);

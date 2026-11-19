@@ -56,6 +56,7 @@ const VAULT_ABI = parseAbi([
   "function getFuses() view returns (address[])",
   "function getActiveMarketsInBalanceFuses() view returns (uint256[])",
   "function getRewardsClaimManagerAddress() view returns (address)",
+  "function getUnrealizedManagementFee() view returns (uint256)",
   "function totalAssetsInMarket(uint256) view returns (uint256)",
   "function getMarketSubstrates(uint256) view returns (bytes32[])",
 ]);
@@ -91,6 +92,7 @@ const CALLS = [
   "getFuses",
   "getActiveMarketsInBalanceFuses",
   "getRewardsClaimManagerAddress",
+  "getUnrealizedManagementFee",
 ] as const;
 
 /** Each chain's lane for `eth_getLogs`, named: a receipt states the variable,
@@ -183,6 +185,10 @@ export interface IporFusionVaultResponse {
     supplyCap: RawAmount | null;
     performanceFee: IporFusionFee | null;
     managementFee: IporFusionFee | null;
+    /** `getUnrealizedManagementFee()`: the management fee accrued and not yet
+     *  minted, in the asset. Older PlasmaVaults deduct it inside
+     *  totalAssets(); null where unread. */
+    unrealizedManagementFee: RawAmount | null;
     accessManager: string | null;
     priceOracleMiddleware: string | null;
   };
@@ -210,7 +216,7 @@ export interface IporFusionMarkets {
   inVault: RawAmount | null;
   /** The rewards claim manager and its `balanceOf()`, where the vault names one. */
   rewards: { manager: string; balance: RawAmount | null } | null;
-  /** Names for every address the substrates name, a child vault's asset and a
+  /** Names for every address the grants name, a child vault's asset and a
    *  Morpho market's tokens, lowercased. */
   names: Record<string, { symbol: string; named: boolean }>;
   /** A child vault's `asset()`, by child. */
@@ -500,6 +506,7 @@ export async function loadIporFusionVault(
     supplyCap: null,
     performanceFee: null,
     managementFee: null,
+    unrealizedManagementFee: null,
     accessManager: null,
     priceOracleMiddleware: null,
   });
@@ -638,6 +645,10 @@ export async function loadIporFusionVault(
         supplyCap: cap == null ? null : amount(cap, entry.shareDecimals),
         performanceFee: fee(at("getPerformanceFeeData")),
         managementFee: fee(at("getManagementFeeData")),
+        unrealizedManagementFee: (() => {
+          const f = at("getUnrealizedManagementFee") as bigint | undefined;
+          return f == null ? null : amount(f, ad);
+        })(),
         accessManager,
         priceOracleMiddleware: oracle,
       },

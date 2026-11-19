@@ -196,7 +196,7 @@ test(`market 14 MORPHO words, vault 0xc825…1d39 at block ${BLOCK}: pair and LL
       { kind: "morpho-market", id: "0xeb17955ea422baeddbfb0b8d8c9086c5be7a9cfdefb292119a102e981a30062e" },
       NAMES,
     ),
-    "0xeb17…062e, market params not in Rails' catalog",
+    "0xeb17…062e, not in Rails' catalog",
   );
 });
 

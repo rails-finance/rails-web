@@ -11,6 +11,9 @@ import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { iporFusionRoster } from "@/lib/ipor-fusion/vault-roster";
 import { FOOT_LINK } from "@/lib/shared/ui-grammar";
+import { Prov } from "@/components/shared/provenance";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { iporRosterCensusProv } from "@/lib/ipor-fusion/vault-provenance";
 
 export const metadata = listingMetadata({
   title: "About the IPOR Fusion vault roster",
@@ -32,11 +35,19 @@ export default function IporFusionVaultsInfoPage() {
         <code>convertToAssets</code>, in its asset.
       </p>
       <p data-intro-roster>
-        The roster is every vault the IPOR Fusion factory made on Ethereum: {n(roster.vaults.length)} by block{" "}
-        {n(roster.censusBlock)}, each found from the creation event the factory emits. Anyone may deploy from the
-        factory, so a vault on the list is not one IPOR curates. The list is a floor: a vault deployed by hand or by an
-        earlier factory emits no such event, and a vault made since that block joins when the census runs again. Every
-        figure is read from chain at one block, at most five minutes old.
+        The roster is every vault the IPOR Fusion factory made on Ethereum:{" "}
+        <Prov
+          info={iporRosterCensusProv(
+            { chainId: MAINNET_CHAIN_ID },
+            { catalogSize: roster.vaults.length, censusBlock: roster.censusBlock, factory: roster.factory },
+          )}
+        >
+          {n(roster.vaults.length)} by block {n(roster.censusBlock)}
+        </Prov>
+        , each found from the creation event the factory emits. Anyone may deploy from the factory, so a vault on the
+        list is not one IPOR curates. The list is a floor: a vault deployed by hand or by an earlier factory emits no
+        such event, and a vault made since that block joins when the census runs again. Every figure is read from chain
+        at one block, at most five minutes old.
       </p>
       <p data-intro-roles>
         Each vault has an access manager that grants roles. Rails calls the holder of OWNER_ROLE the vault&rsquo;s
@@ -64,6 +75,7 @@ export default function IporFusionVaultsInfoPage() {
         </a>{" "}
         explains fuses and markets in IPOR&rsquo;s terms.
       </p>
+      <ProvInspectorLayer />
     </VaultsInfoPage>
   );
 }

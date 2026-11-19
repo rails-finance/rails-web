@@ -6,7 +6,7 @@ import { IPOR_ROLES } from "./addresses";
 /** Basis points as a percentage: 500 → "5%", 30 → "0.3%". */
 export const bpsText = (bps: number) => `${(bps / 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}%`;
 
-/** A role's name on the page: Rails's word where it has one (owner, curator,
+/** A role's name on the page: Rails' word where it has one (owner, curator,
  *  Atomist), else IPOR's constant, flagged so the page sets it as code. */
 export function roleName(roleId: string): { text: string; constant: boolean } {
   const r = IPOR_ROLES[roleId];

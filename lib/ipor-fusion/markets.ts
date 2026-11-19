@@ -9,7 +9,7 @@
 /** How a market's substrates are decoded and drawn. */
 export type MarketKind =
   | "tokens" // asset addresses (Aave V3, SparkLend, Compound V3)
-  | "held" // ERC20_VAULT_BALANCE: tokens the vault holds itself
+  | "held" // ERC20_VAULT_BALANCE: tokens the vault holds
   | "morpho" // Morpho Blue market ids
   | "child" // ERC-4626 or MetaMorpho vaults the vault holds shares of
   | "address" // one contract per substrate: a pool, a gauge, an fToken, a silo, a Pendle market
@@ -30,6 +30,9 @@ export interface MarketInfo {
   kind: MarketKind;
   /** The Rails explorer that covers the market, by chain: its session key. */
   covered?: Partial<Record<number, string>>;
+  /** The explorer has a page per address (`<explorer>/<address>`) and no
+   *  wallet-filtered listing: Pendle, Uniswap V4. */
+  walletPage?: true;
 }
 
 const T = (venue: string, kind: MarketKind, covered?: Partial<Record<number, string>>) => ({ venue, kind, covered });
@@ -55,7 +58,7 @@ const MARKETS: Record<string, Omit<MarketInfo, "constant"> & { constant: string 
   "17": { constant: "CURVE_LP_GAUGE", ...T("Curve gauge", "address") },
   "19": { constant: "MORPHO_FLASH_LOAN", ...T("Morpho flash loans", "route") },
   "20": { constant: "AAVE_V3_LIDO", ...T("Aave V3 Lido market", "tokens", { 1: "aave-v3" }) },
-  "23": { constant: "PENDLE", ...T("Pendle", "address", { 1: "pendle" }) },
+  "23": { constant: "PENDLE", ...T("Pendle", "address", { 1: "pendle" }), walletPage: true },
   "25": { constant: "CURVE_GAUGE_ERC4626", ...T("Curve gauge", "address") },
   "26": { constant: "COMPOUND_V3_WETH", ...T("Compound V3 WETH", "tokens", { 1: "compound" }) },
   "29": { constant: "LIQUITY_V2", ...T("Liquity V2", "liquity", { 1: "liquity-v2" }) },
@@ -71,7 +74,7 @@ const MARKETS: Record<string, Omit<MarketInfo, "constant"> & { constant: string 
   "46": { constant: "NAPIER", ...T("Napier", "raw") },
   "49": { constant: "AAVE_V4", ...T("Aave V4", "aave-v4", { 1: "aave-v4" }) },
   "50": { constant: "EXTERNAL_STATE", ...T("External state", "external") },
-  "53": { constant: "UNISWAP_V4", ...T("Uniswap V4", "uniswap-v4", { 1: "uniswap-v4" }) },
+  "53": { constant: "UNISWAP_V4", ...T("Uniswap V4", "uniswap-v4", { 1: "uniswap-v4" }), walletPage: true },
   "57": {
     constant: "COMPOUND_V3_INSTITUTIONAL_USDC",
     ...T("Compound V3 institutional USDC", "tokens"),

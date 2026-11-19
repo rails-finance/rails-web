@@ -33,7 +33,7 @@ export function substrateWords(s: Substrate, n: MarketNames): string {
     }
     case "morpho-market": {
       const m = n.morpho[s.id];
-      if (!m) return `${short(s.id)}, market params not in Rails' catalog`;
+      if (!m) return `${short(s.id)}, not in Rails' catalog`;
       const pair =
         m.collateralToken === ZERO
           ? nameOf(n, m.loanToken)

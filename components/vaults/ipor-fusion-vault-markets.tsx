@@ -1,28 +1,30 @@
 "use client";
 
 // "Where the assets are" on an IPOR Fusion factsheet (anatomy V3; rails-ops
-// TO-DO-ipor-scoping §6.3 phase B): the asset in the vault, the rewards
-// manager, then each active market's booked balance with its grants decoded,
-// a row for any gap to totalAssets(), and under the table the routes, the
-// markets that hold no balance. One link rule for every row: a row links to
-// Rails only where its balance is above zero.
+// TO-DO-ipor-scoping §6.3 phase B): the asset in the vault, the rewards claim
+// manager, then each active market's recorded balance with its grants decoded;
+// where this vault's totalAssets() is below the rows, the management fee not
+// yet taken as a deduction, and any remainder; under the table the routes,
+// the markets that hold no balance. Shares are over the rows' sum, the gross
+// book. A row links to Rails only where its balance is above zero.
 
 import { Prov } from "@/components/shared/provenance";
 import { allocationBar, VaultAssets, type VaultAssetRow } from "@/components/vaults/vault-assets";
-import { vaultVenueShareProv } from "@/lib/vaults/card-provenance";
 import { vaultAssetsExports, type VaultExportModel } from "@/lib/vaults/card-export";
 import { iporFusionVaultAssetsContent } from "@/lib/vaults/card-words";
 import type { VaultSummary } from "@/lib/vaults/summary";
-import { listingHrefForWallet } from "@/lib/shared/protocols";
+import { listingHrefForWallet, protocolForSession } from "@/lib/shared/protocols";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { assetText, pctText } from "@/lib/shared/vault-amount-text";
-import { substratesLine } from "@/lib/ipor-fusion/market-words";
+import { substratesLine, substrateWords } from "@/lib/ipor-fusion/market-words";
 import {
+  iporFeeNotTakenProv,
   iporInVaultProv,
   iporMarketBalanceProv,
   iporMarketsGapProv,
   iporMarketSubstratesProv,
   iporRewardsProv,
+  iporShareProv,
   type IporFusionCoords,
 } from "@/lib/ipor-fusion/vault-provenance";
 import type { MarketKind } from "@/lib/ipor-fusion/markets";
@@ -49,25 +51,19 @@ const DECODER: Record<MarketKind, string> = {
   raw: "is shown as the hex the vault answers, which this page does not decode",
 };
 
-const fraction = (part: RawAmount | null, total: RawAmount | null): number | null =>
-  part && total && BigInt(total.raw) > ZERO ? Number((BigInt(part.raw) * BigInt(1e9)) / BigInt(total.raw)) / 1e9 : null;
-
-/** The covered explorer's listing at the vault's address, or the child vault's
- *  page: only where the balance is above zero. */
-function linkOf(
-  r: IporFusionMarketRow,
-  chainId: number,
-  vault: string,
-  childPages: Record<string, string>,
-): string | undefined {
-  if (!r.balance || BigInt(r.balance.raw) === ZERO) return undefined;
-  if (r.kind === "child") {
-    const only = r.substrates?.length === 1 && r.substrates[0].kind === "address" ? r.substrates[0].address : null;
-    return only ? childPages[only] : undefined;
-  }
+/** Where Rails shows this market at the vault's address, whatever its
+ *  balance: the explorer's listing filtered to the vault, or its page per
+ *  address. Null where no Rails page covers it: the row says "not covered". */
+function railsHrefOf(r: IporFusionMarketRow, chainId: number, vault: string): string | null {
   const session = r.covered?.[chainId] as SessionProtocol | undefined;
-  return session ? (listingHrefForWallet(session, vault) ?? undefined) : undefined;
+  if (!session) return null;
+  const listing = listingHrefForWallet(session, vault);
+  if (listing) return listing;
+  const entry = protocolForSession(session);
+  return r.walletPage && entry ? `${entry.href}/${vault.toLowerCase()}` : null;
 }
+
+const isZero = (a: RawAmount | null) => !a || BigInt(a.raw) === ZERO;
 
 export function IporFusionMarketsTile({
   data,
@@ -78,7 +74,7 @@ export function IporFusionMarketsTile({
   data: IporFusionVaultResponse;
   coords: IporFusionCoords;
   v: VaultSummary;
-  /** Rails's page for each child vault it catalogues, by lowercased address. */
+  /** Rails' page for each child vault it catalogues, by lowercased address. */
   childPages: Record<string, string>;
 }) {
   const y = data.vault;
@@ -87,6 +83,17 @@ export function IporFusionMarketsTile({
   const ad = y.asset.decimals;
   const asset = { symbol: unit, address: y.asset.address };
   const amount = (raw: bigint): RawAmount => ({ raw: raw.toString(), value: Number(raw) / Math.pow(10, ad) });
+  // asset() answered another token than the census's: the decimals these
+  // amounts would be scaled by are not known, so no amount is printed.
+  const withheld = y.assetDiffersFromCensus
+    ? "The vault's asset() answers a token other than the one the census recorded, so the decimals these amounts are scaled by are not known."
+    : undefined;
+  const line = (
+    <>
+      The asset in the vault and the {n(m?.rows.filter((r) => r.kind !== "route").length ?? 0)} markets it acts in,
+      largest first.
+    </>
+  );
   if (!m) {
     return (
       <VaultAssets
@@ -96,7 +103,7 @@ export function IporFusionMarketsTile({
         assetDecimals={ad}
         look="index"
         line="The vault's markets could not be read at this block."
-        shareTip="The row's amount over the vault's total assets."
+        shareTip="The row's amount over the rows' sum."
         learnMore={iporFusionVaultAssetsContent()}
         menu={{}}
       />
@@ -110,99 +117,161 @@ export function IporFusionMarketsTile({
     return x === z ? 0 : x > z ? -1 : 1;
   });
 
-  const rows: VaultAssetRow[] = [
+  type Draft = Omit<VaultAssetRow, "share" | "shareProv"> & { shareVenue?: string };
+  const drafts: Draft[] = [
     {
       key: "in-vault",
       venue: "In the vault",
-      sub: "held by the vault contract",
+      sub: "outside every market",
       amount: m.inVault,
       amountProv: iporInVaultProv(coords, y.asset.address),
-      share: fraction(m.inVault, y.totalAssets),
-      shareProv: vaultVenueShareProv(v, "the asset in the vault", "totalAssets()", coords.readBy),
+      shareVenue: "the asset in the vault",
       hooks: { "data-market": "in-vault" },
     },
   ];
-  if (m.rewards && m.rewards.balance && BigInt(m.rewards.balance.raw) > ZERO)
-    rows.push({
+  if (m.rewards && !isZero(m.rewards.balance))
+    drafts.push({
       key: "rewards",
-      venue: "Rewards manager",
+      venue: "Rewards claim manager",
       sub: "rewards the vault has claimed",
       amount: m.rewards.balance,
       amountProv: iporRewardsProv(coords, m.rewards.manager),
-      share: fraction(m.rewards.balance, y.totalAssets),
-      shareProv: vaultVenueShareProv(v, "the rewards manager's balance", "totalAssets()", coords.readBy),
+      shareVenue: "the rewards claim manager",
       hooks: { "data-market": "rewards" },
     });
   for (const r of sorted) {
-    const href = linkOf(r, data.chainId, y.address, childPages);
-    const uncovered = !r.covered?.[data.chainId] && r.kind !== "held" && r.kind !== "child";
-    const childUncovered =
-      r.kind === "child" && !(r.substrates ?? []).some((s) => s.kind === "address" && childPages[s.address]);
-    const only = r.kind === "child" && r.substrates?.length === 1 ? substratesLine(r.substrates, m) : null;
-    const grants = r.substrates ? substratesLine(only ? [] : r.substrates, m) : "grants not read";
-    rows.push({
+    const railsHref = railsHrefOf(r, data.chainId, y.address);
+    const grants = r.substrates ?? [];
+    // A child-vault market links where exactly one granted child has a Rails
+    // page; otherwise each grant says whether Rails covers it.
+    const childGrants = r.kind === "child" ? grants.filter((g) => g.kind === "address") : [];
+    const childWithPage = childGrants.filter((g) => g.kind === "address" && childPages[g.address]);
+    const childHref =
+      childWithPage.length === 1 && childWithPage[0].kind === "address"
+        ? childPages[childWithPage[0].address]
+        : undefined;
+    const href = isZero(r.balance) ? undefined : ((r.kind === "child" ? childHref : railsHref) ?? undefined);
+    const covered =
+      r.kind === "held"
+        ? "held"
+        : r.kind === "child"
+          ? childWithPage.length > 0
+            ? "yes"
+            : "no"
+          : railsHref
+            ? "yes"
+            : "no";
+    const one = r.kind === "child" && grants.length === 1;
+    const words =
+      r.kind === "child" && grants.length > 1
+        ? grants
+            .map(
+              (g) =>
+                `${substrateWords(g, m)}${g.kind === "address" && !childPages[g.address] ? " (not covered by Rails)" : ""}`,
+            )
+            .join(", ")
+        : substratesLine(grants, m);
+    drafts.push({
       key: r.id,
-      venue: only ?? r.venue,
+      venue: one ? substrateWords(grants[0], m) : r.venue,
       ...(href ? { href } : {}),
       sub: (
         <>
           {r.substrates ? (
             <Prov info={iporMarketSubstratesProv(coords, { id: r.id, constant: r.constant, decoder: DECODER[r.kind] })}>
-              {only ? r.venue : grants || "no grants"}
+              {one ? r.venue : words || "no grants"}
             </Prov>
           ) : (
-            grants
+            "grants not read"
           )}
-          {(uncovered || childUncovered) && " · not covered by Rails"}
+          {covered === "no" && (r.kind !== "child" || grants.length <= 1) && " · not covered by Rails"}
         </>
       ),
       amount: r.balance,
       amountProv: iporMarketBalanceProv(coords, { id: r.id, constant: r.constant }),
-      share: fraction(r.balance, y.totalAssets),
-      shareProv: vaultVenueShareProv(v, `totalAssetsInMarket(${r.id})`, "totalAssets()", coords.readBy),
+      shareVenue: `totalAssetsInMarket(${r.id})`,
       hooks: {
         "data-market": r.id,
         "data-market-constant": r.constant ?? "",
         "data-market-kind": r.kind,
-        "data-market-covered": r.kind === "held" ? "held" : uncovered || childUncovered ? "no" : "yes",
+        "data-market-covered": covered,
         "data-market-balance-raw": r.balance?.raw ?? "",
       },
     });
   }
 
-  // The gap between the rows and totalAssets(), where the reads all answered.
-  const parts = rows.map((r) => r.amount);
-  if (y.totalAssets && parts.every((p) => p != null)) {
-    const summed = parts.reduce((acc, p) => acc + BigInt(p!.raw), ZERO);
-    const gap = BigInt(y.totalAssets.raw) - summed;
-    if (gap !== ZERO) {
-      const gapAmount = amount(gap < ZERO ? -gap : gap);
-      rows.push({
+  // The gross book: the rows' sum. Where this vault's totalAssets() is below
+  // it, the management fee not yet taken is the deduction, and anything left
+  // is a remainder row. A rewards manager whose balance did not answer leaves
+  // the book unsummed.
+  const rewardsUnread = m.rewards != null && m.rewards.balance == null;
+  const allRead = drafts.every((d) => d.amount != null) && !rewardsUnread;
+  const book = allRead ? drafts.reduce((acc, d) => acc + BigInt(d.amount!.raw), ZERO) : null;
+  const extra: VaultAssetRow[] = [];
+  let feeDeducted = false;
+  let denominator = book;
+  if (book != null && y.totalAssets) {
+    const total = BigInt(y.totalAssets.raw);
+    const below = book - total;
+    const feeRaw = y.unrealizedManagementFee ? BigInt(y.unrealizedManagementFee.raw) : ZERO;
+    const fee = below > ZERO ? (feeRaw < below ? feeRaw : below) : ZERO;
+    if (fee > ZERO) {
+      feeDeducted = true;
+      extra.push({
+        key: "fee-not-taken",
+        venue: "Management fee not yet taken",
+        sub: "accrued, and minted to the fee account when taken",
+        amount: amount(fee),
+        amountProv: iporFeeNotTakenProv(coords, { fee: assetText(amount(fee), ad) }),
+        minus: true,
+        share: null,
+        hooks: { "data-figure": "fee-not-taken" },
+      });
+    }
+    const remainder = total - (book - fee);
+    if (remainder !== ZERO) {
+      const abs = amount(remainder < ZERO ? -remainder : remainder);
+      if (remainder > ZERO) denominator = book + remainder;
+      extra.push({
         key: "not-in-a-row",
         venue: "Not in a row",
-        sub:
-          gap > ZERO
-            ? `totalAssets() ${assetText(y.totalAssets, ad)} less the rows' ${assetText(amount(summed), ad)} at block ${n(data.blockNumber)}`
-            : `the rows' ${assetText(amount(summed), ad)} exceed totalAssets() ${assetText(y.totalAssets, ad)} by ${assetText(gapAmount, ad)} at block ${n(data.blockNumber)}`,
-        amount: gapAmount,
+        sub: remainder > ZERO ? "total assets beyond the rows above" : "the rows above exceed total assets",
+        amount: abs,
         amountProv: iporMarketsGapProv(coords, {
           total: assetText(y.totalAssets, ad),
-          summed: assetText(amount(summed), ad),
-          gap: `${gap < ZERO ? "−" : ""}${assetText(gapAmount, ad)}`,
+          summed: assetText(amount(book), ad),
+          fee: fee > ZERO ? assetText(amount(fee), ad) : null,
+          gap: `${remainder < ZERO ? "−" : ""}${assetText(abs, ad)}`,
         }),
-        share: gap < ZERO ? null : fraction(gapAmount, y.totalAssets),
-        shareProv: vaultVenueShareProv(v, "the difference", "totalAssets()", coords.readBy),
-        offBand: gap < ZERO,
+        ...(remainder < ZERO ? { minus: true } : {}),
+        share: null,
         hooks: { "data-figure": "not-in-a-row" },
       });
     }
   }
+  const den = denominator != null ? amount(denominator) : null;
+  const bookText = den ? assetText(den, ad) : "";
+  const shareOf = (d: Draft): Pick<VaultAssetRow, "share" | "shareProv"> =>
+    den && d.amount
+      ? {
+          share: Number((BigInt(d.amount.raw) * BigInt(1e9)) / (BigInt(den.raw) || BigInt(1))) / 1e9,
+          shareProv: iporShareProv(coords, { venue: d.shareVenue ?? String(d.key), book: bookText, feeDeducted }),
+        }
+      : { share: null };
+  const rows: VaultAssetRow[] = [
+    ...drafts.map(({ shareVenue, ...d }) => ({ ...d, ...shareOf({ ...d, shareVenue }) })),
+    ...extra.map((e) =>
+      e.key === "not-in-a-row" && !e.minus && den && e.amount
+        ? { ...e, ...shareOf({ ...e, shareVenue: "the remainder" }) }
+        : e,
+    ),
+  ];
 
   const exportModel: VaultExportModel = {
     stats: [],
     rows: rows.map((r): [string, string, string] => [
       typeof r.venue === "string" ? r.venue : r.key,
-      r.amount ? assetText(r.amount, ad) : "not read",
+      r.amount ? `${r.minus ? "−" : ""}${assetText(r.amount, ad)}` : "not read",
       r.share == null ? "" : pctText(r.share),
     ]),
   };
@@ -218,21 +287,17 @@ export function IporFusionMarketsTile({
         chart={alloc.chart}
         keyColours={alloc.keyColours}
         look="index"
-        line={
-          <>
-            The asset in the vault and the {n(markets.length)} {markets.length === 1 ? "market" : "markets"} its balance
-            fuses book, at block {n(data.blockNumber)}. A row links to Rails where its balance is above zero.
-          </>
-        }
-        shareTip="The row's amount over the vault's total assets."
+        line={line}
+        shareTip="The row's amount over the rows' sum."
         learnMore={iporFusionVaultAssetsContent()}
         menu={{ exports: vaultAssetsExports(v, exportModel) }}
+        amountsWithheld={withheld}
       />
       {routes.length > 0 && (
         <div className="mt-6" data-vault-routes="" data-anatomy="V3.2">
           <h3 className="text-sm font-semibold text-foreground">Routes</h3>
           <p className="mt-1 text-[13px] text-rb-500">
-            Markets the vault acts through that hold no balance: swaps, flash loans and the zero-balance market.
+            Markets the vault acts through that hold no balance, such as swaps and flash loans.
           </p>
           <ul className="mt-2 space-y-1.5 text-[13px]">
             {routes.map((r) => (

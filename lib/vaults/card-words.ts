@@ -224,7 +224,7 @@ export const iporFusionVaultCardContent = (): LearnMoreContent => ({
 export const iporFusionVaultAssetsContent = (): LearnMoreContent => ({
   title: "Where an IPOR Fusion vault's assets are",
   intro:
-    "The vault's balance is the asset it holds, plus each market's balance as its balance fuse last booked it, in the vault's asset. A market is one protocol, or one kind of holding, the vault may act in.",
+    "The vault's balance is the asset it holds, plus each market's balance as the vault last recorded it, in the vault's asset. A market is one protocol, or one kind of holding, the vault may act in.",
   detailsHeading: "Key concepts:",
   details: [
     {
@@ -233,17 +233,19 @@ export const iporFusionVaultAssetsContent = (): LearnMoreContent => ({
     },
     {
       bold: "Grants",
-      text: "under each market, what the vault may use there: tokens, markets, pools or vaults, as the market's grants name them.",
+      text: "under each market, what the vault may use there: tokens, markets, pools or vaults. IPOR calls them substrates.",
     },
     {
-      bold: "Links",
-      text: "a row links to Rails only where its balance is above zero: to that protocol's explorer at this vault's address, or to the vault it holds shares of. Elsewhere it names the protocol, or says it is not covered by Rails.",
+      bold: "Management fee not yet taken",
+      text: "on some vault versions the vault's total assets are the rows less the management fee accrued and not yet minted; the table shows it as a deduction.",
     },
+    { bold: "Share of this vault", text: "a row's amount over the rows' sum, so the shares total 100%." },
+  ],
+  links: [
     {
-      bold: "Routes",
-      text: "markets the vault acts through that hold no balance, such as swaps and flash loans, listed under the table.",
+      label: "IPOR's documentation: What is a fuse",
+      url: "https://ipor.io/docs/build-on-fusion/architecture-overview/what-is-a-fuse",
     },
-    { bold: "Share of this vault", text: "a row's amount over the vault's total assets." },
   ],
 });
 

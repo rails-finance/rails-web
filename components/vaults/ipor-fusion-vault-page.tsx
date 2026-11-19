@@ -64,7 +64,7 @@ export function IporFusionVaultPage({
   childPages = {},
 }: {
   data: IporFusionVaultResponse;
-  /** Rails's page for each child vault it catalogues, by lowercased address. */
+  /** Rails' page for each child vault it catalogues, by lowercased address. */
   childPages?: Record<string, string>;
 }) {
   const registry = useReceiptRegistry();
@@ -322,6 +322,7 @@ export function IporFusionVaultPage({
         <div className={VAULT_CARD_TILE}>
           <VaultCard
             vault={v}
+            yieldFigure={{ none: "no-series" }}
             holdersHref={null}
             receipts={{
               name: iporVaultNameProv(coords),
