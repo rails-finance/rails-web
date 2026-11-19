@@ -17,6 +17,7 @@ import { WalletContextProvider } from "@/components/nav/wallet-context";
 import { ThemeScript } from "@/components/ThemeScript";
 import { ASSET_SCOPE_SCRIPT } from "@/lib/shared/asset-preference";
 import { BetaStrip } from "@/components/shared/beta-strip";
+import { FeedbackButton } from "@/components/shared/feedback-button";
 import { BETA_STRIP_SCRIPT } from "@/lib/shared/beta-strip-script";
 import { WorkInProgressStrip } from "@/components/shared/work-in-progress-strip";
 import { SITE_URL, TWITTER_HANDLE } from "@/lib/shared/page-metadata";
@@ -213,6 +214,8 @@ export default function RootLayout({
                 Mounted here so no such route can be missed. */}
             <WorkInProgressStrip />
             {children}
+            {/* The floating feedback button, on every page (ui-jobs 769). */}
+            <FeedbackButton />
           </WalletContextProvider>
         </Providers>
         <Analytics />

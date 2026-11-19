@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { FeedbackCluster } from "@/components/shared/feedback-cluster";
 import { LwNotice } from "@/components/shared/lw-attribution";
-import { PhoneBeta } from "@/components/nav/phone-beta";
 
 /** Slim app footer used on protocol pages (/liquity-v2, /trove/*).
  *  Single row: copyright + legal on the left, the shared feedback cluster
@@ -17,15 +16,13 @@ import { PhoneBeta } from "@/components/nav/phone-beta";
 export function AppFooter() {
   return (
     <footer className="mt-32" data-anatomy="H8">
-      {/* The hairline spans the text's width, in the muted text tone at half strength. */}
+      {/* The hairline spans the text's width, in the muted text tone at half strength.
+          96px under the last line keep it clear of the feedback button (H26). */}
       <div className="max-w-7xl mx-auto px-4">
-        <div className="border-t border-rb-500/50 pt-6 pb-6">
+        <div className="border-t border-rb-500/50 pt-6 pb-24">
           <div className="flex flex-col md:flex-row justify-between items-center md:items-start gap-6 md:gap-4">
             <div className="flex flex-col md:flex-row items-center gap-4">
-              <div className="flex items-center gap-2">
-                <p className="text-xs text-rb-500">© {new Date().getUTCFullYear()} Rails</p>
-                <PhoneBeta />
-              </div>
+              <p className="text-xs text-rb-500">© {new Date().getUTCFullYear()} Rails</p>
               <div className="flex gap-4">
                 <Link href="/privacy" className="text-rb-500 hover:text-foreground text-xs transition-colors">
                   Privacy Policy

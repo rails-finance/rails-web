@@ -2541,3 +2541,11 @@ html[data-asset-scope] [data-scope-list]:not([data-scope-ready]),
 html[data-chain-focus] [data-chain-gate]:not([data-scope-ready]) {
   visibility: hidden;
 }
+
+/* The feedback button (H26) rises over the compare bar (E3) below 768px, where
+   the bar spans the window's width. */
+@media (max-width: 767px) {
+  body:has([data-compare-bar]) [data-feedback-button] {
+    bottom: calc(max(1rem, env(safe-area-inset-bottom)) + 4.5rem);
+  }
+}

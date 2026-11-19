@@ -34,8 +34,8 @@ const browser = await chromium.launch();
 //
 // THE CONTRACT FROM `md` UP ON AN APP ROUTE (rails-ops TO-DO-ui-jobs 68): the
 // top bar is not drawn at all, on the app and the site pages alike (ui-jobs
-// 498). BrandRail holds the mark, the search's glyph, the chooser, the theme
-// toggle and the beta pill; H20 stands at the column's top right. Below `md` there is no rail and the bar carries
+// 498). BrandRail holds the mark, the beta pill, the search's glyph, the chooser
+// and the theme toggle; H20 stands at the column's top right. Below `md` there is no rail and the bar carries
 // every one of those controls, which is what the mobile block at the foot
 // holds. The separate bookmarks button (H11) went on 1 Nov 2026: the glyph
 // opens the wallet panel, where the bookmarks are listed, so its locator stays
@@ -132,38 +132,31 @@ const railBg = await rail.evaluate((el) => {
 console.log("   ", JSON.stringify(railBg));
 check(railBg.bg !== "rgba(0, 0, 0, 0)" && railBg.bg !== "transparent", `the rail paints a background (${railBg.bg})`);
 check(railBg.bg === railBg.raised, `the rail takes the raised surface tone (${railBg.bg} vs ${railBg.raised})`);
-// The beta pill: at the FOOT, drawn as a full-width
-// strip across the rail from the browser's left edge, square on every corner,
-// x=0 (c0534d67, 13 Oct 2026).
+// The beta pill (H25, ui-jobs 769): an outlined, rounded button under the
+// mark, in the rail's upper half, opening the feedback form.
 const pill = await page.evaluate(() => {
   const r = document.querySelector('aside[aria-label="Rails"]');
-  const el = [...r.querySelectorAll("span")].find((s) => /^beta$/i.test(s.textContent.trim()));
-  if (!el) return null;
-  const cs = getComputedStyle(el);
+  const el = r.querySelector('button[data-beta-pill="rail"]');
+  const mark = r.querySelector("[data-rail-home]");
+  if (!el || !mark) return null;
   const b = el.getBoundingClientRect();
   return {
-    left: Math.round(b.left),
-    topLeftRadius: cs.borderTopLeftRadius,
-    bottomLeftRadius: cs.borderBottomLeftRadius,
-    topRightRadius: cs.borderTopRightRadius,
-    width: Math.round(b.width),
-    railWidth: Math.round(r.getBoundingClientRect().width),
-    atFoot: Math.round(b.bottom) === Math.round(r.getBoundingClientRect().bottom),
-    inLowerHalf: b.top > window.innerHeight / 2,
+    text: el.textContent.trim(),
+    radius: getComputedStyle(el).borderTopLeftRadius,
+    underMark: b.top >= mark.getBoundingClientRect().bottom && b.top - mark.getBoundingClientRect().bottom <= 12,
+    inUpperHalf: b.bottom < window.innerHeight / 2,
   };
 });
 check(pill !== null, "the rail draws the beta pill");
 if (pill) {
   console.log("   ", JSON.stringify(pill));
-  check(pill.left === 0, `the beta pill starts at the browser's left edge (left=${pill.left})`);
-  check(
-    pill.topLeftRadius === "0px" && pill.bottomLeftRadius === "0px",
-    `the beta pill is square on its left (${pill.topLeftRadius} / ${pill.bottomLeftRadius})`,
-  );
-  check(pill.topRightRadius === "0px", `the beta pill is square on its right (${pill.topRightRadius})`);
-  check(pill.width === pill.railWidth, `the beta pill spans the rail (${pill.width} of ${pill.railWidth}px)`);
-  check(pill.atFoot, "the beta pill sits at the rail's foot");
-  check(pill.inLowerHalf, "the beta pill sits at the foot of the rail, not under the glyph");
+  check(/^beta$/i.test(pill.text), `the beta pill reads Beta (${pill.text})`);
+  check(parseFloat(pill.radius) >= 7, `the beta pill is rounded (${pill.radius})`);
+  check(pill.underMark && pill.inUpperHalf, "the beta pill sits under the mark");
+  await page.click('aside[aria-label="Rails"] button[data-beta-pill="rail"]');
+  const opened = await page.locator('div[role="dialog"][aria-labelledby="feedback-modal-title"]').count();
+  check(opened === 1, `the beta pill opens the feedback form (${opened})`);
+  await page.keyboard.press("Escape");
 }
 
 // ── The protocol title row: size, case, tracking, and the chain's label on it ──
@@ -346,8 +339,8 @@ await mob.goto(BASE + "/ethereum/liquity-v2", { waitUntil: "networkidle" });
 const mBurger = await mob.locator('header button[aria-label="Toggle menu"]').count();
 check(mBurger === 0, `mobile header has no hamburger (${mBurger})`);
 // Below `md` the brand rail does not render: the bar is the sidebar toggle,
-// which opens the panel (H15.1), the Rails mark and name centred as a link home
-// (every page but home), and H20 (rails-ops TO-DO-ui-jobs 67, 68, 507, 514).
+// which opens the panel (H15.1), the Rails mark centred as a link home (every
+// page but home) with the beta pill to its right (ui-jobs 769), and H20 (rails-ops TO-DO-ui-jobs 67, 68, 507, 514).
 const mRail = await mob.locator('aside[aria-label="Rails"]').isVisible();
 check(mRail === false, `mobile draws no brand rail (${mRail})`);
 const mLauncher = await mob.locator('header button[data-anatomy="H15.1"]:visible').count();
@@ -368,13 +361,15 @@ const mHome = await mob.locator('header a[href="/"][data-home-brand]:visible').c
 check(mHome === 1, `mobile header's centred brand links home (${mHome})`);
 const mWordmark = await mob.locator("header").first().innerText();
 check(
-  /Rails/.test(mWordmark) && !/Ethereum/i.test(mWordmark),
-  `mobile header shows "Rails" and not the chain (${mWordmark.replace(/\s+/g, " ")})`,
+  /^beta$/i.test(mWordmark.trim()) && !/Ethereum/i.test(mWordmark),
+  `mobile header shows the beta pill and not the chain (${mWordmark.replace(/\s+/g, " ")})`,
 );
+const mPill = await mob.locator('header button[data-beta-pill="header"]:visible').count();
+check(mPill === 1, `mobile header carries the beta pill (${mPill})`);
 // The phone header on home (ui-jobs 514): the toggle on the left, H20 on the
 // right, no brand (the hero carries it), no "Start here" (it is in H20's menu).
-// The panel's top row closes it from the toggle's place. The beta pill is in the footer
-// below md, and the rail's from md.
+// The panel's top row closes it from the toggle's place. The beta pill stands
+// alone at the centre (ui-jobs 769).
 const mHomePage = await browser.newPage({ viewport: { width: 390, height: 800 } });
 await mHomePage.goto(BASE + "/", { waitUntil: "networkidle" });
 const mStart = await mHomePage.locator('header[data-anatomy="H2"] a[href="/start"]').count();
@@ -412,9 +407,7 @@ await mHomePage.waitForTimeout(500);
 const panelShut = await mHomePage.evaluate(() => document.documentElement.hasAttribute("data-wallet-panel-open"));
 check(!panelShut, "home @390: a second press on the launcher's place closes the panel");
 const mHeaderBeta = await mHomePage.locator('header[data-anatomy="H2"]').first().innerText();
-check(!/beta/i.test(mHeaderBeta), "home @390: the header carries no beta pill");
-const mFooterBeta = await mHomePage.locator("footer [data-phone-beta]").isVisible();
-check(mFooterBeta, "home @390: the beta pill is in the footer");
+check(/beta/i.test(mHeaderBeta), "home @390: the header carries the beta pill");
 // The profile control's menu (ui-jobs 504, 582, 586; Miles 13 Nov 2026,
 // mockup): a menu button; with nothing saved, Start here first, then two
 // sections, Saved views (its header a link with no toggle, the empty line
@@ -498,8 +491,8 @@ await mHomePage.waitForTimeout(300);
 const samePlaceClosed = await mHomePage.evaluate(() => !document.querySelector("[data-profile-menu]"));
 check(samePlaceClosed, "home @390: a second press on H20's place closes the sheet");
 await mHomePage.close();
-const dFooterBeta = await page.locator("footer [data-phone-beta]:visible").count();
-check(dFooterBeta === 0, `@1280: the footer's beta pill is hidden, the rail carries it (${dFooterBeta})`);
+const dHeaderBeta = await page.locator('[data-beta-pill="header"]:visible').count();
+check(dHeaderBeta === 0, `@1280: the header's beta pill is hidden, the rail carries it (${dHeaderBeta})`);
 // FRANKENCOIN is the roster's longest name: at 390 the title must stay on one
 // line, the chain's glyph following it (ui-jobs 514).
 for (const [w, h] of [
