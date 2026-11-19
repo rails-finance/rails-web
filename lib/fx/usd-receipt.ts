@@ -31,6 +31,9 @@ export function fxCollateralUsd(o: {
   leg: FxLeg;
   price: number | null | undefined;
   priceBlock: number | null | undefined;
+  /** The price's note where the leg alone does not say it (a block that
+   *  stores only the min leg). */
+  priceNote?: string;
 }): FxUsd | null {
   if (o.colls == null || o.price == null || !(o.price > 0)) return null;
   const sym = FX_POOLS[o.pool].normalizedSymbol;
@@ -47,7 +50,7 @@ export function fxCollateralUsd(o: {
         amountNote: o.amountNote,
         amountKind: { kind: "chain", pclass: "state" },
         price: o.price,
-        priceNote: fxPriceNote(o.leg, o.priceBlock),
+        priceNote: o.priceNote ?? fxPriceNote(o.leg, o.priceBlock),
         priceContract: oracleOf(o.pool),
       },
     ],
@@ -85,31 +88,27 @@ export function fxSeizedUsd(o: {
   });
 }
 
-/** A position's collateral as its card draws it: at the anchor leg of the
- *  settled block on the position page, the anchor leg of the pool totals'
- *  block on the listing, else the sweep's stored min leg at its block. The
- *  leg rides along so the words beside the figure can name it. */
+/** A position's collateral as the card, the listing, the Explanation and
+ *  the export state it: the settled colls at the oracle's anchor leg, the
+ *  price the LTV divides by (on the position page at the settled block, on
+ *  the listing at the pool totals' block). Null where no anchor read stands:
+ *  no figure (FX_NO_ANCHOR). */
 export function fxPositionCollUsd(
-  v: {
-    pool: FxPoolKey;
-    settled: { colls: number | null; block: number | null };
-    oracle: { priceUsd: number | null; priceBlock: number | null };
-  },
-  px?: { anchor: number; block: number } | null,
-  listing?: { anchor: number; block: number } | null,
-): (FxUsd & { leg: FxLeg; price: number }) | null {
+  v: { pool: FxPoolKey; settled: { colls: number | null; block: number | null } },
+  anchor: { anchor: number; block: number } | null | undefined,
+): (FxUsd & { price: number }) | null {
+  if (!anchor) return null;
   const sym = FX_POOLS[v.pool].normalizedSymbol;
   const at = v.settled.block != null ? ` at block ${v.settled.block.toLocaleString("en-US")}` : "";
-  const base = {
+  const r = fxCollateralUsd({
     what: `The position's ${sym} collateral in USD`,
     pool: v.pool,
     colls: v.settled.colls,
     amountNote: `the pool's getPosition rawColls, in ${sym}${at}`,
     collsBlock: v.settled.block,
-  };
-  const pick = px ?? listing ?? null;
-  const leg: FxLeg = pick ? "anchor" : "min";
-  const price = pick ? pick.anchor : v.oracle.priceUsd;
-  const r = fxCollateralUsd({ ...base, leg, price, priceBlock: pick ? pick.block : v.oracle.priceBlock });
-  return r && price != null ? { ...r, leg, price } : null;
+    leg: "anchor",
+    price: anchor.anchor,
+    priceBlock: anchor.block,
+  });
+  return r ? { ...r, price: anchor.anchor } : null;
 }

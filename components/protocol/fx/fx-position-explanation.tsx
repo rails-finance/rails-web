@@ -119,7 +119,7 @@ export function FxPositionExplanation({
       ? { anchor: Number(pxRead.anchorPrice) / 1e18, min: Number(pxRead.minPrice) / 1e18 }
       : null;
   // The collateral's dollars as the card draws them: the shown product at the
-  // anchor leg of the settled block, else the sweep's min leg (ui-jobs 743).
+  // anchor leg of the settled block (ui-jobs 743).
   const collUsd = fxPositionCollUsd(
     v,
     px && v.settled.block != null ? { anchor: px.anchor, block: v.settled.block } : null,
@@ -280,8 +280,8 @@ export function FxPositionExplanation({
     if (collUsd) {
       bullets.push(
         <span key="usd">
-          At the oracle&rsquo;s {collUsd.leg} price, {formatUsd(collUsd.price)} per {v.normalizedSymbol}, that
-          collateral is worth{" "}
+          At the oracle&rsquo;s anchor price, {formatUsd(collUsd.price)} per {v.normalizedSymbol}, that collateral is
+          worth{" "}
           <Prov info={collUsd.prov}>
             <H>{formatUsd(collUsd.usd)}</H>
           </Prov>

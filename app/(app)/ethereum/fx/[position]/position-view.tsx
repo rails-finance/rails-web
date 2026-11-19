@@ -396,6 +396,12 @@ export default function FxPositionView({
     view?.status === "open" ? view.settled.block : null,
     true,
   );
+  // The anchor leg at the settled block, which the export states the
+  // collateral at, as the card does.
+  const settledAnchor =
+    settledPx?.anchorPrice != null && view?.settled.block != null
+      ? { anchor: Number(settledPx.anchorPrice) / 1e18, block: view.settled.block }
+      : null;
   const stripAssets = useMemo<LatestPriceAsset[]>(() => {
     if (!view || view.status !== "open") return [];
     if (settledPx?.anchorPrice != null)
@@ -508,6 +514,7 @@ export default function FxPositionView({
         buildMarkdown: () =>
           fxPositionToMarkdown({
             view,
+            anchor: settledAnchor,
             events: fxEvents,
             drift,
             reads: historyWindow.state === "whole" ? socializedReadsMap : undefined,

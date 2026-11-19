@@ -18,3 +18,9 @@ export function fxPriceNote(leg: FxLeg, block: number | null | undefined): strin
 /** Where the collateral and the price stand at different blocks. */
 export const fxBlocksNote = (collsBlock: number, priceBlock: number): string =>
   `The collateral stands at block ${collsBlock.toLocaleString("en-US")} and the price at block ${priceBlock.toLocaleString("en-US")}.`;
+
+/** A sheet row whose block stores only the min leg. */
+export const FX_MIN_ONLY_NOTE = "the min leg (getLiquidatePrice), the only leg stored at this block";
+
+/** Where a position's collateral has no anchor read: the house no-figure form. */
+export const FX_NO_ANCHOR = "no dollar figure: the oracle's anchor leg was not read for this position";

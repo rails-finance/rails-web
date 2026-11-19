@@ -36,6 +36,7 @@ register("data:text/javascript," + encodeURIComponent(hook));
 
 const { fxCollateralUsd, fxPositionCollUsd, fxSeizedUsd } = await import(ROOT + "lib/fx/usd-receipt.ts");
 const { shownUsd } = await import(ROOT + "lib/shared/shown-usd.ts");
+const { FX_MIN_ONLY_NOTE, FX_NO_ANCHOR } = await import(ROOT + "lib/fx/price-notes.ts");
 
 const num = (t) => Number(String(t).replace(/[^0-9.]/g, ""));
 const row = (prov, label) => prov.inputs.find((i) => i.label === label);
@@ -63,23 +64,40 @@ test("rows multiply out to the cent, a 7-decimal colls at a high price among the
   assert.equal(row(r.prov, "WBTC price").contract.address, "0xb3c90e64eb6f456a5f5c17aa99b6aeca6f4a6390");
 });
 
-test("the anchor and min legs are named; the anchor-leg receipt rebuilds its figure", () => {
-  const anchor = fxPositionCollUsd(view(2.5), { anchor: 97_000.123456, block: 23_500_000 });
-  assert.equal(anchor.leg, "anchor");
-  assert.match(row(anchor.prov, "WBTC price").note, /anchor leg \(getPrice\).*at block 23,500,000/);
+test("a position's collateral stands at the anchor leg, its receipt rebuilding the figure; the seizures keep the min leg", () => {
+  const anchor = fxPositionCollUsd(view(2.5), { anchor: 97_000.123456, block: 23_499_990 });
+  assert.match(row(anchor.prov, "WBTC price").note, /anchor leg \(getPrice\).*at block 23,499,990/);
   assert.equal(
     anchor.usd,
     Math.round(num(row(anchor.prov, "WBTC amount").value) * num(row(anchor.prov, "WBTC price").value) * 100) / 100,
   );
-  const min = fxPositionCollUsd(view(2.5, 96_500.5, 23_499_990));
-  assert.equal(min.leg, "min");
-  assert.match(row(min.prov, "WBTC price").note, /min leg \(getLiquidatePrice\).*at block 23,499,990/);
   // The collateral and the price stand at different blocks: both named.
-  assert.match(min.prov.summary, /collateral stands at block 23,500,000 and the price at block 23,499,990/);
+  assert.match(anchor.prov.summary, /collateral stands at block 23,500,000 and the price at block 23,499,990/);
+  const seized = fxSeizedUsd({ what: "x", pool: "wbtc", legs: [{ amount: 0.1, price: 96_500.5, block: 23_000_000 }] });
+  assert.match(row(seized.prov, "WBTC price").note, /min leg \(getLiquidatePrice\)/);
+});
+
+test("a sheet row whose block stores only the min leg names it as such", () => {
+  const r = fxCollateralUsd({
+    what: "x",
+    pool: "wsteth",
+    colls: 1.5,
+    amountNote: "",
+    leg: "min",
+    price: 1990.5,
+    priceBlock: 23_000_000,
+    priceNote: `${FX_MIN_ONLY_NOTE}, block 23,000,000`,
+  });
+  assert.equal(
+    row(r.prov, "stETH price").note,
+    "the min leg (getLiquidatePrice), the only leg stored at this block, block 23,000,000",
+  );
 });
 
 test("a missing price draws no figure", () => {
-  assert.equal(fxPositionCollUsd(view(2.5)), null);
+  // No anchor read: no collateral dollars, even with the sweep's min leg stored.
+  assert.equal(fxPositionCollUsd(view(2.5, 96_500.5, 23_499_990), null), null);
+  assert.match(FX_NO_ANCHOR, /^no dollar figure: /);
   assert.equal(
     fxCollateralUsd({ what: "x", pool: "wsteth", colls: 1, amountNote: "", leg: "anchor", price: null, priceBlock: 1 }),
     null,

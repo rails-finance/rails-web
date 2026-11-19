@@ -23,6 +23,7 @@
 // hidden: wsteth-285 shows implied 25,178 fxUSD against settled 0. They are
 // panel rows on an open card and on a closed one.
 
+import { FX_NO_ANCHOR } from "@/lib/fx/price-notes";
 import { fxPositionCollUsd } from "@/lib/fx/usd-receipt";
 import { positionName } from "@/lib/shared/position-name";
 import { POSITION_NOUN } from "@/lib/shared/protocols";
@@ -64,7 +65,7 @@ import {
   leftUnpaidProv,
   badDebtAddedProv,
 } from "@/lib/fx/event-provenance";
-import { useFxPoolTerms, useFxPricesAt, type FxPoolTerms } from "@/lib/fx/use-event-state";
+import { useFxPoolTerms, useFxPricesAtRead, type FxPoolTerms } from "@/lib/fx/use-event-state";
 import { fxBlocksChange } from "@/lib/fx/socialized-reads";
 import type { FxNoTxParts } from "@/lib/fx/no-tx-parts";
 import type { FxInTxFunding } from "@/lib/fx/in-tx-funding";
@@ -615,8 +616,8 @@ function collateralDriftRow(
 /** The settled collateral in USD. On the detail page it is valued at the
  *  anchor price of the settled block (read with the min leg beside it), so
  *  the debt divided by it is the debt ratio; the listing values it at the
- *  oracle's anchor leg at the block the pool's totals were swept at, and falls
- *  back to the sweep's stored min-price reading. */
+ *  oracle's anchor leg at the block the pool's totals were swept at. Where no
+ *  anchor read stands there is no figure, and the cell says so (ui-jobs 743). */
 export interface FxListingPrice {
   anchor: number;
   block: number;
@@ -624,12 +625,14 @@ export interface FxListingPrice {
 
 function collateralUsd(
   v: FxPositionView,
-  px: { anchor: number; block: number } | null,
-  listing?: FxListingPrice | null,
+  anchor: { anchor: number; block: number } | null,
+  /** The anchor read is still on its way: no figure yet, and no word. */
+  waiting: boolean,
 ): ReactNode | null {
-  // The shown product, its receipt naming the leg and its block (ui-jobs 743).
-  const r = fxPositionCollUsd(v, px, listing);
-  if (!r) return null;
+  if (waiting || v.settled.colls == null || v.settled.colls <= 0) return null;
+  // The shown product at the anchor leg, its receipt naming it and its block.
+  const r = fxPositionCollUsd(v, anchor);
+  if (!r) return <span className="text-xs font-normal text-rb-500">{FX_NO_ANCHOR}</span>;
   return (
     <Prov info={r.prov}>
       <span className="font-bold text-green-400">{formatUsdValue(r.usd)}</span>
@@ -679,7 +682,8 @@ export function useFxCardSlots({
   const poolMeta = FX_POOLS[v.pool];
   const terms = useFxPoolTerms(detail ? v.pool : null);
   // The oracle's anchor and min legs at the settled block (detail page only).
-  const pxRead = useFxPricesAt(v.pool, v.positionId, detail && v.status === "open" ? v.settled.block : null, true);
+  const pxState = useFxPricesAtRead(v.pool, v.positionId, detail && v.status === "open" ? v.settled.block : null, true);
+  const pxRead = pxState.value;
   const px =
     pxRead?.anchorPrice != null && pxRead.minPrice != null && v.settled.block != null
       ? {
@@ -792,7 +796,7 @@ export function useFxCardSlots({
           : {}),
         tier: "amount",
         value: collateralValue,
-        usd: collateralUsd(v, px, listingPx),
+        usd: collateralUsd(v, px ?? (detail ? null : (listingPx ?? null)), detail && !pxState.settled),
       },
       // fxUSD is not pinned to a dollar, so the debt carries no USD line.
       { id: "debt", label: CARD_VOCAB.debt, tier: "amount", value: debtValue },

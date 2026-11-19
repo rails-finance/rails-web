@@ -24,7 +24,8 @@
 
 import { fxCollateralUsd } from "@/lib/fx/usd-receipt";
 import type { FxPoolKey } from "@/lib/fx/asset-catalog";
-import { shownUsd } from "@/lib/shared/shown-usd";
+import { priceText, shownUsd } from "@/lib/shared/shown-usd";
+import { FX_MIN_ONLY_NOTE } from "@/lib/fx/price-notes";
 import type { FxContext } from "@/lib/shared/types/event-shape";
 import type { Provenance } from "@/components/shared/provenance";
 import {
@@ -110,15 +111,18 @@ const faceProv = (what: string, coords: FxCoords): Provenance => ({
     coords.blockNumber != null ? [{ label: "block", value: String(coords.blockNumber), kind: "chain" }] : undefined,
 });
 
-/** A collateral amount at the oracle's min leg at a block: the amount × the
- *  price as shown, the product to the cent (ui-jobs 743). The event's stored
- *  price is the one its PositionSnapshot carried, the min leg the pool acted on. */
+/** A collateral amount at an oracle leg at a block: the amount × the price
+ *  as shown, the product to the cent (ui-jobs 743). The anchor where the
+ *  block's read stores it, the leg the LTV uses; else the min leg, the only
+ *  one stored there (the PositionSnapshot's price), named as such. */
+type SheetLeg = "anchor" | "min-only";
 const collUsdAt = (
   pool: FxPoolKey | undefined,
   what: string,
   amount: number,
   price: number | null,
   block: number | null | undefined,
+  leg: SheetLeg,
 ) =>
   !pool
     ? null
@@ -127,9 +131,14 @@ const collUsdAt = (
         pool,
         colls: amount,
         amountNote: `in the pool's normalized unit${block != null ? `, at block ${block.toLocaleString("en-US")}` : ""}`,
-        leg: "min",
+        leg: leg === "anchor" ? "anchor" : "min",
         price,
         priceBlock: block ?? null,
+        ...(leg === "min-only"
+          ? {
+              priceNote: `${FX_MIN_ONLY_NOTE}${block != null ? `, block ${block.toLocaleString("en-US")}` : ""}`,
+            }
+          : {}),
       });
 
 /** A sheet cell from a receipt, signed where the amount is. */
@@ -204,7 +213,11 @@ export function useFxSheet({
   const debtBefore = opened ? 0 : (before?.debts ?? num(ctx.debtBefore));
   if (collAfter == null || debtAfter == null || collBefore == null || debtBefore == null) return undefined;
   const read = after != null && (opened || before != null);
-  const price = ctx.oraclePrice != null ? Number(ctx.oraclePrice) : (after?.minPrice ?? null);
+  // The anchor leg where this block's read stores it (rebalance and
+  // liquidation rows read the prices); else the min leg, the only one stored.
+  const anchorAt = after?.anchorPrice ?? null;
+  const leg: SheetLeg = anchorAt != null ? "anchor" : "min-only";
+  const price = anchorAt ?? (ctx.oraclePrice != null ? Number(ctx.oraclePrice) : (after?.minPrice ?? null));
   const since = ctx.debtSincePrevious != null ? Number(ctx.debtSincePrevious) : null;
 
   const kind: "operate" | "liquidation" | "rebalance" | "redemption" =
@@ -282,10 +295,10 @@ export function useFxSheet({
           : chainChangeProv("coll", normalizedSymbol, coords),
         value: formatExact(collMove),
       },
-      usd: usdCell(collUsdAt(pool, "Collateral this event moved, in USD", collMove, price, blockNumber), collMove),
+      usd: usdCell(collUsdAt(pool, "Collateral this event moved, in USD", collMove, price, blockNumber, leg), collMove),
       tip: collTip,
     });
-  const collAfterR = collUsdAt(pool, "Collateral after this event, in USD", collAfter, price, blockNumber);
+  const collAfterR = collUsdAt(pool, "Collateral after this event, in USD", collAfter, price, blockNumber, leg);
   const collAfterUsd = collAfterR?.usd ?? null;
   // The carry layer from the previous event's position and price.
   const prevColl = !opened && prev?.collAfter != null ? Number(prev.collAfter) : null;
@@ -302,7 +315,9 @@ export function useFxSheet({
         info: prevCollProv(normalizedSymbol, prevColl, coords),
         value: formatExact(prevColl),
       },
-      usd: usdCell(collUsdAt(pool, "Collateral at the previous event, in USD", prevColl, prevPrice, prevBlock)),
+      usd: usdCell(
+        collUsdAt(pool, "Collateral at the previous event, in USD", prevColl, prevPrice, prevBlock, "min-only"),
+      ),
       tip: TIPS.collLast,
     });
     const movedColl = collBefore - prevColl;
@@ -324,7 +339,7 @@ export function useFxSheet({
           value: formatExact(movedColl),
         },
         usd: usdCell(
-          collUsdAt(pool, "Collateral the pool moved since the last event, in USD", movedColl, price, blockNumber),
+          collUsdAt(pool, "Collateral the pool moved since the last event, in USD", movedColl, price, blockNumber, leg),
           movedColl,
         ),
         tip: TIPS.collMoved,
@@ -341,17 +356,24 @@ export function useFxSheet({
             info: {
               kind: "chain-derived",
               pclass: "oracle",
-              summary: `Market move on the collateral since the last event. The ${normalizedSymbol} held at the previous event, valued at the oracle's price at this block less its price at the previous event. No token moved.`,
+              summary: `Market move on the collateral since the last event. The ${normalizedSymbol} held at the previous event, valued at the oracle's price at this block less its price at the previous event${leg === "anchor" ? ": the anchor leg now, the min leg then, the only leg stored at that block" : ", both the min leg"}. No token moved.`,
               formula: "collateral at the previous event × (price now − price then)",
               inputs: [
                 { label: "collateral", value: `${formatNumber(prevColl)} ${normalizedSymbol}`, kind: "chain" },
                 {
                   label: "price at the previous event",
-                  value: sheetUsd(prevPrice),
+                  value: priceText(prevPrice),
                   kind: "chain-derived",
                   pclass: "oracle",
+                  note: FX_MIN_ONLY_NOTE,
                 },
-                { label: "price at this event", value: sheetUsd(price), kind: "chain-derived", pclass: "oracle" },
+                {
+                  label: "price at this event",
+                  value: priceText(price),
+                  kind: "chain-derived",
+                  pclass: "oracle",
+                  note: leg === "anchor" ? "the pool oracle's anchor leg (getPrice) at this block" : FX_MIN_ONLY_NOTE,
+                },
               ],
             },
           },
@@ -377,7 +399,9 @@ export function useFxSheet({
                 : chainBeforeProv("coll", normalizedSymbol, coords, false),
               value: formatExact(collBefore),
             },
-            usd: usdCell(collUsdAt(pool, "Collateral just before this event, in USD", collBefore, price, blockNumber)),
+            usd: usdCell(
+              collUsdAt(pool, "Collateral just before this event, in USD", collBefore, price, blockNumber, leg),
+            ),
             tip: TIPS.collBefore,
           }
         : undefined,
