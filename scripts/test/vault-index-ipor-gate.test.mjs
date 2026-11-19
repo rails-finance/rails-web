@@ -64,3 +64,12 @@ test("an IPOR roster and vault resolve to their chain's pages", () => {
   assert.equal(R.vaultIndexRosterHref("ipor-fusion", 8453), "/base/ipor-fusion/vaults");
   assert.equal(R.vaultIndexRosterHref("ipor-fusion", 42161), "/arbitrum/ipor-fusion/vaults");
 });
+
+test("the holder label links nowhere while the IPOR Fusion pages are unlaunched", async () => {
+  const { holderLabelHref } = await import("../../lib/ipor-fusion/label-href.ts");
+  const R2 = await import("../../lib/vaults/routes.ts");
+  const v = "0xb8a451107a9f87fde481d4d686247d6e43ed715e";
+  assert.equal(R2.iporFusionVaultHref(1, v), `/ethereum/ipor-fusion/vaults/${v}`);
+  for (const chainId of [1, 42161, 8453]) assert.equal(holderLabelHref(chainId, v), null);
+  assert.equal(holderLabelHref(10, v), null);
+});

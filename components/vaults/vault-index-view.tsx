@@ -120,7 +120,9 @@ export function VaultIndexView({
       .map((x) => x.trim())
       .filter((x) => known.includes(x));
   const networks = chosen("network", [...new Set(vaults.map((v) => String(v.chainId)))]);
-  const protocols = chosen("protocol", [...VAULT_INDEX_PROTOCOLS]);
+  // Only the protocols whose rosters the index read: a protocol it does not
+  // list yet (IPOR Fusion before launch) falls back to the whole index.
+  const protocols = chosen("protocol", [...new Set(rosters.map((r) => r.protocol))]);
   const initialFilters = {
     ...(assetValues.length > 0 ? { [TOKEN_FACET.id]: assetValues } : {}),
     ...(networks.length > 0 ? { network: networks } : {}),

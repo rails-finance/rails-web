@@ -104,7 +104,7 @@ export const IPOR_ROLE_LOG_LANE: Partial<Record<IporFusionChainId, { env: string
   // Arbitrum and Base have no lane wide enough for a vault's history (no
   // history key on the server; Base's backfill lane caps a range at 1,000
   // blocks), and the scan never goes over Alchemy or a public RPC: their roles
-  // read "not configured" until one is named (TO-DO-ipor-scoping §6.3).
+  // read "not scanned yet" until one is named (TO-DO-ipor-scoping §6.3).
 };
 
 export const IPOR_ROLE_SCAN_REVALIDATE_SECONDS = 300;
@@ -375,7 +375,7 @@ interface RoleScan {
 /** The fixed words a page states when the roles are not read. No provider
  *  message and no variable name reaches the page. */
 export const ROLES_UNREAD = {
-  unconfigured: "the logs lane is not configured",
+  unconfigured: "this chain's history is not scanned yet",
   refused: "the logs lane refused the scan",
   check: "a role check did not answer",
   accessManager: "the vault did not name its access manager",

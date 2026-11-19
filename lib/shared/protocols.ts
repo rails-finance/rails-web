@@ -1182,7 +1182,7 @@ const SPECS: ProtocolSpec[] = [
     subPages: [{ segment: "vaults", label: "Vaults overview", tab: "Vaults" }],
   },
   {
-    // IPOR Fusion on Arbitrum: the Ethereum entry's shape, its own census (TO-DO-ipor-scoping §6.3 phase C).
+    // IPOR Fusion on Arbitrum: the Ethereum entry's shape, with a census per chain (TO-DO-ipor-scoping §6.3 phase C).
     id: "ipor-fusion-arbitrum",
     session: "ipor-fusion-arbitrum",
     label: "IPOR Fusion",
@@ -1196,7 +1196,7 @@ const SPECS: ProtocolSpec[] = [
     subPages: [{ segment: "vaults", label: "Vaults overview", tab: "Vaults" }],
   },
   {
-    // IPOR Fusion on Base: the Ethereum entry's shape, its own census (TO-DO-ipor-scoping §6.3 phase C).
+    // IPOR Fusion on Base: the Ethereum entry's shape, with a census per chain (TO-DO-ipor-scoping §6.3 phase C).
     id: "ipor-fusion-base",
     session: "ipor-fusion-base",
     label: "IPOR Fusion",

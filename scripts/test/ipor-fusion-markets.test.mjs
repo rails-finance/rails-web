@@ -237,7 +237,7 @@ test("market 54 CROSSCHAIN, vault 0x8bee…8fbf on Arbitrum at block 525,673,038
       decodeSubstrate("crosschain", "0x0200000000000000000003e7b8de01ca5ca57a14671e1c696337134a02b4a478"),
       NAMES,
     ),
-    "vault 0xb8de…a478 on chain 999",
+    "vault 0xb8de…a478 on HyperEVM",
   );
 });
 
@@ -245,5 +245,13 @@ test("the coverage map names each chain's explorer", () => {
   assert.deepEqual(marketInfo("1").covered, { 1: "aave-v3", 42161: "aave-v3-arbitrum", 8453: "aave-v3-base" });
   assert.deepEqual(marketInfo("11").covered, { 42161: "euler-v2-arbitrum", 8453: "euler-v2-base" });
   assert.equal(marketInfo("33").walletPage, true);
+  assert.equal(marketInfo("30").covered, undefined);
   assert.equal(marketInfo("13").covered[8453], undefined);
+  assert.equal(
+    substrateWords(
+      { kind: "remote-vault", chainId: 4242, address: "0xb8de01ca5ca57a14671e1c696337134a02b4a478" },
+      NAMES,
+    ),
+    "vault 0xb8de…a478 on chain 4242",
+  );
 });

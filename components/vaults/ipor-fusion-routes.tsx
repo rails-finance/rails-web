@@ -112,8 +112,7 @@ export function iporFusionInfoMetadata(chainId: IporFusionChainId): Metadata {
         ? "About the IPOR Fusion vault roster"
         : `About the IPOR Fusion vault roster on ${chainName(chainId)}`,
     canonicalPath: `${iporFusionVaultRosterHref(chainId)}/info`,
-    description:
-      "How Rails builds the IPOR Fusion roster: every vault the factory made, the creation event that enumerates them, the roles over each vault, and why totals stay in each vault's asset.",
+    description: `How Rails builds the IPOR Fusion roster: every vault the factory made, the creation event that enumerates them,${IPOR_ROLE_LOG_LANE[chainId] ? " the roles over each vault," : ""} and why totals stay in each vault's asset.`,
   });
 }
 
@@ -154,7 +153,7 @@ export function IporFusionInfoPage({ chainId }: { chainId: IporFusionChainId }) 
         keeps no list of a role&rsquo;s holders, so a vault&rsquo;s page finds them in its grant events and confirms
         each one at the block it reads.
         {!rolesRead &&
-          ` On ${chain} Rails has no logs lane that reaches a vault's history yet, so a vault's page states its roles as not read.`}
+          ` On ${chain} Rails does not scan vault history yet, so a vault's page states its roles as not read.`}
       </p>
       <p data-intro-fees>
         A vault charges a performance fee on gains in the share price and a yearly management fee on its assets, each
@@ -194,7 +193,7 @@ export async function iporFusionVaultMetadata(
   const name = data.vault.name ?? data.vault.censusName ?? address;
   return listingMetadata({
     title: `${name} · IPOR Fusion`,
-    description: `What the ${name} vault holds, its fees and supply cap, who holds the roles over it and the fuses it acts through, read from the contracts at one block.`,
+    description: `What the ${name} vault holds, its fees and supply cap,${IPOR_ROLE_LOG_LANE[chainId] ? " who holds the roles over it" : ""} and the fuses it acts through, read from the contracts at one block.`,
     canonicalPath: iporFusionVaultHref(chainId, address)!,
   });
 }

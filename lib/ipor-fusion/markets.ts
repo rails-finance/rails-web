@@ -56,7 +56,11 @@ const MARKETS: Record<string, Omit<MarketInfo, "constant"> & { constant: string 
   "8": { constant: "UNISWAP_SWAP_V3_POSITIONS", ...T("Uniswap V3 positions", "raw") },
   "9": { constant: "UNISWAP_SWAP_V2", ...T("Uniswap V2 swaps", "route") },
   "10": { constant: "UNISWAP_SWAP_V3", ...T("Uniswap V3 swaps", "route") },
-  "11": { constant: "EULER_V2", ...T("Euler V2", "euler", { 42161: "euler-v2-arbitrum", 8453: "euler-v2-base" }) },
+  "11": {
+    constant: "EULER_V2",
+    ...T("Euler V2", "euler", { 42161: "euler-v2-arbitrum", 8453: "euler-v2-base" }),
+    walletPage: true,
+  },
   "12": { constant: "UNIVERSAL_TOKEN_SWAPPER", ...T("Universal Token Swapper", "route") },
   "13": { constant: "COMPOUND_V3_USDT", ...T("Compound V3 USDT", "tokens", { 1: "compound" }) },
   "14": {
@@ -69,7 +73,8 @@ const MARKETS: Record<string, Omit<MarketInfo, "constant"> & { constant: string 
   "19": { constant: "MORPHO_FLASH_LOAN", ...T("Morpho flash loans", "route") },
   "21": { constant: "MOONWELL", ...T("Moonwell", "tokens", { 8453: "moonwell-base" }) },
   "20": { constant: "AAVE_V3_LIDO", ...T("Aave V3 Lido market", "tokens", { 1: "aave-v3" }) },
-  "30": { constant: "AERODROME", ...T("Aerodrome", "address", { 8453: "aerodrome" }), walletPage: true },
+  // The aerodrome explorer reads Slipstream positions only: basic pools are not covered.
+  "30": { constant: "AERODROME", ...T("Aerodrome", "address") },
   "33": {
     constant: "AREODROME_SLIPSTREAM",
     ...T("Aerodrome Slipstream", "address", { 8453: "aerodrome" }),

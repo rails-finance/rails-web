@@ -13,8 +13,7 @@ import { allocationBar, VaultAssets, type VaultAssetRow } from "@/components/vau
 import { vaultAssetsExports, type VaultExportModel } from "@/lib/vaults/card-export";
 import { iporFusionVaultAssetsContent } from "@/lib/vaults/card-words";
 import type { VaultSummary } from "@/lib/vaults/summary";
-import { listingHrefForWallet, protocolForSession } from "@/lib/shared/protocols";
-import type { SessionProtocol } from "@/lib/shared/sessions";
+import { marketRailsHref } from "@/lib/ipor-fusion/market-links";
 import { assetText, pctText } from "@/lib/shared/vault-amount-text";
 import { substratesLine, substrateWords } from "@/lib/ipor-fusion/market-words";
 import {
@@ -51,18 +50,6 @@ const DECODER: Record<MarketKind, string> = {
   route: "is a token address",
   raw: "is shown as the hex the vault answers, which this page does not decode",
 };
-
-/** Where Rails shows this market at the vault's address, whatever its
- *  balance: the explorer's listing filtered to the vault, or its page per
- *  address. Null where no Rails page covers it: the row says "not covered". */
-function railsHrefOf(r: IporFusionMarketRow, chainId: number, vault: string): string | null {
-  const session = r.covered?.[chainId] as SessionProtocol | undefined;
-  if (!session) return null;
-  const listing = listingHrefForWallet(session, vault);
-  if (listing) return listing;
-  const entry = protocolForSession(session);
-  return r.walletPage && entry ? `${entry.href}/${vault.toLowerCase()}` : null;
-}
 
 const isZero = (a: RawAmount | null) => !a || BigInt(a.raw) === ZERO;
 
@@ -141,7 +128,7 @@ export function IporFusionMarketsTile({
       hooks: { "data-market": "rewards" },
     });
   for (const r of sorted) {
-    const railsHref = railsHrefOf(r, data.chainId, y.address);
+    const railsHref = marketRailsHref(r, data.chainId, y.address);
     const grants = r.substrates ?? [];
     // A child-vault market, and a cross-chain market's remote vaults, link
     // where exactly one granted vault has a Rails page; otherwise each grant

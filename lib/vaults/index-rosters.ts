@@ -61,7 +61,7 @@ export const VAULT_INDEX_ROSTERS: readonly { protocol: VaultIndexProtocol; chain
 ];
 
 /** Protocols whose rosters join the index only once launched, and never hold
- *  its own launch back (rails-ops TO-DO-ipor-scoping §6.3 phase C): while a
+ *  back its launch (rails-ops TO-DO-ipor-scoping §6.3 phase C): while a
  *  roster of one is unlaunched the index neither reads nor lists its rows. */
 const LISTED_ONCE_LAUNCHED: readonly VaultIndexProtocol[] = ["ipor-fusion"];
 
