@@ -35,6 +35,8 @@ export interface OracleRead {
   prices: OraclePriceMap;
   blockNumber: number | null;
   blockTimestamp: number | null;
+  /** The read did not answer: no price stands, and the figures say so. */
+  failed?: true;
 }
 
 /** The deployment's oracle map, once per mount. On Base the map is keyed by
@@ -42,6 +44,8 @@ export interface OracleRead {
  *  (priceKeyFor), so `resolvePrice(symbol, …)` reaches it: Base USDC is priced
  *  under the key USDC's figures are looked up by. Null until loaded or on
  *  failure. */
+const FAILED_READ: OracleRead = { prices: {}, blockNumber: null, blockTimestamp: null, failed: true };
+
 export function useAaveV4OracleRead(): OracleRead | null {
   const { oracleRoute, key } = useAaveV4Deployment();
   const [read, setRead] = useState<OracleRead | null>(null);
@@ -50,7 +54,11 @@ export function useAaveV4OracleRead(): OracleRead | null {
     fetch(oracleRoute)
       .then((r) => (r.ok ? (r.json() as Promise<OracleResponse>) : null))
       .then((data) => {
-        if (cancelled || !data?.success || !data.prices) return;
+        if (cancelled) return;
+        if (!data?.success || !data.prices) {
+          setRead(FAILED_READ);
+          return;
+        }
         const prices: OraclePriceMap = { ...data.prices };
         if (key !== "ethereum") {
           for (const p of Object.values(data.prices)) {
@@ -61,7 +69,8 @@ export function useAaveV4OracleRead(): OracleRead | null {
         setRead({ prices, blockNumber: data.blockNumber ?? null, blockTimestamp: data.blockTimestamp ?? null });
       })
       .catch(() => {
-        /* fall back — no throw, no page block */
+        // No throw, no page block: the figures name the failed read.
+        if (!cancelled) setRead(FAILED_READ);
       });
     return () => {
       cancelled = true;

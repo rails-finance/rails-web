@@ -1082,30 +1082,35 @@ function AaveV4SpokeTowerBlock({
                     liquidations) is valued at its price when it left, and what is still held at the latest block&apos;s
                     price. Supplied and Borrowed are set so each side balances, so a price change while a token was held
                     shows in them.
-                    {totals.unpricedSymbols.length > 0 && (
+                    {totals.noFigure.length > 0 && (
                       <>
                         {" "}
-                        They are partial: no price source covers {listSymbols(totals.unpricedSymbols)}, so that balance
-                        shows in its asset&apos;s units in the breakdown and is in none of the dollar figures here.
+                        No dollar figures here: {listSymbols(totals.noFigure)}{" "}
+                        {totals.noFigure.length === 1 ? "has" : "have"} no on-chain price, so the breakdown gives those
+                        balances in their assets&apos; units.
                       </>
                     )}
                   </p>
-                  <div className="flex items-start gap-2 leading-relaxed">
-                    <span className="select-none text-rb-500">•</span>
-                    <span>
-                      {fig(totals.depositedUsd)} of collateral supplied over the position&apos;s life
-                      {totals.supplyInterestUsd > 0.01 && <> and {fig(totals.supplyInterestUsd)} earned in interest</>}
-                      {totals.withdrawnUsd > 0.01 && <>, then {fig(totals.withdrawnUsd)} withdrawn</>}
-                      {totals.liquidatedCollUsd > 0.01 && (
-                        <>
-                          {totals.withdrawnUsd > 0.01 ? " and " : ", then "}
-                          {fig(totals.liquidatedCollUsd)} liquidated
-                        </>
-                      )}
-                      , leaving {fig(totals.inProtocolUsd)} in protocol today.
-                    </span>
-                  </div>
-                  {totals.hasDebtHistory && (
+                  {totals.noFigure.length === 0 && (
+                    <div className="flex items-start gap-2 leading-relaxed">
+                      <span className="select-none text-rb-500">•</span>
+                      <span>
+                        {fig(totals.depositedUsd)} of collateral supplied over the position&apos;s life
+                        {totals.supplyInterestUsd > 0.01 && (
+                          <> and {fig(totals.supplyInterestUsd)} earned in interest</>
+                        )}
+                        {totals.withdrawnUsd > 0.01 && <>, then {fig(totals.withdrawnUsd)} withdrawn</>}
+                        {totals.liquidatedCollUsd > 0.01 && (
+                          <>
+                            {totals.withdrawnUsd > 0.01 ? " and " : ", then "}
+                            {fig(totals.liquidatedCollUsd)} liquidated
+                          </>
+                        )}
+                        , leaving {fig(totals.inProtocolUsd)} in protocol today.
+                      </span>
+                    </div>
+                  )}
+                  {totals.noFigure.length === 0 && totals.hasDebtHistory && (
                     <div className="flex items-start gap-2 leading-relaxed">
                       <span className="select-none text-rb-500">•</span>
                       <span>
@@ -1124,7 +1129,7 @@ function AaveV4SpokeTowerBlock({
                       </span>
                     </div>
                   )}
-                  {liqNet && (
+                  {totals.noFigure.length === 0 && liqNet && (
                     <div className="flex items-start gap-2 leading-relaxed">
                       <span className="select-none text-rb-500">•</span>
                       <span>

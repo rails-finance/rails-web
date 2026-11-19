@@ -138,6 +138,8 @@ function sumReceipt(
   base: Pick<Provenance, "summary" | "via" | "source" | "contract">,
   sum: PricedSum,
   amountNote: string,
+  /** The block the amounts stand at, named beside the prices' where they differ. */
+  balanceBlock?: number | null,
 ): Provenance {
   if (sum.usd == null)
     return { kind: "derived", ...base, summary: `${base.summary} ${capital(aaveV4NoPriceLine(sum.unpriced))}.` };
@@ -147,6 +149,7 @@ function sumReceipt(
     face: "compact",
     via: base.via ?? "",
     byValue: sum.rows.length > 3,
+    balanceBlock,
   });
   if (!r || r.prov == null) return { kind: "derived", ...base };
   const tail = r.prov.summary.replace(/^: /, "");
@@ -186,6 +189,7 @@ export function storedValueProv(
     },
     sum,
     `the hub's ${getter}, ${onVisit(c) ? "read at the head" : "stored"}, over its lines`,
+    c.block,
   );
 }
 
@@ -200,6 +204,7 @@ function hubValueProv(side: "supplied" | "borrowed", scope: string, c: StoredCoo
     },
     sum,
     `the hub's ${getter}, read at the head`,
+    c.block,
   );
 }
 
@@ -596,6 +601,7 @@ export function spokeValueProv(
     },
     sum,
     `the hub's ${call}(assetId, spoke), read near block ${n(block)}`,
+    block,
   );
 }
 

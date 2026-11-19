@@ -38,7 +38,9 @@ export interface AaveV4UsdRow {
 
 export type AaveV4UsdResult =
   | { prov: Provenance; usd: number; missing: [] }
-  | { prov: null; usd: null; missing: string[] };
+  /** No figure: `missing` names the assets with no on-chain price; `state`
+   *  says the oracle read is still loading or did not answer. */
+  | { prov: null; usd: null; missing: string[]; state?: "pending" | "failed" };
 
 /** The figure and its receipt; where a held row has no on-chain price, no
  *  figure and the assets to name. Null with nothing held. */

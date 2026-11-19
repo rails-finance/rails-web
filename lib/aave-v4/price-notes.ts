@@ -50,6 +50,14 @@ const list = (xs: string[]) =>
 export const aaveV4NoPriceLine = (names: string[]): string =>
   `no dollar figure: ${list(names)} ${names.length === 1 ? "has" : "have"} no on-chain price`;
 
+/** What stands where a figure cannot, from a result with no figure. */
+export const aaveV4NoFigureLine = (r: { missing: string[]; state?: "pending" | "failed" }): string =>
+  r.state === "pending"
+    ? "price read pending"
+    : r.state === "failed"
+      ? "no dollar figure: the price read did not answer"
+      : aaveV4NoPriceLine(r.missing);
+
 /** How the face shows a figure the rows rebuild to the cent. */
 export const AAVE_V4_FACE_NOTE = {
   dollars: "To the cent, shown to the dollar.",

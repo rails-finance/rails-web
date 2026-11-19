@@ -70,7 +70,7 @@ import { partialSumProv } from "@/lib/aave-v4/unpriced";
 import { aaveV4PeakReceipt, type AaveV4UsdResult } from "@/lib/aave-v4/usd-receipt";
 import { aaveV4SpokeSideUsd } from "@/lib/aave-v4/spoke-usd";
 import type { AaveV4Peak } from "@/lib/aave-v4/spoke-cards";
-import { aaveV4NoPriceLine, AAVE_V4_PEAK_WHAT } from "@/lib/aave-v4/price-notes";
+import { aaveV4NoFigureLine, AAVE_V4_PEAK_WHAT } from "@/lib/aave-v4/price-notes";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { useAaveV4Deployment } from "@/lib/aave-v4/deployment";
 import { PanelFigure } from "@/components/shared/position-card-panel";
@@ -82,12 +82,17 @@ export type { AaveSpokeCardInfo };
 const supplyInterestProv = () => interestSinceZeroProv("Earned interest inside the collateral");
 const borrowInterestProv = () => interestSinceZeroProv("Accrued interest inside the debt");
 
+/** The price read is still on its way for this side. */
+const isPending = (r: AaveV4UsdResult | null): boolean => r != null && r.prov == null && r.state === "pending";
+
 /** What stands where a side's figure cannot: the assets it has no on-chain price for. */
-function NoPriceLine({ missing }: { missing: string[] }) {
+function NoPriceLine({ r }: { r: { missing: string[]; state?: "pending" | "failed" } }) {
+  // While the price read is pending the head pulses (`pending`); no words yet.
+  if (r.state === "pending") return null;
   return (
-    <Prov info={partialSumProv({ kind: "derived", summary: "" }, "This figure", missing)}>
-      <span className="text-[11px] font-normal text-rb-500" data-total-unpriced="">
-        {aaveV4NoPriceLine(missing)}
+    <Prov info={partialSumProv({ kind: "derived", summary: "" }, "This figure", r.missing)}>
+      <span className="text-[11px] font-normal text-rb-500" data-total-unpriced={r.state ?? "unpriced"}>
+        {aaveV4NoFigureLine(r)}
       </span>
     </Prov>
   );
@@ -97,7 +102,7 @@ function NoPriceLine({ missing }: { missing: string[] }) {
  *  products its receipt lists, compact, the cents on hover. */
 function HeadlineUsd({ r }: { r: AaveV4UsdResult | null }) {
   if (!r) return null;
-  if (r.prov == null) return <NoPriceLine missing={r.missing} />;
+  if (r.prov == null) return <NoPriceLine r={r} />;
   const v = fmtUsd(r.usd);
   return (
     <RevealTip tip={v.title}>
@@ -123,7 +128,7 @@ function oneAssetHead(
       </Prov>
     ),
     usd: !r ? null : r.prov == null ? (
-      <NoPriceLine missing={r.missing} />
+      <NoPriceLine r={r} />
     ) : (
       <Prov info={r.prov}>
         <span className="font-bold text-green-400">{formatUsdValue(r.usd)}</span>
@@ -144,7 +149,7 @@ function peakValue(
   what: string,
   plain: Provenance,
 ): ReactNode {
-  if (!peak && unpriced && unpriced.length > 0) return <NoPriceLine missing={unpriced} />;
+  if (!peak && unpriced && unpriced.length > 0) return <NoPriceLine r={{ missing: unpriced }} />;
   return <PeakUsd usd={usd} info={peakInfo(peak, what, plain)} />;
 }
 
@@ -455,7 +460,7 @@ export function useAaveV4SpokeCardSlots({
     !supplyOnly && nonCollR ? (
       nonCollR.prov == null ? (
         <span data-collateral-sub="not-collateral">
-          + <NoPriceLine missing={nonCollR.missing} /> supplied, not collateral
+          + <NoPriceLine r={nonCollR} /> supplied, not collateral
         </span>
       ) : nonCollR.usd > 0 ? (
         (() => {
@@ -481,7 +486,7 @@ export function useAaveV4SpokeCardSlots({
           ...(oneSupply
             ? oneAssetHead(oneSupply, "Currently supplied", chainBalances, supplyR)
             : {
-                pending: supplyUsdPending,
+                pending: supplyUsdPending || isPending(supplyR),
                 assets: cluster(spoke.supplyingSymbols),
                 value: <HeadlineUsd r={supplyR} />,
               }),
@@ -498,7 +503,7 @@ export function useAaveV4SpokeCardSlots({
           ...(oneColl
             ? oneAssetHead(oneColl, "Current collateral", chainBalances, collR)
             : {
-                pending: supplyUsdPending,
+                pending: supplyUsdPending || isPending(collR),
                 assets: cluster(spoke.supplyBreakdown.collateralSymbols),
                 value: <HeadlineUsd r={collR} />,
               }),
@@ -509,6 +514,7 @@ export function useAaveV4SpokeCardSlots({
           ...(oneDebt
             ? oneAssetHead(oneDebt, "Current debt", chainBalances, debtR)
             : {
+                pending: isPending(debtR),
                 assets: cluster(spoke.borrowingSymbols),
                 value: <HeadlineUsd r={debtR} />,
               }),

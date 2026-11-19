@@ -41,6 +41,9 @@ export interface AaveLifetimeTotals {
   /** Assets with a live balance and no price source — left out of every USD
    *  figure above, so anything that prints one has to name them. */
   unpricedSymbols: string[];
+  /** Every asset a figure above cannot stand on: a held balance or an outflow
+   *  with no on-chain price. Where any, the figures are not drawn (ui-jobs 743). */
+  noFigure: string[];
 }
 
 /** Below this many tokens an interest leg is zero: share rounding. */
@@ -127,6 +130,7 @@ export function computeAaveLifetimeTotals(
     outstandingUsd: 0,
     hasDebtHistory: false,
     unpricedSymbols: [],
+    noFigure: [],
   };
   // Nothing is known to be unpriced until the price map has answered at all.
   const mapAnswered = pricesHaveLoaded(prices);
@@ -149,5 +153,11 @@ export function computeAaveLifetimeTotals(
     t.debtInterestUsd += debt.interestUsd;
     if (r.borrowed > 0 || r.repaid > 0 || r.liquidatedDebt > 0) t.hasDebtHistory = true;
   }
+  t.noFigure = [
+    ...new Set([
+      ...t.unpricedSymbols,
+      ...reserves.filter((r) => (r.unpricedFlows ?? []).length > 0).map((r) => r.symbol),
+    ]),
+  ];
   return t;
 }

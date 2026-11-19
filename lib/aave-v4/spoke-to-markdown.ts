@@ -20,7 +20,7 @@
 
 import type { AaveV4UsdResult } from "@/lib/aave-v4/usd-receipt";
 import { aaveV4SpokeSideUsd } from "@/lib/aave-v4/spoke-usd";
-import { aaveV4NoPriceLine } from "@/lib/aave-v4/price-notes";
+import { aaveV4NoFigureLine } from "@/lib/aave-v4/price-notes";
 import { shownUsd } from "@/lib/shared/shown-usd";
 import { formatExact } from "@/lib/utils/format";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
@@ -185,7 +185,7 @@ function openHeadlines(args: AaveV4SpokeMarkdownArgs): string[] {
   // The card's figures: the sums of the shown products its receipts list, or
   // the assets with no on-chain price (ui-jobs 743).
   const side = (r: AaveV4UsdResult | null, fallback: number) =>
-    r == null ? usd(fallback) : r.prov == null ? aaveV4NoPriceLine(r.missing) : usd(r.usd);
+    r == null ? usd(fallback) : r.prov == null ? aaveV4NoFigureLine(r) : usd(r.usd);
   let collLine = `- **Collateral:** ${side(aaveV4SpokeSideUsd(card, "supply"), card.totalSupplyUsd)} supplied`;
   if (card.weightedCollateralUsd > 0) {
     collLine += ` (${usd(card.weightedCollateralUsd)} counts at the collateral factor`;

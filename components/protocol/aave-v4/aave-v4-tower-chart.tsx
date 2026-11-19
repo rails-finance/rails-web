@@ -173,6 +173,8 @@ const LIFETIME_DUST_USD = 0.01;
 
 interface AssetRow {
   symbol: string;
+  /** Outflows with an event no on-chain price stands behind (ui-jobs 743). */
+  unpricedFlows: NonNullable<ReserveStats["unpricedFlows"]>;
   // Lifetime totals — drive the historical-view side bars and breakdown rows.
   supplied: number;
   withdrawn: number;
@@ -371,6 +373,7 @@ export function AaveV4TowerChart({
         liquidatedCollateral: r.liquidatedCollateral,
         withdrawnUsd: r.withdrawnUsd,
         repaidUsd: r.repaidUsd,
+        unpricedFlows: r.unpricedFlows ?? [],
         liquidatedDebtUsd: r.liquidatedDebtUsd,
         liquidatedCollateralUsd: r.liquidatedCollateralUsd,
         netSupply,
@@ -463,25 +466,55 @@ export function AaveV4TowerChart({
   const totalDebtInterestUsd = allRows.reduce((s, r) => s + r.debtInterestUsd, 0);
   const heldDebtInterestUsd = debtAssets.reduce((s, r) => s + r.heldDebtInterestUsd, 0);
   const depositedExcluded = unpricedSupplyAll.map((r) => r.symbol);
-  const borrowedExcluded = unpricedDebtSymbols;
+  // An outflow with no on-chain price leaves its side's all-time total
+  // without a figure (no partial totals, ui-jobs 743).
+  const flowUnpriced = (flows: string[]) =>
+    allRows.filter((r) => r.unpricedFlows.some((f) => flows.includes(f))).map((r) => r.symbol);
+  depositedExcluded.push(
+    ...flowUnpriced(["withdrawn", "liquidatedCollateral"]).filter((x) => !depositedExcluded.includes(x)),
+  );
+  const borrowedExcluded = [
+    ...unpricedDebtSymbols,
+    ...flowUnpriced(["repaid", "liquidatedDebt"]).filter((x) => !unpricedDebtSymbols.includes(x)),
+  ];
 
   // Per-asset flow arrays feed the hatched segments, the breakdown rows, and the
   // side-bar totals from a single `usd` — valued at price-at-the-time.
   const withdrawnAssets = allRows
-    .map((r) => ({ symbol: r.symbol, amount: r.withdrawn, usd: r.withdrawnUsd }))
-    .filter((r) => r.usd > LIFETIME_DUST_USD)
+    .map((r) => ({
+      symbol: r.symbol,
+      amount: r.withdrawn,
+      usd: r.withdrawnUsd,
+      unpriced: r.unpricedFlows.includes("withdrawn"),
+    }))
+    .filter((r) => r.unpriced || r.usd > LIFETIME_DUST_USD)
     .sort((a, b) => b.usd - a.usd);
   const repaidAssets = allRows
-    .map((r) => ({ symbol: r.symbol, amount: r.repaid, usd: r.repaidUsd }))
-    .filter((r) => r.usd > LIFETIME_DUST_USD)
+    .map((r) => ({
+      symbol: r.symbol,
+      amount: r.repaid,
+      usd: r.repaidUsd,
+      unpriced: r.unpricedFlows.includes("repaid"),
+    }))
+    .filter((r) => r.unpriced || r.usd > LIFETIME_DUST_USD)
     .sort((a, b) => b.usd - a.usd);
   const liquidatedCollAssets = allRows
-    .map((r) => ({ symbol: r.symbol, amount: r.liquidatedCollateral, usd: r.liquidatedCollateralUsd }))
-    .filter((r) => r.usd > LIFETIME_DUST_USD)
+    .map((r) => ({
+      symbol: r.symbol,
+      amount: r.liquidatedCollateral,
+      usd: r.liquidatedCollateralUsd,
+      unpriced: r.unpricedFlows.includes("liquidatedCollateral"),
+    }))
+    .filter((r) => r.unpriced || r.usd > LIFETIME_DUST_USD)
     .sort((a, b) => b.usd - a.usd);
   const liquidatedDebtAssets = allRows
-    .map((r) => ({ symbol: r.symbol, amount: r.liquidatedDebt, usd: r.liquidatedDebtUsd }))
-    .filter((r) => r.usd > LIFETIME_DUST_USD)
+    .map((r) => ({
+      symbol: r.symbol,
+      amount: r.liquidatedDebt,
+      usd: r.liquidatedDebtUsd,
+      unpriced: r.unpricedFlows.includes("liquidatedDebt"),
+    }))
+    .filter((r) => r.unpriced || r.usd > LIFETIME_DUST_USD)
     .sort((a, b) => b.usd - a.usd);
 
   const hasLive =
@@ -703,20 +736,31 @@ export function AaveV4TowerChart({
   // single USD row when grouped & ≥2 (no icon — the row is a sum across assets),
   // else per-asset rows with the native amount + icon as before.
   const flowRows = (
-    items: { symbol: string; amount: number; usd: number }[],
+    items: { symbol: string; amount: number; usd: number; unpriced?: boolean }[],
     pattern: CSSProperties,
     mergedLabel: string,
   ): BreakdownRow[] => {
+    // A flow with an event no on-chain price stands behind draws "—", and so
+    // does any total over it (no partial totals, ui-jobs 743).
     if (grouped && items.length >= 2) {
-      const prov = flowProv(mergedLabel);
+      const unpriced = items.filter((i) => i.unpriced).map((i) => i.symbol);
+      const prov = partialSumProv(flowProv(mergedLabel), mergedLabel, unpriced);
       const total = items.reduce((s, i) => s + i.usd, 0);
-      return [{ sign: "−", label: mergedLabel, amount: fmtUsd(total).display, swatchStyle: pattern, prov }];
+      return [
+        {
+          sign: "−",
+          label: mergedLabel,
+          amount: unpriced.length > 0 ? "—" : fmtUsd(total).display,
+          swatchStyle: pattern,
+          prov,
+        },
+      ];
     }
     return items.map((i) => ({
       sign: "−",
       label: mergedLabel,
-      amount: fmtUsd(i.usd).display,
-      exact: fmtUsd(i.usd).title,
+      amount: i.unpriced ? "—" : fmtUsd(i.usd).display,
+      exact: i.unpriced ? undefined : fmtUsd(i.usd).title,
       ...tokenHint(i.amount, i.symbol, flowAmountProv(mergedLabel, aaveV4DisplaySymbol(i.symbol))),
       swatchStyle: pattern,
       icon: <TokenChipIcon symbol={i.symbol} size={14} filterable={false} />,

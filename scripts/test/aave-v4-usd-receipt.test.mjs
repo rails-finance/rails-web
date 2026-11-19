@@ -239,3 +239,48 @@ test("the peak walk: no instant priced draws no peak and names the reserve", () 
   assert.equal(r.peakDebtUsd, 0);
   assert.deepEqual(r.peakDebtUnpriced, ["XAUt"]);
 });
+
+const { aaveV4SpokeSideUsd } = await import(ROOT + "lib/aave-v4/spoke-usd.ts");
+const { aaveV4NoFigureLine } = await import(ROOT + "lib/aave-v4/price-notes.ts");
+const { computeAaveLifetimeTotals } = await import(ROOT + "lib/aave-v4/lifetime-totals.ts");
+const { shownUsd } = await import(ROOT + "lib/shared/shown-usd.ts");
+
+test("before the oracle read lands, or once it fails, a held side draws no figure and says which", () => {
+  const spoke = {
+    supplyingSymbols: ["WETH"],
+    borrowingSymbols: ["USDC"],
+    supplyBreakdown: { collateralSymbols: ["WETH"] },
+    supplyLegs: [],
+    debtLegs: [],
+    unpricedHoldings: [],
+  };
+  const pending = aaveV4SpokeSideUsd({ ...spoke, oracleRead: null }, "supply");
+  assert.deepEqual(pending, { prov: null, usd: null, missing: ["WETH"], state: "pending" });
+  assert.equal(aaveV4NoFigureLine(pending), "price read pending");
+  const failedRead = { prices: {}, blockNumber: null, blockTimestamp: null, failed: true };
+  const failed = aaveV4SpokeSideUsd({ ...spoke, oracleRead: failedRead }, "debt");
+  assert.equal(failed.state, "failed");
+  assert.equal(aaveV4NoFigureLine(failed), "no dollar figure: the price read did not answer");
+  assert.equal(aaveV4SpokeSideUsd({ ...spoke, oracleRead: null }, "nonCollateral"), null, "the sub-line waits");
+  assert.equal(aaveV4SpokeSideUsd({ ...spoke, supplyingSymbols: [], oracleRead: null }, "supply"), null);
+});
+
+test("lifetime flows: each outflow its shown product; an outflow with no on-chain price leaves no figure", () => {
+  const r = calculateAaveEconomics(
+    [
+      ev(1, "supply", "WETH", 3, { usd: 3000.123456, source: "iaave-oracle", block: 1001 }),
+      ev(2, "withdraw", "WETH", 1.2345678, { usd: 3100.5, source: "iaave-oracle", block: 1002 }),
+      ev(3, "supply", "XAUt", 2, { usd: 2400, source: "defillama", block: 1003 }),
+      ev(4, "withdraw", "XAUt", 1, null),
+    ],
+    undefined,
+    undefined,
+  );
+  const weth = r.reserves.find((x) => x.symbol === "WETH");
+  assert.equal(weth.withdrawnUsd, shownUsd(1.2345678, 3100.5));
+  const xaut = r.reserves.find((x) => x.symbol === "XAUt");
+  assert.deepEqual(xaut.unpricedFlows, ["withdrawn"]);
+  assert.equal(xaut.withdrawnUsd, 0);
+  const t = computeAaveLifetimeTotals(r.reserves, { "0x0": 1 });
+  assert.ok(t.noFigure.includes("XAUt"), "the lifetime figures name XAUt and draw none");
+});

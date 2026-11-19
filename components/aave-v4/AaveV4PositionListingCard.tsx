@@ -21,7 +21,7 @@
 // the lifecycle one.
 
 import { ListingTag } from "@/components/shared/listing-tag";
-import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
+import { notRecordedNote, CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { symbolOnly } from "@/lib/shared/asset-mark";
 import { Icon } from "@/components/icons/icon";
@@ -136,10 +136,8 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
   // transaction (e.g. withdrawing what the seizure left) is what actually
   // zeroed the position — matches Aave V3's `everLiquidated` rule.
   const closedByLiquidation = (row.liquidationCount ?? 0) > 0;
-  // The wire states no peak or closing date for a row it serves as open; the
-  // chain-closed card then leaves the peak figure out and dates the close by
-  // the last act, which is the one that emptied the position.
-  const peakKnown = row.peakSupplyUsd != null;
+  // The wire states no closing date for a row it serves as open; the
+  // chain-closed card dates the close by the last act, which emptied it.
   const closedAt = row.closedAt ?? (wireOpen ? row.lastActivityAt : undefined);
   // Peak-based supply-only test for the closed card: a position that never
   // carried real debt (peak debt < $1) drops the Peak Debt column, mirroring the
@@ -224,21 +222,18 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
     const status: PositionCardStatus = closedByLiquidation
       ? { word: "Liquidated", tone: "danger" }
       : { word: "Closed", tone: "muted" };
-    const peak = (usd: number) => {
-      const v = fmtUsd(usd);
-      return (
-        <span className="text-rb-500">
-          <RevealTip tip={v.title}>{v.display}</RevealTip>
-        </span>
-      );
-    };
+    // The server's peak figures are no sum of shown products and carry no
+    // receipt (ui-jobs 743): the listing asserts none, in the house's
+    // not-recorded form, and the position page states the peaks it can rebuild.
+    const notRecorded = notRecordedNote("position");
     const heads: PositionCardHead[] = [
       {
         id: "peak-collateral",
         label: peakSupplyOnly ? CARD_VOCAB.peakSupply : CARD_VOCAB.peakCollateral,
-        value: peakKnown ? peak(row.peakSupplyUsd ?? 0) : null,
+        value: null,
+        sub: notRecorded,
       },
-      ...(peakSupplyOnly ? [] : [{ id: "peak-debt", label: CARD_VOCAB.peakDebt, value: peak(row.peakDebtUsd ?? 0) }]),
+      ...(peakSupplyOnly ? [] : [{ id: "peak-debt", label: CARD_VOCAB.peakDebt, value: null, sub: notRecorded }]),
     ];
     const slots: PositionCardListingSlots = {
       surface: "listing",

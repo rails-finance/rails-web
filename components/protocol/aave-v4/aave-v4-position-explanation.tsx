@@ -12,7 +12,7 @@
 
 import { aaveV4PeakReceipt, type AaveV4UsdResult } from "@/lib/aave-v4/usd-receipt";
 import { aaveV4SpokeSideUsd } from "@/lib/aave-v4/spoke-usd";
-import { aaveV4NoPriceLine, AAVE_V4_PEAK_WHAT } from "@/lib/aave-v4/price-notes";
+import { aaveV4NoFigureLine, AAVE_V4_PEAK_WHAT } from "@/lib/aave-v4/price-notes";
 import { v4Apy } from "@/lib/aave-v4/rates";
 import type { ReactNode } from "react";
 import {
@@ -329,7 +329,7 @@ function recordBullet(spoke: AaveSpokeCardInfo): ReactNode | null {
  *  asset has no on-chain price (ui-jobs 743). */
 function explainUsd(r: AaveV4UsdResult | null | undefined, fallback: number, plain: Provenance): ReactNode {
   if (r == null) return <Prov info={plain}>{usd(fallback)}</Prov>;
-  if (r.prov == null) return <span data-prov-exempt="">{aaveV4NoPriceLine(r.missing)}</span>;
+  if (r.prov == null) return <span data-prov-exempt="">{aaveV4NoFigureLine(r)}</span>;
   return <Prov info={r.prov}>{usd(r.usd)}</Prov>;
 }
 

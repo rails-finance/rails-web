@@ -358,7 +358,6 @@ export function useAaveV4Cells({
   const sumLegs = (rows: AaveV4SnapshotItem[]) => {
     let usd = 0;
     const excluded: string[] = [];
-    const pending = false;
     for (const r of rows) {
       const amt = parseFloat(r.amount);
       if (!(amt > 0)) continue;
@@ -367,7 +366,7 @@ export function useAaveV4Cells({
       if (price != null) usd += shownUsd(amt, price);
       else if (amt > UNPRICED_DUST_TOKENS) excluded.push(r.symbol);
     }
-    return { usd, excluded, pending };
+    return { usd, excluded };
   };
   const supplySum = sumLegs(supplies);
   const debtSum = sumLegs(debts);
@@ -378,8 +377,7 @@ export function useAaveV4Cells({
   const collateralAbsent = supplySum.excluded.length > 0;
   const debtAbsent = debtSum.excluded.length > 0;
   const ratioAbsent = collateralAbsent || debtAbsent;
-  const showRatio =
-    hasSupplies && hasDebts && !supplySum.pending && !debtSum.pending && (ratioAbsent || debtSum.usd > 0.01);
+  const showRatio = hasSupplies && hasDebts && (ratioAbsent || debtSum.usd > 0.01);
 
   // Footer price pills — one per distinct asset in the snapshot (collateral +
   // debt). Prefer each row's historic price; fall back to the event's primary

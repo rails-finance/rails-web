@@ -64,6 +64,8 @@ export function computeOnchainUsd(
   if (!chain || chain.chainStale || !oracle) return undefined;
   const side = (s: OnchainSide): AaveV4UsdResult | null => {
     const rows = onchainRows(chain, oracle, s);
+    if (oracle.failed)
+      return rows.length > 0 ? { prov: null, usd: null, missing: rows.map((r) => r.symbol), state: "failed" } : null;
     return aaveV4UsdReceipt({
       what: WHAT[s],
       rows,

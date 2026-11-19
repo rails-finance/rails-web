@@ -20,6 +20,22 @@ const WHAT: Record<AaveV4SpokeSide, string> = {
 /** One side's figure and receipt; null where the side holds nothing. */
 export function aaveV4SpokeSideUsd(spoke: AaveSpokeCardInfo, side: AaveV4SpokeSide): AaveV4UsdResult | null {
   if (spoke.onchainUsd !== undefined) return spoke.onchainUsd[side];
+  // Before the oracle read lands, or once it has failed, no price stands: a
+  // side holding anything draws no figure, and says which.
+  const read = spoke.oracleRead ?? null;
+  if (!read || read.failed) {
+    // The not-collateral line waits for the read with the headline above it.
+    if (side === "nonCollateral") return null;
+    const held =
+      side === "debt"
+        ? spoke.borrowingSymbols
+        : side === "collateral"
+          ? spoke.supplyBreakdown.collateralSymbols.length > 0
+            ? spoke.supplyBreakdown.collateralSymbols
+            : spoke.supplyingSymbols
+          : spoke.supplyingSymbols;
+    return held.length > 0 ? { prov: null, usd: null, missing: [...held], state: read ? "failed" : "pending" } : null;
+  }
   const supply = (spoke.supplyLegs ?? []).filter((l) => l.amount > 0);
   const legs =
     side === "debt"
@@ -38,7 +54,6 @@ export function aaveV4SpokeSideUsd(spoke: AaveSpokeCardInfo, side: AaveV4SpokeSi
     )
     .map((h) => h.symbol);
   if (unpriced.length > 0) return { prov: null, usd: null, missing: [...new Set(unpriced)] };
-  const read = spoke.oracleRead ?? null;
   const entryOf = (symbol: string) => Object.values(read?.prices ?? {}).find((p) => p.symbol === symbol);
   return aaveV4UsdReceipt({
     what: WHAT[side],
