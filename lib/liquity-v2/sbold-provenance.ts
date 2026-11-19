@@ -39,8 +39,12 @@ const vaultRead = (c: SboldCoords, call: string, summary: string): Provenance =>
   via: `${LANE} · sBOLD.${call} @ the pinned block`,
 });
 
-const sboldNameProv_ = (c: SboldCoords): Provenance =>
-  vaultRead(c, "name()", `Vault name — the name the sBOLD share token answers${atBlock(c)}.`);
+const sboldNameProv_ = (c: SboldCoords, name: string | null): Provenance =>
+  vaultRead(
+    c,
+    "symbol()",
+    `Vault symbol — the symbol the share token's symbol() answers${atBlock(c)}${name ? `; its name() answers "${name}"` : ""}.`,
+  );
 
 const sboldTotalAssetsProv_ = (c: SboldCoords): Provenance =>
   vaultRead(

@@ -605,7 +605,7 @@ export function SboldVaultPage({
   // Total assets and Share price only: the figures this page reads. A share
   // price of zero reads "0" (ui-jobs 749).
   const receipts = {
-    name: sboldNameProv(coords),
+    name: sboldNameProv(coords, y.name),
     totalAssets: sboldTotalAssetsProv(coords),
     sharePrice: sboldSharePriceProv(coords),
   };

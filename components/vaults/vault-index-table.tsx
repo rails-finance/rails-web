@@ -465,9 +465,10 @@ export function VaultIndexTable({
                   >
                     <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 sm:flex-nowrap">
                       <span className="shrink-0" data-prov-exempt>
+                        {/* sBOLD leads with its share token's icon, as its card does (ui-jobs 765). */}
                         <TokenChipIcon
-                          symbol={v.asset.symbol}
-                          address={v.asset.address}
+                          symbol={v.family === "sbold" ? (v.symbol ?? "sBOLD") : v.asset.symbol}
+                          address={v.family === "sbold" ? v.address : v.asset.address}
                           size={28}
                           filterable={false}
                           untitled

@@ -130,7 +130,14 @@ export function VaultCard({
     <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5" data-vault-identity="">
       <VaultLead vault={v} size={24} />
       <h1 className="text-sm font-semibold text-foreground" data-vault-name>
-        {v.name != null && receipts.name ? <Prov info={receipts.name}>{v.name}</Prov> : name}
+        {/* sBOLD's heading is its symbol, its receipt symbol()'s (ui-jobs 765). */}
+        {v.family === "sbold" && v.symbol != null && receipts.name ? (
+          <Prov info={receipts.name}>{v.symbol}</Prov>
+        ) : v.name != null && receipts.name ? (
+          <Prov info={receipts.name}>{v.name}</Prov>
+        ) : (
+          name
+        )}
       </h1>
       <span className="inline-flex items-center gap-1 font-mono text-[11px] text-rb-500" data-vault-address={v.address}>
         {shortAddress(v.address)}

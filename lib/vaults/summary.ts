@@ -321,7 +321,10 @@ const trimmed = (s: string | null) => s?.trim() || null;
 
 /** The name a surface shows and sorts by, trimmed (ui-jobs 664). */
 export const vaultDisplayName = (v: VaultSummary): string | null =>
-  trimmed(v.name) ?? trimmed(v.catalogName) ?? trimmed(v.symbol);
+  // sBOLD shows by its symbol() "sBOLD"; its name() "sBold" stays a fact in receipts (ui-jobs 765).
+  v.family === "sbold"
+    ? (trimmed(v.symbol) ?? trimmed(v.catalogName) ?? trimmed(v.name))
+    : (trimmed(v.name) ?? trimmed(v.catalogName) ?? trimmed(v.symbol));
 
 // ── The vault pages' reads (V2) ─────────────────────────────────────────────
 // Each vault page reads its vault at one block with its own loader; these turn
