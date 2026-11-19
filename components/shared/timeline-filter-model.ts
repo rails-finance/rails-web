@@ -4,6 +4,10 @@
 // is the axis's VISIBLE keys, [] while every key shows and [NONE_SHOWN] while
 // none does, and a write becomes the hook's resets and toggles. Pure, so
 // scripts/test/timeline-filter-model.test.mjs runs it on a stand-in state.
+//
+// Size (ui-jobs 752) is the listings' Size panel on the same fields (`debt`,
+// `coll`; a Stability Pool deposit's `deposit`), one pill holding the ranges the page offers; a write goes to the
+// hook's `setSizeRange`.
 
 import type { ReactNode } from "react";
 import { groupDimensions, resetAll } from "@/components/shared/filter-bar/pill-model";
@@ -11,11 +15,47 @@ import type { FilterDimension, FilterOptionDef } from "@/components/shared/filte
 import type { FilterOption } from "@/components/shared/filter-dropdown";
 import type { BaseListFilters } from "@/lib/shared/list-filter";
 import type { TimelineAxesView, TimelineEventsState } from "@/hooks/useTimelineEvents";
+import { sizeDimensions } from "@/lib/shared/size-dimensions";
+import type { SizeSide, TimelineSizeDim } from "@/lib/shared/timeline-size";
 
 export type Axis = "type" | "asset" | "version" | "address";
-/** Each axis pill's code beside N1.10 (app-anatomy L1). */
-export const AXIS_ANATOMY: Record<Axis, string> = { type: "L1.3", asset: "L1.4", version: "L1.5", address: "L1.6" };
-export type TimelineFilters = BaseListFilters & Record<Axis, string[]>;
+/** Each pill's code beside N1.10 (app-anatomy L1), by its first dimension. */
+const HIDE_AXIS_ANATOMY = { type: "L1.3", asset: "L1.4", version: "L1.5", address: "L1.6" };
+const SIZE_PILL_ANATOMY = "L1.13";
+export const AXIS_ANATOMY: Record<string, string> = {
+  ...HIDE_AXIS_ANATOMY,
+  debt: SIZE_PILL_ANATOMY,
+  coll: SIZE_PILL_ANATOMY,
+  deposit: SIZE_PILL_ANATOMY,
+};
+export type TimelineFilters = BaseListFilters & Record<Axis, string[]> & Record<SizeSide, string[]>;
+
+/** The Size panel's ranges, each in its unit with its own top; the panel's
+ *  one line names what the figures are. */
+function sizeDimsOf(dims: readonly TimelineSizeDim[], note: string | undefined): FilterDimension<TimelineFilters>[] {
+  return dims.flatMap((d, i) =>
+    sizeDimensions<TimelineFilters>({
+      getDebt: (f) => f.debt,
+      setDebt: (f, debt) => ({ ...f, debt }),
+      // A deposit range takes the second range's slot under its own param.
+      getColl: (f) => (d.side === "deposit" ? f.deposit : f.coll),
+      setColl: (f, v) => (d.side === "deposit" ? { ...f, deposit: v } : { ...f, coll: v }),
+      ...(d.side === "deposit" ? { collId: "deposit" } : {}),
+      sides: [d.side === "debt" ? "debt" : "coll"],
+      top: d.top,
+      ...(d.side === "debt" ? { debtLabel: d.word, debtUnit: d.unit } : { collLabel: d.word, collUnit: d.unit }),
+      panelNote: i === dims.length - 1 ? note : undefined,
+    }),
+  );
+}
+
+/** The panel's line: what a figure is, in the units the ranges use. */
+export function sizeNote(dims: readonly TimelineSizeDim[]): string | undefined {
+  if (dims.length === 0) return undefined;
+  const units = [...new Set(dims.map((d) => d.unit))];
+  const list = units.length > 1 ? `${units.slice(0, -1).join(", ")} and ${units[units.length - 1]}` : units[0];
+  return `The amount each event moved, in ${list}.`;
+}
 
 interface AxisSpec {
   axis: Axis;
@@ -161,9 +201,18 @@ export function timelineFilterModel(
     asset: [],
     version: [],
     address: [],
+    debt: tl.sizeRanges.debt ?? [],
+    coll: tl.sizeRanges.coll ?? [],
+    deposit: tl.sizeRanges.deposit ?? [],
   };
   for (const a of axes) filters[a.axis] = selectionOf(a);
+  const size = sizeDimsOf(tl.sizeDims, sizeNote(tl.sizeDims));
   const onChange = (next: TimelineFilters) => {
+    for (const d of tl.sizeDims) {
+      const was = filters[d.side];
+      const want = next[d.side] ?? [];
+      if (want.length !== was.length || want.some((v, i) => v !== was[i])) tl.setSizeRange(d.side, want);
+    }
     for (const a of axes) {
       const want = next[a.axis];
       // Against the keys the hook holds, so a view no selection names (every
@@ -177,7 +226,11 @@ export function timelineFilterModel(
       for (const key of hide) a.toggle(key);
     }
   };
-  return { dimensions: axes.map(dimensionOf), filters, onChange };
+  // Size after Type, as the listings set it before Assets.
+  const dims = axes.map(dimensionOf);
+  const typeAt = dims.findIndex((d) => d.id === "type");
+  dims.splice(typeAt + 1, 0, ...size);
+  return { dimensions: dims, filters, onChange };
 }
 
 /** A draft as the hook's four hidden sets: an offered axis hides what its
@@ -196,6 +249,14 @@ export function draftAxesView(tl: TimelineEventsState, draft: TimelineFilters): 
     hiddenAssets: hidden("asset", tl.assetOptions, tl.visibleAssetKeys),
     hiddenVersions: hidden("version", tl.versionOptions, tl.visibleVersionKeys),
     hiddenCounterparties: hidden("address", tl.counterpartyOptions, tl.visibleCounterpartyKeys),
+    ...(tl.sizeDims.length > 0
+      ? {
+          size: {
+            dims: tl.sizeDims,
+            ranges: { debt: draft.debt ?? [], coll: draft.coll ?? [], deposit: draft.deposit ?? [] },
+          },
+        }
+      : {}),
   };
 }
 

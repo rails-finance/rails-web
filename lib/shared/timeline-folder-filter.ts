@@ -29,6 +29,8 @@
 //   • date — `byDay` is exact per UTC day, so a day-aligned range is counted.
 //   • counterparty — the folder contract carries none, so any counterparty
 //     filter leaves the folder standing and unsettled.
+//   • size — the header carries no per-member amount, so a Size range leaves
+//     the folder standing and unsettled, cells or not (ui-jobs 752).
 
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { ServedFolder } from "@/lib/shared/timeline-folder";
@@ -40,6 +42,8 @@ export interface FolderFilterAxes {
   hiddenAssets: Set<string>;
   hiddenCounterparties: Set<string>;
   dateRange: [number, number] | null;
+  /** A Size range is on. */
+  sizeActive?: boolean;
 }
 
 /**
@@ -139,6 +143,7 @@ function cellsMatchCount(folder: ServedFolder, axes: FolderFilterAxes): number |
  * that is NULL too.
  */
 export function folderMatchCount(folder: ServedFolder, axes: FolderFilterAxes): number | null {
+  if (axes.sizeActive) return null;
   const fromCells = cellsMatchCount(folder, axes);
   if (fromCells !== null) return fromCells;
   if (axes.hiddenCounterparties.size > 0) return null;

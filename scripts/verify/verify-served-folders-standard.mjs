@@ -132,6 +132,7 @@ const NEVER_EMPTY = [
 const EMPTY_LABELS = [
   "No transaction history available",
   "All events filtered out",
+  "None of the searched events match",
   "has no Moonwell activity",
   "No events to show",
 ];

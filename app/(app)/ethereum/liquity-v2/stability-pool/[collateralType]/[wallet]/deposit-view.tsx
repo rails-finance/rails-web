@@ -29,6 +29,7 @@ import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import { boldPriceReason, boldStripAsset, useBoldPrice } from "@/lib/liquity-v2/use-bold-price";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
+import { liquityV2SpSizeDims } from "@/lib/liquity-v2/timeline-size";
 import { LiquityV2DepositCard } from "@/components/protocol/liquity/sp-deposit-card";
 import { LiquityV2DepositEventCard } from "@/components/protocol/liquity/sp-event-card";
 import { LiquityV2DepositFlowsNote, liquityV2DepositFlowsContent } from "@/components/protocol/liquity/sp-flows-note";
@@ -224,10 +225,13 @@ export default function DepositView({
   // The whole life is still being read: no boundary card for rows about to land.
   const lifePending = !firstWhole && total <= SP_WHOLE_LIFE_READ && lifeRows == null && lifeRead === "reading";
 
+  // "Deposited (BOLD)": each touch's top-up or withdrawal (ui-jobs 752).
+  const sizeDims = useMemo(() => liquityV2SpSizeDims((e) => rowById.get(e.id)?.top_up_or_withdrawal), [rowById]);
   const tl = useTimelineEvents(events, {
     storageKey: `liquity-v2-sp-${branch}-${depositor}`,
     protocolKey: "liquity-v2-sp",
     olderCount,
+    size: sizeDims,
     // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
     dates: false,
   });
@@ -342,6 +346,9 @@ export default function DepositView({
               closed={!open}
               tl={tl}
               boundary={boundary}
+              // The whole life is read on arrival up to SP_WHOLE_LIFE_READ: the
+              // cut-page notice says so while it is in flight.
+              loadOlder={lifePending ? { state: "loading", load: () => {} } : undefined}
               displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
               emptyLabel="No operations recorded for this deposit"
               notes={liqNotesShown}

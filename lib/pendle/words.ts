@@ -27,6 +27,10 @@ export const PENDLE_WORDS = {
   noLiquidity: "no liquidity",
   /** The tip on "no liquidity", on the market head and the markets roster. */
   noLiquidityTip: "The pool holds under 0.000001 SY. Its stored rate is the last trade's.",
+  /** 750: an implied APY withheld where the SY's exchangeRate() reads 0. */
+  syZero: "SY reads 0",
+  syZeroTip:
+    "The SY's exchangeRate() reads 0 at this block, so PT, YT and LP are worth 0 in the market's asset. The stored rate is the last trade's.",
   /** 662: Rails's grouping by the protocol behind a market's yield-bearing token; the docs' "underlying" is an asset. */
   underlyingProtocol: "Underlying protocol",
   underlyingProtocolTip:
