@@ -12,8 +12,10 @@
 // `RoleGranted` logs from the vault's creation block, on the chain's logs lane;
 // a candidate is a holder only where `hasRole(role, account)` answers true at
 // the pinned block, so a revoked grant drops out there. The scan is cached
-// five minutes per access manager and states the block it reached; a refused
-// scan is never cached and leaves the roles unread, with the reason.
+// five minutes per access manager; where it ends short of the pinned block an
+// uncached scan covers the rest, so the range always reaches that block. A
+// refused range is split in halves once. A failed scan is never cached and
+// leaves the roles unread, in fixed words (ROLES_UNREAD).
 //
 // NOT CACHED otherwise: a factsheet is one address at the head, read per
 // request, as the Yearn factsheet is.
@@ -29,6 +31,7 @@ import { iporFusionRoster, iporFusionRosterEntry, type IporFusionChainId } from 
 import { IPOR_FUSE_WHITELIST } from "@/lib/ipor-fusion/addresses";
 
 const VAULT_ABI = parseAbi([
+  "function asset() view returns (address)",
   "function name() view returns (string)",
   "function symbol() view returns (string)",
   "function totalAssets() view returns (uint256)",
@@ -55,6 +58,7 @@ const ROLE_GRANTED = parseAbiItem(
 
 /** The vault's calls in wave one, in order. */
 const CALLS = [
+  "asset",
   "name",
   "symbol",
   "totalAssets",
@@ -142,7 +146,14 @@ export interface IporFusionVaultResponse {
     censusBlock: number;
     /** The census's `isFusionVault` badge, read at its block. */
     registered: boolean;
+    /** `asset()` at the pinned block; symbol and decimals from the census.
+     *  Null where the call did not answer. */
     asset: { address: string; symbol: string; decimals: number; named: boolean };
+    /** True where `asset()` answered and differs from the census's asset: the
+     *  symbol and decimals beside it are the census's, so the page says so. */
+    assetDiffersFromCensus: boolean;
+    /** False where `asset()` did not answer and the address is the census's. */
+    assetRead: boolean;
     shareDecimals: number;
     totalAssets: RawAmount | null;
     totalSupply: RawAmount | null;
@@ -183,20 +194,45 @@ interface RoleScan {
   pairs: IporFusionRoleHolder[];
 }
 
-/** Every `RoleGranted` on `accessManager` from `fromBlock` to the lane's head.
- *  Throws on a refusal, so the cache never keeps one. */
-async function scanRoleGrants(chainId: IporFusionChainId, accessManager: string, fromBlock: number): Promise<RoleScan> {
-  const client = logsClient(chainId);
-  if (!client) throw new Error(`${IPOR_ROLE_LOG_LANE[chainId].env} is not set`);
-  const toBlock = await client.getBlockNumber();
-  const logs = await client.getLogs({
-    address: accessManager as `0x${string}`,
-    event: ROLE_GRANTED,
-    fromBlock: BigInt(fromBlock),
-    toBlock,
-  });
-  const seen = new Set<string>();
-  const pairs: IporFusionRoleHolder[] = [];
+/** The fixed words a page states when the roles are not read. No provider
+ *  message and no variable name reaches the page. */
+export const ROLES_UNREAD = {
+  unconfigured: "the logs lane is not configured",
+  refused: "the logs lane refused the scan",
+  check: "a role check did not answer",
+  accessManager: "the vault did not name its access manager",
+  vault: "the vault could not be read",
+} as const;
+type ScanFailure = "unconfigured" | "refused";
+
+/** A scan failure carried in the message, so it survives the data cache's rethrow. */
+const scanError = (code: ScanFailure) => new Error(`ipor-role-scan:${code}`);
+const failureOf = (error: unknown): ScanFailure =>
+  String((error as Error)?.message ?? "").includes("ipor-role-scan:unconfigured") ? "unconfigured" : "refused";
+
+/** `RoleGranted` logs on `accessManager` over [from, to]. A refused range is
+ *  split in halves once; a half refused again fails the scan. */
+async function grantLogs(client: PublicClient, accessManager: string, from: bigint, to: bigint) {
+  const one = (a: bigint, b: bigint) =>
+    client.getLogs({ address: accessManager as `0x${string}`, event: ROLE_GRANTED, fromBlock: a, toBlock: b });
+  try {
+    return await one(from, to);
+  } catch {
+    if (to <= from) throw scanError("refused");
+    const mid = from + (to - from) / BigInt(2);
+    try {
+      return [...(await one(from, mid)), ...(await one(mid + BigInt(1), to))];
+    } catch {
+      throw scanError("refused");
+    }
+  }
+}
+
+function pairsOf(
+  logs: Awaited<ReturnType<typeof grantLogs>>,
+  into: IporFusionRoleHolder[] = [],
+): IporFusionRoleHolder[] {
+  const seen = new Set(into.map((p) => `${p.roleId}:${p.account}`));
   for (const l of logs) {
     const roleId = l.args.roleId?.toString();
     const account = l.args.account?.toLowerCase();
@@ -204,27 +240,55 @@ async function scanRoleGrants(chainId: IporFusionChainId, accessManager: string,
     const key = `${roleId}:${account}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    pairs.push({ roleId, account });
+    into.push({ roleId, account });
   }
-  return { toBlock: Number(toBlock), grants: logs.length, pairs };
+  return into;
+}
+
+/** Every `RoleGranted` on `accessManager` from `fromBlock` to the lane's head.
+ *  Throws on a failure, so the cache never keeps one. */
+async function scanRoleGrants(chainId: IporFusionChainId, accessManager: string, fromBlock: number): Promise<RoleScan> {
+  const client = logsClient(chainId);
+  if (!client) throw scanError("unconfigured");
+  let toBlock: bigint;
+  try {
+    toBlock = await client.getBlockNumber();
+  } catch {
+    throw scanError("refused");
+  }
+  const logs = await grantLogs(client, accessManager, BigInt(fromBlock), toBlock);
+  return { toBlock: Number(toBlock), grants: logs.length, pairs: pairsOf(logs) };
 }
 
 const cachedRoleScan = unstable_cache(scanRoleGrants, ["ipor-fusion-role-scan"], {
   revalidate: IPOR_ROLE_SCAN_REVALIDATE_SECONDS,
 });
 
-/** The scan, where it answered; the reason, where it did not. */
-async function roleScan(
+/** The scan up to `pinned`: the cached scan, topped up uncached from its end to
+ *  the pinned block where it stops short. `toBlock` is the range the page
+ *  states: the pinned block, or the scan's end clipped to it. */
+async function roleScanAt(
   chainId: IporFusionChainId,
   accessManager: string,
   fromBlock: number,
-): Promise<RoleScan | { reason: string }> {
+  pinned: number,
+): Promise<RoleScan | { failure: ScanFailure }> {
+  const am = accessManager.toLowerCase();
   try {
-    return await cachedRoleScan(chainId, accessManager.toLowerCase(), fromBlock);
+    const cached = await cachedRoleScan(chainId, am, fromBlock);
+    if (cached.toBlock >= pinned) return { ...cached, toBlock: pinned };
+    const client = logsClient(chainId);
+    if (!client) throw scanError("unconfigured");
+    const more = await grantLogs(client, am, BigInt(cached.toBlock + 1), BigInt(pinned));
+    return {
+      toBlock: pinned,
+      grants: cached.grants + more.length,
+      pairs: pairsOf(more, [...cached.pairs]),
+    };
   } catch (error) {
-    const reason = (error as { shortMessage?: string }).shortMessage ?? (error as Error).message ?? String(error);
-    console.error(`IPOR Fusion role scan on ${accessManager} (chain ${chainId}) failed:`, reason);
-    return { reason: reason.split("\n")[0].slice(0, 200) };
+    const failure = failureOf(error);
+    console.error(`IPOR Fusion role scan on ${am} (chain ${chainId}) failed: ${failure}`);
+    return { failure };
   }
 }
 
@@ -268,6 +332,8 @@ export async function loadIporFusionVault(
       decimals: ad,
       named: Boolean(entry.asset.symbol),
     },
+    assetDiffersFromCensus: false,
+    assetRead: false,
     shareDecimals: entry.shareDecimals,
     totalAssets: null,
     totalSupply: null,
@@ -301,7 +367,9 @@ export async function loadIporFusionVault(
     const accessManager = ((at("getAccessManagerAddress") as string | undefined) ?? null)?.toLowerCase() ?? null;
     const fuseAddresses = ((at("getFuses") as string[] | undefined) ?? null)?.map((f) => f.toLowerCase()) ?? null;
 
-    const scan = accessManager ? await roleScan(chainId, accessManager, entry.createdBlock) : null;
+    const scan = accessManager
+      ? await roleScanAt(chainId, accessManager, entry.createdBlock, Number(blockNumber))
+      : null;
     const pairs = scan && "pairs" in scan ? scan.pairs : [];
 
     const second = (await client.multicall({
@@ -346,13 +414,12 @@ export async function loadIporFusionVault(
       }) ?? null;
 
     let roles: IporFusionRoles;
-    if (!accessManager) roles = { read: false, reason: "the vault's getAccessManagerAddress() did not answer", lane };
-    else if (scan && "reason" in scan) roles = { read: false, reason: scan.reason, lane };
+    if (!accessManager) roles = { read: false, reason: ROLES_UNREAD.accessManager, lane };
+    else if (scan && "failure" in scan) roles = { read: false, reason: ROLES_UNREAD[scan.failure], lane };
     else {
       const s = scan as RoleScan;
       const answered = pairs.map((_, i) => ok(second[2 + fuseCount + i]) as readonly [boolean, number] | undefined);
-      if (answered.some((a) => a == null))
-        roles = { read: false, reason: "a hasRole() call on the access manager did not answer", lane };
+      if (answered.some((a) => a == null)) roles = { read: false, reason: ROLES_UNREAD.check, lane };
       else
         roles = {
           read: true,
@@ -364,6 +431,16 @@ export async function loadIporFusionVault(
         };
     }
 
+    const readAsset = (at("asset") as string | undefined)?.toLowerCase();
+    const assetRead = (): Pick<IporFusionVaultResponse["vault"], "asset" | "assetDiffersFromCensus" | "assetRead"> => {
+      const base = shell().asset;
+      if (!readAsset) return { asset: base, assetDiffersFromCensus: false, assetRead: false };
+      return {
+        asset: { ...base, address: readAsset },
+        assetDiffersFromCensus: readAsset !== base.address,
+        assetRead: true,
+      };
+    };
     const ta = at("totalAssets") as bigint | undefined;
     const ts = at("totalSupply") as bigint | undefined;
     const sp = at("convertToAssets") as bigint | undefined;
@@ -376,6 +453,7 @@ export async function loadIporFusionVault(
       chainStale: false,
       vault: {
         ...shell(),
+        ...assetRead(),
         name: (at("name") as string | undefined) ?? null,
         symbol: (at("symbol") as string | undefined) ?? null,
         totalAssets: ta == null ? null : amount(ta, ad),
@@ -400,7 +478,7 @@ export async function loadIporFusionVault(
       vault: shell(),
       whitelist,
       fuses: null,
-      roles: { read: false, reason: "the vault could not be read", lane },
+      roles: { read: false, reason: ROLES_UNREAD.vault, lane },
     };
   }
 }

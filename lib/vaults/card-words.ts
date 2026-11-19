@@ -204,7 +204,7 @@ export const iporFusionVaultCardContent = (): LearnMoreContent => ({
   details: [
     {
       bold: "Owner and curator",
-      text: "the owner appoints the vault's Atomist and guardians; the curator, IPOR's Alpha, moves the assets between markets.",
+      text: "the owner appoints the vault's Atomist, owners and guardians; the curator, IPOR's Alpha, moves the assets between markets.",
     },
     {
       bold: "Fuses",
@@ -216,7 +216,7 @@ export const iporFusionVaultCardContent = (): LearnMoreContent => ({
     },
     {
       bold: "Factory",
-      text: "anyone may make a vault from the factory, so the address identifies the vault.",
+      text: "anyone may deploy from the factory, so the address identifies the vault.",
     },
   ],
 });

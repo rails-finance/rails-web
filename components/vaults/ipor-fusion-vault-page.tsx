@@ -39,6 +39,7 @@ import { IPOR_ROLES, IPOR_STEWARD_ROLES } from "@/lib/ipor-fusion/addresses";
 import { bpsText, roleName } from "@/lib/ipor-fusion/words";
 import {
   iporFuseStateProv,
+  iporRoleNoneProv,
   iporRoleProv,
   iporVaultFeeProv,
   iporVaultNameProv,
@@ -114,7 +115,23 @@ export function IporFusionVaultPage({ data }: { data: IporFusionVaultResponse })
         <span key={roleId} className="flex items-baseline gap-1.5" data-steward-role={IPOR_ROLES[roleId].word}>
           <span className="text-xs text-rb-500">{IPOR_ROLES[roleId].word?.toLowerCase()}</span>
           {holders.length === 0 ? (
-            <span className="text-sm text-rb-500">none</span>
+            <span className="text-sm text-rb-500" data-steward-none="">
+              {roles.read && y.accessManager ? (
+                <Prov
+                  info={iporRoleNoneProv(coords, {
+                    roleId,
+                    accessManager: y.accessManager,
+                    fromBlock: roles.fromBlock,
+                    toBlock: roles.toBlock,
+                    lane: roles.lane,
+                  })}
+                >
+                  none
+                </Prov>
+              ) : (
+                "none"
+              )}
+            </span>
           ) : (
             <>
               {holderAddress(holders[0])}
@@ -195,7 +212,7 @@ export function IporFusionVaultPage({ data }: { data: IporFusionVaultResponse })
       id: "steward",
       label: "Steward",
       sub: "owner · curator",
-      tip: "The owner appoints the vault's Atomist and guardians; the curator, IPOR's Alpha, moves the assets between markets.",
+      tip: "The owner appoints the vault's Atomist, owners and guardians; the curator, IPOR's Alpha, moves the assets between markets.",
       value: fig("steward", undefined, stewardValue),
     },
   ];
@@ -245,8 +262,8 @@ export function IporFusionVaultPage({ data }: { data: IporFusionVaultResponse })
         )}
         {owners.length > 0 && (
           <ExplainBullet>
-            The owner <Fig>{shortAddress(owners[0].account)}</Fig> appoints the Atomist, who sets the vault&rsquo;s
-            fuses, fees and limits.
+            The owner <Fig>{shortAddress(owners[0].account)}</Fig> appoints the Atomist, who manages the vault&rsquo;s
+            settings and fuses.
           </ExplainBullet>
         )}
         <ExplainBullet>
@@ -323,14 +340,16 @@ export function IporFusionVaultPage({ data }: { data: IporFusionVaultResponse })
                         name: vaultName,
                         address: y.address,
                         reads:
-                          "name(), totalAssets(), totalSupply(), convertToAssets(), getTotalSupplyCap(), getPerformanceFeeData(), getManagementFeeData()",
+                          "name(), totalAssets(), totalSupply(), convertToAssets(), getTotalSupplyCap(), getPerformanceFeeData(), getManagementFeeData(), getAccessManagerAddress()",
                       },
                       ...(y.accessManager
                         ? [
                             {
                               name: "IporFusionAccessManager",
                               address: y.accessManager,
-                              reads: "hasRole(role, account)",
+                              reads: roles.read
+                                ? `RoleGranted logs from block ${n(roles.fromBlock)} to ${n(roles.toBlock)} on ${roles.lane}, then hasRole(role, account)`
+                                : "hasRole(role, account)",
                             },
                           ]
                         : []),

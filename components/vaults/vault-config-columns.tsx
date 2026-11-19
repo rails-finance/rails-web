@@ -617,7 +617,8 @@ export function iporFusionConfigTile({
       {
         name: vaultName,
         address: y.address,
-        reads: "getAccessManagerAddress(), getPriceOracleMiddleware(), getPerformanceFeeData(), getManagementFeeData()",
+        reads:
+          "asset(), getAccessManagerAddress(), getPriceOracleMiddleware(), getPerformanceFeeData(), getManagementFeeData()",
       },
     ],
     columns: [
@@ -659,9 +660,17 @@ export function iporFusionConfigTile({
             id: "asset",
             label: "Asset",
             tip: "The token the vault takes in deposits.",
-            sub: y.asset.symbol,
-            address: y.asset.address,
-            prov: address("Asset", "asset()", `the token the vault takes in deposits: ${y.asset.symbol}.`),
+            sub: y.assetDiffersFromCensus ? undefined : y.asset.symbol,
+            note: y.assetDiffersFromCensus ? "differs from the asset the census recorded" : undefined,
+            address: y.assetRead ? y.asset.address : null,
+            read: y.assetRead,
+            prov: address(
+              "Asset",
+              "asset()",
+              y.assetDiffersFromCensus
+                ? "the token the vault takes in deposits. It differs from the asset the census recorded, so no symbol is stated beside it."
+                : `the token the vault takes in deposits: ${y.asset.symbol}.`,
+            ),
           },
           ...(created
             ? [

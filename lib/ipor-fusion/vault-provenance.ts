@@ -81,7 +81,7 @@ const iporVaultNameProv_ = (c: IporFusionCoords) =>
   vaultCallProv_(c, {
     label: "Vault name",
     call: "name()",
-    what: `the name of the vault's share token${atBlock(c)}, as the contract answers it. Anyone can make a vault from the factory and name it anything, so the address beside the name identifies it.`,
+    what: `the name of the vault's share token${atBlock(c)}, as the contract answers it. Anyone can deploy from the factory and name a vault anything, so the address beside the name identifies it.`,
   });
 
 const iporVaultTotalAssetsProv_ = (c: IporFusionCoords) =>
@@ -159,13 +159,35 @@ const iporRoleProv_ = (
       kind: "recompute",
       text: `To check: read the RoleGranted logs of the access manager ${r.accessManager} from block ${n(r.fromBlock)} to ${n(r.toBlock)}, then ask any ${chainName(c)} archive node for hasRole(${r.roleId}, ${r.account}) on it${atBlock(c)}.`,
     },
-    summary: `${name}, role ${r.roleId} — ${r.account} holds it${atBlock(c)}: the access manager answers hasRole true. The address was found in its RoleGranted logs from the vault's creation at block ${n(r.fromBlock)} to block ${n(r.toBlock)}; the access manager keeps no list of a role's holders, so a grant made after that block is not on this page. An address, because nothing on chain says who holds it.`,
+    summary: `${name}, role ${r.roleId} — ${r.account} holds it${atBlock(c)}: the access manager answers hasRole true. The address was found in its RoleGranted logs from the vault's creation at block ${n(r.fromBlock)} to block ${n(r.toBlock)}; the access manager keeps no list of a role's holders, so its grants are read from the logs up to the page's block.`,
+    contract: { name: "IporFusionAccessManager", address: r.accessManager },
+    via: `${lane(c)} · RoleGranted logs on ${r.lane} · IporFusionAccessManager.hasRole(role, account) @ the pinned block`,
+  };
+};
+
+/** A steward role no address holds at the block. */
+const iporRoleNoneProv_ = (
+  c: IporFusionCoords,
+  r: { roleId: string; accessManager: string; fromBlock: number; toBlock: number; lane: string },
+): Provenance => {
+  const role = IPOR_ROLES[r.roleId];
+  const name = role ? `${role.word ? `${role.word} (${role.constant})` : role.constant}` : `role ${r.roleId}`;
+  return {
+    kind: "chain",
+    pclass: "state",
+    source: { block: c.blockNumber },
+    verify: {
+      kind: "recompute",
+      text: `To check: read the RoleGranted logs of the access manager ${r.accessManager} from block ${n(r.fromBlock)} to ${n(r.toBlock)}, then ask any ${chainName(c)} archive node for hasRole(${r.roleId}, account) on it${atBlock(c)} for each account they name.`,
+    },
+    summary: `${name}, role ${r.roleId} — no address holds it${atBlock(c)}: no account the access manager's RoleGranted logs name from block ${n(r.fromBlock)} to ${n(r.toBlock)} answers hasRole true for it.`,
     contract: { name: "IporFusionAccessManager", address: r.accessManager },
     via: `${lane(c)} · RoleGranted logs on ${r.lane} · IporFusionAccessManager.hasRole(role, account) @ the pinned block`,
   };
 };
 
 export const iporRosterCensusProv = withServerRead(iporRosterCensusProv_);
+export const iporRoleNoneProv = withServerRead(iporRoleNoneProv_);
 export const iporEmptyCountProv = withServerRead(iporEmptyCountProv_);
 export const iporVaultNameProv = withServerRead(iporVaultNameProv_);
 export const iporVaultTotalAssetsProv = withServerRead(iporVaultTotalAssetsProv_);

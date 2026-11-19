@@ -25,13 +25,13 @@ export default function IporFusionVaultsInfoPage() {
       <p data-intro-membership>
         An IPOR Fusion vault, a PlasmaVault in IPOR&rsquo;s code, takes deposits of one token and issues shares for
         them. Its curator moves the token into other protocols through fuses: small contracts that each speak to one
-        protocol, which the vault runs as its own code. What a share is worth is the vault&rsquo;s answer to{" "}
+        protocol, which the vault runs. What a share is worth is the vault&rsquo;s answer to{" "}
         <code>convertToAssets</code>, which is what the Share price column on the roster shows, in the vault&rsquo;s
         asset.
       </p>
       <p data-intro-roster>
         The roster is every vault the factory made on Ethereum, {n(roster.vaults.length)} of them at block{" "}
-        {n(roster.censusBlock)}. Anyone may make a vault from the factory, and each one is announced by a creation event
+        {n(roster.censusBlock)}. Anyone may deploy from the factory, and a deployment is announced by a creation event
         on it, which is the only enumeration there is. The factory&rsquo;s registry answers false for vaults made before
         it was added, so the roster follows the events. That makes it a floor: a vault deployed by hand or by an earlier
         factory announces nothing, and a vault made since the census block joins when the census runs again.

@@ -19,7 +19,7 @@ export const IPOR_FUSE_WHITELIST: Record<number, string> = {
  *  Atomist. Every other role is named by its constant, as chain text. */
 export const IPOR_ROLES: Record<string, { constant: string; word?: string; tip: string }> = {
   "0": { constant: "ADMIN_ROLE", tip: "Manages the access manager, every role included." },
-  "1": { constant: "OWNER_ROLE", word: "Owner", tip: "Appoints the vault's owners, guardians and Atomists." },
+  "1": { constant: "OWNER_ROLE", word: "Owner", tip: "Appoints the vault's Atomist, owners and guardians." },
   "2": { constant: "GUARDIAN_ROLE", tip: "Can cancel a time-locked change, and pause and unpause the vault." },
   "3": { constant: "TECH_PLASMA_VAULT_ROLE", tip: "The vault contract, set at creation." },
   "4": { constant: "IPOR_DAO_ROLE", tip: "The IPOR DAO, set at creation." },
