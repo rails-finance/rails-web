@@ -29,6 +29,9 @@ import { assetLedgers, dollarLedger, tokenLedger } from "@/lib/shared/event-ledg
 import type { FlowSegment, FlowSide } from "@/lib/shared/flows-timeline";
 import { flowSegmentProv, ledgerPartProv } from "@/lib/shared/flows-timeline-provenance";
 import { compoundSideBalances, type CompoundFlowReplay } from "@/lib/compound/flows";
+import { cometNoDollarLine } from "@/lib/compound/comet-price-notes";
+
+const capitalised = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** The position's replay, for the cards' ledgers; null where the page has
  *  none (the cells then stand as they always did). */
@@ -53,7 +56,10 @@ function CompoundSideLedger({ side, eventId, eventTs }: { side: FlowSide; eventI
   if (sb.held == null)
     return (
       <p className="text-sm text-rb-500" data-ledger-missing={side}>
-        A held asset has no price at this block, so the ledger is left out.
+        {capitalised(
+          cometNoDollarLine(sb.balances.filter((b) => b.price == null && b.amount > 0).map((b) => b.symbol)),
+        )}
+        .
       </p>
     );
   const heldUsd = sb.held;

@@ -40,7 +40,8 @@
 import { actedByOther } from "@/lib/shared/external-actor";
 import type { FlowBucket, FlowDayRow, FlowEvent, FlowLeg, FlowSide, FlowTimeline } from "@/lib/shared/flows-timeline";
 import { daysFromEvents, flowLeg } from "@/lib/shared/flows-timeline";
-import { cometFlowPriceNote } from "@/lib/compound/comet-price-notes";
+import { cometAbsorbValueNote, cometFlowPriceNote } from "@/lib/compound/comet-price-notes";
+import type { CometFactor } from "@/lib/compound/at-block-prices";
 import { centsOf, shownUsd } from "@/lib/shared/shown-usd";
 import type { AssetBalance, FocusEvent } from "@/lib/shared/flow-focus";
 import type { BaseActivityEvent, CompoundEventType } from "@/lib/shared/types/event-shape";
@@ -120,8 +121,10 @@ export interface CompoundFlowEvent {
   collAfter: number | null;
   /** An absorb row's oracle value in dollars (its event's usdValue). */
   usdValue: number | null;
-  /** Comet's price feed per token address at the block, where read. */
+  /** Comet's price feed per token address at the block, where read; an
+   *  ETH-quoted Comet's composed, its two factors beside it. */
   prices: Record<string, number> | null;
+  factors: Record<string, CometFactor> | null;
   /** Another account acted: a transfer received, or a sender and funder
    *  both other than the owner (the card's `externalActor` verdict). */
   byOther?: boolean;
@@ -151,6 +154,7 @@ export function compoundFlowEvents(
   baseToken: string,
   baseDecimals: number,
   prices?: Map<number, Record<string, number>> | null,
+  factors?: Map<number, Record<string, CometFactor>> | null,
 ): CompoundFlowEvent[] {
   const rows = events.filter(isCompoundEvent);
   // The served order within a block is the chain's; a newest-first list is
@@ -183,6 +187,7 @@ export function compoundFlowEvents(
       collAfter: num(c.collateralAfter),
       usdValue: num(c.usdValue),
       prices: prices?.get(e.blockNumber) ?? null,
+      factors: factors?.get(e.blockNumber) ?? null,
       byOther:
         c.eventType === "transfer_in" ||
         c.eventType === "transfer_collateral_in" ||
@@ -225,7 +230,7 @@ export interface CompoundReplayed {
   own: Set<string>;
   /** Where each token's price came from: the block it was read at, and
    *  whether it is a read or an absorb's own value (ui-jobs 743). */
-  from: Record<string, { block: number; kind: "read" | "absorb" }>;
+  from: Record<string, { block: number; factor?: CometFactor }>;
   /** The base move since the previous row that no event states. */
   unlogged: number;
 }
@@ -357,13 +362,8 @@ function priceRows(rows: CompoundReplayed[], base: string) {
       if (p > 0 && tokens.has(t)) {
         r.price[t] = p;
         r.own.add(t);
-        r.from[t] = { block: r.ev.block, kind: "read" };
+        r.from[t] = { block: r.ev.block, ...(r.ev.factors?.[t] ? { factor: r.ev.factors[t] } : {}) };
       }
-    if (r.ev.usdValue != null && r.ev.usdValue > 0 && Math.abs(r.ev.delta) > DUST && !r.own.has(r.ev.token)) {
-      r.price[r.ev.token] = r.ev.usdValue / Math.abs(r.ev.delta);
-      r.own.add(r.ev.token);
-      r.from[r.ev.token] = { block: r.ev.block, kind: "absorb" };
-    }
   }
   for (const t of tokens) {
     let last: CompoundReplayed | null = null;
@@ -608,6 +608,19 @@ function compoundLeg(
   r: CompoundReplayed,
   l: CompoundReplayed["legs"][number],
 ): FlowLeg {
+  // An absorb's collateral leg is the dollars its AbsorbCollateral log
+  // states, to the cent: no price, no product.
+  if (r.ev.kind === "absorb_collateral" && l.token === r.ev.token && r.ev.usdValue != null && r.ev.usdValue > 0)
+    return {
+      bucket: l.bucket,
+      amount: l.amount,
+      symbol: l.symbol,
+      price: null,
+      usd: centsOf(r.ev.usdValue),
+      block: r.ev.block,
+      priceNote: cometAbsorbValueNote(r.ev.block),
+      stated: true,
+    };
   const from = r.from[l.token];
   return flowLeg({
     bucket: l.bucket,
@@ -616,13 +629,7 @@ function compoundLeg(
     price: r.price[l.token],
     block: from?.block ?? null,
     priceNote: from
-      ? cometFlowPriceNote({
-          comet: rp.comet,
-          quoteUnit: rp.quoteUnit,
-          from: from.kind,
-          priceBlock: from.block,
-          eventBlock: r.ev.block,
-        })
+      ? cometFlowPriceNote({ comet: rp.comet, priceBlock: from.block, eventBlock: r.ev.block, factor: from.factor })
       : "no price read for this token",
     ...(ACCRUAL_KEYS.has(l.bucket) ? { accrual: true } : {}),
   });
@@ -933,10 +940,9 @@ function sideAt(rp: CompoundFlowReplay, r: CompoundReplayed | null, side: FlowSi
         ? {
             priceNote: cometFlowPriceNote({
               comet: rp.comet,
-              quoteUnit: rp.quoteUnit,
-              from: from.kind,
               priceBlock: from.block,
               eventBlock: r.ev.block,
+              factor: from.factor,
             }),
           }
         : {}),
@@ -982,7 +988,7 @@ export function compoundFocusEvents(rp: CompoundFlowReplay): FocusEvent[] {
     const lastOf = tx[tx.length - 1];
     const firstIdx = replayed.indexOf(tx[0]);
     const prior = firstIdx > 0 ? replayed[firstIdx - 1] : null;
-    const usdOf = (assets: { amount: number; price: number | null }[]) => sideCents(assets) ?? 0;
+    const usdOf = (assets: { amount: number; price: number | null }[]) => sideCents(assets);
     const side = (s: FlowSide) => {
       const after = sideAt(rp, lastOf, s);
       // Before the transaction, at its prices.
@@ -996,12 +1002,20 @@ export function compoundFocusEvents(rp: CompoundFlowReplay): FocusEvent[] {
       return { before: usdOf(before), after: usdOf(after), amount: held - was, symbol: baseSym, held };
     };
     const rate = twoSided(roles) ? rp.borrowRate[i] : rp.supplyRate[i];
+    const coll = side("collateral");
+    const debt = side("debt");
+    // A side holding an unpriced token has no dollars: the event states no
+    // sides rather than a $0 (ui-jobs 743).
+    const priced = (x: typeof coll) =>
+      x.before != null && x.after != null ? { ...x, before: x.before, after: x.after } : null;
+    const c = priced(coll);
+    const d = priced(debt);
     return {
       id: r.ev.id,
       ts: r.ev.ts,
       ...(r.ev.tx ? { tx: r.ev.tx } : {}),
       legs: r.legs.map((l) => compoundLeg(rp, r, l)),
-      sides: { collateral: side("collateral"), debt: side("debt") },
+      ...(c && d ? { sides: { collateral: c, debt: d } } : {}),
       rate: rate * 100,
     };
   });

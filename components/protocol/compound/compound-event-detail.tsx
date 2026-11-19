@@ -10,6 +10,7 @@
 // behind the assets' icons, as the cToken cards do. The absorb breakdown and
 // the rate note stand under the grid as notes.
 
+import { cometNoDollarLine } from "@/lib/compound/comet-price-notes";
 import { useContext, type ReactNode } from "react";
 import { unreadBalanceText, useCompoundBalanceRead } from "./balance-read";
 import type { CompoundContext } from "@/lib/shared/types/event-shape";
@@ -280,6 +281,22 @@ export function useCompoundCells({
     const held = side === "collateral" ? [collStat(), baseStat("collateral")] : [baseStat("debt")];
     const chain = held.filter((st): st is ChainTruthStat => st != null);
     stated.push(...chain);
+    if (sb && sb.balances.length > 1 && sb.held == null) {
+      // A held asset with no price: the cell names it, and draws no dollars.
+      const line = cometNoDollarLine(sb.balances.filter((b) => b.price == null && b.amount > 0).map((b) => b.symbol));
+      direct[side] = {
+        kind: "ledger",
+        side,
+        key: side,
+        label: SIDE_NAME[side],
+        changed: sb.balances.some((b) => Math.abs(b.amount - b.before) > 1e-12),
+        value: {
+          cluster: sb.balances.map((b) => b.symbol),
+          after: { text: line, info: { kind: "derived", summary: `${SIDE_NAME[side]} at this event: ${line}.` } },
+        },
+      };
+      continue;
+    }
     if (sb && sb.balances.length > 1 && sb.held != null) {
       const heldUsd = sb.held;
       // Several assets: the side's dollars before → after, behind their icons.

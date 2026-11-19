@@ -416,7 +416,9 @@ export function eventAssetSum(
         flowPrice[l.symbol] =
           parts && l.price != null
             ? { price: l.price, block: l.block, priceNote: l.priceNote }
-            : { price: l.usd / l.amount };
+            : parts
+              ? (flowPrice[l.symbol] ?? { price: l.usd / l.amount })
+              : { price: l.usd / l.amount };
     }
   // The page holds every flow: it holds as many events as the history has,
   // or its legs meet the running totals the card states.

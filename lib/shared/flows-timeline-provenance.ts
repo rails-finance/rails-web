@@ -6,6 +6,7 @@ import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import type { FlowLeg, FlowSegment, FlowSide, MarketMove } from "@/lib/shared/flows-timeline";
 import { holderUsdReceipt } from "@/lib/shared/holder-usd-receipt";
 import { listWords, noPriceWords } from "@/lib/shared/flows-sum";
+import { amountText, centsOf } from "@/lib/shared/shown-usd";
 import { formatUsdValue } from "@/lib/utils/format";
 
 // ── The rows behind a line (ui-jobs 743) ─────────────────────────────────────
@@ -48,6 +49,39 @@ function legsKey(legs: readonly FlowLeg[]): string {
     }
   return `${legs.length}:${h.toString(16)}`;
 }
+
+/** A stated leg's rows: its amount, and the figure the chain states, with
+ *  no price and no product. */
+function statedLegRows(legs: readonly FlowLeg[], labels: string[]): ProvInput[] {
+  return legs.flatMap((l, i): ProvInput[] =>
+    l.stated
+      ? [
+          {
+            label: `${labels[i]} amount`,
+            value: `${amountText(l.amount ?? 0)} ${l.symbol ?? ""}`.trim(),
+            kind: "chain",
+            pclass: "indexed",
+            note: "the amount its event moved",
+          },
+          {
+            label: `${labels[i]} value`,
+            value: formatUsdValue(l.usd ?? 0),
+            kind: "chain",
+            pclass: "emitted",
+            note: l.priceNote,
+          },
+        ]
+      : [],
+  );
+}
+
+/** The sum row over every leg's cents. */
+const sumRow = (legs: readonly FlowLeg[]): ProvInput => ({
+  label: "sum",
+  value: formatUsdValue(centsOf(legs.reduce((a, l) => a + (l.usd ?? 0), 0))),
+  kind: "derived",
+  step: true,
+});
 
 /** A receipt whose rows are built on first read, when it opens; `key`
  *  stands for them in the registry's signature. */
@@ -96,11 +130,14 @@ export function legsProv(
     key,
     () => {
       const labels = legLabels(legs);
+      const priced = legs.filter((l) => !l.stated);
+      const statedRows = statedLegRows(legs, labels);
+      if (priced.length === 0) return [...statedRows, sumRow(legs)];
       const { prov } = holderUsdReceipt({
         what,
-        legs: legs.map((l, i) => ({
+        legs: priced.map((l) => ({
           token: l.symbol ?? "Token",
-          label: labels[i],
+          label: labels[legs.indexOf(l)],
           amount: l.amount ?? 0,
           amountNote: "the amount its event moved",
           price: l.price ?? 0,
@@ -111,10 +148,14 @@ export function legsProv(
         byValue: true,
         blocksPerRow: true,
       });
+      // A stated leg's rows join the priced legs', and the sum is all of them.
+      const rows = statedRows.length
+        ? [...(prov.inputs ?? []).filter((r) => r.label !== "sum"), ...statedRows, sumRow(legs)]
+        : (prov.inputs ?? []);
       // Past the first LEG_CAP legs (largest first), the rest sit behind the
       // dust control with those under a cent.
       const order: string[] = [];
-      return (prov.inputs ?? []).map((r) => {
+      return rows.map((r) => {
         const leg = labels.find((l) => r.label.startsWith(`${l} `));
         if (leg && !order.includes(leg)) order.push(leg);
         return leg && order.indexOf(leg) >= LEG_CAP ? { ...r, dust: true as const } : r;

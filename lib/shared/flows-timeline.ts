@@ -110,6 +110,10 @@ export interface FlowLeg {
   ts?: number;
   /** A Liquity Trove's interest since its last event, not the event's act. */
   accrual?: boolean;
+  /** The leg's dollars are a figure the chain states (a Comet absorb's
+   *  usdValue), to the cent, with no price: `price` is null, `usd` that
+   *  figure, `priceNote` names it. */
+  stated?: true;
 }
 
 /** A leg that carries its parts: the price as shown, and its dollars the

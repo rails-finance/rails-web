@@ -45,7 +45,7 @@
 //
 //   npx tsx --test scripts/verify/verify-compound-v3-flows.ts
 import { test } from "node:test";
-import { shownUsd } from "@/lib/shared/shown-usd";
+import { centsOf, shownUsd } from "@/lib/shared/shown-usd";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -102,8 +102,19 @@ function served(f: Fixture): BaseActivityEvent[] {
 }
 function rows(f: Fixture): CompoundFlowEvent[] {
   const m = marketFor(f);
-  const prices = new Map(Object.entries(f.prices).map(([b, p]) => [Number(b), p]));
+  const prices = new Map(Object.entries(archivePrices(f)).map(([b, p]) => [Number(b), p]));
   return compoundFlowEvents(served(f), m.baseToken, m.baseDecimals, prices);
+}
+/** The archive route's answer per block. The fixture recorded it before an
+ *  ETH-quoted Comet's price was composed from its two factors as shown
+ *  (ui-jobs 743); the route now answers what the stored raw reads give
+ *  through the same composition, so an ETH-quoted market's blocks take that,
+ *  checked against the recording to the composition's rounding. */
+function archivePrices(f: Fixture): Record<string, Record<string, number>> {
+  if (marketFor(f).quoteUnit !== "ETH") return f.prices;
+  const out: Record<string, Record<string, number>> = {};
+  for (const b of Object.keys(f.prices)) out[b] = storedCometPrices(STORED.v3[f.name].blocks[b], assetsOf(f)) ?? {};
+  return out;
 }
 function opts(f: Fixture): CompoundFlowOptions {
   const m = marketFor(f);
@@ -462,7 +473,13 @@ for (const name of NAMES) {
     for (const [b, archive] of Object.entries(f.prices)) {
       const s = stored.blocks[b];
       assert.ok(s, `${name} ${b}: stored`);
-      assert.deepEqual(storedCometPrices(s, assetsOf(f)), archive, `${name} ${b}`);
+      const got = storedCometPrices(s, assetsOf(f));
+      if (marketFor(f).quoteUnit === "ETH") {
+        // Composed from its two factors as shown: the recording's product to
+        // the composition's rounding.
+        for (const [t, p] of Object.entries(archive))
+          assert.ok(Math.abs((got?.[t] ?? 0) - p) <= 1e-5 * p, `${name} ${b} ${t}: ${got?.[t]} vs ${p}`);
+      } else assert.deepEqual(got, archive, `${name} ${b}`);
     }
   });
 
@@ -477,7 +494,9 @@ for (const name of NAMES) {
     const missing = new Set(blocks.filter((_, i) => i % 2 === 1));
     const mixed = new Map<number, Record<string, number>>();
     for (const b of blocks) {
-      const r = missing.has(b) ? f.prices[String(b)] : storedCometPrices(STORED.v3[name].blocks[String(b)], assets);
+      const r = missing.has(b)
+        ? archivePrices(f)[String(b)]
+        : storedCometPrices(STORED.v3[name].blocks[String(b)], assets);
       if (r) mixed.set(b, r);
     }
     const fromStore = compoundFlowTimeline(compoundFlowEvents(served(f), m.baseToken, m.baseDecimals, mixed), opts(f));
@@ -522,8 +541,17 @@ for (const name of NAMES) {
     const f = fx(name);
     const rp = compoundFlowReplay(rows(f), opts(f));
     let legs = 0;
+    let absorbs = 0;
     for (const fe of compoundFocusEvents(rp))
       for (const l of fe.legs) {
+        if (l.stated) {
+          // An absorb's collateral: the log's usdValue, to the cent.
+          const r = rp.replayed.find((x) => x.ev.id === fe.id)!;
+          assert.equal(l.usd, centsOf(r.ev.usdValue!), `${name} ${fe.id}: the log's usdValue`);
+          assert.match(l.priceNote!, /^usdValue in the AbsorbCollateral log, block [\d,]+$/);
+          absorbs++;
+          continue;
+        }
         if (l.price == null) {
           assert.equal(l.usd, null, `${name}: an unpriced leg has no figure`);
           continue;
@@ -535,5 +563,24 @@ for (const name of NAMES) {
           assert.match(l.priceNote!, /price at block [\d,]+, the nearest read; this event is at block [\d,]+$/);
       }
     assert.ok(legs > 0);
+    if (name.includes("absorbed")) assert.ok(absorbs > 0, `${name}: an absorb's leg states its usdValue`);
   });
 }
+
+// A side holding a token no read priced states no dollars: the event has no
+// sides, never a $0 (ui-jobs 743).
+test("a side holding an unpriced token has no sides on its event", () => {
+  const f = fx("usdc-repaid");
+  const coll = rows(f).find((r) => !r.isBase)!.token;
+  const unpriced = rows(f).map((r) => ({
+    ...r,
+    prices: r.prices ? Object.fromEntries(Object.entries(r.prices).filter(([t]) => t !== coll)) : null,
+  }));
+  const rp = compoundFlowReplay(unpriced, opts(f));
+  const held = compoundFocusEvents(rp).filter((fe) => {
+    const r = rp.replayed.find((x) => x.ev.id === fe.id)!;
+    return (r.coll.get(coll) ?? 0) > 1e-9;
+  });
+  assert.ok(held.length > 0);
+  for (const fe of held) assert.equal(fe.sides, undefined, `${fe.id}: no sides`);
+});

@@ -36,7 +36,7 @@ import {
   type CompoundFlowReplay,
   type CompoundLive,
 } from "@/lib/compound/flows";
-import { storedCometPrices } from "@/lib/compound/at-block-prices";
+import { storedCometFactors, storedCometPrices, type CometFactor } from "@/lib/compound/at-block-prices";
 import { fetchStoredCometPrices } from "@/lib/api/fetch-compound-stored-prices";
 import { fetchDailyPrices } from "@/lib/api/fetch-daily-prices";
 import type { CompoundDeploymentKey } from "@/lib/compound/deployments";
@@ -68,7 +68,9 @@ const RETRY_BACKOFF_MS = 800;
  *  nearest priced row's prices, and the Explanation counts them. */
 export const COMPOUND_PRICE_READS = 250;
 
-const cache = new Map<string, Promise<Record<string, number> | null>>();
+/** One block's read: the prices, and an ETH-quoted Comet's two factors. */
+type PricesAt = { prices: Record<string, number>; factors: Record<string, CometFactor> };
+const cache = new Map<string, Promise<PricesAt | null>>();
 
 /** Comet's oracle prices at one block, cached for the page's life (a past
  *  block's answer never changes); null where the read failed. */
@@ -77,21 +79,28 @@ function loadPricesAt(
   market: string,
   block: number,
   assets: string[],
-): Promise<Record<string, number> | null> {
+): Promise<PricesAt | null> {
   const url = `/api/chain/compound/prices-at-block?deployment=${deployment}&market=${market}&block=${block}&assets=${assets.join(",")}`;
   let p = cache.get(url);
   if (!p) {
     const once = () =>
       fetch(url)
         .then((r) => (r.ok ? r.json() : null))
-        .then((d) => (d?.prices && typeof d.prices === "object" ? (d.prices as Record<string, number>) : null))
+        .then((d) =>
+          d?.prices && typeof d.prices === "object"
+            ? {
+                prices: d.prices as Record<string, number>,
+                factors: (d.factors && typeof d.factors === "object" ? d.factors : {}) as Record<string, CometFactor>,
+              }
+            : null,
+        )
         .catch(() => null);
     // The keyless Arbitrum gateway refuses a burst now and then: one more
     // ask after a short back-off.
     p = once().then((v) =>
       v != null || !RETRY[deployment]
         ? v
-        : new Promise<Record<string, number> | null>((r) => setTimeout(() => r(once()), RETRY_BACKOFF_MS)),
+        : new Promise<PricesAt | null>((r) => setTimeout(() => r(once()), RETRY_BACKOFF_MS)),
     );
     p.then((v) => {
       if (v == null) cache.delete(url);
@@ -165,11 +174,16 @@ export function useCompoundFlows(p: CompoundFlowsInput): {
   const blocks = useMemo(() => compoundPriceBlocks(bare, COMPOUND_PRICE_READS), [bare]);
   const assets = useMemo(() => compoundAssets(bare, market.baseToken), [bare, market.baseToken]);
   const blocksKey = `${p.deployment}:${market.key}:${assets.join(",")}:${blocks.join(",")}`;
-  const [prices, setPrices] = useState<{ key: string; map: Map<number, Record<string, number>> } | null>(null);
+  const [prices, setPrices] = useState<{
+    key: string;
+    map: Map<number, Record<string, number>>;
+    factors: Map<number, Record<string, CometFactor>>;
+  } | null>(null);
   useEffect(() => {
     if (source == null) return;
     let live = true;
     const map = new Map<number, Record<string, number>>();
+    const factors = new Map<number, Record<string, CometFactor>>();
     const run = async () => {
       // The stored prices first; the archive for the blocks the server has not
       // stored (or every block, where the stored read failed).
@@ -183,6 +197,7 @@ export function useCompoundFlows(p: CompoundFlowsInput): {
           const s = stored.blocks[String(b)];
           const r = s ? storedCometPrices(s, assets) : null;
           if (r) map.set(b, r);
+          if (r && s) factors.set(b, storedCometFactors(s, assets));
         }
         const missing = new Set(stored.missing);
         list = blocks.filter((b) => missing.has(b));
@@ -192,13 +207,16 @@ export function useCompoundFlows(p: CompoundFlowsInput): {
         while (live && next < list.length) {
           const b = list[next++];
           const r = await loadPricesAt(p.deployment, market.key, b, assets);
-          if (r) map.set(b, r);
+          if (r) {
+            map.set(b, r.prices);
+            factors.set(b, r.factors);
+          }
         }
       };
       await Promise.all(Array.from({ length: Math.min(READS_AT_ONCE[p.deployment], list.length) }, worker));
     };
     run().then(() => {
-      if (live) setPrices({ key: blocksKey, map });
+      if (live) setPrices({ key: blocksKey, map, factors });
     });
     return () => {
       live = false;
@@ -207,9 +225,11 @@ export function useCompoundFlows(p: CompoundFlowsInput): {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [blocksKey, source == null]);
   const priced = prices?.key === blocksKey ? prices.map : null;
+  const factors = prices?.key === blocksKey ? prices.factors : null;
   const rows = useMemo(
-    () => (source && priced ? compoundFlowEvents(source, market.baseToken, market.baseDecimals, priced) : null),
-    [source, priced, market.baseToken, market.baseDecimals],
+    () =>
+      source && priced ? compoundFlowEvents(source, market.baseToken, market.baseDecimals, priced, factors) : null,
+    [source, priced, factors, market.baseToken, market.baseDecimals],
   );
 
   // The daily store, one read per page: each asset's series (the base's
