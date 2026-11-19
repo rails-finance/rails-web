@@ -27,6 +27,13 @@ import { RailHeader } from "@/components/shared/rail-header";
 import { CHAINS, type ChainId } from "@/lib/shared/chains";
 import type { ProtocolEntry } from "@/lib/shared/protocols";
 
+/** A section's heading and list, the classes ProtocolInfoPage draws its own
+ *  sections with, so a vault layer's about page reads like its explorer's:
+ *  short headed sections, a list where the prose is a set of separate facts
+ *  (rails-ops standards/info-page-template.md, body rules). */
+export const INFO_H2 = "mt-5 text-sm font-semibold text-foreground";
+export const INFO_UL = "mt-1.5 list-disc space-y-1 pl-5";
+
 export function VaultsInfoPage({
   chainId,
   protocol,

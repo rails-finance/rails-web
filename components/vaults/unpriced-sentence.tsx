@@ -12,14 +12,21 @@ import { vaultIsUnpricedByOracle, type VaultCensusRow } from "@/lib/aave-vaults/
 
 const n = (v: number) => v.toLocaleString("en-US");
 
+/** Whether UnpricedSentence draws anything for these rows, so a page that sets
+ *  it in a list item can leave the item out with it. */
+export function hasUnpricedSentence(census: readonly VaultCensusRow[]): boolean {
+  const held = census.filter((c) => c.participants > 0);
+  if (!held.some((c) => c.pricedBlock != null)) return true;
+  return held.some((c) => vaultIsUnpricedByOracle(c));
+}
+
 export function UnpricedSentence({ census }: { census: readonly VaultCensusRow[] }) {
   const held = census.filter((c) => c.participants > 0);
   const priced = held.filter((c) => c.pricedBlock != null);
   if (priced.length === 0) {
     return (
       <span data-intro-unpriced data-unpriced-vaults="0" data-unpriced-assets="">
-        The census has not yet priced any vault on this chain, so every card states its value as not priced rather than
-        as a figure.
+        The census has not yet priced any vault on this chain, so every card says not priced.
       </span>
     );
   }
@@ -29,9 +36,9 @@ export function UnpricedSentence({ census }: { census: readonly VaultCensusRow[]
   const positions = declined.reduce((s, c) => s + c.liveCount, 0);
   return (
     <span data-intro-unpriced data-unpriced-vaults={declined.length} data-unpriced-assets={assets.join(",")}>
-      That oracle does not price {assets.length === 1 ? "the asset of" : "the assets of"} {n(declined.length)} of the
-      held vaults ({assets.join(", ")}), so their {n(positions)} open positions carry no USD figure and are stated as
-      not priced, never guessed; a zero from the oracle is the oracle declining, not a reading of value.
+      The oracle does not price {assets.length === 1 ? "the asset of" : "the assets of"} {n(declined.length)} held
+      vaults ({assets.join(", ")}). Their {n(positions)} open positions carry no USD figure and say not priced. An
+      oracle answer of zero counts as a decline.
     </span>
   );
 }
