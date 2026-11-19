@@ -11,12 +11,13 @@ import { vaultIndexHref } from "@/lib/vaults/index-rosters";
 import { VAULT_FRONTS, frontVaultKey, type VaultFront } from "@/lib/vaults/fronts";
 
 /** Rails's reading of one row's vault. `unknown`: the index did not answer
- *  in full and the vault was not among what did. */
+ *  in full and the vault was not among what did. `unchecked`: the row lacks
+ *  the address or the chain to look up. */
 export type FrontRead =
   | { kind: "read"; href: string }
   | { kind: "not-read" }
   | { kind: "unknown" }
-  | { kind: "no-address" };
+  | { kind: "unchecked" };
 
 export interface FrontRow extends VaultFront {
   read: FrontRead;
@@ -26,7 +27,7 @@ export async function readFronts(): Promise<FrontRow[]> {
   const { vaults, indexDown } = await loadVaultIndex();
   const served = new Map(vaults.map((v) => [frontVaultKey(v.chainId, v.address), v]));
   return VAULT_FRONTS.map((f) => {
-    if (f.vault == null || f.chainId == null) return { ...f, read: { kind: "no-address" } };
+    if (f.vault == null || f.chainId == null) return { ...f, read: { kind: "unchecked" } };
     const hit = served.get(frontVaultKey(f.chainId, f.vault));
     const read: FrontRead = hit
       ? { kind: "read", href: vaultIndexHref(hit) }
