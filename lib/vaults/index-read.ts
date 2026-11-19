@@ -6,7 +6,8 @@
 // MetaMorpho rosters on Base and Ethereum, Aave's vault roster on Ethereum (savings GHO, the
 // static aTokens, the Umbrella stake tokens), Yearn V3's roster on Ethereum,
 // and Maple's two syrup pools, which keep their pools page and join here
-// as rows (survey 2026-10-20 §7.6). Each roster is read by its loader at its
+// as rows (survey 2026-10-20 §7.6), and sBOLD, one row from its page's head
+// read (lib/sources/chain/sbold-vault.ts; no census, no daily series; ui-jobs 765). Each roster is read by its loader at its
 // block, the same read its page makes, and the index names each
 // block. Holders is each roster's census, which every roster but Maple's has;
 // Yield is the daily store's (decision 0047), which serves no Maple series.
@@ -33,6 +34,8 @@ import {
   type YearnVaultDirectoryResponse,
 } from "@/lib/sources/chain/yearn-ethereum-vault-directory";
 import { resolveMaplePoolState, type MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
+import { loadSboldVault } from "@/lib/sources/chain/sbold-vault";
+import { SBOLD_ASSET, SBOLD_CREATED_BLOCK } from "@/lib/liquity-v2/sbold";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { serverReadAt } from "@/lib/shared/server-head-read";
 import { BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
@@ -43,6 +46,7 @@ import {
   aaveEthereumVaultSummaries,
   maplePoolSummary,
   morphoBaseVaultSummaries,
+  sboldVaultPageSummary,
   yearnVaultSummaries,
   withAssetScale,
   type VaultSummary,
@@ -122,6 +126,7 @@ async function readVaultIndex(): Promise<VaultIndexRead> {
     aaveRead,
     yearnRead,
     maple,
+    sbold,
     baseCensusRead,
     ethCensusRead,
     ethMorphoCensusRead,
@@ -144,6 +149,7 @@ async function readVaultIndex(): Promise<VaultIndexRead> {
       console.error("Maple's pools did not answer for the vault index:", error);
       return { states: [] as MaplePoolState[], readAt: new Date().toISOString() };
     }),
+    loadSboldVault(),
     loadCensus(BASE_CHAIN_ID),
     loadCensus(MAINNET_CHAIN_ID),
     loadCensus(MAINNET_CHAIN_ID, "morpho"),
@@ -198,6 +204,16 @@ async function readVaultIndex(): Promise<VaultIndexRead> {
         ),
       );
 
+  const sboldReadAt = new Date().toISOString();
+  const sboldVaults = sbold.chainStale
+    ? []
+    : [
+        {
+          ...sboldVaultPageSummary(sbold, SBOLD_ASSET, SBOLD_CREATED_BLOCK),
+          readAt: { block: sbold.blockNumber, timestamp: sboldReadAt },
+        },
+      ];
+
   // The "decimals disagree" standing: one read per chain over the assets.
   const [baseScales, ethScales] = await Promise.all([
     loadAssetScales(
@@ -229,13 +245,14 @@ async function readVaultIndex(): Promise<VaultIndexRead> {
     if (ethYields[v.address]) yields[vaultIndexKey(v)] = ethYields[v.address];
   // The store keeps no Maple series (decision 0047, "Out of scope"), so it is
   // not asked; the rows say so.
-  for (const v of mapleVaults) yields[vaultIndexKey(v)] = { none: "no-series" };
+  for (const v of [...mapleVaults, ...sboldVaults]) yields[vaultIndexKey(v)] = { none: "no-series" };
 
   const ethCensusBlock = ethCensus.length > 0 ? Math.max(...ethCensus.map((c) => c.censusBlock)) : null;
   return {
     vaults: [
       ...scaled(morphoVaults, baseScales),
       ...scaled([...morphoEthVaults, ...aaveVaults, ...yearnVaults, ...mapleVaults], ethScales),
+      ...sboldVaults,
     ],
     yields,
     indexDown: [
@@ -305,6 +322,16 @@ async function readVaultIndex(): Promise<VaultIndexRead> {
         readAt: maple.readAt,
         count: mapleVaults.length,
         catalog: { catalogSize: MAPLE_POOLS.length },
+      },
+      {
+        protocol: "sbold",
+        chainId: MAINNET_CHAIN_ID,
+        blockNumber: sbold.blockNumber,
+        readBy: serverReadAt(sbold.head, sbold.blockNumber || null),
+        chainStale: sbold.chainStale,
+        readAt: sboldReadAt,
+        count: sboldVaults.length,
+        catalog: { catalogSize: 1 },
       },
     ],
   };

@@ -134,8 +134,7 @@ export async function buildSearchIndex(): Promise<SearchIndexWire> {
 
   for (const p of MAPLE_POOLS) sized.push({ row: row(p.symbol, p.symbol, p.assetSymbol, MAPLE, p.pool), size: 0 });
 
-  // No asset: a BOLD token row would open the vault index, which does not list sBOLD.
-  sized.push({ row: row("sBOLD", "sBOLD", "", SBOLD, SBOLD_VAULT), size: 0 });
+  sized.push({ row: row("sBOLD", "sBOLD", "BOLD", SBOLD, SBOLD_VAULT), size: 0 });
 
   // A stable sort: the unsized keep their roster order behind the sized, and
   // the vaults the census shows empty (size -1) go last.

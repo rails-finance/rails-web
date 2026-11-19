@@ -33,6 +33,7 @@ import {
 } from "@/lib/yearn/vault-provenance";
 import { poolNavRateProv, poolTotalAssetsProv } from "@/lib/maple/event-provenance";
 import { vaultIndexProtocol } from "@/lib/vaults/index-rosters";
+import { sboldSharePriceProv, sboldTotalAssetsProv } from "@/lib/liquity-v2/sbold-provenance";
 import { vaultDisplayName, type VaultSummary } from "@/lib/vaults/summary";
 
 /** The roster read a row's receipts name. */
@@ -118,5 +119,10 @@ export function vaultIndexRowReceipts(read: RosterRead, v: VaultSummary): VaultR
       return yearnRowReceipts(read, v);
     case "maple":
       return mapleRowReceipts(read, v);
+    case "sbold": {
+      // sBOLD's row: the page's head read (ui-jobs 765).
+      const c = { readBy: read.readBy, blockNumber: read.blockNumber || v.readAt.block || undefined };
+      return { totalAssets: sboldTotalAssetsProv(c), sharePrice: sboldSharePriceProv(c) };
+    }
   }
 }
