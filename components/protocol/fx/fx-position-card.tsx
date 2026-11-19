@@ -24,7 +24,7 @@
 // panel rows on an open card and on a closed one.
 
 import { FX_NO_ANCHOR } from "@/lib/fx/price-notes";
-import { fxPositionCollUsd } from "@/lib/fx/usd-receipt";
+import { fxAnchorOf, fxPositionCollUsd } from "@/lib/fx/usd-receipt";
 import { positionName } from "@/lib/shared/position-name";
 import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { ListingTag } from "@/components/shared/listing-tag";
@@ -796,7 +796,11 @@ export function useFxCardSlots({
           : {}),
         tier: "amount",
         value: collateralValue,
-        usd: collateralUsd(v, px ?? (detail ? null : (listingPx ?? null)), detail && !pxState.settled),
+        usd: collateralUsd(
+          v,
+          detail ? fxAnchorOf(pxRead, v.settled.block) : (listingPx ?? null),
+          detail && !pxState.settled,
+        ),
       },
       // fxUSD is not pinned to a dollar, so the debt carries no USD line.
       { id: "debt", label: CARD_VOCAB.debt, tier: "amount", value: debtValue },

@@ -19,7 +19,7 @@
 
 import type { FxPositionView } from "@/components/protocol/fx/fx-position-card";
 import { formatUsd } from "@/lib/shared/format-event";
-import { fxPositionCollUsd, fxSeizedUsd } from "@/lib/fx/usd-receipt";
+import { fxAnchorOf, fxPositionCollUsd, fxSeizedUsd } from "@/lib/fx/usd-receipt";
 import { shownUsd } from "@/lib/shared/shown-usd";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { useEnsName } from "@/lib/ens/use-ens-names";
@@ -120,10 +120,7 @@ export function FxPositionExplanation({
       : null;
   // The collateral's dollars as the card draws them: the shown product at the
   // anchor leg of the settled block (ui-jobs 743).
-  const collUsd = fxPositionCollUsd(
-    v,
-    px && v.settled.block != null ? { anchor: px.anchor, block: v.settled.block } : null,
-  );
+  const collUsd = fxPositionCollUsd(v, fxAnchorOf(pxRead, v.settled.block));
 
   const isClosed = v.status === "closed";
   const hasEvents = v.activity.eventCount > 0;

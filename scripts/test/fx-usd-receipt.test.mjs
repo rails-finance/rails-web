@@ -117,15 +117,19 @@ test("a missing price draws no figure", () => {
 
 test("the bonus's collateral is the sum of shown legs, each at the min leg of its block", () => {
   const legs = [
-    { amount: 0.1234567, price: 2001.987654, block: 23_000_001 },
-    { amount: 0.0500001, price: 1999.123456, block: 23_100_002 },
+    { kind: "rebalance", amount: 0.1234567, price: 2001.987654, block: 23_000_002, priceBlock: 23_000_001 },
+    { kind: "redemption", amount: 0.0500001, price: 1999.123456, block: 23_100_003, priceBlock: 23_100_002 },
   ];
   const r = fxSeizedUsd({ what: "x", pool: "wsteth", legs });
   const sum = Math.round(legs.reduce((s, l) => s + shownUsd(l.amount, l.price), 0) * 100) / 100;
   assert.equal(r.usd, sum);
   const notes = r.prov.inputs.map((i) => i.note ?? "").join(" | ");
+  // Each row names its event and the event's block; the price stands at the
+  // block before it, where it was read.
+  assert.match(notes, /collateral the rebalance took at block 23,000,002/);
+  assert.match(notes, /collateral the redemption took at block 23,100,003/);
   assert.match(notes, /min leg \(getLiquidatePrice\).*at block 23,000,001/);
-  assert.match(notes, /at block 23,100,002/);
+  assert.match(notes, /min leg \(getLiquidatePrice\).*at block 23,100,002/);
 });
 
 const { fxMarketMove, FX_LEGS_DIFFER } = await import(ROOT + "lib/fx/usd-receipt.ts");
@@ -136,4 +140,13 @@ test("a market move is the difference of two shown products on one leg, and no f
   const across = fxMarketMove(1.2345678, { price: 1990.123456, leg: "min" }, { price: 2010.654321, leg: "anchor" });
   assert.deepEqual(across, { none: FX_LEGS_DIFFER });
   assert.equal(FX_LEGS_DIFFER, "The two values stand on different oracle legs (min then, anchor now).");
+});
+
+const { fxAnchorOf } = await import(ROOT + "lib/fx/usd-receipt.ts");
+
+test("the position figures gate on the anchor alone: an anchor-only read states the collateral", () => {
+  const anchor = fxAnchorOf({ anchorPrice: "1779567367000000000000", minPrice: null }, 26_445_741);
+  assert.deepEqual(anchor, { anchor: 1779.567367, block: 26_445_741 });
+  assert.ok(fxPositionCollUsd(view(2.5), anchor));
+  assert.equal(fxAnchorOf({ anchorPrice: null, minPrice: "1770000000000000000000" }, 26_445_741), null);
 });

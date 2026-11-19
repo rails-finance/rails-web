@@ -66,20 +66,28 @@ export function fxCollateralUsd(o: {
 export function fxSeizedUsd(o: {
   what: string;
   pool: FxPoolKey;
-  legs: readonly { amount: number; price: number | null; block: number | null }[];
+  /** `block` the event's; `priceBlock` the block its price was read at
+   *  (the one before a rebalance or redemption), else the event's. */
+  legs: readonly {
+    kind?: "rebalance" | "redemption" | "liquidation";
+    amount: number;
+    price: number | null;
+    block: number | null;
+    priceBlock?: number | null;
+  }[];
 }): FxUsd | null {
   if (o.legs.length === 0 || o.legs.some((l) => l.price == null || !(l.price > 0))) return null;
   const sym = FX_POOLS[o.pool].normalizedSymbol;
   const legs: UsdLeg[] = o.legs.map((l, i) => ({
     token: sym,
-    label: o.legs.length > 1 ? `${sym} seized (${i + 1})` : undefined,
+    label: o.legs.length > 1 ? `${sym} taken (${i + 1})` : undefined,
     amount: Math.abs(l.amount),
-    amountNote: `collateral the liquidation took${l.block != null ? ` at block ${l.block.toLocaleString("en-US")}` : ""}`,
+    amountNote: `collateral the ${l.kind ?? "liquidation"} took${l.block != null ? ` at block ${l.block.toLocaleString("en-US")}` : ""}`,
     price: l.price as number,
-    priceNote: fxPriceNote("min", l.block),
+    priceNote: fxPriceNote("min", l.priceBlock ?? l.block),
     priceContract: oracleOf(o.pool),
   }));
-  const blocks = [...new Set(o.legs.map((l) => l.block))];
+  const blocks = [...new Set(o.legs.map((l) => l.priceBlock ?? l.block))];
   return holderUsdReceipt({
     what: o.what,
     legs,
@@ -128,4 +136,16 @@ export function fxMarketMove(
 ): { usd: number } | { none: string } {
   if (then.leg !== now.leg) return { none: FX_LEGS_DIFFER };
   return { usd: Math.round((shownUsd(held, now.price) - shownUsd(held, then.price)) * 100) / 100 };
+}
+
+/** The anchor leg from a settled-block read, gated on the anchor alone: a
+ *  read that carries the anchor states the collateral at it whatever the
+ *  min leg's read did. */
+export function fxAnchorOf(
+  read: { anchorPrice?: string | null } | null | undefined,
+  block: number | null | undefined,
+): { anchor: number; block: number } | null {
+  if (read?.anchorPrice == null || block == null) return null;
+  const anchor = Number(read.anchorPrice) / 1e18;
+  return Number.isFinite(anchor) && anchor > 0 ? { anchor, block } : null;
 }

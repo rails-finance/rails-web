@@ -31,7 +31,8 @@ export interface FxPoolMeta {
   normalizedSymbol: string;
   /** Deploy block (RegisterPool on the PoolManager). */
   fromBlock: number;
-  /** The pool's price oracle: `priceOracle()` on the pool, read 19 Nov 2026.
+  /** The pool's price oracle: the pool's `priceOracle()`, read through
+   *  /api/chain/fx/pools at block 26,446,146 (19 Nov 2026).
    *  getPrice() gives its anchor, min and max legs; getLiquidatePrice the min. */
   oracle: string;
   /** How the pool's oracle forms its anchor price (rails-ops
