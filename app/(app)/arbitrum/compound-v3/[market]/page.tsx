@@ -6,7 +6,7 @@
 // touched (rails-ops reference/arbitrum-position-first-lane.md).
 
 // Each held token at its Comet's price in dollars as shown (ui-jobs 743).
-import { cometPricesUsd } from "@/lib/compound-arbitrum/usd";
+import { cometPriceFactors, cometPricesUsd } from "@/lib/compound/comet-usd";
 import type { Metadata } from "next";
 import { after } from "next/server";
 import { notFound, redirect } from "next/navigation";
@@ -101,6 +101,9 @@ export default async function CompoundArbitrumWalletPage({ params }: Props) {
         history?.markets.find((r) => r.market === market.key) ?? null,
         chain ? cometPricesUsd(chain, market.baseToken, head?.ethUsd) : undefined,
         whole,
+        chain
+          ? { factors: cometPriceFactors(chain, market.baseToken, head?.ethUsd), block: head?.blockNumber ?? null }
+          : undefined,
       ),
     }))
     .sort((a, b) => Number(b.view.status === "open") - Number(a.view.status === "open"));

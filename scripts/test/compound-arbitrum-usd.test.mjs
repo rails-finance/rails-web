@@ -34,7 +34,8 @@ export async function resolve(spec, ctx, next) {
 `;
 register("data:text/javascript," + encodeURIComponent(hook));
 
-const { compoundArbitrumUsd, cometUsdPrice } = await import(ROOT + "lib/compound-arbitrum/usd.ts");
+const { compoundArbitrumUsd } = await import(ROOT + "lib/compound-arbitrum/usd.ts");
+const { cometUsdPrice } = await import(ROOT + "lib/compound/comet-usd.ts");
 const { compoundArbitrumHolderStrip } = await import(ROOT + "lib/compound-arbitrum/holder-strip.ts");
 const { compoundBaseHolderStrip } = await import(ROOT + "lib/compound-base/holder-strip.ts");
 const { shownUsd, shownComposedPrice } = await import(ROOT + "lib/shared/shown-usd.ts");

@@ -25,8 +25,14 @@ import { scaleCompoundChainBalance, type CompoundMarketChainResponse } from "@/l
 import type { CompoundWalletChainResponse } from "@/lib/api/fetch-compound-wallet";
 import { formatNumber, formatUsdValue } from "@/lib/utils/format";
 import { holderUsdReceipt, type UsdLeg } from "@/lib/shared/holder-usd-receipt";
-import { compoundArbitrumUsd, cometUsdPrice } from "./usd";
-import { cometComposedPriceNote, cometNoPriceLine, cometPriceNote, type CometUnpriced } from "./price-notes";
+import { compoundArbitrumUsd } from "./usd";
+import { cometUsdPrice } from "@/lib/compound/comet-usd";
+import {
+  cometComposedPriceNote,
+  cometNoPriceLine,
+  cometPriceNote,
+  type CometUnpriced,
+} from "@/lib/compound/comet-price-notes";
 
 /** Why a Comet's price has no dollars: a zero getPrice, or no conversion. */
 const whyUnpriced = (c: HolderStripComet, price: number): CometUnpriced => ({

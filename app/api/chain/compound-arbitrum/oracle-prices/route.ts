@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { resolveCometPrices, cometPriceOf, type CometPriceRequest } from "@/lib/sources/chain/compound-prices";
+import {
+  resolveCometPrices,
+  cometFactorOf,
+  cometPriceOf,
+  type CometPriceRequest,
+} from "@/lib/sources/chain/compound-prices";
+import type { CometPriceFactor } from "@/lib/compound/comet-usd";
 import { COMPOUND_ARBITRUM_DEPLOYMENT } from "@/lib/compound-arbitrum/asset-catalog";
 
 // On-chain USD for the tokens an Arbitrum Comet position touches — each
@@ -41,14 +47,22 @@ export async function GET(request: NextRequest) {
     });
     const map = await resolveCometPrices(reqs, COMPOUND_ARBITRUM_DEPLOYMENT);
     const prices: Record<string, number> = {};
+    const factors: Record<string, CometPriceFactor> = {};
     for (const [key, tokens] of wanted) {
       const m = markets.get(key)!;
       for (const t of tokens) {
         const p = cometPriceOf(map, m.comet, t);
         if (p != null && p > 0) prices[`${key}:${t}`] = p;
+        // The factors of a composed price, for the receipt (ui-jobs 743).
+        const f = cometFactorOf(map, m.comet, t, COMPOUND_ARBITRUM_DEPLOYMENT);
+        if (f) factors[`${key}:${t}`] = f;
       }
     }
-    return NextResponse.json({ prices });
+    return NextResponse.json({
+      prices,
+      factors,
+      ...(map.read ? { blockNumber: map.read.blockNumber } : {}),
+    });
   } catch (error) {
     console.error("Error reading Compound V3 Arbitrum oracle prices:", error);
     return NextResponse.json({ prices: {} });
