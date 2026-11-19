@@ -68,6 +68,9 @@ export function holderUsdReceipt(opts: {
   numeraire?: "USD" | "ETH";
   /** The prices stand at different blocks, each named on its row. */
   blocksPerRow?: boolean;
+  /** The face the figure prints as ("$51K"), given its cents: the last row
+   *  says the figure is to the cent, shown as that face (ui-jobs 743). */
+  shownAs?: (usd: number) => string;
 }): { prov: Provenance; usd: number } {
   const eth = opts.numeraire === "ETH";
   const product = eth ? shownEth : shownUsd;
@@ -112,13 +115,14 @@ export function holderUsdReceipt(opts: {
             contract: l.priceContract,
           },
     ];
-    if (many)
-      rows.push({
-        label: `${l.label ?? l.token} amount × price`,
-        value: valueText(products[i]),
-        kind: "derived",
-        step: true,
-      });
+    // Each leg's product, to the cent: the rows multiply out to the figure.
+    rows.push({
+      label: `${l.label ?? l.token} amount × price`,
+      value: valueText(products[i]),
+      kind: "derived",
+      step: true,
+      ...(!many && opts.shownAs ? { note: `to the cent, shown as ${opts.shownAs(usd)}` } : {}),
+    });
     return opts.byValue && Math.abs(products[i]) < 0.01 ? rows.map((r) => ({ ...r, dust: true as const })) : rows;
   });
   const allFaces = legs.every((l) => l.face);
@@ -148,7 +152,17 @@ export function holderUsdReceipt(opts: {
       formula: many ? "Σ amount × price" : "amount × price",
       inputs: [
         ...inputs,
-        ...(many ? [{ label: "sum", value: valueText(usd), kind: "derived" as const, step: true as const }] : []),
+        ...(many
+          ? [
+              {
+                label: "sum",
+                value: valueText(usd),
+                kind: "derived" as const,
+                step: true as const,
+                ...(opts.shownAs ? { note: `to the cent, shown as ${opts.shownAs(usd)}` } : {}),
+              },
+            ]
+          : []),
       ],
       source: opts.block != null && !allFaces ? { block: opts.block } : undefined,
     },

@@ -60,6 +60,13 @@ const LIQUITY_SPINE_KEY: SpineKey = {
   keyRight: troveWords("spine_into_trove"),
 };
 
+/** A wei figure in whole tokens, from its raw read where it is one; else
+ *  the formatted figure. */
+const wadOf = (raw: string | null | undefined, formatted: number): number => {
+  const n = raw != null && /^\d+$/.test(raw) ? Number(raw) / 1e18 : Number.NaN;
+  return Number.isFinite(n) ? n : formatted;
+};
+
 /** The Lifetime flows replay and the day focus the panel and the timeline
  *  share (components/shared/flow-focus-context.tsx). The timeline waits for
  *  the clock (`now`, set on mount) and the daily prices' read. */
@@ -105,11 +112,16 @@ export function useTroveFlows({
                   price: price ?? null,
                   ...(liveState
                     ? {
-                        coll: liveState.collateral.entire,
-                        debt: liveState.debt.entire,
-                        redistColl: liveState.collateral.redistGain,
-                        redistDebt: liveState.debt.redistGain,
-                        batchFee: liveState.rates.accruedBatchManagementFee,
+                        // The raw reads, not the 2-decimal figures beside them:
+                        // the live rows state each amount to six decimals (ui-jobs 743).
+                        coll: wadOf(liveState.collateral.entireRaw, liveState.collateral.entire),
+                        debt: wadOf(liveState.debt.entireRaw, liveState.debt.entire),
+                        redistColl: wadOf(liveState.collateral.redistGainRaw, liveState.collateral.redistGain),
+                        redistDebt: wadOf(liveState.debt.redistGainRaw, liveState.debt.redistGain),
+                        batchFee: wadOf(
+                          liveState.rates.accruedBatchManagementFeeRaw,
+                          liveState.rates.accruedBatchManagementFee,
+                        ),
                       }
                     : {}),
                 }

@@ -406,7 +406,11 @@ export function Headline({
   const tokens = assets.held.filter((h) => h.side === side && (h.amount ?? 0) > 0).map((h) => h.symbol);
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-      <Prov info={flowSegmentProv(st.bar[0], side, when, isLive, model.daily, unitOf(model, side))}>
+      <Prov
+        info={flowSegmentProv(st.bar[0], side, when, isLive, model.daily, unitOf(model, side), (u) =>
+          formatFlowUsd(u, unitOf(model, side)),
+        )}
+      >
         <span className="text-xl font-semibold tabular-nums text-foreground">
           {formatFlowUsd(shownNow(st), unitOf(model, side))}
         </span>

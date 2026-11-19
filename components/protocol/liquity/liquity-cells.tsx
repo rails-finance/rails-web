@@ -5,7 +5,7 @@
 // (components/shared/event-cells.tsx). The figures are the generator's
 // (lib/liquity/event-prose.ts `liquityL2`); the receipts are built here.
 
-import { amountText, priceText } from "@/lib/shared/holder-usd-receipt";
+import { amountText, priceText, shownUsd } from "@/lib/shared/holder-usd-receipt";
 import { collSheetUsd } from "@/lib/liquity/sheet-usd";
 import { formatUsdValue } from "@/lib/utils/format";
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
@@ -392,6 +392,7 @@ export function useLiquityCells({
               note: "after",
             },
             ...priceInput.map((p) => ({ ...p, value: priceText(collPrice) })),
+            { ...productRow(l2.coll.after, collPrice), label: "collateral × price", note: "to the cent" },
           ],
         }
       : undefined;
@@ -413,6 +414,7 @@ export function useLiquityCells({
               value: priceText(l2.coll.beforePrice),
               note: l2.coll.beforePrice !== collPrice ? "the price the liquidation used" : p.note,
             })),
+            { ...productRow(l2.coll.before, l2.coll.beforePrice), label: "collateral × price", note: "to the cent" },
           ],
         }
       : undefined;
@@ -1246,6 +1248,19 @@ export function useLiquityCells({
   return { cells, sheet };
 }
 
+/** An amount × price row: the product of the two as shown, to the cent, and
+ *  the face the sheet prints it as (ui-jobs 743). */
+function productRow(amount: number, price: number) {
+  const cents = shownUsd(Math.abs(amount), price);
+  return {
+    label: "amount × price",
+    value: formatUsdValue(cents),
+    kind: "derived" as const,
+    step: true as const,
+    note: `to the cent, shown as ${sheetUsd(cents)}`,
+  };
+}
+
 /** A token amount's dollars at a price, as the rows show them, to the cent. */
 function usdMoveProv(sym: string, amount: number, price: number): Provenance {
   return {
@@ -1261,6 +1276,7 @@ function usdMoveProv(sym: string, amount: number, price: number): Provenance {
         pclass: "oracle",
         note: "on-chain oracle @ event block",
       },
+      productRow(amount, price),
     ],
   };
 }
@@ -1293,6 +1309,7 @@ function atPriceProv(sym: string, amount: number, price: number, when: string): 
     inputs: [
       { label: "collateral", value: `${amountText(amount)} ${sym}`, kind: "chain" },
       { label: `price at ${when}`, value: priceText(price), kind: "chain-derived", pclass: "oracle" },
+      productRow(amount, price),
     ],
   };
 }

@@ -191,7 +191,13 @@ export function marketMoveProv(label: string, side: FlowSide, when: string, m: M
  *  last event by then (grown by its index where the family has one) × the
  *  price that day as shown, named with its block. The state card
  *  (components/shared/flow-moment-card.tsx) states its figures with it. */
-export function heldDayProv(label: string, when: string, rows: readonly FlowAssetHeld[]): Provenance {
+export function heldDayProv(
+  label: string,
+  when: string,
+  rows: readonly FlowAssetHeld[],
+  /** The face the figure prints as, given its cents. */
+  shownAs?: (usd: number) => string,
+): Provenance {
   const priced = rows.filter((r) => r.priced?.price != null && (r.amount ?? 0) > 0);
   const day = (d: number) =>
     new Date(d * 86_400_000).toLocaleDateString("en-GB", {
@@ -271,6 +277,7 @@ export function heldDayProv(label: string, when: string, rows: readonly FlowAsse
     byValue: true,
     blocksPerRow: true,
     caveat: FACE,
+    ...(shownAs ? { shownAs } : {}),
   }).prov;
 }
 
@@ -309,6 +316,8 @@ export function flowSegmentProv(
   daily = false,
   /** The side's token on a unit model: its figures carry no dollar rows. */
   unit?: FlowUnit,
+  /** The face the surface prints the figure as, given its cents ("$51K"). */
+  shownAs?: (usd: number) => string,
 ): Provenance {
   const held = side === "collateral" ? "held" : "owed";
   if (s.legs && (s.fill === "in" || s.fill === "out"))
@@ -328,7 +337,7 @@ export function flowSegmentProv(
     };
   // A held figure in rows, the live stop's too (ui-jobs 743).
   if (s.fill === "held" && !unit && s.heldRows?.some((r) => r.priced?.price != null))
-    return heldDayProv(s.label, isLive ? "now" : when, s.heldRows);
+    return heldDayProv(s.label, isLive ? "now" : when, s.heldRows, shownAs);
   if (s.fill === "held")
     return isLive
       ? {

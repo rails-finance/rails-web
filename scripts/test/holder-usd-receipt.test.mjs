@@ -33,7 +33,8 @@ test("one token: amount × price, the price an oracle read at its block", () => 
     via: "GET /x",
   });
   assert.equal(p.formula, "amount × price");
-  assert.deepEqual(rows(p), ["pETH amount=2 pETH", "pETH price=$1,500.00"]);
+  // One leg states its product too, so the rows multiply out (ui-jobs 743).
+  assert.deepEqual(rows(p), ["pETH amount=2 pETH", "pETH price=$1,500.00", "pETH amount × price=$3,000.00"]);
   assert.equal(p.kind, "chain-derived");
   assert.equal(p.pclass, "oracle");
   assert.deepEqual(p.source, { block: 123 });

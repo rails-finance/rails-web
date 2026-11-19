@@ -427,7 +427,9 @@ export function SegmentTipBody({
         <span aria-hidden className="inline-block h-3 w-4 shrink-0 rounded-[2px]" style={fillStyle(side, seg, hues)} />
         <span>{seg.label}</span>
         <span className="ml-auto tabular-nums">
-          <Prov info={flowSegmentProv(seg, side, when, isLive, daily, unit)}>{wholeUsd(seg.value, unit)}</Prov>
+          <Prov info={flowSegmentProv(seg, side, when, isLive, daily, unit, (u) => wholeUsd(u, unit))}>
+            {wholeUsd(seg.value, unit)}
+          </Prov>
         </span>
       </div>
       {pct && (
@@ -489,7 +491,9 @@ export function SegmentPanelBody({
       <div className="flex items-baseline gap-2 pr-6 text-sm font-semibold">
         <span>{title}</span>
         <span className="ml-auto tabular-nums">
-          <Prov info={flowSegmentProv(seg, side, when, isLive, daily, unit)}>{wholeUsd(seg.value, unit)}</Prov>
+          <Prov info={flowSegmentProv(seg, side, when, isLive, daily, unit, (u) => wholeUsd(u, unit))}>
+            {wholeUsd(seg.value, unit)}
+          </Prov>
         </span>
       </div>
       {shownParts.length > 0 && (
@@ -598,7 +602,9 @@ function SideSumTable({
               className="whitespace-nowrap border-t py-0.5 text-right"
               style={{ borderColor: "var(--rb-tooltip-border)" }}
             >
-              <Prov info={flowSegmentProv(sum.total.seg, side, when, isLive, daily, unit)}>{sum.total.amount}</Prov>
+              <Prov info={flowSegmentProv(sum.total.seg, side, when, isLive, daily, unit, () => sum.total.amount)}>
+                {sum.total.amount}
+              </Prov>
             </td>
           </tr>
           {heldAssets.map((h, i) => (

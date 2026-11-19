@@ -122,6 +122,7 @@ export function amountsUsd(
     byValue: live.length > 1,
     via: o.via,
     caveat: FACE,
+    shownAs: (u) => (o.signed ? sheetUsd(mixed ? u : sign * u, true) : sheetUsd(mixed ? u : sign * u)),
   });
   const v = mixed ? usd : sign * usd;
   return { text: o.signed ? sheetUsd(v, true) : sheetUsd(v), info: prov, usd: v };
