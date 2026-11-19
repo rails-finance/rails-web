@@ -83,6 +83,9 @@ export interface ListToolbarProps<F extends BaseListFilters> {
   /** Keys in the search field, for a listing whose search does more than
    *  filter (the Pendle roster's wallet row takes Enter). */
   onSearchKeyDown?: (e: ReactKeyboardEvent<HTMLInputElement>) => void;
+  /** False where the page names its subject and has nothing to search (the
+   *  wallet page, ui-jobs 738): the row starts with the pills. */
+  search?: boolean;
 }
 
 export function ListToolbar<F extends BaseListFilters>({
@@ -102,6 +105,7 @@ export function ListToolbar<F extends BaseListFilters>({
   countFor,
   nounFor,
   onSearchKeyDown,
+  search = true,
 }: ListToolbarProps<F>) {
   // Inert until this strip's handlers are attached — including the search box,
   // which pre-hydration accepts typing into a value React then overwrites from
@@ -158,16 +162,18 @@ export function ListToolbar<F extends BaseListFilters>({
       <div className="flex flex-wrap items-center gap-2">
         {/* The shared search's look (H15); the listing's own behaviour: the
             query filters this explorer, family identifiers included. */}
-        <SearchBox
-          value={filters.q}
-          onChange={(q) => onChange({ ...filters, q })}
-          placeholder={searchPlaceholder}
-          size="pill"
-          anatomy="N1.1 H15"
-          inputRef={searchRef}
-          onKeyDown={onSearchKeyDown}
-          className="max-sm:basis-full sm:min-w-[220px] sm:flex-[0_1_300px]"
-        />
+        {search && (
+          <SearchBox
+            value={filters.q}
+            onChange={(q) => onChange({ ...filters, q })}
+            placeholder={searchPlaceholder}
+            size="pill"
+            anatomy="N1.1 H15"
+            inputRef={searchRef}
+            onKeyDown={onSearchKeyDown}
+            className="max-sm:basis-full sm:min-w-[220px] sm:flex-[0_1_300px]"
+          />
+        )}
         {/* Below sm one sideways-scrolling row with a fade at its right edge;
             from sm its pills join the wrapping row (display: contents). */}
         <div className="relative max-sm:-mx-4 max-sm:mt-1 max-sm:min-w-0 max-sm:basis-[calc(100%+2rem)] sm:contents">

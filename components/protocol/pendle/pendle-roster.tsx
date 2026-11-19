@@ -44,6 +44,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { lookable, useLookup } from "@/components/shared/front-door-search";
 import { PendleTokenIcon } from "@/components/protocol/pendle/pendle-token-icon";
+import { SyZeroApy } from "@/components/protocol/pendle/pendle-position-card";
 import { ListToolbar } from "@/components/shared/filter-bar/list-toolbar";
 import type { FilterDimension } from "@/components/shared/filter-bar/types";
 import type { BaseListFilters } from "@/lib/shared/list-filter";
@@ -71,9 +72,17 @@ import {
   shortAddress,
   units,
 } from "@/lib/pendle/format";
-import { impliedApyProv, markProv, maturityProv, tvlProv, underlyingProv, valueProv } from "@/lib/pendle/provenance";
+import {
+  impliedApyProv,
+  markProv,
+  maturityProv,
+  syZeroProv,
+  tvlProv,
+  underlyingProv,
+  valueProv,
+} from "@/lib/pendle/provenance";
 import { PENDLE_WORDS } from "@/lib/pendle/words";
-import { emptyPool } from "@/lib/pendle/rules";
+import { emptyPool, syRateZero } from "@/lib/pendle/rules";
 import { UNDERLYING_LABEL_TIP, underlyingProtocol } from "@/lib/pendle/underlying";
 import { pendleMarketHref, pendleWalletHref } from "@/lib/pendle/routes";
 import type { PendleRoster, PendleRosterEntry } from "@/lib/pendle/types";
@@ -103,7 +112,7 @@ const DEFAULT_SORT: SortKey = "maturity";
 
 /** How a column sorts, where that is not plain from its figure. */
 const SORT_NOTE: Partial<Record<SortKey, string>> = {
-  apy: "Pendle's docs: the market consensus of the future APY of an asset. Sorts by that rate; a matured market or an empty pool has none and sorts last.",
+  apy: "Pendle's docs: the market consensus of the future APY of an asset. Sorts by that rate; a matured market, an empty pool or a market whose SY reads 0 has none and sorts last.",
   tvl: "The pool's SY and its PT at the PT's rate, in the market's asset. Sorts by asset, then by liquidity within each asset.",
   pt: "What one PT is worth in the market's asset. Sorts by asset, then by price within each asset.",
   maturity: "Sorts by the expiry date, soonest first.",
@@ -115,8 +124,12 @@ const tvlOf = (m: PendleRosterEntry) => units(m.tvl?.asset, assetDecimals(m.toke
 /** An empty pool (lib/pendle/rules.ts): its stored rate is not shown. */
 const emptyOf = (m: PendleRosterEntry) => emptyPool(m.expired, m.tvl, m.tokens.sy.decimals);
 
+/** The SY's exchangeRate() reads 0 (lib/pendle/rules.ts): the PT is worth 0, no implied APY. */
+const zeroOf = (m: PendleRosterEntry) => syRateZero(m);
+
 /** The PT's price in the asset: ptToSy × SY.exchangeRate(), both 1e18-scaled. */
 function ptToAsset(m: PendleRosterEntry): string | null {
+  if (zeroOf(m)) return "0";
   if (m.expired) return E18.toString();
   if (m.ptToSy == null || m.syToAsset == null) return null;
   return ((BigInt(m.ptToSy) * BigInt(m.syToAsset)) / E18).toString();
@@ -125,7 +138,7 @@ function ptToAsset(m: PendleRosterEntry): string | null {
 function figureOf(key: SortKey, m: PendleRosterEntry): number | null {
   switch (key) {
     case "apy":
-      return emptyOf(m) ? null : m.impliedApy;
+      return emptyOf(m) || zeroOf(m) ? null : m.impliedApy;
     case "tvl":
       return tvlOf(m);
     case "pt":
@@ -251,7 +264,7 @@ function rosterCsv(markets: PendleRosterEntry[]): string {
       t.market.address,
       underlyingOf(m),
       assetOf(m),
-      // The table's figure: blank where it shows none (matured, unread, an empty pool).
+      // The table's figure: blank where it shows none (matured, unread, an empty pool, an SY reading 0).
       figureOf("apy", m)?.toFixed(6) ?? "",
       exact(m.tvl?.asset, assetDecimals(t)) ?? "",
       ptToAsset(m) == null ? "" : String(rate(ptToAsset(m))),
@@ -599,7 +612,9 @@ function Row({ m, block, at }: { m: PendleRosterEntry; block: number; at: number
       {cell(
         "apy",
         "Implied APY",
-        emptyOf(m) ? (
+        zeroOf(m) ? (
+          <SyZeroApy />
+        ) : emptyOf(m) ? (
           <RevealTip
             tip={PENDLE_WORDS.noLiquidityTip}
             label={`${PENDLE_WORDS.noLiquidity}: ${PENDLE_WORDS.noLiquidityTip}`}
@@ -634,7 +649,13 @@ function Row({ m, block, at }: { m: PendleRosterEntry; block: number; at: number
         pt == null ? null : (
           <InAsset m={m}>
             <Prov
-              info={m.expired ? valueProv("PT", t, block, true) : markProv("PT", "routerstatic-spot", 900, block)}
+              info={
+                zeroOf(m)
+                  ? syZeroProv("PT price", t, block)
+                  : m.expired
+                    ? valueProv("PT", t, block, true)
+                    : markProv("PT", "routerstatic-spot", 900, block)
+              }
               value={pt}
             >
               {(rate(pt) ?? 0).toLocaleString("en-US", { maximumFractionDigits: 4 })}

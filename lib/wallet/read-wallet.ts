@@ -20,6 +20,7 @@ import { withBudget, type WalletSummaryAnswer, type WalletSummaryRow } from "@/l
 import type { HeadRead, WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
 import type { WalletCounts, WalletCountsFamily, WalletCountsPosition } from "@/lib/wallet/summary-counts";
 import { publicErrorMessage } from "@/lib/api/public-error";
+import { kindOfRow, WALLET_PROTOCOLS } from "@/lib/wallet/wallet-filters";
 
 /** The whole read's budget, the summary route's time included. */
 export const WALLET_BUDGET_MS = 8000;
@@ -104,7 +105,14 @@ async function readFamily(
   deadline: number,
 ): Promise<{ read: WalletFamilyRead; positions: WalletPosition[] }> {
   const t0 = Date.now();
-  const positions = await f.shape(rows);
+  const byId = new Map(rows.map((r) => [r.positionId, r]));
+  const positions = (await f.shape(rows)).map((p) => {
+    // A position the shaping split from a row (a Comet of an Arbitrum read)
+    // takes the family's first row's kind, then its own debt's.
+    const row = byId.get(p.positionId) ?? rows[0];
+    const kind = (p.debtUsd ?? 0) > 0 && kindOfRow(row) === "deposits" ? "loans" : kindOfRow(row);
+    return { ...p, kind };
+  });
   const open = positions.filter((p) => p.status === "open");
   const rest = positions.filter((p) => p.status !== "open");
   let head: HeadResult = { positions: open, reads: 0 };
@@ -121,7 +129,11 @@ async function readFamily(
       head = { positions: open.map((p) => (p.notRead ? p : { ...p, headRead: "failed" as const })), reads: 0 };
     }
   }
-  const all = [...head.positions, ...rest];
+  // A head read that finds debt on a stored deposit makes it a loan.
+  const headKinded = head.positions.map((p) =>
+    p.headRead === "read" && p.kind === "deposits" && (p.debtUsd ?? 0) > 0 ? { ...p, kind: "loans" as const } : p,
+  );
+  const all = [...headKinded, ...rest];
   return {
     positions: all,
     read: {
@@ -129,8 +141,8 @@ async function readFamily(
       name: f.name,
       chain: f.chain,
       positions: all.length,
-      open: head.positions.length,
-      headRead: headOf(head.positions),
+      open: headKinded.length,
+      headRead: headOf(headKinded),
       ms: Date.now() - t0,
       reads: head.reads,
       error,
@@ -138,7 +150,22 @@ async function readFamily(
   };
 }
 
-export async function readWalletUncached(address: string, readerIp?: string): Promise<WalletRead> {
+/** The protocols the rows name, in the read's order, with their row counts. */
+function heldOf(rows: WalletSummaryRow[]): WalletRead["held"] {
+  return WALLET_PROTOCOLS.map((p) => ({
+    slug: p.slug,
+    name: p.name,
+    positions: rows.filter((r) => r.family === p.slug).length,
+  })).filter((p) => p.positions > 0);
+}
+
+/** `protocol`: read that protocol's families alone (ui-jobs 738); the summary
+ *  route still answers every row, which names the others for the pill. */
+export async function readWalletUncached(
+  address: string,
+  readerIp?: string,
+  opts: { protocol?: string } = {},
+): Promise<WalletRead> {
   const t0 = Date.now();
   const deadline = t0 + WALLET_BUDGET_MS;
   let summary: WalletSummaryAnswer;
@@ -154,13 +181,19 @@ export async function readWalletUncached(address: string, readerIp?: string): Pr
       serverMs: Date.now() - t0,
       ms: Date.now() - t0,
       error: publicErrorMessage(err),
+      protocol: opts.protocol,
+      held: [],
     };
   }
   const serverMs = Date.now() - t0;
-  const groups = WALLET_FAMILIES.map((f) => ({
-    f,
-    rows: summary.rows.filter((r) => r.chain === f.summaryChain && r.family === f.summaryFamily),
-  })).filter((g) => g.rows.length > 0);
+  const held = heldOf(summary.rows);
+  const reading = opts.protocol ? WALLET_FAMILIES.filter((f) => f.summaryFamily === opts.protocol) : WALLET_FAMILIES;
+  const groups = reading
+    .map((f) => ({
+      f,
+      rows: summary.rows.filter((r) => r.chain === f.summaryChain && r.family === f.summaryFamily),
+    }))
+    .filter((g) => g.rows.length > 0);
   const settled = await Promise.allSettled(groups.map((g) => readFamily(g.f, g.rows, address, deadline)));
   const families: WalletFamilyRead[] = [];
   const positions: WalletPosition[] = [];
@@ -187,10 +220,12 @@ export async function readWalletUncached(address: string, readerIp?: string): Pr
     address,
     positions,
     families,
-    total: summary.total,
+    total: opts.protocol ? groups.reduce((s, g) => s + g.rows.length, 0) : summary.total,
     readAt: Math.floor(Date.now() / 1000),
     serverMs,
     ms: Date.now() - t0,
+    protocol: opts.protocol,
+    held,
   };
 }
 
@@ -198,11 +233,11 @@ export async function readWalletUncached(address: string, readerIp?: string): Pr
 // asking together share the read.
 const cache = new Map<string, { at: number; read: Promise<WalletRead> }>();
 
-export function readWallet(address: string, readerIp?: string): Promise<WalletRead> {
-  const key = address.toLowerCase();
+export function readWallet(address: string, readerIp?: string, opts: { protocol?: string } = {}): Promise<WalletRead> {
+  const key = `${address.toLowerCase()}:${opts.protocol ?? ""}`;
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < WALLET_CACHE_MS) return hit.read;
-  const read = readWalletUncached(key, readerIp);
+  const read = readWalletUncached(address.toLowerCase(), readerIp, opts);
   cache.set(key, { at: Date.now(), read });
   // A failed summary read is not kept.
   void read.then((r) => {

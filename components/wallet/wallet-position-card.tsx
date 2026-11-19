@@ -130,6 +130,9 @@ export function WalletPositionCard({ position: p }: { position: WalletPosition }
         Not read
       </span>
     ) : (
+      // A closed position's card states its ending; the read's age is an
+      // open position's.
+      p.status === "open" &&
       !p.card.kind.endsWith("-arbitrum") &&
       (p.readAtBlock != null || p.readAt != null) && <ReadStamp block={p.readAtBlock} at={p.readAt} inLink />
     ),

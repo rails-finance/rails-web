@@ -130,8 +130,8 @@ export interface PositionCardHead {
    *  headline whose label needs its meaning in the row (Polaris's estimated
    *  ratio). */
   labelTipOnListing?: boolean;
-  /** An icon after the label. The closed card's peaks carry their asset here
-   *  (Liquity V2's closed face); an open headline puts it in `assets`. */
+  /** An icon after the label. A headline whose asset belongs beside its
+   *  figure puts it in `assets`. */
   labelIcon?: ReactNode;
   /** Which size the figure takes (decision 0066; ui-jobs 604): an `amount` the
    *  position holds (collateral, debt, total assets) at the headline size, a

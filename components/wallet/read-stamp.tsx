@@ -68,6 +68,8 @@ export function ReadStamp({
     <button
       type="button"
       data-anatomy="H6"
+      // A read's freshness, as H6's stamp: no figure for a receipt.
+      data-prov-exempt=""
       data-read-block={block}
       onClick={toggle}
       aria-label={`${label} ${[age ? `${age} ago` : null, blockText ? `at block ${blockText}` : null].filter(Boolean).join(", ")}`}

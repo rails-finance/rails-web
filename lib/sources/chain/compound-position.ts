@@ -116,7 +116,7 @@ async function loadCompoundPositions(
   deployment: CometDeployment,
   pinnedBlock?: number,
   reader?: PublicClient,
-): Promise<{ blockNumber: number; positions: CompoundMarketChainResponse[] }> {
+): Promise<{ blockNumber: number; positions: CompoundMarketChainResponse[]; ethUsd: number | null }> {
   const client = reader ?? chainClient(deployment.chainId);
   // Heterogeneous multicalls: type the entries as the generic viem contract
   // parameters (the per-call return types are asserted at the result casts).
@@ -262,7 +262,19 @@ async function loadCompoundPositions(
     } satisfies CompoundMarketChainResponse;
   });
 
-  return { blockNumber, positions };
+  // WETH in dollars, as the stated path reads it: a dollar-quoted Comet's
+  // price for the ETH-quoted Comet's base token, from the getPrice reads above.
+  let ethUsd: number | null = null;
+  const eth = deployment.markets.find((m) => m.quoteUnit === "ETH");
+  const usdIdx = markets.findIndex((m) => m.quoteUnit === "USD");
+  if (eth && usdIdx >= 0) {
+    const a = infos[usdIdx].findIndex((info) => info.asset.toLowerCase() === eth.baseToken.toLowerCase());
+    if (a >= 0) {
+      const p = Number(p3[off3[usdIdx] + a * 2 + 1] as bigint) / PRICE;
+      ethUsd = p > 0 ? p : null;
+    }
+  }
+  return { blockNumber, positions, ethUsd };
 }
 
 // ── A roster the deployment states (Arbitrum) ───────────────────────────────
@@ -514,7 +526,7 @@ export async function loadCompoundWalletFromChain(
     const stated = statedRoster(deployment)
       ? await loadStatedRosterPositions(wallet, deployment, opts.blockNumber, opts.reader)
       : null;
-    const { blockNumber, positions } =
+    const { blockNumber, positions, ethUsd } =
       stated ?? (await loadCompoundPositions(wallet, deployment.markets, deployment, opts.blockNumber, opts.reader));
     // "Holds something" is any of the three ways a Comet account can be
     // non-empty: lent base, borrowed base, or collateral parked against it.
@@ -530,7 +542,7 @@ export async function loadCompoundWalletFromChain(
       positionsFound: held.length,
       positions: held,
       chainStale: false,
-      ...(stated?.ethUsd != null ? { ethUsd: stated.ethUsd } : {}),
+      ...(ethUsd != null ? { ethUsd } : {}),
     };
   } catch (error) {
     console.error("Compound V3 wallet sweep failed:", error);

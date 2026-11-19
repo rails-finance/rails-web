@@ -1,52 +1,61 @@
 "use client";
 
 // The wallet view (rails-ops decisions/0050-one-wallet-across-protocols-and-chains.md,
-// steps 2 and 3; the mock-up reference/mockups/wallet-view-milodon-2026-10-21.html):
-// the wallet's header, four tiles over its open positions, the open positions
-// as their families' listing cards sorted by buffer, the wallet's CoW trades
-// as one row (W7, from rails-server's CoW tokens route), and the closed
-// positions as a History table. Every position figure comes from
-// /api/chain/wallet/<address> (lib/wallet/read-wallet.ts); the view sums, sorts and lays out, and adds
-// nothing inside a card. The rulings of 21 October: a ten-dollar floor on the
-// risk sort, a tile sums only dollars at the family's own oracle, an unread
-// Aave V3 Base account is shown with a "not read" mark, and every wallet,
-// a sink included, is drawn the same with one line naming its count.
+// steps 2 and 3; ui-jobs 738): the wallet's header, the filter bar (W8), the
+// totals row over the protocols (W2), then one section per protocol the
+// wallet holds (W3): the listing's holder band (N7) over that protocol's
+// cards, open by risk, then closed newest first; then the wallet's CoW trades
+// as one row (W7, from rails-server's CoW tokens route). Every position figure
+// comes from /api/chain/wallet/<address> (lib/wallet/read-wallet.ts); the
+// sections and totals are lib/wallet/wallet-sections.ts. The rulings of 21
+// October stand: a ten-dollar floor on the risk sort, a total sums only
+// dollars at the protocol's own oracle, an unread Aave V3 Base account is
+// shown with a "not read" mark, and every wallet, a sink included, is drawn
+// the same with one line naming its count.
 
 import { IndexNotice } from "@/components/shared/index-notice";
 import Link from "next/link";
-import { Suspense, use, type ReactNode } from "react";
+import { Suspense, use, useState, useTransition, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { HeadingTip, TipLabel } from "@/components/shared/tip-label";
-import { DetailBackButton } from "@/components/shared/detail-back-row";
-import { WalletHeading } from "@/components/shared/wallet-heading";
-import { PROFILE_CLEARANCE } from "@/lib/shared/ui-grammar";
-import { WalletMenu } from "@/components/shared/wallet-menu";
-import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
+import { WalletHeader } from "@/components/wallet/wallet-header";
+import { WalletFilterBar } from "@/components/wallet/wallet-filter-bar";
+import { walletProtocol, type WalletKind, type WalletStatus } from "@/lib/wallet/wallet-filters";
+import { Prov, ProvReceiptsScope, useReceiptRegistry, type Provenance } from "@/components/shared/provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { WalletLookup } from "@/components/shared/wallet-lookup";
 import { StartHereLine } from "@/components/start/start-here-line";
-import { WalletPositionCard, atRisk, protocolId } from "@/components/wallet/wallet-position-card";
-import { Icon } from "@/components/icons/icon";
+import { HolderStrip } from "@/components/shared/holder-strip";
+import { WalletPositionCard, atRisk } from "@/components/wallet/wallet-position-card";
 import { ChainGlyph } from "@/components/icons/chain-glyphs";
 import {
   DataTable,
   DataTableBody,
   DataTableCell,
-  DataTableHead,
-  DataTableHeader,
   DataTableLeadCell,
-  DataTableLeadHeader,
   DataTableLeadMark,
   DataTableRow,
   DataTableRowLink,
 } from "@/components/shared/data-table/data-table";
 import { ReadStamp } from "@/components/wallet/read-stamp";
 import { formatCompactUsd } from "@/lib/shared/format-compact";
+import { formatUsdValue } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
 import { ARBITRUM_CHAIN_ID, chainMeta, type ChainId } from "@/lib/shared/chains";
 import { walletCountProv, walletTradeAtProv } from "@/lib/cow/trade";
 import type { CowWalletEntry } from "@/lib/cow/types";
-import type { WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
+import type { WalletFamilyRead, WalletRead } from "@/lib/wallet/types";
 import { WALLET_COUNTS_SCOPE } from "@/lib/wallet/summary-counts";
+import {
+  byRisk,
+  DUST_USD,
+  unreadAtHead,
+  walletNet,
+  walletSections,
+  walletTotal,
+  type WalletSection,
+  type WalletTotal,
+} from "@/lib/wallet/wallet-sections";
 import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
 import { useAssetScope } from "@/lib/shared/asset-scope";
 import { walletPositionAssetKeys } from "@/lib/wallet/aim-assets";
@@ -63,26 +72,7 @@ const RATE_TIP =
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
-/** The dust floor on the risk sort (open point 5): collateral under this many
- *  dollars lists below the sorted set. */
-const DUST_USD = 10;
-
-/** The dollars the floor reads: the card's, or a rank-only figure. */
-const dustFigure = (p: WalletPosition) => p.collateralUsd ?? p.dustUsd;
-export const isDust = (p: WalletPosition) => {
-  const d = dustFigure(p);
-  return d != null && d < DUST_USD;
-};
-
-/** Buffer ascending where stated, then collateral dollars descending. */
-function byRisk(a: WalletPosition, b: WalletPosition): number {
-  if (a.buffer != null && b.buffer != null) return a.buffer - b.buffer;
-  if (a.buffer != null) return -1;
-  if (b.buffer != null) return 1;
-  return (b.collateralUsd ?? -1) - (a.collateralUsd ?? -1);
-}
-
-function Tile({ label, value, sub, anatomy }: { label: string; value: string; sub?: ReactNode; anatomy: string }) {
+function Tile({ label, value, sub, anatomy }: { label: string; value: ReactNode; sub?: ReactNode; anatomy: string }) {
   return (
     <div className={TILE} data-wallet-tile={anatomy}>
       <div className="text-xs font-semibold uppercase tracking-wide text-rb-500">{label}</div>
@@ -92,40 +82,49 @@ function Tile({ label, value, sub, anatomy }: { label: string; value: string; su
   );
 }
 
-function Tiles({ open, ranked, filtered }: { open: WalletPosition[]; ranked: WalletPosition[]; filtered: boolean }) {
-  // Only dollars the family states at its own oracle (open point 7).
-  const summed = open.filter((p) => p.usdOwnOracle && !p.notRead);
-  const withColl = summed.filter((p) => p.collateralUsd != null);
-  const withDebt = summed.filter((p) => p.debtUsd != null);
-  const coll = withColl.reduce((s, p) => s + p.collateralUsd!, 0);
-  const debt = withDebt.reduce((s, p) => s + p.debtUsd!, 0);
-  const owing = summed.filter((p) => (p.debtUsd ?? 0) > 0);
+/** A total's figure, compact, with its receipt; a dash where there is none. */
+function Figure({ f }: { f: { usd: number; prov: Provenance } | null }) {
+  if (!f) return <span data-prov-exempt="">—</span>;
+  return (
+    <Prov info={f.prov} value={formatUsdValue(f.usd)}>
+      <span>{formatCompactUsd(f.usd)}</span>
+    </Prov>
+  );
+}
+
+/** "across 3 protocols"; nothing where there is no wallet total. */
+const across = (t: WalletTotal | null) => (t?.figure ? `across ${plural(t.of, "protocol")}` : undefined);
+
+/** The wallet's totals (W2): each figure the sum of the protocol sections'
+ *  figures below it, with its receipt. */
+function Totals({ sections, filtered }: { sections: WalletSection[]; filtered: boolean }) {
+  const coll = walletTotal(sections, "collateral");
+  const debt = walletTotal(sections, "debt");
+  const net = walletNet(coll, debt);
+  // Each reason a total is absent, said once under the row.
+  const gaps = [...new Set([coll?.gap, debt?.gap].filter((g): g is string => g != null))];
+  const owing = sections
+    .flatMap((s) => s.open)
+    .filter((p) => p.usdOwnOracle && !unreadAtHead(p) && (p.debtUsd ?? 0) > 0);
   const rated = owing.filter((p) => p.debtRate != null);
   const ratedUsd = rated.reduce((s, p) => s + p.debtUsd!, 0);
   const rate = ratedUsd > 0 ? rated.reduce((s, p) => s + p.debtUsd! * p.debtRate!, 0) / ratedUsd : null;
-  const closest = ranked.filter((p) => p.buffer != null && p.riskFigure).sort(byRisk)[0];
-  const n = open.length;
+  const closest = sections
+    .flatMap((s) => s.ranked)
+    .filter((p) => p.buffer != null && p.riskFigure)
+    .sort(byRisk)[0];
   return (
-    <section aria-label="Totals" data-wallet-tiles="" data-anatomy="W2" data-prov-exempt="">
+    <section aria-label="Totals" data-wallet-tiles="" data-anatomy="W2">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Tile
-          anatomy="collateral"
-          label="Collateral"
-          value={withColl.length ? formatCompactUsd(coll) : "—"}
-          sub={
-            withColl.length === n
-              ? `across ${plural(n, "open position")}`
-              : `across ${withColl.length} of ${plural(n, "open position")}`
-          }
-        />
+        <Tile anatomy="collateral" label="Collateral" value={<Figure f={coll?.figure ?? null} />} sub={across(coll)} />
         <Tile
           anatomy="debt"
           label="Debt"
-          value={withDebt.length ? formatCompactUsd(debt) : "—"}
+          value={<Figure f={debt?.figure ?? null} />}
           sub={
-            owing.length === 0 ? (
+            debt?.figure?.usd === 0 ? (
               "no debt"
-            ) : rate == null ? undefined : (
+            ) : rate == null || !debt?.figure ? undefined : (
               <>
                 <TipLabel text="simple yearly rate" tip={RATE_TIP} /> {pct(rate)}
                 {rated.length < owing.length && ` on ${rated.length} of ${owing.length} with debt`}
@@ -133,16 +132,11 @@ function Tiles({ open, ranked, filtered }: { open: WalletPosition[]; ranked: Wal
             )
           }
         />
-        <Tile
-          anatomy="net"
-          label="Net"
-          value={withColl.length || withDebt.length ? formatCompactUsd(coll - debt) : "—"}
-          sub="collateral − debt"
-        />
+        <Tile anatomy="net" label="Net" value={<Figure f={net} />} sub="collateral − debt" />
         <Tile
           anatomy="risk"
           label="Closest to liquidation"
-          value={closest?.riskFigure?.value ?? "—"}
+          value={<span data-prov-exempt="">{closest?.riskFigure?.value ?? "—"}</span>}
           sub={
             closest
               ? [closest.familyName, closest.market, chainMeta(closest.chain).name].filter(Boolean).join(" · ")
@@ -150,168 +144,55 @@ function Tiles({ open, ranked, filtered }: { open: WalletPosition[]; ranked: Wal
           }
         />
       </div>
-      <p className="mt-2 text-xs text-rb-500">
-        {filtered ? `Total of the ${n} shown, in dollars` : "Dollars"} summed at each protocol&rsquo;s oracle.
-      </p>
+      {gaps.length > 0 ? (
+        gaps.map((g) => (
+          <p key={g} className="mt-2 text-xs text-rb-500" data-wallet-total-gap="">
+            {g}
+          </p>
+        ))
+      ) : (
+        <p className="mt-2 text-xs text-rb-500">
+          {filtered ? "The positions shown" : "Each protocol’s total below"}, summed in dollars at its own oracle.
+        </p>
+      )}
     </section>
   );
 }
 
-const OUTCOME_TONE: Record<string, string> = {
-  liquidated: "bg-red-500/20 text-red-500",
-  redeemed: "bg-caution-500/20 text-tone-caution",
-  closed: "bg-rb-300 text-foreground/70 dark:bg-rb-700",
-  moved: "bg-rb-300 text-foreground/70 dark:bg-rb-700",
-};
-
-function lifetime(from?: number, to?: number): string | null {
-  if (from == null || to == null || to < from) return null;
-  const days = Math.floor((to - from) / 86400);
-  if (days < 1) return "under a day";
-  if (days < 60) return plural(days, "day");
-  const months = Math.floor(days / 30.44);
-  if (months < 12) return `${months} mo`;
-  const y = Math.floor(months / 12);
-  const m = months % 12;
-  return m ? `${y} yr ${m} mo` : `${y} yr`;
-}
-
-/** A closed row's transaction count behind the card foot's ⇄ glyph. */
-function TxCount({ n }: { n: number }) {
+/** One protocol's section (W3): its name, the listing's band (N7) where it
+ *  holds two positions or more, then its cards, open by risk, then closed
+ *  newest first. */
+function Section({ s }: { s: WalletSection }) {
+  const atRiskCount = s.open.filter(atRisk).length;
+  const id = `wallet-section-${s.slug}`;
   return (
-    <span className="inline-flex items-center gap-1">
-      <Icon name="arrow-left-right" size={12} />
-      {n.toLocaleString("en-US")}
-      <span className="sr-only">{n === 1 ? " transaction" : " transactions"}</span>
-    </span>
-  );
-}
-
-function History({ closed }: { closed: WalletPosition[] }) {
-  const rows = [...closed].sort((a, b) => (b.history?.closedAt ?? 0) - (a.history?.closedAt ?? 0));
-  const counts = (["liquidated", "redeemed", "closed", "moved"] as const)
-    .map((s) => ({ s, n: rows.filter((p) => p.status === s).length }))
-    .filter((c) => c.n > 0)
-    .map((c) =>
-      c.s === "liquidated"
-        ? plural(c.n, "liquidation")
-        : c.s === "redeemed"
-          ? plural(c.n, "redemption")
-          : c.s === "moved"
-            ? `${c.n} moved`
-            : `${c.n} closed`,
-    );
-  return (
-    <section aria-labelledby="wallet-history" data-wallet-history={rows.length} data-anatomy="W4" data-prov-exempt="">
-      <div className="mb-1 flex flex-wrap items-baseline justify-between gap-3">
-        <h2 id="wallet-history" className={H2}>
-          History{" "}
+    <section
+      aria-labelledby={id}
+      data-wallet-section={s.slug}
+      data-wallet-open={s.open.length}
+      data-wallet-closed={s.closed.length}
+      data-anatomy="W3"
+    >
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-3">
+        <h2 id={id} className={H2}>
+          {s.name}{" "}
           <span className="font-medium text-rb-500" data-prov-exempt="">
-            {rows.length}
+            {s.positions.length}
           </span>
         </h2>
-        {counts.length > 0 && <span className="text-xs text-rb-500">{counts.join(" · ")}</span>}
+        {s.open.length > 1 && (
+          <span className="text-xs text-rb-500">
+            Riskiest first{atRiskCount > 0 ? ` · ${atRiskCount} at risk` : ""}
+            {s.dust > 0 ? ` · ${plural(s.dust, "position")} under $${DUST_USD} last` : ""}
+          </span>
+        )}
       </div>
-      {/* The house table (rails-ops ui-jobs 539): D1, D4 (each row opens its
-          position), D5 (the protocol's zone) and D6 cards below sm. */}
-      <DataTable label="Closed positions" stacked rowHeight="two" tableClassName="text-sm sm:min-w-[860px]">
-        <DataTableHead>
-          <DataTableLeadHeader />
-          <DataTableHeader label="Closed" />
-          <DataTableHeader label="Protocol" />
-          <DataTableHeader label="Outcome" />
-          <DataTableHeader label="Size at close" />
-          <DataTableHeader label="Result" />
-          <DataTableHeader label="Lifetime" align="right" />
-        </DataTableHead>
-        <DataTableBody>
-          {rows.map((p) => {
-            const h = p.history ?? {};
-            const life = lifetime(h.openedAt, h.closedAt);
-            return (
-              <DataTableRow
-                key={`${p.chain}:${p.family}:${p.positionId}`}
-                href={p.href}
-                data-history-row={p.positionId}
-                data-family={p.family}
-              >
-                <DataTableLeadCell protocol={protocolId(p)} protocolName={p.familyName} chain={p.chain} />
-                <DataTableCell
-                  label={p.status === "moved" ? "Moved" : "Closed"}
-                  className="whitespace-nowrap text-foreground/80"
-                >
-                  {h.closedAt != null ? formatDate(h.closedAt) : "—"}
-                </DataTableCell>
-                {/* First on a card, where the row header spans the card. */}
-                <DataTableCell rowHeader className="max-sm:-order-1 sm:max-w-[13rem]">
-                  <span className="flex min-w-0 items-center gap-2">
-                    <DataTableLeadMark protocol={protocolId(p)} chain={p.chain} />
-                    <span className="flex min-w-0 flex-col">
-                      <DataTableRowLink href={p.href} className="truncate font-medium">
-                        {p.familyName}
-                      </DataTableRowLink>
-                      {p.market && (
-                        <span className="truncate text-xs uppercase tracking-wide text-rb-500">{p.market}</span>
-                      )}
-                    </span>
-                  </span>
-                </DataTableCell>
-                <DataTableCell label="Outcome" className="whitespace-nowrap">
-                  <span
-                    className={`rounded-xs px-2 py-0.5 text-xs font-bold tracking-wider ${OUTCOME_TONE[p.status] ?? OUTCOME_TONE.closed}`}
-                  >
-                    {p.status.toUpperCase()}
-                  </span>
-                </DataTableCell>
-                {/* A cell with nothing to say stays empty, so a card leaves it out. */}
-                <DataTableCell label={h.size ? "Size at close" : undefined} className="sm:max-w-[14rem]">
-                  {h.size && (
-                    <span className="flex min-w-0 flex-col">
-                      <span className="truncate">{h.size}</span>
-                      {h.sizeNote && <span className="truncate text-xs text-rb-500">{h.sizeNote}</span>}
-                    </span>
-                  )}
-                </DataTableCell>
-                <DataTableCell label={h.result || h.movedTo ? "Result" : undefined} className="sm:max-w-[14rem]">
-                  {/* A moved position names the wallet it went to, which opens
-                      that wallet's page (ui-jobs 705). */}
-                  {h.movedTo && (
-                    <span className="flex min-w-0 flex-col">
-                      <span className="truncate">
-                        to{" "}
-                        <Link
-                          href={`/wallet/${h.movedTo}`}
-                          prefetch={false}
-                          className="font-mono text-xs text-blue-600 hover:underline dark:text-[var(--text-link)]"
-                          data-moved-to={h.movedTo}
-                        >
-                          {`${h.movedTo.slice(0, 6)}…${h.movedTo.slice(-4)}`}
-                        </Link>
-                      </span>
-                    </span>
-                  )}
-                  {h.result && (
-                    <span className="flex min-w-0 flex-col">
-                      <span className="truncate">{h.result}</span>
-                      {h.resultNote && <span className="truncate text-xs text-rb-500">{h.resultNote}</span>}
-                    </span>
-                  )}
-                </DataTableCell>
-                <DataTableCell label="Lifetime" align="right" className="whitespace-nowrap">
-                  <span className="flex flex-col items-end max-sm:items-start">
-                    <span>{life ?? ""}</span>
-                    {h.txCount != null && (
-                      <span className="text-xs text-rb-500">
-                        <TxCount n={h.txCount} />
-                      </span>
-                    )}
-                  </span>
-                </DataTableCell>
-              </DataTableRow>
-            );
-          })}
-        </DataTableBody>
-      </DataTable>
+      <HolderStrip scoped {...s.band} />
+      <div className="flex flex-col gap-3">
+        {s.positions.map((p) => (
+          <WalletPositionCard key={`${p.chain}:${p.family}:${p.positionId}`} position={p} />
+        ))}
+      </div>
     </section>
   );
 }
@@ -320,8 +201,8 @@ function History({ closed }: { closed: WalletPosition[] }) {
 const COW_CHAIN: ChainId = 1;
 const cowHref = (address: string) => `/ethereum/cow/${address}`;
 
-/** The wallet's trades through CoW (W7): one row, drawn as a History row
- *  (W4), linking to the wallet's CoW page. Streamed: the page passes the read
+/** The wallet's trades through CoW (W7): one row on the house table's chrome,
+ *  linking to the wallet's CoW page. Streamed: the page passes the read
  *  unawaited, and a wallet with no trade, or a read that failed or ran past
  *  its budget, draws nothing. */
 function Trades({ address, cow }: { address: string; cow: Promise<CowWalletEntry | null> }) {
@@ -353,7 +234,7 @@ function Trades({ address, cow }: { address: string; cow: Promise<CowWalletEntry
       <h2 id="wallet-trades" className={`${H2} mb-3`}>
         Trades
       </h2>
-      {/* One row on the History table's chrome (W4: D1, D4, D5, D6). */}
+      {/* One row on the house table's chrome (D1, D4, D5, D6). */}
       <DataTable label="Trades" stacked rowHeight="one" tableClassName="text-sm">
         <DataTableBody>
           <DataTableRow href={cowHref(address)} data-wallet-trades-row="cow">
@@ -386,12 +267,19 @@ export function WalletView({
   cow,
   reads,
   back,
+  kinds: initialKinds = [],
+  status: initialStatus,
 }: {
   address: string;
   ensName: string | null;
   read: WalletRead;
-  /** The wallet's CoW trades, unawaited (`readCowWalletEntry`); W7. */
-  cow: Promise<CowWalletEntry | null>;
+  /** The wallet's CoW trades, unawaited (`readCowWalletEntry`); W7. Null
+   *  where one protocol is chosen, which is read alone. */
+  cow: Promise<CowWalletEntry | null> | null;
+  /** `?kind=`: the Kind pill's selection on arrival (ui-jobs 738). */
+  kinds?: WalletKind[];
+  /** `?status=`: the Status pill's selection on arrival. */
+  status?: WalletStatus;
   /** The families the page reads, by chain (`walletFamiliesLine`). */
   reads: string;
   /** The explorer the reader came from, for the empty state's link back. */
@@ -400,28 +288,63 @@ export function WalletView({
   // AIM (ui-jobs 557): the positions naming an AIM asset (lib/wallet/aim-assets.ts),
   // the reader's own wallet included.
   const scoped = useScopedRows(read.positions, walletPositionAssetKeys, (p) => p.chain as number);
-  const filtered = scoped.on && !scoped.peek;
-  const all = scoped.rows;
-  const openAll = all.filter((p) => p.status === "open");
-  // The sorted set, then the dust under the floor, then the accounts not read.
-  const ranked = openAll.filter((p) => !p.notRead && !isDust(p)).sort(byRisk);
-  const dust = openAll.filter((p) => !p.notRead && isDust(p)).sort(byRisk);
-  const notRead = openAll.filter((p) => p.notRead);
-  const open = [...ranked, ...dust, ...notRead];
-  const closed = all.filter((p) => p.status !== "open");
-  // Passed to another wallet (ui-jobs 705): counted apart from closed.
-  const movedN = closed.filter((p) => p.status === "moved").length;
+  const [kinds, setKinds] = useState<WalletKind[]>(initialKinds);
+  const [status, setStatus] = useState<WalletStatus | undefined>(initialStatus);
+  // A protocol change reads the page again: the page stays and dims meanwhile.
+  const router = useRouter();
+  const [reading, startReading] = useTransition();
+  const navigate = (href: string) => startReading(() => router.push(href, { scroll: false }));
+  const byKind = kinds.length > 0;
+  const focused = scoped.on && !scoped.peek;
+  const filtered = focused || byKind || status != null;
+  const all = scoped.rows.filter(
+    (p) =>
+      (!byKind || (p.kind != null && kinds.includes(p.kind))) &&
+      (status == null || (status === "open") === (p.status === "open")),
+  );
+  const chosen = walletProtocol(read.protocol);
+  // The heading counts the wallet's positions whatever the pills hold.
+  const wallet = {
+    open: scoped.rows.filter((p) => p.status === "open").length,
+    moved: scoped.rows.filter((p) => p.status === "moved").length,
+    closed: scoped.rows.filter((p) => p.status !== "open" && p.status !== "moved").length,
+  };
+  // The bands state a protocol's whole holding: drawn while no pill narrows it.
+  const sections = walletSections(all, { bands: !filtered });
+  const open = sections.flatMap((s) => s.open);
   const scope = useAssetScope();
   // Under Focus, only the families on a chain in focus.
-  const unread = read.families.filter((r) => r.headRead === "failed" && (!filtered || scope.chainOk(r.chain)));
+  const unread = read.families.filter((r) => r.headRead === "failed" && (!focused || scope.chainOk(r.chain)));
   const stamps = open.map((p) => p.readAt).filter((t): t is number => t != null);
   const oldest = stamps.length ? Math.min(...stamps) : undefined;
-  const atRiskCount = open.filter(atRisk).length;
   const registry = useReceiptRegistry();
-  const trades = (
+  // The trades are no position: drawn with neither Kind nor Status chosen.
+  const trades = cow && !byKind && status == null && (
     <Suspense fallback={null}>
       <Trades address={address} cow={cow} />
     </Suspense>
+  );
+  const filterBar = read.held.length > 0 && (
+    <WalletFilterBar
+      address={address}
+      protocol={read.protocol}
+      held={read.held}
+      kinds={kinds}
+      setKinds={setKinds}
+      status={status}
+      setStatus={setStatus}
+      shown={all.length}
+      navigate={navigate}
+    />
+  );
+  const body = (children: ReactNode) => (
+    <div
+      className={`flex flex-col gap-7 transition-opacity ${reading ? "pointer-events-none opacity-50" : ""}`}
+      aria-busy={reading || undefined}
+      data-wallet-reading={reading ? "" : undefined}
+    >
+      {children}
+    </div>
   );
 
   return (
@@ -436,7 +359,7 @@ export function WalletView({
           // What each family answered and which fields it filled: the gap list
           // decision 0050's step 3 is built from.
           read.families.map((r) => {
-            const mine = openAll.filter(
+            const mine = open.filter(
               (p) => `${p.family}:${p.chain}` === `${r.id.replace(/-(base|arbitrum)$/, "")}:${r.chain}`,
             );
             return {
@@ -454,45 +377,34 @@ export function WalletView({
           }),
         )}
       >
-        <header data-anatomy="W1">
-          {/* Back's row, as a detail page draws it (H7): the column's first
-              line, level with the profile control (H20) at the top right from
-              md. With no history Back opens the home page. */}
-          <div className={`flex min-h-[38px] items-center ${PROFILE_CLEARANCE}`} data-anatomy="H7" data-back-row="">
-            <DetailBackButton fallbackHref="/" />
-          </div>
-          <WalletHeading
-            address={address}
-            className="mt-6"
-            // The address menu a position page draws (ui-jobs 430): Copy the
-            // address and Bookmark it; no View wallet on the wallet view.
-            title={<WalletMenu wallet={address} ensName={ensName} heading view={false} />}
-            lines={
-              <>
-                {filtered ? (
-                  <ScopeNote scoped={scoped} noun={["position", "positions"]} />
-                ) : (
-                  read.total > 0 && (
-                    <div className="text-xs text-rb-500" data-wallet-count={read.total}>
-                      <HeadingTip
-                        text={`${plural(read.total, "position")} · ${openAll.length} open · ${closed.length - movedN} closed${movedN > 0 ? ` · ${movedN} moved` : ""}`}
-                        tip={WALLET_COUNTS_SCOPE}
-                      />
-                    </div>
-                  )
-                )}
-                {scoped.on && scoped.peek && <ScopeNote scoped={scoped} noun={["position", "positions"]} />}
-              </>
-            }
-            end={
-              oldest != null && (
-                <span className="ml-auto flex shrink-0 items-center">
-                  <ReadStamp at={oldest} label="Updated" />
-                </span>
-              )
-            }
-          />
-        </header>
+        <WalletHeader
+          address={address}
+          ensName={ensName}
+          lines={
+            <>
+              {focused ? (
+                <ScopeNote scoped={scoped} noun={["position", "positions"]} />
+              ) : (
+                read.total > 0 && (
+                  <div className="text-xs text-rb-500" data-wallet-count={read.total}>
+                    <HeadingTip
+                      text={`${plural(read.total, "position")} · ${wallet.open} open · ${wallet.closed} closed${wallet.moved > 0 ? ` · ${wallet.moved} moved` : ""}`}
+                      tip={WALLET_COUNTS_SCOPE}
+                    />
+                  </div>
+                )
+              )}
+              {scoped.on && scoped.peek && <ScopeNote scoped={scoped} noun={["position", "positions"]} />}
+            </>
+          }
+          end={
+            oldest != null && (
+              <span className="ml-auto flex shrink-0 items-center">
+                <ReadStamp at={oldest} label="Updated" />
+              </span>
+            )
+          }
+        />
 
         {read.error ? (
           <>
@@ -502,65 +414,74 @@ export function WalletView({
             {trades}
           </>
         ) : filtered && all.length === 0 && read.positions.length > 0 ? (
-          <>{trades}</>
+          <>
+            {filterBar}
+            {body(
+              <>
+                <p className="text-sm text-rb-500">
+                  {byKind
+                    ? "No position of this kind."
+                    : status === "open"
+                      ? "No open position."
+                      : "No closed position."}
+                </p>
+                {trades}
+              </>,
+            )}
+          </>
         ) : all.length === 0 ? (
           <>
-            <section className="flex max-w-xl flex-col gap-3" data-wallet-empty="">
-              <p className="text-sm text-foreground/80" data-wallet-reads="">
-                Rails holds no position for this wallet. This page reads {reads}.
-              </p>
-              {back && (
-                <p className="text-sm">
-                  <Link
-                    href={back.href}
-                    className="text-foreground underline underline-offset-2 hover:text-rb-700 dark:hover:text-rb-300"
-                    data-wallet-back=""
-                  >
-                    Back to {back.name}
-                  </Link>
-                </p>
-              )}
-              <WalletLookup positionHref={(w) => `/wallet/${w}`} placeholder="Wallet address or ENS name" />
-              <StartHereLine />
-            </section>
-            {trades}
+            {filterBar}
+            {body(
+              <>
+                <section className="flex max-w-xl flex-col gap-3" data-wallet-empty="">
+                  {chosen ? (
+                    <p className="text-sm text-foreground/80" data-wallet-reads="">
+                      Rails holds no {chosen.name} position for this wallet.
+                    </p>
+                  ) : (
+                    <p className="text-sm text-foreground/80" data-wallet-reads="">
+                      Rails holds no position for this wallet. This page reads {reads}.
+                    </p>
+                  )}
+                  {back && (
+                    <p className="text-sm">
+                      <Link
+                        href={back.href}
+                        className="text-foreground underline underline-offset-2 hover:text-rb-700 dark:hover:text-rb-300"
+                        data-wallet-back=""
+                      >
+                        Back to {back.name}
+                      </Link>
+                    </p>
+                  )}
+                  <WalletLookup positionHref={(w) => `/wallet/${w}`} placeholder="Wallet address or ENS name" />
+                  <StartHereLine />
+                </section>
+                {trades}
+              </>,
+            )}
           </>
         ) : (
           <>
-            {open.length > 0 && <Tiles open={open} ranked={ranked} filtered={filtered} />}
-            <section aria-labelledby="wallet-open" data-wallet-open={open.length} data-anatomy="W3">
-              <div className="mb-3 flex flex-wrap items-baseline justify-between gap-3">
-                <h2 id="wallet-open" className={H2}>
-                  Open positions{" "}
-                  <span className="font-medium text-rb-500" data-prov-exempt="">
-                    {open.length}
-                  </span>
-                </h2>
-                {open.length > 1 && (
-                  <span className="text-xs text-rb-500">
-                    Sorted by risk{atRiskCount > 0 ? ` · ${atRiskCount} at risk` : ""}
-                    {dust.length > 0 ? ` · ${plural(dust.length, "position")} under $${DUST_USD} last` : ""}
-                  </span>
-                )}
-              </div>
-              {open.length === 0 ? (
-                <p className="text-sm text-rb-500">No open position.</p>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  {open.map((p) => (
-                    <WalletPositionCard key={`${p.chain}:${p.family}:${p.positionId}`} position={p} />
-                  ))}
-                </div>
-              )}
-            </section>
-            {trades}
-            {closed.length > 0 && <History closed={closed} />}
+            {filterBar}
+            {body(
+              <>
+                {open.length > 0 && <Totals sections={sections} filtered={filtered} />}
+                {sections.map((s) => (
+                  <Section key={s.slug} s={s} />
+                ))}
+                {trades}
+              </>,
+            )}
           </>
         )}
 
         {/* How Arbitrum positions come to show: kept under a focus that takes in
             Arbitrum, the only guidance there is for it. */}
-        {!read.error && (!filtered || scope.chains.includes(ARBITRUM_CHAIN_ID)) && <ArbitrumNote address={address} />}
+        {!read.error && (!chosen || chosen.arbitrum) && (!focused || scope.chains.includes(ARBITRUM_CHAIN_ID)) && (
+          <ArbitrumNote address={address} />
+        )}
 
         {unread.length > 0 && (
           <p className="text-xs text-rb-500" data-wallet-unread={unread.map((r) => r.id).join(",")}>

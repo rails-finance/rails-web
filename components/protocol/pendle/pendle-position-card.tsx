@@ -40,13 +40,14 @@ import {
   lpSplitProv,
   maturityProv,
   rewardProv,
+  syZeroProv,
   underlyingProv,
   valueProv,
 } from "@/lib/pendle/provenance";
 import { UNDERLYING_LABEL_TIP, underlyingProtocol } from "@/lib/pendle/underlying";
 import type { PendlePosition, PendleTimelineRow, PendleToken } from "@/lib/pendle/types";
 import { pendleMarketHref } from "@/lib/pendle/routes";
-import { ptHolding } from "@/lib/pendle/rules";
+import { assetValues, ptHolding, syRateZero } from "@/lib/pendle/rules";
 import { LP_SYMBOL_NOTE, PENDLE_WORDS as W, lpName } from "@/lib/pendle/words";
 
 /** Whether the wallet holds nothing in the market at the block. */
@@ -68,6 +69,17 @@ function TokenIcon({ tok, figure }: { tok: PendleToken; figure?: string }) {
     <AssetPopover symbol={symbol} address={tok.address} figure={figure}>
       <TokenChipIcon symbol={tok.symbol ?? ""} address={tok.address} size={16} filterable={false} untitled />
     </AssetPopover>
+  );
+}
+
+/** An implied APY withheld because the SY's exchangeRate() reads 0 (lib/pendle/rules.ts). */
+export function SyZeroApy({ className = "" }: { className?: string }) {
+  return (
+    <RevealTip tip={W.syZeroTip} label={`${W.syZero}: ${W.syZeroTip}`} focusable wrap className="focus-ring rounded-sm">
+      <span className={`font-normal text-rb-500 ${className}`} data-pendle-sy-zero="">
+        — <span className="tip-underline text-[11px]">{W.syZero}</span>
+      </span>
+    </RevealTip>
   );
 }
 
@@ -118,7 +130,12 @@ export function PendlePositionCard({
       </Prov>
     );
 
-  const total = p.value.asset.total;
+  // Where the SY reads 0 every value in the asset is 0, with that read as its receipt.
+  const zero = syRateZero(p.marks);
+  const values = assetValues(p);
+  const vProv = (leg: "PT" | "YT" | "LP" | "interest" | "total") =>
+    zero ? syZeroProv(leg, t, block) : valueProv(leg, t, block, p.maturity.expired);
+  const total = values.total;
   const entry = p.apy.entry;
   // A fixed rate is the yield of holding PT (rails-ops ui-jobs 654): none is
   // shown where the wallet holds no PT at the block.
@@ -129,7 +146,7 @@ export function PendlePositionCard({
       id: "value",
       label: "Value",
       labelTip: `The PT, YT and LP legs and the unclaimed yield at their marks, in ${asset}.`,
-      value: assetFig(total, valueProv("total", t, block, p.maturity.expired)),
+      value: assetFig(total, vProv("total")),
       assets: <TokenIcon tok={t.asset} figure={total ? `${amountText(total, dec)} ${asset}` : undefined} />,
       sub: `in ${asset}`,
     },
@@ -156,16 +173,17 @@ export function PendlePositionCard({
       id: "implied-apy",
       label: "Implied APY now",
       labelTip: "Pendle's docs: the market consensus of the future APY of an asset. It ends at maturity.",
-      value:
-        p.apy.current == null ? (
-          expired ? (
-            "Matured"
-          ) : null
-        ) : (
-          <Prov info={impliedApyProv(t.market.address, block, null)} value={p.apy.current.toFixed(6)}>
-            {apyText(p.apy.current)}
-          </Prov>
-        ),
+      value: zero ? (
+        <SyZeroApy />
+      ) : p.apy.current == null ? (
+        expired ? (
+          "Matured"
+        ) : null
+      ) : (
+        <Prov info={impliedApyProv(t.market.address, block, null)} value={p.apy.current.toFixed(6)}>
+          {apyText(p.apy.current)}
+        </Prov>
+      ),
       sub: expired ? "swaps closed at maturity" : "the market's rate",
     },
     {
@@ -207,8 +225,7 @@ export function PendlePositionCard({
           </PanelFigure>
           {valueRaw != null && raw !== "0" && (
             <span>
-              worth <PanelFigure>{assetFig(valueRaw, valueProv(leg, t, block, p.maturity.expired))}</PanelFigure>{" "}
-              {asset}
+              worth <PanelFigure>{assetFig(valueRaw, vProv(leg))}</PanelFigure> {asset}
             </span>
           )}
         </span>
@@ -229,7 +246,7 @@ export function PendlePositionCard({
       "PT",
       t.pt,
       p.balances.pt,
-      p.value.asset.pt,
+      values.pt,
       "PT",
       expired
         ? `Each PT now redeems for up to one ${asset}.`
@@ -240,7 +257,7 @@ export function PendlePositionCard({
       "YT",
       t.yt,
       p.balances.yt,
-      p.value.asset.yt,
+      values.yt,
       "YT",
       expired
         ? "YT is worth nothing after maturity; its unclaimed yield stays claimable."
@@ -251,7 +268,7 @@ export function PendlePositionCard({
       "LP",
       lpToken,
       p.balances.lp,
-      p.value.asset.lp,
+      values.lp,
       "LP",
       expired
         ? `The pool's swaps closed at maturity; LP can still be removed. ${LP_SYMBOL_NOTE}`
@@ -278,12 +295,11 @@ export function PendlePositionCard({
     id: "interest",
     label: W.unclaimedYield,
     value:
-      p.ytInterest.asset == null ? (
+      (zero ? values.interest : p.ytInterest.asset) == null ? (
         "–"
       ) : (
         <span>
-          <PanelFigure>{assetFig(p.ytInterest.asset, valueProv("interest", t, block, p.maturity.expired))}</PanelFigure>{" "}
-          {asset}
+          <PanelFigure>{assetFig(zero ? values.interest : p.ytInterest.asset, vProv("interest"))}</PanelFigure> {asset}
         </span>
       ),
     tip: "The yield this wallet's YT has earned and not yet claimed, after Pendle's 5% fee on YT yield.",
@@ -336,20 +352,27 @@ export function PendlePositionCard({
           yield until maturity. {W.lpEarns}
         </p>
       )}
-      <p>
-        Every figure is read at block {block.toLocaleString("en-US")}. The legs are valued at{" "}
-        {p.marks.source === "oracle-twap"
-          ? `Pendle's oracle, a ${p.marks.twapSeconds / 60}-minute average`
-          : p.marks.source === "routerstatic-spot"
-            ? "RouterStatic's spot rate, since Pendle's oracle does not yet hold enough observations on this market"
-            : "no mark, because neither the oracle nor RouterStatic answered"}
-        , in SY, then in {asset} at the SY&rsquo;s exchange rate.
-      </p>
+      {zero ? (
+        <p data-pendle-sy-zero-note="">
+          Every figure is read at block {block.toLocaleString("en-US")}. The SY&rsquo;s exchangeRate() reads 0 there, so
+          each leg and the unclaimed yield are worth 0 {asset}.
+        </p>
+      ) : (
+        <p>
+          Every figure is read at block {block.toLocaleString("en-US")}. The legs are valued at{" "}
+          {p.marks.source === "oracle-twap"
+            ? `Pendle's oracle, a ${p.marks.twapSeconds / 60}-minute average`
+            : p.marks.source === "routerstatic-spot"
+              ? "RouterStatic's spot rate, since Pendle's oracle does not yet hold enough observations on this market"
+              : "no mark, because neither the oracle nor RouterStatic answered"}
+          , in SY, then in {asset} at the SY&rsquo;s exchange rate.
+        </p>
+      )}
       {entry.buys > 0 && entry.ptWeighted != null && holdsPt && (
         <p>
           This wallet bought {amountText(entry.ptBought, t.pt.decimals)} PT through Pendle&rsquo;s routers for{" "}
           {amountText(entry.assetPaid, dec)} {asset}, an Effective Fixed APY of {apyText(entry.ptWeighted)}
-          {p.apy.current != null ? `; the market prices PT at ${apyText(p.apy.current)} now` : ""}.
+          {p.apy.current != null && !zero ? `; the market prices PT at ${apyText(p.apy.current)} now` : ""}.
         </p>
       )}
     </div>

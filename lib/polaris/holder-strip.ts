@@ -228,14 +228,14 @@ export function polarisHolderStrip(
     });
   } else if (debtByMarket.size > 1) {
     // Two markets, two units: the only sum that exists is a valued one.
-    const parts: string[] = [];
+    const parts: { text: string; symbol: string }[] = [];
     const usdLegs: UsdLeg[] = [];
     for (const [market, amount] of debtByMarket) {
       const symbol = POLARIS_MARKET_CONFIG[market].stable.symbol;
       const leg = debtLeg(market, amount);
       if (!leg) continue;
       usdLegs.push(leg);
-      parts.push(`${formatNumber(amount)} ${symbol}`);
+      parts.push({ text: `${formatNumber(amount)} ${symbol}`, symbol });
     }
     // A sum across tokens stands only where every token is priced: a total
     // of the priced ones alone would read as the whole.
@@ -254,8 +254,9 @@ export function polarisHolderStrip(
         approx: false,
         tip: LEG_TIP.debtValued,
         prov: receipt.prov,
-        footnote: { text: parts.join(" · ") },
-        // The icons of the markets the total counts.
+        // Each market's amount with its token's icon, beneath the dollars
+        // (ui-jobs 738).
+        footnote: { text: parts.map((p) => p.text).join(" · "), parts },
         figure: {
           tokens: usdLegs.map((l) => ({ symbol: l.token })),
           usd: receipt.usd,
