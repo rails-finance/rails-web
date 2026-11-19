@@ -19,7 +19,7 @@ import { useFlowFocusRoot, useFlowFocusValue, type FlowFocusValue } from "@/comp
 import type { FlowTimeline } from "@/lib/shared/flows-timeline";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { MoonwellChainResponse } from "@/lib/api/fetch-moonwell-position";
-import { fetchDailyPrices } from "@/lib/api/fetch-daily-prices";
+import { dailyBlocksFromAnswer, dailyPricesFromAnswer, fetchDailyAnswer } from "@/lib/api/fetch-daily-prices";
 import {
   ctokenEventStates,
   ctokenFlowReplay,
@@ -133,22 +133,32 @@ export function useMoonwellFlows(p: MoonwellFlowsInput): {
     const markets = [...new Set(rows.map((r) => r.market))];
     return { markets, from: Math.floor(rows[0].ts / DAY_S), key: markets.join(",") };
   }, [rows]);
-  const [daily, setDaily] = useState<{ key: string; prices: Record<string, [number, number][]> | null } | null>(null);
+  const [daily, setDaily] = useState<{
+    key: string;
+    prices: Record<string, [number, number][]> | null;
+    /** The block each day's price was read at, by market and day (ui-jobs 743). */
+    blocks?: Record<string, Record<number, number>>;
+  } | null>(null);
   useEffect(() => {
     if (!want) return;
     const ac = new AbortController();
-    fetchDailyPrices(
+    fetchDailyAnswer(
       chainId,
       want.markets.map((m) => moonwellSeriesKey(mtokenOf(m))),
       { from: want.from, signal: ac.signal },
     )
-      .then((byKey) => {
+      .then((body) => {
+        const byKey = body ? dailyPricesFromAnswer(body) : null;
+        const blocksByKey = body ? dailyBlocksFromAnswer(body) : {};
         const prices: Record<string, [number, number][]> = {};
+        const blocks: Record<string, Record<number, number>> = {};
         for (const m of want.markets) {
           const obs = byKey?.[moonwellSeriesKey(mtokenOf(m))];
           if (obs) prices[m] = obs;
+          const b = blocksByKey[moonwellSeriesKey(mtokenOf(m))];
+          if (b) blocks[m] = b;
         }
-        setDaily({ key: want.key, prices: Object.keys(prices).length > 0 ? prices : null });
+        setDaily({ key: want.key, prices: Object.keys(prices).length > 0 ? prices : null, blocks });
       })
       .catch((err) => {
         if ((err as { name?: string })?.name !== "AbortError") setDaily({ key: want.key, prices: null });
@@ -177,12 +187,19 @@ export function useMoonwellFlows(p: MoonwellFlowsInput): {
     return out;
   }, [p.chain]);
   const dailyPrices = dailySettled ? (daily?.prices ?? undefined) : undefined;
+  const dailyBlocks = dailySettled ? daily?.blocks : undefined;
   const opts = useMemo<CTokenFlowOptions | null>(
     () =>
       now != null
-        ? { vocab: { brand: "Moonwell", receipt: "mToken" }, now, live, ...(dailyPrices ? { dailyPrices } : {}) }
+        ? {
+            vocab: { brand: "Moonwell", receipt: "mToken" },
+            now,
+            live,
+            ...(dailyPrices ? { dailyPrices } : {}),
+            ...(dailyBlocks ? { dailyBlocks } : {}),
+          }
         : null,
-    [now, live, dailyPrices],
+    [now, live, dailyPrices, dailyBlocks],
   );
   const replay = useMemo(() => (rows && opts && rows.length > 0 ? ctokenFlowReplay(rows, opts) : null), [rows, opts]);
   const replayed = useMemo(

@@ -24,7 +24,7 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { CompoundV2ChainResponse } from "@/lib/api/fetch-compound-v2-position";
 import { fetchCompoundV2PricesAt } from "@/lib/api/fetch-compound-v2-prices-at";
 import { fetchStoredV2Prices } from "@/lib/api/fetch-compound-stored-prices";
-import { fetchDailyAnswer } from "@/lib/api/fetch-daily-prices";
+import { dailyBlocksFromAnswer, fetchDailyAnswer } from "@/lib/api/fetch-daily-prices";
 import { compoundV2DailyPrices, compoundV2SeriesKey, storedV2Prices } from "@/lib/compound-v2/at-block-prices";
 import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
 import {
@@ -185,7 +185,12 @@ export function useCompoundV2Flows(p: CompoundV2FlowsInput): {
     const markets = [...new Set(rows.map((r) => r.market))].filter((m) => COMPOUND_V2_MARKET_BY_KEY[m]);
     return { markets, from: Math.floor(rows[0].ts / DAY_S), key: markets.join(",") };
   }, [rows]);
-  const [daily, setDaily] = useState<{ key: string; prices: Record<string, [number, number][]> | null } | null>(null);
+  const [daily, setDaily] = useState<{
+    key: string;
+    prices: Record<string, [number, number][]> | null;
+    /** The block each day's price was read at, by market and day (ui-jobs 743). */
+    blocks?: Record<string, Record<number, number>>;
+  } | null>(null);
   useEffect(() => {
     if (!want) return;
     const ac = new AbortController();
@@ -195,7 +200,14 @@ export function useCompoundV2Flows(p: CompoundV2FlowsInput): {
     fetchDailyAnswer(1, keys, { from: want.from, signal: ac.signal })
       .then((body) => {
         const prices = body ? compoundV2DailyPrices(body, want.markets) : {};
-        setDaily({ key: want.key, prices: Object.keys(prices).length > 0 ? prices : null });
+        // Each day's block, whatever its unit (an ETH-year day's too).
+        const byKey = body ? dailyBlocksFromAnswer(body, () => true) : {};
+        const blocks: Record<string, Record<number, number>> = {};
+        for (const m of want.markets) {
+          const b = byKey[compoundV2SeriesKey(COMPOUND_V2_MARKET_BY_KEY[m].ctoken)];
+          if (b) blocks[m] = b;
+        }
+        setDaily({ key: want.key, prices: Object.keys(prices).length > 0 ? prices : null, blocks });
       })
       .catch((err) => {
         if ((err as { name?: string })?.name !== "AbortError") setDaily({ key: want.key, prices: null });
@@ -206,6 +218,7 @@ export function useCompoundV2Flows(p: CompoundV2FlowsInput): {
   }, [want?.key, want?.from]);
   const dailySettled = want != null && daily?.key === want.key;
   const dailyPrices = dailySettled ? (daily?.prices ?? undefined) : undefined;
+  const dailyBlocks = dailySettled ? daily?.blocks : undefined;
 
   // Set on mount, so the server's render and the first client render agree.
   const [now, setNow] = useState<number | null>(null);
@@ -233,9 +246,10 @@ export function useCompoundV2Flows(p: CompoundV2FlowsInput): {
             live,
             todayPrices: p.todayPrices,
             ...(dailyPrices ? { dailyPrices } : {}),
+            ...(dailyBlocks ? { dailyBlocks } : {}),
           }
         : null,
-    [now, live, p.todayPrices, dailyPrices],
+    [now, live, p.todayPrices, dailyPrices, dailyBlocks],
   );
   const replay = useMemo(() => (rows && opts && rows.length > 0 ? ctokenFlowReplay(rows, opts) : null), [rows, opts]);
   const replayed = useMemo(

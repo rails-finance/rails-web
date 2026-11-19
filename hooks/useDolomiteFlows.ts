@@ -23,7 +23,7 @@ import { useFlowFocusRoot, useFlowFocusValue, type FlowFocusValue } from "@/comp
 import type { FlowTimeline } from "@/lib/shared/flows-timeline";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { DolomiteChainResponse } from "@/lib/api/fetch-dolomite-position";
-import { fetchDailyPrices } from "@/lib/api/fetch-daily-prices";
+import { dailyBlocksFromAnswer, dailyPricesFromAnswer, fetchDailyAnswer } from "@/lib/api/fetch-daily-prices";
 import {
   DL,
   dolomiteEventStates,
@@ -157,18 +157,28 @@ export function useDolomiteFlows(p: DolomiteFlowsInput): {
     const markets = [...new Set(rows.map((r) => r.market))];
     return { markets, from: Math.floor(rows[0].ts / DAY_S) - 1, key: markets.join(",") };
   }, [rows]);
-  const [daily, setDaily] = useState<{ key: string; prices: Record<string, [number, number][]> | null } | null>(null);
+  const [daily, setDaily] = useState<{
+    key: string;
+    prices: Record<string, [number, number][]> | null;
+    /** The block each day's price was read at, by market and day (ui-jobs 743). */
+    blocks?: Record<string, Record<number, number>>;
+  } | null>(null);
   useEffect(() => {
     if (!want) return;
     const ac = new AbortController();
-    fetchDailyPrices(1, want.markets.map(dolomiteSeriesKey), { from: want.from, signal: ac.signal })
-      .then((byKey) => {
+    fetchDailyAnswer(1, want.markets.map(dolomiteSeriesKey), { from: want.from, signal: ac.signal })
+      .then((body) => {
+        const byKey = body ? dailyPricesFromAnswer(body) : null;
+        const blocksByKey = body ? dailyBlocksFromAnswer(body) : {};
         const prices: Record<string, [number, number][]> = {};
+        const blocks: Record<string, Record<number, number>> = {};
         for (const m of want.markets) {
           const obs = byKey?.[dolomiteSeriesKey(m)];
           if (obs) prices[m] = obs;
+          const b = blocksByKey[dolomiteSeriesKey(m)];
+          if (b) blocks[m] = b;
         }
-        setDaily({ key: want.key, prices: Object.keys(prices).length > 0 ? prices : null });
+        setDaily({ key: want.key, prices: Object.keys(prices).length > 0 ? prices : null, blocks });
       })
       .catch((err) => {
         if ((err as { name?: string })?.name !== "AbortError") setDaily({ key: want.key, prices: null });
@@ -184,9 +194,13 @@ export function useDolomiteFlows(p: DolomiteFlowsInput): {
   useEffect(() => setNow(Date.now() / 1000), []);
   const live = useMemo(() => dolomiteLive(p.chain), [p.chain]);
   const dailyPrices = dailySettled ? (daily?.prices ?? undefined) : undefined;
+  const dailyBlocks = dailySettled ? daily?.blocks : undefined;
   const opts = useMemo<DolomiteFlowOptions | null>(
-    () => (now != null ? { now, live, ...(dailyPrices ? { dailyPrices } : {}) } : null),
-    [now, live, dailyPrices],
+    () =>
+      now != null
+        ? { now, live, ...(dailyPrices ? { dailyPrices } : {}), ...(dailyBlocks ? { dailyBlocks } : {}) }
+        : null,
+    [now, live, dailyPrices, dailyBlocks],
   );
   const ready = Array.isArray(rows) && opts != null && (dailySettled || rows.length === 0);
   const replay = useMemo(() => (rows && opts && ready ? dolomiteFlowReplay(rows, opts) : null), [rows, opts, ready]);

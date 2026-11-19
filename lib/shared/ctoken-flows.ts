@@ -211,6 +211,8 @@ export interface CTokenFlowOptions {
    *  price store's, rails-ops reference/daily-prices.md): each day no row
    *  priced takes it, so a quiet market is valued at its day's price. */
   dailyPrices?: Record<string, [number, number][]>;
+  /** The block each daily price was read at, by market and day. */
+  dailyBlocks?: Record<string, Record<number, number>>;
 }
 
 /** A replayed row: its legs in tokens and the market's balances after it. */
@@ -423,6 +425,15 @@ export function ctokenFlowReplay(rows: CTokenFlowRow[], o: CTokenFlowOptions): C
     brand: o.vocab.brand,
   };
 }
+
+/** "5 Jul 2025": a store day's close, in words. */
+const dayWords = (day: number): string =>
+  new Date(day * 86_400_000).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 
 /** A price in Compound's ETH years: the market's price in ETH ÷ USDC's,
  *  both from the Comptroller's oracle, each as shown. */
@@ -720,7 +731,7 @@ export interface CTokenEventState {
 
 export function ctokenEventStates(
   rp: CTokenFlowReplay,
-  o: Pick<CTokenFlowOptions, "todayPrices" | "live" | "dailyPrices">,
+  o: Pick<CTokenFlowOptions, "todayPrices" | "live" | "dailyPrices" | "dailyBlocks">,
 ): Map<string, CTokenEventState> {
   const out = new Map<string, CTokenEventState>();
   const { replayed, indexes } = rp;
@@ -762,12 +773,14 @@ export function ctokenEventStates(
   ): { usd: number; block: number | null; note: string } | null => {
     const row = lastPrice.get(m);
     const store = storeAt(m, day);
-    if (store && (!row || store.day > row.day))
+    if (store && (!row || store.day > row.day)) {
+      const b = o.dailyBlocks?.[m]?.[store.day] ?? null;
       return {
         usd: store.usd,
-        block: null,
-        note: `${oracle(sym)}, the daily store's price at the close of a day, a block the store's route does not state; this event is at block ${n(at)}`,
+        block: b,
+        note: `${oracle(sym)}, ${b != null ? `price at block ${n(b)}` : "a block the daily store's route does not state"}, the close of ${dayWords(store.day)}; this event is at block ${n(at)}`,
       };
+    }
     const from = row ?? firstPrice.get(m);
     if (from)
       return {

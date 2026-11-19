@@ -349,6 +349,8 @@ export interface DolomiteFlowOptions {
   /** A daily price per market, [UTC day, USD] ascending (the shared daily
    *  price store's): a row the route did not price takes its day's. */
   dailyPrices?: Record<string, [number, number][]>;
+  /** The block each daily price was read at, by market and day (ui-jobs 743). */
+  dailyBlocks?: Record<string, Record<number, number>>;
 }
 
 /** How a row's price was found. */
@@ -391,10 +393,12 @@ function pricesFor(rows: DolomiteFlowRow[], o: DolomiteFlowOptions): RowPrice[] 
     if (r.price != null) return { price: r.price, basis: "block" };
     const day = Math.floor(r.ts / DAY_S);
     const s = storeOn(o.dailyPrices?.[r.market], day);
-    if (s && s.day === day) return { price: s.usd, basis: "day", priceDay: s.day };
+    const sb = s ? o.dailyBlocks?.[r.market]?.[s.day] : undefined;
+    if (s && s.day === day)
+      return { price: s.usd, basis: "day", priceDay: s.day, ...(sb != null ? { priceBlock: sb } : {}) };
     const live = o.live?.[r.market]?.price;
     if (day >= today && live != null && live > 0) return { price: live, basis: "live" };
-    if (s) return { price: s.usd, basis: "carried", priceDay: s.day };
+    if (s) return { price: s.usd, basis: "carried", priceDay: s.day, ...(sb != null ? { priceBlock: sb } : {}) };
     return null;
   });
   return rows.map((r, i) => {
@@ -428,7 +432,7 @@ function dolomiteLeg(r: DolomiteReplayed, l: { bucket: string; amount: number })
     amount: l.amount,
     symbol: r.ev.symbol,
     price: r.basis === "none" ? null : r.price,
-    block: r.basis === "block" ? r.ev.block : r.basis === "nearest" ? (r.priceBlock ?? null) : null,
+    block: r.basis === "block" ? r.ev.block : (r.priceBlock ?? null),
     priceNote: dolomitePriceNote(r, r.ev.block),
     ...(r.basis === "latest" ? { basis: DOLOMITE_TODAY_BASIS } : {}),
     ...(ACCRUAL_KEYS.has(l.bucket) ? { accrual: true } : {}),
@@ -451,7 +455,7 @@ function dolomitePriceNote(r: DolomiteReplayed, at: number): string {
     : r.basis === "block"
       ? `${oracle}, the last LogOraclePrice at or before block ${n(r.ev.block)}; this event is at block ${n(at)}`
       : r.basis === "day" || r.basis === "carried"
-        ? `${oracle}, the close of ${day(r.priceDay ?? Math.floor(r.ev.ts / DAY_S))} in the daily store, a block its route does not state; this event is at block ${n(at)}`
+        ? `${oracle}, ${r.priceBlock != null ? `price at block ${n(r.priceBlock)}` : "a block the daily store's route does not state"}, the close of ${day(r.priceDay ?? Math.floor(r.ev.ts / DAY_S))}; this event is at block ${n(at)}`
         : r.basis === "nearest"
           ? `${oracle}, price at block ${n(r.priceBlock ?? r.ev.block)}, the nearest read; this event is at block ${n(at)}`
           : `${oracle}, price at the latest read, which names no block; this event is at block ${n(at)}`;
@@ -854,7 +858,7 @@ export interface DolomiteEventState {
 
 export function dolomiteEventStates(
   rp: DolomiteFlowReplay,
-  o: Pick<DolomiteFlowOptions, "live" | "dailyPrices">,
+  o: Pick<DolomiteFlowOptions, "live" | "dailyPrices" | "dailyBlocks">,
 ): Map<string, DolomiteEventState> {
   const out = new Map<string, DolomiteEventState>();
   const { replayed, indexes } = rp;
@@ -876,12 +880,14 @@ export function dolomiteEventStates(
     const row = lastPrice.get(m);
     const store = storeOn(o.dailyPrices?.[m], day);
     const n = (b: number) => b.toLocaleString("en-US");
-    if (store && (!row || store.day > row.day))
+    if (store && (!row || store.day > row.day)) {
+      const b = o.dailyBlocks?.[m]?.[store.day] ?? null;
       return {
         usd: store.usd,
-        block: null,
-        note: `Dolomite's oracle price for ${sym}, the daily store's close, a block its route does not state; this event is at block ${n(at)}`,
+        block: b,
+        note: `Dolomite's oracle price for ${sym}, ${b != null ? `price at block ${n(b)}` : "a block the daily store's route does not state"}, the close of the store's day; this event is at block ${n(at)}`,
       };
+    }
     const from = row?.r ?? firstPrice.get(m);
     if (from)
       return {

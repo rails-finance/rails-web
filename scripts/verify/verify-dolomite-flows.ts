@@ -61,7 +61,7 @@ import {
   type DolomiteFlowRow,
 } from "@/lib/dolomite/flows";
 import { dolomiteLive } from "@/hooks/useDolomiteFlows";
-import { dailyPricesFromAnswer, type DailyAnswer } from "@/lib/api/fetch-daily-prices";
+import { dailyBlocksFromAnswer, dailyPricesFromAnswer, type DailyAnswer } from "@/lib/api/fetch-daily-prices";
 import { buildFlowModel, stateAt, type FlowModel } from "@/lib/shared/flows-timeline";
 import { sideSumRows } from "@/lib/shared/flows-sum";
 import { binInputFromTimeline, binSeries, seriesRouteBinFor } from "@/lib/shared/flows-series";
@@ -91,6 +91,8 @@ const rows = (f: Fixture): DolomiteFlowRow[] => {
   return r;
 };
 const STORE = dailyPricesFromAnswer(J.daily);
+/** The block each store day was read at, as the page reads it (ui-jobs 743). */
+const STORE_BLOCKS = dailyBlocksFromAnswer(J.daily);
 function daily(f: Fixture): Record<string, [number, number][]> {
   const out: Record<string, [number, number][]> = {};
   for (const m of new Set(rows(f).map((r) => r.market))) {
@@ -102,8 +104,16 @@ function daily(f: Fixture): Record<string, [number, number][]> {
 const opts = (f: Fixture, store = true): DolomiteFlowOptions => ({
   now: NOW,
   live: dolomiteLive(f.chain),
-  ...(store ? { dailyPrices: daily(f) } : {}),
+  ...(store ? { dailyPrices: daily(f), dailyBlocks: dailyBlocks(f) } : {}),
 });
+function dailyBlocks(f: Fixture): Record<string, Record<number, number>> {
+  const out: Record<string, Record<number, number>> = {};
+  for (const m of new Set(rows(f).map((r) => r.market))) {
+    const b = STORE_BLOCKS[dolomiteSeriesKey(m)];
+    if (b) out[m] = b;
+  }
+  return out;
+}
 function model(f: Fixture, store = true): FlowModel {
   const t = dolomiteFlowTimeline(rows(f), opts(f, store));
   assert.ok(t, `${f.name}: a timeline`);
@@ -476,11 +486,9 @@ test("a row the route prices at its block (oracle_price) is valued there, the st
   assert.ok(!fe.some((u) => /day's close/.test(u.why)), "a day-close row is not marked");
   const dayLegs = dolomiteFocusEvents(rp).flatMap((e) => e.legs.filter((l) => /the close of /.test(l.priceNote ?? "")));
   assert.ok(dayLegs.length > 0, "some rows at the day's close");
+  // The store answers each day's block: the leg names it.
   for (const l of dayLegs)
-    assert.match(
-      l.priceNote!,
-      /the close of .+ in the daily store, a block its route does not state; this event is at block [\d,]+$/,
-    );
+    assert.match(l.priceNote!, /price at block [\d,]+, the close of .+; this event is at block [\d,]+$/);
   const blockOnly = dolomiteFlowTimeline(
     dolomiteFlowRows(
       evs.map((e) => {
