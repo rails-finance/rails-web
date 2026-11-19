@@ -11,6 +11,8 @@
 
 import type { Provenance, ProvInput, ProvVerify } from "@/components/shared/provenance";
 import { MAKER_ADDRESSES } from "./asset-catalog";
+import { MAKER_PRICE_FORMULA, makerPriceNote } from "./price-notes";
+import { priceText } from "@/lib/shared/shown-usd";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 
 const VAT = { name: "Vat", address: MAKER_ADDRESSES.VAT };
@@ -206,12 +208,12 @@ export const daiDebtProv = (artHuman: string, rateRay: string, symbol: string = 
 //
 // A grab moves the vault's seized collateral (dink) and cleared debt (dart)
 // into the liquidation system. The collateral leg is valued at the ilk's own
-// OSM price recovered from the protocol's risk state AT the grab block
-// (Vat spot × Spotter mat — inverting Spot.poke's spot = val/par/mat; the OSM
-// itself is read-whitelisted, these are two public views). The DAI leg needs
-// no price: dart × rate IS the protocol's own unit of account. The cushion
-// (seized ÷ cleared − 1) is what the seizure carried into the Dutch auction —
-// the penalty and any surplus settle there, not at the grab.
+// OSM price recovered from the protocol's risk state AT the grab block:
+// Spotter.poke writes spot = price ÷ par ÷ mat, so spot × par × mat gives the
+// price back (lib/makerdao/price-notes.ts MAKER_PRICE_FORMULA). The DAI leg
+// needs no price: dart × rate is the protocol's unit of account. The cushion
+// (seized ÷ cleared − 1) is what the seizure carried into the Dutch auction;
+// the penalty and any surplus settle there.
 
 const SPOTTER = { name: "Spot (Spotter)", address: MAKER_ADDRESSES.SPOTTER };
 
@@ -219,19 +221,19 @@ const SPOTTER = { name: "Spot (Spotter)", address: MAKER_ADDRESSES.SPOTTER };
 export const atBlockPriceProv = (collSym: string, coords: MakerCoords, priceUsd: number): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
-  formula: "Vat.ilks(ilk).spot × Spotter.ilks(ilk).mat ÷ RAY²",
+  formula: MAKER_PRICE_FORMULA,
   verify: {
     kind: "recompute",
     text:
       coords.blockNumber != null
-        ? `Re-run the Vat.ilks and Spotter.ilks eth_calls at block ${coords.blockNumber} (archive node) and multiply spot × mat`
-        : "Re-run the Vat.ilks and Spotter.ilks eth_calls (archive node) and multiply spot × mat",
+        ? `Re-run the Vat.ilks, Spotter.par and Spotter.ilks eth_calls at block ${coords.blockNumber.toLocaleString("en-US")} (archive node) and multiply spot × par × mat`
+        : "Re-run the Vat.ilks, Spotter.par and Spotter.ilks eth_calls (archive node) and multiply spot × par × mat",
   },
-  summary: `${collSym}:USD at this event's block — the OSM price recovered from the protocol's own risk state${atBlock(coords)}: Spot.poke writes spot = price ÷ par ÷ mat, so spot × mat inverts it back to the OSM's figure — the EXACT price the Dog's unsafety test (ink × spot < art × rate) judged this vault against. Read from two public Vat/Spotter views at the block and captured into the index; the OSM itself is read-whitelisted.`,
+  summary: `${collSym}:USD at this event's block. The OSM price recovered from the protocol's risk state${atBlock(coords)}. Spotter.poke writes spot = price ÷ par ÷ mat, so spot × par × mat gives the OSM's figure back, the price the Dog's unsafety test (ink × spot < art × rate) judged this vault against. Read from public Vat and Spotter views at the block and captured into the index; the OSM is read-whitelisted.`,
   contract: SPOTTER,
-  via: "Vat.ilks · spot × Spotter.ilks · mat at the event's block",
+  via: "Vat.ilks · spot × Spotter.par × Spotter.ilks · mat at the event's block",
   inputs: [
-    { label: `${collSym} price`, value: String(priceUsd), kind: "chain", note: "spot × mat, at block" },
+    { label: `${collSym} price`, value: priceText(priceUsd), kind: "chain", note: makerPriceNote(coords.blockNumber) },
     ...eventInputs(coords),
   ],
 });

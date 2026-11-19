@@ -587,7 +587,7 @@ export function useFxSheet({
             : tickPrice != null
               ? {
                   text: sheetUsd(tickPrice),
-                  info: minTriggerPriceProv(`the pool's rebalance line, ${lineText(rebLine!)}`, normalizedSymbol),
+                  info: minTriggerPriceProv(pool, `the pool's rebalance line, ${lineText(rebLine!)}`, normalizedSymbol),
                   value: formatExact(tickPrice),
                 }
               : { none: UNREAD },
@@ -630,7 +630,7 @@ export function useFxSheet({
     label,
     value:
       line != null
-        ? { text: lineText(line), info: poolLineProv(which, blockNumber), value: formatExact(line * 100) }
+        ? { text: lineText(line), info: poolLineProv(pool, which, blockNumber), value: formatExact(line * 100) }
         : { none: UNREAD },
     tip,
   });

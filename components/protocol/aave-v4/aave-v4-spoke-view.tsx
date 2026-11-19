@@ -347,6 +347,7 @@ function AaveV4SpokePageInner({
         sortedEvents.filter((e) => isAaveV4Event(e) && (e.context.data.spokeName ?? "Main") === spokeName),
         patchedReserves,
         chainTruthPrices,
+        oracleRead,
       ),
       // On-chain-oracle valuation of the headline totals, from the same chain
       // balances at Aave's own oracle price — lets On-chain-values show these

@@ -11,6 +11,8 @@
 import type { OnchainUsdTotals } from "@/lib/aave-v4/onchain-usd";
 import type { OracleRead } from "@/lib/aave-v4/use-oracle-prices";
 import { shownUsd } from "@/lib/shared/shown-usd";
+import type { Provenance } from "@/components/shared/provenance";
+import { aaveV4UsdReceipt, type AaveV4UsdRow } from "@/lib/aave-v4/usd-receipt";
 import { v4Apy } from "@/lib/aave-v4/rates";
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
@@ -148,6 +150,9 @@ export interface AaveEconomicsResult {
 export interface AaveV4Peak {
   block: number;
   legs: { symbol: string; amount: number; price: number; priceBlock: number }[];
+  /** Instants the walk skipped for an unpriced holding: the figure is then a
+   *  lower bound. */
+  skipped?: boolean;
 }
 
 /** An event's stored price, where it is the oracle's on-chain read (server
@@ -436,8 +441,17 @@ export function computeAaveV4InterestPnl(
 /** Per side, USD of the interest since each balance last started from zero,
  *  and the earliest such start (unix seconds); null where the side cannot say. */
 export interface AaveV4InterestSinceZero {
-  supply: { usd: number; since: number } | null;
-  debt: { usd: number; since: number } | null;
+  supply: AaveV4InterestSide | null;
+  debt: AaveV4InterestSide | null;
+}
+
+/** One side's interest since zero: the figure, its earliest start, and the
+ *  receipt that rebuilds it (each reserve's interest × its oracle price at
+ *  the read's block). */
+export interface AaveV4InterestSide {
+  usd: number;
+  since: number;
+  prov: Provenance;
 }
 
 /** The lane rows one spoke's events give a reserve on one side, oldest first,
@@ -482,12 +496,15 @@ export function computeAaveV4InterestSinceZero(
   events: readonly BaseActivityEvent[],
   reserves: ReserveStats[],
   prices: Record<string, PriceEntry | number>,
+  /** The oracle read the prices come from: its block and each price's source. */
+  read?: OracleRead | null,
 ): AaveV4InterestSinceZero {
   const ordered = [...events].sort((a, b) => a.blockNumber - b.blockNumber);
-  const side = (which: "supply" | "debt"): { usd: number; since: number } | null => {
-    let usd = 0;
+  const sourceOf = (symbol: string) =>
+    Object.values(read?.prices ?? {}).find((p) => p.symbol === symbol)?.source ?? null;
+  const side = (which: "supply" | "debt"): AaveV4InterestSide | null => {
+    const rows: AaveV4UsdRow[] = [];
     let since = Infinity;
-    let any = false;
     for (const r of reserves) {
       const current = which === "supply" ? r.currentSupplied : r.currentBorrowed;
       if (current == null || current <= 0) continue;
@@ -500,11 +517,26 @@ export function computeAaveV4InterestSinceZero(
       if (lane.hubs.size > 1) return null;
       const got = interestSinceZero(lane.rows, current, 0.01 / price);
       if (!got) return null;
-      usd += got.amount * price;
+      rows.push({
+        symbol: r.symbol,
+        amount: got.amount,
+        amountNote: `the ${which === "supply" ? "supplied" : "owed"} balance now less its rows' since it last started from zero`,
+        amountKind: { kind: "derived", pclass: undefined },
+        price: { usd: price, source: sourceOf(r.symbol), block: read?.blockNumber ?? null },
+      });
       since = Math.min(since, got.since);
-      any = true;
     }
-    return any && Number.isFinite(since) ? { usd, since } : null;
+    if (rows.length === 0 || !Number.isFinite(since)) return null;
+    const what = which === "supply" ? "Earned interest inside the collateral" : "Accrued interest inside the debt";
+    const got = aaveV4UsdReceipt({
+      what,
+      rows,
+      face: "compact",
+      via: "Σ (row before − previous row after) + (spoke balance now − last row after) · the oracle read's prices",
+      caveat:
+        "Each reserve's interest is the interest added since its balance last started from zero: each row's before less the previous row's after, and the balance the spoke reports now less the last row's after. The Lifetime flows count the interest of the whole life.",
+    });
+    return got && got.prov ? { usd: got.usd, since, prov: got.prov } : null;
   };
   return { supply: side("supply"), debt: side("debt") };
 }
@@ -861,8 +893,9 @@ export function calculateAaveEconomics(
     lastAction: sorted[sorted.length - 1].context.data.eventType,
     peakSupplyUsd,
     peakDebtUsd,
-    peakSupply,
-    peakDebt,
+    // An instant skipped for an unpriced holding makes a surviving peak a lower bound.
+    peakSupply: peakSupply && peakSupplyUnpriced.size > 0 ? { ...peakSupply, skipped: true } : peakSupply,
+    peakDebt: peakDebt && peakDebtUnpriced.size > 0 ? { ...peakDebt, skipped: true } : peakDebt,
     // Named only where no instant survived: the peak then has no figure.
     peakSupplyUnpriced: peakSupply ? [] : [...peakSupplyUnpriced],
     peakDebtUnpriced: peakDebt ? [] : [...peakDebtUnpriced],
