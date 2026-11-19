@@ -50,9 +50,10 @@ export default function RedeemerView({
   }, [initial, address]);
 
   // The rows past the first read, on the cut notice's "Load the older
-  // events": pages of REDEEMER_FIRST_READ, newest first, until the wallet's
-  // count is reached. A row arriving meanwhile shifts the pages down, so a
-  // page can repeat a row and never skips one; the ids settle repeats.
+  // events": pages of REDEEMER_FIRST_READ, newest first, read on while a page
+  // comes back full. A row arriving meanwhile shifts the pages down, so a page
+  // can repeat a row and the last page still reaches the oldest; the ids
+  // settle repeats.
   const [older, setOlder] = useState<LiquityV2RedemptionRow[]>([]);
   const [olderRead, setOlderRead] = useState<"idle" | "loading" | "failed">("idle");
   const loadRest = async () => {
@@ -60,7 +61,7 @@ export default function RedeemerView({
     setOlderRead("loading");
     const got: LiquityV2RedemptionRow[] = [];
     try {
-      for (let offset = data.rows.length; offset < data.totals.operations; offset += REDEEMER_FIRST_READ) {
+      for (let offset = data.rows.length; ; offset += REDEEMER_FIRST_READ) {
         const page = await readLiquityV2Redeemer(address, {
           order: "desc",
           limit: String(REDEEMER_FIRST_READ),
