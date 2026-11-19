@@ -308,16 +308,35 @@ async function readDeploymentPrices(client: PublicClient, deployment: CometDeplo
 
 /** The chain read for a deployment rails-server does not answer (Arbitrum). */
 async function resolveFromChain(reqs: CometPriceRequest[], deployment: CometDeployment): Promise<CometPriceMap> {
-  const out: CometPriceMap = new Map();
-
   let client: ReturnType<typeof chainClient>;
   try {
     client = chainClient(deployment.chainId);
   } catch {
-    return out; // The chain's RPC var is unset — no on-chain USD; callers stay token-only.
+    return new Map(); // The chain's RPC var is unset — no on-chain USD; callers stay token-only.
   }
+  return readChainPrices(client, reqs, deployment);
+}
+
+/** The chain lane's prices, pinned to one block read first, which the map
+ *  names (ui-jobs 743). Exported so a stubbed client can test it. */
+export async function readChainPrices(
+  client: Pick<ReturnType<typeof chainClient>, "getBlockNumber" | "multicall">,
+  reqs: CometPriceRequest[],
+  deployment: CometDeployment,
+): Promise<CometPriceMap> {
+  const out: CometPriceMap = new Map();
+  let blockNumber: bigint;
+  try {
+    blockNumber = await client.getBlockNumber();
+  } catch (err) {
+    rethrowAtBuild(err);
+    return out;
+  }
+  out.read = { blockNumber: Number(blockNumber) };
   const conv = ethConversion(deployment);
-  await readRosters(client, [...new Set(reqs.filter((r) => r.wholeRoster).map((r) => r.comet.toLowerCase()))]);
+  await readRosters(client as ReturnType<typeof chainClient>, [
+    ...new Set(reqs.filter((r) => r.wholeRoster).map((r) => r.comet.toLowerCase())),
+  ]);
 
   // The distinct (market, token) pairs we need a price for, tagged base vs collateral.
   const pairs: Pair[] = [];
@@ -352,6 +371,7 @@ async function resolveFromChain(reqs: CometPriceRequest[], deployment: CometDepl
     try {
       feedResults = (await client.multicall({
         allowFailure: true,
+        blockNumber,
         contracts: feedLookups.map((p) =>
           p.isBase
             ? ({ address: p.comet as `0x${string}`, abi: COMET_ABI, functionName: "baseTokenPriceFeed" } as const)
@@ -387,6 +407,7 @@ async function resolveFromChain(reqs: CometPriceRequest[], deployment: CometDepl
   try {
     priceResults = (await client.multicall({
       allowFailure: true,
+      blockNumber,
       contracts: priced.map(
         (x) =>
           ({

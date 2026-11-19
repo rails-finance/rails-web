@@ -73,6 +73,10 @@ export interface CometUsdView {
   priceFactors?: Record<string, CometPriceFactor>;
   /** The block the prices were read at; null where the read names none. */
   priceBlock?: number | null;
+  /** Where an ETH-quoted Comet's WETH-in-dollars factor was read, where it is
+   *  a read of its own (Base's holder view): named on the composed row, and
+   *  the getPrice factor's block named beside it. */
+  wethFrom?: string;
 }
 
 const blockText = (b: number) => `block ${b.toLocaleString("en-US")}`;
@@ -113,7 +117,8 @@ export function compoundSideUsd(o: {
             comet: o.view.marketLabel,
             ethPrice: f.price,
             ethUsd: f.ethUsd,
-            wethFrom: "the USD Comet's WETH collateral feed, in the same read",
+            wethFrom: o.view.wethFrom ?? "the USD Comet's WETH collateral feed, in the same read",
+            block: o.view.wethFrom ? (o.view.priceBlock ?? null) : null,
           })
         : cometPriceNote(o.view.marketLabel),
       priceContract: { name: o.view.marketLabel, address: o.view.comet },

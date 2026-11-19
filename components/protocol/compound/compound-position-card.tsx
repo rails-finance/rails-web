@@ -105,6 +105,8 @@ export interface CompoundPositionView {
    *  prices stand at (ui-jobs 743). */
   priceFactors?: Record<string, CometPriceFactor>;
   priceBlock?: number | null;
+  /** Where the WETH-in-dollars factor was read, where it is a read of its own. */
+  wethFrom?: string;
   /** Set when the account still holds balances but every one is worth under
    *  a cent at the oracle and nothing is borrowed: the card reads it as
    *  closed, and these are the amounts left behind. */

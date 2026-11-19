@@ -17,6 +17,9 @@ import { existsSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 const ROOT = ${JSON.stringify(ROOT)};
 export async function resolve(spec, ctx, next) {
+  if (spec === "next/server") return next("next/server.js", ctx);
+  // next build resolves server-only to its own guard; under plain node it is a no-op.
+  if (spec === "server-only") return { url: "data:text/javascript,", shortCircuit: true };
   let url = null;
   if (spec.startsWith("@/")) url = ROOT + spec.slice(2);
   else if (spec.startsWith("./") || spec.startsWith("../")) url = new URL(spec, ctx.parentURL).href;
@@ -141,4 +144,51 @@ test("both blocks are named where the balances and the prices stand apart; a rep
   assert.match(apart.prov.summary, /The balances stand at block 21,000,000 and the prices at block 21,000,010\./);
   const replay = compoundSideUsd({ what: "x", view: v, legs, balance: { source: "replay" } });
   assert.match(row(replay.prov, "WBTC amount").note, /a block this read does not name/);
+});
+
+test("on Base the composed row names the WETH read's own block beside the getPrice's", () => {
+  const r = compoundSideUsd({
+    what: "Collateral in USD",
+    view: view({
+      marketLabel: "cWETHv3",
+      priceByAddress: { "0xcbeth": shownComposedPrice(1.0912345, 3012.345678) },
+      priceFactors: { "0xcbeth": { eth: { price: 1.0912345, ethUsd: 3012.345678 } } },
+      priceBlock: 22_000_000,
+      wethFrom: "on cUSDCv3's WETH feed, read beside it at block 22,000,123",
+    }),
+    legs: [{ symbol: "cbETH", address: "0xcbeth", amount: 1.5 }],
+    balance: { source: "chain", block: 22_000_000 },
+  });
+  assert.match(
+    row(r.prov, "cbETH price").note,
+    /getPrice, in ETH at block 22,000,000\) × \$3,012\.345678 \(WETH\/USD, on cUSDCv3's WETH feed, read beside it at block 22,000,123\)$/,
+  );
+});
+
+const { readChainPrices } = await import(ROOT + "lib/sources/chain/compound-prices.ts");
+const { COMPOUND_ARBITRUM_DEPLOYMENT } = await import(ROOT + "lib/compound-arbitrum/asset-catalog.ts");
+
+test("the chain lane pins its read to one block and names it, as the Arbitrum route answers", async () => {
+  const usdc = COMPOUND_ARBITRUM_DEPLOYMENT.markets.find((m) => m.quoteUnit === "USD");
+  const calls = [];
+  const client = {
+    getBlockNumber: async () => 412_345_678n,
+    multicall: async ({ contracts, blockNumber }) => {
+      calls.push(blockNumber);
+      return contracts.map((c) =>
+        c.functionName === "baseTokenPriceFeed"
+          ? { status: "success", result: "0x00000000000000000000000000000000000000f1" }
+          : c.functionName === "getAssetInfoByAddress"
+            ? { status: "success", result: { priceFeed: "0x00000000000000000000000000000000000000f2" } }
+            : { status: "success", result: 99_987_000n },
+      );
+    },
+  };
+  const map = await readChainPrices(
+    client,
+    [{ comet: usdc.comet, baseToken: usdc.baseToken, collateral: [] }],
+    COMPOUND_ARBITRUM_DEPLOYMENT,
+  );
+  assert.deepEqual(map.read, { blockNumber: 412_345_678 });
+  assert.ok(calls.length > 0 && calls.every((b) => b === 412_345_678n), "every multicall at the pinned block");
 });

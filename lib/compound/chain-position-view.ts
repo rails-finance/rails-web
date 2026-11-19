@@ -78,7 +78,7 @@ export function cometViewFromChain(
   prices?: Record<string, number>,
   whole: boolean = true,
   /** The factors of composed prices and the block the prices stand at. */
-  priceMeta?: { factors?: Record<string, CometPriceFactor>; block?: number | null },
+  priceMeta?: { factors?: Record<string, CometPriceFactor>; block?: number | null; wethFrom?: string },
 ): CompoundPositionView {
   const baseToken = market.baseToken.toLowerCase();
   const live = chain && !chain.chainStale ? chain : null;
@@ -178,5 +178,6 @@ export function cometViewFromChain(
     priceByAddress: prices,
     priceFactors: priceMeta?.factors,
     priceBlock: priceMeta?.block ?? null,
+    ...(priceMeta?.wethFrom ? { wethFrom: priceMeta.wethFrom } : {}),
   };
 }
