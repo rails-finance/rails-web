@@ -26,7 +26,13 @@ import type { CompoundWalletChainResponse } from "@/lib/api/fetch-compound-walle
 import { formatNumber, formatUsdValue } from "@/lib/utils/format";
 import { holderUsdReceipt, type UsdLeg } from "@/lib/shared/holder-usd-receipt";
 import { compoundArbitrumUsd, cometUsdPrice } from "./usd";
-import { cometComposedPriceNote, cometNoPriceLine, cometPriceNote } from "./price-notes";
+import { cometComposedPriceNote, cometNoPriceLine, cometPriceNote, type CometUnpriced } from "./price-notes";
+
+/** Why a Comet's price has no dollars: a zero getPrice, or no conversion. */
+const whyUnpriced = (c: HolderStripComet, price: number): CometUnpriced => ({
+  comet: c.market.label,
+  why: !(price > 0) ? "zero" : "conversion",
+});
 
 /** One Comet on the overview: the read's answer for it (null where it holds
  *  nothing now, or the read failed) and the status its card states. */
@@ -54,6 +60,9 @@ const joinAnd = (parts: string[]): string =>
 export interface HolderStripSource {
   via: string;
   ethUsdFrom: string;
+  /** The WETH-in-dollars leg comes from a read of its own (Base), so the
+   *  receipts name each price's block on its row. */
+  separateWeth?: boolean;
 }
 
 const ARBITRUM_SOURCE: HolderStripSource = {
@@ -71,6 +80,8 @@ function cometLeg(
   ethUsd: number | undefined,
   amountNote: string,
   src: HolderStripSource,
+  /** The Comet read's block, named on the row where the WETH leg has its own. */
+  blockOf: number,
 ): UsdLeg | null {
   const ch = c.chain!;
   const u = cometUsdPrice(ch, rawPrice, ethUsd);
@@ -87,8 +98,9 @@ function cometLeg(
           ethPrice: u.eth.price,
           ethUsd: u.eth.ethUsd,
           wethFrom: src.ethUsdFrom,
+          block: src.separateWeth ? blockOf : null,
         })
-      : cometPriceNote(c.market.label),
+      : cometPriceNote(c.market.label, src.separateWeth ? blockOf : null),
     priceContract: { name: c.market.label, address: c.market.comet },
   };
 }
@@ -96,9 +108,10 @@ function cometLeg(
 /** A leg's figure and receipt from its rows; the no-figure words where a
  *  Comet in it has no conversion (no partial totals). */
 function legFigure(
+  label: string,
   what: string,
   rows: (UsdLeg | null)[],
-  unpriced: string[],
+  unpriced: CometUnpriced[],
   block: number,
   src: HolderStripSource,
 ): { value: string; approx: boolean; prov: Provenance } | null {
@@ -108,7 +121,7 @@ function legFigure(
       approx: false,
       prov: {
         kind: "derived",
-        summary: `${what} — ${cometNoPriceLine(unpriced)}, so the wallet's total is not drawn.`,
+        summary: `${what} — ${cometNoPriceLine(unpriced)}, so the ${label.toLowerCase()} is not drawn.`,
         via: src.via,
       },
     };
@@ -118,6 +131,7 @@ function legFigure(
     what,
     legs,
     block,
+    blocksPerRow: src.separateWeth,
     via: `${src.via} at block ${block.toLocaleString("en-US")} · one batched read of every Comet · Σ amount × the Comet's price`,
     caveat:
       "An estimate: the Comets hold different tokens, and a sum of them exists only at a price, which moves every block.",
@@ -185,7 +199,7 @@ export function compoundHolderStrip(
   // ── collateral: per Comet and asset, the shown products summed ─────────
   {
     const rows: (UsdLeg | null)[] = [];
-    const unpriced: string[] = [];
+    const unpriced: CometUnpriced[] = [];
     const parts: string[] = [];
     for (const c of open) {
       const ch = c.chain!;
@@ -195,12 +209,28 @@ export function compoundHolderStrip(
       for (const a of ch.collateral) {
         const amount = scaleCompoundChainBalance(a.balanceRaw, a.decimals);
         if (!(amount > 0)) continue;
-        const r = cometLeg(c, a.symbol, amount, a.price, head.ethUsd, `${c.market.label}'s collateralBalanceOf`, src);
-        if (!r && !unpriced.includes(c.market.label)) unpriced.push(c.market.label);
+        const r = cometLeg(
+          c,
+          a.symbol,
+          amount,
+          a.price,
+          head.ethUsd,
+          `${c.market.label}'s collateralBalanceOf`,
+          src,
+          block,
+        );
+        if (!r && !unpriced.some((u) => u.comet === c.market.label)) unpriced.push(whyUnpriced(c, a.price));
         rows.push(r);
       }
     }
-    const f = legFigure("What the wallet holds as collateral across its Comets, in USD", rows, unpriced, block, src);
+    const f = legFigure(
+      "Total collateral",
+      "What the wallet holds as collateral across its Comets, in USD",
+      rows,
+      unpriced,
+      block,
+      src,
+    );
     if (f)
       legs.push({
         id: "collateral",
@@ -214,7 +244,7 @@ export function compoundHolderStrip(
   // ── the base, borrowed and lent: the shown products, the parts in each base ──
   const baseLeg = (side: "borrow" | "supply") => {
     const rows: (UsdLeg | null)[] = [];
-    const unpriced: string[] = [];
+    const unpriced: CometUnpriced[] = [];
     const parts: string[] = [];
     for (const c of open) {
       const ch = c.chain!;
@@ -231,12 +261,14 @@ export function compoundHolderStrip(
         head.ethUsd,
         `${c.market.label}'s ${side === "borrow" ? "borrowBalanceOf" : "balanceOf"}, interest included`,
         src,
+        block,
       );
       parts.push(`${formatNumber(amount)} ${ch.baseSymbol}${r ? "" : " (not priced)"}`);
-      if (!r) unpriced.push(c.market.label);
+      if (!r) unpriced.push(whyUnpriced(c, ch.basePrice));
       rows.push(r);
     }
     const f = legFigure(
+      side === "borrow" ? "Total debt" : "Total lent",
       side === "borrow"
         ? "What the wallet owes across its Comets, in USD"
         : "What the wallet lends across its Comets, in USD",

@@ -113,7 +113,7 @@ test("the WETH Comet's price is one composed row: getPrice in ETH × WETH in dol
   const note = m.get("cWETHv3 wstETH price").note;
   assert.match(
     note,
-    /1\.212346 ETH \(cWETHv3's getPrice, in ETH\) × \$3,012\.345678 \(WETH\/USD, from the same read\) → USD = getPrice \(in ETH\) × WETH\/USD/,
+    /1\.212346 ETH \(cWETHv3's getPrice, in ETH\) × \$3,012\.345678 \(WETH\/USD, from the same read\)$/,
   );
   assert.equal(num(m.get("cWETHv3 wstETH price").value), p.usd);
 });
@@ -126,7 +126,10 @@ test("a Comet with no conversion draws no totals", () => {
   const strip = compoundArbitrumHolderStrip(r, [comet(usdc(), "cUSDCv3"), comet(weth(), "cWETHv3")]);
   const coll = strip.legs.find((l) => l.id === "collateral");
   assert.equal(coll.value, "—");
-  assert.match(coll.prov.summary, /no dollar figure: cWETHv3 has no conversion to dollars/);
+  assert.match(
+    coll.prov.summary,
+    /no dollar figure: cWETHv3 quotes in ETH and the read carries no WETH in dollars to convert at, so the total collateral is not drawn\./,
+  );
 });
 
 test("Base's strip takes the same rows and names Base's read", () => {
@@ -142,4 +145,32 @@ test("Base's strip takes the same rows and names Base's read", () => {
     num(strip.legs.find((l) => l.id === "debt").value),
     compoundArbitrumUsd(r).byComet.get(WETH_COMET).borrowUsd,
   );
+});
+
+test("a zero getPrice on a USD-quoted Comet is named as such, not as a missing conversion", () => {
+  const zero = usdc({
+    collateral: [{ address: "0xwbtc", symbol: "WBTC", decimals: 8, balanceRaw: String(raw(0.5, 8)), price: 0 }],
+  });
+  const strip = compoundArbitrumHolderStrip(read([zero]), [comet(zero, "cUSDCv3")]);
+  const coll = strip.legs.find((l) => l.id === "collateral");
+  assert.equal(coll.value, "—");
+  assert.match(
+    coll.prov.summary,
+    /no dollar figure: cUSDCv3's getPrice answered zero at this read, so the total collateral is not drawn\./,
+  );
+  assert.doesNotMatch(coll.prov.summary, /convert/);
+});
+
+test("Base's receipts name each price's block on its row: the WETH factor is its own read", () => {
+  const strip = compoundBaseHolderStrip(read([weth(), usdc()]), [comet(weth(), "cWETHv3"), comet(usdc(), "cUSDCv3")], {
+    blockNumber: 22_000_123,
+  });
+  const prov = strip.legs.find((l) => l.id === "collateral").prov;
+  assert.match(prov.summary, /each price at the block its row names/);
+  const m = rows(prov);
+  assert.match(
+    m.get("cWETHv3 wstETH price").note,
+    /getPrice, in ETH at block 400,000,000\) × .*read beside it at block 22,000,123/,
+  );
+  assert.match(m.get("cUSDCv3 WBTC price").note, /cUSDCv3's getPrice, in dollars at block 400,000,000/);
 });

@@ -47,5 +47,6 @@ export function compoundBaseHolderStrip(
   comets: HolderStripComet[],
   wethRead?: WethUsdRead,
 ): HolderStripProps {
-  return compoundHolderStrip(head, comets, { ...BASE_SOURCE, ethUsdFrom: ethUsdFrom(wethRead) });
+  // The WETH factor is its own read, so each row names its price's block.
+  return compoundHolderStrip(head, comets, { ...BASE_SOURCE, ethUsdFrom: ethUsdFrom(wethRead), separateWeth: true });
 }
