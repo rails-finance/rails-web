@@ -20,24 +20,9 @@ import { withServerHead } from "@/lib/sources/api/lender-position-head";
 import { chainClient } from "@/lib/sources/chain/rpc";
 import { BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import type { WalletPosition } from "@/lib/wallet/types";
-import { amountText, bufferFromHealth, historyBase, plural, scaled, storeStamp } from "@/lib/wallet/summary-row";
+import { amountText, bufferFromHealth, historyBase, plural, storeStamp } from "@/lib/wallet/summary-row";
 import type { FamilyModule, HeadResult } from "./module";
-
-const priceOf = (s: CompoundPositionSummary, address: string): number | undefined =>
-  s.priceByAddress?.[address.toLowerCase()];
-
-/** The row's collateral in dollars at its Comet's prices; undefined the
- *  moment one leg is unpriced. */
-function collateralUsdOf(s: CompoundPositionSummary): number | undefined {
-  let sum = 0;
-  for (const c of s.collateral) {
-    if (c.amount <= 0) continue;
-    const p = priceOf(s, c.address);
-    if (c.decimalsUnread || p == null) return undefined;
-    sum += c.amount * p;
-  }
-  return sum;
-}
+import { cometHeadUsd } from "@/lib/wallet/comet-head-usd";
 
 function lane(name: "ethereum" | "base"): FamilyModule {
   const chain: ChainId = name === "ethereum" ? MAINNET_CHAIN_ID : BASE_CHAIN_ID;
@@ -111,14 +96,11 @@ function lane(name: "ethereum" | "base"): FamilyModule {
         positions: open.map((p): WalletPosition => {
           const s = (p.card as { row: CompoundPositionSummary }).row;
           const live = wallet.positions.find((x) => x.comet.toLowerCase() === s.comet.toLowerCase());
-          // A Comet the sweep found empty: the account holds nothing there at head.
-          const borrowed = live ? scaled(live.borrowBalanceRaw, live.baseDecimals) : 0;
-          const basePrice = priceOf(s, s.base.address);
-          const debtUsd = basePrice != null ? borrowed * basePrice : undefined;
+          const { collateralUsd, debtUsd, borrowed } = cometHeadUsd(live, wallet.ethUsd);
           const hf = live?.healthFactor ?? null;
           return {
             ...p,
-            collateralUsd: collateralUsdOf(s),
+            collateralUsd,
             debtUsd,
             usdOwnOracle: true,
             buffer: bufferFromHealth(hf),

@@ -15,6 +15,7 @@
 // Units are native everywhere; the one dollar figure is the protocol's own
 // feed, and the header line says "Sepolia testnet" once.
 
+import { shownComposedPrice } from "@/lib/shared/shown-usd";
 import { SectionSidebar } from "@/components/shared/section-sidebar";
 import { useReportPositionRead } from "@/components/shared/position-read";
 import { readOfHeadAnswer } from "@/lib/shared/position-read";
@@ -313,16 +314,21 @@ export default function PolarisPositionView({
         label: `${PETH.symbol}, bonding curve, native`,
         // "2.84 ETH" alone read as a gas price: the trigger names the token.
         triggerLabel: PETH.symbol,
-        info: liveCurvePriceProv(),
+        info: liveCurvePriceProv(false, chain.blockNumber),
       },
-      { symbol: PETH.symbol, address: PETH.address, price: chain.price.pethUsd },
+      // The card's composed row: each factor as shown (ui-jobs 743).
+      {
+        symbol: PETH.symbol,
+        address: PETH.address,
+        price: shownComposedPrice(chain.price.curve, chain.price.ethUsd),
+      },
     ];
     if (chain.price.ethUsd > 0)
       out.push({
         symbol: "ETH",
         price: chain.price.ethUsd,
         label: ETH_USD_LABEL,
-        info: liveMedianiserProv("eth"),
+        info: liveMedianiserProv("eth", false, chain.blockNumber),
       });
     const stableUsd = market === "usdp" ? 1 : chain.price.xauUsd;
     if (stableUsd != null) out.push({ symbol: stable, address: cfg.stable.address, price: stableUsd });

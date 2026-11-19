@@ -341,8 +341,11 @@ export function aaveV4EventProse(input: AaveV4ProseInput): AaveV4EventProse {
         sp.say("liq.by");
       }
       // The legs valued at the two prices the row carries.
-      const cp = ctx.collateralPrice?.usd;
-      const dp = ctx.debtPrice?.usd;
+      // Only an on-chain stored price values a leg (ui-jobs 743).
+      const onChainUsd = (p: { usd: number; source: string } | undefined) =>
+        p && p.source !== "defillama" && p.source !== "stablecoin" ? p.usd : undefined;
+      const cp = onChainUsd(ctx.collateralPrice);
+      const dp = onChainUsd(ctx.debtPrice);
       if (cp && dp && cleared != null && seized != null && cleared > 0 && seized > 0) {
         v.seized_usd = seized * cp;
         v.cleared_usd = cleared * dp;

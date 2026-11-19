@@ -41,6 +41,7 @@ import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
 import { formatUsdValue } from "@/lib/utils/format";
 import { FOOT_LINK } from "@/lib/shared/ui-grammar";
 import Link from "next/link";
+import { Fragment } from "react";
 
 /** One summed unit the wallet holds — a collateral, a debt. */
 export interface HolderLeg {
@@ -60,7 +61,13 @@ export interface HolderLeg {
   /** Beneath the value: the per-token legs behind a priced headline, or the
    *  headline's own grammar ("by the protocol's feed · testnet"). `prov` when
    *  the footnote itself states a figure rather than naming the sum's parts. */
-  footnote?: { text: string; prov?: Provenance };
+  footnote?: {
+    text: string;
+    prov?: Provenance;
+    /** The per-token amounts the text lists, each drawn with its token's
+     *  small icon (ui-jobs 738). */
+    parts?: { text: string; symbol: string; address?: string }[];
+  };
   /** Where the figure came from. */
   prov: Provenance;
   /** The position card's figure (ui-jobs 737): the compact amount with its
@@ -144,13 +151,17 @@ function HouseFigure({ leg, figure }: { leg: HolderLeg; figure: NonNullable<Hold
           <Prov info={leg.prov} value={leg.approx ? `≈ ${leg.value}` : leg.value}>
             {leg.tip ? <RevealTip tip={<span className={TIP_PROSE}>{leg.tip}</span>}>{shown}</RevealTip> : shown}
           </Prov>
-          <span className="inline-flex shrink-0 items-center" data-holder-tokens="">
-            {figure.tokens.map((t, i) => (
-              <span key={t.symbol} className={i > 0 ? "-ml-2" : undefined}>
-                <TokenChipIcon symbol={t.symbol} address={t.address} size={28} filterable={false} />
-              </span>
-            ))}
-          </span>
+          {/* A token's icon follows an amount in it; a figure in dollars
+              carries none, its tokens named beneath (ui-jobs 738). */}
+          {figure.amount != null && (
+            <span className="inline-flex shrink-0 items-center" data-holder-tokens="">
+              {figure.tokens.map((t, i) => (
+                <span key={t.symbol} className={i > 0 ? "-ml-2" : undefined}>
+                  <TokenChipIcon symbol={t.symbol} address={t.address} size={28} filterable={false} />
+                </span>
+              ))}
+            </span>
+          )}
         </span>
       </StatValue>
       {figure.amount != null && figure.usd != null && figure.usd > 0 && (
@@ -168,9 +179,25 @@ function HouseFigure({ leg, figure }: { leg: HolderLeg; figure: NonNullable<Hold
   );
 }
 
-export function HolderStrip({ countsLine, counts, legs, truncated, note, wallet, positions }: HolderStripProps) {
+export function HolderStrip({
+  countsLine,
+  counts,
+  legs,
+  truncated,
+  note,
+  wallet,
+  positions,
+  scoped = false,
+}: HolderStripProps & {
+  /** Drawn inside a page's receipts scope (the wallet page, ui-jobs 738):
+   *  its receipts open in that page's inspector. */
+  scoped?: boolean;
+}) {
   if (positions != null && positions < 2) return null;
+  const Scope = scoped ? Fragment : ProvUnscoped;
   const totals = !truncated && legs.length > 0 && (positions == null || counts.open >= 2);
+  // The wallet page's sections pass no counts sentence: their cards are under it.
+  if (!countsLine && !totals && !note && !wallet) return null;
   return (
     // A BAND, not a card: the raised rounded surface belongs to a position, and
     // this states something about several of them. A rule under it separates it
@@ -181,7 +208,7 @@ export function HolderStrip({ countsLine, counts, legs, truncated, note, wallet,
     // dock is a detail-page surface), so every <Prov> here is inert content —
     // exactly as the listing cards' own figures are. Declaring it keeps the dev
     // unscoped-<Prov> tripwire quiet here while it stays loud everywhere else.
-    <ProvUnscoped>
+    <Scope>
       <div
         data-holder-strip=""
         data-anatomy="N7"
@@ -190,11 +217,15 @@ export function HolderStrip({ countsLine, counts, legs, truncated, note, wallet,
         data-holder-liquidated={counts.liquidated}
         className="mb-5 border-b border-rb-300/60 dark:border-rb-700/60 pb-4"
       >
-        <p data-holder-counts="" className="text-sm text-foreground/80">
-          {countsLine}
-        </p>
+        {countsLine && (
+          <p data-holder-counts="" className="text-sm text-foreground/80">
+            {countsLine}
+          </p>
+        )}
         {totals && (
-          <div className={`mt-2 grid grid-cols-2 gap-4 ${legs.length > 2 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+          <div
+            className={`${countsLine ? "mt-2 " : ""}grid grid-cols-2 gap-4 ${legs.length > 2 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}
+          >
             {legs.map((leg) => (
               <div key={leg.id} data-holder-leg={leg.id} data-anatomy="N7.1">
                 <div className="text-rb-500 text-xs font-semibold">{leg.label}</div>
@@ -211,6 +242,17 @@ export function HolderStrip({ countsLine, counts, legs, truncated, note, wallet,
                       <Prov info={leg.footnote.prov} value={leg.footnote.text}>
                         <span>{leg.footnote.text}</span>
                       </Prov>
+                    ) : leg.footnote.parts ? (
+                      // The amounts are the rows of the total's receipt.
+                      <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5" data-prov-exempt="">
+                        {leg.footnote.parts.map((pt, i) => (
+                          <span key={pt.symbol} className="inline-flex items-center gap-1" data-holder-part={pt.symbol}>
+                            {i > 0 && <span aria-hidden="true">·</span>}
+                            <TokenChipIcon symbol={pt.symbol} address={pt.address} size={14} filterable={false} />
+                            {pt.text}
+                          </span>
+                        ))}
+                      </span>
                     ) : (
                       <span>{leg.footnote.text}</span>
                     )}
@@ -238,6 +280,6 @@ export function HolderStrip({ countsLine, counts, legs, truncated, note, wallet,
           </Link>
         )}
       </div>
-    </ProvUnscoped>
+    </Scope>
   );
 }

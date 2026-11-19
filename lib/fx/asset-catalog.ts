@@ -31,6 +31,10 @@ export interface FxPoolMeta {
   normalizedSymbol: string;
   /** Deploy block (RegisterPool on the PoolManager). */
   fromBlock: number;
+  /** The pool's price oracle: the pool's `priceOracle()`, read through
+   *  /api/chain/fx/pools at block 26,446,146 (19 Nov 2026).
+   *  getPrice() gives its anchor, min and max legs; getLiquidatePrice the min. */
+  oracle: string;
   /** How the pool's oracle forms its anchor price (rails-ops
    *  reference/official-docs/fx.md, "Docs and chain disagree" 2). */
   anchor: FxAnchorSource;
@@ -63,6 +67,7 @@ export const FX_POOLS: Record<FxPoolKey, FxPoolMeta> = {
     tokenDecimals: 18,
     normalizedSymbol: "stETH",
     fromBlock: 21529397,
+    oracle: "0x0c5c61025f047cb7e3e85852dc8eafd7b9a4abfb",
     anchor: {
       words: "a Curve stETH/ETH moving average multiplied by Chainlink's ETH/USD price",
       basis: {
@@ -81,6 +86,7 @@ export const FX_POOLS: Record<FxPoolKey, FxPoolMeta> = {
     tokenDecimals: 8,
     normalizedSymbol: "WBTC",
     fromBlock: 22081079,
+    oracle: "0xb3c90e64eb6f456a5f5c17aa99b6aeca6f4a6390",
     anchor: {
       words: "Chainlink's WBTC/BTC and BTC/USD prices multiplied",
       basis: { kind: "docs", page: "Risk management, Oracle, WBTC" },

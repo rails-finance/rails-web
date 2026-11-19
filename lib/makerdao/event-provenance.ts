@@ -236,26 +236,6 @@ export const atBlockPriceProv = (collSym: string, coords: MakerCoords, priceUsd:
   ],
 });
 
-/** The seized-collateral leg — |dink| × the at-block OSM price. */
-export const grabSeizedUsdProv = (
-  collSym: string,
-  coords: MakerCoords,
-  vals: { amount: string; priceUsd: number },
-): Provenance => ({
-  kind: "chain-derived",
-  pclass: "oracle",
-  formula: "seized collateral × price at block",
-  verify: txVerify(coords),
-  summary: `What the seized collateral was worth at the moment of the grab — the collateral this seizure moved (the grab LogNote's dink) times the ilk's own OSM price recovered at the event's block. Both factors are chain values pinned to this block. The collateral went to a Dutch auction.`,
-  contract: VAT,
-  via: `${MAKER_VIA} · |dink| × (spot × mat) at block`,
-  inputs: [
-    { label: "seized", value: `${vals.amount} ${collSym}`, kind: "chain", note: "grab LogNote · dink" },
-    { label: "price at block", value: String(vals.priceUsd), kind: "chain", note: "Vat spot × Spotter mat" },
-    ...eventInputs(coords),
-  ],
-});
-
 /** Position-card slot phrasing: the replay reconstructs the Vat.urns slot from the
  *  vault's own frob/grab/fork deltas. */
 export const vaultSlotPhrase = (): string => "replayed from the vault's own Vat frob/grab/fork operations (Σ dink)";
@@ -308,31 +288,6 @@ export const vaultArtProv = (atBlock?: number, residue?: boolean, source: MakerS
         }. A replay of the urn.art slot. Multiply by the ilk rate for the DAI figure.${residue ? RESIDUE_SENTENCE : ""}`,
   contract: VAT,
   via: source === "chain" ? "Vat.urns(ilk, urn) · art, eth_call at the block" : `${MAKER_VIA} · Σ ±dart → urn.art`,
-});
-
-/** Collateral USD = ink × OSM price (charter §3 — overlay names its source). */
-export const collateralUsdProv = (collSym: string, inkHuman: string, priceUsd: number): Provenance => ({
-  kind: "chain-derived",
-  summary: `USD value of the vault's ${collSym} collateral — the collateral amount times the Maker OSM price for this ilk, derived from the Vat spot × Spotter mat. The price names its source on its face (§3).`,
-  contract: { name: "Spotter", address: MAKER_ADDRESSES.SPOTTER },
-  via: "Maker OSM (Spotter spot × mat)",
-  formula: "ink × price",
-  inputs: [
-    {
-      label: "ink",
-      value: `${inkHuman} ${collSym}`,
-      kind: "chain",
-      pclass: "indexed",
-      note: "Σ dink (replay of the urn.ink slot)",
-    },
-    {
-      label: "price",
-      value: `$${priceUsd.toLocaleString("en-US")}`,
-      kind: "chain",
-      pclass: "oracle",
-      note: "Maker OSM (Spotter)",
-    },
-  ],
 });
 
 /** Third-party action: the vault owner neither signed the transaction nor
@@ -421,7 +376,13 @@ export const giveOwnerProv = (coords: MakerCoords): Provenance => ({
  *  predicate ink·spot ≥ art·rate (equivalence machine-verified in
  *  scripts/verify-makerdao-chain.mjs §4), so this is the contract's line
  *  restated as a price, not a client risk model. */
-export const liquidationPriceProv = (debtDaiHuman: string, matPct: string, inkHuman: string): Provenance => ({
+export const liquidationPriceProv = (
+  debtDaiHuman: string,
+  matPct: string,
+  inkHuman: string,
+  /** The result as the inputs above make it (ui-jobs 743). */
+  result?: string,
+): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   summary: `The collateral price at which this vault crosses the liquidation line — the vault is safe exactly while ink × spot ≥ art × rate (the Vat's own predicate), which rearranges to price ≥ DAI debt × mat ÷ ink. Every input is a live chain read; the equivalence to the Vat's predicate is machine-verified, so this is the contract's line.`,
@@ -432,6 +393,7 @@ export const liquidationPriceProv = (debtDaiHuman: string, matPct: string, inkHu
     { label: "DAI debt", value: debtDaiHuman, kind: "chain-derived", pclass: "state", note: "art × rate (Vat)" },
     { label: "mat", value: matPct, kind: "chain", pclass: "state", note: "Spotter.ilks(ilk).mat — liquidation ratio" },
     { label: "ink", value: inkHuman, kind: "chain", pclass: "state", note: "urn.ink collateral" },
+    ...(result ? [{ label: "debt × mat ÷ ink", value: result, kind: "derived" as const, step: true as const }] : []),
   ],
 });
 
@@ -459,13 +421,45 @@ export const stabilityFeeAprProv = (ilk: string): Provenance => ({
 
 /** Borrow headroom to the mat line — how much more DAI the vault could draw
  *  before crossing the ilk's minimum collateralization. */
-export const borrowHeadroomProv = (matPct: string): Provenance => ({
+export const borrowHeadroomProv = (
+  matPct: string,
+  /** The inputs as shown and the result (ui-jobs 743). */
+  shown?: { collateralUsd: string; debt: string; result: string },
+): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   summary: `How much more DAI this vault could draw before crossing the ${matPct} minimum collateralization — collateral USD ÷ mat − current DAI debt. Every input is a live chain read (Vat slots + the OSM price); the algebra rearranges Maker's own safety line.`,
   contract: VAT,
   via: "collateral USD ÷ mat − DAI debt",
-  formula: "ink × price ÷ mat − art × rate",
+  formula: "collateral USD ÷ mat − debt",
+  ...(shown
+    ? {
+        inputs: [
+          {
+            label: "collateral USD",
+            value: shown.collateralUsd,
+            kind: "chain-derived" as const,
+            pclass: "oracle" as const,
+            note: "ink × the OSM price, the card's figure",
+          },
+          {
+            label: "mat",
+            value: matPct,
+            kind: "chain" as const,
+            pclass: "state" as const,
+            note: "Spotter.ilks(ilk).mat",
+          },
+          {
+            label: "debt",
+            value: shown.debt,
+            kind: "chain-derived" as const,
+            pclass: "state" as const,
+            note: "art × rate (Vat)",
+          },
+          { label: "collateral USD ÷ mat − debt", value: shown.result, kind: "derived" as const, step: true as const },
+        ],
+      }
+    : {}),
 });
 
 /** Collateralization ratio — collateral USD (ink × OSM price) ÷ DAI debt (art ×
@@ -523,36 +517,10 @@ export const peakDebtProv = (symbol: string, coords?: MakerCoords): Provenance =
 // ── The ilk at an event's block (T2 of a row) ────────────────────────────────
 
 /** The OSM price at a row's block. */
-/** The collateral after an event valued as the Lifetime flows ledger values
- *  it: at the ilk's price at the close of the event's day in the daily price
- *  store (Vat spot × Spotter mat at the day's last block), or a liquidation's
- *  price at its block. */
-export const flowValueProv = (
-  collSym: string,
-  coords: MakerCoords,
-  vals: { amount: string; priceUsd: number },
-): Provenance => ({
-  kind: "chain-derived",
-  pclass: "oracle",
-  formula: "ink after × the ilk's price at the day's close",
-  verify: {
-    kind: "recompute",
-    text: "Read Vat.ilks(ilk).spot × Spotter.ilks(ilk).mat at the last block of the event's day (archive node) and multiply by the collateral after the event",
-  },
-  summary: `What the ${collSym} in the vault after this event was worth at Maker's oracle price at the close of the event's day, the price the Lifetime flows ledger values the event at. Rails records that price once a day for each collateral type.`,
-  contract: SPOTTER,
-  via: "the daily price store (maker:<ILK>, Vat spot × Spotter mat at the day's last block)",
-  inputs: [
-    { label: "collateral after", value: `${vals.amount} ${collSym}`, kind: "chain", note: "ink after the event" },
-    { label: `${collSym} price`, value: String(vals.priceUsd), kind: "chain", note: "spot × mat at the day's close" },
-    ...eventInputs(coords),
-  ],
-});
-
 export const eventPriceProv = (collSym: string, coords: MakerCoords, priceUsd: number): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
-  formula: "Vat.ilks(ilk).spot × Spotter.par × Spotter.ilks(ilk).mat ÷ RAY²",
+  formula: "Vat.ilks(ilk).spot × Spotter.par × Spotter.ilks(ilk).mat ÷ RAY³",
   verify: {
     kind: "recompute",
     text:

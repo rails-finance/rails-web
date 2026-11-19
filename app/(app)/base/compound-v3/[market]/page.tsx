@@ -5,6 +5,8 @@
 // to that market page; otherwise the holder strip and one card per Comet it
 // touched (rails-ops reference/arbitrum-position-first-lane.md).
 
+// Each held token at its Comet's price in dollars as shown (ui-jobs 743).
+import { cometPriceFactors, cometPricesUsd } from "@/lib/compound/comet-usd";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { positionMetadata, shortSubject } from "@/lib/shared/page-metadata";
@@ -26,18 +28,6 @@ interface Props {
 
 // Every figure is read at one block per request; nothing is cacheable across requests.
 export const dynamic = "force-dynamic";
-
-/** Each held token at its Comet's price in dollars, keyed by lowercase
- *  address: the `prices` `cometViewFromChain` reads. The ETH-quoted Comet
- *  converts at the read's `ethUsd`; a Comet with no conversion is unpriced. */
-function cometPricesUsd(p: CompoundMarketChainResponse, baseToken: string, ethUsd: number | undefined) {
-  const fx = p.quoteUnit === "USD" ? 1 : p.quoteUnit === "ETH" && ethUsd ? ethUsd : null;
-  const out: Record<string, number> = {};
-  if (fx == null) return out;
-  if (p.basePrice > 0) out[baseToken.toLowerCase()] = p.basePrice * fx;
-  for (const c of p.collateral) if (c.price > 0) out[c.address.toLowerCase()] = c.price * fx;
-  return out;
-}
 
 /** WETH in dollars: the ETH-quoted Comet's base price converted on
  *  cUSDCv3's WETH feed, the reading the market page's prices route makes
@@ -129,6 +119,17 @@ export default async function CompoundBaseHolderPage({ params }: Props) {
           replay,
           chain ? cometPricesUsd(chain, market.baseToken, head?.ethUsd) : undefined,
           whole,
+          chain
+            ? {
+                factors: cometPriceFactors(chain, market.baseToken, head?.ethUsd),
+                block: head?.blockNumber ?? null,
+                // The WETH factor is a read of its own (wethUsd above), at its block.
+                wethFrom:
+                  weth?.read != null
+                    ? `on cUSDCv3's WETH feed, read beside it at block ${weth.read.blockNumber.toLocaleString("en-US")}`
+                    : "on cUSDCv3's WETH feed, read beside it at a block this read does not name",
+              }
+            : undefined,
         ),
       };
     })

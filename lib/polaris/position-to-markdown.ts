@@ -8,6 +8,7 @@
 // every figure a SEPOLIA TESTNET figure. A PURE function of the data already
 // in scope on the detail page — no fetching.
 
+import { polarisEquity } from "@/lib/polaris/usd-receipt";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isPolarisEvent } from "@/lib/shared/types/event-shape";
 import type { PolarisPositionView } from "@/components/protocol/polaris/polaris-position-card";
@@ -20,13 +21,7 @@ import {
 } from "@/components/protocol/polaris/polaris-liquidation-forensics";
 import { crPct2, polarisCrAtEvent } from "@/lib/polaris/cr-at-event";
 import { formatPolarisRatio } from "@/lib/polaris/ratio-format";
-import {
-  polarisDebtOwed,
-  polarisEquityAtFeed,
-  polarisLifetime,
-  polarisPendingAtFeed,
-  polarisPsmShareValue,
-} from "@/lib/polaris/economics";
+import { polarisDebtOwed, polarisLifetime, polarisPendingAtFeed, polarisPsmShareValue } from "@/lib/polaris/economics";
 import { polarisPsmOutcomeSentence } from "@/lib/polaris/economics-explanation";
 import {
   polarisSinceLabel,
@@ -188,10 +183,19 @@ export function polarisPositionToMarkdown(args: PolarisPositionMarkdownArgs): st
         `- **pETH price (protocol feed):** ${amt(live.price.pethInDebt)} ${stable} — bonding curve ${num(live.price.curve, 4)} ETH per pETH × ETH/USD ${usd(live.price.ethUsd)}${live.price.xauUsd != null ? ` ÷ XAU/USD ${usd(live.price.xauUsd)}` : ""}`,
       );
       if (live.entireColl > 0) {
-        const equity = polarisEquityAtFeed(live.entireColl, live.entireDebt, live.price.pethInDebt);
-        lines.push(
-          `- **Equity at the feed:** ${amt(equity)} ${stable} (collateral × feed − debt; a debt below zero is owed to the holder and adds to it; a valuation at block ${live.blockNumber}, not a profit)`,
-        );
+        // The card's figure: from the shown rows (ui-jobs 743).
+        // No price, no equity line.
+        const equity = polarisEquity({
+          market: view.market,
+          coll: live.entireColl,
+          debt: live.entireDebt,
+          pethInDebt: live.price.pethInDebt,
+          block: live.blockNumber,
+        })?.equity;
+        if (equity != null)
+          lines.push(
+            `- **Equity at the feed:** ${amt(equity)} ${stable} (collateral × feed − debt; a debt below zero is owed to the holder and adds to it; a valuation at block ${live.blockNumber}, not a profit)`,
+          );
       }
     }
     lines.push("");

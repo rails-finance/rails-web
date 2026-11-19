@@ -55,23 +55,22 @@ import { Prov, type Provenance } from "@/components/shared/provenance";
 import {
   accumProv,
   chainTruthProv,
-  usdProvOnchain,
   healthFactorProv,
   interestSinceZeroProv,
   BLENDED_LT_PROV,
   BORROW_RATE_PROV,
-  COLL_USD_PROV,
-  DEBT_USD_PROV,
   LIQ_DROP_PROV,
   LIQ_PRICE_PROV,
   liqRatioProv,
-  NONCOLL_USD_PROV,
   PEAK_COLL_PROV,
   PEAK_DEBT_PROV,
-  SUPPLY_USD_PROV,
   YEARLY_COST_PROV,
 } from "@/lib/aave-v4/position-provenance";
-import { PARTIAL_LABEL_SUFFIX, partialSumProv } from "@/lib/aave-v4/unpriced";
+import { partialSumProv } from "@/lib/aave-v4/unpriced";
+import { aaveV4PeakState, type AaveV4UsdResult } from "@/lib/aave-v4/usd-receipt";
+import { aaveV4SpokeSideUsd } from "@/lib/aave-v4/spoke-usd";
+import type { AaveV4Peak } from "@/lib/aave-v4/spoke-cards";
+import { aaveV4NoFigureLine, AAVE_V4_PEAK_WHAT } from "@/lib/aave-v4/price-notes";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { useAaveV4Deployment } from "@/lib/aave-v4/deployment";
 import { PanelFigure } from "@/components/shared/position-card-panel";
@@ -83,36 +82,31 @@ export type { AaveSpokeCardInfo };
 const supplyInterestProv = () => interestSinceZeroProv("Earned interest inside the collateral");
 const borrowInterestProv = () => interestSinceZeroProv("Accrued interest inside the debt");
 
-/**
- * A headline USD figure (collateral, debt, supplied). The on-chain-oracle
- * total when every contributing asset is oracle-priced, traced as read from
- * the chain; otherwise the DefiLlama figure, which sums only the assets a price
- * covers and is marked partial when one is missing (RULE: Rails never invents a
- * price, lib/aave-v4/unpriced.ts). The figure's "(partial)" tip and its
- * receipt (`partialSumProv`) name what is missing.
- */
-function HeadlineUsd({
-  defillamaUsd,
-  onchainUsd,
-  derivedProv,
-  onchainLabel,
-  unpricedSymbols,
-}: {
-  defillamaUsd: number;
-  onchainUsd: number | null | undefined;
-  derivedProv: Provenance;
-  onchainLabel: string;
-  unpricedSymbols: string[];
-}) {
-  const useOnchain = onchainUsd != null;
-  const v = fmtUsd(useOnchain ? onchainUsd : defillamaUsd);
-  const excluded = useOnchain ? [] : unpricedSymbols;
-  const info: Provenance = useOnchain
-    ? usdProvOnchain(onchainLabel)
-    : partialSumProv(derivedProv, onchainLabel, excluded);
+/** The price read is still on its way for this side. */
+const isPending = (r: AaveV4UsdResult | null): boolean => r != null && r.prov == null && r.state === "pending";
+
+/** What stands where a side's figure cannot: the assets it has no on-chain price for. */
+function NoPriceLine({ r }: { r: { missing: string[]; state?: "pending" | "failed" } }) {
+  // While the price read is pending the head pulses (`pending`); no words yet.
+  if (r.state === "pending") return null;
   return (
-    <RevealTip tip={excluded.length > 0 ? `${v.title}${PARTIAL_LABEL_SUFFIX}` : v.title}>
-      <Prov info={info}>{v.display}</Prov>
+    <Prov info={partialSumProv({ kind: "derived", summary: "" }, "This figure", r.missing)}>
+      <span className="text-[11px] font-normal text-rb-500" data-total-unpriced={r.state ?? "unpriced"}>
+        {aaveV4NoFigureLine(r)}
+      </span>
+    </Prov>
+  );
+}
+
+/** A headline USD figure (collateral, debt, supplied): the sum of the shown
+ *  products its receipt lists, compact, the cents on hover. */
+function HeadlineUsd({ r }: { r: AaveV4UsdResult | null }) {
+  if (!r) return null;
+  if (r.prov == null) return <NoPriceLine r={r} />;
+  const v = fmtUsd(r.usd);
+  return (
+    <RevealTip tip={v.title}>
+      <Prov info={r.prov}>{v.display}</Prov>
     </RevealTip>
   );
 }
@@ -120,31 +114,42 @@ function HeadlineUsd({
 /** A side holding one asset: its amount with its icon, and the USD line
  *  beneath in cents (the Liquity V2 headline). The amount is the spoke's
  *  balance where the chain read has landed (`chainBalances`), else the
- *  events' sum. The USD follows `HeadlineUsd`'s rule: the oracle figure,
- *  else the fallback price's, and no line where no source prices the asset. */
+ *  events' sum. */
 function oneAssetHead(
   leg: { symbol: string; amount: number },
   what: string,
   chainBalances: boolean,
-  defillamaUsd: number,
-  onchainUsd: number | null | undefined,
-  derivedProv: Provenance,
-  unpricedSymbols: string[],
+  r: AaveV4UsdResult | null,
 ): Pick<PositionCardHead, "value" | "usd"> {
-  const unpriced = onchainUsd == null && unpricedSymbols.includes(leg.symbol);
-  const usd = onchainUsd ?? defillamaUsd;
   return {
     value: (
       <Prov info={chainBalances ? chainTruthProv(what) : accumProv(what, { formula: "in − out" })}>
         <AssetAmount value={leg.amount} symbol={leg.symbol} />
       </Prov>
     ),
-    usd: unpriced ? null : (
-      <Prov info={onchainUsd != null ? usdProvOnchain(what) : derivedProv}>
-        <span className="font-bold text-green-400">{formatUsdValue(usd)}</span>
+    usd: !r ? null : r.prov == null ? (
+      <NoPriceLine r={r} />
+    ) : (
+      <Prov info={r.prov}>
+        <span className="font-bold text-green-400">{formatUsdValue(r.usd)}</span>
       </Prov>
     ),
   };
+}
+
+/** A peak's figure from its receipt, or where no instant could be priced,
+ *  the reserves it lacks a price for (aaveV4PeakState, which the markdown
+ *  export reads too); $0 on the plain receipt where the side held nothing. */
+function peakValue(
+  peak: AaveV4Peak | undefined,
+  unpriced: string[] | undefined,
+  what: string,
+  plain: Provenance,
+): ReactNode {
+  const state = aaveV4PeakState(what, peak, unpriced);
+  if (state == null) return <PeakUsd usd={0} info={plain} />;
+  if (state.prov == null) return <NoPriceLine r={state} />;
+  return <PeakUsd usd={state.usd} info={state.prov} />;
 }
 
 /** A closed card's peak, muted as a historic figure. */
@@ -331,7 +336,11 @@ export function useAaveV4SpokeCardSlots({
   // position ever carried real debt (peak debt under $1); an open card counts
   // any live debt, so a sub-dollar leftover borrow keeps its Debt and Health
   // factor heads.
-  const supplyOnly = isClosed ? spoke.peakDebtUsd < 1 : spoke.totalDebtUsd <= 0;
+  // A debt peak with no figure (its reserves unpriced) still means the
+  // position carried debt.
+  const supplyOnly = isClosed
+    ? spoke.peakDebtUsd < 1 && (spoke.peakDebtUnpriced ?? []).length === 0
+    : spoke.totalDebtUsd <= 0;
 
   const identity = (
     <span className="flex items-center gap-2">
@@ -379,7 +388,7 @@ export function useAaveV4SpokeCardSlots({
       {
         id: "peak-collateral",
         label: supplyOnly ? CARD_VOCAB.peakSupply : CARD_VOCAB.peakCollateral,
-        value: <PeakUsd usd={spoke.peakSupplyUsd} info={PEAK_COLL_PROV} />,
+        value: peakValue(spoke.peakSupply, spoke.peakSupplyUnpriced, AAVE_V4_PEAK_WHAT.supply, PEAK_COLL_PROV),
       },
       ...(supplyOnly
         ? []
@@ -387,7 +396,7 @@ export function useAaveV4SpokeCardSlots({
             {
               id: "peak-debt",
               label: CARD_VOCAB.peakDebt,
-              value: <PeakUsd usd={spoke.peakDebtUsd} info={PEAK_DEBT_PROV} />,
+              value: peakValue(spoke.peakDebt, spoke.peakDebtUnpriced, AAVE_V4_PEAK_WHAT.debt, PEAK_DEBT_PROV),
             },
           ]),
     ];
@@ -427,29 +436,34 @@ export function useAaveV4SpokeCardSlots({
   const oneSupply = single(supplyLegs, spoke.supplyingSymbols);
   const oneColl = single(collLegs, spoke.supplyBreakdown.collateralSymbols);
   const oneDebt = single(debtLegs, spoke.borrowingSymbols);
+  // Each side's dollars and receipt (ui-jobs 743; lib/aave-v4/spoke-usd.ts).
+  const supplyR = aaveV4SpokeSideUsd(spoke, "supply");
+  const collR = aaveV4SpokeSideUsd(spoke, "collateral");
+  const debtR = aaveV4SpokeSideUsd(spoke, "debt");
+  const nonCollR = aaveV4SpokeSideUsd(spoke, "nonCollateral");
   // Supplies not enabled as collateral: they cannot be seized and do not move
-  // the health factor. The on-chain figure (supply − collateral, both priced)
-  // where it stands, else the DefiLlama one, on a line under the Collateral
-  // headline (TO-DO-position-card 341).
-  const nonCollUsd = spoke.supplyBreakdown.nonCollateralUsd;
-  const onchainNonColl = onc && onc.supply != null && onc.collateral != null ? onc.supply - onc.collateral : null;
+  // the health factor; a line under the Collateral headline (TO-DO-position-card 341).
   const nonCollSub: ReactNode =
-    !supplyOnly && nonCollUsd > 0
-      ? (() => {
-          const v = fmtUsd(onchainNonColl ?? nonCollUsd);
+    !supplyOnly && nonCollR ? (
+      nonCollR.prov == null ? (
+        <span data-collateral-sub="not-collateral">
+          + <NoPriceLine r={nonCollR} /> supplied, not collateral
+        </span>
+      ) : nonCollR.usd > 0 ? (
+        (() => {
+          const v = fmtUsd(nonCollR.usd);
           return (
             <span data-collateral-sub="not-collateral">
               +
               <RevealTip tip={v.title}>
-                <Prov info={onchainNonColl != null ? usdProvOnchain("Supplied, not collateral") : NONCOLL_USD_PROV}>
-                  {v.display}
-                </Prov>
+                <Prov info={nonCollR.prov}>{v.display}</Prov>
               </RevealTip>{" "}
               supplied, not collateral
             </span>
           );
         })()
-      : undefined;
+      ) : undefined
+    ) : undefined;
 
   const heads: PositionCardHead[] = supplyOnly
     ? [
@@ -457,27 +471,11 @@ export function useAaveV4SpokeCardSlots({
           id: "supplied",
           label: "Supplied",
           ...(oneSupply
-            ? oneAssetHead(
-                oneSupply,
-                "Currently supplied",
-                chainBalances,
-                spoke.totalSupplyUsd,
-                onc?.supply,
-                SUPPLY_USD_PROV,
-                spoke.unpricedSymbols,
-              )
+            ? oneAssetHead(oneSupply, "Currently supplied", chainBalances, supplyR)
             : {
-                pending: supplyUsdPending,
+                pending: supplyUsdPending || isPending(supplyR),
                 assets: cluster(spoke.supplyingSymbols),
-                value: (
-                  <HeadlineUsd
-                    defillamaUsd={spoke.totalSupplyUsd}
-                    onchainUsd={onc?.supply}
-                    derivedProv={SUPPLY_USD_PROV}
-                    onchainLabel="Currently supplied"
-                    unpricedSymbols={spoke.unpricedSymbols}
-                  />
-                ),
+                value: <HeadlineUsd r={supplyR} />,
               }),
         },
       ]
@@ -490,53 +488,22 @@ export function useAaveV4SpokeCardSlots({
           label: CARD_VOCAB.collateral,
           sub: nonCollSub,
           ...(oneColl
-            ? oneAssetHead(
-                oneColl,
-                "Current collateral",
-                chainBalances,
-                spoke.supplyBreakdown.collateralUsd,
-                onc?.collateral,
-                COLL_USD_PROV,
-                spoke.unpricedSymbols,
-              )
+            ? oneAssetHead(oneColl, "Current collateral", chainBalances, collR)
             : {
-                pending: supplyUsdPending,
+                pending: supplyUsdPending || isPending(collR),
                 assets: cluster(spoke.supplyBreakdown.collateralSymbols),
-                value: (
-                  <HeadlineUsd
-                    defillamaUsd={spoke.supplyBreakdown.collateralUsd}
-                    onchainUsd={onc?.collateral}
-                    derivedProv={COLL_USD_PROV}
-                    onchainLabel="Current collateral"
-                    unpricedSymbols={spoke.unpricedSymbols}
-                  />
-                ),
+                value: <HeadlineUsd r={collR} />,
               }),
         },
         {
           id: "debt",
           label: CARD_VOCAB.debt,
           ...(oneDebt
-            ? oneAssetHead(
-                oneDebt,
-                "Current debt",
-                chainBalances,
-                spoke.totalDebtUsd,
-                onc?.debt,
-                DEBT_USD_PROV,
-                spoke.unpricedSymbols,
-              )
+            ? oneAssetHead(oneDebt, "Current debt", chainBalances, debtR)
             : {
+                pending: isPending(debtR),
                 assets: cluster(spoke.borrowingSymbols),
-                value: (
-                  <HeadlineUsd
-                    defillamaUsd={spoke.totalDebtUsd}
-                    onchainUsd={onc?.debt}
-                    derivedProv={DEBT_USD_PROV}
-                    onchainLabel="Current debt"
-                    unpricedSymbols={spoke.unpricedSymbols}
-                  />
-                ),
+                value: <HeadlineUsd r={debtR} />,
               }),
         },
         {

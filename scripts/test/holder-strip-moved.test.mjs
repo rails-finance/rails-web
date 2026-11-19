@@ -65,7 +65,7 @@ const board = {
       defensiveMcr: 1.5,
       defensiveMode: false,
       interestRate: 0.03,
-      price: { pethInDebt: 6000, pethUsd: 6000, xauUsd: null },
+      price: { pethInDebt: 6000, pethUsd: 6000, curve: 2, ethUsd: 3000, xauUsd: null },
     },
   ],
 };

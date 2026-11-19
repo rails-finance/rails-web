@@ -14,6 +14,7 @@
 // `/api/aave-v4-base/reserves`); receipts lib/aave-v4/market-provenance.ts.
 // Present, don't rank: hubs in their canonical order, one neutral shade.
 
+import { shownUsd } from "@/lib/shared/shown-usd";
 import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { ChevronDown } from "lucide-react";
@@ -33,7 +34,6 @@ import {
   DataTableHeader,
   DataTableRow,
 } from "@/components/shared/data-table/data-table";
-import { PricesProvider } from "@/lib/shared/prices-context";
 import { aaveV4Modal } from "@/lib/aave-v4/event-templates";
 import { fmtUsd } from "@/lib/aave-v4/format";
 import { formatCompact } from "@/lib/shared/format-compact";
@@ -78,7 +78,8 @@ const priceOf = (l: { underlying: string }, book: Prices) => book(l.underlying)?
 
 function usd(tokens: number, price: number | null, symbol: string): { display: string; title: string } {
   if (tokens === 0) return { display: price != null ? "$0" : `0 ${symbol}`, title: "None" };
-  if (price != null) return fmtUsd(tokens * price);
+  // The amount × the price as the receipt shows them, to the cent.
+  if (price != null) return fmtUsd(shownUsd(tokens, price));
   return { display: `${formatCompact(tokens)} ${symbol}`, title: `${tokens.toLocaleString("en-US")} ${symbol}` };
 }
 
@@ -109,9 +110,8 @@ function hubHead(s: V4Stored, h: V4Hub, prices: Prices): ProductHead {
   const borSum = sumOf("borrowed");
   const supplied = supSum.usd;
   const borrowed = borSum.usd;
-  const sup = fmtUsd(supplied);
-  const bor = fmtUsd(borrowed);
-  const partial = supSum.unpriced.length > 0 || borSum.unpriced.length > 0;
+  const sup = fmtUsd(supplied ?? 0);
+  const bor = fmtUsd(borrowed ?? 0);
   const n = h.spokes.length;
   /** Arc: the hub's totals, which count its tokenization and treasury spokes too. */
   const own = h.assets.some((x) => x.hubTotal);
@@ -124,16 +124,16 @@ function hubHead(s: V4Stored, h: V4Hub, prices: Prices): ProductHead {
     {
       slot: "sizeIn",
       label: own ? "Hub supplied" : "Supplied",
-      tip: sup.title,
+      tip: supplied != null ? sup.title : undefined,
       value: <PricedTotal sum={supSum} info={storedValueProv("supplied", `The ${h.label} hub`, c, supSum, own)} />,
     },
     {
       slot: "sizeOut",
       label: own ? "Hub borrowed" : "Borrowed",
-      tip: bor.title,
+      tip: borrowed != null ? bor.title : undefined,
       value: <PricedTotal sum={borSum} info={storedValueProv("borrowed", `The ${h.label} hub`, c, borSum, own)} />,
     },
-    ...(supplied > 0 && !partial
+    ...(supplied != null && borrowed != null && supplied > 0
       ? [
           {
             slot: "usage" as const,
@@ -284,7 +284,7 @@ function CreditLines({ s, a, prices }: { s: V4Stored; a: V4HubAsset; prices: Pri
                 <Prov info={storedAmountProv("add cap", scope, c)}>{capText(l.addCap, a.symbol)}</Prov>
               </DataTableCell>
               <DataTableCell align="right" className={NUM}>
-                <Prov info={pricedAmountProv(storedAmountProv("supplied", scope, c), a.symbol, p, c)}>
+                <Prov info={pricedAmountProv(storedAmountProv("supplied", scope, c), a.symbol, p, c, l.supplied)}>
                   <span title={sup.title}>{sup.display}</span>
                 </Prov>
               </DataTableCell>
@@ -292,7 +292,7 @@ function CreditLines({ s, a, prices }: { s: V4Stored; a: V4HubAsset; prices: Pri
                 <Prov info={storedAmountProv("draw cap", scope, c)}>{capText(l.drawCap, a.symbol)}</Prov>
               </DataTableCell>
               <DataTableCell align="right" className={NUM}>
-                <Prov info={pricedAmountProv(storedAmountProv("borrowed", scope, c), a.symbol, p, c)}>
+                <Prov info={pricedAmountProv(storedAmountProv("borrowed", scope, c), a.symbol, p, c, l.borrowed)}>
                   <span title={drawn.title}>{drawn.display}</span>
                 </Prov>
               </DataTableCell>
@@ -341,6 +341,7 @@ function AssetRow({ s, h, a, prices }: { s: V4Stored; h: V4Hub; a: V4HubAsset; p
           a.symbol,
           p,
           c,
+          tokens,
         )}
       >
         <span title={v.title}>{v.display}</span>
@@ -586,9 +587,5 @@ function HubsBody({ d }: { d: V4Deployment }) {
 
 /** The Hubs page of one deployment. */
 export function AaveV4HubsPage({ d }: { d: V4Deployment }) {
-  return (
-    <PricesProvider>
-      <HubsBody d={d} />
-    </PricesProvider>
-  );
+  return <HubsBody d={d} />;
 }

@@ -10,6 +10,7 @@
 // auctions the page read. The mechanisms behind them are the card's "?"
 // (position_* in the same file).
 
+import { makerVaultCollateralUsd } from "@/lib/makerdao/usd-receipt";
 import type { ReactNode } from "react";
 import { usdPrice } from "@/lib/makerdao/price-format";
 import type { MakerVaultView } from "./makerdao-vault-card";
@@ -21,13 +22,7 @@ import type { ExternalActorSummary } from "@/lib/shared/external-actor";
 import { AmountText } from "@/components/shared/amount-text";
 import { Prov } from "@/components/shared/provenance";
 import { formatNumber, formatExact } from "@/lib/utils/format";
-import {
-  collateralRatioProv,
-  collateralUsdProv,
-  daiDebtProv,
-  stabilityFeeAprProv,
-  vaultInkProv,
-} from "@/lib/makerdao/event-provenance";
+import { collateralRatioProv, daiDebtProv, stabilityFeeAprProv, vaultInkProv } from "@/lib/makerdao/event-provenance";
 import { LinkedAddress } from "@/components/shared/linked-address";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isMakerDAOEvent } from "@/lib/shared/types/event-shape";
@@ -133,7 +128,9 @@ export function MakerdaoPositionExplanation({
     hasDebt && v.drawnDai != null && (v.debtDai as number) - v.drawnDai > 0.005
       ? (v.debtDai as number) - v.drawnDai
       : null;
-  const ratio = hasDebt && v.collateralUsd != null ? v.collateralUsd / (v.debtDai as number) : null;
+  // The collateral's dollars as the card draws them: the shown product.
+  const collReceipt = makerVaultCollateralUsd(v);
+  const ratio = hasDebt && collReceipt ? collReceipt.usd / (v.debtDai as number) : null;
   const drop =
     v.liquidationPriceUsd != null && v.priceUsd != null && v.priceUsd > 0
       ? 1 - v.liquidationPriceUsd / v.priceUsd
@@ -176,10 +173,10 @@ export function MakerdaoPositionExplanation({
   // and the OSM (lib/sources/chain/makerdao-lse-oracle.ts).
   const cap = v.priceCap ?? null;
   const capBinds = cap != null && cap.oracleUsd != null && cap.oracleUsd > cap.capUsd;
-  if (v.collateralUsd != null && v.priceUsd != null) {
+  if (collReceipt) {
     const collUsd = (
-      <Prov info={collateralUsdProv(sym, formatNumber(v.ink), v.priceUsd)}>
-        <H>{formatUsd(v.collateralUsd)}</H>
+      <Prov info={collReceipt.prov}>
+        <H>{formatUsd(collReceipt.usd)}</H>
       </Prov>
     );
     add(
@@ -214,7 +211,7 @@ export function MakerdaoPositionExplanation({
   const ratioNode =
     ratio != null ? (
       <Prov
-        info={collateralRatioProv(formatUsd(v.collateralUsd as number), `${formatNumber(v.debtDai as number)} ${dsym}`)}
+        info={collateralRatioProv(formatUsd(collReceipt?.usd ?? 0), `${formatNumber(v.debtDai as number)} ${dsym}`)}
       >
         <H>{(ratio * 100).toFixed(0)}%</H>
       </Prov>

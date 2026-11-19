@@ -13,6 +13,7 @@
 // (lib/compound-base/share-card.ts), which asks the same question of a live
 // chain read instead of an indexed row.
 
+import { shownUsd } from "@/lib/shared/shown-usd";
 import type { CompoundPositionSummary } from "@/lib/sources/api/compound-positions";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import { formatUsd } from "@/lib/shared/format-event";
@@ -58,11 +59,11 @@ export function compoundEffectiveSide(position: CompoundPositionSummary): {
   return { amount: position.base.amount, side: position.side };
 }
 
-/** On-chain oracle USD for one asset; null when this market didn't price it —
- *  mirrors `assetUsd` in compound-position-card.tsx. */
+/** On-chain oracle USD for one asset, the card's shown product (ui-jobs
+ *  743); null when this market didn't price it. */
 function assetUsd(priceByAddress: Record<string, number> | undefined, address: string, amount: number): number | null {
   const p = priceByAddress?.[address.toLowerCase()];
-  return typeof p === "number" && p > 0 ? amount * p : null;
+  return typeof p === "number" && p > 0 ? shownUsd(amount, p) : null;
 }
 
 /** Total USD across a set of legs, null the moment any contributing leg is
@@ -78,7 +79,7 @@ function totalUsd(
     if (amount <= 0) continue;
     const u = assetUsd(priceByAddress, address, amount);
     if (u == null) return null;
-    sum += u;
+    sum = Math.round((sum + u) * 100) / 100;
     any = true;
   }
   return any ? sum : null;

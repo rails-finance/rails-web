@@ -147,6 +147,8 @@ import { EventPageContext, EventPageTitle } from "@/components/shared/event-page
 import type { EventPageContract, EventPageSlot } from "@/lib/shared/explorer-adapter";
 import { setCardOpen } from "@/lib/shared/card-open-store";
 import { IndexNotice } from "@/components/shared/index-notice";
+import { TimelineSearchedNotice, timelineSearched } from "@/components/shared/timeline-searched-notice";
+import type { TimelineLoadOlder } from "@/lib/shared/timeline-size";
 import { useChainId } from "@/lib/shared/chain-context";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { decodeEventId } from "@/lib/shared/page-metadata";
@@ -494,6 +496,11 @@ export interface ChainTruthTimelineProps {
    *  there — the neighbouring row's own `isLast` is handed to it, so the spine
    *  runs through into the glyph and ends there. */
   boundary?: TimelineBoundary | null;
+  /** The page's read of the events past its cut, where it has one (the Trove
+   *  page's whole-history read): the cut-page notice (L11) offers it under a
+   *  Size or Type filter. Omitted, the notice states what was searched and
+   *  offers nothing. */
+  loadOlder?: TimelineLoadOlder;
   /** The boundary card names the CSV download when the page's export menu
    *  can fetch the whole history in one answer. Pass the arm's whole-answer
    *  ceiling (`INDEX_ROW_CEILING`, `DRAINED_ROW_CEILING`) or null where the
@@ -758,6 +765,7 @@ function ChainTruthTimelineBody({
   footerWhileMore,
   notice,
   boundary,
+  loadOlder,
   csvExportCeiling,
   persistKeyPrefix,
   eventPage,
@@ -851,6 +859,10 @@ function ChainTruthTimelineBody({
     );
     return { ...tl, filteredCount: count, filteredCountIsFloor: floor };
   }, [tl, servedRows, folders]);
+
+  // What a Size or Type filter searched on a page holding fewer events than
+  // the history (L11, ui-jobs 752 and 753).
+  const searched = still ? null : timelineSearched(toolbarTl);
 
   // The pill editors' draft count: the applied count's rule over an
   // unapplied view (ui-jobs 735), a floor while a folder it splits is unread.
@@ -2148,6 +2160,7 @@ function ChainTruthTimelineBody({
               }
             />
           </div>
+          {searched && <TimelineSearchedNotice notice={searched} loadOlder={loadOlder} />}
           {/* THE NARROWING ROW (L2): the cut's chip, while the chart cuts or
             leads the list. The filters state themselves on their pills in the
             toolbar (ui-jobs 735). No cut, no row. */}
@@ -2446,11 +2459,13 @@ function ChainTruthTimelineBody({
                       ? segmentNotice
                       : tl.isFiltered && cut != null && tl.sortedEvents.some((e) => e.timestamp <= cut)
                         ? `Nothing to ${rewind!.word} matches these filters.`
-                        : tl.isFiltered
-                          ? "All events filtered out: adjust the filters above to show some."
-                          : cut != null
-                            ? cutEmptyState(cut, rewind!.word)
-                            : emptyLabel}
+                        : searched
+                          ? "None of the searched events match these filters."
+                          : tl.isFiltered
+                            ? "All events filtered out: adjust the filters above to show some."
+                            : cut != null
+                              ? cutEmptyState(cut, rewind!.word)
+                              : emptyLabel}
                   </div>
                 </>
               )}

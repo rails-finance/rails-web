@@ -513,28 +513,6 @@ export const lifetimeCollateralDriftProv = (
   ],
 });
 
-// ── USD (chain oracle at a named block) ──────────────────────────────────────
-
-/** Position collateral valued in USD — settled colls (NORMALIZED units) × the
- *  pool oracle's USD price per normalized unit, naming the price block. */
-export const fxPositionUsdProv = (normalizedSym: string, priceBlock?: number | null): Provenance => ({
-  kind: "chain-derived",
-  pclass: "oracle",
-  summary: `The position's collateral valued in USD — the settled collateral (the pool's own getPosition, NORMALIZED ${normalizedSym} units) multiplied by the pool oracle's USD price per normalized unit${priceBlock != null ? `, read at block ${priceBlock}` : ""}. Both legs are chain reads at named blocks — the same oracle the pool's own liquidation math consults. The oracle quotes three prices (anchor / min / max) and this figure uses the MIN leg — the conservative price the protocol itself calls getLiquidatePrice, chain-verified as the one the sweep snapshots (scripts/verify-fx-chain.mjs). The LTV beside it is judged at the ANCHOR leg instead, so the two figures deliberately sit at different prices. Normalized amounts only: an operate's token-unit deltas are never priced with this figure.`,
-  contract: { name: "AaveFundingPool", address: "" },
-  via: "settled collateral × pool oracle min (liquidate) price (both eth_call at named blocks)",
-  formula: "settled colls × oracle min (liquidate) price",
-  inputs: [
-    { label: "settled colls", kind: "chain", pclass: "state", note: "pool getPosition rawColls (the sweep)" },
-    {
-      label: "oracle price",
-      kind: "chain",
-      pclass: "oracle",
-      note: `pool oracle min (liquidate) leg — USD per ${normalizedSym}${priceBlock != null ? ` at block ${priceBlock}` : ""}`,
-    },
-  ],
-});
-
 // ── per-row reads (getPosition at block − 1 and at the block) ────────────────
 
 const rowReadVerify = (block?: number): ProvVerify => ({
@@ -714,16 +692,6 @@ export const oracleLegAtProv = (leg: "anchor" | "min", sym: string, block: numbe
       : `The oracle's min price, USD per ${sym}, at block ${block} — the same block as the collateral and debt. The pool checks borrowing and withdrawing (the 85.5% ceiling), rebalancing (from 88%) and liquidation (from 95%) against it: BasePool.operate uses getExchangePrice, rebalance getPrice's min leg, liquidate getLiquidatePrice, all the min leg.`,
   contract: { name: "AaveFundingPool", address: "" },
   via: "pool.priceOracle() · getPrice() (archive eth_call at the settled block)",
-});
-
-/** The position's collateral valued at the anchor price of the settled block. */
-export const anchorUsdProv = (sym: string, block: number | null): Provenance => ({
-  kind: "chain-derived",
-  pclass: "oracle",
-  summary: `The collateral in USD — the settled collateral (getPosition, ${sym}) times the oracle's anchor price${block != null ? ` at block ${block}` : ""}, the price the LTV uses, so the debt divided by this figure is the ratio.`,
-  contract: { name: "AaveFundingPool", address: "" },
-  via: "settled colls × anchor price (same block)",
-  formula: "colls × anchor",
 });
 
 /** The debt ratio at the min price: debts ÷ (colls × min). */

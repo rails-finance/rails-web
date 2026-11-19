@@ -30,6 +30,7 @@
 // overlay — the cdpManager's own entire figures at head, the primary truth on
 // the detail page).
 
+import { polarisDebtUsd, polarisEquity, polarisPethUsd } from "@/lib/polaris/usd-receipt";
 import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { PositionNameId } from "@/components/shared/position-name-id";
 import { SkeletonBar } from "@/components/shared/skeleton-card";
@@ -61,7 +62,6 @@ import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { latestStateProv, lifetimeLegProv, peakProv } from "@/lib/polaris/event-provenance";
 import {
   polarisDebtOwed,
-  polarisEquityAtFeed,
   polarisPendingAtFeed,
   polarisPsmOutcomeAtFeed,
   type PolarisLifetime,
@@ -71,7 +71,6 @@ import { polarisPsmOutcomeAtFeedProv } from "@/lib/polaris/economics-explanation
 import {
   listingIcrProv,
   liveEntireProv,
-  liveEquityProv,
   liveIcrProv,
   liveMcrProv,
   liveModeProv,
@@ -79,8 +78,6 @@ import {
   livePendingToSettleProv,
   liveRateProv,
   liveRecordedDebtProv,
-  liveUsdValueProv,
-  liveDebtUsdProv,
   polarisAnnualCostProv,
   againstHoldingProv,
 } from "@/lib/polaris/live-provenance";
@@ -135,11 +132,16 @@ export interface PolarisPositionView {
   /** Collateral valued by the protocol's own feed — the position read on the
    *  chain lane, the market board's own legs on the index lane. */
   collUsd: number | null;
+  /** The receipts behind collUsd, debtUsd and equity: the shown rows, each
+   *  price at its read's block (ui-jobs 743). */
+  collUsdProv?: Provenance | null;
+  debtUsdProv?: Provenance | null;
+  equityProv?: Provenance | null;
   /** The debt in USD: USDp at one dollar, GOLDp at the XAU/USD leg of the
    *  same read. */
   debtUsd: number | null;
   /** Chain lane only — entireColl × the feed's pETH-in-debt-unit price, minus
-   *  the debt owed (polarisEquityAtFeed). A valuation at the block, not a
+   *  the debt owed, from the shown rows (lib/polaris/usd-receipt.ts). A valuation at the block, not a
    *  profit — may be negative. An entire debt below zero is the stables the
    *  next touch mints to the holder, so it adds to the equity. */
   equity: number | null;
@@ -587,8 +589,8 @@ export function polarisCardSlots({
               )
             : undefined,
         usd:
-          v.collUsd != null && v.collUsd > 0 ? (
-            <Prov info={liveUsdValueProv("Collateral", index)} value={formatUsdValue(v.collUsd)}>
+          v.collUsd != null && v.collUsd > 0 && v.collUsdProv ? (
+            <Prov info={v.collUsdProv} value={formatUsdValue(v.collUsd)}>
               <span className="font-bold text-green-400">{formatUsdValue(v.collUsd)}</span>
             </Prov>
           ) : v.pricePending && v.coll > 0 ? (
@@ -641,8 +643,8 @@ export function polarisCardSlots({
                 )
               : undefined,
         usd:
-          v.debtUsd != null && v.debtUsd > 0 ? (
-            <Prov info={liveDebtUsdProv(v.market, index)} value={formatUsdValue(v.debtUsd)}>
+          v.debtUsd != null && v.debtUsd > 0 && v.debtUsdProv ? (
+            <Prov info={v.debtUsdProv} value={formatUsdValue(v.debtUsd)}>
               <span className="font-bold text-green-400">{formatUsdValue(v.debtUsd)}</span>
             </Prov>
           ) : v.pricePending && v.debt > 0 ? (
@@ -668,7 +670,13 @@ export function polarisCardSlots({
                   </span>
                 </Prov>
               ) : (
-                <Prov info={liveIcrProv(v.market)} value={pct(v.icr)}>
+                <Prov
+                  info={liveIcrProv(
+                    v.market,
+                    v.pethInDebt != null ? { pethInDebt: v.pethInDebt, block: v.blockNumber } : null,
+                  )}
+                  value={pct(v.icr)}
+                >
                   <span className={belowMin ? "text-red-500" : undefined}>
                     {formatPolarisRatio(v.icr, 1, mcrInForce ?? undefined)}
                   </span>
@@ -768,14 +776,14 @@ export function polarisCardSlots({
   // the debt costs and what is pending on the right.
   const left: PositionPanelRow[] = [];
   const right: PositionPanelRow[] = [];
-  if (v.basis === "chain" && v.equity != null && v.coll > 0) {
+  if (v.basis === "chain" && v.equity != null && v.equityProv && v.coll > 0) {
     left.push({
       id: "equity",
       label: "Equity at the feed",
       tip: "The collateral at the market's price feed less the debt owed, read at this block; it moves with the feed and can be negative.",
       value: (
         <TokenFigure symbol={stable} address={stableAddress}>
-          <Prov info={liveEquityProv(v.market)}>
+          <Prov info={v.equityProv}>
             <span>
               <CardFigure value={v.equity} symbol={stable} signed />
             </span>
@@ -868,11 +876,49 @@ export function PolarisPositionCard(props: PolarisPositionCardProps) {
   return <PositionCard slots={polarisCardSlots(props)} />;
 }
 
-/** A debt in USD: USDp is a dollar by construction, GOLDp a troy ounce at the
- *  XAU/USD leg of the market's price read. */
-function debtInUsd(market: PolarisMarket, debt: number, xauUsd: number | null): number | null {
-  if (market === "usdp") return debt;
-  return xauUsd != null && xauUsd > 0 ? debt * xauUsd : null;
+/** The collateral and debt in dollars from the shown rows, each price at its
+ *  read's block (ui-jobs 743): pETH at the curve × ETH/USD, USDp at its $1
+ *  face, GOLDp at XAU/USD. No price, no figure. */
+function usdOf(
+  market: PolarisMarket,
+  coll: number,
+  debt: number,
+  price: { curve: number; ethUsd: number; xauUsd: number | null } | null,
+  block: number | null,
+  via: string,
+): Pick<PolarisPositionView, "collUsd" | "collUsdProv" | "debtUsd" | "debtUsdProv"> {
+  const c = price
+    ? polarisPethUsd({
+        what: "Collateral in USD",
+        coll,
+        amountNote: "the CDP's pETH collateral",
+        curve: price.curve,
+        ethUsd: price.ethUsd,
+        block,
+        via,
+      })
+    : null;
+  const d = price ? polarisDebtUsd({ market, debt, xauUsd: price.xauUsd, block, via }) : null;
+  return {
+    collUsd: c?.usd ?? null,
+    collUsdProv: c?.prov ?? null,
+    debtUsd: d?.usd ?? null,
+    debtUsdProv: d?.prov ?? null,
+  };
+}
+
+/** The equity at the feed from the shown rows. */
+function equityOf(c: PolarisChainResponse): Pick<PolarisPositionView, "equity" | "equityProv"> {
+  const e = c.price
+    ? polarisEquity({
+        market: c.market,
+        coll: c.entireColl,
+        debt: c.entireDebt,
+        pethInDebt: c.price.pethInDebt,
+        block: c.blockNumber,
+      })
+    : null;
+  return { equity: e?.equity ?? null, equityProv: e?.equityProv ?? null };
 }
 
 /** Build a card view from the listing summary row (the index).
@@ -906,8 +952,14 @@ export function viewFromSummary(
     collRaw: s.collRaw,
     debt: s.debt,
     debtRaw: s.debtRaw,
-    collUsd: board && s.coll > 0 ? s.coll * board.price.pethUsd : null,
-    debtUsd: board && s.debt > 0 ? debtInUsd(s.market, s.debt, board.price.xauUsd) : null,
+    ...usdOf(
+      s.market,
+      s.coll,
+      s.debt,
+      board?.price ?? null,
+      markets?.blockNumber ?? null,
+      "GET /api/chain/polaris/markets · the market board's prices",
+    ),
     equity: null,
     recordedDebt: null,
     icr: priced && board ? (s.coll * board.price.pethInDebt) / s.debt : null,
@@ -948,9 +1000,8 @@ export function viewFromChain(c: PolarisChainResponse): PolarisPositionView {
     collRaw: c.entireCollRaw,
     debt: c.entireDebt,
     debtRaw: c.entireDebtRaw,
-    collUsd: c.price ? c.entireColl * c.price.pethUsd : null,
-    debtUsd: c.price && c.entireDebt > 0 ? debtInUsd(c.market, c.entireDebt, c.price.xauUsd) : null,
-    equity: c.price ? polarisEquityAtFeed(c.entireColl, c.entireDebt, c.price.pethInDebt) : null,
+    ...usdOf(c.market, c.entireColl, c.entireDebt, c.price ?? null, c.blockNumber, "GET /api/chain/polaris/position"),
+    ...equityOf(c),
     recordedDebt: c.recordedDebt,
     icr: c.icr,
     mcr: c.defensiveMode ? c.defensiveMcr : c.mcr,

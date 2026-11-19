@@ -24,6 +24,7 @@ import type { BasedollarTroveSummary } from "@/lib/sources/api/basedollar-troves
 import type { OraclePricesData } from "@/types/api/oracle";
 import type { ArbitrumReadRow } from "@/components/shared/arbitrum-positions-listing";
 import type { CometCard } from "@/lib/compound-arbitrum/comet-cards";
+import type { WalletKind } from "@/lib/wallet/wallet-filters";
 
 /** "redeemed" is in the type for the families that end a position by
  *  redemption; no store states it as an ending yet (a fully redeemed Liquity
@@ -91,6 +92,8 @@ export interface WalletPosition {
   positionId: string;
   href: string;
   status: WalletPositionStatus;
+  /** Trove, deposit, loan or vault, for the Kind pill (ui-jobs 738). */
+  kind?: WalletKind;
   card: WalletCard;
   collateralUsd?: number;
   debtUsd?: number;
@@ -159,4 +162,10 @@ export interface WalletRead {
   ms: number;
   /** Set when the summary route did not answer: the page says so. */
   error?: string;
+  /** The protocol the read was narrowed to (`?protocol=`); unset for every
+   *  protocol. */
+  protocol?: string;
+  /** Every protocol the summary rows name, with its row count, for the
+   *  Protocol pill: a narrowed read still offers the others. */
+  held: { slug: string; name: string; positions: number }[];
 }
