@@ -2,7 +2,7 @@ import type { Provenance } from "@/components/shared/provenance";
 import { aaveV4NoFigureLine } from "@/lib/aave-v4/price-notes";
 import { resolvePrice, type PriceEntry } from "@/lib/aave/prices";
 import { shownUsd } from "@/lib/shared/shown-usd";
-import { listSymbols, pricesHaveLoaded, UNPRICED_DUST_TOKENS } from "@/lib/aave-v4/unpriced";
+import { listSymbols, pricesHaveLoaded, unpricedFloor } from "@/lib/aave-v4/unpriced";
 import type { ReserveStats } from "@/lib/aave-v4/spoke-cards";
 
 /** Lifetime USD totals that mirror the tower chart's breakdown-legend rows
@@ -88,9 +88,11 @@ function leg(
   outflowUsd: number,
   price: number | null,
   complete: boolean,
+  floor: number,
 ): LifetimeLeg {
   const held = current ?? Math.max(0, inflow - outflow);
-  const heldUsd = held <= 0 ? 0 : price == null ? null : shownUsd(held, price);
+  // A balance at or below the residue floor (unpricedFloor) is held at $0.
+  const heldUsd = held <= floor ? 0 : price == null ? null : shownUsd(held, price);
   // interest = held − (in − out): what the balance carries beyond the events.
   const interest = current == null ? null : current - (inflow - outflow);
   const accounted =
@@ -120,6 +122,7 @@ export function reserveLifetime(
   price: number | null,
   historyComplete = true,
 ): { supply: LifetimeLeg; debt: LifetimeLeg } {
+  const floor = unpricedFloor(r);
   return {
     supply: leg(
       r.currentSupplied,
@@ -128,6 +131,7 @@ export function reserveLifetime(
       r.withdrawnUsd + r.liquidatedCollateralUsd,
       price,
       historyComplete,
+      floor,
     ),
     debt: leg(
       r.currentBorrowed,
@@ -136,6 +140,7 @@ export function reserveLifetime(
       r.repaidUsd + r.liquidatedDebtUsd,
       price,
       historyComplete,
+      floor,
     ),
   };
 }
@@ -168,7 +173,7 @@ export function computeAaveLifetimeTotals(
     // Holdings at the live price; flows at the price stored for their block.
     const price = resolvePrice(r.symbol, prices);
     const { supply, debt } = reserveLifetime(r, price, historyComplete);
-    if (mapAnswered && price == null && (supply.held > UNPRICED_DUST_TOKENS || debt.held > UNPRICED_DUST_TOKENS)) {
+    if (mapAnswered && price == null && (supply.held > unpricedFloor(r) || debt.held > unpricedFloor(r))) {
       t.unpricedSymbols.push(r.symbol);
     }
     const add = (a: number | null, b: number | null) => (a == null || b == null ? null : cents(a + b));
@@ -220,15 +225,15 @@ export const INTEREST_AMOUNT_NOTE = {
 } as const;
 
 /** Why an interest figure, or an all-time figure set apart from the interest,
- *  is not drawn: once anything has left the side, the interest may have left
- *  with it at the outflows' blocks, and no price stands at its own block. */
-export const SETTLED_INTEREST_NOTE =
+ *  is not drawn. The receipt holds the reason in full; the Explanation's
+ *  bullet gives it in a clause. */
+const SETTLED_INTEREST_NOTE =
   "some of the interest may have left with the withdrawals, repayments or liquidations, each at its own block, and the events do not say how much left at which, so the interest has no on-chain price at its own block";
 
-export function noInterestFigureProv(what: string, side: "supply" | "debt"): Provenance {
+export function noInterestFigureProv(what: string): Provenance {
   return {
     kind: "derived",
-    summary: `${what} — no dollar figure: ${SETTLED_INTEREST_NOTE}. The side bar shows ${side === "supply" ? "supplied and earned" : "borrowed and accrued"} together: what is held now at the latest block's price plus each outflow at the price of the block it left at.`,
+    summary: `${what} — no dollar figure: ${SETTLED_INTEREST_NOTE}.`,
     via: "no on-chain price at the interest's own block",
   };
 }
