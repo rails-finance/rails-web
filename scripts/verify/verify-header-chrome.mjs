@@ -132,17 +132,20 @@ const railBg = await rail.evaluate((el) => {
 console.log("   ", JSON.stringify(railBg));
 check(railBg.bg !== "rgba(0, 0, 0, 0)" && railBg.bg !== "transparent", `the rail paints a background (${railBg.bg})`);
 check(railBg.bg === railBg.raised, `the rail takes the raised surface tone (${railBg.bg} vs ${railBg.raised})`);
-// The beta pill (H25, ui-jobs 769): an outlined, rounded button under the
-// mark, in the rail's upper half, opening the feedback form.
+// The beta pill (H25, ui-jobs 769): an outlined, rounded label under the mark,
+// inside the rail's home link, in the rail's upper half; no button, no tab
+// stop of its own.
 const pill = await page.evaluate(() => {
   const r = document.querySelector('aside[aria-label="Rails"]');
-  const el = r.querySelector('button[data-beta-pill="rail"]');
-  const mark = r.querySelector("[data-rail-home]");
+  const el = r.querySelector('[data-beta-pill="rail"]');
+  const mark = r.querySelector("[data-rail-mark]");
   if (!el || !mark) return null;
   const b = el.getBoundingClientRect();
   return {
     text: el.textContent.trim(),
     radius: getComputedStyle(el).borderTopLeftRadius,
+    inHomeLink: !!el.closest('a[href="/"][data-rail-home]'),
+    tag: el.tagName,
     underMark: b.top >= mark.getBoundingClientRect().bottom && b.top - mark.getBoundingClientRect().bottom <= 12,
     inUpperHalf: b.bottom < window.innerHeight / 2,
   };
@@ -152,11 +155,8 @@ if (pill) {
   console.log("   ", JSON.stringify(pill));
   check(/^beta$/i.test(pill.text), `the beta pill reads Beta (${pill.text})`);
   check(parseFloat(pill.radius) >= 7, `the beta pill is rounded (${pill.radius})`);
+  check(pill.inHomeLink && pill.tag === "SPAN", `the beta pill is part of the home link (${pill.tag})`);
   check(pill.underMark && pill.inUpperHalf, "the beta pill sits under the mark");
-  await page.click('aside[aria-label="Rails"] button[data-beta-pill="rail"]');
-  const opened = await page.locator('div[role="dialog"][aria-labelledby="feedback-modal-title"]').count();
-  check(opened === 1, `the beta pill opens the feedback form (${opened})`);
-  await page.keyboard.press("Escape");
 }
 
 // ── The protocol title row: size, case, tracking, and the chain's label on it ──
@@ -340,7 +340,8 @@ const mBurger = await mob.locator('header button[aria-label="Toggle menu"]').cou
 check(mBurger === 0, `mobile header has no hamburger (${mBurger})`);
 // Below `md` the brand rail does not render: the bar is the sidebar toggle,
 // which opens the panel (H15.1), the Rails mark centred as a link home (every
-// page but home) with the beta pill to its right (ui-jobs 769), and H20 (rails-ops TO-DO-ui-jobs 67, 68, 507, 514).
+// page but home) with the beta pill to its right in the same link (ui-jobs
+// 769), and H20 (rails-ops TO-DO-ui-jobs 67, 68, 507, 514).
 const mRail = await mob.locator('aside[aria-label="Rails"]').isVisible();
 check(mRail === false, `mobile draws no brand rail (${mRail})`);
 const mLauncher = await mob.locator('header button[data-anatomy="H15.1"]:visible').count();
@@ -364,8 +365,8 @@ check(
   /^beta$/i.test(mWordmark.trim()) && !/Ethereum/i.test(mWordmark),
   `mobile header shows the beta pill and not the chain (${mWordmark.replace(/\s+/g, " ")})`,
 );
-const mPill = await mob.locator('header button[data-beta-pill="header"]:visible').count();
-check(mPill === 1, `mobile header carries the beta pill (${mPill})`);
+const mPill = await mob.locator('header a[data-home-brand] [data-beta-pill="header"]:visible').count();
+check(mPill === 1, `mobile header's home link carries the beta pill (${mPill})`);
 // The phone header on home (ui-jobs 514): the toggle on the left, H20 on the
 // right, no brand (the hero carries it), no "Start here" (it is in H20's menu).
 // The panel's top row closes it from the toggle's place. The beta pill stands

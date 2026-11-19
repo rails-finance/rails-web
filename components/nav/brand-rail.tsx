@@ -2,13 +2,13 @@
 
 // BrandRail — the narrow vertical strip down the left edge of every page from
 // md (rails-ops TO-DO-ui-jobs 67, 68, 498), fixed, so the nav holds its place
-// as the page scrolls. The Rails mark at the top goes home; under it the
-// beta pill (H25, ui-jobs 769), then the sidebar toggle (H15.1, ui-jobs 514),
-// which opens the wallet panel, sliding out from beneath the rail with the
-// search and the explorer chooser, and closes it from the same place. A press
-// anywhere else on
-// the rail does what the toggle does, the cursor an arrow pointing the way the
-// panel will move (e-resize to open, w-resize to close; Miles, 6 Nov 2026):
+// as the page scrolls. The Rails mark at the top and the beta pill under it
+// (H25, ui-jobs 769) are one link home; under them the sidebar toggle (H15.1,
+// ui-jobs 514) opens the wallet panel, which slides out from beneath the rail
+// with the search and the explorer chooser, and closes it from the same place.
+// A press anywhere else on the rail does what the toggle does, the cursor an
+// arrow pointing the way the panel will move (e-resize to open, w-resize to
+// close; Miles, 6 Nov 2026):
 // a pointer convenience, the toggle stays the keyboard's control. At the foot
 // the theme switch, one button that steps Light, Dark and Auto (Miles 13 Nov
 // 2026, components/nav/theme-switch.tsx).
@@ -57,21 +57,21 @@ export function BrandRail() {
           panelOpen ? "cursor-w-resize" : "cursor-e-resize"
         }`}
       >
-        {/* The Rails mark goes home and holds its place while the panel opens
-            beside it, the beta pill under it; the toggle under that opens and
-            closes the panel (ui-jobs 514). */}
+        {/* The Rails mark and the beta pill under it are one link home, which
+            holds its place while the panel opens beside it; the toggle under
+            it opens and closes the panel (ui-jobs 514, 769). */}
         <div className="flex flex-col items-center gap-3.5">
-          <div className="flex flex-col items-center gap-1.5">
-            <Link
-              href="/"
-              className="flex h-[38px] w-[38px] items-center justify-center rounded-lg text-foreground focus-ring"
-              aria-label="Rails home"
-              data-rail-home=""
-            >
+          <Link
+            href="/"
+            className="flex flex-col items-center gap-1.5 rounded-lg pb-1 text-foreground focus-ring"
+            aria-label="Rails home, beta"
+            data-rail-home=""
+          >
+            <span className="flex h-[38px] w-[38px] items-center justify-center" data-rail-mark="">
               <RailsMark size={30} />
-            </Link>
+            </span>
             <BetaPill placement="rail" />
-          </div>
+          </Link>
           <SearchLauncher placement="rail" />
         </div>
         <ThemeSwitch placement="rail" />

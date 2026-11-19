@@ -31,8 +31,8 @@ export function HeaderBar() {
       <div className="max-w-7xl mx-auto grid grid-cols-[1fr_auto_1fr] items-center py-4 px-4 md:px-6">
         {/* Left: the sidebar toggle, which opens the wallet panel (H15.1,
             ui-jobs 514); the panel's top row draws its open glyph in the same
-            place, closing it. Centre: the Rails mark, a link home, and the
-            beta pill (H25) to its right; on home the pill alone, the hero
+            place, closing it. Centre: the Rails mark and the beta pill (H25)
+            to its right, one link home; on home the pill alone, the hero
             carrying the mark (ui-jobs 769).
             Right: H20, with the inspector indicator (H7.4) left of it
             while the inspector is armed on a page with a traced value
@@ -41,10 +41,7 @@ export function HeaderBar() {
         <div className="justify-self-start">
           <SearchLauncher placement="header" />
         </div>
-        <div className="flex items-center gap-1.5" data-header-brand="">
-          {!isHome && <HomeBrand />}
-          <BetaPill placement="header" />
-        </div>
+        {isHome ? <BetaPill placement="header" /> : <HomeBrand />}
         <div className="flex items-center gap-2 justify-self-end" data-header-cluster="">
           <ProfileMenu />
         </div>
