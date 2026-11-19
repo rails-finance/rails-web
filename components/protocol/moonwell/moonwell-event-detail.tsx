@@ -59,6 +59,7 @@ import { CTokenLiquidationBreakdown } from "@/components/shared/ctoken-liquidati
 import { CTokenMembershipLine } from "@/components/shared/ctoken-membership-line";
 import { pillPriceChips, useCTokenLedgerCells, useCTokenSoleAsset } from "@/components/shared/ctoken-event-ledger";
 import { formatCompact } from "@/lib/shared/format-compact";
+import { priceText } from "@/lib/shared/shown-usd";
 
 export interface MoonwellCellsInput {
   ctx: MoonwellContext;
@@ -71,13 +72,6 @@ export interface MoonwellCellsInput {
 }
 
 const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Number(human)));
-
-/** A price under $10 keeps four decimals: a stablecoin read at 0.9996 shows
- *  as 0.9996. */
-const pillPrice = (n: number) =>
-  n < 10
-    ? n.toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 4 })
-    : n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /** "oracle at block 47,020,084": the price pill names the block it was read at. */
 const oracleNote = (block?: number) =>
@@ -303,7 +297,7 @@ export function useMoonwellCells({ ctx, txHash, blockNumber, wallet, eventId, ev
           ]
         : [],
     "Moonwell",
-    (n) => `$${pillPrice(n)}`,
+    priceText,
   );
   const statCells = useStatCells(stats);
 

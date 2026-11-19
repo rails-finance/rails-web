@@ -30,7 +30,7 @@ import {
 } from "@/components/protocol/compound/compound-absorb-breakdown";
 import { compoundAmount, compoundBaseBefore, impliedYearlyRate, isBaseDust } from "@/lib/compound/row-facts";
 import { compoundSideBalances } from "@/lib/compound/flows";
-import { decimalSub, formatUsdValue } from "@/lib/utils/format";
+import { decimalSub } from "@/lib/utils/format";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
 import {
   absorbPriceProv,
@@ -391,7 +391,6 @@ export function useCompoundCells({
     prices.push({
       symbol: ctx.assetSymbol,
       usd,
-      display: formatUsdValue(usd),
       info:
         absorb && ctx.usdValue != null
           ? absorbPriceProv(ctx.assetSymbol, coords, {

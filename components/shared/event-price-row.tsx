@@ -13,6 +13,7 @@ import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { usePreferences } from "@/lib/shared/preferences-context";
 import { GAS_UNITS, type GasUnit } from "@/lib/shared/preferences";
 import type { GasCost } from "@/lib/shared/types/event-shape";
+import { priceText } from "@/lib/shared/shown-usd";
 
 /** The gas the owner paid for the event's transaction (or a run of them). */
 export interface EventGas {
@@ -223,8 +224,11 @@ export function EventPriceRow({ price }: { price: EventCardPrice }) {
   const word = outcome?.word;
   const chips = prices.map((p) => {
     const icon = <TokenChipIcon symbol={p.symbol} address={p.address} size={14} />;
-    const format = p.unit?.format ?? p.format ?? usdWhole;
+    // A dollar price prints as the receipts show it (ui-jobs 743): six
+    // decimals from $1 up, six significant figures below.
+    const format = p.unit?.format ?? p.format ?? priceText;
     const text = p.display ?? format(p.usd);
+    const exact = p.value ?? (p.unit ? undefined : priceText(p.usd));
     const chip = (
       <ThenTodayChip
         symbol={p.symbol}
@@ -233,14 +237,14 @@ export function EventPriceRow({ price }: { price: EventCardPrice }) {
         then={
           p.named ? (
             p.info ? (
-              <Prov info={p.info} value={p.value ?? text} symbol={p.symbol}>
+              <Prov info={p.info} value={exact ?? text} symbol={p.symbol}>
                 {text}
               </Prov>
             ) : (
               text
             )
           ) : p.info ? (
-            <Prov info={p.info} value={p.value} icon={icon}>
+            <Prov info={p.info} value={exact} icon={icon}>
               {text}
             </Prov>
           ) : (

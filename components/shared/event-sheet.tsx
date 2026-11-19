@@ -51,6 +51,9 @@ export interface SheetFigure {
   info?: Provenance;
   /** The exact value the receipt keys on. */
   value?: string;
+  /** A dollar figure's cents, where its rows give them (ui-jobs 743): a
+   *  group's sheet sums these, not the faces. */
+  cents?: number;
 }
 
 /** A row of a side panel. */

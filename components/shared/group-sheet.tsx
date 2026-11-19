@@ -23,6 +23,8 @@ import type { EventSheet, SheetRow, SheetSide } from "@/components/shared/event-
 import { SHEET_NO_USD, sheetUsd } from "@/components/shared/event-sheet";
 import type { EventCardPrice, EventPriceChip } from "@/components/shared/event-price-row";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
+import { amountsUsd, cellOf, groupMoveUsd, type PricedAmount } from "@/lib/shared/sheet-usd-rows";
+import { centsOf } from "@/lib/shared/shown-usd";
 
 const WORDS = {
   before: "Before the group",
@@ -54,8 +56,10 @@ export interface GroupLane {
   /** The asset's USD price the row carries, at its block; unset where the
    *  row prices none. */
   price?: number;
-  /** The receipt of `amount` of this asset in dollars at `price`. */
-  usdProv?: (what: string, amount: string) => Provenance;
+  /** The price's block and where it comes from, for the receipts (ui-jobs
+   *  743). */
+  priceBlock?: number | null;
+  priceNote?: string;
   /** A token amount as the family prints it. */
   fmt: (v: number) => string;
 }
@@ -111,6 +115,8 @@ function summedRows(rows: SheetRow[], label: string, n: number): SheetRow[] | nu
     let places = 0;
     let usd = 0;
     let usdKnown = true;
+    // In cents where every member's figure carries its rows' cents (ui-jobs 743).
+    const allCents = rs.every((r) => r.usd?.cents != null);
     for (const r of rs) {
       if (r.amount) {
         // The receipt's exact figure where it reads, so the sum does not
@@ -121,9 +127,9 @@ function summedRows(rows: SheetRow[], label: string, n: number): SheetRow[] | nu
         amount += exact != null ? Math.sign(shown) * Math.abs(exact) : shown;
         places = Math.max(places, placesOf(r.amount.text as string));
       }
-      const u = r.usd ? parseSheetNumber(r.usd.text) : null;
+      const u = r.usd ? (allCents ? (r.usd.cents as number) : parseSheetNumber(r.usd.text)) : null;
       if (u == null) usdKnown = false;
-      else usd += u;
+      else usd = allCents ? centsOf(usd + u) : usd + u;
     }
     const amountText = `${amount < 0 ? "−" : ""}${Math.abs(amount).toLocaleString("en-US", {
       minimumFractionDigits: places,
@@ -135,7 +141,9 @@ function summedRows(rows: SheetRow[], label: string, n: number): SheetRow[] | nu
       amount: rs[0].amount
         ? { text: amountText, symbol: symbol || undefined, address: rs[0].amount.address, info: sumProv(label, n) }
         : undefined,
-      usd: usdKnown ? { text: sheetUsd(usd), info: sumProv(`${label} in USD`, n) } : undefined,
+      usd: usdKnown
+        ? { text: sheetUsd(usd), info: sumProv(`${label} in USD`, n), ...(allCents ? { cents: usd } : {}) }
+        : undefined,
     });
   }
   return out;
@@ -155,10 +163,12 @@ function sumFigure(
   if (!usd && new Set(present.map((f) => (f as SheetRow["amount"])?.symbol ?? "")).size > 1) return undefined;
   let total = 0;
   let places = 0;
+  // In cents where every member's dollar figure carries its rows' cents.
+  const allCents = usd && present.every((f) => f!.cents != null);
   for (const f of present) {
-    const v = parseSheetNumber(f!.text);
+    const v = allCents ? (f!.cents as number) : parseSheetNumber(f!.text);
     if (v == null) return null;
-    total += v;
+    total = allCents ? centsOf(total + v) : total + v;
     places = Math.max(places, placesOf(f!.text as string));
   }
   const first = present[0] as SheetRow["amount"];
@@ -168,7 +178,13 @@ function sumFigure(
         minimumFractionDigits: places,
         maximumFractionDigits: places,
       })}`;
-  return { text, symbol: first?.symbol, address: first?.address, info: sumProv(what, n) };
+  return {
+    text,
+    symbol: first?.symbol,
+    address: first?.address,
+    info: sumProv(what, n),
+    ...(allCents ? { cents: total } : {}),
+  };
 }
 
 /** The members' carry-forward rows past the first member's "Last event" (the
@@ -289,7 +305,6 @@ interface LaneAcc {
   legs: { lane: GroupLane; card: CollectedCard; at: number }[];
   labels: string[];
   moved: number;
-  movedUsd: number | null;
 }
 
 const signedText = (v: number, fmt: (v: number) => string) => `${v < 0 ? "−" : ""}${fmt(Math.abs(v))}`;
@@ -323,21 +338,7 @@ function laneInterestProv(sym: string, before: number, after: number, moved: num
   };
 }
 
-const laneMarketProv: Provenance = {
-  kind: "chain-derived",
-  summary:
-    "Market move across these events. The side's dollars after the last event, less its dollars before the first, the moves and the interest, each at the price its row carries: what the prices changed.",
-  formula: "$ after − $ before − Σ $ moves − $ interest",
-};
-
-function laneTotalProv(side: FlowSide, parts: { sym: string; usd: number }[]): Provenance {
-  return {
-    kind: "chain-derived",
-    summary: `The ${side === "collateral" ? "collateral" : "debt"} after these events, in dollars. Each asset's balance after the last event that moved it, at the price that event's row carries.`,
-    formula: "Σ balance × price",
-    inputs: parts.map((p) => ({ label: p.sym, value: sheetUsd(p.usd), kind: "chain-derived" as const })),
-  };
-}
+const LANE_VIA = "the events' rows · each asset's amount × the price its row carries at its block";
 
 function laneSide(side: FlowSide, accs: LaneAcc[], label: string): SheetSide {
   if (accs.length === 0)
@@ -359,59 +360,71 @@ function laneSide(side: FlowSide, accs: LaneAcc[], label: string): SheetSide {
     info,
     value,
   });
+  // Each dollar cell is its rows' cents, each price the one its row carries
+  // at its block (lib/shared/sheet-usd-rows.ts, ui-jobs 743). A lane whose
+  // row prices nothing draws no dollars.
+  const pa = (l: GroupLane | undefined, amount: number): PricedAmount => ({
+    symbol: l?.symbol ?? "",
+    amount,
+    price: l?.price ?? null,
+    block: l?.priceBlock ?? null,
+    priceNote: l?.priceNote,
+  });
+  const cell = (what: string, xs: PricedAmount[]) =>
+    amountsUsd(what, xs, { amountNote: "as the events' rows state it", via: LANE_VIA });
   const interest: SheetRow[] = [];
   const moves: SheetRow[] = [];
   const legs: (SheetRow & { at: number })[] = [];
   const holdings: SheetRow[] = [];
   const befores: SheetRow[] = [];
-  let beforeUsd: number | null = 0;
-  let marketUsd: number | null = 0;
-  const totals: { sym: string; usd: number }[] = [];
-  let totalUsd: number | null = 0;
+  const beforeLegs: PricedAmount[] = [];
+  const afterLegs: PricedAmount[] = [];
+  const movedLegs: PricedAmount[] = [];
+  const interestLegs: PricedAmount[] = [];
+  // Every figure on every lane priced: the totals and Market move stand.
+  let priced = true;
   let unread = false;
   for (const a of accs) {
     const b = a.first.before;
-    const p0 = a.first.price;
     const aft = a.lastWithAfter?.after;
-    const p1 = a.lastWithAfter?.price;
     const bv = b ? Number(b.value) : null;
     const av = aft ? Number(aft.value) : null;
+    if (a.first.price == null || (a.lastWithAfter && a.lastWithAfter.price == null)) priced = false;
     if (b && bv != null) {
+      const leg = pa(a.first, bv);
+      beforeLegs.push(leg);
       befores.push({
         key: `before-${a.symbol}`,
         label: multi ? a.symbol : WORDS.before,
         amount: amountOf(a, bv, b.prov, b.value),
-        usd:
-          p0 != null && a.first.usdProv
-            ? { text: sheetUsd(bv * p0), info: a.first.usdProv(`${capital(a.symbol)} before the group`, b.value) }
-            : undefined,
+        usd: a.first.price != null ? cellOf(cell(`${capital(a.symbol)} before the group, in USD`, [leg])) : undefined,
         tip: LANE_TIPS.before(a.symbol, side),
       });
-      if (beforeUsd != null) beforeUsd = p0 != null ? beforeUsd + bv * p0 : null;
-    } else beforeUsd = null;
+    } else priced = false;
     // The interest: what the balances say beyond the moves, where the first
     // row states the balance before and the last the balance after.
-    let r = 0;
     if (b && a.last.after && bv != null && av != null) {
-      r = av - bv - a.moved;
-      if (Math.abs(r) >= LANE_DUST)
+      const r = av - bv - a.moved;
+      if (Math.abs(r) >= LANE_DUST) {
+        const leg = pa(a.lastWithAfter, r);
+        interestLegs.push(leg);
         interest.push({
           key: `interest-${a.symbol}`,
           label: named(WORDS.interest, a),
           amount: amountOf(a, r, laneInterestProv(a.symbol, bv, av, a.moved, a.legs.length), String(r)),
           usd:
-            p1 != null && a.lastWithAfter?.usdProv
-              ? {
-                  text: sheetUsd(r * p1),
-                  info: a.lastWithAfter.usdProv(`Interest on ${a.symbol} across these events`, String(r)),
-                }
+            a.lastWithAfter?.price != null
+              ? cellOf(cell(`Interest on ${a.symbol} across these events, in USD`, [leg]))
               : undefined,
           tip: LANE_TIPS.interest(a.symbol),
         });
-      else r = 0;
+      }
     }
     if (a.legs.length > 0) {
       const words = capital(a.labels.join(" + ").toLowerCase());
+      const mine = a.legs.map(({ lane }) => pa(lane, Number(lane.change)));
+      movedLegs.push(...mine);
+      if (a.legs.some(({ lane }) => lane.price == null)) priced = false;
       moves.push({
         key: `group-${a.symbol}`,
         label: named(a.labels.length > 0 ? words : label, a),
@@ -422,10 +435,9 @@ function laneSide(side: FlowSide, accs: LaneAcc[], label: string): SheetSide {
           info: sumProv(`${a.symbol} moved`, a.legs.length),
           value: String(a.moved),
         },
-        usd:
-          a.movedUsd != null
-            ? { text: sheetUsd(a.movedUsd), info: sumProv(`${a.symbol} moved in USD`, a.legs.length) }
-            : undefined,
+        usd: a.legs.every(({ lane }) => lane.price != null)
+          ? cellOf(cell(`${a.symbol} moved across these events, in USD`, mine))
+          : undefined,
         tip: LANE_TIPS.moved(a.symbol),
       });
     }
@@ -443,57 +455,42 @@ function laneSide(side: FlowSide, accs: LaneAcc[], label: string): SheetSide {
           info: lane.changeProv,
           value: lane.change,
         },
-        usd:
-          lane.price != null && lane.usdProv
-            ? {
-                text: sheetUsd(c * lane.price),
-                info: lane.usdProv(`The ${a.symbol} this event moved`, String(Math.abs(c))),
-              }
-            : undefined,
+        usd: lane.price != null ? cellOf(cell(`The ${a.symbol} this event moved, in USD`, [pa(lane, c)])) : undefined,
       });
     }
     if (aft && av != null) {
+      const leg = pa(a.lastWithAfter, av);
+      afterLegs.push(leg);
       holdings.push({
         key: `after-${a.symbol}`,
         label: a.symbol,
         amount: amountOf(a, av, aft.prov, aft.value),
         usd:
-          p1 != null && a.lastWithAfter?.usdProv
-            ? {
-                text: sheetUsd(av * p1),
-                info: a.lastWithAfter.usdProv(`${capital(a.symbol)} after these events`, aft.value),
-              }
+          a.lastWithAfter?.price != null
+            ? cellOf(cell(`${capital(a.symbol)} after these events, in USD`, [leg]))
             : undefined,
         tip: LANE_TIPS.asset(a.symbol, side),
       });
-      if (p1 != null) totals.push({ sym: a.symbol, usd: av * p1 });
-      if (totalUsd != null) totalUsd = p1 != null ? totalUsd + av * p1 : null;
-    } else {
-      unread = true;
-      totalUsd = null;
-    }
-    // The market move: the dollars the balances say beyond the moves and the
-    // interest, where every figure on the lane is priced.
-    if (marketUsd != null && bv != null && av != null && p0 != null && p1 != null && a.movedUsd != null)
-      marketUsd += av * p1 - bv * p0 - a.movedUsd - r * p1;
-    else marketUsd = null;
+    } else unread = true;
   }
-  const market: SheetRow[] =
-    marketUsd != null && Math.abs(marketUsd) >= 0.005
-      ? [
-          {
-            key: "group-market",
-            label: WORDS.market,
-            usd: { text: sheetUsd(marketUsd, true), info: laneMarketProv },
-            tip: LANE_TIPS.market,
-          },
-        ]
-      : [];
+  const afterCell = cell(`${capital(side)} after these events, in USD`, afterLegs);
+  const beforeCell = cell(`${capital(side)} before the group, in USD`, beforeLegs);
+  const market: SheetRow[] = [];
+  if (priced && !unread) {
+    const move = groupMoveUsd(
+      afterCell,
+      beforeCell,
+      cell(`${capital(side)} moved across these events, in USD`, movedLegs),
+      interestLegs.length ? cell(`Interest on the ${side} across these events, in USD`, interestLegs) : null,
+    );
+    if (move.usd != null && Math.abs(move.usd) >= 0.005)
+      market.push({ key: "group-market", label: WORDS.market, usd: cellOf(move), tip: LANE_TIPS.market });
+  }
   const one = accs[0];
   const total: SheetSide["total"] = unread
     ? { none: WORDS.unread }
-    : totalUsd != null
-      ? { text: sheetUsd(totalUsd), info: laneTotalProv(side, totals) }
+    : accs.every((a) => a.lastWithAfter?.price != null)
+      ? cellOf(afterCell)
       : !multi && one.lastWithAfter?.after && one.lastWithAfter.price == null
         ? SHEET_NO_USD
         : { none: WORDS.unpriced };
@@ -504,10 +501,7 @@ function laneSide(side: FlowSide, accs: LaneAcc[], label: string): SheetSide {
       ? {
           key: "before",
           label: WORDS.before,
-          usd:
-            beforeUsd != null
-              ? { text: sheetUsd(beforeUsd), info: sumProv(`${capital(side)} before the group in USD`, accs.length) }
-              : undefined,
+          usd: accs.every((a) => a.first.price != null) ? cellOf(beforeCell) : undefined,
         }
       : undefined
     : befores[0] && { ...befores[0], key: "before" };
@@ -551,7 +545,6 @@ export function mergeLaneSheet(cards: CollectedCard[], label: string): EventShee
           legs: [],
           labels: [],
           moved: 0,
-          movedUsd: 0,
         };
         lanes.set(key, acc);
       }
@@ -560,7 +553,6 @@ export function mergeLaneSheet(cards: CollectedCard[], label: string): EventShee
       if (c === 0) continue;
       acc.legs.push({ lane: l, card, at });
       acc.moved += c;
-      acc.movedUsd = acc.movedUsd != null && l.price != null ? acc.movedUsd + c * l.price : null;
       if (!acc.labels.includes(l.label)) acc.labels.push(l.label);
     }
   if (lanes.size === 0) return null;

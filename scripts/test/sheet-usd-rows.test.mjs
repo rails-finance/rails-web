@@ -89,3 +89,19 @@ test("Market move is the difference of the shown sums, to the cent", () => {
   assert.equal(m.usd, centsOf(before.usd - last.usd - interest.usd));
   assert.equal(m.info.inputs.at(-1).label, "difference");
 });
+
+test("a group's Market move is after less before, the moves and the interest, each a shown sum; a cell carries its cents", async () => {
+  const { groupMoveUsd, cellOf } = await import(ROOT + "lib/shared/sheet-usd-rows.ts");
+  const after = amountsUsd("After", [{ ...wbtc, price: 99_000.5 }], o);
+  const before = amountsUsd("Before", [{ ...wbtc, amount: 1 }], o);
+  const moved = amountsUsd("Moved", [{ ...wbtc, amount: 0.2345678 }], o);
+  const interest = amountsUsd("Interest", [{ ...wbtc, amount: 0.0000001 }], o);
+  const m = groupMoveUsd(after, before, moved, interest);
+  assert.equal(m.usd, centsOf(after.usd - before.usd - moved.usd - interest.usd));
+  assert.deepEqual(
+    m.info.inputs.map((r) => r.label),
+    ["after these events", "before the group", "the moves", "interest", "difference"],
+  );
+  assert.equal(cellOf(after).cents, after.usd);
+  assert.equal(cellOf(amountsUsd("X", [{ ...usdc, price: null }], o)).cents, undefined, "no cents without a figure");
+});

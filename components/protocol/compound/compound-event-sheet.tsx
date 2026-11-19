@@ -23,7 +23,6 @@
 import type { Provenance } from "@/components/shared/provenance";
 import {
   SHEET_WORDS,
-  sheetUsd,
   type EventSheet,
   type SheetRow,
   type SheetSide,
@@ -31,6 +30,9 @@ import {
 } from "@/components/shared/event-sheet";
 import { changeText, type SwapFigure } from "@/components/shared/change-swap-value";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
+import { amountsUsd, cellOf, marketMoveUsd, type PricedAmount } from "@/lib/shared/sheet-usd-rows";
+import { priceText } from "@/lib/shared/shown-usd";
+import { cometFlowPriceNote } from "@/lib/compound/comet-price-notes";
 import type { CompoundContext } from "@/lib/shared/types/event-shape";
 import { CV3, type CompoundFlowReplay, type CompoundReplayed } from "@/lib/compound/flows";
 import { compoundAmount } from "@/lib/compound/row-facts";
@@ -64,10 +66,6 @@ const eventTip = (side: FlowSide, sym: string) =>
     ? fillText(COMPOUND_WORDS.tip_coll_event, { symbol: sym })
     : fillText(COMPOUND_WORDS.tip_debt_event, { symbol: sym });
 
-/** "$0.9997": a price as the rows print it. */
-const priceWords = (p: number) =>
-  `$${p.toLocaleString("en-US", p < 10 ? { minimumFractionDigits: 4, maximumFractionDigits: 4 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const usdText = (v: number) => (Math.abs(v) < 0.005 ? "$0" : sheetUsd(v));
 const signedAmount = (c: number) => `${c < 0 ? "−" : ""}${compoundAmount(Math.abs(c))}`;
 /** A decimal string's negation: a borrowed base's move stated as owed. */
 const negated = (v: string): string => (v.startsWith("-") ? v.slice(1) : `-${v}`);
@@ -87,9 +85,11 @@ interface Holding {
   last: number;
   price: number | null;
   pricePrev: number | null;
-  /** Whether the row's block was read for this price, or it is the nearest
-   *  priced row's. */
-  atBlock: boolean;
+  /** Each price's block and its words (lib/compound/comet-price-notes.ts). */
+  block: number | null;
+  note?: string;
+  blockPrev: number | null;
+  notePrev?: string;
 }
 
 const priceOf = (r: CompoundReplayed | null, t: string): number | null => {
@@ -97,63 +97,10 @@ const priceOf = (r: CompoundReplayed | null, t: string): number | null => {
   return p != null && p > 0 ? p : null;
 };
 
-/** A token figure's dollars at the price the replay values the row at. */
-const atPriceUsdProv = (
-  h: Holding,
-  what: string,
-  amount: number,
-  price: number,
-  coords: CompoundCoords,
-): Provenance => ({
-  kind: "chain-derived",
-  pclass: "oracle",
-  summary: `${what}, in US dollars. The amount times the Comet's price for ${h.symbol} ${h.atBlock ? "at this event's block" : "at the nearest row whose block was read"}.`,
-  formula: "amount × price",
-  contract: cometContract(coords),
-  inputs: [
-    { label: "amount", value: `${compoundAmount(amount)} ${h.symbol}`, kind: "chain-derived", pclass: "indexed" },
-    { label: `${h.symbol} price`, value: `$${price}`, kind: "chain", pclass: "oracle" },
-  ],
-});
-
-/** A side's dollars at one point, its assets at their prices. */
-function sideUsdProv(
-  side: FlowSide,
-  when: "after" | "before" | "previous",
-  hs: Holding[],
-  coords: CompoundCoords,
-): Provenance {
-  const what = side === "collateral" ? "Collateral" : "Debt";
-  const at =
-    when === "previous"
-      ? "once the previous event had run, at the prices then"
-      : when === "before"
-        ? "just before this event, at the prices at this event"
-        : "once this event had run, at the prices at this event";
-  const amountOf = (h: Holding) => (when === "previous" ? h.last : when === "before" ? h.before : h.after);
-  const priceAt = (h: Holding) => (when === "previous" ? h.pricePrev : h.price);
-  return {
-    kind: "chain-derived",
-    pclass: "oracle",
-    summary: `${what} ${when === "previous" ? "at the last event" : `${when} this event`}. What the account ${side === "collateral" ? "posted and lent" : "owed"} ${at}, in US dollars: each asset's balance from the position's replay of its rows times the Comet's price.`,
-    formula: "Σ balance × price",
-    contract: cometContract(coords),
-    via: "the position's replay of its rows (lib/compound/flows.ts)",
-    inputs: hs
-      .filter((h) => amountOf(h) > DUST)
-      .flatMap((h) => [
-        {
-          label: `${h.symbol}${h.base && side === "collateral" ? " lent" : ""}`,
-          value: `${compoundAmount(amountOf(h))} ${h.symbol}`,
-          kind: "chain-derived" as const,
-          pclass: "indexed" as const,
-        },
-        ...(priceAt(h) != null
-          ? [{ label: `${h.symbol} price`, value: `$${priceAt(h)}`, kind: "chain" as const, pclass: "oracle" as const }]
-          : []),
-      ]),
-  };
-}
+// Each dollar cell is its rows' cents, shown to the dollar, each price the
+// Comet's getPrice named with its block (lib/shared/sheet-usd-rows.ts,
+// ui-jobs 743).
+const VIA = "the position's replay of its rows (lib/compound/flows.ts) · each asset × the Comet's price at its block";
 
 /** What a figure became since the previous event. */
 const sinceProv = (what: string): Provenance => ({
@@ -210,6 +157,34 @@ export function compoundEventSheet(input: CompoundSheetInput): EventSheet | unde
     previous.blockNumber === p.ev.block &&
     Math.abs(r.unlogged) <= dust;
 
+  /** Each price's block and words at this row and at the previous one. */
+  const noteOf = (t: string) => {
+    const at = (x: typeof r | null) => {
+      const f = x?.from[t];
+      return f
+        ? {
+            block: f.block,
+            note: cometFlowPriceNote({
+              comet: rp.comet,
+              priceBlock: f.block,
+              eventBlock: x!.ev.block,
+              factor: f.factor,
+            }),
+          }
+        : { block: null, note: undefined };
+    };
+    const now = at(r);
+    const then = at(p);
+    return { block: now.block, note: now.note, blockPrev: then.block, notePrev: then.note };
+  };
+  /** A holding's amount at a point, at the price there. */
+  const priced = (h: Holding, key: "after" | "before" | "last"): PricedAmount => ({
+    symbol: h.symbol,
+    amount: h[key],
+    ...(key === "last"
+      ? { price: h.pricePrev, block: h.blockPrev, priceNote: h.notePrev }
+      : { price: h.price, block: h.block, priceNote: h.note }),
+  });
   const baseHolding = (side: FlowSide): Holding => {
     const on = (v: number) => (side === "collateral" ? Math.max(0, v) : Math.max(0, -v));
     return {
@@ -221,7 +196,7 @@ export function compoundEventSheet(input: CompoundSheetInput): EventSheet | unde
       last: on(lastBase),
       price: priceOf(r, base),
       pricePrev: priceOf(p, base),
-      atBlock: r.own.has(base),
+      ...noteOf(base),
     };
   };
   const collTokens = [...new Set([...r.coll.keys(), ...(p ? [...p.coll.keys()] : [])])];
@@ -237,7 +212,7 @@ export function compoundEventSheet(input: CompoundSheetInput): EventSheet | unde
       last,
       price: priceOf(r, t),
       pricePrev: priceOf(p, t),
-      atBlock: r.own.has(t),
+      ...noteOf(t),
     };
   });
   const held = (h: Holding) => h.after > DUST || h.before > DUST || h.last > DUST;
@@ -326,33 +301,35 @@ export function compoundEventSheet(input: CompoundSheetInput): EventSheet | unde
                 },
             value: logged ? (exact!.startsWith("-") ? `−${exact!.slice(1)}` : `+${exact}`) : undefined,
           },
-          usd:
-            h.price != null
-              ? {
-                  text: sheetUsd(c * h.price),
-                  info: atPriceUsdProv(h, `The ${h.symbol} this event moved`, Math.abs(c), h.price, coords),
-                }
-              : undefined,
+          usd: cellOf(
+            amountsUsd(`The ${h.symbol} this event moved, in USD`, [{ ...priced(h, "after"), amount: c }], {
+              amountNote: "the balance once the event had run less the balance just before it",
+              via: VIA,
+            }),
+          ),
           tip: eventTip(side, h.symbol),
         };
       });
 
-    const priced = (key: "after" | "before" | "last") =>
-      hs.every((h) => h[key] <= DUST || (key === "last" ? h.pricePrev : h.price) != null);
-    const usdAt = (key: "after" | "before" | "last") =>
-      hs.reduce((a, h) => a + h[key] * ((key === "last" ? h.pricePrev : h.price) ?? 0), 0);
+    const what = side === "collateral" ? "Collateral" : "Debt";
+    const totalAt = (key: "after" | "before" | "last", at: string) =>
+      amountsUsd(
+        `${what} ${at}, in USD`,
+        hs.filter((h) => h[key] > DUST).map((h) => priced(h, key)),
+        { amountNote: `the balance ${at}, from the position's replay of its rows`, via: VIA },
+      );
 
     // The carry-forward layer.
     const carry: SheetSide["carry"] = [];
     let before: SheetRow | undefined;
-    const lastUsd = priced("last") ? usdAt("last") : null;
-    const beforeUsd = priced("before") ? usdAt("before") : null;
-    if (carryOk && !baseUnread && lastUsd != null && beforeUsd != null && (lastUsd > 0.005 || beforeUsd > 0.005)) {
+    const lastCell = totalAt("last", "at the last event");
+    const beforeCell = totalAt("before", "before this event");
+    if (carryOk && !baseUnread && hs.some((h) => h.last > DUST || h.before > DUST)) {
       const single = side === "debt" ? b : null;
       carry.push({
         key: "last",
         label: SHEET_WORDS.last,
-        note: single && single.pricePrev != null ? priceWords(single.pricePrev) : undefined,
+        note: single && single.pricePrev != null ? priceText(single.pricePrev) : undefined,
         amount: single
           ? {
               text: compoundAmount(single.last),
@@ -361,16 +338,26 @@ export function compoundEventSheet(input: CompoundSheetInput): EventSheet | unde
               info: baseOwedProv("previous", single.last),
             }
           : undefined,
-        usd: { text: usdText(lastUsd), info: sideUsdProv(side, "previous", hs, coords) },
+        usd: cellOf(lastCell),
         tip: tip.last,
       });
       const interest = interestOf(side);
-      const interestUsd = b.price != null ? interest * b.price : null;
+      const interestCell =
+        interest > dust
+          ? amountsUsd(
+              `Interest on ${baseSym} since the last event, in USD`,
+              [{ ...priced(b, "after"), amount: interest }],
+              {
+                amountNote: "the balance just before this event less the balance once the previous event had run",
+                via: VIA,
+              },
+            )
+          : null;
       if (interest > dust)
         carry.push({
           key: "interest",
           label: SHEET_WORDS.interest,
-          note: b.price != null ? priceWords(b.price) : undefined,
+          note: b.price != null ? priceText(b.price) : undefined,
           amount: {
             text: compoundAmount(interest),
             symbol: baseSym,
@@ -383,65 +370,23 @@ export function compoundEventSheet(input: CompoundSheetInput): EventSheet | unde
               contract: cometContract(coords),
             },
           },
-          usd:
-            interestUsd != null
-              ? {
-                  text: sheetUsd(interestUsd),
-                  info: atPriceUsdProv(b, `Interest on ${baseSym} since the last event`, interest, b.price!, coords),
-                }
-              : undefined,
+          usd: interestCell ? cellOf(interestCell) : undefined,
           tip: tip.interest,
         });
       // The market move: the rest of the change in the side's dollars, which
-      // the prices moved; its receipt names each asset's price at both rows.
-      const accrued = interest > dust ? interestUsd : 0;
-      if (accrued != null) {
-        const mv = beforeUsd - lastUsd - accrued;
-        if (Math.abs(mv) >= 0.005)
-          carry.push({
-            key: "market",
-            label: SHEET_WORDS.market,
-            usd: {
-              text: sheetUsd(mv, true),
-              info: {
-                kind: "chain-derived",
-                pclass: "oracle",
-                summary: `Market move on the ${side} since the last event. The side's total just before this event, less its total once the previous event had run and the interest since, all in US dollars: the change the Comet's prices made to the balances held between the two. No token moved.`,
-                formula: "before this event − last event − interest since",
-                contract: cometContract(coords),
-                inputs: hs
-                  .filter((h) => h.last > DUST)
-                  .flatMap((h) => [
-                    ...(h.pricePrev != null
-                      ? [
-                          {
-                            label: `${h.symbol} price at the last event`,
-                            value: `$${h.pricePrev}`,
-                            kind: "chain" as const,
-                            pclass: "oracle" as const,
-                          },
-                        ]
-                      : []),
-                    ...(h.price != null
-                      ? [
-                          {
-                            label: `${h.symbol} price at this event`,
-                            value: `$${h.price}`,
-                            kind: "chain" as const,
-                            pclass: "oracle" as const,
-                          },
-                        ]
-                      : []),
-                  ]),
-              },
-            },
-            tip: tip.market,
-          });
-      }
+      // the prices moved; the difference of the totals' shown products.
+      const move = marketMoveUsd(`Market move on the ${side} since the last event`, beforeCell, lastCell, interestCell);
+      if (move.usd == null || Math.abs(move.usd) >= 0.005)
+        carry.push({
+          key: "market",
+          label: SHEET_WORDS.market,
+          usd: cellOf(move),
+          tip: tip.market,
+        });
       before = {
         key: "before",
         label: SHEET_WORDS.before,
-        note: single && single.price != null ? priceWords(single.price) : undefined,
+        note: single && single.price != null ? priceText(single.price) : undefined,
         amount: single
           ? {
               text: compoundAmount(single.before),
@@ -450,7 +395,7 @@ export function compoundEventSheet(input: CompoundSheetInput): EventSheet | unde
               info: baseOwedProv("before", single.before),
             }
           : undefined,
-        usd: { text: usdText(beforeUsd), info: sideUsdProv(side, "before", hs, coords) },
+        usd: cellOf(beforeCell),
         tip: tip.before,
       };
     }
@@ -479,11 +424,7 @@ export function compoundEventSheet(input: CompoundSheetInput): EventSheet | unde
       before,
       rows,
       ...(side === "debt" ? { repaid, repaidTip: COMPOUND_WORDS.tip_debt_repaid } : {}),
-      total: baseUnread
-        ? { none: unsettled }
-        : priced("after")
-          ? { text: usdText(usdAt("after")), info: sideUsdProv(side, "after", hs, coords) }
-          : { none: COMPOUND_WORDS.sheet_no_price },
+      total: baseUnread ? { none: unsettled } : cellOf(totalAt("after", "after this event")),
       totalAmount:
         sole && soleAmount != null
           ? {

@@ -46,6 +46,13 @@ export interface UsdCell {
 const FACE = "To the cent, shown to the dollar.";
 const signedCents = (v: number): string => `${v < 0 ? "−" : ""}${formatUsdValue(Math.abs(v))}`;
 
+/** A cell as a sheet row's dollar figure, carrying its cents. */
+export const cellOf = (c: UsdCell): { text: string; info: Provenance; cents?: number } => ({
+  text: c.text,
+  info: c.info,
+  ...(c.usd != null ? { cents: c.usd } : {}),
+});
+
 /** A cell with no figure: "—", naming the assets with no price. */
 export const noFigureCell = (what: string, symbols: string[]): UsdCell => ({
   text: NO_FIGURE,
@@ -86,46 +93,70 @@ export function amountsUsd(
   return { text: o.signed ? sheetUsd(v, true) : sheetUsd(v), info: prov, usd: v };
 }
 
-/** Market move: the side's total before this transaction less its total at
- *  the last event and the interest since, each a sum of shown products; no
- *  figure where any of them has none. */
-export function marketMoveUsd(what: string, before: UsdCell, last: UsdCell, interest: UsdCell | null): UsdCell {
-  const parts = [before, last, ...(interest ? [interest] : [])];
-  if (parts.some((p) => p.usd == null))
+/** A figure as one total less others, each a sum of shown products, to the
+ *  cent; no figure where any of them has none. */
+function differenceUsd(
+  what: string,
+  summary: string,
+  formula: string,
+  from: { label: string; cell: UsdCell },
+  less: { label: string; cell: UsdCell }[],
+): UsdCell {
+  const parts = [from, ...less];
+  if (parts.some((p) => p.cell.usd == null))
     return {
       text: NO_FIGURE,
       info: { kind: "derived", summary: `${what}. No figure: a total beside it has none.` },
       usd: null,
     };
-  const v = centsOf((before.usd as number) - (last.usd as number) - (interest?.usd ?? 0));
+  const v = centsOf(less.reduce((a, p) => a - (p.cell.usd as number), from.cell.usd as number));
   return {
     text: sheetUsd(v, true),
     usd: v,
     info: {
       kind: "chain-derived",
       pclass: "oracle",
-      summary: `${what}. The total before this transaction less the total at the last event${interest ? " and the interest since" : ""}, each the sum of its markets' amounts times their prices as shown: the change the prices made to the balances held between the two. No token moved. ${FACE}`,
-      formula: interest ? "before − last event − interest" : "before − last event",
+      summary: `${what}. ${summary} No token moved. ${FACE}`,
+      formula,
       inputs: [
-        {
-          label: "before this event",
-          value: signedCents(before.usd as number),
-          kind: "chain-derived",
-          pclass: "oracle",
-        },
-        { label: "at the last event", value: signedCents(last.usd as number), kind: "chain-derived", pclass: "oracle" },
-        ...(interest
-          ? [
-              {
-                label: "interest since",
-                value: signedCents(interest.usd as number),
-                kind: "chain-derived" as const,
-                pclass: "oracle" as const,
-              },
-            ]
-          : []),
+        ...parts.map((p) => ({
+          label: p.label,
+          value: signedCents(p.cell.usd as number),
+          kind: "chain-derived" as const,
+          pclass: "oracle" as const,
+        })),
         { label: "difference", value: signedCents(v), kind: "derived", step: true },
       ],
     },
   };
+}
+
+/** Market move: the side's total before this transaction less its total at
+ *  the last event and the interest since, each a sum of shown products; no
+ *  figure where any of them has none. */
+export function marketMoveUsd(what: string, before: UsdCell, last: UsdCell, interest: UsdCell | null): UsdCell {
+  return differenceUsd(
+    what,
+    `The total before this transaction less the total at the last event${interest ? " and the interest since" : ""}, each the sum of its markets' amounts times their prices as shown: the change the prices made to the balances held between the two.`,
+    interest ? "before − last event − interest" : "before − last event",
+    { label: "before this event", cell: before },
+    [{ label: "at the last event", cell: last }, ...(interest ? [{ label: "interest since", cell: interest }] : [])],
+  );
+}
+
+/** Market move across a group of events: the side after the last less the
+ *  side before the first, the moves and the interest, each a sum of shown
+ *  products. */
+export function groupMoveUsd(after: UsdCell, before: UsdCell, moved: UsdCell, interest: UsdCell | null): UsdCell {
+  return differenceUsd(
+    "Market move across these events",
+    "The side after the last event less the side before the first, the moves and the interest, each the sum of its assets' amounts times the prices their rows carry, as shown: what the prices changed.",
+    interest ? "after − before − moves − interest" : "after − before − moves",
+    { label: "after these events", cell: after },
+    [
+      { label: "before the group", cell: before },
+      { label: "the moves", cell: moved },
+      ...(interest ? [{ label: "interest", cell: interest }] : []),
+    ],
+  );
 }

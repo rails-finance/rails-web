@@ -33,7 +33,7 @@ import { fmtPositionAmount } from "@/components/shared/position-row";
 import type { CTokenEventState } from "@/lib/shared/ctoken-flows";
 import type { AssetBalance } from "@/lib/shared/flow-focus";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
-import { amountsUsd, marketMoveUsd, type PricedAmount, type UsdCell } from "@/lib/shared/sheet-usd-rows";
+import { amountsUsd, cellOf, marketMoveUsd, type PricedAmount } from "@/lib/shared/sheet-usd-rows";
 import { priceText } from "@/lib/shared/shown-usd";
 import type { DolomiteContext } from "@/lib/shared/types/event-shape";
 import { balanceChangeProv, type DolomiteCoords } from "@/lib/dolomite/event-provenance";
@@ -42,7 +42,6 @@ import { decimalSub, formatExactDecimal } from "@/lib/utils/format";
 
 // Each dollar cell is its rows' cents, shown to the dollar, each price named
 // with its block (lib/shared/sheet-usd-rows.ts, ui-jobs 743).
-const cellOf = (c: UsdCell) => ({ text: c.text, info: c.info });
 const VIA = "the page's replay of the account's rows · each market's amount × its price at its block";
 const INTEREST_NOTE = "the balance just before this transaction less the balance once the previous one had run";
 

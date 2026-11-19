@@ -12,7 +12,7 @@ import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { usePreferences } from "@/lib/shared/preferences-context";
 import { formatRatio, ratioLabel, ratioColorClass } from "@/lib/shared/ratio-format";
 import { StatSubline } from "@/components/shared/state-transition";
-import { hfLabelV4, fmtV4Amount, fmtUnitPrice } from "@/lib/aave-v4/format";
+import { hfLabelV4, fmtV4Amount } from "@/lib/aave-v4/format";
 import { PositionRow } from "@/components/shared/position-row";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
@@ -26,6 +26,7 @@ import {
   type AaveV4PremiumAt,
   interestSincePreviousProv,
   deltaProv,
+  isOnChainPriceSource,
   pricePillProv,
   usdProv,
   type EventProvDetail,
@@ -603,16 +604,16 @@ export function useAaveV4Cells({
   }
 
   // The price row's chips: one per distinct asset in the snapshot (collateral
-  // + debt), each its historic price at this block. The ≈ prefix on a
-  // stablecoin source tells a pinned $1 from a market price.
-  const chips: EventPriceChip[] = pricePills.map((p) => ({
-    symbol: p.symbol,
-    usd: p.usd,
-    format: fmtUnitPrice,
-    display: p.source === "stablecoin" ? `≈${fmtUnitPrice(p.usd)}` : undefined,
-    info: pricePillProv(p.symbol, p.source, p.block, blockNumber),
-    title: pricePillTitle(p.symbol, p.source, p.block, blockNumber),
-  }));
+  // + debt), each its historic price at this block, on-chain reads only: a $1
+  // pin or an off-chain aggregate is no price (ui-jobs 743).
+  const chips: EventPriceChip[] = pricePills
+    .filter((p) => isOnChainPriceSource(p.source))
+    .map((p) => ({
+      symbol: p.symbol,
+      usd: p.usd,
+      info: pricePillProv(p.symbol, p.source, p.block, blockNumber),
+      title: pricePillTitle(p.symbol, p.source, p.block, blockNumber),
+    }));
 
   // The balance sheet (ui-jobs 330); a collateral toggle keeps its cell.
   const sheet = aaveV4Sheet({ ctx, prev: previous, coord, label: aaveV4Label(ctx), address, hf: hfAround, repaid });
