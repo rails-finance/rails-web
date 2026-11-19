@@ -21,6 +21,7 @@ import { Prov, type Provenance, type ProvVerify } from "@/components/shared/prov
 import { usdAt } from "@/components/shared/event-ledger";
 import { usdShown } from "@/lib/shared/usd-display";
 import { faceUsdProv } from "@/lib/shared/flows-timeline-provenance";
+import { boldEventLine } from "@/lib/liquity-v2/bold-event-price";
 import type { EventCells, EventCellSpec, EventFigure } from "@/components/shared/event-cells";
 import {
   streamVia,
@@ -130,6 +131,9 @@ export function useLiquityCells({
   const tmContract = tmContractOf(tm);
   const collSym = ctx.collateralType;
   const debtSym = ctx.assetType ?? "BOLD";
+  // BOLD's market price at the event, a line in the debt's $1-face receipt
+  // (ui-jobs 757); none where the row carries no boldPrice.
+  const boldLine = boldEventLine(ctx.boldPrice, blockNumber)?.text;
   // Carries the concrete tx / block coordinates into the after-state provenance.
   const coords = { txHash, blockNumber };
   // Emitted log fields carry a real third-party proof: the tx's event logs.
@@ -669,9 +673,15 @@ export function useLiquityCells({
       ? {
           before:
             debtShowBefore && !accrualMove ? (
-              <P info={faceUsdProv(debtSym, toLocaleStringHelper(beforeDebt), "before")}>{formatUsd(beforeDebt)}</P>
+              <P info={faceUsdProv(debtSym, toLocaleStringHelper(beforeDebt), "before", boldLine)}>
+                {formatUsd(beforeDebt)}
+              </P>
             ) : null,
-          after: <P info={faceUsdProv(debtSym, toLocaleStringHelper(debtAfter), "after")}>{formatUsd(debtAfter)}</P>,
+          after: (
+            <P info={faceUsdProv(debtSym, toLocaleStringHelper(debtAfter), "after", boldLine)}>
+              {formatUsd(debtAfter)}
+            </P>
+          ),
           price: `At its $1 face, $1 per ${debtSym}`,
         }
       : undefined,
@@ -963,7 +973,10 @@ export function useLiquityCells({
       key: "upfront-fee",
       label: L2_WORDS.sheet_upfront_fee,
       amount: { text: toLocaleStringHelper(upfrontFee), symbol: debtSym, info: feeP?.info, value: feeP?.value },
-      usd: { text: sheetUsd(upfrontFee), info: faceUsdProv(debtSym, toLocaleStringHelper(upfrontFee), "after") },
+      usd: {
+        text: sheetUsd(upfrontFee),
+        info: faceUsdProv(debtSym, toLocaleStringHelper(upfrontFee), "after", boldLine),
+      },
       tip: TIP.debtUpfront,
     });
   if (Math.abs(redistDebt) >= DUST_DEBT)
@@ -980,7 +993,10 @@ export function useLiquityCells({
       key: "last",
       label: SHEET_WORDS.last,
       amount: { text: toLocaleStringHelper(beforeDebt), symbol: debtSym, info: debtBeforeProv },
-      usd: { text: sheetUsd(beforeDebt), info: faceUsdProv(debtSym, toLocaleStringHelper(beforeDebt), "before") },
+      usd: {
+        text: sheetUsd(beforeDebt),
+        info: faceUsdProv(debtSym, toLocaleStringHelper(beforeDebt), "before", boldLine),
+      },
       tip: TIP.debtLast,
     });
     if (accrualTotal >= DUST_DEBT)
@@ -1036,7 +1052,7 @@ export function useLiquityCells({
     rows: debtRows,
     total: {
       text: debtAfter > 0 ? sheetUsd(debtAfter) : "$0",
-      info: faceUsdProv(debtSym, toLocaleStringHelper(debtAfter), "after"),
+      info: faceUsdProv(debtSym, toLocaleStringHelper(debtAfter), "after", boldLine),
     },
     totalAmount: { text: toLocaleStringHelper(debtAfter), symbol: debtSym, info: debtAfterProv },
     totalTip: TIP.debtTotal,

@@ -239,6 +239,28 @@ export interface TransferDetail {
   toAddress: string;
 }
 
+/** A debt token's market price at an event's block, from a pool it trades in
+ *  (rails-server mig 497, api/src/services/debt-token-prices.ts). A fact
+ *  beside the $1 face: debt is not re-valued from it. */
+export interface DebtTokenPrice {
+  /** The token in USD from last_price(0), the pool's last trade, quote at $1. */
+  usd: number;
+  /** The same from price_oracle(0), the pool's EMA; null where not read. */
+  emaUsd: number | null;
+  /** The block the pool was read at: the event's block, or the newest stored
+   *  block before it within about a day. */
+  block: number;
+  /** The lane, e.g. "curve-usdc-bold". */
+  source: string;
+  pool: string;
+  /** The debt token's coin index in the pool: at 0 the token is 1 / raw. */
+  tokenIndex: number;
+  quoteSymbol: string;
+  /** last_price(0) and price_oracle(0) as read, 1e18. */
+  lastPriceRaw: string;
+  emaRaw: string | null;
+}
+
 /** Full Liquity V2 protocol context for granular event rendering. */
 export interface LiquityContext {
   eventType: LiquityEventType;
@@ -246,6 +268,9 @@ export interface LiquityContext {
   troveId: string;
   collateralType: CollateralType;
   collateralPrice: number;
+  /** BOLD's market price at the event's block from the Curve BOLD/USDC pool;
+   *  absent where none is stored (before the pool, or not yet filled). */
+  boldPrice?: DebtTokenPrice;
   protocolName: string; // "liquity-v2"
   assetType: string;    // "BOLD"
 
