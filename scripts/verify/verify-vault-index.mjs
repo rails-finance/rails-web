@@ -18,7 +18,7 @@
 // `data-index-key`, a row's `data-protocol` and `data-chain`).
 //
 //   0  /vaults answers 200 and names a block for each of the five rosters
-//   1  each roster's count, as its page states it (Maple: the catalogue),
+//   1  each roster's count, as its vaults info page states it (Maple: the catalogue),
 //      equals the index's count for it, and the index's rows per protocol
 //      (funded + empty + unread) equal it; the sum equals the union
 //   2  the Protocol facet narrows the rows to each protocol's count, every
@@ -30,7 +30,7 @@
 //      the protocol roster's raw figure for the same vault at the same block
 //   7  every row links under its protocol, to a vault its roster lists (a
 //      Maple pool to /ethereum/maple/pools/<key>); two links per protocol answer 200
-//   8  the rosters' heads link the index
+//   8  no roster links the index: each opens on its read stamp alone (ui-jobs 771)
 //   9  the index's rows carry receipts and the page offers the inspector (ui-jobs 571);
 //      every Total assets and Share price figure names its asset
 //  10  the default view (ui-jobs 485): the preset's rows against ?show=all,
@@ -68,6 +68,7 @@ const ROSTER = {
   "morpho:8453": {
     protocol: "morpho",
     href: "/base/morpho/vaults",
+    info: "/base/morpho/vaults/info",
     figure: "directory-census",
     prefix: "/base/morpho/vaults/",
     chain: "8453",
@@ -76,6 +77,7 @@ const ROSTER = {
   "morpho:1": {
     protocol: "morpho",
     href: "/ethereum/morpho/vaults",
+    info: "/ethereum/morpho/vaults/info",
     figure: "directory-census",
     prefix: "/ethereum/morpho/vaults/",
     chain: "1",
@@ -84,6 +86,7 @@ const ROSTER = {
   "aave:1": {
     protocol: "aave",
     href: "/ethereum/aave/vaults",
+    info: "/ethereum/aave/vaults/info",
     figure: "directory-catalogue",
     prefix: "/ethereum/aave/vaults/",
     chain: "1",
@@ -92,6 +95,7 @@ const ROSTER = {
   "yearn:1": {
     protocol: "yearn",
     href: "/ethereum/yearn/vaults",
+    info: "/ethereum/yearn/vaults/info",
     figure: "roster-census",
     prefix: "/ethereum/yearn/vaults/",
     chain: "1",
@@ -158,9 +162,10 @@ for (const k of KEYS) {
   // Every row of the roster (ui-jobs 485: the default view is the preset).
   const r = await get(`${ROSTER[k].href}?show=all`);
   rosterPages[k] = { status: r.status, html: r.html, ...rosterRows(r.html) };
+  // The count is on the roster's vaults info page (ui-jobs 771).
   if (ROSTER[k].figure) {
-    const text = figureText(r.html, ROSTER[k].figure) ?? "";
-    const m = text.match(/([\d,]+) vaults/);
+    const text = figureText((await get(ROSTER[k].info)).html, ROSTER[k].figure) ?? "";
+    const m = text.match(/([\d,]+) (?:vaults|of them)/);
     expected[k] = m ? Number(m[1].replace(/,/g, "")) : null;
   }
 }
@@ -367,13 +372,13 @@ for (const k of KEYS.filter((k) => ROSTER[k].protocol !== "maple")) {
   }
 }
 
-// ── 8: the rosters link the index ───────────────────────────────────────────
+// ── 8: no roster links the index (ui-jobs 771) ──────────────────────────────
+// Each roster opens on its read stamp alone; the rail reaches /vaults.
 for (const k of KEYS) {
   const html = rosterPages[k].html;
   check(
-    `8  ${ROSTER[k].href} links the index`,
-    rosterPages[k].status === 200 &&
-      /data-link="vault-index"[^>]*href="\/vaults"|href="\/vaults"[^>]*data-link="vault-index"/.test(html),
+    `8  ${ROSTER[k].href} draws no index link`,
+    rosterPages[k].status === 200 && !html.includes('data-link="vault-index"') && !html.includes('href="/vaults"'),
   );
 }
 

@@ -10,6 +10,9 @@
 // lib/morpho-base/vault-catalog.ts by this script (completeness asserted), not
 // scraped off the page. The one thing taken from the DOM is the block number,
 // which is the subject of check 0b, not a source of truth for the rest.
+// Since ui-jobs 771 the roster prints no block: 0b holds the read stamp's
+// block against the header attribute (one prop), and the printed block is
+// tested on the vaults info page (verify-vault-roster R4).
 //
 // Run:
 //   BASE=http://localhost:3801 node scripts/verify/verify-base-vault-directory.mjs
@@ -272,7 +275,10 @@ await page.waitForSelector("[data-roster-panel] [data-vault-row]", { timeout: 12
 // vaults" panel, linked; the panel's BlockRef is what is read (textContent: the
 // panel is closed at rest), held against the attribute and the stamp.
 // ui-jobs 771: the roster opens on its read stamp alone, with no panel; the
-// stamp's block is what is read, held against the line's attribute.
+// stamp's block is what is read, held against the line's attribute. Both come
+// from one prop, so this check holds the two hooks together and no more: the
+// printed block is tested on the vaults info page (verify-vault-roster R4,
+// verify-ethereum-vaults 9).
 const statedBlock = Number(
   (await page.locator("[data-roster-read-block]").first().getAttribute("data-roster-read-block")) ?? NaN,
 );

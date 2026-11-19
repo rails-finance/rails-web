@@ -55,6 +55,7 @@ export async function MetaMorphoVaultsInfo({ chainId }: { chainId: MetaMorphoCha
   const neverHeld = census.filter((c) => c.participants === 0).length;
   const unproven = census.filter((c) => !c.sumMatches);
   const words = WORDS[chainId];
+  const censusBlock = census.length > 0 ? Math.max(...census.map((c) => c.censusBlock)) : null;
 
   return (
     <VaultsInfoPage chainId={chainId} protocol={protocolForPathname(metaMorphoVaultRosterHref(chainId))!}>
@@ -78,32 +79,32 @@ export async function MetaMorphoVaultsInfo({ chainId }: { chainId: MetaMorphoCha
           {n(roster.censusBlock)}
         </Prov>
         , each found from the creation event its factory emits. The list is a floor: a vault deployed without a factory
-        emits no creation event, a vault created since the census block joins when the census runs again, and the Vault
-        V2 family is outside it. Names are read live, because a V1.1 owner can rename a vault. Every figure on the
-        roster is a call answered at the block its read stamp names, re-read at most every five minutes.
+        emits no creation event, and a vault created since the census block joins when the census runs again. Names are
+        read live, because a V1.1 owner can rename a vault. Each total and share price on the roster is a call answered
+        at the block its read stamp names, re-read at most every five minutes.
       </p>
       <p data-intro-figures>
-        Amounts are in each vault&rsquo;s asset and nothing is priced in USD, so two assets are never ordered or added
-        together. Yield is Rails&rsquo;s figure: the share price&rsquo;s growth over 30 days, annualised simply, net of
-        the fees the vault takes inside the share; rewards paid outside the share, such as MORPHO, are not in it. An
-        empty vault answered zero to <code>totalAssets()</code>; a vault with no holder has never minted a share.
-        {census.length > 0 && (
+        On the roster, amounts are in each vault&rsquo;s asset and nothing is priced in USD, so two assets are never
+        ordered or added together. Yield is Rails&rsquo;s figure: the share price&rsquo;s growth over 30 days,
+        annualised simply, net of the fees the vault takes inside the share; rewards paid outside the share, such as
+        MORPHO, are not in it. An empty vault answered zero to <code>totalAssets()</code>.
+        {censusBlock != null && (
           <>
             {" "}
-            Holders counts every address holding a share at the census&rsquo;s block: a floor, since an address is often
-            a wrapper. The positions listing names{" "}
+            Holders counts every address holding a share at census block {n(censusBlock)}: a floor, since an address is
+            often a wrapper. The positions listing names{" "}
             <Link href={metaMorphoVaultsListingHref(chainId)} className={INLINE_LINK} prefetch={false}>
               every holder
             </Link>
-            ; the paragraphs below say how it is built.
+            ; the paragraphs below say how that listing is built.
           </>
         )}
       </p>
       <p data-intro-docs>
         <a href={MORPHO_VAULT_DOCS} target="_blank" rel="noopener" className={`font-medium ${FOOT_LINK}`}>
-          Morpho&rsquo;s documentation
+          Morpho&rsquo;s docs
         </a>{" "}
-        explains the Vaults V1 roles in Morpho&rsquo;s terms.
+        explain the Vaults V1 roles in Morpho&rsquo;s terms.
       </p>
       <p data-intro-membership>
         Membership comes from the census and only from the census: every address named either side of any{" "}

@@ -8,8 +8,9 @@
 //
 // THE CATALOGUE COUNT IS A CHAIN READ: what Aave's enumerators answer at a
 // block. The page asks the roster's loader, which caches a good read for five
-// minutes and never caches a failure; a failed read states the count as not
-// read and the prose stands.
+// minutes; a failed read is re-read on every request until its cache entry
+// expires, and while it fails the count is stated as not read and the prose
+// stands.
 //
 // THE CENSUS HEADER IS FETCHED HERE, without the live overlay: three of the
 // paragraphs are about the census itself — which vaults nobody has ever held,
@@ -42,7 +43,7 @@ export const metadata = listingMetadata({
   title: "About the Vaults section on Ethereum",
   canonicalPath: "/ethereum/aave/vaults/info",
   description:
-    "How Rails builds the vault position listing on Ethereum: membership from a whole-Transfer census proven complete by Σ balanceOf, the one priced figure and the block it was priced at, the vaults nobody has ever held, and what the search does and does not do.",
+    "What Aave's three vault families are and how Rails lists them on Ethereum: the roster read from Aave's enumerators at one block, what is outside it and what its figures leave out; then the vault position listing: membership from a whole-Transfer census proven complete by Σ balanceOf, the one priced figure and the block it was priced at, the vaults nobody has ever held, and what the search does and does not do.",
 });
 
 const n = (v: number) => v.toLocaleString("en-US");
@@ -74,14 +75,14 @@ export default async function EthereumVaultsInfoPage() {
   return (
     <VaultsInfoPage chainId={MAINNET_CHAIN_ID} protocol={protocolForHref("/ethereum/aave")!}>
       <p data-intro-vault>
-        Three families of ERC-4626 vault that Aave deploys. Savings GHO is one vault over GHO: a holder&rsquo;s shares
-        grow with a stored yield index, and withdrawals are clamped to the GHO the contract holds. A static aToken wraps
+        Aave deploys three families of ERC-4626 vault. Savings GHO is one vault over GHO: a holder&rsquo;s shares grow
+        with a stored yield index, and withdrawals are clamped to the GHO the contract holds. A static aToken wraps
         exactly one Aave V3 aToken, so its shares are a non-rebasing claim on a supply position and its share price is
         the reserve&rsquo;s accrued index. An Umbrella stake token is staked against one reserve&rsquo;s deficit:
         Umbrella can slash it, taking part of the stake to cover the deficit, which lowers every holder&rsquo;s share
         price at once, and redemption runs through a cooldown and a window after it.
       </p>
-      <p data-intro-roster>
+      <p data-intro-roster data-figure="directory-catalogue">
         {data.chainStale ? (
           <>
             One row on the roster is one vault: savings GHO, the static aTokens <code>getStataTokens()</code> returns
@@ -99,15 +100,15 @@ export default async function EthereumVaultsInfoPage() {
           </>
         )}{" "}
         Both calls answer their whole family, so the list is complete at its block. Outside it: Aave&rsquo;s deployments
-        on other chains, the legacy static-aToken factory, and any ERC-4626 Aave has not published. Every figure on the
-        roster is a call answered at the block its read stamp names, re-read at most every five minutes.
+        on other chains, the legacy static-aToken factory, and any ERC-4626 Aave has not published. Each total and share
+        price on the roster is a call answered at the block its read stamp names, re-read at most every five minutes.
       </p>
       <p data-intro-figures>
-        Amounts are in each vault&rsquo;s asset and nothing is priced in USD. Three of the four stake tokens hold a
-        static aToken, so their amounts are in that wrapper&rsquo;s units. A static aToken holding nothing still answers
-        a share price well above one: the reserve&rsquo;s index. Yield is Rails&rsquo;s figure: the share price&rsquo;s
-        growth over 30 days, annualised simply; Umbrella&rsquo;s rewards are paid outside the share and are not in it.
-        The deposit cap, the wrapped aToken and the cooldown are on each vault&rsquo;s page.
+        On the roster, amounts are in each vault&rsquo;s asset and nothing is priced in USD. Three of the four stake
+        tokens hold a static aToken, so their amounts are in that wrapper&rsquo;s units. A static aToken holding nothing
+        still answers a share price well above one: the reserve&rsquo;s index. Yield is Rails&rsquo;s figure: the share
+        price&rsquo;s growth over 30 days, annualised simply; Umbrella&rsquo;s rewards are paid outside the share and
+        are not in it. The deposit cap, the wrapped aToken and the cooldown are on each vault&rsquo;s page.
         {censusBlock != null && (
           <>
             {" "}
@@ -115,7 +116,7 @@ export default async function EthereumVaultsInfoPage() {
             <Link href={ethereumVaultsListingHref()} className={INLINE_LINK} prefetch={false}>
               every holder
             </Link>
-            ; the paragraphs below say how it is built.
+            ; the paragraphs below say how that listing is built.
           </>
         )}
       </p>
@@ -153,9 +154,9 @@ export default async function EthereumVaultsInfoPage() {
         The section lists two layers of one machine, and a reader must not add them together. An Umbrella stake
         token&rsquo;s shares are a claim on a single position, the static aToken it is staked on, so that stake
         token&rsquo;s holding of the wrapper and the stake token&rsquo;s holders are the same assets at two heights.
-        Nothing here sums them: the census line counts positions and Value · USD is per row, so no total is rendered
-        anywhere in this section. Each static aToken&rsquo;s page names the stake token that holds it and the share it
-        holds, and each stake token&rsquo;s page names the wrapper its assets sit in.
+        Nothing here sums them: Value · USD is per row, so no total is rendered anywhere in this section. Each static
+        aToken&rsquo;s page names the stake token that holds it and the share it holds, and each stake token&rsquo;s
+        page names the wrapper its assets sit in.
       </p>
       {/* ui-jobs 664, VA7: the docs' word for the page's "Static aToken". */}
       <p data-intro-glossary>

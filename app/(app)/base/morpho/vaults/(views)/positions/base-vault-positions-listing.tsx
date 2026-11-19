@@ -16,7 +16,9 @@
 // TWO ROWS ABOVE THE TOOLBAR, AND NOTHING ELSE. The Morpho Blue Base rail —
 // identity, the chain head's recency stamp, POSITIONS / MARKETS / VAULTS / (i)
 // — then the census line. How the vault layer is built is at
-// /base/morpho/vaults/info, and the provenance inspector is gone from this
+// /base/morpho/vaults/info, which the explorer's About page links from its
+// Vaults section (the rail's (i) opens /base/morpho/info), and the provenance
+// inspector is gone from this
 // face: a listing card is inert content inside its row link, and the same card
 // carries live receipts on the position page.
 //

@@ -227,6 +227,32 @@ export function MorphoInfoPage({ deployment }: { deployment: MorphoInfoDeploymen
             ),
           },
           marketsView("/ethereum/morpho/markets", LOAN_TOKEN_ROWS),
+          {
+            heading: "Vaults",
+            body: (
+              <ul className={UL}>
+                <li>
+                  <Link href="/ethereum/morpho/vaults" className={INLINE_LINK}>
+                    The vault roster
+                  </Link>{" "}
+                  lists every MetaMorpho vault (Morpho&apos;s vault kind, run by a curator who picks its markets) that
+                  Rails has found on Ethereum, with its total assets, share price and 30-day yield.
+                </li>
+                <li>
+                  <Link href="/ethereum/morpho/vaults/positions" className={INLINE_LINK}>
+                    The vault positions listing
+                  </Link>{" "}
+                  shows each address that holds shares in a vault.
+                </li>
+                <li>
+                  <Link href="/ethereum/morpho/vaults/info" className={INLINE_LINK}>
+                    The vault layer&apos;s about page
+                  </Link>{" "}
+                  explains how Rails builds the roster and that listing.
+                </li>
+              </ul>
+            ),
+          },
         ]}
         search={
           <>
@@ -322,7 +348,7 @@ export function MorphoInfoPage({ deployment }: { deployment: MorphoInfoDeploymen
                   <Link href="/base/morpho/vaults/info" className={INLINE_LINK}>
                     The vault layer&apos;s about page
                   </Link>{" "}
-                  explains how Rails builds that listing.
+                  explains how Rails builds the roster and that listing.
                 </li>
               </ul>
             ),

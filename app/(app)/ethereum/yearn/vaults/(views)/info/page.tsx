@@ -11,8 +11,9 @@
 // alone (ui-jobs 771). The census count comes from the roster the pages serve
 // (lib/yearn/vault-roster.ts: the box's weekly census over the baked
 // catalogue). THE ENDORSED COUNT IS A CHAIN READ: the roster's loader caches a
-// good read for five minutes and never caches a failure, and a failed read
-// states the count as not read while the prose stands.
+// good read for five minutes; a failed read is re-read on every request until
+// its cache entry expires, and while it fails the count is stated as not read
+// and the prose stands.
 
 import { VaultsInfoPage } from "@/components/vaults/vaults-info-page";
 import { Prov } from "@/components/shared/provenance";
@@ -75,8 +76,8 @@ export default async function YearnVaultsInfoPage() {
         announced by a creation event on that factory, which is the only enumeration there is: a vault keeps no list of
         its siblings and a factory keeps no list of its children. Each vault the sweep found is then asked which factory
         made it, which release it runs and which token it takes, and the three answers must match the event before it
-        joins the roster. Every figure on the roster is a call answered at the block its read stamp names, re-read at
-        most every five minutes.
+        joins the roster. Each total and share price on the roster is a call answered at the block its read stamp names,
+        re-read at most every five minutes.
       </p>
       <p data-intro-floor>
         That makes the roster a floor. The V3 vault is a contract, so it can be compiled and deployed by hand with no
@@ -93,18 +94,19 @@ export default async function YearnVaultsInfoPage() {
         running Yearn&rsquo;s vault code at the release the row states. An endorsement is Yearn&rsquo;s word on the
         vault; the strategies behind it are judged one at a time.{" "}
         {data.chainStale ? (
-          "The Registry was not read just now, so the count of endorsed vaults is not stated."
+          "The registry was not read just now, so the count of endorsed vaults is not stated."
         ) : (
           <>
             <Prov info={yearnEndorsedCountProv(coords, endorsed, data.catalogSize)}>
-              {n(endorsed)} of the {n(data.catalogSize)} are endorsed at block {n(data.blockNumber)}
+              {n(endorsed)} of the {n(data.catalogSize)} vaults on the roster are endorsed at block{" "}
+              {n(data.blockNumber)}
             </Prov>
             .
           </>
         )}
       </p>
       <p data-intro-units>
-        Every figure on the roster is a quantity of one vault&rsquo;s asset, and the roster holds{" "}
+        Every amount on the roster is a quantity of one vault&rsquo;s asset, and the roster holds{" "}
         {n(new Set(vaults.map((v) => v.asset.address)).size)} different assets. Nothing is priced in USD, so two assets
         are never ordered or added together, and there is no total across the page. Yield is Rails&rsquo;s figure: the
         share price&rsquo;s growth over 30 days, annualised simply, net of the fees the vault takes inside the share;

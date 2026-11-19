@@ -120,7 +120,7 @@ const aaveVaultCatalogueProv_ = (
     kind: "recompute",
     text: `To check: ask any Ethereum archive node${atBlock(c)} for StataTokenFactory.getStataTokens() and Umbrella.getStkTokens(), count what they return, and add one for sGHO.`,
   },
-  summary: `Vaults listed — ${counts.catalogSize}: sGHO, the ${counts.stakeCount} stake tokens Umbrella lists and the ${counts.stataCount} static aTokens the static aToken factory lists, every one of them read${atBlock(c)}. The list is complete at this block, so it is neither a census nor a floor: Umbrella and the factory each return their whole family in one read, and Aave's address book names sGHO. A vault deployed one block earlier is in it. What is outside it is stated on the vaults info page.`,
+  summary: `Vaults listed — ${counts.catalogSize}: sGHO, the ${counts.stakeCount} stake tokens Umbrella lists and the ${counts.stataCount} static aTokens the static aToken factory lists, every one of them read${atBlock(c)}. The list is complete at this block, so it is neither a census nor a floor: Umbrella and the factory each return their whole family in one read, and Aave's address book names sGHO. A vault deployed one block earlier is in it. What is outside it is named after this figure.`,
   via: `${LANE} · getStataTokens() + getStkTokens() + GhoEthereum.SGHO @ the pinned block`,
   formula: "1 (sGHO) + getStkTokens().length + getStataTokens().length",
 });
