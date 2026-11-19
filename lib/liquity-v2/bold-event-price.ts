@@ -6,7 +6,7 @@
 //
 // Dependency-free apart from relative imports, so the unit test loads it.
 
-import type { EventPriceFigure } from "../../components/shared/event-price-row";
+import type { EventPriceChip } from "../../components/shared/event-price-row";
 import type { Provenance } from "../../components/shared/provenance";
 import type { DebtTokenPrice } from "../shared/types/event-shape";
 import { priceText } from "../shared/shown-usd";
@@ -71,23 +71,22 @@ export function boldEventProv(bp: DebtTokenPrice, eventBlock?: number): Provenan
   };
 }
 
-/** The price row's figure for the line: on a redemption, and on a row that
- *  draws no Debt cell, whose $1-face receipt would otherwise carry it. None
- *  where the row carries no boldPrice. */
-export function boldPriceFigure(
+/** BOLD's chip on the price row, beside the collateral's: the stored price at
+ *  its block, "then", and the page's head read "today" (ThenTodayChip), with
+ *  the line's receipt. None where the row carries no boldPrice. */
+export function boldPriceChip(
   bp: DebtTokenPrice | undefined | null,
   eventBlock: number | undefined,
-  row: { redemption: boolean; debtCell: boolean },
-): EventPriceFigure | null {
-  if (!row.redemption && row.debtCell) return null;
-  const line = boldEventLine(bp, eventBlock);
-  if (!line || !bp) return null;
+  title?: string,
+): EventPriceChip | null {
+  if (!bp || !boldEventLine(bp, eventBlock)) return null;
   return {
-    key: "bold-price",
-    label: line.lead,
-    text: line.price,
-    unit: line.rest,
+    symbol: "BOLD",
+    usd: bp.usd,
+    format: priceText,
     info: boldEventProv(bp, eventBlock),
     value: String(bp.usd),
+    title,
+    figure: "bold-price",
   };
 }

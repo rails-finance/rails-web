@@ -185,9 +185,12 @@ export function StatSubline({
 export function PriceChipShell({
   title,
   bare,
+  figure,
   children,
 }: {
   title?: string;
+  /** `data-price-figure`, a verifier's handle on the chip. */
+  figure?: string;
   /** The figure and its icon with no fill or box (Liquity V2's event price,
    *  ui-jobs 281). */
   bare?: boolean;
@@ -197,6 +200,7 @@ export function PriceChipShell({
     <span
       className={`ml-auto inline-flex items-center gap-1.5 text-xs font-bold ${bare ? "" : "rounded-md bg-background px-2 py-1 "}${changeTone(false)}`}
       title={title}
+      data-price-figure={figure}
     >
       {children}
     </span>

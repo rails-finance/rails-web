@@ -77,6 +77,8 @@ export interface EventPriceChip {
   /** The symbol's name before the figure and a source note after it
    *  ("pETH 4,861.78 · oracle at block"), the icon first. */
   named?: { note: string };
+  /** A stable handle a verifier reads the chip by (`data-price-figure`). */
+  figure?: string;
 }
 
 /** A chain-derived outcome of the event, in the family's words. */
@@ -253,7 +255,7 @@ export function EventPriceRow({ price }: { price: EventCardPrice }) {
       />
     );
     return (
-      <PriceChipShell key={p.symbol} bare title={p.title}>
+      <PriceChipShell key={p.symbol} bare title={p.title} figure={p.figure}>
         {p.named ? (
           <span className="inline-flex items-center gap-1 font-normal tabular-nums text-rb-500">
             {icon}

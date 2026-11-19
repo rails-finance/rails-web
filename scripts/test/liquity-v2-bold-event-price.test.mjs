@@ -8,7 +8,7 @@ import { registerAppResolver } from "../lib/app-resolver.mjs";
 
 registerAppResolver();
 
-const { boldEventLine, boldEventProv, boldPriceFigure } = await import("../../lib/liquity-v2/bold-event-price.ts");
+const { boldEventLine, boldEventProv, boldPriceChip } = await import("../../lib/liquity-v2/bold-event-price.ts");
 const { faceUsdProv } = await import("../../lib/shared/flows-timeline-provenance.ts");
 const { liquityEventProse } = await import("../../lib/liquity/event-prose.ts");
 
@@ -42,7 +42,8 @@ test("a row with no boldPrice states no line", () => {
   assert.equal(boldEventLine(null), null);
   assert.equal(boldEventLine({ ...BP, usd: 0 }, 26441929), null);
   assert.equal(boldEventProv({ ...BP, usd: Number.NaN }), undefined);
-  assert.equal(boldPriceFigure(undefined, 26441929, { redemption: true, debtCell: true }), null);
+  assert.equal(boldPriceChip(undefined, 26441929), null);
+  assert.equal(boldPriceChip({ ...BP, usd: 0 }, 26441929), null);
   const face = faceUsdProv("BOLD", "1,000.00", "after", null);
   assert.ok(!face.summary.includes("BOLD at"));
   assert.ok(!face.summary.includes("Debt stays"));
@@ -69,14 +70,15 @@ test("the line's receipt names the pool, the call and the block", () => {
   assert.ok(boldEventProv(BP, 26442100).summary.startsWith(`${OLDER}, from`));
 });
 
-test("the price row's figure: on a redemption and on a row with no Debt cell", () => {
-  const f = boldPriceFigure(BP, 26442100, { redemption: true, debtCell: true });
-  assert.equal(f.key, "bold-price");
-  assert.equal(`${f.label} ${f.text} ${f.unit}`, OLDER);
-  assert.ok(f.info.summary.startsWith(OLDER));
-  assert.equal(boldPriceFigure(BP, 26441929, { redemption: false, debtCell: true }), null);
-  const g = boldPriceFigure(BP, 26441929, { redemption: false, debtCell: false });
-  assert.equal(`${g.label} ${g.text} ${g.unit}`, SAME);
+test("the price row's BOLD chip: the stored price at six figures, with the line's receipt", () => {
+  const c = boldPriceChip(BP, 26442100, "BOLD price at the time of this event");
+  assert.equal(c.symbol, "BOLD");
+  assert.equal(c.figure, "bold-price");
+  assert.equal(c.format(c.usd), "$0.998842");
+  assert.equal(c.format(0.99753412), "$0.997534");
+  assert.ok(c.info.summary.startsWith(OLDER));
+  assert.ok(c.info.summary.endsWith("Debt stays at its $1 face."));
+  assert.equal(c.unit, undefined);
 });
 
 // A redemption as the timeline serves it, trimmed to what the L2 reads.
