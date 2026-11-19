@@ -10,6 +10,8 @@
 // transaction's sender; the collateral goes to the caller of
 // CollateralRegistry.redeemCollateral. Totals cover every row of the wallet.
 
+import type { BoldDailyResponse, RedeemerDaysResponse } from "@/lib/liquity-v2/redeemer-flows";
+
 export type LiquityV2RedeemerBranch = "WETH" | "wstETH" | "rETH";
 
 export interface LiquityV2RedemptionRow {
@@ -17,6 +19,10 @@ export interface LiquityV2RedemptionRow {
   trove_id: string;
   bold_raw: string;
   coll_raw: string;
+  /** The TroveOperation event's annual interest rate, 1e18 = 100%: the
+   *  Trove's rate at the block, its batch's for a batch member. Absent from a
+   *  server before ui-jobs 762. */
+  rate_raw?: string;
   block_number: string;
   block_timestamp: string;
   transaction_hash: string;
@@ -78,4 +84,18 @@ export async function readLiquityV2Redeemer(
   const res = await fetch(url, { cache: "no-store", headers: opts.headers, signal: opts.signal });
   if (!res.ok) throw new Error(`Liquity V2 redeemer read failed: ${res.status} ${res.statusText}`);
   return (await res.json()) as LiquityV2RedeemerResponse;
+}
+
+/** The wallet's redemption days, through the proxy. */
+export async function readLiquityV2RedeemerDays(address: string, signal?: AbortSignal): Promise<RedeemerDaysResponse> {
+  const res = await fetch(`/api/liquity-v2/redeemer/${address.toLowerCase()}/days`, { cache: "no-store", signal });
+  if (!res.ok) throw new Error(`Liquity V2 redeemer days read failed: ${res.status} ${res.statusText}`);
+  return (await res.json()) as RedeemerDaysResponse;
+}
+
+/** BOLD's daily market price over [from, to], through the proxy. */
+export async function readBoldDailyPrices(from: number, to: number, signal?: AbortSignal): Promise<BoldDailyResponse> {
+  const res = await fetch(`/api/liquity-v2/bold-prices/daily?from=${from}&to=${to}`, { cache: "no-store", signal });
+  if (!res.ok) throw new Error(`BOLD daily prices read failed: ${res.status} ${res.statusText}`);
+  return (await res.json()) as BoldDailyResponse;
 }

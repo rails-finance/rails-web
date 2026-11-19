@@ -4,8 +4,11 @@
 // (app/(app)/ethereum/liquity-v2/stability-pool/[collateralType]/[wallet]/deposit-view.tsx):
 // the card (P1) with the wallet's sums, then the shared timeline (P3), one
 // row per Trove a redemption hit, newest first, with its filters (the
-// collateral narrows to a branch). A wallet has no Lifetime flows panel: it
-// holds no position. Past REDEEMER_FIRST_READ rows the timeline closes on a
+// collateral narrows to a branch). Between them the Lifetime flows panel
+// draws BOLD's market price over the redeeming span with the wallet's
+// redemption days on its events row, tied to the timeline by the day as the
+// deposit page's is (lib/liquity-v2/redeemer-flows.ts; a wallet holds no
+// position, so no bars). Past REDEEMER_FIRST_READ rows the timeline closes on a
 // boundary card, and the cut notice reads the rest on request; the card's
 // sums cover every row. A row's event page and View in timeline are the
 // Trove's.
@@ -17,6 +20,16 @@ import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { CHAIN_TRUTH_DISPLAY_ITEMS, TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { LifetimeFlowsPanel, type FlowsRead } from "@/components/shared/lifetime-flows-panel";
+import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
+import { FlowFocusContext, useFlowFocusRoot, useFlowFocusValue } from "@/components/shared/flow-focus-context";
+import { RedeemerFlowsNote } from "@/components/protocol/liquity/redeemer-flows-note";
+import {
+  redeemerFlows,
+  unfilledThrough,
+  type BoldDailyResponse,
+  type RedeemerDaysResponse,
+} from "@/lib/liquity-v2/redeemer-flows";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { LiquityV2RedeemerCard } from "@/components/protocol/liquity/redeemer-card";
 import { LiquityV2RedemptionCard } from "@/components/protocol/liquity/redeemer-event-card";
@@ -29,7 +42,9 @@ import {
 } from "@/lib/liquity-v2/redeemer-timeline";
 import { boundaryFromLimit } from "@/lib/shared/timeline-boundary";
 import {
+  readBoldDailyPrices,
   readLiquityV2Redeemer,
+  readLiquityV2RedeemerDays,
   type LiquityV2RedeemerResponse,
   type LiquityV2RedemptionRow,
 } from "@/lib/sources/api/liquity-v2-redeemer";
@@ -131,10 +146,36 @@ export default function RedeemerView({
     };
   }, [olderCount, address]);
 
+  // The chart: every redemption day, then BOLD's price over them.
+  const [days, setDays] = useState<RedeemerDaysResponse | null>(null);
+  const [prices, setPrices] = useState<BoldDailyResponse | null>(null);
+  const [flowsFailed, setFlowsFailed] = useState(false);
+  useEffect(() => {
+    const ctl = new AbortController();
+    readLiquityV2RedeemerDays(address, ctl.signal)
+      .then(async (d) => {
+        setDays(d);
+        if (d.days.length === 0) return;
+        const from = d.days[0][0];
+        const to = d.days[d.days.length - 1][0];
+        setPrices(await readBoldDailyPrices(from, to, ctl.signal));
+      })
+      .catch(() => !ctl.signal.aborted && setFlowsFailed(true));
+    return () => ctl.abort();
+  }, [address]);
+  const flows = useMemo(
+    () => (days && (prices || days.days.length === 0) ? redeemerFlows(days.days, prices, listed) : null),
+    [days, prices, listed],
+  );
+  const flowsRead: FlowsRead = flowsFailed ? "failed" : days && (prices || days.days.length === 0) ? "done" : "reading";
+  const flowFocus = useFlowFocusValue(useFlowFocusRoot(flows?.focus ?? NO_FOCUS), flows?.timeline ?? null);
+
   const tl = useTimelineEvents(events, {
     storageKey: `liquity-v2-redeemer-${address}`,
     protocolKey: "liquity-v2-redeemer",
     olderCount,
+    // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
+    dates: false,
   });
   const boundary = useMemo(() => {
     const oldest = tl.sortedEvents[0];
@@ -164,54 +205,81 @@ export default function RedeemerView({
   const firstAt = olderCount === 0 && listed.length > 0 ? Number(listed[0].block_timestamp) : firstRead;
   const served = data.served_thru_block;
 
+  const firstDay = days?.days[0]?.[0] ?? null;
+  const lastDay = days?.days[days.days.length - 1]?.[0] ?? null;
+
   return (
-    <div className="py-8 space-y-6" data-anatomy="Q1·liquity">
-      <DetailTopRow session="liquity-v2" wallet={address} fallbackHref={LIQUITY_V2_BASE_PATH} tools={false} />
-      <LiquityV2RedeemerCard
-        data={data}
-        lastAt={newest}
-        explanation={
-          <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed text-rb-500">
-            <li>
-              A redemption burns BOLD and takes collateral of the same value at the branch price, less a fee. It takes
-              the debt from the Troves with the lowest interest rates, and the fee stays in those Troves.
-            </li>
-            <li>
-              This address sent the transactions. The collateral went to the account that called the CollateralRegistry:
-              this address when it called it directly.
-            </li>
-            <li>
-              The sums cover every redemption the index holds from this address
-              {served ? `, through block ${Number(served).toLocaleString("en-US")}` : ""}.
-            </li>
-          </ul>
-        }
-      />
-      {awaitAt ? (
-        <DetailBodySkeleton />
-      ) : (
-        <ChainTruthTimeline
-          persistKeyPrefix="liquity-v2-redeemer"
-          closed={false}
-          tl={tl}
-          boundary={boundary}
-          eventHref={(id) => {
-            const r = rowById.get(id);
-            return r ? redemptionEventHref(r) : null;
-          }}
-          loadOlder={olderCount > 0 ? { state: olderRead, load: () => void loadRest() } : undefined}
-          displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
-          emptyLabel="No redemptions recorded for this address"
-          toolbarLeading={
-            <TimelineActivityHeader events={events} closed={false} firstAt={firstAt} tenurePending={firstAt == null} />
+    <FlowFocusContext.Provider value={flows ? flowFocus : null}>
+      <div className="py-8 space-y-6" data-anatomy="Q1·liquity">
+        <DetailTopRow session="liquity-v2" wallet={address} fallbackHref={LIQUITY_V2_BASE_PATH} tools={false} />
+        <LiquityV2RedeemerCard
+          data={data}
+          lastAt={newest}
+          explanation={
+            <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed text-rb-500">
+              <li>
+                A redemption burns BOLD and takes collateral of the same value at the branch price, less a fee. It takes
+                the debt from the Troves with the lowest interest rates, and the fee stays in those Troves.
+              </li>
+              <li>
+                This address sent the transactions. The collateral went to the account that called the
+                CollateralRegistry: this address when it called it directly.
+              </li>
+              <li>
+                The sums cover every redemption the index holds from this address
+                {served ? `, through block ${Number(served).toLocaleString("en-US")}` : ""}.
+              </li>
+            </ul>
           }
-          renderCard={(event, meta) => {
-            const r = rowById.get(event.id);
-            return r ? <LiquityV2RedemptionCard row={r} isLast={meta.isLast} eventNumber={meta.eventNumber} /> : null;
-          }}
         />
-      )}
-      <ProvInspectorLayer />
-    </div>
+        <LifetimeFlowsPanel
+          scrubber={flows ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
+          read={flowsRead}
+          explanation={
+            days && firstDay != null && lastDay != null ? (
+              <RedeemerFlowsNote
+                days={days.days.length}
+                firstDay={firstDay}
+                lastDay={lastDay}
+                unreadThrough={unfilledThrough(prices, firstDay)}
+                pool={prices?.pool ?? null}
+              />
+            ) : undefined
+          }
+        />
+        {awaitAt ? (
+          <DetailBodySkeleton />
+        ) : (
+          <ChainTruthTimeline
+            persistKeyPrefix="liquity-v2-redeemer"
+            closed={false}
+            tl={tl}
+            boundary={boundary}
+            eventHref={(id) => {
+              const r = rowById.get(id);
+              return r ? redemptionEventHref(r) : null;
+            }}
+            loadOlder={olderCount > 0 ? { state: olderRead, load: () => void loadRest() } : undefined}
+            displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
+            emptyLabel="No redemptions recorded for this address"
+            toolbarLeading={
+              <TimelineActivityHeader
+                events={events}
+                closed={false}
+                firstAt={firstAt}
+                tenurePending={firstAt == null}
+              />
+            }
+            renderCard={(event, meta) => {
+              const r = rowById.get(event.id);
+              return r ? <LiquityV2RedemptionCard row={r} isLast={meta.isLast} eventNumber={meta.eventNumber} /> : null;
+            }}
+          />
+        )}
+        <ProvInspectorLayer />
+      </div>
+    </FlowFocusContext.Provider>
   );
 }
+
+const NO_FOCUS: never[] = [];

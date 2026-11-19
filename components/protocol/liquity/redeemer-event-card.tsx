@@ -4,7 +4,7 @@
 // the wallet sent took debt from, on the shared event-card shell
 // (components/shared/event-card.tsx) as the deposit row draws it
 // (sp-event-card.tsx). T1 the label with the BOLD redeemed on the spine and
-// the collateral paid out of the Trove in the head, T2 the Trove, the two amounts and the transaction,
+// the collateral paid out of the Trove in the head, T2 the Trove, its rate at the block, the two amounts and the transaction,
 // T3 the row in words. The Trove links open this redemption in the Trove's
 // timeline.
 
@@ -20,6 +20,7 @@ import { shortPositionId } from "@/lib/shared/position-name";
 import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
 import { big, exactUnits, units } from "@/lib/liquity-v2/sp-math";
+import { fmtRateNum } from "@/lib/liquity/figure-format";
 import { redemptionLogProv } from "@/lib/liquity-v2/redeemer-provenance";
 import { REDEMPTION_LABEL, redemptionId, redemptionTroveHref } from "@/lib/liquity-v2/redeemer-timeline";
 import type { LiquityV2RedemptionRow } from "@/lib/sources/api/liquity-v2-redeemer";
@@ -67,6 +68,10 @@ export function LiquityV2RedemptionCard({
   const bold = big(row.bold_raw);
   const coll = big(row.coll_raw);
   const id = shortPositionId(row.trove_id);
+  // The Trove's annual rate at the block, from the row's TroveOperation log
+  // (absent from a server before ui-jobs 762).
+  const ratePct = row.rate_raw != null ? Number(big(row.rate_raw)) / 1e16 : null;
+  const rateText = ratePct != null ? `${fmtRateNum(ratePct)}%` : null;
 
   const tokens: SpineTokenRow[] = [
     {
@@ -102,6 +107,18 @@ export function LiquityV2RedemptionCard({
         ],
       },
     },
+    ...(rateText
+      ? [
+          {
+            kind: "stat",
+            key: "rate",
+            label: "Trove rate",
+            changed: false,
+            figure: "liquity-v2-redeemer-rate",
+            value: { after: { text: rateText, info: redemptionLogProv("rate", row), value: String(ratePct) } },
+          } satisfies EventCellSpec,
+        ]
+      : []),
     amountCell("bold", "BOLD redeemed", bold, "BOLD", TOKEN_ADDRESSES.BOLD, redemptionLogProv("bold", row)),
     amountCell("coll", `${c} paid out of the Trove`, coll, c, branch.collateralAddr, redemptionLogProv("coll", row)),
     {
@@ -156,6 +173,16 @@ export function LiquityV2RedemptionCard({
         >
           Trove {id} ({c})
         </Link>,
+        ...(rateText
+          ? [
+              <span key="rate" data-redeemer-rate="">
+                at{" "}
+                <Prov info={redemptionLogProv("rate", row)} value={String(ratePct)}>
+                  {rateText}
+                </Prov>
+              </span>,
+            ]
+          : []),
       ],
       deltas: [
         {
