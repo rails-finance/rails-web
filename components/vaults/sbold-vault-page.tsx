@@ -36,6 +36,9 @@ import { liquityV2DepositHref } from "@/lib/liquity-v2/sp-routes";
 import {
   sboldAssetProv,
   sboldBlockProv,
+  sboldCollProv,
+  sboldFragmentsProv,
+  sboldYieldProv,
   sboldDepositProv,
   sboldIdleProv,
   sboldNameProv,
@@ -385,8 +388,29 @@ export function SboldVaultPage({
       hooks: { "data-sp-branch": d.branch, "data-sp-pool": d.pool, "data-deposit-raw": d.compounded?.raw ?? "" },
     };
   });
+  // The three pools' BOLD yield pending, one row, where all three answered (ui-jobs 765).
+  const yields = data.deposits.map((d) => d.yieldPending);
+  const yieldSum = yields.every((p) => p != null) ? yields.reduce((t, p) => t + BigInt(p!.raw), BigInt(0)) : null;
+  const yieldAmount: RawAmount | null =
+    yieldSum == null ? null : { raw: yieldSum.toString(), value: Number(yieldSum) / 1e18 };
   const rows: VaultAssetRow[] = [
     ...depositRows,
+    {
+      key: "yield-pending",
+      venue: "BOLD yield pending",
+      sub: <span>getDepositorYieldGainWithPending, three pools</span>,
+      amount: yieldAmount,
+      amountProv:
+        yieldSum == null
+          ? undefined
+          : sboldYieldProv(coords, {
+              pools: data.deposits.map((d) => ({ branch: d.branch, pool: d.pool, raw: d.yieldPending!.raw })),
+              sumRaw: yieldSum.toString(),
+            }),
+      share: fraction(yieldAmount, y.totalAssets),
+      shareProv: vaultVenueShareProv(v, "the BOLD yield pending", "totalAssets()", coords.readBy),
+      hooks: { "data-yield-pending-raw": yieldAmount?.raw ?? "" },
+    },
     {
       key: "idle",
       venue: "Idle BOLD in the vault",
@@ -399,21 +423,30 @@ export function SboldVaultPage({
     },
   ];
 
-  // The three deposits and the idle BOLD against totalAssets() (ui-jobs 749):
-  // stated where all five getters answered.
-  const parts = [...data.deposits.map((d) => d.compounded), data.idle];
+  // The rows against totalAssets() (ui-jobs 749, 765): stated where every
+  // getter answered; a difference is stated with its figures.
+  const parts = [...data.deposits.map((d) => d.compounded), ...yields, data.idle];
   const reconcile =
     y.totalAssets && parts.every((p) => p != null)
       ? (() => {
           const sum = parts.reduce((t, p) => t + BigInt(p!.raw), BigInt(0));
           const diff = BigInt(y.totalAssets.raw) - sum;
           const amt = (raw: bigint) => assetText({ raw: raw.toString(), value: Number(raw) / 1e18 }, ad);
+          // calcFragments() stated where its BOLD amount is the rows' sum and its total is totalAssets().
+          const f = y.fragments;
+          const fragments = f && f.boldRaw === sum.toString() && f.totalRaw === y.totalAssets.raw ? f : null;
           return {
             sum,
             diff,
             text: amt,
+            fragments,
             prov: sboldReconcileProv(coords, {
-              deposits: data.deposits.map((d) => ({ branch: d.branch, pool: d.pool, raw: d.compounded!.raw })),
+              deposits: data.deposits.map((d) => ({
+                branch: d.branch,
+                pool: d.pool,
+                raw: d.compounded!.raw,
+                yieldRaw: d.yieldPending!.raw,
+              })),
               idleRaw: data.idle!.raw,
               totalRaw: y.totalAssets.raw,
               sumRaw: sum.toString(),
@@ -632,13 +665,19 @@ export function SboldVaultPage({
                         name: "sBOLD vault",
                         address: y.address,
                         reads:
-                          "totalAssets(), totalSupply(), convertToAssets(10 ** 18), asset(), name(), symbol(), decimals(), paused()",
+                          "totalAssets(), totalSupply(), convertToAssets(10 ** 18), asset(), name(), symbol(), decimals(), paused(), calcFragments()",
                       },
                       { name: "BOLD", address: SBOLD_ASSET.address, reads: "balanceOf(sBOLD)" },
                       ...data.deposits.map((d) => ({
+                        name: d.coll.symbol,
+                        address: d.coll.address,
+                        reads: "balanceOf(sBOLD)",
+                      })),
+                      ...data.deposits.map((d) => ({
                         name: `Liquity V2 ${d.branch} Stability Pool`,
                         address: d.pool,
-                        reads: "getCompoundedBoldDeposit(sBOLD)",
+                        reads:
+                          "getCompoundedBoldDeposit(sBOLD), getDepositorYieldGainWithPending(sBOLD), getDepositorCollGain(sBOLD), stashedColl(sBOLD)",
                       })),
                     ],
                   })
@@ -662,7 +701,7 @@ export function SboldVaultPage({
             assetAddress={asset.address}
             assetDecimals={ad}
             chart={null}
-            line="The vault's deposit in each of Liquity V2's three Stability Pools, and its BOLD balance."
+            line="The vault's deposit in each of Liquity V2's three Stability Pools, their BOLD yield pending, and its BOLD balance."
             shareTip="The row's amount over the vault's total assets."
             learnMore={sboldVaultAssetsContent()}
             menu={{ exports: vaultAssetsExports(v, exportModel) }}
@@ -675,20 +714,57 @@ export function SboldVaultPage({
             >
               {reconcile.diff === BigInt(0) ? (
                 <>
-                  The three deposits and the idle BOLD sum to total assets,{" "}
-                  <Prov info={reconcile.prov}>{reconcile.text(reconcile.sum)}</Prov> {unit}.
+                  The rows sum to total assets, <Prov info={reconcile.prov}>{reconcile.text(reconcile.sum)}</Prov>{" "}
+                  {unit}.
                 </>
               ) : (
                 <>
-                  The three deposits and the idle BOLD sum to{" "}
-                  <Prov info={reconcile.prov}>{reconcile.text(reconcile.sum)}</Prov> {unit}; total assets are{" "}
-                  <Prov info={sboldTotalAssetsProv(coords)}>{assetText(y.totalAssets!, ad)}</Prov> {unit},{" "}
+                  The rows sum to <Prov info={reconcile.prov}>{reconcile.text(reconcile.sum)}</Prov> {unit}; total
+                  assets are <Prov info={sboldTotalAssetsProv(coords)}>{assetText(y.totalAssets!, ad)}</Prov> {unit},{" "}
                   <Prov info={reconcile.prov}>
-                    {reconcile.text(reconcile.diff < BigInt(0) ? -reconcile.diff : reconcile.diff)}
+                    {formatUnitsExact((reconcile.diff < BigInt(0) ? -reconcile.diff : reconcile.diff).toString(), ad)}
                   </Prov>{" "}
                   {unit} {reconcile.diff > BigInt(0) ? "above" : "below"} the sum.
+                  {reconcile.fragments && (
+                    <>
+                      {" "}
+                      The vault&rsquo;s{" "}
+                      <Prov info={sboldFragmentsProv(coords, reconcile.fragments)}>calcFragments()</Prov> answers the
+                      rows&rsquo; sum as its BOLD amount and total assets as its total; in its verified source the total
+                      adds the vault&rsquo;s collateral, valued in BOLD.
+                    </>
+                  )}
                 </>
               )}
+            </p>
+          )}
+          {data.deposits.every((d) => d.collGainRaw != null && d.stashedCollRaw != null && d.collHeldRaw != null) && (
+            <p className="mt-2 text-[13px] text-rb-500" data-sbold-collateral="">
+              Collateral in the vault&rsquo;s name, pending in each pool, stashed and held:{" "}
+              {data.deposits.map((d, i) => {
+                const raw = (BigInt(d.collGainRaw!) + BigInt(d.stashedCollRaw!) + BigInt(d.collHeldRaw!)).toString();
+                const text = formatUnitsExact(raw, d.coll.decimals);
+                return (
+                  <span key={d.branch} data-sbold-coll={d.branch} data-raw={raw}>
+                    {i > 0 ? ", " : ""}
+                    <Prov
+                      info={sboldCollProv(coords, {
+                        branch: d.branch,
+                        pool: d.pool,
+                        coll: d.coll,
+                        gainRaw: d.collGainRaw!,
+                        stashRaw: d.stashedCollRaw!,
+                        heldRaw: d.collHeldRaw!,
+                        text,
+                      })}
+                    >
+                      {text}
+                    </Prov>{" "}
+                    {d.coll.symbol}
+                  </span>
+                );
+              })}
+              .
             </p>
           )}
         </Tile>

@@ -101,11 +101,84 @@ const sboldIdleProv_ = (c: SboldCoords): Provenance => ({
   via: `${LANE} · BOLD.balanceOf(sBOLD) @ the pinned block`,
 });
 
+/** The three pools' `getDepositorYieldGainWithPending(sBOLD)`, summed (ui-jobs 765). */
+const sboldYieldProv_ = (
+  c: SboldCoords,
+  r: { pools: { branch: SpBranch; pool: string; raw: string }[]; sumRaw: string },
+): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  source: { block: c.blockNumber },
+  verify: {
+    kind: "recompute",
+    text: `To check: ask any Ethereum archive node${atBlock(c)} for getDepositorYieldGainWithPending(${SBOLD_VAULT}) on each of the three Stability Pools, and add them.`,
+  },
+  summary: `BOLD yield pending — the BOLD yield each Stability Pool's getDepositorYieldGainWithPending(sBOLD) answers${atBlock(c)}, the interest not yet minted included, summed over the three pools: ${r.sumRaw} raw BOLD. The vault's totalAssets() counts it with each pool's deposit (SpLogic._getBoldAssetsSP in the vault's verified source).`,
+  contract: vaultContract,
+  via: `${LANE} · Σ StabilityPool.getDepositorYieldGainWithPending(sBOLD) @ the pinned block`,
+  formula: "WETH pool + wstETH pool + rETH pool",
+  inputs: r.pools.map((p) => ({
+    label: `getDepositorYieldGainWithPending · ${p.branch} pool`,
+    value: p.raw,
+    kind: "chain" as const,
+    pclass: "state" as const,
+    contract: { name: `Liquity V2 ${p.branch} Stability Pool`, address: p.pool },
+  })),
+});
+
+/** One branch's collateral in the vault's name, in the collateral (ui-jobs 765). */
+const sboldCollProv_ = (
+  c: SboldCoords,
+  r: {
+    branch: SpBranch;
+    pool: string;
+    coll: { symbol: string; address: string };
+    gainRaw: string;
+    stashRaw: string;
+    heldRaw: string;
+    text: string;
+  },
+): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  source: { block: c.blockNumber },
+  verify: {
+    kind: "recompute",
+    text: `To check: ask any Ethereum archive node${atBlock(c)} for getDepositorCollGain(${SBOLD_VAULT}) and stashedColl(${SBOLD_VAULT}) on ${r.pool}, and balanceOf(${SBOLD_VAULT}) on ${r.coll.address}, and add them.`,
+  },
+  summary: `${r.coll.symbol} in the vault's name — the ${r.branch} Stability Pool's getDepositorCollGain(sBOLD) (${r.gainRaw}) and stashedColl(sBOLD) (${r.stashRaw}), and the ${r.coll.symbol} token's balanceOf(sBOLD) (${r.heldRaw}), raw ${r.coll.symbol}${atBlock(c)}: ${r.text} ${r.coll.symbol}.`,
+  contract: { name: `Liquity V2 ${r.branch} Stability Pool`, address: r.pool },
+  via: `${LANE} · StabilityPool.getDepositorCollGain + stashedColl, ${r.coll.symbol}.balanceOf(sBOLD) @ the pinned block`,
+  formula: "getDepositorCollGain + stashedColl + balanceOf",
+  inputs: [
+    { label: "getDepositorCollGain(sBOLD)", value: r.gainRaw, kind: "chain", pclass: "state" },
+    { label: "stashedColl(sBOLD)", value: r.stashRaw, kind: "chain", pclass: "state" },
+    {
+      label: `${r.coll.symbol}.balanceOf(sBOLD)`,
+      value: r.heldRaw,
+      kind: "chain",
+      pclass: "state",
+      contract: { name: r.coll.symbol, address: r.coll.address },
+    },
+  ],
+});
+
+/** `calcFragments()` on the vault: its total and its BOLD amount (ui-jobs 765). */
+const sboldFragmentsProv_ = (c: SboldCoords, r: { totalRaw: string; boldRaw: string }): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  source: { block: c.blockNumber },
+  verify: recompute("calcFragments()", SBOLD_VAULT, c),
+  summary: `calcFragments() — the sBOLD vault's calcFragments()${atBlock(c)} answers ${r.totalRaw} raw BOLD as its total, the figure totalAssets() returns, and ${r.boldRaw} raw BOLD as its BOLD amount (the pools' deposits and yield pending and the vault's BOLD balance). In the vault's verified source the total is the BOLD amount plus the vault's collateral valued in BOLD, after its slippage and fee terms.`,
+  contract: vaultContract,
+  via: `${LANE} · sBOLD.calcFragments() @ the pinned block`,
+});
+
 /** The three deposits and the idle BOLD summed, against totalAssets(). */
 const sboldReconcileProv_ = (
   c: SboldCoords,
   r: {
-    deposits: { branch: SpBranch; pool: string; raw: string }[];
+    deposits: { branch: SpBranch; pool: string; raw: string; yieldRaw: string }[];
     idleRaw: string;
     totalRaw: string;
     sumRaw: string;
@@ -117,16 +190,23 @@ const sboldReconcileProv_ = (
   source: { block: c.blockNumber },
   verify: {
     kind: "recompute",
-    text: `To check: ask any Ethereum archive node${atBlock(c)} for getCompoundedBoldDeposit(${SBOLD_VAULT}) on each of the three Stability Pools, balanceOf(${SBOLD_VAULT}) on BOLD and totalAssets() on the vault, add the first four and compare the sum with the fifth.`,
+    text: `To check: ask any Ethereum archive node${atBlock(c)} for getCompoundedBoldDeposit(${SBOLD_VAULT}) and getDepositorYieldGainWithPending(${SBOLD_VAULT}) on each of the three Stability Pools, balanceOf(${SBOLD_VAULT}) on BOLD and totalAssets() on the vault; add the first seven and compare the sum with the last.`,
   },
-  summary: `Deposits and idle BOLD against total assets — the three Stability Pool deposits plus the vault's BOLD balance${atBlock(c)} sum to ${r.sumRaw} raw BOLD; totalAssets() answers ${r.totalRaw}; totalAssets() less the sum is ${r.diffRaw}.`,
+  summary: `The rows against total assets — the three Stability Pool deposits, their BOLD yield pending and the vault's BOLD balance${atBlock(c)} sum to ${r.sumRaw} raw BOLD; totalAssets() answers ${r.totalRaw}; totalAssets() less the sum is ${r.diffRaw}.`,
   contract: vaultContract,
-  via: `${LANE} · Σ getCompoundedBoldDeposit(sBOLD) + BOLD.balanceOf(sBOLD) vs sBOLD.totalAssets() @ the pinned block`,
-  formula: "WETH deposit + wstETH deposit + rETH deposit + idle BOLD − totalAssets()",
+  via: `${LANE} · Σ getCompoundedBoldDeposit(sBOLD) + Σ getDepositorYieldGainWithPending(sBOLD) + BOLD.balanceOf(sBOLD) vs sBOLD.totalAssets() @ the pinned block`,
+  formula: "totalAssets() − (three deposits + three yields pending + idle BOLD)",
   inputs: [
     ...r.deposits.map((d) => ({
       label: `getCompoundedBoldDeposit · ${d.branch} pool`,
       value: d.raw,
+      kind: "chain" as const,
+      pclass: "state" as const,
+      contract: { name: `Liquity V2 ${d.branch} Stability Pool`, address: d.pool },
+    })),
+    ...r.deposits.map((d) => ({
+      label: `getDepositorYieldGainWithPending · ${d.branch} pool`,
+      value: d.yieldRaw,
       kind: "chain" as const,
       pclass: "state" as const,
       contract: { name: `Liquity V2 ${d.branch} Stability Pool`, address: d.pool },
@@ -236,3 +316,6 @@ export const sboldReconcileProv = withServerRead(sboldReconcileProv_);
 export const sboldBlockProv = withServerRead(sboldBlockProv_);
 export const sboldDepositProv = withServerRead(sboldDepositProv_);
 export const sboldPausedProv = withServerRead(sboldPausedProv_);
+export const sboldYieldProv = withServerRead(sboldYieldProv_);
+export const sboldCollProv = withServerRead(sboldCollProv_);
+export const sboldFragmentsProv = withServerRead(sboldFragmentsProv_);

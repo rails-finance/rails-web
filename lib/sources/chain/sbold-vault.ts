@@ -3,8 +3,10 @@
 // ----------------------------------------------------------------------------
 // One Multicall3 round at the block the page states: the vault's totalAssets(),
 // totalSupply(), convertToAssets(10 ** 18), asset(), name(), symbol() and
-// decimals(), paused(), and each Liquity V2 Stability Pool's
-// getCompoundedBoldDeposit(sBOLD), and BOLD.balanceOf(sBOLD).
+// decimals(), paused(), calcFragments(), and each Liquity V2 Stability Pool's
+// getCompoundedBoldDeposit(sBOLD), getDepositorYieldGainWithPending(sBOLD),
+// getDepositorCollGain(sBOLD) and stashedColl(sBOLD), BOLD.balanceOf(sBOLD),
+// and each branch collateral token's balanceOf(sBOLD) (ui-jobs 765).
 //
 // RULE: a figure is the getter's answer. A getter that fails states no figure
 // (lib/liquity-v2/sp-chain-read.ts); a failed getter never becomes a zero.
@@ -21,6 +23,7 @@ import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { SBOLD_ASSET, SBOLD_VAULT } from "@/lib/liquity-v2/sbold";
 import { LIQUITY_V2_SP_POOLS } from "@/lib/liquity-v2/sp-catalog";
 import { SP_BRANCHES, type SpBranch } from "@/lib/liquity-v2/sp-routes";
+import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
 
 const VAULT_ABI = parseAbi([
   "function totalAssets() view returns (uint256)",
@@ -31,8 +34,20 @@ const VAULT_ABI = parseAbi([
   "function symbol() view returns (string)",
   "function decimals() view returns (uint8)",
   "function paused() view returns (bool)",
+  "function calcFragments() view returns (uint256, uint256, uint256, uint256)",
 ]);
-const SP_ABI = parseAbi(["function getCompoundedBoldDeposit(address) view returns (uint256)"]);
+const SP_ABI = parseAbi([
+  "function getCompoundedBoldDeposit(address) view returns (uint256)",
+  "function getDepositorYieldGainWithPending(address) view returns (uint256)",
+  "function getDepositorCollGain(address) view returns (uint256)",
+  "function stashedColl(address) view returns (uint256)",
+]);
+const SP_CALLS = [
+  "getCompoundedBoldDeposit",
+  "getDepositorYieldGainWithPending",
+  "getDepositorCollGain",
+  "stashedColl",
+] as const;
 const ERC20_ABI = parseAbi(["function balanceOf(address) view returns (uint256)"]);
 
 type Call = { status: string; result?: unknown };
@@ -49,6 +64,15 @@ export interface SboldDeposit {
   pool: string;
   /** `getCompoundedBoldDeposit(sBOLD)` in BOLD; null where the getter failed. */
   compounded: RawAmount | null;
+  /** `getDepositorYieldGainWithPending(sBOLD)` in BOLD; null where it failed. */
+  yieldPending: RawAmount | null;
+  /** The branch's collateral token. */
+  coll: { symbol: string; address: string; decimals: number };
+  /** `getDepositorCollGain(sBOLD)`, `stashedColl(sBOLD)` and the collateral
+   *  token's `balanceOf(sBOLD)`, raw in the collateral; null where one failed. */
+  collGainRaw: string | null;
+  stashedCollRaw: string | null;
+  collHeldRaw: string | null;
 }
 
 export interface SboldVaultResponse {
@@ -72,6 +96,9 @@ export interface SboldVaultResponse {
     sharePrice: RawAmount | null;
     /** `paused()` (ui-jobs 765); null where it failed. */
     paused: boolean | null;
+    /** `calcFragments()`'s first two answers, raw BOLD: the total, which
+     *  totalAssets() returns, and the BOLD amount; null where it failed. */
+    fragments: { totalRaw: string; boldRaw: string } | null;
   };
   /** One per branch, in SP_BRANCHES order. */
   deposits: SboldDeposit[];
@@ -88,6 +115,7 @@ const VAULT_CALLS = [
   "decimals",
   "convertToAssets",
   "paused",
+  "calcFragments",
 ] as const;
 
 const EMPTY_VAULT: SboldVaultResponse["vault"] = {
@@ -100,10 +128,19 @@ const EMPTY_VAULT: SboldVaultResponse["vault"] = {
   totalSupply: null,
   sharePrice: null,
   paused: null,
+  fragments: null,
 };
 
 export async function loadSboldVault(): Promise<SboldVaultResponse> {
-  const pools = SP_BRANCHES.map((branch) => ({ branch, pool: LIQUITY_V2_SP_POOLS[branch].toLowerCase() }));
+  const pools = SP_BRANCHES.map((branch) => {
+    const b = LIQUITY_V2_BRANCHES[branch.toLowerCase()];
+    return {
+      branch,
+      pool: LIQUITY_V2_SP_POOLS[branch].toLowerCase(),
+      coll: { symbol: b.symbol, address: b.collateralAddr.toLowerCase(), decimals: b.decimals },
+    };
+  });
+  const unread = { yieldPending: null, collGainRaw: null, stashedCollRaw: null, collHeldRaw: null };
   try {
     const client = vaultHeadClient(MAINNET_CHAIN_ID);
     const blockNumber = await client.getBlockNumber();
@@ -114,14 +151,19 @@ export async function loadSboldVault(): Promise<SboldVaultResponse> {
           ? { address: vault, abi: VAULT_ABI, functionName, args: [BigInt(10) ** BigInt(18)] }
           : { address: vault, abi: VAULT_ABI, functionName },
       ),
-      ...pools.map(({ pool }) => ({
-        address: pool as `0x${string}`,
-        abi: SP_ABI,
-        functionName: "getCompoundedBoldDeposit",
+      ...pools.flatMap(({ pool }) =>
+        SP_CALLS.map((functionName) => ({ address: pool as `0x${string}`, abi: SP_ABI, functionName, args: [vault] })),
+      ),
+      { address: SBOLD_ASSET.address as `0x${string}`, abi: ERC20_ABI, functionName: "balanceOf", args: [vault] },
+      ...pools.map(({ coll }) => ({
+        address: coll.address as `0x${string}`,
+        abi: ERC20_ABI,
+        functionName: "balanceOf",
         args: [vault],
       })),
-      { address: SBOLD_ASSET.address as `0x${string}`, abi: ERC20_ABI, functionName: "balanceOf", args: [vault] },
     ];
+    const SP_AT = VAULT_CALLS.length;
+    const IDLE_AT = SP_AT + pools.length * SP_CALLS.length;
     const reads = (await client.multicall({ contracts, allowFailure: true, blockNumber })) as Call[];
     const at = <T>(name: (typeof VAULT_CALLS)[number]) => ok<T>(reads[VAULT_CALLS.indexOf(name)]);
 
@@ -133,7 +175,9 @@ export async function loadSboldVault(): Promise<SboldVaultResponse> {
     const totalAssets = at<bigint>("totalAssets");
     const totalSupply = at<bigint>("totalSupply");
     const sharePrice = at<bigint>("convertToAssets");
-    const idleRaw = ok<bigint>(reads[VAULT_CALLS.length + pools.length]);
+    const idleRaw = ok<bigint>(reads[IDLE_AT]);
+    const frag = at<readonly [bigint, bigint, bigint, bigint]>("calcFragments");
+    const rawAt = (i: number) => ok<bigint>(reads[i])?.toString() ?? null;
 
     return {
       blockNumber: Number(blockNumber),
@@ -149,10 +193,22 @@ export async function loadSboldVault(): Promise<SboldVaultResponse> {
         totalSupply: shareDecimals != null && totalSupply != null ? amount(totalSupply, shareDecimals) : null,
         sharePrice: inBold && shareDecimals === 18 && sharePrice != null ? amount(sharePrice, d) : null,
         paused: at<boolean>("paused"),
+        fragments: inBold && frag ? { totalRaw: frag[0].toString(), boldRaw: frag[1].toString() } : null,
       },
-      deposits: pools.map(({ branch, pool }, i) => {
-        const raw = ok<bigint>(reads[VAULT_CALLS.length + i]);
-        return { branch, pool, compounded: raw == null ? null : amount(raw, d) };
+      deposits: pools.map(({ branch, pool, coll }, i) => {
+        const base = SP_AT + i * SP_CALLS.length;
+        const raw = ok<bigint>(reads[base]);
+        const y = ok<bigint>(reads[base + 1]);
+        return {
+          branch,
+          pool,
+          coll,
+          compounded: raw == null ? null : amount(raw, d),
+          yieldPending: y == null ? null : amount(y, d),
+          collGainRaw: rawAt(base + 2),
+          stashedCollRaw: rawAt(base + 3),
+          collHeldRaw: rawAt(IDLE_AT + 1 + i),
+        };
       }),
       idle: idleRaw == null ? null : amount(idleRaw, d),
     };
@@ -162,7 +218,7 @@ export async function loadSboldVault(): Promise<SboldVaultResponse> {
       blockNumber: 0,
       chainStale: true,
       vault: EMPTY_VAULT,
-      deposits: pools.map(({ branch, pool }) => ({ branch, pool, compounded: null })),
+      deposits: pools.map(({ branch, pool, coll }) => ({ branch, pool, coll, compounded: null, ...unread })),
       idle: null,
     };
   }
