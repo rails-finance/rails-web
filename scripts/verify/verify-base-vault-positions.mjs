@@ -1716,8 +1716,8 @@ check(
 // reads no position and no overlay, so a block number here would be a different
 // request's answer wearing the listing's words. The check is the absence of a
 // comma-grouped block figure — the form every block on this section is printed
-// in — inside that paragraph alone, so the sampled distance ("between 643 and
-// 795 blocks behind head") stays admissible and a re-stated block does not.
+// in — inside that section alone, so the sampled distance ("643 to 795 blocks
+// behind head") stays admissible and a re-stated block does not.
 const blockFigures = info.blocks.match(/\b\d{1,3}(?:,\d{3})+\b/g) ?? [];
 check(
   "L14e the about page's three-blocks paragraph states the mechanism and names no block of its own",
