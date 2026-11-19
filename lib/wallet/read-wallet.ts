@@ -129,7 +129,11 @@ async function readFamily(
       head = { positions: open.map((p) => (p.notRead ? p : { ...p, headRead: "failed" as const })), reads: 0 };
     }
   }
-  const all = [...head.positions, ...rest];
+  // A head read that finds debt on a stored deposit makes it a loan.
+  const headKinded = head.positions.map((p) =>
+    p.headRead === "read" && p.kind === "deposits" && (p.debtUsd ?? 0) > 0 ? { ...p, kind: "loans" as const } : p,
+  );
+  const all = [...headKinded, ...rest];
   return {
     positions: all,
     read: {
@@ -137,8 +141,8 @@ async function readFamily(
       name: f.name,
       chain: f.chain,
       positions: all.length,
-      open: head.positions.length,
-      headRead: headOf(head.positions),
+      open: headKinded.length,
+      headRead: headOf(headKinded),
       ms: Date.now() - t0,
       reads: head.reads,
       error,

@@ -126,10 +126,50 @@ test("a section with an open position not read at head states no figure, and the
   assert.equal(coll.gap, "No wallet total: Aave V3 was not read at the chain head");
 });
 
-test("a deposit with no debt figure owes nothing", () => {
+test("a deposit no head read contradicts owes nothing", () => {
   const s = walletSections(
-    [pos("aave-v3", { collateralUsd: 10, debtUsd: 4 }), pos("aave-v3", { collateralUsd: 5, kind: "deposits" })],
+    [
+      pos("aave-v3", { collateralUsd: 10, debtUsd: 4 }),
+      pos("aave-v3", { collateralUsd: 5, kind: "deposits", headRead: "none" }),
+    ],
     { bands: true },
   );
   assert.equal(walletTotal(s, "debt").figure.usd, 4);
+});
+
+test("a deposit read at head with no debt figure is unpriced, not owing nothing", () => {
+  const s = walletSections(
+    [
+      pos("compound-v3", { collateralUsd: 10, debtUsd: 4 }),
+      pos("compound-v3", { collateralUsd: 5, kind: "deposits", headRead: "read" }),
+    ],
+    { bands: true },
+  );
+  assert.equal(s[0].debt, undefined);
+  assert.equal(walletTotal(s, "debt").figure, undefined);
+});
+
+test("a last-visit stored read stops its section's total", () => {
+  const s = walletSections(
+    [
+      pos("aave-v3", { collateralUsd: 100, debtUsd: 10 }),
+      pos("aave-v3", { chain: 42161, collateralUsd: 50, debtUsd: 5, headRead: "stored" }),
+    ],
+    { bands: true },
+  );
+  assert.equal(s[0].collateral, undefined);
+  assert.equal(walletTotal(s, "collateral").gap, "No wallet total: Aave V3 was not read at the chain head");
+});
+
+test("a section missing either figure leaves both totals and Net without a figure", () => {
+  const s = walletSections([pos("aave-v3", { collateralUsd: 100, debtUsd: 10 }), pos("spark", { collateralUsd: 50 })], {
+    bands: true,
+  });
+  const coll = walletTotal(s, "collateral");
+  const debt = walletTotal(s, "debt");
+  assert.equal(coll.figure, undefined);
+  assert.equal(debt.figure, undefined);
+  assert.equal(coll.gap, "No wallet total: SparkLend states no dollars");
+  assert.equal(coll.gap, debt.gap);
+  assert.equal(walletNet(coll, debt), null);
 });

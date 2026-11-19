@@ -23,22 +23,6 @@ import type { WalletPosition } from "@/lib/wallet/types";
 import { amountText, bufferFromHealth, historyBase, plural, scaled, storeStamp } from "@/lib/wallet/summary-row";
 import type { FamilyModule, HeadResult } from "./module";
 
-const priceOf = (s: CompoundPositionSummary, address: string): number | undefined =>
-  s.priceByAddress?.[address.toLowerCase()];
-
-/** The row's collateral in dollars at its Comet's prices; undefined the
- *  moment one leg is unpriced. */
-function collateralUsdOf(s: CompoundPositionSummary): number | undefined {
-  let sum = 0;
-  for (const c of s.collateral) {
-    if (c.amount <= 0) continue;
-    const p = priceOf(s, c.address);
-    if (c.decimalsUnread || p == null) return undefined;
-    sum += c.amount * p;
-  }
-  return sum;
-}
-
 function lane(name: "ethereum" | "base"): FamilyModule {
   const chain: ChainId = name === "ethereum" ? MAINNET_CHAIN_ID : BASE_CHAIN_ID;
   const deployment: CometDeployment = name === "ethereum" ? COMPOUND_DEPLOYMENT : COMPOUND_BASE_DEPLOYMENT;
@@ -113,13 +97,23 @@ function lane(name: "ethereum" | "base"): FamilyModule {
           const live = wallet.positions.find((x) => x.comet.toLowerCase() === s.comet.toLowerCase());
           // A Comet the sweep found empty: the account holds nothing there at head.
           const borrowed = live ? scaled(live.borrowBalanceRaw, live.baseDecimals) : 0;
-          const basePrice = priceOf(s, s.base.address);
+          // Both dollar figures from the head read, at the Comet's prices
+          // (an ETH-quoted Comet's through the read's WETH price), so no
+          // stored figure sits beside a head one (ui-jobs 738).
+          const toUsd = !live ? 1 : live.quoteUnit === "USD" ? 1 : (wallet.ethUsd ?? undefined);
+          const collateralUsd = !live
+            ? 0
+            : toUsd == null
+              ? undefined
+              : live.collateral.reduce((sum, c) => sum + scaled(c.balanceRaw, c.decimals) * c.price, 0) * toUsd;
           // Nothing borrowed is no debt, priced or not.
-          const debtUsd = borrowed === 0 ? 0 : basePrice != null ? borrowed * basePrice : undefined;
+          const debtUsd = borrowed === 0 ? 0 : toUsd == null || !live ? undefined : borrowed * live.basePrice * toUsd;
           const hf = live?.healthFactor ?? null;
           return {
             ...p,
-            collateralUsd: collateralUsdOf(s),
+            // The head read settles whether the account owes.
+            kind: p.kind === "deposits" || p.kind === "loans" ? (borrowed > 0 ? "loans" : "deposits") : p.kind,
+            collateralUsd,
             debtUsd,
             usdOwnOracle: true,
             buffer: bufferFromHealth(hf),

@@ -71,14 +71,18 @@ export interface WalletSection {
 const closedAt = (p: WalletPosition) => p.history?.closedAt ?? 0;
 
 /** An open position whose figures were not read at head this visit: an
- *  account the chain has not been read for, or a head read that did not
- *  answer (its card keeps the stored figures). A section holding one states
- *  no total, so no stored figure is summed with head-read ones (rule 743). */
-export const unreadAtHead = (p: WalletPosition) => p.notRead === true || p.headRead === "failed";
+ *  account the chain has not been read for, a head read that did not answer
+ *  (its card keeps the stored figures), or the last visit's stored read (the
+ *  Arbitrum lane). A section holding one states no total, so no stored figure
+ *  is summed with head-read ones (rule 743). */
+export const unreadAtHead = (p: WalletPosition) =>
+  p.notRead === true || p.headRead === "failed" || p.headRead === "stored";
 
-/** A position's dollars in one field; a deposit owes nothing. */
+/** A position's dollars in one field. A missing debt counts as none only on
+ *  a deposit no head read contradicts: a head read states its debt, so one
+ *  missing there is unpriced, not zero. */
 const dollarsOf = (p: WalletPosition, field: "collateralUsd" | "debtUsd") =>
-  p[field] ?? (field === "debtUsd" && p.kind === "deposits" ? 0 : undefined);
+  p[field] ?? (field === "debtUsd" && p.kind === "deposits" && p.headRead !== "read" ? 0 : undefined);
 
 /** The label a receipt row gives one position: its market, or its id. */
 const positionLabel = (p: WalletPosition) =>
@@ -265,7 +269,9 @@ export interface WalletTotal {
 export function walletTotal(sections: WalletSection[], which: "collateral" | "debt"): WalletTotal | null {
   const holding = sections.filter((s) => s.open.length > 0);
   if (holding.length === 0) return null;
-  const missing = holding.filter((s) => s[which] == null);
+  // One rule for both figures: a section missing either leaves both, and
+  // Net, without a wallet total (Miles, 18 Nov 2026).
+  const missing = holding.filter((s) => s.collateral == null || s.debt == null);
   if (missing.length > 0) {
     const unread = missing.filter((s) => s.unread > 0).map((s) => s.name);
     const priced = missing.filter((s) => s.unread === 0).map((s) => s.name);
