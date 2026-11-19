@@ -306,7 +306,7 @@ export const VAULT_FRONTS: readonly VaultFront[] = [
     vaultNamedBy: "front",
     several: true,
     positionSits: "user's wallet",
-    positionQuote: "Your position is held in vault shares onchain",
+    positionQuote: "Earn is self-custodial, so your funds stay in your control from deposit to withdrawal",
     limits: null,
     sources: [
       { url: "https://blog.uniswap.org/earn-is-now-live-on-uniswap", kind: "front", readOn: READ },
