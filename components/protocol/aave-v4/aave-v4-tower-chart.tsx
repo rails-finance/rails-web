@@ -316,7 +316,7 @@ const lifetimeInterestProv = (side: "supply" | "debt"): Provenance =>
         label: "price",
         kind: "chain",
         pclass: "oracle",
-        note: `${HOLDING_PRICE_NOTE}, while all the interest is still held. Once any of the side has left, the interest has no price at its own block, so it has no dollar figure`,
+        note: `While all the interest is still held, it is valued at ${HOLDING_PRICE_NOTE}. Once any of the side has left, the interest has no price at its own block and no dollar figure`,
       },
     ],
   });
