@@ -81,8 +81,8 @@ export default async function LiquityV2BranchesPage() {
             roster's block, it reads once more at head. */}
         <div data-skel-section="page-table">
           <ProvSource source={{ block: data.blockNumber }}>
-            <SpDepthStrip depth={depth} className="mb-6" />
             <LiquityForkBranchesView
+              afterBranches={<SpDepthStrip depth={depth} />}
               scopeKeys={branchScopeKeys(1, LIQUITY_V2_BRANCHES, TOKEN_ADDRESSES.BOLD)}
               ccr={ccr}
               data={data}
