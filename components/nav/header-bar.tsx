@@ -30,17 +30,17 @@ export function HeaderBar() {
       <div className="max-w-7xl mx-auto grid grid-cols-[1fr_auto_1fr] items-center py-4 px-4 md:px-6">
         {/* Left: the sidebar toggle, which opens the wallet panel (H15.1,
             ui-jobs 514); the panel's top row draws its open glyph in the same
-            place, closing it. Centre: the Rails mark and name, a link home, on
-            every page but home, whose hero carries them.
+            place, closing it. Centre: the Rails mark and the beta pill (H25)
+            to its right, one link home, on every page, home included
+            (ui-jobs 769).
             Right: H20, with the inspector indicator (H7.4) left of it
             while the inspector is armed on a page with a traced value
             (ui-jobs 651); the way into /start is in its menu, the theme
-            switch at the wallet panel's foot. Below md the beta pill is in the footer
-            (components/nav/phone-beta.tsx). */}
+            switch at the wallet panel's foot. */}
         <div className="justify-self-start">
           <SearchLauncher placement="header" />
         </div>
-        {isHome ? <span /> : <HomeBrand />}
+        <HomeBrand />
         <div className="flex items-center gap-2 justify-self-end" data-header-cluster="">
           <ProfileMenu />
         </div>
