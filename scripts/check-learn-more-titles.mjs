@@ -54,6 +54,7 @@ const PROPER = new Set([
   "Umbrella",
   "Transmuter",
   "Yearn",
+  "Fusion",
   "V1",
   "V2",
   "V3",

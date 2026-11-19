@@ -518,7 +518,7 @@ function LadderRung({ cls, name, children }: { cls: ProvClass; name: string; chi
 }
 
 /** Shared centered-modal shell (the learn-more chrome): portal to document.body,
- *  blurred scrim, body scroll lock, Escape to close. Portaling out of the dock
+ *  the site's scrim (--backdrop-bg), body scroll lock, Escape to close. Portaling out of the dock
  *  deliberately puts the content back on the NORMAL theme surface. SSR guard:
  *  document is undefined on the server. Escape is heard on `window` in the
  *  capture phase and stopped there, so it closes the modal and never reaches
@@ -553,10 +553,7 @@ function ProvModal({ ariaLabel, onClose, children }: { ariaLabel: string; onClos
       aria-label={ariaLabel}
       data-prov-chrome=""
     >
-      <div
-        className="fixed inset-0 backdrop-blur-sm pointer-events-none"
-        style={{ background: "var(--backdrop-bg)" }}
-      />
+      <div className="fixed inset-0 pointer-events-none" style={{ background: "var(--backdrop-bg)" }} />
       <div className="relative min-h-full flex items-start sm:items-center justify-center p-4">
         <div
           className="relative rounded-2xl max-w-lg w-full my-8 p-6 shadow-xl"

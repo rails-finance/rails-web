@@ -64,6 +64,7 @@ const VENUE: Record<Exclude<VaultFamily, "sbold">, VaultVenue> = {
   "umbrella-stake": "umbrella-stake",
   "yearn-v3": "yearn",
   "maple-pool": "maple",
+  "ipor-fusion": "ipor-fusion",
 };
 
 export const VAULT_PILL =

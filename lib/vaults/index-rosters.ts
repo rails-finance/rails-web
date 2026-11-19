@@ -22,7 +22,9 @@ import { SBOLD_PAGE_PATH } from "@/lib/liquity-v2/sbold";
 /** One protocol's roster: the Protocol facet's value and the row's protocol.
  *  `sbold` is the one vault no explorer deploys, its own roster of one
  *  (ui-jobs 765). */
-export type VaultIndexProtocol = "morpho" | "aave" | "yearn" | "maple" | "sbold";
+/** "ipor-fusion" joins `VAULT_INDEX_PROTOCOLS`, and the index, with its three
+ *  chains (rails-ops TO-DO-ipor-scoping §6.3 phase C). */
+export type VaultIndexProtocol = "morpho" | "aave" | "yearn" | "maple" | "sbold" | "ipor-fusion";
 
 export const VAULT_INDEX_PROTOCOLS: readonly VaultIndexProtocol[] = ["morpho", "aave", "yearn", "maple", "sbold"];
 
@@ -32,6 +34,7 @@ export const VAULT_INDEX_PROTOCOL_LABEL: Record<VaultIndexProtocol, string> = {
   yearn: "Yearn",
   maple: "Maple",
   sbold: "sBOLD",
+  "ipor-fusion": "IPOR Fusion",
 };
 
 /** The rosters the index reads, in its order: a protocol on a chain. Morpho
@@ -89,6 +92,8 @@ export function vaultIndexProtocol(v: VaultSummary): VaultIndexProtocol {
       return "maple";
     case "sbold":
       return "sbold";
+    case "ipor-fusion":
+      return "ipor-fusion";
   }
 }
 

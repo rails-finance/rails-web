@@ -96,6 +96,10 @@ export type SessionProtocol =
   // position listing beside it (rails-ops decision 0027 point 2). Yearn V2 is
   // an older registry and different vault code, and is not covered (call 4).
   | "yearn"
+  // IPOR Fusion, at `/ethereum/ipor-fusion`: the second vault-native subject,
+  // the Yearn shape (rails-ops TO-DO-ipor-scoping §6.3). Its vaults' positions
+  // in other protocols show in those protocols' explorers (decision 0014).
+  | "ipor-fusion"
   // Sky Savings, at `/ethereum/sky-savings`: sUSDS holders, a position being a
   // holder address. A roster explorer outside the home headline (rails-ops
   // TO-DO-sky-savings-scoping §6.1, decision 0027 call 2).

@@ -6,9 +6,7 @@ import { LwNotice } from "@/components/shared/lw-attribution";
 import { Activity, DraftingCompass, FileText, Home, Info, LayoutGrid, ReceiptText, Signpost } from "lucide-react";
 import { INPLACE_TEXT, NAV_LINK } from "@/lib/shared/ui-grammar";
 import { DonateModal } from "@/components/site/DonateModal";
-import { FeedbackCluster } from "@/components/shared/feedback-cluster";
 import { LiquityModal } from "@/components/site/LiquityModal";
-import { PhoneBeta } from "@/components/nav/phone-beta";
 import { useIsHome } from "@/hooks/useIsHome";
 
 export function SiteFooter() {
@@ -25,9 +23,10 @@ export function SiteFooter() {
     // of the content above; on home the lower gradient carries those 64px
     // (app/(site)/page.tsx) and the footer takes the gradient's end tone.
     <footer className={home ? "bg-rb-50 dark:bg-rb-600" : "mt-16"} data-anatomy="H9">
-      {/* The hairline spans the text's width, in the muted text tone at half strength. */}
+      {/* The hairline spans the text's width, in the muted text tone at half strength.
+          96px under the last line keep it clear of the feedback button (H26). */}
       <div className="max-w-7xl mx-auto px-4">
-        <div className="border-t border-rb-500/50 py-12">
+        <div className="border-t border-rb-500/50 pt-12 pb-24">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             {/* Rails Info */}
             <div>
@@ -170,11 +169,11 @@ export function SiteFooter() {
             {/* The third column stays empty: room in a busy footer (Miles, 6 Nov 2026). */}
             <div aria-hidden="true" className="max-md:hidden" />
 
-            {/* Feedback, the ask, and under it the donation address, which opens
-              the donate modal in place (teal, the in-place hue). */}
+            {/* The donation address, which opens the donate modal in place
+              (teal, the in-place hue). Feedback is the floating button's (H26,
+              ui-jobs 769). */}
             <div>
-              <FeedbackCluster />
-              <p className="body-text mt-4">
+              <p className="body-text">
                 Support Rails at{" "}
                 <button
                   type="button"
@@ -195,10 +194,7 @@ export function SiteFooter() {
           <div className="mt-8 pt-8">
             <div className="flex flex-col md:flex-row justify-between items-center">
               <div className="flex flex-col md:flex-row items-center gap-4 mb-4 md:mb-0">
-                <div className="flex items-center gap-2">
-                  <p className="text-rb-500 text-xs">© {new Date().getUTCFullYear()} Rails</p>
-                  <PhoneBeta />
-                </div>
+                <p className="text-rb-500 text-xs">© {new Date().getUTCFullYear()} Rails</p>
                 <div className="flex gap-4">
                   <Link
                     href="/privacy"

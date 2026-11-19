@@ -1,11 +1,12 @@
 "use client";
 
-// The CoW trade card's settlement panel (ui-jobs 711), under the cells of an
-// opened card whose settlement carried other trades: the trades on the card's
-// directed pair with their prices, the settlement's clearing price and each
-// trade's distance from it where settle()'s calldata was decoded, then the
-// settlement's other pairs as a count. Read when the card opens
-// (`useCowSettlementOpened`), through the settlement proxy.
+// The CoW trade card's opened notes, read when the card opens
+// (`useCowSettlementOpened`), through the settlement proxy: the trade's surplus
+// and fee lines (cow-surplus-lines.tsx, ui-jobs 712) where settle()'s calldata
+// was decoded and matched, then, where the settlement carried other trades,
+// the settlement panel (ui-jobs 711): the trades on the card's directed pair
+// with their prices, the settlement's clearing price and each trade's fees in
+// its price, then the settlement's other pairs as a count.
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -15,19 +16,22 @@ import { SECTION_HEADING } from "@/lib/shared/ui-grammar";
 import type { CowTrade } from "@/lib/cow/types";
 import { shortAddress, tokenText, type CowTokenLabel } from "@/lib/cow/trade";
 import {
+  cowTradeView,
   feeExplains,
   feeToken,
-  gapBp,
-  gapText,
+  findTrade,
   isCowSettlement,
   pairView,
   type CowSettlement,
+  type CowSettlementTrade,
 } from "@/lib/cow/settlement";
+import { COW_FEE_LABEL, feeBpText } from "@/lib/cow/surplus";
+import { cowFeeProv } from "@/lib/cow/surplus-provenance";
+import { CowSurplusLines } from "@/components/protocol/cow/cow-surplus-lines";
 import {
   clearingPrice,
   clearingPriceProv,
   feeChargeProv,
-  gapProv,
   otherPairsProv,
   pairCountProv,
   pairPricing,
@@ -74,6 +78,7 @@ export function CowSettlementPanel({
 }) {
   const view = pairView(s, trade);
   if (!view) return null;
+  const coords = { block: s.blockNumber, txHash: s.txHash };
   const pricing = pairPricing(view.self, sell, buy);
   const pairWords = `sold ${tokenText(sell)} for ${tokenText(buy)}`;
   const others =
@@ -145,15 +150,16 @@ export function CowSettlementPanel({
                 <th className="font-normal py-0.5">Price</th>
                 {view.decoded && (
                   <th className="font-normal py-0.5 text-right">
-                    <span className="sm:hidden">Gap</span>
-                    <span className="max-sm:hidden">From clearing price</span>
+                    <span className="sm:hidden">Fees</span>
+                    <span className="max-sm:hidden">{COW_FEE_LABEL}</span>
                   </th>
                 )}
               </tr>
             </thead>
             <tbody>
               {view.pair.map((t) => {
-                const g = gapBp(t);
+                const cv = cowTradeView(s, t, sell, buy);
+                const fv = cv?.fee ? cv.view : null;
                 const fee = feeExplains(t, s.blockNumber) ? feeToken(t) : null;
                 const feeTok = fee ? (fee === sell.address.toLowerCase() ? sell : buy) : null;
                 const p = pricing ? tradePrice(t, pricing, sell, buy) : null;
@@ -192,9 +198,9 @@ export function CowSettlementPanel({
                     </td>
                     {view.decoded && (
                       <td className="py-0.5 text-right">
-                        {g != null ? (
-                          <Prov info={gapProv(s, t)} value={g.toFixed(4)}>
-                            <span className="text-foreground">{gapText(g)}</span>
+                        {fv ? (
+                          <Prov info={cowFeeProv(fv, rawOf(t), coords)} value={String(fv.feeBp)}>
+                            <span className="text-foreground">{feeBpText(fv.feeBp)}</span>
                           </Prov>
                         ) : (
                           "—"
@@ -212,10 +218,46 @@ export function CowSettlementPanel({
   );
 }
 
-/** The opened card's notes: the settlement panel, read when the card opens. */
+const rawOf = (t: CowSettlementTrade) => ({ sell: t.sellAmount, buy: t.buyAmount, fee: t.feeAmount });
+
+/** The opened card's notes, read when the card opens: the trade's surplus and fee lines where settle() was decoded
+ *  and matched (none where it is unread, refused or does not match), then the settlement panel where the settlement
+ *  carried other trades. */
 export function useCowSettlementOpened(trade: CowTrade, sell: CowTokenLabel, buy: CowTokenLabel): EventCardOpened {
   const { value, pending } = useCowSettlement(trade);
   if (pending) return { notes: <div className="px-5 py-3 text-xs text-rb-500">Reading the settlement…</div> };
   if (!value) return {};
-  return { notes: <CowSettlementPanel settlement={value} trade={trade} sell={sell} buy={buy} /> };
+  return { notes: <CowTradeNotes settlement={value} trade={trade} sell={sell} buy={buy} /> };
+}
+
+/** The lines and the panel of one read settlement. */
+export function CowTradeNotes({
+  settlement: s,
+  trade,
+  sell,
+  buy,
+}: {
+  settlement: CowSettlement;
+  trade: CowTrade;
+  sell: CowTokenLabel;
+  buy: CowTokenLabel;
+}) {
+  const self = findTrade(s, trade);
+  const cv = self ? cowTradeView(s, self, sell, buy) : null;
+  const view = cv?.view ?? null;
+  const panel = trade.settlementTrades > 1;
+  if (!view && !panel) return null;
+  return (
+    <>
+      {view && self && (
+        <CowSurplusLines
+          view={view}
+          trade={rawOf(self)}
+          coords={{ block: s.blockNumber, txHash: s.txHash }}
+          noFee={!cv?.fee}
+        />
+      )}
+      {panel && <CowSettlementPanel settlement={s} trade={trade} sell={sell} buy={buy} />}
+    </>
+  );
 }

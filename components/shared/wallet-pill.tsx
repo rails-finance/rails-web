@@ -10,13 +10,15 @@
 
 import { useContext, useState } from "react";
 import { useEnsName } from "@/lib/ens/use-ens-names";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { startNavigationProgress } from "@/components/nav/navigation-progress";
 import { Facehash } from "@/components/shared/facehash";
 import { Icon } from "@/components/icons/icon";
 import { BookmarkToggle } from "@/components/shared/bookmark-toggle";
 import { RevealTip } from "@/components/shared/reveal-tip";
-import { listingHrefForWallet } from "@/lib/shared/protocols";
+import { listingHrefForWallet, protocolForPathname, protocolForSession } from "@/lib/shared/protocols";
+import { HolderLabelTag } from "@/components/shared/holder-label";
+import type { ChainId } from "@/lib/shared/chains";
 import { PositionCardEdgeContext } from "@/components/shared/position-card-edge";
 import { WALLET_HEADING_NAME } from "@/lib/shared/ui-grammar";
 import type { SessionProtocol } from "@/lib/shared/sessions";
@@ -42,6 +44,7 @@ function WalletPillInner({
   href: hrefOverride,
   hrefLabel,
   heading = false,
+  chainId: chainIdProp,
 }: {
   wallet: string;
   ensName: string | null;
@@ -72,8 +75,17 @@ function WalletPillInner({
   /** The label as the page's h1 (the wallet heading, H13): heading type, no
    *  facehash. */
   heading?: boolean;
+  /** The chain the holder label (C7.1) matches on. Defaults to
+   *  `filterProtocol`'s chain, then the chain of the explorer whose route
+   *  holds the page; with none of the three the label is not drawn. */
+  chainId?: ChainId;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const chainId =
+    chainIdProp ??
+    (filterProtocol ? protocolForSession(filterProtocol)?.chainId : undefined) ??
+    protocolForPathname(pathname)?.chainId;
   const [copied, setCopied] = useState(false);
   const href = vault
     ? vault.href
@@ -196,6 +208,8 @@ function WalletPillInner({
         </RevealTip>
         {bookmark && <BookmarkToggle wallet={wallet} ensName={name} size={heading ? 14 : 12} />}
       </span>
+      {/* The position heading draws it beside the address kind. */}
+      {!heading && <HolderLabelTag wallet={wallet} chainId={chainId} />}
     </span>
   );
 }

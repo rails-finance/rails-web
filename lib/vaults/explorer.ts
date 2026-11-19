@@ -18,6 +18,7 @@ const FAMILY_NOUN: Record<VaultFamilyKey, string> = {
   yearn: "Yearn V3 vault",
   "morpho-base": "MetaMorpho vault",
   morpho: "MetaMorpho vault",
+  "ipor-fusion": "IPOR Fusion vault",
 };
 
 const DEPLOYMENT_NAME = { ethereum: "Ethereum", base: "Base" } as const;

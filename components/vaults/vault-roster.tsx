@@ -77,13 +77,14 @@ type Filters = Record<string, string[]>;
 /** What the roster states above its rows: at most the read-at line and one
  *  census sentence (survey §6, "Words, by surface"); the rest is in the drawer. */
 export interface VaultRosterHead {
-  /** The one sentence on what the list is, with its receipts. */
+  /** The one sentence on what the list is, with its receipts; null draws none. */
   census: ReactNode;
   /** `data-figure` on the census sentence, which the roster verifiers read. */
   censusFigure: string;
   /** The positions listing, linked after the sentence; null where there is none. */
   listingHref: string | null;
-  /** The intro drawer's body (standards/explanation-copy-charter.md §8a). */
+  /** The intro drawer's body (standards/explanation-copy-charter.md §8a);
+   *  null draws no (i) and no drawer, where the about page carries it all. */
   drawer: ReactNode;
   /** The vault layer's about page; null where there is none. */
   infoHref: string | null;
@@ -456,12 +457,14 @@ export function VaultRoster({
             data-directory-block={blockNumber}
             data-prov-exempt
           >
-            <InfoDisclosureTrigger
-              open={introOpen}
-              onToggle={() => setIntroOpen((o) => !o)}
-              label="about these vaults"
-              ariaControls="vault-roster-intro"
-            />
+            {head.drawer != null && (
+              <InfoDisclosureTrigger
+                open={introOpen}
+                onToggle={() => setIntroOpen((o) => !o)}
+                label="about these vaults"
+                ariaControls="vault-roster-intro"
+              />
+            )}
             <span className="ml-auto flex items-center gap-1">
               <RosterReadStamp
                 reads={[
@@ -477,21 +480,23 @@ export function VaultRoster({
           </div>
         )
       )}
-      <div
-        id="vault-roster-intro"
-        data-intro-drawer
-        hidden={!introOpen}
-        className="mt-2 max-w-3xl space-y-2 rounded-xl bg-raised px-3 py-3 text-[12px] leading-relaxed text-rb-500"
-      >
-        {head.drawer}
-        {head.infoHref && (
-          <p>
-            <Link href={head.infoHref} className={`text-xs font-semibold ${FOOT_LINK}`} prefetch={false}>
-              How this is built
-            </Link>
-          </p>
-        )}
-      </div>
+      {head.drawer != null && (
+        <div
+          id="vault-roster-intro"
+          data-intro-drawer
+          hidden={!introOpen}
+          className="mt-2 max-w-3xl space-y-2 rounded-xl bg-raised px-3 py-3 text-[12px] leading-relaxed text-rb-500"
+        >
+          {head.drawer}
+          {head.infoHref && (
+            <p>
+              <Link href={head.infoHref} className={`text-xs font-semibold ${FOOT_LINK}`} prefetch={false}>
+                How this is built
+              </Link>
+            </p>
+          )}
+        </div>
+      )}
       {head.census != null && (
         <p className="mt-1 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-figure={head.censusFigure}>
           {head.census}

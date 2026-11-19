@@ -33,6 +33,12 @@ import {
 } from "@/lib/yearn/vault-provenance";
 import { poolNavRateProv, poolTotalAssetsProv } from "@/lib/maple/event-provenance";
 import { vaultIndexProtocol } from "@/lib/vaults/index-rosters";
+import {
+  iporVaultNameProv,
+  iporVaultSharePriceProv,
+  iporVaultTotalAssetsProv,
+  type IporFusionCoords,
+} from "@/lib/ipor-fusion/vault-provenance";
 import { sboldPerShareProv, sboldTotalAssetsProv } from "@/lib/liquity-v2/sbold-provenance";
 import { perShareFace } from "@/lib/liquity-v2/sbold-per-share";
 import { assetText, shareText } from "@/lib/shared/vault-amount-text";
@@ -100,6 +106,22 @@ export function yearnRowReceipts(read: RosterRead, v: VaultSummary): VaultRowRec
   };
 }
 
+/** An IPOR Fusion vault on its chain's roster. */
+export function iporFusionRowReceipts(read: RosterRead, v: VaultSummary): VaultRowReceipts {
+  const c: IporFusionCoords = {
+    ...read,
+    chainId: v.chainId,
+    vault: v.address,
+    vaultName: vaultDisplayName(v) ?? undefined,
+    assetSymbol: v.asset.symbol,
+  };
+  return {
+    name: iporVaultNameProv(c),
+    totalAssets: iporVaultTotalAssetsProv(c),
+    sharePrice: v.shareDecimals != null ? iporVaultSharePriceProv(c, v.shareDecimals) : undefined,
+  };
+}
+
 /** A Maple pool: total assets and the NAV per share, as its pools page reads them. */
 export function mapleRowReceipts(read: RosterRead, v: VaultSummary): VaultRowReceipts {
   const block = read.blockNumber || v.readAt.block || undefined;
@@ -121,6 +143,8 @@ export function vaultIndexRowReceipts(read: RosterRead, v: VaultSummary): VaultR
       return yearnRowReceipts(read, v);
     case "maple":
       return mapleRowReceipts(read, v);
+    case "ipor-fusion":
+      return iporFusionRowReceipts(read, v);
     case "sbold": {
       // sBOLD's row: the page's head read; its share-price cell is total
       // assets ÷ shares issued, with that division's receipt (ui-jobs 765).

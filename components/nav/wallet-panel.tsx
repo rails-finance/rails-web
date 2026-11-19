@@ -40,7 +40,7 @@ let open = false;
 let openAt: "search" | "chooser" = "search";
 let trigger: HTMLElement | null = null;
 /** The header launcher's top as the panel opens, so the panel's close lands
- *  on it under the beta strip too; 16px (the bar's padding) otherwise. */
+ *  on it; 16px (the bar's padding) until it is measured. */
 let launcherTop = 16;
 /** The brand rail's right edge, measured as the panel opens; 0 with no rail. */
 let railRight = 0;
@@ -195,7 +195,7 @@ export function WalletPanel() {
         aria-hidden="true"
         onClick={close}
         data-anatomy="H16.1"
-        className="absolute inset-0 bg-white/60 dark:bg-rb-950/70"
+        className="absolute inset-0 bg-[var(--backdrop-bg)]"
         style={{
           opacity: isOpen ? 1 : 0,
           transition: still ? "none" : `opacity ${isOpen ? EASE_IN : EASE_OUT}`,
@@ -228,7 +228,7 @@ export function WalletPanel() {
         {/* The top row, below `md` only: the header bar is under the panel,
             so the row restates it (ui-jobs 514): the toggle's open glyph in
             the toggle's place (16px in; the launcher's top, measured as the
-            panel opens, under the beta strip too), so the tap that opened the
+            panel opens), so the tap that opened the
             panel closes it in the same spot. From md the rail's mark goes home and its toggle closes
             the panel. */}
         <div className="flex shrink-0 items-center px-4 md:hidden" style={{ paddingTop: launcherTop }}>
@@ -244,9 +244,10 @@ export function WalletPanel() {
         </div>
         {/* Pinned at the top: the search under its heading, the field with no
             placeholder (ui-jobs 514). From md the heading's line centres on the
-            rail's toggle (its 38px box at 68px, so its middle at 87px; the
-            heading's 20px line from 77px). */}
-        <div className="relative z-10 shrink-0 px-5 pb-4 pt-4 md:pt-[77px]">
+            rail's toggle (its 38px box at 94px, under the home link's mark and
+            beta pill, so its middle at 113px; the heading's 20px line from
+            103px; ui-jobs 769). */}
+        <div className="relative z-10 shrink-0 px-5 pb-4 pt-4 md:pt-[103px]">
           <h2 className={PANEL_HEADING}>Search wallet, vault or protocol</h2>
           <div className="-ml-2 mt-5">
             <FrontDoorSearch size="lg" surface="raised" onDone={close} suggest placeholder="" />

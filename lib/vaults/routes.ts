@@ -48,7 +48,7 @@
 // entry's sub-page, so the path text lives in lib/shared/protocols.ts alone and
 // moving the tab moves every href below with it.
 
-import { protocolForHref } from "@/lib/shared/protocols";
+import { PROTOCOLS, protocolForHref } from "@/lib/shared/protocols";
 import { MAPLE_POOLS } from "@/lib/maple/asset-catalog";
 
 /** One explorer's `vaults` sub-page route — the roster, and the parent of every
@@ -259,6 +259,21 @@ export function yearnVaultRosterHref(): string {
 export function yearnVaultHref(vault: string, holder?: string): string {
   const path = `${YEARN_VAULTS}/${vault.toLowerCase()}`;
   return holder ? `${path}/${encodeURIComponent(holder.toLowerCase())}` : path;
+}
+
+/** IPOR Fusion's roster on a chain (`/<chain>/ipor-fusion/vaults`), read off
+ *  that chain's roster entry; null on a chain with no IPOR Fusion entry. */
+export function iporFusionVaultRosterHref(chainId: number): string | null {
+  const entry = PROTOCOLS.find((p) => p.slug === "ipor-fusion" && p.chainId === chainId);
+  return entry?.subPages.find((s) => s.segment === "vaults")?.href ?? null;
+}
+
+/** One IPOR Fusion vault's factsheet (`/<chain>/ipor-fusion/vaults/<vault>`);
+ *  null where the chain has no IPOR Fusion entry. The served set is the census
+ *  (lib/ipor-fusion/vault-catalog.ts): any other address 404s. */
+export function iporFusionVaultHref(chainId: number, vault: string): string | null {
+  const roster = iporFusionVaultRosterHref(chainId);
+  return roster ? `${roster}/${vault.toLowerCase()}` : null;
 }
 
 /** Maple's pools page (`/ethereum/maple/pools`), the roster of pools. Read

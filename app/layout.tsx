@@ -16,8 +16,7 @@ import { NavigationProgress } from "@/components/nav/navigation-progress";
 import { WalletContextProvider } from "@/components/nav/wallet-context";
 import { ThemeScript } from "@/components/ThemeScript";
 import { ASSET_SCOPE_SCRIPT } from "@/lib/shared/asset-preference";
-import { BetaStrip } from "@/components/shared/beta-strip";
-import { BETA_STRIP_SCRIPT } from "@/lib/shared/beta-strip-script";
+import { FeedbackButton } from "@/components/shared/feedback-button";
 import { WorkInProgressStrip } from "@/components/shared/work-in-progress-strip";
 import { SITE_URL, TWITTER_HANDLE } from "@/lib/shared/page-metadata";
 import { SITE_LEAD, SITE_METHOD } from "@/lib/shared/site-copy";
@@ -190,9 +189,6 @@ export default function RootLayout({
             before first paint, so a filtered list waits for its filter
             rather than drawing whole first (globals.css). */}
         <script dangerouslySetInnerHTML={{ __html: ASSET_SCOPE_SCRIPT }} />
-        {/* The beta strip's dismissal, read from its cookie before first
-            paint (components/shared/beta-strip.tsx). */}
-        <script dangerouslySetInnerHTML={{ __html: BETA_STRIP_SCRIPT }} />
       </head>
       <body
         className={`${dmSans.className} ${dmSans.variable} antialiased bg-background text-foreground min-h-screen flex flex-col overflow-x-hidden min-w-[320px]`}
@@ -201,9 +197,6 @@ export default function RootLayout({
         <Providers>
           <WalletContextProvider>
             <NavigationProgress />
-            {/* The beta notice sits above the header. It draws only on the app
-                routes (/ethereum, /base, /sepolia) and nothing on marketing. */}
-            <BetaStrip />
             <HeaderBar />
             {/* The wallet panel (search and bookmarks): one instance, opened
                 from the rail, the header bar and `/`. */}
@@ -213,6 +206,8 @@ export default function RootLayout({
                 Mounted here so no such route can be missed. */}
             <WorkInProgressStrip />
             {children}
+            {/* The floating feedback button, on every page (ui-jobs 769). */}
+            <FeedbackButton />
           </WalletContextProvider>
         </Providers>
         <Analytics />

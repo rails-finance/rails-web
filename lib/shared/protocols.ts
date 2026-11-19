@@ -1164,6 +1164,23 @@ const SPECS: ProtocolSpec[] = [
     positionListing: false,
     subPages: [{ segment: "vaults", label: "Vaults overview", tab: "Vaults" }],
   },
+  {
+    // The second vault-native roster subject, in the Yearn shape (rails-ops
+    // TO-DO-ipor-scoping §6.3; decisions 0027, 0028): every vault the IPOR
+    // Fusion factory made, and a factsheet per vault. A vault's positions in
+    // other protocols are those explorers' rows (decision 0014).
+    id: "ipor-fusion",
+    session: "ipor-fusion",
+    label: "IPOR Fusion",
+    chainId: 1,
+    slug: "ipor-fusion",
+    brand: 286,
+    tags: ["Vaults", "Yield"],
+    desc: "Every vault the IPOR Fusion factory made, each one's totals, share price, fees, roles and fuses read from chain at one block",
+    positionListing: false,
+    unlaunched: true,
+    subPages: [{ segment: "vaults", label: "Vaults overview", tab: "Vaults" }],
+  },
 ];
 
 // A slug is unique WITHIN a chain, and a collision would make one explorer
@@ -1331,6 +1348,7 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   // Yearn's is the same word for the same reason, and goes unprinted the same
   // way: the explorer draws no position tab and lists no positions.
   yearn: "Holding",
+  "ipor-fusion": "Holding",
   seamless: "Position",
   makerdao: "Vault",
   maple: "Position",
