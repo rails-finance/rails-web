@@ -1,13 +1,14 @@
 "use client";
 
 // T2's price row (rails-ops reference/shared-event-card-spec.md §3; ui-jobs
-// 309 step 3): the gas the owner paid, the event's outcome (claimable, P/L)
-// and a then/today chip per symbol the cells value. The shell draws it from
+// 309 step 3, 761): the gas the owner paid, the event's outcome (claimable,
+// P/L) and a then/today chip per symbol the cells value, led by one clock
+// press for all of them. The shell draws it from
 // the card's `price` slot; a family supplies figures and words.
 
 import { Fuel } from "lucide-react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { ThenTodayChip } from "@/components/shared/price-basis";
+import { PriceBasisPress, ThenTodayChip } from "@/components/shared/price-basis";
 import { PriceChipShell } from "@/components/shared/state-transition";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { usePreferences } from "@/lib/shared/preferences-context";
@@ -52,7 +53,8 @@ export function gasReceipt(gas: EventGas): Provenance {
   };
 }
 
-/** A symbol's price at the event, as a then/today chip. */
+/** A symbol's price at the event, as a then/today chip the row's clock
+ *  press flips. */
 export interface EventPriceChip {
   symbol: string;
   usd: number;
@@ -164,7 +166,7 @@ const GAS_UNIT_WORD: Record<GasUnit, string> = { usd: "USD", eth: "ETH" };
  *  (ui-jobs 289). A cost with no USD figure reads in ETH alone and is plain
  *  text: there is nothing to switch to. Where it is a button, the glyph and
  *  figure hover as one; with the inspector armed the figure is a receipt
- *  pick and the rest of the button keeps the press, as in ThenTodayChip. */
+ *  pick and the rest of the button keeps the press. */
 export function EventGasButton({ gas }: { gas: EventGas }) {
   const { prefs, update } = usePreferences();
   const units = GAS_UNITS.filter((u) => u !== "usd" || gas.usd > 0);
@@ -296,11 +298,13 @@ export function EventPriceRow({ price }: { price: EventCardPrice }) {
             )}
           </div>
         )}
-        {/* Several chips stand together at the row's right end. */}
-        {prices.length > 1 ? (
-          <div className="ml-auto inline-flex flex-wrap items-center gap-x-3 gap-y-1">{chips}</div>
-        ) : (
-          chips
+        {/* The chips stand together at the row's right end, the then/today
+            press before them. */}
+        {prices.length > 0 && (
+          <div className="ml-auto inline-flex flex-wrap items-center gap-x-3 gap-y-1">
+            <PriceBasisPress chips={prices.map((p) => ({ symbol: p.symbol, noToday: p.unit != null }))} />
+            {chips}
+          </div>
         )}
         {price.figures?.map((f) => {
           const icon = f.symbol ? <TokenChipIcon symbol={f.symbol} address={f.address} size={14} /> : null;
