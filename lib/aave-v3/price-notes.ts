@@ -24,6 +24,10 @@ export const aaveV3BlocksNote = (balanceBlock: number | null | undefined, priceB
     ? `The balances stand at block ${balanceBlock.toLocaleString("en-US")} and the prices at block ${priceBlock.toLocaleString("en-US")}.`
     : "";
 
+/** A Lifetime flows line on a lane whose day rows rails-server sums (Aave V3
+ *  on Ethereum, SparkLend): its receipt names no legs. */
+export const AAVE_V3_SERVED_NOTE = "Each day's figure is summed by rails-server, whose day rows name no legs.";
+
 /** How the face shows a figure the rows rebuild to the cent. */
 export const AAVE_V3_FACE_NOTE = {
   dollars: "To the cent, shown to the dollar.",

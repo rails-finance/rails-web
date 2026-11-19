@@ -80,6 +80,8 @@ export interface LedgerUsd {
   legs?: FlowLeg[];
   unpriced?: string[];
   market?: MarketMove;
+  /** A served series' line: the sentence its receipt states (`FlowWords.served`). */
+  served?: string;
 }
 
 export interface Ledger {
@@ -279,7 +281,8 @@ export function tokenLedger({
   const scale = 10 ** sum.decimals;
   const bucketOf = (k: string) => model.buckets.find((b) => b.key === k);
   const usdOf = new Map(usd?.lines.map((l) => [l.key, l]) ?? []);
-  const inCents = usd != null && (usd.cents != null || usd.lines.some((l) => l.cents != null || l.unpriced));
+  // In cents where the lines are: a served series' lines are whole dollars.
+  const inCents = usd != null && usd.lines.some((l) => l.cents != null || l.unpriced);
   const rows: LedgerRow[] = [];
   const row = (
     key: string,
@@ -296,8 +299,15 @@ export function tokenLedger({
     role,
     seg,
     tokens: units == null ? null : { units, text: signedTokens(units, sum.decimals) },
-    usd: dollars == null ? null : typeof dollars === "number" ? { dollars, text: signedUsd(dollars) } : dollars,
+    usd:
+      dollars == null
+        ? null
+        : typeof dollars === "number"
+          ? { dollars, text: signedUsd(dollars), ...(servedOf(line) ? { served: servedOf(line) } : {}) }
+          : dollars,
   });
+  /** The sentence a served series' line states in its receipt. */
+  const servedOf = (line: string) => usdOf.get(line)?.seg?.served;
   /** A whole line's dollars in cents: its legs' sum, or no figure. */
   const lineCents = (u: UsdLine | undefined): LedgerUsd =>
     u?.unpriced?.length
@@ -436,7 +446,7 @@ export function dollarLedger({
   cents?: number;
 }): Ledger {
   const unit = unitOf(model, side);
-  const inCents = cents != null || lines.some((l) => l.cents != null || l.unpriced);
+  const inCents = lines.some((l) => l.cents != null || l.unpriced);
   const rows: LedgerRow[] = [];
   const row = (
     key: string,

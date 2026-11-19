@@ -332,3 +332,25 @@ test("a family's basis set with its legs' unset compares on one basis", () => {
   assert.equal(rest.none, undefined);
   assert.equal(typeof rest.cents, "number");
 });
+
+const { AAVE_V3_SERVED_NOTE } = await import(ROOT + "lib/aave-v3/price-notes.ts");
+const { AAVE_V4_SERVED_NOTE } = await import(ROOT + "lib/aave-v4/price-notes.ts");
+
+test("a served series' line names no legs, and its receipt says the server sums the day rows", () => {
+  for (const served of [AAVE_V3_SERVED_NOTE, AAVE_V4_SERVED_NOTE]) {
+    const m = buildFlowModel({
+      buckets: BUCKETS,
+      // Day rows as rails-server serves them: running totals, no legs.
+      days: [
+        { day: 20_000, events: 1, tick: "collateral", cum: { dep: 1234.56, wd: 0, bor: 0 }, balances: [], prices: [] },
+      ],
+      live: { collateralUsd: 1300, debtUsd: 0 },
+      words: { served },
+    });
+    assert.equal(m.hasLegs, false);
+    const dep = stateAt(m, 0).collateral.sources.find((s) => s.key === "dep");
+    assert.equal(dep.legs, undefined, "no partial leg list");
+    assert.ok(flowSegmentProv(dep, "collateral", "5 Jul '25", false).summary.endsWith(served));
+  }
+  assert.equal(AAVE_V3_SERVED_NOTE, "Each day's figure is summed by rails-server, whose day rows name no legs.");
+});

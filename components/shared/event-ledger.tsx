@@ -645,6 +645,14 @@ function LedgerRows({
       return legsProv(r.label, at, r.usd.legs, r.usd.unpriced);
     const own = provs?.usd?.(r) ?? usdProvOf?.(r);
     if (own) return own;
+    // A served series names no legs: its receipt says so.
+    if (r.usd?.served) {
+      const base = ledgerUsdProv(r);
+      return { ...base, summary: `${base.summary} ${r.usd.served}` };
+    }
+    return ledgerUsdProv(r);
+  };
+  const ledgerUsdProv = (r: LedgerRow): Provenance => {
     if (r.role === "market")
       return flowRemainderProv(r.label, side, at, "the change in the price since each flow, no funds moved");
     if (r.role === "interest") return flowInterestUsdProv(r.label, at);

@@ -47,6 +47,8 @@ import { isAaveV3Event } from "@/lib/shared/types/event-shape";
 import type { AaveV3Context } from "@/lib/shared/types/protocols/aave-v3";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
 import {
+  flowLeg,
+  type FlowLeg,
   daysFromEvents,
   type FlowBucket,
   type FlowDayRow,
@@ -59,6 +61,7 @@ import {
   type FlowWords,
 } from "@/lib/shared/flows-timeline";
 import { aaveV3EventLegs, aaveV3LiquidationTxs } from "@/lib/aave-v3/chain-truth-tower";
+import { aaveV3PriceNote } from "@/lib/aave-v3/price-notes";
 import {
   AAVE_V3_FLOW_BUCKETS,
   AAVE_V3_NOT_COUNTED,
@@ -696,7 +699,7 @@ export function aaveBaseSummary(rp: AaveBaseReplay, o: Partial<AaveBaseFlowOptio
   if (rp.borrower) for (const k of ["borrowed", INTEREST_ACCRUED, "repaid"]) base.add(k);
   const buckets = AAVE_V3_BASE_FLOW_BUCKETS.filter((b) => base.has(b.key) || used.has(b.key)).map((b) => b.key);
   const notCounted = o.notCounted ?? AAVE_V3_NOT_COUNTED;
-  const flowEvents = replayed.map((r) => aaveBaseFlowEvent(r, notCounted));
+  const flowEvents = replayed.map((r) => aaveBaseFlowEvent(r, notCounted, o.brand ?? "Aave"));
   const days = daysFromEvents(buckets, flowEvents);
 
   const assets: AaveBaseSummary["assets"] = [];
@@ -737,7 +740,22 @@ export function aaveBaseSummary(rp: AaveBaseReplay, o: Partial<AaveBaseFlowOptio
 }
 
 /** One replayed row as the panel's event. */
-function aaveBaseFlowEvent(r: AaveBaseReplayed, notCounted: readonly string[]): FlowEvent {
+/** A row's leg with its parts (ui-jobs 743): priced only where the oracle's
+ *  price at its block is stored; a leg the replay priced at the day's close,
+ *  the nearest row or today's is unpriced. */
+function aaveBaseLeg(l: AaveBaseLeg, block: number, brand: string): FlowLeg {
+  return flowLeg({
+    bucket: l.bucket,
+    amount: l.amount,
+    symbol: l.symbol,
+    price: l.basis === "block" ? l.price : null,
+    block,
+    priceNote: aaveV3PriceNote(`${brand}'s AaveOracle`, l.symbol, block),
+    ...(ACCRUAL_KEYS.has(l.bucket) ? { accrual: true } : {}),
+  });
+}
+
+function aaveBaseFlowEvent(r: AaveBaseReplayed, notCounted: readonly string[], brand: string): FlowEvent {
   const moved = new Set<FlowSide>();
   for (const l of r.legs) if (!ACCRUAL_KEYS.has(l.bucket)) moved.add(l.side);
   const liq = r.legs.some((l) => l.bucket === "liquidatedCollateral" || l.bucket === "liquidatedDebt");
@@ -755,7 +773,7 @@ function aaveBaseFlowEvent(r: AaveBaseReplayed, notCounted: readonly string[]): 
     ...(unsure.length ? { unsure } : {}),
     tick:
       liq || r.seizureTransfer ? "liquidation" : moved.size === 2 ? "both" : moved.has("debt") ? "debt" : "collateral",
-    legs: r.legs.map((l) => ({ bucket: l.bucket, usd: l.amount * l.price, symbol: l.symbol })),
+    legs: r.legs.map((l) => aaveBaseLeg(l, r.ev.blockNumber, brand)),
     tx: r.tx,
     countsTx: countsTx(r.ev, notCounted),
     ...(aaveFamilyByOther(r.ev) ? { byOther: true } : {}),
@@ -929,18 +947,12 @@ export function aaveBaseFlowWords(brand: string, borrower: boolean): FlowWords {
 /** The rows as the event cards' sums read them (lib/shared/flow-focus.ts):
  *  each row's legs in USD and in tokens, ascending; the interest legs are
  *  accruals, not the event's act. */
-export function aaveBaseFocusEvents(rp: AaveBaseReplay): FocusEvent[] {
+export function aaveBaseFocusEvents(rp: AaveBaseReplay, brand: string): FocusEvent[] {
   return rp.replayed.map((r) => ({
     id: r.ev.id,
     ts: r.ev.timestamp,
     tx: r.tx,
-    legs: r.legs.map((l) => ({
-      bucket: l.bucket,
-      usd: l.amount * l.price,
-      amount: l.amount,
-      symbol: l.symbol,
-      ...(ACCRUAL_KEYS.has(l.bucket) ? { accrual: true } : {}),
-    })),
+    legs: r.legs.map((l) => aaveBaseLeg(l, r.ev.blockNumber, brand)),
   }));
 }
 

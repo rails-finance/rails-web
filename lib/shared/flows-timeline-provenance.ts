@@ -205,7 +205,7 @@ export function flowSegmentProv(
     };
   return {
     kind: "chain-derived",
-    summary: `${s.label} up to ${when}. Every such flow the position's events record by then, each at the oracle price at its block, added up.`,
+    summary: `${s.label} up to ${when}. Every such flow the position's events record by then, each at the oracle price at its block, added up.${s.served ? ` ${s.served}` : ""}`,
     formula: "Σ amount × price at block",
   };
 }

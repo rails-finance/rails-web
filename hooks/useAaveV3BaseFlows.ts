@@ -358,13 +358,13 @@ export function useAaveV3BaseFlows(p: AaveV3BaseFlowsInput): {
   const focusEvents = useMemo<FocusEvent[]>(
     () =>
       replay
-        ? aaveBaseFocusEvents(replay)
+        ? aaveBaseFocusEvents(replay, brand)
         : route
           ? olderEvents && olderEvents.length > 0
             ? [...olderEvents, ...route.events]
             : route.events
           : [],
-    [replay, route, olderEvents],
+    [replay, route, olderEvents, brand],
   );
   const focus = useFlowFocusValue(useFlowFocusRoot(focusEvents), timeline);
   const facts = useMemo<AaveV3BaseFlowsFacts | null>(() => {

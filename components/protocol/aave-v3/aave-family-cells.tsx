@@ -107,6 +107,8 @@ import {
   type TouchedLeg,
 } from "./aave-v3-position-state";
 import { formatCompact } from "@/lib/shared/format-compact";
+import { aaveV3PriceNote } from "@/lib/aave-v3/price-notes";
+import { centsOf, shownUsd } from "@/lib/shared/shown-usd";
 
 type Side = "supply" | "debt";
 const ZERO = BigInt(0);
@@ -170,11 +172,15 @@ function sideBalances(state: AaveV3PositionState, side: FlowSide): AssetBalance[
     if (r.decimals == null) continue;
     const l = side === "collateral" ? r.supply : r.debt;
     if (big(l.after) <= ZERO && big(l.before) <= ZERO) continue;
+    const block = state.sources.marketReadBlock ?? state.block;
+    const symbol = reserveSymbol(r);
     out.push({
-      symbol: reserveSymbol(r),
+      symbol,
       amount: Number(humanOf(l.after, r.decimals)),
       before: Number(humanOf(l.before, r.decimals)),
       price: r.priceBase != null ? Number(big(r.priceBase)) / 1e8 : null,
+      block,
+      priceNote: aaveV3PriceNote(`${state.market}'s AaveOracle`, symbol, block),
     });
   }
   return out;
@@ -847,6 +853,12 @@ function SideLedger({
     : null;
   const name = SIDE_NAME[side];
   const { afterProv: totalProv, beforeProv: totalBeforeProv } = sideTotals(side, state, coords, facts, at);
+  // In cents (ui-jobs 743): what the side holds is each balance as shown
+  // times its price as shown, summed, where every balance is priced.
+  const live = balances.filter((b) => b.amount > 0);
+  const heldCents = live.every((b) => b.price != null)
+    ? centsOf(live.reduce((a, b) => a + shownUsd(b.amount, b.price as number), 0))
+    : null;
   const note = <DayCloseNote cum={cum} eventTs={eventTs} />;
   if (bySum) {
     const priceOf = (sym: string) => bySum.balances.find((x) => x.symbol === sym);
@@ -856,16 +868,25 @@ function SideLedger({
     };
     const single = assetTokenSum(bySum);
     if (single) {
-      const dollars = eventSideSumByAsset(model, bySum, cum, facts.held);
+      const dollars = eventSideSumByAsset(model, bySum, cum, heldCents ?? facts.held);
+      const bal = bySum.balances.find((x) => x.symbol === single.symbol);
       const ledger = tokenLedger({
         model,
         side,
         ev,
         sum: single,
         usd: shownFor(single.symbol)
-          ? { lines: dollars.lines, dollars: dollars.total.dollars, before: facts.heldBefore }
+          ? {
+              lines: dollars.lines,
+              dollars: dollars.total.dollars,
+              before: facts.heldBefore,
+              ...(dollars.total.cents != null ? { cents: dollars.total.cents } : {}),
+            }
           : null,
-        price: bySum.balances.find((x) => x.symbol === single.symbol)?.price ?? null,
+        price: bal?.price ?? null,
+        ...(bal?.price != null
+          ? { held: { amount: bal.amount, price: bal.price, block: bal.block ?? null, priceNote: bal.priceNote } }
+          : {}),
       });
       return (
         <>
@@ -905,7 +926,7 @@ function SideLedger({
     );
   }
   // The page does not hold every flow before the event: the ledger in dollars.
-  const rows = eventSideSum(model, side, cum, facts.held);
+  const rows = eventSideSum(model, side, cum, heldCents ?? facts.held);
   const ledger = dollarLedger({
     model,
     side,
@@ -913,6 +934,7 @@ function SideLedger({
     lines: rows.lines,
     dollars: rows.total.dollars,
     before: facts.heldBefore,
+    ...(rows.total.cents != null ? { cents: rows.total.cents } : {}),
   });
   return (
     <>

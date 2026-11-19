@@ -10,6 +10,7 @@
 // two reserves of it, and the scrubber values the token, so the event's
 // snapshot of the spoke is summed per symbol.
 
+import { AAVE_V4_SERVED_NOTE, aaveV4PriceNote, type AaveV4PriceSource } from "./price-notes";
 import type { AaveV4SnapshotItem, BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAaveV4Event } from "@/lib/shared/types/event-shape";
 import {
@@ -46,28 +47,46 @@ export interface AaveV4EventLeg {
   amount: number;
   /** USD per token at the event's block, where the event carries it. */
   price?: number;
+  /** The stored price's on-chain source (lib/aave-v4/price-notes.ts). */
+  source?: string;
 }
 
 const priceOf = (p: { usd: number } | undefined): number | undefined =>
   p != null && Number.isFinite(p.usd) && p.usd > 0 ? p.usd : undefined;
+
+/** A stored price the cards count, where it is an on-chain read: DefiLlama
+ *  and the $1 face are no price (ui-jobs 743). The route's reference keeps
+ *  every stored price, as rails-server does. */
+const onChain = (l: AaveV4EventLeg): number | undefined =>
+  l.source === "defillama" || l.source === "stablecoin" ? undefined : l.price;
 
 /** The legs one event adds to the lifetime flows (rails-server `aaveV4EventLegs`). */
 export function aaveV4EventLegs(ev: BaseActivityEvent): AaveV4EventLeg[] {
   if (!isAaveV4Event(ev)) return [];
   const c = ev.context.data;
   const out: AaveV4EventLeg[] = [];
-  const add = (symbol: string | undefined, leg: AaveV4FlowLeg, amount: string | undefined, price?: number) => {
+  const add = (
+    symbol: string | undefined,
+    leg: AaveV4FlowLeg,
+    amount: string | undefined,
+    stored?: { usd: number; source?: string },
+  ) => {
     const n = Math.abs(Number(amount));
     if (!symbol || amount == null || !Number.isFinite(n) || n === 0) return;
-    out.push(price != null ? { symbol, leg, amount: n, price } : { symbol, leg, amount: n });
+    const price = priceOf(stored);
+    out.push(
+      price != null
+        ? { symbol, leg, amount: n, price, ...(stored?.source ? { source: stored.source } : {}) }
+        : { symbol, leg, amount: n },
+    );
   };
   if (c.eventType === "liquidation") {
-    add(c.collateralSymbol, "liquidatedCollateral", c.liquidatedCollateralAmount, priceOf(c.collateralPrice));
-    add(c.reserveSymbol, "liquidatedDebt", c.debtToCover ?? c.amount, priceOf(c.debtPrice));
-  } else if (c.eventType === "supply") add(c.reserveSymbol, "supplied", c.amount, priceOf(c.price));
-  else if (c.eventType === "withdraw") add(c.reserveSymbol, "withdrawn", c.amount, priceOf(c.price));
-  else if (c.eventType === "borrow") add(c.reserveSymbol, "borrowed", c.amount, priceOf(c.price));
-  else if (c.eventType === "repay") add(c.reserveSymbol, "repaid", c.amount, priceOf(c.price));
+    add(c.collateralSymbol, "liquidatedCollateral", c.liquidatedCollateralAmount, c.collateralPrice);
+    add(c.reserveSymbol, "liquidatedDebt", c.debtToCover ?? c.amount, c.debtPrice);
+  } else if (c.eventType === "supply") add(c.reserveSymbol, "supplied", c.amount, c.price);
+  else if (c.eventType === "withdraw") add(c.reserveSymbol, "withdrawn", c.amount, c.price);
+  else if (c.eventType === "borrow") add(c.reserveSymbol, "borrowed", c.amount, c.price);
+  else if (c.eventType === "repay") add(c.reserveSymbol, "repaid", c.amount, c.price);
   return out;
 }
 
@@ -172,7 +191,14 @@ export function aaveV4FlowTimeline(
   const flows = flowEventsFromLegs(
     ordered,
     (ev) =>
-      of(ev).legs.map((l) => ({ symbol: l.symbol, address: l.symbol, leg: l.leg, amount: l.amount, price: l.price })),
+      of(ev).legs.map((l) => ({
+        symbol: l.symbol,
+        address: l.symbol,
+        leg: l.leg,
+        amount: l.amount,
+        price: l.price,
+        priceSource: l.source,
+      })),
     (ev) => of(ev).balances.map((b) => ({ side: b.side, asset: b.symbol, symbol: b.symbol, amount: b.amount })),
     todayPrices,
     {
@@ -213,11 +239,17 @@ export function aaveV4FocusEvents(
         address: l.symbol,
         leg: l.leg,
         amount: l.amount,
-        price: l.price,
+        price: onChain(l),
+        priceSource: l.source,
       })),
     todayPrices,
+    aaveV4LegPriceNote,
   );
 }
+
+/** An Aave V4 leg's price: its stored on-chain read at the event's block. */
+const aaveV4LegPriceNote = (l: { symbol: string; priceSource?: string }, block: number): string =>
+  aaveV4PriceNote(l.priceSource as AaveV4PriceSource | undefined, l.symbol, block);
 
 /** Aave V3's buckets under the V4 timeline's event names (its liquidation
  *  row reads "Liquidation"); the supply bucket keeps Aave V3's "Supplied",
@@ -232,5 +264,5 @@ export function aaveV4FlowSeriesTimeline(
   live: FlowLive | null,
   todayPrices: Record<string, number> | undefined,
 ): FlowTimeline | null {
-  return flowSeriesTimeline(series, AAVE_V4_FLOW_BUCKETS, live, todayPrices);
+  return flowSeriesTimeline(series, AAVE_V4_FLOW_BUCKETS, live, todayPrices, AAVE_V4_SERVED_NOTE);
 }

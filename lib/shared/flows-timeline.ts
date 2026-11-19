@@ -498,6 +498,9 @@ export interface FlowWords {
   /** How a side's held or owed figure is valued between events, for its
    *  receipt ("each Trove's …"). */
   heldBasis?: Partial<Record<FlowSide, string>>;
+  /** A served series' line receipts: the day rows are summed by the server
+   *  and name no legs (`FlowModel.hasLegs` false). */
+  served?: string;
   /** The basis a side's held figure is priced on, where the family has two
    *  (f(x)'s anchor leg): a leg on another basis leaves Market move with no
    *  figure (`FlowLeg.basis`). */
@@ -574,6 +577,9 @@ interface FlowRow {
   cells: { bucket: string; symbol: string; usd: number }[];
   /** The day's legs that carry their parts (`FlowDayRow.legs`). */
   legs: FlowLeg[];
+  /** Through this row: the lines with legs, and each line's unpriced assets. */
+  withLegs: string[];
+  unpriced: Record<string, string[]>;
 }
 
 export interface FlowModel {
@@ -692,6 +698,9 @@ export interface FlowSegment {
    *  figure. */
   legs?: FlowLeg[];
   unpriced?: string[];
+  /** A line of a served series: the sentence its receipt states in place
+   *  of the legs (`FlowWords.served`). */
+  served?: string;
   /** On the held segment: the basis its price stands on, where the family
    *  has two (`FlowWords.priceBasis`). */
   priceBasis?: string;
@@ -928,6 +937,22 @@ interface PriceAt {
   series: boolean;
 }
 
+/** Through each row, the lines with legs and their unpriced assets: small,
+ *  so a stop decides its gaps without walking the legs. */
+function markLegs(rows: FlowRow[]): void {
+  const seen = new Set<string>();
+  const gaps: Record<string, string[]> = {};
+  for (const r of rows) {
+    for (const l of r.legs) {
+      if (!hasParts(l)) continue;
+      seen.add(l.bucket);
+      if (l.usd == null && l.symbol && !(gaps[l.bucket] ??= []).includes(l.symbol)) gaps[l.bucket].push(l.symbol);
+    }
+    r.withLegs = [...seen];
+    r.unpriced = Object.fromEntries(Object.entries(gaps).map(([k, v]) => [k, [...v]]));
+  }
+}
+
 /** Replay the day rows into the model the scrubber reads. */
 export function buildFlowModel(t: FlowTimeline): FlowModel | null {
   const days = [...t.days].sort((a, b) => a.day - b.day);
@@ -946,7 +971,10 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     cum: { ...d.cum },
     cells: d.cumAsset ?? [],
     legs: d.legs ?? [],
+    withLegs: [],
+    unpriced: {},
   }));
+  markLegs(rows);
   const lastDay = rows[rows.length - 1].day;
   // A row whose events equal the row before's holds a balance the protocol set
   // with no event (Aave V3 Core's GHO discount settlement, 3 Jul 2025): the
@@ -1310,13 +1338,53 @@ export function rowLegs(m: Pick<FlowModel, "rows">, i: number): FlowLeg[] {
   return out;
 }
 
-/** A line's legs and unpriced assets, for its segment. */
-const partsOf = (parts: BucketLegs | undefined, key: string): Pick<FlowSegment, "legs" | "unpriced"> => {
-  const legs = parts?.legs[key];
-  if (!legs) return {};
+/** Where a side's segments read their legs: the lines that have any, each
+ *  line's unpriced assets, and the legs themselves, built on first read. */
+export interface PartsSource {
+  has: (key: string) => boolean;
+  legs: (key: string) => FlowLeg[];
+  unpriced: Record<string, string[]>;
+}
+
+/** A BucketLegs as a parts source. */
+export const partsFrom = (b: BucketLegs): PartsSource => ({
+  has: (k) => b.legs[k] != null,
+  legs: (k) => b.legs[k] ?? [],
+  unpriced: b.unpriced,
+});
+
+/** The model's legs through row `i`, read only when a receipt asks. */
+function rowParts(m: FlowModel, i: number): PartsSource | undefined {
+  if (!m.hasLegs || i < 0) return undefined;
+  const row = m.rows[i];
+  let built: BucketLegs | null = null;
+  const has = new Set(row.withLegs);
+  return {
+    has: (k) => has.has(k),
+    legs: (k) => (built ??= bucketLegs(rowLegs(m, i))).legs[k] ?? [],
+    unpriced: row.unpriced,
+  };
+}
+
+/** A line's unpriced assets, or a served series' sentence, for its segment. */
+const partsOf = (
+  parts: PartsSource | undefined,
+  key: string,
+  served?: string,
+): Pick<FlowSegment, "unpriced" | "served"> => {
+  if (served) return { served };
   const unpriced = parts?.unpriced[key];
-  return { legs, ...(unpriced?.length ? { unpriced } : {}) };
+  return unpriced?.length ? { unpriced } : {};
 };
+
+/** Each line's legs on its segment, read when asked: not enumerable, so a
+ *  stop's state stays small and copies of it do not carry them. */
+function withLegs(segs: FlowSegment[], parts: PartsSource | undefined): void {
+  if (!parts) return;
+  for (const x of segs)
+    if ((x.fill === "in" || x.fill === "out") && parts.has(x.key))
+      Object.defineProperty(x, "legs", { get: () => parts.legs(x.key), enumerable: false, configurable: true });
+}
 
 function sideState(
   m: FlowModel,
@@ -1324,12 +1392,13 @@ function sideState(
   cum: Record<string, number>,
   now: number,
   interest: number | null,
-  parts?: BucketLegs,
+  parts?: PartsSource,
 ): FlowSideState {
   const bs = m.buckets.filter((b) => b.side === side);
   const outs = bs.filter((b) => b.dir === "out");
   const ins = bs.filter((b) => b.dir === "in");
   const heldNow = Math.max(0, now);
+  const served = m.hasLegs ? undefined : m.words.served;
   // A line holding an unpriced leg draws no bar: a gap, its figure "—"
   // (ui-jobs 743); beside it the balancing item has no width either.
   const gap = (k: string) => (parts?.unpriced[k]?.length ?? 0) > 0;
@@ -1357,7 +1426,7 @@ function sideState(
         link: b.link,
         width: gap(b.key) ? 0 : v,
         value: v,
-        ...partsOf(parts, b.key),
+        ...partsOf(parts, b.key, served),
       };
     }),
   ];
@@ -1370,7 +1439,7 @@ function sideState(
       ...(b.hatch ? { hatch: b.hatch } : {}),
       width: v,
       value: v,
-      ...partsOf(parts, b.key),
+      ...partsOf(parts, b.key, served),
     };
   });
   if (m.opening) {
@@ -1402,6 +1471,8 @@ function sideState(
   const sources = sourcesFor(exact, total, balancing).map((x) =>
     x.unpriced?.length || (anyGap && x.fill === "estimate") ? { ...x, width: 0 } : x,
   );
+  withLegs(bar, parts);
+  withLegs(sources, parts);
   return { now: heldNow, total, out, bar, sources };
 }
 
@@ -1415,7 +1486,7 @@ export function sideStateFor(
   now: number,
   parts?: BucketLegs,
 ): FlowSideState {
-  return sideState(m, side, cum, now, null, parts);
+  return sideState(m, side, cum, now, null, parts ? partsFrom(parts) : undefined);
 }
 
 /** The position as of the end of day `stop` (0 = the first event's day), or
@@ -1425,14 +1496,17 @@ export function stateAt(m: FlowModel, stop: number): FlowState {
   const i = isLive ? m.rows.length - 1 : rowAt(m, stop);
   const row = i >= 0 ? m.rows[i] : null;
   let cum = row?.cum ?? Object.fromEntries(m.buckets.map((b) => [b.key, 0]));
-  const parts = m.hasLegs ? bucketLegs(rowLegs(m, i)) : undefined;
+  let parts = rowParts(m, i);
   if (isLive && m.live.pending?.length) {
     cum = { ...cum };
+    const pending = new Set<string>();
     for (const p of m.live.pending) {
       cum[p.bucket] = (cum[p.bucket] ?? 0) + p.usd;
-      // A pending flow is a raw figure: its line's legs no longer add to it.
-      if (parts) delete parts.legs[p.bucket];
+      pending.add(p.bucket);
     }
+    // A pending flow is a raw figure: its line's legs no longer add to it.
+    const base = parts;
+    if (base) parts = { ...base, has: (k) => !pending.has(k) && base.has(k) };
   }
   const v = !isLive && stop >= 0 ? m.valued[Math.min(stop, m.valued.length - 1)] : undefined;
   const collNow = isLive ? m.live.collateralUsd : (v?.collateral ?? 0);
@@ -1540,6 +1614,8 @@ export function windowModel(m: FlowModel, from: number): FlowModel {
       cells: r.cells.map((c) => ({ ...c, usd: c.usd - (baseCells.get(`${c.bucket}|${c.symbol}`) ?? 0) })),
     }));
   if (rows.length === 0) return m;
+  // The window's lines hold the window's legs only.
+  markLegs(rows);
   const shift = <T extends { day: number }>(xs: T[]) =>
     xs.filter((x) => x.day >= from).map((x) => ({ ...x, day: x.day - from }));
   const outOf = (side: FlowSide, c: Record<string, number>) =>

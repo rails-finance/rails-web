@@ -146,7 +146,7 @@ export function webAnswer(f: Fixture, c: Case): Answer {
   const rows = (k: string) => rp.replayed.filter((r) => r.legs.some((l) => l.bucket === k)).length;
   return json({
     summary: aaveBaseSummary(rp, o),
-    events: aaveBaseFocusEvents(rp).slice(-f.keepEvents),
+    events: aaveBaseFocusEvents(rp, o.brand ?? "Aave").slice(-f.keepEvents),
     facts: {
       priced,
       liquidations: rp.replayed.filter((r) => r.ev.context.data.eventType === "liquidation").length,
