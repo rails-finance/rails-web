@@ -12,7 +12,6 @@ export const FRONTS_PAGE = {
   lead: "Apps that put an on-chain vault behind their product. Each row is one product and vault, cited to the page the app publishes with the day it was read.",
   caption: (front: string) => `${front}: the vaults behind its products`,
   columns: {
-    front: "Front",
     product: "Product",
     chain: "Chain",
     family: "Vault family",

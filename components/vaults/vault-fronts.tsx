@@ -136,21 +136,17 @@ function FrontTable({ front, rows }: { front: string; rows: FrontRow[] }) {
       data-front-layout="table"
     >
       <DataTableHead>
-        <DataTableHeader label={C.front} className="w-[10%]" />
-        <DataTableHeader label={C.product} className="w-[19%]" />
-        <DataTableHeader label={C.chain} className="w-[9%]" />
-        <DataTableHeader label={C.family} className="w-[12%]" />
-        <DataTableHeader label={C.vault} className="w-[15%]" />
-        <DataTableHeader label={C.position} className="w-[18%]" />
-        <DataTableHeader label={C.source} className="w-[17%]" />
+        <DataTableHeader label={C.product} className="w-[23%]" />
+        <DataTableHeader label={C.chain} className="w-[10%]" />
+        <DataTableHeader label={C.family} className="w-[13%]" />
+        <DataTableHeader label={C.vault} className="w-[16%]" />
+        <DataTableHeader label={C.position} className="w-[20%]" />
+        <DataTableHeader label={C.source} className="w-[18%]" />
       </DataTableHead>
       <DataTableBody>
         {rows.map((r) => (
           <tr key={r.product} data-anatomy="E5.1" data-front-row={r.slug}>
-            <DataTableCell rowHeader className="text-foreground">
-              {r.front}
-            </DataTableCell>
-            <DataTableCell>
+            <DataTableCell rowHeader>
               <Product row={r} />
             </DataTableCell>
             <DataTableCell className={r.chainId == null ? "text-rb-500" : "text-foreground"}>
