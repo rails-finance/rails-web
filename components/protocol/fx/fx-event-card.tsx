@@ -240,6 +240,7 @@ export function FxEventCard({ event, isLast, eventNumber, blockPeers, previousEv
     blockPeers,
     active,
     prev: previousEvent?.context.data,
+    prevBlock: previousEvent?.blockNumber,
   });
 
   const slots: EventCardSlots = {

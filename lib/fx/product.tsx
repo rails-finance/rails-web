@@ -15,6 +15,7 @@
 // raw share integers and the read path live in receipts; the contracts Rails
 // reads are on the info page ("How Rails reads it").
 
+import { shownUsd } from "@/lib/shared/shown-usd";
 import { assetKey } from "@/lib/shared/asset-family";
 import { useEffect, useState, type ReactNode } from "react";
 import { AssetUnit } from "@/components/shared/asset-unit";
@@ -313,7 +314,7 @@ function poolMarkdown(p: FxPoolSystem, block: number): string {
     "",
     `${fxPoolPurpose(p.tokenSymbol, p.normalizedSymbol)} On Ethereum.`,
     "",
-    `- Supplied: ${formatNumber(p.totalRawColl)} ${p.normalizedSymbol} (${usd(p.totalRawColl * p.priceAnchor)} at the anchor price)`,
+    `- Supplied: ${formatNumber(p.totalRawColl)} ${p.normalizedSymbol} (${usd(shownUsd(p.totalRawColl, p.priceAnchor))} at the anchor price)`,
     `- Borrowed: ${formatNumber(p.totalRawDebt)} fxUSD`,
     `- Funding rate: ${pctOf(p.fundingRatioAnnual, 2)} a year, on collateral`,
     ...(ratio != null ? [`- LTV: ${pctOf(ratio, 2)}`] : []),
@@ -371,7 +372,7 @@ function head(c: Ctx, overview: boolean): ProductHead {
       {
         slot: "sizeIn",
         label: "Supplied",
-        tip: `The pool's collateral, counted in ${p.normalizedSymbol}; ${usd(p.totalRawColl * p.priceAnchor)} at the anchor price`,
+        tip: `The pool's collateral, counted in ${p.normalizedSymbol}; ${usd(shownUsd(p.totalRawColl, p.priceAnchor))} at the anchor price`,
         value: (
           <Prov
             info={stamp(c, poolCollateralProv(label, p.address, p.normalizedSymbol))}

@@ -20,6 +20,7 @@
 // under the anchor (rails-ops reference/official-docs/fx.md, "Docs and chain
 // disagree" 6), so the two differ by that move.
 
+import { shownUsd } from "@/lib/shared/shown-usd";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isFxEvent } from "@/lib/shared/types/event-shape";
 import type { FxStateAt } from "@/lib/sources/chain/fx-event-state";
@@ -53,7 +54,11 @@ export interface FxNoTxParts {
    *  block before each, less the debt they cleared. Null until the prices
    *  are in. */
   bonus: {
+    /** The sum of the legs' shown products (ui-jobs 743). */
     collUsd: number;
+    /** Each block's collateral taken, at the min leg of the block before it:
+     *  `block` the event's, `priceBlock` the price read's (block − 1). */
+    legs: { kind: "rebalance" | "redemption"; amount: number; price: number; block: number; priceBlock: number }[];
     debt: number;
     coll: number;
     /** The pool's rebalance bounty over the debt each rebalance cleared, in
@@ -116,6 +121,7 @@ export function fxNoTxParts(
   }
   const parts: Record<Kind, FxNoTxPart | null> = { rebalance: null, redemption: null, poolLiquidation: null };
   let collUsd = 0;
+  const legs: NonNullable<FxNoTxParts["bonus"]>["legs"] = [];
   let bonusDebt = 0;
   let bonusColl = 0;
   let bounty: number | null = 0;
@@ -134,7 +140,11 @@ export function fxNoTxParts(
     if (kind !== "poolLiquidation") {
       const min = reads[String(block - 1)]?.minPrice;
       if (min == null) priced = false;
-      else collUsd += -c.coll * (Number(min) / WAD);
+      else {
+        const price = Number(min) / WAD;
+        legs.push({ kind, amount: -c.coll, price, block, priceBlock: block - 1 });
+        collUsd = Math.round((collUsd + shownUsd(-c.coll, price)) * 100) / 100;
+      }
       bonusDebt += -c.debt;
       bonusColl += -c.coll;
       if (kind === "rebalance") {
@@ -160,6 +170,7 @@ export function fxNoTxParts(
       priced && bonusColl > 0
         ? {
             collUsd,
+            legs,
             debt: bonusDebt,
             coll: bonusColl,
             bounty,

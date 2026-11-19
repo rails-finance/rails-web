@@ -31,6 +31,8 @@
 // forbids convenience pins), so it is never restated as USD. A PURE function
 // of the data already in scope on the detail page — no fetching.
 
+import { FX_NO_ANCHOR } from "@/lib/fx/price-notes";
+import { fxPositionCollUsd } from "@/lib/fx/usd-receipt";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isFxEvent } from "@/lib/shared/types/event-shape";
 import type { FxPositionView } from "@/components/protocol/fx/fx-position-card";
@@ -47,6 +49,9 @@ export interface FxPositionMarkdownArgs {
    *  Absent means `events` IS the whole history and answers for itself. */
   history?: MarkdownHistoryScope;
   view: FxPositionView;
+  /** The oracle's anchor leg at the settled block, as the card reads it; the
+   *  collateral is stated at it, and without it has no dollar figure. */
+  anchor?: { anchor: number; block: number } | null;
   /** Chronologically sorted (oldest → newest) f(x) event list. */
   events: BaseActivityEvent[];
   /** The per-stretch reads the page has in hand (the newest suffix of the
@@ -157,10 +162,14 @@ export function fxPositionToMarkdown(args: FxPositionMarkdownArgs): string {
       if (collDrift) lines.push(collDrift);
     } else {
       if (settled.colls != null) {
+        // The card's figure: the shown product at the anchor leg (ui-jobs 743).
+        const collUsd = settled.colls > 0 ? fxPositionCollUsd(view, args.anchor) : null;
         const valued =
-          settled.collUsd != null && view.oracle.priceUsd != null && settled.colls > 0
-            ? ` (worth ${usd(settled.collUsd)} at ${usd(view.oracle.priceUsd)} per ${colSym} — the pool oracle's MIN "liquidate" leg${view.oracle.priceBlock != null ? `, read at block ${view.oracle.priceBlock}` : ""})`
-            : "";
+          settled.colls <= 0
+            ? ""
+            : collUsd
+              ? ` (worth ${usd(collUsd.usd)} at ${usd(collUsd.price)} per ${colSym} — the pool oracle's anchor leg, the price the LTV divides by, read at block ${args.anchor!.block})`
+              : ` (${FX_NO_ANCHOR})`;
         lines.push(
           `- **Collateral:** ${amt(settled.colls)} ${colSym}${valued} — ${rateDiffers ? `normalized units, not the ${tokenSym} deposited` : `normalized to 18dp (the ${tokenSym} deposited is ${pool.tokenDecimals}dp)`}`,
         );
