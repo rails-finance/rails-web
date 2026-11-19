@@ -19,7 +19,7 @@ export function redemptionLogProv(
     coll: `${c} paid out of the Trove — the ${c} this redemption took out of the Trove: the TroveOperation log's _collChangeFromOperation, with its sign turned. The redemption fee stays in the Trove and is left out.`,
     trove: `Trove — the _troveId of the ${c} TroveManager's TroveOperation log, with _operation redeemCollateral (6).`,
     block: "Block — the block this TroveOperation was logged in.",
-    rate: "Trove rate — the Trove's annual interest rate at this block, its batch's for a Trove in a batch: the TroveOperation log's _annualInterestRate.",
+    rate: "Interest rate — the Trove's annual interest rate at this block, its batch's for a Trove in a batch: the TroveOperation log's _annualInterestRate.",
   }[what];
   const raw =
     what === "bold" ? r.bold_raw : what === "coll" ? r.coll_raw : what === "rate" ? (r.rate_raw ?? null) : null;

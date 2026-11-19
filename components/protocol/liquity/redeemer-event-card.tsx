@@ -112,7 +112,7 @@ export function LiquityV2RedemptionCard({
           {
             kind: "stat",
             key: "rate",
-            label: "Trove rate",
+            label: "Interest rate",
             changed: false,
             figure: "liquity-v2-redeemer-rate",
             value: { after: { text: rateText, info: redemptionLogProv("rate", row), value: String(ratePct) } },

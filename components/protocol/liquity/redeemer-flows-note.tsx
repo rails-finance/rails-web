@@ -36,9 +36,9 @@ export function RedeemerFlowsNote({
     <div className="space-y-2" data-liquity-v2-redeemer-flows-note="" data-anatomy="F14">
       {!priceFailed && !noneRead && (
         <p>
-          The line is BOLD&apos;s market price in USD: the Curve BOLD/USDC pool&apos;s last_price(0)
+          The line is BOLD&apos;s market price in USD: 1 ÷ the Curve BOLD/USDC pool&apos;s last_price(0)
           {pool ? ` (${pool.slice(0, 6)}…${pool.slice(-4)})` : ""} at the end of the newest Liquity V2 event block
-          stored each day, with USDC at $1. The tip names the block.
+          stored each day, with USDC at $1.
         </p>
       )}
       <p>
@@ -49,10 +49,7 @@ export function RedeemerFlowsNote({
       {priceFailed && <p data-redeemer-price-failed="">BOLD&apos;s price could not be read just now.</p>}
       {noneRead && <p data-redeemer-price-unread="all">BOLD&apos;s price is not read yet for these days.</p>}
       {unreadThrough != null && !noneRead && (
-        <p data-redeemer-price-unread="">
-          BOLD&apos;s price is not read yet up to {dayStamp(unreadThrough * DAY_S)}: the store reads it from the newest
-          block back, and those days are still to come.
-        </p>
+        <p data-redeemer-price-unread="">BOLD&apos;s price is not read yet up to {dayStamp(unreadThrough * DAY_S)}.</p>
       )}
     </div>
   );

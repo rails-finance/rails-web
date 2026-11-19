@@ -50,12 +50,13 @@ function scaleFor(peak: number): number {
 }
 
 /** The source's words, for the price tip's receipt and the caption. */
-export const BOLD_PRICE_SOURCE = "Curve BOLD/USDC pool, last_price(0) at the end of each day's newest stored block";
+export const BOLD_PRICE_SOURCE =
+  "1 ÷ the Curve BOLD/USDC pool's last_price(0) at the end of each day's newest stored block";
 
 /** The price tip's receipt: the day's point at its block. */
 const BOLD_HERE = {
-  read: "BOLD's market price in USD on {day}: the Curve BOLD/USDC pool's last_price(0) at the end of block {block}, the newest Liquity V2 event block stored that day, with USDC at $1.",
-  live: "BOLD's market price in USD on {day}: the Curve BOLD/USDC pool's last_price(0), with USDC at $1.",
+  read: "BOLD's market price in USD on {day}: 1 ÷ the Curve BOLD/USDC pool's last_price(0) at the end of block {block}, the newest Liquity V2 event block stored that day, with USDC at $1.",
+  live: "BOLD's market price in USD on {day}: 1 ÷ the Curve BOLD/USDC pool's last_price(0), with USDC at $1.",
 };
 
 /** The words the readout states on a day the store has not read yet. */
