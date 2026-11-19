@@ -24,7 +24,9 @@ import type { CompoundPositionView } from "@/components/protocol/compound/compou
 import { scaleCompoundChainBalance, type CompoundMarketChainResponse } from "@/lib/api/fetch-compound-position";
 import type { CompoundWalletChainResponse } from "@/lib/api/fetch-compound-wallet";
 import { formatNumber, formatUsdValue } from "@/lib/utils/format";
-import { compoundArbitrumUsd } from "./usd";
+import { holderUsdReceipt, type UsdLeg } from "@/lib/shared/holder-usd-receipt";
+import { compoundArbitrumUsd, cometUsdPrice } from "./usd";
+import { cometComposedPriceNote, cometNoPriceLine, cometPriceNote } from "./price-notes";
 
 /** One Comet on the overview: the read's answer for it (null where it holds
  *  nothing now, or the read failed) and the status its card states. */
@@ -59,22 +61,69 @@ const ARBITRUM_SOURCE: HolderStripSource = {
   ethUsdFrom: "from the same read",
 };
 
-function legProv(what: string, figure: string, block: number, comets: string[], src: HolderStripSource): Provenance {
+/** One priced row of a leg: the amount, the Comet's price as shown (the WETH
+ *  Comet's composed), and the rows ahead of a composed price. */
+function cometLeg(
+  c: HolderStripComet,
+  symbol: string,
+  amount: number,
+  rawPrice: number,
+  ethUsd: number | undefined,
+  amountNote: string,
+  src: HolderStripSource,
+): UsdLeg | null {
+  const ch = c.chain!;
+  const u = cometUsdPrice(ch, rawPrice, ethUsd);
+  if (!u) return null;
   return {
-    kind: "chain-derived",
-    pclass: "oracle",
-    verify: {
-      kind: "recompute",
-      text: `To check: ask any Arbitrum archive node for each Comet's ${figure} and getPrice at block ${block.toLocaleString("en-US")}, scale each by the asset's decimals, multiply by that Comet's price (the ETH-quoted Comet also by WETH in dollars) and add the Comets.`,
-    },
-    summary: `${what}, in USD. Each Comet's figure (${comets.join(", ")}) at that Comet's getPrice, read in one batched call at block ${block.toLocaleString("en-US")}; cWETHv3 quotes in ETH and converts at WETH in dollars ${src.ethUsdFrom}. An estimate: the Comets hold different tokens and a sum of them exists only at a price, and each price moves every block.`,
-    via: `${src.via} at block ${block.toLocaleString("en-US")} · Σ over the Comets of amount × the Comet's price`,
-    formula: "Σ amount × the Comet's price",
-    inputs: [
-      { label: "amounts", kind: "chain", pclass: "state", note: `${figure} @ the read block` },
-      { label: "price", kind: "chain", pclass: "oracle", note: "the Comet's getPrice @ the read block" },
-    ],
+    token: symbol,
+    label: `${c.market.label} ${symbol}`,
+    amount,
+    amountNote,
+    price: u.usd,
+    priceNote: u.eth
+      ? cometComposedPriceNote({
+          comet: c.market.label,
+          ethPrice: u.eth.price,
+          ethUsd: u.eth.ethUsd,
+          wethFrom: src.ethUsdFrom,
+        })
+      : cometPriceNote(c.market.label),
+    priceContract: { name: c.market.label, address: c.market.comet },
   };
+}
+
+/** A leg's figure and receipt from its rows; the no-figure words where a
+ *  Comet in it has no conversion (no partial totals). */
+function legFigure(
+  what: string,
+  rows: (UsdLeg | null)[],
+  unpriced: string[],
+  block: number,
+  src: HolderStripSource,
+): { value: string; approx: boolean; prov: Provenance } | null {
+  if (unpriced.length > 0)
+    return {
+      value: "—",
+      approx: false,
+      prov: {
+        kind: "derived",
+        summary: `${what} — ${cometNoPriceLine(unpriced)}, so the wallet's total is not drawn.`,
+        via: src.via,
+      },
+    };
+  const legs = rows.filter((r): r is UsdLeg => r != null);
+  if (legs.length === 0) return null;
+  const { prov, usd } = holderUsdReceipt({
+    what,
+    legs,
+    block,
+    via: `${src.via} at block ${block.toLocaleString("en-US")} · one batched read of every Comet · Σ amount × the Comet's price`,
+    caveat:
+      "An estimate: the Comets hold different tokens, and a sum of them exists only at a price, which moves every block.",
+  });
+  if (!(usd > 0)) return null;
+  return { value: formatUsdValue(usd), approx: true, prov };
 }
 
 /** The counts sentence, in Comet positions. */
@@ -133,46 +182,40 @@ export function compoundHolderStrip(
   const block = head.blockNumber;
   const legs: HolderLeg[] = [];
 
-  // ── collateral: per Comet in dollars, the parts named by Comet ────────────
+  // ── collateral: per Comet and asset, the shown products summed ─────────
   {
-    let sum = 0;
+    const rows: (UsdLeg | null)[] = [];
+    const unpriced: string[] = [];
     const parts: string[] = [];
-    const named: string[] = [];
     for (const c of open) {
-      if (c.chain!.collateral.length === 0) continue;
-      const v = usd.get(c.chain!.comet.toLowerCase())?.collateralUsd;
-      if (v == null) {
-        parts.push(`${c.market.label} not priced`);
-        continue;
+      const ch = c.chain!;
+      if (ch.collateral.length === 0) continue;
+      const v = usd.get(ch.comet.toLowerCase())?.collateralUsd;
+      parts.push(v == null ? `${c.market.label} not priced` : `${c.market.label} ${formatUsdValue(v)}`);
+      for (const a of ch.collateral) {
+        const amount = scaleCompoundChainBalance(a.balanceRaw, a.decimals);
+        if (!(amount > 0)) continue;
+        const r = cometLeg(c, a.symbol, amount, a.price, head.ethUsd, `${c.market.label}'s collateralBalanceOf`, src);
+        if (!r && !unpriced.includes(c.market.label)) unpriced.push(c.market.label);
+        rows.push(r);
       }
-      if (!(v > 0)) continue;
-      sum += v;
-      parts.push(`${c.market.label} ${formatUsdValue(v)}`);
-      named.push(c.market.label);
     }
-    if (sum > 0)
+    const f = legFigure("What the wallet holds as collateral across its Comets, in USD", rows, unpriced, block, src);
+    if (f)
       legs.push({
         id: "collateral",
         label: "Total collateral",
-        value: formatUsdValue(sum),
-        approx: true,
-        tip: LEG_TIP.collateral,
-        prov: legProv(
-          "What the wallet holds as collateral across its Comets",
-          "collateralBalanceOf",
-          block,
-          named,
-          src,
-        ),
+        ...f,
+        tip: f.approx ? LEG_TIP.collateral : undefined,
         footnote: { text: parts.join(" · ") },
       });
   }
 
-  // ── the base, borrowed and lent: dollars, the parts in each Comet's base ──
+  // ── the base, borrowed and lent: the shown products, the parts in each base ──
   const baseLeg = (side: "borrow" | "supply") => {
-    let sum = 0;
+    const rows: (UsdLeg | null)[] = [];
+    const unpriced: string[] = [];
     const parts: string[] = [];
-    const named: string[] = [];
     for (const c of open) {
       const ch = c.chain!;
       const amount = scaleCompoundChainBalance(
@@ -180,35 +223,36 @@ export function compoundHolderStrip(
         ch.baseDecimals,
       );
       if (!(amount > 0)) continue;
-      const u = usd.get(ch.comet.toLowerCase());
-      const v = side === "borrow" ? u?.borrowUsd : u?.supplyUsd;
-      parts.push(`${formatNumber(amount)} ${ch.baseSymbol}${v == null ? " (not priced)" : ""}`);
-      if (v == null) continue;
-      sum += v;
-      named.push(c.market.label);
+      const r = cometLeg(
+        c,
+        ch.baseSymbol,
+        amount,
+        ch.basePrice,
+        head.ethUsd,
+        `${c.market.label}'s ${side === "borrow" ? "borrowBalanceOf" : "balanceOf"}, interest included`,
+        src,
+      );
+      parts.push(`${formatNumber(amount)} ${ch.baseSymbol}${r ? "" : " (not priced)"}`);
+      if (!r) unpriced.push(c.market.label);
+      rows.push(r);
     }
-    if (!(sum > 0)) return;
-    legs.push(
+    const f = legFigure(
       side === "borrow"
-        ? {
-            id: "debt",
-            label: "Total debt",
-            value: formatUsdValue(sum),
-            approx: true,
-            tip: LEG_TIP.debt,
-            prov: legProv("What the wallet owes across its Comets", "borrowBalanceOf", block, named, src),
-            footnote: { text: parts.join(" · ") },
-          }
-        : {
-            id: "lent",
-            label: "Total lent",
-            value: formatUsdValue(sum),
-            approx: true,
-            tip: LEG_TIP.lent,
-            prov: legProv("What the wallet lends across its Comets", "balanceOf", block, named, src),
-            footnote: { text: parts.join(" · ") },
-          },
+        ? "What the wallet owes across its Comets, in USD"
+        : "What the wallet lends across its Comets, in USD",
+      rows,
+      unpriced,
+      block,
+      src,
     );
+    if (!f) return;
+    legs.push({
+      id: side === "borrow" ? "debt" : "lent",
+      label: side === "borrow" ? "Total debt" : "Total lent",
+      ...f,
+      tip: f.approx ? (side === "borrow" ? LEG_TIP.debt : LEG_TIP.lent) : undefined,
+      footnote: { text: parts.join(" · ") },
+    });
   };
   baseLeg("borrow");
   baseLeg("supply");
