@@ -205,12 +205,13 @@ test("the live stop states the ledger's figures", () => {
   assert.ok(c.current.every((l) => l.price != null) && d.current.every((l) => l.price != null), "each line priced");
   assert.equal(s.collateral.now, shown(c.current));
   assert.ok(near(s.collateral.now, usdSum(c.current), 0.01 * c.current.length + 1e-6 * usdSum(c.current)));
-  assert.ok(
-    near(
-      s.debt.now,
-      usdSum(d.current) + (d.interest?.usd ?? 0),
-      0.01 * (d.current.length + 1) + 1e-6 * usdSum(d.current),
-    ),
+  // The debt: each asset's rows (its line with the interest joined) at its
+  // price, as shown, summed by cents.
+  const debtRows = model.liveHeld.filter((r) => r.side === "debt" && (r.amount ?? 0) > 0);
+  assert.ok(debtRows.length > 0 && debtRows.every((r) => r.priced?.price != null), "each debt row priced");
+  assert.equal(
+    s.debt.now,
+    debtRows.reduce((t, r) => centsOf(t + shownUsd(r.amount as number, r.priced!.price as number)), 0),
   );
   assert.ok(near(seg(s.collateral, "deposited"), c.lifetimeInflow));
   assert.ok(near(seg(s.collateral, "received"), usdSum(c.received)));
@@ -1972,7 +1973,12 @@ test("incomplete stretches: a figure without its price or read is dashed and nam
   // A leg priced off its block marks the bars from its day, not the day's held figure.
   assert.deepEqual(unsureAt(m, 2, "collateral").flows, []);
   assert.deepEqual(unsureAt(m, 3, "collateral"), { held: [], flows: [why.legs] });
-  assert.deepEqual(partialAt(m, m.liveStop, "collateral"), [why.legs]);
+  // The live stop holds WETH with no live price: its last stop's price,
+  // carried and not complete (ui-jobs 743).
+  assert.deepEqual(partialAt(m, m.liveStop, "collateral"), [
+    "WETH at an earlier price: the live read has no price for it.",
+    why.legs,
+  ]);
   // An unread balance stands until the next day with events.
   for (const st of [6, 7, 8]) assert.deepEqual(unsureAt(m, st, "debt").held, [why.unread], `stop ${st}`);
   assert.deepEqual(unsureAt(m, 9, "debt").held, []);
@@ -1984,8 +1990,10 @@ test("incomplete stretches: a figure without its price or read is dashed and nam
     /^WETH is valued at its price of \d+ \w+ '\d\d: no daily price is stored/,
   );
   assert.equal(unsureAt(m, 4, "collateral").held.length, 1);
-  // The live stop is the live read's: only the flows' reasons.
-  assert.deepEqual(unsureAt(m, m.liveStop, "collateral").held, []);
+  // The live stop: the carried price's reason, then the flows'.
+  assert.deepEqual(unsureAt(m, m.liveStop, "collateral").held, [
+    "WETH at an earlier price: the live read has no price for it.",
+  ]);
   // A window keeps each reason, those before it from its opening.
   const w = windowModel(m, 5);
   assert.deepEqual(unsureAt(w, 0, "collateral").flows, [why.legs]);

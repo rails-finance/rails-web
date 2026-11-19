@@ -59,6 +59,7 @@ export function FxPoolStatsBand({
               {price != null && (
                 <span
                   className="ml-auto text-xs tabular-nums text-rb-500"
+                  data-anatomy="N4.1·fx"
                   title={
                     a
                       ? `The pool oracle's anchor price per ${p.normalizedSymbol}, read at block ${a.block}`

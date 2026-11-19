@@ -554,7 +554,8 @@ export function aaveV3FlowLive(tower: ChainTruthTowerData): FlowLive {
  *  price; a line with no price leaves its asset with none. */
 export function towerAssets(tower: ChainTruthTowerData, collateralInterest: boolean): FlowAssetHeld[] {
   const out: FlowAssetHeld[] = [];
-  const priced = (p: NonNullable<TowerLine["price"]>) => livePriced(p.usd, p.block, 0, { source: p.source });
+  const priced = (p: NonNullable<TowerLine["price"]>) =>
+    livePriced(p.usd, p.block, 0, { source: p.source, balanceBlock: p.balanceBlock });
   const join = (side: FlowSide, symbol: string, amount: number, usd: number | null, price: TowerLine["price"]) => {
     const at = out.find((x) => x.side === side && x.symbol === symbol);
     if (at) {

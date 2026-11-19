@@ -722,13 +722,22 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
                                 : "the branch PriceFeed's price now",
                           })
                         : {
+                            // The last event's price, carried: its block as
+                            // its leg names it (A5).
                             day: Math.floor(o.now / DAY_S),
                             series: false,
                             price: pricedNow,
-                            block: lastRow.borrowedPrice ? lastRow.priceBlock : lastRow.ev.block,
+                            block: lastRow.borrowedPrice
+                              ? lastRow.priceBlock
+                              : lastRow.ev.priceFrom?.source === "v2-weth-day"
+                                ? lastRow.ev.priceFrom.block
+                                : lastRow.ev.block,
+                            carried: true as const,
                           },
                   }
-                : {}),
+                : nowColl > 0
+                  ? { unpriced: true as const }
+                  : {}),
             },
             {
               side: "debt",

@@ -249,6 +249,11 @@ export interface FlowAssetHeld {
     factorNote?: string;
     /** The live stop's price (`livePriced`): its source and block in words. */
     live?: string;
+    /** The block the live balance stands at, where it differs from the
+     *  price's: both named, not complete. */
+    balanceBlock?: number | null;
+    /** A price carried from an earlier read to the live stop: not complete. */
+    carried?: true;
   };
   /** No price stands for the asset on that day: the side's figure has none. */
   unpriced?: true;
@@ -1386,8 +1391,13 @@ function liveHeldFromBalances(
     // No price today and none carried from the last stop: the asset has no
     // figure, and the line breaks at the live point (ui-jobs 743).
     const none = inDollars && !priced && (prev == null || prev.unpriced);
-    // The price row: today's, at its read's block where it names one.
-    const row = priced ? livePriced(p, todayBlock, todayDay * 86_400) : undefined;
+    // The price row: today's, at its read's block where it names one; else
+    // the last stop's price, carried and named with its block, not complete.
+    const row = priced
+      ? livePriced(p, todayBlock, todayDay * 86_400)
+      : prev?.priced?.price != null && !prev.priced.face && !prev.unpriced
+        ? { ...prev.priced, carried: true as const }
+        : undefined;
     out.push({
       side: h.side,
       symbol: h.symbol,
@@ -1407,25 +1417,30 @@ export function livePriced(
   price: number,
   block: number | null | undefined,
   nowSec: number,
-  o: { face?: boolean; source?: string } = {},
+  o: { face?: boolean; source?: string; balanceBlock?: number | null; carried?: boolean } = {},
 ): NonNullable<FlowAssetHeld["priced"]> {
   const src = o.source ?? "the live read's price";
+  const apart = o.balanceBlock != null && block != null && o.balanceBlock !== block;
   return {
     day: Math.floor(nowSec / 86_400),
     series: false,
     price: o.face ? 1 : price,
     block: block ?? null,
-    live: block != null ? `${src}, block ${block.toLocaleString("en-US")}` : `${src}, which names no block`,
+    live: `${block != null ? `${src}, block ${block.toLocaleString("en-US")}` : `${src}, which names no block`}${
+      apart ? `; the balance is read at block ${(o.balanceBlock as number).toLocaleString("en-US")}` : ""
+    }`,
+    ...(apart ? { balanceBlock: o.balanceBlock } : {}),
+    ...(o.carried ? { carried: true as const } : {}),
     ...(o.face ? { face: true as const } : {}),
   };
 }
 
 /** The live stop's figures from its rows (ui-jobs 743): a side in dollars
- *  whose assets each carry a price row (`livePriced`) is the sum of their
- *  shown products, to the cent; an asset held with no price leaves the side
- *  with none ("—"); a price whose read names no block, or an earlier price,
- *  is not complete. A side whose family states no price rows keeps its
- *  figure and is not stated in rows; a unit side keeps the family's figure. */
+ *  is the sum of its assets' shown products, each at its price row
+ *  (`livePriced`), to the cent; an asset held with no price row leaves the
+ *  side with none ("—"); a price whose read names no block, an earlier
+ *  price, or a price read at another block than its balance is not
+ *  complete. A unit side keeps the family's figure. */
 function liveFromRows(
   live: FlowLive,
   rows: FlowAssetHeld[],
@@ -1439,10 +1454,12 @@ function liveFromRows(
   if (!inDollars) return { live, rows, stated: [], unsure: [] };
   const unsure: { side: FlowSide; why: string; symbol?: string }[] = [];
   const held = (r: FlowAssetHeld) => (r.amount ?? 0) > 0 || Math.abs(r.usd) >= 0.005;
-  const stated = (side: FlowSide) =>
-    rows.every((r) => r.side !== side || !held(r) || r.unpriced || ((r.amount ?? 0) > 0 && r.priced?.price != null));
+  // A held asset with no price row has no figure: its side draws "—", never
+  // the family's total in its place.
+  rows = rows.map((r) =>
+    held(r) && !r.unpriced && !((r.amount ?? 0) > 0 && r.priced?.price != null) ? { ...r, unpriced: true as const } : r,
+  );
   const sum = (side: FlowSide): number | null => {
-    if (!stated(side)) return null;
     let c = 0;
     for (const r of rows) {
       if (r.side !== side || !held(r)) continue;
@@ -1458,11 +1475,13 @@ function liveFromRows(
       // to the live stop: not complete.
       const why = p.face
         ? null
-        : p.live == null
+        : p.live == null || p.carried
           ? "at an earlier price: the live read has no price for it."
           : p.block == null
             ? "at the latest read's price, which names no block."
-            : null;
+            : p.balanceBlock != null
+              ? "at a price read at another block than its balance."
+              : null;
       if (why && !unsure.some((u) => u.side === side && u.symbol === r.symbol))
         unsure.push({ side, why, symbol: r.symbol });
     }
@@ -1478,8 +1497,7 @@ function liveFromRows(
       debtUsd: ok(debt) ? debt : live.debtUsd,
     },
     rows,
-    // The sides stated in rows; a side its family gives no price rows for
-    // keeps the family's figure.
+    // The sides stated in rows: both, on a model in dollars.
     stated: (["collateral", "debt"] as const).filter((x) => (x === "collateral" ? coll : debt) != null),
     unsure,
   };

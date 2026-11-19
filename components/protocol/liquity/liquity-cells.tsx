@@ -924,7 +924,12 @@ export function useLiquityCells({
             key: "before",
             label: SHEET_WORDS.before,
             amount: { text: formatColl(beforeColl), symbol: collSym, info: collBeforeProv },
-            usd: beforeCollAtEventUsd > 0 ? { ...centsParts(beforeCollAtEventUsd), info: usdBeforeProv } : undefined,
+            usd:
+              beforeCollAtEventUsd > 0
+                ? { ...centsParts(beforeCollAtEventUsd), info: usdBeforeProv }
+                : beforeColl > 0
+                  ? collNoFigure("The collateral just before this event, in USD")
+                  : undefined,
             tip: TIP.collBefore,
           }
         : undefined,

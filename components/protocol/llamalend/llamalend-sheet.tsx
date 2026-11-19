@@ -144,15 +144,19 @@ export function llamalendSheet({
   ctx: LlamalendContext;
   state: LlamalendEventState;
   f: LlamalendEventFigures;
-  /** The event's block is in hand: the sheet's reads are at it and the block before. */
-  coords: LlamalendCoords & { blockNumber: number };
+  coords: LlamalendCoords;
   previousStated?: LlamalendPreviousStated | null;
   collateralAddress?: string;
   borrowedAddress?: string;
 }): EventSheet {
   const c = ctx.collateralSymbol;
   const b = ctx.borrowedSymbol;
-  const block = coords.blockNumber;
+  // The event's block and the one before; an event that names no block
+  // names none on its rows (ui-jobs 743).
+  const block = coords.blockNumber ?? null;
+  const before = block != null ? block - 1 : null;
+  const blockText = (b: number | null) =>
+    b != null ? `block ${b.toLocaleString("en-US")}` : "a block this read does not name";
   const usdMarket = ctx.borrowedIsCrvusd;
   const p = f.priceAfter;
   const isLiq = ctx.eventType === "liquidation";
@@ -185,8 +189,7 @@ export function llamalendSheet({
   // the collateral at the AMM's price_oracle at this block, crvUSD at its $1
   // face.
   const VIA = "the Controller and AMM reads around the event · the collateral × price_oracle, crvUSD at $1";
-  const oracleAt = (at: number) =>
-    `the market's AMM price_oracle (crvUSD per ${c}) at block ${at.toLocaleString("en-US")}`;
+  const oracleAt = (at: number | null) => `the market's AMM price_oracle (crvUSD per ${c}) at ${blockText(at)}`;
   const collAt = (amount: number): PricedAmount => ({
     symbol: c,
     amount,
@@ -199,10 +202,10 @@ export function llamalendSheet({
   const pBefore = f.priceBefore ?? p;
   const collBeforeAt = (amount: number): PricedAmount =>
     f.priceBefore != null
-      ? { symbol: c, amount, price: f.priceBefore, block: block - 1, priceNote: oracleAt(block - 1) }
+      ? { symbol: c, amount, price: f.priceBefore, block: before, priceNote: oracleAt(before) }
       : {
           ...collAt(amount),
-          priceNote: `Not complete: ${oracleAt(block)}, this event's block; the collateral is read at block ${(block - 1).toLocaleString("en-US")}, whose price was not read`,
+          priceNote: `Not complete: ${oracleAt(block)}, this event's block; the collateral is read at ${before != null ? blockText(before) : "the block before"}, whose price was not read`,
         };
   const crv = (amount: number): PricedAmount => ({
     symbol: b,
@@ -282,7 +285,7 @@ export function llamalendSheet({
         amount: collAmt(`−${fmtColl(sold)}`, {
           kind: "chain-derived",
           pclass: "state",
-          summary: `${c} the AMM sold from the position's bands since the ${formatDayMonth(previousStated.timestamp)} event. The collateral that row's UserState stated, less Controller.user_state(user)[0] at block ${block - 1}.`,
+          summary: `${c} the AMM sold from the position's bands since the ${formatDayMonth(previousStated.timestamp)} event. The collateral that row's UserState stated, less Controller.user_state(user)[0] at ${before != null ? `block ${before}` : "the block before"}.`,
           formula: "last stated − collateral at block − 1",
         }),
         tip: TIPS.sold(c),
@@ -295,7 +298,7 @@ export function llamalendSheet({
     ...(pBefore != null
       ? [
           {
-            label: `${c} price at block ${(f.priceBefore != null ? block - 1 : block).toLocaleString("en-US")}`,
+            label: `${c} price at ${blockText(f.priceBefore != null ? before : block)}`,
             value: `${pBefore} ${b}`,
           },
         ]
@@ -313,7 +316,7 @@ export function llamalendSheet({
                 stateAtBlockProv(
                   `${c} collateral`,
                   "Controller.user_state(user)[0]",
-                  block - 1,
+                  before,
                   coords,
                   state.before.collateralRaw,
                 ),
@@ -397,7 +400,7 @@ export function llamalendSheet({
   const debtBeforeProv = stateAtBlockProv(
     `${b} debt`,
     "Controller.user_state(user)[2]",
-    block - 1,
+    before,
     coords,
     state.before.debtRaw,
   );
@@ -435,7 +438,7 @@ export function llamalendSheet({
           {
             kind: "chain-derived",
             pclass: "state",
-            summary: `Interest on the ${b} debt since the ${formatDayMonth(lastDebt.timestamp)} event. Controller.user_state(user)[2] at block ${block - 1}, less the debt that row stated.`,
+            summary: `Interest on the ${b} debt since the ${formatDayMonth(lastDebt.timestamp)} event. Controller.user_state(user)[2] at ${before != null ? `block ${before}` : "the block before"}, less the debt that row stated.`,
             formula: "debt at block − 1 − debt at the last event",
           },
           formatExactDecimal(String(interest)),
@@ -523,7 +526,7 @@ export function llamalendSheet({
       <span key="before">
         Health was{" "}
         <Prov
-          info={stateAtBlockProv("Health", "Controller.health(user, true)", block - 1, coords, state.before.healthRaw)}
+          info={stateAtBlockProv("Health", "Controller.health(user, true)", before, coords, state.before.healthRaw)}
           value={`${hB * 100}%`}
         >
           {fmtHealth(hB)}

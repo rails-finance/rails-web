@@ -120,15 +120,21 @@ function assertSharedAnswer(f: Fixture, c: Case, got: Answer, want: Answer): voi
   const { rows, store } = caseInput(f, c);
   const symbolOf = (a: string | null | undefined) => (a ? lane.metas[a.toLowerCase()]?.symbol : undefined);
   const inputs = new Map<string, number[]>();
-  const put = (a: string | null | undefined, v: unknown) => {
+  // The rows' at-block prices by token and block: a leg at a row's block
+  // takes that row's price.
+  const atBlock = new Map<string, number[]>();
+  const put = (a: string | null | undefined, v: unknown, block?: number) => {
     const sym = symbolOf(a);
     const n = Number(v);
-    if (sym && v != null && Number.isFinite(n) && n > 0) inputs.set(sym, [...(inputs.get(sym) ?? []), n]);
+    if (!(sym && v != null && Number.isFinite(n) && n > 0)) return;
+    inputs.set(sym, [...(inputs.get(sym) ?? []), n]);
+    if (block != null) atBlock.set(`${sym}@${block}`, [...(atBlock.get(`${sym}@${block}`) ?? []), n]);
   };
   for (const r of rows) {
-    put(r.reserve, r.price_usd);
-    put(r.reserve, r.debt_price_usd);
-    put(r.collateral_asset, r.collateral_price_usd);
+    const b = Number(r.block_number);
+    put(r.reserve, r.price_usd, b);
+    put(r.reserve, r.debt_price_usd, b);
+    put(r.collateral_asset, r.collateral_price_usd, b);
   }
   for (const [a, obs] of Object.entries(store)) for (const [, v] of obs) put(a, v);
   for (const [a, v] of Object.entries(lane.todayPrices)) put(a, v);
@@ -137,7 +143,6 @@ function assertSharedAnswer(f: Fixture, c: Case, got: Answer, want: Answer): voi
   assert.deepEqual(g.facts, w.facts, `${c.name}: facts`);
   // The events' legs.
   assert.equal(g.events.length, w.events.length, `${c.name}: events`);
-  let legCount = 0;
   g.events.forEach((ge, i) => {
     const we = w.events[i];
     const { legs: gl, ...gRest } = ge as { legs: Record<string, unknown>[] };
@@ -145,7 +150,6 @@ function assertSharedAnswer(f: Fixture, c: Case, got: Answer, want: Answer): voi
     assert.deepEqual(gRest, wRest, `${c.name} event ${i}`);
     assert.equal(gl.length, wl.length, `${c.name} event ${i}: legs`);
     gl.forEach((l, j) => {
-      legCount++;
       const want = wl[j];
       for (const [k, v] of Object.entries(want))
         if (k === "usd" && v != null && typeof l.price === "number") {
@@ -159,11 +163,14 @@ function assertSharedAnswer(f: Fixture, c: Case, got: Answer, want: Answer): voi
           );
         } else if (k === "usd") assert.equal(l.usd, v == null ? v : centsOf(v as number), `${c.name} ${i}.${j}: usd`);
         else assert.deepEqual(l[k], v, `${c.name} ${i}.${j}: ${k}`);
-      const known = inputs.get(l.symbol as string);
+      // A leg at a block the rows price is pinned to that row's price; any
+      // other to a price the case's inputs carry.
+      const pinned = typeof l.block === "number" ? atBlock.get(`${l.symbol}@${l.block}`) : undefined;
+      const known = pinned?.length ? pinned : inputs.get(l.symbol as string);
       if (typeof l.price === "number" && known?.length)
         assert.ok(
           known.some((p) => p === l.price || shownPrice(p) === l.price),
-          `${c.name} ${i}.${j}: ${l.symbol} at ${l.price}, a price the inputs carry`,
+          `${c.name} ${i}.${j}: ${l.symbol} at ${l.price}, ${pinned?.length ? `the row's price at block ${l.block}` : "a price the inputs carry"}`,
         );
     });
   });
@@ -172,13 +179,19 @@ function assertSharedAnswer(f: Fixture, c: Case, got: Answer, want: Answer): voi
   const { days: wd, ...ws } = w.summary as { days: Record<string, unknown>[] };
   assert.deepEqual(gs, ws, `${c.name}: summary`);
   assert.equal(gd.length, wd.length, `${c.name}: days`);
-  const legsIn = gd.reduce((n, d) => n + ((d.legs as unknown[] | undefined)?.length ?? 0), 0) + legCount;
   // Each leg's cents differ from its raw figure by half a cent and what the
-  // shown amount and price round away (a millionth of the figure at most).
-  const near = (a: unknown, b: unknown, what: string) =>
+  // shown amount and price round away: a running sum's slack is that, summed
+  // over the legs in its bucket (and token) through the day.
+  const legSlack = (l: { amount?: number; price?: number | null }) =>
+    0.005 +
+    (typeof l.price === "number"
+      ? Math.abs(l.amount ?? 0) * 5e-7 * Math.max(1, l.price) + 5e-7 * l.price
+      : 1e-6 * Math.abs(l.amount ?? 0));
+  const slack = new Map<string, number>();
+  const near = (a: unknown, b: unknown, key: string, what: string) =>
     assert.ok(
-      Math.abs((a as number) - (b as number)) <= 0.005 * Math.max(1, legsIn) + 1e-6 * Math.abs(b as number) + 1e-6,
-      `${c.name} ${what}: ${a} against ${b}`,
+      Math.abs((a as number) - (b as number)) <= (slack.get(key) ?? 0) + 1e-9,
+      `${c.name} ${what}: ${a} against ${b} (slack ${slack.get(key) ?? 0})`,
     );
   const reasons = (us: { side: string; why: string; symbol?: string }[] | undefined, web: boolean) =>
     (us ?? [])
@@ -190,30 +203,34 @@ function assertSharedAnswer(f: Fixture, c: Case, got: Answer, want: Answer): voi
       .filter((u) => !(web && u.why.startsWith("priced at the last stored close before its day")));
   gd.forEach((day, i) => {
     const want = wd[i];
+    for (const l of (day.legs as { bucket: string; symbol?: string; amount?: number; price?: number | null }[]) ?? []) {
+      for (const key of [l.bucket, `${l.bucket}|${l.symbol}`]) slack.set(key, (slack.get(key) ?? 0) + legSlack(l));
+    }
+    // A carried close stands only where the fixture names the day's close.
+    const gotU = day.unsure as { side: string; why: string; symbol?: string }[] | undefined;
+    const wantU = (want.unsure as typeof gotU) ?? [];
+    for (const u of gotU ?? [])
+      if (u.why.startsWith("priced at the last stored close before its day"))
+        assert.ok(
+          wantU.some(
+            (x) => x.side === u.side && x.symbol === u.symbol && x.why.startsWith("priced at the day's close"),
+          ),
+          `day ${i}: a carried close where the fixture has the day's close`,
+        );
     for (const [k, v] of Object.entries(want)) {
       if (k === "cum")
         for (const [b, x] of Object.entries(v as Record<string, number>))
-          near((day.cum as Record<string, number>)[b], x, `day ${i} cum.${b}`);
+          near((day.cum as Record<string, number>)[b], x, b, `day ${i} cum.${b}`);
       else if (k === "cumAsset")
         (v as { bucket: string; symbol: string; usd: number }[]).forEach((x, j) => {
           const y = (day.cumAsset as (typeof x)[])[j];
           assert.equal(y.bucket, x.bucket);
           assert.equal(y.symbol, x.symbol);
-          near(y.usd, x.usd, `day ${i} cumAsset ${x.symbol} ${x.bucket}`);
+          near(y.usd, x.usd, `${x.bucket}|${x.symbol}`, `day ${i} cumAsset ${x.symbol} ${x.bucket}`);
         });
-      else if (k === "unsure") {
-        const gotU = day.unsure as { side: string; why: string; symbol?: string }[] | undefined;
+      else if (k === "unsure")
         assert.deepEqual(reasons(gotU, true), reasons(v as typeof gotU, false), `day ${i} unsure`);
-        // A carried close stands where the fixture names the day's close.
-        for (const u of gotU ?? [])
-          if (u.why.startsWith("priced at the last stored close before its day"))
-            assert.ok(
-              (v as typeof gotU)!.some(
-                (x) => x.side === u.side && x.symbol === u.symbol && x.why.startsWith("priced at the day's close"),
-              ),
-              `day ${i}: a carried close where the fixture has the day's close`,
-            );
-      } else if (k === "prices")
+      else if (k === "prices")
         (v as Record<string, unknown>[]).forEach((x, j) => {
           const { block: _b, ...y } = (day.prices as Record<string, unknown>[])[j];
           void _b;
@@ -221,10 +238,7 @@ function assertSharedAnswer(f: Fixture, c: Case, got: Answer, want: Answer): voi
         });
       else assert.deepEqual(day[k], v, `day ${i} ${k}`);
     }
-    if (!("unsure" in want)) {
-      const gotU = day.unsure as { side: string; why: string; symbol?: string }[] | undefined;
-      assert.deepEqual(reasons(gotU, true), [], `day ${i} unsure`);
-    }
+    if (!("unsure" in want)) assert.deepEqual(reasons(gotU, true), [], `day ${i} unsure`);
   });
 }
 

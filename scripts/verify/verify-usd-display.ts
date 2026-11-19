@@ -294,3 +294,76 @@ test("each family's cells carry cents, and a group sums them", async () => {
     );
   }
 });
+
+// An Aave group whose middle member's account was not read: its Market move
+// draws "—", so the group's does (ui-jobs 743, R3).
+test("an Aave group with an unread middle member draws no Market move sum", async () => {
+  const { mergeGroupSheet } = await import("@/components/shared/group-sheet");
+  const { aaveFamilySheet } = await import("@/components/protocol/aave-v3/aave-family-sheet");
+  const WETH = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2";
+  const leg = (before: string, after: string) => ({
+    before,
+    after,
+    scaledBefore: before,
+    scaledAfter: after,
+    index: "1000000000000000000000000000",
+  });
+  const acct = (coll: string) => ({
+    totalCollateralBase: coll,
+    totalDebtBase: "0",
+    ltvBps: 8000,
+    liquidationThresholdBps: 8250,
+    healthFactor: null,
+  });
+  const state = (i: number, price: string, read: boolean) => ({
+    wallet: "0x1",
+    market: "Core",
+    marketKey: "core",
+    block: 100 + i,
+    txHash: `0x${i}`,
+    txIndex: 0,
+    blockTimestamp: 1_700_000_000 + i * 86_400,
+    complete: read,
+    reserves: [
+      {
+        reserve: WETH,
+        symbol: "WETH",
+        decimals: 18,
+        supply: leg("1000000000000000000", "1000000000000000000"),
+        debt: leg("0", "0"),
+        collateral: { before: true, after: true },
+        priceBase: price,
+        ltvBps: 8000,
+        liquidationThresholdBps: 8250,
+        inEmode: false,
+      },
+    ],
+    emode: null,
+    account: read ? { before: acct(price), after: acct(price) } : null,
+    sources: {
+      balances: "chain-read-at-block",
+      settings: null,
+      market: "chain-read-at-block",
+      marketReadBlock: 100 + i,
+      poolRevision: null,
+    },
+    notes: [],
+  });
+  const s0 = state(0, "300000000000", true);
+  const s1 = state(1, "310000000000", false);
+  const s2 = state(2, "320000000000", true);
+  const s3 = state(3, "330000000000", true);
+  const sheet = (st: unknown, prev: unknown) =>
+    aaveFamilySheet({ state: st as never, prev: prev as never, coords: {} as never, label: "Supply" });
+  const cards = [
+    { id: "a", timestamp: 1, sheet: sheet(s1, s0) },
+    { id: "b", timestamp: 2, sheet: sheet(s2, s1) },
+    { id: "c", timestamp: 3, sheet: sheet(s3, s2) },
+  ];
+  const middle = cards[0].sheet.sides[0].carry.find((r) => r.key === "market");
+  assert.equal(middle?.usd?.text, "—", "the unread member's Market move draws —");
+  const g = mergeGroupSheet(cards as never, "Supply");
+  assert.ok(g, "the group reads as one");
+  const mv = g!.sides[0].rows.find((r) => r.key === "group-market");
+  assert.equal(mv?.usd?.text, "—", "the group's Market move draws —");
+});

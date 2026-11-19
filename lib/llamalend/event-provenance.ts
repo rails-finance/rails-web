@@ -372,7 +372,8 @@ const EVENT_STATE_VIA = "GET /api/chain/llamalend/event-state";
 export const stateAtBlockProv = (
   figure: string,
   getter: string,
-  block: number,
+  /** Null where the event names no block: the receipt names none. */
+  block: number | null,
   coords: LlamalendCoords,
   raw?: string | null,
 ): Provenance => ({
@@ -380,10 +381,12 @@ export const stateAtBlockProv = (
   pclass: "state",
   verify: {
     kind: "recompute",
-    text: `Re-run the ${getter} eth_call at block ${block} against an archive node; it reproduces this figure exactly.`,
+    text: `Re-run the ${getter} eth_call at ${block != null ? `block ${block}` : "the read's block"} against an archive node; it reproduces this figure exactly.`,
   },
-  summary: `${figure} at block ${block} — ${getter}, read at ${
-    coords.blockNumber != null && block < coords.blockNumber ? "the block before this event" : "this event's block"
+  summary: `${figure}${block != null ? ` at block ${block}` : ""} — ${getter}, read at ${
+    block != null && coords.blockNumber != null && block < coords.blockNumber
+      ? "the block before this event"
+      : "this event's block"
   }.`,
   contract: controllerOf(coords),
   via: `${EVENT_STATE_VIA} · ${getter} @ ${block}${raw != null ? ` · raw: ${raw}` : ""}`,

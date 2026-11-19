@@ -30,6 +30,7 @@ import { fmtPositionAmount, fmtPositionUsd } from "@/components/shared/position-
 import type { FlowSide } from "@/lib/shared/flows-timeline";
 import { amountsUsd, cellOf, marketMoveUsd, type PricedAmount, type UsdCell } from "@/lib/shared/sheet-usd-rows";
 import { centsOf } from "@/lib/shared/shown-usd";
+import { NO_FIGURE } from "@/lib/shared/flows-sum";
 import { aaveV3PriceNote } from "@/lib/aave-v3/price-notes";
 import type { GroupLane } from "@/components/shared/group-sheet";
 import {
@@ -229,17 +230,27 @@ function sheetSide(
   const carry: SheetSide["carry"] = [];
   let beforeRow: SheetRow | undefined;
   const fresh = !!prev && prev.txHash.toLowerCase() !== state.txHash.toLowerCase();
-  if (fresh && usd?.before) {
+  // A side held before this transaction keeps its carry rows where a total
+  // is missing: each draws "—", so a group's sum is blocked (ui-jobs 743).
+  const heldBefore = reserves.some((r) => big(legOf(r, leg).before) > ZERO);
+  const unread = (what: string): UsdCell => ({
+    text: NO_FIGURE,
+    info: { kind: "derived", summary: `${what}. No dollar figure: the total was not read or not priced.` },
+    usd: null,
+  });
+  if (fresh && (usd?.before || heldBefore)) {
     const prevFacts = sideFacts(prev!, side);
     const prevUsd = sideUsd(side, prev!, prevCoords, prevFacts, undefined);
     const lastUsd = prevFacts.offSupply ? prevFacts.held : prevFacts.after;
-    if (prevUsd && lastUsd != null)
-      carry.push({
-        key: "last",
-        label: SHEET_WORDS.last,
-        usd: { text: prevUsd.after.text, info: prevUsd.after.prov, value: prevUsd.after.value },
-        tip: TIPS.last(side),
-      });
+    carry.push({
+      key: "last",
+      label: SHEET_WORDS.last,
+      usd:
+        prevUsd && lastUsd != null
+          ? { text: prevUsd.after.text, info: prevUsd.after.prov, value: prevUsd.after.value }
+          : cellOf(unread(`The ${side} once the previous transaction had run, in USD`)),
+      tip: TIPS.last(side),
+    });
     // Interest per reserve, at this block's price.
     const since = interestSincePrevious(state, prev);
     const parts = (side === "collateral" ? since?.collateral : since?.debt) ?? [];
@@ -287,17 +298,23 @@ function sheetSide(
     // total once the previous one had run, each as the Pool states it to the
     // cent, and the interest since, the sum of its shown products.
     const beforeUsd = facts.offSupply ? facts.heldBefore : facts.before;
-    if (lastUsd != null && beforeUsd != null && prevUsd && usd.before) {
+    {
       // With a supply's switch off, each total is the supplied balances'
-      // shown products (ui-jobs 743).
+      // shown products (ui-jobs 743); a total missing draws "—".
+      const beforeWhat = `The ${side} just before this transaction, in USD`;
+      const lastWhat = `The ${side} once the previous transaction had run, in USD`;
       const move = marketMoveUsd(
         `Market move on the ${side} since the previous event`,
         facts.offSupply
-          ? suppliedCell(state, "before", `The ${side} just before this transaction, in USD`)
-          : statedCell(beforeUsd, usd.before),
+          ? suppliedCell(state, "before", beforeWhat)
+          : beforeUsd != null && usd?.before
+            ? statedCell(beforeUsd, usd.before)
+            : unread(beforeWhat),
         prevFacts.offSupply
-          ? suppliedCell(prev!, "after", `The ${side} once the previous transaction had run, in USD`)
-          : statedCell(lastUsd, prevUsd.after),
+          ? suppliedCell(prev!, "after", lastWhat)
+          : lastUsd != null && prevUsd
+            ? statedCell(lastUsd, prevUsd.after)
+            : unread(lastWhat),
         interestCell,
       );
       if (move.usd == null || Math.abs(move.usd) >= 0.005)

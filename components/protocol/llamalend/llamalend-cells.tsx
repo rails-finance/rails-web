@@ -470,16 +470,8 @@ export function useLlamalendOpened({
   const sheet =
     read === undefined
       ? null
-      : state && f && coords.blockNumber != null
-        ? llamalendSheet({
-            ctx,
-            state,
-            f,
-            coords: { ...coords, blockNumber: coords.blockNumber },
-            previousStated,
-            collateralAddress,
-            borrowedAddress,
-          })
+      : state && f
+        ? llamalendSheet({ ctx, state, f, coords, previousStated, collateralAddress, borrowedAddress })
         : undefined;
 
   const ledgered = cells != null || flowsPending;

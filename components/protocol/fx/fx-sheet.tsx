@@ -309,7 +309,15 @@ export function useFxSheet({
   const collCarry: SheetSide["carry"] = [];
   // Set where the "Last" row and this block's rows stand on different legs.
   let legsNote: string | null = null;
-  if (prevColl != null && prevColl > DUST_COLL && prevPrice != null && prevPrice > 0) {
+  // A price missing at either event: the rows that need it draw "—", so a
+  // group's sum is blocked (ui-jobs 743).
+  const noFig = (what: string) => ({
+    text: NO_FIGURE,
+    info: { kind: "derived" as const, summary: `${what}. No dollar figure: ${noPriceWords([normalizedSymbol])}.` },
+  });
+  if (prevColl != null && prevColl > DUST_COLL) {
+    const pricedThen = prevPrice != null && prevPrice > 0;
+    const pricedNow = price != null && price > 0;
     collCarry.push({
       key: "last",
       label: SHEET_WORDS.last,
@@ -320,13 +328,15 @@ export function useFxSheet({
         info: prevCollProv(normalizedSymbol, prevColl, coords, pool),
         value: formatExact(prevColl),
       },
-      usd: usdCell(
-        collUsdAt(pool, "Collateral at the previous event, in USD", prevColl, prevPrice, prevBlock, "min-only"),
-      ),
+      usd: pricedThen
+        ? usdCell(
+            collUsdAt(pool, "Collateral at the previous event, in USD", prevColl, prevPrice, prevBlock, "min-only"),
+          )
+        : noFig("Collateral at the previous event, in USD"),
       tip: TIPS.collLast,
     });
     const movedColl = collBefore - prevColl;
-    if (Math.abs(movedColl) >= DUST_COLL && price != null && price > 0)
+    if (Math.abs(movedColl) >= DUST_COLL)
       collCarry.push({
         key: "moved",
         label: "Moved by the pool since last event",
@@ -343,17 +353,30 @@ export function useFxSheet({
           },
           value: formatExact(movedColl),
         },
-        usd: usdCell(
-          collUsdAt(pool, "Collateral the pool moved since the last event, in USD", movedColl, price, blockNumber, leg),
-          movedColl,
-        ),
+        usd: pricedNow
+          ? usdCell(
+              collUsdAt(
+                pool,
+                "Collateral the pool moved since the last event, in USD",
+                movedColl,
+                price,
+                blockNumber,
+                leg,
+              ),
+              movedColl,
+            )
+          : noFig("Collateral the pool moved since the last event, in USD"),
         tip: TIPS.collMoved,
       });
     // The difference of the two shown products where both stand on the
     // same leg; across the min then and the anchor now, no figure.
     const move =
-      price != null && price > 0
-        ? fxMarketMove(prevColl, { price: prevPrice, leg: "min" }, { price, leg: leg === "anchor" ? "anchor" : "min" })
+      pricedNow && pricedThen
+        ? fxMarketMove(
+            prevColl,
+            { price: prevPrice as number, leg: "min" },
+            { price: price as number, leg: leg === "anchor" ? "anchor" : "min" },
+          )
         : null;
     if (move && "none" in move) legsNote = move.none;
     // No price at this event, or the two prices on different legs: "—", so
@@ -388,7 +411,7 @@ export function useFxSheet({
                 { label: "collateral", value: `${amountText(prevColl)} ${normalizedSymbol}`, kind: "chain" },
                 {
                   label: "price at the previous event",
-                  value: priceText(prevPrice),
+                  value: priceText(prevPrice as number),
                   kind: "chain-derived",
                   pclass: "oracle",
                   note: `${FX_MIN_ONLY_NOTE}${prevBlock != null ? `, block ${prevBlock.toLocaleString("en-US")}` : ", at a block this read does not name"}`,
@@ -408,7 +431,7 @@ export function useFxSheet({
                 },
                 {
                   label: "collateral × price then",
-                  value: formatUsdValue(shownUsd(prevColl, prevPrice)),
+                  value: formatUsdValue(shownUsd(prevColl, prevPrice as number)),
                   kind: "derived",
                   step: true,
                 },
