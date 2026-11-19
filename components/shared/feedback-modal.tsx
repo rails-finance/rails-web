@@ -111,10 +111,7 @@ function FeedbackModalInner({ onClose, initialType = "bug", initialTitle = "" }:
   return (
     <div className="fixed inset-0 z-[var(--z-modal)] overflow-y-auto" onClick={onClose}>
       {/* Backdrop */}
-      <div
-        className="fixed inset-0 backdrop-blur-sm pointer-events-none"
-        style={{ background: "var(--backdrop-bg)" }}
-      />
+      <div className="fixed inset-0 pointer-events-none" style={{ background: "var(--backdrop-bg)" }} />
       {/* Centering wrapper */}
       <div className="relative min-h-full flex items-start sm:items-center justify-center p-4">
         <div

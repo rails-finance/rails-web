@@ -594,7 +594,7 @@ export function ProfileMenu() {
             {place.phone && (
               <div
                 aria-hidden="true"
-                className="fixed inset-0 z-[var(--z-popover)] bg-white/60 dark:bg-rb-950/70"
+                className="fixed inset-0 z-[var(--z-popover)] bg-[var(--backdrop-bg)]"
                 data-profile-menu-scrim=""
               />
             )}

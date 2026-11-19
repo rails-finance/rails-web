@@ -8,11 +8,12 @@
 //
 // Two registers, because two kinds of panel open here (Miles, 2026-09-02):
 //   - "modal": a definition to read (the coverage capability sheet). The page
-//     behind is not the point, so it dims and blurs, and the sheet may take
+//     behind is not the point, so it dims under the site's one scrim
+//     (--backdrop-bg, ui-jobs 770), and the sheet may take
 //     three-quarters of the viewport.
 //   - "live":  a filter whose every tap re-settles the list behind it. The
 //     list IS the point — the reader ticks a type and watches the timeline
-//     change — so the scrim is faint, nothing blurs, and the sheet stops at
+//     change — so the scrim is faint, and the sheet stops at
 //     half the viewport so the top of the list stays readable. This is the
 //     non-modal sheet Apple and Material both reserve for filters that apply
 //     as you go, as opposed to the Apply-button modal a commerce filter uses.
@@ -35,7 +36,7 @@ interface MobileSheetProps {
   /** aria-label for the dialog — what the sheet is showing. */
   label: string;
   onClose: () => void;
-  /** Blur-and-dim reading sheet (default) or the faint-scrim live filter. */
+  /** Dimmed reading sheet (default) or the faint-scrim live filter. */
   mode?: MobileSheetMode;
   /** Pinned above the scrolling body — a heading row, a live count — so a
    *  long option list scrolls underneath it rather than carrying it away. */
@@ -275,7 +276,7 @@ export function MobileSheet({
     <div className="fixed inset-0 z-[var(--z-modal)]">
       <div
         className={`absolute inset-0 transition-opacity duration-300 ${
-          live ? "bg-black/20" : "bg-black/50 backdrop-blur-sm"
+          live ? "bg-black/20" : "bg-[var(--backdrop-bg)]"
         } ${visible ? "opacity-100" : "opacity-0"}`}
         onClick={() => close()}
         aria-hidden="true"
@@ -289,8 +290,8 @@ export function MobileSheet({
         aria-modal={live ? undefined : "true"}
         aria-label={label}
         tabIndex={-1}
-        // The live sheet gets a hairline top edge: without the blur behind
-        // it, a dark sheet over a dark page has nothing else to mark where
+        // The live sheet gets a hairline top edge: over its faint scrim, a
+        // dark sheet over a dark page has nothing else to mark where
         // the list ends and the menu begins. In dark mode the sheet wears the
         // desktop dropdown's near-black (.overlay-panel) so it lifts off the
         // rb-800 cards beneath it. A sticky search row inside wears the sheet's
