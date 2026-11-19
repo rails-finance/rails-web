@@ -34,6 +34,8 @@
 //
 //   npx tsx --test scripts/verify/verify-liquity-flows.ts
 import { test } from "node:test";
+import { centsOfLines } from "./lib/cents-lines";
+import { shownUsd } from "@/lib/shared/shown-usd";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -207,13 +209,23 @@ function cursorStops(m: FlowModel): number[] {
   return [...stops].sort((a, b) => a - b);
 }
 
+/** The printed lines' sum and the total, in cents where the lines are (the
+ *  legs carry their parts, ui-jobs 743), else in whole dollars. */
+function linesAdd(r: {
+  lines: { dollars: number; cents?: number; unpriced?: string[]; amount: string; kind: string; none?: string }[];
+  total: { dollars: number; cents?: number };
+}): [number, number] {
+  if (r.total.cents != null) return [centsOfLines(r.lines, "liquity"), Math.round(r.total.cents * 100) || 0];
+  return [r.lines.reduce((a, l) => a + l.dollars, 0), r.total.dollars];
+}
+
 function assertSumsAdd(m: FlowModel, label: string, debtRest = "Interest since the last event") {
   for (const stop of cursorStops(m)) {
     const st = stateAt(m, stop);
     for (const side of ["collateral", "debt"] as const) {
       const rows = sideSumRows(st[side]);
-      const printed = rows.lines.reduce((a, l) => a + l.dollars, 0);
-      assert.equal(printed, rows.total.dollars, `${label} ${side} at stop ${stop}: lines add to the total`);
+      const [printed, total] = linesAdd(rows);
+      assert.equal(printed, total, `${label} ${side} at stop ${stop}: lines add to the total`);
       const rest = rows.lines.find((l) => l.kind === "rest");
       if (rest)
         assert.equal(
@@ -402,8 +414,8 @@ for (const [name, events, symbols, open, v1] of [
       for (const side of ["collateral", "debt"] as const) {
         const held = f.sides![side].after;
         const rows = eventSideSum(m, side, cum, held);
-        const printed = rows.lines.reduce((a, l) => a + l.dollars, 0);
-        assert.equal(printed, rows.total.dollars, `${name} ${f.id} ${side}: lines add to the total`);
+        const [printed, total] = linesAdd(rows);
+        assert.equal(printed, total, `${name} ${f.id} ${side}: lines add to the total`);
         assert.equal(rows.total.dollars, Math.round(held), `${name} ${f.id} ${side}: the total is the card's figure`);
         if (side === "debt") {
           // Interest is exact event by event: nothing is left for the remainder.
@@ -500,7 +512,15 @@ for (const [name, events, symbols, open, v1] of [
         const sum = eventTokenSum(m, focus, side, cum, f.id)!;
         const s = f.sides![side];
         const rows = eventSideSum(m, side, cum, s.after);
-        for (const usd of [null, { lines: rows.lines, dollars: rows.total.dollars, before: s.before }]) {
+        for (const usd of [
+          null,
+          {
+            lines: rows.lines,
+            dollars: rows.total.dollars,
+            before: s.before,
+            ...(rows.total.cents != null ? { cents: rows.total.cents } : {}),
+          },
+        ]) {
           const l = tokenLedger({ model: m, side, ev: f, sum, usd });
           const adds = ledgerAdds(l);
           assert.ok(adds.tokens, `${name} ${f.id} ${side}: the token rows add to the total`);
@@ -531,6 +551,7 @@ for (const [name, events, symbols, open, v1] of [
           lines: rows.lines,
           dollars: rows.total.dollars,
           before: s.before,
+          ...(rows.total.cents != null ? { cents: rows.total.cents } : {}),
         });
         assert.ok(ledgerAdds(d).usd, `${name} ${f.id} ${side}: the ledger in dollars adds`);
       }
@@ -682,10 +703,7 @@ for (const [name, events, symbols] of [
         let ri = -1;
         for (let i = 0; i < m.rows.length && m.rows[i].day <= stop; i++) ri = i;
         const rows = sideSumRows(sideStateFor(m, "debt", m.rows[ri].cum, debt.held));
-        assert.equal(
-          rows.lines.reduce((a, l) => a + l.dollars, 0),
-          rows.total.dollars,
-        );
+        assert.equal(...linesAdd(rows));
       }
     }
     assert.ok(checked > 0, "days between events");
@@ -865,12 +883,28 @@ for (const [name, events, , open] of V1_CASES) {
       const st = stateAt(m, stop);
       for (const side of ["collateral", "debt"] as const) {
         const rows = sideSumRows(st[side]);
-        assert.equal(
-          rows.lines.reduce((a, l) => a + l.dollars, 0),
-          rows.total.dollars,
-          `${name} ${side} at stop ${stop}`,
-        );
+        assert.equal(...linesAdd(rows), `${name} ${side} at stop ${stop}`);
       }
     }
   });
 }
+
+// The legs carry their parts (ui-jobs 743): collateral at the branch
+// PriceFeed's price as shown, at its block (a borrowed price naming both
+// blocks); debt at its $1 face; each leg its shown product.
+test("V2 WETH, redeemed: each leg is its shown product, its price named", () => {
+  let coll = 0;
+  for (const f of liquityFocusEvents(REDEEMED, "WETH", "BOLD"))
+    for (const l of f.legs) {
+      assert.equal(l.usd, l.price == null ? null : shownUsd(l.amount!, l.price), `${f.id}: the shown product`);
+      if (l.symbol === "BOLD") {
+        assert.equal(l.face, true);
+        assert.equal(l.price, 1);
+        continue;
+      }
+      coll++;
+      assert.match(l.priceNote!, /the branch PriceFeed's price(, price)? at block [\d,]+/);
+      if (l.priceNote!.includes("nearest read")) assert.match(l.priceNote!, /this event is at block [\d,]+$/);
+    }
+  assert.ok(coll > 0);
+});

@@ -28,8 +28,9 @@
 //
 // Pure: tested offline in scripts/verify/verify-liquity-flows.ts.
 
-import type { FlowBucket, FlowDayRow, FlowEvent, FlowTimeline } from "@/lib/shared/flows-timeline";
-import { daysFromEvents } from "@/lib/shared/flows-timeline";
+import type { FlowBucket, FlowDayRow, FlowEvent, FlowLeg, FlowTimeline } from "@/lib/shared/flows-timeline";
+import { daysFromEvents, flowLeg } from "@/lib/shared/flows-timeline";
+import { shownUsd } from "@/lib/shared/shown-usd";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
 import type { BaseActivityEvent, LiquityForkPriceAtBlock } from "@/lib/shared/types/event-shape";
 import { isLiquityEvent } from "@/lib/shared/types/event-shape";
@@ -294,7 +295,48 @@ export interface LiquityReplayed {
   price: number;
   /** The price was the nearest recorded one, not the event's own. */
   borrowedPrice: boolean;
+  /** The block the price was recorded at (the event's own, or the one it
+   *  borrowed from), where known (ui-jobs 743). */
+  priceBlock: number | null;
   legs: { bucket: string; amount: number }[];
+}
+
+/** A Trove's leg with its parts (ui-jobs 743): collateral at the branch
+ *  PriceFeed's price as shown, at its block, a borrowed price naming both
+ *  blocks; debt at its $1 face. */
+function liquityLeg(
+  r: LiquityReplayed,
+  l: { bucket: string; amount: number },
+  collSymbol: string,
+  debtSymbol: string,
+  family: LiquityFamily,
+): FlowLeg {
+  if (!COLL_BUCKETS.has(l.bucket))
+    return flowLeg({
+      bucket: l.bucket,
+      amount: l.amount,
+      symbol: debtSymbol,
+      price: 1,
+      priceNote: `$1, ${debtSymbol}'s face: one ${debtSymbol} counts as one dollar`,
+      face: true,
+      ...(l.bucket === LQ.interest || l.bucket === LQ.batchFee ? { accrual: true } : {}),
+    });
+  const n = (b: number) => b.toLocaleString("en-US");
+  const feed = family === "v1" ? "Liquity's PriceFeed lastGoodPrice" : "the branch PriceFeed's price";
+  const at = r.ev.block;
+  const note = !r.borrowedPrice
+    ? `${feed} at block ${n(at)}`
+    : r.priceBlock != null
+      ? `${feed}, price at block ${n(r.priceBlock)}, the nearest read; this event is at block ${n(at)}`
+      : `${feed}, the nearest read, a block the record does not name; this event is at block ${n(at)}`;
+  return flowLeg({
+    bucket: l.bucket,
+    amount: l.amount,
+    symbol: collSymbol,
+    price: r.price > 0 ? r.price : null,
+    block: r.borrowedPrice ? r.priceBlock : at,
+    priceNote: note,
+  });
 }
 
 /** An event id's log index (`${txHash}_${logIndex}`), for events in one block. */
@@ -338,8 +380,10 @@ export function replayLiquity(events: LiquityFlowEvent[]): LiquityReplayed[] {
   );
   // A row the filler has not priced takes the last recorded price before it,
   // else the first after it.
-  const firstPrice = sorted.find((e) => e.price != null && e.price > 0)?.price ?? 0;
+  const firstPriced = sorted.find((e) => e.price != null && e.price > 0);
+  const firstPrice = firstPriced?.price ?? 0;
   let lastPrice = firstPrice;
+  let lastBlock: number | null = firstPriced?.block ?? null;
   let collBefore = 0;
   let debtBefore = 0;
   let rate = 0;
@@ -347,7 +391,10 @@ export function replayLiquity(events: LiquityFlowEvent[]): LiquityReplayed[] {
   const out: LiquityReplayed[] = [];
   for (const ev of sorted) {
     const own = ev.price != null && ev.price > 0;
-    if (own) lastPrice = ev.price as number;
+    if (own) {
+      lastPrice = ev.price as number;
+      lastBlock = ev.block ?? null;
+    }
     const legs: { bucket: string; amount: number }[] = [];
     const add = (bucket: string, amount: number) => {
       if (Math.abs(amount) > DUST) legs.push({ bucket, amount });
@@ -397,7 +444,13 @@ export function replayLiquity(events: LiquityFlowEvent[]): LiquityReplayed[] {
       if (debtOp > 0) add(LQ.borrowed, debtOp);
       else add(LQ.repaid, -debtOp);
     }
-    out.push({ ev, price: own ? (ev.price as number) : lastPrice, borrowedPrice: !own, legs });
+    out.push({
+      ev,
+      price: own ? (ev.price as number) : lastPrice,
+      borrowedPrice: !own,
+      priceBlock: own ? (ev.block ?? null) : lastBlock,
+      legs,
+    });
     collBefore = ev.collAfter;
     debtBefore = ev.debtAfter;
     rate = ev.rate;
@@ -489,7 +542,8 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
   const debt = `debt:${o.debtSymbol}`;
   const family = o.family ?? "v2";
   const buckets = liquityFlowBuckets(o.surplusClaimed, family);
-  const flowEvents: FlowEvent[] = replayed.map(({ ev, price, legs, borrowedPrice }) => {
+  const flowEvents: FlowEvent[] = replayed.map((row) => {
+    const { ev, price, legs, borrowedPrice } = row;
     const moved = { coll: false, debt: false };
     for (const l of legs) {
       if (l.bucket === LQ.interest || l.bucket === LQ.batchFee) continue;
@@ -528,11 +582,7 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
                   : moved.coll
                     ? "collateral"
                     : "debt",
-      legs: legs.map((l) =>
-        COLL_BUCKETS.has(l.bucket)
-          ? { bucket: l.bucket, usd: l.amount * price, symbol: o.collSymbol }
-          : { bucket: l.bucket, usd: l.amount, symbol: o.debtSymbol },
-      ),
+      legs: legs.map((l) => liquityLeg(row, l, o.collSymbol, o.debtSymbol, family)),
       tx: ev.tx,
       // The card counts the owner's transactions; a redemption or a
       // liquidation is another party's.
@@ -828,28 +878,18 @@ export function liquityFocusEvents(
     return {
       id: r.ev.id,
       ts: r.ev.ts,
-      legs: r.legs.map((l) =>
-        COLL_BUCKETS.has(l.bucket)
-          ? { bucket: l.bucket, usd: l.amount * r.price, amount: l.amount, symbol: collSymbol }
-          : {
-              bucket: l.bucket,
-              usd: l.amount,
-              amount: l.amount,
-              symbol: debtSymbol,
-              ...(l.bucket === LQ.interest || l.bucket === LQ.batchFee ? { accrual: true } : {}),
-            },
-      ),
+      legs: r.legs.map((l) => liquityLeg(r, l, collSymbol, debtSymbol, family)),
       sides: {
         collateral: {
-          before: Math.max(0, collAfter - collMove) * r.price,
-          after: collAfter * r.price,
+          before: shownUsd(Math.max(0, collAfter - collMove), r.price),
+          after: shownUsd(collAfter, r.price),
           amount: collMove,
           symbol: collSymbol,
           held: collAfter,
         },
         debt: {
-          before: Math.max(0, debtAfter - debtMove),
-          after: debtAfter,
+          before: shownUsd(Math.max(0, debtAfter - debtMove), 1),
+          after: shownUsd(debtAfter, 1),
           amount: debtMove,
           symbol: debtSymbol,
           held: debtAfter,

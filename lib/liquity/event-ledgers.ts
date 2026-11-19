@@ -44,7 +44,14 @@ export function liquityEventLedger(
     side,
     ev,
     sum,
-    usd: rows ? { lines: rows.lines, dollars: rows.total.dollars, before: f.before } : null,
+    usd: rows
+      ? {
+          lines: rows.lines,
+          dollars: rows.total.dollars,
+          before: f.before,
+          ...(rows.total.cents != null ? { cents: rows.total.cents } : {}),
+        }
+      : null,
     ...(cum.exact ? { accrualLabel: liquityAccrualLabel } : {}),
   });
   return { ledger, exact: cum.exact };
