@@ -33,7 +33,9 @@ import {
 } from "@/lib/yearn/vault-provenance";
 import { poolNavRateProv, poolTotalAssetsProv } from "@/lib/maple/event-provenance";
 import { vaultIndexProtocol } from "@/lib/vaults/index-rosters";
-import { sboldSharePriceProv, sboldTotalAssetsProv } from "@/lib/liquity-v2/sbold-provenance";
+import { sboldPerShareProv, sboldTotalAssetsProv } from "@/lib/liquity-v2/sbold-provenance";
+import { perShareFace } from "@/lib/liquity-v2/sbold-per-share";
+import { assetText, shareText } from "@/lib/shared/vault-amount-text";
 import { vaultDisplayName, type VaultSummary } from "@/lib/vaults/summary";
 
 /** The roster read a row's receipts name. */
@@ -120,9 +122,26 @@ export function vaultIndexRowReceipts(read: RosterRead, v: VaultSummary): VaultR
     case "maple":
       return mapleRowReceipts(read, v);
     case "sbold": {
-      // sBOLD's row: the page's head read (ui-jobs 765).
+      // sBOLD's row: the page's head read; its share-price cell is total
+      // assets ÷ shares issued, with that division's receipt (ui-jobs 765).
       const c = { readBy: read.readBy, blockNumber: read.blockNumber || v.readAt.block || undefined };
-      return { totalAssets: sboldTotalAssetsProv(c), sharePrice: sboldSharePriceProv(c) };
+      const ratio =
+        v.totalAssets && v.totalSupply && v.shareDecimals != null
+          ? perShareFace(v.totalAssets.raw, v.totalSupply.raw, v.asset.decimals, v.shareDecimals)
+          : null;
+      return {
+        totalAssets: sboldTotalAssetsProv(c),
+        sharePrice:
+          ratio != null && v.totalAssets && v.totalSupply && v.shareDecimals != null
+            ? sboldPerShareProv(c, {
+                assets: assetText(v.totalAssets, v.asset.decimals),
+                supply: shareText(v.totalSupply, v.shareDecimals),
+                assetsRaw: v.totalAssets.raw,
+                supplyRaw: v.totalSupply.raw,
+                ratio,
+              })
+            : undefined,
+      };
     }
   }
 }

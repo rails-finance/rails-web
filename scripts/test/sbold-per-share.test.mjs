@@ -87,3 +87,10 @@ test("the share price as the sBOLD page and its /vaults row print it (ui-jobs 76
   assert.equal(sboldPriceFace("100000000000000"), null);
   assert.equal(sboldPriceFace("1096059000000000000"), null);
 });
+
+test("the /vaults row's per-share face (ui-jobs 765)", async () => {
+  const { perShareFace } = await import("../../lib/liquity-v2/sbold-per-share.ts");
+  assert.equal(perShareFace("4536142689132635456", "43719935839791186313206357993620281274", 18, 18), "1.038 × 10⁻¹⁹");
+  assert.equal(perShareFace("1050000000000000000", "1000000000000000000", 18, 18), "1.05");
+  assert.equal(perShareFace("5", "0", 18, 18), null);
+});

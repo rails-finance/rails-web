@@ -127,3 +127,18 @@ export function sboldPriceFace(raw: string, assetDecimals = 18): string | null {
   const sci = perShareScientific(raw, (BigInt(10) ** BigInt(18)).toString(), assetDecimals, 18);
   return sci ? scientificText(sci.mantissa, sci.exponent) : null;
 }
+
+/** totalAssets ÷ totalSupply as the sBOLD page's stat prints it: scientific
+ *  below 0.0001, else the four-digit decimal; null over a zero supply
+ *  (ui-jobs 765). */
+export function perShareFace(
+  assetsRaw: string,
+  supplyRaw: string,
+  assetDecimals: number,
+  shareDecimals: number,
+): string | null {
+  const sci = perShareScientific(assetsRaw, supplyRaw, assetDecimals, shareDecimals);
+  return sci
+    ? scientificText(sci.mantissa, sci.exponent)
+    : perShareText(assetsRaw, supplyRaw, assetDecimals, shareDecimals);
+}
