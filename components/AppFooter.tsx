@@ -1,12 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { FeedbackCluster } from "@/components/shared/feedback-cluster";
 import { LwNotice } from "@/components/shared/lw-attribution";
 
 /** Slim app footer used on protocol pages (/liquity-v2, /trove/*).
- *  Single row: copyright + legal on the left, the shared feedback cluster
- *  (heading + ask + teal Send-feedback pill) on the right. No ground of its
+ *  Single row: copyright + legal. Feedback is the floating button's (H26,
+ *  ui-jobs 769). No ground of its
  *  own: the page's ground runs through it, and a hairline at its top, as wide
  *  as the text, is the division (Miles, 12 Nov 2026; ui-jobs 602). The "Built
  *  with support from Liquity" credit has been retired from this surface — it
@@ -32,9 +31,6 @@ export function AppFooter() {
                 </Link>
               </div>
             </div>
-            {/* The shared feedback cluster (its own modal state) — the slim
-              inline variant: no heading, ask + pill on one row in small text. */}
-            <FeedbackCluster variant="inline" />
           </div>
           {/* The charts' attribution (Lightweight Charts' licence), on every page. */}
           <p

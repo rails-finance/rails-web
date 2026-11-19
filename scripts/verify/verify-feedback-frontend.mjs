@@ -1,16 +1,17 @@
-// Live in-browser verification of the footer feedback modal (plan §7 UI
+// Live in-browser verification of the feedback form (H27) opened from the
+// floating feedback button (H26, ui-jobs 769; the footers' trigger is gone) (plan §7 UI
 // checks). Run against the dev server:  node scripts/verify/verify-feedback-frontend.mjs
 // (claude-in-chrome cannot reach localhost — this script is the check.)
 //
 // Checklist:
-//   1. SiteFooter (home): "Send feedback" trigger opens the modal.
+//   1. Home: the floating button opens the modal; the footer has no trigger.
 //   2. Category pills switch; the Title field hides on Correctness.
 //   3. Description counter updates live (n/2000).
 //   4. Honeypot input exists in the DOM, invisible, unfocusable and hidden
 //      from assistive tech — and empty, which is what makes it a trap.
 //   5. Body scroll is free before opening, locks while open, and is restored
 //      by Esc.
-//   6. AppFooter (/ethereum/liquity-v2): the same modal opens from the slim footer.
+//   6. An app route (/ethereum/liquity-v2): the same modal opens from the button.
 //   7. Page line auto-captures the current pathname.
 //   8. Mobile width (375px) renders the modal inside the viewport.
 //   9. Zero pageerrors throughout.
@@ -67,11 +68,14 @@ const page = await browser.newPage();
 const pageErrors = [];
 page.on("pageerror", (e) => pageErrors.push(String(e)));
 
-// ── 1. SiteFooter (home) ─────────────────────────────────────────────────────
+// ── 1. The button (home) ─────────────────────────────────────────────────────
 await page.goto(`${BASE}/`, { waitUntil: "domcontentloaded", timeout: 240000 });
-const siteTrigger = page.locator('footer button:has-text("Send feedback")').first();
-await siteTrigger.scrollIntoViewIfNeeded();
-check("1. SiteFooter trigger present", (await siteTrigger.count()) > 0);
+const siteTrigger = page.locator("[data-feedback-button]");
+check("1. the feedback button is present", (await siteTrigger.count()) === 1);
+check(
+  "1. the site footer has no feedback trigger",
+  (await page.locator('footer button:has-text("Send feedback")').count()) === 0,
+);
 
 // ── 5a. Body scroll is FREE before the modal exists ──────────────────────────
 // The other half of the lock. "overflow is hidden while open" says nothing on a
@@ -80,7 +84,7 @@ check("1. SiteFooter trigger present", (await siteTrigger.count()) > 0);
 const overflowBefore = await page.evaluate(() => document.body.style.overflow);
 check("5. body scrolls freely before the modal opens", overflowBefore !== "hidden", `overflow="${overflowBefore}"`);
 
-check("1. modal opens from SiteFooter", await openModal(page, siteTrigger));
+check("1. modal opens from the button", await openModal(page, siteTrigger));
 
 // ── 5b. Body scroll lock while open ──────────────────────────────────────────
 const overflowOpen = await page.evaluate(() => document.body.style.overflow);
@@ -92,7 +96,7 @@ check("7. page line auto-captures pathname", pageLine === "Page: /", `"${pageLin
 
 // ── 2. Pills switch; Title hides on Correctness ──────────────────────────
 const titleInput = page.locator(`${DIALOG} input[placeholder="Short summary"]`);
-check("2. Title field visible on Bug (default)", await titleInput.isVisible());
+check("2. Title field visible on General (the button's default)", await titleInput.isVisible());
 await page.click(`${DIALOG} button[role="tab"]:has-text("Correctness")`);
 await pause(150);
 check("2. Title field hides on Correctness", (await titleInput.count()) === 0);
@@ -143,13 +147,16 @@ check("5. Esc closes the modal", (await page.locator(DIALOG).count()) === 0);
 const overflowClosed = await page.evaluate(() => document.body.style.overflow);
 check("5. body scroll restored on close", overflowClosed !== "hidden", `overflow="${overflowClosed}"`);
 
-// ── 6. AppFooter (/ethereum/liquity-v2) ──────────────────────────────────────
+// ── 6. The button on an app route (/ethereum/liquity-v2) ─────────────────────
 const APP_ROUTE = "/ethereum/liquity-v2";
 await page.goto(`${BASE}${APP_ROUTE}`, { waitUntil: "domcontentloaded", timeout: 240000 });
-const appTrigger = page.locator('footer button:has-text("Send feedback")').first();
-await appTrigger.scrollIntoViewIfNeeded();
-check("6. AppFooter trigger present", (await appTrigger.count()) > 0);
-check("6. modal opens from AppFooter", await openModal(page, appTrigger));
+const appTrigger = page.locator("[data-feedback-button]");
+check("6. the feedback button is present", (await appTrigger.count()) === 1);
+check(
+  "6. the app footer has no feedback trigger",
+  (await page.locator('footer button:has-text("Send feedback")').count()) === 0,
+);
+check("6. modal opens from the button", await openModal(page, appTrigger));
 const appPageLine = (await page.textContent('[data-testid="feedback-page-line"]'))?.trim();
 const landedPath = new URL(page.url()).pathname;
 // Two claims. The line is CAPTURED (it agrees with the address bar the browser

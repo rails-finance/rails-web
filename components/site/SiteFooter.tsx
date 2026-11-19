@@ -6,7 +6,6 @@ import { LwNotice } from "@/components/shared/lw-attribution";
 import { Activity, DraftingCompass, FileText, Home, Info, LayoutGrid, ReceiptText, Signpost } from "lucide-react";
 import { INPLACE_TEXT, NAV_LINK } from "@/lib/shared/ui-grammar";
 import { DonateModal } from "@/components/site/DonateModal";
-import { FeedbackCluster } from "@/components/shared/feedback-cluster";
 import { LiquityModal } from "@/components/site/LiquityModal";
 import { useIsHome } from "@/hooks/useIsHome";
 
@@ -170,11 +169,11 @@ export function SiteFooter() {
             {/* The third column stays empty: room in a busy footer (Miles, 6 Nov 2026). */}
             <div aria-hidden="true" className="max-md:hidden" />
 
-            {/* Feedback, the ask, and under it the donation address, which opens
-              the donate modal in place (teal, the in-place hue). */}
+            {/* The donation address, which opens the donate modal in place
+              (teal, the in-place hue). Feedback is the floating button's (H26,
+              ui-jobs 769). */}
             <div>
-              <FeedbackCluster />
-              <p className="body-text mt-4">
+              <p className="body-text">
                 Support Rails at{" "}
                 <button
                   type="button"
