@@ -392,7 +392,7 @@ export function useLiquityCells({
               note: "after",
             },
             ...priceInput.map((p) => ({ ...p, value: priceText(collPrice) })),
-            { ...productRow(l2.coll.after, collPrice), label: "collateral × price", note: "to the cent" },
+            { ...productRow(l2.coll.after, collPrice), label: "collateral × price" },
           ],
         }
       : undefined;
@@ -414,7 +414,7 @@ export function useLiquityCells({
               value: priceText(l2.coll.beforePrice),
               note: l2.coll.beforePrice !== collPrice ? "the price the liquidation used" : p.note,
             })),
-            { ...productRow(l2.coll.before, l2.coll.beforePrice), label: "collateral × price", note: "to the cent" },
+            { ...productRow(l2.coll.before, l2.coll.beforePrice), label: "collateral × price" },
           ],
         }
       : undefined;
@@ -865,6 +865,7 @@ export function useLiquityCells({
                 afterCollInUsd,
                 beforeCollAtEventUsd,
                 redistUsd,
+                eventUsd,
                 Boolean(isLiquidation && liquidation),
               ),
             }
@@ -905,7 +906,7 @@ export function useLiquityCells({
         label: SHEET_WORDS.market,
         usd: {
           ...centsParts(marketUsd, true),
-          info: marketMoveProv(collSym, beforeCollAtEventUsd, lastUsd),
+          info: marketMoveProv(collSym, beforeCollAtEventUsd, lastUsd, marketUsd),
         },
         tip: TIP.collMarket,
       });
@@ -1283,19 +1284,34 @@ function usdMoveProv(sym: string, amount: number, price: number): Provenance {
 
 /** The event's own row on the sheet: what takes the balance before to the
  *  balance after, in dollars, less any redistribution. */
-function eventMoveUsdProv(sym: string, total: number, before: number, redist: number, liquidation = false): Provenance {
+function eventMoveUsdProv(
+  sym: string,
+  total: number,
+  before: number,
+  redist: number,
+  moved: number,
+  liquidation = false,
+): Provenance {
+  const formula = redist !== 0 ? "total − before − redistribution" : "total − before";
   return {
     kind: "derived",
     summary: liquidation
       ? `${sym} this liquidation moved, in US dollars. The balance after at Liquity's price for ${sym} at this block, less the balance before and any redistribution at the price the liquidation used, to the cent, shown to the dollar.`
       : `${sym} this event moved, in US dollars. The balance after less the balance before and any redistribution, each at Liquity's price for ${sym} at this block, to the cent, shown to the dollar.`,
-    formula: redist !== 0 ? "total − before − redistribution" : "total − before",
+    formula,
     inputs: [
       { label: "total", value: formatUsdValue(total), kind: "derived", step: true },
       { label: "before", value: formatUsdValue(before), kind: "derived", step: true },
       ...(redist !== 0
         ? [{ label: "redistribution", value: formatUsdValue(redist), kind: "derived" as const, step: true as const }]
         : []),
+      {
+        label: formula,
+        value: `${moved < 0 ? "−" : ""}${formatUsdValue(Math.abs(moved))}`,
+        kind: "derived",
+        step: true,
+        note: `to the cent, shown as ${sheetUsd(moved)}`,
+      },
     ],
   };
 }
@@ -1317,7 +1333,7 @@ function atPriceProv(sym: string, amount: number, price: number, when: string): 
 /** The collateral's move in dollars from the previous event's price to this
  *  event's: the balance before at this event's price less the same balance at
  *  the previous event's (the sheet's Before − Last). */
-function marketMoveProv(sym: string, before: number, last: number): Provenance {
+function marketMoveProv(sym: string, before: number, last: number, moved: number): Provenance {
   return {
     kind: "derived",
     summary: `Market move. The change in Liquity's price for ${sym} from the previous event to this one, on the ${sym} the Trove held between them, to the cent, shown to the dollar. No ${sym} moved.`,
@@ -1325,6 +1341,13 @@ function marketMoveProv(sym: string, before: number, last: number): Provenance {
     inputs: [
       { label: "before", value: formatUsdValue(before), kind: "derived", step: true },
       { label: "last", value: formatUsdValue(last), kind: "derived", step: true },
+      {
+        label: "before − last",
+        value: `${moved < 0 ? "−" : ""}${formatUsdValue(Math.abs(moved))}`,
+        kind: "derived",
+        step: true,
+        note: `to the cent, shown as ${sheetUsd(moved, true)}`,
+      },
     ],
   };
 }
