@@ -54,6 +54,7 @@ import {
 import { SELF_LIQUIDATION_LABEL } from "./alchemix-event-header";
 import { ltvExact, ltvOfCollateralization, ltvPct, ltvPrint } from "@/lib/alchemix/ltv";
 import { shownUsd } from "@/lib/shared/shown-usd";
+import { faceParts } from "@/lib/shared/sheet-usd-rows";
 
 const WORDS = {
   ltv: "LTV",
@@ -316,7 +317,7 @@ export function alchemixSheet({
         },
         usd: face
           ? {
-              text: sheetUsd(units(dDebt)),
+              ...faceParts(units(dDebt)),
               info: faceProv("The debt this event moved", sym, formatUnitsExact(abs(dDebt).toString(), DECIMALS)),
             }
           : undefined,
@@ -362,7 +363,7 @@ export function alchemixSheet({
           },
           usd: face
             ? {
-                text: sheetUsd(units(signed)),
+                ...faceParts(units(signed)),
                 info: faceProv("The synthetic the log states", sym, formatUnitsExact(raw, DECIMALS)),
               }
             : undefined,
@@ -479,9 +480,8 @@ export function alchemixSheet({
     : debtAfter === ZERO
       ? { text: "$0", info: reading("Debt", sym, state.debtRaw) }
       : {
-          text: sheetUsd(shownUsd(units(debtAfter), 1)),
+          ...faceParts(units(debtAfter)),
           info: faceProv("Debt after this event", sym, formatUnitsExact(state.debtRaw, DECIMALS)),
-          cents: shownUsd(units(debtAfter), 1),
         };
 
   // Earmarked: part of the debt, stated at this block alone (decisions/0032).

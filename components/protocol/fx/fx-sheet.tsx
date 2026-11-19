@@ -53,6 +53,7 @@ import { FX_POOLS, FXUSD_META, isFxPoolKey } from "@/lib/fx/asset-catalog";
 import { fxBeforeAfter, useFxEventStateRead } from "@/lib/fx/use-event-state";
 import { formatExact, formatNumber } from "@/lib/utils/format";
 import { FX_DUST_USD } from "./fx-cells";
+import { centsParts, faceParts } from "@/lib/shared/sheet-usd-rows";
 
 /** The rows' read-more, one sentence each. */
 const TIPS = {
@@ -360,7 +361,7 @@ export function useFxSheet({
           key: "market",
           label: SHEET_WORDS.market,
           usd: {
-            text: sheetUsd(mv, true),
+            ...centsParts(mv, true),
             info: {
               kind: "chain-derived",
               pclass: "oracle",
@@ -416,7 +417,7 @@ export function useFxSheet({
     rows: collRows,
     total:
       collAfterUsd != null
-        ? { text: collAfter > 0 ? sheetUsd(collAfterUsd) : "$0", info: collAfterR!.prov }
+        ? { text: collAfter > 0 ? sheetUsd(collAfterUsd) : "$0", cents: collAfterUsd, info: collAfterR!.prov }
         : { none: UNREAD },
     totalAmount: {
       text: formatNumber(collAfter),
@@ -445,7 +446,7 @@ export function useFxSheet({
           : chainChangeProv("debt", normalizedSymbol, coords),
         value: formatExact(debtMove),
       },
-      usd: { text: sheetUsd(debtMove), info: faceProv("The debt this event moved", coords) },
+      usd: { ...faceParts(debtMove), info: faceProv("The debt this event moved", coords) },
       tip: debtTip,
     });
   const debtCarry: SheetSide["carry"] = [];
@@ -461,7 +462,7 @@ export function useFxSheet({
         info: debtLastProv(coords),
         value: formatExact(last),
       },
-      usd: { text: sheetUsd(last), info: faceProv("The debt at the previous event", coords) },
+      usd: { ...faceParts(last), info: faceProv("The debt at the previous event", coords) },
       tip: TIPS.debtLast,
     });
     debtCarry.push({
@@ -474,7 +475,7 @@ export function useFxSheet({
         info: debtSincePreviousProv(coords),
         value: formatExact(since),
       },
-      usd: { text: sheetUsd(since), info: faceProv("The debt the pool moved", coords) },
+      usd: { ...faceParts(since), info: faceProv("The debt the pool moved", coords) },
       tip: TIPS.debtMoved,
     });
   } else if (!opened && prev?.debtAfter != null && Number(prev.debtAfter) > 0) {
@@ -495,7 +496,7 @@ export function useFxSheet({
         },
         value: formatExact(last),
       },
-      usd: { text: sheetUsd(last), info: faceProv("The debt at the previous event", coords) },
+      usd: { ...faceParts(last), info: faceProv("The debt at the previous event", coords) },
       tip: TIPS.debtLastRead,
     });
   }
@@ -517,13 +518,14 @@ export function useFxSheet({
                 : chainBeforeProv("debt", normalizedSymbol, coords, false),
               value: formatExact(debtBefore),
             },
-            usd: { text: sheetUsd(debtBefore), info: faceProv("The debt before this event", coords) },
+            usd: { ...faceParts(debtBefore), info: faceProv("The debt before this event", coords) },
             tip: TIPS.debtBefore,
           }
         : undefined,
     rows: debtRows,
     total: {
-      text: debtAfter > 0 ? sheetUsd(debtAfter) : "$0",
+      text: debtAfter > 0 ? faceParts(debtAfter).text : "$0",
+      cents: faceParts(debtAfter).cents,
       info: faceProv("The debt after this event", coords),
     },
     totalAmount: {
@@ -586,7 +588,7 @@ export function useFxSheet({
             ? { none: "No debt" }
             : tickPrice != null
               ? {
-                  text: sheetUsd(tickPrice),
+                  text: priceText(tickPrice),
                   info: minTriggerPriceProv(pool, `the pool's rebalance line, ${lineText(rebLine!)}`, normalizedSymbol),
                   value: formatExact(tickPrice),
                 }
@@ -594,7 +596,7 @@ export function useFxSheet({
       change:
         tickPrice != null && prevTick != null
           ? {
-              text: changeText(tickPrice - prevTick, (x) => sheetUsd(x)),
+              text: changeText(tickPrice - prevTick, (x) => priceText(x)),
               info: {
                 kind: "derived",
                 summary:

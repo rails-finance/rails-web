@@ -188,3 +188,68 @@ test("a group's dollar row is the sum of its members' cents", async () => {
   const mixed = mergeGroupSheet([card("a", 1.49, "$1.49"), card("b", undefined, "$1.49")] as never, "Supply")!;
   assert.ok(!mixed.sides[0].rows.some((r) => r.key.startsWith("group") && r.usd));
 });
+
+// Every family's sheet cells carry their rows' cents (ui-jobs 743), so a
+// group's dollar row sums cents for each: the $1-face debts (Liquity, forks,
+// V1, Maker, f(x), Sky, Alchemix's alUSD), the shown products at a price
+// named with its block (fork and V1 collateral, gas escrow), and figures
+// already in cents (Liquity V2's collateral, Maker, Polaris, f(x)).
+test("each family's cells carry cents, and a group sums them", async () => {
+  const { mergeGroupSheet } = await import("@/components/shared/group-sheet");
+  const { faceParts, centsParts, priceCell } = await import("@/lib/shared/sheet-usd-rows");
+  const { shownUsd } = await import("@/lib/shared/shown-usd");
+  const { readFileSync } = await import("node:fs");
+  const kinds = {
+    face: (x: number) => ({ ...faceParts(x), info: { kind: "derived" as const, summary: "s" } }),
+    cents: (x: number) => ({ ...centsParts(x), info: { kind: "derived" as const, summary: "s" } }),
+    priced: (x: number) =>
+      priceCell(
+        "Collateral",
+        { symbol: "ETH", amount: x, price: 3456.789012, block: 1, priceNote: "n" },
+        { amountNote: "a", via: "v" },
+      ),
+  };
+  const sheetOf = (usd: object) => ({
+    sides: [
+      {
+        side: "collateral" as const,
+        icons: ["ETH"],
+        carry: [],
+        rows: [{ key: "event", label: "Move", amount: { text: "1", symbol: "ETH", value: "1" }, usd }],
+        total: { text: "$0" },
+      },
+    ],
+    panels: [],
+  });
+  for (const [kind, cell] of Object.entries(kinds)) {
+    const a = cell(1.2345678);
+    const b = cell(12.4999999);
+    const g = mergeGroupSheet(
+      [
+        { id: "a", timestamp: 0, sheet: sheetOf(a) },
+        { id: "b", timestamp: 0, sheet: sheetOf(b) },
+      ] as never,
+      "Move",
+    )!;
+    const row = g.sides[0].rows.find((r) => r.usd)!;
+    assert.equal(row.usd!.cents, Math.round((a.cents! + b.cents!) * 100) / 100, `${kind}: the members' cents`);
+  }
+  assert.equal(kinds.face(12.4999999).cents, shownUsd(12.4999999, 1));
+  // No sheet cell in these families prints a dollar figure without its cents.
+  for (const f of [
+    "components/protocol/liquity/liquity-cells.tsx",
+    "components/protocol/liquity-fork/liquity-fork-sheet.tsx",
+    "components/protocol/liquity-v1/liquity-v1-sheet.tsx",
+    "components/protocol/liquity/delegate-run-sheet.tsx",
+    "components/protocol/sky-savings/sky-savings-sheet.tsx",
+    "components/protocol/alchemix/alchemix-event-sheet.ts",
+  ]) {
+    const src = readFileSync(f, "utf8");
+    const bare = [...src.matchAll(/text: sheetUsd\([^\n]*\n?[^\n]*/g)].filter((m) => !/cents/.test(m[0]));
+    assert.deepEqual(
+      bare.map((m) => m[0].split("\n")[0].trim()),
+      [],
+      `${f}: a dollar cell without cents`,
+    );
+  }
+});

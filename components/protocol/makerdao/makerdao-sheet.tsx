@@ -54,6 +54,7 @@ import {
 } from "@/components/shared/event-sheet";
 import { formatExactDecimal } from "@/lib/utils/format";
 import { fmtDai, fmtMat, fmtRatio } from "./makerdao-cells";
+import { faceParts } from "@/lib/shared/sheet-usd-rows";
 
 const UNREAD = "Not read on this page";
 const DUST_COLL = 0.00005;
@@ -230,7 +231,7 @@ export function useMakerSheet(ctx: MakerDAOContext, coords: MakerCoords, open = 
     rows: collRows,
     total:
       price != null && collAfterUsd
-        ? { text: inkAfter > 0 ? sheetUsd(collAfterUsd.usd) : "$0", info: collAfterUsd.prov }
+        ? { text: inkAfter > 0 ? sheetUsd(collAfterUsd.usd) : "$0", cents: collAfterUsd.usd, info: collAfterUsd.prov }
         : { none: "No price read at this block" },
     totalAmount: { text: collAmount(inkAfter), symbol: collSym, info: inkAfterProv(collSym, coords) },
     totalTip: TIP.collTotal,
@@ -261,7 +262,7 @@ export function useMakerSheet(ctx: MakerDAOContext, coords: MakerCoords, open = 
       debtCarry.push({
         key: "interest",
         label: SHEET_WORDS.interest,
-        usd: { text: sheetUsd(interest), info: interestSincePreviousProv(debtSym, coords) },
+        usd: { ...faceParts(interest), info: interestSincePreviousProv(debtSym, coords) },
         tip: TIP.debtInterest,
         sub: [
           {
@@ -269,7 +270,7 @@ export function useMakerSheet(ctx: MakerDAOContext, coords: MakerCoords, open = 
             label: debtSym,
             note: "$1.00 face",
             amount: { text: fmtDai(interest), symbol: debtSym, info: interestSincePreviousProv(debtSym, coords) },
-            usd: { text: sheetUsd(interest), info: interestSincePreviousProv(debtSym, coords) },
+            usd: { ...faceParts(interest), info: interestSincePreviousProv(debtSym, coords) },
             tip: TIP.debtInterestAsset,
           },
         ],
@@ -292,6 +293,7 @@ export function useMakerSheet(ctx: MakerDAOContext, coords: MakerCoords, open = 
     rows: debtRows,
     total: {
       text: debtAfter > 0 ? sheetUsd(debtAfterUsd.usd) : "$0",
+      cents: debtAfterUsd.usd,
       info: debtAfterUsd.prov,
     },
     totalAmount: { text: fmtDai(debtAfter), symbol: debtSym, info: debtAfterProv(debtSym, coords) },

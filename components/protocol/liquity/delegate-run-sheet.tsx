@@ -12,12 +12,12 @@
 import { createContext } from "react";
 import type { Provenance } from "@/components/shared/provenance";
 import type { EventSheet, SheetRow, SheetSide } from "@/components/shared/event-sheet";
-import { sheetUsd } from "@/components/shared/event-sheet";
 import { GROUP_SHEET_WORDS, type CollectedCard } from "@/components/shared/group-sheet";
 import type { BaseActivityEvent } from "@/lib/shared/types/activity";
 import type { BatchRateDebtMove } from "@/lib/liquity/batch-rate-move";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { troveWords } from "@/lib/liquity/event-templates";
+import { faceParts } from "@/lib/shared/sheet-usd-rows";
 
 /** The Trove's chronologically previous event, by event id: the first
  *  member's accrual runs from the event before the run (TroveBody). */
@@ -80,7 +80,7 @@ export function mergeDelegateRunSheet(cards: CollectedCard[], steps: DelegateRun
   const interest = steps.reduce((a, st) => a + moveOf(st), 0) - upfront;
   const fig = (v: number, what: string): Pick<SheetRow, "amount" | "usd"> => ({
     amount: { text: fmt(v), symbol, info: sumProv(what, n) },
-    usd: { text: sheetUsd(v), info: sumProv(`${what} in USD`, n) },
+    usd: { ...faceParts(v), info: sumProv(`${what} in USD`, n) },
   });
   const rows: SheetRow[] = [
     {
@@ -110,7 +110,7 @@ export function mergeDelegateRunSheet(cards: CollectedCard[], steps: DelegateRun
         date: `${shortDate(st.timestamp)} ${shortDateYear(st.timestamp)}`,
       }),
       amount: { text: fmt(v), symbol, info: moveProv(number) },
-      usd: { text: sheetUsd(v), info: moveProv(number, true) },
+      usd: { ...faceParts(v), info: moveProv(number, true) },
     };
   });
   // Before the run: the debt the first member's previous event recorded.

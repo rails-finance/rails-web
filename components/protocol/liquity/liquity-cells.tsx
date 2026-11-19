@@ -46,6 +46,7 @@ import { SHEET_WORDS, sheetUsd, type EventSheet, type SheetRow, type SheetStat }
 import { changeText } from "@/components/shared/change-swap-value";
 import { liquityV2RedeemerHref } from "@/lib/liquity-v2/redeemer-routes";
 import { useTxTroves } from "@/lib/liquity-v2/tx-troves";
+import { centsParts, faceParts } from "@/lib/shared/sheet-usd-rows";
 
 const tmContractOf = (addr?: string) => ({ name: "TroveManager", address: addr });
 
@@ -846,7 +847,7 @@ export function useLiquityCells({
       usd:
         priceNow > 0
           ? {
-              text: sheetUsd(eventUsd),
+              ...centsParts(eventUsd),
               info: eventMoveUsdProv(
                 collSym,
                 afterCollInUsd,
@@ -863,7 +864,7 @@ export function useLiquityCells({
       key: "redistribution",
       label: L2_WORDS.sheet_redistribution,
       amount: { text: formatColl(redistColl), symbol: collSym, info: collDeltaProv },
-      usd: priceNow > 0 ? { text: sheetUsd(redistUsd), info: usdMoveProv(collSym, redistColl, priceNow) } : undefined,
+      usd: priceNow > 0 ? { ...centsParts(redistUsd), info: usdMoveProv(collSym, redistColl, priceNow) } : undefined,
       tip: TIP.collRedist,
     });
   const collCarry: EventSheet["sides"][number]["carry"] = [];
@@ -875,7 +876,7 @@ export function useLiquityCells({
       usd:
         lastUsd != null && prevPrice
           ? {
-              text: sheetUsd(lastUsd),
+              ...centsParts(lastUsd),
               info: atPriceProv(collSym, beforeColl, prevPrice, "the previous event"),
             }
           : undefined,
@@ -887,7 +888,7 @@ export function useLiquityCells({
         key: "market",
         label: SHEET_WORDS.market,
         usd: {
-          text: sheetUsd(marketUsd, true),
+          ...centsParts(marketUsd, true),
           info: marketMoveProv(collSym, beforeCollAtEventUsd, lastUsd),
         },
         tip: TIP.collMarket,
@@ -903,12 +904,16 @@ export function useLiquityCells({
             key: "before",
             label: SHEET_WORDS.before,
             amount: { text: formatColl(beforeColl), symbol: collSym, info: collBeforeProv },
-            usd: beforeCollAtEventUsd > 0 ? { text: sheetUsd(beforeCollAtEventUsd), info: usdBeforeProv } : undefined,
+            usd: beforeCollAtEventUsd > 0 ? { ...centsParts(beforeCollAtEventUsd), info: usdBeforeProv } : undefined,
             tip: TIP.collBefore,
           }
         : undefined,
     rows: collRows,
-    total: { text: afterCollInUsd > 0 ? sheetUsd(afterCollInUsd) : "$0", info: usdAfterProv ?? collAfterProv },
+    total: {
+      text: afterCollInUsd > 0 ? sheetUsd(afterCollInUsd) : "$0",
+      cents: afterCollInUsd,
+      info: usdAfterProv ?? collAfterProv,
+    },
     totalAmount: { text: formatColl(collAfter), symbol: collSym, info: collAfterProv },
     totalTip: TIP.collTotal,
   };
@@ -955,7 +960,7 @@ export function useLiquityCells({
             : debtMoveProv,
         value: sheetDebtCp?.value,
       },
-      usd: { text: sheetUsd(opDebt), info: debtMoveProv },
+      usd: { ...faceParts(opDebt), info: debtMoveProv },
       tip: TIP.debtEvent,
     });
   if (upfrontFee >= DUST_DEBT)
@@ -963,7 +968,7 @@ export function useLiquityCells({
       key: "upfront-fee",
       label: L2_WORDS.sheet_upfront_fee,
       amount: { text: toLocaleStringHelper(upfrontFee), symbol: debtSym, info: feeP?.info, value: feeP?.value },
-      usd: { text: sheetUsd(upfrontFee), info: faceUsdProv(debtSym, toLocaleStringHelper(upfrontFee), "after") },
+      usd: { ...faceParts(upfrontFee), info: faceUsdProv(debtSym, toLocaleStringHelper(upfrontFee), "after") },
       tip: TIP.debtUpfront,
     });
   if (Math.abs(redistDebt) >= DUST_DEBT)
@@ -971,7 +976,7 @@ export function useLiquityCells({
       key: "redistribution",
       label: L2_WORDS.sheet_redistribution,
       amount: { text: debtFig(redistDebt), symbol: debtSym, info: debtMoveProv },
-      usd: { text: sheetUsd(redistDebt), info: debtMoveProv },
+      usd: { ...faceParts(redistDebt), info: debtMoveProv },
       tip: TIP.debtRedist,
     });
   const debtCarry: EventSheet["sides"][number]["carry"] = [];
@@ -980,14 +985,14 @@ export function useLiquityCells({
       key: "last",
       label: SHEET_WORDS.last,
       amount: { text: toLocaleStringHelper(beforeDebt), symbol: debtSym, info: debtBeforeProv },
-      usd: { text: sheetUsd(beforeDebt), info: faceUsdProv(debtSym, toLocaleStringHelper(beforeDebt), "before") },
+      usd: { ...faceParts(beforeDebt), info: faceUsdProv(debtSym, toLocaleStringHelper(beforeDebt), "before") },
       tip: TIP.debtLast,
     });
     if (accrualTotal >= DUST_DEBT)
       debtCarry.push({
         key: "interest",
         label: SHEET_WORDS.interest,
-        usd: { text: sheetUsd(accrualTotal), info: accrualProv },
+        usd: { ...faceParts(accrualTotal), info: accrualProv },
         tip: TIP.debtInterest,
         sub: [
           {
@@ -1000,7 +1005,7 @@ export function useLiquityCells({
               info: accrualProv,
             },
             usd: {
-              text: sheetUsd(accrual.batched && accrual.split ? accrual.interest : accrualTotal),
+              ...faceParts(accrual.batched && accrual.split ? accrual.interest : accrualTotal),
               info: accrualProv,
             },
             tip: TIP.debtInterestAsset,
@@ -1011,7 +1016,7 @@ export function useLiquityCells({
                   key: "fee",
                   label: L2_WORDS.sheet_fee,
                   amount: { text: fmtAccrued(accrual.fee), symbol: debtSym, info: accrualProv },
-                  usd: { text: sheetUsd(accrual.fee), info: accrualProv },
+                  usd: { ...faceParts(accrual.fee), info: accrualProv },
                   tip: TIP.debtFee,
                 },
               ]
@@ -1029,13 +1034,14 @@ export function useLiquityCells({
             key: "before",
             label: SHEET_WORDS.before,
             amount: { text: toLocaleStringHelper(debtBeforeEvent), symbol: debtSym, info: debtBeforeEventProv },
-            usd: { text: sheetUsd(debtBeforeEvent), info: debtBeforeEventProv },
+            usd: { ...faceParts(debtBeforeEvent), info: debtBeforeEventProv },
             tip: TIP.debtBefore,
           }
         : undefined,
     rows: debtRows,
     total: {
-      text: debtAfter > 0 ? sheetUsd(debtAfter) : "$0",
+      text: debtAfter > 0 ? faceParts(debtAfter).text : "$0",
+      cents: faceParts(debtAfter).cents,
       info: faceUsdProv(debtSym, toLocaleStringHelper(debtAfter), "after"),
     },
     totalAmount: { text: toLocaleStringHelper(debtAfter), symbol: debtSym, info: debtAfterProv },

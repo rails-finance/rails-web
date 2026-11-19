@@ -49,6 +49,7 @@ import { formatExact, formatNumber } from "@/lib/utils/format";
 import { formatPeth } from "@/lib/polaris/figure-format";
 import { priceText, shownUsd } from "@/lib/shared/shown-usd";
 import { polarisSheetUsd, shownPricesOf } from "@/lib/polaris/sheet-usd";
+import { centsParts } from "@/lib/shared/sheet-usd-rows";
 
 const W = POLARIS_WORDS;
 
@@ -91,7 +92,7 @@ function unitPriceOf(ctx: PolarisContext): UnitPrice | null {
     usd: pa.xauUsd,
     input: {
       label: `${stable} in USD`,
-      value: sheetUsd(pa.xauUsd),
+      value: priceText(pa.xauUsd),
       kind: "chain",
       pclass: "oracle",
       note: "the XAU/USD medianiser at this block; the feed counts a GOLDp as one ounce of gold",
@@ -171,7 +172,7 @@ export function polarisSheet(
       key: "market",
       label: SHEET_WORDS.market,
       usd: {
-        text: sheetUsd(mv, true),
+        ...centsParts(mv, true),
         info: {
           kind: "chain-derived",
           pclass: "oracle",

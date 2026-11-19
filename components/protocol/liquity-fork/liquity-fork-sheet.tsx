@@ -39,7 +39,6 @@ import {
 import { faceUsdProv } from "@/lib/shared/flows-timeline-provenance";
 import {
   SHEET_WORDS,
-  sheetUsd,
   type EventSheet,
   type SheetRow,
   type SheetSide,
@@ -58,6 +57,7 @@ import { forkEscrowTip, type LiquityForkEscrow } from "./liquity-fork-escrow";
 import { gasEscrowMove } from "@/lib/shared/liquity-gas-escrow";
 import { gasEscrowNote } from "@/components/protocol/liquity-family/gas-escrow";
 import { familyRatioPct, fmtLtv, LTV_LIQUIDATION_PRICE_FORMULA, type LiquityFamilyTerms } from "@/lib/liquity/ltv";
+import { faceParts, priceCell, type PricedAmount } from "@/lib/shared/sheet-usd-rows";
 
 /** What the sheet reads of a fork's branch: the collateral token, the
  *  governance ratios and the contract that holds them. */
@@ -148,26 +148,6 @@ const pts = (a: number) => `${a.toFixed(2)} pts`;
 const usd2 = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const pct = (ratio: number) => `${+(ratio * 100).toFixed(1)}%`;
 
-/** A token amount's dollars at the block's price. */
-function usdMoveProv(sym: string, amount: number, price: number): Provenance {
-  return {
-    kind: "chain-derived",
-    pclass: "oracle",
-    summary: `${sym} this event moved, in US dollars. The amount times the branch's price for ${sym} at this block.`,
-    formula: "amount × price",
-    inputs: [
-      { label: "amount", value: `${forkCollAmount(amount)} ${sym}`, kind: "chain" },
-      {
-        label: "price",
-        value: usd2(price),
-        kind: "chain-derived",
-        pclass: "oracle",
-        note: "branch price feed @ event block",
-      },
-    ],
-  };
-}
-
 function sinceProv(what: string, formula: string): Provenance {
   return {
     kind: "derived",
@@ -194,6 +174,17 @@ export function liquityForkSheet({
   const debtSym = debtSymbol;
   const f = liquityForkStateFigures(ctx);
   const price = f.price;
+  // The collateral's dollars: the amount × the branch's price as shown, named
+  // at the event's block (ui-jobs 743).
+  const forkBlock = coords.blockNumber ?? null;
+  const collAt = (amount: number): PricedAmount => ({
+    symbol: collSym,
+    amount,
+    price: price ?? null,
+    block: forkBlock,
+    priceNote: `the branch's price feed for ${collSym}${forkBlock != null ? ` at block ${forkBlock.toLocaleString("en-US")}` : " at this event's block"}`,
+  });
+  const FORK_O = { amountNote: "as the event's row states it", via: "the branch price feed at the event's block" };
   const op = ctx.operation;
   const isClose = ctx.eventType === "closeTrove";
   const collAddr = soleFlowAddress(flows, collSym) ?? branch?.collateralAddr;
@@ -256,7 +247,7 @@ export function liquityForkSheet({
         address: collAddr,
         info: collDeltaProv(opColl),
       },
-      usd: price != null ? { text: sheetUsd(opColl * price), info: usdMoveProv(collSym, opColl, price) } : undefined,
+      usd: price != null ? priceCell(`${collSym} this event moved, in USD`, collAt(opColl), FORK_O) : undefined,
       tip: TIP.collEvent,
     });
   if (redistColl > 0)
@@ -269,10 +260,7 @@ export function liquityForkSheet({
         address: collAddr,
         info: provs.redistProv?.(coords, { leg: "coll", amount: redist!.collText }) ?? collDeltaProv(redistColl),
       },
-      usd:
-        price != null
-          ? { text: sheetUsd(redistColl * price), info: usdMoveProv(collSym, redistColl, price) }
-          : undefined,
+      usd: price != null ? priceCell(`${collSym} redistributed, in USD`, collAt(redistColl), FORK_O) : undefined,
       tip: TIP.collRedist,
     });
 
@@ -298,12 +286,7 @@ export function liquityForkSheet({
             label: SHEET_WORDS.before,
             amount: { text: forkCollAmount(collBefore), symbol: collSym, address: collAddr, info: collBeforeProv },
             usd:
-              price != null
-                ? {
-                    text: sheetUsd(collBefore * price),
-                    info: provs.collUsdProv(coords, { coll: ctx.collBefore, priceUsd: price, which: "before" }),
-                  }
-                : undefined,
+              price != null ? priceCell("Collateral before this event, in USD", collAt(collBefore), FORK_O) : undefined,
             tip: TIP.collBefore,
           }
         : undefined,
@@ -312,10 +295,7 @@ export function liquityForkSheet({
       collAfter === 0
         ? { text: "$0", info: provs.collAfterProv(coords, ctx.origin?.coll) }
         : collAfterUsd != null && price != null
-          ? {
-              text: sheetUsd(collAfterUsd),
-              info: provs.collUsdProv(coords, { coll: ctx.collAfter, priceUsd: price, which: "after" }),
-            }
+          ? priceCell("Collateral after this event, in USD", collAt(collAfter), FORK_O)
           : { none: WORDS.unread },
     totalAmount: {
       text: forkCollAmount(collAfter),
@@ -339,7 +319,7 @@ export function liquityForkSheet({
         address: debtAddr,
         info: provs.debtDeltaProv(coords, forkDebtMoveOps(ctx), ctx.origin?.debt),
       },
-      usd: { text: sheetUsd(opDebt), info: debtMoveProv },
+      usd: { ...faceParts(opDebt), info: debtMoveProv },
       tip: TIP.debtEvent,
     });
   if (upfrontFee >= FORK_DEBT_DUST_FLOAT)
@@ -352,7 +332,7 @@ export function liquityForkSheet({
         address: debtAddr,
         info: provs.upfrontFeeProv(coords, { fee: op!.debtUpfrontFee }),
       },
-      usd: { text: sheetUsd(upfrontFee), info: faceUsdProv(debtSym, forkAmount(upfrontFee), "after") },
+      usd: { ...faceParts(upfrontFee), info: faceUsdProv(debtSym, forkAmount(upfrontFee), "after") },
       tip: TIP.debtUpfront,
     });
   if (redistDebt >= FORK_DEBT_DUST_FLOAT)
@@ -365,7 +345,7 @@ export function liquityForkSheet({
         address: debtAddr,
         info: provs.redistProv?.(coords, { leg: "debt", amount: redist!.debtText }) ?? debtMoveProv,
       },
-      usd: { text: sheetUsd(redistDebt), info: debtMoveProv },
+      usd: { ...faceParts(redistDebt), info: debtMoveProv },
       tip: TIP.debtRedist,
     });
 
@@ -398,14 +378,14 @@ export function liquityForkSheet({
       key: "last",
       label: SHEET_WORDS.last,
       amount: { text: forkAmount(debtBefore), symbol: debtSym, address: debtAddr, info: debtBeforeProv },
-      usd: { text: sheetUsd(debtBefore), info: faceUsdProv(debtSym, forkAmount(debtBefore), "before") },
+      usd: { ...faceParts(debtBefore), info: faceUsdProv(debtSym, forkAmount(debtBefore), "before") },
       tip: TIP.debtLast,
     });
     if (accrualProv)
       debtCarry.push({
         key: "interest",
         label: SHEET_WORDS.interest,
-        usd: { text: sheetUsd(accrued), info: accrualProv },
+        usd: { ...faceParts(accrued), info: accrualProv },
         tip: TIP.debtInterest,
         sub: [
           {
@@ -413,7 +393,7 @@ export function liquityForkSheet({
             label: debtSym,
             note: WORDS.face,
             amount: { text: forkAmount(accrued), symbol: debtSym, address: debtAddr, info: accrualProv },
-            usd: { text: sheetUsd(accrued), info: accrualProv },
+            usd: { ...faceParts(accrued), info: accrualProv },
             tip: TIP.debtInterestAsset,
           },
         ],
@@ -434,13 +414,14 @@ export function liquityForkSheet({
               address: debtAddr,
               info: debtBeforeEventProv,
             },
-            usd: { text: sheetUsd(debtBeforeEvent), info: debtBeforeEventProv },
+            usd: { ...faceParts(debtBeforeEvent), info: debtBeforeEventProv },
             tip: TIP.debtBefore,
           }
         : undefined,
     rows: debtRows,
     total: {
-      text: debtAfter > 0 ? sheetUsd(debtAfter) : "$0",
+      text: debtAfter > 0 ? faceParts(debtAfter).text : "$0",
+      cents: faceParts(debtAfter).cents,
       info: faceUsdProv(debtSym, forkAmount(debtAfter), "after"),
     },
     totalAmount: {

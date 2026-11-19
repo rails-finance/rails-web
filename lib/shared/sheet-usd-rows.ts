@@ -9,7 +9,7 @@
 
 import type { Provenance } from "@/components/shared/provenance";
 import { holderUsdReceipt } from "@/lib/shared/holder-usd-receipt";
-import { centsOf } from "@/lib/shared/shown-usd";
+import { centsOf, shownUsd } from "@/lib/shared/shown-usd";
 import { NO_FIGURE, noPriceWords } from "@/lib/shared/flows-sum";
 import { formatUsdValue } from "@/lib/utils/format";
 
@@ -54,6 +54,26 @@ export const cellOf = (c: UsdCell): { text: string; info: Provenance; cents?: nu
   info: c.info,
   ...(c.usd != null ? { cents: c.usd } : {}),
 });
+
+/** A $1-face amount's face and cents (BOLD, LUSD, DAI, fxUSD at $1): the
+ *  amount to six decimals at $1, to the cent. The cell keeps its receipt. */
+export const faceParts = (amount: number, signed = false): { text: string; cents: number } => {
+  const cents = shownUsd(amount, 1);
+  return { text: sheetUsd(cents, signed), cents };
+};
+
+/** A figure already in its rows' cents: its face and its cents. */
+export const centsParts = (cents: number, signed = false): { text: string; cents: number } => ({
+  text: sheetUsd(cents, signed),
+  cents,
+});
+
+/** One amount at a price named with its block, as a sheet cell. */
+export const priceCell = (
+  what: string,
+  a: PricedAmount,
+  o: { amountNote: string; via: string; signed?: boolean },
+): { text: string; info: Provenance; cents?: number } => cellOf(amountsUsd(what, [a], o));
 
 /** A cell with no figure: "—", naming the assets with no price. */
 export const noFigureCell = (what: string, symbols: string[]): UsdCell => ({

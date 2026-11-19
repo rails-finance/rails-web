@@ -13,7 +13,7 @@
 
 import type { Provenance } from "@/components/shared/provenance";
 import type { SheetFootnote } from "@/components/shared/event-sheet";
-import { sheetUsd } from "@/components/shared/event-sheet";
+import { priceCell } from "@/lib/shared/sheet-usd-rows";
 import { gasEscrowFootnote, type GasEscrowMove, type LiquityGasEscrow } from "@/lib/shared/liquity-gas-escrow";
 
 /** The escrow's footnote on the sheet: its amount, in dollars at this block's
@@ -40,26 +40,19 @@ export function gasEscrowNote(args: {
     text: fmt(e.amount),
     symbol: e.symbol,
     info,
+    // The amount × this block's price as shown, to the cent (ui-jobs 743).
     usd:
       price != null
-        ? {
-            text: sheetUsd(e.amount * price),
-            info: {
-              kind: "chain-derived",
-              pclass: "oracle",
-              summary: `The ${(e.terms?.name ?? "Gas compensation escrow").toLowerCase()} in US dollars. ${e.label} times the ${e.symbol} price at this block.`,
-              formula: "amount × price",
-              inputs: [
-                { label: "amount", value: e.label, kind: "chain", pclass: "state" },
-                {
-                  label: `${e.symbol} price at this block`,
-                  value: sheetUsd(price),
-                  kind: "chain-derived",
-                  pclass: "oracle",
-                },
-              ],
+        ? priceCell(
+            `The ${(e.terms?.name ?? "Gas compensation escrow").toLowerCase()} in US dollars`,
+            {
+              symbol: e.symbol,
+              amount: e.amount,
+              price,
+              priceNote: `the branch's price for ${e.symbol} at this event's block`,
             },
-          }
+            { amountNote: e.label, via: "the branch price feed at the event's block" },
+          )
         : undefined,
     tip,
     terms: e.terms,
