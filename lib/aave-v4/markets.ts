@@ -12,6 +12,8 @@
 // - Borrow rate is the drawn rate; the premium is named beside it.
 // - Available = min(hub liquidity, draw cap − what the spoke owes).
 
+import { shownUsd } from "@/lib/shared/shown-usd";
+import { aaveV4AssetName, type AaveV4PriceSource } from "@/lib/aave-v4/price-notes";
 import { HUB_ORDER, type AaveV4HubsResponse, type HubTierKey } from "@/lib/api/fetch-aave-v4-hubs";
 import type { V4ReserveHead } from "@/lib/api/fetch-aave-v4-reserve";
 import { assetClass, type AssetClass } from "@/lib/aave-v4/asset-class";
@@ -598,25 +600,35 @@ export function hubsOf(s: V4Stored): V4Hub[] {
 }
 
 // ── Prices ───────────────────────────────────────────────────────────────────
-// Every USD figure prices a token at the spoke oracle's getReservePrice where
-// one is held (Ethereum: `/api/oracle/aave-v4`; Base: the stored row), and at
-// the off-chain market feed (DefiLlama) only where the oracle holds none. An
-// asset with neither is unpriced: it joins no USD total, and the total says so.
+// Every USD figure prices a token at an on-chain read (ui-jobs 743): the spoke
+// oracle's getReservePrice where one is held (Ethereum: `/api/oracle/aave-v4`;
+// Base: the stored row), the Chainlink read or Pendle TWAP the oracle map names
+// for an asset no spoke oracle answers, or a spoke's reserve read for a line
+// the map leaves out. An asset with none is unpriced: it draws no dollars, and
+// any total including it draws nothing and names it.
 
 export interface V4Price {
   usd: number;
-  via: "oracle" | "market";
-  /** A spoke listing the asset, whose oracle answers for it (oracle prices). */
+  via: "oracle";
+  /** A spoke listing the asset, whose oracle answers for it. */
   spoke?: string;
   block?: number | null;
+  /** The read behind the price (lib/aave-v4/price-notes.ts). */
+  source?: AaveV4PriceSource | null;
+  /** The spoke oracle answering it, where the read names one. */
+  oracle?: string | null;
 }
 
 export type V4PriceBook = (underlying: string) => V4Price | null;
 
+/** A spoke's reserve read for a line the oracle map leaves out: the price,
+ *  its block and the oracle that answered. */
+export type V4ReservePrices = Record<string, { usd: number; block: number; oracle: string | null }>;
+
 export function priceBook(
   s: V4Stored,
-  oracle: { prices: Record<string, { usd: number }>; block: number | null } | null,
-  market: Record<string, number>,
+  oracle: { prices: Record<string, { usd: number; source?: string }>; block: number | null } | null,
+  reserves: V4ReservePrices = {},
 ): V4PriceBook {
   const spokeOf = new Map<string, string>();
   for (const sp of [...s.spokes].sort((a, b) => a.name.localeCompare(b.name)))
@@ -626,37 +638,59 @@ export function priceBook(
   return (underlying) => {
     const a = underlying.toLowerCase();
     const b = base.get(a) ?? held.get(a);
-    if (b) return { usd: b.price, via: "oracle", spoke: spokeOf.get(a), block: b.block };
-    const o = oracle?.prices[a]?.usd;
-    if (o != null && Number.isFinite(o)) return { usd: o, via: "oracle", spoke: spokeOf.get(a), block: oracle?.block };
-    const m = market[a];
-    return m != null && Number.isFinite(m) ? { usd: m, via: "market" } : null;
+    if (b) return { usd: b.price, via: "oracle", spoke: spokeOf.get(a), block: b.block, source: "iaave-oracle" };
+    const o = oracle?.prices[a];
+    if (o && Number.isFinite(o.usd) && o.usd > 0)
+      return {
+        usd: o.usd,
+        via: "oracle",
+        spoke: spokeOf.get(a),
+        block: oracle?.block,
+        source: (o.source as AaveV4PriceSource | undefined) ?? "iaave-oracle",
+      };
+    const r = reserves[a];
+    if (r && r.usd > 0)
+      return { usd: r.usd, via: "oracle", spoke: spokeOf.get(a), block: r.block, source: "reserve", oracle: r.oracle };
+    return null;
   };
 }
 
-/** A USD total over token amounts: the priced part, and what it leaves out. */
+/** A USD total over token amounts: each amount × its price as the receipt
+ *  shows them, to the cent, summed; or, where an asset has no on-chain
+ *  price, no total and the assets to name. */
 export interface PricedSum {
-  usd: number;
-  /** Symbols priced at the market feed. */
-  market: string[];
-  /** Symbols with a balance and no price, left out of `usd`. */
+  /** Null where any held asset is unpriced. */
+  usd: number | null;
+  rows: { underlying: string; symbol: string; tokens: number; price: V4Price }[];
+  /** Held assets with no on-chain price, by symbol or, unresolved, address. */
   unpriced: string[];
 }
 
 export function pricedSum(
-  items: { underlying: string; symbol: string; tokens: number }[],
+  items: readonly { underlying: string; symbol: string; tokens: number }[],
   book: V4PriceBook,
 ): PricedSum {
-  const out: PricedSum = { usd: 0, market: [], unpriced: [] };
+  const rows: PricedSum["rows"] = [];
+  const unpriced: string[] = [];
+  let usd = 0;
+  // One row per asset: a hub's lines for one asset over several spokes add
+  // their tokens before the price, so each asset is one product on the receipt.
+  const byAsset = new Map<string, { underlying: string; symbol: string; tokens: number }>();
   for (const it of items) {
+    const k = it.underlying.toLowerCase();
+    const cur = byAsset.get(k);
+    byAsset.set(k, cur ? { ...cur, tokens: cur.tokens + it.tokens } : { ...it, underlying: k });
+  }
+  for (const it of byAsset.values()) {
     if (it.tokens <= 0) continue;
     const p = book(it.underlying);
     if (!p) {
-      if (!out.unpriced.includes(it.symbol)) out.unpriced.push(it.symbol);
+      const name = aaveV4AssetName(it.symbol, it.underlying);
+      if (!unpriced.includes(name)) unpriced.push(name);
       continue;
     }
-    out.usd += it.tokens * p.usd;
-    if (p.via === "market" && !out.market.includes(it.symbol)) out.market.push(it.symbol);
+    rows.push({ ...it, price: p });
+    usd += shownUsd(it.tokens, p.usd);
   }
-  return out;
+  return { usd: unpriced.length > 0 ? null : Math.round(usd * 100) / 100, rows, unpriced };
 }

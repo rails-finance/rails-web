@@ -12,6 +12,7 @@
 // live overlay supplied them, with their derivations named. A PURE function
 // of the data already in scope on the detail page — no fetching.
 
+import { makerVaultCollateralUsd } from "@/lib/makerdao/usd-receipt";
 import { NOT_LOADED_CELL } from "@/lib/shared/decimals-unread";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isMakerDAOEvent } from "@/lib/shared/types/event-shape";
@@ -101,9 +102,11 @@ export function makerVaultToMarkdown(args: MakerVaultMarkdownArgs): string {
       lines.push(`- **Highest recorded debt:** ${num(view.peakDebtDai, 2)} ${dsym}`);
     }
   } else {
+    // The card's figure: ink × the OSM price as shown, to the cent (ui-jobs 743).
+    const collUsd = makerVaultCollateralUsd(view)?.usd ?? null;
     lines.push(
       `- **Collateral (ink):** ${amt(view.ink)} ${sym}` +
-        (view.collateralUsd != null && view.collateralUsd > 0 ? ` (${usd(view.collateralUsd)} at the OSM)` : ""),
+        (collUsd != null && collUsd > 0 ? ` (${usd(collUsd)} at the OSM)` : ""),
     );
     if (view.debtDai != null && view.debtDai > 0) {
       lines.push(`- **Debt:** ${num(view.debtDai, 2)} ${dsym} (normalized art ${amt(view.art)} × the ilk's rate)`);
@@ -130,8 +133,8 @@ export function makerVaultToMarkdown(args: MakerVaultMarkdownArgs): string {
         `- **OSM price:** ${usd(view.priceUsd)} / ${sym} (Maker's own oracle security module, one to two hours behind the market)`,
       );
     }
-    if (view.debtDai != null && view.debtDai > 0 && view.collateralUsd != null && view.collateralUsd > 0) {
-      const ratio = view.collateralUsd / view.debtDai;
+    if (view.debtDai != null && view.debtDai > 0 && collUsd != null && collUsd > 0) {
+      const ratio = collUsd / view.debtDai;
       lines.push(
         `- **Collateralization ratio:** ${(ratio * 100).toFixed(1)}%` +
           (view.matRatio != null

@@ -191,12 +191,12 @@ export function liquityV2HolderStrip(
       },
     });
   } else if (branchLegs.length > 1) {
-    const parts: string[] = [];
+    const parts: { text: string; symbol: string; address?: string }[] = [];
     const usdLegs = [];
     for (const [collateralType, amount] of branchLegs) {
       const price = priceFor(collateralType, prices);
       if (price == null) continue;
-      parts.push(`${formatNumber(amount)} ${collateralType}`);
+      parts.push({ text: `${formatNumber(amount)} ${collateralType}`, ...collToken(collateralType) });
       usdLegs.push({
         token: collateralType,
         amount,
@@ -221,7 +221,7 @@ export function liquityV2HolderStrip(
         approx: false,
         tip: LEG_TIP.collateralValued,
         prov: receipt.prov,
-        footnote: { text: parts.join(" · ") },
+        footnote: { text: parts.map((p) => p.text).join(" · "), parts },
         // The icons of the branches the total counts.
         figure: { tokens: usdLegs.map((l) => collToken(l.token)), usd: receipt.usd },
       });

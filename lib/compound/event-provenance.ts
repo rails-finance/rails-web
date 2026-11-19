@@ -586,27 +586,6 @@ export const peakCollateralProv = (sym: string, coords: CompoundCoords): Provena
   inputs: eventInputs(coords),
 });
 
-/** A USD figure valued at Comet's OWN on-chain oracle — the chain-state token
- *  balance multiplied by `Comet.getPrice(priceFeed)` (the same Chainlink feed
- *  Comet's liquidation engine reads), NOT an off-chain market cache. Both legs are
- *  on-chain, so the product is `chain-derived` and survives the chain-state gate —
- *  the on-chain sibling of Aave's `usdProvOnchain`. Used only when every asset in
- *  the total is oracle-priced; a partial total stays token-only rather than assert
- *  an incomplete figure. */
-export const compoundUsdProvOnchain = (what: string, coords?: CompoundCoords): Provenance => ({
-  kind: "chain-derived",
-  // Both legs on-chain; the oracle price is the furthest class, so it leads.
-  pclass: "oracle",
-  summary: `${what} valued in USD at the Comet's prices — the chain-state token balance multiplied by the Chainlink price Comet's liquidation engine reads (\`getPrice\`). The cWETHv3 market's feeds quote in ETH, so its values are converted with Comet's WETH/USD price feed (read from the cUSDCv3 market).`,
-  contract: cometContract(coords),
-  via: "chain balance × Comet getPrice on its price feed",
-  formula: "balance × price",
-  inputs: [
-    { label: "balance", kind: "chain", pclass: "state", note: "replayed position balance" },
-    { label: "price", kind: "chain", pclass: "oracle", note: "Comet getPrice (Chainlink price feed)" },
-  ],
-});
-
 // ── lifetime flows (economics tower) ─────────────────────────────────────────
 
 /** The lifetime flow buckets the economics tower draws. Base flows are the

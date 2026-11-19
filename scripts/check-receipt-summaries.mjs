@@ -92,11 +92,6 @@ const C_KEEP = [
     why: "Polaris runs on Sepolia; without this, a reader could take a testnet price for a real one and act on it. Covers both the ETH and the Gold/XAU branches, which share this exact sentence.",
   },
   {
-    file: "lib/polaris/live-provenance.ts",
-    phrase: "Sepolia testnet figures throughout: a test dollar, not a real one.",
-    why: "A USD-shaped figure on a testnet page reads as real money unless said otherwise.",
-  },
-  {
     file: "lib/liquity-v1/event-provenance.ts",
     phrase: "Emitted whole, not a reconstructed sum.",
     why: "Distinguishes the TroveManager's own emitted absolute from a client-side replay; a reader who assumed the latter could doubt a figure that is in fact exact.",

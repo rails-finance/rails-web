@@ -5,6 +5,7 @@
 // (rails-ops reference/arbitrum-position-first-lane.md). Server-rendered from
 // the page's read; nothing here asks again.
 
+import { cometUsdPrice } from "@/lib/compound/comet-usd";
 import { HolderStrip, type HolderStripProps } from "@/components/shared/holder-strip";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
@@ -40,8 +41,6 @@ function stripAssets(head: CompoundWalletChainResponse | null): PriceStripAsset[
   const out: PriceStripAsset[] = [];
   const seen = new Set<string>();
   for (const p of head.positions) {
-    const fx = p.quoteUnit === "USD" ? 1 : p.quoteUnit === "ETH" && head.ethUsd ? head.ethUsd : null;
-    if (fx == null) continue;
     const market = COMPOUND_BASE_PAGE.deployment.markets.find((m) => m.key === p.market);
     const assets = [
       ...(p.supplyBalanceRaw !== "0" || p.borrowBalanceRaw !== "0"
@@ -51,9 +50,11 @@ function stripAssets(head: CompoundWalletChainResponse | null): PriceStripAsset[
     ];
     for (const a of assets) {
       const addr = a.address.toLowerCase();
-      if (!addr || seen.has(addr) || !(a.price > 0)) continue;
+      // The Comet's price as shown, the WETH Comet's composed (ui-jobs 743).
+      const u = cometUsdPrice(p, a.price, head.ethUsd);
+      if (!addr || seen.has(addr) || !u) continue;
       seen.add(addr);
-      out.push({ symbol: a.symbol, address: a.address, price: a.price * fx });
+      out.push({ symbol: a.symbol, address: a.address, price: u.usd });
     }
   }
   return out;

@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { resolveCometPrices, cometPriceOf, type CometPriceRequest } from "@/lib/sources/chain/compound-prices";
+import {
+  resolveCometPrices,
+  cometFactorOf,
+  cometPriceOf,
+  type CometPriceRequest,
+} from "@/lib/sources/chain/compound-prices";
+import type { CometPriceFactor } from "@/lib/compound/comet-usd";
 import { COMPOUND_BASE_DEPLOYMENT } from "@/lib/compound-base/asset-catalog";
 import { headReadOf, headReadSource } from "@/lib/shared/server-head-read";
 
@@ -49,17 +55,22 @@ export async function GET(request: NextRequest) {
     });
     const map = await resolveCometPrices(reqs, COMPOUND_BASE_DEPLOYMENT);
     const prices: Record<string, number> = {};
+    const factors: Record<string, CometPriceFactor> = {};
     for (const [key, tokens] of wanted) {
       const m = markets.get(key)!;
       for (const t of tokens) {
         const p = cometPriceOf(map, m.comet, t);
         if (p != null && p > 0) prices[`${key}:${t}`] = p;
+        // The factors of a composed price, for the receipt (ui-jobs 743).
+        const f = cometFactorOf(map, m.comet, t, COMPOUND_BASE_DEPLOYMENT);
+        if (f) factors[`${key}:${t}`] = f;
       }
     }
     const read = map.read;
     const source = headReadSource(read && headReadOf(read.head, read.blockNumber, read.stored));
     return NextResponse.json({
       prices,
+      factors,
       ...(read ? { blockNumber: read.blockNumber, source } : {}),
       ...(read?.head ? { head: read.head } : {}),
       ...(read?.stored ? { stored: read.stored } : {}),

@@ -11,6 +11,7 @@
 // Every figure is a Sepolia testnet figure, and the page says so once, in the
 // stamp — not on every number.
 
+import { polarisPethUsd } from "@/lib/polaris/usd-receipt";
 import Link from "next/link";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
@@ -27,7 +28,6 @@ import {
   liveSpDepositsProv,
   liveSpPProv,
   liveTotalProv,
-  liveUsdValueProv,
 } from "@/lib/polaris/live-provenance";
 import { POLARIS_BASE_PATH, POLARIS_LOANS_PATH, POLARIS_SP_PATH } from "@/lib/polaris/routes";
 import { bookCountProv, openBookProv } from "@/lib/polaris/book-provenance";
@@ -81,7 +81,29 @@ function formatSpP(raw: string): string {
   return frac;
 }
 
-function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; book: PolarisMarketBook | null }) {
+function MarketCard({
+  chain,
+  book,
+  block,
+}: {
+  chain: PolarisMarketChainState | null;
+  book: PolarisMarketBook | null;
+  /** The block the board's read stands at. */
+  block: number | null;
+}) {
+  // The market's collateral in dollars: the shown product at the composed
+  // curve × ETH/USD price, the board's block named (ui-jobs 743).
+  const collUsd = chain
+    ? polarisPethUsd({
+        what: "The market's collateral in USD",
+        coll: chain.totalColl,
+        amountNote: "the market's total collateral, PSM shares included",
+        curve: chain.price.curve,
+        ethUsd: chain.price.ethUsd,
+        block,
+        via: "GET /api/chain/polaris/markets · the market board's prices",
+      })
+    : null;
   const market = (chain?.market ?? book?.market) as PolarisMarket;
   const cfg = POLARIS_MARKET_CONFIG[market];
   const stable = cfg.stable.symbol;
@@ -102,12 +124,13 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
               label="Collateral in positions, now"
               note={
                 <>
-                  <Prov
-                    info={liveUsdValueProv("The market's collateral", true)}
-                    value={formatUsdValue(chain.totalColl * chain.price.pethUsd)}
-                  >
-                    <span>{formatUsdValue(chain.totalColl * chain.price.pethUsd)}</span>
-                  </Prov>{" "}
+                  {collUsd ? (
+                    <Prov info={collUsd.prov} value={formatUsdValue(collUsd.usd)}>
+                      <span>{formatUsdValue(collUsd.usd)}</span>
+                    </Prov>
+                  ) : (
+                    "no dollar figure"
+                  )}{" "}
                   · the market&rsquo;s total, PSM shares included
                 </>
               }
@@ -179,23 +202,23 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
 
           <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
             <Stat label={`pETH in ${stable}`}>
-              <Prov info={livePethInDebtProv(market, true)} value={formatExact(chain.price.pethInDebt)}>
+              <Prov info={livePethInDebtProv(market, true, block)} value={formatExact(chain.price.pethInDebt)}>
                 <AmountText value={chain.price.pethInDebt} /> {unit}
               </Prov>
             </Stat>
             <Stat label="pETH in ETH">
-              <Prov info={liveCurvePriceProv(true)} value={formatExact(chain.price.curve)}>
+              <Prov info={liveCurvePriceProv(true, block)} value={formatExact(chain.price.curve)}>
                 {chain.price.curve.toFixed(4)} ETH
               </Prov>
             </Stat>
             <Stat label={market === "usdp" ? "ETH/USD" : "ETH/USD · XAU/USD"}>
-              <Prov info={liveMedianiserProv("eth", true)} value={formatExact(chain.price.ethUsd)}>
+              <Prov info={liveMedianiserProv("eth", true, block)} value={formatExact(chain.price.ethUsd)}>
                 {formatUsdValue(chain.price.ethUsd)}
               </Prov>
               {chain.price.xauUsd != null && (
                 <>
                   <span className="mx-1 text-rb-400">·</span>
-                  <Prov info={liveMedianiserProv("xau", true)} value={formatExact(chain.price.xauUsd)}>
+                  <Prov info={liveMedianiserProv("xau", true, block)} value={formatExact(chain.price.xauUsd)}>
                     {formatUsdValue(chain.price.xauUsd)}
                   </Prov>
                 </>
@@ -338,6 +361,7 @@ export function PolarisMarketsView({ chain, book }: { chain: PolarisMarketsChain
             <MarketCard
               key={market}
               chain={chain.markets.find((m) => m.market === market) ?? null}
+              block={chain.blockNumber > 0 ? chain.blockNumber : null}
               book={book.markets.find((m) => m.market === market) ?? null}
             />
           ))}

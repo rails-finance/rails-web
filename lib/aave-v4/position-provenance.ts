@@ -645,29 +645,6 @@ export function usdProv(
   };
 }
 
-/** The on-chain-priced sibling of {@link usdProv}: a chain-state token balance
- *  valued at Aave's oracle price (`getReservePrice` on the spoke's AaveOracle,
- *  served by /api/oracle/aave-v4). Both legs are on-chain, so the product is
- *  `chain-derived` and survives On-chain-values, where the DefiLlama-priced
- *  `usdProv` is `derived`. Used only when every asset in the total is
- *  oracle-priced; a partial total stays on `usdProv` (and middots) rather than
- *  assert an incomplete on-chain figure. */
-export function usdProvOnchain(what: string): Provenance {
-  return {
-    kind: "chain-derived",
-    // Both legs on-chain; the oracle price is the furthest class, so it leads.
-    pclass: "oracle",
-    summary: `${what} valued in USD — the balance the spoke reports, times the price Aave's oracle answers for the asset. Both legs come from the chain, and the price is the one the spoke values the position at.`,
-    contract: { name: "Aave V4 oracle" },
-    via: "the spoke's balance × Aave's oracle price",
-    formula: "balance × oracle price",
-    inputs: [
-      { label: "balance", kind: "chain", pclass: "state", note: "spoke-position read" },
-      { label: "oracle price", kind: "chain", pclass: "oracle", note: "Aave's oracle (getReservePrice)" },
-    ],
-  };
-}
-
 // ── The position card's receipts ────────────────────────────────────────────
 // One receipt per figure, read by the card's cells and footnotes
 // (components/protocol/aave-v4/aave-v4-spoke-card.tsx,
@@ -678,10 +655,6 @@ export function usdProvOnchain(what: string): Provenance {
 export const COLL_USD_PROV = usdProv("Current collateral", { amountLabel: "collateral balance", amountKind: "chain" });
 export const DEBT_USD_PROV = usdProv("Current debt", { amountLabel: "debt balance", amountKind: "chain" });
 export const SUPPLY_USD_PROV = usdProv("Currently supplied", { amountLabel: "supply balance", amountKind: "chain" });
-export const NONCOLL_USD_PROV = usdProv("Supplied, not collateral", {
-  amountLabel: "supply balance",
-  amountKind: "chain",
-});
 
 /** The latest borrow rate, accumulated over this spoke's indexed event stream. */
 export const BORROW_RATE_PROV: Provenance = {
@@ -706,8 +679,9 @@ export const YEARLY_COST_PROV: Provenance = {
 
 const PEAK_PRICE_INPUT: ProvInput = {
   label: "price",
-  kind: "offchain",
-  note: "each event at the price stored for its block — what Aave's oracle answered there, so the figure stays at the value of the day",
+  kind: "chain",
+  pclass: "oracle",
+  note: "each reserve at the price stored for its last event before the peak: the spoke oracle's getReservePrice at that event's block (server migrations 314/315), so the figure stays at the value of the day",
 };
 export const PEAK_COLL_PROV = accumProv("The peak collateral this position has held", {
   formula: "max(Σ collateral × price)",

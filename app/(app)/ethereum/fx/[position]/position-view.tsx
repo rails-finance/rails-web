@@ -12,6 +12,7 @@
 // state; the timeline is history, and the card's reconciliation line
 // quantifies the gap between the two (the socialized lane), always surfaced.
 
+import { fxAnchorOf } from "@/lib/fx/usd-receipt";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
@@ -396,6 +397,9 @@ export default function FxPositionView({
     view?.status === "open" ? view.settled.block : null,
     true,
   );
+  // The anchor leg at the settled block, which the export states the
+  // collateral at, as the card does.
+  const settledAnchor = fxAnchorOf(settledPx, view?.settled.block);
   const stripAssets = useMemo<LatestPriceAsset[]>(() => {
     if (!view || view.status !== "open") return [];
     if (settledPx?.anchorPrice != null)
@@ -433,12 +437,8 @@ export default function FxPositionView({
     () =>
       view && view.status === "open"
         ? {
-            price:
-              settledPx?.anchorPrice != null
-                ? Number(settledPx.anchorPrice) / 1e18
-                : view.oracle.priceUsd != null && view.oracle.priceUsd > 0
-                  ? view.oracle.priceUsd
-                  : null,
+            // The anchor leg only, as the card: without it, no figure today.
+            price: settledPx?.anchorPrice != null ? Number(settledPx.anchorPrice) / 1e18 : null,
             coll: view.settled.colls,
             debt: view.settled.debts,
           }
@@ -508,6 +508,7 @@ export default function FxPositionView({
         buildMarkdown: () =>
           fxPositionToMarkdown({
             view,
+            anchor: settledAnchor,
             events: fxEvents,
             drift,
             reads: historyWindow.state === "whole" ? socializedReadsMap : undefined,

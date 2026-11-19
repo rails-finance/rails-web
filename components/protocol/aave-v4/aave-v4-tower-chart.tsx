@@ -8,6 +8,7 @@
 // segments so the chart tells the lifetime story; the Display dropdown collapses
 // back to current-state-only.
 
+import { shownUsd } from "@/lib/shared/shown-usd";
 import { useState, type CSSProperties } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
@@ -28,40 +29,31 @@ import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import { fmtUsd } from "@/lib/aave-v4/format";
 import { accumProv, chainTruthProv, livePriceInput } from "@/lib/aave-v4/position-provenance";
 import { oraclePriceSource, type OraclePriceMap } from "@/lib/aave-v4/use-oracle-prices";
-import {
-  NO_PRICE_HINT,
-  noPriceProv,
-  partialLabel,
-  partialSumProv,
-  pricesHaveLoaded,
-  UNPRICED_DUST_TOKENS,
-} from "@/lib/aave-v4/unpriced";
+import { NO_PRICE_HINT, noPriceProv, partialSumProv, pricesHaveLoaded, unpricedFloor } from "@/lib/aave-v4/unpriced";
 import type { AaveV4PriceSource } from "@/lib/shared/types/protocols/aave-v4";
 import type { Provenance } from "@/components/shared/provenance";
+import { aaveV4FlowReceipt, aaveV4UsdReceipt, type AaveV4RowPrice } from "@/lib/aave-v4/usd-receipt";
+import { INTEREST_AMOUNT_NOTE, lifetimeSideBarUsd, noInterestFigureProv } from "@/lib/aave-v4/lifetime-totals";
 
 // Lifetime-flow provenance is added up over this position's events on the
 // spoke. The current-balance rows come from the spoke's read, so they stay
 // constants.
 //
-// The two price legs are different sources and say so. An OUTFLOW is valued at
-// the price stored for its block, which since server migration 314 is what
-// Aave's oracle answered there (`iaave-oracle`); where no row sits at that
-// block the reserve's nearest earlier row stands in, and a reserve with no
-// stored price contributes nothing. A HOLDING is valued at the live map the
-// page assembled — Aave's oracle at head where the oracle registry covers the
-// asset, an off-chain market price where it does not. A per-asset holding
-// receipt names the source that answered for THAT asset (livePriceInput); the
-// cross-asset aggregates below span both, so they keep the `offchain` kind of
-// their weakest case.
+// The two price legs are different reads and say so. An OUTFLOW is valued at
+// the on-chain price stored for its own event's block, and an outflow with none
+// there has no figure: no earlier event's price stands in (ui-jobs 743). A
+// HOLDING is valued at the latest block's on-chain price (the spoke oracle, or
+// the Chainlink feed the receipt names). A per-asset holding receipt names the
+// read that answered for that asset (livePriceInput).
 //
 // RULE: Rails never invents a price (rails-ops TO-DO-ui-jobs §40). A holding
 // whose asset no source covers gets NO USD leg: no tower segment, no place in
 // a USD total, a breakdown row in the asset's units reading "no price source",
 // and a "(partial)" total that names it.
 const HOLDING_PRICE_NOTE =
-  "the latest block's price: Aave's oracle where it covers the asset, an off-chain market price otherwise";
+  "the latest block's on-chain price: the spoke oracle's getReservePrice, or the Chainlink feed the receipt names; an asset with neither has no figure";
 const OUTFLOW_PRICE_NOTE =
-  "each outflow at the price stored for its block. What Aave's oracle answered there, so the figure stays at the value the tokens left at";
+  "each outflow at the on-chain price stored for its own event's block; an outflow with none there has no figure";
 
 // Deposited and Borrowed: what the side holds and what has left it, less the
 // interest (lib/aave-v4/lifetime-totals.ts), so in each token they are the sums
@@ -85,7 +77,7 @@ const inflowProv = (side: "supply" | "debt") =>
               ? "the balance the spoke reports, plus each withdrawn or liquidated outflow, less the interest it has earned: in the token's units, the position's supplies added up"
               : "the debt the spoke reports, plus each repaid or liquidated outflow, less the interest it has accrued: in the token's units, the position's borrows added up",
         },
-        { label: "holding price", kind: "offchain", note: HOLDING_PRICE_NOTE },
+        { label: "holding price", kind: "chain", pclass: "oracle", note: HOLDING_PRICE_NOTE },
         { label: "outflow price", kind: "chain", pclass: "oracle", note: OUTFLOW_PRICE_NOTE },
       ],
     },
@@ -117,12 +109,24 @@ const CURRENT_DEBT_PROV: Provenance = {
 // (see the totals derivation below): outflows are valued at price-at-the-time
 // so a closed position's history stays fixed; current holdings use the live
 // price, since "what's it worth now" is a current-price question.
-const flowUsdHintProv = (symbol: string): Provenance => ({
-  kind: "derived",
-  summary: `${symbol} outflow value in USD. Each event's amount at the price stored for its block, added up. The figure stays at what the tokens were worth as they left.`,
-  formula: "Σ(flow amount × price at the event's block)",
-  inputs: [{ label: "price", kind: "chain", pclass: "oracle", note: OUTFLOW_PRICE_NOTE }],
-});
+// An outflow figure's receipt lists each event's amount × that event's
+// on-chain price, with the block, and sums the shown products (ui-jobs 743);
+// with an unpriced event among them there is no figure, and the receipt names
+// the asset.
+const flowReceiptProv = (
+  what: string,
+  items: readonly { symbol: string; unpriced?: boolean; legs: NonNullable<ReserveStats["flowLegs"]> }[],
+): Provenance => {
+  const unpriced = items.filter((i) => i.unpriced).map((i) => aaveV4DisplaySymbol(i.symbol));
+  const base: Provenance = { kind: "derived", summary: what };
+  if (unpriced.length > 0) return partialSumProv(base, what, unpriced);
+  return (
+    aaveV4FlowReceipt(
+      what,
+      items.map((i) => ({ symbol: aaveV4DisplaySymbol(i.symbol), legs: i.legs })),
+    )?.prov ?? base
+  );
+};
 const currentUsdHintProv = (symbol: string, source: AaveV4PriceSource | null): Provenance => ({
   kind: "derived",
   summary: `${symbol} value in USD. The row's token balance at the latest block's price.`,
@@ -142,20 +146,6 @@ const flowAmountProv = (label: string, symbol: string): Provenance =>
       },
     ],
   });
-const flowProv = (label: string): Provenance =>
-  accumProv(`${label} over the position's life`, {
-    formula: "Σ(flow amount × price)",
-    inputs: [
-      {
-        label: "flow amount",
-        kind: "chain",
-        pclass: "indexed",
-        note: "the amount each of the position's events moved",
-      },
-      { label: "price", kind: "chain", pclass: "oracle", note: OUTFLOW_PRICE_NOTE },
-    ],
-  });
-
 const CHART_HEIGHT = 180;
 
 // Lifetime USD totals (the breakdown-legend figures) live in
@@ -173,6 +163,10 @@ const LIFETIME_DUST_USD = 0.01;
 
 interface AssetRow {
   symbol: string;
+  /** Outflows with an event no on-chain price stands behind (ui-jobs 743). */
+  unpricedFlows: NonNullable<ReserveStats["unpricedFlows"]>;
+  /** Each priced outflow's amount, price and block, for the flow receipts. */
+  flowLegs: NonNullable<ReserveStats["flowLegs"]>;
   // Lifetime totals — drive the historical-view side bars and breakdown rows.
   supplied: number;
   withdrawn: number;
@@ -195,12 +189,16 @@ interface AssetRow {
   netDebt: number;
   /** Deposited / Borrowed (all time) for this asset, and the interest its
    *  balance carries beyond the events (reserveLifetime). */
-  suppliedInflowUsd: number;
-  borrowedInflowUsd: number;
+  // Null where the figure cannot stand on prices at their own blocks.
+  suppliedInflowUsd: number | null;
+  borrowedInflowUsd: number | null;
+  /** Held + outflows, each a shown product: the side bar's figure. */
+  suppliedGrossUsd: number | null;
+  borrowedGrossUsd: number | null;
   supplyInterest: number;
-  supplyInterestUsd: number;
+  supplyInterestUsd: number | null;
   debtInterest: number;
-  debtInterestUsd: number;
+  debtInterestUsd: number | null;
   /** The part of the current debt that is interest, in USD: the debt less the
    *  net the events leave, never below zero or above the debt. */
   heldDebtInterestUsd: number;
@@ -296,6 +294,8 @@ export interface AaveV4TowerChartProps {
   /** False when the page holds a window of the timeline: the lifetime sums
    *  then miss the older events, so no interest leg is split out. */
   historyComplete?: boolean;
+  /** The block the oracle read stands at, named on the interest receipt. */
+  priceBlock?: number | null;
 }
 
 /** The accrued-interest swatch and segment of the shared tower vocabulary
@@ -314,8 +314,9 @@ const lifetimeInterestProv = (side: "supply" | "debt"): Provenance =>
       { label: "amounts moved", kind: "chain", pclass: "indexed", note: "the position's events, summed" },
       {
         label: "price",
-        kind: "offchain",
-        note: `${HOLDING_PRICE_NOTE}; for a reserve the position has left, the average price its outflows left at`,
+        kind: "chain",
+        pclass: "oracle",
+        note: `While all the interest is still held, it is valued at ${HOLDING_PRICE_NOTE}. Once any of the side has left, the interest has no price at its own block and no dollar figure`,
       },
     ],
   });
@@ -329,6 +330,7 @@ export function AaveV4TowerChart({
   onToggleHideSurplus,
   title,
   historyComplete = true,
+  priceBlock = null,
 }: AaveV4TowerChartProps) {
   const [hideHistorical, setHideHistorical] = useState(false);
   const [showTokens, setShowTokens] = useState(false);
@@ -371,26 +373,33 @@ export function AaveV4TowerChart({
         liquidatedCollateral: r.liquidatedCollateral,
         withdrawnUsd: r.withdrawnUsd,
         repaidUsd: r.repaidUsd,
+        unpricedFlows: r.unpricedFlows ?? [],
+        flowLegs: r.flowLegs ?? [],
         liquidatedDebtUsd: r.liquidatedDebtUsd,
         liquidatedCollateralUsd: r.liquidatedCollateralUsd,
         netSupply,
         netDebt,
         suppliedInflowUsd: life.supply.inflowUsd,
         borrowedInflowUsd: life.debt.inflowUsd,
+        suppliedGrossUsd: life.supply.grossUsd,
+        borrowedGrossUsd: life.debt.grossUsd,
         supplyInterest: life.supply.interest,
         supplyInterestUsd: life.supply.interestUsd,
         debtInterest: life.debt.interest,
         debtInterestUsd: life.debt.interestUsd,
-        heldDebtInterestUsd: price == null ? 0 : Math.min(netDebt, life.debt.interest) * price,
+        // Split out only where the interest has a figure (reserveLifetime).
+        heldDebtInterestUsd:
+          price == null || life.debt.interestUsd == null ? 0 : shownUsd(Math.min(netDebt, life.debt.interest), price),
         price,
         priceSource: oraclePriceSource(r.symbol, oraclePrices),
-        netSupplyUsd: price == null ? null : netSupply * price,
-        netDebtUsd: price == null ? null : netDebt * price,
+        // Today's figures, each the amount × the price as shown, to the cent.
+        netSupplyUsd: price == null ? null : shownUsd(netSupply, price),
+        netDebtUsd: price == null ? null : shownUsd(netDebt, price),
         // An unpriced row can't be measured against a USD dust floor, so its
         // balances are judged in tokens.
         isClosed:
           price == null
-            ? netSupply <= UNPRICED_DUST_TOKENS && netDebt <= UNPRICED_DUST_TOKENS
+            ? netSupply <= unpricedFloor(r) && netDebt <= unpricedFloor(r)
             : netSupply * price < LIFETIME_DUST_USD && netDebt * price < LIFETIME_DUST_USD,
         hasHistoricActivity,
       };
@@ -419,9 +428,9 @@ export function AaveV4TowerChart({
   // they get a breakdown row in the asset's units and their names go on every
   // total they are missing from.
   const unpricedRows = priced ? activeRows.filter((r) => r.price == null) : [];
-  const unpricedSupplyAll = unpricedRows.filter((r) => r.netSupply > UNPRICED_DUST_TOKENS);
+  const unpricedSupplyAll = unpricedRows.filter((r) => r.netSupply > unpricedFloor(r));
   const unpricedSupply = hideSurplus ? unpricedSupplyAll.filter((r) => !isSurplus(r.symbol)) : unpricedSupplyAll;
-  const unpricedDebt = unpricedRows.filter((r) => r.netDebt > UNPRICED_DUST_TOKENS);
+  const unpricedDebt = unpricedRows.filter((r) => r.netDebt > unpricedFloor(r));
   const unpricedSupplySymbols = unpricedSupply.map((r) => r.symbol);
   const unpricedDebtSymbols = unpricedDebt.map((r) => r.symbol);
 
@@ -456,31 +465,68 @@ export function AaveV4TowerChart({
   // borrowed + accrued each meet the tower. The supply side's earned interest
   // grows the faded reference bar; the debt side's held interest is the
   // lighter "Accrued" segment on top of the debt — the shared tower grammar.
-  const totalDepositedUsd = allRows.reduce((s, r) => s + r.suppliedInflowUsd, 0);
-  const totalBorrowedUsd = allRows.reduce((s, r) => s + r.borrowedInflowUsd, 0);
-  const totalSupplyInterestUsd = allRows.reduce((s, r) => s + r.supplyInterestUsd, 0);
-  const totalDebtInterestUsd = allRows.reduce((s, r) => s + r.debtInterestUsd, 0);
+  // Each a sum of cent figures, null where any row's is (no partial totals).
+  const sumOrNull = (vals: (number | null)[]): number | null =>
+    vals.some((v) => v == null) ? null : Math.round(vals.reduce<number>((s, v) => s + (v ?? 0), 0) * 100) / 100;
+  const totalDepositedUsd = sumOrNull(allRows.map((r) => r.suppliedInflowUsd));
+  const totalBorrowedUsd = sumOrNull(allRows.map((r) => r.borrowedInflowUsd));
+  const totalSupplyInterestUsd = sumOrNull(allRows.map((r) => r.supplyInterestUsd));
+  const totalDebtInterestUsd = sumOrNull(allRows.map((r) => r.debtInterestUsd));
   const heldDebtInterestUsd = debtAssets.reduce((s, r) => s + r.heldDebtInterestUsd, 0);
   const depositedExcluded = unpricedSupplyAll.map((r) => r.symbol);
-  const borrowedExcluded = unpricedDebtSymbols;
+  // An outflow with no on-chain price leaves its side's all-time total
+  // without a figure (no partial totals, ui-jobs 743).
+  const flowUnpriced = (flows: string[]) =>
+    allRows.filter((r) => r.unpricedFlows.some((f) => flows.includes(f))).map((r) => r.symbol);
+  depositedExcluded.push(
+    ...flowUnpriced(["withdrawn", "liquidatedCollateral"]).filter((x) => !depositedExcluded.includes(x)),
+  );
+  const borrowedExcluded = [
+    ...unpricedDebtSymbols,
+    ...flowUnpriced(["repaid", "liquidatedDebt"]).filter((x) => !unpricedDebtSymbols.includes(x)),
+  ];
 
   // Per-asset flow arrays feed the hatched segments, the breakdown rows, and the
   // side-bar totals from a single `usd` — valued at price-at-the-time.
   const withdrawnAssets = allRows
-    .map((r) => ({ symbol: r.symbol, amount: r.withdrawn, usd: r.withdrawnUsd }))
-    .filter((r) => r.usd > LIFETIME_DUST_USD)
+    .map((r) => ({
+      symbol: r.symbol,
+      amount: r.withdrawn,
+      usd: r.withdrawnUsd,
+      unpriced: r.unpricedFlows.includes("withdrawn"),
+      legs: r.flowLegs.filter((l) => l.flow === "withdrawn"),
+    }))
+    .filter((r) => r.unpriced || r.usd > LIFETIME_DUST_USD)
     .sort((a, b) => b.usd - a.usd);
   const repaidAssets = allRows
-    .map((r) => ({ symbol: r.symbol, amount: r.repaid, usd: r.repaidUsd }))
-    .filter((r) => r.usd > LIFETIME_DUST_USD)
+    .map((r) => ({
+      symbol: r.symbol,
+      amount: r.repaid,
+      usd: r.repaidUsd,
+      unpriced: r.unpricedFlows.includes("repaid"),
+      legs: r.flowLegs.filter((l) => l.flow === "repaid"),
+    }))
+    .filter((r) => r.unpriced || r.usd > LIFETIME_DUST_USD)
     .sort((a, b) => b.usd - a.usd);
   const liquidatedCollAssets = allRows
-    .map((r) => ({ symbol: r.symbol, amount: r.liquidatedCollateral, usd: r.liquidatedCollateralUsd }))
-    .filter((r) => r.usd > LIFETIME_DUST_USD)
+    .map((r) => ({
+      symbol: r.symbol,
+      amount: r.liquidatedCollateral,
+      usd: r.liquidatedCollateralUsd,
+      unpriced: r.unpricedFlows.includes("liquidatedCollateral"),
+      legs: r.flowLegs.filter((l) => l.flow === "liquidatedCollateral"),
+    }))
+    .filter((r) => r.unpriced || r.usd > LIFETIME_DUST_USD)
     .sort((a, b) => b.usd - a.usd);
   const liquidatedDebtAssets = allRows
-    .map((r) => ({ symbol: r.symbol, amount: r.liquidatedDebt, usd: r.liquidatedDebtUsd }))
-    .filter((r) => r.usd > LIFETIME_DUST_USD)
+    .map((r) => ({
+      symbol: r.symbol,
+      amount: r.liquidatedDebt,
+      usd: r.liquidatedDebtUsd,
+      unpriced: r.unpricedFlows.includes("liquidatedDebt"),
+      legs: r.flowLegs.filter((l) => l.flow === "liquidatedDebt"),
+    }))
+    .filter((r) => r.unpriced || r.usd > LIFETIME_DUST_USD)
     .sort((a, b) => b.usd - a.usd);
 
   const hasLive =
@@ -537,28 +583,34 @@ export function AaveV4TowerChart({
       <ArrowLeft className="w-3 h-3 text-rb-500 shrink-0" />
     );
 
-  const tipBody = (symbol: string | undefined, usd: number, dir: "in" | "out") => (
+  // A flow with an event no on-chain price stands behind draws "—" on hover
+  // too, as its row does (ui-jobs 743).
+  const tipBody = (symbol: string | undefined, usd: number, dir: "in" | "out", unpriced = false) => (
     <div className="flex items-center gap-1.5">
       {symbol && <TokenChipIcon symbol={symbol} size={14} filterable={false} />}
       {symbol && <span>{aaveV4DisplaySymbol(symbol)}</span>}
       {dirArrow(dir)}
-      <span className="ml-auto tabular-nums">{fmtUsd(usd).title}</span>
+      <span className="ml-auto tabular-nums">{unpriced ? "—" : fmtUsd(usd).title}</span>
     </div>
   );
 
   // Tooltip for a merged block: the category total, then the per-asset
   // constituents that were merged in (capped, with an "+N more" overflow).
-  const mergedTip = (items: { symbol: string; usd: number }[], total: number, dir: "in" | "out") => (
+  const mergedTip = (
+    items: { symbol: string; usd: number; unpriced?: boolean }[],
+    total: number,
+    dir: "in" | "out",
+  ) => (
     <div className="space-y-1">
       <div className="flex items-center gap-1.5 font-medium">
         {dirArrow(dir)}
-        <span className="ml-auto tabular-nums">{fmtUsd(total).title}</span>
+        <span className="ml-auto tabular-nums">{items.some((i) => i.unpriced) ? "—" : fmtUsd(total).title}</span>
       </div>
       {items.slice(0, 6).map((i) => (
         <div key={i.symbol} className="flex items-center gap-1.5 text-rb-500">
           <TokenChipIcon symbol={i.symbol} size={12} filterable={false} />
           <span>{aaveV4DisplaySymbol(i.symbol)}</span>
-          <span className="ml-auto tabular-nums">{fmtUsd(i.usd).title}</span>
+          <span className="ml-auto tabular-nums">{i.unpriced ? "—" : fmtUsd(i.usd).title}</span>
         </div>
       ))}
       {items.length > 6 && <div className="text-rb-500">+{items.length - 6} more</div>}
@@ -605,7 +657,7 @@ export function AaveV4TowerChart({
   // block when grouped & ≥2, else one hatched segment per asset (reversed so the
   // largest sits nearest the active segments, as before).
   const flowSegs = (
-    items: { symbol: string; amount: number; usd: number }[],
+    items: { symbol: string; amount: number; usd: number; unpriced?: boolean }[],
     pattern: CSSProperties,
     keyPrefix: string,
     mergedLabel: string,
@@ -630,7 +682,7 @@ export function AaveV4TowerChart({
       value: i.usd,
       colorClass: "",
       patternStyle: pattern,
-      tooltip: tipBody(i.symbol, i.usd, dir),
+      tooltip: tipBody(i.symbol, i.usd, dir, i.unpriced),
     }));
   };
 
@@ -680,17 +732,28 @@ export function AaveV4TowerChart({
   // Side-bar max is merged in regardless of view so the tower scale is frozen
   // across the toggle; the bars themselves render `hidden` in live view (column
   // width still reserved → no horizontal shift of the tower).
-  const depositedBarUsd = totalDepositedUsd + totalSupplyInterestUsd;
-  const sideBarMax = Math.max(depositedBarUsd, totalBorrowedUsd);
+  // Each bar is what has passed through its side, interest included: held +
+  // outflows, every one a shown product. A side with any asset or outflow
+  // that has no on-chain price draws no bar, and its breakdown's all-time row
+  // reads "—" and names the asset (ui-jobs 743).
+  const suppliedBarUsd = lifetimeSideBarUsd(
+    allRows.map((r) => r.suppliedGrossUsd),
+    depositedExcluded,
+  );
+  const borrowedBarUsd = lifetimeSideBarUsd(
+    allRows.map((r) => r.borrowedGrossUsd),
+    borrowedExcluded,
+  );
+  const sideBarMax = Math.max(suppliedBarUsd ?? 0, borrowedBarUsd ?? 0);
   const towerMax = Math.max(collPeak, debtPeak, sideBarMax) * 1.08;
 
   const collSideBar =
-    depositedBarUsd > 0
-      ? { heightPct: (depositedBarUsd / towerMax) * CHART_HEIGHT, color: COLLATERAL_FADED, hidden: isLiveView }
+    suppliedBarUsd != null && suppliedBarUsd > 0
+      ? { heightPct: (suppliedBarUsd / towerMax) * CHART_HEIGHT, color: COLLATERAL_FADED, hidden: isLiveView }
       : undefined;
   const debtSideBar =
-    totalBorrowedUsd > 0
-      ? { heightPct: (totalBorrowedUsd / towerMax) * CHART_HEIGHT, color: DEBT_GREEN_FADED, hidden: isLiveView }
+    borrowedBarUsd != null && borrowedBarUsd > 0
+      ? { heightPct: (borrowedBarUsd / towerMax) * CHART_HEIGHT, color: DEBT_GREEN_FADED, hidden: isLiveView }
       : undefined;
 
   // The token amount riding beside a single-asset row's USD figure, when the
@@ -702,32 +765,52 @@ export function AaveV4TowerChart({
   // single USD row when grouped & ≥2 (no icon — the row is a sum across assets),
   // else per-asset rows with the native amount + icon as before.
   const flowRows = (
-    items: { symbol: string; amount: number; usd: number }[],
+    items: {
+      symbol: string;
+      amount: number;
+      usd: number;
+      unpriced?: boolean;
+      legs: NonNullable<ReserveStats["flowLegs"]>;
+    }[],
     pattern: CSSProperties,
     mergedLabel: string,
   ): BreakdownRow[] => {
+    // A flow with an event no on-chain price stands behind draws "—", and so
+    // does any total over it (no partial totals, ui-jobs 743).
     if (grouped && items.length >= 2) {
-      const prov = flowProv(mergedLabel);
+      const unpriced = items.filter((i) => i.unpriced).map((i) => i.symbol);
+      const prov = flowReceiptProv(`${mergedLabel} over the position's life`, items);
       const total = items.reduce((s, i) => s + i.usd, 0);
-      return [{ sign: "−", label: mergedLabel, amount: fmtUsd(total).display, swatchStyle: pattern, prov }];
+      return [
+        {
+          sign: "−",
+          label: mergedLabel,
+          amount: unpriced.length > 0 ? "—" : fmtUsd(total).display,
+          swatchStyle: pattern,
+          prov,
+        },
+      ];
     }
     return items.map((i) => ({
       sign: "−",
       label: mergedLabel,
-      amount: fmtUsd(i.usd).display,
-      exact: fmtUsd(i.usd).title,
+      amount: i.unpriced ? "—" : fmtUsd(i.usd).display,
+      exact: i.unpriced ? undefined : fmtUsd(i.usd).title,
       ...tokenHint(i.amount, i.symbol, flowAmountProv(mergedLabel, aaveV4DisplaySymbol(i.symbol))),
       swatchStyle: pattern,
       icon: <TokenChipIcon symbol={i.symbol} size={14} filterable={false} />,
-      prov: flowUsdHintProv(aaveV4DisplaySymbol(i.symbol)),
+      prov: flowReceiptProv(`${aaveV4DisplaySymbol(i.symbol)} ${mergedLabel.toLowerCase()} over the position's life`, [
+        i,
+      ]),
     }));
   };
 
   // A total the unpriced holdings emptied has no figure to state: "< $0.01"
   // would read as a value it measured. An em dash says there is none, and the
   // "(partial)" label and the receipt say why.
-  const totalAmount = (usd: number, excluded: string[]) =>
-    excluded.length > 0 && usd < LIFETIME_DUST_USD ? "—" : fmtUsd(usd).display;
+  // A total including an asset with no on-chain price draws no figure (no
+  // partial totals, ui-jobs 743); its receipt names the asset.
+  const totalAmount = (usd: number, excluded: string[]) => (excluded.length > 0 ? "—" : fmtUsd(usd).display);
 
   // The unpriced holdings on a side: always per-asset (a sum can't absorb a row
   // that has no USD), no swatch (there is no segment for one to point at), and
@@ -765,7 +848,7 @@ export function AaveV4TowerChart({
       return [
         {
           sign: "",
-          label: partialLabel(mergedLabel, excluded),
+          label: mergedLabel,
           amount: totalAmount(total, excluded),
           swatchClass,
           prov: partialSumProv(prov, mergedLabel, excluded),
@@ -820,32 +903,56 @@ export function AaveV4TowerChart({
   // "+ Interest earned" on the supply side (the faded inflow swatch, as it
   // grows the reference bar) and "+ Accrued interest" on the debt side (the
   // accrued swatch). Hidden below a cent.
+  // A figure only where every reserve's interest is priced at its own block
+  // and the side has no unpriced asset or outflow (ui-jobs 743); otherwise
+  // "—", and the receipt says why.
   const interestRow = (side: "supply" | "debt"): BreakdownRow[] => {
     const usd = side === "supply" ? totalSupplyInterestUsd : totalDebtInterestUsd;
-    if (usd < LIFETIME_DUST_USD) return [];
-    const earning = allRows.filter((r) => (side === "supply" ? r.supplyInterestUsd : r.debtInterestUsd) > 0);
+    const excluded = side === "supply" ? depositedExcluded : borrowedExcluded;
+    const tokensOf = (r: AssetRow) => (side === "supply" ? r.supplyInterest : r.debtInterest);
+    const earning = allRows.filter((r) => tokensOf(r) > 0);
+    if (earning.length === 0) return [];
+    const drawn = usd != null && excluded.length === 0;
+    if (drawn && usd < LIFETIME_DUST_USD) return [];
     const one = earning.length === 1 ? earning[0] : null;
     const label = side === "supply" ? "Earned interest" : "Accrued interest";
-    const v = fmtUsd(usd);
+    const receipt = drawn
+      ? aaveV4UsdReceipt({
+          what: side === "supply" ? "Interest the supply has earned to date" : "Interest the debt has accrued to date",
+          rows: earning.map((r) => ({
+            symbol: aaveV4DisplaySymbol(r.symbol),
+            amount: tokensOf(r),
+            amountNote: INTEREST_AMOUNT_NOTE[side],
+            // The oracle map's sources are on-chain reads only.
+            price:
+              r.price == null
+                ? null
+                : { usd: r.price, source: r.priceSource as AaveV4RowPrice["source"], block: priceBlock },
+          })),
+          face: "compact",
+          via: "the spoke's balance at the latest block, less the position's events · × the latest block's on-chain price",
+        })
+      : null;
+    const prov =
+      excluded.length > 0
+        ? partialSumProv(lifetimeInterestProv(side), label, excluded)
+        : (receipt?.prov ?? noInterestFigureProv(label));
+    const v = drawn ? fmtUsd(usd) : null;
     return [
       {
         sign: "+",
         label,
-        amount: v.display,
-        exact: v.title,
+        amount: v ? v.display : "—",
+        exact: v?.title,
         indent: true,
         ...(side === "supply" ? { swatchStyle: { backgroundColor: COLLATERAL_FADED } } : { swatchClass: FEE_SOLID }),
         ...(one
           ? {
               icon: <TokenChipIcon symbol={one.symbol} size={14} filterable={false} />,
-              ...tokenHint(
-                side === "supply" ? one.supplyInterest : one.debtInterest,
-                one.symbol,
-                lifetimeInterestProv(side),
-              ),
+              ...tokenHint(tokensOf(one), one.symbol, lifetimeInterestProv(side)),
             }
           : {}),
-        prov: lifetimeInterestProv(side),
+        prov,
       },
     ];
   };
@@ -855,11 +962,14 @@ export function AaveV4TowerChart({
       ? [
           {
             sign: "",
-            label: partialLabel("Supplied (all time)", depositedExcluded),
-            amount: totalAmount(totalDepositedUsd, depositedExcluded),
+            label: "Supplied (all time)",
+            amount: totalDepositedUsd == null ? "—" : totalAmount(totalDepositedUsd, depositedExcluded),
             swatchStyle: { backgroundColor: COLLATERAL_FADED },
             icon: collSideSymbol ? <TokenChipIcon symbol={collSideSymbol} size={14} filterable={false} /> : undefined,
-            prov: partialSumProv(depositedProv(), "Supplied (all time)", depositedExcluded),
+            prov:
+              depositedExcluded.length === 0 && totalDepositedUsd == null
+                ? noInterestFigureProv("Supplied (all time)")
+                : partialSumProv(depositedProv(), "Supplied (all time)", depositedExcluded),
           } as BreakdownRow,
         ]
       : []),
@@ -881,7 +991,7 @@ export function AaveV4TowerChart({
         // Parity with Liquity's "Current Collateral" total for borrow positions;
         // a never-borrowed wallet has nothing collateralised, so it reads as a
         // plain supply balance instead.
-        label: partialLabel(currentCollLabel, unpricedSupplySymbols),
+        label: currentCollLabel,
         amount: totalAmount(totalSupplyUsd, unpricedSupplySymbols),
         isResult: true,
         prov: partialSumProv(CURRENT_COLL_PROV, currentCollLabel, unpricedSupplySymbols),
@@ -894,11 +1004,14 @@ export function AaveV4TowerChart({
       ? [
           {
             sign: "",
-            label: partialLabel("Borrowed (all time)", borrowedExcluded),
-            amount: totalAmount(totalBorrowedUsd, borrowedExcluded),
+            label: "Borrowed (all time)",
+            amount: totalBorrowedUsd == null ? "—" : totalAmount(totalBorrowedUsd, borrowedExcluded),
             swatchStyle: { backgroundColor: DEBT_GREEN_FADED },
             icon: debtSideSymbol ? <TokenChipIcon symbol={debtSideSymbol} size={14} filterable={false} /> : undefined,
-            prov: partialSumProv(borrowedProv(), "Borrowed (all time)", borrowedExcluded),
+            prov:
+              borrowedExcluded.length === 0 && totalBorrowedUsd == null
+                ? noInterestFigureProv("Borrowed (all time)")
+                : partialSumProv(borrowedProv(), "Borrowed (all time)", borrowedExcluded),
           } as BreakdownRow,
         ]
       : []),
@@ -917,7 +1030,7 @@ export function AaveV4TowerChart({
       ),
       {
         sign: "",
-        label: partialLabel("Current Debt", unpricedDebtSymbols),
+        label: "Current Debt",
         amount: totalAmount(totalDebtUsd, unpricedDebtSymbols),
         isResult: true,
         prov: partialSumProv(CURRENT_DEBT_PROV, "Current Debt", unpricedDebtSymbols),
@@ -986,7 +1099,7 @@ export function AaveV4TowerChart({
             <div className="flex items-center gap-1.5">
               <span>Supplied + interest earned</span>
               {dirArrow("in")}
-              <span className="ml-auto tabular-nums">{fmtUsd(depositedBarUsd).title}</span>
+              <span className="ml-auto tabular-nums">{fmtUsd(suppliedBarUsd ?? 0).title}</span>
             </div>
           ) : undefined,
         }}
@@ -1007,9 +1120,9 @@ export function AaveV4TowerChart({
                 placeholder: debtPlaceholder,
                 sideBarTooltip: debtSideBar ? (
                   <div className="flex items-center gap-1.5">
-                    <span>Borrowed (all time)</span>
+                    <span>Borrowed + interest accrued</span>
                     {dirArrow("out")}
-                    <span className="ml-auto tabular-nums">{fmtUsd(totalBorrowedUsd).title}</span>
+                    <span className="ml-auto tabular-nums">{fmtUsd(borrowedBarUsd ?? 0).title}</span>
                   </div>
                 ) : undefined,
               }

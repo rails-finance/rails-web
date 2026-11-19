@@ -138,7 +138,8 @@ export const compoundV3Arbitrum: FamilyModule = {
           }
           capacity += leg.usd * f;
         }
-        const debt = m.borrowUsd ?? undefined;
+        // Nothing borrowed is no debt, priced or not.
+        const debt = BigInt(m.baseBorrowed) === BigInt(0) ? 0 : (m.borrowUsd ?? undefined);
         const hf = capacity != null && debt != null && debt > 0 ? capacity / debt : null;
         out.push({
           ...base,

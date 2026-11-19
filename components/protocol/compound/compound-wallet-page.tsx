@@ -41,6 +41,7 @@
 // The history's completeness is a property of the request rather than of the
 // explorer, so it is stated under every timeline.
 
+import type { CometPriceFactor } from "@/lib/compound/comet-usd";
 import { useReportPositionRead } from "@/components/shared/position-read";
 import { readOfHeadAnswer } from "@/lib/shared/position-read";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -137,17 +138,30 @@ type TimelineState = "loading" | "first-read" | "ready" | "unavailable" | "overB
 
 /** Prices keyed `${marketKey}:${token}` — each Comet reads its own feeds, so a
  *  token has one price PER MARKET, not one price. */
-async function fetchCometPrices(route: string, pairs: string[]): Promise<Record<string, number>> {
-  if (pairs.length === 0) return {};
+async function fetchCometPrices(route: string, pairs: string[]): Promise<CometPricesAnswer> {
+  const none: CometPricesAnswer = { prices: {}, factors: {}, block: null };
+  if (pairs.length === 0) return none;
   const res = await fetch(`${route}?pairs=${pairs.join(",")}`, { cache: "no-store" });
-  if (!res.ok) return {};
-  const data = (await res.json()) as { prices?: Record<string, number> };
-  return data.prices ?? {};
+  if (!res.ok) return none;
+  const data = (await res.json()) as {
+    prices?: Record<string, number>;
+    factors?: Record<string, CometPriceFactor>;
+    blockNumber?: number;
+  };
+  return { prices: data.prices ?? {}, factors: data.factors ?? {}, block: data.blockNumber ?? null };
 }
 
-/** This market's prices, keyed by token — what the view and tower look up. */
-function pricesFor(prices: Record<string, number>, key: string): Record<string, number> {
-  const out: Record<string, number> = {};
+/** The prices route's answer: each price as shown, the factors of a composed
+ *  one, and the block the read stands at (ui-jobs 743). */
+interface CometPricesAnswer {
+  prices: Record<string, number>;
+  factors: Record<string, CometPriceFactor>;
+  block: number | null;
+}
+
+/** This market's entries, keyed by token — what the view and tower look up. */
+function pricesFor<T>(prices: Record<string, T>, key: string): Record<string, T> {
+  const out: Record<string, T> = {};
   for (const [k, v] of Object.entries(prices)) if (k.startsWith(`${key}:`)) out[k.slice(key.length + 1)] = v;
   return out;
 }
@@ -542,6 +556,10 @@ export function CompoundWalletView({
   const pinnedRouteParams = useParams<{ eventId?: string | string[] }>();
   const pinnedRoute = pinnedRouteParams?.eventId != null;
   const [prices, setPrices] = useState<Record<string, number>>({});
+  const [priceMeta, setPriceMeta] = useState<{ factors: Record<string, CometPriceFactor>; block: number | null }>({
+    factors: {},
+    block: null,
+  });
 
   // Only when the server could not answer. A seeded view has every Comet's
   // figures in its first paint and never asks again.
@@ -759,8 +777,10 @@ export function CompoundWalletView({
     fetchCometPrices(d.routes.prices, [...pairs])
       .then((p) => {
         if (pricedRef.current !== forWallet) return;
-        if (Object.keys(p).length > 0) setPrices(p);
-        else pricedRef.current = null;
+        if (Object.keys(p.prices).length > 0) {
+          setPrices(p.prices);
+          setPriceMeta({ factors: p.factors, block: p.block });
+        } else pricedRef.current = null;
       })
       .catch(() => {
         // Nothing priced: the next change may ask again.
@@ -776,9 +796,12 @@ export function CompoundWalletView({
         // transaction count and the last-activity stamp are claims about the
         // WHOLE life, and a horizoned history — the API's heavy answer, or a
         // capped sweep — has not read one.
-        cometViewFromChain(s.market, wallet, s.chain, s.replay, pricesFor(prices, s.market.key), sweptClean),
+        cometViewFromChain(s.market, wallet, s.chain, s.replay, pricesFor(prices, s.market.key), sweptClean, {
+          factors: pricesFor(priceMeta.factors, s.market.key),
+          block: priceMeta.block,
+        }),
       ),
-    [sections, wallet, prices, sweptClean],
+    [sections, wallet, prices, priceMeta, sweptClean],
   );
 
   // A market's own `ChainTruthTimeline` reads `event/[eventId]` off the URL

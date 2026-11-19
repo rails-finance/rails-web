@@ -5,9 +5,8 @@
 // - STORED: `GET /api/aave-v4/hubs` (Ethereum) and `GET /api/aave-v4-base/reserves`
 //   (Base), the hub's lines per spoke as rails-server's Aave V4 refresher read them
 //   from the hub contracts each cycle (getSpokeConfig, getSpokeAddedAssets,
-//   getSpokeTotalOwed) and stored at its block: class `indexed`. A dollar figure on
-//   Ethereum prices the amount at an off-chain market feed (`offchain`); Base's
-//   stored row carries the spoke oracle's price (`oracle`).
+//   getSpokeTotalOwed) and stored at its block: class `indexed`. A dollar figure
+//   prices the amount at an on-chain read (`oracle`), named with its block.
 // - HEAD: `GET /api/at-block/aave-v4/reserve`, one Multicall3 of the spoke, its
 //   oracle and the hub at the head block, kept 30 s by rails-server: class `state`,
 //   and a figure valued at the spoke oracle's price is `oracle`.
@@ -17,6 +16,8 @@
 
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import type { PricedSum, V4Price, V4ReserveFigures } from "@/lib/aave-v4/markets";
+import { aaveV4UsdReceipt, type AaveV4UsdRow } from "@/lib/aave-v4/usd-receipt";
+import { aaveV4NoPriceLine } from "@/lib/aave-v4/price-notes";
 import { APY_FORMULA, COMPOUNDED, rateFraction } from "@/lib/aave-v4/rates";
 
 const STORED_ETH = "GET /api/aave-v4/hubs";
@@ -103,24 +104,66 @@ const list = (xs: string[]) =>
 
 const usdText = (x: number) => `$${x.toLocaleString("en-US", { maximumFractionDigits: 6 })}`;
 
-/** The price leaf of a USD figure: the spoke oracle, or the market feed where the oracle holds none. */
-function priceLeaf(symbol: string, p: V4Price): ProvInput {
-  return p.via === "oracle"
-    ? {
-        label: "price",
-        value: usdText(p.usd),
-        kind: "chain",
-        pclass: "oracle",
-        note: `the spoke oracle's getReservePrice${p.spoke ? `, as the ${p.spoke} spoke's oracle answers it` : ""}${p.block != null ? ` at block ${n(p.block)}` : ""}; every spoke listing ${symbol} points at the same source`,
-      }
-    : {
-        label: "price",
-        value: usdText(p.usd),
-        kind: "offchain",
-        pclass: "offchain",
-        note: `an off-chain market feed (DefiLlama): the spoke oracle holds no price for ${symbol}`,
-      };
+/** The read a price comes from, as a via line names it. */
+const priceRead = (source: V4Price["source"]): string =>
+  source === "chainlink"
+    ? "Chainlink X/USD"
+    : source === "chainlink-eth-derived"
+      ? "Chainlink X/ETH × ETH/USD"
+      : source === "pendle-twap"
+        ? "Pendle PT TWAP"
+        : "spoke oracle getReservePrice";
+/** The reads a sum's prices come from, each named once. */
+const priceReads = (sum: PricedSum): string => {
+  const reads = [...new Set(sum.rows.map((r) => priceRead(r.price.source)))];
+  return reads.length > 0 ? reads.join(", ") : "spoke oracle getReservePrice";
+};
+
+/** A sum's rows as the receipt reads them: one per asset, its tokens and its on-chain price. */
+const sumRows = (sum: PricedSum, amountNote: string): AaveV4UsdRow[] =>
+  sum.rows.map((r) => ({
+    symbol: r.symbol,
+    address: r.underlying,
+    amount: r.tokens,
+    amountNote,
+    price: { usd: r.price.usd, source: r.price.source, block: r.price.block, oracle: r.price.oracle },
+  }));
+
+/** A USD total's receipt: the scope's words, then each asset's tokens × its
+ *  on-chain price as shown, to the cent, summed (lib/aave-v4/usd-receipt.ts);
+ *  where an asset has no on-chain price, no figure and the asset named. Long
+ *  sums list every asset by value, those under a cent behind the dust control. */
+function sumReceipt(
+  base: Pick<Provenance, "summary" | "via" | "source" | "contract">,
+  sum: PricedSum,
+  amountNote: string,
+  /** The block the amounts stand at, named beside the prices' where they differ. */
+  balanceBlock?: number | null,
+): Provenance {
+  if (sum.usd == null)
+    return { kind: "derived", ...base, summary: `${base.summary} ${capital(aaveV4NoPriceLine(sum.unpriced))}.` };
+  const r = aaveV4UsdReceipt({
+    what: "",
+    rows: sumRows(sum, amountNote),
+    face: "compact",
+    via: base.via ?? "",
+    byValue: sum.rows.length > 3,
+    balanceBlock,
+  });
+  if (!r || r.prov == null) return { kind: "derived", ...base };
+  const tail = r.prov.summary.replace(/^: /, "");
+  // The scope's words, then what the rows add.
+  const summary = [base.summary, capital(tail)].join(" ");
+  return {
+    kind: "chain-derived",
+    pclass: "oracle",
+    ...base,
+    summary,
+    formula: r.prov.formula,
+    inputs: r.prov.inputs,
+  };
 }
+const capital = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
 /** A total of stored amounts valued in USD: a spoke's or a hub's supplied or borrowed. */
 export function storedValueProv(
@@ -137,93 +180,70 @@ export function storedValueProv(
     side === "supplied"
       ? "What suppliers have added (Aave's added assets)"
       : "What borrowers owe, drawn and premium, with interest";
-  const one = sum.market.length === 1;
-  const market = sum.market.length
-    ? ` ${list(sum.market)} ${one ? "has" : "have"} no oracle price and ${one ? "is" : "are"} valued at an off-chain market feed (DefiLlama).`
-    : "";
-  const gap = sum.unpriced.length ? ` The total leaves out ${list(sum.unpriced)}, which no price source holds.` : "";
-  const inputs: ProvInput[] = [
+  return sumReceipt(
     {
-      label: "amount",
-      kind: "chain",
-      pclass: lineClass(c),
-      note: `the hub's ${getter}, ${onVisit(c) ? "read at the head" : "stored"}`,
+      source: { block: c.block ?? undefined },
+      summary: `${scope} ${side}. ${words}, from the hub's line for each spoke and asset${atStored(c)}, each asset's amount valued at its on-chain price, then added up.`,
+      via: `${storedLane(c)} · hub ${getter}(assetId, spoke) per line · × ${priceReads(sum)} · summed`,
     },
-    {
-      label: "price",
-      kind: "chain",
-      pclass: "oracle",
-      note: "the spoke oracle's getReservePrice (GET /api/oracle/aave-v4; on Base, stored with the row; on Arc, read with the line)",
-    },
-  ];
-  if (sum.market.length)
-    inputs.push({
-      label: "market price",
-      value: list(sum.market),
-      kind: "offchain",
-      pclass: "offchain",
-      note: "DefiLlama, where the oracle holds none",
-    });
-  if (sum.unpriced.length)
-    inputs.push({
-      label: "left out",
-      value: list(sum.unpriced),
-      kind: "offchain",
-      pclass: "offchain",
-      note: "no price source",
-    });
-  return {
-    kind: sum.market.length ? "derived" : "chain-derived",
-    pclass: sum.market.length ? "offchain" : "oracle",
-    source: { block: c.block ?? undefined },
-    summary: `${scope} ${side}${sum.unpriced.length ? " (partial)" : ""}. ${words}, from the hub's line for each spoke and asset${atStored(c)}, each amount valued at the spoke oracle's price, then added up.${market}${gap}`,
-    via: `${storedLane(c)} · hub ${getter}(assetId, spoke) per line · × spoke oracle getReservePrice · summed`,
-    formula: "Σ (amount × price)",
-    inputs,
-  };
+    sum,
+    `the hub's ${getter}, ${onVisit(c) ? "read at the head" : "stored"}, over its lines`,
+    c.block,
+  );
 }
 
 /** A hub's supplied or borrowed in USD from its own totals per asset, at the spoke oracle's price. */
 function hubValueProv(side: "supplied" | "borrowed", scope: string, c: StoredCoords, sum: PricedSum): Provenance {
   const getter = side === "supplied" ? "getAddedAssets" : "getAssetTotalOwed";
-  const gap = sum.unpriced.length ? ` The total leaves out ${list(sum.unpriced)}, which no price source holds.` : "";
-  return {
-    kind: sum.market.length ? "derived" : "chain-derived",
-    pclass: sum.market.length ? "offchain" : "oracle",
-    source: { block: c.block ?? undefined },
-    summary: `${scope} ${side}, the hub's total${sum.unpriced.length ? " (partial)" : ""}. Each asset's ${side === "supplied" ? "added assets" : "total owed"} over every spoke the hub lends to${atStored(c)}, its tokenization and treasury spokes included, valued at the spoke oracle's price, then added up.${gap}`,
-    via: `${storedLane(c)} · hub ${getter}(assetId) per asset · × spoke oracle getReservePrice · summed`,
-    formula: "Σ (amount × price)",
-    inputs: [
-      { label: "amount", kind: "chain", pclass: lineClass(c), note: `the hub's ${getter}, read at the head` },
-      {
-        label: "price",
-        kind: "chain",
-        pclass: "oracle",
-        note: "the spoke oracle's getReservePrice, read with the line",
-      },
-    ],
-  };
+  return sumReceipt(
+    {
+      source: { block: c.block ?? undefined },
+      summary: `${scope} ${side}, the hub's total. Each asset's ${side === "supplied" ? "added assets" : "total owed"} over every spoke the hub lends to${atStored(c)}, its tokenization and treasury spokes included, valued at its on-chain price, then added up.`,
+      via: `${storedLane(c)} · hub ${getter}(assetId) per asset · × ${priceReads(sum)} · summed`,
+    },
+    sum,
+    `the hub's ${getter}, read at the head`,
+    c.block,
+  );
 }
 
-/** A token amount's receipt, revalued in USD at its price. */
+/** A token amount's receipt, revalued in USD at its on-chain price: the
+ *  amount × the price as shown, to the cent (lib/aave-v4/usd-receipt.ts). */
 /** `c`, where the amount is a stored line's: Arc's lines class as a state read. */
-export function pricedAmountProv(amount: Provenance, symbol: string, p: V4Price | null, c?: StoredCoords): Provenance {
+export function pricedAmountProv(
+  amount: Provenance,
+  symbol: string,
+  p: V4Price | null,
+  c: StoredCoords | undefined,
+  tokens: number,
+): Provenance {
   if (!p) return amount;
-  const oracle = p.via === "oracle";
   const [head, ...rest] = amount.summary.split(". ");
   const body = rest.join(". ");
+  const r = aaveV4UsdReceipt({
+    what: "",
+    rows: [
+      {
+        symbol,
+        amount: tokens,
+        amountNote: amount.via ?? "",
+        price: { usd: p.usd, source: p.source, block: p.block, oracle: p.oracle },
+      },
+    ],
+    face: "compact",
+    via: "",
+  });
+  const inputs = r?.prov
+    ? r.prov.inputs?.map((i) => (i.label.endsWith(" amount") && c ? { ...i, pclass: lineClass(c) } : i))
+    : undefined;
   return {
     ...amount,
-    kind: oracle ? "chain-derived" : "derived",
-    pclass: oracle ? "oracle" : "offchain",
-    summary: `${head}, in USD. ${body} Valued at ${oracle ? "the spoke oracle's price" : "an off-chain market price (DefiLlama), the oracle holding none"}.`,
-    via: `${amount.via} · × ${oracle ? "spoke oracle getReservePrice" : "DefiLlama price"}`,
-    formula: "amount × price",
-    inputs: [
-      { label: "amount", kind: "chain", pclass: c ? lineClass(c) : "indexed", note: amount.via },
-      priceLeaf(symbol, p),
-    ],
+    kind: "chain-derived",
+    pclass: "oracle",
+    summary: `${head}, in USD. ${body} Valued at its on-chain price, to the cent.`,
+    via: `${amount.via} · × ${priceRead(p.source)}`,
+    formula: r?.prov?.formula ?? "amount × price",
+    ...(inputs ? { inputs } : {}),
   };
 }
 
@@ -521,21 +541,45 @@ export function headValueProv(
     summary: `${o.symbol} ${what} ${scope}. The tokens ${words}, read from the hub${atHead(f)}${priced ? ", valued at the spoke oracle's price at the same block" : ""}.`,
     contract: hubContract(f, o.hub),
     via: `${headLane(f)} · hub ${call}${priced ? " · × oracle getReservePrice" : ""}`,
-    formula: priced ? "amount × price" : undefined,
-    inputs: priced
-      ? [
-          { label: "amount", kind: "chain", pclass: "state", contract: hubContract(f, o.hub), note: `hub ${call}` },
-          {
-            label: "price",
-            value: `$${f.price!.toLocaleString("en-US", { maximumFractionDigits: 6 })}`,
-            kind: "chain",
-            pclass: "oracle",
-            contract: f.oracle ? { name: `${o.spoke} oracle`, address: f.oracle } : undefined,
-            note: "the spoke oracle's getReservePrice",
-          },
-        ]
-      : undefined,
+    ...(priced
+      ? headRows(
+          f,
+          o.symbol,
+          side === "spoke"
+            ? what === "supplied"
+              ? f.spokeSupplied
+              : f.spokeBorrowed
+            : what === "supplied"
+              ? f.hubSupplied
+              : f.hubBorrowed,
+          `hub ${call}`,
+        )
+      : {}),
   };
+}
+
+/** A head amount's rows: the tokens × the spoke oracle's price at the same
+ *  block, as shown, to the cent (lib/aave-v4/usd-receipt.ts). */
+function headRows(
+  f: V4ReserveFigures,
+  symbol: string,
+  tokens: number,
+  amountNote: string,
+): Pick<Provenance, "formula" | "inputs"> {
+  const r = aaveV4UsdReceipt({
+    what: "",
+    rows: [
+      {
+        symbol,
+        amount: tokens,
+        amountNote,
+        price: { usd: f.price as number, source: "reserve", block: f.block, oracle: f.oracle },
+      },
+    ],
+    face: "compact",
+    via: "",
+  });
+  return r?.prov ? { formula: r.prov.formula, inputs: r.prov.inputs } : {};
 }
 
 /** A sum of head amounts over a spoke's reserves. */
@@ -548,18 +592,16 @@ export function spokeValueProv(
   chainId: number = 1,
 ): Provenance {
   const call = what === "supplied" ? "getSpokeAddedAssets" : "getSpokeTotalOwed";
-  const market = sum.market.length
-    ? ` ${list(sum.market)} had no price from the spoke's oracle and ${sum.market.length === 1 ? "is" : "are"} valued at an off-chain market feed (DefiLlama).`
-    : "";
-  const gap = sum.unpriced.length ? ` The total leaves out ${list(sum.unpriced)}, which no price source holds.` : "";
-  return {
-    kind: sum.market.length ? "derived" : "chain-derived",
-    pclass: sum.market.length ? "offchain" : "oracle",
-    source: { block },
-    summary: `${spoke} ${what}${sum.unpriced.length ? " (partial)" : ""}. Each of its ${count} reserves' ${what === "supplied" ? "added assets" : "owed, drawn and premium,"} on the hub it draws from, read near block ${n(block)} and valued at the spoke oracle's price, then added up.${market}${gap}`,
-    via: `${chainId === 5042 ? HEAD_ARC : HEAD} per reserve · hub ${call}(assetId, spoke) × oracle getReservePrice · summed`,
-    formula: "Σ (amount × price)",
-  };
+  return sumReceipt(
+    {
+      source: { block },
+      summary: `${spoke} ${what}. Each of its ${count} reserves' ${what === "supplied" ? "added assets" : "owed, drawn and premium,"} on the hub it draws from, read near block ${n(block)} and valued at its on-chain price, then added up.`,
+      via: `${chainId === 5042 ? HEAD_ARC : HEAD} per reserve · hub ${call}(assetId, spoke) × ${priceReads(sum)} · summed`,
+    },
+    sum,
+    `the hub's ${call}(assetId, spoke), read near block ${n(block)}`,
+    block,
+  );
 }
 
 /** Available: what the spoke can still draw, valued at the spoke oracle's
@@ -596,18 +638,7 @@ export function availableProv(f: V4ReserveFigures, o: { symbol: string; spoke: s
         pclass: "state",
         note: "hub getSpokeTotalOwed",
       },
-      ...(priced
-        ? [
-            {
-              label: "price",
-              value: `$${f.price!.toLocaleString("en-US", { maximumFractionDigits: 6 })}`,
-              kind: "chain" as const,
-              pclass: "oracle" as const,
-              contract: f.oracle ? { name: `${o.spoke} oracle`, address: f.oracle } : undefined,
-              note: "the spoke oracle's getReservePrice",
-            },
-          ]
-        : []),
+      ...(priced ? (headRows(f, o.symbol, f.available, "min(liquidity, draw cap − owed)").inputs ?? []) : []),
     ],
   };
 }

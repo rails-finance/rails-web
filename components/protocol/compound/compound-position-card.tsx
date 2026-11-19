@@ -21,6 +21,8 @@
 //           block the balance was read at.
 //   closed  the highest recorded supply and debt, and the Outcome.
 
+import { compoundSideUsd } from "@/lib/compound/comet-usd";
+import type { CometPriceFactor } from "@/lib/compound/comet-usd";
 import { POSITION_NOUN } from "@/lib/shared/protocols";
 import { positionName } from "@/lib/shared/position-name";
 import { ListingTag } from "@/components/shared/listing-tag";
@@ -49,12 +51,7 @@ import { WalletPill } from "@/components/shared/wallet-pill";
 import { useDustLines } from "@/components/shared/dust-reserves";
 import { ExactSpan } from "@/components/shared/amount-text";
 import { formatUnitsExact, formatExactDecimal, formatUsdValue } from "@/lib/utils/format";
-import {
-  compoundUsdProvOnchain,
-  peakBaseProv,
-  peakCollateralProv,
-  type CompoundCoords,
-} from "@/lib/compound/event-provenance";
+import { peakBaseProv, peakCollateralProv, type CompoundCoords } from "@/lib/compound/event-provenance";
 import { COMPOUND_INDEXED_VOCABULARY, type CompoundTowerVocabulary } from "@/lib/compound/economics";
 import { compoundPositionModal, type CompoundPositionDeployment } from "@/lib/compound/event-templates";
 import type { SessionProtocol } from "@/lib/shared/sessions";
@@ -101,9 +98,15 @@ export interface CompoundPositionView {
   lastActivityAt: number | null;
   atBlock?: number;
   /** §3 USD layer: head prices keyed by lowercased token address, threaded in by
-   *  the detail page (the shared `/api/prices` cache). Feeds the valued economics
+   *  the detail page. Feeds the valued economics
    *  tower; absent on the listing (the card itself shows no USD). */
   priceByAddress?: Record<string, number>;
+  /** The factors of an ETH-quoted Comet's composed prices, and the block the
+   *  prices stand at (ui-jobs 743). */
+  priceFactors?: Record<string, CometPriceFactor>;
+  priceBlock?: number | null;
+  /** Where the WETH-in-dollars factor was read, where it is a read of its own. */
+  wethFrom?: string;
   /** Set when the account still holds balances but every one is worth under
    *  a cent at the oracle and nothing is borrowed: the card reads it as
    *  closed, and these are the amounts left behind. */
@@ -143,48 +146,68 @@ function baseProv(
     : vocab.positionBase(v.base.symbol, side, coords);
 }
 
-/** On-chain oracle USD for one asset; null when this market didn't price it. */
-function assetUsd(v: CompoundPositionView, address: string, amount: number): number | null {
-  const p = v.priceByAddress?.[address.toLowerCase()];
-  return typeof p === "number" && p > 0 ? amount * p : null;
+/** Where the card's amounts come from: the live read at its block, or the
+ *  replay of the account's events, which names no block (ui-jobs 743). */
+function balanceOf(v: CompoundPositionView, eff: EffectiveBase): Parameters<typeof compoundSideUsd>[0]["balance"] {
+  return eff.isChain || v.atBlock != null
+    ? { source: "chain", block: eff.block ?? v.atBlock ?? null }
+    : { source: "replay" };
 }
 
-/** Total USD across a set of {address, amount} legs, with the STRICT guard from
- *  Aave's on-chain USD: null the moment any contributing leg is unpriced, so a
- *  partial total is never asserted. */
-function totalUsd(
-  v: CompoundPositionView,
-  legs: { address: string; amount: number; decimalsUnread?: true }[],
-): number | null {
-  let sum = 0;
-  let any = false;
-  for (const { address, amount, decimalsUnread } of legs) {
-    if (decimalsUnread) return null;
-    if (amount <= 0) continue;
-    const u = assetUsd(v, address, amount);
-    if (u == null) return null;
-    sum += u;
-    any = true;
-  }
-  return any ? sum : null;
-}
-
-/** The card's oracle-USD side figures (the chain-state balances × Comet's own
- *  getPrice, threaded on the summary's priceByAddress), exported so the
- *  Explanation pane restates the card's figures byte for byte (charter §3
- *  reverse-completeness). A side is null when the card shows no USD for it
- *  (any contributing leg unpriced — the strict guard above). */
-export function cardSideUsd(v: CompoundPositionView): { supplyUsd: number | null; borrowUsd: number | null } {
+/** The card's dollar figures and their receipts: each asset's amount × its
+ *  Comet's price as shown, the product to the cent, each side the sum of its
+ *  products; where any asset on a side has no price, no figure and the
+ *  asset named (lib/compound/comet-usd.ts). */
+export function cardSideReceipts(v: CompoundPositionView): {
+  supply: ReturnType<typeof compoundSideUsd>;
+  borrow: ReturnType<typeof compoundSideUsd>;
+} {
   const eff = effectiveBase(v);
+  const balance = balanceOf(v, eff);
   const supplyLegs = [
-    ...(eff.side === "lend" ? [{ address: v.base.address, amount: eff.amount }] : []),
-    ...v.collateral.map((c) => ({ address: c.address, amount: c.amount, decimalsUnread: c.decimalsUnread })),
+    ...(eff.side === "lend" ? [{ symbol: v.base.symbol, address: v.base.address, amount: eff.amount }] : []),
+    ...v.collateral.map((c) => ({
+      symbol: c.symbol,
+      address: c.address,
+      amount: c.amount,
+      decimalsUnread: c.decimalsUnread,
+    })),
   ];
   return {
-    supplyUsd: totalUsd(v, supplyLegs),
-    borrowUsd: eff.side === "borrow" ? assetUsd(v, v.base.address, Math.abs(eff.amount)) : null,
+    supply: compoundSideUsd({
+      what: eff.side === "lend" ? "Lent base and collateral in USD" : "Collateral in USD",
+      view: v,
+      legs: supplyLegs,
+      balance,
+    }),
+    borrow:
+      eff.side === "borrow"
+        ? compoundSideUsd({
+            what: "Borrowed base in USD",
+            view: v,
+            legs: [{ symbol: v.base.symbol, address: v.base.address, amount: Math.abs(eff.amount) }],
+            balance,
+          })
+        : null,
   };
 }
+
+const figureOf = (r: ReturnType<typeof compoundSideUsd>) => (r && "usd" in r ? r : null);
+
+/** The card's oracle-USD side figures, the sums of the shown products,
+ *  exported so the Explanation pane restates the card's figures byte for byte
+ *  (charter §3 reverse-completeness). A side is null where the card shows no
+ *  dollars for it (an asset on it unpriced). */
+export function cardSideUsd(v: CompoundPositionView): { supplyUsd: number | null; borrowUsd: number | null } {
+  const r = cardSideReceipts(v);
+  return { supplyUsd: figureOf(r.supply)?.usd ?? null, borrowUsd: figureOf(r.borrow)?.usd ?? null };
+}
+
+/** The no-figure words for a side with an unpriced asset. */
+const noFigure = (r: ReturnType<typeof compoundSideUsd>) =>
+  r && "missing" in r && r.missing.length > 0
+    ? `no dollar figure: ${r.missing.join(", ")} ${r.missing.length === 1 ? "has" : "have"} no price at this read`
+    : null;
 
 /** One line on the supply side: the lent base (a net LENDER only) or one
  *  collateral asset. */
@@ -212,12 +235,23 @@ function supplyLegs(v: CompoundPositionView, eff: EffectiveBase): SupplyLeg[] {
   ];
 }
 
-/** A supply line's oracle USD for the dust rule (components/shared/dust-reserves);
- *  null (held) where unpriced or its decimals were not read. */
-const legUsdOf =
+/** A supply line's dollars and receipt: its shown product. Null (held)
+ *  where unpriced or its decimals were not read. */
+const legReceiptOf =
   (v: CompoundPositionView) =>
-  (l: SupplyLeg): number | null =>
-    l.collateral?.decimalsUnread ? null : assetUsd(v, l.address, l.amount);
+  (l: SupplyLeg): { usd: number; prov: Provenance } | null =>
+    l.collateral?.decimalsUnread
+      ? null
+      : figureOf(
+          compoundSideUsd({
+            what: `${l.symbol}${l.collateral ? " collateral" : " lent"} in USD`,
+            view: v,
+            legs: [{ symbol: l.symbol, address: l.address, amount: l.amount }],
+            balance: balanceOf(v, effectiveBase(v)),
+          }),
+        );
+/** A supply line's oracle USD for the dust rule (components/shared/dust-reserves). */
+const legUsdOf = (v: CompoundPositionView) => (l: SupplyLeg) => legReceiptOf(v)(l)?.usd ?? null;
 
 /** A traced token amount at headline size (the asset's glyph after it). */
 function TracedAmount({
@@ -479,7 +513,11 @@ export function useCompoundCardSlots({
       asset: v.base.address,
       blockNumber: v.atBlock,
     };
-    const { supplyUsd, borrowUsd } = cardSideUsd(v);
+    const receipts = cardSideReceipts(v);
+    const supplyR = figureOf(receipts.supply);
+    const borrowR = figureOf(receipts.borrow);
+    const supplyUsd = supplyR?.usd ?? null;
+    const borrowUsd = borrowR?.usd ?? null;
     // Without the live read, Ethereum shows the balance at the last event and
     // Base the replayed principal; the live read includes interest.
     const lentBasis = eff.isChain ? "incl. interest" : "earns supply rate";
@@ -504,7 +542,7 @@ export function useCompoundCardSlots({
       label: lending ? SUPPLIED : CARD_VOCAB.collateral,
       value:
         legs.length === 0 ? null : supplyUsd != null ? (
-          <UsdFigure usd={supplyUsd} info={compoundUsdProvOnchain(lending ? "Lent base" : "Collateral", coords)} />
+          <UsdFigure usd={supplyUsd} info={supplyR!.prov} />
         ) : (
           <div className="flex flex-col gap-1">
             {lines.map((l) => (
@@ -524,11 +562,8 @@ export function useCompoundCardSlots({
           </div>
         ),
       assets: supplyUsd != null && supplyMarks.length > 0 ? <InlineAssetCluster assets={supplyMarks} /> : undefined,
-      total:
-        supplyUsd != null
-          ? { usd: supplyUsd, info: compoundUsdProvOnchain(lending ? "Lent base" : "Collateral", coords) }
-          : undefined,
-      sub: lending ? lentBasis : undefined,
+      total: supplyUsd != null ? { usd: supplyUsd, info: supplyR!.prov } : undefined,
+      sub: noFigure(receipts.supply) ?? (lending ? lentBasis : undefined),
     };
     // One supply line: its amount with its icon, the dollars beneath (the
     // Liquity V2 headline, as the debt side draws it).
@@ -554,7 +589,7 @@ export function useCompoundCardSlots({
       supplyHead.assets = undefined;
       supplyHead.usd =
         supplyUsd != null ? (
-          <Prov info={compoundUsdProvOnchain(lending ? "Lent base" : "Collateral", coords)}>
+          <Prov info={supplyR!.prov}>
             <span className="font-bold text-green-400">{formatUsdValue(supplyUsd)}</span>
           </Prov>
         ) : null;
@@ -571,12 +606,12 @@ export function useCompoundCardSlots({
       ) : null,
       usd: borrowing
         ? borrowUsd != null && (
-            <Prov info={compoundUsdProvOnchain("Borrowed base", coords)}>
+            <Prov info={borrowR!.prov}>
               <span className="font-bold text-green-400">{formatUsdValue(borrowUsd)}</span>
             </Prov>
           )
         : undefined,
-      sub: borrowing ? borrowBasis : undefined,
+      sub: borrowing ? (noFigure(receipts.borrow) ?? borrowBasis) : undefined,
     };
     // The risk headline and its rows from the live read: a borrower only.
     const risk = borrowing && live !== undefined ? compoundRiskSlots(live, v.base.address) : null;
@@ -587,7 +622,8 @@ export function useCompoundCardSlots({
     const supplyBreakdown: AssetBreakdown = {
       assets: lines.map((l) => {
         const c = l.collateral;
-        const usd = usdOf(l);
+        const legR = legReceiptOf(v)(l);
+        const usd = legR?.usd ?? null;
         return {
           id: c ? `collateral-${c.symbol.toLowerCase()}` : "lent",
           symbol: l.symbol,
@@ -608,12 +644,7 @@ export function useCompoundCardSlots({
               </ExactSpan>
             </Prov>
           ),
-          usdText:
-            usd != null ? (
-              <Prov info={compoundUsdProvOnchain(c ? `${l.symbol} collateral` : "Lent base", coords)}>
-                {formatUsdValue(usd)}
-              </Prov>
-            ) : undefined,
+          usdText: usd != null ? <Prov info={legR!.prov}>{formatUsdValue(usd)}</Prov> : undefined,
         };
       }),
       dust: dustControl ?? undefined,
@@ -701,5 +732,7 @@ export function viewFromSummary(s: CompoundPositionSummary): CompoundPositionVie
     txCount: s.txCount,
     lastActivityAt: s.lastActivityAt,
     priceByAddress: s.priceByAddress,
+    priceFactors: s.priceFactors,
+    priceBlock: s.priceBlock,
   };
 }

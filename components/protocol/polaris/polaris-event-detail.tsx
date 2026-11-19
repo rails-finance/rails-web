@@ -142,6 +142,8 @@ export function polarisEventBody(
   ledgers: boolean,
   /** The CDP's previous event, where the page hands it down. */
   prev?: PolarisContext,
+  /** That event's block, which its stored prices were read at. */
+  prevBlock?: number,
 ): PolarisEventBody {
   const stable = ctx.stableSymbol;
   const stableAddr = POLARIS_MARKET_CONFIG[ctx.market].stable.address;
@@ -348,7 +350,7 @@ export function polarisEventBody(
         }
       : undefined;
 
-  const sheet = polarisSheet(ctx, coords, prev);
+  const sheet = polarisSheet(ctx, coords, prev, prevBlock);
 
   // The sheet states the primary rate in its Limits panel and the escrow in
   // a panel of its own; the cells carry both in the grid.

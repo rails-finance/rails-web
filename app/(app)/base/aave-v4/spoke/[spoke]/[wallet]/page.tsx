@@ -6,7 +6,7 @@ import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
 import { resolveSpokeSegment } from "@/lib/aave-v4/spoke-meta";
-import { loadAaveV4CardPrices, loadAaveV4SpokeTail } from "@/lib/aave-v4/spoke-position-page-data";
+import { loadAaveV4SpokeTail } from "@/lib/aave-v4/spoke-position-page-data";
 import { AAVE_V4_BASE_API_ROOT } from "@/lib/aave-v4/deployment-routes";
 import AaveV4SpokeView from "@/components/protocol/aave-v4/aave-v4-spoke-view";
 
@@ -42,9 +42,8 @@ export default async function AaveV4BaseSpokePage({ params }: Props) {
   if (slug && slug !== rawSpoke) permanentRedirect(canonicalPath);
   const spokeSlug = slug ?? rawSpoke;
 
-  const [tail, prices, indexRead] = await Promise.all([
+  const [tail, indexRead] = await Promise.all([
     loadAaveV4SpokeTail(wallet, spokeName, AAVE_V4_BASE_API_ROOT),
-    loadAaveV4CardPrices(),
     indexReadAt(BASE_CHAIN_ID),
   ]);
   // The card states the Spoke read where the figures stand on it, else the index head (ui-jobs 512).
@@ -61,7 +60,6 @@ export default async function AaveV4BaseSpokePage({ params }: Props) {
         initialChain={tail.chain}
         initialEvents={tail.events}
         initialSpokeTotalEvents={tail.spokeTotalEvents}
-        initialPrices={prices}
       />
     </PositionReadProvider>
   );

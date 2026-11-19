@@ -9,10 +9,12 @@
 // so no lookup), scales the signed base and each collateral line, and shapes a
 // CompoundPositionSummary. Chain-direct amounts only — no HF, no USD (layers).
 
+import type { CometPriceFactor } from "@/lib/compound/comet-usd";
 import { resolveErc20Meta, scaleRaw, decimalsUnreadFlag, type Erc20Meta } from "@/lib/sources/chain/erc20-meta";
 import {
   cometRosterOf,
   resolveCometPrices,
+  cometFactorOf,
   cometPriceOf,
   type CometPriceRequest,
 } from "@/lib/sources/chain/compound-prices";
@@ -104,6 +106,10 @@ export interface CompoundPositionSummary {
    *  (`getPrice`). Chain-derived — survives the chain-state gate. Absent entries
    *  mean the token wasn't priceable (RPC down); callers degrade to token-only. */
   priceByAddress: Record<string, number>;
+  /** The factors of an ETH-quoted Comet's composed prices, by token. */
+  priceFactors: Record<string, CometPriceFactor>;
+  /** The block the prices were read at; null where the read names none. */
+  priceBlock: number | null;
 }
 
 /** One collateral line as returned by the rails route. */
@@ -275,9 +281,12 @@ export async function buildCompoundPositionRows(
     // This market's on-chain oracle prices, keyed by token address for the card /
     // economics (which look values up by address).
     const priceByAddress: Record<string, number> = {};
+    const priceFactors: Record<string, CometPriceFactor> = {};
     const putPrice = (token: string) => {
       const u = cometPriceOf(cometPrices, m.comet, token);
       if (u != null) priceByAddress[token.toLowerCase()] = u;
+      const f = cometFactorOf(cometPrices, m.comet, token, deployment);
+      if (f) priceFactors[token.toLowerCase()] = f;
     };
     putPrice(m.baseToken);
     for (const c of collateral) putPrice(c.address);
@@ -324,6 +333,8 @@ export async function buildCompoundPositionRows(
       // API hasn't served txCount yet.
       txCount: p.txCount ?? p.eventCount,
       priceByAddress,
+      priceFactors,
+      priceBlock: cometPrices.read?.blockNumber ?? null,
     };
   });
 }

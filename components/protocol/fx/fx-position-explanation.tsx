@@ -19,10 +19,13 @@
 
 import type { FxPositionView } from "@/components/protocol/fx/fx-position-card";
 import { formatUsd } from "@/lib/shared/format-event";
+import { fxAnchorOf, fxPositionCollUsd, fxSeizedUsd } from "@/lib/fx/usd-receipt";
+import { shownUsd } from "@/lib/shared/shown-usd";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
 import { AmountText } from "@/components/shared/amount-text";
+import { Prov } from "@/components/shared/provenance";
 import { useFxPoolTerms, useFxPricesAt } from "@/lib/fx/use-event-state";
 import { formatNumber } from "@/lib/utils/format";
 import type { FxNoTxParts } from "@/lib/fx/no-tx-parts";
@@ -115,6 +118,9 @@ export function FxPositionExplanation({
     pxRead?.anchorPrice != null && pxRead.minPrice != null
       ? { anchor: Number(pxRead.anchorPrice) / 1e18, min: Number(pxRead.minPrice) / 1e18 }
       : null;
+  // The collateral's dollars as the card draws them: the shown product at the
+  // anchor leg of the settled block (ui-jobs 743).
+  const collUsd = fxPositionCollUsd(v, fxAnchorOf(pxRead, v.settled.block));
 
   const isClosed = v.status === "closed";
   const hasEvents = v.activity.eventCount > 0;
@@ -268,23 +274,15 @@ export function FxPositionExplanation({
 
     const anchorAt =
       px?.anchor ?? (hasDebt && v.settled.debtRatio && colls ? debts / (colls * v.settled.debtRatio) : null);
-    if (colls != null && px) {
+    if (collUsd) {
       bullets.push(
         <span key="usd">
-          At the oracle&rsquo;s anchor price, {formatUsd(px.anchor)} per {v.normalizedSymbol}, that collateral is worth{" "}
-          <H>{formatUsd(colls * px.anchor)}</H>.
-        </span>,
-      );
-    } else if (v.settled.collUsd != null) {
-      bullets.push(
-        <span key="usd">
-          At the oracle&rsquo;s min price
-          {v.oracle.priceUsd != null ? (
-            <>
-              , {formatUsd(v.oracle.priceUsd)} per {v.normalizedSymbol},
-            </>
-          ) : null}{" "}
-          that collateral is worth <H>{formatUsd(v.settled.collUsd)}</H>.
+          At the oracle&rsquo;s anchor price, {formatUsd(collUsd.price)} per {v.normalizedSymbol}, that collateral is
+          worth{" "}
+          <Prov info={collUsd.prov}>
+            <H>{formatUsd(collUsd.usd)}</H>
+          </Prov>
+          .
         </span>,
       );
     }
@@ -409,7 +407,14 @@ export function FxPositionExplanation({
   const bonus = parts?.bonus;
   if (bonus && bonus.debt > 0.0005) {
     const who = parts?.redemptions && parts.redemptions.debt > 0.0005 ? "Rebalances and redemptions" : "Rebalances";
-    const paid = bonus.collUsd - bonus.debt;
+    // The collateral's dollars: each block's take × the min leg of the block
+    // before it, the sum of the shown products (ui-jobs 743); the debt at $1.
+    const seized = fxSeizedUsd({
+      what: `The ${v.normalizedSymbol} rebalances and redemptions took, in USD`,
+      pool: v.pool,
+      legs: bonus.legs,
+    });
+    const paid = Math.round((bonus.collUsd - shownUsd(bonus.debt, 1)) * 100) / 100;
     const bountyWords = fxBountyWords(
       {
         paid,
@@ -423,8 +428,9 @@ export function FxPositionExplanation({
       <span key="bounty">
         {who} took {formatNumber(bonus.coll)} {v.normalizedSymbol} of collateral for <AmountText value={bonus.debt} />{" "}
         fxUSD of debt. At the oracle&rsquo;s min price at the block before each, that collateral was worth{" "}
-        {formatUsd(bonus.collUsd)}: {formatUsd(Math.abs(paid))} {paid >= 0 ? "more" : "less"} than the debt it cleared,
-        which the pool counts at $1 per fxUSD.
+        {seized ? <Prov info={seized.prov}>{formatUsd(seized.usd)}</Prov> : formatUsd(bonus.collUsd)}:{" "}
+        {formatUsd(Math.abs(paid))} {paid >= 0 ? "more" : "less"} than the debt it cleared, which the pool counts at $1
+        per fxUSD.
         {bountyWords ? <> {bountyWords.replace(/'/g, "’")}</> : null}
       </span>,
     );

@@ -28,6 +28,8 @@
 // the paging trap — so the strip states the count, says why the totals are
 // absent, and never quietly sums a slice.
 
+import { shownComposedPrice } from "@/lib/shared/shown-usd";
+import { polarisPethUsdNote } from "./price-notes";
 import type { HolderLeg, HolderStripProps } from "@/components/shared/holder-strip";
 import type { PolarisPositionSummary } from "@/lib/sources/api/polaris-positions";
 // Type-only — lib/sources/chain/* is server-only, and an `import type` is
@@ -152,11 +154,20 @@ export function polarisHolderStrip(
   const coll = open.reduce((sum, r) => sum + r.coll, 0);
   // pETH has one price on this protocol — both markets read the same bonding
   // curve and the same ETH/USD medianiser, and the board carries it on each.
-  const pethUsd = (boardFor("usdp") ?? markets.markets[0])?.price.pethUsd ?? null;
+  // One composed row, the curve × ETH/USD, each factor as shown, at the
+  // board's block: the card's row, so the two agree to the cent (ui-jobs 743).
+  const boardPrice = (boardFor("usdp") ?? markets.markets[0])?.price ?? null;
+  const composed =
+    boardPrice && boardPrice.curve > 0 && boardPrice.ethUsd > 0
+      ? {
+          usd: shownComposedPrice(boardPrice.curve, boardPrice.ethUsd),
+          note: polarisPethUsdNote({ curve: boardPrice.curve, ethUsd: boardPrice.ethUsd, block: markets.blockNumber }),
+        }
+      : null;
   const legs: HolderLeg[] = [];
   if (coll > 0) {
     const receipt =
-      pethUsd != null
+      composed != null
         ? holderUsdReceipt({
             what: "The wallet's collateral in USD",
             legs: [
@@ -164,9 +175,8 @@ export function polarisHolderStrip(
                 token: "pETH",
                 amount: coll,
                 amountNote: "Σ last emitted collateral of the wallet's open positions",
-                price: pethUsd,
-                priceNote:
-                  "pETH / USD: the bonding curve's currentPrice() × the ETH/USD medianiser's previewExternalPrice()",
+                price: composed.usd,
+                priceNote: composed.note,
                 priceContract: { name: "Polaris bonding curve", address: POLARIS_CORE.bondingCurve },
               },
             ],
@@ -228,14 +238,14 @@ export function polarisHolderStrip(
     });
   } else if (debtByMarket.size > 1) {
     // Two markets, two units: the only sum that exists is a valued one.
-    const parts: string[] = [];
+    const parts: { text: string; symbol: string }[] = [];
     const usdLegs: UsdLeg[] = [];
     for (const [market, amount] of debtByMarket) {
       const symbol = POLARIS_MARKET_CONFIG[market].stable.symbol;
       const leg = debtLeg(market, amount);
       if (!leg) continue;
       usdLegs.push(leg);
-      parts.push(`${formatNumber(amount)} ${symbol}`);
+      parts.push({ text: `${formatNumber(amount)} ${symbol}`, symbol });
     }
     // A sum across tokens stands only where every token is priced: a total
     // of the priced ones alone would read as the whole.
@@ -254,8 +264,9 @@ export function polarisHolderStrip(
         approx: false,
         tip: LEG_TIP.debtValued,
         prov: receipt.prov,
-        footnote: { text: parts.join(" · ") },
-        // The icons of the markets the total counts.
+        // Each market's amount with its token's icon, beneath the dollars
+        // (ui-jobs 738).
+        footnote: { text: parts.map((p) => p.text).join(" · "), parts },
         figure: {
           tokens: usdLegs.map((l) => ({ symbol: l.token })),
           usd: receipt.usd,

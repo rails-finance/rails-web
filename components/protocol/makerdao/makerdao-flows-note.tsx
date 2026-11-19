@@ -44,8 +44,9 @@ export function MakerFlowsNote({ facts, collSymbol, debtSymbol, ilk, capped }: M
       {store ? (
         <p>
           The collateral is valued at Maker&apos;s oracle price for {ilk} at the close of each day (Vat spot × Spotter
-          mat, the price the liquidation check uses, one hour behind the market), recorded once a day in Rails&apos;
-          daily price store: each event at its day&apos;s price
+          par × mat, the price the liquidation check uses, one hour behind the market), recorded once a day in
+          Rails&apos; daily price store with the block it was read at: each event at its day&apos;s price, its receipt
+          naming that block beside the event&apos;s own
           {p && p.row > 0
             ? `, ${count(p.row, "a liquidation", "liquidations")} at the price at ${p.row === 1 ? "its block" : "their blocks"}`
             : ""}
