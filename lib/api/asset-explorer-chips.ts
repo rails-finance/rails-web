@@ -282,6 +282,7 @@ const pendleMarkets = unstable_cache(
         yieldToken: m.tokens.yieldToken.address,
         asset: m.tokens.asset.address ?? null,
         expired: m.expired,
+        expiry: m.tokens.expiry,
       }));
   },
   ["asset-explorer-pendle-markets-v1"],
@@ -333,7 +334,12 @@ export async function assetChips(
   const llama = await llamalendTokens().catch(() => [] as [string, string][]);
   for (const [t, symbol] of llama)
     hits.push({ explorer: "llamalend", chain: 1, token: t, from: "catalog", page: "/markets", symbol });
-  const pendle = await pendleMarkets().catch(() => [] as PendleMarketRef[]);
+  // The cache can serve an older roster when a refresh fails: a market past
+  // its expiry is dropped here too.
+  const now = Date.now() / 1000;
+  const pendle = (await pendleMarkets().catch(() => [] as PendleMarketRef[])).filter(
+    (m) => m.expired !== true && m.expiry > now,
+  );
   for (const { token, use } of pendleUses(pendle))
     hits.push({ explorer: "pendle", chain: 1, token, from: "catalog", page: "/markets", uses: [use] });
 

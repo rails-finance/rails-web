@@ -1,6 +1,6 @@
 // What a token is to an explorer that lists it (rails-ops ui-jobs 490): the
 // uses the asset page names under its "Read by" chips (A1.8), each a link to
-// the explorer's page for it. Every use comes from a protocol's own config or
+// the explorer's page for it. Every use comes from a protocol's config or
 // roster, read in lib/api/asset-explorer-chips.ts: a Liquity-family debt
 // token's Troves and Stability Pools, sBOLD's asset, and Pendle's roster,
 // whose markets name their yield token and the asset it accounts in (BOLD
@@ -28,10 +28,12 @@ export interface PendleMarketRef {
   yieldToken: string;
   asset: string | null;
   expired: boolean | null;
+  /** Unix seconds. */
+  expiry: number;
 }
 
 /** The uses of one Pendle market's tokens: the yield token and, where it is
- *  another token, the asset it accounts in, each named by the PT; an expired
+ *  another token, the asset it accounts in, each labelled with the market's PT symbol; an expired
  *  market, and the zero address Pendle writes for ETH, have none. */
 export function pendleUses(markets: readonly PendleMarketRef[]): { token: string; use: TokenUse }[] {
   const out: { token: string; use: TokenUse }[] = [];

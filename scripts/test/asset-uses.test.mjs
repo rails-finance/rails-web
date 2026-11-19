@@ -17,6 +17,7 @@ test("a live Pendle market names its yield token and its asset", () => {
       yieldToken: SBOLD,
       asset: BOLD,
       expired: false,
+      expiry: 1801699200,
     },
   ]);
   assert.deepEqual(
@@ -31,13 +32,14 @@ test("a live Pendle market names its yield token and its asset", () => {
 
 test("an expired market, the zero address and a repeated token give no use", () => {
   const out = pendleUses([
-    { market: "0x1", pt: "PT-sBOLD-25JUN2026", yieldToken: SBOLD, asset: BOLD, expired: true },
+    { market: "0x1", pt: "PT-sBOLD-25JUN2026", yieldToken: SBOLD, asset: BOLD, expired: true, expiry: 1782345600 },
     {
       market: "0x2",
       pt: "PT-stETH",
       yieldToken: "0xae7ab96520de3a18e5e111b5eaab095312d7fe84",
       asset: "0x0000000000000000000000000000000000000000",
       expired: null,
+      expiry: 1801699200,
     },
     {
       market: "0x3",
@@ -45,6 +47,7 @@ test("an expired market, the zero address and a repeated token give no use", () 
       yieldToken: "0xAAAA000000000000000000000000000000000001",
       asset: "0xaaaa000000000000000000000000000000000001",
       expired: false,
+      expiry: 1801699200,
     },
   ]);
   assert.deepEqual(
