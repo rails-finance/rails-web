@@ -110,3 +110,40 @@ test("a missing price draws no figure", () => {
   assert.equal(polarisDebtUsd({ market: "goldp", debt: 1, xauUsd: null, block: BLOCK, via: "" }), null);
   assert.equal(polarisEquity({ market: "usdp", coll: 1, debt: 1, pethInDebt: null, block: BLOCK }), null);
 });
+
+const { polarisHolderStrip } = await import(ROOT + "lib/polaris/holder-strip.ts");
+
+test("the holder strip and the card give the same position the same collateral cents", () => {
+  const price = {
+    curve: 3.1995223456,
+    ethUsd: 1769.04123,
+    pethUsd: 3.1995223456 * 1769.04123,
+    pethInDebt: 5660.082591,
+    xauUsd: 3820.145319,
+  };
+  const markets = {
+    blockNumber: 12_165_707,
+    chainStale: false,
+    markets: [
+      { market: "usdp", price },
+      { market: "goldp", price },
+    ],
+  };
+  const row = { market: "usdp", cdpId: "1", status: "open", coll: 0.0349341234, debt: 31.65, formerHold: false };
+  const strip = polarisHolderStrip([row], 1, markets, 100);
+  const stripUsd = strip.legs.find((l) => l.id === "collateral").figure.usd;
+  const card = polarisPethUsd({
+    what: "x",
+    coll: row.coll,
+    amountNote: "",
+    curve: price.curve,
+    ethUsd: price.ethUsd,
+    block: markets.blockNumber,
+    via: "",
+  });
+  assert.equal(stripUsd, card.usd);
+  assert.match(
+    strip.legs.find((l) => l.id === "collateral").figure.usdProv.inputs.find((i) => i.label === "pETH price").note,
+    /currentPrice\(\), pETH in ETH\) × .*ETH\/USD.*at block 12,165,707/,
+  );
+});
