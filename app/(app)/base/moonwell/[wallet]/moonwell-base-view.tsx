@@ -328,8 +328,6 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
     folderParams: { wallet },
     storageKey: `moonwell-base-${wallet}`,
     protocolKey: "moonwell",
-    // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
-    dates: false,
   });
 
   // The CSV on a grouped page: the rows in the order the route served them,

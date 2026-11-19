@@ -77,9 +77,6 @@ export interface TimelineSegmentOptions {
   folderParams: Record<string, string>;
   storageKey: string;
   protocolKey: string;
-  /** False on a page tied to its Lifetime flows chart: no date range
-   *  (`useTimelineEvents`'s `dates`). */
-  dates?: boolean;
   /** Rows the page adds that no served read carries (an account's e-mode
    *  changes), the whole life of them: a month read draws those inside its
    *  span among its own rows. */
@@ -223,7 +220,6 @@ export function useTimelineSegment(o: TimelineSegmentOptions) {
         : segment
           ? 0
           : (o.olderCount ?? 0),
-    dates: o.dates,
   });
   const { setDateRange } = tl;
   const pickMonth = useCallback(

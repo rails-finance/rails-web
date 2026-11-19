@@ -5,8 +5,8 @@
 // Sync to chart, the 30-day projection's switch and Display at its right), then
 // the pill row: one N1.10 pill per axis the history offers (Type, Asset,
 // Version, Address; timeline-filter-bar.tsx), the Date pill where the page has
-// a date axis (`tl.datesAxis`; a page tied to its Lifetime flows chart has
-// none), Clear all, and the count at the row's right end. Below sm the pills
+// a date axis (`tl.datesAxis`; a timeline its Lifetime flows chart draws tied
+// to has none, `timelineDates` in lib/shared/flow-focus.ts), Clear all, and the count at the row's right end. Below sm the pills
 // scroll sideways behind the filter sheet's button and the count takes the line
 // under them. The Date pill opens the navigator panel (the month grid) under
 // the strip. Driven by a useTimelineEvents() state object, so a page wires it

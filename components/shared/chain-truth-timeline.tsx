@@ -77,7 +77,8 @@ import {
   useRewindParam,
 } from "@/components/shared/flow-focus-context";
 import { FlowDayMark, utcDay } from "@/components/shared/flow-day-mark";
-import { rewindEvents, rewindRows, timelineCut } from "@/lib/shared/flow-focus";
+import { rewindEvents, rewindRows, timelineCut, timelineDates } from "@/lib/shared/flow-focus";
+import { useHydrated } from "@/hooks/useHydrated";
 import { flowMoment } from "@/lib/shared/flow-moment";
 import { FlowMomentCard, type MomentNeighbour } from "@/components/shared/flow-moment-card";
 import { Link2, List, Lock, X } from "lucide-react";
@@ -851,8 +852,20 @@ function ChainTruthTimelineBody({
   useEffect(() => {
     for (const folder of unsettledFolders) folders.open(folder);
   }, [unsettledFolders, folders]);
+  // How this timeline picks a day (ui-jobs 764): where the Lifetime flows
+  // chart draws with its cursor tied here, by the chart ("Sync to chart", the
+  // cards' "View on chart") and no Date pill; elsewhere by the Date pill. Read
+  // from what the chart draws, held back while the page's panel reads.
+  const hydratedHere = useHydrated();
+  const datesBy = useFlowFocusState((st) =>
+    timelineDates(flowFocusValue ? { cursor: st.cursor, flows: st.flows } : null, hydratedHere),
+  );
+  const chartTied = datesBy === "chart";
+  const { setChartTie } = tl;
+  useEffect(() => setChartTie(chartTied), [setChartTie, chartTied]);
   const toolbarTl = useMemo<TimelineEventsState>(() => {
-    if (!servedRows || !tl.isFiltered) return tl;
+    const pill = tl.datesAxis && datesBy === "pill";
+    if (!servedRows || !tl.isFiltered) return pill === tl.datesAxis ? tl : { ...tl, datesAxis: pill };
     const { count, floor } = filteredEventCount(
       tl.filteredCount,
       servedRows.flatMap((row) => (row.kind === "folder" ? [{ folder: row.folder, matched: row.matched }] : [])),
@@ -862,8 +875,8 @@ function ChainTruthTimelineBody({
       },
       tl.memberPasses,
     );
-    return { ...tl, filteredCount: count, filteredCountIsFloor: floor };
-  }, [tl, servedRows, folders]);
+    return { ...tl, datesAxis: pill, filteredCount: count, filteredCountIsFloor: floor };
+  }, [tl, servedRows, folders, datesBy]);
 
   // What a Size or Type filter searched on a page holding fewer events than
   // the history (L11, ui-jobs 752 and 753).
@@ -1311,19 +1324,25 @@ function ChainTruthTimelineBody({
   // visitor left it. Where the page holds another month (a served,
   // month-navigated page) it reads the cut's month, and a line says so;
   // where a filter leaves the cut list empty the filters stay and the empty
-  // list says it (Miles, 1 Oct 2026). These
-  // pages have no Dates (`tl.datesAxis`): the cut is how they are navigated
-  // by day, and the address bar carries it (`useRewindParam`).
+  // list says it (Miles, 1 Oct 2026). A tied timeline has no Date pill
+  // (`chartTied`): the cut is how it is navigated by day, and the address bar
+  // carries it (`useRewindParam`). Every other keeps Dates and `?from=&to=`.
   const focusStore = useFlowFocus()?.store ?? null;
-  // Aave V4 on Base wears the provider without a series, so without the Show timeline button,
-  // and keeps Dates and its `?from=&to=`.
-  useRewindParam(tl.datesAxis ? null : focusStore);
-  useFollowPreference(tl.datesAxis ? null : focusStore);
+  useRewindParam(chartTied ? focusStore : null);
+  useFollowPreference(chartTied ? focusStore : null);
   const go = useFlowFocusState((st) => st.go);
   const [rewindNote, setRewindNote] = useState<string | null>(null);
   /** The month this code asked the page to read, and the cut it read for. */
   const askedMonth = useRef<number | null>(null);
   const askedCut = useRef<number | null>(null);
+  // A month the Date pill's grid read as its own segment goes when the chart
+  // ties, since the pill that would clear it goes too; a month the cut asked
+  // for stays.
+  useEffect(() => {
+    if (chartTied && segments?.month != null && askedMonth.current == null) segments.onReset?.();
+    // Only the tie's arrival; `segments` is read at that moment.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chartTied]);
   // The chip's × releases the cut; while the timeline follows the chart it
   // also stops following, which leaves the list whole where the chart stands.
   const releaseRewind = useCallback(() => {
@@ -1336,7 +1355,6 @@ function ChainTruthTimelineBody({
   // chart is drawn, its cursor the one the timeline syncs to. A press cuts the
   // timeline at the cursor; a second press while that cut stands locks it to
   // the cursor ("Follows chart"); a press then unlocks, the cut kept.
-  const chartDrawn = useFlowFocusState((st) => st.cursor != null);
   const inSync = useFlowFocusState(
     (st) => st.cursor != null && (st.cursor.live ? st.rewind == null : st.rewind?.endTs === st.cursor.endTs),
   );
@@ -1346,7 +1364,7 @@ function ChainTruthTimelineBody({
   }, [inSync]);
   const synced = justSynced && inSync;
   const followToggle =
-    focusStore && chartDrawn && !tl.datesAxis ? (
+    focusStore && chartTied ? (
       <SyncChartButton
         state={following ? "follow" : synced ? "synced" : "off"}
         onPress={() => {
@@ -2141,7 +2159,7 @@ function ChainTruthTimelineBody({
           data-protocol-change-stated={placedChanges.stated || undefined}
         >
           {/* data-skel-section feeds the skeleton memory layer (skeleton-size-recorder). */}
-          <div data-skel-section="detail-timeline-header">
+          <div data-skel-section="detail-timeline-header" data-timeline-dates={still ? undefined : datesBy}>
             <TimelineToolbar
               tl={toolbarTl}
               displayItems={items}
@@ -2151,8 +2169,9 @@ function ChainTruthTimelineBody({
               countTooltip={countTooltip}
               countDetail={countDetail}
               still={still}
-              // The Date button's panel hangs from the toolbar; the second path a
-              // month click can take travels to it here.
+              // The Date pill's panel hangs from the toolbar; the second path a
+              // month click can take travels to it here. A tied timeline draws
+              // no pill (`chartTied`), and the cut reads its month instead.
               monthReach={
                 segments
                   ? {

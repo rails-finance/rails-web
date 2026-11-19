@@ -47,7 +47,7 @@ import {
 import { Plus, X } from "lucide-react";
 import { readFlowsView, writeFlowsView } from "@/lib/shared/flows-view-store";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
-import { useFlowFocusState } from "@/components/shared/flow-focus-context";
+import { useFlowFocusState, useFlowsWaiting } from "@/components/shared/flow-focus-context";
 import { LearnMoreButton, LearnMoreModal, type LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { lifetimeFlowsBarsContent } from "@/lib/shared/learn-more-content";
 import { SectionSidebar } from "@/components/shared/section-sidebar";
@@ -192,6 +192,8 @@ export function LifetimeFlowsPanel({
       {label}
     </button>
   );
+  // The timeline holds back its Date pill while this reads (ui-jobs 764).
+  useFlowsWaiting(scrubber == null && read === "reading");
   if (scrubber == null && (read === "done" || read === "withheld")) return null;
   const loading = scrubber == null && read !== "failed";
   const none = scrubber != null && life === "none";

@@ -353,8 +353,6 @@ export default function EbisuTroveDetail({
     folderParams: {},
     storageKey: `ebisu-${collateralType}-${troveId}`,
     protocolKey: "ebisu",
-    // Navigated by the Lifetime flows chart's Apply: no Dates.
-    dates: false,
   });
 
   // ⚠️ On a windowed page every lifetime surface must read the MERGED history,

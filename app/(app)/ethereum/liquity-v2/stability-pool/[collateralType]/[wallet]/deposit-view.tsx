@@ -232,8 +232,6 @@ export default function DepositView({
     protocolKey: "liquity-v2-sp",
     olderCount,
     size: sizeDims,
-    // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
-    dates: false,
   });
   const boundary = useMemo(() => {
     const oldest = tl.sortedEvents[0];

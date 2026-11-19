@@ -290,8 +290,6 @@ export default function CompoundV2PositionView({
     folderParams: { wallet },
     storageKey: `compound-v2-${wallet}`,
     protocolKey: "compound-v2",
-    // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
-    dates: false,
   });
 
   // ⚠️ On a windowed page every lifetime surface must read the MERGED history,

@@ -201,8 +201,6 @@ export default function DepositView({
     storageKey: `polaris-sp-${market}-${tokenId}`,
     protocolKey: "polaris-sp",
     olderCount,
-    // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
-    dates: false,
   });
   const boundary = useMemo(() => {
     const oldest = tl.sortedEvents[0];

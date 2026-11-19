@@ -141,8 +141,6 @@ export default function LoanView({ loanId, initial }: { loanId: string; initial:
   const tl = useTimelineEvents(events, {
     storageKey: `polaris-loan-${loanId}`,
     protocolKey: "polaris-loan",
-    // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
-    dates: false,
   });
   const previousOf = useMemo(() => {
     const m = new Map<string, PolarisLoanEventRow | null>();

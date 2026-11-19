@@ -126,7 +126,6 @@ function HeroTroveComposition({ wire }: { wire: WireLiveExample }) {
   const tl = useTimelineEvents(rowEvents, {
     protocolKey: "liquity-v2-troves",
     olderCount: totalEvents - rowEvents.length,
-    dates: false,
   });
   // A card's previous event comes from the whole history; the projection
   // carries every field those reads take (see HeroTowerEvent).

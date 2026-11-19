@@ -406,8 +406,6 @@ export default function PwnLoanView({
     storageKey: `pwn-${wallet}-${selectedLoanId ?? "all"}`,
     protocolKey: "pwn",
     window: historyWindow,
-    // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
-    dates: false,
   });
 
   // The Lifetime flows panel replays the loan's whole history

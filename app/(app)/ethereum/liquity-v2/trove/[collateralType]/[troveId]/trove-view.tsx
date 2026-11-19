@@ -460,8 +460,6 @@ export default function TroveView({
     protocolKey: "liquity-v2-troves",
     olderCount,
     size: sizeDims,
-    // Navigated by the Lifetime flows chart's Apply: no Dates.
-    dates: false,
   });
   // The boundary card for a `limit`-cut list: the count the route reported,
   // the oldest served row's block and its own before-state.

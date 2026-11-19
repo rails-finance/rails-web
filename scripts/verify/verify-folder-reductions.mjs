@@ -846,10 +846,14 @@ async function runArm(arm, ctx) {
   };
 
   // Both arms' families navigate by their Lifetime flows chart since
-  // 2026-10-01 and draw no Dates control, so no grid stands on the page to
-  // read: H1 is skipped there.
+  // 2026-10-01 and draw no Dates control where the chart ties, so no grid
+  // stands on the page to read: H1 is skipped there. The toolbar says which
+  // once the panel has read (`data-timeline-dates`, ui-jobs 764).
   const hasGrid = await (async () => {
     const page = await openPage(true, "[data-timeline-total]");
+    await page
+      .waitForSelector('[data-timeline-dates]:not([data-timeline-dates="waiting"])', { timeout: 180_000 })
+      .catch(() => null);
     const n = await page.locator("[data-date-control]").count();
     await page.close();
     return n > 0;
@@ -857,7 +861,7 @@ async function runArm(arm, ctx) {
   if (!hasGrid) {
     skip(
       id("H1 the page's heatmap counts the same events with folders on and off"),
-      "this family draws no Dates control (navigated by its Lifetime flows chart since 2026-10-01); R1 and R2 check the folders' days",
+      "this page draws no Dates control (its Lifetime flows chart ties to the timeline); R1 and R2 check the folders' days",
     );
   } else {
     const groupedGrid = await readHeatmap(true);

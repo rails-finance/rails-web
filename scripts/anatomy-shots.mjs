@@ -145,6 +145,10 @@ if (process.argv.includes("--check")) check();
 // ── The shots ───────────────────────────────────────────────────────────────
 
 const AAVE = "/ethereum/aave-v3/0xfb9395e0b216823c9a60d5dfcb8c6ef458232a71";
+/** A page whose Lifetime flows panel is not tied to its timeline, so it
+ *  keeps the Date pill (L1.7) and its month grid (L1.8): a tied page draws
+ *  neither (ui-jobs 764). */
+const SKY = "/ethereum/sky-savings/0xef42cf85be6adf3081ada73af87e27996046fe63";
 const TROVE =
   "/ethereum/liquity-v2/trove/WETH/22412517865912344610666591322850826630726594253808037974356128721405243892759";
 
@@ -300,7 +304,7 @@ const SHOTS = [
       await openModal("T4", sel("T2"))(page);
     },
   },
-  { name: "timeline-dates", path: AAVE, widths: [1280], codes: ["L1"], crop: ["L1"], setup: openDates },
+  { name: "timeline-dates", path: SKY, widths: [1280], codes: ["L1"], crop: ["L1"], setup: openDates },
   {
     name: "apply-state-card",
     path: AAVE,

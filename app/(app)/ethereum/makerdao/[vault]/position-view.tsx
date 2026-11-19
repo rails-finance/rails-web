@@ -485,8 +485,6 @@ export default function MakerVaultDetailView({
     folderParams: {},
     storageKey: `makerdao-${vault}`,
     protocolKey: "makerdao-vaults",
-    // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
-    dates: false,
   });
 
   // The CSV is the export whose purpose IS the rows, so on a windowed page it

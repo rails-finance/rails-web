@@ -36,7 +36,7 @@
 // today's at the live read; each row's price is a mark at its block.
 //
 //   npx tsx --test scripts/verify/verify-lifetime-flows-state.ts
-import { createFlowFocusStore, rewindEvents, rewindRows, timelineCut } from "@/lib/shared/flow-focus";
+import { createFlowFocusStore, rewindEvents, rewindRows, timelineCut, timelineDates } from "@/lib/shared/flow-focus";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -1462,6 +1462,21 @@ test("the counter counts the card's transactions", () => {
 });
 
 // ── The flows panel and the timeline tied together (lib/shared/flow-focus.ts) ──
+
+test("the Date pill: drawn where no chart ties, held back while the panel reads, gone once the cursor ties", () => {
+  const cursor = { endTs: 1_700_000_000, word: "14 Nov '23", live: false };
+  // No provider (Sky Savings, the redeemer page): the pill from the first render.
+  assert.equal(timelineDates(null, false), "pill");
+  // A tied page before hydration, and while its panel reads.
+  assert.equal(timelineDates({ cursor: null, flows: null }, false), "waiting");
+  assert.equal(timelineDates({ cursor: null, flows: "waiting" }, true), "waiting");
+  // The chart drew its cursor: the chart picks the day.
+  assert.equal(timelineDates({ cursor, flows: "waiting" }, true), "chart");
+  assert.equal(timelineDates({ cursor, flows: "settled" }, true), "chart");
+  // Settled with no cursor (a one-day life, the price chart alone) or no panel said.
+  assert.equal(timelineDates({ cursor: null, flows: "settled" }, true), "pill");
+  assert.equal(timelineDates({ cursor: null, flows: null }, true), "pill");
+});
 
 test("the event card's sum: the running totals around each event meet the route's day rows, and the printed lines add", () => {
   const series = readJson<AaveV3FlowSeries>("lifetime-flows-series-fb93.json");

@@ -566,6 +566,12 @@ export interface FlowFocusState {
   /** A cut restored from the address bar: the chart's cursor goes to its
    *  day (`endTs`, that day's close) and freezes there. */
   restore: { endTs: number; n: number } | null;
+  /** Where the page's Lifetime flows panel stands: `waiting` while it reads
+   *  the history it draws from, `settled` once it has drawn or found nothing
+   *  to draw, null where no panel has said. The timeline holds back its Date
+   *  pill while it waits, so a page whose chart is about to tie draws none
+   *  (`timelineDates`). */
+  flows: "waiting" | "settled" | null;
 }
 
 export interface FlowFocusStore {
@@ -583,6 +589,7 @@ export function createFlowFocusStore(): FlowFocusStore {
     follow: false,
     go: 0,
     restore: null,
+    flows: null,
   };
   const subs = new Set<() => void>();
   return {
@@ -596,6 +603,26 @@ export function createFlowFocusStore(): FlowFocusStore {
       return () => subs.delete(fn);
     },
   };
+}
+
+// ── The timeline's dates ────────────────────────────────────────────────────
+
+/** How the timeline picks a day (rails-ops TO-DO-ui-jobs 764): `chart` where
+ *  the Lifetime flows chart draws with its cursor tied to the timeline, so
+ *  "Sync to chart" and the cards' "View on chart" pick the day and the
+ *  toolbar draws no Date pill; `pill` on every other timeline, the Date pill
+ *  and its month grid; `waiting` while the page's panel is still reading, or
+ *  before the page has hydrated on a page with the tie, the pill held back so
+ *  a tied page never shows it. `s` is null on a page without the tie's
+ *  provider (Sky Savings, the redeemer page); `hydrated` is whether the panel
+ *  has had its first commit to say. */
+export type TimelineDates = "chart" | "pill" | "waiting";
+
+export function timelineDates(s: Pick<FlowFocusState, "cursor" | "flows"> | null, hydrated: boolean): TimelineDates {
+  if (!s) return "pill";
+  if (s.cursor != null) return "chart";
+  if (!hydrated || s.flows === "waiting") return "waiting";
+  return "pill";
 }
 
 // ── The timeline's rewind ───────────────────────────────────────────────────

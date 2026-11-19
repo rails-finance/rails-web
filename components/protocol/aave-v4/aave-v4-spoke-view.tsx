@@ -102,7 +102,12 @@ import {
   LifetimeFlowsScrubber,
   type FlowsKeyItems,
 } from "@/components/shared/lifetime-flows-scrubber";
-import { FlowFocusContext, useFlowFocusRoot, useFlowFocusValue } from "@/components/shared/flow-focus-context";
+import {
+  FlowFocusContext,
+  useFlowFocusRoot,
+  useFlowFocusValue,
+  useFlowsWaiting,
+} from "@/components/shared/flow-focus-context";
 import type { FlowTimeline } from "@/lib/shared/flows-timeline";
 import {
   aaveV4FlowLive,
@@ -621,9 +626,6 @@ function AaveV4SpokePageInner({
     storageKey: `aave-v4-${rawSpoke}-${wallet}`,
     protocolKey: "aave-v4",
     olderCount,
-    // Navigated by the Lifetime flows chart's Show timeline button: no Dates. Base has no
-    // flows series (`flowSeriesEnabled` below), so no Show timeline button, and keeps Dates.
-    dates: deployment.key === "base",
   });
 
   if (loading) {
@@ -1003,6 +1005,8 @@ function AaveV4SpokeTowerBlock({
   // The series is still on its way: the panel holds its settled shape in the
   // loading skeleton, and the tower waits (a failed read lets it stand alone).
   const flowsPending = flowSeriesEnabled && flowSeries == null && !flowsFailed;
+  // The timeline holds back its Date pill while the series reads (ui-jobs 764).
+  useFlowsWaiting(flowsPending);
   const ledgerShown = !flowsPending && (!scrubbed || ledgerOpen);
   const title = (
     <span className={`${SECTION_HEADING} inline-flex items-center gap-1.5 text-rb-500`}>Lifetime flows</span>

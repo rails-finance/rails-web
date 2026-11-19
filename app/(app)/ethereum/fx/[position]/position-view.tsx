@@ -350,8 +350,6 @@ export default function FxPositionView({
     storageKey: `fx-${slug}`,
     protocolKey: "fx",
     window: historyWindow,
-    // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
-    dates: false,
   });
 
   // On a windowed page the row count reads the MERGED history: unknown until

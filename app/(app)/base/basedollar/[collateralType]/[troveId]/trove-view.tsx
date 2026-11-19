@@ -358,8 +358,6 @@ export default function BasedollarTroveDetail({
     folderParams: {},
     storageKey: `basedollar-${collateralType}-${troveId}`,
     protocolKey: "basedollar",
-    // Navigated by the Lifetime flows chart's Apply: no Dates.
-    dates: false,
   });
 
   // ⚠️ On a windowed page every lifetime surface must read the MERGED history,

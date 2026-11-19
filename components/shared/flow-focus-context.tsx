@@ -9,7 +9,7 @@
 // there, and each event card can state the lifetime sum as of its event. A
 // page without it keeps the segment panels (Sky Savings).
 
-import { createContext, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useSyncExternalStore } from "react";
 import { formatUtcDay, parseUtcDay } from "@/hooks/useTimelineEvents";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
@@ -75,6 +75,28 @@ export function useFlowFocusValue(root: FlowFocusRoot, timeline: FlowTimeline | 
   const model = useMemo(() => (timeline ? buildFlowModel(timeline) : null), [timeline]);
   const { store, events } = root;
   return useMemo<FlowFocusValue>(() => ({ store, model, events }), [store, model, events]);
+}
+
+/** A Lifetime flows panel's side of the timeline's Date pill (`timelineDates`
+ *  in lib/shared/flow-focus.ts): `waiting` while it reads the history it
+ *  draws from, `settled` once it has drawn or found nothing to draw, and on
+ *  unmount. Waiting is said before paint, so the pill never shows on a page
+ *  about to tie; settled after the commit's effects, so the chart's cursor
+ *  (set by a child's effect) lands first. */
+export function useFlowsWaiting(waiting: boolean): void {
+  const store = useContext(FlowFocusContext)?.store ?? null;
+  useLayoutEffect(() => {
+    if (store && waiting && store.get().flows !== "waiting") store.set({ flows: "waiting" });
+  }, [store, waiting]);
+  useEffect(() => {
+    if (store && !waiting && store.get().flows !== "settled") store.set({ flows: "settled" });
+  }, [store, waiting]);
+  useEffect(
+    () => () => {
+      if (store && store.get().flows !== "settled") store.set({ flows: "settled" });
+    },
+    [store],
+  );
 }
 
 const DAY_S = 86_400;

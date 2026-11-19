@@ -520,8 +520,6 @@ export default function AaveV3PositionDetail({
     folderParams: { wallet, market },
     storageKey: `aave-v3-${market}-${wallet}`,
     protocolKey: "aave-v3",
-    // Navigated by the Lifetime flows chart's Apply: no Dates.
-    dates: false,
   });
   const readMembers = useCallback<FolderMembersReader>(
     async (ask) => {

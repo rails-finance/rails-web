@@ -285,8 +285,6 @@ export default function DolomitePositionView({
     storageKey: `dolomite-${owner}-${accountNumber}`,
     protocolKey: "dolomite",
     window: historyWindow,
-    // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
-    dates: false,
   });
 
   // A closed card's peaks as each row's token balance before and after it,
