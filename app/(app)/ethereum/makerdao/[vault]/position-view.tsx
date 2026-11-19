@@ -550,6 +550,7 @@ export default function MakerVaultDetailView({
     returnedIds,
     risk: flowRisk,
     rateLog,
+    capped: (cardView ?? view)?.priceCap != null,
   });
 
   // Who executed this vault's events — the SAME two-fact verdict each event

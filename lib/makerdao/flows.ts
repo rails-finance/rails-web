@@ -319,6 +319,8 @@ export interface MakerFlowOptions {
   /** The block each stored day's price was read at, by UTC day, where the
    *  store's route states it. */
   dailyBlocks?: ReadonlyMap<number, number> | null;
+  /** The ilk's feed is capped (LockStake). */
+  capped?: boolean;
 }
 
 /** The per-row replay. */
@@ -422,7 +424,7 @@ export function replayMaker(events: MakerFlowEvent[], o: MakerFlowOptions): Make
     } else if (act > 0) add(MK.generated, act);
     else add(MK.repaid, -act);
     const p = priceOf(ev);
-    out.push({ ev, price: p.price, priceFrom: p.from, priceAt: p.at, legs });
+    out.push({ ev, price: p.price, priceFrom: p.from, priceAt: o.capped ? { ...p.at, capped: true } : p.at, legs });
     ink = ev.inkAfter;
     debt = ev.debtAfter;
   }
@@ -472,17 +474,18 @@ export function makerFlowTimeline(events: MakerFlowEvent[], o: MakerFlowOptions)
     const isToday = Math.floor(r.ev.ts / DAY_S) >= Math.floor(o.now / DAY_S);
     // Each names the price's block beside the event's (ui-jobs 743).
     const at = makerRowPriceNote(r.priceAt);
+    // A row at its own day's close is the decided basis, stated once in the
+    // flows note (makerdao-flows-note.tsx); a row priced from another day
+    // stays incomplete and says which price it took (ui-jobs 743).
     const why =
-      r.priceFrom === "store"
-        ? `${o.collSymbol} at the ${at}: the OSM price at this block is not stored (only a liquidation's is).`
-        : r.priceFrom === "store-near"
-          ? `${o.collSymbol} at ${at}: no price is stored for its day.`
-          : r.priceFrom === "nearest" || (r.priceFrom === "today" && !isToday)
-            ? `${o.collSymbol} at ${at}: no daily price is stored for this ilk.`
-            : null;
+      r.priceFrom === "store-near"
+        ? `${o.collSymbol} at ${at}: no price is stored for its day.`
+        : r.priceFrom === "nearest" || (r.priceFrom === "today" && !isToday)
+          ? `${o.collSymbol} at ${at}: no daily price is stored for this ilk.`
+          : null;
     const unsure =
       why && (r.ev.inkAfter > DUST || r.legs.some((l) => COLL_KEYS.has(l.bucket)))
-        ? [{ side: "collateral" as const, why, ...(r.priceFrom !== "store" ? { held: true } : {}) }]
+        ? [{ side: "collateral" as const, why, held: true }]
         : [];
     return {
       id: r.ev.id,

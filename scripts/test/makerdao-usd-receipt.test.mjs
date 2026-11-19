@@ -60,7 +60,7 @@ test("rows multiply out to the cent, a 7-decimal ink at a high price among them"
   assert.equal(row(r.prov, "WBTC amount").pclass, "state", "the eth_call read is a state read");
   assert.match(
     row(r.prov, "WBTC price").note,
-    /Vat\.ilks\(ilk\)\.spot × Spotter\.par × Spotter\.ilks\(ilk\)\.mat ÷ RAY² at block 21,000,000/,
+    /Vat\.ilks\(ilk\)\.spot × Spotter\.par × Spotter\.ilks\(ilk\)\.mat ÷ RAY³ at block 21,000,000/,
   );
   const listing = makerVaultCollateralUsd({ collateralSymbol: "ETH", ink: 2, source: "api", priceUsd: 3000.5 });
   assert.equal(row(listing.prov, "ETH amount").pclass, "indexed", "the replay is indexed");
@@ -171,4 +171,34 @@ test("the liquidation price is the arithmetic of its inputs as shown", () => {
   assert.equal(l.ink, "5");
   assert.equal(l.mat, "145%");
   assert.ok(Math.abs(l.price - (10_000.123457 * 1.45) / 5) < 1e-6);
+});
+
+const { MAKER_PRICE_FORMULA, makerRowPriceNote } = await import(ROOT + "lib/makerdao/price-notes.ts");
+
+test("the dollar price rebuilds from the raw spot, par and mat integers as the formula says: ÷ RAY³", () => {
+  const RAY = 10n ** 27n;
+  const rdiv = (x, y) => (x * RAY) / y;
+  const val = 3_000_512_345_678_900_000_000n; // $3,000.5123456789 as a wad
+  const par = RAY; // one DAI = $1
+  const mat = (145n * RAY) / 100n; // 145%
+  const spot = rdiv(rdiv(val * 10n ** 9n, par), mat); // Spotter.poke
+  assert.match(MAKER_PRICE_FORMULA, /÷ RAY³$/);
+  const rebuilt = Number((spot * par * mat) / RAY ** 2n) / 1e27; // ÷ RAY³, the last RAY as a float
+  assert.ok(Math.abs(rebuilt - 3000.5123456789) < 1e-9, `rebuilt ${rebuilt}`);
+});
+
+test("an event receipt names the cap where it binds; the today note with no block is one statement", () => {
+  const r = makerCollateralUsd({
+    what: "x",
+    symbol: "SKY",
+    ink: 100,
+    inkSource: "api",
+    inkBlock: 22_000_000,
+    price: 0.025,
+    priceBlock: 22_000_000,
+    cap: { capUsd: 0.025, oracleUsd: 0.06 },
+  });
+  assert.match(row(r.prov, "SKY price").note, /at block 22,000,000, capped by governance at \$0\.025; oracle \$0\.06/);
+  assert.equal(makerRowPriceNote({ from: "today", block: null }), "the live read's price, which names no block");
+  assert.match(makerRowPriceNote({ from: "today", block: 5, capped: true }), /capped price/);
 });

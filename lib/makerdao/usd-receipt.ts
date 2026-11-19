@@ -13,6 +13,9 @@ import { makerParNote, makerPriceNote, makerRowPriceNote, type MakerRowPrice } f
 
 const SPOTTER = { name: "Spotter", address: MAKER_ADDRESSES.SPOTTER };
 
+/** A capped feed (LockStake): the governance cap and the oracle's price. */
+export type MakerPriceCap = { capUsd: number; oracleUsd: number | null };
+
 export interface MakerUsd {
   prov: Provenance;
   usd: number;
@@ -31,10 +34,12 @@ export function makerCollateralUsd(o: {
   price: number | null | undefined;
   /** The block the price was read at; null where the read names none. */
   priceBlock: number | null | undefined;
-  cap?: { capUsd: number; oracleUsd: number | null } | null;
+  /** The capped feed at the price's block; named only where it binds. */
+  cap?: MakerPriceCap | null;
   caveat?: string;
 }): MakerUsd | null {
   if (o.price == null || !(o.price > 0)) return null;
+  const binds = o.cap != null && o.cap.oracleUsd != null && o.cap.oracleUsd > o.cap.capUsd;
   const amount = Math.abs(o.ink);
   const at = o.inkBlock != null ? ` at block ${o.inkBlock.toLocaleString("en-US")}` : "";
   return holderUsdReceipt({
@@ -49,7 +54,7 @@ export function makerCollateralUsd(o: {
             : `the vault's ink replayed from its own Vat rows${at}`,
         amountKind: o.inkSource === "chain" ? { kind: "chain", pclass: "state" } : undefined,
         price: o.price,
-        priceNote: makerPriceNote(o.priceBlock, o.cap),
+        priceNote: makerPriceNote(o.priceBlock, binds ? o.cap : null),
         priceContract: SPOTTER,
       },
     ],
@@ -119,7 +124,6 @@ export function makerVaultCollateralUsd(v: {
   priceCap?: { capUsd: number; oracleUsd: number | null } | null;
 }): MakerUsd | null {
   const chain = v.source === "chain";
-  const binds = v.priceCap != null && v.priceCap.oracleUsd != null && v.priceCap.oracleUsd > v.priceCap.capUsd;
   return makerCollateralUsd({
     what: `The vault's ${v.collateralSymbol} collateral in USD`,
     symbol: v.collateralSymbol,
@@ -128,7 +132,7 @@ export function makerVaultCollateralUsd(v: {
     inkBlock: chain ? (v.atBlock ?? null) : null,
     price: v.priceUsd,
     priceBlock: chain ? (v.atBlock ?? null) : null,
-    cap: binds ? v.priceCap : null,
+    cap: v.priceCap ?? null,
   });
 }
 

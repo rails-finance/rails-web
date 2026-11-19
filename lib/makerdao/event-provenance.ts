@@ -520,7 +520,7 @@ export const peakDebtProv = (symbol: string, coords?: MakerCoords): Provenance =
 export const eventPriceProv = (collSym: string, coords: MakerCoords, priceUsd: number): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
-  formula: "Vat.ilks(ilk).spot × Spotter.par × Spotter.ilks(ilk).mat ÷ RAY²",
+  formula: "Vat.ilks(ilk).spot × Spotter.par × Spotter.ilks(ilk).mat ÷ RAY³",
   verify: {
     kind: "recompute",
     text:

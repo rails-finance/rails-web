@@ -57,6 +57,7 @@ import { knownContract } from "@/lib/makerdao/known-contracts";
 import { shortAddr } from "@/lib/makerdao/ownership-prose";
 import { useMakerIlkAt } from "@/lib/makerdao/use-chain-history";
 import type { MakerIlkAt } from "@/lib/makerdao/chain-history-types";
+import type { MakerPriceCap } from "@/lib/makerdao/usd-receipt";
 
 const fmt = (human: string): string => formatNumber(Number(human));
 /** A running balance the answer did not carry is stated, never filled in. */
@@ -109,14 +110,22 @@ export function rowRatios(ctx: MakerDAOContext, price: number | null) {
   const inkBefore = inkAfter - (Number(ctx.dink) || 0);
   const debtAfter = Number(ctx.debtAfter);
   const debtBefore = debtAfter - (Number(ctx.debtChange) || 0);
-  const r = (ink: number, debt: number) => (debt > 1e-9 ? (ink * price) / debt : null);
+  // Each side's collateral dollars as the Collateral cell draws them: the
+  // shown product (ui-jobs 743).
+  const usd = (ink: number) =>
+    makerCollateralUsd({ what: "", symbol: "", ink, inkSource: "api", price, priceBlock: null })?.usd ?? 0;
+  const collUsdAfter = usd(inkAfter);
+  const collUsdBefore = usd(inkBefore);
+  const r = (collUsd: number, debt: number) => (debt > 1e-9 ? collUsd / debt : null);
   return {
-    before: r(inkBefore, debtBefore),
-    after: r(inkAfter, debtAfter),
+    before: r(collUsdBefore, debtBefore),
+    after: r(collUsdAfter, debtAfter),
     inkBefore,
     inkAfter,
     debtBefore,
     debtAfter,
+    collUsdBefore,
+    collUsdAfter,
   };
 }
 
@@ -126,7 +135,14 @@ export function rowRatios(ctx: MakerDAOContext, price: number | null) {
 /** A cell's dollars from a receipt: the drawn figure is its product. */
 const usdOf = (r: { prov: Provenance; usd: number } | null) => (r ? { usd: { value: r.usd, prov: r.prov } } : {});
 
-function useMakerStats(ctx: MakerDAOContext, coords: MakerCoords, eventId: string, price: number | null) {
+function useMakerStats(
+  ctx: MakerDAOContext,
+  coords: MakerCoords,
+  eventId: string,
+  price: number | null,
+  /** LockStake's capped feed at the block, named where it binds. */
+  cap?: MakerPriceCap | null,
+) {
   const debtSym = ilkDebtSymbol(ctx.ilk);
   const collSym = ctx.collateralSymbol;
   const isGrab = ctx.eventType === "grab";
@@ -213,6 +229,7 @@ function useMakerStats(ctx: MakerDAOContext, coords: MakerCoords, eventId: strin
                 inkBlock: coords.blockNumber ?? null,
                 price,
                 priceBlock: coords.blockNumber ?? null,
+                cap,
               }),
             )
           : {}),
@@ -274,15 +291,13 @@ export function useMakerOpened(
   const price = isGrab ? (ctx.priceAtBlock?.usd ?? ilkAt?.priceUsd ?? null) : (ilkAt?.priceUsd ?? null);
   const mat = ilkAt?.mat ?? null;
   const ratios = ctx.eventType === "frob" ? rowRatios(ctx, price) : null;
-  const stats = useMakerStats(ctx, coords, eventId, price);
+  const stats = useMakerStats(ctx, coords, eventId, price, ilkAt?.priceCap ?? null);
 
   if (ratios && (ratios.after != null || ratios.before != null)) {
     const a = ratios.after;
     const b = ratios.before;
     const room =
-      mat != null && price != null && a != null
-        ? Math.max(0, (ratios.inkAfter * price) / mat - ratios.debtAfter)
-        : null;
+      mat != null && price != null && a != null ? Math.max(0, ratios.collUsdAfter / mat - ratios.debtAfter) : null;
     stats.push({
       key: "ratio",
       inputs: ["collateral", "debt"],
@@ -291,7 +306,7 @@ export function useMakerOpened(
       display: a != null ? fmtRatio(a) : "no debt",
       symbol: "",
       prov: eventRatioProv("after", coords, {
-        collateralUsd: formatUsdValue(ratios.inkAfter * (price ?? 0)),
+        collateralUsd: formatUsdValue(ratios.collUsdAfter),
         debt: `${fmtDai(ratios.debtAfter)} ${debtSym}`,
       }),
       transition:
@@ -300,13 +315,13 @@ export function useMakerOpened(
               before: fmtRatio(b),
               beforeExact: String(b * 100),
               beforeProv: eventRatioProv("before", coords, {
-                collateralUsd: formatUsdValue(ratios.inkBefore * (price ?? 0)),
+                collateralUsd: formatUsdValue(ratios.collUsdBefore),
                 debt: `${fmtDai(ratios.debtBefore)} ${debtSym}`,
               }),
               change: a == null ? "debt cleared" : `${a >= b ? "+" : "−"}${(Math.abs(a - b) * 100).toFixed(2)} pts`,
               changeExact: a == null ? "debt cleared" : `${a >= b ? "+" : "−"}${Math.abs(a - b) * 100}`,
               changeProv: eventRatioProv("after", coords, {
-                collateralUsd: formatUsdValue(ratios.inkAfter * (price ?? 0)),
+                collateralUsd: formatUsdValue(ratios.collUsdAfter),
                 debt: `${fmtDai(ratios.debtAfter)} ${debtSym}`,
               }),
               shownAsIs: true,
@@ -368,7 +383,7 @@ export function useMakerOpened(
       <MakerOwnerNote step={step} ctx={ctx} coords={coords} txCtx={txCtx} />
     </EventNotes>
   ) : isGrab ? (
-    <MakerAuctionNotes ctx={ctx} coords={coords} price={row} auction={auction} />
+    <MakerAuctionNotes ctx={ctx} coords={coords} price={row} auction={auction} cap={cap ?? null} />
   ) : undefined;
   return { cells, notes, price: row };
 }
@@ -382,7 +397,9 @@ function MakerAuctionNotes({
   coords,
   price,
   auction,
+  cap,
 }: {
+  cap: MakerPriceCap | null;
   ctx: MakerDAOContext;
   coords: MakerCoords;
   price: EventCardPrice | undefined;
@@ -408,6 +425,7 @@ function MakerAuctionNotes({
           inkBlock: coords.blockNumber ?? null,
           price: usd,
           priceBlock: coords.blockNumber ?? null,
+          cap,
         })
       : null;
   const ratio = seizedUsd != null && cleared != null && cleared > 0 ? seizedUsd.usd / cleared : null;

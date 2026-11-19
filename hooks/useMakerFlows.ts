@@ -85,6 +85,8 @@ export interface MakerFlowsInput {
   /** The ilk's stability fee history, where the page read it: the fee sets
    *  the events row marks (ruling 10). */
   rateLog?: MakerRateLogResponse | null;
+  /** The ilk's feed is capped (LockStake). */
+  capped?: boolean;
 }
 
 /** The card's risk figures now. */
@@ -208,9 +210,17 @@ export function useMakerFlows(p: MakerFlowsInput): {
   const opts = useMemo<MakerFlowOptions | null>(
     () =>
       now != null && p.collSymbol && p.debtSymbol && p.liveSettled
-        ? { collSymbol: p.collSymbol, debtSymbol: p.debtSymbol, now, live: p.live, daily: dailyPrices, dailyBlocks }
+        ? {
+            collSymbol: p.collSymbol,
+            debtSymbol: p.debtSymbol,
+            now,
+            live: p.live,
+            daily: dailyPrices,
+            dailyBlocks,
+            capped: p.capped,
+          }
         : null,
-    [now, p.collSymbol, p.debtSymbol, p.live, p.liveSettled, dailyPrices, dailyBlocks],
+    [now, p.collSymbol, p.debtSymbol, p.live, p.liveSettled, dailyPrices, dailyBlocks, p.capped],
   );
   const ready = opts != null && rows != null && dailySettled;
   const replayed = useMemo(() => (ready && rows && opts ? replayMaker(rows, opts) : null), [ready, rows, opts]);

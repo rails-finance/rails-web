@@ -6,7 +6,7 @@ import { priceText } from "@/lib/shared/shown-usd";
 
 /** The OSM price as the Spotter stores it: Spotter.poke writes spot = price ÷
  *  par ÷ mat, so the three multiplied give the price back. */
-export const MAKER_PRICE_FORMULA = "Vat.ilks(ilk).spot × Spotter.par × Spotter.ilks(ilk).mat ÷ RAY²";
+export const MAKER_PRICE_FORMULA = "Vat.ilks(ilk).spot × Spotter.par × Spotter.ilks(ilk).mat ÷ RAY³";
 
 /** Where a read states no block for its price (the listing's ilk state). */
 export const MAKER_NO_BLOCK = "a block this read does not name";
@@ -40,13 +40,23 @@ const dayText = (day: number): string =>
 
 /** Where a Lifetime flows row's collateral price came from, with both blocks
  *  named where they differ. */
-export type MakerRowPrice =
+export type MakerRowPrice = (
   | { from: "row"; block: number }
   | { from: "store" | "store-near"; day: number; dayBlock: number | null; eventBlock: number; staleDays?: number }
   | { from: "today"; block: number | null }
-  | { from: "nearest"; block: number | null; eventBlock: number; staleDays?: number };
+  | { from: "nearest"; block: number | null; eventBlock: number; staleDays?: number }
+) & {
+  /** A capped feed (LockStake): the price is the lower of governance's cap
+   *  and the oracle's, and the store keeps no oracle price beside it. */
+  capped?: boolean;
+};
 
 export function makerRowPriceNote(p: MakerRowPrice): string {
+  const note = rowNote(p);
+  return p.capped ? `${note}. It is Maker's capped price, the lower of governance's cap and the oracle's` : note;
+}
+
+function rowNote(p: MakerRowPrice): string {
   const old = (d?: number) => (d != null && d > 30 ? `, more than 30 days old (${d} days)` : "");
   switch (p.from) {
     case "row":
@@ -56,7 +66,9 @@ export function makerRowPriceNote(p: MakerRowPrice): string {
     case "store-near":
       return `the nearest day's price, at the close of ${dayText(p.day)}, ${p.dayBlock != null ? blockText(p.dayBlock) : "a block the daily store's route does not state"}${old(p.staleDays)}; this event is at block ${p.eventBlock.toLocaleString("en-US")}`;
     case "today":
-      return `the latest block's price, ${blockText(p.block)}`;
+      return p.block != null
+        ? `the latest block's price, block ${p.block.toLocaleString("en-US")}`
+        : "the live read's price, which names no block";
     case "nearest":
       return `the nearest priced moment, ${blockText(p.block)}${old(p.staleDays)}; this event is at block ${p.eventBlock.toLocaleString("en-US")}`;
   }

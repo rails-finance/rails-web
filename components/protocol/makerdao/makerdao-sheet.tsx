@@ -34,7 +34,12 @@ import {
   type MakerCoords,
 } from "@/lib/makerdao/event-provenance";
 import { useMakerVaultHistory } from "@/lib/makerdao/vault-history";
-import { makerCollateralUsd, makerDebtUsd, makerLiquidationPrice } from "@/lib/makerdao/usd-receipt";
+import {
+  makerCollateralUsd,
+  makerDebtUsd,
+  makerLiquidationPrice,
+  type MakerPriceCap,
+} from "@/lib/makerdao/usd-receipt";
 import { priceText } from "@/lib/shared/shown-usd";
 import type { MakerDAOContext } from "@/lib/shared/types/event-shape";
 import type { Provenance } from "@/components/shared/provenance";
@@ -58,8 +63,16 @@ const signed = (n: number, text: string) => (n < 0 ? `−${text}` : text);
 
 /** A collateral amount's dollars at the OSM price of the event's block: the
  *  amount × the price as shown, the product to the cent (ui-jobs 743). */
-function collUsd(sym: string, what: string, amount: number, price: number, coords: MakerCoords) {
+function collUsd(
+  sym: string,
+  what: string,
+  amount: number,
+  price: number,
+  coords: MakerCoords,
+  cap: MakerPriceCap | null = null,
+) {
   return makerCollateralUsd({
+    cap,
     what: `${what} in US dollars`,
     symbol: sym,
     ink: amount,
@@ -167,10 +180,13 @@ export function useMakerSheet(ctx: MakerDAOContext, coords: MakerCoords, open = 
           ? "Draw"
           : "Repay";
 
+  // LockStake's capped feed at the block, named on each receipt where it binds.
+  const collUsdAt = (what: string, amount: number, p: number, c: MakerCoords) =>
+    collUsd(collSym, what, amount, p, c, held?.priceCap ?? null);
+
   // ── Collateral ──
-  const collAfterUsd = price != null ? collUsd(collSym, "Collateral after this event", inkAfter, price, coords) : null;
-  const collBeforeUsd =
-    price != null ? collUsd(collSym, "Collateral just before this event", inkBefore, price, coords) : null;
+  const collAfterUsd = price != null ? collUsdAt("Collateral after this event", inkAfter, price, coords) : null;
+  const collBeforeUsd = price != null ? collUsdAt("Collateral just before this event", inkBefore, price, coords) : null;
   const debtAfterUsd = faceUsd(debtSym, "Debt after this event", debtAfter);
   const collRows: SheetRow[] = [];
   if (Math.abs(dink) >= DUST_COLL)
@@ -183,8 +199,7 @@ export function useMakerSheet(ctx: MakerDAOContext, coords: MakerCoords, open = 
         info: dinkProv(collSym, coords),
         value: formatExactDecimal(String(Math.abs(dink))),
       },
-      usd:
-        price != null ? usdCell(collUsd(collSym, "Collateral this event moved", dink, price, coords), dink) : undefined,
+      usd: price != null ? usdCell(collUsdAt("Collateral this event moved", dink, price, coords), dink) : undefined,
       tip: TIP.collEvent,
     });
   const collCarry: SheetSide["carry"] = [];
@@ -207,7 +222,7 @@ export function useMakerSheet(ctx: MakerDAOContext, coords: MakerCoords, open = 
             amount: { text: collAmount(inkBefore), symbol: collSym, info: inkBeforeProv(collSym, coords) },
             usd:
               price != null
-                ? usdCell(collUsd(collSym, "Collateral just before this event", inkBefore, price, coords))
+                ? usdCell(collUsdAt("Collateral just before this event", inkBefore, price, coords))
                 : undefined,
             tip: TIP.collBefore,
           }
@@ -286,8 +301,9 @@ export function useMakerSheet(ctx: MakerDAOContext, coords: MakerCoords, open = 
   // ── Risk and Limits ──
   const owes = debtAfter > 1e-9;
   const owedBefore = debtBefore > 1e-9;
-  const ratioAfter = price != null && owes ? (inkAfter * price) / debtAfter : null;
-  const ratioBefore = price != null && owedBefore ? (inkBefore * price) / debtBefore : null;
+  // The collateral's dollars as the Collateral cells draw them (ui-jobs 743).
+  const ratioAfter = collAfterUsd != null && owes ? collAfterUsd.usd / debtAfter : null;
+  const ratioBefore = collBeforeUsd != null && owedBefore ? collBeforeUsd.usd / debtBefore : null;
   const collUsdAfter = collAfterUsd?.usd ?? 0;
   const collUsdBefore = collBeforeUsd?.usd ?? 0;
   const ratioInputs = (side: "before" | "after") =>
@@ -348,7 +364,7 @@ export function useMakerSheet(ctx: MakerDAOContext, coords: MakerCoords, open = 
   ];
 
   const roomOf = (ink: number, debt: number) =>
-    mat != null && price != null ? Math.max(0, (ink * price) / mat - debt) : null;
+    mat != null && price != null ? Math.max(0, (collUsdAt("", ink, price, coords)?.usd ?? 0) / mat - debt) : null;
   const roomAfter = owes || debtMove !== 0 ? roomOf(inkAfter, debtAfter) : null;
   const roomBefore = roomOf(inkBefore, debtBefore);
   const limits: SheetStat[] = [
