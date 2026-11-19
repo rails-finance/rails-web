@@ -179,11 +179,17 @@ export function ledgerPartProv(
 
 /** A stablecoin debt's dollars at its $1 face, as the event card's Debt
  *  cell and its ledger count it: the debt before or after the event's
- *  transaction, one dollar a token. */
-export function faceUsdProv(symbol: string, amount: string, which: "before" | "after"): Provenance {
+ *  transaction, one dollar a token. `market` states the token's market price
+ *  at the event (Liquity V2's "BOLD at $0.998842 at this block", ui-jobs 757). */
+export function faceUsdProv(
+  symbol: string,
+  amount: string,
+  which: "before" | "after",
+  market?: string | null,
+): Provenance {
   return {
     kind: "derived",
-    summary: `Debt ${which} this event in USD. The ${symbol} owed ${which} the transaction at its $1 face, as the Lifetime flows count it.`,
+    summary: `Debt ${which} this event in USD. The ${symbol} owed ${which} the transaction at its $1 face, as the Lifetime flows count it.${market ? ` Debt stays at its $1 face. ${market}.` : ""}`,
     formula: "debt × $1",
     inputs: [
       { label: "debt", value: `${amount} ${symbol}`, kind: "chain", note: which },
