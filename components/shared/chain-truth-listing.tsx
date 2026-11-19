@@ -40,6 +40,8 @@ export interface ChainTruthListingFilter<F extends BaseListFilters> {
   onChange: (next: F) => void;
   sortOptions: SortOption[];
   searchPlaceholder?: string;
+  /** False: no search box (the wallet page names its subject). */
+  search?: boolean;
   /** Draw the ⋮ that saves this view (N1.7, ui-jobs 521). */
   viewMenu?: boolean;
   /** The count a staged selection in that sheet would give. */
@@ -237,6 +239,7 @@ export function ChainTruthListing<T, F extends BaseListFilters = BaseListFilters
           onChange={filter.onChange}
           sortOptions={filter.sortOptions}
           searchPlaceholder={filter.searchPlaceholder}
+          search={filter.search}
           count={count}
           countNode={filter.countNode}
           chipsLead={filter.chipsLead}
