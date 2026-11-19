@@ -8,7 +8,7 @@
 // Dolomite), the Comet sheet and the Aave family's.
 
 import type { Provenance } from "@/components/shared/provenance";
-import { holderUsdReceipt } from "@/lib/shared/holder-usd-receipt";
+import { FACE_WORDS, holderUsdReceipt } from "@/lib/shared/holder-usd-receipt";
 import { centsOf, shownUsd } from "@/lib/shared/shown-usd";
 import { listWords, NO_FIGURE, noPriceWords } from "@/lib/shared/flows-sum";
 import { formatUsdValue } from "@/lib/utils/format";
@@ -45,7 +45,6 @@ export interface UsdCell {
   usd: number | null;
 }
 
-const FACE = "To the cent, shown to the dollar.";
 const signedCents = (v: number): string => `${v < 0 ? "−" : ""}${formatUsdValue(Math.abs(v))}`;
 
 /** A cell as a sheet row's dollar figure, carrying its cents. */
@@ -121,7 +120,7 @@ export function amountsUsd(
     blocksPerRow: true,
     byValue: live.length > 1,
     via: o.via,
-    caveat: FACE,
+    caveat: FACE_WORDS,
     shownAs: (u) => (o.signed ? sheetUsd(mixed ? u : sign * u, true) : sheetUsd(mixed ? u : sign * u)),
   });
   const v = mixed ? usd : sign * usd;
@@ -151,7 +150,7 @@ function differenceUsd(
     info: {
       kind: "chain-derived",
       pclass: "oracle",
-      summary: `${what}. ${summary} No token moved. ${FACE}`,
+      summary: `${what}. ${summary} No token moved.`,
       formula,
       inputs: [
         ...parts.map((p) => ({
@@ -160,7 +159,13 @@ function differenceUsd(
           kind: "chain-derived" as const,
           pclass: "oracle" as const,
         })),
-        { label: "difference", value: signedCents(v), kind: "derived", step: true },
+        {
+          label: "difference",
+          value: signedCents(v),
+          kind: "derived",
+          step: true,
+          note: `to the cent, shown as ${sheetUsd(v, true)}`,
+        },
       ],
     },
   };

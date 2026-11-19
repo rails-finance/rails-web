@@ -9,6 +9,7 @@
 // the browser; the example's arrive with the home page, and it draws no top
 // row, no export shapes and a still timeline toolbar.
 
+import { liquityV2PriceNote } from "@/lib/liquity-v2/price-notes";
 import { useCallback, useMemo, type ReactNode } from "react";
 import type { TroveSummary } from "@/types/api/trove";
 import type { TroveStateData } from "@/types/api/troveState";
@@ -107,6 +108,7 @@ export function useTroveFlows({
             dailyColl: daily.obs,
             shutdownAt,
             priceView: { collateralType: collSymbol },
+            priceNote: liquityV2PriceNote(collSymbol),
             live: open
               ? {
                   price: price ?? null,

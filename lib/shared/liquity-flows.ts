@@ -275,6 +275,9 @@ export interface LiquityFlowOptions {
   /** Unix seconds the Trove's branch shut down (ui-jobs 612): interest stops
    *  accruing then, and the liquidation level ends there. */
   shutdownAt?: number | null;
+  /** Whose price the collateral takes, in words, where the page names it
+   *  (Liquity V2: `liquityV2PriceNote`); unset, "the branch PriceFeed's price". */
+  priceNote?: string;
 }
 
 /** A fork branch's minimum for the price view's level (Ebisu, Asymmetry,
@@ -320,6 +323,7 @@ function liquityLeg(
   collSymbol: string,
   debtSymbol: string,
   family: LiquityFamily,
+  priceNote?: string,
 ): FlowLeg {
   if (!COLL_BUCKETS.has(l.bucket))
     return flowLeg({
@@ -333,7 +337,7 @@ function liquityLeg(
     });
   const n = (b: number) => b.toLocaleString("en-US");
   const at = r.ev.block;
-  const note = liquityPriceNote(r, family);
+  const note = liquityPriceNote(r, family, priceNote);
   return flowLeg({
     bucket: l.bucket,
     amount: l.amount,
@@ -350,7 +354,7 @@ function liquityLeg(
 
 /** A Trove row's price in words (ui-jobs 743): its source, its block, and
  *  for a price taken from another event or another feed, both blocks. */
-export function liquityPriceNote(r: LiquityReplayed, family: LiquityFamily): string {
+export function liquityPriceNote(r: LiquityReplayed, family: LiquityFamily, priceNote?: string): string {
   const n = (b: number) => b.toLocaleString("en-US");
   const at = r.ev.block;
   const feedOf = (ev: LiquityFlowEvent) =>
@@ -358,7 +362,7 @@ export function liquityPriceNote(r: LiquityReplayed, family: LiquityFamily): str
       ? "_price in the Redemption log"
       : family === "v1"
         ? "Liquity's PriceFeed lastGoodPrice"
-        : "the branch PriceFeed's price";
+        : (priceNote ?? "the branch PriceFeed's price");
   const from = r.ev.priceFrom;
   if (!r.borrowedPrice && from?.source === "v2-weth-day")
     return `Liquity V2's WETH PriceFeed, the close of ${dayWords(from.day)} ${from.block != null ? `at block ${n(from.block)}` : "at a block the daily store's route does not name"}; this event is at block ${n(at)}`;
@@ -625,7 +629,7 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
                   : moved.coll
                     ? "collateral"
                     : "debt",
-      legs: legs.map((l) => liquityLeg(row, l, o.collSymbol, o.debtSymbol, family)),
+      legs: legs.map((l) => liquityLeg(row, l, o.collSymbol, o.debtSymbol, family, o.priceNote)),
       tx: ev.tx,
       // The card counts the owner's transactions; a redemption or a
       // liquidation is another party's.
@@ -719,7 +723,7 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
                             source:
                               family === "v1"
                                 ? "Liquity's PriceFeed lastGoodPrice now"
-                                : "the branch PriceFeed's price now",
+                                : (o.priceNote ?? "the branch PriceFeed's price now"),
                           })
                         : {
                             // The last event's price, carried: its block as

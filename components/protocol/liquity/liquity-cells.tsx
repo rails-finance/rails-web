@@ -5,6 +5,7 @@
 // (components/shared/event-cells.tsx). The figures are the generator's
 // (lib/liquity/event-prose.ts `liquityL2`); the receipts are built here.
 
+import { liquityV2PriceNote } from "@/lib/liquity-v2/price-notes";
 import { amountText, priceText, shownUsd } from "@/lib/shared/holder-usd-receipt";
 import { collSheetUsd } from "@/lib/liquity/sheet-usd";
 import { formatUsdValue } from "@/lib/utils/format";
@@ -155,6 +156,12 @@ export function useLiquityCells({
   // price — and the USD / ratio derived from it — is chain-derived. (On the
   // live-chain source lane collPrice is 0, so these
   // gate out rather than assert an unpriced figure.)
+  // Named by its source and this event's block (ui-jobs 743); an event with
+  // no block names none and is not complete.
+  const priceNote =
+    blockNumber != null
+      ? `${liquityV2PriceNote(collSym)}, at block ${blockNumber.toLocaleString("en-US")}`
+      : `Not complete: ${liquityV2PriceNote(collSym)}, at a block this read does not name`;
   const priceInput =
     collPrice > 0
       ? [
@@ -163,7 +170,7 @@ export function useLiquityCells({
             value: formatUsd(collPrice),
             kind: "chain-derived" as const,
             pclass: "oracle" as const,
-            note: "on-chain oracle @ event block",
+            note: priceNote,
           },
         ]
       : [];
@@ -382,7 +389,7 @@ export function useLiquityCells({
     collPrice > 0
       ? {
           kind: "chain-derived",
-          summary: `Collateral value (after) in USD. The collateral after this event times Liquity's price for ${collSym} at this block, as the rows show them, to the cent, shown to the dollar.`,
+          summary: `Collateral value (after) in USD. The collateral after this event times Liquity's price for ${collSym} at this block, as the rows show them.`,
           formula: "collateral × price",
           inputs: [
             {
@@ -400,7 +407,7 @@ export function useLiquityCells({
     collPrice > 0
       ? {
           kind: "chain-derived",
-          summary: `Collateral value (before) in USD. The collateral before this event times Liquity's price for ${collSym} at this block, as the rows show them, to the cent, shown to the dollar.`,
+          summary: `Collateral value (before) in USD. The collateral before this event times Liquity's price for ${collSym} at this block, as the rows show them.`,
           formula: "collateral × price",
           inputs: [
             {
@@ -879,7 +886,7 @@ export function useLiquityCells({
       amount: { text: formatColl(redistColl), symbol: collSym, info: collDeltaProv },
       usd:
         priceNow > 0
-          ? { ...centsParts(redistUsd), info: usdMoveProv(collSym, redistColl, priceNow) }
+          ? { ...centsParts(redistUsd), info: usdMoveProv(collSym, redistColl, priceNow, priceNote) }
           : collNoFigure("The redistribution's collateral, in USD"),
       tip: TIP.collRedist,
     });
@@ -1263,10 +1270,10 @@ function productRow(amount: number, price: number) {
 }
 
 /** A token amount's dollars at a price, as the rows show them, to the cent. */
-function usdMoveProv(sym: string, amount: number, price: number): Provenance {
+function usdMoveProv(sym: string, amount: number, price: number, priceNote: string): Provenance {
   return {
     kind: "chain-derived",
-    summary: `${sym} this event moved, in US dollars. The amount times Liquity's price for ${sym} at this block, as the rows show them, to the cent, shown to the dollar.`,
+    summary: `${sym} this event moved, in US dollars. The amount times Liquity's price for ${sym} at this block, as the rows show them.`,
     formula: "amount × price",
     inputs: [
       { label: "amount", value: `${amountText(amount)} ${sym}`, kind: "chain" },
@@ -1275,7 +1282,7 @@ function usdMoveProv(sym: string, amount: number, price: number): Provenance {
         value: priceText(price),
         kind: "chain-derived",
         pclass: "oracle",
-        note: "on-chain oracle @ event block",
+        note: priceNote,
       },
       productRow(amount, price),
     ],
@@ -1296,8 +1303,8 @@ function eventMoveUsdProv(
   return {
     kind: "derived",
     summary: liquidation
-      ? `${sym} this liquidation moved, in US dollars. The balance after at Liquity's price for ${sym} at this block, less the balance before and any redistribution at the price the liquidation used, to the cent, shown to the dollar.`
-      : `${sym} this event moved, in US dollars. The balance after less the balance before and any redistribution, each at Liquity's price for ${sym} at this block, to the cent, shown to the dollar.`,
+      ? `${sym} this liquidation moved, in US dollars. The balance after at Liquity's price for ${sym} at this block, less the balance before and any redistribution at the price the liquidation used.`
+      : `${sym} this event moved, in US dollars. The balance after less the balance before and any redistribution, each at Liquity's price for ${sym} at this block.`,
     formula,
     inputs: [
       { label: "total", value: formatUsdValue(total), kind: "derived", step: true },
@@ -1320,7 +1327,7 @@ function eventMoveUsdProv(
 function atPriceProv(sym: string, amount: number, price: number, when: string): Provenance {
   return {
     kind: "chain-derived",
-    summary: `${sym} held after ${when}, in US dollars. The amount times Liquity's price for ${sym} then, as the rows show them, to the cent, shown to the dollar.`,
+    summary: `${sym} held after ${when}, in US dollars. The amount times Liquity's price for ${sym} then, as the rows show them.`,
     formula: "collateral × price then",
     inputs: [
       { label: "collateral", value: `${amountText(amount)} ${sym}`, kind: "chain" },
@@ -1336,7 +1343,7 @@ function atPriceProv(sym: string, amount: number, price: number, when: string): 
 function marketMoveProv(sym: string, before: number, last: number, moved: number): Provenance {
   return {
     kind: "derived",
-    summary: `Market move. The change in Liquity's price for ${sym} from the previous event to this one, on the ${sym} the Trove held between them, to the cent, shown to the dollar. No ${sym} moved.`,
+    summary: `Market move. The change in Liquity's price for ${sym} from the previous event to this one, on the ${sym} the Trove held between them. No ${sym} moved.`,
     formula: "before − last",
     inputs: [
       { label: "before", value: formatUsdValue(before), kind: "derived", step: true },

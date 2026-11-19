@@ -4,7 +4,7 @@
 
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import type { FlowAssetHeld, FlowLeg, FlowSegment, FlowSide, FlowUnit, MarketMove } from "@/lib/shared/flows-timeline";
-import { holderUsdReceipt } from "@/lib/shared/holder-usd-receipt";
+import { FACE_WORDS as FACE, holderUsdReceipt } from "@/lib/shared/holder-usd-receipt";
 import { listWords, noPriceWords } from "@/lib/shared/flows-sum";
 import { amountText, centsOf, faceAmount, factorText, shownUsd } from "@/lib/shared/shown-usd";
 import { formatUsdValue } from "@/lib/utils/format";
@@ -18,9 +18,6 @@ import { formatUsdValue } from "@/lib/utils/format";
 
 /** Legs shown before the dust control. */
 const LEG_CAP = 12;
-
-/** How a whole-dollar face relates to its receipt. */
-const FACE = "To the cent, shown to the dollar.";
 
 const blockWords = (b: number | null | undefined) => (b != null ? `block ${b.toLocaleString("en-US")}` : null);
 

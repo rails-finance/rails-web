@@ -49,6 +49,9 @@ export { shownPrice, shownUsd, shownComposedPrice, amountText, priceText } from 
 const cents = centsOf;
 
 /** The receipt and the figure it rebuilds. */
+/** How a whole-dollar face relates to a receipt its rows rebuild to the cent. */
+export const FACE_WORDS = "To the cent, shown to the dollar.";
+
 export function holderUsdReceipt(opts: {
   /** What the figure is ("The wallet's collateral in USD"). */
   what: string;
@@ -144,7 +147,8 @@ export function holderUsdReceipt(opts: {
       summary: [
         `${opts.what}: ${many ? "each token's amount times its price, summed" : "the amount times the price"}${at}.`,
         faces.length ? `${faces.join("; ")}, a face the protocol defines.` : "",
-        opts.caveat ?? "",
+        // The last row says the face where `shownAs` is set: said once.
+        (opts.shownAs ? opts.caveat?.replace(FACE_WORDS, "").trim() : opts.caveat) ?? "",
       ]
         .filter(Boolean)
         .join(" "),

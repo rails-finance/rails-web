@@ -828,7 +828,15 @@ export function CombinedFlows({
         <SectionHelp content={barsHelp} name="the bars" anatomy="F16" extra={flowsKey} />
       </div>
     ),
-    ...(hasDebt ? { debt: <div className="mb-1.5 mt-4">{bareHeadline("debt")}</div> } : {}),
+    ...(hasDebt
+      ? {
+          debt: (
+            <div className="mb-1.5 mt-4" data-flow-headline-row="debt">
+              {bareHeadline("debt")}
+            </div>
+          ),
+        }
+      : {}),
   };
   // The protocol's changes inside the life, a marker a day (ruling 10).
   const changeDays = useMemo(() => changesByDay(model.changes, startDay, today), [model.changes, startDay, today]);
