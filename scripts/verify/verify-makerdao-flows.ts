@@ -28,6 +28,7 @@
 // store the rows take the nearest priced moment.
 //
 //   npx tsx --test scripts/verify/verify-makerdao-flows.ts
+import { shownUsd } from "@/lib/shared/shown-usd";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -294,9 +295,9 @@ for (const name of NAMES) {
       assert.equal(end.collateral.now, 0, `${name}: closed`);
       assert.equal(end.debt.now, 0, `${name}: closed`);
     } else {
-      // Today meets the live read.
-      assert.ok(near(end.debt.now, c.debtDai, 1e-9), `${name}: debt now ${end.debt.now} vs ${c.debtDai}`);
-      assert.ok(near(end.collateral.now, c.ink * c.priceUsd!, 1e-9), `${name}: collateral now`);
+      // Today meets the live read, as the shown products (ui-jobs 743).
+      assert.ok(near(end.debt.now, shownUsd(c.debtDai, 1), 1e-9), `${name}: debt now ${end.debt.now} vs ${c.debtDai}`);
+      assert.ok(near(end.collateral.now, shownUsd(c.ink, c.priceUsd!), 1e-9), `${name}: collateral now`);
     }
   });
 }

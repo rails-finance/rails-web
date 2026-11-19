@@ -169,7 +169,7 @@ export interface MakerIlkRow {
   /** Liquidation penalty `chop` (wad → multiplier, 1.13 = 13%). Null when the
    *  ilk has no Dog entry (it cannot be liquidated). */
   chop: number | null;
-  /** OSM price = spot × par × mat ÷ RAY², the ilk's own operative price. */
+  /** OSM price = spot × par × mat ÷ RAY³, the ilk's own operative price. */
   priceUsd: number | null;
   /** The price feed the Spotter reads for this ilk. */
   pip: string | null;
@@ -441,7 +441,7 @@ export async function loadMakerSystemFromChain(): Promise<MakerSystemChainRespon
         dustDai: rad(dust),
         chop,
         // The OSM price, inverted out of Spotter.poke exactly as the position
-        // lane does it: price = spot × par × mat ÷ RAY².
+        // lane does it: price = spot × par × mat ÷ RAY³.
         priceUsd: mat > ZERO ? Number(((spot * par) / RAY) * mat) / 1e27 / 1e27 : null,
         pip,
         priceCap: caps[i],

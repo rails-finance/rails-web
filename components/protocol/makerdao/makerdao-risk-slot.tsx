@@ -11,7 +11,6 @@
 // Liquity family).
 
 import { Prov } from "@/components/shared/provenance";
-import { pct } from "@/components/shared/ratio-bar";
 import type { PositionPanelColumns, PositionPanelRow } from "@/components/shared/position-card";
 import {
   matProv,
@@ -20,7 +19,9 @@ import {
   stabilityFeeAprProv,
 } from "@/lib/makerdao/event-provenance";
 import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
-import { formatExact, formatNumber } from "@/lib/utils/format";
+import { formatExact, formatUsdValue } from "@/lib/utils/format";
+import { amountText, priceText } from "@/lib/shared/shown-usd";
+import { makerBorrowRoom, makerLiquidationPrice, makerVaultCollateralUsd } from "@/lib/makerdao/usd-receipt";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { formatLiquidationPrice } from "@/lib/utils/liquidation-utils";
 import type { MakerVaultView } from "./makerdao-vault-card";
@@ -61,7 +62,12 @@ export function makerdaoPanelColumns(v: MakerVaultView): PositionPanelColumns {
       tip: `The collateral ratio ${v.ilk} vaults must keep: the Spotter's liquidation ratio for the collateral type, read from the chain. Below it the vault can be liquidated.`,
     });
 
-  if (v.liquidationPriceUsd != null && v.liquidationPriceUsd > 0)
+  // The price from the inputs as the receipt shows them (ui-jobs 743).
+  const liq =
+    v.liquidationPriceUsd != null && v.liquidationPriceUsd > 0 && v.debtDai != null && v.matRatio != null
+      ? makerLiquidationPrice(v.debtDai, v.matRatio, v.ink)
+      : null;
+  if (liq)
     right.push({
       id: "liquidates-at",
       label: "Liquidates at",
@@ -69,36 +75,52 @@ export function makerdaoPanelColumns(v: MakerVaultView): PositionPanelColumns {
         <Prov
           info={stampServerRead(
             liquidationPriceProv(
-              v.debtDai != null ? `${formatNumber(v.debtDai)} ${dsym}` : "—",
-              v.matRatio != null ? `${(v.matRatio * 100).toFixed(0)}%` : "—",
-              `${formatNumber(v.ink)} ${v.collateralSymbol}`,
+              `${liq.debt} ${dsym}`,
+              liq.mat,
+              `${liq.ink} ${v.collateralSymbol}`,
+              priceText(liq.price),
             ),
             v.readBy,
           )}
         >
-          {formatLiquidationPrice(v.liquidationPriceUsd)}
+          {formatLiquidationPrice(liq.price)}
         </Prov>
       ),
       tip: `The ${v.collateralSymbol} price at which the vault crosses the Vat's safety line: its debt times the minimum ratio, divided by its collateral. Below it the vault can be liquidated.`,
     });
 
   // Meaningful only for an open vault with debt and the live overlay landed.
-  if (
+  const collUsd = makerVaultCollateralUsd(v);
+  const room =
     v.source === "chain" &&
     v.status === "open" &&
     v.debtDai != null &&
     v.debtDai > 0 &&
-    v.collateralUsd != null &&
-    v.collateralUsd > 0 &&
+    collUsd != null &&
+    collUsd.usd > 0 &&
     v.matRatio != null
-  ) {
-    // How much more the vault could draw before crossing the ilk's minimum.
-    const headroom = Math.max(0, v.collateralUsd / v.matRatio - v.debtDai);
+      ? makerBorrowRoom(collUsd.usd, v.matRatio, v.debtDai)
+      : null;
+  if (room && v.matRatio != null) {
+    // How much more the vault could draw before crossing the ilk's minimum,
+    // from the figures as the receipt shows them.
+    const headroom = room.room;
     right.push({
       id: "room-to-borrow",
       label: "Room to borrow",
       value: (
-        <Prov info={stampServerRead(borrowHeadroomProv(pct(v.matRatio)), v.readBy)}>{formatCompact(headroom)}</Prov>
+        <Prov
+          info={stampServerRead(
+            borrowHeadroomProv(room.mat, {
+              collateralUsd: formatUsdValue(room.collateralUsd),
+              debt: `${room.debt} ${dsym}`,
+              result: `${amountText(headroom)} ${dsym}`,
+            }),
+            v.readBy,
+          )}
+        >
+          {formatCompact(headroom)}
+        </Prov>
       ),
       asset: { symbol: dsym, figure: `${formatExact(headroom)} ${dsym}` },
       tip: `The ${dsym} the vault could still draw before its collateral ratio falls to the ${pctWhole(v.matRatio)} minimum: the collateral's value divided by the minimum, less the debt.`,

@@ -11,6 +11,7 @@
 // each historic event repriced at ITS OWN rate, not today's — so this mapper
 // states it as given rather than recomputing a rate of its own.
 
+import { makerVaultCollateralUsd } from "@/lib/makerdao/usd-receipt";
 import type { loadMakerVaultTail } from "./position-page-data";
 import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
@@ -37,7 +38,16 @@ export function makerShareCardModel(tail: MakerTail, vault: string): PositionCar
   const status = summary?.status ?? (chain && (chain.ink > 0 || chain.art > 0) ? "open" : "closed");
   const ink = chain?.ink ?? summary?.collateral.amount ?? 0;
   const debtDai = chain?.debtDai ?? summary?.debt.dai ?? null;
-  const collateralUsd = chain?.collateralUsd ?? summary?.collateral.valueUsd ?? null;
+  // The card's figure: ink × the OSM price as shown, to the cent (ui-jobs 743).
+  const collateralUsd =
+    makerVaultCollateralUsd({
+      collateralSymbol,
+      ink,
+      source: chain ? "chain" : "api",
+      atBlock: chain?.atBlock,
+      priceUsd: chain?.priceUsd ?? summary?.ilkState.priceUsd ?? null,
+      priceCap: chain?.priceCap ?? null,
+    })?.usd ?? null;
   // Peak is a whole-life aggregate a slot read can't infer — the replay
   // summary's own figures, falling back to the live values only when there is
   // no summary at all (matches the card's `mergeView`).
