@@ -54,7 +54,7 @@ import { AaveV4SpokeCardSelector } from "@/components/protocol/aave-v4/aave-v4-s
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { aaveV4EconomicsContent } from "@/lib/shared/learn-more-content";
 import { shownUsd } from "@/lib/shared/shown-usd";
-import { computeAaveLifetimeTotals, lifetimeFiguresState, SETTLED_INTEREST_NOTE } from "@/lib/aave-v4/lifetime-totals";
+import { computeAaveLifetimeTotals, lifetimeFiguresState } from "@/lib/aave-v4/lifetime-totals";
 // Lazy chunk: the tower chart (below the fold, ~700 lines of legend/anatomy)
 // loads off the initial bundle. A mount-time prefetch (below) has it cached
 // well before the data fetch resolves and it first renders.
@@ -1109,8 +1109,8 @@ function AaveV4SpokeTowerBlock({
                           </>
                         ) : (
                           <>
-                            {fig(totals.suppliedGrossUsd)} supplied and earned in interest over the position&apos;s
-                            life, not drawn apart because {SETTLED_INTEREST_NOTE}
+                            {fig(totals.suppliedGrossUsd)} supplied and earned together (the interest has no price at
+                            its own block)
                           </>
                         )}
                         {totals.withdrawnUsd > 0.01 && <>, then {fig(totals.withdrawnUsd)} withdrawn</>}
@@ -1137,8 +1137,8 @@ function AaveV4SpokeTowerBlock({
                           </>
                         ) : (
                           <>
-                            {fig(totals.borrowedGrossUsd)} borrowed and accrued in interest over the position&apos;s
-                            life, not drawn apart because {SETTLED_INTEREST_NOTE}
+                            {fig(totals.borrowedGrossUsd)} borrowed and accrued together (the interest has no price at
+                            its own block)
                           </>
                         )}
                         {totals.repaidUsd > 0.01 && <>, then {fig(totals.repaidUsd)} repaid</>}

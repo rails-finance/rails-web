@@ -17,11 +17,27 @@ import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 /** What the USD column shows beside a balance with no price behind it. */
 export const NO_PRICE_HINT = "no on-chain price";
 
-/** Below this many tokens an unpriced balance is the arithmetic residue of
- *  adding event amounts as floats, not a holding. An unpriced holding of any
- *  real size stops every figure it belongs to (ui-jobs 743): at 0.0001 tokens
- *  the old floor passed over about $10 of WBTC. */
+/** Below this many tokens an unpriced balance read as one value is no
+ *  holding. An unpriced holding of any real size stops every figure it
+ *  belongs to (ui-jobs 743): at 0.0001 tokens the old floor passed over about
+ *  $10 of WBTC. */
 export const UNPRICED_DUST_TOKENS = 1e-12;
+
+/** The floor for a balance worked out by adding a reserve's event amounts as
+ *  floats: their residue grows with the amounts (about 1e-10 once the flows
+ *  reach 1e6 tokens), so the floor scales with the reserve's gross flows. At
+ *  or below it a balance is residue, held at $0. */
+export function unpricedFloor(r: {
+  supplied: number;
+  withdrawn: number;
+  borrowed: number;
+  repaid: number;
+  liquidatedDebt: number;
+  liquidatedCollateral: number;
+}): number {
+  const gross = r.supplied + r.withdrawn + r.borrowed + r.repaid + r.liquidatedDebt + r.liquidatedCollateral;
+  return UNPRICED_DUST_TOKENS * Math.max(1, gross);
+}
 
 /** Whether the live price map has answered at all. An empty map means the page
  *  is still fetching it, which is a loading state and not a missing source, so

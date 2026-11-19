@@ -17,7 +17,7 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { interestSinceZero, numOrNull, type LaneRow } from "@/lib/shared/interest-since-zero";
 import type { AaveV4Context } from "@/lib/shared/types/protocols/aave-v4";
 import { type PriceEntry, resolvePrice } from "@/lib/aave/prices";
-import { pricesHaveLoaded, UNPRICED_DUST_TOKENS } from "@/lib/aave-v4/unpriced";
+import { pricesHaveLoaded, UNPRICED_DUST_TOKENS, unpricedFloor } from "@/lib/aave-v4/unpriced";
 import { SPOKE_HUB, type HubTier } from "@/components/protocol/aave-v4/aave-v4-spoke-constants";
 import { AAVE_V4_FALLBACK_LT } from "@/lib/aave-v4/liquidation-thresholds";
 import {
@@ -829,7 +829,8 @@ export function calculateAaveEconomics(
         const price = reservePrice.get(sym);
         if (price == null) {
           // The token floor judges only an unpriced leg; a priced one counts.
-          if (amount <= UNPRICED_DUST_TOKENS) continue;
+          const flows = reserveMap.get(sym);
+          if (amount <= (flows ? unpricedFloor(flows) : UNPRICED_DUST_TOKENS)) continue;
           unpriced.add(sym);
           return null;
         }
@@ -916,7 +917,7 @@ export function groupBySpoke(
     const unpricedSymbols: string[] = [];
     for (const r of pricesHaveLoaded(prices) ? result.reserves : []) {
       const held = Math.max(0, r.supplied - r.withdrawn) + Math.max(0, r.borrowed - r.repaid);
-      if (held > UNPRICED_DUST_TOKENS && resolvePrice(r.symbol, prices) == null) unpricedSymbols.push(r.symbol);
+      if (held > unpricedFloor(r) && resolvePrice(r.symbol, prices) == null) unpricedSymbols.push(r.symbol);
     }
     const totalSupplyUsd = result.reserves.reduce(
       (s, r) => s + Math.max(0, r.supplied - r.withdrawn) * (resolvePrice(r.symbol, prices) ?? 0),
@@ -966,9 +967,9 @@ function heldSymbols(
     .map((r) => {
       const amount = amountOf(r);
       const price = resolvePrice(r.symbol, prices);
-      return { symbol: r.symbol, amount, usd: price == null ? null : amount * price };
+      return { symbol: r.symbol, amount, usd: price == null ? null : amount * price, floor: unpricedFloor(r) };
     })
-    .filter((r) => (r.usd == null ? r.amount > UNPRICED_DUST_TOKENS : r.usd > SPOKE_ICON_USD_MIN))
+    .filter((r) => (r.usd == null ? r.amount > r.floor : r.usd > SPOKE_ICON_USD_MIN))
     .sort((a, b) => (b.usd ?? -1) - (a.usd ?? -1))
     .map((r) => r.symbol);
 }
@@ -983,9 +984,9 @@ function unpricedHoldingsOf(
   return reserves.flatMap((r) => {
     if (resolvePrice(r.symbol, prices) != null) return [];
     const out: NonNullable<AaveSpokeCardInfo["unpricedHoldings"]> = [];
-    if (Math.max(0, r.supplied - r.withdrawn) > UNPRICED_DUST_TOKENS)
+    if (Math.max(0, r.supplied - r.withdrawn) > unpricedFloor(r))
       out.push({ symbol: r.symbol, side: "supply", collateralEnabled: r.collateralEnabled ?? true });
-    if (Math.max(0, r.borrowed - r.repaid) > UNPRICED_DUST_TOKENS)
+    if (Math.max(0, r.borrowed - r.repaid) > unpricedFloor(r))
       out.push({ symbol: r.symbol, side: "debt", collateralEnabled: false });
     return out;
   });

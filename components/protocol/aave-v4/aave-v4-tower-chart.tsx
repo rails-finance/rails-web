@@ -29,13 +29,7 @@ import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import { fmtUsd } from "@/lib/aave-v4/format";
 import { accumProv, chainTruthProv, livePriceInput } from "@/lib/aave-v4/position-provenance";
 import { oraclePriceSource, type OraclePriceMap } from "@/lib/aave-v4/use-oracle-prices";
-import {
-  NO_PRICE_HINT,
-  noPriceProv,
-  partialSumProv,
-  pricesHaveLoaded,
-  UNPRICED_DUST_TOKENS,
-} from "@/lib/aave-v4/unpriced";
+import { NO_PRICE_HINT, noPriceProv, partialSumProv, pricesHaveLoaded, unpricedFloor } from "@/lib/aave-v4/unpriced";
 import type { AaveV4PriceSource } from "@/lib/shared/types/protocols/aave-v4";
 import type { Provenance } from "@/components/shared/provenance";
 import { aaveV4FlowReceipt, aaveV4UsdReceipt, type AaveV4RowPrice } from "@/lib/aave-v4/usd-receipt";
@@ -322,7 +316,7 @@ const lifetimeInterestProv = (side: "supply" | "debt"): Provenance =>
         label: "price",
         kind: "chain",
         pclass: "oracle",
-        note: `${HOLDING_PRICE_NOTE}, while all the interest is still held; once any of the side has left, none`,
+        note: `${HOLDING_PRICE_NOTE}, while all the interest is still held. Once any of the side has left, the interest has no price at its own block, so it has no dollar figure`,
       },
     ],
   });
@@ -405,7 +399,7 @@ export function AaveV4TowerChart({
         // balances are judged in tokens.
         isClosed:
           price == null
-            ? netSupply <= UNPRICED_DUST_TOKENS && netDebt <= UNPRICED_DUST_TOKENS
+            ? netSupply <= unpricedFloor(r) && netDebt <= unpricedFloor(r)
             : netSupply * price < LIFETIME_DUST_USD && netDebt * price < LIFETIME_DUST_USD,
         hasHistoricActivity,
       };
@@ -434,9 +428,9 @@ export function AaveV4TowerChart({
   // they get a breakdown row in the asset's units and their names go on every
   // total they are missing from.
   const unpricedRows = priced ? activeRows.filter((r) => r.price == null) : [];
-  const unpricedSupplyAll = unpricedRows.filter((r) => r.netSupply > UNPRICED_DUST_TOKENS);
+  const unpricedSupplyAll = unpricedRows.filter((r) => r.netSupply > unpricedFloor(r));
   const unpricedSupply = hideSurplus ? unpricedSupplyAll.filter((r) => !isSurplus(r.symbol)) : unpricedSupplyAll;
-  const unpricedDebt = unpricedRows.filter((r) => r.netDebt > UNPRICED_DUST_TOKENS);
+  const unpricedDebt = unpricedRows.filter((r) => r.netDebt > unpricedFloor(r));
   const unpricedSupplySymbols = unpricedSupply.map((r) => r.symbol);
   const unpricedDebtSymbols = unpricedDebt.map((r) => r.symbol);
 
@@ -942,7 +936,7 @@ export function AaveV4TowerChart({
     const prov =
       excluded.length > 0
         ? partialSumProv(lifetimeInterestProv(side), label, excluded)
-        : (receipt?.prov ?? noInterestFigureProv(label, side));
+        : (receipt?.prov ?? noInterestFigureProv(label));
     const v = drawn ? fmtUsd(usd) : null;
     return [
       {
@@ -974,7 +968,7 @@ export function AaveV4TowerChart({
             icon: collSideSymbol ? <TokenChipIcon symbol={collSideSymbol} size={14} filterable={false} /> : undefined,
             prov:
               depositedExcluded.length === 0 && totalDepositedUsd == null
-                ? noInterestFigureProv("Supplied (all time)", "supply")
+                ? noInterestFigureProv("Supplied (all time)")
                 : partialSumProv(depositedProv(), "Supplied (all time)", depositedExcluded),
           } as BreakdownRow,
         ]
@@ -1016,7 +1010,7 @@ export function AaveV4TowerChart({
             icon: debtSideSymbol ? <TokenChipIcon symbol={debtSideSymbol} size={14} filterable={false} /> : undefined,
             prov:
               borrowedExcluded.length === 0 && totalBorrowedUsd == null
-                ? noInterestFigureProv("Borrowed (all time)", "debt")
+                ? noInterestFigureProv("Borrowed (all time)")
                 : partialSumProv(borrowedProv(), "Borrowed (all time)", borrowedExcluded),
           } as BreakdownRow,
         ]

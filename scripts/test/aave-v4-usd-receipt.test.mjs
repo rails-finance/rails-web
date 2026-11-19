@@ -471,3 +471,17 @@ test("the markdown export writes no figure while the read is pending, once it ha
   assert.match(drawn, /\*\*Peak supply:\*\* \$6,000/);
   assert.match(md({ ...card, peakSupply: undefined, peakSupplyUnpriced: ["XAUt"] }), /\*\*Peak supply:\*\* .*XAUt/);
 });
+
+test("the residue floor scales with a reserve's flows; a real small unpriced holding still stops the figure", () => {
+  // 3e6 tokens in and nearly all out: float residue of 2^-31 (≈4.7e-10), above
+  // the fixed 1e-12 and below 1e-12 × the gross flows.
+  const residue = 2 ** -31;
+  const big = stats({ symbol: "XAUt", supplied: 3e6, withdrawn: 3e6 - residue });
+  assert.ok(big.supplied - big.withdrawn > 1e-12);
+  const t = computeAaveLifetimeTotals([big], { "0x0": 1 });
+  assert.deepEqual(t.noFigure, []);
+  assert.equal(reserveLifetime(big, null).supply.heldUsd, 0, "residue is held at $0, not left without a figure");
+  const small = stats({ symbol: "XAUt", supplied: 0.00005 });
+  assert.deepEqual(computeAaveLifetimeTotals([small], { "0x0": 1 }).noFigure, ["XAUt"]);
+  assert.equal(reserveLifetime(small, null).supply.heldUsd, null);
+});
