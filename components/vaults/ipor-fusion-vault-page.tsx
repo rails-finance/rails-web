@@ -403,9 +403,8 @@ function IporFusionRoles({
                 <DataTableRow key={`${h.roleId}:${h.account}`} data-role-row={h.roleId}>
                   <DataTableCell rowHeader>
                     <span className={name.constant ? "font-mono text-[12px]" : "font-semibold"}>
-                      <TipLabel text={name.text} tip={tip} />
+                      <TipLabel text={name.text} tip={`${tip ? `${tip} ` : ""}Role ${h.roleId}.`} />
                     </span>
-                    <span className="ml-1.5 text-xs text-rb-500">{h.roleId}</span>
                   </DataTableCell>
                   <DataTableCell label="Holder" align="right">
                     {holderAddress(h)}
