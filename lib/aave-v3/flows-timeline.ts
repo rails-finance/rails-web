@@ -30,6 +30,7 @@ import type { ChainTruthTowerData, TowerLine } from "@/lib/shared/chain-truth-ec
 import {
   daysFromEvents,
   flowLeg,
+  livePriced,
   type FlowAssetHeld,
   type FlowBucket,
   type FlowDayRow,
@@ -548,32 +549,43 @@ export function aaveV3FlowLive(tower: ChainTruthTowerData): FlowLive {
 
 /** Each asset the ledger holds and owes now: its current lines, and where a
  *  side splits off interest (`interest`), that line joined to its asset.
- *  `collateralInterest` joins the collateral side's too. */
+ *  `collateralInterest` joins the collateral side's too. Each asset carries
+ *  its line's price (ui-jobs 743), so the live stop states it as amount ×
+ *  price; a line with no price leaves its asset with none. */
 export function towerAssets(tower: ChainTruthTowerData, collateralInterest: boolean): FlowAssetHeld[] {
   const out: FlowAssetHeld[] = [];
-  const add = (side: FlowSide, lines: TowerLine[], interest: TowerLine | null | undefined) => {
-    for (const l of lines) {
-      const at = out.find((x) => x.side === side && x.symbol === l.symbol);
-      if (at) {
-        at.usd += l.usd ?? 0;
-        at.amount = at.amount != null ? at.amount + l.amount : null;
-      } else
-        out.push({
-          side,
-          symbol: l.symbol,
-          amount: l.amount,
-          usd: l.usd ?? 0,
-          // A line the tower could not price has no figure (ui-jobs 743).
-          ...(l.usd == null && l.amount > 0 ? { unpriced: true as const } : {}),
-        });
-    }
-    if (!interest) return;
-    // Interest on one asset joins it; interest summed across assets is its own line.
-    const at = out.find((x) => x.side === side && x.symbol === interest.symbol);
+  const priced = (p: NonNullable<TowerLine["price"]>) => livePriced(p.usd, p.block, 0, { source: p.source });
+  const join = (side: FlowSide, symbol: string, amount: number, usd: number | null, price: TowerLine["price"]) => {
+    const at = out.find((x) => x.side === side && x.symbol === symbol);
     if (at) {
-      at.usd += interest.usd ?? 0;
-      at.amount = at.amount != null ? at.amount + interest.amount : null;
+      at.usd += usd ?? 0;
+      at.amount = at.amount != null ? at.amount + amount : null;
+      if (usd == null && amount > 0) {
+        at.unpriced = true;
+        delete at.priced;
+      }
     } else
+      out.push({
+        side,
+        symbol,
+        amount,
+        usd: usd ?? 0,
+        // A line the tower could not price has no figure (ui-jobs 743).
+        ...(usd == null && amount > 0 ? { unpriced: true as const } : price ? { priced: priced(price) } : {}),
+      });
+  };
+  const add = (side: FlowSide, lines: TowerLine[], interest: TowerLine | null | undefined) => {
+    for (const l of lines) join(side, l.symbol, l.amount, l.usd, l.price);
+    if (!interest) return;
+    // Interest on one asset joins it; interest summed across assets joins
+    // each asset by its part, or stands as its own line.
+    if (interest.parts?.length) {
+      for (const p of interest.parts) join(side, p.symbol, p.amount, p.amount * p.price.usd, p.price);
+      return;
+    }
+    const at = out.find((x) => x.side === side && x.symbol === interest.symbol);
+    if (at) join(side, interest.symbol, interest.amount, interest.usd, interest.price);
+    else
       out.push({
         side,
         symbol: side === "debt" ? "Interest accrued" : "Interest earned",

@@ -198,8 +198,20 @@ test("the live stop states the ledger's figures", () => {
   const s = stateAt(model, model.liveStop);
   const c = tower.collateral;
   const d = tower.debt;
-  assert.ok(near(s.collateral.now, usdSum(c.current)));
-  assert.ok(near(s.debt.now, usdSum(d.current) + (d.interest?.usd ?? 0)));
+  // The live figures are the lines' shown products, to the cent (ui-jobs
+  // 743): the same assets as the ledger's lines, within what showing each
+  // amount and price rounds away.
+  const shown = (ls: typeof c.current) => ls.reduce((t, l) => centsOf(t + shownUsd(l.amount, l.price!.usd)), 0);
+  assert.ok(c.current.every((l) => l.price != null) && d.current.every((l) => l.price != null), "each line priced");
+  assert.equal(s.collateral.now, shown(c.current));
+  assert.ok(near(s.collateral.now, usdSum(c.current), 0.01 * c.current.length + 1e-6 * usdSum(c.current)));
+  assert.ok(
+    near(
+      s.debt.now,
+      usdSum(d.current) + (d.interest?.usd ?? 0),
+      0.01 * (d.current.length + 1) + 1e-6 * usdSum(d.current),
+    ),
+  );
   assert.ok(near(seg(s.collateral, "deposited"), c.lifetimeInflow));
   assert.ok(near(seg(s.collateral, "received"), usdSum(c.received)));
   // One balancing item at every stop: at the live stop it is the ledger's

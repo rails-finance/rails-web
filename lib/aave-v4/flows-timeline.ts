@@ -157,6 +157,8 @@ export function aaveV4FlowLive(
   totals: AaveLifetimeTotals,
   reserves: ReserveStats[],
   priceOf: (symbol: string) => number | null,
+  /** The block the oracle read stands at, where it names one (ui-jobs 743). */
+  priceBlock: number | null = null,
 ): FlowLive {
   const assets: FlowAssetHeld[] = [];
   for (const r of reserves) {
@@ -169,10 +171,10 @@ export function aaveV4FlowLive(
         symbol: r.symbol,
         amount: supplied,
         usd: p == null ? 0 : supplied * p,
-        // The page's price now, whose read names no block (ui-jobs 743).
+        // The oracle read's price now, at its block (ui-jobs 743).
         ...(p == null
           ? { unpriced: true as const }
-          : { priced: livePriced(p, null, 0, { source: "the oracle's price now" }) }),
+          : { priced: livePriced(p, priceBlock, 0, { source: "the oracle's price now" }) }),
       });
     if (owed > 0)
       assets.push({
@@ -180,10 +182,10 @@ export function aaveV4FlowLive(
         symbol: r.symbol,
         amount: owed,
         usd: p == null ? 0 : owed * p,
-        // The page's price now, whose read names no block (ui-jobs 743).
+        // The oracle read's price now, at its block (ui-jobs 743).
         ...(p == null
           ? { unpriced: true as const }
-          : { priced: livePriced(p, null, 0, { source: "the oracle's price now" }) }),
+          : { priced: livePriced(p, priceBlock, 0, { source: "the oracle's price now" }) }),
       });
   }
   return {

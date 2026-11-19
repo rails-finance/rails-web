@@ -31,6 +31,7 @@ import type { V3TokenMeta } from "@/lib/sources/chain/aave-v3-tokens";
 import { isAaveV3Event } from "@/lib/shared/types/event-shape";
 import { aaveBaseFocusEvents, aaveBaseReplay, aaveBaseSummary, isAaveBaseInterest } from "@/lib/aave-v3-base/flows";
 import { AAVE_V3_BASE_FIRST_WRITE_OFF_BLOCK } from "@/lib/aave-v3-base/write-off-gap";
+import { centsOf, shownPrice, shownUsd } from "@/lib/shared/shown-usd";
 
 const FIXTURE = join(process.cwd(), "scripts/verify/fixtures/aave-base-flow-series.json");
 const SERVER_COPY = join(
@@ -98,6 +99,135 @@ export function caseInput(
   );
   return { rows, store };
 }
+/** The web's answer against the fixture's (ui-jobs 743). The fixture is the
+ *  server's shape, shared byte for byte, so it stays as it is and the web is
+ *  read against it:
+ *  - every field the fixture has compares equal, except
+ *  - a leg's `usd`, which is its cents: centsOf(the fixture's usd);
+ *  - a day's running sums (`cum`, `cumAsset[].usd`), sums of those cents:
+ *    within half a cent per leg the case holds;
+ *  - a day's `unsure`: the day's close is the decided basis and lists no
+ *    reason, a close carried from an earlier day lists one where the fixture
+ *    lists the day's close, and the nearest read is named so;
+ *  - the leg's parts the server does not emit yet (`price`, `block`,
+ *    `priceNote`, `basis`; a day's `legs` and price blocks) are not compared,
+ *    except that a leg's price is one of the case's price inputs (a row's
+ *    at-block price, a store close or today's) where it has any for the token.
+ *  The server item that emits the parts: rails-ops TO-DO-infra-and-backend,
+ *  "Aave Base flow series: the server emits each leg's price, block and cents". */
+function assertSharedAnswer(f: Fixture, c: Case, got: Answer, want: Answer): void {
+  const lane = f.lanes[c.lane];
+  const { rows, store } = caseInput(f, c);
+  const symbolOf = (a: string | null | undefined) => (a ? lane.metas[a.toLowerCase()]?.symbol : undefined);
+  const inputs = new Map<string, number[]>();
+  const put = (a: string | null | undefined, v: unknown) => {
+    const sym = symbolOf(a);
+    const n = Number(v);
+    if (sym && v != null && Number.isFinite(n) && n > 0) inputs.set(sym, [...(inputs.get(sym) ?? []), n]);
+  };
+  for (const r of rows) {
+    put(r.reserve, r.price_usd);
+    put(r.reserve, r.debt_price_usd);
+    put(r.collateral_asset, r.collateral_price_usd);
+  }
+  for (const [a, obs] of Object.entries(store)) for (const [, v] of obs) put(a, v);
+  for (const [a, v] of Object.entries(lane.todayPrices)) put(a, v);
+  const g = got as { summary: Record<string, unknown>; events: Record<string, unknown>[]; facts: unknown };
+  const w = want as { summary: Record<string, unknown>; events: Record<string, unknown>[]; facts: unknown };
+  assert.deepEqual(g.facts, w.facts, `${c.name}: facts`);
+  // The events' legs.
+  assert.equal(g.events.length, w.events.length, `${c.name}: events`);
+  let legCount = 0;
+  g.events.forEach((ge, i) => {
+    const we = w.events[i];
+    const { legs: gl, ...gRest } = ge as { legs: Record<string, unknown>[] };
+    const { legs: wl, ...wRest } = we as { legs: Record<string, unknown>[] };
+    assert.deepEqual(gRest, wRest, `${c.name} event ${i}`);
+    assert.equal(gl.length, wl.length, `${c.name} event ${i}: legs`);
+    gl.forEach((l, j) => {
+      legCount++;
+      const want = wl[j];
+      for (const [k, v] of Object.entries(want))
+        if (k === "usd" && v != null && typeof l.price === "number") {
+          // The leg is its shown product, and it meets the fixture's figure
+          // to the cent, less what the shown price and amount round away.
+          assert.equal(l.usd, shownUsd(l.amount as number, l.price), `${c.name} ${i}.${j}: usd is the shown product`);
+          const slack = 0.01 + Math.abs(l.amount as number) * 5e-7 * Math.max(1, l.price) + 5e-7 * l.price;
+          assert.ok(
+            Math.abs((l.usd as number) - centsOf(v as number)) <= slack,
+            `${c.name} ${i}.${j}: ${l.usd} against ${centsOf(v as number)}`,
+          );
+        } else if (k === "usd") assert.equal(l.usd, v == null ? v : centsOf(v as number), `${c.name} ${i}.${j}: usd`);
+        else assert.deepEqual(l[k], v, `${c.name} ${i}.${j}: ${k}`);
+      const known = inputs.get(l.symbol as string);
+      if (typeof l.price === "number" && known?.length)
+        assert.ok(
+          known.some((p) => p === l.price || shownPrice(p) === l.price),
+          `${c.name} ${i}.${j}: ${l.symbol} at ${l.price}, a price the inputs carry`,
+        );
+    });
+  });
+  // The summary: the days compared with cents, the rest equal.
+  const { days: gd, ...gs } = g.summary as { days: Record<string, unknown>[] };
+  const { days: wd, ...ws } = w.summary as { days: Record<string, unknown>[] };
+  assert.deepEqual(gs, ws, `${c.name}: summary`);
+  assert.equal(gd.length, wd.length, `${c.name}: days`);
+  const legsIn = gd.reduce((n, d) => n + ((d.legs as unknown[] | undefined)?.length ?? 0), 0) + legCount;
+  // Each leg's cents differ from its raw figure by half a cent and what the
+  // shown amount and price round away (a millionth of the figure at most).
+  const near = (a: unknown, b: unknown, what: string) =>
+    assert.ok(
+      Math.abs((a as number) - (b as number)) <= 0.005 * Math.max(1, legsIn) + 1e-6 * Math.abs(b as number) + 1e-6,
+      `${c.name} ${what}: ${a} against ${b}`,
+    );
+  const reasons = (us: { side: string; why: string; symbol?: string }[] | undefined, web: boolean) =>
+    (us ?? [])
+      .filter((u) => !u.why.startsWith("priced at the day's close"))
+      .map((u) => ({
+        ...u,
+        why: web ? u.why : u.why.replace("priced at the nearest priced row:", "priced at the nearest read:"),
+      }))
+      .filter((u) => !(web && u.why.startsWith("priced at the last stored close before its day")));
+  gd.forEach((day, i) => {
+    const want = wd[i];
+    for (const [k, v] of Object.entries(want)) {
+      if (k === "cum")
+        for (const [b, x] of Object.entries(v as Record<string, number>))
+          near((day.cum as Record<string, number>)[b], x, `day ${i} cum.${b}`);
+      else if (k === "cumAsset")
+        (v as { bucket: string; symbol: string; usd: number }[]).forEach((x, j) => {
+          const y = (day.cumAsset as (typeof x)[])[j];
+          assert.equal(y.bucket, x.bucket);
+          assert.equal(y.symbol, x.symbol);
+          near(y.usd, x.usd, `day ${i} cumAsset ${x.symbol} ${x.bucket}`);
+        });
+      else if (k === "unsure") {
+        const gotU = day.unsure as { side: string; why: string; symbol?: string }[] | undefined;
+        assert.deepEqual(reasons(gotU, true), reasons(v as typeof gotU, false), `day ${i} unsure`);
+        // A carried close stands where the fixture names the day's close.
+        for (const u of gotU ?? [])
+          if (u.why.startsWith("priced at the last stored close before its day"))
+            assert.ok(
+              (v as typeof gotU)!.some(
+                (x) => x.side === u.side && x.symbol === u.symbol && x.why.startsWith("priced at the day's close"),
+              ),
+              `day ${i}: a carried close where the fixture has the day's close`,
+            );
+      } else if (k === "prices")
+        (v as Record<string, unknown>[]).forEach((x, j) => {
+          const { block: _b, ...y } = (day.prices as Record<string, unknown>[])[j];
+          void _b;
+          assert.deepEqual(y, x, `day ${i} prices ${j}`);
+        });
+      else assert.deepEqual(day[k], v, `day ${i} ${k}`);
+    }
+    if (!("unsure" in want)) {
+      const gotU = day.unsure as { side: string; why: string; symbol?: string }[] | undefined;
+      assert.deepEqual(reasons(gotU, true), [], `day ${i} unsure`);
+    }
+  });
+}
+
 /** As JSON carries it: no undefined keys. */
 const json = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 
@@ -139,7 +269,8 @@ export function webAnswer(f: Fixture, c: Case): Answer {
     for (const l of r.legs) {
       if (isAaveBaseInterest(l.bucket)) continue;
       if (l.basis === "block") priced.block++;
-      else if (l.basis === "day") priced.day++;
+      // A close carried from an earlier day is a store price, as the server counts it.
+      else if (l.basis === "day" || l.basis === "carried") priced.day++;
       else if (l.basis === "nearest") priced.nearest++;
       else priced.today++;
     }
@@ -175,7 +306,7 @@ if (process.env.WRITE === "1") {
 
   for (const c of fixture.cases) {
     test(`summary: ${c.name} (${c.about})`, () => {
-      assert.deepEqual(webAnswer(fixture, c), c.answer);
+      assertSharedAnswer(fixture, c, webAnswer(fixture, c), c.answer!);
     });
   }
 

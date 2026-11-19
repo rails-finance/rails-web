@@ -488,6 +488,63 @@ test("a live asset with no price leaves the live total with none (ui-jobs 743, A
   assert.match(rows.total.none, /WETH has no price at this block/);
 });
 
+const { aaveV3FlowLive } = await import(ROOT + "lib/aave-v3/flows-timeline.ts");
+
+/** An Aave tower whose current collateral lines carry `prices` (null: the
+ *  tower could not price the line). */
+function towerModel(prices, block) {
+  const line = (symbol, amount, p) => ({
+    key: symbol,
+    symbol,
+    amount,
+    usd: p == null ? null : amount * p,
+    ...(p == null ? {} : { price: { usd: p, block, source: "Aave's AaveOracle getAssetPrice now" } }),
+    prov: { kind: "chain", summary: "s" },
+  });
+  const tower = {
+    valued: true,
+    collateral: {
+      current: [line("WBTC", 1.2345678, prices.wbtc), line("WETH", 2.5, prices.weth)],
+      interest: null,
+      exited: [],
+      liquidated: [],
+      lifetimeInflow: 0,
+    },
+    debt: { current: [], interest: null, exited: [], liquidated: [], lifetimeInflow: 0 },
+  };
+  return buildFlowModel({
+    buckets: BUCKETS,
+    days: daysFromEvents(
+      BUCKETS.map((b) => b.key),
+      heldEvents(),
+    ),
+    live: aaveV3FlowLive(tower),
+    today: 20_005,
+    dailyPrices: { wbtc: [[20_002, 99_000.123456, 1_500_000]], weth: [[20_002, 3100.25]] },
+  });
+}
+
+test("an Aave tower's live side is its lines' price rows (ui-jobs 743)", () => {
+  const m = towerModel({ wbtc: 101_234.567891, weth: 3210.987654 }, 2_000_000);
+  const want = centsOf(shownUsd(1.2345678, 101_234.567891) + shownUsd(2.5, 3210.987654));
+  const st = stateAt(m, m.liveStop);
+  assert.equal(st.collateral.now, want);
+  const prov = flowSegmentProv(st.collateral.bar[0], "collateral", "now", true, true);
+  assert.equal(rebuild(prov).cents, want);
+  assert.ok(prov.inputs.some((i) => /AaveOracle getAssetPrice now, block 2,000,000$/.test(i.note ?? "")));
+  assert.deepEqual(partialAt(m, m.liveStop, "collateral"), []);
+  // A read naming no block: not complete.
+  const blockless = towerModel({ wbtc: 101_234.567891, weth: 3210.987654 }, null);
+  assert.equal(partialAt(blockless, blockless.liveStop, "collateral").length, 1);
+});
+
+test("an Aave tower line with no price leaves the live total with none (ui-jobs 743)", () => {
+  const m = towerModel({ wbtc: 101_234.567891, weth: null }, 2_000_000);
+  const rows = sideSumRows(stateAt(m, m.liveStop).collateral);
+  assert.equal(rows.total.amount, "—");
+  assert.match(rows.total.none, /WETH has no price at this block/);
+});
+
 test("a past day holding an asset with no price has no held figure and names the asset", () => {
   const m = buildFlowModel({
     buckets: BUCKETS,
