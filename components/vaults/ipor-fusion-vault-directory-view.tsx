@@ -96,13 +96,17 @@ export function IporFusionVaultDirectoryView({
             censusFigure: "roster-census",
             census: (
               <>
+                Listed below are the{" "}
                 <Prov info={iporRosterCensusProv(coords, { catalogSize, censusBlock, factory })}>
-                  The {n(catalogSize)} vaults the IPOR Fusion factory had made on {chain} at block {n(censusBlock)}
+                  {n(catalogSize)} vaults the IPOR Fusion factory had made on {chain} by block {n(censusBlock)}
                 </Prov>
                 .
               </>
             ),
             listingHref: null,
+            // The cross-protocol index lists no IPOR Fusion vault until phase C
+            // (TO-DO-ipor-scoping §6.3), so the line carries no link to it.
+            indexHref: null,
             infoHref: `${rosterHref}/info`,
             menu: <RosterMenu listingHref={null} infoHref={`${rosterHref}/info`} docs={IPOR_FUSION_DOCS} />,
             drawer: <IporFusionRosterDrawer block={readBlock} chain={chain} />,
