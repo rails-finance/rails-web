@@ -5,6 +5,8 @@
 // to that market page; otherwise the holder strip and one card per Comet it
 // touched (rails-ops reference/arbitrum-position-first-lane.md).
 
+// Each held token at its Comet's price in dollars as shown (ui-jobs 743).
+import { cometPricesUsd } from "@/lib/compound-arbitrum/usd";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { positionMetadata, shortSubject } from "@/lib/shared/page-metadata";
@@ -26,18 +28,6 @@ interface Props {
 
 // Every figure is read at one block per request; nothing is cacheable across requests.
 export const dynamic = "force-dynamic";
-
-/** Each held token at its Comet's price in dollars, keyed by lowercase
- *  address: the `prices` `cometViewFromChain` reads. The ETH-quoted Comet
- *  converts at the read's `ethUsd`; a Comet with no conversion is unpriced. */
-function cometPricesUsd(p: CompoundMarketChainResponse, baseToken: string, ethUsd: number | undefined) {
-  const fx = p.quoteUnit === "USD" ? 1 : p.quoteUnit === "ETH" && ethUsd ? ethUsd : null;
-  const out: Record<string, number> = {};
-  if (fx == null) return out;
-  if (p.basePrice > 0) out[baseToken.toLowerCase()] = p.basePrice * fx;
-  for (const c of p.collateral) if (c.price > 0) out[c.address.toLowerCase()] = c.price * fx;
-  return out;
-}
 
 /** WETH in dollars: the ETH-quoted Comet's base price converted on
  *  cUSDCv3's WETH feed, the reading the market page's prices route makes
