@@ -26,6 +26,8 @@ import { LinkedAddress } from "@/components/shared/linked-address";
 import type { LiquityV2DepositEventRow } from "@/lib/sources/api/liquity-v2-sp";
 import { DEPOSIT_AFTER_FORMULA, spDepositSheet } from "./sp-sheet";
 import { SpTxTroves } from "./sp-tx-troves";
+import { useTxTroves } from "@/lib/liquity-v2/tx-troves";
+import { liquityV2RedeemerHref, sentRedemption } from "@/lib/liquity-v2/redeemer-routes";
 
 const ZERO = BigInt(0);
 /** A kept amount as the row states it: the compact form from 0.01, two
@@ -100,16 +102,20 @@ function depositorGas(r: LiquityV2DepositEventRow): EventGas | undefined {
   return eth > 0 ? { eth, usd: 0, gasUsed: Number(r.gas_used) } : undefined;
 }
 
-/** The row's sentences, the sender's linked to its wallet page, then the
+/** The row's sentences, the sender's linked to its wallet page, or to its
+ *  redeemer page where the transaction holds a redemption it sent, then the
  *  Troves its transaction acted on (ui-jobs 751). */
 function Bullets({ row, coll }: { row: LiquityV2DepositEventRow; coll: string }) {
   const sender = row.tx_from ? spSenderSentence(row.tx_from) : null;
+  const txTroves = useTxTroves(row.tx_hash);
+  const redeemerHref =
+    row.tx_from && txTroves && sentRedemption(txTroves.rows, row.tx_from) ? liquityV2RedeemerHref(row.tx_from) : null;
   return (
     <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed">
       {spEventSentences(row, coll).map((l) =>
         l === sender && row.tx_from ? (
           <li key={l}>
-            <LinkedAddress address={row.tx_from} holderOf="liquity-v2" /> sent the transaction.
+            <LinkedAddress address={row.tx_from} holderOf="liquity-v2" href={redeemerHref} /> sent the transaction.
           </li>
         ) : (
           <li key={l}>{l}</li>
