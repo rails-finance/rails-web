@@ -427,12 +427,15 @@ export function LiquityEventCard({
     },
     notes:
       ctx.stateBefore && ctx.stateAfter && prose.L2 ? (
-        <LiquityRedeemerNote ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} />
+        <LiquityRedeemerNote ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} eventId={event.id} />
       ) : undefined,
     price,
     explainer: {
-      body: <LiquityEventExplainer prose={prose} ctx={ctx} coords={coords} />,
-      first: prose.L4.length > 0 ? <LiquityExplainerTeaser prose={prose} ctx={ctx} coords={coords} /> : undefined,
+      body: <LiquityEventExplainer prose={prose} ctx={ctx} coords={coords} eventId={event.id} />,
+      first:
+        prose.L4.length > 0 ? (
+          <LiquityExplainerTeaser prose={prose} ctx={ctx} coords={coords} eventId={event.id} />
+        ) : undefined,
       grouped: isGroupedExplanation(prose),
     },
     learnMore: <LearnMore inline content={prose.L5.content} />,

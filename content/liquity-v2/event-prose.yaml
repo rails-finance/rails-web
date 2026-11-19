@@ -273,6 +273,10 @@ placeholders:
     rounding: debt
     means: |-
       debt the event cleared
+  redeemer:
+    rounding: text
+    means: |-
+      the word "redeemer", which the page links to the redeemer's page
   coll_taken:
     rounding: coll_trim
     means: |-
@@ -1473,7 +1477,7 @@ templates:
         when: |-
           variant at_event
         text: |-
-          A redeemer swapped {debt_cleared} {debt_symbol} for {coll_taken} {coll_symbol} of this trove’s collateral, clearing that much debt.
+          A {redeemer} swapped {debt_cleared} {debt_symbol} for {coll_taken} {coll_symbol} of this trove’s collateral, clearing that much debt.
       redeem.result:
         when: |-
           variant at_event, the fee the trove kept reads at least $1

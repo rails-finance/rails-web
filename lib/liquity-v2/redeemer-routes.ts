@@ -15,6 +15,28 @@ export function liquityV2RedeemerHref(address: string): string {
   return `${LIQUITY_V2_REDEEMER_PATH}/${address.toLowerCase()}`;
 }
 
+/** One of the redeemer's redemptions on the redeemer page: its row, landed
+ *  on and ringed (`?at=`, the Trove timeline's event id). */
+export function redeemerEventHref(address: string, eventId: string): string {
+  return `${liquityV2RedeemerHref(address)}?at=${encodeURIComponent(eventId)}`;
+}
+
+/** A Trove operation's id on its Trove's timeline: the transaction and the
+ *  TroveOperation log's index. */
+export function troveEventId(txHash: string, logIndex: number | string): string {
+  return `${txHash}_${logIndex}`;
+}
+
+/** That operation's event page on its Trove. */
+export function troveEventHref(branch: string, troveId: string, eventId: string): string {
+  return `/ethereum/liquity-v2/trove/${branch}/${troveId}/event/${encodeURIComponent(eventId)}`;
+}
+
+/** That operation in its Trove's timeline, landed on and ringed (`?at=`). */
+export function troveTimelineHref(branch: string, troveId: string, eventId: string): string {
+  return `/ethereum/liquity-v2/trove/${branch}/${troveId}?at=${encodeURIComponent(eventId)}`;
+}
+
 /** Whether a transaction's Trove operations hold a redemption sent by
  *  `sender`: a redeemCollateral row whose transaction it sent. */
 export function sentRedemption(

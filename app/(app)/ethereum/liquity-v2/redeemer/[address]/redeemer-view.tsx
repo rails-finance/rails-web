@@ -7,9 +7,11 @@
 // collateral narrows to a branch). A wallet has no Lifetime flows panel: it
 // holds no position. Past REDEEMER_FIRST_READ rows the timeline closes on a
 // boundary card, and the cut notice reads the rest on request; the card's
-// sums cover every row.
+// sums cover every row. A row's event page and View in timeline are the
+// Trove's.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
@@ -19,7 +21,12 @@ import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { LiquityV2RedeemerCard } from "@/components/protocol/liquity/redeemer-card";
 import { LiquityV2RedemptionCard } from "@/components/protocol/liquity/redeemer-event-card";
 import { LIQUITY_V2_BASE_PATH } from "@/lib/liquity-v2/sp-routes";
-import { REDEEMER_FIRST_READ, redemptionId, redemptionTimelineEvent } from "@/lib/liquity-v2/redeemer-timeline";
+import {
+  REDEEMER_FIRST_READ,
+  redemptionEventHref,
+  redemptionId,
+  redemptionTimelineEvent,
+} from "@/lib/liquity-v2/redeemer-timeline";
 import { boundaryFromLimit } from "@/lib/shared/timeline-boundary";
 import {
   readLiquityV2Redeemer,
@@ -56,8 +63,12 @@ export default function RedeemerView({
   // settle repeats.
   const [older, setOlder] = useState<LiquityV2RedemptionRow[]>([]);
   const [olderRead, setOlderRead] = useState<"idle" | "loading" | "failed">("idle");
+  // One read at a time: a second would land later and replace the rows,
+  // resetting the timeline's window under a landing.
+  const reading = useRef(false);
   const loadRest = async () => {
-    if (!data) return;
+    if (!data || reading.current) return;
+    reading.current = true;
     setOlderRead("loading");
     const got: LiquityV2RedemptionRow[] = [];
     try {
@@ -74,6 +85,8 @@ export default function RedeemerView({
       setOlderRead("idle");
     } catch {
       setOlderRead("failed");
+    } finally {
+      reading.current = false;
     }
   };
 
@@ -92,6 +105,17 @@ export default function RedeemerView({
   const events = useMemo(() => listed.map((r) => redemptionTimelineEvent(r, address)), [listed, address]);
   const total = data?.totals.operations ?? 0;
   const olderCount = Math.max(0, total - listed.length);
+
+  // A `?at=` link to a row past the first read (a Trove's "redeemer" link):
+  // the rest is read first, and the timeline mounts with the row in it, so
+  // its landing finds the row.
+  const at = useSearchParams()?.get("at") ?? null;
+  const awaitAt = at != null && olderCount > 0 && !rowById.has(at) && olderRead !== "failed";
+  useEffect(() => {
+    if (awaitAt && olderRead === "idle") void loadRest();
+    // `loadRest` is a fresh closure every render; the read keys on the wait.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [awaitAt, olderRead]);
 
   // Where the rows stop short of the first redemption, its time is one more
   // read: the oldest row.
@@ -163,22 +187,30 @@ export default function RedeemerView({
           </ul>
         }
       />
-      <ChainTruthTimeline
-        persistKeyPrefix="liquity-v2-redeemer"
-        closed={false}
-        tl={tl}
-        boundary={boundary}
-        loadOlder={olderCount > 0 ? { state: olderRead, load: () => void loadRest() } : undefined}
-        displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
-        emptyLabel="No redemptions recorded for this address"
-        toolbarLeading={
-          <TimelineActivityHeader events={events} closed={false} firstAt={firstAt} tenurePending={firstAt == null} />
-        }
-        renderCard={(event, meta) => {
-          const r = rowById.get(event.id);
-          return r ? <LiquityV2RedemptionCard row={r} isLast={meta.isLast} eventNumber={meta.eventNumber} /> : null;
-        }}
-      />
+      {awaitAt ? (
+        <DetailBodySkeleton />
+      ) : (
+        <ChainTruthTimeline
+          persistKeyPrefix="liquity-v2-redeemer"
+          closed={false}
+          tl={tl}
+          boundary={boundary}
+          eventHref={(id) => {
+            const r = rowById.get(id);
+            return r ? redemptionEventHref(r) : null;
+          }}
+          loadOlder={olderCount > 0 ? { state: olderRead, load: () => void loadRest() } : undefined}
+          displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
+          emptyLabel="No redemptions recorded for this address"
+          toolbarLeading={
+            <TimelineActivityHeader events={events} closed={false} firstAt={firstAt} tenurePending={firstAt == null} />
+          }
+          renderCard={(event, meta) => {
+            const r = rowById.get(event.id);
+            return r ? <LiquityV2RedemptionCard row={r} isLast={meta.isLast} eventNumber={meta.eventNumber} /> : null;
+          }}
+        />
+      )}
       <ProvInspectorLayer />
     </div>
   );
