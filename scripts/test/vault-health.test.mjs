@@ -114,6 +114,8 @@ test("withdrawals: the holder's figure first, then the vault's", () => {
 test("withdrawals: a pause leads; Yearn's idle part; Umbrella's cooldown; unread families", () => {
   const p = lines({ family: "sgho", paused: true, holder: { block: 1, claim: "10", maxWithdraw: "0" } });
   assert.equal(p.withdrawals.headline, "Withdrawals are paused");
+  const sb = lines({ family: "sbold", paused: true });
+  assert.equal(sb.withdrawals.headline, "paused() answers true");
   const y = lines({ family: "yearn-v3", exit: { kind: "idle", block: 1, idle: "250", total: "1000" } });
   assert.equal(y.withdrawals.headline, "25% of the vault's assets idle at the last read");
   const yh = lines({
