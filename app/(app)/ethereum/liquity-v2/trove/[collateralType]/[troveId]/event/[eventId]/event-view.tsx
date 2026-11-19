@@ -111,9 +111,11 @@ export default function EventView({
   const surplusClaimed = surplus?.claimed != null;
   const open = trove?.status === "open";
   // BOLD's price from the Curve BOLD/USDC pool (ui-jobs 746) while the Trove
-  // is open. The event page draws no Prices chip; DetailTopRow publishes its
-  // assets to the cards' "today" side, which values BOLD at it (offPar).
-  const boldPrice = useBoldPrice(open ? undefined : null);
+  // is open, or where an event carries a BOLD chip to flip (ui-jobs 761). The
+  // event page draws no Prices chip; DetailTopRow publishes its assets to the
+  // cards' "today" side, which values BOLD at it (offPar).
+  const boldChip = liquityEvents.some((e) => e.context.data.boldPrice != null);
+  const boldPrice = useBoldPrice(open || boldChip ? undefined : null);
   // The branch's shutdown, as the trove page reads it (ui-jobs 612, 626): the
   // prose takes it on any Trove (an urgent redemption, ui-jobs 619), the
   // replay's accrual on an open one only.

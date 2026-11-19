@@ -234,6 +234,7 @@ export function EventPriceRow({ price }: { price: EventCardPrice }) {
         symbol={p.symbol}
         format={format}
         noToday={p.unit != null}
+        icon={p.named ? undefined : icon}
         then={
           p.named ? (
             p.info ? (

@@ -73,7 +73,8 @@ export function boldEventProv(bp: DebtTokenPrice, eventBlock?: number): Provenan
 
 /** BOLD's chip on the price row, beside the collateral's: the stored price at
  *  its block, and the page's head read once the row's clock press stands at
- *  the latest block (ThenTodayChip), with the line's receipt. None where the row carries no boldPrice. */
+ *  the latest block (ThenTodayChip), with the line's receipt. None where the
+ *  row carries no boldPrice. */
 export function boldPriceChip(
   bp: DebtTokenPrice | undefined | null,
   eventBlock: number | undefined,

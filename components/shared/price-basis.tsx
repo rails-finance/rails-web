@@ -14,7 +14,11 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { CTRL_GHOST, CTRL_OFF, CTRL_ON } from "@/lib/shared/ui-grammar";
+import { CTRL_GHOST, CTRL_OFF } from "@/lib/shared/ui-grammar";
+
+/** The latest block's prices in the live green (the price chart's figure at
+ *  today, F19.2), on the press and on each chip it flipped. */
+const TODAY_TONE = "text-green-600 dark:text-green-400";
 
 export type PriceBasis = "event" | "today";
 
@@ -146,8 +150,9 @@ function ClockIcon({ basis, size }: { basis: PriceBasis; size: number }) {
 }
 
 /** The row's then/today press: one clock icon before its price chips (Miles,
- *  19 Nov 2026; ui-jobs 761). Rotate-ccw-clock at the event's prices, the
- *  default; clock-check at the latest block's. A press flips every chip on
+ *  19 Nov 2026; ui-jobs 761). Rotate-ccw-clock, muted, at the event's
+ *  prices, the default; clock-check, in the live green, at the latest
+ *  block's. A press flips every chip on
  *  the card; none is drawn where no chip can flip. */
 export function PriceBasisPress({ chips }: { chips: Flippable[] }) {
   const ctx = useContext(BasisContext);
@@ -168,7 +173,7 @@ export function PriceBasisPress({ chips }: { chips: Flippable[] }) {
         ctx.setBasis(isToday ? "event" : "today");
       }}
       onKeyDown={(e) => e.stopPropagation()}
-      className={`${CTRL_GHOST} size-6 shrink-0 rounded-sm focus-ring ${isToday ? CTRL_ON : CTRL_OFF}`}
+      className={`${CTRL_GHOST} size-6 shrink-0 rounded-sm focus-ring ${isToday ? `${TODAY_TONE} hover:bg-[var(--surface-row-hover)] dark:hover:bg-rb-800` : CTRL_OFF}`}
       data-price-basis-press=""
       data-price-basis={ctx.basis}
     >
@@ -178,20 +183,24 @@ export function PriceBasisPress({ chips }: { chips: Flippable[] }) {
 }
 
 /** T2's price chip: the event's figure by default (`then`, its receipt with
- *  it), and the latest block's price, in the pressed styling, while the
- *  card's PriceBasisPress stands at today (ui-jobs 309, 761). Without a card
- *  to switch or a price today it stays the event's figure. */
+ *  it), and the latest block's price, in the live green, while the card's
+ *  PriceBasisPress stands at today (ui-jobs 309, 761). Without a card to
+ *  switch or a price today it stays the event's figure. */
 export function ThenTodayChip({
   symbol,
   then,
   format,
   noToday,
+  icon,
 }: {
   symbol: string;
   then: ReactNode;
   format: (n: number) => string;
   /** The chip's figure is in another unit than the page's Prices chip. */
   noToday?: boolean;
+  /** The asset's icon after the figure, where `then` draws it there: the
+   *  today side draws it in the same place. */
+  icon?: ReactNode;
 }) {
   const ctx = useContext(BasisContext);
   const today = useTodayPrice(symbol);
@@ -199,7 +208,7 @@ export function ThenTodayChip({
   const isToday = ctx.basis === "today";
   return (
     <span
-      className={`inline-flex min-h-6 items-center gap-1 rounded-sm${isToday ? ` px-1.5 py-0.5 ${CTRL_ON}` : ""}`}
+      className={`inline-flex min-h-6 items-center gap-1${isToday ? ` ${TODAY_TONE}` : ""}`}
       data-then-today=""
       data-price-basis={ctx.basis}
     >
@@ -209,6 +218,7 @@ export function ThenTodayChip({
             kind: "chain-derived",
             summary: `${symbol} price today. The oracle's price at the latest block, which the page's Prices chip states.`,
           }}
+          icon={icon}
         >
           {format(today)}
         </Prov>
