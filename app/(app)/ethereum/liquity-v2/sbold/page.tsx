@@ -1,4 +1,4 @@
-// THE sBOLD VAULT'S PAGE — /ethereum/vaults/sbold (rails-ops ui-jobs 749, 765).
+// THE sBOLD VAULT'S PAGE — /ethereum/liquity-v2/sbold (rails-ops ui-jobs 749).
 // ----------------------------------------------------------------------------
 // The Yearn vault page's shell (app/(app)/ethereum/yearn/vaults/[vault]) for
 // one ERC-4626 vault on BOLD, drawn by components/vaults/sbold-vault-page.tsx
@@ -9,7 +9,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-import { SboldPageHeader } from "@/components/vaults/sbold-page-header";
+import { RailHeader } from "@/components/shared/rail-header";
 import { SboldVaultPage } from "@/components/vaults/sbold-vault-page";
 import { FocusSourceGate } from "@/components/shared/aim-gate";
 import { listingMetadata } from "@/lib/shared/page-metadata";
@@ -22,7 +22,7 @@ import { SBOLD_ASSET, SBOLD_PAGE_PATH, sboldHolderHref } from "@/lib/liquity-v2/
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = listingMetadata({
-  title: "sBOLD · Vaults",
+  title: "sBOLD · Liquity V2",
   description:
     "The sBOLD vault's total assets, shares issued, share price and its deposits in Liquity V2's three Stability Pools, read from the contracts at one block.",
   canonicalPath: SBOLD_PAGE_PATH,
@@ -48,7 +48,7 @@ export default async function SboldVaultRoute({ searchParams }: Props) {
       <div className="min-h-screen">
         <div className="py-8">
           <header className="mb-5" data-skel-section="page-header">
-            <SboldPageHeader />
+            <RailHeader session="liquity-v2" venue="subPage" />
           </header>
 
           {data.chainStale ? (
