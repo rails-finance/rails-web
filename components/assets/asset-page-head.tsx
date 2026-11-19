@@ -185,12 +185,37 @@ function ReadBy({
                       </li>
                     ))}
                 </ul>
+                <UseLines chips={chips.filter((ch) => ch.chain === c && ch.uses?.length)} />
               </div>
             );
           })}
         </div>
       )}
     </section>
+  );
+}
+
+/** Under a group's chips, a muted line per explorer that names what the
+ *  token is to it, each use a link to the explorer's page for it: "Liquity
+ *  V2: Trove debt, Stability Pools, sBOLD", "Pendle: PT-sBOLD-4FEB2027". */
+function UseLines({ chips }: { chips: AssetChip[] }) {
+  if (chips.length === 0) return null;
+  return (
+    <ul className="mt-1.5 space-y-0.5 text-xs text-rb-500" data-asset-uses="" data-anatomy="A1.8">
+      {chips.map((ch) => (
+        <li key={ch.explorer} data-asset-use={ch.explorer}>
+          {ch.label}:{" "}
+          {ch.uses!.map((u, i) => (
+            <span key={u.href}>
+              {i > 0 && ", "}
+              <Link href={u.href} className="font-medium text-foreground underline-offset-2 hover:underline">
+                {u.label}
+              </Link>
+            </span>
+          ))}
+        </li>
+      ))}
+    </ul>
   );
 }
 

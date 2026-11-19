@@ -7,7 +7,11 @@
 //             names the protocol whose oracle prices the token, by its key;
 //   catalog   each explorer's own asset list: its asset catalog, its branch or
 //             pool table, Morpho Blue's market census, LlamaLend's factories
-//             (read at head, cached six hours), the Yearn vault census.
+//             (read at head, cached six hours), the Yearn vault census, and
+//             Pendle's roster of markets that have not expired.
+//
+// A hit can carry what the token is to the explorer, its uses
+// (lib/shared/asset-uses.ts): the asset page's line under the chips (A1.8).
 //
 // A chip appears only for an explorer in lib/shared/protocols.ts. Its link is
 // the explorer's listing filtered to the asset where the listing has a facet
@@ -53,6 +57,9 @@ import { discoverLlamalendMarkets } from "@/lib/sources/chain/llamalend-markets"
 import { resolveErc20Meta } from "@/lib/sources/chain/erc20-meta";
 import { MORPHO_SUPPLY_READ, MORPHO_SUPPLY_TOKENS } from "@/lib/morpho/supply-tokens";
 import type { ChainId } from "@/lib/shared/chains";
+import { SBOLD_VAULT } from "@/lib/liquity-v2/sbold";
+import { readPendleRoster } from "@/lib/sources/api/pendle";
+import { chipUses, pendleUses, type PendleMarketRef, type TokenUse } from "@/lib/shared/asset-uses";
 
 const BOLD = "0x6440f144b7e50d6a8439336510312d2f54beb01d";
 const ZERO = /^0x0{40}$/;
@@ -67,7 +74,12 @@ interface Hit {
   page?: string;
   /** The symbol, where the list names it. */
   symbol?: string;
+  /** What the token is to the explorer (lib/shared/asset-uses.ts). */
+  uses?: TokenUse[];
 }
+
+/** A Liquity-family stablecoin's use: the debt of its Troves. */
+const TROVE_DEBT: TokenUse = { label: "Trove debt", page: "" };
 
 const lc = (s: string) => s.toLowerCase();
 const byExplorer = new Map(PROTOCOLS.filter((p) => !p.unlaunched).map((p) => [p.id, p]));
@@ -173,7 +185,14 @@ function staticCatalogHits(): Hit[] {
       facet: { param: "collateralTypes", value: b.symbol },
       symbol: b.symbol,
     });
-  hit({ explorer: "liquity", chain: 1, token: BOLD, symbol: "BOLD" });
+  hit({
+    explorer: "liquity",
+    chain: 1,
+    token: BOLD,
+    symbol: "BOLD",
+    uses: [TROVE_DEBT, { label: "Stability Pools", page: "/stability-pool" }, { label: "sBOLD", page: "/sbold" }],
+  });
+  hit({ explorer: "liquity", chain: 1, token: SBOLD_VAULT, page: "/sbold", symbol: "sBOLD" });
   for (const [explorer, chain, branches, debt, debtSymbol] of [
     ["asymmetry", 1, ASYMMETRY_BRANCHES, USDAF, USDAF_SYMBOL],
     ["ebisu", 1, EBISU_BRANCHES, EBUSD, EBUSD_SYMBOL],
@@ -187,10 +206,10 @@ function staticCatalogHits(): Hit[] {
         facet: { param: "branch", value: b.symbol },
         symbol: b.symbol,
       });
-    hit({ explorer, chain, token: debt, symbol: debtSymbol });
+    hit({ explorer, chain, token: debt, symbol: debtSymbol, uses: [TROVE_DEBT] });
   }
   hit({ explorer: "liquity-v1", chain: 1, token: NATIVE, symbol: "ETH" });
-  hit({ explorer: "liquity-v1", chain: 1, token: LIQUITY_V1_ADDRESSES.LUSD, symbol: "LUSD" });
+  hit({ explorer: "liquity-v1", chain: 1, token: LIQUITY_V1_ADDRESSES.LUSD, symbol: "LUSD", uses: [TROVE_DEBT] });
   for (const p of Object.values(FX_POOLS))
     hit({ explorer: "fx", chain: 1, token: p.tokenAddress, facet: { param: "pool", value: p.key } });
   hit({ explorer: "fx", chain: 1, token: FX_ADDRESSES.FXUSD, symbol: FXUSD_META.symbol });
@@ -222,6 +241,16 @@ function staticCatalogHits(): Hit[] {
 
 const STATIC_HITS = staticCatalogHits();
 
+/** Each explorer's static list as `chain:token` with the explorer and the
+ *  symbol where the list names one, for scripts/asset-page-gaps.mjs. */
+export const catalogTokens = (): { explorer: string; chain: number; token: string; symbol: string | null }[] =>
+  STATIC_HITS.filter((h) => byExplorer.has(h.explorer)).map((h) => ({
+    explorer: h.explorer,
+    chain: h.chain,
+    token: h.token,
+    symbol: h.symbol ?? null,
+  }));
+
 /** LlamaLend's markets at head: identity only, cached six hours (markets are
  *  listed rarely; the factories' counters are the source). */
 const llamalendTokens = unstable_cache(
@@ -236,6 +265,28 @@ const llamalendTokens = unstable_cache(
   },
   ["asset-explorer-llamalend-tokens-v2"],
   { revalidate: 6 * 3600 },
+);
+
+/** Pendle's markets that have not expired, from its roster (kept ten
+ *  minutes, as the roster is): each market's yield token and the asset it
+ *  accounts in. A failed read is not cached. */
+const pendleMarkets = unstable_cache(
+  async (): Promise<PendleMarketRef[]> => {
+    const read = await readPendleRoster();
+    if (!read.ok) throw new Error(`Pendle roster: ${read.status}`);
+    return read.data.markets
+      .filter((m) => m.expired !== true)
+      .map((m) => ({
+        market: m.tokens.market.address,
+        pt: m.tokens.pt.symbol,
+        yieldToken: m.tokens.yieldToken.address,
+        asset: m.tokens.asset.address ?? null,
+        expired: m.expired,
+        expiry: m.tokens.expiry,
+      }));
+  },
+  ["asset-explorer-pendle-markets-v1"],
+  { revalidate: 600 },
 );
 
 /** The symbols of the tokens in Morpho markets with $1M or more of supply, by
@@ -283,6 +334,14 @@ export async function assetChips(
   const llama = await llamalendTokens().catch(() => [] as [string, string][]);
   for (const [t, symbol] of llama)
     hits.push({ explorer: "llamalend", chain: 1, token: t, from: "catalog", page: "/markets", symbol });
+  // The cache can serve an older roster when a refresh fails: a market past
+  // its expiry is dropped here too.
+  const now = Date.now() / 1000;
+  const pendle = (await pendleMarkets().catch(() => [] as PendleMarketRef[])).filter(
+    (m) => m.expired !== true && m.expiry > now,
+  );
+  for (const { token, use } of pendleUses(pendle))
+    hits.push({ explorer: "pendle", chain: 1, token, from: "catalog", page: "/markets", uses: [use] });
 
   const morpho = new Map(await morphoSupplySymbols().catch(() => [] as [string, string][]));
   if (morpho.size)
@@ -324,6 +383,10 @@ export async function assetChips(
         href = `${p.href}${page}`;
         link = "page";
       }
+      const uses = chipUses(
+        p.href,
+        hs.flatMap((h) => h.uses ?? []),
+      );
       chips.push({
         explorer,
         label: p.label,
@@ -331,6 +394,7 @@ export async function assetChips(
         href,
         link,
         from: [...new Set(hs.map((h) => h.from))].sort(),
+        ...(uses.length ? { uses } : {}),
       });
     }
     chips.sort((x, y) => x.chain - y.chain || x.label.localeCompare(y.label));
