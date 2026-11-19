@@ -29,8 +29,8 @@ import { soldLessFee } from "./price";
 /** The first block where the sample found every trade of a settlement priced
  *  on entries of its own (17 Nov 2026 measure, ui-jobs 711). From here a
  *  trade priced worse than the clearing price on its own entries is read as
- *  carrying its fees; before it, own entries were also market makers' orders
- *  filled at their limit price, which is no fee. */
+ *  carrying its fees; before it, own entries also carried market makers'
+ *  orders at a price of their own, so a gap there is not read as a fee. */
 export const COW_OWN_PRICE_FEES_FROM = 19_815_319;
 
 export interface CowSettledOrder {
