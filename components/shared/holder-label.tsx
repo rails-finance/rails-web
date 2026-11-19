@@ -14,7 +14,7 @@ import { useHolderLabel, type HolderLabel } from "@/lib/shared/use-holder-label"
 const IPOR_FUSION_VAULT = "IPOR Fusion vault";
 
 function holderLabelTip(label: HolderLabel, chainId: ChainId): string {
-  const made = "A vault made through IPOR Fusion's factory, which anyone can use.";
+  const made = "A vault made through IPOR Fusion's factory, which anyone can deploy from.";
   if (!label.name) return made;
   const at = `block ${label.censusBlock.toLocaleString("en-US")} (${formatDate(label.censusBlockIso)})`;
   return `${made} Its name on ${CHAINS[chainId].name} at ${at}: ${label.name}.`;

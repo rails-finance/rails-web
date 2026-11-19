@@ -67,3 +67,80 @@ test("the route's answer carries hits only, keyed lowercase", () => {
   assert.deepEqual(Object.keys(hits[STETH_LOOP]).sort(), ["censusBlock", "censusBlockIso", "name", "symbol"]);
   assert.deepEqual(iporFusionVaultHits(8453, [STETH_LOOP, NOBODY]), {});
 });
+
+// The client batcher (lib/shared/holder-label-batch.ts) and the census chains.
+const { createHolderLabelBatcher } = await import("../../lib/shared/holder-label-batch.ts");
+const { IPOR_FUSION_CHAIN_IDS } = await import("../../lib/ipor-fusion/census-chains.ts");
+
+test("only the census chains are looked up", () => {
+  assert.deepEqual(
+    [...IPOR_FUSION_CHAIN_IDS].sort((a, b) => a - b),
+    [1, 8453, 42161],
+  );
+  for (const id of [10, 5042, 11155111]) assert.equal(IPOR_FUSION_CHAIN_IDS.has(id), false);
+});
+
+test("one tick's asks go out as one fetch per chain", async () => {
+  const calls = [];
+  const b = createHolderLabelBatcher(
+    async (chainId, addrs) => {
+      calls.push([chainId, addrs]);
+      return chainId === 1 ? { [STETH_LOOP]: "vault" } : {};
+    },
+    () => {},
+  );
+  const got = [];
+  b.subscribe(1, STETH_LOOP, (v) => got.push(["a", v]));
+  b.subscribe(1, NOBODY, (v) => got.push(["b", v]));
+  b.subscribe(8453, STETH_LOOP, (v) => got.push(["c", v]));
+  await b.flush();
+  assert.deepEqual(calls, [
+    [1, [STETH_LOOP, NOBODY]],
+    [8453, [STETH_LOOP]],
+  ]);
+  assert.deepEqual(got, [
+    ["a", "vault"],
+    ["b", null],
+    ["c", null],
+  ]);
+  assert.equal(b.get(1, STETH_LOOP), "vault");
+  assert.equal(b.get(1, NOBODY), null);
+});
+
+test("a failed fetch drops only its own callbacks; an ask made during it hears its own fetch", async () => {
+  let release;
+  let n = 0;
+  const b = createHolderLabelBatcher(
+    async () => {
+      n += 1;
+      if (n === 1) {
+        await new Promise((r) => (release = r));
+        throw new Error("down");
+      }
+      return { [STETH_LOOP]: "vault" };
+    },
+    () => {},
+  );
+  const got = [];
+  b.subscribe(1, STETH_LOOP, (v) => got.push(["early", v]));
+  const first = b.flush();
+  b.subscribe(1, STETH_LOOP, (v) => got.push(["late", v]));
+  release();
+  await first;
+  assert.deepEqual(got, []);
+  assert.equal(b.get(1, STETH_LOOP), undefined);
+  await b.flush();
+  assert.deepEqual(got, [["late", "vault"]]);
+});
+
+test("an unsubscribed callback is not called", async () => {
+  const b = createHolderLabelBatcher(
+    async () => ({ [STETH_LOOP]: "vault" }),
+    () => {},
+  );
+  const got = [];
+  const off = b.subscribe(1, STETH_LOOP, (v) => got.push(v));
+  off();
+  await b.flush();
+  assert.deepEqual(got, []);
+});

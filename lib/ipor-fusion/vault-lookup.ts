@@ -7,6 +7,7 @@
 
 import type { ChainId } from "../shared/chains";
 import { IPOR_FUSION_CENSUS } from "./vault-catalog";
+import { IPOR_FUSION_CENSUS_CHAINS } from "./census-chains";
 
 /** What the holder label states about one vault: its name and symbol as the
  *  chain answered them at the census block. */
@@ -17,18 +18,12 @@ export interface IporFusionVaultHit {
   censusBlockIso: string;
 }
 
-const CENSUS_CHAINS: [ChainId, keyof typeof IPOR_FUSION_CENSUS][] = [
-  [1, "ethereum"],
-  [42161, "arbitrum"],
-  [8453, "base"],
-];
-
 let index: Map<ChainId, Map<string, IporFusionVaultHit>> | null = null;
 
 function byChain(): Map<ChainId, Map<string, IporFusionVaultHit>> {
   if (index) return index;
   index = new Map();
-  for (const [chainId, key] of CENSUS_CHAINS) {
+  for (const [chainId, key] of IPOR_FUSION_CENSUS_CHAINS) {
     const census = IPOR_FUSION_CENSUS[key];
     const rows = new Map<string, IporFusionVaultHit>();
     for (const v of census.vaults)

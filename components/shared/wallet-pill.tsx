@@ -208,7 +208,7 @@ function WalletPillInner({
         </RevealTip>
         {bookmark && <BookmarkToggle wallet={wallet} ensName={name} size={heading ? 14 : 12} />}
       </span>
-      {/* The position heading draws its own beside the address kind. */}
+      {/* The position heading draws it beside the address kind. */}
       {!heading && <HolderLabelTag wallet={wallet} chainId={chainId} />}
     </span>
   );

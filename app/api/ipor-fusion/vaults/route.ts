@@ -5,7 +5,7 @@ import { iporFusionVaultHits } from "@/lib/ipor-fusion/vault-lookup";
  * `GET /api/ipor-fusion/vaults?chain=1&addresses=0xabc…,0xdef…` → `{ vaults:
  * { <lower-addr>: { name, symbol, censusBlock, censusBlockIso } } }`, the
  * addresses that are IPOR Fusion vaults on that chain (hits only). Read from
- * the static census (lib/ipor-fusion/vault-catalog.ts), never the chain, so an
+ * the static census (lib/ipor-fusion/vault-catalog.ts), so an
  * answer is cached for a day. For the holder label (lib/shared/use-holder-label.ts).
  */
 
