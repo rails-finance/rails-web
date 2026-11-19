@@ -289,6 +289,9 @@ export function maplePoolsHref(): string {
  *  protocol. It spans chains, so it sits under no chain. */
 export const VAULT_INDEX_HREF = "/vaults";
 
+/** The vault fronts page (ui-jobs 774), the /vaults menu's Fronts. */
+export const FRONTS_HREF = `${VAULT_INDEX_HREF}/fronts`;
+
 /** The index's About page (ui-jobs 776): a link to each family's vaults info page. */
 export const VAULT_INDEX_ABOUT_HREF = `${VAULT_INDEX_HREF}/about`;
 

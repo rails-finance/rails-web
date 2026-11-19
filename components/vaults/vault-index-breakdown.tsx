@@ -8,7 +8,7 @@
 // receipt.
 
 import Link from "next/link";
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { AnchoredPanel } from "@/components/shared/asset-popover";
 import { InfoDisclosureTrigger } from "@/components/shared/info-disclosure";
 import { Prov } from "@/components/shared/provenance";
@@ -41,6 +41,13 @@ export function VaultIndexBreakdown({
   const [open, setOpen] = useState(false);
   const button = useRef<HTMLButtonElement | null>(null);
   const panelId = useId();
+  const body = useRef<HTMLDivElement | null>(null);
+  // Opening moves focus into the panel; closing returns it to the (i).
+  useEffect(() => {
+    if (!open) return;
+    const f = requestAnimationFrame(() => body.current?.focus());
+    return () => cancelAnimationFrame(f);
+  }, [open]);
   return (
     <>
       <InfoDisclosureTrigger
@@ -64,7 +71,7 @@ export function VaultIndexBreakdown({
           name="breakdown-panel"
           surface="overlay"
         >
-          <div data-index-counts={total} data-anatomy="V6.1">
+          <div ref={body} tabIndex={-1} className="outline-none" data-index-counts={total} data-anatomy="V6.1">
             <p className="mb-3 pr-8 sm:pr-0" data-breakdown-heading="">
               <span className={OVERLAY_HEADING}>{TITLE}</span>
             </p>

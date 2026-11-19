@@ -1,7 +1,8 @@
 // The /vaults About page's body (rails-ops ui-jobs 776): one row per family
 // the index reads, its chains linking that family's vaults info page
-// (vaultIndexInfoHref). An IPOR Fusion chain whose page is not launched is
-// named without a link.
+// (vaultIndexInfoHref). The families are the index's listed rosters
+// (VAULT_INDEX_LISTED): IPOR Fusion joins at its launch; a chain whose info
+// page is unlaunched is named without a link.
 
 import Link from "next/link";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
@@ -9,18 +10,19 @@ import {
   chainName,
   VAULT_INDEX_PROTOCOL_LABEL,
   VAULT_INDEX_PROTOCOLS,
-  VAULT_INDEX_ROSTERS,
+  VAULT_INDEX_LISTED,
   vaultIndexInfoHref,
 } from "@/lib/vaults/index-rosters";
 
 export function VaultIndexAbout() {
+  // The rosters the index lists, so a family joins when it joins the index.
+  const listed = VAULT_INDEX_LISTED();
   const families = VAULT_INDEX_PROTOCOLS.map((p) => ({
     protocol: p,
-    chains: VAULT_INDEX_ROSTERS.filter((r) => r.protocol === p).map((r) => ({
-      chainId: r.chainId,
-      href: vaultIndexInfoHref(p, r.chainId),
-    })),
-  }));
+    chains: listed
+      .filter((r) => r.protocol === p)
+      .map((r) => ({ chainId: r.chainId, href: vaultIndexInfoHref(p, r.chainId) })),
+  })).filter((f) => f.chains.length > 0);
   return (
     <div className="mt-6 max-w-3xl text-sm" data-vault-index-about="">
       <p className="text-rb-500">How Rails reads each family&rsquo;s vaults, on its info page:</p>

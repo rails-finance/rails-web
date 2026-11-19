@@ -40,7 +40,9 @@ export const rosterCountProv = (read: RosterRead, count: number): Provenance => 
   kind: "chain",
   pclass: "state",
   ...(read.block > 0 ? { source: { block: read.block } } : {}),
-  summary: `${read.label} vaults. ${n(count)} vaults on this roster, read at block ${n(read.block)} (${utc(read.at)}); each is a row of the index.`,
+  summary: `${read.label} vaults — ${n(count)} on this roster, read at ${
+    read.block > 0 ? `block ${n(read.block)} (${utc(read.at)})` : "its roster's read block"
+  }. Each is a row of the index.`,
   via: "vault index · the roster's rows @ its read block",
 });
 

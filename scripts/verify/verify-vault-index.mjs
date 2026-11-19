@@ -17,7 +17,8 @@
 // Base and on Ethereum, keyed `morpho:8453` and `morpho:1` (the index's
 // `data-index-key`, a row's `data-protocol` and `data-chain`).
 //
-//   0  /vaults answers 200 and names a block for each of the five rosters
+//   0  /vaults answers 200 and names a block for each roster; the (i) after the stamp
+//      opens the census breakdown, focus moving into it and back to the (i) on Escape
 //   1  each roster's count, as its vaults info page states it (Maple: the catalogue; sBOLD: 1),
 //      equals the index's count for it, and the index's rows per protocol
 //      (funded + empty + unread) equal it; the sum equals the union
@@ -245,16 +246,31 @@ const head = await page.evaluate(() => {
     after: !!(stamp && info && stamp.compareDocumentPosition(info) & Node.DOCUMENT_POSITION_FOLLOWING),
     panel: panel?.getAttribute("data-breakdown-panel") ?? null,
     rows: rows.length,
-    receipted: rows.filter((r) => r.querySelectorAll("[data-prov-covered]").length >= 2).length,
+    // A roster whose read failed (block 0) states "the read block", with no block receipt.
+    receipted: rows.filter(
+      (r) =>
+        r.querySelectorAll("[data-prov-covered]").length >= (Number(r.getAttribute("data-index-block")) > 0 ? 2 : 1),
+    ).length,
+    focused: !!panel?.contains(document.activeElement),
   };
 });
 check("0c the (i) stands after the read stamp", head.after);
+check("0e opening the (i) moves focus into its panel", head.focused);
 check(
   "0d the (i) opens the census as a breakdown, each roster's count and block in a receipt",
   head.panel === "popover" && head.rows === KEYS.length && head.receipted === head.rows,
   `panel ${head.panel}, ${head.rows} rows of ${KEYS.length}, ${head.receipted} with both receipts`,
 );
 await page.keyboard.press("Escape");
+await page.waitForTimeout(100);
+check(
+  "0f Escape closes the panel and returns focus to the (i)",
+  await page.evaluate(
+    (sel) =>
+      !document.querySelector("[data-breakdown-panel]") && document.activeElement === document.querySelector(sel),
+    INFO,
+  ),
+);
 const emptyToggle = page.locator("[data-vault-index] [data-empty-group] > button");
 const openEmpty = async () => {
   if ((await emptyToggle.count()) > 0 && (await emptyToggle.getAttribute("aria-expanded")) !== "true") {

@@ -17,7 +17,10 @@
 // (lib/vaults/fronts-read.ts): from the vault's kind and chain, and for a kind
 // Rails reads, from that roster.
 //
-// Pure: no imports, so the search's builder and the page both read it.
+// Pure data and its route (from lib/vaults/routes.ts), so the search's builder
+// and the page both read it.
+
+import { FRONTS_HREF } from "@/lib/vaults/routes";
 
 /** What the vault is, where a page or a reading says: MetaMorpho V1.x, Morpho
  *  Vault V2, Veda's BoringVault. Null where nothing says which. */
@@ -319,7 +322,9 @@ export const VAULT_FRONTS: readonly VaultFront[] = [
   },
 ];
 
-export const FRONTS_HREF = "/vaults/fronts";
+/** The page's route lives with the other vault routes, so the /vaults head
+ *  links it without this module's rows (ui-jobs 776). */
+export { FRONTS_HREF };
 
 /** A front's group on /vaults/fronts. */
 export const frontHref = (slug: string) => `${FRONTS_HREF}#${slug}`;

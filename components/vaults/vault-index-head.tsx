@@ -1,19 +1,19 @@
 "use client";
 
 // The /vaults head (rails-ops ui-jobs 776): the "Vaults" heading and, after
-// it, the sections menu an explorer's rail draws (H5, SectionsMenu): the
-// listing, Fronts, then About last, as a rail orders its info page. The index sits under no chain and no explorer,
-// so the heading takes the place of the rail's identity and chain glyph.
+// it, the sections menu an explorer's rail draws (H5, SectionsMenu): All
+// vaults, Fronts, then About last, as a rail orders its info page. The index
+// sits under no chain and no explorer, so the heading takes the place of the
+// rail's identity and chain glyph.
 
 import { SectionsMenu } from "@/components/shared/rail-header";
-import { VAULT_INDEX_ABOUT_HREF, VAULT_INDEX_HREF } from "@/lib/vaults/routes";
-import { FRONTS_HREF } from "@/lib/vaults/fronts";
+import { FRONTS_HREF, VAULT_INDEX_ABOUT_HREF, VAULT_INDEX_HREF } from "@/lib/vaults/routes";
 
 export type VaultIndexVenue = "listing" | "about" | "fronts";
 
 export function VaultIndexHead({ venue }: { venue: VaultIndexVenue }) {
   const sections = [
-    { href: VAULT_INDEX_HREF, name: "Listing", current: venue === "listing" },
+    { href: VAULT_INDEX_HREF, name: "All vaults", current: venue === "listing" },
     { href: FRONTS_HREF, name: "Fronts", current: venue === "fronts" },
     { href: VAULT_INDEX_ABOUT_HREF, name: "About", current: venue === "about" },
   ];
