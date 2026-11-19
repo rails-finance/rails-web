@@ -164,12 +164,15 @@ const sboldCollProv_ = (
 });
 
 /** `calcFragments()` on the vault: its total and its BOLD amount (ui-jobs 765). */
-const sboldFragmentsProv_ = (c: SboldCoords, r: { totalRaw: string; boldRaw: string }): Provenance => ({
+const sboldFragmentsProv_ = (
+  c: SboldCoords,
+  r: { totalRaw: string; boldRaw: string; collValueRaw: string; collInBoldRaw: string },
+): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("calcFragments()", SBOLD_VAULT, c),
-  summary: `calcFragments() — the sBOLD vault's calcFragments()${atBlock(c)} answers ${r.totalRaw} raw BOLD as its total, the figure totalAssets() returns, and ${r.boldRaw} raw BOLD as its BOLD amount (the pools' deposits and yield pending and the vault's BOLD balance). In the vault's verified source the total is the BOLD amount plus the vault's collateral valued in BOLD, after its slippage and fee terms.`,
+  summary: `calcFragments() — the sBOLD vault's calcFragments()${atBlock(c)} answers, raw: totalBold ${r.totalRaw}, boldAmount ${r.boldRaw}, collValue ${r.collValueRaw}, collInBold ${r.collInBoldRaw}. Its boldAmount equals the rows' sum to the wei, and its totalBold equals totalAssets().`,
   contract: vaultContract,
   via: `${LANE} · sBOLD.calcFragments() @ the pinned block`,
 });

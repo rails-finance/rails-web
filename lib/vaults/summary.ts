@@ -442,8 +442,7 @@ export function sboldVaultPageSummary(
     sharePrice: v.sharePrice,
     lostAssets: null,
     steward: null,
-    // paused() answering true is a standing (ui-jobs 765).
-    standing: v.paused === true ? ["paused"] : [],
+    standing: [],
     createdBlock,
     census: null,
     readAt: { block: d.blockNumber, timestamp: "" },

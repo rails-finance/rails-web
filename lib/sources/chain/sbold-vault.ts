@@ -96,9 +96,9 @@ export interface SboldVaultResponse {
     sharePrice: RawAmount | null;
     /** `paused()` (ui-jobs 765); null where it failed. */
     paused: boolean | null;
-    /** `calcFragments()`'s first two answers, raw BOLD: the total, which
-     *  totalAssets() returns, and the BOLD amount; null where it failed. */
-    fragments: { totalRaw: string; boldRaw: string } | null;
+    /** `calcFragments()`'s four answers, raw: totalBold, boldAmount,
+     *  collValue, collInBold; null where it failed. */
+    fragments: { totalRaw: string; boldRaw: string; collValueRaw: string; collInBoldRaw: string } | null;
   };
   /** One per branch, in SP_BRANCHES order. */
   deposits: SboldDeposit[];
@@ -193,7 +193,15 @@ export async function loadSboldVault(): Promise<SboldVaultResponse> {
         totalSupply: shareDecimals != null && totalSupply != null ? amount(totalSupply, shareDecimals) : null,
         sharePrice: inBold && shareDecimals === 18 && sharePrice != null ? amount(sharePrice, d) : null,
         paused: at<boolean>("paused"),
-        fragments: inBold && frag ? { totalRaw: frag[0].toString(), boldRaw: frag[1].toString() } : null,
+        fragments:
+          inBold && frag
+            ? {
+                totalRaw: frag[0].toString(),
+                boldRaw: frag[1].toString(),
+                collValueRaw: frag[2].toString(),
+                collInBoldRaw: frag[3].toString(),
+              }
+            : null,
       },
       deposits: pools.map(({ branch, pool, coll }, i) => {
         const base = SP_AT + i * SP_CALLS.length;

@@ -1,7 +1,7 @@
 "use client";
 
-// The sBOLD vault's page (rails-ops ui-jobs 749), on the Yearn vault page's
-// shell (components/vaults/yearn-vault-page.tsx): the vault card (V2), then the
+// The sBOLD vault's page (rails-ops ui-jobs 749), on the shell of
+// components/vaults/yearn-vault-page.tsx: the vault card (V2), then the
 // grid (V13): the last 30 days (V5), three daily lines read from the chain
 // (lib/sources/chain/sbold-daily.ts); where the assets are (V3), the three
 // Stability Pool deposits and the idle BOLD, reconciled against total assets.
@@ -501,7 +501,7 @@ export function SboldVaultPage({
       {y.paused === true && (
         <ExplainGroup title="Paused">
           <ExplainBullet data-sbold-paused="">
-            At block <Fig>{n(data.blockNumber)}</Fig> the vault&rsquo;s paused() answers{" "}
+            The vault&rsquo;s paused() answers{" "}
             <Prov info={sboldPausedProv(coords)}>
               <Fig>true</Fig>
             </Prov>
@@ -529,7 +529,7 @@ export function SboldVaultPage({
                   <Fig>{shortAddress(pausedLog.txHash)}</Fig>
                 </Prov>
               </a>
-              , account{" "}
+              , paused by account{" "}
               <a href={eth("address", pausedLog.account)} target="_blank" rel="noopener" className="link-external">
                 <Prov info={sboldPausedLogProv(pausedLog, "account")}>
                   <Fig>{shortAddress(pausedLog.account)}</Fig>
@@ -578,7 +578,6 @@ export function SboldVaultPage({
     name: sboldNameProv(coords),
     totalAssets: sboldTotalAssetsProv(coords),
     sharePrice: sboldSharePriceProv(coords),
-    standing: { paused: sboldPausedProv(coords) },
   };
   const heads: PositionCardHead[] = vaultHeads({ vault: v, holdersHref: null, receipts, detail: true })
     .filter((h) => h.id === "total-assets" || h.id === "share-price")
@@ -731,9 +730,8 @@ export function SboldVaultPage({
                     <>
                       {" "}
                       The vault&rsquo;s{" "}
-                      <Prov info={sboldFragmentsProv(coords, reconcile.fragments)}>calcFragments()</Prov> answers the
-                      rows&rsquo; sum as its BOLD amount and total assets as its total; in its verified source the total
-                      adds the vault&rsquo;s collateral, valued in BOLD.
+                      <Prov info={sboldFragmentsProv(coords, reconcile.fragments)}>calcFragments()</Prov> answers a BOLD
+                      amount equal to the rows&rsquo; sum, to the wei, and a total equal to total assets.
                     </>
                   )}
                 </>
