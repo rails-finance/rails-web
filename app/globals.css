@@ -2569,7 +2569,8 @@ html[data-chain-focus] [data-chain-gate]:not([data-scope-ready]) {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .feedback-blink {
+  .feedback-blink,
+  .feedback-blink[data-blinking] {
     animation: none;
   }
 }
