@@ -37,7 +37,7 @@
 //      its Shown pill, the counts line, lifting and resetting it, and the table's
 //      sorts (ui-jobs 538: Holders by default, Total assets within each token)
 //  11  ?asset=ETH,WETH keeps the preset; a token it would empty lifts it
-//  12  the Vaults menu (listing, About) and /vaults/about: a row per family, each listed
+//  12  the Vaults menu (listing, Fronts, About) and /vaults/about: a row per family, each listed
 //      roster's info page linked and answering 200 (ui-jobs 776)
 // The census (sections 0 and 1) is read from the (i)'s breakdown after the read stamp.
 // Sections 0 to 9 read /vaults?show=all and the rosters' ?show=all pages.
@@ -525,7 +525,7 @@ await checkRosterView({
 
 // ── 12: the sections menu and /vaults/about (ui-jobs 776) ───────────────────
 {
-  const MENU = ["/vaults", "/vaults/about"];
+  const MENU = ["/vaults", "/vaults/fronts", "/vaults/about"];
   const p = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
   await p.goto(`${BASE}/vaults`, { waitUntil: "domcontentloaded", timeout: 300_000 });
   await p.locator("[data-vault-index-head] [data-sections-trigger]").click();
@@ -535,7 +535,7 @@ await checkRosterView({
       els.map((el) => ({ href: el.getAttribute("href"), current: el.getAttribute("aria-current") })),
     );
   check(
-    "12a the Vaults menu lists the listing (current) and About",
+    "12a the Vaults menu lists the listing (current), Fronts and About",
     entries.map((e) => e.href).join() === MENU.join() && entries[0]?.current === "page",
     entries.map((e) => `${e.href}${e.current ? " (current)" : ""}`).join(", "),
   );

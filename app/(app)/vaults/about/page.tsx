@@ -9,6 +9,7 @@ import { vaultIndexLaunched } from "@/lib/vaults/index-rosters";
 import { VAULT_INDEX_ABOUT_HREF } from "@/lib/vaults/routes";
 
 /** The page states no figures, so no receipts (check:prov reads this). */
+// focus: a page of links to each family's info page, naming no asset and no figure
 const PROV_EXEMPT = "the vault index's About page links each family's info page and states no figures (ui-jobs 776)";
 
 export const metadata = {
