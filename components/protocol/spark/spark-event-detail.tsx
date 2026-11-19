@@ -451,6 +451,8 @@ export function useSparkEventBody({
           clearedLabel="Debt repaid by the liquidator"
           premiumLabel="Liquidator's premium over the debt"
           rowCells
+          // One then/today clock per card: the price row carries the chips.
+          pricePills={pricePills.length > 0 ? [] : forensics.pricePills}
         />
       )}
       {showBasket && (

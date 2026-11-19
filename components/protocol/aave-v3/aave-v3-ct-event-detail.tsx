@@ -914,7 +914,10 @@ export function useAaveV3EventBody({
         </div>
       )}
       {risk?.notes && <div className="space-y-0.5 px-5 pb-2 text-xs text-rb-500">{risk.notes}</div>}
-      {forensics && <LiquidationForensics {...forensics} rowCells />}
+      {/* One then/today clock per card: the price row carries the chips. */}
+      {forensics && (
+        <LiquidationForensics {...forensics} rowCells pricePills={pricePills.length > 0 ? [] : forensics.pricePills} />
+      )}
       {ctx.eventType === "liquidation" && unread && <LiquidationFiguresNotLoaded tokens={unread} />}
       {fee && ctx.collateralSymbol && !unread && (
         <div className="px-5 pb-2 text-xs text-rb-500">

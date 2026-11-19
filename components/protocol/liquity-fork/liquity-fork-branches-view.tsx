@@ -35,7 +35,7 @@
 // borrowers' own choices, not a protocol setting, so nothing here reads as
 // "better"; redemption is exposure, not danger.
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
 import { useAssetScope } from "@/lib/shared/asset-scope";
@@ -436,6 +436,9 @@ export interface LiquityForkBranchesViewProps {
   scopeKeys?: Record<string, string[]>;
   /** Liquity V2's branches read against their CCR, by symbol (ui-jobs 747). */
   ccr?: Partial<Record<string, LiquityV2BranchCcr>>;
+  /** A block rendered beneath the branch cards, before the Redemption section
+   *  (Liquity V2's Stability Pool depth table). */
+  afterBranches?: ReactNode;
 }
 
 export function LiquityForkBranchesView({
@@ -446,6 +449,7 @@ export function LiquityForkBranchesView({
   urls,
   scopeKeys,
   ccr,
+  afterBranches,
 }: LiquityForkBranchesViewProps) {
   const registry = useReceiptRegistry();
   const wiring: Required<LiquityForkUrlWiring> = { ...DEFAULT_WIRING, ...urls };
@@ -516,6 +520,8 @@ export function LiquityForkBranchesView({
             ))}
           </div>
         </section>
+
+        {afterBranches ? <div className="mt-8">{afterBranches}</div> : null}
 
         <section className="mt-8">
           <div className="flex items-center gap-2">

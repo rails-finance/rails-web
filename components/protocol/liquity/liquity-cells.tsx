@@ -21,6 +21,7 @@ import { Prov, type Provenance, type ProvVerify } from "@/components/shared/prov
 import { usdAt } from "@/components/shared/event-ledger";
 import { usdShown } from "@/lib/shared/usd-display";
 import { faceUsdProv } from "@/lib/shared/flows-timeline-provenance";
+import { boldEventLine } from "@/lib/liquity-v2/bold-event-price";
 import type { EventCells, EventCellSpec, EventFigure } from "@/components/shared/event-cells";
 import {
   streamVia,
@@ -44,7 +45,7 @@ import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
 import { collChangeProv as collCpOf, debtChangeProv } from "@/lib/liquity/event-provenance";
 import { SHEET_WORDS, sheetUsd, type EventSheet, type SheetRow, type SheetStat } from "@/components/shared/event-sheet";
 import { changeText } from "@/components/shared/change-swap-value";
-import { liquityV2RedeemerHref } from "@/lib/liquity-v2/redeemer-routes";
+import { redeemerEventHref } from "@/lib/liquity-v2/redeemer-routes";
 import { useTxTroves } from "@/lib/liquity-v2/tx-troves";
 import { centsParts, faceParts } from "@/lib/shared/sheet-usd-rows";
 import { NO_FIGURE, noPriceWords } from "@/lib/shared/flows-sum";
@@ -132,6 +133,9 @@ export function useLiquityCells({
   const tmContract = tmContractOf(tm);
   const collSym = ctx.collateralType;
   const debtSym = ctx.assetType ?? "BOLD";
+  // BOLD's market price at the event, a line in the debt's $1-face receipt
+  // (ui-jobs 757); none where the row carries no boldPrice.
+  const boldLine = boldEventLine(ctx.boldPrice, blockNumber)?.text;
   // Carries the concrete tx / block coordinates into the after-state provenance.
   const coords = { txHash, blockNumber };
   // Emitted log fields carry a real third-party proof: the tx's event logs.
@@ -671,9 +675,9 @@ export function useLiquityCells({
       ? {
           before:
             debtShowBefore && !accrualMove ? (
-              <P info={faceUsdProv(debtSym, beforeDebt, "before")}>{formatUsd(beforeDebt)}</P>
+              <P info={faceUsdProv(debtSym, beforeDebt, "before", boldLine)}>{formatUsd(beforeDebt)}</P>
             ) : null,
-          after: <P info={faceUsdProv(debtSym, debtAfter, "after")}>{formatUsd(debtAfter)}</P>,
+          after: <P info={faceUsdProv(debtSym, debtAfter, "after", boldLine)}>{formatUsd(debtAfter)}</P>,
           price: `At its $1 face, $1 per ${debtSym}`,
         }
       : undefined,
@@ -997,7 +1001,7 @@ export function useLiquityCells({
       key: "upfront-fee",
       label: L2_WORDS.sheet_upfront_fee,
       amount: { text: toLocaleStringHelper(upfrontFee), symbol: debtSym, info: feeP?.info, value: feeP?.value },
-      usd: { ...faceParts(upfrontFee), info: faceUsdProv(debtSym, upfrontFee, "after") },
+      usd: { ...faceParts(upfrontFee), info: faceUsdProv(debtSym, upfrontFee, "after", boldLine) },
       tip: TIP.debtUpfront,
     });
   if (Math.abs(redistDebt) >= DUST_DEBT)
@@ -1014,7 +1018,7 @@ export function useLiquityCells({
       key: "last",
       label: SHEET_WORDS.last,
       amount: { text: toLocaleStringHelper(beforeDebt), symbol: debtSym, info: debtBeforeProv },
-      usd: { ...faceParts(beforeDebt), info: faceUsdProv(debtSym, beforeDebt, "before") },
+      usd: { ...faceParts(beforeDebt), info: faceUsdProv(debtSym, beforeDebt, "before", boldLine) },
       tip: TIP.debtLast,
     });
     if (accrualTotal >= DUST_DEBT)
@@ -1071,7 +1075,7 @@ export function useLiquityCells({
     total: {
       text: debtAfter > 0 ? faceParts(debtAfter).text : "$0",
       cents: faceParts(debtAfter).cents,
-      info: faceUsdProv(debtSym, debtAfter, "after"),
+      info: faceUsdProv(debtSym, debtAfter, "after", boldLine),
     },
     totalAmount: { text: toLocaleStringHelper(debtAfter), symbol: debtSym, info: debtAfterProv },
     totalTip: TIP.debtTotal,
@@ -1308,7 +1312,8 @@ function marketMoveProv(sym: string, before: number, last: number): Provenance {
   };
 }
 
-/** The redemption's redeemer, under the grid, linked to its redeemer page. A
+/** The redemption's redeemer, under the grid, linked to this redemption on
+ *  its redeemer page. A
  *  row the timeline serves without one reads the sender of its transaction
  *  from the transaction's Trove operations (lib/liquity-v2/tx-troves.ts),
  *  once the card opens. */
@@ -1316,10 +1321,13 @@ export function LiquityRedeemerNote({
   ctx,
   txHash,
   blockNumber,
+  eventId,
 }: {
   ctx: LiquityContext;
   txHash: string;
   blockNumber?: number;
+  /** The event's id on the Trove's timeline, which the redeemer page's row shares. */
+  eventId: string;
 }) {
   const isRedemption = ctx.operation === "redeemCollateral";
   const tx = useTxTroves(isRedemption && !ctx.redeemer ? txHash : "");
@@ -1365,7 +1373,7 @@ export function LiquityRedeemerNote({
       <span className="text-xs text-rb-500">
         {L2_WORDS.redeemed_by}{" "}
         <Prov info={addrProv}>
-          <LinkedAddress address={redeemer} href={liquityV2RedeemerHref(redeemer)} />
+          <LinkedAddress address={redeemer} href={redeemerEventHref(redeemer, eventId)} />
         </Prov>
       </span>
     </div>
