@@ -17,18 +17,16 @@
 // V1 vault rows (ui-jobs 407).
 import { serverReadOf } from "@/lib/shared/server-head-read";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-import { SubPageHeader } from "@/components/shared/sub-page-header";
-import { yearnVaultCardContent } from "@/lib/vaults/card-words";
+import { RailHeader } from "@/components/shared/rail-header";
 import { YearnVaultDirectoryView } from "@/components/vaults/yearn-vault-directory-view";
 import { loadYearnEthereumVaultDirectory, YEARN_CHAIN_ID } from "@/lib/sources/chain/yearn-ethereum-vault-directory";
 import { listingMetadata } from "@/lib/shared/page-metadata";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { loadYearnVaultRoster } from "@/lib/yearn/vault-roster";
 import { yearnVaultSummaries } from "@/lib/vaults/summary";
-import { fetchVaultPositions } from "@/lib/api/fetch-vault-positions";
-import type { VaultCensusRow } from "@/lib/aave-vaults/vault-position";
+import { loadYearnCensus } from "@/lib/yearn/vault-census";
 import { loadVaultYields } from "@/lib/vaults/yield-read";
-import { ssrHop, toURLSearchParams, type RawSearchParams } from "@/lib/shared/listing-ssr";
+import { toURLSearchParams, type RawSearchParams } from "@/lib/shared/listing-ssr";
 
 export const dynamic = "force-dynamic";
 
@@ -43,30 +41,11 @@ export async function generateMetadata() {
   });
 }
 
-/** The census header for Yearn V3: the rows' Holders figure. An unanswered
- *  census leaves the figure out. */
-async function loadCensus(): Promise<VaultCensusRow[]> {
-  try {
-    const hop = await ssrHop();
-    const r = await fetchVaultPositions({
-      chainId: YEARN_CHAIN_ID,
-      families: "yearn-v3",
-      overlay: false,
-      limit: 1,
-      ...hop,
-    });
-    return r.census;
-  } catch (error) {
-    console.error("The vault census did not answer for the Yearn roster:", error);
-    return [];
-  }
-}
-
 export default async function YearnVaultRosterPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const initialSearch = toURLSearchParams(await searchParams).toString();
   const data = await loadYearnEthereumVaultDirectory();
   const [census, yields] = await Promise.all([
-    loadCensus(),
+    loadYearnCensus(),
     loadVaultYields(
       YEARN_CHAIN_ID,
       data.rows.map((r) => r.address),
@@ -76,7 +55,11 @@ export default async function YearnVaultRosterPage({ searchParams }: { searchPar
   return (
     <div className="min-h-screen">
       <div className="py-8">
-        <SubPageHeader protocol={PROTOCOL} title="Vaults" learnMore={yearnVaultCardContent()} />
+        {/* The rail alone, as on IPOR Fusion's roster (ui-jobs 771); the h1 is for screen readers. */}
+        <header className="mb-5" data-skel-section="page-header">
+          <RailHeader session={PROTOCOL.session} venue="subPage" />
+          <h1 className="sr-only">Yearn V3 vaults</h1>
+        </header>
 
         {/* `data-roster-panel` marks the rows for the readers that hold them to
             the chain, the same marker the two other vault rosters carry. */}
@@ -89,8 +72,6 @@ export default async function YearnVaultRosterPage({ searchParams }: { searchPar
             readBy={serverReadOf(data)}
             chainStale={data.chainStale}
             catalogSize={data.catalogSize}
-            censusBlock={data.censusBlock}
-            holdersBlock={census.length > 0 ? Math.max(...census.map((c) => c.censusBlock)) : null}
             endorsementUnread={data.rows.filter((r) => r.endorsed == null).map((r) => r.address)}
           />
         </div>

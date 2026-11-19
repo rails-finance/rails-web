@@ -17,7 +17,7 @@
 //       NewVault sweep of them, factory, creation block and asset included
 //   R3  each served roster contains its baked catalogue, immutables equal
 //       (else the web serves the baked one and says so in its log)
-//   R4  each roster page states the served count, at a block after the bake's
+//   R4  each roster's info page states the served count, at a block after the bake's
 //       and no later than the box's last run
 //   R5  a vault the served roster has and the bake lacks answers 200 on its
 //       page (SKIP, named, when there is none)
@@ -359,21 +359,23 @@ check(
 );
 
 // ── R4: the pages carry the served roster ───────────────────────────────────
+// The count is on each roster's vaults info page: the roster opens on its read
+// stamp alone (ui-jobs 771).
 // The web reuses a served roster for up to an hour (SERVED_ROSTER_REVALIDATE_
 // SECONDS), and the box can write a newer run inside that hour, so the page's
 // block may trail the one read here. The page must state the served count at a
 // block after the bake's and no later than the box's latest run; the baked
 // count at the baked block is the failure this looks for.
 for (const [label, url, figure, served, baked] of [
-  ["R4a /base/morpho/vaults", `${BASE}/base/morpho/vaults`, "directory-census", morpho, bm],
-  ["R4b /ethereum/yearn/vaults", `${BASE}/ethereum/yearn/vaults`, "roster-census", yearn, by],
+  ["R4a /base/morpho/vaults/info", `${BASE}/base/morpho/vaults/info`, "directory-census", morpho, bm],
+  ["R4b /ethereum/yearn/vaults/info", `${BASE}/ethereum/yearn/vaults/info`, "roster-census", yearn, by],
 ]) {
   if (!served) {
     skip(`${label} states the served roster`, "no served roster");
     continue;
   }
   const { status, text } = await figureText(url, figure);
-  const m = text?.match(/([\d,]+) vaults[^.]*?at block ([\d,]+)/);
+  const m = text?.match(/([\d,]+) (?:vaults|of them)[^.]*?at block ([\d,]+)/);
   const count = m ? Number(m[1].replace(/,/g, "")) : NaN;
   const block = m ? Number(m[2].replace(/,/g, "")) : NaN;
   check(

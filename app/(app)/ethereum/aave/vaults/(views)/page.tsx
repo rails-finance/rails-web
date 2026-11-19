@@ -24,7 +24,7 @@
 import { serverReadOf } from "@/lib/shared/server-head-read";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { AaveVaultDirectoryView } from "@/components/vaults/aave-vault-directory-view";
-import { SubPageHeader } from "@/components/shared/sub-page-header";
+import { RailHeader } from "@/components/shared/rail-header";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { loadAaveEthereumVaultDirectory } from "@/lib/sources/chain/aave-ethereum-vault-directory";
 import { listingMetadata } from "@/lib/shared/page-metadata";
@@ -83,7 +83,11 @@ export default async function EthereumVaultRosterPage({ searchParams }: { search
   return (
     <div className="min-h-screen">
       <div className="py-8">
-        <SubPageHeader protocol={PROTOCOL} title="Vaults" />
+        {/* The rail alone, as on IPOR Fusion's roster (ui-jobs 771); the h1 is for screen readers. */}
+        <header className="mb-5" data-skel-section="page-header">
+          <RailHeader session={PROTOCOL.session} venue="subPage" />
+          <h1 className="sr-only">Aave vaults</h1>
+        </header>
 
         {/* `data-roster-panel` marks the rows for the readers that hold them to
             the chain. */}
@@ -95,8 +99,7 @@ export default async function EthereumVaultRosterPage({ searchParams }: { search
             blockNumber={data.blockNumber}
             readBy={serverReadOf(data)}
             chainStale={data.chainStale}
-            counts={{ catalogSize: data.catalogSize, stataCount: data.stataCount, stakeCount: data.stakeCount }}
-            censusBlock={census.length > 0 ? Math.max(...census.map((c) => c.censusBlock)) : null}
+            catalogSize={data.catalogSize}
           />
         </div>
 
