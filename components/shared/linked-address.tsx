@@ -19,6 +19,9 @@ interface LinkedAddressProps {
    *  Rails (`holderHref`). Left out for a contract, or for an address the call
    *  site cannot tell from one: those keep the block explorer. */
   holderOf?: SessionProtocol;
+  /** A page inside Rails the address opens, in place of `holderOf`'s
+   *  (a Liquity V2 redeemer opens its redeemer page). */
+  href?: string | null;
 }
 
 /**
@@ -27,11 +30,11 @@ interface LinkedAddressProps {
  * Resolves the explorer from context: Etherscan on L1, Basescan under a
  * <ChainProvider chainId={8453}>.
  */
-export function LinkedAddress({ address, label, className = "", chainId, holderOf }: LinkedAddressProps) {
+export function LinkedAddress({ address, label, className = "", chainId, holderOf, href }: LinkedAddressProps) {
   const ctxChain = useChainId();
   const pathname = usePathname();
   const short = `${address.slice(0, 6)}…${address.slice(-4)}`;
-  const inside = holderOf ? holderHref(holderOf, address, listingHrefForWallet, pathname) : null;
+  const inside = href ?? (holderOf ? holderHref(holderOf, address, listingHrefForWallet, pathname) : null);
   if (inside)
     return (
       // No prefetch: the wallet page is dynamic and reads the API and the

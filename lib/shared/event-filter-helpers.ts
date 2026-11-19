@@ -794,6 +794,12 @@ const PROTOCOL_OP_LABELS: Record<string, Record<string, string>> = {
   "sky-savings": SKY_SAVINGS_OP_LABELS,
   "alchemix-v3": ALCHEMIX_OP_LABELS,
   "alchemix-v2": ALCHEMIX_OP_LABELS,
+  // A Liquity V2 redeemer's rows by branch (lib/liquity-v2/redeemer-timeline.ts).
+  "liquity-v2-redeemer": {
+    "redemption-WETH": "On WETH",
+    "redemption-wstETH": "On wstETH",
+    "redemption-rETH": "On rETH",
+  },
 };
 
 /**

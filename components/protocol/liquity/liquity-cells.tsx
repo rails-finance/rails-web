@@ -44,6 +44,8 @@ import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
 import { collChangeProv as collCpOf, debtChangeProv } from "@/lib/liquity/event-provenance";
 import { SHEET_WORDS, sheetUsd, type EventSheet, type SheetRow, type SheetStat } from "@/components/shared/event-sheet";
 import { changeText } from "@/components/shared/change-swap-value";
+import { liquityV2RedeemerHref } from "@/lib/liquity-v2/redeemer-routes";
+import { useTxTroves } from "@/lib/liquity-v2/tx-troves";
 
 const tmContractOf = (addr?: string) => ({ name: "TroveManager", address: addr });
 
@@ -1271,7 +1273,10 @@ function marketMoveProv(sym: string, before: number, last: number): Provenance {
   };
 }
 
-/** The redemption's redeemer, under the grid. */
+/** The redemption's redeemer, under the grid, linked to its redeemer page. A
+ *  row the timeline serves without one reads the sender of its transaction
+ *  from the transaction's Trove operations (lib/liquity-v2/tx-troves.ts),
+ *  once the card opens. */
 export function LiquityRedeemerNote({
   ctx,
   txHash,
@@ -1281,7 +1286,11 @@ export function LiquityRedeemerNote({
   txHash: string;
   blockNumber?: number;
 }) {
-  if (ctx.operation !== "redeemCollateral" || !ctx.redeemer) return null;
+  const isRedemption = ctx.operation === "redeemCollateral";
+  const tx = useTxTroves(isRedemption && !ctx.redeemer ? txHash : "");
+  const sent = tx?.rows.find((r) => r.operation === "redeemCollateral")?.transaction_from;
+  const redeemer = ctx.redeemer ?? sent;
+  if (!isRedemption || !redeemer) return null;
   const coords = { txHash, blockNumber };
   const addrProv: Provenance = {
     kind: "chain",
@@ -1293,9 +1302,9 @@ export function LiquityRedeemerNote({
           text: "Confirm in the tx event logs",
         }
       : undefined,
-    summary: "Redeemer. The wallet that made the redemption.",
+    summary: "Redeemer — the account that sent the transaction holding this redemption.",
     contract: tmContractOf(TROVE_MANAGER[(ctx.collateralType ?? "").toLowerCase()]),
-    via: `${streamVia()} · redemption event`,
+    via: ctx.redeemer ? `${streamVia()} · redemption event` : "GET /api/liquity-v2/tx/:hash/troves · transaction_from",
     inputs: eventInputs(coords),
   };
   return (
@@ -1303,7 +1312,7 @@ export function LiquityRedeemerNote({
       <span className="text-xs text-rb-500">
         {L2_WORDS.redeemed_by}{" "}
         <Prov info={addrProv}>
-          <LinkedAddress address={ctx.redeemer} />
+          <LinkedAddress address={redeemer} href={liquityV2RedeemerHref(redeemer)} />
         </Prov>
       </span>
     </div>
