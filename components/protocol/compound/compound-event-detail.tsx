@@ -443,6 +443,7 @@ export function useCompoundCells({
             marketKey={m.key}
             timestamp={timestamp}
             previous={previousTx}
+            footnote={prices.length === 0}
           />
         )}
       </>

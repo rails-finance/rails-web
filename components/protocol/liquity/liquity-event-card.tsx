@@ -11,6 +11,7 @@ import { useLiquityHeadSpec } from "./liquity-head";
 import { liquityT1Caption, liquityT1Words } from "@/lib/liquity/event-prose";
 import { useSurplusClaimFor } from "@/components/protocol/liquity-family/coll-surplus-context";
 import { LiquityRedeemerNote, useLiquityCells } from "./liquity-cells";
+import { boldPriceChip } from "@/lib/liquity-v2/bold-event-price";
 import { isGroupedExplanation, LiquityEventExplainer, LiquityExplainerTeaser } from "./liquity-event-explainer";
 import { useLiquityEventMarkdown, useLiquityEventProse } from "./event-prose-render";
 import { EventMarkdownContext, EventPageContext } from "@/components/shared/event-page-aside";
@@ -348,6 +349,9 @@ export function LiquityEventCard({
   const l2 = ctx.stateBefore && ctx.stateAfter && prose.L2 && prose.L2.price > 0 ? prose.L2 : null;
   const priceP = l2 ? eventPriceProv(ctx, coords) : undefined;
   const redemption = l2?.redemption;
+  // BOLD's chip beside the collateral's (ui-jobs 757): the Curve pool's
+  // price at the block, on every row that carries one.
+  const boldChip = boldPriceChip(ctx.boldPrice, event.blockNumber, eventPriceTitle("BOLD"));
   const price: EventCardPrice = {
     gas: prose.footer.gasCost
       ? {
@@ -368,8 +372,11 @@ export function LiquityEventCard({
             value: priceP?.value,
             title: eventPriceTitle(ctx.collateralType),
           },
+          ...(boldChip ? [boldChip] : []),
         ]
-      : [],
+      : boldChip
+        ? [boldChip]
+        : [],
     outcome: redemption
       ? {
           claimable:

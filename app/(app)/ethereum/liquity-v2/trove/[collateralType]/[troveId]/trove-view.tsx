@@ -14,6 +14,7 @@
 // tail itself, exactly as it did before the route had a server half.
 
 import { useState, useEffect, useMemo, useRef } from "react";
+import { boldPriceChip } from "@/lib/liquity-v2/bold-event-price";
 import { boldPriceReason, boldStripAsset, closedAtBlock, useBoldPrice } from "@/lib/liquity-v2/use-bold-price";
 import {
   collateralPriceInfo as collateralPriceReceipt,
@@ -276,8 +277,13 @@ export default function TroveView({
   // transaction).
   const liquityEvents = useMemo(() => events.filter(isLiquityEvent).sort(compareEventsInOrder), [events]);
   // BOLD's price from the Curve BOLD/USDC pool (ui-jobs 746): at head while
-  // the Trove is open, at its closing row's block once closed.
-  const boldPrice = useBoldPrice(troveData?.status === "open" ? undefined : null);
+  // the Trove is open or while a card draws a BOLD chip to flip (ui-jobs
+  // 761), and at its closing row's block once closed.
+  const boldChip = useMemo(
+    () => liquityEvents.some((e) => boldPriceChip(e.context.data.boldPrice, e.blockNumber) != null),
+    [liquityEvents],
+  );
+  const boldPrice = useBoldPrice(troveData?.status === "open" || boldChip ? undefined : null);
   const boldAtClosing = useBoldPrice(closedAtBlock(troveData?.status, liquityEvents));
   // "last holder" only on a closed Trove that changed hands (ui-jobs 702).
   const changedHands = useMemo(() => troveChangedHands(events), [events]);
