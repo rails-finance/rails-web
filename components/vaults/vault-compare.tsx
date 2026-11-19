@@ -97,7 +97,9 @@ function VaultHead({ c }: { c: CompareColumn }) {
           {c.name}
         </Link>
         <div className={`flex items-center gap-1 text-xs ${MUTED}`}>
-          <ProtocolIcon id={VAULT_FAMILIES[c.vault.family].venue} className="h-3 w-3" />
+          {VAULT_FAMILIES[c.vault.family].venue && (
+            <ProtocolIcon id={VAULT_FAMILIES[c.vault.family].venue ?? ""} className="h-3 w-3" />
+          )}
           {c.family} · {c.chain}
         </div>
         <div className={`text-xs ${MUTED} tabular-nums`} data-compare-block={c.block ?? ""}>

@@ -31,8 +31,12 @@ export const WRAPPER_CARDS: "own" | "merged" = "own";
 export type ChipLink = "filtered" | "page" | "explorer";
 
 export interface AssetChip {
-  /** The explorer's id in lib/shared/protocols.ts. */
+  /** The explorer's id in lib/shared/protocols.ts, or a vault family no
+   *  explorer deploys ("sbold", ui-jobs 765). */
   explorer: string;
+  /** On a vault no explorer deploys: the token whose icon the chip draws in
+   *  place of a protocol mark. */
+  token?: { symbol: string; address: string };
   label: string;
   chain: number;
   href: string;
@@ -40,7 +44,7 @@ export interface AssetChip {
   /** Where the chip came from: the price roster, the explorer's asset list, or both. */
   from: ("roster" | "catalog")[];
   /** What the token is to the explorer, each with its page: BOLD's "Trove
-   *  debt", "Stability Pools" and "sBOLD" on Liquity V2, a Pendle market's PT
+   *  debt" and "Stability Pools" on Liquity V2, a Pendle market's PT
    *  (lib/shared/asset-uses.ts). */
   uses?: ChipUse[];
 }

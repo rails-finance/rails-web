@@ -38,6 +38,7 @@ register("data:text/javascript," + encodeURIComponent(hook));
 
 const { aaveV4UsdReceipt, aaveV4PeakReceipt } = await import(ROOT + "lib/aave-v4/usd-receipt.ts");
 const { priceBook, pricedSum } = await import(ROOT + "lib/aave-v4/markets.ts");
+const { formatUsdValue } = await import(ROOT + "lib/utils/format.ts");
 
 const num = (t) => Number(String(t).replace(/[^0-9.]/g, ""));
 /** Multiply each printed amount by its printed price, to the cent, and add. */
@@ -240,6 +241,16 @@ test("the peak walk: on-chain stored prices, shown products, the blocks named, u
   assert.equal(rebuild(receipt.prov), r.peakSupplyUsd);
   assert.deepEqual(r.peakSupplyUnpriced, [], "an instant survived");
   assert.equal(r.peakDebt.legs[0].symbol, "USDC");
+  // An instant passed over leaves the figure a lower bound, said first.
+  assert.equal(r.peakSupply.skipped, true);
+  assert.ok(
+    receipt.prov.summary.startsWith(
+      `At least ${formatUsdValue(r.peakSupplyUsd)}: an instant holding an unpriced asset is not counted.`,
+    ),
+    receipt.prov.summary,
+  );
+  assert.equal(r.peakDebt.skipped, undefined, "the debt walk skipped nothing");
+  assert.doesNotMatch(aaveV4PeakReceipt("The peak debt", r.peakDebt).prov.summary, /At least/);
 });
 
 test("the peak walk: no instant priced draws no peak and names the reserve", () => {

@@ -62,7 +62,9 @@ function Card({ c }: { c: AssetCard }) {
               {c.name}
             </div>
             <div className={`flex items-center gap-1 text-xs ${MUTED}`}>
-              <ProtocolIcon id={VAULT_FAMILIES[c.vault.family].venue} className="h-3 w-3" />
+              {VAULT_FAMILIES[c.vault.family].venue && (
+                <ProtocolIcon id={VAULT_FAMILIES[c.vault.family].venue ?? ""} className="h-3 w-3" />
+              )}
               {c.family} · {c.chain}
             </div>
           </div>

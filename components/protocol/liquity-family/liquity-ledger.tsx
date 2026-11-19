@@ -55,7 +55,14 @@ function LiquityLedger({
     side,
     ev,
     sum,
-    usd: rows ? { lines: rows.lines, dollars: rows.total.dollars, before: f.before } : null,
+    usd: rows
+      ? {
+          lines: rows.lines,
+          dollars: rows.total.dollars,
+          before: f.before,
+          ...(rows.total.cents != null ? { cents: rows.total.cents } : {}),
+        }
+      : null,
     ...(accrualLabel && cum.exact ? { accrualLabel } : {}),
   });
   const at = `this event (${dayStamp(eventTs)})`;

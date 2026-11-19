@@ -781,3 +781,14 @@ test("partial-last, stored: today's crvUSD in the bands is on the collateral at 
   const p = (t.live.pending ?? []).find((x) => x.bucket === (gap > 0 ? LL.softReceived : LL.softSpent));
   if (Math.abs(gap) > 1e-6) assert.ok(p && near(p.usd, Math.abs(gap) * G), `pending ${gap}`);
 });
+
+// A read whose event names no block names none (ui-jobs 743).
+test("a state read with no block names none: no 'this event's block', no '@ null'", async () => {
+  const { stateAtBlockProv } = await import("@/lib/llamalend/event-provenance");
+  const p = stateAtBlockProv("WETH collateral", "Controller.user_state(user)[0]", null, { controller: "0x1" } as never);
+  const text = JSON.stringify(p);
+  assert.ok(!text.includes("null"), text);
+  assert.ok(!text.includes("this event's block"), text);
+  assert.ok(p.summary.includes("a block this read does not name"), p.summary);
+  assert.ok((p.via ?? "").includes("@ a block this read does not name"), p.via);
+});

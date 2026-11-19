@@ -230,7 +230,9 @@ function withdrawalsLine(w: WithdrawalsFigure, c: HealthContext, f: HealthFormat
     );
   const holder = w.holder && BigInt(w.holder.claim) > BigInt(0) ? holderWords(w.holder, c, f) : null;
   const exit = w.exit ? exitWords(w.exit, w.share, w.caught, holder != null) : null;
-  const head = w.paused ? "Withdrawals are paused" : (holder ?? exit?.head ?? "The vault is shut down");
+  // sBOLD's line states the getter (ui-jobs 765); sGHO keeps its words.
+  const pausedHead = c.family === "sbold" ? "paused() answers true" : "Withdrawals are paused";
+  const head = w.paused ? pausedHead : (holder ?? exit?.head ?? "The vault is shut down");
   const rest = [
     w.shutdown && head !== "The vault is shut down" ? "The vault is shut down." : "",
     w.paused && holder ? `${holder}.` : "",

@@ -298,7 +298,7 @@ export function useMakerFlows(p: MakerFlowsInput): {
   const focusEvents = useMemo(
     () =>
       replayed && opts && timeline
-        ? makerFocusEvents(replayed, makerFeeRates(replayed, opts), opts.collSymbol, opts.debtSymbol)
+        ? makerFocusEvents(replayed, makerFeeRates(replayed, opts), opts.collSymbol, opts.debtSymbol, opts.now)
         : [],
     [replayed, opts, timeline],
   );

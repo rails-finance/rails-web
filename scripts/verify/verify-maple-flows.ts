@@ -29,6 +29,7 @@
 //
 //   npx tsx --test scripts/verify/verify-maple-flows.ts
 import { test } from "node:test";
+import { assertUnitReceipts } from "./lib/unit-receipts";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -305,4 +306,10 @@ test("between events the claim follows the pool's rate in a straight line", () =
     }
   }
   assert.ok(checked > 0);
+});
+
+test("a unit model's past-day Held receipts stay in the pool's asset (ui-jobs 743)", () => {
+  let read = 0;
+  for (const name of NAMES) for (const rp of replays(fx(name))) read += assertUnitReceipts(model(fx(name), rp), name);
+  assert.ok(read > 0, "receipts read");
 });

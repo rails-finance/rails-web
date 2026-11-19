@@ -80,6 +80,7 @@ import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import { llamalendOraclePriceProv } from "@/lib/llamalend/live-provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { shownUsd } from "@/lib/shared/shown-usd";
 
 interface LlamalendPositionViewProps {
   /** The market's own Controller, normalised by the server route — anything
@@ -259,7 +260,7 @@ export default function LlamalendPositionView({
       readBy: serverReadOf(chain),
       collateralUsd:
         chain.borrowedIsCrvusd && chain.priceOracle != null && chain.collateral != null
-          ? chain.collateral * chain.priceOracle
+          ? shownUsd(chain.collateral, chain.priceOracle)
           : view.collateralUsd,
       debtUsd: chain.borrowedIsCrvusd && chain.debt != null ? chain.debt : view.debtUsd,
     };
@@ -284,8 +285,6 @@ export default function LlamalendPositionView({
     storageKey: `llamalend-${controller}-${user}`,
     protocolKey: "llamalend",
     window: historyWindow,
-    // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
-    dates: false,
   });
 
   // ⚠️ On a windowed page every lifetime surface must read the MERGED history,

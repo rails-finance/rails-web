@@ -309,8 +309,6 @@ export default function LiquityV1TroveView({
     storageKey: `liquity-v1-${wallet}-${selectedEpoch ?? "all"}`,
     protocolKey: "liquity-v1",
     window: historyWindow,
-    // Navigated by the Lifetime flows chart's Apply: no Dates.
-    dates: false,
   });
 
   // The Lifetime flows panel replays the selected life's whole history
@@ -465,6 +463,7 @@ export default function LiquityV1TroveView({
             live: flowOpen
               ? {
                   price: priceNow,
+                  ...(priceNow != null && chain ? { block: chain.blockNumber } : {}),
                   ...(chainLive
                     ? {
                         coll: chainLive.coll,

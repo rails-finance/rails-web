@@ -29,6 +29,7 @@
 import type { DayObs, PriceMarks, PriceSeries } from "@/lib/shared/price-series";
 import type { FlowChange } from "@/lib/shared/flows-changes";
 import type { ProtocolActivity } from "@/lib/shared/flows-pace";
+import { centsOf, faceAmount, shownPrice, shownUsd } from "@/lib/shared/shown-usd";
 
 export type FlowSide = "collateral" | "debt";
 
@@ -82,6 +83,75 @@ export type FlowHatch =
   | "checker"
   | "rings";
 
+/** A flow leg as a ledger reads it (ui-jobs 743): its amount, its price as
+ *  shown with the block it stands at and where it comes from, and its
+ *  dollars, the product of the two as shown to the cent (`shownUsd`). A leg
+ *  with no price at its block carries `price: null` and `usd: null`: it
+ *  is unpriced, never $0. A leg with no `price` key is a raw leg a family
+ *  has not yet given its parts; its `usd` is read as before. */
+export interface FlowLeg {
+  bucket: string;
+  usd: number | null;
+  symbol?: string;
+  amount?: number;
+  /** USD per token as shown (`shownPrice`); null where the leg has none. */
+  price?: number | null;
+  /** The block the price stands at, where the read names one. */
+  block?: number | null;
+  /** Where the price comes from, in the family's words (its price-notes). */
+  priceNote?: string;
+  /** A $1 face the protocol defines, not a read. */
+  face?: boolean;
+  /** The price's basis where a family has two (an oracle's min or anchor
+   *  leg, another day's close): a Market move compares values on one basis
+   *  only. Unset is the family's one basis. */
+  basis?: string;
+  /** Unix seconds of the leg's event (set by the day rows). */
+  ts?: number;
+  /** A Liquity Trove's interest since its last event, not the event's act. */
+  accrual?: boolean;
+  /** The leg's dollars are a figure the chain states (a Comet absorb's
+   *  usdValue), to the cent, with no price: `price` is null, `usd` that
+   *  figure, `priceNote` names it. */
+  stated?: true;
+}
+
+/** A leg that carries its parts: the price as shown, and its dollars the
+ *  product of the shown amount and price, to the cent; unpriced where no
+ *  price stands at its block. */
+export function flowLeg(o: {
+  bucket: string;
+  amount: number;
+  symbol: string;
+  price: number | null | undefined;
+  block?: number | null;
+  priceNote: string;
+  face?: boolean;
+  basis?: string;
+  accrual?: boolean;
+}): FlowLeg & { amount: number; symbol: string; price: number | null } {
+  const priced = o.price != null && Number.isFinite(o.price) && o.price > 0;
+  const price = priced ? shownPrice(o.price as number) : null;
+  return {
+    bucket: o.bucket,
+    amount: o.amount,
+    symbol: o.symbol,
+    price,
+    usd: price == null ? null : shownUsd(o.amount, price),
+    block: o.block ?? null,
+    priceNote: o.priceNote,
+    ...(o.face ? { face: true } : {}),
+    ...(o.basis ? { basis: o.basis } : {}),
+    ...(o.accrual ? { accrual: true } : {}),
+  };
+}
+
+/** Whether a leg carries its parts (`flowLeg`), not a raw figure. */
+export const hasParts = (l: Pick<FlowLeg, "price">): boolean => l.price !== undefined;
+
+/** A sum of cents, kept to the cent. */
+export const addCents = (a: number, b: number): number => centsOf(a + b);
+
 export interface FlowEvent {
   id: string;
   /** Unix seconds. */
@@ -99,8 +169,9 @@ export interface FlowEvent {
    *  movement as the external act's pink diamond. Unset where the row does
    *  not say. */
   byOther?: boolean;
-  /** What the event adds to each bucket, in USD, and the asset it moved. */
-  legs: { bucket: string; usd: number; symbol?: string }[];
+  /** What the event adds to each bucket, in USD, and the asset it moved:
+   *  a leg with its parts (`flowLeg`), or a raw figure. */
+  legs: FlowLeg[];
   /** The transaction, and whether the position card counts it (false: a
    *  liquidation or a transfer). Default counted. */
   tx?: string;
@@ -141,7 +212,9 @@ export interface FlowLive {
    *  `words.rest`: at the live stop that item states this figure. */
   collateralInterestUsd?: number | null;
   /** Each asset held and owed now, as the ledger values it, for the zoom
-   *  view; absent, the last day's balances at today's prices. */
+   *  view; absent, the last day's balances at today's prices. Each priced
+   *  asset carries `priced` (`livePriced`): a model in dollars states its
+   *  live total as these rows' shown products, to the cent (ui-jobs 743). */
   assets?: FlowAssetHeld[];
   /** Flows a live read states that no event has recorded yet, added to their
    *  buckets at the live stop only (a Liquity Trove's pending redistribution
@@ -159,7 +232,31 @@ export interface FlowAssetHeld {
   /** Where the model values it on a past day: the UTC day (days since the
    *  epoch) its price was recorded, and whether a daily series recorded it
    *  (else an event's block). */
-  priced?: { day: number; series: boolean };
+  priced?: {
+    day: number;
+    series: boolean;
+    /** The price as the model values the asset at (USD per token), and the
+     *  block it was read at; null where the store's route names none
+     *  (ui-jobs 743). */
+    price?: number;
+    block?: number | null;
+    /** A side counted at its $1 face (`FlowMomentWords.face`): `price` is
+     *  the interest built on the recorded balance since its event, and the
+     *  figure is that debt at $1, to the cent. */
+    face?: true;
+    /** A face factor's note: where its rate comes from, in the family's
+     *  words (`FlowTimeline.factorNotes`). */
+    factorNote?: string;
+    /** The live stop's price (`livePriced`): its source and block in words. */
+    live?: string;
+    /** The block the live balance stands at, where it differs from the
+     *  price's: both named, not complete. */
+    balanceBlock?: number | null;
+    /** A price carried from an earlier read to the live stop: not complete. */
+    carried?: true;
+  };
+  /** No price stands for the asset on that day: the side's figure has none. */
+  unpriced?: true;
   /** Grown by interest since the event that recorded it (`FlowIndexes`):
    *  `amount` is `recorded` × `index` ÷ `anchor`. */
   grown?: FlowGrowth;
@@ -302,14 +399,18 @@ export interface FlowDayRow {
   cum: Record<string, number>;
   /** Balances the day's events stated, after its last event. */
   balances: FlowEvent["balances"];
-  /** Each asset's last at-block price that day, with its block time. */
-  prices: { asset: string; usd: number; ts: number }[];
+  /** Each asset's last at-block price that day, with its block time and
+   *  block. */
+  prices: { asset: string; usd: number; ts: number; block?: number }[];
   /** Transactions on or before this day (the position card's count). */
   txs?: number;
   /** The running USD per bucket and symbol, for the cells the day moved. */
   cumAsset?: { bucket: string; symbol: string; usd: number }[];
   /** The day's events' figures that rest on something not read (`FlowEvent.unsure`). */
   unsure?: FlowUnsure[];
+  /** The day's legs that carry their parts, for the receipts; unset on rows
+   *  a server serves, which carry no legs. */
+  legs?: FlowLeg[];
   /** The most the collateral was worth after any of the day's events, each
    *  balance at the last price an event carried, where every held collateral
    *  asset had one (`daysFromEvents`). Unset, the model takes the day's
@@ -340,9 +441,16 @@ export interface FlowTimeline {
   live: FlowLive;
   /** Today's price per asset, for an asset held while no event has priced it. */
   todayPrices?: Record<string, number>;
+  /** The block today's prices were read at, where the read names one. */
+  todayBlock?: number | null;
   /** Per asset, the days a new daily price was recorded: [day, usd, block?]. The last
-   *  oracle price recorded on or before each day's end, across every wallet. */
+   *  oracle price recorded on or before each day's end, across every wallet.
+   *  A day whose price is not a number has none, and the day before's does
+   *  not carry onto it. */
   dailyPrices?: Record<string, DayObs[]>;
+  /** A $1-face side's interest factor (Maker's debt), per asset and day: the
+   *  family's words for where its rate comes from, on the factor's row. */
+  factorNotes?: Record<string, Record<number, string>>;
   /** The price view's caption for `dailyPrices`: the oracle or store and how
    *  a day's price is chosen ("AaveOracle, the last price recorded each day").
    *  Unset, an asset with `carriedWhy` reads as priced by its events and any
@@ -400,6 +508,10 @@ export interface FlowTimeline {
    *  the chart's time axis (lib/shared/flows-pace.ts; Liquity V2's branch
    *  redemptions). */
   activity?: ProtocolActivity;
+  /** The panel draws the price chart with its events row and its tie to the
+   *  timeline, and no bars, value line or totals: the page holds no position
+   *  (a Liquity V2 redeemer). The one-day rule still applies. */
+  chartAlone?: true;
 }
 
 /** Per-timeline words for the scrubber. Every field is optional and defaults
@@ -409,6 +521,9 @@ export interface FlowWords {
   held?: string;
   /** The date label at the last stop ("At the latest block's price"). */
   live?: string;
+  /** The last stop of a closed life, where "Close" would not name it (a
+   *  redeemer's "Last redemption"). */
+  close?: string;
   /** The supplied side's balancing item, for a bar whose dollar axis is a
    *  fixed rate, where everything past what came in is interest. Unset, each
    *  side's balancing item reads "Market move and interest" at every stop:
@@ -428,6 +543,13 @@ export interface FlowWords {
   /** How a side's held or owed figure is valued between events, for its
    *  receipt ("each Trove's …"). */
   heldBasis?: Partial<Record<FlowSide, string>>;
+  /** A served series' line receipts: the day rows are summed by the server
+   *  and name no legs (`FlowModel.hasLegs` false). */
+  served?: string;
+  /** The basis a side's held figure is priced on, where the family has two
+   *  (f(x)'s anchor leg): a leg on another basis leaves Market move with no
+   *  figure (`FlowLeg.basis`). */
+  priceBasis?: Partial<Record<FlowSide, string>>;
   /** The Explanation's clause on the prices the line is drawn at, where it is
    *  not the index's daily prices. */
   linePrices?: string;
@@ -469,6 +591,10 @@ export interface FlowMomentWords {
   /** The year, in seconds, a face side's rate builds over (365.25 days where
    *  unset; Liquity V2 and its forks: 365 days). */
   yearSeconds?: number;
+  /** The rate compounds each second (Maker's stability fee, through Jug's
+   *  rpow): the rate is continuous and the factor e^(rate × time); else
+   *  simple, 1 + rate × time. */
+  compound?: true;
 }
 
 /** A held asset whose price, at some date, is older than the gap allowed. */
@@ -498,6 +624,11 @@ interface FlowRow {
   cum: Record<string, number>;
   /** The running USD per `${bucket}|${symbol}` the day moved. */
   cells: { bucket: string; symbol: string; usd: number }[];
+  /** The day's legs that carry their parts (`FlowDayRow.legs`). */
+  legs: FlowLeg[];
+  /** Through this row: the lines with legs, and each line's unpriced assets. */
+  withLegs: string[];
+  unpriced: Record<string, string[]>;
 }
 
 export interface FlowModel {
@@ -512,6 +643,9 @@ export interface FlowModel {
   rows: FlowRow[];
   /** UTC midnight of the first event's day, ms. */
   start: number;
+  /** Every row states its legs (`daysFromEvents`): the lines' receipts can
+   *  list them. A served series does not. */
+  hasLegs: boolean;
   /** Day index of the last event's day. */
   lastDay: number;
   /** The final stop: today, at live prices. */
@@ -539,6 +673,8 @@ export interface FlowModel {
   changesUnavailable: boolean;
   /** The timeline's protocol activity (`FlowTimeline.activity`), or null. */
   activity: ProtocolActivity | null;
+  /** The timeline's `chartAlone`: no position, so no state between events. */
+  chartAlone?: true;
   live: FlowLive;
   /** Held and owed, valued, at the end of each stop before the live one. */
   valued: { collateral: number; debt: number }[];
@@ -554,6 +690,10 @@ export interface FlowModel {
   unsure: Map<number, { side: FlowSide; why: string; symbol?: string }[]>;
   /** The flows that rest on one: each reason's first stop. */
   unsureFlows: { stop: number; side: FlowSide; why: string; symbol?: string }[];
+  /** The live figures that rest on a read naming no block (ui-jobs 743). */
+  liveUnsure: { side: FlowSide; why: string; symbol?: string }[];
+  /** The sides whose live figure is its rows' shown products (ui-jobs 743). */
+  liveStated: FlowSide[];
   /** Whether held assets are valued at a daily price series. */
   daily: boolean;
   /** Days a price may age before the asset is on an old price. */
@@ -569,6 +709,9 @@ export interface FlowModel {
   /** Each asset held and owed at the end of each stop before the live one,
    *  and at the live stop. */
   heldAt: FlowAssetHeld[][];
+  /** Per stop, each side's held assets with no price that day: the side's
+   *  figure there has none (ui-jobs 743). */
+  heldUnpriced: Map<number, Record<FlowSide, string[]>>;
   liveHeld: FlowAssetHeld[];
   /** The shared x-axis, fixed for the position so bars never rescale. */
   axis: { max: number; ticks: number[] };
@@ -608,7 +751,33 @@ export interface FlowSegment {
   /** The basis line's opening sentence for the side, and (on the held
    *  segment) how the held figure is valued between events. */
   basis?: string;
+  /** A line of legs that carry their parts: every leg to the stop, for the
+   *  receipt; and the assets of any unpriced leg, where the line draws no
+   *  figure. */
+  legs?: FlowLeg[];
+  unpriced?: string[];
+  /** A line of a served series: the sentence its receipt states in place
+   *  of the legs (`FlowWords.served`). */
+  served?: string;
+  /** On the held segment at a past stop: each held asset with its price,
+   *  day and block, for the receipt (not enumerable). */
+  heldRows?: FlowAssetHeld[];
+  /** On the held segment: the basis its price stands on, where the family
+   *  has two (`FlowWords.priceBasis`). */
+  priceBasis?: string;
+  /** The balancing item worked out in cents (`sideSumRows`): what is held or
+   *  owed less the lines above it, or why it has no figure. */
+  market?: MarketMove;
 }
+
+/** Market move in cents: the held figure less the lines, each a sum of shown
+ *  products; no figure where a line is unpriced or the two values stand on
+ *  different bases, and the line that says which. */
+export type MarketMove = { cents: number; held: number; lines: number } | { none: string };
+
+/** The line under a ledger whose two values stand on different bases. */
+export const differentBases = (then: string, now: string): string =>
+  `The two values stand on different bases (${then} then, ${now} now).`;
 
 export interface FlowSideState {
   /** What is still there: the solid segment. */
@@ -702,9 +871,10 @@ export function daysFromEvents(bucketKeys: string[], events: FlowEvent[]): FlowD
     rates: Set<"rate-delegate" | "rate-owner">;
     byOther: boolean;
     balances: Map<string, FlowEvent["balances"][number]>;
-    prices: Map<string, { usd: number; ts: number }>;
+    prices: Map<string, { usd: number; ts: number; block: number }>;
     cells: Set<string>;
     unsure: Map<string, FlowUnsure>;
+    legs: FlowLeg[];
     /** The most the collateral was worth after one of the day's events; null
      *  once an event leaves a held collateral asset without a price. */
     high: number | null;
@@ -726,7 +896,7 @@ export function daysFromEvents(bucketKeys: string[], events: FlowEvent[]): FlowD
       ...(cur.byOther ? { byOther: true as const } : {}),
       cum: { ...cum },
       balances: [...cur.balances.values()],
-      prices: [...cur.prices].map(([asset, p]) => ({ asset, usd: p.usd, ts: p.ts })),
+      prices: [...cur.prices].map(([asset, p]) => ({ asset, usd: p.usd, ts: p.ts, block: p.block })),
       txs,
       cumAsset: [...cur.cells].map((c) => ({
         bucket: c.slice(0, c.indexOf("|")),
@@ -734,6 +904,7 @@ export function daysFromEvents(bucketKeys: string[], events: FlowEvent[]): FlowD
         usd: cumAsset[c],
       })),
       ...(cur.unsure.size ? { unsure: [...cur.unsure.values()] } : {}),
+      legs: cur.legs,
       ...(cur.high != null ? { collateralHigh: cur.high } : {}),
     });
     cur = null;
@@ -751,6 +922,7 @@ export function daysFromEvents(bucketKeys: string[], events: FlowEvent[]): FlowD
       prices: new Map(),
       cells: new Set(),
       unsure: new Map(),
+      legs: [],
       high: 0,
     };
     n += 1;
@@ -762,13 +934,22 @@ export function daysFromEvents(bucketKeys: string[], events: FlowEvent[]): FlowD
         lastTx = tx;
       }
     }
-    for (const p of ev.prices) if (p.usd > 0) cur.prices.set(p.asset, { usd: p.usd, ts: ev.ts });
+    for (const p of ev.prices) if (p.usd > 0) cur.prices.set(p.asset, { usd: p.usd, ts: ev.ts, block: ev.block });
     for (const leg of ev.legs) {
-      if (!(leg.bucket in cum) || !Number.isFinite(leg.usd)) continue;
-      cum[leg.bucket] += leg.usd;
+      if (!(leg.bucket in cum)) continue;
+      const parts = hasParts(leg);
+      if (parts) {
+        cur.legs.push({ ...leg, ts: ev.ts });
+        // An unpriced leg adds nothing: its line draws no figure (`bucketLegs`).
+        if (leg.usd == null) continue;
+      }
+      const usd = leg.usd;
+      if (usd == null || !Number.isFinite(usd)) continue;
+      // A leg with its parts adds its cents, so the line is their sum.
+      cum[leg.bucket] = parts ? addCents(cum[leg.bucket], usd) : cum[leg.bucket] + usd;
       if (leg.symbol) {
         const cell = `${leg.bucket}|${leg.symbol}`;
-        cumAsset[cell] = (cumAsset[cell] ?? 0) + leg.usd;
+        cumAsset[cell] = parts ? addCents(cumAsset[cell] ?? 0, usd) : (cumAsset[cell] ?? 0) + usd;
         cur.cells.add(cell);
       }
     }
@@ -815,6 +996,26 @@ interface PriceAt {
   /** Stop of the day it was recorded. */
   day: number;
   series: boolean;
+  /** The block it was read at, where the source names one. */
+  block?: number | null;
+  /** A face side's factor: where its rate comes from, in the family's words. */
+  factorNote?: string;
+}
+
+/** Through each row, the lines with legs and their unpriced assets: small,
+ *  so a stop decides its gaps without walking the legs. */
+function markLegs(rows: FlowRow[]): void {
+  const seen = new Set<string>();
+  const gaps: Record<string, string[]> = {};
+  for (const r of rows) {
+    for (const l of r.legs) {
+      if (!hasParts(l)) continue;
+      seen.add(l.bucket);
+      if (l.usd == null && l.symbol && !(gaps[l.bucket] ??= []).includes(l.symbol)) gaps[l.bucket].push(l.symbol);
+    }
+    r.withLegs = [...seen];
+    r.unpriced = Object.fromEntries(Object.entries(gaps).map(([k, v]) => [k, [...v]]));
+  }
 }
 
 /** Replay the day rows into the model the scrubber reads. */
@@ -834,7 +1035,11 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     txs: d.txs ?? null,
     cum: { ...d.cum },
     cells: d.cumAsset ?? [],
+    legs: d.legs ?? [],
+    withLegs: [],
+    unpriced: {},
   }));
+  markLegs(rows);
   const lastDay = rows[rows.length - 1].day;
   // A row whose events equal the row before's holds a balance the protocol set
   // with no event (Aave V3 Core's GHO discount settlement, 3 Jul 2025): the
@@ -849,13 +1054,18 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
   const liveStop = t.today != null && stillHeld ? Math.max(lastDay + 1, t.today - startDay) : lastDay + 1;
 
   // Each asset's daily observations as stops, ascending.
-  const series = new Map<string, { day: number; usd: number }[]>();
+  const series = new Map<string, { day: number; usd: number; block: number | null; factorNote?: string }[]>();
   for (const [asset, obs] of Object.entries(t.dailyPrices ?? {}))
     series.set(
       asset,
       obs
-        .map(([d, usd]) => ({ day: d - startDay, usd }))
-        .filter((o) => o.usd > 0)
+        .map(([d, usd, block]) => {
+          const factorNote = t.factorNotes?.[asset]?.[d];
+          return { day: d - startDay, usd, block: block ?? null, ...(factorNote ? { factorNote } : {}) };
+        })
+        // A day that states no number has no price, and the day before's does
+        // not carry onto it (a Maker stretch with no rate).
+        .filter((o) => o.usd > 0 || Number.isNaN(o.usd))
         .sort((a, b) => a.day - b.day),
     );
   const seriesAt = (asset: string, stop: number, from: { i: number }): PriceAt | null => {
@@ -863,7 +1073,16 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     if (!obs) return null;
     while (from.i + 1 < obs.length && obs[from.i + 1].day <= stop) from.i++;
     const o = obs[from.i];
-    return o && o.day <= stop ? { usd: o.usd, ts: (startDay + o.day) * DAY_S, day: o.day, series: true } : null;
+    return o && o.day <= stop
+      ? {
+          usd: o.usd,
+          ts: (startDay + o.day) * DAY_S,
+          day: o.day,
+          series: true,
+          block: o.block,
+          ...(o.factorNote ? { factorNote: o.factorNote } : {}),
+        }
+      : null;
   };
 
   const held = new Map<string, { symbol: string; side: FlowSide; amount: number; index?: number; day: number }>();
@@ -871,6 +1090,9 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
   const seriesCursor = new Map<string, { i: number }>();
   const valued: FlowModel["valued"] = [];
   const heldAt: FlowAssetHeld[][] = [];
+  const heldUnpriced = new Map<number, Record<FlowSide, string[]>>();
+  const inDollars = !t.unit && !t.sideUnits;
+  const faceSides = new Set(t.words?.moment?.face ?? []);
   const stale = new Map<number, StalePrice[]>();
   type Reason = { side: FlowSide; why: string; symbol?: string };
   const same = (a: Reason, b: Reason) => a.side === b.side && a.why === b.why && a.symbol === b.symbol;
@@ -896,7 +1118,14 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
         if (!unsureFlows.some((f) => same(f, reason(u)))) unsureFlows.push({ stop, ...reason(u) });
       }
       for (const p of d.prices)
-        if (p.usd > 0) eventPrice.set(p.asset, { usd: p.usd, ts: p.ts, day: utcDay(p.ts) - startDay, series: false });
+        if (p.usd > 0)
+          eventPrice.set(p.asset, {
+            usd: p.usd,
+            ts: p.ts,
+            day: utcDay(p.ts) - startDay,
+            series: false,
+            block: p.block ?? null,
+          });
       for (const b of d.balances)
         held.set(`${b.side}:${b.asset}`, {
           symbol: b.symbol,
@@ -907,6 +1136,8 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
         });
     } else for (const u of standing) note(u);
     const priceNow = new Map<string, PriceAt>();
+    const noPrice = new Set<string>();
+    const unpricedHere: Record<FlowSide, string[]> = { collateral: [], debt: [] };
     let coll = 0;
     let debt = 0;
     const staleHere: StalePrice[] = [];
@@ -939,15 +1170,30 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
         const e = eventPrice.get(asset);
         // The newer of the two; on one day the series (the day's end) wins.
         const best = s && e ? (e.day > s.day ? e : s) : (s ?? e ?? null);
-        if (best) {
+        // A series day that states no number: no price, and nothing else
+        // stands in for it.
+        if (best && Number.isNaN(best.usd)) noPrice.add(asset);
+        else if (best) {
           p = best;
           priceNow.set(asset, best);
         }
       }
-      const usdPer = p?.usd ?? t.todayPrices?.[asset] ?? 0;
-      const usd = h.amount * usdPer;
-      if (h.side === "collateral") coll += usd;
-      else debt += usd;
+      // The chart and the bars value at the day's price; the held figure's
+      // receipt states each asset's shown product at its block, and an asset
+      // with no price that day leaves the side with no held figure (ui-jobs
+      // 743). A unit model keeps its arithmetic. A priced asset in dollars
+      // is its shown product to the cent, so every figure the panel prints
+      // from it is its rows' cents.
+      const usdPer = p?.usd ?? (noPrice.has(asset) ? 0 : (t.todayPrices?.[asset] ?? 0));
+      const cents = inDollars && p != null;
+      const usd = cents
+        ? faceSides.has(h.side)
+          ? shownUsd(faceAmount(h.amount, usdPer), 1)
+          : shownUsd(h.amount, usdPer)
+        : h.amount * usdPer;
+      if (inDollars && !p) unpricedHere[h.side].push(h.symbol);
+      if (h.side === "collateral") coll = cents ? addCents(coll, usd) : coll + usd;
+      else debt = cents ? addCents(debt, usd) : debt + usd;
       lines.push({ asset, h, usd, p, ...(g.grown ? { grown: g.grown } : {}) });
       // A price from an earlier day, where only the events record one.
       const carried = t.carriedWhy?.[asset];
@@ -983,13 +1229,37 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     // Only what was held at this stop can be repriced at the next.
     prevPrice = priceNow;
     valued.push({ collateral: coll, debt });
+    if (unpricedHere.collateral.length || unpricedHere.debt.length) heldUnpriced.set(stop, unpricedHere);
     heldAt.push(
       lines.map(({ h, usd, p, grown }) => ({
         side: h.side,
         symbol: h.symbol,
         amount: h.amount,
         usd,
-        ...(p ? { priced: { day: utcDay(p.ts), series: p.series } } : {}),
+        ...(p
+          ? {
+              // The price and its block only on a model in dollars: a unit
+              // model's daily prices are in its token's grains.
+              priced: {
+                day: utcDay(p.ts),
+                series: p.series,
+                ...(inDollars
+                  ? {
+                      price: p.usd,
+                      block: p.block ?? null,
+                      ...(faceSides.has(h.side)
+                        ? {
+                            face: true as const,
+                            ...(p.factorNote ? { factorNote: p.factorNote } : {}),
+                          }
+                        : {}),
+                    }
+                  : {}),
+              },
+            }
+          : inDollars
+            ? { unpriced: true as const }
+            : {}),
         ...(grown ? { grown } : {}),
       })),
     );
@@ -1011,10 +1281,28 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     collateralHigh[stop] = Math.max(collateralHigh[stop], high);
   });
 
+  // The live stop in rows: each asset's amount × its live price, shown.
+  const stated = liveFromRows(
+    t.live,
+    t.live.assets ??
+      liveHeldFromBalances(
+        held,
+        t.todayPrices,
+        heldAt[heldAt.length - 1] ?? [],
+        inDollars,
+        t.todayBlock,
+        startDay + liveStop,
+      ),
+    inDollars,
+  );
+  const live = stated.live;
+  const liveHeld = stated.rows;
+  const liveStated = stated.stated;
+  const liveUnsure = stated.unsure;
   const last = rows[rows.length - 1];
   const today = {
-    collateral: t.live.collateralUsd + outOf("collateral", last.cum),
-    debt: t.live.debtUsd + outOf("debt", last.cum),
+    collateral: live.collateralUsd + outOf("collateral", last.cum),
+    debt: live.debtUsd + outOf("debt", last.cum),
   };
   let peak = Math.max(today.collateral, today.debt);
   const sidePeak = { collateral: today.collateral, debt: today.debt };
@@ -1041,6 +1329,7 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     buckets: t.buckets,
     rows,
     start,
+    hasLegs: days.every((d) => Array.isArray(d.legs)),
     lastDay,
     liveStop,
     eventDays,
@@ -1067,7 +1356,8 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     changes: t.changes ?? [],
     changesUnavailable: t.changesUnavailable === true,
     activity: t.activity ?? null,
-    live: t.live,
+    ...(t.chartAlone ? { chartAlone: true as const } : {}),
+    live,
     valued,
     collateralHigh,
     stale,
@@ -1081,7 +1371,10 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     words: t.words ?? {},
     ...(t.addresses ? { addresses: t.addresses } : {}),
     heldAt,
-    liveHeld: t.live.assets ?? liveHeldFromBalances(held, t.todayPrices, heldAt[heldAt.length - 1] ?? []),
+    heldUnpriced,
+    liveHeld,
+    liveStated,
+    liveUnsure,
     axis: axisFor(peak),
     today,
   };
@@ -1093,6 +1386,9 @@ function liveHeldFromBalances(
   held: Map<string, { symbol: string; side: FlowSide; amount: number }>,
   todayPrices: Record<string, number> | undefined,
   last: FlowAssetHeld[],
+  inDollars: boolean,
+  todayBlock: number | null | undefined,
+  todayDay: number,
 ): FlowAssetHeld[] {
   const out: FlowAssetHeld[] = [];
   for (const [key, h] of held) {
@@ -1100,10 +1396,121 @@ function liveHeldFromBalances(
     const asset = key.slice(key.indexOf(":") + 1);
     const p = todayPrices?.[asset];
     const prev = last.find((x) => x.side === h.side && x.symbol === h.symbol);
-    const usd = typeof p === "number" && p > 0 ? h.amount * p : (prev?.usd ?? 0);
-    out.push({ side: h.side, symbol: h.symbol, amount: h.amount, usd });
+    const priced = typeof p === "number" && p > 0;
+    const usd = priced ? h.amount * p : (prev?.usd ?? 0);
+    // No price today and none carried from the last stop: the asset has no
+    // figure, and the line breaks at the live point (ui-jobs 743).
+    const none = inDollars && !priced && (prev == null || prev.unpriced);
+    // The price row: today's, at its read's block where it names one; else
+    // the last stop's price, carried and named with its block, not complete.
+    const row = priced
+      ? livePriced(p, todayBlock, todayDay * 86_400)
+      : prev?.priced?.price != null && !prev.priced.face && !prev.unpriced
+        ? { ...prev.priced, carried: true as const }
+        : undefined;
+    out.push({
+      side: h.side,
+      symbol: h.symbol,
+      amount: h.amount,
+      usd,
+      ...(row ? { priced: row } : {}),
+      ...(none ? { unpriced: true as const } : {}),
+    });
   }
   return out;
+}
+
+/** A live asset's price row (ui-jobs 743): the price its live figure takes,
+ *  at the live read's block where the read names one; `face` for a $1-face
+ *  side counted at its current balance. */
+export function livePriced(
+  price: number,
+  block: number | null | undefined,
+  nowSec: number,
+  o: { face?: boolean; source?: string; balanceBlock?: number | null; carried?: boolean } = {},
+): NonNullable<FlowAssetHeld["priced"]> {
+  const src = o.source ?? "the live read's price";
+  const apart = o.balanceBlock != null && block != null && o.balanceBlock !== block;
+  return {
+    day: Math.floor(nowSec / 86_400),
+    series: false,
+    price: o.face ? 1 : price,
+    block: block ?? null,
+    live: `${block != null ? `${src}, block ${block.toLocaleString("en-US")}` : `${src}, which names no block`}${
+      apart ? `; the balance is read at block ${(o.balanceBlock as number).toLocaleString("en-US")}` : ""
+    }`,
+    ...(apart ? { balanceBlock: o.balanceBlock } : {}),
+    ...(o.carried ? { carried: true as const } : {}),
+    ...(o.face ? { face: true as const } : {}),
+  };
+}
+
+/** The live stop's figures from its rows (ui-jobs 743): a side in dollars
+ *  is the sum of its assets' shown products, each at its price row
+ *  (`livePriced`), to the cent; an asset held with no price row leaves the
+ *  side with none ("—"); a price whose read names no block, an earlier
+ *  price, or a price read at another block than its balance is not
+ *  complete. A unit side keeps the family's figure. */
+function liveFromRows(
+  live: FlowLive,
+  rows: FlowAssetHeld[],
+  inDollars: boolean,
+): {
+  live: FlowLive;
+  rows: FlowAssetHeld[];
+  stated: FlowSide[];
+  unsure: { side: FlowSide; why: string; symbol?: string }[];
+} {
+  if (!inDollars) return { live, rows, stated: [], unsure: [] };
+  const unsure: { side: FlowSide; why: string; symbol?: string }[] = [];
+  const held = (r: FlowAssetHeld) => (r.amount ?? 0) > 0 || Math.abs(r.usd) >= 0.005;
+  // A held asset with no price row has no figure: its side draws "—", never
+  // the family's total in its place.
+  rows = rows.map((r) =>
+    held(r) && !r.unpriced && !((r.amount ?? 0) > 0 && r.priced?.price != null) ? { ...r, unpriced: true as const } : r,
+  );
+  const sum = (side: FlowSide): number | null => {
+    let c = 0;
+    for (const r of rows) {
+      if (r.side !== side || !held(r)) continue;
+      if (r.unpriced) return Number.NaN;
+      const p = r.priced!;
+      c = addCents(
+        c,
+        p.face
+          ? shownUsd(faceAmount(r.amount as number, p.price as number), 1)
+          : shownUsd(r.amount as number, p.price as number),
+      );
+      // A live price whose read names no block, or an earlier price carried
+      // to the live stop: not complete.
+      const why = p.face
+        ? null
+        : p.live == null || p.carried
+          ? "at an earlier price: the live read has no price for it."
+          : p.block == null
+            ? "at the latest read's price, which names no block."
+            : p.balanceBlock != null
+              ? "at a price read at another block than its balance."
+              : null;
+      if (why && !unsure.some((u) => u.side === side && u.symbol === r.symbol))
+        unsure.push({ side, why, symbol: r.symbol });
+    }
+    return c;
+  };
+  const coll = sum("collateral");
+  const debt = sum("debt");
+  const ok = (v: number | null): v is number => v != null && !Number.isNaN(v);
+  return {
+    live: {
+      ...live,
+      collateralUsd: ok(coll) ? coll : live.collateralUsd,
+      debtUsd: ok(debt) ? debt : live.debtUsd,
+    },
+    rows,
+    // The sides stated in rows: both, on a model in dollars.
+    stated: (["collateral", "debt"] as const).filter((x) => (x === "collateral" ? coll : debt) != null),
+    unsure,
+  };
 }
 
 /** Each asset's part of the position at a stop: what is held and owed, and
@@ -1170,18 +1577,100 @@ function sourcesFor(
   return out;
 }
 
+/** Each bucket's legs that carry their parts, and the assets of its
+ *  unpriced ones, from a list of legs. */
+export interface BucketLegs {
+  legs: Record<string, FlowLeg[]>;
+  unpriced: Record<string, string[]>;
+}
+
+export function bucketLegs(legs: Iterable<FlowLeg>): BucketLegs {
+  const out: BucketLegs = { legs: {}, unpriced: {} };
+  for (const l of legs) {
+    if (!hasParts(l)) continue;
+    (out.legs[l.bucket] ??= []).push(l);
+    if (l.usd == null && l.symbol) {
+      const list = (out.unpriced[l.bucket] ??= []);
+      if (!list.includes(l.symbol)) list.push(l.symbol);
+    }
+  }
+  return out;
+}
+
+/** The legs of the model's rows through row `i`. */
+export function rowLegs(m: Pick<FlowModel, "rows">, i: number): FlowLeg[] {
+  const out: FlowLeg[] = [];
+  for (let k = 0; k <= i && k < m.rows.length; k++) for (const l of m.rows[k].legs) out.push(l);
+  return out;
+}
+
+/** Where a side's segments read their legs: the lines that have any, each
+ *  line's unpriced assets, and the legs themselves, built on first read. */
+export interface PartsSource {
+  has: (key: string) => boolean;
+  legs: (key: string) => FlowLeg[];
+  unpriced: Record<string, string[]>;
+}
+
+/** A BucketLegs as a parts source. */
+export const partsFrom = (b: BucketLegs): PartsSource => ({
+  has: (k) => b.legs[k] != null,
+  legs: (k) => b.legs[k] ?? [],
+  unpriced: b.unpriced,
+});
+
+/** The model's legs through row `i`, read only when a receipt asks. */
+function rowParts(m: FlowModel, i: number): PartsSource | undefined {
+  if (!m.hasLegs || i < 0) return undefined;
+  const row = m.rows[i];
+  let built: BucketLegs | null = null;
+  const has = new Set(row.withLegs);
+  return {
+    has: (k) => has.has(k),
+    legs: (k) => (built ??= bucketLegs(rowLegs(m, i))).legs[k] ?? [],
+    unpriced: row.unpriced,
+  };
+}
+
+/** A line's unpriced assets, or a served series' sentence, for its segment. */
+const partsOf = (
+  parts: PartsSource | undefined,
+  key: string,
+  served?: string,
+): Pick<FlowSegment, "unpriced" | "served"> => {
+  if (served) return { served };
+  const unpriced = parts?.unpriced[key];
+  return unpriced?.length ? { unpriced } : {};
+};
+
+/** Each line's legs on its segment, read when asked: not enumerable, so a
+ *  stop's state stays small and copies of it do not carry them. */
+function withLegs(segs: FlowSegment[], parts: PartsSource | undefined): void {
+  if (!parts) return;
+  for (const x of segs)
+    if ((x.fill === "in" || x.fill === "out") && parts.has(x.key))
+      Object.defineProperty(x, "legs", { get: () => parts.legs(x.key), enumerable: false, configurable: true });
+}
+
 function sideState(
   m: FlowModel,
   side: FlowSide,
   cum: Record<string, number>,
   now: number,
   interest: number | null,
+  parts?: PartsSource,
+  held?: { rows: FlowAssetHeld[]; unpriced: string[] },
 ): FlowSideState {
   const bs = m.buckets.filter((b) => b.side === side);
   const outs = bs.filter((b) => b.dir === "out");
   const ins = bs.filter((b) => b.dir === "in");
   const heldNow = Math.max(0, now);
-  const out = outs.reduce((s, b) => s + Math.max(0, cum[b.key] ?? 0), 0);
+  const served = m.hasLegs ? undefined : m.words.served;
+  // A line holding an unpriced leg draws no bar: a gap, its figure "—"
+  // (ui-jobs 743); beside it the balancing item has no width either.
+  const gap = (k: string) => (parts?.unpriced[k]?.length ?? 0) > 0;
+  const anyGap = bs.some((b) => gap(b.key));
+  const out = outs.reduce((s, b) => s + (gap(b.key) ? 0 : Math.max(0, cum[b.key] ?? 0)), 0);
   const total = heldNow + out;
   const bar: FlowSegment[] = [
     {
@@ -1191,6 +1680,8 @@ function sideState(
       width: heldNow,
       value: heldNow,
       ...(m.words.heldBasis?.[side] ? { basis: m.words.heldBasis[side] } : {}),
+      ...(m.words.priceBasis?.[side] ? { priceBasis: m.words.priceBasis[side] } : {}),
+      ...(held?.unpriced.length ? { unpriced: held.unpriced } : {}),
     },
     ...outs.map((b) => {
       const v = Math.max(0, cum[b.key] ?? 0);
@@ -1201,14 +1692,23 @@ function sideState(
         tone: b.tone ?? "exit",
         hatch: b.hatch,
         link: b.link,
-        width: v,
+        width: gap(b.key) ? 0 : v,
         value: v,
+        ...partsOf(parts, b.key, served),
       };
     }),
   ];
   const exact: FlowSegment[] = ins.map((b) => {
     const v = cum[b.key] ?? 0;
-    return { key: b.key, label: b.label, fill: "in", ...(b.hatch ? { hatch: b.hatch } : {}), width: v, value: v };
+    return {
+      key: b.key,
+      label: b.label,
+      fill: "in",
+      ...(b.hatch ? { hatch: b.hatch } : {}),
+      width: v,
+      value: v,
+      ...partsOf(parts, b.key, served),
+    };
   });
   if (m.opening) {
     const v = side === "collateral" ? m.opening.collateral : m.opening.debt;
@@ -1236,14 +1736,34 @@ function sideState(
         ...words,
       }
     : { key: `${side}-market`, label: named ?? "Market move and interest", value: rest, signed: true, ...words };
-  return { now: heldNow, total, out, bar, sources: sourcesFor(exact, total, balancing) };
+  const sources = sourcesFor(exact, total, balancing).map((x) =>
+    x.unpriced?.length || (anyGap && x.fill === "estimate") ? { ...x, width: 0 } : x,
+  );
+  withLegs(bar, parts);
+  withLegs(sources, parts);
+  // The held figure's rows, read when its receipt opens.
+  if (held) {
+    const rows = held.rows.filter((r) => r.side === side);
+    Object.defineProperty(bar[0], "heldRows", { get: () => rows, enumerable: false, configurable: true });
+  }
+  return { now: heldNow, total, out, bar, sources };
 }
+
+/** What a side's headline prints: what is held or owed, or not a number
+ *  where an asset held has no price (ui-jobs 743); the bar keeps `now`. */
+export const shownNow = (st: FlowSideState): number => (st.bar[0]?.unpriced?.length ? Number.NaN : st.now);
 
 /** One side's bar and sources for a set of running totals and what is held
  *  or owed, as `stateAt` builds each stop's: the event card's lifetime sum
  *  (lib/shared/flow-focus.ts) reads a side at one event with it. */
-export function sideStateFor(m: FlowModel, side: FlowSide, cum: Record<string, number>, now: number): FlowSideState {
-  return sideState(m, side, cum, now, null);
+export function sideStateFor(
+  m: FlowModel,
+  side: FlowSide,
+  cum: Record<string, number>,
+  now: number,
+  parts?: BucketLegs,
+): FlowSideState {
+  return sideState(m, side, cum, now, null, parts ? partsFrom(parts) : undefined);
 }
 
 /** The position as of the end of day `stop` (0 = the first event's day), or
@@ -1253,11 +1773,32 @@ export function stateAt(m: FlowModel, stop: number): FlowState {
   const i = isLive ? m.rows.length - 1 : rowAt(m, stop);
   const row = i >= 0 ? m.rows[i] : null;
   let cum = row?.cum ?? Object.fromEntries(m.buckets.map((b) => [b.key, 0]));
+  let parts = rowParts(m, i);
   if (isLive && m.live.pending?.length) {
     cum = { ...cum };
-    for (const p of m.live.pending) cum[p.bucket] = (cum[p.bucket] ?? 0) + p.usd;
+    const pending = new Set<string>();
+    for (const p of m.live.pending) {
+      cum[p.bucket] = (cum[p.bucket] ?? 0) + p.usd;
+      pending.add(p.bucket);
+    }
+    // A pending flow is a raw figure: its line's legs no longer add to it.
+    const base = parts;
+    if (base) parts = { ...base, has: (k) => !pending.has(k) && base.has(k) };
   }
-  const v = !isLive && stop >= 0 ? m.valued[Math.min(stop, m.valued.length - 1)] : undefined;
+  const vi = Math.min(stop, m.valued.length - 1);
+  const v = !isLive && stop >= 0 ? m.valued[vi] : undefined;
+  // A past stop's held assets with their prices and blocks (ui-jobs 743).
+  // A unit model's figures are its token's: its held segment carries no
+  // dollar rows.
+  const heldOn = (side: FlowSide) =>
+    !isLive && stop >= 0 && m.heldAt[vi] && !unitOf(m, side)
+      ? { rows: m.heldAt[vi], unpriced: m.heldUnpriced?.get(vi)?.[side] ?? [] }
+      : isLive && !unitOf(m, side)
+        ? {
+            rows: m.liveHeld.filter((h) => m.liveStated.includes(h.side)),
+            unpriced: m.liveHeld.filter((h) => h.side === side && h.unpriced).map((h) => h.symbol),
+          }
+        : undefined;
   const collNow = isLive ? m.live.collateralUsd : (v?.collateral ?? 0);
   const debtNow = isLive ? m.live.debtUsd : (v?.debt ?? 0);
   return {
@@ -1265,8 +1806,16 @@ export function stateAt(m: FlowModel, stop: number): FlowState {
     isLive,
     count: row?.events ?? 0,
     txs: m.totalTxs == null ? null : (row?.txs ?? 0),
-    collateral: sideState(m, "collateral", cum, collNow, isLive ? (m.live.collateralInterestUsd ?? null) : null),
-    debt: sideState(m, "debt", cum, debtNow, null),
+    collateral: sideState(
+      m,
+      "collateral",
+      cum,
+      collNow,
+      isLive ? (m.live.collateralInterestUsd ?? null) : null,
+      parts,
+      heldOn("collateral"),
+    ),
+    debt: sideState(m, "debt", cum, debtNow, null, parts, heldOn("debt")),
     stale: isLive ? [] : (m.stale.get(stop) ?? []),
   };
 }
@@ -1305,7 +1854,9 @@ export function oldPriceAt(m: FlowModel, stop: number): { word: "Old price" | "R
  *  the live read's, and every reason the history has counts for the flows. */
 export function unsureAt(m: FlowModel, stop: number, side: FlowSide): { held: string[]; flows: string[] } {
   const live = stop >= m.liveStop;
-  const held = live ? [] : (m.unsure.get(stop) ?? []).filter((u) => u.side === side);
+  const held = live
+    ? m.liveUnsure.filter((u) => u.side === side)
+    : (m.unsure.get(stop) ?? []).filter((u) => u.side === side);
   const flows = m.unsureFlows.filter(
     (u) => u.side === side && (live || u.stop <= stop) && !held.some((h) => h.why === u.why && h.symbol === u.symbol),
   );
@@ -1363,6 +1914,8 @@ export function windowModel(m: FlowModel, from: number): FlowModel {
       cells: r.cells.map((c) => ({ ...c, usd: c.usd - (baseCells.get(`${c.bucket}|${c.symbol}`) ?? 0) })),
     }));
   if (rows.length === 0) return m;
+  // The window's lines hold the window's legs only.
+  markLegs(rows);
   const shift = <T extends { day: number }>(xs: T[]) =>
     xs.filter((x) => x.day >= from).map((x) => ({ ...x, day: x.day - from }));
   const outOf = (side: FlowSide, c: Record<string, number>) =>
@@ -1404,6 +1957,7 @@ export function windowModel(m: FlowModel, from: number): FlowModel {
     // A reason before the window stands from its opening: the bars there count what it left.
     unsureFlows: m.unsureFlows.map((u) => ({ ...u, stop: Math.max(0, u.stop - from) })),
     heldAt: m.heldAt.slice(from),
+    heldUnpriced: new Map([...m.heldUnpriced].filter(([k]) => k >= from).map(([k, v]) => [k - from, v])),
     axis: axisFor(peak),
     ...(m.sideAxes ? { sideAxes: { collateral: axisFor(sidePeak.collateral), debt: axisFor(sidePeak.debt) } } : {}),
     today,
@@ -1440,6 +1994,8 @@ export const dayStart = (m: FlowModel, stop: number): number => (m.start + stop 
  *  dropped ("$1.0B", "$1.5B", "$1.89B"). */
 export function formatFlowUsd(v: number, unit?: FlowUnit): string {
   if (unit) return formatFlowToken(v, unit);
+  // A figure with no price (not a number) prints no figure (ui-jobs 743).
+  if (!Number.isFinite(v)) return "—";
   const a = Math.abs(v);
   const sign = v < 0 && a >= 0.5 ? "−" : "";
   let body: string;
@@ -1454,6 +2010,7 @@ export function formatFlowUsd(v: number, unit?: FlowUnit): string {
 /** "211 thousand dollars" — a figure for a screen reader. */
 export function spokenUsd(v: number, unit?: FlowUnit): string {
   if (unit) return spokenToken(v, unit);
+  if (!Number.isFinite(v)) return "no figure";
   const a = Math.abs(v);
   const sign = v < 0 ? "minus " : "";
   if (a >= 999_950_000) return `${sign}${(a / 1e9).toFixed(2).replace(/(\.\d)0$/, "$1")} billion dollars`;

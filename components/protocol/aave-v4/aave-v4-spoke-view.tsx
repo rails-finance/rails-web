@@ -102,7 +102,12 @@ import {
   LifetimeFlowsScrubber,
   type FlowsKeyItems,
 } from "@/components/shared/lifetime-flows-scrubber";
-import { FlowFocusContext, useFlowFocusRoot, useFlowFocusValue } from "@/components/shared/flow-focus-context";
+import {
+  FlowFocusContext,
+  useFlowFocusRoot,
+  useFlowFocusValue,
+  useFlowsWaiting,
+} from "@/components/shared/flow-focus-context";
 import type { FlowTimeline } from "@/lib/shared/flows-timeline";
 import {
   aaveV4FlowLive,
@@ -347,6 +352,7 @@ function AaveV4SpokePageInner({
         sortedEvents.filter((e) => isAaveV4Event(e) && (e.context.data.spokeName ?? "Main") === spokeName),
         patchedReserves,
         chainTruthPrices,
+        oracleRead,
       ),
       // On-chain-oracle valuation of the headline totals, from the same chain
       // balances at Aave's own oracle price — lets On-chain-values show these
@@ -621,9 +627,6 @@ function AaveV4SpokePageInner({
     storageKey: `aave-v4-${rawSpoke}-${wallet}`,
     protocolKey: "aave-v4",
     olderCount,
-    // Navigated by the Lifetime flows chart's Show timeline button: no Dates. Base has no
-    // flows series (`flowSeriesEnabled` below), so no Show timeline button, and keeps Dates.
-    dates: deployment.key === "base",
   });
 
   if (loading) {
@@ -972,12 +975,12 @@ function AaveV4SpokeTowerBlock({
         ? aaveV4FlowSeriesTimeline(
             flowSeries,
             totals.unpricedSymbols.length === 0
-              ? aaveV4FlowLive(totals, reserves, (sym) => resolvePrice(sym, prices))
+              ? aaveV4FlowLive(totals, reserves, (sym) => resolvePrice(sym, prices), priceBlock)
               : null,
             todayPrices,
           )
         : null,
-    [flowSeries, totals, todayPrices, reserves, prices],
+    [flowSeries, totals, todayPrices, reserves, prices, priceBlock],
   );
   // The price chart's health view (ui-jobs 328, ruling 15).
   const flowTimeline = useAaveFamilyHealth(flowSeriesTimeline, {
@@ -1003,6 +1006,8 @@ function AaveV4SpokeTowerBlock({
   // The series is still on its way: the panel holds its settled shape in the
   // loading skeleton, and the tower waits (a failed read lets it stand alone).
   const flowsPending = flowSeriesEnabled && flowSeries == null && !flowsFailed;
+  // The timeline holds back its Date pill while the series reads (ui-jobs 764).
+  useFlowsWaiting(flowsPending);
   const ledgerShown = !flowsPending && (!scrubbed || ledgerOpen);
   const title = (
     <span className={`${SECTION_HEADING} inline-flex items-center gap-1.5 text-rb-500`}>Lifetime flows</span>

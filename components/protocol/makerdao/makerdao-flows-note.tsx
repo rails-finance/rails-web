@@ -50,7 +50,7 @@ export function MakerFlowsNote({ facts, collSymbol, debtSymbol, ilk, capped }: M
           {p && p.row > 0
             ? `, ${count(p.row, "a liquidation", "liquidations")} at the price at ${p.row === 1 ? "its block" : "their blocks"}`
             : ""}
-          {p && p.today > 0 ? `, ${count(p.today, "an event", "events")} at the latest block's price` : ""}
+          {p && p.today > 0 ? `, ${count(p.today, "an event", "events")} at the latest read's price` : ""}
           {p && p["store-near"] > 0
             ? `, and ${count(p["store-near"], "one event", "events")} on a day the store holds no price for at the nearest day's`
             : ""}

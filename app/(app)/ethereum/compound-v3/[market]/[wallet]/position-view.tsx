@@ -446,8 +446,6 @@ export default function CompoundPositionView({
     folderParams: { wallet, market },
     storageKey: `compound-${market}-${wallet}`,
     protocolKey: "compound",
-    // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
-    dates: false,
   });
 
   // The Lifetime flows panel replays the position's whole history
@@ -465,6 +463,7 @@ export default function CompoundPositionView({
         chain.collateral.map((c) => [c.address.toLowerCase(), scaleCompoundChainBalance(c.balanceRaw, c.decimals)]),
       ),
       prices: Object.fromEntries(Object.entries(view.priceByAddress ?? {}).map(([a, p]) => [a.toLowerCase(), p])),
+      block: view.priceBlock ?? null,
       supplyApr: chain.supplyApr,
       borrowApr: chain.borrowApr,
     };

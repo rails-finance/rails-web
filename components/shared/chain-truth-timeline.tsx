@@ -73,11 +73,21 @@ import { UnreadTokensProvider } from "@/components/shared/unread-tokens-context"
 import {
   useFlowFocus,
   useFlowFocusState,
+  useFlowsStore,
+  useFlowsStoreState,
   useFollowPreference,
   useRewindParam,
 } from "@/components/shared/flow-focus-context";
 import { FlowDayMark, utcDay } from "@/components/shared/flow-day-mark";
 import { rewindEvents, rewindRows, timelineCut } from "@/lib/shared/flow-focus";
+import {
+  DATES_WAIT_MS,
+  resetMonthOnTie,
+  tieDropped,
+  timelineDates,
+  type TimelineDates,
+} from "@/lib/shared/timeline-dates";
+import { useHydrated } from "@/hooks/useHydrated";
 import { flowMoment } from "@/lib/shared/flow-moment";
 import { FlowMomentCard, type MomentNeighbour } from "@/components/shared/flow-moment-card";
 import { Link2, List, Lock, X } from "lucide-react";
@@ -123,7 +133,7 @@ import { MemberRevealContext } from "@/components/shared/group-frame";
 import type { DisplayedTimelineRow, TimelineAxesView, TimelineEventsState } from "@/hooks/useTimelineEvents";
 import { FolderMembersProvider, useFolderMembers, type FolderMembersReader } from "@/lib/shared/folder-members";
 import { filteredEventCount } from "@/lib/shared/timeline-folder-filter";
-import { PILL_NEUTRAL, PILL_SET_TONE } from "@/components/shared/filter-bar/filter-pill";
+import { FilterPillChip, PILL_NEUTRAL, PILL_SET_TONE } from "@/components/shared/filter-bar/filter-pill";
 import {
   folderAggregates,
   type FolderResponseId,
@@ -148,7 +158,7 @@ import type { EventPageContract, EventPageSlot } from "@/lib/shared/explorer-ada
 import { setCardOpen } from "@/lib/shared/card-open-store";
 import { IndexNotice } from "@/components/shared/index-notice";
 import { TimelineSearchedNotice, timelineSearched } from "@/components/shared/timeline-searched-notice";
-import type { TimelineLoadOlder } from "@/lib/shared/timeline-size";
+import { cutUnloadedWords, type TimelineLoadOlder } from "@/lib/shared/timeline-size";
 import { useChainId } from "@/lib/shared/chain-context";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { decodeEventId } from "@/lib/shared/page-metadata";
@@ -524,6 +534,10 @@ export interface ChainTruthTimelineProps {
    *  with the shared side column, from the family's contract
    *  (`lib/<family>/explorer.ts`). Unset, the route draws the pinned card. */
   eventPage?: (slot: EventPageSlot) => EventPageContract;
+  /** A row's event page where it lives on another position's page (the
+   *  Liquity V2 redeemer page's rows are Troves' events). Unset, it is this
+   *  page's `/event/<id>`. */
+  eventHref?: (id: string) => string | null;
   /** True once this position is closed/liquidated. Suppresses the pulsing
    *  "live" tip dot — the newest row is no longer a claim about an ongoing
    *  position. Does NOT touch which row IS the tip (numbering, the stale-tip
@@ -531,7 +545,7 @@ export interface ChainTruthTimelineProps {
    *  with no open/closed concept (a vault share-transfer timeline). */
   closed?: boolean;
   /** The SECOND PATH a month click in the Date panel can take, on a page that
-   *  can read a month from the index as its own segment (decision 0019,
+   *  can read a month from the index as a segment (decision 0019,
    *  amendment 2026-09-25). The page owns the segment and its reads; this
    *  component forwards the months to the panel and draws the skeleton while
    *  one is in flight.
@@ -769,6 +783,7 @@ function ChainTruthTimelineBody({
   csvExportCeiling,
   persistKeyPrefix,
   eventPage,
+  eventHref,
   closed,
   segments,
   spineKey,
@@ -846,8 +861,53 @@ function ChainTruthTimelineBody({
   useEffect(() => {
     for (const folder of unsettledFolders) folders.open(folder);
   }, [unsettledFolders, folders]);
+  // How this timeline picks a day (ui-jobs 764): where the Lifetime flows
+  // chart draws with its cursor tied here, by the chart ("Sync to chart", the
+  // cards' "View on chart") and no Date pill; elsewhere by the Date pill. Read
+  // from what the chart draws, held back while the page's panel reads.
+  const hydratedHere = useHydrated();
+  const tieStore = useFlowsStore();
+  const cursorDrawn = useFlowsStoreState((st) => st.cursor != null);
+  const flowsStanding = useFlowsStoreState((st) => st.flows);
+  // A panel still reading after DATES_WAIT_MS: the pill stands until a tie
+  // takes over, so the page is never without both it and "Sync to chart".
+  const [waitedOut, setWaitedOut] = useState(false);
+  const holding = tieStore != null && !cursorDrawn && !waitedOut;
+  useEffect(() => {
+    if (!holding) return;
+    const t = setTimeout(() => setWaitedOut(true), DATES_WAIT_MS);
+    return () => clearTimeout(t);
+  }, [holding]);
+  const datesBy = timelineDates(
+    tieStore ? { cursor: cursorDrawn ? true : null, flows: flowsStanding ?? null } : null,
+    hydratedHere,
+    waitedOut,
+  );
+  const chartTied = datesBy === "chart";
+  const { setTimelineDates } = tl;
+  useEffect(() => setTimelineDates(datesBy), [setTimelineDates, datesBy]);
+  // A tie that drops once it stood (the chart's cursor gone) takes its cut
+  // with it, in the store and in the address bar: no cut stands beside a
+  // Date pill with no "Sync to chart".
+  const lastDates = useRef<TimelineDates>(datesBy);
+  useEffect(() => {
+    if (tieDropped(lastDates.current, datesBy)) {
+      if (tieStore?.get().rewind) tieStore.set({ rewind: null });
+      try {
+        const url = new URL(window.location.href);
+        if (url.searchParams.has("to") && !url.searchParams.has("from")) {
+          url.searchParams.delete("to");
+          window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+        }
+      } catch {
+        /* non-fatal: the stale param stays in the link */
+      }
+    }
+    lastDates.current = datesBy;
+  }, [datesBy, tieStore]);
   const toolbarTl = useMemo<TimelineEventsState>(() => {
-    if (!servedRows || !tl.isFiltered) return tl;
+    const pill = tl.datesAxis && datesBy === "pill";
+    if (!servedRows || !tl.isFiltered) return pill === tl.datesAxis ? tl : { ...tl, datesAxis: pill };
     const { count, floor } = filteredEventCount(
       tl.filteredCount,
       servedRows.flatMap((row) => (row.kind === "folder" ? [{ folder: row.folder, matched: row.matched }] : [])),
@@ -857,8 +917,8 @@ function ChainTruthTimelineBody({
       },
       tl.memberPasses,
     );
-    return { ...tl, filteredCount: count, filteredCountIsFloor: floor };
-  }, [tl, servedRows, folders]);
+    return { ...tl, datesAxis: pill, filteredCount: count, filteredCountIsFloor: floor };
+  }, [tl, servedRows, folders, datesBy]);
 
   // What a Size or Type filter searched on a page holding fewer events than
   // the history (L11, ui-jobs 752 and 753).
@@ -1306,21 +1366,38 @@ function ChainTruthTimelineBody({
   // visitor left it. Where the page holds another month (a served,
   // month-navigated page) it reads the cut's month, and a line says so;
   // where a filter leaves the cut list empty the filters stay and the empty
-  // list says it (Miles, 1 Oct 2026). These
-  // pages have no Dates (`tl.datesAxis`): the cut is how they are navigated
-  // by day, and the address bar carries it (`useRewindParam`).
+  // list says it (Miles, 1 Oct 2026). A tied timeline has no Date pill
+  // (`chartTied`): the cut is how it is navigated by day, and the address bar
+  // carries it (`useRewindParam`). Every other keeps the Date pill and
+  // `?from=&to=`.
   const focusStore = useFlowFocus()?.store ?? null;
-  // Aave V4 on Base wears the provider without a series, so without the Show timeline button,
-  // and keeps Dates and its `?from=&to=`.
-  useRewindParam(tl.datesAxis ? null : focusStore);
-  useFollowPreference(tl.datesAxis ? null : focusStore);
+  useRewindParam(chartTied ? focusStore : null);
+  useFollowPreference(chartTied ? focusStore : null);
   const go = useFlowFocusState((st) => st.go);
   const [rewindNote, setRewindNote] = useState<string | null>(null);
   /** The month this code asked the page to read, and the cut it read for. */
   const askedMonth = useRef<number | null>(null);
   const askedCut = useRef<number | null>(null);
+  // A month the Date pill's grid read, or is reading, as a segment goes
+  // when the chart ties, since the pill that would clear it goes too; a month
+  // the cut asked for stays.
+  useEffect(() => {
+    if (
+      segments &&
+      resetMonthOnTie({
+        tied: chartTied,
+        month: segments.month,
+        loading: segments.loading,
+        askedByCut: askedMonth.current != null,
+      })
+    )
+      segments.onReset?.();
+    // Only the tie's arrival; `segments` is read at that moment.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chartTied]);
   // The chip's × releases the cut; while the timeline follows the chart it
   // also stops following, which leaves the list whole where the chart stands.
+  const syncRef = useRef<HTMLButtonElement>(null);
   const releaseRewind = useCallback(() => {
     if (!focusStore) return;
     const st = focusStore.get();
@@ -1331,7 +1408,6 @@ function ChainTruthTimelineBody({
   // chart is drawn, its cursor the one the timeline syncs to. A press cuts the
   // timeline at the cursor; a second press while that cut stands locks it to
   // the cursor ("Follows chart"); a press then unlocks, the cut kept.
-  const chartDrawn = useFlowFocusState((st) => st.cursor != null);
   const inSync = useFlowFocusState(
     (st) => st.cursor != null && (st.cursor.live ? st.rewind == null : st.rewind?.endTs === st.cursor.endTs),
   );
@@ -1341,8 +1417,9 @@ function ChainTruthTimelineBody({
   }, [inSync]);
   const synced = justSynced && inSync;
   const followToggle =
-    focusStore && chartDrawn && !tl.datesAxis ? (
+    focusStore && chartTied ? (
       <SyncChartButton
+        buttonRef={syncRef}
         state={following ? "follow" : synced ? "synced" : "off"}
         onPress={() => {
           const st = focusStore.get();
@@ -1369,14 +1446,35 @@ function ChainTruthTimelineBody({
     const topDay = segments ? newestLifeDayBefore(segments.lifeDays, cutTs) : null;
     if (segments && topDay == null) return `No events on or before ${word}.`;
     if (segments?.loading != null) return `Loading events to ${word}…`;
-    // A page with no month read (Liquity V2's newest 1,000 rows, Aave V4's
-    // newest window) cannot reach an older cut until decision 0039's
-    // point-in-time read (TO-DO-ui-jobs §141).
+    // A page with no month read (Liquity V2's newest rows, Aave V4's newest
+    // window): its older rows through `loadOlder` where it has one, else the
+    // oldest day it holds (TO-DO-ui-jobs §141, 762).
     if (!segments) {
       const oldest = tl.sortedEvents[0]?.timestamp;
-      return oldest != null
-        ? `Events on or before ${word} are not loaded on this page, which starts at ${shortDate(oldest)} ${shortDateYear(oldest)}.`
-        : `Events on or before ${word} are not loaded on this page.`;
+      const w = cutUnloadedWords({
+        word,
+        oldest: oldest != null ? `${shortDate(oldest)} ${shortDateYear(oldest)}` : null,
+        loadOlder: loadOlder?.state ?? null,
+        whole: boundary == null,
+      });
+      if (!w.load || !loadOlder) return w.text;
+      return (
+        <>
+          {w.text}{" "}
+          {w.load === "loading" ? (
+            <span className="text-rb-500">Loading the older events…</span>
+          ) : (
+            <button
+              type="button"
+              data-timeline-empty-load-older=""
+              onClick={loadOlder.load}
+              className="cursor-pointer text-teal-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-teal-400"
+            >
+              {w.load === "failed" ? "They did not load. Try again" : "Load the older events"}
+            </button>
+          )}
+        </>
+      );
     }
     return (
       <>
@@ -1824,7 +1922,7 @@ function ChainTruthTimelineBody({
   // `EventCard` reads this href into; it draws no page rows where there is
   // none.
   const shareHrefFor = (id: string) =>
-    `${positionPath}/event/${encodeURIComponent(id)}${subjectQuery ? `?${subjectQuery}` : ""}`;
+    eventHref?.(id) ?? `${positionPath}/event/${encodeURIComponent(id)}${subjectQuery ? `?${subjectQuery}` : ""}`;
 
   /** An `asOneEvent` run row is one card for one transaction, so it takes the
    *  wrappers a single card takes: the day prefix from its place in the flat
@@ -2136,18 +2234,57 @@ function ChainTruthTimelineBody({
           data-protocol-change-stated={placedChanges.stated || undefined}
         >
           {/* data-skel-section feeds the skeleton memory layer (skeleton-size-recorder). */}
-          <div data-skel-section="detail-timeline-header">
+          <div data-skel-section="detail-timeline-header" data-timeline-dates={still ? undefined : datesBy}>
             <TimelineToolbar
               tl={toolbarTl}
               displayItems={items}
               leading={toolbarLeading}
               beforeDisplay={followToggle}
+              datesHeld={datesBy === "waiting"}
+              cutPill={
+                rewind || following ? (
+                  // The chart's cut in the Date pill's slot, as a set filter
+                  // pill (ui-jobs 764): "Timeline to {day}" once "Sync to
+                  // chart" or the followed cursor cuts the list, "Following
+                  // the chart" while following with the cursor at today.
+                  <FilterPillChip
+                    icon={
+                      <Link2
+                        size={14}
+                        aria-hidden
+                        className="shrink-0 text-teal-700 dark:text-teal-300"
+                        {...(following ? { "data-flow-rewind-chain": "" } : {})}
+                      />
+                    }
+                    label={rewind ? "Timeline to" : undefined}
+                    value={rewind ? rewind.word : "Following the chart"}
+                    title={
+                      rewind
+                        ? `Bring the last event of ${rewind.word} into view`
+                        : "The timeline follows the chart's cursor"
+                    }
+                    removeLabel={following ? "Stop following the chart" : `Clear the cut at ${rewind?.word ?? ""}`}
+                    onPress={() => rewind && focusStore?.set({ go: focusStore.get().go + 1 })}
+                    onRemove={() => {
+                      releaseRewind();
+                      // The pill goes with the cut: focus lands on the
+                      // button that makes the next one.
+                      syncRef.current?.focus();
+                    }}
+                    data={{ "data-flow-rewind-chip": "", "data-anatomy": "N1.10 L2.1" }}
+                    pressData={{ "data-flow-rewind-go": "" }}
+                    removeData={{ "data-flow-rewind-release": "" }}
+                  />
+                ) : undefined
+              }
+              loadOlder={loadOlder}
               countDraft={countDraft}
               countTooltip={countTooltip}
               countDetail={countDetail}
               still={still}
-              // The Date button's panel hangs from the toolbar; the second path a
-              // month click can take travels to it here.
+              // The Date pill's panel hangs from the toolbar; the second path a
+              // month click can take travels to it here. A tied timeline draws
+              // no pill (`chartTied`), and the cut reads its month instead.
               monthReach={
                 segments
                   ? {
@@ -2161,51 +2298,14 @@ function ChainTruthTimelineBody({
             />
           </div>
           {searched && <TimelineSearchedNotice notice={searched} loadOlder={loadOlder} />}
-          {/* THE NARROWING ROW (L2): the cut's chip, while the chart cuts or
-            leads the list. The filters state themselves on their pills in the
-            toolbar (ui-jobs 735). No cut, no row. */}
-          {(rewind || following) && (
+          {/* THE NARROWING ROW (L2): the cut's note, where the cut read
+            another month or left the list empty. The cut itself is a pill in
+            the toolbar's filter row (L2.1, `cutPill`). */}
+          {rewind && rewindNote && (
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5" data-anatomy="L2" data-narrowing-row="">
-              {/* In the chart's teal: the cut is the Lifetime flows cursor's
-                day, or, following with the cursor at today, the chart it
-                follows. */}
-              <span
-                className="inline-flex items-center rounded-full bg-teal-500/15 text-xs text-teal-700 dark:text-teal-300"
-                data-flow-rewind-chip=""
-                data-anatomy="L2.1"
-              >
-                <button
-                  type="button"
-                  onClick={() => rewind && focusStore?.set({ go: focusStore.get().go + 1 })}
-                  title={
-                    rewind
-                      ? `Bring the last event of ${rewind.word} into view`
-                      : "The timeline follows the chart's cursor"
-                  }
-                  className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-l-full py-1 pl-2.5 pr-1.5 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:min-h-0"
-                  data-flow-rewind-go=""
-                >
-                  {/* The chain while the timeline follows the chart; a cut
-                      the one-shot button made, or one left standing once
-                      following stopped, reads without it. */}
-                  {following && <Link2 size={13} aria-hidden data-flow-rewind-chain="" />}
-                  {rewind ? `Timeline to ${rewind.word}` : "Following the chart"}
-                </button>
-                <button
-                  type="button"
-                  onClick={releaseRewind}
-                  aria-label={following ? "Stop following the chart" : `Clear the cut at ${rewind?.word ?? ""}`}
-                  className="inline-flex min-h-11 min-w-9 cursor-pointer items-center justify-center rounded-r-full pl-0.5 pr-1.5 transition-colors hover:bg-teal-500/20 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:min-h-0 sm:min-w-0 sm:py-1"
-                  data-flow-rewind-release=""
-                >
-                  <X className="size-3.5" aria-hidden />
-                </button>
-              </span>
-              {rewind && rewindNote && (
-                <p className="text-xs text-rb-500" data-flow-reveal-note="">
-                  {rewindNote}
-                </p>
-              )}
+              <p className="text-xs text-rb-500" data-flow-reveal-note="">
+                {rewindNote}
+              </p>
             </div>
           )}
           {notice}
@@ -2483,10 +2583,19 @@ function ChainTruthTimelineBody({
  *  moves ("Follows chart", the chain with a padlock, kept with Display's
  *  preferences as `followChart`); a press then unlocks it. Teal while locked,
  *  the engaged fill while synced; icon-only under 640px. */
-function SyncChartButton({ state, onPress }: { state: "off" | "synced" | "follow"; onPress: () => void }) {
+function SyncChartButton({
+  state,
+  onPress,
+  buttonRef,
+}: {
+  state: "off" | "synced" | "follow";
+  onPress: () => void;
+  buttonRef?: React.Ref<HTMLButtonElement>;
+}) {
   const on = state === "follow";
   return (
     <button
+      ref={buttonRef}
       type="button"
       aria-pressed={on}
       aria-label={on ? "Follows chart" : "Sync to chart"}

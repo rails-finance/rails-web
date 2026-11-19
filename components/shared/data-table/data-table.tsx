@@ -465,7 +465,8 @@ export function DataTableLeadCell({
           {protocolName} on {chainMeta(chain).name}
         </span>
         <span className="flex items-center gap-2.5 text-rb-500" aria-hidden>
-          <ProtocolIcon id={protocol} className="h-[18px] w-[18px] shrink-0 [&:is(img)]:grayscale" />
+          {/* An empty id is a vault no explorer deploys (sBOLD, ui-jobs 765): no mark. */}
+          {protocol && <ProtocolIcon id={protocol} className="h-[18px] w-[18px] shrink-0 [&:is(img)]:grayscale" />}
           <ChainGlyph id={chain} className="h-[18px] w-[18px] shrink-0" />
         </span>
       </DataTableCell>
@@ -494,7 +495,8 @@ export function DataTableLeadCell({
 export function DataTableLeadMark({ protocol, chain }: { protocol: string; chain: ChainId }) {
   return (
     <span className="dt-lead-mark shrink-0 items-center gap-1 text-rb-500" aria-hidden>
-      <ProtocolIcon id={protocol} className="h-4 w-4 shrink-0 [&:is(img)]:grayscale" />
+      {/* An empty id is a vault no explorer deploys (sBOLD, ui-jobs 765): no mark. */}
+      {protocol && <ProtocolIcon id={protocol} className="h-4 w-4 shrink-0 [&:is(img)]:grayscale" />}
       <ChainGlyph id={chain} className="h-4 w-4 shrink-0" />
     </span>
   );

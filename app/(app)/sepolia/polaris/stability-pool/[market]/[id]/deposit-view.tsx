@@ -21,7 +21,12 @@ import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { LifetimeFlowsPanel, type FlowsRead } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
-import { FlowFocusContext, useFlowFocusRoot, useFlowFocusValue } from "@/components/shared/flow-focus-context";
+import {
+  FlowFocusContext,
+  useFlowFocusRoot,
+  useFlowFocusValue,
+  FlowsStoreContext,
+} from "@/components/shared/flow-focus-context";
 import { CHAIN_TRUTH_DISPLAY_ITEMS, TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import { Prov } from "@/components/shared/provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
@@ -201,8 +206,6 @@ export default function DepositView({
     storageKey: `polaris-sp-${market}-${tokenId}`,
     protocolKey: "polaris-sp",
     olderCount,
-    // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
-    dates: false,
   });
   const boundary = useMemo(() => {
     const oldest = tl.sortedEvents[0];
@@ -251,126 +254,130 @@ export default function DepositView({
     );
 
   return (
-    <FlowFocusContext.Provider value={flows ? flowFocus : null}>
-      {/* The pETH bar is paid in, not owed: violet, apart from a debt's green
+    // The store from the first render, so the panel says it is reading and the
+    // timeline holds its Date pill back (FlowsStoreContext, ui-jobs 764).
+    <FlowsStoreContext.Provider value={flowFocus.store}>
+      <FlowFocusContext.Provider value={flows ? flowFocus : null}>
+        {/* The pETH bar is paid in, not owed: violet, apart from a debt's green
           (Miles, 17 Nov 2026). */}
-      <FlowHuesContext.Provider value={PAID_IN_HUES}>
-        <div className="py-8 space-y-6" style={PAID_IN_VARS}>
-          <DetailTopRow
-            session="polaris"
-            wallet={holder}
-            owner={{
-              wallet: holder,
-              pending: !chainSettled,
-              href: holder ? `${POLARIS_SP_PATH}?q=${holder}` : undefined,
-              wrap: chain?.owner
-                ? (pill) => (
-                    <Prov info={spLiveProv("owner", market)} value={chain.owner ?? undefined}>
-                      {pill}
-                    </Prov>
-                  )
-                : undefined,
-            }}
-            fallbackHref={POLARIS_SP_PATH}
-            assets={stripAssets}
-            closed={!open}
-            tools={false}
-          />
-          {!onEventPage && (
-            <>
-              <PolarisDepositCard
-                row={row}
-                lifetime={lifetime}
-                now={cardNow}
-                pending={open && !chainSettled}
-                explanation={
-                  <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed text-rb-500">
-                    <li>
-                      A deposit in the {stable.symbol} Stability Pool repays the debt of liquidated positions. Each
-                      liquidation burns a share of every deposit and pays pETH in its place.
-                    </li>
-                    <li>The deposit now and the pending gains are the pool&rsquo;s current figures.</li>
-                    <li>
-                      The deposit also earns {stable.symbol} yield; what a touch does not claim stays in the deposit.
-                    </li>
-                  </ul>
-                }
-              />
-              <LifetimeFlowsPanel
-                scrubber={flows ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
-                read={flowsRead}
-                explanation={
-                  <div className="space-y-2 text-sm text-rb-500">
-                    <PolarisDepositFlowsNote stable={stable.symbol} />
-                  </div>
-                }
-                learnMore={polarisDepositFlowsContent(stable.symbol)}
-              />
-            </>
-          )}
-          {(failed || pinnedUnread) && (
-            <p className="text-sm text-rb-500">The operations could not be read just now.</p>
-          )}
-          {pinnedWaits ? (
-            <DetailBodySkeleton />
-          ) : pinnedUnread ? null : (
-            <ChainTruthTimeline
-              persistKeyPrefix="polaris-sp"
-              closed={!open}
-              tl={tl}
-              boundary={boundary}
-              displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
-              emptyLabel="No operations recorded for this deposit"
-              toolbarLeading={
-                <TimelineActivityHeader
-                  events={events}
-                  closed={!open}
-                  firstAt={Number(row.first_timestamp)}
-                  tenurePending={false}
-                />
-              }
-              liveWindow={
-                now && lifetime && chain
-                  ? () => (
-                      <PolarisDepositSinceTouchRow
-                        market={market}
-                        recorded={lifetime.recorded}
-                        burned={now.pendingLoss}
-                        now={now.now}
-                        gain={now.pendingStable}
-                        stashed={lifetime.stashed}
-                        paidIn={now.bcSinceTouch}
-                        feed={feed}
-                        fromBlock={Number(lastTouch?.block_number ?? row.last_block)}
-                        fromAt={Number(lastTouch?.block_timestamp ?? row.last_timestamp)}
-                        toAt={chain.blockTimestamp}
-                        headBlock={chain.blockNumber}
-                        sinceOpen={sinceOpen}
-                      />
+        <FlowHuesContext.Provider value={PAID_IN_HUES}>
+          <div className="py-8 space-y-6" style={PAID_IN_VARS}>
+            <DetailTopRow
+              session="polaris"
+              wallet={holder}
+              owner={{
+                wallet: holder,
+                pending: !chainSettled,
+                href: holder ? `${POLARIS_SP_PATH}?q=${holder}` : undefined,
+                wrap: chain?.owner
+                  ? (pill) => (
+                      <Prov info={spLiveProv("owner", market)} value={chain.owner ?? undefined}>
+                        {pill}
+                      </Prov>
                     )
-                  : undefined
-              }
-              eventPage={(slot) =>
-                polarisDepositEventPage({ ...slot, market, tokenId, holder, row: rowById.get(slot.event.id) })
-              }
-              renderCard={(event, meta) => {
-                const r = rowById.get(event.id);
-                return r ? (
-                  <PolarisDepositEventCard
-                    row={r}
-                    isLast={meta.isLast}
-                    eventNumber={meta.eventNumber}
-                    holder={row.holder}
-                    vaultHeld={row.vault_held}
-                  />
-                ) : null;
+                  : undefined,
               }}
+              fallbackHref={POLARIS_SP_PATH}
+              assets={stripAssets}
+              closed={!open}
+              tools={false}
             />
-          )}
-          <ProvInspectorLayer />
-        </div>
-      </FlowHuesContext.Provider>
-    </FlowFocusContext.Provider>
+            {!onEventPage && (
+              <>
+                <PolarisDepositCard
+                  row={row}
+                  lifetime={lifetime}
+                  now={cardNow}
+                  pending={open && !chainSettled}
+                  explanation={
+                    <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed text-rb-500">
+                      <li>
+                        A deposit in the {stable.symbol} Stability Pool repays the debt of liquidated positions. Each
+                        liquidation burns a share of every deposit and pays pETH in its place.
+                      </li>
+                      <li>The deposit now and the pending gains are the pool&rsquo;s current figures.</li>
+                      <li>
+                        The deposit also earns {stable.symbol} yield; what a touch does not claim stays in the deposit.
+                      </li>
+                    </ul>
+                  }
+                />
+                <LifetimeFlowsPanel
+                  scrubber={flows ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
+                  read={flowsRead}
+                  explanation={
+                    <div className="space-y-2 text-sm text-rb-500">
+                      <PolarisDepositFlowsNote stable={stable.symbol} />
+                    </div>
+                  }
+                  learnMore={polarisDepositFlowsContent(stable.symbol)}
+                />
+              </>
+            )}
+            {(failed || pinnedUnread) && (
+              <p className="text-sm text-rb-500">The operations could not be read just now.</p>
+            )}
+            {pinnedWaits ? (
+              <DetailBodySkeleton />
+            ) : pinnedUnread ? null : (
+              <ChainTruthTimeline
+                persistKeyPrefix="polaris-sp"
+                closed={!open}
+                tl={tl}
+                boundary={boundary}
+                displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
+                emptyLabel="No operations recorded for this deposit"
+                toolbarLeading={
+                  <TimelineActivityHeader
+                    events={events}
+                    closed={!open}
+                    firstAt={Number(row.first_timestamp)}
+                    tenurePending={false}
+                  />
+                }
+                liveWindow={
+                  now && lifetime && chain
+                    ? () => (
+                        <PolarisDepositSinceTouchRow
+                          market={market}
+                          recorded={lifetime.recorded}
+                          burned={now.pendingLoss}
+                          now={now.now}
+                          gain={now.pendingStable}
+                          stashed={lifetime.stashed}
+                          paidIn={now.bcSinceTouch}
+                          feed={feed}
+                          fromBlock={Number(lastTouch?.block_number ?? row.last_block)}
+                          fromAt={Number(lastTouch?.block_timestamp ?? row.last_timestamp)}
+                          toAt={chain.blockTimestamp}
+                          headBlock={chain.blockNumber}
+                          sinceOpen={sinceOpen}
+                        />
+                      )
+                    : undefined
+                }
+                eventPage={(slot) =>
+                  polarisDepositEventPage({ ...slot, market, tokenId, holder, row: rowById.get(slot.event.id) })
+                }
+                renderCard={(event, meta) => {
+                  const r = rowById.get(event.id);
+                  return r ? (
+                    <PolarisDepositEventCard
+                      row={r}
+                      isLast={meta.isLast}
+                      eventNumber={meta.eventNumber}
+                      holder={row.holder}
+                      vaultHeld={row.vault_held}
+                    />
+                  ) : null;
+                }}
+              />
+            )}
+            <ProvInspectorLayer />
+          </div>
+        </FlowHuesContext.Provider>
+      </FlowFocusContext.Provider>
+    </FlowsStoreContext.Provider>
   );
 }
 

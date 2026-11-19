@@ -49,10 +49,9 @@ export function LiquityFlowsNote({
         {daily
           ? "Between the Trove's events its collateral is valued at the branch's price at each day's close: the last price any Trove's operation on the branch recorded that day. A day no Trove touched keeps the day before's."
           : "No daily price is recorded for the branch yet, so between the Trove's events its collateral keeps the price of its latest event, and a price more than 30 days old is stated as such."}
-        {unpriced === 1 &&
-          " One of its events carries no price of its own; its flows take the nearest price before it."}
+        {unpriced === 1 && " One of its events carries no price; its flows take the nearest price before it."}
         {unpriced > 1 &&
-          ` ${unpriced.toLocaleString("en-US")} of its events carry no price of their own; their flows take the nearest price before them.`}
+          ` ${unpriced.toLocaleString("en-US")} of its events carry no price; their flows take the nearest price before them.`}
       </p>
       <p>
         The bars and the sums cover every life of this Trove: a closed life&apos;s flows stay in the bars and the line

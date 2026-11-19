@@ -19,6 +19,8 @@ import { amountText, priceText } from "@/lib/shared/holder-usd-receipt";
 import { LIQUITY_V1_ADDRESSES } from "./asset-catalog";
 import { ratioConstantProv } from "./position-provenance";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { priceCell } from "@/lib/shared/sheet-usd-rows";
+import { faceRows } from "@/lib/shared/flows-timeline-provenance";
 
 const TROVE_MANAGER = { name: "Liquity V1 TroveManager", address: LIQUITY_V1_ADDRESSES.TROVE_MANAGER };
 
@@ -660,11 +662,11 @@ export const sheetMoveUsdProv = (coords: LiquityV1Coords, vals: { amount: string
 });
 
 /** Debt an event moved, in dollars, at LUSD's $1 face. */
-export const sheetFaceUsdProv = (what: string, amount: string): Provenance => ({
+export const sheetFaceUsdProv = (what: string, amount: string | number): Provenance => ({
   kind: "chain-derived",
   summary: `${what}, in USD — the LUSD counted at the $1 redemption face value the protocol uses.`,
   formula: "LUSD × $1",
-  inputs: [{ label: "LUSD", value: amount, kind: "chain" }],
+  inputs: faceRows("LUSD", amount, { label: "LUSD" }),
 });
 
 /** The debt a full redemption cancelled, in its two parts. */
@@ -733,3 +735,23 @@ export const sheetToMinimumChangeProv = (): Provenance =>
 export const minimumRatioProv = (): Provenance => ratioConstantProv("Minimum collateral ratio (MCR), 110%", "MCR");
 export const recoveryRatioProv = (): Provenance =>
   ratioConstantProv("Critical collateral ratio (CCR), 150%, the system ratio below which Recovery Mode starts", "CCR");
+
+/** ETH's dollars on the V1 sheet (ui-jobs 743): the amount × the PriceFeed's
+ *  price as shown, named at the event's block, to the cent. */
+export function liquityV1EthUsdCell(
+  what: "move" | "before" | "after",
+  amount: number,
+  price: number | null,
+  block: number | null,
+) {
+  const at = block != null ? ` at block ${block.toLocaleString("en-US")}` : " at this event's block";
+  return priceCell(
+    what === "move"
+      ? "ETH moved, in USD"
+      : what === "before"
+        ? "Collateral before this event, in USD"
+        : "Collateral after this event, in USD",
+    { symbol: "ETH", amount, price, block, priceNote: `Liquity V1's PriceFeed, ETH/USD${at}` },
+    { amountNote: "as the event's row states it", via: "the PriceFeed at the event's block" },
+  );
+}

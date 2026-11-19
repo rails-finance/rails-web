@@ -103,6 +103,7 @@ export function liquityV1FlowTxs(events: BaseActivityEvent[], cap = 250): string
 
 export function liquityV1FlowEvents(input: LiquityV1FlowInput): LiquityV1FlowEvents {
   const daily = new Map((input.daily ?? []).map(([d, usd]) => [d, usd]));
+  const dailyBlock = new Map((input.daily ?? []).map(([d, , block]) => [d, block ?? null]));
   const prices = { block: 0, dayClose: 0, nearest: 0 };
   let feesUnread = 0;
   let redistributions = 0;
@@ -183,6 +184,17 @@ export function liquityV1FlowEvents(input: LiquityV1FlowInput): LiquityV1FlowEve
       debtFromRedist: redistDebt,
       surplus,
       price: price != null && price > 0 ? price : null,
+      // A day V1 has no read for takes Liquity V2's WETH close: the
+      // day-close basis, its block and the event's named (ui-jobs 743).
+      ...(!(own != null && own > 0) && dayClose != null
+        ? {
+            priceFrom: {
+              source: "v2-weth-day" as const,
+              day: Math.floor(e.timestamp / DAY_S),
+              block: dailyBlock.get(Math.floor(e.timestamp / DAY_S)) ?? null,
+            },
+          }
+        : {}),
       rate: 0,
       fee: 0,
       ...(reserve !== 0 ? { reserve } : {}),

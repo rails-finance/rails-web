@@ -10,6 +10,7 @@
 // The ledger (lib/spark/economics.ts) counts with the same classifier,
 // `sparkEventLegs`, so its in and out meet the bars at the live stop.
 
+import { AAVE_V3_SERVED_NOTE, aaveV3PriceNote } from "@/lib/aave-v3/price-notes";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isSparkEvent } from "@/lib/shared/types/event-shape";
 import type { ChainTruthTowerData } from "@/lib/shared/chain-truth-economics";
@@ -166,7 +167,12 @@ export function sparkFocusEvents(
     (a, b) => a.timestamp - b.timestamp || a.blockNumber - b.blockNumber,
   );
   const liqTxs = sparkLiquidationTxs(ordered);
-  return focusEventsFromLegs(ordered, (ev) => sparkFlowLegs(ev, liqTxs), todayPrices);
+  return focusEventsFromLegs(ordered, (ev) => sparkFlowLegs(ev, liqTxs), todayPrices, sparkLegPriceNote);
+}
+
+/** A SparkLend leg's price: SparkLend's AaveOracle at the event's block. */
+function sparkLegPriceNote(l: { symbol: string }, block: number): string {
+  return aaveV3PriceNote("SparkLend's AaveOracle", l.symbol, block);
 }
 
 /** The scrubber's timeline from the index's day rows. */
@@ -180,5 +186,6 @@ export function sparkFlowSeriesTimeline(
     AAVE_V3_FLOW_BUCKETS,
     tower?.valued === true ? aaveV3FlowLive(tower) : null,
     todayPrices,
+    AAVE_V3_SERVED_NOTE,
   );
 }

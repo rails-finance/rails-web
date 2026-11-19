@@ -202,3 +202,13 @@ test("an event receipt names the cap where it binds; the today note with no bloc
   assert.equal(makerRowPriceNote({ from: "today", block: null }), "the live read's price, which names no block");
   assert.match(makerRowPriceNote({ from: "today", block: 5, capped: true }), /capped price/);
 });
+
+const { atBlockPriceProv } = await import(ROOT + "lib/makerdao/event-provenance.ts");
+
+test("the grab block's price is stated with par, its block named", () => {
+  const p = atBlockPriceProv("ETH", { blockNumber: 22_000_000 }, 3012.4567891);
+  assert.equal(p.formula, MAKER_PRICE_FORMULA);
+  assert.match(p.formula, /Spotter\.par/);
+  assert.equal(p.inputs[0].value, "$3,012.456789");
+  assert.match(p.inputs[0].note, /at block 22,000,000/);
+});

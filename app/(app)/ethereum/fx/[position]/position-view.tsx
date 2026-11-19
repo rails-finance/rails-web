@@ -350,8 +350,6 @@ export default function FxPositionView({
     storageKey: `fx-${slug}`,
     protocolKey: "fx",
     window: historyWindow,
-    // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
-    dates: false,
   });
 
   // On a windowed page the row count reads the MERGED history: unknown until
@@ -409,7 +407,7 @@ export default function FxPositionView({
           price: Number(settledPx.anchorPrice) / 1e18,
           label: `${view.normalizedSymbol} · anchor price`,
           ...(view.settled.block != null
-            ? { info: oracleLegAtProv("anchor", view.normalizedSymbol, view.settled.block) }
+            ? { info: oracleLegAtProv(view.pool, "anchor", view.normalizedSymbol, view.settled.block) }
             : {}),
         },
       ];
@@ -422,7 +420,7 @@ export default function FxPositionView({
         symbol: view.normalizedSymbol,
         price: view.oracle.priceUsd,
         ...(minAtSettled
-          ? { info: oracleLegAtProv("min", view.normalizedSymbol, view.oracle.priceBlock as number) }
+          ? { info: oracleLegAtProv(view.pool, "min", view.normalizedSymbol, view.oracle.priceBlock as number) }
           : {}),
       },
     ];
@@ -610,6 +608,7 @@ export default function FxPositionView({
                 normalizedSymbol={view.normalizedSymbol}
                 blockDates={blockDates}
                 inTx={inTxFunding}
+                pool={view.pool}
               />
             )}
             {/* Chain-only positions: the contract minted them via a path that

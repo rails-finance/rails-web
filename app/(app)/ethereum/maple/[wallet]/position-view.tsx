@@ -312,8 +312,6 @@ export default function MaplePositionView({
     folderParams: { wallet },
     storageKey: `maple-${wallet}`,
     protocolKey: "maple",
-    // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
-    dates: false,
   });
 
   // Who executed this account's events — the SAME verdict each event card

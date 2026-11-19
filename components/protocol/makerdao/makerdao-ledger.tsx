@@ -57,7 +57,14 @@ function MakerLedger({ side, eventId, eventTs }: { side: FlowSide; eventId: stri
     side,
     ev,
     sum,
-    usd: rows ? { lines: rows.lines, dollars: rows.total.dollars, before: f.before } : null,
+    usd: rows
+      ? {
+          lines: rows.lines,
+          dollars: rows.total.dollars,
+          before: f.before,
+          ...(rows.total.cents != null ? { cents: rows.total.cents } : {}),
+        }
+      : null,
   });
   const at = `this event (${dayStamp(eventTs)})`;
   const held: FlowSegment = {

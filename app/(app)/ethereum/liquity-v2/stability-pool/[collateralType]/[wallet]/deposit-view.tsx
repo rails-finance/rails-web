@@ -19,11 +19,17 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useParams } from "next/navigation";
 import { FlowHuesContext, PAID_IN_HUES } from "@/components/shared/lifetime-flows-tip";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
+import { sboldDepositorVault } from "@/lib/liquity-v2/sbold";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { LifetimeFlowsPanel, type FlowsRead } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
-import { FlowFocusContext, useFlowFocusRoot, useFlowFocusValue } from "@/components/shared/flow-focus-context";
+import {
+  FlowFocusContext,
+  useFlowFocusRoot,
+  useFlowFocusValue,
+  FlowsStoreContext,
+} from "@/components/shared/flow-focus-context";
 import { CHAIN_TRUTH_DISPLAY_ITEMS, TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
@@ -232,8 +238,6 @@ export default function DepositView({
     protocolKey: "liquity-v2-sp",
     olderCount,
     size: sizeDims,
-    // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
-    dates: false,
   });
   const boundary = useMemo(() => {
     const oldest = tl.sortedEvents[0];
@@ -282,131 +286,139 @@ export default function DepositView({
     );
 
   return (
-    <FlowFocusContext.Provider value={flows ? flowFocus : null}>
-      {/* The collateral bar is paid in: violet, as on Polaris's deposit
+    // The store from the first render, so the panel says it is reading and the
+    // timeline holds its Date pill back (FlowsStoreContext, ui-jobs 764).
+    <FlowsStoreContext.Provider value={flowFocus.store}>
+      <FlowFocusContext.Provider value={flows ? flowFocus : null}>
+        {/* The collateral bar is paid in: violet, as on Polaris's deposit
           (Miles, 17 Nov 2026). */}
-      <FlowHuesContext.Provider value={PAID_IN_HUES}>
-        <div className="py-8 space-y-6" style={PAID_IN_VARS}>
-          <DetailTopRow
-            session="liquity-v2"
-            wallet={depositor}
-            owner={{ wallet: depositor, href: `${LIQUITY_V2_SP_PATH}?q=${depositor}` }}
-            fallbackHref={LIQUITY_V2_SP_PATH}
-            assets={stripAssets}
-            priceReason={boldPriceReason(boldPrice)}
-            closed={!open}
-            tools={false}
-          />
-          {!onEventPage && (
-            <>
-              <LiquityV2DepositCard
-                row={row}
-                lifetime={lifetime}
-                now={cardNow}
-                pending={open && !chainSettled}
-                pool={
-                  chain?.totalDepositsRaw != null
-                    ? { totalRaw: BigInt(chain.totalDepositsRaw), block: chain.blockNumber }
-                    : null
-                }
-                explanation={
-                  <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed text-rb-500">
-                    <li>
-                      A deposit in the {branch} Stability Pool repays the BOLD debt of liquidated {branch} Troves. Each
-                      liquidation burns a share of every deposit and pays {branch} in its place.
-                    </li>
-                    <li>
-                      The branch&rsquo;s interest pays the pool a BOLD yield. A touch that claims sends the yield and
-                      the {branch}; one that does not adds the yield to the deposit and stashes the {branch}.
-                    </li>
-                    <li>The deposit now and the pending gains are the pool&rsquo;s current figures.</li>
-                  </ul>
-                }
-              />
-              <LifetimeFlowsPanel
-                scrubber={flows ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
-                read={flowsRead}
-                explanation={
-                  <div className="space-y-2 text-sm text-rb-500">
-                    <LiquityV2DepositFlowsNote coll={branch} />
-                  </div>
-                }
-                learnMore={liquityV2DepositFlowsContent(branch)}
-              />
-            </>
-          )}
-          {(failed || pinnedUnread) && (
-            <p className="text-sm text-rb-500">The operations could not be read just now.</p>
-          )}
-          {pinnedWaits ? (
-            <DetailBodySkeleton />
-          ) : pinnedUnread ? null : (
-            <ChainTruthTimeline
-              persistKeyPrefix="liquity-v2-sp"
-              closed={!open}
-              tl={tl}
-              boundary={boundary}
-              // The whole life is read on arrival up to SP_WHOLE_LIFE_READ: the
-              // cut-page notice says so while it is in flight.
-              loadOlder={lifePending ? { state: "loading", load: () => {} } : undefined}
-              displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
-              emptyLabel="No operations recorded for this deposit"
-              notes={liqNotesShown}
-              toolbarLeading={
-                <TimelineActivityHeader
-                  events={events}
-                  closed={!open}
-                  firstAt={Number(row.first_timestamp)}
-                  tenurePending={false}
-                />
-              }
-              liveWindow={
-                now && lifetime && chain
-                  ? () => (
-                      <LiquityV2DepositSinceTouchRow
-                        branch={branch}
-                        recorded={lifetime.recorded}
-                        burned={now.pendingLoss}
-                        now={now.now}
-                        gain={now.pendingYield}
-                        stash={lifetime.stash}
-                        paidIn={now.collSinceTouch}
-                        price={price}
-                        priceStale={chain.priceStale}
-                        fromBlock={Number(lastTouch?.block_number ?? row.last_block)}
-                        fromAt={Number(lastTouch?.block_timestamp ?? row.last_timestamp)}
-                        toAt={chain.blockTimestamp}
-                        headBlock={chain.blockNumber}
-                        sinceOpen={sinceOpen}
-                        liquidations={
-                          openStretch && liqRead ? (
-                            <SpOpenStretchLiquidations
-                              branch={branch}
-                              stretch={openStretch}
-                              servedThru={liqRead.served_thru_block}
-                              check={spBranchCheck(liqRead)}
-                            />
-                          ) : undefined
-                        }
-                      />
-                    )
-                  : undefined
-              }
-              eventPage={(slot) =>
-                liquityV2DepositEventPage({ ...slot, branch, depositor, row: rowById.get(slot.event.id) })
-              }
-              renderCard={(event, meta) => {
-                const r = rowById.get(event.id);
-                return r ? (
-                  <LiquityV2DepositEventCard row={r} isLast={meta.isLast} eventNumber={meta.eventNumber} />
-                ) : null;
+        <FlowHuesContext.Provider value={PAID_IN_HUES}>
+          <div className="py-8 space-y-6" style={PAID_IN_VARS}>
+            <DetailTopRow
+              session="liquity-v2"
+              wallet={depositor}
+              owner={{
+                wallet: depositor,
+                href: `${LIQUITY_V2_SP_PATH}?q=${depositor}`,
+                vault: sboldDepositorVault(depositor),
               }}
+              fallbackHref={LIQUITY_V2_SP_PATH}
+              assets={stripAssets}
+              priceReason={boldPriceReason(boldPrice)}
+              closed={!open}
+              tools={false}
             />
-          )}
-          <ProvInspectorLayer />
-        </div>
-      </FlowHuesContext.Provider>
-    </FlowFocusContext.Provider>
+            {!onEventPage && (
+              <>
+                <LiquityV2DepositCard
+                  row={row}
+                  lifetime={lifetime}
+                  now={cardNow}
+                  pending={open && !chainSettled}
+                  pool={
+                    chain?.totalDepositsRaw != null
+                      ? { totalRaw: BigInt(chain.totalDepositsRaw), block: chain.blockNumber }
+                      : null
+                  }
+                  explanation={
+                    <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed text-rb-500">
+                      <li>
+                        A deposit in the {branch} Stability Pool repays the BOLD debt of liquidated {branch} Troves.
+                        Each liquidation burns a share of every deposit and pays {branch} in its place.
+                      </li>
+                      <li>
+                        The branch&rsquo;s interest pays the pool a BOLD yield. A touch that claims sends the yield and
+                        the {branch}; one that does not adds the yield to the deposit and stashes the {branch}.
+                      </li>
+                      <li>The deposit now and the pending gains are the pool&rsquo;s current figures.</li>
+                    </ul>
+                  }
+                />
+                <LifetimeFlowsPanel
+                  scrubber={flows ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
+                  read={flowsRead}
+                  explanation={
+                    <div className="space-y-2 text-sm text-rb-500">
+                      <LiquityV2DepositFlowsNote coll={branch} />
+                    </div>
+                  }
+                  learnMore={liquityV2DepositFlowsContent(branch)}
+                />
+              </>
+            )}
+            {(failed || pinnedUnread) && (
+              <p className="text-sm text-rb-500">The operations could not be read just now.</p>
+            )}
+            {pinnedWaits ? (
+              <DetailBodySkeleton />
+            ) : pinnedUnread ? null : (
+              <ChainTruthTimeline
+                persistKeyPrefix="liquity-v2-sp"
+                closed={!open}
+                tl={tl}
+                boundary={boundary}
+                // The whole life is read on arrival up to SP_WHOLE_LIFE_READ: the
+                // cut-page notice says so while it is in flight.
+                loadOlder={lifePending ? { state: "loading", load: () => {} } : undefined}
+                displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
+                emptyLabel="No operations recorded for this deposit"
+                notes={liqNotesShown}
+                toolbarLeading={
+                  <TimelineActivityHeader
+                    events={events}
+                    closed={!open}
+                    firstAt={Number(row.first_timestamp)}
+                    tenurePending={false}
+                  />
+                }
+                liveWindow={
+                  now && lifetime && chain
+                    ? () => (
+                        <LiquityV2DepositSinceTouchRow
+                          branch={branch}
+                          recorded={lifetime.recorded}
+                          burned={now.pendingLoss}
+                          now={now.now}
+                          gain={now.pendingYield}
+                          stash={lifetime.stash}
+                          paidIn={now.collSinceTouch}
+                          price={price}
+                          priceStale={chain.priceStale}
+                          fromBlock={Number(lastTouch?.block_number ?? row.last_block)}
+                          fromAt={Number(lastTouch?.block_timestamp ?? row.last_timestamp)}
+                          toAt={chain.blockTimestamp}
+                          headBlock={chain.blockNumber}
+                          sinceOpen={sinceOpen}
+                          liquidations={
+                            openStretch && liqRead ? (
+                              <SpOpenStretchLiquidations
+                                branch={branch}
+                                stretch={openStretch}
+                                servedThru={liqRead.served_thru_block}
+                                check={spBranchCheck(liqRead)}
+                              />
+                            ) : undefined
+                          }
+                        />
+                      )
+                    : undefined
+                }
+                eventPage={(slot) =>
+                  liquityV2DepositEventPage({ ...slot, branch, depositor, row: rowById.get(slot.event.id) })
+                }
+                renderCard={(event, meta) => {
+                  const r = rowById.get(event.id);
+                  return r ? (
+                    <LiquityV2DepositEventCard row={r} isLast={meta.isLast} eventNumber={meta.eventNumber} />
+                  ) : null;
+                }}
+              />
+            )}
+            <ProvInspectorLayer />
+          </div>
+        </FlowHuesContext.Provider>
+      </FlowFocusContext.Provider>
+    </FlowsStoreContext.Provider>
   );
 }
 

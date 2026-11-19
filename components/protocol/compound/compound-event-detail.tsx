@@ -10,6 +10,7 @@
 // behind the assets' icons, as the cToken cards do. The absorb breakdown and
 // the rate note stand under the grid as notes.
 
+import { cometNoDollarLine } from "@/lib/compound/comet-price-notes";
 import { useContext, type ReactNode } from "react";
 import { unreadBalanceText, useCompoundBalanceRead } from "./balance-read";
 import type { CompoundContext } from "@/lib/shared/types/event-shape";
@@ -29,10 +30,9 @@ import {
 } from "@/components/protocol/compound/compound-absorb-breakdown";
 import { compoundAmount, compoundBaseBefore, impliedYearlyRate, isBaseDust } from "@/lib/compound/row-facts";
 import { compoundSideBalances } from "@/lib/compound/flows";
-import { decimalSub, formatUsdValue } from "@/lib/utils/format";
+import { decimalSub } from "@/lib/utils/format";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
 import {
-  absorbPriceProv,
   baseAfterProv,
   baseInterestProv,
   collateralAfterProv,
@@ -280,7 +280,24 @@ export function useCompoundCells({
     const held = side === "collateral" ? [collStat(), baseStat("collateral")] : [baseStat("debt")];
     const chain = held.filter((st): st is ChainTruthStat => st != null);
     stated.push(...chain);
-    if (sb && sb.balances.length > 1) {
+    if (sb && sb.balances.length > 1 && sb.held == null) {
+      // A held asset with no price: the cell names it, and draws no dollars.
+      const line = cometNoDollarLine(sb.balances.filter((b) => b.price == null && b.amount > 0).map((b) => b.symbol));
+      direct[side] = {
+        kind: "ledger",
+        side,
+        key: side,
+        label: SIDE_NAME[side],
+        changed: sb.balances.some((b) => Math.abs(b.amount - b.before) > 1e-12),
+        value: {
+          cluster: sb.balances.map((b) => b.symbol),
+          after: { text: line, info: { kind: "derived", summary: `${SIDE_NAME[side]} at this event: ${line}.` } },
+        },
+      };
+      continue;
+    }
+    if (sb && sb.balances.length > 1 && sb.held != null) {
+      const heldUsd = sb.held;
       // Several assets: the side's dollars before → after, behind their icons.
       const moved = sb.balances.some((b) => Math.abs(b.amount - b.before) > 1e-12);
       const usdText = (v: number) => (v < 0.005 ? "$0" : fmtPositionUsd(v));
@@ -293,10 +310,10 @@ export function useCompoundCells({
         value: {
           cluster: sb.balances.map((b) => b.symbol),
           before:
-            moved && Math.round(sb.heldBefore) !== Math.round(sb.held)
+            moved && sb.heldBefore != null && Math.round(sb.heldBefore) !== Math.round(heldUsd)
               ? { text: usdText(sb.heldBefore), info: replayHeldProv(side, true, coords) }
               : undefined,
-          after: { text: usdText(sb.held), info: replayHeldProv(side, false, coords) },
+          after: { text: usdText(heldUsd), info: replayHeldProv(side, false, coords) },
         },
         sub: chain.flatMap((st) =>
           st.interestSincePrevious ? [{ content: <InterestLine stat={st} />, changed: false }] : [],
@@ -364,24 +381,16 @@ export function useCompoundCells({
   });
 
   // ── The price row: the moved asset's price at the block, where the
-  // replay read it there or an absorb states it.
+  // replay read it there (an absorb's too: the pill and its receipt are the
+  // getPrice read). An absorb whose block was not read draws no pill.
   const prices: EventPriceChip[] = [];
   const row = rp?.replayed.find((r) => r.ev.id === eventId);
   if (row && row.own.has(row.ev.token) && row.price[row.ev.token] > 0) {
-    const usd = row.price[row.ev.token];
-    const absorb = ctx.eventType === "absorb_debt" || ctx.eventType === "absorb_collateral";
     prices.push({
       symbol: ctx.assetSymbol,
-      usd,
-      display: formatUsdValue(usd),
-      info:
-        absorb && ctx.usdValue != null
-          ? absorbPriceProv(ctx.assetSymbol, coords, {
-              amount: ctx.assetsDelta.replace(/^-/, ""),
-              usdValue: ctx.usdValue,
-            })
-          : cometPriceAtBlockProv(ctx.assetSymbol, coords),
-      title: `${ctx.assetSymbol} price at this event: ${absorb ? "the absorb's value over its amount" : `${m.label}'s price feed at block ${blockNumber?.toLocaleString("en-US") ?? ""}`}`,
+      usd: row.price[row.ev.token],
+      info: cometPriceAtBlockProv(ctx.assetSymbol, coords),
+      title: `${ctx.assetSymbol} price at this event: ${m.label}'s price feed at block ${blockNumber?.toLocaleString("en-US") ?? ""}`,
     });
   }
 
@@ -443,6 +452,7 @@ export function useCompoundCells({
             marketKey={m.key}
             timestamp={timestamp}
             previous={previousTx}
+            footnote={prices.length === 0}
           />
         )}
       </>

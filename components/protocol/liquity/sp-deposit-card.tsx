@@ -21,6 +21,7 @@ import {
 } from "@/components/shared/position-card";
 import { Prov } from "@/components/shared/provenance";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
+import { sboldDepositorVault } from "@/lib/liquity-v2/sbold";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { ListingTag } from "@/components/shared/listing-tag";
 import { PositionNameId } from "@/components/shared/position-name-id";
@@ -133,7 +134,13 @@ export function liquityV2DepositSlots({
       status,
       heads,
       identity: (
-        <WalletPill wallet={row.depositor} ensName={null} href={`${LIQUITY_V2_SP_PATH}?q=${row.depositor}`} bookmark />
+        <WalletPill
+          wallet={row.depositor}
+          ensName={null}
+          href={`${LIQUITY_V2_SP_PATH}?q=${row.depositor}`}
+          vault={sboldDepositorVault(row.depositor)}
+          bookmark
+        />
       ),
       counters,
       name,

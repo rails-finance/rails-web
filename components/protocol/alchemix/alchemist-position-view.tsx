@@ -80,6 +80,7 @@ import { isAlchemistEvent, isAlchemixV2Event } from "@/lib/shared/types/event-sh
 import { AlchemixV2EventCard, type AlchemixV2Event } from "@/components/protocol/alchemix/v2-event-card";
 import { lineProtocolFeeStep, v2PositionPath, v3PositionPath } from "@/lib/alchemix/lines";
 import { protocolFeeNow } from "@/lib/alchemix/protocol-fee";
+import { alchemixPriceAssets, alchemixPriceReason } from "@/lib/alchemix/price-list";
 import { AlchemixEventCard } from "@/components/protocol/alchemix/alchemix-event-card";
 import {
   AlchemixIdentity,
@@ -87,7 +88,6 @@ import {
   alchemixAmountFigure,
   alchemixChip,
   alchemixStatus,
-  collateralUsdText,
   depositedHead,
   formatSharePrice,
 } from "@/components/protocol/alchemix/alchemix-position-card";
@@ -136,7 +136,6 @@ import {
   redemptionNetTotalProv,
   sharePriceProv,
   underlyingProv,
-  usdProv,
   type AlchemixCoords,
 } from "@/lib/alchemix/event-provenance";
 import type { AlchemixDeployment } from "@/lib/alchemix/lines";
@@ -401,12 +400,10 @@ export function AlchemistPositionView({
   // is the underlying the readings name; with none named, nothing is valued.
   const underlyingUnit = useMemo<AlchemixUnderlyingUnit | null>(() => {
     const u = live?.collateral.underlying ?? position.figures.collateral?.underlying ?? null;
-    const usd = live?.collateral.usd ?? position.figures.collateral?.usd ?? null;
     return u?.symbol
       ? {
           symbol: u.symbol,
           decimals: u.decimals,
-          usd: usd ? { pricePerUnit: usd.pricePerUnit, priceSource: usd.priceSource, pricedAt: usd.pricedAt } : null,
         }
       : null;
   }, [live, position.figures.collateral]);
@@ -472,8 +469,6 @@ export function AlchemistPositionView({
     storageKey: `alchemix-${lineKey}-${tokenId}`,
     protocolKey: "alchemix-v3",
     olderCount,
-    // Tied to the Lifetime flows chart where the panel draws (the whole history).
-    dates: olderCount > 0,
   });
 
   const boundary = useMemo(() => {
@@ -574,53 +569,12 @@ export function AlchemistPositionView({
     return { endedAtBlock: w.endedAtBlock, endedAt: at };
   }, [lineEventWindow, alchemistEvents]);
 
-  // The top row's price list: the asset underneath in dollars, a vault share
-  // in that asset, and the synthetic at the value the protocol counts it at,
-  // one unit of the asset underneath.
   const priceView = live?.collateral ?? position.figures.collateral ?? null;
-  const priceAssets = useMemo<LatestPriceAsset[]>(() => {
-    const u = priceView?.underlying;
-    const out: LatestPriceAsset[] = [];
-    if (u?.symbol && priceView?.usd)
-      out.push({
-        symbol: u.symbol,
-        address: u.address,
-        price: priceView.usd.pricePerUnit,
-        info: {
-          kind: "offchain",
-          pclass: "offchain",
-          summary: `${u.symbol}'s price. The dollar figure this asset is quoted at now.`,
-          via: `${priceView.usd.priceSource} · ${priceView.usd.pricedAt}`,
-          verify: { kind: "none", text: "An off-chain price, with no on-chain anchor" },
-          inputs: [
-            {
-              label: "price",
-              value: String(priceView.usd.pricePerUnit),
-              kind: "offchain",
-              note: priceView.usd.priceSource,
-            },
-            { label: "priced at", value: priceView.usd.pricedAt, kind: "offchain" },
-          ],
-        },
-      });
-    if (u?.symbol && priceView && priceView.formatted > 0)
-      out.push({
-        symbol: mytSymbol,
-        price: u.formatted / priceView.formatted,
-        unit: u.symbol,
-        label: `One ${mytSymbol} in ${u.symbol}`,
-      });
-    out.push(
-      u?.symbol
-        ? { symbol: sym, price: 1, unit: u.symbol, label: `One ${sym} as the protocol counts it, in ${u.symbol}` }
-        : { symbol: sym },
-    );
-    return out;
-  }, [priceView, mytSymbol, sym]);
-  const underSym = priceView?.underlying?.symbol ?? null;
-  const priceReason = underSym
-    ? `${underSym} is priced in dollars, and a ${mytSymbol} share in ${underSym} at the vault's share price; together they give the collateral's dollar value. ${sym} is shown at 1 ${underSym}, the protocol's accounting value: Alchemix counts each ${sym} of debt as one ${underSym}. Its market price can differ.`
-    : `${sym} and ${mytSymbol} are shown in their own units with no dollar price: no share price has been read for this position.`;
+  const priceAssets = useMemo<LatestPriceAsset[]>(
+    () => alchemixPriceAssets(priceView, mytSymbol, sym),
+    [priceView, mytSymbol, sym],
+  );
+  const priceReason = alchemixPriceReason(priceView?.underlying?.symbol ?? null, mytSymbol, sym);
 
   const dlb = position.figures.derivedLowerBound;
   // Rule 3. The events-only debt beside the debt read now, where the two
@@ -663,9 +617,6 @@ export function AlchemistPositionView({
         )}
       </>
     ) : null;
-  // Whether the collateral column states the dollar figure (collateralUsdText).
-  const usdOnCard =
-    live != null && collateralUsdText(live.collateral.underlying ?? null, live.collateral.usd ?? null) != null;
   const v2Names =
     v2History && v2History.links.length > 0 ? (
       <>
@@ -708,7 +659,6 @@ export function AlchemistPositionView({
           ? explorerUrl(chainId as ChainId, "address", live.collateral.mytAddress)
           : null,
         debtFromEvents,
-        usdOnCard,
         // The fee now, for what clearing the earmarked debt would take.
         feeBps: protocolFeeNow(chainId, lineKey)?.bps ?? null,
         lineLiquidations: live.health?.lineLiquidations
@@ -744,14 +694,6 @@ export function AlchemistPositionView({
               live.collateral.underlying.sharePriceRaw,
               live.collateral.underlying.sharePriceAsOfBlock,
               coords,
-            )
-          : undefined,
-        usd: live.collateral.usd
-          ? usdProv(
-              live.collateral.underlying?.symbol ?? "the asset underneath",
-              live.collateral.usd.pricePerUnit,
-              live.collateral.usd.priceSource,
-              live.collateral.usd.pricedAt,
             )
           : undefined,
       }

@@ -9,6 +9,7 @@
 // its levels and Copy for LLM are the timeline's.
 
 import { useEffect, useMemo, useState } from "react";
+import { boldPriceChip } from "@/lib/liquity-v2/bold-event-price";
 import { boldStripAsset, useBoldPrice } from "@/lib/liquity-v2/use-bold-price";
 import { useRouter } from "next/navigation";
 import type { TroveSummary } from "@/types/api/trove";
@@ -111,9 +112,12 @@ export default function EventView({
   const surplusClaimed = surplus?.claimed != null;
   const open = trove?.status === "open";
   // BOLD's price from the Curve BOLD/USDC pool (ui-jobs 746) while the Trove
-  // is open. The event page draws no Prices chip; DetailTopRow publishes its
-  // assets to the cards' "today" side, which values BOLD at it (offPar).
-  const boldPrice = useBoldPrice(open ? undefined : null);
+  // is open, or where the shown event's card draws a BOLD chip to flip
+  // (ui-jobs 761). The event page draws no Prices chip; DetailTopRow
+  // publishes its assets to the cards' "today" side, which values BOLD at it
+  // (offPar).
+  const boldChip = event != null && boldPriceChip(event.context.data.boldPrice, event.blockNumber) != null;
+  const boldPrice = useBoldPrice(open || boldChip ? undefined : null);
   // The branch's shutdown, as the trove page reads it (ui-jobs 612, 626): the
   // prose takes it on any Trove (an urgent redemption, ui-jobs 619), the
   // replay's accrual on an open one only.

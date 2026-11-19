@@ -20,7 +20,6 @@
 import type { Provenance } from "@/components/shared/provenance";
 import {
   SHEET_WORDS,
-  sheetUsd,
   type EventSheet,
   type SheetRow,
   type SheetSide,
@@ -33,6 +32,8 @@ import { fmtPositionAmount } from "@/components/shared/position-row";
 import type { CTokenEventState } from "@/lib/shared/ctoken-flows";
 import type { AssetBalance } from "@/lib/shared/flow-focus";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
+import { amountsUsd, cellOf, marketMoveUsd, type PricedAmount } from "@/lib/shared/sheet-usd-rows";
+import { priceText } from "@/lib/shared/shown-usd";
 import type { MoonwellContext } from "@/lib/shared/types/event-shape";
 import { MOONWELL_WORDS, PROSE } from "@/lib/moonwell/event-templates";
 import {
@@ -42,6 +43,11 @@ import {
   type MoonwellCoords,
 } from "@/lib/moonwell/event-provenance";
 import { decimalSub } from "@/lib/utils/format";
+
+// Each dollar cell is its rows' cents, shown to the dollar, each price named
+// with its block (lib/shared/sheet-usd-rows.ts, ui-jobs 743).
+const VIA = "the page's replay of the account's rows · each market's amount × its price at its block";
+const INTEREST_NOTE = "the balance just before this transaction less the balance once the previous one had run";
 
 const DUST = 1e-9;
 const { fillText } = PROSE;
@@ -74,42 +80,6 @@ const TIPS: Record<
   },
 };
 const debtAssetTip = (symbol: string) => fillText(MOONWELL_WORDS.tip_debt_asset, { symbol });
-
-/** "$0.9997": a price as the sub-rows print it. */
-const priceWords = (p: number | null) =>
-  p == null
-    ? undefined
-    : `$${p.toLocaleString("en-US", p < 10 ? { minimumFractionDigits: 4, maximumFractionDigits: 4 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-const usdText = (v: number) => (Math.abs(v) < 0.005 ? "$0" : sheetUsd(v));
-
-/** A side's dollars once a transaction had run, or just before it. */
-function heldProv(side: FlowSide, when: "after" | "before" | "previous"): Provenance {
-  const what = side === "collateral" ? "Collateral" : "Debt";
-  const at =
-    when === "previous"
-      ? "once the previous transaction on this timeline had run"
-      : when === "before"
-        ? "just before this transaction ran"
-        : "once this transaction had run";
-  return {
-    kind: "chain-derived",
-    summary: `${what} ${when === "previous" ? "at the last event" : `${when} this event`} — what the account ${side === "collateral" ? "supplied" : "owed"} ${at}, in USD: each market's ${side === "collateral" ? "supply (mTokens × the exchange rate)" : "debt (accountBorrows)"} as its rows recorded it, a market the transaction left alone grown by its interest since its last event, each at Moonwell's oracle price of its latest priced event.`,
-    formula: "Σ balance × price",
-  };
-}
-
-/** A token figure's dollars at the price the replay values it at. */
-const atPriceUsdProv = (sym: string, what: string, amount: number, price: number): Provenance => ({
-  kind: "chain-derived",
-  pclass: "oracle",
-  summary: `${what}, in US dollars — the amount times Moonwell's oracle price for ${sym} of its latest priced event.`,
-  formula: "amount × price",
-  inputs: [
-    { label: "amount", value: `${fmtPositionAmount(amount)} ${sym}`, kind: "chain-derived", pclass: "indexed" },
-    { label: `${sym} price`, value: `$${price}`, kind: "chain", pclass: "oracle" },
-  ],
-});
 
 /** A market's balance change across the transaction. */
 const changeProv = (side: FlowSide, sym: string): Provenance => ({
@@ -177,6 +147,15 @@ function sheetSide(
     ? balances.filter((b) => Math.abs(b.amount - b.before) > Math.max(DUST, Math.abs(b.before) * 1e-12))
     : [];
   const addr = (sym: string) => addresses?.[sym];
+  const sideWord = side === "collateral" ? "Collateral" : "Debt";
+  const total = (bs: readonly AssetBalance[], pick: (b: AssetBalance) => number, at: string) =>
+    amountsUsd(
+      `${sideWord} ${at}, in USD`,
+      bs.map((b) => ({ ...b, amount: pick(b) })),
+      { amountNote: `the market's ${side === "collateral" ? "supply" : "debt"} ${at}`, via: VIA },
+    );
+  const heldCell = total(balances, (b) => b.amount, "after this event");
+  const beforeCell = total(balances, (b) => b.before, "before this event");
 
   const rows: SheetRow[] = moved.map((b) => {
     const c = b.amount - b.before;
@@ -191,133 +170,90 @@ function sheetSide(
         info: exact?.info ?? changeProv(side, b.symbol),
         value: exact?.value,
       },
-      usd:
-        b.price != null
-          ? {
-              text: sheetUsd(c * b.price),
-              info: atPriceUsdProv(b.symbol, `The ${b.symbol} this transaction moved`, Math.abs(c), b.price),
-            }
-          : undefined,
+      usd: cellOf(
+        amountsUsd(`The ${b.symbol} this transaction moved, in USD`, [{ ...b, amount: c }], {
+          amountNote: "the balance once the transaction had run less the balance just before it",
+          via: VIA,
+          signed: false,
+        }),
+      ),
       tip: TIPS[side].event(b.symbol),
     };
   });
 
   // The carry-forward layer, where the page holds the previous transaction.
   const carry: SheetSide["carry"] = [];
-  const held = state.held[side];
-  const heldBefore = state.heldBefore[side];
-  const last = prev?.held[side] ?? null;
-  if (prev && last != null && heldBefore != null && (last > 0.005 || heldBefore > 0.005)) {
+  // A side with no price draws its rows with "—" naming the asset.
+  const heldThen = prev?.balances[side].some((b) => b.amount > DUST) ?? false;
+  const heldBeforeAny = balances.some((b) => b.before > DUST);
+  if (prev && (heldThen || heldBeforeAny)) {
+    const lastCell = total(prev.balances[side], (b) => b.amount, "at the last event");
     carry.push({
       key: "last",
       label: SHEET_WORDS.last,
-      usd: { text: usdText(last), info: heldProv(side, "previous") },
+      usd: cellOf(lastCell),
       tip: TIPS[side].last,
     });
     const then = new Map(prev.balances[side].map((b) => [b.symbol, b]));
-    let interestUsd = 0;
-    let priced = true;
+    const legs: PricedAmount[] = [];
     const sub: SheetRow[] = [];
     for (const b of balances) {
       const p = then.get(b.symbol);
       if (!p) continue;
       const i = b.before - p.amount;
       if (!(Math.abs(i) > Math.max(DUST, Math.abs(b.before) * 1e-9))) continue;
-      const v = b.price != null ? i * b.price : null;
-      if (v == null) priced = false;
-      else interestUsd += v;
+      legs.push({ ...b, amount: i });
       sub.push({
         key: `interest-${b.symbol}`,
         label: b.symbol,
-        note: priceWords(b.price),
+        note: b.price != null ? priceText(b.price) : undefined,
         amount: {
           text: `${i < 0 ? "−" : ""}${fmtPositionAmount(Math.abs(i))}`,
           symbol: b.symbol,
           address: addr(b.symbol),
           info: interestProv(side, b.symbol),
         },
-        usd:
-          v != null
-            ? {
-                text: sheetUsd(v),
-                info: atPriceUsdProv(b.symbol, `Interest on ${b.symbol} since the last event`, Math.abs(i), b.price!),
-              }
-            : undefined,
+        usd: cellOf(
+          amountsUsd(`Interest on ${b.symbol} since the last event, in USD`, [{ ...b, amount: i }], {
+            amountNote: INTEREST_NOTE,
+            via: VIA,
+          }),
+        ),
         tip: TIPS[side].interestAsset(b.symbol),
       });
     }
-    if (sub.length > 0)
+    const interestCell =
+      sub.length > 0
+        ? amountsUsd(`Interest on the ${side} since the last event, in USD`, legs, {
+            amountNote: INTEREST_NOTE,
+            via: VIA,
+          })
+        : null;
+    if (interestCell)
       carry.push({
         key: "interest",
         label: SHEET_WORDS.interest,
-        usd: priced
-          ? {
-              text: sheetUsd(interestUsd),
-              info: {
-                kind: "chain-derived",
-                pclass: "oracle",
-                summary: `Interest on the ${side} since the last event, in US dollars — every market's interest at Moonwell's oracle price of its latest priced event, added up.`,
-                formula: "Σ interest × price",
-              },
-            }
-          : undefined,
+        usd: cellOf(interestCell),
         tip: TIPS[side].interest,
         sub,
       });
     // The market move: the rest of the change in the side's dollars, which
-    // the prices moved; its receipt names each market's price at both events.
-    if (priced) {
-      const move = heldBefore - last - interestUsd;
-      if (Math.abs(move) >= 0.005)
-        carry.push({
-          key: "market",
-          label: SHEET_WORDS.market,
-          usd: {
-            text: sheetUsd(move, true),
-            info: {
-              kind: "chain-derived",
-              pclass: "oracle",
-              summary: `Market move on the ${side} since the last event — the side's total before this transaction, less its total once the previous transaction had run and the interest since, all in US dollars: the change Moonwell's oracle prices made to the balances held between the two. No token moved.`,
-              formula: "before this event − last event − interest since",
-              inputs: balances
-                .filter((b) => then.has(b.symbol))
-                .flatMap((b) => {
-                  const pThen = then.get(b.symbol)!.price;
-                  return [
-                    ...(pThen != null
-                      ? [
-                          {
-                            label: `${b.symbol} price at the last event`,
-                            value: `$${pThen}`,
-                            kind: "chain" as const,
-                            pclass: "oracle" as const,
-                          },
-                        ]
-                      : []),
-                    ...(b.price != null
-                      ? [
-                          {
-                            label: `${b.symbol} price at this event`,
-                            value: `$${b.price}`,
-                            kind: "chain" as const,
-                            pclass: "oracle" as const,
-                          },
-                        ]
-                      : []),
-                  ];
-                }),
-            },
-          },
-          tip: TIPS[side].market,
-        });
-    }
+    // the prices moved; the difference of the totals' shown products.
+    const move = marketMoveUsd(`Market move on the ${side} since the last event`, beforeCell, lastCell, interestCell);
+    if (move.usd == null || Math.abs(move.usd) >= 0.005)
+      carry.push({
+        key: "market",
+        label: SHEET_WORDS.market,
+        usd: cellOf(move),
+        tip: TIPS[side].market,
+      });
   }
   const before: SheetRow | undefined =
-    carry.length > 0 && heldBefore != null
+    carry.length > 0
       ? {
           key: "before",
           label: SHEET_WORDS.before,
-          usd: { text: usdText(heldBefore), info: heldProv(side, "before") },
+          usd: cellOf(beforeCell),
           tip: TIPS[side].before,
         }
       : undefined;
@@ -328,20 +264,19 @@ function sheetSide(
       ? after.map((b: AssetBalance) => ({
           key: `asset-${b.symbol}`,
           label: b.symbol,
-          note: priceWords(b.price),
+          note: b.price != null ? priceText(b.price) : undefined,
           amount: {
             text: fmtPositionAmount(b.amount),
             symbol: b.symbol,
             address: addr(b.symbol),
             info: balanceProv(side, b.symbol),
           },
-          usd:
-            b.price != null
-              ? {
-                  text: usdText(b.amount * b.price),
-                  info: atPriceUsdProv(b.symbol, `The ${b.symbol} owed after this event`, b.amount, b.price),
-                }
-              : undefined,
+          usd: cellOf(
+            amountsUsd(`The ${b.symbol} owed after this event, in USD`, [b], {
+              amountNote: "the debt once the transaction had run",
+              via: VIA,
+            }),
+          ),
           tip: debtAssetTip(b.symbol),
         }))
       : undefined;
@@ -357,8 +292,7 @@ function sheetSide(
     before,
     rows,
     ...(side === "debt" ? { assets, repaid, repaidTip: MOONWELL_WORDS.tip_debt_repaid } : {}),
-    total:
-      held != null ? { text: usdText(held), info: heldProv(side, "after") } : { none: MOONWELL_WORDS.sheet_no_price },
+    total: cellOf(heldCell),
     totalAmount: sole && {
       text: fmtPositionAmount(sole.amount > DUST ? sole.amount : 0),
       symbol: sole.symbol,

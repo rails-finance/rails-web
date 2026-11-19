@@ -128,6 +128,9 @@ export interface AaveV3PositionView {
   /** The block `priceByAddress` was read at, where the read named one: the
    *  card's block on a position page, the latest when a listing was served. */
   priceBlock?: number | null;
+  /** The block each price merged in later was read at (null: the read named
+   *  none), by lowercased address; `priceBlock` for the rest (ui-jobs 743). */
+  priceBlockByAddress?: Record<string, number | null>;
   atBlock?: number;
   /** rails-server's head read and the block it read at, where it answered the page's read. */
   readBy?: PositionHeadStamp & { block: number };

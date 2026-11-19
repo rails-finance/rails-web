@@ -59,16 +59,6 @@ export function hfProseV4(hf: number | null): string {
   return hf != null && hf >= HF_CAP ? `over ${HF_CAP}` : hfLabelV4(hf);
 }
 
-/** A per-unit asset price at the precision its value needs: four decimals
- *  below $10 (sUSDe at $1.2437, USDT at $0.9997), whole dollars from $100. */
-export function fmtUnitPrice(p: number): string {
-  if (!isFinite(p) || p <= 0) return "–";
-  if (p < 0.0001) return "< $0.0001";
-  if (p < 10) return "$" + p.toFixed(4);
-  if (p < 100) return "$" + p.toFixed(2);
-  return "$" + p.toLocaleString("en-US", { maximumFractionDigits: 0 });
-}
-
 /** A health factor this close above 1 (under 1% of collateral value to spare)
  *  is at the liquidation line: the runway rounds to 0%. */
 export const AT_LINE_HF = 1.01;

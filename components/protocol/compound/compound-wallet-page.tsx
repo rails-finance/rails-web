@@ -278,8 +278,6 @@ function MarketSection({
     folderParams: { wallet, market: market.key },
     storageKey: `${d.csvPrefix}-${market.key}-${view.account}`,
     protocolKey: "compound",
-    // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
-    dates: false,
   });
   const sideUsd = cardSideUsd(view);
 
@@ -336,6 +334,7 @@ function MarketSection({
         chain.collateral.map((c) => [c.address.toLowerCase(), scaleCompoundChainBalance(c.balanceRaw, c.decimals)]),
       ),
       prices: Object.fromEntries(Object.entries(view.priceByAddress ?? {}).map(([a, p]) => [a.toLowerCase(), p])),
+      block: view.priceBlock ?? null,
       supplyApr: chain.supplyApr,
       borrowApr: chain.borrowApr,
     };

@@ -17,17 +17,21 @@ import {
   yearnVaultHref,
   yearnVaultRosterHref,
 } from "@/lib/vaults/routes";
+import { SBOLD_PAGE_PATH } from "@/lib/liquity-v2/sbold";
 
-/** One protocol's roster: the Protocol facet's value and the row's protocol. */
-export type VaultIndexProtocol = "morpho" | "aave" | "yearn" | "maple";
+/** One protocol's roster: the Protocol facet's value and the row's protocol.
+ *  `sbold` is the one vault no explorer deploys, its own roster of one
+ *  (ui-jobs 765). */
+export type VaultIndexProtocol = "morpho" | "aave" | "yearn" | "maple" | "sbold";
 
-export const VAULT_INDEX_PROTOCOLS: readonly VaultIndexProtocol[] = ["morpho", "aave", "yearn", "maple"];
+export const VAULT_INDEX_PROTOCOLS: readonly VaultIndexProtocol[] = ["morpho", "aave", "yearn", "maple", "sbold"];
 
 export const VAULT_INDEX_PROTOCOL_LABEL: Record<VaultIndexProtocol, string> = {
   morpho: "Morpho",
   aave: "Aave",
   yearn: "Yearn",
   maple: "Maple",
+  sbold: "sBOLD",
 };
 
 /** The rosters the index reads, in its order: a protocol on a chain. Morpho
@@ -38,6 +42,7 @@ export const VAULT_INDEX_ROSTERS: readonly { protocol: VaultIndexProtocol; chain
   { protocol: "aave", chainId: 1 },
   { protocol: "yearn", chainId: 1 },
   { protocol: "maple", chainId: 1 },
+  { protocol: "sbold", chainId: 1 },
 ];
 
 /** A roster's key: its protocol and chain. */
@@ -82,9 +87,8 @@ export function vaultIndexProtocol(v: VaultSummary): VaultIndexProtocol {
       return "yearn";
     case "maple-pool":
       return "maple";
-    // The index holds no sBOLD row (ui-jobs 749): its one page is under Liquity V2.
     case "sbold":
-      throw new Error("sBOLD has no vault index roster");
+      return "sbold";
   }
 }
 
@@ -104,11 +108,13 @@ export function vaultIndexRosterHref(p: VaultIndexProtocol, chainId: number): st
       ? ethereumVaultRosterHref()
       : p === "yearn"
         ? yearnVaultRosterHref()
-        : maplePoolsHref();
+        : p === "maple"
+          ? maplePoolsHref()
+          : SBOLD_PAGE_PATH;
 }
 
 /** The vault's page under its protocol (decision 0028 point 8); a Maple
- *  pool's under Maple's pools tab. */
+ *  pool's under Maple's pools tab; sBOLD's at /ethereum/vaults/sbold. */
 export function vaultIndexHref(v: VaultSummary): string {
   const p = vaultIndexProtocol(v);
   return p === "morpho"
@@ -117,7 +123,9 @@ export function vaultIndexHref(v: VaultSummary): string {
       ? ethereumVaultHref(v.address)
       : p === "yearn"
         ? yearnVaultHref(v.address)
-        : maplePoolHref(v.address);
+        : p === "maple"
+          ? maplePoolHref(v.address)
+          : SBOLD_PAGE_PATH;
 }
 
 /** The positions listing filtered to this vault, where its roster has one. */

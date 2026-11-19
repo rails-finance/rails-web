@@ -76,6 +76,7 @@ import { heldAssetsRaw, lostAssetsSentence } from "@/lib/vaults/lost-assets";
 import { assetScaleAbsentTip, assetScaleSentence } from "@/lib/vaults/asset-scale-words";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { sharePriceText } from "@/lib/shared/vault-amount-text";
+import { perShareFace } from "@/lib/liquity-v2/sbold-per-share";
 import { useCompareSelection } from "@/components/vaults/compare-selection";
 import { compareKey } from "@/lib/vaults/compare";
 import { COMPARE_TICK } from "@/lib/vaults/compare-words";
@@ -190,6 +191,12 @@ function comparator(key: SortKey, dir: "asc" | "desc", yieldOf: (v: VaultSummary
 const n = (x: number) => x.toLocaleString("en-US");
 
 /** A figure in its receipt, where the family states one. */
+/** sBOLD's per-share figure, where both getters and the share decimals answered. */
+const sboldFace = (v: VaultSummary): string | null =>
+  v.totalAssets && v.totalSupply && v.shareDecimals != null
+    ? perShareFace(v.totalAssets.raw, v.totalSupply.raw, v.asset.decimals, v.shareDecimals)
+    : null;
+
 const traced = (info: Provenance | undefined, children: ReactNode) =>
   info ? <Prov info={info}>{children}</Prov> : children;
 
@@ -443,7 +450,7 @@ export function VaultIndexTable({
                   {leadOf && (
                     <DataTableLeadCell
                       plain
-                      protocol={leadOf(v) ?? VAULT_FAMILIES[v.family].venue}
+                      protocol={leadOf(v) ?? VAULT_FAMILIES[v.family].venue ?? ""}
                       protocolName={VAULT_INDEX_PROTOCOL_LABEL[vaultIndexProtocol(v)]}
                       chain={v.chainId as ChainId}
                     />
@@ -458,9 +465,10 @@ export function VaultIndexTable({
                   >
                     <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 sm:flex-nowrap">
                       <span className="shrink-0" data-prov-exempt>
+                        {/* sBOLD leads with its share token's icon, as its card does (ui-jobs 765). */}
                         <TokenChipIcon
-                          symbol={v.asset.symbol}
-                          address={v.asset.address}
+                          symbol={v.family === "sbold" ? (v.symbol ?? "sBOLD") : v.asset.symbol}
+                          address={v.family === "sbold" ? v.address : v.asset.address}
                           size={28}
                           filterable={false}
                           untitled
@@ -468,7 +476,7 @@ export function VaultIndexTable({
                       </span>
                       {leadOf && (
                         <DataTableLeadMark
-                          protocol={leadOf(v) ?? VAULT_FAMILIES[v.family].venue}
+                          protocol={leadOf(v) ?? VAULT_FAMILIES[v.family].venue ?? ""}
                           chain={v.chainId as ChainId}
                         />
                       )}
@@ -531,9 +539,13 @@ export function VaultIndexTable({
                       <InAsset v={v} data-cell="share-price">
                         {/* Past a million, compact (its full text in the
                           title), so one vault's figure cannot widen the column. */}
+                        {/* sBOLD's row prints total assets ÷ shares issued as its page's
+                          stat does, its receipt that division (ui-jobs 765). */}
                         {traced(
                           receipts.sharePrice,
-                          shownPrice.value >= 1e6 ? (
+                          v.family === "sbold" && sboldFace(v) != null ? (
+                            sboldFace(v)
+                          ) : shownPrice.value >= 1e6 ? (
                             <span title={sharePriceText(shownPrice, v.asset.decimals)}>
                               {formatCompact(shownPrice.value)}
                             </span>

@@ -77,9 +77,6 @@ export interface TimelineSegmentOptions {
   folderParams: Record<string, string>;
   storageKey: string;
   protocolKey: string;
-  /** False on a page tied to its Lifetime flows chart: no date range
-   *  (`useTimelineEvents`'s `dates`). */
-  dates?: boolean;
   /** Rows the page adds that no served read carries (an account's e-mode
    *  changes), the whole life of them: a month read draws those inside its
    *  span among its own rows. */
@@ -146,7 +143,10 @@ export function useTimelineSegment(o: TimelineSegmentOptions) {
                 if (r.kind === "folder" && r.folder.firstAt < cutAt) cutAt = r.folder.firstAt;
               if (!Number.isFinite(cutAt)) cutAt = null;
             }
-            setSegment({ monthIdx, asked: ask, events: grouped.events, grouped, cutAt });
+            // A read reset or replaced while it ran (the chart's tie, another
+            // month) lands nowhere.
+            if (segmentRead.current === ac && !ac.signal.aborted)
+              setSegment({ monthIdx, asked: ask, events: grouped.events, grouped, cutAt });
             return;
           }
           apiGroupsSpans.current = false;
@@ -154,7 +154,8 @@ export function useTimelineSegment(o: TimelineSegmentOptions) {
         const flat = await reads.current.readFlat(span);
         const kept = trimToNewest(flat.events, preloadCap);
         const cutAt = kept.length < flat.events.length && kept.length > 0 ? kept[0].timestamp : null;
-        setSegment({ monthIdx, asked: ask, events: kept, grouped: null, cutAt });
+        if (segmentRead.current === ac && !ac.signal.aborted)
+          setSegment({ monthIdx, asked: ask, events: kept, grouped: null, cutAt });
       } catch (err) {
         if ((err as { name?: string })?.name === "AbortError") return;
         // The rows the page holds stay; the month stays where it was.
@@ -223,7 +224,6 @@ export function useTimelineSegment(o: TimelineSegmentOptions) {
         : segment
           ? 0
           : (o.olderCount ?? 0),
-    dates: o.dates,
   });
   const { setDateRange } = tl;
   const pickMonth = useCallback(
@@ -237,6 +237,7 @@ export function useTimelineSegment(o: TimelineSegmentOptions) {
   );
   const resetSegment = useCallback(() => {
     segmentRead.current?.abort();
+    segmentRead.current = null;
     setSegmentLoading(null);
     setSegmentFailed(null);
     setDateRange(null);
@@ -256,7 +257,7 @@ export function useTimelineSegment(o: TimelineSegmentOptions) {
             failed: segmentFailed?.monthIdx ?? null,
             onRetry: segmentFailed ? retrySegment : null,
             onPick: pickMonth,
-            onReset: segment ? resetSegment : null,
+            onReset: segment || segmentLoading != null ? resetSegment : null,
           }
         : undefined,
     [groupedTail, hasLife, lifeDays, segment, segmentLoading, segmentFailed, retrySegment, pickMonth, resetSegment],

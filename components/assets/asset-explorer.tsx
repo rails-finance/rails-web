@@ -697,7 +697,11 @@ function ExplorerMarks({ card: c }: { card: AssetCard }) {
           data-asset-chip-link={ch.link}
           data-anatomy="A5.9"
         >
-          <ProtocolIcon id={ch.explorer} className="h-3.5 w-3.5" />
+          {ch.token ? (
+            <TokenChipIcon symbol={ch.token.symbol} address={ch.token.address} size={14} filterable={false} untitled />
+          ) : (
+            <ProtocolIcon id={ch.explorer} className="h-3.5 w-3.5" />
+          )}
         </Link>
       ))}
       {more > 0 && (
@@ -815,7 +819,11 @@ export function ExplorerChip({ chip: ch, symbol, chainMark }: { chip: AssetChip;
       data-asset-chip-link={ch.link}
       data-anatomy="A5.9"
     >
-      <ProtocolIcon id={ch.explorer} className="h-3 w-3 shrink-0" />
+      {ch.token ? (
+        <TokenChipIcon symbol={ch.token.symbol} address={ch.token.address} size={12} filterable={false} untitled />
+      ) : (
+        <ProtocolIcon id={ch.explorer} className="h-3 w-3 shrink-0" />
+      )}
       {ch.label}
       {chainMark && <ChainGlyph id={ch.chain as ChainId} className="h-2.5 w-2.5 text-rb-500" />}
     </Link>

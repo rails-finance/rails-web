@@ -21,23 +21,27 @@ export function LiquityExplainerTeaser({
   prose,
   ctx,
   coords,
+  eventId,
 }: {
   prose: LiquityEventProse;
   ctx: LiquityContext;
   coords: EventCoords;
+  eventId: string;
 }) {
   const lead = prose.L4[0];
-  return lead ? <ProseSentenceText s={lead} ctx={ctx} coords={coords} /> : null;
+  return lead ? <ProseSentenceText s={lead} ctx={ctx} coords={coords} eventId={eventId} /> : null;
 }
 
 export function LiquityEventExplainer({
   prose,
   ctx,
   coords,
+  eventId,
 }: {
   prose: LiquityEventProse;
   ctx: LiquityContext;
   coords: EventCoords;
+  eventId: string;
 }) {
   if (isGroupedExplanation(prose))
     return (
@@ -45,12 +49,16 @@ export function LiquityEventExplainer({
         items={explanationRuns(prose).flatMap((run) =>
           run.sentences.map((s) => ({
             group: run.heading ?? "",
-            node: <ProseSentenceText key={s.sentence_id} s={s} ctx={ctx} coords={coords} />,
+            node: <ProseSentenceText key={s.sentence_id} s={s} ctx={ctx} coords={coords} eventId={eventId} />,
           })),
         )}
       />
     );
-  const items = prose.L4.slice(1).map((s) => <ProseSentenceText key={s.sentence_id} s={s} ctx={ctx} coords={coords} />);
-  const list = prose.list.map((s) => <ProseSentenceText key={s.sentence_id} s={s} ctx={ctx} coords={coords} />);
+  const items = prose.L4.slice(1).map((s) => (
+    <ProseSentenceText key={s.sentence_id} s={s} ctx={ctx} coords={coords} eventId={eventId} />
+  ));
+  const list = prose.list.map((s) => (
+    <ProseSentenceText key={s.sentence_id} s={s} ctx={ctx} coords={coords} eventId={eventId} />
+  ));
   return <ProseExplainer items={items} list={list} />;
 }

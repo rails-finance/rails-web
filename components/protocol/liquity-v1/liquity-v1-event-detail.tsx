@@ -368,7 +368,8 @@ export function useLiquityV1Opened({
       {isRedemption && split && (
         <RedemptionOutcome ctx={ctx} coords={coords} split={split} surplus={surplus} currentPrice={currentPrice} />
       )}
-      {forensics && <LiquidationForensics {...forensics} />}
+      {/* One then/today clock per card: the price row carries ETH where it has a price. */}
+      {forensics && <LiquidationForensics {...forensics} pricePills={price != null ? [] : forensics.pricePills} />}
       {isLiq && read?.liquidation ? (
         <LiquidationRoute read={read} coords={coords} surplusClaimed={surplus?.claimed ?? null} />
       ) : isLiq && readPending ? (

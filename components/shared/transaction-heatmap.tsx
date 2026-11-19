@@ -6,6 +6,7 @@ import { RESET_LINK } from "@/lib/shared/ui-grammar";
 // The life reduced to months, on the same `year * 12 + month` key this grid
 // has always used for a cell.
 import { monthCounts } from "@/lib/shared/timeline-segments";
+import { monthCountIsFloor, monthLoaded, monthWhollyHeld } from "@/lib/shared/timeline-month-cells";
 
 // GitHub-style activity heatmap. Doubles as a date-range selector for the
 // timeline below: click a cell for a single-day filter, or drag across cells
@@ -200,8 +201,18 @@ export interface TransactionHeatmapProps {
    *  holds: a reader who has read one month from the index still sees the
    *  four years around it at the shades they had. `months` layout only. */
   lifeDays?: ReadonlyMap<number, number> | null;
-  /** The span the rows ON THE PAGE cover, as unix seconds. A month that meets
-   *  it is filtered locally, which is instant; a month outside it is a read.
+  /** False where the loaded rows are not the whole history (a cut list, a
+   *  window): without `lifeDays`, a month they hold only in part refuses the
+   *  click with the months below the cut, and says it is not loaded (ui-jobs
+   *  764). `months` layout only; true by default. */
+  whole?: boolean;
+  /** The page's read of the events past its cut, offered in the caption
+   *  where months are not loaded. */
+  loadOlder?: { state: "idle" | "loading" | "failed"; load: () => void } | null;
+  /** The span the rows ON THE PAGE cover, as unix seconds. A month whose days
+   *  all lie inside it is filtered locally, which is instant; any other month
+   *  is a read (`monthWhollyHeld`), so a month the page holds in part is never
+   *  filtered to part of itself.
    *  Defaults to "from the oldest loaded row onward", which is what a windowed
    *  page without a segment holds. */
   held?: [number, number] | null;
@@ -622,6 +633,9 @@ interface MonthCell {
    *  loaded row falls in it. Either the page can READ it (`reachMonth`) or the
    *  cell refuses the click; filtering to it would empty the list. */
   summarised: boolean;
+  /** Its count comes from the loaded rows of a month they hold in part, with
+   *  no index count for the rest: the label says "at least". */
+  floor?: boolean;
 }
 
 /** Compact heatmap: one row per year, one column per month. Bounded to 12
@@ -653,6 +667,8 @@ function MonthsHeatmap({
   chrome = "card",
   extent,
   select = "range",
+  whole = true,
+  loadOlder,
 }: TransactionHeatmapProps) {
   const single = select === "single";
   const [dragStart, setDragStart] = useState<number | null>(null);
@@ -684,7 +700,7 @@ function MonthsHeatmap({
             idx,
             count: counts.get(idx) ?? 0,
             inLifetime: idx >= lifeMinIdx && idx <= lifeMaxIdx,
-            summarised: idx < heldMinIdx || idx > heldMaxIdx,
+            summarised: !monthWhollyHeld(idx, lifeDays, held ?? null),
           });
         }
         rows.push({ year: y, cells });
@@ -696,6 +712,7 @@ function MonthsHeatmap({
         maxCount: counts.size === 0 ? 0 : Math.max(...counts.values()),
         windowMinIdx: heldMinIdx,
         summarising: lifeMinIdx < heldMinIdx || lifeMaxIdx > heldMaxIdx,
+        unloaded: false,
       };
     }
     if (events.length === 0 && (windowDays?.length ?? 0) === 0) return null;
@@ -731,6 +748,8 @@ function MonthsHeatmap({
     }
     const lifeMinIdx = monthIdxOf(minTs);
     const lifeMaxIdx = monthIdxOf(maxTs);
+    // Which months the loaded rows hold in full (`monthLoaded`).
+    const cut = { windowMinIdx, whole, priorDays };
     // The drawn span — see the weeks grid above for why a missed extent falls
     // back to the whole life rather than to nothing.
     const clipStart = extent ? Math.max(monthIdxOf(extent[0]), lifeMinIdx) : lifeMinIdx;
@@ -749,7 +768,8 @@ function MonthsHeatmap({
           idx,
           count: counts.get(idx) ?? 0,
           inLifetime: idx >= minIdx && idx <= maxIdx,
-          summarised: idx < windowMinIdx,
+          summarised: !monthLoaded(idx, cut),
+          floor: monthCountIsFloor(idx, cut),
         });
       }
       rows.push({ year: y, cells });
@@ -766,8 +786,9 @@ function MonthsHeatmap({
       maxCount,
       windowMinIdx,
       summarising: (priorDays?.length ?? 0) > 0 && minIdx < windowMinIdx,
+      unloaded: rows.some((row) => row.cells.some((c) => c.inLifetime && c.summarised && c.idx >= windowMinIdx)),
     };
-  }, [events, priorDays, windowDays, lifeDays, held, extent]);
+  }, [events, priorDays, windowDays, lifeDays, held, extent, whole]);
 
   useEffect(() => {
     if (dragStart === null) return;
@@ -885,7 +906,7 @@ function MonthsHeatmap({
               // `text-rb-500`, the grid's own label colour, which the wash
               // never uses.
               const picked = selectable && (inSelection(cell) || isCurrent);
-              const label = `${MONTH_NAMES[cell.idx % 12]} ${Math.floor(cell.idx / 12)} · ${cell.count} event${cell.count === 1 ? "" : "s"}`;
+              const label = `${MONTH_NAMES[cell.idx % 12]} ${Math.floor(cell.idx / 12)} · ${cell.floor ? "at least " : ""}${cell.count} event${cell.count === 1 && !cell.floor ? "" : "s"}`;
               // The ticked cell says what a press on it DOES, since the Reset
               // that used to say it is gone (ui-jobs 60).
               const title = !cell.inLifetime
@@ -895,7 +916,9 @@ function MonthsHeatmap({
                   : reachable
                     ? `${label} · read from the index`
                     : cell.summarised
-                      ? `${label} · in the opening balance`
+                      ? cell.idx < grid.windowMinIdx
+                        ? `${label} · in the opening balance`
+                        : `${label} · not loaded`
                       : label;
               return (
                 // A REAL BUTTON, not a div with a mousedown (ui-jobs 60). The
@@ -952,7 +975,25 @@ function MonthsHeatmap({
         ))}
       </div>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[10px] text-rb-500">
-        {grid.summarising ? (
+        {grid.unloaded ? (
+          // A cut list without the index's month read (ui-jobs 764): the
+          // months it holds in part refuse the click, and the page's read of
+          // the rest is offered where it has one.
+          <span data-heatmap-unloaded="">
+            Months from {MONTH_NAMES[grid.windowMinIdx % 12]} {Math.floor(grid.windowMinIdx / 12)} back are not loaded.
+            {loadOlder &&
+              (loadOlder.state === "loading" ? (
+                <span role="status"> Loading the older events…</span>
+              ) : (
+                <>
+                  {" "}
+                  <button type="button" onClick={loadOlder.load} className={RESET_LINK} data-heatmap-load-older="">
+                    {loadOlder.state === "failed" ? "They did not load. Try again" : "Load the older events"}
+                  </button>
+                </>
+              ))}
+          </span>
+        ) : grid.summarising ? (
           reachMonth ? (
             // The picker-inline review branch drops the sentence that stood
             // here (Miles, 2026-09-25): "A month the list does not hold is

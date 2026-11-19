@@ -19,6 +19,16 @@ import type { UnreadToken } from "@/lib/shared/types/event-shape";
 
 /** One valued line in a tower side — a token amount, its USD value when
  *  priceable, and the provenance that traces it back to the chain. */
+/** A tower line's price: USD per token, the block its read stands at (null
+ *  where the read names none), its source in words, and the block the
+ *  balance stands at where the line knows it. */
+export interface TowerPrice {
+  usd: number;
+  block: number | null;
+  source: string;
+  balanceBlock?: number | null;
+}
+
 export interface TowerLine {
   key: string;
   symbol: string;
@@ -58,6 +68,13 @@ export interface TowerLine {
    *  the direction (a Polaris PSM mint-share INFLOW is another party's act
    *  too, but it is a mint, not a redemption). Ignored on `current` lines. */
   flowKind?: "redeemed" | "external";
+  /** A `current` or interest line's price (ui-jobs 743): USD per token, the
+   *  block its read stands at (null where the read names none), and its
+   *  source in words. The live stop states the line as amount × price. */
+  price?: TowerPrice;
+  /** An interest line summed across assets: each asset's part, so the live
+   *  stop states each at its price. */
+  parts?: { symbol: string; amount: number; price: TowerPrice }[];
   /** Legend caption for a `current` line in place of its symbol, where the
    *  held amount is not the whole balance (Morpho: the principal row under an
    *  accrued-interest row reads "Net borrowed"). Unset: the symbol. */

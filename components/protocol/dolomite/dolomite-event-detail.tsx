@@ -63,6 +63,7 @@ import {
   formatUsdValue,
 } from "@/lib/utils/format";
 import { formatCompact } from "@/lib/shared/format-compact";
+import { priceText } from "@/lib/shared/shown-usd";
 
 export interface DolomiteCellsInput {
   ctx: DolomiteContext;
@@ -496,14 +497,13 @@ export function useDolomiteCells({
   // The price row: the liquidation's two legs at the block, else the
   // market's price at this event.
   const prices: EventPriceChip[] = forensics
-    ? pillPriceChips(forensics.pricePills, "Dolomite", (n) => `$${formatDolomitePrice(n)}`)
+    ? pillPriceChips(forensics.pricePills, "Dolomite", priceText)
     : ctx.oraclePrice && ctx.oraclePrice.usd > 0
       ? [
           {
             symbol: sym,
             usd: ctx.oraclePrice.usd,
             address: ctx.marketToken,
-            display: `$${formatDolomitePrice(ctx.oraclePrice.usd)}`,
             info: dolomiteEventPriceProv(sym, coords, ctx.oraclePrice.raw),
             title: `${sym} price at this event: Dolomite's oracle`,
           },

@@ -150,3 +150,37 @@ test("the position figures gate on the anchor alone: an anchor-only read states 
   assert.ok(fxPositionCollUsd(view(2.5), anchor));
   assert.equal(fxAnchorOf({ anchorPrice: null, minPrice: "1770000000000000000000" }, 26_445_741), null);
 });
+
+const fxProv = await import(ROOT + "lib/fx/event-provenance.ts");
+const { FX_POOLS } = await import(ROOT + "lib/fx/asset-catalog.ts");
+
+test("every receipt naming the AaveFundingPool carries the pool's address", () => {
+  const built = [
+    fxProv.settledDebtProv("wsteth", 1),
+    fxProv.impliedDebtProv("wbtc"),
+    fxProv.leftUnpaidProv("wsteth"),
+    fxProv.oracleLegAtProv("wbtc", "anchor", "WBTC", 1),
+    fxProv.driftTotalProv("wsteth", "colls", "stETH", 2),
+  ];
+  for (const p of built) assert.match(p.contract.address, /^0x[0-9a-f]{40}$/, p.summary);
+  assert.equal(built[1].contract.address, FX_POOLS.wbtc.address);
+});
+
+test("an f(x) event receipt names its pool only where the coords name one; config reads name PoolConfiguration", async () => {
+  const { debtDeltaProv } = await import(ROOT + "lib/fx/event-provenance.ts");
+  const { fundingRateProv, redeemGateProv, defaultFeesProv } = await import(ROOT + "lib/fx/system-provenance.ts");
+  assert.equal(debtDeltaProv({ txHash: "0xabc", blockNumber: 1 }).contract, undefined, "no zero address");
+  const pool = "0x6ecfa38fee8a5277b91efda204c235814f0122e8";
+  assert.deepEqual(debtDeltaProv({ pool, poolLabel: "wstETH pool" }).contract, {
+    name: "AaveFundingPool (wstETH pool)",
+    address: pool,
+  });
+  // pool.configuration() at block 26,447,493, through /api/chain/fx/pools.
+  const config = "0x16b334f2644cc00b85db1a1eff0c2c395e00c28d";
+  for (const p of [
+    fundingRateProv("wstETH pool", pool, config),
+    redeemGateProv("wstETH pool", config),
+    defaultFeesProv(config),
+  ])
+    assert.deepEqual(p.contract, { name: "PoolConfiguration", address: config });
+});

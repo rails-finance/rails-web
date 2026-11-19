@@ -57,11 +57,15 @@ import { discoverLlamalendMarkets } from "@/lib/sources/chain/llamalend-markets"
 import { resolveErc20Meta } from "@/lib/sources/chain/erc20-meta";
 import { MORPHO_SUPPLY_READ, MORPHO_SUPPLY_TOKENS } from "@/lib/morpho/supply-tokens";
 import type { ChainId } from "@/lib/shared/chains";
-import { SBOLD_VAULT } from "@/lib/liquity-v2/sbold";
+import { SBOLD_PAGE_PATH, SBOLD_VAULT } from "@/lib/liquity-v2/sbold";
 import { readPendleRoster } from "@/lib/sources/api/pendle";
 import { chipUses, pendleUses, type PendleMarketRef, type TokenUse } from "@/lib/shared/asset-uses";
 
 const BOLD = "0x6440f144b7e50d6a8439336510312d2f54beb01d";
+
+/** Vaults no explorer deploys, each its own page (ui-jobs 765): a chip with
+ *  the vault's token icon in place of a protocol mark, opening its page. */
+const VAULT_PAGES = new Map([["sbold", { href: SBOLD_PAGE_PATH, label: "sBOLD", chainId: 1, address: SBOLD_VAULT }]]);
 const ZERO = /^0x0{40}$/;
 
 /** One explorer listing one token: a facet value, or a page, or neither. */
@@ -190,9 +194,10 @@ function staticCatalogHits(): Hit[] {
     chain: 1,
     token: BOLD,
     symbol: "BOLD",
-    uses: [TROVE_DEBT, { label: "Stability Pools", page: "/stability-pool" }, { label: "sBOLD", page: "/sbold" }],
+    // sBOLD is no use of Liquity V2's (ui-jobs 765): its page is under /ethereum/vaults.
+    uses: [TROVE_DEBT, { label: "Stability Pools", page: "/stability-pool" }],
   });
-  hit({ explorer: "liquity", chain: 1, token: SBOLD_VAULT, page: "/sbold", symbol: "sBOLD" });
+  hit({ explorer: "sbold", chain: 1, token: SBOLD_VAULT, symbol: "sBOLD" });
   for (const [explorer, chain, branches, debt, debtSymbol] of [
     ["asymmetry", 1, ASYMMETRY_BRANCHES, USDAF, USDAF_SYMBOL],
     ["ebisu", 1, EBISU_BRANCHES, EBUSD, EBUSD_SYMBOL],
@@ -363,6 +368,19 @@ export async function assetChips(
   for (const [id, g] of grouped) {
     const chips: AssetChip[] = [];
     for (const [explorer, hs] of g) {
+      const vaultPage = VAULT_PAGES.get(explorer);
+      if (vaultPage) {
+        chips.push({
+          explorer,
+          label: vaultPage.label,
+          chain: vaultPage.chainId,
+          href: vaultPage.href,
+          link: "page",
+          token: { symbol: vaultPage.label, address: vaultPage.address },
+          from: [...new Set(hs.map((h) => h.from))].sort(),
+        });
+        continue;
+      }
       const p = byExplorer.get(explorer);
       if (!p) continue;
       const facets = hs
@@ -402,7 +420,7 @@ export async function assetChips(
   }
   const listed = new Map<string, ListedToken>();
   for (const h of hits)
-    if (h.symbol && byExplorer.has(h.explorer) && !listed.has(`${h.chain}:${h.token}`))
+    if (h.symbol && (byExplorer.has(h.explorer) || VAULT_PAGES.has(h.explorer)) && !listed.has(`${h.chain}:${h.token}`))
       listed.set(`${h.chain}:${h.token}`, { chain: h.chain, token: h.token, symbol: h.symbol });
   return { chips: out, listed: [...listed.values()] };
 }

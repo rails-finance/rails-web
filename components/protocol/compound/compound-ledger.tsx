@@ -29,6 +29,9 @@ import { assetLedgers, dollarLedger, tokenLedger } from "@/lib/shared/event-ledg
 import type { FlowSegment, FlowSide } from "@/lib/shared/flows-timeline";
 import { flowSegmentProv, ledgerPartProv } from "@/lib/shared/flows-timeline-provenance";
 import { compoundSideBalances, type CompoundFlowReplay } from "@/lib/compound/flows";
+import { cometNoDollarLine } from "@/lib/compound/comet-price-notes";
+
+const capitalised = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** The position's replay, for the cards' ledgers; null where the page has
  *  none (the cells then stand as they always did). */
@@ -50,12 +53,22 @@ function CompoundSideLedger({ side, eventId, eventTs }: { side: FlowSide; eventI
   const ev = focus.events.find((e) => e.id === eventId) ?? null;
   const sb = compoundSideBalances(rp, eventId, side);
   if (!sb) return null;
+  if (sb.held == null)
+    return (
+      <p className="text-sm text-rb-500" data-ledger-missing={side}>
+        {capitalised(
+          cometNoDollarLine(sb.balances.filter((b) => b.price == null && b.amount > 0).map((b) => b.symbol)),
+        )}
+        .
+      </p>
+    );
+  const heldUsd = sb.held;
   const held: FlowSegment = {
     key: `${side}-held`,
     label: side === "collateral" ? "Held" : "Owed",
     fill: "held",
-    width: sb.held,
-    value: sb.held,
+    width: heldUsd,
+    value: heldUsd,
   };
   const totalProv = flowSegmentProv(held, side, at, false, model.daily);
   const beforeProv = ledgerPartProv(SIDE_NAME[side], "USD", at, "held-before");
@@ -68,16 +81,25 @@ function CompoundSideLedger({ side, eventId, eventTs }: { side: FlowSide; eventI
     };
     const single = assetTokenSum(bySum);
     if (single) {
-      const dollars = eventSideSumByAsset(model, bySum, cum, sb.held);
+      const dollars = eventSideSumByAsset(model, bySum, cum, heldUsd);
+      const bal = bySum.balances.find((x) => x.symbol === single.symbol);
       const ledger = tokenLedger({
         model,
         side,
         ev,
         sum: single,
         usd: shownFor(single.symbol)
-          ? { lines: dollars.lines, dollars: dollars.total.dollars, before: sb.heldBefore }
+          ? {
+              lines: dollars.lines,
+              dollars: dollars.total.dollars,
+              before: sb.heldBefore,
+              ...(dollars.total.cents != null ? { cents: dollars.total.cents } : {}),
+            }
           : null,
-        price: bySum.balances.find((x) => x.symbol === single.symbol)?.price ?? null,
+        price: bal?.price ?? null,
+        ...(bal?.price != null
+          ? { held: { amount: bal.amount, price: bal.price, block: bal.block ?? null, priceNote: bal.priceNote } }
+          : {}),
       });
       return (
         <>
@@ -98,7 +120,7 @@ function CompoundSideLedger({ side, eventId, eventTs }: { side: FlowSide; eventI
       side,
       ev,
       sum: bySum,
-      held: sb.held,
+      held: heldUsd,
       heldBefore: sb.heldBefore,
     });
     return (
@@ -117,7 +139,7 @@ function CompoundSideLedger({ side, eventId, eventTs }: { side: FlowSide; eventI
     );
   }
   // The flows before the event do not meet the day rows: the ledger in dollars.
-  const rows = eventSideSum(model, side, cum, sb.held);
+  const rows = eventSideSum(model, side, cum, heldUsd);
   const ledger = dollarLedger({
     model,
     side,
@@ -125,6 +147,7 @@ function CompoundSideLedger({ side, eventId, eventTs }: { side: FlowSide; eventI
     lines: rows.lines,
     dollars: rows.total.dollars,
     before: sb.heldBefore,
+    ...(rows.total.cents != null ? { cents: rows.total.cents } : {}),
   });
   return (
     <>

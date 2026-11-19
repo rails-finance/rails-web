@@ -6,6 +6,7 @@
 
 import type { Provenance } from "@/components/shared/provenance";
 import { holderUsdReceipt, type UsdLeg } from "@/lib/shared/holder-usd-receipt";
+import { formatUsdValue } from "@/lib/utils/format";
 import {
   aaveV4PeakPriceNote,
   aaveV4PriceNote,
@@ -34,6 +35,8 @@ export interface AaveV4UsdRow {
   price: AaveV4RowPrice | null;
   /** The rows' name where the symbol alone does not tell two rows apart. */
   label?: string;
+  /** The amount row's class where it is worked out rather than read. */
+  amountKind?: UsdLeg["amountKind"];
 }
 
 export type AaveV4UsdResult =
@@ -68,6 +71,7 @@ export function aaveV4UsdReceipt(o: {
       label: r.label,
       amount: r.amount,
       amountNote: r.amountNote,
+      ...(r.amountKind ? { amountKind: r.amountKind } : {}),
       price: p.usd,
       priceNote: p.note ?? aaveV4PriceNote(p.source, r.symbol, p.block),
       ...(p.oracle ? { priceContract: { name: "Aave V4 spoke oracle", address: p.oracle } } : {}),
@@ -101,6 +105,22 @@ export function aaveV4UsdReceipt(o: {
 /** A peak's receipt: the amounts held at it, each at its reserve's last
  *  event's oracle price, both blocks named (ui-jobs 743). */
 export function aaveV4PeakReceipt(
+  what: string,
+  peak: {
+    block: number;
+    legs: readonly { symbol: string; amount: number; price: number; priceBlock: number }[];
+    skipped?: boolean;
+  },
+): AaveV4UsdResult | null {
+  const r = peakReceipt(what, peak);
+  // An instant the walk skipped for an unpriced holding leaves the figure a
+  // lower bound, said first.
+  if (!peak.skipped || !r?.prov) return r;
+  const bound = `At least ${formatUsdValue(r.usd)}: an instant holding an unpriced asset is not counted.`;
+  return { ...r, prov: { ...r.prov, summary: `${bound} ${r.prov.summary}` } };
+}
+
+function peakReceipt(
   what: string,
   peak: { block: number; legs: readonly { symbol: string; amount: number; price: number; priceBlock: number }[] },
 ): AaveV4UsdResult | null {

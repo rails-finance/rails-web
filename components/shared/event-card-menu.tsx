@@ -1,7 +1,8 @@
 "use client";
 
 // The event card's ⋮ (rails-ops TO-DO-ui-jobs 281, 308, 535), at the T1 row's
-// right end (ui-jobs 295), the same on every family. On a timeline: Open event
+// right end (ui-jobs 295), the same on every family. On a timeline: View in
+// timeline where the row's event lives on another position's page, Open event
 // page, Copy transaction hash, inside a group Group {n} events, and Hide the
 // row's type of event, the Type filter's untick; a closed group's
 // row holds Show {n} grouped events. On the event page it stands at the
@@ -16,6 +17,7 @@ import { usePathname } from "next/navigation";
 import { ArrowUpRight, Check, ChevronDown, ChevronUp, Copy, EyeOff } from "lucide-react";
 import { ToolsMenu, ToolsMenuItem } from "@/components/shared/tools-menu";
 import { EVENT_PAGE_WORDS as W } from "@/lib/shared/event-page-words";
+import { timelineHrefOf } from "@/components/shared/event-number-pill";
 
 /** The menu's words. */
 const WORDS = {
@@ -110,6 +112,10 @@ export function EventCardMenu({
   const hideType = useContext(EventTypeHideContext);
   const pagePath = shareHref?.split("?")[0] ?? null;
   const onEventPage = pagePath != null && pathname === pagePath;
+  // A row whose event lives on another position's page (the Liquity V2
+  // redeemer page's): View in timeline lands on it in that position's timeline.
+  const elsewhere = pagePath != null && !onEventPage && pagePath.replace(/\/event\/[^/]+$/, "") !== pathname;
+  const timeline = timelineHref ?? (elsewhere && shareHref ? timelineHrefOf(shareHref) : undefined);
   const [copied, copy] = useMenuCopied();
   const hideTypeRow = (close: () => void) =>
     hideType && (
@@ -145,13 +151,13 @@ export function EventCardMenu({
           </>
         ) : (
           <>
-            {timelineHref && (
+            {timeline && (
               <ToolsMenuItem
                 item="view-timeline"
                 icon={<ArrowUpRight size={16} />}
                 title={W.in_timeline}
                 subtitle={W.in_timeline_hint}
-                href={timelineHref}
+                href={timeline}
                 internal
                 onClick={close}
               />

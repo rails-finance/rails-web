@@ -9,6 +9,7 @@
 // got it: a delivery phrase + via, and copyable block / tx / asset chips
 // threaded from the event.
 
+import { liquityV2PriceNote } from "@/lib/liquity-v2/price-notes";
 import type { Provenance, ProvInput, ProvScaling, ProvVerify } from "@/components/shared/provenance";
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import type { OriginEnvelope } from "@/lib/shared/types/event-shape";
@@ -255,7 +256,11 @@ export function eventPriceProv(ctx: LiquityContext, coords?: EventCoords): Figur
       kind: "chain-derived",
       pclass: "oracle",
       summary: `${collSym} price at this event — the price Liquity used at this block, from Chainlink's on-chain price feeds (and, for staked ETH, the token's exchange rate) combined by the rules in Liquity's PriceFeed contract.`,
-      via: `${streamVia()} · on-chain oracle feeds @ event block · Liquity PriceFeed math`,
+      via: `${streamVia()} · ${liquityV2PriceNote(collSym)}, ${
+        coords?.blockNumber != null
+          ? `at block ${coords.blockNumber.toLocaleString("en-US")}`
+          : "at a block this read does not name"
+      }`,
       inputs: eventInputs({ ...coords, asset: collSym }),
     },
   };
