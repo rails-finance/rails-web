@@ -81,6 +81,9 @@ export interface VaultAssetRow {
   /** A row the band does not draw (a wrapper hop, which holds no amount of
    *  this vault's asset). */
   offBand?: boolean;
+  /** A deduction from the rows above (IPOR Fusion's management fee not yet
+   *  taken): the amount reads with a minus sign, and the band does not draw it. */
+  minus?: boolean;
   /** `data-*` hooks a verifier reads. */
   hooks?: Record<string, string>;
 }
@@ -111,7 +114,7 @@ export function allocationBar(
   const plan = planAllocation(
     rows
       .map((r, order) => ({ r, order, key: r.key, amount: r.amount ? BigInt(r.amount.raw) : null }))
-      .filter(({ r }) => !r.offBand),
+      .filter(({ r }) => !r.offBand && !r.minus),
   );
   const planTotal = Number(plan.total);
   const parts = plan.shown.map((l) => ({
@@ -235,7 +238,7 @@ export function VaultAssets({
   const tableRows = capped ? rows.slice(0, limit) : rows;
   const banded = rows
     .map((r, order) => ({ r, order }))
-    .filter(({ r }) => !r.offBand)
+    .filter(({ r }) => !r.offBand && !r.minus)
     .map(({ r, order }) => ({ key: r.key, amount: r.amount ? BigInt(r.amount.raw) : null, order, r }));
   const plan = planAllocation(banded);
   const total = plan.total;
@@ -382,9 +385,12 @@ export function VaultAssets({
                       {r.amount == null ? (
                         <NotLoaded />
                       ) : r.amountProv ? (
-                        <Prov info={r.amountProv}>{amountText(r.amount)}</Prov>
+                        <Prov info={r.amountProv}>
+                          {r.minus ? "−" : ""}
+                          {amountText(r.amount)}
+                        </Prov>
                       ) : (
-                        amountText(r.amount)
+                        `${r.minus ? "−" : ""}${amountText(r.amount)}`
                       )}
                     </span>
                     {r.amount != null && <AssetUnit symbol={assetSymbol} address={assetAddress} />}

@@ -36,6 +36,8 @@ import type { AaveEthereumVaultResponse } from "@/lib/sources/chain/aave-ethereu
 import { yearnVaultEndorsedProv, yearnVaultRoleProv, type YearnVaultCoords } from "@/lib/yearn/vault-provenance";
 import type { YearnVaultResponse } from "@/lib/sources/chain/yearn-ethereum-vault";
 import { YEARN_REGISTRY } from "@/lib/yearn/vault-catalog";
+import type { IporFusionVaultResponse } from "@/lib/sources/chain/ipor-fusion-vault";
+import { iporVaultAddressProv, type IporFusionCoords } from "@/lib/ipor-fusion/vault-provenance";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -552,6 +554,165 @@ export function yearnConfigTile({
                 },
               ]
             : []),
+        ],
+      },
+    ],
+  };
+}
+
+// ── IPOR Fusion ────────────────────────────────────────────────────────────
+
+/** An IPOR Fusion vault's Configuration (rails-ops TO-DO-ipor-scoping §6.3):
+ *  the factory version and creation, then the contracts the vault names. Its
+ *  roles have a tile of their own. */
+export function iporFusionConfigTile({
+  data,
+  coords,
+  release,
+  createdAt,
+}: {
+  data: IporFusionVaultResponse;
+  coords: IporFusionCoords;
+  /** "IPOR Fusion V4". */
+  release: string;
+  createdAt: number | null;
+}): ConfigTile {
+  const y = data.vault;
+  const chainId = data.chainId as ChainId;
+  const vaultName = y.name ?? y.censusName ?? y.address;
+  const created: VaultCreation | null =
+    y.createdBlock > 0
+      ? {
+          chainId,
+          vault: y.address,
+          vaultName,
+          release,
+          log: "FusionInstanceCreated",
+          factory: y.factory,
+          block: y.createdBlock,
+          at: createdAt,
+        }
+      : null;
+  const address = (label: string, call: string, what: string) => () =>
+    iporVaultAddressProv(coords, { label, call, what });
+  const feeAccount = (which: "performance" | "management") => {
+    const f = which === "performance" ? y.performanceFee : y.managementFee;
+    return {
+      kind: "address" as const,
+      id: `${which}-fee-account`,
+      label: which === "performance" ? "Performance fee account" : "Management fee account",
+      tip: "The address the vault mints this fee to, as new shares.",
+      address: f?.account ?? null,
+      read: f != null,
+      prov: address(
+        which === "performance" ? "Performance fee account" : "Management fee account",
+        which === "performance" ? "getPerformanceFeeData()" : "getManagementFeeData()",
+        "the address the vault mints this fee to, as new shares.",
+      ),
+    };
+  };
+  return {
+    stampWhat: "The version, the creation and the contracts",
+    stampContracts: [
+      {
+        name: vaultName,
+        address: y.address,
+        reads:
+          "asset(), getAccessManagerAddress(), getPriceOracleMiddleware(), getPerformanceFeeData(), getManagementFeeData()",
+      },
+    ],
+    columns: [
+      {
+        title: "Configuration",
+        entries: [
+          networkEntry(chainId),
+          {
+            kind: "fact",
+            id: "version",
+            label: "Version",
+            tip: "The factory version that made the vault, from its creation event.",
+            value: created ? <Prov info={configReleaseProv(created)}>{release}</Prov> : release,
+          },
+          createdEntry(created, y.createdBlock, createdAt),
+        ],
+      },
+      {
+        title: "Contracts",
+        entries: [
+          {
+            kind: "address",
+            id: "vault",
+            label: "Vault",
+            tip: "The PlasmaVault that holds the deposits and issues the shares.",
+            sub: vaultName,
+            address: y.address,
+            prov: () =>
+              created
+                ? configVaultProv(created)
+                : iporVaultAddressProv(coords, {
+                    label: "Vault",
+                    call: "name()",
+                    what: "the vault every figure is read from.",
+                  }),
+          },
+          {
+            kind: "address",
+            id: "asset",
+            label: "Asset",
+            tip: "The token the vault takes in deposits.",
+            sub: y.assetDiffersFromCensus ? undefined : y.asset.symbol,
+            note: y.assetDiffersFromCensus ? "differs from the asset the census recorded" : undefined,
+            address: y.assetRead ? y.asset.address : null,
+            read: y.assetRead,
+            prov: address(
+              "Asset",
+              "asset()",
+              y.assetDiffersFromCensus
+                ? "the token the vault takes in deposits. It differs from the asset the census recorded, so no symbol is stated beside it."
+                : `the token the vault takes in deposits: ${y.asset.symbol}.`,
+            ),
+          },
+          ...(created
+            ? [
+                {
+                  kind: "address" as const,
+                  id: "factory",
+                  label: "Factory",
+                  tip: "The IPOR Fusion factory proxy whose creation event names the vault.",
+                  sub: release,
+                  address: y.factory,
+                  prov: () => configReleaseProv(created),
+                },
+              ]
+            : []),
+          {
+            kind: "address",
+            id: "access-manager",
+            label: "Access manager",
+            tip: "The contract that grants every role over the vault.",
+            address: y.accessManager,
+            read: y.accessManager != null,
+            prov: address(
+              "Access manager",
+              "getAccessManagerAddress()",
+              "the contract that grants every role over the vault.",
+            ),
+          },
+          {
+            kind: "address",
+            id: "price-oracle",
+            label: "Price oracle middleware",
+            tip: "The contract the vault asks for the USD price of each token it holds.",
+            address: y.priceOracleMiddleware,
+            read: y.priceOracleMiddleware != null,
+            prov: address(
+              "Price oracle middleware",
+              "getPriceOracleMiddleware()",
+              "the contract the vault asks for the USD price of each token it holds, which its balance fuses use to value a market in the vault's asset.",
+            ),
+          },
+          feeAccount("performance"),
+          feeAccount("management"),
         ],
       },
     ],

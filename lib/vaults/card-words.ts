@@ -196,6 +196,59 @@ export const yearnVaultCardContent = (): LearnMoreContent => ({
   ],
 });
 
+export const iporFusionVaultCardContent = (): LearnMoreContent => ({
+  title: "How an IPOR Fusion vault works",
+  intro:
+    "An IPOR Fusion vault takes one token and its curator moves it into other protocols through fuses. A holder owns shares, and a share converts to more of the token as those positions earn.",
+  detailsHeading: "Key concepts:",
+  details: [
+    {
+      bold: "Owner and curator",
+      text: "the owner appoints the vault's Atomist, owners and guardians; the curator, IPOR's Alpha, moves the assets between markets.",
+    },
+    {
+      bold: "Fuses",
+      text: "small contracts the vault runs to act in one protocol each. The IPOR DAO keeps a register marking each fuse active, deprecated or removed.",
+    },
+    {
+      bold: "Fees",
+      text: "a performance fee on the share price's gains and a yearly management fee, each minted to its fee account as new shares.",
+    },
+    {
+      bold: "Factory",
+      text: "anyone may deploy from the factory, so the address identifies the vault.",
+    },
+  ],
+});
+
+export const iporFusionVaultAssetsContent = (): LearnMoreContent => ({
+  title: "Where an IPOR Fusion vault's assets are",
+  intro:
+    "The vault's balance is the asset it holds, plus each market's balance as the vault last recorded it, in the vault's asset. A market is one protocol, or one kind of holding, the vault may act in.",
+  detailsHeading: "Key concepts:",
+  details: [
+    {
+      bold: "Amount",
+      text: "the market's balance as the vault stored it when it last acted there or updated its balances, so it can trail the market.",
+    },
+    {
+      bold: "Grants",
+      text: "under each market, what the vault may use there: tokens, markets, pools or vaults. IPOR calls them substrates.",
+    },
+    {
+      bold: "Management fee not yet taken",
+      text: "on some vault versions the vault's total assets are the rows less the management fee accrued and not yet minted; the table shows it as a deduction.",
+    },
+    { bold: "Share of this vault", text: "a row's amount over the rows' sum, so the shares total 100%." },
+  ],
+  links: [
+    {
+      label: "IPOR's documentation: What is a fuse",
+      url: "https://ipor.io/docs/build-on-fusion/architecture-overview/what-is-a-fuse",
+    },
+  ],
+});
+
 export const yearnVaultAssetsContent = (): LearnMoreContent => ({
   title: "Where a Yearn V3 vault's assets are",
   intro:

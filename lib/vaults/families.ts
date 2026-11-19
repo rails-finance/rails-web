@@ -18,12 +18,20 @@
  *  cross-protocol index (ui-jobs 39; survey 2026-10-20 §7.6); sBOLD on
  *  Ethereum, which no explorer deploys: its page is /ethereum/vaults/sbold and
  *  it carries no venue mark (ui-jobs 749, 765). */
-export type VaultFamily = "metamorpho" | "sgho" | "stata" | "umbrella-stake" | "yearn-v3" | "maple-pool" | "sbold";
+export type VaultFamily =
+  | "metamorpho"
+  | "sgho"
+  | "stata"
+  | "umbrella-stake"
+  | "yearn-v3"
+  | "maple-pool"
+  | "sbold"
+  | "ipor-fusion";
 
 /** The explorer a vault sits under (decision 0028), which is also the session
  *  key its listing is filed under. MetaMorpho's is chain-keyed: `morpho-base`
  *  on Base, `morpho` on Ethereum. */
-export type VaultExplorer = "morpho-base" | "morpho" | "aave-vaults" | "yearn";
+export type VaultExplorer = "morpho-base" | "morpho" | "aave-vaults" | "yearn" | "ipor-fusion";
 
 /** The census's word for a family. The census writes `morpho` for every
  *  MetaMorpho vault and `yearn-v3` for Yearn V3. */
@@ -37,7 +45,7 @@ export interface VaultFamilyEntry {
   explorer: VaultExplorer | "maple" | null;
   /** The `ProtocolIcon` id of the venue that deployed it; null where no
    *  explorer deploys it, and no mark is drawn. */
-  venue: "morpho" | "aave-v3" | "yearn" | "maple" | null;
+  venue: "morpho" | "aave-v3" | "yearn" | "maple" | "ipor-fusion" | null;
   /** The family as a heading or a facet names it. */
   label: string;
   /** The same, for one vault. */
@@ -125,6 +133,17 @@ export const VAULT_FAMILIES: Record<VaultFamily, VaultFamilyEntry> = {
     census: null,
     served: null,
   },
+  // IPOR Fusion (rails-ops TO-DO-ipor-scoping §6.3): every vault its factory
+  // made, on Ethereum first. No census and no served roster yet.
+  "ipor-fusion": {
+    explorer: "ipor-fusion",
+    venue: "ipor-fusion",
+    label: "IPOR Fusion",
+    singular: "IPOR Fusion vault",
+    kind: "Curated vault",
+    census: null,
+    served: null,
+  },
   sbold: {
     explorer: null,
     venue: null,
@@ -145,5 +164,6 @@ export const familyOfCensus = (f: VaultCensusFamily): VaultFamily => (f === "mor
 export function releaseLabel(family: VaultFamily, release: string | null): string {
   if (family === "metamorpho") return release ? `MetaMorpho ${release.replace(/^v/, "V")}` : "MetaMorpho";
   if (family === "yearn-v3") return release ? `Yearn V3 ${release}` : "Yearn V3";
+  if (family === "ipor-fusion") return release ? `IPOR Fusion ${release.replace(/^v/, "V")}` : "IPOR Fusion";
   return VAULT_FAMILIES[family].singular;
 }
