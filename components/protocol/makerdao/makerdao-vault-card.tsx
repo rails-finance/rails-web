@@ -44,13 +44,13 @@ import {
   vaultInkProv,
   vaultArtProv,
   daiDebtProv,
-  collateralUsdProv,
   collateralRatioProv,
   peakInkProv,
   peakDebtProv,
 } from "@/lib/makerdao/event-provenance";
 import { formatNumber, formatUsdValue } from "@/lib/utils/format";
 import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
+import { makerVaultCollateralUsd, makerVaultDebtUsd } from "@/lib/makerdao/usd-receipt";
 import { makerPositionModal } from "@/lib/makerdao/event-templates";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { makerdaoPanelColumns } from "./makerdao-risk-slot";
@@ -148,19 +148,6 @@ function vaultIdentityLabel(v: MakerVaultView): string {
   return `${name.noun} ${name.id}`;
 }
 
-/** The debt's dollar value at Maker's $1 par. */
-function debtUsdProv(symbol: string, debt: number): Provenance {
-  return {
-    kind: "derived",
-    summary: `Debt value in USD. The ${symbol} debt at Maker's $1 par. The Vat counts one ${symbol} as one dollar, and the card states no market price for it.`,
-    formula: "debt × $1",
-    inputs: [
-      { label: "debt", value: `${formatNumber(debt)} ${symbol}`, kind: "chain-derived", pclass: "state" },
-      { label: "par", value: "$1", kind: "derived", note: `Maker accounts ${symbol} at $1` },
-    ],
-  };
-}
-
 const chipClass =
   "rounded-sm bg-rb-300 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-foreground/60 dark:bg-rb-700";
 
@@ -247,7 +234,10 @@ export function makerVaultCardSlots({
   // DAI for CdpManager vaults, USDS for LockStake urns — same Vat accounting,
   // different join mints the token (asset-catalog).
   const debtSym = ilkDebtSymbol(v.ilk);
-  const ratio = v.debtDai && v.collateralUsd != null && v.debtDai > 0 ? (v.collateralUsd / v.debtDai) * 100 : null;
+  // The dollars each head draws: the shown products (ui-jobs 743).
+  const collUsd = makerVaultCollateralUsd(v);
+  const debtUsd = v.debtDai != null && v.rate && v.debtDai >= 0 ? makerVaultDebtUsd(debtSym, v.debtDai) : null;
+  const ratio = collUsd && debtUsd && debtUsd.usd > 0 ? (collUsd.usd / debtUsd.usd) * 100 : null;
   // A capped feed valued at its cap: the oracle reads above it.
   const capBinds = v.priceCap != null && v.priceCap.oracleUsd != null && v.priceCap.oracleUsd > v.priceCap.capUsd;
 
@@ -371,17 +361,11 @@ export function makerVaultCardSlots({
           <AssetAmount value={v.ink} symbol={v.collateralSymbol} />
         </Prov>
       ),
-      usd:
-        v.collateralUsd != null ? (
-          <Prov
-            info={stampServerRead(
-              collateralUsdProv(v.collateralSymbol, formatNumber(v.ink), v.priceUsd ?? 0),
-              v.readBy,
-            )}
-          >
-            <span className="font-bold text-green-400">{formatUsdValue(v.collateralUsd)}</span>
-          </Prov>
-        ) : null,
+      usd: collUsd ? (
+        <Prov info={stampServerRead(collUsd.prov, v.readBy)}>
+          <span className="font-bold text-green-400">{formatUsdValue(collUsd.usd)}</span>
+        </Prov>
+      ) : null,
       // The feed is capped under the oracle, so the value is at the cap
       // (TO-DO-ui-jobs 189).
       sub:
@@ -405,9 +389,9 @@ export function makerVaultCardSlots({
         ),
       usd:
         // A zero debt states its zero dollars, as Liquity V2's does.
-        v.debtDai != null && v.rate && v.debtDai >= 0 ? (
-          <Prov info={debtUsdProv(debtSym, v.debtDai)}>
-            <span className="font-bold text-green-400">{formatUsdValue(v.debtDai)}</span>
+        debtUsd ? (
+          <Prov info={debtUsd.prov}>
+            <span className="font-bold text-green-400">{formatUsdValue(debtUsd.usd)}</span>
           </Prov>
         ) : null,
     },
@@ -421,8 +405,8 @@ export function makerVaultCardSlots({
           <Prov
             info={stampServerRead(
               collateralRatioProv(
-                v.collateralUsd != null ? formatUsdValue(v.collateralUsd) : "—",
-                v.debtDai != null ? `${formatNumber(v.debtDai)} ${debtSym}` : "—",
+                collUsd ? formatUsdValue(collUsd.usd) : "—",
+                debtUsd ? formatUsdValue(debtUsd.usd) : "—",
               ),
               v.readBy,
             )}

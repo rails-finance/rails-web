@@ -14,7 +14,7 @@
 import type { ReactNode } from "react";
 import { collAmount, debtDigits, usdPrice } from "@/lib/makerdao/price-format";
 import type { MakerDAOContext } from "@/lib/shared/types/event-shape";
-import { Prov } from "@/components/shared/provenance";
+import { Prov, type Provenance } from "@/components/shared/provenance";
 import { reconstructTransition } from "@/components/shared/chain-truth-event";
 import {
   EventNotes,
@@ -33,8 +33,6 @@ import {
   debtBeforeProv,
   debtChangeProv,
   interestSincePreviousProv,
-  grabSeizedUsdProv,
-  flowValueProv,
   eventPriceProv,
   atBlockPriceProv,
   eventRatioProv,
@@ -51,6 +49,8 @@ import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
 import { useMakerVaultHistory, type MakerOwnerRef, type MakerOwnershipStep } from "@/lib/makerdao/vault-history";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
 import { useMakerLedgerCells } from "./makerdao-ledger";
+import { useMakerFlowPrice } from "@/lib/makerdao/flow-prices";
+import { makerCollateralUsd, makerFlowUsd } from "@/lib/makerdao/usd-receipt";
 import type { MakerAuctionRead, MakerTxContext } from "@/lib/makerdao/chain-history-types";
 import { formatDate } from "@/lib/date";
 import { knownContract } from "@/lib/makerdao/known-contracts";
@@ -123,6 +123,9 @@ export function rowRatios(ctx: MakerDAOContext, price: number | null) {
 /** The Collateral and Debt cells, with the collateral's value at `price`
  *  (the ledger's price where the cell opens into the Lifetime flows ledger,
  *  else the OSM price at the block, where read). */
+/** A cell's dollars from a receipt: the drawn figure is its product. */
+const usdOf = (r: { prov: Provenance; usd: number } | null) => (r ? { usd: { value: r.usd, prov: r.prov } } : {});
+
 function useMakerStats(ctx: MakerDAOContext, coords: MakerCoords, eventId: string, price: number | null) {
   const debtSym = ilkDebtSymbol(ctx.ilk);
   const collSym = ctx.collateralSymbol;
@@ -157,11 +160,9 @@ function useMakerStats(ctx: MakerDAOContext, coords: MakerCoords, eventId: strin
   const flowsPending = !!focus && !focus.model;
   const flowRow = isFrob || isGrab || ctx.eventType === "fork-in" || ctx.eventType === "fork-out";
   const owes = (Number(ctx.debtAfter ?? "0") || 0) > 0 || debtMove !== 0;
-  const flowEv = focus?.model ? focus.events.find((e) => e.id === eventId) : undefined;
-  const flowPrice =
-    flowEv?.sides && flowEv.sides.collateral.held > 0
-      ? flowEv.sides.collateral.after / flowEv.sides.collateral.held
-      : null;
+  // The price the Lifetime flows replay took for this row, and its read.
+  const flowAt = useMakerFlowPrice(eventId);
+  const flowPrice = focus?.model && flowAt && flowAt.price > 0 ? flowAt.price : null;
   const collLedger = flowRow && (cells != null || flowsPending) ? { ledger: "collateral" as const } : {};
   const debtLedger = flowRow && (cells?.debt || (flowsPending && owes)) ? { ledger: "debt" as const } : {};
 
@@ -190,20 +191,30 @@ function useMakerStats(ctx: MakerDAOContext, coords: MakerCoords, eventId: strin
       // Where the cell opens into the Lifetime flows ledger, the collateral's
       // value at the ledger's price, so the closed cell and the opened ledger
       // state one figure; otherwise at this block's OSM price.
-      ...(isFrob && flowPrice != null && inkAfter != null && inkAfter > 1e-9 && collLedger.ledger
-        ? {
-            usd: {
-              value: inkAfter * flowPrice,
-              prov: flowValueProv(collSym, coords, { amount: fmt(String(inkAfter)), priceUsd: flowPrice }),
-            },
-          }
+      // Each the shown product, its receipt naming the price's blocks (ui-jobs 743).
+      ...(isFrob && flowPrice != null && flowAt && inkAfter != null && inkAfter > 1e-9 && collLedger.ledger
+        ? usdOf(
+            makerFlowUsd({
+              what: `The ${collSym} in the vault after this event, at the Lifetime flows ledger's price`,
+              symbol: collSym,
+              amount: inkAfter,
+              amountNote: `the vault's ink after this event${coords.blockNumber != null ? ` at block ${coords.blockNumber.toLocaleString("en-US")}` : ""}`,
+              price: flowPrice,
+              from: flowAt.at,
+            }),
+          )
         : isFrob && price != null && inkAfter != null && inkAfter > 1e-9
-          ? {
-              usd: {
-                value: inkAfter * price,
-                prov: grabSeizedUsdProv(collSym, coords, { amount: fmt(String(inkAfter)), priceUsd: price }),
-              },
-            }
+          ? usdOf(
+              makerCollateralUsd({
+                what: `The ${collSym} in the vault after this event, at the OSM price of its block`,
+                symbol: collSym,
+                ink: inkAfter,
+                inkSource: "api",
+                inkBlock: coords.blockNumber ?? null,
+                price,
+                priceBlock: coords.blockNumber ?? null,
+              }),
+            )
           : {}),
     },
     // The debt owed: art × the rate at the block (DAI, or USDS on LockStake
@@ -385,7 +396,21 @@ function MakerAuctionNotes({
   const a = auction?.kind === "clipper" ? auction : null;
   const mat = a?.mat ?? null;
   const usd = price?.prices.find((p) => p.symbol === collSym)?.usd ?? null;
-  const ratio = usd != null && cleared != null && cleared > 0 ? (seized * usd) / cleared : null;
+  // The seized collateral's dollars: the shown product at the OSM price of
+  // the grab's block (ui-jobs 743).
+  const seizedUsd =
+    usd != null
+      ? makerCollateralUsd({
+          what: "What the seized collateral was worth at the grab",
+          symbol: collSym,
+          ink: seized,
+          inkSource: "api",
+          inkBlock: coords.blockNumber ?? null,
+          price: usd,
+          priceBlock: coords.blockNumber ?? null,
+        })
+      : null;
+  const ratio = seizedUsd != null && cleared != null && cleared > 0 ? seizedUsd.usd / cleared : null;
   const vals = { clip: a?.clip, auctionId: a?.auctionId };
   const lines: ReactNode[] = [];
   if (ratio != null)
@@ -405,7 +430,7 @@ function MakerAuctionNotes({
         )}
       </NoteLine>,
     );
-  if (usd != null)
+  if (seizedUsd != null)
     lines.push(
       <NoteLine key="seized" label="Seized">
         <Prov info={dinkProv(collSym, coords)} value={formatNumber(seized)}>
@@ -413,11 +438,8 @@ function MakerAuctionNotes({
         </Prov>{" "}
         <span className="font-normal text-rb-500">
           ={" "}
-          <Prov
-            info={grabSeizedUsdProv(collSym, coords, { amount: formatNumber(seized), priceUsd: usd })}
-            value={formatUsdValue(seized * usd)}
-          >
-            {`$${Math.round(seized * usd).toLocaleString("en-US")}`}
+          <Prov info={seizedUsd.prov} value={formatUsdValue(seizedUsd.usd)}>
+            {formatUsdValue(seizedUsd.usd)}
           </Prov>{" "}
           at the OSM price then
         </span>

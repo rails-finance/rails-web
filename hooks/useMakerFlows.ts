@@ -13,11 +13,12 @@
 // the timeline (components/shared/flow-focus-context.tsx).
 
 import { useEffect, useMemo, useState } from "react";
+import type { MakerFlowPrices } from "@/lib/makerdao/flow-prices";
 import type { FlowsRead } from "@/components/shared/lifetime-flows-panel";
 import { useFlowFocusRoot, useFlowFocusValue, type FlowFocusValue } from "@/components/shared/flow-focus-context";
 import type { FlowTimeline } from "@/lib/shared/flows-timeline";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
-import { fetchDailyPrices } from "@/lib/api/fetch-daily-prices";
+import { dailyPricesFromAnswer, fetchDailyAnswer, type DailyAnswer } from "@/lib/api/fetch-daily-prices";
 import { useMakerIlkAt, useMakerMatChanges } from "@/lib/makerdao/use-chain-history";
 import { makerCollKey, makerHealthSource, makerMatReads } from "@/lib/makerdao/flows-health";
 import { makerFeedChanges, makerLifeHasFeedChange, type MakerFeedLog } from "@/lib/makerdao/feed-log";
@@ -42,6 +43,22 @@ import {
 
 const DAY_S = 86_400;
 const NO_EVENTS: never[] = [];
+
+/** One series of the store's answer: its `[day, usd]` prices and the block
+ *  each day's price was read at (the route's `obs[i][2]`). */
+function makerDailyRead(
+  body: DailyAnswer | null,
+  key: string,
+): { prices: [number, number][] | null; blocks: Map<number, number> | null } {
+  if (!body) return { prices: null, blocks: null };
+  const prices = dailyPricesFromAnswer(body)[key] ?? null;
+  const blocks = new Map<number, number>();
+  for (const [day, , block] of body.series?.[key]?.obs ?? []) {
+    const b = Number(block);
+    if (Number.isFinite(b) && b > 0) blocks.set(day, b);
+  }
+  return { prices, blocks: blocks.size > 0 ? blocks : null };
+}
 
 /** The store's series key for an ilk (rails-ops reference/daily-prices.md). */
 export const makerSeriesKey = (ilk: string) => `maker:${ilk}`;
@@ -103,6 +120,8 @@ export function useMakerFlows(p: MakerFlowsInput): {
   read: FlowsRead;
   focus: FlowFocusValue;
   facts: MakerFlowsFacts | null;
+  /** Each row's collateral price and its read, by event id. */
+  prices: MakerFlowPrices | null;
 } {
   const [fetched, setFetched] = useState<{ events: BaseActivityEvent[] | null; read: FlowsRead }>({
     events: null,
@@ -142,15 +161,19 @@ export function useMakerFlows(p: MakerFlowsInput): {
     [p.ilk, rows],
   );
   const wantKey = want ? `${want.ilk}:${want.from}` : null;
-  const [daily, setDaily] = useState<{ key: string; prices: [number, number][] | null } | null>(null);
+  const [daily, setDaily] = useState<{
+    key: string;
+    prices: [number, number][] | null;
+    blocks: Map<number, number> | null;
+  } | null>(null);
   useEffect(() => {
     if (!want || !wantKey) return;
     const ac = new AbortController();
     const key = makerSeriesKey(want.ilk);
-    fetchDailyPrices(1, [key], { from: want.from, signal: ac.signal })
-      .then((byKey) => setDaily({ key: wantKey, prices: byKey?.[key] ?? null }))
+    fetchDailyAnswer(1, [key], { from: want.from, signal: ac.signal })
+      .then((body) => setDaily({ key: wantKey, ...makerDailyRead(body, key) }))
       .catch((err) => {
-        if ((err as { name?: string })?.name !== "AbortError") setDaily({ key: wantKey, prices: null });
+        if ((err as { name?: string })?.name !== "AbortError") setDaily({ key: wantKey, prices: null, blocks: null });
       });
     return () => ac.abort();
     // `wantKey` stands for `want`.
@@ -181,12 +204,13 @@ export function useMakerFlows(p: MakerFlowsInput): {
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => setNow(Date.now() / 1000), []);
   const dailyPrices = dailySettled ? (daily?.prices ?? null) : null;
+  const dailyBlocks = dailySettled ? (daily?.blocks ?? null) : null;
   const opts = useMemo<MakerFlowOptions | null>(
     () =>
       now != null && p.collSymbol && p.debtSymbol && p.liveSettled
-        ? { collSymbol: p.collSymbol, debtSymbol: p.debtSymbol, now, live: p.live, daily: dailyPrices }
+        ? { collSymbol: p.collSymbol, debtSymbol: p.debtSymbol, now, live: p.live, daily: dailyPrices, dailyBlocks }
         : null,
-    [now, p.collSymbol, p.debtSymbol, p.live, p.liveSettled, dailyPrices],
+    [now, p.collSymbol, p.debtSymbol, p.live, p.liveSettled, dailyPrices, dailyBlocks],
   );
   const ready = opts != null && rows != null && dailySettled;
   const replayed = useMemo(() => (ready && rows && opts ? replayMaker(rows, opts) : null), [ready, rows, opts]);
@@ -299,5 +323,9 @@ export function useMakerFlows(p: MakerFlowsInput): {
           : rows != null && rows.length > 0 && timeline == null
             ? "failed"
             : "done";
-  return { timeline, read, focus, facts };
+  const prices = useMemo<MakerFlowPrices | null>(
+    () => (replayed ? new Map(replayed.map((r) => [r.ev.id, { price: r.price, at: r.priceAt }])) : null),
+    [replayed],
+  );
+  return { timeline, read, focus, facts, prices };
 }

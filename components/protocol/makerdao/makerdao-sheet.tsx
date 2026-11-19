@@ -19,7 +19,6 @@ import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
 import { collAmount, debtDigits } from "@/lib/makerdao/price-format";
 import {
   atBlock,
-  collateralUsdProv,
   debtAfterProv,
   debtBeforeProv,
   debtChangeProv,
@@ -35,6 +34,8 @@ import {
   type MakerCoords,
 } from "@/lib/makerdao/event-provenance";
 import { useMakerVaultHistory } from "@/lib/makerdao/vault-history";
+import { makerCollateralUsd, makerDebtUsd, makerLiquidationPrice } from "@/lib/makerdao/usd-receipt";
+import { priceText } from "@/lib/shared/shown-usd";
 import type { MakerDAOContext } from "@/lib/shared/types/event-shape";
 import type { Provenance } from "@/components/shared/provenance";
 import { changeText } from "@/components/shared/change-swap-value";
@@ -55,24 +56,32 @@ const DUST_DEBT = 0.005;
 
 const signed = (n: number, text: string) => (n < 0 ? `−${text}` : text);
 
-/** A collateral amount's dollars at the OSM price of the block. */
-function collUsdProv(sym: string, what: string, amount: number, price: number, coords: MakerCoords): Provenance {
-  const base = collateralUsdProv(sym, formatExactDecimal(String(Math.abs(amount))), price);
-  return {
-    ...base,
-    summary: `${what} in US dollars. The ${sym} amount times the OSM price for the ilk at this event's block${atBlock(coords)}, Vat spot × Spotter mat.`,
-    inputs: [...(base.inputs ?? []), ...eventInputs(coords)],
-  };
+/** A collateral amount's dollars at the OSM price of the event's block: the
+ *  amount × the price as shown, the product to the cent (ui-jobs 743). */
+function collUsd(sym: string, what: string, amount: number, price: number, coords: MakerCoords) {
+  return makerCollateralUsd({
+    what: `${what} in US dollars`,
+    symbol: sym,
+    ink: amount,
+    inkSource: "api",
+    inkBlock: coords.blockNumber ?? null,
+    price,
+    priceBlock: coords.blockNumber ?? null,
+  });
 }
 
-/** DAI (or USDS) at its $1 face. */
-function faceProv(sym: string, what: string): Provenance {
-  return {
-    kind: "derived",
-    summary: `${what} in US dollars. The ${sym} amount at its $1 face.`,
-    formula: "amount × $1",
-  };
-}
+/** DAI (or USDS) at the Vat's $1 par. */
+const faceUsd = (sym: string, what: string, amount: number) =>
+  makerDebtUsd({
+    what: `${what} in US dollars`,
+    symbol: sym,
+    debt: amount,
+    amountNote: "the vault's normalized debt × the ilk's rate accumulator at this event's block",
+  });
+
+/** A sheet cell from a receipt: its figure, signed where the amount is. */
+const usdCell = (r: { prov: Provenance; usd: number } | null, sign = 1) =>
+  r ? { text: sheetUsd(sign < 0 ? -r.usd : r.usd), info: r.prov } : undefined;
 
 /** A figure's change over this event: the figure after less the figure before. */
 function changeProv(what: string, formula: string): Provenance {
@@ -159,6 +168,10 @@ export function useMakerSheet(ctx: MakerDAOContext, coords: MakerCoords, open = 
           : "Repay";
 
   // ── Collateral ──
+  const collAfterUsd = price != null ? collUsd(collSym, "Collateral after this event", inkAfter, price, coords) : null;
+  const collBeforeUsd =
+    price != null ? collUsd(collSym, "Collateral just before this event", inkBefore, price, coords) : null;
+  const debtAfterUsd = faceUsd(debtSym, "Debt after this event", debtAfter);
   const collRows: SheetRow[] = [];
   if (Math.abs(dink) >= DUST_COLL)
     collRows.push({
@@ -171,12 +184,7 @@ export function useMakerSheet(ctx: MakerDAOContext, coords: MakerCoords, open = 
         value: formatExactDecimal(String(Math.abs(dink))),
       },
       usd:
-        price != null
-          ? {
-              text: sheetUsd(dink * price),
-              info: collUsdProv(collSym, "Collateral this event moved", dink, price, coords),
-            }
-          : undefined,
+        price != null ? usdCell(collUsd(collSym, "Collateral this event moved", dink, price, coords), dink) : undefined,
       tip: TIP.collEvent,
     });
   const collCarry: SheetSide["carry"] = [];
@@ -199,21 +207,15 @@ export function useMakerSheet(ctx: MakerDAOContext, coords: MakerCoords, open = 
             amount: { text: collAmount(inkBefore), symbol: collSym, info: inkBeforeProv(collSym, coords) },
             usd:
               price != null
-                ? {
-                    text: sheetUsd(inkBefore * price),
-                    info: collUsdProv(collSym, "Collateral just before this event", inkBefore, price, coords),
-                  }
+                ? usdCell(collUsd(collSym, "Collateral just before this event", inkBefore, price, coords))
                 : undefined,
             tip: TIP.collBefore,
           }
         : undefined,
     rows: collRows,
     total:
-      price != null
-        ? {
-            text: inkAfter > 0 ? sheetUsd(inkAfter * price) : "$0",
-            info: collUsdProv(collSym, "Collateral after this event", inkAfter, price, coords),
-          }
+      price != null && collAfterUsd
+        ? { text: inkAfter > 0 ? sheetUsd(collAfterUsd.usd) : "$0", info: collAfterUsd.prov }
         : { none: "No price read at this block" },
     totalAmount: { text: collAmount(inkAfter), symbol: collSym, info: inkAfterProv(collSym, coords) },
     totalTip: TIP.collTotal,
@@ -227,7 +229,7 @@ export function useMakerSheet(ctx: MakerDAOContext, coords: MakerCoords, open = 
       key: "event",
       label: debtWord,
       amount: { text: debtFig(debtMove), symbol: debtSym, info: debtChangeProv(debtSym, coords) },
-      usd: { text: sheetUsd(debtMove), info: faceProv(debtSym, "Debt this event moved") },
+      usd: usdCell(faceUsd(debtSym, "Debt this event moved", debtMove), debtMove),
       tip: TIP.debtEvent,
     });
   const debtCarry: SheetSide["carry"] = [];
@@ -237,7 +239,7 @@ export function useMakerSheet(ctx: MakerDAOContext, coords: MakerCoords, open = 
       key: "last",
       label: SHEET_WORDS.last,
       amount: { text: fmtDai(debtLast), symbol: debtSym, info: debtBeforeProv(debtSym, coords) },
-      usd: { text: sheetUsd(debtLast), info: faceProv(debtSym, "Debt after the previous event") },
+      usd: usdCell(faceUsd(debtSym, "Debt after the previous event", debtLast)),
       tip: TIP.debtLast,
     });
     if (interest >= DUST_DEBT)
@@ -268,14 +270,14 @@ export function useMakerSheet(ctx: MakerDAOContext, coords: MakerCoords, open = 
             key: "before",
             label: SHEET_WORDS.before,
             amount: { text: fmtDai(debtBefore), symbol: debtSym, info: debtBeforeProv(debtSym, coords) },
-            usd: { text: sheetUsd(debtBefore), info: faceProv(debtSym, "Debt just before this event") },
+            usd: usdCell(faceUsd(debtSym, "Debt just before this event", debtBefore)),
             tip: TIP.debtBefore,
           }
         : undefined,
     rows: debtRows,
     total: {
-      text: debtAfter > 0 ? sheetUsd(debtAfter) : "$0",
-      info: debtAfterProv(debtSym, coords),
+      text: debtAfter > 0 ? sheetUsd(debtAfterUsd.usd) : "$0",
+      info: debtAfterUsd.prov,
     },
     totalAmount: { text: fmtDai(debtAfter), symbol: debtSym, info: debtAfterProv(debtSym, coords) },
     totalTip: TIP.debtTotal,
@@ -286,16 +288,19 @@ export function useMakerSheet(ctx: MakerDAOContext, coords: MakerCoords, open = 
   const owedBefore = debtBefore > 1e-9;
   const ratioAfter = price != null && owes ? (inkAfter * price) / debtAfter : null;
   const ratioBefore = price != null && owedBefore ? (inkBefore * price) / debtBefore : null;
-  const collUsdAfter = inkAfter * (price ?? 0);
-  const collUsdBefore = inkBefore * (price ?? 0);
+  const collUsdAfter = collAfterUsd?.usd ?? 0;
+  const collUsdBefore = collBeforeUsd?.usd ?? 0;
   const ratioInputs = (side: "before" | "after") =>
     side === "after"
       ? { collateralUsd: sheetUsd(collUsdAfter), debt: `${fmtDai(debtAfter)} ${debtSym}` }
       : { collateralUsd: sheetUsd(collUsdBefore), debt: `${fmtDai(debtBefore)} ${debtSym}` };
   const pts = (a: number) => `${(a * 100).toFixed(2)} pts`;
-  const liqOf = (ink: number, debt: number) => (mat != null && ink > 1e-9 && debt > 1e-9 ? (debt * mat) / ink : null);
-  const liqAfter = liqOf(inkAfter, debtAfter);
-  const liqBefore = liqOf(inkBefore, debtBefore);
+  // From the inputs as the receipt shows them (ui-jobs 743).
+  const liqOf = (ink: number, debt: number) =>
+    mat != null && ink > 1e-9 && debt > 1e-9 ? makerLiquidationPrice(debt, mat, ink) : null;
+  const liqAfterShown = liqOf(inkAfter, debtAfter);
+  const liqAfter = liqAfterShown?.price ?? null;
+  const liqBefore = liqOf(inkBefore, debtBefore)?.price ?? null;
   const usd2 = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const noDebt = isGrab && !owes ? "Liquidated" : "No debt";
 
@@ -325,9 +330,10 @@ export function useMakerSheet(ctx: MakerDAOContext, coords: MakerCoords, open = 
           ? {
               text: usd2(liqAfter),
               info: liquidationPriceProv(
-                formatExactDecimal(String(debtAfter)),
-                fmtMat(mat as number),
-                formatExactDecimal(String(inkAfter)),
+                `${liqAfterShown!.debt} ${debtSym}`,
+                liqAfterShown!.mat,
+                `${liqAfterShown!.ink} ${collSym}`,
+                priceText(liqAfter),
               ),
             }
           : { none: mat == null && owes ? "Minimum ratio not read at this block" : noDebt },
