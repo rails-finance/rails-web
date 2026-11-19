@@ -107,7 +107,7 @@ test("the surplus claim's collateral comes off its flow, WETH as ETH", () => {
 test("a Stability Pool touch's Deposited is its top-up or withdrawal in BOLD", () => {
   const rows = { a: "12500000000000000000000", w: "-3000000000000000000", t: "0" };
   const [dep] = lv2.liquityV2SpSizeDims((e) => rows[e.id]);
-  assert.deepEqual([dep.side, dep.word, dep.unit], ["coll", "Deposited", "BOLD"]);
+  assert.deepEqual([dep.side, dep.word, dep.unit], ["deposit", "Deposited", "BOLD"]);
   assert.equal(dep.figure({ id: "a" }), 12500);
   assert.equal(dep.figure({ id: "w" }), 3);
   assert.equal(dep.figure({ id: "t" }), 0);
@@ -219,11 +219,18 @@ test("a Size write reaches the hook side by side, and Clear all clears it", () =
 test("a draft carries its Size ranges", () => {
   const { tl } = modelState();
   const view = draftAxesView(tl, { ...timelineFilterModel(tl).filters, debt: ["5-"] });
-  assert.deepEqual(view.size.ranges, { debt: ["5-"], coll: [] });
+  assert.deepEqual(view.size.ranges, { debt: ["5-"], coll: [], deposit: [] });
 });
 
 test("the notice applies under a Size or Type filter on a page short of the history", () => {
-  const spark = { narrowed: true, totalCount: 28_179, servedEventCount: 1_000, totalKnown: true, totalIsFloor: false };
+  const spark = {
+    narrowed: true,
+    totalCount: 28_179,
+    servedEventCount: 1_000,
+    totalKnown: true,
+    totalIsFloor: false,
+    windowUnread: false,
+  };
   const n = size.searchedNotice(spark);
   assert.deepEqual(n, { searched: 1_000, older: 27_179, atLeast: false });
   assert.equal(size.searchedNoticeText(n), "Searched the latest 1,000 events. 27,179 older ones not searched.");
@@ -231,6 +238,25 @@ test("the notice applies under a Size or Type filter on a page short of the hist
   assert.equal(size.searchedNotice({ ...spark, narrowed: false }), null);
   assert.equal(size.searchedNotice({ ...spark, servedEventCount: 28_179 }), null);
   assert.equal(size.searchedNotice({ ...spark, totalKnown: false }), null);
+  // A window whose opening read is pending or failed: the older count is unknown.
+  const unread = size.searchedNotice({ ...spark, totalKnown: false, windowUnread: true });
+  assert.deepEqual(unread, { searched: 1_000, older: null, atLeast: false });
+  assert.equal(size.searchedNoticeText(unread), "Searched the latest 1,000 events. Older ones not searched.");
+  assert.equal(size.searchedNotice({ ...spark, narrowed: false, windowUnread: true }), null);
   const floor = size.searchedNotice({ ...spark, totalCount: 1_001, totalIsFloor: true });
   assert.equal(size.searchedNoticeText(floor), "Searched the latest 1,000 events. At least 1 older one not searched.");
+});
+
+test("a Stability Pool deposit's range writes ?deposit=, its own param", () => {
+  const spDims = lv2.liquityV2SpSizeDims(() => "1000000000000000000");
+  const log = [];
+  const { tl } = modelState();
+  const m = timelineFilterModel({ ...tl, sizeDims: spDims, setSizeRange: (s, v) => log.push([s, v]) });
+  const dep = m.dimensions.find((d) => d.id === "deposit");
+  assert.equal(dep.param, "deposit");
+  assert.equal(dep.label, "Deposited (BOLD)");
+  assert.equal(dep.chipLabel(["10000-"], []), "Deposited: ≥ 10K BOLD");
+  m.onChange(dep.set(m.filters, ["5-"]));
+  assert.deepEqual(log, [["deposit", ["5-"]]]);
+  assert.deepEqual(size.readSizeParams(new URLSearchParams("coll=1-&deposit=5-"), ["deposit"]), { deposit: ["5-"] });
 });

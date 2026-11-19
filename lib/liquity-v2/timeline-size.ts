@@ -65,7 +65,7 @@ function boldUnits(raw: string | undefined): number | null {
 export function liquityV2SpSizeDims(topUpOf: (e: BaseActivityEvent) => string | undefined): TimelineSizeDim[] {
   return [
     {
-      side: "coll",
+      side: "deposit",
       word: "Deposited",
       unit: "BOLD",
       top: DEBT_TOP,

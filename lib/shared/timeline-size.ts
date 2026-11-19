@@ -18,11 +18,13 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { debtRangeFromUrl, rangeAdmits } from "@/lib/shared/size-dimensions";
 import { normalizeRange } from "@/components/shared/filter-bar/types";
 
-export type SizeSide = "debt" | "coll";
+/** Each side is its URL param: the listings' `debt` and `coll`, and `deposit`
+ *  for a Stability Pool deposit (the Trove listing's `coll` is in USD). */
+export type SizeSide = "debt" | "coll" | "deposit";
 
 /** One Size range a timeline offers. */
 export interface TimelineSizeDim {
-  /** `debt` writes `?debt=`, `coll` writes `?coll=`, the listings' params. */
+  /** The range's URL param: `?debt=`, `?coll=`, `?deposit=`. */
   side: SizeSide;
   /** The range's word: "Debt", "Collateral", "Deposited". */
   word: string;
@@ -93,16 +95,18 @@ export function flowAmountIn(e: BaseActivityEvent, symbols: readonly string[]): 
 export interface SearchedNotice {
   /** The events the page holds, folder members included. */
   searched: number;
-  /** The older events it does not hold. */
-  older: number;
+  /** The older events it does not hold; null where the page holds a window
+   *  whose opening read is pending or failed, so their count is unknown. */
+  older: number | null;
   /** `older` is a lower bound. */
   atLeast: boolean;
 }
 
 /**
  * The notice's numbers, or null where it does not apply: no Size or Type
- * filter on, the page holds the whole history, or the total is not known yet
- * (a window whose opening balance has not landed, a month read).
+ * filter on, or the page holds the whole history. A window whose opening read
+ * is pending or failed (`windowUnread`) holds older events it cannot count:
+ * the notice stands with `older` null.
  */
 export function searchedNotice(s: {
   narrowed: boolean;
@@ -110,17 +114,22 @@ export function searchedNotice(s: {
   servedEventCount: number;
   totalKnown: boolean;
   totalIsFloor: boolean;
+  windowUnread: boolean;
 }): SearchedNotice | null {
-  if (!s.narrowed || !s.totalKnown) return null;
+  if (!s.narrowed) return null;
+  if (s.windowUnread) return { searched: s.servedEventCount, older: null, atLeast: false };
+  if (!s.totalKnown) return null;
   const older = s.totalCount - s.servedEventCount;
   if (older <= 0) return null;
   return { searched: s.servedEventCount, older, atLeast: s.totalIsFloor };
 }
 
-/** "Searched the latest 1,000 events. 27,179 older ones not searched." */
+/** "Searched the latest 1,000 events. 27,179 older ones not searched.", or
+ *  "Older ones not searched." where their count is unknown. */
 export function searchedNoticeText(n: SearchedNotice): string {
   const f = (v: number) => v.toLocaleString("en-US");
   const head = n.searched === 1 ? "Searched the latest event." : `Searched the latest ${f(n.searched)} events.`;
+  if (n.older == null) return `${head} Older ones not searched.`;
   const count = `${n.atLeast ? "At least " : ""}${f(n.older)}`;
   return `${head} ${count} older ${n.older === 1 ? "one" : "ones"} not searched.`;
 }

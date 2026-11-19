@@ -78,6 +78,10 @@ export interface TroveViewProps {
   renderedAt: number;
 }
 
+/** The whole-history read's page cap: 11 pages of 1,000 rows, above the
+ *  longest Trove's 2,204 events (19 Nov 2026). */
+const FLOW_HISTORY_PAGES = 11;
+
 export default function TroveView({
   collateralType,
   troveId,
@@ -332,32 +336,38 @@ export default function TroveView({
   // The Lifetime flows panel replays the Trove's whole history. The page
   // holds it unless the timeline read stopped short (`totalEvents` set); then
   // the panel reads the rest, a page of 1,000 rows at a time, as far as the
-  // route serves.
-  const [flowHistory, setFlowHistory] = useState<{ events: BaseActivityEvent[] | null; read: FlowsRead }>({
+  // route serves. Past FLOW_HISTORY_PAGES the read stops: the panel reads it
+  // as failed, and the pages it holds are kept for the timeline (`capped`).
+  const [flowHistory, setFlowHistory] = useState<{
+    events: BaseActivityEvent[] | null;
+    read: FlowsRead;
+    capped: BaseActivityEvent[] | null;
+  }>({
     events: null,
     read: "reading",
+    capped: null,
   });
   // A retry of that read, from the timeline's cut-page notice.
   const [flowRetry, setFlowRetry] = useState(0);
   useEffect(() => {
     if (totalEvents == null) return;
     let cancelled = false;
-    setFlowHistory({ events: null, read: "reading" });
+    setFlowHistory({ events: null, read: "reading", capped: null });
     (async () => {
       const seen = new Map<string, BaseActivityEvent>();
       try {
-        for (let offset = 0; offset <= 10_000; offset += 1_000) {
+        for (let offset = 0; offset < FLOW_HISTORY_PAGES * 1_000; offset += 1_000) {
           const page = await fetchTroveTimeline({ collateralType, troveId, limit: 1_000, offset });
           for (const e of page.events ?? []) seen.set(e.id, e);
           if (!page.pagination?.hasMore) {
-            if (!cancelled) setFlowHistory({ events: [...seen.values()], read: "done" });
+            if (!cancelled) setFlowHistory({ events: [...seen.values()], read: "done", capped: null });
             return;
           }
         }
-        if (!cancelled) setFlowHistory({ events: null, read: "failed" });
+        if (!cancelled) setFlowHistory({ events: null, read: "failed", capped: [...seen.values()] });
       } catch (err) {
         console.warn("Lifetime flows history not read:", err);
-        if (!cancelled) setFlowHistory({ events: null, read: "failed" });
+        if (!cancelled) setFlowHistory({ events: null, read: "failed", capped: null });
       }
     })();
     return () => {
@@ -366,16 +376,25 @@ export default function TroveView({
   }, [totalEvents, collateralType, troveId, flowRetry]);
   // The timeline's older events come off the same read (ui-jobs 752): on the
   // reader's press, once it is done, the page holds the whole history and the
-  // filters search all of it.
+  // filters search all of it. A read that stopped at its page cap hands over
+  // the pages it holds: the notice then states the larger count searched and
+  // offers nothing more.
   const [olderAsked, setOlderAsked] = useState(false);
+  const [olderTaken, setOlderTaken] = useState(false);
   useEffect(() => {
-    if (!olderAsked || flowHistory.read !== "done" || !flowHistory.events) return;
-    setEvents(flowHistory.events);
-    setTotalEvents(null);
-    setOlderAsked(false);
+    if (!olderAsked) return;
+    if (flowHistory.read === "done" && flowHistory.events) {
+      setEvents(flowHistory.events);
+      setTotalEvents(null);
+      setOlderAsked(false);
+    } else if (flowHistory.capped) {
+      setEvents(flowHistory.capped);
+      setOlderTaken(true);
+      setOlderAsked(false);
+    }
   }, [olderAsked, flowHistory]);
   const loadOlder = useMemo<TimelineLoadOlder | undefined>(() => {
-    if (totalEvents == null) return undefined;
+    if (totalEvents == null || olderTaken) return undefined;
     if (!olderAsked) return { state: "idle", load: () => setOlderAsked(true) };
     if (flowHistory.read === "failed")
       return {
@@ -383,7 +402,7 @@ export default function TroveView({
         load: () => setFlowRetry((n) => n + 1),
       };
     return { state: "loading", load: () => {} };
-  }, [totalEvents, olderAsked, flowHistory.read]);
+  }, [totalEvents, olderTaken, olderAsked, flowHistory.read]);
   const flowEvents = useMemo(
     () => liquityV2FlowEvents(totalEvents == null ? liquityEvents : (flowHistory.events ?? [])),
     [totalEvents, liquityEvents, flowHistory.events],

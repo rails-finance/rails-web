@@ -6,7 +6,7 @@
 // scripts/test/timeline-filter-model.test.mjs runs it on a stand-in state.
 //
 // Size (ui-jobs 752) is the listings' Size panel on the same fields (`debt`,
-// `coll`), one pill holding the ranges the page offers; a write goes to the
+// `coll`; a Stability Pool deposit's `deposit`), one pill holding the ranges the page offers; a write goes to the
 // hook's `setSizeRange`.
 
 import type { ReactNode } from "react";
@@ -26,6 +26,7 @@ export const AXIS_ANATOMY: Record<string, string> = {
   ...HIDE_AXIS_ANATOMY,
   debt: SIZE_PILL_ANATOMY,
   coll: SIZE_PILL_ANATOMY,
+  deposit: SIZE_PILL_ANATOMY,
 };
 export type TimelineFilters = BaseListFilters & Record<Axis, string[]> & Record<SizeSide, string[]>;
 
@@ -36,9 +37,11 @@ function sizeDimsOf(dims: readonly TimelineSizeDim[], note: string | undefined):
     sizeDimensions<TimelineFilters>({
       getDebt: (f) => f.debt,
       setDebt: (f, debt) => ({ ...f, debt }),
-      getColl: (f) => f.coll,
-      setColl: (f, coll) => ({ ...f, coll }),
-      sides: [d.side],
+      // A deposit range takes the second range's slot under its own param.
+      getColl: (f) => (d.side === "deposit" ? f.deposit : f.coll),
+      setColl: (f, v) => (d.side === "deposit" ? { ...f, deposit: v } : { ...f, coll: v }),
+      ...(d.side === "deposit" ? { collId: "deposit" } : {}),
+      sides: [d.side === "debt" ? "debt" : "coll"],
       top: d.top,
       ...(d.side === "debt" ? { debtLabel: d.word, debtUnit: d.unit } : { collLabel: d.word, collUnit: d.unit }),
       panelNote: i === dims.length - 1 ? note : undefined,
@@ -200,6 +203,7 @@ export function timelineFilterModel(
     address: [],
     debt: tl.sizeRanges.debt ?? [],
     coll: tl.sizeRanges.coll ?? [],
+    deposit: tl.sizeRanges.deposit ?? [],
   };
   for (const a of axes) filters[a.axis] = selectionOf(a);
   const size = sizeDimsOf(tl.sizeDims, sizeNote(tl.sizeDims));
@@ -246,7 +250,12 @@ export function draftAxesView(tl: TimelineEventsState, draft: TimelineFilters): 
     hiddenVersions: hidden("version", tl.versionOptions, tl.visibleVersionKeys),
     hiddenCounterparties: hidden("address", tl.counterpartyOptions, tl.visibleCounterpartyKeys),
     ...(tl.sizeDims.length > 0
-      ? { size: { dims: tl.sizeDims, ranges: { debt: draft.debt ?? [], coll: draft.coll ?? [] } } }
+      ? {
+          size: {
+            dims: tl.sizeDims,
+            ranges: { debt: draft.debt ?? [], coll: draft.coll ?? [], deposit: draft.deposit ?? [] },
+          },
+        }
       : {}),
   };
 }

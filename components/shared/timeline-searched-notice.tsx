@@ -26,6 +26,7 @@ export function timelineSearched(tl: TimelineEventsState): SearchedNotice | null
     // A month read states its own month; it is not a cut of the latest events.
     totalKnown: state.total !== "pending" && tl.historyWindow.state !== "span",
     totalIsFloor: state.total === "floor",
+    windowUnread: tl.historyWindow.state === "pending" || tl.historyWindow.state === "failed",
   });
 }
 
@@ -41,7 +42,7 @@ export function TimelineSearchedNotice({
       className={`flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm text-rb-500 ${CARD_INSET_START}`}
       data-anatomy="L11"
       data-timeline-searched={notice.searched}
-      data-timeline-not-searched={notice.older}
+      data-timeline-not-searched={notice.older ?? "unknown"}
       data-prov-exempt=""
     >
       <span>{searchedNoticeText(notice)}</span>
