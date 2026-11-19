@@ -27,6 +27,8 @@
 // SERVER-ONLY — imported from /api/* route handlers only (it calls Alchemy via
 // lib/sources/chain/rpc). Mirrors the batched-multicall shape of erc20-meta.ts.
 
+import { shownComposedPrice, shownPrice } from "@/lib/shared/shown-usd";
+import type { CometPriceFactor } from "@/lib/compound/comet-usd";
 import { parseAbi, type PublicClient } from "viem";
 import { chainClient } from "./rpc";
 import { cometSurface } from "./compound-markets";
@@ -145,9 +147,30 @@ export type CometPriceMap = Map<string, number> & { read?: CometPriceRead };
 
 const priceKey = (comet: string, token: string) => `${comet.toLowerCase()}:${token.toLowerCase()}`;
 
-/** Look up a resolved price for one (market, token). */
+/** The key suffix holding an ETH-quoted Comet's getPrice in ETH, beside its
+ *  composed dollar price. */
+const ETH_FACTOR = "#eth";
+
+/** Look up a resolved price for one (market, token): dollars per token as
+ *  shown (six decimals, six significant figures under $1). */
 export function cometPriceOf(map: CometPriceMap, comet: string, token: string): number | undefined {
-  return map.get(priceKey(comet, token));
+  const v = map.get(priceKey(comet, token));
+  return v != null ? shownPrice(v) : undefined;
+}
+
+/** The factors behind an ETH-quoted Comet's composed price: its getPrice in
+ *  ETH and WETH in dollars (the USD Comet's WETH feed); undefined for a
+ *  USD-quoted one. */
+export function cometFactorOf(
+  map: CometPriceMap,
+  comet: string,
+  token: string,
+  deployment: CometDeployment = COMPOUND_DEPLOYMENT,
+): CometPriceFactor | undefined {
+  const raw = map.get(priceKey(comet, token) + ETH_FACTOR);
+  const conv = ethConversion(deployment);
+  const ethUsd = conv ? map.get(priceKey(conv.usdComet, conv.wethToken)) : undefined;
+  return raw != null && ethUsd != null ? { eth: { price: raw, ethUsd } } : undefined;
 }
 
 // Price feeds are immutable per (comet, token), so resolve each at most once and
@@ -271,9 +294,13 @@ async function readDeploymentPrices(client: PublicClient, deployment: CometDeplo
   if (conv) {
     const ethUsd = out.get(priceKey(conv.usdComet, conv.wethToken));
     for (const [k, v] of [...out.entries()]) {
-      if (!k.startsWith(`${conv.wethComet}:`)) continue;
-      if (ethUsd != null && ethUsd > 0) out.set(k, v * ethUsd);
-      else out.delete(k);
+      if (!k.startsWith(`${conv.wethComet}:`) || k.endsWith(ETH_FACTOR)) continue;
+      // One composed row, each factor as shown (ui-jobs 743); the ETH factor
+      // kept beside it for the receipt.
+      if (ethUsd != null && ethUsd > 0) {
+        out.set(k + ETH_FACTOR, v);
+        out.set(k, shownComposedPrice(v, ethUsd));
+      } else out.delete(k);
     }
   }
   return out;
@@ -389,9 +416,13 @@ async function resolveFromChain(reqs: CometPriceRequest[], deployment: CometDepl
   if (conv && needsEthUsd) {
     const ethUsd = out.get(priceKey(conv.usdComet, conv.wethToken));
     for (const [k, v] of [...out.entries()]) {
-      if (!k.startsWith(`${conv.wethComet}:`)) continue;
-      if (ethUsd != null && ethUsd > 0) out.set(k, v * ethUsd);
-      else out.delete(k);
+      if (!k.startsWith(`${conv.wethComet}:`) || k.endsWith(ETH_FACTOR)) continue;
+      // One composed row, each factor as shown (ui-jobs 743); the ETH factor
+      // kept beside it for the receipt.
+      if (ethUsd != null && ethUsd > 0) {
+        out.set(k + ETH_FACTOR, v);
+        out.set(k, shownComposedPrice(v, ethUsd));
+      } else out.delete(k);
     }
   }
 

@@ -1,5 +1,5 @@
-// The Compound V3 wallet read's price wording (ui-jobs 743), for Arbitrum and
-// Base alike: every price is a Comet's getPrice at the read block; the WETH
+// Compound V3's price wording (ui-jobs 743), for every deployment: the card,
+// the wallet strips and /wallet. Every price is a Comet's getPrice at its read's block; the WETH
 // Comet quotes in ETH, so its price composes with WETH in dollars.
 
 import { priceText } from "@/lib/shared/shown-usd";

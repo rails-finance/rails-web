@@ -10,7 +10,8 @@
 
 import { scaleCompoundChainBalance, type CompoundMarketChainResponse } from "@/lib/api/fetch-compound-position";
 import type { CompoundWalletChainResponse } from "@/lib/api/fetch-compound-wallet";
-import { shownComposedPrice, shownPrice, shownUsd } from "@/lib/shared/shown-usd";
+import { shownUsd } from "@/lib/shared/shown-usd";
+import { cometUsdPrice } from "@/lib/compound/comet-usd";
 
 export interface CompoundArbitrumCometUsd {
   supplyUsd: number | null;
@@ -26,37 +27,6 @@ export interface CompoundArbitrumUsd {
 }
 
 const cents = (v: number): number => Math.round(v * 100) / 100;
-
-/** A Comet's price in dollars as shown, and the ETH factor where it composed
- *  one; null where the Comet has no conversion. */
-export function cometUsdPrice(
-  p: Pick<CompoundMarketChainResponse, "quoteUnit">,
-  price: number,
-  ethUsd: number | undefined,
-): { usd: number; eth?: { price: number; ethUsd: number } } | null {
-  if (!(price > 0)) return null;
-  if (p.quoteUnit === "USD") return { usd: shownPrice(price) };
-  if (p.quoteUnit === "ETH" && ethUsd != null && ethUsd > 0)
-    return { usd: shownComposedPrice(price, ethUsd), eth: { price, ethUsd } };
-  return null;
-}
-
-/** Every held token at its Comet's price in dollars as shown, keyed by
- *  lowercase address: the `prices` the market pages and the overview read. */
-export function cometPricesUsd(
-  p: CompoundMarketChainResponse,
-  baseToken: string,
-  ethUsd: number | undefined,
-): Record<string, number> {
-  const out: Record<string, number> = {};
-  const base = cometUsdPrice(p, p.basePrice, ethUsd);
-  if (base) out[baseToken.toLowerCase()] = base.usd;
-  for (const c of p.collateral) {
-    const u = cometUsdPrice(p, c.price, ethUsd);
-    if (u) out[c.address.toLowerCase()] = u.usd;
-  }
-  return out;
-}
 
 export function compoundArbitrumUsd(read: CompoundWalletChainResponse): CompoundArbitrumUsd {
   const byComet = new Map<string, CompoundArbitrumCometUsd>();

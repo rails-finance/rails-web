@@ -47,6 +47,7 @@
 // and with no principal beside it the card shows the one number it has and
 // labels it current.
 
+import type { CometPriceFactor } from "@/lib/compound/comet-usd";
 import type { CompoundPositionView } from "@/components/protocol/compound/compound-position-card";
 import type { CompoundMarketChainResponse } from "@/lib/api/fetch-compound-position";
 import type { CometMarketReplay } from "@/lib/sources/chain/compound-v3-events";
@@ -76,6 +77,8 @@ export function cometViewFromChain(
   replay: CometMarketReplay | null,
   prices?: Record<string, number>,
   whole: boolean = true,
+  /** The factors of composed prices and the block the prices stand at. */
+  priceMeta?: { factors?: Record<string, CometPriceFactor>; block?: number | null },
 ): CompoundPositionView {
   const baseToken = market.baseToken.toLowerCase();
   const live = chain && !chain.chainStale ? chain : null;
@@ -173,5 +176,7 @@ export function cometViewFromChain(
     lastActivityAt: lifeReplay?.lastActivityAt ?? null,
     atBlock: live?.blockNumber,
     priceByAddress: prices,
+    priceFactors: priceMeta?.factors,
+    priceBlock: priceMeta?.block ?? null,
   };
 }

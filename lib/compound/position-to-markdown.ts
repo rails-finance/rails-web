@@ -10,6 +10,7 @@
 // same shape as the page — then the unified cross-market timeline. A PURE
 // function of the data already in scope on the detail page — no fetching.
 
+import { shownUsd } from "@/lib/shared/shown-usd";
 import { NOT_LOADED_CELL, unreadToken } from "@/lib/shared/decimals-unread";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isCompoundEvent } from "@/lib/shared/types/event-shape";
@@ -39,10 +40,11 @@ export interface CompoundPositionsMarkdownArgs {
   generatedAt: Date;
 }
 
-/** Comet-oracle USD for one leg; null when this market didn't price it. */
+/** Comet-oracle USD for one leg, the card's shown product (ui-jobs 743);
+ *  null when this market didn't price it. */
 function legUsd(view: CompoundPositionView, address: string, amount: number): number | null {
   const p = view.priceByAddress?.[address.toLowerCase()];
-  return typeof p === "number" && p > 0 ? amount * p : null;
+  return typeof p === "number" && p > 0 ? shownUsd(amount, p) : null;
 }
 
 /** "1,234.56 USDC ($1,234.10)" — the token figure with its oracle USD when priced. */

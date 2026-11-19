@@ -5,7 +5,7 @@
 // (rails-ops reference/arbitrum-position-first-lane.md). Server-rendered from
 // the page's read; nothing here asks again.
 
-import { cometUsdPrice } from "@/lib/compound-arbitrum/usd";
+import { cometUsdPrice } from "@/lib/compound/comet-usd";
 import { HolderStrip, type HolderStripProps } from "@/components/shared/holder-strip";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
