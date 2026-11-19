@@ -148,6 +148,63 @@ export function FilterPill({
   );
 }
 
+/** A set pill that is not an axis: the timeline's chart cut, "Timeline to
+ *  7 Oct '26 ×" (L2.1, ui-jobs 764), in the set pill's tone, height, radius
+ *  and ×, with a glyph at its start. The main button runs `onPress`, the ×
+ *  `onRemove`; each carries its own data hooks. */
+export function FilterPillChip({
+  icon,
+  label,
+  value,
+  title,
+  removeLabel,
+  onPress,
+  onRemove,
+  data,
+  pressData,
+  removeData,
+}: {
+  icon: ReactNode;
+  /** Muted before the value, as a set pill's axis name: "Timeline to". */
+  label?: string;
+  value: string;
+  title: string;
+  removeLabel: string;
+  onPress: () => void;
+  onRemove: () => void;
+  data?: Record<string, string>;
+  pressData?: Record<string, string>;
+  removeData?: Record<string, string>;
+}) {
+  return (
+    <div className="relative shrink-0" {...data}>
+      <div className={`${PILL_BASE} ${PILL_SET} text-foreground`}>
+        <button
+          type="button"
+          onClick={onPress}
+          title={title}
+          className={`flex h-full min-w-0 items-center gap-1.5 rounded-full pl-3 pr-1 ${FOCUS}`}
+          {...pressData}
+        >
+          {icon}
+          {label && <span className={`shrink-0 ${LABEL}`}>{label}</span>}
+          {label && " "}
+          <span className="min-w-0 truncate font-semibold">{value}</span>
+        </button>
+        <button
+          type="button"
+          onClick={onRemove}
+          className={`flex h-full w-9 shrink-0 items-center justify-center rounded-full ${LABEL} hover:text-foreground ${FOCUS}`}
+          aria-label={removeLabel}
+          {...removeData}
+        >
+          <X className="size-3.5" aria-hidden="true" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** An unset pill's place, held empty: the box "+ {name}" takes, unseen and
  *  out of the accessibility tree, so the row does not move when the pill
  *  arrives (the timeline's Date pill while its page's panel reads, ui-jobs

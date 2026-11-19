@@ -127,7 +127,7 @@ import { MemberRevealContext } from "@/components/shared/group-frame";
 import type { DisplayedTimelineRow, TimelineAxesView, TimelineEventsState } from "@/hooks/useTimelineEvents";
 import { FolderMembersProvider, useFolderMembers, type FolderMembersReader } from "@/lib/shared/folder-members";
 import { filteredEventCount } from "@/lib/shared/timeline-folder-filter";
-import { PILL_NEUTRAL, PILL_SET_TONE } from "@/components/shared/filter-bar/filter-pill";
+import { FilterPillChip, PILL_NEUTRAL, PILL_SET_TONE } from "@/components/shared/filter-bar/filter-pill";
 import {
   folderAggregates,
   type FolderResponseId,
@@ -2189,6 +2189,37 @@ function ChainTruthTimelineBody({
               leading={toolbarLeading}
               beforeDisplay={followToggle}
               datesHeld={datesBy === "waiting"}
+              cutPill={
+                rewind || following ? (
+                  // The chart's cut in the Date pill's slot, as a set filter
+                  // pill (ui-jobs 764): "Timeline to {day}" once "Sync to
+                  // chart" or the followed cursor cuts the list, "Following
+                  // the chart" while following with the cursor at today.
+                  <FilterPillChip
+                    icon={
+                      <Link2
+                        size={14}
+                        aria-hidden
+                        className="shrink-0 text-teal-700 dark:text-teal-300"
+                        {...(following ? { "data-flow-rewind-chain": "" } : {})}
+                      />
+                    }
+                    label={rewind ? "Timeline to" : undefined}
+                    value={rewind ? rewind.word : "Following the chart"}
+                    title={
+                      rewind
+                        ? `Bring the last event of ${rewind.word} into view`
+                        : "The timeline follows the chart's cursor"
+                    }
+                    removeLabel={following ? "Stop following the chart" : `Clear the cut at ${rewind?.word ?? ""}`}
+                    onPress={() => rewind && focusStore?.set({ go: focusStore.get().go + 1 })}
+                    onRemove={releaseRewind}
+                    data={{ "data-flow-rewind-chip": "", "data-anatomy": "N1.10 L2.1" }}
+                    pressData={{ "data-flow-rewind-go": "" }}
+                    removeData={{ "data-flow-rewind-release": "" }}
+                  />
+                ) : undefined
+              }
               loadOlder={loadOlder}
               countDraft={countDraft}
               countTooltip={countTooltip}
@@ -2210,51 +2241,14 @@ function ChainTruthTimelineBody({
             />
           </div>
           {searched && <TimelineSearchedNotice notice={searched} loadOlder={loadOlder} />}
-          {/* THE NARROWING ROW (L2): the cut's chip, while the chart cuts or
-            leads the list. The filters state themselves on their pills in the
-            toolbar (ui-jobs 735). No cut, no row. */}
-          {(rewind || following) && (
+          {/* THE NARROWING ROW (L2): the cut's note, where the cut read
+            another month or left the list empty. The cut itself is a pill in
+            the toolbar's filter row (L2.1, `cutPill`). */}
+          {rewind && rewindNote && (
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5" data-anatomy="L2" data-narrowing-row="">
-              {/* In the chart's teal: the cut is the Lifetime flows cursor's
-                day, or, following with the cursor at today, the chart it
-                follows. */}
-              <span
-                className="inline-flex items-center rounded-full bg-teal-500/15 text-xs text-teal-700 dark:text-teal-300"
-                data-flow-rewind-chip=""
-                data-anatomy="L2.1"
-              >
-                <button
-                  type="button"
-                  onClick={() => rewind && focusStore?.set({ go: focusStore.get().go + 1 })}
-                  title={
-                    rewind
-                      ? `Bring the last event of ${rewind.word} into view`
-                      : "The timeline follows the chart's cursor"
-                  }
-                  className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-l-full py-1 pl-2.5 pr-1.5 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:min-h-0"
-                  data-flow-rewind-go=""
-                >
-                  {/* The chain while the timeline follows the chart; a cut
-                      the one-shot button made, or one left standing once
-                      following stopped, reads without it. */}
-                  {following && <Link2 size={13} aria-hidden data-flow-rewind-chain="" />}
-                  {rewind ? `Timeline to ${rewind.word}` : "Following the chart"}
-                </button>
-                <button
-                  type="button"
-                  onClick={releaseRewind}
-                  aria-label={following ? "Stop following the chart" : `Clear the cut at ${rewind?.word ?? ""}`}
-                  className="inline-flex min-h-11 min-w-9 cursor-pointer items-center justify-center rounded-r-full pl-0.5 pr-1.5 transition-colors hover:bg-teal-500/20 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:min-h-0 sm:min-w-0 sm:py-1"
-                  data-flow-rewind-release=""
-                >
-                  <X className="size-3.5" aria-hidden />
-                </button>
-              </span>
-              {rewind && rewindNote && (
-                <p className="text-xs text-rb-500" data-flow-reveal-note="">
-                  {rewindNote}
-                </p>
-              )}
+              <p className="text-xs text-rb-500" data-flow-reveal-note="">
+                {rewindNote}
+              </p>
             </div>
           )}
           {notice}

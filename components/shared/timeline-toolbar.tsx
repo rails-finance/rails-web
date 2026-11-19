@@ -6,7 +6,8 @@
 // the pill row: one N1.10 pill per axis the history offers (Type, Asset,
 // Version, Address; timeline-filter-bar.tsx), the Date pill where the page has
 // a date axis (`tl.datesAxis`; a timeline its Lifetime flows chart draws tied
-// to has none, `timelineDates` in lib/shared/timeline-dates.ts), Clear all,
+// to has none, `timelineDates` in lib/shared/timeline-dates.ts, and draws the
+// chart's cut as a set pill in its slot), Clear all,
 // and the count at the row's right end. Below sm the pills scroll sideways
 // behind the filter sheet's button and the count takes the line under them.
 // The Date pill opens the navigator panel (the month grid) under
@@ -355,6 +356,9 @@ export interface TimelineToolbarProps {
   /** The page's read of the events past its cut, offered in the Date panel
    *  where months are not loaded. */
   loadOlder?: { state: "idle" | "loading" | "failed"; load: () => void };
+  /** The chart's cut as a set pill (L2.1), in the Date pill's slot on a
+   *  timeline the chart ties to (ui-jobs 764). */
+  cutPill?: React.ReactNode;
 }
 
 /**
@@ -555,6 +559,7 @@ export function TimelineToolbar({
   still,
   datesHeld,
   loadOlder,
+  cutPill,
 }: TimelineToolbarProps) {
   const dateActive = tl.dateRange !== null;
   // The second path (decision 0019, amendment 2026-09-25) sets no
@@ -746,6 +751,7 @@ export function TimelineToolbar({
                 />
               )}
               {!tl.datesAxis && datesHeld && <FilterPillReserve name="Date" />}
+              {!tl.datesAxis && cutPill}
               <span className="w-6 shrink-0 sm:hidden" aria-hidden="true" />
             </div>
             <div
