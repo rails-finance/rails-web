@@ -179,16 +179,32 @@ for (const dir of [APP_DIR, ...routeDirs(APP_DIR)]) {
 //    now inside an explorer's own directory and the registry is deleted. A
 //    `/<chain>/vaults` directory appearing again is an orphan, which is what
 //    this check should say about it.
-//    One allowance: `/ethereum/vaults`, which holds sBOLD alone, a vault no
-//    explorer deploys (Miles's ruling, ui-jobs 765).
-const VAULTS_OUTSIDE_EXPLORERS = new Set(["/ethereum/vaults"]);
+//    The rule for a vault no explorer deploys (decision NNNN, ui-jobs 765): it
+//    lives at `/<chain>/vaults/<family key>`, where the key is a family in
+//    lib/vaults/families.ts whose `explorer` is null. `/<chain>/vaults` holds
+//    those directories and nothing else.
+function familiesWithoutExplorer() {
+  const src = fs.readFileSync(path.join(ROOT, "lib", "vaults", "families.ts"), "utf8");
+  const body = src.slice(src.indexOf("export const VAULT_FAMILIES"));
+  return new Set([...body.matchAll(/^ {2}"?([a-z0-9-]+)"?: \{\n {4}explorer: null,/gm)].map((m) => m[1]));
+}
+const noExplorer = familiesWithoutExplorer();
 for (const chainSlug of chainSlugs.values()) {
   const chainDir = path.join(APP_DIR, chainSlug);
   if (!fs.existsSync(chainDir)) continue;
   for (const dirent of fs.readdirSync(chainDir, { withFileTypes: true })) {
     if (!dirent.isDirectory()) continue;
     const href = `/${chainSlug}/${dirent.name}`;
-    if (!expected.has(href) && !VAULTS_OUTSIDE_EXPLORERS.has(href)) {
+    if (dirent.name === "vaults") {
+      for (const v of fs.readdirSync(path.join(chainDir, "vaults"), { withFileTypes: true })) {
+        if (v.isDirectory() && !noExplorer.has(v.name))
+          fail(
+            `app/(app)/${chainSlug}/vaults/${v.name}/ is no vault family with explorer: null in lib/vaults/families.ts — a vault an explorer deploys sits under that explorer (decision 0028)`,
+          );
+      }
+      continue;
+    }
+    if (!expected.has(href)) {
       fail(
         `app/(app)/${chainSlug}/${dirent.name}/ has no roster entry — nothing links to it and /coverage does not count it`,
       );
