@@ -173,3 +173,33 @@ test("a section missing either figure leaves both totals and Net without a figur
   assert.equal(coll.gap, debt.gap);
   assert.equal(walletNet(coll, debt), null);
 });
+
+test("a section with collateral and no debt figure says so in its band", () => {
+  const s = walletSections([pos("spark", { collateralUsd: 50, debtUsd: 5 }), pos("spark", { collateralUsd: 20 })], {
+    bands: true,
+  });
+  assert.equal(s[0].band.legs.map((l) => l.id).join(), "collateral");
+  assert.equal(s[0].band.note, "No debt total: an open position's debt states no dollars.");
+});
+
+test("an ETH-quoted Comet's head dollars convert through the read's WETH price", async () => {
+  const { cometHeadUsd } = await import("../../lib/wallet/comet-head-usd.ts");
+  const live = {
+    quoteUnit: "ETH",
+    baseDecimals: 18,
+    basePrice: 1,
+    borrowBalanceRaw: "2000000000000000000",
+    collateral: [{ balanceRaw: "10000000000000000000", decimals: 18, price: 1.2 }],
+  };
+  const got = cometHeadUsd(live, 3000);
+  assert.equal(got.collateralUsd, 36000);
+  assert.equal(got.debtUsd, 6000);
+  const none = cometHeadUsd(live, null);
+  assert.equal(none.collateralUsd, undefined);
+  assert.equal(none.debtUsd, undefined);
+  assert.deepEqual(cometHeadUsd({ ...live, quoteUnit: "USD", borrowBalanceRaw: "0" }, null), {
+    collateralUsd: 12,
+    debtUsd: 0,
+    borrowed: 0,
+  });
+});

@@ -20,8 +20,9 @@ import { withServerHead } from "@/lib/sources/api/lender-position-head";
 import { chainClient } from "@/lib/sources/chain/rpc";
 import { BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import type { WalletPosition } from "@/lib/wallet/types";
-import { amountText, bufferFromHealth, historyBase, plural, scaled, storeStamp } from "@/lib/wallet/summary-row";
+import { amountText, bufferFromHealth, historyBase, plural, storeStamp } from "@/lib/wallet/summary-row";
 import type { FamilyModule, HeadResult } from "./module";
+import { cometHeadUsd } from "@/lib/wallet/comet-head-usd";
 
 function lane(name: "ethereum" | "base"): FamilyModule {
   const chain: ChainId = name === "ethereum" ? MAINNET_CHAIN_ID : BASE_CHAIN_ID;
@@ -95,24 +96,10 @@ function lane(name: "ethereum" | "base"): FamilyModule {
         positions: open.map((p): WalletPosition => {
           const s = (p.card as { row: CompoundPositionSummary }).row;
           const live = wallet.positions.find((x) => x.comet.toLowerCase() === s.comet.toLowerCase());
-          // A Comet the sweep found empty: the account holds nothing there at head.
-          const borrowed = live ? scaled(live.borrowBalanceRaw, live.baseDecimals) : 0;
-          // Both dollar figures from the head read, at the Comet's prices
-          // (an ETH-quoted Comet's through the read's WETH price), so no
-          // stored figure sits beside a head one (ui-jobs 738).
-          const toUsd = !live ? 1 : live.quoteUnit === "USD" ? 1 : (wallet.ethUsd ?? undefined);
-          const collateralUsd = !live
-            ? 0
-            : toUsd == null
-              ? undefined
-              : live.collateral.reduce((sum, c) => sum + scaled(c.balanceRaw, c.decimals) * c.price, 0) * toUsd;
-          // Nothing borrowed is no debt, priced or not.
-          const debtUsd = borrowed === 0 ? 0 : toUsd == null || !live ? undefined : borrowed * live.basePrice * toUsd;
+          const { collateralUsd, debtUsd, borrowed } = cometHeadUsd(live, wallet.ethUsd);
           const hf = live?.healthFactor ?? null;
           return {
             ...p,
-            // The head read settles whether the account owes.
-            kind: p.kind === "deposits" || p.kind === "loans" ? (borrowed > 0 ? "loans" : "deposits") : p.kind,
             collateralUsd,
             debtUsd,
             usdOwnOracle: true,

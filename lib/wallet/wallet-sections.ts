@@ -224,6 +224,11 @@ export function walletSections(positions: WalletPosition[], opts: { bands: boole
         legs: [],
         note: `${unread === open.length ? (unread === 1 ? "The open position was" : `None of the ${open.length} open positions were`) : `${unread} of the ${open.length} open positions ${unread === 1 ? "was" : "were"}`} not read at the chain head, so the section states no total.`,
       };
+    } else if (open.length > 0 && (collateral == null) !== (debt == null)) {
+      // One figure stands: the band says the other states none, so a lone
+      // "Total collateral" never reads as owing nothing.
+      const missing = collateral == null ? "collateral" : "debt";
+      band = { ...band, note: `No ${missing} total: an open position's ${missing} states no dollars.` };
     }
     if (!opts.bands) band = { ...band, positions: 0 };
     sections.push({
