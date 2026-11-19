@@ -60,10 +60,12 @@ export interface FxCoords {
   positionId?: string;
 }
 
-const poolContract = (coords?: FxCoords) => ({
-  name: coords?.poolLabel ? `AaveFundingPool (${coords.poolLabel})` : "AaveFundingPool",
-  address: coords?.pool ?? "0x0000000000000000000000000000000000000000",
-});
+/** The pool the event's log came from; no contract where the coords name
+ *  none. */
+const poolContract = (coords?: FxCoords) =>
+  coords?.pool
+    ? { name: coords.poolLabel ? `AaveFundingPool (${coords.poolLabel})` : "AaveFundingPool", address: coords.pool }
+    : undefined;
 
 const atBlock = (coords?: FxCoords): string => (coords?.blockNumber != null ? ` at block ${coords.blockNumber}` : "");
 
