@@ -3,9 +3,12 @@
 // explorer id, for the explorer chooser, the home tiles, /start's picker and
 // an explorer's own pages to test against the reader's assets in the browser.
 //
-// Two sources the chips do not carry are added here: Pendle (each PT the PT
-// table names, its yield token, and the family table's PT, YT and LP tokens)
-// and Sky Savings (USDS and sUSDS). A launched explorer with no source at all
+// Two sources are added here: Pendle (each PT the PT table names, its yield
+// token, and the family table's PT, YT and LP tokens) and Sky Savings (USDS
+// and sUSDS). The chips' Pendle hits (its live markets' yield tokens and the
+// assets they account in, for the asset page's uses line) are left out: they
+// would count each market's accounting asset (USDC, BOLD) as a Pendle asset
+// and move the chooser, the home tiles and /start's picker. A launched explorer with no source at all
 // (rails-ops reference/asset-key-map.md, "No chip source") is in `unknown`:
 // Rails cannot say whether it touches an asset.
 //
@@ -44,7 +47,7 @@ export async function explorerAssetIndex(): Promise<ExplorerAssetIndex> {
     if (SCOPE_KEYS.has(k)) byExplorer.set(explorer, (byExplorer.get(explorer) ?? new Set()).add(k));
   };
 
-  for (const [key, list] of chips) for (const c of list) put(c.explorer, key);
+  for (const [key, list] of chips) for (const c of list) if (c.explorer !== "pendle") put(c.explorer, key);
   for (const [pt, [underlying]] of Object.entries(PT_UNDERLYING_MAINNET)) {
     put("pendle", `1:${pt}`);
     put("pendle", `1:${underlying}`);
