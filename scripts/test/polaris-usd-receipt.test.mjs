@@ -147,3 +147,18 @@ test("the holder strip and the card give the same position the same collateral c
     /currentPrice\(\), pETH in ETH\) × .*ETH\/USD.*at block 12,165,707/,
   );
 });
+
+const { shownPricesOf, polarisSheetUsd } = await import(ROOT + "lib/polaris/sheet-usd.ts");
+
+test("the sheet's Last event row stands at the previous event's prices and names that event's block", () => {
+  const prev = {
+    market: "usdp",
+    stableSymbol: "USDp",
+    priceAtBlock: { pethInDebt: 5600.5, curve: 3.1234567, ethUsd: 1793.123456, xauUsd: null },
+  };
+  const r = polarisSheetUsd(shownPricesOf(prev), "Last event", "coll", 0.0349341, 12_100_000, "USDp");
+  const price = r.prov.inputs.find((i) => i.label === "pETH price");
+  assert.match(price.note, /at block 12,100,000$/);
+  assert.equal(r.usd, Math.round(0.034934 * shownComposedPrice(3.1234567, 1793.123456) * 100) / 100);
+  assert.match(r.prov.summary, /the price at block 12,100,000/);
+});

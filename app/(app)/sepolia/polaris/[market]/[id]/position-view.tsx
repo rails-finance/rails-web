@@ -15,6 +15,7 @@
 // Units are native everywhere; the one dollar figure is the protocol's own
 // feed, and the header line says "Sepolia testnet" once.
 
+import { shownComposedPrice } from "@/lib/shared/shown-usd";
 import { SectionSidebar } from "@/components/shared/section-sidebar";
 import { useReportPositionRead } from "@/components/shared/position-read";
 import { readOfHeadAnswer } from "@/lib/shared/position-read";
@@ -315,7 +316,12 @@ export default function PolarisPositionView({
         triggerLabel: PETH.symbol,
         info: liveCurvePriceProv(false, chain.blockNumber),
       },
-      { symbol: PETH.symbol, address: PETH.address, price: chain.price.pethUsd },
+      // The card's composed row: each factor as shown (ui-jobs 743).
+      {
+        symbol: PETH.symbol,
+        address: PETH.address,
+        price: shownComposedPrice(chain.price.curve, chain.price.ethUsd),
+      },
     ];
     if (chain.price.ethUsd > 0)
       out.push({

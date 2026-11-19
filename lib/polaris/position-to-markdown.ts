@@ -184,17 +184,18 @@ export function polarisPositionToMarkdown(args: PolarisPositionMarkdownArgs): st
       );
       if (live.entireColl > 0) {
         // The card's figure: from the shown rows (ui-jobs 743).
-        const equity =
-          polarisEquity({
-            market: view.market,
-            coll: live.entireColl,
-            debt: live.entireDebt,
-            pethInDebt: live.price.pethInDebt,
-            block: live.blockNumber,
-          })?.equity ?? 0;
-        lines.push(
-          `- **Equity at the feed:** ${amt(equity)} ${stable} (collateral × feed − debt; a debt below zero is owed to the holder and adds to it; a valuation at block ${live.blockNumber}, not a profit)`,
-        );
+        // No price, no equity line.
+        const equity = polarisEquity({
+          market: view.market,
+          coll: live.entireColl,
+          debt: live.entireDebt,
+          pethInDebt: live.price.pethInDebt,
+          block: live.blockNumber,
+        })?.equity;
+        if (equity != null)
+          lines.push(
+            `- **Equity at the feed:** ${amt(equity)} ${stable} (collateral × feed − debt; a debt below zero is owed to the holder and adds to it; a valuation at block ${live.blockNumber}, not a profit)`,
+          );
       }
     }
     lines.push("");

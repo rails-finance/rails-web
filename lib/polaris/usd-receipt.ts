@@ -144,7 +144,8 @@ export function polarisEquity(o: {
         ...rows,
         {
           label: "entire debt",
-          value: `${amountText(o.debt)} ${stable}`,
+          // A debt below zero is owed to the holder; its sign is the true minus.
+          value: `${o.debt < 0 ? "−" : ""}${amountText(Math.abs(o.debt))} ${stable}`,
           kind: "chain",
           pclass: "state",
           note: "getCDPEntireDebt(id)",

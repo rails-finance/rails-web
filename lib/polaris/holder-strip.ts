@@ -157,19 +157,13 @@ export function polarisHolderStrip(
   // One composed row, the curve × ETH/USD, each factor as shown, at the
   // board's block: the card's row, so the two agree to the cent (ui-jobs 743).
   const boardPrice = (boardFor("usdp") ?? markets.markets[0])?.price ?? null;
-  // A read that carries only the product states it as it came, said so.
   const composed =
     boardPrice && boardPrice.curve > 0 && boardPrice.ethUsd > 0
       ? {
           usd: shownComposedPrice(boardPrice.curve, boardPrice.ethUsd),
           note: polarisPethUsdNote({ curve: boardPrice.curve, ethUsd: boardPrice.ethUsd, block: markets.blockNumber }),
         }
-      : boardPrice && boardPrice.pethUsd > 0
-        ? {
-            usd: boardPrice.pethUsd,
-            note: `pETH / USD, the bonding curve's currentPrice() × the ETH/USD medianiser as the read carries it, the two factors not stated apart, at block ${markets.blockNumber.toLocaleString("en-US")}`,
-          }
-        : null;
+      : null;
   const legs: HolderLeg[] = [];
   if (coll > 0) {
     const receipt =

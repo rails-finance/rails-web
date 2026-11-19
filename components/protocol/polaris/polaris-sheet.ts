@@ -47,15 +47,8 @@ import {
 } from "./polaris-liquidation-forensics";
 import { formatExact, formatNumber } from "@/lib/utils/format";
 import { formatPeth } from "@/lib/polaris/figure-format";
-import { holderUsdReceipt, type UsdLeg } from "@/lib/shared/holder-usd-receipt";
-import { priceText, shownComposedPrice, shownPrice, shownUsd } from "@/lib/shared/shown-usd";
-import {
-  POLARIS_TEST_DOLLAR,
-  POLARIS_USDP_FACE,
-  polarisFeedPriceNote,
-  polarisPethUsdNote,
-  polarisXauNote,
-} from "@/lib/polaris/price-notes";
+import { priceText, shownUsd } from "@/lib/shared/shown-usd";
+import { polarisSheetUsd, shownPricesOf } from "@/lib/polaris/sheet-usd";
 
 const W = POLARIS_WORDS;
 
@@ -108,56 +101,6 @@ function unitPriceOf(ctx: PolarisContext): UnitPrice | null {
   };
 }
 
-/** An event's dollar prices as shown, and each as a receipt row naming its
- *  block (ui-jobs 743): pETH at the curve × ETH/USD composed (else, on USDp,
- *  the feed's price, a dollar by construction; on GOLDp the feed's price ×
- *  XAU/USD), the debt at USDp's $1 face or at XAU/USD. */
-function shownPricesOf(c: PolarisContext): {
-  coll: number | null;
-  debt: number | null;
-  collLeg: (block?: number) => Omit<UsdLeg, "amount" | "amountNote"> | null;
-  debtLeg: (block?: number) => Omit<UsdLeg, "amount" | "amountNote"> | null;
-} | null {
-  const pa = c.priceAtBlock;
-  if (!pa) return null;
-  const gold = c.market === "goldp";
-  const stable = c.stableSymbol;
-  const xau = pa.xauUsd != null && pa.xauUsd > 0 ? pa.xauUsd : null;
-  const curveLeg = pa.curve != null && pa.curve > 0 && pa.ethUsd != null && pa.ethUsd > 0;
-  const coll = curveLeg
-    ? shownComposedPrice(pa.curve as number, pa.ethUsd as number)
-    : !gold
-      ? pa.pethInDebt > 0
-        ? shownPrice(pa.pethInDebt)
-        : null
-      : xau != null && pa.pethInDebt > 0
-        ? shownComposedPrice(pa.pethInDebt, xau)
-        : null;
-  const debt = gold ? (xau != null ? shownPrice(xau) : null) : 1;
-  return {
-    coll,
-    debt,
-    collLeg: (block) =>
-      coll == null
-        ? null
-        : {
-            token: "pETH",
-            price: coll,
-            priceNote: curveLeg
-              ? polarisPethUsdNote({ curve: pa.curve as number, ethUsd: pa.ethUsd as number, block })
-              : gold
-                ? `${polarisFeedPriceNote(stable, block)} × ${polarisXauNote(block)}`
-                : polarisFeedPriceNote(stable, block),
-          },
-    debtLeg: (block) =>
-      debt == null
-        ? null
-        : gold
-          ? { token: stable, price: debt, priceNote: polarisXauNote(block) }
-          : { token: stable, price: 1, priceNote: POLARIS_USDP_FACE, face: true },
-  };
-}
-
 /** Polaris's sheet, or undefined for the events it cannot state (a
  *  transfer). */
 export function polarisSheet(
@@ -195,22 +138,8 @@ export function polarisSheet(
   const rowUsd = (what: string, token: "coll" | "debt", n: number, at: "this" | "prev" = "this"): SheetRow["usd"] => {
     const pr = at === "this" ? prices : prevPrices;
     const block = at === "this" ? coords.blockNumber : prevBlock;
-    const leg = pr ? (token === "coll" ? pr.collLeg(block) : pr.debtLeg(block)) : null;
-    if (!leg || n === 0) return undefined;
-    const r = holderUsdReceipt({
-      what: `${what} in US dollars`,
-      legs: [
-        {
-          ...leg,
-          amount: Math.abs(n),
-          amountNote: token === "coll" ? "the pETH the row states" : `the ${stable} the row states`,
-        },
-      ],
-      block: block ?? null,
-      via: "polaris_oracle_at_block",
-      caveat: POLARIS_TEST_DOLLAR,
-    });
-    return { text: sheetUsd(n < 0 ? -r.usd : r.usd), info: r.prov };
+    const r = polarisSheetUsd(pr, what, token, n, block, stable);
+    return r ? { text: sheetUsd(n < 0 ? -r.usd : r.usd), info: r.prov } : undefined;
   };
   // The previous event's prices, where the page hands it down and it read the feed.
   const prevUnit = prev ? unitPriceOf(prev) : null;
