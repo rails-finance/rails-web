@@ -2,8 +2,8 @@
 
 // Then / today on the event card (rails-ops standards/detail-page-anatomy.md,
 // "USD values on the timeline"; anatomy T2; ui-jobs 283, 309, 761). T2's
-// price chips stand at the event's prices by default; a press on the clock
-// icon before them (PriceBasisPress) moves the chips and the card's USD
+// price chips stand at the event's prices by default; a press on them or the
+// clock before them (PriceBasisGroup) moves the chips and the card's USD
 // figures (its cells, the opened ledger's USD column, the closed cell's
 // tooltip) to the latest block's price. The choice is the card's, held in
 // its state and never stored.
@@ -12,17 +12,28 @@
 // (components/shared/latest-prices.tsx), published by symbol with each one's
 // receipt; the cards read them here, so the two never disagree.
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import {
   anyFlips,
+  clockClass,
   pressState,
   todayChipProv,
   todayChipTitle,
   type Flippable,
   type PriceBasis,
 } from "@/lib/shared/price-basis-words";
-import { CTRL_GHOST, CTRL_OFF } from "@/lib/shared/ui-grammar";
+import { CTRL_GHOST } from "@/lib/shared/ui-grammar";
 
 export { todayChipTitle, type Flippable, type PriceBasis };
 
@@ -161,41 +172,62 @@ function ClockIcon({ basis, size }: { basis: PriceBasis; size: number }) {
   );
 }
 
-/** The row's then/today press: one clock icon before its price chips (Miles,
- *  19 Nov 2026; ui-jobs 761). Rotate-ccw-clock, muted, at the event's
- *  prices, the default; clock-check, in the live green, at the latest
- *  block's. A press flips every chip on the card; none is drawn where no
- *  chip can flip. A card draws one: where its price row carries the chips,
- *  the forensics footnote states none. */
-export function PriceBasisPress({ chips }: { chips: Flippable[] }) {
+/** The row's then/today press (Miles, 19 Nov 2026; ui-jobs 761): the group
+ *  of the clock and the price chips. A click anywhere on it flips every chip
+ *  on the card. The clock is rotate-ccw-clock at the event's prices, shown on
+ *  the group's hover, on keyboard focus and always on a device without
+ *  hover; clock-check in the live green at the latest block's, always shown.
+ *  It is the one focusable control, carrying the name and pressed state: a
+ *  receipt pick, while the inspector is armed, is a button of its own and
+ *  takes its click first. Where no chip can flip the group is plain. A card
+ *  draws one: where its price row carries the chips, the forensics footnote
+ *  states none. */
+export function PriceBasisGroup({
+  chips,
+  className,
+  children,
+}: {
+  chips: Flippable[];
+  className?: string;
+  children: ReactNode;
+}) {
   const ctx = useContext(BasisContext);
   const flips = useAnyFlips(chips);
-  if (!ctx || !flips) return null;
-  const isToday = ctx.basis === "today";
+  if (!ctx || !flips) return <div className={className}>{children}</div>;
   const { label, pressed } = pressState(ctx.basis);
+  const flip = (e: MouseEvent) => {
+    e.stopPropagation();
+    ctx.setBasis(ctx.basis === "today" ? "event" : "today");
+  };
   return (
-    <button
-      type="button"
+    <div
+      className={`${className ?? ""} group/price cursor-pointer`}
       title={label}
-      aria-label={label}
-      aria-pressed={pressed}
-      onClick={(e) => {
-        e.stopPropagation();
-        ctx.setBasis(isToday ? "event" : "today");
-      }}
-      onKeyDown={(e) => e.stopPropagation()}
-      className={`${CTRL_GHOST} size-6 shrink-0 rounded-sm focus-ring ${isToday ? `${TODAY_TONE} hover:bg-[var(--surface-row-hover)] dark:hover:bg-rb-800` : CTRL_OFF}`}
-      data-price-basis-press=""
+      onClick={flip}
+      data-price-basis-group=""
       data-price-basis={ctx.basis}
     >
-      <ClockIcon basis={ctx.basis} size={16} />
-    </button>
+      <button
+        type="button"
+        title={label}
+        aria-label={label}
+        aria-pressed={pressed}
+        onClick={flip}
+        onKeyDown={(e) => e.stopPropagation()}
+        className={`${CTRL_GHOST} -mr-1 size-6 shrink-0 rounded-sm focus-ring ${clockClass(ctx.basis)} ${ctx.basis === "today" ? TODAY_TONE : "text-rb-500"}`}
+        data-price-basis-press=""
+        data-price-basis={ctx.basis}
+      >
+        <ClockIcon basis={ctx.basis} size={16} />
+      </button>
+      {children}
+    </div>
   );
 }
 
 /** T2's price chip: the event's figure by default (`then`, its receipt with
  *  it), and the latest block's price, in the live green, while the card's
- *  PriceBasisPress stands at today (ui-jobs 309, 761). Without a card to
+ *  PriceBasisGroup stands at today (ui-jobs 309, 761). Without a card to
  *  switch or a price today it stays the event's figure. */
 export function ThenTodayChip({
   symbol,

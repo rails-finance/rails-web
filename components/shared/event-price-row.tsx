@@ -8,7 +8,7 @@
 
 import { Fuel } from "lucide-react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { PriceBasisPress, ThenTodayChip, todayChipTitle, useTodayBasisPrices } from "@/components/shared/price-basis";
+import { PriceBasisGroup, ThenTodayChip, todayChipTitle, useTodayBasisPrices } from "@/components/shared/price-basis";
 import { PriceChipShell } from "@/components/shared/state-transition";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { usePreferences } from "@/lib/shared/preferences-context";
@@ -302,13 +302,15 @@ export function EventPriceRow({ price }: { price: EventCardPrice }) {
             )}
           </div>
         )}
-        {/* The chips stand together at the row's right end, the then/today
-            press before them. */}
+        {/* The chips stand together at the row's right end, the group the
+            then/today press, its clock before them. */}
         {prices.length > 0 && (
-          <div className="ml-auto inline-flex flex-wrap items-center gap-x-3 gap-y-1">
-            <PriceBasisPress chips={prices.map((p) => ({ symbol: p.symbol, noToday: p.unit != null }))} />
+          <PriceBasisGroup
+            chips={prices.map((p) => ({ symbol: p.symbol, noToday: p.unit != null }))}
+            className="ml-auto inline-flex flex-wrap items-center gap-x-3 gap-y-1"
+          >
             {chips}
-          </div>
+          </PriceBasisGroup>
         )}
         {price.figures?.map((f) => {
           const icon = f.symbol ? <TokenChipIcon symbol={f.symbol} address={f.address} size={14} /> : null;

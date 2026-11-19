@@ -25,6 +25,16 @@ export function pressState(basis: PriceBasis): { label: string; pressed: boolean
     : { label: "Prices at this event. Press for the prices at the latest block.", pressed: false };
 }
 
+/** The clock's visibility at a basis: at the event's prices hidden at rest
+ *  and shown on the price group's hover, on keyboard focus and on a device
+ *  without hover, its width kept so nothing moves; at the latest block's
+ *  always shown, the cue that the prices are not the event's. */
+export function clockClass(basis: PriceBasis): string {
+  return basis === "today"
+    ? "opacity-100"
+    : "opacity-0 transition-opacity group-hover/price:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100";
+}
+
 /** A flipped chip's tip. */
 export function todayChipTitle(symbol: string): string {
   return `${symbol} price at the latest block`;

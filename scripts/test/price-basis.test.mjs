@@ -4,7 +4,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const { anyFlips, pressState, todayChipTitle, todayChipProv } = await import("../../lib/shared/price-basis-words.ts");
+const { anyFlips, clockClass, pressState, todayChipTitle, todayChipProv } = await import(
+  "../../lib/shared/price-basis-words.ts"
+);
 
 const prices = { weth: { price: 1806 }, bold: { price: 0.9985 } };
 
@@ -23,7 +25,7 @@ test("a chip the page prices today flips, by symbol in any case", () => {
   assert.equal(anyFlips([{ symbol: "WETH" }], prices), true);
 });
 
-test("the press's name and pressed state at each basis", () => {
+test("the group's name, tip and pressed state at each basis", () => {
   assert.deepEqual(pressState("event"), {
     label: "Prices at this event. Press for the prices at the latest block.",
     pressed: false,
@@ -32,6 +34,22 @@ test("the press's name and pressed state at each basis", () => {
     label: "Prices at the latest block. Press for the prices at this event.",
     pressed: true,
   });
+});
+
+test("at the event's prices the clock is hidden at rest, shown on the group's hover and on keyboard focus", () => {
+  const c = clockClass("event").split(" ");
+  assert.ok(c.includes("opacity-0"));
+  assert.ok(c.includes("group-hover/price:opacity-100"));
+  assert.ok(c.includes("focus-visible:opacity-100"));
+});
+
+test("on a device without hover the clock is always shown", () => {
+  assert.ok(clockClass("event").split(" ").includes("[@media(hover:none)]:opacity-100"));
+});
+
+test("at the latest block's prices the clock is always shown", () => {
+  assert.ok(!clockClass("today").includes("opacity-0"));
+  assert.ok(clockClass("today").split(" ").includes("opacity-100"));
 });
 
 test("a flipped chip's tip says the latest block", () => {
