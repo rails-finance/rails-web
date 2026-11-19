@@ -546,6 +546,8 @@ export interface FlowModel {
   changesUnavailable: boolean;
   /** The timeline's protocol activity (`FlowTimeline.activity`), or null. */
   activity: ProtocolActivity | null;
+  /** The timeline's `chartAlone`: no position, so no state between events. */
+  chartAlone?: true;
   live: FlowLive;
   /** Held and owed, valued, at the end of each stop before the live one. */
   valued: { collateral: number; debt: number }[];
@@ -1074,6 +1076,7 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     changes: t.changes ?? [],
     changesUnavailable: t.changesUnavailable === true,
     activity: t.activity ?? null,
+    ...(t.chartAlone ? { chartAlone: true as const } : {}),
     live: t.live,
     valued,
     collateralHigh,

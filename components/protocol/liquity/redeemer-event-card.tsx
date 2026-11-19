@@ -175,7 +175,7 @@ export function LiquityV2RedemptionCard({
         </Link>,
         ...(rateText
           ? [
-              <span key="rate" data-redeemer-rate="">
+              <span key="rate" data-redeemer-rate="" data-anatomy="Q4·liquity">
                 at{" "}
                 <Prov info={redemptionLogProv("rate", row)} value={String(ratePct)}>
                   {rateText}

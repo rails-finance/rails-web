@@ -40,11 +40,6 @@ export interface BoldDailyResponse {
   obs: [number, number, number][];
 }
 
-export interface RedeemerFlows {
-  timeline: FlowTimeline;
-  focus: FocusEvent[];
-}
-
 /** BOLD from a 1e18 raw, as a number. */
 const boldOf = (raw: string) => Number(BigInt(raw) / BigInt(1e12)) / 1e6;
 
@@ -69,6 +64,7 @@ export const BOLD_UNREAD_TEXT = "Not read yet";
 /** The price days drawn: the answer's points inside the span, and the days
  *  before the store's first one marked as not read yet. */
 export function boldPriceSeries(prices: BoldDailyResponse, firstDay: number, lastDay: number): PriceSeries | null {
+  const unread = unfilledThrough(prices, firstDay, lastDay);
   const points = prices.obs
     .filter(([d, usd]) => d >= firstDay && d <= lastDay && Number.isFinite(usd) && usd > 0)
     .map(([d, usd, block]) => [d, usd, block] as [number, number, number]);
@@ -81,26 +77,27 @@ export function boldPriceSeries(prices: BoldDailyResponse, firstDay: number, las
     source: BOLD_PRICE_SOURCE,
     points,
     here: BOLD_HERE,
-    ...(unfilledThrough(prices, firstDay) != null
-      ? { unread: { through: unfilledThrough(prices, firstDay)!, text: BOLD_UNREAD_TEXT } }
-      : {}),
+    ...(unread != null ? { unread: { through: unread, text: BOLD_UNREAD_TEXT } } : {}),
   };
 }
 
-/** The first day of the span the price lane has not read yet, or null when
- *  it reaches the first redemption day. */
-export function unfilledThrough(prices: BoldDailyResponse | null, firstDay: number): number | null {
-  const from = prices?.filledFrom?.day;
-  if (prices && prices.filledFrom == null) return firstDay;
-  return from != null && from > firstDay ? from - 1 : null;
+/** The last day of the span [firstDay, lastDay] the price store has not read
+ *  yet, or null where it has read the whole span or the price read failed
+ *  (`prices` null). The store reads newest first from `filledFrom`: a store
+ *  with no row, or a first row whose day is not mapped yet, has read none of
+ *  the span. */
+export function unfilledThrough(prices: BoldDailyResponse | null, firstDay: number, lastDay: number): number | null {
+  if (!prices) return null;
+  const from = prices.filledFrom?.day;
+  if (from == null) return lastDay;
+  const through = Math.min(from - 1, lastDay);
+  return through >= firstDay ? through : null;
 }
 
-/** The page's flows, or null with fewer than one redemption day. */
-export function redeemerFlows(
-  days: RedeemerDay[],
-  prices: BoldDailyResponse | null,
-  rows: LiquityV2RedemptionRow[],
-): RedeemerFlows | null {
+/** The page's chart timeline, or null with no redemption day. Built from the
+ *  days and prices alone, so reading more rows leaves the chart (and its
+ *  cursor) as it stands. */
+export function redeemerTimeline(days: RedeemerDay[], prices: BoldDailyResponse | null): FlowTimeline | null {
   const sorted = [...days].sort((a, b) => a[0] - b[0]);
   if (sorted.length === 0) return null;
   const firstDay = sorted[0][0];
@@ -149,9 +146,16 @@ export function redeemerFlows(
     addresses: { [BOLD]: BOLD_ADDRESS },
     chartAlone: true,
     ...(series ? { shareLine: { asset: A, series, unitLabel: "USD", name: "BOLD", digits: 4 } } : {}),
-    words: { close: "Last redemption", moment: { tokensOnly: ["collateral", "debt"] } },
+    words: { close: "Last redemption" },
   };
-  const focus: FocusEvent[] = rows.map((r) => {
+  return timeline;
+}
+
+/** The listed rows as the chart's focus events, each under its
+ *  Trove-timeline id (the card's "View on chart"). */
+export function redeemerFocus(rows: LiquityV2RedemptionRow[], timeline: FlowTimeline | null): FocusEvent[] {
+  const G = 10 ** (timeline?.unit?.scale ?? 0);
+  return rows.map((r) => {
     const bold = boldOf(r.bold_raw);
     return {
       id: `${r.transaction_hash}_${r.log_index}`,
@@ -160,5 +164,4 @@ export function redeemerFlows(
       legs: [{ bucket: BUCKET, usd: bold * G, amount: bold, symbol: BOLD }],
     };
   });
-  return { timeline, focus };
 }

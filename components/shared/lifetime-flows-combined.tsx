@@ -737,7 +737,8 @@ export function CombinedFlows({
   // While the charts are shown, the HTML under and over the chart (the events
   // row, the tips, the stems) takes the chart's axis, which zooms and pans;
   // hidden, or before the chart is drawn, the whole life's.
-  const shown = !compact || noBars;
+  // A chart standing alone with no price to draw keeps its events row only.
+  const shown = (!compact || noBars) && !(chartAlone && prices.length === 0);
   const chartAxis = shown ? lwAxis : null;
   const wholeAxis = useMemo(() => lifeAxis(w, startDay, span), [w, startDay, span]);
   const xClose = (day: number) => (chartAxis ? chartAxis.xClose(day) : wholeAxis(Math.min(day, today)));
@@ -1045,7 +1046,7 @@ export function CombinedFlows({
                 {/* The events: a row of pips on the time axis, the price
                     chart's cursor line running on down to the date over it. */}
                 <div className={priceOnly ? "hidden" : compact ? "mt-2" : undefined} data-flow-events-section="">
-                  {!compact && <Stem x={cx} w={rowW} />}
+                  {shown && <Stem x={cx} w={rowW} />}
                   <PipRow
                     model={model}
                     xClose={xClose}

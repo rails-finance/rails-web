@@ -25,7 +25,8 @@ import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubb
 import { FlowFocusContext, useFlowFocusRoot, useFlowFocusValue } from "@/components/shared/flow-focus-context";
 import { RedeemerFlowsNote } from "@/components/protocol/liquity/redeemer-flows-note";
 import {
-  redeemerFlows,
+  redeemerFocus,
+  redeemerTimeline,
   unfilledThrough,
   type BoldDailyResponse,
   type RedeemerDaysResponse,
@@ -146,29 +147,42 @@ export default function RedeemerView({
     };
   }, [olderCount, address]);
 
-  // The chart: every redemption day, then BOLD's price over them.
+  // The chart: every redemption day, then BOLD's price over them. Only a
+  // failed days read fails the panel; a failed price read keeps the events
+  // row and says the price was not read.
   const [days, setDays] = useState<RedeemerDaysResponse | null>(null);
+  const [daysFailed, setDaysFailed] = useState(false);
   const [prices, setPrices] = useState<BoldDailyResponse | null>(null);
-  const [flowsFailed, setFlowsFailed] = useState(false);
+  const [priceRead, setPriceRead] = useState<"reading" | "done" | "failed">("reading");
   useEffect(() => {
     const ctl = new AbortController();
     readLiquityV2RedeemerDays(address, ctl.signal)
-      .then(async (d) => {
+      .then((d) => {
         setDays(d);
-        if (d.days.length === 0) return;
+        if (d.days.length === 0) {
+          setPriceRead("done");
+          return;
+        }
         const from = d.days[0][0];
         const to = d.days[d.days.length - 1][0];
-        setPrices(await readBoldDailyPrices(from, to, ctl.signal));
+        readBoldDailyPrices(from, to, ctl.signal)
+          .then((p) => {
+            setPrices(p);
+            setPriceRead("done");
+          })
+          .catch(() => !ctl.signal.aborted && setPriceRead("failed"));
       })
-      .catch(() => !ctl.signal.aborted && setFlowsFailed(true));
+      .catch(() => !ctl.signal.aborted && setDaysFailed(true));
     return () => ctl.abort();
   }, [address]);
-  const flows = useMemo(
-    () => (days && (prices || days.days.length === 0) ? redeemerFlows(days.days, prices, listed) : null),
-    [days, prices, listed],
+  // On the days and prices alone: reading more rows leaves the chart's cursor.
+  const timeline = useMemo(
+    () => (days && priceRead !== "reading" ? redeemerTimeline(days.days, prices) : null),
+    [days, prices, priceRead],
   );
-  const flowsRead: FlowsRead = flowsFailed ? "failed" : days && (prices || days.days.length === 0) ? "done" : "reading";
-  const flowFocus = useFlowFocusValue(useFlowFocusRoot(flows?.focus ?? NO_FOCUS), flows?.timeline ?? null);
+  const focusEvents = useMemo(() => redeemerFocus(listed, timeline), [listed, timeline]);
+  const flowsRead: FlowsRead = daysFailed ? "failed" : days && priceRead !== "reading" ? "done" : "reading";
+  const flowFocus = useFlowFocusValue(useFlowFocusRoot(timeline ? focusEvents : NO_FOCUS), timeline);
 
   const tl = useTimelineEvents(events, {
     storageKey: `liquity-v2-redeemer-${address}`,
@@ -209,7 +223,7 @@ export default function RedeemerView({
   const lastDay = days?.days[days.days.length - 1]?.[0] ?? null;
 
   return (
-    <FlowFocusContext.Provider value={flows ? flowFocus : null}>
+    <FlowFocusContext.Provider value={timeline ? flowFocus : null}>
       <div className="py-8 space-y-6" data-anatomy="Q1·liquity">
         <DetailTopRow session="liquity-v2" wallet={address} fallbackHref={LIQUITY_V2_BASE_PATH} tools={false} />
         <LiquityV2RedeemerCard
@@ -232,21 +246,24 @@ export default function RedeemerView({
             </ul>
           }
         />
-        <LifetimeFlowsPanel
-          scrubber={flows ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
-          read={flowsRead}
-          explanation={
-            days && firstDay != null && lastDay != null ? (
-              <RedeemerFlowsNote
-                days={days.days.length}
-                firstDay={firstDay}
-                lastDay={lastDay}
-                unreadThrough={unfilledThrough(prices, firstDay)}
-                pool={prices?.pool ?? null}
-              />
-            ) : undefined
-          }
-        />
+        <div data-anatomy="Q3·liquity">
+          <LifetimeFlowsPanel
+            scrubber={timeline ? <LifetimeFlowsScrubber timeline={timeline} /> : null}
+            read={flowsRead}
+            explanation={
+              days && firstDay != null && lastDay != null ? (
+                <RedeemerFlowsNote
+                  days={days.days.length}
+                  firstDay={firstDay}
+                  lastDay={lastDay}
+                  unreadThrough={unfilledThrough(prices, firstDay, lastDay)}
+                  priceFailed={priceRead === "failed"}
+                  pool={prices?.pool ?? null}
+                />
+              ) : undefined
+            }
+          />
+        </div>
         {awaitAt ? (
           <DetailBodySkeleton />
         ) : (
