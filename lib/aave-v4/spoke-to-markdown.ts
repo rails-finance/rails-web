@@ -18,6 +18,10 @@
 // we parseFloat only here at serialization time (the render boundary), never at
 // the data boundary.
 
+import type { AaveV4UsdResult } from "@/lib/aave-v4/usd-receipt";
+import { aaveV4SpokeSideUsd } from "@/lib/aave-v4/spoke-usd";
+import { aaveV4NoFigureLine } from "@/lib/aave-v4/price-notes";
+import { shownUsd } from "@/lib/shared/shown-usd";
 import { formatExact } from "@/lib/utils/format";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAaveV4Event } from "@/lib/shared/types/event-shape";
@@ -178,7 +182,11 @@ function openHeadlines(args: AaveV4SpokeMarkdownArgs): string[] {
   // Collateral — gross deposited value is the headline; the LT-weighted figure
   // that actually backs the loan + HF is stated alongside (see the house rule on
   // "Collateral" = full deposit).
-  let collLine = `- **Collateral:** ${usd(card.totalSupplyUsd)} supplied`;
+  // The card's figures: the sums of the shown products its receipts list, or
+  // the assets with no on-chain price (ui-jobs 743).
+  const side = (r: AaveV4UsdResult | null, fallback: number) =>
+    r == null ? usd(fallback) : r.prov == null ? aaveV4NoFigureLine(r) : usd(r.usd);
+  let collLine = `- **Collateral:** ${side(aaveV4SpokeSideUsd(card, "supply"), card.totalSupplyUsd)} supplied`;
   if (card.weightedCollateralUsd > 0) {
     collLine += ` (${usd(card.weightedCollateralUsd)} counts at the collateral factor`;
     collLine += card.blendedLt != null ? `, ~${num(card.blendedLt * 100, 0)}% blended)` : ")";
@@ -189,7 +197,7 @@ function openHeadlines(args: AaveV4SpokeMarkdownArgs): string[] {
   }
 
   // Debt + what's borrowed.
-  out.push(`- **Debt:** ${usd(card.totalDebtUsd)}`);
+  out.push(`- **Debt:** ${side(aaveV4SpokeSideUsd(card, "debt"), card.totalDebtUsd)}`);
   if (card.borrowingSymbols.length) {
     out.push(`- **Borrowing:** ${card.borrowingSymbols.join(", ")}`);
   }
@@ -244,8 +252,9 @@ function openHeadlines(args: AaveV4SpokeMarkdownArgs): string[] {
     if (s <= 0.0001 && d <= 0.0001) continue;
     const price = resolvePrice(r.symbol, prices);
     const parts: string[] = [];
-    if (s > 0.0001) parts.push(`${amt(s)} supplied${price != null ? ` (${usd(s * price)})` : ""}`);
-    if (d > 0.0001) parts.push(`${amt(d)} borrowed${price != null ? ` (${usd(d * price)})` : ""}`);
+    // Each the amount × the price as shown, to the cent, as the card's receipts.
+    if (s > 0.0001) parts.push(`${amt(s)} supplied${price != null ? ` (${usd(shownUsd(s, price))})` : ""}`);
+    if (d > 0.0001) parts.push(`${amt(d)} borrowed${price != null ? ` (${usd(shownUsd(d, price))})` : ""}`);
     balLines.push(`- **${r.symbol}:** ${parts.join(", ")}`);
   }
   if (econ.length || balLines.length) {

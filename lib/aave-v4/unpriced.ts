@@ -1,11 +1,12 @@
-// RULE: Rails never invents a price (rails-ops TO-DO-ui-jobs §40 ruling).
+// RULE: Rails never invents a price (rails-ops TO-DO-ui-jobs §40 ruling), and
+// every V4 dollar stands on an on-chain price (ui-jobs 743).
 //
-// A holding whose asset the live price map does not cover has NO USD leg on the
-// V4 surface: the row carries the balance in that asset's units, it joins no
-// USD total and nothing derived from one, and a total that leaves it out says
-// it is partial and names what was left out. `resolvePrice` returns `null` for
-// such an asset (lib/aave/prices.ts) — every V4 call site reads that `null` as
-// "state the gap", never as a number to substitute for.
+// A holding whose asset has no on-chain price has NO USD leg on the V4
+// surface: the row carries the balance in that asset's units, and any total
+// including it draws no figure and names the asset. There are no partial
+// totals. `resolvePrice` returns `null` for such an asset (lib/aave/prices.ts)
+// — every V4 call site reads that `null` as "state the gap", never as a
+// number to substitute for.
 //
 // This module holds the two things that gap needs: what a USD column shows
 // where there is no price, and how a total says it is short of one.
@@ -14,14 +15,11 @@ import type { Provenance } from "@/components/shared/provenance";
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 
 /** What the USD column shows beside a balance with no price behind it. */
-export const NO_PRICE_HINT = "no price source";
+export const NO_PRICE_HINT = "no on-chain price";
 
 /** The dust floor for a holding no USD floor can judge, because the asset has
  *  no price. Matches the token epsilon the position calculation uses. */
 export const UNPRICED_DUST_TOKENS = 0.0001;
-
-/** What a total's label gains when an unpriced holding is missing from it. */
-export const PARTIAL_LABEL_SUFFIX = " (partial)";
 
 /** Whether the live price map has answered at all. An empty map means the page
  *  is still fetching it, which is a loading state and not a missing source, so
@@ -42,60 +40,33 @@ export function listSymbols(symbols: string[]): string {
 export function noPriceProv(symbol: string): Provenance {
   const sym = aaveV4DisplaySymbol(symbol);
   return {
-    kind: "offchain",
-    pclass: "offchain",
-    summary: `${sym} has no price source — the live price map carries no entry for this asset, so the row gives the balance in ${sym} and no dollar figure.`,
-    via: "no price source",
+    kind: "derived",
+    summary: `${sym} has no on-chain price — no spoke oracle, Chainlink read or Pendle TWAP prices it, so the row gives the balance in ${sym} and no dollar figure.`,
+    via: "no on-chain price",
   };
 }
 
-/** A USD total that adds up only the priced holdings: the figure's own receipt,
- *  re-summarised as partial and naming the assets it could not reach. Returns
- *  `base` unchanged when nothing was left out. */
+/** A USD total that includes an asset with no on-chain price draws no figure
+ *  (ui-jobs 743): its receipt names the assets in place of the sum. Returns
+ *  `base` unchanged when every asset is priced. */
 export function partialSumProv(base: Provenance, what: string, excluded: string[]): Provenance {
   if (excluded.length === 0) return base;
   const names = listSymbols(excluded);
   return {
-    ...base,
-    summary: `${what} is a partial total — it adds up the holdings the live price map covers. It leaves out ${names}, for which there is no price source.`,
-    inputs: [
-      ...(base.inputs ?? []),
-      { label: "left out", kind: "offchain", pclass: "offchain", note: `${names} — no price source` },
-    ],
+    kind: "derived",
+    summary: `${what} — no dollar figure: ${names} ${excluded.length === 1 ? "has" : "have"} no on-chain price, and a total including ${excluded.length === 1 ? "it" : "them"} is not drawn.`,
+    via: "no on-chain price",
   };
 }
 
-/** The total's label with "(partial)" appended when something was left out. */
-export function partialLabel(label: string, excluded: string[]): string {
-  return excluded.length > 0 ? `${label}${PARTIAL_LABEL_SUFFIX}` : label;
-}
-
-/** A ratio of two USD sums that each add up only the priced holdings: the
- *  figure's own receipt, re-summarised as partial and naming the assets it
- *  could not reach. Returns `base` unchanged when nothing was left out. */
-export function partialRatioProv(base: Provenance, what: string, excluded: string[]): Provenance {
-  if (excluded.length === 0) return base;
-  const names = listSymbols(excluded);
-  return {
-    ...base,
-    summary: `${what} is partial — it divides the priced collateral by the priced debt. It leaves out ${names}, for which there is no price source.`,
-    inputs: [
-      ...(base.inputs ?? []),
-      { label: "left out", kind: "offchain", pclass: "offchain", note: `${names} — no price source` },
-    ],
-  };
-}
-
-/** Receipt for the `NO_PRICE_HINT` standing where a ratio would be, because
- *  every holding on one side of it has no price: there is no dollar figure on
- *  that side to divide by or from. */
+/** Receipt for the `NO_PRICE_HINT` standing where a ratio would be: a side
+ *  holds an asset with no on-chain price, so it has no dollar figure to divide
+ *  by or from (no partial totals, ui-jobs 743). */
 export function noPriceRatioProv(what: string, side: "collateral" | "debt", excluded: string[]): Provenance {
   const names = listSymbols(excluded);
   return {
-    kind: "offchain",
-    pclass: "offchain",
-    summary: `${what} has no figure at this event — ${names} has no price source, and it is all the ${side} side holds, so there is no ${side} dollar figure to take the ratio from.`,
-    via: "no price source",
-    inputs: [{ label: "left out", kind: "offchain", pclass: "offchain", note: `${names} — no price source` }],
+    kind: "derived",
+    summary: `${what} has no figure at this event — ${names} on the ${side} side has no on-chain price, so that side has no dollar figure to take the ratio from.`,
+    via: "no on-chain price",
   };
 }

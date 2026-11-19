@@ -6,6 +6,7 @@
 // the hub chip, the state tags, a spoke reserve's parameters (the spoke's and the
 // hub's, each labelled) and the Details panel that opens them in a row.
 
+import { shownUsd } from "@/lib/shared/shown-usd";
 import { createContext, useContext, useId, useRef, useState, type ReactNode } from "react";
 import { HeadingTip } from "@/components/shared/tip-label";
 import { v4ParameterTips } from "@/lib/aave-v4/learn-more-parameters";
@@ -40,7 +41,8 @@ export function HubChip({ label }: { label: string }) {
 /** A token amount in USD at the reserve's price, or in tokens where there is none. */
 export function amountText(tokens: number, price: number | null, symbol: string): { display: string; title: string } {
   if (tokens === 0) return { display: price != null ? "$0" : `0 ${symbol}`, title: "None" };
-  if (price != null) return fmtUsd(tokens * price);
+  // The amount × the price as the receipt shows them, to the cent.
+  if (price != null) return fmtUsd(shownUsd(tokens, price));
   const t = formatCompactTitled(tokens);
   return { display: `${t.display} ${symbol}`, title: `${t.title} ${symbol}` };
 }

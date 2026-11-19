@@ -101,7 +101,7 @@ export interface CompoundPositionView {
   lastActivityAt: number | null;
   atBlock?: number;
   /** §3 USD layer: head prices keyed by lowercased token address, threaded in by
-   *  the detail page (the shared `/api/prices` cache). Feeds the valued economics
+   *  the detail page. Feeds the valued economics
    *  tower; absent on the listing (the card itself shows no USD). */
   priceByAddress?: Record<string, number>;
   /** Set when the account still holds balances but every one is worth under

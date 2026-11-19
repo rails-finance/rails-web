@@ -53,7 +53,7 @@ import type { AaveV4Event } from "@/lib/aave-v4/event-prose";
 import { AaveV4SpokeCardSelector } from "@/components/protocol/aave-v4/aave-v4-spoke-card";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { aaveV4EconomicsContent } from "@/lib/shared/learn-more-content";
-import { computeAaveLifetimeTotals } from "@/lib/aave-v4/lifetime-totals";
+import { computeAaveLifetimeTotals, lifetimeFiguresState } from "@/lib/aave-v4/lifetime-totals";
 // Lazy chunk: the tower chart (below the fold, ~700 lines of legend/anatomy)
 // loads off the initial bundle. A mount-time prefetch (below) has it cached
 // well before the data fetch resolves and it first renders.
@@ -116,9 +116,7 @@ import { fetchFlowSeries, type FlowSeries } from "@/lib/api/fetch-aave-v3-flow-s
 import { shortAddr } from "@/lib/shared/format-event";
 import { useWalletContext } from "@/components/nav/wallet-context";
 import { useAaveV4UiState } from "@/hooks/useAaveV4UiState";
-import { PricesProvider, usePrices, useRequestPrices } from "@/lib/shared/prices-context";
-import { useAaveV4OraclePrices, type OraclePriceMap } from "@/lib/aave-v4/use-oracle-prices";
-import { listSymbols } from "@/lib/aave-v4/unpriced";
+import { useAaveV4OracleRead, type OraclePriceMap } from "@/lib/aave-v4/use-oracle-prices";
 import { computeOnchainUsd } from "@/lib/aave-v4/onchain-usd";
 import { priceKeyFor } from "@/lib/aave/prices";
 import { useAaveV4Deployment } from "@/lib/aave-v4/deployment";
@@ -150,19 +148,10 @@ export interface AaveV4SpokeViewProps {
    *  windowed read that seeded `initialEvents`. Null when the read answered
    *  the whole history (the events are the count) or did not answer at all. */
   initialSpokeTotalEvents?: number | null;
-  /** Address→USD, read on the server beside the tail. Seeds PricesProvider so
-   *  the card's collateral / supplied figure renders into the HTML rather than
-   *  as a skeleton the client fills after hydration. Empty when the read
-   *  failed — the provider then fetches on mount as it always did. */
-  initialPrices?: Record<string, number>;
 }
 
 export default function AaveV4SpokeView(props: AaveV4SpokeViewProps) {
-  return (
-    <PricesProvider initialPrices={props.initialPrices}>
-      <AaveV4SpokePageInner {...props} />
-    </PricesProvider>
-  );
+  return <AaveV4SpokePageInner {...props} />;
 }
 
 function AaveV4SpokePageInner({
@@ -301,27 +290,19 @@ function AaveV4SpokePageInner({
   const sortedEvents = useMemo(() => [...expandAaveV4Swaps(events)].sort(byTime), [events]);
   const sortedDisplayEvents = useMemo(() => [...events].sort(byTime), [events]);
 
-  const prices = usePrices();
-  const oraclePrices = useAaveV4OraclePrices();
-  // Oracle-first price map: Aave's own on-chain oracle price (chain-state — the
-  // same Chainlink feeds its risk engine reads) overrides the DefiLlama price
-  // per reserve, keyed by address; DefiLlama stays the fallback for any asset
-  // the oracle registry doesn't cover. Threaded into every CURRENT-STATE
-  // valuation (liq price, borrowing power, interest carry, runway, tower "today"
-  // figures, prices) so the whole live position reads chain-true, not just
-  // the headline totals. Until the oracle map loads it IS `prices`, so first
-  // paint is unchanged and the figures refine to oracle when it arrives. The
-  // event-derived history/peak seed (groupBySpoke / buildAaveV4SpokeCards) keeps
-  // the plain `prices` map — those are historic aggregates, overridden for
-  // current state by patchSpokeCardWithChain below.
+  // Every dollar on the page stands on an on-chain price (ui-jobs 743): the
+  // oracle map's (the spoke oracle's getReservePrice, or the Chainlink read or
+  // Pendle TWAP it names), keyed by address. No off-chain price enters; an
+  // asset the map does not carry has none, and every total including it draws
+  // nothing. Until the map loads the map is empty, and the figures wait.
+  const oracleRead = useAaveV4OracleRead();
+  const oraclePrices = oracleRead?.prices ?? null;
   const chainTruthPrices = useMemo<Record<string, PriceEntry | number>>(() => {
-    if (!oraclePrices) return prices;
-    const merged: Record<string, PriceEntry | number> = { ...prices };
-    for (const [addr, p] of Object.entries(oraclePrices)) {
-      merged[addr.toLowerCase()] = p.usd;
-    }
-    return merged;
-  }, [prices, oraclePrices]);
+    const out: Record<string, PriceEntry | number> = {};
+    for (const [addr, p] of Object.entries(oraclePrices ?? {})) out[addr.toLowerCase()] = p.usd;
+    return out;
+  }, [oraclePrices]);
+  const prices = chainTruthPrices;
   const spokeGroups = useMemo(() => groupBySpoke(sortedEvents, undefined, prices), [sortedEvents, prices]);
   const spokeCards = useMemo(() => buildAaveV4SpokeCards(sortedEvents, undefined, prices), [sortedEvents, prices]);
   // The one card we render (single-spoke breadcrumb). If the URL spoke doesn't
@@ -338,7 +319,7 @@ function AaveV4SpokePageInner({
       // the headline numbers from event data, but resolve un-toggled supplies
       // to NON-collateral first so HF / borrowing-power / liq-price don't credit
       // collateral we can't confirm. See resolveFallbackCollateral.
-      if (!eventActiveGroup) return eventActiveCard;
+      if (!eventActiveGroup) return { ...eventActiveCard, oracleRead };
       const hardenedGroup = {
         ...eventActiveGroup,
         result: {
@@ -346,7 +327,8 @@ function AaveV4SpokePageInner({
           reserves: resolveFallbackCollateral(eventActiveGroup.result.reserves),
         },
       };
-      return buildSpokeCards([hardenedGroup], prices)[0] ?? eventActiveCard;
+      const built = buildSpokeCards([hardenedGroup], prices)[0] ?? eventActiveCard;
+      return { ...built, oracleRead };
     }
     const patched = patchSpokeCardWithChain(eventActiveCard, chainPosition, chainTruthPrices);
     // Interest carry needs both legs together: chain-state current balances and
@@ -368,18 +350,10 @@ function AaveV4SpokePageInner({
       // On-chain-oracle valuation of the headline totals, from the same chain
       // balances at Aave's own oracle price — lets On-chain-values show these
       // as chain-derived instead of middotting the DefiLlama figure.
-      onchainUsd: computeOnchainUsd(chainPosition, oraclePrices),
+      onchainUsd: computeOnchainUsd(chainPosition, oracleRead),
+      oracleRead,
     };
-  }, [
-    eventActiveCard,
-    eventActiveGroup,
-    chainPosition,
-    prices,
-    chainTruthPrices,
-    oraclePrices,
-    sortedEvents,
-    spokeName,
-  ]);
+  }, [eventActiveCard, eventActiveGroup, chainPosition, prices, chainTruthPrices, oracleRead, sortedEvents, spokeName]);
   const activeGroup = useMemo(() => {
     if (!eventActiveGroup) return undefined;
     if (!chainPosition || chainPosition.chainStale) {
@@ -651,40 +625,6 @@ function AaveV4SpokePageInner({
     dates: deployment.key === "base",
   });
 
-  const reserveAddresses = useMemo(() => {
-    const out = new Set<string>();
-    for (const p of positions) {
-      if (p.reserveAddress) out.add(p.reserveAddress.toLowerCase());
-      const fromSymbol = priceKeyFor(p.reserveSymbol);
-      if (fromSymbol) out.add(fromSymbol);
-    }
-    for (const e of sortedEvents) {
-      if (!isAaveV4Event(e)) continue;
-      const ctx = e.context.data;
-      const symbols = [
-        ctx.reserveSymbol,
-        ctx.collateralSymbol,
-        ...(ctx.allSupplies?.map((s) => s.symbol) ?? []),
-        ...(ctx.allDebts?.map((d) => d.symbol) ?? []),
-      ];
-      for (const s of symbols) {
-        if (!s) continue;
-        const addr = priceKeyFor(s);
-        if (addr) out.add(addr);
-      }
-    }
-    // Chain reserves win for the position card; make sure their prices are
-    // requested even if the indexer hasn't seen the asset yet.
-    if (chainPosition) {
-      for (const r of chainPosition.reserves) {
-        if (r.address) out.add(r.address.toLowerCase());
-      }
-    }
-    return [...out];
-  }, [positions, sortedEvents, chainPosition]);
-
-  useRequestPrices(reserveAddresses);
-
   if (loading) {
     // Real back button (so the nav chrome doesn't pop in) above the shared
     // detail skeleton — position card, economics panel, and timeline spine in
@@ -819,6 +759,7 @@ function AaveV4SpokePageInner({
             reserves={activeGroup.result.reserves}
             prices={chainTruthPrices}
             oraclePrices={oraclePrices}
+            priceRead={!oracleRead ? "pending" : oracleRead.failed ? "failed" : "answered"}
             gasEth={activeGroup.result.totalGasCostEth}
             gasUsd={activeGroup.result.totalGasCostUsd}
             historyComplete={olderCount === 0}
@@ -886,6 +827,7 @@ function AaveV4SpokeTowerBlock({
   reserves,
   prices,
   oraclePrices,
+  priceRead,
   gasEth,
   gasUsd,
   historyComplete,
@@ -911,6 +853,9 @@ function AaveV4SpokeTowerBlock({
   /** The oracle map behind `prices` — passed on so each priced row's receipt
    *  can name the feed that answered for that asset. */
   oraclePrices: OraclePriceMap | null;
+  /** Whether the oracle read has answered: before it does, or once it has
+   *  failed, the lifetime figures are not drawn. */
+  priceRead: "pending" | "failed" | "answered";
   gasEth: number;
   gasUsd: number;
   /** False when the page holds a window of the timeline (lib/aave-v4/lifetime-totals.ts). */
@@ -960,6 +905,8 @@ function AaveV4SpokeTowerBlock({
     () => computeAaveLifetimeTotals(reserves, prices, historyComplete),
     [reserves, prices, historyComplete],
   );
+  const figures = lifetimeFiguresState(priceRead, totals.noFigure);
+  const capital = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
   // What liquidations cost the borrower: collateral seized minus debt cleared,
   // in tokens and in dollars at each event's price and at today's.
   const liqNet = useMemo(() => {
@@ -1141,30 +1088,28 @@ function AaveV4SpokeTowerBlock({
                     liquidations) is valued at its price when it left, and what is still held at the latest block&apos;s
                     price. Supplied and Borrowed are set so each side balances, so a price change while a token was held
                     shows in them.
-                    {totals.unpricedSymbols.length > 0 && (
-                      <>
-                        {" "}
-                        They are partial: no price source covers {listSymbols(totals.unpricedSymbols)}, so that balance
-                        shows in its asset&apos;s units in the breakdown and is in none of the dollar figures here.
-                      </>
-                    )}
+                    {!figures.draw && <> {capital(figures.line)}.</>}
                   </p>
-                  <div className="flex items-start gap-2 leading-relaxed">
-                    <span className="select-none text-rb-500">•</span>
-                    <span>
-                      {fig(totals.depositedUsd)} of collateral supplied over the position&apos;s life
-                      {totals.supplyInterestUsd > 0.01 && <> and {fig(totals.supplyInterestUsd)} earned in interest</>}
-                      {totals.withdrawnUsd > 0.01 && <>, then {fig(totals.withdrawnUsd)} withdrawn</>}
-                      {totals.liquidatedCollUsd > 0.01 && (
-                        <>
-                          {totals.withdrawnUsd > 0.01 ? " and " : ", then "}
-                          {fig(totals.liquidatedCollUsd)} liquidated
-                        </>
-                      )}
-                      , leaving {fig(totals.inProtocolUsd)} in protocol today.
-                    </span>
-                  </div>
-                  {totals.hasDebtHistory && (
+                  {figures.draw && (
+                    <div className="flex items-start gap-2 leading-relaxed">
+                      <span className="select-none text-rb-500">•</span>
+                      <span>
+                        {fig(totals.depositedUsd)} of collateral supplied over the position&apos;s life
+                        {totals.supplyInterestUsd > 0.01 && (
+                          <> and {fig(totals.supplyInterestUsd)} earned in interest</>
+                        )}
+                        {totals.withdrawnUsd > 0.01 && <>, then {fig(totals.withdrawnUsd)} withdrawn</>}
+                        {totals.liquidatedCollUsd > 0.01 && (
+                          <>
+                            {totals.withdrawnUsd > 0.01 ? " and " : ", then "}
+                            {fig(totals.liquidatedCollUsd)} liquidated
+                          </>
+                        )}
+                        , leaving {fig(totals.inProtocolUsd)} in protocol today.
+                      </span>
+                    </div>
+                  )}
+                  {figures.draw && totals.hasDebtHistory && (
                     <div className="flex items-start gap-2 leading-relaxed">
                       <span className="select-none text-rb-500">•</span>
                       <span>
@@ -1183,7 +1128,7 @@ function AaveV4SpokeTowerBlock({
                       </span>
                     </div>
                   )}
-                  {liqNet && (
+                  {figures.draw && liqNet && (
                     <div className="flex items-start gap-2 leading-relaxed">
                       <span className="select-none text-rb-500">•</span>
                       <span>
