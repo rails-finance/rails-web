@@ -25,6 +25,7 @@ import { vaultHeads } from "@/components/vaults/vault-heads";
 import type { PositionCardHead } from "@/components/shared/position-card";
 import { explorerUrl } from "@/lib/shared/chains";
 import { formatDate } from "@/lib/date";
+import { walletHref } from "@/lib/wallet/wallet-filters";
 import { formatUnitsExact } from "@/lib/utils/format";
 import { assetText, pctText, sharePriceText, shareText, shortAddress } from "@/lib/shared/vault-amount-text";
 import { sboldVaultPageSummary } from "@/lib/vaults/summary";
@@ -43,6 +44,7 @@ import {
   sboldDepositProv,
   sboldIdleProv,
   sboldNameProv,
+  sboldOwnerProv,
   sboldPausedLogProv,
   sboldPausedProv,
   sboldPerShareProv,
@@ -356,6 +358,28 @@ export function SboldVaultPage({
       ),
     },
     {
+      id: "owner",
+      label: "Owner",
+      tip: "The address the vault's owner() names.",
+      value: fig(
+        "owner",
+        undefined,
+        y.owner ? (
+          <span className="font-mono text-sm" data-steward={y.owner} data-steward-role="owner">
+            <a
+              href={walletHref(y.owner, undefined)}
+              className="text-(--text-link) hover:underline"
+              data-link="owner-wallet"
+            >
+              <Prov info={sboldOwnerProv(coords, y.owner)}>{shortAddress(y.owner)}</Prov>
+            </a>
+          </span>
+        ) : (
+          UNREAD
+        ),
+      ),
+    },
+    {
       id: "read-block",
       label: "Block",
       tip: "The block every figure on this page was read at.",
@@ -616,6 +640,7 @@ export function SboldVaultPage({
           ]
         : []),
       ["Asset", y.asset ?? "not read"],
+      ["Owner", y.owner ?? "not read"],
       ["Block", String(data.blockNumber)],
     ],
     rows: rows.map((r) => [
@@ -666,7 +691,7 @@ export function SboldVaultPage({
                         name: "sBOLD vault",
                         address: y.address,
                         reads:
-                          "totalAssets(), totalSupply(), convertToAssets(10 ** 18), asset(), name(), symbol(), decimals(), paused(), calcFragments()",
+                          "totalAssets(), totalSupply(), convertToAssets(10 ** 18), asset(), name(), symbol(), decimals(), paused(), owner(), calcFragments()",
                       },
                       { name: "BOLD", address: SBOLD_ASSET.address, reads: "balanceOf(sBOLD)" },
                       ...data.deposits.map((d) => ({

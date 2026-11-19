@@ -179,13 +179,16 @@ for (const dir of [APP_DIR, ...routeDirs(APP_DIR)]) {
 //    now inside an explorer's own directory and the registry is deleted. A
 //    `/<chain>/vaults` directory appearing again is an orphan, which is what
 //    this check should say about it.
+//    One allowance: `/ethereum/vaults`, which holds sBOLD alone, a vault no
+//    explorer deploys (Miles's ruling, ui-jobs 765).
+const VAULTS_OUTSIDE_EXPLORERS = new Set(["/ethereum/vaults"]);
 for (const chainSlug of chainSlugs.values()) {
   const chainDir = path.join(APP_DIR, chainSlug);
   if (!fs.existsSync(chainDir)) continue;
   for (const dirent of fs.readdirSync(chainDir, { withFileTypes: true })) {
     if (!dirent.isDirectory()) continue;
     const href = `/${chainSlug}/${dirent.name}`;
-    if (!expected.has(href)) {
+    if (!expected.has(href) && !VAULTS_OUTSIDE_EXPLORERS.has(href)) {
       fail(
         `app/(app)/${chainSlug}/${dirent.name}/ has no roster entry — nothing links to it and /coverage does not count it`,
       );

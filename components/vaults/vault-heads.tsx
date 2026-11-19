@@ -95,7 +95,12 @@ export function VaultLead({ vault: v, size = 28 }: { vault: VaultSummary; size?:
     // The icon is decoration (the name beside it says which vault): a fallback
     // glyph's letters and digits are no figure, so the tripwire skips it.
     <span className="relative inline-flex shrink-0 items-center" data-vault-asset={v.asset.address} data-prov-exempt>
-      <TokenChipIcon symbol={v.asset.symbol} address={v.asset.address} size={size} filterable={false} untitled />
+      {/* sBOLD leads with its own share token's icon (ui-jobs 765); every other family with the asset's. */}
+      {v.family === "sbold" ? (
+        <TokenChipIcon symbol={v.symbol ?? "sBOLD"} address={v.address} size={size} filterable={false} untitled />
+      ) : (
+        <TokenChipIcon symbol={v.asset.symbol} address={v.asset.address} size={size} filterable={false} untitled />
+      )}
       {marked && venue != null && (
         <span className="absolute -bottom-0.5 -right-1.5 inline-flex rounded-full bg-raised p-px" data-venue-mark>
           <VaultVenueMark family={venue} />

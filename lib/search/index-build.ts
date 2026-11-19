@@ -9,7 +9,7 @@
 //   the Umbrella stake tokens), with the five the address book names as the
 //   floor when the census does not answer.
 // - Maple: the two syrup pools in lib/maple/asset-catalog.ts.
-// - sBOLD (lib/liquity-v2/sbold.ts): one vault, opening its Liquity V2 deposits.
+// - sBOLD (lib/liquity-v2/sbold.ts): one vault, opening its page under /ethereum/vaults.
 //
 // The vaults go out in the order of their total assets at the census block,
 // in USD at the census's oracle price, where the census holds them (Morpho and
@@ -99,7 +99,8 @@ export async function buildSearchIndex(): Promise<SearchIndexWire> {
     ["Aave", eth, `${ethereumVaultRosterHref()}/`, 1],
     ["Yearn", eth, `${yearnVaultRosterHref()}/`, 1],
     ["Maple", eth, maplePoolsHref(), 0],
-    ["Liquity V2", eth, SBOLD_PAGE_PATH, 0],
+    // sBOLD is no explorer's product (ui-jobs 765): its row says what it is.
+    ["ERC-4626 vault", eth, SBOLD_PAGE_PATH, 0],
   ];
   const [MORPHO, AAVE, YEARN, MAPLE, SBOLD] = [0, 1, 2, 3, 4];
   const row = (name: string, symbol: string, asset: string, roster: number, address: string): WireVault => [

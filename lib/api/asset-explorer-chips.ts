@@ -57,7 +57,6 @@ import { discoverLlamalendMarkets } from "@/lib/sources/chain/llamalend-markets"
 import { resolveErc20Meta } from "@/lib/sources/chain/erc20-meta";
 import { MORPHO_SUPPLY_READ, MORPHO_SUPPLY_TOKENS } from "@/lib/morpho/supply-tokens";
 import type { ChainId } from "@/lib/shared/chains";
-import { SBOLD_VAULT } from "@/lib/liquity-v2/sbold";
 import { readPendleRoster } from "@/lib/sources/api/pendle";
 import { chipUses, pendleUses, type PendleMarketRef, type TokenUse } from "@/lib/shared/asset-uses";
 
@@ -190,9 +189,9 @@ function staticCatalogHits(): Hit[] {
     chain: 1,
     token: BOLD,
     symbol: "BOLD",
-    uses: [TROVE_DEBT, { label: "Stability Pools", page: "/stability-pool" }, { label: "sBOLD", page: "/sbold" }],
+    // sBOLD is no use of Liquity V2's (ui-jobs 765): its page is under /ethereum/vaults.
+    uses: [TROVE_DEBT, { label: "Stability Pools", page: "/stability-pool" }],
   });
-  hit({ explorer: "liquity", chain: 1, token: SBOLD_VAULT, page: "/sbold", symbol: "sBOLD" });
   for (const [explorer, chain, branches, debt, debtSymbol] of [
     ["asymmetry", 1, ASYMMETRY_BRANCHES, USDAF, USDAF_SYMBOL],
     ["ebisu", 1, EBISU_BRANCHES, EBUSD, EBUSD_SYMBOL],

@@ -9,7 +9,7 @@ import { SBOLD_ASSET, SBOLD_VAULT } from "@/lib/liquity-v2/sbold";
 import type { SpBranch } from "@/lib/liquity-v2/sp-routes";
 import { explorerUrl } from "@/lib/shared/chains";
 
-const LANE = "live Ethereum chain reads (/ethereum/liquity-v2/sbold)";
+const LANE = "live Ethereum chain reads (/ethereum/vaults/sbold)";
 
 export interface SboldCoords {
   /** rails-server's read of `blockNumber`, when it answered every read of the page. */
@@ -265,6 +265,10 @@ const sboldDepositProv_ = (c: SboldCoords, branch: SpBranch, pool: string): Prov
   via: `${LANE} · StabilityPool.getCompoundedBoldDeposit(sBOLD) @ the pinned block`,
 });
 
+/** `owner()` on the vault (ui-jobs 765): an address, no name. */
+const sboldOwnerProv_ = (c: SboldCoords, owner: string): Provenance =>
+  vaultRead(c, "owner()", `Owner — the address the sBOLD vault's owner() answers${atBlock(c)}: ${owner}.`);
+
 /** `paused()` on the vault (ui-jobs 765): the fact as the getter answers it. */
 const sboldPausedProv_ = (c: SboldCoords): Provenance =>
   vaultRead(c, "paused()", `Paused — the sBOLD vault's paused() answers true${atBlock(c)}.`);
@@ -361,6 +365,7 @@ export const sboldReconcileProv = withServerRead(sboldReconcileProv_);
 export const sboldBlockProv = withServerRead(sboldBlockProv_);
 export const sboldDepositProv = withServerRead(sboldDepositProv_);
 export const sboldPausedProv = withServerRead(sboldPausedProv_);
+export const sboldOwnerProv = withServerRead(sboldOwnerProv_);
 export const sboldYieldProv = withServerRead(sboldYieldProv_);
 export const sboldCollProv = withServerRead(sboldCollProv_);
 export const sboldFragmentsProv = withServerRead(sboldFragmentsProv_);

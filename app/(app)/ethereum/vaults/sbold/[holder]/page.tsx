@@ -1,4 +1,4 @@
-// ONE sBOLD HOLDING — /ethereum/liquity-v2/sbold/<holder> (rails-ops ui-jobs 765).
+// ONE sBOLD HOLDING — /ethereum/vaults/sbold/<holder> (rails-ops ui-jobs 765).
 // ----------------------------------------------------------------------------
 // The Yearn holder page's shell (app/(app)/ethereum/yearn/vaults/[vault]/[holder])
 // for the sBOLD vault: the segment is an address or an ENS name, resolved on
@@ -11,7 +11,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-import { DetailTopRow } from "@/components/shared/detail-back-row";
+import { SboldPageHeader } from "@/components/vaults/sbold-page-header";
 import { FocusSourceGate } from "@/components/shared/aim-gate";
 import { SboldHoldingCard } from "@/components/vaults/sbold-holding-card";
 import { sectionPositionMetadata } from "@/lib/shared/page-metadata";
@@ -54,15 +54,10 @@ export default async function SboldHoldingRoute({ params }: Props) {
       <div className="min-h-screen">
         <div className="py-8">
           <header className="mb-5" data-skel-section="page-header">
-            <DetailTopRow
-              session="liquity-v2"
-              fallbackHref={SBOLD_PAGE_PATH}
-              owner={{ wallet: lookup.address, filterProtocol: null, bookmark: false }}
-              tools={false}
-            />
-            <h2 className="text-2xl font-semibold text-foreground" data-vault-page="sbold">
-              {!lookup.address && <span className="font-mono">{subject}</span>}
-              <span className={`${lookup.address ? "" : "ml-2 "}text-base font-normal text-rb-500`}>in sBOLD</span>
+            <SboldPageHeader />
+            <h2 className="mt-6 text-2xl font-semibold text-foreground" data-vault-page="sbold">
+              <span className="font-mono">{subject}</span>
+              <span className="ml-2 text-base font-normal text-rb-500">in sBOLD</span>
             </h2>
             {lookup.kind === "ens" && lookup.address && (
               <p className="mt-1 text-[11px] text-rb-500" data-holder-ens={lookup.typed}>

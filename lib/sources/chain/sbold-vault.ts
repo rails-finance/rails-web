@@ -1,9 +1,9 @@
-// The sBOLD vault read at one head block, behind /ethereum/liquity-v2/sbold
+// The sBOLD vault read at one head block, behind /ethereum/vaults/sbold
 // (rails-ops ui-jobs 749). SERVER-ONLY.
 // ----------------------------------------------------------------------------
 // One Multicall3 round at the block the page states: the vault's totalAssets(),
 // totalSupply(), convertToAssets(10 ** 18), asset(), name(), symbol() and
-// decimals(), paused(), calcFragments(), and each Liquity V2 Stability Pool's
+// decimals(), paused(), owner(), calcFragments(), and each Liquity V2 Stability Pool's
 // getCompoundedBoldDeposit(sBOLD), getDepositorYieldGainWithPending(sBOLD),
 // getDepositorCollGain(sBOLD) and stashedColl(sBOLD), BOLD.balanceOf(sBOLD),
 // and each branch collateral token's balanceOf(sBOLD) (ui-jobs 765).
@@ -34,6 +34,7 @@ const VAULT_ABI = parseAbi([
   "function symbol() view returns (string)",
   "function decimals() view returns (uint8)",
   "function paused() view returns (bool)",
+  "function owner() view returns (address)",
   "function calcFragments() view returns (uint256, uint256, uint256, uint256)",
 ]);
 const SP_ABI = parseAbi([
@@ -96,6 +97,8 @@ export interface SboldVaultResponse {
     sharePrice: RawAmount | null;
     /** `paused()` (ui-jobs 765); null where it failed. */
     paused: boolean | null;
+    /** `owner()`, lowercased (ui-jobs 765); null where it failed. */
+    owner: string | null;
     /** `calcFragments()`'s four answers, raw: totalBold, boldAmount,
      *  collValue, collInBold; null where it failed. */
     fragments: { totalRaw: string; boldRaw: string; collValueRaw: string; collInBoldRaw: string } | null;
@@ -115,6 +118,7 @@ const VAULT_CALLS = [
   "decimals",
   "convertToAssets",
   "paused",
+  "owner",
   "calcFragments",
 ] as const;
 
@@ -128,6 +132,7 @@ const EMPTY_VAULT: SboldVaultResponse["vault"] = {
   totalSupply: null,
   sharePrice: null,
   paused: null,
+  owner: null,
   fragments: null,
 };
 
@@ -193,6 +198,7 @@ export async function loadSboldVault(): Promise<SboldVaultResponse> {
         totalSupply: shareDecimals != null && totalSupply != null ? amount(totalSupply, shareDecimals) : null,
         sharePrice: inBold && shareDecimals === 18 && sharePrice != null ? amount(sharePrice, d) : null,
         paused: at<boolean>("paused"),
+        owner: at<string>("owner")?.toLowerCase() ?? null,
         fragments:
           inBold && frag
             ? {
