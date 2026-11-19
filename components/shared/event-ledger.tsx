@@ -645,11 +645,9 @@ function LedgerRows({
       return legsProv(r.label, at, r.usd.legs, r.usd.unpriced);
     const own = provs?.usd?.(r) ?? usdProvOf?.(r);
     if (own) return own;
-    // A served series names no legs: its receipt says so.
-    if (r.usd?.served) {
-      const base = ledgerUsdProv(r);
-      return { ...base, summary: `${base.summary} ${r.usd.served}` };
-    }
+    // A served series names no legs: its receipt says what sums it, with no
+    // oracle claim.
+    if (r.usd?.served) return { kind: "derived", summary: `${r.label} up to ${at}. ${r.usd.served}` };
     return ledgerUsdProv(r);
   };
   const ledgerUsdProv = (r: LedgerRow): Provenance => {

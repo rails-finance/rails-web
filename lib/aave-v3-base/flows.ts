@@ -126,15 +126,17 @@ export interface AaveBaseLeg {
   /** USD per token, and where it came from. */
   price: number;
   basis: AaveBasePriceBasis;
+  /** The block the price stands at where it is not the row's: the store's
+   *  day, the nearest priced row's, or the latest read's (ui-jobs 743). */
+  priceBlock?: number | null;
 }
 
 /** Why a leg's figure is not at the oracle's price at its block, by how its
  *  price was found. */
 const UNSURE_WHY: Partial<Record<AaveBasePriceBasis, string>> = {
-  day: "priced at the day's close: the oracle price at this block is not stored.",
   nearest: "priced at the nearest priced row: no price is stored for its block or its day.",
   today: "priced at the latest block's oracle price: no price is stored for its block or its day.",
-  none: "has no price stored: its flows count at zero.",
+  none: "has no price stored: its flows have no figure.",
 };
 
 /** A balance a row states: before (where it states one) and after. */
@@ -179,6 +181,10 @@ export interface AaveBaseFlowOptions {
   todayPrices: Record<string, number>;
   /** The daily store's series by lowercase reserve, where it answered. */
   dailyPrices?: Record<string, [number, number][]>;
+  /** The block each daily price was read at, by lowercase reserve and day. */
+  dailyBlocks?: Record<string, Record<number, number>>;
+  /** The block the latest read (`todayPrices`) stands at. */
+  todayBlock?: number | null;
   /** The Pool's brand: "Aave" or "Seamless". */
   brand: string;
   /** The block of the Pool's first DeficitCreated, where the Pool writes off
@@ -284,6 +290,11 @@ function pricesOf(ev: V3Event, book: Map<string, string>): Map<string, number> {
 
 /** A reserve's store price for `day`: the last at or before it. */
 function storeAt(obs: [number, number][] | undefined, day: number): number | null {
+  return storeObsAt(obs, day)?.[1] ?? null;
+}
+
+/** The store's row for `day`: the last at or before it, with a price. */
+function storeObsAt(obs: [number, number][] | undefined, day: number): [number, number] | null {
   if (!obs || obs.length === 0 || obs[0][0] > day) return null;
   let lo = 0;
   let hi = obs.length - 1;
@@ -292,7 +303,7 @@ function storeAt(obs: [number, number][] | undefined, day: number): number | nul
     if (obs[mid][0] <= day) lo = mid;
     else hi = mid - 1;
   }
-  return obs[lo][1] > 0 ? obs[lo][1] : null;
+  return obs[lo][1] > 0 ? obs[lo] : null;
 }
 
 /** The replay: each row's legs (interest included), the balances it states
@@ -356,38 +367,38 @@ export function aaveBaseReplay(events: readonly BaseActivityEvent[], o: AaveBase
   const tolOf = (asset: string, v: number) => Math.max(3 * (unit.get(asset) ?? 1e-18), 1e-9 * Math.abs(v));
 
   // Prices: at the block, by reserve and time, for the nearest-row fallback.
-  const priced = new Map<string, [number, number][]>();
+  const priced = new Map<string, [number, number, number][]>();
   const rowPrices = ordered.map((ev) => {
     const p = pricesOf(ev, book);
     for (const [a, usd] of p) {
       const list = priced.get(a) ?? [];
-      list.push([ev.timestamp, usd]);
+      list.push([ev.timestamp, usd, ev.blockNumber]);
       priced.set(a, list);
     }
     return p;
   });
-  const nearest = (asset: string, ts: number): number | null => {
+  const nearest = (asset: string, ts: number): { price: number; block: number } | null => {
     const list = priced.get(asset);
     if (!list || list.length === 0) return null;
     let best = list[0];
     for (const p of list) if (Math.abs(p[0] - ts) < Math.abs(best[0] - ts)) best = p;
-    return best[1];
+    return { price: best[1], block: best[2] };
   };
   const priceFor = (
     asset: string,
     ev: V3Event,
     own: Map<string, number>,
     legPrice?: number,
-  ): { price: number; basis: AaveBasePriceBasis } => {
+  ): { price: number; basis: AaveBasePriceBasis; priceBlock?: number | null } => {
     if (legPrice != null && legPrice > 0) return { price: legPrice, basis: "block" };
     const at = own.get(asset);
     if (at != null) return { price: at, basis: "block" };
-    const day = storeAt(o.dailyPrices?.[asset], Math.floor(ev.timestamp / DAY_S));
-    if (day != null) return { price: day, basis: "day" };
+    const day = storeObsAt(o.dailyPrices?.[asset], Math.floor(ev.timestamp / DAY_S));
+    if (day != null) return { price: day[1], basis: "day", priceBlock: o.dailyBlocks?.[asset]?.[day[0]] ?? null };
     const near = nearest(asset, ev.timestamp);
-    if (near != null) return { price: near, basis: "nearest" };
+    if (near != null) return { price: near.price, basis: "nearest", priceBlock: near.block };
     const today = o.todayPrices[asset];
-    if (today != null && today > 0) return { price: today, basis: "today" };
+    if (today != null && today > 0) return { price: today, basis: "today", priceBlock: o.todayBlock ?? null };
     return { price: 0, basis: "none" };
   };
 
@@ -427,6 +438,7 @@ export function aaveBaseReplay(events: readonly BaseActivityEvent[], o: AaveBase
         amount: l.amount,
         price: p.price,
         basis: p.basis,
+        ...(p.priceBlock !== undefined ? { priceBlock: p.priceBlock } : {}),
       });
     }
     // The balances the row states; a liquidation's where its balance before
@@ -459,6 +471,7 @@ export function aaveBaseReplay(events: readonly BaseActivityEvent[], o: AaveBase
             amount: gain,
             price: p.price,
             basis: p.basis,
+            ...(p.priceBlock !== undefined ? { priceBlock: p.priceBlock } : {}),
           });
         }
       }
@@ -494,6 +507,7 @@ export function aaveBaseReplay(events: readonly BaseActivityEvent[], o: AaveBase
             amount: gain,
             price: p.price,
             basis: p.basis,
+            ...(p.priceBlock !== undefined ? { priceBlock: p.priceBlock } : {}),
           });
           index = (index * (prev.amount + gain)) / prev.amount;
           const list = knots.get(key) ?? [];
@@ -740,19 +754,47 @@ export function aaveBaseSummary(rp: AaveBaseReplay, o: Partial<AaveBaseFlowOptio
 }
 
 /** One replayed row as the panel's event. */
-/** A row's leg with its parts (ui-jobs 743): priced only where the oracle's
- *  price at its block is stored; a leg the replay priced at the day's close,
- *  the nearest row or today's is unpriced. */
+/** A row's leg with its parts (ui-jobs 743). At its block the oracle's
+ *  price; else the day's close, the nearest priced row's or the latest
+ *  read's, both blocks named; a leg at the latest read's price stands on
+ *  another basis than the block's. Unpriced only where no price exists. */
 function aaveBaseLeg(l: AaveBaseLeg, block: number, brand: string): FlowLeg {
   return flowLeg({
     bucket: l.bucket,
     amount: l.amount,
     symbol: l.symbol,
-    price: l.basis === "block" ? l.price : null,
-    block,
-    priceNote: aaveV3PriceNote(`${brand}'s AaveOracle`, l.symbol, block),
+    price: l.basis === "none" ? null : l.price,
+    block: l.basis === "block" ? block : (l.priceBlock ?? null),
+    priceNote: aaveBasePriceNote(l, block, brand),
+    ...(l.basis === "today" ? { basis: AAVE_BASE_TODAY_BASIS } : {}),
     ...(ACCRUAL_KEYS.has(l.bucket) ? { accrual: true } : {}),
   });
+}
+
+/** Where a price not read at its leg's block came from. */
+const FROM_WORDS: Partial<Record<AaveBasePriceBasis, string>> = {
+  day: "the day's close",
+  nearest: "the nearest read",
+  today: "the latest read",
+};
+
+/** The basis words a leg at the latest read's price stands on, and the
+ *  family's (`FlowWords.priceBasis`). */
+const AAVE_BASE_TODAY_BASIS = "the latest read's price";
+const AAVE_BASE_BLOCK_BASIS = "each block's price";
+
+/** A leg's price note: the oracle at the row's block, or "price at block M,
+ *  <the day's close | the nearest read | the latest read>; this event is at
+ *  block N". */
+export function aaveBasePriceNote(
+  l: Pick<AaveBaseLeg, "basis" | "priceBlock" | "symbol">,
+  block: number,
+  brand: string,
+): string {
+  const oracle = `${brand}'s AaveOracle`;
+  if (l.basis === "block" || l.basis === "none") return aaveV3PriceNote(oracle, l.symbol, block);
+  const at = l.priceBlock != null ? `block ${l.priceBlock.toLocaleString("en-US")}` : "a block the read does not name";
+  return `${oracle} getAssetPrice(${l.symbol}), price at ${at}, ${FROM_WORDS[l.basis]}; this event is at block ${block.toLocaleString("en-US")}`;
 }
 
 function aaveBaseFlowEvent(r: AaveBaseReplayed, notCounted: readonly string[], brand: string): FlowEvent {
@@ -916,6 +958,8 @@ export function aaveBaseTimelineFromSummary(s: AaveBaseSummary, o: AaveBaseFlowO
 export function aaveBaseFlowWords(brand: string, borrower: boolean): FlowWords {
   return {
     held: "Still supplied",
+    // A flow at the latest read's price stands on another basis (aaveBaseLeg).
+    priceBasis: { collateral: AAVE_BASE_BLOCK_BASIS, debt: AAVE_BASE_BLOCK_BASIS },
     restBySide: {
       collateral: "Market move and interest since the last event",
       ...(borrower ? { debt: "Market move and interest since the last event" } : {}),

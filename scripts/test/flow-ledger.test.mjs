@@ -350,7 +350,19 @@ test("a served series' line names no legs, and its receipt says the server sums 
     assert.equal(m.hasLegs, false);
     const dep = stateAt(m, 0).collateral.sources.find((s) => s.key === "dep");
     assert.equal(dep.legs, undefined, "no partial leg list");
-    assert.ok(flowSegmentProv(dep, "collateral", "5 Jul '25", false).summary.endsWith(served));
+    const summary = flowSegmentProv(dep, "collateral", "5 Jul '25", false).summary;
+    assert.ok(summary.endsWith(served));
+    assert.doesNotMatch(summary, /oracle/, "no oracle claim for a served sum");
   }
-  assert.equal(AAVE_V3_SERVED_NOTE, "Each day's figure is summed by rails-server, whose day rows name no legs.");
+  assert.match(AAVE_V3_SERVED_NOTE, /^Each day's figure is summed by rails-server from its stored prices/);
+});
+
+test("two lines with the same count, sum and last block get different receipt keys", () => {
+  const a = legsProv("Deposited", "now", [leg("dep", 1, 30, 5), leg("dep", 2, 10, 9)]);
+  const b = legsProv("Deposited", "now", [leg("dep", 2, 15, 5), leg("dep", 1, 20, 9)]);
+  assert.equal(
+    [leg("dep", 1, 30, 5), leg("dep", 2, 10, 9)].reduce((x, l) => x + l.usd, 0),
+    [leg("dep", 2, 15, 5), leg("dep", 1, 20, 9)].reduce((x, l) => x + l.usd, 0),
+  );
+  assert.notEqual(a.key, b.key);
 });

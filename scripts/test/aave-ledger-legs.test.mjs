@@ -63,3 +63,69 @@ test("without a price note the legs keep their raw figures (the adapter)", () =>
   assert.equal(focus[1].legs[0].usd, 0.5 * 90_000);
   assert.equal(focus[1].legs[0].price, undefined);
 });
+
+// ── Aave V3 on Base: prices not read at a leg's block, both blocks named ──
+const { readFileSync } = await import("node:fs");
+const { aaveBaseReplay, aaveBaseFocusEvents, aaveBaseFlowTimeline } = await import(ROOT + "lib/aave-v3-base/flows.ts");
+const { dailyPricesFromAnswer, dailyBlocksFromAnswer } = await import(ROOT + "lib/api/fetch-daily-prices.ts");
+const { buildFlowModel, partialAt } = await import(ROOT + "lib/shared/flows-timeline.ts");
+const FIX = JSON.parse(readFileSync(REPO + "/scripts/verify/fixtures/aave-v3-base-flows.json", "utf8"));
+const fixture = (name) => FIX.fixtures.find((f) => f.name === name);
+function baseOpts(f, { store = true, today = true } = {}) {
+  const strip = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k.slice(k.indexOf(":") + 1), v]));
+  return {
+    now: FIX.readAt,
+    live: null,
+    todayPrices: today ? Object.fromEntries(Object.entries(f.prices).map(([a, p]) => [a.toLowerCase(), p])) : {},
+    brand: "Aave",
+    writeOffFrom: null,
+    todayBlock: 30_000_000,
+    ...(store
+      ? { dailyPrices: strip(dailyPricesFromAnswer(f.daily)), dailyBlocks: strip(dailyBlocksFromAnswer(f.daily)) }
+      : {}),
+  };
+}
+const legsOf = (f, o) => aaveBaseFocusEvents(aaveBaseReplay(f.events, o), "Aave").flatMap((e) => e.legs);
+const BOTH = (from) => new RegExp(`price at block [\\d,]+, ${from}; this event is at block [\\d,]+$`);
+
+test("Base: a leg at the day's close keeps that price and names both blocks", () => {
+  const f = fixture("aave-liquidated-six");
+  const l = legsOf(f, baseOpts(f)).find(
+    (x) => x.priceNote.includes("the day's close") && !x.priceNote.includes("does not name"),
+  );
+  assert.ok(l, "a day-close leg with its store block");
+  assert.match(l.priceNote, BOTH("the day's close"));
+  assert.equal(l.usd, shownUsd(l.amount, l.price));
+});
+
+test("Base: a leg at the nearest read keeps that price and names both blocks", () => {
+  const f = fixture("aave-liquidated-six");
+  const l = legsOf(f, baseOpts(f, { store: false })).find((x) => x.priceNote.includes("the nearest read"));
+  assert.ok(l);
+  assert.match(l.priceNote, BOTH("the nearest read"));
+  assert.ok(l.usd != null);
+});
+
+test("Base: a past event at today's price names both blocks and is not complete; Market move has no figure beside it", () => {
+  const f = fixture("aave-liquidated-swaps");
+  const o = baseOpts(f, { store: false });
+  const l = legsOf(f, o).find((x) => x.priceNote.includes("the latest read"));
+  assert.ok(l, "a leg at the latest read's price");
+  assert.match(l.priceNote, /price at block 30,000,000, the latest read; this event is at block [\d,]+$/);
+  assert.equal(l.basis, "the latest read's price");
+  const m = buildFlowModel(aaveBaseFlowTimeline(aaveBaseReplay(f.events, o), o));
+  const reasons = [];
+  for (let stop = 0; stop <= m.liveStop; stop++)
+    for (const s of ["collateral", "debt"]) reasons.push(...partialAt(m, stop, s));
+  assert.ok(
+    reasons.some((r) => r.includes("priced at the latest block's oracle price")),
+    "under Not complete",
+  );
+});
+
+test("Base: a leg with no price anywhere is unpriced", () => {
+  const f = fixture("aave-liquidated-swaps");
+  const l = legsOf(f, baseOpts(f, { store: false, today: false })).find((x) => x.price == null);
+  assert.ok(l);
+  assert.equal(l.usd, null);
+});

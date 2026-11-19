@@ -37,7 +37,8 @@ export const aaveV4PeakPriceNote = (priceBlock: number, peakBlock: number): stri
 
 /** A Lifetime flows line on Aave V4, whose day rows rails-server sums: its
  *  receipt names no legs. */
-export const AAVE_V4_SERVED_NOTE = "Each day's figure is summed by rails-server, whose day rows name no legs.";
+export const AAVE_V4_SERVED_NOTE =
+  "Each day's figure is summed by rails-server from its stored prices, a leg with none at its block at a fallback price; its day rows name no legs.";
 
 /** What a peak's receipt is, by side. */
 export const AAVE_V4_PEAK_WHAT = { supply: "The peak collateral", debt: "The peak debt" } as const;

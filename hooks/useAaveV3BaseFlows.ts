@@ -27,7 +27,7 @@ import { useFlowFocusRoot, useFlowFocusValue, type FlowFocusValue } from "@/comp
 import type { FlowTimeline } from "@/lib/shared/flows-timeline";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { AaveV3PositionChainResponse } from "@/lib/api/fetch-aave-v3-position";
-import { fetchDailyPrices } from "@/lib/api/fetch-daily-prices";
+import { dailyBlocksFromAnswer, dailyPricesFromAnswer, fetchDailyAnswer } from "@/lib/api/fetch-daily-prices";
 import {
   aaveBaseFlowTimeline,
   aaveBaseFocusEvents,
@@ -217,7 +217,11 @@ export function useAaveV3BaseFlows(p: AaveV3BaseFlowsInput): {
     const list = [...reserves].sort();
     return { reserves: list, from: Math.floor(first / DAY_S), key: list.join(",") };
   }, [source, route]);
-  const [daily, setDaily] = useState<{ key: string; prices: Record<string, [number, number][]> | null } | null>(null);
+  const [daily, setDaily] = useState<{
+    key: string;
+    prices: Record<string, [number, number][]> | null;
+    blocks?: Record<string, Record<number, number>>;
+  } | null>(null);
   useEffect(() => {
     if (!want) return;
     if (p.noDailyStore) {
@@ -225,18 +229,24 @@ export function useAaveV3BaseFlows(p: AaveV3BaseFlowsInput): {
       return;
     }
     const ac = new AbortController();
-    fetchDailyPrices(
+    fetchDailyAnswer(
       chain,
       want.reserves.map((r) => `${family}:${r}`),
       { from: want.from, signal: ac.signal },
     )
-      .then((byKey) => {
+      .then((answer) => {
+        // Each day's price and the block it was read at (ui-jobs 743).
+        const byKey = answer ? dailyPricesFromAnswer(answer) : null;
+        const blocksByKey = answer ? dailyBlocksFromAnswer(answer) : {};
         const prices: Record<string, [number, number][]> = {};
+        const blocks: Record<string, Record<number, number>> = {};
         for (const r of want.reserves) {
           const obs = byKey?.[`${family}:${r}`];
           if (obs && obs.length > 0) prices[r] = obs;
+          const b = blocksByKey[`${family}:${r}`];
+          if (b) blocks[r] = b;
         }
-        setDaily({ key: want.key, prices: Object.keys(prices).length > 0 ? prices : null });
+        setDaily({ key: want.key, prices: Object.keys(prices).length > 0 ? prices : null, blocks });
       })
       .catch((err) => {
         if ((err as { name?: string })?.name !== "AbortError") setDaily({ key: want.key, prices: null });
@@ -263,6 +273,8 @@ export function useAaveV3BaseFlows(p: AaveV3BaseFlowsInput): {
     return out;
   }, [p.chain]);
   const dailyPrices = dailySettled ? (daily?.prices ?? undefined) : undefined;
+  const dailyBlocks = dailySettled ? daily?.blocks : undefined;
+  const todayBlock = p.chain && !p.chain.chainStale ? p.chain.blockNumber : null;
   const { brand, writeOffFrom, notCounted, prices } = p;
   const opts = useMemo<AaveBaseFlowOptions | null>(
     () =>
@@ -275,9 +287,11 @@ export function useAaveV3BaseFlows(p: AaveV3BaseFlowsInput): {
             writeOffFrom,
             ...(notCounted ? { notCounted } : {}),
             ...(dailyPrices ? { dailyPrices } : {}),
+            ...(dailyBlocks ? { dailyBlocks } : {}),
+            todayBlock,
           }
         : null,
-    [now, live, prices, brand, writeOffFrom, notCounted, dailyPrices],
+    [now, live, prices, brand, writeOffFrom, notCounted, dailyPrices, dailyBlocks, todayBlock],
   );
   const replay = useMemo(
     () => (source && opts && (dailySettled || source.length === 0) ? aaveBaseReplay(source, opts) : null),

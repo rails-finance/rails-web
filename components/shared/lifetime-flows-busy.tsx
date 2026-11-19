@@ -43,13 +43,11 @@ import {
   assetsAt,
   axisFor,
   axisLabelOnPhone,
-  bucketLegs,
   dayStart,
   formatFlowToken,
   formatFlowUsd,
   oldPriceAt,
   partialAt,
-  rowLegs,
   spokenUsd,
   stateAt,
   unitOf,
@@ -290,7 +288,7 @@ export function flowsTotals(model: FlowModel, since: string | null): FlowsTotals
   const t = throughput(model);
   const hasDebt = model.buckets.some((b) => b.side === "debt");
   // A side whose inflows hold an unpriced leg draws no figure (ui-jobs 743).
-  const gaps = model.hasLegs ? bucketLegs(rowLegs(model, model.rows.length - 1)).unpriced : {};
+  const gaps = model.rows.at(-1)?.unpriced ?? {};
   const gapIn = (side: FlowSide) =>
     model.buckets.some((b) => b.side === side && b.dir === "in" && (gaps[b.key]?.length ?? 0) > 0);
   return {

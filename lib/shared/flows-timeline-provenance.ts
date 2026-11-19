@@ -37,6 +37,18 @@ function legLabels(legs: readonly FlowLeg[]): string[] {
 
 const signedCents = (v: number): string => `${v < 0 ? "−" : ""}${formatUsdValue(Math.abs(v))}`;
 
+/** A line's legs as one short key: an FNV-1a hash over each leg's symbol,
+ *  amount, price and block, so two lines with the same count and sum differ. */
+function legsKey(legs: readonly FlowLeg[]): string {
+  let h = 0x811c9dc5;
+  for (const l of legs)
+    for (const ch of `${l.symbol ?? ""}|${l.amount ?? ""}|${l.price ?? ""}|${l.block ?? ""};`) {
+      h ^= ch.charCodeAt(0);
+      h = Math.imul(h, 0x01000193) >>> 0;
+    }
+  return `${legs.length}:${h.toString(16)}`;
+}
+
 /** A receipt whose rows are built on first read, when it opens; `key`
  *  stands for them in the registry's signature. */
 function lazyProv(base: Omit<Provenance, "inputs" | "key">, key: string, build: () => ProvInput[]): Provenance {
@@ -71,8 +83,7 @@ export function legsProv(
       ],
     };
   }
-  const sum = legs.reduce((a, l) => a + (l.usd ?? 0), 0);
-  const key = `${legs.length}:${Math.round(sum * 100)}:${legs.at(-1)?.block ?? ""}`;
+  const key = legsKey(legs);
   const what = `${label} ${when}`;
   return lazyProv(
     {
@@ -173,6 +184,9 @@ export function flowSegmentProv(
   if (s.legs && (s.fill === "in" || s.fill === "out"))
     return legsProv(s.label, isLive ? "now" : `up to ${when}`, s.legs, s.unpriced);
   if (s.market) return marketMoveProv(s.label, side, isLive ? "now" : `at ${when}`, s.market);
+  // A served series' line: what the server sums it from, and no oracle claim.
+  if (s.served && (s.fill === "in" || s.fill === "out"))
+    return { kind: "derived", summary: `${s.label} up to ${when}. ${s.served}` };
   if (s.fill === "held")
     return isLive
       ? {
@@ -205,7 +219,7 @@ export function flowSegmentProv(
     };
   return {
     kind: "chain-derived",
-    summary: `${s.label} up to ${when}. Every such flow the position's events record by then, each at the oracle price at its block, added up.${s.served ? ` ${s.served}` : ""}`,
+    summary: `${s.label} up to ${when}. Every such flow the position's events record by then, each at the oracle price at its block, added up.`,
     formula: "Σ amount × price at block",
   };
 }

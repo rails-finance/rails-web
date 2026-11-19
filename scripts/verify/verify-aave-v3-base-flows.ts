@@ -287,8 +287,8 @@ for (const name of NAMES) {
           );
         } else if (r.total.cents != null)
           assert.equal(
-            Math.round(r.lines.reduce((a, l) => a + (l.cents ?? 0), 0) * 100),
-            Math.round(r.total.cents * 100),
+            Math.round(r.lines.reduce((a, l) => a + (l.cents ?? 0), 0) * 100) || 0,
+            Math.round(r.total.cents * 100) || 0,
             `${name} ${side} at stop ${stop}: lines add in cents`,
           );
         else

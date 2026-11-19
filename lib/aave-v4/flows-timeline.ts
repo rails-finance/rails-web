@@ -47,18 +47,29 @@ export interface AaveV4EventLeg {
   amount: number;
   /** USD per token at the event's block, where the event carries it. */
   price?: number;
-  /** The stored price's on-chain source (lib/aave-v4/price-notes.ts). */
-  source?: string;
 }
 
 const priceOf = (p: { usd: number } | undefined): number | undefined =>
   p != null && Number.isFinite(p.usd) && p.usd > 0 ? p.usd : undefined;
 
+/** The stored price's source for a leg, read from its event: the legs are
+ *  rails-server's mirror and carry none. */
+function legSource(ev: BaseActivityEvent, leg: AaveV4FlowLeg): string | undefined {
+  if (!isAaveV4Event(ev)) return undefined;
+  const c = ev.context.data as {
+    price?: { source?: string };
+    collateralPrice?: { source?: string };
+    debtPrice?: { source?: string };
+  };
+  return (leg === "liquidatedCollateral" ? c.collateralPrice : leg === "liquidatedDebt" ? c.debtPrice : c.price)
+    ?.source;
+}
+
 /** A stored price the cards count, where it is an on-chain read: DefiLlama
  *  and the $1 face are no price (ui-jobs 743). The route's reference keeps
  *  every stored price, as rails-server does. */
-const onChain = (l: AaveV4EventLeg): number | undefined =>
-  l.source === "defillama" || l.source === "stablecoin" ? undefined : l.price;
+const onChain = (price: number | undefined, source: string | undefined): number | undefined =>
+  source === "defillama" || source === "stablecoin" ? undefined : price;
 
 /** The legs one event adds to the lifetime flows (rails-server `aaveV4EventLegs`). */
 export function aaveV4EventLegs(ev: BaseActivityEvent): AaveV4EventLeg[] {
@@ -74,11 +85,7 @@ export function aaveV4EventLegs(ev: BaseActivityEvent): AaveV4EventLeg[] {
     const n = Math.abs(Number(amount));
     if (!symbol || amount == null || !Number.isFinite(n) || n === 0) return;
     const price = priceOf(stored);
-    out.push(
-      price != null
-        ? { symbol, leg, amount: n, price, ...(stored?.source ? { source: stored.source } : {}) }
-        : { symbol, leg, amount: n },
-    );
+    out.push(price != null ? { symbol, leg, amount: n, price } : { symbol, leg, amount: n });
   };
   if (c.eventType === "liquidation") {
     add(c.collateralSymbol, "liquidatedCollateral", c.liquidatedCollateralAmount, c.collateralPrice);
@@ -197,7 +204,6 @@ export function aaveV4FlowTimeline(
         leg: l.leg,
         amount: l.amount,
         price: l.price,
-        priceSource: l.source,
       })),
     (ev) => of(ev).balances.map((b) => ({ side: b.side, asset: b.symbol, symbol: b.symbol, amount: b.amount })),
     todayPrices,
@@ -239,8 +245,8 @@ export function aaveV4FocusEvents(
         address: l.symbol,
         leg: l.leg,
         amount: l.amount,
-        price: onChain(l),
-        priceSource: l.source,
+        price: onChain(l.price, legSource(ev, l.leg)),
+        priceSource: legSource(ev, l.leg),
       })),
     todayPrices,
     aaveV4LegPriceNote,

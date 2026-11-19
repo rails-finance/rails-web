@@ -58,6 +58,24 @@ export async function fetchDailyAnswer(
   return out;
 }
 
+/** The block each kept row was read at, by series key and day: the same
+ *  rows `dailyPricesFromAnswer` keeps, so a receipt can name the block its
+ *  day's price stands at (ui-jobs 743). */
+export function dailyBlocksFromAnswer(
+  body: DailyAnswer,
+  accept: (unit: string) => boolean = (u) => u === "usd",
+): Record<string, Record<number, number>> {
+  const out: Record<string, Record<number, number>> = {};
+  for (const [key, s] of Object.entries(body.series ?? {}))
+    for (const [day, , block, unit] of s.obs ?? []) {
+      const u = unit ?? s.unit;
+      const b = Number(block);
+      if (u == null || !accept(u) || !Number.isFinite(b) || b <= 0) continue;
+      (out[key] ??= {})[day] = b;
+    }
+  return out;
+}
+
 /** One answer's series as `[day, price]` ascending, the rows whose unit
  *  `accept` takes: USD by default; a ratio family (Fluid's `token:<debt
  *  token>`) passes its own. */
