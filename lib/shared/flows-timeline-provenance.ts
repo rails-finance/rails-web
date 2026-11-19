@@ -187,6 +187,18 @@ export function marketMoveProv(label: string, side: FlowSide, when: string, m: M
   };
 }
 
+/** A face factor compounded each second, between two rows: "compounded
+ *  each second at the rate the Vat's accumulators at blocks M and N imply".
+ *  The duty is taken as held between the rows. */
+export function compoundedWords(source: string, from?: number | null, to?: number | null): string {
+  const at = (b: number) => b.toLocaleString("en-US");
+  return from != null && to != null
+    ? `compounded each second at the rate ${source} at blocks ${at(from)} and ${at(to)} imply`
+    : from != null
+      ? `compounded each second at the rate ${source} at block ${at(from)} and the fee now imply`
+      : `compounded each second at the fee's rate`;
+}
+
 /** A past day's held figure from its rows: each asset's balance after its
  *  last event by then (grown by its index where the family has one) × the
  *  price that day as shown, named with its block. The state card
@@ -224,7 +236,9 @@ export function heldDayProv(label: string, when: string, rows: readonly FlowAsse
               label: `${r.symbol} interest factor`,
               value: factorText(p.price as number),
               kind: "chain-derived" as const,
-              note: `the interest its rate built on the recorded debt to the close of ${day(p.day)}`,
+              note: p.compound
+                ? `${compoundedWords(p.compound, p.block, p.toBlock)}, to the close of ${day(p.day)}`
+                : `the interest its rate built on the recorded debt to the close of ${day(p.day)}`,
             },
           ],
           amount: faceAmount(r.amount ?? 0, p.price as number),

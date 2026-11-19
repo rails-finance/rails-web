@@ -29,7 +29,7 @@ import { fmtTokens, tokenDecimals } from "@/lib/shared/flow-focus";
 import { wholeUsd } from "@/lib/shared/flows-sum";
 import type { FlowMoment, MomentAsset } from "@/lib/shared/flow-moment";
 import { unitOf, type FlowGrowth, type FlowModel, type FlowSegment, type FlowSide } from "@/lib/shared/flows-timeline";
-import { flowSegmentProv, heldDayProv } from "@/lib/shared/flows-timeline-provenance";
+import { compoundedWords, flowSegmentProv, heldDayProv } from "@/lib/shared/flows-timeline-provenance";
 import { centsOf, roundAway } from "@/lib/shared/shown-usd";
 import { formatUsdValue } from "@/lib/utils/format";
 
@@ -133,7 +133,7 @@ export function FlowMomentCard({
   flash: boolean;
 }) {
   const date = dayStamp(moment.day * DAY_S);
-  const compound = model.words.moment?.compound === true;
+  const compound = model.words.moment?.compound;
   const when = `the close of ${date}`;
   const lastStamp = dayStamp(moment.lastDay * DAY_S);
   // A face side whose interest is a contract's minute sum that stops at a
@@ -399,7 +399,7 @@ export function FlowMomentCard({
               value: `${moment.accrual.rate.toLocaleString("en-US", { maximumFractionDigits: 4 })}%`,
               kind: "chain" as const,
               note: compound
-                ? "in force after the last event, compounded each second"
+                ? `in force after the last event, ${compoundedWords(compound, a.row.priced?.block, a.row.priced?.toBlock)}`
                 : "in force after the last event, fees included",
             },
             {

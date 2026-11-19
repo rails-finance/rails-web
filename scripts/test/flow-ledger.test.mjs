@@ -656,11 +656,48 @@ test("a $1-face receipt states the recorded debt, the factor and their product",
   const rows = flowSegmentProv(st.debt.bar[0], "debt", "the end of 2 Oct '24", false, true).inputs;
   const v = (l) => rows.find((r) => r.label === l)?.value;
   assert.equal(v("BOLD recorded debt"), "1,000.123457 BOLD");
-  assert.equal(v("BOLD interest factor"), "1.000123456789");
-  // 1,000.123457 × 1.000123456789 = 1,000.246929…, shown to six decimals.
+  assert.equal(v("BOLD interest factor"), "1.000123457");
+  // 1,000.123457 × 1.000123457 = 1,000.246929…, shown to six decimals.
   assert.equal(v("BOLD amount"), "1,000.246929 BOLD");
   assert.equal(v("BOLD price"), "$1.00");
   assert.equal(st.debt.now, 1000.25);
   const mo = flowMoment(m, [], (20_002 + 1) * DAY - 1);
   assert.equal(mo.sides.debt.assets[0].tokens, 1000.246929, "the card's tokens to six decimals");
+});
+
+test("a $1-face amount multiplies out from its printed rows, a 10^8 DAI vault among them", async () => {
+  const { faceAmount, factorText, amountText } = await import(ROOT + "lib/shared/shown-usd.ts");
+  const { compoundedWords } = await import(ROOT + "lib/shared/flows-timeline-provenance.ts");
+  // Exact decimal product of two printed strings, rounded half away to six places.
+  const micro = (t) => {
+    const [i, f = ""] = t.replace(/,/g, "").split(".");
+    return BigInt(i + f.padEnd(6, "0").slice(0, 6));
+  };
+  const nano = (t) => {
+    const [i, f = ""] = t.replace(/,/g, "").split(".");
+    return BigInt(i + f.padEnd(9, "0"));
+  };
+  const rebuilt = (rText, fText) => {
+    const p = micro(rText) * nano(fText);
+    return Number((p + 500_000_000n) / 1_000_000_000n) / 1e6;
+  };
+  const cases = [
+    [100_000_000.123456, 1.0000000123456],
+    [123_456_789.987654, 1.04938271605],
+    [99_999_999.999999, 1.000000000499],
+    [1000.1234567, 1.0001234567891],
+    [0.000001, 1.5],
+  ];
+  for (const [recorded, factor] of cases) {
+    const rText = amountText(recorded);
+    const fText = factorText(factor);
+    assert.match(fText, /^\d\.\d{9}$/, "the factor to nine decimals");
+    const amount = faceAmount(recorded, factor);
+    assert.equal(rebuilt(rText, fText), amount, `${rText} × ${fText}`);
+    assert.equal(amountText(amount), amountText(rebuilt(rText, fText)), "the printed amount");
+  }
+  assert.equal(
+    compoundedWords("the Vat's accumulators", 19_000_000, 19_100_000),
+    "compounded each second at the rate the Vat's accumulators at blocks 19,000,000 and 19,100,000 imply",
+  );
 });

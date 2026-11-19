@@ -43,7 +43,7 @@ const dayText = (day: number): string =>
 export type MakerRowPrice = (
   | { from: "row"; block: number }
   | { from: "store" | "store-near"; day: number; dayBlock: number | null; eventBlock: number; staleDays?: number }
-  | { from: "today"; block: number | null }
+  | { from: "today"; block: number | null; eventBlock?: number }
   | { from: "nearest"; block: number | null; eventBlock: number; staleDays?: number }
 ) & {
   /** A capped feed (LockStake): the price is the lower of governance's cap
@@ -65,10 +65,12 @@ function rowNote(p: MakerRowPrice): string {
       return `price at the close of ${dayText(p.day)}, ${p.dayBlock != null ? blockText(p.dayBlock) : "a block the daily store's route does not state"}; this event is at block ${p.eventBlock.toLocaleString("en-US")}`;
     case "store-near":
       return `the nearest day's price, at the close of ${dayText(p.day)}, ${p.dayBlock != null ? blockText(p.dayBlock) : "a block the daily store's route does not state"}${old(p.staleDays)}; this event is at block ${p.eventBlock.toLocaleString("en-US")}`;
-    case "today":
+    case "today": {
+      const ev = p.eventBlock != null ? `; this event is at block ${p.eventBlock.toLocaleString("en-US")}` : "";
       return p.block != null
-        ? `the latest block's price, block ${p.block.toLocaleString("en-US")}`
-        : "the live read's price, which names no block";
+        ? `the latest read's price, block ${p.block.toLocaleString("en-US")}${ev}`
+        : `the live read's price, which names no block${ev}`;
+    }
     case "nearest":
       return `the nearest priced moment, ${blockText(p.block)}${old(p.staleDays)}; this event is at block ${p.eventBlock.toLocaleString("en-US")}`;
   }

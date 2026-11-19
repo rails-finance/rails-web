@@ -242,6 +242,10 @@ export interface FlowAssetHeld {
      *  the interest built on the recorded balance since its event, and the
      *  figure is that debt at $1, to the cent. */
     face?: true;
+    /** A face factor compounded each second: what its rate is read from,
+     *  and the block of the row it grows to (`block` the row it grows from). */
+    compound?: string;
+    toBlock?: number | null;
   };
   /** No price stands for the asset on that day: the side's figure has none. */
   unpriced?: true;
@@ -432,6 +436,11 @@ export interface FlowTimeline {
   /** Per asset, the days a new daily price was recorded: [day, usd, block?]. The last
    *  oracle price recorded on or before each day's end, across every wallet. */
   dailyPrices?: Record<string, DayObs[]>;
+  /** A $1-face side's interest factor (Maker's debt), per asset and day: the
+   *  block of the row it grows to, its rate the one the accumulators at the
+   *  two blocks imply (the day's own block in `dailyPrices` the row it grows
+   *  from). */
+  factorToBlocks?: Record<string, Record<number, number | null>>;
   /** The price view's caption for `dailyPrices`: the oracle or store and how
    *  a day's price is chosen ("AaveOracle, the last price recorded each day").
    *  Unset, an asset with `carriedWhy` reads as priced by its events and any
@@ -567,8 +576,10 @@ export interface FlowMomentWords {
   yearSeconds?: number;
   /** The rate compounds each second (Maker's stability fee, through Jug's
    *  rpow): the rate is continuous and the factor e^(rate × time); else
-   *  simple, 1 + rate × time. */
-  compound?: true;
+   *  simple, 1 + rate × time. Its value names what the rate is read from
+   *  ("the Vat's accumulators"), at the two blocks the factor's series
+   *  names. */
+  compound?: string;
 }
 
 /** A held asset whose price, at some date, is older than the gap allowed. */
@@ -966,6 +977,8 @@ interface PriceAt {
   series: boolean;
   /** The block it was read at, where the source names one. */
   block?: number | null;
+  /** A face side's factor: the block of the row its rate grows to. */
+  toBlock?: number | null;
 }
 
 /** Through each row, the lines with legs and their unpriced assets: small,
@@ -1020,12 +1033,15 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
   const liveStop = t.today != null && stillHeld ? Math.max(lastDay + 1, t.today - startDay) : lastDay + 1;
 
   // Each asset's daily observations as stops, ascending.
-  const series = new Map<string, { day: number; usd: number; block: number | null }[]>();
+  const series = new Map<string, { day: number; usd: number; block: number | null; toBlock?: number | null }[]>();
   for (const [asset, obs] of Object.entries(t.dailyPrices ?? {}))
     series.set(
       asset,
       obs
-        .map(([d, usd, block]) => ({ day: d - startDay, usd, block: block ?? null }))
+        .map(([d, usd, block]) => {
+          const toBlock = t.factorToBlocks?.[asset]?.[d];
+          return { day: d - startDay, usd, block: block ?? null, ...(toBlock !== undefined ? { toBlock } : {}) };
+        })
         .filter((o) => o.usd > 0)
         .sort((a, b) => a.day - b.day),
     );
@@ -1035,7 +1051,14 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     while (from.i + 1 < obs.length && obs[from.i + 1].day <= stop) from.i++;
     const o = obs[from.i];
     return o && o.day <= stop
-      ? { usd: o.usd, ts: (startDay + o.day) * DAY_S, day: o.day, series: true, block: o.block }
+      ? {
+          usd: o.usd,
+          ts: (startDay + o.day) * DAY_S,
+          day: o.day,
+          series: true,
+          block: o.block,
+          ...(o.toBlock !== undefined ? { toBlock: o.toBlock } : {}),
+        }
       : null;
   };
 
@@ -1047,6 +1070,7 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
   const heldUnpriced = new Map<number, Record<FlowSide, string[]>>();
   const inDollars = !t.unit && !t.sideUnits;
   const faceSides = new Set(t.words?.moment?.face ?? []);
+  const compound = t.words?.moment?.compound;
   const stale = new Map<number, StalePrice[]>();
   type Reason = { side: FlowSide; why: string; symbol?: string };
   const same = (a: Reason, b: Reason) => a.side === b.side && a.why === b.why && a.symbol === b.symbol;
@@ -1197,7 +1221,12 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
                   ? {
                       price: p.usd,
                       block: p.block ?? null,
-                      ...(faceSides.has(h.side) ? { face: true as const } : {}),
+                      ...(faceSides.has(h.side)
+                        ? {
+                            face: true as const,
+                            ...(compound ? { compound, toBlock: p.toBlock ?? null } : {}),
+                          }
+                        : {}),
                     }
                   : {}),
               },

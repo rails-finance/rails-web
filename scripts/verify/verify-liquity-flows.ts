@@ -702,7 +702,8 @@ for (const [name, events, symbols] of [
         const owed = last.debtAfter * mo.accrual.factor;
         // The recorded debt × the factor, as the receipt multiplies them out (ui-jobs 743).
         assert.equal(tokens, faceAmount(last.debtAfter, mo.accrual.factor), `debt by the rate at stop ${stop}`);
-        assert.ok(Math.abs(tokens - owed) <= 1.1e-6 + owed * 1e-12, `debt by the rate at stop ${stop}`);
+        // Within the rows' rounding: six decimals of the debt, nine of the factor.
+        assert.ok(Math.abs(tokens - owed) <= 1.1e-6 + last.debtAfter * 5e-10, `debt by the rate at stop ${stop}`);
         assert.equal(mo.accrual.rate, last.rate + last.fee);
         // Its sum to that day adds up to what is owed.
         let ri = -1;

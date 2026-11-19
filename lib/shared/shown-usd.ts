@@ -42,14 +42,23 @@ export const shownComposedPrice = (a: number, b: number, op: "×" | "÷" = "×")
   shownPrice(op === "÷" ? shownPrice(a) / shownPrice(b) : shownPrice(a) * shownPrice(b));
 
 /** A growth factor as a receipt shows it (the interest a $1-face debt has
- *  built since its event, 1 + …): twelve decimal places. */
-export const shownFactor = (v: number): number => roundAway(scaled(v, 1e12)) / 1e12;
+ *  built since its event, 1 + …): nine decimal places. */
+export const shownFactor = (v: number): number => roundAway(scaled(v, 1e9)) / 1e9;
 /** A $1-face debt grown by its factor, as its receipt rows multiply out: the
- *  recorded debt as shown × the factor as shown, to six decimals. */
-export const faceAmount = (recorded: number, factor: number): number =>
-  shownAmount(shownAmount(recorded) * shownFactor(factor));
+ *  recorded debt as shown (six decimals) × the factor as shown (nine), the
+ *  product in exact integers rounded half away to six decimals, so a vault
+ *  of 10^8 DAI multiplies out to the printed digit. */
+export const faceAmount = (recorded: number, factor: number): number => {
+  const r = BigInt(Math.round(shownAmount(recorded) * 1e6));
+  const f = BigInt(Math.round(shownFactor(factor) * 1e9));
+  const p = r * f;
+  const half = BigInt(500_000_000);
+  const q = (p < BigInt(0) ? -(-p + half) : p + half) / BigInt(1_000_000_000);
+  return Number(q) / 1e6;
+};
 /** A factor as a receipt row prints it. */
-export const factorText = (v: number) => shownFactor(v).toLocaleString("en-US", { maximumFractionDigits: 12 });
+export const factorText = (v: number) =>
+  shownFactor(v).toLocaleString("en-US", { minimumFractionDigits: 9, maximumFractionDigits: 9 });
 
 /** An amount as a receipt row prints it. */
 export const amountText = (v: number) => shownAmount(v).toLocaleString("en-US", { maximumFractionDigits: 6 });
