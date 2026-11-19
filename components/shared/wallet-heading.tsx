@@ -25,6 +25,7 @@ import { Facehash } from "@/components/shared/facehash";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { WalletMenu } from "@/components/shared/wallet-menu";
+import { HolderLabelTag } from "@/components/shared/holder-label";
 import { WalletPositionsMenu } from "@/components/shared/wallet-positions-menu";
 import { SkeletonBar } from "@/components/shared/skeleton-card";
 import type { SessionProtocol } from "@/lib/shared/sessions";
@@ -300,6 +301,7 @@ export function PositionWalletHeading({
               chainName={owner.chain != null ? CHAINS[owner.chain].name : undefined}
             />
           )}
+          {owner.wallet && <HolderLabelTag wallet={owner.wallet} chainId={chainId} className="" />}
           {owner.extra}
         </>
       }
