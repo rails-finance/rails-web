@@ -252,7 +252,7 @@ export function useTimelineSegment(o: TimelineSegmentOptions) {
             failed: segmentFailed?.monthIdx ?? null,
             onRetry: segmentFailed ? retrySegment : null,
             onPick: pickMonth,
-            onReset: segment ? resetSegment : null,
+            onReset: segment || segmentLoading != null ? resetSegment : null,
           }
         : undefined,
     [groupedTail, hasLife, lifeDays, segment, segmentLoading, segmentFailed, retrySegment, pickMonth, resetSegment],

@@ -849,18 +849,24 @@ async function runArm(arm, ctx) {
   // 2026-10-01 and draw no Dates control where the chart ties, so no grid
   // stands on the page to read: H1 is skipped there. The toolbar says which
   // once the panel has read (`data-timeline-dates`, ui-jobs 764).
-  const hasGrid = await (async () => {
+  const H1 = id("H1 the page's heatmap counts the same events with folders on and off");
+  const dates = await (async () => {
     const page = await openPage(true, "[data-timeline-total]");
-    await page
+    // A toolbar still `waiting` after the wait is a page stuck on its
+    // panel's read: a failure, not a page without the control.
+    const settledDates = await page
       .waitForSelector('[data-timeline-dates]:not([data-timeline-dates="waiting"])', { timeout: 180_000 })
+      .then((h) => h.getAttribute("data-timeline-dates"))
       .catch(() => null);
     const n = await page.locator("[data-date-control]").count();
     await page.close();
-    return n > 0;
+    return { settled: settledDates, pill: n > 0 };
   })();
-  if (!hasGrid) {
+  if (dates.settled == null) {
+    check(H1, false, "stuck waiting: the toolbar's data-timeline-dates never left `waiting` in 180s");
+  } else if (!dates.pill) {
     skip(
-      id("H1 the page's heatmap counts the same events with folders on and off"),
+      H1,
       "this page draws no Dates control (its Lifetime flows chart ties to the timeline); R1 and R2 check the folders' days",
     );
   } else {

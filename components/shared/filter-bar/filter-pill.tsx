@@ -148,6 +148,19 @@ export function FilterPill({
   );
 }
 
+/** An unset pill's place, held empty: the box "+ {name}" takes, unseen and
+ *  out of the accessibility tree, so the row does not move when the pill
+ *  arrives (the timeline's Date pill while its page's panel reads, ui-jobs
+ *  764). */
+export function FilterPillReserve({ name }: { name: string }) {
+  return (
+    <span aria-hidden="true" className={`${PILL_BASE} invisible gap-1.5 border pl-3 pr-3.5`} data-pill-reserve={name}>
+      <Plus className="size-3.5" />
+      {name}
+    </span>
+  );
+}
+
 /** The sort as one pill: "↓ Recent activity ⌄" (N1.3). */
 export function SortPillButton({
   label,

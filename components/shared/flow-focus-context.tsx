@@ -15,6 +15,7 @@ import { useTimelineDisplay } from "@/components/shared/timeline-display-context
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { buildFlowModel, type FlowModel, type FlowTimeline } from "@/lib/shared/flows-timeline";
 import type { AssetMark } from "@/lib/shared/asset-mark";
+import { flowsPatch } from "@/lib/shared/timeline-dates";
 import {
   createFlowFocusStore,
   type FlowFocusState,
@@ -77,26 +78,42 @@ export function useFlowFocusValue(root: FlowFocusRoot, timeline: FlowTimeline | 
   return useMemo<FlowFocusValue>(() => ({ store, model, events }), [store, model, events]);
 }
 
+/** The page's flow-focus store, for a page whose focus value stands only once
+ *  its flows are in hand (`value={flows ? flowFocus : null}`: the Liquity V2
+ *  and Polaris deposits, the Polaris reserve loan). Worn around the whole page
+ *  from the first render, so the panel can say it is reading and the timeline
+ *  holds its Date pill back (ui-jobs 764). */
+export const FlowsStoreContext = createContext<FlowFocusStore | null>(null);
+
+/** The store the panel and the timeline's Date pill read: the focus value's,
+ *  else the page's FlowsStoreContext. */
+export function useFlowsStore(): FlowFocusStore | null {
+  const focus = useContext(FlowFocusContext)?.store ?? null;
+  const page = useContext(FlowsStoreContext);
+  return focus ?? page;
+}
+
+/** `useFlowFocusState` over `useFlowsStore()`; null without a store. */
+export function useFlowsStoreState<T>(select: (s: FlowFocusState) => T): T | null {
+  const store = useFlowsStore();
+  const read = () => (store ? select(store.get()) : null);
+  return useSyncExternalStore(store ? store.subscribe : NOOP_STORE.subscribe, read, read);
+}
+
 /** A Lifetime flows panel's side of the timeline's Date pill (`timelineDates`
- *  in lib/shared/flow-focus.ts): `waiting` while it reads the history it
- *  draws from, `settled` once it has drawn or found nothing to draw, and on
- *  unmount. Waiting is said before paint, so the pill never shows on a page
- *  about to tie; settled after the commit's effects, so the chart's cursor
- *  (set by a child's effect) lands first. */
+ *  in lib/shared/timeline-dates.ts, the steps `flowsPatch`): `waiting` while
+ *  it reads the history it draws from, `settled` once it has drawn or found
+ *  nothing to draw, and on unmount. */
 export function useFlowsWaiting(waiting: boolean): void {
-  const store = useContext(FlowFocusContext)?.store ?? null;
-  useLayoutEffect(() => {
-    if (store && waiting && store.get().flows !== "waiting") store.set({ flows: "waiting" });
-  }, [store, waiting]);
-  useEffect(() => {
-    if (store && !waiting && store.get().flows !== "settled") store.set({ flows: "settled" });
-  }, [store, waiting]);
-  useEffect(
-    () => () => {
-      if (store && store.get().flows !== "settled") store.set({ flows: "settled" });
-    },
-    [store],
-  );
+  const store = useFlowsStore();
+  const write = (step: "layout" | "effect" | "unmount", w: boolean) => {
+    const next = store ? flowsPatch(step, w, store.get().flows) : null;
+    if (store && next) store.set({ flows: next });
+  };
+  useLayoutEffect(() => write("layout", waiting));
+  useEffect(() => write("effect", waiting));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => () => write("unmount", false), [store]);
 }
 
 const DAY_S = 86_400;

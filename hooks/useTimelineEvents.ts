@@ -25,10 +25,11 @@
 //
 // A timeline whose Lifetime flows chart draws with its cursor tied to it has
 // no date range (rails-ops TO-DO-ui-jobs 764): ChainTruthTimeline says so at
-// runtime through `setChartTie`, from what the chart draws (`timelineDates`
-// in lib/shared/flow-focus.ts). `?to=` there is the chart's cut, which the
-// flow-focus store reads and writes (components/shared/flow-focus-context.tsx),
-// and this hook leaves `from` and `to` alone.
+// runtime through `setTimelineDates`, from what the chart draws
+// (`timelineDates` in lib/shared/timeline-dates.ts). `?to=` there is the
+// chart's cut, which the flow-focus store reads and writes
+// (components/shared/flow-focus-context.tsx), and this hook leaves `from` and
+// `to` alone; once the timeline settles on the pill, a lone `?to=` goes.
 //
 // Every axis is written as what is HIDDEN, never what is shown: a list of
 // hidden keys is the state itself, applies unchanged when a deeper read adds
@@ -91,6 +92,7 @@
 // demand for the toolbar's copy-link control, which is an explicit share act
 // and works on a load where nothing was toggled.
 
+import { withoutLoneTo, type TimelineDates } from "@/lib/shared/timeline-dates";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import {
@@ -262,9 +264,10 @@ export interface TimelineEventsState {
   /** False on a timeline its Lifetime flows chart is tied to: no date
    *  range, and the toolbar draws no Date pill. */
   datesAxis: boolean;
-  /** The chart's tie, as ChainTruthTimeline reads it from what the chart
-   *  draws: true clears the date range and closes the month grid. */
-  setChartTie: (tied: boolean) => void;
+  /** How the timeline picks a day, as ChainTruthTimeline reads it from what
+   *  the chart draws: `chart` clears the date range and closes the month
+   *  grid, `pill` drops a lone `?to=`. */
+  setTimelineDates: (dates: TimelineDates) => void;
   heatmapOpen: boolean;
   toggleHeatmap: () => void;
 
@@ -385,7 +388,7 @@ const splitList = (s: string | null): string[] | null => (s === null ? null : s.
 function writeViewParams(
   sp: URLSearchParams,
   view: ViewParams,
-  datesAxis: boolean,
+  datesBy: TimelineDates,
   sizeSides: readonly SizeSide[],
 ): void {
   const list = (key: string, values: string[]) => {
@@ -401,13 +404,13 @@ function writeViewParams(
   list("hideAddresses", view.hiddenCounterparties);
   list("hideVersions", view.hiddenVersions);
   writeSizeParams(sp, sizeSides, view.sizeRanges);
-  if (!datesAxis) return;
+  if (datesBy === "chart") return;
   if (view.dateRange) {
     sp.set("from", formatUtcDay(view.dateRange[0]));
     sp.set("to", formatUtcDay(view.dateRange[1]));
-  } else if (sp.has("from")) {
-    // A lone `to` is the chart's cut, which a page about to tie reads once
-    // its chart draws (`useRewindParam`); only a range goes.
+  } else if (sp.has("from") || datesBy === "pill") {
+    // While waiting, a lone `to` is the chart's cut, which a page about to
+    // tie reads once its chart draws (`useRewindParam`).
     sp.delete("from");
     sp.delete("to");
   }
@@ -500,14 +503,28 @@ export function useTimelineEvents(
   const sizeSidesKey = sizeDims.map((d) => d.side).join(",");
   const sizeSides = useMemo(() => (sizeSidesKey ? (sizeSidesKey.split(",") as SizeSide[]) : []), [sizeSidesKey]);
   const [heatmapOpen, setHeatmapOpen] = useState(false);
-  // The chart's tie (see the header): no date range while it stands.
-  const [chartTie, setChartTie] = useState(false);
-  const datesAxis = !chartTie;
+  // How the timeline picks a day (see the header): no date range while the
+  // chart ties; `waiting` until ChainTruthTimeline has said.
+  const [datesBy, setTimelineDates] = useState<TimelineDates>("waiting");
+  const datesAxis = datesBy !== "chart";
   useEffect(() => {
-    if (!chartTie) return;
-    setDateRange(null);
-    setHeatmapOpen(false);
-  }, [chartTie]);
+    if (datesBy === "chart") {
+      setDateRange(null);
+      setHeatmapOpen(false);
+      return;
+    }
+    try {
+      const search = withoutLoneTo(window.location.search, datesBy);
+      if (search != null)
+        window.history.replaceState(
+          window.history.state,
+          "",
+          `${window.location.pathname}${search}${window.location.hash}`,
+        );
+    } catch {
+      /* non-fatal: the stale param stays in the link */
+    }
+  }, [datesBy]);
   const [hydrated, setHydrated] = useState(false);
   // Flips true on the visitor's first live toggle of any view axis — the
   // gate for writing state into the URL. Keeps a silently-restored
@@ -598,7 +615,7 @@ export function useTimelineEvents(
           dateRange,
           sizeRanges,
         },
-        datesAxis,
+        datesBy,
         sizeSides,
       );
       const next = `${url.pathname}${url.search}${url.hash}`;
@@ -615,7 +632,7 @@ export function useTimelineEvents(
     hiddenVersions,
     dateRange,
     sizeRanges,
-    datesAxis,
+    datesBy,
     sizeSides,
   ]);
 
@@ -632,11 +649,11 @@ export function useTimelineEvents(
         dateRange,
         sizeRanges,
       },
-      datesAxis,
+      datesBy,
       sizeSides,
     );
     return url.toString();
-  }, [hiddenActions, hiddenAssets, hiddenCounterparties, hiddenVersions, dateRange, sizeRanges, datesAxis, sizeSides]);
+  }, [hiddenActions, hiddenAssets, hiddenCounterparties, hiddenVersions, dateRange, sizeRanges, datesBy, sizeSides]);
 
   const hiddenSet = useMemo(() => new Set(hiddenActions), [hiddenActions]);
   const hiddenAssetSet = useMemo(() => new Set(hiddenAssets), [hiddenAssets]);
@@ -1138,7 +1155,7 @@ export function useTimelineEvents(
     setSizeRange,
     narrowed: actionHiddenSet.size > 0 || sizeView != null,
     datesAxis,
-    setChartTie,
+    setTimelineDates,
     heatmapOpen,
     toggleHeatmap,
     viewHref,

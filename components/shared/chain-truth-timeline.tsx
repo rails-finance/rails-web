@@ -73,11 +73,14 @@ import { UnreadTokensProvider } from "@/components/shared/unread-tokens-context"
 import {
   useFlowFocus,
   useFlowFocusState,
+  useFlowsStore,
+  useFlowsStoreState,
   useFollowPreference,
   useRewindParam,
 } from "@/components/shared/flow-focus-context";
 import { FlowDayMark, utcDay } from "@/components/shared/flow-day-mark";
-import { rewindEvents, rewindRows, timelineCut, timelineDates } from "@/lib/shared/flow-focus";
+import { rewindEvents, rewindRows, timelineCut } from "@/lib/shared/flow-focus";
+import { resetMonthOnTie, tieDropped, timelineDates, type TimelineDates } from "@/lib/shared/timeline-dates";
 import { useHydrated } from "@/hooks/useHydrated";
 import { flowMoment } from "@/lib/shared/flow-moment";
 import { FlowMomentCard, type MomentNeighbour } from "@/components/shared/flow-moment-card";
@@ -857,12 +860,23 @@ function ChainTruthTimelineBody({
   // cards' "View on chart") and no Date pill; elsewhere by the Date pill. Read
   // from what the chart draws, held back while the page's panel reads.
   const hydratedHere = useHydrated();
-  const datesBy = useFlowFocusState((st) =>
-    timelineDates(flowFocusValue ? { cursor: st.cursor, flows: st.flows } : null, hydratedHere),
+  const tieStore = useFlowsStore();
+  const cursorDrawn = useFlowsStoreState((st) => st.cursor != null);
+  const flowsStanding = useFlowsStoreState((st) => st.flows);
+  const datesBy = timelineDates(
+    tieStore ? { cursor: cursorDrawn ? true : null, flows: flowsStanding ?? null } : null,
+    hydratedHere,
   );
   const chartTied = datesBy === "chart";
-  const { setChartTie } = tl;
-  useEffect(() => setChartTie(chartTied), [setChartTie, chartTied]);
+  const { setTimelineDates } = tl;
+  useEffect(() => setTimelineDates(datesBy), [setTimelineDates, datesBy]);
+  // A tie that drops once it stood (the chart's cursor gone) takes its cut
+  // with it: no cut stands beside a Date pill with no "Sync to chart".
+  const lastDates = useRef<TimelineDates>(datesBy);
+  useEffect(() => {
+    if (tieDropped(lastDates.current, datesBy) && tieStore?.get().rewind) tieStore.set({ rewind: null });
+    lastDates.current = datesBy;
+  }, [datesBy, tieStore]);
   const toolbarTl = useMemo<TimelineEventsState>(() => {
     const pill = tl.datesAxis && datesBy === "pill";
     if (!servedRows || !tl.isFiltered) return pill === tl.datesAxis ? tl : { ...tl, datesAxis: pill };
@@ -1335,11 +1349,20 @@ function ChainTruthTimelineBody({
   /** The month this code asked the page to read, and the cut it read for. */
   const askedMonth = useRef<number | null>(null);
   const askedCut = useRef<number | null>(null);
-  // A month the Date pill's grid read as its own segment goes when the chart
-  // ties, since the pill that would clear it goes too; a month the cut asked
-  // for stays.
+  // A month the Date pill's grid read, or is reading, as its own segment goes
+  // when the chart ties, since the pill that would clear it goes too; a month
+  // the cut asked for stays.
   useEffect(() => {
-    if (chartTied && segments?.month != null && askedMonth.current == null) segments.onReset?.();
+    if (
+      segments &&
+      resetMonthOnTie({
+        tied: chartTied,
+        month: segments.month,
+        loading: segments.loading,
+        askedByCut: askedMonth.current != null,
+      })
+    )
+      segments.onReset?.();
     // Only the tie's arrival; `segments` is read at that moment.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chartTied]);
@@ -2165,6 +2188,8 @@ function ChainTruthTimelineBody({
               displayItems={items}
               leading={toolbarLeading}
               beforeDisplay={followToggle}
+              datesHeld={datesBy === "waiting"}
+              loadOlder={loadOlder}
               countDraft={countDraft}
               countTooltip={countTooltip}
               countDetail={countDetail}

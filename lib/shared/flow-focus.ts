@@ -27,6 +27,7 @@ import {
   type FlowSegment,
   type FlowSide,
 } from "@/lib/shared/flows-timeline";
+import type { FlowsStanding } from "@/lib/shared/timeline-dates";
 
 /** One event of the page as the flow lines read it: the buckets its legs
  *  fill, each in USD at the price its event carries (null where no price). */
@@ -570,8 +571,8 @@ export interface FlowFocusState {
    *  the history it draws from, `settled` once it has drawn or found nothing
    *  to draw, null where no panel has said. The timeline holds back its Date
    *  pill while it waits, so a page whose chart is about to tie draws none
-   *  (`timelineDates`). */
-  flows: "waiting" | "settled" | null;
+   *  (`timelineDates` in lib/shared/timeline-dates.ts). */
+  flows: FlowsStanding;
 }
 
 export interface FlowFocusStore {
@@ -603,26 +604,6 @@ export function createFlowFocusStore(): FlowFocusStore {
       return () => subs.delete(fn);
     },
   };
-}
-
-// ── The timeline's dates ────────────────────────────────────────────────────
-
-/** How the timeline picks a day (rails-ops TO-DO-ui-jobs 764): `chart` where
- *  the Lifetime flows chart draws with its cursor tied to the timeline, so
- *  "Sync to chart" and the cards' "View on chart" pick the day and the
- *  toolbar draws no Date pill; `pill` on every other timeline, the Date pill
- *  and its month grid; `waiting` while the page's panel is still reading, or
- *  before the page has hydrated on a page with the tie, the pill held back so
- *  a tied page never shows it. `s` is null on a page without the tie's
- *  provider (Sky Savings, the redeemer page); `hydrated` is whether the panel
- *  has had its first commit to say. */
-export type TimelineDates = "chart" | "pill" | "waiting";
-
-export function timelineDates(s: Pick<FlowFocusState, "cursor" | "flows"> | null, hydrated: boolean): TimelineDates {
-  if (!s) return "pill";
-  if (s.cursor != null) return "chart";
-  if (!hydrated || s.flows === "waiting") return "waiting";
-  return "pill";
 }
 
 // ── The timeline's rewind ───────────────────────────────────────────────────
