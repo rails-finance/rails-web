@@ -230,7 +230,17 @@ export interface FlowAssetHeld {
   /** Where the model values it on a past day: the UTC day (days since the
    *  epoch) its price was recorded, and whether a daily series recorded it
    *  (else an event's block). */
-  priced?: { day: number; series: boolean };
+  priced?: {
+    day: number;
+    series: boolean;
+    /** The price as the model values the asset at (USD per token), and the
+     *  block it was read at; null where the store's route names none
+     *  (ui-jobs 743). */
+    price?: number;
+    block?: number | null;
+  };
+  /** No price stands for the asset on that day: the side's figure has none. */
+  unpriced?: true;
   /** Grown by interest since the event that recorded it (`FlowIndexes`):
    *  `amount` is `recorded` × `index` ÷ `anchor`. */
   grown?: FlowGrowth;
@@ -373,8 +383,9 @@ export interface FlowDayRow {
   cum: Record<string, number>;
   /** Balances the day's events stated, after its last event. */
   balances: FlowEvent["balances"];
-  /** Each asset's last at-block price that day, with its block time. */
-  prices: { asset: string; usd: number; ts: number }[];
+  /** Each asset's last at-block price that day, with its block time and
+   *  block. */
+  prices: { asset: string; usd: number; ts: number; block?: number }[];
   /** Transactions on or before this day (the position card's count). */
   txs?: number;
   /** The running USD per bucket and symbol, for the cells the day moved. */
@@ -658,6 +669,9 @@ export interface FlowModel {
   /** Each asset held and owed at the end of each stop before the live one,
    *  and at the live stop. */
   heldAt: FlowAssetHeld[][];
+  /** Per stop, each side's held assets with no price that day: the side's
+   *  figure there has none (ui-jobs 743). */
+  heldUnpriced: Map<number, Record<FlowSide, string[]>>;
   liveHeld: FlowAssetHeld[];
   /** The shared x-axis, fixed for the position so bars never rescale. */
   axis: { max: number; ticks: number[] };
@@ -705,6 +719,9 @@ export interface FlowSegment {
   /** A line of a served series: the sentence its receipt states in place
    *  of the legs (`FlowWords.served`). */
   served?: string;
+  /** On the held segment at a past stop: each held asset with its price,
+   *  day and block, for the receipt (not enumerable). */
+  heldRows?: FlowAssetHeld[];
   /** On the held segment: the basis its price stands on, where the family
    *  has two (`FlowWords.priceBasis`). */
   priceBasis?: string;
@@ -814,7 +831,7 @@ export function daysFromEvents(bucketKeys: string[], events: FlowEvent[]): FlowD
     rates: Set<"rate-delegate" | "rate-owner">;
     byOther: boolean;
     balances: Map<string, FlowEvent["balances"][number]>;
-    prices: Map<string, { usd: number; ts: number }>;
+    prices: Map<string, { usd: number; ts: number; block: number }>;
     cells: Set<string>;
     unsure: Map<string, FlowUnsure>;
     legs: FlowLeg[];
@@ -839,7 +856,7 @@ export function daysFromEvents(bucketKeys: string[], events: FlowEvent[]): FlowD
       ...(cur.byOther ? { byOther: true as const } : {}),
       cum: { ...cum },
       balances: [...cur.balances.values()],
-      prices: [...cur.prices].map(([asset, p]) => ({ asset, usd: p.usd, ts: p.ts })),
+      prices: [...cur.prices].map(([asset, p]) => ({ asset, usd: p.usd, ts: p.ts, block: p.block })),
       txs,
       cumAsset: [...cur.cells].map((c) => ({
         bucket: c.slice(0, c.indexOf("|")),
@@ -877,7 +894,7 @@ export function daysFromEvents(bucketKeys: string[], events: FlowEvent[]): FlowD
         lastTx = tx;
       }
     }
-    for (const p of ev.prices) if (p.usd > 0) cur.prices.set(p.asset, { usd: p.usd, ts: ev.ts });
+    for (const p of ev.prices) if (p.usd > 0) cur.prices.set(p.asset, { usd: p.usd, ts: ev.ts, block: ev.block });
     for (const leg of ev.legs) {
       if (!(leg.bucket in cum)) continue;
       const parts = hasParts(leg);
@@ -939,6 +956,8 @@ interface PriceAt {
   /** Stop of the day it was recorded. */
   day: number;
   series: boolean;
+  /** The block it was read at, where the source names one. */
+  block?: number | null;
 }
 
 /** Through each row, the lines with legs and their unpriced assets: small,
@@ -993,12 +1012,12 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
   const liveStop = t.today != null && stillHeld ? Math.max(lastDay + 1, t.today - startDay) : lastDay + 1;
 
   // Each asset's daily observations as stops, ascending.
-  const series = new Map<string, { day: number; usd: number }[]>();
+  const series = new Map<string, { day: number; usd: number; block: number | null }[]>();
   for (const [asset, obs] of Object.entries(t.dailyPrices ?? {}))
     series.set(
       asset,
       obs
-        .map(([d, usd]) => ({ day: d - startDay, usd }))
+        .map(([d, usd, block]) => ({ day: d - startDay, usd, block: block ?? null }))
         .filter((o) => o.usd > 0)
         .sort((a, b) => a.day - b.day),
     );
@@ -1007,7 +1026,9 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     if (!obs) return null;
     while (from.i + 1 < obs.length && obs[from.i + 1].day <= stop) from.i++;
     const o = obs[from.i];
-    return o && o.day <= stop ? { usd: o.usd, ts: (startDay + o.day) * DAY_S, day: o.day, series: true } : null;
+    return o && o.day <= stop
+      ? { usd: o.usd, ts: (startDay + o.day) * DAY_S, day: o.day, series: true, block: o.block }
+      : null;
   };
 
   const held = new Map<string, { symbol: string; side: FlowSide; amount: number; index?: number; day: number }>();
@@ -1015,6 +1036,8 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
   const seriesCursor = new Map<string, { i: number }>();
   const valued: FlowModel["valued"] = [];
   const heldAt: FlowAssetHeld[][] = [];
+  const heldUnpriced = new Map<number, Record<FlowSide, string[]>>();
+  const inDollars = !t.unit && !t.sideUnits;
   const stale = new Map<number, StalePrice[]>();
   type Reason = { side: FlowSide; why: string; symbol?: string };
   const same = (a: Reason, b: Reason) => a.side === b.side && a.why === b.why && a.symbol === b.symbol;
@@ -1040,7 +1063,14 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
         if (!unsureFlows.some((f) => same(f, reason(u)))) unsureFlows.push({ stop, ...reason(u) });
       }
       for (const p of d.prices)
-        if (p.usd > 0) eventPrice.set(p.asset, { usd: p.usd, ts: p.ts, day: utcDay(p.ts) - startDay, series: false });
+        if (p.usd > 0)
+          eventPrice.set(p.asset, {
+            usd: p.usd,
+            ts: p.ts,
+            day: utcDay(p.ts) - startDay,
+            series: false,
+            block: p.block ?? null,
+          });
       for (const b of d.balances)
         held.set(`${b.side}:${b.asset}`, {
           symbol: b.symbol,
@@ -1051,6 +1081,7 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
         });
     } else for (const u of standing) note(u);
     const priceNow = new Map<string, PriceAt>();
+    const unpricedHere: Record<FlowSide, string[]> = { collateral: [], debt: [] };
     let coll = 0;
     let debt = 0;
     const staleHere: StalePrice[] = [];
@@ -1088,8 +1119,13 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
           priceNow.set(asset, best);
         }
       }
+      // The chart and the bars value at the day's price; the held figure's
+      // receipt states each asset's shown product at its block, and an asset
+      // with no price that day leaves the side with no held figure (ui-jobs
+      // 743). A unit model keeps its arithmetic.
       const usdPer = p?.usd ?? t.todayPrices?.[asset] ?? 0;
       const usd = h.amount * usdPer;
+      if (inDollars && !p) unpricedHere[h.side].push(h.symbol);
       if (h.side === "collateral") coll += usd;
       else debt += usd;
       lines.push({ asset, h, usd, p, ...(g.grown ? { grown: g.grown } : {}) });
@@ -1127,13 +1163,18 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     // Only what was held at this stop can be repriced at the next.
     prevPrice = priceNow;
     valued.push({ collateral: coll, debt });
+    if (unpricedHere.collateral.length || unpricedHere.debt.length) heldUnpriced.set(stop, unpricedHere);
     heldAt.push(
       lines.map(({ h, usd, p, grown }) => ({
         side: h.side,
         symbol: h.symbol,
         amount: h.amount,
         usd,
-        ...(p ? { priced: { day: utcDay(p.ts), series: p.series } } : {}),
+        ...(p
+          ? { priced: { day: utcDay(p.ts), series: p.series, price: p.usd, block: p.block ?? null } }
+          : inDollars
+            ? { unpriced: true as const }
+            : {}),
         ...(grown ? { grown } : {}),
       })),
     );
@@ -1226,6 +1267,7 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     words: t.words ?? {},
     ...(t.addresses ? { addresses: t.addresses } : {}),
     heldAt,
+    heldUnpriced,
     liveHeld: t.live.assets ?? liveHeldFromBalances(held, t.todayPrices, heldAt[heldAt.length - 1] ?? []),
     axis: axisFor(peak),
     today,
@@ -1397,6 +1439,7 @@ function sideState(
   now: number,
   interest: number | null,
   parts?: PartsSource,
+  held?: { rows: FlowAssetHeld[]; unpriced: string[] },
 ): FlowSideState {
   const bs = m.buckets.filter((b) => b.side === side);
   const outs = bs.filter((b) => b.dir === "out");
@@ -1418,6 +1461,7 @@ function sideState(
       value: heldNow,
       ...(m.words.heldBasis?.[side] ? { basis: m.words.heldBasis[side] } : {}),
       ...(m.words.priceBasis?.[side] ? { priceBasis: m.words.priceBasis[side] } : {}),
+      ...(held?.unpriced.length ? { unpriced: held.unpriced } : {}),
     },
     ...outs.map((b) => {
       const v = Math.max(0, cum[b.key] ?? 0);
@@ -1477,6 +1521,11 @@ function sideState(
   );
   withLegs(bar, parts);
   withLegs(sources, parts);
+  // The held figure's rows, read when its receipt opens.
+  if (held) {
+    const rows = held.rows.filter((r) => r.side === side);
+    Object.defineProperty(bar[0], "heldRows", { get: () => rows, enumerable: false, configurable: true });
+  }
   return { now: heldNow, total, out, bar, sources };
 }
 
@@ -1512,7 +1561,13 @@ export function stateAt(m: FlowModel, stop: number): FlowState {
     const base = parts;
     if (base) parts = { ...base, has: (k) => !pending.has(k) && base.has(k) };
   }
-  const v = !isLive && stop >= 0 ? m.valued[Math.min(stop, m.valued.length - 1)] : undefined;
+  const vi = Math.min(stop, m.valued.length - 1);
+  const v = !isLive && stop >= 0 ? m.valued[vi] : undefined;
+  // A past stop's held assets with their prices and blocks (ui-jobs 743).
+  const heldOn = (side: FlowSide) =>
+    !isLive && stop >= 0 && m.heldAt[vi]
+      ? { rows: m.heldAt[vi], unpriced: m.heldUnpriced?.get(vi)?.[side] ?? [] }
+      : undefined;
   const collNow = isLive ? m.live.collateralUsd : (v?.collateral ?? 0);
   const debtNow = isLive ? m.live.debtUsd : (v?.debt ?? 0);
   return {
@@ -1520,8 +1575,16 @@ export function stateAt(m: FlowModel, stop: number): FlowState {
     isLive,
     count: row?.events ?? 0,
     txs: m.totalTxs == null ? null : (row?.txs ?? 0),
-    collateral: sideState(m, "collateral", cum, collNow, isLive ? (m.live.collateralInterestUsd ?? null) : null, parts),
-    debt: sideState(m, "debt", cum, debtNow, null, parts),
+    collateral: sideState(
+      m,
+      "collateral",
+      cum,
+      collNow,
+      isLive ? (m.live.collateralInterestUsd ?? null) : null,
+      parts,
+      heldOn("collateral"),
+    ),
+    debt: sideState(m, "debt", cum, debtNow, null, parts, heldOn("debt")),
     stale: isLive ? [] : (m.stale.get(stop) ?? []),
   };
 }
@@ -1661,6 +1724,7 @@ export function windowModel(m: FlowModel, from: number): FlowModel {
     // A reason before the window stands from its opening: the bars there count what it left.
     unsureFlows: m.unsureFlows.map((u) => ({ ...u, stop: Math.max(0, u.stop - from) })),
     heldAt: m.heldAt.slice(from),
+    heldUnpriced: new Map([...m.heldUnpriced].filter(([k]) => k >= from).map(([k, v]) => [k - from, v])),
     axis: axisFor(peak),
     ...(m.sideAxes ? { sideAxes: { collateral: axisFor(sidePeak.collateral), debt: axisFor(sidePeak.debt) } } : {}),
     today,

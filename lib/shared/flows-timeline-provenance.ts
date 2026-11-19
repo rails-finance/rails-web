@@ -3,7 +3,7 @@
 // date; a segment's tip lists its assets.
 
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
-import type { FlowLeg, FlowSegment, FlowSide, MarketMove } from "@/lib/shared/flows-timeline";
+import type { FlowAssetHeld, FlowLeg, FlowSegment, FlowSide, MarketMove } from "@/lib/shared/flows-timeline";
 import { holderUsdReceipt } from "@/lib/shared/holder-usd-receipt";
 import { listWords, noPriceWords } from "@/lib/shared/flows-sum";
 import { amountText, centsOf } from "@/lib/shared/shown-usd";
@@ -187,6 +187,42 @@ export function marketMoveProv(label: string, side: FlowSide, when: string, m: M
   };
 }
 
+/** A past day's held figure from its rows: each asset's balance after its
+ *  last event by then (grown by its index where the family has one) × the
+ *  price that day as shown, named with its block. */
+function heldDayProv(label: string, when: string, rows: readonly FlowAssetHeld[]): Provenance {
+  const priced = rows.filter((r) => r.priced?.price != null && (r.amount ?? 0) > 0);
+  const day = (d: number) =>
+    new Date(d * 86_400_000).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+  return holderUsdReceipt({
+    what: `${label} at ${when}`,
+    legs: priced.map((r) => {
+      const p = r.priced!;
+      const at = p.block != null ? `block ${p.block.toLocaleString("en-US")}` : null;
+      return {
+        token: r.symbol,
+        amount: r.amount ?? 0,
+        amountNote: r.grown
+          ? "the balance after its last event, grown by its index to the day"
+          : "the balance after its last event by then",
+        price: p.price as number,
+        priceNote: p.series
+          ? `the daily store's price at the close of ${day(p.day)}, ${at ?? "a block the store's route does not state"}`
+          : `the price its last event carried, ${at ?? "a block the event does not name"}`,
+      };
+    }),
+    via: "each asset's balance × that day's price · summed",
+    byValue: true,
+    blocksPerRow: true,
+    caveat: FACE,
+  }).prov;
+}
+
 /** What a side holds or owes as one asset's amount times its price, as
  *  shown, the price at its block. */
 export function heldUsdProv(
@@ -228,6 +264,15 @@ export function flowSegmentProv(
   // A served series' line: what the server sums it from, and no oracle claim.
   if (s.served && (s.fill === "in" || s.fill === "out"))
     return { kind: "derived", summary: `${s.label} up to ${when}. ${s.served}` };
+  // A past day's held figure: each asset's balance × that day's price as
+  // shown, at its block, summed; or no figure, naming the asset (ui-jobs 743).
+  if (s.fill === "held" && !isLive && s.unpriced?.length)
+    return {
+      kind: "derived",
+      summary: `${s.label} at ${when}. No figure: ${noPriceWords([...s.unpriced])} on this day.`,
+    };
+  if (s.fill === "held" && !isLive && s.heldRows?.some((r) => r.priced?.price != null))
+    return heldDayProv(s.label, when, s.heldRows);
   if (s.fill === "held")
     return isLive
       ? {

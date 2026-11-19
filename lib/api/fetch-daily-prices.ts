@@ -27,17 +27,6 @@ export interface DailyAnswer {
 /** At most 40 series per read (the route's cap). */
 const MAX_SERIES = 40;
 
-export async function fetchDailyPrices(
-  chain: number,
-  keys: readonly string[],
-  opts: { from?: number; signal?: AbortSignal } = {},
-): Promise<Record<string, [number, number][]> | null> {
-  const body = await fetchDailyAnswer(chain, keys, opts);
-  if (!body) return null;
-  const out = dailyPricesFromAnswer(body);
-  return Object.keys(out).length > 0 ? out : null;
-}
-
 /** The store's answer as it came, every unit kept, the reads of more than
  *  40 series merged; null where a read failed. */
 export async function fetchDailyAnswer(

@@ -34,7 +34,9 @@ export function fmtPositionAmount(v: string | number | undefined): string {
 /** USD on a position line, Liquity V2's detail-row style: `< $0.01` for
  *  sub-cent, `$0.XX` for sub-dollar, whole dollars otherwise. */
 export function fmtPositionUsd(value: number | undefined | null): string {
-  if (value == null || isNaN(value) || value < 0.01) return "< $0.01";
+  // A figure with no price (not a number) prints no figure (ui-jobs 743).
+  if (value != null && Number.isNaN(value)) return "—";
+  if (value == null || value < 0.01) return "< $0.01";
   if (value < 1) return `$${value.toFixed(2)}`;
   return "$" + value.toLocaleString("en-US", { maximumFractionDigits: 0 });
 }

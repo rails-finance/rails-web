@@ -47,6 +47,8 @@ export const formatPrice = (value: number): string => {
 // Cents, grouped: "$2,725,629.68". A positive amount under a cent reads
 // "< $0.01", never a false "$0.00".
 export const formatUsdValue = (value: number): string => {
+  // A figure with no price (not a number) prints no figure (ui-jobs 743).
+  if (!Number.isFinite(value)) return "—";
   if (value > 0 && value < 0.01) return "< $0.01";
   return toLocaleStringHelper(value, {
     prefix: "$",

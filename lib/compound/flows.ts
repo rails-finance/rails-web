@@ -40,6 +40,7 @@
 import { actedByOther } from "@/lib/shared/external-actor";
 import type { FlowBucket, FlowDayRow, FlowEvent, FlowLeg, FlowSide, FlowTimeline } from "@/lib/shared/flows-timeline";
 import { daysFromEvents, flowLeg } from "@/lib/shared/flows-timeline";
+import type { DayObs } from "@/lib/shared/price-series";
 import { cometAbsorbValueNote, cometFlowPriceNote } from "@/lib/compound/comet-price-notes";
 import type { CometFactor } from "@/lib/compound/at-block-prices";
 import { centsOf, shownUsd } from "@/lib/shared/shown-usd";
@@ -541,6 +542,8 @@ export interface CompoundFlowOptions {
    *  day, USD] ascending, from the shared daily price store: each completed
    *  day no row priced takes it. */
   dailyPrices?: Record<string, [number, number][]>;
+  /** The block each daily price was read at, by token and day (ui-jobs 743). */
+  dailyBlocks?: Record<string, Record<number, number>>;
   /** The Comet's name and the unit its getPrice quotes in, for the legs'
    *  price notes. */
   comet?: string;
@@ -759,33 +762,40 @@ export function compoundFlowTimeline(events: CompoundFlowEvent[], o: CompoundFlo
 
   // The daily store's prices, where it has them: a day a row priced keeps
   // the row's (the cards and the bars agree on an event's day).
-  const storeDays = (t: string, obs: Map<number, number>) => {
+  // Each day's price with the block it was read at (a row's own block, the
+  // store's day block), so a held figure on that day names it (ui-jobs 743).
+  type Obs = Map<number, [number, number | null]>;
+  const storeDays = (t: string, obs: Obs) => {
     const rowDays = new Set(obs.keys());
-    for (const [d, p] of o.dailyPrices?.[t] ?? []) if (p > 0 && !rowDays.has(d) && d < today) obs.set(d, p);
+    for (const [d, p] of o.dailyPrices?.[t] ?? [])
+      if (p > 0 && !rowDays.has(d) && d < today) obs.set(d, [p, o.dailyBlocks?.[t]?.[d] ?? null]);
   };
+  const asSeries = (obs: Obs): DayObs[] => [...obs].sort((a, b) => a[0] - b[0]).map(([d, [p, b]]) => [d, p, b]);
   // Each collateral asset's price on each day a row priced it, the store's
   // between, and today's.
-  const dailyPrices: Record<string, [number, number][]> = {};
+  const dailyPrices: Record<string, DayObs[]> = {};
   for (const t of collTokens) {
-    const obs = new Map<number, number>();
-    for (const r of replayed) if (r.own.has(t)) obs.set(Math.floor(r.ev.ts / DAY_S), r.price[t]);
+    const obs: Obs = new Map();
+    for (const r of replayed) if (r.own.has(t)) obs.set(Math.floor(r.ev.ts / DAY_S), [r.price[t], r.ev.block]);
     // Days before the first priced row take its price, as their flows do.
     const first = replayed.find((r) => r.price[t] != null);
-    if (first && ![...obs.keys()].some((d) => d <= firstDay)) obs.set(firstDay, first.price[t]);
+    if (first && ![...obs.keys()].some((d) => d <= firstDay))
+      obs.set(firstDay, [first.price[t], first.from[t]?.block ?? null]);
     storeDays(t, obs);
-    if (open && (o.live?.prices[t] ?? 0) > 0) obs.set(today, o.live!.prices[t]);
-    dailyPrices[collAsset(t)] = [...obs].sort((a, b) => a[0] - b[0]);
+    if (open && (o.live?.prices[t] ?? 0) > 0) obs.set(today, [o.live!.prices[t], null]);
+    dailyPrices[collAsset(t)] = asSeries(obs);
   }
   // The base's price: each day a row priced it, the store's between, and
   // today's. Its index each day: the last row's, grown at the rate since to
   // the day's end; today's meets the live read.
-  const baseObs = new Map<number, number>();
-  for (const r of replayed) if (r.own.has(base)) baseObs.set(Math.floor(r.ev.ts / DAY_S), r.price[base]);
+  const baseObs: Obs = new Map();
+  for (const r of replayed) if (r.own.has(base)) baseObs.set(Math.floor(r.ev.ts / DAY_S), [r.price[base], r.ev.block]);
   const firstBase = replayed.find((r) => r.price[base] != null);
-  if (firstBase && ![...baseObs.keys()].some((d) => d <= firstDay)) baseObs.set(firstDay, firstBase.price[base]);
+  if (firstBase && ![...baseObs.keys()].some((d) => d <= firstDay))
+    baseObs.set(firstDay, [firstBase.price[base], firstBase.from[base]?.block ?? null]);
   storeDays(base, baseObs);
-  if (open && (o.live?.prices[base] ?? 0) > 0) baseObs.set(today, o.live!.prices[base]);
-  const baseSeries = [...baseObs].sort((a, b) => a[0] - b[0]);
+  if (open && (o.live?.prices[base] ?? 0) > 0) baseObs.set(today, [o.live!.prices[base], null]);
+  const baseSeries = asSeries(baseObs);
   dailyPrices[SUPPLY_ASSET] = baseSeries;
   dailyPrices[DEBT_ASSET] = baseSeries;
   const indexRows: [number, number | null, number | null][] = [];

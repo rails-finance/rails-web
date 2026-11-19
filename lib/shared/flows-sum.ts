@@ -14,7 +14,7 @@
 //
 // Pure, tested offline (scripts/verify/verify-lifetime-flows-state.ts).
 
-import { centsOf, roundAway } from "@/lib/shared/shown-usd";
+import { centsOf, roundAway, shownUsd } from "@/lib/shared/shown-usd";
 import {
   differentBases,
   type FlowSegment,
@@ -48,7 +48,7 @@ export interface SideSumRows {
   lines: SumLine[];
   /** What is held or owed, in whole dollars, and printed; `cents` where the
    *  lines are in cents. */
-  total: { dollars: number; amount: string; seg: FlowSegment; cents?: number };
+  total: { dollars: number; amount: string; seg: FlowSegment; cents?: number; none?: string };
 }
 
 /** The figure a line draws where it has none. */
@@ -58,6 +58,8 @@ const toCents = centsOf;
 
 /** "$79,412": whole dollars with thousands separators, unsigned. */
 export function wholeUsd(v: number, unit?: FlowUnit): string {
+  // A figure with no price (not a number) prints no figure (ui-jobs 743).
+  if (!Number.isFinite(v)) return NO_FIGURE;
   if (unit) {
     const x = Math.round(Math.abs(v)) / 10 ** unit.scale;
     const d = unit.scale;
@@ -69,9 +71,12 @@ export function wholeUsd(v: number, unit?: FlowUnit): string {
 /** The side's sum at a stop, as the panel prints it. */
 export function sideSumRows(st: FlowSideState, unit?: FlowUnit): SideSumRows {
   const held = st.bar.find((s) => s.fill === "held") as FlowSegment;
+  // A held asset with no price that day: no held figure, and no remainder
+  // worked out from one (ui-jobs 743).
+  if (!unit && held.unpriced?.length) return heldUnpricedRows(st, held);
   // A side whose lines carry their legs (ui-jobs 743) sums in cents.
   if (!unit && [...st.sources, ...st.bar].some((x) => x.legs)) return centsSumRows(st, held);
-  const totalDollars = Math.round(st.now);
+  const totalDollars = roundAway(heldCents(held, unit) ?? st.now);
   const raw: Omit<SumLine, "sign" | "amount">[] = [];
   for (const seg of st.sources) {
     if (seg.fill !== "in") continue;
@@ -116,7 +121,7 @@ export function sideSumRows(st: FlowSideState, unit?: FlowUnit): SideSumRows {
  *  held figure stand on different bases. Nothing is apportioned: the cents
  *  add, and each face is its cents to the dollar. */
 function centsSumRows(st: FlowSideState, held: FlowSegment): SideSumRows {
-  const total = toCents(Math.max(0, st.now));
+  const total = heldCents(held) ?? toCents(Math.max(0, st.now));
   const raw: SumLine[] = [];
   const push = (seg: FlowSegment, kind: SumLine["kind"], sign: 1 | -1) => {
     if (seg.unpriced?.length) {
@@ -193,6 +198,53 @@ function centsSumRows(st: FlowSideState, held: FlowSegment): SideSumRows {
  *  blocks". */
 export const noPriceWords = (xs: string[]): string =>
   xs.length > 1 ? `${listWords(xs)} have no price at their blocks` : `${listWords(xs)} has no price at its block`;
+
+/** A side whose held figure has no price that day: the flows as they stand,
+ *  the total "—" naming the asset, and no balancing item. */
+function heldUnpricedRows(st: FlowSideState, held: FlowSegment): SideSumRows {
+  const none = `No figure: ${noPriceWords(held.unpriced ?? [])} on this day.`;
+  const raw: SumLine[] = [];
+  for (const seg of st.sources)
+    if (seg.fill === "in" && seg.value)
+      raw.push({
+        key: seg.key,
+        label: seg.label,
+        kind: seg.key.endsWith("-opening") ? "opening" : "in",
+        seg,
+        dollars: roundAway(seg.value),
+        sign: "",
+        amount: "",
+      });
+  for (const seg of st.bar)
+    if (seg.fill === "out" && seg.value)
+      raw.push({
+        key: seg.key,
+        label: seg.label,
+        kind: "out",
+        seg,
+        dollars: -roundAway(seg.value),
+        sign: "",
+        amount: "",
+      });
+  const lines = raw.map((l, i) => ({
+    ...l,
+    sign: (i === 0 && l.dollars > 0 ? "" : l.dollars < 0 ? "−" : "+") as SumSign,
+    amount: seg_amount(l),
+  }));
+  return { lines, total: { dollars: 0, amount: NO_FIGURE, seg: held, none } };
+}
+const seg_amount = (l: SumLine) => (l.seg.unpriced?.length ? NO_FIGURE : wholeUsd(l.dollars));
+
+/** A past day's held figure from its rows: each asset's balance times that
+ *  day's price, as shown, summed to the cent (ui-jobs 743); null where the
+ *  segment carries no priced rows or the figures are a token's. */
+export function heldCents(held: FlowSegment, unit?: FlowUnit): number | null {
+  const rows = held.heldRows;
+  if (unit || !rows?.length || rows.some((r) => (r.amount ?? 0) > 0 && r.priced?.price == null)) return null;
+  return toCents(
+    rows.reduce((a, r) => a + ((r.amount ?? 0) > 0 ? shownUsd(r.amount as number, r.priced!.price!) : 0), 0),
+  );
+}
 
 /** "WETH", "WETH and USDC", "WETH, USDC and DAI". */
 export const listWords = (xs: string[]): string =>

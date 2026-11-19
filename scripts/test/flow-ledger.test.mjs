@@ -366,3 +366,95 @@ test("two lines with the same count, sum and last block get different receipt ke
   );
   assert.notEqual(a.key, b.key);
 });
+
+// ── A past day's held figure in rows (ui-jobs 743) ──────────────────────────
+const { formatUsdValue } = await import(ROOT + "lib/utils/format.ts");
+const { fmtUsdWhole } = await import(ROOT + "lib/liquity/figure-format.ts");
+
+/** One WBTC deposit and one WETH deposit, then a quiet day priced by the store. */
+function heldModel({ wethPrice = true } = {}) {
+  const events = [
+    {
+      id: "a",
+      ts: T0 + 10,
+      block: 1001,
+      tick: "collateral",
+      legs: [leg("dep", 1.2345678, 98_765.43218765, 1001)],
+      balances: [{ asset: "wbtc", symbol: "WBTC", side: "collateral", amount: 1.2345678 }],
+      prices: [],
+    },
+    {
+      id: "b",
+      ts: T0 + 20,
+      block: 1002,
+      tick: "collateral",
+      legs: [flowLeg({ bucket: "dep", amount: 2.5, symbol: "WETH", price: 3000.5, block: 1002, priceNote: "n" })],
+      balances: [{ asset: "weth", symbol: "WETH", side: "collateral", amount: 2.5 }],
+      prices: [],
+    },
+  ];
+  return buildFlowModel({
+    buckets: BUCKETS,
+    days: daysFromEvents(
+      BUCKETS.map((b) => b.key),
+      events,
+    ),
+    live: { collateralUsd: 0, debtUsd: 0 },
+    today: 20_005,
+    dailyPrices: {
+      // The store's close of day 20,002 with its block; WETH's without one.
+      wbtc: [[20_002, 99_000.123456, 1_500_000]],
+      ...(wethPrice ? { weth: [[20_002, 3100.25]] } : {}),
+    },
+  });
+}
+
+test("a past day's held figure is its rows to the cent, each naming the day's block", () => {
+  const m = heldModel();
+  const st = stateAt(m, 2);
+  const held = st.collateral.bar[0];
+  const want = Math.round((shownUsd(1.2345678, 99_000.123456) + shownUsd(2.5, 3100.25)) * 100) / 100;
+  // The tip's figure is its rows' cents, shown to the dollar.
+  assert.equal(sideSumRows(st.collateral).total.dollars, Math.round(want));
+  const prov = flowSegmentProv(held, "collateral", "the end of 7 Oct '24", false, true);
+  assert.equal(rebuild(prov).cents, want, "the rows multiply out to the figure");
+  const notes = prov.inputs.filter((i) => i.label.endsWith(" price")).map((i) => i.note);
+  assert.ok(notes.some((n) => /the daily store's price at the close of .+, block 1,500,000$/.test(n)));
+  // A store row with no block says so.
+  assert.ok(notes.some((n) => /a block the store's route does not state$/.test(n)));
+});
+
+test("a past day holding an asset with no price has no held figure and names the asset", () => {
+  const m = buildFlowModel({
+    buckets: BUCKETS,
+    days: daysFromEvents(
+      BUCKETS.map((b) => b.key),
+      [
+        {
+          id: "a",
+          ts: T0 + 10,
+          block: 1001,
+          tick: "collateral",
+          legs: [leg("dep", 1, null, 1001)],
+          balances: [{ asset: "wbtc", symbol: "WBTC", side: "collateral", amount: 1 }],
+          prices: [],
+        },
+      ],
+    ),
+    live: { collateralUsd: 0, debtUsd: 0 },
+    today: 20_005,
+    dailyPrices: {},
+  });
+  const st = stateAt(m, 2);
+  const rows = sideSumRows(st.collateral);
+  assert.equal(rows.total.amount, "—");
+  assert.match(rows.total.none, /WBTC has no price at its block/);
+  assert.ok(!rows.lines.some((l) => l.kind === "rest"), "no remainder worked out from no figure");
+});
+
+test("an unpriced side renders no NaN in any shared formatter", () => {
+  for (const s of [wholeUsd(Number.NaN), formatUsdValue(Number.NaN), fmtUsdWhole(Number.NaN)]) {
+    assert.ok(!/NaN/.test(s), s);
+    assert.equal(s, "—");
+  }
+});

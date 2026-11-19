@@ -38,7 +38,7 @@ import {
 } from "@/lib/compound/flows";
 import { storedCometFactors, storedCometPrices, type CometFactor } from "@/lib/compound/at-block-prices";
 import { fetchStoredCometPrices } from "@/lib/api/fetch-compound-stored-prices";
-import { fetchDailyPrices } from "@/lib/api/fetch-daily-prices";
+import { dailyBlocksFromAnswer, dailyPricesFromAnswer, fetchDailyAnswer } from "@/lib/api/fetch-daily-prices";
 import type { CompoundDeploymentKey } from "@/lib/compound/deployments";
 import type { CompoundMarketChainResponse } from "@/lib/api/fetch-compound-position";
 import { cometCardLines, cometFactorRead, cometHealthSource, cometTodayRead } from "@/lib/compound/flows-health";
@@ -239,7 +239,12 @@ export function useCompoundFlows(p: CompoundFlowsInput): {
     if (!rows || rows.length === 0) return null;
     return { from: Math.floor(rows[0].ts / DAY_S), key: `${p.deployment}:${market.comet}:${assets.join(",")}` };
   }, [rows, p.deployment, market.comet, assets]);
-  const [daily, setDaily] = useState<{ key: string; prices: Record<string, [number, number][]> | null } | null>(null);
+  const [daily, setDaily] = useState<{
+    key: string;
+    prices: Record<string, [number, number][]> | null;
+    /** The block each day's price was read at, by token and day (ui-jobs 743). */
+    blocks?: Record<string, Record<number, number>>;
+  } | null>(null);
   useEffect(() => {
     if (!want) return;
     if (!STORED[p.deployment]) {
@@ -248,18 +253,23 @@ export function useCompoundFlows(p: CompoundFlowsInput): {
     }
     const ac = new AbortController();
     const comet = market.comet.toLowerCase();
-    fetchDailyPrices(
+    fetchDailyAnswer(
       CHAIN_ID[p.deployment],
       assets.map((t) => `cv3:${comet}:${t}`),
       { from: want.from, signal: ac.signal },
     )
-      .then((byKey) => {
+      .then((body) => {
+        const byKey = body ? dailyPricesFromAnswer(body) : null;
+        const blocksByKey = body ? dailyBlocksFromAnswer(body) : {};
         const prices: Record<string, [number, number][]> = {};
+        const blocks: Record<string, Record<number, number>> = {};
         for (const t of assets) {
           const obs = byKey?.[`cv3:${comet}:${t}`];
           if (obs) prices[t] = obs;
+          const b = blocksByKey[`cv3:${comet}:${t}`];
+          if (b) blocks[t] = b;
         }
-        setDaily({ key: want.key, prices: Object.keys(prices).length > 0 ? prices : null });
+        setDaily({ key: want.key, prices: Object.keys(prices).length > 0 ? prices : null, blocks });
       })
       .catch((err) => {
         if ((err as { name?: string })?.name !== "AbortError") setDaily({ key: want.key, prices: null });
@@ -270,6 +280,7 @@ export function useCompoundFlows(p: CompoundFlowsInput): {
   }, [want?.key, want?.from]);
   const dailySettled = want != null && daily?.key === want.key;
   const dailyPrices = dailySettled ? (daily?.prices ?? undefined) : undefined;
+  const dailyBlocks = dailySettled ? daily?.blocks : undefined;
 
   // Set on mount, so the server's render and the first client render agree.
   const [now, setNow] = useState<number | null>(null);
@@ -286,6 +297,7 @@ export function useCompoundFlows(p: CompoundFlowsInput): {
             now,
             live: p.open ? p.live : null,
             ...(dailyPrices ? { dailyPrices } : {}),
+            ...(dailyBlocks ? { dailyBlocks } : {}),
           }
         : null,
     [
@@ -298,6 +310,7 @@ export function useCompoundFlows(p: CompoundFlowsInput): {
       p.open,
       p.live,
       dailyPrices,
+      dailyBlocks,
     ],
   );
   const replay = useMemo(() => (rows && opts && rows.length > 0 ? compoundFlowReplay(rows, opts) : null), [rows, opts]);
