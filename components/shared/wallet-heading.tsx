@@ -233,7 +233,7 @@ export interface PositionOwner {
   filterProtocol?: SessionProtocol | null;
   /** The bookmark on the address; false draws none. */
   bookmark?: boolean;
-  vault?: { name: string; href: string } | null;
+  vault?: { name: string; href: string; kind?: string } | null;
   href?: string;
   hrefLabel?: string;
   /** Drawn before the address ("last holder" on a closed Trove that changed hands). */
