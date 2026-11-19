@@ -255,18 +255,19 @@ async function readVaultIndex(): Promise<VaultIndexRead> {
       ...sboldVaults,
     ],
     yields,
-    indexDown: [
-      morphoRead,
-      morphoEthRead,
-      aaveRead,
-      yearnRead,
-      baseCensusRead,
-      ethCensusRead,
-      ethMorphoCensusRead,
-      yearnCensusRead,
-      baseYieldsRead,
-      ethYieldsRead,
-    ].some((r) => r == null),
+    indexDown:
+      [
+        morphoRead,
+        morphoEthRead,
+        aaveRead,
+        yearnRead,
+        baseCensusRead,
+        ethCensusRead,
+        ethMorphoCensusRead,
+        yearnCensusRead,
+        baseYieldsRead,
+        ethYieldsRead,
+      ].some((r) => r == null) || sbold.chainStale,
     rosters: [
       {
         protocol: "morpho",

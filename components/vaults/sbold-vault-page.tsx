@@ -662,7 +662,7 @@ export function SboldVaultPage({
       <Tile id="summary" flush>
         <div className={VAULT_CARD_TILE}>
           <VaultCard
-            vault={v}
+            vault={{ ...v, standing: v.standing.filter((s) => s !== "paused") }}
             holdersHref={null}
             receipts={receipts}
             heads={heads}

@@ -334,6 +334,8 @@ async function familyRead(v: VaultSummary): Promise<FamilyRead> {
     if (v.family === "metamorpho") return await metaMorpho(v);
     if (v.family === "yearn-v3") return await yearn(v);
     if (v.family === "maple-pool") return await maple(v);
+    // sBOLD: the summary's figures, its paused standing and owner() (ui-jobs 765).
+    if (v.family === "sbold") return fromSummary(v);
     return await aave(v);
   } catch (error) {
     console.error(`vault compare: ${v.family} ${v.address} did not answer`, error);

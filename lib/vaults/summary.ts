@@ -422,7 +422,7 @@ export function yearnVaultPageSummary(d: YearnVaultResponse, census: VaultCensus
   };
 }
 
-/** The sBOLD vault's page read (ui-jobs 749). No census and no steward read. */
+/** The sBOLD vault's page read (ui-jobs 749, 765). No census; the steward is owner(). */
 export function sboldVaultPageSummary(
   d: SboldVaultResponse,
   asset: { address: string; symbol: string; decimals: number },
@@ -444,8 +444,10 @@ export function sboldVaultPageSummary(
     totalSupply: v.totalSupply,
     sharePrice: v.sharePrice,
     lostAssets: null,
-    steward: null,
-    standing: [],
+    steward: v.owner ? { role: "owner", address: v.owner } : null,
+    // paused() answering true is a standing for /vaults and compare; the
+    // card draws no pill for it (ui-jobs 765).
+    standing: v.paused === true ? ["paused"] : [],
     createdBlock,
     census: null,
     readAt: { block: d.blockNumber, timestamp: "" },
