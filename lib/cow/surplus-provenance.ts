@@ -41,7 +41,7 @@ export function settleCallNote(call: CowSwapView["call"] | undefined, offset: nu
   if (call === "wrapped")
     return `The settle() call sits inside the solver contract's input from byte ${(offset ?? 0).toLocaleString("en-US")}; Etherscan does not decode it there.`;
   if (call === "inline")
-    return "settle()'s arguments were read inline from the adapter's call: the transaction's own function takes them as its first four parameters, and Etherscan decodes them under that function's name.";
+    return "settle()'s arguments were read inline from the adapter's call: the transaction's function takes them as its first four parameters, and Etherscan decodes them under that function's name.";
   return "";
 }
 
@@ -133,24 +133,17 @@ export function cowSurplusProv(c: CowSwapView, trade: CowTradeRaw, coords: CowCo
   };
 }
 
-/** The fee line: the gap between the trade's clearingPrices entries and
- *  the settlement's uniform price, in bp. */
 /** The fee line on a CoW trade card before block 19,815,319 (`signedFeeOnly`): the order's signed fee alone, in bp
  *  of the amount at the clearing price. */
 function signedFeeProv(c: CowSwapView, trade: CowTradeRaw, coords: CowCoords): Provenance {
   const sym = tokenName(c);
   const u = c.prices.uniform;
-  const o = c.prices.own;
   const sell = c.kind === "sell";
   const net = trade.fee !== "0" ? "(sold − fee)" : "sold";
-  const why =
-    c.signedFeeOnly === "own-entries"
-      ? `the clearingPrices entries listed for this trade, [${o.sellIndex}, ${o.buyIndex}], then carried market makers' orders at their limit price, which is no fee`
-      : `this trade's price carried no per-trade entries: the settlement contract priced it on each token's first clearingPrices entry, [${u.sellIndex}, ${u.buyIndex}], the clearing price`;
   return {
     kind: "derived",
     pclass: "input",
-    summary: `${COW_FEE_LABEL} — the fee this order signed, the Trade log's feeAmount${sell ? ", taken into the bought token at the clearing price" : ""}, in basis points (0.01%) of the amount at the clearing price. Before block 19,815,319 Rails reads no other fee in a trade's price: ${why}.`,
+    summary: `${COW_FEE_LABEL} — the fee this order signed, the Trade log's feeAmount${sell ? ", taken into the bought token at the clearing price" : ""}, in basis points (0.01%) of the amount at the clearing price. Before block 19,815,319 Rails reads no other fee in a trade's price, and this trade's price carried no per-trade entries: the settlement contract priced it on each token's first clearingPrices entry, [${u.sellIndex}, ${u.buyIndex}], the clearing price.`,
     formula: sell
       ? `signed fee = ⌊fee × clearingPrices[${u.sellIndex}] ÷ clearingPrices[${u.buyIndex}]⌋; signed fee ÷ ⌊${net} × clearingPrices[${u.sellIndex}] ÷ clearingPrices[${u.buyIndex}]⌋ × 10,000`
       : `fee ÷ ⌈bought × clearingPrices[${u.buyIndex}] ÷ clearingPrices[${u.sellIndex}]⌉ × 10,000`,
@@ -178,7 +171,10 @@ function signedFeeProv(c: CowSwapView, trade: CowTradeRaw, coords: CowCoords): P
   };
 }
 
+/** The fee line: the gap between the trade's clearingPrices entries and
+ *  the settlement's uniform price, in bp. */
 export function cowFeeProv(c: CowSwapView, trade: CowTradeRaw, coords: CowCoords): Provenance {
+  if (c.signedFeeOnly) return signedFeeProv(c, trade, coords);
   const sym = tokenName(c);
   const u = c.prices.uniform;
   const o = c.prices.own;
@@ -190,7 +186,6 @@ export function cowFeeProv(c: CowSwapView, trade: CowTradeRaw, coords: CowCoords
       ? ` + ⌊fee × clearingPrices[${u.sellIndex}] ÷ clearingPrices[${u.buyIndex}]⌋`
       : " + fee"
     : "";
-  if (c.signedFeeOnly) return signedFeeProv(c, trade, coords);
   return {
     kind: "derived",
     pclass: "input",

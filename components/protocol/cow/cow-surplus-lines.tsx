@@ -21,6 +21,7 @@ export function CowSurplusLines({
   coords,
   symbol,
   feeOnly = false,
+  noFee = false,
 }: {
   view: CowSwapView;
   trade: CowTradeRaw;
@@ -29,6 +30,8 @@ export function CowSurplusLines({
   symbol?: string;
   /** Draw the fee line alone: the surplus is stated elsewhere on the card, with its receipt. */
   feeOnly?: boolean;
+  /** Draw no fee line: the CoW trade card states no fee for this trade (lib/cow/settlement.ts `cardFee`). */
+  noFee?: boolean;
 }) {
   const sym = symbol ?? view.token.symbol ?? undefined;
   const exact = view.token.decimals == null ? view.surplus : shiftRaw(view.surplus, view.token.decimals);
@@ -49,12 +52,14 @@ export function CowSurplusLines({
           </Prov>
         </div>
       )}
-      <div className="text-rb-500" data-event-row-line="" data-cow-fee="">
-        {COW_FEE_LABEL}{" "}
-        <Prov info={cowFeeProv(view, trade, coords)} value={String(view.feeBp)}>
-          <span className="font-semibold tabular-nums text-foreground">{feeBpText(view.feeBp)}</span>
-        </Prov>
-      </div>
+      {!noFee && (
+        <div className="text-rb-500" data-event-row-line="" data-cow-fee="">
+          {COW_FEE_LABEL}{" "}
+          <Prov info={cowFeeProv(view, trade, coords)} value={String(view.feeBp)}>
+            <span className="font-semibold tabular-nums text-foreground">{feeBpText(view.feeBp)}</span>
+          </Prov>
+        </div>
+      )}
     </div>
   );
 }

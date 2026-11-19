@@ -68,7 +68,7 @@ test("the settlement panel: clearingPrices are input, Trade log amounts emitted"
   assert.deepEqual(head(cp), ["input"]);
 
   // The fee column: the swap lines' receipt, on the panel's trade.
-  const fv = ST.cowTradeView(settlement, trade, USDT, USDC);
+  const fv = ST.cowTradeView(settlement, trade, USDT, USDC)?.view;
   assert.ok(fv);
   const gap = SU.cowFeeProv(
     fv,
@@ -143,12 +143,10 @@ test("the swap card's fee line: clearingPrices are input, the Trade log emitted"
 });
 
 test("the CoW card's fee line before block 19,815,319: the signed fee alone, its entries input", () => {
-  for (const signedFeeOnly of ["no-entries", "own-entries"]) {
-    const p = SU.cowFeeProv(view({ signedFeeOnly, route: "cow" }), raw, coords);
-    assert.equal(p.pclass, "input");
-    assert.equal(classOf(p, /sold token, first entry\)$/), "input");
-    assert.equal(classOf(p, /^fee \(Trade log/), "emitted");
-    assert.equal(classOf(p, /^the signed fee, in/), null);
-    assert.deepEqual(head(p), ["emitted", "input"], signedFeeOnly);
-  }
+  const p = SU.cowFeeProv(view({ signedFeeOnly: true, route: "cow" }), raw, coords);
+  assert.equal(p.pclass, "input");
+  assert.equal(classOf(p, /sold token, first entry\)$/), "input");
+  assert.equal(classOf(p, /^fee \(Trade log/), "emitted");
+  assert.equal(classOf(p, /^the signed fee, in/), null);
+  assert.deepEqual(head(p), ["emitted", "input"]);
 });

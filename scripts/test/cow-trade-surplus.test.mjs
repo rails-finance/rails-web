@@ -87,25 +87,74 @@ test("no figures without a decoded order or with a zero price", () => {
   assert.equal(ST.tradeSurplus({ ...f.trade, settled: zero }), null);
 });
 
-test("before block 19,815,319 the card's fee is the signed fee alone, on the same base", () => {
+test("the card's fee: the gap from block 19,815,319, the signed fee alone before it on first entries, none on own entries", () => {
+  let none = 0;
   for (const s of SETTLEMENTS) {
     for (const t of s.trades) {
       const f = ST.tradeSurplus(t);
-      const c = ST.cardFee(f, s.blockNumber);
+      const c = ST.cardFee(f, s.blockNumber, t.settled.ownEntries);
+      const at = `${s.txHash.slice(0, 6)}:${t.logIndex}`;
       if (s.blockNumber >= ST.COW_OWN_PRICE_FEES_FROM) {
-        assert.deepEqual(c, { feeGap: f.feeGap, feeBp: f.feeBp, signedOnly: false });
+        assert.deepEqual(c, f.feeGap < 0n ? null : { feeGap: f.feeGap, feeBp: f.feeBp, signedOnly: false }, at);
+      } else if (t.settled.ownEntries) {
+        assert.equal(c, null, `${at}: own entries before the block`);
+        none++;
       } else {
-        assert.equal(c.signedOnly, true);
-        assert.equal(c.feeGap, f.signedFee);
-        assert.equal(c.feeBp, Number((f.signedFee * 10_000_000n) / f.atUniform) / 1000);
+        assert.equal(c.signedOnly, true, at);
+        assert.equal(c.feeGap, f.signedFee, at);
+        assert.equal(c.feeBp, Number((f.signedFee * 10_000_000n) / f.atUniform) / 1000, at);
       }
     }
   }
-  // 2023, a market maker's order on its own entries: the gap to the clearing price is its limit price, no fee.
+  assert.ok(none >= 2, "the 2023 market makers' trades");
+  // 0x9da9… log 31: 41.5 bp from the clearing price and 4.87 received beyond its limit; the gap is no fee Rails can read.
   const mm = SETTLEMENTS.find((s) => s.blockNumber === 16807176);
   const t = mm.trades.find((x) => x.logIndex === 31);
-  assert.ok(ST.tradeSurplus(t).feeBp > 40, "41.5 bp from the clearing price");
-  assert.equal(ST.cardFee(ST.tradeSurplus(t), mm.blockNumber).feeBp, 0, "and no signed fee");
+  assert.ok(ST.tradeSurplus(t).feeBp > 40);
+  assert.ok(ST.tradeSurplus(t).surplus > 0n);
+  assert.equal(ST.cardFee(ST.tradeSurplus(t), mm.blockNumber, true), null);
+});
+
+test("a negative gap states no fee: no minus sign, no -0.00 bp", () => {
+  const s = SETTLEMENTS.find((x) => x.blockNumber === 26434894);
+  const t = s.trades[1];
+  // Twice the bought amount for the same sold: priced better than the clearing price.
+  const better = { ...t, buyAmount: (BigInt(t.buyAmount) * 2n).toString() };
+  const f = ST.tradeSurplus(better);
+  assert.ok(f.feeGap < 0n);
+  assert.equal(ST.cardFee(f, s.blockNumber, true), null);
+  const cv = ST.cowTradeView(
+    { ...s, trades: [better] },
+    better,
+    label(t.sellToken, "USDT", 6),
+    label(t.buyToken, "USDC", 6),
+  );
+  assert.equal(cv.fee, false);
+  // A hair below zero, which would round to "-0.00 bp".
+  const hair = { ...f, feeGap: -1n, feeBp: -0.0001 };
+  assert.equal(ST.cardFee(hair, s.blockNumber, true), null);
+});
+
+test("a buy order with a signed fee: the server's figures", () => {
+  // 0xa3ef… with a fee signed (0.5 USDC) and charged (0.4 USDC, inside the sold amount). Expected: rails-server
+  // origin/main api/src/services/cow-surplus.ts `tradeSurplus` on the same trade, run 19 Nov 2026.
+  const h = Object.keys(SWAPS).find((x) => x.startsWith("0xa3eff66c"));
+  const f = SWAPS[h];
+  const t = {
+    ...f.trade,
+    sellAmount: "14028930452",
+    feeAmount: "400000",
+    settled: { ...f.trade.settled, order: { ...f.trade.settled.order, feeAmount: "500000" } },
+  };
+  assert.deepEqual(figures(ST.tradeSurplus(t)), {
+    kind: "buy",
+    surplus: "67590510",
+    surplusToken: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+    limitAmount: "14096520962",
+    feeGap: "38885410",
+    signedFee: "400000",
+    feeBp: 27.795,
+  });
 });
 
 test("the card's view: plain buy-order words on an adapter's order, the figures from tradeSurplus", () => {
@@ -113,7 +162,8 @@ test("the card's view: plain buy-order words on an adapter's order, the figures 
   const f = SWAPS[h];
   const sell = label(f.trade.sellToken, "USDC", 6);
   const buy = label(f.trade.buyToken, "WETH", 18);
-  const v = ST.cowTradeView(settlementOf(h, f), f.trade, sell, buy);
+  const { view: v, fee } = ST.cowTradeView(settlementOf(h, f), f.trade, sell, buy);
+  assert.equal(fee, true);
   assert.equal(v.kind, "buy");
   assert.equal(v.route, "cow");
   assert.equal(SU.cowSurplusLabel(v.kind, v.route), "Paid less than the limit signed");
@@ -145,7 +195,7 @@ test("no view where settle() is unread, refused or does not match", () => {
 test("partial fills: the receipt says the limit is pro rata on the part filled", () => {
   const h = Object.keys(SWAPS).find((x) => x.startsWith("0x3317c69d"));
   const f = SWAPS[h];
-  const v = ST.cowTradeView(
+  const { view: v } = ST.cowTradeView(
     settlementOf(h, f),
     f.trade,
     label(f.trade.sellToken, "A", 18),
@@ -169,8 +219,9 @@ test("before block 19,815,319: the fee receipt names the signed fee and why no o
   const t = s.trades[0];
   const sell = label(t.sellToken, "A", 18);
   const buy = label(t.buyToken, "B", 18);
-  const v = ST.cowTradeView(s, t, sell, buy);
-  assert.equal(v.signedFeeOnly, "no-entries");
+  const { view: v, fee } = ST.cowTradeView(s, t, sell, buy);
+  assert.equal(fee, true);
+  assert.equal(v.signedFeeOnly, true);
   assert.equal(v.feeGap, v.signedFee);
   const raw = { sell: t.sellAmount, buy: t.buyAmount, fee: t.feeAmount };
   const p = SP.cowFeeProv(v, raw, { block: s.blockNumber, txHash: s.txHash });
@@ -183,8 +234,7 @@ test("before block 19,815,319: the fee receipt names the signed fee and why no o
     sell,
     buy,
   );
-  assert.equal(own.signedFeeOnly, "own-entries");
-  assert.match(SP.cowFeeProv(own, raw, { block: mm.blockNumber, txHash: mm.txHash }).summary, /market makers' orders/);
+  assert.equal(own.fee, false, "own entries before the block: no fee line");
 });
 
 test("an inline settle(): its own words in every receipt that names the call", () => {
@@ -197,7 +247,7 @@ test("an inline settle(): its own words in every receipt that names the call", (
   });
   const sell = label(f.trade.sellToken, "A", 18);
   const buy = label(f.trade.buyToken, "B", 6);
-  const v = ST.cowTradeView(s, f.trade, sell, buy);
+  const { view: v } = ST.cowTradeView(s, f.trade, sell, buy);
   const raw = { sell: f.trade.sellAmount, buy: f.trade.buyAmount, fee: f.trade.feeAmount };
   const coords = { block: f.block, txHash: h };
   const inline = /read inline from the adapter's call/;

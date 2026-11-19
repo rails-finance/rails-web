@@ -18,29 +18,34 @@ const require = createRequire(import.meta.url);
 const esbuild = createRequire(require.resolve("tsx"))("esbuild");
 // Under node_modules, so the bundle resolves React and Next as the app does.
 mkdirSync(join(ROOT, "node_modules/.cache"), { recursive: true });
-const out = join(mkdtempSync(join(ROOT, "node_modules/.cache/cow-notes-")), "notes.mjs");
-await esbuild.build({
-  entryPoints: [join(ROOT, "components/protocol/cow/cow-settlement-panel.tsx")],
-  bundle: true,
-  format: "esm",
-  platform: "node",
-  jsx: "automatic",
-  outfile: out,
-  tsconfig: join(ROOT, "tsconfig.json"),
-  packages: "external",
-  // Next's subpaths have no exports map: node's ESM resolver needs the file's name.
-  plugins: [
-    {
-      name: "next-subpaths",
-      setup: (b) => b.onResolve({ filter: /^next\/[a-z-]+$/ }, (a) => ({ path: `${a.path}.js`, external: true })),
-    },
-  ],
-  logLevel: "silent",
-});
-const React = await import("react");
-const { renderToStaticMarkup } = await import("react-dom/server");
-const { CowTradeNotes } = await import(pathToFileURL(out).href);
-rmSync(join(out, ".."), { recursive: true, force: true });
+const dir = mkdtempSync(join(ROOT, "node_modules/.cache/cow-notes-"));
+const out = join(dir, "notes.mjs");
+let React, renderToStaticMarkup, CowTradeNotes;
+try {
+  await esbuild.build({
+    entryPoints: [join(ROOT, "components/protocol/cow/cow-settlement-panel.tsx")],
+    bundle: true,
+    format: "esm",
+    platform: "node",
+    jsx: "automatic",
+    outfile: out,
+    tsconfig: join(ROOT, "tsconfig.json"),
+    packages: "external",
+    // Next's subpaths have no exports map: node's ESM resolver needs the file's name.
+    plugins: [
+      {
+        name: "next-subpaths",
+        setup: (b) => b.onResolve({ filter: /^next\/[a-z-]+$/ }, (a) => ({ path: `${a.path}.js`, external: true })),
+      },
+    ],
+    logLevel: "silent",
+  });
+  React = await import("react");
+  ({ renderToStaticMarkup } = await import("react-dom/server"));
+  ({ CowTradeNotes } = await import(pathToFileURL(out).href));
+} finally {
+  rmSync(dir, { recursive: true, force: true });
+}
 
 const json = (p) => JSON.parse(readFileSync(new URL(p, import.meta.url), "utf8"));
 const SWAPS = json("../fixtures/cow-surplus-trades.json");
@@ -133,14 +138,26 @@ test("before block 19,815,319: the signed fee alone", () => {
   const html = render(s, s.trades[0]);
   assert.match(html, /data-cow-fee=""/);
   assert.match(html, /data-cow-settlement-panel/);
-  // 2023: a market maker's own entries; the gap of 41.5 bp is its limit price and no signed fee: 0.00 bp.
+  // 2023: market makers on their own entries; the gap cannot tell a fee from their price: no fee line, "—" in the column.
   const mm = settlementFile("0x9da9e41580fd115c41baf4072da17da2e815be8f676cc8b01e6ea3a58c43c5a2");
   const mmHtml = render(
     mm,
     mm.trades.find((t) => t.logIndex === 31),
   );
-  assert.match(mmHtml, /data-cow-fee=""[^]*?0\.00 bp/);
-  assert.doesNotMatch(mmHtml, /41\.5\d bp/);
+  assert.match(mmHtml, /data-cow-surplus="sell"/);
+  assert.doesNotMatch(mmHtml, /data-cow-fee/);
+  assert.doesNotMatch(mmHtml, /\d bp/);
+  assert.equal(count(mmHtml, /<td class="py-0.5 text-right">—<\/td>/g), 2, "both rows of the pair");
+});
+
+test("a trade priced better than the clearing price: no fee line, no minus sign", () => {
+  const s = settlementFile("0x1fc438bb77a22c1d9200f55d52730975812364127ace1e9906af02553c8ac793");
+  const t = s.trades[1];
+  const better = { ...t, buyAmount: (BigInt(t.buyAmount) * 2n).toString() };
+  const html = render({ ...s, trades: [better] }, better, 1);
+  assert.match(html, /data-cow-surplus/);
+  assert.doesNotMatch(html, /data-cow-fee/);
+  assert.doesNotMatch(html.replace(/<[^>]+>/g, " "), /[-−]\s?\d/, "no negative figure in the text");
 });
 
 test("no lines where the settle call is unread, refused or does not match", () => {

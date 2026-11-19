@@ -158,7 +158,8 @@ export function CowSettlementPanel({
             </thead>
             <tbody>
               {view.pair.map((t) => {
-                const fv = cowTradeView(s, t, sell, buy);
+                const cv = cowTradeView(s, t, sell, buy);
+                const fv = cv?.fee ? cv.view : null;
                 const fee = feeExplains(t, s.blockNumber) ? feeToken(t) : null;
                 const feeTok = fee ? (fee === sell.address.toLowerCase() ? sell : buy) : null;
                 const p = pricing ? tradePrice(t, pricing, sell, buy) : null;
@@ -242,13 +243,19 @@ export function CowTradeNotes({
   buy: CowTokenLabel;
 }) {
   const self = findTrade(s, trade);
-  const view = self ? cowTradeView(s, self, sell, buy) : null;
+  const cv = self ? cowTradeView(s, self, sell, buy) : null;
+  const view = cv?.view ?? null;
   const panel = trade.settlementTrades > 1;
   if (!view && !panel) return null;
   return (
     <>
       {view && self && (
-        <CowSurplusLines view={view} trade={rawOf(self)} coords={{ block: s.blockNumber, txHash: s.txHash }} />
+        <CowSurplusLines
+          view={view}
+          trade={rawOf(self)}
+          coords={{ block: s.blockNumber, txHash: s.txHash }}
+          noFee={!cv?.fee}
+        />
       )}
       {panel && <CowSettlementPanel settlement={s} trade={trade} sell={sell} buy={buy} />}
     </>

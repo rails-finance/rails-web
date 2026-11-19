@@ -228,18 +228,37 @@ export function tradeSurplus(t: CowSettlementTrade): CowTradeSurplus | null {
   };
 }
 
-/** The fees the card states: the gap to the uniform price from block COW_OWN_PRICE_FEES_FROM; before it, the signed
- *  fee alone, on the same base (entries of a trade's own then priced market makers' orders at their limit). */
-export function cardFee(s: CowTradeSurplus, block: number): { feeGap: bigint; feeBp: number; signedOnly: boolean } {
-  if (block >= COW_OWN_PRICE_FEES_FROM) return { feeGap: s.feeGap, feeBp: s.feeBp, signedOnly: false };
+/** The fees the card states, or null where it states none.
+ *  - From block COW_OWN_PRICE_FEES_FROM: the gap to the uniform price.
+ *  - Before it, on the tokens' first entries: the signed fee alone, on the same base.
+ *  - Before it, on entries of the trade's own: none. Those entries then also carried market makers' orders at a price
+ *    of their own, and the gap cannot tell a fee from that price (0x9da9…, block 16,807,176, log 31: 41.5 bp from the
+ *    clearing price with 4.87 received beyond its limit).
+ *  - A negative gap (the trade priced better than the clearing price): none. A fee below zero is no fee, and the line
+ *    would print a minus sign or "-0.00 bp". */
+export function cardFee(
+  s: CowTradeSurplus,
+  block: number,
+  ownEntries: boolean,
+): { feeGap: bigint; feeBp: number; signedOnly: boolean } | null {
+  if (block >= COW_OWN_PRICE_FEES_FROM)
+    return s.feeGap < ZERO ? null : { feeGap: s.feeGap, feeBp: s.feeBp, signedOnly: false };
+  if (ownEntries) return null;
   return { feeGap: s.signedFee, feeBp: bpOf(s.signedFee, s.atUniform), signedOnly: true };
 }
 
-/** The fee sentence under a panel row applies: fees in the price of at least 0.1 bp on the trade's own entries,
- *  from the block CoW charges fees that way. */
+/** The fee sentence under a panel row applies: fees in the price on the trade's own entries, from the block CoW
+ *  charges fees that way, of at least 0.1 bp. Below that a gap sits at the noise level of the entries' integer
+ *  rounding, which the 711 sample saw on trades at the clearing price, and is not read as a fee. */
 export function feeExplains(t: CowSettlementTrade, block: number): boolean {
   const s = tradeSurplus(t);
   return s != null && !!t.settled?.ownEntries && block >= COW_OWN_PRICE_FEES_FROM && s.feeBp >= 0.1;
+}
+
+/** The card's view of a trade: the swap lines' figures, and `fee` false where the card states no fee (cardFee). */
+export interface CowCardView {
+  view: CowSwapView;
+  fee: boolean;
 }
 
 /** A trade of a decoded settlement as the CoW swap lines read it (lib/cow/surplus.ts), its tokens named by the
@@ -249,21 +268,21 @@ export function cowTradeView(
   t: CowSettlementTrade,
   sell: CowTokenLabel,
   buy: CowTokenLabel,
-): CowSwapView | null {
+): CowCardView | null {
   if (s.settle.status !== "decoded" || !t.settled) return null;
   const f = tradeSurplus(t);
   if (!f) return null;
-  const fee = cardFee(f, s.blockNumber);
   const { order, own, uniform, ownEntries } = t.settled;
+  const fee = cardFee(f, s.blockNumber, ownEntries);
   const token = f.kind === "sell" ? buy : sell;
-  return {
+  const view: CowSwapView = {
     kind: f.kind,
     surplus: f.surplus.toString(),
     surplusToken: f.surplusToken,
-    feeBp: fee.feeBp,
+    feeBp: fee?.feeBp ?? 0,
     settleOffset: s.settle.offset ?? 0,
     call: s.settle.call ?? "direct",
-    feeGap: fee.feeGap.toString(),
+    feeGap: (fee?.feeGap ?? ZERO).toString(),
     signedFee: f.signedFee.toString(),
     flashLoan: null,
     flashRead: false,
@@ -281,6 +300,7 @@ export function cowTradeView(
     },
     token: { address: token.address, symbol: token.symbol, decimals: token.decimals },
     route: "cow",
-    ...(fee.signedOnly ? { signedFeeOnly: ownEntries ? ("own-entries" as const) : ("no-entries" as const) } : {}),
+    ...(fee?.signedOnly ? { signedFeeOnly: true as const } : {}),
   };
+  return { view, fee: fee != null };
 }

@@ -50,10 +50,9 @@ export interface CowSwapView extends CowSwapFigures {
   /** cow_permit: the wallet's own order; cow_adapter: an order an Aave adapter's one-order contract owns; cow: a
    *  trade on the CoW trade card, the order of the wallet the page shows. */
   route: "cow_permit" | "cow_adapter" | "cow";
-  /** The CoW trade card, before block 19,815,319 (lib/cow/settlement.ts `cardFee`): the fee figure is the signed fee
-   *  alone. "no-entries": the trade was priced on its tokens' first entries; "own-entries": on entries of its own,
-   *  then a market maker's limit price. */
-  signedFeeOnly?: "no-entries" | "own-entries";
+  /** The CoW trade card, before block 19,815,319 on the tokens' first entries (lib/cow/settlement.ts `cardFee`): the
+   *  fee figure is the signed fee alone. */
+  signedFeeOnly?: true;
 }
 
 /** The surplus line's words: a sell order received more than its limit; a buy order through an Aave adapter got

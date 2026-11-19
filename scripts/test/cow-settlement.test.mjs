@@ -81,6 +81,12 @@ test("2022: two trades at one price", () => {
   const v = pairView(s, byOwner(s, "0x5a15d7"));
   assert.equal(v.pair.length, 2);
   assert.equal(v.onePrice, true);
+  // On the clearing price: the gap is the signed fee alone, within the entries' rounding.
+  for (const t of v.pair) {
+    const f = tradeSurplus(t);
+    const signedBp = Number((f.signedFee * 10_000_000n) / f.atUniform) / 1000;
+    assert.ok(Math.abs(f.feeBp - signedBp) < 0.1, `${t.logIndex}: ${f.feeBp} against ${signedBp}`);
+  }
 });
 
 test("a trade alone on its pair counts the settlement's other pairs", () => {
