@@ -95,8 +95,7 @@ const COINBASE_SOURCES: readonly FrontSource[] = [
   STEAKHOUSE_PARTNERSHIPS,
 ];
 
-const COINBASE_POSITION =
-  "a smart contract wallet will be created by Coinbase to connect to the Morpho protocol via onchain vaults curated by Steakhouse Financial";
+const COINBASE_POSITION = "requires creating a self-custodial wallet";
 
 const COINBASE_LIMITS = "in the U.S. (excluding NY State) and additional countries";
 
@@ -147,7 +146,7 @@ export const VAULT_FRONTS: readonly VaultFront[] = [
     vaultKind: null,
     vault: null,
     vaultNamedBy: "front",
-    positionSits: "user's wallet",
+    positionSits: "not stated",
     positionQuote: "Your funds sit in a smart contract, not in Bitso's custody.",
     limits: null,
     sources: [
