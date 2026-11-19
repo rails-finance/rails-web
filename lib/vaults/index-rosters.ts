@@ -12,8 +12,10 @@ import {
   ethereumVaultHref,
   ethereumVaultRosterHref,
   ethereumVaultsListingHref,
+  mapleInfoHref,
   maplePoolHref,
   maplePoolsHref,
+  vaultRosterInfoHref,
   yearnVaultHref,
   yearnVaultRosterHref,
   iporFusionVaultHref,
@@ -149,6 +151,21 @@ export function vaultIndexRosterHref(p: VaultIndexProtocol, chainId: number): st
           : p === "ipor-fusion"
             ? (iporFusionVaultRosterHref(chainId) ?? SBOLD_PAGE_PATH)
             : SBOLD_PAGE_PATH;
+}
+
+/** A roster's info page, the /vaults About page's link (ui-jobs 776): the
+ *  roster's `info`; Maple's explorer About, its pools tab having none; sBOLD's
+ *  page, which has none. An IPOR Fusion chain's links only once launched, the
+ *  gate its holder tag uses (lib/ipor-fusion/label-href.ts); null before. */
+export function vaultIndexInfoHref(p: VaultIndexProtocol, chainId: number): string | null {
+  if (p === "maple") return mapleInfoHref();
+  if (p === "sbold") return SBOLD_PAGE_PATH;
+  if (p === "ipor-fusion") {
+    const roster = iporFusionVaultRosterHref(chainId);
+    const href = roster ? vaultRosterInfoHref(roster) : null;
+    return href && !isUnlaunchedPath(href) ? href : null;
+  }
+  return vaultRosterInfoHref(vaultIndexRosterHref(p, chainId));
 }
 
 /** The vault's page under its protocol (decision 0028 point 8); a Maple

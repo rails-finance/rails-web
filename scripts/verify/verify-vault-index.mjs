@@ -37,6 +37,9 @@
 //      its Shown pill, the counts line, lifting and resetting it, and the table's
 //      sorts (ui-jobs 538: Holders by default, Total assets within each token)
 //  11  ?asset=ETH,WETH keeps the preset; a token it would empty lifts it
+//  12  the Vaults menu (listing, About) and /vaults/about: a row per family, each listed
+//      roster's info page linked and answering 200 (ui-jobs 776)
+// The census (sections 0 and 1) is read from the (i)'s breakdown after the read stamp.
 // Sections 0 to 9 read /vaults?show=all and the rosters' ?show=all pages.
 
 import { chromium } from "playwright";
@@ -200,6 +203,14 @@ const page = await (await browser.newContext({ viewport: { width: 1280, height: 
 const res = await page.goto(`${BASE}/vaults?show=all`, { waitUntil: "networkidle", timeout: 300_000 });
 check("0a /vaults answers 200", res?.status() === 200, String(res?.status()));
 await page.waitForSelector("[data-vault-index] [data-vault-row]", { timeout: 120_000 });
+// The census is the (i)'s breakdown after the read stamp (ui-jobs 776): open it
+// to read each roster's count and block.
+const INFO = '[data-vault-index] button[aria-label$="about these vaults"]';
+const openCensus = async () => {
+  if ((await page.locator(INFO).getAttribute("aria-expanded")) !== "true") await page.locator(INFO).click();
+  await page.waitForSelector("[data-breakdown-panel] [data-index-key]", { timeout: 10_000 });
+};
+await openCensus();
 const blocks = await page
   .locator("[data-index-key]")
   .evaluateAll((els) =>
@@ -223,6 +234,27 @@ const counts = await page
     Object.fromEntries(els.map((el) => [el.getAttribute("data-index-key"), Number(el.getAttribute("data-count"))])),
   );
 const union = Number(await page.locator("[data-index-counts]").getAttribute("data-index-counts"));
+// The head (ui-jobs 776): the (i) after the stamp, its panel the stat
+// breakdown's popover, each roster's count and block in a receipt.
+const head = await page.evaluate(() => {
+  const stamp = document.querySelector("[data-vault-index] [data-roster-read-at]");
+  const info = document.querySelector('[data-vault-index] button[aria-label$="about these vaults"]');
+  const panel = document.querySelector("[data-breakdown-panel]");
+  const rows = [...(panel?.querySelectorAll('[data-anatomy~="V6.2"]') ?? [])];
+  return {
+    after: !!(stamp && info && stamp.compareDocumentPosition(info) & Node.DOCUMENT_POSITION_FOLLOWING),
+    panel: panel?.getAttribute("data-breakdown-panel") ?? null,
+    rows: rows.length,
+    receipted: rows.filter((r) => r.querySelectorAll("[data-prov-covered]").length >= 2).length,
+  };
+});
+check("0c the (i) stands after the read stamp", head.after);
+check(
+  "0d the (i) opens the census as a breakdown, each roster's count and block in a receipt",
+  head.panel === "popover" && head.rows === KEYS.length && head.receipted === head.rows,
+  `panel ${head.panel}, ${head.rows} rows of ${KEYS.length}, ${head.receipted} with both receipts`,
+);
+await page.keyboard.press("Escape");
 const emptyToggle = page.locator("[data-vault-index] [data-empty-group] > button");
 const openEmpty = async () => {
   if ((await emptyToggle.count()) > 0 && (await emptyToggle.getAttribute("aria-expanded")) !== "true") {
@@ -489,6 +521,62 @@ await checkRosterView({
       `${hidden[0]}: ${n} of ${hidden[1].length} drawn, default pill ${lifted.chip}, unset pill ${lifted.unset}`,
     );
   }
+}
+
+// ── 12: the sections menu and /vaults/about (ui-jobs 776) ───────────────────
+{
+  const MENU = ["/vaults", "/vaults/about"];
+  const p = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
+  await p.goto(`${BASE}/vaults`, { waitUntil: "domcontentloaded", timeout: 300_000 });
+  await p.locator("[data-vault-index-head] [data-sections-trigger]").click();
+  const entries = await p
+    .locator('[data-vault-index-head] [data-sections-menu] [role="menuitem"]')
+    .evaluateAll((els) =>
+      els.map((el) => ({ href: el.getAttribute("href"), current: el.getAttribute("aria-current") })),
+    );
+  check(
+    "12a the Vaults menu lists the listing (current) and About",
+    entries.map((e) => e.href).join() === MENU.join() && entries[0]?.current === "page",
+    entries.map((e) => `${e.href}${e.current ? " (current)" : ""}`).join(", "),
+  );
+  const res2 = await p.goto(`${BASE}/vaults/about`, { waitUntil: "domcontentloaded", timeout: 120_000 });
+  check("12b /vaults/about answers 200", res2?.status() === 200, String(res2?.status()));
+  const about = await p.evaluate(() => ({
+    current: document
+      .querySelector('[data-vault-index-head] [data-sections-menu] [aria-current="page"]')
+      ?.getAttribute("href"),
+    families: [...document.querySelectorAll("[data-about-family]")].map((el) => el.getAttribute("data-about-family")),
+    links: [...document.querySelectorAll("[data-about-link]")].map((el) => [
+      el.getAttribute("data-about-link"),
+      el.getAttribute("href"),
+    ]),
+    unlinked: [...document.querySelectorAll("[data-about-unlinked]")].map((el) =>
+      el.getAttribute("data-about-unlinked"),
+    ),
+  }));
+  const PROTOCOLS = [...new Set(KEYS.map((k) => ROSTER[k].protocol))];
+  check(
+    "12c About lists each family, About lit in the menu",
+    about.current === "/vaults/about" && PROTOCOLS.every((x) => about.families.includes(x)),
+    `${about.families.join(", ")}; lit ${about.current}`,
+  );
+  check(
+    "12d each listed roster links its info page; only an unlaunched IPOR Fusion chain goes unlinked",
+    KEYS.every((k) => about.links.some(([key]) => key === k)) &&
+      about.unlinked.every((k) => k.startsWith("ipor-fusion:")),
+    `${about.links.length} linked, unlinked: ${about.unlinked.join(", ") || "none"}`,
+  );
+  const answers = [];
+  for (const [key, href] of about.links) {
+    const r = await p.request.get(`${BASE}${href}`, { maxRedirects: 0 });
+    answers.push([key, r.status()]);
+  }
+  check(
+    "12e every About link answers 200",
+    answers.every(([, st]) => st === 200),
+    answers.map(([k, st]) => `${k} ${st}`).join(", "),
+  );
+  await p.close();
 }
 
 await browser.close();

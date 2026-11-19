@@ -80,7 +80,8 @@ export interface VaultRosterHead {
   /** The intro drawer's body (standards/explanation-copy-charter.md §8a);
    *  null draws no (i) and no drawer. */
   drawer: ReactNode;
-  /** In place of the one "Read at block N" line: the index's line per roster. */
+  /** In place of the one "Read at block N" line: the index's stamp and, after
+   *  it, its (i) (ui-jobs 776). */
   readAt?: ReactNode;
 }
 
@@ -382,14 +383,16 @@ export function VaultRoster({
     <section className="mb-5" data-skel-section={`${skel}-denominator`}>
       {head.readAt ? (
         // The index's read line names each roster's block, the anchor its rows'
-        // receipts name.
+        // receipts name; its (i) stands after the stamp, in `readAt` (ui-jobs 776).
         <div className="flex items-center gap-1 text-[11px] text-rb-500" data-prov-exempt>
-          <InfoDisclosureTrigger
-            open={introOpen}
-            onToggle={() => setIntroOpen((o) => !o)}
-            label="about these vaults"
-            ariaControls="vault-roster-intro"
-          />
+          {head.drawer != null && (
+            <InfoDisclosureTrigger
+              open={introOpen}
+              onToggle={() => setIntroOpen((o) => !o)}
+              label="about these vaults"
+              ariaControls="vault-roster-intro"
+            />
+          )}
           {/* The stamp stands at the right (ui-jobs 730). */}
           <span className="ml-auto flex items-center gap-1">{head.readAt}</span>
         </div>

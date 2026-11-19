@@ -7,19 +7,18 @@
 // The index owns no vault page: every row opens the vault's page under its
 // protocol, a Maple pool's opening Maple's pools page. Facets: Token (by
 // symbol, across chains), Network and Protocol, with the rosters' search.
-// Each roster was read at its block and the read-at line names each one.
+// Each roster was read at its block; the (i) after the read stamp names each one.
 // No USD and no cross-asset total. The rows open receipts at their roster's
 // block, through each family's builders (lib/vaults/row-receipts.ts), picked
 // while the inspector is armed (decision 0062 point 5; ui-jobs 571, 625).
 
-import Link from "next/link";
 import { ProvSection } from "@/components/shared/section-menu";
 import { ROSTER_SCOPE, VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
 import { CompareBar } from "@/components/vaults/compare-selection";
-import { isoSeconds, RosterBlock, RosterReadStamp } from "@/components/vaults/roster-read-stamp";
+import { isoSeconds, RosterReadStamp } from "@/components/vaults/roster-read-stamp";
+import { VaultIndexBreakdown } from "@/components/vaults/vault-index-breakdown";
 import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { protocolForPathname } from "@/lib/shared/protocols";
-import { PAGE_LINK } from "@/lib/shared/ui-grammar";
 import { symbolsOfKeyword } from "@/lib/shared/asset-categories";
 import type { VaultSummary } from "@/lib/vaults/summary";
 import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
@@ -40,8 +39,6 @@ import {
   vaultIndexRosterKeyOf,
   type VaultIndexRoster,
 } from "@/lib/vaults/index-rosters";
-
-const n = (v: number) => v.toLocaleString("en-US");
 
 /** Each row's lead zone: the roster entry whose route holds the vault's
  *  family directory (Maple: its pools page), keyed by protocol and chain
@@ -154,32 +151,13 @@ export function VaultIndexView({
     return vaultIndexRowReceipts({ blockNumber: r?.blockNumber || undefined, readBy: r?.readBy }, v);
   };
 
-  // One stamp for the oldest roster's read; the panel names each roster's block.
-  const readAt = <RosterReadStamp reads={counts.map(readOf)} />;
-
-  const drawer = (
-    <p data-index-counts={total}>
-      Every vault the rosters list:{" "}
-      {counts.map((r, i) => (
-        <span
-          key={vaultIndexRosterKey(r)}
-          data-index-key={vaultIndexRosterKey(r)}
-          data-index-count={r.protocol}
-          data-count={r.count}
-          data-index-roster={r.protocol}
-          data-index-chain={r.chainId}
-          data-index-block={r.blockNumber}
-        >
-          {i > 0 && ", "}
-          <Link href={vaultIndexRosterHref(r.protocol, r.chainId)} className={PAGE_LINK} prefetch={false}>
-            {VAULT_INDEX_PROTOCOL_LABEL[r.protocol]}
-          </Link>{" "}
-          {n(r.count)} at <RosterBlock read={readOf(r)} chainId={r.chainId} />
-          {r.chainId !== MAINNET_CHAIN_ID && ` on ${chainName(r.chainId)}`}
-        </span>
-      ))}
-      ; each row opens under its protocol.
-    </p>
+  // One stamp for the oldest roster's read, and after it the (i): the census
+  // as a breakdown naming each roster's count and block (ui-jobs 776).
+  const readAt = (
+    <>
+      <RosterReadStamp reads={counts.map(readOf)} />
+      <VaultIndexBreakdown rosters={counts} total={total} readOf={readOf} />
+    </>
   );
 
   return (
@@ -204,7 +182,7 @@ export function VaultIndexView({
             receiptsOf={receiptsOf}
             hooksOf={hooksOf}
             leadOf={(v) => LEAD_IDS[vaultIndexRosterKeyOf(v)] ?? null}
-            head={{ readAt, drawer }}
+            head={{ readAt, drawer: null }}
           />
         </div>
       </ProvSection>

@@ -8,6 +8,7 @@
 // mounts the inspector (decision 0062 point 5; ui-jobs 571).
 
 import { VaultIndexView } from "@/components/vaults/vault-index-view";
+import { VaultIndexHead } from "@/components/vaults/vault-index-head";
 import { IndexNotice } from "@/components/shared/index-notice";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { loadVaultIndex } from "@/lib/vaults/index-read";
@@ -32,7 +33,7 @@ export default async function VaultIndexPage({ searchParams }: { searchParams: P
     <div className="min-h-screen">
       <div className="py-8">
         <header className="mb-6" data-skel-section="page-header">
-          <h1 className="text-2xl font-semibold text-foreground">Vaults</h1>
+          <VaultIndexHead venue="listing" />
         </header>
         {indexDown && <IndexNotice chainFilled={vaults.length > 0} className="mb-4 text-sm text-rb-500" />}
         <div data-roster-panel data-vault-index>

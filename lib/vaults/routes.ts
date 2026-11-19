@@ -289,6 +289,21 @@ export function maplePoolsHref(): string {
  *  protocol. It spans chains, so it sits under no chain. */
 export const VAULT_INDEX_HREF = "/vaults";
 
+/** The index's About page (ui-jobs 776): a link to each family's vaults info page. */
+export const VAULT_INDEX_ABOUT_HREF = `${VAULT_INDEX_HREF}/about`;
+
+/** A vault roster's info page (`<roster>/info`): how that layer is built, in words. */
+export function vaultRosterInfoHref(rosterHref: string): string {
+  return `${rosterHref}/info`;
+}
+
+/** Maple's info page: its explorer's About, since the pools tab has none. */
+export function mapleInfoHref(): string {
+  const entry = protocolForHref("/ethereum/maple");
+  if (!entry) throw new Error(`/ethereum/maple has no roster entry.`);
+  return entry.infoHref;
+}
+
 /** One Maple pool's page, `/ethereum/maple/pools/<key>`: `pool` is the
  *  catalogue key ("syrupusdc") or the pool's address. */
 export function maplePoolHref(pool: string): string {
