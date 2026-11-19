@@ -19,6 +19,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useParams } from "next/navigation";
 import { FlowHuesContext, PAID_IN_HUES } from "@/components/shared/lifetime-flows-tip";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
+import { sboldDepositorVault } from "@/lib/liquity-v2/sbold";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { LifetimeFlowsPanel, type FlowsRead } from "@/components/shared/lifetime-flows-panel";
@@ -290,7 +291,11 @@ export default function DepositView({
           <DetailTopRow
             session="liquity-v2"
             wallet={depositor}
-            owner={{ wallet: depositor, href: `${LIQUITY_V2_SP_PATH}?q=${depositor}` }}
+            owner={{
+              wallet: depositor,
+              href: `${LIQUITY_V2_SP_PATH}?q=${depositor}`,
+              vault: sboldDepositorVault(depositor),
+            }}
             fallbackHref={LIQUITY_V2_SP_PATH}
             assets={stripAssets}
             priceReason={boldPriceReason(boldPrice)}

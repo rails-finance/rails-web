@@ -20,5 +20,10 @@ export const SBOLD_PAGE_PATH = "/ethereum/vaults/sbold";
 /** One address's holding, under the vault's page (ui-jobs 765). */
 export const sboldHolderHref = (holder: string) => `${SBOLD_PAGE_PATH}/${encodeURIComponent(holder)}`;
 
+/** sBOLD's name and page where it is the Stability Pool depositor, for the
+ *  wallet pill's vault slot (ui-jobs 765); null for any other address. */
+export const sboldDepositorVault = (depositor: string): { name: string; href: string } | null =>
+  depositor.toLowerCase() === SBOLD_VAULT ? { name: "sBOLD", href: SBOLD_PAGE_PATH } : null;
+
 /** The vault's deposits in the Stability Pool listing, one row per branch. */
 export const SBOLD_DEPOSITS_HREF = `${LIQUITY_V2_SP_PATH}?q=${SBOLD_VAULT}`;
