@@ -19,8 +19,6 @@ export const FRONTS_PAGE = {
     position: "Position sits in",
     source: "Source",
   },
-  /** The /vaults line pointing here. */
-  indexLink: "Apps that put a vault behind their product",
 };
 
 export const FRONT_VAULT = {

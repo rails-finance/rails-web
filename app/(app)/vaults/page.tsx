@@ -7,16 +7,12 @@
 // and no explorer rail. Its rows carry their rosters' receipts and the page
 // mounts the inspector (decision 0062 point 5; ui-jobs 571).
 
-import Link from "next/link";
 import { VaultIndexView } from "@/components/vaults/vault-index-view";
 import { IndexNotice } from "@/components/shared/index-notice";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { loadVaultIndex } from "@/lib/vaults/index-read";
 import { vaultIndexLaunched } from "@/lib/vaults/index-rosters";
 import { VAULT_INDEX_HREF } from "@/lib/vaults/routes";
-import { FRONTS_HREF } from "@/lib/vaults/fronts";
-import { FRONTS_PAGE } from "@/lib/vaults/fronts-words";
-import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { toURLSearchParams, type RawSearchParams } from "@/lib/shared/listing-ssr";
 
 export const dynamic = "force-dynamic";
@@ -37,11 +33,6 @@ export default async function VaultIndexPage({ searchParams }: { searchParams: P
       <div className="py-8">
         <header className="mb-6" data-skel-section="page-header">
           <h1 className="text-2xl font-semibold text-foreground">Vaults</h1>
-          <p className="mt-2 text-sm">
-            <Link href={FRONTS_HREF} className={INLINE_LINK} prefetch={false} data-fronts-link="">
-              {FRONTS_PAGE.indexLink}
-            </Link>
-          </p>
         </header>
         {indexDown && <IndexNotice chainFilled={vaults.length > 0} className="mb-4 text-sm text-rb-500" />}
         <div data-roster-panel data-vault-index>
