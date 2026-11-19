@@ -18,6 +18,7 @@ import { isCollSurplusClaimEvent, isLiquityEvent } from "@/lib/shared/types/even
 import type { DayObs } from "@/lib/shared/price-series";
 import type { FlowTimeline } from "@/lib/shared/flows-timeline";
 import type { TimelineEventsState } from "@/hooks/useTimelineEvents";
+import type { TimelineLoadOlder } from "@/lib/shared/timeline-size";
 import type { TimelineBoundary } from "@/lib/shared/timeline-boundary";
 import type { PositionCardExports } from "@/components/shared/position-card";
 import type { LiquityTroveSurplus } from "@/components/protocol/liquity-family/types";
@@ -171,6 +172,8 @@ export interface TroveBodyProps {
    *  (the index notice, ui-jobs 461) in place of "no events". */
   historyNotice?: ReactNode;
   boundary: TimelineBoundary | null;
+  /** The read of the events past the cut, for the timeline's cut-page notice. */
+  loadOlder?: TimelineLoadOlder;
   /** The events the Lifetime flows Explanation replays, oldest first. */
   economicsEvents: Parameters<typeof computeLiquityEconomics>[0];
   /** The chronological list a card's previous event is read from (interest
@@ -214,6 +217,7 @@ export function TroveBody({
   tl,
   historyNotice,
   boundary,
+  loadOlder,
   economicsEvents,
   chronoEvents,
   flowEvents,
@@ -334,6 +338,7 @@ export function TroveBody({
                 closed={closed}
                 tl={tlWithGlyph}
                 boundary={boundary}
+                loadOlder={loadOlder}
                 runs={LIQUITY_TIMELINE_RUNS}
                 displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
                 spineKey={LIQUITY_SPINE_KEY}
