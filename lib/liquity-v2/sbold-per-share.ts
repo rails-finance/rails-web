@@ -66,3 +66,79 @@ export function engineeringParts(
   }
   return { mantissa: lead < 4 ? `${digits.slice(0, lead)}.${digits.slice(lead)}` : digits, exponent };
 }
+
+/** perShareText's figure below 0.0001 as a mantissa of four significant
+ *  digits and a negative power of ten ("1.038", -19), the same half-up
+ *  rounding (ui-jobs 765); null at or above 0.0001, or over a zero supply. */
+export function perShareScientific(
+  assetsRaw: string,
+  supplyRaw: string,
+  assetDecimals: number,
+  shareDecimals: number,
+): { mantissa: string; exponent: number } | null {
+  const text = perShareText(assetsRaw, supplyRaw, assetDecimals, shareDecimals);
+  const m = text == null ? null : /^0\.(0{4,})(\d+)$/.exec(text);
+  if (m == null) return null;
+  const digits = m[2].padEnd(4, "0");
+  return { mantissa: `${digits[0]}.${digits.slice(1)}`, exponent: -(m[1].length + 1) };
+}
+
+const SUPERSCRIPT: Record<string, string> = {
+  "-": "⁻",
+  "0": "⁰",
+  "1": "¹",
+  "2": "²",
+  "3": "³",
+  "4": "⁴",
+  "5": "⁵",
+  "6": "⁶",
+  "7": "⁷",
+  "8": "⁸",
+  "9": "⁹",
+};
+
+/** "1.038 × 10⁻¹⁹": the page's one exponent style, in superscript
+ *  characters, so copied text and a screen reader keep it (ui-jobs 765). */
+export const scientificText = (mantissa: string, exponent: number): string =>
+  `${mantissa} × 10${String(exponent).replace(/[-\d]/g, (c) => SUPERSCRIPT[c])}`;
+
+/** A holder's pro-rata BOLD, balance × totalAssets ÷ totalSupply, in the
+ *  asset to four significant digits rounded half-up (perShareText's rule),
+ *  and its scientific form below 0.0001 (ui-jobs 765). */
+export function proRata(
+  sharesRaw: string,
+  assetsRaw: string,
+  supplyRaw: string,
+  assetDecimals: number,
+  shareDecimals: number,
+): { text: string; sci: { mantissa: string; exponent: number } | null } | null {
+  const a = (BigInt(sharesRaw) * BigInt(assetsRaw)).toString();
+  const s = (BigInt(supplyRaw) * BigInt(10) ** BigInt(shareDecimals)).toString();
+  const text = perShareText(a, s, assetDecimals, shareDecimals);
+  return text == null ? null : { text, sci: perShareScientific(a, s, assetDecimals, shareDecimals) };
+}
+
+/** One whole share's `convertToAssets` answer as the sBOLD page prints it
+ *  where it differs from the shared share-price text: "0" for a zero answer,
+ *  "1.038 × 10⁻¹⁹" below 0.0001; null otherwise, for the shared text
+ *  (ui-jobs 765). */
+export function sboldPriceFace(raw: string, assetDecimals = 18): string | null {
+  if (BigInt(raw) === BigInt(0)) return "0";
+  const sci = perShareScientific(raw, (BigInt(10) ** BigInt(18)).toString(), assetDecimals, 18);
+  return sci ? scientificText(sci.mantissa, sci.exponent) : null;
+}
+
+/** totalAssets ÷ totalSupply as the sBOLD page's stat prints it: scientific
+ *  below 0.0001, else the four-digit decimal; null over a zero supply
+ *  (ui-jobs 765). */
+export function perShareFace(
+  assetsRaw: string,
+  supplyRaw: string,
+  assetDecimals: number,
+  shareDecimals: number,
+): string | null {
+  const sci = perShareScientific(assetsRaw, supplyRaw, assetDecimals, shareDecimals);
+  return sci
+    ? scientificText(sci.mantissa, sci.exponent)
+    : perShareText(assetsRaw, supplyRaw, assetDecimals, shareDecimals);
+}

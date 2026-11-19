@@ -258,7 +258,9 @@ export interface ProtocolContract extends KnownContractBase {
     // Pays tokens out to many accounts (a reward distributor, a bulk drop): a transfer in from one is a payout.
     | "distributor"
     // Takes a wallet's aTokens into a stake: a transfer out to one is a stake.
-    | "staking";
+    | "staking"
+    // An ERC-4626 vault that holds deposits elsewhere in its name (sBOLD in Liquity V2's Stability Pools).
+    | "vault";
   /** A noun phrase that completes "The recipient is …" / "The sender is …" in
    *  an event's explanation. Says what the contract does, nothing more. */
   role: string;
@@ -1263,8 +1265,21 @@ const PANCAKE_V2_PAIR = known(
   "a PancakeSwap V2 pair, which trades two tokens against each other and holds both as its liquidity",
 );
 
+// sBOLD (ui-jobs 765). Evidence, in decision 0053's order:
+//   1. growthepie: the OLI attestation by 0x8dbae854… names the contract `sBold`; growthepie's labels
+//      file and the pool state no owner.
+//   2. Etherscan V2 `getsourcecode`: verified source `sBold`, not a proxy. The contract answers name()
+//      "sBold" and symbol() "sBOLD". Rails names it by its symbol and states its owner() as an address.
+const SBOLD_VAULT_ENTRY = known(
+  "vault",
+  "sBOLD",
+  "sBold",
+  "sBOLD, an ERC-4626 vault on BOLD that deposits into Liquity V2’s Stability Pools",
+);
+
 const ENTRIES: [ChainId, string, KnownInfrastructure][] = [
   // ── Ethereum ──
+  [MAINNET_CHAIN_ID, "0x50bd66d59911f5e086ec87ae43c811e0d059dd11", SBOLD_VAULT_ENTRY],
   [MAINNET_CHAIN_ID, "0x20b79d39bd44deee4f89b1e9d0e3b945fde06491", escrow("syrupUSDC")],
   [MAINNET_CHAIN_ID, "0xde76a096c5eadddf97af3fe15ee49d32aeda9822", escrow("syrupUSDT")],
   [MAINNET_CHAIN_ID, "0x9008d19f58aabd9ed0d60971565aa8510560ab41", COW],
@@ -1731,6 +1746,7 @@ const ENTRIES: [ChainId, string, KnownInfrastructure][] = [
 // Enso 0x7d58…6994 and the multicall) rests on the fallback sources alone.
 const GROWTHEPIE_LABELS: [ChainId, string, string | null, string | null][] = [
   // ── Ethereum ──
+  [MAINNET_CHAIN_ID, "0x50bd66d59911f5e086ec87ae43c811e0d059dd11", null, "sBold"],
   [MAINNET_CHAIN_ID, "0x20b79d39bd44deee4f89b1e9d0e3b945fde06491", null, "LockReleaseTokenPool"],
   [MAINNET_CHAIN_ID, "0x9008d19f58aabd9ed0d60971565aa8510560ab41", "CowSwap", "GPv2Settlement"],
   // Read 17 Nov 2026, after GROWTHEPIE_READ: no owner in the labels file; the pool's Sourcify name.

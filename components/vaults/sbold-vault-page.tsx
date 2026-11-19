@@ -1,7 +1,7 @@
 "use client";
 
-// The sBOLD vault's page (rails-ops ui-jobs 749), on the Yearn vault page's
-// shell (components/vaults/yearn-vault-page.tsx): the vault card (V2), then the
+// The sBOLD vault's page (rails-ops ui-jobs 749), on the shell of
+// components/vaults/yearn-vault-page.tsx: the vault card (V2), then the
 // grid (V13): the last 30 days (V5), three daily lines read from the chain
 // (lib/sources/chain/sbold-daily.ts); where the assets are (V3), the three
 // Stability Pool deposits and the idle BOLD, reconciled against total assets.
@@ -17,6 +17,7 @@ import { NotLoaded } from "@/components/shared/not-loaded";
 import { ProvSection, SectionHeading, SectionMenu } from "@/components/shared/section-menu";
 import { VaultCard, type VaultMenuLink } from "@/components/vaults/vault-card";
 import { VaultAssets, type VaultAssetRow } from "@/components/vaults/vault-assets";
+import { VaultFinder } from "@/components/vaults/vault-finder";
 import { Tile } from "@/components/shared/tile-grid";
 import { VAULT_CARD_TILE, VAULT_GRID } from "@/components/vaults/vault-tiles";
 import { Sparkline, STRIP_SCOPE } from "@/components/vaults/vault-strip";
@@ -24,6 +25,7 @@ import { vaultHeads } from "@/components/vaults/vault-heads";
 import type { PositionCardHead } from "@/components/shared/position-card";
 import { explorerUrl } from "@/lib/shared/chains";
 import { formatDate } from "@/lib/date";
+import { walletHref } from "@/lib/wallet/wallet-filters";
 import { formatUnitsExact } from "@/lib/utils/format";
 import { assetText, pctText, sharePriceText, shareText, shortAddress } from "@/lib/shared/vault-amount-text";
 import { sboldVaultPageSummary } from "@/lib/vaults/summary";
@@ -31,14 +33,26 @@ import { vaultVenueShareProv } from "@/lib/vaults/card-provenance";
 import { vaultAssetsExports, vaultPointsCsv, type VaultExportModel } from "@/lib/vaults/card-export";
 import { SHARES_ISSUED_TIP, sboldVaultAssetsContent, sboldVaultCardContent } from "@/lib/vaults/card-words";
 import { SBOLD_ASSET, SBOLD_CREATED_BLOCK, SBOLD_DEPOSITS_HREF, SBOLD_VAULT } from "@/lib/liquity-v2/sbold";
-import { engineeringParts, perShareText } from "@/lib/liquity-v2/sbold-per-share";
+import {
+  engineeringParts,
+  perShareScientific,
+  perShareText,
+  sboldPriceFace,
+  scientificText,
+} from "@/lib/liquity-v2/sbold-per-share";
 import { liquityV2DepositHref } from "@/lib/liquity-v2/sp-routes";
 import {
   sboldAssetProv,
   sboldBlockProv,
+  sboldCollProv,
+  sboldFragmentsProv,
+  sboldYieldProv,
   sboldDepositProv,
   sboldIdleProv,
   sboldNameProv,
+  sboldOwnerProv,
+  sboldPausedLogProv,
+  sboldPausedProv,
   sboldPerShareProv,
   sboldPointProv,
   sboldReconcileProv,
@@ -50,6 +64,7 @@ import {
 } from "@/lib/liquity-v2/sbold-provenance";
 import type { SboldVaultResponse } from "@/lib/sources/chain/sbold-vault";
 import type { SboldSeries } from "@/lib/sources/chain/sbold-daily";
+import type { SboldPausedLog } from "@/lib/sources/chain/sbold-paused";
 import type { RawAmount } from "@/lib/sources/chain/morpho-base-vault";
 
 const CHAIN_ID = 1;
@@ -59,7 +74,7 @@ const n = (v: number) => v.toLocaleString("en-US");
 const markedLabel = (label: string, blocks: number[]) =>
   `${label}, one read at each day's last block over the last 30 days` +
   (blocks.length === 0 ? "" : `, then block${blocks.length === 1 ? "" : "s"} ${blocks.map(n).join(", ")}`);
-const eth = (kind: "address" | "block", v: string | number) => explorerUrl(CHAIN_ID, kind, v);
+const eth = (kind: "address" | "block" | "tx", v: string | number) => explorerUrl(CHAIN_ID, kind, v);
 const UNREAD = <NotLoaded className="text-base font-normal text-rb-500" />;
 
 const fraction = (part: RawAmount | null, total: RawAmount | null): number | null =>
@@ -68,7 +83,8 @@ const fraction = (part: RawAmount | null, total: RawAmount | null): number | nul
     : null;
 
 /** A share count: the full figure up to twelve integer digits, else
- *  "43.72 × 10¹⁸" with the full raw integer in its title. */
+ *  "43.72 × 10¹⁸" (scientificText, the page's one exponent style) with the
+ *  full raw integer in its title. */
 function SharesFace({ raw, decimals }: { raw: string; decimals: number }) {
   const e = engineeringParts(raw, decimals);
   const exact = formatUnitsExact(raw, decimals);
@@ -76,14 +92,14 @@ function SharesFace({ raw, decimals }: { raw: string; decimals: number }) {
     return <span data-figure-value="">{shareText({ raw, value: Number(raw) / 10 ** decimals }, decimals)}</span>;
   return (
     <span data-figure-value="" data-prov-exact={exact} title={`${exact} shares (raw ${raw})`}>
-      {e.mantissa} × 10<sup>{e.exponent}</sup>
+      {scientificText(e.mantissa, e.exponent)}
     </span>
   );
 }
 
-/** A share price as the getter answers it: "0" where it answers zero. */
-const priceText = (raw: string) =>
-  BigInt(raw) === BigInt(0) ? "0" : sharePriceText({ raw, value: Number(raw) / 1e18 }, 18);
+/** A share price as the getter answers it: "0" where it answers zero,
+ *  scientific below 0.0001 (sboldPriceFace, as its /vaults row prints it). */
+const priceText = (raw: string) => sboldPriceFace(raw) ?? sharePriceText({ raw, value: Number(raw) / 1e18 }, 18);
 
 const pointText = (key: SboldSeriesKey, raw: string): string =>
   key === "totalAssets"
@@ -93,7 +109,7 @@ const pointText = (key: SboldSeriesKey, raw: string): string =>
       : (() => {
           const e = engineeringParts(raw, 18);
           return e
-            ? `${e.mantissa} × 10^${e.exponent} shares`
+            ? `${scientificText(e.mantissa, e.exponent)} shares`
             : `${shareText({ raw, value: Number(raw) / 1e18 }, 18)} shares`;
         })();
 
@@ -221,7 +237,16 @@ function SboldDailyLines({ series }: { series: SboldSeries | null }) {
   );
 }
 
-export function SboldVaultPage({ data, series }: { data: SboldVaultResponse; series: SboldSeries | null }) {
+export function SboldVaultPage({
+  data,
+  series,
+  pausedLog,
+}: {
+  data: SboldVaultResponse;
+  series: SboldSeries | null;
+  /** The latest Paused log, read where paused() answers true (ui-jobs 765). */
+  pausedLog: SboldPausedLog | null;
+}) {
   const registry = useReceiptRegistry();
   const y = data.vault;
   const v = sboldVaultPageSummary(data, SBOLD_ASSET, SBOLD_CREATED_BLOCK);
@@ -240,6 +265,11 @@ export function SboldVaultPage({ data, series }: { data: SboldVaultResponse; ser
   const perShare =
     y.totalAssets && y.totalSupply && y.shareDecimals != null
       ? perShareText(y.totalAssets.raw, y.totalSupply.raw, ad, y.shareDecimals)
+      : null;
+  // Below 0.0001 the stat reads "1.038 × 10⁻¹⁹"; the receipt keeps the decimal (ui-jobs 765).
+  const perShareSci =
+    y.totalAssets && y.totalSupply && y.shareDecimals != null
+      ? perShareScientific(y.totalAssets.raw, y.totalSupply.raw, ad, y.shareDecimals)
       : null;
 
   const stats: PositionPanelRow[] = [
@@ -269,8 +299,9 @@ export function SboldVaultPage({ data, series }: { data: SboldVaultResponse; ser
         "per-share",
         undefined,
         perShare != null && y.totalAssets && y.totalSupply && y.shareDecimals != null ? (
-          <span className="break-all" data-figure-value="">
+          <span className={perShareSci ? undefined : "break-all"} data-figure-value="">
             <Prov
+              value={perShare}
               info={sboldPerShareProv(coords, {
                 assets: assetText(y.totalAssets, ad),
                 supply: shareText(y.totalSupply, y.shareDecimals),
@@ -279,7 +310,7 @@ export function SboldVaultPage({ data, series }: { data: SboldVaultResponse; ser
                 ratio: perShare,
               })}
             >
-              {perShare}
+              {perShareSci ? scientificText(perShareSci.mantissa, perShareSci.exponent) : perShare}
             </Prov>
           </span>
         ) : (
@@ -287,6 +318,34 @@ export function SboldVaultPage({ data, series }: { data: SboldVaultResponse; ser
         ),
       ),
     },
+    // Where paused() answers true and the Paused log was read: its block and time (ui-jobs 765).
+    ...(y.paused === true && pausedLog
+      ? [
+          {
+            id: "paused-log",
+            label: "Latest Paused log",
+            tip: "The block of the vault's latest Paused(address) log; no Unpaused log follows it.",
+            sub:
+              pausedLog.time == null ? undefined : (
+                <Prov info={sboldPausedLogProv(pausedLog, "time")}>{whenText({ time: pausedLog.time })}</Prov>
+              ),
+            value: fig(
+              "paused-log",
+              String(pausedLog.block),
+              <a
+                href={eth("block", pausedLog.block)}
+                target="_blank"
+                rel="noopener"
+                className="link-external"
+                data-paused-log-block={pausedLog.block}
+                data-paused-log-tx={pausedLog.txHash}
+              >
+                <Prov info={sboldPausedLogProv(pausedLog, "block")}>{n(pausedLog.block)}</Prov>
+              </a>,
+            ),
+          } satisfies PositionPanelRow,
+        ]
+      : []),
     {
       id: "asset",
       label: "Asset",
@@ -298,6 +357,28 @@ export function SboldVaultPage({ data, series }: { data: SboldVaultResponse; ser
         y.asset ? (
           <span className="font-mono text-sm" data-vault-asset-read={y.asset}>
             <Prov info={sboldAssetProv(coords)}>{shortAddress(y.asset)}</Prov>
+          </span>
+        ) : (
+          UNREAD
+        ),
+      ),
+    },
+    {
+      id: "owner",
+      label: "Owner",
+      tip: "The address the vault's owner() names.",
+      value: fig(
+        "owner",
+        undefined,
+        y.owner ? (
+          <span className="font-mono text-sm" data-steward={y.owner} data-steward-role="owner">
+            <a
+              href={walletHref(y.owner, undefined)}
+              className="text-(--text-link) hover:underline"
+              data-link="owner-wallet"
+            >
+              <Prov info={sboldOwnerProv(coords, y.owner)}>{shortAddress(y.owner)}</Prov>
+            </a>
           </span>
         ) : (
           UNREAD
@@ -338,8 +419,29 @@ export function SboldVaultPage({ data, series }: { data: SboldVaultResponse; ser
       hooks: { "data-sp-branch": d.branch, "data-sp-pool": d.pool, "data-deposit-raw": d.compounded?.raw ?? "" },
     };
   });
+  // The three pools' BOLD yield pending, one row, where all three answered (ui-jobs 765).
+  const yields = data.deposits.map((d) => d.yieldPending);
+  const yieldSum = yields.every((p) => p != null) ? yields.reduce((t, p) => t + BigInt(p!.raw), BigInt(0)) : null;
+  const yieldAmount: RawAmount | null =
+    yieldSum == null ? null : { raw: yieldSum.toString(), value: Number(yieldSum) / 1e18 };
   const rows: VaultAssetRow[] = [
     ...depositRows,
+    {
+      key: "yield-pending",
+      venue: "BOLD yield pending",
+      sub: <span>getDepositorYieldGainWithPending, three pools</span>,
+      amount: yieldAmount,
+      amountProv:
+        yieldSum == null
+          ? undefined
+          : sboldYieldProv(coords, {
+              pools: data.deposits.map((d) => ({ branch: d.branch, pool: d.pool, raw: d.yieldPending!.raw })),
+              sumRaw: yieldSum.toString(),
+            }),
+      share: fraction(yieldAmount, y.totalAssets),
+      shareProv: vaultVenueShareProv(v, "the BOLD yield pending", "totalAssets()", coords.readBy),
+      hooks: { "data-yield-pending-raw": yieldAmount?.raw ?? "" },
+    },
     {
       key: "idle",
       venue: "Idle BOLD in the vault",
@@ -352,21 +454,30 @@ export function SboldVaultPage({ data, series }: { data: SboldVaultResponse; ser
     },
   ];
 
-  // The three deposits and the idle BOLD against totalAssets() (ui-jobs 749):
-  // stated where all five getters answered.
-  const parts = [...data.deposits.map((d) => d.compounded), data.idle];
+  // The rows against totalAssets() (ui-jobs 749, 765): stated where every
+  // getter answered; a difference is stated with its figures.
+  const parts = [...data.deposits.map((d) => d.compounded), ...yields, data.idle];
   const reconcile =
     y.totalAssets && parts.every((p) => p != null)
       ? (() => {
           const sum = parts.reduce((t, p) => t + BigInt(p!.raw), BigInt(0));
           const diff = BigInt(y.totalAssets.raw) - sum;
           const amt = (raw: bigint) => assetText({ raw: raw.toString(), value: Number(raw) / 1e18 }, ad);
+          // calcFragments() stated where its BOLD amount is the rows' sum and its total is totalAssets().
+          const f = y.fragments;
+          const fragments = f && f.boldRaw === sum.toString() && f.totalRaw === y.totalAssets.raw ? f : null;
           return {
             sum,
             diff,
             text: amt,
+            fragments,
             prov: sboldReconcileProv(coords, {
-              deposits: data.deposits.map((d) => ({ branch: d.branch, pool: d.pool, raw: d.compounded!.raw })),
+              deposits: data.deposits.map((d) => ({
+                branch: d.branch,
+                pool: d.pool,
+                raw: d.compounded!.raw,
+                yieldRaw: d.yieldPending!.raw,
+              })),
               idleRaw: data.idle!.raw,
               totalRaw: y.totalAssets.raw,
               sumRaw: sum.toString(),
@@ -417,6 +528,48 @@ export function SboldVaultPage({ data, series }: { data: SboldVaultResponse; ser
           </ExplainBullet>
         ))}
       </ExplainGroup>
+      {y.paused === true && (
+        <ExplainGroup title="Paused">
+          <ExplainBullet data-sbold-paused="">
+            The vault&rsquo;s paused() answers{" "}
+            <Prov info={sboldPausedProv(coords)}>
+              <Fig>true</Fig>
+            </Prov>
+            .
+          </ExplainBullet>
+          {pausedLog && (
+            <ExplainBullet data-sbold-paused-log={pausedLog.block}>
+              Its latest Paused log is at block{" "}
+              <Prov info={sboldPausedLogProv(pausedLog, "block")}>
+                <Fig>{n(pausedLog.block)}</Fig>
+              </Prov>
+              {pausedLog.time != null && (
+                <>
+                  {" "}
+                  (
+                  <Prov info={sboldPausedLogProv(pausedLog, "time")}>
+                    <Fig>{whenText({ time: pausedLog.time })}</Fig>
+                  </Prov>
+                  )
+                </>
+              )}
+              , in transaction{" "}
+              <a href={eth("tx", pausedLog.txHash)} target="_blank" rel="noopener" className="link-external">
+                <Prov info={sboldPausedLogProv(pausedLog, "tx")}>
+                  <Fig>{shortAddress(pausedLog.txHash)}</Fig>
+                </Prov>
+              </a>
+              , paused by account{" "}
+              <a href={eth("address", pausedLog.account)} target="_blank" rel="noopener" className="link-external">
+                <Prov info={sboldPausedLogProv(pausedLog, "account")}>
+                  <Fig>{shortAddress(pausedLog.account)}</Fig>
+                </Prov>
+              </a>
+              .
+            </ExplainBullet>
+          )}
+        </ExplainGroup>
+      )}
       {/* Blocks 26,441,800 and 26,442,100 stay here when the strip's window has passed them (ui-jobs 749). */}
       {series && series.marked.length > 0 && (
         <ExplainGroup title="Earlier reads">
@@ -452,7 +605,7 @@ export function SboldVaultPage({ data, series }: { data: SboldVaultResponse; ser
   // Total assets and Share price only: the figures this page reads. A share
   // price of zero reads "0" (ui-jobs 749).
   const receipts = {
-    name: sboldNameProv(coords),
+    name: sboldNameProv(coords, y.name),
     totalAssets: sboldTotalAssetsProv(coords),
     sharePrice: sboldSharePriceProv(coords),
   };
@@ -483,7 +636,17 @@ export function SboldVaultPage({ data, series }: { data: SboldVaultResponse; ser
         y.totalSupply && y.shareDecimals != null ? shareText(y.totalSupply, y.shareDecimals) : "not read",
       ],
       ["Total assets ÷ shares issued (BOLD per share)", perShare ?? "not read"],
+      ...(y.paused === true ? [["Paused", "true"] as [string, string]] : []),
+      ...(y.paused === true && pausedLog
+        ? [
+            ["Latest Paused log", `block ${pausedLog.block}, tx ${pausedLog.txHash}, account ${pausedLog.account}`] as [
+              string,
+              string,
+            ],
+          ]
+        : []),
       ["Asset", y.asset ?? "not read"],
+      ["Owner", y.owner ?? "not read"],
       ["Block", String(data.blockNumber)],
     ],
     rows: rows.map((r) => [
@@ -495,14 +658,24 @@ export function SboldVaultPage({ data, series }: { data: SboldVaultResponse; ser
 
   return (
     <ProvReceiptsScope registry={registry}>
+      <VaultFinder />
       <Tile id="summary" flush>
         <div className={VAULT_CARD_TILE}>
           <VaultCard
-            vault={v}
+            vault={{ ...v, standing: v.standing.filter((s) => s !== "paused") }}
             holdersHref={null}
             receipts={receipts}
             heads={heads}
-            status={null}
+            status={
+              y.paused === true
+                ? {
+                    word: "Paused",
+                    tone: "muted",
+                    tip: "The vault's paused() answers true at this block.",
+                    prov: sboldPausedProv(coords),
+                  }
+                : null
+            }
             stats={stats}
             links={links}
             explanation={explanation}
@@ -524,13 +697,19 @@ export function SboldVaultPage({ data, series }: { data: SboldVaultResponse; ser
                         name: "sBOLD vault",
                         address: y.address,
                         reads:
-                          "totalAssets(), totalSupply(), convertToAssets(10 ** 18), asset(), name(), symbol(), decimals()",
+                          "totalAssets(), totalSupply(), convertToAssets(10 ** 18), asset(), name(), symbol(), decimals(), paused(), owner(), calcFragments()",
                       },
                       { name: "BOLD", address: SBOLD_ASSET.address, reads: "balanceOf(sBOLD)" },
                       ...data.deposits.map((d) => ({
+                        name: d.coll.symbol,
+                        address: d.coll.address,
+                        reads: "balanceOf(sBOLD)",
+                      })),
+                      ...data.deposits.map((d) => ({
                         name: `Liquity V2 ${d.branch} Stability Pool`,
                         address: d.pool,
-                        reads: "getCompoundedBoldDeposit(sBOLD)",
+                        reads:
+                          "getCompoundedBoldDeposit(sBOLD), getDepositorYieldGainWithPending(sBOLD), getDepositorCollGain(sBOLD), stashedColl(sBOLD)",
                       })),
                     ],
                   })
@@ -554,7 +733,7 @@ export function SboldVaultPage({ data, series }: { data: SboldVaultResponse; ser
             assetAddress={asset.address}
             assetDecimals={ad}
             chart={null}
-            line="The vault's deposit in each of Liquity V2's three Stability Pools, and its BOLD balance."
+            line="The vault's deposit in each of Liquity V2's three Stability Pools, their BOLD yield pending, and its BOLD balance."
             shareTip="The row's amount over the vault's total assets."
             learnMore={sboldVaultAssetsContent()}
             menu={{ exports: vaultAssetsExports(v, exportModel) }}
@@ -567,20 +746,56 @@ export function SboldVaultPage({ data, series }: { data: SboldVaultResponse; ser
             >
               {reconcile.diff === BigInt(0) ? (
                 <>
-                  The three deposits and the idle BOLD sum to total assets,{" "}
-                  <Prov info={reconcile.prov}>{reconcile.text(reconcile.sum)}</Prov> {unit}.
+                  The rows sum to total assets, <Prov info={reconcile.prov}>{reconcile.text(reconcile.sum)}</Prov>{" "}
+                  {unit}.
                 </>
               ) : (
                 <>
-                  The three deposits and the idle BOLD sum to{" "}
-                  <Prov info={reconcile.prov}>{reconcile.text(reconcile.sum)}</Prov> {unit}; total assets are{" "}
-                  <Prov info={sboldTotalAssetsProv(coords)}>{assetText(y.totalAssets!, ad)}</Prov> {unit},{" "}
+                  The rows sum to <Prov info={reconcile.prov}>{reconcile.text(reconcile.sum)}</Prov> {unit}; total
+                  assets are <Prov info={sboldTotalAssetsProv(coords)}>{assetText(y.totalAssets!, ad)}</Prov> {unit},{" "}
                   <Prov info={reconcile.prov}>
-                    {reconcile.text(reconcile.diff < BigInt(0) ? -reconcile.diff : reconcile.diff)}
+                    {formatUnitsExact((reconcile.diff < BigInt(0) ? -reconcile.diff : reconcile.diff).toString(), ad)}
                   </Prov>{" "}
                   {unit} {reconcile.diff > BigInt(0) ? "above" : "below"} the sum.
+                  {reconcile.fragments && (
+                    <>
+                      {" "}
+                      The vault&rsquo;s{" "}
+                      <Prov info={sboldFragmentsProv(coords, reconcile.fragments)}>calcFragments()</Prov> answers a BOLD
+                      amount equal to the rows&rsquo; sum, to the wei, and a total equal to total assets.
+                    </>
+                  )}
                 </>
               )}
+            </p>
+          )}
+          {data.deposits.every((d) => d.collGainRaw != null && d.stashedCollRaw != null && d.collHeldRaw != null) && (
+            <p className="mt-2 text-[13px] text-rb-500" data-sbold-collateral="">
+              Collateral in the vault&rsquo;s name, pending in each pool, stashed and held:{" "}
+              {data.deposits.map((d, i) => {
+                const raw = (BigInt(d.collGainRaw!) + BigInt(d.stashedCollRaw!) + BigInt(d.collHeldRaw!)).toString();
+                const text = formatUnitsExact(raw, d.coll.decimals);
+                return (
+                  <span key={d.branch} data-sbold-coll={d.branch} data-raw={raw}>
+                    {i > 0 ? ", " : ""}
+                    <Prov
+                      info={sboldCollProv(coords, {
+                        branch: d.branch,
+                        pool: d.pool,
+                        coll: d.coll,
+                        gainRaw: d.collGainRaw!,
+                        stashRaw: d.stashedCollRaw!,
+                        heldRaw: d.collHeldRaw!,
+                        text,
+                      })}
+                    >
+                      {text}
+                    </Prov>{" "}
+                    {d.coll.symbol}
+                  </span>
+                );
+              })}
+              .
             </p>
           )}
         </Tile>

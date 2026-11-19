@@ -143,7 +143,9 @@ export function DetailTopRow({
   fallbackHref,
   children,
 }: {
-  session: SessionProtocol;
+  /** The page's explorer; absent on a page no explorer owns (sBOLD's holder
+   *  page, ui-jobs 765): Back's fresh-tab fallback is then `fallbackHref`. */
+  session?: SessionProtocol;
   wallet?: string | null;
   showStamp?: boolean;
   assets?: LatestPriceAsset[];
@@ -168,7 +170,7 @@ export function DetailTopRow({
   children?: ReactNode;
 }) {
   const eventPage = useParams<{ eventId?: string }>()?.eventId != null;
-  const entry = protocolForSession(session);
+  const entry = session ? protocolForSession(session) : undefined;
   const lifecycleId = entry?.lifecycle ? entry.id : null;
   // The event page's facts table leaves out a row repeating this address.
   usePublishHeadingWallet(eventPage ? (owner?.wallet ?? null) : null);

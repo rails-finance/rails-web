@@ -39,7 +39,7 @@ import { tooSmallToMeasure } from "@/lib/vaults/yield";
 
 /** What the chain or the venue states about a vault's standing, as a pill
  *  reads it. `endorsed`: Yearn's Registry endorses it. `shut-down`: the vault
- *  answers `isShutdown()` true. `paused`: the vault says deposits are paused.
+ *  answers `isShutdown()` true. `paused`: the vault's `paused()` answers true.
  *  `address-book`: Aave publishes the address in its own address book.
  *  `illiquid`: Rails's test over the chain's reads of a MetaMorpho vault's
  *  markets (lib/vaults/illiquid.ts, ui-jobs 540). `lost-assets`: a MetaMorpho
@@ -321,7 +321,10 @@ const trimmed = (s: string | null) => s?.trim() || null;
 
 /** The name a surface shows and sorts by, trimmed (ui-jobs 664). */
 export const vaultDisplayName = (v: VaultSummary): string | null =>
-  trimmed(v.name) ?? trimmed(v.catalogName) ?? trimmed(v.symbol);
+  // sBOLD shows by its symbol() "sBOLD"; its name() "sBold" stays a fact in receipts (ui-jobs 765).
+  v.family === "sbold"
+    ? (trimmed(v.symbol) ?? trimmed(v.catalogName) ?? trimmed(v.name))
+    : (trimmed(v.name) ?? trimmed(v.catalogName) ?? trimmed(v.symbol));
 
 // ── The vault pages' reads (V2) ─────────────────────────────────────────────
 // Each vault page reads its vault at one block with its own loader; these turn
@@ -419,7 +422,7 @@ export function yearnVaultPageSummary(d: YearnVaultResponse, census: VaultCensus
   };
 }
 
-/** The sBOLD vault's page read (ui-jobs 749). No census and no steward read. */
+/** The sBOLD vault's page read (ui-jobs 749, 765). No census; the steward is owner(). */
 export function sboldVaultPageSummary(
   d: SboldVaultResponse,
   asset: { address: string; symbol: string; decimals: number },
@@ -441,8 +444,10 @@ export function sboldVaultPageSummary(
     totalSupply: v.totalSupply,
     sharePrice: v.sharePrice,
     lostAssets: null,
-    steward: null,
-    standing: [],
+    steward: v.owner ? { role: "owner", address: v.owner } : null,
+    // paused() answering true is a standing for /vaults and compare; the
+    // card draws no pill for it (ui-jobs 765).
+    standing: v.paused === true ? ["paused"] : [],
     createdBlock,
     census: null,
     readAt: { block: d.blockNumber, timestamp: "" },

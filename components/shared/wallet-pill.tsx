@@ -63,7 +63,7 @@ function WalletPillInner({
    *  not a person, so the label names the vault and the click goes to the
    *  vault's own page rather than a wallet-filtered listing. The hex stays
    *  reachable — the tooltip states it, and the copy button still copies it. */
-  vault?: { name: string; href: string } | null;
+  vault?: { name: string; href: string; kind?: string } | null;
   /** Where the label goes in place of the wallet-filtered listing, with the
    *  words its accessible name states (PWN: the same loan read from this
    *  party's side). A vault's href still wins. */
@@ -122,7 +122,7 @@ function WalletPillInner({
   // truncated, and a clipped name with no way to read it in full would be worse
   // than the hex it replaced.
   const labelTip = vault
-    ? `${vault.name}, a MetaMorpho vault · ${wallet}`
+    ? `${vault.name}, ${vault.kind ?? "a MetaMorpho vault"} · ${wallet}`
     : href && hrefOverride && hrefLabel
       ? `${hrefLabel} · ${name ?? wallet}`
       : name

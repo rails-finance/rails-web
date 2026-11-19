@@ -1,4 +1,4 @@
-// THE sBOLD VAULT'S PAGE — /ethereum/liquity-v2/sbold (rails-ops ui-jobs 749).
+// THE sBOLD VAULT'S PAGE — /ethereum/vaults/sbold (rails-ops ui-jobs 749, 765).
 // ----------------------------------------------------------------------------
 // The Yearn vault page's shell (app/(app)/ethereum/yearn/vaults/[vault]) for
 // one ERC-4626 vault on BOLD, drawn by components/vaults/sbold-vault-page.tsx
@@ -6,35 +6,49 @@
 // lines (lib/sources/chain/sbold-daily.ts). Chain facts only.
 
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-import { RailHeader } from "@/components/shared/rail-header";
+import { SboldPageHeader } from "@/components/vaults/sbold-page-header";
 import { SboldVaultPage } from "@/components/vaults/sbold-vault-page";
 import { FocusSourceGate } from "@/components/shared/aim-gate";
 import { listingMetadata } from "@/lib/shared/page-metadata";
 import { loadSboldVault } from "@/lib/sources/chain/sbold-vault";
 import { loadSboldSeries } from "@/lib/sources/chain/sbold-daily";
-import { SBOLD_ASSET, SBOLD_PAGE_PATH } from "@/lib/liquity-v2/sbold";
+import { loadSboldPausedLog } from "@/lib/sources/chain/sbold-paused";
+import { SBOLD_ASSET, SBOLD_PAGE_PATH, sboldHolderHref } from "@/lib/liquity-v2/sbold";
 
 // Every figure is a getter's answer at the head.
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = listingMetadata({
-  title: "sBOLD · Liquity V2",
+  title: "sBOLD · Vaults",
   description:
     "The sBOLD vault's total assets, shares issued, share price and its deposits in Liquity V2's three Stability Pools, read from the contracts at one block.",
   canonicalPath: SBOLD_PAGE_PATH,
 });
 
-export default async function SboldVaultRoute() {
+type Props = { searchParams: Promise<{ holder?: string | string[] }> };
+
+export default async function SboldVaultRoute({ searchParams }: Props) {
+  // The finder's submit (V4), sent on to the holder's path as typed (ui-jobs 765).
+  const q = (await searchParams).holder;
+  const typed = (Array.isArray(q) ? q[0] : q)?.trim();
+  if (typed) redirect(sboldHolderHref(typed));
   const data = await loadSboldVault();
-  const series = data.chainStale ? null : await loadSboldSeries(data);
+  // The latest Paused log is read only where paused() answers true (ui-jobs 765).
+  const [series, pausedLog] = data.chainStale
+    ? [null, null]
+    : await Promise.all([
+        loadSboldSeries(data),
+        data.vault.paused === true ? loadSboldPausedLog(data.blockNumber) : Promise.resolve(null),
+      ]);
   return (
     <FocusSourceGate source={{ asset: SBOLD_ASSET }} chain={1} what="This vault">
       <div className="min-h-screen">
         <div className="py-8">
           <header className="mb-5" data-skel-section="page-header">
-            <RailHeader session="liquity-v2" venue="subPage" />
+            <SboldPageHeader />
           </header>
 
           {data.chainStale ? (
@@ -42,7 +56,7 @@ export default async function SboldVaultRoute() {
               This vault could not be read from chain just now, so no figure is stated for it.
             </p>
           ) : (
-            <SboldVaultPage data={data} series={series} />
+            <SboldVaultPage data={data} series={series} pausedLog={pausedLog} />
           )}
 
           {/* The inspector, armed from the profile menu's switch. */}

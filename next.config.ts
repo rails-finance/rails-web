@@ -275,6 +275,13 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
+      // sBOLD moved out of Liquity V2 to /ethereum/vaults/sbold (ui-jobs 765).
+      { source: "/ethereum/liquity-v2/sbold", destination: "/ethereum/vaults/sbold", permanent: true },
+      {
+        source: "/ethereum/liquity-v2/sbold/:path*",
+        destination: "/ethereum/vaults/sbold/:path*",
+        permanent: true,
+      },
       // Legacy explorer paths — collapsed to a single hop to the new canonical
       // /liquity-v2/trove/... rather than chaining through the intermediate
       // /trove/... URL.

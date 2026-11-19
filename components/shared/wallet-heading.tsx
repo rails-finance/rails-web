@@ -233,7 +233,7 @@ export interface PositionOwner {
   filterProtocol?: SessionProtocol | null;
   /** The bookmark on the address; false draws none. */
   bookmark?: boolean;
-  vault?: { name: string; href: string } | null;
+  vault?: { name: string; href: string; kind?: string } | null;
   href?: string;
   hrefLabel?: string;
   /** Drawn before the address ("last holder" on a closed Trove that changed hands). */
@@ -252,8 +252,9 @@ export function PositionWalletHeading({
 }: {
   owner: PositionOwner;
   /** The page's explorer: the chain of the address kind, and the default for
-   *  the listing link. */
-  session: SessionProtocol;
+   *  the listing link. Absent on a page no explorer owns (ui-jobs 765): the
+   *  chain is `owner.chain` and the label links nowhere by default. */
+  session?: SessionProtocol;
   /** The Tools menu with the page's export shapes; absent or false for none
    *  (a page whose card carries the menu, ui-jobs 270). */
   tools?: ReactNode;
@@ -263,7 +264,7 @@ export function PositionWalletHeading({
 }) {
   const filterProtocol = owner.filterProtocol === null ? undefined : (owner.filterProtocol ?? session);
   const bookmark = owner.bookmark !== false;
-  const chainId = protocolForSession(session)?.chainId;
+  const chainId = (session ? protocolForSession(session)?.chainId : undefined) ?? owner.chain;
   // A wallet is its address menu (ui-jobs 271); a vault or a page that links
   // the address elsewhere (PWN's other side) keeps the pill.
   const plain = !owner.vault && !owner.href;

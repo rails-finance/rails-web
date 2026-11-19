@@ -7,8 +7,9 @@ import { withServerRead, type ServerRead } from "@/lib/shared/server-head-read";
 import type { Provenance } from "@/components/shared/provenance";
 import { SBOLD_ASSET, SBOLD_VAULT } from "@/lib/liquity-v2/sbold";
 import type { SpBranch } from "@/lib/liquity-v2/sp-routes";
+import { explorerUrl } from "@/lib/shared/chains";
 
-const LANE = "live Ethereum chain reads (/ethereum/liquity-v2/sbold)";
+const LANE = "live Ethereum chain reads (/ethereum/vaults/sbold)";
 
 export interface SboldCoords {
   /** rails-server's read of `blockNumber`, when it answered every read of the page. */
@@ -38,8 +39,12 @@ const vaultRead = (c: SboldCoords, call: string, summary: string): Provenance =>
   via: `${LANE} · sBOLD.${call} @ the pinned block`,
 });
 
-const sboldNameProv_ = (c: SboldCoords): Provenance =>
-  vaultRead(c, "name()", `Vault name — the name the sBOLD share token answers${atBlock(c)}.`);
+const sboldNameProv_ = (c: SboldCoords, name: string | null): Provenance =>
+  vaultRead(
+    c,
+    "symbol()",
+    `Vault symbol — the symbol the share token's symbol() answers${atBlock(c)}${name ? `; its name() answers "${name}"` : ""}.`,
+  );
 
 const sboldTotalAssetsProv_ = (c: SboldCoords): Provenance =>
   vaultRead(
@@ -100,11 +105,87 @@ const sboldIdleProv_ = (c: SboldCoords): Provenance => ({
   via: `${LANE} · BOLD.balanceOf(sBOLD) @ the pinned block`,
 });
 
+/** The three pools' `getDepositorYieldGainWithPending(sBOLD)`, summed (ui-jobs 765). */
+const sboldYieldProv_ = (
+  c: SboldCoords,
+  r: { pools: { branch: SpBranch; pool: string; raw: string }[]; sumRaw: string },
+): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  source: { block: c.blockNumber },
+  verify: {
+    kind: "recompute",
+    text: `To check: ask any Ethereum archive node${atBlock(c)} for getDepositorYieldGainWithPending(${SBOLD_VAULT}) on each of the three Stability Pools, and add them.`,
+  },
+  summary: `BOLD yield pending — the BOLD yield each Stability Pool's getDepositorYieldGainWithPending(sBOLD) answers${atBlock(c)}, summed over the three pools: ${r.sumRaw} raw BOLD.`,
+  contract: vaultContract,
+  via: `${LANE} · Σ StabilityPool.getDepositorYieldGainWithPending(sBOLD) @ the pinned block`,
+  formula: "WETH pool + wstETH pool + rETH pool",
+  inputs: r.pools.map((p) => ({
+    label: `getDepositorYieldGainWithPending · ${p.branch} pool`,
+    value: p.raw,
+    kind: "chain" as const,
+    pclass: "state" as const,
+    contract: { name: `Liquity V2 ${p.branch} Stability Pool`, address: p.pool },
+  })),
+});
+
+/** One branch's collateral in the vault's name, in the collateral (ui-jobs 765). */
+const sboldCollProv_ = (
+  c: SboldCoords,
+  r: {
+    branch: SpBranch;
+    pool: string;
+    coll: { symbol: string; address: string };
+    gainRaw: string;
+    stashRaw: string;
+    heldRaw: string;
+    text: string;
+  },
+): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  source: { block: c.blockNumber },
+  verify: {
+    kind: "recompute",
+    text: `To check: ask any Ethereum archive node${atBlock(c)} for getDepositorCollGain(${SBOLD_VAULT}) and stashedColl(${SBOLD_VAULT}) on ${r.pool}, and balanceOf(${SBOLD_VAULT}) on ${r.coll.address}, and add them.`,
+  },
+  summary: `${r.coll.symbol} in the vault's name — the ${r.branch} Stability Pool's getDepositorCollGain(sBOLD) (${r.gainRaw}) and stashedColl(sBOLD) (${r.stashRaw}), and the ${r.coll.symbol} token's balanceOf(sBOLD) (${r.heldRaw}), raw ${r.coll.symbol}${atBlock(c)}: ${r.text} ${r.coll.symbol}.`,
+  contract: { name: `Liquity V2 ${r.branch} Stability Pool`, address: r.pool },
+  via: `${LANE} · StabilityPool.getDepositorCollGain + stashedColl, ${r.coll.symbol}.balanceOf(sBOLD) @ the pinned block`,
+  formula: "getDepositorCollGain + stashedColl + balanceOf",
+  inputs: [
+    { label: "getDepositorCollGain(sBOLD)", value: r.gainRaw, kind: "chain", pclass: "state" },
+    { label: "stashedColl(sBOLD)", value: r.stashRaw, kind: "chain", pclass: "state" },
+    {
+      label: `${r.coll.symbol}.balanceOf(sBOLD)`,
+      value: r.heldRaw,
+      kind: "chain",
+      pclass: "state",
+      contract: { name: r.coll.symbol, address: r.coll.address },
+    },
+  ],
+});
+
+/** `calcFragments()` on the vault: its total and its BOLD amount (ui-jobs 765). */
+const sboldFragmentsProv_ = (
+  c: SboldCoords,
+  r: { totalRaw: string; boldRaw: string; collValueRaw: string; collInBoldRaw: string },
+): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  source: { block: c.blockNumber },
+  verify: recompute("calcFragments()", SBOLD_VAULT, c),
+  summary: `calcFragments() — the sBOLD vault's calcFragments()${atBlock(c)} answers, raw: totalBold ${r.totalRaw}, boldAmount ${r.boldRaw}, collValue ${r.collValueRaw}, collInBold ${r.collInBoldRaw}. Its boldAmount equals the rows' sum to the wei, and its totalBold equals totalAssets().`,
+  contract: vaultContract,
+  via: `${LANE} · sBOLD.calcFragments() @ the pinned block`,
+});
+
 /** The three deposits and the idle BOLD summed, against totalAssets(). */
 const sboldReconcileProv_ = (
   c: SboldCoords,
   r: {
-    deposits: { branch: SpBranch; pool: string; raw: string }[];
+    deposits: { branch: SpBranch; pool: string; raw: string; yieldRaw: string }[];
     idleRaw: string;
     totalRaw: string;
     sumRaw: string;
@@ -116,16 +197,23 @@ const sboldReconcileProv_ = (
   source: { block: c.blockNumber },
   verify: {
     kind: "recompute",
-    text: `To check: ask any Ethereum archive node${atBlock(c)} for getCompoundedBoldDeposit(${SBOLD_VAULT}) on each of the three Stability Pools, balanceOf(${SBOLD_VAULT}) on BOLD and totalAssets() on the vault, add the first four and compare the sum with the fifth.`,
+    text: `To check: ask any Ethereum archive node${atBlock(c)} for getCompoundedBoldDeposit(${SBOLD_VAULT}) and getDepositorYieldGainWithPending(${SBOLD_VAULT}) on each of the three Stability Pools, balanceOf(${SBOLD_VAULT}) on BOLD and totalAssets() on the vault; add the first seven and compare the sum with the last.`,
   },
-  summary: `Deposits and idle BOLD against total assets — the three Stability Pool deposits plus the vault's BOLD balance${atBlock(c)} sum to ${r.sumRaw} raw BOLD; totalAssets() answers ${r.totalRaw}; totalAssets() less the sum is ${r.diffRaw}.`,
+  summary: `The rows against total assets — the three Stability Pool deposits, their BOLD yield pending and the vault's BOLD balance${atBlock(c)} sum to ${r.sumRaw} raw BOLD; totalAssets() answers ${r.totalRaw}; totalAssets() less the sum is ${r.diffRaw}.`,
   contract: vaultContract,
-  via: `${LANE} · Σ getCompoundedBoldDeposit(sBOLD) + BOLD.balanceOf(sBOLD) vs sBOLD.totalAssets() @ the pinned block`,
-  formula: "WETH deposit + wstETH deposit + rETH deposit + idle BOLD − totalAssets()",
+  via: `${LANE} · Σ getCompoundedBoldDeposit(sBOLD) + Σ getDepositorYieldGainWithPending(sBOLD) + BOLD.balanceOf(sBOLD) vs sBOLD.totalAssets() @ the pinned block`,
+  formula: "totalAssets() − (three deposits + three yields pending + idle BOLD)",
   inputs: [
     ...r.deposits.map((d) => ({
       label: `getCompoundedBoldDeposit · ${d.branch} pool`,
       value: d.raw,
+      kind: "chain" as const,
+      pclass: "state" as const,
+      contract: { name: `Liquity V2 ${d.branch} Stability Pool`, address: d.pool },
+    })),
+    ...r.deposits.map((d) => ({
+      label: `getDepositorYieldGainWithPending · ${d.branch} pool`,
+      value: d.yieldRaw,
       kind: "chain" as const,
       pclass: "state" as const,
       contract: { name: `Liquity V2 ${d.branch} Stability Pool`, address: d.pool },
@@ -181,6 +269,116 @@ const sboldDepositProv_ = (c: SboldCoords, branch: SpBranch, pool: string): Prov
   via: `${LANE} · StabilityPool.getCompoundedBoldDeposit(sBOLD) @ the pinned block`,
 });
 
+/** `owner()` on the vault (ui-jobs 765): an address, no name. */
+const sboldOwnerProv_ = (c: SboldCoords, owner: string): Provenance =>
+  vaultRead(c, "owner()", `Owner — the address the sBOLD vault's owner() answers${atBlock(c)}: ${owner}.`);
+
+/** `paused()` on the vault (ui-jobs 765): the fact as the getter answers it. */
+const sboldPausedProv_ = (c: SboldCoords): Provenance =>
+  vaultRead(c, "paused()", `Paused — the sBOLD vault's paused() answers true${atBlock(c)}.`);
+
+/** The vault's latest Paused(address) log, from a sweep of its Paused and
+ *  Unpaused logs (ui-jobs 765). */
+export const sboldPausedLogProv = (
+  l: {
+    block: number;
+    time: number | null;
+    txHash: string;
+    logIndex: number;
+    account: string;
+    from: number;
+    to: number;
+  },
+  what: "block" | "time" | "tx" | "account",
+): Provenance => {
+  const when = l.time == null ? "" : ` (${new Date(l.time * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC)`;
+  const lead =
+    what === "block"
+      ? "Paused log block"
+      : what === "time"
+        ? "Paused log time — the block's timestamp"
+        : what === "tx"
+          ? "Paused log transaction"
+          : "Paused log account — the log's account field";
+  return {
+    kind: "chain",
+    pclass: "emitted",
+    source: { block: l.block, txHash: l.txHash },
+    summary: `${lead} — the sBOLD vault's latest Paused(address) log: block ${n(l.block)}${when}, transaction ${l.txHash}, log ${l.logIndex}, account ${l.account}. The vault's Paused and Unpaused logs from block ${n(l.from)} to block ${n(l.to)} were read; no Unpaused log follows it.`,
+    contract: vaultContract,
+    via: `${LANE} · eth_getLogs sBOLD Paused(address) / Unpaused(address), blocks ${n(l.from)}–${n(l.to)} · log ${l.logIndex}`,
+    verify: {
+      kind: "etherscan",
+      href: explorerUrl(1, "tx-logs", l.txHash),
+      text: "The transaction's logs on Etherscan",
+    },
+  };
+};
+
+/** A holder's sBOLD (ui-jobs 765): balanceOf, convertToAssets(balance) and
+ *  the pro-rata balance × totalAssets ÷ totalSupply, at the page's block. */
+const sboldHolderSharesProv_ = (c: SboldCoords, h: { holder: string; raw: string; decimals: number }): Provenance =>
+  vaultRead(
+    c,
+    `balanceOf(${h.holder})`,
+    `Shares held — the sBOLD vault's balanceOf(${h.holder})${atBlock(c)}: ${h.raw} share units, ${h.decimals} decimals as decimals() answers.`,
+  );
+
+const sboldHolderClaimProv_ = (c: SboldCoords, h: { holder: string; sharesRaw: string; raw: string }): Provenance => ({
+  ...vaultRead(
+    c,
+    `convertToAssets(${h.sharesRaw})`,
+    `convertToAssets(balance) — the BOLD the vault's convertToAssets answers${atBlock(c)} for the ${h.sharesRaw} share units ${h.holder} holds: ${h.raw} raw BOLD.`,
+  ),
+  inputs: [
+    { label: `balanceOf(${h.holder})`, value: h.sharesRaw, kind: "chain", pclass: "state", contract: vaultContract },
+  ],
+});
+
+/** The pro-rata less convertToAssets(balance), both at the block (ui-jobs 765). */
+const sboldHolderDiffProv_ = (
+  c: SboldCoords,
+  h: { holder: string; proRataRaw: string; claimRaw: string; diffRaw: string },
+): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  source: { block: c.blockNumber },
+  verify: {
+    kind: "recompute",
+    text: `To check: ask any Ethereum archive node${atBlock(c)} for balanceOf(${h.holder}), totalAssets() and totalSupply() on ${SBOLD_VAULT}, and convertToAssets of that balance; take balance × totalAssets ÷ totalSupply, rounded down to the wei, less the conversion.`,
+  },
+  summary: `Pro-rata less convertToAssets(balance) — balance × totalAssets() ÷ totalSupply() for ${h.holder}${atBlock(c)}, ${h.proRataRaw} raw BOLD rounded down to the wei, less convertToAssets(balance), ${h.claimRaw} raw BOLD: ${h.diffRaw} raw BOLD.`,
+  contract: vaultContract,
+  via: `${LANE} · balanceOf × totalAssets ÷ totalSupply − convertToAssets(balance) @ the pinned block`,
+  formula: "floor(balanceOf × totalAssets ÷ totalSupply) − convertToAssets(balanceOf)",
+  inputs: [
+    { label: "pro-rata (wei)", value: h.proRataRaw, kind: "chain-derived", pclass: "state", step: true },
+    { label: "convertToAssets(balance)", value: h.claimRaw, kind: "chain", pclass: "state", contract: vaultContract },
+  ],
+});
+
+const sboldHolderProRataProv_ = (
+  c: SboldCoords,
+  h: { holder: string; sharesRaw: string; assetsRaw: string; supplyRaw: string; text: string },
+): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  source: { block: c.blockNumber },
+  verify: {
+    kind: "recompute",
+    text: `To check: ask any Ethereum archive node${atBlock(c)} for balanceOf(${h.holder}), totalAssets() and totalSupply() on ${SBOLD_VAULT}; multiply the first two and divide by the third.`,
+  },
+  summary: `Pro-rata BOLD — ${h.holder}'s share units times the vault's totalAssets(), over its totalSupply()${atBlock(c)}: ${h.text} BOLD, rounded half-up to four significant digits.`,
+  contract: vaultContract,
+  via: `${LANE} · sBOLD.balanceOf(holder) × sBOLD.totalAssets() ÷ sBOLD.totalSupply() @ the pinned block`,
+  formula: "balanceOf(holder) × totalAssets() ÷ totalSupply()",
+  inputs: [
+    { label: "balanceOf(holder)", value: h.sharesRaw, kind: "chain", pclass: "state", contract: vaultContract },
+    { label: "totalAssets()", value: h.assetsRaw, kind: "chain", pclass: "state", contract: vaultContract },
+    { label: "totalSupply()", value: h.supplyRaw, kind: "chain", pclass: "state", contract: vaultContract },
+  ],
+});
+
 // Receipts over a page's reads stamp rails-server's head read when the coordinates carry it.
 export const sboldNameProv = withServerRead(sboldNameProv_);
 export const sboldTotalAssetsProv = withServerRead(sboldTotalAssetsProv_);
@@ -192,3 +390,12 @@ export const sboldIdleProv = withServerRead(sboldIdleProv_);
 export const sboldReconcileProv = withServerRead(sboldReconcileProv_);
 export const sboldBlockProv = withServerRead(sboldBlockProv_);
 export const sboldDepositProv = withServerRead(sboldDepositProv_);
+export const sboldPausedProv = withServerRead(sboldPausedProv_);
+export const sboldOwnerProv = withServerRead(sboldOwnerProv_);
+export const sboldYieldProv = withServerRead(sboldYieldProv_);
+export const sboldCollProv = withServerRead(sboldCollProv_);
+export const sboldFragmentsProv = withServerRead(sboldFragmentsProv_);
+export const sboldHolderSharesProv = withServerRead(sboldHolderSharesProv_);
+export const sboldHolderClaimProv = withServerRead(sboldHolderClaimProv_);
+export const sboldHolderProRataProv = withServerRead(sboldHolderProRataProv_);
+export const sboldHolderDiffProv = withServerRead(sboldHolderDiffProv_);
