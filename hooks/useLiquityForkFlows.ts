@@ -99,6 +99,7 @@ export function useLiquityForkFlows(p: LiquityForkFlowsInput): {
       live: p.open
         ? {
             price: livePrice,
+            ...(chain?.priceUsd != null ? { block: chain.blockNumber } : {}),
             ...(chain
               ? {
                   coll: chain.entireColl,

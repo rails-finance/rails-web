@@ -13,7 +13,7 @@
 // health factor weighs the collateral by as the liquidation threshold. A
 // collateral toggle moves no balance and keeps its cell.
 
-import type { Provenance, ProvInput } from "@/components/shared/provenance";
+import type { Provenance } from "@/components/shared/provenance";
 import {
   SHEET_WORDS,
   sheetUsd,
@@ -26,8 +26,11 @@ import { changeText } from "@/components/shared/change-swap-value";
 import type { AaveV4Context, AaveV4PriceSource } from "@/lib/shared/types/protocols/aave-v4";
 import type { AaveV4SnapshotItem } from "@/lib/shared/types/event-shape";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
+import { amountsUsd, cellOf, marketMoveUsd, type PricedAmount } from "@/lib/shared/sheet-usd-rows";
+import { priceText } from "@/lib/shared/shown-usd";
+import { aaveV4PriceNote } from "@/lib/aave-v4/price-notes";
 import { UNPRICED_DUST_TOKENS } from "@/lib/aave-v4/unpriced";
-import { fmtUnitPrice, fmtV4Amount, hfLabelV4, HF_CAP } from "@/lib/aave-v4/format";
+import { fmtV4Amount, hfLabelV4, HF_CAP } from "@/lib/aave-v4/format";
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import { hfOf, premiumAt, type HealthFactorAround } from "@/lib/aave-v4/use-health-factor-around";
 import {
@@ -108,6 +111,11 @@ function decSub(a: string, b: string): string {
 /** An asset's price at an event's block: the snapshot row's, else the event's
  *  primary price for the asset it moved. */
 function priceOf(ctx: AaveV4Context, item: Holding): Price | undefined {
+  const p = rawPriceOf(ctx, item);
+  // An on-chain read only: a $1 pin or an off-chain aggregate is no price.
+  return p && isOnChainPriceSource(p.source) ? p : undefined;
+}
+function rawPriceOf(ctx: AaveV4Context, item: Holding): Price | undefined {
   if (item.price) return item.price;
   if (ctx.eventType === "liquidation") {
     if (item.symbol === ctx.collateralSymbol) return ctx.collateralPrice;
@@ -153,67 +161,43 @@ function holdingsOf(ctx: AaveV4Context, leg: Side): Holding[] {
   return m && Number(m.after) > 0 ? [{ symbol: m.symbol, amount: m.after }] : [];
 }
 
-const priceInput = (sym: string, p: Price, what = `${sym} price`): ProvInput => ({
-  label: what,
-  value: `$${p.usd}`,
-  kind: isOnChainPriceSource(p.source) ? "chain" : "offchain",
-  pclass: isOnChainPriceSource(p.source) ? "oracle" : "offchain",
-  note: p.source === "iaave-oracle" ? "Aave's oracle (getReservePrice)" : `price source · ${p.source}`,
+// Each dollar cell is its rows' cents, shown to the dollar, each price named
+// with its read and block (lib/shared/sheet-usd-rows.ts, ui-jobs 743).
+const VIA = "the spoke's snapshot around the event · each asset's amount × its price at its block";
+/** A holding's amount at its price, named by its read and block. */
+const pricedOf = (sym: string, amount: number, p: Price | undefined, block: number | undefined): PricedAmount => ({
+  symbol: sym,
+  amount,
+  price: p?.usd ?? null,
+  block: p?.block ?? block ?? null,
+  ...(p
+    ? { priceNote: aaveV4PriceNote(p.source as Parameters<typeof aaveV4PriceNote>[0], sym, p.block ?? block ?? null) }
+    : {}),
 });
 
-/** A token amount's dollars at its price at this block. */
-const atBlockUsdProv = (sym: string, what: string, amount: string, p: Price): Provenance => ({
-  kind: isOnChainPriceSource(p.source) ? "chain-derived" : "derived",
-  pclass: isOnChainPriceSource(p.source) ? "oracle" : "offchain",
-  summary: `${what}, in US dollars. The amount times the ${sym} price at this block.`,
-  formula: "amount × price",
-  inputs: [{ label: "amount", value: `${amount} ${sym}`, kind: "chain-derived", pclass: "state" }, priceInput(sym, p)],
-});
-
-/** Dollars over a list of holdings; an asset with no price above dust is
- *  named and leaves the sum unstated (RULE: Rails never invents a price,
- *  lib/aave-v4/unpriced.ts). */
-function sumOf(ctx: AaveV4Context, items: Holding[]) {
-  let usd = 0;
+/** Dollars over a list of holdings, each at its price as shown: an asset with
+ *  no price above dust is named and leaves the sum with no figure (RULE: Rails
+ *  never invents a price, lib/aave-v4/unpriced.ts). */
+function sumOf(ctx: AaveV4Context, items: Holding[], what: string, block: number | undefined) {
+  const legs: PricedAmount[] = [];
   const missing: string[] = [];
-  const priced: { item: Holding; price: Price }[] = [];
   for (const item of items) {
     const n = Number(item.amount);
     if (!(n > 0)) continue;
     const p = priceOf(ctx, item);
-    if (p) {
-      usd += n * p.usd;
-      priced.push({ item, price: p });
-    } else if (n > UNPRICED_DUST_TOKENS) missing.push(aaveV4DisplaySymbol(item.symbol));
+    const sym = aaveV4DisplaySymbol(item.symbol);
+    if (p) legs.push(pricedOf(sym, n, p, block));
+    else if (n > UNPRICED_DUST_TOKENS) {
+      missing.push(sym);
+      legs.push(pricedOf(sym, n, undefined, block));
+    }
   }
-  return { usd, missing, priced };
+  const cell = amountsUsd(what, legs, { amountNote: "the balance in the spoke's snapshot", via: VIA });
+  return { cell, usd: cell.usd, missing };
 }
 
-/** A sum's receipt: each balance and its price. */
-const sumProv = (summary: string, priced: { item: Holding; price: Price }[]): Provenance => {
-  const onchain = priced.every((x) => isOnChainPriceSource(x.price.source));
-  return {
-    kind: onchain ? "chain-derived" : "derived",
-    pclass: onchain ? "oracle" : "offchain",
-    summary,
-    formula: "Σ balance × price",
-    inputs: priced.flatMap(({ item, price }) => {
-      const sym = aaveV4DisplaySymbol(item.symbol);
-      return [
-        {
-          label: `${sym} balance`,
-          value: `${item.amount} ${sym}`,
-          kind: "chain-derived" as const,
-          pclass: "state" as const,
-        },
-        priceInput(sym, price),
-      ];
-    }),
-  };
-};
-
-const priceNote = (p: Price | undefined) =>
-  p ? (p.source === "stablecoin" ? `≈${fmtUnitPrice(p.usd)}` : fmtUnitPrice(p.usd)) : undefined;
+/** A price as the sub-rows print it. */
+const priceNote = (p: Price | undefined) => (p ? priceText(p.usd) : undefined);
 
 const sinceProv = (what: string): Provenance => ({
   kind: "derived",
@@ -224,6 +208,7 @@ const sinceProv = (what: string): Provenance => ({
 function sheetSide({
   ctx,
   prev,
+  prevBlock,
   side,
   coord,
   label,
@@ -233,6 +218,7 @@ function sheetSide({
 }: {
   ctx: AaveV4Context;
   prev: AaveV4Context | undefined;
+  prevBlock?: number;
   side: FlowSide;
   coord: EventProvDetail;
   label: string;
@@ -265,9 +251,12 @@ function sheetSide({
           info: deltaProv({ ...coord, asset: sym }),
           value: `${n < 0 ? "−" : "+"}${abs}`,
         },
-        usd: p
-          ? { text: sheetUsd(n * p.usd), info: atBlockUsdProv(sym, `The ${sym} this event moved`, abs, p) }
-          : undefined,
+        usd: cellOf(
+          amountsUsd(`The ${sym} this event moved, in USD`, [pricedOf(sym, n, p, coord.blockNumber)], {
+            amountNote: "the balance after the event less the balance before it",
+            via: VIA,
+          }),
+        ),
         tip: TIPS.event(sym, side),
       });
     }
@@ -295,24 +284,17 @@ function sheetSide({
   // A side that held nothing then and nothing before this event has no carry.
   const prevItems = prev ? holdingsOf(prev, leg) : [];
   if (prev && (prevItems.length > 0 || beforeItems.some((h) => Number(h.amount) > 0))) {
-    const last = sumOf(prev, prevItems);
-    const beforeSum = sumOf(ctx, beforeItems);
-    if (last.missing.length === 0)
-      carry.push({
-        key: "last",
-        label: SHEET_WORDS.last,
-        usd: {
-          text: sheetUsd(last.usd),
-          info: sumProv(
-            `The ${side} once the previous event on this spoke had run, in US dollars. Each asset's balance in that event's snapshot times its price at that block, added up.`,
-            last.priced,
-          ),
-        },
-        tip: TIPS.last(side),
-      });
+    const last = sumOf(prev, prevItems, `The ${side} once the previous event on this spoke had run, in USD`, prevBlock);
+    const beforeSum = sumOf(ctx, beforeItems, `The ${side} just before this event, in USD`, coord.blockNumber);
+    carry.push({
+      key: "last",
+      label: SHEET_WORDS.last,
+      usd: cellOf(last.cell),
+      tip: TIPS.last(side),
+    });
     // Interest per asset: the balance before this event less the balance after
     // the previous one; no event moved the shares between them.
-    let interestUsd = 0;
+    const legs: PricedAmount[] = [];
     let complete = true;
     const sub: SheetRow[] = [];
     for (const h of beforeItems) {
@@ -326,8 +308,8 @@ function sheetSide({
       if (!(g > 0)) continue;
       const sym = aaveV4DisplaySymbol(h.symbol);
       const p = priceOf(ctx, h);
-      if (p) interestUsd += g * p.usd;
-      else complete = false;
+      const leg1 = pricedOf(sym, g, p, coord.blockNumber);
+      legs.push(leg1);
       sub.push({
         key: `interest-${sym}`,
         label: sym,
@@ -339,73 +321,53 @@ function sheetSide({
           info: interestSincePreviousProv({ ...coord, asset: sym }, leg),
           value: gain,
         },
-        usd: p
-          ? {
-              text: sheetUsd(g * p.usd),
-              info: atBlockUsdProv(sym, `Interest on ${sym} since the previous event`, gain, p),
-            }
-          : undefined,
+        usd: cellOf(
+          amountsUsd(`Interest on ${sym} since the previous event, in USD`, [leg1], {
+            amountNote: "the balance before this event less the balance once the previous one had run",
+            via: VIA,
+          }),
+        ),
         tip: TIPS.interestAsset(sym, side),
       });
     }
-    if (sub.length > 0)
+    const interestCell =
+      sub.length > 0
+        ? amountsUsd(`Interest on the ${side} since the previous event, in USD`, legs, {
+            amountNote: "the balance before this event less the balance once the previous one had run",
+            via: VIA,
+          })
+        : null;
+    if (interestCell)
       carry.push({
         key: "interest",
         label: SHEET_WORDS.interest,
-        usd: complete
-          ? {
-              text: sheetUsd(interestUsd),
-              info: {
-                kind: "chain-derived",
-                pclass: "oracle",
-                summary: `Interest on the ${side} since the previous event, in US dollars. Every asset's interest at its price at this block, added up.`,
-                formula: "Σ interest × price",
-              },
-            }
-          : undefined,
+        // An asset not held at the previous event leaves the interest unstated.
+        usd: complete ? cellOf(interestCell) : undefined,
         tip: TIPS.interest(side),
         sub,
       });
     // The market move: the rest of the change in the total, which the prices
-    // made; its receipt names each asset's price at both blocks.
-    if (complete && last.missing.length === 0 && beforeSum.missing.length === 0) {
-      const move = beforeSum.usd - last.usd - interestUsd;
-      if (Math.abs(move) >= 0.005)
+    // made; the difference of the totals' shown products.
+    if (complete) {
+      const move = marketMoveUsd(
+        `Market move on the ${side} since the previous event`,
+        beforeSum.cell,
+        last.cell,
+        interestCell,
+      );
+      if (move.usd == null || Math.abs(move.usd) >= 0.005)
         carry.push({
           key: "market",
           label: SHEET_WORDS.market,
-          usd: {
-            text: sheetUsd(move, true),
-            info: {
-              kind: "chain-derived",
-              pclass: "oracle",
-              summary: `Market move on the ${side} since the previous event. The total before this event, less the total once the previous event had run and the interest since, all in US dollars: the change the prices made to the balances held between the two. No token moved.`,
-              formula: "before this event − last event − interest since",
-              inputs: beforeSum.priced.flatMap(({ item, price }) => {
-                const sym = aaveV4DisplaySymbol(item.symbol);
-                const then = prevItems.find((x) => x.symbol === item.symbol);
-                const pThen = then ? priceOf(prev, then) : undefined;
-                return [
-                  ...(pThen ? [priceInput(sym, pThen, `${sym} price at the previous event`)] : []),
-                  priceInput(sym, price, `${sym} price at this event`),
-                ];
-              }),
-            },
-          },
+          usd: cellOf(move),
           tip: TIPS.market(side),
         });
     }
-    if (carry.length > 0 && beforeSum.missing.length === 0)
+    if (carry.length > 0)
       beforeRow = {
         key: "before",
         label: SHEET_WORDS.before,
-        usd: {
-          text: sheetUsd(beforeSum.usd),
-          info: sumProv(
-            `The ${side} just before this event, in US dollars. Each asset's balance before it times its price at this block, added up.`,
-            beforeSum.priced,
-          ),
-        },
+        usd: cellOf(beforeSum.cell),
         tip: TIPS.before(side),
       };
   }
@@ -454,17 +416,17 @@ function sheetSide({
       label: sym,
       note: priceNote(p),
       amount: amountAfter(h),
-      usd: p
-        ? {
-            text: sheetUsd(Number(h.amount) * p.usd),
-            info: atBlockUsdProv(sym, `The ${sym} after this event`, h.amount, p),
-          }
-        : undefined,
+      usd: cellOf(
+        amountsUsd(`The ${sym} after this event, in USD`, [pricedOf(sym, Number(h.amount), p, coord.blockNumber)], {
+          amountNote: "the balance in the spoke's snapshot",
+          via: VIA,
+        }),
+      ),
       tip: TIPS.asset(sym, side),
     };
   });
 
-  const total = sumOf(ctx, after);
+  const total = sumOf(ctx, after, `The ${side} after this event, in USD`, coord.blockNumber);
   // Where the spoke's snapshot shows one asset held after the event, or none
   // after it emptied the one it moved, the total states its amount (decision
   // 0042, point 9). Without a snapshot the side's other assets are unknown.
@@ -486,16 +448,7 @@ function sheetSide({
       rows,
       assets,
       ...(side === "debt" ? { repaid, repaidTip: TIPS.repaid } : {}),
-      total:
-        total.missing.length === 0
-          ? {
-              text: sheetUsd(total.usd),
-              info: sumProv(
-                `The ${side} after this event, in US dollars: each asset's balance in the spoke's snapshot times its price at this block, added up.`,
-                total.priced,
-              ),
-            }
-          : { none: WORDS.no_price(total.missing) },
+      total: total.missing.length === 0 ? cellOf(total.cell) : { none: WORDS.no_price(total.missing) },
       totalAmount: sole && amountAfter(sole),
       totalTip: TIPS.total(side),
     },
@@ -504,9 +457,9 @@ function sheetSide({
 
 /** The loan to value from a snapshot's two sums, in percent. */
 function ltvOf(ctx: AaveV4Context): number | null {
-  const c = sumOf(ctx, holdingsOf(ctx, "supply"));
-  const d = sumOf(ctx, holdingsOf(ctx, "debt"));
-  if (c.missing.length > 0 || d.missing.length > 0 || !(c.usd > 0)) return null;
+  const c = sumOf(ctx, holdingsOf(ctx, "supply"), "Supplied", undefined);
+  const d = sumOf(ctx, holdingsOf(ctx, "debt"), "Owed", undefined);
+  if (c.usd == null || d.usd == null || !(c.usd > 0)) return null;
   return (d.usd / c.usd) * 100;
 }
 
@@ -515,6 +468,7 @@ function ltvOf(ctx: AaveV4Context): number | null {
 export function aaveV4Sheet({
   ctx,
   prev,
+  prevBlock,
   coord,
   label,
   address,
@@ -524,6 +478,8 @@ export function aaveV4Sheet({
   ctx: AaveV4Context;
   /** The previous event on this spoke, whose snapshot the carry layer reads. */
   prev?: AaveV4Context;
+  /** That event's block, which its snapshot's prices stand at. */
+  prevBlock?: number;
   coord: EventProvDetail;
   /** The event's word ("Supply"), naming its rows. */
   label: string;
@@ -536,8 +492,8 @@ export function aaveV4Sheet({
   if (ctx.eventType === "collateral_toggle") return undefined;
   if (hf.status === "loading") return null;
 
-  const coll = sheetSide({ ctx, prev, side: "collateral", coord, label, address, hf });
-  const debt = sheetSide({ ctx, prev, side: "debt", coord, label, address, hf, repaid });
+  const coll = sheetSide({ ctx, prev, prevBlock, side: "collateral", coord, label, address, hf });
+  const debt = sheetSide({ ctx, prev, prevBlock, side: "debt", coord, label, address, hf, repaid });
 
   // Risk: the spoke's health factor at the end of the block, and the fall it
   // leaves the collateral before it reaches 1.

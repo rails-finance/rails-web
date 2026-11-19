@@ -334,6 +334,7 @@ function MarketSection({
         chain.collateral.map((c) => [c.address.toLowerCase(), scaleCompoundChainBalance(c.balanceRaw, c.decimals)]),
       ),
       prices: Object.fromEntries(Object.entries(view.priceByAddress ?? {}).map(([a, p]) => [a.toLowerCase(), p])),
+      block: view.priceBlock ?? null,
       supplyApr: chain.supplyApr,
       borrowApr: chain.borrowApr,
     };

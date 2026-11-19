@@ -51,6 +51,9 @@ export interface SheetFigure {
   info?: Provenance;
   /** The exact value the receipt keys on. */
   value?: string;
+  /** A dollar figure's cents, where its rows give them (ui-jobs 743): a
+   *  group's sheet sums these, not the faces. */
+  cents?: number;
 }
 
 /** A row of a side panel. */
@@ -185,17 +188,8 @@ export const SHEET_WORDS = {
  *  (Morpho, Fluid): its total states the amount in the asset column. */
 export const SHEET_NO_USD = { none: "" };
 
-/** Dollars as the sheet prints them: cents under $10, whole dollars above;
- *  `signed` puts "+" on a gain (a loss always reads "−"). */
-export function sheetUsd(v: number, signed = false): string {
-  const a = Math.abs(v);
-  const body =
-    a < 10
-      ? a.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-      : a.toLocaleString("en-US", { maximumFractionDigits: 0 });
-  const zero = !/[1-9]/.test(body);
-  return `${zero ? "" : v < 0 ? "−" : signed ? "+" : ""}$${body}`;
-}
+// Dollars as the sheet prints them (lib/shared/sheet-usd-rows.ts).
+export { sheetUsd } from "@/lib/shared/sheet-usd-rows";
 
 const WORDS = {
   collateral: "Collateral",

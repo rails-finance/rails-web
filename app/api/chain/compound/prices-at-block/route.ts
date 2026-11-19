@@ -10,7 +10,7 @@ import { cometDeploymentOf, compoundDeploymentParam } from "@/lib/compound/deplo
 // cached hard.
 //
 // `?deployment=ethereum|base|arbitrum&market=<key>&block=<n>&assets=a,b,…`
-// Answers `{ block, prices: { [token]: usd } }`, the base under its token
+// Answers `{ block, prices: { [token]: usd }, factors? }`, the base under its token
 // address; an asset the Comet did not list at that block is absent.
 
 export const runtime = "nodejs";
@@ -38,20 +38,22 @@ export async function GET(request: NextRequest) {
   if (!market || !Number.isInteger(block) || block < 1)
     return NextResponse.json({ error: "deployment, market and block are required" }, { status: 400 });
   try {
-    let prices = await cometPricesAtBlock(deployment, market, assets, block).catch((e: unknown) => {
+    let read = await cometPricesAtBlock(deployment, market, assets, block).catch((e: unknown) => {
       if (!arbitrum) throw e;
-      return {} as Record<string, number>;
+      return { prices: {} as Record<string, number>, factors: {} };
     });
     // The keyless Arbitrum gateway refuses a burst now and then: one more
     // read after a short back-off.
-    if (arbitrum && Object.keys(prices).length === 0) {
+    if (arbitrum && Object.keys(read.prices).length === 0) {
       await new Promise((r) => setTimeout(r, RETRY_BACKOFF_MS));
-      prices = await cometPricesAtBlock(deployment, market, assets, block);
+      read = await cometPricesAtBlock(deployment, market, assets, block);
     }
-    if (Object.keys(prices).length === 0)
+    if (Object.keys(read.prices).length === 0)
       return NextResponse.json({ error: "No price was read at that block" }, { status: 502 });
+    // An ETH-quoted Comet's two factors ride beside its composed prices, so a
+    // receipt shows both (ui-jobs 743).
     return NextResponse.json(
-      { block, prices },
+      { block, prices: read.prices, ...(Object.keys(read.factors).length > 0 ? { factors: read.factors } : {}) },
       { headers: { "Cache-Control": "public, max-age=86400, s-maxage=604800" } },
     );
   } catch (error) {

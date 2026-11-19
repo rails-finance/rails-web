@@ -16,7 +16,7 @@
 
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import { formatUsdValue } from "@/lib/utils/format";
-import { shownUsd, shownEth, amountText, priceText } from "@/lib/shared/shown-usd";
+import { centsOf, shownUsd, shownEth, amountText, priceText } from "@/lib/shared/shown-usd";
 
 export interface UsdLeg {
   /** The token's symbol ("WETH", "BOLD"). */
@@ -46,9 +46,12 @@ export interface UsdLeg {
 
 // The shown-values arithmetic lives in lib/shared/shown-usd.ts, dependency-free.
 export { shownPrice, shownUsd, shownComposedPrice, amountText, priceText } from "@/lib/shared/shown-usd";
-const cents = (v: number): number => Math.round(v * 100) / 100;
+const cents = centsOf;
 
 /** The receipt and the figure it rebuilds. */
+/** How a whole-dollar face relates to a receipt its rows rebuild to the cent. */
+export const FACE_WORDS = "To the cent, shown to the dollar.";
+
 export function holderUsdReceipt(opts: {
   /** What the figure is ("The wallet's collateral in USD"). */
   what: string;
@@ -68,11 +71,18 @@ export function holderUsdReceipt(opts: {
   numeraire?: "USD" | "ETH";
   /** The prices stand at different blocks, each named on its row. */
   blocksPerRow?: boolean;
+  /** The face the figure prints as ("$51K"), given its cents: the last row
+   *  says the figure is to the cent, shown as that face (ui-jobs 743). */
+  shownAs?: (usd: number) => string;
 }): { prov: Provenance; usd: number } {
   const eth = opts.numeraire === "ETH";
   const product = eth ? shownEth : shownUsd;
+  // A negative amount or product leads with "−", as signedCents does.
+  const minus = (v: number) => (v < 0 ? "−" : "");
   const valueText = (v: number) =>
-    eth ? `${v.toLocaleString("en-US", { maximumFractionDigits: 6 })} ETH` : formatUsdValue(v);
+    eth
+      ? `${minus(v)}${Math.abs(v).toLocaleString("en-US", { maximumFractionDigits: 6 })} ETH`
+      : `${minus(v)}${formatUsdValue(Math.abs(v))}`;
   const priceOf = (p: number) => (eth ? `${priceText(p).slice(1)} ETH` : priceText(p));
   const legs = opts.byValue
     ? [...opts.legs].sort((a, b) => product(b.amount, b.price) - product(a.amount, a.price))
@@ -86,7 +96,7 @@ export function holderUsdReceipt(opts: {
       ...(l.before ?? []),
       {
         label: `${l.label ?? l.token} amount`,
-        value: `${amountText(l.amount)} ${l.token}`,
+        value: `${minus(l.amount)}${amountText(Math.abs(l.amount))} ${l.token}`,
         kind: l.amountKind?.kind ?? "chain",
         pclass: l.amountKind ? l.amountKind.pclass : "indexed",
         note: l.amountNote,
@@ -108,14 +118,15 @@ export function holderUsdReceipt(opts: {
             contract: l.priceContract,
           },
     ];
-    if (many)
-      rows.push({
-        label: `${l.label ?? l.token} amount × price`,
-        value: valueText(products[i]),
-        kind: "derived",
-        step: true,
-      });
-    return opts.byValue && products[i] < 0.01 ? rows.map((r) => ({ ...r, dust: true as const })) : rows;
+    // Each leg's product, to the cent: the rows multiply out to the figure.
+    rows.push({
+      label: `${l.label ?? l.token} amount × price`,
+      value: valueText(products[i]),
+      kind: "derived",
+      step: true,
+      ...(!many && opts.shownAs ? { note: `to the cent, shown as ${opts.shownAs(usd)}` } : {}),
+    });
+    return opts.byValue && Math.abs(products[i]) < 0.01 ? rows.map((r) => ({ ...r, dust: true as const })) : rows;
   });
   const allFaces = legs.every((l) => l.face);
   const read = legs.filter((l) => !l.face).length;
@@ -126,7 +137,7 @@ export function holderUsdReceipt(opts: {
       ? ", each price at the block its row names"
       : opts.block != null
         ? `, the ${read > 1 ? "prices" : "price"} at block ${opts.block.toLocaleString("en-US")}`
-        : `, the ${read > 1 ? "prices" : "price"} at the latest read, which states no block`;
+        : `, the ${read > 1 ? "prices" : "price"} at the latest read, which names no block`;
   const faces = legs.filter((l) => l.face).map((l) => `1 ${l.token} is counted as $1`);
   return {
     usd,
@@ -136,7 +147,8 @@ export function holderUsdReceipt(opts: {
       summary: [
         `${opts.what}: ${many ? "each token's amount times its price, summed" : "the amount times the price"}${at}.`,
         faces.length ? `${faces.join("; ")}, a face the protocol defines.` : "",
-        opts.caveat ?? "",
+        // The last row says the face where `shownAs` is set: said once.
+        (opts.shownAs ? opts.caveat?.replace(FACE_WORDS, "").trim() : opts.caveat) ?? "",
       ]
         .filter(Boolean)
         .join(" "),
@@ -144,7 +156,17 @@ export function holderUsdReceipt(opts: {
       formula: many ? "Σ amount × price" : "amount × price",
       inputs: [
         ...inputs,
-        ...(many ? [{ label: "sum", value: valueText(usd), kind: "derived" as const, step: true as const }] : []),
+        ...(many
+          ? [
+              {
+                label: "sum",
+                value: valueText(usd),
+                kind: "derived" as const,
+                step: true as const,
+                ...(opts.shownAs ? { note: `to the cent, shown as ${opts.shownAs(usd)}` } : {}),
+              },
+            ]
+          : []),
       ],
       source: opts.block != null && !allFaces ? { block: opts.block } : undefined,
     },

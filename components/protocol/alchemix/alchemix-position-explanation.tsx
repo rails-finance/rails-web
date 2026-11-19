@@ -70,8 +70,6 @@ export interface AlchemixPositionExplanationProps {
   fall?: number | null;
   /** The debt this position's own events leave, and what the redemptions cleared of it, where the two differ. */
   debtFromEvents?: ReactNode;
-  /** The card's Collateral subline states the dollar value. */
-  usdOnCard?: boolean;
   /** The line's redemption fee, in basis points of the shares a redemption takes. */
   feeBps?: number | null;
   /** The line's liquidation count with its receipt. */
@@ -146,7 +144,6 @@ function explanationParts({
   vaultHref = null,
   fall = null,
   debtFromEvents = null,
-  usdOnCard = false,
   feeBps = null,
   lineLiquidations = null,
   v2 = null,
@@ -213,13 +210,6 @@ function explanationParts({
           </>
         ) : null}
         .
-      </>
-    ) : null,
-    hasCollateral && under && live.collateral.usd ? (
-      <>
-        At {underSym}&rsquo;s ${live.collateral.usd.pricePerUnit.toLocaleString("en-US", { maximumFractionDigits: 2 })}{" "}
-        the collateral is worth{" "}
-        {usdOnCard ? <H>${compact(live.collateral.usd.usd)}</H> : <>${compact(live.collateral.usd.usd)}</>}.
       </>
     ) : null,
   ];

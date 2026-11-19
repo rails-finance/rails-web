@@ -36,7 +36,7 @@
 import type { ReactNode } from "react";
 import { NoteRowShell } from "@/components/shared/note-row-shell";
 import { HeadingTip } from "@/components/shared/tip-label";
-import { Prov, type Provenance, type ProvInput } from "@/components/shared/provenance";
+import { Prov, type Provenance } from "@/components/shared/provenance";
 import {
   EventSheetView,
   sheetUsd,
@@ -68,6 +68,8 @@ import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { formatPeth } from "@/lib/polaris/figure-format";
+import { polarisSheetUsd, shownPricesOf } from "@/lib/polaris/sheet-usd";
+import type { PolarisContext } from "@/lib/shared/types/event-shape";
 
 const Signed = ({ value, unit }: { value: number; unit: string }) => (
   <span className="font-semibold text-foreground tabular-nums">
@@ -413,56 +415,20 @@ function polarisLiveSheet(
   const atHead = `at the head block ${head.toLocaleString("en-US")}`;
   const coords: PolarisCoords = { market, cdpId: o.cdpId, blockNumber: head };
   const manager = { name: `Polaris ${stable} CDPManager`, address: cfg.cdpManager };
-  // The stablecoin in dollars now: a USDp is $1 in the feed, a GOLDp an ounce at XAU/USD.
-  const unitUsd = market === "usdp" ? 1 : (w.to.xauUsd ?? null);
-  const unitInput: ProvInput | null =
-    unitUsd == null
-      ? null
-      : market === "usdp"
-        ? {
-            label: `${stable} in USD`,
-            value: "$1.00",
-            kind: "chain-derived",
-            pclass: "oracle",
-            note: "the feed prices pETH as the bonding curve's rate times ETH/USD, so a USDp is $1 in it",
-          }
-        : {
-            label: `${stable} in USD`,
-            value: sheetUsd(unitUsd),
-            kind: "chain",
-            pclass: "oracle",
-            note: `the XAU/USD medianiser ${atHead}`,
-          };
-  const pethUsd = unitUsd != null ? w.to.pethInDebt * unitUsd : null;
-  const priceInput: ProvInput = {
-    label: `pETH price in ${stable}`,
-    value: `${formatExact(w.to.pethInDebt)} ${stable}`,
-    kind: "chain",
-    pclass: "oracle",
-    note: `the market's price feed, previewPrice() ${atHead}`,
-    contract: { name: `Polaris ${stable} price feed`, address: cfg.priceFeed },
-  };
+  // The dollar prices at the head block as shown, each a receipt row naming
+  // the block (ui-jobs 743): pETH at the curve × ETH/USD composed (else the
+  // feed's price), USDp at its $1 face, GOLDp at XAU/USD; an amount's dollars
+  // the shown product.
+  const prices = shownPricesOf({
+    market,
+    stableSymbol: stable,
+    priceAtBlock: { ...w.to },
+  } as unknown as PolarisContext);
   const usd = (what: string, token: "coll" | "debt", n: number) => {
-    const price = token === "coll" ? pethUsd : unitUsd;
-    if (price == null) return undefined;
-    return {
-      text: sheetUsd(n * price),
-      info: {
-        kind: "chain-derived",
-        pclass: "oracle",
-        summary:
-          token === "coll"
-            ? `${what} in US dollars. The pETH times the feed's price for pETH in ${stable}, times ${stable} in dollars, ${atHead}.`
-            : `${what} in US dollars. The ${stable} times its price in dollars, ${atHead}.`,
-        formula:
-          token === "coll" ? `pETH × pETH price in ${stable} × ${stable} in USD` : `${stable} × ${stable} in USD`,
-        inputs: [
-          { label: token === "coll" ? "pETH" : stable, value: formatExact(Math.abs(n)), kind: "chain" },
-          ...(token === "coll" ? [priceInput] : []),
-          ...(unitInput ? [unitInput] : []),
-        ],
-      } satisfies Provenance,
-    };
+    if ((token === "coll" ? prices?.coll : prices?.debt) == null) return undefined;
+    const r = polarisSheetUsd(prices, what, token, n, head, stable);
+    // A zero leg draws no dollar cell: no "$0" without a receipt.
+    return r ? { text: sheetUsd(n < 0 ? -r.usd : r.usd), info: r.prov, cents: n < 0 ? -r.usd : r.usd } : undefined;
   };
   /** A view call on the cdpManager at the head block, as a receipt. */
   const view = (summary: string, fn: string, value: number, unit: string): Provenance => ({
@@ -538,7 +504,7 @@ function polarisLiveSheet(
         : []),
     ],
     after: W.live_at_feed,
-    total: pethUsd != null ? usd("The collateral at the feed", "coll", w.atFeed.coll)! : { none: W.sheet_no_price },
+    total: usd("The collateral at the feed", "coll", w.atFeed.coll) ?? { none: W.sheet_no_price },
     totalAmount: pethFig(
       formatPeth(w.atFeed.coll),
       view(
@@ -625,7 +591,7 @@ function polarisLiveSheet(
         : []),
     ],
     after: W.live_at_feed,
-    total: unitUsd != null ? usd("The debt at the feed", "debt", w.atFeed.debt)! : { none: W.sheet_no_price },
+    total: usd("The debt at the feed", "debt", w.atFeed.debt) ?? { none: W.sheet_no_price },
     totalAmount: stableFig(
       formatNumber(w.atFeed.debt),
       view(

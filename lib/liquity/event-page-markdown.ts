@@ -7,6 +7,7 @@
 // route (event/[eventId]/markdown/route.ts, served at `…/event/<id>.md`) calls
 // it; it reads nothing.
 
+import { liquityV2PriceNote } from "@/lib/liquity-v2/price-notes";
 import type { BaseActivityEvent } from "@/lib/shared/types/activity";
 import type { TroveSummary } from "@/types/api/trove";
 import type { OraclePricesData } from "@/types/api/oracle";
@@ -69,6 +70,7 @@ export function liquityEventPageMarkdown(input: EventPageMarkdownInput): string 
     now: input.now,
     dailyColl: input.dailyColl,
     shutdownAt: trove.status === "open" ? shutdownAt : null,
+    priceNote: liquityV2PriceNote(collSymbol),
     live: trove.status === "open" ? { price: currentPrice ?? null } : null,
   });
   const model = timeline ? buildFlowModel(timeline) : null;

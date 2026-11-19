@@ -38,6 +38,7 @@
 //   npx tsx --test scripts/verify/verify-fluid-flows.ts
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { assertUnitReceipts } from "./lib/unit-receipts";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
@@ -498,4 +499,12 @@ test("the daily store: a quiet day takes the store's price, an event day its row
     assert.ok(quiet > 0, `${name}: quiet days`);
     assert.match(t.words!.linePrices!, /each day's close/, `${name}: the line names the store`);
   }
+});
+
+test("a unit model's Held/Owed receipts stay in its token (ui-jobs 743)", () => {
+  let read = 0;
+  for (const name of MODE_NAMES) read += assertUnitReceipts(model(fx(name)), name);
+  const f = fx("supply-only");
+  read += assertUnitReceipts(buildFlowModel(fluidFlowTimeline(rows(f), opts(f))!)!, "supply-only");
+  assert.ok(read > 0, "receipts read");
 });

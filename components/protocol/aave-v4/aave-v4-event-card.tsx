@@ -189,6 +189,7 @@ export function AaveV4EventCard({
     wallet: event.wallet,
     previousRate,
     previous: previousEvent?.context.data,
+    previousBlock: previousEvent?.blockNumber,
     repaid,
     address: symAddress,
     active: opened || collected,

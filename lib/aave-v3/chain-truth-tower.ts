@@ -61,7 +61,8 @@ export const isWethGateway = (address: string | undefined): boolean =>
 
 /** What the tower reads of a position: its reserves and their oracle prices.
  *  Aave V3 and SparkLend views both carry it. */
-export type AaveFamilyTowerView = Pick<AaveV3PositionView, "supplies" | "borrows" | "priceByAddress" | "atBlock">;
+export type AaveFamilyTowerView = Pick<AaveV3PositionView, "supplies" | "borrows" | "priceByAddress" | "atBlock"> &
+  Partial<Pick<AaveV3PositionView, "priceBlock" | "priceBlockByAddress">>;
 
 /** What the card captions read of the live Pool read: the borrow rates. */
 export type AaveFamilyChainRead = Pick<AaveV3PositionChainResponse, "chainStale" | "pool"> & {
@@ -916,6 +917,21 @@ export function computeAaveV3Economics(
     const p = prices?.[address.toLowerCase()];
     return typeof p === "number" && p > 0 ? amount * p : null;
   };
+  // A line's price as the live stop states it: the AaveOracle's read, at the
+  // block the read names (ui-jobs 743).
+  const oracleName = `${vocab.brand ?? v3Brand(vocab.protocol ?? "Aave V3")}'s AaveOracle getAssetPrice now`;
+  // Each price names the block of its own read; the balances stand at the
+  // view's block, named beside it where the two differ.
+  const priceOf = (address: string | undefined): TowerLine["price"] => {
+    const a = address?.toLowerCase();
+    const p = a ? prices?.[a] : undefined;
+    if (!(typeof p === "number" && p > 0)) return undefined;
+    const block =
+      a && view.priceBlockByAddress && a in view.priceBlockByAddress
+        ? view.priceBlockByAddress[a]
+        : (view.priceBlock ?? null);
+    return { usd: p, block, source: oracleName, balanceBlock: view.atBlock ?? null };
+  };
 
   // Interest rows beside the flows, at the prices it accrued at: each row's
   // interest since the balance last moved, valued at that row's oracle price
@@ -968,6 +984,7 @@ export function computeAaveV3Economics(
       symbol: r.symbol,
       amount: r.amount,
       usd: usdOf(r.address, r.amount),
+      price: priceOf(r.address),
       prov: vocab.supply(r.symbol, view.atBlock),
     }));
 
@@ -978,6 +995,7 @@ export function computeAaveV3Economics(
       symbol: r.symbol,
       amount: r.amount,
       usd: usdOf(r.address, r.amount),
+      price: priceOf(r.address),
       prov: vocab.debt(r.symbol, view.atBlock),
     }));
 
@@ -1090,6 +1108,7 @@ export function computeAaveV3Economics(
         symbol: cur.symbol,
         amount: split.interest,
         usd: usdOf(cur.key, split.interest),
+        price: priceOf(cur.key),
         prov: laneInterestProv(cur.symbol, "debt"),
       };
       debtInterestBy.set(cur.symbol, split.interest);
@@ -1122,6 +1141,10 @@ export function computeAaveV3Economics(
           symbol: "",
           amount: total,
           usd: total,
+          parts: debtLines.flatMap((l, i) => {
+            const price = priceOf(l.key);
+            return price ? [{ symbol: l.symbol, amount: splits[i]!.interest, price }] : [];
+          }),
           prov: laneInterestProv(`${syms.slice(0, -1).join(", ")} and ${syms[syms.length - 1]}`, "debt"),
         };
       }

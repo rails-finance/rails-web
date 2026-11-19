@@ -106,11 +106,11 @@ export const indexIdentityProv = (label: string, address: string, exact: boolean
   verify: STATE_VERIFY,
 });
 
-export const fundingRateProv = (label: string, address: string): Provenance => ({
+export const fundingRateProv = (label: string, address: string, configuration: string): Provenance => ({
   kind: "chain",
   pclass: "state",
   summary: `The ${label}'s funding rate — the protocol's own configuration getter (getLongPoolFundingRatio), an annualized fraction of the pool's collateral. AaveFundingPool charges it INTO the collateral index at each checkpoint: funding = totalRawColls × this rate × elapsed time ÷ one year, taken from every position's collateral pro-rata, with no event. Funding charges the collateral side, never the debt side.`,
-  contract: { name: "PoolConfiguration", address: "" },
+  contract: { name: "PoolConfiguration", address: configuration },
   via: `${SYSTEM_VIA} · configuration.getLongPoolFundingRatio(pool) (eth_call) ÷ 1e18`,
   verify: STATE_VERIFY,
 });
@@ -211,22 +211,22 @@ export const pausedProv = (which: "borrow" | "redeem", label: string, address: s
 });
 
 /** The manager's redemption gate — PoolConfiguration.isRedeemAllowed. */
-export const redeemGateProv = (label: string, address: string): Provenance => ({
+export const redeemGateProv = (label: string, configuration: string): Provenance => ({
   kind: "chain",
   pclass: "state",
   summary: `Whether redemption is open — PoolConfiguration.isRedeemAllowed(), read at the pinned block for the ${label}'s configuration. It answers true only while the fxUSD oracle price sits below its peg by more than the allowed deviation; PoolManager.redeem reverts otherwise.`,
-  contract: pool(label, address),
+  contract: { name: "PoolConfiguration", address: configuration },
   via: `${SYSTEM_VIA} · PoolConfiguration.isRedeemAllowed()`,
   verify: STATE_VERIFY,
 });
 
 /** The pool's default fee schedule — PoolConfiguration.getPoolFeeRatio with no
  *  per-caller entry. */
-export const defaultFeesProv = (label: string, address: string): Provenance => ({
+export const defaultFeesProv = (configuration: string): Provenance => ({
   kind: "chain",
   pclass: "state",
   summary: `The pool's default fees — PoolConfiguration.getPoolFeeRatio(pool, 0x0) at the pinned block: the schedule for any caller without its own entry, as fractions of each deposit, withdrawal, borrow and repayment. A router can carry its own entry.`,
-  contract: pool(label, address),
+  contract: { name: "PoolConfiguration", address: configuration },
   via: `${SYSTEM_VIA} · PoolConfiguration.getPoolFeeRatio(pool, 0x0)`,
   verify: STATE_VERIFY,
 });

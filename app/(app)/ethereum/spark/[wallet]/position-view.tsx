@@ -478,7 +478,19 @@ export default function SparkPositionDetail({
         if (Object.keys(prices).length === 0) return;
         setView((v) =>
           v && v.wallet.toLowerCase() === wallet.toLowerCase()
-            ? { ...v, priceByAddress: { ...prices, ...(v.priceByAddress ?? {}) } }
+            ? {
+                ...v,
+                priceByAddress: { ...prices, ...(v.priceByAddress ?? {}) },
+                // Each merged price keeps its read's block (ui-jobs 743).
+                priceBlockByAddress: {
+                  ...Object.fromEntries(
+                    Object.keys(prices)
+                      .filter((a) => v.priceByAddress?.[a] == null)
+                      .map((a) => [a.toLowerCase(), null]),
+                  ),
+                  ...(v.priceBlockByAddress ?? {}),
+                },
+              }
             : v,
         );
       })

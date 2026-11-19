@@ -19,6 +19,7 @@
 // over each market's history; a row not read takes the nearest priced row's
 // price on its market.
 
+import { compoundV2EthFactor } from "@/lib/compound-v2/at-block-prices";
 import type { BaseActivityEvent, CompoundV2Context } from "@/lib/shared/types/event-shape";
 import { isCompoundV2Event } from "@/lib/shared/types/event-shape";
 import { sortByLog, type LedgerKind } from "@/lib/shared/ctoken-ledger";
@@ -131,6 +132,9 @@ export function compoundV2FlowRows(
       exchangeRate: exchangeRate != null && Number.isFinite(exchangeRate) && exchangeRate > 0 ? exchangeRate : null,
       amount: c.assetsDelta != null ? Math.abs(Number(c.assetsDelta)) : null,
       price: price != null && price > 0 ? price : null,
+      ...(price != null && price > 0 && compoundV2EthFactor(prices, e.blockNumber, c.market)
+        ? { ethFactor: compoundV2EthFactor(prices, e.blockNumber, c.market)! }
+        : {}),
       byOwner:
         c.eventType === "transfer_in" || c.eventType === "seize_out" || c.eventType === "seize_burn"
           ? false

@@ -26,10 +26,12 @@ import { dayStamp, type LedgerProvs } from "@/components/shared/event-ledger";
 import { SHEET_NO_USD, type EventSheet, type SheetSide } from "@/components/shared/event-sheet";
 import { signedTokens, signedUsd, type Ledger, type LedgerRow } from "@/lib/shared/event-ledger";
 import { fmtTokens, tokenDecimals } from "@/lib/shared/flow-focus";
-import { apportionSigned, wholeUsd } from "@/lib/shared/flows-sum";
+import { wholeUsd } from "@/lib/shared/flows-sum";
 import type { FlowMoment, MomentAsset } from "@/lib/shared/flow-moment";
 import { unitOf, type FlowGrowth, type FlowModel, type FlowSegment, type FlowSide } from "@/lib/shared/flows-timeline";
-import { flowSegmentProv } from "@/lib/shared/flows-timeline-provenance";
+import { flowSegmentProv, heldDayProv } from "@/lib/shared/flows-timeline-provenance";
+import { centsOf, roundAway } from "@/lib/shared/shown-usd";
+import { formatUsdValue } from "@/lib/utils/format";
 
 const DAY_S = 86_400;
 
@@ -131,6 +133,7 @@ export function FlowMomentCard({
   flash: boolean;
 }) {
   const date = dayStamp(moment.day * DAY_S);
+  const compound = model.words.moment?.compound;
   const when = `the close of ${date}`;
   const lastStamp = dayStamp(moment.lastDay * DAY_S);
   // A face side whose interest is a contract's minute sum that stops at a
@@ -256,44 +259,49 @@ export function FlowMomentCard({
     const g = a.grown as FlowGrowth;
     return {
       kind: "chain-derived",
-      summary: `${a.symbol} ${ACCRUAL[g.basis]?.what ?? `interest ${side === "collateral" ? "earned" : "owed"}`} to ${when}. From the event on ${dayStamp(g.recordedDay * DAY_S)}: the balance grown by ${INDEX_OWNER[g.basis]} ${INDEX_NAME[g.basis][side]}, less the balance that event recorded.${a.interestUsd != null ? " USD at the oracle price the index recorded for that day." : ""}`,
-      formula:
-        a.interestUsd != null
-          ? "recorded × (index at the close ÷ index at the event − 1) × price"
-          : "recorded × (index at the close ÷ index at the event − 1)",
-      ...(a.interestUsd != null ? { pclass: "oracle" as const } : {}),
+      summary: `${a.symbol} ${ACCRUAL[g.basis]?.what ?? `interest ${side === "collateral" ? "earned" : "owed"}`} to ${when}. From the event on ${dayStamp(g.recordedDay * DAY_S)}: the balance grown by ${INDEX_OWNER[g.basis]} ${INDEX_NAME[g.basis][side]}, less the balance that event recorded.`,
+      formula: "recorded × (index at the close ÷ index at the event − 1)",
+      inputs: indexInputs(side, a, g),
+    };
+  };
+  /** The interest in USD: the asset's shown product less the recorded
+   *  balance's, each at the day's price as shown (ui-jobs 743). */
+  const interestUsdProv = (side: FlowSide, a: MomentAsset): Provenance => {
+    const g = a.grown;
+    const what = g ? (ACCRUAL[g.basis]?.what ?? "interest") : "interest";
+    return {
+      kind: "chain-derived",
+      pclass: "oracle",
+      summary: `${a.symbol} ${what} to ${when}, in USD. The balance at the close times the day's price, less the balance the last event recorded times the same price, each product as shown. To the cent, shown to the dollar.`,
+      formula: "balance × price − recorded × price",
       inputs: [
-        ...indexInputs(side, a, g),
-        ...(a.price != null
-          ? [
-              {
-                label: "price",
-                value: `$${a.price.toLocaleString("en-US", { maximumFractionDigits: 4 })}`,
-                kind: "chain-derived" as const,
-                pclass: "oracle" as const,
-                note: `last oracle price recorded by the end of ${date}`,
-              },
-            ]
-          : []),
+        {
+          label: "balance × price",
+          value: formatUsdValue(a.usd ?? 0),
+          kind: "chain-derived",
+          pclass: "oracle",
+          note: "the asset's figure at the close (its receipt lists the rows)",
+        },
+        {
+          label: "recorded × price",
+          value: formatUsdValue(a.heldUsd ?? 0),
+          kind: "chain-derived",
+          pclass: "oracle",
+          note: `the balance its last event recorded on ${dayStamp(sinceDay(a) * DAY_S)}, at the same price`,
+        },
+        {
+          label: "difference",
+          value: `${(a.interestUsd ?? 0) < 0 ? "−" : ""}${formatUsdValue(Math.abs(a.interestUsd ?? 0))}`,
+          kind: "derived",
+          step: true,
+        },
       ],
     };
   };
-  const usdProv = (a: MomentAsset): Provenance => ({
-    kind: "chain-derived",
-    summary: `${a.symbol} in USD at ${when}. The balance at the oracle price the index recorded for that day.`,
-    formula: "balance × price at the day's end",
-    pclass: "oracle",
-    inputs: [
-      { label: "balance", value: `${fmtPositionAmount(a.tokens)} ${a.symbol}`, kind: "chain" },
-      {
-        label: "price",
-        value: `$${(a.price ?? 0).toLocaleString("en-US", { maximumFractionDigits: 4 })}`,
-        kind: "chain-derived",
-        pclass: "oracle",
-        note: `last oracle price recorded by the end of ${date}`,
-      },
-    ],
-  });
+  /** An asset's USD at the close: its balance × the day's price as shown,
+   *  the price named with its day and block. */
+  const usdProv = (side: FlowSide, a: MomentAsset): Provenance =>
+    heldDayProv(`${a.symbol} ${side === "collateral" ? "held" : "owed"}`, when, [a.row]);
   const heldSeg = (side: FlowSide): FlowSegment => ({
     key: `${side}-held`,
     label: side === "collateral" ? "Held" : "Owed",
@@ -301,10 +309,11 @@ export function FlowMomentCard({
     width: moment.sides[side].held,
     value: moment.sides[side].held,
   });
+  /** The side's USD: its assets' shown products, to the cent. */
   const sideUsd = (side: FlowSide): number | null => {
     const s = moment.sides[side];
     if (s.face || !s.priced || s.assets.length === 0) return null;
-    return s.assets.reduce((t, a) => t + (a.usd ?? 0), 0);
+    return centsOf(s.assets.reduce((t, a) => t + (a.usd ?? 0), 0));
   };
 
   // ── The header: the moment and its place between the events ──────────
@@ -358,22 +367,12 @@ export function FlowMomentCard({
     summary: `${a.symbol} ${side === "collateral" ? "held" : "owed"}. As the position's last event left it on ${dayStamp(sinceDay(a) * DAY_S)}.`,
     inputs: [{ label: "recorded balance", value: `${fmtPositionAmount(a.recorded)} ${a.symbol}`, kind: "chain" }],
   });
-  const heldUsdProv = (side: FlowSide, a: MomentAsset): Provenance => ({
-    kind: "chain-derived",
-    summary: `${a.symbol} ${side === "collateral" ? "held" : "owed"} in USD. As its last event left it on ${dayStamp(sinceDay(a) * DAY_S)}, at the oracle price recorded for ${date}.`,
-    formula: "recorded balance × price at the day's end",
-    pclass: "oracle",
-    inputs: [
-      { label: "recorded balance", value: `${fmtPositionAmount(a.recorded)} ${a.symbol}`, kind: "chain" },
-      {
-        label: "price",
-        value: `$${(a.price ?? 0).toLocaleString("en-US", { maximumFractionDigits: 4 })}`,
-        kind: "chain-derived",
-        pclass: "oracle",
-        note: `last oracle price recorded by the end of ${date}`,
-      },
-    ],
-  });
+  const heldUsdProv = (side: FlowSide, a: MomentAsset): Provenance =>
+    a.interestUsd == null
+      ? usdProv(side, a)
+      : heldDayProv(`${a.symbol} ${side === "collateral" ? "held" : "owed"} as its last event left it`, when, [
+          { ...a.row, amount: a.recorded, grown: undefined },
+        ]);
   const faceInterestProv = (a: MomentAsset): Provenance =>
     sum
       ? {
@@ -388,7 +387,9 @@ export function FlowMomentCard({
   const faceRateInterestProv = (a: MomentAsset): Provenance => ({
     kind: "chain-derived",
     summary: `${a.symbol} interest owed to ${when}. What the rate in force after the last event (${lastStamp}) builds on the debt that event recorded, to the end of the day.`,
-    formula: "recorded debt × annual rate × time ÷ 1 year",
+    formula: compound
+      ? "recorded debt × (e^(annual rate × time ÷ 1 year) − 1)"
+      : "recorded debt × annual rate × time ÷ 1 year",
     inputs: [
       { label: "recorded debt", value: `${fmtPositionAmount(a.recorded)} ${a.symbol}`, kind: "chain" },
       ...(moment.accrual
@@ -397,7 +398,9 @@ export function FlowMomentCard({
               label: "annual rate",
               value: `${moment.accrual.rate.toLocaleString("en-US", { maximumFractionDigits: 4 })}%`,
               kind: "chain" as const,
-              note: "in force after the last event, fees included",
+              note: compound
+                ? `in force after the last event, ${a.row.priced?.factorNote ?? "compounded each second"}`
+                : "in force after the last event, fees included",
             },
             {
               label: "time",
@@ -411,13 +414,9 @@ export function FlowMomentCard({
   });
 
   /** One asset's ledger: Held / Owed, the interest since, its total, at the
-   *  decimals an event's ledger prints the asset at; `dollars` its total in
-   *  whole USD (the side's share where several assets add to its total). */
-  const assetLedger = (
-    side: FlowSide,
-    a: MomentAsset,
-    dollars: number | null,
-  ): { ledger: Ledger; provs: LedgerProvs } => {
+   *  decimals an event's ledger prints the asset at; each USD figure its
+   *  cents, shown to the dollar. */
+  const assetLedger = (side: FlowSide, a: MomentAsset): { ledger: Ledger; provs: LedgerProvs } => {
     const face = moment.sides[side].face;
     const interest = interestOf(side, a);
     const decimals = tokenDecimals(
@@ -428,8 +427,9 @@ export function FlowMomentCard({
     const totalUnits = Math.round(a.tokens * scale);
     const interestUnits = interest != null ? Math.round(interest * scale) : null;
     const heldUnits = totalUnits - (interestUnits ?? 0);
-    const interestDollars = dollars != null && interestUnits != null ? Math.round(a.interestUsd ?? 0) : null;
-    const heldDollars = dollars != null ? dollars - (interestDollars ?? 0) : null;
+    const dollars = a.usd != null ? roundAway(a.usd) : null;
+    const interestDollars = a.interestUsd != null && interestUnits != null ? roundAway(a.interestUsd) : null;
+    const heldDollars = a.heldUsd != null ? roundAway(interestDollars != null ? a.heldUsd : a.usd!) : null;
     const usdCell = (d: number | null) => (d == null ? null : { dollars: d, text: signedUsd(d, unitOf(model, side)) });
     const rows: LedgerRow[] = [
       {
@@ -463,9 +463,9 @@ export function FlowMomentCard({
     const provs: LedgerProvs = {
       token: (r) =>
         r.role === "interest" ? (a.grown ? interestProv(side, a) : faceInterestProv(a)) : heldProv(side, a),
-      usd: (r) => (r.role === "interest" ? interestProv(side, a) : heldUsdProv(side, a)),
+      usd: (r) => (r.role === "interest" ? interestUsdProv(side, a) : heldUsdProv(side, a)),
       totalTokens: tokensProv(side, a),
-      totalUsd: a.usd != null ? usdProv(a) : undefined,
+      totalUsd: a.usd != null ? usdProv(side, a) : undefined,
     };
     return { ledger, provs };
   };
@@ -478,16 +478,17 @@ export function FlowMomentCard({
     const s = moment.sides[side];
     const usd = sideUsd(side);
     const multi = s.assets.length > 1;
-    const shares =
-      multi && usd != null
-        ? apportionSigned(
-            s.assets.map((a) => a.usd ?? 0),
-            Math.round(usd),
-          )
-        : s.assets.map((a) => (a.usd != null ? Math.round(a.usd) : null));
-    const built = s.assets.map((a, i) => ({ a, ...assetLedger(side, a, shares[i]) }));
+    const built = s.assets.map((a) => ({ a, ...assetLedger(side, a) }));
     const shownFor = (a: MomentAsset) => a.usd != null && usdShown(a.usd);
-    const totalProv = flowSegmentProv(heldSeg(side), side, when, false, model.daily);
+    // The side's total: each asset's shown product, summed (ui-jobs 743).
+    const totalProv =
+      usd != null
+        ? heldDayProv(
+            model.labels[side],
+            when,
+            s.assets.map((a) => a.row),
+          )
+        : flowSegmentProv(heldSeg(side), side, when, false, model.daily);
     const carry: SheetSide["carry"] = built.map(({ a, ledger: l, provs }) => {
       const held = l.rows.find((r) => r.role === "flow");
       const interest = l.rows.find((r) => r.role === "interest");
@@ -597,7 +598,7 @@ export function FlowMomentCard({
           ? `the debt the last event recorded, plus the interest the contract's sum built on the principal until the deadline on ${sumStop}, where it stopped: principal × APR × whole minutes from the start to the deadline ÷ 5,256,000,000.`
           : `the debt the last event recorded, plus the interest the contract's sum builds on the principal to the end of ${date}: principal × APR × whole minutes from the start ÷ 5,256,000,000.`
         : s.face && moment.accrual
-          ? `the debt the last event recorded, plus the interest at ${moment.accrual.rate.toLocaleString("en-US", { maximumFractionDigits: 2 })}% a year built on it to the end of ${date}.`
+          ? `the debt the last event recorded, plus the interest at ${moment.accrual.rate.toLocaleString("en-US", { maximumFractionDigits: 2 })}% a year${compound ? ", compounded each second," : ""} built on it to the end of ${date}.`
           : s.assets.some((a) => a.grown)
             ? `${grownWords(side)}${priced}`
             : `as the last event left it on ${lastStamp}; no event changed it by then.${priced}`;

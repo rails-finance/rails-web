@@ -13,6 +13,8 @@
 import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
 import { rawToNum } from "@/lib/compound-v2/liquidation-values";
 
+import { shownComposedPrice } from "@/lib/shared/shown-usd";
+
 /** First block at which Compound's oracle answered in USD. */
 export const COMPOUND_V2_USD_ORACLE_BLOCK = 10_678_764;
 
@@ -30,16 +32,39 @@ export function compoundV2UsdAtBlock(
     if (!meta || raw == null || raw === BigInt(0)) continue;
     native.set(m, rawToNum(raw, 36 - meta.decimals));
   }
-  // Dollars per ETH at this block: 1 ÷ (ETH per USDC).
+  // In the ETH years a dollar price is the market's ETH price ÷ USDC's ETH
+  // price, composed from the two as shown (ui-jobs 743); each factor rides
+  // beside it under `${m}#eth` and `#usdc-eth` so a receipt names both.
   const inEth = block < COMPOUND_V2_USD_ORACLE_BLOCK;
-  const usdPerNative = inEth ? (native.get("usdc") ? 1 / native.get("usdc")! : null) : 1;
+  const usdcEth = native.get("usdc");
   const out = new Map<string, number>();
   for (const m of markets) {
     const n = native.get(m);
-    const usd = n != null && usdPerNative != null ? n * usdPerNative : null;
-    if (usd != null && Number.isFinite(usd) && usd > 0) out.set(m, usd);
+    if (n == null) continue;
+    const usd = inEth ? (usdcEth ? shownComposedPrice(n, usdcEth, "÷") : null) : n;
+    if (usd != null && Number.isFinite(usd) && usd > 0) {
+      out.set(m, usd);
+      if (inEth) out.set(`${m}${ETH_FACTOR}`, n);
+    }
   }
+  if (inEth && usdcEth) out.set(USDC_ETH, usdcEth);
   return out;
+}
+
+/** The keys an ETH-year price's two factors ride under: `${market}#eth` and
+ *  `#usdc-eth`, each beside `${block}:` where a map is by block. */
+export const ETH_FACTOR = "#eth";
+export const USDC_ETH = "#usdc-eth";
+
+/** An ETH-year row's two factors from a by-block map, where it has them. */
+export function compoundV2EthFactor(
+  prices: ReadonlyMap<string, number> | null | undefined,
+  block: number,
+  market: string,
+): { eth: number; usdcEth: number } | null {
+  const eth = prices?.get(`${block}:${market}${ETH_FACTOR}`);
+  const usdcEth = prices?.get(`${block}:${USDC_ETH}`);
+  return eth != null && usdcEth != null ? { eth, usdcEth } : null;
 }
 
 /** The server's answer for stored pairs (/api/compound-v2/prices-at). */

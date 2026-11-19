@@ -19,9 +19,13 @@ export const entrySig = (e: Omit<ProvReceiptEntry, "order" | "el">) =>
     e.info.formula ?? "",
     e.info.via ?? "",
     e.info.scaling?.raw ?? "",
-    (e.info.inputs ?? [])
-      .map(
-        (i) => `${i.label}:${i.value ?? ""}:${i.kind}:${i.pclass ?? ""}:${i.definition ? "def" : ""}:${i.note ?? ""}`,
-      )
-      .join("|"),
+    // A receipt with a key builds its rows when it opens: the key stands for them.
+    e.info.key != null
+      ? `key:${e.info.key}`
+      : (e.info.inputs ?? [])
+          .map(
+            (i) =>
+              `${i.label}:${i.value ?? ""}:${i.kind}:${i.pclass ?? ""}:${i.definition ? "def" : ""}:${i.note ?? ""}`,
+          )
+          .join("|"),
   ].join("§");

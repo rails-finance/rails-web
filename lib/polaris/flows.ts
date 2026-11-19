@@ -593,7 +593,7 @@ export function polarisFlowTimeline(rp: PolarisReplay, o: PolarisFlowOptions): F
             unsure: [
               {
                 side: "collateral" as const,
-                why: `${PETH_SYMBOL} priced at the ${r.priceFrom === "today" ? "feed's price at the latest block" : "nearest priced row"}: the feed's price at this block is not stored.`,
+                why: `${PETH_SYMBOL} priced at the ${r.priceFrom === "today" ? "feed's price at the latest block" : "nearest read"}: the feed's price at this block is not stored.`,
                 held: true,
               },
             ],

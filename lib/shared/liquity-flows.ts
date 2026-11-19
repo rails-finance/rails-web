@@ -28,8 +28,9 @@
 //
 // Pure: tested offline in scripts/verify/verify-liquity-flows.ts.
 
-import type { FlowBucket, FlowDayRow, FlowEvent, FlowTimeline } from "@/lib/shared/flows-timeline";
-import { daysFromEvents } from "@/lib/shared/flows-timeline";
+import type { FlowBucket, FlowDayRow, FlowEvent, FlowLeg, FlowTimeline } from "@/lib/shared/flows-timeline";
+import { daysFromEvents, flowLeg, livePriced } from "@/lib/shared/flows-timeline";
+import { shownUsd } from "@/lib/shared/shown-usd";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
 import type { BaseActivityEvent, LiquityForkPriceAtBlock } from "@/lib/shared/types/event-shape";
 import { isLiquityEvent } from "@/lib/shared/types/event-shape";
@@ -82,6 +83,11 @@ export interface LiquityFlowEvent {
   reserve?: number;
   /** The branch's collateral price at the block, where recorded. */
   price: number | null;
+  /** Where the price comes from, where it is not the family's feed at
+   *  the event's block (ui-jobs 743): the _price a fork's TroveManager emits
+   *  in its Redemption log, or (Liquity V1) Liquity V2's WETH branch close
+   *  for a day V1 has no read for, with that close's day and block. */
+  priceFrom?: { source: "redemption-log" } | { source: "v2-weth-day"; day: number; block: number | null };
   /** A redemption's redemption price (the PriceFeed's redemption leg), where recorded. */
   redemptionPrice?: number | null;
   /** The rate and the batch's management fee in force after the event. */
@@ -239,6 +245,8 @@ export function liquityFlowBuckets(surplusClaimed: boolean, family: LiquityFamil
 export interface LiquityLive {
   /** The branch's price now. */
   price: number | null;
+  /** The block the live read stands at, where it names one (ui-jobs 743). */
+  block?: number | null;
   coll?: number;
   debt?: number;
   accruedInterest?: number;
@@ -267,6 +275,9 @@ export interface LiquityFlowOptions {
   /** Unix seconds the Trove's branch shut down (ui-jobs 612): interest stops
    *  accruing then, and the liquidation level ends there. */
   shutdownAt?: number | null;
+  /** Whose price the collateral takes, in words, where the page names it
+   *  (Liquity V2: `liquityV2PriceNote`); unset, "the branch PriceFeed's price". */
+  priceNote?: string;
 }
 
 /** A fork branch's minimum for the price view's level (Ebisu, Asymmetry,
@@ -294,8 +305,81 @@ export interface LiquityReplayed {
   price: number;
   /** The price was the nearest recorded one, not the event's own. */
   borrowedPrice: boolean;
+  /** The block the price was recorded at (the event's, or the one it
+   *  borrowed from), where known (ui-jobs 743). */
+  priceBlock: number | null;
+  /** A borrowed price's direction: the last priced event's, or (before the
+   *  first) the next one's. */
+  priceDirection?: "last" | "next";
   legs: { bucket: string; amount: number }[];
 }
+
+/** A Trove's leg with its parts (ui-jobs 743): collateral at the branch
+ *  PriceFeed's price as shown, at its block, a borrowed price naming both
+ *  blocks; debt at its $1 face. */
+function liquityLeg(
+  r: LiquityReplayed,
+  l: { bucket: string; amount: number },
+  collSymbol: string,
+  debtSymbol: string,
+  family: LiquityFamily,
+  priceNote?: string,
+): FlowLeg {
+  if (!COLL_BUCKETS.has(l.bucket))
+    return flowLeg({
+      bucket: l.bucket,
+      amount: l.amount,
+      symbol: debtSymbol,
+      price: 1,
+      priceNote: `$1, ${debtSymbol}'s face: one ${debtSymbol} counts as one dollar`,
+      face: true,
+      ...(l.bucket === LQ.interest || l.bucket === LQ.batchFee ? { accrual: true } : {}),
+    });
+  const n = (b: number) => b.toLocaleString("en-US");
+  const at = r.ev.block;
+  const note = liquityPriceNote(r, family, priceNote);
+  return flowLeg({
+    bucket: l.bucket,
+    amount: l.amount,
+    symbol: collSymbol,
+    price: r.price > 0 ? r.price : null,
+    block: r.borrowedPrice
+      ? r.priceBlock
+      : !r.borrowedPrice && r.ev.priceFrom?.source === "v2-weth-day"
+        ? r.ev.priceFrom.block
+        : at,
+    priceNote: note,
+  });
+}
+
+/** A Trove row's price in words (ui-jobs 743): its source, its block, and
+ *  for a price taken from another event or another feed, both blocks. */
+export function liquityPriceNote(r: LiquityReplayed, family: LiquityFamily, priceNote?: string): string {
+  const n = (b: number) => b.toLocaleString("en-US");
+  const at = r.ev.block;
+  const feedOf = (ev: LiquityFlowEvent) =>
+    ev.priceFrom?.source === "redemption-log"
+      ? "_price in the Redemption log"
+      : family === "v1"
+        ? "Liquity's PriceFeed lastGoodPrice"
+        : (priceNote ?? "the branch PriceFeed's price");
+  const from = r.ev.priceFrom;
+  if (!r.borrowedPrice && from?.source === "v2-weth-day")
+    return `Liquity V2's WETH PriceFeed, the close of ${dayWords(from.day)} ${from.block != null ? `at block ${n(from.block)}` : "at a block the daily store's route does not name"}; this event is at block ${n(at)}`;
+  if (!r.borrowedPrice) return `${feedOf(r.ev)}, block ${n(at)}`;
+  const dir = r.priceDirection === "next" ? "the next priced event's" : "the last priced event's";
+  return r.priceBlock != null
+    ? `${dir} price, at block ${n(r.priceBlock)}; this event is at block ${n(at)}`
+    : `${dir} price, at a block this read does not name; this event is at block ${n(at)}`;
+}
+
+const dayWords = (day: number): string =>
+  new Date(day * 86_400_000).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 
 /** An event id's log index (`${txHash}_${logIndex}`), for events in one block. */
 function logIndex(id: string): number {
@@ -338,8 +422,11 @@ export function replayLiquity(events: LiquityFlowEvent[]): LiquityReplayed[] {
   );
   // A row the filler has not priced takes the last recorded price before it,
   // else the first after it.
-  const firstPrice = sorted.find((e) => e.price != null && e.price > 0)?.price ?? 0;
+  const firstPriced = sorted.find((e) => e.price != null && e.price > 0);
+  const firstPrice = firstPriced?.price ?? 0;
   let lastPrice = firstPrice;
+  let lastBlock: number | null = firstPriced?.block ?? null;
+  let seenOwn = false;
   let collBefore = 0;
   let debtBefore = 0;
   let rate = 0;
@@ -347,7 +434,11 @@ export function replayLiquity(events: LiquityFlowEvent[]): LiquityReplayed[] {
   const out: LiquityReplayed[] = [];
   for (const ev of sorted) {
     const own = ev.price != null && ev.price > 0;
-    if (own) lastPrice = ev.price as number;
+    if (own) {
+      lastPrice = ev.price as number;
+      lastBlock = ev.block ?? null;
+      seenOwn = true;
+    }
     const legs: { bucket: string; amount: number }[] = [];
     const add = (bucket: string, amount: number) => {
       if (Math.abs(amount) > DUST) legs.push({ bucket, amount });
@@ -397,7 +488,14 @@ export function replayLiquity(events: LiquityFlowEvent[]): LiquityReplayed[] {
       if (debtOp > 0) add(LQ.borrowed, debtOp);
       else add(LQ.repaid, -debtOp);
     }
-    out.push({ ev, price: own ? (ev.price as number) : lastPrice, borrowedPrice: !own, legs });
+    out.push({
+      ev,
+      price: own ? (ev.price as number) : lastPrice,
+      borrowedPrice: !own,
+      priceBlock: own ? (ev.block ?? null) : lastBlock,
+      ...(own ? {} : { priceDirection: seenOwn ? ("last" as const) : ("next" as const) }),
+      legs,
+    });
     collBefore = ev.collAfter;
     debtBefore = ev.debtAfter;
     rate = ev.rate;
@@ -489,14 +587,17 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
   const debt = `debt:${o.debtSymbol}`;
   const family = o.family ?? "v2";
   const buckets = liquityFlowBuckets(o.surplusClaimed, family);
-  const flowEvents: FlowEvent[] = replayed.map(({ ev, price, legs, borrowedPrice }) => {
+  const flowEvents: FlowEvent[] = replayed.map((row) => {
+    const { ev, price, legs, borrowedPrice } = row;
     const moved = { coll: false, debt: false };
     for (const l of legs) {
       if (l.bucket === LQ.interest || l.bucket === LQ.batchFee) continue;
       if (COLL_BUCKETS.has(l.bucket)) moved.coll = true;
       else moved.debt = true;
     }
-    // An event that records no price takes the last one recorded before it.
+    // An event that records no price takes the last one recorded before it:
+    // kept, both blocks named, not complete (ui-jobs 743). Liquity V2's WETH
+    // close on a V1 day is the day-close basis: both blocks named, complete.
     const unpriced =
       borrowedPrice && price > 0 && (ev.collAfter > DUST || legs.some((l) => COLL_BUCKETS.has(l.bucket)));
     return {
@@ -505,7 +606,7 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
             unsure: [
               {
                 side: "collateral" as const,
-                why: `${o.collSymbol} priced at the last event's price: this event records none.`,
+                why: `${o.collSymbol} priced at ${row.priceDirection === "next" ? "the next" : "the last"} priced event's price: this event records none.`,
                 held: true,
               },
             ],
@@ -528,11 +629,7 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
                   : moved.coll
                     ? "collateral"
                     : "debt",
-      legs: legs.map((l) =>
-        COLL_BUCKETS.has(l.bucket)
-          ? { bucket: l.bucket, usd: l.amount * price, symbol: o.collSymbol }
-          : { bucket: l.bucket, usd: l.amount, symbol: o.debtSymbol },
-      ),
+      legs: legs.map((l) => liquityLeg(row, l, o.collSymbol, o.debtSymbol, family, o.priceNote)),
       tx: ev.tx,
       // The card counts the owner's transactions; a redemption or a
       // liquidation is another party's.
@@ -588,7 +685,8 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
   const nowDebt = open
     ? (o.live?.debt ?? last.debtAfter * accrualFactor(last.rate, last.fee, last.ts, accrueTo(o.now)))
     : 0;
-  const pricedNow = livePrice ?? replayed[replayed.length - 1].price;
+  const lastRow = replayed[replayed.length - 1];
+  const pricedNow = livePrice ?? lastRow.price;
   const pending: NonNullable<FlowTimeline["live"]["pending"]> = [];
   if (open && o.live) {
     if ((o.live.redistColl ?? 0) > DUST)
@@ -604,13 +702,54 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
   return {
     buckets,
     days,
+    // Each held figure a shown product (ui-jobs 743): the collateral at the
+    // live price, at its read's block; with no live price, at the last
+    // event's, its block named and not complete; the debt at its $1 face.
     live: {
-      collateralUsd: nowColl * pricedNow,
-      debtUsd: nowDebt,
+      collateralUsd: shownUsd(nowColl, pricedNow),
+      debtUsd: shownUsd(nowDebt, 1),
       assets: open
         ? [
-            { side: "collateral", symbol: o.collSymbol, amount: nowColl, usd: nowColl * pricedNow },
-            { side: "debt", symbol: o.debtSymbol, amount: nowDebt, usd: nowDebt },
+            {
+              side: "collateral",
+              symbol: o.collSymbol,
+              amount: nowColl,
+              usd: shownUsd(nowColl, pricedNow),
+              ...(pricedNow > 0
+                ? {
+                    priced:
+                      livePrice != null
+                        ? livePriced(livePrice, o.live?.block, o.now, {
+                            source:
+                              family === "v1"
+                                ? "Liquity's PriceFeed lastGoodPrice now"
+                                : (o.priceNote ?? "the branch PriceFeed's price now"),
+                          })
+                        : {
+                            // The last event's price, carried: its block as
+                            // its leg names it (A5).
+                            day: Math.floor(o.now / DAY_S),
+                            series: false,
+                            price: pricedNow,
+                            block: lastRow.borrowedPrice
+                              ? lastRow.priceBlock
+                              : lastRow.ev.priceFrom?.source === "v2-weth-day"
+                                ? lastRow.ev.priceFrom.block
+                                : lastRow.ev.block,
+                            carried: true as const,
+                          },
+                  }
+                : nowColl > 0
+                  ? { unpriced: true as const }
+                  : {}),
+            },
+            {
+              side: "debt",
+              symbol: o.debtSymbol,
+              amount: nowDebt,
+              usd: shownUsd(nowDebt, 1),
+              priced: livePriced(1, null, o.now, { face: true }),
+            },
           ]
         : [],
       ...(pending.length ? { pending } : {}),
@@ -828,28 +967,20 @@ export function liquityFocusEvents(
     return {
       id: r.ev.id,
       ts: r.ev.ts,
-      legs: r.legs.map((l) =>
-        COLL_BUCKETS.has(l.bucket)
-          ? { bucket: l.bucket, usd: l.amount * r.price, amount: l.amount, symbol: collSymbol }
-          : {
-              bucket: l.bucket,
-              usd: l.amount,
-              amount: l.amount,
-              symbol: debtSymbol,
-              ...(l.bucket === LQ.interest || l.bucket === LQ.batchFee ? { accrual: true } : {}),
-            },
-      ),
+      legs: r.legs.map((l) => liquityLeg(r, l, collSymbol, debtSymbol, family)),
       sides: {
         collateral: {
-          before: Math.max(0, collAfter - collMove) * r.price,
-          after: collAfter * r.price,
+          // No price on the Trove: not a number, never $0; usdShown reads it
+          // as no figure, and the token sums stand (ui-jobs 743).
+          before: r.price > 0 ? shownUsd(Math.max(0, collAfter - collMove), r.price) : Number.NaN,
+          after: r.price > 0 ? shownUsd(collAfter, r.price) : Number.NaN,
           amount: collMove,
           symbol: collSymbol,
           held: collAfter,
         },
         debt: {
-          before: Math.max(0, debtAfter - debtMove),
-          after: debtAfter,
+          before: shownUsd(Math.max(0, debtAfter - debtMove), 1),
+          after: shownUsd(debtAfter, 1),
           amount: debtMove,
           symbol: debtSymbol,
           held: debtAfter,
@@ -1099,6 +1230,9 @@ export function liquityForkFlowEvents(
       debtFromRedist: op ? num(op.debtFromRedist) : 0,
       surplus: c.liquidation ? num(c.liquidation.collSurplus) : 0,
       price: c.priceAtBlock?.usd != null && c.priceAtBlock.usd > 0 ? c.priceAtBlock.usd : null,
+      ...(c.priceAtBlock?.source === "redemption-event-price"
+        ? { priceFrom: { source: "redemption-log" as const } }
+        : {}),
       rate: num(c.interestRate),
       fee,
       rateBy: rateByOf(c.eventType),

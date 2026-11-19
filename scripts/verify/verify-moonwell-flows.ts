@@ -36,6 +36,8 @@
 //
 //   npx tsx --test scripts/verify/verify-moonwell-flows.ts
 import { test } from "node:test";
+import { centsOfLines } from "./lib/cents-lines";
+import { shownUsd } from "@/lib/shared/shown-usd";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -267,11 +269,20 @@ for (const name of NAMES) {
       const st = stateAt(m, stop);
       for (const side of ["collateral", "debt"] as const) {
         const r = sideSumRows(st[side], m.unit);
-        assert.equal(
-          r.lines.reduce((a, l) => a + l.dollars, 0),
-          r.total.dollars,
-          `${name} ${side} at stop ${stop}: lines add`,
-        );
+        // In cents where the legs carry their parts (ui-jobs 743): the lines add
+        // to the cent, each face its cents to the dollar.
+        if (r.total.cents != null)
+          assert.equal(
+            centsOfLines(r.lines, "moonwell"),
+            Math.round(r.total.cents * 100) || 0,
+            `${name} ${side} at stop ${stop}: lines add in cents`,
+          );
+        else
+          assert.equal(
+            r.lines.reduce((a, l) => a + l.dollars, 0),
+            r.total.dollars,
+            `${name} ${side} at stop ${stop}: lines add`,
+          );
         const src = st[side].sources.reduce((a, s) => a + s.value, 0);
         assert.ok(Math.abs(src - st[side].total) < 1e-6 * Math.max(1, st[side].total), `${name} ${side} ${stop}`);
       }
@@ -321,7 +332,12 @@ for (const name of NAMES) {
                 sum: single,
                 usd: (() => {
                   const d = eventSideSumByAsset(m, sum, cum, held);
-                  return { lines: d.lines, dollars: d.total.dollars, before: st.heldBefore[side] };
+                  return {
+                    lines: d.lines,
+                    dollars: d.total.dollars,
+                    before: st.heldBefore[side],
+                    ...(d.total.cents != null ? { cents: d.total.cents } : {}),
+                  };
                 })(),
               }),
             ]
@@ -385,7 +401,13 @@ test("a quiet day takes the store's price; without the store, the last event's",
         const market = rows(f).find((r) => r.symbol === h.symbol)!.market;
         const p = store[market]?.find(([d]) => d === day)?.[1];
         if (p == null || !(h.amount! > 0)) continue;
-        assert.ok(near(h.usd! / h.amount!, p, 1e-9), `${name} ${h.symbol} day ${day}: ${h.usd! / h.amount!} vs ${p}`);
+        // The held figure is its shown product at the store's price, to the cent (ui-jobs 743).
+        assert.equal(h.priced?.price, p, `${name} ${h.symbol} day ${day}: price ${h.priced?.price} vs ${p}`);
+        assert.equal(
+          h.usd,
+          shownUsd(h.amount!, p),
+          `${name} ${h.symbol} day ${day}: ${h.usd} vs ${shownUsd(h.amount!, p)}`,
+        );
         checked++;
       }
     }
@@ -426,3 +448,26 @@ test("open positions: between events each debt grows by its market's index, and 
   }
   assert.ok(checked > 0, "an open borrow");
 });
+
+// The cards' legs carry their parts (ui-jobs 743): each the shown product of
+// its amount and its price, the price named; one read away from its block
+// names both blocks; no price anywhere is unpriced.
+for (const name of NAMES) {
+  test(`${name}: each leg is its shown product, its price named`, () => {
+    const f = fx(name);
+    let legs = 0;
+    for (const fe of ctokenFocusEvents(ctokenFlowReplay(rows(f), opts(f))))
+      for (const l of fe.legs) {
+        if (l.price == null) {
+          assert.equal(l.usd, null, `${name}: an unpriced leg has no figure`);
+          continue;
+        }
+        legs++;
+        assert.equal(l.usd, shownUsd(l.amount!, l.price), `${name} ${fe.id}: the shown product`);
+        assert.ok(l.priceNote && /block [\d,]+/.test(l.priceNote), `${name} ${fe.id}: ${l.priceNote}`);
+        if (l.block == null || l.priceNote.includes("this "))
+          assert.match(l.priceNote, /this (event|row) is at block [\d,]+$/);
+      }
+    assert.ok(legs > 0);
+  });
+}

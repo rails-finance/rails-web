@@ -480,11 +480,23 @@ export default function AaveV3PositionDetail({
     // Not cancelled when the lifetime changes under it (the route's answer
     // landing): the prices still belong to this wallet's view.
     fetchAaveV3OraclePrices(missing, market)
-      .then(({ prices }) => {
+      .then(({ prices, block }) => {
         if (Object.keys(prices).length === 0) return;
         setView((v) =>
           v && v.wallet.toLowerCase() === wallet.toLowerCase()
-            ? { ...v, priceByAddress: { ...prices, ...(v.priceByAddress ?? {}) } }
+            ? {
+                ...v,
+                priceByAddress: { ...prices, ...(v.priceByAddress ?? {}) },
+                // Each merged price keeps its read's block (ui-jobs 743).
+                priceBlockByAddress: {
+                  ...Object.fromEntries(
+                    Object.keys(prices)
+                      .filter((a) => v.priceByAddress?.[a] == null)
+                      .map((a) => [a.toLowerCase(), block]),
+                  ),
+                  ...(v.priceBlockByAddress ?? {}),
+                },
+              }
             : v,
         );
       })

@@ -28,21 +28,27 @@
 // store the rows take the nearest priced moment.
 //
 //   npx tsx --test scripts/verify/verify-makerdao-flows.ts
-import { shownUsd } from "@/lib/shared/shown-usd";
 import { test } from "node:test";
+import { centsOfLines } from "./lib/cents-lines";
+import { faceAmount, shownUsd } from "@/lib/shared/shown-usd";
+import { flowSegmentProv } from "@/lib/shared/flows-timeline-provenance";
+import { makerFactorNote } from "@/lib/makerdao/price-notes";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { BaseActivityEvent, MakerDAOContext } from "@/lib/shared/types/event-shape";
 import {
   MK,
+  makerFeeRateFrom,
   makerFeeRates,
   makerFlowEvents,
+  makerGrowth,
   makerFlowTimeline,
   makerFocusEvents,
   makerPricing,
   replayMaker,
   type MakerFlowOptions,
+  type MakerReplayed,
 } from "@/lib/makerdao/flows";
 import { buildFlowModel, stateAt, type FlowModel } from "@/lib/shared/flows-timeline";
 import { sideSumRows } from "@/lib/shared/flows-sum";
@@ -143,6 +149,16 @@ test("the fixtures are the vaults the header names", () => {
   ]);
   for (const f of ALL) assert.ok(daily(f), `${f.name}: the store answered`);
 });
+
+/** The printed lines' sum and the total, in cents where the lines are (the
+ *  legs carry their parts, ui-jobs 743), else in whole dollars. */
+function linesAdd(r: {
+  lines: { dollars: number; cents?: number; unpriced?: string[]; amount: string; kind: string; none?: string }[];
+  total: { dollars: number; cents?: number };
+}): [number, number] {
+  if (r.total.cents != null) return [centsOfLines(r.lines, "makerdao"), Math.round(r.total.cents * 100) || 0];
+  return [r.lines.reduce((a, l) => a + l.dollars, 0), r.total.dollars];
+}
 
 for (const name of NAMES) {
   test(`${name}: the replay meets every row's recorded balances, and each act is the row's`, () => {
@@ -279,11 +295,7 @@ for (const name of NAMES) {
       const st = stateAt(m, stop);
       for (const side of ["collateral", "debt"] as const) {
         const r = sideSumRows(st[side], m.unit);
-        assert.equal(
-          r.lines.reduce((a, l) => a + l.dollars, 0),
-          r.total.dollars,
-          `${name} ${side} at stop ${stop}: lines add`,
-        );
+        assert.equal(...linesAdd(r), `${name} ${side} at stop ${stop}: lines add`);
         const src = st[side].sources.reduce((a, s) => a + s.value, 0);
         assert.ok(Math.abs(src - st[side].total) < 1e-6 * Math.max(1, st[side].total), `${name} ${side} ${stop}`);
       }
@@ -320,11 +332,7 @@ for (const name of NAMES) {
       assert.ok(cum.exact, `${name} ${fe.id}: the legs add to the day row's move`);
       for (const side of ["collateral", "debt"] as const) {
         const usd = eventSideSum(m, side, cum, fe.sides![side].after);
-        assert.equal(
-          usd.lines.reduce((a, l) => a + l.dollars, 0),
-          usd.total.dollars,
-          `${name} ${fe.id} ${side}: lines add`,
-        );
+        assert.equal(...linesAdd(usd), `${name} ${fe.id} ${side}: lines add`);
         const sum = eventTokenSum(m, focus, side, cum, fe.id);
         assert.ok(sum, `${name} ${fe.id} ${side}: a token sum`);
         const scale = 10 ** sum.decimals;
@@ -341,7 +349,12 @@ for (const name of NAMES) {
           side,
           ev: fe,
           sum,
-          usd: { lines: usd.lines, dollars: usd.total.dollars, before: fe.sides![side].before },
+          usd: {
+            lines: usd.lines,
+            dollars: usd.total.dollars,
+            before: fe.sides![side].before,
+            ...(usd.total.cents != null ? { cents: usd.total.cents } : {}),
+          },
         });
         const adds = ledgerAdds(l);
         assert.ok(adds.tokens, `${name} ${fe.id} ${side}: the ledger's tokens add`);
@@ -393,11 +406,18 @@ test("between two rows the debt runs from what the first recorded to what the se
     const day = Math.floor(a.ev.ts / DAY) + 1;
     const owed = stateAt(m, day - startDay).debt.now;
     const before = b.ev.debtAfter - b.ev.debtChange;
-    assert.ok(owed >= a.ev.debtAfter && owed <= before, `owed ${owed} between ${a.ev.debtAfter} and ${before}`);
-    const expected = a.ev.debtAfter * (1 + rates[i] * (((day + 1) * DAY - a.ev.ts) / 31_557_600));
-    assert.ok(near(owed, expected, 1e-9), `${owed} vs ${expected}`);
-    // At the next row's block the straight line reaches the debt the row found.
-    assert.ok(near(a.ev.debtAfter * (1 + rates[i] * ((b.ev.ts - a.ev.ts) / 31_557_600)), before, 1e-9));
+    // In cents (ui-jobs 743): the owed figure is a debt at its $1 par.
+    assert.ok(
+      owed >= shownUsd(a.ev.debtAfter, 1) && owed <= shownUsd(before, 1),
+      `owed ${owed} between ${a.ev.debtAfter} and ${before}`,
+    );
+    // The fee compounds each second, as the Vat's rate accumulator grows
+    // through Jug's rpow: the recorded debt × e^(rate × time), to the cent.
+    const factor = makerGrowth(rates[i], (day + 1) * DAY - a.ev.ts);
+    assert.ok(near(factor, Math.exp(rates[i] * (((day + 1) * DAY - a.ev.ts) / 31_557_600)), 1e-15));
+    assert.equal(owed, shownUsd(faceAmount(a.ev.debtAfter, factor), 1), `${owed} vs ${a.ev.debtAfter * factor}`);
+    // At the next row's block the compounding meets the debt the row found.
+    assert.ok(near(a.ev.debtAfter * makerGrowth(rates[i], b.ev.ts - a.ev.ts), before, 1e-9));
     checked++;
   }
   assert.ok(checked > 3, `${checked} stretches`);
@@ -420,9 +440,156 @@ test("the state card between events states the chart's figures", () => {
     checked++;
     assert.ok(mo.sides.debt.face);
     const chart = stateAt(m, stop).debt.now;
-    assert.ok(near(d.tokens, chart, 1e-9), `stop ${stop}: ${d.tokens} vs ${chart}`);
+    // The card's tokens to six decimals; the chart's figure is them at $1, to the cent.
+    assert.equal(shownUsd(d.tokens, 1), chart, `stop ${stop}: ${d.tokens} vs ${chart}`);
     assert.ok(mo.accrual, "the fee's accrual");
-    assert.ok(near(d.recorded * mo.accrual!.factor, chart, 1e-9), `stop ${stop}: the card's factor`);
+    assert.ok(near(mo.accrual!.factor, Math.exp((mo.accrual!.rate / 100) * (mo.accrual!.seconds / 31_557_600)), 1e-12));
+    assert.equal(d.tokens, faceAmount(d.recorded, mo.accrual!.factor), `stop ${stop}: the card's factor`);
   }
   assert.ok(checked > 10, `${checked}`);
+});
+
+// The legs carry their parts (ui-jobs 743): the collateral at the row's
+// Spotter price as shown, named with its blocks; the debt at its $1 par.
+for (const name of NAMES) {
+  test(`${name}: each leg is its shown product, its price named`, () => {
+    const f = fx(name);
+    const rp = replayMaker(rows(f), opts(f));
+    let coll = 0;
+    for (const fe of makerFocusEvents(rp, makerFeeRates(rp, opts(f)), "ETH", "DAI", opts(f).now))
+      for (const l of fe.legs) {
+        assert.equal(l.usd, l.price == null ? null : shownUsd(l.amount!, l.price), `${name} ${fe.id}`);
+        if (l.face) continue;
+        coll++;
+        assert.match(l.priceNote!, /block [\d,]+/);
+      }
+    assert.ok(coll > 0, `${name}: collateral legs`);
+  });
+}
+
+test("a vault with no price anywhere draws no collateral figure, never $0", () => {
+  const f = fx("open-fee");
+  const bare = rows(f).map((r) => ({ ...r, price: null }));
+  const o = { ...opts(f, false), live: null };
+  const rp = replayMaker(bare, o);
+  const focus = makerFocusEvents(rp, makerFeeRates(rp, o), "ETH", "DAI", o.now);
+  let coll = 0;
+  for (const fe of focus) {
+    for (const l of fe.legs)
+      if (!l.face) {
+        coll++;
+        assert.equal(l.price, null, `${fe.id}: unpriced`);
+        assert.equal(l.usd, null, `${fe.id}: no dollars`);
+      }
+    assert.ok(Number.isNaN(fe.sides!.collateral.after), `${fe.id}: the side has no figure`);
+  }
+  assert.ok(coll > 0);
+  // The debt still stands at its par, to the cent.
+  const debt = focus.flatMap((fe) => fe.legs).filter((l) => l.face);
+  assert.ok(debt.length > 0 && debt.every((l) => l.usd === shownUsd(l.amount!, 1)));
+});
+
+test("a past event priced at the latest read stands on another basis and names its block", () => {
+  const f = fx("open-fee");
+  const bare = rows(f).map((r) => ({ ...r, price: null }));
+  const o = { ...opts(f, false), live: { ...opts(f).live!, block: 24_000_000 } };
+  const rp = replayMaker(bare, o);
+  const focus = makerFocusEvents(rp, makerFeeRates(rp, o), "ETH", "DAI", o.now);
+  const live = focus.flatMap((fe) => fe.legs).filter((l) => !l.face && l.basis);
+  assert.ok(live.length > 0, "legs at the latest read");
+  for (const l of live) {
+    assert.equal(l.block, 24_000_000);
+    assert.match(l.priceNote!, /block 24,000,000; this event is at block [\d,]+/);
+  }
+});
+
+test("a past day's debt states the recorded debt, the factor its rows' accumulators imply, and their product", () => {
+  const f = fx("open-fee");
+  const m = model(f);
+  const rp = replayMaker(rows(f), opts(f));
+  let checked = 0;
+  for (let stop = 1; stop < m.liveStop && checked < 20; stop += 7) {
+    const held = stateAt(m, stop).debt.bar[0];
+    if (!(held.value > 0) || !held.heldRows?.length) continue;
+    const rowsIn = flowSegmentProv(held, "debt", "the end of the day", false, true).inputs ?? [];
+    const factor = rowsIn.find((r) => r.label.endsWith("interest factor"));
+    assert.ok(factor, `stop ${stop}: a factor row`);
+    const m2 = /at blocks ([\d,]+) and ([\d,]+) imply/.exec(factor.note ?? "");
+    assert.ok(m2, `stop ${stop}: ${factor.note}`);
+    const [from, to] = [Number(m2[1].replace(/,/g, "")), Number(m2[2].replace(/,/g, ""))];
+    const i = rp.findIndex((r) => r.ev.block === from);
+    assert.ok(i >= 0, `block ${from} is a row's`);
+    assert.equal(rp[i + 1]?.ev.block ?? to, to, `block ${to} is the next row's`);
+    assert.match(String(factor.value), /^\d\.\d{9}$/);
+    checked++;
+  }
+  assert.ok(checked > 3, `${checked}`);
+});
+
+// Each stretch's rate names the branch that gave it (makerFeeRateFrom), and a
+// missing accumulator gives no rate, never a log of zero.
+test("the fee's rate names its source: the next row, the live read, the fee, or carried; none without an accumulator", () => {
+  const YEAR = 31_557_600;
+  const ev = (block: number, ts: number, rate: number) => ({ ev: { block, ts, rate } }) as unknown as MakerReplayed;
+  const base = { collSymbol: "ETH", debtSymbol: "DAI", now: 2 * YEAR, daily: null } as MakerFlowOptions;
+  // Two rows a year apart: the next row's accumulator.
+  const rows = makerFeeRateFrom([ev(100, 0, 1), ev(200, YEAR, 1.05)], { ...base, live: null });
+  assert.equal(rows[0].from, "rows");
+  assert.ok(near(rows[0].rate, Math.log(1.05), 1e-12));
+  assert.equal(
+    makerFactorNote(rows[0]),
+    "compounded each second at the rate the Vat's accumulators at blocks 100 and 200 imply",
+  );
+  // After the last row, the live read's accumulator at its block.
+  const live = makerFeeRateFrom([ev(100, 0, 1)], {
+    ...base,
+    live: { price: 1, ink: 1, debt: 1, rate: 1.1, block: 900, feeApr: null },
+  });
+  assert.equal(live[0].from, "live");
+  assert.ok(near(live[0].rate, Math.log(1.1) / 2, 1e-12));
+  assert.match(makerFactorNote(live[0])!, /accumulator at block 100 and the live read's at block 900 imply$/);
+  assert.doesNotMatch(makerFactorNote(live[0])!, /fee now/);
+  // No live accumulator: the live stability fee.
+  const fee = makerFeeRateFrom([ev(100, 0, 1)], {
+    ...base,
+    live: { price: 1, ink: 1, debt: 1, rate: null, feeApr: 0.05 },
+  });
+  assert.equal(fee[0].from, "fee");
+  assert.ok(near(fee[0].rate, Math.log(1.05), 1e-12));
+  assert.match(makerFactorNote(fee[0])!, /live read's stability fee, ln\(1 \+ fee\) a year, from block 100/);
+  // Two rows in one moment: the stretch before's rate, carried.
+  const same = makerFeeRateFrom([ev(100, 0, 1), ev(200, YEAR, 1.05), ev(201, YEAR, 1.05)], { ...base, live: null });
+  assert.equal(same[1].from, "carried");
+  assert.equal(same[1].rate, same[0].rate);
+  assert.match(makerFactorNote(same[1])!, /rate of the stretch before block 200, carried on/);
+  // A zero accumulator: no rate and no note, never −Infinity.
+  const none = makerFeeRateFrom([ev(100, 0, 1), ev(200, YEAR, 0)], { ...base, live: null });
+  assert.equal(none[0].from, "none");
+  assert.ok(Number.isNaN(none[0].rate));
+  assert.equal(makerFactorNote(none[0]), null);
+});
+
+test("a stretch with no accumulator leaves the debt with no figure, never $0 or a carried factor", () => {
+  const f = fx("open-fee");
+  const o = opts(f);
+  const bare = rows(f).map((r, i) => (i === 2 ? { ...r, rate: 0 } : r));
+  const rp = replayMaker(bare, o);
+  const from = makerFeeRateFrom(rp, o);
+  assert.ok(
+    from.some((r) => r.from === "none"),
+    "a stretch with no rate",
+  );
+  const m = buildFlowModel(makerFlowTimeline(bare, o)!)!;
+  const startDay = m.start / 86_400_000;
+  let gaps = 0;
+  for (const [i, r] of from.entries()) {
+    if (r.from !== "none" || !rp[i + 1] || !(rp[i].ev.debtAfter > 0)) continue;
+    const day = Math.floor(rp[i].ev.ts / DAY) + 1;
+    if (day >= Math.floor(rp[i + 1].ev.ts / DAY)) continue;
+    const stop = day - startDay;
+    assert.ok(m.heldUnpriced.get(stop)?.debt.includes(o.debtSymbol), `day ${day}: the debt has no figure`);
+    assert.equal(sideSumRows(stateAt(m, stop).debt).total.amount, "—");
+    gaps++;
+  }
+  assert.ok(gaps > 0, "a day in the stretch");
 });

@@ -29,6 +29,8 @@ import { actedByOther } from "@/lib/shared/external-actor";
 import type { ChainTruthTowerData, TowerLine } from "@/lib/shared/chain-truth-economics";
 import {
   daysFromEvents,
+  flowLeg,
+  livePriced,
   type FlowAssetHeld,
   type FlowBucket,
   type FlowDayRow,
@@ -39,6 +41,7 @@ import {
 } from "@/lib/shared/flows-timeline";
 import type { FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
+import { AAVE_V3_SERVED_NOTE, aaveV3PriceNote } from "./price-notes";
 import {
   aaveV3EventLegs,
   aaveV3LiquidationTxs,
@@ -155,7 +158,16 @@ export const AAVE_V3_FLOW_BUCKETS: FlowBucket[] = [
 /** A leg of the scrubber's flows: the ledger's legs, and the collateral a
  *  repay made with aTokens used, which the ledger does not count. */
 export type SeriesFlowLeg = FlowLeg | "usedToRepay";
-export type FlowEventLeg = Omit<AaveV3EventLeg, "leg"> & { leg: SeriesFlowLeg | null };
+export type FlowEventLeg = Omit<AaveV3EventLeg, "leg"> & {
+  leg: SeriesFlowLeg | null;
+  /** Where the leg's price comes from, where it is not the market's oracle
+   *  (an Aave V4 Chainlink entry). */
+  priceSource?: string;
+};
+
+/** How a family names a leg's price at its block (ui-jobs 743): the legs
+ *  then carry their parts, and a leg with no price at its block is unpriced. */
+export type LegPriceNote = (l: FlowEventLeg, block: number) => string;
 
 const BUCKET_OF: Record<SeriesFlowLeg, string> = {
   supplied: "deposited",
@@ -319,6 +331,9 @@ export function aaveV3FlowEvents(
   );
 }
 
+/** An Aave V3 leg's price: the market's oracle at the event's block. */
+const aaveV3LegPriceNote: LegPriceNote = (l, block) => aaveV3PriceNote("the market's AaveOracle", l.symbol, block);
+
 /** The collateral leg of a repay made with aTokens, added to the ledger's
  *  legs for that event: the repaid leg's asset, amount and price, on the
  *  collateral side. A repay-with-collateral swap is a swap event and keeps
@@ -342,6 +357,7 @@ export function focusEventsFromLegs<E extends BaseActivityEvent>(
   ordered: E[],
   legsOf: (ev: E) => FlowEventLeg[],
   todayPrices: Record<string, number> | undefined,
+  priceNote?: LegPriceNote,
 ): FocusEvent[] {
   const priceToday = (address: string | undefined) => {
     const p = address ? (todayPrices?.[address] ?? todayPrices?.[address.toLowerCase()]) : undefined;
@@ -351,9 +367,21 @@ export function focusEventsFromLegs<E extends BaseActivityEvent>(
     id: ev.id,
     ts: ev.timestamp,
     tx: ev.txHash?.toLowerCase(),
-    legs: legsOf(ev).flatMap((l) => {
+    legs: legsOf(ev).flatMap((l): FocusEvent["legs"] => {
       const bucket = bucketOf(l);
       if (!bucket || !(l.amount > 0) || !Number.isFinite(l.amount)) return [];
+      // With its parts: the price at the leg's block, or none.
+      if (priceNote)
+        return [
+          flowLeg({
+            bucket,
+            amount: l.amount,
+            symbol: l.symbol,
+            price: l.price,
+            block: ev.blockNumber,
+            priceNote: priceNote(l, ev.blockNumber),
+          }),
+        ];
       const price = l.price != null && l.price > 0 ? l.price : priceToday(l.address);
       return [{ bucket, usd: price == null ? null : l.amount * price, amount: l.amount, symbol: l.symbol }];
     }),
@@ -369,7 +397,7 @@ export function aaveV3FocusEvents(
     .filter(isAaveV3Event)
     .sort((a, b) => a.timestamp - b.timestamp || a.blockNumber - b.blockNumber || logIndex(a.id) - logIndex(b.id));
   const liqTxs = aaveV3LiquidationTxs(ordered);
-  return focusEventsFromLegs(ordered, (ev) => aaveV3FlowLegs(ev, liqTxs), todayPrices);
+  return focusEventsFromLegs(ordered, (ev) => aaveV3FlowLegs(ev, liqTxs), todayPrices, aaveV3LegPriceNote);
 }
 
 /** Actions each family's position card leaves out of its transaction count
@@ -521,24 +549,44 @@ export function aaveV3FlowLive(tower: ChainTruthTowerData): FlowLive {
 
 /** Each asset the ledger holds and owes now: its current lines, and where a
  *  side splits off interest (`interest`), that line joined to its asset.
- *  `collateralInterest` joins the collateral side's too. */
+ *  `collateralInterest` joins the collateral side's too. Each asset carries
+ *  its line's price (ui-jobs 743), so the live stop states it as amount ×
+ *  price; a line with no price leaves its asset with none. */
 export function towerAssets(tower: ChainTruthTowerData, collateralInterest: boolean): FlowAssetHeld[] {
   const out: FlowAssetHeld[] = [];
-  const add = (side: FlowSide, lines: TowerLine[], interest: TowerLine | null | undefined) => {
-    for (const l of lines) {
-      const at = out.find((x) => x.side === side && x.symbol === l.symbol);
-      if (at) {
-        at.usd += l.usd ?? 0;
-        at.amount = at.amount != null ? at.amount + l.amount : null;
-      } else out.push({ side, symbol: l.symbol, amount: l.amount, usd: l.usd ?? 0 });
-    }
-    if (!interest) return;
-    // Interest on one asset joins it; interest summed across assets is its own line.
-    const at = out.find((x) => x.side === side && x.symbol === interest.symbol);
+  const priced = (p: NonNullable<TowerLine["price"]>) =>
+    livePriced(p.usd, p.block, 0, { source: p.source, balanceBlock: p.balanceBlock });
+  const join = (side: FlowSide, symbol: string, amount: number, usd: number | null, price: TowerLine["price"]) => {
+    const at = out.find((x) => x.side === side && x.symbol === symbol);
     if (at) {
-      at.usd += interest.usd ?? 0;
-      at.amount = at.amount != null ? at.amount + interest.amount : null;
+      at.usd += usd ?? 0;
+      at.amount = at.amount != null ? at.amount + amount : null;
+      if (usd == null && amount > 0) {
+        at.unpriced = true;
+        delete at.priced;
+      }
     } else
+      out.push({
+        side,
+        symbol,
+        amount,
+        usd: usd ?? 0,
+        // A line the tower could not price has no figure (ui-jobs 743).
+        ...(usd == null && amount > 0 ? { unpriced: true as const } : price ? { priced: priced(price) } : {}),
+      });
+  };
+  const add = (side: FlowSide, lines: TowerLine[], interest: TowerLine | null | undefined) => {
+    for (const l of lines) join(side, l.symbol, l.amount, l.usd, l.price);
+    if (!interest) return;
+    // Interest on one asset joins it; interest summed across assets joins
+    // each asset by its part, or stands as its own line.
+    if (interest.parts?.length) {
+      for (const p of interest.parts) join(side, p.symbol, p.amount, p.amount * p.price.usd, p.price);
+      return;
+    }
+    const at = out.find((x) => x.side === side && x.symbol === interest.symbol);
+    if (at) join(side, interest.symbol, interest.amount, interest.usd, interest.price);
+    else
       out.push({
         side,
         symbol: side === "debt" ? "Interest accrued" : "Interest earned",
@@ -567,6 +615,7 @@ export function aaveV3FlowSeriesTimeline(
     AAVE_V3_FLOW_BUCKETS,
     tower?.valued === true ? aaveV3FlowLive(tower) : null,
     todayPrices,
+    AAVE_V3_SERVED_NOTE,
   );
 }
 
@@ -578,6 +627,8 @@ export function flowSeriesTimeline(
   bucketDefs: FlowBucket[],
   live: FlowLive | null,
   todayPrices: Record<string, number> | undefined,
+  /** The family's sentence that its day rows name no legs (its price-notes). */
+  served: string,
 ): FlowTimeline | null {
   if (series.days.length === 0) return null;
   const symbolOf = (a: string) => series.assets[a]?.symbol ?? a.slice(0, 8);
@@ -613,9 +664,10 @@ export function flowSeriesTimeline(
     // its interest; without them (an older server) it keeps the balance its
     // last event recorded (rails-ops reference/lifetime-flows-scrubber.md).
     ...(series.indexes && Object.keys(series.indexes.assets).length > 0
-      ? { indexes: series.indexes }
+      ? { indexes: series.indexes, words: { served } }
       : {
           words: {
+            served,
             moment: {
               notes: [
                 "Interest since the last event is not included: each balance is the one the last event recorded, valued at the day's price.",

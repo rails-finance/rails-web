@@ -13,7 +13,6 @@
 import type { LiquityV1Context } from "@/lib/shared/types/event-shape";
 import {
   SHEET_WORDS,
-  sheetUsd,
   type EventSheet,
   type SheetRow,
   type SheetSide,
@@ -26,7 +25,6 @@ import {
   collAfterProv,
   collBeforeProv,
   collDeltaProv,
-  collUsdAtBlockProv,
   borrowingFeeProv,
   closeRepaidProv,
   debtAfterProv,
@@ -48,6 +46,7 @@ import {
   sheetMoveUsdProv,
   sheetToMinimumProv,
   type LiquityV1Coords,
+  liquityV1EthUsdCell,
 } from "@/lib/liquity-v1/event-provenance";
 import {
   COLLATERAL_SYMBOL,
@@ -71,6 +70,7 @@ import {
 import { useLiquityV1EventReadState } from "@/lib/liquity-v1/use-event-read";
 import { V1_WORDS } from "@/lib/liquity-v1/event-templates";
 import { liquityV1EventPrice } from "./liquity-v1-event-detail";
+import { faceParts } from "@/lib/shared/sheet-usd-rows";
 
 const DUST_COLL = 0.00005;
 const DUST_DEBT = 0.005;
@@ -98,6 +98,8 @@ export function useLiquityV1Sheet({ ctx, txHash, blockNumber, wallet, active }: 
   if (!active || (price == null && pending)) return null;
 
   const coords: LiquityV1Coords = { txHash, blockNumber, wallet };
+  const ethUsd = (what: "move" | "before" | "after", amount: number) =>
+    liquityV1EthUsdCell(what, amount, price ?? null, blockNumber ?? null);
   const s = sidesOf(ctx);
   const isOpen = ctx.eventType === "openTrove";
   const isClose = ctx.eventType === "closeTrove";
@@ -128,7 +130,7 @@ export function useLiquityV1Sheet({ ctx, txHash, blockNumber, wallet, active }: 
       key,
       label,
       amount: { text: signed(amount, fmtEth(Math.abs(amount))), symbol: COLLATERAL_SYMBOL, info },
-      usd: price != null && usdInfo ? { text: sheetUsd(amount * price), info: usdInfo } : undefined,
+      usd: price != null && usdInfo ? ethUsd("move", amount) : undefined,
       tip,
     });
   };
@@ -177,13 +179,7 @@ export function useLiquityV1Sheet({ ctx, txHash, blockNumber, wallet, active }: 
             key: "before",
             label: SHEET_WORDS.before,
             amount: { text: fmtEth(s.collBefore), symbol: COLLATERAL_SYMBOL, info: collBeforeProv(coords) },
-            usd:
-              price != null && collBeforeUsd != null
-                ? {
-                    text: sheetUsd(collBeforeUsd),
-                    info: collUsdAtBlockProv(coords, { coll: ctx.collBefore, priceUsd: price, side: "before" }),
-                  }
-                : undefined,
+            usd: price != null && collBeforeUsd != null ? ethUsd("before", s.collBefore) : undefined,
             tip: V1_WORDS.tip_coll_before,
           }
         : undefined,
@@ -192,10 +188,7 @@ export function useLiquityV1Sheet({ ctx, txHash, blockNumber, wallet, active }: 
       s.collAfter <= EPS
         ? { text: "$0", info: collAfterProv(coords) }
         : price != null && collAfterUsd != null
-          ? {
-              text: sheetUsd(collAfterUsd),
-              info: collUsdAtBlockProv(coords, { coll: ctx.collAfter, priceUsd: price, side: "after" }),
-            }
+          ? ethUsd("after", s.collAfter)
           : { none: V1_WORDS.sheet_no_price },
     totalAmount: {
       text: fmtEth(s.collAfter <= EPS ? 0 : s.collAfter),
@@ -219,7 +212,7 @@ export function useLiquityV1Sheet({ ctx, txHash, blockNumber, wallet, active }: 
       key,
       label,
       amount: { text: signed(amount, fmtLusd(Math.abs(amount))), symbol: DEBT_SYMBOL, address: LUSD, info },
-      usd: { text: sheetUsd(amount), info: sheetFaceUsdProv(label, fmtLusd(Math.abs(amount))) },
+      usd: { ...faceParts(amount), info: sheetFaceUsdProv(label, Math.abs(amount)) },
       tip,
     });
   };
@@ -285,14 +278,15 @@ export function useLiquityV1Sheet({ ctx, txHash, blockNumber, wallet, active }: 
             key: "before",
             label: SHEET_WORDS.before,
             amount: { text: fmtLusd(s.debtBefore), symbol: DEBT_SYMBOL, address: LUSD, info: debtBeforeProv(coords) },
-            usd: { text: sheetUsd(s.debtBefore), info: faceUsdProv(DEBT_SYMBOL, fmtLusd(s.debtBefore), "before") },
+            usd: { ...faceParts(s.debtBefore), info: faceUsdProv(DEBT_SYMBOL, s.debtBefore, "before") },
             tip: V1_WORDS.tip_debt_before,
           }
         : undefined,
     rows: debtRows,
     total: {
-      text: s.debtAfter > EPS ? sheetUsd(s.debtAfter) : "$0",
-      info: s.debtAfter > EPS ? faceUsdProv(DEBT_SYMBOL, fmtLusd(s.debtAfter), "after") : debtAfterProv(coords),
+      text: s.debtAfter > EPS ? faceParts(s.debtAfter).text : "$0",
+      cents: s.debtAfter > EPS ? faceParts(s.debtAfter).cents : 0,
+      info: s.debtAfter > EPS ? faceUsdProv(DEBT_SYMBOL, s.debtAfter, "after") : debtAfterProv(coords),
     },
     totalAmount: {
       text: fmtLusd(s.debtAfter > EPS ? s.debtAfter : 0),
@@ -340,7 +334,7 @@ export function useLiquityV1Sheet({ ctx, txHash, blockNumber, wallet, active }: 
             key: `reserve-${reserveHow}`,
             label: reserveLabel,
             amount: reserveFig(reserveMove, reserveHow),
-            usd: { text: sheetUsd(reserveMove), info: sheetFaceUsdProv(reserveLabel, fmtLusd(LIQUITY_V1_RESERVE)) },
+            usd: { ...faceParts(reserveMove), info: sheetFaceUsdProv(reserveLabel, LIQUITY_V1_RESERVE) },
             tip:
               reserveHow === "minted"
                 ? V1_WORDS.tip_reserve_minted
@@ -363,8 +357,8 @@ export function useLiquityV1Sheet({ ctx, txHash, blockNumber, wallet, active }: 
           label: SHEET_WORDS.before,
           amount: reserveFig(LIQUITY_V1_RESERVE, "held"),
           usd: {
-            text: sheetUsd(LIQUITY_V1_RESERVE),
-            info: sheetFaceUsdProv(SHEET_WORDS.before, fmtLusd(LIQUITY_V1_RESERVE)),
+            ...faceParts(LIQUITY_V1_RESERVE),
+            info: sheetFaceUsdProv(SHEET_WORDS.before, LIQUITY_V1_RESERVE),
           },
           tip: V1_WORDS.tip_reserve_before,
         }
@@ -372,7 +366,7 @@ export function useLiquityV1Sheet({ ctx, txHash, blockNumber, wallet, active }: 
     rows: reserveRows,
     total: reserveEnds
       ? { text: "$0", info: reserveProv(coords, reserveHow) }
-      : { text: sheetUsd(LIQUITY_V1_RESERVE), info: faceUsdProv(DEBT_SYMBOL, fmtLusd(LIQUITY_V1_RESERVE), "after") },
+      : { ...faceParts(LIQUITY_V1_RESERVE), info: faceUsdProv(DEBT_SYMBOL, LIQUITY_V1_RESERVE, "after") },
     totalAmount: {
       ...reserveFig(reserveAfter, reserveEnds ? reserveHow : isOpen ? "minted" : "held"),
       value: String(reserveAfter),

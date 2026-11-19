@@ -162,3 +162,24 @@ test("the sheet's Last event row stands at the previous event's prices and names
   assert.equal(r.usd, Math.round(0.034934 * shownComposedPrice(3.1234567, 1793.123456) * 100) / 100);
   assert.match(r.prov.summary, /the price at block 12,100,000/);
 });
+
+test("the since-last-touch sheet's dollars are shown products at the head block's prices", async () => {
+  const { shownPricesOf, polarisSheetUsd } = await import(ROOT + "lib/polaris/sheet-usd.ts");
+  const { shownUsd, shownComposedPrice } = await import(ROOT + "lib/shared/shown-usd.ts");
+  const head = 9_123_456;
+  const to = { block: head, timestamp: 0, pethInDebt: 3_456.789, curve: 1.2345678, ethUsd: 2_800.123456 };
+  const prices = shownPricesOf({ market: "usdp", stableSymbol: "USDp", priceAtBlock: to });
+  // A 7-decimal amount at a high price.
+  const r = polarisSheetUsd(prices, "The collateral at the feed", "coll", 12.3456789, head, "USDp");
+  assert.equal(r.usd, shownUsd(12.3456789, shownComposedPrice(1.2345678, 2_800.123456)));
+  assert.ok(JSON.stringify(r.prov).includes("9,123,456"), "the price names the head block");
+  // GOLDp with no XAU/USD read: no price, no figure (never $0).
+  const gold = shownPricesOf({
+    market: "goldp",
+    stableSymbol: "GOLDp",
+    priceAtBlock: { ...to, curve: undefined, xauUsd: undefined },
+  });
+  assert.equal(gold.coll, null);
+  assert.equal(gold.debt, null);
+  assert.equal(polarisSheetUsd(gold, "The debt at the feed", "debt", 5, head, "GOLDp"), null);
+});

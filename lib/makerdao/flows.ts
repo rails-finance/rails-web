@@ -37,15 +37,22 @@
 //
 // Pure: tested offline in scripts/verify/verify-makerdao-flows.ts.
 
-import type { FlowBucket, FlowDayRow, FlowEvent, FlowTimeline } from "@/lib/shared/flows-timeline";
-import { daysFromEvents } from "@/lib/shared/flows-timeline";
+import type { FlowBucket, FlowDayRow, FlowEvent, FlowLeg, FlowTimeline } from "@/lib/shared/flows-timeline";
+import { daysFromEvents, flowLeg, livePriced } from "@/lib/shared/flows-timeline";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
 import type { BaseActivityEvent, MakerDAOEventType } from "@/lib/shared/types/event-shape";
 import { isMakerDAOEvent } from "@/lib/shared/types/event-shape";
 import { actedByOther } from "@/lib/shared/external-actor";
 import { makerTxHashOf } from "@/lib/makerdao/market-notes";
 import { shownUsd } from "@/lib/shared/shown-usd";
-import { makerRowPriceNote, type MakerRowPrice } from "@/lib/makerdao/price-notes";
+import type { DayObs } from "@/lib/shared/price-series";
+import {
+  makerFactorNote,
+  makerParNote,
+  makerRowPriceNote,
+  type MakerRateFrom,
+  type MakerRowPrice,
+} from "@/lib/makerdao/price-notes";
 
 const DAY_S = 86_400;
 const ONE_YEAR_S = 31_557_600;
@@ -292,6 +299,62 @@ export interface MakerReplayed {
   legs: { bucket: string; amount: number }[];
 }
 
+/** The basis a leg at the latest read's price stands on (a past event priced
+ *  live), and the family's (ui-jobs 743). */
+const MAKER_TODAY_BASIS = "the latest read's price";
+const MAKER_BLOCK_BASIS = "each block's price";
+
+/** A row priced at the live read, from a later block than its own: a
+ *  latest read, both blocks named, not complete and on another basis
+ *  (ui-jobs 743). */
+const atLatestRead = (r: MakerReplayed): boolean =>
+  r.priceFrom === "today" && makerPriceBlock(r.priceAt) !== r.ev.block;
+
+/** The block a row's price stands at, where its read names one. */
+function makerPriceBlock(p: MakerRowPrice): number | null {
+  switch (p.from) {
+    case "row":
+      return p.block;
+    case "store":
+    case "store-near":
+      return p.dayBlock;
+    case "today":
+    case "nearest":
+      return p.block;
+  }
+}
+
+/** A vault row's leg with its parts (ui-jobs 743): the collateral at the
+ *  row's price as shown, named by makerRowPriceNote with its blocks; a past
+ *  event at the latest read's price on another basis; the debt at its $1
+ *  par. No price at all is unpriced. */
+function makerLeg(
+  r: MakerReplayed,
+  l: { bucket: string; amount: number },
+  collSymbol: string,
+  debtSymbol: string,
+): FlowLeg {
+  if (!COLL_KEYS.has(l.bucket))
+    return flowLeg({
+      bucket: l.bucket,
+      amount: l.amount,
+      symbol: debtSymbol,
+      price: 1,
+      priceNote: makerParNote(debtSymbol),
+      face: true,
+      ...(l.bucket === MK.fee ? { accrual: true } : {}),
+    });
+  return flowLeg({
+    bucket: l.bucket,
+    amount: l.amount,
+    symbol: collSymbol,
+    price: r.price > 0 ? r.price : null,
+    block: makerPriceBlock(r.priceAt),
+    priceNote: makerRowPriceNote(r.priceAt),
+    ...(atLatestRead(r) ? { basis: MAKER_TODAY_BASIS } : {}),
+  });
+}
+
 /** What the page's live read states now, where it has one. */
 export interface MakerLive {
   /** The ilk's OSM price now (USD per gem). */
@@ -363,14 +426,17 @@ export function replayMaker(events: MakerFlowEvent[], o: MakerFlowOptions): Make
     return {
       price: c.price,
       from: c.from,
-      at: { from: "nearest", block: c.block, eventBlock: ev.block, staleDays: Math.floor(c.dt / DAY_S) },
+      at:
+        c.from === "today"
+          ? { from: "today", block: c.block, eventBlock: ev.block }
+          : { from: "nearest", block: c.block, eventBlock: ev.block, staleDays: Math.floor(c.dt / DAY_S) },
     };
   };
   const priceOf = (ev: MakerFlowEvent): Priced => {
     if (ev.price != null) return { price: ev.price, from: "row", at: { from: "row", block: ev.block } };
     const day = Math.floor(ev.ts / DAY_S);
     if (day >= today && livePrice != null)
-      return { price: livePrice, from: "today", at: { from: "today", block: liveBlock } };
+      return { price: livePrice, from: "today", at: { from: "today", block: liveBlock, eventBlock: ev.block } };
     const own = byDay.get(day);
     if (own != null)
       return { price: own, from: "store", at: { from: "store", day, dayBlock: dayBlock(day), eventBlock: ev.block } };
@@ -431,23 +497,56 @@ export function replayMaker(events: MakerFlowEvent[], o: MakerFlowOptions): Make
   return out;
 }
 
-/** The fee's rate from each row to the next, simple, as a fraction a year:
- *  the next row's rate over this row's, spread over the time between them;
+/** The fee's rate from each row to the next, compounded each second as the
+ *  Vat's rate accumulator grows through Jug's rpow, as a continuous fraction
+ *  a year: ln(the next row's rate over this row's) over the time between
+ *  them, so a duty unchanged between the rows meets the next row's figure;
  *  after the last row, to the live read's rate now, else the fee now. */
+/** What a continuous annual `rate` grows a debt by over `seconds`. */
+export const makerGrowth = (rate: number, seconds: number): number => Math.exp(rate * (seconds / ONE_YEAR_S));
+
 export function makerFeeRates(replayed: MakerReplayed[], o: MakerFlowOptions): number[] {
-  const out: number[] = [];
+  return makerFeeRateFrom(replayed, o).map((r) => r.rate);
+}
+
+/** Each stretch's rate with the branch that gave it (lib/makerdao/price-notes.ts
+ *  `makerFactorNote` names it): the next row's accumulator, the live read's,
+ *  the live stability fee, or the rate carried from the stretch before. A row
+ *  whose accumulator is missing or zero gives no rate (not a number): the
+ *  debt has no factor there, never a log of zero. */
+export function makerFeeRateFrom(replayed: MakerReplayed[], o: MakerFlowOptions): MakerRateFrom[] {
+  const out: MakerRateFrom[] = [];
+  const ok = (v: number | null | undefined): v is number => v != null && Number.isFinite(v) && v > 0;
   for (let i = 0; i < replayed.length; i++) {
     const a = replayed[i].ev;
     const b = replayed[i + 1]?.ev;
-    const to = b
-      ? { rate: b.rate, ts: b.ts }
-      : o.live?.rate != null && o.live.rate > 0
-        ? { rate: o.live.rate, ts: o.now }
-        : null;
-    const dt = to ? to.ts - a.ts : 0;
-    if (to && dt > 0 && a.rate > 0) out.push((to.rate / a.rate - 1) / (dt / ONE_YEAR_S));
-    else if (!b && o.live?.feeApr != null) out.push(Math.log(1 + o.live.feeApr));
-    else out.push(out[i - 1] ?? 0);
+    const prev = out[i - 1];
+    const carried = (): MakerRateFrom =>
+      prev && prev.from !== "none"
+        ? { from: "carried", rate: prev.rate, block: a.block }
+        : prev
+          ? { from: "none", rate: Number.NaN, block: a.block }
+          : { from: "carried", rate: 0, block: a.block };
+    if (b) {
+      if (!ok(a.rate) || !ok(b.rate)) out.push({ from: "none", rate: Number.NaN, block: a.block });
+      else if (b.ts - a.ts > 0)
+        out.push({
+          from: "rows",
+          rate: Math.log(b.rate / a.rate) / ((b.ts - a.ts) / ONE_YEAR_S),
+          block: a.block,
+          toBlock: b.block,
+        });
+      else out.push(carried());
+    } else if (ok(o.live?.rate) && ok(a.rate) && o.now - a.ts > 0)
+      out.push({
+        from: "live",
+        rate: Math.log((o.live!.rate as number) / a.rate) / ((o.now - a.ts) / ONE_YEAR_S),
+        block: a.block,
+        liveBlock: o.live?.block ?? null,
+      });
+    else if (o.live?.feeApr != null && Number.isFinite(o.live.feeApr) && o.live.feeApr > -1)
+      out.push({ from: "fee", rate: Math.log(1 + o.live.feeApr), block: a.block });
+    else out.push(carried());
   }
   return out;
 }
@@ -471,7 +570,6 @@ export function makerFlowTimeline(events: MakerFlowEvent[], o: MakerFlowOptions)
     }
     // A row valued without the OSM price at its block (only a liquidation's
     // is stored): its collateral flows rest on the price it took.
-    const isToday = Math.floor(r.ev.ts / DAY_S) >= Math.floor(o.now / DAY_S);
     // Each names the price's block beside the event's (ui-jobs 743).
     const at = makerRowPriceNote(r.priceAt);
     // A row at its own day's close is the decided basis, stated once in the
@@ -480,7 +578,7 @@ export function makerFlowTimeline(events: MakerFlowEvent[], o: MakerFlowOptions)
     const why =
       r.priceFrom === "store-near"
         ? `${o.collSymbol} at ${at}: no price is stored for its day.`
-        : r.priceFrom === "nearest" || (r.priceFrom === "today" && !isToday)
+        : r.priceFrom === "nearest" || atLatestRead(r)
           ? `${o.collSymbol} at ${at}: no daily price is stored for this ilk.`
           : null;
     const unsure =
@@ -496,11 +594,7 @@ export function makerFlowTimeline(events: MakerFlowEvent[], o: MakerFlowOptions)
         r.ev.kind === "grab" ? "liquidation" : moved.coll && moved.debt ? "both" : moved.debt ? "debt" : "collateral",
       // Each leg the shown product: the amount at six decimals × the price
       // as shown, to the cent; the debt at its $1 par (ui-jobs 743).
-      legs: r.legs.map((l) =>
-        COLL_KEYS.has(l.bucket)
-          ? { bucket: l.bucket, usd: shownUsd(l.amount, r.price), symbol: o.collSymbol }
-          : { bucket: l.bucket, usd: shownUsd(l.amount, 1), symbol: o.debtSymbol },
-      ),
+      legs: r.legs.map((l) => makerLeg(r, l, o.collSymbol, o.debtSymbol)),
       tx: r.ev.tx,
       // The card counts the owner's transactions; a liquidation is a keeper's.
       countsTx: r.ev.kind !== "grab",
@@ -527,27 +621,38 @@ export function makerFlowTimeline(events: MakerFlowEvent[], o: MakerFlowOptions)
 
   // The collateral: the store's daily price, each event day the price its
   // flows took (a liquidation's at its block), and today's live price.
-  const collObs = new Map<number, number>();
-  for (const [d, usd] of o.daily ?? []) if (d <= today && usd > 0) collObs.set(d, usd);
-  for (const r of replayed) if (r.price > 0) collObs.set(Math.floor(r.ev.ts / DAY_S), r.price);
-  if (livePrice != null && open) collObs.set(today, livePrice);
+  // Each with the block its read stands at, for the held figure's receipt.
+  const collObs = new Map<number, [number, number | null]>();
+  for (const [d, usd] of o.daily ?? []) if (d <= today && usd > 0) collObs.set(d, [usd, o.dailyBlocks?.get(d) ?? null]);
+  for (const r of replayed)
+    if (r.price > 0) collObs.set(Math.floor(r.ev.ts / DAY_S), [r.price, makerPriceBlock(r.priceAt)]);
+  if (livePrice != null && open) collObs.set(today, [livePrice, o.live?.block ?? null]);
   // The debt's price each day: $1 plus the fee built on what the last row
-  // recorded by the day's close, in a straight line to the next row's figure
-  // (or the live read's).
-  const debtObs: [number, number][] = [];
+  // recorded by the day's close, compounded each second to the next row's
+  // figure (or the live read's).
+  // Each names the row it grows from and the row (or live read) whose
+  // accumulator its rate meets.
+  const debtObs: DayObs[] = [];
+  const debtNotes: Record<number, string> = {};
+  const rateFrom = makerFeeRateFrom(replayed, o);
   let ei = 0;
   for (let d = firstDay; d <= endDay; d++) {
     const end = Math.min((d + 1) * DAY_S, o.now);
     while (ei + 1 < replayed.length && replayed[ei + 1].ev.ts <= end) ei++;
     const e = replayed[ei].ev;
-    debtObs.push([d, e.ts <= end ? 1 + rates[ei] * (Math.max(0, end - e.ts) / ONE_YEAR_S) : 1]);
+    if (e.ts <= end) {
+      // No rate: not a number, a day with no factor (FlowTimeline.dailyPrices).
+      debtObs.push([d, makerGrowth(rates[ei], Math.max(0, end - e.ts)), e.block]);
+      const note = makerFactorNote(rateFrom[ei]);
+      if (note) debtNotes[d] = note;
+    } else debtObs.push([d, 1, null]);
   }
 
   // Now: the live read where the page has one, else the last row with the
   // fee grown since.
   const nowColl = open ? (o.live?.ink ?? last.ev.inkAfter) : 0;
   const nowDebt = open
-    ? (o.live?.debt ?? last.ev.debtAfter * (1 + rates[rates.length - 1] * ((o.now - last.ev.ts) / ONE_YEAR_S)))
+    ? (o.live?.debt ?? last.ev.debtAfter * makerGrowth(rates[rates.length - 1], o.now - last.ev.ts))
     : 0;
   const priceNow = livePrice ?? last.price;
 
@@ -556,7 +661,7 @@ export function makerFlowTimeline(events: MakerFlowEvent[], o: MakerFlowOptions)
     days,
     live: {
       collateralUsd: shownUsd(nowColl, priceNow),
-      debtUsd: shownUsd(nowDebt, 1),
+      debtUsd: Number.isFinite(nowDebt) ? shownUsd(nowDebt, 1) : 0,
       assets: open
         ? [
             ...(nowColl > DUST
@@ -566,20 +671,55 @@ export function makerFlowTimeline(events: MakerFlowEvent[], o: MakerFlowOptions)
                     symbol: o.collSymbol,
                     amount: nowColl,
                     usd: shownUsd(nowColl, priceNow),
+                    // The live read's OSM price at its block; else the last
+                    // row's, its block named and not complete (ui-jobs 743).
+                    ...(priceNow > 0
+                      ? {
+                          priced:
+                            livePrice != null
+                              ? livePriced(livePrice, o.live?.block, o.now, { source: "the ilk's OSM price now" })
+                              : {
+                                  day: Math.floor(o.now / DAY_S),
+                                  series: false,
+                                  price: priceNow,
+                                  block: makerPriceBlock(last.priceAt),
+                                },
+                        }
+                      : { unpriced: true as const }),
                   },
                 ]
               : []),
             ...(nowDebt > DUST
-              ? [{ side: "debt" as const, symbol: o.debtSymbol, amount: nowDebt, usd: shownUsd(nowDebt, 1) }]
-              : []),
+              ? [
+                  {
+                    side: "debt" as const,
+                    symbol: o.debtSymbol,
+                    amount: nowDebt,
+                    usd: shownUsd(nowDebt, 1),
+                    priced: livePriced(1, null, o.now, { face: true }),
+                  },
+                ]
+              : !Number.isFinite(nowDebt) && last.ev.debtAfter > DUST
+                ? // No rate to grow it by: the debt has no figure, never $0.
+                  [
+                    {
+                      side: "debt" as const,
+                      symbol: o.debtSymbol,
+                      amount: last.ev.debtAfter,
+                      usd: 0,
+                      unpriced: true as const,
+                    },
+                  ]
+                : []),
           ]
         : [],
     },
     todayPrices: { [coll]: priceNow, [debt]: 1 },
     dailyPrices: {
-      [coll]: [...collObs].sort((a, b) => a[0] - b[0]),
+      [coll]: [...collObs].map(([d, [usd, block]]) => [d, usd, block] as DayObs).sort((a, b) => a[0] - b[0]),
       [debt]: debtObs,
     },
+    factorNotes: { [debt]: debtNotes },
     seriesCarry: true,
     ...(o.daily && o.daily.length > 0
       ? {}
@@ -602,6 +742,8 @@ export function makerFlowWords(
   return {
     held: "Still deposited",
     restBySide: { collateral: "Market move", debt: "Stability fee since the last event" },
+    // A flow at the latest read's price stands on another basis (makerLeg).
+    priceBasis: { collateral: MAKER_BLOCK_BASIS, debt: MAKER_BLOCK_BASIS },
     restNote: {
       collateral: `the change in ${collSymbol}'s price since each flow`,
       debt: "the stability fee built up on the debt since the vault's last event",
@@ -623,6 +765,7 @@ export function makerFlowWords(
       : `with the collateral at the price of the vault's latest event by then and the debt at $1 plus the stability fee built since`,
     moment: {
       face: ["debt"],
+      compound: true,
       noPrice: {
         collateral: `No Maker oracle price is recorded for this day, so the collateral is stated in ${collSymbol} only.`,
       },
@@ -642,6 +785,8 @@ export function makerFocusEvents(
   rates: number[],
   collSymbol: string,
   debtSymbol: string,
+  /** Unix seconds now: a past event priced live stands on another basis. */
+  nowSec = Number.POSITIVE_INFINITY,
 ): FocusEvent[] {
   const byTx = new Map<string, MakerReplayed[]>();
   for (const r of replayed) {
@@ -668,21 +813,12 @@ export function makerFocusEvents(
       id: r.ev.id,
       ts: r.ev.ts,
       ...(r.ev.tx ? { tx: r.ev.tx } : {}),
-      legs: r.legs.map((l) =>
-        COLL_KEYS.has(l.bucket)
-          ? { bucket: l.bucket, usd: shownUsd(l.amount, r.price), amount: l.amount, symbol: collSymbol }
-          : {
-              bucket: l.bucket,
-              usd: shownUsd(l.amount, 1),
-              amount: l.amount,
-              symbol: debtSymbol,
-              ...(l.bucket === MK.fee ? { accrual: true } : {}),
-            },
-      ),
+      legs: r.legs.map((l) => makerLeg(r, l, collSymbol, debtSymbol)),
       sides: {
         collateral: {
-          before: shownUsd(Math.max(0, collAfter - collMove), lastOf.price),
-          after: shownUsd(collAfter, lastOf.price),
+          // No price on the vault: not a number, never $0 (ui-jobs 743).
+          before: lastOf.price > 0 ? shownUsd(Math.max(0, collAfter - collMove), lastOf.price) : Number.NaN,
+          after: lastOf.price > 0 ? shownUsd(collAfter, lastOf.price) : Number.NaN,
           amount: collMove,
           symbol: collSymbol,
           held: collAfter,
@@ -695,7 +831,7 @@ export function makerFocusEvents(
           held: debtAfter,
         },
       },
-      rate: (rates[i] ?? 0) * 100,
+      ...(Number.isFinite(rates[i]) ? { rate: rates[i] * 100 } : {}),
     };
   });
 }

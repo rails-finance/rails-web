@@ -45,22 +45,19 @@ import type {
   FlowBucket,
   FlowEvent,
   FlowIndexes,
+  FlowLeg,
   FlowSide,
   FlowTimeline,
   FlowWords,
 } from "@/lib/shared/flows-timeline";
-import { daysFromEvents } from "@/lib/shared/flows-timeline";
+import { daysFromEvents, flowLeg, livePriced } from "@/lib/shared/flows-timeline";
 import { indexAt, type IndexKnot } from "@/lib/shared/ctoken-index";
-import { shownUsd } from "@/lib/shared/shown-usd";
+import { priceText, shownUsd } from "@/lib/shared/shown-usd";
 
 /** A row valued at another row's price, both blocks named. */
 const nearestPriceNote = (priceBlock: number, rowBlock: number): string =>
   `price at block ${priceBlock.toLocaleString("en-US")}, the nearest read on this market; this row is at block ${rowBlock.toLocaleString("en-US")}`;
 const cents = (v: number): number => Math.round(v * 100) / 100;
-/** A leg's dollars as shown, its sign kept. */
-const signedShownUsd = (amount: number, price: number): number =>
-  amount < 0 ? -shownUsd(-amount, price) : shownUsd(amount, price);
-
 const DAY_S = 86_400;
 const DUST = 1e-12;
 
@@ -182,6 +179,9 @@ export interface CTokenFlowRow {
   amount: number | null;
   /** USD per underlying token at the row's block, where it was read. */
   price: number | null;
+  /** In Compound V2's ETH years, the two factors the price is composed from:
+   *  the market's price in ETH and USDC's, at the row's block. */
+  ethFactor?: { eth: number; usdcEth: number };
   /** Whether the account's owner made the transaction (false: a liquidator,
    *  the sender of a transfer). Default true. */
   byOwner?: boolean;
@@ -194,6 +194,8 @@ export interface CTokenLiveMarket {
   /** Underlying per whole cToken now. */
   exchangeRate: number | null;
   price: number | null;
+  /** The block the live read stands at, where it names one (ui-jobs 743). */
+  block?: number | null;
   /** The market's rates now, as APYs (lib/comptroller/apy.ts). */
   supplyApr: number | null;
   borrowApr: number | null;
@@ -211,6 +213,8 @@ export interface CTokenFlowOptions {
    *  price store's, rails-ops reference/daily-prices.md): each day no row
    *  priced takes it, so a quiet market is valued at its day's price. */
   dailyPrices?: Record<string, [number, number][]>;
+  /** The block each daily price was read at, by market and day. */
+  dailyBlocks?: Record<string, Record<number, number>>;
 }
 
 /** A replayed row: its legs in tokens and the market's balances after it. */
@@ -221,8 +225,13 @@ export interface CTokenReplayed {
   price: number;
   ownPrice: boolean;
   /** The block of the row whose price this row takes, where it is another
-   *  row's (the nearest read on its market); null for its own or today's. */
+   *  row's (the nearest read on its market), or the latest read's where it
+   *  names one; null for its own. */
   priceBlock: number | null;
+  /** Priced at the latest read: not complete, on another basis. */
+  latestRead?: true;
+  /** A nearest read in Compound's ETH years: that row's two factors. */
+  priceFactor?: { eth: number; usdcEth: number };
   legs: { bucket: string; amount: number }[];
   /** The market's supply and debt after the row. */
   supply: number;
@@ -246,12 +255,22 @@ function ordered(rows: CTokenFlowRow[]): CTokenFlowRow[] {
 function pricesFor(
   rows: CTokenFlowRow[],
   todayPrice: (market: string) => number | null,
-): { price: number; own: boolean; block: number | null }[] {
-  const priced = new Map<string, { ts: number; price: number; block: number }[]>();
+  todayBlock: (market: string) => number | null,
+): {
+  price: number;
+  own: boolean;
+  block: number | null;
+  latest?: true;
+  factor?: { eth: number; usdcEth: number };
+}[] {
+  const priced = new Map<
+    string,
+    { ts: number; price: number; block: number; factor?: { eth: number; usdcEth: number } }[]
+  >();
   for (const r of rows)
     if (r.price != null && r.price > 0) {
       const list = priced.get(r.market) ?? [];
-      list.push({ ts: r.ts, price: r.price, block: r.block });
+      list.push({ ts: r.ts, price: r.price, block: r.block, ...(r.ethFactor ? { factor: r.ethFactor } : {}) });
       priced.set(r.market, list);
     }
   return rows.map((r) => {
@@ -260,9 +279,9 @@ function pricesFor(
     if (list && list.length > 0) {
       let best = list[0];
       for (const p of list) if (Math.abs(p.ts - r.ts) < Math.abs(best.ts - r.ts)) best = p;
-      return { price: best.price, own: false, block: best.block };
+      return { price: best.price, own: false, block: best.block, ...(best.factor ? { factor: best.factor } : {}) };
     }
-    return { price: todayPrice(r.market) ?? 0, own: false, block: null };
+    return { price: todayPrice(r.market) ?? 0, own: false, block: todayBlock(r.market), latest: true as const };
   });
 }
 
@@ -273,7 +292,9 @@ export function replayCToken(
 ): CTokenReplayed[] {
   const evs = ordered(rows);
   const today = (m: string) => o.live?.[m]?.price ?? o.todayPrices?.[m] ?? null;
-  const prices = pricesFor(evs, today);
+  // The live read's block, where its price is the one taken.
+  const todayBlock = (m: string) => (o.live?.[m]?.price != null ? (o.live[m].block ?? null) : null);
+  const prices = pricesFor(evs, today, todayBlock);
   const supply = new Map<string, number>();
   const debt = new Map<string, number>();
   const debtIdx = new Map<string, number>();
@@ -325,6 +346,8 @@ export function replayCToken(
       price: prices[i].price,
       ownPrice: prices[i].own,
       priceBlock: prices[i].block,
+      ...(prices[i].latest ? { latestRead: true as const } : {}),
+      ...(prices[i].factor ? { priceFactor: prices[i].factor } : {}),
       legs,
       supply: supply.get(m) ?? 0,
       debt: debt.get(m) ?? 0,
@@ -410,6 +433,8 @@ export interface CTokenFlowReplay {
   indexes: CTokenIndexes;
   /** Whether any row moved debt: else the panel draws one bar. */
   borrower: boolean;
+  /** The family's brand, for the legs' price notes. */
+  brand: string;
 }
 
 export function ctokenFlowReplay(rows: CTokenFlowRow[], o: CTokenFlowOptions): CTokenFlowReplay {
@@ -418,7 +443,56 @@ export function ctokenFlowReplay(rows: CTokenFlowRow[], o: CTokenFlowOptions): C
     replayed,
     indexes: ctokenIndexes(replayed, o),
     borrower: replayed.some((r) => r.ev.debtAfter != null),
+    brand: o.vocab.brand,
   };
+}
+
+/** "5 Jul 2025": a store day's close, in words. */
+const dayWords = (day: number): string =>
+  new Date(day * 86_400_000).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+
+/** A price in Compound's ETH years: the market's price in ETH ÷ USDC's,
+ *  both from the Comptroller's oracle, each as shown. */
+function ethYearsNote(symbol: string, f: { eth: number; usdcEth: number }): string {
+  return `${priceText(f.eth).slice(1)} ETH (the oracle's getUnderlyingPrice for ${symbol}, in ETH) ÷ ${priceText(f.usdcEth).slice(1)} ETH (its price for USDC): the oracle priced in ETH before block 10,678,764`;
+}
+
+/** The basis a leg at the latest read's price stands on, and the family's. */
+const CTOKEN_TODAY_BASIS = "the latest read's price";
+const CTOKEN_BLOCK_BASIS = "each block's price";
+
+/** A row's leg with its parts (ui-jobs 743): the market's oracle price at
+ *  the row's block; else the nearest read's or the latest read's, both
+ *  blocks named, the latest read's on another basis; no price at all is
+ *  unpriced. */
+function ctokenLeg(brand: string, r: CTokenReplayed, l: { bucket: string; amount: number }): FlowLeg {
+  const oracle = `${brand}'s Comptroller oracle, getUnderlyingPrice for the ${r.ev.symbol} market`;
+  const at = (b: number) => b.toLocaleString("en-US");
+  const composed = r.ownPrice && r.ev.ethFactor ? ethYearsNote(r.ev.symbol, r.ev.ethFactor) : null;
+  const priceNote = !(r.price > 0)
+    ? `no price: the oracle answered none for the ${r.ev.symbol} market at block ${at(r.ev.block)} or near it`
+    : composed
+      ? `${composed} at block ${at(r.ev.block)}`
+      : r.ownPrice
+        ? `${oracle} at block ${at(r.ev.block)}`
+        : !r.latestRead && r.priceBlock != null
+          ? `${r.priceFactor ? ethYearsNote(r.ev.symbol, r.priceFactor) : oracle}, ${nearestPriceNote(r.priceBlock, r.ev.block)}`
+          : `${oracle}, price at the latest read, ${r.priceBlock != null ? `block ${at(r.priceBlock)}` : "which names no block"}; this row is at block ${at(r.ev.block)}`;
+  return flowLeg({
+    bucket: l.bucket,
+    amount: l.amount,
+    symbol: r.ev.symbol,
+    price: r.price > 0 ? r.price : null,
+    block: r.ownPrice ? r.ev.block : r.priceBlock,
+    priceNote,
+    ...(r.latestRead ? { basis: CTOKEN_TODAY_BASIS } : {}),
+    ...(ACCRUAL_KEYS.has(l.bucket) ? { accrual: true } : {}),
+  });
 }
 
 /** What is held and owed now per market: the live read where it states the
@@ -487,9 +561,9 @@ export function ctokenFlowTimeline(rows: CTokenFlowRow[], o: CTokenFlowOptions):
     // on its market, else today's: its figures that day rest on that price.
     const why = r.ownPrice
       ? null
-      : r.priceBlock != null
+      : !r.latestRead && r.priceBlock != null
         ? `${nearestPriceNote(r.priceBlock, r.ev.block)}: no price is read at this block.`
-        : "priced at the latest block's price: no price is read at this block, nor at any row on its market.";
+        : "priced at the latest read's price: no price is read at this block, nor at any row on its market.";
     const unsure =
       why && r.legs.length > 0 ? balances.map((b) => ({ side: b.side, why, symbol: r.ev.symbol, held: true })) : [];
     return {
@@ -499,7 +573,7 @@ export function ctokenFlowTimeline(rows: CTokenFlowRow[], o: CTokenFlowOptions):
       block: r.ev.block,
       tick: liq ? "liquidation" : moved.coll && moved.debt ? "both" : moved.debt ? "debt" : "collateral",
       // Each leg the amount × the price as shown, to the cent.
-      legs: r.legs.map((l) => ({ bucket: l.bucket, usd: signedShownUsd(l.amount, r.price), symbol: r.ev.symbol })),
+      legs: r.legs.map((l) => ctokenLeg(o.vocab.brand, r, l)),
       tx: r.ev.tx,
       countsTx: !liq && r.ev.byOwner !== false,
       ...(!liq && r.ev.byOwner === false ? { byOther: true } : {}),
@@ -574,18 +648,43 @@ export function ctokenFlowTimeline(rows: CTokenFlowRow[], o: CTokenFlowOptions):
   const assets: NonNullable<FlowTimeline["live"]["assets"]> = [];
   let collateralUsd = 0;
   let debtUsd = 0;
+  // Each live figure's price row (ui-jobs 743): the live read's oracle price
+  // at its block; else today's price, whose read names no block; else the
+  // store's last close, its block named.
+  const liveRow = (m: string) => {
+    const lv = o.live?.[m];
+    if (lv?.price != null && lv.price > 0)
+      return livePriced(lv.price, lv.block, o.now, { source: `${o.vocab.brand}'s Comptroller oracle now` });
+    const t = o.todayPrices?.[m];
+    if (t != null && t > 0) return livePriced(t, null, o.now, { source: "today's price" });
+    const obs = dailyPrices[m]?.at(-1);
+    return obs ? { day: obs[0], series: true, price: obs[1], block: o.dailyBlocks?.[m]?.[obs[0]] ?? null } : undefined;
+  };
   for (const h of held) {
     const p = todayPrice(h.market) ?? dailyPrices[h.market]?.at(-1)?.[1] ?? 0;
+    const row = p > 0 ? liveRow(h.market) : undefined;
     if (h.supply > DUST) {
       // The amount × the price as shown, to the cent, so "Still supplied"
       // agrees with the panel's rows.
       const usd = shownUsd(h.supply, p);
-      assets.push({ side: "collateral", symbol: h.symbol, amount: h.supply, usd });
+      assets.push({
+        side: "collateral",
+        symbol: h.symbol,
+        amount: h.supply,
+        usd,
+        ...(row ? { priced: row } : { unpriced: true as const }),
+      });
       collateralUsd += usd;
     }
     if (h.debt > DUST) {
       const usd = shownUsd(h.debt, p);
-      assets.push({ side: "debt", symbol: h.symbol, amount: h.debt, usd });
+      assets.push({
+        side: "debt",
+        symbol: h.symbol,
+        amount: h.debt,
+        usd,
+        ...(row ? { priced: row } : { unpriced: true as const }),
+      });
       debtUsd += usd;
     }
   }
@@ -622,6 +721,8 @@ export function ctokenFlowTimeline(rows: CTokenFlowRow[], o: CTokenFlowOptions):
 export function ctokenFlowWords(v: CTokenVocab, borrower: boolean): FlowWords {
   return {
     held: "Still supplied",
+    // A flow at the latest read's price stands on another basis (ctokenLeg).
+    priceBasis: { collateral: CTOKEN_BLOCK_BASIS, debt: CTOKEN_BLOCK_BASIS },
     restBySide: {
       collateral: "Market move and interest since the last event",
       ...(borrower ? { debt: "Market move and interest since the last event" } : {}),
@@ -659,13 +760,7 @@ export function ctokenFocusEvents(rp: CTokenFlowReplay): FocusEvent[] {
     id: r.ev.id,
     ts: r.ev.ts,
     ...(r.ev.tx ? { tx: r.ev.tx } : {}),
-    legs: r.legs.map((l) => ({
-      bucket: l.bucket,
-      usd: signedShownUsd(l.amount, r.price),
-      amount: l.amount,
-      symbol: r.ev.symbol,
-      ...(ACCRUAL_KEYS.has(l.bucket) ? { accrual: true } : {}),
-    })),
+    legs: r.legs.map((l) => ctokenLeg(rp.brand, r, l)),
   }));
 }
 
@@ -682,16 +777,23 @@ export interface CTokenEventState {
 
 export function ctokenEventStates(
   rp: CTokenFlowReplay,
-  o: Pick<CTokenFlowOptions, "todayPrices" | "live" | "dailyPrices">,
+  o: Pick<CTokenFlowOptions, "todayPrices" | "live" | "dailyPrices" | "dailyBlocks">,
 ): Map<string, CTokenEventState> {
   const out = new Map<string, CTokenEventState>();
   const { replayed, indexes } = rp;
   // Per market: the balance each side recorded last, its index then, and the
   // latest price read (and its day).
   const rec = new Map<string, { symbol: string; s: number; sIdx: number | null; d: number; dIdx: number }>();
-  const lastPrice = new Map<string, { usd: number; day: number }>();
-  const firstPrice = new Map<string, number>();
-  for (const r of replayed) if (r.price > 0 && !firstPrice.has(r.ev.market)) firstPrice.set(r.ev.market, r.price);
+  type Read = { usd: number; block: number | null; factor?: { eth: number; usdcEth: number } };
+  const lastPrice = new Map<string, Read & { day: number }>();
+  const firstPrice = new Map<string, Read>();
+  for (const r of replayed)
+    if (r.price > 0 && !firstPrice.has(r.ev.market))
+      firstPrice.set(r.ev.market, {
+        usd: r.price,
+        block: r.ownPrice ? r.ev.block : r.priceBlock,
+        ...(r.ownPrice && r.ev.ethFactor ? { factor: r.ev.ethFactor } : r.priceFactor ? { factor: r.priceFactor } : {}),
+      });
   // A market the transaction left alone takes the newer of its latest row's
   // price and the daily store's for the event's day, as the bars do that day.
   const storeAt = (m: string, day: number): { usd: number; day: number } | null => {
@@ -706,11 +808,46 @@ export function ctokenEventStates(
     }
     return obs[lo][1] > 0 ? { usd: obs[lo][1], day: obs[lo][0] } : null;
   };
-  const priceOf = (m: string, day: number) => {
+  // The price, and the words naming it with its block (ui-jobs 743).
+  const oracle = (sym: string) => `${rp.brand}'s Comptroller oracle, getUnderlyingPrice for the ${sym} market`;
+  const n = (b: number) => b.toLocaleString("en-US");
+  const priceOf = (
+    m: string,
+    day: number,
+    sym: string,
+    at: number,
+  ): { usd: number; block: number | null; note: string } | null => {
     const row = lastPrice.get(m);
     const store = storeAt(m, day);
-    if (store && (!row || store.day > row.day)) return store.usd;
-    return row?.usd ?? firstPrice.get(m) ?? o.live?.[m]?.price ?? o.todayPrices?.[m] ?? null;
+    if (store && (!row || store.day > row.day)) {
+      const b = o.dailyBlocks?.[m]?.[store.day] ?? null;
+      return {
+        usd: store.usd,
+        block: b,
+        note: `${oracle(sym)}, ${b != null ? `price at block ${n(b)}` : "a block the daily store's route does not name"}, the close of ${dayWords(store.day)}; this event is at block ${n(at)}`,
+      };
+    }
+    const from = row ?? firstPrice.get(m);
+    if (from)
+      return {
+        usd: from.usd,
+        block: from.block,
+        note:
+          from.block === at
+            ? `${from.factor ? ethYearsNote(sym, from.factor) : oracle(sym)} at block ${n(at)}`
+            : `${from.factor ? ethYearsNote(sym, from.factor) : oracle(sym)}, ${from.block != null ? `price at block ${n(from.block)}` : "a price at a block this read does not name"}, the nearest read on this market; this event is at block ${n(at)}`,
+      };
+    // The latest read: its block where the live read names one.
+    const lv = o.live?.[m];
+    const today = lv?.price ?? o.todayPrices?.[m] ?? null;
+    const tb = lv?.price != null ? (lv.block ?? null) : null;
+    return today != null
+      ? {
+          usd: today,
+          block: tb,
+          note: `${oracle(sym)}, price at the latest read, ${tb != null ? `block ${n(tb)}` : "which names no block"}; this event is at block ${n(at)}`,
+        }
+      : null;
   };
   let i = 0;
   while (i < replayed.length) {
@@ -742,7 +879,13 @@ export function ctokenEventStates(
         cur.dIdx = r.debtIndex;
       }
       rec.set(r.ev.market, cur);
-      if (r.ownPrice && r.price > 0) lastPrice.set(r.ev.market, { usd: r.price, day: Math.floor(r.ev.ts / DAY_S) });
+      if (r.ownPrice && r.price > 0)
+        lastPrice.set(r.ev.market, {
+          usd: r.price,
+          day: Math.floor(r.ev.ts / DAY_S),
+          block: r.ev.block,
+          ...(r.ev.ethFactor ? { factor: r.ev.ethFactor } : {}),
+        });
     }
     const ts = replayed[j].ev.ts;
     const day = Math.floor(ts / DAY_S);
@@ -750,7 +893,8 @@ export function ctokenEventStates(
     const usd: Record<FlowSide, number | null> = { collateral: 0, debt: 0 };
     const usdBefore: Record<FlowSide, number | null> = { collateral: 0, debt: 0 };
     for (const [m, c] of rec) {
-      const p = priceOf(m, day);
+      const pr = priceOf(m, day, c.symbol, replayed[j].ev.block);
+      const p = pr?.usd ?? null;
       const touched = before.get(m);
       // A side the transaction moved stands as its rows recorded it; one it
       // left alone, grown by its index to the block, the same before and after.
@@ -761,10 +905,20 @@ export function ctokenEventStates(
       const sides = [pair(touched?.s, c.s, "collateral", c.sIdx), pair(touched?.d, c.d, "debt", c.dIdx)];
       for (const [side, after, prior] of sides) {
         if (!(after > DUST) && !(prior > DUST)) continue;
-        const b = bySym[side].get(c.symbol) ?? { symbol: c.symbol, amount: 0, before: 0, price: p };
+        const b = bySym[side].get(c.symbol) ?? {
+          symbol: c.symbol,
+          amount: 0,
+          before: 0,
+          price: p,
+          ...(pr ? { block: pr.block, priceNote: pr.note } : {}),
+        };
         b.amount += Math.max(0, after);
         b.before += Math.max(0, prior);
-        if (b.price == null) b.price = p;
+        if (b.price == null && pr) {
+          b.price = pr.usd;
+          b.block = pr.block;
+          b.priceNote = pr.note;
+        }
         bySym[side].set(c.symbol, b);
         const add = (into: Record<FlowSide, number | null>, v: number) => {
           if (v <= DUST) return;

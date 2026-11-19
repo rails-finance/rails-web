@@ -98,7 +98,7 @@ export function aaveV3LiqPriceReceipt(o: {
 }): { prov: Provenance; liqPrice: number } {
   const liqPrice = shownPrice(o.price) / shownHf(o.hf);
   const hfAt =
-    o.hfBlock != null ? ` at block ${o.hfBlock.toLocaleString("en-US")}` : " at the latest read, which states no block";
+    o.hfBlock != null ? ` at block ${o.hfBlock.toLocaleString("en-US")}` : " at the latest read, which names no block";
   return {
     liqPrice,
     prov: {

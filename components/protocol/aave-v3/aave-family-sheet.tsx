@@ -28,6 +28,10 @@ import {
 import { changeText } from "@/components/shared/change-swap-value";
 import { fmtPositionAmount, fmtPositionUsd } from "@/components/shared/position-row";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
+import { amountsUsd, cellOf, marketMoveUsd, type PricedAmount, type UsdCell } from "@/lib/shared/sheet-usd-rows";
+import { centsOf } from "@/lib/shared/shown-usd";
+import { NO_FIGURE } from "@/lib/shared/flows-sum";
+import { aaveV3PriceNote } from "@/lib/aave-v3/price-notes";
 import type { GroupLane } from "@/components/shared/group-sheet";
 import {
   accountRatioProv,
@@ -53,7 +57,7 @@ import {
   type AaveV3PositionState,
   type AaveV3PositionStateReserve,
 } from "@/lib/aave-v3/position-state";
-import { emodeFigure, exactLeg, exactUsd, hfFigure, isDustRow, reserveSymbol } from "./aave-v3-position-state";
+import { emodeFigure, exactLeg, hfFigure, isDustRow, reserveSymbol } from "./aave-v3-position-state";
 import { sideFacts, sideUsd } from "./aave-family-cells";
 
 const WORDS = {
@@ -128,16 +132,43 @@ const sinceProv = (what: string): Provenance => ({
   formula: "after − after the previous event",
 });
 
-/** A token amount's dollars at the oracle's price at this block. */
-const atBlockUsdProv = (sym: string, what: string, amount: string, price: number): Provenance => ({
-  kind: "chain-derived",
-  pclass: "oracle",
-  summary: `${what}, in US dollars. The amount times the oracle's price for ${sym} at this block.`,
-  formula: "amount × price",
-  inputs: [
-    { label: "amount", value: `${amount} ${sym}`, kind: "chain-derived", pclass: "indexed" },
-    { label: `${sym} price`, value: `$${price}`, kind: "chain", pclass: "oracle" },
-  ],
+// Each dollar cell is its rows' cents, shown to the dollar, each price the
+// market's AaveOracle at the Pool read's block (lib/shared/sheet-usd-rows.ts,
+// ui-jobs 743).
+const VIA = "the Pool read before and after the transaction · each reserve's amount × its oracle price at the block";
+/** A reserve's amount at the oracle's price at the state's read block. */
+const pricedOf = (
+  state: AaveV3PositionState,
+  r: AaveV3PositionStateReserve | undefined,
+  sym: string,
+  amount: number,
+): PricedAmount => {
+  const block = state.sources.marketReadBlock ?? state.block;
+  return {
+    symbol: sym,
+    amount,
+    price: r ? priceOf(r) : null,
+    block,
+    priceNote: aaveV3PriceNote(`${state.market}'s AaveOracle`, sym, block),
+  };
+};
+/** Every supplied balance at its reserve's price, the sum of the shown
+ *  products: the side's total where a supply has its collateral switch off
+ *  (the Pool's total leaves it out). `which`: before or after the state's
+ *  transaction. */
+const suppliedCell = (state: AaveV3PositionState, which: "before" | "after", what: string): UsdCell =>
+  amountsUsd(
+    what,
+    state.reserves
+      .filter((r) => r.decimals != null && big(r.supply[which]) > BigInt(0))
+      .map((r) => pricedOf(state, r, reserveSymbol(r), Number(humanOf(r.supply[which], r.decimals as number)))),
+    { amountNote: `the supplied balance ${which} the transaction, read from the Pool`, via: VIA },
+  );
+/** A total the Pool states (getUserAccountData), to the cent, as a cell. */
+const statedCell = (usd: number, f: { text: string; prov: Provenance }): UsdCell => ({
+  usd: centsOf(usd),
+  text: f.text,
+  info: f.prov,
 });
 
 /** The current loan to value of one account side. */
@@ -170,7 +201,6 @@ function sheetSide(
     const c = legChange(l, r.decimals!);
     const before = humanOf(l.before, r.decimals!);
     const after = humanOf(l.after, r.decimals!);
-    const p = priceOf(r);
     const signed = `${c.sign < 0 ? "−" : ""}${fmtPositionAmount(c.magnitude)}`;
     return {
       key: `event-${sym}`,
@@ -182,13 +212,16 @@ function sheetSide(
         info: exactBalanceChangeProv(sym, leg, coords, { before: groupExact(before), after: groupExact(after) }),
         value: `${c.sign < 0 ? "−" : "+"}${groupExact(c.magnitude)}`,
       },
-      usd:
-        p != null
-          ? {
-              text: sheetUsd(c.sign * Number(c.magnitude) * p),
-              info: atBlockUsdProv(sym, `The ${sym} this transaction moved`, groupExact(c.magnitude), p),
-            }
-          : undefined,
+      usd: cellOf(
+        amountsUsd(
+          `The ${sym} this transaction moved, in USD`,
+          [pricedOf(state, r, sym, c.sign * Number(c.magnitude))],
+          {
+            amountNote: "the balance after the transaction less the balance before it, read from the Pool",
+            via: VIA,
+          },
+        ),
+      ),
       tip: TIPS.event(sym, side),
     };
   });
@@ -197,28 +230,35 @@ function sheetSide(
   const carry: SheetSide["carry"] = [];
   let beforeRow: SheetRow | undefined;
   const fresh = !!prev && prev.txHash.toLowerCase() !== state.txHash.toLowerCase();
-  if (fresh && usd?.before) {
+  // A side held before this transaction keeps its carry rows where a total
+  // is missing: each draws "—", so a group's sum is blocked (ui-jobs 743).
+  const heldBefore = reserves.some((r) => big(legOf(r, leg).before) > ZERO);
+  const unread = (what: string): UsdCell => ({
+    text: NO_FIGURE,
+    info: { kind: "derived", summary: `${what}. No dollar figure: the total was not read or not priced.` },
+    usd: null,
+  });
+  if (fresh && (usd?.before || heldBefore)) {
     const prevFacts = sideFacts(prev!, side);
     const prevUsd = sideUsd(side, prev!, prevCoords, prevFacts, undefined);
     const lastUsd = prevFacts.offSupply ? prevFacts.held : prevFacts.after;
-    if (prevUsd && lastUsd != null)
-      carry.push({
-        key: "last",
-        label: SHEET_WORDS.last,
-        usd: { text: prevUsd.after.text, info: prevUsd.after.prov, value: prevUsd.after.value },
-        tip: TIPS.last(side),
-      });
+    carry.push({
+      key: "last",
+      label: SHEET_WORDS.last,
+      usd:
+        prevUsd && lastUsd != null
+          ? { text: prevUsd.after.text, info: prevUsd.after.prov, value: prevUsd.after.value }
+          : cellOf(unread(`The ${side} once the previous transaction had run, in USD`)),
+      tip: TIPS.last(side),
+    });
     // Interest per reserve, at this block's price.
     const since = interestSincePrevious(state, prev);
     const parts = (side === "collateral" ? since?.collateral : since?.debt) ?? [];
-    let interestUsd = 0;
-    let interestPriced = true;
+    const legs: PricedAmount[] = [];
     const sub: SheetRow[] = parts.map((part) => {
-      const r = reserves.find((x) => x.reserve === part.reserve)!;
-      const p = r ? priceOf(r) : null;
-      const v = p != null ? Number(part.interest) * p : null;
-      if (v == null) interestPriced = false;
-      else interestUsd += v;
+      const r = reserves.find((x) => x.reserve === part.reserve);
+      const leg1 = pricedOf(state, r, part.symbol, Number(part.interest));
+      legs.push(leg1);
       return {
         key: `interest-${part.symbol}`,
         label: part.symbol,
@@ -230,86 +270,58 @@ function sheetSide(
           info: prevEventInterestProv(part.symbol, leg, coords),
           value: part.interest,
         },
-        usd:
-          v != null
-            ? {
-                text: sheetUsd(v),
-                info: atBlockUsdProv(
-                  part.symbol,
-                  `Interest on ${part.symbol} since the previous event`,
-                  part.interest,
-                  p!,
-                ),
-              }
-            : undefined,
+        usd: cellOf(
+          amountsUsd(`Interest on ${part.symbol} since the previous event, in USD`, [leg1], {
+            amountNote: "the balance before this transaction less the balance once the previous one had run",
+            via: VIA,
+          }),
+        ),
         tip: TIPS.interestAsset(part.symbol),
       };
     });
-    if (sub.length > 0)
+    const interestCell =
+      sub.length > 0
+        ? amountsUsd(`Interest on the ${side} since the previous event, in USD`, legs, {
+            amountNote: "the balance before this transaction less the balance once the previous one had run",
+            via: VIA,
+          })
+        : null;
+    if (interestCell)
       carry.push({
         key: "interest",
         label: SHEET_WORDS.interest,
-        usd: interestPriced
-          ? {
-              text: sheetUsd(interestUsd),
-              info: {
-                kind: "chain-derived",
-                pclass: "oracle",
-                summary: `Interest on the ${side} since the previous event, in US dollars. Every reserve's interest at its oracle price at this block, added up.`,
-                formula: "Σ interest × price",
-              },
-            }
-          : undefined,
+        usd: cellOf(interestCell),
         tip: TIPS.interest(side),
         sub,
       });
-    // The market move: the rest of the change in the Pool's total, which the
-    // prices moved; its receipt names each reserve's price at both blocks.
+    // The market move: the Pool's total before this transaction less its
+    // total once the previous one had run, each as the Pool states it to the
+    // cent, and the interest since, the sum of its shown products.
     const beforeUsd = facts.offSupply ? facts.heldBefore : facts.before;
-    if (lastUsd != null && beforeUsd != null && interestPriced) {
-      const move = beforeUsd - lastUsd - interestUsd;
-      const held = reserves.filter((r) => big(legOf(r, leg).before) > ZERO);
-      if (Math.abs(move) >= 0.005)
+    {
+      // With a supply's switch off, each total is the supplied balances'
+      // shown products (ui-jobs 743); a total missing draws "—".
+      const beforeWhat = `The ${side} just before this transaction, in USD`;
+      const lastWhat = `The ${side} once the previous transaction had run, in USD`;
+      const move = marketMoveUsd(
+        `Market move on the ${side} since the previous event`,
+        facts.offSupply
+          ? suppliedCell(state, "before", beforeWhat)
+          : beforeUsd != null && usd?.before
+            ? statedCell(beforeUsd, usd.before)
+            : unread(beforeWhat),
+        prevFacts.offSupply
+          ? suppliedCell(prev!, "after", lastWhat)
+          : lastUsd != null && prevUsd
+            ? statedCell(lastUsd, prevUsd.after)
+            : unread(lastWhat),
+        interestCell,
+      );
+      if (move.usd == null || Math.abs(move.usd) >= 0.005)
         carry.push({
           key: "market",
           label: SHEET_WORDS.market,
-          usd: {
-            text: sheetUsd(move, true),
-            info: {
-              kind: "chain-derived",
-              pclass: "oracle",
-              summary: `Market move on the ${side} since the previous event. The Pool's total before this transaction, less its total once the previous transaction had run and the interest since, all in US dollars: the change the oracle's prices made to the balances held between the two. No token moved.`,
-              formula: "before this event − last event − interest since",
-              inputs: held.flatMap((r) => {
-                const sym = reserveSymbol(r);
-                const then = prev!.reserves.find((x) => x.reserve === r.reserve);
-                const p = priceOf(r);
-                const pThen = then ? priceOf(then) : null;
-                return [
-                  ...(pThen != null
-                    ? [
-                        {
-                          label: `${sym} price at the previous event`,
-                          value: `$${pThen}`,
-                          kind: "chain" as const,
-                          pclass: "oracle" as const,
-                        },
-                      ]
-                    : []),
-                  ...(p != null
-                    ? [
-                        {
-                          label: `${sym} price at this event`,
-                          value: `$${p}`,
-                          kind: "chain" as const,
-                          pclass: "oracle" as const,
-                        },
-                      ]
-                    : []),
-                ];
-              }),
-            },
-          },
+          usd: cellOf(move),
           tip: TIPS.market(side),
         });
     }
@@ -331,7 +343,6 @@ function sheetSide(
           .map((r) => {
             const sym = reserveSymbol(r);
             const after = humanOf(legOf(r, leg).after, r.decimals!);
-            const u = exactUsd(state, r, leg, "after", coords);
             return {
               key: `asset-${sym}`,
               label: sym,
@@ -349,7 +360,12 @@ function sheetSide(
                 ),
                 value: groupExact(after),
               },
-              usd: u ? { text: sheetUsd(u.value), info: u.prov, value: u.exact } : undefined,
+              usd: cellOf(
+                amountsUsd(`The ${sym} owed after this event, in USD`, [pricedOf(state, r, sym, Number(after))], {
+                  amountNote: "the debt after the transaction, read from the Pool",
+                  via: VIA,
+                }),
+              ),
               tip: TIPS.asset(sym),
             };
           })
@@ -595,8 +611,10 @@ export interface AaveRowBalance {
   changeProv: Provenance;
   /** The balance after the event, with its receipt and its dollars. */
   after?: { value: string; prov: Provenance; usd?: { value: number; prov: Provenance } };
-  /** The oracle's price at the block, where the row carries it. */
+  /** The oracle's price at the block, where the row carries it, and the
+   *  block. */
   price?: number;
+  block?: number | null;
 }
 
 /** The sheet of a row with no position read (a block shared with another of
@@ -633,10 +651,12 @@ export function aaveRowSheet({
         },
         usd:
           b.price != null
-            ? {
-                text: sheetUsd(n * b.price),
-                info: atBlockUsdProv(b.symbol, `The ${b.symbol} this event moved`, mag, b.price),
-              }
+            ? cellOf(
+                amountsUsd(`The ${b.symbol} this event moved, in USD`, [rowPriced(b.symbol, n, b.price, b.block)], {
+                  amountNote: "the change the row states",
+                  via: ROW_VIA,
+                }),
+              )
             : undefined,
         tip: TIPS.event(b.symbol, side),
       };
@@ -653,7 +673,16 @@ export function aaveRowSheet({
           info: b.after!.prov,
           value: b.after!.value,
         },
-        usd: b.after!.usd ? { text: sheetUsd(b.after!.usd.value), info: b.after!.usd.prov } : undefined,
+        usd:
+          b.price != null
+            ? cellOf(
+                amountsUsd(
+                  `The ${b.symbol} after this event, in USD`,
+                  [rowPriced(b.symbol, Number(b.after!.value), b.price, b.block)],
+                  { amountNote: "the balance the row states after the event", via: ROW_VIA },
+                ),
+              )
+            : undefined,
         tip: TIPS.rowAsset(b.symbol, side),
       }));
     return {
@@ -685,9 +714,22 @@ export interface AaveRowLane {
   beforeProv: Provenance;
   afterProv: Provenance;
   price?: number;
-  /** The row field the price is read from ("price_usd"). */
+  /** The row field the price is read from ("price_usd"), and the row's block. */
   priceField: string;
+  block?: number | null;
 }
+
+const ROW_VIA = "the event's row · its amount × the price the row stores";
+/** A stored row's price: the field it is read from and the block. */
+const rowPriceNote = (sym: string, field: string, block: number | null | undefined) =>
+  `the row's ${field}, the market's AaveOracle price for ${sym}${block != null ? ` at block ${block.toLocaleString("en-US")}` : ", at a block the row does not name"}`;
+const rowPriced = (sym: string, amount: number, price: number, block: number | null | undefined): PricedAmount => ({
+  symbol: sym,
+  amount,
+  price,
+  block: block ?? null,
+  priceNote: rowPriceNote(sym, "price_usd", block),
+});
 
 /** A receipt, naming the row field its figure is read from. */
 const fromRowField = (p: Provenance, field: string, value: string): Provenance => ({
@@ -713,11 +755,8 @@ export function aaveGroupLanes(lanes: AaveRowLane[], label: string): GroupLane[]
         l.before != null ? { value: l.before, prov: fromRowField(l.beforeProv, field("before"), l.before) } : undefined,
       after: l.after != null ? { value: l.after, prov: fromRowField(l.afterProv, field("after"), l.after) } : undefined,
       price,
-      usdProv:
-        price != null
-          ? (what: string, amount: string) =>
-              fromRowField(atBlockUsdProv(l.symbol, what, amount, price), l.priceField, `$${price}`)
-          : undefined,
+      priceBlock: l.block ?? null,
+      priceNote: rowPriceNote(l.symbol, l.priceField, l.block),
       fmt: fmtPositionAmount,
     };
   });

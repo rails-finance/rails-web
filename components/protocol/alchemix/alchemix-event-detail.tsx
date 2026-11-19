@@ -59,7 +59,6 @@ import {
   redemptionFeeProv,
   redemptionNetProv,
   redemptionNetUnavailableProv,
-  redemptionNetUsdProv,
   resolvedAtCaptureProv,
   type AlchemixCoords,
 } from "@/lib/alchemix/event-provenance";
@@ -236,27 +235,6 @@ function legStats(
             symbol: unit.symbol,
             prov: redemptionNetProv(net, sym, mytSymbol, unit.symbol, coords),
           });
-          // The same net in dollars, at the underlying's price now: the only
-          // dollar price the page holds.
-          if (unit.usd) {
-            const usd = n * unit.usd.pricePerUnit;
-            stats.push({
-              label: `Net in USD, at ${unit.symbol}'s price now`,
-              value: formatExact(usd),
-              display: `${usd > 0 ? "+" : usd < 0 ? "−" : ""}$${Math.abs(usd).toLocaleString("en-US", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: Math.abs(usd) < 0.01 ? 4 : 2,
-              })}`,
-              symbol: "",
-              prov: redemptionNetUsdProv(
-                n,
-                unit.symbol,
-                unit.usd.pricePerUnit,
-                unit.usd.priceSource,
-                unit.usd.pricedAt,
-              ),
-            });
-          }
           // The line's redemption fee, inside the shares taken: the main part
           // of the net (lib/alchemix/redemption-net).
           if (net.fee && net.fee.bps > 0) {
