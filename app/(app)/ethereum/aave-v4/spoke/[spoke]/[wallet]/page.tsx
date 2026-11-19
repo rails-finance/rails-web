@@ -68,10 +68,7 @@ export default async function AaveV4SpokePage({ params }: Props) {
 
   // Beside the tail, not behind it: the price map covers every address the
   // card can resolve, so it needs nothing the tail returns.
-  const [tail, indexRead] = await Promise.all([
-    loadAaveV4SpokeTail(wallet, spokeName),
-    indexReadAt(MAINNET_CHAIN_ID),
-  ]);
+  const [tail, indexRead] = await Promise.all([loadAaveV4SpokeTail(wallet, spokeName), indexReadAt(MAINNET_CHAIN_ID)]);
   // The card states the Spoke read where the figures stand on it, else the index head (ui-jobs 512).
   const read = await timedRead(
     tail.spokePositions ? (readOfHeadAnswer(tail.chain) ?? indexRead) : null,
