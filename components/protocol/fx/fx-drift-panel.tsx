@@ -19,6 +19,7 @@
 // page-level provenance inspector can open, and the dev prov-coverage
 // tripwire sweeps the panel like any other receipted surface.
 
+import type { FxPoolKey } from "@/lib/fx/asset-catalog";
 import { formatDate } from "@/lib/date";
 import { formatExact } from "@/lib/utils/format";
 import { Prov, ProvReceiptsScope, useReceiptRegistry, type Provenance } from "@/components/shared/provenance";
@@ -55,7 +56,10 @@ export function FxDriftPanel({
   normalizedSymbol,
   blockDates,
   inTx,
+  pool,
 }: {
+  /** The position's pool, whose address the receipts name. */
+  pool: FxPoolKey;
   /** The intervals in hand (the newest suffix), or null before the first
    *  answer. */
   drift: FxDriftResult | null;
@@ -134,7 +138,7 @@ export function FxDriftPanel({
                     <tr key={`${iv.fromBlock}-${iv.toBlock}`} className="border-t border-edge-raised">
                       <td className="py-1.5 pr-4 tabular-nums text-rb-500">
                         <Prov
-                          info={driftIntervalProv(iv.fromBlock, iv.toBlock, iv.toHead)}
+                          info={driftIntervalProv(pool, iv.fromBlock, iv.toBlock, iv.toHead)}
                           value={`${iv.fromBlock} → ${iv.toBlock}`}
                         >
                           <span>
@@ -150,14 +154,14 @@ export function FxDriftPanel({
                         <DriftCell
                           value={iv.collsDrift}
                           symbol={normalizedSymbol}
-                          prov={driftValueProv("colls", normalizedSymbol, iv.fromBlock, iv.toBlock, iv.toHead)}
+                          prov={driftValueProv(pool, "colls", normalizedSymbol, iv.fromBlock, iv.toBlock, iv.toHead)}
                         />
                       </td>
                       <td className="py-1.5 pr-4">
                         <DriftCell
                           value={iv.debtsDrift}
                           symbol="fxUSD"
-                          prov={driftValueProv("debts", "fxUSD", iv.fromBlock, iv.toBlock, iv.toHead)}
+                          prov={driftValueProv(pool, "debts", "fxUSD", iv.fromBlock, iv.toBlock, iv.toHead)}
                         />
                       </td>
                     </tr>
@@ -169,14 +173,14 @@ export function FxDriftPanel({
                         <DriftCell
                           value={sumColls}
                           symbol={normalizedSymbol}
-                          prov={driftTotalProv("colls", normalizedSymbol, drift.intervals.length)}
+                          prov={driftTotalProv(pool, "colls", normalizedSymbol, drift.intervals.length)}
                         />
                       </td>
                       <td className="py-1.5 pr-4">
                         <DriftCell
                           value={sumDebts}
                           symbol="fxUSD"
-                          prov={driftTotalProv("debts", "fxUSD", drift.intervals.length)}
+                          prov={driftTotalProv(pool, "debts", "fxUSD", drift.intervals.length)}
                         />
                       </td>
                     </tr>
@@ -196,14 +200,14 @@ export function FxDriftPanel({
                 {inside.rows.map((r, i) => (
                   <span key={r.block}>
                     {i > 0 ? (i === inside.rows.length - 1 ? " and " : ", ") : ""}
-                    <Prov info={lifetimeInTxFundingProv(normalizedSymbol, inside.reads)} value={String(r.taken)}>
+                    <Prov info={lifetimeInTxFundingProv(pool, normalizedSymbol, inside.reads)} value={String(r.taken)}>
                       {fxFundingText(r.taken)} {normalizedSymbol}
                     </Prov>{" "}
                     on {formatDate(r.ts)}
                   </span>
                 ))}
                 . With the table, funding and rebalances took{" "}
-                <Prov info={lifetimeCollateralMovedProv(normalizedSymbol, drift.headBlock)}>
+                <Prov info={lifetimeCollateralMovedProv(pool, normalizedSymbol, drift.headBlock)}>
                   {fxFundingText(-sumColls + inside.total)} {normalizedSymbol}
                 </Prov>{" "}
                 in all.

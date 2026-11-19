@@ -10,10 +10,12 @@
 // two reserves of it, and the scrubber values the token, so the event's
 // snapshot of the spoke is summed per symbol.
 
+import { AAVE_V4_SERVED_NOTE, aaveV4PriceNote, type AaveV4PriceSource } from "./price-notes";
 import type { AaveV4SnapshotItem, BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAaveV4Event } from "@/lib/shared/types/event-shape";
 import {
   daysFromEvents,
+  livePriced,
   type FlowAssetHeld,
   type FlowBucket,
   type FlowLive,
@@ -51,23 +53,48 @@ export interface AaveV4EventLeg {
 const priceOf = (p: { usd: number } | undefined): number | undefined =>
   p != null && Number.isFinite(p.usd) && p.usd > 0 ? p.usd : undefined;
 
+/** The stored price's source for a leg, read from its event: the legs are
+ *  rails-server's mirror and carry none. */
+function legSource(ev: BaseActivityEvent, leg: AaveV4FlowLeg): string | undefined {
+  if (!isAaveV4Event(ev)) return undefined;
+  const c = ev.context.data as {
+    price?: { source?: string };
+    collateralPrice?: { source?: string };
+    debtPrice?: { source?: string };
+  };
+  return (leg === "liquidatedCollateral" ? c.collateralPrice : leg === "liquidatedDebt" ? c.debtPrice : c.price)
+    ?.source;
+}
+
+/** A stored price the cards count, where it is an on-chain read: DefiLlama
+ *  and the $1 face are no price (ui-jobs 743). The route's reference keeps
+ *  every stored price, as rails-server does. */
+const onChain = (price: number | undefined, source: string | undefined): number | undefined =>
+  source === "defillama" || source === "stablecoin" ? undefined : price;
+
 /** The legs one event adds to the lifetime flows (rails-server `aaveV4EventLegs`). */
 export function aaveV4EventLegs(ev: BaseActivityEvent): AaveV4EventLeg[] {
   if (!isAaveV4Event(ev)) return [];
   const c = ev.context.data;
   const out: AaveV4EventLeg[] = [];
-  const add = (symbol: string | undefined, leg: AaveV4FlowLeg, amount: string | undefined, price?: number) => {
+  const add = (
+    symbol: string | undefined,
+    leg: AaveV4FlowLeg,
+    amount: string | undefined,
+    stored?: { usd: number; source?: string },
+  ) => {
     const n = Math.abs(Number(amount));
     if (!symbol || amount == null || !Number.isFinite(n) || n === 0) return;
+    const price = priceOf(stored);
     out.push(price != null ? { symbol, leg, amount: n, price } : { symbol, leg, amount: n });
   };
   if (c.eventType === "liquidation") {
-    add(c.collateralSymbol, "liquidatedCollateral", c.liquidatedCollateralAmount, priceOf(c.collateralPrice));
-    add(c.reserveSymbol, "liquidatedDebt", c.debtToCover ?? c.amount, priceOf(c.debtPrice));
-  } else if (c.eventType === "supply") add(c.reserveSymbol, "supplied", c.amount, priceOf(c.price));
-  else if (c.eventType === "withdraw") add(c.reserveSymbol, "withdrawn", c.amount, priceOf(c.price));
-  else if (c.eventType === "borrow") add(c.reserveSymbol, "borrowed", c.amount, priceOf(c.price));
-  else if (c.eventType === "repay") add(c.reserveSymbol, "repaid", c.amount, priceOf(c.price));
+    add(c.collateralSymbol, "liquidatedCollateral", c.liquidatedCollateralAmount, c.collateralPrice);
+    add(c.reserveSymbol, "liquidatedDebt", c.debtToCover ?? c.amount, c.debtPrice);
+  } else if (c.eventType === "supply") add(c.reserveSymbol, "supplied", c.amount, c.price);
+  else if (c.eventType === "withdraw") add(c.reserveSymbol, "withdrawn", c.amount, c.price);
+  else if (c.eventType === "borrow") add(c.reserveSymbol, "borrowed", c.amount, c.price);
+  else if (c.eventType === "repay") add(c.reserveSymbol, "repaid", c.amount, c.price);
   return out;
 }
 
@@ -130,6 +157,8 @@ export function aaveV4FlowLive(
   totals: AaveLifetimeTotals,
   reserves: ReserveStats[],
   priceOf: (symbol: string) => number | null,
+  /** The block the oracle read stands at, where it names one (ui-jobs 743). */
+  priceBlock: number | null = null,
 ): FlowLive {
   const assets: FlowAssetHeld[] = [];
   for (const r of reserves) {
@@ -137,8 +166,27 @@ export function aaveV4FlowLive(
     const supplied = r.currentSupplied ?? Math.max(0, r.supplied - r.withdrawn - r.liquidatedCollateral);
     const owed = r.currentBorrowed ?? Math.max(0, r.borrowed - r.repaid - r.liquidatedDebt);
     if (supplied > 0)
-      assets.push({ side: "collateral", symbol: r.symbol, amount: supplied, usd: p == null ? 0 : supplied * p });
-    if (owed > 0) assets.push({ side: "debt", symbol: r.symbol, amount: owed, usd: p == null ? 0 : owed * p });
+      assets.push({
+        side: "collateral",
+        symbol: r.symbol,
+        amount: supplied,
+        usd: p == null ? 0 : supplied * p,
+        // The oracle read's price now, at its block (ui-jobs 743).
+        ...(p == null
+          ? { unpriced: true as const }
+          : { priced: livePriced(p, priceBlock, 0, { source: "the oracle's price now" }) }),
+      });
+    if (owed > 0)
+      assets.push({
+        side: "debt",
+        symbol: r.symbol,
+        amount: owed,
+        usd: p == null ? 0 : owed * p,
+        // The oracle read's price now, at its block (ui-jobs 743).
+        ...(p == null
+          ? { unpriced: true as const }
+          : { priced: livePriced(p, priceBlock, 0, { source: "the oracle's price now" }) }),
+      });
   }
   return {
     collateralUsd: Math.max(0, totals.inProtocolUsd),
@@ -172,7 +220,13 @@ export function aaveV4FlowTimeline(
   const flows = flowEventsFromLegs(
     ordered,
     (ev) =>
-      of(ev).legs.map((l) => ({ symbol: l.symbol, address: l.symbol, leg: l.leg, amount: l.amount, price: l.price })),
+      of(ev).legs.map((l) => ({
+        symbol: l.symbol,
+        address: l.symbol,
+        leg: l.leg,
+        amount: l.amount,
+        price: l.price,
+      })),
     (ev) => of(ev).balances.map((b) => ({ side: b.side, asset: b.symbol, symbol: b.symbol, amount: b.amount })),
     todayPrices,
     {
@@ -213,11 +267,17 @@ export function aaveV4FocusEvents(
         address: l.symbol,
         leg: l.leg,
         amount: l.amount,
-        price: l.price,
+        price: onChain(l.price, legSource(ev, l.leg)),
+        priceSource: legSource(ev, l.leg),
       })),
     todayPrices,
+    aaveV4LegPriceNote,
   );
 }
+
+/** An Aave V4 leg's price: its stored on-chain read at the event's block. */
+const aaveV4LegPriceNote = (l: { symbol: string; priceSource?: string }, block: number): string =>
+  aaveV4PriceNote(l.priceSource as AaveV4PriceSource | undefined, l.symbol, block);
 
 /** Aave V3's buckets under the V4 timeline's event names (its liquidation
  *  row reads "Liquidation"); the supply bucket keeps Aave V3's "Supplied",
@@ -232,5 +292,5 @@ export function aaveV4FlowSeriesTimeline(
   live: FlowLive | null,
   todayPrices: Record<string, number> | undefined,
 ): FlowTimeline | null {
-  return flowSeriesTimeline(series, AAVE_V4_FLOW_BUCKETS, live, todayPrices);
+  return flowSeriesTimeline(series, AAVE_V4_FLOW_BUCKETS, live, todayPrices, AAVE_V4_SERVED_NOTE);
 }

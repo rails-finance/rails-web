@@ -6,7 +6,7 @@
 
 const n = (b: number) => b.toLocaleString("en-US");
 const blockText = (block: number | null | undefined): string =>
-  block != null ? `at block ${n(block)}` : "at the latest read, which states no block";
+  block != null ? `at block ${n(block)}` : "at the latest read, which names no block";
 
 /** One market's price from the Comptroller's oracle. */
 export const compoundV2PriceNote = (cSymbol: string, block: number | null | undefined): string =>

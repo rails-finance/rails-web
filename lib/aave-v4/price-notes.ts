@@ -11,7 +11,7 @@
 export type AaveV4PriceSource = "iaave-oracle" | "chainlink" | "chainlink-eth-derived" | "pendle-twap" | "reserve";
 
 const blockText = (block: number | null | undefined): string =>
-  block != null ? `at block ${block.toLocaleString("en-US")}` : "at the latest read, which states no block";
+  block != null ? `at block ${block.toLocaleString("en-US")}` : "at the latest read, which names no block";
 
 /** One asset's price, named by its read and its block. */
 export function aaveV4PriceNote(
@@ -34,6 +34,11 @@ export function aaveV4PriceNote(
 /** A peak valued at its reserve's last event's price. */
 export const aaveV4PeakPriceNote = (priceBlock: number, peakBlock: number): string =>
   `price at block ${priceBlock.toLocaleString("en-US")}, this reserve's last event; the peak is at block ${peakBlock.toLocaleString("en-US")}`;
+
+/** A Lifetime flows line on Aave V4, whose day rows rails-server sums: its
+ *  receipt names no legs. */
+export const AAVE_V4_SERVED_NOTE =
+  "Each day's figure is summed by rails-server from its stored prices, a leg with none at its block at a fallback price; its day rows name no legs.";
 
 /** What a peak's receipt is, by side. */
 export const AAVE_V4_PEAK_WHAT = { supply: "The peak collateral", debt: "The peak debt" } as const;

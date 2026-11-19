@@ -17,8 +17,15 @@
 // Pure: tested offline in scripts/verify/verify-lifetime-flows-state.ts.
 
 import type { FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
-import { grownBalance, type FlowIndexes, type FlowSide, type FlowTimeline } from "@/lib/shared/flows-timeline";
+import {
+  grownBalance,
+  type FlowIndexes,
+  type FlowModel,
+  type FlowSide,
+  type FlowTimeline,
+} from "@/lib/shared/flows-timeline";
 import type { DayObs } from "@/lib/shared/price-series";
+import { centsOf, shownUsd } from "@/lib/shared/shown-usd";
 
 export type SeriesBin = "day" | "week" | "month";
 
@@ -108,9 +115,6 @@ export function binRanges(first: number, today: number, bin: SeriesBin): [number
   return out;
 }
 
-// exponent-safe: a wire figure the chart scales, never printed
-const round = (v: number) => Number(v.toPrecision(8));
-
 /** Held and owed at the end of each bin, from the open to today. */
 export function binSeries(input: BinInput, bin: SeriesBin): FlowBinSeries | null {
   const days = [...input.days].sort((a, b) => a.day - b.day);
@@ -151,14 +155,9 @@ export function binSeries(input: BinInput, bin: SeriesBin): FlowBinSeries | null
       if (p == null) {
         sum[h.side] = null;
         gaps.push([points.length, h.side, input.symbols[h.asset] ?? h.asset]);
-      } else if (sum[h.side] != null) sum[h.side] = (sum[h.side] as number) + amount * p;
+      } else if (sum[h.side] != null) sum[h.side] = centsOf((sum[h.side] as number) + shownUsd(amount, p));
     }
-    points.push([
-      from,
-      to,
-      sum.collateral == null ? null : round(sum.collateral),
-      sum.debt == null ? null : round(sum.debt),
-    ]);
+    points.push([from, to, sum.collateral, sum.debt]);
   }
   const active = days.map((d) => d.day);
   const from = windowFromDay(active);
@@ -170,6 +169,32 @@ export function binSeries(input: BinInput, bin: SeriesBin): FlowBinSeries | null
     points,
     gaps,
   };
+}
+
+/** A point of the flows line: its bin's last day (UTC day number) and what
+ *  was held and owed then; null a break. */
+export type LinePoint = { to: number; collateral: number | null; debt: number | null };
+
+/** The flows line's points, the last at the live figures. A side breaks on
+ *  each point whose day the model holds an asset there with no price, as its
+ *  bar does (ui-jobs 743), and at the live point where a live asset has none. */
+export function flowLinePoints(model: FlowModel, series: FlowBinSeries | null): LinePoint[] {
+  const startDay = model.start / DAY_MS;
+  const points: LinePoint[] = (series?.points ?? []).map(([, to, collateral, debt]) => {
+    const gap = model.heldUnpriced.get(to - startDay);
+    return {
+      to,
+      collateral: gap?.collateral.length ? null : collateral,
+      debt: gap?.debt.length ? null : debt,
+    };
+  });
+  const tail = points[points.length - 1];
+  if (tail) {
+    const liveGap = (side: FlowSide) => model.liveHeld.some((h) => h.side === side && h.unpriced);
+    tail.collateral = liveGap("collateral") ? null : model.live.collateralUsd;
+    tail.debt = liveGap("debt") ? null : model.live.debtUsd;
+  }
+  return points;
 }
 
 /** The daily route's answer as binning input. */

@@ -347,6 +347,7 @@ function AaveV4SpokePageInner({
         sortedEvents.filter((e) => isAaveV4Event(e) && (e.context.data.spokeName ?? "Main") === spokeName),
         patchedReserves,
         chainTruthPrices,
+        oracleRead,
       ),
       // On-chain-oracle valuation of the headline totals, from the same chain
       // balances at Aave's own oracle price — lets On-chain-values show these
@@ -972,12 +973,12 @@ function AaveV4SpokeTowerBlock({
         ? aaveV4FlowSeriesTimeline(
             flowSeries,
             totals.unpricedSymbols.length === 0
-              ? aaveV4FlowLive(totals, reserves, (sym) => resolvePrice(sym, prices))
+              ? aaveV4FlowLive(totals, reserves, (sym) => resolvePrice(sym, prices), priceBlock)
               : null,
             todayPrices,
           )
         : null,
-    [flowSeries, totals, todayPrices, reserves, prices],
+    [flowSeries, totals, todayPrices, reserves, prices, priceBlock],
   );
   // The price chart's health view (ui-jobs 328, ruling 15).
   const flowTimeline = useAaveFamilyHealth(flowSeriesTimeline, {

@@ -5,14 +5,30 @@
 // /api/compound/prices-at), so a stored price gives the figure the archive
 // read gives. rails-ops reference/compound-prices-at-block.md.
 
+import { shownComposedPrice } from "@/lib/shared/shown-usd";
+
 /** Comet `getPrice` answers 8 decimals in the market's quote unit. */
 export const COMET_PRICE_SCALE = 1e8;
 
-/** USD per whole token from `getPrice`'s raw answer; an ETH-quoted Comet's
- *  with WETH/USD at the same block (raw, 8 decimals), a USD Comet's with null. */
+/** An ETH-quoted Comet's two factors: getPrice in ETH and WETH in dollars. */
+export interface CometFactor {
+  price: number;
+  ethUsd: number;
+}
+
+/** USD per whole token from `getPrice`'s raw answer: a USD Comet's as read;
+ *  an ETH-quoted Comet's composed with WETH/USD at the same block (raw, 8
+ *  decimals), each factor as shown, as the card composes it
+ *  (lib/compound/comet-usd.ts cometUsdPrice). */
 export function cometUsdOf(raw: bigint | string, quoteUsdRaw: bigint | string | null): number {
-  const quote = quoteUsdRaw == null ? 1 : Number(quoteUsdRaw) / COMET_PRICE_SCALE;
-  return (Number(raw) / COMET_PRICE_SCALE) * quote;
+  const f = cometEthFactorOf(raw, quoteUsdRaw);
+  return f ? shownComposedPrice(f.price, f.ethUsd) : Number(raw) / COMET_PRICE_SCALE;
+}
+
+/** An ETH-quoted Comet's factors from the raw reads; null for a USD Comet. */
+export function cometEthFactorOf(raw: bigint | string, quoteUsdRaw: bigint | string | null): CometFactor | null {
+  if (quoteUsdRaw == null) return null;
+  return { price: Number(raw) / COMET_PRICE_SCALE, ethUsd: Number(quoteUsdRaw) / COMET_PRICE_SCALE };
 }
 
 /** One stored block as the server answers it (/api/compound/prices-at). */
@@ -36,4 +52,17 @@ export function storedCometPrices(block: StoredCometBlock, tokens: readonly stri
     if (usd > 0) out[t] = usd;
   }
   return Object.keys(out).length > 0 ? out : null;
+}
+
+/** The stored block's ETH factors for the asked tokens, where the Comet
+ *  quotes in ETH. */
+export function storedCometFactors(block: StoredCometBlock, tokens: readonly string[]): Record<string, CometFactor> {
+  const out: Record<string, CometFactor> = {};
+  if (block.unit !== "eth" || block.quoteUsd == null) return out;
+  for (const t of new Set(tokens.map((x) => x.toLowerCase()))) {
+    const raw = block.prices[t];
+    const f = raw != null ? cometEthFactorOf(raw, block.quoteUsd) : null;
+    if (f && f.price > 0 && f.ethUsd > 0) out[t] = f;
+  }
+  return out;
 }

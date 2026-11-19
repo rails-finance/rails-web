@@ -27,17 +27,6 @@ export interface DailyAnswer {
 /** At most 40 series per read (the route's cap). */
 const MAX_SERIES = 40;
 
-export async function fetchDailyPrices(
-  chain: number,
-  keys: readonly string[],
-  opts: { from?: number; signal?: AbortSignal } = {},
-): Promise<Record<string, [number, number][]> | null> {
-  const body = await fetchDailyAnswer(chain, keys, opts);
-  if (!body) return null;
-  const out = dailyPricesFromAnswer(body);
-  return Object.keys(out).length > 0 ? out : null;
-}
-
 /** The store's answer as it came, every unit kept, the reads of more than
  *  40 series merged; null where a read failed. */
 export async function fetchDailyAnswer(
@@ -55,6 +44,24 @@ export async function fetchDailyAnswer(
     if (!res.ok) return null;
     Object.assign(out.series!, ((await res.json()) as DailyAnswer).series ?? {});
   }
+  return out;
+}
+
+/** The block each kept row was read at, by series key and day: the same
+ *  rows `dailyPricesFromAnswer` keeps, so a receipt can name the block its
+ *  day's price stands at (ui-jobs 743). */
+export function dailyBlocksFromAnswer(
+  body: DailyAnswer,
+  accept: (unit: string) => boolean = (u) => u === "usd",
+): Record<string, Record<number, number>> {
+  const out: Record<string, Record<number, number>> = {};
+  for (const [key, s] of Object.entries(body.series ?? {}))
+    for (const [day, , block, unit] of s.obs ?? []) {
+      const u = unit ?? s.unit;
+      const b = Number(block);
+      if (u == null || !accept(u) || !Number.isFinite(b) || b <= 0) continue;
+      (out[key] ??= {})[day] = b;
+    }
   return out;
 }
 

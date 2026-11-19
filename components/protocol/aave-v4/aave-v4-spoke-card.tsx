@@ -56,7 +56,6 @@ import {
   accumProv,
   chainTruthProv,
   healthFactorProv,
-  interestSinceZeroProv,
   BLENDED_LT_PROV,
   BORROW_RATE_PROV,
   LIQ_DROP_PROV,
@@ -77,10 +76,6 @@ import { PanelFigure } from "@/components/shared/position-card-panel";
 import { v4Apy } from "@/lib/aave-v4/rates";
 
 export type { AaveSpokeCardInfo };
-
-// The interest figures are added since each balance last started from zero.
-const supplyInterestProv = () => interestSinceZeroProv("Earned interest inside the collateral");
-const borrowInterestProv = () => interestSinceZeroProv("Accrued interest inside the debt");
 
 /** The price read is still on its way for this side. */
 const isPending = (r: AaveV4UsdResult | null): boolean => r != null && r.prov == null && r.state === "pending";
@@ -205,7 +200,7 @@ function interestRow(spoke: AaveSpokeCardInfo, side: "supply" | "debt"): Positio
         tip: "The interest the supplied balance has earned, in dollars: what it holds beyond its supplies and withdrawals since it last started from zero.",
         value: (
           <span>
-            <Prov info={supplyInterestProv()}>
+            <Prov info={got.prov}>
               <PanelFigure>{v.display}</PanelFigure>
             </Prov>{" "}
             since {formatDate(got.since)}
@@ -218,7 +213,7 @@ function interestRow(spoke: AaveSpokeCardInfo, side: "supply" | "debt"): Positio
         tip: "The interest the debt has accrued, in dollars: what it holds beyond its borrows and repayments since it last started from zero.",
         value: (
           <span>
-            <Prov info={borrowInterestProv()}>
+            <Prov info={got.prov}>
               <PanelFigure>{v.display}</PanelFigure>
             </Prov>{" "}
             since {formatDate(got.since)}
@@ -333,14 +328,10 @@ export function useAaveV4SpokeCardSlots({
   const { session } = useAaveV4Deployment();
   const { isClosed } = spoke;
   // Supply-only draws one head, Supplied. A closed card asks whether the
-  // position ever carried real debt (peak debt under $1); an open card counts
-  // any live debt, so a sub-dollar leftover borrow keeps its Debt and Health
-  // factor heads.
-  // A debt peak with no figure (its reserves unpriced) still means the
-  // position carried debt.
-  const supplyOnly = isClosed
-    ? spoke.peakDebtUsd < 1 && (spoke.peakDebtUnpriced ?? []).length === 0
-    : spoke.totalDebtUsd <= 0;
+  // position ever borrowed, in tokens (`debtReserveHistory`); an open card
+  // counts any live debt, so a sub-dollar leftover borrow keeps its Debt and
+  // Health factor heads.
+  const supplyOnly = isClosed ? spoke.debtReserveHistory.length === 0 : spoke.totalDebtUsd <= 0;
 
   const identity = (
     <span className="flex items-center gap-2">

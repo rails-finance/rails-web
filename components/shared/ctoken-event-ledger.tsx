@@ -136,15 +136,24 @@ function SideLedger({
   const single = assetTokenSum(sum);
   if (single) {
     const dollars = eventSideSumByAsset(model, sum, cum, held);
+    const bal = sum.balances.find((x) => x.symbol === single.symbol);
     const ledger = tokenLedger({
       model,
       side,
       ev,
       sum: single,
       usd: shownFor(single.symbol)
-        ? { lines: dollars.lines, dollars: dollars.total.dollars, before: state.heldBefore[side] }
+        ? {
+            lines: dollars.lines,
+            dollars: dollars.total.dollars,
+            before: state.heldBefore[side],
+            ...(dollars.total.cents != null ? { cents: dollars.total.cents } : {}),
+          }
         : null,
-      price: sum.balances.find((x) => x.symbol === single.symbol)?.price ?? null,
+      price: bal?.price ?? null,
+      ...(bal?.price != null
+        ? { held: { amount: bal.amount, price: bal.price, block: bal.block ?? null, priceNote: bal.priceNote } }
+        : {}),
     });
     return (
       <>

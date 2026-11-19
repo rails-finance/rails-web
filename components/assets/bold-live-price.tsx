@@ -35,7 +35,7 @@ function figureProv(f: CardFigure): Provenance {
   return {
     kind: "derived",
     pclass: "indexed",
-    summary: `${f.unit} ${f.label.toLowerCase()} — ${f.title.charAt(0).toLowerCase()}${f.title.slice(1)}: each open Trove's current debt summed, at the index's latest read, which states no block.`,
+    summary: `${f.unit} ${f.label.toLowerCase()} — ${f.title.charAt(0).toLowerCase()}${f.title.slice(1)}: each open Trove's current debt summed, at the index's latest read, which names no block.`,
     formula: "Σ current debt over the open Troves",
   };
 }

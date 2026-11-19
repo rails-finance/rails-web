@@ -73,7 +73,7 @@ import { fxCollMoved, fxFundingText, fxRowFunding } from "@/lib/fx/in-tx-funding
 import { FX_ADDRESSES, FX_POOLS, isFxPoolKey } from "@/lib/fx/asset-catalog";
 import { fxExternalActor } from "@/lib/fx/external-actor";
 import { formatExact, formatNumber, formatTinyNonZero } from "@/lib/utils/format";
-import { formatUsd } from "@/lib/shared/format-event";
+import { priceText } from "@/lib/shared/shown-usd";
 
 /** What the row's read (getPosition at block − 1 and at the block) adds to the
  *  prose, once it has landed. */
@@ -472,13 +472,12 @@ function fxEventSlotsBase(ctx: FxContext, coords: FxCoords, read: FxRowRead): Ev
       : null;
   // Which price the pool judged the row at: the oracle's min leg (BasePool
   // rebalance / liquidate), where the row's ratios are read at the anchor.
-  const usd = (n: number) => formatUsd(n);
   const judgedClause = (what: "rebalance" | "liquidate"): ClauseInput => {
     const line = what === "rebalance" ? before?.rebalanceLine : before?.liquidateLine;
     return clause(
       <>
         The pool judged the tick at the oracle&rsquo;s min price
-        {before?.minPrice != null ? <>, {usd(before.minPrice)} at the block before</> : null}
+        {before?.minPrice != null ? <>, {priceText(before.minPrice)} at the block before</> : null}
         {line != null ? (
           <>
             : it {what === "rebalance" ? "rebalances" : "liquidates"} a tick whose LTV there is{" "}
@@ -487,8 +486,8 @@ function fxEventSlotsBase(ctx: FxContext, coords: FxCoords, read: FxRowRead): Ev
         ) : null}
         {what === "rebalance" ? <>, and a rebalance brings the tick back toward that line at that price</> : null}. The
         LTVs on this row are read at the anchor price
-        {before?.anchorPrice != null ? <> ({usd(before.anchorPrice)})</> : null}, at or above the min, so they can show
-        below the line.
+        {before?.anchorPrice != null ? <> ({priceText(before.anchorPrice)})</> : null}, at or above the min, so they can
+        show below the line.
       </>,
     );
   };

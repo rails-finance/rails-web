@@ -203,10 +203,11 @@ export function cardSideUsd(v: CompoundPositionView): { supplyUsd: number | null
   return { supplyUsd: figureOf(r.supply)?.usd ?? null, borrowUsd: figureOf(r.borrow)?.usd ?? null };
 }
 
-/** The no-figure words for a side with an unpriced asset. */
-const noFigure = (r: ReturnType<typeof compoundSideUsd>) =>
+/** The no-figure words for a side with an unpriced asset: "at this block"
+ *  where the prices' read names one, "at this read" where it names none. */
+const noFigure = (r: ReturnType<typeof compoundSideUsd>, block: number | null | undefined) =>
   r && "missing" in r && r.missing.length > 0
-    ? `no dollar figure: ${r.missing.join(", ")} ${r.missing.length === 1 ? "has" : "have"} no price at this read`
+    ? `no dollar figure: ${r.missing.join(", ")} ${r.missing.length === 1 ? "has" : "have"} no price at ${block != null ? "this block" : "this read"}`
     : null;
 
 /** One line on the supply side: the lent base (a net LENDER only) or one
@@ -563,7 +564,7 @@ export function useCompoundCardSlots({
         ),
       assets: supplyUsd != null && supplyMarks.length > 0 ? <InlineAssetCluster assets={supplyMarks} /> : undefined,
       total: supplyUsd != null ? { usd: supplyUsd, info: supplyR!.prov } : undefined,
-      sub: noFigure(receipts.supply) ?? (lending ? lentBasis : undefined),
+      sub: noFigure(receipts.supply, v.priceBlock ?? v.atBlock) ?? (lending ? lentBasis : undefined),
     };
     // One supply line: its amount with its icon, the dollars beneath (the
     // Liquity V2 headline, as the debt side draws it).
@@ -611,7 +612,7 @@ export function useCompoundCardSlots({
             </Prov>
           )
         : undefined,
-      sub: borrowing ? (noFigure(receipts.borrow) ?? borrowBasis) : undefined,
+      sub: borrowing ? (noFigure(receipts.borrow, v.priceBlock ?? v.atBlock) ?? borrowBasis) : undefined,
     };
     // The risk headline and its rows from the live read: a borrower only.
     const risk = borrowing && live !== undefined ? compoundRiskSlots(live, v.base.address) : null;

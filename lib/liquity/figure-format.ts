@@ -20,7 +20,9 @@ export function fmtColl(n: number): string {
 
 /** A dollar value in the value pill or the price chip: whole dollars. */
 export function fmtUsdWhole(value: number | undefined | null): string {
-  if (value == null || isNaN(value) || value < 0.01) return "< $0.01";
+  // A figure with no price (not a number) prints no figure (ui-jobs 743).
+  if (value != null && Number.isNaN(value)) return "—";
+  if (value == null || value < 0.01) return "< $0.01";
   if (value < 1) return `$${value.toFixed(2)}`;
   return "$" + value.toLocaleString("en-US", { maximumFractionDigits: 0 });
 }

@@ -115,6 +115,10 @@ export interface Provenance {
   via?: string;
   formula?: string;
   inputs?: ProvInput[];
+  /** A receipt whose rows are built when it opens (a line of many legs,
+   *  ui-jobs 743): this stands for the rows in the registry's signature, so
+   *  registering on every render does not build them. */
+  key?: string;
   /** Precise distance class for the displayed value; falls back to `kind`. */
   pclass?: ProvClass;
   /** Third-party proof for the displayed value (defaults from its class). */

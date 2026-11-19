@@ -81,6 +81,7 @@ import {
   type FlowTimeline,
   windowModel,
   lineUnitWords,
+  shownNow,
 } from "@/lib/shared/flows-timeline";
 import { isBusy } from "@/lib/shared/flows-busy";
 import {
@@ -442,8 +443,8 @@ function SideBlock({
   const u = unitOf(model, side);
   const axis = sideAxis(model, side);
   const spoken = coll
-    ? `${word}: ${spokenUsd(st.now, u)} ${(model.words.held ?? "Still supplied").toLowerCase()}, of ${spokenUsd(st.total, u)} that came in; ${spokenUsd(st.out, u)} has left.`
-    : `${word}: ${spokenUsd(st.now, u)} owed, of ${spokenUsd(st.total, u)} owed in all; ${spokenUsd(repaid, u)} repaid` +
+    ? `${word}: ${spokenUsd(shownNow(st), u)} ${(model.words.held ?? "Still supplied").toLowerCase()}, of ${spokenUsd(st.total, u)} that came in; ${spokenUsd(st.out, u)} has left.`
+    : `${word}: ${spokenUsd(shownNow(st), u)} owed, of ${spokenUsd(st.total, u)} owed in all; ${spokenUsd(repaid, u)} repaid` +
       (liquidated > 0 ? `, ${spokenUsd(liquidated, u)} liquidated.` : ".");
   // The strip's label names every segment it draws, so the bar reads without
   // the Key.

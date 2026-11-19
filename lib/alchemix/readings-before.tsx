@@ -175,8 +175,6 @@ export function collateralTakenRaw(event: AlchemistEvent, before: AlchemixReadin
 export interface AlchemixUnderlyingUnit {
   symbol: string;
   decimals: number;
-  /** The underlying's dollar price now, where the page has one. */
-  usd?: { pricePerUnit: number; priceSource: string; pricedAt: string } | null;
 }
 
 export const AlchemixUnderlyingContext = createContext<AlchemixUnderlyingUnit | null>(null);

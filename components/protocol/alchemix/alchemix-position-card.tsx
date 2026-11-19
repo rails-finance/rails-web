@@ -48,13 +48,9 @@ import type {
   AlchemixLiveCollateral,
   AlchemixPositionStatus,
   AlchemixPositionSummary,
-  AlchemixUnderlyingValue,
-  AlchemixUsdValue,
 } from "@/types/api/alchemix";
 import { alchemixMarketWord } from "@/lib/alchemix/naming";
 import { BlockRef } from "@/components/shared/block-ref";
-import { isStableDenominated } from "@/lib/aave-v4/asset-class";
-import { DEPEG_BAND } from "@/lib/shared/usd-display";
 import { formatCompactTitled } from "@/lib/shared/format-compact";
 
 /** A vault share price at the asset underneath's own precision, up to six
@@ -102,22 +98,6 @@ export function alchemixAmountFigure(a: AlchemixAmount, unit: string, prov?: Pro
 /** The figure for an amount whose read did not settle. */
 export const NOT_SETTLED = <span className="text-rb-500">Not settled</span>;
 
-/** The collateral's dollar figure, where the card states one. The house rule
- *  for a stablecoin (lib/shared/usd-display.ts): a USDC line priced within
- *  1% of $1 says its figure once, in USDC; anything else carries the dollar
- *  figure on every card. A holding worth less than a cent reads "< $0.01",
- *  never "$0". */
-export function collateralUsdText(
-  underlying: AlchemixUnderlyingValue | null,
-  usd: AlchemixUsdValue | null,
-): string | null {
-  if (!underlying || !usd) return null;
-  if (underlying.symbol && isStableDenominated(underlying.symbol) && Math.abs(usd.pricePerUnit - 1) <= DEPEG_BAND)
-    return null;
-  if (usd.usd > 0 && usd.usd < 0.01) return "< $0.01";
-  return `$${formatCompactTitled(usd.usd).display}`;
-}
-
 /** The Deposit headline, on either surface. What a holder recognises is the
  *  asset underneath, so THE UNDERLYING LEADS, its dollar
  *  figure beneath where the card states one, and the share count the position
@@ -131,7 +111,7 @@ export function collateralUsdText(
 export function depositedHead(
   c: (AlchemixCollateral | AlchemixLiveCollateral) | null,
   fallbackMytSymbol: string,
-  prov?: { shares?: Provenance; underlying?: Provenance; usd?: Provenance },
+  prov?: { shares?: Provenance; underlying?: Provenance },
   block?: ReactNode,
 ): PositionCardHead {
   const head = { id: "deposited", label: "Deposit" };
@@ -158,22 +138,10 @@ export function depositedHead(
       sub: <>no share price in hand{block}</>,
     };
   }
-  const usdText = collateralUsdText(u, c.usd);
-  const usd =
-    usdText != null ? (
-      prov?.usd && c.usd ? (
-        <Prov info={prov.usd} value={String(c.usd.usd)}>
-          <span className="text-green-400">{usdText}</span>
-        </Prov>
-      ) : (
-        <span className="text-green-400">{usdText}</span>
-      )
-    ) : undefined;
   return {
     ...head,
     value: alchemixAmountFigure(u, u.symbol ?? "underlying", prov?.underlying),
     assets: alchemixChip(u.symbol ?? "underlying"),
-    usd,
     sub: (
       <>
         held as {sharesNode}

@@ -515,6 +515,7 @@ export function useSparkEventBody({
           afterProv: afterProv(symbol, side),
           price: price?.usd,
           priceField,
+          block: coords.blockNumber ?? null,
         };
   const lanes =
     ctx.eventType === "liquidation"

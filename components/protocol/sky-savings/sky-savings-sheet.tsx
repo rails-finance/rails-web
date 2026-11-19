@@ -10,7 +10,7 @@
 // counts each USDS at $1; the receipt says so.
 
 import type { SkySavingsContext } from "@/lib/shared/types/event-shape";
-import { SHEET_WORDS, sheetUsd, type EventSheet, type SheetRow } from "@/components/shared/event-sheet";
+import { SHEET_WORDS, type EventSheet, type SheetRow } from "@/components/shared/event-sheet";
 import type { Provenance } from "@/components/shared/provenance";
 import { SUSDS, USDS } from "@/lib/sky-savings/constants";
 import { exact, fixed6, skyTransition, units } from "@/lib/sky-savings/math";
@@ -24,6 +24,7 @@ import {
   type SkyEventCoords,
 } from "@/lib/sky-savings/provenance";
 import { formatCompact } from "@/lib/shared/format-compact";
+import { faceParts } from "@/lib/shared/sheet-usd-rows";
 
 const WORDS = {
   side: "Savings",
@@ -87,8 +88,7 @@ export function skySavingsSheet({ c, coords, previous, sinceRaw }: SkySheetArgs)
   const kind = c.eventType;
   const dollars = (raw: bigint, what: string, sign: -1 | 0 | 1 = 0) => {
     const n = units(raw);
-    const text = sheetUsd(sign < 0 ? -n : n, sign > 0);
-    return { text, info: dollarProv(what, exact(raw)), value: exact(raw) };
+    return { ...faceParts(sign < 0 ? -n : n, sign > 0), info: dollarProv(what, exact(raw)), value: exact(raw) };
   };
 
   const rows: SheetRow[] = [];

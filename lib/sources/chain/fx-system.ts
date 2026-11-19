@@ -144,6 +144,9 @@ export interface FxPoolSystem {
 
   /** Oracle legs — USD per NORMALIZED unit, 1e18-scaled to numbers. */
   oracle: string;
+  /** The pool's PoolConfiguration (pool.configuration() at the read's block),
+   *  where the funding rate, fee schedule and redemption gate are read. */
+  configuration: string;
   priceAnchor: number;
   priceMin: number;
   priceMax: number;
@@ -379,6 +382,7 @@ async function loadPool(key: FxPoolKey, blockNumber: bigint): Promise<FxPoolSyst
 
     fundingRatioAnnual: wad(fundingRatio),
     fundingCheckpoint: Number(snapshot[2]),
+    configuration: (configuration as string).toLowerCase(),
 
     oracle: oracle.toLowerCase(),
     priceAnchor: wad(anchor),

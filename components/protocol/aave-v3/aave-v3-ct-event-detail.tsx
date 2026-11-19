@@ -841,6 +841,7 @@ export function useAaveV3EventBody({
           changeProv: st.transition?.changeProv ?? a.changeProv,
           after: a.principalAfter != null ? { value: a.principalAfter, prov: st.prov, usd: st.usd } : undefined,
           price: a.price?.usd,
+          block: coords.blockNumber ?? null,
         };
       }),
       label: aaveV3CtLabel(ctx, !!feeOf, coords.chainId, wallet),
@@ -882,6 +883,7 @@ export function useAaveV3EventBody({
                 ? supplyAfterProv(a.symbol, coords, a.principalRawAfter)
                 : debtAfterProv(a.symbol, coords, a.principalRawAfter),
             price: a.price?.usd,
+            block: coords.blockNumber ?? null,
             priceField:
               ctx.eventType === "liquidation"
                 ? a.side === "supply"

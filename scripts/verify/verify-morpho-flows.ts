@@ -26,6 +26,7 @@
 //
 //   npx tsx --test scripts/verify/verify-morpho-flows.ts
 import { test } from "node:test";
+import { assertUnitReceipts } from "./lib/unit-receipts";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -329,4 +330,10 @@ test("token figures: compact, whole and spoken", () => {
   assert.equal(wholeUsd(123_456, unit), "12.3456 WETH");
   assert.equal(wholeUsd(-90_118, { symbol: "USDC", scale: 0 }), "90,118 USDC");
   assert.equal(formatFlowUsd(82_029, { symbol: "USDC", scale: 0 }), "82K USDC");
+});
+
+test("a unit model's past-day Held and Owed receipts stay in the loan token (ui-jobs 743)", () => {
+  let read = 0;
+  for (const name of NAMES) read += assertUnitReceipts(model(fx(name)), name);
+  assert.ok(read > 0, "receipts read");
 });

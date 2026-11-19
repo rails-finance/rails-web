@@ -5,6 +5,7 @@
 // (app/api/liquity-v2/event-prose/route.ts) call it with what they read; it
 // reads nothing.
 
+import { liquityV2PriceNote } from "@/lib/liquity-v2/price-notes";
 import type { BaseActivityEvent } from "@/lib/shared/types/activity";
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import type { TroveSummary } from "@/types/api/trove";
@@ -60,6 +61,7 @@ export function liquityPositionProse(input: LiquityPositionInput): LiquityProseR
     surplusClaimed: false,
     now: input.now,
     dailyColl: input.dailyColl,
+    priceNote: liquityV2PriceNote(collSym),
     live: trove?.status === "open" ? { price: priceToday ?? null } : null,
   });
   const model = tl ? buildFlowModel(tl) : null;

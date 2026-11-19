@@ -60,6 +60,7 @@ import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import type { LlamalendPositionSummary } from "@/lib/sources/api/llamalend-positions";
 import type { LlamalendChainResponse } from "@/lib/api/fetch-llamalend-position";
 import { LlamalendMenuRows } from "@/components/protocol/llamalend/llamalend-menu-rows";
+import { holderUsdReceipt, shownUsd } from "@/lib/shared/holder-usd-receipt";
 import {
   LlamalendHealth,
   llamalendHasRisk,
@@ -118,6 +119,8 @@ export interface LlamalendPositionView {
   convertedCrossCheckExact?: boolean | null;
   /** AMM.price_oracle at head — borrowed per collateral. */
   priceOracle: number | null;
+  /** The block priceOracle was read at, where in hand. */
+  priceBlock?: number | null;
   collateralUsd: number | null;
   debtUsd: number | null;
   eventCount: number;
@@ -212,9 +215,43 @@ function usdLine(
   what: "Collateral" | "Borrowed",
 ): React.ReactNode | null | undefined {
   if (usd == null) return v.borrowedIsCrvusd ? null : undefined;
+  // The figure is its rows' cents (ui-jobs 743): the collateral × the AMM's
+  // price_oracle at head as shown, the debt at crvUSD's $1 face.
+  const coll = what === "Collateral";
+  const r =
+    coll && (v.collateral == null || v.priceOracle == null)
+      ? null
+      : holderUsdReceipt({
+          what: `${what} in USD`,
+          legs: [
+            coll
+              ? {
+                  token: v.collateralSymbol,
+                  amount: v.collateral as number,
+                  amountNote: "the collateral the Controller states at head",
+                  price: v.priceOracle as number,
+                  priceNote:
+                    v.priceBlock != null
+                      ? `the AMM's oracle price (crvUSD per ${v.collateralSymbol}) at block ${v.priceBlock.toLocaleString("en-US")}`
+                      : `the AMM's oracle price (crvUSD per ${v.collateralSymbol}) at head, which names no block`,
+                }
+              : {
+                  token: v.borrowedSymbol,
+                  amount: v.debt,
+                  amountNote: "the debt the Controller states at head",
+                  price: 1,
+                  priceNote: `1 ${v.borrowedSymbol} is counted as $1`,
+                  face: true,
+                },
+          ],
+          block: coll ? v.priceBlock : undefined,
+          via: "the Controller and AMM read at head",
+          caveat: "To the cent.",
+        });
+  if (!r) return null;
   return (
-    <Prov info={llamalendUsdProv(what, v.borrowedSymbol, v.amm ?? undefined)}>
-      <span className="font-bold text-green-400">{formatUsdValue(usd)}</span>
+    <Prov info={{ ...llamalendUsdProv(what, v.borrowedSymbol, v.amm ?? undefined), ...r.prov }}>
+      <span className="font-bold text-green-400">{formatUsdValue(r.usd)}</span>
     </Prov>
   );
 }
@@ -448,8 +485,11 @@ export function viewFromChain(
     liquidatable: c.hasLoan && c.healthFull != null ? c.healthFull < 0 : null,
     convertedCrossCheckExact: c.convertedCrossCheckExact,
     priceOracle: c.priceOracle,
+    priceBlock: serverReadOf(c)?.block ?? null,
     collateralUsd:
-      c.borrowedIsCrvusd && c.priceOracle != null && c.collateral != null ? c.collateral * c.priceOracle : null,
+      c.borrowedIsCrvusd && c.priceOracle != null && c.collateral != null
+        ? shownUsd(c.collateral, c.priceOracle)
+        : null,
     debtUsd: c.borrowedIsCrvusd && c.debt != null ? c.debt : null,
     eventCount: 0,
     txCount: 0,
@@ -486,6 +526,7 @@ export function viewFromSummary(s: LlamalendPositionSummary): LlamalendPositionV
     healthFullRaw: s.healthFullRaw,
     liquidatable: s.liquidatable,
     priceOracle: s.priceOracle,
+    priceBlock: s.priceBlock ?? null,
     collateralUsd: s.collateralUsd,
     debtUsd: s.debtUsd,
     eventCount: s.eventCount,

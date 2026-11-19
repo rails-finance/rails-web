@@ -89,6 +89,9 @@ export interface SparkPositionView {
    *  lowercased token address. A reserve the oracle didn't price is absent
    *  (the side's total then omits). */
   priceByAddress?: Record<string, number>;
+  /** The block each price merged in later was read at (null: the read named
+   *  none), by lowercased address (ui-jobs 743). */
+  priceBlockByAddress?: Record<string, number | null>;
   atBlock?: number;
   /** rails-server's head read and the block it read at, where it answered the page's read. */
   readBy?: PositionHeadStamp & { block: number };

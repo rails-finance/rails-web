@@ -37,6 +37,7 @@
 //   npx tsx --test scripts/verify/verify-pwn-flows.ts
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { assertUnitReceipts } from "./lib/unit-receipts";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { BaseActivityEvent, PwnContext } from "@/lib/shared/types/event-shape";
@@ -408,4 +409,11 @@ test("a lapsed v1.2/v1.3 loan's state card: the contract's sum, stopped at the d
   assert.ok(before > 0 && after > 0, `${before} days before the deadline, ${after} after`);
   // A fixed loan's moment carries none.
   assert.equal(model(fx("lapsed-fixed")).words.moment?.minuteSum, undefined);
+});
+
+test("a unit model's Held/Owed receipts stay in its tokens (ui-jobs 743)", () => {
+  let read = 0;
+  for (const name of NAMES)
+    read += assertUnitReceipts(buildFlowModel(pwnFlowTimeline(replay(fx(name)), { now: NOW })!)!, name);
+  assert.ok(read > 0, "receipts read");
 });

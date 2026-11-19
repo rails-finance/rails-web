@@ -180,7 +180,7 @@ function debtReconciliationRows(v: FxPositionView, rows?: FxRebalanceRows): Posi
   const implied: PositionPanelRow = {
     id: "debt-implied",
     label: "Transactions add up to",
-    value: <Prov info={impliedDebtProv()}>{formatCompact(v.impliedDebt.amount)}</Prov>,
+    value: <Prov info={impliedDebtProv(v.pool)}>{formatCompact(v.impliedDebt.amount)}</Prov>,
     asset: { symbol: "fxUSD", figure: `${formatExact(v.impliedDebt.amount)} fxUSD` },
     tip: impliedTip,
   };
@@ -192,7 +192,7 @@ function debtReconciliationRows(v: FxPositionView, rows?: FxRebalanceRows): Posi
         value: (
           <>
             <PanelToken symbol="fxUSD" value={v.impliedDebt.amount}>
-              <Prov info={impliedDebtProv()}>{formatCompact(v.impliedDebt.amount)}</Prov>
+              <Prov info={impliedDebtProv(v.pool)}>{formatCompact(v.impliedDebt.amount)}</Prov>
             </PanelToken>
             , awaiting the pool&apos;s figure
           </>
@@ -219,7 +219,7 @@ function debtReconciliationRows(v: FxPositionView, rows?: FxRebalanceRows): Posi
       items.push(
         <span key="reb">
           <PanelToken symbol="fxUSD" value={parts.rebalances.debt}>
-            <Prov value={formatExact(parts.rebalances.debt)} info={rebalanceClearedProv(parts.rebalances.rows)}>
+            <Prov value={formatExact(parts.rebalances.debt)} info={rebalanceClearedProv(v.pool, parts.rebalances.rows)}>
               <AmountText value={parts.rebalances.debt} format="compact" />
             </Prov>
           </PanelToken>{" "}
@@ -232,7 +232,7 @@ function debtReconciliationRows(v: FxPositionView, rows?: FxRebalanceRows): Posi
           <PanelToken symbol="fxUSD" value={parts.redemptions.debt}>
             <Prov
               value={formatExact(parts.redemptions.debt)}
-              info={rebalanceClearedProv(parts.redemptions.rows, "redemption")}
+              info={rebalanceClearedProv(v.pool, parts.redemptions.rows, "redemption")}
             >
               <AmountText value={parts.redemptions.debt} format="compact" />
             </Prov>
@@ -246,7 +246,7 @@ function debtReconciliationRows(v: FxPositionView, rows?: FxRebalanceRows): Posi
           <PanelToken symbol="fxUSD" value={parts.poolLiquidations.debt}>
             <Prov
               value={formatExact(parts.poolLiquidations.debt)}
-              info={rebalanceClearedProv(parts.poolLiquidations.rows, "pool-wide liquidation")}
+              info={rebalanceClearedProv(v.pool, parts.poolLiquidations.rows, "pool-wide liquidation")}
             >
               <AmountText value={parts.poolLiquidations.debt} format="compact" />
             </Prov>
@@ -262,7 +262,7 @@ function debtReconciliationRows(v: FxPositionView, rows?: FxRebalanceRows): Posi
       items.push(
         <span key="unpaid">
           <PanelToken symbol="fxUSD" value={parts.leftUnpaid}>
-            <Prov value={formatExact(parts.leftUnpaid)} info={leftUnpaidProv()}>
+            <Prov value={formatExact(parts.leftUnpaid)} info={leftUnpaidProv(v.pool)}>
               <AmountText value={parts.leftUnpaid} format="compact" />
             </Prov>
           </PanelToken>{" "}
@@ -273,7 +273,7 @@ function debtReconciliationRows(v: FxPositionView, rows?: FxRebalanceRows): Posi
       items.push(
         <span key="bad">
           <PanelToken symbol="fxUSD" value={parts.badDebt}>
-            <Prov value={`+${formatExact(parts.badDebt)}`} info={badDebtAddedProv()}>
+            <Prov value={`+${formatExact(parts.badDebt)}`} info={badDebtAddedProv(v.pool)}>
               +<AmountText value={parts.badDebt} format="compact" />
             </Prov>
           </PanelToken>{" "}
@@ -300,7 +300,7 @@ function debtReconciliationRows(v: FxPositionView, rows?: FxRebalanceRows): Posi
       moved(
         <>
           <PanelToken symbol="fxUSD" value={cleared}>
-            <Prov value={formatExact(cleared)} info={rebalanceClearedProv(n)}>
+            <Prov value={formatExact(cleared)} info={rebalanceClearedProv(v.pool, n)}>
               <AmountText value={cleared} format="compact" />
             </Prov>
           </PanelToken>{" "}
@@ -309,7 +309,10 @@ function debtReconciliationRows(v: FxPositionView, rows?: FxRebalanceRows): Posi
             <>
               {" and "}
               <PanelToken symbol="fxUSD" value={Math.abs(other)}>
-                <Prov value={`${other > 0 ? "+" : "−"}${formatExact(Math.abs(other))}`} info={otherDebtMovesProv()}>
+                <Prov
+                  value={`${other > 0 ? "+" : "−"}${formatExact(Math.abs(other))}`}
+                  info={otherDebtMovesProv(v.pool)}
+                >
                   {other > 0 ? "+" : "−"}
                   <AmountText value={Math.abs(other)} format="compact" />
                 </Prov>
@@ -332,7 +335,7 @@ function debtReconciliationRows(v: FxPositionView, rows?: FxRebalanceRows): Posi
         <PanelToken symbol="fxUSD" value={diff}>
           <Prov
             value={`${diff >= 0 ? "" : "+"}${formatExact(Math.abs(diff))}`}
-            info={socializedDebtProv(diff >= 0 ? "cleared" : "accrued", v.settled.block)}
+            info={socializedDebtProv(v.pool, diff >= 0 ? "cleared" : "accrued", v.settled.block)}
           >
             {diff >= 0 ? "" : "+"}
             <AmountText value={Math.abs(diff)} format="compact" />
@@ -389,7 +392,7 @@ function ratioRows(
   if (terms) {
     // The pool's two lines, each read from the pool with its receipt.
     const lineFigure = (which: "rebalance" | "liquidate") => (
-      <Prov info={poolLineProv(which, terms.block, serverReadAt(terms.head, terms.block))}>
+      <Prov info={poolLineProv(v.pool, which, terms.block, serverReadAt(terms.head, terms.block))}>
         {pctLine(which === "rebalance" ? terms.rebalanceRatio : terms.liquidateRatio)}
       </Prov>
     );
@@ -430,7 +433,7 @@ function ratioRows(
             label: "Rebalances at",
             value: (
               <>
-                <Prov info={minTriggerPriceProv(pctLine(terms.rebalanceRatio), sym)}>
+                <Prov info={minTriggerPriceProv(v.pool, pctLine(terms.rebalanceRatio), sym)}>
                   <PanelFigure>{formatLiquidationPrice(rb)}</PanelFigure>
                 </Prov>{" "}
                 min price ({fall(rb, px.min)})
@@ -443,7 +446,7 @@ function ratioRows(
             label: "Liquidates at",
             value: (
               <>
-                <Prov info={minTriggerPriceProv(pctLine(terms.liquidateRatio), sym)}>
+                <Prov info={minTriggerPriceProv(v.pool, pctLine(terms.liquidateRatio), sym)}>
                   <PanelFigure>{formatLiquidationPrice(lq)}</PanelFigure>
                 </Prov>{" "}
                 min price ({fall(lq, px.min)})
@@ -462,7 +465,7 @@ function ratioRows(
         label: "Rebalances at",
         value: (
           <>
-            <Prov info={triggerPriceProv(pctLine(terms.rebalanceRatio), sym)}>
+            <Prov info={triggerPriceProv(v.pool, pctLine(terms.rebalanceRatio), sym)}>
               <PanelFigure>{formatLiquidationPrice(at)}</PanelFigure>
             </Prov>{" "}
             anchor price ({fall(at, anchor)})
@@ -499,7 +502,7 @@ function FxTickLine({
   return (
     <p className="text-xs text-rb-500 tabular-nums">
       Tick{" "}
-      <Prov info={positionTickProv(v.normalizedSymbol, block)} value={String(tick)}>
+      <Prov info={positionTickProv(v.pool, v.normalizedSymbol, block)} value={String(tick)}>
         #{tick}
       </Prov>{" "}
       ·{" "}
@@ -511,7 +514,7 @@ function FxTickLine({
       ) : (
         <>
           .{" "}
-          <Prov info={ticksAboveProv(block)} value={String(ticksAbove)}>
+          <Prov info={ticksAboveProv(v.pool, block)} value={String(ticksAbove)}>
             {ticksAbove.toLocaleString("en-US")}
           </Prov>{" "}
           debt {ticksAbove === 1 ? "tick sits" : "ticks sit"} above it, which a redemption reaches first.
@@ -542,19 +545,19 @@ function collateralDriftRow(
     <>
       {" "}
       (
-      <Prov info={lifetimeCollateralDriftProv(sym, s.intervals, s.complete, drift.headBlock)}>
+      <Prov info={lifetimeCollateralDriftProv(v.pool, sym, s.intervals, s.complete, drift.headBlock)}>
         {formatCompact(Math.abs(between))}
       </Prov>{" "}
       {sym} between the transactions and{" "}
-      <Prov info={lifetimeInTxFundingProv(sym, inTx?.reads ?? 0)}>{formatCompact(Math.abs(inside.total))}</Prov> {sym}{" "}
-      inside {inside.rows.length === 1 ? "one of them" : `${inside.rows.length} of them`})
+      <Prov info={lifetimeInTxFundingProv(v.pool, sym, inTx?.reads ?? 0)}>{formatCompact(Math.abs(inside.total))}</Prov>{" "}
+      {sym} inside {inside.rows.length === 1 ? "one of them" : `${inside.rows.length} of them`})
     </>
   ) : null;
   const funding = taken ? between - taken.coll + (inside?.total ?? 0) : null;
   const scope = s.complete
     ? "without a transaction"
     : `over the latest ${s.intervals} stretch${s.intervals === 1 ? "" : "es"} read so far`;
-  const prov = lifetimeCollateralDriftProv(sym, s.intervals, s.complete, drift.headBlock);
+  const prov = lifetimeCollateralDriftProv(v.pool, sym, s.intervals, s.complete, drift.headBlock);
   const row = (total: number, info: Provenance, sentence: ReactNode): PositionPanelRow => ({
     id: "collateral-moved",
     label: "Collateral moved by the pool",
@@ -583,13 +586,14 @@ function collateralDriftRow(
     const n = rows.blocks.length;
     return row(
       between + (inside?.total ?? 0),
-      inside ? lifetimeCollateralMovedProv(sym, drift.headBlock) : prov,
+      inside ? lifetimeCollateralMovedProv(v.pool, sym, drift.headBlock) : prov,
       <>
         {rowsNoun(rows).replace(/^./, (c) => c.toUpperCase())} took{" "}
-        <Prov value={formatExact(Math.abs(taken.coll))} info={socializedCollTakenProv(sym, n)}>
+        <Prov value={formatExact(Math.abs(taken.coll))} info={socializedCollTakenProv(v.pool, sym, n)}>
           <AmountText value={Math.abs(taken.coll)} format="compact" />
         </Prov>{" "}
-        {sym} and funding took <Prov info={fundingTakenProv(sym)}>{formatCompact(Math.abs(funding))}</Prov> {sym}
+        {sym} and funding took <Prov info={fundingTakenProv(v.pool, sym)}>{formatCompact(Math.abs(funding))}</Prov>{" "}
+        {sym}
         {insideNote}.
       </>,
     );
@@ -600,7 +604,7 @@ function collateralDriftRow(
   if (inside) {
     return row(
       between + inside.total,
-      lifetimeCollateralMovedProv(sym, drift.headBlock),
+      lifetimeCollateralMovedProv(v.pool, sym, drift.headBlock),
       <>Funding and rebalances took it{insideNote}.</>,
     );
   }
@@ -743,7 +747,7 @@ export function useFxCardSlots({
   // symbol (stETH-equivalent on the wstETH pool), never the deposit token's.
   const collateralValue =
     v.settled.colls != null ? (
-      <Prov info={settledCollateralProv(v.normalizedSymbol, v.settled.block)}>
+      <Prov info={settledCollateralProv(v.pool, v.normalizedSymbol, v.settled.block)}>
         <AssetAmount
           value={v.settled.colls}
           symbol={v.normalizedSymbol}
@@ -753,7 +757,7 @@ export function useFxCardSlots({
     ) : null;
   const debtValue =
     v.settled.debts != null ? (
-      <Prov info={settledDebtProv(v.settled.block)}>
+      <Prov info={settledDebtProv(v.pool, v.settled.block)}>
         <AssetAmount value={v.settled.debts} symbol="fxUSD" exact={formatUnitsExact(v.settled.debtsRaw, 18)} />
       </Prov>
     ) : null;
@@ -815,10 +819,10 @@ export function useFxCardSlots({
               <>
                 {" "}
                 The pool judges its lines at the oracle&apos;s min price,{" "}
-                <Prov info={oracleLegAtProv("min", v.normalizedSymbol, px.block)}>
+                <Prov info={oracleLegAtProv(v.pool, "min", v.normalizedSymbol, px.block)}>
                   {formatLiquidationPrice(px.min)}
                 </Prov>
-                , where the ratio is <Prov info={minRatioProv(px.block)}>{(minRatio * 100).toFixed(1)}%</Prov>.
+                , where the ratio is <Prov info={minRatioProv(v.pool, px.block)}>{(minRatio * 100).toFixed(1)}%</Prov>.
               </>
             )}
           </>
@@ -827,7 +831,7 @@ export function useFxCardSlots({
         // risk figure.
         value:
           v.settled.debtRatio != null ? (
-            <Prov info={settledDebtRatioProv(v.settled.block)}>{(v.settled.debtRatio * 100).toFixed(1)}%</Prov>
+            <Prov info={settledDebtRatioProv(v.pool, v.settled.block)}>{(v.settled.debtRatio * 100).toFixed(1)}%</Prov>
           ) : null,
       },
     ];
