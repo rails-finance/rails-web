@@ -6,7 +6,8 @@
 // row per Trove a redemption hit, newest first, with its filters (the
 // collateral narrows to a branch). A wallet has no Lifetime flows panel: it
 // holds no position. Past REDEEMER_FIRST_READ rows the timeline closes on a
-// boundary card; the card's sums cover every row.
+// boundary card, and the cut notice reads the rest on request; the card's
+// sums cover every row.
 
 import { useEffect, useMemo, useState } from "react";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
@@ -20,7 +21,11 @@ import { LiquityV2RedemptionCard } from "@/components/protocol/liquity/redeemer-
 import { LIQUITY_V2_BASE_PATH } from "@/lib/liquity-v2/sp-routes";
 import { REDEEMER_FIRST_READ, redemptionId, redemptionTimelineEvent } from "@/lib/liquity-v2/redeemer-timeline";
 import { boundaryFromLimit } from "@/lib/shared/timeline-boundary";
-import { readLiquityV2Redeemer, type LiquityV2RedeemerResponse } from "@/lib/sources/api/liquity-v2-redeemer";
+import {
+  readLiquityV2Redeemer,
+  type LiquityV2RedeemerResponse,
+  type LiquityV2RedemptionRow,
+} from "@/lib/sources/api/liquity-v2-redeemer";
 
 export default function RedeemerView({
   address,
@@ -44,8 +49,44 @@ export default function RedeemerView({
     };
   }, [initial, address]);
 
+  // The rows past the first read, on the cut notice's "Load the older
+  // events": pages of REDEEMER_FIRST_READ, newest first, until the wallet's
+  // count is reached. A row arriving meanwhile shifts the pages down, so a
+  // page can repeat a row and never skips one; the ids settle repeats.
+  const [older, setOlder] = useState<LiquityV2RedemptionRow[]>([]);
+  const [olderRead, setOlderRead] = useState<"idle" | "loading" | "failed">("idle");
+  const loadRest = async () => {
+    if (!data) return;
+    setOlderRead("loading");
+    const got: LiquityV2RedemptionRow[] = [];
+    try {
+      for (let offset = data.rows.length; offset < data.totals.operations; offset += REDEEMER_FIRST_READ) {
+        const page = await readLiquityV2Redeemer(address, {
+          order: "desc",
+          limit: String(REDEEMER_FIRST_READ),
+          offset: String(offset),
+        });
+        got.push(...page.rows);
+        if (page.rows.length < REDEEMER_FIRST_READ) break;
+      }
+      setOlder(got);
+      setOlderRead("idle");
+    } catch {
+      setOlderRead("failed");
+    }
+  };
+
   const rows = data?.rows;
-  const listed = useMemo(() => (rows ? [...rows].reverse() : []), [rows]);
+  const listed = useMemo(() => {
+    const seen = new Set<string>();
+    const all = [...(rows ?? []), ...older].filter((r) => {
+      const id = redemptionId(r);
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+    return all.reverse();
+  }, [rows, older]);
   const rowById = useMemo(() => new Map(listed.map((r) => [redemptionId(r), r])), [listed]);
   const events = useMemo(() => listed.map((r) => redemptionTimelineEvent(r, address)), [listed, address]);
   const total = data?.totals.operations ?? 0;
@@ -107,8 +148,8 @@ export default function RedeemerView({
         explanation={
           <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed text-rb-500">
             <li>
-              A redemption hands BOLD to the protocol and takes collateral of the same value at the branch price, less a
-              fee. It takes the debt from the Troves with the lowest interest rates, and the fee stays in those Troves.
+              A redemption burns BOLD and takes collateral of the same value at the branch price, less a fee. It takes
+              the debt from the Troves with the lowest interest rates, and the fee stays in those Troves.
             </li>
             <li>
               This address sent the transactions. The collateral went to the account that called the CollateralRegistry:
@@ -121,12 +162,12 @@ export default function RedeemerView({
           </ul>
         }
       />
-      {failed && <p className="text-sm text-rb-500">The redemptions could not be read just now.</p>}
       <ChainTruthTimeline
         persistKeyPrefix="liquity-v2-redeemer"
         closed={false}
         tl={tl}
         boundary={boundary}
+        loadOlder={olderCount > 0 ? { state: olderRead, load: () => void loadRest() } : undefined}
         displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
         emptyLabel="No redemptions recorded for this address"
         toolbarLeading={

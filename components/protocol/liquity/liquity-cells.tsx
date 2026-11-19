@@ -1292,21 +1292,39 @@ export function LiquityRedeemerNote({
   const redeemer = ctx.redeemer ?? sent;
   if (!isRedemption || !redeemer) return null;
   const coords = { txHash, blockNumber };
-  const addrProv: Provenance = {
-    kind: "chain",
-    pclass: "emitted",
-    verify: txHash
-      ? {
-          kind: "etherscan",
-          href: explorerUrl(MAINNET_CHAIN_ID, "tx-logs", txHash),
-          text: "Confirm in the tx event logs",
-        }
-      : undefined,
-    summary: "Redeemer — the account that sent the transaction holding this redemption.",
-    contract: tmContractOf(TROVE_MANAGER[(ctx.collateralType ?? "").toLowerCase()]),
-    via: ctx.redeemer ? `${streamVia()} · redemption event` : "GET /api/liquity-v2/tx/:hash/troves · transaction_from",
-    inputs: eventInputs(coords),
-  };
+  const summary = "Redeemer — the account that sent the transaction holding this redemption.";
+  // The timeline's own field is the redemption event's; the fallback is the
+  // transaction's `from`, which no log carries: the transaction page shows it.
+  const addrProv: Provenance = ctx.redeemer
+    ? {
+        kind: "chain",
+        pclass: "emitted",
+        verify: txHash
+          ? {
+              kind: "etherscan",
+              href: explorerUrl(MAINNET_CHAIN_ID, "tx-logs", txHash),
+              text: "Confirm in the tx event logs",
+            }
+          : undefined,
+        summary,
+        contract: tmContractOf(TROVE_MANAGER[(ctx.collateralType ?? "").toLowerCase()]),
+        via: `${streamVia()} · redemption event`,
+        inputs: eventInputs(coords),
+      }
+    : {
+        kind: "chain",
+        pclass: "input",
+        verify: txHash
+          ? {
+              kind: "etherscan",
+              href: explorerUrl(MAINNET_CHAIN_ID, "tx", txHash),
+              text: "Confirm the From on the transaction page",
+            }
+          : undefined,
+        summary,
+        via: "GET /api/liquity-v2/tx/:hash/troves · transaction_from",
+        inputs: eventInputs(coords),
+      };
   return (
     <div className="px-5 py-2">
       <span className="text-xs text-rb-500">

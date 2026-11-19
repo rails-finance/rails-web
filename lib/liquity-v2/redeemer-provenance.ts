@@ -13,7 +13,7 @@ export function redemptionLogProv(what: "bold" | "coll" | "trove" | "block", r: 
   const c = r.collateral_type;
   const summary = {
     bold: "BOLD redeemed — the BOLD this redemption took off the Trove's debt: the TroveOperation log's _debtChangeFromOperation, with its sign turned.",
-    coll: `${c} paid out — the ${c} this redemption took out of the Trove: the TroveOperation log's _collChangeFromOperation, with its sign turned. The redemption fee stays in the Trove and is left out.`,
+    coll: `${c} paid out of the Trove — the ${c} this redemption took out of the Trove: the TroveOperation log's _collChangeFromOperation, with its sign turned. The redemption fee stays in the Trove and is left out.`,
     trove: `Trove — the _troveId of the ${c} TroveManager's TroveOperation log, with _operation redeemCollateral (6).`,
     block: "Block — the block this TroveOperation was logged in.",
   }[what];
@@ -42,7 +42,7 @@ const SUM = {
   branchBold: (c: string) =>
     `BOLD redeemed on ${c} — the sum over this wallet's redemption rows on the ${c} branch of each TroveOperation's _debtChangeFromOperation, with its sign turned. Per transaction it equals the Redemption log's _actualBoldAmount.`,
   branchColl: (c: string) =>
-    `${c} paid out — the sum over this wallet's redemption rows on the ${c} branch of each TroveOperation's _collChangeFromOperation, with its sign turned. Per transaction it equals the Redemption log's _ETHSent, the fees staying in the Troves.`,
+    `${c} paid out of Troves — the sum over this wallet's redemption rows on the ${c} branch of each TroveOperation's _collChangeFromOperation, with its sign turned. Per transaction it equals the Redemption log's _ETHSent, the fees staying in the Troves.`,
   troves: () =>
     "Troves hit — the Troves this wallet's redemptions took debt from, each counted once by branch and Trove id.",
   transactions: () => "Transactions — the transactions this wallet sent that logged a redemption, each counted once.",

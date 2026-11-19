@@ -3,8 +3,8 @@
 // One timeline row of a Liquity V2 redeemer's page: one Trove a redemption
 // the wallet sent took debt from, on the shared event-card shell
 // (components/shared/event-card.tsx) as the deposit row draws it
-// (sp-event-card.tsx). T1 the label with the BOLD redeemed and the collateral
-// paid out on the spine, T2 the Trove, the two amounts and the transaction,
+// (sp-event-card.tsx). T1 the label with the BOLD redeemed on the spine and
+// the collateral paid out of the Trove in the head, T2 the Trove, the two amounts and the transaction,
 // T3 the row in words with the Trove linked to its page.
 
 import Link from "next/link";
@@ -81,15 +81,9 @@ export function LiquityV2RedemptionCard({
       display: amountText(bold),
       verb: "redeemed",
     },
-    {
-      symbol: c,
-      address: branch.collateralAddr,
-      direction: "left",
-      popover: true,
-      value: units(coll),
-      display: amountText(coll),
-      verb: "paid out",
-    },
+    // Out of the Trove, to whoever called the CollateralRegistry: no arrow
+    // toward this wallet, and the head states the amount.
+    { symbol: c, address: branch.collateralAddr, popover: true, verb: "paid out of the Trove" },
   ];
 
   const cells: EventCellSpec[] = [
@@ -112,7 +106,7 @@ export function LiquityV2RedemptionCard({
       },
     },
     amountCell("bold", "BOLD redeemed", bold, "BOLD", TOKEN_ADDRESSES.BOLD, redemptionLogProv("bold", row)),
-    amountCell("coll", `${c} paid out`, coll, c, branch.collateralAddr, redemptionLogProv("coll", row)),
+    amountCell("coll", `${c} paid out of the Trove`, coll, c, branch.collateralAddr, redemptionLogProv("coll", row)),
     {
       kind: "stat",
       key: "tx",
@@ -165,7 +159,19 @@ export function LiquityV2RedemptionCard({
           Trove {id} ({c})
         </Link>,
       ],
-      deltas: [],
+      deltas: [
+        {
+          label: "Paid out of the Trove",
+          value: units(coll),
+          symbol: c,
+          address: branch.collateralAddr,
+          exact: exactUnits(coll),
+          display: amountText(coll),
+          prov: redemptionLogProv("coll", row),
+          // The spine draws the collateral without a flank: the head keeps it at every width.
+          noSpineCounterpart: true,
+        },
+      ],
     },
     caption: REDEMPTION_LABEL,
     cells,

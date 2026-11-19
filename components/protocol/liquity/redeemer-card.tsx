@@ -80,7 +80,7 @@ function branchStats(
     },
     coll: {
       id: `coll-${c}`,
-      label: `${c} paid out`,
+      label: `${c} paid out of Troves`,
       asset: { symbol: c, address: branch.collateralAddr, figure: `${exactUnits(coll)} ${c}` },
       value: (
         <Prov info={redeemerSumProv("branchColl", served, c)}>
