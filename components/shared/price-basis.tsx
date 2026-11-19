@@ -38,7 +38,7 @@ import { CTRL_GHOST } from "@/lib/shared/ui-grammar";
 export { todayChipTitle, type Flippable, type PriceBasis };
 
 /** The latest block's prices in the live green (the price chart's figure at
- *  today, F19.2), on the press and on each chip it flipped. */
+ *  today, F19.2), on each chip the press flipped. */
 const TODAY_TONE = "text-green-600 dark:text-green-400";
 
 /** A price at the latest block and the receipt of the read behind it. */
@@ -176,7 +176,8 @@ function ClockIcon({ basis, size }: { basis: PriceBasis; size: number }) {
  *  of the clock and the price chips. A click anywhere on it flips every chip
  *  on the card. The clock is rotate-ccw-clock at the event's prices, shown on
  *  the group's hover, on keyboard focus and always on a device without
- *  hover; clock-check in the live green at the latest block's, always shown.
+ *  hover; clock-check at the latest block's, always shown, the chips in the
+ *  live green.
  *  It is the one focusable control, carrying the name and pressed state: a
  *  receipt pick, while the inspector is armed, is a button of its own and
  *  takes its click first. Where no chip can flip the group is plain. A card
@@ -214,7 +215,7 @@ export function PriceBasisGroup({
         aria-pressed={pressed}
         onClick={flip}
         onKeyDown={(e) => e.stopPropagation()}
-        className={`${CTRL_GHOST} -mr-1 size-6 shrink-0 rounded-sm focus-ring ${clockClass(ctx.basis)} ${ctx.basis === "today" ? TODAY_TONE : "text-rb-500"}`}
+        className={`${CTRL_GHOST} -mr-1 size-6 shrink-0 rounded-sm focus-ring ${clockClass(ctx.basis)}`}
         data-price-basis-press=""
         data-price-basis={ctx.basis}
       >

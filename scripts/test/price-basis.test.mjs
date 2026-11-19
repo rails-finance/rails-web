@@ -47,6 +47,14 @@ test("on a device without hover the clock is always shown", () => {
   assert.ok(clockClass("event").split(" ").includes("[@media(hover:none)]:opacity-100"));
 });
 
+test("the clock is muted at both bases", () => {
+  for (const basis of ["event", "today"]) {
+    const c = clockClass(basis).split(" ");
+    assert.ok(c.includes("text-rb-500"));
+    assert.ok(!c.some((x) => x.includes("green")));
+  }
+});
+
 test("at the latest block's prices the clock is always shown", () => {
   assert.ok(!clockClass("today").includes("opacity-0"));
   assert.ok(clockClass("today").split(" ").includes("opacity-100"));
