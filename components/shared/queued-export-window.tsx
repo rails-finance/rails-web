@@ -52,10 +52,7 @@ function WindowInner({ request, onClose }: { request: QueuedExportRequest; onClo
 
   return (
     <div className="fixed inset-0 z-[var(--z-modal)] overflow-y-auto" onClick={onClose}>
-      <div
-        className="fixed inset-0 backdrop-blur-sm pointer-events-none"
-        style={{ background: "var(--backdrop-bg)" }}
-      />
+      <div className="fixed inset-0 pointer-events-none" style={{ background: "var(--backdrop-bg)" }} />
       <div className="relative min-h-full flex items-start sm:items-center justify-center p-4">
         <div
           className="relative rounded-2xl w-full max-w-md my-8 p-6 shadow-xl border border-rb-200 dark:border-rb-800 flex flex-col gap-5"

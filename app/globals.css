@@ -247,7 +247,9 @@
   --card-border-hover: oklch(0.997 calc(0.0041 * var(--paper-chroma)) var(--paper-hue));
   --card-border-drag: oklch(0.8642 calc(0.0226 * var(--paper-chroma)) var(--paper-hue));
   --sidebar-header-hover: oklch(0.9432 calc(0.0111 * var(--paper-chroma)) var(--paper-hue));
-  --backdrop-bg: oklch(0.982 calc(0.0082 * var(--paper-chroma)) var(--paper-hue) / 0.45);
+  /* The one scrim behind every window and sheet (H16.1's): white at 80% in
+     light, rb-950 at 85% in dark, never blurred (ui-jobs 770). */
+  --backdrop-bg: rgb(255 255 255 / 0.8);
   --panel-shadow: -8px 0 30px oklch(0.2518 calc(0.0251 * var(--paper-chroma)) var(--paper-hue) / 0.15);
   --facehash-ring: oklch(0.967 calc(0.0082 * var(--paper-chroma)) var(--paper-hue));
   /* The mono facehash (H20): outlined in light, filled in dark (ui-jobs 509). */
@@ -343,7 +345,7 @@
   --card-border-hover: #050507;
   --card-border-drag: #050507;
   --sidebar-header-hover: #0f1017;
-  --backdrop-bg: rgba(0, 0, 0, 0.5);
+  --backdrop-bg: color-mix(in oklab, var(--color-rb-950) 85%, transparent);
   --panel-shadow: -8px 0 30px rgba(0, 0, 0, 0.5);
   --facehash-ring: #12131a;
   --facehash-fill: currentColor;
@@ -1373,11 +1375,6 @@ label[for] {
 .reveal-in {
   animation: fade-in 120ms ease-out backwards;
 }
-/* The beta strip, dismissed: hidden from first paint by the cookie the
-   layout's head script reads (components/shared/beta-strip.tsx). */
-html[data-beta-dismissed] [data-beta-strip] {
-  display: none;
-}
 /* A placeholder bar: a coarse pill where a line or a figure goes. */
 .skel-bar {
   display: inline-block;
@@ -2189,9 +2186,8 @@ html[data-beta-dismissed] [data-beta-strip] {
   }
 }
 
-/* The wallet panel's scrim blurs the page (H16.1, ui-jobs 503): while the
-   panel is open nothing under the blur animates, so the blur is drawn once
-   and not repainted every frame. The panel is portalled to the body as
+/* While the wallet panel is open the page under its scrim holds still (H16.1,
+   ui-jobs 503), so it is not repainted every frame. The panel is portalled to the body as
    [data-wallet-panel-root] and keeps its own motion. */
 html[data-wallet-panel-open] body > :not([data-wallet-panel-root]),
 html[data-wallet-panel-open] body > :not([data-wallet-panel-root]) *,
@@ -2540,4 +2536,42 @@ table.dt-stacked.dt-compact {
 html[data-asset-scope] [data-scope-list]:not([data-scope-ready]),
 html[data-chain-focus] [data-chain-gate]:not([data-scope-ready]) {
   visibility: hidden;
+}
+
+/* The feedback button (H26) rises over the compare bar (E3) below 768px, where
+   the bar spans the window's width. */
+@media (max-width: 767px) {
+  body:has([data-compare-bar]) [data-feedback-button] {
+    bottom: calc(max(1rem, env(safe-area-inset-bottom)) + 4.5rem);
+  }
+}
+
+/* The feedback button's eyes (H26) blink twice every 7s; still under reduced
+   motion. */
+.feedback-blink {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.feedback-blink[data-blinking] {
+  animation: feedback-blink 420ms ease-in-out;
+}
+@keyframes feedback-blink {
+  0%,
+  40%,
+  100% {
+    transform: scaleY(1);
+  }
+  20%,
+  60% {
+    transform: scaleY(0.1);
+  }
+  80% {
+    transform: scaleY(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .feedback-blink,
+  .feedback-blink[data-blinking] {
+    animation: none;
+  }
 }

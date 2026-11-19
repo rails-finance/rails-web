@@ -1,12 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
+import Image from "next/image";
 
-// Footer feedback modal — Bug / Correctness / Request / General.
+import { RailsMark } from "@/components/nav/rails-mark";
+import { FEEDBACK_FACE, FEEDBACK_FACE_NAME } from "@/lib/shared/feedback-face";
+
+// The feedback form (H27) — Bug / Correctness / Request / General.
 // Mirrors DonateModal's shell (portal, mounted gate, Esc close, body scroll
-// lock) and POSTs to /api/feedback, which relays to the private team chat.
+// lock), holds keyboard focus inside itself while open and hands it back on
+// close, and POSTs to /api/feedback, which relays to the private team chat.
+// Its header (H27.1) pairs the Rails mark with Miles's face (ui-jobs 769).
 // The hidden "website" field is a honeypot: readers never see it, so a
 // non-empty value marks the submission as bot traffic.
 
@@ -52,10 +58,39 @@ function FeedbackModalInner({ onClose, initialType = "bug", initialTitle = "" }:
   const [pending, setPending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Focus moves into the form on open and returns to the control that opened
+  // it on close; Tab and Shift+Tab cycle inside it.
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    dialogRef.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus();
+    return () => opener?.focus?.();
+  }, []);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab" || !dialogRef.current) return;
+      const focusable = [
+        ...dialogRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([tabindex="-1"]), textarea, [href], [tabindex]:not([tabindex="-1"])',
+        ),
+      ].filter((el) => el.offsetParent !== null);
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const inside = dialogRef.current.contains(document.activeElement);
+      if (e.shiftKey && (document.activeElement === first || !inside)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (document.activeElement === last || !inside)) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
@@ -111,16 +146,15 @@ function FeedbackModalInner({ onClose, initialType = "bug", initialTitle = "" }:
   return (
     <div className="fixed inset-0 z-[var(--z-modal)] overflow-y-auto" onClick={onClose}>
       {/* Backdrop */}
-      <div
-        className="fixed inset-0 backdrop-blur-sm pointer-events-none"
-        style={{ background: "var(--backdrop-bg)" }}
-      />
+      <div className="fixed inset-0 pointer-events-none" style={{ background: "var(--backdrop-bg)" }} />
       {/* Centering wrapper */}
       <div className="relative min-h-full flex items-start sm:items-center justify-center p-4">
         <div
           className="relative rounded-2xl w-full max-w-md my-8 p-6 shadow-xl border border-rb-200 dark:border-rb-800 flex flex-col gap-5"
           style={{ background: "var(--surface-overlay)" }}
           onClick={(e) => e.stopPropagation()}
+          ref={dialogRef}
+          data-anatomy="H27"
           role="dialog"
           aria-modal="true"
           aria-labelledby="feedback-modal-title"
@@ -144,11 +178,31 @@ function FeedbackModalInner({ onClose, initialType = "bug", initialTitle = "" }:
           </button>
 
           {/* Header */}
-          <div className="pr-8">
-            <h2 id="feedback-modal-title" className="text-xl font-semibold text-foreground">
-              Send feedback
-            </h2>
-            <p className="text-sm text-rb-500 mt-0.5">Lands directly with the Rails team.</p>
+          <div className="pr-8" data-anatomy="H27.1">
+            <div className="flex items-center gap-3">
+              <h2 id="feedback-modal-title" className="text-xl font-semibold text-foreground">
+                Send feedback
+              </h2>
+              {/* Miles's face is read out by name (Miles, 19 Nov 2026); the
+                  mark beside it is decoration. */}
+              <span className="flex items-center" data-feedback-faces="">
+                <span
+                  aria-hidden="true"
+                  className="relative z-10 flex h-8 w-8 items-center justify-center rounded-full border border-rb-300 text-foreground dark:border-rb-500"
+                  style={{ background: "var(--surface-overlay)" }}
+                >
+                  <RailsMark size={18} />
+                </span>
+                <Image
+                  src={FEEDBACK_FACE}
+                  alt={FEEDBACK_FACE_NAME}
+                  width={32}
+                  height={32}
+                  className="-ml-1 h-8 w-8 rounded-full"
+                />
+              </span>
+            </div>
+            <p className="text-sm text-rb-500 mt-0.5">Goes to the Rails team.</p>
           </div>
 
           {sent ? (

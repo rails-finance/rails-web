@@ -50,6 +50,7 @@ redrawn for the share-card renderer. Lucide's notice, reproduced for that transc
 ## People's images
 
 The repository holds only the team's own images: `public/avatars/x/milesessex.png`,
-`public/avatars/x/rails_finance.svg`, `public/avatars/github/*` and `public/about-team-*.jpg`.
+`public/avatars/x/rails_finance.svg`, `public/avatars/github/*`, `public/about-team-*.jpg` and
+`public/feedback/miles.jpg`.
 Other people's profile pictures are fetched at request time (`app/api/avatar/x/[handle]/route.ts`)
 and are not stored here.
