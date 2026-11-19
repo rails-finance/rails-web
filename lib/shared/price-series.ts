@@ -43,6 +43,10 @@ export interface PriceSeries {
    *  derived series such as the health factor, which has no figure on a day
    *  with no debt). */
   noCarry?: true;
+  /** Days on or before `through` have no point because the store has not
+   *  read them yet (a backfill that runs newest first): the readout says
+   *  `text` there, where a day with none says no price was recorded. */
+  unread?: { through: number; text: string };
   /** A derived series' receipt in its family's words (the health factor):
    *  at the live read, and at a point resting on a block ("{block}", "{day}");
    *  `held` on a day in `heldDays` (Maple's pool rate between two events). */

@@ -152,7 +152,7 @@ import type { EventPageContract, EventPageSlot } from "@/lib/shared/explorer-ada
 import { setCardOpen } from "@/lib/shared/card-open-store";
 import { IndexNotice } from "@/components/shared/index-notice";
 import { TimelineSearchedNotice, timelineSearched } from "@/components/shared/timeline-searched-notice";
-import type { TimelineLoadOlder } from "@/lib/shared/timeline-size";
+import { cutUnloadedWords, type TimelineLoadOlder } from "@/lib/shared/timeline-size";
 import { useChainId } from "@/lib/shared/chain-context";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { decodeEventId } from "@/lib/shared/page-metadata";
@@ -1415,14 +1415,35 @@ function ChainTruthTimelineBody({
     const topDay = segments ? newestLifeDayBefore(segments.lifeDays, cutTs) : null;
     if (segments && topDay == null) return `No events on or before ${word}.`;
     if (segments?.loading != null) return `Loading events to ${word}…`;
-    // A page with no month read (Liquity V2's newest 1,000 rows, Aave V4's
-    // newest window) cannot reach an older cut until decision 0039's
-    // point-in-time read (TO-DO-ui-jobs §141).
+    // A page with no month read (Liquity V2's newest rows, Aave V4's newest
+    // window): its older rows through `loadOlder` where it has one, else the
+    // oldest day it holds (TO-DO-ui-jobs §141, 762).
     if (!segments) {
       const oldest = tl.sortedEvents[0]?.timestamp;
-      return oldest != null
-        ? `Events on or before ${word} are not loaded on this page, which starts at ${shortDate(oldest)} ${shortDateYear(oldest)}.`
-        : `Events on or before ${word} are not loaded on this page.`;
+      const w = cutUnloadedWords({
+        word,
+        oldest: oldest != null ? `${shortDate(oldest)} ${shortDateYear(oldest)}` : null,
+        loadOlder: loadOlder?.state ?? null,
+        whole: boundary == null,
+      });
+      if (!w.load || !loadOlder) return w.text;
+      return (
+        <>
+          {w.text}{" "}
+          {w.load === "loading" ? (
+            <span className="text-rb-500">Loading the older events…</span>
+          ) : (
+            <button
+              type="button"
+              data-timeline-empty-load-older=""
+              onClick={loadOlder.load}
+              className="cursor-pointer text-teal-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-teal-400"
+            >
+              {w.load === "failed" ? "They did not load. Try again" : "Load the older events"}
+            </button>
+          )}
+        </>
+      );
     }
     return (
       <>
