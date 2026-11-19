@@ -900,6 +900,16 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
       why: "nobody in a Pendle market holds a loan, so there is no threshold to breach and no liquidation to trace",
     },
   }),
+  // IPOR Fusion (rails-ops TO-DO-ipor-scoping §6.3). `views` is the roster of
+  // every vault the factory made and each vault's factsheet, read at one block
+  // the page names. USD is open: each vault names a price oracle middleware
+  // the factsheet does not read yet. No holder pages (decision 0014).
+  "ipor-fusion": explorerDepth({
+    views: true,
+    forensics: {
+      why: "nobody in a vault holds a loan: there is no threshold to breach and nothing to seize, so there is no liquidation to trace",
+    },
+  }),
   yearn: explorerDepth({
     views: true,
     verification: true,

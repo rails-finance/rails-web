@@ -180,6 +180,8 @@ const LEGACY_EXPLORER_PATHS: [string, string][] = [
   // Polaris's does, and a bare /yearn is unambiguous — one Yearn door, and V3
   // is the only version covered.
   ["/yearn", "/ethereum/yearn"],
+  // IPOR Fusion never had one either; Ethereum is its first chain.
+  ["/ipor-fusion", "/ethereum/ipor-fusion"],
   // A roster segment moved to `markets` (rails-ops decision 0059 point 8): the
   // market page and its reserve pages, query strings kept (`?market=core`).
   ["/ethereum/aave-v3/market", "/ethereum/aave-v3/markets"],

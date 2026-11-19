@@ -28,6 +28,11 @@ import type {
   YearnVaultDirectoryRow,
 } from "@/lib/sources/chain/yearn-ethereum-vault-directory";
 import type { MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
+import type {
+  IporFusionVaultDirectoryResponse,
+  IporFusionVaultDirectoryRow,
+} from "@/lib/sources/chain/ipor-fusion-vault-directory";
+import type { IporFusionVaultResponse } from "@/lib/sources/chain/ipor-fusion-vault";
 import type { MaplePool } from "@/lib/maple/asset-catalog";
 import type { VaultCensusRow } from "@/lib/aave-vaults/vault-position";
 import { releaseLabel, type VaultFamily } from "@/lib/vaults/families";
@@ -418,6 +423,68 @@ export function yearnVaultPageSummary(d: YearnVaultResponse, census: VaultCensus
     standing,
     createdBlock: v.createdBlock,
     census: censusOf(census ?? undefined),
+    readAt: { block: d.blockNumber, timestamp: "" },
+  };
+}
+
+/** An IPOR Fusion roster row (lib/sources/chain/ipor-fusion-vault-directory.ts).
+ *  The release is the factory version the creation event stamped. No census. */
+export function iporFusionVaultSummary(
+  r: IporFusionVaultDirectoryRow,
+  d: IporFusionVaultDirectoryResponse,
+): VaultSummary {
+  const release = r.version == null ? null : `v${r.version}`;
+  return {
+    chainId: d.chainId,
+    address: r.address,
+    family: "ipor-fusion",
+    release,
+    releaseLabel: releaseLabel("ipor-fusion", release),
+    name: r.name,
+    catalogName: r.censusName,
+    symbol: r.censusSymbol,
+    asset: r.asset,
+    shareDecimals: r.shareDecimals,
+    totalAssets: r.totalAssets,
+    totalSupply: r.totalSupply,
+    sharePrice: r.sharePrice,
+    lostAssets: null,
+    steward: null,
+    standing: [],
+    createdBlock: r.createdBlock,
+    census: null,
+    readAt: readAt(d),
+  };
+}
+
+export const iporFusionVaultSummaries = (d: IporFusionVaultDirectoryResponse): VaultSummary[] =>
+  d.rows.map((r) => iporFusionVaultSummary(r, d));
+
+/** An IPOR Fusion factsheet's read. The steward is the owner (role 1) where
+ *  one holds it at the block. */
+export function iporFusionVaultPageSummary(d: IporFusionVaultResponse): VaultSummary {
+  const v = d.vault;
+  const release = v.version == null ? null : `v${v.version}`;
+  const owner = d.roles.read ? d.roles.holders.find((h) => h.roleId === "1") : undefined;
+  return {
+    chainId: d.chainId,
+    address: v.address,
+    family: "ipor-fusion",
+    release,
+    releaseLabel: releaseLabel("ipor-fusion", release),
+    name: v.name,
+    catalogName: v.censusName,
+    symbol: v.symbol ?? v.censusSymbol,
+    asset: v.asset,
+    shareDecimals: v.shareDecimals,
+    totalAssets: v.totalAssets,
+    totalSupply: v.totalSupply,
+    sharePrice: v.sharePrice,
+    lostAssets: null,
+    steward: owner ? { role: "owner", address: owner.account } : null,
+    standing: [],
+    createdBlock: v.createdBlock,
+    census: null,
     readAt: { block: d.blockNumber, timestamp: "" },
   };
 }

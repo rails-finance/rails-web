@@ -196,6 +196,31 @@ export const yearnVaultCardContent = (): LearnMoreContent => ({
   ],
 });
 
+export const iporFusionVaultCardContent = (): LearnMoreContent => ({
+  title: "How an IPOR Fusion vault works",
+  intro:
+    "An IPOR Fusion vault takes one token and its curator moves it into other protocols through fuses. A holder owns shares, and a share converts to more of the token as those positions earn.",
+  detailsHeading: "Key concepts:",
+  details: [
+    {
+      bold: "Owner and curator",
+      text: "the owner appoints the vault's Atomist and guardians; the curator, IPOR's Alpha, moves the assets between markets.",
+    },
+    {
+      bold: "Fuses",
+      text: "small contracts the vault runs to act in one protocol each. The IPOR DAO keeps a register marking each fuse active, deprecated or removed.",
+    },
+    {
+      bold: "Fees",
+      text: "a performance fee on the share price's gains and a yearly management fee, each minted to its fee account as new shares.",
+    },
+    {
+      bold: "Factory",
+      text: "anyone may make a vault from the factory, so the address identifies the vault.",
+    },
+  ],
+});
+
 export const yearnVaultAssetsContent = (): LearnMoreContent => ({
   title: "Where a Yearn V3 vault's assets are",
   intro:
