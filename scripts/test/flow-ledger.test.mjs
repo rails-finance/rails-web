@@ -458,3 +458,91 @@ test("an unpriced side renders no NaN in any shared formatter", () => {
     assert.equal(s, "—");
   }
 });
+
+// ── Every printed figure in cents; the line breaks where the bars do (ui-jobs 743) ──
+const { flowLinePoints } = await import(ROOT + "lib/shared/flows-series.ts");
+const { flowMoment } = await import(ROOT + "lib/shared/flow-moment.ts");
+const { heldDayProv, flowAssetProv } = await import(ROOT + "lib/shared/flows-timeline-provenance.ts");
+
+test("a past day's held figure, its assets and the state card are the rows' cents, each naming its block", () => {
+  const m = heldModel();
+  const wbtc = shownUsd(1.2345678, 99_000.123456);
+  const weth = shownUsd(2.5, 3100.25);
+  const want = centsOf(wbtc + weth);
+  assert.equal(wbtc, 122_222.38, "1.234568 × $99,000.123456, to the cent");
+  assert.equal(m.heldAt[2].find((h) => h.symbol === "WBTC").usd, wbtc);
+  const st = stateAt(m, 2);
+  assert.equal(st.collateral.now, want, "the bar's figure is the rows' cents");
+  // An asset's part names its rows.
+  const part = flowAssetProv("WBTC", st.collateral.bar[0], "collateral", "the end of 2 Oct '24", false, true);
+  assert.equal(rebuild(part).cents, wbtc);
+  assert.match(part.inputs.find((i) => i.label === "WBTC price").note, /block 1,500,000/);
+  // The state card between events: each asset its shown product, the side their sum.
+  const mo = flowMoment(m, [], (20_002 + 1) * DAY - 1);
+  const a = mo.sides.collateral.assets.find((x) => x.symbol === "WBTC");
+  assert.equal(a.usd, wbtc);
+  assert.equal(a.price, 99_000.123456);
+  const total = heldDayProv(
+    "Collateral",
+    "the close of 2 Oct '24",
+    mo.sides.collateral.assets.map((x) => x.row),
+  );
+  assert.equal(rebuild(total).cents, want, "the card's total multiplies out");
+  assert.equal(centsOf(mo.sides.collateral.assets.reduce((s, x) => s + x.usd, 0)), st.collateral.now);
+});
+
+test("a $1-face side is its grown debt at $1, to the cent", () => {
+  const events = [
+    {
+      id: "a",
+      ts: T0 + 10,
+      block: 1001,
+      tick: "debt",
+      legs: [
+        flowLeg({ bucket: "bor", amount: 1000, symbol: "BOLD", price: 1, block: 1001, priceNote: "face", face: true }),
+      ],
+      balances: [{ asset: "bold", symbol: "BOLD", side: "debt", amount: 1000 }],
+      prices: [],
+    },
+  ];
+  const m = buildFlowModel({
+    buckets: BUCKETS,
+    days: daysFromEvents(
+      BUCKETS.map((b) => b.key),
+      events,
+    ),
+    live: { collateralUsd: 0, debtUsd: 0 },
+    today: 20_005,
+    // The day's "price" is the interest built on the recorded debt.
+    dailyPrices: { bold: [[20_002, 1.0001234567]] },
+    words: { moment: { face: ["debt"] } },
+  });
+  const st = stateAt(m, 2);
+  assert.equal(st.debt.now, 1000.12, "1,000 × 1.0001234567 at $1, to the cent");
+  const prov = flowSegmentProv(st.debt.bar[0], "debt", "the end of 2 Oct '24", false, true);
+  const price = prov.inputs.find((i) => i.label === "BOLD price");
+  assert.equal(price.value, "$1.00");
+  assert.equal(rebuild(prov).cents, 1000.12);
+});
+
+test("the line breaks on each day an asset held there has no price, as the bars do", () => {
+  const m = heldModel();
+  // No price stands for either asset before the store's day 20,002.
+  const series = { points: [0, 1, 2, 3, 4].map((i) => [20_000 + i, 20_000 + i, 100 + i, 0]) };
+  const pts = flowLinePoints(m, series).slice(0, 4);
+  assert.deepEqual(
+    pts.map((p) => p.collateral),
+    [null, null, 102, 103],
+  );
+  for (const [i, p] of pts.entries()) {
+    const bars = sideSumRows(stateAt(m, i).collateral).total.amount;
+    assert.equal(p.collateral == null, bars === "—", `day ${i}: the line and the bar agree`);
+  }
+  assert.ok(
+    pts.every((p) => p.debt === 0),
+    "the debt side holds nothing unpriced",
+  );
+  // The live point breaks where a live asset has no price.
+  const live = { ...m, liveHeld: [{ side: "collateral", symbol: "WBTC", amount: 1, usd: 0, unpriced: true }] };
+  assert.equal(flowLinePoints(live, series).at(-1).collateral, null);
+});

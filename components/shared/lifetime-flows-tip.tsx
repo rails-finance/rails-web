@@ -44,7 +44,8 @@ import {
   flowRemainderProv,
   flowSegmentProv,
 } from "@/lib/shared/flows-timeline-provenance";
-import { apportionDollars, sideSumRows, sumBasis, wholeUsd } from "@/lib/shared/flows-sum";
+import { apportionDollars, NO_FIGURE, sideSumRows, sumBasis, wholeUsd } from "@/lib/shared/flows-sum";
+import { roundAway } from "@/lib/shared/shown-usd";
 import type {
   FlowAssetHeld,
   FlowHatch,
@@ -473,10 +474,14 @@ export function SegmentPanelBody({
   const cursor = useContext(FlowCursorContext);
   const unit = useFlowUnit(side);
   const markOf = useFlowMark();
-  const partDollars = apportionDollars(
-    parts.map((p) => p.usd),
-    Math.round(seg.value),
-  );
+  // In dollars each part is its cents, shown to the dollar (ui-jobs 743); a
+  // token's parts are rounded together to add to the figure.
+  const partDollars = unit
+    ? apportionDollars(
+        parts.map((p) => p.usd),
+        Math.round(seg.value),
+      )
+    : parts.map((p) => roundAway(p.usd));
   const shownParts = parts.slice(0, PANEL_ROWS);
   return (
     <div className="flex flex-col gap-1" data-flow-tip={side}>
@@ -548,10 +553,12 @@ function SideSumTable({
   const heldWord = coll ? "Held" : "Owed";
   const at = cursor?.at ?? (isLive ? "now" : `at ${when}`);
   const heldAssets = held.filter((h) => h.usd >= 0.5 || (h.amount ?? 0) > 0);
-  const heldDollars = apportionDollars(
-    heldAssets.map((h) => h.usd),
-    sum.total.dollars,
-  );
+  const heldDollars = unit
+    ? apportionDollars(
+        heldAssets.map((h) => h.usd),
+        sum.total.dollars,
+      )
+    : heldAssets.map((h) => roundAway(h.usd));
   const sw = (s: FlowSegment | null) => {
     const style = s ? swatch(s) : null;
     return <span aria-hidden className="inline-block size-2.5 shrink-0 rounded-[2px]" style={style ?? undefined} />;
@@ -608,7 +615,7 @@ function SideSumTable({
               </td>
               <td className="whitespace-nowrap py-0.5 text-right">
                 <Prov info={flowAssetProv(h.symbol, sum.total.seg, side, when, isLive, daily)}>
-                  {wholeUsd(heldDollars[i], unit)}
+                  {!unit && h.unpriced ? NO_FIGURE : wholeUsd(heldDollars[i], unit)}
                 </Prov>
               </td>
             </tr>

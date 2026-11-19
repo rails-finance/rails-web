@@ -36,6 +36,7 @@
 // today's at the live read; each row's price is a mark at its block.
 //
 //   npx tsx --test scripts/verify/verify-lifetime-flows-state.ts
+import { centsOf, shownUsd } from "@/lib/shared/shown-usd";
 import { createFlowFocusStore, rewindEvents, rewindRows, timelineCut } from "@/lib/shared/flow-focus";
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -1824,9 +1825,9 @@ test("indexes: between events the card, the bars and the line state recorded × 
       // The line's day point is the bars' figure that day.
       const p = line.points.find((x) => x[0] === day);
       const v = m.valued[stop];
-      if (p && p[2] != null)
-        assert.ok(near(p[2], v.collateral, 1e-6 * Math.max(1, v.collateral)), `${name}: collateral line at ${day}`);
-      if (p && p[3] != null) assert.ok(near(p[3], v.debt, 1e-6 * Math.max(1, v.debt)), `${name}: debt line at ${day}`);
+      // Both in cents (ui-jobs 743): the point is the bars' figure to the cent.
+      if (p && p[2] != null) assert.equal(p[2], v.collateral, `${name}: collateral line at ${day}`);
+      if (p && p[3] != null) assert.equal(p[3], v.debt, `${name}: debt line at ${day}`);
       // The state card states the model's tokens and their interest.
       if (m.eventDays.includes(stop)) continue;
       const mo: FlowMoment | null = flowMoment(m, [], (day + 1) * 86_400 - 1);
@@ -1838,7 +1839,12 @@ test("indexes: between events the card, the bars and the line state recorded × 
           if (h.grown) {
             assert.equal(a.recorded, h.grown.recorded);
             assert.ok(near(a.interest ?? -1, (h.amount ?? 0) - h.grown.recorded, 1e-15 * (h.amount ?? 1)));
-            if (a.price != null) assert.ok(near(a.interestUsd ?? -1, (a.interest ?? 0) * a.price, 1e-9));
+            // In cents (ui-jobs 743): the asset is its shown product, the
+            // interest that less the recorded balance's.
+            if (a.price != null) {
+              assert.equal(a.usd, shownUsd(a.tokens, a.price), `${name}: ${a.symbol} to the cent on ${day}`);
+              assert.equal(a.interestUsd, centsOf((a.usd ?? 0) - shownUsd(a.recorded, a.price)));
+            }
           } else assert.equal(a.interest, null);
         }
     }

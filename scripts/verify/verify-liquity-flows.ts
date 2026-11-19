@@ -699,7 +699,8 @@ for (const [name, events, symbols] of [
         assert.ok(Math.abs(tokens - chart.debt.now) <= Math.max(1e-9, chart.debt.now * 1e-12), `debt at stop ${stop}`);
         assert.ok(mo.accrual, "the rate in force");
         const owed = last.debtAfter * mo.accrual.factor;
-        assert.ok(Math.abs(tokens - owed) <= Math.max(1e-9, owed * 1e-9), `debt by the rate at stop ${stop}`);
+        // The debt with its interest at the $1 face, to the cent (ui-jobs 743).
+        assert.equal(tokens, shownUsd(owed, 1), `debt by the rate at stop ${stop}`);
         assert.equal(mo.accrual.rate, last.rate + last.fee);
         // Its sum to that day adds up to what is owed.
         let ri = -1;
@@ -738,7 +739,8 @@ test("V2 WETH with the branch's daily price: the collateral moves between events
     let coll = 0;
     for (const r of replayed) if (r.ev.ts < close) coll = r.ev.collAfter;
     const st = stateAt(m, stop);
-    assert.ok(Math.abs(st.collateral.now - coll * usd) <= Math.max(1e-6, coll * usd * 1e-12), `stop ${stop}`);
+    // The held figure is its shown product at the day's close, to the cent (ui-jobs 743).
+    assert.equal(st.collateral.now, shownUsd(coll, usd), `stop ${stop}`);
     checked++;
     if (Math.abs(stateAt(m, stop - 1).collateral.now - st.collateral.now) > 1) moved++;
   }
@@ -863,16 +865,17 @@ test("V1: between events the debt stays as recorded and the collateral takes ETH
     let last = replayed[0].ev;
     for (const r of replayed) if (r.ev.ts < close) last = r.ev;
     const st = stateAt(m, stop);
-    assert.ok(Math.abs(st.debt.now - last.debtAfter) < 1e-6, `debt at stop ${stop}`);
+    // Each held figure to the cent: the debt at its $1 face, the collateral its shown product (ui-jobs 743).
+    assert.equal(st.debt.now, shownUsd(last.debtAfter, 1), `debt at stop ${stop}`);
     const usd = daily.get(startDay + stop);
     if (usd != null) {
-      assert.ok(Math.abs(st.collateral.now - last.collAfter * usd) < 1e-6 * last.collAfter * usd, `coll ${stop}`);
+      assert.equal(st.collateral.now, shownUsd(last.collAfter, usd), `coll ${stop}`);
       checked++;
     }
     const mo = flowMoment(m, focus, close - 1);
     if (mo) {
       assert.equal(mo.accrual, null, "no interest built between events");
-      if (last.debtAfter > 0) assert.ok(Math.abs(mo.sides.debt.assets[0].tokens - last.debtAfter) < 1e-6);
+      if (last.debtAfter > 0) assert.equal(mo.sides.debt.assets[0].tokens, shownUsd(last.debtAfter, 1));
     }
   }
   assert.ok(checked > 100, `days priced by the daily close (${checked})`);

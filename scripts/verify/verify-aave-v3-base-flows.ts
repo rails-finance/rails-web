@@ -48,6 +48,7 @@
 import { test } from "node:test";
 import { centsOfLines } from "./lib/cents-lines";
 import { NO_FIGURE } from "@/lib/shared/flows-sum";
+import { shownUsd } from "@/lib/shared/shown-usd";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -394,7 +395,13 @@ test("a quiet day takes the store's price; without the store, the last event's",
       for (const h of m.heldAt[stop]) {
         const p = store[assetOf.get(h.symbol) ?? ""]?.find(([d]) => d === day)?.[1];
         if (p == null || !(h.amount! > 0)) continue;
-        assert.ok(near(h.usd! / h.amount!, p, 1e-9), `${name} ${h.symbol} day ${day}: ${h.usd! / h.amount!} vs ${p}`);
+        // The held figure is its shown product at the store's price, to the cent (ui-jobs 743).
+        assert.equal(h.priced?.price, p, `${name} ${h.symbol} day ${day}: price ${h.priced?.price} vs ${p}`);
+        assert.equal(
+          h.usd,
+          shownUsd(h.amount!, p),
+          `${name} ${h.symbol} day ${day}: ${h.usd} vs ${shownUsd(h.amount!, p)}`,
+        );
         checked++;
       }
     }

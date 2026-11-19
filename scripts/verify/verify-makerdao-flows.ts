@@ -395,7 +395,8 @@ test("between two rows the debt runs from what the first recorded to what the se
     const before = b.ev.debtAfter - b.ev.debtChange;
     assert.ok(owed >= a.ev.debtAfter && owed <= before, `owed ${owed} between ${a.ev.debtAfter} and ${before}`);
     const expected = a.ev.debtAfter * (1 + rates[i] * (((day + 1) * DAY - a.ev.ts) / 31_557_600));
-    assert.ok(near(owed, expected, 1e-9), `${owed} vs ${expected}`);
+    // The owed figure is that debt at its $1 par, to the cent (ui-jobs 743).
+    assert.equal(owed, shownUsd(expected, 1), `${owed} vs ${expected}`);
     // At the next row's block the straight line reaches the debt the row found.
     assert.ok(near(a.ev.debtAfter * (1 + rates[i] * ((b.ev.ts - a.ev.ts) / 31_557_600)), before, 1e-9));
     checked++;
@@ -422,7 +423,7 @@ test("the state card between events states the chart's figures", () => {
     const chart = stateAt(m, stop).debt.now;
     assert.ok(near(d.tokens, chart, 1e-9), `stop ${stop}: ${d.tokens} vs ${chart}`);
     assert.ok(mo.accrual, "the fee's accrual");
-    assert.ok(near(d.recorded * mo.accrual!.factor, chart, 1e-9), `stop ${stop}: the card's factor`);
+    assert.equal(shownUsd(d.recorded * mo.accrual!.factor, 1), chart, `stop ${stop}: the card's factor, to the cent`);
   }
   assert.ok(checked > 10, `${checked}`);
 });

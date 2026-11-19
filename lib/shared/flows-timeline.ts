@@ -238,6 +238,10 @@ export interface FlowAssetHeld {
      *  (ui-jobs 743). */
     price?: number;
     block?: number | null;
+    /** A side counted at its $1 face (`FlowMomentWords.face`): `price` is
+     *  the interest built on the recorded balance since its event, and the
+     *  figure is that debt at $1, to the cent. */
+    face?: true;
   };
   /** No price stands for the asset on that day: the side's figure has none. */
   unpriced?: true;
@@ -1038,6 +1042,7 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
   const heldAt: FlowAssetHeld[][] = [];
   const heldUnpriced = new Map<number, Record<FlowSide, string[]>>();
   const inDollars = !t.unit && !t.sideUnits;
+  const faceSides = new Set(t.words?.moment?.face ?? []);
   const stale = new Map<number, StalePrice[]>();
   type Reason = { side: FlowSide; why: string; symbol?: string };
   const same = (a: Reason, b: Reason) => a.side === b.side && a.why === b.why && a.symbol === b.symbol;
@@ -1122,12 +1127,19 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
       // The chart and the bars value at the day's price; the held figure's
       // receipt states each asset's shown product at its block, and an asset
       // with no price that day leaves the side with no held figure (ui-jobs
-      // 743). A unit model keeps its arithmetic.
+      // 743). A unit model keeps its arithmetic. A priced asset in dollars
+      // is its shown product to the cent, so every figure the panel prints
+      // from it is its rows' cents.
       const usdPer = p?.usd ?? t.todayPrices?.[asset] ?? 0;
-      const usd = h.amount * usdPer;
+      const cents = inDollars && p != null;
+      const usd = cents
+        ? faceSides.has(h.side)
+          ? shownUsd(h.amount * usdPer, 1)
+          : shownUsd(h.amount, usdPer)
+        : h.amount * usdPer;
       if (inDollars && !p) unpricedHere[h.side].push(h.symbol);
-      if (h.side === "collateral") coll += usd;
-      else debt += usd;
+      if (h.side === "collateral") coll = cents ? addCents(coll, usd) : coll + usd;
+      else debt = cents ? addCents(debt, usd) : debt + usd;
       lines.push({ asset, h, usd, p, ...(g.grown ? { grown: g.grown } : {}) });
       // A price from an earlier day, where only the events record one.
       const carried = t.carriedWhy?.[asset];
@@ -1171,7 +1183,15 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
         amount: h.amount,
         usd,
         ...(p
-          ? { priced: { day: utcDay(p.ts), series: p.series, price: p.usd, block: p.block ?? null } }
+          ? {
+              priced: {
+                day: utcDay(p.ts),
+                series: p.series,
+                price: p.usd,
+                block: p.block ?? null,
+                ...(faceSides.has(h.side) ? { face: true as const } : {}),
+              },
+            }
           : inDollars
             ? { unpriced: true as const }
             : {}),

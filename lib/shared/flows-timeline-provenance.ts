@@ -189,8 +189,9 @@ export function marketMoveProv(label: string, side: FlowSide, when: string, m: M
 
 /** A past day's held figure from its rows: each asset's balance after its
  *  last event by then (grown by its index where the family has one) × the
- *  price that day as shown, named with its block. */
-function heldDayProv(label: string, when: string, rows: readonly FlowAssetHeld[]): Provenance {
+ *  price that day as shown, named with its block. The state card
+ *  (components/shared/flow-moment-card.tsx) states its figures with it. */
+export function heldDayProv(label: string, when: string, rows: readonly FlowAssetHeld[]): Provenance {
   const priced = rows.filter((r) => r.priced?.price != null && (r.amount ?? 0) > 0);
   const day = (d: number) =>
     new Date(d * 86_400_000).toLocaleDateString("en-GB", {
@@ -204,6 +205,17 @@ function heldDayProv(label: string, when: string, rows: readonly FlowAssetHeld[]
     legs: priced.map((r) => {
       const p = r.priced!;
       const at = p.block != null ? `block ${p.block.toLocaleString("en-US")}` : null;
+      // A side counted at its $1 face: the recorded debt with the interest
+      // built on it since, at $1.
+      if (p.face)
+        return {
+          token: r.symbol,
+          amount: (r.amount ?? 0) * (p.price as number),
+          amountNote: "the debt its last event recorded, with the interest its rate built on it to the day",
+          price: 1,
+          priceNote: `1 ${r.symbol} is counted as $1`,
+          face: true,
+        };
       return {
         token: r.symbol,
         amount: r.amount ?? 0,
@@ -350,6 +362,25 @@ export function flowAssetProv(
   isLive: boolean,
   daily = false,
 ): Provenance {
+  // A figure in cents states its rows: the asset's legs on a line, or its
+  // balance × the day's price on a past day's held figure (ui-jobs 743).
+  if (s.fill === "held" && !isLive) {
+    const rows = s.heldRows?.filter((r) => r.symbol === symbol && (r.amount ?? 0) > 0);
+    if (rows?.length && rows.every((r) => r.priced?.price != null))
+      return heldDayProv(`${symbol} ${side === "collateral" ? "held" : "owed"}`, when, rows);
+    if (rows?.some((r) => r.unpriced))
+      return { kind: "derived", summary: `${symbol} at ${when}. No figure: ${noPriceWords([symbol])} on this day.` };
+  }
+  if ((s.fill === "in" || s.fill === "out") && s.legs) {
+    const legs = s.legs.filter((l) => l.symbol === symbol);
+    if (legs.length)
+      return legsProv(
+        `${s.label} in ${symbol}`,
+        isLive ? "now" : `up to ${when}`,
+        legs,
+        legs.some((l) => l.price === null && !l.stated) ? [symbol] : undefined,
+      );
+  }
   if (s.fill === "held") {
     const held = side === "collateral" ? "held" : "owed";
     return {

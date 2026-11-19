@@ -242,7 +242,16 @@ export function heldCents(held: FlowSegment, unit?: FlowUnit): number | null {
   const rows = held.heldRows;
   if (unit || !rows?.length || rows.some((r) => (r.amount ?? 0) > 0 && r.priced?.price == null)) return null;
   return toCents(
-    rows.reduce((a, r) => a + ((r.amount ?? 0) > 0 ? shownUsd(r.amount as number, r.priced!.price!) : 0), 0),
+    rows.reduce(
+      (a, r) =>
+        a +
+        ((r.amount ?? 0) > 0
+          ? r.priced!.face
+            ? shownUsd((r.amount as number) * r.priced!.price!, 1)
+            : shownUsd(r.amount as number, r.priced!.price!)
+          : 0),
+      0,
+    ),
   );
 }
 
