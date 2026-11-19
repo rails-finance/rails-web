@@ -475,8 +475,9 @@ for (const name of NAMES) {
       assert.ok(s, `${name} ${b}: stored`);
       const got = storedCometPrices(s, assetsOf(f));
       if (marketFor(f).quoteUnit === "ETH") {
-        // Composed from its two factors as shown: the recording's product to
-        // the composition's rounding.
+        // Composed from its two factors as shown. The tolerance covers only
+        // the 6 dp rounding of those two factors, against a recording made
+        // from their unrounded product.
         for (const [t, p] of Object.entries(archive))
           assert.ok(Math.abs((got?.[t] ?? 0) - p) <= 1e-5 * p, `${name} ${b} ${t}: ${got?.[t]} vs ${p}`);
       } else assert.deepEqual(got, archive, `${name} ${b}`);

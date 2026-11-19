@@ -46,11 +46,12 @@ import type {
   FlowBucket,
   FlowEvent,
   FlowIndexes,
+  FlowLeg,
   FlowSide,
   FlowTimeline,
   FlowWords,
 } from "@/lib/shared/flows-timeline";
-import { daysFromEvents } from "@/lib/shared/flows-timeline";
+import { daysFromEvents, flowLeg } from "@/lib/shared/flows-timeline";
 import { externalActor } from "@/lib/shared/external-actor";
 
 const DAY_S = 86_400;
@@ -357,6 +358,10 @@ export interface DolomiteReplayed {
   ev: DolomiteFlowRow;
   price: number;
   basis: DolomitePriceBasis;
+  /** Where a price not read at the row's block stands: the store's day, or
+   *  the nearest priced row's block (ui-jobs 743). */
+  priceDay?: number;
+  priceBlock?: number;
   legs: { bucket: string; amount: number }[];
   /** The market's supply and debt after the row (magnitudes). */
   supply: number;
@@ -377,39 +382,88 @@ function storeOn(obs: [number, number][] | undefined, day: number): { usd: numbe
 }
 
 /** The price each row is valued at, and how it was found. */
-function pricesFor(rows: DolomiteFlowRow[], o: DolomiteFlowOptions): { price: number; basis: DolomitePriceBasis }[] {
+type RowPrice = { price: number; basis: DolomitePriceBasis; priceDay?: number; priceBlock?: number };
+
+function pricesFor(rows: DolomiteFlowRow[], o: DolomiteFlowOptions): RowPrice[] {
   const today = Math.floor(o.now / DAY_S);
-  const first = rows.map((r): { price: number; basis: DolomitePriceBasis } | null => {
+  const first = rows.map((r): RowPrice | null => {
     if (r.price != null) return { price: r.price, basis: "block" };
     const day = Math.floor(r.ts / DAY_S);
     const s = storeOn(o.dailyPrices?.[r.market], day);
-    if (s && s.day === day) return { price: s.usd, basis: "day" };
+    if (s && s.day === day) return { price: s.usd, basis: "day", priceDay: s.day };
     const live = o.live?.[r.market]?.price;
     if (day >= today && live != null && live > 0) return { price: live, basis: "live" };
-    if (s) return { price: s.usd, basis: "carried" };
+    if (s) return { price: s.usd, basis: "carried", priceDay: s.day };
     return null;
   });
   return rows.map((r, i) => {
     const p = first[i];
     if (p) return p;
-    let best: { ts: number; price: number } | null = null;
+    let best: { ts: number; price: number; block: number } | null = null;
     rows.forEach((x, j) => {
       const q = first[j];
       if (!q || x.market !== r.market) return;
-      if (!best || Math.abs(x.ts - r.ts) < Math.abs(best.ts - r.ts)) best = { ts: x.ts, price: q.price };
+      if (!best || Math.abs(x.ts - r.ts) < Math.abs(best.ts - r.ts))
+        best = { ts: x.ts, price: q.price, block: x.block };
     });
-    if (best) return { price: (best as { price: number }).price, basis: "nearest" as const };
+    if (best) {
+      const b = best as { price: number; block: number };
+      return { price: b.price, basis: "nearest" as const, priceBlock: b.block };
+    }
     const live = o.live?.[r.market]?.price;
-    return live != null && live > 0 ? { price: live, basis: "nearest" as const } : { price: 0, basis: "none" as const };
+    return live != null && live > 0 ? { price: live, basis: "live" as const } : { price: 0, basis: "none" as const };
   });
 }
+
+/** A row's leg with its parts (ui-jobs 743): Dolomite's oracle price at or
+ *  before the row's block; else the day's close in the daily store, the
+ *  nearest priced row's or the latest read's, both named; the latest read's
+ *  on another basis; no price at all is unpriced. */
+function dolomiteLeg(r: DolomiteReplayed, l: { bucket: string; amount: number }): FlowLeg {
+  return flowLeg({
+    bucket: l.bucket,
+    amount: l.amount,
+    symbol: r.ev.symbol,
+    price: r.basis === "none" ? null : r.price,
+    block: r.basis === "block" ? r.ev.block : r.basis === "nearest" ? (r.priceBlock ?? null) : null,
+    priceNote: dolomitePriceNote(r, r.ev.block),
+    ...(r.basis === "live" ? { basis: DOLOMITE_TODAY_BASIS } : {}),
+    ...(ACCRUAL_KEYS.has(l.bucket) ? { accrual: true } : {}),
+  });
+}
+
+/** A row's price in words, against the block `at` the figure stands at. */
+function dolomitePriceNote(r: DolomiteReplayed, at: number): string {
+  const n = (b: number) => b.toLocaleString("en-US");
+  const oracle = `Dolomite's oracle price for ${r.ev.symbol}`;
+  const day = (d: number) =>
+    new Date(d * 86_400_000).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+  return r.basis === "block" && r.ev.block === at
+    ? `${oracle}, the last LogOraclePrice at or before block ${n(r.ev.block)}`
+    : r.basis === "block"
+      ? `${oracle}, the last LogOraclePrice at or before block ${n(r.ev.block)}; this event is at block ${n(at)}`
+      : r.basis === "day" || r.basis === "carried"
+        ? `${oracle}, the close of ${day(r.priceDay ?? Math.floor(r.ev.ts / DAY_S))} in the daily store, a block its route does not state; this event is at block ${n(at)}`
+        : r.basis === "nearest"
+          ? `${oracle}, price at block ${n(r.priceBlock ?? r.ev.block)}, the nearest read; this event is at block ${n(at)}`
+          : `${oracle}, price at the latest read, which names no block; this event is at block ${n(at)}`;
+}
+
+/** The basis a leg at the latest read's price stands on, and the family's. */
+const DOLOMITE_TODAY_BASIS = "the latest read's price";
+const DOLOMITE_BLOCK_BASIS = "each row's price";
 
 /** Why a row's figures are not at its block's price, by how its price was found. */
 const UNSURE_WHY: Partial<Record<DolomitePriceBasis, string>> = {
   day: "priced at the day's close: the price at this block is not stored yet.",
   carried: "priced at the last stored close before its day: no price is stored for the day.",
   nearest: "priced at the nearest priced row: no price is stored near its day.",
-  none: "has no price stored: its flows count at zero.",
+  none: "has no price stored: its flows have no figure.",
 };
 
 /** The per-row replay. */
@@ -447,6 +501,8 @@ export function replayDolomite(rows: DolomiteFlowRow[], o: DolomiteFlowOptions):
       ev,
       price: prices[i].price,
       basis: prices[i].basis,
+      ...(prices[i].priceDay != null ? { priceDay: prices[i].priceDay } : {}),
+      ...(prices[i].priceBlock != null ? { priceBlock: prices[i].priceBlock } : {}),
       legs,
       supply: Math.max(a, 0),
       debt: Math.max(-a, 0),
@@ -618,7 +674,7 @@ export function dolomiteFlowTimeline(rows: DolomiteFlowRow[], o: DolomiteFlowOpt
       ts: r.ev.ts,
       block: r.ev.block,
       tick: liq ? "liquidation" : moved.coll && moved.debt ? "both" : moved.debt ? "debt" : "collateral",
-      legs: r.legs.map((l) => ({ bucket: l.bucket, usd: l.amount * r.price, symbol: r.ev.symbol })),
+      legs: r.legs.map((l) => dolomiteLeg(r, l)),
       tx: r.ev.tx,
       countsTx: r.ev.byOwner,
       // The account acting as a liquidator (seize_in, a payout) is its own act.
@@ -732,6 +788,8 @@ export function dolomiteFlowTimeline(rows: DolomiteFlowRow[], o: DolomiteFlowOpt
 export function dolomiteFlowWords(borrower: boolean): FlowWords {
   return {
     held: "Still supplied",
+    // A flow at the latest read's price stands on another basis (dolomiteLeg).
+    priceBasis: { collateral: DOLOMITE_BLOCK_BASIS, debt: DOLOMITE_BLOCK_BASIS },
     restBySide: {
       collateral: "Market move and interest since the last event",
       ...(borrower ? { debt: "Market move and interest since the last event" } : {}),
@@ -772,13 +830,7 @@ export function dolomiteFocusEvents(rp: DolomiteFlowReplay): FocusEvent[] {
     id: r.ev.id,
     ts: r.ev.ts,
     tx: r.ev.tx,
-    legs: r.legs.map((l) => ({
-      bucket: l.bucket,
-      usd: l.amount * r.price,
-      amount: l.amount,
-      symbol: r.ev.symbol,
-      ...(ACCRUAL_KEYS.has(l.bucket) ? { accrual: true } : {}),
-    })),
+    legs: r.legs.map((l) => dolomiteLeg(r, l)),
   }));
 }
 
@@ -803,16 +855,42 @@ export function dolomiteEventStates(
   // Per market: the signed balance recorded last, when, and the latest price
   // a row of the market took (and its day).
   const rec = new Map<string, { symbol: string; bal: number; ts: number }>();
-  const lastPrice = new Map<string, { usd: number; day: number }>();
-  const firstPrice = new Map<string, number>();
-  for (const r of replayed) if (r.price > 0 && !firstPrice.has(r.ev.market)) firstPrice.set(r.ev.market, r.price);
+  const lastPrice = new Map<string, { usd: number; day: number; r: DolomiteReplayed }>();
+  const firstPrice = new Map<string, DolomiteReplayed>();
+  for (const r of replayed) if (r.price > 0 && !firstPrice.has(r.ev.market)) firstPrice.set(r.ev.market, r);
   // A market the transaction left alone takes the newer of its latest row's
   // price and the daily store's for the event's day, as the bars do that day.
-  const priceOf = (m: string, day: number) => {
+  // The price, with the words naming it and its block (ui-jobs 743).
+  const priceOf = (
+    m: string,
+    day: number,
+    sym: string,
+    at: number,
+  ): { usd: number; block: number | null; note: string } | null => {
     const row = lastPrice.get(m);
     const store = storeOn(o.dailyPrices?.[m], day);
-    if (store && (!row || store.day > row.day)) return store.usd;
-    return row?.usd ?? firstPrice.get(m) ?? o.live?.[m]?.price ?? null;
+    const n = (b: number) => b.toLocaleString("en-US");
+    if (store && (!row || store.day > row.day))
+      return {
+        usd: store.usd,
+        block: null,
+        note: `Dolomite's oracle price for ${sym}, the daily store's close, a block its route does not state; this event is at block ${n(at)}`,
+      };
+    const from = row?.r ?? firstPrice.get(m);
+    if (from)
+      return {
+        usd: from.price,
+        block: from.basis === "block" ? from.ev.block : (from.priceBlock ?? null),
+        note: dolomitePriceNote(from, at),
+      };
+    const live = o.live?.[m]?.price;
+    return live != null
+      ? {
+          usd: live,
+          block: null,
+          note: `Dolomite's oracle price for ${sym}, price at the latest read, which names no block; this event is at block ${n(at)}`,
+        }
+      : null;
   };
   let i = 0;
   while (i < replayed.length) {
@@ -833,7 +911,7 @@ export function dolomiteEventStates(
       }
       rec.set(r.ev.market, { symbol: r.ev.symbol, bal: r.ev.after, ts: r.ev.ts });
       if (r.price > 0 && r.basis !== "nearest" && r.basis !== "none")
-        lastPrice.set(r.ev.market, { usd: r.price, day: Math.floor(r.ev.ts / DAY_S) });
+        lastPrice.set(r.ev.market, { usd: r.price, day: Math.floor(r.ev.ts / DAY_S), r });
     }
     const ts = replayed[j].ev.ts;
     const day = Math.floor(ts / DAY_S);
@@ -841,7 +919,8 @@ export function dolomiteEventStates(
     const usd: Record<FlowSide, number | null> = { collateral: 0, debt: 0 };
     const usdBefore: Record<FlowSide, number | null> = { collateral: 0, debt: 0 };
     for (const [m, c] of rec) {
-      const p = priceOf(m, day);
+      const pr = priceOf(m, day, c.symbol, replayed[j].ev.block);
+      const p = pr?.usd ?? null;
       const prior = before.get(m);
       // A market the transaction moved stands as its rows recorded it; one it
       // left alone, grown by its index to the block, the same before and after.
@@ -853,7 +932,13 @@ export function dolomiteEventStates(
         const a = s === "collateral" ? Math.max(after, 0) : Math.max(-after, 0);
         const b0 = s === "collateral" ? Math.max(was, 0) : Math.max(-was, 0);
         if (!(a > DUST) && !(b0 > DUST)) continue;
-        const b = bySym[s].get(c.symbol) ?? { symbol: c.symbol, amount: 0, before: 0, price: p };
+        const b = bySym[s].get(c.symbol) ?? {
+          symbol: c.symbol,
+          amount: 0,
+          before: 0,
+          price: p,
+          ...(pr ? { block: pr.block, priceNote: pr.note } : {}),
+        };
         b.amount += a;
         b.before += b0;
         if (b.price == null) b.price = p;
