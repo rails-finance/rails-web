@@ -4,7 +4,7 @@
 // the next on each press, Light → Dark → Auto (the system's) → Light, with a
 // sun, a moon and a sun-moon (Miles 13 Nov 2026, in place of the three-way
 // radio group). It stands on the chrome's left side: from md at the brand
-// rail's foot, over the beta pill, the icon alone (`placement="rail"`,
+// rail's foot, the icon alone (`placement="rail"`,
 // components/nav/brand-rail.tsx); below md at the foot of the wallet panel,
 // the slide-out the header's sidebar toggle opens, the icon and the word
 // (`placement="panel"`, components/nav/wallet-panel.tsx).

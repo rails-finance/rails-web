@@ -97,7 +97,7 @@ check(railLauncher === 1, `the brand rail carries the sidebar toggle (${railLaun
 const railHome = await rail.locator('a[href="/"][data-rail-home]').count();
 check(railHome === 1, `the rail's mark links home (${railHome})`);
 // The theme switch stands at the rail's foot from md (Miles 13 Nov 2026):
-// one button over the beta pill that steps Light → Dark → Auto → Light.
+// one button that steps Light → Dark → Auto → Light.
 const railSwitch = rail.locator('button[data-theme-switch="rail"]');
 const railTheme = [];
 for (let i = 0; i < 4; i++) {
@@ -340,8 +340,8 @@ const mBurger = await mob.locator('header button[aria-label="Toggle menu"]').cou
 check(mBurger === 0, `mobile header has no hamburger (${mBurger})`);
 // Below `md` the brand rail does not render: the bar is the sidebar toggle,
 // which opens the panel (H15.1), the Rails mark centred as a link home (every
-// page but home) with the beta pill to its right in the same link (ui-jobs
-// 769), and H20 (rails-ops TO-DO-ui-jobs 67, 68, 507, 514).
+// page, home included) with the beta pill to its right in the same link
+// (ui-jobs 769), and H20 (rails-ops TO-DO-ui-jobs 67, 68, 507, 514).
 const mRail = await mob.locator('aside[aria-label="Rails"]').isVisible();
 check(mRail === false, `mobile draws no brand rail (${mRail})`);
 const mLauncher = await mob.locator('header button[data-anatomy="H15.1"]:visible').count();
@@ -360,10 +360,11 @@ const mOrder = await mob.evaluate(() => {
 check(mOrder, "mobile header: the sidebar toggle at the left, H20 at the right (ui-jobs 514)");
 const mHome = await mob.locator('header a[href="/"][data-home-brand]:visible').count();
 check(mHome === 1, `mobile header's centred brand links home (${mHome})`);
-const mWordmark = await mob.locator("header").first().innerText();
+const mWordmark = await mob.locator("header a[data-home-brand]").first().innerText();
+const mHomeName = await mob.locator("header a[data-home-brand]").first().getAttribute("aria-label");
 check(
-  /^beta$/i.test(mWordmark.trim()) && !/Ethereum/i.test(mWordmark),
-  `mobile header shows the beta pill and not the chain (${mWordmark.replace(/\s+/g, " ")})`,
+  /^beta$/i.test(mWordmark.trim()) && mHomeName === "Rails home, beta",
+  `mobile header's home link reads Beta and is named "Rails home, beta" (${mWordmark.trim()} / ${mHomeName})`,
 );
 const mPill = await mob.locator('header a[data-home-brand] [data-beta-pill="header"]:visible').count();
 check(mPill === 1, `mobile header's home link carries the beta pill (${mPill})`);

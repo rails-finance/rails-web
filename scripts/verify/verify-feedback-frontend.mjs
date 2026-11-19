@@ -15,6 +15,8 @@
 //   7. Page line auto-captures the current pathname.
 //   8. Mobile width (375px) renders the modal inside the viewport.
 //   9. Zero pageerrors throughout.
+//  10. The button's and the home link's names, the face's alt, Tab and
+//      Shift+Tab held inside the form, and Escape handing focus back.
 //
 // Submission is NOT exercised here — the route's status matrix is covered by
 // curl checks (415/413/400/honeypot-200/429/500-when-env-unset).
@@ -140,10 +142,40 @@ check("4. honeypot starts empty (a filled one is the bot signal)", trap.value ==
 check("4. honeypot is out of the tab order", trap.tabIndex === -1, `tabIndex=${trap.tabIndex}`);
 check("4. honeypot is hidden from assistive tech", trap.ariaHidden);
 
+// ── 10. Names, the face, and focus held inside the form (ui-jobs 769) ─────────
+check("10. the button is named Send feedback", (await siteTrigger.getAttribute("aria-label")) === "Send feedback");
+const railHomeName = await page.locator("aside a[data-rail-home]").getAttribute("aria-label");
+check("10. the rail's home link is named Rails home, beta", railHomeName === "Rails home, beta", `${railHomeName}`);
+const faceAlt = await page.locator(`${DIALOG} [data-feedback-faces] img`).getAttribute("alt");
+check("10. the form header's face reads Miles", faceAlt === "Miles", `alt="${faceAlt}"`);
+const ends = await page.evaluate((sel) => {
+  const d = document.querySelector(sel);
+  const f = [
+    ...d.querySelectorAll(
+      'button:not([disabled]), input:not([tabindex="-1"]), textarea, [href], [tabindex]:not([tabindex="-1"])',
+    ),
+  ].filter((el) => el.offsetParent !== null);
+  f.forEach((el, i) => el.setAttribute("data-trap-i", String(i)));
+  f[0].focus();
+  return f.length - 1;
+}, DIALOG);
+await page.keyboard.press("Shift+Tab");
+const afterShiftTab = await page.evaluate(() => document.activeElement?.getAttribute("data-trap-i"));
+check(
+  "10. Shift+Tab from the first stop lands on the last",
+  afterShiftTab === String(ends),
+  `at ${afterShiftTab} of ${ends}`,
+);
+await page.keyboard.press("Tab");
+const afterTab = await page.evaluate(() => document.activeElement?.getAttribute("data-trap-i"));
+check("10. Tab from the last stop lands on the first", afterTab === "0", `at ${afterTab}`);
+
 // ── 5c. Esc closes and restores scroll ───────────────────────────────────────
 await page.keyboard.press("Escape");
 await pause(250);
 check("5. Esc closes the modal", (await page.locator(DIALOG).count()) === 0);
+const focusBack = await page.evaluate(() => document.activeElement?.hasAttribute("data-feedback-button") ?? false);
+check("10. Esc hands focus back to the feedback button", focusBack);
 const overflowClosed = await page.evaluate(() => document.body.style.overflow);
 check("5. body scroll restored on close", overflowClosed !== "hidden", `overflow="${overflowClosed}"`);
 

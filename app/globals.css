@@ -2550,19 +2550,22 @@ html[data-chain-focus] [data-chain-gate]:not([data-scope-ready]) {
 .feedback-blink {
   transform-box: fill-box;
   transform-origin: center;
-  animation: feedback-blink 7s ease-in-out infinite;
+}
+.feedback-blink[data-blinking] {
+  animation: feedback-blink 420ms ease-in-out;
 }
 @keyframes feedback-blink {
   0%,
-  92%,
-  95%,
-  98%,
+  40%,
   100% {
     transform: scaleY(1);
   }
-  93.5%,
-  96.5% {
+  20%,
+  60% {
     transform: scaleY(0.1);
+  }
+  80% {
+    transform: scaleY(1);
   }
 }
 @media (prefers-reduced-motion: reduce) {

@@ -8,7 +8,7 @@
 // has no hover, so there the face is in the form's header. Below 768px it
 // rises over the compare bar (E3) while that shows (app/globals.css).
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 
 import { FeedbackModal } from "@/components/shared/feedback-modal";
@@ -51,6 +51,20 @@ export function FeedbackButton() {
 /** A speech bubble, its tail at the lower left, with the profile facehash's
  *  round eyes (H20, ui-jobs 727). */
 function BubbleFace() {
+  // Every 7s the eyes take one 420ms blink, then the layer sits idle until the
+  // next: the attribute runs the keyframes once, so no frame restyles between.
+  const eyes = useRef<SVGGElement>(null);
+  useEffect(() => {
+    const g = eyes.current;
+    if (!g) return;
+    const end = () => g.removeAttribute("data-blinking");
+    g.addEventListener("animationend", end);
+    const id = window.setInterval(() => g.setAttribute("data-blinking", ""), 7000);
+    return () => {
+      window.clearInterval(id);
+      g.removeEventListener("animationend", end);
+    };
+  }, []);
   return (
     <svg width={26} height={26} viewBox="0 0 24 24" fill="none" aria-hidden="true" data-feedback-face="">
       <path
@@ -59,7 +73,7 @@ function BubbleFace() {
         strokeWidth={1.75}
         strokeLinejoin="round"
       />
-      <g className="feedback-blink" fill="currentColor">
+      <g ref={eyes} className="feedback-blink" fill="currentColor">
         <circle cx={9.5} cy={10.5} r={1.5} />
         <circle cx={14.5} cy={10.5} r={1.5} />
       </g>
