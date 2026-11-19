@@ -11,7 +11,7 @@
 export type AaveV4PriceSource = "iaave-oracle" | "chainlink" | "chainlink-eth-derived" | "pendle-twap" | "reserve";
 
 const blockText = (block: number | null | undefined): string =>
-  block != null ? `at block ${block.toLocaleString("en-US")}` : "at the latest read, which states no block";
+  block != null ? `at block ${block.toLocaleString("en-US")}` : "at the latest read, which names no block";
 
 /** One asset's price, named by its read and its block. */
 export function aaveV4PriceNote(

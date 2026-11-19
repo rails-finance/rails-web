@@ -25,6 +25,7 @@ import type { EventCardPrice, EventPriceChip } from "@/components/shared/event-p
 import type { FlowSide } from "@/lib/shared/flows-timeline";
 import { amountsUsd, cellOf, groupMoveUsd, type PricedAmount } from "@/lib/shared/sheet-usd-rows";
 import { centsOf } from "@/lib/shared/shown-usd";
+import { NO_FIGURE } from "@/lib/shared/flows-sum";
 
 const WORDS = {
   before: "Before the group",
@@ -101,6 +102,13 @@ function sumProv(what: string, n: number): Provenance {
   };
 }
 
+/** A group's dollar figure where a member's has none: "—", never a
+ *  partial sum. */
+const noGroupFigure = (what: string): SheetRow["amount"] => ({
+  text: NO_FIGURE,
+  info: { kind: "derived", summary: `${what}. No dollar figure: a member's figure has none.` },
+});
+
 /** One summed row per asset of the members' rows; null where a figure does
  *  not read. */
 function summedRows(rows: SheetRow[], label: string, n: number): SheetRow[] | null {
@@ -115,8 +123,9 @@ function summedRows(rows: SheetRow[], label: string, n: number): SheetRow[] | nu
     let places = 0;
     let usd = 0;
     // The members' cents (ui-jobs 743): a member whose figure carries none
-    // leaves the group's row with no dollars, never a sum of faces.
+    // leaves the group's row with no dollar figure ("—"), never a partial sum.
     const usdKnown = rs.every((r) => r.usd?.cents != null);
+    const usdSome = rs.some((r) => r.usd != null);
     for (const r of rs) {
       if (r.amount) {
         // The receipt's exact figure where it reads, so the sum does not
@@ -139,7 +148,11 @@ function summedRows(rows: SheetRow[], label: string, n: number): SheetRow[] | nu
       amount: rs[0].amount
         ? { text: amountText, symbol: symbol || undefined, address: rs[0].amount.address, info: sumProv(label, n) }
         : undefined,
-      usd: usdKnown ? { text: sheetUsd(usd), info: sumProv(`${label} in USD`, n), cents: usd } : undefined,
+      usd: usdKnown
+        ? { text: sheetUsd(usd), info: sumProv(`${label} in USD`, n), cents: usd }
+        : usdSome
+          ? noGroupFigure(`${label} in USD`)
+          : undefined,
     });
   }
   return out;
@@ -159,9 +172,7 @@ function sumFigure(
   if (!usd && new Set(present.map((f) => (f as SheetRow["amount"])?.symbol ?? "")).size > 1) return undefined;
   let total = 0;
   let places = 0;
-  // Dollars sum the members' cents; a member whose figure carries none
-  // leaves the group with no dollar figure, never a sum of faces.
-  if (usd && present.some((f) => f!.cents == null)) return undefined;
+  if (usd && present.some((f) => f!.cents == null)) return noGroupFigure(what);
   for (const f of present) {
     const v = usd ? (f!.cents as number) : parseSheetNumber(f!.text);
     if (v == null) return null;

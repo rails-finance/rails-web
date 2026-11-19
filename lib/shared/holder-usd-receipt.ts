@@ -71,8 +71,12 @@ export function holderUsdReceipt(opts: {
 }): { prov: Provenance; usd: number } {
   const eth = opts.numeraire === "ETH";
   const product = eth ? shownEth : shownUsd;
+  // A negative amount or product leads with "−", as signedCents does.
+  const minus = (v: number) => (v < 0 ? "−" : "");
   const valueText = (v: number) =>
-    eth ? `${v.toLocaleString("en-US", { maximumFractionDigits: 6 })} ETH` : formatUsdValue(v);
+    eth
+      ? `${minus(v)}${Math.abs(v).toLocaleString("en-US", { maximumFractionDigits: 6 })} ETH`
+      : `${minus(v)}${formatUsdValue(Math.abs(v))}`;
   const priceOf = (p: number) => (eth ? `${priceText(p).slice(1)} ETH` : priceText(p));
   const legs = opts.byValue
     ? [...opts.legs].sort((a, b) => product(b.amount, b.price) - product(a.amount, a.price))
@@ -86,7 +90,7 @@ export function holderUsdReceipt(opts: {
       ...(l.before ?? []),
       {
         label: `${l.label ?? l.token} amount`,
-        value: `${amountText(l.amount)} ${l.token}`,
+        value: `${minus(l.amount)}${amountText(Math.abs(l.amount))} ${l.token}`,
         kind: l.amountKind?.kind ?? "chain",
         pclass: l.amountKind ? l.amountKind.pclass : "indexed",
         note: l.amountNote,
@@ -126,7 +130,7 @@ export function holderUsdReceipt(opts: {
       ? ", each price at the block its row names"
       : opts.block != null
         ? `, the ${read > 1 ? "prices" : "price"} at block ${opts.block.toLocaleString("en-US")}`
-        : `, the ${read > 1 ? "prices" : "price"} at the latest read, which states no block`;
+        : `, the ${read > 1 ? "prices" : "price"} at the latest read, which names no block`;
   const faces = legs.filter((l) => l.face).map((l) => `1 ${l.token} is counted as $1`);
   return {
     usd,

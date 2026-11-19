@@ -181,6 +181,7 @@ export function useMoonwellFlows(p: MoonwellFlowsInput): {
         debt: m.borrowUnderlying,
         exchangeRate: m.exchangeRate > 0 ? m.exchangeRate : null,
         price: m.priceUsd != null && m.priceUsd > 0 ? m.priceUsd : null,
+        block: p.chain.blockNumber,
         supplyApr: m.supplyApr,
         borrowApr: m.borrowApr,
       };

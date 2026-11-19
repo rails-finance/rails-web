@@ -149,7 +149,7 @@ test("a line with an unpriced leg draws no figure and names the asset; no partia
   const rest = rows.lines.find((l) => l.kind === "rest");
   assert.equal(rest.amount, "—", "Market move has no figure either");
   const prov = flowSegmentProv(dep.seg, "collateral", "5 Jul '25", false);
-  assert.match(prov.summary, /No figure: WBTC has no price at its block/);
+  assert.match(prov.summary, /No dollar figure: WBTC has no price at this block/);
   assert.ok(!prov.inputs.some((i) => i.label === "sum"), "no sum row");
   assert.deepEqual(
     prov.inputs.map((i) => [i.label, i.value]),
@@ -318,8 +318,8 @@ test("a line of many legs builds its rows when the receipt opens, past twelve be
 });
 
 test("several assets with no price read as plural", () => {
-  assert.equal(noPriceWords(["WETH"]), "WETH has no price at its block");
-  assert.equal(noPriceWords(["WETH", "USDC"]), "WETH and USDC have no price at their blocks");
+  assert.equal(noPriceWords(["WETH"]), "WETH has no price at this block");
+  assert.equal(noPriceWords(["WETH", "USDC"]), "WETH and USDC have no price at this block");
 });
 
 test("a family's basis set with its legs' unset compares on one basis", () => {
@@ -421,7 +421,7 @@ test("a past day's held figure is its rows to the cent, each naming the day's bl
   const notes = prov.inputs.filter((i) => i.label.endsWith(" price")).map((i) => i.note);
   assert.ok(notes.some((n) => /the daily store's price at the close of .+, block 1,500,000$/.test(n)));
   // A store row with no block says so.
-  assert.ok(notes.some((n) => /a block the store's route does not state$/.test(n)));
+  assert.ok(notes.some((n) => /a block the daily store's route does not name$/.test(n)));
 });
 
 test("a past day holding an asset with no price has no held figure and names the asset", () => {
@@ -448,7 +448,7 @@ test("a past day holding an asset with no price has no held figure and names the
   const st = stateAt(m, 2);
   const rows = sideSumRows(st.collateral);
   assert.equal(rows.total.amount, "—");
-  assert.match(rows.total.none, /WBTC has no price at its block/);
+  assert.match(rows.total.none, /WBTC has no price at this block/);
   assert.ok(!rows.lines.some((l) => l.kind === "rest"), "no remainder worked out from no figure");
 });
 

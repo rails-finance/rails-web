@@ -655,7 +655,7 @@ function centsRest(
   return out;
 }
 
-const NO_PRICE_REST = "No figure: a line above has no price at its block.";
+const NO_PRICE_REST = "No dollar figure: a line above has no price at its block.";
 
 // ── The shared state ────────────────────────────────────────────────────────
 

@@ -318,7 +318,9 @@ check(
 );
 check(
   "484: a rebalance row states the min-price judgement",
-  /The pool judged the tick at the oracle’s min price, \$79,6\d\d\.\d{2,6} at the block before/.test(p484.text),
+  // The WBTC pool's priceOracle() (0xb3c9…6390) getPrice() min leg at block
+  // 23,847,368, the block before the rebalance row at 23,847,369: 79,675.432654471277107225.
+  /The pool judged the tick at the oracle’s min price, \$79,675\.432654 at the block before/.test(p484.text),
 );
 
 // ── Y10: the pool-wide Liquidate names twelve positions ─────────────────────
@@ -414,7 +416,7 @@ const pList = await openAndRead("/ethereum/fx");
   // The pool header names its anchor price and block; a row's USD is its
   // collateral at that price.
   const anchors = Object.fromEntries(
-    [...pList.text.matchAll(/(stETH|WBTC) \$([\d,]+) anchor @ [\d,]+/g)].map((m) => [
+    [...pList.text.matchAll(/(stETH|WBTC) \$([\d,]+(?:\.\d{2,6})?) anchor @ [\d,]+/g)].map((m) => [
       m[1],
       Number(m[2].replace(/,/g, "")),
     ]),

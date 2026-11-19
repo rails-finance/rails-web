@@ -76,7 +76,7 @@ test("a market with no price draws no figure and names it; no partial sum", () =
   const c = amountsUsd("Collateral after this event, in USD", [wbtc, { ...usdc, price: null }], o);
   assert.equal(c.usd, null);
   assert.equal(c.text, "—");
-  assert.match(c.info.summary, /USDC has no price at its block/);
+  assert.match(c.info.summary, /USDC has no price at this block/);
   const move = marketMoveUsd("Market move", c, amountsUsd("Last", [wbtc], o), null);
   assert.equal(move.text, "—");
 });
@@ -104,4 +104,26 @@ test("a group's Market move is after less before, the moves and the interest, ea
   );
   assert.equal(cellOf(after).cents, after.usd);
   assert.equal(cellOf(amountsUsd("X", [{ ...usdc, price: null }], o)).cents, undefined, "no cents without a figure");
+});
+
+test("an amount not read is no figure, never $0 or Nothing held (ui-jobs 743)", () => {
+  const c = amountsUsd("Collateral", [{ symbol: "WETH", amount: Number.NaN, price: 3000, block: 1 }], o);
+  assert.equal(c.text, "—");
+  assert.equal(c.usd, null);
+  assert.match(c.info.summary, /WETH has no amount read/);
+});
+
+test("a negative leg's amount and product lead with a minus sign (ui-jobs 743)", () => {
+  const c = amountsUsd(
+    "Change",
+    [
+      { symbol: "WETH", amount: -0.5, price: 3000, block: 1 },
+      { symbol: "USDC", amount: 2, price: 1, block: 1 },
+    ],
+    o,
+  );
+  const val = (label) => c.info.inputs.find((i) => i.label === label).value;
+  assert.equal(val("WETH amount"), "−0.5 WETH");
+  assert.equal(val("WETH amount × price"), "−$1,500.00");
+  assert.equal(c.usd, -1498);
 });

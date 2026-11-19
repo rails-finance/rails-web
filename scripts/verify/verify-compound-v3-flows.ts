@@ -569,9 +569,9 @@ for (const name of NAMES) {
   });
 }
 
-// A side holding a token no read priced states no dollars: the event has no
-// sides, never a $0 (ui-jobs 743).
-test("a side holding an unpriced token has no sides on its event", () => {
+// A side holding a token no read priced states no dollars: that side is NaN
+// (printed "—"), never a $0, and the priced side keeps its figures (ui-jobs 743).
+test("a side holding an unpriced token has no dollars; the other side keeps its own", () => {
   const f = fx("usdc-repaid");
   const coll = rows(f).find((r) => !r.isBase)!.token;
   const unpriced = rows(f).map((r) => ({
@@ -584,5 +584,10 @@ test("a side holding an unpriced token has no sides on its event", () => {
     return (r.coll.get(coll) ?? 0) > 1e-9;
   });
   assert.ok(held.length > 0);
-  for (const fe of held) assert.equal(fe.sides, undefined, `${fe.id}: no sides`);
+  for (const fe of held) {
+    const c = fe.sides!.collateral;
+    // Before or once the transaction had run, the unpriced token is held.
+    assert.ok(Number.isNaN(c.after) || Number.isNaN(c.before), `${fe.id}: the collateral has no dollars`);
+    assert.ok(Number.isFinite(fe.sides!.debt.after), `${fe.id}: the debt keeps its figure`);
+  }
 });

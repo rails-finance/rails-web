@@ -106,6 +106,8 @@ export interface AaveV4EventDetailProps {
   /** The previous event on this spoke: the sheet's carry layer reads its
    *  snapshot. */
   previous?: AaveV4Context;
+  /** That event's block, which its snapshot's prices stand at. */
+  previousBlock?: number;
   /** The assets the position once owed on this spoke and owes none of after
    *  this event. */
   repaid?: string[];
@@ -227,6 +229,7 @@ export function useAaveV4Cells({
   wallet,
   previousRate,
   previous,
+  previousBlock,
   repaid,
   address,
   active,
@@ -616,7 +619,16 @@ export function useAaveV4Cells({
     }));
 
   // The balance sheet (ui-jobs 330); a collateral toggle keeps its cell.
-  const sheet = aaveV4Sheet({ ctx, prev: previous, coord, label: aaveV4Label(ctx), address, hf: hfAround, repaid });
+  const sheet = aaveV4Sheet({
+    ctx,
+    prev: previous,
+    prevBlock: previousBlock,
+    coord,
+    label: aaveV4Label(ctx),
+    address,
+    hf: hfAround,
+    repaid,
+  });
 
   return { cells, prices: chips, sheet };
 }

@@ -104,6 +104,7 @@ export function dolomiteLive(chain: DolomiteChainResponse | null): Record<string
       supplyIndex: b.wei > 0 ? index : null,
       borrowIndex: b.wei < 0 ? index : null,
       price: b.priceUsd != null && b.priceUsd > 0 ? b.priceUsd : null,
+      block: chain.blockNumber,
       supplyApr: b.supplyAprPct != null ? b.supplyAprPct / 100 : null,
       borrowApr: b.borrowAprPct != null ? b.borrowAprPct / 100 : null,
     };

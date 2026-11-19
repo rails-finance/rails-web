@@ -184,9 +184,44 @@ test("a group's dollar row is the sum of its members' cents", async () => {
   assert.equal(row.usd!.text, "$2.98");
   const big = mergeGroupSheet([card("a", 12.49, "$12"), card("b", 12.49, "$12")] as never, "Supply")!;
   assert.equal(big.sides[0].rows.find((r) => r.usd)!.usd!.cents, 24.98);
-  // A member with no cents: no dollars on the group's row.
+  // A member with no cents: the group's row draws "—", never a partial sum.
   const mixed = mergeGroupSheet([card("a", 1.49, "$1.49"), card("b", undefined, "$1.49")] as never, "Supply")!;
-  assert.ok(!mixed.sides[0].rows.some((r) => r.key.startsWith("group") && r.usd));
+  const mixedRow = mixed.sides[0].rows.find((r) => r.key.startsWith("group"))!;
+  assert.equal(mixedRow.usd?.text, "—");
+  assert.equal(mixedRow.usd?.cents, undefined);
+  // Three members whose middle one's Market move has no price: the group's
+  // Market move draws "—" (ui-jobs 743, A1).
+  const member = (id: string, market: object) => ({
+    id,
+    timestamp: 0,
+    sheet: {
+      sides: [
+        {
+          side: "collateral" as const,
+          icons: ["ETH"],
+          carry: [{ key: "market", label: "Market move", usd: market }],
+          rows: [],
+          total: { text: "$1", cents: 1 },
+        },
+      ],
+      panels: [],
+    },
+  });
+  const priced = (cents: number) => ({ text: `+$${cents}`, cents, info: { kind: "derived", summary: "s" } });
+  const three = mergeGroupSheet(
+    [
+      member("a", priced(5)),
+      member("b", {
+        text: "—",
+        info: { kind: "derived", summary: "No dollar figure: ETH has no price at this block." },
+      }),
+      member("c", priced(7)),
+    ] as never,
+    "Move",
+  )!;
+  const mv = three.sides[0].rows.find((r) => r.key === "group-market")!;
+  assert.equal(mv.usd?.text, "—", "an unpriced member blocks the group's figure");
+  assert.equal(mv.usd?.cents, undefined);
 });
 
 // Every family's sheet cells carry their rows' cents (ui-jobs 743), so a
@@ -243,9 +278,15 @@ test("each family's cells carry cents, and a group sums them", async () => {
     "components/protocol/liquity/delegate-run-sheet.tsx",
     "components/protocol/sky-savings/sky-savings-sheet.tsx",
     "components/protocol/alchemix/alchemix-event-sheet.ts",
+    "components/protocol/fx/fx-sheet.tsx",
+    "components/protocol/polaris/polaris-sheet.ts",
+    "components/protocol/polaris/polaris-sp-loan-sheet.ts",
+    "components/protocol/polaris/polaris-since-last-touch.tsx",
+    "components/protocol/llamalend/llamalend-sheet.tsx",
   ]) {
     const src = readFileSync(f, "utf8");
-    const bare = [...src.matchAll(/text: sheetUsd\([^\n]*\n?[^\n]*/g)].filter((m) => !/cents/.test(m[0]));
+    // `text: sheetUsd(…)`, and `text: cond ? sheetUsd(…) : …` too.
+    const bare = [...src.matchAll(/text: [^\n]*?\bsheetUsd\([^\n]*\n?[^\n]*/g)].filter((m) => !/cents/.test(m[0]));
     assert.deepEqual(
       bare.map((m) => m[0].split("\n")[0].trim()),
       [],

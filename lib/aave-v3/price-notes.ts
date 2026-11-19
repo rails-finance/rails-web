@@ -5,7 +5,7 @@
 // reserve pages) names a price the same way (ui-jobs 743).
 
 const blockText = (block: number | null | undefined): string =>
-  block != null ? `at block ${block.toLocaleString("en-US")}` : "at the latest read, which states no block";
+  block != null ? `at block ${block.toLocaleString("en-US")}` : "at the latest read, which names no block";
 
 /** One reserve's price: the oracle, the call and the block it was read at. */
 export const aaveV3PriceNote = (oracle: string, symbol: string, block: number | null | undefined): string =>
@@ -14,7 +14,7 @@ export const aaveV3PriceNote = (oracle: string, symbol: string, block: number | 
 /** Ethereum's balance row: the index's balance, interest accrued to the
  *  latest block it has indexed, which the listing does not name. */
 export const aaveV3IndexBalanceNote = (symbol: string, side: "supply" | "debt"): string =>
-  `the index's ${symbol} ${side === "supply" ? "balance" : "debt"}, interest accrued to the index's latest read, which states no block`;
+  `the index's ${symbol} ${side === "supply" ? "balance" : "debt"}, interest accrued to the index's latest read, which names no block`;
 
 /** Where a receipt's balances and prices stand at two blocks (a listing row:
  *  the balances at the row's block, the prices at the latest when it was

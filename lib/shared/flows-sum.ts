@@ -150,7 +150,7 @@ function centsSumRows(st: FlowSideState, held: FlowSegment): SideSumRows {
     const heldBasis = held.priceBasis ?? "";
     const bases = [...new Set(raw.flatMap((l) => (l.seg.legs ?? []).map((g) => g.basis ?? heldBasis)))];
     const market: MarketMove = unpriced.length
-      ? { none: `No figure: ${noPriceWords(unpriced)}.` }
+      ? { none: `No dollar figure: ${noPriceWords(unpriced)}.` }
       : bases.some((b) => b !== heldBasis)
         ? {
             none: differentBases(
@@ -194,15 +194,15 @@ function centsSumRows(st: FlowSideState, held: FlowSegment): SideSumRows {
   return { lines, total: { dollars: roundAway(total), amount: wholeUsd(total), seg: held, cents: total } };
 }
 
-/** "WETH has no price at its block"; "WETH and USDC have no price at their
- *  blocks". */
+/** "WETH has no price at this block"; "WETH and USDC have no price at this
+ *  block". Callers open it with "No dollar figure: ". */
 export const noPriceWords = (xs: string[]): string =>
-  xs.length > 1 ? `${listWords(xs)} have no price at their blocks` : `${listWords(xs)} has no price at its block`;
+  `${listWords(xs)} ${xs.length > 1 ? "have" : "has"} no price at this block`;
 
 /** A side whose held figure has no price that day: the flows as they stand,
  *  the total "—" naming the asset, and no balancing item. */
 function heldUnpricedRows(st: FlowSideState, held: FlowSegment): SideSumRows {
-  const none = `No figure: ${noPriceWords(held.unpriced ?? [])} on this day.`;
+  const none = `No dollar figure: ${noPriceWords(held.unpriced ?? [])}.`;
   const raw: SumLine[] = [];
   for (const seg of st.sources)
     if (seg.fill === "in" && seg.value)

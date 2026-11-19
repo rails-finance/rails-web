@@ -6,7 +6,7 @@ import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import type { FlowAssetHeld, FlowLeg, FlowSegment, FlowSide, FlowUnit, MarketMove } from "@/lib/shared/flows-timeline";
 import { holderUsdReceipt } from "@/lib/shared/holder-usd-receipt";
 import { listWords, noPriceWords } from "@/lib/shared/flows-sum";
-import { amountText, centsOf, faceAmount, factorText } from "@/lib/shared/shown-usd";
+import { amountText, centsOf, faceAmount, factorText, shownUsd } from "@/lib/shared/shown-usd";
 import { formatUsdValue } from "@/lib/utils/format";
 
 // ── The rows behind a line (ui-jobs 743) ─────────────────────────────────────
@@ -29,7 +29,7 @@ function legLabels(legs: readonly FlowLeg[]): string[] {
   const seen = new Map<string, number>();
   return legs.map((l) => {
     const at = blockWords(l.block);
-    const base = `${l.symbol ?? "Token"} ${at ? `at ${at}` : "at a block the read does not name"}`;
+    const base = `${l.symbol ?? "Token"} ${at ? `at ${at}` : "at a block this read does not name"}`;
     const n = (seen.get(base) ?? 0) + 1;
     seen.set(base, n);
     return n > 1 ? `${base} (${n})` : base;
@@ -105,7 +105,7 @@ export function legsProv(
     const names = [...unpriced];
     return {
       kind: "derived",
-      summary: `${label} ${when}. No figure: ${noPriceWords(names)}, so the line is not summed.`,
+      summary: `${label} ${when}. No dollar figure: ${noPriceWords(names)}, so the line is not summed.`,
       via: "the position's events · each leg × its price at its block",
       inputs: [
         {
@@ -171,7 +171,7 @@ export function marketMoveProv(label: string, side: FlowSide, when: string, m: M
   if ("none" in m) return { kind: "derived", summary: `${label} ${when}. ${m.none}` };
   return {
     kind: "chain-derived",
-    summary: `${label} ${when}. What the position has ${held}, its amount times its price as shown, less the lines above it, each the sum of its legs' shown products: the change in the prices since the flows. No funds moved. ${FACE}`,
+    summary: `${label} ${when}. What the position has ${held}, its amount times its price as shown, less the lines above it, each the sum of its legs' shown products: the change in the prices since the flows. No token moved. ${FACE}`,
     formula: `${held} − Σ lines`,
     inputs: [
       {
@@ -244,8 +244,8 @@ export function heldDayProv(label: string, when: string, rows: readonly FlowAsse
           : "the balance after its last event by then",
         price: p.price as number,
         priceNote: p.series
-          ? `the daily store's price at the close of ${day(p.day)}, ${at ?? "a block the store's route does not state"}`
-          : `the price its last event carried, ${at ?? "a block the event does not name"}`,
+          ? `the daily store's price at the close of ${day(p.day)}, ${at ?? "a block the daily store's route does not name"}`
+          : `the price its last event carried, ${at ?? "at a block this read does not name"}`,
       };
     }),
     via: "each asset's balance × that day's price · summed",
@@ -304,8 +304,8 @@ export function flowSegmentProv(
     return {
       kind: "derived",
       summary: isLive
-        ? `${s.label} now. No figure: ${noPriceWords([...s.unpriced])}.`
-        : `${s.label} at ${when}. No figure: ${noPriceWords([...s.unpriced])} on this day.`,
+        ? `${s.label} now. No dollar figure: ${noPriceWords([...s.unpriced])}.`
+        : `${s.label} at ${when}. No dollar figure: ${noPriceWords([...s.unpriced])}.`,
     };
   if (s.fill === "held" && !isLive && !unit && s.heldRows?.some((r) => r.priced?.price != null))
     return heldDayProv(s.label, when, s.heldRows);
@@ -335,8 +335,8 @@ export function flowSegmentProv(
       summary: s.key.endsWith("-interest")
         ? `${s.label}. Over the position's whole life, as the Explanation states it.`
         : s.note
-          ? `${s.label} at ${when}. The bar's length less the sources beside it: ${s.note}. No funds moved.`
-          : `${s.label} at ${when}. The bar's length less the sources beside it; what prices and interest added to what came in. No funds moved.`,
+          ? `${s.label} at ${when}. The bar's length less the sources beside it: ${s.note}. No token moved.`
+          : `${s.label} at ${when}. The bar's length less the sources beside it; what prices and interest added to what came in. No token moved.`,
       formula: s.key.endsWith("-interest") ? undefined : "in − Σ sources",
     };
   return {
@@ -360,7 +360,7 @@ export function flowRemainderProv(
   const holds = note ? `It is ${note}` : "It holds price changes and interest together";
   return {
     kind: "chain-derived",
-    summary: `${label} ${when === "now" ? "now" : `at ${when}`}. The remainder; what the position has ${held} ${when === "now" ? "now" : "at that date"} less every flow above it, each flow valued at the oracle price at its block. ${holds}; no funds moved.`,
+    summary: `${label} ${when === "now" ? "now" : `at ${when}`}. The remainder; what the position has ${held} ${when === "now" ? "now" : "at that date"} less every flow above it, each flow valued at the oracle price at its block. ${holds}. No token moved.`,
     formula: `${held} − Σ flows`,
   };
 }
@@ -395,7 +395,7 @@ export function flowAssetProv(
     if (rows?.length && rows.every((r) => r.priced?.price != null))
       return heldDayProv(`${symbol} ${side === "collateral" ? "held" : "owed"}`, when, rows);
     if (rows?.some((r) => r.unpriced))
-      return { kind: "derived", summary: `${symbol} at ${when}. No figure: ${noPriceWords([symbol])} on this day.` };
+      return { kind: "derived", summary: `${symbol} at ${when}. No dollar figure: ${noPriceWords([symbol])}.` };
   }
   if ((s.fill === "in" || s.fill === "out") && s.legs && !unit) {
     const legs = s.legs.filter((l) => l.symbol === symbol);
@@ -499,18 +499,41 @@ export function ledgerPartProv(
   };
 }
 
+/** An amount as a number: a number as given, a printed figure ("1,234.5",
+ *  "−3") parsed. */
+const amountOf = (amount: string | number): number =>
+  typeof amount === "number" ? amount : Number(amount.replace(/,/g, "").replace(/^−/, "-"));
+
+/** A $1-face amount's rows (ui-jobs 743): the amount at six decimals, the
+ *  face, and their product to the cent, so the receipt rebuilds the cell. */
+export function faceRows(
+  symbol: string,
+  amount: string | number,
+  amountRow: { label: string; note?: string },
+): ProvInput[] {
+  const n = Math.abs(amountOf(amount));
+  if (!Number.isFinite(n))
+    return [
+      { label: amountRow.label, value: `${amount} ${symbol}`, kind: "chain", note: amountRow.note },
+      { label: "face", value: "$1", kind: "derived", definition: true, note: `${symbol} redeems at $1` },
+    ];
+  return [
+    { label: amountRow.label, value: `${amountText(n)} ${symbol}`, kind: "chain", note: amountRow.note },
+    { label: "face", value: "$1", kind: "derived", definition: true, note: `${symbol} redeems at $1` },
+    { label: `${amountRow.label} × $1`, value: formatUsdValue(shownUsd(n, 1)), kind: "derived", step: true },
+  ];
+}
+
 /** A stablecoin debt's dollars at its $1 face, as the event card's Debt
  *  cell and its ledger count it: the debt before or after the event's
- *  transaction, one dollar a token. */
-export function faceUsdProv(symbol: string, amount: string, which: "before" | "after"): Provenance {
+ *  transaction, one dollar a token. `amount` is the debt as a number, or
+ *  as printed. */
+export function faceUsdProv(symbol: string, amount: string | number, which: "before" | "after"): Provenance {
   return {
     kind: "derived",
     summary: `Debt ${which} this event in USD. The ${symbol} owed ${which} the transaction at its $1 face, as the Lifetime flows count it.`,
     formula: "debt × $1",
-    inputs: [
-      { label: "debt", value: `${amount} ${symbol}`, kind: "chain", note: which },
-      { label: "face", value: "$1", kind: "derived", definition: true, note: `${symbol} redeems at $1` },
-    ],
+    inputs: faceRows(symbol, amount, { label: "debt", note: which }),
   };
 }
 
@@ -530,7 +553,7 @@ export function ledgerAssetUsdProv(
       }
     : {
         kind: "chain-derived",
-        summary: `${label} on ${symbol} at ${when}. The remainder; the ${symbol} balance at the oracle price at the block less every ${symbol} row above it. It is the change in ${symbol}'s price since its flows; no funds moved.`,
+        summary: `${label} on ${symbol} at ${when}. The remainder; the ${symbol} balance at the oracle price at the block less every ${symbol} row above it. It is the change in ${symbol}'s price since its flows. No token moved.`,
         formula: "balance × price − Σ rows",
       };
 }

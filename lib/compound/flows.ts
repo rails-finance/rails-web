@@ -603,6 +603,21 @@ export function compoundFlowReplay(events: CompoundFlowEvent[], o: CompoundFlowO
   };
 }
 
+/** An absorb's collateral leg stated from its AbsorbCollateral log: on a
+ *  USD-quoted Comet only. An ETH-quoted Comet's log value is in ETH, so its
+ *  leg is the composed getPrice leg (the Comet's getPrice in ETH × WETH/USD,
+ *  each at its block). */
+const absorbFromLog = (
+  rp: Pick<CompoundFlowReplay, "quoteUnit">,
+  r: CompoundReplayed,
+  l: CompoundReplayed["legs"][number],
+): boolean =>
+  rp.quoteUnit !== "ETH" &&
+  r.ev.kind === "absorb_collateral" &&
+  l.token === r.ev.token &&
+  r.ev.usdValue != null &&
+  r.ev.usdValue > 0;
+
 /** A row's leg with its parts (ui-jobs 743): the token at the row's price as
  *  shown, its block and source named; a price from the nearest read names
  *  both blocks; no price at all is unpriced. */
@@ -611,9 +626,9 @@ function compoundLeg(
   r: CompoundReplayed,
   l: CompoundReplayed["legs"][number],
 ): FlowLeg {
-  // An absorb's collateral leg is the dollars its AbsorbCollateral log
-  // states, to the cent: no price, no product.
-  if (r.ev.kind === "absorb_collateral" && l.token === r.ev.token && r.ev.usdValue != null && r.ev.usdValue > 0)
+  // An absorb's collateral leg on a USD-quoted Comet is the dollars its
+  // AbsorbCollateral log states, to the cent: no price, no product.
+  if (absorbFromLog(rp, r, l) && r.ev.usdValue != null)
     return {
       bucket: l.bucket,
       amount: l.amount,
@@ -710,9 +725,10 @@ export function compoundFlowTimeline(events: CompoundFlowEvent[], o: CompoundFlo
     // nearest priced row's price.
     const unsure: { side: "collateral" | "debt"; why: string; symbol: string; held: true }[] = [];
     for (const l of r.legs) {
-      if (r.own.has(l.token)) continue;
+      // A leg stated from its log needs no price.
+      if (r.own.has(l.token) || absorbFromLog(rp, r, l)) continue;
       const side = COLL_SIDE.has(l.bucket) ? ("collateral" as const) : ("debt" as const);
-      const why = "priced at the nearest priced row: the price at this block is not read.";
+      const why = "priced at the nearest read: the price at this block is not read.";
       if (!unsure.some((u) => u.side === side && u.symbol === l.symbol))
         unsure.push({ side, why, symbol: l.symbol, held: true });
     }
@@ -1032,18 +1048,15 @@ export function compoundFocusEvents(rp: CompoundFlowReplay): FocusEvent[] {
     const rate = twoSided(roles) ? rp.borrowRate[i] : rp.supplyRate[i];
     const coll = side("collateral");
     const debt = side("debt");
-    // A side holding an unpriced token has no dollars: the event states no
-    // sides rather than a $0 (ui-jobs 743).
-    const priced = (x: typeof coll) =>
-      x.before != null && x.after != null ? { ...x, before: x.before, after: x.after } : null;
-    const c = priced(coll);
-    const d = priced(debt);
+    // A side holding an unpriced token has no dollars: NaN (the formatters
+    // print "—"), never $0; the priced side keeps its figures (ui-jobs 743).
+    const priced = (x: typeof coll) => ({ ...x, before: x.before ?? Number.NaN, after: x.after ?? Number.NaN });
     return {
       id: r.ev.id,
       ts: r.ev.ts,
       ...(r.ev.tx ? { tx: r.ev.tx } : {}),
       legs: r.legs.map((l) => compoundLeg(rp, r, l)),
-      ...(c && d ? { sides: { collateral: c, debt: d } } : {}),
+      sides: { collateral: priced(coll), debt: priced(debt) },
       rate: rate * 100,
     };
   });

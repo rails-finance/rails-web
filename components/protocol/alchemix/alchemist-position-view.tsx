@@ -80,6 +80,7 @@ import { isAlchemistEvent, isAlchemixV2Event } from "@/lib/shared/types/event-sh
 import { AlchemixV2EventCard, type AlchemixV2Event } from "@/components/protocol/alchemix/v2-event-card";
 import { lineProtocolFeeStep, v2PositionPath, v3PositionPath } from "@/lib/alchemix/lines";
 import { protocolFeeNow } from "@/lib/alchemix/protocol-fee";
+import { alchemixPriceAssets, alchemixPriceReason } from "@/lib/alchemix/price-list";
 import { AlchemixEventCard } from "@/components/protocol/alchemix/alchemix-event-card";
 import {
   AlchemixIdentity,
@@ -570,53 +571,12 @@ export function AlchemistPositionView({
     return { endedAtBlock: w.endedAtBlock, endedAt: at };
   }, [lineEventWindow, alchemistEvents]);
 
-  // The top row's price list: the asset underneath in dollars, a vault share
-  // in that asset, and the synthetic at the value the protocol counts it at,
-  // one unit of the asset underneath.
   const priceView = live?.collateral ?? position.figures.collateral ?? null;
-  const priceAssets = useMemo<LatestPriceAsset[]>(() => {
-    const u = priceView?.underlying;
-    const out: LatestPriceAsset[] = [];
-    if (u?.symbol && priceView?.usd)
-      out.push({
-        symbol: u.symbol,
-        address: u.address,
-        price: priceView.usd.pricePerUnit,
-        info: {
-          kind: "offchain",
-          pclass: "offchain",
-          summary: `${u.symbol}'s price. The dollar figure this asset is quoted at now.`,
-          via: `${priceView.usd.priceSource} · ${priceView.usd.pricedAt}`,
-          verify: { kind: "none", text: "An off-chain price, with no on-chain anchor" },
-          inputs: [
-            {
-              label: "price",
-              value: String(priceView.usd.pricePerUnit),
-              kind: "offchain",
-              note: priceView.usd.priceSource,
-            },
-            { label: "priced at", value: priceView.usd.pricedAt, kind: "offchain" },
-          ],
-        },
-      });
-    if (u?.symbol && priceView && priceView.formatted > 0)
-      out.push({
-        symbol: mytSymbol,
-        price: u.formatted / priceView.formatted,
-        unit: u.symbol,
-        label: `One ${mytSymbol} in ${u.symbol}`,
-      });
-    out.push(
-      u?.symbol
-        ? { symbol: sym, price: 1, unit: u.symbol, label: `One ${sym} as the protocol counts it, in ${u.symbol}` }
-        : { symbol: sym },
-    );
-    return out;
-  }, [priceView, mytSymbol, sym]);
-  const underSym = priceView?.underlying?.symbol ?? null;
-  const priceReason = underSym
-    ? `${underSym} is priced in dollars, and a ${mytSymbol} share in ${underSym} at the vault's share price; together they give the collateral's dollar value. ${sym} is shown at 1 ${underSym}, the protocol's accounting value: Alchemix counts each ${sym} of debt as one ${underSym}. Its market price can differ.`
-    : `${sym} and ${mytSymbol} are shown in their own units with no dollar price: no share price has been read for this position.`;
+  const priceAssets = useMemo<LatestPriceAsset[]>(
+    () => alchemixPriceAssets(priceView, mytSymbol, sym),
+    [priceView, mytSymbol, sym],
+  );
+  const priceReason = alchemixPriceReason(priceView?.underlying?.symbol ?? null, mytSymbol, sym);
 
   const dlb = position.figures.derivedLowerBound;
   // Rule 3. The events-only debt beside the debt read now, where the two

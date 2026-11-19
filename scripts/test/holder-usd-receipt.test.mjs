@@ -59,9 +59,9 @@ test("several tokens: each leg worked out, then the sum", () => {
     "rETH amount × price=$110,000.00",
     "sum=$310,000.00",
   ]);
-  // A read that states no block says so.
+  // A read that names no block says so.
   assert.equal(p.source, undefined);
-  assert.match(p.summary, /the prices at the latest read, which states no block/);
+  assert.match(p.summary, /the prices at the latest read, which names no block/);
 });
 
 test("a $1 face is a definition, said plainly", () => {
@@ -100,4 +100,36 @@ test("the rows rebuild the figure, with awkward numbers", () => {
   assert.equal(val("WETH amount"), "12.34567 WETH");
   assert.equal(val("WETH price"), "$3,456.789");
   assert.equal(val("pETH price"), "$0.987654");
+});
+
+test("a negative amount and its product lead with a minus sign (ui-jobs 743)", () => {
+  const { prov, usd } = holderUsdReceipt({
+    what: "A change",
+    legs: [
+      { token: "WETH", amount: -0.5, amountNote: "a", price: 3000, priceNote: "p" },
+      { token: "USDC", amount: 2, amountNote: "a", price: 1, priceNote: "p" },
+    ],
+    via: "v",
+  });
+  const val = (label) => prov.inputs.find((i) => i.label === label).value;
+  assert.equal(val("WETH amount"), "−0.5 WETH");
+  assert.equal(val("WETH amount × price"), "−$1,500.00");
+  assert.equal(val("sum"), "−$1,498.00");
+  assert.equal(usd, -1498);
+});
+
+test("a $1-face receipt states the amount to six decimals and its product (ui-jobs 743)", async () => {
+  const { faceUsdProv } = await import("../../lib/shared/flows-timeline-provenance.ts");
+  const p = faceUsdProv("BOLD", 1234.5678919, "after");
+  const val = (label) => p.inputs.find((i) => i.label === label).value;
+  assert.equal(val("debt"), "1,234.567892 BOLD");
+  assert.equal(val("debt × $1"), "$1,234.57");
+});
+
+test("shown values above ten million keep fifteen significant figures", async () => {
+  const { centsOf, shownAmount } = await import("../../lib/shared/shown-usd.ts");
+  assert.equal(centsOf(10_000_000.005), 10_000_000.01);
+  assert.equal(centsOf(123_456_789.125), 123_456_789.13);
+  assert.equal(shownAmount(12_345_678.1234565), 12_345_678.123457);
+  assert.equal(shownAmount(1_234_567_890.1234565), 1_234_567_890.12346);
 });

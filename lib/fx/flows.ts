@@ -656,7 +656,7 @@ export function fxFlowTimeline(rp: FxFlowReplay, o: FxFlowOptions): FlowTimeline
             unsure: [
               {
                 side: "collateral" as const,
-                why: `${o.collSymbol} priced at the ${r.priceFrom === "today" ? "latest block's price" : "nearest priced row"}: no price is recorded or read at this block.`,
+                why: `${o.collSymbol} priced at the ${r.priceFrom === "today" ? "latest block's price" : "nearest read"}: no price is recorded or read at this block.`,
                 held: true,
               },
             ],

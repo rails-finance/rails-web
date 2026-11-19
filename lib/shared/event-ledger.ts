@@ -151,8 +151,8 @@ function notesFor(rows: LedgerRow[]): string[] | undefined {
   const notes: string[] = [];
   for (const r of rows) {
     if (r.usd?.unpriced?.length && r.role !== "before")
-      notes.push(`${r.label} has no figure: ${noPriceWords(r.usd.unpriced)}.`);
-    if (r.usd?.market && "none" in r.usd.market && !r.usd.market.none.startsWith("No figure"))
+      notes.push(`${r.label} has no dollar figure: ${noPriceWords(r.usd.unpriced)}.`);
+    if (r.usd?.market && "none" in r.usd.market && !r.usd.market.none.startsWith("No dollar figure"))
       notes.push(r.usd.market.none);
   }
   return notes.length ? [...new Set(notes)] : undefined;
@@ -709,7 +709,7 @@ export function ledgerAtPrice(l: Ledger, price: number): Ledger | null {
     const lineSum = toCents(rows.reduce((a, r) => a + (r.usd?.cents ?? 0), 0));
     const market = toCents(cents - lineSum);
     if (blocked)
-      rows.push(marketRow(noFigure({ market: { none: "No figure: a line above has no price at its block." } })));
+      rows.push(marketRow(noFigure({ market: { none: "No dollar figure: a line above has no price at its block." } })));
     else if (Math.abs(market) >= 0.005)
       rows.push(marketRow(centsUsd(market, { market: { cents: market, held: cents, lines: lineSum } })));
     return {

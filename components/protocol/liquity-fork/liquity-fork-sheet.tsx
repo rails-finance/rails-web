@@ -332,7 +332,7 @@ export function liquityForkSheet({
         address: debtAddr,
         info: provs.upfrontFeeProv(coords, { fee: op!.debtUpfrontFee }),
       },
-      usd: { ...faceParts(upfrontFee), info: faceUsdProv(debtSym, forkAmount(upfrontFee), "after") },
+      usd: { ...faceParts(upfrontFee), info: faceUsdProv(debtSym, upfrontFee, "after") },
       tip: TIP.debtUpfront,
     });
   if (redistDebt >= FORK_DEBT_DUST_FLOAT)
@@ -378,7 +378,7 @@ export function liquityForkSheet({
       key: "last",
       label: SHEET_WORDS.last,
       amount: { text: forkAmount(debtBefore), symbol: debtSym, address: debtAddr, info: debtBeforeProv },
-      usd: { ...faceParts(debtBefore), info: faceUsdProv(debtSym, forkAmount(debtBefore), "before") },
+      usd: { ...faceParts(debtBefore), info: faceUsdProv(debtSym, debtBefore, "before") },
       tip: TIP.debtLast,
     });
     if (accrualProv)
@@ -422,7 +422,7 @@ export function liquityForkSheet({
     total: {
       text: debtAfter > 0 ? faceParts(debtAfter).text : "$0",
       cents: faceParts(debtAfter).cents,
-      info: faceUsdProv(debtSym, forkAmount(debtAfter), "after"),
+      info: faceUsdProv(debtSym, debtAfter, "after"),
     },
     totalAmount: {
       text: forkAmount(debtAfter),

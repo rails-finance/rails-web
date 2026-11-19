@@ -63,13 +63,17 @@ export function FxPoolStatsBand({
                     a
                       ? `The pool oracle's anchor price per ${p.normalizedSymbol}, read at block ${a.block}`
                       : p.oraclePriceBlock != null
-                        ? `The pool oracle's min price per ${p.normalizedSymbol}, read at block ${p.oraclePriceBlock}`
-                        : undefined
+                        ? `The pool oracle's min price per ${p.normalizedSymbol}, read at block ${Number(p.oraclePriceBlock).toLocaleString("en-US")}`
+                        : `Not complete: the pool oracle's min price per ${p.normalizedSymbol}, at a block this read does not name`
                   }
                 >
                   {p.normalizedSymbol} {priceText(price)}
                   {a ? " anchor" : " min"}
-                  {a ? ` @ ${a.block.toLocaleString("en-US")}` : ""}
+                  {a
+                    ? ` @ ${a.block.toLocaleString("en-US")}`
+                    : p.oraclePriceBlock != null
+                      ? ` @ ${Number(p.oraclePriceBlock).toLocaleString("en-US")}`
+                      : "*"}
                 </span>
               )}
             </div>

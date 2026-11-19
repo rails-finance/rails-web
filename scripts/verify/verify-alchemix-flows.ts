@@ -45,6 +45,7 @@ import {
 } from "@/lib/alchemix/flows";
 import { alchemixBoundRead, alchemixHealthFinish, alchemixHealthSource } from "@/lib/alchemix/flows-health";
 import { ltvPrint } from "@/lib/alchemix/ltv";
+import { alchemixPriceAssets, alchemixPriceReason } from "@/lib/alchemix/price-list";
 import { buildFlowModel, stateAt, type FlowTimeline } from "@/lib/shared/flows-timeline";
 import { sideSumRows } from "@/lib/shared/flows-sum";
 import { eventCum, eventSideSum, eventTokenSum } from "@/lib/shared/flow-focus";
@@ -528,4 +529,16 @@ test("the sheet and the card draw no dollars but alUSD's debt at its $1 face", a
     "mvUSDC",
   );
   assert.equal((head as { usd?: unknown }).usd, undefined, "no dollar line on the card");
+  // The top row's price list: no dollar price for the underlying, even with
+  // a lane price in hand (ui-jobs 743).
+  const coll = {
+    formatted: 2.5,
+    underlying: { symbol: "USDC", formatted: 2.505862 },
+    usd: { usd: 2.51, pricePerUnit: 1.0001, priceSource: "lane", pricedAt: "0x0" },
+  } as never;
+  const list = alchemixPriceAssets(coll, "mvUSDC", "alUSD");
+  const listed = JSON.stringify(list);
+  assert.ok(!listed.includes("$"), `the price list carries no "$": ${listed}`);
+  assert.ok(!list.some((a) => a.symbol === "USDC"), "no price row for the underlying");
+  assert.ok(!alchemixPriceReason("USDC", "mvUSDC", "alUSD").includes("$"), "the reason claims no dollar value");
 });

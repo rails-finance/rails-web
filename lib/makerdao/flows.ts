@@ -304,6 +304,12 @@ export interface MakerReplayed {
 const MAKER_TODAY_BASIS = "the latest read's price";
 const MAKER_BLOCK_BASIS = "each block's price";
 
+/** A row priced at the live read, from a later block than its own: a
+ *  latest read, both blocks named, not complete and on another basis
+ *  (ui-jobs 743). */
+const atLatestRead = (r: MakerReplayed): boolean =>
+  r.priceFrom === "today" && makerPriceBlock(r.priceAt) !== r.ev.block;
+
 /** The block a row's price stands at, where its read names one. */
 function makerPriceBlock(p: MakerRowPrice): number | null {
   switch (p.from) {
@@ -327,7 +333,6 @@ function makerLeg(
   l: { bucket: string; amount: number },
   collSymbol: string,
   debtSymbol: string,
-  isToday: boolean,
 ): FlowLeg {
   if (!COLL_KEYS.has(l.bucket))
     return flowLeg({
@@ -346,7 +351,7 @@ function makerLeg(
     price: r.price > 0 ? r.price : null,
     block: makerPriceBlock(r.priceAt),
     priceNote: makerRowPriceNote(r.priceAt),
-    ...(r.priceFrom === "today" && !isToday ? { basis: MAKER_TODAY_BASIS } : {}),
+    ...(atLatestRead(r) ? { basis: MAKER_TODAY_BASIS } : {}),
   });
 }
 
@@ -565,7 +570,6 @@ export function makerFlowTimeline(events: MakerFlowEvent[], o: MakerFlowOptions)
     }
     // A row valued without the OSM price at its block (only a liquidation's
     // is stored): its collateral flows rest on the price it took.
-    const isToday = Math.floor(r.ev.ts / DAY_S) >= Math.floor(o.now / DAY_S);
     // Each names the price's block beside the event's (ui-jobs 743).
     const at = makerRowPriceNote(r.priceAt);
     // A row at its own day's close is the decided basis, stated once in the
@@ -574,7 +578,7 @@ export function makerFlowTimeline(events: MakerFlowEvent[], o: MakerFlowOptions)
     const why =
       r.priceFrom === "store-near"
         ? `${o.collSymbol} at ${at}: no price is stored for its day.`
-        : r.priceFrom === "nearest" || (r.priceFrom === "today" && !isToday)
+        : r.priceFrom === "nearest" || atLatestRead(r)
           ? `${o.collSymbol} at ${at}: no daily price is stored for this ilk.`
           : null;
     const unsure =
@@ -590,7 +594,7 @@ export function makerFlowTimeline(events: MakerFlowEvent[], o: MakerFlowOptions)
         r.ev.kind === "grab" ? "liquidation" : moved.coll && moved.debt ? "both" : moved.debt ? "debt" : "collateral",
       // Each leg the shown product: the amount at six decimals × the price
       // as shown, to the cent; the debt at its $1 par (ui-jobs 743).
-      legs: r.legs.map((l) => makerLeg(r, l, o.collSymbol, o.debtSymbol, isToday)),
+      legs: r.legs.map((l) => makerLeg(r, l, o.collSymbol, o.debtSymbol)),
       tx: r.ev.tx,
       // The card counts the owner's transactions; a liquidation is a keeper's.
       countsTx: r.ev.kind !== "grab",
@@ -787,9 +791,7 @@ export function makerFocusEvents(
       id: r.ev.id,
       ts: r.ev.ts,
       ...(r.ev.tx ? { tx: r.ev.tx } : {}),
-      legs: r.legs.map((l) =>
-        makerLeg(r, l, collSymbol, debtSymbol, Math.floor(r.ev.ts / 86_400) >= Math.floor(nowSec / 86_400)),
-      ),
+      legs: r.legs.map((l) => makerLeg(r, l, collSymbol, debtSymbol)),
       sides: {
         collateral: {
           // No price on the vault: not a number, never $0 (ui-jobs 743).

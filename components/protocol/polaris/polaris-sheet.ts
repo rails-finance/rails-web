@@ -50,6 +50,7 @@ import { formatPeth } from "@/lib/polaris/figure-format";
 import { priceText, shownUsd } from "@/lib/shared/shown-usd";
 import { polarisSheetUsd, shownPricesOf } from "@/lib/polaris/sheet-usd";
 import { centsParts } from "@/lib/shared/sheet-usd-rows";
+import { NO_FIGURE, noPriceWords } from "@/lib/shared/flows-sum";
 
 const W = POLARIS_WORDS;
 
@@ -164,7 +165,22 @@ export function polarisSheet(
   ): SheetRow | null => {
     const now = token === "coll" ? pethUsd : (prices?.debt ?? null);
     const then = token === "coll" ? prevPethUsd : (prevPrices?.debt ?? null);
-    if (now == null || then == null || held <= 0) return null;
+    if (held <= 0) return null;
+    // Held with a price missing at either event: "—", so a group's sum is
+    // blocked (ui-jobs 743).
+    if (now == null || then == null)
+      return {
+        key: "market",
+        label: SHEET_WORDS.market,
+        usd: {
+          text: NO_FIGURE,
+          info: {
+            kind: "derived",
+            summary: `Market move on the ${what} since the last event. No dollar figure: ${noPriceWords([token === "coll" ? "pETH" : stable])}.`,
+          },
+        },
+        tip,
+      };
     // The difference of the two shown products.
     const mv = shownUsd(held, now) - shownUsd(held, then);
     if (Math.abs(mv) < 0.005) return null;
@@ -346,7 +362,7 @@ export function polarisSheet(
     assets: isLiq ? liqSplit("coll") : undefined,
     total:
       collAfter === 0
-        ? { text: "$0", info: ledgerFieldProv("newColl", coords, ctx.raw?.newColl) }
+        ? { text: "$0", cents: 0, info: ledgerFieldProv("newColl", coords, ctx.raw?.newColl) }
         : (rowUsd("The collateral after this event", "coll", collAfter) ?? { none: W.sheet_no_price }),
     totalAmount: {
       text: formatPeth(collAfter),
@@ -473,7 +489,7 @@ export function polarisSheet(
     assets: isLiq ? liqSplit("debt") : undefined,
     total:
       debtAfter === 0
-        ? { text: "$0", info: ledgerFieldProv("newDebt", coords, ctx.raw?.newDebt) }
+        ? { text: "$0", cents: 0, info: ledgerFieldProv("newDebt", coords, ctx.raw?.newDebt) }
         : (rowUsd("The debt after this event", "debt", debtAfter) ?? { none: W.sheet_no_price }),
     totalAmount: {
       text: formatNumber(debtAfter),

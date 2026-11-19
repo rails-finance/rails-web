@@ -293,7 +293,17 @@ export function FxPositionExplanation({
       bullets.push(
         <span key="ratio">
           The pool puts the LTV at <H>{(ratio * 100).toFixed(1)}%</H>: the debt as a share of the collateral&rsquo;s
-          value at the anchor price, {priceText(anchorAt)} per {v.normalizedSymbol}.
+          value at the anchor price,{" "}
+          {px?.anchor != null ? (
+            <>
+              {priceText(anchorAt)} per {v.normalizedSymbol}.
+            </>
+          ) : (
+            <>
+              {priceText(anchorAt)} per {v.normalizedSymbol}, derived from the pool&rsquo;s figures as debts ÷
+              (collateral × LTV).
+            </>
+          )}
           {px ? (
             <>
               {" "}
@@ -311,9 +321,9 @@ export function FxPositionExplanation({
           <span key="lines">
             Rebalancing starts at <H>{line(terms.rebalanceRatio)}</H> and liquidation at{" "}
             <H>{line(terms.liquidateRatio)}</H>. With today&rsquo;s collateral and debt the position reaches{" "}
-            {line(terms.rebalanceRatio)} if the min price falls to <H>{formatUsd(p88)}</H>,{" "}
+            {line(terms.rebalanceRatio)} if the min price falls to <H>{priceText(p88)}</H>,{" "}
             {((1 - p88 / px.min) * 100).toFixed(1)}% below now, and {line(terms.liquidateRatio)} at{" "}
-            <H>{formatUsd(p95)}</H>, {((1 - p95 / px.min) * 100).toFixed(1)}% below; funding keeps taking collateral,
+            <H>{priceText(p95)}</H>, {((1 - p95 / px.min) * 100).toFixed(1)}% below; funding keeps taking collateral,
             which moves both prices up slowly. A rebalance takes part of the collateral and leaves the position open; a
             liquidation repays the debt and takes collateral worth it plus the bounty.
           </span>,

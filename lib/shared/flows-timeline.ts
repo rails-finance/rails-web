@@ -86,7 +86,7 @@ export type FlowHatch =
 /** A flow leg as a ledger reads it (ui-jobs 743): its amount, its price as
  *  shown with the block it stands at and where it comes from, and its
  *  dollars, the product of the two as shown to the cent (`shownUsd`). A leg
- *  with no price at its own block carries `price: null` and `usd: null`: it
+ *  with no price at its block carries `price: null` and `usd: null`: it
  *  is unpriced, never $0. A leg with no `price` key is a raw leg a family
  *  has not yet given its parts; its `usd` is read as before. */
 export interface FlowLeg {

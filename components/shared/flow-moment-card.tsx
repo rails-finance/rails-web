@@ -272,7 +272,7 @@ export function FlowMomentCard({
     return {
       kind: "chain-derived",
       pclass: "oracle",
-      summary: `${a.symbol} ${what} to ${when}, in USD. The balance at the close times the day's price, less the balance the last event recorded times the same price, each product as shown to the cent. To the cent, shown to the dollar.`,
+      summary: `${a.symbol} ${what} to ${when}, in USD. The balance at the close times the day's price, less the balance the last event recorded times the same price, each product as shown. To the cent, shown to the dollar.`,
       formula: "balance × price − recorded × price",
       inputs: [
         {

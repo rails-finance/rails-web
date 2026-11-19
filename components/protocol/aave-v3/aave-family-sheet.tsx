@@ -151,6 +151,18 @@ const pricedOf = (
     priceNote: aaveV3PriceNote(`${state.market}'s AaveOracle`, sym, block),
   };
 };
+/** Every supplied balance at its reserve's price, the sum of the shown
+ *  products: the side's total where a supply has its collateral switch off
+ *  (the Pool's total leaves it out). `which`: before or after the state's
+ *  transaction. */
+const suppliedCell = (state: AaveV3PositionState, which: "before" | "after", what: string): UsdCell =>
+  amountsUsd(
+    what,
+    state.reserves
+      .filter((r) => r.decimals != null && big(r.supply[which]) > BigInt(0))
+      .map((r) => pricedOf(state, r, reserveSymbol(r), Number(humanOf(r.supply[which], r.decimals as number)))),
+    { amountNote: `the supplied balance ${which} the transaction, read from the Pool`, via: VIA },
+  );
 /** A total the Pool states (getUserAccountData), to the cent, as a cell. */
 const statedCell = (usd: number, f: { text: string; prov: Provenance }): UsdCell => ({
   usd: centsOf(usd),
@@ -276,10 +288,16 @@ function sheetSide(
     // cent, and the interest since, the sum of its shown products.
     const beforeUsd = facts.offSupply ? facts.heldBefore : facts.before;
     if (lastUsd != null && beforeUsd != null && prevUsd && usd.before) {
+      // With a supply's switch off, each total is the supplied balances'
+      // shown products (ui-jobs 743).
       const move = marketMoveUsd(
         `Market move on the ${side} since the previous event`,
-        statedCell(beforeUsd, usd.before),
-        statedCell(lastUsd, prevUsd.after),
+        facts.offSupply
+          ? suppliedCell(state, "before", `The ${side} just before this transaction, in USD`)
+          : statedCell(beforeUsd, usd.before),
+        prevFacts.offSupply
+          ? suppliedCell(prev!, "after", `The ${side} once the previous transaction had run, in USD`)
+          : statedCell(lastUsd, prevUsd.after),
         interestCell,
       );
       if (move.usd == null || Math.abs(move.usd) >= 0.005)

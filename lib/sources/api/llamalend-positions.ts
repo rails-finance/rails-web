@@ -117,6 +117,8 @@ export interface LlamalendPositionSummary {
 
   /** AMM.price_oracle() at head — collateral in the borrowed token. */
   priceOracle: number | null;
+  /** The block the market state (and so priceOracle) was read at, where in hand. */
+  priceBlock: number | null;
   /** USD figures — ONLY on crvUSD-borrowed markets (~$1); null elsewhere. */
   collateralUsd: number | null;
   debtUsd: number | null;
@@ -193,10 +195,13 @@ export async function buildLlamalendPositionRows(
   // The AMM oracle prices (per controller) for the USD figures — identity
   // itself now rides on the rows.
   let state: LlamalendMarketStateMap = new Map();
+  let priceBlock: number | null = null;
   if (stateMap) state = stateMap;
   else if (raw.length > 0) {
     try {
-      state = (await resolveLlamalendMarketState()).state;
+      const resolved = await resolveLlamalendMarketState();
+      state = resolved.state;
+      priceBlock = resolved.blockNumber;
     } catch {
       // Prices stay null; token identity is on the rows.
     }
@@ -314,6 +319,7 @@ export async function buildLlamalendPositionRows(
       healthFullRaw: healthRaw != null ? healthRaw.toString() : null,
       liquidatable: healthRaw != null ? healthRaw < ZERO : null,
       priceOracle,
+      priceBlock: priceOracle != null ? priceBlock : null,
       // ~$1: crvUSD debt IS the USD figure; collateral through the AMM's own
       // oracle. Null on the non-crvUSD-borrowed markets — their own token is
       // the unit, and no dollar is asserted.

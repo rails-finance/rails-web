@@ -67,6 +67,11 @@ const poolContract = (coords?: FxCoords) =>
     ? { name: coords.poolLabel ? `AaveFundingPool (${coords.poolLabel})` : "AaveFundingPool", address: coords.pool }
     : undefined;
 
+/** The pool a figure cites: the event's coords where they name it, else the
+ *  catalogue's pool; never an empty address. */
+export const fxPoolContract = (coords: FxCoords | undefined, pool: FxPoolKey | undefined) =>
+  poolContract(coords) ?? fundingPool(pool);
+
 const atBlock = (coords?: FxCoords): string => (coords?.blockNumber != null ? ` at block ${coords.blockNumber}` : "");
 
 /** Log-anatomy via segment: `field: <raw>` when the transform delivered the

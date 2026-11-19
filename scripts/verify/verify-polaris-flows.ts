@@ -35,6 +35,7 @@
 //   npx tsx --test scripts/verify/verify-polaris-flows.ts
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { assertUnitReceipts } from "./lib/unit-receipts";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildPolarisTimeline, type PolarisTimelineRow } from "@/lib/sources/api/polaris-timeline";
@@ -603,4 +604,10 @@ test("a redistribution takes separate lines, on the liquidated CDP and on a rece
     for (const key of [PF.collRedistIn, PF.debtRedistIn, PF.collRedistOut, PF.debtRedistOut])
       assert.equal(total(r, key), 0, `${f.name}: ${key}`);
   }
+});
+
+test("a unit model's Held/Owed receipts stay in its token (ui-jobs 743)", () => {
+  let read = 0;
+  for (const name of NAMES) read += assertUnitReceipts(model(fx(name)), name);
+  assert.ok(read > 0, "receipts read");
 });

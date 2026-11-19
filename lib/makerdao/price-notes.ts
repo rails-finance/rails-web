@@ -91,9 +91,9 @@ function rowNote(p: MakerRowPrice): string {
     case "row":
       return `the OSM price at this liquidation's block, ${blockText(p.block)}`;
     case "store":
-      return `price at the close of ${dayText(p.day)}, ${p.dayBlock != null ? blockText(p.dayBlock) : "a block the daily store's route does not state"}; this event is at block ${p.eventBlock.toLocaleString("en-US")}`;
+      return `price at the close of ${dayText(p.day)}, ${p.dayBlock != null ? blockText(p.dayBlock) : "a block the daily store's route does not name"}; this event is at block ${p.eventBlock.toLocaleString("en-US")}`;
     case "store-near":
-      return `the nearest day's price, at the close of ${dayText(p.day)}, ${p.dayBlock != null ? blockText(p.dayBlock) : "a block the daily store's route does not state"}${old(p.staleDays)}; this event is at block ${p.eventBlock.toLocaleString("en-US")}`;
+      return `the nearest day's price, at the close of ${dayText(p.day)}, ${p.dayBlock != null ? blockText(p.dayBlock) : "a block the daily store's route does not name"}${old(p.staleDays)}; this event is at block ${p.eventBlock.toLocaleString("en-US")}`;
     case "today": {
       const ev = p.eventBlock != null ? `; this event is at block ${p.eventBlock.toLocaleString("en-US")}` : "";
       return p.block != null
@@ -101,6 +101,6 @@ function rowNote(p: MakerRowPrice): string {
         : `the live read's price, which names no block${ev}`;
     }
     case "nearest":
-      return `the nearest priced moment, ${blockText(p.block)}${old(p.staleDays)}; this event is at block ${p.eventBlock.toLocaleString("en-US")}`;
+      return `the nearest read, ${blockText(p.block)}${old(p.staleDays)}; this event is at block ${p.eventBlock.toLocaleString("en-US")}`;
   }
 }

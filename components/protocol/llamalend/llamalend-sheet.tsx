@@ -87,7 +87,7 @@ const TIPS = {
   sold: (c: string) =>
     `The ${c} the AMM sold from the position's bands between the previous event and this one: the collateral that row stated, less the collateral read at the block before this event.`,
   collBefore: (c: string) =>
-    `The ${c} collateral just before this transaction, read from the Controller at the block before, valued at the AMM's oracle price at this block.`,
+    `The ${c} collateral just before this transaction, read from the Controller at the block before and valued at the AMM's oracle price there.`,
   collTotal: (c: string, b: string) =>
     `The collateral after this transaction, the ${c} in the bands and any ${b} the AMM holds from selling it, valued at the AMM's oracle price at this block. With no ${b} held, the ${c} amount stands beside the value.`,
   debtEvent: (b: string) => `The ${b} this transaction borrowed or repaid, from the log's loan field.`,
@@ -144,14 +144,15 @@ export function llamalendSheet({
   ctx: LlamalendContext;
   state: LlamalendEventState;
   f: LlamalendEventFigures;
-  coords: LlamalendCoords;
+  /** The event's block is in hand: the sheet's reads are at it and the block before. */
+  coords: LlamalendCoords & { blockNumber: number };
   previousStated?: LlamalendPreviousStated | null;
   collateralAddress?: string;
   borrowedAddress?: string;
 }): EventSheet {
   const c = ctx.collateralSymbol;
   const b = ctx.borrowedSymbol;
-  const block = coords.blockNumber ?? 0;
+  const block = coords.blockNumber;
   const usdMarket = ctx.borrowedIsCrvusd;
   const p = f.priceAfter;
   const isLiq = ctx.eventType === "liquidation";
@@ -184,13 +185,25 @@ export function llamalendSheet({
   // the collateral at the AMM's price_oracle at this block, crvUSD at its $1
   // face.
   const VIA = "the Controller and AMM reads around the event · the collateral × price_oracle, crvUSD at $1";
+  const oracleAt = (at: number) =>
+    `the market's AMM price_oracle (crvUSD per ${c}) at block ${at.toLocaleString("en-US")}`;
   const collAt = (amount: number): PricedAmount => ({
     symbol: c,
     amount,
     price: p ?? null,
     block,
-    priceNote: `the market's AMM price_oracle (crvUSD per ${c}) at block ${block.toLocaleString("en-US")}`,
+    priceNote: oracleAt(block),
   });
+  // The Before row is the read at block − 1, priced there where that read
+  // answered; else at this block's price, both blocks named, not complete.
+  const pBefore = f.priceBefore ?? p;
+  const collBeforeAt = (amount: number): PricedAmount =>
+    f.priceBefore != null
+      ? { symbol: c, amount, price: f.priceBefore, block: block - 1, priceNote: oracleAt(block - 1) }
+      : {
+          ...collAt(amount),
+          priceNote: `Not complete: ${oracleAt(block)}, this event's block; the collateral is read at block ${(block - 1).toLocaleString("en-US")}, whose price was not read`,
+        };
   const crv = (amount: number): PricedAmount => ({
     symbol: b,
     amount,
@@ -275,11 +288,18 @@ export function llamalendSheet({
         tip: TIPS.sold(c),
       });
   }
-  const collBeforeValue = p != null ? collBefore * p + convBefore : null;
+  const collBeforeValue = pBefore != null ? collBefore * pBefore + convBefore : null;
   const beforeParts = [
     { label: "collateral", value: `${formatExactDecimal(String(collBefore))} ${c}` },
     { label: "converted", value: `${formatExactDecimal(String(convBefore))} ${b}` },
-    ...(p != null ? [{ label: `${c} price`, value: `${p} ${b}` }] : []),
+    ...(pBefore != null
+      ? [
+          {
+            label: `${c} price at block ${(f.priceBefore != null ? block - 1 : block).toLocaleString("en-US")}`,
+            value: `${pBefore} ${b}`,
+          },
+        ]
+      : []),
   ];
   const collBeforeRow: SheetRow | undefined = f.hadLoan
     ? {
@@ -304,7 +324,9 @@ export function llamalendSheet({
           collBeforeValue == null
             ? undefined
             : usdMarket
-              ? cellOf(usdOf("The collateral just before this transaction", [collAt(collBefore), crv(convBefore)]))
+              ? cellOf(
+                  usdOf("The collateral just before this transaction", [collBeforeAt(collBefore), crv(convBefore)]),
+                )
               : convBefore > 0
                 ? {
                     text: `${fmtPrice(collBeforeValue)} ${b}`,

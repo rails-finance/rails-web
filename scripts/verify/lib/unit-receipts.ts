@@ -1,15 +1,18 @@
-// A unit model's past-day Held/Owed receipts stay in its token (ui-jobs 743):
+// A unit model's Held/Owed receipts, past days and the live stop, stay in its
+// token (ui-jobs 743):
 // its daily prices are in the token's grains, so its rows carry no dollar
 // price and no receipt of a held figure or an asset's part prints "$".
 import assert from "node:assert/strict";
 import { stateAt, unitOf, type FlowModel } from "@/lib/shared/flows-timeline";
 import { flowAssetProv, flowSegmentProv } from "@/lib/shared/flows-timeline-provenance";
 
-/** Walks every stop before the live one; returns the receipts read. */
+/** Walks every stop, the live one too; returns the receipts read. */
 export function assertUnitReceipts(m: FlowModel, name: string): number {
   assert.ok(m.unit || m.sideUnits, `${name}: a unit model`);
   let read = 0;
-  for (let stop = 0; stop < m.liveStop; stop++) {
+  for (let stop = 0; stop <= m.liveStop; stop++) {
+    const live = stop === m.liveStop;
+    const when = live ? "now" : "the end of the day";
     for (const h of m.heldAt[stop] ?? []) assert.equal(h.priced?.price, undefined, `${name} ${h.symbol} ${stop}`);
     const st = stateAt(m, stop);
     for (const side of ["collateral", "debt"] as const) {
@@ -25,10 +28,10 @@ export function assertUnitReceipts(m: FlowModel, name: string): number {
         [forced, undefined],
       ] as const) {
         const provs = [
-          flowSegmentProv(held, side, "the end of the day", false, m.daily, unit),
+          flowSegmentProv(held, side, when, live, m.daily, unit),
           ...(m.heldAt[stop] ?? [])
             .filter((h) => h.side === side)
-            .map((h) => flowAssetProv(h.symbol, held, side, "the end of the day", false, m.daily, unit)),
+            .map((h) => flowAssetProv(h.symbol, held, side, when, live, m.daily, unit)),
         ];
         for (const p of provs) {
           const text = JSON.stringify(p);

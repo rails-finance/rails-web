@@ -43,7 +43,7 @@ import { OFF_PAR_BAND, OffParFigure } from "@/components/shared/usd-figure";
 import { eventPriceText, offPar, todayPriceText, type OffPar } from "@/lib/shared/usd-display";
 import { wholeUsd } from "@/lib/shared/flows-sum";
 import { holderUsdReceipt } from "@/lib/shared/holder-usd-receipt";
-import { centsOf, roundAway } from "@/lib/shared/shown-usd";
+import { centsOf, roundAway, shownUsd } from "@/lib/shared/shown-usd";
 import { eventCum, type EventCum } from "@/lib/shared/flow-focus";
 import { dayCloseNote, ledgerAtPrice, ledgerDayStamp, type Ledger, type LedgerRow } from "@/lib/shared/event-ledger";
 import type { FlowSegment, FlowSide } from "@/lib/shared/flows-timeline";
@@ -651,8 +651,7 @@ function LedgerRows({
     return ledgerUsdProv(r);
   };
   const ledgerUsdProv = (r: LedgerRow): Provenance => {
-    if (r.role === "market")
-      return flowRemainderProv(r.label, side, at, "the change in the price since each flow, no funds moved");
+    if (r.role === "market") return flowRemainderProv(r.label, side, at, "the change in the price since each flow");
     if (r.role === "interest") return flowInterestUsdProv(r.label, at);
     if (r.role === "before" || r.role === "event") return ledgerPartProv(r.label, "USD", at, r.role);
     return flowSegmentProv(
@@ -927,11 +926,12 @@ export function AssetLedgers({
     const inCents = repriced.every((l) => l?.usd?.cents != null);
     const cents = inCents ? centsOf(repriced.reduce((t, l) => t + (l?.usd?.cents ?? 0), 0)) : null;
     const dollars = cents != null ? roundAway(cents) : repriced.reduce((t, l) => t + (l?.usd?.dollars ?? 0), 0);
-    // Before the event: each asset's tokens less the event's rows.
+    // Before the event: each asset's tokens less the event's rows, times
+    // today's price, each the shown product, summed in cents (ui-jobs 743).
     const before = priced.reduce((t, a) => {
       if (!a.tokens || a.decimals == null) return t;
       const moved = a.rows.reduce((m, r) => m + (r.role === "event" ? (r.tokens?.units ?? 0) : 0), 0);
-      return t + ((a.tokens.units - moved) / 10 ** a.decimals) * (todayOf(a.symbol) ?? 0);
+      return centsOf(t + shownUsd((a.tokens.units - moved) / 10 ** a.decimals, todayOf(a.symbol) ?? 0));
     }, 0);
     usd = {
       before: usd.before != null && roundAway(before) !== dollars ? wholeUsd(before) : null,

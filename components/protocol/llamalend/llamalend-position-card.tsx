@@ -119,6 +119,8 @@ export interface LlamalendPositionView {
   convertedCrossCheckExact?: boolean | null;
   /** AMM.price_oracle at head — borrowed per collateral. */
   priceOracle: number | null;
+  /** The block priceOracle was read at, where in hand. */
+  priceBlock?: number | null;
   collateralUsd: number | null;
   debtUsd: number | null;
   eventCount: number;
@@ -228,7 +230,10 @@ function usdLine(
                   amount: v.collateral as number,
                   amountNote: "the collateral the Controller states at head",
                   price: v.priceOracle as number,
-                  priceNote: `the AMM's oracle price (crvUSD per ${v.collateralSymbol}) at head, which names no block`,
+                  priceNote:
+                    v.priceBlock != null
+                      ? `the AMM's oracle price (crvUSD per ${v.collateralSymbol}) at block ${v.priceBlock.toLocaleString("en-US")}`
+                      : `the AMM's oracle price (crvUSD per ${v.collateralSymbol}) at head, which names no block`,
                 }
               : {
                   token: v.borrowedSymbol,
@@ -239,6 +244,7 @@ function usdLine(
                   face: true,
                 },
           ],
+          block: coll ? v.priceBlock : undefined,
           via: "the Controller and AMM read at head",
           caveat: "To the cent.",
         });
@@ -479,6 +485,7 @@ export function viewFromChain(
     liquidatable: c.hasLoan && c.healthFull != null ? c.healthFull < 0 : null,
     convertedCrossCheckExact: c.convertedCrossCheckExact,
     priceOracle: c.priceOracle,
+    priceBlock: serverReadOf(c)?.block ?? null,
     collateralUsd:
       c.borrowedIsCrvusd && c.priceOracle != null && c.collateral != null
         ? shownUsd(c.collateral, c.priceOracle)
@@ -519,6 +526,7 @@ export function viewFromSummary(s: LlamalendPositionSummary): LlamalendPositionV
     healthFullRaw: s.healthFullRaw,
     liquidatable: s.liquidatable,
     priceOracle: s.priceOracle,
+    priceBlock: s.priceBlock ?? null,
     collateralUsd: s.collateralUsd,
     debtUsd: s.debtUsd,
     eventCount: s.eventCount,

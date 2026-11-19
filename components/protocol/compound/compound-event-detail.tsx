@@ -33,7 +33,6 @@ import { compoundSideBalances } from "@/lib/compound/flows";
 import { decimalSub } from "@/lib/utils/format";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
 import {
-  absorbPriceProv,
   baseAfterProv,
   baseInterestProv,
   collateralAfterProv,
@@ -382,23 +381,16 @@ export function useCompoundCells({
   });
 
   // ── The price row: the moved asset's price at the block, where the
-  // replay read it there or an absorb states it.
+  // replay read it there (an absorb's too: the pill and its receipt are the
+  // getPrice read). An absorb whose block was not read draws no pill.
   const prices: EventPriceChip[] = [];
   const row = rp?.replayed.find((r) => r.ev.id === eventId);
   if (row && row.own.has(row.ev.token) && row.price[row.ev.token] > 0) {
-    const usd = row.price[row.ev.token];
-    const absorb = ctx.eventType === "absorb_debt" || ctx.eventType === "absorb_collateral";
     prices.push({
       symbol: ctx.assetSymbol,
-      usd,
-      info:
-        absorb && ctx.usdValue != null
-          ? absorbPriceProv(ctx.assetSymbol, coords, {
-              amount: ctx.assetsDelta.replace(/^-/, ""),
-              usdValue: ctx.usdValue,
-            })
-          : cometPriceAtBlockProv(ctx.assetSymbol, coords),
-      title: `${ctx.assetSymbol} price at this event: ${absorb ? "the absorb's value over its amount" : `${m.label}'s price feed at block ${blockNumber?.toLocaleString("en-US") ?? ""}`}`,
+      usd: row.price[row.ev.token],
+      info: cometPriceAtBlockProv(ctx.assetSymbol, coords),
+      title: `${ctx.assetSymbol} price at this event: ${m.label}'s price feed at block ${blockNumber?.toLocaleString("en-US") ?? ""}`,
     });
   }
 

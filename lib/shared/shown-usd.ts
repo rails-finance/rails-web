@@ -13,7 +13,7 @@ export const roundAway = (v: number): number => (v < 0 ? -Math.round(-v) : Math.
  *  fifteen significant figures, so an exact half rounds as the decimal
  *  reads. Fifteen keeps every digit of a scaled amount up to 10^9 tokens
  *  at six decimals. */
-// exponent-safe: the string goes straight back to a Number.
+// exponent-safe: the string goes back to a Number.
 const scaled = (v: number, k: number): number => Number((v * k).toPrecision(15));
 /** A dollar figure to the cent, half away from zero. */
 export const centsOf = (v: number): number => roundAway(scaled(v, 100)) / 100;
@@ -23,7 +23,7 @@ export const shownAmount = (v: number): number => roundAway(scaled(v, 1e6)) / 1e
  *  price keeps the precision its product needs), six significant figures
  *  below $1. */
 export const shownPrice = (v: number): number =>
-  // exponent-safe: toPrecision's string goes straight back to a Number; priceText prints it.
+  // exponent-safe: toPrecision's string goes back to a Number; priceText prints it.
   v === 0 ? 0 : Math.abs(v) >= 1 ? roundAway(scaled(v, 1e6)) / 1e6 : Number(v.toPrecision(6));
 const cents = centsOf;
 /** A dollar figure from an amount and a price as a receipt shows them: the

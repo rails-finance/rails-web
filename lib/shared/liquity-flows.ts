@@ -83,10 +83,10 @@ export interface LiquityFlowEvent {
   reserve?: number;
   /** The branch's collateral price at the block, where recorded. */
   price: number | null;
-  /** Where the price comes from, where it is not the family's own feed at
+  /** Where the price comes from, where it is not the family's feed at
    *  the event's block (ui-jobs 743): the _price a fork's TroveManager emits
    *  in its Redemption log, or (Liquity V1) Liquity V2's WETH branch close
-   *  for a day with no read of V1's own, with that close's day and block. */
+   *  for a day V1 has no read for, with that close's day and block. */
   priceFrom?: { source: "redemption-log" } | { source: "v2-weth-day"; day: number; block: number | null };
   /** A redemption's redemption price (the PriceFeed's redemption leg), where recorded. */
   redemptionPrice?: number | null;
@@ -300,7 +300,7 @@ export interface LiquityReplayed {
   price: number;
   /** The price was the nearest recorded one, not the event's own. */
   borrowedPrice: boolean;
-  /** The block the price was recorded at (the event's own, or the one it
+  /** The block the price was recorded at (the event's, or the one it
    *  borrowed from), where known (ui-jobs 743). */
   priceBlock: number | null;
   /** A borrowed price's direction: the last priced event's, or (before the
@@ -337,7 +337,11 @@ function liquityLeg(
     amount: l.amount,
     symbol: collSymbol,
     price: r.price > 0 ? r.price : null,
-    block: r.borrowedPrice ? r.priceBlock : at,
+    block: r.borrowedPrice
+      ? r.priceBlock
+      : !r.borrowedPrice && r.ev.priceFrom?.source === "v2-weth-day"
+        ? r.ev.priceFrom.block
+        : at,
     priceNote: note,
   });
 }
@@ -355,12 +359,12 @@ export function liquityPriceNote(r: LiquityReplayed, family: LiquityFamily): str
         : "the branch PriceFeed's price";
   const from = r.ev.priceFrom;
   if (!r.borrowedPrice && from?.source === "v2-weth-day")
-    return `Liquity V2's WETH PriceFeed, the close of ${dayWords(from.day)} ${from.block != null ? `at block ${n(from.block)}` : "at a block the store's route does not state"}; this event is at block ${n(at)}`;
+    return `Liquity V2's WETH PriceFeed, the close of ${dayWords(from.day)} ${from.block != null ? `at block ${n(from.block)}` : "at a block the daily store's route does not name"}; this event is at block ${n(at)}`;
   if (!r.borrowedPrice) return `${feedOf(r.ev)}, block ${n(at)}`;
   const dir = r.priceDirection === "next" ? "the next priced event's" : "the last priced event's";
   return r.priceBlock != null
     ? `${dir} price, at block ${n(r.priceBlock)}; this event is at block ${n(at)}`
-    : `${dir} price, a block the record does not name; this event is at block ${n(at)}`;
+    : `${dir} price, at a block this read does not name; this event is at block ${n(at)}`;
 }
 
 const dayWords = (day: number): string =>
@@ -585,23 +589,18 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
       if (COLL_BUCKETS.has(l.bucket)) moved.coll = true;
       else moved.debt = true;
     }
-    // An event that records no price takes the last one recorded before it.
-    // A borrowed price, or another protocol's feed (Liquity V2's WETH close
-    // on a V1 day): kept, both blocks named, not complete (ui-jobs 743).
-    const otherFeed = ev.priceFrom?.source === "v2-weth-day";
+    // An event that records no price takes the last one recorded before it:
+    // kept, both blocks named, not complete (ui-jobs 743). Liquity V2's WETH
+    // close on a V1 day is the day-close basis: both blocks named, complete.
     const unpriced =
-      (borrowedPrice || otherFeed) &&
-      price > 0 &&
-      (ev.collAfter > DUST || legs.some((l) => COLL_BUCKETS.has(l.bucket)));
+      borrowedPrice && price > 0 && (ev.collAfter > DUST || legs.some((l) => COLL_BUCKETS.has(l.bucket)));
     return {
       ...(unpriced
         ? {
             unsure: [
               {
                 side: "collateral" as const,
-                why: otherFeed
-                  ? `${o.collSymbol} priced at Liquity V2's WETH close for its day: this event records no price of its own.`
-                  : `${o.collSymbol} priced at ${row.priceDirection === "next" ? "the next" : "the last"} priced event's price: this event records none.`,
+                why: `${o.collSymbol} priced at ${row.priceDirection === "next" ? "the next" : "the last"} priced event's price: this event records none.`,
                 held: true,
               },
             ],

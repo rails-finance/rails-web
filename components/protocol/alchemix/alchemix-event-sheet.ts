@@ -478,7 +478,7 @@ export function alchemixSheet({
   const debtTotal: SheetSide["total"] = !face
     ? SHEET_NO_USD
     : debtAfter === ZERO
-      ? { text: "$0", info: reading("Debt", sym, state.debtRaw) }
+      ? { text: "$0", cents: 0, info: reading("Debt", sym, state.debtRaw) }
       : {
           ...faceParts(units(debtAfter)),
           info: faceProv("Debt after this event", sym, formatUnitsExact(state.debtRaw, DECIMALS)),

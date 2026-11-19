@@ -184,8 +184,8 @@ export function liquityV1FlowEvents(input: LiquityV1FlowInput): LiquityV1FlowEve
       debtFromRedist: redistDebt,
       surplus,
       price: price != null && price > 0 ? price : null,
-      // A day with no read of V1's own takes Liquity V2's WETH close: another
-      // protocol's feed, named so and not complete (ui-jobs 743).
+      // A day V1 has no read for takes Liquity V2's WETH close: the
+      // day-close basis, its block and the event's named (ui-jobs 743).
       ...(!(own != null && own > 0) && dayClose != null
         ? {
             priceFrom: {

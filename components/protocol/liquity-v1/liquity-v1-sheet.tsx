@@ -212,7 +212,7 @@ export function useLiquityV1Sheet({ ctx, txHash, blockNumber, wallet, active }: 
       key,
       label,
       amount: { text: signed(amount, fmtLusd(Math.abs(amount))), symbol: DEBT_SYMBOL, address: LUSD, info },
-      usd: { ...faceParts(amount), info: sheetFaceUsdProv(label, fmtLusd(Math.abs(amount))) },
+      usd: { ...faceParts(amount), info: sheetFaceUsdProv(label, Math.abs(amount)) },
       tip,
     });
   };
@@ -278,7 +278,7 @@ export function useLiquityV1Sheet({ ctx, txHash, blockNumber, wallet, active }: 
             key: "before",
             label: SHEET_WORDS.before,
             amount: { text: fmtLusd(s.debtBefore), symbol: DEBT_SYMBOL, address: LUSD, info: debtBeforeProv(coords) },
-            usd: { ...faceParts(s.debtBefore), info: faceUsdProv(DEBT_SYMBOL, fmtLusd(s.debtBefore), "before") },
+            usd: { ...faceParts(s.debtBefore), info: faceUsdProv(DEBT_SYMBOL, s.debtBefore, "before") },
             tip: V1_WORDS.tip_debt_before,
           }
         : undefined,
@@ -286,7 +286,7 @@ export function useLiquityV1Sheet({ ctx, txHash, blockNumber, wallet, active }: 
     total: {
       text: s.debtAfter > EPS ? faceParts(s.debtAfter).text : "$0",
       cents: s.debtAfter > EPS ? faceParts(s.debtAfter).cents : 0,
-      info: s.debtAfter > EPS ? faceUsdProv(DEBT_SYMBOL, fmtLusd(s.debtAfter), "after") : debtAfterProv(coords),
+      info: s.debtAfter > EPS ? faceUsdProv(DEBT_SYMBOL, s.debtAfter, "after") : debtAfterProv(coords),
     },
     totalAmount: {
       text: fmtLusd(s.debtAfter > EPS ? s.debtAfter : 0),
@@ -334,7 +334,7 @@ export function useLiquityV1Sheet({ ctx, txHash, blockNumber, wallet, active }: 
             key: `reserve-${reserveHow}`,
             label: reserveLabel,
             amount: reserveFig(reserveMove, reserveHow),
-            usd: { ...faceParts(reserveMove), info: sheetFaceUsdProv(reserveLabel, fmtLusd(LIQUITY_V1_RESERVE)) },
+            usd: { ...faceParts(reserveMove), info: sheetFaceUsdProv(reserveLabel, LIQUITY_V1_RESERVE) },
             tip:
               reserveHow === "minted"
                 ? V1_WORDS.tip_reserve_minted
@@ -358,7 +358,7 @@ export function useLiquityV1Sheet({ ctx, txHash, blockNumber, wallet, active }: 
           amount: reserveFig(LIQUITY_V1_RESERVE, "held"),
           usd: {
             ...faceParts(LIQUITY_V1_RESERVE),
-            info: sheetFaceUsdProv(SHEET_WORDS.before, fmtLusd(LIQUITY_V1_RESERVE)),
+            info: sheetFaceUsdProv(SHEET_WORDS.before, LIQUITY_V1_RESERVE),
           },
           tip: V1_WORDS.tip_reserve_before,
         }
@@ -366,7 +366,7 @@ export function useLiquityV1Sheet({ ctx, txHash, blockNumber, wallet, active }: 
     rows: reserveRows,
     total: reserveEnds
       ? { text: "$0", info: reserveProv(coords, reserveHow) }
-      : { ...faceParts(LIQUITY_V1_RESERVE), info: faceUsdProv(DEBT_SYMBOL, fmtLusd(LIQUITY_V1_RESERVE), "after") },
+      : { ...faceParts(LIQUITY_V1_RESERVE), info: faceUsdProv(DEBT_SYMBOL, LIQUITY_V1_RESERVE, "after") },
     totalAmount: {
       ...reserveFig(reserveAfter, reserveEnds ? reserveHow : isOpen ? "minted" : "held"),
       value: String(reserveAfter),

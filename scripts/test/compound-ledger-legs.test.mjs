@@ -1,7 +1,7 @@
 // Compound V3's flow legs name their price (rails-ops ui-jobs 743): the
 // Comet's getPrice at the leg's block (an ETH-quoted Comet's composed with
-// WETH/USD), an absorb's usdValue over its amount, or the nearest read's,
-// both blocks named.
+// WETH/USD), the dollars a USD-quoted Comet's AbsorbCollateral log states,
+// or the nearest read's, both blocks named.
 // Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -87,4 +87,101 @@ test("an absorb's collateral leg is the log's usdValue, with its amount and no p
     !prov.inputs.some((i) => i.label.endsWith(" price") || i.label.endsWith("× price")),
     "no price, no product",
   );
+});
+
+const { compoundFlowReplay, compoundFlowTimeline, compoundFocusEvents } = await import(ROOT + "lib/compound/flows.ts");
+
+/** A Comet whose collateral is absorbed: a supply at block 100, the absorb
+ *  at block 200. `quote` is the unit its getPrice and usdValue are in. */
+function absorbed(quote) {
+  const base = "0xbase";
+  const coll = "0xcoll";
+  const eth = quote === "ETH";
+  const row = (x) => ({
+    tx: x.id,
+    isBase: false,
+    token: coll,
+    symbol: "wstETH",
+    baseAfter: 0,
+    baseInterest: 0,
+    units: { delta: BigInt(0), after: BigInt(0), interest: BigInt(0) },
+    baseUnsettled: false,
+    usdValue: null,
+    factors: null,
+    ...x,
+  });
+  const events = [
+    row({
+      id: "a",
+      ts: 1_700_000_000,
+      block: 100,
+      kind: "supply_collateral",
+      delta: 2,
+      collAfter: 2,
+      prices: { [coll]: 4000, [base]: eth ? 3500 : 1 },
+      factors: eth ? { [coll]: { price: 1.142857, ethUsd: 3500 } } : null,
+    }),
+    row({
+      id: "b",
+      ts: 1_700_086_400,
+      block: 200,
+      kind: "absorb_collateral",
+      delta: -2,
+      collAfter: 0,
+      usdValue: eth ? 2.3 : 8200.123,
+      // The USD Comet's absorb block has no collateral price read: its leg
+      // is stated from the log.
+      prices: eth ? { [coll]: 4025, [base]: 3500 } : { [base]: 1 },
+      factors: eth ? { [coll]: { price: 1.15, ethUsd: 3500 } } : null,
+    }),
+  ];
+  const o = {
+    baseToken: base,
+    baseSymbol: eth ? "WETH" : "USDC",
+    baseDecimals: eth ? 18 : 6,
+    now: 1_700_200_000,
+    live: null,
+    comet: eth ? "cWETHv3" : "cUSDCv3",
+    quoteUnit: quote,
+  };
+  return { events, o };
+}
+
+test("a USD-quoted Comet's absorb leg is the log's usdValue, with no unsure line", () => {
+  const { events, o } = absorbed("USD");
+  const focus = compoundFocusEvents(compoundFlowReplay(events, o));
+  const leg = focus[1].legs.find((l) => l.symbol === "wstETH");
+  assert.equal(leg.usd, 8200.12);
+  assert.equal(leg.price, null);
+  assert.equal(leg.stated, true);
+  assert.match(leg.priceNote, /^usdValue in the AbsorbCollateral log, block 200$/);
+  const t = compoundFlowTimeline(events, o);
+  assert.ok(!t.days.some((d) => d.unsure?.length), "a leg stated from its log needs no price");
+});
+
+test("an ETH-quoted Comet's absorb leg is the composed getPrice leg, never the log's usdValue", () => {
+  const { events, o } = absorbed("ETH");
+  const focus = compoundFocusEvents(compoundFlowReplay(events, o));
+  const leg = focus[1].legs.find((l) => l.symbol === "wstETH");
+  assert.equal(leg.price, 4025);
+  assert.notEqual(leg.stated, true);
+  assert.doesNotMatch(leg.priceNote, /usdValue/);
+  assert.match(leg.priceNote, /cWETHv3's getPrice, in ETH\) × \$3,500\.00 \(WETH\/USD/);
+});
+
+test("an unpriced side drops only that side's dollars (ui-jobs 743, B9)", () => {
+  const { events, o } = absorbed("USD");
+  // The base has no price at either row: the debt side is unpriced, the
+  // collateral side keeps its figures.
+  const bare = events.map((e) => ({
+    ...e,
+    baseAfter: -1000,
+    units: { ...e.units, after: BigInt(-1_000_000_000) },
+    prices: { [e.token]: e.prices[e.token] ?? 4000 },
+  }));
+  const focus = compoundFocusEvents(compoundFlowReplay(bare, o));
+  const s = focus[0].sides;
+  assert.ok(s, "the event states its sides");
+  assert.ok(Number.isFinite(s.collateral.after), "the priced side keeps its figure");
+  assert.ok(Number.isNaN(s.debt.after), "the unpriced side has none");
 });

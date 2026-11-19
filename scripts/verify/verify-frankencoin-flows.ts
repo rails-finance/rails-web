@@ -38,6 +38,7 @@
 //   npx tsx --test scripts/verify/verify-frankencoin-flows.ts
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { assertUnitReceipts } from "./lib/unit-receipts";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
@@ -422,4 +423,13 @@ test("the unit scales: the collateral and the debt each about five significant d
   // Up to 1,764 LsETH and 2.53M ZCHF.
   assert.equal(t.sideUnits!.collateral.scale, 1);
   assert.equal(t.sideUnits!.debt.scale, 0);
+});
+
+test("a unit model's Held/Owed receipts stay in its tokens (ui-jobs 743)", () => {
+  let read = 0;
+  for (const name of NAMES) {
+    const f = fx(name);
+    read += assertUnitReceipts(buildFlowModel(frankencoinFlowTimeline(rows(f), opts(f))!)!, name);
+  }
+  assert.ok(read > 0, "receipts read");
 });

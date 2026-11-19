@@ -194,6 +194,8 @@ export interface CTokenLiveMarket {
   /** Underlying per whole cToken now. */
   exchangeRate: number | null;
   price: number | null;
+  /** The block the live read stands at, where it names one (ui-jobs 743). */
+  block?: number | null;
   /** The market's rates now, as APYs (lib/comptroller/apy.ts). */
   supplyApr: number | null;
   borrowApr: number | null;
@@ -223,8 +225,13 @@ export interface CTokenReplayed {
   price: number;
   ownPrice: boolean;
   /** The block of the row whose price this row takes, where it is another
-   *  row's (the nearest read on its market); null for its own or today's. */
+   *  row's (the nearest read on its market), or the latest read's where it
+   *  names one; null for its own. */
   priceBlock: number | null;
+  /** Priced at the latest read: not complete, on another basis. */
+  latestRead?: true;
+  /** A nearest read in Compound's ETH years: that row's two factors. */
+  priceFactor?: { eth: number; usdcEth: number };
   legs: { bucket: string; amount: number }[];
   /** The market's supply and debt after the row. */
   supply: number;
@@ -248,12 +255,22 @@ function ordered(rows: CTokenFlowRow[]): CTokenFlowRow[] {
 function pricesFor(
   rows: CTokenFlowRow[],
   todayPrice: (market: string) => number | null,
-): { price: number; own: boolean; block: number | null }[] {
-  const priced = new Map<string, { ts: number; price: number; block: number }[]>();
+  todayBlock: (market: string) => number | null,
+): {
+  price: number;
+  own: boolean;
+  block: number | null;
+  latest?: true;
+  factor?: { eth: number; usdcEth: number };
+}[] {
+  const priced = new Map<
+    string,
+    { ts: number; price: number; block: number; factor?: { eth: number; usdcEth: number } }[]
+  >();
   for (const r of rows)
     if (r.price != null && r.price > 0) {
       const list = priced.get(r.market) ?? [];
-      list.push({ ts: r.ts, price: r.price, block: r.block });
+      list.push({ ts: r.ts, price: r.price, block: r.block, ...(r.ethFactor ? { factor: r.ethFactor } : {}) });
       priced.set(r.market, list);
     }
   return rows.map((r) => {
@@ -262,9 +279,9 @@ function pricesFor(
     if (list && list.length > 0) {
       let best = list[0];
       for (const p of list) if (Math.abs(p.ts - r.ts) < Math.abs(best.ts - r.ts)) best = p;
-      return { price: best.price, own: false, block: best.block };
+      return { price: best.price, own: false, block: best.block, ...(best.factor ? { factor: best.factor } : {}) };
     }
-    return { price: todayPrice(r.market) ?? 0, own: false, block: null };
+    return { price: todayPrice(r.market) ?? 0, own: false, block: todayBlock(r.market), latest: true as const };
   });
 }
 
@@ -275,7 +292,9 @@ export function replayCToken(
 ): CTokenReplayed[] {
   const evs = ordered(rows);
   const today = (m: string) => o.live?.[m]?.price ?? o.todayPrices?.[m] ?? null;
-  const prices = pricesFor(evs, today);
+  // The live read's block, where its price is the one taken.
+  const todayBlock = (m: string) => (o.live?.[m]?.price != null ? (o.live[m].block ?? null) : null);
+  const prices = pricesFor(evs, today, todayBlock);
   const supply = new Map<string, number>();
   const debt = new Map<string, number>();
   const debtIdx = new Map<string, number>();
@@ -327,6 +346,8 @@ export function replayCToken(
       price: prices[i].price,
       ownPrice: prices[i].own,
       priceBlock: prices[i].block,
+      ...(prices[i].latest ? { latestRead: true as const } : {}),
+      ...(prices[i].factor ? { priceFactor: prices[i].factor } : {}),
       legs,
       supply: supply.get(m) ?? 0,
       debt: debt.get(m) ?? 0,
@@ -459,9 +480,9 @@ function ctokenLeg(brand: string, r: CTokenReplayed, l: { bucket: string; amount
       ? `${composed} at block ${at(r.ev.block)}`
       : r.ownPrice
         ? `${oracle} at block ${at(r.ev.block)}`
-        : r.priceBlock != null
-          ? `${oracle}, ${nearestPriceNote(r.priceBlock, r.ev.block)}`
-          : `${oracle}, price at the latest read, which names no block; this row is at block ${at(r.ev.block)}`;
+        : !r.latestRead && r.priceBlock != null
+          ? `${r.priceFactor ? ethYearsNote(r.ev.symbol, r.priceFactor) : oracle}, ${nearestPriceNote(r.priceBlock, r.ev.block)}`
+          : `${oracle}, price at the latest read, ${r.priceBlock != null ? `block ${at(r.priceBlock)}` : "which names no block"}; this row is at block ${at(r.ev.block)}`;
   return flowLeg({
     bucket: l.bucket,
     amount: l.amount,
@@ -469,7 +490,7 @@ function ctokenLeg(brand: string, r: CTokenReplayed, l: { bucket: string; amount
     price: r.price > 0 ? r.price : null,
     block: r.ownPrice ? r.ev.block : r.priceBlock,
     priceNote,
-    ...(!r.ownPrice && r.priceBlock == null ? { basis: CTOKEN_TODAY_BASIS } : {}),
+    ...(r.latestRead ? { basis: CTOKEN_TODAY_BASIS } : {}),
     ...(ACCRUAL_KEYS.has(l.bucket) ? { accrual: true } : {}),
   });
 }
@@ -540,9 +561,9 @@ export function ctokenFlowTimeline(rows: CTokenFlowRow[], o: CTokenFlowOptions):
     // on its market, else today's: its figures that day rest on that price.
     const why = r.ownPrice
       ? null
-      : r.priceBlock != null
+      : !r.latestRead && r.priceBlock != null
         ? `${nearestPriceNote(r.priceBlock, r.ev.block)}: no price is read at this block.`
-        : "priced at the latest block's price: no price is read at this block, nor at any row on its market.";
+        : "priced at the latest read's price: no price is read at this block, nor at any row on its market.";
     const unsure =
       why && r.legs.length > 0 ? balances.map((b) => ({ side: b.side, why, symbol: r.ev.symbol, held: true })) : [];
     return {
@@ -758,7 +779,7 @@ export function ctokenEventStates(
       firstPrice.set(r.ev.market, {
         usd: r.price,
         block: r.ownPrice ? r.ev.block : r.priceBlock,
-        ...(r.ownPrice && r.ev.ethFactor ? { factor: r.ev.ethFactor } : {}),
+        ...(r.ownPrice && r.ev.ethFactor ? { factor: r.ev.ethFactor } : r.priceFactor ? { factor: r.priceFactor } : {}),
       });
   // A market the transaction left alone takes the newer of its latest row's
   // price and the daily store's for the event's day, as the bars do that day.
@@ -790,7 +811,7 @@ export function ctokenEventStates(
       return {
         usd: store.usd,
         block: b,
-        note: `${oracle(sym)}, ${b != null ? `price at block ${n(b)}` : "a block the daily store's route does not state"}, the close of ${dayWords(store.day)}; this event is at block ${n(at)}`,
+        note: `${oracle(sym)}, ${b != null ? `price at block ${n(b)}` : "a block the daily store's route does not name"}, the close of ${dayWords(store.day)}; this event is at block ${n(at)}`,
       };
     }
     const from = row ?? firstPrice.get(m);
@@ -801,14 +822,17 @@ export function ctokenEventStates(
         note:
           from.block === at
             ? `${from.factor ? ethYearsNote(sym, from.factor) : oracle(sym)} at block ${n(at)}`
-            : `${from.factor ? ethYearsNote(sym, from.factor) : oracle(sym)}, ${from.block != null ? `price at block ${n(from.block)}` : "a price whose block the read does not name"}, the nearest read on this market; this event is at block ${n(at)}`,
+            : `${from.factor ? ethYearsNote(sym, from.factor) : oracle(sym)}, ${from.block != null ? `price at block ${n(from.block)}` : "a price at a block this read does not name"}, the nearest read on this market; this event is at block ${n(at)}`,
       };
-    const today = o.live?.[m]?.price ?? o.todayPrices?.[m] ?? null;
+    // The latest read: its block where the live read names one.
+    const lv = o.live?.[m];
+    const today = lv?.price ?? o.todayPrices?.[m] ?? null;
+    const tb = lv?.price != null ? (lv.block ?? null) : null;
     return today != null
       ? {
           usd: today,
-          block: null,
-          note: `${oracle(sym)}, price at the latest read, which names no block; this event is at block ${n(at)}`,
+          block: tb,
+          note: `${oracle(sym)}, price at the latest read, ${tb != null ? `block ${n(tb)}` : "which names no block"}; this event is at block ${n(at)}`,
         }
       : null;
   };

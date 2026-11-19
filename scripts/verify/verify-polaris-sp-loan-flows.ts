@@ -20,6 +20,8 @@
 //   npx tsx --test scripts/verify/verify-polaris-sp-loan-flows.ts
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { assertUnitReceipts } from "./lib/unit-receipts";
+import { buildFlowModel } from "@/lib/shared/flows-timeline";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { depositFlows, depositFlowsFromDays, loanFlows } from "@/lib/polaris/sp-loan-flow-timelines";
@@ -183,4 +185,19 @@ test("the bars' how-to-read names each bar by its hue and its own label", () => 
   assert.ok(lifetimeFlowsBarsContent().intro!.startsWith("Blue is the collateral, green the debt. "));
   // A grain is a unit factor: no block on the deposit's series.
   assert.ok(t.dailyPrices!.a.every((o) => o.length === 2));
+});
+
+test("the deposit's and the loan's Held/Owed receipts stay in their tokens (ui-jobs 743)", () => {
+  const now: DepositNow = {
+    now: BigInt("4100000000000000000"),
+    pendingLoss: BigInt("80000000000000000"),
+    pendingPeth: BigInt("1000000000000"),
+    bcSinceTouch: BigInt("1000000000000"),
+    pendingStable: BigInt("2000000000000000"),
+  };
+  const dep = depositFlows("usdp", deposit.rows, { open: true, now, nowSec: NOW })!;
+  const ln = loanFlows(loan.rows, { open: true, chain: CHAIN, nowSec: NOW, floorDays: loan.floorDays })!;
+  let read = assertUnitReceipts(buildFlowModel(dep.timeline)!, "deposit");
+  read += assertUnitReceipts(buildFlowModel(ln.timeline)!, "loan");
+  assert.ok(read > 0, "receipts read");
 });

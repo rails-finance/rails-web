@@ -47,6 +47,7 @@ import { changeText } from "@/components/shared/change-swap-value";
 import { liquityV2RedeemerHref } from "@/lib/liquity-v2/redeemer-routes";
 import { useTxTroves } from "@/lib/liquity-v2/tx-troves";
 import { centsParts, faceParts } from "@/lib/shared/sheet-usd-rows";
+import { NO_FIGURE, noPriceWords } from "@/lib/shared/flows-sum";
 
 const tmContractOf = (addr?: string) => ({ name: "TroveManager", address: addr });
 
@@ -670,9 +671,9 @@ export function useLiquityCells({
       ? {
           before:
             debtShowBefore && !accrualMove ? (
-              <P info={faceUsdProv(debtSym, toLocaleStringHelper(beforeDebt), "before")}>{formatUsd(beforeDebt)}</P>
+              <P info={faceUsdProv(debtSym, beforeDebt, "before")}>{formatUsd(beforeDebt)}</P>
             ) : null,
-          after: <P info={faceUsdProv(debtSym, toLocaleStringHelper(debtAfter), "after")}>{formatUsd(debtAfter)}</P>,
+          after: <P info={faceUsdProv(debtSym, debtAfter, "after")}>{formatUsd(debtAfter)}</P>,
           price: `At its $1 face, $1 per ${debtSym}`,
         }
       : undefined,
@@ -830,6 +831,11 @@ export function useLiquityCells({
   const redistUsd = sheetUsdOf.redistribution;
   const eventUsd = sheetUsdOf.event;
   const marketUsd = sheetUsdOf.market;
+  // A collateral figure with no price at this block: "—", naming the asset.
+  const collNoFigure = (what: string) => ({
+    text: NO_FIGURE,
+    info: { kind: "derived" as const, summary: `${what}. No dollar figure: ${noPriceWords([collSym])}.` },
+  });
   const collRows: SheetRow[] = [];
   if (Math.abs(opColl) >= DUST_COLL)
     collRows.push({
@@ -856,7 +862,7 @@ export function useLiquityCells({
                 Boolean(isLiquidation && liquidation),
               ),
             }
-          : undefined,
+          : collNoFigure("The collateral this event moved, in USD"),
       tip: TIP.collEvent,
     });
   if (Math.abs(redistColl) >= DUST_COLL)
@@ -864,7 +870,10 @@ export function useLiquityCells({
       key: "redistribution",
       label: L2_WORDS.sheet_redistribution,
       amount: { text: formatColl(redistColl), symbol: collSym, info: collDeltaProv },
-      usd: priceNow > 0 ? { ...centsParts(redistUsd), info: usdMoveProv(collSym, redistColl, priceNow) } : undefined,
+      usd:
+        priceNow > 0
+          ? { ...centsParts(redistUsd), info: usdMoveProv(collSym, redistColl, priceNow) }
+          : collNoFigure("The redistribution's collateral, in USD"),
       tip: TIP.collRedist,
     });
   const collCarry: EventSheet["sides"][number]["carry"] = [];
@@ -882,7 +891,8 @@ export function useLiquityCells({
           : undefined,
       tip: TIP.collLast,
     });
-    // The same price at both events moves nothing: the row is left out.
+    // The same price at both events moves nothing: the row is left out. A
+    // price missing at either event draws "—", so a group's sum is blocked.
     if (lastUsd != null && priceNow > 0 && marketUsd !== 0)
       collCarry.push({
         key: "market",
@@ -890,6 +900,16 @@ export function useLiquityCells({
         usd: {
           ...centsParts(marketUsd, true),
           info: marketMoveProv(collSym, beforeCollAtEventUsd, lastUsd),
+        },
+        tip: TIP.collMarket,
+      });
+    else if (lastUsd == null || !(priceNow > 0))
+      collCarry.push({
+        key: "market",
+        label: SHEET_WORDS.market,
+        usd: {
+          text: NO_FIGURE,
+          info: { kind: "derived", summary: `Market move. No dollar figure: ${noPriceWords([collSym])}.` },
         },
         tip: TIP.collMarket,
       });
@@ -909,11 +929,15 @@ export function useLiquityCells({
           }
         : undefined,
     rows: collRows,
-    total: {
-      text: afterCollInUsd > 0 ? sheetUsd(afterCollInUsd) : "$0",
-      cents: afterCollInUsd,
-      info: usdAfterProv ?? collAfterProv,
-    },
+    // Collateral held with no price at this block: "—", never "$0".
+    total:
+      collAfter > 0 && !(collPrice > 0)
+        ? collNoFigure("Collateral after this event, in USD")
+        : {
+            text: afterCollInUsd > 0 ? sheetUsd(afterCollInUsd) : "$0",
+            cents: afterCollInUsd,
+            info: usdAfterProv ?? collAfterProv,
+          },
     totalAmount: { text: formatColl(collAfter), symbol: collSym, info: collAfterProv },
     totalTip: TIP.collTotal,
   };
@@ -968,7 +992,7 @@ export function useLiquityCells({
       key: "upfront-fee",
       label: L2_WORDS.sheet_upfront_fee,
       amount: { text: toLocaleStringHelper(upfrontFee), symbol: debtSym, info: feeP?.info, value: feeP?.value },
-      usd: { ...faceParts(upfrontFee), info: faceUsdProv(debtSym, toLocaleStringHelper(upfrontFee), "after") },
+      usd: { ...faceParts(upfrontFee), info: faceUsdProv(debtSym, upfrontFee, "after") },
       tip: TIP.debtUpfront,
     });
   if (Math.abs(redistDebt) >= DUST_DEBT)
@@ -985,7 +1009,7 @@ export function useLiquityCells({
       key: "last",
       label: SHEET_WORDS.last,
       amount: { text: toLocaleStringHelper(beforeDebt), symbol: debtSym, info: debtBeforeProv },
-      usd: { ...faceParts(beforeDebt), info: faceUsdProv(debtSym, toLocaleStringHelper(beforeDebt), "before") },
+      usd: { ...faceParts(beforeDebt), info: faceUsdProv(debtSym, beforeDebt, "before") },
       tip: TIP.debtLast,
     });
     if (accrualTotal >= DUST_DEBT)
@@ -1042,7 +1066,7 @@ export function useLiquityCells({
     total: {
       text: debtAfter > 0 ? faceParts(debtAfter).text : "$0",
       cents: faceParts(debtAfter).cents,
-      info: faceUsdProv(debtSym, toLocaleStringHelper(debtAfter), "after"),
+      info: faceUsdProv(debtSym, debtAfter, "after"),
     },
     totalAmount: { text: toLocaleStringHelper(debtAfter), symbol: debtSym, info: debtAfterProv },
     totalTip: TIP.debtTotal,

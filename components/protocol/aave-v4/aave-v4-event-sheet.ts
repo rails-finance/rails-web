@@ -208,6 +208,7 @@ const sinceProv = (what: string): Provenance => ({
 function sheetSide({
   ctx,
   prev,
+  prevBlock,
   side,
   coord,
   label,
@@ -217,6 +218,7 @@ function sheetSide({
 }: {
   ctx: AaveV4Context;
   prev: AaveV4Context | undefined;
+  prevBlock?: number;
   side: FlowSide;
   coord: EventProvDetail;
   label: string;
@@ -282,7 +284,7 @@ function sheetSide({
   // A side that held nothing then and nothing before this event has no carry.
   const prevItems = prev ? holdingsOf(prev, leg) : [];
   if (prev && (prevItems.length > 0 || beforeItems.some((h) => Number(h.amount) > 0))) {
-    const last = sumOf(prev, prevItems, `The ${side} once the previous event on this spoke had run, in USD`, undefined);
+    const last = sumOf(prev, prevItems, `The ${side} once the previous event on this spoke had run, in USD`, prevBlock);
     const beforeSum = sumOf(ctx, beforeItems, `The ${side} just before this event, in USD`, coord.blockNumber);
     carry.push({
       key: "last",
@@ -466,6 +468,7 @@ function ltvOf(ctx: AaveV4Context): number | null {
 export function aaveV4Sheet({
   ctx,
   prev,
+  prevBlock,
   coord,
   label,
   address,
@@ -475,6 +478,8 @@ export function aaveV4Sheet({
   ctx: AaveV4Context;
   /** The previous event on this spoke, whose snapshot the carry layer reads. */
   prev?: AaveV4Context;
+  /** That event's block, which its snapshot's prices stand at. */
+  prevBlock?: number;
   coord: EventProvDetail;
   /** The event's word ("Supply"), naming its rows. */
   label: string;
@@ -487,8 +492,8 @@ export function aaveV4Sheet({
   if (ctx.eventType === "collateral_toggle") return undefined;
   if (hf.status === "loading") return null;
 
-  const coll = sheetSide({ ctx, prev, side: "collateral", coord, label, address, hf });
-  const debt = sheetSide({ ctx, prev, side: "debt", coord, label, address, hf, repaid });
+  const coll = sheetSide({ ctx, prev, prevBlock, side: "collateral", coord, label, address, hf });
+  const debt = sheetSide({ ctx, prev, prevBlock, side: "debt", coord, label, address, hf, repaid });
 
   // Risk: the spoke's health factor at the end of the block, and the fall it
   // leaves the collateral before it reaches 1.

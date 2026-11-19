@@ -20,6 +20,7 @@ import { LIQUITY_V1_ADDRESSES } from "./asset-catalog";
 import { ratioConstantProv } from "./position-provenance";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { priceCell } from "@/lib/shared/sheet-usd-rows";
+import { faceRows } from "@/lib/shared/flows-timeline-provenance";
 
 const TROVE_MANAGER = { name: "Liquity V1 TroveManager", address: LIQUITY_V1_ADDRESSES.TROVE_MANAGER };
 
@@ -661,11 +662,11 @@ export const sheetMoveUsdProv = (coords: LiquityV1Coords, vals: { amount: string
 });
 
 /** Debt an event moved, in dollars, at LUSD's $1 face. */
-export const sheetFaceUsdProv = (what: string, amount: string): Provenance => ({
+export const sheetFaceUsdProv = (what: string, amount: string | number): Provenance => ({
   kind: "chain-derived",
   summary: `${what}, in USD — the LUSD counted at the $1 redemption face value the protocol uses.`,
   formula: "LUSD × $1",
-  inputs: [{ label: "LUSD", value: amount, kind: "chain" }],
+  inputs: faceRows("LUSD", amount, { label: "LUSD" }),
 });
 
 /** The debt a full redemption cancelled, in its two parts. */

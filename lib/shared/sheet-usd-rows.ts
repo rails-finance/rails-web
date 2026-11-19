@@ -10,7 +10,7 @@
 import type { Provenance } from "@/components/shared/provenance";
 import { holderUsdReceipt } from "@/lib/shared/holder-usd-receipt";
 import { centsOf, shownUsd } from "@/lib/shared/shown-usd";
-import { NO_FIGURE, noPriceWords } from "@/lib/shared/flows-sum";
+import { listWords, NO_FIGURE, noPriceWords } from "@/lib/shared/flows-sum";
 import { formatUsdValue } from "@/lib/utils/format";
 
 /** Dollars as the sheet prints them: cents under $10, whole dollars above;
@@ -78,7 +78,7 @@ export const priceCell = (
 /** A cell with no figure: "—", naming the assets with no price. */
 export const noFigureCell = (what: string, symbols: string[]): UsdCell => ({
   text: NO_FIGURE,
-  info: { kind: "derived", summary: `${what}. No figure: ${noPriceWords([...new Set(symbols)])}.` },
+  info: { kind: "derived", summary: `${what}. No dollar figure: ${noPriceWords([...new Set(symbols)])}.` },
   usd: null,
 });
 
@@ -89,6 +89,17 @@ export function amountsUsd(
   xs: readonly PricedAmount[],
   o: { amountNote: string; via: string; signed?: boolean },
 ): UsdCell {
+  // An amount not read is no figure, never "Nothing held".
+  const unread = xs.filter((x) => !Number.isFinite(x.amount)).map((x) => x.symbol);
+  if (unread.length)
+    return {
+      text: NO_FIGURE,
+      info: {
+        kind: "derived",
+        summary: `${what}. No dollar figure: ${listWords([...new Set(unread)])} ${unread.length > 1 ? "have" : "has"} no amount read.`,
+      },
+      usd: null,
+    };
   const live = xs.filter((x) => Math.abs(x.amount) > 1e-12);
   const unpriced = live.filter((x) => x.price == null || !(x.price > 0)).map((x) => x.symbol);
   if (unpriced.length) return noFigureCell(what, unpriced);
@@ -129,7 +140,7 @@ function differenceUsd(
   if (parts.some((p) => p.cell.usd == null))
     return {
       text: NO_FIGURE,
-      info: { kind: "derived", summary: `${what}. No figure: a total beside it has none.` },
+      info: { kind: "derived", summary: `${what}. No dollar figure: a total beside it has none.` },
       usd: null,
     };
   const v = centsOf(less.reduce((a, p) => a - (p.cell.usd as number), from.cell.usd as number));
