@@ -120,3 +120,35 @@ export function aaveV4PeakReceipt(
     via: "the position's events · each reserve's balance × its last event's stored oracle price · summed, at the highest instant",
   });
 }
+
+const FLOW_WORD = {
+  withdrawn: "withdrawn",
+  repaid: "repaid",
+  liquidatedDebt: "repaid by liquidation",
+  liquidatedCollateral: "seized by liquidation",
+} as const;
+
+/** An outflow figure's receipt: each event's amount at that event's on-chain
+ *  price, each row naming its block, the figure their sum (ui-jobs 743). */
+export function aaveV4FlowReceipt(
+  what: string,
+  assets: readonly {
+    symbol: string;
+    legs: readonly { flow: keyof typeof FLOW_WORD; amount: number; price: number; source: string; block: number }[];
+  }[],
+): AaveV4UsdResult | null {
+  return aaveV4UsdReceipt({
+    what,
+    rows: assets.flatMap((a) =>
+      a.legs.map((l) => ({
+        symbol: a.symbol,
+        label: `${a.symbol} ${FLOW_WORD[l.flow]} at block ${l.block.toLocaleString("en-US")}`,
+        amount: l.amount,
+        amountNote: `the amount the position's event at block ${l.block.toLocaleString("en-US")} moved`,
+        price: { usd: l.price, source: l.source as AaveV4PriceSource, block: l.block },
+      })),
+    ),
+    face: "compact",
+    via: "the position's events · each outflow × the on-chain price stored for its block · summed",
+  });
+}

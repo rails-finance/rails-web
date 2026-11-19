@@ -297,3 +297,45 @@ test("lifetime flows: each outflow its shown product; an outflow with no on-chai
   const t = computeAaveLifetimeTotals(r.reserves, { "0x0": 1 });
   assert.ok(t.noFigure.includes("XAUt"), "the lifetime figures name XAUt and draw none");
 });
+
+const { aaveV4FlowReceipt } = await import(ROOT + "lib/aave-v4/usd-receipt.ts");
+const { lifetimeFiguresState } = await import(ROOT + "lib/aave-v4/lifetime-totals.ts");
+
+test("an outflow with no price at its own block takes no earlier event's; the priced ones rebuild with their blocks", () => {
+  const r = calculateAaveEconomics(
+    [
+      ev(1, "supply", "WETH", 5, { usd: 3000.123456, source: "iaave-oracle", block: 1001 }),
+      ev(2, "withdraw", "WETH", 1.2345678, { usd: 3100.5, source: "iaave-oracle", block: 1002 }),
+      ev(3, "withdraw", "WETH", 0.5, { usd: 3205.987654, source: "chainlink", block: 1003 }),
+      ev(4, "supply", "USDC", 100, { usd: 0.9999, source: "iaave-oracle", block: 1004 }),
+      // No price at this block: the WETH-era or USDC supply price is not used.
+      ev(5, "withdraw", "USDC", 40, null),
+    ],
+    undefined,
+    undefined,
+  );
+  const usdc = r.reserves.find((x) => x.symbol === "USDC");
+  assert.deepEqual(usdc.unpricedFlows, ["withdrawn"]);
+  assert.equal(usdc.withdrawnUsd, 0);
+  const weth = r.reserves.find((x) => x.symbol === "WETH");
+  assert.equal(weth.withdrawnUsd, Math.round((shownUsd(1.2345678, 3100.5) + shownUsd(0.5, 3205.987654)) * 100) / 100);
+  const receipt = aaveV4FlowReceipt("WETH withdrawn over the position's life", [
+    { symbol: "WETH", legs: weth.flowLegs },
+  ]);
+  assert.equal(receipt.usd, weth.withdrawnUsd);
+  assert.equal(rebuild(receipt.prov), weth.withdrawnUsd, "the rows multiply out to the drawn figure");
+  const notes = receipt.prov.inputs.map((i) => i.note ?? "").join(" | ");
+  assert.match(notes, /block 1,002/);
+  assert.match(notes, /Chainlink WETH\/USD at block 1,003/);
+});
+
+test("the lifetime figures wait for the oracle read, and say so while pending and once failed", () => {
+  assert.deepEqual(lifetimeFiguresState("pending", []), { draw: false, line: "price read pending" });
+  assert.deepEqual(lifetimeFiguresState("failed", []), {
+    draw: false,
+    line: "no dollar figure: the price read did not answer",
+  });
+  assert.equal(lifetimeFiguresState("answered", ["XAUt"]).draw, false);
+  assert.match(lifetimeFiguresState("answered", ["XAUt"]).line, /XAUt has no on-chain price/);
+  assert.deepEqual(lifetimeFiguresState("answered", []), { draw: true });
+});

@@ -1,5 +1,6 @@
+import { aaveV4NoFigureLine } from "@/lib/aave-v4/price-notes";
 import { resolvePrice, type PriceEntry } from "@/lib/aave/prices";
-import { pricesHaveLoaded, UNPRICED_DUST_TOKENS } from "@/lib/aave-v4/unpriced";
+import { listSymbols, pricesHaveLoaded, UNPRICED_DUST_TOKENS } from "@/lib/aave-v4/unpriced";
 import type { ReserveStats } from "@/lib/aave-v4/spoke-cards";
 
 /** Lifetime USD totals that mirror the tower chart's breakdown-legend rows
@@ -160,4 +161,21 @@ export function computeAaveLifetimeTotals(
     ]),
   ];
   return t;
+}
+
+/** Whether the lifetime figures may be drawn (ui-jobs 743): only once the
+ *  oracle read has answered and every holding and outflow has an on-chain
+ *  price; otherwise the line that stands in their place. */
+export function lifetimeFiguresState(
+  read: "pending" | "failed" | "answered",
+  noFigure: readonly string[],
+): { draw: true } | { draw: false; line: string } {
+  if (read === "pending") return { draw: false, line: aaveV4NoFigureLine({ missing: [], state: "pending" }) };
+  if (read === "failed") return { draw: false, line: aaveV4NoFigureLine({ missing: [], state: "failed" }) };
+  if (noFigure.length > 0)
+    return {
+      draw: false,
+      line: `No dollar figures here: ${listSymbols([...noFigure])} ${noFigure.length === 1 ? "has" : "have"} no on-chain price, so the breakdown gives those balances in their assets' units`,
+    };
+  return { draw: true };
 }

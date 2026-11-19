@@ -74,6 +74,16 @@ export interface ReserveStats {
   /** The outflows with an event no on-chain price stands behind: their
    *  dollars above draw no figure (ui-jobs 743). */
   unpricedFlows?: ("withdrawn" | "repaid" | "liquidatedDebt" | "liquidatedCollateral")[];
+  /** Each priced outflow as its receipt lists it: the amount, its event's
+   *  on-chain price and that block. */
+  flowLegs?: {
+    flow: "withdrawn" | "repaid" | "liquidatedDebt" | "liquidatedCollateral";
+    amount: number;
+    price: number;
+    /** The read the price came from (lib/aave-v4/price-notes.ts). */
+    source: string;
+    block: number;
+  }[];
   /** Chain-state current balance for this reserve, when an on-chain read has
    *  been applied (see `patchReservesWithChain`). When absent, consumers
    *  derive current state from `supplied − withdrawn − liquidatedCollateral`.
@@ -507,6 +517,26 @@ function isAaveV4Event(
 
 // ---- Calculation ----
 
+type OutFlow = NonNullable<ReserveStats["unpricedFlows"]>[number];
+const FLOW_USD: Record<OutFlow, "withdrawnUsd" | "repaidUsd" | "liquidatedDebtUsd" | "liquidatedCollateralUsd"> = {
+  withdrawn: "withdrawnUsd",
+  repaid: "repaidUsd",
+  liquidatedDebt: "liquidatedDebtUsd",
+  liquidatedCollateral: "liquidatedCollateralUsd",
+};
+/** An outflow at its own block's on-chain price: its shown product adds to
+ *  the flow's dollars, and its row is kept for the receipt. */
+function addFlow(
+  stats: ReserveStats,
+  flow: OutFlow,
+  amount: number,
+  p: { usd: number; source: string; block?: number },
+  eventBlock: number,
+): void {
+  stats[FLOW_USD[flow]] = Math.round((stats[FLOW_USD[flow]] + shownUsd(amount, p.usd)) * 100) / 100;
+  (stats.flowLegs ??= []).push({ flow, amount, price: p.usd, source: p.source, block: p.block ?? eventBlock });
+}
+
 /** An outflow at an event with no on-chain price: its side's dollars draw no figure. */
 function markUnpriced(stats: ReserveStats, flow: NonNullable<ReserveStats["unpricedFlows"]>[number]): void {
   const flows = (stats.unpricedFlows ??= []);
@@ -583,7 +613,9 @@ export function calculateAaveEconomics(
     // reserve's most-recent historic price. NO current-price fallback — per the
     // chain-state omission rule a historic figure must not be back-filled with a
     // live-market guess; an unpriceable event contributes 0 (omitted).
-    const priceNow = movedPrice ?? reservePrice.get(symbol) ?? 0;
+    // Only this event's own on-chain price: an earlier event's stands at
+    // another block, and an outflow with none here has no figure (ui-jobs 743).
+    const priceNow = movedPrice ?? 0;
 
     if (event.gas) {
       totalGasCostEth += event.gas.gasCostEth || 0;
@@ -637,7 +669,7 @@ export function calculateAaveEconomics(
       }
       case "withdraw": {
         stats.withdrawn += amount;
-        if (priceNow > 0) stats.withdrawnUsd += shownUsd(amount, priceNow);
+        if (priceNow > 0) addFlow(stats, "withdrawn", amount, ctx.price!, event.blockNumber);
         else if (amount > 0) markUnpriced(stats, "withdrawn");
         runningSupply.set(symbol, Math.max(0, (runningSupply.get(symbol) ?? 0) - amount));
         if (amount > 0)
@@ -666,7 +698,7 @@ export function calculateAaveEconomics(
         break;
       case "repay":
         stats.repaid += amount;
-        if (priceNow > 0) stats.repaidUsd += shownUsd(amount, priceNow);
+        if (priceNow > 0) addFlow(stats, "repaid", amount, ctx.price!, event.blockNumber);
         else if (amount > 0) markUnpriced(stats, "repaid");
         runningDebt.set(symbol, (runningDebt.get(symbol) ?? 0) - amount);
         if (amount > 0)
@@ -697,7 +729,8 @@ export function calculateAaveEconomics(
         }
 
         stats.liquidatedDebt += debtCovered;
-        if ((debtPx ?? priceNow) > 0) stats.liquidatedDebtUsd += shownUsd(debtCovered, debtPx ?? priceNow);
+        if (debtPx != null && debtCovered > 0)
+          addFlow(stats, "liquidatedDebt", debtCovered, ctx.debtPrice!, event.blockNumber);
         else if (debtCovered > 0) markUnpriced(stats, "liquidatedDebt");
         stats.liquidationCount++;
         runningDebt.set(symbol, (runningDebt.get(symbol) ?? 0) - debtCovered);
@@ -751,8 +784,8 @@ export function calculateAaveEconomics(
             reservePriceBlock.set(collStats.symbol, ctx.collateralPrice?.block ?? event.blockNumber);
           }
           collStats.liquidatedCollateral += collSeized;
-          const collPrice = collPx ?? reservePrice.get(collStats.symbol) ?? 0;
-          if (collPrice > 0) collStats.liquidatedCollateralUsd += shownUsd(collSeized, collPrice);
+          if (collPx != null && collSeized > 0)
+            addFlow(collStats, "liquidatedCollateral", collSeized, ctx.collateralPrice!, event.blockNumber);
           else if (collSeized > 0) markUnpriced(collStats, "liquidatedCollateral");
           runningSupply.set(collStats.symbol, Math.max(0, (runningSupply.get(collStats.symbol) ?? 0) - collSeized));
           collStats.flowEvents.push({

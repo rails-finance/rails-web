@@ -53,7 +53,7 @@ import type { AaveV4Event } from "@/lib/aave-v4/event-prose";
 import { AaveV4SpokeCardSelector } from "@/components/protocol/aave-v4/aave-v4-spoke-card";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { aaveV4EconomicsContent } from "@/lib/shared/learn-more-content";
-import { computeAaveLifetimeTotals } from "@/lib/aave-v4/lifetime-totals";
+import { computeAaveLifetimeTotals, lifetimeFiguresState } from "@/lib/aave-v4/lifetime-totals";
 // Lazy chunk: the tower chart (below the fold, ~700 lines of legend/anatomy)
 // loads off the initial bundle. A mount-time prefetch (below) has it cached
 // well before the data fetch resolves and it first renders.
@@ -117,7 +117,6 @@ import { shortAddr } from "@/lib/shared/format-event";
 import { useWalletContext } from "@/components/nav/wallet-context";
 import { useAaveV4UiState } from "@/hooks/useAaveV4UiState";
 import { useAaveV4OracleRead, type OraclePriceMap } from "@/lib/aave-v4/use-oracle-prices";
-import { listSymbols } from "@/lib/aave-v4/unpriced";
 import { computeOnchainUsd } from "@/lib/aave-v4/onchain-usd";
 import { priceKeyFor } from "@/lib/aave/prices";
 import { useAaveV4Deployment } from "@/lib/aave-v4/deployment";
@@ -320,7 +319,7 @@ function AaveV4SpokePageInner({
       // the headline numbers from event data, but resolve un-toggled supplies
       // to NON-collateral first so HF / borrowing-power / liq-price don't credit
       // collateral we can't confirm. See resolveFallbackCollateral.
-      if (!eventActiveGroup) return eventActiveCard;
+      if (!eventActiveGroup) return { ...eventActiveCard, oracleRead };
       const hardenedGroup = {
         ...eventActiveGroup,
         result: {
@@ -760,6 +759,7 @@ function AaveV4SpokePageInner({
             reserves={activeGroup.result.reserves}
             prices={chainTruthPrices}
             oraclePrices={oraclePrices}
+            priceRead={!oracleRead ? "pending" : oracleRead.failed ? "failed" : "answered"}
             gasEth={activeGroup.result.totalGasCostEth}
             gasUsd={activeGroup.result.totalGasCostUsd}
             historyComplete={olderCount === 0}
@@ -827,6 +827,7 @@ function AaveV4SpokeTowerBlock({
   reserves,
   prices,
   oraclePrices,
+  priceRead,
   gasEth,
   gasUsd,
   historyComplete,
@@ -852,6 +853,9 @@ function AaveV4SpokeTowerBlock({
   /** The oracle map behind `prices` — passed on so each priced row's receipt
    *  can name the feed that answered for that asset. */
   oraclePrices: OraclePriceMap | null;
+  /** Whether the oracle read has answered: before it does, or once it has
+   *  failed, the lifetime figures are not drawn. */
+  priceRead: "pending" | "failed" | "answered";
   gasEth: number;
   gasUsd: number;
   /** False when the page holds a window of the timeline (lib/aave-v4/lifetime-totals.ts). */
@@ -901,6 +905,8 @@ function AaveV4SpokeTowerBlock({
     () => computeAaveLifetimeTotals(reserves, prices, historyComplete),
     [reserves, prices, historyComplete],
   );
+  const figures = lifetimeFiguresState(priceRead, totals.noFigure);
+  const capital = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
   // What liquidations cost the borrower: collateral seized minus debt cleared,
   // in tokens and in dollars at each event's price and at today's.
   const liqNet = useMemo(() => {
@@ -1082,16 +1088,9 @@ function AaveV4SpokeTowerBlock({
                     liquidations) is valued at its price when it left, and what is still held at the latest block&apos;s
                     price. Supplied and Borrowed are set so each side balances, so a price change while a token was held
                     shows in them.
-                    {totals.noFigure.length > 0 && (
-                      <>
-                        {" "}
-                        No dollar figures here: {listSymbols(totals.noFigure)}{" "}
-                        {totals.noFigure.length === 1 ? "has" : "have"} no on-chain price, so the breakdown gives those
-                        balances in their assets&apos; units.
-                      </>
-                    )}
+                    {!figures.draw && <> {capital(figures.line)}.</>}
                   </p>
-                  {totals.noFigure.length === 0 && (
+                  {figures.draw && (
                     <div className="flex items-start gap-2 leading-relaxed">
                       <span className="select-none text-rb-500">•</span>
                       <span>
@@ -1110,7 +1109,7 @@ function AaveV4SpokeTowerBlock({
                       </span>
                     </div>
                   )}
-                  {totals.noFigure.length === 0 && totals.hasDebtHistory && (
+                  {figures.draw && totals.hasDebtHistory && (
                     <div className="flex items-start gap-2 leading-relaxed">
                       <span className="select-none text-rb-500">•</span>
                       <span>
@@ -1129,7 +1128,7 @@ function AaveV4SpokeTowerBlock({
                       </span>
                     </div>
                   )}
-                  {totals.noFigure.length === 0 && liqNet && (
+                  {figures.draw && liqNet && (
                     <div className="flex items-start gap-2 leading-relaxed">
                       <span className="select-none text-rb-500">•</span>
                       <span>

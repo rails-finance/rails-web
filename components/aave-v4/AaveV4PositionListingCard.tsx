@@ -139,12 +139,6 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
   // The wire states no closing date for a row it serves as open; the
   // chain-closed card dates the close by the last act, which emptied it.
   const closedAt = row.closedAt ?? (wireOpen ? row.lastActivityAt : undefined);
-  // Peak-based supply-only test for the closed card: a position that never
-  // carried real debt (peak debt < $1) drops the Peak Debt column, mirroring the
-  // detail card's `spoke.peakDebtUsd < 1` rule. Distinct from the live
-  // `supplyOnly` (which reads the now-zero current balances and is always true
-  // once closed).
-  const peakSupplyOnly = (row.peakDebtUsd ?? 0) < 1;
 
   // The balances are the chain read's where it answered, else the index's;
   // the prices only on-chain ones (below).
@@ -225,15 +219,19 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
     // The server's peak figures are no sum of shown products and carry no
     // receipt (ui-jobs 743): the listing asserts none, in the house's
     // not-recorded form, and the position page states the peaks it can rebuild.
+    // Both columns, whatever the dollar peaks say (ui-jobs 743): the wire
+    // counts no lifetime borrows, and a closed row's debtAssetCount is 0
+    // whether or not it ever borrowed, so no count can tell a supply-only
+    // position apart.
     const notRecorded = notRecordedNote("position");
     const heads: PositionCardHead[] = [
       {
         id: "peak-collateral",
-        label: peakSupplyOnly ? CARD_VOCAB.peakSupply : CARD_VOCAB.peakCollateral,
+        label: CARD_VOCAB.peakCollateral,
         value: null,
         sub: notRecorded,
       },
-      ...(peakSupplyOnly ? [] : [{ id: "peak-debt", label: CARD_VOCAB.peakDebt, value: null, sub: notRecorded }]),
+      { id: "peak-debt", label: CARD_VOCAB.peakDebt, value: null, sub: notRecorded },
     ];
     const slots: PositionCardListingSlots = {
       surface: "listing",

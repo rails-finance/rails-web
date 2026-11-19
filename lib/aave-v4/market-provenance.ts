@@ -5,9 +5,8 @@
 // - STORED: `GET /api/aave-v4/hubs` (Ethereum) and `GET /api/aave-v4-base/reserves`
 //   (Base), the hub's lines per spoke as rails-server's Aave V4 refresher read them
 //   from the hub contracts each cycle (getSpokeConfig, getSpokeAddedAssets,
-//   getSpokeTotalOwed) and stored at its block: class `indexed`. A dollar figure on
-//   Ethereum prices the amount at an off-chain market feed (`offchain`); Base's
-//   stored row carries the spoke oracle's price (`oracle`).
+//   getSpokeTotalOwed) and stored at its block: class `indexed`. A dollar figure
+//   prices the amount at an on-chain read (`oracle`), named with its block.
 // - HEAD: `GET /api/at-block/aave-v4/reserve`, one Multicall3 of the spoke, its
 //   oracle and the hub at the head block, kept 30 s by rails-server: class `state`,
 //   and a figure valued at the spoke oracle's price is `oracle`.
