@@ -679,9 +679,14 @@ export function LifetimeFlowsScrubber({
   );
   useEffect(() => {
     if (!words) return;
-    // Nothing drawn, no Key; the price chart alone, its basis and the totals.
-    if (life !== "full") {
-      reportKey?.(life === "none" ? null : { items: [], outline: null, priceBasis, totals: totals ?? undefined });
+    // Nothing drawn, no Key; the price chart alone, its basis and the totals;
+    // a chart standing alone, its basis.
+    if (life !== "full" || timeline.chartAlone) {
+      reportKey?.(
+        life === "none"
+          ? null
+          : { items: [], outline: null, priceBasis, totals: timeline.chartAlone ? undefined : (totals ?? undefined) },
+      );
       return;
     }
     const drawn = busy ? null : hatches;
@@ -700,7 +705,7 @@ export function LifetimeFlowsScrubber({
       priceBasis,
       totals: totals ?? undefined,
     });
-  }, [reportKey, busy, hatches, words, from, lined, bin, basisUnit, totals, priceBasis, life]);
+  }, [reportKey, busy, hatches, words, from, lined, bin, basisUnit, totals, priceBasis, life, timeline.chartAlone]);
   useEffect(() => () => reportKey?.(null), [reportKey]);
 
   if (!model || !bars || !words || life === "none") return null;
@@ -728,6 +733,7 @@ export function LifetimeFlowsScrubber({
           prices={prices}
           failed={lifetime?.failed ?? false}
           priceOnly={life === "price"}
+          chartAlone={life === "full" && timeline.chartAlone === true}
           onLedgerNote={ledgerNote ?? undefined}
           renderBars={(stop, when, isLive, atLive) => (
             <PlainBars model={bars} stop={stop} when={when} isLive={isLive} atLive={atLive} onKey={setHatches} />

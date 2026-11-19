@@ -110,6 +110,8 @@ export function flowMoment(model: FlowModel, events: FocusEvent[], endTs: number
   const startDay = model.start / DAY_MS;
   const day = Math.floor(endTs / DAY_S);
   const stop = day - startDay;
+  // A chart standing alone has no position to state between its events.
+  if (model.chartAlone) return null;
   if (stop <= 0 || stop >= model.liveStop || model.eventDays.includes(stop)) return null;
   // The event days around it (a balance step's row is not one).
   let ei = -1;

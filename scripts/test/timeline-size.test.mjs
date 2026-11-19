@@ -260,3 +260,28 @@ test("a Stability Pool deposit's range writes ?deposit=, its own param", () => {
   assert.deepEqual(log, [["deposit", ["5-"]]]);
   assert.deepEqual(size.readSizeParams(new URLSearchParams("coll=1-&deposit=5-"), ["deposit"]), { deposit: ["5-"] });
 });
+
+test("cutUnloadedWords: a cut past the loaded rows (ui-jobs 762)", () => {
+  const { cutUnloadedWords } = size;
+  // A page with a path to its older rows: they are not loaded yet, and the control loads them.
+  assert.deepEqual(cutUnloadedWords({ word: "1 Oct '26", oldest: "28 Oct '26", loadOlder: "idle", whole: false }), {
+    text: "Events on or before 1 Oct '26 are not loaded yet.",
+    load: "idle",
+  });
+  assert.equal(
+    cutUnloadedWords({ word: "1 Oct '26", oldest: "28 Oct '26", loadOlder: "failed", whole: false }).load,
+    "failed",
+  );
+  // A capped page with no path: the one day it holds back to.
+  assert.deepEqual(cutUnloadedWords({ word: "1 Oct '26", oldest: "28 Oct '26", loadOlder: null, whole: false }), {
+    text: "This page holds events back to 28 Oct '26.",
+  });
+  // The whole history held: there are none.
+  assert.deepEqual(cutUnloadedWords({ word: "1 Oct '26", oldest: "28 Oct '26", loadOlder: null, whole: true }), {
+    text: "No events on or before 1 Oct '26.",
+  });
+  assert.equal(
+    cutUnloadedWords({ word: "1 Oct '26", oldest: null, loadOlder: null, whole: false }).text,
+    "No events on or before 1 Oct '26.",
+  );
+});

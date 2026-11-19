@@ -140,3 +140,21 @@ export interface TimelineLoadOlder {
   state: "idle" | "loading" | "failed";
   load: () => void;
 }
+
+/** What a timeline with no month reads says when a cut ("Sync to chart", a
+ *  `?to=` link) leaves no loaded row (ui-jobs 762). With a path to the older
+ *  rows: they are not loaded yet, and the control loads them (`load`). With
+ *  none, the page holding a capped history: the oldest day it holds. With
+ *  none and the whole history held: there are none. */
+export function cutUnloadedWords(o: {
+  word: string;
+  /** The oldest loaded row's day in words, or null with none. */
+  oldest: string | null;
+  loadOlder: TimelineLoadOlder["state"] | null;
+  /** The page holds the whole history: no boundary card, no older rows. */
+  whole: boolean;
+}): { text: string; load?: "idle" | "loading" | "failed" } {
+  if (o.loadOlder) return { text: `Events on or before ${o.word} are not loaded yet.`, load: o.loadOlder };
+  if (o.whole || o.oldest == null) return { text: `No events on or before ${o.word}.` };
+  return { text: `This page holds events back to ${o.oldest}.` };
+}
