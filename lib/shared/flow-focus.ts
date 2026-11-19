@@ -34,7 +34,7 @@ import {
   type FlowSegment,
   type FlowSide,
 } from "@/lib/shared/flows-timeline";
-import { shownUsd } from "@/lib/shared/shown-usd";
+import { centsOf, roundAway, shownUsd } from "@/lib/shared/shown-usd";
 
 /** One event of the page as the flow lines read it: the buckets its legs
  *  fill, each in USD at the price its event carries (null where no price). */
@@ -149,7 +149,8 @@ export function eventCum(model: FlowModel, events: FocusEvent[], id: string): Ev
     buckets: new Set(ev.legs.filter((l) => !(l.accrual && Math.abs(l.usd ?? 0) < 0.5)).map((l) => l.bucket)),
     legs: ev.legs,
     later: at < events.length - 1 || ri < model.rows.length - 1,
-    parts: bucketLegs(legs),
+    // A served series states no legs: no line can list them.
+    parts: model.hasLegs ? bucketLegs(legs) : { legs: {}, unpriced: {} },
   };
 }
 
@@ -551,7 +552,7 @@ export function eventSideSumByAsset(
   const il = sum.lines.find((l) => l.kind === "interest");
   if (!il || sum.interestUsd == null) return rows;
   const inCents = rows.total.cents != null;
-  const dollars = Math.round(sum.interestUsd);
+  const dollars = inCents ? roundAway(sum.interestUsd) : Math.round(sum.interestUsd);
   const flows = rows.lines.filter((l) => l.kind !== "rest");
   const rest = rows.lines.find((l) => l.kind === "rest");
   const interest: EventSumLine = {
@@ -627,8 +628,8 @@ function centsRest(
       before: null,
     });
   } else {
-    const lineCents = Math.round(lines.reduce((a, l) => a + (l.cents ?? 0), 0) * 100) / 100;
-    const cents = Math.round((held - lineCents) * 100) / 100;
+    const lineCents = centsOf(lines.reduce((a, l) => a + (l.cents ?? 0), 0));
+    const cents = centsOf(held - lineCents);
     if (Math.abs(cents) >= 0.005)
       out.push({
         key: seg.key,
@@ -640,7 +641,7 @@ function centsRest(
           note: "the change in each asset's price since its flows",
           market: { cents, held, lines: lineCents },
         },
-        dollars: Math.round(cents),
+        dollars: roundAway(cents),
         sign: cents < 0 ? "−" : "+",
         amount: wholeUsd(cents, unitOf(model, side)),
         cents,

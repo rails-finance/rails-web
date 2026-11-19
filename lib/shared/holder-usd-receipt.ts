@@ -16,7 +16,7 @@
 
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import { formatUsdValue } from "@/lib/utils/format";
-import { shownUsd, shownEth, amountText, priceText } from "@/lib/shared/shown-usd";
+import { centsOf, shownUsd, shownEth, amountText, priceText } from "@/lib/shared/shown-usd";
 
 export interface UsdLeg {
   /** The token's symbol ("WETH", "BOLD"). */
@@ -46,7 +46,7 @@ export interface UsdLeg {
 
 // The shown-values arithmetic lives in lib/shared/shown-usd.ts, dependency-free.
 export { shownPrice, shownUsd, shownComposedPrice, amountText, priceText } from "@/lib/shared/shown-usd";
-const cents = (v: number): number => Math.round(v * 100) / 100;
+const cents = centsOf;
 
 /** The receipt and the figure it rebuilds. */
 export function holderUsdReceipt(opts: {
@@ -115,7 +115,7 @@ export function holderUsdReceipt(opts: {
         kind: "derived",
         step: true,
       });
-    return opts.byValue && products[i] < 0.01 ? rows.map((r) => ({ ...r, dust: true as const })) : rows;
+    return opts.byValue && Math.abs(products[i]) < 0.01 ? rows.map((r) => ({ ...r, dust: true as const })) : rows;
   });
   const allFaces = legs.every((l) => l.face);
   const read = legs.filter((l) => !l.face).length;

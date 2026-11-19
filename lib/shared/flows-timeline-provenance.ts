@@ -5,14 +5,21 @@
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import type { FlowLeg, FlowSegment, FlowSide, MarketMove } from "@/lib/shared/flows-timeline";
 import { holderUsdReceipt } from "@/lib/shared/holder-usd-receipt";
-import { amountText } from "@/lib/shared/shown-usd";
+import { listWords, noPriceWords } from "@/lib/shared/flows-sum";
 import { formatUsdValue } from "@/lib/utils/format";
 
 // ── The rows behind a line (ui-jobs 743) ─────────────────────────────────────
 // A line whose legs carry their parts states every leg: its amount, its price
 // as shown at its block with the price's source, their product to the cent,
-// largest first with those under a cent behind the dust control, and the sum
-// the line draws. A line holding an unpriced leg states no sum.
+// largest first, and the sum the line draws. Legs under a cent, and those past
+// the first LEG_CAP, sit behind the dust control. A line holding an unpriced
+// leg states no sum. The rows are built when the receipt opens (`key`).
+
+/** Legs shown before the dust control. */
+const LEG_CAP = 12;
+
+/** How a whole-dollar face relates to its receipt. */
+const FACE = "To the cent, shown to the dollar.";
 
 const blockWords = (b: number | null | undefined) => (b != null ? `block ${b.toLocaleString("en-US")}` : null);
 
@@ -30,62 +37,79 @@ function legLabels(legs: readonly FlowLeg[]): string[] {
 
 const signedCents = (v: number): string => `${v < 0 ? "−" : ""}${formatUsdValue(Math.abs(v))}`;
 
+/** A receipt whose rows are built on first read, when it opens; `key`
+ *  stands for them in the registry's signature. */
+function lazyProv(base: Omit<Provenance, "inputs" | "key">, key: string, build: () => ProvInput[]): Provenance {
+  let rows: ProvInput[] | null = null;
+  const p = { ...base, key } as Provenance;
+  Object.defineProperty(p, "inputs", { enumerable: true, get: () => (rows ??= build()) });
+  return p;
+}
+
 /** A line's receipt from its legs: each amount × price at its block, the
- *  products summed; or, with an unpriced leg, the legs and no sum. */
+ *  products summed; or, with an unpriced leg, the assets with no price and
+ *  no sum. */
 export function legsProv(
   label: string,
   when: string,
   legs: readonly FlowLeg[],
   unpriced?: readonly string[],
 ): Provenance {
-  const labels = legLabels(legs);
   if (unpriced?.length) {
-    const names = unpriced.length === 1 ? unpriced[0] : `${unpriced.slice(0, -1).join(", ")} and ${unpriced.at(-1)}`;
+    const names = [...unpriced];
     return {
       kind: "derived",
-      summary: `${label} ${when}. No figure: ${names} has no price at its block, so the line is not summed.`,
+      summary: `${label} ${when}. No figure: ${noPriceWords(names)}, so the line is not summed.`,
       via: "the position's events · each leg × its price at its block",
-      inputs: legs.flatMap((l, i): ProvInput[] => [
+      inputs: [
         {
-          label: `${labels[i]} amount`,
-          value: `${amountText(l.amount ?? 0)} ${l.symbol ?? ""}`.trim(),
-          kind: "chain",
-          pclass: "indexed",
-          note: "the amount its event moved",
+          label: names.length > 1 ? "assets with no price" : "asset with no price",
+          value: listWords(names),
+          kind: "derived",
+          note: `${legs.filter((l) => l.price == null).length} of the line's ${legs.length} legs`,
         },
-        l.price == null
-          ? {
-              label: `${labels[i]} price`,
-              value: "no price",
-              kind: "derived",
-              note: "no price stands at this leg's block",
-            }
-          : {
-              label: `${labels[i]} price`,
-              value: formatUsdValue(l.price),
-              kind: "chain-derived",
-              pclass: "oracle",
-              note: l.priceNote,
-            },
-      ]),
+      ],
     };
   }
-  const { prov } = holderUsdReceipt({
-    what: `${label} ${when}`,
-    legs: legs.map((l, i) => ({
-      token: l.symbol ?? "Token",
-      label: labels[i],
-      amount: l.amount ?? 0,
-      amountNote: "the amount its event moved",
-      price: l.price ?? 0,
-      priceNote: l.priceNote ?? "the price at its block",
-      ...(l.face ? { face: true } : {}),
-    })),
-    via: "the position's events · each leg × its price at its block · summed",
-    byValue: true,
-    blocksPerRow: true,
-  });
-  return prov;
+  const sum = legs.reduce((a, l) => a + (l.usd ?? 0), 0);
+  const key = `${legs.length}:${Math.round(sum * 100)}:${legs.at(-1)?.block ?? ""}`;
+  const what = `${label} ${when}`;
+  return lazyProv(
+    {
+      kind: "chain-derived",
+      pclass: "oracle",
+      summary: `${what}: ${legs.length > 1 ? "each token's amount times its price, summed" : "the amount times the price"}, each price at the block its row names. ${FACE}`,
+      via: "the position's events · each leg × its price at its block · summed",
+      formula: legs.length > 1 ? "Σ amount × price" : "amount × price",
+    },
+    key,
+    () => {
+      const labels = legLabels(legs);
+      const { prov } = holderUsdReceipt({
+        what,
+        legs: legs.map((l, i) => ({
+          token: l.symbol ?? "Token",
+          label: labels[i],
+          amount: l.amount ?? 0,
+          amountNote: "the amount its event moved",
+          price: l.price ?? 0,
+          priceNote: l.priceNote ?? "the price at its block",
+          ...(l.face ? { face: true } : {}),
+        })),
+        via: "",
+        byValue: true,
+        blocksPerRow: true,
+      });
+      // Past the first LEG_CAP legs (largest first), the rest sit behind the
+      // dust control with those under a cent.
+      const order: string[] = [];
+      return (prov.inputs ?? []).map((r) => {
+        const leg = labels.find((l) => r.label.startsWith(`${l} `));
+        if (leg && !order.includes(leg)) order.push(leg);
+        return leg && order.indexOf(leg) >= LEG_CAP ? { ...r, dust: true as const } : r;
+      });
+    },
+  );
 }
 
 /** Market move in cents: what is held or owed to the cent less the lines
@@ -95,7 +119,7 @@ export function marketMoveProv(label: string, side: FlowSide, when: string, m: M
   if ("none" in m) return { kind: "derived", summary: `${label} ${when}. ${m.none}` };
   return {
     kind: "chain-derived",
-    summary: `${label} ${when}. What the position has ${held}, its amount times its price as shown, less the lines above it, each the sum of its legs' shown products: the change in the prices since the flows. No funds moved.`,
+    summary: `${label} ${when}. What the position has ${held}, its amount times its price as shown, less the lines above it, each the sum of its legs' shown products: the change in the prices since the flows. No funds moved. ${FACE}`,
     formula: `${held} − Σ lines`,
     inputs: [
       {
@@ -132,6 +156,7 @@ export function heldUsdProv(
     ],
     block: h.block,
     via: "the position's balance × the price at the block",
+    caveat: FACE,
   }).prov;
 }
 

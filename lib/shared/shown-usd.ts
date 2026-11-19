@@ -5,15 +5,20 @@
 // stripping loads (lib/morpho-at-block/position.ts) can import it, and
 // lib/shared/holder-usd-receipt.ts re-exports it.
 
+/** Rounded half away from zero: −$1,150.50 and +$1,150.50 both come to
+ *  $1,151, so a signed face and its receipt agree. */
+export const roundAway = (v: number): number => (v < 0 ? -Math.round(-v) : Math.round(v));
+/** A dollar figure to the cent, half away from zero. */
+export const centsOf = (v: number): number => roundAway(v * 100) / 100;
 /** An amount as the receipt shows it: six decimal places. */
-export const shownAmount = (v: number): number => Math.round(v * 1e6) / 1e6;
+export const shownAmount = (v: number): number => roundAway(v * 1e6) / 1e6;
 /** A price as the receipt shows it: to six decimals from $1 up (so a BTC
  *  price keeps the precision its product needs), six significant figures
  *  below $1. */
 export const shownPrice = (v: number): number =>
   // exponent-safe: toPrecision's string goes straight back to a Number; priceText prints it.
   v === 0 ? 0 : Math.abs(v) >= 1 ? Math.round(v * 1e6) / 1e6 : Number(v.toPrecision(6));
-const cents = (v: number): number => Math.round(v * 100) / 100;
+const cents = centsOf;
 /** A dollar figure from an amount and a price as a receipt shows them: the
  *  product of the shown values, to the cent. Every figure whose receipt shows
  *  its rows is drawn from this. */

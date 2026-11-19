@@ -14,6 +14,7 @@
 //
 // Pure, tested offline (scripts/verify/verify-lifetime-flows-state.ts).
 
+import { centsOf, roundAway } from "@/lib/shared/shown-usd";
 import {
   differentBases,
   type FlowSegment,
@@ -53,16 +54,16 @@ export interface SideSumRows {
 /** The figure a line draws where it has none. */
 export const NO_FIGURE = "—";
 
-const toCents = (v: number): number => Math.round(v * 100) / 100;
+const toCents = centsOf;
 
 /** "$79,412": whole dollars with thousands separators, unsigned. */
 export function wholeUsd(v: number, unit?: FlowUnit): string {
   if (unit) {
-    const x = Math.abs(Math.round(v)) / 10 ** unit.scale;
+    const x = Math.round(Math.abs(v)) / 10 ** unit.scale;
     const d = unit.scale;
     return `${x.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d })} ${unit.symbol}`;
   }
-  return `$${Math.abs(Math.round(v)).toLocaleString("en-US")}`;
+  return `$${Math.round(Math.abs(v)).toLocaleString("en-US")}`;
 }
 
 /** The side's sum at a stop, as the panel prints it. */
@@ -133,17 +134,18 @@ function centsSumRows(st: FlowSideState, held: FlowSegment): SideSumRows {
     }
     const cents = sign * toCents(seg.value);
     if (Math.abs(cents) < 0.005) return;
-    raw.push({ key: seg.key, label: seg.label, kind, seg, dollars: Math.round(cents), sign: "", amount: "", cents });
+    raw.push({ key: seg.key, label: seg.label, kind, seg, dollars: roundAway(cents), sign: "", amount: "", cents });
   };
   for (const seg of st.sources) if (seg.fill === "in") push(seg, seg.key.endsWith("-opening") ? "opening" : "in", 1);
   for (const seg of st.bar) if (seg.fill === "out") push(seg, "out", -1);
   const rest = st.sources.find((x) => x.fill === "estimate");
   if (rest) {
     const unpriced = [...new Set(raw.flatMap((l) => l.unpriced ?? []))];
-    const bases = [...new Set(raw.flatMap((l) => (l.seg.legs ?? []).map((g) => g.basis ?? "")))];
+    // A leg with no basis of its own stands on the family's.
     const heldBasis = held.priceBasis ?? "";
+    const bases = [...new Set(raw.flatMap((l) => (l.seg.legs ?? []).map((g) => g.basis ?? heldBasis)))];
     const market: MarketMove = unpriced.length
-      ? { none: `No figure: ${listWords(unpriced)} has no price at its block.` }
+      ? { none: `No figure: ${noPriceWords(unpriced)}.` }
       : bases.some((b) => b !== heldBasis)
         ? {
             none: differentBases(
@@ -173,7 +175,7 @@ function centsSumRows(st: FlowSideState, held: FlowSegment): SideSumRows {
         label: rest.label,
         kind: "rest",
         seg,
-        dollars: Math.round(market.cents),
+        dollars: roundAway(market.cents),
         sign: "",
         amount: "",
         cents: market.cents,
@@ -184,8 +186,13 @@ function centsSumRows(st: FlowSideState, held: FlowSegment): SideSumRows {
     sign: (l.cents == null ? "" : i === 0 && l.cents > 0 ? "" : l.cents < 0 ? "−" : "+") as SumSign,
     amount: l.cents == null ? NO_FIGURE : wholeUsd(l.cents),
   }));
-  return { lines, total: { dollars: Math.round(total), amount: wholeUsd(total), seg: held, cents: total } };
+  return { lines, total: { dollars: roundAway(total), amount: wholeUsd(total), seg: held, cents: total } };
 }
+
+/** "WETH has no price at its block"; "WETH and USDC have no price at their
+ *  blocks". */
+export const noPriceWords = (xs: string[]): string =>
+  xs.length > 1 ? `${listWords(xs)} have no price at their blocks` : `${listWords(xs)} has no price at its block`;
 
 /** "WETH", "WETH and USDC", "WETH, USDC and DAI". */
 export const listWords = (xs: string[]): string =>

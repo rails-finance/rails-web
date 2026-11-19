@@ -36,17 +36,20 @@ import {
   useFlowUnit,
 } from "@/components/shared/lifetime-flows-tip";
 import { flowSegmentProv } from "@/lib/shared/flows-timeline-provenance";
+import { NO_FIGURE } from "@/lib/shared/flows-sum";
 import { CTRL_GHOST, CTRL_OFF } from "@/lib/shared/ui-grammar";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import {
   assetsAt,
   axisFor,
   axisLabelOnPhone,
+  bucketLegs,
   dayStart,
   formatFlowToken,
   formatFlowUsd,
   oldPriceAt,
   partialAt,
+  rowLegs,
   spokenUsd,
   stateAt,
   unitOf,
@@ -286,9 +289,19 @@ export type FlowsTotalsData = {
 export function flowsTotals(model: FlowModel, since: string | null): FlowsTotalsData {
   const t = throughput(model);
   const hasDebt = model.buckets.some((b) => b.side === "debt");
+  // A side whose inflows hold an unpriced leg draws no figure (ui-jobs 743).
+  const gaps = model.hasLegs ? bucketLegs(rowLegs(model, model.rows.length - 1)).unpriced : {};
+  const gapIn = (side: FlowSide) =>
+    model.buckets.some((b) => b.side === side && b.dir === "in" && (gaps[b.key]?.length ?? 0) > 0);
   return {
-    deposited: formatFlowUsd(t.deposited, unitOf(model, "collateral")),
-    borrowed: hasDebt && t.borrowed > 0.5 ? formatFlowUsd(t.borrowed, unitOf(model, "debt")) : null,
+    deposited: gapIn("collateral") ? NO_FIGURE : formatFlowUsd(t.deposited, unitOf(model, "collateral")),
+    borrowed: !hasDebt
+      ? null
+      : gapIn("debt")
+        ? NO_FIGURE
+        : t.borrowed > 0.5
+          ? formatFlowUsd(t.borrowed, unitOf(model, "debt"))
+          : null,
     txs: t.txs,
     unit: t.unit,
     turnover: t.turnover,

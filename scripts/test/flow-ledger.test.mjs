@@ -35,11 +35,12 @@ export async function resolve(spec, ctx, next) {
 register("data:text/javascript," + encodeURIComponent(hook));
 
 const { flowLeg, daysFromEvents, buildFlowModel, stateAt } = await import(ROOT + "lib/shared/flows-timeline.ts");
-const { sideSumRows } = await import(ROOT + "lib/shared/flows-sum.ts");
+const { sideSumRows, wholeUsd, noPriceWords } = await import(ROOT + "lib/shared/flows-sum.ts");
 const { eventCum, eventSideSum, eventTokenSum } = await import(ROOT + "lib/shared/flow-focus.ts");
 const { tokenLedger, dollarLedger, ledgerAdds, ledgerAtPrice } = await import(ROOT + "lib/shared/event-ledger.ts");
 const { flowSegmentProv, legsProv, marketMoveProv } = await import(ROOT + "lib/shared/flows-timeline-provenance.ts");
-const { shownUsd } = await import(ROOT + "lib/shared/shown-usd.ts");
+const { shownUsd, roundAway, centsOf } = await import(ROOT + "lib/shared/shown-usd.ts");
+const { holderUsdReceipt } = await import(ROOT + "lib/shared/holder-usd-receipt.ts");
 
 const DAY = 86_400;
 const T0 = 20_000 * DAY;
@@ -150,6 +151,16 @@ test("a line with an unpriced leg draws no figure and names the asset; no partia
   const prov = flowSegmentProv(dep.seg, "collateral", "5 Jul '25", false);
   assert.match(prov.summary, /No figure: WBTC has no price at its block/);
   assert.ok(!prov.inputs.some((i) => i.label === "sum"), "no sum row");
+  assert.deepEqual(
+    prov.inputs.map((i) => [i.label, i.value]),
+    [["asset with no price", "WBTC"]],
+    "the asset named once",
+  );
+  // No bar for the line, and none for the balancing item beside it: a gap.
+  const dep2 = st.collateral.sources.find((s) => s.key === "dep");
+  assert.equal(dep2.width, 0);
+  assert.equal(st.collateral.sources.find((s) => s.fill === "estimate").width, 0);
+  assert.ok(st.collateral.bar.find((s) => s.key === "wd").width > 0, "a priced line keeps its bar");
 });
 
 test("Market move on one basis is the cent difference of the held figure and the lines", () => {
@@ -238,4 +249,86 @@ test("raw legs keep the old rounding (the adapter)", () => {
   const rows = sideSumRows(st.collateral);
   assert.equal(rows.total.cents, undefined);
   assert.ok(rows.lines.every((l) => l.cents == null));
+});
+
+test("a signed figure rounds half away from zero, so the face agrees with its receipt", () => {
+  assert.equal(roundAway(-1150.5), -1151);
+  assert.equal(roundAway(1150.5), 1151);
+  assert.equal(centsOf(-0.125), -0.13);
+  assert.equal(wholeUsd(-1150.5), "$1,151");
+  assert.equal(wholeUsd(1150.5), "$1,151");
+  // A withdrawal of $1,150.50 prints −$1,151, as its receipt's $1,150.50 does.
+  const out = [
+    {
+      id: "a",
+      ts: T0 + 10,
+      block: 1,
+      tick: "collateral",
+      legs: [leg("dep", 3, 1000, 1)],
+      balances: [],
+      prices: [],
+    },
+    {
+      id: "b",
+      ts: T0 + DAY + 10,
+      block: 2,
+      tick: "collateral",
+      legs: [leg("wd", 1.1505, 1000, 2)],
+      balances: [],
+      prices: [],
+    },
+  ];
+  const m = model(out);
+  const rows = sideSumRows(stateAt(m, m.rows.at(-1).day).collateral);
+  const wd = rows.lines.find((l) => l.key === "wd");
+  assert.equal(wd.cents, -1150.5);
+  assert.equal(wd.dollars, -1151);
+  assert.equal(wd.amount, "$1,151");
+});
+
+test("a negative leg under a cent sits behind the dust control too", () => {
+  const { prov } = holderUsdReceipt({
+    what: "x",
+    legs: [
+      { token: "A", amount: 5, amountNote: "n", price: 2, priceNote: "p" },
+      { token: "B", amount: -0.001, amountNote: "n", price: 2, priceNote: "p" },
+    ],
+    via: "v",
+    byValue: true,
+  });
+  assert.ok(prov.inputs.filter((i) => i.label.startsWith("B ")).every((i) => i.dust));
+  assert.ok(prov.inputs.filter((i) => i.label.startsWith("A ")).every((i) => !i.dust));
+});
+
+test("a line of many legs builds its rows when the receipt opens, past twelve behind the dust control", () => {
+  const legs = Array.from({ length: 15 }, (_, i) => leg("dep", 1 + i, 100, 100 + i));
+  const prov = legsProv("Deposited", "now", legs);
+  assert.ok(prov.key, "a key stands for the rows");
+  assert.match(prov.summary, /To the cent, shown to the dollar\./);
+  const shown = new Set(prov.inputs.filter((i) => !i.dust && i.label.endsWith(" amount")).map((i) => i.label));
+  assert.equal(shown.size, 12);
+  assert.ok(
+    prov.inputs.some((i) => i.label === "WBTC at block 100 amount" && i.dust),
+    "the smallest is past the cap",
+  );
+  assert.equal(
+    num(prov.inputs.find((i) => i.label === "sum").value),
+    legs.reduce((a, l) => a + l.usd, 0),
+  );
+});
+
+test("several assets with no price read as plural", () => {
+  assert.equal(noPriceWords(["WETH"]), "WETH has no price at its block");
+  assert.equal(noPriceWords(["WETH", "USDC"]), "WETH and USDC have no price at their blocks");
+});
+
+test("a family's basis set with its legs' unset compares on one basis", () => {
+  const events = history().map((e) => ({ ...e, legs: e.legs.map((l) => ({ ...l, basis: undefined })) }));
+  const m = model(events, { priceBasis: { collateral: "anchor" } });
+  const evs = focus(events);
+  const cum = eventCum(m, evs, "e2");
+  const rows = eventSideSum(m, "collateral", cum, shownUsd(HELD, 97_000.5));
+  const rest = rows.lines.find((l) => l.kind === "rest");
+  assert.equal(rest.none, undefined);
+  assert.equal(typeof rest.cents, "number");
 });

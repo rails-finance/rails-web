@@ -15,7 +15,7 @@
 // Pure, tested offline (scripts/verify/verify-liquity-flows.ts,
 // scripts/verify/verify-lifetime-flows-state.ts).
 
-import { apportionSigned, listWords, NO_FIGURE, wholeUsd } from "@/lib/shared/flows-sum";
+import { apportionSigned, NO_FIGURE, noPriceWords, wholeUsd } from "@/lib/shared/flows-sum";
 import {
   assetTokenSumFor,
   signedShownUsd,
@@ -37,7 +37,7 @@ import {
   type FlowSide,
   type FlowUnit,
 } from "@/lib/shared/flows-timeline";
-import { shownPrice, shownUsd } from "@/lib/shared/shown-usd";
+import { centsOf, roundAway, shownPrice, shownUsd } from "@/lib/shared/shown-usd";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 
 /** "5 Jul '25": the day a ledger's rows stand at. */
@@ -116,7 +116,7 @@ export interface UsdLine {
   none?: string;
 }
 
-const toCents = (v: number): number => Math.round(v * 100) / 100;
+const toCents = centsOf;
 
 /** A row's dollars from its cents: the face to the dollar, the cents kept. */
 function centsUsd(
@@ -124,7 +124,7 @@ function centsUsd(
   extra: Omit<LedgerUsd, "dollars" | "text" | "cents"> = {},
   unit?: FlowUnit,
 ): LedgerUsd {
-  return { dollars: Math.round(cents), text: signedUsd(cents, unit), cents, ...extra };
+  return { dollars: roundAway(cents), text: signedUsd(cents, unit), cents, ...extra };
 }
 
 /** A row with no figure: "—", its unpriced assets or why. */
@@ -149,7 +149,7 @@ function notesFor(rows: LedgerRow[]): string[] | undefined {
   const notes: string[] = [];
   for (const r of rows) {
     if (r.usd?.unpriced?.length && r.role !== "before")
-      notes.push(`${r.label} has no figure: ${listWords(r.usd.unpriced)} has no price at its block.`);
+      notes.push(`${r.label} has no figure: ${noPriceWords(r.usd.unpriced)}.`);
     if (r.usd?.market && "none" in r.usd.market && !r.usd.market.none.startsWith("No figure"))
       notes.push(r.usd.market.none);
   }
@@ -235,11 +235,11 @@ function eventPart(
 
 const usdTotal = (dollars: number, before: number | null, unit?: FlowUnit, cents?: number) => ({
   before:
-    before != null && Math.round(before) !== Math.round(dollars) && Math.round(before) !== 0
+    before != null && roundAway(before) !== roundAway(dollars) && roundAway(before) !== 0
       ? wholeUsd(before, unit)
       : null,
   after: wholeUsd(cents ?? dollars, unit),
-  dollars: cents != null ? Math.round(cents) : dollars,
+  dollars: cents != null ? roundAway(cents) : dollars,
   ...(cents != null ? { cents } : {}),
 });
 
@@ -628,7 +628,7 @@ function assetLedgersInCents({
           label: l.label,
           kind: l.kind === "interest" ? "in" : l.kind,
           seg: { key: l.key, label: l.label, fill: "in", width: 0, value: cents, legs },
-          dollars: Math.round(cents),
+          dollars: roundAway(cents),
           cents,
         });
       }
@@ -648,11 +648,11 @@ function assetLedgersInCents({
             value: rest,
             market: { cents: rest, held: assetCents, lines: lineSum },
           },
-          dollars: Math.round(rest),
+          dollars: roundAway(rest),
           cents: rest,
         });
       }
-      usd = { lines, dollars: Math.round(assetCents), before: null, cents: assetCents };
+      usd = { lines, dollars: roundAway(assetCents), before: null, cents: assetCents };
     }
     const ledger = tokenLedger({ model, side, ev, sum: t, usd, symbolFilter: symbol, price: bal?.price ?? null });
     // The held row's receipt: the balance as shown times its price as shown.
@@ -730,6 +730,6 @@ export function ledgerAdds(l: Ledger): { tokens: boolean; usd: boolean } {
     usd:
       l.usd == null ||
       none ||
-      (cents ? Math.round(usd * 100) === Math.round((l.usd.cents as number) * 100) : usd === l.usd.dollars),
+      (cents ? roundAway(usd * 100) === roundAway((l.usd.cents as number) * 100) : usd === l.usd.dollars),
   };
 }

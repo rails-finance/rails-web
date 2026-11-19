@@ -29,7 +29,7 @@
 import type { DayObs, PriceMarks, PriceSeries } from "@/lib/shared/price-series";
 import type { FlowChange } from "@/lib/shared/flows-changes";
 import type { ProtocolActivity } from "@/lib/shared/flows-pace";
-import { shownPrice, shownUsd } from "@/lib/shared/shown-usd";
+import { centsOf, shownPrice, shownUsd } from "@/lib/shared/shown-usd";
 
 export type FlowSide = "collateral" | "debt";
 
@@ -146,7 +146,7 @@ export function flowLeg(o: {
 export const hasParts = (l: Pick<FlowLeg, "price">): boolean => l.price !== undefined;
 
 /** A sum of cents, kept to the cent. */
-export const addCents = (a: number, b: number): number => Math.round((a + b) * 100) / 100;
+export const addCents = (a: number, b: number): number => centsOf(a + b);
 
 export interface FlowEvent {
   id: string;
@@ -377,7 +377,8 @@ export interface FlowDayRow {
   cumAsset?: { bucket: string; symbol: string; usd: number }[];
   /** The day's events' figures that rest on something not read (`FlowEvent.unsure`). */
   unsure?: FlowUnsure[];
-  /** The day's legs that carry their parts, for the receipts. */
+  /** The day's legs that carry their parts, for the receipts; unset on rows
+   *  a server serves, which carry no legs. */
   legs?: FlowLeg[];
   /** The most the collateral was worth after any of the day's events, each
    *  balance at the last price an event carried, where every held collateral
@@ -587,6 +588,9 @@ export interface FlowModel {
   rows: FlowRow[];
   /** UTC midnight of the first event's day, ms. */
   start: number;
+  /** Every row states its legs (`daysFromEvents`): the lines' receipts can
+   *  list them. A served series does not. */
+  hasLegs: boolean;
   /** Day index of the last event's day. */
   lastDay: number;
   /** The final stop: today, at live prices. */
@@ -830,7 +834,7 @@ export function daysFromEvents(bucketKeys: string[], events: FlowEvent[]): FlowD
         usd: cumAsset[c],
       })),
       ...(cur.unsure.size ? { unsure: [...cur.unsure.values()] } : {}),
-      ...(cur.legs.length ? { legs: cur.legs } : {}),
+      legs: cur.legs,
       ...(cur.high != null ? { collateralHigh: cur.high } : {}),
     });
     cur = null;
@@ -1149,6 +1153,7 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     buckets: t.buckets,
     rows,
     start,
+    hasLegs: days.every((d) => Array.isArray(d.legs)),
     lastDay,
     liveStop,
     eventDays,
@@ -1325,7 +1330,11 @@ function sideState(
   const outs = bs.filter((b) => b.dir === "out");
   const ins = bs.filter((b) => b.dir === "in");
   const heldNow = Math.max(0, now);
-  const out = outs.reduce((s, b) => s + Math.max(0, cum[b.key] ?? 0), 0);
+  // A line holding an unpriced leg draws no bar: a gap, its figure "—"
+  // (ui-jobs 743); beside it the balancing item has no width either.
+  const gap = (k: string) => (parts?.unpriced[k]?.length ?? 0) > 0;
+  const anyGap = bs.some((b) => gap(b.key));
+  const out = outs.reduce((s, b) => s + (gap(b.key) ? 0 : Math.max(0, cum[b.key] ?? 0)), 0);
   const total = heldNow + out;
   const bar: FlowSegment[] = [
     {
@@ -1346,7 +1355,7 @@ function sideState(
         tone: b.tone ?? "exit",
         hatch: b.hatch,
         link: b.link,
-        width: v,
+        width: gap(b.key) ? 0 : v,
         value: v,
         ...partsOf(parts, b.key),
       };
@@ -1390,7 +1399,10 @@ function sideState(
         ...words,
       }
     : { key: `${side}-market`, label: named ?? "Market move and interest", value: rest, signed: true, ...words };
-  return { now: heldNow, total, out, bar, sources: sourcesFor(exact, total, balancing) };
+  const sources = sourcesFor(exact, total, balancing).map((x) =>
+    x.unpriced?.length || (anyGap && x.fill === "estimate") ? { ...x, width: 0 } : x,
+  );
+  return { now: heldNow, total, out, bar, sources };
 }
 
 /** One side's bar and sources for a set of running totals and what is held
@@ -1413,13 +1425,13 @@ export function stateAt(m: FlowModel, stop: number): FlowState {
   const i = isLive ? m.rows.length - 1 : rowAt(m, stop);
   const row = i >= 0 ? m.rows[i] : null;
   let cum = row?.cum ?? Object.fromEntries(m.buckets.map((b) => [b.key, 0]));
-  const parts = bucketLegs(rowLegs(m, i));
+  const parts = m.hasLegs ? bucketLegs(rowLegs(m, i)) : undefined;
   if (isLive && m.live.pending?.length) {
     cum = { ...cum };
     for (const p of m.live.pending) {
       cum[p.bucket] = (cum[p.bucket] ?? 0) + p.usd;
       // A pending flow is a raw figure: its line's legs no longer add to it.
-      delete parts.legs[p.bucket];
+      if (parts) delete parts.legs[p.bucket];
     }
   }
   const v = !isLive && stop >= 0 ? m.valued[Math.min(stop, m.valued.length - 1)] : undefined;

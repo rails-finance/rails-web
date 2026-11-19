@@ -43,6 +43,7 @@ import { OFF_PAR_BAND, OffParFigure } from "@/components/shared/usd-figure";
 import { eventPriceText, offPar, todayPriceText, type OffPar } from "@/lib/shared/usd-display";
 import { wholeUsd } from "@/lib/shared/flows-sum";
 import { holderUsdReceipt } from "@/lib/shared/holder-usd-receipt";
+import { centsOf, roundAway } from "@/lib/shared/shown-usd";
 import { eventCum, type EventCum } from "@/lib/shared/flow-focus";
 import { dayCloseNote, ledgerAtPrice, ledgerDayStamp, type Ledger, type LedgerRow } from "@/lib/shared/event-ledger";
 import type { FlowSegment, FlowSide } from "@/lib/shared/flows-timeline";
@@ -916,7 +917,10 @@ export function AssetLedgers({
       totalUsdProv = sideHeldProv(SIDE_NAME[side], at, held);
   }
   if (usd && allToday) {
-    const dollars = repriced.reduce((t, l) => t + (l?.usd?.dollars ?? 0), 0);
+    // In cents where the assets are, summed before the one rounding.
+    const inCents = repriced.every((l) => l?.usd?.cents != null);
+    const cents = inCents ? centsOf(repriced.reduce((t, l) => t + (l?.usd?.cents ?? 0), 0)) : null;
+    const dollars = cents != null ? roundAway(cents) : repriced.reduce((t, l) => t + (l?.usd?.dollars ?? 0), 0);
     // Before the event: each asset's tokens less the event's rows.
     const before = priced.reduce((t, a) => {
       if (!a.tokens || a.decimals == null) return t;
@@ -924,9 +928,10 @@ export function AssetLedgers({
       return t + ((a.tokens.units - moved) / 10 ** a.decimals) * (todayOf(a.symbol) ?? 0);
     }, 0);
     usd = {
-      before: usd.before != null && Math.round(before) !== dollars ? wholeUsd(before) : null,
-      after: wholeUsd(dollars),
+      before: usd.before != null && roundAway(before) !== dollars ? wholeUsd(before) : null,
+      after: wholeUsd(cents ?? dollars),
       dollars,
+      ...(cents != null ? { cents } : {}),
     };
     totalUsdProv = todayUsdProv(`${SIDE_NAME[side]}, the assets held,`, "each asset");
     totalUsdBeforeProv = todayUsdProv(`${SIDE_NAME[side]}, the assets held before the event,`, "each asset");
