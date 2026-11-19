@@ -117,3 +117,13 @@ export function proRata(
   const text = perShareText(a, s, assetDecimals, shareDecimals);
   return text == null ? null : { text, sci: perShareScientific(a, s, assetDecimals, shareDecimals) };
 }
+
+/** One whole share's `convertToAssets` answer as the sBOLD page prints it
+ *  where it differs from the shared share-price text: "0" for a zero answer,
+ *  "1.038 × 10⁻¹⁹" below 0.0001; null otherwise, for the shared text
+ *  (ui-jobs 765). */
+export function sboldPriceFace(raw: string, assetDecimals = 18): string | null {
+  if (BigInt(raw) === BigInt(0)) return "0";
+  const sci = perShareScientific(raw, (BigInt(10) ** BigInt(18)).toString(), assetDecimals, 18);
+  return sci ? scientificText(sci.mantissa, sci.exponent) : null;
+}

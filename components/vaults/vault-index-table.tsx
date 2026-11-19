@@ -76,6 +76,7 @@ import { heldAssetsRaw, lostAssetsSentence } from "@/lib/vaults/lost-assets";
 import { assetScaleAbsentTip, assetScaleSentence } from "@/lib/vaults/asset-scale-words";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { sharePriceText } from "@/lib/shared/vault-amount-text";
+import { sboldPriceFace } from "@/lib/liquity-v2/sbold-per-share";
 import { useCompareSelection } from "@/components/vaults/compare-selection";
 import { compareKey } from "@/lib/vaults/compare";
 import { COMPARE_TICK } from "@/lib/vaults/compare-words";
@@ -531,9 +532,13 @@ export function VaultIndexTable({
                       <InAsset v={v} data-cell="share-price">
                         {/* Past a million, compact (its full text in the
                           title), so one vault's figure cannot widen the column. */}
+                        {/* sBOLD's row prints its page's figure: "0" for a zero answer,
+                          scientific below 0.0001 (ui-jobs 765). */}
                         {traced(
                           receipts.sharePrice,
-                          shownPrice.value >= 1e6 ? (
+                          v.family === "sbold" && sboldPriceFace(shownPrice.raw, v.asset.decimals) != null ? (
+                            sboldPriceFace(shownPrice.raw, v.asset.decimals)
+                          ) : shownPrice.value >= 1e6 ? (
                             <span title={sharePriceText(shownPrice, v.asset.decimals)}>
                               {formatCompact(shownPrice.value)}
                             </span>

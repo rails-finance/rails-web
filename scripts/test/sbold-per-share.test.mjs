@@ -77,3 +77,13 @@ test("a holder's pro-rata BOLD: balance × total assets ÷ total supply (ui-jobs
   assert.equal(proRata("1", "5", "0", 18, 18), null);
   assert.deepEqual(proRata("0", "5", "7", 18, 18), { text: "0", sci: null });
 });
+
+test("the share price as the sBOLD page and its /vaults row print it (ui-jobs 765)", async () => {
+  const { sboldPriceFace } = await import("../../lib/liquity-v2/sbold-per-share.ts");
+  assert.equal(sboldPriceFace("0"), "0");
+  assert.equal(sboldPriceFace("1"), "1.000 × 10⁻¹⁸");
+  assert.equal(sboldPriceFace("99994999999999"), "9.999 × 10⁻⁵");
+  // At or above 0.0001 the shared share-price text stands.
+  assert.equal(sboldPriceFace("100000000000000"), null);
+  assert.equal(sboldPriceFace("1096059000000000000"), null);
+});

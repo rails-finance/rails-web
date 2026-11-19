@@ -33,7 +33,13 @@ import { vaultVenueShareProv } from "@/lib/vaults/card-provenance";
 import { vaultAssetsExports, vaultPointsCsv, type VaultExportModel } from "@/lib/vaults/card-export";
 import { SHARES_ISSUED_TIP, sboldVaultAssetsContent, sboldVaultCardContent } from "@/lib/vaults/card-words";
 import { SBOLD_ASSET, SBOLD_CREATED_BLOCK, SBOLD_DEPOSITS_HREF, SBOLD_VAULT } from "@/lib/liquity-v2/sbold";
-import { engineeringParts, perShareScientific, perShareText, scientificText } from "@/lib/liquity-v2/sbold-per-share";
+import {
+  engineeringParts,
+  perShareScientific,
+  perShareText,
+  sboldPriceFace,
+  scientificText,
+} from "@/lib/liquity-v2/sbold-per-share";
 import { liquityV2DepositHref } from "@/lib/liquity-v2/sp-routes";
 import {
   sboldAssetProv,
@@ -91,9 +97,9 @@ function SharesFace({ raw, decimals }: { raw: string; decimals: number }) {
   );
 }
 
-/** A share price as the getter answers it: "0" where it answers zero. */
-const priceText = (raw: string) =>
-  BigInt(raw) === BigInt(0) ? "0" : sharePriceText({ raw, value: Number(raw) / 1e18 }, 18);
+/** A share price as the getter answers it: "0" where it answers zero,
+ *  scientific below 0.0001 (sboldPriceFace, as its /vaults row prints it). */
+const priceText = (raw: string) => sboldPriceFace(raw) ?? sharePriceText({ raw, value: Number(raw) / 1e18 }, 18);
 
 const pointText = (key: SboldSeriesKey, raw: string): string =>
   key === "totalAssets"
