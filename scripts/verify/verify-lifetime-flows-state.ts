@@ -75,6 +75,7 @@ import {
   daysFromEvents,
   dayStart,
   formatFlowUsd,
+  livePriced,
   longDay,
   nextEventDay,
   prevEventDay,
@@ -87,6 +88,7 @@ import {
   windowModel,
 } from "@/lib/shared/flows-timeline";
 import { formatDate } from "@/lib/date";
+import { heldDayProv } from "@/lib/shared/flows-timeline-provenance";
 import {
   flowPriceSeries,
   formatPrice,
@@ -3259,4 +3261,28 @@ test("LlamaLend's band and health: each read's user_prices and health held to th
   assert.deepEqual(open.band!.points.at(-1), [110, 1_900, 1_700, null]);
   assert.deepEqual(open.health!.points.at(-1), [110, 0.05, null]);
   assert.equal(open.band!.end, "today");
+});
+
+test("the live and past held receipts' via names what it sums, as the receipt prints it", () => {
+  // components/shared/provenance.tsx viaNode: the leading custody segment
+  // drops whenever more than one stands.
+  const printed = (via?: string) => {
+    const parts = via ? via.split(" · ") : [];
+    return (parts.length > 1 ? parts.slice(1) : parts).join(" · ");
+  };
+  const row = (priced: FlowAssetHeld["priced"]): FlowAssetHeld => ({
+    side: "collateral",
+    symbol: "WETH",
+    amount: 2,
+    usd: 3000,
+    priced,
+  });
+  const live = heldDayProv("Still deposited", "now", [
+    row(livePriced(1500, 23_000_000, 1_763_500_000, { source: "the oracle's price now" })),
+  ]);
+  const past = heldDayProv("Still deposited", "the end of 9 Nov 2025", [
+    row({ day: 20_401, series: true, price: 1500, block: 23_000_000 }),
+  ]);
+  assert.equal(printed(live.via), "each asset's balance × its price now · summed");
+  assert.equal(printed(past.via), "each asset's balance × its price that day · summed");
 });

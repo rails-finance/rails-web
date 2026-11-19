@@ -1033,7 +1033,7 @@ function sideHeldProv(name: string, at: string, assets: Ledger[]): Provenance {
     block: blocks.length === 1 ? blocks[0] : null,
     blocksPerRow: blocks.length > 1,
     byValue: true,
-    via: "the side's balances × the prices at the block · summed",
+    via: "the side's balances · each asset's balance × its price at the block · summed",
   }).prov;
 }
 

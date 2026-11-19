@@ -532,7 +532,7 @@ export function computeAaveV4InterestSinceZero(
       what,
       rows,
       face: "compact",
-      via: "Σ (row before − previous row after) + (spoke balance now − last row after) · the oracle read's prices",
+      via: "the spoke's rows and its read now · Σ (row before − previous row after) + (spoke balance now − last row after) · the oracle read's prices",
       caveat:
         "Each reserve's interest is the interest added since its balance last started from zero: each row's before less the previous row's after, and the balance the spoke reports now less the last row's after. The Lifetime flows count the interest of the whole life.",
     });

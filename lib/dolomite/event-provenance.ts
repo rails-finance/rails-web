@@ -363,7 +363,7 @@ export const dolomiteLiqAtBlockPriceProv = (
       verify: txVerify(coords),
       summary: `${sym}'s USD price in this liquidation — the price Dolomite's core logged in this transaction before it ran the liquidation, per whole token (scale 1e(36 − decimals)). The core values the margin check and the seizure in this operation at that price, so valuing the legs at it reproduces the engine's arithmetic.`,
       contract: MARGIN,
-      via: `LogOraclePrice in the liquidation's transaction${raw}`,
+      via: `the margin core · LogOraclePrice in the liquidation's transaction${raw}`,
       inputs: eventInputs(coords),
     };
   if (src === "unnamed")
@@ -373,7 +373,7 @@ export const dolomiteLiqAtBlockPriceProv = (
       verify: txVerify(coords),
       summary: `${sym}'s USD price in this liquidation, per whole token (scale 1e(36 − decimals)). Of the two legs' prices, one is the price Dolomite's core logged in this transaction and the other is getMarketPrice at ${blockOf(coords)}; the answer does not say which leg is which.`,
       contract: MARGIN,
-      via: `LogOraclePrice in the transaction, or getMarketPrice ${viaBlock(coords)}${raw}`,
+      via: `the margin core · LogOraclePrice in the transaction, or getMarketPrice ${viaBlock(coords)}${raw}`,
       inputs: eventInputs(coords),
     };
   return {
@@ -388,7 +388,7 @@ export const dolomiteLiqAtBlockPriceProv = (
     },
     summary: `${sym}'s USD price AT the block this liquidation fired — the margin core's own \`getMarketPrice\` read back at that block (scale 1e(36 − decimals)). This is the figure the risk engine judged the account with when it fired: the core routes every margin check and every seizure through this oracle read, so valuing the legs at it reproduces the engine's own arithmetic.`,
     contract: MARGIN,
-    via: `archive eth_call ${viaBlock(coords)} · getMarketPrice${raw}`,
+    via: `archive eth_call · getMarketPrice ${viaBlock(coords)}${raw}`,
     inputs: eventInputs(coords),
   };
 };
@@ -482,7 +482,7 @@ export const dolomiteLiqSpreadRefProv = (
   },
   summary: `The liquidation spread the core set for the seized account on this exact pair (${pair.heldSym} held, ${pair.owedSym} owed) at the block the liquidation fired — the core's own \`getLiquidationSpreadForAccountAndPair\`: the global base spread multiplied up by each market's own premium, unless the account carries a risk override (the LST/ETH and BTC categories), which seizes at the override's own spread with premiums skipped. The engine sized the seizure from this constant, so the realized premium beside it is a check against the protocol's own parameter, never a restatement of it.`,
   contract: MARGIN,
-  via: `archive eth_call ${viaBlock(coords)} · getLiquidationSpreadForAccountAndPair(account, held, owed)`,
+  via: `archive eth_call · getLiquidationSpreadForAccountAndPair(account, held, owed) ${viaBlock(coords)}`,
   formula: "base spread × (1 + held premium) × (1 + owed premium), or the account's override spread",
   inputs: eventInputs(coords),
 });

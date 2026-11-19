@@ -270,7 +270,7 @@ export function heldDayProv(
           : `the price its last event carried, ${at ?? "at a block this read does not name"}`,
       };
     }),
-    via: "each asset's balance × that day's price · summed",
+    via: `the position's balances · each asset's balance × ${when === "now" ? "its price now" : "its price that day"} · summed`,
     byValue: true,
     blocksPerRow: true,
     caveat: FACE,
