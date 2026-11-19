@@ -35,15 +35,26 @@ export interface CowCoords {
 
 const tokenName = (c: CowSwapView) => c.token.symbol ?? c.token.address;
 
-/** Where the call sits in the input, for the leaves read from it. */
+/** Where settle()'s arguments sit in the transaction's input, for a leaf read from them: a sentence, or "" on a
+ *  direct call. Shared with the settlement panel's receipts (settlement-provenance.ts). */
+export function settleCallNote(call: CowSwapView["call"] | undefined, offset: number | undefined): string {
+  if (call === "wrapped")
+    return `The settle() call sits inside the solver contract's input from byte ${(offset ?? 0).toLocaleString("en-US")}; Etherscan does not decode it there.`;
+  if (call === "inline")
+    return "settle()'s arguments were read inline from the adapter's call: the transaction's function takes them as its first four parameters, and Etherscan decodes them under that function's name.";
+  return "";
+}
+
+/** The receipt's `via` for a read of settle()'s input. */
+export function settleCallVia(call: CowSwapView["call"] | undefined, offset: number | undefined): string {
+  if (call === "wrapped") return `settle() input, from byte ${(offset ?? 0).toLocaleString("en-US")}`;
+  if (call === "inline") return "settle() arguments, inline in the adapter's call";
+  return "settle() input";
+}
+
 function inputNote(c: CowSwapView): string {
-  const where =
-    c.call === "wrapped"
-      ? ` The settle() call sits inside the solver contract's input from byte ${c.settleOffset.toLocaleString("en-US")}; Etherscan does not decode it there.`
-      : c.call === "inline"
-        ? " The transaction's own function takes settle()'s arguments as its first four parameters; Etherscan decodes them under that function's name."
-        : "";
-  return `The settle() call's argument, which the settlement contract checked against the order's signature.${where}`;
+  const where = settleCallNote(c.call, c.settleOffset);
+  return `The settle() call's argument, which the settlement contract checked against the order's signature.${where ? ` ${where}` : ""}`;
 }
 
 const inputLeaf = (c: CowSwapView, label: string, value: string): ProvInput => ({
@@ -65,7 +76,7 @@ const txVerify = (coords: CowCoords) => ({
 const source = (coords: CowCoords) => ({ block: coords.block, txHash: coords.txHash });
 
 const via = (c: CowSwapView) =>
-  `settle() input${c.call === "wrapped" ? `, from byte ${c.settleOffset.toLocaleString("en-US")}` : c.call === "inline" ? ", passed inline" : ""} · the order as signed; Trade log · the executed amounts`;
+  `${settleCallVia(c.call, c.settleOffset)} · the order as signed; Trade log · the executed amounts`;
 
 /** The surplus figure: received beyond the limit signed (sell order), returned to the wallet from the unused limit
  *  (buy order through an Aave adapter) or paid less than the limit signed (the wallet's own buy order), in the
@@ -82,7 +93,7 @@ export function cowSurplusProv(c: CowSwapView, trade: CowTradeRaw, coords: CowCo
     pclass: "input",
     summary: sell
       ? `${label} — the ${sym} this sell order received above the least it would accept: the buy amount the order signed,${part} taken from what the order bought. ${docs}`
-      : c.route === "cow_permit"
+      : c.route !== "cow_adapter"
         ? `${label} — the ${sym} this buy order did not spend of the most it would pay: the sell amount the wallet's order signed,${part} less what the order sold. ${docs}`
         : `${label} — the ${sym} this buy order did not spend of the most it would pay: the sell amount the order signed,${part} less what the order sold. The front end that placed the order sets that limit with a slippage allowance, and the adapter sends the unused part to the wallet in the same transaction: one amount. ${docs}`,
     formula: sell
@@ -122,9 +133,48 @@ export function cowSurplusProv(c: CowSwapView, trade: CowTradeRaw, coords: CowCo
   };
 }
 
+/** The fee line on a CoW trade card before block 19,815,319 (`signedFeeOnly`): the order's signed fee alone, in bp
+ *  of the amount at the clearing price. */
+function signedFeeProv(c: CowSwapView, trade: CowTradeRaw, coords: CowCoords): Provenance {
+  const sym = tokenName(c);
+  const u = c.prices.uniform;
+  const sell = c.kind === "sell";
+  const net = trade.fee !== "0" ? "(sold − fee)" : "sold";
+  return {
+    kind: "derived",
+    pclass: "input",
+    summary: `${COW_FEE_LABEL} — the fee this order signed, the Trade log's feeAmount${sell ? ", taken into the bought token at the clearing price" : ""}, in basis points (0.01%) of the amount at the clearing price. Before block 19,815,319 Rails reads no other fee in a trade's price, and this trade's price carried no per-trade entries: the settlement contract priced it on each token's first clearingPrices entry, [${u.sellIndex}, ${u.buyIndex}], the clearing price.`,
+    formula: sell
+      ? `signed fee = ⌊fee × clearingPrices[${u.sellIndex}] ÷ clearingPrices[${u.buyIndex}]⌋; signed fee ÷ ⌊${net} × clearingPrices[${u.sellIndex}] ÷ clearingPrices[${u.buyIndex}]⌋ × 10,000`
+      : `fee ÷ ⌈bought × clearingPrices[${u.buyIndex}] ÷ clearingPrices[${u.sellIndex}]⌉ × 10,000`,
+    inputs: [
+      inputLeaf(c, `clearingPrices[${u.sellIndex}] (sold token, first entry)`, u.sell),
+      inputLeaf(c, `clearingPrices[${u.buyIndex}] (bought token, first entry)`, u.buy),
+      logLeaf("sold (Trade log sellAmount)", trade.sell),
+      logLeaf("fee (Trade log feeAmount)", trade.fee),
+      logLeaf("bought (Trade log buyAmount)", trade.buy),
+      { label: `the signed fee, in ${sym}`, value: c.signedFee, kind: "derived", step: true },
+      { label: "block", value: String(coords.block), kind: "chain", pclass: "emitted" },
+      {
+        label: "fees",
+        value: "docs.cow.fi Fees",
+        kind: "offchain",
+        pclass: "offchain",
+        definition: true,
+        verify: { kind: "link", href: FEES, text: `${COW_TERMS.name}'s docs: Fees` },
+      },
+    ],
+    contract: SETTLEMENT,
+    via: via(c),
+    source: source(coords),
+    verify: txVerify(coords),
+  };
+}
+
 /** The fee line: the gap between the trade's clearingPrices entries and
  *  the settlement's uniform price, in bp. */
 export function cowFeeProv(c: CowSwapView, trade: CowTradeRaw, coords: CowCoords): Provenance {
+  if (c.signedFeeOnly) return signedFeeProv(c, trade, coords);
   const sym = tokenName(c);
   const u = c.prices.uniform;
   const o = c.prices.own;

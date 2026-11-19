@@ -5,8 +5,9 @@
 // bought for the order; the Trade log names no receiver) with the amounts on their flanks; every token
 // icon on the card opens the asset's panel (AssetPopover); T2 Sold, Bought, the
 // executed price, the fee where the log carries one, the settlement
-// transaction and its block, and, once the card opens on a settlement with
-// other trades, the settlement panel (cow-settlement-panel.tsx); T3 the trade in words. No USD: phase 1 reads no
+// transaction and its block; once the card opens and its settlement is read,
+// the surplus and fee lines (T2.3) and, on a settlement with other trades, the
+// settlement panel (T2.2; both cow-settlement-panel.tsx); T3 the trade in words. No USD: phase 1 reads no
 // oracle at a trade's block, so the slot stays empty (rails-ops chain-truth
 // charter §3).
 
@@ -240,8 +241,8 @@ export function CowTradeCard({
       ),
     },
     learnMore: null,
-    // The settlement panel (ui-jobs 711): read when the card opens, where the settlement carried other trades.
-    ...(others > 0 ? { useOpened: () => useCowSettlementOpened(trade, sell, buy) } : {}),
+    // The surplus and fee lines (ui-jobs 712) and the settlement panel (ui-jobs 711): read when the card opens.
+    useOpened: () => useCowSettlementOpened(trade, sell, buy),
   };
   return <EventCard slots={slots} avatar={null} />;
 }
