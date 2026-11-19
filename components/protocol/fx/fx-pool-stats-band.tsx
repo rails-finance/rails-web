@@ -14,6 +14,7 @@ import { Prov } from "@/components/shared/provenance";
 import { fxCollateralUsd } from "@/lib/fx/usd-receipt";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { formatUsd } from "@/lib/shared/format-event";
+import { priceText } from "@/lib/shared/shown-usd";
 import type { FxPoolStatsSummary } from "@/lib/sources/api/fx-stats";
 import type { FxPoolKey } from "@/lib/fx/asset-catalog";
 import type { FxListingPrice } from "@/components/protocol/fx/fx-position-card";
@@ -66,7 +67,7 @@ export function FxPoolStatsBand({
                         : undefined
                   }
                 >
-                  {p.normalizedSymbol} {formatUsd(price)}
+                  {p.normalizedSymbol} {priceText(price)}
                   {a ? " anchor" : " min"}
                   {a ? ` @ ${a.block.toLocaleString("en-US")}` : ""}
                 </span>

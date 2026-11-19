@@ -32,12 +32,14 @@ import { test } from "node:test";
 import { centsOfLines } from "./lib/cents-lines";
 import { faceAmount, shownUsd } from "@/lib/shared/shown-usd";
 import { flowSegmentProv } from "@/lib/shared/flows-timeline-provenance";
+import { makerFactorNote } from "@/lib/makerdao/price-notes";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { BaseActivityEvent, MakerDAOContext } from "@/lib/shared/types/event-shape";
 import {
   MK,
+  makerFeeRateFrom,
   makerFeeRates,
   makerFlowEvents,
   makerGrowth,
@@ -46,6 +48,7 @@ import {
   makerPricing,
   replayMaker,
   type MakerFlowOptions,
+  type MakerReplayed,
 } from "@/lib/makerdao/flows";
 import { buildFlowModel, stateAt, type FlowModel } from "@/lib/shared/flows-timeline";
 import { sideSumRows } from "@/lib/shared/flows-sum";
@@ -521,4 +524,72 @@ test("a past day's debt states the recorded debt, the factor its rows' accumulat
     checked++;
   }
   assert.ok(checked > 3, `${checked}`);
+});
+
+// Each stretch's rate names the branch that gave it (makerFeeRateFrom), and a
+// missing accumulator gives no rate, never a log of zero.
+test("the fee's rate names its source: the next row, the live read, the fee, or carried; none without an accumulator", () => {
+  const YEAR = 31_557_600;
+  const ev = (block: number, ts: number, rate: number) => ({ ev: { block, ts, rate } }) as unknown as MakerReplayed;
+  const base = { collSymbol: "ETH", debtSymbol: "DAI", now: 2 * YEAR, daily: null } as MakerFlowOptions;
+  // Two rows a year apart: the next row's accumulator.
+  const rows = makerFeeRateFrom([ev(100, 0, 1), ev(200, YEAR, 1.05)], { ...base, live: null });
+  assert.equal(rows[0].from, "rows");
+  assert.ok(near(rows[0].rate, Math.log(1.05), 1e-12));
+  assert.equal(
+    makerFactorNote(rows[0]),
+    "compounded each second at the rate the Vat's accumulators at blocks 100 and 200 imply",
+  );
+  // After the last row, the live read's accumulator at its block.
+  const live = makerFeeRateFrom([ev(100, 0, 1)], {
+    ...base,
+    live: { price: 1, ink: 1, debt: 1, rate: 1.1, block: 900, feeApr: null },
+  });
+  assert.equal(live[0].from, "live");
+  assert.ok(near(live[0].rate, Math.log(1.1) / 2, 1e-12));
+  assert.match(makerFactorNote(live[0])!, /accumulator at block 100 and the live read's at block 900 imply$/);
+  assert.doesNotMatch(makerFactorNote(live[0])!, /fee now/);
+  // No live accumulator: the live stability fee.
+  const fee = makerFeeRateFrom([ev(100, 0, 1)], {
+    ...base,
+    live: { price: 1, ink: 1, debt: 1, rate: null, feeApr: 0.05 },
+  });
+  assert.equal(fee[0].from, "fee");
+  assert.ok(near(fee[0].rate, Math.log(1.05), 1e-12));
+  assert.match(makerFactorNote(fee[0])!, /live read's stability fee, ln\(1 \+ fee\) a year, from block 100/);
+  // Two rows in one moment: the stretch before's rate, carried.
+  const same = makerFeeRateFrom([ev(100, 0, 1), ev(200, YEAR, 1.05), ev(201, YEAR, 1.05)], { ...base, live: null });
+  assert.equal(same[1].from, "carried");
+  assert.equal(same[1].rate, same[0].rate);
+  assert.match(makerFactorNote(same[1])!, /rate of the stretch before block 200, carried on/);
+  // A zero accumulator: no rate and no note, never −Infinity.
+  const none = makerFeeRateFrom([ev(100, 0, 1), ev(200, YEAR, 0)], { ...base, live: null });
+  assert.equal(none[0].from, "none");
+  assert.ok(Number.isNaN(none[0].rate));
+  assert.equal(makerFactorNote(none[0]), null);
+});
+
+test("a stretch with no accumulator leaves the debt with no figure, never $0 or a carried factor", () => {
+  const f = fx("open-fee");
+  const o = opts(f);
+  const bare = rows(f).map((r, i) => (i === 2 ? { ...r, rate: 0 } : r));
+  const rp = replayMaker(bare, o);
+  const from = makerFeeRateFrom(rp, o);
+  assert.ok(
+    from.some((r) => r.from === "none"),
+    "a stretch with no rate",
+  );
+  const m = buildFlowModel(makerFlowTimeline(bare, o)!)!;
+  const startDay = m.start / 86_400_000;
+  let gaps = 0;
+  for (const [i, r] of from.entries()) {
+    if (r.from !== "none" || !rp[i + 1] || !(rp[i].ev.debtAfter > 0)) continue;
+    const day = Math.floor(rp[i].ev.ts / DAY) + 1;
+    if (day >= Math.floor(rp[i + 1].ev.ts / DAY)) continue;
+    const stop = day - startDay;
+    assert.ok(m.heldUnpriced.get(stop)?.debt.includes(o.debtSymbol), `day ${day}: the debt has no figure`);
+    assert.equal(sideSumRows(stateAt(m, stop).debt).total.amount, "—");
+    gaps++;
+  }
+  assert.ok(gaps > 0, "a day in the stretch");
 });

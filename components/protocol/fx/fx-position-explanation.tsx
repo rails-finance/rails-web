@@ -20,7 +20,7 @@
 import type { FxPositionView } from "@/components/protocol/fx/fx-position-card";
 import { formatUsd } from "@/lib/shared/format-event";
 import { fxAnchorOf, fxPositionCollUsd, fxSeizedUsd } from "@/lib/fx/usd-receipt";
-import { centsOf, shownUsd } from "@/lib/shared/shown-usd";
+import { centsOf, priceText, shownUsd } from "@/lib/shared/shown-usd";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
@@ -277,7 +277,7 @@ export function FxPositionExplanation({
     if (collUsd) {
       bullets.push(
         <span key="usd">
-          At the oracle&rsquo;s anchor price, {formatUsd(collUsd.price)} per {v.normalizedSymbol}, that collateral is
+          At the oracle&rsquo;s anchor price, {priceText(collUsd.price)} per {v.normalizedSymbol}, that collateral is
           worth{" "}
           <Prov info={collUsd.prov}>
             <H>{formatUsd(collUsd.usd)}</H>
@@ -293,11 +293,11 @@ export function FxPositionExplanation({
       bullets.push(
         <span key="ratio">
           The pool puts the LTV at <H>{(ratio * 100).toFixed(1)}%</H>: the debt as a share of the collateral&rsquo;s
-          value at the anchor price, {formatUsd(anchorAt)} per {v.normalizedSymbol}.
+          value at the anchor price, {priceText(anchorAt)} per {v.normalizedSymbol}.
           {px ? (
             <>
               {" "}
-              The pool judges its lines at the oracle&rsquo;s min price, {formatUsd(px.min)}, where the ratio is{" "}
+              The pool judges its lines at the oracle&rsquo;s min price, {priceText(px.min)}, where the ratio is{" "}
               {((debts / (colls * px.min)) * 100).toFixed(1)}%. The ratios on the timeline rows are read at the anchor
               price, so a rebalanced row can show a little under the rebalance line.
             </>

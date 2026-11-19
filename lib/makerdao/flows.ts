@@ -46,7 +46,13 @@ import { actedByOther } from "@/lib/shared/external-actor";
 import { makerTxHashOf } from "@/lib/makerdao/market-notes";
 import { shownUsd } from "@/lib/shared/shown-usd";
 import type { DayObs } from "@/lib/shared/price-series";
-import { makerParNote, makerRowPriceNote, type MakerRowPrice } from "@/lib/makerdao/price-notes";
+import {
+  makerFactorNote,
+  makerParNote,
+  makerRowPriceNote,
+  type MakerRateFrom,
+  type MakerRowPrice,
+} from "@/lib/makerdao/price-notes";
 
 const DAY_S = 86_400;
 const ONE_YEAR_S = 31_557_600;
@@ -495,19 +501,47 @@ export function replayMaker(events: MakerFlowEvent[], o: MakerFlowOptions): Make
 export const makerGrowth = (rate: number, seconds: number): number => Math.exp(rate * (seconds / ONE_YEAR_S));
 
 export function makerFeeRates(replayed: MakerReplayed[], o: MakerFlowOptions): number[] {
-  const out: number[] = [];
+  return makerFeeRateFrom(replayed, o).map((r) => r.rate);
+}
+
+/** Each stretch's rate with the branch that gave it (lib/makerdao/price-notes.ts
+ *  `makerFactorNote` names it): the next row's accumulator, the live read's,
+ *  the live stability fee, or the rate carried from the stretch before. A row
+ *  whose accumulator is missing or zero gives no rate (not a number): the
+ *  debt has no factor there, never a log of zero. */
+export function makerFeeRateFrom(replayed: MakerReplayed[], o: MakerFlowOptions): MakerRateFrom[] {
+  const out: MakerRateFrom[] = [];
+  const ok = (v: number | null | undefined): v is number => v != null && Number.isFinite(v) && v > 0;
   for (let i = 0; i < replayed.length; i++) {
     const a = replayed[i].ev;
     const b = replayed[i + 1]?.ev;
-    const to = b
-      ? { rate: b.rate, ts: b.ts }
-      : o.live?.rate != null && o.live.rate > 0
-        ? { rate: o.live.rate, ts: o.now }
-        : null;
-    const dt = to ? to.ts - a.ts : 0;
-    if (to && dt > 0 && a.rate > 0) out.push(Math.log(to.rate / a.rate) / (dt / ONE_YEAR_S));
-    else if (!b && o.live?.feeApr != null) out.push(Math.log(1 + o.live.feeApr));
-    else out.push(out[i - 1] ?? 0);
+    const prev = out[i - 1];
+    const carried = (): MakerRateFrom =>
+      prev && prev.from !== "none"
+        ? { from: "carried", rate: prev.rate, block: a.block }
+        : prev
+          ? { from: "none", rate: Number.NaN, block: a.block }
+          : { from: "carried", rate: 0, block: a.block };
+    if (b) {
+      if (!ok(a.rate) || !ok(b.rate)) out.push({ from: "none", rate: Number.NaN, block: a.block });
+      else if (b.ts - a.ts > 0)
+        out.push({
+          from: "rows",
+          rate: Math.log(b.rate / a.rate) / ((b.ts - a.ts) / ONE_YEAR_S),
+          block: a.block,
+          toBlock: b.block,
+        });
+      else out.push(carried());
+    } else if (ok(o.live?.rate) && ok(a.rate) && o.now - a.ts > 0)
+      out.push({
+        from: "live",
+        rate: Math.log((o.live!.rate as number) / a.rate) / ((o.now - a.ts) / ONE_YEAR_S),
+        block: a.block,
+        liveBlock: o.live?.block ?? null,
+      });
+    else if (o.live?.feeApr != null && Number.isFinite(o.live.feeApr) && o.live.feeApr > -1)
+      out.push({ from: "fee", rate: Math.log(1 + o.live.feeApr), block: a.block });
+    else out.push(carried());
   }
   return out;
 }
@@ -595,17 +629,18 @@ export function makerFlowTimeline(events: MakerFlowEvent[], o: MakerFlowOptions)
   // Each names the row it grows from and the row (or live read) whose
   // accumulator its rate meets.
   const debtObs: DayObs[] = [];
-  const debtTo: Record<number, number | null> = {};
+  const debtNotes: Record<number, string> = {};
+  const rateFrom = makerFeeRateFrom(replayed, o);
   let ei = 0;
   for (let d = firstDay; d <= endDay; d++) {
     const end = Math.min((d + 1) * DAY_S, o.now);
     while (ei + 1 < replayed.length && replayed[ei + 1].ev.ts <= end) ei++;
     const e = replayed[ei].ev;
-    const toBlock =
-      replayed[ei + 1]?.ev.block ?? (o.live?.rate != null && o.live.rate > 0 ? (o.live.block ?? null) : null);
     if (e.ts <= end) {
+      // No rate: not a number, a day with no factor (FlowTimeline.dailyPrices).
       debtObs.push([d, makerGrowth(rates[ei], Math.max(0, end - e.ts)), e.block]);
-      debtTo[d] = toBlock;
+      const note = makerFactorNote(rateFrom[ei]);
+      if (note) debtNotes[d] = note;
     } else debtObs.push([d, 1, null]);
   }
 
@@ -622,7 +657,7 @@ export function makerFlowTimeline(events: MakerFlowEvent[], o: MakerFlowOptions)
     days,
     live: {
       collateralUsd: shownUsd(nowColl, priceNow),
-      debtUsd: shownUsd(nowDebt, 1),
+      debtUsd: Number.isFinite(nowDebt) ? shownUsd(nowDebt, 1) : 0,
       assets: open
         ? [
             ...(nowColl > DUST
@@ -638,7 +673,18 @@ export function makerFlowTimeline(events: MakerFlowEvent[], o: MakerFlowOptions)
               : []),
             ...(nowDebt > DUST
               ? [{ side: "debt" as const, symbol: o.debtSymbol, amount: nowDebt, usd: shownUsd(nowDebt, 1) }]
-              : []),
+              : !Number.isFinite(nowDebt) && last.ev.debtAfter > DUST
+                ? // No rate to grow it by: the debt has no figure, never $0.
+                  [
+                    {
+                      side: "debt" as const,
+                      symbol: o.debtSymbol,
+                      amount: last.ev.debtAfter,
+                      usd: 0,
+                      unpriced: true as const,
+                    },
+                  ]
+                : []),
           ]
         : [],
     },
@@ -647,7 +693,7 @@ export function makerFlowTimeline(events: MakerFlowEvent[], o: MakerFlowOptions)
       [coll]: [...collObs].map(([d, [usd, block]]) => [d, usd, block] as DayObs).sort((a, b) => a[0] - b[0]),
       [debt]: debtObs,
     },
-    factorToBlocks: { [debt]: debtTo },
+    factorNotes: { [debt]: debtNotes },
     seriesCarry: true,
     ...(o.daily && o.daily.length > 0
       ? {}
@@ -693,7 +739,7 @@ export function makerFlowWords(
       : `with the collateral at the price of the vault's latest event by then and the debt at $1 plus the stability fee built since`,
     moment: {
       face: ["debt"],
-      compound: "the Vat's accumulators",
+      compound: true,
       noPrice: {
         collateral: `No Maker oracle price is recorded for this day, so the collateral is stated in ${collSymbol} only.`,
       },
@@ -761,7 +807,7 @@ export function makerFocusEvents(
           held: debtAfter,
         },
       },
-      rate: (rates[i] ?? 0) * 100,
+      ...(Number.isFinite(rates[i]) ? { rate: rates[i] * 100 } : {}),
     };
   });
 }

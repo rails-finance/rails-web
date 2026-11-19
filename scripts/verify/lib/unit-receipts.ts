@@ -13,9 +13,17 @@ export function assertUnitReceipts(m: FlowModel, name: string): number {
     for (const h of m.heldAt[stop] ?? []) assert.equal(h.priced?.price, undefined, `${name} ${h.symbol} ${stop}`);
     const st = stateAt(m, stop);
     for (const side of ["collateral", "debt"] as const) {
-      const held = st[side].bar[0];
-      // With the side's token and without it: the rows are not there to read.
-      for (const unit of [unitOf(m, side), undefined]) {
+      // The segment as the panel builds it, and one carrying the stop's rows
+      // as a dollar model's would: the dollar branch is then reachable, and
+      // only the rows' missing price keeps it from printing "$".
+      const forced = { ...st[side].bar[0] };
+      const rows = (m.heldAt[stop] ?? []).filter((h) => h.side === side);
+      Object.defineProperty(forced, "heldRows", { value: rows, enumerable: false });
+      for (const [held, unit] of [
+        [st[side].bar[0], unitOf(m, side)],
+        [st[side].bar[0], undefined],
+        [forced, undefined],
+      ] as const) {
         const provs = [
           flowSegmentProv(held, side, "the end of the day", false, m.daily, unit),
           ...(m.heldAt[stop] ?? [])

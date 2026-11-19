@@ -667,7 +667,6 @@ test("a $1-face receipt states the recorded debt, the factor and their product",
 
 test("a $1-face amount multiplies out from its printed rows, a 10^8 DAI vault among them", async () => {
   const { faceAmount, factorText, amountText } = await import(ROOT + "lib/shared/shown-usd.ts");
-  const { compoundedWords } = await import(ROOT + "lib/shared/flows-timeline-provenance.ts");
   // Exact decimal product of two printed strings, rounded half away to six places.
   const micro = (t) => {
     const [i, f = ""] = t.replace(/,/g, "").split(".");
@@ -696,8 +695,4 @@ test("a $1-face amount multiplies out from its printed rows, a 10^8 DAI vault am
     assert.equal(rebuilt(rText, fText), amount, `${rText} × ${fText}`);
     assert.equal(amountText(amount), amountText(rebuilt(rText, fText)), "the printed amount");
   }
-  assert.equal(
-    compoundedWords("the Vat's accumulators", 19_000_000, 19_100_000),
-    "compounded each second at the rate the Vat's accumulators at blocks 19,000,000 and 19,100,000 imply",
-  );
 });

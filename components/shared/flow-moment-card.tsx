@@ -29,7 +29,7 @@ import { fmtTokens, tokenDecimals } from "@/lib/shared/flow-focus";
 import { wholeUsd } from "@/lib/shared/flows-sum";
 import type { FlowMoment, MomentAsset } from "@/lib/shared/flow-moment";
 import { unitOf, type FlowGrowth, type FlowModel, type FlowSegment, type FlowSide } from "@/lib/shared/flows-timeline";
-import { compoundedWords, flowSegmentProv, heldDayProv } from "@/lib/shared/flows-timeline-provenance";
+import { flowSegmentProv, heldDayProv } from "@/lib/shared/flows-timeline-provenance";
 import { centsOf, roundAway } from "@/lib/shared/shown-usd";
 import { formatUsdValue } from "@/lib/utils/format";
 
@@ -399,7 +399,7 @@ export function FlowMomentCard({
               value: `${moment.accrual.rate.toLocaleString("en-US", { maximumFractionDigits: 4 })}%`,
               kind: "chain" as const,
               note: compound
-                ? `in force after the last event, ${compoundedWords(compound, a.row.priced?.block, a.row.priced?.toBlock)}`
+                ? `in force after the last event, ${a.row.priced?.factorNote ?? "compounded each second"}`
                 : "in force after the last event, fees included",
             },
             {

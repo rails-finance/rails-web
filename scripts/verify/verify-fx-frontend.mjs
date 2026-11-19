@@ -238,8 +238,8 @@ const LINES = linesRe(Math.round(terms.rebalanceRatio * 100), Math.round(terms.l
 check("249: the card names the lines and the trigger price", LINES.test(p249.text));
 check(
   "249: the USD figure and the ratio name their prices",
-  /The pool judges its lines at the oracle’s min price, \$[\d,]+/.test(p249.text) &&
-    /At the oracle’s anchor price, \$[\d,]+ per stETH/.test(p249.text),
+  /The pool judges its lines at the oracle’s min price, \$[\d,]+\.\d{2,6}/.test(p249.text) &&
+    /At the oracle’s anchor price, \$[\d,]+\.\d{2,6} per stETH/.test(p249.text),
 );
 check(
   "249: the debt line splits rebalances from other positions' bad debt",
@@ -260,7 +260,7 @@ check("484: no page errors", p484.errors.length === 0, p484.errors.slice(0, 2).j
   // The card's collateral (full figure, then USD) against the Explanation's
   // anchor price.
   const m = p484.text.match(/\n([\d.]+) WBTC\n\$([\d,.]+)\n/);
-  const a = p484.text.match(/At the oracle’s anchor price, \$([\d,]+) per WBTC/);
+  const a = p484.text.match(/At the oracle’s anchor price, \$([\d,]+\.\d{2,6}) per WBTC/);
   const usd = m ? Number(m[2].replace(/,/g, "")) : NaN;
   const anchor = a ? Number(a[1].replace(/,/g, "")) : NaN;
   check(
@@ -271,7 +271,7 @@ check("484: no page errors", p484.errors.length === 0, p484.errors.slice(0, 2).j
 }
 check(
   "484: the min price is named where the lines are judged",
-  /The pool judges its lines at the oracle’s min price, \$[\d,]+, where the ratio is [\d.]+%/.test(p484.text),
+  /The pool judges its lines at the oracle’s min price, \$[\d,]+\.\d{2,6}, where the ratio is [\d.]+%/.test(p484.text),
 );
 check("484: the rebalance and liquidation prices with their falls", LINES.test(p484.text));
 check(
@@ -318,7 +318,7 @@ check(
 );
 check(
   "484: a rebalance row states the min-price judgement",
-  /The pool judged the tick at the oracle’s min price, \$79,675 at the block before/.test(p484.text),
+  /The pool judged the tick at the oracle’s min price, \$79,6\d\d\.\d{2,6} at the block before/.test(p484.text),
 );
 
 // ── Y10: the pool-wide Liquidate names twelve positions ─────────────────────

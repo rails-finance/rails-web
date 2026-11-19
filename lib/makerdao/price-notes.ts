@@ -38,6 +38,35 @@ const dayText = (day: number): string =>
     timeZone: "UTC",
   });
 
+/** Where a stretch's stability-fee rate comes from (lib/makerdao/flows.ts
+ *  `makerFeeRateFrom`), continuous a year: `block` is the row it grows from. */
+export type MakerRateFrom =
+  | { from: "rows"; rate: number; block: number; toBlock: number }
+  | { from: "live"; rate: number; block: number; liveBlock: number | null }
+  | { from: "fee"; rate: number; block: number }
+  | { from: "carried"; rate: number; block: number }
+  | { from: "none"; rate: number; block: number };
+
+/** The debt's interest factor's note, by the branch that gave its rate; none
+ *  where there is no rate. */
+export function makerFactorNote(r: MakerRateFrom): string | null {
+  const b = (n: number) => n.toLocaleString("en-US");
+  switch (r.from) {
+    case "rows":
+      return `compounded each second at the rate the Vat's accumulators at blocks ${b(r.block)} and ${b(r.toBlock)} imply`;
+    case "live":
+      return r.liveBlock != null
+        ? `compounded each second at the rate the Vat's accumulator at block ${b(r.block)} and the live read's at block ${b(r.liveBlock)} imply`
+        : `compounded each second at the rate the Vat's accumulator at block ${b(r.block)} and the live read's, which names no block, imply`;
+    case "fee":
+      return `compounded each second at the live read's stability fee, ln(1 + fee) a year, from block ${b(r.block)}; no accumulator after that row is read`;
+    case "carried":
+      return `compounded each second at the rate of the stretch before block ${b(r.block)}, carried on: the row at this block moves no time`;
+    case "none":
+      return null;
+  }
+}
+
 /** Where a Lifetime flows row's collateral price came from, with both blocks
  *  named where they differ. */
 export type MakerRowPrice = (

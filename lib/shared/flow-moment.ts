@@ -174,7 +174,7 @@ export function flowMoment(model: FlowModel, events: FocusEvent[], endTs: number
     const seconds = Math.max(0, close - last.ts);
     const year = model.words.moment?.yearSeconds ?? ONE_YEAR_S;
     const t = (last.rate / 100) * (seconds / year);
-    accrual = { rate: last.rate, seconds, factor: model.words.moment?.compound != null ? Math.exp(t) : 1 + t };
+    accrual = { rate: last.rate, seconds, factor: model.words.moment?.compound ? Math.exp(t) : 1 + t };
     const sum = model.words.moment?.minuteSum;
     if (sum) {
       const past = sum.deadline != null && close > sum.deadline;
