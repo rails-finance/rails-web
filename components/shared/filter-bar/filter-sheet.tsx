@@ -406,7 +406,7 @@ function Sheet<F>({
   return createPortal(
     <div className="fixed inset-0 z-[var(--z-modal)] flex flex-col justify-end sm:hidden">
       {/* The scrim: a press on it closes the sheet and drops the draft. */}
-      <div className="absolute inset-0 bg-black/50" onClick={() => closeSheet()} aria-hidden="true" />
+      <div className="absolute inset-0 bg-[var(--backdrop-bg)]" onClick={() => closeSheet()} aria-hidden="true" />
       <div
         ref={panelRef}
         role="dialog"
