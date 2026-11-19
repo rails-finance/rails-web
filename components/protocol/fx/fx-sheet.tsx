@@ -22,9 +22,9 @@
 // The read starts when the card opens (`active`); the sheet is null until it
 // lands, and undefined where the row has no balance to state (the cells stand).
 
-import { fxCollateralUsd } from "@/lib/fx/usd-receipt";
+import { fxCollateralUsd, fxMarketMove } from "@/lib/fx/usd-receipt";
 import type { FxPoolKey } from "@/lib/fx/asset-catalog";
-import { priceText, shownUsd } from "@/lib/shared/shown-usd";
+import { priceText } from "@/lib/shared/shown-usd";
 import { FX_MIN_ONLY_NOTE } from "@/lib/fx/price-notes";
 import type { FxContext } from "@/lib/shared/types/event-shape";
 import type { Provenance } from "@/components/shared/provenance";
@@ -304,6 +304,8 @@ export function useFxSheet({
   const prevColl = !opened && prev?.collAfter != null ? Number(prev.collAfter) : null;
   const prevPrice = prev?.oraclePrice != null ? Number(prev.oraclePrice) : null;
   const collCarry: SheetSide["carry"] = [];
+  // Set where the "Last" row and this block's rows stand on different legs.
+  let legsNote: string | null = null;
   if (prevColl != null && prevColl > DUST_COLL && prevPrice != null && prevPrice > 0) {
     collCarry.push({
       key: "last",
@@ -344,9 +346,15 @@ export function useFxSheet({
         ),
         tip: TIPS.collMoved,
       });
-    if (price != null && price > 0) {
-      // The difference of the two shown products.
-      const mv = shownUsd(prevColl, price) - shownUsd(prevColl, prevPrice);
+    // The difference of the two shown products where both stand on the
+    // same leg; across the min then and the anchor now, no figure.
+    const move =
+      price != null && price > 0
+        ? fxMarketMove(prevColl, { price: prevPrice, leg: "min" }, { price, leg: leg === "anchor" ? "anchor" : "min" })
+        : null;
+    if (move && "none" in move) legsNote = move.none;
+    if (move && "usd" in move && price != null) {
+      const mv = move.usd;
       if (Math.abs(mv) >= 0.005)
         collCarry.push({
           key: "market",
@@ -356,7 +364,7 @@ export function useFxSheet({
             info: {
               kind: "chain-derived",
               pclass: "oracle",
-              summary: `Market move on the collateral since the last event. The ${normalizedSymbol} held at the previous event, valued at the oracle's price at this block less its price at the previous event${leg === "anchor" ? ": the anchor leg now, the min leg then, the only leg stored at that block" : ", both the min leg"}. No token moved.`,
+              summary: `Market move on the collateral since the last event. The ${normalizedSymbol} held at the previous event, valued at the oracle's min leg at this block less its min leg at the previous event, the only leg stored at each. No token moved.`,
               formula: "collateral at the previous event × (price now − price then)",
               inputs: [
                 { label: "collateral", value: `${formatNumber(prevColl)} ${normalizedSymbol}`, kind: "chain" },
@@ -372,7 +380,7 @@ export function useFxSheet({
                   value: priceText(price),
                   kind: "chain-derived",
                   pclass: "oracle",
-                  note: leg === "anchor" ? "the pool oracle's anchor leg (getPrice) at this block" : FX_MIN_ONLY_NOTE,
+                  note: FX_MIN_ONLY_NOTE,
                 },
               ],
             },
@@ -635,5 +643,5 @@ export function useFxSheet({
     { panel: "risk", rows: risk },
     { panel: "limits", rows: limits, breakdown: params },
   ];
-  return { sides: [collSide, debtSide], panels };
+  return { sides: [collSide, debtSide], panels, ...(legsNote ? { note: legsNote } : {}) };
 }

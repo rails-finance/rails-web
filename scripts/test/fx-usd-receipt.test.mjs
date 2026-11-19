@@ -127,3 +127,13 @@ test("the bonus's collateral is the sum of shown legs, each at the min leg of it
   assert.match(notes, /min leg \(getLiquidatePrice\).*at block 23,000,001/);
   assert.match(notes, /at block 23,100,002/);
 });
+
+const { fxMarketMove, FX_LEGS_DIFFER } = await import(ROOT + "lib/fx/usd-receipt.ts");
+
+test("a market move is the difference of two shown products on one leg, and no figure across two", () => {
+  const same = fxMarketMove(1.2345678, { price: 1990.123456, leg: "min" }, { price: 2010.654321, leg: "min" });
+  assert.equal(same.usd, Math.round((shownUsd(1.2345678, 2010.654321) - shownUsd(1.2345678, 1990.123456)) * 100) / 100);
+  const across = fxMarketMove(1.2345678, { price: 1990.123456, leg: "min" }, { price: 2010.654321, leg: "anchor" });
+  assert.deepEqual(across, { none: FX_LEGS_DIFFER });
+  assert.equal(FX_LEGS_DIFFER, "The two values stand on different oracle legs (min then, anchor now).");
+});

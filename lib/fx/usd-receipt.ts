@@ -6,6 +6,7 @@
 
 import type { Provenance } from "@/components/shared/provenance";
 import { holderUsdReceipt, type UsdLeg } from "@/lib/shared/holder-usd-receipt";
+import { shownUsd } from "@/lib/shared/shown-usd";
 import { FX_POOLS, type FxPoolKey } from "./asset-catalog";
 import { fxBlocksNote, fxPriceNote, type FxLeg } from "./price-notes";
 
@@ -111,4 +112,20 @@ export function fxPositionCollUsd(
     priceBlock: anchor.block,
   });
   return r ? { ...r, price: anchor.anchor } : null;
+}
+
+/** The line a sheet states where its "Last" row and this block's rows stand
+ *  on different oracle legs. */
+export const FX_LEGS_DIFFER = "The two values stand on different oracle legs (min then, anchor now).";
+
+/** The sheet's market move: the difference of the two shown products where
+ *  both stand on the same leg; across two legs no figure, and the line that
+ *  says why (ui-jobs 743). */
+export function fxMarketMove(
+  held: number,
+  then: { price: number; leg: FxLeg },
+  now: { price: number; leg: FxLeg },
+): { usd: number } | { none: string } {
+  if (then.leg !== now.leg) return { none: FX_LEGS_DIFFER };
+  return { usd: Math.round((shownUsd(held, now.price) - shownUsd(held, then.price)) * 100) / 100 };
 }
