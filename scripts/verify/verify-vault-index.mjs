@@ -18,7 +18,7 @@
 // `data-index-key`, a row's `data-protocol` and `data-chain`).
 //
 //   0  /vaults answers 200 and names a block for each of the five rosters
-//   1  each roster's count, as its vaults info page states it (Maple: the catalogue),
+//   1  each roster's count, as its vaults info page states it (Maple: the catalogue; sBOLD: 1),
 //      equals the index's count for it, and the index's rows per protocol
 //      (funded + empty + unread) equal it; the sum equals the union
 //   2  the Protocol facet narrows the rows to each protocol's count, every
@@ -62,7 +62,7 @@ const skip = (name, why) => {
   skipped++;
 };
 
-const PROTOCOLS = ["morpho", "aave", "yearn", "maple"];
+const PROTOCOLS = ["morpho", "aave", "yearn", "maple", "sbold"];
 /** The rosters, by `protocol:chain`; `sidebar` is the roster entry the lead zone (D5) draws. */
 const ROSTER = {
   "morpho:8453": {
@@ -109,12 +109,23 @@ const ROSTER = {
     chain: "1",
     sidebar: "maple",
   },
+  // sBOLD (ui-jobs 765): one vault no explorer deploys, its own roster of one,
+  // the row linking its page. Its lead zone names no explorer: the family has
+  // no venue, so the zone's protocol is empty.
+  "sbold:1": {
+    protocol: "sbold",
+    href: "/ethereum/vaults/sbold",
+    figure: null,
+    prefix: "/ethereum/vaults/sbold",
+    chain: "1",
+    sidebar: "",
+  },
 };
 const KEYS = Object.keys(ROSTER);
 /** A Maple pool's catalogue key by its address: the slug of its page. */
 const MAPLE_KEY = {};
 const keyOf = (r) => `${r.protocol}:${r.chain}`;
-const LABEL = { morpho: "Morpho", aave: "Aave", yearn: "Yearn", maple: "Maple" };
+const LABEL = { morpho: "Morpho", aave: "Aave", yearn: "Yearn", maple: "Maple", sbold: "sBOLD" };
 
 const strip = (html) =>
   html
@@ -176,6 +187,8 @@ for (const k of KEYS) {
   // Each pool's page is /ethereum/maple/pools/<key> (ui-jobs 549 step 4).
   for (const m of body.matchAll(/key: "([^"]+)",[\s\S]*?pool: "(0x[0-9a-f]{40})"/g)) MAPLE_KEY[m[2]] = m[1];
 }
+// sBOLD's page states no count: it is one vault, so its roster's count is 1.
+expected["sbold:1"] = 1;
 console.log(`rosters state: ${KEYS.map((k) => `${k} ${expected[k]}`).join(", ")}`);
 /** A protocol's rows across its rosters. */
 const expectedOf = (p) => KEYS.filter((k) => ROSTER[k].protocol === p).reduce((a, k) => a + (expected[k] ?? 0), 0);
@@ -326,7 +339,8 @@ check(
 }
 
 // ── 6: Total assets against the protocol roster ─────────────────────────────
-for (const k of KEYS.filter((k) => ROSTER[k].protocol !== "maple")) {
+// Maple's pools page and sBOLD's page draw no roster rows to compare against.
+for (const k of KEYS.filter((k) => ROSTER[k].protocol !== "maple" && ROSTER[k].protocol !== "sbold")) {
   const funded = byRoster[k].filter((r) => r.group === "funded");
   const top = funded.sort((a, b) => (BigInt(b.raw) > BigInt(a.raw) ? 1 : -1))[0];
   const roster = rosterPages[k];
@@ -355,6 +369,7 @@ for (const k of KEYS.filter((k) => ROSTER[k].protocol !== "maple")) {
     if (!R) return true;
     if (!r.href) return true;
     if (r.protocol === "maple") return r.href !== `${R.prefix}/${MAPLE_KEY[r.address]}`;
+    if (r.protocol === "sbold") return r.href !== R.prefix;
     return r.href !== `${R.prefix}${r.address}`;
   });
   check("7a every row links to its vault under its protocol", bad.length === 0, `${bad.length} off-pattern`);
@@ -373,8 +388,9 @@ for (const k of KEYS.filter((k) => ROSTER[k].protocol !== "maple")) {
 }
 
 // ── 8: no roster links the index (ui-jobs 771) ──────────────────────────────
-// Each roster opens on its read stamp alone; the rail reaches /vaults.
-for (const k of KEYS) {
+// Each roster opens on its read stamp alone; the rail reaches /vaults. sBOLD's
+// page is a vault page, whose header links back to the index, and stays out.
+for (const k of KEYS.filter((k) => ROSTER[k].protocol !== "sbold")) {
   const html = rosterPages[k].html;
   check(
     `8  ${ROSTER[k].href} draws no index link`,
