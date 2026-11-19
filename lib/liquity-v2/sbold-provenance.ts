@@ -304,6 +304,48 @@ export const sboldPausedLogProv = (
   };
 };
 
+/** A holder's sBOLD (ui-jobs 765): balanceOf, convertToAssets(balance) and
+ *  the pro-rata balance × totalAssets ÷ totalSupply, at the page's block. */
+const sboldHolderSharesProv_ = (c: SboldCoords, h: { holder: string; raw: string; decimals: number }): Provenance =>
+  vaultRead(
+    c,
+    `balanceOf(${h.holder})`,
+    `Shares held — the sBOLD vault's balanceOf(${h.holder})${atBlock(c)}: ${h.raw} share units, ${h.decimals} decimals as decimals() answers.`,
+  );
+
+const sboldHolderClaimProv_ = (c: SboldCoords, h: { holder: string; sharesRaw: string; raw: string }): Provenance => ({
+  ...vaultRead(
+    c,
+    `convertToAssets(${h.sharesRaw})`,
+    `convertToAssets(balance) — the BOLD the vault's convertToAssets answers${atBlock(c)} for the ${h.sharesRaw} share units ${h.holder} holds: ${h.raw} raw BOLD. The vault rounds this conversion down.`,
+  ),
+  inputs: [
+    { label: `balanceOf(${h.holder})`, value: h.sharesRaw, kind: "chain", pclass: "state", contract: vaultContract },
+  ],
+});
+
+const sboldHolderProRataProv_ = (
+  c: SboldCoords,
+  h: { holder: string; sharesRaw: string; assetsRaw: string; supplyRaw: string; text: string },
+): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  source: { block: c.blockNumber },
+  verify: {
+    kind: "recompute",
+    text: `To check: ask any Ethereum archive node${atBlock(c)} for balanceOf(${h.holder}), totalAssets() and totalSupply() on ${SBOLD_VAULT}; multiply the first two and divide by the third.`,
+  },
+  summary: `Pro-rata BOLD — ${h.holder}'s share units times the vault's totalAssets(), over its totalSupply()${atBlock(c)}: ${h.text} BOLD, rounded half-up to four significant digits.`,
+  contract: vaultContract,
+  via: `${LANE} · sBOLD.balanceOf(holder) × sBOLD.totalAssets() ÷ sBOLD.totalSupply() @ the pinned block`,
+  formula: "balanceOf(holder) × totalAssets() ÷ totalSupply()",
+  inputs: [
+    { label: "balanceOf(holder)", value: h.sharesRaw, kind: "chain", pclass: "state", contract: vaultContract },
+    { label: "totalAssets()", value: h.assetsRaw, kind: "chain", pclass: "state", contract: vaultContract },
+    { label: "totalSupply()", value: h.supplyRaw, kind: "chain", pclass: "state", contract: vaultContract },
+  ],
+});
+
 // Receipts over a page's reads stamp rails-server's head read when the coordinates carry it.
 export const sboldNameProv = withServerRead(sboldNameProv_);
 export const sboldTotalAssetsProv = withServerRead(sboldTotalAssetsProv_);
@@ -319,3 +361,6 @@ export const sboldPausedProv = withServerRead(sboldPausedProv_);
 export const sboldYieldProv = withServerRead(sboldYieldProv_);
 export const sboldCollProv = withServerRead(sboldCollProv_);
 export const sboldFragmentsProv = withServerRead(sboldFragmentsProv_);
+export const sboldHolderSharesProv = withServerRead(sboldHolderSharesProv_);
+export const sboldHolderClaimProv = withServerRead(sboldHolderClaimProv_);
+export const sboldHolderProRataProv = withServerRead(sboldHolderProRataProv_);

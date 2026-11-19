@@ -6,6 +6,7 @@
 // lines (lib/sources/chain/sbold-daily.ts). Chain facts only.
 
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { RailHeader } from "@/components/shared/rail-header";
@@ -15,7 +16,7 @@ import { listingMetadata } from "@/lib/shared/page-metadata";
 import { loadSboldVault } from "@/lib/sources/chain/sbold-vault";
 import { loadSboldSeries } from "@/lib/sources/chain/sbold-daily";
 import { loadSboldPausedLog } from "@/lib/sources/chain/sbold-paused";
-import { SBOLD_ASSET, SBOLD_PAGE_PATH } from "@/lib/liquity-v2/sbold";
+import { SBOLD_ASSET, SBOLD_PAGE_PATH, sboldHolderHref } from "@/lib/liquity-v2/sbold";
 
 // Every figure is a getter's answer at the head.
 export const dynamic = "force-dynamic";
@@ -27,7 +28,13 @@ export const metadata: Metadata = listingMetadata({
   canonicalPath: SBOLD_PAGE_PATH,
 });
 
-export default async function SboldVaultRoute() {
+type Props = { searchParams: Promise<{ holder?: string | string[] }> };
+
+export default async function SboldVaultRoute({ searchParams }: Props) {
+  // The finder's submit (V4), sent on to the holder's path as typed (ui-jobs 765).
+  const q = (await searchParams).holder;
+  const typed = (Array.isArray(q) ? q[0] : q)?.trim();
+  if (typed) redirect(sboldHolderHref(typed));
   const data = await loadSboldVault();
   // The latest Paused log is read only where paused() answers true (ui-jobs 765).
   const [series, pausedLog] = data.chainStale

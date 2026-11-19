@@ -101,3 +101,19 @@ const SUPERSCRIPT: Record<string, string> = {
  *  characters, so copied text and a screen reader keep it (ui-jobs 765). */
 export const scientificText = (mantissa: string, exponent: number): string =>
   `${mantissa} × 10${String(exponent).replace(/[-\d]/g, (c) => SUPERSCRIPT[c])}`;
+
+/** A holder's pro-rata BOLD, balance × totalAssets ÷ totalSupply, in the
+ *  asset to four significant digits rounded half-up (perShareText's rule),
+ *  and its scientific form below 0.0001 (ui-jobs 765). */
+export function proRata(
+  sharesRaw: string,
+  assetsRaw: string,
+  supplyRaw: string,
+  assetDecimals: number,
+  shareDecimals: number,
+): { text: string; sci: { mantissa: string; exponent: number } | null } | null {
+  const a = (BigInt(sharesRaw) * BigInt(assetsRaw)).toString();
+  const s = (BigInt(supplyRaw) * BigInt(10) ** BigInt(shareDecimals)).toString();
+  const text = perShareText(a, s, assetDecimals, shareDecimals);
+  return text == null ? null : { text, sci: perShareScientific(a, s, assetDecimals, shareDecimals) };
+}

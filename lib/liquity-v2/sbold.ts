@@ -15,5 +15,8 @@ export const SBOLD_CREATED_BLOCK = 22_639_160;
 /** The vault's page, where a search for sBOLD lands. */
 export const SBOLD_PAGE_PATH = `${LIQUITY_V2_BASE_PATH}/sbold`;
 
+/** One address's holding, under the vault's page (ui-jobs 765). */
+export const sboldHolderHref = (holder: string) => `${SBOLD_PAGE_PATH}/${encodeURIComponent(holder)}`;
+
 /** The vault's deposits in the Stability Pool listing, one row per branch. */
 export const SBOLD_DEPOSITS_HREF = `${LIQUITY_V2_SP_PATH}?q=${SBOLD_VAULT}`;

@@ -17,6 +17,7 @@ import { NotLoaded } from "@/components/shared/not-loaded";
 import { ProvSection, SectionHeading, SectionMenu } from "@/components/shared/section-menu";
 import { VaultCard, type VaultMenuLink } from "@/components/vaults/vault-card";
 import { VaultAssets, type VaultAssetRow } from "@/components/vaults/vault-assets";
+import { VaultFinder } from "@/components/vaults/vault-finder";
 import { Tile } from "@/components/shared/tile-grid";
 import { VAULT_CARD_TILE, VAULT_GRID } from "@/components/vaults/vault-tiles";
 import { Sparkline, STRIP_SCOPE } from "@/components/vaults/vault-strip";
@@ -627,6 +628,7 @@ export function SboldVaultPage({
 
   return (
     <ProvReceiptsScope registry={registry}>
+      <VaultFinder />
       <Tile id="summary" flush>
         <div className={VAULT_CARD_TILE}>
           <VaultCard

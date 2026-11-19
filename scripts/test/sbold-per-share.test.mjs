@@ -66,3 +66,14 @@ test("a positive power reads in the same superscript style", async () => {
   const { scientificText } = await import("../../lib/liquity-v2/sbold-per-share.ts");
   assert.equal(scientificText("43.72", 18), "43.72 × 10¹⁸");
 });
+
+test("a holder's pro-rata BOLD: balance × total assets ÷ total supply (ui-jobs 765)", async () => {
+  const { proRata } = await import("../../lib/liquity-v2/sbold-per-share.ts");
+  // Half the supply of a vault of 3 BOLD is 1.5 BOLD.
+  assert.deepEqual(proRata("50", "3000000000000000000", "100", 18, 18), { text: "1.5", sci: null });
+  // One share unit of the 749 block's supply: far below a wei, stated in scientific form.
+  const p = proRata("1", "4536142689132635456", "43719935839791186313206357993620281274", 18, 18);
+  assert.deepEqual(p.sci, { mantissa: "1.038", exponent: -37 });
+  assert.equal(proRata("1", "5", "0", 18, 18), null);
+  assert.deepEqual(proRata("0", "5", "7", 18, 18), { text: "0", sci: null });
+});
