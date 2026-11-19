@@ -5,13 +5,15 @@
 // Sync to chart, the 30-day projection's switch and Display at its right), then
 // the pill row: one N1.10 pill per axis the history offers (Type, Asset,
 // Version, Address; timeline-filter-bar.tsx), the Date pill where the page has
-// a date axis (`tl.datesAxis`; a page tied to its Lifetime flows chart has
-// none), Clear all, and the count at the row's right end. Below sm the pills
-// scroll sideways behind the filter sheet's button and the count takes the line
-// under them. The Date pill opens the navigator panel (the month grid) under
-// the strip. Driven by a useTimelineEvents() state object, so a page wires it
-// in one line. The copy-link control that puts the current VIEW on the
-// clipboard (`tl.viewHref`) is in the position card's Explanation pane — see
+// a date axis (`tl.datesAxis`; a timeline the Lifetime flows chart ties to
+// has none, `timelineDates` in lib/shared/timeline-dates.ts, and draws the
+// chart's cut as a set pill in its slot), Clear all, and the count at the
+// row's right end. Below sm the pills scroll sideways behind the filter
+// sheet's button and the count takes the line under them. The Date pill
+// opens the navigator panel (the month grid) under the strip. Driven by a
+// useTimelineEvents() state object, so a page wires it in one line. The
+// copy-link control that puts the current VIEW on the clipboard
+// (`tl.viewHref`) is in the position card's Explanation pane — see
 // `CopyViewLink` in `provenance-info-tabs.tsx`.
 
 import { RevealTip } from "@/components/shared/reveal-tip";
@@ -31,7 +33,7 @@ import { lifetimeFiguresKnown } from "@/lib/shared/timeline-opening-balance";
 import { loadedDaysStatement, segmentStatement } from "@/lib/shared/timeline-segments";
 import { TimelineNavigatorPanel, type TimelineMonthReach } from "@/components/shared/timeline-navigator";
 import { useHydrated } from "@/hooks/useHydrated";
-import { FilterPill, PILL_MUTED } from "@/components/shared/filter-bar/filter-pill";
+import { FilterPill, FilterPillReserve, PILL_MUTED } from "@/components/shared/filter-bar/filter-pill";
 import {
   clearTimelineFilters,
   draftAxesView,
@@ -347,6 +349,16 @@ export interface TimelineToolbarProps {
   /** A picture of the strip (the home page's live example): the leading words
    *  and the position's whole count, no controls. */
   still?: boolean;
+  /** The Date pill is held back while the page's Lifetime flows panel reads
+   *  (`timelineDates`, ui-jobs 764): its place stays empty so the row does not
+   *  move when it arrives. */
+  datesHeld?: boolean;
+  /** The page's read of the events past its cut, offered in the Date panel
+   *  where months are not loaded. */
+  loadOlder?: { state: "idle" | "loading" | "failed"; load: () => void };
+  /** The chart's cut as a set pill (L2.1), in the Date pill's slot on a
+   *  timeline the chart ties to (ui-jobs 764). */
+  cutPill?: React.ReactNode;
 }
 
 /**
@@ -545,6 +557,9 @@ export function TimelineToolbar({
   countDetail,
   monthReach,
   still,
+  datesHeld,
+  loadOlder,
+  cutPill,
 }: TimelineToolbarProps) {
   const dateActive = tl.dateRange !== null;
   // The second path (decision 0019, amendment 2026-09-25) sets no
@@ -735,6 +750,8 @@ export function TimelineToolbar({
                   onRemove={clearDate}
                 />
               )}
+              {!tl.datesAxis && datesHeld && <FilterPillReserve name="Date" />}
+              {!tl.datesAxis && cutPill}
               <span className="w-6 shrink-0 sm:hidden" aria-hidden="true" />
             </div>
             <div
@@ -796,7 +813,7 @@ export function TimelineToolbar({
             }
           >
             <div className="px-4 pb-3">
-              <TimelineNavigatorPanel tl={tl} reach={monthReach} onPicked={tl.toggleHeatmap} />
+              <TimelineNavigatorPanel tl={tl} reach={monthReach} onPicked={tl.toggleHeatmap} loadOlder={loadOlder} />
             </div>
           </MobileSheet>
         ) : (
@@ -828,7 +845,7 @@ export function TimelineToolbar({
           // `shadow-xl`, and the border that went with the floating surface:
           // `bg-raised` carries neither.
           <div data-nav-dropdown="" data-anatomy="L1.8" className="mt-2 rounded-xl bg-raised p-3">
-            <TimelineNavigatorPanel tl={tl} reach={monthReach} />
+            <TimelineNavigatorPanel tl={tl} reach={monthReach} loadOlder={loadOlder} />
           </div>
         ))}
     </div>

@@ -244,8 +244,6 @@ export default function MoonwellPositionView({
     storageKey: `moonwell-${wallet}`,
     protocolKey: "moonwell",
     window: historyWindow,
-    // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
-    dates: false,
   });
 
   // Who executed this account's events — the SAME externalActor() verdict each

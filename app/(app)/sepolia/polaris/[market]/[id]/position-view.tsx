@@ -252,8 +252,6 @@ export default function PolarisPositionView({
   const tl = useTimelineEvents(polarisEvents, {
     storageKey: `polaris-${market}-${cdpId}`,
     protocolKey: "polaris",
-    // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
-    dates: false,
   });
 
   // Market notes: the stretches between two of this CDP's own touches where

@@ -219,8 +219,6 @@ export function MorphoBasePositionSection({
     folderParams: { wallet, market: pos.marketId },
     storageKey: `${deployment.session}-${pos.marketId}-${wallet}`,
     protocolKey: "morpho",
-    // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
-    dates: !flowsOn,
   });
 
   const view = useMemo(() => morphoViewFromSweep(pos, wallet, chain), [pos, wallet, chain]);

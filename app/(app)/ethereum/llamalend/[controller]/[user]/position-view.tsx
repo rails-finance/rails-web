@@ -285,8 +285,6 @@ export default function LlamalendPositionView({
     storageKey: `llamalend-${controller}-${user}`,
     protocolKey: "llamalend",
     window: historyWindow,
-    // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
-    dates: false,
   });
 
   // ⚠️ On a windowed page every lifetime surface must read the MERGED history,

@@ -23,10 +23,13 @@
 // (lib/shared/timeline-size.ts). It has its own state beside the date range,
 // and like it never rides localStorage.
 //
-// A page tied to its Lifetime flows chart passes `dates: false`: it has no
-// date range, and `?to=` there is the chart's cut, which the flow-focus store
-// reads and writes (components/shared/flow-focus-context.tsx). This hook then
-// leaves `from` and `to` alone.
+// A timeline whose Lifetime flows chart draws with its cursor tied to it has
+// no date range (rails-ops TO-DO-ui-jobs 764): ChainTruthTimeline says so at
+// runtime through `setTimelineDates`, from what the chart draws
+// (`timelineDates` in lib/shared/timeline-dates.ts). `?to=` there is the
+// chart's cut, which the flow-focus store reads and writes
+// (components/shared/flow-focus-context.tsx), and this hook leaves `from` and
+// `to` alone; once the timeline settles on the pill, a lone `?to=` goes.
 //
 // Every axis is written as what is HIDDEN, never what is shown: a list of
 // hidden keys is the state itself, applies unchanged when a deeper read adds
@@ -89,6 +92,7 @@
 // demand for the toolbar's copy-link control, which is an explicit share act
 // and works on a load where nothing was toggled.
 
+import { withoutLoneTo, type TimelineDates } from "@/lib/shared/timeline-dates";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import {
@@ -257,9 +261,13 @@ export interface TimelineEventsState {
   setSizeRange: (side: SizeSide, values: string[]) => void;
   /** A Type or Size filter is on: what the cut-page notice reads. */
   narrowed: boolean;
-  /** False on a page that navigates by its Lifetime flows chart: no date
+  /** False on a timeline its Lifetime flows chart is tied to: no date
    *  range, and the toolbar draws no Date pill. */
   datesAxis: boolean;
+  /** How the timeline picks a day, as ChainTruthTimeline reads it from what
+   *  the chart draws: `chart` clears the date range and closes the month
+   *  grid, `pill` drops a lone `?to=`. */
+  setTimelineDates: (dates: TimelineDates) => void;
   heatmapOpen: boolean;
   toggleHeatmap: () => void;
 
@@ -380,7 +388,7 @@ const splitList = (s: string | null): string[] | null => (s === null ? null : s.
 function writeViewParams(
   sp: URLSearchParams,
   view: ViewParams,
-  datesAxis: boolean,
+  datesBy: TimelineDates,
   sizeSides: readonly SizeSide[],
 ): void {
   const list = (key: string, values: string[]) => {
@@ -396,14 +404,17 @@ function writeViewParams(
   list("hideAddresses", view.hiddenCounterparties);
   list("hideVersions", view.hiddenVersions);
   writeSizeParams(sp, sizeSides, view.sizeRanges);
-  if (!datesAxis) return;
+  if (datesBy === "chart") return;
   if (view.dateRange) {
     sp.set("from", formatUtcDay(view.dateRange[0]));
     sp.set("to", formatUtcDay(view.dateRange[1]));
-  } else {
+  } else if (datesBy === "pill") {
     sp.delete("from");
     sp.delete("to");
   }
+  // While waiting, `from` and `to` stay as the link has them: a range is
+  // applied once the timeline settles on the pill, and a lone `to` is the
+  // chart's cut, which a page about to tie reads once its chart draws.
 }
 
 /** Read the view back out of `sp`. Each axis is `undefined` when its param is
@@ -438,14 +449,11 @@ export function useTimelineEvents(
     olderCountIsFloor = false,
     servedRows,
     eventsServed,
-    dates = true,
     size,
   }: {
     /** The Size ranges this history offers (ui-jobs 752): Liquity V2's Trove
      *  and Stability Pool deposit. Omitted, the page has no Size. */
     size?: readonly TimelineSizeDim[];
-    /** False on a page tied to its Lifetime flows chart (see the header). */
-    dates?: boolean;
     storageKey?: string;
     protocolKey: string;
     /** The index's own answer as ROWS, in ASCENDING chain order: folders and
@@ -496,6 +504,39 @@ export function useTimelineEvents(
   const sizeSidesKey = sizeDims.map((d) => d.side).join(",");
   const sizeSides = useMemo(() => (sizeSidesKey ? (sizeSidesKey.split(",") as SizeSide[]) : []), [sizeSidesKey]);
   const [heatmapOpen, setHeatmapOpen] = useState(false);
+  // How the timeline picks a day (see the header): no date range while the
+  // chart ties; `waiting` until ChainTruthTimeline has said.
+  const [datesBy, setTimelineDates] = useState<TimelineDates>("waiting");
+  const datesAxis = datesBy !== "chart";
+  // A `?from=&to=` range from the address bar waits for the timeline to
+  // settle: applied on `pill`; on `chart` dropped, and `useRewindParam` takes
+  // its `to` as the chart's cut.
+  const datesByRef = useRef<TimelineDates>(datesBy);
+  datesByRef.current = datesBy;
+  const pendingRange = useRef<[number, number] | null>(null);
+  useEffect(() => {
+    if (datesBy === "chart") {
+      pendingRange.current = null;
+      setDateRange(null);
+      setHeatmapOpen(false);
+      return;
+    }
+    if (datesBy === "pill" && pendingRange.current) {
+      setDateRange(pendingRange.current);
+      pendingRange.current = null;
+    }
+    try {
+      const search = withoutLoneTo(window.location.search, datesBy);
+      if (search != null)
+        window.history.replaceState(
+          window.history.state,
+          "",
+          `${window.location.pathname}${search}${window.location.hash}`,
+        );
+    } catch {
+      /* non-fatal: the stale param stays in the link */
+    }
+  }, [datesBy]);
   const [hydrated, setHydrated] = useState(false);
   // Flips true on the visitor's first live toggle of any view axis — the
   // gate for writing state into the URL. Keeps a silently-restored
@@ -539,14 +580,18 @@ export function useTimelineEvents(
         if (view.hiddenAssets) setHiddenAssets(view.hiddenAssets);
         if (view.hiddenCounterparties) setHiddenCounterparties(view.hiddenCounterparties);
         if (view.hiddenVersions) setHiddenVersions(view.hiddenVersions);
-        if (view.dateRange && dates) setDateRange(view.dateRange);
+        pendingRange.current = null;
+        if (view.dateRange) {
+          if (datesByRef.current === "pill") setDateRange(view.dateRange);
+          else if (datesByRef.current === "waiting") pendingRange.current = view.dateRange;
+        }
         if (view.sizeRanges) setSizeRanges(view.sizeRanges);
       } catch {
         /* malformed query string — keep the storage-derived state */
       }
       setHydrated(true);
     }
-  }, [storageKey, defaultHidden, dates, sizeSides]);
+  }, [storageKey, defaultHidden, sizeSides]);
 
   // Persist after hydration.
   useEffect(() => {
@@ -586,7 +631,7 @@ export function useTimelineEvents(
           dateRange,
           sizeRanges,
         },
-        dates,
+        datesBy,
         sizeSides,
       );
       const next = `${url.pathname}${url.search}${url.hash}`;
@@ -603,7 +648,7 @@ export function useTimelineEvents(
     hiddenVersions,
     dateRange,
     sizeRanges,
-    dates,
+    datesBy,
     sizeSides,
   ]);
 
@@ -620,11 +665,11 @@ export function useTimelineEvents(
         dateRange,
         sizeRanges,
       },
-      dates,
+      datesBy,
       sizeSides,
     );
     return url.toString();
-  }, [hiddenActions, hiddenAssets, hiddenCounterparties, hiddenVersions, dateRange, sizeRanges, dates, sizeSides]);
+  }, [hiddenActions, hiddenAssets, hiddenCounterparties, hiddenVersions, dateRange, sizeRanges, datesBy, sizeSides]);
 
   const hiddenSet = useMemo(() => new Set(hiddenActions), [hiddenActions]);
   const hiddenAssetSet = useMemo(() => new Set(hiddenAssets), [hiddenAssets]);
@@ -1125,7 +1170,8 @@ export function useTimelineEvents(
     sizeRanges,
     setSizeRange,
     narrowed: actionHiddenSet.size > 0 || sizeView != null,
-    datesAxis: dates,
+    datesAxis,
+    setTimelineDates,
     heatmapOpen,
     toggleHeatmap,
     viewHref,

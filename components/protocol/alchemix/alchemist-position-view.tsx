@@ -469,8 +469,6 @@ export function AlchemistPositionView({
     storageKey: `alchemix-${lineKey}-${tokenId}`,
     protocolKey: "alchemix-v3",
     olderCount,
-    // Tied to the Lifetime flows chart where the panel draws (the whole history).
-    dates: olderCount > 0,
   });
 
   const boundary = useMemo(() => {

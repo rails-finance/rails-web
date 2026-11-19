@@ -278,8 +278,6 @@ function MarketSection({
     folderParams: { wallet, market: market.key },
     storageKey: `${d.csvPrefix}-${market.key}-${view.account}`,
     protocolKey: "compound",
-    // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
-    dates: false,
   });
   const sideUsd = cardSideUsd(view);
 

@@ -320,8 +320,6 @@ export default function FluidPositionView({
     storageKey: `fluid-${nftId}`,
     protocolKey: "fluid",
     window: historyWindow,
-    // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
-    dates: !flowsOn,
   });
 
   // The Lifetime flows panel replays the position's whole history

@@ -460,8 +460,6 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
     folderParams: { wallet },
     storageKey: `seamless-${wallet}`,
     protocolKey: "aave-v3",
-    // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
-    dates: false,
   });
 
   // The CSV on a grouped page: the rows in the order the route served them,

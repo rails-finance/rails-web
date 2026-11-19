@@ -183,9 +183,12 @@ export interface TimelineNavigatorPanelProps {
   reach?: TimelineMonthReach;
   /** A month was picked, either path: the panel closes on it. */
   onPicked?: () => void;
+  /** The page's read of the events past its cut, offered where months are
+   *  not loaded (ui-jobs 764). */
+  loadOlder?: { state: "idle" | "loading" | "failed"; load: () => void };
 }
 
-export function TimelineNavigatorPanel({ tl, reach, onPicked }: TimelineNavigatorPanelProps) {
+export function TimelineNavigatorPanel({ tl, reach, onPicked, loadOlder }: TimelineNavigatorPanelProps) {
   const events = tl.visibleEvents;
   const priorDays = tl.historyWindow.opening?.byDay;
   // The served folders' own days. They are part of the WINDOW, not of the
@@ -238,6 +241,10 @@ export function TimelineNavigatorPanel({ tl, reach, onPicked }: TimelineNavigato
         windowDays={folderDays}
         lifeDays={reach?.lifeDays}
         held={held}
+        // Without the index's month read, a month the loaded rows hold in
+        // part refuses the click and says it is not loaded (ui-jobs 764).
+        whole={tl.historyWindow.state === "whole" && tl.olderCount === 0}
+        loadOlder={loadOlder}
         reachMonth={
           reach
             ? (monthIdx) => {

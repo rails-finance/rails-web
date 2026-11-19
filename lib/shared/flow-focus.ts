@@ -35,6 +35,7 @@ import {
   type FlowSide,
 } from "@/lib/shared/flows-timeline";
 import { centsOf, roundAway, shownUsd } from "@/lib/shared/shown-usd";
+import type { FlowsStanding } from "@/lib/shared/timeline-dates";
 
 /** One event of the page as the flow lines read it: the buckets its legs
  *  fill, each in USD at the price its event carries (null where no price). */
@@ -685,6 +686,12 @@ export interface FlowFocusState {
   /** A cut restored from the address bar: the chart's cursor goes to its
    *  day (`endTs`, that day's close) and freezes there. */
   restore: { endTs: number; n: number } | null;
+  /** Where the page's Lifetime flows panel stands: `waiting` while it reads
+   *  the history it draws from, `settled` once it has drawn or found nothing
+   *  to draw, null where no panel has said. The timeline holds back its Date
+   *  pill while it waits, so a page whose chart is about to tie draws none
+   *  (`timelineDates` in lib/shared/timeline-dates.ts). */
+  flows: FlowsStanding;
 }
 
 export interface FlowFocusStore {
@@ -702,6 +709,7 @@ export function createFlowFocusStore(): FlowFocusStore {
     follow: false,
     go: 0,
     restore: null,
+    flows: null,
   };
   const subs = new Set<() => void>();
   return {
