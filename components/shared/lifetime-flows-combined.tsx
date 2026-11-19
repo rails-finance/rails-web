@@ -481,6 +481,11 @@ export interface CombinedFlowsProps {
   /** The price chart alone (the one-day rule, `flowsLife`): no bars, no value
    *  line, no events row or steps, and no tie to the timeline. */
   priceOnly?: boolean;
+  /** The price chart with its events row and its tie to the timeline, no
+   *  bars and no value line: a page that holds no position
+   *  (`FlowTimeline.chartAlone`, a Liquity V2 redeemer). The charts stay
+   *  shown. */
+  chartAlone?: boolean;
   /** A ledger's note while the cursor is off its last stop (Aave V4). */
   onLedgerNote?: (note: string | null) => void;
   /** The plain bars at a stop of `bars` (the scrubber's); `atLive` is the
@@ -497,6 +502,7 @@ export function CombinedFlows({
   prices,
   failed,
   priceOnly = false,
+  chartAlone = false,
   onLedgerNote,
   renderBars,
 }: CombinedFlowsProps) {
@@ -528,7 +534,10 @@ export function CombinedFlows({
   const go = (i: number) => setAt(Math.max(0, Math.min(last, i)));
   // Collapsed, the charts hide; the bars, the events and the steps keep
   // the cursor.
-  const { compact, toggle: viewToggle } = useContext(FlowsCompactContext);
+  const { compact: compactView, toggle: viewToggle } = useContext(FlowsCompactContext);
+  // Bars and the value line are drawn unless the chart stands alone.
+  const noBars = priceOnly || chartAlone;
+  const compact = chartAlone ? false : compactView;
   const [lwAxis, setLwAxis] = useState<FlowsLwAxis | null>(null);
   const lwApi = useRef<FlowsLwApi | null>(null);
   const [lwLink, setLwLink] = useState<FlowsLwLink | null>(null);
@@ -671,8 +680,10 @@ export function CombinedFlows({
   const hasDebt = model.buckets.some((b) => b.side === "debt");
   const closeDay = dayStamp(dayStart(model, model.lastDay));
   const atClose = head.isLive && closed;
+  // The last stop of a closed life, in the family's word where it has one.
+  const closeWord = model.words.close ?? "Close";
   const dateText = atClose
-    ? `At close, ${closeDay}`
+    ? `${model.words.close ?? "At close"}, ${closeDay}`
     : head.isLive
       ? (model.words.live ?? "At the latest block's price")
       : dayStamp(dayStart(model, cur.stop));
@@ -699,7 +710,11 @@ export function CombinedFlows({
   // steps, so the panel restates its figures as the cursor moves.
   const cursor = useMemo(
     () => ({
-      at: atClose ? `at close, ${closeDay}` : head.isLive ? `today (${dayStamp(Date.now() / 1000)})` : `at ${dateText}`,
+      at: atClose
+        ? `${model.words.close ? closeWord.toLowerCase() : "at close"}, ${closeDay}`
+        : head.isLive
+          ? `today (${dayStamp(Date.now() / 1000)})`
+          : `at ${dateText}`,
       prev: stepBack,
       next: stepOn,
       canPrev: eventStep(stops, at, -1) !== at,
@@ -722,7 +737,8 @@ export function CombinedFlows({
   // While the charts are shown, the HTML under and over the chart (the events
   // row, the tips, the stems) takes the chart's axis, which zooms and pans;
   // hidden, or before the chart is drawn, the whole life's.
-  const shown = !compact || priceOnly;
+  // A chart standing alone with no price to draw keeps its events row only.
+  const shown = (!compact || noBars) && !(chartAlone && prices.length === 0);
   const chartAxis = shown ? lwAxis : null;
   const wholeAxis = useMemo(() => lifeAxis(w, startDay, span), [w, startDay, span]);
   const xClose = (day: number) => (chartAxis ? chartAxis.xClose(day) : wholeAxis(Math.min(day, today)));
@@ -757,7 +773,7 @@ export function CombinedFlows({
   };
 
   const valueText = tickHere?.kinds.length ? `${dateLine}: ${tickHere.kinds.join(", ")}` : dateLine;
-  const cursorWord = atClose ? "Close" : head.isLive ? "Today" : dayStamp(dayStart(model, cur.stop));
+  const cursorWord = atClose ? closeWord : head.isLive ? "Today" : dayStamp(dayStart(model, cur.stop));
   const dateProps: CursorDateProps = {
     word: cursorWord,
     byDays,
@@ -785,7 +801,7 @@ export function CombinedFlows({
       <button
         type="button"
         className={btn}
-        aria-label={closed ? `Jump to close, ${closeDay}` : "Jump to today"}
+        aria-label={closed ? `Jump to ${closeWord.toLowerCase()}, ${closeDay}` : "Jump to today"}
         onClick={() => {
           go(last);
           setFrozen(false);
@@ -855,6 +871,7 @@ export function CombinedFlows({
     },
   });
   const priceOnlyHelp = lifetimeFlowsStackContent({ events: null, charts: { value: false, price: priceBrief } });
+  const aloneHelp = lifetimeFlowsStackContent({ events: marks, charts: { value: false, price: priceBrief } });
 
   const barsBlock = (
     <div className="relative" data-flow-combined-bars={outside ? "outside" : "inside"} data-anatomy="F3">
@@ -909,14 +926,27 @@ export function CombinedFlows({
       <SegmentTipContext.Provider value={byDays || null}>
         <div
           className="text-sm"
-          data-flows-combined={priceOnly ? "price" : ""}
+          data-flows-combined={priceOnly ? "price" : chartAlone ? "alone" : ""}
           data-flow-frozen={frozen ? "" : undefined}
         >
-          {!priceOnly && <Steady>{barsBlock}</Steady>}
+          {!noBars && <Steady>{barsBlock}</Steady>}
           {/* The section's heading, its "?" and the charts' button: "Events"
               and "+ Value and price chart" while the charts are hidden,
               "Events with value and prices" and "× Hide charts" while shown. */}
-          {!priceOnly && (
+          {chartAlone && (
+            <div className="flex items-start justify-between gap-3" data-flows-view-row="">
+              <h3
+                className="flex min-h-8 items-center text-sm font-semibold text-rb-500 pointer-coarse:min-h-11"
+                data-flow-events-label=""
+              >
+                {priced ? "Events with prices" : "Events"}
+              </h3>
+              <span className="flex min-h-8 items-center pointer-coarse:min-h-11">
+                <SectionHelp content={aloneHelp} name="the events and the price chart" anatomy="F7.1" />
+              </span>
+            </div>
+          )}
+          {!noBars && (
             <div className="mt-6 flex items-start justify-between gap-3" data-flows-view-row="">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 {/* As tall as the "?" beside it, so the two share a centre
@@ -948,9 +978,9 @@ export function CombinedFlows({
                   time axis and one cursor, which either chart moves. The
                   charts stay mounted while collapsed, so they draw at once
                   on expanding. */}
-                <div className={shown ? "relative" : "hidden"} data-flows-charts={priceOnly ? "price" : "value"}>
+                <div className={shown ? "relative" : "hidden"} data-flows-charts={noBars ? "price" : "value"}>
                   <LwRanges axis={chartAxis} api={lwApi} span={span} cursorDay={cursorDay} />
-                  {!lineReady && !priceOnly && (
+                  {!lineReady && !noBars && (
                     <p className="pointer-events-none absolute inset-x-0 top-10 text-center text-xs text-rb-500">
                       {failed ? "The line could not be read. Reload to try again." : "Reading the line…"}
                     </p>
@@ -964,13 +994,13 @@ export function CombinedFlows({
                     ariaLabel={priced ? `${sliderLabel}, over the ${priced.asset.symbol} price` : sliderLabel}
                     nearestAt={stopAtPx}
                     edge={chartAxis ? chartAxis.plotW : null}
-                    priceOnly={priceOnly}
+                    priceOnly={noBars}
                   >
                     <LifetimeFlowsLw
                       model={model}
                       scale={lineScale}
                       hasDebt={hasDebt}
-                      value={priceOnly ? null : model.sideUnits ? "split" : "one"}
+                      value={noBars ? null : model.sideUnits ? "split" : "one"}
                       priced={priced}
                       priceScale={priced ? priceScales.get(priced.key)! : null}
                       startDay={startDay}
@@ -1016,7 +1046,7 @@ export function CombinedFlows({
                 {/* The events: a row of pips on the time axis, the price
                     chart's cursor line running on down to the date over it. */}
                 <div className={priceOnly ? "hidden" : compact ? "mt-2" : undefined} data-flow-events-section="">
-                  {!compact && <Stem x={cx} w={rowW} />}
+                  {shown && <Stem x={cx} w={rowW} />}
                   <PipRow
                     model={model}
                     xClose={xClose}
@@ -1497,8 +1527,12 @@ function PriceFigures({
           </Prov>
         </span>
       ) : (
-        <span data-price-readout="" data-price-none="">
-          {s.health ? `No ${viewWord(s.asset.symbol)}` : "No price recorded"}
+        <span data-price-readout="" data-price-none={s.unread && day <= s.unread.through ? "unread" : ""}>
+          {s.health
+            ? `No ${viewWord(s.asset.symbol)}`
+            : s.unread && day <= s.unread.through
+              ? s.unread.text
+              : "No price recorded"}
         </span>
       )}
       {showLevel && lv && levelProv && (
