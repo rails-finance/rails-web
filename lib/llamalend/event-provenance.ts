@@ -368,6 +368,9 @@ export const llamaLiqPremiumProv = (
 
 const EVENT_STATE_VIA = "GET /api/chain/llamalend/event-state";
 
+/** Where a read's block is not in hand (ui-jobs 743). */
+const NO_BLOCK = "a block this read does not name";
+
 /** One figure of the position read at one block. */
 export const stateAtBlockProv = (
   figure: string,
@@ -381,15 +384,18 @@ export const stateAtBlockProv = (
   pclass: "state",
   verify: {
     kind: "recompute",
-    text: `Re-run the ${getter} eth_call at ${block != null ? `block ${block}` : "the read's block"} against an archive node; it reproduces this figure exactly.`,
+    text: `Re-run the ${getter} eth_call at ${block != null ? `block ${block}` : NO_BLOCK} against an archive node; it reproduces this figure exactly.`,
   },
-  summary: `${figure}${block != null ? ` at block ${block}` : ""} — ${getter}, read at ${
-    block != null && coords.blockNumber != null && block < coords.blockNumber
-      ? "the block before this event"
-      : "this event's block"
-  }.`,
+  summary:
+    block != null
+      ? `${figure} at block ${block} — ${getter}, read at ${
+          coords.blockNumber != null && block < coords.blockNumber
+            ? "the block before this event"
+            : "this event's block"
+        }.`
+      : `${figure} — ${getter}, read at ${NO_BLOCK}.`,
   contract: controllerOf(coords),
-  via: `${EVENT_STATE_VIA} · ${getter} @ ${block}${raw != null ? ` · raw: ${raw}` : ""}`,
+  via: `${EVENT_STATE_VIA} · ${getter} @ ${block != null ? block : NO_BLOCK}${raw != null ? ` · raw: ${raw}` : ""}`,
   inputs: eventInputs(coords),
 });
 

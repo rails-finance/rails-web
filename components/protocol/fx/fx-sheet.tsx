@@ -466,9 +466,11 @@ export function useFxSheet({
                 : chainBeforeProv("coll", normalizedSymbol, coords, false),
               value: formatExact(collBefore),
             },
-            usd: usdCell(
-              collUsdAt(pool, "Collateral just before this event, in USD", collBefore, price, blockNumber, leg),
-            ),
+            // Held with no price: "—", as the carry rows draw it.
+            usd:
+              usdCell(
+                collUsdAt(pool, "Collateral just before this event, in USD", collBefore, price, blockNumber, leg),
+              ) ?? noFig("Collateral just before this event, in USD"),
             tip: TIPS.collBefore,
           }
         : undefined,

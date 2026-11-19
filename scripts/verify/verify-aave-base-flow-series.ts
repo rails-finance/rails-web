@@ -201,11 +201,31 @@ function assertSharedAnswer(f: Fixture, c: Case, got: Answer, want: Answer): voi
         why: web ? u.why : u.why.replace("priced at the nearest priced row:", "priced at the nearest read:"),
       }))
       .filter((u) => !(web && u.why.startsWith("priced at the last stored close before its day")));
+  // The legs' cents through each day, by bucket and by bucket and token:
+  // the web's running sums are exactly these.
+  const run = new Map<string, number>();
   gd.forEach((day, i) => {
     const want = wd[i];
-    for (const l of (day.legs as { bucket: string; symbol?: string; amount?: number; price?: number | null }[]) ?? []) {
-      for (const key of [l.bucket, `${l.bucket}|${l.symbol}`]) slack.set(key, (slack.get(key) ?? 0) + legSlack(l));
+    for (const l of (day.legs as {
+      bucket: string;
+      symbol?: string;
+      amount?: number;
+      price?: number | null;
+      usd?: number | null;
+    }[]) ?? []) {
+      for (const key of [l.bucket, `${l.bucket}|${l.symbol}`]) {
+        slack.set(key, (slack.get(key) ?? 0) + legSlack(l));
+        run.set(key, centsOf((run.get(key) ?? 0) + (l.usd ?? 0)));
+      }
     }
+    for (const [b, x] of Object.entries((day.cum as Record<string, number>) ?? {}))
+      assert.equal(x, run.get(b) ?? 0, `${c.name} day ${i} cum.${b}: the legs' cents through the day`);
+    for (const x of (day.cumAsset as { bucket: string; symbol: string; usd: number }[]) ?? [])
+      assert.equal(
+        x.usd,
+        run.get(`${x.bucket}|${x.symbol}`) ?? 0,
+        `${c.name} day ${i} cumAsset ${x.symbol} ${x.bucket}: the legs' cents through the day`,
+      );
     // A carried close stands only where the fixture names the day's close.
     const gotU = day.unsure as { side: string; why: string; symbol?: string }[] | undefined;
     const wantU = (want.unsure as typeof gotU) ?? [];

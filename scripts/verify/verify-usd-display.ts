@@ -350,8 +350,8 @@ test("an Aave group with an unread middle member draws no Market move sum", asyn
     notes: [],
   });
   const s0 = state(0, "300000000000", true);
-  const s1 = state(1, "310000000000", false);
-  const s2 = state(2, "320000000000", true);
+  const s1 = state(1, "310000000000", true);
+  const s2 = state(2, "320000000000", false);
   const s3 = state(3, "330000000000", true);
   const sheet = (st: unknown, prev: unknown) =>
     aaveFamilySheet({ state: st as never, prev: prev as never, coords: {} as never, label: "Supply" });
@@ -360,7 +360,8 @@ test("an Aave group with an unread middle member draws no Market move sum", asyn
     { id: "b", timestamp: 2, sheet: sheet(s2, s1) },
     { id: "c", timestamp: 3, sheet: sheet(s3, s2) },
   ];
-  const middle = cards[0].sheet.sides[0].carry.find((r) => r.key === "market");
+  // Read, unread, read: the middle member's account is the unread one.
+  const middle = cards[1].sheet.sides[0].carry.find((r) => r.key === "market");
   assert.equal(middle?.usd?.text, "—", "the unread member's Market move draws —");
   const g = mergeGroupSheet(cards as never, "Supply");
   assert.ok(g, "the group reads as one");
