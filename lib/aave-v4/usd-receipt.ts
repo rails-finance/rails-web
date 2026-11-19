@@ -75,10 +75,16 @@ export function aaveV4UsdReceipt(o: {
   });
   const blocks = [...new Set(live.map((r) => r.price?.block ?? null))];
   const priceBlock = blocks.length === 1 ? blocks[0] : null;
+  // Where the prices stand at several blocks, each row names its own; the
+  // balances' block is still named once.
   const both =
-    o.balanceBlock != null && priceBlock != null && o.balanceBlock !== priceBlock
-      ? `The balances stand at block ${o.balanceBlock.toLocaleString("en-US")} and the prices at block ${priceBlock.toLocaleString("en-US")}.`
-      : "";
+    o.balanceBlock == null
+      ? ""
+      : priceBlock == null && blocks.length > 1
+        ? `The balances stand at block ${o.balanceBlock.toLocaleString("en-US")}.`
+        : priceBlock != null && o.balanceBlock !== priceBlock
+          ? `The balances stand at block ${o.balanceBlock.toLocaleString("en-US")} and the prices at block ${priceBlock.toLocaleString("en-US")}.`
+          : "";
   const caveat = [o.caveat, both, AAVE_V4_FACE_NOTE[o.face]].filter(Boolean).join(" ");
   const { prov, usd } = holderUsdReceipt({
     what: o.what,

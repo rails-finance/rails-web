@@ -173,6 +173,19 @@ test("a line the oracle map leaves out takes its spoke's getReservePrice, its bl
   assert.match(row.note, /getReservePrice\(BTCX\) at block 26,444,812/);
   assert.equal(row.contract.address, "0x99b2b6cea9c3d2fd8f4d90f86741c44b212a6127");
   assert.match(r.prov.summary, /each price at the block its row names/, "two blocks, each named on its row");
+  const withBalances = aaveV4UsdReceipt({
+    what: "x",
+    rows: r.prov
+      ? [
+          { symbol: "BTCX", amount: 0.5, amountNote: "t", price: { usd: p.usd, source: p.source, block: p.block } },
+          { symbol: "WBTC", amount: 0.1, amountNote: "t", price: { usd: 1, source: "iaave-oracle", block: MAP.block } },
+        ]
+      : [],
+    face: "cents",
+    via: "t",
+    balanceBlock: 26_444_800,
+  });
+  assert.match(withBalances.prov.summary, /The balances stand at block 26,444,800\./, "the amounts' block named once");
   assert.equal(rebuild(r.prov), r.usd);
 });
 
